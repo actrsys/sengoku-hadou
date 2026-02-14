@@ -102,6 +102,16 @@
             </div>
         </div>
 
+        <div id="prisoner-modal" class="modal hidden">
+            <div class="modal-content prisoner-content">
+                <h2>捕虜の処遇</h2>
+                <p>捕らえた武将の処遇を決めてください</p>
+                <div id="prisoner-list"></div>
+                <div class="modal-footer">
+                    </div>
+            </div>
+        </div>
+
         <div id="war-modal" class="modal hidden">
             <div class="modal-content war-content">
                 <h2>合戦</h2>
@@ -127,13 +137,7 @@
                     R: <span id="war-round">1</span>/10 | 手番: <span id="war-turn-actor">--</span>
                 </div>
                 <div id="war-log"></div>
-                <div id="war-controls" class="disabled-area">
-                    <button onclick="window.GameApp.execWarCmd('bow')">弓攻撃</button>
-                    <button onclick="window.GameApp.execWarCmd('siege')">攻撃</button>
-                    <button onclick="window.GameApp.execWarCmd('charge')">力攻め</button>
-                    <button onclick="window.GameApp.execWarCmd('scheme')">計略</button>
-                    <button onclick="window.GameApp.execWarCmd('retreat')" class="btn-danger">撤退</button>
-                </div>
+                <div id="war-controls" class="war-controls-area disabled-area"></div>
             </div>
         </div>
     </div>
