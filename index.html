@@ -3,20 +3,26 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>戦国覇道（機能拡張版）</title>
+    <title>戦国覇道</title>
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
-    <div id="app">
+    <div id="title-screen">
+        <div class="title-content">
+            <h1 class="game-title">戦国覇道</h1>
+            <div class="title-menu">
+                <button class="title-btn" onclick="window.GameApp.startNewGame()">はじめから</button>
+                <button class="title-btn" onclick="document.getElementById('load-file-input').click()">続きから</button>
+                <input type="file" id="load-file-input" accept=".json" style="display:none">
+            </div>
+        </div>
+    </div>
+
+    <div id="app" class="hidden">
         <header>
             <h1>戦国覇道</h1>
             <div id="global-status">
-                <span id="date-display">開始前</span>
-                <div class="header-controls">
-                    <input type="file" id="load-file-input" accept=".json" style="display:none">
-                    <button onclick="window.GameApp.saveGameToFile()">ファイル保存</button>
-                    <button onclick="document.getElementById('load-file-input').click()">ファイル読込</button>
-                </div>
+                <span id="date-display">--年 --月</span>
             </div>
         </header>
 
@@ -27,20 +33,20 @@
             </div>
 
             <div id="control-panel" class="panel hidden">
-                <div class="panel-header">
-                    <h2 id="panel-title">城名</h2>
-                    <span id="panel-clan" class="clan-badge">--</span>
-                </div>
-
                 <div id="command-area"></div>
                 <div id="panel-message" class="panel-msg"></div>
                 
                 <hr>
 
+                <div class="panel-header">
+                    <h2 id="panel-title">城名</h2>
+                    <span id="panel-clan" class="clan-badge">--</span>
+                </div>
+
                 <div id="status-container" class="status-list"></div>
 
                 <div id="panel-actions">
-                    <button id="btn-show-bushos" class="action-btn" onclick="window.GameApp.ui.showCastleBushosModal()">武将一覧を見る</button>
+                    <button id="btn-show-bushos" class="action-btn" onclick="window.GameApp.ui.showCastleBushosModal()">武将一覧</button>
                 </div>
             </div>
         </main>
@@ -54,7 +60,7 @@
             <div class="cutin-text" id="cutin-message"></div>
         </div>
 
-        <div id="start-screen" class="modal">
+        <div id="start-screen" class="modal hidden">
             <div class="modal-content start-content">
                 <h2>大名家選択</h2>
                 <p>天下統一を目指す大名家を選んでください</p>
@@ -66,6 +72,7 @@
             <div class="modal-content selector-content">
                 <h2 id="selector-title">選択</h2>
                 <div id="selector-context-info" class="context-info hidden"></div>
+                <div id="selector-header" class="selector-header"></div>
                 <div id="selector-list"></div>
                 <div class="selector-actions">
                     <button id="selector-confirm-btn" class="btn-primary">決定</button>
@@ -87,6 +94,7 @@
 
         <div id="busho-detail-modal" class="modal hidden">
             <div class="modal-content detail-content">
+                <h2 id="busho-modal-title">所属武将</h2>
                 <div id="busho-detail-body"></div>
                 <div class="modal-footer">
                     <button onclick="document.getElementById('busho-detail-modal').classList.add('hidden')" class="btn-secondary">閉じる</button>

@@ -1,5 +1,5 @@
 /**
- * 戦国シミュレーションゲーム - UI刷新・機能強化版
+ * 戦国シミュレーションゲーム - 完全版
  */
 
 /* --- Config & Data --- */
@@ -28,87 +28,82 @@ const CONFIG = {
     }
 };
 
-// 外部データソース設定 (GitHubなどのRaw URLを指定可能)
-// ここではデモ用に空文字にしていますが、URLを入れるとfetchしに行きます
+// 相対パスで定義
 const DATA_SOURCES = {
-    castles: "", // 例: "https://raw.githubusercontent.com/user/repo/main/data/castles.csv"
-    bushos: ""
+    castles: "./data/castles.csv",
+    bushos: "./data/warriors.csv"
 };
 
-// デフォルトデータ (CSV形式のテキストとして保持し、ローダーでパースする例)
+// デフォルトデータ (読み込み失敗時用・IDを5桁化)
 const DEFAULT_CSV_CASTLES = `
 id,name,ownerClan,x,y,castellanId,soldiers,gold,rice,kokudaka,commerce,defense,loyalty,population
-1,魚津城,1,1,0,102,8000,3000,15000,900,600,800,800,20000
-2,春日山城,1,2,0,101,12000,6000,25000,1500,1000,1200,900,30000
-15,新発田城,1,3,0,107,9000,3500,16000,950,700,900,850,22000
-3,稲葉山城,5,0,1,501,11000,5000,20000,1400,1200,1100,700,28000
-4,岩村城,5,1,1,503,7000,2000,12000,700,500,900,600,15000
-5,海津城,2,2,1,202,9000,3500,16000,900,700,1000,800,20000
-6,厩橋城,1,3,1,103,8000,3000,14000,850,800,700,750,18000
-7,清州城,6,0,2,601,11000,5500,22000,1600,1500,1000,850,35000
-8,飯田城,2,1,2,205,7500,2500,13000,750,600,800,700,16000
-9,躑躅ヶ崎館,2,2,2,201,13000,7000,24000,1600,1200,1100,950,32000
-10,河越城,3,3,2,302,8500,3500,17000,1000,900,900,800,21000
-11,名古屋城,6,0,3,603,9000,4000,18000,1100,1400,850,800,24000
-12,曳馬城,4,1,3,402,8000,3000,15000,900,1000,800,700,19000
-13,駿府城,4,2,3,401,12000,9000,28000,1800,2000,1300,900,38000
-14,小田原城,3,3,3,301,15000,8000,30000,2000,1800,2000,950,40000
+1,魚津城,1,1,0,10102,8000,3000,15000,900,600,800,800,20000
+2,春日山城,1,2,0,10101,12000,6000,25000,1500,1000,1200,900,30000
+15,新発田城,1,3,0,10107,9000,3500,16000,950,700,900,850,22000
+3,稲葉山城,5,0,1,10501,11000,5000,20000,1400,1200,1100,700,28000
+4,岩村城,5,1,1,10503,7000,2000,12000,700,500,900,600,15000
+5,海津城,2,2,1,10202,9000,3500,16000,900,700,1000,800,20000
+6,厩橋城,1,3,1,10103,8000,3000,14000,850,800,700,750,18000
+7,清州城,6,0,2,10601,11000,5500,22000,1600,1500,1000,850,35000
+8,飯田城,2,1,2,10205,7500,2500,13000,750,600,800,700,16000
+9,躑躅ヶ崎館,2,2,2,10201,13000,7000,24000,1600,1200,1100,950,32000
+10,河越城,3,3,2,10302,8500,3500,17000,1000,900,900,800,21000
+11,名古屋城,6,0,3,10603,9000,4000,18000,1100,1400,850,800,24000
+12,曳馬城,4,1,3,10402,8000,3000,15000,900,1000,800,700,19000
+13,駿府城,4,2,3,10401,12000,9000,28000,1800,2000,1300,900,38000
+14,小田原城,3,3,3,10301,15000,8000,30000,2000,1800,2000,950,40000
 `.trim();
 
 const DEFAULT_CSV_BUSHOS = `
 id,name,strength,politics,intelligence,charm,loyalty,clan,castleId,isCastellan,personality
-101,上杉謙信,100,60,90,95,100,1,2,true,aggressive
-102,柿崎景家,90,40,50,60,90,1,1,true,aggressive
-103,直江景綱,60,85,80,75,95,1,6,true,balanced
-104,宇佐美定満,70,70,92,70,88,1,2,false,conservative
-107,本庄繁長,88,50,70,65,85,1,15,true,aggressive
-201,武田信玄,95,95,95,98,100,2,9,true,aggressive
-202,高坂昌信,80,80,85,88,92,2,5,true,conservative
-203,山県昌景,92,60,70,75,95,2,9,false,aggressive
-204,山本勘助,60,70,98,60,95,2,5,false,balanced
-205,秋山信友,82,65,75,70,90,2,8,true,balanced
-301,北条氏康,88,95,92,94,100,3,14,true,conservative
-302,北条氏政,70,75,70,75,95,3,10,true,conservative
-303,北条綱成,93,50,60,85,98,3,14,false,aggressive
-401,今川義元,75,90,85,92,100,4,13,true,conservative
-402,朝比奈泰朝,82,60,60,70,90,4,12,true,balanced
-403,太原雪斎,50,98,98,85,100,4,13,false,conservative
-501,斎藤義龍,85,70,75,50,100,5,3,true,aggressive
-502,稲葉一鉄,80,70,80,60,80,5,3,false,balanced
-503,遠山景任,65,60,65,65,85,5,4,true,conservative
-601,織田信長,95,90,92,96,100,6,7,true,aggressive
-602,柴田勝家,96,50,60,75,95,6,7,false,aggressive
-603,佐久間信盛,75,75,70,60,88,6,11,true,conservative
+10001,上杉謙信,100,60,90,95,100,1,2,true,aggressive
+10002,柿崎景家,90,40,50,60,90,1,1,true,aggressive
+10003,直江景綱,60,85,80,75,95,1,6,true,balanced
+10004,宇佐美定満,70,70,92,70,88,1,2,false,conservative
+10007,本庄繁長,88,50,70,65,85,1,15,true,aggressive
+20001,武田信玄,95,95,95,98,100,2,9,true,aggressive
+20002,高坂昌信,80,80,85,88,92,2,5,true,conservative
+20003,山県昌景,92,60,70,75,95,2,9,false,aggressive
+20004,山本勘助,60,70,98,60,95,2,5,false,balanced
+20005,秋山信友,82,65,75,70,90,2,8,true,balanced
+30001,北条氏康,88,95,92,94,100,3,14,true,conservative
+30002,北条氏政,70,75,70,75,95,3,10,true,conservative
+30003,北条綱成,93,50,60,85,98,3,14,false,aggressive
+40001,今川義元,75,90,85,92,100,4,13,true,conservative
+40002,朝比奈泰朝,82,60,60,70,90,4,12,true,balanced
+40003,太原雪斎,50,98,98,85,100,4,13,false,conservative
+50001,斎藤義龍,85,70,75,50,100,5,3,true,aggressive
+50002,稲葉一鉄,80,70,80,60,80,5,3,false,balanced
+50003,遠山景任,65,60,65,65,85,5,4,true,conservative
+60001,織田信長,95,90,92,96,100,6,7,true,aggressive
+60002,柴田勝家,96,50,60,75,95,6,7,false,aggressive
+60003,佐久間信盛,75,75,70,60,88,6,11,true,conservative
 `.trim();
 
-/* --- Data Manager (CSV Loader) --- */
+/* --- Data Manager --- */
 class DataManager {
     static async loadAll() {
         const castles = await this.loadData(DATA_SOURCES.castles, DEFAULT_CSV_CASTLES, Castle);
         const bushos = await this.loadData(DATA_SOURCES.bushos, DEFAULT_CSV_BUSHOS, Busho);
         
-        // CSVでは配列を表現しにくいため、武将データ読み込み後に城のsamuraiIdsを構築
         castles.forEach(c => c.samuraiIds = []);
         bushos.forEach(b => {
             const c = castles.find(castle => castle.id === b.castleId);
             if(c) c.samuraiIds.push(b.id);
         });
         
-        // 雑魚武将の追加生成
         this.generateGenericBushos(bushos, castles);
-
         return { castles, bushos };
     }
 
     static async loadData(url, defaultCsv, ModelClass) {
         let csvText = defaultCsv;
-        if (url) {
-            try {
-                const response = await fetch(url);
-                if (response.ok) csvText = await response.text();
-            } catch(e) {
-                console.warn("External data load failed, using default.", e);
-            }
+        try {
+            const response = await fetch(url);
+            if (response.ok) csvText = await response.text();
+            else console.log(`${url} not found, using default data.`);
+        } catch(e) {
+            console.log(`Fetch failed for ${url}, using default data.`);
         }
         return this.parseCSV(csvText, ModelClass);
     }
@@ -117,16 +112,15 @@ class DataManager {
         const lines = text.split('\n').map(l => l.trim()).filter(l => l);
         const headers = lines[0].split(',');
         const result = [];
-        
         for (let i = 1; i < lines.length; i++) {
             const values = lines[i].split(',');
+            if(values.length < headers.length) continue;
             const data = {};
             headers.forEach((header, index) => {
                 let val = values[index];
-                // 数値変換、真偽値変換
                 if (!isNaN(Number(val)) && val !== "") val = Number(val);
-                if (val === "true") val = true;
-                if (val === "false") val = false;
+                if (val === "true" || val === "TRUE") val = true;
+                if (val === "false" || val === "FALSE") val = false;
                 data[header] = val;
             });
             result.push(new ModelClass(data));
@@ -135,9 +129,9 @@ class DataManager {
     }
 
     static generateGenericBushos(bushos, castles) {
-        const clans = [1,2,3,4,5,6]; // 各勢力ID
+        const clans = [1,2,3,4,5,6];
         const ranks = ["足軽頭", "侍大将", "部将", "家老"];
-        let idCounter = 2000;
+        let idCounter = 20000; // 5桁ID
         
         clans.forEach(clanId => {
             const clanCastles = castles.filter(c => c.ownerClan === clanId);
@@ -153,7 +147,7 @@ class DataManager {
                 
                 const b = new Busho({
                     id: idCounter++,
-                    name: `武将${String.fromCharCode(65+i)}`, // 汎用名
+                    name: `武将${String.fromCharCode(65+i)}`,
                     strength: s, politics: p, intelligence: int, charm: ch,
                     loyalty: 80, clan: clanId, castleId: castle.id, 
                     isCastellan: false, personality: "balanced"
@@ -258,6 +252,7 @@ class UIManager {
         this.selectorModal = document.getElementById('selector-modal');
         this.selectorList = document.getElementById('selector-list');
         this.selectorContextInfo = document.getElementById('selector-context-info');
+        this.selectorHeader = document.getElementById('selector-header');
         this.selectorConfirmBtn = document.getElementById('selector-confirm-btn');
         this.startScreen = document.getElementById('start-screen');
         this.cutinOverlay = document.getElementById('cutin-overlay');
@@ -314,7 +309,6 @@ class UIManager {
         this.mapEl.innerHTML = '';
         document.getElementById('date-display').textContent = `${this.game.year}年 ${this.game.month}月`;
 
-        // ターゲット選択モードか判定
         const isSelectionMode = (this.game.selectionMode !== null);
         if(isSelectionMode) this.mapGuide.classList.remove('hidden');
         else this.mapGuide.classList.add('hidden');
@@ -345,24 +339,21 @@ class UIManager {
             `;
             if(clanData) el.style.borderTop = `5px solid ${clanData.color}`;
 
-            // ターゲット選択モード時の処理
             if (isSelectionMode) {
-                // 有効なターゲットかチェック
                 if (this.game.validTargets.includes(c)) {
                     el.classList.add('selectable-target');
                     el.onclick = () => {
                         this.game.resolveMapSelection(c);
                     };
                 } else {
-                    el.style.opacity = '0.4'; // 対象外は薄く
+                    el.style.opacity = '0.4'; 
                 }
             } else {
-                // 通常時
                 el.onclick = () => {
-                    // 自ターンの城以外クリックで詳細表示
-                    if (!(this.game.getCurrentTurnCastle() === c && c.ownerClan === this.game.playerClanId)) {
-                        this.showCastleInfo(c);
-                    }
+                    // 自ターンの城以外、または自ターン城でもクリックで詳細を見る
+                    // (操作パネルは自ターン時に自動で出るので、ここでは詳細表示に統一する)
+                    // ただし、もし今が手番の城なら「既にパネルが出てる」が、一応詳細閲覧も可能にする
+                    this.showCastleInfo(c);
                 };
             }
             this.mapEl.appendChild(el);
@@ -422,12 +413,12 @@ class UIManager {
             this.cmdArea.appendChild(btn);
         };
 
-        // 括弧書きを削除してシンプルに
         if (this.menuState === 'MAIN') {
-            createBtn("【開発】", "category", () => { this.menuState = 'DEVELOP'; this.renderCommandMenu(); });
-            createBtn("【軍事】", "category", () => { this.menuState = 'MILITARY'; this.renderCommandMenu(); });
-            createBtn("【情報】", "category", () => { this.menuState = 'INFO'; this.renderCommandMenu(); });
-            createBtn("【人事】", "category", () => { this.menuState = 'PERSONNEL'; this.renderCommandMenu(); });
+            createBtn("開発", "category", () => { this.menuState = 'DEVELOP'; this.renderCommandMenu(); });
+            createBtn("軍事", "category", () => { this.menuState = 'MILITARY'; this.renderCommandMenu(); });
+            createBtn("情報", "category", () => { this.menuState = 'INFO'; this.renderCommandMenu(); });
+            createBtn("人事", "category", () => { this.menuState = 'PERSONNEL'; this.renderCommandMenu(); });
+            createBtn("機能", "category", () => { this.menuState = 'SYSTEM'; this.renderCommandMenu(); });
             createBtn("終了", "finish", () => this.game.finishTurn());
         }
         else if (this.menuState === 'DEVELOP') {
@@ -437,22 +428,36 @@ class UIManager {
             createBtn("戻る", "back", () => { this.menuState = 'MAIN'; this.renderCommandMenu(); });
         }
         else if (this.menuState === 'MILITARY') {
-            createBtn("出陣", "", () => this.game.enterMapSelection('war')); // マップ選択へ
+            createBtn("出陣", "", () => this.game.enterMapSelection('war')); 
             createBtn("徴兵", "", () => this.openBushoSelector('draft'));
             createBtn("修復", "", () => this.openBushoSelector('repair'));
-            createBtn("輸送", "", () => this.game.enterMapSelection('transport')); // マップ選択へ
+            createBtn("輸送", "", () => this.game.enterMapSelection('transport')); 
             createBtn("戻る", "back", () => { this.menuState = 'MAIN'; this.renderCommandMenu(); });
         }
         else if (this.menuState === 'INFO') {
-            createBtn("調査", "", () => this.game.enterMapSelection('investigate')); // マップ選択へ
+            createBtn("調査", "", () => this.game.enterMapSelection('investigate')); 
             createBtn("戻る", "back", () => { this.menuState = 'MAIN'; this.renderCommandMenu(); });
         }
         else if (this.menuState === 'PERSONNEL') {
-            createBtn("移動", "", () => this.game.enterMapSelection('move')); // マップ選択へ
+            createBtn("移動", "", () => this.game.enterMapSelection('move'));
             if (!this.currentCastle.castellanId) createBtn("城主任命", "", () => this.openBushoSelector('appoint'));
             createBtn("追放", "", () => this.openBushoSelector('banish'));
             createBtn("戻る", "back", () => { this.menuState = 'MAIN'; this.renderCommandMenu(); });
         }
+        else if (this.menuState === 'SYSTEM') {
+            createBtn("ファイル保存", "", () => window.GameApp.saveGameToFile());
+            createBtn("ファイル読込", "", () => document.getElementById('load-file-input').click());
+            createBtn("戻る", "back", () => { this.menuState = 'MAIN'; this.renderCommandMenu(); });
+        }
+    }
+
+    // キャンセル機能: マップ選択解除してメニューを戻す
+    cancelMapSelection() {
+        this.game.selectionMode = null;
+        this.game.validTargets = [];
+        this.renderMap();
+        this.menuState = 'MAIN';
+        this.renderCommandMenu();
     }
 
     openBushoSelector(actionType, targetId = null) {
@@ -461,19 +466,49 @@ class UIManager {
         this.selectorList.innerHTML = '';
         
         const contextEl = document.getElementById('selector-context-info');
+        const headerEl = document.getElementById('selector-header');
         contextEl.classList.remove('hidden');
+        
         const c = this.currentCastle;
         let infoHtml = "";
-        
-        // 参照数値を表示
-        if (['farm','commerce','charity','repair'].includes(actionType)) {
+        let sortKey = 'strength'; // default
+        let sortLabel = "武力";
+
+        // アクション別の表示・ソート設定
+        if (actionType === 'farm') {
             infoHtml = `<div>金: ${c.gold}</div>`;
+            sortKey = 'politics'; sortLabel = '政治';
+        } else if (actionType === 'commerce') {
+            infoHtml = `<div>金: ${c.gold}</div>`;
+            sortKey = 'politics'; sortLabel = '政治';
+        } else if (actionType === 'charity') {
+            infoHtml = `<div>金: ${c.gold}</div>`;
+            sortKey = 'charm'; sortLabel = '魅力';
+        } else if (actionType === 'repair') {
+            infoHtml = `<div>金: ${c.gold}</div>`;
+            sortKey = 'politics'; sortLabel = '政治';
+        } else if (actionType === 'draft') {
+            infoHtml = `<div>民忠: ${c.loyalty}</div>`;
+            sortKey = 'strength'; sortLabel = '武力';
+        } else if (actionType === 'war_deploy') {
+            sortKey = 'strength'; sortLabel = '武力';
+        } else if (actionType === 'investigate_deploy') {
+            sortKey = 'intelligence'; sortLabel = '知略';
         } else {
             contextEl.classList.add('hidden');
         }
+        
         contextEl.innerHTML = infoHtml;
+        headerEl.innerHTML = `<span>名前</span><span>${sortLabel} (ソート順)</span>`;
 
-        const bushos = this.game.getCastleBushos(this.currentCastle.id);
+        let bushos = this.game.getCastleBushos(this.currentCastle.id);
+        
+        // ソート実行
+        bushos.sort((a,b) => {
+            let valA = a[sortKey], valB = b[sortKey];
+            return valB - valA;
+        });
+
         const isMulti = (actionType === 'war_deploy' || actionType === 'move_deploy'); 
         
         bushos.forEach(b => {
@@ -482,17 +517,19 @@ class UIManager {
             div.className = `select-item ${isDisabled ? 'disabled' : ''}`;
             
             const inputType = isMulti ? 'checkbox' : 'radio';
+            // 表示する能力値
+            const statVal = b[sortKey];
+            
             div.innerHTML = `
                 <input type="${inputType}" name="sel_busho" value="${b.id}" ${isDisabled ? 'disabled' : ''}>
                 <div class="item-detail">
                     <span class="item-main">${b.name} ${b.isCastellan ? '(城主)' : ''}</span>
-                    <span class="item-sub">武:${b.strength} 政:${b.politics} 智:${b.intelligence} 魅:${b.charm} ${isDisabled ? '[済]' : ''}</span>
+                    <span class="item-sub">${sortLabel}: <strong>${statVal}</strong> (武:${b.strength} 政:${b.politics} 智:${b.intelligence} 魅:${b.charm}) ${isDisabled ? '[済]' : ''}</span>
                 </div>
             `;
             if(!isDisabled) {
                 div.onclick = (e) => {
-                    const inp = div.querySelector('input');
-                    if(e.target !== inp) inp.click();
+                    if(e.target.tagName !== 'INPUT') div.querySelector('input').click();
                 };
             }
             this.selectorList.appendChild(div);
@@ -593,20 +630,22 @@ class UIManager {
 
     showCastleBushosModal() {
         if (!this.currentCastle) return;
-        this.showCastleInfo(this.currentCastle, true);
+        this.showBushoList(this.currentCastle);
     }
 
-    showCastleInfo(castle, isModal = false) {
-        const modal = document.getElementById('busho-detail-modal');
+    // マップタップ等から呼ばれる詳細閲覧
+    showCastleInfo(castle) {
+        const modal = document.getElementById('busho-detail-modal'); // 再利用
         const body = document.getElementById('busho-detail-body');
         modal.classList.remove('hidden');
         
+        document.getElementById('busho-modal-title').textContent = "城情報";
+
         const clanData = CLAN_DATA.find(c => c.id === castle.ownerClan);
         let html = `<h3>${castle.name} (${clanData ? clanData.name : '中立'})</h3>`;
         
         const isVisible = this.game.isCastleVisible(castle);
 
-        // 詳細画面もバー表示を利用
         if (isVisible) {
             html += `<div class="status-list" style="max-height:none; margin-bottom:15px;">`;
             const createStatusRow = (label, val, max = null) => {
@@ -624,26 +663,47 @@ class UIManager {
             html += createStatusRow("民忠", castle.loyalty, 1000);
             html += createStatusRow("人口", castle.population);
             html += `</div>`;
+            
+            // 武将一覧を見るボタンを追加
+            html += `<button class="action-btn" onclick="window.GameApp.ui.showBushoListById(${castle.id})">武将一覧を見る</button>`;
+
         } else {
             html += `<p class="panel-msg">情報は不明です（調査が必要です）</p>`;
         }
-
-        html += `<h4>所属武将</h4>`;
-        html += `<div style="max-height:300px; overflow-y:auto;">`;
         
-        if (isVisible) {
-            const bushos = this.game.getCastleBushos(castle.id);
+        body.innerHTML = html;
+    }
+
+    // IDから武将リストを表示（HTML内のonclick用）
+    showBushoListById(castleId) {
+        const castle = this.game.getCastle(castleId);
+        this.showBushoList(castle);
+    }
+
+    showBushoList(castle) {
+        const modal = document.getElementById('busho-detail-modal');
+        const body = document.getElementById('busho-detail-body');
+        modal.classList.remove('hidden');
+        
+        document.getElementById('busho-modal-title').textContent = `${castle.name} 所属武将`;
+        
+        const bushos = this.game.getCastleBushos(castle.id);
+        let html = `<div style="max-height:400px; overflow-y:auto;">`;
+        
+        if (bushos.length > 0) {
             bushos.forEach(b => {
                 html += `
-                    <div style="border-bottom:1px solid #ccc; padding:8px;">
-                        <strong style="font-size:1.1rem;">${b.name}</strong> ${b.isCastellan ? '★' : ''}<br>
-                        武:${b.strength} 政:${b.politics} 智:${b.intelligence} 魅:${b.charm}<br>
+                    <div style="border-bottom:1px solid #ccc; padding:10px;">
+                        <strong style="font-size:1.2rem;">${b.name}</strong> ${b.isCastellan ? '★' : ''}<br>
+                        <span style="color:#666">武:${b.strength} 政:${b.politics} 智:${b.intelligence} 魅:${b.charm}</span><br>
+                        状態: ${b.isActionDone ? '行動済' : '可'}
                     </div>
                 `;
             });
         } else {
-             html += `<div style="padding:10px; color:#666;">？？？</div>`;
+            html += `<div style="padding:10px; color:#666;">所属武将はいません</div>`;
         }
+        
         html += `</div>`;
         body.innerHTML = html;
     }
@@ -661,22 +721,32 @@ class GameManager {
         this.playerClanId = 1;
         this.ui = new UIManager(this);
         this.warState = { active: false };
-        
-        // マップ選択モード用状態
-        this.selectionMode = null; // 'war', 'transport', 'investigate', 'move'
+        this.selectionMode = null; 
         this.validTargets = [];
     }
 
+    // 初期化はここではせず、ボタン押下で呼ぶ
+    startNewGame() {
+        this.boot();
+    }
+
     async boot() {
-        // 非同期でデータロード
         const data = await DataManager.loadAll();
         this.castles = data.castles;
         this.bushos = data.bushos;
         
+        // タイトルを隠す
+        document.getElementById('title-screen').classList.add('hidden');
+        document.getElementById('app').classList.remove('hidden');
+
         this.ui.showStartScreen(CLAN_DATA, (clanId) => {
             this.playerClanId = clanId;
-            this.startMonth();
+            this.init();
         });
+    }
+
+    init() {
+        this.startMonth();
     }
 
     getBusho(id) { return this.bushos.find(b => b.id === id); }
@@ -764,7 +834,7 @@ class GameManager {
     }
 
     finishTurn() {
-        this.selectionMode = null; // ターン終了時にモードリセット
+        this.selectionMode = null; 
         const castle = this.getCurrentTurnCastle();
         if(castle) castle.isDone = true;
         this.currentIndex++;
@@ -809,8 +879,14 @@ class GameManager {
             return;
         }
         
-        // パネルを隠してマップを見やすく
-        // document.getElementById('control-panel').classList.add('hidden');
+        // 戻るボタンを追加したメニューを描画するために、一度メニューを更新
+        this.ui.cmdArea.innerHTML = '';
+        const btn = document.createElement('button');
+        btn.className = 'cmd-btn back';
+        btn.textContent = "キャンセル";
+        btn.onclick = () => this.ui.cancelMapSelection();
+        this.ui.cmdArea.appendChild(btn);
+
         this.ui.renderMap();
     }
 
@@ -819,15 +895,16 @@ class GameManager {
         const actionType = this.selectionMode;
         this.selectionMode = null;
         
-        // document.getElementById('control-panel').classList.remove('hidden');
-        
+        // メニューを元に戻す
+        this.ui.renderCommandMenu();
+
         // コマンド実行用武将選択へ
         if (actionType === 'war') this.ui.openBushoSelector('war_deploy', targetCastle.id);
         else if (actionType === 'move') this.ui.openBushoSelector('move_deploy', targetCastle.id);
         else if (actionType === 'transport') this.ui.openBushoSelector('transport_deploy', targetCastle.id);
         else if (actionType === 'investigate') this.ui.openBushoSelector('investigate_deploy', targetCastle.id);
         
-        this.ui.renderMap(); // ハイライト解除
+        this.ui.renderMap(); 
     }
 
     // --- Command Execution ---
@@ -1195,8 +1272,11 @@ class GameManager {
                 this.playerClanId = d.playerClanId || 1;
                 this.castles = d.castles.map(c => new Castle(c));
                 this.bushos = d.bushos.map(b => new Busho(b));
+                
+                // ロード完了処理
+                document.getElementById('title-screen').classList.add('hidden');
+                document.getElementById('app').classList.remove('hidden');
                 this.startMonth();
-                document.getElementById('start-screen').classList.add('hidden');
                 alert("ロードしました");
             } catch(err) {
                 alert("セーブデータの読み込みに失敗しました");
@@ -1204,10 +1284,7 @@ class GameManager {
         };
         reader.readAsText(file);
     }
-
-    // 後方互換性のため残す
-    saveGame() { this.saveGameToFile(); }
-    loadGame() { document.getElementById('load-file-input').click(); }
 }
 
-window.onload = () => { window.GameApp = new GameManager(); window.GameApp.boot(); };
+// 起動時はタイトル表示のため、インスタンス生成のみ
+window.onload = () => { window.GameApp = new GameManager(); };
