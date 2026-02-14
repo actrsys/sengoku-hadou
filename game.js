@@ -7,30 +7,30 @@ const CONFIG = {
     StartYear: 1560,
     StartMonth: 1,
     Coef: {
-        IncomeGold: 0.5,
-        ConsumeRice: 0.02,
-        ConsumeGoldPerBusho: 50,
-        DevPolitics: 5.0,
-        DraftStr: 5.0,
-        RepairPol: 5.0,
-        CharityCharm: 2.0,
-        BaseDev: 50,
-        BaseDraft: 500,
-        BaseRepair: 100,
-        BaseCharity: 50
+        IncomeGold: 0.5,          // 商業値に対する金収入の倍率
+        ConsumeRice: 0.05,        // 兵士1人あたりの兵糧消費量
+        ConsumeGoldPerBusho: 50,  // 武将1人あたりの俸禄（金消費）
+        DevPolitics: 5.0,         // 政治力1あたりに上昇する開発値（石高・商業）
+        DraftStr: 2.0,            // 武力1あたりに徴兵できる基本兵数
+        RepairPol: 2.0,           // 政治力1あたりに回復する城防御値
+        CharityCharm: 2.0,        // 魅力1あたりに上昇する民忠
+        BaseDev: 10,              // 開発時の基礎上昇値
+        BaseDraft: 100,           // 徴兵時の基礎兵数
+        BaseRepair: 10,          // 修復時の基礎回復値
+        BaseCharity: 10           // 施し時の基礎民忠上昇値
     },
     War: {
-        MaxRounds: 10,
-        SoldierPower: 0.05,
-        WallDefense: 0.5,
-        DefAdvantage: 2.0,
-        WoundedRecovery: 0.2,
-        RetreatRecovery: 0.3,
-        RetreatTurnLimit: 5
+        MaxRounds: 10,            // 戦争の最大ターン数
+        SoldierPower: 0.05,       // 兵士数1が持つ攻撃力への換算係数
+        WallDefense: 0.5,         // 城防御1が持つ防御力への換算係数
+        DefAdvantage: 1.3,        // 防御側（反撃）のダメージ倍率（有利補正）
+        WoundedRecovery: 0.2,     // 戦争終了後に復帰する死亡兵の割合（通常）
+        RetreatRecovery: 0.3,     // 短期撤退時に復帰する死亡兵の割合
+        RetreatTurnLimit: 5       // 短期撤退とみなすターン数未満
     },
     Prisoner: {
-        BaseCaptureRate: 0.4,
-        HireDifficulty: 1.5
+        BaseCaptureRate: 0.4,     // 敗北武将が捕まる基礎確率
+        HireDifficulty: 1.5       // 登用難易度係数（高いほど引き抜きにくい）
     },
     Employ: {
         AmbitionPenalty: 1.0, // 野心による登用難易度
