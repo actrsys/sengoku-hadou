@@ -35,16 +35,12 @@
             <div id="control-panel" class="panel hidden">
                 <div id="command-area"></div>
                 <div id="panel-message" class="panel-msg"></div>
-                
                 <hr>
-
                 <div class="panel-header">
                     <h2 id="panel-title">城名</h2>
                     <span id="panel-clan" class="clan-badge">--</span>
                 </div>
-
                 <div id="status-container" class="status-list"></div>
-
                 <div id="panel-actions">
                     <button id="btn-show-bushos" class="action-btn" onclick="window.GameApp.ui.showCastleBushosModal()">武将・在野一覧</button>
                 </div>
@@ -63,7 +59,6 @@
         <div id="start-screen" class="modal hidden">
             <div class="modal-content start-content">
                 <h2>大名家選択</h2>
-                <p>天下統一を目指す大名家を選んでください</p>
                 <div id="clan-selector"></div>
             </div>
         </div>
@@ -88,6 +83,20 @@
                 <div class="modal-footer">
                     <button id="quantity-confirm-btn" class="btn-primary">実行</button>
                     <button onclick="document.getElementById('quantity-modal').classList.add('hidden')" class="btn-secondary">キャンセル</button>
+                </div>
+            </div>
+        </div>
+
+        <div id="gunshi-modal" class="modal hidden">
+            <div class="modal-content gunshi-content">
+                <h2>軍師の助言</h2>
+                <div class="gunshi-avatar-area">
+                    <div id="gunshi-name" class="gunshi-name">--</div>
+                </div>
+                <p id="gunshi-message" class="gunshi-msg">...</p>
+                <div class="modal-footer">
+                    <button id="gunshi-execute-btn" class="btn-primary">実行</button>
+                    <button onclick="document.getElementById('gunshi-modal').classList.add('hidden')" class="btn-secondary">やめる</button>
                 </div>
             </div>
         </div>

@@ -221,3 +221,16 @@ main {
 /* Result Modal */
 .result-content { max-width: 500px; text-align: center; }
 .result-body { font-size: 1.2rem; margin: 20px 0; line-height: 1.6; }
+
+/* Gunshi Avatar */
+.gunshi-content { text-align: center; max-width: 400px; }
+.gunshi-avatar-area { 
+    background: #eceff1; border-radius: 50%; width: 120px; height: 120px; 
+    margin: 20px auto; display: flex; justify-content: center; align-items: center;
+    border: 4px solid #607d8b;
+}
+.gunshi-name { font-weight: bold; font-size: 1.2rem; }
+.gunshi-msg { 
+    background: #fff3e0; border: 1px solid #ffcc80; padding: 15px; 
+    border-radius: 8px; margin: 20px 0; font-size: 1.1rem; line-height: 1.5;
+}
