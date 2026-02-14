@@ -153,7 +153,7 @@ class UIManager {
                     <div class="param-item"><span>城主</span> <strong>${castellan ? castellan.name : '-'}</strong></div>
                     <div class="param-item"><span>兵数</span> ${c.soldiers}</div>
                     <div class="param-item"><span>金</span> ${c.gold}</div>
-                    <div class="param-item"><span>米</span> ${c.rice}</div>
+                    <div class="param-item"><span>兵糧</span> ${c.rice}</div>
                 </div>
             `;
             // 自分の城、または情報閲覧モードならクリック可能
@@ -210,7 +210,7 @@ class UIManager {
         }
         else if (this.menuState === 'MILITARY') {
             createBtn("出陣 (敵城選択)", "", () => this.openTargetCastleSelector('war'));
-            createBtn("徴兵 (金50/米50)", "", () => this.openBushoSelector('draft'));
+            createBtn("徴兵 (金50/兵糧50)", "", () => this.openBushoSelector('draft'));
             createBtn("城壁修復 (金30)", "", () => this.openBushoSelector('repair'));
             createBtn("戻る", "back", () => { this.menuState = 'MAIN'; this.renderCommandMenu(); });
         }
@@ -319,7 +319,7 @@ class UIManager {
         modal.classList.remove('hidden');
         
         const bushos = this.game.getCastleBushos(castle.id);
-        let html = `<h3>${castle.name} (金:${castle.gold} 米:${castle.rice})</h3>`;
+        let html = `<h3>${castle.name} (金:${castle.gold} 兵糧:${castle.rice})</h3>`;
         html += `<div style="max-height:300px; overflow-y:auto;">`;
         bushos.forEach(b => {
             html += `
