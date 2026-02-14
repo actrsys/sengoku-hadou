@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>戦国覇道（UI刷新・調査機能版）</title>
+    <title>戦国覇道（機能拡張版）</title>
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -13,8 +13,9 @@
             <div id="global-status">
                 <span id="date-display">開始前</span>
                 <div class="header-controls">
-                    <button onclick="window.GameApp.saveGame()">保存</button>
-                    <button onclick="window.GameApp.loadGame()">読込</button>
+                    <input type="file" id="load-file-input" accept=".json" style="display:none">
+                    <button onclick="window.GameApp.saveGameToFile()">ファイル保存</button>
+                    <button onclick="document.getElementById('load-file-input').click()">ファイル読込</button>
                 </div>
             </div>
         </header>
@@ -22,6 +23,7 @@
         <main id="main-view">
             <div id="map-scroll-area">
                 <div id="map-container"></div>
+                <div id="map-guide" class="hidden">対象の城を選択してください</div>
             </div>
 
             <div id="control-panel" class="panel hidden">
@@ -29,18 +31,17 @@
                     <h2 id="panel-title">城名</h2>
                     <span id="panel-clan" class="clan-badge">--</span>
                 </div>
+
+                <div id="command-area"></div>
+                <div id="panel-message" class="panel-msg"></div>
                 
+                <hr>
+
                 <div id="status-container" class="status-list"></div>
 
                 <div id="panel-actions">
                     <button id="btn-show-bushos" class="action-btn" onclick="window.GameApp.ui.showCastleBushosModal()">武将一覧を見る</button>
                 </div>
-
-                <hr>
-
-                <div id="command-area"></div>
-                
-                <div id="panel-message" class="panel-msg"></div>
             </div>
         </main>
 
@@ -86,7 +87,6 @@
 
         <div id="busho-detail-modal" class="modal hidden">
             <div class="modal-content detail-content">
-                <h2>武将・詳細</h2>
                 <div id="busho-detail-body"></div>
                 <div class="modal-footer">
                     <button onclick="document.getElementById('busho-detail-modal').classList.add('hidden')" class="btn-secondary">閉じる</button>
