@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>戦国覇道（AI強化版）</title>
+    <title>戦国覇道（AI強化・新機能版）</title>
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -42,6 +42,14 @@
                     <div class="res-item">
                         <span class="res-label">兵士</span>
                         <span class="res-value" id="panel-soldiers">0</span>
+                    </div>
+                    <div class="res-item">
+                        <span class="res-label">人口</span>
+                        <span class="res-value" id="panel-population">0</span>
+                    </div>
+                    <div class="res-item">
+                        <span class="res-label">民忠</span>
+                        <span class="res-value" id="panel-loyalty">0</span>
                     </div>
                     <div class="res-item">
                         <span class="res-label">防御</span>
@@ -93,6 +101,17 @@
             </div>
         </div>
 
+        <div id="quantity-modal" class="modal hidden">
+            <div class="modal-content quantity-content">
+                <h2 id="quantity-title">数量指定</h2>
+                <div id="quantity-container"></div>
+                <div class="modal-footer">
+                    <button id="quantity-confirm-btn" class="btn-primary">実行</button>
+                    <button onclick="document.getElementById('quantity-modal').classList.add('hidden')" class="btn-secondary">キャンセル</button>
+                </div>
+            </div>
+        </div>
+
         <div id="busho-detail-modal" class="modal hidden">
             <div class="modal-content detail-content">
                 <h2>詳細</h2>
@@ -130,7 +149,7 @@
                 <div id="war-log"></div>
                 <div id="war-controls" class="disabled-area">
                     <button onclick="window.GameApp.execWarCmd('bow')">弓攻撃</button>
-                    <button onclick="window.GameApp.execWarCmd('siege')">城攻め</button>
+                    <button onclick="window.GameApp.execWarCmd('siege')">攻撃</button>
                     <button onclick="window.GameApp.execWarCmd('charge')">力攻め</button>
                     <button onclick="window.GameApp.execWarCmd('scheme')">計略</button>
                     <button onclick="window.GameApp.execWarCmd('retreat')" class="btn-danger">撤退</button>

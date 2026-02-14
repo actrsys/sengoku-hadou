@@ -85,7 +85,6 @@ main {
     transform: scale(1.05);
 }
 
-/* 修正: 行動済みでも勢力色はわかるように、透過と彩度下げのみにする */
 .castle-card.done {
     opacity: 0.6;
     filter: grayscale(0.5) brightness(0.9);
@@ -115,7 +114,7 @@ main {
 }
 .res-item { display: flex; flex-direction: column; align-items: center; }
 .res-label { font-size: 0.7rem; color: #666; }
-.res-value { font-weight: bold; font-size: 1.0rem; }
+.res-value { font-weight: bold; font-size: 0.9rem; }
 
 /* Command Area */
 #command-area { display: grid; gap: 8px; flex: 1; align-content: start; overflow-y: auto; margin-bottom: 10px;}
@@ -177,31 +176,4 @@ main {
     z-index: 2000;
     pointer-events: none;
 }
-.cutin-text {
-    font-size: 2rem; font-weight: bold; color: #fff;
-    text-shadow: 0 0 10px #000;
-    background: rgba(0,0,0,0.8);
-    padding: 20px 40px; border-radius: 10px;
-    border: 2px solid #ff9800;
-    text-align: center; white-space: pre-line;
-}
-.fade-in { animation: fadeIn 0.5s forwards; }
-.fade-out { animation: fadeOut 0.5s forwards; }
-@keyframes fadeIn { from { opacity: 0; transform: scale(0.8); } to { opacity: 1; transform: scale(1); } }
-@keyframes fadeOut { from { opacity: 1; transform: scale(1); } to { opacity: 0; transform: scale(1.2); } }
-
-/* List Item Styles */
-.select-item {
-    display: flex; align-items: center;
-    padding: 8px; border-bottom: 1px solid #eee; cursor: pointer;
-}
-.select-item:hover { background: #f9f9f9; }
-.select-item.disabled { color: #aaa; background: #f0f0f0; cursor: not-allowed; }
-.select-item input { margin-right: 10px; transform: scale(1.2); }
-.item-detail { display: flex; flex-direction: column; }
-.item-main { font-weight: bold; }
-.item-sub { font-size: 0.8rem; color: #666; }
-.selector-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 10px; }
-.btn-primary { background: #1976d2; color: white; border: none; padding: 8px 16px; border-radius: 4px; cursor: pointer; }
-.btn-secondary { background: #78909c; color: white; border: none; padding: 8px 16px; border-radius: 4px; cursor: pointer; }
-.btn-danger { background: #d32f2f; color: white; border: none; padding: 8px 16px; border-radius: 4px; cursor: pointer; }
+.cutin
