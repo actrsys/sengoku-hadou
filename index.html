@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>戦国戦略シミュレーション（完全版）</title>
+    <title>戦国戦略シミュレーション（コマンド版）</title>
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -13,7 +13,6 @@
             <div id="global-status">
                 <span id="date-display">1560年 1月</span>
                 <div class="header-controls">
-                    <button id="next-turn-btn" onclick="window.GameApp.nextTurn()">進行 / パス</button>
                     <button onclick="window.GameApp.saveGame()">セーブ</button>
                     <button onclick="window.GameApp.loadGame()">ロード</button>
                 </div>
@@ -25,7 +24,10 @@
                 </div>
 
             <div id="control-panel" class="panel hidden">
-                <h2 id="panel-title">城名</h2>
+                <div class="panel-header">
+                    <h2 id="panel-title">城名</h2>
+                    <span id="panel-clan" class="clan-badge">--</span>
+                </div>
                 
                 <div class="resource-grid">
                     <div class="res-item">
@@ -46,14 +48,12 @@
                     </div>
                 </div>
 
-                <div class="sub-info">
-                    <button class="info-btn" onclick="window.GameApp.showBushoList()">武将一覧・詳細</button>
-                </div>
-
                 <hr>
-                
-                <div id="action-buttons">
+
+                <div id="command-area">
                     </div>
+                
+                <div id="panel-message" class="panel-msg"></div>
             </div>
         </main>
 
@@ -62,14 +62,22 @@
             <div id="log-content"></div>
         </div>
 
-        <div id="busho-modal" class="modal hidden">
-            <div class="modal-content busho-list-content">
-                <div class="modal-header">
-                    <h2>所属武将一覧</h2>
-                    <button onclick="window.GameApp.closeBushoModal()">閉じる</button>
+        <div id="selector-modal" class="modal hidden">
+            <div class="modal-content selector-content">
+                <h2 id="selector-title">選択してください</h2>
+                <div id="selector-list"></div>
+                <div class="selector-actions">
+                    <button id="selector-confirm-btn" class="btn-primary">決定</button>
+                    <button onclick="window.GameApp.ui.closeSelector()" class="btn-secondary">キャンセル</button>
                 </div>
-                <div id="busho-list-container">
-                    </div>
+            </div>
+        </div>
+
+        <div id="busho-detail-modal" class="modal hidden">
+            <div class="modal-content detail-content">
+                <h2>武将詳細</h2>
+                <div id="busho-detail-body"></div>
+                <button onclick="document.getElementById('busho-detail-modal').classList.add('hidden')" class="btn-secondary">閉じる</button>
             </div>
         </div>
 
@@ -84,9 +92,7 @@
                             <div>兵士: <span id="war-atk-soldier" class="highlight-val"></span></div>
                         </div>
                     </div>
-                    
                     <div class="vs-badge">VS</div>
-
                     <div class="army-box defender">
                         <h3 class="army-title">守備軍: <span id="war-def-name"></span></h3>
                         <div class="army-stats">
@@ -96,13 +102,10 @@
                         </div>
                     </div>
                 </div>
-
                 <div class="war-info-bar">
-                    ラウンド: <span id="war-round">1</span> / 10 | 手番: <span id="war-turn-actor">--</span>
+                    R: <span id="war-round">1</span>/10 | 手番: <span id="war-turn-actor">--</span>
                 </div>
-
                 <div id="war-log"></div>
-
                 <div id="war-controls" class="disabled-area">
                     <button onclick="window.GameApp.execWarCmd('bow')">弓攻撃(小)</button>
                     <button onclick="window.GameApp.execWarCmd('siege')">城攻め(対城)</button>
