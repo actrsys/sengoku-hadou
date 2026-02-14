@@ -1,5 +1,5 @@
 /**
- * 戦国シミュレーションゲーム - 戦闘バランス調整＆新発田城追加版
+ * 戦国シミュレーションゲーム - AI強化＆演出追加版
  */
 
 /* --- Config & Data --- */
@@ -19,11 +19,10 @@ const CONFIG = {
     },
     War: {
         MaxRounds: 10,
-        // 戦闘バランス係数
-        AtkDmgCoef: 1.0,     // 攻撃側の基本ダメージ倍率
-        DefDmgCoef: 2.5,     // 防御側のダメージ倍率（ここを上げて防御有利に）
-        SoldierPower: 0.1,   // 兵士数1あたりの攻撃力
-        WallMitigation: 1.0  // 城防御1あたりのダメージ軽減量
+        AtkDmgCoef: 1.0,
+        DefDmgCoef: 2.5,
+        SoldierPower: 0.1,
+        WallMitigation: 1.0
     }
 };
 
@@ -40,7 +39,7 @@ const MASTER_DATA = {
         // y=0
         { id: 1, name: "魚津城", ownerClan: 1, x: 1, y: 0, castellanId: 102, samuraiIds: [102], soldiers: 800, gold: 300, rice: 1500, kokudaka: 90, commerce: 60, defense: 80 },
         { id: 2, name: "春日山城", ownerClan: 1, x: 2, y: 0, castellanId: 101, samuraiIds: [101, 104], soldiers: 1200, gold: 600, rice: 2500, kokudaka: 150, commerce: 100, defense: 120 },
-        { id: 15, name: "新発田城", ownerClan: 1, x: 3, y: 0, castellanId: 107, samuraiIds: [107], soldiers: 900, gold: 350, rice: 1600, kokudaka: 95, commerce: 70, defense: 90 }, // 追加
+        { id: 15, name: "新発田城", ownerClan: 1, x: 3, y: 0, castellanId: 107, samuraiIds: [107], soldiers: 900, gold: 350, rice: 1600, kokudaka: 95, commerce: 70, defense: 90 },
         // y=1
         { id: 3, name: "稲葉山城", ownerClan: 5, x: 0, y: 1, castellanId: 501, samuraiIds: [501, 502], soldiers: 1100, gold: 500, rice: 2000, kokudaka: 140, commerce: 120, defense: 110 },
         { id: 4, name: "岩村城", ownerClan: 5, x: 1, y: 1, castellanId: 503, samuraiIds: [503], soldiers: 700, gold: 200, rice: 1200, kokudaka: 70, commerce: 50, defense: 90 },
@@ -57,35 +56,36 @@ const MASTER_DATA = {
         { id: 13, name: "駿府城", ownerClan: 4, x: 2, y: 3, castellanId: 401, samuraiIds: [401, 403], soldiers: 1200, gold: 900, rice: 2800, kokudaka: 180, commerce: 200, defense: 130 },
         { id: 14, name: "小田原城", ownerClan: 3, x: 3, y: 3, castellanId: 301, samuraiIds: [301, 303], soldiers: 1500, gold: 800, rice: 3000, kokudaka: 200, commerce: 180, defense: 200 }
     ],
+    // 性格: aggressive, balanced, conservative
     bushos: [
         // Uesugi (1)
-        { id: 101, name: "上杉謙信", strength: 100, politics: 60, intelligence: 90, loyalty: 100, clan: 1, castleId: 2, isCastellan: true },
-        { id: 102, name: "柿崎景家", strength: 90,  politics: 40, intelligence: 50, loyalty: 90,  clan: 1, castleId: 1, isCastellan: true },
-        { id: 103, name: "直江景綱", strength: 60,  politics: 85, intelligence: 80, loyalty: 95,  clan: 1, castleId: 6, isCastellan: true },
-        { id: 104, name: "宇佐美定満", strength: 70, politics: 70, intelligence: 92, loyalty: 88, clan: 1, castleId: 2, isCastellan: false },
-        { id: 107, name: "本庄繁長", strength: 88,  politics: 50, intelligence: 70, loyalty: 85,  clan: 1, castleId: 15, isCastellan: true }, // 追加
+        { id: 101, name: "上杉謙信", strength: 100, politics: 60, intelligence: 90, loyalty: 100, clan: 1, castleId: 2, isCastellan: true, personality: "aggressive" },
+        { id: 102, name: "柿崎景家", strength: 90,  politics: 40, intelligence: 50, loyalty: 90,  clan: 1, castleId: 1, isCastellan: true, personality: "aggressive" },
+        { id: 103, name: "直江景綱", strength: 60,  politics: 85, intelligence: 80, loyalty: 95,  clan: 1, castleId: 6, isCastellan: true, personality: "balanced" },
+        { id: 104, name: "宇佐美定満", strength: 70, politics: 70, intelligence: 92, loyalty: 88, clan: 1, castleId: 2, isCastellan: false, personality: "conservative" },
+        { id: 107, name: "本庄繁長", strength: 88,  politics: 50, intelligence: 70, loyalty: 85,  clan: 1, castleId: 15, isCastellan: true, personality: "aggressive" },
         // Takeda (2)
-        { id: 201, name: "武田信玄", strength: 95,  politics: 95, intelligence: 95, loyalty: 100, clan: 2, castleId: 9, isCastellan: true },
-        { id: 202, name: "高坂昌信", strength: 80,  politics: 80, intelligence: 85, loyalty: 92,  clan: 2, castleId: 5, isCastellan: true },
-        { id: 203, name: "山県昌景", strength: 92,  politics: 60, intelligence: 70, loyalty: 95,  clan: 2, castleId: 9, isCastellan: false },
-        { id: 204, name: "山本勘助", strength: 60,  politics: 70, intelligence: 98, loyalty: 95,  clan: 2, castleId: 5, isCastellan: false },
-        { id: 205, name: "秋山信友", strength: 82,  politics: 65, intelligence: 75, loyalty: 90,  clan: 2, castleId: 8, isCastellan: true },
+        { id: 201, name: "武田信玄", strength: 95,  politics: 95, intelligence: 95, loyalty: 100, clan: 2, castleId: 9, isCastellan: true, personality: "aggressive" },
+        { id: 202, name: "高坂昌信", strength: 80,  politics: 80, intelligence: 85, loyalty: 92,  clan: 2, castleId: 5, isCastellan: true, personality: "conservative" },
+        { id: 203, name: "山県昌景", strength: 92,  politics: 60, intelligence: 70, loyalty: 95,  clan: 2, castleId: 9, isCastellan: false, personality: "aggressive" },
+        { id: 204, name: "山本勘助", strength: 60,  politics: 70, intelligence: 98, loyalty: 95,  clan: 2, castleId: 5, isCastellan: false, personality: "balanced" },
+        { id: 205, name: "秋山信友", strength: 82,  politics: 65, intelligence: 75, loyalty: 90,  clan: 2, castleId: 8, isCastellan: true, personality: "balanced" },
         // Hojo (3)
-        { id: 301, name: "北条氏康", strength: 88,  politics: 95, intelligence: 92, loyalty: 100, clan: 3, castleId: 14, isCastellan: true },
-        { id: 302, name: "北条氏政", strength: 70,  politics: 75, intelligence: 70, loyalty: 95,  clan: 3, castleId: 10, isCastellan: true },
-        { id: 303, name: "北条綱成", strength: 93,  politics: 50, intelligence: 60, loyalty: 98,  clan: 3, castleId: 14, isCastellan: false },
+        { id: 301, name: "北条氏康", strength: 88,  politics: 95, intelligence: 92, loyalty: 100, clan: 3, castleId: 14, isCastellan: true, personality: "conservative" },
+        { id: 302, name: "北条氏政", strength: 70,  politics: 75, intelligence: 70, loyalty: 95,  clan: 3, castleId: 10, isCastellan: true, personality: "conservative" },
+        { id: 303, name: "北条綱成", strength: 93,  politics: 50, intelligence: 60, loyalty: 98,  clan: 3, castleId: 14, isCastellan: false, personality: "aggressive" },
         // Imagawa (4)
-        { id: 401, name: "今川義元", strength: 75,  politics: 90, intelligence: 85, loyalty: 100, clan: 4, castleId: 13, isCastellan: true },
-        { id: 402, name: "朝比奈泰朝", strength: 82, politics: 60, intelligence: 60, loyalty: 90, clan: 4, castleId: 12, isCastellan: true },
-        { id: 403, name: "太原雪斎", strength: 50,  politics: 98, intelligence: 98, loyalty: 100, clan: 4, castleId: 13, isCastellan: false },
+        { id: 401, name: "今川義元", strength: 75,  politics: 90, intelligence: 85, loyalty: 100, clan: 4, castleId: 13, isCastellan: true, personality: "conservative" },
+        { id: 402, name: "朝比奈泰朝", strength: 82, politics: 60, intelligence: 60, loyalty: 90, clan: 4, castleId: 12, isCastellan: true, personality: "balanced" },
+        { id: 403, name: "太原雪斎", strength: 50,  politics: 98, intelligence: 98, loyalty: 100, clan: 4, castleId: 13, isCastellan: false, personality: "conservative" },
         // Saito (5)
-        { id: 501, name: "斎藤義龍", strength: 85,  politics: 70, intelligence: 75, loyalty: 100, clan: 5, castleId: 3, isCastellan: true },
-        { id: 502, name: "稲葉一鉄", strength: 80,  politics: 70, intelligence: 80, loyalty: 80,  clan: 5, castleId: 3, isCastellan: false },
-        { id: 503, name: "遠山景任", strength: 65,  politics: 60, intelligence: 65, loyalty: 85,  clan: 5, castleId: 4, isCastellan: true },
+        { id: 501, name: "斎藤義龍", strength: 85,  politics: 70, intelligence: 75, loyalty: 100, clan: 5, castleId: 3, isCastellan: true, personality: "aggressive" },
+        { id: 502, name: "稲葉一鉄", strength: 80,  politics: 70, intelligence: 80, loyalty: 80,  clan: 5, castleId: 3, isCastellan: false, personality: "balanced" },
+        { id: 503, name: "遠山景任", strength: 65,  politics: 60, intelligence: 65, loyalty: 85,  clan: 5, castleId: 4, isCastellan: true, personality: "conservative" },
         // Oda (6)
-        { id: 601, name: "織田信長", strength: 95,  politics: 90, intelligence: 92, loyalty: 100, clan: 6, castleId: 7, isCastellan: true },
-        { id: 602, name: "柴田勝家", strength: 96,  politics: 50, intelligence: 60, loyalty: 95,  clan: 6, castleId: 7, isCastellan: false },
-        { id: 603, name: "佐久間信盛", strength: 75, politics: 75, intelligence: 70, loyalty: 88, clan: 6, castleId: 11, isCastellan: true }
+        { id: 601, name: "織田信長", strength: 95,  politics: 90, intelligence: 92, loyalty: 100, clan: 6, castleId: 7, isCastellan: true, personality: "aggressive" },
+        { id: 602, name: "柴田勝家", strength: 96,  politics: 50, intelligence: 60, loyalty: 95,  clan: 6, castleId: 7, isCastellan: false, personality: "aggressive" },
+        { id: 603, name: "佐久間信盛", strength: 75, politics: 75, intelligence: 70, loyalty: 88, clan: 6, castleId: 11, isCastellan: true, personality: "conservative" }
     ]
 };
 
@@ -95,6 +95,7 @@ class Busho {
         Object.assign(this, data);
         this.fatigue = 0;
         this.isActionDone = false;
+        if(!this.personality) this.personality = 'balanced';
     }
 }
 class Castle {
@@ -114,14 +115,12 @@ class GameSystem {
     static calcDraft(busho) { return Math.floor(CONFIG.Coef.BaseDraft + (busho.strength * CONFIG.Coef.DraftStr)); }
     static calcRepair(busho) { return Math.floor(CONFIG.Coef.BaseRepair + (busho.politics * CONFIG.Coef.RepairPol)); }
     
-    // 隣接判定
     static isAdjacent(c1, c2) {
         return (Math.abs(c1.x - c2.x) + Math.abs(c1.y - c2.y)) === 1;
     }
 
-    // 戦争用：部隊の最大パラメータ取得
     static getBestStat(bushos, type) {
-        if (!bushos || bushos.length === 0) return 30; // 汎用
+        if (!bushos || bushos.length === 0) return 30;
         let max = 0;
         bushos.forEach(b => {
             const val = (type === 'str') ? b.strength : b.intelligence;
@@ -130,70 +129,44 @@ class GameSystem {
         return max;
     }
 
-    // ダメージ計算（新ロジック）
     static calcWarDamage(atkStats, defStats, atkSoldiers, defSoldiers, defWall, isAttackerTurn, type) {
-        // 基本攻撃力 = (最大武力) + (兵士数 * 係数)
-        // 乱数: 0.8 ~ 1.2
         const rand = 0.8 + (Math.random() * 0.4);
 
         if (isAttackerTurn) {
-            // 攻撃側のターン
-            // 攻撃側の基本ダメージ
             const baseDmg = (atkStats.str + (atkSoldiers * CONFIG.War.SoldierPower)) * CONFIG.War.AtkDmgCoef * rand;
-            
-            // コマンド補正
             let multiplier = 1.0;
             let soldierDmgRate = 1.0;
             let wallDmgRate = 0.0;
 
             switch(type) {
-                case 'bow': multiplier = 0.8; break; // 遠距離は少し弱い
-                case 'charge': multiplier = 1.2; break; // 力攻めは強い
+                case 'bow': multiplier = 0.8; break;
+                case 'charge': multiplier = 1.2; break;
                 case 'siege': 
                     multiplier = 1.0; 
-                    soldierDmgRate = 0.1; // 兵士へのダメージは極小
-                    wallDmgRate = 1.5;    // 城壁へのダメージは大
+                    soldierDmgRate = 0.1;
+                    wallDmgRate = 1.5;
                     break;
-                case 'scheme': 
-                    // 計略は別判定だが、基本ダメージ計算としては知略ベース
-                    // ここでは呼ばれない前提（Manager側で処理）
-                    multiplier = 1.0;
-                    break;
+                case 'scheme': multiplier = 1.0; break;
             }
 
-            // 防御側の軽減 (城防御による軽減)
             const mitigation = defWall * CONFIG.War.WallMitigation;
-            
             let finalDmg = (baseDmg * multiplier) - (mitigation * 0.5); 
-            // ※城防御が高いと攻撃側はダメージを与えにくい
-            if (finalDmg < 10) finalDmg = 10 + Math.random() * 10; // 最低保証
+            if (finalDmg < 10) finalDmg = 10 + Math.random() * 10;
 
             return {
                 soldierDmg: Math.floor(finalDmg * soldierDmgRate),
-                wallDmg: Math.floor(finalDmg * wallDmgRate * 0.5) // 城壁へのダメージ
+                wallDmg: Math.floor(finalDmg * wallDmgRate * 0.5)
             };
 
         } else {
-            // 防御側のターン（反撃）
-            // 防御側は城防御力も攻撃力に加算される（地の利）＆ ダメージ倍率が高い
             const baseDmg = (defStats.str + (defSoldiers * CONFIG.War.SoldierPower) + (defWall * 0.5)) * CONFIG.War.DefDmgCoef * rand;
-            
-            // 攻撃側の防御手段はないため、ダイレクトに受ける
-            return {
-                soldierDmg: Math.floor(baseDmg),
-                wallDmg: 0
-            };
+            return { soldierDmg: Math.floor(baseDmg), wallDmg: 0 };
         }
     }
 
-    // 計略成功判定
     static tryScheme(atkInt, defInt) {
-        // (攻撃側知略 / 防御側知略) * 乱数
         const ratio = (atkInt / (defInt || 1));
         const check = ratio * Math.random(); 
-        // 相手より知略が高ければ成功しやすい。
-        // 例: 90 vs 30 -> ratio=3. random(0~1) -> avg 1.5. Success > 0.6 -> High Chance
-        // 例: 30 vs 90 -> ratio=0.33. random -> avg 0.16. Success > 0.6 -> Very Low
         return check > 0.6;
     }
 }
@@ -213,12 +186,28 @@ class UIManager {
         this.selectorList = document.getElementById('selector-list');
         this.selectorConfirmBtn = document.getElementById('selector-confirm-btn');
         this.startScreen = document.getElementById('start-screen');
+        this.cutinOverlay = document.getElementById('cutin-overlay');
+        this.cutinMessage = document.getElementById('cutin-message');
     }
 
     log(msg) {
         const div = document.createElement('div');
         div.textContent = msg;
         this.logEl.prepend(div);
+    }
+
+    showCutin(msg) {
+        this.cutinMessage.textContent = msg;
+        this.cutinOverlay.classList.remove('hidden');
+        this.cutinOverlay.classList.add('fade-in');
+        setTimeout(() => {
+            this.cutinOverlay.classList.remove('fade-in');
+            this.cutinOverlay.classList.add('fade-out');
+            setTimeout(() => {
+                this.cutinOverlay.classList.add('hidden');
+                this.cutinOverlay.classList.remove('fade-out');
+            }, 500);
+        }, 2000); // 2秒表示
     }
 
     showStartScreen(clans, onSelect) {
@@ -249,7 +238,6 @@ class UIManager {
             el.className = 'castle-card';
             el.dataset.clan = c.ownerClan;
             
-            // Grid
             el.style.setProperty('--c-x', c.x + 1);
             el.style.setProperty('--c-y', c.y + 1);
 
@@ -450,7 +438,7 @@ class UIManager {
                 <div style="border-bottom:1px solid #ccc; padding:5px;">
                     <strong>${b.name}</strong> ${b.isCastellan ? '★' : ''}<br>
                     武:${b.strength} 政:${b.politics} 智:${b.intelligence} 忠:${b.loyalty}<br>
-                    状態: ${b.isActionDone ? '行動済' : '可'}
+                    性格: ${b.personality} / 状態: ${b.isActionDone ? '行動済' : '可'}
                 </div>
             `;
         });
@@ -493,6 +481,12 @@ class GameManager {
 
     startMonth() {
         this.ui.log(`=== ${this.year}年 ${this.month}月 ===`);
+        
+        // 人事異動判定 (3ヶ月に1回)
+        if (this.month % 3 === 0) {
+            this.optimizeCastellans();
+        }
+
         this.castles.forEach(c => {
             if (c.ownerClan === 0) return;
             c.isDone = false;
@@ -509,6 +503,47 @@ class GameManager {
         this.turnQueue = this.castles.filter(c => c.ownerClan !== 0).sort(() => Math.random() - 0.5);
         this.currentIndex = 0;
         this.processTurn();
+    }
+
+    // 城主の最適化ロジック
+    optimizeCastellans() {
+        const clanIds = [...new Set(this.castles.filter(c=>c.ownerClan!==0).map(c=>c.ownerClan))];
+        
+        clanIds.forEach(clanId => {
+            // 大名の知略をチェック
+            // 大名が定義されていない場合は簡易的に平均知略とする
+            let daimyoInt = 50;
+            const myBushos = this.bushos.filter(b => b.clan === clanId);
+            // 本来はDaimyo IDを特定すべきだが、簡易的にその家で一番知略が高い者を参謀役とする
+            if(myBushos.length > 0) {
+                daimyoInt = Math.max(...myBushos.map(b => b.intelligence));
+            }
+
+            // 大名の知略が高いほど、適材適所を行う確率が上がる
+            if (Math.random() * 100 < daimyoInt) {
+                const clanCastles = this.castles.filter(c => c.ownerClan === clanId);
+                clanCastles.forEach(castle => {
+                    const castleBushos = this.getCastleBushos(castle.id);
+                    if (castleBushos.length <= 1) return;
+
+                    // 能力合計（武＋政＋知）が一番高い武将を探す
+                    castleBushos.sort((a, b) => (b.strength + b.politics + b.intelligence) - (a.strength + a.politics + a.intelligence));
+                    const best = castleBushos[0];
+                    
+                    if (best.id !== castle.castellanId) {
+                        // 交代
+                        const old = this.getBusho(castle.castellanId);
+                        if(old) old.isCastellan = false;
+                        best.isCastellan = true;
+                        castle.castellanId = best.id;
+                        // プレイヤーの城ならログを出す
+                        if (clanId === this.playerClanId) {
+                            this.ui.log(`[人事] ${castle.name}の城主を${best.name}に変更しました`);
+                        }
+                    }
+                });
+            }
+        });
     }
 
     processTurn() {
@@ -620,33 +655,103 @@ class GameManager {
         this.ui.renderCommandMenu();
     }
 
+    // AIの思考ルーチン（強化版）
     execAI(castle) {
         const castellan = this.getBusho(castle.castellanId);
         if (castellan && !castellan.isActionDone) {
+            
+            // --- 総合スコア計算 ---
+            let attackDesire = 0; // 攻撃意欲スコア
+            let developDesire = 0; // 内政意欲スコア
+
+            // 1. 性格と能力による基本補正
+            if (castellan.personality === 'aggressive') {
+                attackDesire += 30;
+                developDesire -= 10;
+            } else if (castellan.personality === 'conservative') {
+                attackDesire -= 30;
+                developDesire += 30;
+            } else { // balanced
+                attackDesire += 0;
+                developDesire += 10;
+            }
+
+            // 武力が高いほど攻撃したくなる
+            attackDesire += (castellan.strength * 0.5);
+            // 政治が高いほど内政したくなる
+            developDesire += (castellan.politics * 0.5);
+
+            // 2. 周辺状況の分析
             const enemies = this.castles.filter(c => 
                 c.ownerClan !== 0 && c.ownerClan !== castle.ownerClan &&
                 GameSystem.isAdjacent(castle, c)
             );
 
-            // 慎重になったAI: 兵力が相手の3倍以上ないと攻撃しない
-            if (castle.soldiers > 1000 && enemies.length > 0) {
-                enemies.sort((a,b) => a.soldiers - b.soldiers); // 一番弱い敵を探す
-                const target = enemies[0];
-                if (castle.soldiers > target.soldiers * 3.0) {
-                    castellan.isActionDone = true;
-                    this.startWar(castle, target, [castellan]);
-                    return; 
-                }
+            let bestTarget = null;
+            let maxWarScore = -999;
+
+            if (enemies.length > 0) {
+                enemies.forEach(target => {
+                    // 戦争スコア計算
+                    // (自軍兵士 - 敵兵士)
+                    let diffScore = (castle.soldiers - target.soldiers) / 10; // 差分100人で+10点
+                    
+                    // 知略による判断精度の補正
+                    // 知略が高いと、負け戦（兵力差がマイナス）を重く受け止める
+                    // 知略が低いと、兵力差をあまり気にしない
+                    if (castellan.intelligence > 80) {
+                        if (diffScore < 0) diffScore *= 2.0; // 劣勢を2倍重く見る（慎重）
+                    } else if (castellan.intelligence < 40) {
+                        if (diffScore < 0) diffScore *= 0.5; // 劣勢を半分しか気にしない（無謀）
+                    }
+
+                    // 兵糧チェック (兵糧が少ないとペナルティ)
+                    let ricePenalty = 0;
+                    if (castle.rice < castle.soldiers * 1.5) ricePenalty = 50;
+                    
+                    let warScore = attackDesire + diffScore - ricePenalty;
+                    
+                    // ランダム要素（気分）
+                    warScore += (Math.random() * 20 - 10);
+
+                    if (warScore > maxWarScore) {
+                        maxWarScore = warScore;
+                        bestTarget = target;
+                    }
+                });
             }
-            // 内政
-            if (castle.gold > 100) {
-                if (castle.soldiers < 800 && castle.rice > 100) {
-                    castle.soldiers += 100; castle.gold -= 50; castle.rice -= 50;
-                    this.ui.log(`${castle.name}が徴兵を行いました`);
-                } else {
-                    castle.commerce = Math.min(castle.maxCommerce, castle.commerce + 5); 
-                    castle.gold -= 50;
-                    this.ui.log(`${castle.name}が開発を行いました`);
+
+            // 3. 行動決定
+            // 攻撃スコアが一定以上、かつターゲットがいれば攻撃
+            if (bestTarget && maxWarScore > 60) {
+                // 出陣
+                castellan.isActionDone = true;
+                this.startWar(castle, bestTarget, [castellan]);
+                return;
+            } else {
+                // 内政を行う
+                // 金があれば
+                if (castle.gold > 100) {
+                    // 兵士が少なければ徴兵優先
+                    if (castle.soldiers < 500 && castle.rice > 500) {
+                         castle.soldiers += 100; castle.gold -= 50; castle.rice -= 50;
+                         this.ui.log(`${castle.name}が徴兵を行いました`);
+                    } 
+                    // 政治が高ければ開発
+                    else if (castellan.politics > 60) {
+                        if (castle.commerce < castle.maxCommerce) {
+                            castle.commerce = Math.min(castle.maxCommerce, castle.commerce + 5); 
+                            castle.gold -= 50;
+                            this.ui.log(`${castle.name}が商業開発を行いました`);
+                        } else {
+                            // 金が余ってれば修復など
+                             castle.defense = Math.min(castle.maxDefense, castle.defense + 5);
+                             castle.gold -= 30;
+                             this.ui.log(`${castle.name}が修復を行いました`);
+                        }
+                    } else {
+                        // 特にやることなし（貯蓄）
+                    }
                 }
                 castellan.isActionDone = true;
             }
@@ -655,8 +760,13 @@ class GameManager {
     }
 
     startWar(atkCastle, defCastle, atkBushos) {
-        // CPU同士の戦いかどうか判定
         const isPlayerInvolved = (atkCastle.ownerClan === this.playerClanId || defCastle.ownerClan === this.playerClanId);
+        const atkClan = MASTER_DATA.clans.find(c => c.id === atkCastle.ownerClan);
+        const atkGeneral = atkBushos[0].name;
+
+        // カットイン演出（ポップアップ）
+        const msg = `${atkClan.name}軍の${atkGeneral}が\n${defCastle.name}に攻め込みました！`;
+        this.ui.showCutin(msg);
 
         this.warState = {
             active: true, round: 1, attacker: atkCastle, defender: defCastle,
@@ -666,24 +776,25 @@ class GameManager {
             isPlayerInvolved: isPlayerInvolved
         };
 
-        if (isPlayerInvolved) {
-            const warModal = document.getElementById('war-modal');
-            warModal.classList.remove('hidden');
-            document.getElementById('war-log').innerHTML = '';
-            this.ui.log(`★ ${atkCastle.name}が出陣！ ${defCastle.name}へ攻撃！`);
-            this.updateWarUI();
-            this.processWarRound();
-        } else {
-            // CPUスキップ処理
-            this.ui.log(`[合戦] ${atkCastle.name} vs ${defCastle.name} (結果のみ)`);
-            this.resolveAutoWar();
-        }
+        // 少し待ってから処理開始（カットインを見せるため）
+        setTimeout(() => {
+            if (isPlayerInvolved) {
+                const warModal = document.getElementById('war-modal');
+                warModal.classList.remove('hidden');
+                document.getElementById('war-log').innerHTML = '';
+                this.ui.log(`★ ${atkCastle.name}が出陣！ ${defCastle.name}へ攻撃！`);
+                this.updateWarUI();
+                this.processWarRound();
+            } else {
+                this.ui.log(`[合戦] ${atkCastle.name} vs ${defCastle.name} (結果のみ)`);
+                this.resolveAutoWar();
+            }
+        }, 1500);
     }
 
     resolveAutoWar() {
         const s = this.warState;
         while(s.round <= 10 && s.attacker.soldiers > 0 && s.defender.soldiers > 0 && s.defender.defense > 0) {
-            // 単純化した交互攻撃
             this.resolveWarAction('charge');
             if (s.attacker.soldiers <= 0 || s.defender.soldiers <= 0) break;
         }
@@ -738,11 +849,9 @@ class GameManager {
         const isAtkTurn = (s.turn === 'attacker');
         const target = isAtkTurn ? s.defender : s.attacker;
         
-        // ステータス計算
         let atkStats = { str: GameSystem.getBestStat(s.atkBushos, 'str'), int: GameSystem.getBestStat(s.atkBushos, 'int') };
         let defStats = { str: s.defBusho.strength, int: s.defBusho.intelligence };
 
-        // 計略判定
         if (type === 'scheme') {
             const success = GameSystem.tryScheme(isAtkTurn ? atkStats.int : defStats.int, isAtkTurn ? defStats.int : atkStats.int);
             if (!success) {
@@ -751,14 +860,11 @@ class GameManager {
                     logDiv.textContent = `R${s.round} [${isAtkTurn?'攻':'守'}] 計略失敗！`;
                     document.getElementById('war-log').prepend(logDiv);
                 }
-                // ターン経過
                 this.advanceWarTurn();
                 return;
             }
-            // 成功時はダメージ処理へ
         }
 
-        // ダメージ計算
         const result = GameSystem.calcWarDamage(atkStats, defStats, s.attacker.soldiers, s.defender.soldiers, s.defender.defense, isAtkTurn, type);
         
         target.soldiers = Math.max(0, target.soldiers - result.soldierDmg);
@@ -788,7 +894,6 @@ class GameManager {
             s.round++;
             if(s.round > 10) { this.endWar(false); return; }
         }
-        // スキップモードでなければ次ラウンドUI処理へ
         if (s.isPlayerInvolved) this.processWarRound();
     }
 
