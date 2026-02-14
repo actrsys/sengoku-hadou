@@ -1,48 +1,56 @@
 /**
  * 戦国シミュレーションゲーム (Unity移植対応アーキテクチャ)
+ * Version: Complete
  */
 
-/* --- 0. Data Source (本来は外部JSONファイル) --- */
+/* --- 0. Data Source (Config & Master) --- */
 const MASTER_DATA = {
+    config: {
+        StartYear: 1560,
+        StartMonth: 1,
+        Coef: {
+            IncomeGold: 0.5,
+            ConsumeRice: 0.2,
+            ConsumeGoldPerBusho: 5,
+            Repair: 2.0,
+            DevStats: 5,
+            TradeRate: 1.0 // 金1 = 米1
+        },
+        War: {
+            MaxRounds: 10,
+            DmgStatCoef: 0.5,
+            DmgSoldierCoef: 0.05,
+            LoyaltyWin: 3,
+            LoyaltyLoseAtk: -3,
+            LoyaltyLoseDef: -5
+        }
+    },
+    // 初期データ
     castles: [
-        { id: 1, name: "春日山城", ownerClan: 1, castellanId: 101, samuraiIds: [101, 102], soldiers: 1000, gold: 500, rice: 2000, kokudaka: 120, commerce: 80, defense: 100 },
-        { id: 2, name: "海津城",   ownerClan: 1, castellanId: 103, samuraiIds: [103],      soldiers: 800,  gold: 300, rice: 1500, kokudaka: 80,  commerce: 60, defense: 80 },
-        { id: 3, name: "躑躅ヶ崎館", ownerClan: 2, castellanId: 201, samuraiIds: [201, 202], soldiers: 1200, gold: 600, rice: 2200, kokudaka: 150, commerce: 90, defense: 110 },
-        { id: 4, name: "小田原城", ownerClan: 2, castellanId: 203, samuraiIds: [203],      soldiers: 1500, gold: 800, rice: 3000, kokudaka: 180, commerce: 100, defense: 200 }
+        { id: 1, name: "春日山城", ownerClan: 1, castellanId: 101, samuraiIds: [101, 102, 104], soldiers: 1000, gold: 500, rice: 2000, kokudaka: 120, commerce: 80, defense: 100 },
+        { id: 2, name: "海津城",   ownerClan: 1, castellanId: 103, samuraiIds: [103, 105, 106], soldiers: 800,  gold: 300, rice: 1500, kokudaka: 80,  commerce: 60, defense: 80 },
+        { id: 3, name: "躑躅ヶ崎館", ownerClan: 2, castellanId: 201, samuraiIds: [201, 202, 204], soldiers: 1200, gold: 600, rice: 2200, kokudaka: 150, commerce: 90, defense: 110 },
+        { id: 4, name: "小田原城", ownerClan: 2, castellanId: 203, samuraiIds: [203, 205, 206], soldiers: 1500, gold: 800, rice: 3000, kokudaka: 180, commerce: 100, defense: 200 }
     ],
     bushos: [
         // Clan 1: 上杉
         { id: 101, name: "上杉謙信", strength: 100, politics: 60, intelligence: 90, loyalty: 100, clan: 1, castleId: 1, isCastellan: true },
         { id: 102, name: "柿崎景家", strength: 90,  politics: 40, intelligence: 50, loyalty: 90,  clan: 1, castleId: 1, isCastellan: false },
         { id: 103, name: "直江景綱", strength: 60,  politics: 85, intelligence: 80, loyalty: 95,  clan: 1, castleId: 2, isCastellan: true },
+        { id: 104, name: "宇佐美定満", strength: 70, politics: 70, intelligence: 92, loyalty: 88, clan: 1, castleId: 1, isCastellan: false },
+        { id: 105, name: "甘粕景持", strength: 82, politics: 50, intelligence: 60, loyalty: 85, clan: 1, castleId: 2, isCastellan: false },
+        { id: 106, name: "鬼小島弥太郎", strength: 94, politics: 10, intelligence: 20, loyalty: 80, clan: 1, castleId: 2, isCastellan: false },
         // Clan 2: 武田/北条
         { id: 201, name: "武田信玄", strength: 95,  politics: 95, intelligence: 95, loyalty: 100, clan: 2, castleId: 3, isCastellan: true },
         { id: 202, name: "山県昌景", strength: 88,  politics: 60, intelligence: 70, loyalty: 90,  clan: 2, castleId: 3, isCastellan: false },
-        { id: 203, name: "北条氏康", strength: 85,  politics: 90, intelligence: 90, loyalty: 100, clan: 2, castleId: 4, isCastellan: true }
-    ],
-    config: {
-        StartYear: 1560,
-        StartMonth: 1,
-        // 係数定義
-        Coef: {
-            IncomeGold: 0.5,
-            ConsumeRice: 0.2,
-            ConsumeGoldPerBusho: 5,
-            Repair: 2.0,
-            DevStats: 5 // 開発ごとの上昇値
-        },
-        War: {
-            MaxRounds: 10,
-            DmgStatCoef: 0.5, // 能力値係数
-            DmgSoldierCoef: 0.05, // 兵数係数
-            LoyaltyWin: 3,
-            LoyaltyLoseAtk: -3,
-            LoyaltyLoseDef: -5
-        }
-    }
+        { id: 203, name: "北条氏康", strength: 85,  politics: 90, intelligence: 90, loyalty: 100, clan: 2, castleId: 4, isCastellan: true },
+        { id: 204, name: "山本勘助", strength: 60,  politics: 70, intelligence: 98, loyalty: 95,  clan: 2, castleId: 3, isCastellan: false },
+        { id: 205, name: "北条綱成", strength: 92,  politics: 50, intelligence: 60, loyalty: 95,  clan: 2, castleId: 4, isCastellan: false },
+        { id: 206, name: "風魔小太郎", strength: 80, politics: 20, intelligence: 90, loyalty: 70,  clan: 2, castleId: 4, isCastellan: false }
+    ]
 };
 
-/* --- 1. Models (データ構造定義) --- */
+/* --- 1. Data Models --- */
 
 class BushoModel {
     constructor(data) {
@@ -58,8 +66,7 @@ class BushoModel {
         this.isCastellan = data.isCastellan;
         this.fatigue = 0;
     }
-
-    // 志向性判定プロパティ
+    
     get personality() {
         if (this.strength >= this.politics && this.strength >= this.intelligence) return 'aggressive';
         if (this.politics >= this.strength && this.politics >= this.intelligence) return 'domestic';
@@ -80,47 +87,94 @@ class CastleModel {
         this.kokudaka = data.kokudaka;
         this.commerce = data.commerce;
         this.defense = data.defense;
-        this.maxDefense = data.defense; // 初期値を最大とする
-        this.isDone = false; // ターン行動済みフラグ
+        this.maxDefense = data.defense;
+        this.isDone = false;
     }
 }
 
-/* --- 2. Systems (純粋関数・ロジック計算) --- */
+/* --- 2. Systems (Logic) --- */
 
 class InternalAffairsSystem {
-    // 開発計算
     static develop(castle, type) {
         const cost = 50;
-        if (castle.gold < cost) return false;
+        if (castle.gold < cost) return { success: false, msg: "金が足りません" };
 
-        castle.gold -= cost;
-        if (type === 'commerce') castle.commerce += MASTER_DATA.config.Coef.DevStats;
-        if (type === 'farm') castle.kokudaka += MASTER_DATA.config.Coef.DevStats;
-        return true;
+        castle.gold = Math.max(0, castle.gold - cost);
+        if (type === 'commerce') {
+            castle.commerce += MASTER_DATA.config.Coef.DevStats;
+            return { success: true, msg: "商業が発展しました" };
+        }
+        if (type === 'farm') {
+            castle.kokudaka += MASTER_DATA.config.Coef.DevStats;
+            return { success: true, msg: "石高が増えました" };
+        }
+        return { success: false, msg: "不明な開発タイプ" };
     }
 
-    // 徴兵
     static draft(castle) {
         const goldCost = 50;
         const riceCost = 50;
-        if (castle.gold < goldCost || castle.rice < riceCost) return false;
+        if (castle.gold < goldCost || castle.rice < riceCost) return { success: false, msg: "金か米が足りません" };
 
-        castle.gold -= goldCost;
-        castle.rice -= riceCost;
+        castle.gold = Math.max(0, castle.gold - goldCost);
+        castle.rice = Math.max(0, castle.rice - riceCost);
         castle.soldiers += 100;
-        return true;
+        return { success: true, msg: "兵士を100名徴兵しました" };
     }
 
-    // 月次資源計算
+    static trade(castle, type) {
+        // type: 'buy_rice' (金->米), 'sell_rice' (米->金)
+        // レートは等価交換とする
+        const amount = 100;
+        if (type === 'buy_rice') {
+            if (castle.gold < amount) return { success: false, msg: "金が足りません" };
+            castle.gold -= amount;
+            castle.rice += amount;
+            return { success: true, msg: "米を100購入しました" };
+        } else {
+            if (castle.rice < amount) return { success: false, msg: "米が足りません" };
+            castle.rice -= amount;
+            castle.gold += amount;
+            return { success: true, msg: "米を100売却しました" };
+        }
+    }
+
+    static repair(castle) {
+        const cost = 30;
+        if (castle.gold < cost) return { success: false, msg: "金が足りません" };
+        
+        // 内政値依存で回復
+        const castellan = window.GameApp.manager.getCastellan(castle.id);
+        const pol = castellan ? castellan.politics : 10;
+        const recover = Math.floor(pol * 0.5) + 10;
+
+        castle.gold -= cost;
+        castle.defense = Math.min(castle.maxDefense, castle.defense + recover);
+        return { success: true, msg: `城壁を修復しました (+${recover})` };
+    }
+
+    static moveBusho(sourceCastle, bushoId, targetCastleId) {
+        // 簡易実装：指定武将をターゲット城へ移動
+        // 城主は移動不可とする（簡単のため）
+        const busho = window.GameApp.manager.getBusho(bushoId);
+        if (busho.isCastellan) return { success: false, msg: "城主は移動できません" };
+
+        // 所属変更
+        sourceCastle.samuraiIds = sourceCastle.samuraiIds.filter(id => id !== bushoId);
+        const targetCastle = window.GameApp.manager.getCastle(targetCastleId);
+        targetCastle.samuraiIds.push(bushoId);
+        busho.castleId = targetCastleId;
+
+        return { success: true, msg: `${busho.name}が${targetCastle.name}へ移動しました` };
+    }
+
     static calcMonthlyResources(castle, bushoCount, month) {
-        // 収入
         let goldIn = Math.floor(castle.commerce * MASTER_DATA.config.Coef.IncomeGold);
         if (month === 3) goldIn += 100;
         
         let riceIn = 0;
         if (month === 9) riceIn = castle.kokudaka * 10;
 
-        // 支出
         const riceOut = Math.floor(castle.soldiers * MASTER_DATA.config.Coef.ConsumeRice);
         const goldOut = bushoCount * MASTER_DATA.config.Coef.ConsumeGoldPerBusho;
 
@@ -129,21 +183,19 @@ class InternalAffairsSystem {
 }
 
 class WarSystem {
-    // ダメージ計算式
     static calculateDamage(atkBusho, atkSoldiers, type) {
         // type: bow(小), siege(中), charge(大), scheme(計略)
-        let baseDmg = (atkBusho.strength * MASTER_DATA.config.Coef.War.DmgStatCoef) +
-                      (atkSoldiers * MASTER_DATA.config.Coef.War.DmgSoldierCoef);
+        let baseDmg = (atkBusho.strength * MASTER_DATA.config.War.DmgStatCoef) +
+                      (atkSoldiers * MASTER_DATA.config.War.DmgSoldierCoef);
         
         let multiplier = 1.0;
-        let variance = Math.random() * 10; // 0-10の乱数
+        let variance = Math.random() * 10;
 
         switch(type) {
             case 'bow': multiplier = 0.6; break;
             case 'siege': multiplier = 0.8; break; // 対城壁用
             case 'charge': multiplier = 1.2; break;
             case 'scheme': 
-                // 計略は智謀依存
                 baseDmg = (atkBusho.intelligence * 1.5); 
                 multiplier = 1.0; 
                 break;
@@ -154,77 +206,73 @@ class WarSystem {
 }
 
 class AISystem {
-    static decideStrategyAction(castle, busho, enemies) {
-        // 1. 戦争スコア計算
+    static decideStrategy(castle, busho, enemies) {
+        // 戦争するかどうか
         let bestTarget = null;
         let maxScore = -9999;
 
-        // 簡易判断: 兵士数が十分で、かつ隣接(全敵)の中で一番弱い所を狙う
         enemies.forEach(enemy => {
             let score = (busho.strength) - (enemy.soldiers * 0.1);
-            if (castle.rice < castle.soldiers * 0.5) score -= 50; // 兵糧不安
-
+            if (castle.rice < castle.soldiers * 0.5) score -= 50; 
             if (score > maxScore) {
                 maxScore = score;
                 bestTarget = enemy;
             }
         });
 
-        // 閾値を超えたら戦争
         if (maxScore > 50 && bestTarget) {
             return { type: 'war', targetId: bestTarget.id };
         }
 
-        // 2. 内政判断 (性格依存)
-        if (busho.personality === 'domestic') {
-            return { type: 'farm' };
-        } else if (busho.personality === 'aggressive') {
+        // 内政行動
+        if (busho.personality === 'domestic') return { type: 'farm' };
+        if (busho.personality === 'aggressive') {
             if (castle.gold > 50 && castle.rice > 100) return { type: 'draft' };
             return { type: 'commerce' };
-        } else {
-            // 分析家はバランス型
-            return castle.commerce < castle.kokudaka ? { type: 'commerce' } : { type: 'farm' };
         }
+        return castle.commerce < castle.kokudaka ? { type: 'commerce' } : { type: 'farm' };
     }
 
-    static decideTacticalCommand(situation) {
-        // 戦闘中のAIコマンド選択
+    static decideTactics(situation, isAttacker) {
         const mySoldiers = situation.me.soldiers;
         const enemySoldiers = situation.enemy.soldiers;
         const enemyWall = situation.enemy.defense;
 
-        // 兵数が少ないなら弓で削る
+        // 兵数が少ないなら弓
         if (mySoldiers < enemySoldiers * 0.5) return 'bow';
         
-        // 敵の城壁が薄いなら城攻め
-        if (enemyWall < 50) return 'siege';
+        // 攻撃側で敵の城壁が薄いなら城攻め
+        if (isAttacker && enemyWall < 50) return 'siege';
+        
+        // 防御側で城壁減ってるなら力攻めで敵兵を減らす優先
+        if (!isAttacker && situation.me.defense < 30) return 'charge';
 
         // それ以外は力攻め
         return 'charge';
     }
 }
 
-/* --- 3. Managers (状態管理) --- */
+/* --- 3. GameManager (Controller) --- */
 
 class GameManager {
     constructor() {
-        this.year = MASTER_DATA.config.StartYear;
-        this.month = MASTER_DATA.config.StartMonth;
+        this.year = 0;
+        this.month = 0;
         this.castles = [];
         this.bushos = [];
-        this.turnOrder = [];
-        this.currentTurnIndex = 0;
+        this.turnQueue = [];
+        this.currentIndex = 0;
         this.isPlayerTurn = false;
         
-        // 戦争状態
-        this.warState = null; 
-
-        this.loadInitialData();
+        this.warState = { active: false };
     }
 
-    loadInitialData() {
+    init() {
+        this.year = MASTER_DATA.config.StartYear;
+        this.month = MASTER_DATA.config.StartMonth;
         this.castles = MASTER_DATA.castles.map(d => new CastleModel(d));
         this.bushos = MASTER_DATA.bushos.map(d => new BushoModel(d));
+        this.startMonth();
     }
 
     getCastle(id) { return this.castles.find(c => c.id === id); }
@@ -233,45 +281,51 @@ class GameManager {
         const c = this.getCastle(castleId);
         return this.bushos.find(b => b.id === c.castellanId);
     }
+    getCastleBushos(castleId) {
+        const c = this.getCastle(castleId);
+        return c.samuraiIds.map(id => this.getBusho(id));
+    }
 
-    // 月初処理
+    /* --- Flow Control --- */
+
     startMonth() {
         UIManager.log(`=== ${this.year}年 ${this.month}月 ===`);
         
-        // 資源増減
         this.castles.forEach(c => {
+            if (c.ownerClan === 0) return; // 滅亡済みはスキップ
+
             const bushoCount = c.samuraiIds.length;
             const res = InternalAffairsSystem.calcMonthlyResources(c, bushoCount, this.month);
             
-            c.gold += res.goldIn - res.goldOut;
-            c.rice += res.riceIn - res.riceOut;
+            c.gold = Math.max(0, c.gold + res.goldIn - res.goldOut);
+            c.rice = Math.max(0, c.rice + res.riceIn - res.riceOut);
             c.isDone = false;
+            
+            // 忠誠度回復（城主）
+            const castellan = this.getCastellan(c.id);
+            if(castellan) castellan.loyalty = Math.min(100, castellan.loyalty + 5);
         });
 
-        // 順番決め (ランダム)
-        this.turnOrder = [...this.castles].sort(() => Math.random() - 0.5);
-        this.currentTurnIndex = -1; // nextTurnで0になる
+        // ランダム順決定
+        this.turnQueue = this.castles.filter(c => c.ownerClan !== 0).sort(() => Math.random() - 0.5);
+        this.currentIndex = -1;
 
         this.nextTurn();
     }
 
-    // ターン進行
     nextTurn() {
-        // 戦争中なら無視
-        if (this.warState && this.warState.active) return;
+        if (this.warState.active) return; // 戦争中は進行不可
 
-        this.currentTurnIndex++;
+        this.currentIndex++;
 
-        // 月終了判定
-        if (this.currentTurnIndex >= this.turnOrder.length) {
+        if (this.currentIndex >= this.turnQueue.length) {
             this.endMonth();
             return;
         }
 
-        const currentCastle = this.turnOrder[this.currentTurnIndex];
+        const currentCastle = this.turnQueue[this.currentIndex];
         
-        // 滅亡済み or 行動済みならスキップ
-        if (currentCastle.ownerClan === 0 || currentCastle.isDone) {
+        if (currentCastle.isDone) {
             this.nextTurn();
             return;
         }
@@ -279,74 +333,73 @@ class GameManager {
         UIManager.renderMap();
         UIManager.highlightCastle(currentCastle.id);
 
-        // プレイヤー判定 (Clan 1をプレイヤーとする)
         if (currentCastle.ownerClan === 1) {
             this.isPlayerTurn = true;
-            UIManager.log(`${currentCastle.name} (自軍) の手番です。`);
+            UIManager.log(`${currentCastle.name} (自軍) の手番です`);
             UIManager.showControlPanel(currentCastle);
         } else {
             this.isPlayerTurn = false;
             UIManager.log(`${currentCastle.name} (敵軍) 思考中...`);
             UIManager.hideControlPanel();
-            setTimeout(() => this.execAI(currentCastle), 1000); // 演出用ウェイト
+            setTimeout(() => this.execAI(currentCastle), 800);
         }
     }
 
-    // AI実行
+    /* --- Actions --- */
+
+    execAction(type, targetId = null) {
+        const castle = this.turnQueue[this.currentIndex];
+        let res = { success: false, msg: "" };
+
+        switch(type) {
+            case 'commerce': res = InternalAffairsSystem.develop(castle, 'commerce'); break;
+            case 'farm': res = InternalAffairsSystem.develop(castle, 'farm'); break;
+            case 'draft': res = InternalAffairsSystem.draft(castle); break;
+            case 'buy_rice': res = InternalAffairsSystem.trade(castle, 'buy_rice'); break;
+            case 'sell_rice': res = InternalAffairsSystem.trade(castle, 'sell_rice'); break;
+            case 'repair': res = InternalAffairsSystem.repair(castle); break;
+            case 'move':
+                // 簡易実装：配下の一人を別の自分の城へ送る
+                const subordinate = castle.samuraiIds.find(id => id !== castle.castellanId);
+                const targetC = this.castles.find(c => c.ownerClan === castle.ownerClan && c.id !== castle.id);
+                if (!subordinate) res = { success: false, msg: "配下の武将がいません" };
+                else if (!targetC) res = { success: false, msg: "移動先の城がありません" };
+                else res = InternalAffairsSystem.moveBusho(castle, subordinate, targetC.id);
+                break;
+            case 'wait': res = { success: true, msg: "待機しました" }; break;
+            case 'war': 
+                const enemy = this.getCastle(targetId);
+                this.startWar(castle, enemy);
+                return; // 戦争開始したらターン終了処理は戦争終了後
+        }
+
+        if (res.success) {
+            UIManager.log(`[${castle.name}] ${res.msg}`);
+            castle.isDone = true;
+            UIManager.renderMap();
+            if (this.isPlayerTurn) {
+                UIManager.hideControlPanel();
+                this.nextTurn();
+            }
+        } else {
+            if (this.isPlayerTurn) alert(res.msg);
+        }
+    }
+
     execAI(castle) {
         const busho = this.getCastellan(castle.id);
         const enemies = this.castles.filter(c => c.ownerClan !== 0 && c.ownerClan !== castle.ownerClan);
         
-        const action = AISystem.decideStrategyAction(castle, busho, enemies);
-        
+        const action = AISystem.decideStrategy(castle, busho, enemies);
         if (action.type === 'war') {
-            const target = this.getCastle(action.targetId);
-            this.startWar(castle, target);
+            this.execAction('war', action.targetId);
         } else {
-            this.executeDomestic(castle, action.type);
-            this.nextTurn();
+            this.execAction(action.type);
         }
     }
 
-    // プレイヤー行動実行
-    executeDomestic(castle, type) {
-        let msg = "";
-        let success = false;
+    /* --- War System (Async / Round Based) --- */
 
-        switch(type) {
-            case 'commerce':
-                success = InternalAffairsSystem.develop(castle, 'commerce');
-                msg = success ? "商業を開発しました。" : "資金が足りません。";
-                break;
-            case 'farm':
-                success = InternalAffairsSystem.develop(castle, 'farm');
-                msg = success ? "石高を開発しました。" : "資金が足りません。";
-                break;
-            case 'draft':
-                success = InternalAffairsSystem.draft(castle);
-                msg = success ? "徴兵を行いました。" : "資源が足りません。";
-                break;
-            case 'wait':
-                success = true;
-                msg = "待機しました。";
-                break;
-        }
-
-        if (success) {
-            castle.isDone = true;
-            UIManager.log(`[${castle.name}] ${msg}`);
-            if (this.isPlayerTurn) {
-                UIManager.hideControlPanel();
-                // プレイヤーの場合、手動で「次へ」を押してもらうか、自動で進むか。
-                // ここでは自動で進める
-                this.nextTurn();
-            }
-        } else {
-            if (this.isPlayerTurn) alert(msg);
-        }
-    }
-
-    // --- 戦争システム (ラウンド制) ---
     startWar(atkCastle, defCastle) {
         UIManager.log(`★ 合戦開始！ ${atkCastle.name} vs ${defCastle.name}`);
         
@@ -359,129 +412,163 @@ class GameManager {
             attacker: atkCastle,
             defender: defCastle,
             atkBusho: atkBusho,
-            defBusho: defBusho
+            defBusho: defBusho,
+            turn: 'defender' // 要件：防御側が先
         };
 
         UIManager.showWarModal(this.warState);
+        this.nextWarStep();
+    }
 
-        // プレイヤーが攻撃側ならコマンド待ち、そうでなければAI開始
-        if (atkCastle.ownerClan === 1) {
+    nextWarStep() {
+        if (!this.warState.active) return;
+        
+        // 決着判定
+        if (this.checkWarEnd()) return;
+
+        // ラウンド更新
+        UIManager.updateWarModal(this.warState);
+
+        const { turn, attacker, defender } = this.warState;
+        const currentActor = (turn === 'attacker') ? attacker : defender;
+        const isPlayer = (currentActor.ownerClan === 1);
+
+        document.getElementById('war-turn-actor').textContent = isPlayer ? "自軍 (コマンド選択)" : "敵軍 (思考中)";
+
+        if (isPlayer) {
             UIManager.enableWarButtons(true);
         } else {
             UIManager.enableWarButtons(false);
-            setTimeout(() => this.processWarRoundAI(), 1000);
+            setTimeout(() => this.execWarAI(), 1000);
         }
     }
 
-    // プレイヤーがコマンド選択したときに呼ばれる
-    executeWarCommand(cmdType) {
-        if (!this.warState.active) return;
-        this.resolveRound(cmdType);
+    execWarAI() {
+        const { turn, attacker, defender } = this.warState;
+        const isAtk = (turn === 'attacker');
+        const me = isAtk ? attacker : defender;
+        const enemy = isAtk ? defender : attacker;
+        
+        const cmd = AISystem.decideTactics({ me, enemy }, isAtk);
+        this.resolveWarAction(cmd);
     }
 
-    // AI同士 または AI攻撃の場合
-    processWarRoundAI() {
+    // プレイヤーがボタンを押した時
+    execWarCmd(cmd) {
         if (!this.warState.active) return;
-        // 攻撃側AIの判断
-        const cmd = AISystem.decideTacticalCommand({
-            me: this.warState.attacker, 
-            enemy: this.warState.defender
-        });
-        this.resolveRound(cmd);
+        this.resolveWarAction(cmd);
     }
 
-    // ラウンド解決 (共通)
-    resolveRound(atkCmd) {
-        const { attacker, defender, atkBusho, defBusho } = this.warState;
+    resolveWarAction(cmd) {
+        const { turn, attacker, defender, atkBusho, defBusho, round } = this.warState;
         
-        // 1. 攻撃側の行動
-        const dmgToDef = WarSystem.calculateDamage(atkBusho, attacker.soldiers, atkCmd);
+        if (cmd === 'retreat') {
+            UIManager.logWar(`${turn === 'attacker' ? '攻撃側' : '防御側'}が撤退しました`);
+            // 撤退は即敗北
+            if (turn === 'attacker') this.endWar(false); // 攻撃側敗北
+            else this.endWar(true); // 防御側敗北（=攻撃側勝利）
+            return;
+        }
+
+        const isAtk = (turn === 'attacker');
+        const actor = isAtk ? attacker : defender;
+        const target = isAtk ? defender : attacker;
+        const actorBusho = isAtk ? atkBusho : defBusho;
+
+        const dmg = WarSystem.calculateDamage(actorBusho, actor.soldiers, cmd);
         
-        // ダメージ適用 (城攻めならDefenseに、それ以外ならSoldiersに比重)
-        let defLog = "";
-        if (atkCmd === 'siege') {
-            defender.defense -= Math.floor(dmgToDef * 0.8);
-            defender.soldiers -= Math.floor(dmgToDef * 0.2);
-            defLog = `城壁に大打撃！(城-${Math.floor(dmgToDef*0.8)})`;
+        let msg = "";
+        if (cmd === 'siege' && isAtk) {
+            target.defense = Math.max(0, target.defense - Math.floor(dmg * 0.8));
+            target.soldiers = Math.max(0, target.soldiers - Math.floor(dmg * 0.2));
+            msg = `城壁攻撃！ 城防-${Math.floor(dmg*0.8)} 兵-${Math.floor(dmg*0.2)}`;
         } else {
-            defender.soldiers -= dmgToDef;
-            defLog = `守備兵にダメージ！(兵-${dmgToDef})`;
+            target.soldiers = Math.max(0, target.soldiers - dmg);
+            msg = `攻撃！ 敵兵-${dmg}`;
         }
 
-        UIManager.logWar(`R${this.warState.round} [攻]${atkCmd}: ${defLog}`);
-
-        // 決着判定
-        if (defender.soldiers <= 0 || defender.defense <= 0) {
-            this.endWar(true);
-            return;
-        }
-
-        // 2. 防御側の行動 (常にAI)
-        const defCmd = AISystem.decideTacticalCommand({ me: defender, enemy: attacker });
-        const dmgToAtk = WarSystem.calculateDamage(defBusho, defender.soldiers, defCmd);
-        
-        attacker.soldiers -= dmgToAtk;
-        UIManager.logWar(`R${this.warState.round} [守]${defCmd}: 攻撃兵に反撃！(兵-${dmgToAtk})`);
-
-        // 決着判定
-        if (attacker.soldiers <= 0) {
-            this.endWar(false);
-            return;
-        }
-
-        // ラウンド経過
-        this.warState.round++;
-        if (this.warState.round > 10) {
-            this.endWar(false); // 期限切れは攻撃側敗北
-            return;
-        }
-
-        // UI更新
+        UIManager.logWar(`R${round} [${isAtk?'攻':'守'}] ${cmd}: ${msg}`);
         UIManager.updateWarModal(this.warState);
 
-        // 次のラウンドへ
-        if (attacker.ownerClan === 1) {
-            UIManager.enableWarButtons(true);
+        // ターン交代 or ラウンド進行
+        if (turn === 'defender') {
+            this.warState.turn = 'attacker';
+            this.nextWarStep();
         } else {
-            setTimeout(() => this.processWarRoundAI(), 1000);
+            // ラウンド終了
+            this.warState.round++;
+            if (this.warState.round > MASTER_DATA.config.War.MaxRounds) {
+                // 時間切れは攻撃側敗北
+                UIManager.logWar("時間切れ！ 攻撃失敗");
+                this.endWar(false);
+            } else {
+                this.warState.turn = 'defender';
+                this.nextWarStep();
+            }
         }
+    }
+
+    checkWarEnd() {
+        const { attacker, defender } = this.warState;
+        if (defender.soldiers <= 0 || defender.defense <= 0) {
+            this.endWar(true);
+            return true;
+        }
+        if (attacker.soldiers <= 0) {
+            this.endWar(false);
+            return true;
+        }
+        return false;
     }
 
     endWar(attackerWon) {
         const { attacker, defender, atkBusho, defBusho } = this.warState;
-        
         this.warState.active = false;
         UIManager.hideWarModal();
 
         attacker.isDone = true;
 
         if (attackerWon) {
-            UIManager.log(`決着！ ${attacker.name} の勝利！ ${defender.name} を制圧しました。`);
+            UIManager.log(`＞＞ ${attacker.name} の勝利！ ${defender.name} を制圧しました`);
             defender.ownerClan = attacker.ownerClan;
-            defender.soldiers = 0; // 残存兵を0にするか、少し残すかは仕様次第だが今回は0
+            defender.soldiers = 0; // 残党クリア
             atkBusho.loyalty += 3;
         } else {
-            UIManager.log(`決着！ ${attacker.name} の敗北（または撤退）...`);
+            UIManager.log(`＞＞ ${attacker.name} の敗北...`);
             atkBusho.loyalty -= 3;
-            defBusho.loyalty -= 5; // 防御側も被害甚大なら下がる
+            defBusho.loyalty -= 5;
         }
-
+        
         UIManager.renderMap();
         this.nextTurn();
     }
 
-
     endMonth() {
-        // 月末処理 (資源枯渇ペナルティ等)
+        // 月末処理：資源チェックと在野化
         this.castles.forEach(c => {
-            if (c.rice < 0) {
-                c.soldiers = Math.max(0, c.soldiers - 200);
+            if (c.ownerClan === 0) return;
+
+            // 米不足
+            if (c.rice <= 0) {
+                const loss = 100;
+                c.soldiers = Math.max(0, c.soldiers - loss);
                 c.rice = 0;
-                UIManager.log(`${c.name}: 米不足により兵士逃亡`);
+                UIManager.log(`${c.name}: 米不足で兵士逃亡 (-${loss})`);
             }
-            if (c.gold < 0) {
+            
+            // 金不足 -> 忠誠最低の武将が在野化
+            if (c.gold <= 0) {
                 c.gold = 0;
-                // 忠誠度低下ロジックを入れる場所
+                const bushosh = this.getCastleBushos(c.id).filter(b => !b.isCastellan);
+                if (bushosh.length > 0) {
+                    bushosh.sort((a,b) => a.loyalty - b.loyalty);
+                    const ronin = bushosh[0];
+                    ronin.status = 'ronin';
+                    ronin.clan = 0;
+                    ronin.castleId = 0;
+                    c.samuraiIds = c.samuraiIds.filter(id => id !== ronin.id);
+                    UIManager.log(`${c.name}: 資金不足で ${ronin.name} が出奔しました`);
+                }
             }
         });
 
@@ -491,43 +578,37 @@ class GameManager {
             this.year++;
         }
         
-        // 終了判定
-        const clans = new Set(this.castles.map(c => c.ownerClan));
+        // 勝利判定
+        const clans = new Set(this.castles.filter(c => c.ownerClan !== 0).map(c => c.ownerClan));
         if (clans.size === 1) {
-            alert("天下統一完了！");
+            alert(`天下統一！ おめでとうございます！\n${this.year}年${this.month}月`);
             return;
         }
 
         this.startMonth();
     }
 
-    // セーブ・ロード
+    /* Save/Load */
     save() {
-        const data = {
-            year: this.year,
-            month: this.month,
-            castles: this.castles,
-            bushos: this.bushos
-        };
-        localStorage.setItem('sengoku_save_v2', JSON.stringify(data));
+        const data = { year: this.year, month: this.month, castles: this.castles, bushos: this.bushos };
+        localStorage.setItem('sengoku_complete', JSON.stringify(data));
         alert("セーブしました");
     }
 
     load() {
-        const json = localStorage.getItem('sengoku_save_v2');
+        const json = localStorage.getItem('sengoku_complete');
         if (!json) return;
         const data = JSON.parse(json);
         this.year = data.year;
         this.month = data.month;
-        // クラスの再インスタンス化が必要
         this.castles = data.castles.map(d => new CastleModel(d));
         this.bushos = data.bushos.map(d => new BushoModel(d));
-        UIManager.log("ロードしました。");
         UIManager.renderMap();
+        UIManager.log("ロード完了");
     }
 }
 
-/* --- 4. UIManager (View / DOM操作) --- */
+/* --- 4. UIManager (View) --- */
 
 class UIManager {
     static init() {
@@ -535,10 +616,9 @@ class UIManager {
         this.logEl = document.getElementById('log-content');
         this.panelEl = document.getElementById('control-panel');
         this.panelTitle = document.getElementById('panel-title');
-        this.panelInfo = document.getElementById('panel-info');
         this.actionButtons = document.getElementById('action-buttons');
         
-        // War Modal Elements
+        // War UI
         this.warModal = document.getElementById('war-modal');
         this.warLog = document.getElementById('war-log');
         this.warControls = document.getElementById('war-controls');
@@ -550,7 +630,12 @@ class UIManager {
             defSoldier: document.getElementById('war-def-soldier'),
             defWall: document.getElementById('war-def-wall'),
             defBusho: document.getElementById('war-def-busho'),
+            round: document.getElementById('war-round')
         };
+        
+        // Busho Modal
+        this.bushoModal = document.getElementById('busho-modal');
+        this.bushoListContainer = document.getElementById('busho-list-container');
     }
 
     static log(msg) {
@@ -568,34 +653,45 @@ class UIManager {
             el.className = 'castle-card';
             el.dataset.clan = c.ownerClan;
             if (c.isDone) el.classList.add('done');
-            if (window.GameApp.manager.turnOrder[window.GameApp.manager.currentTurnIndex] === c) {
+            if (window.GameApp.manager.turnQueue[window.GameApp.manager.currentIndex] === c) {
                 el.classList.add('active-turn');
             }
 
             const castellan = window.GameApp.manager.getCastellan(c.id);
 
             el.innerHTML = `
-                <h3>${c.name}</h3>
-                <div class="stat-row"><span>支配:</span> <strong>${c.ownerClan === 1 ? '武田軍' : (c.ownerClan === 2 ? '上杉軍' : 'なし')}</strong></div>
-                <div class="stat-row"><span>城主:</span> ${castellan ? castellan.name : '不在'}</div>
-                <div class="stat-row"><span>兵士:</span> ${c.soldiers}</div>
-                <div class="stat-row"><span>石高/商業:</span> ${c.kokudaka}/${c.commerce}</div>
-                <div class="stat-row"><span>金/米:</span> ${c.gold}/${c.rice}</div>
-                <div class="stat-row"><span>防御:</span> ${c.defense}</div>
+                <div class="card-header"><h3>${c.name}</h3></div>
+                <div class="card-owner">${c.ownerClan === 1 ? '武田軍' : (c.ownerClan === 2 ? '上杉軍' : '陥落')}</div>
+                <div class="param-grid">
+                    <div class="param-item"><span>城主</span> <strong>${castellan ? castellan.name : '-'}</strong></div>
+                    <div class="param-item"><span>兵数</span> ${c.soldiers}</div>
+                    <div class="param-item"><span>金</span> ${c.gold}</div>
+                    <div class="param-item"><span>米</span> ${c.rice}</div>
+                </div>
             `;
+            // Click to inspect (if needed)
+            el.onclick = () => { /* 閲覧機能などがあれば */ };
             this.mapEl.appendChild(el);
         });
     }
 
     static highlightCastle(id) {
-        // renderMapでクラス付与済みだが、スクロール等の処理が必要ならここに記述
+        // CSS class handles visual logic
     }
 
     static showControlPanel(castle) {
         this.panelEl.classList.remove('hidden');
-        this.panelTitle.textContent = castle.name + " 行動選択";
-        this.panelInfo.innerHTML = `金: ${castle.gold} <br> 米: ${castle.rice}`;
+        this.panelTitle.textContent = castle.name;
         
+        // リソース更新
+        document.getElementById('panel-gold').textContent = castle.gold;
+        document.getElementById('panel-rice').textContent = castle.rice;
+        document.getElementById('panel-soldiers').textContent = castle.soldiers;
+        document.getElementById('panel-defense').textContent = castle.defense;
+        
+        this.currentCastle = castle; // for modal
+
+        // ボタン生成
         this.actionButtons.innerHTML = '';
         const createBtn = (label, cb) => {
             const btn = document.createElement('button');
@@ -604,55 +700,76 @@ class UIManager {
             this.actionButtons.appendChild(btn);
         };
 
-        createBtn("商業開発 (金50)", () => window.GameApp.manager.executeDomestic(castle, 'commerce'));
-        createBtn("石高開発 (金50)", () => window.GameApp.manager.executeDomestic(castle, 'farm'));
-        createBtn("徴兵 (金50/米50)", () => window.GameApp.manager.executeDomestic(castle, 'draft'));
-        
-        // 攻撃ボタン (隣接判定省略、自分以外の全敵)
+        createBtn("商業開発 (金50)", () => window.GameApp.manager.execAction('commerce'));
+        createBtn("石高開発 (金50)", () => window.GameApp.manager.execAction('farm'));
+        createBtn("徴兵 (金50/米50)", () => window.GameApp.manager.execAction('draft'));
+        createBtn("米購入 (金100→米100)", () => window.GameApp.manager.execAction('buy_rice'));
+        createBtn("米売却 (米100→金100)", () => window.GameApp.manager.execAction('sell_rice'));
+        createBtn("城壁修復 (金30)", () => window.GameApp.manager.execAction('repair'));
+        createBtn("武将移動 (配下)", () => window.GameApp.manager.execAction('move'));
+
+        // 出陣
         const enemies = window.GameApp.manager.castles.filter(c => c.ownerClan !== castle.ownerClan && c.ownerClan !== 0);
         enemies.forEach(e => {
-            createBtn(`出陣 -> ${e.name}`, () => window.GameApp.manager.startWar(castle, e));
+            createBtn(`出陣 -> ${e.name}`, () => window.GameApp.manager.execAction('war', e.id));
         });
 
-        createBtn("待機", () => window.GameApp.manager.executeDomestic(castle, 'wait'));
+        createBtn("待機", () => window.GameApp.manager.execAction('wait'));
     }
 
     static hideControlPanel() {
         this.panelEl.classList.add('hidden');
     }
 
-    // --- War UI ---
+    /* Busho Modal */
+    static showBushoList() {
+        if (!this.currentCastle) return;
+        this.bushoModal.classList.remove('hidden');
+        this.bushoListContainer.innerHTML = '';
+        
+        const bushos = window.GameApp.manager.getCastleBushos(this.currentCastle.id);
+        bushos.forEach(b => {
+            const div = document.createElement('div');
+            div.className = `busho-card ${b.isCastellan ? 'castellan' : ''}`;
+            div.innerHTML = `
+                <div>
+                    <strong>${b.name}</strong> ${b.isCastellan ? '★城主' : ''}
+                    <br>忠誠: ${b.loyalty}
+                </div>
+                <div class="busho-stats">
+                    <span>武: ${b.strength}</span>
+                    <span>政: ${b.politics}</span>
+                    <span>智: ${b.intelligence}</span>
+                </div>
+            `;
+            this.bushoListContainer.appendChild(div);
+        });
+    }
+
+    static closeBushoModal() {
+        this.bushoModal.classList.add('hidden');
+    }
+
+    /* War UI */
     static showWarModal(state) {
         this.warModal.classList.remove('hidden');
         this.warLog.innerHTML = '';
         this.updateWarModal(state);
-
-        // コマンドボタン生成
-        this.warControls.innerHTML = '';
-        const cmds = [
-            { id: 'bow', label: '弓攻撃 (小)' },
-            { id: 'siege', label: '城攻め (壁)' },
-            { id: 'charge', label: '力攻め (大)' },
-            { id: 'scheme', label: '計略 (知)' },
-            { id: 'retreat', label: '撤退' }
-        ];
-        cmds.forEach(c => {
-            const btn = document.createElement('button');
-            btn.textContent = c.label;
-            btn.onclick = () => window.GameApp.manager.executeWarCommand(c.id);
-            this.warControls.appendChild(btn);
-        });
     }
 
     static updateWarModal(state) {
-        this.warEls.atkName.textContent = state.attacker.name;
-        this.warEls.atkSoldier.textContent = state.attacker.soldiers;
-        this.warEls.atkBusho.textContent = state.atkBusho.name;
+        const { attacker, defender, atkBusho, defBusho, round } = state;
         
-        this.warEls.defName.textContent = state.defender.name;
-        this.warEls.defSoldier.textContent = state.defender.soldiers;
-        this.warEls.defWall.textContent = state.defender.defense;
-        this.warEls.defBusho.textContent = state.defBusho.name;
+        this.warEls.atkName.textContent = attacker.name;
+        this.warEls.atkSoldier.textContent = attacker.soldiers;
+        this.warEls.atkBusho.textContent = atkBusho.name;
+        
+        this.warEls.defName.textContent = defender.name;
+        this.warEls.defSoldier.textContent = defender.soldiers;
+        this.warEls.defWall.textContent = defender.defense;
+        this.warEls.defBusho.textContent = defBusho.name;
+        
+        this.warEls.round.textContent = round;
     }
 
     static logWar(msg) {
@@ -661,9 +778,14 @@ class UIManager {
         this.warLog.prepend(div);
     }
 
-    static enableWarButtons(enabled) {
-        const btns = this.warControls.querySelectorAll('button');
-        btns.forEach(b => b.disabled = !enabled);
+    static enableWarButtons(enable) {
+        if (enable) {
+            this.warControls.classList.remove('disabled-area');
+            this.warControls.classList.add('active-area');
+        } else {
+            this.warControls.classList.remove('active-area');
+            this.warControls.classList.add('disabled-area');
+        }
     }
 
     static hideWarModal() {
@@ -672,28 +794,19 @@ class UIManager {
 }
 
 /* --- Entry Point --- */
-
 window.GameApp = {
     manager: null,
-    
     start: function() {
         UIManager.init();
         this.manager = new GameManager();
-        this.manager.startMonth();
+        this.manager.init();
     },
-
-    nextTurn: function() {
-        if(this.manager) this.manager.nextTurn();
-    },
-    saveGame: function() {
-        if(this.manager) this.manager.save();
-    },
-    loadGame: function() {
-        if(this.manager) this.manager.load();
-    }
+    nextTurn: function() { this.manager.nextTurn(); },
+    saveGame: function() { this.manager.save(); },
+    loadGame: function() { this.manager.load(); },
+    showBushoList: function() { UIManager.showBushoList(); },
+    closeBushoModal: function() { UIManager.closeBushoModal(); },
+    execWarCmd: function(cmd) { this.manager.execWarCmd(cmd); }
 };
 
-// 実行
-window.onload = function() {
-    window.GameApp.start();
-};
+window.onload = () => window.GameApp.start();

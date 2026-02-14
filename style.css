@@ -1,18 +1,20 @@
 :root {
-    --clan-1-color: #b71c1c; /* 武田/赤 */
-    --clan-1-bg: #ffebee;
-    --clan-2-color: #0d47a1; /* 上杉/青 */
-    --clan-2-bg: #e3f2fd;
-    --bg-color: #eceff1;
+    --clan-1-color: #d32f2f; /* 武田:赤 */
+    --clan-1-light: #ffcdd2;
+    --clan-2-color: #1976d2; /* 上杉:青 */
+    --clan-2-light: #bbdefb;
+    --bg-color: #f4f7f6;
     --panel-bg: #ffffff;
+    --text-color: #333;
+    --border-color: #cfd8dc;
 }
 
 body {
-    font-family: "Yu Gothic", "Meiryo", sans-serif;
+    font-family: "Helvetica Neue", Arial, "Hiragino Kaku Gothic ProN", "Hiragino Sans", Meiryo, sans-serif;
     margin: 0;
     padding: 0;
     background-color: var(--bg-color);
-    color: #333;
+    color: var(--text-color);
     height: 100vh;
     display: flex;
     flex-direction: column;
@@ -21,105 +23,163 @@ body {
 header {
     background: #263238;
     color: #fff;
-    padding: 0.5rem 1rem;
+    padding: 0.8rem 1.5rem;
     display: flex;
     justify-content: space-between;
     align-items: center;
-    height: 50px;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.2);
 }
 
 .header-controls button {
-    margin-left: 5px;
-    padding: 5px 10px;
+    background: #455a64;
+    color: #fff;
+    border: 1px solid #607d8b;
+    padding: 6px 12px;
+    border-radius: 4px;
     cursor: pointer;
+    margin-left: 8px;
 }
+.header-controls button:hover { background: #546e7a; }
 
 main {
     flex: 1;
     display: grid;
-    grid-template-columns: 1fr 300px;
-    gap: 1rem;
-    padding: 1rem;
+    grid-template-columns: 1fr 320px;
+    gap: 1.5rem;
+    padding: 1.5rem;
     overflow: hidden;
 }
 
+/* マップエリア */
 #map-container {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-    gap: 1rem;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 1.5rem;
     overflow-y: auto;
+    align-content: start;
 }
 
 .castle-card {
     background: var(--panel-bg);
-    border: 1px solid #cfd8dc;
-    border-radius: 4px;
-    padding: 1rem;
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    padding: 1.2rem;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+    transition: transform 0.2s, box-shadow 0.2s;
     position: relative;
-    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
 }
 
-.castle-card[data-clan="1"] { border-top: 4px solid var(--clan-1-color); background-color: var(--clan-1-bg); }
-.castle-card[data-clan="2"] { border-top: 4px solid var(--clan-2-color); background-color: var(--clan-2-bg); }
+.castle-card[data-clan="1"] { border-top: 6px solid var(--clan-1-color); background: linear-gradient(to bottom, var(--clan-1-light) 0%, #fff 20%); }
+.castle-card[data-clan="2"] { border-top: 6px solid var(--clan-2-color); background: linear-gradient(to bottom, var(--clan-2-light) 0%, #fff 20%); }
 
 .castle-card.active-turn {
-    outline: 3px solid #ffab00;
     transform: scale(1.02);
-    transition: transform 0.2s;
-    z-index: 10;
+    box-shadow: 0 0 15px rgba(255, 160, 0, 0.6);
+    border-color: #ffa000;
+    z-index: 5;
 }
 
 .castle-card.done {
-    opacity: 0.6;
-    filter: grayscale(0.5);
+    filter: grayscale(0.8);
+    opacity: 0.7;
 }
 
-.stat-row {
+.card-header h3 { margin: 0 0 0.5rem 0; font-size: 1.2rem; }
+.card-owner { font-size: 0.85rem; color: #666; margin-bottom: 0.8rem; }
+
+/* パラメータグリッド (カード内・パネル共通) */
+.param-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+    font-size: 0.9rem;
+}
+.param-item {
     display: flex;
     justify-content: space-between;
-    font-size: 0.9rem;
-    margin-bottom: 0.2rem;
+    background: rgba(255,255,255,0.6);
+    padding: 4px;
+    border-radius: 4px;
     border-bottom: 1px dotted #ccc;
 }
 
+/* コントロールパネル */
 #control-panel {
     background: var(--panel-bg);
-    padding: 1rem;
-    border-radius: 4px;
-    box-shadow: -2px 0 5px rgba(0,0,0,0.05);
+    border-radius: 8px;
+    padding: 1.5rem;
+    box-shadow: -2px 0 10px rgba(0,0,0,0.05);
     display: flex;
     flex-direction: column;
 }
 
-#action-buttons button {
-    display: block;
-    width: 100%;
-    margin-bottom: 0.5rem;
+/* 改善されたリソース表示 */
+.resource-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+    margin-bottom: 1rem;
+    background: #f9f9f9;
     padding: 10px;
-    background: #fff;
-    border: 1px solid #90a4ae;
+    border-radius: 6px;
+}
+.res-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+.res-label { font-size: 0.75rem; color: #777; }
+.res-value { font-size: 1.2rem; font-weight: bold; color: #333; }
+
+.info-btn {
+    width: 100%;
+    padding: 8px;
+    background: #e0e0e0;
+    border: none;
     border-radius: 4px;
     cursor: pointer;
+    font-size: 0.9rem;
+}
+.info-btn:hover { background: #d5d5d5; }
+
+/* アクションボタン */
+#action-buttons {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 8px;
+    margin-top: 1rem;
+}
+#action-buttons button {
+    padding: 12px;
     text-align: left;
+    background: #fff;
+    border: 1px solid #b0bec5;
+    border-radius: 4px;
+    cursor: pointer;
+    font-weight: bold;
+    color: #37474f;
+    transition: background 0.2s;
 }
-#action-buttons button:hover { background: #cfd8dc; }
+#action-buttons button:hover { background: #eceff1; }
 
+/* ログ */
 #log-window {
-    height: 150px;
+    height: 120px;
     background: #212121;
-    color: #00e676;
-    padding: 10px;
-    overflow-y: scroll;
-    font-family: monospace;
+    color: #69f0ae;
+    padding: 10px 15px;
+    overflow-y: auto;
+    font-family: "Consolas", monospace;
     font-size: 0.85rem;
-    border-top: 2px solid #444;
+    border-top: 3px solid #333;
 }
+#log-window div { margin-bottom: 4px; border-bottom: 1px solid #333; }
 
-/* Modal for War */
+/* モーダル共通 */
 .modal {
     position: fixed;
     top: 0; left: 0; width: 100%; height: 100%;
-    background: rgba(0,0,0,0.85);
+    background: rgba(0,0,0,0.8);
     display: flex;
     justify-content: center;
     align-items: center;
@@ -127,45 +187,94 @@ main {
 }
 .modal-content {
     background: #fff;
-    width: 80%;
-    max-width: 800px;
-    padding: 20px;
     border-radius: 8px;
+    padding: 20px;
+    width: 90%;
+    max-width: 800px;
+    max-height: 90vh;
+    overflow-y: auto;
     display: flex;
     flex-direction: column;
-    height: 80vh;
 }
-.war-status {
+.hidden { display: none !important; }
+
+/* 武将リストモーダル */
+.busho-card {
+    border: 1px solid #eee;
+    padding: 10px;
+    margin-bottom: 8px;
+    border-left: 4px solid #999;
     display: flex;
     justify-content: space-between;
-    align-items: center;
-    background: #eceff1;
-    padding: 10px;
-    border-radius: 4px;
 }
-.army { width: 45%; padding: 10px; }
-.attacker { border-left: 5px solid red; }
-.defender { border-left: 5px solid blue; }
-.vs { font-weight: bold; font-size: 1.5rem; }
+.busho-card.castellan { border-left-color: #ffd700; background: #fffde7; }
+.busho-stats span { margin-right: 10px; font-weight: bold; }
 
-#war-log {
+/* 合戦モーダル */
+.war-content { background: #fafafa; }
+.war-status-board {
+    display: flex;
+    justify-content: space-between;
+    align-items: stretch;
+    margin-bottom: 15px;
+}
+.army-box {
     flex: 1;
+    padding: 15px;
+    border-radius: 6px;
+    background: #fff;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+}
+.army-box.attacker { border-top: 5px solid #d32f2f; }
+.army-box.defender { border-top: 5px solid #1976d2; }
+.vs-badge {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 900;
+    font-size: 1.5rem;
+    padding: 0 20px;
+    color: #555;
+    font-style: italic;
+}
+.highlight-val { font-size: 1.2rem; font-weight: bold; }
+.war-info-bar {
+    text-align: center;
     background: #333;
     color: #fff;
-    margin: 10px 0;
+    padding: 5px;
+    border-radius: 4px;
+    margin-bottom: 10px;
+}
+#war-log {
+    flex: 1;
+    background: #263238;
+    color: #fff;
     padding: 10px;
+    height: 150px;
     overflow-y: auto;
     font-family: monospace;
+    margin-bottom: 15px;
+    border-radius: 4px;
 }
 #war-controls {
     display: grid;
-    grid-template-columns: repeat(3, 1fr);
-    gap: 10px;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 8px;
 }
 #war-controls button {
-    padding: 15px;
-    font-size: 1rem;
+    padding: 15px 5px;
+    font-size: 0.9rem;
+    font-weight: bold;
     cursor: pointer;
+    border: 1px solid #ccc;
+    background: #fff;
+    border-radius: 4px;
 }
+#war-controls button:hover { background: #e0f2f1; }
+#war-controls button.btn-danger { color: #d32f2f; }
+#war-controls button:disabled { background: #eee; color: #aaa; cursor: not-allowed; }
 
-.hidden { display: none !important; }
+/* 戦争中の操作不可エリア */
+.disabled-area { pointer-events: none; opacity: 0.5; }
+.active-area { pointer-events: auto; opacity: 1; }
