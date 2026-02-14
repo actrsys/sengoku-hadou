@@ -1,5 +1,5 @@
 /**
- * 戦国シミュレーションゲーム - コマンド階層版
+ * 戦国シミュレーションゲーム - コマンド階層版 (Complete Fix)
  */
 
 /* --- Config & Data --- */
@@ -32,14 +32,14 @@ const MASTER_DATA = {
         { id: 4, name: "小田原城", ownerClan: 2, castellanId: 203, samuraiIds: [203, 205, 206], soldiers: 1500, gold: 800, rice: 3000, kokudaka: 180, commerce: 100, defense: 200 }
     ],
     bushos: [
-        // Clan 1
+        // Clan 1 (Player)
         { id: 101, name: "上杉謙信", strength: 100, politics: 60, intelligence: 90, loyalty: 100, clan: 1, castleId: 1, isCastellan: true },
         { id: 102, name: "柿崎景家", strength: 90,  politics: 40, intelligence: 50, loyalty: 90,  clan: 1, castleId: 1, isCastellan: false },
         { id: 103, name: "直江景綱", strength: 60,  politics: 85, intelligence: 80, loyalty: 95,  clan: 1, castleId: 2, isCastellan: true },
         { id: 104, name: "宇佐美定満", strength: 70, politics: 70, intelligence: 92, loyalty: 88, clan: 1, castleId: 1, isCastellan: false },
         { id: 105, name: "甘粕景持", strength: 82, politics: 50, intelligence: 60, loyalty: 85, clan: 1, castleId: 2, isCastellan: false },
         { id: 106, name: "鬼小島弥太郎", strength: 94, politics: 10, intelligence: 20, loyalty: 80, clan: 1, castleId: 2, isCastellan: false },
-        // Clan 2
+        // Clan 2 (AI)
         { id: 201, name: "武田信玄", strength: 95,  politics: 95, intelligence: 95, loyalty: 100, clan: 2, castleId: 3, isCastellan: true },
         { id: 202, name: "山県昌景", strength: 88,  politics: 60, intelligence: 70, loyalty: 90,  clan: 2, castleId: 3, isCastellan: false },
         { id: 203, name: "北条氏康", strength: 85,  politics: 90, intelligence: 90, loyalty: 100, clan: 2, castleId: 4, isCastellan: true },
@@ -328,8 +328,6 @@ class UIManager {
 
     // --- Info View ---
     showCastleInfo(castle) {
-        // 簡易詳細表示（アラートではなく専用モーダルが良いが、ここではセレクターを流用するか既存UIへ）
-        // ここでは「武将詳細モーダル」を流用してリストを表示
         const modal = document.getElementById('busho-detail-modal');
         const body = document.getElementById('busho-detail-body');
         modal.classList.remove('hidden');
@@ -401,6 +399,9 @@ class GameManager {
         // ターン順
         this.turnQueue = this.castles.filter(c => c.ownerClan !== 0).sort(() => Math.random() - 0.5);
         this.currentIndex = 0;
+        
+        // 初回描画（AI思考中でも画面を表示するため）
+        this.ui.renderMap();
         this.processTurn();
     }
 
@@ -426,16 +427,23 @@ class GameManager {
 
     finishTurn() {
         const castle = this.getCurrentTurnCastle();
-        castle.isDone = true;
+        if(castle) castle.isDone = true;
         this.currentIndex++;
         this.processTurn();
     }
 
     endMonth() {
-        // 月末処理省略（前回のコード同様）
+        // 月末処理
         this.month++;
         if(this.month > 12) { this.month = 1; this.year++; }
-        this.startMonth();
+        
+        // 勝利条件
+        const clans = new Set(this.castles.filter(c => c.ownerClan !== 0).map(c => c.ownerClan));
+        if (clans.size === 1) {
+            alert("天下統一！ おめでとうございます！");
+        } else {
+            this.startMonth();
+        }
     }
 
     // --- Command Execution ---
@@ -478,6 +486,9 @@ class GameManager {
             }
             else if (type === 'appoint') {
                 if (castle.castellanId) return; // 念のため
+                const oldCastellan = this.getBusho(castle.castellanId);
+                if(oldCastellan) oldCastellan.isCastellan = false;
+                
                 castle.castellanId = busho.id;
                 busho.isCastellan = true;
                 msg = `${busho.name}を城主に任命しました`;
@@ -497,7 +508,6 @@ class GameManager {
             const targetC = this.getCastle(targetId);
             const movers = bushoIds.map(id => this.getBusho(id));
             
-            // 城主が含まれているかチェック（簡易のため城主移動不可とするか、城主ごと移動するか。今回は城主は移動不可）
             const castellan = movers.find(b => b.id === castle.castellanId);
             if (castellan) { alert("城主は移動できません"); return; }
 
@@ -524,16 +534,18 @@ class GameManager {
 
     // --- AI ---
     execAI(castle) {
-        // AIは簡易的に、城主が未行動なら何か一つ行う
         const castellan = this.getBusho(castle.castellanId);
+        
+        // 簡易AI: 城主が生きていて未行動なら
         if (castellan && !castellan.isActionDone) {
-            // 戦争判断
+            // 戦争判断 (兵1000以上で敵がいれば)
             const enemies = this.castles.filter(c => c.ownerClan !== 0 && c.ownerClan !== castle.ownerClan);
             if (castle.soldiers > 1000 && enemies.length > 0) {
-                const target = enemies[0]; // 適当な敵
-                castellan.isActionDone = true; // 城主のみ出陣
+                const target = enemies[0];
+                castellan.isActionDone = true; 
                 this.startWar(castle, target, [castellan]);
-                return;
+                // 戦争を開始したらここでreturn (endWarでfinishTurnが呼ばれるのを待つ)
+                return; 
             }
             
             // 内政
@@ -549,7 +561,8 @@ class GameManager {
             }
         }
         
-        this.finishTurn(); // AIは1行動で終了
+        // 何も戦争しなかった場合はターン終了
+        this.finishTurn();
     }
 
     // --- War System ---
@@ -564,7 +577,6 @@ class GameManager {
             turn: 'defender'
         };
         
-        // UIセットアップ
         const warModal = document.getElementById('war-modal');
         warModal.classList.remove('hidden');
         document.getElementById('war-log').innerHTML = '';
@@ -587,19 +599,18 @@ class GameManager {
 
         this.updateWarUI();
         
-        // ターン処理
         const isPlayerAtk = (this.warState.attacker.ownerClan === 1);
         const currentIsAtk = (this.warState.turn === 'attacker');
 
+        // プレイヤーの攻撃手番のみ操作可能
         if (currentIsAtk && isPlayerAtk) {
-            // プレイヤー攻撃番
             document.getElementById('war-turn-actor').textContent = "自軍攻撃";
             document.getElementById('war-controls').classList.remove('disabled-area');
         } else {
-            // 敵番 or プレイヤー防御(今回は防御は自動)
+            // 敵攻撃 or 防御側(自動)
             document.getElementById('war-turn-actor').textContent = currentIsAtk ? "敵軍攻撃" : (isPlayerAtk ? "敵軍防御" : "自軍防御");
             document.getElementById('war-controls').classList.add('disabled-area');
-            setTimeout(() => this.execWarAI(), 1000);
+            setTimeout(() => this.execWarAI(), 800);
         }
     }
 
@@ -608,13 +619,11 @@ class GameManager {
     }
 
     execWarAI() {
-        // 簡易AI
         this.resolveWarAction('charge');
     }
 
     resolveWarAction(type) {
         if(type === 'retreat') {
-             // 攻撃側撤退
              if(this.warState.turn === 'attacker') this.endWar(false);
              return;
         }
@@ -623,11 +632,11 @@ class GameManager {
         const target = isAtk ? this.warState.defender : this.warState.attacker;
         const armySoldiers = isAtk ? this.warState.attacker.soldiers : this.warState.defender.soldiers;
         
-        // 攻撃力算出 (武将の総和など簡易化)
+        // 攻撃力算出
         let stats = { str:0, int:0 };
         if (isAtk) {
             this.warState.atkBushos.forEach(b => { stats.str += b.strength; stats.int += b.intelligence; });
-            stats.str /= Math.max(1, this.warState.atkBushos.length * 0.7); // 平均化しつつ数補正
+            stats.str /= Math.max(1, this.warState.atkBushos.length * 0.7); 
         } else {
             stats.str = this.warState.defBusho.strength;
             stats.int = this.warState.defBusho.intelligence;
@@ -649,7 +658,6 @@ class GameManager {
         logDiv.textContent = `R${this.warState.round} [${isAtk?'攻':'守'}] ${msg}`;
         document.getElementById('war-log').prepend(logDiv);
 
-        // 次へ
         if (!isAtk) {
             this.warState.turn = 'attacker';
             this.warState.round++;
@@ -690,11 +698,18 @@ class GameManager {
             this.ui.log(`＞＞ ${this.warState.attacker.name}の勝利！ ${this.warState.defender.name}を制圧！`);
             this.warState.defender.ownerClan = this.warState.attacker.ownerClan;
             this.warState.defender.soldiers = 0;
-            // 守備武将の処理は省略（在野化など本来必要）
         } else {
             this.ui.log(`＞＞ 攻撃失敗...撤退します`);
         }
-        this.ui.renderCommandMenu(); // 再描画
+
+        // 重要修正：AIのターンだった場合はここでターンを終了させる
+        if (this.warState.attacker.ownerClan !== 1) {
+            this.finishTurn();
+        } else {
+            // プレイヤーの場合はメニュー再描画して操作継続
+            this.ui.renderCommandMenu(); 
+            this.ui.renderMap();
+        }
     }
     
     // Save/Load

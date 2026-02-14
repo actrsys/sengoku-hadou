@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>戦国戦略シミュレーション（コマンド版）</title>
+    <title>戦国戦略シミュレーション（完全版）</title>
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -20,8 +20,7 @@
         </header>
 
         <main id="main-view">
-            <div id="map-container">
-                </div>
+            <div id="map-container"></div>
 
             <div id="control-panel" class="panel hidden">
                 <div class="panel-header">
@@ -50,8 +49,7 @@
 
                 <hr>
 
-                <div id="command-area">
-                    </div>
+                <div id="command-area"></div>
                 
                 <div id="panel-message" class="panel-msg"></div>
             </div>
@@ -75,9 +73,11 @@
 
         <div id="busho-detail-modal" class="modal hidden">
             <div class="modal-content detail-content">
-                <h2>武将詳細</h2>
+                <h2>詳細</h2>
                 <div id="busho-detail-body"></div>
-                <button onclick="document.getElementById('busho-detail-modal').classList.add('hidden')" class="btn-secondary">閉じる</button>
+                <div class="modal-footer">
+                    <button onclick="document.getElementById('busho-detail-modal').classList.add('hidden')" class="btn-secondary">閉じる</button>
+                </div>
             </div>
         </div>
 
