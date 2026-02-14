@@ -59,6 +59,7 @@
         <div id="start-screen" class="modal hidden">
             <div class="modal-content start-content">
                 <h2>大名家選択</h2>
+                <p>天下統一を目指す大名家を選んでください</p>
                 <div id="clan-selector"></div>
             </div>
         </div>
@@ -67,8 +68,14 @@
             <div class="modal-content selector-content">
                 <h2 id="selector-title">選択</h2>
                 <div id="selector-context-info" class="context-info hidden"></div>
-                <div id="selector-header" class="selector-header"></div>
-                <div id="selector-list"></div>
+                <div id="selector-header" class="selector-header-row">
+                    <span class="col-check">操作</span>
+                    <span class="col-act">行動</span>
+                    <span class="col-name">名前</span>
+                    <span class="col-rank">身分</span>
+                    <span class="col-stat">能力</span>
+                </div>
+                <div id="selector-list" class="selector-list-container"></div>
                 <div class="selector-actions">
                     <button id="selector-confirm-btn" class="btn-primary">決定</button>
                     <button onclick="window.GameApp.ui.closeSelector()" class="btn-secondary">戻る</button>
@@ -79,6 +86,13 @@
         <div id="quantity-modal" class="modal hidden">
             <div class="modal-content quantity-content">
                 <h2 id="quantity-title">数量指定</h2>
+                
+                <div id="charity-type-selector" class="hidden" style="margin-bottom:15px; text-align:center;">
+                    <label><input type="radio" name="charityType" value="gold" checked> 金のみ</label>
+                    <label><input type="radio" name="charityType" value="rice"> 兵糧のみ</label>
+                    <label><input type="radio" name="charityType" value="both"> 両方</label>
+                </div>
+
                 <div id="quantity-container"></div>
                 <div class="modal-footer">
                     <button id="quantity-confirm-btn" class="btn-primary">実行</button>
