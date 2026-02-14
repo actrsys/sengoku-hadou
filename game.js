@@ -29,7 +29,6 @@ const MASTER_DATA = {
         { id: 1, name: "上杉家", color: "#d32f2f" },
         { id: 2, name: "武田家", color: "#1976d2" }
     ],
-    // Kokudaka(石高)とCommerce(商業)に最大値を追加
     castles: [
         { id: 1, name: "春日山城", ownerClan: 1, castellanId: 101, samuraiIds: [101, 102, 104], soldiers: 1000, gold: 500, rice: 2000, kokudaka: 120, maxKokudaka: 300, commerce: 80, maxCommerce: 250, defense: 100 },
         { id: 2, name: "海津城",   ownerClan: 1, castellanId: 103, samuraiIds: [103, 105, 106], soldiers: 800,  gold: 300, rice: 1500, kokudaka: 80,  maxKokudaka: 200, commerce: 60, maxCommerce: 200, defense: 80 },
@@ -142,6 +141,8 @@ class UIManager {
             el.className = 'castle-card';
             el.dataset.clan = c.ownerClan;
             if (c.isDone) el.classList.add('done');
+            
+            // ターン中の城を強調（ここでクラスを付与している）
             if (this.game.getCurrentTurnCastle() === c && !c.isDone) {
                 el.classList.add('active-turn');
             }
@@ -199,7 +200,8 @@ class UIManager {
         this.cmdArea.innerHTML = ''; // 確実にクリア
         const createBtn = (label, cls, onClick) => {
             const btn = document.createElement('button');
-            btn.className = `cmd-btn ${cls}`;
+            // clsがundefinedの場合に備えて空文字を入れる
+            btn.className = `cmd-btn ${cls || ''}`;
             btn.textContent = label;
             btn.onclick = onClick;
             this.cmdArea.appendChild(btn);
@@ -412,7 +414,8 @@ class GameManager {
 
         const castle = this.turnQueue[this.currentIndex];
         this.ui.renderMap();
-        this.ui.highlightCastle(castle.id);
+        // バグ修正: this.ui.highlightCastle(castle.id) は存在しないため削除しました
+        // renderMap内で .active-turn クラスが付与されるため視覚的効果は既にあります
 
         // プレイヤーのターン判定
         if (castle.ownerClan === this.playerClanId) {
@@ -529,7 +532,7 @@ class GameManager {
             }
             // 内政
             if (castle.gold > 100) {
-                if (castle.soldiers < 800) {
+                if (castle.soldiers < 800 && castle.rice > 100) {
                     castle.soldiers += 100; castle.gold -= 50; castle.rice -= 50;
                     this.ui.log(`${castle.name}が徴兵を行いました`);
                 } else {
