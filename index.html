@@ -9,12 +9,12 @@
 <body>
     <div id="app">
         <header>
-            <h1>戦国戦略 プロトタイプ</h1>
+            <h1>戦国覇道</h1>
             <div id="global-status">
                 <span id="date-display">開始前</span>
                 <div class="header-controls">
-                    <button onclick="window.GameApp.saveGame()">セーブ</button>
-                    <button onclick="window.GameApp.loadGame()">ロード</button>
+                    <button onclick="window.GameApp.saveGame()">保存</button>
+                    <button onclick="window.GameApp.loadGame()">読み込み</button>
                 </div>
             </div>
         </header>
@@ -34,7 +34,7 @@
                         <span class="res-value" id="panel-gold">0</span>
                     </div>
                     <div class="res-item">
-                        <span class="res-label">米</span>
+                        <span class="res-label">兵糧</span>
                         <span class="res-value" id="panel-rice">0</span>
                     </div>
                     <div class="res-item">
@@ -75,7 +75,7 @@
                 <div id="selector-list"></div>
                 <div class="selector-actions">
                     <button id="selector-confirm-btn" class="btn-primary">決定</button>
-                    <button onclick="window.GameApp.ui.closeSelector()" class="btn-secondary">キャンセル</button>
+                    <button onclick="window.GameApp.ui.closeSelector()" class="btn-secondary">戻る</button>
                 </div>
             </div>
         </div>
@@ -116,10 +116,10 @@
                 </div>
                 <div id="war-log"></div>
                 <div id="war-controls" class="disabled-area">
-                    <button onclick="window.GameApp.execWarCmd('bow')">弓攻撃(小)</button>
-                    <button onclick="window.GameApp.execWarCmd('siege')">城攻め(対城)</button>
-                    <button onclick="window.GameApp.execWarCmd('charge')">力攻め(大)</button>
-                    <button onclick="window.GameApp.execWarCmd('scheme')">計略(知謀)</button>
+                    <button onclick="window.GameApp.execWarCmd('bow')">弓攻撃</button>
+                    <button onclick="window.GameApp.execWarCmd('siege')">城攻め</button>
+                    <button onclick="window.GameApp.execWarCmd('charge')">力攻め</button>
+                    <button onclick="window.GameApp.execWarCmd('scheme')">計略</button>
                     <button onclick="window.GameApp.execWarCmd('retreat')" class="btn-danger">撤退</button>
                 </div>
             </div>
@@ -127,4 +127,5 @@
     </div>
     <script src="game.js"></script>
 </body>
+
 </html>
