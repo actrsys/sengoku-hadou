@@ -3,37 +3,62 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>戦国シミュレーション・プロトタイプ</title>
+    <title>戦国戦略シミュレーション</title>
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
     <div id="app">
         <header>
-            <h1>戦国戦略シミュレーション</h1>
+            <h1>戦国戦略 プロトタイプ</h1>
             <div id="global-status">
                 <span id="date-display">1560年 1月</span>
-                <button id="next-turn-btn" onclick="GameApp.nextTurn()">次の城へ / 月進行</button>
-                <button onclick="GameApp.saveGame()">セーブ</button>
-                <button onclick="GameApp.loadGame()">ロード</button>
+                <div class="header-controls">
+                    <button id="next-turn-btn" onclick="window.GameApp.nextTurn()">進行 / パス</button>
+                    <button onclick="window.GameApp.saveGame()">セーブ</button>
+                    <button onclick="window.GameApp.loadGame()">ロード</button>
+                </div>
             </div>
         </header>
 
-        <main>
+        <main id="main-view">
             <div id="map-container">
                 </div>
 
             <div id="control-panel" class="panel hidden">
-                <h2 id="panel-title">城の名前</h2>
-                <div id="panel-stats"></div>
+                <h2 id="panel-title">城名</h2>
+                <div id="panel-info"></div>
+                <hr>
                 <div id="action-buttons">
                     </div>
             </div>
-
-            <div id="log-window">
-                <h3>履歴</h3>
-                <div id="log-content"></div>
-            </div>
         </main>
+
+        <div id="log-window">
+            <h3>履歴</h3>
+            <div id="log-content"></div>
+        </div>
+
+        <div id="war-modal" class="modal hidden">
+            <div class="modal-content">
+                <h2>合戦</h2>
+                <div class="war-status">
+                    <div class="army attacker">
+                        <h3>攻撃軍: <span id="war-atk-name"></span></h3>
+                        <div>兵士: <span id="war-atk-soldier"></span></div>
+                        <div>士気/武将: <span id="war-atk-busho"></span></div>
+                    </div>
+                    <div class="vs">VS</div>
+                    <div class="army defender">
+                        <h3>守備軍: <span id="war-def-name"></span></h3>
+                        <div>兵士: <span id="war-def-soldier"></span> (城防: <span id="war-def-wall"></span>)</div>
+                        <div>士気/武将: <span id="war-def-busho"></span></div>
+                    </div>
+                </div>
+                <div id="war-log"></div>
+                <div id="war-controls">
+                    </div>
+            </div>
+        </div>
     </div>
     <script src="game.js"></script>
 </body>
