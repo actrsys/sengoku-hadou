@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>戦国戦略シミュレーション（改・完全版）</title>
+    <title>戦国覇道（修正完全版）</title>
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -14,7 +14,7 @@
                 <span id="date-display">開始前</span>
                 <div class="header-controls">
                     <button onclick="window.GameApp.saveGame()">保存</button>
-                    <button onclick="window.GameApp.loadGame()">読み込み</button>
+                    <button onclick="window.GameApp.loadGame()">読込</button>
                 </div>
             </div>
         </header>
@@ -45,6 +45,14 @@
                         <span class="res-label">防御</span>
                         <span class="res-value" id="panel-defense">0</span>
                     </div>
+                    <div class="res-item">
+                        <span class="res-label">石高</span>
+                        <span class="res-value" id="panel-kokudaka">0</span>
+                    </div>
+                    <div class="res-item">
+                        <span class="res-label">商業</span>
+                        <span class="res-value" id="panel-commerce">0</span>
+                    </div>
                 </div>
 
                 <hr>
@@ -63,7 +71,7 @@
         <div id="start-screen" class="modal">
             <div class="modal-content start-content">
                 <h2>大名家選択</h2>
-                <p>プレイする大名家を選んでください</p>
+                <p>天下統一を目指す大名家を選んでください</p>
                 <div id="clan-selector">
                     </div>
             </div>
@@ -71,7 +79,7 @@
 
         <div id="selector-modal" class="modal hidden">
             <div class="modal-content selector-content">
-                <h2 id="selector-title">選択してください</h2>
+                <h2 id="selector-title">選択</h2>
                 <div id="selector-list"></div>
                 <div class="selector-actions">
                     <button id="selector-confirm-btn" class="btn-primary">決定</button>
@@ -127,5 +135,4 @@
     </div>
     <script src="game.js"></script>
 </body>
-
 </html>
