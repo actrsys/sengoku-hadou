@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>戦国戦略シミュレーション（完全版）</title>
+    <title>戦国戦略シミュレーション（改・完全版）</title>
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -11,7 +11,7 @@
         <header>
             <h1>戦国戦略 プロトタイプ</h1>
             <div id="global-status">
-                <span id="date-display">1560年 1月</span>
+                <span id="date-display">開始前</span>
                 <div class="header-controls">
                     <button onclick="window.GameApp.saveGame()">セーブ</button>
                     <button onclick="window.GameApp.loadGame()">ロード</button>
@@ -58,6 +58,15 @@
         <div id="log-window">
             <h3>履歴</h3>
             <div id="log-content"></div>
+        </div>
+
+        <div id="start-screen" class="modal">
+            <div class="modal-content start-content">
+                <h2>大名家選択</h2>
+                <p>プレイする大名家を選んでください</p>
+                <div id="clan-selector">
+                    </div>
+            </div>
         </div>
 
         <div id="selector-modal" class="modal hidden">

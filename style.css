@@ -1,7 +1,7 @@
 :root {
-    --clan-1-color: #d32f2f; /* 武田:赤 */
+    --clan-1-color: #d32f2f; /* 上杉:赤 */
     --clan-1-bg: #ffebee;
-    --clan-2-color: #1976d2; /* 上杉:青 */
+    --clan-2-color: #1976d2; /* 武田:青 */
     --clan-2-bg: #e3f2fd;
     --bg-color: #eceff1;
     --panel-bg: #ffffff;
@@ -43,7 +43,7 @@ main {
     grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
     gap: 1rem;
     overflow-y: auto; align-content: start;
-    min-height: 200px; /* 空でも表示領域を確保 */
+    min-height: 200px;
 }
 
 .castle-card {
@@ -142,6 +142,17 @@ main {
     background: #fff; padding: 20px; border-radius: 8px; width: 90%; max-width: 600px;
     max-height: 90vh; overflow-y: auto; display: flex; flex-direction: column;
 }
+.start-content { text-align: center; }
+#clan-selector { display: flex; justify-content: center; gap: 20px; margin-top: 20px; flex-wrap: wrap; }
+.clan-btn { 
+    padding: 20px 40px; font-size: 1.2rem; cursor: pointer; 
+    border: 2px solid #ccc; background: #fff; border-radius: 8px;
+    transition: transform 0.2s;
+}
+.clan-btn:hover { transform: scale(1.05); border-color: #666; }
+.clan-btn[data-id="1"] { border-color: var(--clan-1-color); color: var(--clan-1-color); }
+.clan-btn[data-id="2"] { border-color: var(--clan-2-color); color: var(--clan-2-color); }
+
 .modal-footer { margin-top: 10px; text-align: right; }
 .hidden { display: none !important; }
 
