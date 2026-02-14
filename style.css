@@ -81,7 +81,7 @@ main {
     outline: 4px solid #ff9800; box-shadow: 0 0 20px rgba(255, 152, 0, 0.6);
     z-index: 10; transform: scale(1.05);
 }
-/* doneクラスはスタイル変更なし（ハイライトのみにするため） */
+.castle-card.done { /* 暗くしない */ }
 .castle-card.selectable-target {
     outline: 3px dashed #e91e63;
     animation: pulse 1s infinite alternate; cursor: crosshair;
@@ -213,11 +213,7 @@ main {
 .qty-control input[type="range"] { flex: 1; }
 .qty-control input[type="number"] { width: 80px; padding: 4px; font-size: 1.1rem;}
 
-/* Prisoner List */
-.prisoner-item {
-    border-bottom: 1px solid #ccc; padding: 10px 0;
-}
+/* Prisoner & Succession List */
+.prisoner-item, .succession-item { border-bottom: 1px solid #ccc; padding: 10px 0; }
 .prisoner-actions { display: flex; gap: 10px; margin-top: 5px; }
-.prisoner-actions button {
-    padding: 5px 10px; font-size: 0.9rem; border-radius: 4px; border: none; cursor: pointer; color: #fff;
-}
+.prisoner-actions button { padding: 5px 10px; font-size: 0.9rem; border-radius: 4px; border: none; cursor: pointer; color: #fff; }

@@ -29,7 +29,7 @@
         <main id="main-view">
             <div id="map-scroll-area">
                 <div id="map-container"></div>
-                <div id="map-guide" class="hidden">対象の城を選択してください</div>
+                <div id="map-guide" class="hidden">対象を選択してください</div>
             </div>
 
             <div id="control-panel" class="panel hidden">
@@ -46,7 +46,7 @@
                 <div id="status-container" class="status-list"></div>
 
                 <div id="panel-actions">
-                    <button id="btn-show-bushos" class="action-btn" onclick="window.GameApp.ui.showCastleBushosModal()">武将一覧</button>
+                    <button id="btn-show-bushos" class="action-btn" onclick="window.GameApp.ui.showCastleBushosModal()">武将・在野一覧</button>
                 </div>
             </div>
         </main>
@@ -107,9 +107,15 @@
                 <h2>捕虜の処遇</h2>
                 <p>捕らえた武将の処遇を決めてください</p>
                 <div id="prisoner-list"></div>
-                <div class="modal-footer">
-                    </div>
             </div>
+        </div>
+
+        <div id="succession-modal" class="modal hidden" data-backdrop="static">
+            <div class="modal-content succession-content">
+                <h2 style="color:#d32f2f;">大名死亡</h2>
+                <p>当主が討ち取られました。<br>後継者を選択してください。</p>
+                <div id="succession-list"></div>
+                </div>
         </div>
 
         <div id="war-modal" class="modal hidden">
