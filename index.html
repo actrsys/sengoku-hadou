@@ -92,6 +92,16 @@
             </div>
         </div>
 
+        <div id="result-modal" class="modal hidden">
+            <div class="modal-content result-content" onclick="event.stopPropagation()">
+                <h2 id="result-title">結果</h2>
+                <div id="result-body" class="result-body"></div>
+                <div class="modal-footer">
+                    <button class="btn-primary" onclick="window.GameApp.ui.closeResultModal()">OK</button>
+                </div>
+            </div>
+        </div>
+
         <div id="busho-detail-modal" class="modal hidden">
             <div class="modal-content detail-content">
                 <h2 id="busho-modal-title">所属武将</h2>
@@ -115,7 +125,7 @@
                 <h2 style="color:#d32f2f;">大名死亡</h2>
                 <p>当主が討ち取られました。<br>後継者を選択してください。</p>
                 <div id="succession-list"></div>
-                </div>
+            </div>
         </div>
 
         <div id="war-modal" class="modal hidden">
