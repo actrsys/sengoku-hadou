@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>戦国覇道（AI強化・新機能版）</title>
+    <title>戦国覇道（UI刷新・調査機能版）</title>
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -30,39 +30,10 @@
                     <span id="panel-clan" class="clan-badge">--</span>
                 </div>
                 
-                <div class="resource-grid">
-                    <div class="res-item">
-                        <span class="res-label">金</span>
-                        <span class="res-value" id="panel-gold">0</span>
-                    </div>
-                    <div class="res-item">
-                        <span class="res-label">兵糧</span>
-                        <span class="res-value" id="panel-rice">0</span>
-                    </div>
-                    <div class="res-item">
-                        <span class="res-label">兵士</span>
-                        <span class="res-value" id="panel-soldiers">0</span>
-                    </div>
-                    <div class="res-item">
-                        <span class="res-label">人口</span>
-                        <span class="res-value" id="panel-population">0</span>
-                    </div>
-                    <div class="res-item">
-                        <span class="res-label">民忠</span>
-                        <span class="res-value" id="panel-loyalty">0</span>
-                    </div>
-                    <div class="res-item">
-                        <span class="res-label">防御</span>
-                        <span class="res-value" id="panel-defense">0</span>
-                    </div>
-                    <div class="res-item">
-                        <span class="res-label">石高</span>
-                        <span class="res-value" id="panel-kokudaka">0</span>
-                    </div>
-                    <div class="res-item">
-                        <span class="res-label">商業</span>
-                        <span class="res-value" id="panel-commerce">0</span>
-                    </div>
+                <div id="status-container" class="status-list"></div>
+
+                <div id="panel-actions">
+                    <button id="btn-show-bushos" class="action-btn" onclick="window.GameApp.ui.showCastleBushosModal()">武将一覧を見る</button>
                 </div>
 
                 <hr>
@@ -93,6 +64,7 @@
         <div id="selector-modal" class="modal hidden">
             <div class="modal-content selector-content">
                 <h2 id="selector-title">選択</h2>
+                <div id="selector-context-info" class="context-info hidden"></div>
                 <div id="selector-list"></div>
                 <div class="selector-actions">
                     <button id="selector-confirm-btn" class="btn-primary">決定</button>
@@ -114,7 +86,7 @@
 
         <div id="busho-detail-modal" class="modal hidden">
             <div class="modal-content detail-content">
-                <h2>詳細</h2>
+                <h2>武将・詳細</h2>
                 <div id="busho-detail-body"></div>
                 <div class="modal-footer">
                     <button onclick="document.getElementById('busho-detail-modal').classList.add('hidden')" class="btn-secondary">閉じる</button>

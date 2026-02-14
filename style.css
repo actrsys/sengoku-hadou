@@ -1,12 +1,10 @@
 :root {
-    /* 勢力色定義 */
-    --clan-1-color: #d32f2f; /* 上杉 */
-    --clan-2-color: #1976d2; /* 武田 */
-    --clan-3-color: #fbc02d; /* 北条 */
-    --clan-4-color: #7b1fa2; /* 今川 */
-    --clan-5-color: #388e3c; /* 斎藤 */
-    --clan-6-color: #212121; /* 織田 */
-
+    --clan-1-color: #d32f2f; 
+    --clan-2-color: #1976d2; 
+    --clan-3-color: #fbc02d; 
+    --clan-4-color: #7b1fa2; 
+    --clan-5-color: #388e3c; 
+    --clan-6-color: #212121; 
     --bg-color: #eceff1;
     --panel-bg: #ffffff;
     --text-color: #333;
@@ -19,13 +17,11 @@ body {
     background-color: var(--bg-color);
     color: var(--text-color);
     height: 100vh;
-    display: flex;
-    flex-direction: column;
+    display: flex; flex-direction: column;
 }
 
 header {
-    background: #263238; color: #fff;
-    padding: 0.5rem 1.5rem;
+    background: #263238; color: #fff; padding: 0.5rem 1.5rem;
     display: flex; justify-content: space-between; align-items: center;
     height: 50px; flex-shrink: 0;
 }
@@ -36,99 +32,86 @@ header button {
 
 main {
     flex: 1; display: grid;
-    grid-template-columns: 1fr 350px;
+    grid-template-columns: 1fr 380px; /* パネル幅拡大 */
     gap: 1rem; padding: 1rem;
     overflow: hidden;
 }
 
 /* Map Grid System */
 #map-scroll-area {
-    overflow: auto;
-    background: #b0bec5; /* マップ背景（陸地イメージ） */
-    border-radius: 6px;
-    padding: 20px;
-    display: flex; justify-content: center; align-items: center;
+    overflow: auto; background: #b0bec5; border-radius: 6px;
+    padding: 20px; display: flex; justify-content: center; align-items: center;
 }
-
 #map-container {
     display: grid;
-    /* 4x4 Grid */
     grid-template-columns: repeat(4, 180px);
     grid-template-rows: repeat(4, 140px);
     gap: 20px;
 }
-
 .castle-card {
-    background: var(--panel-bg);
-    border: 1px solid var(--border-color);
-    border-radius: 6px; padding: 0.5rem;
-    position: relative;
-    transition: all 0.2s;
-    cursor: pointer;
+    background: var(--panel-bg); border: 1px solid var(--border-color);
+    border-radius: 6px; padding: 0.5rem; position: relative;
+    transition: all 0.2s; cursor: pointer;
     box-shadow: 0 2px 4px rgba(0,0,0,0.2);
     display: flex; flex-direction: column; justify-content: space-between;
-    
-    /* CSS Grid Positioning */
-    grid-column: var(--c-x);
-    grid-row: var(--c-y);
+    grid-column: var(--c-x); grid-row: var(--c-y);
 }
-
 .castle-card:hover { transform: translateY(-2px); box-shadow: 0 6px 12px rgba(0,0,0,0.2); }
-
 .card-header h3 { margin: 0; font-size: 1rem; text-align: center; }
 .card-owner { font-size: 0.8rem; text-align: center; background: #eee; border-radius: 4px; margin: 4px 0; }
-
 .castle-card.active-turn {
-    outline: 4px solid #ff9800;
-    box-shadow: 0 0 20px rgba(255, 152, 0, 0.6);
-    z-index: 10;
-    transform: scale(1.05);
+    outline: 4px solid #ff9800; box-shadow: 0 0 20px rgba(255, 152, 0, 0.6);
+    z-index: 10; transform: scale(1.05);
 }
-
-.castle-card.done {
-    opacity: 0.6;
-    filter: grayscale(0.5) brightness(0.9);
-    transform: scale(0.98);
-}
-
-.param-grid {
-    font-size: 0.75rem;
-}
+.castle-card.done { opacity: 0.6; filter: grayscale(0.5) brightness(0.9); transform: scale(0.98); }
+.param-grid { font-size: 0.75rem; }
 .param-item { display: flex; justify-content: space-between; border-bottom: 1px dotted #ccc; }
 
 /* Control Panel */
 #control-panel {
-    background: var(--panel-bg);
-    border-radius: 6px; padding: 1rem;
+    background: var(--panel-bg); border-radius: 6px; padding: 1rem;
     display: flex; flex-direction: column;
-    box-shadow: -2px 0 10px rgba(0,0,0,0.05);
-    height: 100%;
+    box-shadow: -2px 0 10px rgba(0,0,0,0.05); height: 100%;
 }
 .panel-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
-#panel-title { margin: 0; font-size: 1.4rem; }
+#panel-title { margin: 0; font-size: 1.6rem; }
 .clan-badge { font-weight: bold; font-size: 0.9rem; padding: 2px 8px; border-radius: 10px; background: #eee; }
 
-.resource-grid {
-    display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px;
-    background: #f5f5f5; padding: 8px; border-radius: 4px; margin-bottom: 10px;
+/* ステータスリスト (縦並び・文字大) */
+.status-list {
+    flex: 1; overflow-y: auto; padding-right: 5px;
 }
-.res-item { display: flex; flex-direction: column; align-items: center; }
-.res-label { font-size: 0.7rem; color: #666; }
-.res-value { font-weight: bold; font-size: 0.9rem; }
+.status-row {
+    margin-bottom: 8px; display: flex; justify-content: space-between; align-items: baseline;
+    border-bottom: 1px solid #eee; padding-bottom: 2px;
+}
+.status-label { font-size: 0.9rem; color: #555; }
+.status-value { font-size: 1.4rem; font-weight: bold; font-family: 'Courier New', monospace; }
+.status-max { font-size: 0.9rem; color: #999; font-weight: normal; }
+
+/* プログレスバー */
+.progress-bar {
+    height: 6px; background: #e0e0e0; border-radius: 3px; overflow: hidden; margin-top: 2px;
+}
+.progress-fill {
+    height: 100%; background: #4caf50; transition: width 0.3s;
+}
+
+#panel-actions { margin-top: 10px; text-align: center; }
+.action-btn { background: #607d8b; color: white; padding: 8px 16px; border: none; border-radius: 4px; cursor: pointer; width: 100%; }
 
 /* Command Area */
-#command-area { display: grid; gap: 8px; flex: 1; align-content: start; overflow-y: auto; margin-bottom: 10px;}
+#command-area { display: grid; gap: 8px; margin-bottom: 10px; margin-top: 10px;}
 .cmd-btn {
     padding: 12px; text-align: left;
     background: #fff; border: 1px solid #b0bec5; border-radius: 4px;
-    cursor: pointer; font-weight: bold; color: #37474f;
+    cursor: pointer; font-weight: bold; color: #37474f; font-size: 1rem;
     transition: background 0.1s;
 }
 .cmd-btn:hover { background: #eceff1; border-color: #78909c; }
 .cmd-btn.category { background: #f0f4c3; border-color: #dce775; color: #33691e; }
 .cmd-btn.back { background: #cfd8dc; color: #455a64; text-align: center; }
 .cmd-btn.finish { background: #ffccbc; border-color: #ffab91; color: #d84315; text-align: center; margin-top: 10px; }
-
 .panel-msg { color: #d32f2f; font-size: 0.9rem; min-height: 1.2em; margin-top: 5px; text-align: center; }
 
 /* Logs & Modals */
@@ -153,11 +136,30 @@ main {
     transition: transform 0.2s;
 }
 .clan-btn:hover { transform: scale(1.05); }
-
 .modal-footer { margin-top: 10px; text-align: right; }
 .hidden { display: none !important; }
 
-/* War Specific */
+/* Selectors */
+.context-info {
+    background: #e3f2fd; border: 1px solid #90caf9; padding: 10px;
+    margin-bottom: 10px; border-radius: 4px;
+}
+.select-item {
+    display: flex; align-items: center;
+    padding: 10px; border-bottom: 1px solid #eee; cursor: pointer;
+}
+.select-item:hover { background: #f9f9f9; }
+.select-item.disabled { color: #aaa; background: #f0f0f0; cursor: not-allowed; }
+.select-item input { margin-right: 15px; transform: scale(1.3); }
+.item-detail { display: flex; flex-direction: column; }
+.item-main { font-weight: bold; font-size: 1.1rem; }
+.item-sub { font-size: 0.9rem; color: #666; }
+.selector-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 10px; }
+.btn-primary { background: #1976d2; color: white; border: none; padding: 10px 20px; border-radius: 4px; cursor: pointer; font-size: 1rem; }
+.btn-secondary { background: #78909c; color: white; border: none; padding: 10px 20px; border-radius: 4px; cursor: pointer; font-size: 1rem; }
+.btn-danger { background: #d32f2f; color: white; border: none; padding: 8px 16px; border-radius: 4px; cursor: pointer; }
+
+/* War & Cutin */
 .war-content { max-width: 800px; }
 .war-status-board { display: flex; justify-content: space-between; margin-bottom: 10px; }
 .army-box { width: 45%; padding: 10px; border-radius: 4px; background: #f9f9f9; }
@@ -168,47 +170,28 @@ main {
 #war-log { height: 150px; overflow-y: auto; background: #333; color: #fff; padding: 5px; margin: 10px 0; font-size: 0.9rem;}
 .disabled-area { opacity: 0.5; pointer-events: none; }
 
-/* Cut-in Overlay */
 #cutin-overlay {
     position: fixed; top: 0; left: 0; width: 100%; height: 100%;
     background: rgba(0,0,0,0.6);
     display: flex; justify-content: center; align-items: center;
-    z-index: 2000;
-    pointer-events: none;
+    z-index: 2000; pointer-events: none;
 }
 .cutin-text {
     font-size: 2rem; font-weight: bold; color: #fff;
     text-shadow: 0 0 10px #000;
     background: rgba(0,0,0,0.8);
     padding: 20px 40px; border-radius: 10px;
-    border: 2px solid #ff9800;
-    text-align: center; white-space: pre-line;
+    border: 2px solid #ff9800; text-align: center; white-space: pre-line;
 }
 .fade-in { animation: fadeIn 0.5s forwards; }
 .fade-out { animation: fadeOut 0.5s forwards; }
 @keyframes fadeIn { from { opacity: 0; transform: scale(0.8); } to { opacity: 1; transform: scale(1); } }
 @keyframes fadeOut { from { opacity: 1; transform: scale(1); } to { opacity: 0; transform: scale(1.2); } }
 
-/* Quantity Slider Styles */
+/* Slider */
 .quantity-content { max-width: 400px; }
 .qty-row { margin-bottom: 15px; }
 .qty-row label { display: block; font-weight: bold; margin-bottom: 5px; }
 .qty-control { display: flex; gap: 10px; align-items: center; }
 .qty-control input[type="range"] { flex: 1; }
-.qty-control input[type="number"] { width: 80px; padding: 4px; }
-
-/* List Item Styles */
-.select-item {
-    display: flex; align-items: center;
-    padding: 8px; border-bottom: 1px solid #eee; cursor: pointer;
-}
-.select-item:hover { background: #f9f9f9; }
-.select-item.disabled { color: #aaa; background: #f0f0f0; cursor: not-allowed; }
-.select-item input { margin-right: 10px; transform: scale(1.2); }
-.item-detail { display: flex; flex-direction: column; }
-.item-main { font-weight: bold; }
-.item-sub { font-size: 0.8rem; color: #666; }
-.selector-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 10px; }
-.btn-primary { background: #1976d2; color: white; border: none; padding: 8px 16px; border-radius: 4px; cursor: pointer; }
-.btn-secondary { background: #78909c; color: white; border: none; padding: 8px 16px; border-radius: 4px; cursor: pointer; }
-.btn-danger { background: #d32f2f; color: white; border: none; padding: 8px 16px; border-radius: 4px; cursor: pointer; }
+.qty-control input[type="number"] { width: 80px; padding: 4px; font-size: 1.1rem;}
