@@ -36,12 +36,16 @@
             <div id="control-panel" class="panel hidden">
                 <div id="command-area"></div>
                 <div id="panel-message" class="panel-msg"></div>
+                
                 <hr>
+
                 <div class="panel-header">
                     <h2 id="panel-title">城名</h2>
                     <span id="panel-clan" class="clan-badge">--</span>
                 </div>
+
                 <div id="status-container" class="status-list"></div>
+
                 <div id="panel-actions">
                     <button id="btn-show-bushos" class="action-btn" onclick="window.GameApp.ui.showCastleBushosModal()">武将・在野一覧</button>
                 </div>
@@ -65,11 +69,24 @@
         </div>
 
         <div id="selector-modal" class="modal hidden">
-            <div class="modal-content selector-content">
+            <div class="modal-content selector-content wide-modal">
                 <h2 id="selector-title">選択</h2>
                 <div id="selector-context-info" class="context-info hidden"></div>
-                <div id="selector-header" class="selector-header-row"></div>
+                
+                <div class="busho-grid-header">
+                    <span class="col-check">操作</span>
+                    <span class="col-act">行動</span>
+                    <span class="col-name">名前</span>
+                    <span class="col-rank">身分</span>
+                    <span class="col-stat">統率</span>
+                    <span class="col-stat">武力</span>
+                    <span class="col-stat">政治</span>
+                    <span class="col-stat">外交</span>
+                    <span class="col-stat">知略</span>
+                    <span class="col-stat">魅力</span>
+                </div>
                 <div id="selector-list" class="selector-list-container"></div>
+                
                 <div class="selector-actions">
                     <button id="selector-confirm-btn" class="btn-primary">決定</button>
                     <button onclick="window.GameApp.ui.closeSelector()" class="btn-secondary">戻る</button>
@@ -118,12 +135,20 @@
         </div>
 
         <div id="busho-detail-modal" class="modal hidden">
-            <div class="modal-content selector-content"> <h2 id="busho-modal-title">所属武将</h2>
-                <div class="selector-header-row">
-                    <span class="col-check">行動</span>
+            <div class="modal-content selector-content wide-modal">
+                <h2 id="busho-modal-title">所属武将</h2>
+                <div id="castle-detail-info" class="context-info hidden"></div>
+
+                <div class="busho-grid-header">
+                    <span class="col-check">状態</span> <span class="col-act">--</span>
                     <span class="col-name">名前</span>
                     <span class="col-rank">身分</span>
-                    <span class="col-stat">能力値</span>
+                    <span class="col-stat">統率</span>
+                    <span class="col-stat">武力</span>
+                    <span class="col-stat">政治</span>
+                    <span class="col-stat">外交</span>
+                    <span class="col-stat">知略</span>
+                    <span class="col-stat">魅力</span>
                 </div>
                 <div id="busho-detail-list" class="selector-list-container"></div>
                 <div class="modal-footer">
@@ -135,6 +160,7 @@
         <div id="prisoner-modal" class="modal hidden">
             <div class="modal-content prisoner-content">
                 <h2>捕虜の処遇</h2>
+                <p>捕らえた武将の処遇を決めてください</p>
                 <div id="prisoner-list"></div>
             </div>
         </div>
