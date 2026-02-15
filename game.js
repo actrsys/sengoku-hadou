@@ -1,14 +1,9 @@
-{
-type: uploaded file
-fileName: game.js
-fullContent:
 /**
- * 戦国シミュレーションゲーム - 修正版 v10.4
+ * 戦国シミュレーションゲーム - 修正版 v10.5
  * 修正内容:
- * 1. 初期化プロセスの堅牢化（「はじめから」ボタン不動バグ修正）
- * 2. マップ選択モードの強制解除ロジック実装（他メニュー遷移時にリセット）
- * 3. PC画面右カラムの城情報削除（オーバーレイへの一元化）
- * 4. モバイル用情報・武将一覧アクセスの改善
+ * 1. スタートボタン無反応バグの根本修正（HTML onclick属性への移行）
+ * 2. モーダル強制リセット機能の実装（裏側で開いているウインドウ対策）
+ * 3. 初期化プロセスの堅牢化注釈の追加
  */
 
 // グローバルエラーハンドリング
@@ -462,6 +457,20 @@ class UIManager {
         }
     }
 
+    /* ★★★ 修正禁止エリア：モーダルリセットロジック ★★★ */
+    // 強制的に全てのモーダルを閉じる処理（裏側で開いているウインドウ対策）
+    forceResetModals() {
+        const modals = document.querySelectorAll('.modal');
+        modals.forEach(m => {
+            m.classList.add('hidden');
+            // opacityなどのスタイルが残っている可能性を排除するため強制スタイル適用はCSSに任せるが、
+            // 万が一のためにスタイル属性もリセット
+            m.style.display = ''; 
+        });
+        if(this.cutinOverlay) this.cutinOverlay.classList.add('hidden');
+    }
+    /* ★★★ 修正禁止エリア終わり ★★★ */
+
     log(msg) { 
         this.logHistory.unshift(`[${this.game.year}年${this.game.month}月] ${msg}`);
         if(this.logHistory.length > 50) this.logHistory.pop();
@@ -507,6 +516,9 @@ class UIManager {
     }
     
     showScenarioSelection(scenarios, onSelect) {
+        // 表示前に一度全てリセット
+        this.forceResetModals();
+        
         if (!this.scenarioScreen) return;
         this.scenarioScreen.classList.remove('hidden'); 
         if (this.scenarioList) {
@@ -520,7 +532,7 @@ class UIManager {
         }
     }
     returnToTitle() { 
-        if(this.scenarioScreen) this.scenarioScreen.classList.add('hidden'); 
+        this.forceResetModals();
         const ts = document.getElementById('title-screen');
         if(ts) ts.classList.remove('hidden'); 
     }
@@ -1217,7 +1229,11 @@ class GameManager {
     getRelationKey(id1, id2) { return id1 < id2 ? `${id1}-${id2}` : `${id2}-${id1}`; }
     getRelation(id1, id2) { const key = this.getRelationKey(id1, id2); if (!this.relations[key]) this.relations[key] = { friendship: 50, alliance: false }; return this.relations[key]; }
     
-    startNewGame() { this.boot(); }
+    startNewGame() { 
+        // 念のためUIのリセットを最初に行う
+        if(this.ui) this.ui.forceResetModals();
+        this.boot(); 
+    }
     
     async boot() { 
         if (this.ui) this.ui.showScenarioSelection(SCENARIOS, (folder) => this.loadScenario(folder)); 
@@ -1981,573 +1997,10 @@ class GameManager {
     }
 }
 
-// 初期化プロセスの堅牢化
+/* ★★★ 修正禁止エリア：初期化ロジック ★★★ */
+// DOMContentLoadedで確実にインスタンスを作成するが、イベントリスナーは使用しない
 window.addEventListener('DOMContentLoaded', () => {
+    // 既に存在していても再生成してリセット（リロード時など）
     window.GameApp = new GameManager();
-    
-    // HTML側のonclick属性に依存せず、JS側でイベントリスナーを設定
-    const startBtn = document.getElementById('start-btn');
-    if (startBtn) {
-        startBtn.onclick = () => window.GameApp.startNewGame();
-    }
 });
-}
-
-{
-type: uploaded file
-fileName: index.html
-fullContent:
-<!DOCTYPE html>
-<html lang="ja">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>戦国覇道</title>
-    <link rel="stylesheet" href="style.css">
-</head>
-<body>
-    <div id="title-screen">
-        <div class="title-content">
-            <h1 class="game-title">戦国覇道</h1>
-            <div class="title-menu">
-                <button id="start-btn" class="title-btn">はじめから</button>
-                <button class="title-btn" onclick="document.getElementById('load-file-input').click()">続きから</button>
-                <input type="file" id="load-file-input" accept=".json" style="display:none" onchange="window.GameApp.loadGameFromFile(event)">
-            </div>
-        </div>
-    </div>
-
-    <div id="scenario-modal" class="modal hidden">
-        <div class="modal-content start-content">
-            <h2>シナリオ選択</h2>
-            <div id="scenario-list" class="clan-grid"></div>
-            <div class="modal-footer" style="justify-content: center;">
-                <button class="btn-secondary" onclick="window.GameApp.ui.returnToTitle()">戻る</button>
-            </div>
-        </div>
-    </div>
-
-    <div id="start-screen" class="modal hidden">
-        <div class="modal-content start-content">
-            <h2>大名家選択</h2>
-            <div id="clan-selector" class="clan-grid"></div>
-        </div>
-    </div>
-
-    <div id="app" class="hidden">
-        <div id="top-info-bar">
-            <div id="mobile-top-left"></div>
-        </div>
-
-        <div id="map-wrapper">
-            <div id="map-scroll-container">
-                <div id="map-container"></div>
-            </div>
-            
-            <div id="pc-map-overlay"></div>
-
-            <div id="map-guide" class="hidden">対象を選択してください</div>
-            <div id="ai-guard" class="hidden"><div class="loading-spinner"></div>思考中...</div>
-            <button id="map-reset-zoom">-</button>
-        </div>
-
-        <div id="bottom-command-bar">
-             <div id="mobile-bottom-info"></div>
-             <div id="command-area" class="command-grid"></div>
-        </div>
-
-        <div id="pc-sidebar">
-            <div id="pc-status-panel"></div>
-            <div id="pc-command-area" class="command-grid"></div>
-        </div>
-    </div>
-
-    <div id="selector-modal" class="modal hidden">
-        <div class="modal-content">
-            <h3 id="selector-title">選択</h3>
-            <div id="selector-context-info" class="context-info"></div>
-            <div class="list-header">
-                <span></span><span>状</span><span>名</span><span>身</span><span>統</span><span>武</span><span>政</span><span>外</span><span>智</span><span>魅</span>
-            </div>
-            <div id="selector-list" class="list-container"></div>
-            <div class="modal-footer">
-                <button id="selector-confirm-btn" class="btn-primary">決定</button>
-                <button class="btn-secondary" onclick="window.GameApp.ui.closeSelector()">戻る</button>
-            </div>
-        </div>
-    </div>
-
-    <div id="quantity-modal" class="modal hidden">
-        <div class="modal-content quantity-content" style="max-width: 400px;">
-            <h3 id="quantity-title">数量指定</h3>
-            <div id="trade-type-info" class="info-text hidden"></div>
-            <div id="charity-type-selector" class="radio-group hidden" style="margin-bottom:10px;">
-                <label><input type="radio" name="charityType" value="gold" checked> 金のみ</label>
-                <label><input type="radio" name="charityType" value="rice"> 米のみ</label>
-            </div>
-            <div id="quantity-container"></div>
-            <div class="modal-footer">
-                <button id="quantity-confirm-btn" class="btn-primary">決定</button>
-                <button class="btn-secondary" onclick="document.getElementById('quantity-modal').classList.add('hidden')">キャンセル</button>
-            </div>
-        </div>
-    </div>
-
-    <div id="history-modal" class="modal hidden">
-        <div class="modal-content">
-            <h3>行動履歴</h3>
-            <div id="history-list" class="list-container" style="max-height: 60vh; background:#fafafa;"></div>
-            <div class="modal-footer">
-                <button class="btn-primary" onclick="document.getElementById('history-modal').classList.add('hidden')">閉じる</button>
-            </div>
-        </div>
-    </div>
-
-    <div id="cutin-overlay" class="cutin-overlay hidden">
-        <div class="cutin-text" id="cutin-message"></div>
-    </div>
-
-    <div id="result-modal" class="modal hidden">
-        <div class="modal-content result-content" style="max-width: 500px; text-align:center;">
-            <div id="result-body" class="result-body" style="margin:20px 0; font-size:1.1rem; line-height:1.6;"></div>
-            <div class="modal-footer" id="result-footer" style="justify-content:center;">
-                <button class="btn-primary" onclick="window.GameApp.ui.closeResultModal()">閉じる</button>
-            </div>
-        </div>
-    </div>
-
-    <div id="prisoner-modal" class="modal hidden">
-        <div class="modal-content">
-            <h3>捕虜処遇</h3>
-            <div id="prisoner-list" class="list-container"></div>
-        </div>
-    </div>
-
-    <div id="succession-modal" class="modal hidden">
-        <div class="modal-content">
-            <h3>後継者選択</h3>
-            <div id="succession-list" class="list-container"></div>
-        </div>
-    </div>
-
-    <div id="gunshi-modal" class="modal hidden">
-        <div class="modal-content result-content" style="max-width: 500px;">
-            <h3 id="gunshi-name">軍師</h3>
-            <p id="gunshi-message" style="margin: 20px 0; font-style: italic; background:#f0f0f0; padding:15px; border-radius:5px;"></p>
-            <div class="modal-footer">
-                <button id="gunshi-execute-btn" class="btn-primary">実行</button>
-                <button class="btn-secondary" onclick="document.getElementById('gunshi-modal').classList.add('hidden')">やめる</button>
-            </div>
-        </div>
-    </div>
-
-    <div id="war-modal" class="modal hidden">
-        <div class="modal-content" style="max-width: 700px; height: 90vh; display: flex; flex-direction: column;">
-            <h2 class="war-title" style="margin:0; padding-bottom:5px;">合戦</h2>
-            <div class="war-screen">
-                <div class="war-visual">
-                    <div class="army-box attacker">
-                        <h3 class="army-title">攻撃軍: <span id="war-atk-name"></span></h3>
-                        <div>大将: <span id="war-atk-busho"></span></div>
-                        <div>兵士: <span id="war-atk-soldier" class="highlight-val"></span> / 士気: <span id="war-atk-morale"></span></div>
-                    </div>
-                    <div style="font-weight:bold; font-size:1.2rem;">VS</div>
-                    <div class="army-box defender">
-                        <h3 class="army-title">守備軍: <span id="war-def-name"></span></h3>
-                        <div>大将: <span id="war-def-busho"></span></div>
-                        <div>兵士: <span id="war-def-soldier" class="highlight-val"></span> / 防御: <span id="war-def-wall"></span></div>
-                    </div>
-                </div>
-                <div class="war-info-bar" style="background:#333; color:#fff; text-align:center; padding:2px;">
-                    R: <span id="war-round">1</span>/10 | 手番: <span id="war-turn-actor">--</span>
-                </div>
-                <div id="war-controls" class="war-controls-area disabled-area"></div>
-            </div>
-        </div>
-    </div>
-
-    <script src="game.js"></script>
-</body>
-</html>
-}
-
-{
-type: uploaded file
-fileName: style.css
-fullContent:
-:root {
-    --bg-color: #eceff1;
-    --panel-bg: #ffffff;
-    --text-color: #333;
-    --border-color: #cfd8dc;
-    --map-tile-size: 80px;
-    --header-height: 100px;
-}
-
-body {
-    font-family: "Helvetica Neue", Arial, sans-serif;
-    margin: 0; padding: 0;
-    background-color: var(--bg-color);
-    color: var(--text-color);
-    height: 100dvh;
-    width: 100vw;
-    overflow: hidden;
-    display: flex;
-    flex-direction: column;
-}
-
-/* Common Helpers */
-.hidden { display: none !important; }
-.fade-in { animation: fadeIn 0.3s ease-in; }
-@keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
-
-/* Title Screen */
-#title-screen {
-    position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-    background: linear-gradient(135deg, #263238 0%, #37474f 100%);
-    display: flex; justify-content: center; align-items: center;
-    z-index: 3000;
-}
-.title-content { text-align: center; color: #fff; }
-.game-title { font-size: 3rem; margin-bottom: 30px; text-shadow: 2px 2px 4px rgba(0,0,0,0.5); }
-.title-menu { display: flex; flex-direction: column; gap: 15px; }
-.title-btn {
-    padding: 12px 40px; font-size: 1.2rem; background: rgba(255,255,255,0.1);
-    color: #fff; border: 1px solid rgba(255,255,255,0.3); cursor: pointer;
-    transition: all 0.3s;
-}
-.title-btn:hover { background: rgba(255,255,255,0.3); }
-
-/* Layout Structure */
-#app {
-    display: flex;
-    flex-direction: column;
-    height: 100%;
-    width: 100%;
-    position: relative;
-    padding-left: env(safe-area-inset-left);
-    padding-right: env(safe-area-inset-right);
-}
-
-/* --- Mobile Top Info Bar --- */
-#top-info-bar {
-    flex: none;
-    background: rgba(255,255,255,0.95);
-    border-bottom: 1px solid var(--border-color);
-    padding-top: max(5px, env(safe-area-inset-top));
-    padding-bottom: 5px;
-    padding-left: 10px;
-    padding-right: 10px;
-    z-index: 100;
-    box-shadow: 0 2px 5px rgba(0,0,0,0.1);
-    font-size: 0.8rem;
-    display: flex;
-    justify-content: space-between;
-    align-items: flex-start;
-}
-/* 左詰め情報エリア */
-#mobile-top-left {
-    display: flex; flex-direction: column; gap: 2px;
-}
-/* 開閉ボタン */
-.toggle-btn {
-    background: none; border: 1px solid #ccc; border-radius: 4px;
-    padding: 2px 8px; font-size: 0.8rem; cursor: pointer; color: #555;
-}
-
-/* Map Area */
-#map-wrapper {
-    flex: 1;
-    position: relative;
-    background-color: #81c784; 
-    overflow: hidden; 
-    display: flex;
-    justify-content: center; 
-    align-items: center;
-    touch-action: none;
-}
-
-#map-scroll-container {
-    width: 100%; height: 100%;
-    overflow: auto;
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    -webkit-overflow-scrolling: touch;
-    /* 上部が見切れないようにパディング確保 */
-    padding: 20px;
-    box-sizing: border-box; 
-}
-
-#map-container {
-    display: grid;
-    gap: 10px;
-    /* paddingはscroll-containerで制御するのでこちらは最小限でも良いが、余白用に残す */
-    padding: 20px; 
-    transition: transform 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
-    transform-origin: center center;
-}
-
-/* PC Overlay Info Panel */
-#pc-map-overlay {
-    position: absolute;
-    top: 20px;
-    right: 20px;
-    width: 280px;
-    background: rgba(255, 255, 255, 0.9);
-    border: 1px solid #999;
-    border-radius: 8px;
-    padding: 10px;
-    box-shadow: 0 4px 10px rgba(0,0,0,0.3);
-    z-index: 550;
-    display: none; /* PCのみJSで表示制御 */
-    font-size: 0.9rem;
-}
-.overlay-header {
-    display: flex; justify-content: space-between; align-items: center;
-    border-bottom: 1px solid #ccc; padding-bottom: 5px; margin-bottom: 5px;
-}
-.overlay-content { display: block; }
-.overlay-content.collapsed { display: none; }
-.info-row { display: flex; justify-content: space-between; margin-bottom: 3px; }
-.info-label { color: #555; font-size: 0.85rem; }
-.info-val { font-weight: bold; }
-.highlight-text { color: #d32f2f; }
-
-/* 縮小ボタン */
-#map-reset-zoom {
-    position: absolute;
-    bottom: 20px; right: 20px; /* PCでの位置 */
-    padding: 0;
-    background: rgba(0,0,0,0.7);
-    color: white; border: none; border-radius: 50%;
-    font-weight: bold; z-index: 500;
-    cursor: pointer;
-    width: 40px; height: 40px;
-    box-shadow: 0 2px 10px rgba(0,0,0,0.3);
-    display: flex; justify-content: center; align-items: center;
-    font-size: 1.2rem;
-}
-
-.castle-card {
-    width: var(--map-tile-size); 
-    height: var(--map-tile-size);
-    background: #fff; border: 1px solid #999; border-radius: 4px;
-    display: flex; flex-direction: column; justify-content: space-between;
-    padding: 2px; box-shadow: 2px 2px 5px rgba(0,0,0,0.2);
-    cursor: pointer; position: relative;
-    user-select: none;
-    font-size: 0.75rem;
-    grid-column: var(--c-x);
-    grid-row: var(--c-y);
-    z-index: 10;
-}
-.castle-card:hover { transform: translateY(-2px); box-shadow: 2px 4px 8px rgba(0,0,0,0.3); z-index: 20; }
-.castle-card.done { filter: grayscale(100%); opacity: 0.7; }
-.castle-card.active-turn { border: 3px solid #ff9800; box-shadow: 0 0 15px #ff9800; z-index: 15; }
-.castle-card.selectable-target { border: 3px solid #e91e63; animation: pulse 1s infinite; z-index: 25; cursor: crosshair; }
-.castle-card.dimmed { opacity: 0.3; filter: grayscale(80%); }
-
-@keyframes pulse { 0% { box-shadow: 0 0 0 0 rgba(233, 30, 99, 0.7); } 70% { box-shadow: 0 0 0 10px rgba(233, 30, 99, 0); } 100% { box-shadow: 0 0 0 0 rgba(233, 30, 99, 0); } }
-
-.card-header h3 { margin: 0; font-size: 0.9em; text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; background:#eee;}
-.card-owner { font-size: 0.7em; text-align: center; color: #555; }
-.param-grid { font-size: 0.7em; padding: 1px; }
-.param-item { display: flex; justify-content: space-between; }
-
-/* --- Mobile Bottom Command Bar --- */
-#bottom-command-bar {
-    flex: none;
-    background: #fff;
-    border-top: 1px solid var(--border-color);
-    padding-bottom: max(5px, env(safe-area-inset-bottom));
-    padding-left: 5px;
-    padding-right: 5px;
-    z-index: 200;
-    box-shadow: 0 -2px 5px rgba(0,0,0,0.1);
-    height: auto;
-    /* コマンドバーは少し小さく */
-    display: block;
-}
-
-/* モバイル用：コマンド上の情報エリア */
-#mobile-bottom-info {
-    padding: 5px 10px;
-    background: #f1f8e9;
-    border-bottom: 1px dashed #ccc;
-    font-size: 0.8rem;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    color: #33691e;
-    font-weight: bold;
-}
-
-.command-grid {
-    display: grid; 
-    grid-template-columns: repeat(3, 1fr); 
-    gap: 4px;
-    padding: 5px 0;
-}
-.cmd-btn {
-    padding: 0; /* padding減らす */
-    height: 38px; /* 高さ減らす */
-    border: 1px solid #bbb; background: #f8f9fa; border-radius: 4px;
-    cursor: pointer; font-size: 0.8rem; font-weight: bold;
-    display: flex; align-items: center; justify-content: center;
-    touch-action: manipulation;
-    white-space: nowrap;
-    overflow: hidden;
-}
-.cmd-btn:hover { background: #e3f2fd; }
-.cmd-btn:active { background: #bbdefb; transform: translateY(1px); }
-.cmd-btn.category { background: #e0f7fa; border-color: #0097a7; color: #006064; }
-.cmd-btn.finish { background: #ffebee; border-color: #ef5350; color: #c62828; grid-column: span 3; margin-top: 2px;}
-.cmd-btn.back { background: #cfd8dc; border-color: #90a4ae; color: #455a64; grid-column: span 3; }
-
-/* PC Sidebar (Default hidden) */
-#pc-sidebar { 
-    display: none !important; 
-}
-
-/* PC Layout Adjustment */
-@media (min-width: 769px) {
-    #app { 
-        flex-direction: row; 
-    }
-    #top-info-bar { display: none !important; }
-    #bottom-command-bar { display: none !important; }
-    #pc-map-overlay { display: block; }
-    #map-reset-zoom { bottom: 20px; right: 20px; }
-
-    /* PC Sidebar Logic */
-    #pc-sidebar {
-        display: flex !important;
-        flex-direction: column;
-        width: 300px; /* 少し細く */
-        background: #f5f5f5;
-        border-left: 1px solid #ccc;
-        box-shadow: -2px 0 5px rgba(0,0,0,0.1);
-        z-index: 200;
-        overflow-y: auto;
-        height: 100dvh;
-    }
-    #pc-command-area { padding: 10px; flex: 1; overflow-y: auto; }
-    
-    /* PCでのコマンドボタン */
-    .command-grid { grid-template-columns: repeat(2, 1fr); gap: 10px; }
-    .cmd-btn { padding: 15px; font-size: 1rem; height: auto; }
-    .cmd-btn.finish, .cmd-btn.back { grid-column: span 2; }
-}
-
-/* Modals & Overlays */
-.modal {
-    position: fixed; top: 0; left: 0; width: 100%; height: 100dvh;
-    background: rgba(0,0,0,0.6); 
-    z-index: 4000; 
-    display: flex; justify-content: center; align-items: center;
-    opacity: 1; transition: opacity 0.2s;
-    padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
-}
-.modal.hidden { opacity: 0; pointer-events: none; display: none !important;} 
-
-.modal-content {
-    background: #fff; padding: 20px; border-radius: 8px;
-    width: 90%; max-width: 800px; 
-    max-height: 80dvh;
-    display: flex; flex-direction: column;
-    box-shadow: 0 10px 25px rgba(0,0,0,0.5);
-    position: relative;
-}
-.modal-content h3 { margin-top: 0; border-bottom: 2px solid #ddd; padding-bottom: 10px; }
-.context-info { margin-bottom: 10px; padding: 10px; background: #e8eaf6; border-radius: 4px; font-size: 0.9rem; }
-
-/* List Styling */
-.list-header {
-    display: grid; 
-    grid-template-columns: 30px 30px 90px 40px repeat(6, 1fr); 
-    gap: 2px; font-weight: bold; background: #37474f; color:#fff; padding: 8px 5px; font-size: 0.8rem;
-    position: sticky; top: 0;
-}
-.list-container { flex: 1; overflow-y: auto; border: 1px solid #ddd; min-height: 200px; }
-.select-item {
-    display: grid; 
-    grid-template-columns: 30px 30px 90px 40px repeat(6, 1fr); 
-    gap: 2px; padding: 10px 5px; border-bottom: 1px solid #eee; cursor: pointer; font-size: 0.85rem; align-items: center;
-}
-.select-item:hover { background: #f0f8ff; }
-.select-item.disabled { color: #aaa; pointer-events: none; background: #f9f9f9; }
-
-/* Rank Colors */
-.grade-rank { font-weight: 900; text-shadow: 0 0 2px rgba(0,0,0,0.5); }
-.rank-s { color: #d32f2f; }
-.rank-a { color: #f57c00; }
-.rank-b { color: #fbc02d; }
-.rank-c { color: #7cb342; }
-.rank-d { color: #388e3c; }
-.rank-e { color: #1976d2; }
-
-/* Footer Buttons */
-.modal-footer { margin-top: 15px; display: flex; justify-content: flex-end; gap: 10px; padding-top: 10px; border-top: 1px solid #eee; flex-shrink: 0;}
-.btn-primary, .btn-secondary, .btn-danger {
-    padding: 10px 20px; border: none; border-radius: 4px; cursor: pointer; font-weight: bold;
-}
-.btn-primary { background: #1976d2; color: #fff; }
-.btn-secondary { background: #78909c; color: #fff; }
-.btn-danger { background: #d32f2f; color: #fff; }
-
-/* Specific Screens */
-.start-content { max-width: 600px; text-align: center; }
-.clan-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 10px; margin-top: 20px; overflow-y: auto;}
-.clan-btn { 
-    padding: 15px; border: 2px solid; border-radius: 8px; 
-    font-weight: bold; cursor: pointer; background: #fff;
-    transition: transform 0.1s; display: flex; justify-content: center; align-items: center;
-}
-.clan-btn:hover { transform: scale(1.05); }
-
-/* War Screen */
-.war-screen { flex: 1; display: flex; flex-direction: column; background: #e0e0e0; padding: 5px; border-radius: 4px; overflow: hidden;}
-.war-visual { flex: 1; display: flex; flex-direction: column; justify-content: space-around; align-items: center; background: #fff; margin-bottom: 5px; padding: 10px; overflow-y: auto;}
-.army-box { width: 90%; padding: 10px; border-radius: 8px; color: #fff; margin: 5px 0; }
-.army-box.attacker { background: #d32f2f; }
-.army-box.defender { background: #1976d2; }
-.highlight-val { font-size: 1.5rem; font-weight: bold; }
-.war-controls-area { display: grid; grid-template-columns: repeat(3, 1fr); gap: 5px; flex-shrink: 0;}
-.war-controls-area button { padding: 12px 2px; cursor: pointer; font-size: 0.9rem; background: #fff; border: 1px solid #999; border-radius: 4px; }
-.war-controls-area button:hover { background: #eee; }
-.disabled-area { pointer-events: none; opacity: 0.5; }
-
-/* Guide & Logs */
-#map-guide {
-    position: absolute; top: 10px; left: 50%; transform: translateX(-50%);
-    background: rgba(0,0,0,0.8); color: #fff; padding: 8px 20px; border-radius: 20px;
-    pointer-events: none; z-index: 600; font-weight: bold;
-    box-shadow: 0 2px 5px rgba(0,0,0,0.3);
-}
-#ai-guard {
-    position: absolute; top: 0; left: 0; width: 100%; height: 100%;
-    background: rgba(0,0,0,0.5); z-index: 1000;
-    display: flex; justify-content: center; align-items: center;
-    color: white; font-size: 1.5rem; font-weight: bold; flex-direction: column;
-}
-.cutin-overlay {
-    position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-    background: rgba(0,0,0,0.7); z-index: 5000; pointer-events: none;
-    display: flex; justify-content: center; align-items: center;
-    opacity: 0; transition: opacity 0.5s;
-}
-.cutin-overlay.fade-in { opacity: 1; }
-.cutin-text {
-    font-size: 2rem; color: #fff; font-weight: bold;
-    text-shadow: 0 0 10px #ff0000; white-space: pre-wrap; text-align: center;
-    transform: scale(0); transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-}
-.cutin-overlay.fade-in .cutin-text { transform: scale(1); }
-
-/* Quantity Modal Range Inputs */
-.qty-row { margin-bottom: 15px; }
-.qty-control { display: flex; align-items: center; gap: 10px; }
-.qty-control input[type="range"] { flex: 1; }
-.qty-control input[type="number"] { width: 80px; padding: 5px; text-align: right; }
-}
+/* ★★★ 修正禁止エリア終わり ★★★ */
