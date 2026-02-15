@@ -58,7 +58,7 @@
             <div class="cutin-text" id="cutin-message"></div>
         </div>
 
-        <div id="scenario-screen" class="modal hidden">
+        <div id="scenario-modal" class="modal hidden">
             <div class="modal-content start-content">
                 <h2>シナリオ選択</h2>
                 <div id="scenario-list" class="scenario-list"></div>
@@ -71,7 +71,7 @@
         <div id="start-screen" class="modal hidden">
             <div class="modal-content start-content">
                 <h2>大名家選択</h2>
-                <p>天下統一を目指す大名家を選んでください</p>
+                <p>担当する大名家を選んでください</p>
                 <div id="clan-selector"></div>
             </div>
         </div>
@@ -97,7 +97,7 @@
                 
                 <div class="selector-actions">
                     <button id="selector-confirm-btn" class="btn-primary">決定</button>
-                    <button class="btn-secondary" onclick="window.GameApp.ui.closeSelector()">戻る</button>
+                    <button id="selector-cancel-btn" class="btn-secondary">戻る</button>
                 </div>
             </div>
         </div>
@@ -105,7 +105,7 @@
         <div id="quantity-modal" class="modal hidden">
             <div class="modal-content quantity-content">
                 <h2 id="quantity-title">数量指定</h2>
-                <div id="charity-type-selector" class="hidden" style="margin-bottom:15px; text-align:center;">
+                <div id="charity-type-selector" class="hidden radio-group">
                     <label><input type="radio" name="charityType" value="gold" checked> 金のみ</label>
                     <label><input type="radio" name="charityType" value="rice"> 兵糧のみ</label>
                     <label><input type="radio" name="charityType" value="both"> 両方</label>
@@ -192,6 +192,7 @@
                         <div class="army-stats">
                             <div>大将: <span id="war-atk-busho"></span></div>
                             <div>兵士: <span id="war-atk-soldier" class="highlight-val"></span></div>
+                            <div>士気: <span id="war-atk-morale"></span></div>
                         </div>
                     </div>
                     <div class="vs-badge">VS</div>
