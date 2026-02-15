@@ -58,9 +58,20 @@
             <div class="cutin-text" id="cutin-message"></div>
         </div>
 
+        <div id="scenario-screen" class="modal hidden">
+            <div class="modal-content start-content">
+                <h2>シナリオ選択</h2>
+                <div id="scenario-list" class="scenario-list"></div>
+                <div class="modal-footer" style="justify-content: center;">
+                    <button class="btn-secondary" onclick="window.GameApp.ui.returnToTitle()">戻る</button>
+                </div>
+            </div>
+        </div>
+
         <div id="start-screen" class="modal hidden">
             <div class="modal-content start-content">
                 <h2>大名家選択</h2>
+                <p>天下統一を目指す大名家を選んでください</p>
                 <div id="clan-selector"></div>
             </div>
         </div>
@@ -86,7 +97,7 @@
                 
                 <div class="selector-actions">
                     <button id="selector-confirm-btn" class="btn-primary">決定</button>
-                    <button onclick="window.GameApp.ui.closeSelector()" class="btn-secondary">戻る</button>
+                    <button class="btn-secondary" onclick="window.GameApp.ui.closeSelector()">戻る</button>
                 </div>
             </div>
         </div>
