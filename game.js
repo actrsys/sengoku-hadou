@@ -1,6 +1,13 @@
+{
+type: uploaded file
+fileName: game.js
+fullContent:
 /**
- * 戦国シミュレーションゲーム - 完全修正版 v10.0
- * 修正: 大名能力秘匿, 調略ターゲット制限, UIレイアウト刷新(スマホ最適化・PCオーバーレイ), 戻るボタンロジック
+ * 戦国シミュレーションゲーム - 修正版 v10.3
+ * 修正内容:
+ * 1. 軍師システム完全実装（不在時の秘匿、相性による過大・過小評価バイアス、忠義による補正）
+ * 2. 調査システムの強化（複数武将の能力加算、低知略時の誤情報表示）
+ * 3. 自軍情報の表示ロジック修正（軍師依存）
  */
 
 window.onerror = function(message, source, lineno, colno, error) {
@@ -247,44 +254,79 @@ class GameSystem {
         else if (val >= 40) { rank = "E+"; cls = "rank-e"; } else { rank = "E"; cls = "rank-e"; }
         return `<span class="grade-rank ${cls}">${rank}</span>`;
     }
-    static getPerceivedStatValue(target, statName, gunshi, castleAccuracy, playerClanId) {
-        // 自勢力の大名・武将は正確
-        if (target.clan === playerClanId) return target[statName];
-
-        // --- 以下、敵または在野 ---
+    
+    // ★修正: 軍師システム・調査精度ロジックの再実装
+    static getPerceivedStatValue(target, statName, gunshi, castleAccuracy, playerClanId, daimyo = null) {
         const realVal = target[statName];
+
+        // 1. 自軍武将の場合
+        if (target.clan === playerClanId) {
+            // 大名は常に正確
+            if (target.isDaimyo) return realVal;
+            // 軍師不在なら不明
+            if (!gunshi) return null; 
+
+            // 軍師による評価
+            // 基本精度は軍師の知略依存
+            const baseAcc = gunshi.intelligence;
+            
+            // 相性によるバイアス計算
+            // 距離(0-100): 近いほど0, 遠いほど100
+            const dist = this.calcValueDistance(gunshi, target);
+            
+            // バイアス方向: 相性が良い(距離が近い)と過大評価、悪いと過小評価
+            // distが小さい(相性良) -> biasFactorは正(1.0以上)
+            // distが大きい(相性悪) -> biasFactorは負(1.0未満)
+            // 例: dist=0 -> factor=1.2 (20%増), dist=100 -> factor=0.8 (20%減)
+            let biasFactor = 1.0 + ((50 - dist) / 250); // ±0.2程度のバイアス
+
+            // 忠義補正: 軍師の義理・忠誠が高く、大名との相性が良ければバイアスを抑制(1.0に近づける)
+            if (daimyo) {
+                const gunshiLoyalty = (gunshi.loyalty + gunshi.duty) / 2;
+                const gunshiDaimyoDist = this.calcValueDistance(gunshi, daimyo);
+                const fairness = (gunshiLoyalty * 0.005) + ((100 - gunshiDaimyoDist) * 0.005); // 0.0 ~ 1.0
+                // fairnessが高いほどbiasFactorを1.0に近づける
+                biasFactor = 1.0 + (biasFactor - 1.0) * (1.0 - fairness);
+            }
+
+            // 最終計算: 知略によるランダム誤差 + バイアス
+            const randomErrorRange = (120 - baseAcc) * 0.5; 
+            const randomError = (Math.random() - 0.5) * randomErrorRange;
+            
+            let perceived = (realVal + randomError) * biasFactor;
+            return Math.max(1, Math.min(120, Math.floor(perceived)));
+        }
+
+        // 2. 敵・在野武将の場合
         
-        // 調査済みの場合
+        // 調査済みの場合 (accuracy 0-100)
         if (castleAccuracy !== null && castleAccuracy > 0) {
-            const maxErr = 40 * (1.0 - (castleAccuracy / 100));
+            // 精度が高いほど誤差が小さい
+            // accuracy 100 -> 誤差なし, accuracy 10 -> 誤差大
+            const maxErr = 50 * (1.0 - (castleAccuracy / 100));
             const err = (Math.random() - 0.5) * 2 * maxErr;
             return Math.max(1, Math.min(120, Math.floor(realVal + err)));
         }
         
-        // 未調査だが、軍師がいる場合
+        // 未調査だが、軍師がいる場合の推測 (精度低)
         if (gunshi) {
-            const noise = (120 - gunshi.intelligence);
+            const noise = (130 - gunshi.intelligence);
             const err = (Math.random() - 0.5) * noise * 2;
             return Math.max(1, Math.min(120, Math.floor(realVal + err)));
         }
         
-        // 全く情報なし (ランダム)
-        return 30 + Math.floor(Math.random() * 70);
+        // 全く情報なし
+        return null;
     }
     
-    static getDisplayStatHTML(target, statName, gunshi, castleAccuracy = null, playerClanId = 0) {
-        // 自軍は常に見える
-        if (target.clan === playerClanId) return this.toGradeHTML(target[statName]);
-        
-        // ★修正: 他家の大名も一般武将と同様に隠蔽する（例外を削除）
-        // 調査済みの場合
-        if (castleAccuracy !== null && castleAccuracy >= 30) {
-             const pVal = this.getPerceivedStatValue(target, statName, null, castleAccuracy, playerClanId);
-             return this.toGradeHTML(pVal);
-        }
+    static getDisplayStatHTML(target, statName, gunshi, castleAccuracy = null, playerClanId = 0, daimyo = null) {
+        // 自軍大名は常に表示
+        if (target.clan === playerClanId && target.isDaimyo) return this.toGradeHTML(target[statName]);
 
-        // 調査なしかつ精度が低い -> 「？」
-        return "？";
+        const val = this.getPerceivedStatValue(target, statName, gunshi, castleAccuracy, playerClanId, daimyo);
+        
+        if (val === null) return "？";
+        return this.toGradeHTML(val);
     }
 
     static calcDevelopment(busho) { const base = GAME_SETTINGS.Economy.BaseDevelopment + (busho.politics * GAME_SETTINGS.Economy.PoliticsEffect); return this.applyVariance(base, GAME_SETTINGS.Economy.DevelopFluctuation); }
@@ -337,16 +379,33 @@ class GameSystem {
         return { soldierDmg: Math.floor(baseDmg * soldierRate), wallDmg: Math.floor(baseDmg * wallRate * 0.5), risk: counterRisk };
     }
     static calcRetreatScore(castle) { return castle.soldiers + (castle.defense * 0.5) + (castle.gold * 0.1) + (castle.rice * 0.1) + (castle.samuraiIds.length * 100); }
+    
+    // ★修正: 調査ロジック（複数人・能力合算）
     static calcInvestigate(bushos, targetCastle) {
-        if (bushos.length === 0) return { success: false, accuracy: 0 };
-        const maxStr = Math.max(...bushos.map(b => b.strength));
-        const maxInt = Math.max(...bushos.map(b => b.intelligence));
+        if (!bushos || bushos.length === 0) return { success: false, accuracy: 0 };
+        
+        // 最大ステータスを持つ武将を探す
+        const maxStrBusho = bushos.reduce((a,b) => a.strength > b.strength ? a : b);
+        const maxIntBusho = bushos.reduce((a,b) => a.intelligence > b.intelligence ? a : b);
+        
+        // 補佐ボーナス (自分以外の武将の能力の20%を加算)
+        const assistStr = bushos.filter(b => b !== maxStrBusho).reduce((sum, b) => sum + b.strength, 0) * 0.2;
+        const assistInt = bushos.filter(b => b !== maxIntBusho).reduce((sum, b) => sum + b.intelligence, 0) * 0.2;
+
+        const totalStr = maxStrBusho.strength + assistStr;
+        const totalInt = maxIntBusho.intelligence + assistInt;
+
         const difficulty = 30 + Math.random() * GAME_SETTINGS.Strategy.InvestigateDifficulty;
-        const isSuccess = maxStr > difficulty;
+        const isSuccess = totalStr > difficulty;
+        
         let accuracy = 0;
-        if (isSuccess) accuracy = Math.min(100, Math.max(10, (maxInt * 0.8) + (Math.random() * 20)));
+        if (isSuccess) {
+            // 知略が高いほど精度向上
+            accuracy = Math.min(100, Math.max(10, (totalInt * 0.8) + (Math.random() * 20)));
+        }
         return { success: isSuccess, accuracy: Math.floor(accuracy) };
     }
+
     static calcIncite(busho) { const score = (busho.intelligence * 0.7) + (busho.strength * 0.3); const success = Math.random() < (score / GAME_SETTINGS.Strategy.InciteFactor); if(!success) return { success: false, val: 0 }; return { success: true, val: Math.floor(score * 2) }; }
     static calcRumor(busho, targetBusho) { const score = (busho.intelligence * 0.7) + (busho.strength * 0.3); const defScore = (targetBusho.intelligence * 0.5) + (targetBusho.loyalty * 0.5); const success = Math.random() < (score / (defScore + GAME_SETTINGS.Strategy.RumorFactor)); if(!success) return { success: false, val: 0 }; return { success: true, val: Math.floor(20 + Math.random()*20) }; }
     static calcAffinityDiff(a, b) { const diff = Math.abs(a - b); return Math.min(diff, 100 - diff); }
@@ -910,6 +969,9 @@ class UIManager {
         }
 
         const gunshi = this.game.getClanGunshi(this.game.playerClanId);
+        // ★修正: 大名の取得（軍師査定用）
+        const myDaimyo = this.game.bushos.find(b => b.clan === this.game.playerClanId && b.isDaimyo);
+
         if (['farm','commerce','repair','draft','charity','training','soldier_charity','war_deploy','transport_deploy','investigate_deploy'].includes(actionType)) {
             isMulti = true;
         }
@@ -919,14 +981,12 @@ class UIManager {
         else if (actionType === 'employ_target') { bushos = this.game.getCastleBushos(c.id).filter(b => b.status === 'ronin'); infoHtml = "<div>登用する在野武将を選択してください</div>"; sortKey = 'strength'; } 
         else if (actionType === 'employ_doer') { bushos = this.game.getCastleBushos(c.id).filter(b => b.status !== 'ronin'); infoHtml = "<div>登用を行う担当官を選択してください (魅力重視)</div>"; sortKey = 'charm'; } 
         else if (actionType === 'diplomacy_doer') { bushos = this.game.getCastleBushos(c.id).filter(b => b.status !== 'ronin'); infoHtml = "<div>外交の担当官を選択してください (外交重視)</div>"; sortKey = 'diplomacy'; }
-        // ★修正: 流言の対象は大名と城主を除外
         else if (actionType === 'rumor_target_busho') { 
             bushos = this.game.getCastleBushos(targetId).filter(b => b.status !== 'ronin' && !b.isDaimyo && !b.isCastellan); 
             infoHtml = "<div>流言の対象とする武将を選択してください</div>"; sortKey = 'loyalty'; 
         }
         else if (actionType === 'rumor_doer') { bushos = this.game.getCastleBushos(c.id).filter(b => b.status !== 'ronin'); infoHtml = "<div>流言を実行する担当官を選択してください</div>"; sortKey = 'intelligence'; }
         else if (actionType === 'incite_doer') { bushos = this.game.getCastleBushos(c.id).filter(b => b.status !== 'ronin'); infoHtml = "<div>扇動を実行する担当官を選択してください</div>"; sortKey = 'intelligence'; }
-        // ★修正: 引抜の対象は大名と城主を除外
         else if (actionType === 'headhunt_target') { 
             bushos = this.game.getCastleBushos(targetId).filter(b => b.status !== 'ronin' && !b.isDaimyo && !b.isCastellan); 
             infoHtml = "<div>引抜の対象とする武将を選択してください (忠誠・義理重視)</div>"; sortKey = 'loyalty'; 
@@ -935,7 +995,7 @@ class UIManager {
         else if (actionType === 'interview') { bushos = this.game.getCastleBushos(c.id).filter(b => b.status !== 'ronin'); infoHtml = "<div>面談する武将を選択してください</div>"; sortKey = 'leadership'; }
         else if (actionType === 'interview_target') { bushos = this.game.bushos.filter(b => b.status !== 'dead' && b.status !== 'ronin' && b.id !== extraData.interviewer.id); infoHtml = `<div>誰についての印象を聞きますか？</div>`; sortKey = 'leadership'; }
         else if (actionType === 'reward') { bushos = this.game.getCastleBushos(c.id).filter(b => b.status !== 'ronin'); infoHtml = "<div>褒美を与える武将を選択してください</div>"; sortKey = 'loyalty'; }
-        else if (actionType === 'investigate_deploy') { bushos = this.game.getCastleBushos(c.id).filter(b => b.status !== 'ronin'); infoHtml = "<div>調査を行う武将を選択してください</div>"; sortKey = 'intelligence'; }
+        else if (actionType === 'investigate_deploy') { bushos = this.game.getCastleBushos(c.id).filter(b => b.status !== 'ronin'); infoHtml = "<div>調査を行う武将を選択してください(複数可)</div>"; sortKey = 'intelligence'; }
         else if (actionType === 'view_only') { bushos = this.game.getCastleBushos(targetId); infoHtml = "<div>武将一覧 (精度により情報は隠蔽されます)</div>"; sortKey = 'leadership'; }
         else {
             bushos = this.game.getCastleBushos(c.id).filter(b => b.status !== 'ronin');
@@ -953,8 +1013,10 @@ class UIManager {
             const getSortVal = (target) => {
                  let acc = null;
                  if (isEnemyTarget && targetCastle) acc = targetCastle.investigatedAccuracy;
-                 if (isEnemyTarget) return GameSystem.getPerceivedStatValue(target, sortKey, gunshi, acc, this.game.playerClanId) || 0;
-                 return GameSystem.getPerceivedStatValue(target, sortKey, gunshi, null, this.game.playerClanId) || 0;
+                 if (isEnemyTarget) return GameSystem.getPerceivedStatValue(target, sortKey, gunshi, acc, this.game.playerClanId, myDaimyo) || 0;
+                 // ★修正: 自軍武将のソートにも軍師査定を適用
+                 const val = GameSystem.getPerceivedStatValue(target, sortKey, gunshi, null, this.game.playerClanId, myDaimyo);
+                 return val === null ? 0 : val;
             };
             return getSortVal(b) - getSortVal(a);
         });
@@ -976,7 +1038,8 @@ class UIManager {
             if (['employ_target','appoint_gunshi','rumor_target_busho','headhunt_target','interview_target','reward','view_only'].includes(actionType)) isSelectable = true;
             
             let acc = null; if (isEnemyTarget && targetCastle) acc = targetCastle.investigatedAccuracy;
-            const getStat = (stat) => GameSystem.getDisplayStatHTML(b, stat, gunshi, acc, this.game.playerClanId);
+            // ★修正: 表示用HTML生成時にDaimyo情報を渡す
+            const getStat = (stat) => GameSystem.getDisplayStatHTML(b, stat, gunshi, acc, this.game.playerClanId, myDaimyo);
 
             const div = document.createElement('div'); div.className = `select-item ${!isSelectable ? 'disabled' : ''}`;
             const inputType = isMulti ? 'checkbox' : 'radio';
@@ -1434,7 +1497,7 @@ class GameManager {
                 this.ui.showResultModal(`${busho.name}を城主に任命しました`); 
             }
             if (type === 'appoint_gunshi') { 
-                const oldGunshi = this.bushos.find(b => b.clan === this.game.playerClanId && b.isGunshi); if (oldGunshi) oldGunshi.isGunshi = false; 
+                const oldGunshi = this.bushos.find(b => b.clan === this.playerClanId && b.isGunshi); if (oldGunshi) oldGunshi.isGunshi = false; 
                 busho.isGunshi = true; 
                 this.ui.showResultModal(`${busho.name}を軍師に任命しました`); 
             }
