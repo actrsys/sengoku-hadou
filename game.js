@@ -1,8 +1,10 @@
 /**
- * 戦国シミュレーションゲーム - カスタマイズ特化版
+ * 戦国シミュレーションゲーム - 乱数・変動幅 カスタマイズ版
  * * 【カスタマイズガイド】
- * ゲームバランスを変更したい場合は、以下の `GAME_SETTINGS` の数値を変更してください。
- * プログラムの知識がなくても、ここの数値をいじるだけで難易度やゲーム性を大きく変えられます。
+ * 数値を固定ではなく「ランダムに変動」させたい場合は、各項目の `Fluctuation` (変動率) を調整してください。
+ * 例: 0.0 = 変動なし (常に固定)
+ * 0.2 = ±20% の範囲でランダム変動 (100なら 80〜120 の間になる)
+ * 0.5 = ±50% の範囲でランダム変動
  */
 
 /* ==========================================================================
@@ -10,53 +12,66 @@
    ========================================================================== */
 const GAME_SETTINGS = {
     // --- 基本設定 ---
-    StartYear: 1560,      // 開始年
-    StartMonth: 1,        // 開始月
+    StartYear: 1560,
+    StartMonth: 1,
     
     // --- 内政・経済バランス ---
     Economy: {
-        IncomeGoldRate: 0.5,        // [収入] 商業値に対する金収入の倍率 (例: 0.5なら商業1000で金500収入)
-        IncomeRiceRate: 10.0,       // [収入] 石高に対する兵糧収入の倍率 (9月の収穫時のみ適用)
+        IncomeGoldRate: 0.5,        // [収入] 商業値に対する金収入の倍率
+        IncomeRiceRate: 10.0,       // [収入] 石高に対する兵糧収入の倍率
+        
+        // ★ ランダム変動設定 (0.1 = ±10%)
+        IncomeFluctuation: 0.15,    // 毎月の収入額のブレ幅
+        
         ConsumeRicePerSoldier: 0.05,// [消費] 兵士1人あたりの毎月の兵糧消費量
         ConsumeGoldPerBusho: 50,    // [消費] 武将1人あたりの毎月の金俸禄
         
-        // 開発コマンドの効率
-        BaseDevelopment: 10,        // [開発] 政治が低い武将でも最低限上がる数値
-        PoliticsEffect: 1.0,        // [開発] 武将の「政治」能力が開発値に与える影響 (大きいほど高政治が有利)
+        // 開発コマンド
+        BaseDevelopment: 10,        // 開発の基礎値
+        PoliticsEffect: 0.6,        // 政治力の影響係数
+        DevelopFluctuation: 0.15,   // 開発結果のブレ幅 (同じ能力でも結果が変わる)
         
-        // 修復コマンドの効率
+        // 修復コマンド
         BaseRepair: 20,             // [修復] 最低限上がる防御度
-        RepairEffect: 1.0,          // [修復] 「政治」能力の影響度
+        RepairEffect: 0.6,          // [修復] 「政治」能力の影響度
+        RepairFluctuation: 0.15,    // 修復結果のブレ幅
         
-        // 施しコマンドの効率
+        // 施しコマンド
         BaseCharity: 10,            // [施し] 最低限上がる民忠
         CharmEffect: 0.4,           // [施し] 「魅力」能力の影響度
+        CharityFluctuation: 0.15,   // 施し結果のブレ幅
         
-        // 相場変動
+        // 相場
         TradeRateMin: 0.5,          // 米相場の最小値 (米1 = 金0.5)
-        TradeRateMax: 3.0,          // 米相場の最大値 (米1 = 金3.0)
-        TradeFluctuation: 0.2       // 毎月の相場変動幅
+        TradeRateMax: 3.0,          // 米相場の最大値 (米1 = 金3.0
+        TradeFluctuation: 0.15      // 相場の変動幅
     },
 
     // --- 軍事バランス ---
     Military: {
         // 徴兵
-        DraftBase: 100,             // [徴兵] 最低限集まる兵数
-        DraftStatBonus: 2.0,        // [徴兵] 武将の能力(統率+武力+魅力)によるボーナス倍率
-        DraftPopRatio: 0.1,         // [徴兵] 人口の何割まで徴兵できるか (0.1 = 10%)
+        DraftBase:  50,             // 最低限集まる兵数
+        DraftStatBonus: 1.5,        // 能力ボーナス倍率
+        DraftPopRatio: 0.05,        // 人口の何割まで徴兵できるか
+        DraftFluctuation: 0.15,     // 徴兵数のブレ幅 (0.2 = ±20%
         
         // 訓練・士気
-        BaseTraining: 5,            // [訓練] 最低上昇値
-        TrainingLdrEffect: 0.2,     // [訓練] 「統率」の影響度
-        TrainingStrEffect: 0.1,     // [訓練] 「武力」の影響度
-        BaseMorale: 5,              // [士気] 最低上昇値（兵施し）
+        BaseTraining: 0,            // [訓練] 最低上昇値
+        TrainingLdrEffect: 0.3,     // [訓練] 「統率」の影響度
+        TrainingStrEffect: 0.2,     // [訓練] 「武力」の影響度
+        TrainingFluctuation: 0.15,  // 訓練上昇値のブレ幅
+        
+        BaseMorale: 0,              // [士気] 最低上昇値（兵施し）
+        MoraleFluctuation: 0.2,     // 士気上昇値のブレ幅
         
         // 戦争・ダメージ計算
         WarMaxRounds: 10,           // 戦争の最大ラウンド数 (これを超えると引き分け)
         DamageSoldierPower: 0.05,   // 兵数が攻撃力に与える影響 (大きいほど「数こそ力」になる)
         WallDefenseEffect: 0.5,     // 城の防御度が守備力に与える影響 (大きいほど城が硬くなる)
         
-        // 部隊の種類による補正
+        // ★ 戦闘ダメージのランダム性
+        DamageFluctuation: 0.2,     // ダメージ計算時の最終的な乱数幅 (0.2 = ±20%)
+        
         UnitTypeBonus: {
             BowAttack: 0.6,         // 弓攻撃の攻撃力倍率 (低めだが反撃を受けにくい設定に使用)
             SiegeAttack: 1.0,       // 城攻めの攻撃力倍率
@@ -65,7 +80,7 @@ const GAME_SETTINGS = {
         }
     },
 
-    // --- 謀略・外交の成功率 ---
+    // --- 謀略・外交 ---
     Strategy: {
         InvestigateDifficulty: 50,  // [調査] 基本難易度 (高いほど成功しにくい)
         InciteFactor: 150,          // [扇動] 成功率の分母 (数値を大きくすると成功しにくくなる)
@@ -74,7 +89,7 @@ const GAME_SETTINGS = {
         EmploymentDiff: 1.5         // [登用] 難易度係数 (大きいほど登用しにくい)
     },
 
-    // --- AI (CPU) の思考 ---
+    // --- AI ---
     AI: {
         Aggressiveness: 1.5,        // 攻撃判断の閾値 (小さいほど好戦的、大きいほど慎重)
                                     // 1.0なら「自軍と敵軍が同数」でも攻める。1.5なら「1.5倍の差」が必要。
@@ -84,20 +99,8 @@ const GAME_SETTINGS = {
     }
 };
 
-// シナリオ一覧
-const SCENARIOS = [
-    { 
-        id: '1560_okehazama', 
-        name: '1560年 桶狭間の戦い', 
-        desc: '尾張の織田信長が今川義元を討ち取り、乱世が大きく動き出す。',
-        folder: '1560_okehazama',
-        startYear: 1560
-    }
-];
-
 /* ==========================================================================
    これより下はゲームエンジン本体です
-   （ロジックを変更する場合以外は編集不要です）
    ========================================================================== */
 
 /* --- Data Manager --- */
@@ -114,7 +117,7 @@ class DataManager {
             const castles = this.parseCSV(castlesText, Castle);
             const bushos = this.parseCSV(bushosText, Busho);
             this.joinData(clans, castles, bushos);
-            if (true) this.generateGenericBushos(bushos, castles, clans); // 汎用武将生成は常にON
+            if (true) this.generateGenericBushos(bushos, castles, clans);
             return { clans, castles, bushos };
         } catch (error) {
             console.error("データ読み込みエラー:", error);
@@ -166,7 +169,6 @@ class DataManager {
     static generateGenericBushos(bushos, castles, clans) {
         let idCounter = 90000;
         const personalities = ['aggressive', 'cautious', 'balanced'];
-        
         clans.forEach(clan => {
             const clanCastles = castles.filter(c => c.ownerClan === clan.id);
             if(clanCastles.length === 0) return;
@@ -230,35 +232,49 @@ class Castle {
     }
 }
 
-/* --- Logic (計算式などはここで GAME_SETTINGS を使って計算します) --- */
+/* --- Logic (乱数処理を追加) --- */
 class GameSystem {
     static seededRandom(seed) { let x = Math.sin(seed++) * 10000; return x - Math.floor(x); }
     
+    // ★ 新機能: 基準値にブレ幅(±fluctuation%)を適用して返す便利関数
+    // 例: val=100, fluctuation=0.2 の場合、80〜120の値をランダムに返す
+    static applyVariance(val, fluctuation) {
+        if (!fluctuation || fluctuation === 0) return Math.floor(val);
+        const min = 1.0 - fluctuation;
+        const max = 1.0 + fluctuation;
+        const rate = min + Math.random() * (max - min);
+        return Math.floor(val * rate);
+    }
+
     // 開発値計算
     static calcDevelopment(busho) { 
-        return Math.floor(GAME_SETTINGS.Economy.BaseDevelopment + (busho.politics * GAME_SETTINGS.Economy.PoliticsEffect)); 
+        const base = GAME_SETTINGS.Economy.BaseDevelopment + (busho.politics * GAME_SETTINGS.Economy.PoliticsEffect); 
+        return this.applyVariance(base, GAME_SETTINGS.Economy.DevelopFluctuation);
     }
     
     // 修復値計算
     static calcRepair(busho) { 
-        return Math.floor(GAME_SETTINGS.Economy.BaseRepair + (busho.politics * GAME_SETTINGS.Economy.RepairEffect)); 
+        const base = GAME_SETTINGS.Economy.BaseRepair + (busho.politics * GAME_SETTINGS.Economy.RepairEffect); 
+        return this.applyVariance(base, GAME_SETTINGS.Economy.RepairFluctuation);
     }
     
     // 施し計算
     static calcCharity(busho, type) { 
-        let val = Math.floor(GAME_SETTINGS.Economy.BaseCharity + (busho.charm * GAME_SETTINGS.Economy.CharmEffect)); 
-        if (type === 'both') val = Math.floor(val * 1.5); 
-        return val; 
+        let val = GAME_SETTINGS.Economy.BaseCharity + (busho.charm * GAME_SETTINGS.Economy.CharmEffect); 
+        if (type === 'both') val = val * 1.5; 
+        return this.applyVariance(val, GAME_SETTINGS.Economy.CharityFluctuation); 
     }
     
     // 訓練度計算
     static calcTraining(busho) { 
-        return Math.floor(GAME_SETTINGS.Military.BaseTraining + (busho.leadership * GAME_SETTINGS.Military.TrainingLdrEffect + busho.strength * GAME_SETTINGS.Military.TrainingStrEffect)); 
+        const base = GAME_SETTINGS.Military.BaseTraining + (busho.leadership * GAME_SETTINGS.Military.TrainingLdrEffect + busho.strength * GAME_SETTINGS.Military.TrainingStrEffect); 
+        return this.applyVariance(base, GAME_SETTINGS.Military.TrainingFluctuation);
     }
     
     // 士気計算
     static calcSoldierCharity(busho) { 
-        return Math.floor(GAME_SETTINGS.Military.BaseMorale + (busho.leadership * 0.2 + busho.charm * 0.1)); 
+        const base = GAME_SETTINGS.Military.BaseMorale + (busho.leadership * 0.2 + busho.charm * 0.1); 
+        return this.applyVariance(base, GAME_SETTINGS.Military.MoraleFluctuation);
     }
     
     // 徴兵数計算
@@ -267,10 +283,15 @@ class GameSystem {
         return Math.floor(gold * 1.0 * bonus); 
     }
     
-    // 徴兵限界計算
+    // 徴兵限界計算 (★ここで乱数を大きく適用しています)
     static calcDraftLimit(castle) { 
         const loyaltyFactor = castle.loyalty / 1000; 
-        return Math.max(GAME_SETTINGS.Military.DraftBase, Math.floor(castle.population * GAME_SETTINGS.Military.DraftPopRatio * loyaltyFactor)); 
+        const popLimit = castle.population * GAME_SETTINGS.Military.DraftPopRatio * loyaltyFactor;
+        
+        // 設定された最低値をベースに乱数を適用
+        const baseLimit = this.applyVariance(GAME_SETTINGS.Military.DraftBase, GAME_SETTINGS.Military.DraftFluctuation);
+        
+        return Math.max(baseLimit, Math.floor(popLimit)); 
     }
     
     static isAdjacent(c1, c2) { return (Math.abs(c1.x - c2.x) + Math.abs(c1.y - c2.y)) === 1; }
@@ -280,7 +301,6 @@ class GameSystem {
         return Math.floor(((currVal * currNum) + (newVal * newNum)) / (currNum + newNum)); 
     }
     
-    // 部隊能力計算
     static calcUnitStats(bushos) { 
         if (!bushos || bushos.length === 0) return { ldr:30, str:30, int:30, charm:30 }; 
         const sorted = [...bushos].sort((a,b) => b.leadership - a.leadership); 
@@ -297,15 +317,14 @@ class GameSystem {
         return { ldr: Math.floor(totalLdr), str: Math.floor(totalStr), int: Math.floor(totalInt), charm: leader.charm }; 
     }
     
-    // 戦闘ダメージ計算
     static calcWarDamage(atkStats, defStats, atkSoldiers, defSoldiers, defWall, atkMorale, defTraining, type) {
-        const rand = 0.9 + (Math.random() * 0.2);
+        // 設定値から乱数を取得 (DamageFluctuation を使用)
+        const fluctuation = GAME_SETTINGS.Military.DamageFluctuation || 0.2;
+        const rand = 1.0 - fluctuation + (Math.random() * fluctuation * 2);
+
         const moraleBonus = (atkMorale - 50) / 100; const trainingBonus = (defTraining - 50) / 100;
         
-        // 攻撃力: 統率と武力、そして兵数による
         const atkPower = ((atkStats.ldr * 1.2) + (atkStats.str * 0.3) + (atkSoldiers * GAME_SETTINGS.Military.DamageSoldierPower)) * (1.0 + moraleBonus);
-        
-        // 防御力: 統率と知略、城壁防御、兵数による
         const defPower = ((defStats.ldr * 1.0) + (defStats.int * 0.5) + (defWall * GAME_SETTINGS.Military.WallDefenseEffect) + (defSoldiers * GAME_SETTINGS.Military.DamageSoldierPower)) * (1.0 + trainingBonus);
         
         let multiplier = 1.0, soldierRate = 1.0, wallRate = 0.0, counterRisk = 1.0;
@@ -678,8 +697,14 @@ class GameManager {
             if (c.ownerClan === 0) return;
             c.isDone = false;
             let income = Math.floor(c.commerce * GAME_SETTINGS.Economy.IncomeGoldRate);
+            income = GameSystem.applyVariance(income, GAME_SETTINGS.Economy.IncomeFluctuation); // ★ 収入変動
+            
             if(this.month === 3) income += 500; c.gold += income; 
-            if(this.month === 9) c.rice += c.kokudaka * GAME_SETTINGS.Economy.IncomeRiceRate;
+            if(this.month === 9) {
+                let riceIncome = c.kokudaka * GAME_SETTINGS.Economy.IncomeRiceRate;
+                riceIncome = GameSystem.applyVariance(riceIncome, GAME_SETTINGS.Economy.IncomeFluctuation); // ★ 収穫変動
+                c.rice += riceIncome;
+            }
             if (isPopGrowth) { 
                 let growth = 0;
                 if(c.loyalty < 300) growth = -Math.floor(c.population * 0.01);
@@ -760,7 +785,14 @@ class GameManager {
         const castle = this.getCurrentTurnCastle(); const goldPerBusho = Math.floor(goldAmount / bushoIds.length); let totalSoldiers = 0, totalPopLost = 0;
         if (castle.gold < goldAmount) { alert("資金不足"); return; }
         bushoIds.forEach(bid => {
-            const busho = this.getBusho(bid); const limit = GameSystem.calcDraftLimit(castle); let draftNum = GameSystem.calcDraftFromGold(goldPerBusho, busho); draftNum = Math.min(draftNum, limit, castle.population);
+            const busho = this.getBusho(bid); 
+            
+            // 徴兵可能数を計算 (★変動幅を考慮)
+            let limit = GameSystem.calcDraftLimit(castle); 
+            
+            let draftNum = GameSystem.calcDraftFromGold(goldPerBusho, busho); 
+            draftNum = Math.min(draftNum, limit, castle.population);
+            
             if (draftNum > 0) {
                 castle.training = GameSystem.calcWeightedAvg(castle.training, castle.soldiers, 30, draftNum);
                 castle.morale = GameSystem.calcWeightedAvg(castle.morale, castle.soldiers, 30, draftNum);
