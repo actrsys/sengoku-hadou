@@ -37,28 +37,33 @@
     </div>
 
     <div id="app" class="hidden">
+        <div id="mobile-top-bar" class="mobile-only">
+            </div>
+
         <div id="map-wrapper">
             <div id="map-container"></div>
             <div id="map-guide" class="hidden">対象を選択してください</div>
             <div id="ai-guard" class="hidden"><div class="loading-spinner"></div>思考中...</div>
+            <button id="map-reset-zoom" class="hidden">縮小</button>
         </div>
 
-        <div id="control-panel" class="hidden">
-            <div class="panel-header">
+        <div id="sidebar">
+            <div class="panel-header pc-only">
                 <div class="header-info">
                     <h2 id="panel-title">城名</h2>
                     <span id="panel-clan" class="clan-badge">--</span>
                 </div>
                 <div class="header-date">
                     <span id="date-display">1560年 1月</span>
-                    <span id="market-rate" style="font-size:0.8em; margin-left:10px;"></span>
                 </div>
             </div>
             
             <div class="panel-body">
-                <div id="status-container" class="status-grid"></div>
+                <div id="status-container" class="status-grid pc-only"></div>
+                
                 <div id="command-area" class="command-grid"></div>
-                <div id="log-area" class="log-container">
+                
+                <div id="log-area" class="log-container pc-only">
                     <div id="log-content"></div>
                 </div>
             </div>
@@ -104,7 +109,7 @@
     <div id="result-modal" class="modal hidden">
         <div class="modal-content result-content">
             <div id="result-body" class="result-body"></div>
-            <div class="modal-footer">
+            <div class="modal-footer" id="result-footer">
                 <button class="btn-primary" onclick="window.GameApp.ui.closeResultModal()">閉じる</button>
             </div>
         </div>
