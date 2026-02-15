@@ -12,7 +12,6 @@ body {
     margin: 0; padding: 0;
     background-color: var(--bg-color);
     color: var(--text-color);
-    /* 100dvhでアドレスバー回避 */
     height: 100dvh;
     width: 100vw;
     overflow: hidden;
@@ -22,6 +21,8 @@ body {
 
 /* Common Helpers */
 .hidden { display: none !important; }
+.fade-in { animation: fadeIn 0.3s ease-in; }
+@keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
 
 /* Title Screen */
 #title-screen {
@@ -47,31 +48,35 @@ body {
     height: 100%;
     width: 100%;
     position: relative;
-    /* セーフエリア対応 */
     padding-left: env(safe-area-inset-left);
     padding-right: env(safe-area-inset-right);
 }
 
-/* Top Info Bar (Mobile) */
+/* --- Mobile Top Info Bar --- */
 #top-info-bar {
     flex: none;
-    background: var(--panel-bg);
+    background: rgba(255,255,255,0.95);
     border-bottom: 1px solid var(--border-color);
-    /* 上部のセーフエリア確保 */
     padding-top: max(5px, env(safe-area-inset-top));
     padding-bottom: 5px;
-    padding-left: 5px;
-    padding-right: 5px;
+    padding-left: 10px;
+    padding-right: 10px;
     z-index: 100;
     box-shadow: 0 2px 5px rgba(0,0,0,0.1);
-    height: auto;
+    font-size: 0.8rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
 }
-.mobile-status-row {
-    display: flex; justify-content: space-between;
-    font-size: 0.8rem; padding: 2px 4px; border-bottom: 1px dashed #eee;
+/* 左詰め情報エリア */
+#mobile-top-left {
+    display: flex; flex-direction: column; gap: 2px;
 }
-.status-highlight { font-weight: bold; color: #d32f2f; }
-.status-small { font-size: 0.75rem; color: #666; }
+/* 開閉ボタン */
+.toggle-btn {
+    background: none; border: 1px solid #ccc; border-radius: 4px;
+    padding: 2px 8px; font-size: 0.8rem; cursor: pointer; color: #555;
+}
 
 /* Map Area */
 #map-wrapper {
@@ -85,7 +90,6 @@ body {
     touch-action: none;
 }
 
-/* マップの実体。スクロールさせるコンテナ */
 #map-scroll-container {
     width: 100%; height: 100%;
     overflow: auto;
@@ -93,26 +97,56 @@ body {
     justify-content: center;
     align-items: center;
     -webkit-overflow-scrolling: touch;
+    /* 上部が見切れないようにパディング確保 */
+    padding: 20px;
+    box-sizing: border-box; 
 }
 
 #map-container {
     display: grid;
     gap: 10px;
-    padding: 50px; /* 余白 */
+    /* paddingはscroll-containerで制御するのでこちらは最小限でも良いが、余白用に残す */
+    padding: 20px; 
     transition: transform 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
     transform-origin: center center;
 }
 
+/* PC Overlay Info Panel */
+#pc-map-overlay {
+    position: absolute;
+    top: 20px;
+    right: 20px;
+    width: 280px;
+    background: rgba(255, 255, 255, 0.9);
+    border: 1px solid #999;
+    border-radius: 8px;
+    padding: 10px;
+    box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+    z-index: 550;
+    display: none; /* PCのみJSで表示制御 */
+    font-size: 0.9rem;
+}
+.overlay-header {
+    display: flex; justify-content: space-between; align-items: center;
+    border-bottom: 1px solid #ccc; padding-bottom: 5px; margin-bottom: 5px;
+}
+.overlay-content { display: block; }
+.overlay-content.collapsed { display: none; }
+.info-row { display: flex; justify-content: space-between; margin-bottom: 3px; }
+.info-label { color: #555; font-size: 0.85rem; }
+.info-val { font-weight: bold; }
+.highlight-text { color: #d32f2f; }
+
 /* 縮小ボタン */
 #map-reset-zoom {
     position: absolute;
-    bottom: 20px; right: 20px;
-    padding: 12px;
-    background: rgba(0,0,0,0.8);
+    bottom: 20px; right: 20px; /* PCでの位置 */
+    padding: 0;
+    background: rgba(0,0,0,0.7);
     color: white; border: none; border-radius: 50%;
     font-weight: bold; z-index: 500;
     cursor: pointer;
-    width: 50px; height: 50px;
+    width: 40px; height: 40px;
     box-shadow: 0 2px 10px rgba(0,0,0,0.3);
     display: flex; justify-content: center; align-items: center;
     font-size: 1.2rem;
@@ -144,33 +178,43 @@ body {
 .param-grid { font-size: 0.7em; padding: 1px; }
 .param-item { display: flex; justify-content: space-between; }
 
-/* Bottom Command Bar (Mobile) */
+/* --- Mobile Bottom Command Bar --- */
 #bottom-command-bar {
     flex: none;
     background: #fff;
     border-top: 1px solid var(--border-color);
-    /* 下部のセーフエリア確保 */
-    padding-top: 5px;
     padding-bottom: max(5px, env(safe-area-inset-bottom));
     padding-left: 5px;
     padding-right: 5px;
     z-index: 200;
     box-shadow: 0 -2px 5px rgba(0,0,0,0.1);
     height: auto;
-    max-height: 40dvh; /* 高さ制限もdvhに */
-    overflow-y: auto;
-    display: block; /* モバイルでは表示 */
+    /* コマンドバーは少し小さく */
+    display: block;
+}
+
+/* モバイル用：コマンド上の情報エリア */
+#mobile-bottom-info {
+    padding: 5px 10px;
+    background: #f1f8e9;
+    border-bottom: 1px dashed #ccc;
+    font-size: 0.8rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    color: #33691e;
+    font-weight: bold;
 }
 
 .command-grid {
     display: grid; 
-    grid-template-columns: repeat(3, 1fr); /* 3列固定 */
-    gap: 5px;
-    padding-bottom: 5px;
+    grid-template-columns: repeat(3, 1fr); 
+    gap: 4px;
+    padding: 5px 0;
 }
 .cmd-btn {
-    padding: 8px 2px;
-    height: 44px;
+    padding: 0; /* padding減らす */
+    height: 38px; /* 高さ減らす */
     border: 1px solid #bbb; background: #f8f9fa; border-radius: 4px;
     cursor: pointer; font-size: 0.8rem; font-weight: bold;
     display: flex; align-items: center; justify-content: center;
@@ -186,7 +230,7 @@ body {
 
 /* PC Sidebar (Default hidden) */
 #pc-sidebar { 
-    display: none !important; /* 強制非表示 */
+    display: none !important; 
 }
 
 /* PC Layout Adjustment */
@@ -196,12 +240,14 @@ body {
     }
     #top-info-bar { display: none !important; }
     #bottom-command-bar { display: none !important; }
+    #pc-map-overlay { display: block; }
+    #map-reset-zoom { bottom: 20px; right: 20px; }
 
     /* PC Sidebar Logic */
     #pc-sidebar {
-        display: flex !important; /* 強制表示 */
+        display: flex !important;
         flex-direction: column;
-        width: 320px;
+        width: 300px; /* 少し細く */
         background: #f5f5f5;
         border-left: 1px solid #ccc;
         box-shadow: -2px 0 5px rgba(0,0,0,0.1);
@@ -209,17 +255,9 @@ body {
         overflow-y: auto;
         height: 100dvh;
     }
-    #pc-status-panel { padding: 15px; background: #fff; margin-bottom: 10px; border-bottom: 1px solid #ddd; }
-    #pc-status-panel h2 { margin: 0 0 10px 0; font-size: 1.2rem; border-bottom: 2px solid #333; }
     #pc-command-area { padding: 10px; flex: 1; overflow-y: auto; }
     
-    .status-row { display: flex; justify-content: space-between; padding: 4px 0; border-bottom: 1px solid #eee; font-size: 0.9rem; }
-    .status-label { color: #555; }
-    .status-value { font-weight: bold; }
-    .progress-bar { height: 4px; background: #eee; margin-bottom: 4px; border-radius: 2px; overflow:hidden;}
-    .progress-fill { height: 100%; background: #4caf50; }
-    
-    /* PCでのコマンドボタンは見やすく */
+    /* PCでのコマンドボタン */
     .command-grid { grid-template-columns: repeat(2, 1fr); gap: 10px; }
     .cmd-btn { padding: 15px; font-size: 1rem; height: auto; }
     .cmd-btn.finish, .cmd-btn.back { grid-column: span 2; }
@@ -232,7 +270,6 @@ body {
     z-index: 4000; 
     display: flex; justify-content: center; align-items: center;
     opacity: 1; transition: opacity 0.2s;
-    /* モーダル内でもセーフエリアを意識 */
     padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
 }
 .modal.hidden { opacity: 0; pointer-events: none; display: none !important;} 
@@ -240,7 +277,6 @@ body {
 .modal-content {
     background: #fff; padding: 20px; border-radius: 8px;
     width: 90%; max-width: 800px; 
-    /* モーダルが画面外にはみ出ないように制限 */
     max-height: 80dvh;
     display: flex; flex-direction: column;
     box-shadow: 0 10px 25px rgba(0,0,0,0.5);
