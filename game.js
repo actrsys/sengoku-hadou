@@ -1,64 +1,138 @@
 /**
- * 戦国シミュレーションゲーム - 完全版 v5.0 (AIバグ修正・UI最終調整)
- * * 【今回の修正対応】
- * - AI思考停止バグ修正: セーブデータロード時のクランデータ欠損を補完するロジック追加
- * - 履歴機能: 画面上のログを削除し、「機能」->「履歴」から閲覧可能に
- * - 結果表示: コマンド実行結果から消費額を削除し、「値 (現在/上限)」形式に変更
- * - スマホUI: 上部に城情報、下部にコマンドを固定配置。レイアウト指定に対応。
- * - UI: マップ拡大時に縮小ボタン表示、初期倍率調整。
+ * 戦国シミュレーションゲーム - 復旧・完全版 v6.0
+ * * 【修正・復旧履歴】
+ * - 「はじめから」が反応しない不具合を修正（初期化フローの再構築）
+ * - 過度なコード整理を取りやめ、安定していたロジックを復元
+ * - 最新機能（スマホUI固定、履歴、褒美、面談強化、AI修正）は全て維持
+ * - エラーハンドリングの強化
  */
 
+/* ==========================================================================
+   ★ シナリオ定義
+   ========================================================================== */
 const SCENARIOS = [
     { name: "群雄割拠 (1560年)", desc: "各地で有力大名が覇を競う標準シナリオ。", folder: "1560_okehazama" }
 ];
 
+/* ==========================================================================
+   ★ ゲームバランス設定
+   ========================================================================== */
 const GAME_SETTINGS = {
-    StartYear: 1560, StartMonth: 1,
-    System: { UseRandomNames: true },
+    // --- 基本設定 ---
+    StartYear: 1560,
+    StartMonth: 1,
+    
+    // --- システム設定 ---
+    System: {
+        UseRandomNames: true // 汎用武将の名前生成を行うか
+    },
+    
+    // --- 内政・経済バランス ---
     Economy: {
-        IncomeGoldRate: 0.5, IncomeRiceRate: 10.0, IncomeFluctuation: 0.15,
-        ConsumeRicePerSoldier: 0.05, ConsumeGoldPerBusho: 50,
+        IncomeGoldRate: 0.5,        
+        IncomeRiceRate: 10.0,       
+        IncomeFluctuation: 0.15,    
+        
+        ConsumeRicePerSoldier: 0.05,
+        ConsumeGoldPerBusho: 50,    
+        
         BaseDevelopment: 10, PoliticsEffect: 0.6, DevelopFluctuation: 0.15,
         BaseRepair: 20, RepairEffect: 0.6, RepairFluctuation: 0.15,
         BaseCharity: 10, CharmEffect: 0.4, CharityFluctuation: 0.15,
+        
         TradeRateMin: 0.5, TradeRateMax: 3.0, TradeFluctuation: 0.15
     },
+
+    // --- 軍事バランス ---
     Military: {
-        DraftBase: 50, DraftStatBonus: 1.5, DraftPopBonusFactor: 0.00005, DraftFluctuation: 0.15,
+        DraftBase: 50,              
+        DraftStatBonus: 1.5,        
+        DraftPopBonusFactor: 0.00005, 
+        DraftFluctuation: 0.15,
+        
         BaseTraining: 0, TrainingLdrEffect: 0.3, TrainingStrEffect: 0.2, TrainingFluctuation: 0.15,
-        BaseMorale: 0, MoraleLdrEffect: 0.2, MoraleCharmEffect: 0.2, MoraleFluctuation: 0.2,
-        WarMaxRounds: 10, DamageSoldierPower: 0.05, WallDefenseEffect: 0.5, DamageFluctuation: 0.2,
-        UnitTypeBonus: { BowAttack: 0.6, SiegeAttack: 1.0, ChargeAttack: 1.2, WallDamageRate: 0.5 },
-        FactionBonus: 1.1, FactionPenalty: 0.8
+        
+        BaseMorale: 0, 
+        MoraleLdrEffect: 0.2,       
+        MoraleCharmEffect: 0.2,     
+        MoraleFluctuation: 0.2,
+        
+        WarMaxRounds: 10,
+        DamageSoldierPower: 0.05, WallDefenseEffect: 0.5, DamageFluctuation: 0.2,
+        
+        UnitTypeBonus: {
+            BowAttack: 0.6, SiegeAttack: 1.0, ChargeAttack: 1.2, WallDamageRate: 0.5
+        },
+
+        FactionBonus: 1.1,  // 同じ派閥ボーナス
+        FactionPenalty: 0.8 // 対立派閥ペナルティ
     },
+
+    // --- 謀略・外交・人事 ---
     Strategy: {
         InvestigateDifficulty: 50, InciteFactor: 150, RumorFactor: 50, SchemeSuccessRate: 0.6, EmploymentDiff: 1.5,
-        HeadhuntBaseDiff: 50, HeadhuntGoldEffect: 0.01, HeadhuntGoldMaxEffect: 15,
-        HeadhuntIntWeight: 0.8, HeadhuntLoyaltyWeight: 1.0, HeadhuntDutyWeight: 0.8,
-        RewardBaseEffect: 10, RewardGoldFactor: 0.1, RewardDistancePenalty: 0.2,
-        AffinityLordWeight: 0.5, AffinityNewLordWeight: 0.6, AffinityDoerWeight: 0.4
+        
+        // 引抜
+        HeadhuntBaseDiff: 50,       
+        HeadhuntGoldEffect: 0.01,   
+        HeadhuntGoldMaxEffect: 15,  
+        HeadhuntIntWeight: 0.8,     
+        HeadhuntLoyaltyWeight: 1.0, 
+        HeadhuntDutyWeight: 0.8,    
+        
+        // 褒美
+        RewardBaseEffect: 10,       
+        RewardGoldFactor: 0.1,      
+        RewardDistancePenalty: 0.2, // 価値観が違うと効果減
+        
+        // 相性係数
+        AffinityLordWeight: 0.5,    
+        AffinityNewLordWeight: 0.6, 
+        AffinityDoerWeight: 0.4     
     },
+
+    // --- AI・思考 ---
     AI: {
-        Aggressiveness: 1.5, SoliderSendRate: 0.8,
-        AbilityBase: 50, AbilitySensitivity: 2.0,
-        GunshiBiasFactor: 0.5, GunshiFairnessFactor: 0.01,
-        WarHighIntThreshold: 80,
-        DiplomacyChance: 0.3, GoodwillThreshold: 40, AllianceThreshold: 70, BreakAllianceDutyFactor: 0.5
+        Aggressiveness: 1.5,
+        SoliderSendRate: 0.8,
+        
+        AbilityBase: 50,
+        AbilitySensitivity: 2.0,
+        
+        // 軍師の評価バイアス
+        GunshiBiasFactor: 0.5,      
+        GunshiFairnessFactor: 0.01, 
+        
+        // 戦争AI
+        WarHighIntThreshold: 80,    
+        
+        // 外交AI
+        DiplomacyChance: 0.3,
+        GoodwillThreshold: 40,
+        AllianceThreshold: 70,
+        BreakAllianceDutyFactor: 0.5
     }
 };
 
-/* --- Data Manager --- */
+/* ==========================================================================
+   データ管理 (DataManager)
+   ========================================================================== */
 class DataManager {
     static genericNames = { surnames: [], names: [] };
+
     static async loadAll(folderName) {
         const path = `./data/${folderName}/`;
         try {
+            // ランダムネーム読み込み (失敗しても続行)
             if (GAME_SETTINGS.System.UseRandomNames) {
                 try {
                     const namesText = await this.fetchText("./generico_fficer.csv");
                     this.parseGenericNames(namesText);
-                } catch (e) {}
+                } catch (e) {
+                    console.warn("汎用武将名ファイルが見つかりません。デフォルト名を使用します。");
+                }
             }
+
             const [clansText, castlesText, bushosText] = await Promise.all([
                 this.fetchText(path + "clans.csv"),
                 this.fetchText(path + "castles.csv"),
@@ -68,18 +142,23 @@ class DataManager {
             const castles = this.parseCSV(castlesText, Castle);
             const bushos = this.parseCSV(bushosText, Busho);
             this.joinData(clans, castles, bushos);
+            
+            // データ不足時の自動生成
             if (bushos.length < 50) this.generateGenericBushos(bushos, castles, clans);
+            
             return { clans, castles, bushos };
         } catch (error) {
-            console.error(error);
-            throw new Error(`データの読み込みに失敗しました。`);
+            console.error("データ読み込みエラー:", error);
+            throw new Error(`データの読み込みに失敗しました。\nフォルダ構成を確認してください: ${path}`);
         }
     }
+
     static async fetchText(url) {
         const response = await fetch(url);
         if (!response.ok) throw new Error(`Failed to load ${url}`);
         return await response.text();
     }
+
     static joinData(clans, castles, bushos) {
         castles.forEach(c => c.samuraiIds = []);
         bushos.forEach(b => {
@@ -88,10 +167,12 @@ class DataManager {
             const castleAsCastellan = castles.find(cs => cs.castellanId === b.id);
             if (castleAsCastellan) b.isCastellan = true;
             if (b.clan === 0) b.status = 'ronin';
+            
             const c = castles.find(castle => castle.id === b.castleId);
             if(c) c.samuraiIds.push(b.id);
         });
     }
+
     static parseCSV(text, ModelClass) {
         const lines = text.split('\n').map(l => l.trim()).filter(l => l);
         if (lines.length === 0) return [];
@@ -112,6 +193,7 @@ class DataManager {
         }
         return result;
     }
+
     static parseGenericNames(text) {
         const lines = text.split('\n').map(l => l.trim()).filter(l => l);
         if (lines.length < 2) return;
@@ -121,10 +203,12 @@ class DataManager {
             if (name) this.genericNames.names.push(name);
         }
     }
+
     static generateGenericBushos(bushos, castles, clans) {
         let idCounter = 90000;
         const personalities = ['aggressive', 'cautious', 'balanced'];
         const useRandom = GAME_SETTINGS.System.UseRandomNames && this.genericNames.surnames.length > 0;
+
         clans.forEach(clan => {
             const clanCastles = castles.filter(c => c.ownerClan === clan.id);
             if(clanCastles.length === 0) return;
@@ -153,25 +237,36 @@ class DataManager {
     }
 }
 
-/* --- Models --- */
+/* ==========================================================================
+   モデル定義
+   ========================================================================== */
 class Clan { 
     constructor(data) { Object.assign(this, data); } 
     getArmyName() { return this.name.replace(/家$/, "") + "軍"; }
 }
+
 class Busho {
     constructor(data) {
         Object.assign(this, data);
         this.fatigue = 0; this.isActionDone = false;
+        
+        // デフォルト値補完
         if(!this.personality) {
             if (this.strength > this.intelligence + 20) this.personality = 'aggressive';
             else if (this.intelligence > this.strength + 20) this.personality = 'cautious';
             else this.personality = 'balanced';
         }
-        if(this.charm === undefined) this.charm = 50; if(this.diplomacy === undefined) this.diplomacy = 50;
-        if(this.ambition === undefined) this.ambition = 50; if(this.affinity === undefined) this.affinity = 50;
-        if(this.duty === undefined) this.duty = 50; if(this.leadership === undefined) this.leadership = this.strength;
+        if(this.charm === undefined) this.charm = 50; 
+        if(this.diplomacy === undefined) this.diplomacy = 50;
+        if(this.ambition === undefined) this.ambition = 50; 
+        if(this.affinity === undefined) this.affinity = 50;
+        if(this.duty === undefined) this.duty = 50; 
+        if(this.leadership === undefined) this.leadership = this.strength;
+        
+        // 価値観パラメータ (ない場合は推測生成)
         if(this.innovation === undefined) this.innovation = Math.min(100, Math.max(0, 50 + (this.intelligence - 50) * 0.5 + (Math.random() * 40 - 20))); 
         if(this.cooperation === undefined) this.cooperation = Math.min(100, Math.max(0, 50 + (this.charm - 50) * 0.5 + (Math.random() * 40 - 20)));
+
         this.isDaimyo = false; this.isGunshi = false; this.isCastellan = false;
         if(this.clan === 0 && !this.status) this.status = 'ronin';
     }
@@ -182,6 +277,7 @@ class Busho {
         return "中道派";
     }
 }
+
 class Castle {
     constructor(data) {
         Object.assign(this, data); this.samuraiIds = this.samuraiIds || [];
@@ -189,19 +285,24 @@ class Castle {
         this.maxLoyalty = 1000; this.isDone = false;
         if(this.loyalty === undefined) this.loyalty = 500; if(this.population === undefined) this.population = 10000;
         if(this.training === undefined) this.training = 50; if(this.morale === undefined) this.morale = 50;
-        this.investigatedUntil = 0; this.investigatedAccuracy = 0;
+        this.investigatedUntil = 0;
+        this.investigatedAccuracy = 0;
     }
 }
 
-/* --- Logic --- */
+/* ==========================================================================
+   ゲームロジック (GameSystem)
+   ========================================================================== */
 class GameSystem {
     static seededRandom(seed) { let x = Math.sin(seed++) * 10000; return x - Math.floor(x); }
+    
     static applyVariance(val, fluctuation) {
         if (!fluctuation || fluctuation === 0) return Math.floor(val);
         const min = 1.0 - fluctuation; const max = 1.0 + fluctuation;
         const rate = min + Math.random() * (max - min);
         return Math.floor(val * rate);
     }
+
     static getAISmartness(attributeVal) {
         const base = GAME_SETTINGS.AI.AbilityBase;
         const diff = attributeVal - base; 
@@ -209,25 +310,43 @@ class GameSystem {
         let prob = 0.5 + (diff * factor); 
         return Math.max(0.1, Math.min(0.95, prob)); 
     }
+
+    // 12段階評価 HTML生成
     static toGradeHTML(val) {
         let rank = "", cls = "";
-        if (val >= 96) { rank = "S+"; cls = "rank-s"; } else if (val >= 90) { rank = "S"; cls = "rank-s"; }
-        else if (val >= 85) { rank = "A+"; cls = "rank-a"; } else if (val >= 80) { rank = "A"; cls = "rank-a"; }
-        else if (val >= 75) { rank = "B+"; cls = "rank-b"; } else if (val >= 70) { rank = "B"; cls = "rank-b"; }
-        else if (val >= 65) { rank = "C+"; cls = "rank-c"; } else if (val >= 60) { rank = "C"; cls = "rank-c"; }
-        else if (val >= 55) { rank = "D+"; cls = "rank-d"; } else if (val >= 50) { rank = "D"; cls = "rank-d"; }
-        else if (val >= 40) { rank = "E+"; cls = "rank-e"; } else { rank = "E"; cls = "rank-e"; }
+        if (val >= 96) { rank = "S+"; cls = "rank-s"; }
+        else if (val >= 90) { rank = "S"; cls = "rank-s"; }
+        else if (val >= 85) { rank = "A+"; cls = "rank-a"; }
+        else if (val >= 80) { rank = "A"; cls = "rank-a"; }
+        else if (val >= 75) { rank = "B+"; cls = "rank-b"; }
+        else if (val >= 70) { rank = "B"; cls = "rank-b"; }
+        else if (val >= 65) { rank = "C+"; cls = "rank-c"; }
+        else if (val >= 60) { rank = "C"; cls = "rank-c"; }
+        else if (val >= 55) { rank = "D+"; cls = "rank-d"; }
+        else if (val >= 50) { rank = "D"; cls = "rank-d"; }
+        else if (val >= 40) { rank = "E+"; cls = "rank-e"; }
+        else { rank = "E"; cls = "rank-e"; }
         return `<span class="grade-rank ${cls}">${rank}</span>`;
     }
+
+    // 評価値計算
     static getPerceivedStatValue(target, statName, gunshi, castleAccuracy, playerClanId) {
+        // 自軍の大名は常に正確
         if (target.isDaimyo && target.clan === playerClanId) return target[statName];
+
         const realVal = target[statName];
+
+        // 他国の調査済み武将
         if (castleAccuracy !== null) {
             const maxErr = 30 * (1.0 - (castleAccuracy / 100)); 
             const err = (Math.random() - 0.5) * 2 * maxErr;
             return Math.max(1, Math.min(100, Math.floor(realVal + err)));
         }
+
+        // 軍師がいない場合 (自軍大名以外は不明)
         if (!gunshi) return null;
+        
+        // 軍師による評価 (相性バイアスあり)
         const dist = this.calcValueDistance(target, gunshi);
         let rawBias = dist * GAME_SETTINGS.AI.GunshiBiasFactor;
         const fairness = (gunshi.duty + gunshi.loyalty) * GAME_SETTINGS.AI.GunshiFairnessFactor;
@@ -235,30 +354,42 @@ class GameSystem {
         const finalBias = rawBias * (1.0 - mitigation);
         return Math.max(1, Math.floor(realVal - finalBias));
     }
+
+    // 表示用HTML取得
     static getDisplayStatHTML(target, statName, gunshi, castleAccuracy = null, playerClanId = 0) {
+        // 自軍の大名は正確に表示
         if (target.isDaimyo && target.clan === playerClanId) return this.toGradeHTML(target[statName]); 
+
+        // 調査済みの他国武将
         if (castleAccuracy !== null) {
             const pVal = this.getPerceivedStatValue(target, statName, null, castleAccuracy, playerClanId);
             return this.toGradeHTML(pVal);
         }
+
+        // 軍師なし -> 不明
         if (!gunshi) return "？";
+        
+        // 軍師あり -> 評価値
         const pVal = this.getPerceivedStatValue(target, statName, gunshi, null, playerClanId);
         return this.toGradeHTML(pVal);
     }
+
+    // 内政計算
     static calcDevelopment(busho) { const base = GAME_SETTINGS.Economy.BaseDevelopment + (busho.politics * GAME_SETTINGS.Economy.PoliticsEffect); return this.applyVariance(base, GAME_SETTINGS.Economy.DevelopFluctuation); }
     static calcRepair(busho) { const base = GAME_SETTINGS.Economy.BaseRepair + (busho.politics * GAME_SETTINGS.Economy.RepairEffect); return this.applyVariance(base, GAME_SETTINGS.Economy.RepairFluctuation); }
     static calcCharity(busho, type) { let val = GAME_SETTINGS.Economy.BaseCharity + (busho.charm * GAME_SETTINGS.Economy.CharmEffect); if (type === 'both') val = val * 1.5; return this.applyVariance(val, GAME_SETTINGS.Economy.CharityFluctuation); }
     static calcTraining(busho) { const base = GAME_SETTINGS.Military.BaseTraining + (busho.leadership * GAME_SETTINGS.Military.TrainingLdrEffect + busho.strength * GAME_SETTINGS.Military.TrainingStrEffect); return this.applyVariance(base, GAME_SETTINGS.Military.TrainingFluctuation); }
     static calcSoldierCharity(busho) { const base = GAME_SETTINGS.Military.BaseMorale + (busho.leadership * GAME_SETTINGS.Military.MoraleLdrEffect) + (busho.charm * GAME_SETTINGS.Military.MoraleCharmEffect); return this.applyVariance(base, GAME_SETTINGS.Military.MoraleFluctuation); }
     static calcDraftFromGold(gold, busho, castlePopulation) { const bonus = 1.0 + ((busho.leadership + busho.strength + busho.charm) / 300) * (GAME_SETTINGS.Military.DraftStatBonus - 1.0); const popBonus = 1.0 + (castlePopulation * GAME_SETTINGS.Military.DraftPopBonusFactor); return Math.floor(gold * 1.0 * bonus * popBonus); }
-    static isAdjacent(c1, c2) { return (Math.abs(c1.x - c2.x) + Math.abs(c1.y - c2.y)) === 1; }
-    static calcWeightedAvg(currVal, currNum, newVal, newNum) { if(currNum + newNum === 0) return currVal; return Math.floor(((currVal * currNum) + (newVal * newNum)) / (currNum + newNum)); }
+    
+    // 戦闘計算
     static calcUnitStats(bushos) { 
         if (!bushos || bushos.length === 0) return { ldr:30, str:30, int:30, charm:30 }; 
         const sorted = [...bushos].sort((a,b) => b.leadership - a.leadership); 
         const leader = sorted[0]; const subs = sorted.slice(1); 
         let totalLdr = leader.leadership; let totalStr = leader.strength; let totalInt = leader.intelligence; 
         let factionBonusMultiplier = 1.0;
+        
         if (subs.length > 0) {
             const leaderFaction = leader.getFactionName();
             let sameFactionCount = 0; let oppFactionCount = 0; 
@@ -273,6 +404,7 @@ class GameSystem {
         }
         return { ldr: Math.floor(totalLdr * factionBonusMultiplier), str: Math.floor(totalStr * factionBonusMultiplier), int: Math.floor(totalInt * factionBonusMultiplier), charm: leader.charm }; 
     }
+    
     static calcWarDamage(atkStats, defStats, atkSoldiers, defSoldiers, defWall, atkMorale, defTraining, type) {
         const fluctuation = GAME_SETTINGS.Military.DamageFluctuation || 0.2;
         const rand = 1.0 - fluctuation + (Math.random() * fluctuation * 2);
@@ -294,7 +426,9 @@ class GameSystem {
         baseDmg = Math.max(50, baseDmg);
         return { soldierDmg: Math.floor(baseDmg * soldierRate), wallDmg: Math.floor(baseDmg * wallRate * 0.5), risk: counterRisk };
     }
+    
     static calcRetreatScore(castle) { return castle.soldiers + (castle.defense * 0.5) + (castle.gold * 0.1) + (castle.rice * 0.1) + (castle.samuraiIds.length * 100); }
+    
     static calcInvestigate(bushos, targetCastle) {
         if (bushos.length === 0) return { success: false, accuracy: 0 };
         const maxStr = Math.max(...bushos.map(b => b.strength));
@@ -305,9 +439,11 @@ class GameSystem {
         if (isSuccess) accuracy = Math.min(100, Math.max(10, (maxInt * 0.8) + (Math.random() * 20)));
         return { success: isSuccess, accuracy: Math.floor(accuracy) };
     }
+
     static calcIncite(busho) { const score = (busho.intelligence * 0.7) + (busho.strength * 0.3); const success = Math.random() < (score / GAME_SETTINGS.Strategy.InciteFactor); if(!success) return { success: false, val: 0 }; return { success: true, val: Math.floor(score * 2) }; }
     static calcRumor(busho, targetBusho) { const score = (busho.intelligence * 0.7) + (busho.strength * 0.3); const defScore = (targetBusho.intelligence * 0.5) + (targetBusho.loyalty * 0.5); const success = Math.random() < (score / (defScore + GAME_SETTINGS.Strategy.RumorFactor)); if(!success) return { success: false, val: 0 }; return { success: true, val: Math.floor(20 + Math.random()*20) }; }
     static calcAffinityDiff(a, b) { const diff = Math.abs(a - b); return Math.min(diff, 100 - diff); }
+    
     static calcValueDistance(a, b) {
         const diffInno = Math.abs(a.innovation - b.innovation);
         const coopFactor = (a.cooperation + b.cooperation) / 200; 
@@ -315,6 +451,7 @@ class GameSystem {
         const classicAff = this.calcAffinityDiff(a.affinity, b.affinity); 
         return Math.floor(dist * 0.8 + classicAff * 0.4); 
     }
+    
     static calcRewardEffect(gold, daimyo, target) {
         const S = GAME_SETTINGS.Strategy;
         const dist = this.calcValueDistance(daimyo, target);
@@ -324,6 +461,7 @@ class GameSystem {
         if (actualIncrease < 0) actualIncrease = 0;
         return Math.floor(actualIncrease);
     }
+    
     static calcHeadhunt(doer, target, gold, targetLord, newLord) {
         const S = GAME_SETTINGS.Strategy;
         const goldEffect = Math.min(S.HeadhuntGoldMaxEffect, gold * S.HeadhuntGoldEffect);
@@ -340,6 +478,7 @@ class GameSystem {
         const successRate = (totalOffense / totalDefense) * 0.5; 
         return Math.random() < successRate;
     }
+    
     static calcScheme(atkBusho, defBusho, defCastleLoyalty) { const atkInt = atkBusho.intelligence; const defInt = defBusho ? defBusho.intelligence : 30; const successRate = (atkInt / (defInt + 20)) * GAME_SETTINGS.Strategy.SchemeSuccessRate; if (Math.random() > successRate) return { success: false, damage: 0 }; const loyaltyBonus = (1000 - defCastleLoyalty) / 500; return { success: true, damage: Math.floor(atkInt * 10 * (1.0 + loyaltyBonus)) }; }
     static calcFire(atkBusho, defBusho) { const atkInt = atkBusho.intelligence; const defInt = defBusho ? defBusho.intelligence : 30; const successRate = (atkInt / (defInt + 10)) * 0.5; if (Math.random() > successRate) return { success: false, damage: 0 }; return { success: true, damage: Math.floor(atkInt * 5 * (Math.random() + 0.5)) }; }
     static calcEmploymentSuccess(recruiter, target, recruiterClanPower, targetClanPower) { 
@@ -350,19 +489,23 @@ class GameSystem {
         return ((recruiter.charm + affBonus) * (Math.random() + 0.5)) > resistance; 
     }
     static getGunshiAdvice(gunshi, action, seed) { const luck = this.seededRandom(seed); const errorMargin = (100 - gunshi.intelligence) / 200; const perceivedLuck = Math.min(1.0, Math.max(0.0, luck + (this.seededRandom(seed+1)-0.5)*errorMargin*2)); if (perceivedLuck > 0.8) return "必ずや成功するでしょう。好機です！"; if (perceivedLuck > 0.6) return "おそらく上手くいくでしょう。"; if (perceivedLuck > 0.4) return "五分五分といったところです。油断めさるな。"; if (perceivedLuck > 0.2) return "厳しい結果になるかもしれません。"; return "おやめください。失敗する未来が見えます。"; }
+    
+    static isAdjacent(c1, c2) { return (Math.abs(c1.x - c2.x) + Math.abs(c1.y - c2.y)) === 1; }
+    static calcWeightedAvg(currVal, currNum, newVal, newNum) { if(currNum + newNum === 0) return currVal; return Math.floor(((currVal * currNum) + (newVal * newNum)) / (currNum + newNum)); }
 }
 
-/* --- UI Manager --- */
+/* ==========================================================================
+   UI管理 (UIManager)
+   ========================================================================== */
 class UIManager {
     constructor(game) {
         this.game = game; this.currentCastle = null; this.menuState = 'MAIN';
-        this.logHistory = []; // ログ保存用
+        this.logHistory = [];
         
-        this.mapEl = document.getElementById('map-container'); this.topBar = document.getElementById('top-info-bar'); 
-        this.cmdArea = document.getElementById('command-area');
-        this.selectorModal = document.getElementById('selector-modal');
-        this.selectorList = document.getElementById('selector-list'); 
-        this.selectorContextInfo = document.getElementById('selector-context-info');
+        this.mapEl = document.getElementById('map-container'); this.panelEl = document.getElementById('sidebar'); 
+        this.statusContainer = document.getElementById('status-container'); this.cmdArea = document.getElementById('command-area');
+        this.logEl = document.getElementById('log-content'); this.selectorModal = document.getElementById('selector-modal');
+        this.selectorList = document.getElementById('selector-list'); this.selectorContextInfo = document.getElementById('selector-context-info');
         this.selectorConfirmBtn = document.getElementById('selector-confirm-btn');
         this.startScreen = document.getElementById('start-screen'); 
         this.cutinOverlay = document.getElementById('cutin-overlay');
@@ -389,6 +532,7 @@ class UIManager {
         this.tradeTypeInfo = document.getElementById('trade-type-info');
         this.scenarioScreen = document.getElementById('scenario-modal');
         this.scenarioList = document.getElementById('scenario-list');
+        this.mobileTopBar = document.getElementById('mobile-top-bar');
         this.mapResetZoomBtn = document.getElementById('map-reset-zoom');
         this.historyModal = document.getElementById('history-modal');
         this.historyList = document.getElementById('history-list');
@@ -398,9 +542,8 @@ class UIManager {
         const backBtn = document.querySelector('#selector-modal .btn-secondary');
         if(backBtn) backBtn.onclick = () => this.closeSelector();
 
-        // マップクリックでズーム
         this.mapEl.addEventListener('click', (e) => {
-            if(e.target === this.mapEl) {
+            if(window.innerWidth <= 768 && e.target === this.mapEl) {
                 this.mapEl.classList.add('zoomed');
                 this.mapResetZoomBtn.classList.remove('hidden');
             }
@@ -412,7 +555,6 @@ class UIManager {
     }
 
     log(msg) { 
-        // ログは画面には出さず履歴に貯める
         this.logHistory.unshift(`[${this.game.year}年${this.game.month}月] ${msg}`);
         if(this.logHistory.length > 50) this.logHistory.pop();
     }
@@ -473,14 +615,23 @@ class UIManager {
         const clanData = this.game.clans.find(cd => cd.id === c.ownerClan); 
         const castellan = this.game.getBusho(c.castellanId);
         
+        // PC用
+        document.getElementById('panel-title').textContent = c.name; 
+        document.getElementById('panel-clan').textContent = clanData ? clanData.name : "--"; 
+        const createRow = (label, val, max = null) => { let html = `<div class="status-row"><div class="status-label">${label}</div><div class="status-value">${val}${max ? '<span class="status-max">/' + max + '</span>' : ''}</div></div>`; if (max) { const pct = Math.min(100, Math.floor((val / max) * 100)); html += `<div class="progress-bar"><div class="progress-fill" style="width:${pct}%"></div></div>`; } return html; }; 
+        let html = ""; 
+        html += createRow("金", c.gold); html += createRow("兵糧", c.rice); html += createRow("兵士", c.soldiers); html += createRow("人口", c.population); html += createRow("民忠", c.loyalty, 1000); html += createRow("防御", c.defense, c.maxDefense); html += createRow("石高", c.kokudaka, c.maxKokudaka); html += createRow("商業", c.commerce, c.maxCommerce); html += createRow("訓練", c.training, 120); html += createRow("士気", c.morale, 120); 
+        this.statusContainer.innerHTML = html; 
+
+        // スマホ用
         const mHtml = `
-            <div class="info-row header"><span>${clanData ? clanData.name : "--"}</span><span>${c.name}</span><span>${castellan ? castellan.name : "-"}</span></div>
-            <div class="info-row"><span>金:<span class="status-highlight">${c.gold}</span></span><span>商:${c.commerce}</span><span>忠:${c.loyalty}</span></div>
-            <div class="info-row"><span>糧:<span class="status-highlight">${c.rice}</span></span><span>石:${c.kokudaka}</span><span>防:${c.defense}</span></div>
-            <div class="info-row"><span>兵:<span class="status-highlight">${c.soldiers}</span></span><span>練:${c.training}</span><span>気:${c.morale}</span></div>
-            <div class="info-row status-small"><span>相場:${this.game.marketRate.toFixed(2)}</span><span>人口:${c.population}</span><span>${this.game.year}年${this.game.month}月</span></div>
+            <div class="mobile-status-row" style="background:#eee; font-weight:bold;"><span>${clanData ? clanData.name : "--"}</span><span>${c.name}</span><span>${castellan ? castellan.name : "-"}</span></div>
+            <div class="mobile-status-row"><span>金:<span class="status-highlight">${c.gold}</span></span><span>商:${c.commerce}</span><span>忠:${c.loyalty}</span></div>
+            <div class="mobile-status-row"><span>糧:<span class="status-highlight">${c.rice}</span></span><span>石:${c.kokudaka}</span><span>防:${c.defense}</span></div>
+            <div class="mobile-status-row"><span>兵:<span class="status-highlight">${c.soldiers}</span></span><span>練:${c.training}</span><span>気:${c.morale}</span></div>
+            <div class="mobile-status-row status-small"><span>相場:${this.game.marketRate.toFixed(2)}</span><span>人口:${c.population}</span><span>${this.game.year}年${this.game.month}月</span></div>
         `;
-        this.topBar.innerHTML = mHtml;
+        this.mobileTopBar.innerHTML = mHtml;
     }
 
     renderCommandMenu() {
@@ -709,8 +860,6 @@ class UIManager {
     
     // ... [他メソッドは既存維持] ...
     
-    // 省略 (showRetreatSelector ~ showCastleInfo などはそのまま)
-    
     executeCommand(type, bushoIds, targetId) {
         const castle = this.getCurrentTurnCastle(); let totalVal = 0, cost = 0, count = 0, actionName = "";
         
@@ -790,9 +939,292 @@ class UIManager {
         this.ui.log(`調査実行: ${target.name} (${result.success ? '成功' : '失敗'})`);
     }
 
-    // ... [他コマンド実行系は既存維持] ...
+    executeEmploy(doerId, targetId) { const doer = this.getBusho(doerId); const target = this.getBusho(targetId); const myPower = this.getClanTotalSoldiers(this.playerClanId); const targetClanId = target.clan; const targetPower = targetClanId === 0 ? 0 : this.getClanTotalSoldiers(targetClanId); const success = GameSystem.calcEmploymentSuccess(doer, target, myPower, targetPower); let msg = ""; if (success) { const oldCastle = this.getCastle(target.castleId); if(oldCastle && oldCastle.samuraiIds.includes(target.id)) { oldCastle.samuraiIds = oldCastle.samuraiIds.filter(id => id !== target.id); } const currentC = this.getCurrentTurnCastle(); currentC.samuraiIds.push(target.id); target.castleId = currentC.id; target.clan = this.playerClanId; target.status = 'active'; target.loyalty = 50; msg = `${target.name}の登用に成功しました！`; } else { msg = `${target.name}は登用に応じませんでした...`; } doer.isActionDone = true; this.ui.showResultModal(msg); this.ui.renderCommandMenu(); }
+    executeDiplomacy(doerId, targetClanId, type, gold = 0) { const doer = this.getBusho(doerId); const relation = this.getRelation(this.playerClanId, targetClanId); let msg = ""; if (type === 'goodwill') { const baseBonus = (gold / 100) + (doer.diplomacy + doer.charm) * 0.1; const increase = Math.floor(baseBonus * (0.8 + Math.random() * 0.4)); relation.friendship = Math.min(100, relation.friendship + increase); const castle = this.getCurrentTurnCastle(); castle.gold -= gold; msg = `${doer.name}が親善を行いました。\n友好度が${increase}上昇しました`; } else if (type === 'alliance') { const chance = relation.friendship + doer.diplomacy; if (chance > 120 && Math.random() > 0.3) { relation.alliance = true; msg = `同盟の締結に成功しました！`; } else { relation.friendship = Math.max(0, relation.friendship - 10); msg = `同盟の締結に失敗しました...`; } } else if (type === 'break_alliance') { relation.alliance = false; relation.friendship = Math.max(0, relation.friendship - 60); msg = `同盟を破棄しました。`; } doer.isActionDone = true; this.ui.showResultModal(msg); this.ui.updatePanelHeader(); this.ui.renderCommandMenu(); }
+    executeWar(bushoIds, targetId, soldierCount) { const castle = this.getCurrentTurnCastle(); const targetC = this.getCastle(targetId); const attackers = bushoIds.map(id => this.getBusho(id)); attackers.forEach(b => b.isActionDone = true); castle.soldiers -= soldierCount; this.startWar(castle, targetC, attackers, soldierCount); }
     
-    // ★ セーブロードでクランデータ不足時の補完
+    executeHeadhunt(doerId, targetBushoId, gold) {
+        const doer = this.getBusho(doerId);
+        const target = this.getBusho(targetBushoId);
+        const castle = this.getCurrentTurnCastle();
+        if (castle.gold < gold) { alert("資金が足りません"); return; }
+        castle.gold -= gold;
+        const targetLord = this.bushos.find(b => b.clan === target.clan && b.isDaimyo) || { affinity: 50 }; 
+        const newLord = this.bushos.find(b => b.clan === this.playerClanId && b.isDaimyo) || { affinity: 50 }; 
+        const isSuccess = GameSystem.calcHeadhunt(doer, target, gold, targetLord, newLord);
+        if (isSuccess) {
+            const oldCastle = this.getCastle(target.castleId);
+            if(oldCastle) {
+                oldCastle.samuraiIds = oldCastle.samuraiIds.filter(id => id !== target.id);
+                if (target.isCastellan) { target.isCastellan = false; oldCastle.castellanId = 0; }
+            }
+            target.clan = this.playerClanId; target.castleId = castle.id; target.loyalty = 50; target.isActionDone = true; castle.samuraiIds.push(target.id);
+            this.ui.showResultModal(`${doer.name}の引抜工作が成功！\n${target.name}が我が軍に加わりました！`);
+        } else {
+            this.ui.showResultModal(`${doer.name}の引抜工作は失敗しました...\n${target.name}は応じませんでした。`);
+        }
+        doer.isActionDone = true; this.ui.updatePanelHeader(); this.ui.renderCommandMenu();
+    }
+
+    executeReward(bushoId, gold) {
+        const target = this.getBusho(bushoId);
+        const daimyo = this.bushos.find(b => b.id === this.game.clans.find(c => c.id === this.game.playerClanId).leaderId);
+        const castle = this.getCurrentTurnCastle();
+        if(castle.gold < gold) { alert("金が足りません"); return; }
+        castle.gold -= gold;
+        const effect = GameSystem.calcRewardEffect(gold, daimyo, target);
+        target.loyalty = Math.min(100, target.loyalty + effect);
+        target.isActionDone = true;
+        let msg = "";
+        if (effect > 5) msg = `「ありがたき幸せ...！」\n忠誠が${effect}上がりました。`;
+        else if (effect > 0) msg = `「はっ、頂戴いたします。」\n忠誠が${effect}上がりました。`;
+        else msg = `「......」(不満げだ)\n忠誠は上がりませんでした。`;
+        this.ui.showResultModal(`${target.name}に金${gold}を与えました。\n${msg}`);
+        this.ui.updatePanelHeader(); this.ui.renderCommandMenu();
+    }
+
+    executeInterviewStatus(busho) {
+        const inno = busho.innovation;
+        let msg = "";
+        if (inno > 80) msg += "「最近のやり方は少々古臭い気がしますな。もっと新しいことをせねば。」<br>";
+        else if (inno < 20) msg += "「古き良き伝統を守ることこそ肝要です。」<br>";
+        else msg += "「特に不満はありません。順調です。」<br>";
+        msg += `<br><button class='btn-secondary' onclick='window.GameApp.ui.reopenInterviewModal(window.GameApp.getBusho(${busho.id}))'>戻る</button>`;
+        this.ui.showResultModal(msg);
+    }
+
+    executeInterviewTopic(interviewer, target) {
+        const dist = GameSystem.calcValueDistance(interviewer, target);
+        let comment = "";
+        const isSelf = (target.isDaimyo && target.clan === this.game.playerClanId);
+
+        if (isSelf) {
+            // 自分(大名)について
+            const loyalty = interviewer.loyalty;
+            const aff = GameSystem.calcAffinityDiff(interviewer.affinity, target.affinity); 
+            if (loyalty < 40 || aff > 30) comment = "「......」(口を閉ざしている。あまり良く思われていないようだ)";
+            else if (loyalty > 80 && aff < 15) comment = "「殿には心より感謝しております。この身尽きるまでお仕えする所存！」";
+            else comment = "「殿のご采配、頼もしく思っております。」";
+        } else {
+            // 他者について
+            if (dist < 15) comment = "「あの方とは意気投合します。素晴らしいお方です。」";
+            else if (dist < 30) comment = "「話のわかる相手だと思います。信頼できます。」";
+            else if (dist < 50) comment = "「悪くはありませんが、時折意見が食い違います。」";
+            else if (dist < 70) comment = "「考え方がどうも合いません。理解に苦しみます。」";
+            else comment = "「あやつとは反りが合いません。顔も見たくない程です。」";
+        }
+        this.ui.showResultModal(`<strong>${interviewer.name}</strong><br>「${target.name}殿ですか...」<br><br>${comment}<br><br><button class='btn-secondary' onclick='window.GameApp.ui.reopenInterviewModal(window.GameApp.getBusho(${interviewer.id}))'>戻る</button>`);
+    }
+
+    // --- AI Logic (エラーガード付き) ---
+    execAI(castle) {
+        try {
+            const castellan = this.getBusho(castle.castellanId);
+            if (!castellan || castellan.isActionDone) { this.finishTurn(); return; }
+            if (this.month % 3 === 0 && Math.random() < GAME_SETTINGS.AI.DiplomacyChance) { this.execAIDiplomacy(castle, castellan); }
+            const enemies = this.castles.filter(c => c.ownerClan !== 0 && c.ownerClan !== castle.ownerClan && GameSystem.isAdjacent(castle, c));
+            const validEnemies = enemies.filter(e => !this.getRelation(castle.ownerClan, e.ownerClan).alliance);
+            const intelligenceFactor = GameSystem.getAISmartness(castellan.intelligence);
+            let bestTarget = null; let maxScore = -1;
+            validEnemies.forEach(target => {
+                let noise = (Math.random() - 0.5) * 2000 * (1.0 - intelligenceFactor);
+                let perceivedEnemyPower = target.soldiers + (target.defense / 2) + noise;
+                let threshold = GAME_SETTINGS.AI.Aggressiveness;
+                if (castellan.innovation > 70) threshold -= 0.3; if (castellan.innovation < 30) threshold += 0.3;
+                if (castellan.personality === 'aggressive') threshold -= 0.2; if (castellan.personality === 'cautious') threshold += 0.3;
+                const ratio = castle.soldiers / (Math.max(1, perceivedEnemyPower));
+                if (ratio > threshold && castle.soldiers > 800) { let score = ratio + (Math.random() * 0.5); if (score > maxScore) { maxScore = score; bestTarget = target; } }
+            });
+            const shouldAttack = bestTarget && (Math.random() < intelligenceFactor || maxScore > 2.0);
+            if (shouldAttack) {
+                 let sendSoldiers = 0;
+                 if (Math.random() < intelligenceFactor) {
+                     let needed = Math.floor((bestTarget.soldiers + bestTarget.defense) * 1.2);
+                     sendSoldiers = Math.min(needed, Math.max(0, castle.soldiers - 300));
+                 } else { sendSoldiers = Math.floor(castle.soldiers * (GAME_SETTINGS.AI.SoliderSendRate + (Math.random()*0.2 - 0.1))); }
+                 sendSoldiers = Math.max(sendSoldiers, Math.min(1000, castle.soldiers));
+                 if (sendSoldiers > 500 && sendSoldiers < castle.soldiers) { this.startWar(castle, bestTarget, [castellan], sendSoldiers); } else { this.execAIDomestic(castle, castellan, intelligenceFactor); }
+            } else { this.execAIDomestic(castle, castellan, intelligenceFactor); }
+        } catch(e) { 
+            console.error("AI Error:", e); 
+            // エラー時は強制的にターンを進める
+            this.finishTurn(); 
+        }
+    }
+    
+    execAIDiplomacy(castle, castellan) {
+        const myPower = this.getClanTotalSoldiers(castle.ownerClan);
+        const neighbors = this.castles.filter(c => c.ownerClan !== 0 && c.ownerClan !== castle.ownerClan && GameSystem.isAdjacent(castle, c));
+        const uniqueNeighbors = [...new Set(neighbors.map(c => c.ownerClan))];
+        const myDaimyo = this.bushos.find(b => b.clan === castle.ownerClan && b.isDaimyo) || { duty: 50 };
+        uniqueNeighbors.forEach(targetClanId => {
+            const targetClanTotal = this.getClanTotalSoldiers(targetClanId);
+            const rel = this.getRelation(castle.ownerClan, targetClanId);
+            const smartness = GameSystem.getAISmartness(castellan.intelligence);
+            if (rel.alliance) {
+                 const enemies = neighbors.filter(c => !this.getRelation(castle.ownerClan, c.ownerClan).alliance);
+                 const dutyFactor = 1.0 - (myDaimyo.duty * 0.01 * GAME_SETTINGS.AI.BreakAllianceDutyFactor); 
+                 if (enemies.length === 0 && myPower > targetClanTotal * 2.0 && Math.random() < smartness * dutyFactor) { this.game.executeDiplomacy(castellan.id, targetClanId, 'break_alliance'); }
+                 return;
+            }
+            if (myPower < targetClanTotal * 0.8) {
+                if (Math.random() < smartness) {
+                    if (rel.friendship < GAME_SETTINGS.AI.GoodwillThreshold && castle.gold > 500) { this.game.executeDiplomacy(castellan.id, targetClanId, 'goodwill', 200); } else if (rel.friendship > GAME_SETTINGS.AI.AllianceThreshold) { this.game.executeDiplomacy(castellan.id, targetClanId, 'alliance'); }
+                } else { if (Math.random() < 0.1) this.game.executeDiplomacy(castellan.id, targetClanId, 'alliance'); }
+            }
+        });
+    }
+
+    execAIDomestic(castle, castellan, smartness) {
+        if(castle.gold > 500) {
+            const balanceCheck = Math.random() < smartness;
+            if (balanceCheck) {
+                if(castle.training < 60) { castle.training += 5; castle.gold -= 300; }
+                else if(castle.loyalty < 50) { castle.loyalty += 5; castle.gold -= 300; castle.rice -= 300; }
+                else if(castle.rice < castle.soldiers * 2 && castle.gold > 1000) { castle.rice += 500; castle.gold -= Math.floor(500 * this.marketRate); } 
+                else { const val = GameSystem.calcDevelopment(castellan); castle.kokudaka+=val; castle.gold-=500; }
+            } else {
+                const rnd = Math.random();
+                if (rnd < 0.5) { const val = GameSystem.calcDevelopment(castellan); castle.kokudaka+=val; castle.gold-=500; }
+                else { const val = GameSystem.calcDevelopment(castellan); castle.commerce+=val; castle.gold-=500; }
+            }
+        }
+        castellan.isActionDone = true; this.finishTurn();
+    }
+
+    startWar(atkCastle, defCastle, atkBushos, atkSoldierCount) {
+        try {
+            const isPlayerInvolved = (atkCastle.ownerClan === this.playerClanId || defCastle.ownerClan === this.playerClanId);
+            const atkClan = this.clans.find(c => c.id === atkCastle.ownerClan); const atkGeneral = atkBushos[0].name;
+            const atkArmyName = atkClan ? atkClan.getArmyName() : atkClan.name;
+            this.ui.showCutin(`${atkArmyName}の${atkGeneral}が\n${defCastle.name}に攻め込みました！`);
+            let defBusho = this.getBusho(defCastle.castellanId); if (!defBusho) defBusho = {name:"守備隊長", strength:30, leadership:30, intelligence:30, charm:30};
+            const attackerForce = { name: atkCastle.name + "遠征軍", ownerClan: atkCastle.ownerClan, soldiers: atkSoldierCount, bushos: atkBushos, training: atkCastle.training, morale: atkCastle.morale };
+            this.warState = { active: true, round: 1, attacker: attackerForce, sourceCastle: atkCastle, defender: defCastle, atkBushos: atkBushos, defBusho: defBusho, turn: 'attacker', isPlayerInvolved: isPlayerInvolved, deadSoldiers: { attacker: 0, defender: 0 } };
+            defCastle.loyalty = Math.max(0, defCastle.loyalty - 50); defCastle.population = Math.max(0, defCastle.population - 500);
+            if (isPlayerInvolved) { 
+                setTimeout(() => {
+                    document.getElementById('war-modal').classList.remove('hidden'); 
+                    document.getElementById('war-log').innerHTML = ''; 
+                    this.ui.log(`★ ${atkCastle.name}が出陣(兵${atkSoldierCount})！ ${defCastle.name}へ攻撃！`); 
+                    this.ui.updateWarUI(); this.processWarRound(); 
+                }, 1000);
+            } else { setTimeout(() => { this.ui.log(`[合戦] ${atkCastle.name} vs ${defCastle.name} (結果のみ)`); this.resolveAutoWar(); }, 1000); }
+        } catch(e) { console.error("StartWar:", e); this.finishTurn(); }
+    }
+    resolveAutoWar() { try { const s = this.warState; while(s.round <= GAME_SETTINGS.Military.WarMaxRounds && s.attacker.soldiers > 0 && s.defender.soldiers > 0 && s.defender.defense > 0) { this.resolveWarAction('charge'); if (s.attacker.soldiers <= 0 || s.defender.soldiers <= 0) break; } this.endWar(s.defender.soldiers <= 0 || s.defender.defense <= 0); } catch(e) { console.error(e); this.endWar(false); } }
+    processWarRound() { if (!this.warState.active) return; const s = this.warState; if (s.defender.soldiers <= 0 || s.defender.defense <= 0) { this.endWar(true); return; } if (s.attacker.soldiers <= 0) { this.endWar(false); return; } this.ui.updateWarUI(); const isPlayerAtkSide = (s.attacker.ownerClan === this.playerClanId); const isPlayerDefSide = (s.defender.ownerClan === this.playerClanId); const isAtkTurn = (s.turn === 'attacker'); document.getElementById('war-turn-actor').textContent = isAtkTurn ? "攻撃側" : "守備側"; let isPlayerTurn = (isAtkTurn && isPlayerAtkSide) || (!isAtkTurn && isPlayerDefSide); this.ui.renderWarControls(isAtkTurn); if (isPlayerTurn) document.getElementById('war-controls').classList.remove('disabled-area'); else { document.getElementById('war-controls').classList.add('disabled-area'); setTimeout(() => this.execWarAI(), 800); } }
+    execWarCmd(type) { if(type==='scheme'||type==='fire') this.resolveWarAction(type); else { document.getElementById('war-controls').classList.add('disabled-area'); this.resolveWarAction(type); } }
+    
+    execWarAI() { 
+        const s = this.warState;
+        const actor = s.turn === 'attacker' ? s.atkBushos[0] : s.defBusho; 
+        const isDefender = (s.turn === 'defender');
+        if (isDefender) {
+            const dangerRatio = s.defender.soldiers / (s.attacker.soldiers + 1);
+            let retreatThreshold = 0.2; 
+            if (actor.intelligence >= GAME_SETTINGS.AI.WarHighIntThreshold) retreatThreshold = 0.4; 
+            if (dangerRatio < retreatThreshold && s.defender.defense < 200) { this.resolveWarAction('retreat'); return; }
+        }
+        let cmd = 'charge'; 
+        const isHighInt = actor.intelligence >= GAME_SETTINGS.AI.WarHighIntThreshold;
+        if (isHighInt) {
+            const opp = isDefender ? s.attacker : s.defender;
+            const oppSoldier = opp.soldiers;
+            const oppWall = isDefender ? 0 : s.defender.defense; 
+            if (oppWall > 500 && Math.random() < 0.7) cmd = 'siege'; 
+            else if (oppSoldier < 500 && Math.random() < 0.8) cmd = 'charge'; 
+            else cmd = 'bow'; 
+            if (Math.random() < 0.3) cmd = 'scheme';
+        } else {
+            const r = Math.random();
+            if (r < 0.4) cmd = 'charge'; else if (r < 0.7) cmd = 'bow'; else cmd = 'siege';
+        }
+        if (isDefender) {
+            if (cmd === 'charge') cmd = 'def_charge'; if (cmd === 'bow') cmd = 'def_bow'; if (cmd === 'siege') cmd = 'def_attack'; 
+        }
+        this.resolveWarAction(cmd); 
+    }
+
+    resolveWarAction(type) {
+        if (!this.warState.active) return;
+        const s = this.warState;
+        if(type === 'retreat') { if(s.turn === 'attacker') { this.endWar(false); } else { this.executeRetreatLogic(s.defender); } return; }
+        const isAtkTurn = (s.turn === 'attacker'); const target = isAtkTurn ? s.defender : s.attacker;
+        let atkStats = GameSystem.calcUnitStats(s.atkBushos); let defStats = { str: s.defBusho.strength, int: s.defBusho.intelligence, ldr: s.defBusho.leadership };
+        if (type === 'scheme') { const actor = isAtkTurn ? s.atkBushos[0] : s.defBusho; const targetBusho = isAtkTurn ? s.defBusho : s.atkBushos[0]; const result = GameSystem.calcScheme(actor, targetBusho, isAtkTurn ? s.defender.loyalty : 1000); if (!result.success) { if (s.isPlayerInvolved) this.ui.log(`R${s.round} 謀略失敗！`); } else { target.soldiers = Math.max(0, target.soldiers - result.damage); if (s.isPlayerInvolved) this.ui.log(`R${s.round} 謀略成功！ 兵士に${result.damage}の被害`); } this.advanceWarTurn(); return; }
+        if (type === 'fire') { const actor = isAtkTurn ? s.atkBushos[0] : s.defBusho; const targetBusho = isAtkTurn ? s.defBusho : s.atkBushos[0]; const result = GameSystem.calcFire(actor, targetBusho); if (!result.success) { if (s.isPlayerInvolved) this.ui.log(`R${s.round} 火攻失敗！`); } else { if(isAtkTurn) s.defender.defense = Math.max(0, s.defender.defense - result.damage); else target.soldiers = Math.max(0, target.soldiers - 50); if (s.isPlayerInvolved) this.ui.log(`R${s.round} 火攻成功！ ${isAtkTurn?'防御':'兵士'}に${result.damage}の被害`); } this.advanceWarTurn(); return; }
+        const result = GameSystem.calcWarDamage(atkStats, defStats, s.attacker.soldiers, s.defender.soldiers, s.defender.defense, s.attacker.morale, s.defender.training, type);
+        const actualSoldierDmg = Math.min(target.soldiers, result.soldierDmg); target.soldiers -= actualSoldierDmg;
+        if(isAtkTurn) s.deadSoldiers.defender += actualSoldierDmg; else s.deadSoldiers.attacker += actualSoldierDmg;
+        if (isAtkTurn) s.defender.defense = Math.max(0, s.defender.defense - result.wallDmg);
+        if(result.risk > 1.0) { const counterDmg = Math.floor(actualSoldierDmg * (result.risk - 1.0) * 0.5); const actorArmy = isAtkTurn ? s.attacker : s.defender; actorArmy.soldiers = Math.max(0, actorArmy.soldiers - counterDmg); if(s.isPlayerInvolved) this.ui.log(`(反撃被害: ${counterDmg})`); }
+        if (s.isPlayerInvolved) { let actionName = type.includes('bow') ? "弓攻撃" : type.includes('siege') ? "城攻め" : "力攻め"; if (type.includes('def_')) actionName = type === 'def_bow' ? "弓反撃" : type === 'def_charge' ? "全力反撃" : "反撃"; let msg = (result.wallDmg > 0) ? `${actionName} (兵-${actualSoldierDmg} 防-${result.wallDmg})` : `${actionName} (兵-${actualSoldierDmg})`; this.ui.log(`R${s.round} [${isAtkTurn?'攻':'守'}] ${msg}`); }
+        this.advanceWarTurn();
+    }
+    advanceWarTurn() { const s = this.warState; if (s.turn === 'attacker') s.turn = 'defender'; else { s.turn = 'attacker'; s.round++; if(s.round > GAME_SETTINGS.Military.WarMaxRounds) { this.endWar(false); return; } } if (s.isPlayerInvolved) this.processWarRound(); }
+    
+    executeRetreatLogic(defCastle) {
+        const candidates = this.castles.filter(c => c.ownerClan === defCastle.ownerClan && c.id !== defCastle.id && GameSystem.isAdjacent(c, defCastle));
+        if (candidates.length === 0) { this.endWar(true); return; }
+        const runRetreat = (targetId) => {
+            if (!targetId) { this.endWar(true); return; } 
+            const target = this.castles.find(c => c.id === targetId);
+            if(target) {
+                target.gold += defCastle.gold; target.rice += defCastle.rice; target.soldiers += defCastle.soldiers;
+                const bushos = this.getCastleBushos(defCastle.id);
+                bushos.forEach(b => { b.castleId = target.id; b.isCastellan = false; target.samuraiIds.push(b.id); });
+                defCastle.gold = 0; defCastle.rice = 0; defCastle.soldiers = 0; defCastle.samuraiIds = []; defCastle.castellanId = 0;
+                this.ui.log(`${defCastle.name}から${target.name}へ撤退しました。(物資移動完了)`);
+                this.endWar(true, true); 
+            }
+        };
+        if (defCastle.ownerClan === this.playerClanId) { if (candidates.length === 1) runRetreat(candidates[0].id); else this.ui.showRetreatSelector(defCastle, candidates, (id) => runRetreat(id)); } 
+        else { candidates.sort((a,b) => GameSystem.calcRetreatScore(b) - GameSystem.calcRetreatScore(a)); runRetreat(candidates[0].id); }
+    }
+
+    endWar(attackerWon, isRetreat = false) { 
+        const s = this.warState; s.active = false; 
+        if (s.isPlayerInvolved) document.getElementById('war-modal').classList.add('hidden'); 
+        if (isRetreat) {
+             s.defender.ownerClan = s.attacker.ownerClan; s.defender.soldiers = s.attacker.soldiers; s.defender.investigatedUntil = 0;
+             s.atkBushos.forEach((b, idx) => { 
+                const srcC = this.getCastle(s.sourceCastle.id); 
+                srcC.samuraiIds = srcC.samuraiIds.filter(id => id !== b.id); 
+                b.castleId = s.defender.id; s.defender.samuraiIds.push(b.id); 
+                if(idx === 0) { b.isCastellan = true; s.defender.castellanId = b.id; } else b.isCastellan = false; 
+            });
+            if (s.attacker.ownerClan !== this.playerClanId) this.finishTurn(); else { this.ui.renderCommandMenu(); this.ui.renderMap(); }
+            return;
+        }
+        const isShortWar = s.round < 5; const recoveryRate = isShortWar ? 0.3 : 0.2; 
+        s.attacker.soldiers += Math.floor(s.deadSoldiers.attacker * recoveryRate); s.defender.soldiers += Math.floor(s.deadSoldiers.defender * recoveryRate); 
+        if (attackerWon) { 
+            s.attacker.training = Math.min(120, s.attacker.training + 5); s.attacker.morale = Math.min(120, s.attacker.morale + 5); 
+            this.processCaptures(s.defender, s.attacker.ownerClan);
+            s.defender.ownerClan = s.attacker.ownerClan; s.defender.soldiers = s.attacker.soldiers; s.defender.investigatedUntil = 0; 
+            s.atkBushos.forEach((b, idx) => { const srcC = this.getCastle(s.sourceCastle.id); srcC.samuraiIds = srcC.samuraiIds.filter(id => id !== b.id); b.castleId = s.defender.id; s.defender.samuraiIds.push(b.id); if(idx === 0) { b.isCastellan = true; s.defender.castellanId = b.id; } else b.isCastellan = false; }); 
+        } else { const srcC = this.getCastle(s.sourceCastle.id); srcC.soldiers += s.attacker.soldiers; } 
+        if (s.attacker.ownerClan !== this.playerClanId) this.finishTurn(); else { this.ui.renderCommandMenu(); this.ui.renderMap(); }
+    }
+    processCaptures(defeatedCastle, winnerClanId) { const losers = this.getCastleBushos(defeatedCastle.id); const captives = []; losers.forEach(b => { let chance = 0.4 - (b.strength * 0.002) + (Math.random() * 0.3); if (defeatedCastle.soldiers > 1000) chance -= 0.2; if (chance > 0.5) captives.push(b); else { b.clan = 0; b.castleId = 0; b.isCastellan = false; b.status = 'ronin'; } }); if (captives.length > 0) { this.pendingPrisoners = captives; if (winnerClanId === this.playerClanId) this.ui.showPrisonerModal(captives); else this.autoResolvePrisoners(captives, winnerClanId); } }
+    handlePrisonerAction(index, action) { const prisoner = this.pendingPrisoners[index]; if (action === 'hire') { const myBushos = this.bushos.filter(b=>b.clan===this.playerClanId); const recruiter = myBushos.find(b => b.isDaimyo) || myBushos[0]; const score = (recruiter.charm * 2.0) / (prisoner.loyalty * 1.5); if (prisoner.isDaimyo) alert(`${prisoner.name}「敵の軍門には下らぬ！」`); else if (score > Math.random()) { prisoner.clan = this.playerClanId; prisoner.loyalty = 50; const targetC = this.getCastle(prisoner.castleId); targetC.samuraiIds.push(prisoner.id); alert(`${prisoner.name}を登用しました！`); } else alert(`${prisoner.name}は登用を拒否しました...`); } else if (action === 'kill') { if (prisoner.isDaimyo) this.handleDaimyoDeath(prisoner); prisoner.status = 'dead'; prisoner.clan = 0; prisoner.castleId = 0; } else if (action === 'release') { prisoner.status = 'ronin'; prisoner.clan = 0; prisoner.castleId = 0; } this.pendingPrisoners.splice(index, 1); if (this.pendingPrisoners.length === 0) this.ui.closePrisonerModal(); else this.ui.showPrisonerModal(this.pendingPrisoners); }
+    handleDaimyoDeath(daimyo) { const clanId = daimyo.clan; if(clanId === 0) return; const candidates = this.bushos.filter(b => b.clan === clanId && b.id !== daimyo.id && b.status !== 'dead' && b.status !== 'ronin'); if (candidates.length === 0) { const clanCastles = this.castles.filter(c => c.ownerClan === clanId); clanCastles.forEach(c => { c.ownerClan = 0; const lords = this.getCastleBushos(c.id); lords.forEach(l => { l.clan=0; l.status='ronin'; }); }); return; } if (clanId === this.playerClanId) this.ui.showSuccessionModal(candidates, (newLeaderId) => this.changeLeader(clanId, newLeaderId)); else { candidates.sort((a,b) => (b.politics + b.charm) - (a.politics + a.charm)); this.changeLeader(clanId, candidates[0].id); } }
+    changeLeader(clanId, newLeaderId) { this.bushos.filter(b => b.clan === clanId).forEach(b => b.isDaimyo = false); const newLeader = this.getBusho(newLeaderId); if(newLeader) { newLeader.isDaimyo = true; this.clans.find(c => c.id === clanId).leaderId = newLeaderId; } }
+    autoResolvePrisoners(captives, winnerClanId) { const aiBushos = this.bushos.filter(b => b.clan === winnerClanId); const leaderInt = Math.max(...aiBushos.map(b => b.intelligence)); captives.forEach(p => { if (p.isDaimyo) { this.handleDaimyoDeath(p); p.status = 'dead'; p.clan = 0; p.castleId = 0; return; } if ((leaderInt / 100) > Math.random()) { p.clan = winnerClanId; p.loyalty = 50; return; } if (p.charm > 60) { p.status = 'ronin'; p.clan = 0; p.castleId = 0; } else { p.status = 'dead'; p.clan = 0; p.castleId = 0; } }); }
+    
+    saveGameToFile() { 
+        // クランデータも含めて保存する
+        const data = { 
+            year: this.year, month: this.month, 
+            castles: this.castles, bushos: this.bushos, clans: this.clans,
+            playerClanId: this.playerClanId, relations: this.relations 
+        }; 
+        const blob = new Blob([JSON.stringify(data, null, 2)], {type: 'application/json'}); 
+        const url = URL.createObjectURL(blob); 
+        const a = document.createElement('a'); a.href = url; a.download = `sengoku_save_${this.year}_${this.month}.json`; a.click(); URL.revokeObjectURL(url); 
+    }
+    
     loadGameFromFile(e) { 
         const file = e.target.files[0]; if (!file) return; 
         const reader = new FileReader(); 
@@ -804,11 +1236,10 @@ class UIManager {
                 this.bushos = d.bushos.map(b => new Busho(b)); 
                 if(d.relations) this.relations = d.relations; 
                 
-                // クランデータ復元または補完
+                // クランデータ復元または補完 (AI停止バグ対策)
                 if (d.clans) {
                     this.clans = d.clans.map(c => new Clan(c));
                 } else {
-                    // 古いデータなどでクランがない場合、デフォルトシナリオから読み込む
                     const scenario = SCENARIOS[0]; 
                     const data = await DataManager.loadAll(scenario.folder);
                     this.clans = data.clans;
@@ -824,18 +1255,6 @@ class UIManager {
             } catch(err) { console.error(err); alert("セーブデータの読み込みに失敗しました"); } 
         }; 
         reader.readAsText(file); 
-    }
-    
-    saveGameToFile() { 
-        // クランデータも含めて保存する
-        const data = { 
-            year: this.year, month: this.month, 
-            castles: this.castles, bushos: this.bushos, clans: this.clans,
-            playerClanId: this.playerClanId, relations: this.relations 
-        }; 
-        const blob = new Blob([JSON.stringify(data, null, 2)], {type: 'application/json'}); 
-        const url = URL.createObjectURL(blob); 
-        const a = document.createElement('a'); a.href = url; a.download = `sengoku_save_${this.year}_${this.month}.json`; a.click(); URL.revokeObjectURL(url); 
     }
 }
 
