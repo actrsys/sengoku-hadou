@@ -1,19 +1,12 @@
 /**
- * 戦国シミュレーションゲーム - 復旧・完全版 v8.0 (安全装置付き)
- * * 【修正内容】
- * - HTML要素が見つからない場合のエラー（classList of null）を回避する安全策を追加。
- * - スマホ用ボタンや履歴モーダルがない古いHTML環境でも動作するように修正。
- * - 「はじめから」が反応しない原因となる初期化エラーを修正。
- * - AI思考、面談、褒美などの全機能を維持。
+ * 戦国シミュレーションゲーム - 完全修正版 v9.0
+ * 修正内容: AI思考停止バグの修正、欠落していたUIメソッドの実装、AIターンのUI抑制
  */
 
-// --- 起動エラー検知用 ---
+// --- 起動エラー検知 ---
 window.onerror = function(message, source, lineno, colno, error) {
     console.error("Global Error:", message, "Line:", lineno);
-    // 致命的なエラーでなければアラートは出さないが、初期化不能時は出す
-    if (message.includes("is not defined") || message.includes("null")) {
-        // alert(`エラーが発生しました。ページを再読み込みしてください。\n${message}`);
-    }
+    // AI思考中のスタックを防ぐため、致命的なエラー時は強制的にリロードを促すかログを出す
     return false;
 };
 
@@ -472,7 +465,8 @@ class UIManager {
         if (this.resultModal) this.resultModal.classList.remove('hidden'); 
     }
     closeResultModal() { if (this.resultModal) this.resultModal.classList.add('hidden'); }
-    
+    closeSelector() { if (this.selectorModal) this.selectorModal.classList.add('hidden'); }
+
     showCutin(msg) { 
         if (this.cutinMessage) this.cutinMessage.textContent = msg; 
         if (this.cutinOverlay) {
@@ -550,7 +544,7 @@ class UIManager {
                             this.mapEl.classList.add('zoomed');
                             if(this.mapResetZoomBtn) this.mapResetZoomBtn.classList.remove('hidden');
                         } else {
-                            this.showCastleInfo(c);
+                            this.showControlPanel(c);
                         }
                     };
                 }
@@ -831,6 +825,155 @@ class UIManager {
             this.quantityConfirmBtn.onclick = () => { const val = parseInt(inputs.amount.num.value); if(val<=0) return; this.quantityModal.classList.add('hidden'); this.game.executeTrade('sell', val); };
         }
     }
+
+    /* -----------------------------------------------------------
+       以下、欠落していたUIメソッド群を追加・修正
+       ----------------------------------------------------------- */
+    
+    // 合戦UIの更新
+    updateWarUI() {
+        if (!this.game.warState.active) return;
+        const s = this.game.warState;
+        const setTxt = (id, val) => { const el = document.getElementById(id); if(el) el.textContent = val; };
+        
+        setTxt('war-atk-name', s.attacker.name);
+        setTxt('war-atk-busho', s.atkBushos[0].name);
+        setTxt('war-atk-soldier', s.attacker.soldiers);
+        setTxt('war-atk-morale', s.attacker.morale);
+        
+        setTxt('war-def-name', s.defender.name);
+        setTxt('war-def-busho', s.defBusho.name);
+        setTxt('war-def-soldier', s.defender.soldiers);
+        setTxt('war-def-wall', s.defender.defense);
+
+        setTxt('war-round', s.round);
+        
+        const isAtkTurn = (s.turn === 'attacker');
+        const actorName = isAtkTurn ? "攻撃側" : "守備側";
+        setTxt('war-turn-actor', actorName);
+
+        // ログは随時追加されているのでここではクリアしない
+    }
+
+    // 合戦コマンドの生成
+    renderWarControls(isAtkTurn) {
+        const controls = document.getElementById('war-controls');
+        if (!controls) return;
+        controls.innerHTML = '';
+        
+        const createBtn = (label, type, isDisabled = false) => {
+            const btn = document.createElement('button');
+            btn.textContent = label;
+            if(isDisabled) btn.disabled = true;
+            else btn.onclick = () => this.game.execWarCmd(type);
+            controls.appendChild(btn);
+        };
+
+        const s = this.game.warState;
+        // プレイヤーが操作可能な場合のみボタンを表示
+        // (AI同士の戦いや、プレイヤーが見ているだけの時は操作不能)
+        if (!s.isPlayerInvolved) return; 
+        
+        // 自分が攻撃側で手番が攻撃側 OR 自分が守備側で手番が守備側
+        const isMyTurn = (isAtkTurn && s.attacker.ownerClan === this.game.playerClanId) ||
+                         (!isAtkTurn && s.defender.ownerClan === this.game.playerClanId);
+
+        if (!isMyTurn) {
+            controls.classList.add('disabled-area');
+            return;
+        } else {
+            controls.classList.remove('disabled-area');
+        }
+
+        if (isAtkTurn) {
+            createBtn("突撃", "charge");
+            createBtn("斉射", "bow");
+            // 城防御が残っている時のみ城攻め可、など条件分岐可
+            createBtn("城攻め", "siege");
+            createBtn("火計", "fire");
+            createBtn("謀略", "scheme");
+            createBtn("撤退", "retreat");
+        } else {
+            createBtn("反撃", "def_charge");
+            createBtn("弓反撃", "def_bow");
+            createBtn("籠城", "def_attack"); // 便宜上def_attack
+            createBtn("火計", "fire");
+            createBtn("謀略", "scheme");
+            createBtn("撤退", "retreat");
+        }
+    }
+
+    // 撤退先選択
+    showRetreatSelector(castle, candidates, onSelect) {
+        if (!this.scenarioScreen) return; // 既存のモーダルを流用
+        this.scenarioScreen.classList.remove('hidden'); 
+        const title = this.scenarioScreen.querySelector('h2');
+        if(title) title.textContent = "撤退先選択";
+        
+        if (this.scenarioList) {
+            this.scenarioList.innerHTML = '';
+            candidates.forEach(c => {
+                const div = document.createElement('div'); div.className = 'scenario-item';
+                div.innerHTML = `<div class="scenario-title">${c.name}</div><div class="scenario-desc">兵数:${c.soldiers} 防御:${c.defense}</div>`;
+                div.onclick = () => { 
+                    this.scenarioScreen.classList.add('hidden'); 
+                    onSelect(c.id); 
+                };
+                this.scenarioList.appendChild(div);
+            });
+        }
+    }
+
+    // 捕虜処遇モーダル
+    showPrisonerModal(captives) {
+        if (!this.prisonerModal) return;
+        this.prisonerModal.classList.remove('hidden');
+        if (this.prisonerList) {
+            this.prisonerList.innerHTML = '';
+            captives.forEach((p, index) => {
+                const div = document.createElement('div');
+                div.className = 'select-item';
+                div.style.display = 'flex';
+                div.style.justifyContent = 'space-between';
+                div.style.alignItems = 'center';
+                
+                div.innerHTML = `
+                    <div style="flex:1;">
+                        <strong>${p.name}</strong> (${p.getRankName()})<br>
+                        統:${p.leadership} 武:${p.strength} 智:${p.intelligence} 忠:${p.loyalty}
+                    </div>
+                    <div style="display:flex; gap:5px;">
+                        <button class="btn-primary" onclick="window.GameApp.handlePrisonerAction(${index}, 'hire')">登用</button>
+                        <button class="btn-secondary" onclick="window.GameApp.handlePrisonerAction(${index}, 'release')">解放</button>
+                        <button class="btn-danger" onclick="window.GameApp.handlePrisonerAction(${index}, 'kill')">処断</button>
+                    </div>
+                `;
+                this.prisonerList.appendChild(div);
+            });
+        }
+    }
+    closePrisonerModal() {
+        if(this.prisonerModal) this.prisonerModal.classList.add('hidden');
+    }
+
+    // 後継者選択モーダル
+    showSuccessionModal(candidates, onSelect) {
+        if (!this.successionModal) return;
+        this.successionModal.classList.remove('hidden');
+        if (this.successionList) {
+            this.successionList.innerHTML = '';
+            candidates.forEach(c => {
+                const div = document.createElement('div');
+                div.className = 'select-item';
+                div.innerHTML = `<span>${c.name}</span> <span>統:${c.leadership} 政:${c.politics}</span>`;
+                div.onclick = () => {
+                    this.successionModal.classList.add('hidden');
+                    onSelect(c.id);
+                };
+                this.successionList.appendChild(div);
+            });
+        }
+    }
 }
 
 /* ==========================================================================
@@ -899,16 +1042,48 @@ class GameManager {
     }
     processRoninMovements() { const ronins = this.bushos.filter(b => b.status === 'ronin'); ronins.forEach(r => { const currentC = this.getCastle(r.castleId); if(!currentC) return; const neighbors = this.castles.filter(c => GameSystem.isAdjacent(currentC, c)); neighbors.forEach(n => { const castellan = this.getBusho(n.castellanId); if (Math.random() < 0.2) { currentC.samuraiIds = currentC.samuraiIds.filter(id => id !== r.id); n.samuraiIds.push(r.id); r.castleId = n.id; } }); }); }
     optimizeCastellans() { const clanIds = [...new Set(this.castles.filter(c=>c.ownerClan!==0).map(c=>c.ownerClan))]; clanIds.forEach(clanId => { const myBushos = this.bushos.filter(b => b.clan === clanId); if(myBushos.length===0) return; let daimyoInt = Math.max(...myBushos.map(b => b.intelligence)); if (Math.random() * 100 < daimyoInt) { const clanCastles = this.castles.filter(c => c.ownerClan === clanId); clanCastles.forEach(castle => { const castleBushos = this.getCastleBushos(castle.id).filter(b => b.status !== 'ronin'); if (castleBushos.length <= 1) return; castleBushos.sort((a, b) => (b.leadership + b.politics) - (a.leadership + a.politics)); const best = castleBushos[0]; if (best.id !== castle.castellanId) { const old = this.getBusho(castle.castellanId); if(old) old.isCastellan = false; best.isCastellan = true; castle.castellanId = best.id; } }); } }); }
+    
     processTurn() {
         if (this.warState.active && this.warState.isPlayerInvolved) return; 
         if (this.currentIndex >= this.turnQueue.length) { this.endMonth(); return; }
         const castle = this.turnQueue[this.currentIndex]; 
+        
+        // 存在しないクランの城だった場合はスキップ
         if(castle.ownerClan !== 0 && !this.clans.find(c=>c.id===castle.ownerClan)) { this.currentIndex++; this.processTurn(); return; }
+        
         this.ui.renderMap();
-        if (castle.ownerClan === this.playerClanId) { this.isProcessingAI = false; this.ui.renderMap(); this.ui.log(`【${castle.name}】命令を下してください`); this.ui.showControlPanel(castle); } 
-        else { this.isProcessingAI = true; this.ui.renderMap(); this.ui.log(`【${castle.name}】(他国) 思考中...`); document.getElementById('control-panel').classList.add('hidden'); setTimeout(() => this.execAI(castle), 600); }
+        
+        if (castle.ownerClan === this.playerClanId) { 
+            this.isProcessingAI = false; 
+            this.ui.renderMap(); 
+            this.ui.log(`【${castle.name}】命令を下してください`); 
+            this.ui.showControlPanel(castle); 
+        } else { 
+            this.isProcessingAI = true; 
+            this.ui.renderMap(); // AI思考中スピナー表示
+            
+            // AIターン
+            if(this.panelEl) this.panelEl.classList.add('hidden'); // プレイヤー用パネルを隠す
+            
+            setTimeout(() => {
+                try {
+                    this.execAI(castle);
+                } catch(e) {
+                    console.error("AI Error caught:", e);
+                    this.finishTurn(); // エラー時は強制的に次へ
+                }
+            }, 600); 
+        }
     }
-    finishTurn() { if(this.warState.active && this.warState.isPlayerInvolved) return; this.selectionMode = null; const castle = this.getCurrentTurnCastle(); if(castle) castle.isDone = true; this.currentIndex++; this.processTurn(); }
+    
+    finishTurn() { 
+        if(this.warState.active && this.warState.isPlayerInvolved) return; 
+        this.selectionMode = null; 
+        const castle = this.getCurrentTurnCastle(); 
+        if(castle) castle.isDone = true; 
+        this.currentIndex++; 
+        this.processTurn(); 
+    }
     endMonth() { this.month++; if(this.month > 12) { this.month = 1; this.year++; } const clans = new Set(this.castles.filter(c => c.ownerClan !== 0).map(c => c.ownerClan)); const playerAlive = clans.has(this.playerClanId); if (clans.size === 1 && playerAlive) alert(`天下統一！`); else if (!playerAlive) alert(`我が軍は滅亡しました...`); else this.startMonth(); }
 
     executeCommand(type, bushoIds, targetId) {
@@ -991,7 +1166,49 @@ class GameManager {
     }
 
     executeEmploy(doerId, targetId) { const doer = this.getBusho(doerId); const target = this.getBusho(targetId); const myPower = this.getClanTotalSoldiers(this.playerClanId); const targetClanId = target.clan; const targetPower = targetClanId === 0 ? 0 : this.getClanTotalSoldiers(targetClanId); const success = GameSystem.calcEmploymentSuccess(doer, target, myPower, targetPower); let msg = ""; if (success) { const oldCastle = this.getCastle(target.castleId); if(oldCastle && oldCastle.samuraiIds.includes(target.id)) { oldCastle.samuraiIds = oldCastle.samuraiIds.filter(id => id !== target.id); } const currentC = this.getCurrentTurnCastle(); currentC.samuraiIds.push(target.id); target.castleId = currentC.id; target.clan = this.playerClanId; target.status = 'active'; target.loyalty = 50; msg = `${target.name}の登用に成功しました！`; } else { msg = `${target.name}は登用に応じませんでした...`; } doer.isActionDone = true; this.ui.showResultModal(msg); this.ui.renderCommandMenu(); }
-    executeDiplomacy(doerId, targetClanId, type, gold = 0) { const doer = this.getBusho(doerId); const relation = this.getRelation(this.playerClanId, targetClanId); let msg = ""; if (type === 'goodwill') { const baseBonus = (gold / 100) + (doer.diplomacy + doer.charm) * 0.1; const increase = Math.floor(baseBonus * (0.8 + Math.random() * 0.4)); relation.friendship = Math.min(100, relation.friendship + increase); const castle = this.getCurrentTurnCastle(); castle.gold -= gold; msg = `${doer.name}が親善を行いました。\n友好度が${increase}上昇しました`; } else if (type === 'alliance') { const chance = relation.friendship + doer.diplomacy; if (chance > 120 && Math.random() > 0.3) { relation.alliance = true; msg = `同盟の締結に成功しました！`; } else { relation.friendship = Math.max(0, relation.friendship - 10); msg = `同盟の締結に失敗しました...`; } } else if (type === 'break_alliance') { relation.alliance = false; relation.friendship = Math.max(0, relation.friendship - 60); msg = `同盟を破棄しました。`; } doer.isActionDone = true; this.ui.showResultModal(msg); this.ui.updatePanelHeader(); this.ui.renderCommandMenu(); }
+    
+    executeDiplomacy(doerId, targetClanId, type, gold = 0) {
+        const doer = this.getBusho(doerId);
+        const relation = this.getRelation(doer.clan, targetClanId);
+        let msg = "";
+        
+        // メッセージ表示判定 (プレイヤーが関与する場合のみ表示)
+        const isPlayerInvolved = (doer.clan === this.playerClanId || targetClanId === this.playerClanId);
+
+        if (type === 'goodwill') {
+            const baseBonus = (gold / 100) + (doer.diplomacy + doer.charm) * 0.1;
+            const increase = Math.floor(baseBonus * (0.8 + Math.random() * 0.4));
+            relation.friendship = Math.min(100, relation.friendship + increase);
+            const castle = this.getCastle(doer.castleId); // DOERの居城から金消費
+            if(castle) castle.gold -= gold;
+            msg = `${doer.name}が親善を行いました。\n友好度が${increase}上昇しました`;
+        } else if (type === 'alliance') {
+            const chance = relation.friendship + doer.diplomacy;
+            if (chance > 120 && Math.random() > 0.3) {
+                relation.alliance = true;
+                msg = `同盟の締結に成功しました！`;
+            } else {
+                relation.friendship = Math.max(0, relation.friendship - 10);
+                msg = `同盟の締結に失敗しました...`;
+            }
+        } else if (type === 'break_alliance') {
+            relation.alliance = false;
+            relation.friendship = Math.max(0, relation.friendship - 60);
+            msg = `同盟を破棄しました。`;
+        }
+        
+        doer.isActionDone = true;
+        
+        // プレイヤー関与時のみUI表示
+        if (isPlayerInvolved) {
+            this.ui.showResultModal(msg);
+            if (doer.clan === this.playerClanId) {
+                this.ui.updatePanelHeader();
+                this.ui.renderCommandMenu();
+            }
+        }
+    }
+    
     executeWar(bushoIds, targetId, soldierCount) { const castle = this.getCurrentTurnCastle(); const targetC = this.getCastle(targetId); const attackers = bushoIds.map(id => this.getBusho(id)); attackers.forEach(b => b.isActionDone = true); castle.soldiers -= soldierCount; this.startWar(castle, targetC, attackers, soldierCount); }
     
     executeHeadhunt(doerId, targetBushoId, gold) {
@@ -1088,11 +1305,17 @@ class GameManager {
         try {
             const castellan = this.getBusho(castle.castellanId);
             if (!castellan || castellan.isActionDone) { this.finishTurn(); return; }
-            if (this.month % 3 === 0 && Math.random() < GAME_SETTINGS.AI.DiplomacyChance) { this.execAIDiplomacy(castle, castellan); }
+            
+            // 外交 (AI同士の場合はUI非表示)
+            if (this.month % 3 === 0 && Math.random() < GAME_SETTINGS.AI.DiplomacyChance) { 
+                this.execAIDiplomacy(castle, castellan); 
+            }
+            
             const enemies = this.castles.filter(c => c.ownerClan !== 0 && c.ownerClan !== castle.ownerClan && GameSystem.isAdjacent(castle, c));
             const validEnemies = enemies.filter(e => !this.getRelation(castle.ownerClan, e.ownerClan).alliance);
             const intelligenceFactor = GameSystem.getAISmartness(castellan.intelligence);
             let bestTarget = null; let maxScore = -1;
+            
             validEnemies.forEach(target => {
                 let noise = (Math.random() - 0.5) * 2000 * (1.0 - intelligenceFactor);
                 let perceivedEnemyPower = target.soldiers + (target.defense / 2) + noise;
@@ -1102,16 +1325,28 @@ class GameManager {
                 const ratio = castle.soldiers / (Math.max(1, perceivedEnemyPower));
                 if (ratio > threshold && castle.soldiers > 800) { let score = ratio + (Math.random() * 0.5); if (score > maxScore) { maxScore = score; bestTarget = target; } }
             });
+            
             const shouldAttack = bestTarget && (Math.random() < intelligenceFactor || maxScore > 2.0);
+            
             if (shouldAttack) {
                  let sendSoldiers = 0;
                  if (Math.random() < intelligenceFactor) {
                      let needed = Math.floor((bestTarget.soldiers + bestTarget.defense) * 1.2);
                      sendSoldiers = Math.min(needed, Math.max(0, castle.soldiers - 300));
                  } else { sendSoldiers = Math.floor(castle.soldiers * (GAME_SETTINGS.AI.SoliderSendRate + (Math.random()*0.2 - 0.1))); }
+                 
                  sendSoldiers = Math.max(sendSoldiers, Math.min(1000, castle.soldiers));
-                 if (sendSoldiers > 500 && sendSoldiers < castle.soldiers) { this.startWar(castle, bestTarget, [castellan], sendSoldiers); } else { this.execAIDomestic(castle, castellan, intelligenceFactor); }
-            } else { this.execAIDomestic(castle, castellan, intelligenceFactor); }
+                 
+                 // 兵士数が少なすぎる場合は出陣しない
+                 if (sendSoldiers > 500 && sendSoldiers < castle.soldiers) { 
+                     this.startWar(castle, bestTarget, [castellan], sendSoldiers); 
+                     // startWar は非同期または同期で処理を進めるため、ここでは finishTurn を呼ばない
+                 } else { 
+                     this.execAIDomestic(castle, castellan, intelligenceFactor); 
+                 }
+            } else { 
+                this.execAIDomestic(castle, castellan, intelligenceFactor); 
+            }
         } catch(e) { 
             console.error("AI Error:", e); 
             // エラー時は強制的にターンを進める
@@ -1156,7 +1391,8 @@ class GameManager {
                 else { const val = GameSystem.calcDevelopment(castellan); castle.commerce+=val; castle.gold-=500; }
             }
         }
-        castellan.isActionDone = true; this.finishTurn();
+        castellan.isActionDone = true; 
+        this.finishTurn();
     }
 
     startWar(atkCastle, defCastle, atkBushos, atkSoldierCount) {
@@ -1164,23 +1400,77 @@ class GameManager {
             const isPlayerInvolved = (atkCastle.ownerClan === this.playerClanId || defCastle.ownerClan === this.playerClanId);
             const atkClan = this.clans.find(c => c.id === atkCastle.ownerClan); const atkGeneral = atkBushos[0].name;
             const atkArmyName = atkClan ? atkClan.getArmyName() : atkClan.name;
-            this.ui.showCutin(`${atkArmyName}の${atkGeneral}が\n${defCastle.name}に攻め込みました！`);
+            
+            if (isPlayerInvolved) {
+                this.ui.showCutin(`${atkArmyName}の${atkGeneral}が\n${defCastle.name}に攻め込みました！`);
+            }
+            
             let defBusho = this.getBusho(defCastle.castellanId); if (!defBusho) defBusho = {name:"守備隊長", strength:30, leadership:30, intelligence:30, charm:30};
             const attackerForce = { name: atkCastle.name + "遠征軍", ownerClan: atkCastle.ownerClan, soldiers: atkSoldierCount, bushos: atkBushos, training: atkCastle.training, morale: atkCastle.morale };
             this.warState = { active: true, round: 1, attacker: attackerForce, sourceCastle: atkCastle, defender: defCastle, atkBushos: atkBushos, defBusho: defBusho, turn: 'attacker', isPlayerInvolved: isPlayerInvolved, deadSoldiers: { attacker: 0, defender: 0 } };
             defCastle.loyalty = Math.max(0, defCastle.loyalty - 50); defCastle.population = Math.max(0, defCastle.population - 500);
+            
             if (isPlayerInvolved) { 
                 setTimeout(() => {
-                    document.getElementById('war-modal').classList.remove('hidden'); 
-                    document.getElementById('war-log').innerHTML = ''; 
+                    const warModal = document.getElementById('war-modal');
+                    if (warModal) warModal.classList.remove('hidden'); 
+                    const warLog = document.getElementById('war-log');
+                    if (warLog) warLog.innerHTML = ''; 
                     this.ui.log(`★ ${atkCastle.name}が出陣(兵${atkSoldierCount})！ ${defCastle.name}へ攻撃！`); 
-                    this.ui.updateWarUI(); this.processWarRound(); 
+                    this.ui.updateWarUI(); 
+                    this.processWarRound(); 
                 }, 1000);
-            } else { setTimeout(() => { this.ui.log(`[合戦] ${atkCastle.name} vs ${defCastle.name} (結果のみ)`); this.resolveAutoWar(); }, 1000); }
-        } catch(e) { console.error("StartWar:", e); this.finishTurn(); }
+            } else { 
+                // AI同士の戦いは高速化
+                setTimeout(() => { 
+                    // this.ui.log(`[合戦] ${atkCastle.name} vs ${defCastle.name} (結果のみ)`); 
+                    this.resolveAutoWar(); 
+                }, 100); 
+            }
+        } catch(e) { 
+            console.error("StartWar Error:", e); 
+            this.finishTurn(); 
+        }
     }
-    resolveAutoWar() { try { const s = this.warState; while(s.round <= GAME_SETTINGS.Military.WarMaxRounds && s.attacker.soldiers > 0 && s.defender.soldiers > 0 && s.defender.defense > 0) { this.resolveWarAction('charge'); if (s.attacker.soldiers <= 0 || s.defender.soldiers <= 0) break; } this.endWar(s.defender.soldiers <= 0 || s.defender.defense <= 0); } catch(e) { console.error(e); this.endWar(false); } }
-    processWarRound() { if (!this.warState.active) return; const s = this.warState; if (s.defender.soldiers <= 0 || s.defender.defense <= 0) { this.endWar(true); return; } if (s.attacker.soldiers <= 0) { this.endWar(false); return; } this.ui.updateWarUI(); const isPlayerAtkSide = (s.attacker.ownerClan === this.playerClanId); const isPlayerDefSide = (s.defender.ownerClan === this.playerClanId); const isAtkTurn = (s.turn === 'attacker'); document.getElementById('war-turn-actor').textContent = isAtkTurn ? "攻撃側" : "守備側"; let isPlayerTurn = (isAtkTurn && isPlayerAtkSide) || (!isAtkTurn && isPlayerDefSide); this.ui.renderWarControls(isAtkTurn); if (isPlayerTurn) document.getElementById('war-controls').classList.remove('disabled-area'); else { document.getElementById('war-controls').classList.add('disabled-area'); setTimeout(() => this.execWarAI(), 800); } }
+    
+    resolveAutoWar() { 
+        try { 
+            const s = this.warState; 
+            let safetyLimit = 100; // 無限ループ防止
+            while(s.round <= GAME_SETTINGS.Military.WarMaxRounds && s.attacker.soldiers > 0 && s.defender.soldiers > 0 && s.defender.defense > 0 && safetyLimit > 0) { 
+                this.resolveWarAction('charge'); 
+                if (s.attacker.soldiers <= 0 || s.defender.soldiers <= 0) break; 
+                safetyLimit--;
+            } 
+            this.endWar(s.defender.soldiers <= 0 || s.defender.defense <= 0); 
+        } catch(e) { 
+            console.error(e); 
+            this.endWar(false); 
+        } 
+    }
+    
+    processWarRound() { 
+        if (!this.warState.active) return; 
+        const s = this.warState; 
+        if (s.defender.soldiers <= 0 || s.defender.defense <= 0) { this.endWar(true); return; } 
+        if (s.attacker.soldiers <= 0) { this.endWar(false); return; } 
+        
+        this.ui.updateWarUI(); 
+        
+        const isPlayerAtkSide = (s.attacker.ownerClan === this.playerClanId); 
+        const isPlayerDefSide = (s.defender.ownerClan === this.playerClanId); 
+        const isAtkTurn = (s.turn === 'attacker'); 
+        
+        let isPlayerTurn = (isAtkTurn && isPlayerAtkSide) || (!isAtkTurn && isPlayerDefSide); 
+        this.ui.renderWarControls(isAtkTurn); 
+        
+        if (isPlayerTurn) {
+            // プレイヤー操作待機
+        } else { 
+            setTimeout(() => this.execWarAI(), 800); 
+        } 
+    }
+    
     execWarCmd(type) { if(type==='scheme'||type==='fire') this.resolveWarAction(type); else { document.getElementById('war-controls').classList.add('disabled-area'); this.resolveWarAction(type); } }
     
     execWarAI() { 
@@ -1252,7 +1542,10 @@ class GameManager {
 
     endWar(attackerWon, isRetreat = false) { 
         const s = this.warState; s.active = false; 
-        if (s.isPlayerInvolved) document.getElementById('war-modal').classList.add('hidden'); 
+        if (s.isPlayerInvolved) {
+            const warModal = document.getElementById('war-modal');
+            if(warModal) warModal.classList.add('hidden'); 
+        }
         if (isRetreat) {
              s.defender.ownerClan = s.attacker.ownerClan; s.defender.soldiers = s.attacker.soldiers; s.defender.investigatedUntil = 0;
              s.atkBushos.forEach((b, idx) => { 
@@ -1274,11 +1567,77 @@ class GameManager {
         } else { const srcC = this.getCastle(s.sourceCastle.id); srcC.soldiers += s.attacker.soldiers; } 
         if (s.attacker.ownerClan !== this.playerClanId) this.finishTurn(); else { this.ui.renderCommandMenu(); this.ui.renderMap(); }
     }
-    processCaptures(defeatedCastle, winnerClanId) { const losers = this.getCastleBushos(defeatedCastle.id); const captives = []; losers.forEach(b => { let chance = 0.4 - (b.strength * 0.002) + (Math.random() * 0.3); if (defeatedCastle.soldiers > 1000) chance -= 0.2; if (chance > 0.5) captives.push(b); else { b.clan = 0; b.castleId = 0; b.isCastellan = false; b.status = 'ronin'; } }); if (captives.length > 0) { this.pendingPrisoners = captives; if (winnerClanId === this.playerClanId) this.ui.showPrisonerModal(captives); else this.autoResolvePrisoners(captives, winnerClanId); } }
-    handlePrisonerAction(index, action) { const prisoner = this.pendingPrisoners[index]; if (action === 'hire') { const myBushos = this.bushos.filter(b=>b.clan===this.playerClanId); const recruiter = myBushos.find(b => b.isDaimyo) || myBushos[0]; const score = (recruiter.charm * 2.0) / (prisoner.loyalty * 1.5); if (prisoner.isDaimyo) alert(`${prisoner.name}「敵の軍門には下らぬ！」`); else if (score > Math.random()) { prisoner.clan = this.playerClanId; prisoner.loyalty = 50; const targetC = this.getCastle(prisoner.castleId); targetC.samuraiIds.push(prisoner.id); alert(`${prisoner.name}を登用しました！`); } else alert(`${prisoner.name}は登用を拒否しました...`); } else if (action === 'kill') { if (prisoner.isDaimyo) this.handleDaimyoDeath(prisoner); prisoner.status = 'dead'; prisoner.clan = 0; prisoner.castleId = 0; } else if (action === 'release') { prisoner.status = 'ronin'; prisoner.clan = 0; prisoner.castleId = 0; } this.pendingPrisoners.splice(index, 1); if (this.pendingPrisoners.length === 0) this.ui.closePrisonerModal(); else this.ui.showPrisonerModal(this.pendingPrisoners); }
-    handleDaimyoDeath(daimyo) { const clanId = daimyo.clan; if(clanId === 0) return; const candidates = this.bushos.filter(b => b.clan === clanId && b.id !== daimyo.id && b.status !== 'dead' && b.status !== 'ronin'); if (candidates.length === 0) { const clanCastles = this.castles.filter(c => c.ownerClan === clanId); clanCastles.forEach(c => { c.ownerClan = 0; const lords = this.getCastleBushos(c.id); lords.forEach(l => { l.clan=0; l.status='ronin'; }); }); return; } if (clanId === this.playerClanId) this.ui.showSuccessionModal(candidates, (newLeaderId) => this.changeLeader(clanId, newLeaderId)); else { candidates.sort((a,b) => (b.politics + b.charm) - (a.politics + a.charm)); this.changeLeader(clanId, candidates[0].id); } }
+    
+    processCaptures(defeatedCastle, winnerClanId) { 
+        const losers = this.getCastleBushos(defeatedCastle.id); 
+        const captives = []; 
+        losers.forEach(b => { 
+            let chance = 0.4 - (b.strength * 0.002) + (Math.random() * 0.3); 
+            if (defeatedCastle.soldiers > 1000) chance -= 0.2; 
+            if (chance > 0.5) captives.push(b); 
+            else { b.clan = 0; b.castleId = 0; b.isCastellan = false; b.status = 'ronin'; } 
+        }); 
+        
+        if (captives.length > 0) { 
+            this.pendingPrisoners = captives; 
+            if (winnerClanId === this.playerClanId) {
+                this.ui.showPrisonerModal(captives); 
+            } else {
+                this.autoResolvePrisoners(captives, winnerClanId); 
+            }
+        } 
+    }
+    
+    handlePrisonerAction(index, action) { 
+        const prisoner = this.pendingPrisoners[index]; 
+        if (action === 'hire') { 
+            const myBushos = this.bushos.filter(b=>b.clan===this.playerClanId); 
+            const recruiter = myBushos.find(b => b.isDaimyo) || myBushos[0]; 
+            const score = (recruiter.charm * 2.0) / (prisoner.loyalty * 1.5); 
+            if (prisoner.isDaimyo) alert(`${prisoner.name}「敵の軍門には下らぬ！」`); 
+            else if (score > Math.random()) { prisoner.clan = this.playerClanId; prisoner.loyalty = 50; const targetC = this.getCastle(prisoner.castleId); if(targetC) targetC.samuraiIds.push(prisoner.id); alert(`${prisoner.name}を登用しました！`); } 
+            else alert(`${prisoner.name}は登用を拒否しました...`); 
+        } 
+        else if (action === 'kill') { 
+            if (prisoner.isDaimyo) this.handleDaimyoDeath(prisoner); 
+            prisoner.status = 'dead'; prisoner.clan = 0; prisoner.castleId = 0; 
+        } 
+        else if (action === 'release') { 
+            prisoner.status = 'ronin'; prisoner.clan = 0; prisoner.castleId = 0; 
+        } 
+        this.pendingPrisoners.splice(index, 1); 
+        if (this.pendingPrisoners.length === 0) this.ui.closePrisonerModal(); 
+        else this.ui.showPrisonerModal(this.pendingPrisoners); 
+    }
+    
+    handleDaimyoDeath(daimyo) { 
+        const clanId = daimyo.clan; if(clanId === 0) return; 
+        const candidates = this.bushos.filter(b => b.clan === clanId && b.id !== daimyo.id && b.status !== 'dead' && b.status !== 'ronin'); 
+        if (candidates.length === 0) { 
+            const clanCastles = this.castles.filter(c => c.ownerClan === clanId); 
+            clanCastles.forEach(c => { c.ownerClan = 0; const lords = this.getCastleBushos(c.id); lords.forEach(l => { l.clan=0; l.status='ronin'; }); }); 
+            return; 
+        } 
+        if (clanId === this.playerClanId) this.ui.showSuccessionModal(candidates, (newLeaderId) => this.changeLeader(clanId, newLeaderId)); 
+        else { candidates.sort((a,b) => (b.politics + b.charm) - (a.politics + a.charm)); this.changeLeader(clanId, candidates[0].id); } 
+    }
+    
     changeLeader(clanId, newLeaderId) { this.bushos.filter(b => b.clan === clanId).forEach(b => b.isDaimyo = false); const newLeader = this.getBusho(newLeaderId); if(newLeader) { newLeader.isDaimyo = true; this.clans.find(c => c.id === clanId).leaderId = newLeaderId; } }
-    autoResolvePrisoners(captives, winnerClanId) { const aiBushos = this.bushos.filter(b => b.clan === winnerClanId); const leaderInt = Math.max(...aiBushos.map(b => b.intelligence)); captives.forEach(p => { if (p.isDaimyo) { this.handleDaimyoDeath(p); p.status = 'dead'; p.clan = 0; p.castleId = 0; return; } if ((leaderInt / 100) > Math.random()) { p.clan = winnerClanId; p.loyalty = 50; return; } if (p.charm > 60) { p.status = 'ronin'; p.clan = 0; p.castleId = 0; } else { p.status = 'dead'; p.clan = 0; p.castleId = 0; } }); }
+    
+    autoResolvePrisoners(captives, winnerClanId) { 
+        const aiBushos = this.bushos.filter(b => b.clan === winnerClanId); 
+        const leaderInt = aiBushos.length > 0 ? Math.max(...aiBushos.map(b => b.intelligence)) : 50; 
+        captives.forEach(p => { 
+            if (p.isDaimyo) { 
+                this.handleDaimyoDeath(p); p.status = 'dead'; p.clan = 0; p.castleId = 0; return; 
+            } 
+            if ((leaderInt / 100) > Math.random()) { 
+                p.clan = winnerClanId; p.loyalty = 50; return; 
+            } 
+            if (p.charm > 60) { p.status = 'ronin'; p.clan = 0; p.castleId = 0; } 
+            else { p.status = 'dead'; p.clan = 0; p.castleId = 0; } 
+        }); 
+    }
     
     saveGameToFile() { 
         const data = { 
