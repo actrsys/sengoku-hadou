@@ -61,7 +61,7 @@ const GAME_SETTINGS = {
             BowAttack: 0.6,         // 弓攻撃の攻撃力倍率 (低めだが反撃を受けにくい設定に使用)
             SiegeAttack: 1.0,       // 城攻めの攻撃力倍率
             ChargeAttack: 1.2,      // 力攻め(突撃)の攻撃力倍率
-            WallDamageRate: 3.0     // 城攻め時の城壁破壊倍率 (大きいほど城壁が壊れやすい)
+            WallDamageRate: 0.5     // 城攻め時の城壁破壊倍率 (大きいほど城壁が壊れやすい)
         }
     },
 
