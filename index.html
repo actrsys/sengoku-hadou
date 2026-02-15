@@ -11,7 +11,7 @@
         <div class="title-content">
             <h1 class="game-title">戦国覇道</h1>
             <div class="title-menu">
-                <button class="title-btn" onclick="window.GameApp.startNewGame()">はじめから</button>
+                <button id="start-btn" class="title-btn">はじめから</button>
                 <button class="title-btn" onclick="document.getElementById('load-file-input').click()">続きから</button>
                 <input type="file" id="load-file-input" accept=".json" style="display:none" onchange="window.GameApp.loadGameFromFile(event)">
             </div>

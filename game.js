@@ -3,13 +3,15 @@ type: uploaded file
 fileName: game.js
 fullContent:
 /**
- * 戦国シミュレーションゲーム - 修正版 v10.3
+ * 戦国シミュレーションゲーム - 修正版 v10.4
  * 修正内容:
- * 1. 軍師システム完全実装（不在時の秘匿、相性による過大・過小評価バイアス、忠義による補正）
- * 2. 調査システムの強化（複数武将の能力加算、低知略時の誤情報表示）
- * 3. 自軍情報の表示ロジック修正（軍師依存）
+ * 1. 初期化プロセスの堅牢化（「はじめから」ボタン不動バグ修正）
+ * 2. マップ選択モードの強制解除ロジック実装（他メニュー遷移時にリセット）
+ * 3. PC画面右カラムの城情報削除（オーバーレイへの一元化）
+ * 4. モバイル用情報・武将一覧アクセスの改善
  */
 
+// グローバルエラーハンドリング
 window.onerror = function(message, source, lineno, colno, error) {
     console.error("Global Error:", message, "Line:", lineno);
     return false;
@@ -254,77 +256,41 @@ class GameSystem {
         else if (val >= 40) { rank = "E+"; cls = "rank-e"; } else { rank = "E"; cls = "rank-e"; }
         return `<span class="grade-rank ${cls}">${rank}</span>`;
     }
-    
-    // ★修正: 軍師システム・調査精度ロジックの再実装
     static getPerceivedStatValue(target, statName, gunshi, castleAccuracy, playerClanId, daimyo = null) {
         const realVal = target[statName];
-
-        // 1. 自軍武将の場合
         if (target.clan === playerClanId) {
-            // 大名は常に正確
             if (target.isDaimyo) return realVal;
-            // 軍師不在なら不明
             if (!gunshi) return null; 
-
-            // 軍師による評価
-            // 基本精度は軍師の知略依存
             const baseAcc = gunshi.intelligence;
-            
-            // 相性によるバイアス計算
-            // 距離(0-100): 近いほど0, 遠いほど100
             const dist = this.calcValueDistance(gunshi, target);
-            
-            // バイアス方向: 相性が良い(距離が近い)と過大評価、悪いと過小評価
-            // distが小さい(相性良) -> biasFactorは正(1.0以上)
-            // distが大きい(相性悪) -> biasFactorは負(1.0未満)
-            // 例: dist=0 -> factor=1.2 (20%増), dist=100 -> factor=0.8 (20%減)
-            let biasFactor = 1.0 + ((50 - dist) / 250); // ±0.2程度のバイアス
-
-            // 忠義補正: 軍師の義理・忠誠が高く、大名との相性が良ければバイアスを抑制(1.0に近づける)
+            let biasFactor = 1.0 + ((50 - dist) / 250); 
             if (daimyo) {
                 const gunshiLoyalty = (gunshi.loyalty + gunshi.duty) / 2;
                 const gunshiDaimyoDist = this.calcValueDistance(gunshi, daimyo);
-                const fairness = (gunshiLoyalty * 0.005) + ((100 - gunshiDaimyoDist) * 0.005); // 0.0 ~ 1.0
-                // fairnessが高いほどbiasFactorを1.0に近づける
+                const fairness = (gunshiLoyalty * 0.005) + ((100 - gunshiDaimyoDist) * 0.005);
                 biasFactor = 1.0 + (biasFactor - 1.0) * (1.0 - fairness);
             }
-
-            // 最終計算: 知略によるランダム誤差 + バイアス
             const randomErrorRange = (120 - baseAcc) * 0.5; 
             const randomError = (Math.random() - 0.5) * randomErrorRange;
-            
             let perceived = (realVal + randomError) * biasFactor;
             return Math.max(1, Math.min(120, Math.floor(perceived)));
         }
-
-        // 2. 敵・在野武将の場合
-        
-        // 調査済みの場合 (accuracy 0-100)
         if (castleAccuracy !== null && castleAccuracy > 0) {
-            // 精度が高いほど誤差が小さい
-            // accuracy 100 -> 誤差なし, accuracy 10 -> 誤差大
             const maxErr = 50 * (1.0 - (castleAccuracy / 100));
             const err = (Math.random() - 0.5) * 2 * maxErr;
             return Math.max(1, Math.min(120, Math.floor(realVal + err)));
         }
-        
-        // 未調査だが、軍師がいる場合の推測 (精度低)
         if (gunshi) {
             const noise = (130 - gunshi.intelligence);
             const err = (Math.random() - 0.5) * noise * 2;
             return Math.max(1, Math.min(120, Math.floor(realVal + err)));
         }
-        
-        // 全く情報なし
         return null;
     }
     
     static getDisplayStatHTML(target, statName, gunshi, castleAccuracy = null, playerClanId = 0, daimyo = null) {
-        // 自軍大名は常に表示
         if (target.clan === playerClanId && target.isDaimyo) return this.toGradeHTML(target[statName]);
-
         const val = this.getPerceivedStatValue(target, statName, gunshi, castleAccuracy, playerClanId, daimyo);
-        
         if (val === null) return "？";
         return this.toGradeHTML(val);
     }
@@ -379,33 +345,22 @@ class GameSystem {
         return { soldierDmg: Math.floor(baseDmg * soldierRate), wallDmg: Math.floor(baseDmg * wallRate * 0.5), risk: counterRisk };
     }
     static calcRetreatScore(castle) { return castle.soldiers + (castle.defense * 0.5) + (castle.gold * 0.1) + (castle.rice * 0.1) + (castle.samuraiIds.length * 100); }
-    
-    // ★修正: 調査ロジック（複数人・能力合算）
     static calcInvestigate(bushos, targetCastle) {
         if (!bushos || bushos.length === 0) return { success: false, accuracy: 0 };
-        
-        // 最大ステータスを持つ武将を探す
         const maxStrBusho = bushos.reduce((a,b) => a.strength > b.strength ? a : b);
         const maxIntBusho = bushos.reduce((a,b) => a.intelligence > b.intelligence ? a : b);
-        
-        // 補佐ボーナス (自分以外の武将の能力の20%を加算)
         const assistStr = bushos.filter(b => b !== maxStrBusho).reduce((sum, b) => sum + b.strength, 0) * 0.2;
         const assistInt = bushos.filter(b => b !== maxIntBusho).reduce((sum, b) => sum + b.intelligence, 0) * 0.2;
-
         const totalStr = maxStrBusho.strength + assistStr;
         const totalInt = maxIntBusho.intelligence + assistInt;
-
         const difficulty = 30 + Math.random() * GAME_SETTINGS.Strategy.InvestigateDifficulty;
         const isSuccess = totalStr > difficulty;
-        
         let accuracy = 0;
         if (isSuccess) {
-            // 知略が高いほど精度向上
             accuracy = Math.min(100, Math.max(10, (totalInt * 0.8) + (Math.random() * 20)));
         }
         return { success: isSuccess, accuracy: Math.floor(accuracy) };
     }
-
     static calcIncite(busho) { const score = (busho.intelligence * 0.7) + (busho.strength * 0.3); const success = Math.random() < (score / GAME_SETTINGS.Strategy.InciteFactor); if(!success) return { success: false, val: 0 }; return { success: true, val: Math.floor(score * 2) }; }
     static calcRumor(busho, targetBusho) { const score = (busho.intelligence * 0.7) + (busho.strength * 0.3); const defScore = (targetBusho.intelligence * 0.5) + (targetBusho.loyalty * 0.5); const success = Math.random() < (score / (defScore + GAME_SETTINGS.Strategy.RumorFactor)); if(!success) return { success: false, val: 0 }; return { success: true, val: Math.floor(20 + Math.random()*20) }; }
     static calcAffinityDiff(a, b) { const diff = Math.abs(a - b); return Math.min(diff, 100 - diff); }
@@ -646,7 +601,6 @@ class UIManager {
         }
         if (this.aiGuard) { if (this.game.isProcessingAI) this.aiGuard.classList.remove('hidden'); else this.aiGuard.classList.add('hidden'); }
 
-        // PC Overlay Update
         this.updateInfoPanel(this.currentCastle || this.game.getCurrentTurnCastle());
 
         this.game.castles.forEach(c => {
@@ -670,7 +624,6 @@ class UIManager {
                 } else { 
                     el.onclick = (e) => {
                         e.stopPropagation();
-                        // 縮小中なら拡大
                         if (this.mapScale < 0.8) {
                             this.mapScale = 1.0;
                             this.applyMapScale();
@@ -680,7 +633,6 @@ class UIManager {
                             if (c.ownerClan === this.game.playerClanId) {
                                 this.showControlPanel(c);
                             } else {
-                                // 敵・中立の場合: 情報表示モードとしてパネル更新
                                 this.showControlPanel(c);
                             }
                         }
@@ -693,10 +645,9 @@ class UIManager {
     
     toggleInfoPanel() {
         this.infoPanelCollapsed = !this.infoPanelCollapsed;
-        this.updatePanelHeader(); // 再描画
+        this.updatePanelHeader(); 
     }
 
-    // 情報パネル・ヘッダー更新の統合メソッド
     updateInfoPanel(castle) {
         if (!castle) return;
         
@@ -706,7 +657,6 @@ class UIManager {
             const rateStr = `米相場: ${this.game.marketRate.toFixed(2)}`;
             const clanData = this.game.clans.find(cd => cd.id === castle.ownerClan);
             const castellan = this.game.getBusho(castle.castellanId);
-            const isSelf = castle.ownerClan === this.game.playerClanId;
             const isVisible = this.game.isCastleVisible(castle);
             const mask = (val) => isVisible ? val : "???";
 
@@ -724,22 +674,14 @@ class UIManager {
                     <div class="info-row"><span class="info-label">金</span><span class="info-val">${mask(castle.gold)}</span> <span class="info-label">兵糧</span><span class="info-val">${mask(castle.rice)}</span></div>
                     <div class="info-row"><span class="info-label">防御</span><span class="info-val">${mask(castle.defense)}</span> <span class="info-label">人口</span><span class="info-val">${mask(castle.population)}</span></div>
                     <div class="info-row"><span class="info-label">訓練</span><span class="info-val">${mask(castle.training)}</span> <span class="info-label">士気</span><span class="info-val">${mask(castle.morale)}</span></div>
+                    <div style="margin-top:5px; text-align:center;"><button class="btn-primary" style="padding:4px 10px; font-size:0.8rem;" onclick="window.GameApp.ui.openBushoSelector('view_only', ${castle.id})">武将一覧</button></div>
+                </div>
             `;
-            
-            // 自拠点の場合は武将一覧ボタンをここに追加（PC版）
-            if (isSelf) {
-                html += `<div style="margin-top:5px; text-align:center;"><button class="btn-primary" style="padding:4px 10px; font-size:0.8rem;" onclick="window.GameApp.ui.openBushoSelector('view_only', ${castle.id})">武将一覧</button></div>`;
-            } else {
-                 html += `<div style="margin-top:5px; text-align:center;"><button class="btn-primary" style="padding:4px 10px; font-size:0.8rem;" onclick="window.GameApp.ui.openBushoSelector('view_only', ${castle.id})">武将情報</button></div>`;
-            }
-
-            html += `</div>`;
             this.pcMapOverlay.innerHTML = html;
         }
 
         // Mobile Bars
         if (this.mobileTopLeft) {
-            // 上部: 人口などの基本情報
             const isVisible = this.game.isCastleVisible(castle);
             const mask = (val) => isVisible ? val : "??";
             this.mobileTopLeft.innerHTML = `
@@ -749,13 +691,16 @@ class UIManager {
             `;
         }
         if (this.mobileBottomInfo) {
-            // 下部コマンド上: 年月・相場
             this.mobileBottomInfo.innerHTML = `
-                <span>${this.game.year}年${this.game.month}月</span>
-                <span>米相場:${this.game.marketRate.toFixed(2)}</span>
-                <button class="toggle-btn" onclick="window.GameApp.ui.toggleInfoPanel()">${this.infoPanelCollapsed ? '開' : '閉'}</button>
+                <div style="display:flex; gap:10px; align-items:center;">
+                    <span>${this.game.year}年${this.game.month}月</span>
+                    <span>米相場:${this.game.marketRate.toFixed(2)}</span>
+                </div>
+                <div style="display:flex; gap:5px;">
+                    <button class="btn-primary" style="padding:2px 8px; font-size:0.75rem;" onclick="window.GameApp.ui.openBushoSelector('view_only', ${castle.id})">武将一覧</button>
+                    <button class="toggle-btn" onclick="window.GameApp.ui.toggleInfoPanel()">${this.infoPanelCollapsed ? '開' : '閉'}</button>
+                </div>
             `;
-            // スマホの下部バー開閉
              const cmdGrid = document.getElementById('command-area');
              if(cmdGrid) {
                  cmdGrid.style.display = this.infoPanelCollapsed ? 'none' : 'grid';
@@ -768,17 +713,12 @@ class UIManager {
         if(this.panelEl) this.panelEl.classList.remove('hidden');
         this.updatePanelHeader(); 
         
-        // 敵拠点の場合はコマンドメニューを表示せず、戻るボタンのみ（あるいは空）にするか
-        // ただし「自拠点」の場合はMainメニューに戻す
         if (castle.ownerClan === this.game.playerClanId) {
-             // 既にメニュー操作中ならリセットしない選択肢もあるが、基本はMainへ
              if (!this.game.selectionMode) {
                  this.menuState = 'MAIN';
                  this.renderCommandMenu(); 
              }
         } else {
-            // 敵拠点の場合、コマンドエリアは「戻る」ボタンだけにするか、隠す
-            // モバイルでは下部バーが出るので、そこに「閉じる」的なものを置く
             this.renderEnemyViewMenu();
         }
     }
@@ -786,26 +726,9 @@ class UIManager {
     updatePanelHeader() { 
         if (!this.currentCastle) return; 
         this.updateInfoPanel(this.currentCastle);
-        // PC Sidebar content logic
+        // PCの右カラムの城ステータス重複表示を削除
         if(this.statusContainer) {
-             const c = this.currentCastle;
-             const clanData = this.game.clans.find(cd => cd.id === c.ownerClan);
-             const isVisible = this.game.isCastleVisible(c);
-             const mask = (val) => isVisible ? val : "???";
-             
-             let html = `<h2>${c.name} <span style="font-size:0.8em">(${clanData ? clanData.name : "中立"})</span></h2>`;
-             // 自拠点の場合は詳細パラメータを表示
-             if (isVisible) {
-                 const createRow = (label, val, max = null) => { let h = `<div class="status-row"><div class="status-label">${label}</div><div class="status-value">${val}${max ? '<span class="status-max">/' + max + '</span>' : ''}</div></div>`; if (max) { const pct = Math.min(100, Math.floor((val / max) * 100)); h += `<div class="progress-bar"><div class="progress-fill" style="width:${pct}%"></div></div>`; } return h; };
-                 html += createRow("金", c.gold); html += createRow("兵糧", c.rice); html += createRow("兵士", c.soldiers); html += createRow("人口", c.population); html += createRow("民忠", c.loyalty, 1000); html += createRow("防御", c.defense, c.maxDefense); html += createRow("石高", c.kokudaka, c.maxKokudaka); html += createRow("商業", c.commerce, c.maxCommerce); html += createRow("訓練", c.training, 120); html += createRow("士気", c.morale, 120);
-                 
-                 // 武将一覧ボタン
-                 html += `<div style="margin-top:10px; text-align:center;"><button class="btn-primary" onclick="window.GameApp.ui.openBushoSelector('view_only', ${c.id})">武将一覧</button></div>`;
-             } else {
-                 html += "<p>詳細不明</p>";
-                 html += `<div style="margin-top:10px; text-align:center;"><button class="btn-primary" onclick="window.GameApp.ui.openBushoSelector('view_only', ${c.id})">武将情報(噂)</button></div>`;
-             }
-             this.statusContainer.innerHTML = html;
+            this.statusContainer.innerHTML = ''; 
         }
     }
 
@@ -816,23 +739,31 @@ class UIManager {
         areas.forEach(area => {
             if(!area) return;
             area.innerHTML = '';
-            // 敵選択時は特にコマンドはないので、モバイルでは閉じるボタンくらい
-            // PCではサイドバーに情報が出るだけ
             if (area === mobileArea) {
-                 // モバイルの場合、自拠点に戻るボタンなど
                  const btn = document.createElement('button');
                  btn.className = 'cmd-btn back';
                  btn.textContent = "自拠点へ戻る";
                  btn.onclick = () => {
                      const myCastle = this.game.getCurrentTurnCastle();
                      this.showControlPanel(myCastle);
-                     // マップも戻す
-                     const el = document.querySelector(`.castle-card[data-clan="${this.game.playerClanId}"]`); // 簡易的
+                     const el = document.querySelector(`.castle-card[data-clan="${this.game.playerClanId}"]`); 
                      if(el) el.scrollIntoView({block:"center"});
                  };
                  area.appendChild(btn);
             }
         });
+    }
+
+    // マップ選択モードをキャンセルする処理（メニュー遷移時に呼び出し）
+    cancelMapSelection(keepMenuState = false) { 
+        this.game.selectionMode = null; 
+        this.game.validTargets = []; 
+        this.renderMap();
+        if (!keepMenuState) {
+            // メニューから「戻る」を押した場合はMAINに戻すなどの処理
+            // ここでは呼び出し元で制御するため、特に指定がなければ何もしない
+            // 呼び出し側で this.menuState をセットしてから renderCommandMenu を呼ぶ
+        }
     }
 
     renderCommandMenu() {
@@ -848,7 +779,11 @@ class UIManager {
                 const btn = document.createElement('button'); 
                 btn.className = `cmd-btn ${cls || ''}`; 
                 btn.textContent = label; 
-                btn.onclick = onClick; 
+                btn.onclick = () => {
+                    // ★重要: メニューを切り替える前に必ずマップ選択モードを解除する
+                    this.cancelMapSelection(true);
+                    onClick();
+                }; 
                 area.appendChild(btn); 
             };
             const createEmpty = () => { const d = document.createElement('div'); area.appendChild(d); };
@@ -909,19 +844,6 @@ class UIManager {
         });
     }
     
-    cancelMapSelection() { 
-        this.game.selectionMode = null; 
-        this.game.validTargets = []; 
-        this.renderMap();
-        // 戻る際、直前のメニューステートを復元する（設定されていれば）
-        if (this.game.lastMenuState) {
-            this.menuState = this.game.lastMenuState;
-        } else {
-            this.menuState = 'MAIN'; 
-        }
-        this.renderCommandMenu(); 
-    }
-    
     showGunshiAdvice(action, onConfirm) {
         if (['farm','commerce','repair','draft','charity','transport','appoint_gunshi','appoint','banish','training','soldier_charity','buy_rice','sell_rice','interview','reward'].includes(action.type)) { onConfirm(); return; }
         const gunshi = this.game.getClanGunshi(this.game.playerClanId); if (!gunshi) { onConfirm(); return; }
@@ -941,16 +863,12 @@ class UIManager {
         if (this.selectorModal) this.selectorModal.classList.remove('hidden'); 
         if (document.getElementById('selector-title')) document.getElementById('selector-title').textContent = "武将を選択"; 
         
-        // 戻るボタンの挙動設定
         const backBtn = document.querySelector('#selector-modal .btn-secondary');
         if(backBtn) {
             backBtn.onclick = () => {
                 this.closeSelector();
                 if (onBack) {
-                    onBack(); // コールバックがあれば実行（例：マップ選択に戻る）
-                } else {
-                    // デフォルトはMainに戻らず、今のメニュー状態を維持
-                    // 何もしなくてもモーダル閉じれば裏のメニューはそのまま
+                    onBack(); 
                 }
             };
         }
@@ -969,7 +887,6 @@ class UIManager {
         }
 
         const gunshi = this.game.getClanGunshi(this.game.playerClanId);
-        // ★修正: 大名の取得（軍師査定用）
         const myDaimyo = this.game.bushos.find(b => b.clan === this.game.playerClanId && b.isDaimyo);
 
         if (['farm','commerce','repair','draft','charity','training','soldier_charity','war_deploy','transport_deploy','investigate_deploy'].includes(actionType)) {
@@ -1014,7 +931,6 @@ class UIManager {
                  let acc = null;
                  if (isEnemyTarget && targetCastle) acc = targetCastle.investigatedAccuracy;
                  if (isEnemyTarget) return GameSystem.getPerceivedStatValue(target, sortKey, gunshi, acc, this.game.playerClanId, myDaimyo) || 0;
-                 // ★修正: 自軍武将のソートにも軍師査定を適用
                  const val = GameSystem.getPerceivedStatValue(target, sortKey, gunshi, null, this.game.playerClanId, myDaimyo);
                  return val === null ? 0 : val;
             };
@@ -1038,7 +954,6 @@ class UIManager {
             if (['employ_target','appoint_gunshi','rumor_target_busho','headhunt_target','interview_target','reward','view_only'].includes(actionType)) isSelectable = true;
             
             let acc = null; if (isEnemyTarget && targetCastle) acc = targetCastle.investigatedAccuracy;
-            // ★修正: 表示用HTML生成時にDaimyo情報を渡す
             const getStat = (stat) => GameSystem.getDisplayStatHTML(b, stat, gunshi, acc, this.game.playerClanId, myDaimyo);
 
             const div = document.createElement('div'); div.className = `select-item ${!isSelectable ? 'disabled' : ''}`;
@@ -1065,8 +980,8 @@ class UIManager {
                     
                     if (actionType === 'employ_target') this.openBushoSelector('employ_doer', null, { targetId: selectedIds[0] });
                     else if (actionType === 'employ_doer') this.showGunshiAdvice({type: 'employ', targetId: extraData.targetId}, () => this.game.executeEmploy(selectedIds[0], extraData.targetId));
-                    else if (actionType === 'headhunt_target') this.openBushoSelector('headhunt_doer', null, { targetId: selectedIds[0] }); // 引抜実行者選択へ
-                    else if (actionType === 'headhunt_doer') this.openQuantitySelector('headhunt_gold', selectedIds, extraData.targetId); // 金額入力へ
+                    else if (actionType === 'headhunt_target') this.openBushoSelector('headhunt_doer', null, { targetId: selectedIds[0] }); 
+                    else if (actionType === 'headhunt_doer') this.openQuantitySelector('headhunt_gold', selectedIds, extraData.targetId); 
                     else if (actionType === 'interview') { const interviewer = this.game.getBusho(selectedIds[0]); this.showInterviewModal(interviewer); }
                     else if (actionType === 'interview_target') { const target = this.game.getBusho(selectedIds[0]); const interviewer = extraData.interviewer; this.game.executeInterviewTopic(interviewer, target); }
                     else if (actionType === 'reward') this.openQuantitySelector('reward', selectedIds);
@@ -1402,7 +1317,6 @@ class GameManager {
     endMonth() { this.month++; if(this.month > 12) { this.month = 1; this.year++; } const clans = new Set(this.castles.filter(c => c.ownerClan !== 0).map(c => c.ownerClan)); const playerAlive = clans.has(this.playerClanId); if (clans.size === 1 && playerAlive) alert(`天下統一！`); else if (!playerAlive) alert(`我が軍は滅亡しました...`); else this.startMonth(); }
 
     enterMapSelection(mode) {
-        // 現在のメニュー階層を保存（戻るボタンで復帰するため）
         this.lastMenuState = this.ui.menuState;
         this.selectionMode = mode;
         const c = this.getCurrentTurnCastle();
@@ -1455,10 +1369,8 @@ class GameManager {
         if (!this.validTargets.includes(targetCastle.id)) return;
         
         const mode = this.selectionMode;
-        // マップ選択を一旦クリアするが、メニュー状態は保持する
         this.ui.cancelMapSelection(); 
 
-        // 戻るボタン用のコールバック: 再びマップ選択モードに戻る
         const onBackToMap = () => {
             this.enterMapSelection(mode);
         };
@@ -2069,6 +1981,573 @@ class GameManager {
     }
 }
 
+// 初期化プロセスの堅牢化
 window.addEventListener('DOMContentLoaded', () => {
     window.GameApp = new GameManager();
+    
+    // HTML側のonclick属性に依存せず、JS側でイベントリスナーを設定
+    const startBtn = document.getElementById('start-btn');
+    if (startBtn) {
+        startBtn.onclick = () => window.GameApp.startNewGame();
+    }
 });
+}
+
+{
+type: uploaded file
+fileName: index.html
+fullContent:
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>戦国覇道</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div id="title-screen">
+        <div class="title-content">
+            <h1 class="game-title">戦国覇道</h1>
+            <div class="title-menu">
+                <button id="start-btn" class="title-btn">はじめから</button>
+                <button class="title-btn" onclick="document.getElementById('load-file-input').click()">続きから</button>
+                <input type="file" id="load-file-input" accept=".json" style="display:none" onchange="window.GameApp.loadGameFromFile(event)">
+            </div>
+        </div>
+    </div>
+
+    <div id="scenario-modal" class="modal hidden">
+        <div class="modal-content start-content">
+            <h2>シナリオ選択</h2>
+            <div id="scenario-list" class="clan-grid"></div>
+            <div class="modal-footer" style="justify-content: center;">
+                <button class="btn-secondary" onclick="window.GameApp.ui.returnToTitle()">戻る</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="start-screen" class="modal hidden">
+        <div class="modal-content start-content">
+            <h2>大名家選択</h2>
+            <div id="clan-selector" class="clan-grid"></div>
+        </div>
+    </div>
+
+    <div id="app" class="hidden">
+        <div id="top-info-bar">
+            <div id="mobile-top-left"></div>
+        </div>
+
+        <div id="map-wrapper">
+            <div id="map-scroll-container">
+                <div id="map-container"></div>
+            </div>
+            
+            <div id="pc-map-overlay"></div>
+
+            <div id="map-guide" class="hidden">対象を選択してください</div>
+            <div id="ai-guard" class="hidden"><div class="loading-spinner"></div>思考中...</div>
+            <button id="map-reset-zoom">-</button>
+        </div>
+
+        <div id="bottom-command-bar">
+             <div id="mobile-bottom-info"></div>
+             <div id="command-area" class="command-grid"></div>
+        </div>
+
+        <div id="pc-sidebar">
+            <div id="pc-status-panel"></div>
+            <div id="pc-command-area" class="command-grid"></div>
+        </div>
+    </div>
+
+    <div id="selector-modal" class="modal hidden">
+        <div class="modal-content">
+            <h3 id="selector-title">選択</h3>
+            <div id="selector-context-info" class="context-info"></div>
+            <div class="list-header">
+                <span></span><span>状</span><span>名</span><span>身</span><span>統</span><span>武</span><span>政</span><span>外</span><span>智</span><span>魅</span>
+            </div>
+            <div id="selector-list" class="list-container"></div>
+            <div class="modal-footer">
+                <button id="selector-confirm-btn" class="btn-primary">決定</button>
+                <button class="btn-secondary" onclick="window.GameApp.ui.closeSelector()">戻る</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="quantity-modal" class="modal hidden">
+        <div class="modal-content quantity-content" style="max-width: 400px;">
+            <h3 id="quantity-title">数量指定</h3>
+            <div id="trade-type-info" class="info-text hidden"></div>
+            <div id="charity-type-selector" class="radio-group hidden" style="margin-bottom:10px;">
+                <label><input type="radio" name="charityType" value="gold" checked> 金のみ</label>
+                <label><input type="radio" name="charityType" value="rice"> 米のみ</label>
+            </div>
+            <div id="quantity-container"></div>
+            <div class="modal-footer">
+                <button id="quantity-confirm-btn" class="btn-primary">決定</button>
+                <button class="btn-secondary" onclick="document.getElementById('quantity-modal').classList.add('hidden')">キャンセル</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="history-modal" class="modal hidden">
+        <div class="modal-content">
+            <h3>行動履歴</h3>
+            <div id="history-list" class="list-container" style="max-height: 60vh; background:#fafafa;"></div>
+            <div class="modal-footer">
+                <button class="btn-primary" onclick="document.getElementById('history-modal').classList.add('hidden')">閉じる</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="cutin-overlay" class="cutin-overlay hidden">
+        <div class="cutin-text" id="cutin-message"></div>
+    </div>
+
+    <div id="result-modal" class="modal hidden">
+        <div class="modal-content result-content" style="max-width: 500px; text-align:center;">
+            <div id="result-body" class="result-body" style="margin:20px 0; font-size:1.1rem; line-height:1.6;"></div>
+            <div class="modal-footer" id="result-footer" style="justify-content:center;">
+                <button class="btn-primary" onclick="window.GameApp.ui.closeResultModal()">閉じる</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="prisoner-modal" class="modal hidden">
+        <div class="modal-content">
+            <h3>捕虜処遇</h3>
+            <div id="prisoner-list" class="list-container"></div>
+        </div>
+    </div>
+
+    <div id="succession-modal" class="modal hidden">
+        <div class="modal-content">
+            <h3>後継者選択</h3>
+            <div id="succession-list" class="list-container"></div>
+        </div>
+    </div>
+
+    <div id="gunshi-modal" class="modal hidden">
+        <div class="modal-content result-content" style="max-width: 500px;">
+            <h3 id="gunshi-name">軍師</h3>
+            <p id="gunshi-message" style="margin: 20px 0; font-style: italic; background:#f0f0f0; padding:15px; border-radius:5px;"></p>
+            <div class="modal-footer">
+                <button id="gunshi-execute-btn" class="btn-primary">実行</button>
+                <button class="btn-secondary" onclick="document.getElementById('gunshi-modal').classList.add('hidden')">やめる</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="war-modal" class="modal hidden">
+        <div class="modal-content" style="max-width: 700px; height: 90vh; display: flex; flex-direction: column;">
+            <h2 class="war-title" style="margin:0; padding-bottom:5px;">合戦</h2>
+            <div class="war-screen">
+                <div class="war-visual">
+                    <div class="army-box attacker">
+                        <h3 class="army-title">攻撃軍: <span id="war-atk-name"></span></h3>
+                        <div>大将: <span id="war-atk-busho"></span></div>
+                        <div>兵士: <span id="war-atk-soldier" class="highlight-val"></span> / 士気: <span id="war-atk-morale"></span></div>
+                    </div>
+                    <div style="font-weight:bold; font-size:1.2rem;">VS</div>
+                    <div class="army-box defender">
+                        <h3 class="army-title">守備軍: <span id="war-def-name"></span></h3>
+                        <div>大将: <span id="war-def-busho"></span></div>
+                        <div>兵士: <span id="war-def-soldier" class="highlight-val"></span> / 防御: <span id="war-def-wall"></span></div>
+                    </div>
+                </div>
+                <div class="war-info-bar" style="background:#333; color:#fff; text-align:center; padding:2px;">
+                    R: <span id="war-round">1</span>/10 | 手番: <span id="war-turn-actor">--</span>
+                </div>
+                <div id="war-controls" class="war-controls-area disabled-area"></div>
+            </div>
+        </div>
+    </div>
+
+    <script src="game.js"></script>
+</body>
+</html>
+}
+
+{
+type: uploaded file
+fileName: style.css
+fullContent:
+:root {
+    --bg-color: #eceff1;
+    --panel-bg: #ffffff;
+    --text-color: #333;
+    --border-color: #cfd8dc;
+    --map-tile-size: 80px;
+    --header-height: 100px;
+}
+
+body {
+    font-family: "Helvetica Neue", Arial, sans-serif;
+    margin: 0; padding: 0;
+    background-color: var(--bg-color);
+    color: var(--text-color);
+    height: 100dvh;
+    width: 100vw;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+}
+
+/* Common Helpers */
+.hidden { display: none !important; }
+.fade-in { animation: fadeIn 0.3s ease-in; }
+@keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+
+/* Title Screen */
+#title-screen {
+    position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+    background: linear-gradient(135deg, #263238 0%, #37474f 100%);
+    display: flex; justify-content: center; align-items: center;
+    z-index: 3000;
+}
+.title-content { text-align: center; color: #fff; }
+.game-title { font-size: 3rem; margin-bottom: 30px; text-shadow: 2px 2px 4px rgba(0,0,0,0.5); }
+.title-menu { display: flex; flex-direction: column; gap: 15px; }
+.title-btn {
+    padding: 12px 40px; font-size: 1.2rem; background: rgba(255,255,255,0.1);
+    color: #fff; border: 1px solid rgba(255,255,255,0.3); cursor: pointer;
+    transition: all 0.3s;
+}
+.title-btn:hover { background: rgba(255,255,255,0.3); }
+
+/* Layout Structure */
+#app {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    width: 100%;
+    position: relative;
+    padding-left: env(safe-area-inset-left);
+    padding-right: env(safe-area-inset-right);
+}
+
+/* --- Mobile Top Info Bar --- */
+#top-info-bar {
+    flex: none;
+    background: rgba(255,255,255,0.95);
+    border-bottom: 1px solid var(--border-color);
+    padding-top: max(5px, env(safe-area-inset-top));
+    padding-bottom: 5px;
+    padding-left: 10px;
+    padding-right: 10px;
+    z-index: 100;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+    font-size: 0.8rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+}
+/* 左詰め情報エリア */
+#mobile-top-left {
+    display: flex; flex-direction: column; gap: 2px;
+}
+/* 開閉ボタン */
+.toggle-btn {
+    background: none; border: 1px solid #ccc; border-radius: 4px;
+    padding: 2px 8px; font-size: 0.8rem; cursor: pointer; color: #555;
+}
+
+/* Map Area */
+#map-wrapper {
+    flex: 1;
+    position: relative;
+    background-color: #81c784; 
+    overflow: hidden; 
+    display: flex;
+    justify-content: center; 
+    align-items: center;
+    touch-action: none;
+}
+
+#map-scroll-container {
+    width: 100%; height: 100%;
+    overflow: auto;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    -webkit-overflow-scrolling: touch;
+    /* 上部が見切れないようにパディング確保 */
+    padding: 20px;
+    box-sizing: border-box; 
+}
+
+#map-container {
+    display: grid;
+    gap: 10px;
+    /* paddingはscroll-containerで制御するのでこちらは最小限でも良いが、余白用に残す */
+    padding: 20px; 
+    transition: transform 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+    transform-origin: center center;
+}
+
+/* PC Overlay Info Panel */
+#pc-map-overlay {
+    position: absolute;
+    top: 20px;
+    right: 20px;
+    width: 280px;
+    background: rgba(255, 255, 255, 0.9);
+    border: 1px solid #999;
+    border-radius: 8px;
+    padding: 10px;
+    box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+    z-index: 550;
+    display: none; /* PCのみJSで表示制御 */
+    font-size: 0.9rem;
+}
+.overlay-header {
+    display: flex; justify-content: space-between; align-items: center;
+    border-bottom: 1px solid #ccc; padding-bottom: 5px; margin-bottom: 5px;
+}
+.overlay-content { display: block; }
+.overlay-content.collapsed { display: none; }
+.info-row { display: flex; justify-content: space-between; margin-bottom: 3px; }
+.info-label { color: #555; font-size: 0.85rem; }
+.info-val { font-weight: bold; }
+.highlight-text { color: #d32f2f; }
+
+/* 縮小ボタン */
+#map-reset-zoom {
+    position: absolute;
+    bottom: 20px; right: 20px; /* PCでの位置 */
+    padding: 0;
+    background: rgba(0,0,0,0.7);
+    color: white; border: none; border-radius: 50%;
+    font-weight: bold; z-index: 500;
+    cursor: pointer;
+    width: 40px; height: 40px;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.3);
+    display: flex; justify-content: center; align-items: center;
+    font-size: 1.2rem;
+}
+
+.castle-card {
+    width: var(--map-tile-size); 
+    height: var(--map-tile-size);
+    background: #fff; border: 1px solid #999; border-radius: 4px;
+    display: flex; flex-direction: column; justify-content: space-between;
+    padding: 2px; box-shadow: 2px 2px 5px rgba(0,0,0,0.2);
+    cursor: pointer; position: relative;
+    user-select: none;
+    font-size: 0.75rem;
+    grid-column: var(--c-x);
+    grid-row: var(--c-y);
+    z-index: 10;
+}
+.castle-card:hover { transform: translateY(-2px); box-shadow: 2px 4px 8px rgba(0,0,0,0.3); z-index: 20; }
+.castle-card.done { filter: grayscale(100%); opacity: 0.7; }
+.castle-card.active-turn { border: 3px solid #ff9800; box-shadow: 0 0 15px #ff9800; z-index: 15; }
+.castle-card.selectable-target { border: 3px solid #e91e63; animation: pulse 1s infinite; z-index: 25; cursor: crosshair; }
+.castle-card.dimmed { opacity: 0.3; filter: grayscale(80%); }
+
+@keyframes pulse { 0% { box-shadow: 0 0 0 0 rgba(233, 30, 99, 0.7); } 70% { box-shadow: 0 0 0 10px rgba(233, 30, 99, 0); } 100% { box-shadow: 0 0 0 0 rgba(233, 30, 99, 0); } }
+
+.card-header h3 { margin: 0; font-size: 0.9em; text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; background:#eee;}
+.card-owner { font-size: 0.7em; text-align: center; color: #555; }
+.param-grid { font-size: 0.7em; padding: 1px; }
+.param-item { display: flex; justify-content: space-between; }
+
+/* --- Mobile Bottom Command Bar --- */
+#bottom-command-bar {
+    flex: none;
+    background: #fff;
+    border-top: 1px solid var(--border-color);
+    padding-bottom: max(5px, env(safe-area-inset-bottom));
+    padding-left: 5px;
+    padding-right: 5px;
+    z-index: 200;
+    box-shadow: 0 -2px 5px rgba(0,0,0,0.1);
+    height: auto;
+    /* コマンドバーは少し小さく */
+    display: block;
+}
+
+/* モバイル用：コマンド上の情報エリア */
+#mobile-bottom-info {
+    padding: 5px 10px;
+    background: #f1f8e9;
+    border-bottom: 1px dashed #ccc;
+    font-size: 0.8rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    color: #33691e;
+    font-weight: bold;
+}
+
+.command-grid {
+    display: grid; 
+    grid-template-columns: repeat(3, 1fr); 
+    gap: 4px;
+    padding: 5px 0;
+}
+.cmd-btn {
+    padding: 0; /* padding減らす */
+    height: 38px; /* 高さ減らす */
+    border: 1px solid #bbb; background: #f8f9fa; border-radius: 4px;
+    cursor: pointer; font-size: 0.8rem; font-weight: bold;
+    display: flex; align-items: center; justify-content: center;
+    touch-action: manipulation;
+    white-space: nowrap;
+    overflow: hidden;
+}
+.cmd-btn:hover { background: #e3f2fd; }
+.cmd-btn:active { background: #bbdefb; transform: translateY(1px); }
+.cmd-btn.category { background: #e0f7fa; border-color: #0097a7; color: #006064; }
+.cmd-btn.finish { background: #ffebee; border-color: #ef5350; color: #c62828; grid-column: span 3; margin-top: 2px;}
+.cmd-btn.back { background: #cfd8dc; border-color: #90a4ae; color: #455a64; grid-column: span 3; }
+
+/* PC Sidebar (Default hidden) */
+#pc-sidebar { 
+    display: none !important; 
+}
+
+/* PC Layout Adjustment */
+@media (min-width: 769px) {
+    #app { 
+        flex-direction: row; 
+    }
+    #top-info-bar { display: none !important; }
+    #bottom-command-bar { display: none !important; }
+    #pc-map-overlay { display: block; }
+    #map-reset-zoom { bottom: 20px; right: 20px; }
+
+    /* PC Sidebar Logic */
+    #pc-sidebar {
+        display: flex !important;
+        flex-direction: column;
+        width: 300px; /* 少し細く */
+        background: #f5f5f5;
+        border-left: 1px solid #ccc;
+        box-shadow: -2px 0 5px rgba(0,0,0,0.1);
+        z-index: 200;
+        overflow-y: auto;
+        height: 100dvh;
+    }
+    #pc-command-area { padding: 10px; flex: 1; overflow-y: auto; }
+    
+    /* PCでのコマンドボタン */
+    .command-grid { grid-template-columns: repeat(2, 1fr); gap: 10px; }
+    .cmd-btn { padding: 15px; font-size: 1rem; height: auto; }
+    .cmd-btn.finish, .cmd-btn.back { grid-column: span 2; }
+}
+
+/* Modals & Overlays */
+.modal {
+    position: fixed; top: 0; left: 0; width: 100%; height: 100dvh;
+    background: rgba(0,0,0,0.6); 
+    z-index: 4000; 
+    display: flex; justify-content: center; align-items: center;
+    opacity: 1; transition: opacity 0.2s;
+    padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+}
+.modal.hidden { opacity: 0; pointer-events: none; display: none !important;} 
+
+.modal-content {
+    background: #fff; padding: 20px; border-radius: 8px;
+    width: 90%; max-width: 800px; 
+    max-height: 80dvh;
+    display: flex; flex-direction: column;
+    box-shadow: 0 10px 25px rgba(0,0,0,0.5);
+    position: relative;
+}
+.modal-content h3 { margin-top: 0; border-bottom: 2px solid #ddd; padding-bottom: 10px; }
+.context-info { margin-bottom: 10px; padding: 10px; background: #e8eaf6; border-radius: 4px; font-size: 0.9rem; }
+
+/* List Styling */
+.list-header {
+    display: grid; 
+    grid-template-columns: 30px 30px 90px 40px repeat(6, 1fr); 
+    gap: 2px; font-weight: bold; background: #37474f; color:#fff; padding: 8px 5px; font-size: 0.8rem;
+    position: sticky; top: 0;
+}
+.list-container { flex: 1; overflow-y: auto; border: 1px solid #ddd; min-height: 200px; }
+.select-item {
+    display: grid; 
+    grid-template-columns: 30px 30px 90px 40px repeat(6, 1fr); 
+    gap: 2px; padding: 10px 5px; border-bottom: 1px solid #eee; cursor: pointer; font-size: 0.85rem; align-items: center;
+}
+.select-item:hover { background: #f0f8ff; }
+.select-item.disabled { color: #aaa; pointer-events: none; background: #f9f9f9; }
+
+/* Rank Colors */
+.grade-rank { font-weight: 900; text-shadow: 0 0 2px rgba(0,0,0,0.5); }
+.rank-s { color: #d32f2f; }
+.rank-a { color: #f57c00; }
+.rank-b { color: #fbc02d; }
+.rank-c { color: #7cb342; }
+.rank-d { color: #388e3c; }
+.rank-e { color: #1976d2; }
+
+/* Footer Buttons */
+.modal-footer { margin-top: 15px; display: flex; justify-content: flex-end; gap: 10px; padding-top: 10px; border-top: 1px solid #eee; flex-shrink: 0;}
+.btn-primary, .btn-secondary, .btn-danger {
+    padding: 10px 20px; border: none; border-radius: 4px; cursor: pointer; font-weight: bold;
+}
+.btn-primary { background: #1976d2; color: #fff; }
+.btn-secondary { background: #78909c; color: #fff; }
+.btn-danger { background: #d32f2f; color: #fff; }
+
+/* Specific Screens */
+.start-content { max-width: 600px; text-align: center; }
+.clan-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 10px; margin-top: 20px; overflow-y: auto;}
+.clan-btn { 
+    padding: 15px; border: 2px solid; border-radius: 8px; 
+    font-weight: bold; cursor: pointer; background: #fff;
+    transition: transform 0.1s; display: flex; justify-content: center; align-items: center;
+}
+.clan-btn:hover { transform: scale(1.05); }
+
+/* War Screen */
+.war-screen { flex: 1; display: flex; flex-direction: column; background: #e0e0e0; padding: 5px; border-radius: 4px; overflow: hidden;}
+.war-visual { flex: 1; display: flex; flex-direction: column; justify-content: space-around; align-items: center; background: #fff; margin-bottom: 5px; padding: 10px; overflow-y: auto;}
+.army-box { width: 90%; padding: 10px; border-radius: 8px; color: #fff; margin: 5px 0; }
+.army-box.attacker { background: #d32f2f; }
+.army-box.defender { background: #1976d2; }
+.highlight-val { font-size: 1.5rem; font-weight: bold; }
+.war-controls-area { display: grid; grid-template-columns: repeat(3, 1fr); gap: 5px; flex-shrink: 0;}
+.war-controls-area button { padding: 12px 2px; cursor: pointer; font-size: 0.9rem; background: #fff; border: 1px solid #999; border-radius: 4px; }
+.war-controls-area button:hover { background: #eee; }
+.disabled-area { pointer-events: none; opacity: 0.5; }
+
+/* Guide & Logs */
+#map-guide {
+    position: absolute; top: 10px; left: 50%; transform: translateX(-50%);
+    background: rgba(0,0,0,0.8); color: #fff; padding: 8px 20px; border-radius: 20px;
+    pointer-events: none; z-index: 600; font-weight: bold;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.3);
+}
+#ai-guard {
+    position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+    background: rgba(0,0,0,0.5); z-index: 1000;
+    display: flex; justify-content: center; align-items: center;
+    color: white; font-size: 1.5rem; font-weight: bold; flex-direction: column;
+}
+.cutin-overlay {
+    position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+    background: rgba(0,0,0,0.7); z-index: 5000; pointer-events: none;
+    display: flex; justify-content: center; align-items: center;
+    opacity: 0; transition: opacity 0.5s;
+}
+.cutin-overlay.fade-in { opacity: 1; }
+.cutin-text {
+    font-size: 2rem; color: #fff; font-weight: bold;
+    text-shadow: 0 0 10px #ff0000; white-space: pre-wrap; text-align: center;
+    transform: scale(0); transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+.cutin-overlay.fade-in .cutin-text { transform: scale(1); }
+
+/* Quantity Modal Range Inputs */
+.qty-row { margin-bottom: 15px; }
+.qty-control { display: flex; align-items: center; gap: 10px; }
+.qty-control input[type="range"] { flex: 1; }
+.qty-control input[type="number"] { width: 80px; padding: 5px; text-align: right; }
+}
