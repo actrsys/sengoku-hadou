@@ -23,6 +23,7 @@
             <h1>戦国覇道</h1>
             <div id="global-status">
                 <span id="date-display">--年 --月</span>
+                <span id="market-rate" style="margin-left:20px; font-size:0.9rem;">米相場: 1.00</span>
             </div>
         </header>
 
@@ -68,6 +69,7 @@
             <div class="modal-content selector-content wide-modal">
                 <h2 id="selector-title">選択</h2>
                 <div id="selector-context-info" class="context-info hidden"></div>
+                
                 <div class="busho-grid-header">
                     <span class="col-check">操作</span>
                     <span class="col-act">行動</span>
@@ -81,6 +83,7 @@
                     <span class="col-stat">魅力</span>
                 </div>
                 <div id="selector-list" class="selector-list-container"></div>
+                
                 <div class="selector-actions">
                     <button id="selector-confirm-btn" class="btn-primary">決定</button>
                     <button onclick="window.GameApp.ui.closeSelector()" class="btn-secondary">戻る</button>
@@ -96,6 +99,7 @@
                     <label><input type="radio" name="charityType" value="rice"> 兵糧のみ</label>
                     <label><input type="radio" name="charityType" value="both"> 両方</label>
                 </div>
+                <div id="trade-type-info" class="hidden" style="text-align:center; margin-bottom:10px;"></div>
                 <div id="quantity-container"></div>
                 <div class="modal-footer">
                     <button id="quantity-confirm-btn" class="btn-primary">実行</button>
@@ -132,6 +136,7 @@
             <div class="modal-content selector-content wide-modal">
                 <h2 id="busho-modal-title">所属武将</h2>
                 <div id="castle-detail-info" class="context-info hidden"></div>
+
                 <div class="busho-grid-header">
                     <span class="col-check">状態</span>
                     <span class="col-act">--</span>
@@ -154,6 +159,7 @@
         <div id="prisoner-modal" class="modal hidden">
             <div class="modal-content prisoner-content">
                 <h2>捕虜の処遇</h2>
+                <p>捕らえた武将の処遇を決めてください</p>
                 <div id="prisoner-list"></div>
             </div>
         </div>

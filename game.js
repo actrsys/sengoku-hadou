@@ -1,5 +1,5 @@
 /**
- * 戦国シミュレーションゲーム - 完全修正版
+ * 戦国シミュレーションゲーム - 完全修正版 (バグ修正・UI整合性確保)
  */
 
 /* --- Config & Data --- */
@@ -20,16 +20,48 @@ const CONFIG = {
     },
     Prisoner: { BaseCaptureRate: 0.4, HireDifficulty: 1.5 },
     Diplomacy: { DefaultFriendship: 50, GoodwillCost: 100 },
-    Employ: { AmbitionPenalty: 1.0, AffinityBonus: 30 }
+    Employ: { AmbitionPenalty: 1.0, AffinityBonus: 30 },
+    Trade: { MinRate: 0.5, MaxRate: 3.0, Fluctuation: 0.2 }
 };
 
 const DATA_SOURCES = { castles: "./data/castles.csv", bushos: "./data/warriors.csv" };
 
-const DEFAULT_CSV_CASTLES = `id,name,ownerClan,x,y,castellanId,soldiers,gold,rice,kokudaka,commerce,defense,loyalty,population
-1,魚津城,1,1,0,10102,8000,3000,15000,900,600,800,800,20000
-2,春日山城,1,2,0,10101,12000,6000,25000,1500,1000,1200,900,30000`.trim();
+// Default Data - Expanded to prevent crash if CSV load fails
+const DEFAULT_CSV_CASTLES = `id,name,ownerClan,x,y,castellanId,soldiers,gold,rice,kokudaka,commerce,defense,loyalty,population,training,morale
+1,魚津城,1,1,0,10102,8000,3000,15000,900,600,800,800,20000,50,50
+2,春日山城,1,2,0,10101,12000,6000,25000,1500,1000,1200,900,30000,60,60
+15,新発田城,1,3,0,10107,9000,3500,16000,950,700,900,850,22000,50,50
+3,稲葉山城,5,0,1,10501,11000,5000,20000,1400,1200,1100,700,28000,50,50
+4,岩村城,5,1,1,10503,7000,2000,12000,700,500,900,600,15000,40,40
+5,海津城,2,2,1,10202,9000,3500,16000,900,700,1000,800,20000,50,50
+6,厩橋城,1,3,1,10103,8000,3000,14000,850,800,700,750,18000,50,50
+7,清州城,6,0,2,10601,11000,5500,22000,1600,1500,1000,850,35000,60,60
+8,飯田城,2,1,2,10205,7500,2500,13000,750,600,800,700,16000,50,50
+9,躑躅ヶ崎館,2,2,2,10201,13000,7000,24000,1600,1200,1100,950,32000,70,70
+10,河越城,3,3,2,10302,8500,3500,17000,1000,900,900,800,21000,50,50
+11,名古屋城,6,0,3,10603,9000,4000,18000,1100,1400,850,800,24000,50,50
+12,曳馬城,4,1,3,10402,8000,3000,15000,900,1000,800,700,19000,40,40
+13,駿府城,4,2,3,10401,12000,9000,28000,1800,2000,1300,900,38000,30,30
+14,小田原城,3,3,3,10301,15000,8000,30000,2000,1800,2000,950,40000,60,60
+`.trim();
+
 const DEFAULT_CSV_BUSHOS = `id,name,strength,politics,diplomacy,intelligence,charm,loyalty,clan,castleId,isCastellan,personality,ambition,affinity,leadership
-10101,上杉謙信,100,60,85,90,95,100,1,2,true,aggressive,80,10,98`.trim();
+10101,上杉謙信,100,60,85,90,95,100,1,2,TRUE,aggressive,80,10,98
+10102,柿崎景家,90,40,20,50,60,90,1,1,TRUE,aggressive,40,6,85
+10103,直江景綱,60,85,88,80,75,95,1,6,TRUE,balanced,30,5,70
+10107,本庄繁長,88,50,30,70,65,85,1,15,TRUE,aggressive,80,5,80
+10201,武田信玄,95,95,90,96,98,100,2,9,TRUE,aggressive,95,65,99
+10202,高坂昌信,80,80,75,85,88,92,2,5,TRUE,conservative,40,66,88
+10205,秋山信友,82,65,55,75,70,90,2,8,TRUE,balanced,50,60,80
+10301,北条氏康,88,95,92,92,94,100,3,14,TRUE,conservative,70,20,95
+10302,北条氏政,70,75,70,70,75,95,3,10,TRUE,conservative,40,20,65
+10401,今川義元,75,90,90,85,92,100,4,13,TRUE,conservative,90,30,80
+10402,朝比奈泰朝,82,60,50,60,70,90,4,12,TRUE,balanced,40,30,75
+10501,斎藤義龍,85,70,40,75,50,100,5,3,TRUE,aggressive,85,90,80
+10503,遠山景任,65,60,50,65,65,85,5,4,TRUE,conservative,30,90,60
+10601,織田信長,95,90,85,92,96,100,6,7,TRUE,aggressive,100,50,98
+10603,佐久間信盛,75,75,60,70,60,88,6,11,TRUE,conservative,40,50,70
+`.trim();
 
 /* --- Data Manager --- */
 class DataManager {
@@ -111,9 +143,9 @@ class Castle {
     }
 }
 const CLAN_DATA = [
-    { id: 1, name: "上杉家", color: "#d32f2f", leaderId: 10001 }, { id: 2, name: "武田家", color: "#1976d2", leaderId: 20001 },
+    { id: 1, name: "上杉家", color: "#d32f2f", leaderId: 10101 }, { id: 2, name: "武田家", color: "#1976d2", leaderId: 20001 },
     { id: 3, name: "北条家", color: "#fbc02d", leaderId: 30001 }, { id: 4, name: "今川家", color: "#7b1fa2", leaderId: 40001 },
-    { id: 5, name: "斎藤家", color: "#388e3c", leaderId: 50001 }, { id: 6, name: "織田家", color: "#212121", leaderId: 60001 }
+    { id: 5, name: "斎藤家", color: "#388e3c", leaderId: 10501 }, { id: 6, name: "織田家", color: "#212121", leaderId: 10601 }
 ];
 
 /* --- Logic --- */
@@ -168,7 +200,6 @@ class UIManager {
         this.statusContainer = document.getElementById('status-container'); this.cmdArea = document.getElementById('command-area');
         this.logEl = document.getElementById('log-content'); this.selectorModal = document.getElementById('selector-modal');
         this.selectorList = document.getElementById('selector-list'); this.selectorContextInfo = document.getElementById('selector-context-info');
-        this.selectorHeader = document.querySelector('.selector-content .busho-grid-header'); 
         this.selectorConfirmBtn = document.getElementById('selector-confirm-btn');
         this.startScreen = document.getElementById('start-screen'); this.cutinOverlay = document.getElementById('cutin-overlay');
         this.cutinMessage = document.getElementById('cutin-message'); this.quantityModal = document.getElementById('quantity-modal');
@@ -183,13 +214,13 @@ class UIManager {
         this.aiGuard = document.getElementById('ai-guard');
         this.bushoDetailModal = document.getElementById('busho-detail-modal');
         this.bushoDetailList = document.getElementById('busho-detail-list');
-        this.marketRateDisplay = document.getElementById('market-rate'); // Add missing
-        this.tradeTypeInfo = document.getElementById('trade-type-info'); // Add missing
+        this.marketRateDisplay = document.getElementById('market-rate');
+        this.tradeTypeInfo = document.getElementById('trade-type-info');
 
         this.resultModal.addEventListener('click', (e) => { if (e.target === this.resultModal) this.closeResultModal(); });
         document.getElementById('load-file-input').addEventListener('change', (e) => this.game.loadGameFromFile(e));
         
-        // 戻るボタンのイベントハンドラを固定 (再バインド不要に)
+        // 戻るボタンのイベントハンドラを固定
         const backBtn = document.querySelector('#selector-modal .btn-secondary');
         if(backBtn) backBtn.onclick = () => this.closeSelector();
     }
@@ -202,12 +233,12 @@ class UIManager {
     
     renderMap() {
         this.mapEl.innerHTML = ''; document.getElementById('date-display').textContent = `${this.game.year}年 ${this.game.month}月`;
-        // Safely set market rate if element exists
         if(this.marketRateDisplay) this.marketRateDisplay.textContent = `米相場: ${this.game.marketRate.toFixed(2)}`;
         
         const isSelectionMode = (this.game.selectionMode !== null);
         if(isSelectionMode) this.mapGuide.classList.remove('hidden'); else this.mapGuide.classList.add('hidden');
         if (this.game.isProcessingAI) this.aiGuard.classList.remove('hidden'); else this.aiGuard.classList.add('hidden');
+
         this.game.castles.forEach(c => {
             const el = document.createElement('div'); el.className = 'castle-card';
             el.dataset.clan = c.ownerClan; el.style.setProperty('--c-x', c.x + 1); el.style.setProperty('--c-y', c.y + 1);
@@ -217,40 +248,20 @@ class UIManager {
             const soldierText = isVisible ? c.soldiers : "???"; const castellanName = isVisible ? (castellan ? castellan.name : '-') : "???";
             el.innerHTML = `<div class="card-header"><h3>${c.name}</h3></div><div class="card-owner">${clanData ? clanData.name : "中立"}</div><div class="param-grid"><div class="param-item"><span>城主</span> <strong>${castellanName}</strong></div><div class="param-item"><span>兵数</span> ${soldierText}</div></div>`;
             if(clanData) el.style.borderTop = `5px solid ${clanData.color}`;
+            
+            // AIターンまたは選択モード外クリックのガード
             if (!this.game.isProcessingAI) {
-                if (isSelectionMode) { if (this.game.validTargets.includes(c)) { el.classList.add('selectable-target'); el.onclick = () => this.game.resolveMapSelection(c); } else { el.style.opacity = '0.4'; } } 
-                else { el.onclick = () => this.showCastleInfo(c); }
+                if (isSelectionMode) {
+                    if (this.game.validTargets.includes(c)) { el.classList.add('selectable-target'); el.onclick = () => this.game.resolveMapSelection(c); } else { el.style.opacity = '0.4'; }
+                } else { el.onclick = () => this.showCastleInfo(c); }
             } else { el.style.cursor = 'default'; }
             this.mapEl.appendChild(el);
         });
     }
     showControlPanel(castle) { this.currentCastle = castle; this.panelEl.classList.remove('hidden'); this.updatePanelHeader(); this.menuState = 'MAIN'; this.renderCommandMenu(); }
     updatePanelHeader() { if (!this.currentCastle) return; const c = this.currentCastle; const clanData = CLAN_DATA.find(cd => cd.id === c.ownerClan); document.getElementById('panel-title').textContent = c.name; document.getElementById('panel-clan').textContent = clanData ? clanData.name : "--"; const createStatusRow = (label, val, max = null) => { let html = `<div class="status-row"><div class="status-label">${label}</div><div class="status-value">${val}${max ? '<span class="status-max">/' + max + '</span>' : ''}</div></div>`; if (max) { const pct = Math.min(100, Math.floor((val / max) * 100)); html += `<div class="progress-bar"><div class="progress-fill" style="width:${pct}%"></div></div>`; } return html; }; let html = ""; html += createStatusRow("金", c.gold); html += createStatusRow("兵糧", c.rice); html += createStatusRow("兵士", c.soldiers); html += createStatusRow("人口", c.population); html += createStatusRow("民忠", c.loyalty, 1000); html += createStatusRow("防御", c.defense, c.maxDefense); html += createStatusRow("石高", c.kokudaka, c.maxKokudaka); html += createStatusRow("商業", c.commerce, c.maxCommerce); html += createStatusRow("訓練", c.training, 120); html += createStatusRow("士気", c.morale, 120); this.statusContainer.innerHTML = html; }
-    renderCommandMenu() {
-        this.cmdArea.innerHTML = '';
-        const createBtn = (label, cls, onClick) => { const btn = document.createElement('button'); btn.className = `cmd-btn ${cls || ''}`; btn.textContent = label; btn.onclick = onClick; this.cmdArea.appendChild(btn); };
-        if (this.menuState === 'MAIN') {
-            createBtn("開発", "category", () => { this.menuState = 'DEVELOP'; this.renderCommandMenu(); });
-            createBtn("軍事", "category", () => { this.menuState = 'MILITARY'; this.renderCommandMenu(); });
-            createBtn("外交", "category", () => { this.menuState = 'DIPLOMACY'; this.renderCommandMenu(); });
-            createBtn("調略", "category", () => { this.menuState = 'STRATEGY'; this.renderCommandMenu(); });
-            createBtn("人事", "category", () => { this.menuState = 'PERSONNEL'; this.renderCommandMenu(); });
-            createBtn("機能", "category", () => { this.menuState = 'SYSTEM'; this.renderCommandMenu(); });
-            createBtn("終了", "finish", () => this.game.finishTurn());
-        } else if (this.menuState === 'DEVELOP') {
-            createBtn("石高開発", "", () => this.openBushoSelector('farm')); createBtn("商業開発", "", () => this.openBushoSelector('commerce')); createBtn("施し", "", () => this.openBushoSelector('charity')); createBtn("戻る", "back", () => { this.menuState = 'MAIN'; this.renderCommandMenu(); });
-        } else if (this.menuState === 'MILITARY') {
-            createBtn("出陣", "", () => this.game.enterMapSelection('war')); createBtn("徴兵", "", () => this.openBushoSelector('draft')); createBtn("修復", "", () => this.openBushoSelector('repair')); createBtn("訓練", "", () => this.openBushoSelector('training')); createBtn("兵施し", "", () => this.openBushoSelector('soldier_charity')); createBtn("輸送", "", () => this.game.enterMapSelection('transport')); createBtn("戻る", "back", () => { this.menuState = 'MAIN'; this.renderCommandMenu(); });
-        } else if (this.menuState === 'STRATEGY') {
-            createBtn("調査", "", () => this.game.enterMapSelection('investigate')); createBtn("扇動", "", () => this.game.enterMapSelection('incite')); createBtn("流言", "", () => this.game.enterMapSelection('rumor')); createBtn("兵糧購入", "", () => this.openQuantitySelector('buy_rice')); createBtn("兵糧売却", "", () => this.openQuantitySelector('sell_rice')); createBtn("戻る", "back", () => { this.menuState = 'MAIN'; this.renderCommandMenu(); });
-        } else if (this.menuState === 'DIPLOMACY') {
-            createBtn("親善", "", () => this.game.enterMapSelection('goodwill')); createBtn("同盟", "", () => this.game.enterMapSelection('alliance')); createBtn("同盟解消", "", () => this.game.enterMapSelection('break_alliance')); createBtn("戻る", "back", () => { this.menuState = 'MAIN'; this.renderCommandMenu(); });
-        } else if (this.menuState === 'PERSONNEL') {
-            createBtn("移動", "", () => this.game.enterMapSelection('move')); createBtn("登用", "", () => this.openBushoSelector('employ_target')); const isDaimyoHere = this.game.getCastleBushos(this.currentCastle.id).some(b => b.isDaimyo); if (!isDaimyoHere) createBtn("城主任命", "", () => this.openBushoSelector('appoint', null, {allowDone: true})); createBtn("軍師任命", "", () => this.openBushoSelector('appoint_gunshi', null, {allowDone: true})); createBtn("追放", "", () => this.openBushoSelector('banish')); createBtn("戻る", "back", () => { this.menuState = 'MAIN'; this.renderCommandMenu(); });
-        } else if (this.menuState === 'SYSTEM') {
-            createBtn("ファイル保存", "", () => window.GameApp.saveGameToFile()); createBtn("ファイル読込", "", () => document.getElementById('load-file-input').click()); createBtn("戻る", "back", () => { this.menuState = 'MAIN'; this.renderCommandMenu(); });
-        }
-    }
+    
+    renderCommandMenu() { /* ... */ this.cmdArea.innerHTML = ''; const createBtn = (label, cls, onClick) => { const btn = document.createElement('button'); btn.className = `cmd-btn ${cls || ''}`; btn.textContent = label; btn.onclick = onClick; this.cmdArea.appendChild(btn); }; if (this.menuState === 'MAIN') { createBtn("開発", "category", () => { this.menuState = 'DEVELOP'; this.renderCommandMenu(); }); createBtn("軍事", "category", () => { this.menuState = 'MILITARY'; this.renderCommandMenu(); }); createBtn("外交", "category", () => { this.menuState = 'DIPLOMACY'; this.renderCommandMenu(); }); createBtn("調略", "category", () => { this.menuState = 'STRATEGY'; this.renderCommandMenu(); }); createBtn("人事", "category", () => { this.menuState = 'PERSONNEL'; this.renderCommandMenu(); }); createBtn("機能", "category", () => { this.menuState = 'SYSTEM'; this.renderCommandMenu(); }); createBtn("終了", "finish", () => this.game.finishTurn()); } else if (this.menuState === 'DEVELOP') { createBtn("石高開発", "", () => this.openBushoSelector('farm')); createBtn("商業開発", "", () => this.openBushoSelector('commerce')); createBtn("施し", "", () => this.openBushoSelector('charity')); createBtn("戻る", "back", () => { this.menuState = 'MAIN'; this.renderCommandMenu(); }); } else if (this.menuState === 'MILITARY') { createBtn("出陣", "", () => this.game.enterMapSelection('war')); createBtn("徴兵", "", () => this.openBushoSelector('draft')); createBtn("修復", "", () => this.openBushoSelector('repair')); createBtn("訓練", "", () => this.openBushoSelector('training')); createBtn("兵施し", "", () => this.openBushoSelector('soldier_charity')); createBtn("輸送", "", () => this.game.enterMapSelection('transport')); createBtn("戻る", "back", () => { this.menuState = 'MAIN'; this.renderCommandMenu(); }); } else if (this.menuState === 'STRATEGY') { createBtn("調査", "", () => this.game.enterMapSelection('investigate')); createBtn("扇動", "", () => this.game.enterMapSelection('incite')); createBtn("流言", "", () => this.game.enterMapSelection('rumor')); createBtn("兵糧購入", "", () => this.openQuantitySelector('buy_rice')); createBtn("兵糧売却", "", () => this.openQuantitySelector('sell_rice')); createBtn("戻る", "back", () => { this.menuState = 'MAIN'; this.renderCommandMenu(); }); } else if (this.menuState === 'DIPLOMACY') { createBtn("親善", "", () => this.game.enterMapSelection('goodwill')); createBtn("同盟", "", () => this.game.enterMapSelection('alliance')); createBtn("同盟解消", "", () => this.game.enterMapSelection('break_alliance')); createBtn("戻る", "back", () => { this.menuState = 'MAIN'; this.renderCommandMenu(); }); } else if (this.menuState === 'PERSONNEL') { createBtn("移動", "", () => this.game.enterMapSelection('move')); createBtn("登用", "", () => this.openBushoSelector('employ_target')); const isDaimyoHere = this.game.getCastleBushos(this.currentCastle.id).some(b => b.isDaimyo); if (!isDaimyoHere) createBtn("城主任命", "", () => this.openBushoSelector('appoint', null, {allowDone: true})); createBtn("軍師任命", "", () => this.openBushoSelector('appoint_gunshi', null, {allowDone: true})); createBtn("追放", "", () => this.openBushoSelector('banish')); createBtn("戻る", "back", () => { this.menuState = 'MAIN'; this.renderCommandMenu(); }); } else if (this.menuState === 'SYSTEM') { createBtn("ファイル保存", "", () => window.GameApp.saveGameToFile()); createBtn("ファイル読込", "", () => document.getElementById('load-file-input').click()); createBtn("戻る", "back", () => { this.menuState = 'MAIN'; this.renderCommandMenu(); }); } }
     cancelMapSelection() { this.game.selectionMode = null; this.game.validTargets = []; this.renderMap(); this.menuState = 'MAIN'; this.renderCommandMenu(); }
     showGunshiAdvice(action, onConfirm) {
         if (['farm','commerce','repair','draft','charity','transport','appoint_gunshi','appoint','banish','training','soldier_charity','buy_rice','sell_rice'].includes(action.type)) { onConfirm(); return; }
@@ -301,6 +312,7 @@ class UIManager {
             this.selectorList.appendChild(div);
         });
         if (bushos.length === 0) this.selectorList.innerHTML = "<div style='padding:10px;'>対象となる武将がいません</div>";
+        // Button Logic: Re-assign explicitly
         this.selectorConfirmBtn.onclick = () => {
             const inputs = document.querySelectorAll('input[name="sel_busho"]:checked'); if (inputs.length === 0) return;
             const selectedIds = Array.from(inputs).map(i => parseInt(i.value)); this.closeSelector();
@@ -341,7 +353,7 @@ class UIManager {
             this.quantityConfirmBtn.onclick = () => { const vals = { gold: parseInt(inputs.gold.num.value), rice: parseInt(inputs.rice.num.value), soldiers: parseInt(inputs.soldiers.num.value) }; if(vals.gold===0 && vals.rice===0 && vals.soldiers===0) return; this.quantityModal.classList.add('hidden'); this.game.executeTransport(data, targetId, vals); };
         } else if (type === 'buy_rice') {
             document.getElementById('quantity-title').textContent = "兵糧購入"; const rate = this.game.marketRate; const maxBuy = Math.floor(c.gold / rate);
-            this.tradeTypeInfo.classList.remove('hidden'); this.tradeTypeInfo.textContent = `相場: ${rate.toFixed(2)} (金1 -> 米${(1/rate).toFixed(2)})`;
+            this.tradeTypeInfo.classList.remove('hidden'); this.tradeTypeInfo.textContent = `相場: ${rate.toFixed(2)} (金${rate.toFixed(2)} -> 米1)`;
             inputs.amount = createSlider("購入量(米)", "amount", maxBuy, 0);
             this.quantityConfirmBtn.onclick = () => { const val = parseInt(inputs.amount.num.value); if(val<=0) return; this.quantityModal.classList.add('hidden'); this.game.executeTrade('buy', val); };
         } else if (type === 'sell_rice') {
@@ -351,10 +363,6 @@ class UIManager {
             this.quantityConfirmBtn.onclick = () => { const val = parseInt(inputs.amount.num.value); if(val<=0) return; this.quantityModal.classList.add('hidden'); this.game.executeTrade('sell', val); };
         }
     }
-    closeSelector() { this.selectorModal.classList.add('hidden'); }
-    showPrisonerModal(prisoners) { /* 省略なし */ this.prisonerModal.classList.remove('hidden'); this.prisonerList.innerHTML = ''; prisoners.forEach((p, index) => { const div = document.createElement('div'); div.className = 'prisoner-item'; div.innerHTML = `<div style="margin-bottom:5px;"><strong>${p.name}</strong> (武:${p.strength} 智:${p.intelligence} 魅:${p.charm} 忠:${p.loyalty}) ${p.isDaimyo?'【大名】':''}</div><div class="prisoner-actions"><button class="btn-primary" onclick="window.GameApp.handlePrisonerAction(${index}, 'hire')">登用</button><button class="btn-danger" onclick="window.GameApp.handlePrisonerAction(${index}, 'kill')">処断</button><button class="btn-secondary" onclick="window.GameApp.handlePrisonerAction(${index}, 'release')">解放</button></div>`; this.prisonerList.appendChild(div); }); }
-    closePrisonerModal() { this.prisonerModal.classList.add('hidden'); }
-    showSuccessionModal(candidates, onSelect) { this.successionModal.classList.remove('hidden'); this.successionList.innerHTML = ''; candidates.forEach(c => { const div = document.createElement('div'); div.className = 'select-item'; div.innerHTML = `<div class="item-detail"><strong style="font-size:1.2rem">${c.name}</strong><span>統率:${c.leadership} 政治:${c.politics}</span></div><button class="btn-primary" style="margin-left:auto;">継承</button>`; div.onclick = () => { this.successionModal.classList.add('hidden'); onSelect(c.id); }; this.successionList.appendChild(div); }); if (candidates.length === 0) this.successionList.innerHTML = "<div>後継者がいません...</div>"; }
     showCastleBushosModal() { if (!this.currentCastle) return; this.showBushoList(this.currentCastle); }
     showCastleInfo(castle) {
         const modal = document.getElementById('busho-detail-modal'); const body = document.getElementById('busho-detail-list'); modal.classList.remove('hidden'); document.getElementById('busho-modal-title').textContent = "城情報";
@@ -408,16 +416,13 @@ class GameManager {
     isCastleVisible(castle) { if (castle.ownerClan === this.playerClanId) return true; if (castle.investigatedUntil >= this.getCurrentTurnId()) return true; return false; }
     
     startMonth() {
-        // Market fluctuation
         this.marketRate = Math.max(CONFIG.Trade.MinRate, Math.min(CONFIG.Trade.MaxRate, this.marketRate * (0.9 + Math.random()*0.2)));
-        
         this.ui.showCutin(`${this.year}年 ${this.month}月`); this.ui.log(`=== ${this.year}年 ${this.month}月 ===`); this.processRoninMovements(); if (this.month % 3 === 0) this.optimizeCastellans(); const isPopGrowth = (this.month % 2 === 0);
         this.castles.forEach(c => {
             if (c.ownerClan === 0) return;
             c.isDone = false;
             let income = Math.floor(c.commerce * CONFIG.Coef.IncomeGold);
             if(this.month === 3) income += 500; c.gold += income; if(this.month === 9) c.rice += c.kokudaka * 10;
-            // Pop dynamics by loyalty
             if (isPopGrowth) { 
                 let growth = 0;
                 if(c.loyalty < 300) growth = -Math.floor(c.population * 0.01);
