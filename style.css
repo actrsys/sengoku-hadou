@@ -57,10 +57,10 @@ main { flex: 1; display: grid; grid-template-columns: 1fr 400px; gap: 1rem; padd
 .hidden { display: none !important; }
 
 /* Excel-like Selectors */
-/* check, act, name, rank, ldr, str, pol, dip, int, chm */
+/* 列幅定義: check, act, name, rank, ldr, str, pol, dip, int, chm */
 .busho-grid-header { 
     display: grid; 
-    grid-template-columns: 50px 60px 140px 60px 45px 45px 45px 45px 45px 45px;
+    grid-template-columns: 50px 50px 140px 60px 45px 45px 45px 45px 45px 45px;
     padding: 8px 5px; background: #e0e0e0; font-weight: bold; 
     border-bottom: 2px solid #ccc; font-size: 0.85rem; text-align: center; 
     position: sticky; top: 0; z-index: 1;
@@ -68,7 +68,7 @@ main { flex: 1; display: grid; grid-template-columns: 1fr 400px; gap: 1rem; padd
 .selector-list-container { max-height: 400px; overflow-y: auto; overflow-x: auto; }
 .select-item { 
     display: grid; 
-    grid-template-columns: 50px 60px 140px 60px 45px 45px 45px 45px 45px 45px;
+    grid-template-columns: 50px 50px 140px 60px 45px 45px 45px 45px 45px 45px;
     align-items: center; padding: 8px 5px; border-bottom: 1px solid #eee; 
     cursor: pointer; white-space: nowrap; font-size: 0.9rem;
 }
