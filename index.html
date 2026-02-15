@@ -18,6 +18,24 @@
         </div>
     </div>
 
+    <div id="scenario-modal" class="modal hidden">
+        <div class="modal-content start-content">
+            <h2>シナリオ選択</h2>
+            <div id="scenario-list" class="scenario-list"></div>
+            <div class="modal-footer" style="justify-content: center;">
+                <button class="btn-secondary" onclick="window.GameApp.ui.returnToTitle()">戻る</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="start-screen" class="modal hidden">
+        <div class="modal-content start-content">
+            <h2>大名家選択</h2>
+            <p>担当する大名家を選んでください</p>
+            <div id="clan-selector"></div>
+        </div>
+    </div>
+
     <div id="app" class="hidden">
         <header>
             <h1>戦国覇道</h1>
@@ -56,24 +74,6 @@
 
         <div id="cutin-overlay" class="hidden">
             <div class="cutin-text" id="cutin-message"></div>
-        </div>
-
-        <div id="scenario-modal" class="modal hidden">
-            <div class="modal-content start-content">
-                <h2>シナリオ選択</h2>
-                <div id="scenario-list" class="scenario-list"></div>
-                <div class="modal-footer" style="justify-content: center;">
-                    <button class="btn-secondary" onclick="window.GameApp.ui.returnToTitle()">戻る</button>
-                </div>
-            </div>
-        </div>
-
-        <div id="start-screen" class="modal hidden">
-            <div class="modal-content start-content">
-                <h2>大名家選択</h2>
-                <p>担当する大名家を選んでください</p>
-                <div id="clan-selector"></div>
-            </div>
         </div>
 
         <div id="selector-modal" class="modal hidden">
