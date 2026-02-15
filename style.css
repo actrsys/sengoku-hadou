@@ -3,9 +3,7 @@
     --panel-bg: #ffffff;
     --text-color: #333;
     --border-color: #cfd8dc;
-    --map-tile-size: 80px;
-    --header-height: 120px; /* モバイル用ヘッダー高さ目安 */
-    --footer-height: 220px; /* モバイル用フッター高さ目安 */
+    --map-tile-size: 80px; 
 }
 
 body {
@@ -14,21 +12,16 @@ body {
     background-color: var(--bg-color);
     color: var(--text-color);
     height: 100vh;
-    width: 100vw;
-    overflow: hidden;
-    display: flex;
-    flex-direction: column;
+    display: flex; flex-direction: column;
+    overflow: hidden; 
 }
-
-/* Common Helpers */
-.hidden { display: none !important; }
 
 /* Title Screen */
 #title-screen {
     position: fixed; top: 0; left: 0; width: 100%; height: 100%;
     background: linear-gradient(135deg, #263238 0%, #37474f 100%);
     display: flex; justify-content: center; align-items: center;
-    z-index: 3000;
+    z-index: 2000;
 }
 .title-content { text-align: center; color: #fff; }
 .game-title { font-size: 3rem; margin-bottom: 30px; text-shadow: 2px 2px 4px rgba(0,0,0,0.5); }
@@ -40,79 +33,68 @@ body {
 }
 .title-btn:hover { background: rgba(255,255,255,0.3); }
 
-/* Layout Structure */
+/* Main Layout Structure */
 #app {
     display: flex;
-    flex-direction: column;
-    height: 100%;
+    flex-direction: column; 
+    height: 100vh;
     width: 100%;
-    position: relative;
 }
+.hidden { display: none !important; }
 
-/* Top Info Bar (Mobile) */
+/* Top Info Bar (スマホ用) */
 #top-info-bar {
-    flex: none;
+    flex: none; 
     background: var(--panel-bg);
     border-bottom: 1px solid var(--border-color);
-    padding: 5px;
+    padding: 4px;
     z-index: 100;
     box-shadow: 0 2px 5px rgba(0,0,0,0.1);
-    height: auto;
-    min-height: 100px;
 }
 .mobile-status-row {
-    display: flex; justify-content: space-between;
-    font-size: 0.85rem; padding: 2px 0; border-bottom: 1px dashed #eee;
+    display: flex; justify-content: space-between; font-size: 0.85rem; padding: 2px 5px;
 }
-.status-highlight { font-weight: bold; color: #d32f2f; }
-.status-small { font-size: 0.75rem; color: #666; }
 
 /* Map Area */
 #map-wrapper {
-    flex: 1;
+    flex: 1; 
     position: relative;
     background-color: #81c784; 
-    overflow: hidden; /* JSでパン・ズーム制御、あるいは内部コンテナでスクロール */
+    overflow: auto; /* スクロール可能 */
     display: flex;
     justify-content: center; 
     align-items: center;
-    touch-action: none; /* スマホでの独自ジェスチャー対策 */
-}
-
-/* マップの実体。スクロールさせるコンテナ */
-#map-scroll-container {
-    width: 100%; height: 100%;
-    overflow: auto;
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    -webkit-overflow-scrolling: touch;
+    -webkit-tap-highlight-color: transparent;
 }
 
 #map-container {
     display: grid;
-    gap: 10px;
-    padding: 50px;
+    gap: 5px;
+    padding: 40px; 
     transition: transform 0.3s ease;
     transform-origin: center center;
-    /* 初期状態はJSで制御 */
 }
 
-/* 拡大時クラス */
+/* デフォルト：画面に収まるように縮小 */
+#map-container.fit-screen {
+    transform: scale(var(--map-scale, 0.6));
+}
+
+/* 拡大時：等倍? */
 #map-container.zoomed {
-    transform: scale(1.0) !important; /* 原寸に戻す */
+    transform: scale(1.4); 
 }
 
-/* 縮小ボタン（画面右下に固定） */
+/* 縮小ボタン (ラッパーの外、絶対配置で固定) */
 #map-reset-zoom {
     position: absolute;
     bottom: 20px; right: 20px;
     padding: 10px 20px;
     background: rgba(0,0,0,0.8);
-    color: white; border: none; border-radius: 30px;
-    font-weight: bold; z-index: 500;
+    color: white; border: 2px solid #fff; border-radius: 30px;
+    font-weight: bold; z-index: 1000; /* マップより上 */
     cursor: pointer;
-    box-shadow: 0 2px 10px rgba(0,0,0,0.3);
+    box-shadow: 0 4px 8px rgba(0,0,0,0.3);
 }
 
 .castle-card {
@@ -120,183 +102,164 @@ body {
     height: var(--map-tile-size);
     background: #fff; border: 1px solid #999; border-radius: 4px;
     display: flex; flex-direction: column; justify-content: space-between;
-    padding: 2px; box-shadow: 2px 2px 5px rgba(0,0,0,0.2);
+    padding: 4px; box-shadow: 2px 2px 5px rgba(0,0,0,0.2);
     cursor: pointer; position: relative;
     user-select: none;
-    font-size: 0.75rem;
+    font-size: 0.8rem;
     grid-column: var(--c-x);
     grid-row: var(--c-y);
-    z-index: 10;
 }
-.castle-card:hover { transform: translateY(-2px); box-shadow: 2px 4px 8px rgba(0,0,0,0.3); z-index: 20; }
+.castle-card:hover { transform: translateY(-2px); box-shadow: 2px 4px 8px rgba(0,0,0,0.3); }
 .castle-card.done { filter: grayscale(100%); opacity: 0.7; }
-.castle-card.active-turn { border: 3px solid #ff9800; box-shadow: 0 0 15px #ff9800; z-index: 15; }
-.castle-card.selectable-target { border: 3px solid #e91e63; animation: pulse 1s infinite; z-index: 25; cursor: crosshair; }
+.castle-card.active-turn { border: 2px solid #ff9800; box-shadow: 0 0 10px #ff9800; }
+.castle-card.selectable-target { border: 2px solid #e91e63; animation: pulse 1s infinite; cursor: crosshair; }
 
 @keyframes pulse { 0% { box-shadow: 0 0 0 0 rgba(233, 30, 99, 0.7); } 70% { box-shadow: 0 0 0 10px rgba(233, 30, 99, 0); } 100% { box-shadow: 0 0 0 0 rgba(233, 30, 99, 0); } }
 
-.card-header h3 { margin: 0; font-size: 0.9em; text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; background:#eee;}
-.card-owner { font-size: 0.7em; text-align: center; color: #555; }
-.param-grid { font-size: 0.7em; padding: 1px; }
+.card-header h3 { margin: 0; font-size: 0.85em; text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;}
+.card-owner { font-size: 0.7em; text-align: center; color: #555; margin-bottom: 2px; }
+.param-grid { font-size: 0.7em; }
 .param-item { display: flex; justify-content: space-between; }
 
-/* Bottom Command Bar */
+#map-guide {
+    position: absolute; top: 10px; left: 50%; transform: translateX(-50%);
+    background: rgba(233, 30, 99, 0.9); color: #fff; padding: 8px 20px; border-radius: 20px;
+    pointer-events: none; z-index: 100; font-weight: bold; box-shadow: 0 2px 5px rgba(0,0,0,0.3);
+}
+#ai-guard {
+    position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+    background: rgba(0,0,0,0.3); z-index: 500;
+    display: flex; justify-content: center; align-items: center;
+    color: white; font-size: 2rem; font-weight: bold; flex-direction: column;
+}
+.loading-spinner {
+    border: 8px solid #f3f3f3; border-top: 8px solid #3498db;
+    border-radius: 50%; width: 50px; height: 50px; animation: spin 1s linear infinite; margin-bottom: 20px;
+}
+@keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+
+/* Bottom Command Bar (スマホ用) */
 #bottom-command-bar {
-    flex: none;
+    flex: none; 
     background: #fff;
     border-top: 1px solid var(--border-color);
     padding: 5px;
     z-index: 200;
     box-shadow: 0 -2px 5px rgba(0,0,0,0.1);
     height: auto;
-    min-height: 160px;
+    max-height: 40vh;
 }
 
+/* Command Grid (3列・ボタン大きく修正) */
 .command-grid {
     display: grid; 
-    grid-template-columns: repeat(3, 1fr); /* 3列に変更 */
-    gap: 4px;
-    padding-bottom: 5px;
+    grid-template-columns: repeat(3, 1fr); /* 3列 */
+    gap: 8px;
+    padding: 5px;
 }
 .cmd-btn {
-    padding: 12px 2px; /* 高さを確保 */
-    border: 1px solid #bbb; background: #f8f9fa; border-radius: 4px;
-    cursor: pointer; font-size: 0.85rem; font-weight: bold;
+    padding: 15px 5px; /* 高さを確保 */
+    min-height: 60px;  /* 最低高さを指定 */
+    border: 1px solid #b0bec5; background: #fff; border-radius: 6px;
+    cursor: pointer; font-size: 0.95rem; font-weight: bold; transition: background 0.2s;
     display: flex; align-items: center; justify-content: center;
-    touch-action: manipulation;
-    white-space: nowrap;
+    touch-action: manipulation; box-shadow: 0 1px 3px rgba(0,0,0,0.1);
 }
 .cmd-btn:hover { background: #e3f2fd; }
 .cmd-btn:active { background: #bbdefb; transform: translateY(1px); }
-.cmd-btn.category { background: #e0f7fa; border-color: #0097a7; color: #006064; }
-.cmd-btn.finish { background: #ffebee; border-color: #ef5350; color: #c62828; grid-column: span 3; padding: 10px; margin-top: 5px;}
-.cmd-btn.back { background: #cfd8dc; border-color: #90a4ae; color: #455a64; grid-column: span 3; }
+.cmd-btn.category { background: #e0f7fa; border-color: #4dd0e1; color: #006064; }
+.cmd-btn.finish { background: #ffebee; border-color: #ef5350; color: #c62828; grid-column: span 3; /* 全幅 */ margin-top: 5px;}
+.cmd-btn.back { background: #eceff1; border-color: #90a4ae; color: #455a64; grid-column: span 3; }
 
-/* PC Layout Adjustment */
-#pc-sidebar { display: none; }
-
-@media (min-width: 769px) {
-    #app { 
-        flex-direction: row; 
-    }
-    #top-info-bar { display: none; }
-    #bottom-command-bar { display: none; }
-
-    /* PC Sidebar Logic */
-    #pc-sidebar {
-        display: flex; flex-direction: column;
-        width: 350px;
-        background: #f5f5f5;
-        border-left: 1px solid #ccc;
-        box-shadow: -2px 0 5px rgba(0,0,0,0.1);
-        z-index: 200;
-        overflow-y: auto;
-    }
-    #pc-status-panel { padding: 15px; background: #fff; margin-bottom: 10px; border-bottom: 1px solid #ddd; }
-    #pc-status-panel h2 { margin: 0 0 10px 0; font-size: 1.2rem; border-bottom: 2px solid #333; }
-    #pc-command-area { padding: 10px; flex: 1; }
-    
-    .status-row { display: flex; justify-content: space-between; padding: 4px 0; border-bottom: 1px solid #eee; font-size: 0.9rem; }
-    .status-label { color: #555; }
-    .status-value { font-weight: bold; }
-    
-    /* PCでのコマンドボタンは見やすく */
-    .command-grid { grid-template-columns: repeat(2, 1fr); gap: 10px; }
-    .cmd-btn { padding: 15px; font-size: 1rem; }
-    .cmd-btn.finish, .cmd-btn.back { grid-column: span 2; }
+/* PC用サイドバー (初期非表示) */
+#sidebar {
+    display: none; /* スマホでは非表示 */
 }
 
-/* Modals & Overlays */
+/* Modals */
 .modal {
     position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-    background: rgba(0,0,0,0.6); z-index: 2000;
+    background: rgba(0,0,0,0.5); z-index: 3000;
     display: flex; justify-content: center; align-items: center;
-    opacity: 1; transition: opacity 0.2s;
 }
-.modal.hidden { opacity: 0; pointer-events: none; display: none !important;} /* display:noneもしっかり効かせる */
-
 .modal-content {
     background: #fff; padding: 20px; border-radius: 8px;
-    width: 90%; max-width: 800px; max-height: 90vh;
+    width: 95%; max-width: 800px; max-height: 90vh;
     display: flex; flex-direction: column;
     box-shadow: 0 10px 25px rgba(0,0,0,0.5);
-    position: relative;
 }
 .modal-content h3 { margin-top: 0; border-bottom: 2px solid #ddd; padding-bottom: 10px; }
-.context-info { margin-bottom: 10px; padding: 10px; background: #e8eaf6; border-radius: 4px; font-size: 0.9rem; }
+.context-info { margin-bottom: 10px; padding: 10px; background: #e8eaf6; border-radius: 4px; }
 
-/* List Styling */
+/* Lists */
 .list-header {
     display: grid; 
-    grid-template-columns: 30px 30px 90px 40px repeat(6, 1fr); 
-    gap: 2px; font-weight: bold; background: #37474f; color:#fff; padding: 8px 5px; font-size: 0.8rem;
-    position: sticky; top: 0;
+    grid-template-columns: 25px 30px 80px 40px repeat(6, 1fr); 
+    gap: 2px; font-weight: bold; background: #eee; padding: 5px; font-size: 0.8rem;
 }
-.list-container { flex: 1; overflow-y: auto; border: 1px solid #ddd; min-height: 200px; }
+.list-container { flex: 1; overflow-y: auto; border: 1px solid #ddd; }
 .select-item {
     display: grid; 
-    grid-template-columns: 30px 30px 90px 40px repeat(6, 1fr); 
-    gap: 2px; padding: 10px 5px; border-bottom: 1px solid #eee; cursor: pointer; font-size: 0.85rem; align-items: center;
+    grid-template-columns: 25px 30px 80px 40px repeat(6, 1fr); 
+    gap: 2px; padding: 8px 2px; border-bottom: 1px solid #eee; cursor: pointer; font-size: 0.85rem; align-items: center;
 }
 .select-item:hover { background: #f0f8ff; }
 .select-item.disabled { color: #aaa; pointer-events: none; background: #f9f9f9; }
 
-/* Rank Colors */
-.grade-rank { font-weight: 900; text-shadow: 0 0 2px rgba(0,0,0,0.5); }
-.rank-s { color: #d32f2f; }
-.rank-a { color: #f57c00; }
-.rank-b { color: #fbc02d; }
-.rank-c { color: #7cb342; }
-.rank-d { color: #388e3c; }
-.rank-e { color: #1976d2; }
-
-/* Footer Buttons */
-.modal-footer { margin-top: 15px; display: flex; justify-content: flex-end; gap: 10px; padding-top: 10px; border-top: 1px solid #eee; }
-.btn-primary, .btn-secondary, .btn-danger {
-    padding: 10px 20px; border: none; border-radius: 4px; cursor: pointer; font-weight: bold;
+/* ランク表示 */
+.grade-rank {
+    font-weight: 900;
+    text-shadow: 0 0 3px rgba(0,0,0,0.5), 1px 1px 0 #fff;
+    letter-spacing: 0px;
 }
-.btn-primary { background: #1976d2; color: #fff; }
-.btn-secondary { background: #78909c; color: #fff; }
-.btn-danger { background: #d32f2f; color: #fff; }
+.rank-s { color: #d32f2f; } 
+.rank-a { color: #f57c00; } 
+.rank-b { color: #fbc02d; } 
+.rank-c { color: #7cb342; } 
+.rank-d { color: #388e3c; } 
+.rank-e { color: #1976d2; } 
 
-/* Specific Screens */
+.modal-footer { margin-top: 15px; display: flex; justify-content: flex-end; gap: 10px; }
+.btn-primary { background: #1976d2; color: #fff; border: none; padding: 10px 20px; border-radius: 4px; cursor: pointer; font-weight: bold; }
+.btn-secondary { background: #78909c; color: #fff; border: none; padding: 10px 20px; border-radius: 4px; cursor: pointer; }
+.btn-danger { background: #d32f2f; color: #fff; border: none; padding: 10px 20px; border-radius: 4px; cursor: pointer; }
+
+/* Start & Scenario */
 .start-content { max-width: 600px; text-align: center; }
-.clan-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 10px; margin-top: 20px; }
+.clan-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 15px; margin-top: 20px; }
 .clan-btn { 
-    padding: 15px; border: 2px solid; border-radius: 8px; 
-    font-weight: bold; cursor: pointer; background: #fff;
-    transition: transform 0.1s;
+    padding: 20px; border: 3px solid; border-radius: 8px; 
+    font-weight: bold; font-size: 1.2rem; cursor: pointer; background: #fff;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.1);
 }
 .clan-btn:hover { transform: scale(1.05); }
 
-/* War Screen */
-.war-screen { flex: 1; display: flex; flex-direction: column; background: #e0e0e0; padding: 5px; border-radius: 4px; overflow: hidden;}
-.war-visual { flex: 1; display: flex; flex-direction: column; justify-content: space-around; align-items: center; background: #fff; margin-bottom: 5px; padding: 10px; overflow-y: auto;}
-.army-box { width: 90%; padding: 10px; border-radius: 8px; color: #fff; margin: 5px 0; }
+.scenario-item { 
+    border: 1px solid #ccc; padding: 15px; margin-bottom: 10px; 
+    border-radius: 4px; cursor: pointer; transition: background 0.2s; 
+}
+.scenario-item:hover { background: #f0f0f0; }
+.scenario-title { font-weight: bold; font-size: 1.1rem; }
+.scenario-desc { font-size: 0.9rem; color: #666; margin-top: 5px; }
+
+/* War Modal */
+.war-screen { flex: 1; display: flex; flex-direction: column; background: #e0e0e0; padding: 5px; border-radius: 4px; }
+.war-visual { flex: 1; display: flex; flex-direction: column; justify-content: space-around; align-items: center; background: #fff; margin-bottom: 5px; position: relative; padding: 10px; gap: 10px; }
+.army-box { width: 90%; padding: 10px; border-radius: 8px; color: #fff; position: relative; }
 .army-box.attacker { background: #d32f2f; }
 .army-box.defender { background: #1976d2; }
+.vs-badge { font-size: 1.5rem; font-weight: bold; color: #333; margin: 5px 0; }
 .highlight-val { font-size: 1.5rem; font-weight: bold; }
+.war-info-bar { text-align: center; font-weight: bold; margin-bottom: 5px; background: #333; color: #fff; padding: 5px; font-size: 0.9rem; }
+#war-log { height: 80px; overflow-y: auto; background: #fff; border: 1px solid #ccc; font-size: 0.8rem; padding: 5px; margin-bottom: 5px; }
 .war-controls-area { display: grid; grid-template-columns: repeat(3, 1fr); gap: 5px; }
-.war-controls-area button { padding: 12px 2px; cursor: pointer; font-size: 0.9rem; background: #fff; border: 1px solid #999; border-radius: 4px; }
-.war-controls-area button:hover { background: #eee; }
+.war-controls-area button { padding: 15px 2px; cursor: pointer; font-size: 0.9rem; font-weight: bold; }
 .disabled-area { pointer-events: none; opacity: 0.5; }
 
-/* Guide & Logs */
-#map-guide {
-    position: absolute; top: 10px; left: 50%; transform: translateX(-50%);
-    background: rgba(0,0,0,0.8); color: #fff; padding: 8px 20px; border-radius: 20px;
-    pointer-events: none; z-index: 600; font-weight: bold;
-    box-shadow: 0 2px 5px rgba(0,0,0,0.3);
-}
-#ai-guard {
-    position: absolute; top: 0; left: 0; width: 100%; height: 100%;
-    background: rgba(0,0,0,0.5); z-index: 1000;
-    display: flex; justify-content: center; align-items: center;
-    color: white; font-size: 1.5rem; font-weight: bold; flex-direction: column;
-}
+/* Cutin */
 .cutin-overlay {
     position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-    background: rgba(0,0,0,0.7); z-index: 4000; pointer-events: none;
+    background: rgba(0,0,0,0.6); z-index: 4000; pointer-events: none;
     display: flex; justify-content: center; align-items: center;
     opacity: 0; transition: opacity 0.5s;
 }
@@ -308,8 +271,67 @@ body {
 }
 .cutin-overlay.fade-in .cutin-text { transform: scale(1); }
 
-/* Quantity Modal Range Inputs */
-.qty-row { margin-bottom: 15px; }
-.qty-control { display: flex; align-items: center; gap: 10px; }
-.qty-control input[type="range"] { flex: 1; }
-.qty-control input[type="number"] { width: 80px; padding: 5px; text-align: right; }
+/* Result Modal */
+.result-content { max-width: 500px; text-align: center; }
+.result-body { font-size: 1.1rem; line-height: 1.6; margin-bottom: 20px; }
+
+/* PC用レイアウト (幅769px以上) */
+@media (min-width: 769px) {
+    #app { flex-direction: row; }
+    
+    /* スマホ用UIを非表示 */
+    #top-info-bar { display: none; }
+    #bottom-command-bar { display: none; }
+    
+    /* サイドバーを表示・設定 */
+    #sidebar {
+        display: flex; flex-direction: column;
+        width: 320px;
+        background: #f5f5f5;
+        border-right: 1px solid #ccc;
+        box-shadow: 2px 0 5px rgba(0,0,0,0.1);
+        z-index: 200;
+        padding: 0;
+    }
+    
+    #sidebar-header {
+        background: #263238; color: #fff; padding: 15px;
+        text-align: center;
+    }
+    #sidebar-header h2 { margin: 0; font-size: 1.5rem; }
+    #panel-clan { margin-top: 5px; color: #b0bec5; }
+
+    #status-container {
+        padding: 10px;
+        background: #fff;
+        border-bottom: 1px solid #ddd;
+    }
+    .status-row { display: flex; justify-content: space-between; margin-bottom: 5px; font-size: 0.9rem; }
+    .status-label { color: #666; }
+    .status-value { font-weight: bold; }
+    .progress-bar { height: 6px; background: #eee; border-radius: 3px; overflow: hidden; margin-bottom: 8px; }
+    .progress-fill { height: 100%; background: #4caf50; }
+
+    /* PC用コマンドエリア */
+    #pc-command-area {
+        padding: 10px;
+        flex: 1;
+        overflow-y: auto;
+    }
+    /* PCではコマンドボタンを2列にするなど調整可能だが、今回はスマホと共通のCSSを再利用するためコンテナ指定 */
+    #pc-command-area .command-grid {
+        grid-template-columns: repeat(2, 1fr); /* PCサイドバーは幅が狭いので2列 */
+        gap: 8px;
+    }
+
+    #pc-log-area {
+        height: 150px;
+        background: #fff;
+        border-top: 1px solid #ccc;
+        padding: 10px;
+        font-size: 0.85rem;
+        overflow-y: auto;
+    }
+    #pc-log-area h3 { margin: 0 0 5px 0; font-size: 0.9rem; color: #555; }
+    #log-content div { margin-bottom: 4px; border-bottom: 1px dashed #eee; }
+}
