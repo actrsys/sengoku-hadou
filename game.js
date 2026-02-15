@@ -1,6 +1,6 @@
 /**
- * 戦国シミュレーションゲーム - 完全修正版 v9.1
- * 修正: PCサイドバー表示、モバイルコマンドレイアウト、地図操作、霧の実装
+ * 戦国シミュレーションゲーム - 完全修正版 v9.2
+ * 修正: PCスタート不可修正、モバイル表示重複修正、敵城情報制限・操作禁止
  */
 
 window.onerror = function(message, source, lineno, colno, error) {
@@ -620,15 +620,29 @@ class UIManager {
                 } else { 
                     el.onclick = (e) => {
                         e.stopPropagation();
-                        // 縮小中なら拡大、拡大中ならパネル
+                        // 縮小中なら拡大、拡大中ならアクション判定
                         if (this.mapScale < 0.8) {
                             this.mapScale = 1.0;
                             this.applyMapScale();
                             if(this.mapResetZoomBtn) this.mapResetZoomBtn.textContent = "-";
-                            // 中心にスクロール（簡易）
                             el.scrollIntoView({block: "center", inline: "center", behavior: "smooth"});
                         } else {
-                            this.showControlPanel(c);
+                            // 自軍の城のみ操作可能
+                            if (c.ownerClan === this.game.playerClanId) {
+                                this.showControlPanel(c);
+                            } else {
+                                // 敵・中立の場合: 視界があれば情報のみ表示、なければ何もしない
+                                if (isVisible) {
+                                    const info = `
+                                        <h3>${c.name}</h3>
+                                        <p>支配: ${clanData ? clanData.name : '中立'}</p>
+                                        <p>城主: ${castellanName}</p>
+                                        <p>兵数: ${c.soldiers}</p>
+                                        <p>防御: ${c.defense}</p>
+                                    `;
+                                    this.showResultModal(info);
+                                }
+                            }
                         }
                     };
                 }
