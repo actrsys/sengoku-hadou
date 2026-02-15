@@ -70,7 +70,7 @@ class DataManager {
             await this.loadParameters("./parameter.csv");
             if (GAME_SETTINGS.System.UseRandomNames) {
                 try {
-                    const namesText = await this.fetchText("./generico_fficer.csv");
+                    const namesText = await this.fetchText("./generic_officer.csv");
                     this.parseGenericNames(namesText);
                 } catch (e) { console.warn("汎用武将名ファイルなし"); }
             }
