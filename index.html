@@ -13,7 +13,7 @@
             <div class="title-menu">
                 <button class="title-btn" onclick="window.GameApp.startNewGame()">はじめから</button>
                 <button class="title-btn" onclick="document.getElementById('load-file-input').click()">続きから</button>
-                <input type="file" id="load-file-input" accept=".json" style="display:none">
+                <input type="file" id="load-file-input" accept=".json" style="display:none" onchange="window.GameApp.loadGameFromFile(event)">
             </div>
         </div>
     </div>
@@ -31,7 +31,6 @@
     <div id="start-screen" class="modal hidden">
         <div class="modal-content start-content">
             <h2>大名家選択</h2>
-            <p>プレイする大名家を選択してください</p>
             <div id="clan-selector" class="clan-grid"></div>
         </div>
     </div>
@@ -42,14 +41,21 @@
         </div>
 
         <div id="map-wrapper">
-            <div id="map-container"></div>
+            <div id="map-scroll-container">
+                <div id="map-container"></div>
+            </div>
             <div id="map-guide" class="hidden">対象を選択してください</div>
             <div id="ai-guard" class="hidden"><div class="loading-spinner"></div>思考中...</div>
-            <button id="map-reset-zoom" class="hidden">縮小</button>
+            <button id="map-reset-zoom" class="hidden">全体 / 拡大</button>
         </div>
 
         <div id="bottom-command-bar">
             <div id="command-area" class="command-grid"></div>
+        </div>
+
+        <div id="pc-sidebar">
+            <div id="pc-status-panel"></div>
+            <div id="pc-command-area" class="command-grid"></div>
         </div>
     </div>
 
@@ -69,13 +75,12 @@
     </div>
 
     <div id="quantity-modal" class="modal hidden">
-        <div class="modal-content quantity-content">
+        <div class="modal-content quantity-content" style="max-width: 400px;">
             <h3 id="quantity-title">数量指定</h3>
             <div id="trade-type-info" class="info-text hidden"></div>
-            <div id="charity-type-selector" class="radio-group hidden">
+            <div id="charity-type-selector" class="radio-group hidden" style="margin-bottom:10px;">
                 <label><input type="radio" name="charityType" value="gold" checked> 金のみ</label>
                 <label><input type="radio" name="charityType" value="rice"> 米のみ</label>
-                <label><input type="radio" name="charityType" value="both"> 両方(効果大)</label>
             </div>
             <div id="quantity-container"></div>
             <div class="modal-footer">
@@ -100,9 +105,9 @@
     </div>
 
     <div id="result-modal" class="modal hidden">
-        <div class="modal-content result-content">
-            <div id="result-body" class="result-body"></div>
-            <div class="modal-footer" id="result-footer">
+        <div class="modal-content result-content" style="max-width: 500px; text-align:center;">
+            <div id="result-body" class="result-body" style="margin:20px 0; font-size:1.1rem; line-height:1.6;"></div>
+            <div class="modal-footer" id="result-footer" style="justify-content:center;">
                 <button class="btn-primary" onclick="window.GameApp.ui.closeResultModal()">閉じる</button>
             </div>
         </div>
@@ -118,15 +123,14 @@
     <div id="succession-modal" class="modal hidden">
         <div class="modal-content">
             <h3>後継者選択</h3>
-            <p>大名が死亡しました。後継者を選んでください。</p>
             <div id="succession-list" class="list-container"></div>
         </div>
     </div>
 
     <div id="gunshi-modal" class="modal hidden">
-        <div class="modal-content result-content">
+        <div class="modal-content result-content" style="max-width: 500px;">
             <h3 id="gunshi-name">軍師</h3>
-            <p id="gunshi-message" style="margin: 20px 0; font-style: italic;"></p>
+            <p id="gunshi-message" style="margin: 20px 0; font-style: italic; background:#f0f0f0; padding:15px; border-radius:5px;"></p>
             <div class="modal-footer">
                 <button id="gunshi-execute-btn" class="btn-primary">実行</button>
                 <button class="btn-secondary" onclick="document.getElementById('gunshi-modal').classList.add('hidden')">やめる</button>
@@ -134,51 +138,31 @@
         </div>
     </div>
 
-    <div id="busho-detail-modal" class="modal hidden">
-        <div class="modal-content" style="max-width: 600px;">
-            <h3 id="busho-modal-title">所属武将</h3>
-            <div id="castle-detail-info" class="hidden" style="margin-bottom:10px; padding:10px; background:#f9f9f9;"></div>
-            <div class="list-header">
-                <span></span><span>状</span><span>名</span><span>身</span><span>統</span><span>武</span><span>政</span><span>外</span><span>智</span><span>魅</span>
-            </div>
-            <div id="busho-detail-list" class="list-container"></div>
-            <div class="modal-footer">
-                <button class="btn-secondary" onclick="document.getElementById('busho-detail-modal').classList.add('hidden')">閉じる</button>
-            </div>
-        </div>
-    </div>
-
     <div id="war-modal" class="modal hidden">
         <div class="modal-content" style="max-width: 700px; height: 90vh; display: flex; flex-direction: column;">
-            <h2 class="war-title">合戦</h2>
+            <h2 class="war-title" style="margin:0; padding-bottom:5px;">合戦</h2>
             <div class="war-screen">
                 <div class="war-visual">
                     <div class="army-box attacker">
                         <h3 class="army-title">攻撃軍: <span id="war-atk-name"></span></h3>
-                        <div class="army-stats">
-                            <div>大将: <span id="war-atk-busho"></span></div>
-                            <div>兵士: <span id="war-atk-soldier" class="highlight-val"></span></div>
-                            <div>士気: <span id="war-atk-morale"></span></div>
-                        </div>
+                        <div>大将: <span id="war-atk-busho"></span></div>
+                        <div>兵士: <span id="war-atk-soldier" class="highlight-val"></span> / 士気: <span id="war-atk-morale"></span></div>
                     </div>
-                    <div class="vs-badge">VS</div>
+                    <div style="font-weight:bold; font-size:1.2rem;">VS</div>
                     <div class="army-box defender">
                         <h3 class="army-title">守備軍: <span id="war-def-name"></span></h3>
-                        <div class="army-stats">
-                            <div>大将: <span id="war-def-busho"></span></div>
-                            <div>兵士: <span id="war-def-soldier" class="highlight-val"></span></div>
-                            <div>城防御: <span id="war-def-wall" class="highlight-val"></span></div>
-                        </div>
+                        <div>大将: <span id="war-def-busho"></span></div>
+                        <div>兵士: <span id="war-def-soldier" class="highlight-val"></span> / 防御: <span id="war-def-wall"></span></div>
                     </div>
                 </div>
-                <div class="war-info-bar">
+                <div class="war-info-bar" style="background:#333; color:#fff; text-align:center; padding:2px;">
                     R: <span id="war-round">1</span>/10 | 手番: <span id="war-turn-actor">--</span>
                 </div>
-                <div id="war-log"></div>
                 <div id="war-controls" class="war-controls-area disabled-area"></div>
             </div>
         </div>
     </div>
+
     <script src="game.js"></script>
 </body>
 </html>
