@@ -8,6 +8,13 @@
  */
 
 /* ==========================================================================
+   ★ シナリオ定義 (これが不足していたため追加しました)
+   ========================================================================== */
+const SCENARIOS = [
+    { name: "群雄割拠 (1560年)", desc: "各地で有力大名が覇を競う標準シナリオ。", folder: "default" }
+];
+
+/* ==========================================================================
    ★ ゲームバランス設定 (ここを編集して調整してください)
    ========================================================================== */
 const GAME_SETTINGS = {
@@ -658,7 +665,15 @@ class UIManager {
             });
         } else { container.innerHTML = "<div style='padding:10px; color:#666;'>なし</div>"; }
     }
-    renderWarControls(isAttacker) { const area = document.getElementById('war-controls'); area.innerHTML = ''; const createBtn = (label, action, cls='') => { const btn = document.createElement('button'); btn.textContent = label; if(cls) btn.className = cls; btn.onclick = () => window.GameApp.execWarCmd(action); area.appendChild(btn); }; if (isAttacker) { createBtn("弓攻撃", "bow"); createBtn("城攻め", "siege"); createBtn("力攻め", "charge"); createBtn("謀略", "scheme"); createBtn("火攻", "fire"); createBtn("撤退", "retreat", "btn-danger"); } else { createBtn("弓攻撃", "def_bow"); createBtn("攻撃", "def_attack"); createBtn("力攻め", "def_charge"); createBtn("謀略", "scheme"); createBtn("火攻", "fire"); createBtn("撤退", "retreat", "btn-danger"); } }
+    
+    // ★ 修正点: 守備側（elseブロック）の「火攻」を削除しました
+    renderWarControls(isAttacker) { const area = document.getElementById('war-controls'); area.innerHTML = ''; const createBtn = (label, action, cls='') => { const btn = document.createElement('button'); btn.textContent = label; if(cls) btn.className = cls; btn.onclick = () => window.GameApp.execWarCmd(action); area.appendChild(btn); }; 
+        if (isAttacker) { 
+            createBtn("弓攻撃", "bow"); createBtn("城攻め", "siege"); createBtn("力攻め", "charge"); createBtn("謀略", "scheme"); createBtn("火攻", "fire"); createBtn("撤退", "retreat", "btn-danger"); 
+        } else { 
+            createBtn("弓攻撃", "def_bow"); createBtn("攻撃", "def_attack"); createBtn("力攻め", "def_charge"); createBtn("謀略", "scheme"); /* 火攻削除 */ createBtn("撤退", "retreat", "btn-danger"); 
+        } 
+    }
 }
 
 /* --- Game Manager --- */
