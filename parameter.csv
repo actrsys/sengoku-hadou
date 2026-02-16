@@ -74,8 +74,13 @@ War.DefChargeMultiplier,1.2,合戦：守備側突撃の攻撃倍率。上げる�
 War.DefChargeRisk,2,合戦：守備側突撃の反撃リスク係数。上げると守備側が突撃した際、逆に受ける被害が激増する
 War.DefBowMultiplier,0.5,合戦：守備側斉射の攻撃倍率。上げると守備側の弓攻撃が強くなる
 War.RojoDamageReduction,0.7,合戦：籠城時の被ダメージ係数。下げると籠城した際に受けるダメージがさらに減る（0.1で1割）
-War.RepairCost,100,合戦：修復コマンドの消費兵士数。上げると修復コストが重くなる
-War.RepairRecovery,100,合戦：修復コマンドの防御回復量。上げると一度に回復する防御値が増える
+War.RepairCost,100,（旧仕様）合戦：修復コマンドの消費兵士数。※新仕様「補修」では使用しません
+War.RepairRecovery,100,（旧仕様）合戦：修復コマンドの防御回復量。※新仕様「補修」では使用しません
 War.SchemeDamageFactor,5,合戦：謀略のダメージ係数。上げると知略差による謀略ダメージが増える
 War.FireSuccessBase,0.5,合戦：火計の成功率基礎値。上げると火計が成功しやすくなる
 War.FireDamageFactor,2,合戦：火計のダメージ係数。上げると火計による城壁・兵士ダメージが増える
+War.RepairMaxSoldiers,200,合戦：補修コマンドで投入できる最大兵士数。上げると一度に多大なコストを払えるようになる
+War.RepairSoldierFactor,0.1,合戦：補修における兵士数の重要度。上げると投入した兵士の数が回復量に大きく影響する
+War.RepairMainPolFactor,0.25,合戦：補修における最高内政官の重要度。上げると最も政治の高い武将の能力が回復量に大きく直結する
+War.RepairSubPolFactor,0.05,合戦：補修における補佐武将の内政重要度。上げるとその他武将の政治力の合計が回復量に影響する
+War.RepairGlobalMultiplier,1,合戦：補修の全体回復量倍率。上げると全体的に回復量が増える。バランス調整用

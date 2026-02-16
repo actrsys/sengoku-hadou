@@ -1,5 +1,5 @@
 /**
- * 戦国シミュレーションゲーム - 修正版 v10.9 (War Config Update)
+ * 戦国シミュレーションゲーム - 修正版 v11.0 (War Repair Config Update)
  * 修正内容:
  * 1. ターン外の自城操作禁止（閲覧モードへ）
  * 2. 同盟解消の対象フィルタ修正（同盟中のみ）＆外交の隣接制限解除
@@ -8,6 +8,7 @@
  * 5. スマホ上部情報の表示項目変更（金・米・兵）
  * 6. 合戦：防御側コマンド仕様変更（突撃/斉射/籠城仕様変更/火計削除/修復追加）
  * 7. パラメータCSV拡張対応（合戦パラメータの外部化・防御側突撃リスク増加）
+ * 8. 合戦：防御側コマンド「修復」を「補修」へ変更。兵士数指定(1-200)と内政値依存の回復計算を実装。
  */
 
 // グローバルエラーハンドリング
@@ -47,9 +48,15 @@ let GAME_SETTINGS = {
         DefChargeMultiplier: 1.5, DefChargeRisk: 2.0, // リスク増加
         DefBowMultiplier: 0.5,
         RojoDamageReduction: 0.5,
-        RepairCost: 100, RepairRecovery: 100,
+        RepairCost: 100, RepairRecovery: 100, // 旧パラメータ(互換性維持)
         SchemeDamageFactor: 10,
-        FireSuccessBase: 0.5, FireDamageFactor: 5
+        FireSuccessBase: 0.5, FireDamageFactor: 5,
+        // 新設: 補修パラメータ
+        RepairMaxSoldiers: 200,
+        RepairSoldierFactor: 0.1,
+        RepairMainPolFactor: 0.25,
+        RepairSubPolFactor: 0.05,
+        RepairGlobalMultiplier: 1.0
     },
     Strategy: {
         InvestigateDifficulty: 50, InciteFactor: 150, RumorFactor: 50, SchemeSuccessRate: 0.6, EmploymentDiff: 1.5,
@@ -1138,6 +1145,19 @@ class UIManager {
             this.tradeTypeInfo.classList.remove('hidden'); this.tradeTypeInfo.textContent = `相場: ${rate.toFixed(2)} (米1 -> 金${rate.toFixed(2)})`;
             inputs.amount = createSlider("売却量(米)", "amount", c.rice, 0);
             this.quantityConfirmBtn.onclick = () => { const val = parseInt(inputs.amount.num.value); if(val<=0) return; this.quantityModal.classList.add('hidden'); this.game.executeTrade('sell', val); };
+        } else if (type === 'war_repair') {
+            // 合戦：補修コマンドの兵士選択
+            const s = this.game.warState;
+            const defender = s.defender;
+            const maxSoldiers = Math.min(GAME_SETTINGS.War.RepairMaxSoldiers, defender.soldiers);
+            document.getElementById('quantity-title').textContent = "補修 (兵士選択)";
+            inputs.soldiers = createSlider("使用兵士数", "soldiers", maxSoldiers, Math.min(50, maxSoldiers));
+             this.quantityConfirmBtn.onclick = () => {
+                const val = parseInt(inputs.soldiers.num.value);
+                if (val <= 0) return;
+                this.quantityModal.classList.add('hidden');
+                this.game.execWarCmd('repair', val);
+            };
         }
     }
 
@@ -1168,6 +1188,7 @@ class UIManager {
         if (!controls) return;
         controls.innerHTML = '';
         
+        // 通常ボタン作成
         const createBtn = (label, type, isDisabled = false) => {
             const btn = document.createElement('button');
             btn.textContent = label;
@@ -1201,7 +1222,13 @@ class UIManager {
             createBtn("斉射", "def_bow");
             createBtn("籠城", "def_attack"); 
             createBtn("謀略", "scheme");
-            createBtn("修復", "repair");
+            
+            // 補修ボタン: 数量選択へ誘導
+            const repairBtn = document.createElement('button');
+            repairBtn.textContent = "補修";
+            repairBtn.onclick = () => window.GameApp.ui.openQuantitySelector('war_repair', [s.defender], null);
+            controls.appendChild(repairBtn);
+
             createBtn("撤退", "retreat");
         }
     }
@@ -1395,7 +1422,7 @@ class GameManager {
         this.lastMenuState = this.ui.menuState;
         this.selectionMode = mode;
         const c = this.getCurrentTurnCastle();
-        this.validTargets = [];
+        this.validTargets = []; 
         
         if (mode === 'war') {
             this.validTargets = this.castles.filter(target => 
@@ -1874,7 +1901,13 @@ class GameManager {
         } 
     }
     
-    execWarCmd(type) { if(type==='scheme'||type==='fire') this.resolveWarAction(type); else { document.getElementById('war-controls').classList.add('disabled-area'); this.resolveWarAction(type); } }
+    execWarCmd(type, extraVal = null) { 
+        if(type==='scheme'||type==='fire') this.resolveWarAction(type); 
+        else { 
+            document.getElementById('war-controls').classList.add('disabled-area'); 
+            this.resolveWarAction(type, extraVal); 
+        } 
+    }
     
     execWarAI() { 
         const s = this.warState;
@@ -1886,10 +1919,10 @@ class GameManager {
             if (actor.intelligence >= GAME_SETTINGS.AI.WarHighIntThreshold) retreatThreshold = 0.4; 
             if (dangerRatio < retreatThreshold && s.defender.defense < 200) { this.resolveWarAction('retreat'); return; }
 
-            // 修復チェック: 防御が減っていて兵士に余裕があれば修復
-            const defenseRatio = s.defender.defense / (s.defender.maxDefense || 1000); // 簡易max
+            // 修復チェック: 防御が減っていて兵士に余裕があれば修復 (AIは簡易的に50兵消費で固定)
+            const defenseRatio = s.defender.defense / (s.defender.maxDefense || 1000); 
             if (defenseRatio < 0.7 && s.defender.soldiers > 500 && Math.random() < 0.4) {
-                 this.resolveWarAction('repair'); return;
+                 this.resolveWarAction('repair', 50); return;
             }
         }
         let cmd = 'charge'; 
@@ -1919,7 +1952,7 @@ class GameManager {
         this.resolveWarAction(cmd); 
     }
 
-    resolveWarAction(type) {
+    resolveWarAction(type, extraVal = null) {
         if (!this.warState.active) return;
         const s = this.warState;
         if(type === 'retreat') { if(s.turn === 'attacker') { this.endWar(false); } else { this.executeRetreatLogic(s.defender); } return; }
@@ -1933,16 +1966,32 @@ class GameManager {
              this.advanceWarTurn();
              return;
         }
-        if (type === 'repair') { // 修復
-             const cost = GAME_SETTINGS.War.RepairCost;
-             const recover = GAME_SETTINGS.War.RepairRecovery;
-             if (s.defender.soldiers > cost) {
-                 s.defender.soldiers -= cost;
-                 // 最大値チェックは簡易的に既存+回復
+        if (type === 'repair') { // 補修 (名称変更に伴いロジック変更)
+             const soldierCost = extraVal || 50; // 指定がない場合(AI)は50
+             
+             if (s.defender.soldiers > soldierCost) {
+                 const W = GAME_SETTINGS.War;
+                 s.defender.soldiers -= soldierCost;
+
+                 // 回復量計算: 兵士数 + 最高内政 + その他内政
+                 const castleBushos = this.getCastleBushos(s.defender.id);
+                 const politicsList = castleBushos.map(b => b.politics).sort((a,b) => b - a);
+                 const maxPol = politicsList.length > 0 ? politicsList[0] : 0;
+                 let subPolSum = 0;
+                 for(let i=1; i<politicsList.length; i++) subPolSum += politicsList[i];
+
+                 // 計算式
+                 let rawPower = (soldierCost * W.RepairSoldierFactor) + 
+                                (maxPol * W.RepairMainPolFactor) + 
+                                (subPolSum * W.RepairSubPolFactor);
+                 
+                 let recover = Math.floor(rawPower * W.RepairGlobalMultiplier);
+                 
                  s.defender.defense += recover;
-                 if(s.isPlayerInvolved) this.ui.log(`R${s.round} [守] 城壁を修復！ (兵-${cost} 防+${recover})`);
+                 
+                 if(s.isPlayerInvolved) this.ui.log(`R${s.round} [守] 補修を実行！ (兵-${soldierCost} 防+${recover})`);
              } else {
-                 if(s.isPlayerInvolved) this.ui.log(`R${s.round} [守] 修復しようとしたが兵が足りない！`);
+                 if(s.isPlayerInvolved) this.ui.log(`R${s.round} [守] 補修しようとしたが兵が足りない！`);
              }
              this.advanceWarTurn();
              return;
