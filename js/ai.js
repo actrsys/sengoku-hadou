@@ -47,13 +47,9 @@ class AIEngine {
     execAI(castle) {
         try {
             // 【安全装置】万が一、プレイヤーの城がAIルーチンに渡された場合、即座に制御を戻す
-            // ★修正: 厳密な数値型変換を行って比較する
             if (Number(castle.ownerClan) === Number(this.game.playerClanId)) {
                 console.warn("AI Alert: Player castle detected in AI routine. Returning control to player.");
                 this.game.isProcessingAI = false;
-                
-                // 行動済みフラグのリセットは行わない（移動後の武将がいる可能性があるため）
-                
                 this.game.ui.showControlPanel(castle);
                 return;
             }
@@ -118,7 +114,6 @@ class AIEngine {
         const myBushos = this.game.getCastleBushos(myCastle.id).filter(b => b.status !== 'ronin');
         const availableBushos = myBushos.sort((a,b) => b.leadership - a.leadership).slice(0, 3);
         
-        // WarSystemが存在しない場合の安全策
         if (typeof WarSystem === 'undefined') return null;
 
         const myStats = WarSystem.calcUnitStats(availableBushos);
@@ -174,7 +169,8 @@ class AIEngine {
         const sendSoldiers = Math.floor(source.soldiers * (window.AIParams.AI.SoldierSendRate || 0.8));
         
         if (sendSoldiers <= 0) return;
-        source.soldiers -= sendSoldiers;
+        
+        // ★変更: war.jsのstartWarで兵数が減るため、ここでは減らさない
         this.game.warManager.startWar(source, target, sorted, sendSoldiers);
     }
 
