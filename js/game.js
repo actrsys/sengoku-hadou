@@ -82,10 +82,10 @@ class DataManager {
     static async loadAll(folderName) {
         const path = `./data/${folderName}/`;
         try {
-            await this.loadParameters("./parameter.csv");
+            await this.loadParameters("./data/parameter.csv");
             if (GAME_SETTINGS.System.UseRandomNames) {
                 try {
-                    const namesText = await this.fetchText("./generic_officer.csv");
+                    const namesText = await this.fetchText("./data/generic_officer.csv");
                     this.parseGenericNames(namesText);
                 } catch (e) { console.warn("汎用武将名ファイルなし"); }
             }
@@ -1537,3 +1537,4 @@ class GameManager {
 window.addEventListener('DOMContentLoaded', () => {
     window.GameApp = new GameManager();
 });
+
