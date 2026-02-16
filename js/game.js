@@ -1347,14 +1347,23 @@ class GameManager {
     }
     
     finishTurn() { 
-        // 修正：プレイヤー関与に関わらず、合戦がアクティブならターンを終了させない
-        if(this.warManager && this.warManager.state.active) return; 
-        
+        if (this._finishing) return; // ロック中なら何もしない
+        this._finishing = true;
+    
+        if(this.warManager.state.active && this.warManager.state.isPlayerInvolved) {
+            this._finishing = false;
+            return; 
+        }
         this.selectionMode = null; 
         const castle = this.getCurrentTurnCastle(); 
         if(castle) castle.isDone = true; 
         this.currentIndex++; 
-        this.processTurn(); 
+        
+        // 少しだけ遅延させてから次のターンへ（連続呼び出し防止）
+        setTimeout(() => {
+            this._finishing = false;
+            this.processTurn(); 
+        }, 50);
     }
     endMonth() { this.month++; if(this.month > 12) { this.month = 1; this.year++; } const clans = new Set(this.castles.filter(c => c.ownerClan !== 0).map(c => c.ownerClan)); const playerAlive = clans.has(this.playerClanId); if (clans.size === 1 && playerAlive) alert(`天下統一！`); else if (!playerAlive) alert(`我が軍は滅亡しました……`); else this.startMonth(); }
 
@@ -1506,5 +1515,6 @@ class GameManager {
 window.addEventListener('DOMContentLoaded', () => {
     window.GameApp = new GameManager();
 });
+
 
 
