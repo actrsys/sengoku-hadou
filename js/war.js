@@ -6,7 +6,7 @@
  */
 
 // 戦争・軍事関連の設定定義
-// parameter.csv のキー定義と構造を一致させています
+// parameter.csv の値(2026-02-16時点)と同期済み
 window.WarParams = {
     // 【Military】: 軍事内政、基本能力、静的な係数
     Military: {
@@ -42,38 +42,38 @@ window.WarParams = {
     // 【War】: 合戦中のアクション倍率、戦術、戦後処理
     War: {
         // 攻撃側アクション倍率・リスク
-        ChargeMultiplier: 1.2,      // 突撃攻撃力
-        ChargeRisk: 1.5,            // 突撃反撃被ダメージ係数
+        ChargeMultiplier: 1.5,      // 突撃攻撃力
+        ChargeRisk: 1.8,            // 突撃反撃被ダメージ係数
         ChargeSoldierDmgRate: 1.0,  // 突撃：対兵士倍率
-        ChargeWallDmgRate: 0.5,     // 突撃：対城壁倍率
+        ChargeWallDmgRate: 0.1,     // 突撃：対城壁倍率
 
         BowMultiplier: 0.6,         // 斉射攻撃力
         BowRisk: 0.5,               // 斉射反撃被ダメージ係数
 
         SiegeMultiplier: 1.0,       // 城攻め攻撃力
-        SiegeWallRate: 0.2,         // 城攻め：対城壁倍率 (CSV初期値に合わせ調整)
-        SiegeRisk: 1.3,             // 城攻め反撃被ダメージ係数
+        SiegeWallRate: 0.5,         // 城攻め：対城壁倍率
+        SiegeRisk: 10.0,             // 城攻め反撃被ダメージ係数
 
         // 防御側アクション倍率
         DefChargeMultiplier: 1.2,   // 防御側突撃
         DefChargeRisk: 2.0,         // 防御側突撃リスク
         DefBowMultiplier: 0.5,      // 防御側斉射
-        RojoDamageReduction: 0.7,   // 籠城時の被ダメージ軽減率 (CSVに合わせ0.5->0.7等の調整推奨)
+        RojoDamageReduction: 0.7,   // 籠城時の被ダメージ軽減率
 
         // 反撃計算
         CounterAtkPowerFactor: 0.05, // 反撃時の敵能力参照係数
 
-        // 補修コマンド (新仕様)
-        RepairMaxSoldiers: 200,     // 最大投入兵数
-        RepairSoldierFactor: 0.1,   // 兵数係数
+        // 補修コマンド
+        RepairMaxSoldiers: 500,     // 最大投入兵数
+        RepairSoldierFactor: 0.05,  // 兵数係数
         RepairMainPolFactor: 0.25,  // 城主政治力係数
         RepairSubPolFactor: 0.05,   // 副将政治力係数
-        RepairGlobalMultiplier: 0.6, // 全体補正 (CSV初期値)
+        RepairGlobalMultiplier: 0.4, // 全体補正
 
         // 計略・火計
-        SchemeDamageFactor: 4,      // 謀略ダメージ係数 (CSV初期値)
-        FireSuccessBase: 0.3,       // 火計成功率 (CSV初期値)
-        FireDamageFactor: 1.0,      // 火計ダメージ係数 (CSV初期値)
+        SchemeDamageFactor: 4,      // 謀略ダメージ係数
+        FireSuccessBase: 0.25,      // 火計成功率
+        FireDamageFactor: 0.8,      // 火計ダメージ係数
 
         // 戦後処理・撤退・捕縛
         ShortWarTurnLimit: 5,       // 短期決戦判定ターン
