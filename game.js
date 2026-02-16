@@ -1,20 +1,8 @@
 /**
- * 戦国シミュレーションゲーム - 修正版 v12.0 (War Mechanics & Post-War Logic Update)
+ * 戦国シミュレーションゲーム - 修正版 v12.1 (War Soldier Recovery Fix)
  * 修正内容:
- * 1. ターン外の自城操作禁止（閲覧モードへ）
- * 2. 同盟解消の対象フィルタ修正（同盟中のみ）＆外交の隣接制限解除
- * 3. 面談時の自軍大名対象バグ修正＆自分語り口調の実装
- * 4. AI思考中の操作ブロック強化
- * 5. スマホ上部情報の表示項目変更（金・米・兵）
- * 6. 合戦：防御側コマンド仕様変更（突撃/斉射/籠城仕様変更/火計削除/修復追加）
- * 7. パラメータCSV拡張対応（合戦パラメータの外部化・防御側突撃リスク増加）
- * 8. 合戦：防御側コマンド「修復」を「補修」へ変更。兵士数指定(1-200)と内政値依存の回復計算を実装。
- * 9. 合戦後処理大幅改修：
- * - 兵士回復ロジック変更（撤退＆短期決戦のみ高回復）
- * - 敗戦時/解放時の自領逃走ロジック追加
- * - 撤退時の物資損失＆武将捕縛リスク追加
- * - 落城時の物資持ち逃げ（魅力依存）実装
- * - 大名の捕縛回避率向上
+ * 1. 撤退時に死傷兵が回復しない問題を修正（撤退先の城に回復分を加算）
+ * 2. 落城（敗北）時、守備側の残存兵と死傷兵の一部(20%)を攻撃側が吸収する仕様に変更
  */
 
 // グローバルエラーハンドリング
@@ -791,7 +779,7 @@ class UIManager {
         
         if (castle.ownerClan === this.game.playerClanId) {
              if (!this.game.selectionMode) {
-                 // 修正: ターンが回ってきていない城は操作不可（閲覧メニューのみ）
+                 // 修正: ターンが回ってきていない城は操作不可（閲覧モードのみ）
                  if (castle === this.game.getCurrentTurnCastle()) {
                      this.menuState = 'MAIN';
                      this.renderCommandMenu(); 
@@ -2100,22 +2088,23 @@ class GameManager {
                 }
 
                 // endWarへ捕縛者リストを渡して処理
-                this.endWar(true, true, capturedBushos); 
+                // ★修正: 撤退先IDを渡す
+                this.endWar(true, true, capturedBushos, target.id); 
             }
         };
         if (defCastle.ownerClan === this.playerClanId) { if (candidates.length === 1) runRetreat(candidates[0].id); else this.ui.showRetreatSelector(defCastle, candidates, (id) => runRetreat(id)); } 
         else { candidates.sort((a,b) => GameSystem.calcRetreatScore(b) - GameSystem.calcRetreatScore(a)); runRetreat(candidates[0].id); }
     }
 
-    endWar(attackerWon, isRetreat = false, capturedInRetreat = []) { 
+    // ★修正: retreatTargetId 引数を追加
+    endWar(attackerWon, isRetreat = false, capturedInRetreat = [], retreatTargetId = null) { 
         const s = this.warState; s.active = false; 
         if (s.isPlayerInvolved) {
             const warModal = document.getElementById('war-modal');
             if(warModal) warModal.classList.add('hidden'); 
         }
 
-        // 兵士回復ロジック変更
-        // 5ターン未満で撤退した撤退側だけが30%回復
+        // 兵士回復ロジック
         const isShortWar = s.round < GAME_SETTINGS.War.ShortWarTurnLimit;
         const baseRecov = GAME_SETTINGS.War.BaseRecoveryRate;
         const highRecov = GAME_SETTINGS.War.RetreatRecoveryRate;
@@ -2129,30 +2118,33 @@ class GameManager {
         }
 
         s.attacker.soldiers += Math.floor(s.deadSoldiers.attacker * attackerRecoverRate); 
-        // 撤退時は既に移動済みなのでdefender.soldiersには加算しない（移動先に加算済みであるべきだが、簡易的に撤退先処理内で処理済みと仮定）
-        // ただし、isRetreatのときはs.defenderは「空の城」を指している状態。
-        // なので、撤退時の兵士回復は executeRetreatLogic 内でやるべきだが、
-        // 既存ロジックは撤退時に兵士が減らない仕様(s.defender.soldiersを丸ごと移動)。
-        // なので、ここで回復させる対象は「死んだ兵士」分を「撤退先」に戻す必要がある。
-        // が、複雑になるため「撤退時は死傷兵は戻らない」または「撤退先城に追加」が必要。
-        // ここでは仕様をシンプルにするため、撤退時は「生き残りが全移動」済みとし、死者は戻らない（あるいは微量戻る）とするが、
-        // 要件「撤退したとき...30%復活する」を満たすため、移動先城を探して加算する。
         
-        if (isRetreat) {
-             // 撤退先を探すのは困難（引数で渡していない）ため、
-             // executeRetreatLogic内で移動した武将の居場所から特定する
-             // もしくは、s.defenderは既に空。
-             // 簡易実装：撤退時は回復なし（生存者が移動しただけ）とするか、
-             // 要件に従うなら「撤退先」に加算が必要。
-             // ここでは、executeRetreatLogicで移動した武将の城IDを取得して加算する。
-             const movedBusho = this.bushos.find(b => b.clan === s.defender.ownerClan && b.castleId !== s.defender.id && b.isActionDone === false); // 戦争参加者はまだactionDoneではない？いや、まだフラグは触ってない
-             // 少し強引だが、同盟軍でない自分の城で、最近兵が増えた城...は特定困難。
-             // 今回は「撤退時の死兵復活」は実装コスト高のため、「生存兵＋撤退時の物資持ち出し」でバランスをとる。
-             // ただし要件順守のため、もし可能なら実装する。
-             // s.defenderオブジェクトはまだ参照可能だが、中身は空。
-             // 撤退時はs.defenderは空っぽ。回復計算はスキップする（死兵は置き去り）。
-        } else {
-             // 通常敗北（全滅）時
+        // ★修正: 撤退時の兵士回復処理（死傷兵の一部が復帰して撤退先に合流）
+        if (isRetreat && retreatTargetId) {
+             const targetC = this.getCastle(retreatTargetId);
+             if (targetC) {
+                 const recovered = Math.floor(s.deadSoldiers.defender * defenderRecoverRate);
+                 targetC.soldiers += recovered;
+                 if (s.isPlayerInvolved && recovered > 0) {
+                     this.ui.log(`(撤退先にて負傷兵 ${recovered}名 が復帰)`);
+                 }
+             }
+        } 
+        // ★修正: 攻城戦勝利（吸収）処理
+        else if (!isRetreat && attackerWon) {
+             // 既存の攻撃側兵数 + 守備側残存兵 + 守備側死傷兵の20%
+             const survivors = Math.max(0, s.defender.soldiers);
+             const recovered = Math.floor(s.deadSoldiers.defender * 0.2);
+             const totalAbsorbed = survivors + recovered;
+             
+             s.defender.soldiers = s.attacker.soldiers + totalAbsorbed;
+             
+             if (s.isPlayerInvolved && totalAbsorbed > 0) {
+                 this.ui.log(`(敵残存兵・負傷兵 計${totalAbsorbed}名 を吸収)`);
+             }
+        } 
+        // 防衛成功時
+        else if (!isRetreat && !attackerWon) {
              s.defender.soldiers += Math.floor(s.deadSoldiers.defender * defenderRecoverRate);
         }
 
@@ -2212,7 +2204,7 @@ class GameManager {
 
             // 城の受け渡し
             s.defender.ownerClan = s.attacker.ownerClan; 
-            s.defender.soldiers = s.attacker.soldiers; // 攻撃軍が駐留
+            // s.defender.soldiers = s.attacker.soldiers; // ★修正済み: 上部のifブロックで兵士統合済み
             s.defender.investigatedUntil = 0; 
             
             s.atkBushos.forEach((b, idx) => { 
