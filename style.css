@@ -347,9 +347,6 @@ body {
 .rank-d .grade-main { color: #ffffff; } /* 白 */
 .rank-e .grade-main { color: #adff2f; } /* 黄緑 (GreenYellow) */
 
-/* 既存の .grade-rank クラスは使用しなくなるため、
-   もし他の場所で使っていなければ削除または放置で問題ありません */
-
 /* Footer Buttons */
 .modal-footer { margin-top: 15px; display: flex; justify-content: flex-end; gap: 10px; padding-top: 10px; border-top: 1px solid #eee; flex-shrink: 0;}
 .btn-primary, .btn-secondary, .btn-danger {
