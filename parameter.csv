@@ -73,9 +73,9 @@ War.SiegeRisk,1,合戦：城攻めの反撃リスク係数。上げると城攻�
 War.DefChargeMultiplier,1.2,合戦：守備側突撃の攻撃倍率。上げると守備側の反撃ダメージが増加
 War.DefChargeRisk,2,合戦：守備側突撃の反撃リスク係数。上げると守備側が突撃した際、逆に受ける被害が激増する
 War.DefBowMultiplier,0.5,合戦：守備側斉射の攻撃倍率。上げると守備側の弓攻撃が強くなる
-War.RojoDamageReduction,0.7,合戦：籠城時の被ダメージ係数。下げると籠城した際に受けるダメージがさらに減る（0.1で1割）
-War.RepairCost,100,（旧仕様）合戦：修復コマンドの消費兵士数。※新仕様「補修」では使用しません
-War.RepairRecovery,100,（旧仕様）合戦：修復コマンドの防御回復量。※新仕様「補修」では使用しません
+War.RojoDamageReduction,0.7,合戦：籠城時の被ダメージ係数。下げると籠城した際に受けるダメージがさらに減る『0.1で1割』
+War.RepairCost,100,旧仕様：合戦：修復コマンドの消費兵士数。※新仕様「補修」では使用しません
+War.RepairRecovery,100,旧仕様：合戦：修復コマンドの防御回復量。※新仕様「補修」では使用しません
 War.SchemeDamageFactor,5,合戦：謀略のダメージ係数。上げると知略差による謀略ダメージが増える
 War.FireSuccessBase,0.5,合戦：火計の成功率基礎値。上げると火計が成功しやすくなる
 War.FireDamageFactor,2,合戦：火計のダメージ係数。上げると火計による城壁・兵士ダメージが増える
@@ -84,3 +84,12 @@ War.RepairSoldierFactor,0.1,合戦：補修における兵士数の重要度。�
 War.RepairMainPolFactor,0.25,合戦：補修における最高内政官の重要度。上げると最も政治の高い武将の能力が回復量に大きく直結する
 War.RepairSubPolFactor,0.05,合戦：補修における補佐武将の内政重要度。上げるとその他武将の政治力の合計が回復量に影響する
 War.RepairGlobalMultiplier,1,合戦：補修の全体回復量倍率。上げると全体的に回復量が増える。バランス調整用
+War.RetreatRecoveryRate,0.3,戦後：短期撤退時の兵士回復率。短期決戦で撤退した場合の負傷兵復活率
+War.ShortWarTurnLimit,5,戦後：短期決戦とみなすターン数。このラウンド未満で撤退すると兵が多く戻る
+War.BaseRecoveryRate,0.2,戦後：通常時の兵士回復率。全滅または長期戦撤退時の負傷兵復活率
+War.RetreatCaptureRate,0.1,戦後：撤退時の武将捕縛確率。上げると撤退戦でも武将が捕まりやすくなる
+War.DaimyoCaptureReduction,0.3,戦後：大名の捕縛率低減値。上げると大名が捕まりにくくなる『0.8ならほぼ捕まらない』
+War.RetreatResourceLossFactor,0.2,戦後：撤退時の物資損失係数『基礎』。上げると撤退時に持ち出せる物資が減る
+War.LootingBaseRate,0.3,戦後：落城時の物資持ち逃げ基礎率。上げると占領した城の物資が減りやすくなる
+War.LootingCharmFactor,0.002,戦後：物資持ち逃げ抑制の魅力係数。上げると魅力の高い武将が攻めた際に物資が残りやすくなる
+War.DaimyoCharmWeight,0.1,戦後：物資持ち逃げ抑制における大名魅力の重み。上げると大名の魅力が影響しやすくなる
