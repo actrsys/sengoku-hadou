@@ -671,3 +671,4 @@ class WarManager {
             else { p.status = 'dead'; p.clan = 0; p.castleId = 0; } 
         }); 
     }
+}
