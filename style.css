@@ -71,6 +71,7 @@ body {
 /* 左詰め情報エリア */
 #mobile-top-left {
     display: flex; flex-direction: column; gap: 2px;
+    width: 100%; /* 幅を確保してFlexレイアウトしやすくする */
 }
 /* 開閉ボタン */
 .toggle-btn {
@@ -94,21 +95,25 @@ body {
     width: 100%; height: 100%;
     overflow: auto;
     display: flex;
-    justify-content: center;
-    align-items: center;
-    -webkit-overflow-scrolling: touch;
+    flex-direction: column; /* 変更: Flex direction column */
+    /* 変更: justify/align centerを削除し、margin: auto で制御する */
+    
     /* 上部が見切れないようにパディング確保 */
     padding: 20px;
     box-sizing: border-box; 
+    -webkit-overflow-scrolling: touch;
 }
 
 #map-container {
     display: grid;
     gap: 10px;
-    /* paddingはscroll-containerで制御するのでこちらは最小限でも良いが、余白用に残す */
     padding: 20px; 
     transition: transform 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
     transform-origin: center center;
+    
+    /* 変更: 親がflexなのでmargin: autoで中央寄せ＆スクロール時は端寄せになる */
+    margin: auto;
+    flex: none; /* 縮小防止 */
 }
 
 /* PC Overlay Info Panel */

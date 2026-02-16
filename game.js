@@ -1,9 +1,10 @@
 /**
- * 戦国シミュレーションゲーム - 修正版 v10.5
+ * 戦国シミュレーションゲーム - 修正版 v10.6
  * 修正内容:
- * 1. スタートボタン無反応バグの根本修正（HTML onclick属性への移行）
- * 2. モーダル強制リセット機能の実装（裏側で開いているウインドウ対策）
- * 3. 初期化プロセスの堅牢化注釈の追加
+ * 1. スマホ地図スクロールの修正（Flexbox中央配置からmargin:autoへ）
+ * 2. 面談不具合修正＆仕様変更（他家武将の選択不可、自勢力のみ）
+ * 3. シナリオ選択時のタイトルちらつき修正
+ * 4. スマホ上部情報バーの拡張（全ステータス表示・開閉機能追加）
  */
 
 // グローバルエラーハンドリング
@@ -15,9 +16,7 @@ window.onerror = function(message, source, lineno, colno, error) {
 /* ==========================================================================
    ★ シナリオ定義 & 設定
    ========================================================================== */
-const SCENARIOS = [
-    { name: "群雄割拠 (1560年)", desc: "各地で有力大名が覇を競う標準シナリオ。", folder: "1560_okehazama" }
-];
+const SCENARIOS = [    { name: "群雄割拠 (1560年)", desc: "各地で有力大名が覇を競う標準シナリオ。", folder: "1560_okehazama" }];
 
 let GAME_SETTINGS = {
     StartYear: 1560, StartMonth: 1,
@@ -69,11 +68,7 @@ class DataManager {
                     this.parseGenericNames(namesText);
                 } catch (e) { console.warn("汎用武将名ファイルなし"); }
             }
-            const [clansText, castlesText, bushosText] = await Promise.all([
-                this.fetchText(path + "clans.csv"),
-                this.fetchText(path + "castles.csv"),
-                this.fetchText(path + "warriors.csv")
-            ]);
+            const [clansText, castlesText, bushosText] = await Promise.all([                this.fetchText(path + "clans.csv"),                this.fetchText(path + "castles.csv"),                this.fetchText(path + "warriors.csv")            ]);
             const clans = this.parseCSV(clansText, Clan);
             const castles = this.parseCSV(castlesText, Castle);
             const bushos = this.parseCSV(bushosText, Busho);
@@ -412,6 +407,7 @@ class UIManager {
         this.logHistory = [];
         this.mapScale = 1.0;
         this.infoPanelCollapsed = false;
+        this.topInfoExpanded = false; // スマホ上部バーの拡張状態
 
         this.mapEl = document.getElementById('map-container'); 
         this.panelEl = document.getElementById('pc-sidebar'); 
@@ -660,6 +656,12 @@ class UIManager {
         this.updatePanelHeader(); 
     }
 
+    // スマホ上部バーの開閉トグル
+    toggleTopInfo() {
+        this.topInfoExpanded = !this.topInfoExpanded;
+        this.updateInfoPanel(this.currentCastle || this.game.getCurrentTurnCastle());
+    }
+
     updateInfoPanel(castle) {
         if (!castle) return;
         
@@ -696,11 +698,29 @@ class UIManager {
         if (this.mobileTopLeft) {
             const isVisible = this.game.isCastleVisible(castle);
             const mask = (val) => isVisible ? val : "??";
-            this.mobileTopLeft.innerHTML = `
-                <div style="font-weight:bold;">${castle.name}</div>
-                <div>人口:${mask(castle.population)} 民忠:${mask(castle.loyalty)}</div>
-                <div>兵:${mask(castle.soldiers)} 防:${mask(castle.defense)}</div>
-            `;
+            
+            // Toggle Button
+            const toggleIcon = this.topInfoExpanded ? "▲" : "▼";
+            const toggleBtn = `<button style="margin-left:5px; padding:2px 8px; border:1px solid #999; border-radius:4px; background:#fff; cursor:pointer;" onclick="window.GameApp.ui.toggleTopInfo()">${toggleIcon}</button>`;
+            
+            let content = `<div style="display:flex; justify-content:space-between; align-items:flex-start; width:100%;">`;
+            content += `<div style="flex:1;"><div style="font-weight:bold;">${castle.name}</div>`;
+            
+            if (this.topInfoExpanded) {
+                // Expanded View (全ステータス)
+                content += `<div>人口:${mask(castle.population)} 民忠:${mask(castle.loyalty)}</div>`;
+                content += `<div>兵:${mask(castle.soldiers)} 防:${mask(castle.defense)}</div>`;
+                content += `<div>金:${mask(castle.gold)} 米:${mask(castle.rice)}</div>`;
+                content += `<div>訓練:${mask(castle.training)} 士気:${mask(castle.morale)}</div>`;
+                content += `<div>石:${mask(castle.kokudaka)} 商:${mask(castle.commerce)}</div>`;
+            } else {
+                // Compact View (デフォルト)
+                content += `<div>人口:${mask(castle.population)} 民忠:${mask(castle.loyalty)}</div>`;
+                content += `<div>兵:${mask(castle.soldiers)} 防:${mask(castle.defense)}</div>`;
+            }
+            content += `</div>${toggleBtn}</div>`;
+
+            this.mobileTopLeft.innerHTML = content;
         }
         if (this.mobileBottomInfo) {
             this.mobileBottomInfo.innerHTML = `
@@ -922,7 +942,11 @@ class UIManager {
         }
         else if (actionType === 'headhunt_doer') { bushos = this.game.getCastleBushos(c.id).filter(b => b.status !== 'ronin'); infoHtml = "<div>引抜を実行する担当官を選択してください (知略重視)</div>"; sortKey = 'intelligence'; }
         else if (actionType === 'interview') { bushos = this.game.getCastleBushos(c.id).filter(b => b.status !== 'ronin'); infoHtml = "<div>面談する武将を選択してください</div>"; sortKey = 'leadership'; }
-        else if (actionType === 'interview_target') { bushos = this.game.bushos.filter(b => b.status !== 'dead' && b.status !== 'ronin' && b.id !== extraData.interviewer.id); infoHtml = `<div>誰についての印象を聞きますか？</div>`; sortKey = 'leadership'; }
+        else if (actionType === 'interview_target') { 
+            // 仕様変更: 他者について聞く際は自勢力のみ
+            bushos = this.game.bushos.filter(b => b.clan === this.game.playerClanId && b.status !== 'dead' && b.status !== 'ronin' && b.id !== extraData.interviewer.id); 
+            infoHtml = `<div>誰についての印象を聞きますか？(同家臣のみ)</div>`; sortKey = 'leadership'; 
+        }
         else if (actionType === 'reward') { bushos = this.game.getCastleBushos(c.id).filter(b => b.status !== 'ronin'); infoHtml = "<div>褒美を与える武将を選択してください</div>"; sortKey = 'loyalty'; }
         else if (actionType === 'investigate_deploy') { bushos = this.game.getCastleBushos(c.id).filter(b => b.status !== 'ronin'); infoHtml = "<div>調査を行う武将を選択してください(複数可)</div>"; sortKey = 'intelligence'; }
         else if (actionType === 'view_only') { bushos = this.game.getCastleBushos(targetId); infoHtml = "<div>武将一覧 (精度により情報は隠蔽されます)</div>"; sortKey = 'leadership'; }
@@ -1241,9 +1265,13 @@ class GameManager {
     
     async loadScenario(folder) {
         try {
+            // タイトル画面のちらつき防止のため先に隠す
+            document.getElementById('title-screen').classList.add('hidden'); 
+
             const data = await DataManager.loadAll(folder); 
             this.clans = data.clans; this.castles = data.castles; this.bushos = data.bushos; 
-            document.getElementById('title-screen').classList.add('hidden'); document.getElementById('app').classList.remove('hidden'); 
+            
+            document.getElementById('app').classList.remove('hidden'); 
             this.ui.showStartScreen(this.clans, (clanId) => { this.playerClanId = clanId; this.init(); }); 
         } catch (e) {
             console.error(e);
