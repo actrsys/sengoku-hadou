@@ -72,38 +72,27 @@ class AIEngine {
  */
 
     execAI(castle) {
-        this.game.isProcessingAI = true; // AI処理中フラグを立ててガードを確実に機能させる
-        let turnFinished = false; // この実行内でfinishTurnが呼ばれたかを追跡
-    
         try {
             const castellan = this.game.getBusho(castle.castellanId);
-            
-            // 城主不在や行動済みの場合は即座に終了
-            if (!castellan || castellan.isActionDone) {
-                this.game.finishTurn();
-                turnFinished = true;
+            // 城主不在や行動済みなら終了
+            if (!castellan || castellan.isActionDone) { 
+                this.game.finishTurn(); 
                 return; 
             }
-    
+            
             const mods = this.getDifficultyMods();
             const smartness = this.getAISmartness(castellan.intelligence);
-    
-            // --- 1. 外交フェーズ (3ヶ月に1回) ---
+
+            // 1. 外交フェーズ (3ヶ月に1回)
             if (this.game.month % 3 === 0) {
-                const diplomacyChance = (window.AIParams.AI.DiplomacyChance || 0.3) * (mods.aggression);
+                const diplomacyChance = (window.AIParams.AI.DiplomacyChance || 0.3) * (mods.aggression); 
                 if (Math.random() < diplomacyChance) {
-                    this.execAIDiplomacy(castle, castellan, smartness);
-                    // 外交を実行して行動済みになった場合、ターンを終了
-                    if (castellan.isActionDone) {
-                        this.game.finishTurn();
-                        turnFinished = true;
-                        return; 
-                    }
+                    this.execAIDiplomacy(castle, castellan, smartness); 
+                    if (castellan.isActionDone) { this.game.finishTurn(); return; }
                 }
             }
             
-            // --- 2. 戦争フェーズ (攻撃判断) ---
-            // 隣接する敵対勢力の城を取得
+            // 2. 戦争フェーズ (攻撃判断)
             const neighbors = this.game.castles.filter(c => 
                 c.ownerClan !== 0 && 
                 c.ownerClan !== castle.ownerClan && 
@@ -114,40 +103,34 @@ class AIEngine {
                 const rel = this.game.getRelation(castle.ownerClan, target.ownerClan);
                 return !rel.alliance && (target.immunityUntil || 0) < this.game.getCurrentTurnId();
             });
-    
-            const threshold = 500; // 攻撃に必要な最低兵数
+
+            const aggroBase = (window.AIParams.AI.Aggressiveness || 1.5) * mods.aggression;
+            const threshold = 500; 
+
             if (validEnemies.length > 0 && castle.soldiers > threshold) {
-                const aggroBase = (window.AIParams.AI.Aggressiveness || 1.5) * mods.aggression;
                 const personalityFactor = (castellan.personality === 'aggressive') ? 1.5 : 1.0;
                 const checkChance = smartness > 0.7 ? 1.0 : (0.5 * aggroBase * personalityFactor);
-    
+
                 if (Math.random() < checkChance) {
                     const target = this.decideAttackTarget(castle, castellan, validEnemies, mods, smartness);
                     if (target) {
-                        // 攻撃実行。executeAttack内部でstartWarが呼ばれ、
-                        // 戦争終了時にwar.js側のendWar()からfinishTurnが呼ばれる設計のため、ここでは呼ばない。
                         this.executeAttack(castle, target, castellan);
-                        turnFinished = true; 
+                        // executeAttack -> startWar 内で finishTurn が呼ばれるため、ここではリターンのみ行う
                         return; 
                     }
                 }
             }
             
-            // --- 3. 内政フェーズ (戦争・外交しなかった場合) ---
+            // 3. 内政フェーズ (攻撃しなかった場合のみ実行)
             this.execInternalAffairs(castle, castellan, mods, smartness);
             
-            // まだターンが進行していなければ、ここで終了させる
-            if (!turnFinished) {
-                this.game.finishTurn();
-                turnFinished = true;
-            }
-    
+            // ターン終了（内政完了後）
+            this.game.finishTurn();
+
         } catch(e) {
-            console.error("AI Logic Error in execAI:", e);
-            // ロジック内でエラーが起きても、ゲームが止まらないよう救済
-            if (!turnFinished) {
-                this.game.finishTurn();
-            }
+            console.error("AI Logic Error:", e);
+            // game.js 側の processTurn 内の catch で処理させるため、ここでは finishTurn を呼ばない
+            throw e; 
         }
     }
 
