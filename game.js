@@ -1,7 +1,3 @@
-{
-type: uploaded file
-fileName: game.js
-fullContent:
 /**
  * 戦国シミュレーションゲーム - 修正版 v10.7
  * 修正内容:
@@ -2081,4 +2077,3 @@ window.addEventListener('DOMContentLoaded', () => {
     window.GameApp = new GameManager();
 });
 /* ★★★ 修正禁止エリア終わり ★★★ */
-}
