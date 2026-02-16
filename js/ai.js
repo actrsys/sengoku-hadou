@@ -223,7 +223,11 @@ class AIEngine {
         const sorted = bushos.sort((a,b) => b.leadership - a.leadership).slice(0, 3);
         const sendSoldiers = Math.floor(source.soldiers * (window.AIParams.AI.SoldierSendRate || 0.8));
         
-        if (sendSoldiers <= 0) return;
+        if (sendSoldiers <= 0) {
+            // 攻撃不能なら内政に切り替えるか、ターンを終了させる
+            this.game.finishTurn(); 
+            return;
+        }
         source.soldiers -= sendSoldiers;
         this.game.warManager.startWar(source, target, sorted, sendSoldiers);
     }
@@ -376,3 +380,4 @@ class AIEngine {
     }
 
 }
+
