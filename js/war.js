@@ -148,7 +148,11 @@ class WarManager {
     getAvailableCommands(isAtkTurn) {
         const s = this.state;
         if (!s.isPlayerInvolved) return [];
-        const isMyTurn = (isAtkTurn && s.attacker.ownerClan === this.game.playerClanId) || (!isAtkTurn && s.defender.ownerClan === this.game.playerClanId);
+        const pid = Number(this.game.playerClanId);
+        const atkClan = Number(s.attacker.ownerClan);
+        const defClan = Number(s.defender.ownerClan);
+        
+        const isMyTurn = (isAtkTurn && atkClan === pid) || (!isAtkTurn && defClan === pid);
         if (!isMyTurn) return []; 
         const commands = [];
         if (isAtkTurn) {
@@ -240,9 +244,11 @@ class WarManager {
     resolveAutoWar() { 
         try { 
             const s = this.state;
-            
+            const pid = Number(this.game.playerClanId);
+            const defClan = Number(s.defender.ownerClan);
+
             // 安全策: もしプレイヤーが関与しているのにここに来てしまった場合、手動モードへ復帰させる
-            if (s.isPlayerInvolved || s.defender.ownerClan === this.game.playerClanId) {
+            if (s.isPlayerInvolved || defClan === pid) {
                 console.warn("AutoWar aborted: Player is involved.");
                 s.isPlayerInvolved = true;
                 const warModal = document.getElementById('war-modal');
@@ -272,7 +278,11 @@ class WarManager {
         const isAtkTurn = (s.turn === 'attacker'); 
         this.game.ui.renderWarControls(isAtkTurn); 
         
-        const isMyTurn = (isAtkTurn && s.attacker.ownerClan === this.game.playerClanId) || (!isAtkTurn && s.defender.ownerClan === this.game.playerClanId);
+        // 厳密なID判定
+        const pid = Number(this.game.playerClanId);
+        const atkClan = Number(s.attacker.ownerClan);
+        const defClan = Number(s.defender.ownerClan);
+        const isMyTurn = (isAtkTurn && atkClan === pid) || (!isAtkTurn && defClan === pid);
         
         if (!isMyTurn) { setTimeout(() => this.execWarAI(), 800); } 
     }
@@ -292,6 +302,12 @@ class WarManager {
         const s = this.state;
         const actor = s.turn === 'attacker' ? s.atkBushos[0] : s.defBusho; 
         const isDefender = (s.turn === 'defender');
+        
+        // 追加安全策: プレイヤーのターンならAIを実行しない
+        const pid = Number(this.game.playerClanId);
+        const currentSideClan = isDefender ? Number(s.defender.ownerClan) : Number(s.attacker.ownerClan);
+        if (currentSideClan === pid) return;
+
         const diff = window.AIParams.AI.Difficulty || 'normal';
         
         // 基本的な知能レベル補正
