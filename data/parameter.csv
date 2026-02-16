@@ -53,7 +53,7 @@ Strategy.AffinityLordWeight,0.5,引抜計算(旧主相性)。上げると、今�
 Strategy.AffinityNewLordWeight,0.6,引抜計算(新主相性)。上げると、自分『勧誘側大名』と相性が良い武将は引き抜きやすくなる
 Strategy.AffinityDoerWeight,0.4,引抜計算(実行者相性)。上げると、勧誘に行く武将と相手の個人的相性が重要になる
 AI.Aggressiveness,1.5,AIの攻撃性閾値。★重要：上げるとAIは慎重になり「勝てる」時しか攻めなくなる、下げるとAIが好戦的になり特攻してくる
-AI.SoliderSendRate,0.8,AIの出兵率。上げるとAIは城を空にして全軍で攻めてくる、下げると守備兵を多く残すようになる
+AI.SoldierSendRate,0.8,AIの出兵率。上げるとAIは城を空にして全軍で攻めてくる、下げると守備兵を多く残すようになる
 AI.AbilityBase,50,AI能力判定の基準値。AIが武将を評価する基準点。変更時はバランス注意
 AI.AbilitySensitivity,2,AIの能力評価感度。上げるとAIが高能力武将を適切に運用する確率が上がる、下げるとAIが武将の質を無視する
 AI.GunshiBiasFactor,0.5,軍師情報のバイアス係数。上げると軍師の助言が不正確になる傾向、下げると正確になる ※現在ロジックでの適用度低
@@ -76,8 +76,6 @@ War.DefChargeMultiplier,1.2,合戦：守備側突撃の攻撃倍率。上げる�
 War.DefChargeRisk,2,合戦：守備側突撃の反撃リスク係数。上げると守備側が突撃した際、逆に受ける被害が激増する
 War.DefBowMultiplier,0.5,合戦：守備側斉射の攻撃倍率。上げると守備側の弓攻撃が強くなる
 War.RojoDamageReduction,0.7,合戦：籠城時の被ダメージ係数。下げると籠城した際に受けるダメージがさらに減る『0.1で1割』
-War.RepairCost,100,旧仕様：合戦：修復コマンドの消費兵士数。※新仕様「補修」では使用しません
-War.RepairRecovery,100,旧仕様：合戦：修復コマンドの防御回復量。※新仕様「補修」では使用しません
 War.SchemeDamageFactor,4,合戦：謀略のダメージ係数。上げると知略差による謀略ダメージが増える
 War.FireSuccessBase,0.3,合戦：火計の成功率基礎値。上げると火計が成功しやすくなる
 War.FireDamageFactor,1,合戦：火計のダメージ係数。上げると火計による城壁・兵士ダメージが増える
