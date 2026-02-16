@@ -1,7 +1,3 @@
-{
-type: uploaded file
-fileName: war.js
-fullContent:
 /**
  * war.js
  * 戦争処理マネージャー & 戦争計算ロジック
@@ -675,4 +671,3 @@ class WarManager {
             else { p.status = 'dead'; p.clan = 0; p.castleId = 0; } 
         }); 
     }
-}
