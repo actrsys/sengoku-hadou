@@ -51,6 +51,8 @@ Strategy.RewardDistancePenalty,0.2,褒美時の相性距離ペナルティ。上
 Strategy.AffinityLordWeight,0.5,引抜計算(旧主相性)。上げると、今の主君と相性が良い武将は引き抜きにくくなる
 Strategy.AffinityNewLordWeight,0.6,引抜計算(新主相性)。上げると、自分『勧誘側大名』と相性が良い武将は引き抜きやすくなる
 Strategy.AffinityDoerWeight,0.4,引抜計算(実行者相性)。上げると、勧誘に行く武将と相手の個人的相性が重要になる
+Strategy.SchemeSuccessRate,0.25,合戦中の計略成功率基準。上げると戦闘中の「謀略」が成功しやすくなる、下げると失敗リスク増
+AI.Difficulty,normal,AIの難易度設定。easy:判断ミス多め/normal:標準/hard:賢く好戦的・資源管理徹底
 AI.Aggressiveness,1.5,AIの攻撃性閾値。★重要：上げるとAIは慎重になり「勝てる」時しか攻めなくなる、下げるとAIが好戦的になり特攻してくる
 AI.SoldierSendRate,0.8,AIの出兵率。上げるとAIは城を空にして全軍で攻めてくる、下げると守備兵を多く残すようになる
 AI.AbilityBase,50,AI能力判定の基準値。AIが武将を評価する基準点。変更時はバランス注意
@@ -75,7 +77,6 @@ War.DefChargeMultiplier,1.2,合戦：守備側突撃の攻撃倍率。上げる�
 War.DefChargeRisk,2,合戦：守備側突撃の反撃リスク係数。上げると守備側が突撃した際、逆に受ける被害が激増する
 War.DefBowMultiplier,0.5,合戦：守備側斉射の攻撃倍率。上げると守備側の弓攻撃が強くなる
 War.RojoDamageReduction,0.7,合戦：籠城時の被ダメージ係数。下げると籠城した際に受けるダメージがさらに減る『0.1で1割』
-Strategy.SchemeSuccessRate,0.25,合戦中の計略成功率基準。上げると戦闘中の「謀略」が成功しやすくなる、下げると失敗リスク増
 War.SchemeDamageFactor,4,合戦：謀略のダメージ係数。上げると知略差による謀略ダメージが増える
 War.FireSuccessBase,0.25,合戦：火計の成功率基礎値。上げると火計が成功しやすくなる
 War.FireDamageFactor,0.8,合戦：火計のダメージ係数。上げると火計による城壁・兵士ダメージが増える
