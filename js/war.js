@@ -2,7 +2,45 @@
  * war.js
  * 戦争処理マネージャー & 戦争計算ロジック
  * 責務: 合戦の進行、戦闘計算、戦後処理、捕虜対応、UIコマンド定義、攻撃可能判定
+ * 設定: Military, War
  */
+
+// 戦争・軍事関連の設定定義
+window.WarParams = {
+    Military: {
+        DraftBase: 50, DraftStatBonus: 1.5, DraftPopBonusFactor: 0.00005, DraftFluctuation: 0.15,
+        BaseTraining: 0, TrainingLdrEffect: 0.3, TrainingStrEffect: 0.2, TrainingFluctuation: 0.15,
+        BaseMorale: 0, MoraleLdrEffect: 0.2, MoraleCharmEffect: 0.2, MoraleFluctuation: 0.2,
+        WarMaxRounds: 10, DamageSoldierPower: 0.05, WallDefenseEffect: 0.5, DamageFluctuation: 0.2,
+        UnitTypeBonus: { BowAttack: 0.6, SiegeAttack: 1.0, ChargeAttack: 1.2, WallDamageRate: 0.5 },
+        FactionBonus: 1.1, FactionPenalty: 0.8
+    },
+    War: {
+        ChargeMultiplier: 1.2, ChargeRisk: 1.5,
+        BowMultiplier: 0.6, BowRisk: 0.5,
+        SiegeMultiplier: 1.0, SiegeWallRate: 0.5, SiegeRisk: 1.0,
+        DefChargeMultiplier: 1.5, DefChargeRisk: 2.0,
+        DefBowMultiplier: 0.5,
+        RojoDamageReduction: 0.5,
+        RepairCost: 100, RepairRecovery: 100,
+        SchemeDamageFactor: 10,
+        FireSuccessBase: 0.5, FireDamageFactor: 5,
+        RepairMaxSoldiers: 200,
+        RepairSoldierFactor: 0.1,
+        RepairMainPolFactor: 0.25,
+        RepairSubPolFactor: 0.05,
+        RepairGlobalMultiplier: 1.0,
+        RetreatRecoveryRate: 0.3,
+        ShortWarTurnLimit: 5,
+        BaseRecoveryRate: 0.2,
+        RetreatCaptureRate: 0.1,
+        DaimyoCaptureReduction: 0.3,
+        RetreatResourceLossFactor: 0.2,
+        LootingBaseRate: 0.3,
+        LootingCharmFactor: 0.002,
+        DaimyoCharmWeight: 0.1
+    }
+};
 
 /* ==========================================================================
    WarSystem: 計算・判定ロジック
@@ -18,7 +56,6 @@ class WarSystem {
         // 陣営ボーナス（革新・保守の相性）
         let factionBonusMultiplier = 1.0;
         if (subs.length > 0) {
-            // Bushoクラスのメソッド依存だが、参照できない場合はデフォルト動作
             const leaderFaction = leader.getFactionName ? leader.getFactionName() : "中立";
             let sameFactionCount = 0; let oppFactionCount = 0; 
             subs.forEach(b => { 
@@ -27,25 +64,25 @@ class WarSystem {
                 if (f === leaderFaction) sameFactionCount++;
                 else if ((leaderFaction === "革新派" && f === "保守派") || (leaderFaction === "保守派" && f === "革新派")) oppFactionCount++;
             });
-            if (oppFactionCount > 0) factionBonusMultiplier = GAME_SETTINGS.Military.FactionPenalty;
-            else if (sameFactionCount === subs.length) factionBonusMultiplier = GAME_SETTINGS.Military.FactionBonus;
+            if (oppFactionCount > 0) factionBonusMultiplier = window.WarParams.Military.FactionPenalty;
+            else if (sameFactionCount === subs.length) factionBonusMultiplier = window.WarParams.Military.FactionBonus;
         }
         return { ldr: Math.floor(totalLdr * factionBonusMultiplier), str: Math.floor(totalStr * factionBonusMultiplier), int: Math.floor(totalInt * factionBonusMultiplier), charm: leader.charm }; 
     }
 
     // 戦闘ダメージ計算
     static calcWarDamage(atkStats, defStats, atkSoldiers, defSoldiers, defWall, atkMorale, defTraining, type) {
-        const fluctuation = GAME_SETTINGS.Military.DamageFluctuation || 0.2;
+        const fluctuation = window.WarParams.Military.DamageFluctuation || 0.2;
         const rand = 1.0 - fluctuation + (Math.random() * fluctuation * 2);
         const moraleBonus = (atkMorale - 50) / 100; const trainingBonus = (defTraining - 50) / 100;
         
         // 攻撃力・防御力の基礎計算
-        const atkPower = ((atkStats.ldr * 1.2) + (atkStats.str * 0.3) + (atkSoldiers * GAME_SETTINGS.Military.DamageSoldierPower)) * (1.0 + moraleBonus);
-        const defPower = ((defStats.ldr * 1.0) + (defStats.int * 0.5) + (defWall * GAME_SETTINGS.Military.WallDefenseEffect) + (defSoldiers * GAME_SETTINGS.Military.DamageSoldierPower)) * (1.0 + trainingBonus);
+        const atkPower = ((atkStats.ldr * 1.2) + (atkStats.str * 0.3) + (atkSoldiers * window.WarParams.Military.DamageSoldierPower)) * (1.0 + moraleBonus);
+        const defPower = ((defStats.ldr * 1.0) + (defStats.int * 0.5) + (defWall * window.WarParams.Military.WallDefenseEffect) + (defSoldiers * window.WarParams.Military.DamageSoldierPower)) * (1.0 + trainingBonus);
         
         let multiplier = 1.0, soldierRate = 1.0, wallRate = 0.0, counterRisk = 1.0;
         
-        const W = GAME_SETTINGS.War;
+        const W = window.WarParams.War;
         switch(type) {
             case 'bow': multiplier = W.BowMultiplier; wallRate = 0.0; counterRisk = W.BowRisk; break;
             case 'siege': multiplier = W.SiegeMultiplier; soldierRate = 0.05; wallRate = W.SiegeWallRate; counterRisk = W.SiegeRisk; break;
@@ -66,23 +103,24 @@ class WarSystem {
     static calcScheme(atkBusho, defBusho, defCastleLoyalty) { 
         const atkInt = atkBusho.intelligence; 
         const defInt = defBusho ? defBusho.intelligence : 30; 
-        const successRate = (atkInt / (defInt + 20)) * GAME_SETTINGS.Strategy.SchemeSuccessRate; 
+        // Strategy設定はMainParams(game.js)にあるため参照
+        const successRate = (atkInt / (defInt + 20)) * window.MainParams.Strategy.SchemeSuccessRate; 
         
         if (Math.random() > successRate) return { success: false, damage: 0 }; 
         
         const loyaltyBonus = (1000 - defCastleLoyalty) / 500; 
-        return { success: true, damage: Math.floor(atkInt * GAME_SETTINGS.War.SchemeDamageFactor * (1.0 + loyaltyBonus)) }; 
+        return { success: true, damage: Math.floor(atkInt * window.WarParams.War.SchemeDamageFactor * (1.0 + loyaltyBonus)) }; 
     }
 
     // 火攻め
     static calcFire(atkBusho, defBusho) { 
         const atkInt = atkBusho.intelligence; 
         const defInt = defBusho ? defBusho.intelligence : 30; 
-        const successRate = (atkInt / (defInt + 10)) * GAME_SETTINGS.War.FireSuccessBase; 
+        const successRate = (atkInt / (defInt + 10)) * window.WarParams.War.FireSuccessBase; 
         
         if (Math.random() > successRate) return { success: false, damage: 0 }; 
         
-        return { success: true, damage: Math.floor(atkInt * GAME_SETTINGS.War.FireDamageFactor * (Math.random() + 0.5)) }; 
+        return { success: true, damage: Math.floor(atkInt * window.WarParams.War.FireDamageFactor * (Math.random() + 0.5)) }; 
     }
 
     // 撤退時のスコア計算（AI判断用）
@@ -251,7 +289,7 @@ class WarManager {
         try { 
             const s = this.state; 
             let safetyLimit = 100; 
-            while(s.round <= GAME_SETTINGS.Military.WarMaxRounds && s.attacker.soldiers > 0 && s.defender.soldiers > 0 && s.defender.defense > 0 && safetyLimit > 0) { 
+            while(s.round <= window.WarParams.Military.WarMaxRounds && s.attacker.soldiers > 0 && s.defender.soldiers > 0 && s.defender.defense > 0 && safetyLimit > 0) { 
                 this.resolveWarAction('charge'); 
                 if (s.attacker.soldiers <= 0 || s.defender.soldiers <= 0) break; 
                 safetyLimit--;
@@ -312,7 +350,7 @@ class WarManager {
         if (isDefender) {
             const dangerRatio = s.defender.soldiers / (s.attacker.soldiers + 1);
             let retreatThreshold = 0.2; 
-            if (actor.intelligence >= GAME_SETTINGS.AI.WarHighIntThreshold) retreatThreshold = 0.4; 
+            if (actor.intelligence >= window.AIParams.AI.WarHighIntThreshold) retreatThreshold = 0.4; 
             
             if (dangerRatio < retreatThreshold && s.defender.defense < 200) { 
                 this.resolveWarAction('retreat'); return; 
@@ -325,7 +363,7 @@ class WarManager {
         }
 
         let cmd = 'charge'; 
-        const isHighInt = actor.intelligence >= GAME_SETTINGS.AI.WarHighIntThreshold;
+        const isHighInt = actor.intelligence >= window.AIParams.AI.WarHighIntThreshold;
         if (isHighInt) {
             const opp = isDefender ? s.attacker : s.defender;
             const oppWall = isDefender ? 0 : s.defender.defense; 
@@ -369,7 +407,7 @@ class WarManager {
         if (type === 'repair') { 
              const soldierCost = extraVal || 50; 
              if (s.defender.soldiers > soldierCost) {
-                 const W = GAME_SETTINGS.War;
+                 const W = window.WarParams.War;
                  s.defender.soldiers -= soldierCost;
 
                  const castleBushos = this.game.getCastleBushos(s.defender.id);
@@ -428,8 +466,8 @@ class WarManager {
         let actualWallDmg = result.wallDmg;
 
         if (isAtkTurn && s.defenderGuarding) {
-             actualSoldierDmg = Math.floor(actualSoldierDmg * GAME_SETTINGS.War.RojoDamageReduction); 
-             actualWallDmg = Math.floor(actualWallDmg * GAME_SETTINGS.War.RojoDamageReduction);
+             actualSoldierDmg = Math.floor(actualSoldierDmg * window.WarParams.War.RojoDamageReduction); 
+             actualWallDmg = Math.floor(actualWallDmg * window.WarParams.War.RojoDamageReduction);
              s.defenderGuarding = false; 
              if (s.isPlayerInvolved) this.game.ui.log(`(籠城効果によりダメージ軽減)`);
         }
@@ -448,7 +486,7 @@ class WarManager {
         this.advanceWarTurn();
     }
 
-    advanceWarTurn() { const s = this.state; if (s.turn === 'attacker') s.turn = 'defender'; else { s.turn = 'attacker'; s.round++; if(s.round > GAME_SETTINGS.Military.WarMaxRounds) { this.endWar(false); return; } } if (s.isPlayerInvolved) this.processWarRound(); }
+    advanceWarTurn() { const s = this.state; if (s.turn === 'attacker') s.turn = 'defender'; else { s.turn = 'attacker'; s.round++; if(s.round > window.WarParams.Military.WarMaxRounds) { this.endWar(false); return; } } if (s.isPlayerInvolved) this.processWarRound(); }
     
     // 撤退ロジック
     executeRetreatLogic(defCastle) {
@@ -462,7 +500,7 @@ class WarManager {
             if(target) {
                 const enemySoldiers = s.attacker.soldiers;
                 const mySoldiers = defCastle.soldiers;
-                const baseLoss = GAME_SETTINGS.War.RetreatResourceLossFactor; 
+                const baseLoss = window.WarParams.War.RetreatResourceLossFactor; 
                 let lossRate = baseLoss + (enemySoldiers / (mySoldiers + 1)) * 0.1;
                 lossRate = Math.min(0.9, Math.max(0.05, lossRate)); 
 
@@ -475,11 +513,11 @@ class WarManager {
                 const bushos = this.game.getCastleBushos(defCastle.id);
                 const safeBushos = [];
                 const capturedBushos = [];
-                const retreatCaptureRate = GAME_SETTINGS.War.RetreatCaptureRate;
+                const retreatCaptureRate = window.WarParams.War.RetreatCaptureRate;
 
                 bushos.forEach(b => { 
                     let rate = retreatCaptureRate;
-                    if(b.isDaimyo) rate = Math.max(0, rate - GAME_SETTINGS.War.DaimyoCaptureReduction);
+                    if(b.isDaimyo) rate = Math.max(0, rate - window.WarParams.War.DaimyoCaptureReduction);
 
                     if(Math.random() < rate) {
                          capturedBushos.push(b);
@@ -524,9 +562,9 @@ class WarManager {
             if(warModal) warModal.classList.add('hidden'); 
         }
 
-        const isShortWar = s.round < GAME_SETTINGS.War.ShortWarTurnLimit;
-        const baseRecov = GAME_SETTINGS.War.BaseRecoveryRate;
-        const highRecov = GAME_SETTINGS.War.RetreatRecoveryRate;
+        const isShortWar = s.round < window.WarParams.War.ShortWarTurnLimit;
+        const baseRecov = window.WarParams.War.BaseRecoveryRate;
+        const highRecov = window.WarParams.War.RetreatRecoveryRate;
 
         const attackerRecoverRate = baseRecov;
         let defenderRecoverRate = baseRecov;
@@ -596,9 +634,9 @@ class WarManager {
             const subCharm = atkBushos.reduce((acc, b) => acc + b.charm, 0) - maxCharm;
             const daimyo = this.game.bushos.find(b => b.clan === s.attacker.ownerClan && b.isDaimyo) || {charm: 50};
             
-            const charmScore = maxCharm + (subCharm * 0.1) + (daimyo.charm * GAME_SETTINGS.War.DaimyoCharmWeight);
-            const baseLoot = GAME_SETTINGS.War.LootingBaseRate;
-            let lossRate = baseLoot - (charmScore * GAME_SETTINGS.War.LootingCharmFactor);
+            const charmScore = maxCharm + (subCharm * 0.1) + (daimyo.charm * window.WarParams.War.DaimyoCharmWeight);
+            const baseLoot = window.WarParams.War.LootingBaseRate;
+            let lossRate = baseLoot - (charmScore * window.WarParams.War.LootingCharmFactor);
             lossRate = Math.max(0, lossRate); 
             
             if (lossRate > 0) {
@@ -640,7 +678,7 @@ class WarManager {
         losers.forEach(b => { 
             let chance = isLastStand ? 1.0 : (0.4 - (b.strength * 0.002) + (Math.random() * 0.3)); 
             if (!isLastStand && defeatedCastle.soldiers > 1000) chance -= 0.2; 
-            if (!isLastStand && b.isDaimyo) chance -= GAME_SETTINGS.War.DaimyoCaptureReduction;
+            if (!isLastStand && b.isDaimyo) chance -= window.WarParams.War.DaimyoCaptureReduction;
 
             if (chance > 0.5) {
                 captives.push(b); 

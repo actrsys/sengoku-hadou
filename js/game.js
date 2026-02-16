@@ -1,6 +1,7 @@
 /**
  * game.js
  * 戦国シミュレーションゲーム (Main / UI / Data / System)
+ * 設定: System, Economy, Strategy
  */
 
 // グローバルエラーハンドリング
@@ -14,7 +15,8 @@ window.onerror = function(message, source, lineno, colno, error) {
    ========================================================================== */
 const SCENARIOS = [    { name: "群雄割拠 (1560年)", desc: "各地で有力大名が覇を競う標準シナリオ。", folder: "1560_okehazama" }];
 
-let GAME_SETTINGS = {
+// メインパラメータ設定 (System, Economy, Strategy)
+window.MainParams = {
     StartYear: 1560, StartMonth: 1,
     System: { UseRandomNames: true },
     Economy: {
@@ -25,52 +27,12 @@ let GAME_SETTINGS = {
         BaseCharity: 10, CharmEffect: 0.4, CharityFluctuation: 0.15,
         TradeRateMin: 0.5, TradeRateMax: 3.0, TradeFluctuation: 0.15
     },
-    Military: {
-        DraftBase: 50, DraftStatBonus: 1.5, DraftPopBonusFactor: 0.00005, DraftFluctuation: 0.15,
-        BaseTraining: 0, TrainingLdrEffect: 0.3, TrainingStrEffect: 0.2, TrainingFluctuation: 0.15,
-        BaseMorale: 0, MoraleLdrEffect: 0.2, MoraleCharmEffect: 0.2, MoraleFluctuation: 0.2,
-        WarMaxRounds: 10, DamageSoldierPower: 0.05, WallDefenseEffect: 0.5, DamageFluctuation: 0.2,
-        UnitTypeBonus: { BowAttack: 0.6, SiegeAttack: 1.0, ChargeAttack: 1.2, WallDamageRate: 0.5 },
-        FactionBonus: 1.1, FactionPenalty: 0.8
-    },
-    War: {
-        ChargeMultiplier: 1.2, ChargeRisk: 1.5,
-        BowMultiplier: 0.6, BowRisk: 0.5,
-        SiegeMultiplier: 1.0, SiegeWallRate: 0.5, SiegeRisk: 1.0,
-        DefChargeMultiplier: 1.5, DefChargeRisk: 2.0,
-        DefBowMultiplier: 0.5,
-        RojoDamageReduction: 0.5,
-        RepairCost: 100, RepairRecovery: 100,
-        SchemeDamageFactor: 10,
-        FireSuccessBase: 0.5, FireDamageFactor: 5,
-        RepairMaxSoldiers: 200,
-        RepairSoldierFactor: 0.1,
-        RepairMainPolFactor: 0.25,
-        RepairSubPolFactor: 0.05,
-        RepairGlobalMultiplier: 1.0,
-        RetreatRecoveryRate: 0.3,
-        ShortWarTurnLimit: 5,
-        BaseRecoveryRate: 0.2,
-        RetreatCaptureRate: 0.1,
-        DaimyoCaptureReduction: 0.3,
-        RetreatResourceLossFactor: 0.2,
-        LootingBaseRate: 0.3,
-        LootingCharmFactor: 0.002,
-        DaimyoCharmWeight: 0.1
-    },
     Strategy: {
         InvestigateDifficulty: 50, InciteFactor: 150, RumorFactor: 50, SchemeSuccessRate: 0.6, EmploymentDiff: 1.5,
         HeadhuntBaseDiff: 50, HeadhuntGoldEffect: 0.01, HeadhuntGoldMaxEffect: 15,
         HeadhuntIntWeight: 0.8, HeadhuntLoyaltyWeight: 1.0, HeadhuntDutyWeight: 0.8,
         RewardBaseEffect: 10, RewardGoldFactor: 0.1, RewardDistancePenalty: 0.2,
         AffinityLordWeight: 0.5, AffinityNewLordWeight: 0.6, AffinityDoerWeight: 0.4
-    },
-    AI: {
-        Aggressiveness: 1.5, SoliderSendRate: 0.8,
-        AbilityBase: 50, AbilitySensitivity: 2.0,
-        GunshiBiasFactor: 0.5, GunshiFairnessFactor: 0.01,
-        WarHighIntThreshold: 80,
-        DiplomacyChance: 0.3, GoodwillThreshold: 40, AllianceThreshold: 70, BreakAllianceDutyFactor: 0.5
     }
 };
 
@@ -83,7 +45,7 @@ class DataManager {
         const path = `./data/scenarios/${folderName}/`;
         try {
             await this.loadParameters("./data/parameter.csv");
-            if (GAME_SETTINGS.System.UseRandomNames) {
+            if (window.MainParams.System.UseRandomNames) {
                 try {
                     const namesText = await this.fetchText("./data/generic_officer.csv");
                     this.parseGenericNames(namesText);
@@ -120,7 +82,20 @@ class DataManager {
     }
     static setSettingValue(keyPath, value) {
         const keys = keyPath.split('.');
-        let current = GAME_SETTINGS;
+        const category = keys[0];
+        
+        let targetObj = null;
+        if (category === "Military" || category === "War") {
+            if (window.WarParams) targetObj = window.WarParams;
+        } else if (category === "AI") {
+            if (window.AIParams) targetObj = window.AIParams;
+        } else {
+            targetObj = window.MainParams;
+        }
+
+        if (!targetObj) return;
+
+        let current = targetObj;
         for (let i = 0; i < keys.length - 1; i++) {
             if (!current[keys[i]]) current[keys[i]] = {};
             current = current[keys[i]];
@@ -176,7 +151,7 @@ class DataManager {
     static generateGenericBushos(bushos, castles, clans) {
         let idCounter = 90000;
         const personalities = ['aggressive', 'cautious', 'balanced'];
-        const useRandom = GAME_SETTINGS.System.UseRandomNames && this.genericNames.surnames.length > 0;
+        const useRandom = window.MainParams.System.UseRandomNames && this.genericNames.surnames.length > 0;
         clans.forEach(clan => {
             const clanCastles = castles.filter(c => c.ownerClan === clan.id);
             if(clanCastles.length === 0) return;
@@ -284,12 +259,13 @@ class GameSystem {
         return this.toGradeHTML(val);
     }
 
-    static calcDevelopment(busho) { const base = GAME_SETTINGS.Economy.BaseDevelopment + (busho.politics * GAME_SETTINGS.Economy.PoliticsEffect); return this.applyVariance(base, GAME_SETTINGS.Economy.DevelopFluctuation); }
-    static calcRepair(busho) { const base = GAME_SETTINGS.Economy.BaseRepair + (busho.politics * GAME_SETTINGS.Economy.RepairEffect); return this.applyVariance(base, GAME_SETTINGS.Economy.RepairFluctuation); }
-    static calcCharity(busho, type) { let val = GAME_SETTINGS.Economy.BaseCharity + (busho.charm * GAME_SETTINGS.Economy.CharmEffect); if (type === 'both') val = val * 1.5; return this.applyVariance(val, GAME_SETTINGS.Economy.CharityFluctuation); }
-    static calcTraining(busho) { const base = GAME_SETTINGS.Military.BaseTraining + (busho.leadership * GAME_SETTINGS.Military.TrainingLdrEffect + busho.strength * GAME_SETTINGS.Military.TrainingStrEffect); return this.applyVariance(base, GAME_SETTINGS.Military.TrainingFluctuation); }
-    static calcSoldierCharity(busho) { const base = GAME_SETTINGS.Military.BaseMorale + (busho.leadership * GAME_SETTINGS.Military.MoraleLdrEffect) + (busho.charm * GAME_SETTINGS.Military.MoraleCharmEffect); return this.applyVariance(base, GAME_SETTINGS.Military.MoraleFluctuation); }
-    static calcDraftFromGold(gold, busho, castlePopulation) { const bonus = 1.0 + ((busho.leadership + busho.strength + busho.charm) / 300) * (GAME_SETTINGS.Military.DraftStatBonus - 1.0); const popBonus = 1.0 + (castlePopulation * GAME_SETTINGS.Military.DraftPopBonusFactor); return Math.floor(gold * 1.0 * bonus * popBonus); }
+    static calcDevelopment(busho) { const base = window.MainParams.Economy.BaseDevelopment + (busho.politics * window.MainParams.Economy.PoliticsEffect); return this.applyVariance(base, window.MainParams.Economy.DevelopFluctuation); }
+    static calcRepair(busho) { const base = window.MainParams.Economy.BaseRepair + (busho.politics * window.MainParams.Economy.RepairEffect); return this.applyVariance(base, window.MainParams.Economy.RepairFluctuation); }
+    static calcCharity(busho, type) { let val = window.MainParams.Economy.BaseCharity + (busho.charm * window.MainParams.Economy.CharmEffect); if (type === 'both') val = val * 1.5; return this.applyVariance(val, window.MainParams.Economy.CharityFluctuation); }
+    // Military設定はWarParamsにある
+    static calcTraining(busho) { const base = window.WarParams.Military.BaseTraining + (busho.leadership * window.WarParams.Military.TrainingLdrEffect + busho.strength * window.WarParams.Military.TrainingStrEffect); return this.applyVariance(base, window.WarParams.Military.TrainingFluctuation); }
+    static calcSoldierCharity(busho) { const base = window.WarParams.Military.BaseMorale + (busho.leadership * window.WarParams.Military.MoraleLdrEffect) + (busho.charm * window.WarParams.Military.MoraleCharmEffect); return this.applyVariance(base, window.WarParams.Military.MoraleFluctuation); }
+    static calcDraftFromGold(gold, busho, castlePopulation) { const bonus = 1.0 + ((busho.leadership + busho.strength + busho.charm) / 300) * (window.WarParams.Military.DraftStatBonus - 1.0); const popBonus = 1.0 + (castlePopulation * window.WarParams.Military.DraftPopBonusFactor); return Math.floor(gold * 1.0 * bonus * popBonus); }
     static isAdjacent(c1, c2) { return (Math.abs(c1.x - c2.x) + Math.abs(c1.y - c2.y)) === 1; }
     static calcWeightedAvg(currVal, currNum, newVal, newNum) { if(currNum + newNum === 0) return currVal; return Math.floor(((currVal * currNum) + (newVal * newNum)) / (currNum + newNum)); }
     
@@ -303,7 +279,8 @@ class GameSystem {
         const assistInt = bushos.filter(b => b !== maxIntBusho).reduce((sum, b) => sum + b.intelligence, 0) * 0.2;
         const totalStr = maxStrBusho.strength + assistStr;
         const totalInt = maxIntBusho.intelligence + assistInt;
-        const difficulty = 30 + Math.random() * GAME_SETTINGS.Strategy.InvestigateDifficulty;
+        // Strategy設定はMainParamsにある
+        const difficulty = 30 + Math.random() * window.MainParams.Strategy.InvestigateDifficulty;
         const isSuccess = totalStr > difficulty;
         let accuracy = 0;
         if (isSuccess) {
@@ -311,8 +288,8 @@ class GameSystem {
         }
         return { success: isSuccess, accuracy: Math.floor(accuracy) };
     }
-    static calcIncite(busho) { const score = (busho.intelligence * 0.7) + (busho.strength * 0.3); const success = Math.random() < (score / GAME_SETTINGS.Strategy.InciteFactor); if(!success) return { success: false, val: 0 }; return { success: true, val: Math.floor(score * 2) }; }
-    static calcRumor(busho, targetBusho) { const score = (busho.intelligence * 0.7) + (busho.strength * 0.3); const defScore = (targetBusho.intelligence * 0.5) + (targetBusho.loyalty * 0.5); const success = Math.random() < (score / (defScore + GAME_SETTINGS.Strategy.RumorFactor)); if(!success) return { success: false, val: 0 }; return { success: true, val: Math.floor(20 + Math.random()*20) }; }
+    static calcIncite(busho) { const score = (busho.intelligence * 0.7) + (busho.strength * 0.3); const success = Math.random() < (score / window.MainParams.Strategy.InciteFactor); if(!success) return { success: false, val: 0 }; return { success: true, val: Math.floor(score * 2) }; }
+    static calcRumor(busho, targetBusho) { const score = (busho.intelligence * 0.7) + (busho.strength * 0.3); const defScore = (targetBusho.intelligence * 0.5) + (targetBusho.loyalty * 0.5); const success = Math.random() < (score / (defScore + window.MainParams.Strategy.RumorFactor)); if(!success) return { success: false, val: 0 }; return { success: true, val: Math.floor(20 + Math.random()*20) }; }
     static calcAffinityDiff(a, b) { const diff = Math.abs(a - b); return Math.min(diff, 100 - diff); }
     static calcValueDistance(a, b) {
         const diffInno = Math.abs(a.innovation - b.innovation);
@@ -322,7 +299,7 @@ class GameSystem {
         return Math.floor(dist * 0.8 + classicAff * 0.4); 
     }
     static calcRewardEffect(gold, daimyo, target) {
-        const S = GAME_SETTINGS.Strategy;
+        const S = window.MainParams.Strategy;
         const dist = this.calcValueDistance(daimyo, target);
         let penalty = dist * S.RewardDistancePenalty;
         let baseIncrease = S.RewardBaseEffect + (gold * S.RewardGoldFactor);
@@ -331,7 +308,7 @@ class GameSystem {
         return Math.floor(actualIncrease);
     }
     static calcHeadhunt(doer, target, gold, targetLord, newLord) {
-        const S = GAME_SETTINGS.Strategy;
+        const S = window.MainParams.Strategy;
         const goldEffect = Math.min(S.HeadhuntGoldMaxEffect, gold * S.HeadhuntGoldEffect);
         const offense = (doer.intelligence * S.HeadhuntIntWeight) + goldEffect;
         const defense = (target.loyalty * S.HeadhuntLoyaltyWeight) + (target.duty * S.HeadhuntDutyWeight) + S.HeadhuntBaseDiff;
@@ -351,7 +328,7 @@ class GameSystem {
         if (target.clan !== 0 && target.ambition > 70 && recruiterClanPower < targetClanPower * 0.7) return false; 
         const affDiff = this.calcAffinityDiff(recruiter.affinity, target.affinity); 
         let affBonus = (affDiff < 10) ? 30 : (affDiff < 25) ? 15 : (affDiff > 40) ? -10 : 0; 
-        const resistance = target.clan === 0 ? target.ambition : target.loyalty * GAME_SETTINGS.Strategy.EmploymentDiff; 
+        const resistance = target.clan === 0 ? target.ambition : target.loyalty * window.MainParams.Strategy.EmploymentDiff; 
         return ((recruiter.charm + affBonus) * (Math.random() + 0.5)) > resistance; 
     }
     static getGunshiAdvice(gunshi, action, seed) { const luck = this.seededRandom(seed); const errorMargin = (100 - gunshi.intelligence) / 200; const perceivedLuck = Math.min(1.0, Math.max(0.0, luck + (this.seededRandom(seed+1)-0.5)*errorMargin*2)); if (perceivedLuck > 0.8) return "必ずや成功するでしょう。好機です！"; if (perceivedLuck > 0.6) return "おそらく上手くいくでしょう。"; if (perceivedLuck > 0.4) return "五分五分といったところです。油断めさるな。"; if (perceivedLuck > 0.2) return "厳しい結果になるかもしれません。"; return "おやめください。失敗する未来が見えます。"; }
@@ -1093,7 +1070,7 @@ class UIManager {
             // WarManager経由
             const s = this.game.warManager.state;
             const defender = s.defender;
-            const maxSoldiers = Math.min(GAME_SETTINGS.War.RepairMaxSoldiers, defender.soldiers);
+            const maxSoldiers = Math.min(window.WarParams.War.RepairMaxSoldiers, defender.soldiers);
             document.getElementById('quantity-title').textContent = "補修 (兵士選択)";
             inputs.soldiers = createSlider("使用兵士数", "soldiers", maxSoldiers, Math.min(50, maxSoldiers));
              this.quantityConfirmBtn.onclick = () => {
@@ -1229,8 +1206,8 @@ class UIManager {
    ========================================================================== */
 class GameManager {
     constructor() { 
-        this.year = GAME_SETTINGS.StartYear; 
-        this.month = GAME_SETTINGS.StartMonth; 
+        this.year = window.MainParams.StartYear; 
+        this.month = window.MainParams.StartMonth; 
         this.castles = []; 
         this.bushos = []; 
         this.turnQueue = []; 
@@ -1287,17 +1264,17 @@ class GameManager {
     isCastleVisible(castle) { if (castle.ownerClan === this.playerClanId) return true; if (castle.investigatedUntil >= this.getCurrentTurnId()) return true; return false; }
     
     startMonth() {
-        this.marketRate = Math.max(GAME_SETTINGS.Economy.TradeRateMin, Math.min(GAME_SETTINGS.Economy.TradeRateMax, this.marketRate * (0.9 + Math.random()*GAME_SETTINGS.Economy.TradeFluctuation)));
+        this.marketRate = Math.max(window.MainParams.Economy.TradeRateMin, Math.min(window.MainParams.Economy.TradeRateMax, this.marketRate * (0.9 + Math.random()*window.MainParams.Economy.TradeFluctuation)));
         this.ui.showCutin(`${this.year}年 ${this.month}月`); this.ui.log(`=== ${this.year}年 ${this.month}月 ===`); this.processRoninMovements(); if (this.month % 3 === 0) this.optimizeCastellans(); const isPopGrowth = (this.month % 2 === 0);
         this.castles.forEach(c => {
             if (c.ownerClan === 0) return;
             c.isDone = false;
-            let income = Math.floor(c.commerce * GAME_SETTINGS.Economy.IncomeGoldRate);
-            income = GameSystem.applyVariance(income, GAME_SETTINGS.Economy.IncomeFluctuation);
+            let income = Math.floor(c.commerce * window.MainParams.Economy.IncomeGoldRate);
+            income = GameSystem.applyVariance(income, window.MainParams.Economy.IncomeFluctuation);
             if(this.month === 3) income += 500; c.gold += income; 
             if(this.month === 9) {
-                let riceIncome = c.kokudaka * GAME_SETTINGS.Economy.IncomeRiceRate;
-                riceIncome = GameSystem.applyVariance(riceIncome, GAME_SETTINGS.Economy.IncomeFluctuation);
+                let riceIncome = c.kokudaka * window.MainParams.Economy.IncomeRiceRate;
+                riceIncome = GameSystem.applyVariance(riceIncome, window.MainParams.Economy.IncomeFluctuation);
                 c.rice += riceIncome;
             }
             if (isPopGrowth) { 
@@ -1307,8 +1284,8 @@ class GameManager {
                 c.population = Math.max(0, c.population + growth);
             }
             const bushos = this.getCastleBushos(c.id);
-            c.rice = Math.max(0, c.rice - Math.floor(c.soldiers * GAME_SETTINGS.Economy.ConsumeRicePerSoldier));
-            c.gold = Math.max(0, c.gold - (bushos.length * GAME_SETTINGS.Economy.ConsumeGoldPerBusho));
+            c.rice = Math.max(0, c.rice - Math.floor(c.soldiers * window.MainParams.Economy.ConsumeRicePerSoldier));
+            c.gold = Math.max(0, c.gold - (bushos.length * window.MainParams.Economy.ConsumeGoldPerBusho));
             bushos.forEach(b => b.isActionDone = false);
         });
         this.turnQueue = this.castles.filter(c => c.ownerClan !== 0).sort(() => Math.random() - 0.5);

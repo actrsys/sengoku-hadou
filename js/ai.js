@@ -2,7 +2,19 @@
  * ai.js - 敵思考エンジン
  * 責務: 敵大名のターン処理、内政、外交、軍事判断
  * 依存: WarSystem (war.js) の計算ロジックを使用して、parameter.csvの変更を反映させる
+ * 設定: AI
  */
+
+// AI関連の設定定義
+window.AIParams = {
+    AI: {
+        Aggressiveness: 1.5, SoliderSendRate: 0.8,
+        AbilityBase: 50, AbilitySensitivity: 2.0,
+        GunshiBiasFactor: 0.5, GunshiFairnessFactor: 0.01,
+        WarHighIntThreshold: 80,
+        DiplomacyChance: 0.3, GoodwillThreshold: 40, AllianceThreshold: 70, BreakAllianceDutyFactor: 0.5
+    }
+};
 
 class AIEngine {
     constructor(game) {
@@ -11,9 +23,9 @@ class AIEngine {
 
     // AIの賢さ判定
     getAISmartness(attributeVal) {
-        const base = GAME_SETTINGS.AI.AbilityBase || 50;
+        const base = window.AIParams.AI.AbilityBase || 50;
         const diff = attributeVal - base; 
-        const factor = (GAME_SETTINGS.AI.AbilitySensitivity || 2.0) * 0.01; 
+        const factor = (window.AIParams.AI.AbilitySensitivity || 2.0) * 0.01; 
         let prob = 0.5 + (diff * factor); 
         return Math.max(0.1, Math.min(0.95, prob)); 
     }
@@ -29,7 +41,7 @@ class AIEngine {
             }
             
             // 1. 外交フェーズ (3ヶ月に1回)
-            if (this.game.month % 3 === 0 && Math.random() < (GAME_SETTINGS.AI.DiplomacyChance || 0.3)) { 
+            if (this.game.month % 3 === 0 && Math.random() < (window.AIParams.AI.DiplomacyChance || 0.3)) { 
                 this.execAIDiplomacy(castle, castellan); 
                 if (castellan.isActionDone) { this.game.finishTurn(); return; }
             }
@@ -51,7 +63,7 @@ class AIEngine {
 
             if (validEnemies.length > 0 && castle.soldiers > 500) {
                 // 攻撃的な性格、または兵数が十分多い場合に検討
-                const aggressiveness = GAME_SETTINGS.AI.Aggressiveness || 1.5;
+                const aggressiveness = window.AIParams.AI.Aggressiveness || 1.5;
                 if (Math.random() < aggressiveness * 0.5) {
                     const target = this.decideAttackTarget(castle, castellan, validEnemies);
                     if (target) {
@@ -87,7 +99,7 @@ class AIEngine {
         // 出陣可能武将（大将+副将候補）
         const availableBushos = myBushos.sort((a,b) => b.leadership - a.leadership).slice(0, 3);
         const myStats = WarSystem.calcUnitStats(availableBushos);
-        const mySoldiers = Math.floor(myCastle.soldiers * (GAME_SETTINGS.AI.SoliderSendRate || 0.8));
+        const mySoldiers = Math.floor(myCastle.soldiers * (window.AIParams.AI.SoliderSendRate || 0.8));
 
         enemies.forEach(target => {
             // 敵軍の戦力予測
@@ -136,7 +148,7 @@ class AIEngine {
         const sorted = bushos.sort((a,b) => b.leadership - a.leadership).slice(0, 3);
         
         // 兵数は設定された割合または全軍
-        const sendSoldiers = Math.floor(source.soldiers * (GAME_SETTINGS.AI.SoliderSendRate || 0.8));
+        const sendSoldiers = Math.floor(source.soldiers * (window.AIParams.AI.SoliderSendRate || 0.8));
         
         if (sendSoldiers <= 0) return;
 
@@ -150,8 +162,9 @@ class AIEngine {
      * 内政判断
      */
     execInternalAffairs(castle, castellan) {
-        const S = GAME_SETTINGS.Economy;
-        const M = GAME_SETTINGS.Military;
+        // Economy設定はMainParams(game.js)にある
+        const S = window.MainParams.Economy;
+        const M = window.WarParams.Military; // Military設定はWarParams
         
         // 優先順位判断
         // 1. 忠誠度が低いなら施し (反乱防止)
@@ -228,7 +241,7 @@ class AIEngine {
             // 1. 同盟破棄判断 (圧倒的に有利、かつ義理が低い、かつ敵が周りにいない)
             if (rel.alliance) {
                  const enemies = neighbors.filter(c => !this.game.getRelation(castle.ownerClan, c.ownerClan).alliance);
-                 const dutyFactor = 1.0 - (myDaimyo.duty * 0.01 * (GAME_SETTINGS.AI.BreakAllianceDutyFactor || 0.5)); 
+                 const dutyFactor = 1.0 - (myDaimyo.duty * 0.01 * (window.AIParams.AI.BreakAllianceDutyFactor || 0.5)); 
                  
                  if (enemies.length === 0 && myPower > targetClanTotal * 2.0 && Math.random() < smartness * dutyFactor) {
                       // 外交実行
@@ -242,9 +255,9 @@ class AIEngine {
             // 2. 親善・同盟判断 (自分が弱い場合)
             if (myPower < targetClanTotal * 0.8) {
                 if (Math.random() < smartness) {
-                    if (rel.friendship < (GAME_SETTINGS.AI.GoodwillThreshold || 40) && castle.gold > 500) {
+                    if (rel.friendship < (window.AIParams.AI.GoodwillThreshold || 40) && castle.gold > 500) {
                          this.game.commandSystem.executeDiplomacy(castellan.id, targetClanId, 'goodwill', 200); 
-                    } else if (rel.friendship > (GAME_SETTINGS.AI.AllianceThreshold || 70)) {
+                    } else if (rel.friendship > (window.AIParams.AI.AllianceThreshold || 70)) {
                          this.game.commandSystem.executeDiplomacy(castellan.id, targetClanId, 'alliance');
                     }
                 }
