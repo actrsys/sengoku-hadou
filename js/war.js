@@ -493,77 +493,107 @@ class WarManager {
     }
 
     endWar(attackerWon, isRetreat = false, capturedInRetreat = [], retreatTargetId = null) { 
-        const s = this.state; s.active = false; 
-        if (s.isPlayerInvolved) { const warModal = document.getElementById('war-modal'); if(warModal) warModal.classList.add('hidden'); }
-        const isShortWar = s.round < window.WarParams.War.ShortWarTurnLimit;
-        const baseRecov = window.WarParams.War.BaseRecoveryRate;
-        const highRecov = window.WarParams.War.RetreatRecoveryRate;
-        const attackerRecovered = Math.floor(s.deadSoldiers.attacker * baseRecov);
-        const totalAtkSurvivors = s.attacker.soldiers + attackerRecovered;
-
-        if (isRetreat && retreatTargetId) {
-             const targetC = this.game.getCastle(retreatTargetId);
-             if (targetC) {
-                 const recovered = Math.floor(s.deadSoldiers.defender * (isShortWar ? highRecov : baseRecov));
-                 targetC.soldiers += (s.defender.soldiers + recovered);
-                 if (s.isPlayerInvolved && recovered > 0) this.game.ui.log(`(撤退先にて負傷兵 ${recovered}名 が復帰)`);
-             }
-        } else if (!isRetreat && attackerWon) {
-             const survivors = Math.max(0, s.defender.soldiers);
-             const recovered = Math.floor(s.deadSoldiers.defender * 0.2);
-             const totalAbsorbed = survivors + recovered;
-             s.defender.soldiers = totalAtkSurvivors + totalAbsorbed;
-             if (s.isPlayerInvolved && totalAbsorbed > 0) this.game.ui.log(`(敵残存兵・負傷兵 計${totalAbsorbed}名 を吸収)`);
-        } else if (!isRetreat && !attackerWon) {
-             const srcC = this.game.getCastle(s.sourceCastle.id); srcC.soldiers += totalAtkSurvivors; 
-             const recovered = Math.floor(s.deadSoldiers.defender * baseRecov);
-             s.defender.soldiers += recovered;
-             if (s.isPlayerInvolved && attackerRecovered > 0) this.game.ui.log(`(遠征軍 負傷兵 ${attackerRecovered}名 が帰還)`);
-        }
-
-        if (isRetreat && capturedInRetreat.length > 0) {
-             this.pendingPrisoners = capturedInRetreat;
-             if (s.attacker.ownerClan === this.game.playerClanId) this.game.ui.showPrisonerModal(capturedInRetreat);
-             else this.autoResolvePrisoners(capturedInRetreat, s.attacker.ownerClan);
-        }
-        
-        if (isRetreat) {
-             s.defender.ownerClan = s.attacker.ownerClan; s.defender.investigatedUntil = 0;
-             s.atkBushos.forEach((b, idx) => { 
-                const srcC = this.game.getCastle(s.sourceCastle.id); srcC.samuraiIds = srcC.samuraiIds.filter(id => id !== b.id); 
-                b.castleId = s.defender.id; s.defender.samuraiIds.push(b.id); 
-                if(idx === 0) { b.isCastellan = true; s.defender.castellanId = b.id; } else b.isCastellan = false; 
-            });
-            this.game.finishTurn(); return;
-        }
-
-        const currentTurnId = this.game.getCurrentTurnId();
-        if (attackerWon) { 
-            s.attacker.training = Math.min(120, s.attacker.training + 5); s.attacker.morale = Math.min(120, s.attacker.morale + 5); 
-            this.processCaptures(s.defender, s.attacker.ownerClan);
-            const atkBushos = s.atkBushos;
-            const maxCharm = Math.max(...atkBushos.map(b => b.charm));
-            const subCharm = atkBushos.reduce((acc, b) => acc + b.charm, 0) - maxCharm;
-            const daimyo = this.game.bushos.find(b => b.clan === s.attacker.ownerClan && b.isDaimyo) || {charm: 50};
-            const charmScore = maxCharm + (subCharm * 0.1) + (daimyo.charm * window.WarParams.War.DaimyoCharmWeight);
-            const baseLoot = window.WarParams.War.LootingBaseRate;
-            let lossRate = baseLoot - (charmScore * window.WarParams.War.LootingCharmFactor);
-            lossRate = Math.max(0, lossRate); 
-            if (lossRate > 0) {
-                 const lostGold = Math.floor(s.defender.gold * lossRate);
-                 const lostRice = Math.floor(s.defender.rice * lossRate);
-                 s.defender.gold -= lostGold; s.defender.rice -= lostRice;
-                 if (s.isPlayerInvolved) this.game.ui.log(`(敵兵の持ち逃げにより 金${lostGold}, 米${lostRice} が失われた)`);
+            const s = this.state; 
+            s.active = false; // 合戦終了フラグを即座に落とす
+            
+            if (s.isPlayerInvolved) { 
+                const warModal = document.getElementById('war-modal'); 
+                if(warModal) warModal.classList.add('hidden');
+                this.game.isProcessingAI = false; // プレイヤー関与時はUIロックを解除
             }
-            s.defender.ownerClan = s.attacker.ownerClan; s.defender.investigatedUntil = 0; s.defender.immunityUntil = currentTurnId + 1;
-            s.atkBushos.forEach((b, idx) => { 
-                const srcC = this.game.getCastle(s.sourceCastle.id); srcC.samuraiIds = srcC.samuraiIds.filter(id => id !== b.id); 
-                b.castleId = s.defender.id; s.defender.samuraiIds.push(b.id); 
-                if(idx === 0) { b.isCastellan = true; s.defender.castellanId = b.id; } else b.isCastellan = false; 
-            }); 
-        } else { s.defender.immunityUntil = currentTurnId; } 
-        this.game.finishTurn();
-    }
+    
+            const isShortWar = s.round < window.WarParams.War.ShortWarTurnLimit;
+            const baseRecov = window.WarParams.War.BaseRecoveryRate;
+            const highRecov = window.WarParams.War.RetreatRecoveryRate;
+            const attackerRecovered = Math.floor(s.deadSoldiers.attacker * baseRecov);
+            const totalAtkSurvivors = s.attacker.soldiers + attackerRecovered;
+    
+            if (isRetreat && retreatTargetId) {
+                 const targetC = this.game.getCastle(retreatTargetId);
+                 if (targetC) {
+                     const recovered = Math.floor(s.deadSoldiers.defender * (isShortWar ? highRecov : baseRecov));
+                     targetC.soldiers += (s.defender.soldiers + recovered);
+                     if (s.isPlayerInvolved && recovered > 0) this.game.ui.log(`(撤退先にて負傷兵 ${recovered}名 が復帰)`);
+                 }
+            } else if (!isRetreat && attackerWon) {
+                 const survivors = Math.max(0, s.defender.soldiers);
+                 const recovered = Math.floor(s.deadSoldiers.defender * 0.2);
+                 const totalAbsorbed = survivors + recovered;
+                 s.defender.soldiers = totalAtkSurvivors + totalAbsorbed;
+                 if (s.isPlayerInvolved && totalAbsorbed > 0) this.game.ui.log(`(敵残存兵・負傷兵 計${totalAbsorbed}名 を吸収)`);
+            } else if (!isRetreat && !attackerWon) {
+                 const srcC = this.game.getCastle(s.sourceCastle.id); srcC.soldiers += totalAtkSurvivors; 
+                 const recovered = Math.floor(s.deadSoldiers.defender * baseRecov);
+                 s.defender.soldiers += recovered;
+                 if (s.isPlayerInvolved && attackerRecovered > 0) this.game.ui.log(`(遠征軍 負傷兵 ${attackerRecovered}名 が帰還)`);
+            }
+    
+            if (isRetreat && capturedInRetreat.length > 0) {
+                 this.pendingPrisoners = capturedInRetreat;
+                 if (s.attacker.ownerClan === this.game.playerClanId) this.game.ui.showPrisonerModal(capturedInRetreat);
+                 else this.autoResolvePrisoners(capturedInRetreat, s.attacker.ownerClan);
+            }
+            
+            if (isRetreat) {
+                 s.defender.ownerClan = s.attacker.ownerClan; s.defender.investigatedUntil = 0;
+                 s.atkBushos.forEach((b, idx) => { 
+                    const srcC = this.game.getCastle(s.sourceCastle.id); srcC.samuraiIds = srcC.samuraiIds.filter(id => id !== b.id); 
+                    b.castleId = s.defender.id; s.defender.samuraiIds.push(b.id); 
+                    if(idx === 0) { b.isCastellan = true; s.defender.castellanId = b.id; } else b.isCastellan = false; 
+                });
+                // 撤退による占領時も判定を行う
+                if (s.attacker.ownerClan === this.game.playerClanId) {
+                    this.game.ui.renderMap();
+                    this.game.finishTurn(); 
+                } else if (s.defender.ownerClan === this.game.playerClanId) {
+                    this.game.ui.renderMap();
+                    this.game.ui.showControlPanel(this.game.getCastle(s.defender.id));
+                } else {
+                    this.game.finishTurn();
+                }
+                return;
+            }
+    
+            const currentTurnId = this.game.getCurrentTurnId();
+            if (attackerWon) { 
+                s.attacker.training = Math.min(120, s.attacker.training + 5); s.attacker.morale = Math.min(120, s.attacker.morale + 5); 
+                this.processCaptures(s.defender, s.attacker.ownerClan);
+                const atkBushos = s.atkBushos;
+                const maxCharm = Math.max(...atkBushos.map(b => b.charm));
+                const subCharm = atkBushos.reduce((acc, b) => acc + b.charm, 0) - maxCharm;
+                const daimyo = this.game.bushos.find(b => b.clan === s.attacker.ownerClan && b.isDaimyo) || {charm: 50};
+                const charmScore = maxCharm + (subCharm * 0.1) + (daimyo.charm * window.WarParams.War.DaimyoCharmWeight);
+                const baseLoot = window.WarParams.War.LootingBaseRate;
+                let lossRate = baseLoot - (charmScore * window.WarParams.War.LootingCharmFactor);
+                lossRate = Math.max(0, lossRate); 
+                if (lossRate > 0) {
+                     const lostGold = Math.floor(s.defender.gold * lossRate);
+                     const lostRice = Math.floor(s.defender.rice * lossRate);
+                     s.defender.gold -= lostGold; s.defender.rice -= lostRice;
+                     if (s.isPlayerInvolved) this.game.ui.log(`(敵兵の持ち逃げにより 金${lostGold}, 米${lostRice} が失われた)`);
+                }
+                s.defender.ownerClan = s.attacker.ownerClan; s.defender.investigatedUntil = 0; s.defender.immunityUntil = currentTurnId + 1;
+                s.atkBushos.forEach((b, idx) => { 
+                    const srcC = this.game.getCastle(s.sourceCastle.id); srcC.samuraiIds = srcC.samuraiIds.filter(id => id !== b.id); 
+                    b.castleId = s.defender.id; s.defender.samuraiIds.push(b.id); 
+                    if(idx === 0) { b.isCastellan = true; s.defender.castellanId = b.id; } else b.isCastellan = false; 
+                }); 
+            } else { s.defender.immunityUntil = currentTurnId; } 
+    
+            // 【重要】手番終了の振り分け
+            if (s.attacker.ownerClan === this.game.playerClanId) {
+                // プレイヤーが攻撃した場合は、その拠点のターンを終了
+                this.game.ui.renderMap();
+                this.game.finishTurn(); 
+            } else if (s.defender.ownerClan === this.game.playerClanId) {
+                // 防衛した場合は、自分の操作に戻す（finishTurnを呼ばない）
+                this.game.ui.renderMap();
+                this.game.ui.showControlPanel(this.game.getCastle(s.defender.id));
+            } else {
+                // AI同士なら普通に次のAIへ
+                this.game.finishTurn();
+            }
+        }
     
     processCaptures(defeatedCastle, winnerClanId) { 
         const losers = this.game.getCastleBushos(defeatedCastle.id); const captives = []; const escapees = [];
