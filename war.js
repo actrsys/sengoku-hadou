@@ -206,6 +206,7 @@ class WarManager {
     execWarAI() { 
         const s = this.state;
         const actor = s.turn === 'attacker' ? s.atkBushos[0] : s.defBusho; 
+        const actorSide = s.turn === 'attacker' ? s.attacker : s.defender;
         const isDefender = (s.turn === 'defender');
         if (isDefender) {
             const dangerRatio = s.defender.soldiers / (s.attacker.soldiers + 1);
@@ -478,7 +479,8 @@ class WarManager {
                 s.defender.samuraiIds.push(b.id); 
                 if(idx === 0) { b.isCastellan = true; s.defender.castellanId = b.id; } else b.isCastellan = false; 
             });
-            if (s.attacker.ownerClan !== this.game.playerClanId) this.game.finishTurn(); else { this.game.ui.renderCommandMenu(); this.game.ui.renderMap(); }
+            // 変更: 戦争後は強制的にターン終了
+            this.game.finishTurn();
             return;
         }
 
@@ -523,7 +525,9 @@ class WarManager {
             srcC.soldiers += s.attacker.soldiers; 
             s.defender.immunityUntil = currentTurnId;
         } 
-        if (s.attacker.ownerClan !== this.game.playerClanId) this.game.finishTurn(); else { this.game.ui.renderCommandMenu(); this.game.ui.renderMap(); }
+        
+        // 変更: 戦争後は強制的にターン終了
+        this.game.finishTurn();
     }
     
     processCaptures(defeatedCastle, winnerClanId) { 
