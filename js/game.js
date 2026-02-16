@@ -1294,49 +1294,55 @@ class GameManager {
     processRoninMovements() { const ronins = this.bushos.filter(b => b.status === 'ronin'); ronins.forEach(r => { const currentC = this.getCastle(r.castleId); if(!currentC) return; const neighbors = this.castles.filter(c => GameSystem.isAdjacent(currentC, c)); neighbors.forEach(n => { const castellan = this.getBusho(n.castellanId); if (Math.random() < 0.2) { currentC.samuraiIds = currentC.samuraiIds.filter(id => id !== r.id); n.samuraiIds.push(r.id); r.castleId = n.id; } }); }); }
     optimizeCastellans() { const clanIds = [...new Set(this.castles.filter(c=>c.ownerClan!==0).map(c=>c.ownerClan))]; clanIds.forEach(clanId => { const myBushos = this.bushos.filter(b => b.clan === clanId); if(myBushos.length===0) return; let daimyoInt = Math.max(...myBushos.map(b => b.intelligence)); if (Math.random() * 100 < daimyoInt) { const clanCastles = this.castles.filter(c => c.ownerClan === clanId); clanCastles.forEach(castle => { const castleBushos = this.getCastleBushos(castle.id).filter(b => b.status !== 'ronin'); if (castleBushos.length <= 1) return; castleBushos.sort((a, b) => (b.leadership + b.politics) - (a.leadership + a.politics)); const best = castleBushos[0]; if (best.id !== castle.castellanId) { const old = this.getBusho(castle.castellanId); if(old) old.isCastellan = false; best.isCastellan = true; castle.castellanId = best.id; } }); } }); }
     
+    /**
+ * 次の拠点のターンを処理する
+ * game.js 内の GameManager クラスのメソッド
+ */
     processTurn() {
-        // 1. 戦争中（特にプレイヤー関与）なら、ターン処理そのものを一時停止するガード
-        if (this.warManager.state.active && this.warManager.state.isPlayerInvolved) {
-            return; 
-        }
+        // 1. 合戦中で、かつプレイヤーが操作中の場合は、ターン進行を一時停止する
+        if (this.warManager.state.active && this.warManager.state.isPlayerInvolved) return;
     
+        // 2. 全ての拠点の処理が終わっていれば、月を更新して終了
         if (this.currentIndex >= this.turnQueue.length) { 
             this.endMonth(); 
             return; 
         }
     
-        const castle = this.turnQueue[this.currentIndex]; 
-        if(castle.ownerClan !== 0 && !this.clans.find(c=>c.id===castle.ownerClan)) { 
+        const castle = this.turnQueue[this.currentIndex];
+        
+        // 3. 拠点の持ち主（クラン）が既に滅亡している等の不整合チェック
+        if(castle.ownerClan !== 0 && !this.clans.find(c => c.id === castle.ownerClan)) { 
             this.currentIndex++; 
             this.processTurn(); 
             return; 
         }
         
+        // 4. マップを最新状態に更新
         this.ui.renderMap();
         
         if (castle.ownerClan === this.playerClanId) { 
-            this.isProcessingAI = false; 
-            this.ui.log(`【${castle.name}】命令を下してください`); 
-            this.ui.showControlPanel(castle); 
+            // --- プレイヤーのターンの場合 ---
+            this.isProcessingAI = false;
+            this.ui.renderMap();
+            this.ui.log(`【${castle.name}】命令を下してください`);
+            this.ui.showControlPanel(castle);
         } else { 
-            this.isProcessingAI = true; 
-            if(this.ui.panelEl) this.ui.panelEl.classList.add('hidden'); 
+            // --- AI（敵大名）のターンの場合 ---
+            this.isProcessingAI = true;
+            this.ui.renderMap();
+            if(this.ui.panelEl) this.ui.panelEl.classList.add('hidden');
             
-            // ★ここが重要！setTimeoutの「中」でもチェックを入れる
+            // 少し遅延を置いてAIの思考エンジンを起動する
             setTimeout(() => {
                 try {
-                    // 実行される直前に、誰かが戦争を始めていないか最終確認
-                    if (this.warManager.state.active && this.warManager.state.isPlayerInvolved) {
-                        this.isProcessingAI = false; // フラグを戻して待機
-                        return; 
-                    }
-    
+                    // AI思考エンジン(ai.js)へ処理を委譲
                     this.aiEngine.execAI(castle);
                 } catch(e) {
-                    console.error("AI Error caught:", e);
-                    this.finishTurn(); 
+                    // AIのプログラム内でエラーが起きた場合、ここでキャッチして強制的にターンを進める
+                    console.error("AI Logic Error caught in processTurn:", e);
+                    this.finishTurn();
                 }
-            }, 600); 
+            }, 600);
         }
     }
     
@@ -1500,4 +1506,5 @@ class GameManager {
 window.addEventListener('DOMContentLoaded', () => {
     window.GameApp = new GameManager();
 });
+
 
