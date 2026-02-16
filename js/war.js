@@ -1,3 +1,7 @@
+{
+type: uploaded file
+fileName: war.js
+fullContent:
 /**
  * war.js
  * 戦争処理マネージャー & 戦争計算ロジック
@@ -183,12 +187,24 @@ class WarManager {
 
     startWar(atkCastle, defCastle, atkBushos, atkSoldierCount) {
         try {
-            const isPlayerInvolved = (atkCastle.ownerClan === this.game.playerClanId || defCastle.ownerClan === this.game.playerClanId);
-            const atkClan = this.game.clans.find(c => c.id === atkCastle.ownerClan); 
-            const atkGeneral = atkBushos[0].name;
-            const atkArmyName = atkClan ? atkClan.getArmyName() : atkClan.name;
+            // ID判定を厳密化（文字列と数値の比較バグを防止）
+            const pid = Number(this.game.playerClanId);
+            const atkClan = Number(atkCastle.ownerClan);
+            const defClan = Number(defCastle.ownerClan);
+
+            let isPlayerInvolved = (atkClan === pid || defClan === pid);
             
-            if (isPlayerInvolved) this.game.ui.showCutin(`${atkArmyName}の${atkGeneral}が\n${defCastle.name}に攻め込みました！`);
+            // 安全策：プレイヤーが防御側の場合、フラグがfalseでも強制的にtrueにする
+            if (defClan === pid) isPlayerInvolved = true;
+
+            const atkClanData = this.game.clans.find(c => c.id === atkClan); 
+            const atkGeneral = atkBushos[0].name;
+            const atkArmyName = atkClanData ? atkClanData.getArmyName() : "敵軍";
+            
+            // プレイヤーが関与しているならカットイン
+            if (isPlayerInvolved) {
+                this.game.ui.showCutin(`${atkArmyName}の${atkGeneral}が\n${defCastle.name}に攻め込みました！`);
+            }
             
             let defBusho = this.game.getBusho(defCastle.castellanId); 
             if (!defBusho) defBusho = {name:"守備隊長", strength:30, leadership:30, intelligence:30, charm:30};
@@ -227,7 +243,19 @@ class WarManager {
 
     resolveAutoWar() { 
         try { 
-            const s = this.state; 
+            const s = this.state;
+            
+            // 安全策: もしプレイヤーが関与しているのにここに来てしまった場合、手動モードへ復帰させる
+            if (s.isPlayerInvolved || s.defender.ownerClan === this.game.playerClanId) {
+                console.warn("AutoWar aborted: Player is involved.");
+                s.isPlayerInvolved = true;
+                const warModal = document.getElementById('war-modal');
+                if (warModal) warModal.classList.remove('hidden'); 
+                this.game.ui.updateWarUI();
+                this.processWarRound();
+                return;
+            }
+
             let safetyLimit = 100; 
             while(s.round <= window.WarParams.Military.WarMaxRounds && s.attacker.soldiers > 0 && s.defender.soldiers > 0 && s.defender.defense > 0 && safetyLimit > 0) { 
                 this.resolveWarAction('charge'); 
@@ -254,6 +282,7 @@ class WarManager {
     }
 
     execWarCmd(type, extraVal = null) { 
+        if (!this.state.active) return;
         if (type === 'repair_setup') { window.GameApp.ui.openQuantitySelector('war_repair', [this.state.defender], null); return; }
         if(type==='scheme'||type==='fire') this.resolveWarAction(type); 
         else { document.getElementById('war-controls').classList.add('disabled-area'); this.resolveWarAction(type, extraVal); } 
@@ -261,9 +290,9 @@ class WarManager {
 
     /**
      * AIの戦術決定
-     * 難易度と知略に応じて、最も効果的(またはそれっぽい)コマンドを選択する
      */
     execWarAI() { 
+        if (!this.state.active) return; // 既に終了している場合は何もしない
         const s = this.state;
         const actor = s.turn === 'attacker' ? s.atkBushos[0] : s.defBusho; 
         const isDefender = (s.turn === 'defender');
@@ -307,7 +336,6 @@ class WarManager {
         let bestCmd = options[0];
         let bestScore = -Infinity;
 
-        // WarSystemのパラメータを参照して期待値を計算
         const W = window.WarParams.War;
 
         options.forEach(cmd => {
@@ -323,9 +351,7 @@ class WarManager {
             else if (cmd === 'def_bow') { multiplier = W.DefBowMultiplier; risk = 0.5; }
             else if (cmd === 'def_attack') { multiplier = 0; risk = 0; } // 籠城
 
-            // 期待ダメージ (アバウトな計算)
-            // 賢いAIは相手の兵数や防御力を考慮する
-            const enemySoldiers = isDefender ? s.attacker.soldiers : s.defender.soldiers;
+            // 期待ダメージ
             const enemyDefense = isDefender ? 0 : s.defender.defense; // 攻撃時は城壁がある
 
             // ダメージスコア (与える被害)
@@ -341,7 +367,6 @@ class WarManager {
             }
 
             // リスクスコア (受ける被害)
-            // 知略が高いほどリスクを重く見る
             score -= (risk * 50 * smartness);
 
             // 計略系
@@ -350,7 +375,7 @@ class WarManager {
                 score = (successProb * 150) - (50 * smartness); // 失敗リスク
             }
 
-            // ランダム揺らぎ (知略が低いほど揺らぎが大きい)
+            // ランダム揺らぎ
             const noise = (Math.random() * 200) * (1.0 - smartness);
             score += noise;
 
@@ -451,7 +476,20 @@ class WarManager {
         this.advanceWarTurn();
     }
 
-    advanceWarTurn() { const s = this.state; if (s.turn === 'attacker') s.turn = 'defender'; else { s.turn = 'attacker'; s.round++; if(s.round > window.WarParams.Military.WarMaxRounds) { this.endWar(false); return; } } if (s.isPlayerInvolved) this.processWarRound(); }
+    advanceWarTurn() { 
+        if (!this.state.active) return;
+        const s = this.state; 
+        if (s.turn === 'attacker') s.turn = 'defender'; 
+        else { 
+            s.turn = 'attacker'; 
+            s.round++; 
+            if(s.round > window.WarParams.Military.WarMaxRounds) { 
+                this.endWar(false); 
+                return; 
+            } 
+        } 
+        if (s.isPlayerInvolved) this.processWarRound(); 
+    }
     
     executeRetreatLogic(defCastle) {
         const candidates = this.game.castles.filter(c => c.ownerClan === defCastle.ownerClan && c.id !== defCastle.id && GameSystem.isAdjacent(c, defCastle));
