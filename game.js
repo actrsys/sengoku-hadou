@@ -1087,7 +1087,7 @@ class UIManager {
         let content = "";
         const isSelf = busho.isDaimyo && busho.clan === this.game.playerClanId;
         if (isSelf) {
-            content = `<h3>独り言 (${busho.name})</h3><div style="margin:20px 0; text-align:left;"><p>（ふむ...我が志、${busho.ambition >= 80 ? "天下統一も夢ではないか。" : "家の安泰こそ第一。無理は禁物だ。"}）</p><p>（家中の者たちはどう思っているのか...）</p><div style="margin-top:20px; display:flex; flex-direction:column; gap:10px;"><button class="btn-primary" id="interview-ask">他者について考える</button><button class="btn-secondary" onclick="window.GameApp.ui.reopenInterviewSelector()">戻る</button></div></div>`;
+            content = `<h3>独り言 (${busho.name})</h3><div style="margin:20px 0; text-align:left;"><p>（ふむ……${busho.ambition >= 80 ? "天下統一も夢ではないか。" : "家の安泰こそ第一。無理は禁物だ。"}）</p><p>（家中の者たちはどう思っているのか……）</p><div style="margin-top:20px; display:flex; flex-direction:column; gap:10px;"><button class="btn-primary" id="interview-ask">他者について考える</button><button class="btn-secondary" onclick="window.GameApp.ui.reopenInterviewSelector()">戻る</button></div></div>`;
         } else {
             content = `<h3>${busho.name}との面談</h3><div style="margin:20px 0; text-align:left;"><p>「殿、どのようなご用件でしょうか？」</p><div style="margin-top:20px; display:flex; flex-direction:column; gap:10px;"><button class="btn-primary" id="interview-status">調子はどうだ</button><button class="btn-primary" id="interview-ask">他者について聞く</button><button class="btn-secondary" onclick="window.GameApp.ui.reopenInterviewSelector()">戻る</button></div></div>`;
         }
@@ -1432,7 +1432,7 @@ class GameManager {
         this.currentIndex++; 
         this.processTurn(); 
     }
-    endMonth() { this.month++; if(this.month > 12) { this.month = 1; this.year++; } const clans = new Set(this.castles.filter(c => c.ownerClan !== 0).map(c => c.ownerClan)); const playerAlive = clans.has(this.playerClanId); if (clans.size === 1 && playerAlive) alert(`天下統一！`); else if (!playerAlive) alert(`我が軍は滅亡しました...`); else this.startMonth(); }
+    endMonth() { this.month++; if(this.month > 12) { this.month = 1; this.year++; } const clans = new Set(this.castles.filter(c => c.ownerClan !== 0).map(c => c.ownerClan)); const playerAlive = clans.has(this.playerClanId); if (clans.size === 1 && playerAlive) alert(`天下統一！`); else if (!playerAlive) alert(`我が軍は滅亡しました……`); else this.startMonth(); }
 
     enterMapSelection(mode) {
         this.lastMenuState = this.ui.menuState;
@@ -1597,13 +1597,13 @@ class GameManager {
         if (result.success) {
             target.investigatedUntil = this.getCurrentTurnId() + 4; target.investigatedAccuracy = result.accuracy;
             msg = `潜入に成功しました！\n情報を入手しました。\n(情報の精度: ${result.accuracy}%)`;
-        } else { msg = `潜入に失敗しました...\n情報は得られませんでした。`; }
+        } else { msg = `潜入に失敗しました……\n情報は得られませんでした。`; }
         bushos.forEach(b => b.isActionDone = true);
         this.ui.showResultModal(msg); this.ui.updatePanelHeader(); this.ui.renderCommandMenu(); this.ui.renderMap();
         this.ui.log(`調査実行: ${target.name} (${result.success ? '成功' : '失敗'})`);
     }
 
-    executeEmploy(doerId, targetId) { const doer = this.getBusho(doerId); const target = this.getBusho(targetId); const myPower = this.getClanTotalSoldiers(this.playerClanId); const targetClanId = target.clan; const targetPower = targetClanId === 0 ? 0 : this.getClanTotalSoldiers(targetClanId); const success = GameSystem.calcEmploymentSuccess(doer, target, myPower, targetPower); let msg = ""; if (success) { const oldCastle = this.getCastle(target.castleId); if(oldCastle && oldCastle.samuraiIds.includes(target.id)) { oldCastle.samuraiIds = oldCastle.samuraiIds.filter(id => id !== target.id); } const currentC = this.getCurrentTurnCastle(); currentC.samuraiIds.push(target.id); target.castleId = currentC.id; target.clan = this.playerClanId; target.status = 'active'; target.loyalty = 50; msg = `${target.name}の登用に成功しました！`; } else { msg = `${target.name}は登用に応じませんでした...`; } doer.isActionDone = true; this.ui.showResultModal(msg); this.ui.renderCommandMenu(); }
+    executeEmploy(doerId, targetId) { const doer = this.getBusho(doerId); const target = this.getBusho(targetId); const myPower = this.getClanTotalSoldiers(this.playerClanId); const targetClanId = target.clan; const targetPower = targetClanId === 0 ? 0 : this.getClanTotalSoldiers(targetClanId); const success = GameSystem.calcEmploymentSuccess(doer, target, myPower, targetPower); let msg = ""; if (success) { const oldCastle = this.getCastle(target.castleId); if(oldCastle && oldCastle.samuraiIds.includes(target.id)) { oldCastle.samuraiIds = oldCastle.samuraiIds.filter(id => id !== target.id); } const currentC = this.getCurrentTurnCastle(); currentC.samuraiIds.push(target.id); target.castleId = currentC.id; target.clan = this.playerClanId; target.status = 'active'; target.loyalty = 50; msg = `${target.name}の登用に成功しました！`; } else { msg = `${target.name}は登用に応じませんでした……`; } doer.isActionDone = true; this.ui.showResultModal(msg); this.ui.renderCommandMenu(); }
     
     executeDiplomacy(doerId, targetClanId, type, gold = 0) {
         const doer = this.getBusho(doerId);
@@ -1625,7 +1625,7 @@ class GameManager {
                 msg = `同盟の締結に成功しました！`;
             } else {
                 relation.friendship = Math.max(0, relation.friendship - 10);
-                msg = `同盟の締結に失敗しました...`;
+                msg = `同盟の締結に失敗しました……`;
             }
         } else if (type === 'break_alliance') {
             relation.alliance = false;
@@ -1663,7 +1663,7 @@ class GameManager {
             target.clan = this.playerClanId; target.castleId = castle.id; target.loyalty = 50; target.isActionDone = true; castle.samuraiIds.push(target.id);
             this.ui.showResultModal(`${doer.name}の引抜工作が成功！\n${target.name}が我が軍に加わりました！`);
         } else {
-            this.ui.showResultModal(`${doer.name}の引抜工作は失敗しました...\n${target.name}は応じませんでした。`);
+            this.ui.showResultModal(`${doer.name}の引抜工作は失敗しました……\n${target.name}は応じませんでした。`);
         }
         doer.isActionDone = true; this.ui.updatePanelHeader(); this.ui.renderCommandMenu();
     }
@@ -1678,9 +1678,9 @@ class GameManager {
         target.loyalty = Math.min(100, target.loyalty + effect);
         target.isActionDone = true;
         let msg = "";
-        if (effect > 5) msg = `「ありがたき幸せ...！」\n忠誠が${effect}上がりました。`;
+        if (effect > 5) msg = `「ありがたき幸せ！」\n忠誠が${effect}上がりました。`;
         else if (effect > 0) msg = `「はっ、頂戴いたします。」\n忠誠が${effect}上がりました。`;
-        else msg = `「......」(不満げだ)\n忠誠は上がりませんでした。`;
+        else msg = `「……。」(不満があるようだ)\n忠誠は上がりませんでした。`;
         this.ui.showResultModal(`${target.name}に金${gold}を与えました。\n${msg}`);
         this.ui.updatePanelHeader(); this.ui.renderCommandMenu();
     }
@@ -1701,15 +1701,15 @@ class GameManager {
         
         // 1. 自分が自分について語る（自分語り・独り言）
         if (interviewer.id === target.id) {
-            if (interviewer.ambition > 80) comment = "「俺の力を持ってすれば、天下も夢ではない...はずだ。」";
-            else if (interviewer.personality === 'cautious') comment = "「慎重に行かねば...足元をすくわれるぞ。」";
-            else comment = "「今のところは順調か...いや、油断はできん。」";
+            if (interviewer.ambition > 80) comment = "「俺の力を持ってすれば、天下も夢ではない……はずだ。」";
+            else if (interviewer.personality === 'cautious') comment = "「慎重に行かねば、足元をすくわれよう。」";
+            else comment = "「今のところは順調か……いや、油断はできん。」";
         }
         // 2. 部下が自軍大名（target）について語る
         else if (target.isDaimyo && target.clan === this.playerClanId) {
             const loyalty = interviewer.loyalty;
             const aff = GameSystem.calcAffinityDiff(interviewer.affinity, target.affinity); 
-            if (loyalty < 40 || aff > 30) comment = "「......」(口を閉ざしている。あまり良く思われていないようだ)";
+            if (loyalty < 40 || aff > 30) comment = "「……。」(口を閉ざしている。あまり良く思われていないようだ)";
             else if (loyalty > 80 && aff < 15) comment = "「殿には心より感謝しております。この身尽きるまでお仕えする所存！」";
             else comment = "「殿のご采配、頼もしく思っております。」";
         }
@@ -1717,11 +1717,11 @@ class GameManager {
         else {
              // インタビュアーが大名本人の場合（独り言スタイル）
              if (interviewer.isDaimyo && interviewer.clan === this.playerClanId) {
-                if (dist < 15) comment = "（あやつとは気が合う。頼りになる男よ...）";
-                else if (dist < 30) comment = "（まあ、悪くはない。使いどころ次第だろう...）";
-                else if (dist < 50) comment = "（少し考えが合わんところがあるな...）";
-                else if (dist < 70) comment = "（どうも好かん。腹の底が読めぬわ...）";
-                else comment = "（あやつは生理的に受け付けん。顔も見たくないわ...）";
+                if (dist < 15) comment = "（あやつとは気が合う。頼りになる男よ。）";
+                else if (dist < 30) comment = "（まあ、悪くはない。使いどころ次第だろう。）";
+                else if (dist < 50) comment = "（少し考えが合わんところがあるな。）";
+                else if (dist < 70) comment = "（どうも好かん。腹の底が読めぬわ。）";
+                else comment = "（あやつは生理的に受け付けん。顔も見たくないわ。）";
              } else {
                 // 通常武将の口調
                 if (dist < 15) comment = "「あの方とは意気投合します。素晴らしいお方です。」";
@@ -1732,9 +1732,9 @@ class GameManager {
              }
         }
         
-        // 呼びかけの文言を判定（大名の独り言なら「〜か...」、それ以外は「〜殿ですか...」）
+        // 呼びかけの文言を判定（大名の独り言なら「〜か……」、それ以外は「〜殿ですか……」）
         const isMonologue = interviewer.isDaimyo && interviewer.clan === this.playerClanId;
-        const targetCall = isMonologue ? `${target.name}か...` : `${target.name}殿ですか...`;
+        const targetCall = isMonologue ? `${target.name}か……` : `${target.name}殿ですか……`;
         
         const returnScript = `window.GameApp.ui.reopenInterviewModal(window.GameApp.getBusho(${interviewer.id}))`;
         this.ui.showResultModal(`<strong>${interviewer.name}</strong><br>「${targetCall}」<br><br>${comment}<br><br><button class='btn-secondary' onclick='${returnScript}'>戻る</button>`);
@@ -2314,7 +2314,7 @@ class GameManager {
             const score = (recruiter.charm * 2.0) / (prisoner.loyalty * 1.5); 
             if (prisoner.isDaimyo) alert(`${prisoner.name}「敵の軍門には下らぬ！」`); 
             else if (score > Math.random()) { prisoner.clan = this.playerClanId; prisoner.loyalty = 50; const targetC = this.getCastle(prisoner.castleId); if(targetC) targetC.samuraiIds.push(prisoner.id); alert(`${prisoner.name}を登用しました！`); } 
-            else alert(`${prisoner.name}は登用を拒否しました...`); 
+            else alert(`${prisoner.name}は登用を拒否しました……`); 
         } 
         else if (action === 'kill') { 
             if (prisoner.isDaimyo) this.handleDaimyoDeath(prisoner); 
