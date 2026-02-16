@@ -63,14 +63,6 @@ class AIEngine {
     }
 
     // AIメインループ
-/**
- * 敵思考エンジンのメイン処理
- * 修正点: 
- * 1. turnFinishedフラグによる二重finishTurnの防止（プレイヤー飛ばし対策）
- * 2. try...catchによるエラー時の救済処理
- * 3. AIガードの整合性確保
- */
-
     execAI(castle) {
         try {
             const castellan = this.game.getBusho(castle.castellanId);
@@ -84,6 +76,8 @@ class AIEngine {
             const smartness = this.getAISmartness(castellan.intelligence);
 
             // 1. 外交フェーズ (3ヶ月に1回)
+            // 知略が高いほど、あるいは外交担当官がいるほど外交頻度が上がる等の調整も可能だが、
+            // ここではランダム性を残しつつ難易度で頻度を変える
             if (this.game.month % 3 === 0) {
                 const diplomacyChance = (window.AIParams.AI.DiplomacyChance || 0.3) * (mods.aggression); 
                 if (Math.random() < diplomacyChance) {
@@ -93,63 +87,49 @@ class AIEngine {
             }
             
             // 2. 戦争フェーズ (攻撃判断)
+            // 隣接敵対国を取得
             const neighbors = this.game.castles.filter(c => 
                 c.ownerClan !== 0 && 
                 c.ownerClan !== castle.ownerClan && 
                 GameSystem.isAdjacent(castle, c)
             );
             
+            // 攻撃対象候補 (同盟除外、不可侵期間除外)
             const validEnemies = neighbors.filter(target => {
                 const rel = this.game.getRelation(castle.ownerClan, target.ownerClan);
                 return !rel.alliance && (target.immunityUntil || 0) < this.game.getCurrentTurnId();
             });
 
+            // 兵士数が最低限(500)以上かつ、好戦性判定をクリアすれば攻撃検討
+            // 知略が高いほど「勝てる時」に確実に攻めるため、乱数依存を減らす
             const aggroBase = (window.AIParams.AI.Aggressiveness || 1.5) * mods.aggression;
             const threshold = 500; 
 
             if (validEnemies.length > 0 && castle.soldiers > threshold) {
+                // 好戦的性格、または知略による機会判断
                 const personalityFactor = (castellan.personality === 'aggressive') ? 1.5 : 1.0;
+                // 知略が高いほど「攻めるべきか」の判断を毎ターン行う（乱数でスキップしない）
                 const checkChance = smartness > 0.7 ? 1.0 : (0.5 * aggroBase * personalityFactor);
 
                 if (Math.random() < checkChance) {
                     const target = this.decideAttackTarget(castle, castellan, validEnemies, mods, smartness);
                     if (target) {
                         this.executeAttack(castle, target, castellan);
-                        // executeAttack 内で finishTurn または startWar が呼ばれるためここで終了
-                        return; 
+                        return; // 攻撃したらターン終了
                     }
                 }
             }
             
-            // 3. 内政フェーズ (攻撃しなかった場合のみ実行)
+            // 3. 内政フェーズ (攻撃しなかった場合)
             this.execInternalAffairs(castle, castellan, mods, smartness);
             
-            // ターン終了（内政完了後）
+            // ターン終了
             this.game.finishTurn();
 
         } catch(e) {
             console.error("AI Logic Error:", e);
-            // game.js 側の processTurn 内の catch で処理させるため、ここでは finishTurn を呼ばない
-            throw e; 
+            this.game.finishTurn();
         }
-    }
-
-executeAttack(source, target, general) {
-        const bushos = this.getCastleBushos(source.id).filter(b => b.status !== 'ronin');
-        const sorted = bushos.sort((a,b) => b.leadership - a.leadership).slice(0, 3);
-        const sendSoldiers = Math.floor(source.soldiers * (window.AIParams.AI.SoldierSendRate || 0.8));
-        
-        if (sendSoldiers <= 0) {
-            // 攻撃不能なら内政に切り替えるか、ターンを終了させる
-            this.game.finishTurn(); 
-            return;
-        }
-
-        // 武将を行動済みに設定
-        general.isActionDone = true; 
-
-        source.soldiers -= sendSoldiers;
-        this.game.warManager.startWar(source, target, sorted, sendSoldiers);
     }
 
     /**
@@ -237,11 +217,7 @@ executeAttack(source, target, general) {
         const sorted = bushos.sort((a,b) => b.leadership - a.leadership).slice(0, 3);
         const sendSoldiers = Math.floor(source.soldiers * (window.AIParams.AI.SoldierSendRate || 0.8));
         
-        if (sendSoldiers <= 0) {
-            // 攻撃不能なら内政に切り替えるか、ターンを終了させる
-            this.game.finishTurn(); 
-            return;
-        }
+        if (sendSoldiers <= 0) return;
         source.soldiers -= sendSoldiers;
         this.game.warManager.startWar(source, target, sorted, sendSoldiers);
     }
@@ -392,9 +368,4 @@ executeAttack(source, target, general) {
             }
         }
     }
-
 }
-
-
-
-
