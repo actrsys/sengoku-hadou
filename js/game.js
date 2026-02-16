@@ -106,7 +106,7 @@ class DataManager {
         const response = await fetch(url);
         if (!response.ok) throw new Error(`Failed to load ${url}`);
         let text = await response.text();
-        // BOM (Byte Order Mark) 対策: 先頭の不可視文字を削除
+        // BOM (Byte Order Mark) 対策
         if (text.charCodeAt(0) === 0xFEFF) {
             text = text.slice(1);
         }
@@ -127,19 +127,33 @@ class DataManager {
     static parseCSV(text, ModelClass) {
         const lines = text.split('\n').map(l => l.trim()).filter(l => l);
         if (lines.length === 0) return [];
-        // ヘッダーの空白削除 (BOM対策済みテキストを使用)
-        const headers = lines[0].split(',').map(h => h.trim());
+        
+        // ヘッダーのクリーニング（BOMや引用符の除去）
+        const headers = lines[0].split(',').map(h => {
+            let val = h.trim();
+            if (val.charCodeAt(0) === 0xFEFF) val = val.slice(1);
+            if (val.startsWith('"') && val.endsWith('"')) val = val.slice(1, -1);
+            return val;
+        });
+
         const result = [];
         for (let i = 1; i < lines.length; i++) {
+            // カンマ区切りだが、単純分割（引用符内のカンマは考慮しない簡易実装）
             const values = lines[i].split(',');
             if(values.length < headers.length) continue;
+            
             const data = {};
             headers.forEach((header, index) => {
                 let val = values[index];
-                if (val) val = val.trim(); // 値もトリム
-                if (!isNaN(Number(val)) && val !== "") val = Number(val);
-                if (val === "true" || val === "TRUE") val = true;
-                if (val === "false" || val === "FALSE") val = false;
+                if (val !== undefined) {
+                    val = val.trim();
+                    // 値の引用符除去
+                    if (val.startsWith('"') && val.endsWith('"')) val = val.slice(1, -1);
+                    
+                    if (!isNaN(Number(val)) && val !== "") val = Number(val);
+                    if (val === "true" || val === "TRUE") val = true;
+                    if (val === "false" || val === "FALSE") val = false;
+                }
                 data[header] = val;
             });
             result.push(new ModelClass(data));
@@ -1324,6 +1338,7 @@ class GameManager {
         this.ui.renderMap();
         
         // ★修正: 厳密な数値比較を行い、プレイヤーの城であることを保証する
+        // データの型不一致対策として == も考慮に入れるが、基本はNumberキャストして比較
         const isPlayerCastle = Number(castle.ownerClan) === Number(this.playerClanId);
 
         if (isPlayerCastle) { 
