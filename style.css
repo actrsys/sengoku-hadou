@@ -341,11 +341,11 @@ body {
 
 /* Rank Colors (Main Character) */
 .rank-s .grade-main { color: #ffd700; } /* 金色 (Gold) */
-.rank-a .grade-main { color: #ef454a; } /* 本朱 (ほんしゅ) */
-.rank-b .grade-main { color: #ffffff; } /* 白 */
-.rank-c .grade-main { color: #ffffff; } /* 白 */
-.rank-d .grade-main { color: #ffffff; } /* 白 */
-.rank-e .grade-main { color: #adff2f; } /* 黄緑 (GreenYellow) */
+.rank-a .grade-main { color: #f47a4d; } /* チャイニーズレッド */
+.rank-b .grade-main { color: #f58f98; } /* 桃色/桃花色 */
+.rank-c .grade-main { color: #adff2f; } /* 黄緑 (GreenYellow) */
+.rank-d .grade-main { color: #65bbe9; } /* 天色 */
+.rank-e .grade-main { color: #9b95c9; } /* 藤紫 */
 
 /* Footer Buttons */
 .modal-footer { margin-top: 15px; display: flex; justify-content: flex-end; gap: 10px; padding-top: 10px; border-top: 1px solid #eee; flex-shrink: 0;}
