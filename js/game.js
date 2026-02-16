@@ -1330,11 +1330,6 @@ class GameManager {
             // 強制的にAI処理フラグを折る
             this.isProcessingAI = false; 
 
-            // ★修正: プレイヤーのターン開始時に、念のため配下武将の行動済みフラグをリセットする
-            // (ロード直後や、何らかの理由でフラグが残っている場合への対処)
-            const myBushos = this.getCastleBushos(castle.id);
-            myBushos.forEach(b => b.isActionDone = false);
-
             this.ui.renderMap(); 
             this.ui.log(`【${castle.name}】命令を下してください`); 
             this.ui.showControlPanel(castle); 

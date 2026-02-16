@@ -51,9 +51,8 @@ class AIEngine {
             if (Number(castle.ownerClan) === Number(this.game.playerClanId)) {
                 console.warn("AI Alert: Player castle detected in AI routine. Returning control to player.");
                 this.game.isProcessingAI = false;
-                // ここでプレイヤー武将の行動済みフラグをリセットしておく（念のため）
-                const myBushos = this.game.getCastleBushos(castle.id);
-                myBushos.forEach(b => b.isActionDone = false);
+                
+                // 行動済みフラグのリセットは行わない（移動後の武将がいる可能性があるため）
                 
                 this.game.ui.showControlPanel(castle);
                 return;
