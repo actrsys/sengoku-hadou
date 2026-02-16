@@ -1346,24 +1346,19 @@ class GameManager {
         }
     }
     
+// finishTurn メソッドの冒頭に安全策を追加
     finishTurn() { 
-        if (this._finishing) return; // ロック中なら何もしない
-        this._finishing = true;
-    
-        if(this.warManager.state.active && this.warManager.state.isPlayerInvolved) {
-            this._finishing = false;
-            return; 
-        }
+        if(this.warManager.state.active && this.warManager.state.isPlayerInvolved) return; 
+        
         this.selectionMode = null; 
         const castle = this.getCurrentTurnCastle(); 
-        if(castle) castle.isDone = true; 
-        this.currentIndex++; 
+        if(!castle) return;
+    
+        if (castle.isDone && this.isProcessingAI === false) return; // 二重終了防止
         
-        // 少しだけ遅延させてから次のターンへ（連続呼び出し防止）
-        setTimeout(() => {
-            this._finishing = false;
-            this.processTurn(); 
-        }, 50);
+        castle.isDone = true; 
+        this.currentIndex++; 
+        this.processTurn(); 
     }
     endMonth() { this.month++; if(this.month > 12) { this.month = 1; this.year++; } const clans = new Set(this.castles.filter(c => c.ownerClan !== 0).map(c => c.ownerClan)); const playerAlive = clans.has(this.playerClanId); if (clans.size === 1 && playerAlive) alert(`天下統一！`); else if (!playerAlive) alert(`我が軍は滅亡しました……`); else this.startMonth(); }
 
@@ -1454,9 +1449,14 @@ class GameManager {
     // 変更: 全武将が行動完了したかチェックするメソッド
     checkAllActionsDone() {
         const c = this.getCurrentTurnCastle();
+        if (!c || c.ownerClan !== this.playerClanId) return; // 【修正】プレイヤーの城でなければ何もしない
+    
         const bushos = this.getCastleBushos(c.id).filter(b => b.status !== 'ronin');
-        if(bushos.length > 0 && bushos.every(b => b.isActionDone)) {
+        // 全員行動済みかつ、現在戦争中でないことを確認
+        if(bushos.length > 0 && bushos.every(b => b.isActionDone) && !this.warManager.state.active) {
              setTimeout(() => {
+                 // 既に完了フラグが立っている場合は二重実行しない
+                 if (c.isDone) return; 
                  if(confirm("すべての武将が行動を終えました。\n今月の命令を終了しますか？")) {
                      this.finishTurn();
                  }
@@ -1515,6 +1515,7 @@ class GameManager {
 window.addEventListener('DOMContentLoaded', () => {
     window.GameApp = new GameManager();
 });
+
 
 
 
