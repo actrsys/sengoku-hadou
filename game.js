@@ -1,8 +1,10 @@
 /**
- * 戦国シミュレーションゲーム - 修正版 v12.1 (War Soldier Recovery Fix)
+ * 戦国シミュレーションゲーム - 修正版 v13.0 (Interview & War Update)
  * 修正内容:
- * 1. 撤退時に死傷兵が回復しない問題を修正（撤退先の城に回復分を加算）
- * 2. 落城（敗北）時、守備側の残存兵と死傷兵の一部(20%)を攻撃側が吸収する仕様に変更
+ * 1. 面談: 大名の独り言化、自大名を対象から除外
+ * 2. 合戦: ログ詳細化、双方の士気・訓練表示
+ * 3. 合戦: 攻撃・落城後のクールダウン期間設定
+ * 4. 合戦: 逃げ場なし時の撤退不可＆全員捕縛処理
  */
 
 // グローバルエラーハンドリング
@@ -32,26 +34,24 @@ let GAME_SETTINGS = {
         BaseTraining: 0, TrainingLdrEffect: 0.3, TrainingStrEffect: 0.2, TrainingFluctuation: 0.15,
         BaseMorale: 0, MoraleLdrEffect: 0.2, MoraleCharmEffect: 0.2, MoraleFluctuation: 0.2,
         WarMaxRounds: 10, DamageSoldierPower: 0.05, WallDefenseEffect: 0.5, DamageFluctuation: 0.2,
-        UnitTypeBonus: { BowAttack: 0.6, SiegeAttack: 1.0, ChargeAttack: 1.2, WallDamageRate: 0.5 }, // 古い設定(互換性のため残す)
+        UnitTypeBonus: { BowAttack: 0.6, SiegeAttack: 1.0, ChargeAttack: 1.2, WallDamageRate: 0.5 },
         FactionBonus: 1.1, FactionPenalty: 0.8
     },
-    War: { // 新設: 合戦パラメータ
+    War: {
         ChargeMultiplier: 1.2, ChargeRisk: 1.5,
         BowMultiplier: 0.6, BowRisk: 0.5,
         SiegeMultiplier: 1.0, SiegeWallRate: 0.5, SiegeRisk: 1.0,
-        DefChargeMultiplier: 1.5, DefChargeRisk: 2.0, // リスク増加
+        DefChargeMultiplier: 1.5, DefChargeRisk: 2.0,
         DefBowMultiplier: 0.5,
         RojoDamageReduction: 0.5,
-        RepairCost: 100, RepairRecovery: 100, // 旧パラメータ(互換性維持)
+        RepairCost: 100, RepairRecovery: 100,
         SchemeDamageFactor: 10,
         FireSuccessBase: 0.5, FireDamageFactor: 5,
-        // 新設: 補修パラメータ
         RepairMaxSoldiers: 200,
         RepairSoldierFactor: 0.1,
         RepairMainPolFactor: 0.25,
         RepairSubPolFactor: 0.05,
         RepairGlobalMultiplier: 1.0,
-        // 新設: 戦後処理パラメータ (デフォルト値)
         RetreatRecoveryRate: 0.3,
         ShortWarTurnLimit: 5,
         BaseRecoveryRate: 0.2,
@@ -240,6 +240,7 @@ class Castle {
         if(this.loyalty === undefined) this.loyalty = 500; if(this.population === undefined) this.population = 10000;
         if(this.training === undefined) this.training = 50; if(this.morale === undefined) this.morale = 50;
         this.investigatedUntil = 0; this.investigatedAccuracy = 0;
+        this.immunityUntil = 0; // 攻撃不可期間 (ターンIDが入る)
     }
 }
 
@@ -985,8 +986,8 @@ class UIManager {
         else if (actionType === 'headhunt_doer') { bushos = this.game.getCastleBushos(c.id).filter(b => b.status !== 'ronin'); infoHtml = "<div>引抜を実行する担当官を選択してください (知略重視)</div>"; sortKey = 'intelligence'; }
         else if (actionType === 'interview') { bushos = this.game.getCastleBushos(c.id).filter(b => b.status !== 'ronin'); infoHtml = "<div>面談する武将を選択してください</div>"; sortKey = 'leadership'; }
         else if (actionType === 'interview_target') { 
-            // 仕様変更: 他者について聞く際は自勢力のみ
-            bushos = this.game.bushos.filter(b => b.clan === this.game.playerClanId && b.status !== 'dead' && b.status !== 'ronin' && b.id !== extraData.interviewer.id); 
+            // 仕様変更: 他者について聞く際、自軍大名はリストから除外する
+            bushos = this.game.bushos.filter(b => b.clan === this.game.playerClanId && b.status !== 'dead' && b.status !== 'ronin' && b.id !== extraData.interviewer.id && !b.isDaimyo); 
             infoHtml = `<div>誰についての印象を聞きますか？(同家臣のみ)</div>`; sortKey = 'leadership'; 
         }
         else if (actionType === 'reward') { bushos = this.game.getCastleBushos(c.id).filter(b => b.status !== 'ronin'); infoHtml = "<div>褒美を与える武将を選択してください</div>"; sortKey = 'loyalty'; }
@@ -1168,17 +1169,24 @@ class UIManager {
     updateWarUI() {
         if (!this.game.warState.active) return;
         const s = this.game.warState;
-        const setTxt = (id, val) => { const el = document.getElementById(id); if(el) el.textContent = val; };
+        
+        // テキストを設定するヘルパー
+        const setTxt = (id, val) => { 
+            const el = document.getElementById(id); 
+            if(el) el.textContent = val; 
+        };
         
         setTxt('war-atk-name', s.attacker.name);
         setTxt('war-atk-busho', s.atkBushos[0].name);
         setTxt('war-atk-soldier', s.attacker.soldiers);
-        setTxt('war-atk-morale', s.attacker.morale);
+        // 士気表示に訓練度を併記（UI拡張）
+        setTxt('war-atk-morale', `${s.attacker.morale} (訓練:${s.attacker.training})`);
         
         setTxt('war-def-name', s.defender.name);
         setTxt('war-def-busho', s.defBusho.name);
         setTxt('war-def-soldier', s.defender.soldiers);
-        setTxt('war-def-wall', s.defender.defense);
+        // 防御表示に士気と訓練度を併記（UI拡張）
+        setTxt('war-def-wall', `${s.defender.defense} (士:${s.defender.morale}/訓:${s.defender.training})`);
 
         setTxt('war-round', s.round);
         
@@ -1233,7 +1241,11 @@ class UIManager {
             repairBtn.onclick = () => window.GameApp.ui.openQuantitySelector('war_repair', [s.defender], null);
             controls.appendChild(repairBtn);
 
-            createBtn("撤退", "retreat");
+            // 撤退ボタン: 隣接する自勢力の城がある場合のみ表示
+            const friendlyCastles = this.game.castles.filter(c => c.ownerClan === s.defender.ownerClan && c.id !== s.defender.id && GameSystem.isAdjacent(c, s.defender));
+            if (friendlyCastles.length > 0) {
+                createBtn("撤退", "retreat");
+            }
         }
     }
 
@@ -1432,7 +1444,8 @@ class GameManager {
             this.validTargets = this.castles.filter(target => 
                 GameSystem.isAdjacent(c, target) && 
                 target.ownerClan !== this.playerClanId &&
-                !this.getRelation(this.playerClanId, target.ownerClan).alliance
+                !this.getRelation(this.playerClanId, target.ownerClan).alliance &&
+                (target.immunityUntil || 0) < this.getCurrentTurnId() // 攻撃クールダウン中かチェック
             ).map(t => t.id);
         } else if (mode === 'move' || mode === 'transport') {
             this.validTargets = this.castles.filter(target => 
@@ -1466,7 +1479,7 @@ class GameManager {
 
     getSelectionGuideMessage() {
         switch(this.selectionMode) {
-            case 'war': return "攻撃目標を選択してください";
+            case 'war': return "攻撃目標を選択してください(攻略直後の城は選択不可)";
             case 'move': return "移動先を選択してください";
             case 'transport': return "輸送先を選択してください";
             case 'investigate': return "調査対象の城を選択してください";
@@ -1703,13 +1716,14 @@ class GameManager {
         }
         // 他者について語る
         else {
-             // インタビュアーが大名本人の場合（自分が他者を評価）は口調を変える
+             // インタビュアーが大名本人の場合（独り言スタイル）
              if (interviewer.isDaimyo && interviewer.clan === this.game.playerClanId) {
-                if (dist < 15) comment = "「あやつとは気が合う。頼りになる男よ。」";
-                else if (dist < 30) comment = "「まあ、悪くはない。使いどころ次第だろう。」";
-                else if (dist < 50) comment = "「少し考えが合わんところがあるな。」";
-                else if (dist < 70) comment = "「どうも好かん。腹の底が読めぬわ。」";
-                else comment = "「あやつは生理的に受け付けん。顔も見たくないわ。」";
+                // 仕様変更: 大名の独り言風にする
+                if (dist < 15) comment = "（あやつとは気が合う。頼りになる男よ...）";
+                else if (dist < 30) comment = "（まあ、悪くはない。使いどころ次第だろう...）";
+                else if (dist < 50) comment = "（少し考えが合わんところがあるな...）";
+                else if (dist < 70) comment = "（どうも好かん。腹の底が読めぬわ...）";
+                else comment = "（あやつは生理的に受け付けん。顔も見たくないわ...）";
              } else {
                  // 通常武将の口調
                 if (dist < 15) comment = "「あの方とは意気投合します。素晴らしいお方です。」";
@@ -1750,7 +1764,7 @@ class GameManager {
             }
             
             const enemies = this.castles.filter(c => c.ownerClan !== 0 && c.ownerClan !== castle.ownerClan && GameSystem.isAdjacent(castle, c));
-            const validEnemies = enemies.filter(e => !this.getRelation(castle.ownerClan, e.ownerClan).alliance);
+            const validEnemies = enemies.filter(e => !this.getRelation(castle.ownerClan, e.ownerClan).alliance && (e.immunityUntil||0) < this.getCurrentTurnId());
             const intelligenceFactor = GameSystem.getAISmartness(castellan.intelligence);
             let bestTarget = null; let maxScore = -1;
             
@@ -1921,7 +1935,12 @@ class GameManager {
             const dangerRatio = s.defender.soldiers / (s.attacker.soldiers + 1);
             let retreatThreshold = 0.2; 
             if (actor.intelligence >= GAME_SETTINGS.AI.WarHighIntThreshold) retreatThreshold = 0.4; 
-            if (dangerRatio < retreatThreshold && s.defender.defense < 200) { this.resolveWarAction('retreat'); return; }
+            
+            // 撤退判断: 兵数ピンチかつ守備力が低い場合
+            if (dangerRatio < retreatThreshold && s.defender.defense < 200) { 
+                // AIも逃げ場があるか確認する必要があるが、resolveWarAction('retreat')内でチェックされる
+                this.resolveWarAction('retreat'); return; 
+            }
 
             // 修復チェック: 防御が減っていて兵士に余裕があれば修復 (AIは簡易的に50兵消費で固定)
             const defenseRatio = s.defender.defense / (s.defender.maxDefense || 1000); 
@@ -2175,6 +2194,7 @@ class GameManager {
         }
 
         // --- 勝敗決着 (非撤退) ---
+        const currentTurnId = this.getCurrentTurnId();
         if (attackerWon) { 
             s.attacker.training = Math.min(120, s.attacker.training + 5); 
             s.attacker.morale = Math.min(120, s.attacker.morale + 5); 
@@ -2205,7 +2225,9 @@ class GameManager {
             // 城の受け渡し
             s.defender.ownerClan = s.attacker.ownerClan; 
             // s.defender.soldiers = s.attacker.soldiers; // ★修正済み: 上部のifブロックで兵士統合済み
-            s.defender.investigatedUntil = 0; 
+            s.defender.investigatedUntil = 0;
+            // 修正: 落城時のクールダウン（今月＋来月＝2ヶ月）
+            s.defender.immunityUntil = currentTurnId + 1;
             
             s.atkBushos.forEach((b, idx) => { 
                 const srcC = this.getCastle(s.sourceCastle.id); 
@@ -2218,6 +2240,8 @@ class GameManager {
             // 防衛成功
             const srcC = this.getCastle(s.sourceCastle.id); 
             srcC.soldiers += s.attacker.soldiers; // 攻撃側帰還
+            // 修正: 防衛成功時のクールダウン（今月のみ）
+            s.defender.immunityUntil = currentTurnId;
         } 
         if (s.attacker.ownerClan !== this.playerClanId) this.finishTurn(); else { this.ui.renderCommandMenu(); this.ui.renderMap(); }
     }
@@ -2227,20 +2251,24 @@ class GameManager {
         const captives = []; 
         const escapees = [];
         
+        // 修正: 友軍の城があるか確認（ラストスタンド判定）
+        const friendlyCastles = this.castles.filter(c => c.ownerClan === defeatedCastle.ownerClan && c.id !== defeatedCastle.id);
+        const isLastStand = friendlyCastles.length === 0;
+
         // 敗将の処理
         losers.forEach(b => { 
             // 捕縛判定
-            let chance = 0.4 - (b.strength * 0.002) + (Math.random() * 0.3); 
-            if (defeatedCastle.soldiers > 1000) chance -= 0.2; 
+            // ラストスタンドなら100%捕縛
+            let chance = isLastStand ? 1.0 : (0.4 - (b.strength * 0.002) + (Math.random() * 0.3)); 
+            if (!isLastStand && defeatedCastle.soldiers > 1000) chance -= 0.2; 
             
-            // 大名は捕まりにくい
-            if (b.isDaimyo) chance -= GAME_SETTINGS.War.DaimyoCaptureReduction;
+            // 大名は捕まりにくい（ラストスタンド以外）
+            if (!isLastStand && b.isDaimyo) chance -= GAME_SETTINGS.War.DaimyoCaptureReduction;
 
             if (chance > 0.5) {
                 captives.push(b); 
             } else { 
                 // 捕縛されなかった -> 自勢力の城があれば逃げる
-                const friendlyCastles = this.castles.filter(c => c.ownerClan === b.clan && c.id !== defeatedCastle.id);
                 if (friendlyCastles.length > 0) {
                     const escapeCastle = friendlyCastles[Math.floor(Math.random() * friendlyCastles.length)];
                     
@@ -2253,7 +2281,7 @@ class GameManager {
                     escapeCastle.samuraiIds.push(b.id);
                     escapees.push(b);
                 } else {
-                    // 逃げ場なし -> 在野
+                    // 逃げ場なし -> 在野 (通常ここには来ないはずだが念のため)
                     b.clan = 0; b.castleId = 0; b.isCastellan = false; b.status = 'ronin'; 
                 }
             } 
