@@ -63,78 +63,91 @@ class AIEngine {
     }
 
     // AIメインループ
+/**
+ * 敵思考エンジンのメイン処理
+ * 修正点: 
+ * 1. turnFinishedフラグによる二重finishTurnの防止（プレイヤー飛ばし対策）
+ * 2. try...catchによるエラー時の救済処理
+ * 3. AIガードの整合性確保
+ */
+
     execAI(castle) {
+        this.game.isProcessingAI = true; // AI処理中フラグを立ててガードを確実に機能させる
+        let turnFinished = false; // この実行内でfinishTurnが呼ばれたかを追跡
+    
         try {
-            // ★追加: プレイヤーが戦争中なら思考をスキップして待機する
-            if (this.game.warManager.state.active && this.game.warManager.state.isPlayerInvolved) {
-                // 少し時間を置いて再試行するか、そのままリターンしてWarManagerの終了を待つ
-                return; 
-            }
-            
             const castellan = this.game.getBusho(castle.castellanId);
-            // 城主不在や行動済みなら終了
-            if (!castellan || castellan.isActionDone) { 
-                this.game.finishTurn(); 
+            
+            // 城主不在や行動済みの場合は即座に終了
+            if (!castellan || castellan.isActionDone) {
+                this.game.finishTurn();
+                turnFinished = true;
                 return; 
             }
-            
+    
             const mods = this.getDifficultyMods();
             const smartness = this.getAISmartness(castellan.intelligence);
-
-            // 1. 外交フェーズ (3ヶ月に1回)
-            // 知略が高いほど、あるいは外交担当官がいるほど外交頻度が上がる等の調整も可能だが、
-            // ここではランダム性を残しつつ難易度で頻度を変える
+    
+            // --- 1. 外交フェーズ (3ヶ月に1回) ---
             if (this.game.month % 3 === 0) {
-                const diplomacyChance = (window.AIParams.AI.DiplomacyChance || 0.3) * (mods.aggression); 
+                const diplomacyChance = (window.AIParams.AI.DiplomacyChance || 0.3) * (mods.aggression);
                 if (Math.random() < diplomacyChance) {
-                    this.execAIDiplomacy(castle, castellan, smartness); 
-                    if (castellan.isActionDone) { this.game.finishTurn(); return; }
+                    this.execAIDiplomacy(castle, castellan, smartness);
+                    // 外交を実行して行動済みになった場合、ターンを終了
+                    if (castellan.isActionDone) {
+                        this.game.finishTurn();
+                        turnFinished = true;
+                        return; 
+                    }
                 }
             }
             
-            // 2. 戦争フェーズ (攻撃判断)
-            // 隣接敵対国を取得
+            // --- 2. 戦争フェーズ (攻撃判断) ---
+            // 隣接する敵対勢力の城を取得
             const neighbors = this.game.castles.filter(c => 
                 c.ownerClan !== 0 && 
                 c.ownerClan !== castle.ownerClan && 
                 GameSystem.isAdjacent(castle, c)
             );
             
-            // 攻撃対象候補 (同盟除外、不可侵期間除外)
             const validEnemies = neighbors.filter(target => {
                 const rel = this.game.getRelation(castle.ownerClan, target.ownerClan);
                 return !rel.alliance && (target.immunityUntil || 0) < this.game.getCurrentTurnId();
             });
-
-            // 兵士数が最低限(500)以上かつ、好戦性判定をクリアすれば攻撃検討
-            // 知略が高いほど「勝てる時」に確実に攻めるため、乱数依存を減らす
-            const aggroBase = (window.AIParams.AI.Aggressiveness || 1.5) * mods.aggression;
-            const threshold = 500; 
-
+    
+            const threshold = 500; // 攻撃に必要な最低兵数
             if (validEnemies.length > 0 && castle.soldiers > threshold) {
-                // 好戦的性格、または知略による機会判断
+                const aggroBase = (window.AIParams.AI.Aggressiveness || 1.5) * mods.aggression;
                 const personalityFactor = (castellan.personality === 'aggressive') ? 1.5 : 1.0;
-                // 知略が高いほど「攻めるべきか」の判断を毎ターン行う（乱数でスキップしない）
                 const checkChance = smartness > 0.7 ? 1.0 : (0.5 * aggroBase * personalityFactor);
-
+    
                 if (Math.random() < checkChance) {
                     const target = this.decideAttackTarget(castle, castellan, validEnemies, mods, smartness);
                     if (target) {
+                        // 攻撃実行。executeAttack内部でstartWarが呼ばれ、
+                        // 戦争終了時にwar.js側のendWar()からfinishTurnが呼ばれる設計のため、ここでは呼ばない。
                         this.executeAttack(castle, target, castellan);
-                        return; // 攻撃したらターン終了
+                        turnFinished = true; 
+                        return; 
                     }
                 }
             }
             
-            // 3. 内政フェーズ (攻撃しなかった場合)
+            // --- 3. 内政フェーズ (戦争・外交しなかった場合) ---
             this.execInternalAffairs(castle, castellan, mods, smartness);
             
-            // ターン終了
-            this.game.finishTurn();
-
+            // まだターンが進行していなければ、ここで終了させる
+            if (!turnFinished) {
+                this.game.finishTurn();
+                turnFinished = true;
+            }
+    
         } catch(e) {
-            console.error("AI Logic Error:", e);
-            this.game.finishTurn();
+            console.error("AI Logic Error in execAI:", e);
+            // ロジック内でエラーが起きても、ゲームが止まらないよう救済
+            if (!turnFinished) {
+                this.game.finishTurn();
+            }
         }
     }
 
@@ -380,4 +393,5 @@ class AIEngine {
     }
 
 }
+
 
