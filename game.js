@@ -1,5 +1,5 @@
 /**
- * 戦国シミュレーションゲーム - 修正版 v10.8 (War Update)
+ * 戦国シミュレーションゲーム - 修正版 v10.9 (War Config Update)
  * 修正内容:
  * 1. ターン外の自城操作禁止（閲覧モードへ）
  * 2. 同盟解消の対象フィルタ修正（同盟中のみ）＆外交の隣接制限解除
@@ -7,6 +7,7 @@
  * 4. AI思考中の操作ブロック強化
  * 5. スマホ上部情報の表示項目変更（金・米・兵）
  * 6. 合戦：防御側コマンド仕様変更（突撃/斉射/籠城仕様変更/火計削除/修復追加）
+ * 7. パラメータCSV拡張対応（合戦パラメータの外部化・防御側突撃リスク増加）
  */
 
 // グローバルエラーハンドリング
@@ -36,8 +37,19 @@ let GAME_SETTINGS = {
         BaseTraining: 0, TrainingLdrEffect: 0.3, TrainingStrEffect: 0.2, TrainingFluctuation: 0.15,
         BaseMorale: 0, MoraleLdrEffect: 0.2, MoraleCharmEffect: 0.2, MoraleFluctuation: 0.2,
         WarMaxRounds: 10, DamageSoldierPower: 0.05, WallDefenseEffect: 0.5, DamageFluctuation: 0.2,
-        UnitTypeBonus: { BowAttack: 0.6, SiegeAttack: 1.0, ChargeAttack: 1.2, WallDamageRate: 0.5 },
+        UnitTypeBonus: { BowAttack: 0.6, SiegeAttack: 1.0, ChargeAttack: 1.2, WallDamageRate: 0.5 }, // 古い設定(互換性のため残す)
         FactionBonus: 1.1, FactionPenalty: 0.8
+    },
+    War: { // 新設: 合戦パラメータ
+        ChargeMultiplier: 1.2, ChargeRisk: 1.5,
+        BowMultiplier: 0.6, BowRisk: 0.5,
+        SiegeMultiplier: 1.0, SiegeWallRate: 0.5, SiegeRisk: 1.0,
+        DefChargeMultiplier: 1.5, DefChargeRisk: 2.0, // リスク増加
+        DefBowMultiplier: 0.5,
+        RojoDamageReduction: 0.5,
+        RepairCost: 100, RepairRecovery: 100,
+        SchemeDamageFactor: 10,
+        FireSuccessBase: 0.5, FireDamageFactor: 5
     },
     Strategy: {
         InvestigateDifficulty: 50, InciteFactor: 150, RumorFactor: 50, SchemeSuccessRate: 0.6, EmploymentDiff: 1.5,
@@ -322,14 +334,16 @@ class GameSystem {
         const atkPower = ((atkStats.ldr * 1.2) + (atkStats.str * 0.3) + (atkSoldiers * GAME_SETTINGS.Military.DamageSoldierPower)) * (1.0 + moraleBonus);
         const defPower = ((defStats.ldr * 1.0) + (defStats.int * 0.5) + (defWall * GAME_SETTINGS.Military.WallDefenseEffect) + (defSoldiers * GAME_SETTINGS.Military.DamageSoldierPower)) * (1.0 + trainingBonus);
         let multiplier = 1.0, soldierRate = 1.0, wallRate = 0.0, counterRisk = 1.0;
-        const UB = GAME_SETTINGS.Military.UnitTypeBonus;
+        
+        // Warパラメータの使用
+        const W = GAME_SETTINGS.War;
         switch(type) {
-            case 'bow': multiplier = UB.BowAttack; wallRate = 0.0; counterRisk = 0.5; break;
-            case 'siege': multiplier = UB.SiegeAttack; soldierRate = 0.05; wallRate = UB.WallDamageRate; counterRisk = 1.0; break;
-            case 'charge': multiplier = UB.ChargeAttack; soldierRate = 1.0; wallRate = 0.5; counterRisk = 1.5; break;
-            case 'def_bow': multiplier = 0.5; wallRate = 0.0; break;
+            case 'bow': multiplier = W.BowMultiplier; wallRate = 0.0; counterRisk = W.BowRisk; break;
+            case 'siege': multiplier = W.SiegeMultiplier; soldierRate = 0.05; wallRate = W.SiegeWallRate; counterRisk = W.SiegeRisk; break;
+            case 'charge': multiplier = W.ChargeMultiplier; soldierRate = 1.0; wallRate = 0.5; counterRisk = W.ChargeRisk; break;
+            case 'def_bow': multiplier = W.DefBowMultiplier; wallRate = 0.0; break;
             case 'def_attack': multiplier = 0.0; wallRate = 0.0; break; // 籠城: 攻撃しない
-            case 'def_charge': multiplier = 1.5; wallRate = 0.0; break;
+            case 'def_charge': multiplier = W.DefChargeMultiplier; wallRate = 0.0; counterRisk = W.DefChargeRisk; break; // リスク高設定
         }
         const ratio = atkPower / (atkPower + defPower);
         let baseDmg = atkPower * ratio * multiplier * rand; 
@@ -388,8 +402,8 @@ class GameSystem {
         const successRate = (totalOffense / totalDefense) * 0.5; 
         return Math.random() < successRate;
     }
-    static calcScheme(atkBusho, defBusho, defCastleLoyalty) { const atkInt = atkBusho.intelligence; const defInt = defBusho ? defBusho.intelligence : 30; const successRate = (atkInt / (defInt + 20)) * GAME_SETTINGS.Strategy.SchemeSuccessRate; if (Math.random() > successRate) return { success: false, damage: 0 }; const loyaltyBonus = (1000 - defCastleLoyalty) / 500; return { success: true, damage: Math.floor(atkInt * 10 * (1.0 + loyaltyBonus)) }; }
-    static calcFire(atkBusho, defBusho) { const atkInt = atkBusho.intelligence; const defInt = defBusho ? defBusho.intelligence : 30; const successRate = (atkInt / (defInt + 10)) * 0.5; if (Math.random() > successRate) return { success: false, damage: 0 }; return { success: true, damage: Math.floor(atkInt * 5 * (Math.random() + 0.5)) }; }
+    static calcScheme(atkBusho, defBusho, defCastleLoyalty) { const atkInt = atkBusho.intelligence; const defInt = defBusho ? defBusho.intelligence : 30; const successRate = (atkInt / (defInt + 20)) * GAME_SETTINGS.Strategy.SchemeSuccessRate; if (Math.random() > successRate) return { success: false, damage: 0 }; const loyaltyBonus = (1000 - defCastleLoyalty) / 500; return { success: true, damage: Math.floor(atkInt * GAME_SETTINGS.War.SchemeDamageFactor * (1.0 + loyaltyBonus)) }; }
+    static calcFire(atkBusho, defBusho) { const atkInt = atkBusho.intelligence; const defInt = defBusho ? defBusho.intelligence : 30; const successRate = (atkInt / (defInt + 10)) * GAME_SETTINGS.War.FireSuccessBase; if (Math.random() > successRate) return { success: false, damage: 0 }; return { success: true, damage: Math.floor(atkInt * GAME_SETTINGS.War.FireDamageFactor * (Math.random() + 0.5)) }; }
     static calcEmploymentSuccess(recruiter, target, recruiterClanPower, targetClanPower) { 
         if (target.clan !== 0 && target.ambition > 70 && recruiterClanPower < targetClanPower * 0.7) return false; 
         const affDiff = this.calcAffinityDiff(recruiter.affinity, target.affinity); 
@@ -1920,8 +1934,8 @@ class GameManager {
              return;
         }
         if (type === 'repair') { // 修復
-             const cost = 100;
-             const recover = 100;
+             const cost = GAME_SETTINGS.War.RepairCost;
+             const recover = GAME_SETTINGS.War.RepairRecovery;
              if (s.defender.soldiers > cost) {
                  s.defender.soldiers -= cost;
                  // 最大値チェックは簡易的に既存+回復
@@ -1944,8 +1958,8 @@ class GameManager {
 
         // 籠城効果チェック
         if (isAtkTurn && s.defenderGuarding) {
-             actualSoldierDmg = Math.floor(actualSoldierDmg * 0.5); // ダメージ半減
-             actualWallDmg = Math.floor(actualWallDmg * 0.5);
+             actualSoldierDmg = Math.floor(actualSoldierDmg * GAME_SETTINGS.War.RojoDamageReduction); // ダメージ軽減
+             actualWallDmg = Math.floor(actualWallDmg * GAME_SETTINGS.War.RojoDamageReduction);
              s.defenderGuarding = false; // フラグ解除
              if (s.isPlayerInvolved) this.ui.log(`(籠城効果によりダメージ軽減)`);
         }
