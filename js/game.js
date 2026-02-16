@@ -1506,7 +1506,7 @@ class GameManager {
                     this.clans = d.clans.map(c => new Clan(c));
                 } else {
                     const scenario = SCENARIOS[0]; 
-                    await DataManager.loadParameters("./parameter.csv");
+                    await DataManager.loadParameters(".data/parameter.csv");
                     const data = await DataManager.loadAll(scenario.folder);
                     this.clans = data.clans;
                 }
