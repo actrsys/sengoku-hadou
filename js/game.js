@@ -1295,33 +1295,45 @@ class GameManager {
     optimizeCastellans() { const clanIds = [...new Set(this.castles.filter(c=>c.ownerClan!==0).map(c=>c.ownerClan))]; clanIds.forEach(clanId => { const myBushos = this.bushos.filter(b => b.clan === clanId); if(myBushos.length===0) return; let daimyoInt = Math.max(...myBushos.map(b => b.intelligence)); if (Math.random() * 100 < daimyoInt) { const clanCastles = this.castles.filter(c => c.ownerClan === clanId); clanCastles.forEach(castle => { const castleBushos = this.getCastleBushos(castle.id).filter(b => b.status !== 'ronin'); if (castleBushos.length <= 1) return; castleBushos.sort((a, b) => (b.leadership + b.politics) - (a.leadership + a.politics)); const best = castleBushos[0]; if (best.id !== castle.castellanId) { const old = this.getBusho(castle.castellanId); if(old) old.isCastellan = false; best.isCastellan = true; castle.castellanId = best.id; } }); } }); }
     
     processTurn() {
-        // 修正：合戦中はいかなる場合もメインループを停止
-        if (this.warManager && this.warManager.state.active) return; 
+        // 1. 戦争中（特にプレイヤー関与）なら、ターン処理そのものを一時停止するガード
+        if (this.warManager.state.active && this.warManager.state.isPlayerInvolved) {
+            return; 
+        }
     
-        if (this.currentIndex >= this.turnQueue.length) { this.endMonth(); return; }
+        if (this.currentIndex >= this.turnQueue.length) { 
+            this.endMonth(); 
+            return; 
+        }
+    
         const castle = this.turnQueue[this.currentIndex]; 
-        
         if(castle.ownerClan !== 0 && !this.clans.find(c=>c.id===castle.ownerClan)) { 
-            this.currentIndex++; this.processTurn(); return; 
+            this.currentIndex++; 
+            this.processTurn(); 
+            return; 
         }
         
         this.ui.renderMap();
         
         if (castle.ownerClan === this.playerClanId) { 
             this.isProcessingAI = false; 
-            this.ui.renderMap(); 
             this.ui.log(`【${castle.name}】命令を下してください`); 
             this.ui.showControlPanel(castle); 
         } else { 
             this.isProcessingAI = true; 
-            this.ui.renderMap(); 
             if(this.ui.panelEl) this.ui.panelEl.classList.add('hidden'); 
             
+            // ★ここが重要！setTimeoutの「中」でもチェックを入れる
             setTimeout(() => {
                 try {
+                    // 実行される直前に、誰かが戦争を始めていないか最終確認
+                    if (this.warManager.state.active && this.warManager.state.isPlayerInvolved) {
+                        this.isProcessingAI = false; // フラグを戻して待機
+                        return; 
+                    }
+    
                     this.aiEngine.execAI(castle);
                 } catch(e) {
-                    console.error("AI Error:", e);
+                    console.error("AI Error caught:", e);
                     this.finishTurn(); 
                 }
             }, 600); 
@@ -1488,3 +1500,4 @@ class GameManager {
 window.addEventListener('DOMContentLoaded', () => {
     window.GameApp = new GameManager();
 });
+
