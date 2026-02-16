@@ -1,12 +1,12 @@
 /**
- * war.js - 戦争処理マネージャー & 戦争計算ロジック
- * 責務: 合戦の進行、戦闘計算、戦後処理、捕虜対応
+ * war.js
+ * 戦争処理マネージャー & 戦争計算ロジック
+ * 責務: 合戦の進行、戦闘計算、戦後処理、捕虜対応、UIコマンド定義、攻撃可能判定
  */
 
-/**
- * 戦争計算ロジック
- * 戦闘ダメージや部隊能力の計算式はここに集約
- */
+/* ==========================================================================
+   WarSystem: 計算・判定ロジック
+   ========================================================================== */
 class WarSystem {
     // 部隊の能力値を計算（統率、武力、知略、補正など）
     static calcUnitStats(bushos) { 
@@ -18,11 +18,12 @@ class WarSystem {
         // 陣営ボーナス（革新・保守の相性）
         let factionBonusMultiplier = 1.0;
         if (subs.length > 0) {
-            const leaderFaction = leader.getFactionName();
+            // Bushoクラスのメソッド依存だが、参照できない場合はデフォルト動作
+            const leaderFaction = leader.getFactionName ? leader.getFactionName() : "中立";
             let sameFactionCount = 0; let oppFactionCount = 0; 
             subs.forEach(b => { 
                 totalLdr += b.leadership * 0.2; totalStr += b.strength * 0.2; totalInt += b.intelligence * 0.2; 
-                const f = b.getFactionName();
+                const f = b.getFactionName ? b.getFactionName() : "中立";
                 if (f === leaderFaction) sameFactionCount++;
                 else if ((leaderFaction === "革新派" && f === "保守派") || (leaderFaction === "保守派" && f === "革新派")) oppFactionCount++;
             });
@@ -61,7 +62,7 @@ class WarSystem {
         return { soldierDmg: Math.floor(baseDmg * soldierRate), wallDmg: Math.floor(baseDmg * wallRate * 0.5), risk: counterRisk };
     }
 
-    // 謀略（War用）
+    // 謀略
     static calcScheme(atkBusho, defBusho, defCastleLoyalty) { 
         const atkInt = atkBusho.intelligence; 
         const defInt = defBusho ? defBusho.intelligence : 30; 
@@ -88,15 +89,107 @@ class WarSystem {
     static calcRetreatScore(castle) { 
         return castle.soldiers + (castle.defense * 0.5) + (castle.gold * 0.1) + (castle.rice * 0.1) + (castle.samuraiIds.length * 100); 
     }
+
+    // 軍師の助言（戦争用）
+    static getWarAdvice(gunshi, state) {
+        const r = Math.random();
+        if (state.attacker.soldiers > state.defender.soldiers * 1.5) {
+             return r > 0.3 ? "我が軍が圧倒的です。一気に攻め落としましょう。" : "油断は禁物ですが、勝利は目前です。";
+        } else if (state.attacker.soldiers < state.defender.soldiers * 0.8) {
+             return "敵の兵数が勝っています。無理な突撃は控えるべきかと。";
+        }
+        return "戦況は五分五分。敵の出方を見極めましょう。";
+    }
 }
 
 
+/* ==========================================================================
+   WarManager: 進行管理・UI連携
+   ========================================================================== */
 class WarManager {
     constructor(game) {
         this.game = game;
         this.state = { active: false };
         this.pendingPrisoners = [];
     }
+
+    // ----------------------------------------------------------------------
+    // ★外部連携用メソッド（GameManager/UIManagerから呼ばれる）
+    // ----------------------------------------------------------------------
+
+    /**
+     * 攻撃可能な城のIDリストを返す
+     */
+    getValidWarTargets(currentCastle) {
+        return this.game.castles.filter(target => 
+            GameSystem.isAdjacent(currentCastle, target) && 
+            target.ownerClan !== this.game.playerClanId &&
+            !this.game.getRelation(this.game.playerClanId, target.ownerClan).alliance &&
+            (target.immunityUntil || 0) < this.game.getCurrentTurnId()
+        ).map(t => t.id);
+    }
+
+    /**
+     * 現在の戦況に応じたコマンドリストを返す
+     */
+    getAvailableCommands(isAtkTurn) {
+        const s = this.state;
+        if (!s.isPlayerInvolved) return [];
+
+        const isMyTurn = (isAtkTurn && s.attacker.ownerClan === this.game.playerClanId) ||
+                         (!isAtkTurn && s.defender.ownerClan === this.game.playerClanId);
+
+        if (!isMyTurn) return []; // 自分のターンでなければコマンドなし
+
+        const commands = [];
+        
+        if (isAtkTurn) {
+            // 攻撃側のコマンド定義
+            commands.push({ label: "突撃", type: "charge" });
+            commands.push({ label: "斉射", type: "bow" });
+            commands.push({ label: "城攻め", type: "siege" });
+            commands.push({ label: "火計", type: "fire" });
+            commands.push({ label: "謀略", type: "scheme" });
+            commands.push({ label: "撤退", type: "retreat" });
+        } else {
+            // 防御側のコマンド定義
+            commands.push({ label: "突撃", type: "def_charge" });
+            commands.push({ label: "斉射", type: "def_bow" });
+            commands.push({ label: "籠城", type: "def_attack" });
+            commands.push({ label: "謀略", type: "scheme" });
+            
+            // 補修はパラメータが必要なため特殊扱いだが、コマンドとしては列挙
+            commands.push({ label: "補修", type: "repair_setup" }); 
+
+            // 撤退可能か判定
+            const friendlyCastles = this.game.castles.filter(c => c.ownerClan === s.defender.ownerClan && c.id !== s.defender.id && GameSystem.isAdjacent(c, s.defender));
+            if (friendlyCastles.length > 0) {
+                commands.push({ label: "撤退", type: "retreat" });
+            }
+        }
+        return commands;
+    }
+
+    /**
+     * 軍師助言の取得
+     */
+    getGunshiAdvice(action) {
+        // 戦争開始前の助言
+        if (action.type === 'war') {
+            return "合戦におもむきますか？ 兵力と兵糧の確認をお忘れなく。";
+        }
+        // 戦闘中の助言
+        if (this.state.active) {
+            const gunshi = this.game.getClanGunshi(this.game.playerClanId);
+            if (!gunshi) return null;
+            return WarSystem.getWarAdvice(gunshi, this.state);
+        }
+        return null;
+    }
+
+    // ----------------------------------------------------------------------
+    // 戦争進行ロジック
+    // ----------------------------------------------------------------------
 
     // 戦争開始処理
     startWar(atkCastle, defCastle, atkBushos, atkSoldierCount) {
@@ -179,14 +272,15 @@ class WarManager {
         
         this.game.ui.updateWarUI(); 
         
-        const isPlayerAtkSide = (s.attacker.ownerClan === this.game.playerClanId); 
-        const isPlayerDefSide = (s.defender.ownerClan === this.game.playerClanId); 
         const isAtkTurn = (s.turn === 'attacker'); 
         
-        let isPlayerTurn = (isAtkTurn && isPlayerAtkSide) || (!isAtkTurn && isPlayerDefSide); 
+        // ★修正: UI描画呼び出し (ボタンの内容はWarManagerが制御)
         this.game.ui.renderWarControls(isAtkTurn); 
         
-        if (isPlayerTurn) {
+        const isMyTurn = (isAtkTurn && s.attacker.ownerClan === this.game.playerClanId) ||
+                         (!isAtkTurn && s.defender.ownerClan === this.game.playerClanId);
+        
+        if (isMyTurn) {
             // プレイヤー入力待ち
         } else { 
             setTimeout(() => this.execWarAI(), 800); 
@@ -195,6 +289,13 @@ class WarManager {
 
     // 戦闘コマンド実行
     execWarCmd(type, extraVal = null) { 
+        if (type === 'repair_setup') {
+             // 補修の場合は数量選択へ（Game.jsのUIを呼び出す）
+             const s = this.state;
+             window.GameApp.ui.openQuantitySelector('war_repair', [s.defender], null);
+             return;
+        }
+
         if(type==='scheme'||type==='fire') this.resolveWarAction(type); 
         else { 
             document.getElementById('war-controls').classList.add('disabled-area'); 
@@ -206,8 +307,8 @@ class WarManager {
     execWarAI() { 
         const s = this.state;
         const actor = s.turn === 'attacker' ? s.atkBushos[0] : s.defBusho; 
-        const actorSide = s.turn === 'attacker' ? s.attacker : s.defender;
         const isDefender = (s.turn === 'defender');
+
         if (isDefender) {
             const dangerRatio = s.defender.soldiers / (s.attacker.soldiers + 1);
             let retreatThreshold = 0.2; 
@@ -222,20 +323,21 @@ class WarManager {
                  this.resolveWarAction('repair', 50); return;
             }
         }
+
         let cmd = 'charge'; 
         const isHighInt = actor.intelligence >= GAME_SETTINGS.AI.WarHighIntThreshold;
         if (isHighInt) {
             const opp = isDefender ? s.attacker : s.defender;
-            const oppSoldier = opp.soldiers;
             const oppWall = isDefender ? 0 : s.defender.defense; 
             if (oppWall > 500 && Math.random() < 0.7) cmd = 'siege'; 
-            else if (oppSoldier < 500 && Math.random() < 0.8) cmd = 'charge'; 
+            else if (opp.soldiers < 500 && Math.random() < 0.8) cmd = 'charge'; 
             else cmd = 'bow'; 
             if (Math.random() < 0.3) cmd = 'scheme';
         } else {
             const r = Math.random();
             if (r < 0.4) cmd = 'charge'; else if (r < 0.7) cmd = 'bow'; else cmd = 'siege';
         }
+
         if (isDefender) {
             if (cmd === 'charge') cmd = 'def_charge'; 
             if (cmd === 'bow') cmd = 'def_bow'; 
@@ -266,7 +368,6 @@ class WarManager {
         }
         if (type === 'repair') { 
              const soldierCost = extraVal || 50; 
-             
              if (s.defender.soldiers > soldierCost) {
                  const W = GAME_SETTINGS.War;
                  s.defender.soldiers -= soldierCost;
@@ -479,7 +580,6 @@ class WarManager {
                 s.defender.samuraiIds.push(b.id); 
                 if(idx === 0) { b.isCastellan = true; s.defender.castellanId = b.id; } else b.isCastellan = false; 
             });
-            // 変更: 戦争後は強制的にターン終了
             this.game.finishTurn();
             return;
         }
@@ -526,7 +626,6 @@ class WarManager {
             s.defender.immunityUntil = currentTurnId;
         } 
         
-        // 変更: 戦争後は強制的にターン終了
         this.game.finishTurn();
     }
     

@@ -265,11 +265,9 @@ class GameSystem {
             return Math.max(1, Math.min(120, Math.floor(realVal + err)));
         }
         
-        // --- 修正箇所: 他国の武将は調査情報がない限り、軍師がいても秘匿する ---
         if (target.clan !== 0 && target.clan !== playerClanId) {
             return null;
         }
-        // -------------------------------------------------------------
 
         if (gunshi) {
             const noise = (130 - gunshi.intelligence);
@@ -295,10 +293,7 @@ class GameSystem {
     static isAdjacent(c1, c2) { return (Math.abs(c1.x - c2.x) + Math.abs(c1.y - c2.y)) === 1; }
     static calcWeightedAvg(currVal, currNum, newVal, newNum) { if(currNum + newNum === 0) return currVal; return Math.floor(((currVal * currNum) + (newVal * newNum)) / (currNum + newNum)); }
     
-    // calcUnitStats は war.js へ移動
-    // calcWarDamage は war.js へ移動
-    
-    // calcRetreatScore は war.js へ移動
+    // 戦争関連の計算メソッド (calcUnitStats, calcWarDamage, calcRetreatScore, calcScheme, calcFire) は war.js へ移動しました
 
     static calcInvestigate(bushos, targetCastle) {
         if (!bushos || bushos.length === 0) return { success: false, accuracy: 0 };
@@ -351,9 +346,6 @@ class GameSystem {
         const successRate = (totalOffense / totalDefense) * 0.5; 
         return Math.random() < successRate;
     }
-    
-    // calcScheme は war.js へ移動
-    // calcFire は war.js へ移動
     
     static calcEmploymentSuccess(recruiter, target, recruiterClanPower, targetClanPower) { 
         if (target.clan !== 0 && target.ambition > 70 && recruiterClanPower < targetClanPower * 0.7) return false; 
@@ -455,7 +447,6 @@ class UIManager {
         if (this.resultModal) this.resultModal.classList.remove('hidden'); 
     }
     
-    // 変更: モーダルを閉じたタイミングで全行動終了チェックを行う
     closeResultModal() { 
         if (this.resultModal) this.resultModal.classList.add('hidden'); 
         if (this.game) this.game.checkAllActionsDone();
@@ -791,7 +782,6 @@ class UIManager {
                 createBtn("調略", "category", () => { this.menuState = 'STRATEGY'; this.renderCommandMenu(); });
                 createBtn("人事", "category", () => { this.menuState = 'PERSONNEL'; this.renderCommandMenu(); });
                 createBtn("機能", "category", () => { this.menuState = 'SYSTEM'; this.renderCommandMenu(); });
-                // 変更: 確認ダイアログを追加
                 createBtn("命令終了", "finish", () => { 
                     if(confirm("今月の命令を終了しますか？")) {
                         this.game.finishTurn();
@@ -846,6 +836,20 @@ class UIManager {
     }
     
     showGunshiAdvice(action, onConfirm) {
+        if (action.type === 'war' || this.game.warManager.state.active) {
+            const warAdvice = this.game.warManager.getGunshiAdvice(action);
+            if (warAdvice) {
+                const gunshi = this.game.getClanGunshi(this.game.playerClanId);
+                if (this.gunshiModal) {
+                    this.gunshiModal.classList.remove('hidden'); 
+                    if(this.gunshiName) this.gunshiName.textContent = `軍師: ${gunshi ? gunshi.name : '???'}`; 
+                    if(this.gunshiMessage) this.gunshiMessage.textContent = warAdvice;
+                }
+                if (this.gunshiExecuteBtn) this.gunshiExecuteBtn.onclick = () => { if(this.gunshiModal) this.gunshiModal.classList.add('hidden'); onConfirm(); };
+                return;
+            }
+        }
+
         if (['farm','commerce','repair','draft','charity','transport','appoint_gunshi','appoint','banish','training','soldier_charity','buy_rice','sell_rice','interview','reward'].includes(action.type)) { onConfirm(); return; }
         const gunshi = this.game.getClanGunshi(this.game.playerClanId); if (!gunshi) { onConfirm(); return; }
         const seed = this.game.year * 100 + this.game.month + (action.type.length) + (action.targetId || 0) + (action.val || 0);
@@ -1132,51 +1136,21 @@ class UIManager {
         if (!controls) return;
         controls.innerHTML = '';
         
-        const createBtn = (label, type, isDisabled = false) => {
-            const btn = document.createElement('button');
-            btn.textContent = label;
-            if(isDisabled) btn.disabled = true;
-            // WarManager経由
-            else btn.onclick = () => this.game.warManager.execWarCmd(type);
-            controls.appendChild(btn);
-        };
+        const commands = this.game.warManager.getAvailableCommands(isAtkTurn);
 
-        const s = this.game.warManager.state;
-        if (!s.isPlayerInvolved) return; 
-        
-        const isMyTurn = (isAtkTurn && s.attacker.ownerClan === this.game.playerClanId) ||
-                         (!isAtkTurn && s.defender.ownerClan === this.game.playerClanId);
-
-        if (!isMyTurn) {
+        if (commands.length === 0) {
             controls.classList.add('disabled-area');
             return;
         } else {
             controls.classList.remove('disabled-area');
         }
 
-        if (isAtkTurn) {
-            createBtn("突撃", "charge");
-            createBtn("斉射", "bow");
-            createBtn("城攻め", "siege");
-            createBtn("火計", "fire");
-            createBtn("謀略", "scheme");
-            createBtn("撤退", "retreat");
-        } else {
-            createBtn("突撃", "def_charge");
-            createBtn("斉射", "def_bow");
-            createBtn("籠城", "def_attack"); 
-            createBtn("謀略", "scheme");
-            
-            const repairBtn = document.createElement('button');
-            repairBtn.textContent = "補修";
-            repairBtn.onclick = () => window.GameApp.ui.openQuantitySelector('war_repair', [s.defender], null);
-            controls.appendChild(repairBtn);
-
-            const friendlyCastles = this.game.castles.filter(c => c.ownerClan === s.defender.ownerClan && c.id !== s.defender.id && GameSystem.isAdjacent(c, s.defender));
-            if (friendlyCastles.length > 0) {
-                createBtn("撤退", "retreat");
-            }
-        }
+        commands.forEach(cmd => {
+            const btn = document.createElement('button');
+            btn.textContent = cmd.label;
+            btn.onclick = () => this.game.warManager.execWarCmd(cmd.type);
+            controls.appendChild(btn);
+        });
     }
 
     showRetreatSelector(castle, candidates, onSelect) {
@@ -1391,12 +1365,7 @@ class GameManager {
         this.validTargets = []; 
         
         if (mode === 'war') {
-            this.validTargets = this.castles.filter(target => 
-                GameSystem.isAdjacent(c, target) && 
-                target.ownerClan !== this.playerClanId &&
-                !this.getRelation(this.playerClanId, target.ownerClan).alliance &&
-                (target.immunityUntil || 0) < this.getCurrentTurnId()
-            ).map(t => t.id);
+            this.validTargets = this.warManager.getValidWarTargets(c);
         } else if (mode === 'move' || mode === 'transport') {
             this.validTargets = this.castles.filter(target => 
                 target.ownerClan === this.playerClanId && target.id !== c.id
@@ -1537,5 +1506,3 @@ class GameManager {
 window.addEventListener('DOMContentLoaded', () => {
     window.GameApp = new GameManager();
 });
-
-
