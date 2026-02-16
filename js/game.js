@@ -1249,6 +1249,7 @@ class GameManager {
         this.isProcessingAI = false; 
         this.marketRate = 1.0; 
         this.lastMenuState = null;
+        this.aiTimer = null; // AI用タイマーの参照保持
         
         // 分割したマネージャーの初期化
         this.commandSystem = new CommandSystem(this);
@@ -1324,12 +1325,21 @@ class GameManager {
     optimizeCastellans() { const clanIds = [...new Set(this.castles.filter(c=>c.ownerClan!==0).map(c=>c.ownerClan))]; clanIds.forEach(clanId => { const myBushos = this.bushos.filter(b => b.clan === clanId); if(myBushos.length===0) return; let daimyoInt = Math.max(...myBushos.map(b => b.intelligence)); if (Math.random() * 100 < daimyoInt) { const clanCastles = this.castles.filter(c => c.ownerClan === clanId); clanCastles.forEach(castle => { const castleBushos = this.getCastleBushos(castle.id).filter(b => b.status !== 'ronin'); if (castleBushos.length <= 1) return; castleBushos.sort((a, b) => (b.leadership + b.politics) - (a.leadership + a.politics)); const best = castleBushos[0]; if (best.id !== castle.castellanId) { const old = this.getBusho(castle.castellanId); if(old) old.isCastellan = false; best.isCastellan = true; castle.castellanId = best.id; } }); } }); }
     
     processTurn() {
+        // 多重実行防止のため、既存のタイマーがあればクリアする
+        if (this.aiTimer) {
+            clearTimeout(this.aiTimer);
+            this.aiTimer = null;
+        }
+
         if (this.warManager.state.active) return;
 
         if (this.currentIndex >= this.turnQueue.length) { this.endMonth(); return; }
         const castle = this.turnQueue[this.currentIndex]; 
         
+        // 城の所有者が存在しない、または滅亡済みクランの場合はスキップして次へ
+        // 型変換を厳密に行う
         if(castle.ownerClan !== 0 && !this.clans.find(c => Number(c.id) === Number(castle.ownerClan))) { 
+            console.warn(`Skipping castle ${castle.name}: ownerClan ${castle.ownerClan} not found in clans list.`);
             this.currentIndex++; 
             this.processTurn(); 
             return; 
@@ -1337,9 +1347,10 @@ class GameManager {
         
         this.ui.renderMap();
         
-        // ★修正: 厳密な数値比較を行い、プレイヤーの城であることを保証する
-        // データの型不一致対策として == も考慮に入れるが、基本はNumberキャストして比較
-        const isPlayerCastle = Number(castle.ownerClan) === Number(this.playerClanId);
+        // 厳密な数値比較を行い、プレイヤーの城であることを保証する
+        const ownerId = Number(castle.ownerClan);
+        const playerId = Number(this.playerClanId);
+        const isPlayerCastle = (ownerId === playerId);
 
         if (isPlayerCastle) { 
             // 強制的にAI処理フラグを折る
@@ -1353,7 +1364,8 @@ class GameManager {
             this.ui.renderMap(); 
             if(this.ui.panelEl) this.ui.panelEl.classList.add('hidden'); 
             
-            setTimeout(() => {
+            // AI思考タイマーを保存しておく
+            this.aiTimer = setTimeout(() => {
                 if (this.warManager.state.active) return;
                 try {
                     this.aiEngine.execAI(castle);
@@ -1506,7 +1518,7 @@ class GameManager {
                     this.clans = d.clans.map(c => new Clan(c));
                 } else {
                     const scenario = SCENARIOS[0]; 
-                    await DataManager.loadParameters(".data/parameter.csv");
+                    await DataManager.loadParameters("./data/parameter.csv");
                     const data = await DataManager.loadAll(scenario.folder);
                     this.clans = data.clans;
                 }
