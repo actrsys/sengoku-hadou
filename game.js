@@ -1,11 +1,12 @@
 /**
- * 戦国シミュレーションゲーム - 修正版 v10.7
+ * 戦国シミュレーションゲーム - 修正版 v10.8 (War Update)
  * 修正内容:
  * 1. ターン外の自城操作禁止（閲覧モードへ）
  * 2. 同盟解消の対象フィルタ修正（同盟中のみ）＆外交の隣接制限解除
  * 3. 面談時の自軍大名対象バグ修正＆自分語り口調の実装
  * 4. AI思考中の操作ブロック強化
  * 5. スマホ上部情報の表示項目変更（金・米・兵）
+ * 6. 合戦：防御側コマンド仕様変更（突撃/斉射/籠城仕様変更/火計削除/修復追加）
  */
 
 // グローバルエラーハンドリング
@@ -327,7 +328,7 @@ class GameSystem {
             case 'siege': multiplier = UB.SiegeAttack; soldierRate = 0.05; wallRate = UB.WallDamageRate; counterRisk = 1.0; break;
             case 'charge': multiplier = UB.ChargeAttack; soldierRate = 1.0; wallRate = 0.5; counterRisk = 1.5; break;
             case 'def_bow': multiplier = 0.5; wallRate = 0.0; break;
-            case 'def_attack': multiplier = 1.0; wallRate = 0.0; break;
+            case 'def_attack': multiplier = 0.0; wallRate = 0.0; break; // 籠城: 攻撃しない
             case 'def_charge': multiplier = 1.5; wallRate = 0.0; break;
         }
         const ratio = atkPower / (atkPower + defPower);
@@ -1182,11 +1183,11 @@ class UIManager {
             createBtn("謀略", "scheme");
             createBtn("撤退", "retreat");
         } else {
-            createBtn("反撃", "def_charge");
-            createBtn("弓反撃", "def_bow");
+            createBtn("突撃", "def_charge");
+            createBtn("斉射", "def_bow");
             createBtn("籠城", "def_attack"); 
-            createBtn("火計", "fire");
             createBtn("謀略", "scheme");
+            createBtn("修復", "repair");
             createBtn("撤退", "retreat");
         }
     }
@@ -1796,7 +1797,9 @@ class GameManager {
             
             let defBusho = this.getBusho(defCastle.castellanId); if (!defBusho) defBusho = {name:"守備隊長", strength:30, leadership:30, intelligence:30, charm:30};
             const attackerForce = { name: atkCastle.name + "遠征軍", ownerClan: atkCastle.ownerClan, soldiers: atkSoldierCount, bushos: atkBushos, training: atkCastle.training, morale: atkCastle.morale };
-            this.warState = { active: true, round: 1, attacker: attackerForce, sourceCastle: atkCastle, defender: defCastle, atkBushos: atkBushos, defBusho: defBusho, turn: 'attacker', isPlayerInvolved: isPlayerInvolved, deadSoldiers: { attacker: 0, defender: 0 } };
+            
+            // defenderGuarding: false を初期化に追加
+            this.warState = { active: true, round: 1, attacker: attackerForce, sourceCastle: atkCastle, defender: defCastle, atkBushos: atkBushos, defBusho: defBusho, turn: 'attacker', isPlayerInvolved: isPlayerInvolved, deadSoldiers: { attacker: 0, defender: 0 }, defenderGuarding: false };
             defCastle.loyalty = Math.max(0, defCastle.loyalty - 50); defCastle.population = Math.max(0, defCastle.population - 500);
             
             if (isPlayerInvolved) { 
@@ -1868,6 +1871,12 @@ class GameManager {
             let retreatThreshold = 0.2; 
             if (actor.intelligence >= GAME_SETTINGS.AI.WarHighIntThreshold) retreatThreshold = 0.4; 
             if (dangerRatio < retreatThreshold && s.defender.defense < 200) { this.resolveWarAction('retreat'); return; }
+
+            // 修復チェック: 防御が減っていて兵士に余裕があれば修復
+            const defenseRatio = s.defender.defense / (s.defender.maxDefense || 1000); // 簡易max
+            if (defenseRatio < 0.7 && s.defender.soldiers > 500 && Math.random() < 0.4) {
+                 this.resolveWarAction('repair'); return;
+            }
         }
         let cmd = 'charge'; 
         const isHighInt = actor.intelligence >= GAME_SETTINGS.AI.WarHighIntThreshold;
@@ -1884,7 +1893,14 @@ class GameManager {
             if (r < 0.4) cmd = 'charge'; else if (r < 0.7) cmd = 'bow'; else cmd = 'siege';
         }
         if (isDefender) {
-            if (cmd === 'charge') cmd = 'def_charge'; if (cmd === 'bow') cmd = 'def_bow'; if (cmd === 'siege') cmd = 'def_attack'; 
+            // 守備側行動マッピング
+            if (cmd === 'charge') cmd = 'def_charge'; 
+            if (cmd === 'bow') cmd = 'def_bow'; 
+            if (cmd === 'siege') {
+                // ピンチのときは籠城
+                if (s.defender.soldiers < s.attacker.soldiers * 0.5) cmd = 'def_attack'; // 籠城
+                else cmd = 'def_charge'; // 通常は反撃
+            }
         }
         this.resolveWarAction(cmd); 
     }
@@ -1895,14 +1911,56 @@ class GameManager {
         if(type === 'retreat') { if(s.turn === 'attacker') { this.endWar(false); } else { this.executeRetreatLogic(s.defender); } return; }
         const isAtkTurn = (s.turn === 'attacker'); const target = isAtkTurn ? s.defender : s.attacker;
         let atkStats = GameSystem.calcUnitStats(s.atkBushos); let defStats = { str: s.defBusho.strength, int: s.defBusho.intelligence, ldr: s.defBusho.leadership };
+        
+        // 防御側特殊アクション処理
+        if (type === 'def_attack') { // 籠城
+             s.defenderGuarding = true;
+             if(s.isPlayerInvolved) this.ui.log(`R${s.round} [守] 籠城し、守りを固めている！`);
+             this.advanceWarTurn();
+             return;
+        }
+        if (type === 'repair') { // 修復
+             const cost = 100;
+             const recover = 100;
+             if (s.defender.soldiers > cost) {
+                 s.defender.soldiers -= cost;
+                 // 最大値チェックは簡易的に既存+回復
+                 s.defender.defense += recover;
+                 if(s.isPlayerInvolved) this.ui.log(`R${s.round} [守] 城壁を修復！ (兵-${cost} 防+${recover})`);
+             } else {
+                 if(s.isPlayerInvolved) this.ui.log(`R${s.round} [守] 修復しようとしたが兵が足りない！`);
+             }
+             this.advanceWarTurn();
+             return;
+        }
+
         if (type === 'scheme') { const actor = isAtkTurn ? s.atkBushos[0] : s.defBusho; const targetBusho = isAtkTurn ? s.defBusho : s.atkBushos[0]; const result = GameSystem.calcScheme(actor, targetBusho, isAtkTurn ? s.defender.loyalty : 1000); if (!result.success) { if (s.isPlayerInvolved) this.ui.log(`R${s.round} 謀略失敗！`); } else { target.soldiers = Math.max(0, target.soldiers - result.damage); if (s.isPlayerInvolved) this.ui.log(`R${s.round} 謀略成功！ 兵士に${result.damage}の被害`); } this.advanceWarTurn(); return; }
         if (type === 'fire') { const actor = isAtkTurn ? s.atkBushos[0] : s.defBusho; const targetBusho = isAtkTurn ? s.defBusho : s.atkBushos[0]; const result = GameSystem.calcFire(actor, targetBusho); if (!result.success) { if (s.isPlayerInvolved) this.ui.log(`R${s.round} 火攻失敗！`); } else { if(isAtkTurn) s.defender.defense = Math.max(0, s.defender.defense - result.damage); else target.soldiers = Math.max(0, target.soldiers - 50); if (s.isPlayerInvolved) this.ui.log(`R${s.round} 火攻成功！ ${isAtkTurn?'防御':'兵士'}に${result.damage}の被害`); } this.advanceWarTurn(); return; }
+        
+        // ダメージ計算
         const result = GameSystem.calcWarDamage(atkStats, defStats, s.attacker.soldiers, s.defender.soldiers, s.defender.defense, s.attacker.morale, s.defender.training, type);
-        const actualSoldierDmg = Math.min(target.soldiers, result.soldierDmg); target.soldiers -= actualSoldierDmg;
+        let actualSoldierDmg = Math.min(target.soldiers, result.soldierDmg);
+        let actualWallDmg = result.wallDmg;
+
+        // 籠城効果チェック
+        if (isAtkTurn && s.defenderGuarding) {
+             actualSoldierDmg = Math.floor(actualSoldierDmg * 0.5); // ダメージ半減
+             actualWallDmg = Math.floor(actualWallDmg * 0.5);
+             s.defenderGuarding = false; // フラグ解除
+             if (s.isPlayerInvolved) this.ui.log(`(籠城効果によりダメージ軽減)`);
+        }
+
+        target.soldiers -= actualSoldierDmg;
         if(isAtkTurn) s.deadSoldiers.defender += actualSoldierDmg; else s.deadSoldiers.attacker += actualSoldierDmg;
-        if (isAtkTurn) s.defender.defense = Math.max(0, s.defender.defense - result.wallDmg);
+        if (isAtkTurn) s.defender.defense = Math.max(0, s.defender.defense - actualWallDmg);
         if(result.risk > 1.0) { const counterDmg = Math.floor(actualSoldierDmg * (result.risk - 1.0) * 0.5); const actorArmy = isAtkTurn ? s.attacker : s.defender; actorArmy.soldiers = Math.max(0, actorArmy.soldiers - counterDmg); if(s.isPlayerInvolved) this.ui.log(`(反撃被害: ${counterDmg})`); }
-        if (s.isPlayerInvolved) { let actionName = type.includes('bow') ? "弓攻撃" : type.includes('siege') ? "城攻め" : "力攻め"; if (type.includes('def_')) actionName = type === 'def_bow' ? "弓反撃" : type === 'def_charge' ? "全力反撃" : "反撃"; let msg = (result.wallDmg > 0) ? `${actionName} (兵-${actualSoldierDmg} 防-${result.wallDmg})` : `${actionName} (兵-${actualSoldierDmg})`; this.ui.log(`R${s.round} [${isAtkTurn?'攻':'守'}] ${msg}`); }
+        
+        if (s.isPlayerInvolved) { 
+            let actionName = type.includes('bow') ? "弓攻撃" : type.includes('siege') ? "城攻め" : "力攻め"; 
+            if (type.includes('def_')) actionName = type === 'def_bow' ? "斉射" : type === 'def_charge' ? "突撃" : "反撃"; 
+            let msg = (actualWallDmg > 0) ? `${actionName} (兵-${actualSoldierDmg} 防-${actualWallDmg})` : `${actionName} (兵-${actualSoldierDmg})`; 
+            this.ui.log(`R${s.round} [${isAtkTurn?'攻':'守'}] ${msg}`); 
+        }
         this.advanceWarTurn();
     }
     advanceWarTurn() { const s = this.warState; if (s.turn === 'attacker') s.turn = 'defender'; else { s.turn = 'attacker'; s.round++; if(s.round > GAME_SETTINGS.Military.WarMaxRounds) { this.endWar(false); return; } } if (s.isPlayerInvolved) this.processWarRound(); }
