@@ -8,7 +8,7 @@
 // AI関連の設定定義
 window.AIParams = {
     AI: {
-        Aggressiveness: 1.5, SoliderSendRate: 0.8,
+        Aggressiveness: 1.5, SoldierSendRate: 0.8,
         AbilityBase: 50, AbilitySensitivity: 2.0,
         GunshiBiasFactor: 0.5, GunshiFairnessFactor: 0.01,
         WarHighIntThreshold: 80,
@@ -99,7 +99,7 @@ class AIEngine {
         // 出陣可能武将（大将+副将候補）
         const availableBushos = myBushos.sort((a,b) => b.leadership - a.leadership).slice(0, 3);
         const myStats = WarSystem.calcUnitStats(availableBushos);
-        const mySoldiers = Math.floor(myCastle.soldiers * (window.AIParams.AI.SoliderSendRate || 0.8));
+        const mySoldiers = Math.floor(myCastle.soldiers * (window.AIParams.AI.SoldierSendRate || 0.8));
 
         enemies.forEach(target => {
             // 敵軍の戦力予測
@@ -148,7 +148,7 @@ class AIEngine {
         const sorted = bushos.sort((a,b) => b.leadership - a.leadership).slice(0, 3);
         
         // 兵数は設定された割合または全軍
-        const sendSoldiers = Math.floor(source.soldiers * (window.AIParams.AI.SoliderSendRate || 0.8));
+        const sendSoldiers = Math.floor(source.soldiers * (window.AIParams.AI.SoldierSendRate || 0.8));
         
         if (sendSoldiers <= 0) return;
 

@@ -6,41 +6,85 @@
  */
 
 // 戦争・軍事関連の設定定義
+// parameter.csv のキー定義と構造を一致させています
 window.WarParams = {
+    // 【Military】: 軍事内政、基本能力、静的な係数
     Military: {
-        DraftBase: 50, DraftStatBonus: 1.5, DraftPopBonusFactor: 0.00005, DraftFluctuation: 0.15,
-        BaseTraining: 0, TrainingLdrEffect: 0.3, TrainingStrEffect: 0.2, TrainingFluctuation: 0.15,
-        BaseMorale: 0, MoraleLdrEffect: 0.2, MoraleCharmEffect: 0.2, MoraleFluctuation: 0.2,
-        WarMaxRounds: 10, DamageSoldierPower: 0.05, WallDefenseEffect: 0.5, DamageFluctuation: 0.2,
-        UnitTypeBonus: { BowAttack: 0.6, SiegeAttack: 1.0, ChargeAttack: 1.2, WallDamageRate: 0.5 },
-        FactionBonus: 1.1, FactionPenalty: 0.8
+        // 徴兵関連
+        DraftBase: 50,
+        DraftStatBonus: 1.5,
+        DraftPopBonusFactor: 0.00005,
+        DraftFluctuation: 0.15,
+
+        // 訓練関連
+        BaseTraining: 0,
+        TrainingLdrEffect: 0.3,
+        TrainingStrEffect: 0.2,
+        TrainingFluctuation: 0.15,
+
+        // 士気関連
+        BaseMorale: 0,
+        MoraleLdrEffect: 0.2,
+        MoraleCharmEffect: 0.2,
+        MoraleFluctuation: 0.2,
+
+        // 戦闘基本定数
+        WarMaxRounds: 10,           // 最大ラウンド数
+        DamageSoldierPower: 0.05,   // 兵数がダメージに与える影響
+        WallDefenseEffect: 0.5,     // 城壁防御効果
+        DamageFluctuation: 0.2,     // ダメージ乱数幅
+        
+        // 相性ボーナス
+        FactionBonus: 1.1,          // 革新/保守一致ボーナス
+        FactionPenalty: 0.8         // 不一致ペナルティ
     },
+
+    // 【War】: 合戦中のアクション倍率、戦術、戦後処理
     War: {
-        ChargeMultiplier: 1.2, ChargeRisk: 1.5,
-        ChargeSoldierDmgRate: 1.0, ChargeWallDmgRate: 0.5, // 新設: 突撃の個別ダメージ倍率
-        BowMultiplier: 0.6, BowRisk: 0.5,
-        SiegeMultiplier: 1.0, SiegeWallRate: 0.5, SiegeRisk: 1.0,
-        DefChargeMultiplier: 1.5, DefChargeRisk: 2.0,
-        DefBowMultiplier: 0.5,
-        RojoDamageReduction: 0.5,
-        RepairCost: 100, RepairRecovery: 100,
-        SchemeDamageFactor: 10,
-        FireSuccessBase: 0.5, FireDamageFactor: 5,
-        RepairMaxSoldiers: 200,
-        RepairSoldierFactor: 0.1,
-        RepairMainPolFactor: 0.25,
-        RepairSubPolFactor: 0.05,
-        RepairGlobalMultiplier: 1.0,
-        RetreatRecoveryRate: 0.3,
-        ShortWarTurnLimit: 5,
-        BaseRecoveryRate: 0.2,
-        RetreatCaptureRate: 0.1,
-        DaimyoCaptureReduction: 0.3,
-        RetreatResourceLossFactor: 0.2,
-        LootingBaseRate: 0.3,
-        LootingCharmFactor: 0.002,
-        DaimyoCharmWeight: 0.1,
-        CounterAtkPowerFactor: 0.05 // 新設: 反撃時の敵能力影響係数
+        // 攻撃側アクション倍率・リスク
+        ChargeMultiplier: 1.2,      // 突撃攻撃力
+        ChargeRisk: 1.5,            // 突撃反撃被ダメージ係数
+        ChargeSoldierDmgRate: 1.0,  // 突撃：対兵士倍率
+        ChargeWallDmgRate: 0.5,     // 突撃：対城壁倍率
+
+        BowMultiplier: 0.6,         // 斉射攻撃力
+        BowRisk: 0.5,               // 斉射反撃被ダメージ係数
+
+        SiegeMultiplier: 1.0,       // 城攻め攻撃力
+        SiegeWallRate: 0.2,         // 城攻め：対城壁倍率 (CSV初期値に合わせ調整)
+        SiegeRisk: 1.3,             // 城攻め反撃被ダメージ係数
+
+        // 防御側アクション倍率
+        DefChargeMultiplier: 1.2,   // 防御側突撃
+        DefChargeRisk: 2.0,         // 防御側突撃リスク
+        DefBowMultiplier: 0.5,      // 防御側斉射
+        RojoDamageReduction: 0.7,   // 籠城時の被ダメージ軽減率 (CSVに合わせ0.5->0.7等の調整推奨)
+
+        // 反撃計算
+        CounterAtkPowerFactor: 0.05, // 反撃時の敵能力参照係数
+
+        // 補修コマンド (新仕様)
+        RepairMaxSoldiers: 200,     // 最大投入兵数
+        RepairSoldierFactor: 0.1,   // 兵数係数
+        RepairMainPolFactor: 0.25,  // 城主政治力係数
+        RepairSubPolFactor: 0.05,   // 副将政治力係数
+        RepairGlobalMultiplier: 0.6, // 全体補正 (CSV初期値)
+
+        // 計略・火計
+        SchemeDamageFactor: 4,      // 謀略ダメージ係数 (CSV初期値)
+        FireSuccessBase: 0.3,       // 火計成功率 (CSV初期値)
+        FireDamageFactor: 1.0,      // 火計ダメージ係数 (CSV初期値)
+
+        // 戦後処理・撤退・捕縛
+        ShortWarTurnLimit: 5,       // 短期決戦判定ターン
+        BaseRecoveryRate: 0.2,      // 通常負傷兵回復率
+        RetreatRecoveryRate: 0.3,   // 撤退時回復率
+        RetreatCaptureRate: 0.1,    // 撤退時捕縛率
+        DaimyoCaptureReduction: 0.3,// 大名捕縛回避補正
+        RetreatResourceLossFactor: 0.2, // 撤退時物資損失
+        LootingBaseRate: 0.3,       // 略奪率
+        LootingCharmFactor: 0.002,  // 略奪抑制魅力係数
+        DaimyoCharmWeight: 0.1      // 略奪抑制大名魅力重み
     }
 };
 
@@ -74,37 +118,55 @@ class WarSystem {
 
     // 戦闘ダメージ計算
     static calcWarDamage(atkStats, defStats, atkSoldiers, defSoldiers, defWall, atkMorale, defTraining, type) {
-        const fluctuation = window.WarParams.Military.DamageFluctuation || 0.2;
+        // 設定値の取得簡略化
+        const M = window.WarParams.Military;
+        const W = window.WarParams.War;
+
+        const fluctuation = M.DamageFluctuation || 0.2;
         const rand = 1.0 - fluctuation + (Math.random() * fluctuation * 2);
-        const moraleBonus = (atkMorale - 50) / 100; const trainingBonus = (defTraining - 50) / 100;
+        const moraleBonus = (atkMorale - 50) / 100; 
+        const trainingBonus = (defTraining - 50) / 100;
         
         // 攻撃力・防御力の基礎計算
         // atkPower: 攻撃側の総合力 (兵数含む)
         // defPower: 防御側の総合力 (兵数 + 城壁含む)
-        const atkPower = ((atkStats.ldr * 1.2) + (atkStats.str * 0.3) + (atkSoldiers * window.WarParams.Military.DamageSoldierPower)) * (1.0 + moraleBonus);
-        const defPower = ((defStats.ldr * 1.0) + (defStats.int * 0.5) + (defWall * window.WarParams.Military.WallDefenseEffect) + (defSoldiers * window.WarParams.Military.DamageSoldierPower)) * (1.0 + trainingBonus);
+        const atkPower = ((atkStats.ldr * 1.2) + (atkStats.str * 0.3) + (atkSoldiers * M.DamageSoldierPower)) * (1.0 + moraleBonus);
+        const defPower = ((defStats.ldr * 1.0) + (defStats.int * 0.5) + (defWall * M.WallDefenseEffect) + (defSoldiers * M.DamageSoldierPower)) * (1.0 + trainingBonus);
         
         let multiplier = 1.0, soldierRate = 1.0, wallRate = 0.0, counterRisk = 1.0;
         
-        const W = window.WarParams.War;
-        
-        // 新パラメータの取得
-        const chargeSoldierRate = W.ChargeSoldierDmgRate !== undefined ? W.ChargeSoldierDmgRate : 1.0;
-        const chargeWallRate = W.ChargeWallDmgRate !== undefined ? W.ChargeWallDmgRate : 0.5;
-        const counterFactor = W.CounterAtkPowerFactor !== undefined ? W.CounterAtkPowerFactor : 0.05;
-
+        // アクションタイプごとの倍率適用 (WarParams.Warから取得)
         switch(type) {
-            case 'bow': multiplier = W.BowMultiplier; wallRate = 0.0; counterRisk = W.BowRisk; break;
-            case 'siege': multiplier = W.SiegeMultiplier; soldierRate = 0.05; wallRate = W.SiegeWallRate; counterRisk = W.SiegeRisk; break;
+            case 'bow': 
+                multiplier = W.BowMultiplier; 
+                wallRate = 0.0; 
+                counterRisk = W.BowRisk; 
+                break;
+            case 'siege': 
+                multiplier = W.SiegeMultiplier; 
+                soldierRate = 0.05; // 城攻めは兵士へのダメージが通りにくい（仕様として固定または別途パラメータ化も可）
+                wallRate = W.SiegeWallRate; 
+                counterRisk = W.SiegeRisk; 
+                break;
             case 'charge': 
                 multiplier = W.ChargeMultiplier; 
-                soldierRate = chargeSoldierRate; // パラメータ適用
-                wallRate = chargeWallRate;       // パラメータ適用
+                soldierRate = W.ChargeSoldierDmgRate; 
+                wallRate = W.ChargeWallDmgRate;       
                 counterRisk = W.ChargeRisk; 
                 break;
-            case 'def_bow': multiplier = W.DefBowMultiplier; wallRate = 0.0; break;
-            case 'def_attack': multiplier = 0.0; wallRate = 0.0; break; 
-            case 'def_charge': multiplier = W.DefChargeMultiplier; wallRate = 0.0; counterRisk = W.DefChargeRisk; break; 
+            case 'def_bow': 
+                multiplier = W.DefBowMultiplier; 
+                wallRate = 0.0; 
+                break;
+            case 'def_attack': // 籠城（攻撃しない）
+                multiplier = 0.0; 
+                wallRate = 0.0; 
+                break; 
+            case 'def_charge': 
+                multiplier = W.DefChargeMultiplier; 
+                wallRate = 0.0; 
+                counterRisk = W.DefChargeRisk; 
+                break; 
         }
         
         // 基本ダメージ計算
@@ -112,10 +174,10 @@ class WarSystem {
         let baseDmg = atkPower * ratio * multiplier * rand; 
         baseDmg = Math.max(50, baseDmg);
         
-        // 反撃ダメージ計算 (OpponentPower * Factor * Risk)
-        // 攻撃側アクションの場合、相手は「防御側(defPower = 武将+兵+城壁)」
-        // 防御側アクション(def_*)の場合、相手は「攻撃側(atkPower = 武将+兵)」
+        // 反撃ダメージ計算
         let counterDmg = 0;
+        const counterFactor = W.CounterAtkPowerFactor !== undefined ? W.CounterAtkPowerFactor : 0.05;
+
         if (counterRisk > 0 && type !== 'def_attack') {
             let isAttackerAction = true;
             if (type.startsWith('def_')) isAttackerAction = false;
@@ -130,7 +192,7 @@ class WarSystem {
         return { 
             soldierDmg: Math.floor(baseDmg * soldierRate), 
             wallDmg: Math.floor(baseDmg * wallRate * 0.5), 
-            counterDmg: counterDmg // 計算済みの反撃ダメージを返す
+            counterDmg: counterDmg 
         };
     }
 
@@ -347,7 +409,7 @@ class WarManager {
         
         const isAtkTurn = (s.turn === 'attacker'); 
         
-        // ★修正: UI描画呼び出し (ボタンの内容はWarManagerが制御)
+        // UI描画呼び出し
         this.game.ui.renderWarControls(isAtkTurn); 
         
         const isMyTurn = (isAtkTurn && s.attacker.ownerClan === this.game.playerClanId) ||
@@ -451,6 +513,7 @@ class WarManager {
                  let subPolSum = 0;
                  for(let i=1; i<politicsList.length; i++) subPolSum += politicsList[i];
 
+                 // パラメータ参照
                  let rawPower = (soldierCost * W.RepairSoldierFactor) + 
                                 (maxPol * W.RepairMainPolFactor) + 
                                 (subPolSum * W.RepairSubPolFactor);
