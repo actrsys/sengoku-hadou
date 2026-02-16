@@ -302,6 +302,13 @@ class GameSystem {
             const err = (Math.random() - 0.5) * 2 * maxErr;
             return Math.max(1, Math.min(120, Math.floor(realVal + err)));
         }
+        
+        // --- 修正箇所: 他国の武将は調査情報がない限り、軍師がいても秘匿する ---
+        if (target.clan !== 0 && target.clan !== playerClanId) {
+            return null;
+        }
+        // -------------------------------------------------------------
+
         if (gunshi) {
             const noise = (130 - gunshi.intelligence);
             const err = (Math.random() - 0.5) * noise * 2;
