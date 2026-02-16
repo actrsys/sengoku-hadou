@@ -128,14 +128,12 @@ class WarSystem {
         const trainingBonus = (defTraining - 50) / 100;
         
         // 攻撃力・防御力の基礎計算
-        // atkPower: 攻撃側の総合力 (兵数含む)
-        // defPower: 防御側の総合力 (兵数 + 城壁含む)
         const atkPower = ((atkStats.ldr * 1.2) + (atkStats.str * 0.3) + (atkSoldiers * M.DamageSoldierPower)) * (1.0 + moraleBonus);
         const defPower = ((defStats.ldr * 1.0) + (defStats.int * 0.5) + (defWall * M.WallDefenseEffect) + (defSoldiers * M.DamageSoldierPower)) * (1.0 + trainingBonus);
         
         let multiplier = 1.0, soldierRate = 1.0, wallRate = 0.0, counterRisk = 1.0;
         
-        // アクションタイプごとの倍率適用 (WarParams.Warから取得)
+        // アクションタイプごとの倍率適用
         switch(type) {
             case 'bow': 
                 multiplier = W.BowMultiplier; 
@@ -144,7 +142,7 @@ class WarSystem {
                 break;
             case 'siege': 
                 multiplier = W.SiegeMultiplier; 
-                soldierRate = 0.05; // 城攻めは兵士へのダメージが通りにくい（仕様として固定または別途パラメータ化も可）
+                soldierRate = 0.05; 
                 wallRate = W.SiegeWallRate; 
                 counterRisk = W.SiegeRisk; 
                 break;
@@ -158,7 +156,7 @@ class WarSystem {
                 multiplier = W.DefBowMultiplier; 
                 wallRate = 0.0; 
                 break;
-            case 'def_attack': // 籠城（攻撃しない）
+            case 'def_attack': 
                 multiplier = 0.0; 
                 wallRate = 0.0; 
                 break; 
@@ -181,11 +179,7 @@ class WarSystem {
         if (counterRisk > 0 && type !== 'def_attack') {
             let isAttackerAction = true;
             if (type.startsWith('def_')) isAttackerAction = false;
-            
-            // 反撃元となる相手のパワー
             const opponentPower = isAttackerAction ? defPower : atkPower;
-            
-            // 反撃計算: 相手の力 × 係数 × リスク係数
             counterDmg = Math.floor(opponentPower * counterFactor * counterRisk);
         }
         
@@ -200,7 +194,6 @@ class WarSystem {
     static calcScheme(atkBusho, defBusho, defCastleLoyalty) { 
         const atkInt = atkBusho.intelligence; 
         const defInt = defBusho ? defBusho.intelligence : 30; 
-        // Strategy設定はMainParams(game.js)にあるため参照
         const successRate = (atkInt / (defInt + 20)) * window.MainParams.Strategy.SchemeSuccessRate; 
         
         if (Math.random() > successRate) return { success: false, damage: 0 }; 
@@ -248,13 +241,6 @@ class WarManager {
         this.pendingPrisoners = [];
     }
 
-    // ----------------------------------------------------------------------
-    // ★外部連携用メソッド（GameManager/UIManagerから呼ばれる）
-    // ----------------------------------------------------------------------
-
-    /**
-     * 攻撃可能な城のIDリストを返す
-     */
     getValidWarTargets(currentCastle) {
         return this.game.castles.filter(target => 
             GameSystem.isAdjacent(currentCastle, target) && 
@@ -264,9 +250,6 @@ class WarManager {
         ).map(t => t.id);
     }
 
-    /**
-     * 現在の戦況に応じたコマンドリストを返す
-     */
     getAvailableCommands(isAtkTurn) {
         const s = this.state;
         if (!s.isPlayerInvolved) return [];
@@ -274,12 +257,11 @@ class WarManager {
         const isMyTurn = (isAtkTurn && s.attacker.ownerClan === this.game.playerClanId) ||
                          (!isAtkTurn && s.defender.ownerClan === this.game.playerClanId);
 
-        if (!isMyTurn) return []; // 自分のターンでなければコマンドなし
+        if (!isMyTurn) return []; 
 
         const commands = [];
         
         if (isAtkTurn) {
-            // 攻撃側のコマンド定義
             commands.push({ label: "突撃", type: "charge" });
             commands.push({ label: "斉射", type: "bow" });
             commands.push({ label: "城攻め", type: "siege" });
@@ -287,16 +269,12 @@ class WarManager {
             commands.push({ label: "謀略", type: "scheme" });
             commands.push({ label: "撤退", type: "retreat" });
         } else {
-            // 防御側のコマンド定義
             commands.push({ label: "突撃", type: "def_charge" });
             commands.push({ label: "斉射", type: "def_bow" });
             commands.push({ label: "籠城", type: "def_attack" });
             commands.push({ label: "謀略", type: "scheme" });
-            
-            // 補修はパラメータが必要なため特殊扱いだが、コマンドとしては列挙
             commands.push({ label: "補修", type: "repair_setup" }); 
 
-            // 撤退可能か判定
             const friendlyCastles = this.game.castles.filter(c => c.ownerClan === s.defender.ownerClan && c.id !== s.defender.id && GameSystem.isAdjacent(c, s.defender));
             if (friendlyCastles.length > 0) {
                 commands.push({ label: "撤退", type: "retreat" });
@@ -305,15 +283,10 @@ class WarManager {
         return commands;
     }
 
-    /**
-     * 軍師助言の取得
-     */
     getGunshiAdvice(action) {
-        // 戦争開始前の助言
         if (action.type === 'war') {
             return "合戦におもむきますか？ 兵力と兵糧の確認をお忘れなく。";
         }
-        // 戦闘中の助言
         if (this.state.active) {
             const gunshi = this.game.getClanGunshi(this.game.playerClanId);
             if (!gunshi) return null;
@@ -322,11 +295,6 @@ class WarManager {
         return null;
     }
 
-    // ----------------------------------------------------------------------
-    // 戦争進行ロジック
-    // ----------------------------------------------------------------------
-
-    // 戦争開始処理
     startWar(atkCastle, defCastle, atkBushos, atkSoldierCount) {
         try {
             const isPlayerInvolved = (atkCastle.ownerClan === this.game.playerClanId || defCastle.ownerClan === this.game.playerClanId);
@@ -381,7 +349,6 @@ class WarManager {
         }
     }
 
-    // 自動戦闘解決（プレイヤー不在時）
     resolveAutoWar() { 
         try { 
             const s = this.state; 
@@ -398,7 +365,6 @@ class WarManager {
         } 
     }
 
-    // 戦闘ラウンド進行
     processWarRound() { 
         if (!this.state.active) return; 
         const s = this.state; 
@@ -406,31 +372,23 @@ class WarManager {
         if (s.attacker.soldiers <= 0) { this.endWar(false); return; } 
         
         this.game.ui.updateWarUI(); 
-        
         const isAtkTurn = (s.turn === 'attacker'); 
-        
-        // UI描画呼び出し
         this.game.ui.renderWarControls(isAtkTurn); 
         
         const isMyTurn = (isAtkTurn && s.attacker.ownerClan === this.game.playerClanId) ||
                          (!isAtkTurn && s.defender.ownerClan === this.game.playerClanId);
         
-        if (isMyTurn) {
-            // プレイヤー入力待ち
-        } else { 
+        if (!isMyTurn) { 
             setTimeout(() => this.execWarAI(), 800); 
         } 
     }
 
-    // 戦闘コマンド実行
     execWarCmd(type, extraVal = null) { 
         if (type === 'repair_setup') {
-             // 補修の場合は数量選択へ（Game.jsのUIを呼び出す）
              const s = this.state;
              window.GameApp.ui.openQuantitySelector('war_repair', [s.defender], null);
              return;
         }
-
         if(type==='scheme'||type==='fire') this.resolveWarAction(type); 
         else { 
             document.getElementById('war-controls').classList.add('disabled-area'); 
@@ -438,7 +396,6 @@ class WarManager {
         } 
     }
 
-    // 戦闘AI
     execWarAI() { 
         const s = this.state;
         const actor = s.turn === 'attacker' ? s.atkBushos[0] : s.defBusho; 
@@ -484,14 +441,12 @@ class WarManager {
         this.resolveWarAction(cmd); 
     }
 
-    // アクション解決
     resolveWarAction(type, extraVal = null) {
         if (!this.state.active) return;
         const s = this.state;
         if(type === 'retreat') { if(s.turn === 'attacker') { this.endWar(false); } else { this.executeRetreatLogic(s.defender); } return; }
         const isAtkTurn = (s.turn === 'attacker'); const target = isAtkTurn ? s.defender : s.attacker;
         
-        // WarSystemを使用
         let atkStats = WarSystem.calcUnitStats(s.atkBushos); 
         let defStats = { str: s.defBusho.strength, int: s.defBusho.intelligence, ldr: s.defBusho.leadership };
         
@@ -506,14 +461,12 @@ class WarManager {
              if (s.defender.soldiers > soldierCost) {
                  const W = window.WarParams.War;
                  s.defender.soldiers -= soldierCost;
-
                  const castleBushos = this.game.getCastleBushos(s.defender.id);
                  const politicsList = castleBushos.map(b => b.politics).sort((a,b) => b - a);
                  const maxPol = politicsList.length > 0 ? politicsList[0] : 0;
                  let subPolSum = 0;
                  for(let i=1; i<politicsList.length; i++) subPolSum += politicsList[i];
 
-                 // パラメータ参照
                  let rawPower = (soldierCost * W.RepairSoldierFactor) + 
                                 (maxPol * W.RepairMainPolFactor) + 
                                 (subPolSum * W.RepairSubPolFactor);
@@ -529,7 +482,6 @@ class WarManager {
              return;
         }
 
-        // WarSystemを使用
         if (type === 'scheme') { 
             const actor = isAtkTurn ? s.atkBushos[0] : s.defBusho; 
             const targetBusho = isAtkTurn ? s.defBusho : s.atkBushos[0]; 
@@ -543,7 +495,6 @@ class WarManager {
             this.advanceWarTurn(); return; 
         }
         
-        // WarSystemを使用
         if (type === 'fire') { 
             const actor = isAtkTurn ? s.atkBushos[0] : s.defBusho; 
             const targetBusho = isAtkTurn ? s.defBusho : s.atkBushos[0]; 
@@ -558,7 +509,6 @@ class WarManager {
             this.advanceWarTurn(); return; 
         }
         
-        // WarSystemを使用 (カウンターダメージを含む結果を取得)
         const result = WarSystem.calcWarDamage(atkStats, defStats, s.attacker.soldiers, s.defender.soldiers, s.defender.defense, s.attacker.morale, s.defender.training, type);
         let actualSoldierDmg = Math.min(target.soldiers, result.soldierDmg);
         let actualWallDmg = result.wallDmg;
@@ -574,11 +524,11 @@ class WarManager {
         if(isAtkTurn) s.deadSoldiers.defender += actualSoldierDmg; else s.deadSoldiers.attacker += actualSoldierDmg;
         if (isAtkTurn) s.defender.defense = Math.max(0, s.defender.defense - actualWallDmg);
         
-        // 反撃処理 (result.counterDmgを使用)
         if(result.counterDmg > 0) { 
             const counterDmg = result.counterDmg; 
             const actorArmy = isAtkTurn ? s.attacker : s.defender; 
             actorArmy.soldiers = Math.max(0, actorArmy.soldiers - counterDmg); 
+            if(isAtkTurn) s.deadSoldiers.attacker += counterDmg; else s.deadSoldiers.defender += counterDmg; // 負傷計算用にカウント
             if(s.isPlayerInvolved) this.game.ui.log(`(反撃被害: ${counterDmg})`); 
         }
         
@@ -593,7 +543,6 @@ class WarManager {
 
     advanceWarTurn() { const s = this.state; if (s.turn === 'attacker') s.turn = 'defender'; else { s.turn = 'attacker'; s.round++; if(s.round > window.WarParams.Military.WarMaxRounds) { this.endWar(false); return; } } if (s.isPlayerInvolved) this.processWarRound(); }
     
-    // 撤退ロジック
     executeRetreatLogic(defCastle) {
         const candidates = this.game.castles.filter(c => c.ownerClan === defCastle.ownerClan && c.id !== defCastle.id && GameSystem.isAdjacent(c, defCastle));
         if (candidates.length === 0) { this.endWar(true); return; }
@@ -648,7 +597,6 @@ class WarManager {
                 this.endWar(true, true, capturedBushos, target.id); 
             }
         };
-        // WarSystem.calcRetreatScore を使用
         if (defCastle.ownerClan === this.game.playerClanId) { 
             if (candidates.length === 1) runRetreat(candidates[0].id); 
             else this.game.ui.showRetreatSelector(defCastle, candidates, (id) => runRetreat(id)); 
@@ -659,7 +607,6 @@ class WarManager {
         }
     }
 
-    // 戦争終了処理
     endWar(attackerWon, isRetreat = false, capturedInRetreat = [], retreatTargetId = null) { 
         const s = this.state; s.active = false; 
         if (s.isPlayerInvolved) {
@@ -671,19 +618,15 @@ class WarManager {
         const baseRecov = window.WarParams.War.BaseRecoveryRate;
         const highRecov = window.WarParams.War.RetreatRecoveryRate;
 
-        const attackerRecoverRate = baseRecov;
-        let defenderRecoverRate = baseRecov;
-        if (isRetreat && isShortWar) {
-             defenderRecoverRate = highRecov;
-        }
+        // 【修正】負傷兵の回復を計算
+        const attackerRecovered = Math.floor(s.deadSoldiers.attacker * baseRecov);
+        const totalAtkSurvivors = s.attacker.soldiers + attackerRecovered;
 
-        s.attacker.soldiers += Math.floor(s.deadSoldiers.attacker * attackerRecoverRate); 
-        
         if (isRetreat && retreatTargetId) {
              const targetC = this.game.getCastle(retreatTargetId);
              if (targetC) {
-                 const recovered = Math.floor(s.deadSoldiers.defender * defenderRecoverRate);
-                 targetC.soldiers += recovered;
+                 const recovered = Math.floor(s.deadSoldiers.defender * (isShortWar ? highRecov : baseRecov));
+                 targetC.soldiers += (s.defender.soldiers + recovered);
                  if (s.isPlayerInvolved && recovered > 0) {
                      this.game.ui.log(`(撤退先にて負傷兵 ${recovered}名 が復帰)`);
                  }
@@ -694,14 +637,25 @@ class WarManager {
              const recovered = Math.floor(s.deadSoldiers.defender * 0.2);
              const totalAbsorbed = survivors + recovered;
              
-             s.defender.soldiers = s.attacker.soldiers + totalAbsorbed;
+             // 占領後の城の兵士 ＝ 攻撃側の生き残り ＋ 吸収した敵兵
+             s.defender.soldiers = totalAtkSurvivors + totalAbsorbed;
              
              if (s.isPlayerInvolved && totalAbsorbed > 0) {
                  this.game.ui.log(`(敵残存兵・負傷兵 計${totalAbsorbed}名 を吸収)`);
              }
         } 
         else if (!isRetreat && !attackerWon) {
-             s.defender.soldiers += Math.floor(s.deadSoldiers.defender * defenderRecoverRate);
+             // 攻撃失敗時：攻撃側は元の城に戻る（生存兵＋回復分）
+             const srcC = this.game.getCastle(s.sourceCastle.id); 
+             srcC.soldiers += totalAtkSurvivors; 
+
+             // 防御側は自分の城で回復
+             const recovered = Math.floor(s.deadSoldiers.defender * baseRecov);
+             s.defender.soldiers += recovered;
+             
+             if (s.isPlayerInvolved && attackerRecovered > 0) {
+                 this.game.ui.log(`(遠征軍 負傷兵 ${attackerRecovered}名 が帰還)`);
+             }
         }
 
         if (isRetreat && capturedInRetreat.length > 0) {
@@ -764,8 +718,6 @@ class WarManager {
                 if(idx === 0) { b.isCastellan = true; s.defender.castellanId = b.id; } else b.isCastellan = false; 
             }); 
         } else { 
-            const srcC = this.game.getCastle(s.sourceCastle.id); 
-            srcC.soldiers += s.attacker.soldiers; 
             s.defender.immunityUntil = currentTurnId;
         } 
         
@@ -776,7 +728,6 @@ class WarManager {
         const losers = this.game.getCastleBushos(defeatedCastle.id); 
         const captives = []; 
         const escapees = [];
-        
         const friendlyCastles = this.game.castles.filter(c => c.ownerClan === defeatedCastle.ownerClan && c.id !== defeatedCastle.id);
         const isLastStand = friendlyCastles.length === 0;
 
@@ -815,7 +766,6 @@ class WarManager {
         } 
     }
     
-    // 捕虜操作
     handlePrisonerAction(index, action) { 
         const prisoner = this.pendingPrisoners[index]; 
         const originalClanId = prisoner.clan;
@@ -851,7 +801,6 @@ class WarManager {
         else this.game.ui.showPrisonerModal(this.pendingPrisoners); 
     }
     
-    // 大名死亡時の処理
     handleDaimyoDeath(daimyo) { 
         const clanId = daimyo.clan; if(clanId === 0) return; 
         const candidates = this.game.bushos.filter(b => b.clan === clanId && b.id !== daimyo.id && b.status !== 'dead' && b.status !== 'ronin'); 
@@ -864,7 +813,6 @@ class WarManager {
         else { candidates.sort((a,b) => (b.politics + b.charm) - (a.politics + a.charm)); this.game.changeLeader(clanId, candidates[0].id); } 
     }
     
-    // AIによる捕虜処遇
     autoResolvePrisoners(captives, winnerClanId) { 
         const aiBushos = this.game.bushos.filter(b => b.clan === winnerClanId); 
         const leaderInt = aiBushos.length > 0 ? Math.max(...aiBushos.map(b => b.intelligence)) : 50; 
