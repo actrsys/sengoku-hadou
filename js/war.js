@@ -17,6 +17,7 @@ window.WarParams = {
     },
     War: {
         ChargeMultiplier: 1.2, ChargeRisk: 1.5,
+        ChargeSoldierDmgRate: 1.0, ChargeWallDmgRate: 0.5, // 新設: 突撃の個別ダメージ倍率
         BowMultiplier: 0.6, BowRisk: 0.5,
         SiegeMultiplier: 1.0, SiegeWallRate: 0.5, SiegeRisk: 1.0,
         DefChargeMultiplier: 1.5, DefChargeRisk: 2.0,
@@ -38,7 +39,8 @@ window.WarParams = {
         RetreatResourceLossFactor: 0.2,
         LootingBaseRate: 0.3,
         LootingCharmFactor: 0.002,
-        DaimyoCharmWeight: 0.1
+        DaimyoCharmWeight: 0.1,
+        CounterAtkPowerFactor: 0.05 // 新設: 反撃時の敵能力影響係数
     }
 };
 
@@ -77,26 +79,59 @@ class WarSystem {
         const moraleBonus = (atkMorale - 50) / 100; const trainingBonus = (defTraining - 50) / 100;
         
         // 攻撃力・防御力の基礎計算
+        // atkPower: 攻撃側の総合力 (兵数含む)
+        // defPower: 防御側の総合力 (兵数 + 城壁含む)
         const atkPower = ((atkStats.ldr * 1.2) + (atkStats.str * 0.3) + (atkSoldiers * window.WarParams.Military.DamageSoldierPower)) * (1.0 + moraleBonus);
         const defPower = ((defStats.ldr * 1.0) + (defStats.int * 0.5) + (defWall * window.WarParams.Military.WallDefenseEffect) + (defSoldiers * window.WarParams.Military.DamageSoldierPower)) * (1.0 + trainingBonus);
         
         let multiplier = 1.0, soldierRate = 1.0, wallRate = 0.0, counterRisk = 1.0;
         
         const W = window.WarParams.War;
+        
+        // 新パラメータの取得
+        const chargeSoldierRate = W.ChargeSoldierDmgRate !== undefined ? W.ChargeSoldierDmgRate : 1.0;
+        const chargeWallRate = W.ChargeWallDmgRate !== undefined ? W.ChargeWallDmgRate : 0.5;
+        const counterFactor = W.CounterAtkPowerFactor !== undefined ? W.CounterAtkPowerFactor : 0.05;
+
         switch(type) {
             case 'bow': multiplier = W.BowMultiplier; wallRate = 0.0; counterRisk = W.BowRisk; break;
             case 'siege': multiplier = W.SiegeMultiplier; soldierRate = 0.05; wallRate = W.SiegeWallRate; counterRisk = W.SiegeRisk; break;
-            case 'charge': multiplier = W.ChargeMultiplier; soldierRate = 1.0; wallRate = 0.5; counterRisk = W.ChargeRisk; break;
+            case 'charge': 
+                multiplier = W.ChargeMultiplier; 
+                soldierRate = chargeSoldierRate; // パラメータ適用
+                wallRate = chargeWallRate;       // パラメータ適用
+                counterRisk = W.ChargeRisk; 
+                break;
             case 'def_bow': multiplier = W.DefBowMultiplier; wallRate = 0.0; break;
             case 'def_attack': multiplier = 0.0; wallRate = 0.0; break; 
             case 'def_charge': multiplier = W.DefChargeMultiplier; wallRate = 0.0; counterRisk = W.DefChargeRisk; break; 
         }
         
+        // 基本ダメージ計算
         const ratio = atkPower / (atkPower + defPower);
         let baseDmg = atkPower * ratio * multiplier * rand; 
         baseDmg = Math.max(50, baseDmg);
         
-        return { soldierDmg: Math.floor(baseDmg * soldierRate), wallDmg: Math.floor(baseDmg * wallRate * 0.5), risk: counterRisk };
+        // 反撃ダメージ計算 (OpponentPower * Factor * Risk)
+        // 攻撃側アクションの場合、相手は「防御側(defPower = 武将+兵+城壁)」
+        // 防御側アクション(def_*)の場合、相手は「攻撃側(atkPower = 武将+兵)」
+        let counterDmg = 0;
+        if (counterRisk > 0 && type !== 'def_attack') {
+            let isAttackerAction = true;
+            if (type.startsWith('def_')) isAttackerAction = false;
+            
+            // 反撃元となる相手のパワー
+            const opponentPower = isAttackerAction ? defPower : atkPower;
+            
+            // 反撃計算: 相手の力 × 係数 × リスク係数
+            counterDmg = Math.floor(opponentPower * counterFactor * counterRisk);
+        }
+        
+        return { 
+            soldierDmg: Math.floor(baseDmg * soldierRate), 
+            wallDmg: Math.floor(baseDmg * wallRate * 0.5), 
+            counterDmg: counterDmg // 計算済みの反撃ダメージを返す
+        };
     }
 
     // 謀略
@@ -460,7 +495,7 @@ class WarManager {
             this.advanceWarTurn(); return; 
         }
         
-        // WarSystemを使用
+        // WarSystemを使用 (カウンターダメージを含む結果を取得)
         const result = WarSystem.calcWarDamage(atkStats, defStats, s.attacker.soldiers, s.defender.soldiers, s.defender.defense, s.attacker.morale, s.defender.training, type);
         let actualSoldierDmg = Math.min(target.soldiers, result.soldierDmg);
         let actualWallDmg = result.wallDmg;
@@ -475,7 +510,14 @@ class WarManager {
         target.soldiers -= actualSoldierDmg;
         if(isAtkTurn) s.deadSoldiers.defender += actualSoldierDmg; else s.deadSoldiers.attacker += actualSoldierDmg;
         if (isAtkTurn) s.defender.defense = Math.max(0, s.defender.defense - actualWallDmg);
-        if(result.risk > 1.0) { const counterDmg = Math.floor(actualSoldierDmg * (result.risk - 1.0) * 0.5); const actorArmy = isAtkTurn ? s.attacker : s.defender; actorArmy.soldiers = Math.max(0, actorArmy.soldiers - counterDmg); if(s.isPlayerInvolved) this.game.ui.log(`(反撃被害: ${counterDmg})`); }
+        
+        // 反撃処理 (result.counterDmgを使用)
+        if(result.counterDmg > 0) { 
+            const counterDmg = result.counterDmg; 
+            const actorArmy = isAtkTurn ? s.attacker : s.defender; 
+            actorArmy.soldiers = Math.max(0, actorArmy.soldiers - counterDmg); 
+            if(s.isPlayerInvolved) this.game.ui.log(`(反撃被害: ${counterDmg})`); 
+        }
         
         if (s.isPlayerInvolved) { 
             let actionName = type.includes('bow') ? "弓攻撃" : type.includes('siege') ? "城攻め" : "力攻め"; 
