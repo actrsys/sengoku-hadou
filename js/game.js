@@ -672,9 +672,10 @@ class UIManager {
         if(this.panelEl) this.panelEl.classList.remove('hidden');
         this.updatePanelHeader(); 
         
-        if (castle.ownerClan === this.game.playerClanId) {
+        // 厳密な数値判定でプレイヤーの城かどうかを判定
+        if (Number(castle.ownerClan) === Number(this.game.playerClanId)) {
              if (!this.game.selectionMode) {
-                 if (castle === this.game.getCurrentTurnCastle()) {
+                 if (this.game.getCurrentTurnCastle() === castle) {
                      this.menuState = 'MAIN';
                      this.renderCommandMenu(); 
                  } else {
@@ -1256,7 +1257,7 @@ class GameManager {
     getCurrentTurnId() { return this.year * 12 + this.month; }
     getClanTotalSoldiers(clanId) { return this.castles.filter(c => c.ownerClan === clanId).reduce((sum, c) => sum + c.soldiers, 0); }
     getClanGunshi(clanId) { return this.bushos.find(b => b.clan === clanId && b.isGunshi); }
-    isCastleVisible(castle) { if (castle.ownerClan === this.playerClanId) return true; if (castle.investigatedUntil >= this.getCurrentTurnId()) return true; return false; }
+    isCastleVisible(castle) { if (Number(castle.ownerClan) === Number(this.playerClanId)) return true; if (castle.investigatedUntil >= this.getCurrentTurnId()) return true; return false; }
     
     startMonth() {
         this.marketRate = Math.max(window.MainParams.Economy.TradeRateMin, Math.min(window.MainParams.Economy.TradeRateMax, this.marketRate * (0.9 + Math.random()*window.MainParams.Economy.TradeFluctuation)));
@@ -1300,7 +1301,8 @@ class GameManager {
         
         this.ui.renderMap();
         
-        if (castle.ownerClan === this.playerClanId) { 
+        // 厳密な数値比較によるプレイヤー判定
+        if (Number(castle.ownerClan) === Number(this.playerClanId)) { 
             this.isProcessingAI = false; 
             this.ui.renderMap(); 
             this.ui.log(`【${castle.name}】命令を下してください`); 
@@ -1420,8 +1422,8 @@ class GameManager {
     // 重大な修正: AIのターン中にこのメソッドが誤動作してプレイヤーのターンをスキップするのを防ぐ
     checkAllActionsDone() {
         const c = this.getCurrentTurnCastle();
-        // プレイヤーの城でない場合は無視する
-        if (!c || c.ownerClan !== this.playerClanId) return; 
+        // プレイヤーの城でない場合は無視する（ID判定を厳密化）
+        if (!c || Number(c.ownerClan) !== Number(this.playerClanId)) return; 
 
         const bushos = this.getCastleBushos(c.id).filter(b => b.status !== 'ronin');
         if(bushos.length > 0 && bushos.every(b => b.isActionDone)) {
