@@ -1732,8 +1732,12 @@ class GameManager {
              }
         }
         
+        // 呼びかけの文言を判定（大名の独り言なら「〜か...」、それ以外は「〜殿ですか...」）
+        const isMonologue = interviewer.isDaimyo && interviewer.clan === this.playerClanId;
+        const targetCall = isMonologue ? `${target.name}か...` : `${target.name}殿ですか...`;
+        
         const returnScript = `window.GameApp.ui.reopenInterviewModal(window.GameApp.getBusho(${interviewer.id}))`;
-        this.ui.showResultModal(`<strong>${interviewer.name}</strong><br>「${target.name}殿ですか...」<br><br>${comment}<br><br><button class='btn-secondary' onclick='${returnScript}'>戻る</button>`);
+        this.ui.showResultModal(`<strong>${interviewer.name}</strong><br>「${targetCall}」<br><br>${comment}<br><br><button class='btn-secondary' onclick='${returnScript}'>戻る</button>`);
     }
 
     executeTransport(bushoIds, targetId, vals) {
