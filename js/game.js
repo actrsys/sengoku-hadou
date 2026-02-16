@@ -105,24 +105,30 @@ class DataManager {
     static async fetchText(url) {
         const response = await fetch(url);
         if (!response.ok) throw new Error(`Failed to load ${url}`);
-        return await response.text();
+        let text = await response.text();
+        // BOM (Byte Order Mark) 対策: 先頭の不可視文字を削除
+        if (text.charCodeAt(0) === 0xFEFF) {
+            text = text.slice(1);
+        }
+        return text;
     }
     static joinData(clans, castles, bushos) {
         castles.forEach(c => c.samuraiIds = []);
         bushos.forEach(b => {
-            const clan = clans.find(cl => cl.leaderId === b.id);
+            const clan = clans.find(cl => Number(cl.leaderId) === Number(b.id));
             if (clan) b.isDaimyo = true;
-            const castleAsCastellan = castles.find(cs => cs.castellanId === b.id);
+            const castleAsCastellan = castles.find(cs => Number(cs.castellanId) === Number(b.id));
             if (castleAsCastellan) b.isCastellan = true;
             if (b.clan === 0) b.status = 'ronin';
-            const c = castles.find(castle => castle.id === b.castleId);
+            const c = castles.find(castle => Number(castle.id) === Number(b.castleId));
             if(c) c.samuraiIds.push(b.id);
         });
     }
     static parseCSV(text, ModelClass) {
         const lines = text.split('\n').map(l => l.trim()).filter(l => l);
         if (lines.length === 0) return [];
-        const headers = lines[0].split(',');
+        // ヘッダーの空白削除 (BOM対策済みテキストを使用)
+        const headers = lines[0].split(',').map(h => h.trim());
         const result = [];
         for (let i = 1; i < lines.length; i++) {
             const values = lines[i].split(',');
@@ -130,6 +136,7 @@ class DataManager {
             const data = {};
             headers.forEach((header, index) => {
                 let val = values[index];
+                if (val) val = val.trim(); // 値もトリム
                 if (!isNaN(Number(val)) && val !== "") val = Number(val);
                 if (val === "true" || val === "TRUE") val = true;
                 if (val === "false" || val === "FALSE") val = false;
@@ -144,8 +151,8 @@ class DataManager {
         if (lines.length < 2) return;
         for (let i = 1; i < lines.length; i++) {
             const [surname, name] = lines[i].split(',');
-            if (surname) this.genericNames.surnames.push(surname);
-            if (name) this.genericNames.names.push(name);
+            if (surname) this.genericNames.surnames.push(surname.trim());
+            if (name) this.genericNames.names.push(name.trim());
         }
     }
     static generateGenericBushos(bushos, castles, clans) {
@@ -153,7 +160,7 @@ class DataManager {
         const personalities = ['aggressive', 'cautious', 'balanced'];
         const useRandom = window.MainParams.System.UseRandomNames && this.genericNames.surnames.length > 0;
         clans.forEach(clan => {
-            const clanCastles = castles.filter(c => c.ownerClan === clan.id);
+            const clanCastles = castles.filter(c => Number(c.ownerClan) === Number(clan.id));
             if(clanCastles.length === 0) return;
             for(let i=0; i<3; i++) {
                 const castle = clanCastles[Math.floor(Math.random() * clanCastles.length)];
@@ -1255,7 +1262,7 @@ class GameManager {
             this.clans = data.clans; this.castles = data.castles; this.bushos = data.bushos; 
             
             document.getElementById('app').classList.remove('hidden'); 
-            this.ui.showStartScreen(this.clans, (clanId) => { this.playerClanId = clanId; this.init(); }); 
+            this.ui.showStartScreen(this.clans, (clanId) => { this.playerClanId = Number(clanId); this.init(); }); 
         } catch (e) {
             console.error(e);
             alert("シナリオデータの読み込みに失敗しました。");
@@ -1263,13 +1270,13 @@ class GameManager {
         }
     }
     init() { this.startMonth(); }
-    getBusho(id) { return this.bushos.find(b => b.id === id); }
-    getCastle(id) { return this.castles.find(c => c.id === id); }
-    getCastleBushos(cid) { const c = this.castles.find(c => c.id === cid); return c ? c.samuraiIds.map(id => this.getBusho(id)).filter(b => b) : []; }
+    getBusho(id) { return this.bushos.find(b => Number(b.id) === Number(id)); }
+    getCastle(id) { return this.castles.find(c => Number(c.id) === Number(id)); }
+    getCastleBushos(cid) { const c = this.castles.find(c => Number(c.id) === Number(cid)); return c ? c.samuraiIds.map(id => this.getBusho(id)).filter(b => b) : []; }
     getCurrentTurnCastle() { return this.turnQueue[this.currentIndex]; }
     getCurrentTurnId() { return this.year * 12 + this.month; }
-    getClanTotalSoldiers(clanId) { return this.castles.filter(c => c.ownerClan === clanId).reduce((sum, c) => sum + c.soldiers, 0); }
-    getClanGunshi(clanId) { return this.bushos.find(b => b.clan === clanId && b.isGunshi); }
+    getClanTotalSoldiers(clanId) { return this.castles.filter(c => Number(c.ownerClan) === Number(clanId)).reduce((sum, c) => sum + c.soldiers, 0); }
+    getClanGunshi(clanId) { return this.bushos.find(b => Number(b.clan) === Number(clanId) && b.isGunshi); }
     isCastleVisible(castle) { if (Number(castle.ownerClan) === Number(this.playerClanId)) return true; if (castle.investigatedUntil >= this.getCurrentTurnId()) return true; return false; }
     
     startMonth() {
@@ -1310,7 +1317,12 @@ class GameManager {
         if (this.currentIndex >= this.turnQueue.length) { this.endMonth(); return; }
         const castle = this.turnQueue[this.currentIndex]; 
         
-        if(castle.ownerClan !== 0 && !this.clans.find(c=>c.id===castle.ownerClan)) { this.currentIndex++; this.processTurn(); return; }
+        // 修正: 型緩めのIDチェックでクランの存在を確認
+        if(castle.ownerClan !== 0 && !this.clans.find(c => Number(c.id) === Number(castle.ownerClan))) { 
+            this.currentIndex++; 
+            this.processTurn(); 
+            return; 
+        }
         
         this.ui.renderMap();
         
@@ -1360,24 +1372,24 @@ class GameManager {
             this.validTargets = this.warManager.getValidWarTargets(c);
         } else if (mode === 'move' || mode === 'transport') {
             this.validTargets = this.castles.filter(target => 
-                target.ownerClan === this.playerClanId && target.id !== c.id
+                Number(target.ownerClan) === Number(this.playerClanId) && target.id !== c.id
             ).map(t => t.id);
         } else if (mode === 'investigate' || mode === 'incite' || mode === 'rumor') {
             this.validTargets = this.castles.filter(target => 
-                target.ownerClan !== this.playerClanId && target.ownerClan !== 0
+                Number(target.ownerClan) !== Number(this.playerClanId) && target.ownerClan !== 0
             ).map(t => t.id);
         } else if (mode === 'headhunt_select_castle') {
             this.validTargets = this.castles.filter(target => 
-                target.ownerClan !== this.playerClanId && target.ownerClan !== 0
+                Number(target.ownerClan) !== Number(this.playerClanId) && target.ownerClan !== 0
             ).map(t => t.id);
         } else if (mode === 'goodwill' || mode === 'alliance') {
             this.validTargets = this.castles.filter(target => 
-                target.ownerClan !== 0 && target.ownerClan !== this.playerClanId
+                target.ownerClan !== 0 && Number(target.ownerClan) !== Number(this.playerClanId)
             ).map(t => t.id);
         } else if (mode === 'break_alliance') {
             this.validTargets = this.castles.filter(target => 
                 target.ownerClan !== 0 && 
-                target.ownerClan !== this.playerClanId &&
+                Number(target.ownerClan) !== Number(this.playerClanId) &&
                 this.getRelation(this.playerClanId, target.ownerClan).alliance === true
             ).map(t => t.id);
         }

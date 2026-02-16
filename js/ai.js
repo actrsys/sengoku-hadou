@@ -65,6 +65,14 @@ class AIEngine {
     // AIメインループ
     execAI(castle) {
         try {
+            // 【安全装置】万が一、プレイヤーの城がAIルーチンに渡された場合、即座に制御を戻す
+            if (Number(castle.ownerClan) === Number(this.game.playerClanId)) {
+                console.warn("AI Alert: Player castle detected in AI routine. Returning control to player.");
+                this.game.isProcessingAI = false;
+                this.game.ui.showControlPanel(castle);
+                return;
+            }
+
             const castellan = this.game.getBusho(castle.castellanId);
             // 城主不在や行動済みなら終了
             if (!castellan || castellan.isActionDone) { 
