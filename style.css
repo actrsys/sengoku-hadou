@@ -306,14 +306,49 @@ body {
 .select-item:hover { background: #f0f8ff; }
 .select-item.disabled { color: #aaa; pointer-events: none; background: #f9f9f9; }
 
-/* Rank Colors */
-.grade-rank { font-weight: 900; text-shadow: 0 0 2px rgba(0,0,0,0.5); }
-.rank-s { color: #d32f2f; }
-.rank-a { color: #f57c00; }
-.rank-b { color: #fbc02d; }
-.rank-c { color: #7cb342; }
-.rank-d { color: #388e3c; }
-.rank-e { color: #1976d2; }
+/* --- Grade Display Styling --- */
+.grade-container {
+    display: inline-flex;
+    position: relative;
+    align-items: center;
+    justify-content: center;
+    width: 24px; /* 枠内での中央揃え用 */
+    height: 1.2em;
+    font-family: 'Arial Black', sans-serif;
+}
+
+.grade-main {
+    font-weight: normal; /* 文字自体の太字を解除 */
+    font-size: 1.1rem;
+    /* 太めの黒枠（袋文字）の設定 */
+    text-shadow: 
+        1.5px 1.5px 0 #000, -1.5px 1.5px 0 #000, 
+        1.5px -1.5px 0 #000, -1.5px -1.5px 0 #000,
+        1.5px 0px 0 #000, -1.5px 0px 0 #000,
+        0px 1.5px 0 #000, 0px -1.5px 0 #000,
+        2px 2px 2px rgba(0,0,0,0.5); /* 軽い影で視認性向上 */
+}
+
+.grade-plus {
+    position: absolute;
+    top: -2px;    /* 右上へ配置 */
+    right: -6px;
+    font-size: 0.7rem;
+    font-weight: bold; /* ＋は黒い太字 */
+    color: #000000;    /* 一律黒 */
+    text-shadow: none; /* ＋には枠をつけない（視認性重視） */
+}
+
+/* Rank Colors (Main Character) */
+.rank-s .grade-main { color: #ffd700; } /* 金色 (Gold) */
+.rank-a .grade-main { color: #ffb74d; } /* 少し薄いオレンジ */
+.rank-b .grade-main { color: #ffffff; } /* 白 */
+.rank-c .grade-main { color: #ffffff; } /* 白 */
+.rank-d .grade-main { color: #ffffff; } /* 白 */
+.rank-e .grade-main { color: #adff2f; } /* 黄緑 (GreenYellow) */
+
+/* 既存の .grade-rank クラスは使用しなくなるため、
+   もし他の場所で使っていなければ削除または放置で問題ありません */
 
 /* Footer Buttons */
 .modal-footer { margin-top: 15px; display: flex; justify-content: flex-end; gap: 10px; padding-top: 10px; border-top: 1px solid #eee; flex-shrink: 0;}
