@@ -182,6 +182,11 @@ class WarManager {
     }
 
     startWar(atkCastle, defCastle, atkBushos, atkSoldierCount) {
+        // ★追加: 既に戦争がアクティブなら実行しない
+        if (this.state.active) {
+            console.warn("War is already active. Ignoring attack from:", atkCastle.name);
+            return;
+        }
         try {
             // 合戦状態を即座に「アクティブ」にする（メインループの finishTurn をブロックするため）
             const isPlayerInvolved = (atkCastle.ownerClan === this.game.playerClanId || defCastle.ownerClan === this.game.playerClanId);
@@ -631,3 +636,4 @@ class WarManager {
     }
 
 }
+
