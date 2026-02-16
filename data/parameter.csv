@@ -65,10 +65,12 @@ AI.AllianceThreshold,70,AI同盟閾値。上げるとAIが同盟を申し込む�
 AI.BreakAllianceDutyFactor,0.5,AI同盟破棄の義理影響。上げると義理堅い大名AIは同盟を破棄しなくなる、下げると義理を無視して裏切る
 War.ChargeMultiplier,1.2,合戦：突撃の攻撃倍率。上げると突撃ダメージが増加
 War.ChargeRisk,1.5,合戦：突撃の反撃リスク係数。上げると突撃失敗時に受ける被害が増える
+War.ChargeSoldierDmgRate,1,合戦：突撃時の対兵士ダメージ倍率。上げると兵士へのダメージが増える
+War.ChargeWallDmgRate,0.5,合戦：突撃時の対城壁ダメージ倍率。上げると城壁へのダメージが増える
 War.BowMultiplier,0.6,合戦：斉射の攻撃倍率。上げると遠距離攻撃が強くなる
 War.BowRisk,0.5,合戦：斉射の反撃リスク係数。下げると斉射がより安全になる
-War.SiegeMultiplier,0.5,合戦：城攻めの対兵士攻撃倍率。上げると城攻めで兵士も減らせるようになる
-War.SiegeWallRate,0.05,合戦：城攻めの対城壁倍率。上げると城壁を破壊しやすくなる
+War.SiegeMultiplier,1,合戦：城攻めの対兵士攻撃倍率。上げると城攻めで兵士も減らせるようになる
+War.SiegeWallRate,0.2,合戦：城攻めの対城壁倍率。上げると城壁を破壊しやすくなる
 War.SiegeRisk,1.3,合戦：城攻めの反撃リスク係数。上げると城攻め時の被害が増える
 War.DefChargeMultiplier,1.2,合戦：守備側突撃の攻撃倍率。上げると守備側の反撃ダメージが増加
 War.DefChargeRisk,2,合戦：守備側突撃の反撃リスク係数。上げると守備側が突撃した際、逆に受ける被害が激増する
@@ -93,3 +95,4 @@ War.RetreatResourceLossFactor,0.2,戦後：撤退時の物資損失係数『基�
 War.LootingBaseRate,0.3,戦後：落城時の物資持ち逃げ基礎率。上げると占領した城の物資が減りやすくなる
 War.LootingCharmFactor,0.002,戦後：物資持ち逃げ抑制の魅力係数。上げると魅力の高い武将が攻めた際に物資が残りやすくなる
 War.DaimyoCharmWeight,0.1,戦後：物資持ち逃げ抑制における大名魅力の重み。上げると大名の魅力が影響しやすくなる
+War.CounterAtkPowerFactor,0.05,合戦：反撃ダメージ計算時の敵攻撃力・防御力の影響係数。上げると攻撃力が高い相手に迂闊に攻めると大被害を受ける
