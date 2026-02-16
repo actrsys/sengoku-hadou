@@ -134,21 +134,21 @@ class AIEngine {
         }
     }
 
-    executeAttack(source, target, general) {
-        const bushos = this.game.getCastleBushos(source.id).filter(b => b.status !== 'ronin');
+executeAttack(source, target, general) {
+        const bushos = this.getCastleBushos(source.id).filter(b => b.status !== 'ronin');
         const sorted = bushos.sort((a,b) => b.leadership - a.leadership).slice(0, 3);
         const sendSoldiers = Math.floor(source.soldiers * (window.AIParams.AI.SoldierSendRate || 0.8));
         
         if (sendSoldiers <= 0) {
+            // 攻撃不能なら内政に切り替えるか、ターンを終了させる
             this.game.finishTurn(); 
             return;
         }
 
-        // 【修正】武将を行動済みに設定し、重複行動を防止
+        // 武将を行動済みに設定
         general.isActionDone = true; 
-        source.soldiers -= sendSoldiers;
 
-        // 合戦開始。この後、endWar を経由して必ず finishTurn が呼ばれます
+        source.soldiers -= sendSoldiers;
         this.game.warManager.startWar(source, target, sorted, sendSoldiers);
     }
 
@@ -394,6 +394,7 @@ class AIEngine {
     }
 
 }
+
 
 
 
