@@ -1,7 +1,3 @@
-{
-type: uploaded file
-fileName: ai.js
-fullContent:
 /**
  * ai.js - 敵思考エンジン
  * 責務: 敵大名のターン処理、内政、外交、軍事判断
@@ -372,5 +368,4 @@ class AIEngine {
             }
         }
     }
-}
 }
