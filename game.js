@@ -823,7 +823,12 @@ class UIManager {
                 createBtn("調略", "category", () => { this.menuState = 'STRATEGY'; this.renderCommandMenu(); });
                 createBtn("人事", "category", () => { this.menuState = 'PERSONNEL'; this.renderCommandMenu(); });
                 createBtn("機能", "category", () => { this.menuState = 'SYSTEM'; this.renderCommandMenu(); });
-                createBtn("命令終了", "finish", () => this.game.finishTurn());
+                // 変更: 確認ダイアログを追加
+                createBtn("命令終了", "finish", () => { 
+                    if(confirm("今月の命令を終了しますか？")) {
+                        this.game.finishTurn();
+                    }
+                });
             } else if (this.menuState === 'DEVELOP') {
                 createBtn("石高開発", "", () => this.openBushoSelector('farm')); 
                 createBtn("商業開発", "", () => this.openBushoSelector('commerce')); 
@@ -1088,7 +1093,17 @@ class UIManager {
         } else if (type === 'war') {
             document.getElementById('quantity-title').textContent = "出陣兵数指定"; inputs.soldiers = createSlider("兵士数", "soldiers", c.soldiers, c.soldiers);
             // WarManager経由に変更
-            this.quantityConfirmBtn.onclick = () => { const val = parseInt(inputs.soldiers.num.value); if(val <= 0) { alert("兵士0"); return; } this.quantityModal.classList.add('hidden'); this.showGunshiAdvice({ type: 'war' }, () => this.game.warManager.startWar(c, this.game.getCastle(targetId), data.map(id=>this.game.getBusho(id)), val)); };
+            this.quantityConfirmBtn.onclick = () => { 
+                const val = parseInt(inputs.soldiers.num.value); 
+                if(val <= 0) { alert("兵士0"); return; } 
+                this.quantityModal.classList.add('hidden'); 
+                // 変更: 確認メッセージを表示
+                const targetName = this.game.getCastle(targetId).name;
+                if (!confirm(`${targetName}に攻め込みますか？\n今月の命令は終了となります。`)) {
+                    return; 
+                }
+                this.showGunshiAdvice({ type: 'war' }, () => this.game.warManager.startWar(c, this.game.getCastle(targetId), data.map(id=>this.game.getBusho(id)), val)); 
+            };
         } else if (type === 'transport') {
             document.getElementById('quantity-title').textContent = "輸送物資指定"; inputs.gold = createSlider("金", "gold", c.gold, 0); inputs.rice = createSlider("兵糧", "rice", c.rice, 0); inputs.soldiers = createSlider("兵士", "soldiers", c.soldiers, 0);
             this.quantityConfirmBtn.onclick = () => { const vals = { gold: parseInt(inputs.gold.num.value), rice: parseInt(inputs.rice.num.value), soldiers: parseInt(inputs.soldiers.num.value) }; if(vals.gold===0 && vals.rice===0 && vals.soldiers===0) return; this.quantityModal.classList.add('hidden'); this.game.executeTransport(data, targetId, vals); };
@@ -1489,6 +1504,19 @@ class GameManager {
         }
     }
 
+    // 変更: 全武将が行動完了したかチェックするメソッド
+    checkAllActionsDone() {
+        const c = this.getCurrentTurnCastle();
+        const bushos = this.getCastleBushos(c.id).filter(b => b.status !== 'ronin');
+        if(bushos.length > 0 && bushos.every(b => b.isActionDone)) {
+             setTimeout(() => {
+                 if(confirm("すべての武将が行動を終えました。\n今月の命令を終了しますか？")) {
+                     this.finishTurn();
+                 }
+             }, 100);
+        }
+    }
+
     executeCommand(type, bushoIds, targetId) {
         const castle = this.getCurrentTurnCastle(); let totalVal = 0, cost = 0, count = 0, actionName = "";
         
@@ -1551,6 +1579,7 @@ class GameManager {
         else if (actionName === "移動") { const targetName = this.getCastle(targetId).name; this.ui.showResultModal(`${count}名が${targetName}へ移動しました`); }
         this.ui.updatePanelHeader(); this.ui.renderCommandMenu();
         this.ui.log(`${actionName}を実行 (効果:${totalVal})`);
+        this.checkAllActionsDone();
     }
     
     executeInvestigate(bushoIds, targetId) {
@@ -1565,9 +1594,10 @@ class GameManager {
         bushos.forEach(b => b.isActionDone = true);
         this.ui.showResultModal(msg); this.ui.updatePanelHeader(); this.ui.renderCommandMenu(); this.ui.renderMap();
         this.ui.log(`調査実行: ${target.name} (${result.success ? '成功' : '失敗'})`);
+        this.checkAllActionsDone();
     }
 
-    executeEmploy(doerId, targetId) { const doer = this.getBusho(doerId); const target = this.getBusho(targetId); const myPower = this.getClanTotalSoldiers(this.playerClanId); const targetClanId = target.clan; const targetPower = targetClanId === 0 ? 0 : this.getClanTotalSoldiers(targetClanId); const success = GameSystem.calcEmploymentSuccess(doer, target, myPower, targetPower); let msg = ""; if (success) { const oldCastle = this.getCastle(target.castleId); if(oldCastle && oldCastle.samuraiIds.includes(target.id)) { oldCastle.samuraiIds = oldCastle.samuraiIds.filter(id => id !== target.id); } const currentC = this.getCurrentTurnCastle(); currentC.samuraiIds.push(target.id); target.castleId = currentC.id; target.clan = this.playerClanId; target.status = 'active'; target.loyalty = 50; msg = `${target.name}の登用に成功しました！`; } else { msg = `${target.name}は登用に応じませんでした……`; } doer.isActionDone = true; this.ui.showResultModal(msg); this.ui.renderCommandMenu(); }
+    executeEmploy(doerId, targetId) { const doer = this.getBusho(doerId); const target = this.getBusho(targetId); const myPower = this.getClanTotalSoldiers(this.playerClanId); const targetClanId = target.clan; const targetPower = targetClanId === 0 ? 0 : this.getClanTotalSoldiers(targetClanId); const success = GameSystem.calcEmploymentSuccess(doer, target, myPower, targetPower); let msg = ""; if (success) { const oldCastle = this.getCastle(target.castleId); if(oldCastle && oldCastle.samuraiIds.includes(target.id)) { oldCastle.samuraiIds = oldCastle.samuraiIds.filter(id => id !== target.id); } const currentC = this.getCurrentTurnCastle(); currentC.samuraiIds.push(target.id); target.castleId = currentC.id; target.clan = this.playerClanId; target.status = 'active'; target.loyalty = 50; msg = `${target.name}の登用に成功しました！`; } else { msg = `${target.name}は登用に応じませんでした……`; } doer.isActionDone = true; this.ui.showResultModal(msg); this.ui.renderCommandMenu(); this.checkAllActionsDone(); }
     
     executeDiplomacy(doerId, targetClanId, type, gold = 0) {
         const doer = this.getBusho(doerId);
@@ -1605,6 +1635,7 @@ class GameManager {
                 this.ui.renderCommandMenu();
             }
         }
+        this.checkAllActionsDone();
     }
     
     executeHeadhunt(doerId, targetBushoId, gold) {
@@ -1627,7 +1658,7 @@ class GameManager {
         } else {
             this.ui.showResultModal(`${doer.name}の引抜工作は失敗しました……\n${target.name}は応じませんでした。`);
         }
-        doer.isActionDone = true; this.ui.updatePanelHeader(); this.ui.renderCommandMenu();
+        doer.isActionDone = true; this.ui.updatePanelHeader(); this.ui.renderCommandMenu(); this.checkAllActionsDone();
     }
 
     executeReward(bushoId, gold) {
@@ -1644,7 +1675,7 @@ class GameManager {
         else if (effect > 0) msg = `「はっ、頂戴いたします。」\n忠誠が${effect}上がりました。`;
         else msg = `「……。」(不満があるようだ)\n忠誠は上がりませんでした。`;
         this.ui.showResultModal(`${target.name}に金${gold}を与えました。\n${msg}`);
-        this.ui.updatePanelHeader(); this.ui.renderCommandMenu();
+        this.ui.updatePanelHeader(); this.ui.renderCommandMenu(); this.checkAllActionsDone();
     }
 
     executeInterviewStatus(busho) {
@@ -1701,11 +1732,11 @@ class GameManager {
         if(vals.soldiers > 0) { t.training = GameSystem.calcWeightedAvg(t.training, t.soldiers, c.training, vals.soldiers); t.morale = GameSystem.calcWeightedAvg(t.morale, t.soldiers, c.morale, vals.soldiers); }
         c.gold -= vals.gold; c.rice -= vals.rice; c.soldiers -= vals.soldiers; t.gold += vals.gold; t.rice += vals.rice; t.soldiers += vals.soldiers;
         const busho = this.getBusho(bushoIds[0]); busho.isActionDone = true;
-        this.ui.showResultModal(`${busho.name}が${t.name}へ物資を輸送しました`); this.ui.updatePanelHeader(); this.ui.renderCommandMenu();
+        this.ui.showResultModal(`${busho.name}が${t.name}へ物資を輸送しました`); this.ui.updatePanelHeader(); this.ui.renderCommandMenu(); this.checkAllActionsDone();
     }
     executeAppointGunshi(bushoId) { const busho = this.getBusho(bushoId); const oldGunshi = this.bushos.find(b => b.clan === this.playerClanId && b.isGunshi); if (oldGunshi) oldGunshi.isGunshi = false; busho.isGunshi = true; this.ui.showResultModal(`${busho.name}を軍師に任命しました`); this.ui.updatePanelHeader(); this.ui.renderCommandMenu(); }
-    executeIncite(doerId, targetId) { const doer = this.getBusho(doerId); const target = this.getCastle(targetId); const result = GameSystem.calcIncite(doer); if(result.success) { target.loyalty = Math.max(0, target.loyalty - result.val); this.ui.showResultModal(`${doer.name}の扇動が成功！\n${target.name}の民忠が${result.val}低下しました`); } else { this.ui.showResultModal(`${doer.name}の扇動は失敗しました`); } doer.isActionDone = true; this.ui.updatePanelHeader(); this.ui.renderCommandMenu(); }
-    executeRumor(doerId, castleId, targetBushoId) { const doer = this.getBusho(doerId); const targetBusho = this.getBusho(targetBushoId); const result = GameSystem.calcRumor(doer, targetBusho); if(result.success) { targetBusho.loyalty = Math.max(0, targetBusho.loyalty - result.val); this.ui.showResultModal(`${doer.name}の流言が成功！\n${targetBusho.name}の忠誠が${result.val}低下しました`); } else { this.ui.showResultModal(`${doer.name}の流言は失敗しました`); } doer.isActionDone = true; this.ui.updatePanelHeader(); this.ui.renderCommandMenu(); }
+    executeIncite(doerId, targetId) { const doer = this.getBusho(doerId); const target = this.getCastle(targetId); const result = GameSystem.calcIncite(doer); if(result.success) { target.loyalty = Math.max(0, target.loyalty - result.val); this.ui.showResultModal(`${doer.name}の扇動が成功！\n${target.name}の民忠が${result.val}低下しました`); } else { this.ui.showResultModal(`${doer.name}の扇動は失敗しました`); } doer.isActionDone = true; this.ui.updatePanelHeader(); this.ui.renderCommandMenu(); this.checkAllActionsDone(); }
+    executeRumor(doerId, castleId, targetBushoId) { const doer = this.getBusho(doerId); const targetBusho = this.getBusho(targetBushoId); const result = GameSystem.calcRumor(doer, targetBusho); if(result.success) { targetBusho.loyalty = Math.max(0, targetBusho.loyalty - result.val); this.ui.showResultModal(`${doer.name}の流言が成功！\n${targetBusho.name}の忠誠が${result.val}低下しました`); } else { this.ui.showResultModal(`${doer.name}の流言は失敗しました`); } doer.isActionDone = true; this.ui.updatePanelHeader(); this.ui.renderCommandMenu(); this.checkAllActionsDone(); }
     executeTrade(type, amount) {
         const castle = this.getCurrentTurnCastle(); const rate = this.marketRate;
         if(type === 'buy') { const cost = Math.floor(amount * rate); if(castle.gold < cost) { alert("資金不足"); return; } castle.gold -= cost; castle.rice += amount; this.ui.showResultModal(`兵糧${amount}を購入しました\n(金-${cost})`); } else { if(castle.rice < amount) { alert("兵糧不足"); return; } const gain = Math.floor(amount * rate); castle.rice -= amount; castle.gold += gain; this.ui.showResultModal(`兵糧${amount}を売却しました\n(金+${gain})`); }
@@ -1727,7 +1758,7 @@ class GameManager {
         castle.soldiers += soldiers; 
         busho.isActionDone = true; 
         this.ui.showResultModal(`${busho.name}が徴兵を行いました\n兵士+${soldiers}`); 
-        this.ui.updatePanelHeader(); this.ui.renderCommandMenu(); 
+        this.ui.updatePanelHeader(); this.ui.renderCommandMenu(); this.checkAllActionsDone();
     }
 
     executeCharity(bushoIds, type) { 
@@ -1745,7 +1776,7 @@ class GameManager {
         castle.loyalty = Math.min(1000, castle.loyalty + val); 
         busho.isActionDone = true; 
         this.ui.showResultModal(`${busho.name}が施しを行いました\n民忠+${val}`); 
-        this.ui.updatePanelHeader(); this.ui.renderCommandMenu(); 
+        this.ui.updatePanelHeader(); this.ui.renderCommandMenu(); this.checkAllActionsDone();
     }
 
     changeLeader(clanId, newLeaderId) { this.bushos.filter(b => b.clan === clanId).forEach(b => b.isDaimyo = false); const newLeader = this.getBusho(newLeaderId); if(newLeader) { newLeader.isDaimyo = true; this.clans.find(c => c.id === clanId).leaderId = newLeaderId; } }
