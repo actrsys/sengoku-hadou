@@ -456,11 +456,13 @@ class WarManager {
         if (isAtkTurn) s.defender.defense = Math.max(0, s.defender.defense - actualWallDmg);
         
         if(result.counterDmg > 0) { 
-            const counterDmg = result.counterDmg; 
             const actorArmy = isAtkTurn ? s.attacker : s.defender; 
-            actorArmy.soldiers = Math.max(0, actorArmy.soldiers - counterDmg); 
-            if(isAtkTurn) s.deadSoldiers.attacker += counterDmg; else s.deadSoldiers.defender += counterDmg;
-            if(s.isPlayerInvolved) this.game.ui.log(`(反撃被害: ${counterDmg})`); 
+            // 修正: 反撃ダメージを残存兵数以下に制限（死傷者数が実兵数を超えて増殖するバグを防止）
+            const actualCounterDmg = Math.min(actorArmy.soldiers, result.counterDmg);
+
+            actorArmy.soldiers -= actualCounterDmg;
+            if(isAtkTurn) s.deadSoldiers.attacker += actualCounterDmg; else s.deadSoldiers.defender += actualCounterDmg;
+            if(s.isPlayerInvolved) this.game.ui.log(`(反撃被害: ${actualCounterDmg})`); 
         }
         
         if (s.isPlayerInvolved) { 
