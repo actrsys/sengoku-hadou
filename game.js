@@ -263,14 +263,35 @@ class GameSystem {
         return Math.max(0.1, Math.min(0.95, prob)); 
     }
     static toGradeHTML(val) {
-        let rank = "", cls = "";
-        if (val >= 96) { rank = "S+"; cls = "rank-s"; } else if (val >= 90) { rank = "S"; cls = "rank-s"; }
-        else if (val >= 85) { rank = "A+"; cls = "rank-a"; } else if (val >= 80) { rank = "A"; cls = "rank-a"; }
-        else if (val >= 75) { rank = "B+"; cls = "rank-b"; } else if (val >= 70) { rank = "B"; cls = "rank-b"; }
-        else if (val >= 65) { rank = "C+"; cls = "rank-c"; } else if (val >= 60) { rank = "C"; cls = "rank-c"; }
-        else if (val >= 55) { rank = "D+"; cls = "rank-d"; } else if (val >= 50) { rank = "D"; cls = "rank-d"; }
-        else if (val >= 40) { rank = "E+"; cls = "rank-e"; } else { rank = "E"; cls = "rank-e"; }
-        return `<span class="grade-rank ${cls}">${rank}</span>`;
+        let rankChar = "", suffix = "", cls = "";
+        let isWhite = false; // B, C, Dの場合は白にするフラグ
+
+        // ランク判定と文字の分割
+        if (val >= 96) { rankChar = "S"; suffix = "+"; cls = "rank-s"; } 
+        else if (val >= 95) { rankChar = "S"; cls = "rank-s"; }
+        else if (val >= 85) { rankChar = "A"; suffix = "+"; cls = "rank-a"; } 
+        else if (val >= 80) { rankChar = "A"; cls = "rank-a"; }
+        else if (val >= 70) { rankChar = "B"; suffix = "+"; cls = "rank-b"; isWhite = true; } 
+        else if (val >= 65) { rankChar = "B"; cls = "rank-b"; isWhite = true; }
+        else if (val >= 55) { rankChar = "C"; suffix = "+"; cls = "rank-c"; isWhite = true; } 
+        else if (val >= 50) { rankChar = "C"; cls = "rank-c"; isWhite = true; }
+        else if (val >= 40) { rankChar = "D"; suffix = "+"; cls = "rank-d"; isWhite = true; } 
+        else if (val >= 35) { rankChar = "D"; cls = "rank-d"; isWhite = true; }
+        else if (val >= 25) { rankChar = "E"; suffix = "+"; cls = "rank-e"; } 
+        else { rankChar = "E"; cls = "rank-e"; }
+
+        // メイン文字のスタイル生成
+        // 1. font-weight: normal (太字解除)
+        // 2. text-shadow (太めの黒枠を作成)
+        // 3. isWhiteフラグが立っている場合は color: #ffffff (白) を強制
+        const colorStyle = isWhite ? "color: #ffffff;" : "";
+        const baseStyle = `font-weight: normal; text-shadow: 2px 0 0 #000, -2px 0 0 #000, 0 2px 0 #000, 0 -2px 0 #000, 1px 1px 0 #000, -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000; ${colorStyle}`;
+        
+        // プラス記号のHTML生成：黒色(#000000)、太字(bold)、枠線なし(text-shadow: none)
+        const suffixHtml = suffix ? `<span style="color: #000000; font-weight: bold; text-shadow: none;">${suffix}</span>` : "";
+
+        // 結合して返却
+        return `<span class="grade-rank ${cls}" style="${baseStyle}">${rankChar}${suffixHtml}</span>`;
     }
     static getPerceivedStatValue(target, statName, gunshi, castleAccuracy, playerClanId, daimyo = null) {
         const realVal = target[statName];
