@@ -378,6 +378,9 @@ class UIManager {
         this.historyModal = document.getElementById('history-modal');
         this.historyList = document.getElementById('history-list');
 
+        // モーダルが閉じた後のコールバック用変数
+        this.onResultModalClose = null;
+
         if (this.resultModal) this.resultModal.addEventListener('click', (e) => { if (e.target === this.resultModal) this.closeResultModal(); });
         if (this.mapResetZoomBtn) {
             this.mapResetZoomBtn.onclick = (e) => { e.stopPropagation(); this.resetMapZoom(); };
@@ -414,14 +417,24 @@ class UIManager {
         }
     }
 
-    showResultModal(msg) { 
+    // 修正: callbackを受け取れるように変更
+    showResultModal(msg, onClose = null) { 
         if (this.resultBody) this.resultBody.innerHTML = msg.replace(/\n/g, '<br>'); 
         if (this.resultModal) this.resultModal.classList.remove('hidden'); 
+        this.onResultModalClose = onClose;
     }
     
+    // 修正: 閉じた際にコールバックを実行、なければ通常の判定
     closeResultModal() { 
         if (this.resultModal) this.resultModal.classList.add('hidden'); 
-        if (this.game) this.game.checkAllActionsDone();
+        
+        if (this.onResultModalClose) {
+            const cb = this.onResultModalClose;
+            this.onResultModalClose = null;
+            cb();
+        } else if (this.game) {
+            this.game.checkAllActionsDone();
+        }
     }
     
     closeSelector() { if (this.selectorModal) this.selectorModal.classList.add('hidden'); }
@@ -1313,6 +1326,9 @@ class GameManager {
             if(this.ui.panelEl) this.ui.panelEl.classList.add('hidden'); 
             
             setTimeout(() => {
+                // 戦争が始まったらAI処理を中断するための再チェック
+                if (this.warManager.state.active) return;
+
                 try {
                     // AIエンジンへ委譲
                     this.aiEngine.execAI(castle);

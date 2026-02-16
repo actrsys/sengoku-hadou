@@ -590,10 +590,19 @@ class WarManager {
                 b.castleId = s.defender.id; s.defender.samuraiIds.push(b.id); 
                 if(idx === 0) { b.isCastellan = true; s.defender.castellanId = b.id; } else b.isCastellan = false; 
             });
-            this.game.finishTurn(); return;
+            // 修正: プレイヤーが関与している場合は結果を確認してからターンを進める
+            if (s.isPlayerInvolved) {
+                const msg = `撤退しました。\n${retreatTargetId ? '部隊は移動しました。' : '部隊は解散しました。'}`;
+                this.game.ui.showResultModal(msg, () => this.game.finishTurn());
+            } else {
+                this.game.finishTurn();
+            }
+            return;
         }
 
         const currentTurnId = this.game.getCurrentTurnId();
+        let resultMsg = "";
+        
         if (attackerWon) { 
             s.attacker.training = Math.min(120, s.attacker.training + 5); s.attacker.morale = Math.min(120, s.attacker.morale + 5); 
             this.processCaptures(s.defender, s.attacker.ownerClan);
@@ -617,8 +626,20 @@ class WarManager {
                 b.castleId = s.defender.id; s.defender.samuraiIds.push(b.id); 
                 if(idx === 0) { b.isCastellan = true; s.defender.castellanId = b.id; } else b.isCastellan = false; 
             }); 
-        } else { s.defender.immunityUntil = currentTurnId; } 
-        this.game.finishTurn();
+            resultMsg = `${s.defender.name}が制圧されました！\n勝者: ${s.attacker.name}`;
+        } else { 
+            s.defender.immunityUntil = currentTurnId; 
+            resultMsg = `${s.defender.name}を守り抜きました！\n敗者: ${s.attacker.name}`;
+        } 
+
+        // 修正: プレイヤーが関与していた場合、必ず結果モーダルを表示し、そのクローズ後にターンを進める
+        if (s.isPlayerInvolved) {
+            this.game.ui.showResultModal(resultMsg, () => {
+                this.game.finishTurn();
+            });
+        } else {
+            this.game.finishTurn();
+        }
     }
     
     processCaptures(defeatedCastle, winnerClanId) { 

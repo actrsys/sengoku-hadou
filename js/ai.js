@@ -115,7 +115,7 @@ class AIEngine {
                     const target = this.decideAttackTarget(castle, castellan, validEnemies, mods, smartness);
                     if (target) {
                         this.executeAttack(castle, target, castellan);
-                        return; // 攻撃したらターン終了
+                        return; // 攻撃したらターン終了 (finishTurnは戦争終了時にwar.jsが呼ぶ)
                     }
                 }
             }
