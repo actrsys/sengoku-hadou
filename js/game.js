@@ -1290,7 +1290,9 @@ class GameManager {
     optimizeCastellans() { const clanIds = [...new Set(this.castles.filter(c=>c.ownerClan!==0).map(c=>c.ownerClan))]; clanIds.forEach(clanId => { const myBushos = this.bushos.filter(b => b.clan === clanId); if(myBushos.length===0) return; let daimyoInt = Math.max(...myBushos.map(b => b.intelligence)); if (Math.random() * 100 < daimyoInt) { const clanCastles = this.castles.filter(c => c.ownerClan === clanId); clanCastles.forEach(castle => { const castleBushos = this.getCastleBushos(castle.id).filter(b => b.status !== 'ronin'); if (castleBushos.length <= 1) return; castleBushos.sort((a, b) => (b.leadership + b.politics) - (a.leadership + a.politics)); const best = castleBushos[0]; if (best.id !== castle.castellanId) { const old = this.getBusho(castle.castellanId); if(old) old.isCastellan = false; best.isCastellan = true; castle.castellanId = best.id; } }); } }); }
     
     processTurn() {
-        if (this.warManager.state.active && this.warManager.state.isPlayerInvolved) return; 
+        // 変更: 戦争がアクティブな場合はターン進行を一時停止
+        if (this.warManager.state.active) return;
+
         if (this.currentIndex >= this.turnQueue.length) { this.endMonth(); return; }
         const castle = this.turnQueue[this.currentIndex]; 
         
@@ -1418,7 +1420,8 @@ class GameManager {
     // 重大な修正: AIのターン中にこのメソッドが誤動作してプレイヤーのターンをスキップするのを防ぐ
     checkAllActionsDone() {
         const c = this.getCurrentTurnCastle();
-        if (!c || c.ownerClan !== this.playerClanId) return; // プレイヤーの城でない場合は無視する
+        // プレイヤーの城でない場合は無視する
+        if (!c || c.ownerClan !== this.playerClanId) return; 
 
         const bushos = this.getCastleBushos(c.id).filter(b => b.status !== 'ronin');
         if(bushos.length > 0 && bushos.every(b => b.isActionDone)) {
