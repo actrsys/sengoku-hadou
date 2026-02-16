@@ -65,6 +65,12 @@ class AIEngine {
     // AIメインループ
     execAI(castle) {
         try {
+            // ★追加: プレイヤーが戦争中なら思考をスキップして待機する
+            if (this.game.warManager.state.active && this.game.warManager.state.isPlayerInvolved) {
+                // 少し時間を置いて再試行するか、そのままリターンしてWarManagerの終了を待つ
+                return; 
+            }
+            
             const castellan = this.game.getBusho(castle.castellanId);
             // 城主不在や行動済みなら終了
             if (!castellan || castellan.isActionDone) { 
@@ -368,4 +374,5 @@ class AIEngine {
             }
         }
     }
+
 }
