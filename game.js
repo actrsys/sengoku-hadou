@@ -1699,33 +1699,31 @@ class GameManager {
         const dist = GameSystem.calcValueDistance(interviewer, target);
         let comment = "";
         
-        // ★修正: 自分が自分について語る（自分語り・独り言）
+        // 1. 自分が自分について語る（自分語り・独り言）
         if (interviewer.id === target.id) {
-            // 性格や野心に基づく独り言
-             if (interviewer.ambition > 80) comment = "「俺の力を持ってすれば、天下も夢ではない...はずだ。」";
-             else if (interviewer.personality === 'cautious') comment = "「慎重に行かねば...足元をすくわれるぞ。」";
-             else comment = "「今のところは順調か...いや、油断はできん。」";
+            if (interviewer.ambition > 80) comment = "「俺の力を持ってすれば、天下も夢ではない...はずだ。」";
+            else if (interviewer.personality === 'cautious') comment = "「慎重に行かねば...足元をすくわれるぞ。」";
+            else comment = "「今のところは順調か...いや、油断はできん。」";
         }
-        // ★修正: 部下が自軍大名（target）について語る
-        else if (target.isDaimyo && target.clan === this.game.playerClanId) {
+        // 2. 部下が自軍大名（target）について語る
+        else if (target.isDaimyo && target.clan === this.playerClanId) {
             const loyalty = interviewer.loyalty;
             const aff = GameSystem.calcAffinityDiff(interviewer.affinity, target.affinity); 
             if (loyalty < 40 || aff > 30) comment = "「......」(口を閉ざしている。あまり良く思われていないようだ)";
             else if (loyalty > 80 && aff < 15) comment = "「殿には心より感謝しております。この身尽きるまでお仕えする所存！」";
             else comment = "「殿のご采配、頼もしく思っております。」";
         }
-        // 他者について語る
+        // 3. 他者について語る（大名が部下を評価する、または部下が同僚を評価する）
         else {
              // インタビュアーが大名本人の場合（独り言スタイル）
-             if (interviewer.isDaimyo && interviewer.clan === this.game.playerClanId) {
-                // 仕様変更: 大名の独り言風にする
+             if (interviewer.isDaimyo && interviewer.clan === this.playerClanId) {
                 if (dist < 15) comment = "（あやつとは気が合う。頼りになる男よ...）";
                 else if (dist < 30) comment = "（まあ、悪くはない。使いどころ次第だろう...）";
                 else if (dist < 50) comment = "（少し考えが合わんところがあるな...）";
                 else if (dist < 70) comment = "（どうも好かん。腹の底が読めぬわ...）";
                 else comment = "（あやつは生理的に受け付けん。顔も見たくないわ...）";
              } else {
-                 // 通常武将の口調
+                // 通常武将の口調
                 if (dist < 15) comment = "「あの方とは意気投合します。素晴らしいお方です。」";
                 else if (dist < 30) comment = "「話のわかる相手だと思います。信頼できます。」";
                 else if (dist < 50) comment = "「悪くはありませんが、時折意見が食い違います。」";
