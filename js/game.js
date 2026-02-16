@@ -80,7 +80,7 @@ let GAME_SETTINGS = {
 class DataManager {
     static genericNames = { surnames: [], names: [] };
     static async loadAll(folderName) {
-        const path = `./data/${folderName}/`;
+        const path = `./data/scenarios/${folderName}/`;
         try {
             await this.loadParameters("./data/parameter.csv");
             if (GAME_SETTINGS.System.UseRandomNames) {
@@ -1537,4 +1537,5 @@ class GameManager {
 window.addEventListener('DOMContentLoaded', () => {
     window.GameApp = new GameManager();
 });
+
 
