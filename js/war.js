@@ -197,6 +197,9 @@ class WarManager {
             // 安全策：プレイヤーが防御側の場合、フラグがfalseでも強制的にtrueにする
             if (defClan === pid) isPlayerInvolved = true;
 
+            // 兵士の移動処理：出陣元の兵士を即座に減算（多重増加バグ防止）
+            atkCastle.soldiers = Math.max(0, atkCastle.soldiers - atkSoldierCount);
+
             const atkClanData = this.game.clans.find(c => c.id === atkClan); 
             const atkGeneral = atkBushos[0].name;
             const atkArmyName = atkClanData ? atkClanData.getArmyName() : "敵軍";
@@ -552,6 +555,8 @@ class WarManager {
         const s = this.state; s.active = false; 
         if (s.isPlayerInvolved) { const warModal = document.getElementById('war-modal'); if(warModal) warModal.classList.add('hidden'); }
         const isShortWar = s.round < window.WarParams.War.ShortWarTurnLimit;
+        
+        // 変数定義を前に移動（スコープ確保のため）
         const baseRecov = window.WarParams.War.BaseRecoveryRate;
         const highRecov = window.WarParams.War.RetreatRecoveryRate;
         const attackerRecovered = Math.floor(s.deadSoldiers.attacker * baseRecov);
@@ -585,6 +590,10 @@ class WarManager {
         
         if (isRetreat) {
              s.defender.ownerClan = s.attacker.ownerClan; s.defender.investigatedUntil = 0;
+             
+             // 修正: 攻撃側の生き残った兵士を、占領した城(s.defender)に移動させる
+             s.defender.soldiers = totalAtkSurvivors;
+
              s.atkBushos.forEach((b, idx) => { 
                 const srcC = this.game.getCastle(s.sourceCastle.id); srcC.samuraiIds = srcC.samuraiIds.filter(id => id !== b.id); 
                 b.castleId = s.defender.id; s.defender.samuraiIds.push(b.id); 

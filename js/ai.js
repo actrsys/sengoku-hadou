@@ -174,7 +174,10 @@ class AIEngine {
         const sendSoldiers = Math.floor(source.soldiers * (window.AIParams.AI.SoldierSendRate || 0.8));
         
         if (sendSoldiers <= 0) return;
-        source.soldiers -= sendSoldiers;
+        
+        // 修正: WarManager.startWarで減算するようにしたため、ここでは減算しない
+        // source.soldiers -= sendSoldiers; 
+
         this.game.warManager.startWar(source, target, sorted, sendSoldiers);
     }
 
