@@ -156,65 +156,133 @@ class CommandSystem {
         if(castle.gold < gold) { alert("金が足りません"); return; }
         castle.gold -= gold;
         const effect = GameSystem.calcRewardEffect(gold, daimyo, target);
-        target.loyalty = Math.min(100, target.loyalty + effect);
+        
+        // 仕様変更: 数値は隠蔽し、ニュアンスで伝える
+        // 忠誠が既にMAXの場合は上げないが金は消費し、特別なメッセージを出す
+        let msg = "";
+        
+        if (target.loyalty >= 100) {
+            // 既に上限の場合
+            msg = "「もったいなきお言葉。この身、命尽きるまで殿のために！」\n(これ以上の忠誠は望めないほど、心服しているようだ)";
+        } else {
+            // 通常の上昇処理
+            target.loyalty = Math.min(100, target.loyalty + effect);
+            
+            if (effect > 8) {
+                msg = "「ありがたき幸せ！」\n(顔をほころばせ、深く感謝しているようだ)";
+            } else if (effect > 0) {
+                msg = "「はっ、頂戴いたします。」\n(恭しく受け取った)";
+            } else {
+                msg = "「……。」\n(不満があるようだ)";
+            }
+        }
+
         // 仕様変更: 褒美を与えても行動済みにはしない
         // target.isActionDone = true;
         
-        let msg = "";
-        if (effect > 5) msg = `「ありがたき幸せ！」\n忠誠が${effect}上がりました。`;
-        else if (effect > 0) msg = `「はっ、頂戴いたします。」\n忠誠が${effect}上がりました。`;
-        else msg = `「……。」(不満があるようだ)\n忠誠は上がりませんでした。`;
         this.game.ui.showResultModal(`${target.name}に金${gold}を与えました。\n${msg}`);
         this.game.ui.updatePanelHeader(); this.game.ui.renderCommandMenu();
     }
 
     executeInterviewStatus(busho) {
-        const inno = busho.innovation;
+        // 仕様変更: 忠誠度を5段階で表示。ただし知略が高い武将は偽る。
+        // 乱数なしの決定論的ロジック
+        
+        let perceivedLoyalty = busho.loyalty;
+        
+        // 知略による偽装判定
+        // 知略が高く、かつ忠誠が低い場合、忠誠が高いように振る舞う
+        if (busho.intelligence >= 85 && busho.loyalty < 80) {
+            // 非常に賢い場合、かなり高く見せる
+            perceivedLoyalty = Math.max(perceivedLoyalty, 90);
+        } else if (busho.intelligence >= 70 && busho.loyalty < 60) {
+            // まあまあ賢い場合、そこそこ高く見せる
+            perceivedLoyalty = Math.max(perceivedLoyalty, 70);
+        }
+
         let msg = "";
-        if (inno > 80) msg += "「最近のやり方は少々古臭い気がしますな。もっと新しいことをせねば。」<br>";
-        else if (inno < 20) msg += "「古き良き伝統を守ることこそ肝要です。」<br>";
-        else msg += "「特に不満はありません。順調です。」<br>";
-        msg += `<br><button class='btn-secondary' onclick='window.GameApp.ui.reopenInterviewModal(window.GameApp.getBusho(${busho.id}))'>戻る</button>`;
+        // 忠誠度に応じた5段階の反応
+        if (perceivedLoyalty >= 85) {
+            msg += "「殿の御恩、片時も忘れたことはありませぬ。この身は殿のために。」<br>(強い忠誠心を感じる)";
+        } else if (perceivedLoyalty >= 65) {
+            msg += "「家中はよく治まっております。何も心配なさりませぬよう。」<br>(順調に務めを果たしているようだ)";
+        } else if (perceivedLoyalty >= 45) {
+            msg += "「特に不満はありません。与えられた役目は果たします。」<br>(態度は普通だ)";
+        } else if (perceivedLoyalty >= 25) {
+            msg += "「……少し、待遇を見直してはいただけませぬか。」<br>(不満があるようだ)";
+        } else {
+            msg += "「……。」(目を合わせようとしない)<br>(危険な気配を感じる)";
+        }
+
+        msg += `<br><br><button class='btn-secondary' onclick='window.GameApp.ui.reopenInterviewModal(window.GameApp.getBusho(${busho.id}))'>戻る</button>`;
         this.game.ui.showResultModal(msg);
     }
 
     executeInterviewTopic(interviewer, target) {
-        const dist = GameSystem.calcValueDistance(interviewer, target);
-        let comment = "";
+        // 仕様変更: 相性に加えて、対象の忠誠度についても聞くことができる。
+        // 乱数なし。能力値と関係性による決定論的ロジック。
         
+        // 自分自身（大名）について聞くことはUI側で制限されている前提だが、
+        // 念のためロジック内では「面談者自身の独り言」処理を維持しつつ、他者評価ロジックを追加。
+
         if (interviewer.id === target.id) {
+            let comment = "";
             if (interviewer.ambition > 80) comment = "「俺の力を持ってすれば、天下も夢ではない……はずだ。」";
             else if (interviewer.personality === 'cautious') comment = "「慎重に行かねば、足元をすくわれよう。」";
             else comment = "「今のところは順調か……いや、油断はできん。」";
+            
+            const returnScript = `window.GameApp.ui.reopenInterviewModal(window.GameApp.getBusho(${interviewer.id}))`;
+            this.game.ui.showResultModal(`<strong>${interviewer.name}</strong><br>「${target.name}か……」<br><br>${comment}<br><br><button class='btn-secondary' onclick='${returnScript}'>戻る</button>`);
+            return;
         }
-        else if (target.isDaimyo && target.clan === this.game.playerClanId) {
-            const loyalty = interviewer.loyalty;
-            const aff = GameSystem.calcAffinityDiff(interviewer.affinity, target.affinity); 
-            if (loyalty < 40 || aff > 30) comment = "「……。」(口を閉ざしている。あまり良く思われていないようだ)";
-            else if (loyalty > 80 && aff < 15) comment = "「殿には心より感謝しております。この身尽きるまでお仕えする所存！」";
-            else comment = "「殿のご采配、頼もしく思っております。」";
+
+        // --- 他者についての評価ロジック ---
+        
+        const dist = GameSystem.calcValueDistance(interviewer, target); // 相性の良さ（低いほど良い）
+        const affinityDiff = GameSystem.calcAffinityDiff(interviewer.affinity, target.affinity); // 純粋な相性差（0-50）
+        
+        // 基本コメント（相性について）
+        let affinityComment = "";
+        if (dist < 15) affinityComment = "「あの方とは意気投合します。素晴らしいお方です。」";
+        else if (dist < 30) affinityComment = "「話のわかる相手だと思います。信頼できます。」";
+        else if (dist < 50) affinityComment = "「悪くはありませんが、時折意見が食い違います。」";
+        else if (dist < 70) affinityComment = "「考え方がどうも合いません。理解に苦しみます。」";
+        else affinityComment = "「あやつとは反りが合いません。顔も見たくない程です。」";
+
+        // 忠誠度評価コメント
+        let loyaltyComment = "";
+        
+        // 条件1: 面談者の忠誠度が低い場合 -> とぼける
+        if (interviewer.loyalty < 40) {
+            loyaltyComment = "「さあ……他人の腹の内など、某には分かりかねます。」(関わり合いを避けているようだ)";
         }
+        // 条件2: 対象との仲が非常に悪い場合 -> 交流がない、または嘘をつく
+        else if (affinityDiff > 35) { // 相性差が大きい
+            // 条件3: 仲が悪く、かつ面談者の知略が高い -> 嘘をついて貶める
+            if (interviewer.intelligence >= 80) {
+                loyaltyComment = "「あやつは危険です。裏で妙な動きをしているとの噂も……。」(低い声で告げ口をした)";
+            } else {
+                loyaltyComment = "「あやつとは口もききませぬゆえ、何も存じませぬ。」(吐き捨てるように言った)";
+            }
+        }
+        // 条件4: 対象の知略が高く、面談者の知略が及ばない場合 -> 防御される
+        else if (target.intelligence > interviewer.intelligence + 20) {
+            loyaltyComment = "「あの方は隙を見せませぬ。本心は深い霧の中です。」(読み取れないようだ)";
+        }
+        // 条件5: 通常評価 (面談者の忠誠と義理が高いほど正確…という要件だが、乱数無しなのでストレートに評価させる)
         else {
-             if (interviewer.isDaimyo && interviewer.clan === this.game.playerClanId) {
-                if (dist < 15) comment = "（あやつとは気が合う。頼りになる男よ。）";
-                else if (dist < 30) comment = "（まあ、悪くはない。使いどころ次第だろう。）";
-                else if (dist < 50) comment = "（少し考えが合わんところがあるな。）";
-                else if (dist < 70) comment = "（どうも好かん。腹の底が読めぬわ。）";
-                else comment = "（あやつは生理的に受け付けん。顔も見たくないわ。）";
-             } else {
-                if (dist < 15) comment = "「あの方とは意気投合します。素晴らしいお方です。」";
-                else if (dist < 30) comment = "「話のわかる相手だと思います。信頼できます。」";
-                else if (dist < 50) comment = "「悪くはありませんが、時折意見が食い違います。」";
-                else if (dist < 70) comment = "「考え方がどうも合いません。理解に苦しみます。」";
-                else comment = "「あやつとは反りが合いません。顔も見たくない程です。」";
-             }
+            const tLoyalty = target.loyalty;
+            if (tLoyalty >= 85) loyaltyComment = "「殿への忠義は本物でしょう。疑う余地もありません。」";
+            else if (tLoyalty >= 65) loyaltyComment = "「不審な点はありませぬ。真面目に務めております。」";
+            else if (tLoyalty >= 45) loyaltyComment = "「今のところは大人しくしておりますが……。」";
+            else if (tLoyalty >= 25) loyaltyComment = "「近頃、何やら不満を漏らしているようです。」";
+            else loyaltyComment = "「油断なりませぬ。野心を抱いている気配があります。」";
         }
-        
-        const isMonologue = interviewer.isDaimyo && interviewer.clan === this.game.playerClanId;
-        const targetCall = isMonologue ? `${target.name}か……` : `${target.name}殿ですか……`;
-        
+
+        const targetCall = `${target.name}殿ですか……`;
         const returnScript = `window.GameApp.ui.reopenInterviewModal(window.GameApp.getBusho(${interviewer.id}))`;
-        this.game.ui.showResultModal(`<strong>${interviewer.name}</strong><br>「${targetCall}」<br><br>${comment}<br><br><button class='btn-secondary' onclick='${returnScript}'>戻る</button>`);
+        
+        this.game.ui.showResultModal(`<strong>${interviewer.name}</strong><br>「${targetCall}」<br><br><strong>【相性】</strong><br>${affinityComment}<br><br><strong>【忠誠の噂】</strong><br>${loyaltyComment}<br><br><button class='btn-secondary' onclick='${returnScript}'>戻る</button>`);
     }
 
     executeTransport(bushoIds, targetId, vals) {
