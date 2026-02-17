@@ -900,7 +900,8 @@ class UIManager {
         const gunshi = this.game.getClanGunshi(this.game.playerClanId);
         const myDaimyo = this.game.bushos.find(b => b.clan === this.game.playerClanId && b.isDaimyo);
 
-        if (['farm','commerce','repair','draft','charity','training','soldier_charity','war_deploy','transport_deploy','investigate_deploy'].includes(actionType)) {
+        // 変更: transport_deployを除外し、move_deployを追加 (2026-02-17)
+        if (['farm','commerce','repair','draft','charity','training','soldier_charity','war_deploy','investigate_deploy','move_deploy'].includes(actionType)) {
             isMulti = true;
         }
 
