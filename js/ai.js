@@ -6,6 +6,7 @@
  */
 
 // AI関連の設定定義
+// Parameter.csv の変更を受けて拡張
 window.AIParams = {
     AI: {
         Difficulty: 'normal',
@@ -15,7 +16,11 @@ window.AIParams = {
         DiplomacyChance: 0.3, 
         GoodwillThreshold: 40, 
         AllianceThreshold: 70, 
-        BreakAllianceDutyFactor: 0.5
+        BreakAllianceDutyFactor: 0.5,
+        // 新規追加パラメータのデフォルト値
+        RiskAversion: 2.0,
+        WinBonus: 1000,
+        AttackThreshold: 300
     }
 };
 
@@ -47,7 +52,6 @@ class AIEngine {
     execAI(castle) {
         try {
             // 【安全装置】万が一、プレイヤーの城がAIルーチンに渡された場合、即座に制御を戻す
-            // ★修正: 厳密な数値型変換を行って比較する
             if (Number(castle.ownerClan) === Number(this.game.playerClanId)) {
                 console.warn("AI Alert: Player castle detected in AI routine. Returning control to player.");
                 this.game.isProcessingAI = false;
@@ -124,6 +128,11 @@ class AIEngine {
         const myStats = WarSystem.calcUnitStats(availableBushos);
         const sendSoldiers = Math.floor(myCastle.soldiers * (window.AIParams.AI.SoldierSendRate || 0.8));
 
+        // パラメータの取得（デフォルト値付き）
+        const riskAversion = window.AIParams.AI.RiskAversion || 2.0;
+        const winBonus = window.AIParams.AI.WinBonus || 1000;
+        const baseThreshold = window.AIParams.AI.AttackThreshold || 300;
+
         enemies.forEach(target => {
             const errorMargin = (1.0 - smartness) * (mods.accuracy === 1.0 ? 0.1 : 0.5); 
             const perceive = (val) => Math.floor(val * (1.0 + (Math.random() - 0.5) * 2 * errorMargin));
@@ -142,9 +151,17 @@ class AIEngine {
             const expectedLoss = enemyDmg.soldierDmg;
             const expectedGain = myDmg.soldierDmg + (myDmg.wallDmg * 2.0);
             
-            let score = expectedGain - (expectedLoss * (2.0 - smartness)); 
+            // 修正: RiskAversionをCSVから取得した値を使用。賢いほどリスク計算が正確になる（リスクを無視しなくなる）
+            const riskFactor = riskAversion - (smartness * 0.5);
+            let score = expectedGain - (expectedLoss * riskFactor); 
 
-            if (pEnemySoldiers < myDmg.soldierDmg * 3) score += 2000 * smartness; 
+            // 修正: 勝利確信ボーナスの条件厳格化。
+            // 敵兵が少なく、かつ「予想被害が自軍の半数以下」である場合のみボーナスを加算。
+            // これにより、勝てるが相打ちになるようなケースでの特攻を防ぐ。
+            if (pEnemySoldiers < myDmg.soldierDmg * 3 && expectedLoss < sendSoldiers * 0.5) {
+                 score += winBonus * smartness; 
+            }
+            
             if (pEnemyDefense < 100) score += 500;
 
             const resourceValue = (target.gold + target.rice) * 0.5 * smartness;
@@ -160,7 +177,8 @@ class AIEngine {
             }
         });
 
-        const threshold = 300 * mods.accuracy; 
+        // 閾値もパラメータ化
+        const threshold = baseThreshold * mods.accuracy; 
 
         if (bestScore > threshold) {
             return bestTarget;
