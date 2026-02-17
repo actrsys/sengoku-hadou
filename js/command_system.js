@@ -178,8 +178,6 @@ class CommandSystem {
     }
 
     executeInterviewStatus(busho) {
-        // 仕様変更: メッセージを統合して表示
-
         // --- 1. 方針についてのコメント (革新性) ---
         const inno = busho.innovation;
         let policyText = "";
@@ -197,26 +195,34 @@ class CommandSystem {
         }
 
         let loyaltyText = "";
-        let attitudeText = "";
+        let attitudeText = ""; // ト書き
 
         if (perceivedLoyalty >= 85) {
             loyaltyText = "殿の御恩、片時も忘れたことはありませぬ。この身は殿のために。";
-            attitudeText = "(強い忠誠心を感じる)";
+            attitudeText = "";
         } else if (perceivedLoyalty >= 65) {
             loyaltyText = "家中はよく治まっております。何も心配なさりませぬよう。";
-            attitudeText = "(順調に務めを果たしているようだ)";
+            attitudeText = "";
         } else if (perceivedLoyalty >= 45) {
             loyaltyText = "特に不満はありません。与えられた役目は果たします。";
-            attitudeText = "(態度は普通だ)";
+            attitudeText = "";
         } else if (perceivedLoyalty >= 25) {
             loyaltyText = "……少し、待遇を見直してはいただけませぬか。";
-            attitudeText = "(不満があるようだ)";
+            attitudeText = "";
         } else {
             loyaltyText = "……。";
-            attitudeText = "(目を合わせようとしない)<br>(危険な気配を感じる)";
+            attitudeText = "(目を合わせようとしない。<br>危険な気配を感じる。)";
         }
 
-        let msg = `「${policyText}<br>${loyaltyText}」<br>${attitudeText}`;
+        // 表示要素を配列に入れ、空でないものだけを結合する
+        // ト書き（attitudeText）を消したい場合は "" にするだけで自動的に非表示になる
+        const displayParts = [];
+        displayParts.push(`「${policyText}<br>${loyaltyText}」`); // セリフ部分
+        if (attitudeText) displayParts.push(attitudeText); // ト書き部分
+
+        // 結合（フィルターで空要素を除去し、brで繋ぐ）
+        let msg = displayParts.filter(Boolean).join('<br>');
+        
         msg += `<br><br><button class='btn-secondary' onclick='window.GameApp.ui.reopenInterviewModal(window.GameApp.getBusho(${busho.id}))'>戻る</button>`;
         this.game.ui.showResultModal(msg);
     }
@@ -244,7 +250,7 @@ class CommandSystem {
         else affinityText = "あやつとは反りが合いません。顔も見たくない程です。";
 
         let loyaltyText = "";
-        let togaki = "";
+        let togaki = ""; // ト書き
 
         if (interviewer.loyalty < 40) {
             loyaltyText = "さあ……他人の腹の内など、某には分かりかねます。";
@@ -252,11 +258,11 @@ class CommandSystem {
         }
         else if (affinityDiff > 35) { 
             if (interviewer.intelligence >= 80) {
-                loyaltyText = "あやつは危険です。裏で妙な動きをしているとの噂も……。";
-                togaki = "(低い声で告げ口をした)";
+                loyaltyText = "あやつは危険です。,.<br>裏で妙な動きをしているとの噂も……。";
+                togaki = ")";
             } else {
                 loyaltyText = "あやつとは口もききませぬゆえ、何も存じませぬ。";
-                togaki = "(吐き捨てるように言った)";
+                togaki = "";
             }
         }
         else if (target.intelligence > interviewer.intelligence + 20) {
@@ -274,8 +280,17 @@ class CommandSystem {
 
         const targetCall = `${target.name}殿ですか……`;
         
-        let msg = `<strong>${interviewer.name}</strong><br>「${targetCall}<br>${affinityText}<br>${loyaltyText}」`;
-        if (togaki) msg += `<br>${togaki}`;
+        // 表示要素を配列に入れて管理（スマートな結合方式）
+        const displayParts = [];
+        displayParts.push(`<strong>${interviewer.name}</strong>`); // 名前
+        displayParts.push(`「${targetCall}<br>${affinityText}<br>${loyaltyText}」`); // セリフ（一括）
+        
+        if (togaki) {
+            displayParts.push(togaki); // ト書き（空なら追加しない）
+        }
+
+        // 結合
+        let msg = displayParts.filter(Boolean).join('<br>');
         
         const returnScript = `window.GameApp.ui.reopenInterviewModal(window.GameApp.getBusho(${interviewer.id}))`;
         msg += `<br><br><button class='btn-secondary' onclick='${returnScript}'>戻る</button>`;
