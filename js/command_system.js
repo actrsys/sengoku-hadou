@@ -181,7 +181,7 @@ class CommandSystem {
         // --- 1. 方針についてのコメント (革新性) ---
         const inno = busho.innovation;
         let policyText = "";
-        if (inno > 80) policyText = "最近のやり方は少々古臭い気がしますな。もっと新しいことをせねば。";
+        if (inno > 80) policyText = "最近のやり方は少々古臭い気がしますな。<br>もっと新しいことをせねば。";
         else if (inno < 20) policyText = "古き良き伝統を守ることこそ肝要です。";
         else policyText = "当家のやり方に特に不満はありません。順調です。";
         
