@@ -459,19 +459,30 @@ class UIManager {
     closeSelector() { if (this.selectorModal) this.selectorModal.classList.add('hidden'); }
 
     showCutin(msg) { 
-        if (this.cutinMessage) this.cutinMessage.textContent = msg; 
-        if (this.cutinOverlay) {
-            this.cutinOverlay.classList.remove('hidden'); 
-            this.cutinOverlay.classList.add('fade-in'); 
-            setTimeout(() => { 
-                this.cutinOverlay.classList.remove('fade-in'); 
-                this.cutinOverlay.classList.add('fade-out'); 
+        return new Promise((resolve) => {
+            if (this.cutinMessage) this.cutinMessage.textContent = msg; 
+            if (this.cutinOverlay) {
+                this.cutinOverlay.classList.remove('hidden'); 
+                this.cutinOverlay.classList.add('fade-in'); 
+                
+                // 表示維持時間 (2000ms)
                 setTimeout(() => { 
-                    this.cutinOverlay.classList.add('hidden'); 
-                    this.cutinOverlay.classList.remove('fade-out'); 
-                }, 500); 
-            }, 2000); 
-        }
+                    this.cutinOverlay.classList.remove('fade-in'); 
+                    this.cutinOverlay.classList.add('fade-out'); 
+                    
+                    // フェードアウト時間 (500ms)
+                    setTimeout(() => { 
+                        this.cutinOverlay.classList.add('hidden'); 
+                        this.cutinOverlay.classList.remove('fade-out'); 
+                        // ここですべてのアニメーション完了を通知
+                        resolve();
+                    }, 500); 
+                }, 2000); 
+            } else {
+                // 要素がない場合は即座に完了
+                resolve();
+            }
+        });
     }
     
     showScenarioSelection(scenarios, onSelect) {
@@ -1364,13 +1375,20 @@ class GameManager {
     getClanGunshi(clanId) { return this.bushos.find(b => Number(b.clan) === Number(clanId) && b.isGunshi); }
     isCastleVisible(castle) { if (Number(castle.ownerClan) === Number(this.playerClanId)) return true; if (castle.investigatedUntil >= this.getCurrentTurnId()) return true; return false; }
     
-    startMonth() {
+    async startMonth() { // async を追加
         this.marketRate = Math.max(window.MainParams.Economy.TradeRateMin, Math.min(window.MainParams.Economy.TradeRateMax, this.marketRate * (0.9 + Math.random()*window.MainParams.Economy.TradeFluctuation)));
-        this.ui.showCutin(`${this.year}年 ${this.month}月`); this.ui.log(`=== ${this.year}年 ${this.month}月 ===`);
         
-        this.factionSystem.processStartMonth(); // 追加: 月初の派閥・下野処理
+        // ★ここで await を使い、アニメーション完了まで待機する
+        await this.ui.showCutin(`${this.year}年 ${this.month}月`);
         
-        this.processRoninMovements(); if (this.month % 3 === 0) this.optimizeCastellans(); const isPopGrowth = (this.month % 2 === 0);
+        this.ui.log(`=== ${this.year}年 ${this.month}月 ===`);
+        
+        this.factionSystem.processStartMonth(); 
+        
+        this.processRoninMovements(); 
+        if (this.month % 3 === 0) this.optimizeCastellans(); 
+        const isPopGrowth = (this.month % 2 === 0);
+        
         this.castles.forEach(c => {
             if (c.ownerClan === 0) return;
             c.isDone = false;
@@ -1394,14 +1412,14 @@ class GameManager {
             bushos.forEach(b => b.isActionDone = false);
         });
 
-        // 変更: ターン順序を「プレイヤー全城」->「AI全城(ランダム)」の順にソートして安定化させる
         const allCastles = this.castles.filter(c => c.ownerClan !== 0);
         const myCastles = allCastles.filter(c => Number(c.ownerClan) === Number(this.playerClanId));
         const otherCastles = allCastles.filter(c => Number(c.ownerClan) !== Number(this.playerClanId));
-        otherCastles.sort(() => Math.random() - 0.5); // AI同士はランダム
+        otherCastles.sort(() => Math.random() - 0.5); 
         this.turnQueue = [...myCastles, ...otherCastles];
 
-        this.currentIndex = 0; this.processTurn();
+        this.currentIndex = 0; 
+        this.processTurn();
     }
     processRoninMovements() { const ronins = this.bushos.filter(b => b.status === 'ronin'); ronins.forEach(r => { const currentC = this.getCastle(r.castleId); if(!currentC) return; const neighbors = this.castles.filter(c => GameSystem.isAdjacent(currentC, c)); neighbors.forEach(n => { const castellan = this.getBusho(n.castellanId); if (Math.random() < 0.2) { currentC.samuraiIds = currentC.samuraiIds.filter(id => id !== r.id); n.samuraiIds.push(r.id); r.castleId = n.id; } }); }); }
     optimizeCastellans() { const clanIds = [...new Set(this.castles.filter(c=>c.ownerClan!==0).map(c=>c.ownerClan))]; clanIds.forEach(clanId => { const myBushos = this.bushos.filter(b => b.clan === clanId); if(myBushos.length===0) return; let daimyoInt = Math.max(...myBushos.map(b => b.intelligence)); if (Math.random() * 100 < daimyoInt) { const clanCastles = this.castles.filter(c => c.ownerClan === clanId); clanCastles.forEach(castle => { const castleBushos = this.getCastleBushos(castle.id).filter(b => b.status !== 'ronin'); if (castleBushos.length <= 1) return; castleBushos.sort((a, b) => (b.leadership + b.politics) - (a.leadership + a.politics)); const best = castleBushos[0]; if (best.id !== castle.castellanId) { const old = this.getBusho(castle.castellanId); if(old) old.isCastellan = false; best.isCastellan = true; castle.castellanId = best.id; } }); } }); }
