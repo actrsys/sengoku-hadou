@@ -198,10 +198,10 @@ class CommandSystem {
         let attitudeText = ""; // ト書き
 
         if (perceivedLoyalty >= 85) {
-            loyaltyText = "殿の御恩、片時も忘れたことはありませぬ。この身は殿のために。";
+            loyaltyText = "身に余る御恩、片時も忘れたことはありませぬ。<br>この身は殿のために。";
             attitudeText = "";
         } else if (perceivedLoyalty >= 65) {
-            loyaltyText = "家中はよく治まっております。何も心配なさりませぬよう。";
+            loyaltyText = "家中はよく治まっております。<br>何も心配なさりませぬよう。";
             attitudeText = "";
         } else if (perceivedLoyalty >= 45) {
             loyaltyText = "特に不満はありません。与えられた役目は果たします。";
@@ -230,9 +230,9 @@ class CommandSystem {
     executeInterviewTopic(interviewer, target) {
         if (interviewer.id === target.id) {
             let comment = "";
-            if (interviewer.ambition > 80) comment = "「俺の力を持ってすれば、天下も夢ではない……はずだ。」";
+            if (interviewer.ambition > 80) comment = "「俺の力を持ってすれば、<br>天下も夢ではない……はずだ。」";
             else if (interviewer.personality === 'cautious') comment = "「慎重に行かねば、足元をすくわれよう。」";
-            else comment = "「今のところは順調か……いや、油断はできん。」";
+            else comment = "「今のところは順調か……<br>いや、油断はできん。」";
             
             const returnScript = `window.GameApp.ui.reopenInterviewModal(window.GameApp.getBusho(${interviewer.id}))`;
             this.game.ui.showResultModal(`<strong>${interviewer.name}</strong><br>「${target.name}か……」<br><br>${comment}<br><br><button class='btn-secondary' onclick='${returnScript}'>戻る</button>`);
@@ -247,27 +247,27 @@ class CommandSystem {
         else if (dist < 30) affinityText = "話のわかる相手だと思います。信頼できます。";
         else if (dist < 50) affinityText = "悪くはありませんが、時折意見が食い違います。";
         else if (dist < 70) affinityText = "考え方がどうも合いません。理解に苦しみます。";
-        else affinityText = "あやつとは反りが合いません。顔も見たくない程です。";
+        else affinityText = "あやつとは反りが合いません。<br>顔も見たくない程です。";
 
         let loyaltyText = "";
         let togaki = ""; // ト書き
 
         if (interviewer.loyalty < 40) {
-            loyaltyText = "さあ……他人の腹の内など、某には分かりかねます。";
-            togaki = "(関わり合いを避けているようだ)";
+            loyaltyText = "さあ……？<br>他人の腹の内など、某には分かりかねます。";
+            togaki = "";
         }
         else if (affinityDiff > 35) { 
             if (interviewer.intelligence >= 80) {
                 loyaltyText = "あやつは危険です。,.<br>裏で妙な動きをしているとの噂も……。";
-                togaki = ")";
+                togaki = "";
             } else {
                 loyaltyText = "あやつとは口もききませぬゆえ、何も存じませぬ。";
                 togaki = "";
             }
         }
         else if (target.intelligence > interviewer.intelligence + 20) {
-            loyaltyText = "あの方は隙を見せませぬ。本心は深い霧の中です。";
-            togaki = "(読み取れないようだ)";
+            loyaltyText = "なかなか内心を見せぬお方です。";
+            togaki = "";
         }
         else {
             const tLoyalty = target.loyalty;
