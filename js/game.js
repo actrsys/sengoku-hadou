@@ -856,7 +856,7 @@ class UIManager {
             }
         }
 
-        if (['farm','commerce','repair','draft','charity','transport','appoint_gunshi','appoint','banish','training','soldier_charity','buy_rice','sell_rice','interview','reward'].includes(action.type)) { onConfirm(); return; }
+        if (['farm','commerce','repair','draft','charity','transport','appoint_gunshi','appoint','banish','training','soldier_charity','buy_rice','sell_rice','interview','reward', 'move_deploy'].includes(action.type)) { onConfirm(); return; }
         const gunshi = this.game.getClanGunshi(this.game.playerClanId); if (!gunshi) { onConfirm(); return; }
         const seed = this.game.year * 100 + this.game.month + (action.type.length) + (action.targetId || 0) + (action.val || 0);
         const msg = GameSystem.getGunshiAdvice(gunshi, action, seed);
@@ -1118,7 +1118,7 @@ class UIManager {
                 if (!confirm(`${targetName}に攻め込みますか？\n今月の命令は終了となります。`)) {
                     return; 
                 }
-                this.showGunshiAdvice({ type: 'war' }, () => this.game.warManager.startWar(c, this.game.getCastle(targetId), data.map(id=>this.game.getBusho(id)), val)); 
+                this.game.warManager.startWar(c, this.game.getCastle(targetId), data.map(id=>this.game.getBusho(id)), val);
             };
         } else if (type === 'transport') {
             document.getElementById('quantity-title').textContent = "輸送物資指定"; inputs.gold = createSlider("金", "gold", c.gold, 0); inputs.rice = createSlider("兵糧", "rice", c.rice, 0); inputs.soldiers = createSlider("兵士", "soldiers", c.soldiers, 0);
