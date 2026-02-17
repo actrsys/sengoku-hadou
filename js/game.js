@@ -1299,6 +1299,7 @@ class GameManager {
         this.warManager = new WarManager(this);
         this.aiEngine = new AIEngine(this);
         this.independenceSystem = new IndependenceSystem(this);
+        this.factionSystem = new FactionSystem(this); // 追加: 派閥システム
     }
     getRelationKey(id1, id2) { return id1 < id2 ? `${id1}-${id2}` : `${id2}-${id1}`; }
     getRelation(id1, id2) { const key = this.getRelationKey(id1, id2); if (!this.relations[key]) this.relations[key] = { friendship: 50, alliance: false }; return this.relations[key]; }
@@ -1339,7 +1340,11 @@ class GameManager {
     
     startMonth() {
         this.marketRate = Math.max(window.MainParams.Economy.TradeRateMin, Math.min(window.MainParams.Economy.TradeRateMax, this.marketRate * (0.9 + Math.random()*window.MainParams.Economy.TradeFluctuation)));
-        this.ui.showCutin(`${this.year}年 ${this.month}月`); this.ui.log(`=== ${this.year}年 ${this.month}月 ===`); this.processRoninMovements(); if (this.month % 3 === 0) this.optimizeCastellans(); const isPopGrowth = (this.month % 2 === 0);
+        this.ui.showCutin(`${this.year}年 ${this.month}月`); this.ui.log(`=== ${this.year}年 ${this.month}月 ===`);
+        
+        this.factionSystem.processStartMonth(); // 追加: 月初の派閥・下野処理
+        
+        this.processRoninMovements(); if (this.month % 3 === 0) this.optimizeCastellans(); const isPopGrowth = (this.month % 2 === 0);
         this.castles.forEach(c => {
             if (c.ownerClan === 0) return;
             c.isDone = false;
@@ -1478,8 +1483,8 @@ class GameManager {
         this.processTurn(); 
     }
     endMonth() { 
-        // 独立判定（月末に実行）
-        this.independenceSystem.checkIndependence();
+        this.factionSystem.processEndMonth(); // 追加: 月末の派閥・忠誠処理
+        this.independenceSystem.checkIndependence(); // 独立判定（月末に実行）
         
         this.month++; if(this.month > 12) { this.month = 1; this.year++; } const clans = new Set(this.castles.filter(c => c.ownerClan !== 0).map(c => c.ownerClan)); const playerAlive = clans.has(this.playerClanId); if (clans.size === 1 && playerAlive) alert(`天下統一！`); else if (!playerAlive) alert(`我が軍は滅亡しました……`); else this.startMonth(); 
     }

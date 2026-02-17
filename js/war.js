@@ -533,7 +533,11 @@ class WarManager {
                     let rate = window.WarParams.War.RetreatCaptureRate;
                     if(b.isDaimyo) rate = Math.max(0, rate - window.WarParams.War.DaimyoCaptureReduction);
                     if(Math.random() < rate) { capturedBushos.push(b); } 
-                    else { b.castleId = target.id; b.isCastellan = false; target.samuraiIds.push(b.id); }
+                    else { 
+                        b.castleId = target.id; b.isCastellan = false; target.samuraiIds.push(b.id); 
+                        // 履歴処理: 撤退は強制移動なので、通常の移動履歴更新を行う
+                        this.game.factionSystem.handleMove(b, defCastle.id, target.id);
+                    }
                 });
                 defCastle.gold = lostGold; defCastle.rice = 0; defCastle.soldiers = 0; defCastle.samuraiIds = []; defCastle.castellanId = 0;
                 
@@ -553,6 +557,26 @@ class WarManager {
 
     endWar(attackerWon, isRetreat = false, capturedInRetreat = [], retreatTargetId = null) { 
         const s = this.state; s.active = false; 
+        
+        // --- 参戦履歴の記録 ---
+        // 攻撃側
+        s.atkBushos.forEach(b => {
+             // 撤退時も参戦実績にはなる
+             this.game.factionSystem.recordBattle(b, s.defender.id);
+             // 不満の蓄積（戦争は疲れる）
+             this.game.factionSystem.updateRecognition(b, 25);
+        });
+        // 防御側（撤退した武将や捕虜含む）
+        const defBushos = this.game.getCastleBushos(s.defender.id).concat(this.pendingPrisoners);
+        // defBushoが一時オブジェクトでない（実在武将）なら履歴追加
+        if (s.defBusho && s.defBusho.id) {
+             if (!defBushos.find(b => b.id === s.defBusho.id)) defBushos.push(s.defBusho);
+        }
+        defBushos.forEach(b => {
+             this.game.factionSystem.recordBattle(b, s.defender.id);
+             this.game.factionSystem.updateRecognition(b, 25);
+        });
+
         if (s.isPlayerInvolved) { const warModal = document.getElementById('war-modal'); if(warModal) warModal.classList.add('hidden'); }
         const isShortWar = s.round < window.WarParams.War.ShortWarTurnLimit;
         
@@ -596,6 +620,7 @@ class WarManager {
 
              s.atkBushos.forEach((b, idx) => { 
                 const srcC = this.game.getCastle(s.sourceCastle.id); srcC.samuraiIds = srcC.samuraiIds.filter(id => id !== b.id); 
+                this.game.factionSystem.handleMove(b, s.sourceCastle.id, s.defender.id); // 履歴
                 b.castleId = s.defender.id; s.defender.samuraiIds.push(b.id); 
                 if(idx === 0) { b.isCastellan = true; s.defender.castellanId = b.id; } else b.isCastellan = false; 
             });
@@ -632,6 +657,7 @@ class WarManager {
             s.defender.ownerClan = s.attacker.ownerClan; s.defender.investigatedUntil = 0; s.defender.immunityUntil = currentTurnId + 1;
             s.atkBushos.forEach((b, idx) => { 
                 const srcC = this.game.getCastle(s.sourceCastle.id); srcC.samuraiIds = srcC.samuraiIds.filter(id => id !== b.id); 
+                this.game.factionSystem.handleMove(b, s.sourceCastle.id, s.defender.id); // 履歴
                 b.castleId = s.defender.id; s.defender.samuraiIds.push(b.id); 
                 if(idx === 0) { b.isCastellan = true; s.defender.castellanId = b.id; } else b.isCastellan = false; 
             }); 
@@ -664,6 +690,7 @@ class WarManager {
                 if (friendlyCastles.length > 0) {
                     const escapeCastle = friendlyCastles[Math.floor(Math.random() * friendlyCastles.length)];
                     defeatedCastle.samuraiIds = defeatedCastle.samuraiIds.filter(id => id !== b.id);
+                    this.game.factionSystem.handleMove(b, defeatedCastle.id, escapeCastle.id); // 履歴
                     b.castleId = escapeCastle.id; b.isCastellan = false; escapeCastle.samuraiIds.push(b.id); escapees.push(b);
                 } else { b.clan = 0; b.castleId = 0; b.isCastellan = false; b.status = 'ronin'; }
             } 
@@ -691,6 +718,7 @@ class WarManager {
             if (friendlyCastles.length > 0) {
                 const returnCastle = friendlyCastles[Math.floor(Math.random() * friendlyCastles.length)];
                 prisoner.castleId = returnCastle.id; prisoner.isCastellan = false; prisoner.status = 'active'; returnCastle.samuraiIds.push(prisoner.id);
+                this.game.factionSystem.handleMove(prisoner, 0, returnCastle.id); // 履歴(0は不明な元位置)
                 alert(`${prisoner.name}を解放しました。(自領へ帰還しました)`);
             } else { prisoner.status = 'ronin'; prisoner.clan = 0; prisoner.castleId = 0; alert(`${prisoner.name}を解放しました。(在野へ下りました)`); }
         } 

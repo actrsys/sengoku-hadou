@@ -23,6 +23,20 @@ class Busho {
         if(this.cooperation === undefined) this.cooperation = Math.min(100, Math.max(0, 50 + (this.charm - 50) * 0.5 + (Math.random() * 40 - 20)));
         this.isDaimyo = false; this.isGunshi = false; this.isCastellan = false;
         if(this.clan === 0 && !this.status) this.status = 'ronin';
+
+        // --- 派閥・承認欲求システム用拡張 ---
+        // 累計功績
+        this.achievementTotal = this.achievementTotal || 0;
+        // 承認欲求 (-100:恩義 ～ 100:不満)
+        this.recognitionNeed = this.recognitionNeed || 0;
+        // 所属派閥ID (0:なし)
+        this.factionId = this.factionId || 0;
+        // 現在の城に到着したターン (ゲーム開始時は0と仮定、ロード時は維持)
+        this.arrivalTurn = this.arrivalTurn !== undefined ? this.arrivalTurn : 0;
+        // 滞在履歴 [{castleId, start, end}] (3ヶ月以上のみ記録)
+        this.stayHistory = this.stayHistory || [];
+        // 参戦履歴 [Year_Month_CastleID]
+        this.battleHistory = this.battleHistory || [];
     }
     getRankName() { if(this.isDaimyo) return "大名"; if(this.clan === 0) return "在野"; if(this.isGunshi) return "軍師"; if(this.isCastellan) return "城主"; return "一般"; }
     getFactionName() { if (this.innovation >= 70) return "革新派"; if (this.innovation <= 30) return "保守派"; return "中道派"; }
