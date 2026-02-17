@@ -157,15 +157,11 @@ class CommandSystem {
         castle.gold -= gold;
         const effect = GameSystem.calcRewardEffect(gold, daimyo, target);
         
-        // 仕様変更: 数値は隠蔽し、ニュアンスで伝える
-        // 忠誠が既にMAXの場合は上げないが金は消費し、特別なメッセージを出す
         let msg = "";
         
         if (target.loyalty >= 100) {
-            // 既に上限の場合
             msg = "「もったいなきお言葉。この身、命尽きるまで殿のために！」\n(これ以上の忠誠は望めないほど、心服しているようだ)";
         } else {
-            // 通常の上昇処理
             target.loyalty = Math.min(100, target.loyalty + effect);
             
             if (effect > 8) {
@@ -177,31 +173,34 @@ class CommandSystem {
             }
         }
 
-        // 仕様変更: 褒美を与えても行動済みにはしない
-        // target.isActionDone = true;
-        
         this.game.ui.showResultModal(`${target.name}に金${gold}を与えました。\n${msg}`);
         this.game.ui.updatePanelHeader(); this.game.ui.renderCommandMenu();
     }
 
     executeInterviewStatus(busho) {
-        // 仕様変更: 忠誠度を5段階で表示。ただし知略が高い武将は偽る。
-        // 乱数なしの決定論的ロジック
+        // 仕様変更: 革新性（方針）と忠誠度（態度）の両方を表示する
+        let msg = "";
+
+        // --- 1. 方針についてのコメント (革新性) ---
+        msg += "<strong>【方針について】</strong><br>";
+        const inno = busho.innovation;
+        if (inno > 80) msg += "「最近のやり方は少々古臭い気がしますな。もっと新しいことをせねば。」<br>";
+        else if (inno < 20) msg += "「古き良き伝統を守ることこそ肝要です。」<br>";
+        else msg += "「当家のやり方に特に不満はありません。順調です。」<br>";
+        
+        msg += "<br>";
+
+        // --- 2. 忠誠度についてのコメント (知略による偽装あり) ---
+        msg += "<strong>【忠誠について】</strong><br>";
         
         let perceivedLoyalty = busho.loyalty;
-        
-        // 知略による偽装判定
         // 知略が高く、かつ忠誠が低い場合、忠誠が高いように振る舞う
         if (busho.intelligence >= 85 && busho.loyalty < 80) {
-            // 非常に賢い場合、かなり高く見せる
             perceivedLoyalty = Math.max(perceivedLoyalty, 90);
         } else if (busho.intelligence >= 70 && busho.loyalty < 60) {
-            // まあまあ賢い場合、そこそこ高く見せる
             perceivedLoyalty = Math.max(perceivedLoyalty, 70);
         }
 
-        let msg = "";
-        // 忠誠度に応じた5段階の反応
         if (perceivedLoyalty >= 85) {
             msg += "「殿の御恩、片時も忘れたことはありませぬ。この身は殿のために。」<br>(強い忠誠心を感じる)";
         } else if (perceivedLoyalty >= 65) {
@@ -219,12 +218,6 @@ class CommandSystem {
     }
 
     executeInterviewTopic(interviewer, target) {
-        // 仕様変更: 相性に加えて、対象の忠誠度についても聞くことができる。
-        // 乱数なし。能力値と関係性による決定論的ロジック。
-        
-        // 自分自身（大名）について聞くことはUI側で制限されている前提だが、
-        // 念のためロジック内では「面談者自身の独り言」処理を維持しつつ、他者評価ロジックを追加。
-
         if (interviewer.id === target.id) {
             let comment = "";
             if (interviewer.ambition > 80) comment = "「俺の力を持ってすれば、天下も夢ではない……はずだ。」";
@@ -236,12 +229,9 @@ class CommandSystem {
             return;
         }
 
-        // --- 他者についての評価ロジック ---
+        const dist = GameSystem.calcValueDistance(interviewer, target); 
+        const affinityDiff = GameSystem.calcAffinityDiff(interviewer.affinity, target.affinity); 
         
-        const dist = GameSystem.calcValueDistance(interviewer, target); // 相性の良さ（低いほど良い）
-        const affinityDiff = GameSystem.calcAffinityDiff(interviewer.affinity, target.affinity); // 純粋な相性差（0-50）
-        
-        // 基本コメント（相性について）
         let affinityComment = "";
         if (dist < 15) affinityComment = "「あの方とは意気投合します。素晴らしいお方です。」";
         else if (dist < 30) affinityComment = "「話のわかる相手だと思います。信頼できます。」";
@@ -249,27 +239,20 @@ class CommandSystem {
         else if (dist < 70) affinityComment = "「考え方がどうも合いません。理解に苦しみます。」";
         else affinityComment = "「あやつとは反りが合いません。顔も見たくない程です。」";
 
-        // 忠誠度評価コメント
         let loyaltyComment = "";
-        
-        // 条件1: 面談者の忠誠度が低い場合 -> とぼける
         if (interviewer.loyalty < 40) {
             loyaltyComment = "「さあ……他人の腹の内など、某には分かりかねます。」(関わり合いを避けているようだ)";
         }
-        // 条件2: 対象との仲が非常に悪い場合 -> 交流がない、または嘘をつく
-        else if (affinityDiff > 35) { // 相性差が大きい
-            // 条件3: 仲が悪く、かつ面談者の知略が高い -> 嘘をついて貶める
+        else if (affinityDiff > 35) { 
             if (interviewer.intelligence >= 80) {
                 loyaltyComment = "「あやつは危険です。裏で妙な動きをしているとの噂も……。」(低い声で告げ口をした)";
             } else {
                 loyaltyComment = "「あやつとは口もききませぬゆえ、何も存じませぬ。」(吐き捨てるように言った)";
             }
         }
-        // 条件4: 対象の知略が高く、面談者の知略が及ばない場合 -> 防御される
         else if (target.intelligence > interviewer.intelligence + 20) {
             loyaltyComment = "「あの方は隙を見せませぬ。本心は深い霧の中です。」(読み取れないようだ)";
         }
-        // 条件5: 通常評価 (面談者の忠誠と義理が高いほど正確…という要件だが、乱数無しなのでストレートに評価させる)
         else {
             const tLoyalty = target.loyalty;
             if (tLoyalty >= 85) loyaltyComment = "「殿への忠義は本物でしょう。疑う余地もありません。」";
