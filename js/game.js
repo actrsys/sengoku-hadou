@@ -971,12 +971,49 @@ class UIManager {
 
             const div = document.createElement('div'); div.className = `select-item ${!isSelectable ? 'disabled' : ''}`;
             const inputType = isMulti ? 'checkbox' : 'radio';
+            
+            // inputは生成するが、CSSでgrid-column 1を0pxにしているため見えなくなる。
             const inputHtml = actionType === 'view_only' ? '' : `<input type="${inputType}" name="sel_busho" value="${b.id}" ${!isSelectable ? 'disabled' : ''} style="grid-column:1;">`;
             
             div.innerHTML = `${inputHtml}<span class="col-act" style="grid-column:2;">${b.isActionDone?'[済]':'[未]'}</span><span class="col-name" style="grid-column:3;">${b.name}</span><span class="col-rank" style="grid-column:4;">${b.getRankName()}</span><span class="col-stat" style="grid-column:5;">${getStat('leadership')}</span><span class="col-stat" style="grid-column:6;">${getStat('strength')}</span><span class="col-stat" style="grid-column:7;">${getStat('politics')}</span><span class="col-stat" style="grid-column:8;">${getStat('diplomacy')}</span><span class="col-stat" style="grid-column:9;">${getStat('intelligence')}</span><span class="col-stat" style="grid-column:10;">${getStat('charm')}</span>`;
             
             if(isSelectable && actionType !== 'view_only') { 
-                div.onclick = (e) => { if(e.target.tagName !== 'INPUT') div.querySelector('input').click(); updateContextCost(); }; 
+                div.onclick = (e) => { 
+                    // もしinput要素自体をクリックした場合（今回は非表示だが念の為）
+                    if(e.target.tagName === 'INPUT') { 
+                        // ラジオボタンなら他のハイライトを消す
+                        if(!isMulti) {
+                            const siblings = this.selectorList.querySelectorAll('.select-item');
+                            siblings.forEach(el => el.classList.remove('selected'));
+                        }
+                        if(e.target.checked) div.classList.add('selected');
+                        else div.classList.remove('selected');
+                        
+                        updateContextCost();
+                        return;
+                    } 
+                    
+                    // 行クリック時の処理
+                    const input = div.querySelector('input');
+                    if(input) {
+                        if (isMulti) {
+                            // チェックボックス: トグル
+                            input.checked = !input.checked;
+                        } else {
+                            // ラジオボタン: 選択
+                            input.checked = true;
+                            // 他の行の選択スタイルを解除
+                            const allItems = this.selectorList.querySelectorAll('.select-item');
+                            allItems.forEach(item => item.classList.remove('selected'));
+                        }
+                        
+                        // 自身のスタイル更新
+                        if(input.checked) div.classList.add('selected');
+                        else div.classList.remove('selected');
+                        
+                        updateContextCost(); 
+                    }
+                }; 
             }
             this.selectorList.appendChild(div);
         });
