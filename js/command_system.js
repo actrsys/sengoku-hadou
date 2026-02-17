@@ -178,21 +178,16 @@ class CommandSystem {
     }
 
     executeInterviewStatus(busho) {
-        // 仕様変更: 革新性（方針）と忠誠度（態度）の両方を表示する
-        let msg = "";
+        // 仕様変更: メッセージを統合して表示
 
         // --- 1. 方針についてのコメント (革新性) ---
-        msg += "<strong>【方針について】</strong><br>";
         const inno = busho.innovation;
-        if (inno > 80) msg += "「最近のやり方は少々古臭い気がしますな。もっと新しいことをせねば。」<br>";
-        else if (inno < 20) msg += "「古き良き伝統を守ることこそ肝要です。」<br>";
-        else msg += "「当家のやり方に特に不満はありません。順調です。」<br>";
+        let policyText = "";
+        if (inno > 80) policyText = "最近のやり方は少々古臭い気がしますな。もっと新しいことをせねば。";
+        else if (inno < 20) policyText = "古き良き伝統を守ることこそ肝要です。";
+        else policyText = "当家のやり方に特に不満はありません。順調です。";
         
-        msg += "<br>";
-
         // --- 2. 忠誠度についてのコメント (知略による偽装あり) ---
-        msg += "<strong>【忠誠について】</strong><br>";
-        
         let perceivedLoyalty = busho.loyalty;
         // 知略が高く、かつ忠誠が低い場合、忠誠が高いように振る舞う
         if (busho.intelligence >= 85 && busho.loyalty < 80) {
@@ -201,18 +196,27 @@ class CommandSystem {
             perceivedLoyalty = Math.max(perceivedLoyalty, 70);
         }
 
+        let loyaltyText = "";
+        let attitudeText = "";
+
         if (perceivedLoyalty >= 85) {
-            msg += "「殿の御恩、片時も忘れたことはありませぬ。この身は殿のために。」<br>(強い忠誠心を感じる)";
+            loyaltyText = "殿の御恩、片時も忘れたことはありませぬ。この身は殿のために。";
+            attitudeText = "(強い忠誠心を感じる)";
         } else if (perceivedLoyalty >= 65) {
-            msg += "「家中はよく治まっております。何も心配なさりませぬよう。」<br>(順調に務めを果たしているようだ)";
+            loyaltyText = "家中はよく治まっております。何も心配なさりませぬよう。";
+            attitudeText = "(順調に務めを果たしているようだ)";
         } else if (perceivedLoyalty >= 45) {
-            msg += "「特に不満はありません。与えられた役目は果たします。」<br>(態度は普通だ)";
+            loyaltyText = "特に不満はありません。与えられた役目は果たします。";
+            attitudeText = "(態度は普通だ)";
         } else if (perceivedLoyalty >= 25) {
-            msg += "「……少し、待遇を見直してはいただけませぬか。」<br>(不満があるようだ)";
+            loyaltyText = "……少し、待遇を見直してはいただけませぬか。";
+            attitudeText = "(不満があるようだ)";
         } else {
-            msg += "「……。」(目を合わせようとしない)<br>(危険な気配を感じる)";
+            loyaltyText = "……。";
+            attitudeText = "(目を合わせようとしない)<br>(危険な気配を感じる)";
         }
 
+        let msg = `「${policyText}<br>${loyaltyText}」<br>${attitudeText}`;
         msg += `<br><br><button class='btn-secondary' onclick='window.GameApp.ui.reopenInterviewModal(window.GameApp.getBusho(${busho.id}))'>戻る</button>`;
         this.game.ui.showResultModal(msg);
     }
@@ -232,40 +236,50 @@ class CommandSystem {
         const dist = GameSystem.calcValueDistance(interviewer, target); 
         const affinityDiff = GameSystem.calcAffinityDiff(interviewer.affinity, target.affinity); 
         
-        let affinityComment = "";
-        if (dist < 15) affinityComment = "「あの方とは意気投合します。素晴らしいお方です。」";
-        else if (dist < 30) affinityComment = "「話のわかる相手だと思います。信頼できます。」";
-        else if (dist < 50) affinityComment = "「悪くはありませんが、時折意見が食い違います。」";
-        else if (dist < 70) affinityComment = "「考え方がどうも合いません。理解に苦しみます。」";
-        else affinityComment = "「あやつとは反りが合いません。顔も見たくない程です。」";
+        let affinityText = "";
+        if (dist < 15) affinityText = "あの方とは意気投合します。素晴らしいお方です。";
+        else if (dist < 30) affinityText = "話のわかる相手だと思います。信頼できます。";
+        else if (dist < 50) affinityText = "悪くはありませんが、時折意見が食い違います。";
+        else if (dist < 70) affinityText = "考え方がどうも合いません。理解に苦しみます。";
+        else affinityText = "あやつとは反りが合いません。顔も見たくない程です。";
 
-        let loyaltyComment = "";
+        let loyaltyText = "";
+        let togaki = "";
+
         if (interviewer.loyalty < 40) {
-            loyaltyComment = "「さあ……他人の腹の内など、某には分かりかねます。」(関わり合いを避けているようだ)";
+            loyaltyText = "さあ……他人の腹の内など、某には分かりかねます。";
+            togaki = "(関わり合いを避けているようだ)";
         }
         else if (affinityDiff > 35) { 
             if (interviewer.intelligence >= 80) {
-                loyaltyComment = "「あやつは危険です。裏で妙な動きをしているとの噂も……。」(低い声で告げ口をした)";
+                loyaltyText = "あやつは危険です。裏で妙な動きをしているとの噂も……。";
+                togaki = "(低い声で告げ口をした)";
             } else {
-                loyaltyComment = "「あやつとは口もききませぬゆえ、何も存じませぬ。」(吐き捨てるように言った)";
+                loyaltyText = "あやつとは口もききませぬゆえ、何も存じませぬ。";
+                togaki = "(吐き捨てるように言った)";
             }
         }
         else if (target.intelligence > interviewer.intelligence + 20) {
-            loyaltyComment = "「あの方は隙を見せませぬ。本心は深い霧の中です。」(読み取れないようだ)";
+            loyaltyText = "あの方は隙を見せませぬ。本心は深い霧の中です。";
+            togaki = "(読み取れないようだ)";
         }
         else {
             const tLoyalty = target.loyalty;
-            if (tLoyalty >= 85) loyaltyComment = "「殿への忠義は本物でしょう。疑う余地もありません。」";
-            else if (tLoyalty >= 65) loyaltyComment = "「不審な点はありませぬ。真面目に務めております。」";
-            else if (tLoyalty >= 45) loyaltyComment = "「今のところは大人しくしておりますが……。」";
-            else if (tLoyalty >= 25) loyaltyComment = "「近頃、何やら不満を漏らしているようです。」";
-            else loyaltyComment = "「油断なりませぬ。野心を抱いている気配があります。」";
+            if (tLoyalty >= 85) loyaltyText = "殿への忠義は本物でしょう。疑う余地もありません。";
+            else if (tLoyalty >= 65) loyaltyText = "不審な点はありませぬ。真面目に務めております。";
+            else if (tLoyalty >= 45) loyaltyText = "今のところは大人しくしておりますが……。";
+            else if (tLoyalty >= 25) loyaltyText = "近頃、何やら不満を漏らしているようです。";
+            else loyaltyText = "油断なりませぬ。野心を抱いている気配があります。";
         }
 
         const targetCall = `${target.name}殿ですか……`;
-        const returnScript = `window.GameApp.ui.reopenInterviewModal(window.GameApp.getBusho(${interviewer.id}))`;
         
-        this.game.ui.showResultModal(`<strong>${interviewer.name}</strong><br>「${targetCall}」<br><br><strong>【相性】</strong><br>${affinityComment}<br><br><strong>【忠誠の噂】</strong><br>${loyaltyComment}<br><br><button class='btn-secondary' onclick='${returnScript}'>戻る</button>`);
+        let msg = `<strong>${interviewer.name}</strong><br>「${targetCall}<br>${affinityText}<br>${loyaltyText}」`;
+        if (togaki) msg += `<br>${togaki}`;
+        
+        const returnScript = `window.GameApp.ui.reopenInterviewModal(window.GameApp.getBusho(${interviewer.id}))`;
+        msg += `<br><br><button class='btn-secondary' onclick='${returnScript}'>戻る</button>`;
+        this.game.ui.showResultModal(msg);
     }
 
     executeTransport(bushoIds, targetId, vals) {
