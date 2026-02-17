@@ -279,6 +279,11 @@ body {
 }
 .modal.hidden { opacity: 0; pointer-events: none; display: none !important;} 
 
+/* 数量指定モーダルを合戦モーダル(4000)より手前に表示する */
+#quantity-modal {
+    z-index: 4500;
+}
+
 .modal-content {
     background: #fff; padding: 20px; border-radius: 8px;
     width: 90%; max-width: 800px; 
