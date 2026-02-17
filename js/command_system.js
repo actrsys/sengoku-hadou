@@ -157,7 +157,9 @@ class CommandSystem {
         castle.gold -= gold;
         const effect = GameSystem.calcRewardEffect(gold, daimyo, target);
         target.loyalty = Math.min(100, target.loyalty + effect);
-        target.isActionDone = true;
+        // 仕様変更: 褒美を与えても行動済みにはしない
+        // target.isActionDone = true;
+        
         let msg = "";
         if (effect > 5) msg = `「ありがたき幸せ！」\n忠誠が${effect}上がりました。`;
         else if (effect > 0) msg = `「はっ、頂戴いたします。」\n忠誠が${effect}上がりました。`;
