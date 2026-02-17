@@ -216,7 +216,16 @@ class CommandSystem {
         castle.gold -= gold;
         const targetLord = this.game.bushos.find(b => b.clan === target.clan && b.isDaimyo) || { affinity: 50 }; 
         const newLord = this.game.bushos.find(b => b.clan === this.game.playerClanId && b.isDaimyo) || { affinity: 50 }; 
-        const isSuccess = GameSystem.calcHeadhunt(doer, target, gold, targetLord, newLord);
+        
+        // 変更: 引抜の成功判定。城主の場合は難易度上昇。
+        let isSuccess = GameSystem.calcHeadhunt(doer, target, gold, targetLord, newLord);
+        if (target.isCastellan && isSuccess) {
+            // 城主補正: 二次判定（成功率を1/3程度に絞る）
+            if (Math.random() > 0.33) {
+                isSuccess = false;
+            }
+        }
+
         if (isSuccess) {
             const oldCastle = this.game.getCastle(target.castleId);
             if(oldCastle) {
@@ -380,6 +389,73 @@ class CommandSystem {
         this.game.ui.showResultModal(msg);
     }
 
+    executeInterviewTopic(interviewer, target) {
+        if (interviewer.id === target.id) {
+            let comment = "";
+            if (interviewer.ambition > 80) comment = "「俺の力を持ってすれば、<br>天下も夢ではない……はずだ。」";
+            else if (interviewer.personality === 'cautious') comment = "「慎重に行かねば、足元をすくわれよう。」";
+            else comment = "「今のところは順調か……<br>いや、油断はできん。」";
+            
+            const returnScript = `window.GameApp.ui.reopenInterviewModal(window.GameApp.getBusho(${interviewer.id}))`;
+            this.game.ui.showResultModal(`<strong>${interviewer.name}</strong><br>「${target.name}か……」<br><br>${comment}<br><br><button class='btn-secondary' onclick='${returnScript}'>戻る</button>`);
+            return;
+        }
+
+        const dist = GameSystem.calcValueDistance(interviewer, target); 
+        const affinityDiff = GameSystem.calcAffinityDiff(interviewer.affinity, target.affinity); 
+        
+        let affinityText = "";
+        if (dist < 15) affinityText = "あの方とは意気投合します。素晴らしいお方です。";
+        else if (dist < 30) affinityText = "話のわかる相手だと思います。信頼できます。";
+        else if (dist < 50) affinityText = "悪くはありませんが、時折意見が食い違います。";
+        else if (dist < 70) affinityText = "考え方がどうも合いません。理解に苦しみます。";
+        else affinityText = "あやつとは反りが合いません。<br>顔も見たくない程です。";
+
+        let loyaltyText = "";
+        let togaki = ""; 
+
+        if (interviewer.loyalty < 40) {
+            loyaltyText = "さあ……？<br>他人の腹の内など、某には分かりかねます。";
+            togaki = "";
+        }
+        else if (affinityDiff > 35) { 
+            if (interviewer.intelligence >= 80) {
+                loyaltyText = "あやつは危険です。,.<br>裏で妙な動きをしているとの噂も……。";
+                togaki = "";
+            } else {
+                loyaltyText = "あやつとは口もききませぬゆえ、何も存じませぬ。";
+                togaki = "";
+            }
+        }
+        else if (target.intelligence > interviewer.intelligence + 20) {
+            loyaltyText = "なかなか内心を見せぬお方です。";
+            togaki = "";
+        }
+        else {
+            const tLoyalty = target.loyalty;
+            if (tLoyalty >= 85) loyaltyText = "殿への忠義は本物でしょう。疑う余地もありません。";
+            else if (tLoyalty >= 65) loyaltyText = "不審な点はありませぬ。真面目に務めております。";
+            else if (tLoyalty >= 45) loyaltyText = "今のところは大人しくしておりますが……。";
+            else if (tLoyalty >= 25) loyaltyText = "近頃、何やら不満を漏らしているようです。";
+            else loyaltyText = "油断なりませぬ。野心を抱いている気配があります。";
+        }
+
+        const targetCall = `${target.name}殿ですか……`;
+        const displayParts = [];
+        displayParts.push(`<strong>${interviewer.name}</strong>`); 
+        displayParts.push(`「${targetCall}<br>${affinityText}<br>${loyaltyText}」`); 
+        
+        if (togaki) {
+            displayParts.push(togaki); 
+        }
+
+        let msg = displayParts.filter(Boolean).join('<br>');
+        
+        const returnScript = `window.GameApp.ui.reopenInterviewModal(window.GameApp.getBusho(${interviewer.id}))`;
+        msg += `<br><br><button class='btn-secondary' onclick='${returnScript}'>戻る</button>`;
+        this.game.ui.showResultModal(msg);
+    }
+
     executeTransport(bushoIds, targetId, vals) {
         const c = this.game.getCurrentTurnCastle(); const t = this.game.getCastle(targetId);
         if(vals.soldiers > 0) { t.training = GameSystem.calcWeightedAvg(t.training, t.soldiers, c.training, vals.soldiers); t.morale = GameSystem.calcWeightedAvg(t.morale, t.soldiers, c.morale, vals.soldiers); }
@@ -418,7 +494,16 @@ class CommandSystem {
     executeRumor(doerId, castleId, targetBushoId) { 
         const doer = this.game.getBusho(doerId); 
         const targetBusho = this.game.getBusho(targetBushoId); 
-        const result = GameSystem.calcRumor(doer, targetBusho); 
+        
+        // 変更: 流言の成功判定。城主の場合は難易度上昇。
+        let result = GameSystem.calcRumor(doer, targetBusho); 
+        if (targetBusho.isCastellan && result.success) {
+            // 城主補正: 二次判定（成功率を1/3程度に絞る）
+            if (Math.random() > 0.33) {
+                result.success = false;
+            }
+        }
+
         if(result.success) { 
             targetBusho.loyalty = Math.max(0, targetBusho.loyalty - result.val); 
             this.game.ui.showResultModal(`${doer.name}の流言が成功！\n${targetBusho.name}の忠誠が${result.val}低下しました`); 

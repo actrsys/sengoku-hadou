@@ -921,13 +921,15 @@ class UIManager {
         else if (actionType === 'employ_doer') { bushos = this.game.getCastleBushos(c.id).filter(b => b.status !== 'ronin'); infoHtml = "<div>登用を行う担当官を選択してください (魅力重視)</div>"; sortKey = 'charm'; } 
         else if (actionType === 'diplomacy_doer') { bushos = this.game.getCastleBushos(c.id).filter(b => b.status !== 'ronin'); infoHtml = "<div>外交の担当官を選択してください (外交重視)</div>"; sortKey = 'diplomacy'; }
         else if (actionType === 'rumor_target_busho') { 
-            bushos = this.game.getCastleBushos(targetId).filter(b => b.status !== 'ronin' && !b.isDaimyo && !b.isCastellan); 
+            // 変更: 引抜と流言の対象に城主を含める (大名は引き続き除外)
+            bushos = this.game.getCastleBushos(targetId).filter(b => b.status !== 'ronin' && !b.isDaimyo); 
             infoHtml = "<div>流言の対象とする武将を選択してください</div>"; sortKey = 'loyalty'; 
         }
         else if (actionType === 'rumor_doer') { bushos = this.game.getCastleBushos(c.id).filter(b => b.status !== 'ronin'); infoHtml = "<div>流言を実行する担当官を選択してください</div>"; sortKey = 'intelligence'; }
         else if (actionType === 'incite_doer') { bushos = this.game.getCastleBushos(c.id).filter(b => b.status !== 'ronin'); infoHtml = "<div>扇動を実行する担当官を選択してください</div>"; sortKey = 'intelligence'; }
         else if (actionType === 'headhunt_target') { 
-            bushos = this.game.getCastleBushos(targetId).filter(b => b.status !== 'ronin' && !b.isDaimyo && !b.isCastellan); 
+            // 変更: 引抜と流言の対象に城主を含める (大名は引き続き除外)
+            bushos = this.game.getCastleBushos(targetId).filter(b => b.status !== 'ronin' && !b.isDaimyo); 
             infoHtml = "<div>引抜の対象とする武将を選択してください (忠誠・義理重視)</div>"; sortKey = 'loyalty'; 
         }
         else if (actionType === 'headhunt_doer') { bushos = this.game.getCastleBushos(c.id).filter(b => b.status !== 'ronin'); infoHtml = "<div>引抜を実行する担当官を選択してください (知略重視)</div>"; sortKey = 'intelligence'; }
@@ -1099,11 +1101,11 @@ class UIManager {
 
     // ★追加: ターン開始時のダイアログ
     showTurnStartDialog(castle, onProceed) {
+        // 変更: 「進む」ボタンを削除（「閉じる」ボタンがフッターにあるため不要）
         const msg = `
             <div style="text-align:center; padding: 10px;">
                 <div style="font-weight:bold; margin-bottom:10px; font-size:1.1rem;">小姓</div>
                 <div style="margin-bottom:20px; font-size:1rem;">「殿、${castle.name}にご命令ください。」</div>
-                <button id="turn-start-proceed-btn" class="btn-primary" style="padding:10px 40px; font-size:1rem;">進む</button>
             </div>
         `;
         
@@ -1114,13 +1116,6 @@ class UIManager {
         // コールバックを設定
         // 背景クリックなどで閉じられた場合も進行するように onResultModalClose にセットする
         this.onResultModalClose = onProceed;
-
-        const btn = document.getElementById('turn-start-proceed-btn');
-        if(btn) {
-            btn.onclick = () => {
-                this.closeResultModal(); // これが onResultModalClose を呼ぶ
-            };
-        }
     }
 
     openQuantitySelector(type, data, targetId) {
