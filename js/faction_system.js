@@ -17,19 +17,14 @@ class FactionSystem {
         if (!busho || busho.status === 'ronin' || busho.status === 'dead') return;
         
         // 大名との相性による補正 (相性が良いほど、不満は溜まりにくく、恩義は感じやすい)
-        // affinityDiff: 0(良) ～ 50(悪) ～ 100(最悪)
-        // ※GameSystem.calcAffinityDiffは最大50を返す仕様のようなので、標準的な0-100スケールとして扱うため再計算
         const daimyo = this.game.bushos.find(b => b.clan === busho.clan && b.isDaimyo);
         let factor = 1.0;
         
         if (daimyo) {
-            // 単純な数値差分 (0-100)
             const diff = Math.abs(busho.affinity - daimyo.affinity); 
-            // baseAmountが正(労働/不満増)の場合: 相性が悪い(diff大)ほど増えやすい
             if (baseAmount > 0) {
                 factor = 0.5 + (diff / 50.0); // 0.5倍 ～ 2.5倍
             } 
-            // baseAmountが負(褒美/恩義増)の場合: 相性が良い(diff小)ほど減りやすい(恩義を感じやすい)
             else {
                 factor = 0.5 + ((100 - diff) / 50.0); // 0.5倍 ～ 2.5倍
             }
@@ -48,16 +43,13 @@ class FactionSystem {
             if (b.clan === 0) return;
 
             // 1. 承認欲求による忠誠度変化
-            // 大名は対象外
             if (!b.isDaimyo) {
-                // 欲求100で-5, -100で+5
                 const loyaltyChange = Math.floor(b.recognitionNeed / -20);
                 if (loyaltyChange !== 0) {
                     b.loyalty = Math.max(0, Math.min(100, b.loyalty + loyaltyChange));
                 }
 
-                // 2. 承認欲求の自然減衰 (0に向かって戻る)
-                // 働かなければ不満(プラス)は消え、恩義(マイナス)も薄れる
+                // 2. 承認欲求の自然減衰
                 if (b.recognitionNeed > 0) {
                     b.recognitionNeed = Math.max(0, b.recognitionNeed - 10);
                 } else if (b.recognitionNeed < 0) {
@@ -71,7 +63,7 @@ class FactionSystem {
      * 月初処理: 下野判定と派閥形成
      */
     processStartMonth() {
-        // 1. 下野判定 (月末に忠誠度が下がった結果、月初に出ていく)
+        // 1. 下野判定
         const roninCandidates = this.game.bushos.filter(b => 
             b.status === 'active' && 
             b.clan !== 0 && 
@@ -81,8 +73,6 @@ class FactionSystem {
         );
 
         roninCandidates.forEach(b => {
-            // 忠誠度30以下で確率判定。低いほど抜けやすい。
-            // 忠誠0: 50%, 忠誠30: 20% 程度
             const chance = 0.5 - (b.loyalty * 0.01); 
             if (Math.random() < chance) {
                 this.executeRonin(b);
@@ -97,19 +87,16 @@ class FactionSystem {
         const clan = this.game.clans.find(c => c.id === busho.clan);
         const clanName = clan ? clan.name : "当家";
         
-        // 処理
         busho.status = 'ronin';
         busho.clan = 0;
         busho.factionId = 0;
         busho.recognitionNeed = 0;
         
-        // 所属城のリストから削除 (浪人としてその城には留まる)
         const castle = this.game.getCastle(busho.castleId);
         if (castle) {
             castle.samuraiIds = castle.samuraiIds.filter(id => id !== busho.id);
         }
 
-        // プレイヤー配下なら通知
         if (clan && clan.id === this.game.playerClanId) {
             this.game.ui.log(`【出奔】${busho.name}は${clanName}に愛想を尽かし、下野しました。`);
             this.game.ui.showCutin(`${busho.name} 出奔！`);
@@ -117,8 +104,7 @@ class FactionSystem {
     }
 
     /**
-     * 派閥の更新ロジック
-     * 功績が高い武将がリーダーとなり、相性の良い武将を取り込む
+     * 派閥の更新ロジック (改修版)
      */
     updateFactions() {
         const clans = this.game.clans;
@@ -127,44 +113,98 @@ class FactionSystem {
             if (clan.id === 0) return;
 
             const members = this.game.bushos.filter(b => b.clan === clan.id && b.status === 'active');
-            if (members.length < 5) return; // 少人数なら派閥なし
-
+            
             // 既存の派閥IDをクリア (再編)
             members.forEach(b => b.factionId = 0);
 
-            // リーダー候補選出 (大名は除く、功績順)
-            const candidates = members.filter(b => !b.isDaimyo)
-                                      .sort((a, b) => b.achievementTotal - a.achievementTotal);
-            
-            if (candidates.length === 0) return;
+            // リーダー候補選出
+            // 条件: 功績500以上 かつ 性格がhermit(隠遁者)ではない
+            const candidates = members.filter(b => 
+                !b.isDaimyo && 
+                b.achievementTotal >= 500 && 
+                b.personality !== 'hermit'
+            ).sort((a, b) => b.achievementTotal - a.achievementTotal);
 
-            // 上位2名を派閥リーダーとする
-            const factionLeaders = candidates.slice(0, 2);
+            // 資格を満たす武将が2名以上いない場合は派閥なし
+            if (candidates.length < 2) return;
+
+            // 最大派閥数の動的決定
+            // 5名以上で最大2つ、以降5名増えるごとに+1 (最大5)
+            // 例: 4人->0, 5人->2, 10人->3, 15人->4, 20人->5
+            let maxFactions = 2;
+            if (members.length >= 10) maxFactions = 3;
+            if (members.length >= 15) maxFactions = 4;
+            if (members.length >= 20) maxFactions = 5;
+
+            // 実際に結成される派閥リーダー
+            const factionLeaders = candidates.slice(0, maxFactions);
             
+            // リーダー自身にID付与
             factionLeaders.forEach((leader, index) => {
-                const factionId = (clan.id * 100) + index + 1; // 簡易ID生成
-                leader.factionId = factionId;
-                
-                // メンバー勧誘
-                members.forEach(b => {
-                    if (b.isDaimyo || b.factionId !== 0) return; // 既に所属済み or 大名
+                leader.factionId = (clan.id * 100) + index + 1;
+            });
 
-                    // 派閥判定ロジック
-                    // 1. 相性 (affinity)
+            // メンバーの加入判定
+            const nonLeaders = members.filter(b => !b.isDaimyo && b.factionId === 0);
+            
+            nonLeaders.forEach(b => {
+                let bestLeader = null;
+                let minScore = 999;
+
+                factionLeaders.forEach(leader => {
+                    // 1. 相性差
                     const affDiff = Math.abs(b.affinity - leader.affinity);
                     
-                    // 2. 思想 (innovation)
+                    // 2. 思想差
                     const innoDiff = Math.abs(b.innovation - leader.innovation);
-                    
-                    // 3. 連帯感 (stayHistory, battleHistoryから推測も可能だが簡易的に相性重視)
-                    // 判定スコア: 低いほど良い
-                    const score = affDiff + (innoDiff * 0.5);
 
-                    // 基準値以下なら派閥入り
-                    if (score < 40) {
-                        b.factionId = factionId;
+                    // 3. 連帯感ボーナス計算
+                    let solidarityBonus = 0;
+
+                    // (A) 参戦履歴ボーナス: 重複する battleHistory 1件につき 5
+                    const battleOverlap = b.battleHistory.filter(h => leader.battleHistory.includes(h)).length;
+                    solidarityBonus += battleOverlap * 5;
+
+                    // (B) 滞在履歴ボーナス: 12ヶ月以上重複滞在している場合 (重複期間 - 9) / 3
+                    // stayHistory: [{castleId, start, end}, ...]
+                    let totalOverlapMonths = 0;
+                    b.stayHistory.forEach(bHist => {
+                        leader.stayHistory.forEach(lHist => {
+                            if (bHist.castleId === lHist.castleId) {
+                                // 期間の重なりを計算
+                                const start = Math.max(bHist.start, lHist.start);
+                                const end = Math.min(bHist.end, lHist.end);
+                                if (end > start) {
+                                    totalOverlapMonths += (end - start);
+                                }
+                            }
+                        });
+                    });
+
+                    if (totalOverlapMonths >= 12) {
+                        solidarityBonus += Math.floor((totalOverlapMonths - 9) / 3);
+                    }
+
+                    // (C) 相性補正: 連帯感ボーナスに対し max(0, 1.0 - (affDiff / 50)) を掛ける
+                    // 相性が悪い(50以上離れている)と、いくら一緒にいても連帯感は生まれない
+                    const correction = Math.max(0, 1.0 - (affDiff / 50.0));
+                    const finalBonus = solidarityBonus * correction;
+
+                    // 判定スコア式
+                    // Score = (affDiff + (innoDiff * 0.5) + 20) - (補正済み連帯ボーナス)
+                    const score = (affDiff + (innoDiff * 0.5) + 20) - finalBonus;
+
+                    // Score < 40 の中で最小のものを探す
+                    if (score < 40 && score < minScore) {
+                        minScore = score;
+                        bestLeader = leader;
                     }
                 });
+
+                // 最適な派閥があれば加入
+                if (bestLeader) {
+                    b.factionId = bestLeader.factionId;
+                }
             });
         });
     }
@@ -183,7 +223,6 @@ class FactionSystem {
                 start: busho.arrivalTurn,
                 end: currentTurn
             });
-            // 履歴は最新10件程度に保つ
             if (busho.stayHistory.length > 10) busho.stayHistory.shift();
         }
 
@@ -195,14 +234,13 @@ class FactionSystem {
      */
     recordBattle(busho, castleId) {
         const key = `${this.game.year}_${this.game.month}_${castleId}`;
-        // 重複チェック
         if (!busho.battleHistory.includes(key)) {
             busho.battleHistory.push(key);
-            // 最新20件程度
             if (busho.battleHistory.length > 20) busho.battleHistory.shift();
             
-            // 功績加算 (合戦は評価が高い)
-            busho.achievementTotal += 50;
+            // 【変更】合戦功績: (実行武将の統率の 30%) + (勝利側ボーナス 20)
+            const achievementGain = Math.floor(busho.leadership * 0.3) + 20;
+            busho.achievementTotal += achievementGain;
         }
     }
 }

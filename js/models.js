@@ -11,14 +11,26 @@ class Clan {
 class Busho {
     constructor(data) {
         Object.assign(this, data); this.fatigue = 0; this.isActionDone = false;
+        
+        // パラメータのデフォルト値を先に設定（性格判定で使用するため）
+        if(this.charm === undefined) this.charm = 50; 
+        if(this.diplomacy === undefined) this.diplomacy = 50;
+        if(this.ambition === undefined) this.ambition = 50; 
+        if(this.affinity === undefined) this.affinity = 50;
+        if(this.duty === undefined) this.duty = 50; 
+        if(this.leadership === undefined) this.leadership = this.strength;
+
+        // 性格決定ロジック
         if(!this.personality) {
-            if (this.strength > this.intelligence + 20) this.personality = 'aggressive';
+            // 【変更】野心30未満は隠遁者(hermit)
+            if (this.ambition < 30) {
+                this.personality = 'hermit';
+            }
+            else if (this.strength > this.intelligence + 20) this.personality = 'aggressive';
             else if (this.intelligence > this.strength + 20) this.personality = 'cautious';
             else this.personality = 'balanced';
         }
-        if(this.charm === undefined) this.charm = 50; if(this.diplomacy === undefined) this.diplomacy = 50;
-        if(this.ambition === undefined) this.ambition = 50; if(this.affinity === undefined) this.affinity = 50;
-        if(this.duty === undefined) this.duty = 50; if(this.leadership === undefined) this.leadership = this.strength;
+
         if(this.innovation === undefined) this.innovation = Math.min(100, Math.max(0, 50 + (this.intelligence - 50) * 0.5 + (Math.random() * 40 - 20))); 
         if(this.cooperation === undefined) this.cooperation = Math.min(100, Math.max(0, 50 + (this.charm - 50) * 0.5 + (Math.random() * 40 - 20)));
         this.isDaimyo = false; this.isGunshi = false; this.isCastellan = false;
