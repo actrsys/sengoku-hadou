@@ -53,7 +53,7 @@ Strategy.AffinityNewLordWeight,0.6,引抜計算(新主相性)。上げると、�
 Strategy.AffinityDoerWeight,0.4,引抜計算(実行者相性)。上げると、勧誘に行く武将と相手の個人的相性が重要になる
 Strategy.SchemeSuccessRate,0.25,合戦中の計略成功率基準。上げると戦闘中の「謀略」が成功しやすくなる、下げると失敗リスク増
 AI.Difficulty,normal,AIの難易度設定。easy:判断ミス多め/normal:標準/hard:賢く好戦的・資源管理徹底
-AI.Aggressiveness,1,AIの攻撃性閾値。★重要：上げるとAIは慎重になり「勝てる」時しか攻めなくなる、下げるとAIが好戦的になり特攻してくる
+AI.Aggressiveness,1,AIの攻撃性閾値。★重要：上げるとAIが好戦的になり頻繁に侵攻判定を行う、下げると大人しくなる
 AI.SoldierSendRate,0.8,AIの出兵率。上げるとAIは城を空にして全軍で攻めてくる、下げると守備兵を多く残すようになる
 AI.AbilityBase,50,AI能力判定の基準値。AIが武将を評価する基準点。変更時はバランス注意
 AI.AbilitySensitivity,2,AIの能力評価感度。上げるとAIが高能力武将を適切に運用する確率が上がる、下げるとAIが武将の質を無視する
@@ -64,6 +64,9 @@ AI.DiplomacyChance,0.3,AI外交発生率。上げるとAIが頻繁に親善や�
 AI.GoodwillThreshold,40,AI親善閾値。上げるとAIは友好度が高くてもまだ親善金を送ってくる、下げるとすぐ満足して親善をやめる
 AI.AllianceThreshold,70,AI同盟閾値。上げるとAIが同盟を申し込むのに必要な友好度が高くなる『同盟しづらい』、下げるとすぐ同盟する
 AI.BreakAllianceDutyFactor,0.5,AI同盟破棄の義理影響。上げると義理堅い大名AIは同盟を破棄しなくなる、下げると義理を無視して裏切る
+AI.RiskAversion,2,AIのリスク回避度。★重要：上げると自軍の損害を嫌い、慎重になる。下げると特攻しやすくなる。
+AI.WinBonus,1000,AIの勝利確信ボーナス。上げると「勝てそう」と判断した時に積極的に攻めるようになる。
+AI.AttackThreshold,300,AIの攻撃判定スコア閾値。上げると、かなり有利でないと攻め込まなくなる。
 War.ChargeMultiplier,1.5,合戦：突撃の攻撃倍率。上げると突撃ダメージが増加
 War.ChargeRisk,1.8,合戦：突撃の反撃リスク係数。上げると突撃失敗時に受ける被害が増える
 War.ChargeSoldierDmgRate,1,合戦：突撃時の対兵士ダメージ倍率。上げると兵士へのダメージが増える
