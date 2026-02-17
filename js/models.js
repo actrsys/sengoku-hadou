@@ -5,7 +5,7 @@
 
 class Clan { 
     constructor(data) { Object.assign(this, data); } 
-    getArmyName() { return this.name ? this.name.replace(/家$/, "") + "軍" : "軍"; } 
+    getArmyName() { return this.name ? this.name.replace(/(家|衆)$/, "") + "軍" : "軍"; }
 }
 
 class Busho {
