@@ -1086,6 +1086,32 @@ class UIManager {
         setTimeout(() => this.showInterviewModal(busho), 100);
     }
 
+    // ★追加: ターン開始時のダイアログ
+    showTurnStartDialog(castle, onProceed) {
+        const msg = `
+            <div style="text-align:center; padding: 10px;">
+                <div style="font-weight:bold; margin-bottom:10px; font-size:1.1rem;">小姓</div>
+                <div style="margin-bottom:20px; font-size:1rem;">「殿、${castle.name}にご命令ください。」</div>
+                <button id="turn-start-proceed-btn" class="btn-primary" style="padding:10px 40px; font-size:1rem;">進む</button>
+            </div>
+        `;
+        
+        // 結果モーダルを再利用する
+        if (this.resultBody) this.resultBody.innerHTML = msg;
+        if (this.resultModal) this.resultModal.classList.remove('hidden');
+
+        // コールバックを設定
+        // 背景クリックなどで閉じられた場合も進行するように onResultModalClose にセットする
+        this.onResultModalClose = onProceed;
+
+        const btn = document.getElementById('turn-start-proceed-btn');
+        if(btn) {
+            btn.onclick = () => {
+                this.closeResultModal(); // これが onResultModalClose を呼ぶ
+            };
+        }
+    }
+
     openQuantitySelector(type, data, targetId) {
         if (!this.quantityModal) return;
         this.quantityModal.classList.remove('hidden'); 
@@ -1441,7 +1467,12 @@ class GameManager {
             // UIを強制的に再描画して操作可能にする
             this.ui.renderMap(); 
             this.ui.log(`【${castle.name}】命令を下してください`); 
-            this.ui.showControlPanel(castle); 
+            
+            // ★変更: いきなりコントロールパネルを出さず、小姓のダイアログを出す
+            this.ui.showTurnStartDialog(castle, () => {
+                this.ui.showControlPanel(castle); 
+            });
+
         } else { 
             // AIのターンの場合
             this.isProcessingAI = true; 
