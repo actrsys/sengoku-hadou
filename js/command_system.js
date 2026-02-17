@@ -258,13 +258,16 @@ class CommandSystem {
         
         let msg = "";
         
+        // 褒美により承認欲求を解消（マイナス値で更新）
+        // effectは正の値として計算されるため、-effect * 2 で大きく減らす
         this.game.factionSystem.updateRecognition(target, -effect * 2);
+
+        // 【変更】忠誠度の上昇ロジックを削除
+        // target.loyalty = Math.min(100, target.loyalty + effect);
 
         if (target.loyalty >= 100) {
             msg = "「もったいなきお言葉。この身、命尽きるまで殿のために！」\n(これ以上の忠誠は望めないほど、心服しているようだ)";
         } else {
-            target.loyalty = Math.min(100, target.loyalty + effect);
-            
             if (effect > 8) {
                 msg = "「ありがたき幸せ！」\n(顔をほころばせ、深く感謝しているようだ)";
             } else if (effect > 0) {
