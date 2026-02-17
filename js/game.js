@@ -1318,55 +1318,97 @@ class GameManager {
             c.gold = Math.max(0, c.gold - (bushos.length * window.MainParams.Economy.ConsumeGoldPerBusho));
             bushos.forEach(b => b.isActionDone = false);
         });
-        this.turnQueue = this.castles.filter(c => c.ownerClan !== 0).sort(() => Math.random() - 0.5);
+
+        // 変更: ターン順序を「プレイヤー全城」->「AI全城(ランダム)」の順にソートして安定化させる
+        const allCastles = this.castles.filter(c => c.ownerClan !== 0);
+        const myCastles = allCastles.filter(c => Number(c.ownerClan) === Number(this.playerClanId));
+        const otherCastles = allCastles.filter(c => Number(c.ownerClan) !== Number(this.playerClanId));
+        otherCastles.sort(() => Math.random() - 0.5); // AI同士はランダム
+        this.turnQueue = [...myCastles, ...otherCastles];
+
         this.currentIndex = 0; this.processTurn();
     }
     processRoninMovements() { const ronins = this.bushos.filter(b => b.status === 'ronin'); ronins.forEach(r => { const currentC = this.getCastle(r.castleId); if(!currentC) return; const neighbors = this.castles.filter(c => GameSystem.isAdjacent(currentC, c)); neighbors.forEach(n => { const castellan = this.getBusho(n.castellanId); if (Math.random() < 0.2) { currentC.samuraiIds = currentC.samuraiIds.filter(id => id !== r.id); n.samuraiIds.push(r.id); r.castleId = n.id; } }); }); }
     optimizeCastellans() { const clanIds = [...new Set(this.castles.filter(c=>c.ownerClan!==0).map(c=>c.ownerClan))]; clanIds.forEach(clanId => { const myBushos = this.bushos.filter(b => b.clan === clanId); if(myBushos.length===0) return; let daimyoInt = Math.max(...myBushos.map(b => b.intelligence)); if (Math.random() * 100 < daimyoInt) { const clanCastles = this.castles.filter(c => c.ownerClan === clanId); clanCastles.forEach(castle => { const castleBushos = this.getCastleBushos(castle.id).filter(b => b.status !== 'ronin'); if (castleBushos.length <= 1) return; castleBushos.sort((a, b) => (b.leadership + b.politics) - (a.leadership + a.politics)); const best = castleBushos[0]; if (best.id !== castle.castellanId) { const old = this.getBusho(castle.castellanId); if(old) old.isCastellan = false; best.isCastellan = true; castle.castellanId = best.id; } }); } }); }
     
     processTurn() {
-        // 多重実行防止のため、既存のタイマーがあればクリアする
+        // AI用タイマーがあればクリアする（二重実行防止）
         if (this.aiTimer) {
             clearTimeout(this.aiTimer);
             this.aiTimer = null;
         }
 
+        // 戦争中はターンの進行を停止
         if (this.warManager.state.active) return;
 
-        if (this.currentIndex >= this.turnQueue.length) { this.endMonth(); return; }
+        // ★追加: 動的優先順位チェック
+        // 現在のインデックス以降に、プレイヤーの城が紛れ込んでいないか確認する
+        // (戦争などで所有権がAIからプレイヤーに移った場合、即座に手番を回すため)
+        for (let i = this.currentIndex; i < this.turnQueue.length; i++) {
+            const c = this.turnQueue[i];
+            // プレイヤーの所有、かつ、現在のターンではない場合
+            if (Number(c.ownerClan) === Number(this.playerClanId)) {
+                if (i !== this.currentIndex) {
+                    // 発見！現在の位置(this.currentIndex)に割り込ませる
+                    // console.log(`Priority Interrupt: ${c.name} moved to front.`);
+                    // 配列操作で入れ替え
+                    const temp = this.turnQueue[this.currentIndex];
+                    this.turnQueue[this.currentIndex] = this.turnQueue[i];
+                    this.turnQueue[i] = temp;
+                }
+                // 見つかった時点で、その城が現在の処理対象になるのでループ終了
+                break; 
+            }
+        }
+
+        // 月の終了チェック
+        if (this.currentIndex >= this.turnQueue.length) { 
+            this.endMonth(); 
+            return; 
+        }
+
         const castle = this.turnQueue[this.currentIndex]; 
         
         // 城の所有者が存在しない、または滅亡済みクランの場合はスキップして次へ
-        // 型変換を厳密に行う
-        if(castle.ownerClan !== 0 && !this.clans.find(c => Number(c.id) === Number(castle.ownerClan))) { 
-            console.warn(`Skipping castle ${castle.name}: ownerClan ${castle.ownerClan} not found in clans list.`);
+        if(!castle || castle.ownerClan === 0 || !this.clans.find(c => Number(c.id) === Number(castle.ownerClan))) { 
+            console.warn(`Skipping invalid castle or owner.`);
             this.currentIndex++; 
             this.processTurn(); 
             return; 
         }
-        
-        this.ui.renderMap();
         
         // 厳密な数値比較を行い、プレイヤーの城であることを保証する
         const ownerId = Number(castle.ownerClan);
         const playerId = Number(this.playerClanId);
         const isPlayerCastle = (ownerId === playerId);
 
+        // マップを最新状態に更新
+        this.ui.renderMap();
+
         if (isPlayerCastle) { 
-            // 強制的にAI処理フラグを折る
+            // プレイヤーのターンの場合、強制的にAI処理フラグをFalseにし、タイマーもセットしない
             this.isProcessingAI = false; 
 
+            // UIを強制的に再描画して操作可能にする
             this.ui.renderMap(); 
             this.ui.log(`【${castle.name}】命令を下してください`); 
             this.ui.showControlPanel(castle); 
         } else { 
+            // AIのターンの場合
             this.isProcessingAI = true; 
+            // AI用ガード表示等のために再描画
             this.ui.renderMap(); 
+            
             if(this.ui.panelEl) this.ui.panelEl.classList.add('hidden'); 
             
-            // AI思考タイマーを保存しておく
+            // AI思考タイマーをセット
             this.aiTimer = setTimeout(() => {
+                // タイマー発火時に戦争が始まっていたらキャンセル
                 if (this.warManager.state.active) return;
+                
+                // 念の為、現在の対象がまだ同じ城か確認
+                if (this.turnQueue[this.currentIndex] !== castle) return;
+
                 try {
                     this.aiEngine.execAI(castle);
                 } catch(e) {
@@ -1378,10 +1420,16 @@ class GameManager {
     }
     
     finishTurn() { 
+        // 戦争中かつプレイヤー関与中の場合はターン進行しない
         if(this.warManager.state.active && this.warManager.state.isPlayerInvolved) return; 
+        
+        // AIタイマーが残っていたらクリア
+        if (this.aiTimer) { clearTimeout(this.aiTimer); this.aiTimer = null; }
+
         this.selectionMode = null; 
         const castle = this.getCurrentTurnCastle(); 
         if(castle) castle.isDone = true; 
+        
         this.currentIndex++; 
         this.processTurn(); 
     }
@@ -1481,6 +1529,7 @@ class GameManager {
         const bushos = this.getCastleBushos(c.id).filter(b => b.status !== 'ronin');
         
         // ★修正: 全員行動済みかつ、武将が1人以上いる場合のみチェック
+        // 全員行動済みでも、自動終了はせずに確認だけ行う（プレイヤーの意図を優先）
         if(bushos.length > 0 && bushos.every(b => b.isActionDone)) {
              setTimeout(() => {
                  if(confirm("すべての武将が行動を終えました。\n今月の命令を終了しますか？")) {
