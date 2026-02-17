@@ -927,7 +927,7 @@ class UIManager {
         }
         else if (actionType === 'interview_target') { 
             bushos = this.game.bushos.filter(b => b.clan === this.game.playerClanId && b.status !== 'dead' && b.status !== 'ronin' && b.id !== extraData.interviewer.id && !b.isDaimyo); 
-            infoHtml = `<div>誰についての印象を聞きますか？(同家臣のみ)</div>`; sortKey = 'leadership'; 
+            infoHtml = `<div>誰についての印象を聞きますか？</div>`; sortKey = 'leadership'; 
         }
         // 仕様変更: 大名は褒美の対象外にする
         else if (actionType === 'reward') { bushos = this.game.getCastleBushos(c.id).filter(b => b.status !== 'ronin' && !b.isDaimyo); infoHtml = "<div>褒美を与える武将を選択してください</div>"; sortKey = 'loyalty'; }
