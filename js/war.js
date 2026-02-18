@@ -26,7 +26,9 @@ window.WarParams = {
         RepairMaxSoldiers: 500, RepairSoldierFactor: 0.05, RepairMainPolFactor: 0.25, RepairSubPolFactor: 0.05, RepairGlobalMultiplier: 0.4,
         SchemeDamageFactor: 4, FireSuccessBase: 0.25, FireDamageFactor: 0.8,
         ShortWarTurnLimit: 5, BaseRecoveryRate: 0.2, RetreatRecoveryRate: 0.3, RetreatCaptureRate: 0.1, DaimyoCaptureReduction: 0.3,
-        RetreatResourceLossFactor: 0.2, LootingBaseRate: 0.3, LootingCharmFactor: 0.002, DaimyoCharmWeight: 0.1
+        RetreatResourceLossFactor: 0.2, LootingBaseRate: 0.3, LootingCharmFactor: 0.002, DaimyoCharmWeight: 0.1,
+        // 新規追加: 兵糧消費
+        RiceConsumptionAtk: 0.1, RiceConsumptionDef: 0.05
     }
 };
 
@@ -37,8 +39,10 @@ class WarSystem {
     // 部隊の能力値を計算
     static calcUnitStats(bushos) { 
         if (!bushos || bushos.length === 0) return { ldr:30, str:30, int:30, charm:30 }; 
-        const sorted = [...bushos].sort((a,b) => b.leadership - a.leadership); 
-        const leader = sorted[0]; const subs = sorted.slice(1); 
+        // 配列の先頭を総大将とする（game.js/ai.js側で並び替え済みである前提）
+        const leader = bushos[0]; 
+        const subs = bushos.slice(1); 
+        
         let totalLdr = leader.leadership; let totalStr = leader.strength; let totalInt = leader.intelligence; 
         
         let factionBonusMultiplier = 1.0;
@@ -185,26 +189,23 @@ class WarManager {
         return null;
     }
 
-    startWar(atkCastle, defCastle, atkBushos, atkSoldierCount) {
+    startWar(atkCastle, defCastle, atkBushos, atkSoldierCount, atkRice) {
         try {
-            // ID判定を厳密化（文字列と数値の比較バグを防止）
             const pid = Number(this.game.playerClanId);
             const atkClan = Number(atkCastle.ownerClan);
             const defClan = Number(defCastle.ownerClan);
 
             let isPlayerInvolved = (atkClan === pid || defClan === pid);
-            
-            // 安全策：プレイヤーが防御側の場合、フラグがfalseでも強制的にtrueにする
             if (defClan === pid) isPlayerInvolved = true;
 
-            // 兵士の移動処理：出陣元の兵士を即座に減算（多重増加バグ防止）
+            // 兵士と兵糧の減算
             atkCastle.soldiers = Math.max(0, atkCastle.soldiers - atkSoldierCount);
+            atkCastle.rice = Math.max(0, atkCastle.rice - atkRice);
 
             const atkClanData = this.game.clans.find(c => c.id === atkClan); 
             const atkGeneral = atkBushos[0].name;
             const atkArmyName = atkClanData ? atkClanData.getArmyName() : "敵軍";
             
-            // プレイヤーが関与しているならカットイン
             if (isPlayerInvolved) {
                 this.game.ui.showCutin(`${atkArmyName}の${atkGeneral}が\n${defCastle.name}に攻め込みました！`);
             }
@@ -212,7 +213,17 @@ class WarManager {
             let defBusho = this.game.getBusho(defCastle.castellanId); 
             if (!defBusho) defBusho = {name:"守備隊長", strength:30, leadership:30, intelligence:30, charm:30};
             
-            const attackerForce = { name: atkCastle.name + "遠征軍", ownerClan: atkCastle.ownerClan, soldiers: atkSoldierCount, bushos: atkBushos, training: atkCastle.training, morale: atkCastle.morale };
+            // 攻撃軍データに兵糧を含める
+            const attackerForce = { 
+                name: atkCastle.name + "遠征軍", 
+                ownerClan: atkCastle.ownerClan, 
+                soldiers: atkSoldierCount, 
+                bushos: atkBushos, 
+                training: atkCastle.training, 
+                morale: atkCastle.morale,
+                rice: atkRice, // 持参兵糧
+                maxRice: atkRice
+            };
             
             this.state = { 
                 active: true, round: 1, attacker: attackerForce, sourceCastle: atkCastle, 
@@ -230,7 +241,7 @@ class WarManager {
                     if (warModal) warModal.classList.remove('hidden'); 
                     const warLog = document.getElementById('war-log');
                     if (warLog) warLog.innerHTML = ''; 
-                    this.game.ui.log(`★ ${atkCastle.name}が出陣(兵${atkSoldierCount})！ ${defCastle.name}へ攻撃！`); 
+                    this.game.ui.log(`★ ${atkCastle.name}が出陣(兵${atkSoldierCount}, 糧${atkRice})！ ${defCastle.name}へ攻撃！`); 
                     this.game.ui.updateWarUI(); 
                     this.processWarRound(); 
                 }, 1000);
@@ -239,7 +250,7 @@ class WarManager {
             }
         } catch(e) { 
             console.error("StartWar Error:", e);
-            this.state.active = false; // エラー時は確実にactiveフラグを落とす
+            this.state.active = false; 
             this.game.finishTurn(); 
         }
     }
@@ -250,7 +261,6 @@ class WarManager {
             const pid = Number(this.game.playerClanId);
             const defClan = Number(s.defender.ownerClan);
 
-            // 安全策: もしプレイヤーが関与しているのにここに来てしまった場合、手動モードへ復帰させる
             if (s.isPlayerInvolved || defClan === pid) {
                 console.warn("AutoWar aborted: Player is involved.");
                 s.isPlayerInvolved = true;
@@ -265,23 +275,59 @@ class WarManager {
             while(s.round <= window.WarParams.Military.WarMaxRounds && s.attacker.soldiers > 0 && s.defender.soldiers > 0 && s.defender.defense > 0 && safetyLimit > 0) { 
                 this.resolveWarAction('charge'); 
                 if (s.attacker.soldiers <= 0 || s.defender.soldiers <= 0) break; 
+                // 兵糧消費（簡易版）
+                s.attacker.rice = Math.max(0, s.attacker.rice - Math.floor(s.attacker.soldiers * window.WarParams.War.RiceConsumptionAtk));
+                s.defender.rice = Math.max(0, s.defender.rice - Math.floor(s.defender.soldiers * window.WarParams.War.RiceConsumptionDef));
+                if (s.attacker.rice <= 0 || s.defender.rice <= 0) break;
+
                 safetyLimit--;
             } 
-            this.endWar(s.defender.soldiers <= 0 || s.defender.defense <= 0); 
+            const atkLost = s.attacker.soldiers <= 0 || s.attacker.rice <= 0;
+            const defLost = s.defender.soldiers <= 0 || s.defender.defense <= 0 || s.defender.rice <= 0;
+            // 防御側が負け(defLost)ならattackerWon=true
+            this.endWar(defLost); 
         } catch(e) { console.error(e); this.endWar(false); } 
     }
 
     processWarRound() { 
         if (!this.state.active) return; 
         const s = this.state; 
+        
+        // 兵糧消費処理 (ターンの終わり、または行動後に行うのが自然だが、ここではラウンド開始時(前ラウンド終了後)のチェックとする)
+        // 初回(Round1)は消費しない、あるいはRound終了時に消費する形にする。
+        // ここでは、resolveWarActionでターンが進むので、advanceWarTurn内で消費させる手もあるが、
+        // 構造上、processWarRoundが各ターンの入り口なので、ここでチェック＆消費を行う。
+        // ただしRound 1の開始時は消費なし。
+        // 簡易的に「攻撃側のターン開始時」に両軍消費させる。
+        if (s.turn === 'attacker' && s.round > 1) {
+             const atkCons = Math.floor(s.attacker.soldiers * window.WarParams.War.RiceConsumptionAtk);
+             const defCons = Math.floor(s.defender.soldiers * window.WarParams.War.RiceConsumptionDef);
+             s.attacker.rice = Math.max(0, s.attacker.rice - atkCons);
+             s.defender.rice = Math.max(0, s.defender.rice - defCons);
+             
+             if (s.isPlayerInvolved) {
+                 // 兵糧切れ警告はUI更新で見えるのでログは省略するか、重要な場合のみ出す
+             }
+        }
+
+        // 敗北判定（兵糧切れ含む）
         if (s.defender.soldiers <= 0 || s.defender.defense <= 0) { this.endWar(true); return; } 
         if (s.attacker.soldiers <= 0) { this.endWar(false); return; } 
+        if (s.attacker.rice <= 0) {
+             if(s.isPlayerInvolved) this.game.ui.log("攻撃軍、兵糧尽きる！");
+             this.endWar(false); // 攻撃側敗北
+             return;
+        }
+        if (s.defender.rice <= 0) {
+             if(s.isPlayerInvolved) this.game.ui.log("守備軍、兵糧尽きる！");
+             this.endWar(true); // 攻撃側勝利
+             return;
+        }
         
         this.game.ui.updateWarUI(); 
         const isAtkTurn = (s.turn === 'attacker'); 
         this.game.ui.renderWarControls(isAtkTurn); 
         
-        // 厳密なID判定
         const pid = Number(this.game.playerClanId);
         const atkClan = Number(s.attacker.ownerClan);
         const defClan = Number(s.defender.ownerClan);
@@ -301,50 +347,49 @@ class WarManager {
      * AIの戦術決定
      */
     execWarAI() { 
-        if (!this.state.active) return; // 既に終了している場合は何もしない
+        if (!this.state.active) return; 
         const s = this.state;
         const actor = s.turn === 'attacker' ? s.atkBushos[0] : s.defBusho; 
         const isDefender = (s.turn === 'defender');
         
-        // 追加安全策: プレイヤーのターンならAIを実行しない
         const pid = Number(this.game.playerClanId);
         const currentSideClan = isDefender ? Number(s.defender.ownerClan) : Number(s.attacker.ownerClan);
         if (currentSideClan === pid) return;
 
         const diff = window.AIParams.AI.Difficulty || 'normal';
         
-        // 基本的な知能レベル補正
         let smartness = actor.intelligence / 100.0;
         if (diff === 'hard') smartness = Math.min(1.0, smartness + 0.2);
         if (diff === 'easy') smartness = Math.max(0.1, smartness - 0.2);
 
-        // 撤退判断 (知略が高い、または難易度が高いと損切りが早い)
         if (isDefender) {
             const dangerRatio = s.defender.soldiers / (s.attacker.soldiers + 1);
-            let retreatThreshold = 0.2 + (smartness * 0.2); // 賢いほど早め(0.4)に撤退を考える
+            let retreatThreshold = 0.2 + (smartness * 0.2); 
             if (dangerRatio < retreatThreshold && s.defender.defense < 200) { 
                 this.resolveWarAction('retreat'); return; 
             }
-            // 補修判断
             const defenseRatio = s.defender.defense / (s.defender.maxDefense || 1000); 
             if (defenseRatio < 0.7 && s.defender.soldiers > 500 && Math.random() < smartness) {
                  this.resolveWarAction('repair', Math.min(s.defender.soldiers, 100)); return;
             }
         } else {
-            // 攻撃側の撤退判断
+            // 攻撃側の撤退判断: 兵糧不足も考慮
+            if (s.attacker.rice < s.attacker.soldiers * 0.1 * 2) { // 残り2ターン分切ったら
+                 if (s.attacker.soldiers < s.defender.soldiers * 0.5) {
+                     this.resolveWarAction('retreat'); return;
+                 }
+            }
             if (s.attacker.soldiers < s.defender.soldiers * 0.3 && smartness > 0.5) {
                 this.resolveWarAction('retreat'); return;
             }
         }
 
-        // コマンド選択のスコアリング
         const options = [];
         if (isDefender) {
             options.push('def_charge', 'def_bow', 'def_attack');
         } else {
             options.push('charge', 'bow', 'siege');
         }
-        // 計略系は確率で候補入り
         if (actor.intelligence > 30) options.push('scheme');
         if (actor.intelligence > 50 && !isDefender) options.push('fire');
 
@@ -355,7 +400,6 @@ class WarManager {
 
         options.forEach(cmd => {
             let score = 0;
-            // 基礎攻撃力・リスクの取得
             let multiplier = 1.0;
             let risk = 1.0;
 
@@ -364,33 +408,25 @@ class WarManager {
             else if (cmd === 'siege') { multiplier = W.SiegeMultiplier; risk = W.SiegeRisk; }
             else if (cmd === 'def_charge') { multiplier = W.DefChargeMultiplier; risk = W.DefChargeRisk; }
             else if (cmd === 'def_bow') { multiplier = W.DefBowMultiplier; risk = 0.5; }
-            else if (cmd === 'def_attack') { multiplier = 0; risk = 0; } // 籠城
+            else if (cmd === 'def_attack') { multiplier = 0; risk = 0; } 
 
-            // 期待ダメージ
-            const enemyDefense = isDefender ? 0 : s.defender.defense; // 攻撃時は城壁がある
+            const enemyDefense = isDefender ? 0 : s.defender.defense; 
 
-            // ダメージスコア (与える被害)
             if (cmd === 'siege') {
-                // 城壁へのダメージ重視
                 score += (multiplier * 50) + (enemyDefense > 0 ? 100 : 0);
             } else if (cmd === 'def_attack') {
-                // 籠城は生存重視
                 score += (s.defender.soldiers < s.attacker.soldiers) ? 200 : -100;
             } else {
-                // 兵士へのダメージ重視
                 score += multiplier * 100;
             }
 
-            // リスクスコア (受ける被害)
             score -= (risk * 50 * smartness);
 
-            // 計略系
             if (cmd === 'scheme' || cmd === 'fire') {
                 const successProb = (actor.intelligence / 100);
-                score = (successProb * 150) - (50 * smartness); // 失敗リスク
+                score = (successProb * 150) - (50 * smartness); 
             }
 
-            // ランダム揺らぎ
             const noise = (Math.random() * 200) * (1.0 - smartness);
             score += noise;
 
@@ -406,7 +442,9 @@ class WarManager {
     resolveWarAction(type, extraVal = null) {
         if (!this.state.active) return;
         const s = this.state;
-        if(type === 'retreat') { if(s.turn === 'attacker') { this.endWar(false); } else { this.executeRetreatLogic(s.defender); } return; }
+        // 攻撃側の撤退: endWar(false, true) を呼ぶように変更
+        if(type === 'retreat') { if(s.turn === 'attacker') { this.endWar(false, true); } else { this.executeRetreatLogic(s.defender); } return; }
+        
         const isAtkTurn = (s.turn === 'attacker'); const target = isAtkTurn ? s.defender : s.attacker;
         
         let atkStats = WarSystem.calcUnitStats(s.atkBushos); 
@@ -476,7 +514,6 @@ class WarManager {
         
         if(result.counterDmg > 0) { 
             const actorArmy = isAtkTurn ? s.attacker : s.defender; 
-            // 修正: 反撃ダメージを残存兵数以下に制限（死傷者数が実兵数を超えて増殖するバグを防止）
             const actualCounterDmg = Math.min(actorArmy.soldiers, result.counterDmg);
 
             actorArmy.soldiers -= actualCounterDmg;
@@ -535,7 +572,6 @@ class WarManager {
                     if(Math.random() < rate) { capturedBushos.push(b); } 
                     else { 
                         b.castleId = target.id; b.isCastellan = false; target.samuraiIds.push(b.id); 
-                        // 履歴処理: 撤退は強制移動なので、通常の移動履歴更新を行う
                         this.game.factionSystem.handleMove(b, defCastle.id, target.id);
                     }
                 });
@@ -558,17 +594,11 @@ class WarManager {
     endWar(attackerWon, isRetreat = false, capturedInRetreat = [], retreatTargetId = null) { 
         const s = this.state; s.active = false; 
         
-        // --- 参戦履歴の記録 ---
-        // 攻撃側
         s.atkBushos.forEach(b => {
-             // 撤退時も参戦実績にはなる
              this.game.factionSystem.recordBattle(b, s.defender.id);
-             // 不満の蓄積（戦争は疲れる）
              this.game.factionSystem.updateRecognition(b, 25);
         });
-        // 防御側（撤退した武将や捕虜含む）
         const defBushos = this.game.getCastleBushos(s.defender.id).concat(this.pendingPrisoners);
-        // defBushoが一時オブジェクトでない（実在武将）なら履歴追加
         if (s.defBusho && s.defBusho.id) {
              if (!defBushos.find(b => b.id === s.defBusho.id)) defBushos.push(s.defBusho);
         }
@@ -580,11 +610,23 @@ class WarManager {
         if (s.isPlayerInvolved) { const warModal = document.getElementById('war-modal'); if(warModal) warModal.classList.add('hidden'); }
         const isShortWar = s.round < window.WarParams.War.ShortWarTurnLimit;
         
-        // 変数定義を前に移動（スコープ確保のため）
         const baseRecov = window.WarParams.War.BaseRecoveryRate;
         const highRecov = window.WarParams.War.RetreatRecoveryRate;
         const attackerRecovered = Math.floor(s.deadSoldiers.attacker * baseRecov);
         const totalAtkSurvivors = s.attacker.soldiers + attackerRecovered;
+
+        // 攻撃側が生き残っている場合、残った兵糧を持ち帰る（ここではソース城に戻す）
+        // 勝った場合は占領した城へ、負けた場合（撤退含む）は元の城へ
+        if (s.attacker.rice > 0) {
+            if (attackerWon) {
+                 // 占領した城に入る
+                 s.defender.rice += s.attacker.rice;
+            } else {
+                 // 元の城に戻る
+                 const srcC = this.game.getCastle(s.sourceCastle.id);
+                 if (srcC) srcC.rice += s.attacker.rice;
+            }
+        }
 
         if (isRetreat && retreatTargetId) {
              const targetC = this.game.getCastle(retreatTargetId);
@@ -612,10 +654,9 @@ class WarManager {
              else this.autoResolvePrisoners(capturedInRetreat, s.attacker.ownerClan);
         }
         
-        if (isRetreat) {
+        // 防御側が撤退したケース (isRetreat=true, attackerWon=true)
+        if (isRetreat && attackerWon) {
              s.defender.ownerClan = s.attacker.ownerClan; s.defender.investigatedUntil = 0;
-             
-             // 修正: 攻撃側の生き残った兵士を、占領した城(s.defender)に移動させる
              s.defender.soldiers = totalAtkSurvivors;
 
              s.atkBushos.forEach((b, idx) => { 
@@ -624,7 +665,6 @@ class WarManager {
                 b.castleId = s.defender.id; s.defender.samuraiIds.push(b.id); 
                 if(idx === 0) { b.isCastellan = true; s.defender.castellanId = b.id; } else b.isCastellan = false; 
             });
-            // 修正: プレイヤーが関与している場合は結果を確認してからターンを進める
             if (s.isPlayerInvolved) {
                 const msg = `撤退しました。\n${retreatTargetId ? '部隊は移動しました。' : '部隊は解散しました。'}`;
                 this.game.ui.showResultModal(msg, () => this.game.finishTurn());
@@ -664,10 +704,14 @@ class WarManager {
             resultMsg = `${s.defender.name}が制圧されました！\n勝者: ${s.attacker.name}`;
         } else { 
             s.defender.immunityUntil = currentTurnId; 
-            resultMsg = `${s.defender.name}を守り抜きました！\n敗者: ${s.attacker.name}`;
+            if (isRetreat) {
+                // 攻撃側が撤退した場合
+                resultMsg = `${s.defender.name}から撤退しました……`;
+            } else {
+                resultMsg = `${s.defender.name}を守り抜きました！\n敗者: ${s.attacker.name}`;
+            }
         } 
 
-        // 修正: プレイヤーが関与していた場合、必ず結果モーダルを表示し、そのクローズ後にターンを進める
         if (s.isPlayerInvolved) {
             this.game.ui.showResultModal(resultMsg, () => {
                 this.game.finishTurn();
@@ -688,7 +732,6 @@ class WarManager {
             
             if (chance > 0.5) { 
                 captives.push(b); 
-                // 【修正】捕虜になる武将を元の城から削除する（増殖防止）
                 defeatedCastle.samuraiIds = defeatedCastle.samuraiIds.filter(id => id !== b.id);
             } else { 
                 if (friendlyCastles.length > 0) {
@@ -697,7 +740,6 @@ class WarManager {
                     this.game.factionSystem.handleMove(b, defeatedCastle.id, escapeCastle.id); // 履歴
                     b.castleId = escapeCastle.id; b.isCastellan = false; escapeCastle.samuraiIds.push(b.id); escapees.push(b);
                 } else { 
-                    // 【修正】在野になる場合も元の城から削除する
                     defeatedCastle.samuraiIds = defeatedCastle.samuraiIds.filter(id => id !== b.id);
                     b.clan = 0; b.castleId = 0; b.isCastellan = false; b.status = 'ronin'; 
                 }
@@ -726,7 +768,7 @@ class WarManager {
             if (friendlyCastles.length > 0) {
                 const returnCastle = friendlyCastles[Math.floor(Math.random() * friendlyCastles.length)];
                 prisoner.castleId = returnCastle.id; prisoner.isCastellan = false; prisoner.status = 'active'; returnCastle.samuraiIds.push(prisoner.id);
-                this.game.factionSystem.handleMove(prisoner, 0, returnCastle.id); // 履歴(0は不明な元位置)
+                this.game.factionSystem.handleMove(prisoner, 0, returnCastle.id); // 履歴
                 alert(`${prisoner.name}を解放しました。(自領へ帰還しました)`);
             } else { prisoner.status = 'ronin'; prisoner.clan = 0; prisoner.castleId = 0; alert(`${prisoner.name}を解放しました。(在野へ下りました)`); }
         } 

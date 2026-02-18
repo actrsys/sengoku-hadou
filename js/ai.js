@@ -55,9 +55,6 @@ class AIEngine {
             if (Number(castle.ownerClan) === Number(this.game.playerClanId)) {
                 console.warn("AI Alert: Player castle detected in AI routine. Returning control to player.");
                 this.game.isProcessingAI = false;
-                
-                // 行動済みフラグのリセットは行わない（移動後の武将がいる可能性があるため）
-                
                 this.game.ui.showControlPanel(castle);
                 return;
             }
@@ -81,13 +78,11 @@ class AIEngine {
             }
             
             // 軍事フェーズ
-            // Optimization: 兵力が著しく少ない場合は、敵探索や攻撃計算自体をスキップする (遅延評価)
-            // 攻撃閾値の基準
             const baseThreshold = window.AIParams.AI.AttackThreshold || 300;
-            const threshold = 500; // 攻撃を検討する最低兵力 (絶対値)
+            const threshold = 500; 
 
-            if (castle.soldiers > threshold) {
-                // ここで初めて周辺諸国の検索を行う（重い処理を避ける）
+            if (castle.soldiers > threshold && castle.rice > 500) { // 兵糧チェック追加
+                // ここで初めて周辺諸国の検索を行う
                 const neighbors = this.game.castles.filter(c => 
                     c.ownerClan !== 0 && 
                     c.ownerClan !== castle.ownerClan && 
@@ -129,16 +124,17 @@ class AIEngine {
         let bestScore = -Infinity;
         
         const myBushos = this.game.getCastleBushos(myCastle.id).filter(b => b.status !== 'ronin');
-        // 兵力が十分にある場合のみ、上位3名のステータス計算を行う
         const availableBushos = myBushos.sort((a,b) => b.leadership - a.leadership).slice(0, 3);
         
-        // WarSystemが存在しない場合の安全策
         if (typeof WarSystem === 'undefined') return null;
 
         const myStats = WarSystem.calcUnitStats(availableBushos);
         const sendSoldiers = Math.floor(myCastle.soldiers * (window.AIParams.AI.SoldierSendRate || 0.8));
 
-        // パラメータの取得（デフォルト値付き）
+        // 兵糧チェック: 最低でも5ターン分は欲しい
+        const neededRice = sendSoldiers * 0.1 * 5;
+        if (myCastle.rice < neededRice) return null;
+
         const riskAversion = window.AIParams.AI.RiskAversion || 2.0;
         const winBonus = window.AIParams.AI.WinBonus || 1000;
 
@@ -160,13 +156,9 @@ class AIEngine {
             const expectedLoss = enemyDmg.soldierDmg;
             const expectedGain = myDmg.soldierDmg + (myDmg.wallDmg * 2.0);
             
-            // 修正: RiskAversionをCSVから取得した値を使用。賢いほどリスク計算が正確になる（リスクを無視しなくなる）
             const riskFactor = riskAversion - (smartness * 0.5);
             let score = expectedGain - (expectedLoss * riskFactor); 
 
-            // 修正: 勝利確信ボーナスの条件厳格化。
-            // 敵兵が少なく、かつ「予想被害が自軍の半数以下」である場合のみボーナスを加算。
-            // これにより、勝てるが相打ちになるようなケースでの特攻を防ぐ。
             if (pEnemySoldiers < myDmg.soldierDmg * 3 && expectedLoss < sendSoldiers * 0.5) {
                  score += winBonus * smartness; 
             }
@@ -186,7 +178,6 @@ class AIEngine {
             }
         });
 
-        // 閾値もパラメータ化
         const threshold = baseThreshold * mods.accuracy; 
 
         if (bestScore > threshold) {
@@ -202,10 +193,15 @@ class AIEngine {
         
         if (sendSoldiers <= 0) return;
         
-        // 修正: WarManager.startWarで減算するようにしたため、ここでは減算しない
-        // source.soldiers -= sendSoldiers; 
+        // 兵糧計算: 兵士数 * 0.1 * 10ターン分 を目安に持参
+        // 足りなければあるだけ持っていく
+        let sendRice = Math.floor(sendSoldiers * 1.0);
+        if (source.rice < sendRice) {
+            sendRice = source.rice;
+        }
+        if (sendRice <= 0) return; // 兵糧がなければ出撃しない
 
-        this.game.warManager.startWar(source, target, sorted, sendSoldiers);
+        this.game.warManager.startWar(source, target, sorted, sendSoldiers, sendRice);
     }
 
     execInternalAffairs(castle, castellan, mods, smartness) {
