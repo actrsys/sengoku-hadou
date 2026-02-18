@@ -1118,7 +1118,48 @@ class UIManager {
         if (this.charityTypeSelector) this.charityTypeSelector.classList.add('hidden'); 
         if (this.tradeTypeInfo) this.tradeTypeInfo.classList.add('hidden'); 
         const c = this.currentCastle;
-        const createSlider = (label, id, max, currentVal) => { const wrap = document.createElement('div'); wrap.className = 'qty-row'; wrap.innerHTML = `<label>${label} (Max: ${max})</label><div class="qty-control"><input type="range" id="range-${id}" min="0" max="${max}" value="${currentVal}"><input type="number" id="num-${id}" min="0" max="${max}" value="${currentVal}"></div>`; const range = wrap.querySelector(`#range-${id}`); const num = wrap.querySelector(`#num-${id}`); range.oninput = () => num.value = range.value; num.oninput = () => range.value = num.value; this.quantityContainer.appendChild(wrap); return { range, num }; };
+
+        // --- 修正: 数値入力バリデーションの強化 ---
+        const createSlider = (label, id, max, currentVal) => { 
+            const wrap = document.createElement('div'); 
+            wrap.className = 'qty-row'; 
+            // input type="number" に min, max 属性を追加
+            wrap.innerHTML = `<label>${label} (Max: ${max})</label><div class="qty-control"><input type="range" id="range-${id}" min="0" max="${max}" value="${currentVal}"><input type="number" id="num-${id}" min="0" max="${max}" value="${currentVal}"></div>`; 
+            const range = wrap.querySelector(`#range-${id}`); 
+            const num = wrap.querySelector(`#num-${id}`); 
+
+            // スライダー操作時
+            range.oninput = () => num.value = range.value; 
+
+            // 数値直接入力時のバリデーション
+            num.oninput = () => {
+                let v = parseInt(num.value);
+                if (isNaN(v)) {
+                    // 入力中は空欄を許容するが、処理上は0扱い(または一時的に空)
+                    // ここでは空文字の場合は何もしない（onblurでリセット）
+                    return; 
+                }
+                // 範囲外なら強制的に修正
+                if (v < 0) v = 0;
+                if (v > max) v = max;
+                
+                // 表示とスライダーを更新
+                if (num.value != v) num.value = v; 
+                range.value = v; 
+            };
+            
+            // フォーカスが外れた時に空欄なら0にする
+            num.onblur = () => {
+                if (num.value === "" || isNaN(parseInt(num.value))) {
+                    num.value = 0;
+                    range.value = 0;
+                }
+            };
+
+            this.quantityContainer.appendChild(wrap); 
+            return { range, num }; 
+        };
+
         let inputs = {};
         
         if (type === 'reward') {
