@@ -724,6 +724,12 @@ class UIManager {
 
     showControlPanel(castle) { 
         this.currentCastle = castle; 
+        
+        // 【修正】プレイヤーの操作時はAIフラグを確実に解除する
+        if (Number(castle.ownerClan) === Number(this.game.playerClanId)) {
+            this.game.isProcessingAI = false;
+        }
+
         if(this.panelEl) this.panelEl.classList.remove('hidden');
         this.updatePanelHeader(); 
         
@@ -779,6 +785,9 @@ class UIManager {
         this.game.validTargets = []; 
         this.renderMap();
         if (!keepMenuState) {
+            // 【修正】メニューをメインに戻す処理を復元
+            this.menuState = 'MAIN';
+            this.renderCommandMenu();
         }
     }
 
@@ -804,8 +813,9 @@ class UIManager {
                 btn.textContent = label; 
                 btn.onclick = () => {
                     if (this.game.isProcessingAI) return;
-                    this.cancelMapSelection(true);
+                    // 【修正】クリック処理を先に実行し、最後に選択解除を行う（描画エラー対策）
                     onClick();
+                    this.cancelMapSelection(true);
                 }; 
                 area.appendChild(btn); 
             };
