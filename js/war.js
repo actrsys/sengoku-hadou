@@ -226,8 +226,7 @@ class WarManager {
             atkCastle.rice = Math.max(0, atkCastle.rice - atkRice);
 
             const atkClanData = this.game.clans.find(c => c.id === atkClan); 
-            const atkGeneral = (atkBushos && atkBushos.length > 0) ? atkBushos[0].name : "部隊長";
-            const atkGeneral = atkBushos[0].name;
+            const atkGeneral = (atkBushos && atkBushos.length > 0) ? atkBushos[0].name : "部隊長"; 
             const atkArmyName = atkClanData ? atkClanData.name : "敵軍";
             
             if (isPlayerInvolved) {
@@ -835,4 +834,5 @@ class WarManager {
     }
 
 }
+
 
