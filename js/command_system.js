@@ -1017,4 +1017,3 @@ class CommandSystem {
         this.game.ui.showResultModal(`${busho.name}が施しを行いました\n民忠+${val}`); 
         this.game.ui.updatePanelHeader(); this.game.ui.renderCommandMenu();
     }
-}
