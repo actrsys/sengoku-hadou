@@ -1,4 +1,3 @@
-independence_system.js
 /**
  * independence_system.js
  * 城主の独立（謀反）システム
