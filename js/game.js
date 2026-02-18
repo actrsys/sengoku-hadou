@@ -568,6 +568,15 @@ class UIManager {
         if (!this.hasInitializedMap && this.game.castles.length > 0) {
             this.fitMapToScreen();
             this.hasInitializedMap = true;
+            
+            // ★変更: 地図の初期位置を中央にする
+            const sc = document.getElementById('map-scroll-container');
+            if (sc) {
+                setTimeout(() => {
+                    sc.scrollTop = (sc.scrollHeight - sc.clientHeight) / 2;
+                    sc.scrollLeft = (sc.scrollWidth - sc.clientWidth) / 2;
+                }, 0);
+            }
         }
 
         const isSelectionMode = (this.game.selectionMode !== null);
