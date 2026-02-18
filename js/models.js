@@ -20,14 +20,18 @@ class Busho {
         if(this.duty === undefined) this.duty = 50; 
         if(this.leadership === undefined) this.leadership = this.strength;
 
+        const sysParams = window.WarParams ? window.WarParams.System : {};
+        const hermitLimit = sysParams.HermitAmbitionLimit || 30;
+        const statDiff = sysParams.PersonalityStatDiff || 20;
+
         // 性格決定ロジック
         if(!this.personality) {
             // 【変更】野心30未満は隠遁者(hermit)
-            if (this.ambition < 30) {
+            if (this.ambition < hermitLimit) {
                 this.personality = 'hermit';
             }
-            else if (this.strength > this.intelligence + 20) this.personality = 'aggressive';
-            else if (this.intelligence > this.strength + 20) this.personality = 'cautious';
+            else if (this.strength > this.intelligence + statDiff) this.personality = 'aggressive';
+            else if (this.intelligence > this.strength + statDiff) this.personality = 'cautious';
             else this.personality = 'balanced';
         }
 
@@ -51,7 +55,15 @@ class Busho {
         this.battleHistory = this.battleHistory || [];
     }
     getRankName() { if(this.isDaimyo) return "大名"; if(this.clan === 0) return "在野"; if(this.isGunshi) return "軍師"; if(this.isCastellan) return "城主"; return "一般"; }
-    getFactionName() { if (this.innovation >= 70) return "革新派"; if (this.innovation <= 30) return "保守派"; return "中道派"; }
+    getFactionName() { 
+        const sysParams = window.WarParams ? window.WarParams.System : {};
+        const high = sysParams.FactionInnovationHigh || 70;
+        const low = sysParams.FactionInnovationLow || 30;
+
+        if (this.innovation >= high) return "革新派"; 
+        if (this.innovation <= low) return "保守派"; 
+        return "中道派"; 
+    }
 }
 
 class Castle {

@@ -17,6 +17,11 @@ class FactionSystem {
     updateRecognition(busho, baseAmount) {
         if (!busho || busho.status === 'ronin' || busho.status === 'dead') return;
         
+        // パラメータ取得
+        const F = window.WarParams.Faction || {};
+        const baseFactor = F.AffinityFactorBase || 0.5;
+        const divisor = F.AffinityDivisor || 25;
+
         // 大名との相性による補正
         const daimyo = this.game.bushos.find(b => b.clan === busho.clan && b.isDaimyo);
         let factor = 1.0;
@@ -29,14 +34,14 @@ class FactionSystem {
                 // 不満が溜まる場合（プラス変動）
                 // 相性が悪い(差50)ほど、係数は大きくなる (最大2.5倍)
                 // 式: 0.5 + (50 / 25) = 2.5
-                factor = 0.5 + (diff / 25.0); 
+                factor = baseFactor + (diff / divisor); 
             } 
             else {
                 // 恩義を感じる場合（マイナス変動）
                 // 相性が良い(差0)ほど、係数は大きくなる (最大2.5倍)
                 // 差が50の場合: 0.5 + 0 = 0.5倍
                 // 差が0の場合: 0.5 + 2.0 = 2.5倍
-                factor = 0.5 + ((50 - diff) / 25.0);
+                factor = baseFactor + ((50 - diff) / divisor);
             }
         }
 
@@ -48,6 +53,10 @@ class FactionSystem {
      * 月末処理: 忠誠度変動と承認欲求の自然減衰
      */
     processEndMonth() {
+        const F = window.WarParams.Faction || {};
+        const threshold = F.LoyaltyChangeThreshold || 20;
+        const decay = F.NaturalDecay || 10;
+
         this.game.bushos.forEach(b => {
             if (b.status !== 'active' && b.status !== 'ronin') return;
             if (b.clan === 0) return;
@@ -55,16 +64,16 @@ class FactionSystem {
             // 1. 承認欲求による忠誠度変化
             if (!b.isDaimyo) {
                 // -20ごとに忠誠+1、+20ごとに忠誠-1
-                const loyaltyChange = Math.floor(b.recognitionNeed / -20);
+                const loyaltyChange = Math.floor(b.recognitionNeed / -threshold);
                 if (loyaltyChange !== 0) {
                     b.loyalty = Math.max(0, Math.min(100, b.loyalty + loyaltyChange));
                 }
 
                 // 2. 承認欲求の自然減衰 (0に近づく)
                 if (b.recognitionNeed > 0) {
-                    b.recognitionNeed = Math.max(0, b.recognitionNeed - 10);
+                    b.recognitionNeed = Math.max(0, b.recognitionNeed - decay);
                 } else if (b.recognitionNeed < 0) {
-                    b.recognitionNeed = Math.min(0, b.recognitionNeed + 10);
+                    b.recognitionNeed = Math.min(0, b.recognitionNeed + decay);
                 }
             }
         });
@@ -74,17 +83,21 @@ class FactionSystem {
      * 月初処理: 下野判定と派閥形成
      */
     processStartMonth() {
+        const F = window.WarParams.Faction || {};
+        const roninThreshold = F.RoninLoyaltyThreshold || 30;
+        const roninChanceBase = F.RoninChanceBase || 0.5;
+
         // 1. 下野判定
         const roninCandidates = this.game.bushos.filter(b => 
             b.status === 'active' && 
             b.clan !== 0 && 
             !b.isDaimyo && 
             !b.isCastellan && 
-            b.loyalty <= 30
+            b.loyalty <= roninThreshold
         );
 
         roninCandidates.forEach(b => {
-            const chance = 0.5 - (b.loyalty * 0.01); 
+            const chance = roninChanceBase - (b.loyalty * 0.01); 
             if (Math.random() < chance) {
                 this.executeRonin(b);
             }
@@ -118,6 +131,14 @@ class FactionSystem {
      * 派閥の更新ロジック (改修版)
      */
     updateFactions() {
+        const F = window.WarParams.Faction || {};
+        const achieveLeader = F.AchievementLeader || 500;
+        const battleBonus = F.SolidarityBattle || 5;
+        const stayBonusTrigger = F.SolidarityStayTrigger || 12; // 追加
+        const stayBonusBase = F.SolidarityStayBase || 9;
+        const stayBonusDiv = F.SolidarityStayDiv || 3;
+        const joinThreshold = F.JoinScoreThreshold || 40;
+
         const clans = this.game.clans;
         
         clans.forEach(clan => {
@@ -132,7 +153,7 @@ class FactionSystem {
             // 条件: 功績500以上 かつ 性格がhermit(隠遁者)ではない
             const candidates = members.filter(b => 
                 !b.isDaimyo && 
-                b.achievementTotal >= 500 && 
+                b.achievementTotal >= achieveLeader && 
                 b.personality !== 'hermit'
             ).sort((a, b) => b.achievementTotal - a.achievementTotal);
 
@@ -174,9 +195,9 @@ class FactionSystem {
 
                     // (A) 参戦履歴ボーナス: 重複する battleHistory 1件につき 5
                     const battleOverlap = b.battleHistory.filter(h => leader.battleHistory.includes(h)).length;
-                    solidarityBonus += battleOverlap * 5;
+                    solidarityBonus += battleOverlap * battleBonus;
 
-                    // (B) 滞在履歴ボーナス: 12ヶ月以上重複滞在している場合 (重複期間 - 9) / 3
+                    // (B) 滞在履歴ボーナス: Trigger(12)ヶ月以上重複滞在している場合 (重複期間 - Base(9)) / Div(3)
                     // stayHistory: [{castleId, start, end}, ...]
                     let totalOverlapMonths = 0;
                     b.stayHistory.forEach(bHist => {
@@ -192,8 +213,9 @@ class FactionSystem {
                         });
                     });
 
-                    if (totalOverlapMonths >= 12) {
-                        solidarityBonus += Math.floor((totalOverlapMonths - 9) / 3);
+                    // 指定月数以上
+                    if (totalOverlapMonths >= stayBonusTrigger) {
+                        solidarityBonus += Math.floor((totalOverlapMonths - stayBonusBase) / stayBonusDiv);
                     }
 
                     // (C) 相性補正: 連帯感ボーナスに対し max(0, 1.0 - (affDiff / 50)) を掛ける
@@ -206,8 +228,8 @@ class FactionSystem {
                     // Score = (affDiff + (innoDiff * 0.5) + 20) - (補正済み連帯ボーナス)
                     const score = (affDiff + (innoDiff * 0.5) + 20) - finalBonus;
 
-                    // Score < 40 の中で最小のものを探す
-                    if (score < 40 && score < minScore) {
+                    // Score < Threshold の中で最小のものを探す
+                    if (score < joinThreshold && score < minScore) {
                         minScore = score;
                         bestLeader = leader;
                     }
@@ -245,13 +267,17 @@ class FactionSystem {
      * 参戦履歴の記録
      */
     recordBattle(busho, castleId) {
+        const F = window.WarParams.Faction || {};
+        const achieveBase = F.BattleAchievementBase || 20;
+        const achieveLdr = F.BattleAchievementLdrFactor || 0.3;
+
         const key = `${this.game.year}_${this.game.month}_${castleId}`;
         if (!busho.battleHistory.includes(key)) {
             busho.battleHistory.push(key);
             if (busho.battleHistory.length > 20) busho.battleHistory.shift();
             
             // 合戦功績: (実行武将の統率の 30%) + (勝利側ボーナス 20)
-            const achievementGain = Math.floor(busho.leadership * 0.3) + 20;
+            const achievementGain = Math.floor(busho.leadership * achieveLdr) + achieveBase;
             busho.achievementTotal += achievementGain;
         }
     }

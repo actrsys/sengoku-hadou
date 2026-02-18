@@ -29,6 +29,11 @@ class IndependenceSystem {
             return true;
         });
 
+        const I = window.WarParams.Independence || {};
+        const thresholdBase = I.ThresholdBase || 29;
+        const dutyDiv = I.ThresholdDutyDiv || 2;
+        const ambDiv = I.ThresholdAmbitionDiv || 5;
+
         // 判定実行
         potentialRebels.forEach(castle => {
             const castellan = this.game.getBusho(castle.castellanId);
@@ -41,7 +46,7 @@ class IndependenceSystem {
             // 基本値29 + 義理が低いほど上昇 + 野心が高いほど上昇
             // 例: 義理10, 野心90 => 29 + 20 + 8 = 57 (忠誠57以下なら危険)
             // 例: 義理90, 野心10 => 29 - 20 - 8 = 1 (ほぼ裏切らない)
-            const threshold = 29 + ((50 - castellan.duty) / 2) + ((castellan.ambition - 50) / 5);
+            const threshold = thresholdBase + ((50 - castellan.duty) / dutyDiv) + ((castellan.ambition - 50) / ambDiv);
 
             // 現在の忠誠が閾値以下なら判定へ
             if (castellan.loyalty <= threshold) {
@@ -54,6 +59,12 @@ class IndependenceSystem {
      * 確率計算と実行
      */
     calculateAndExecute(castle, castellan, daimyo, threshold) {
+        const I = window.WarParams.Independence || {};
+        const bonusMismatch = I.FactionBonusMismatch || 20;
+        const bonusMatch = I.FactionBonusMatch || -10;
+        const probLoyalty = I.ProbLoyaltyFactor || 2;
+        const probAffinity = I.ProbAffinityFactor || 0.5;
+
         // 相性差 (0~100)
         const affinityDiff = GameSystem.calcAffinityDiff(castellan.affinity, daimyo.affinity);
         
@@ -63,13 +74,13 @@ class IndependenceSystem {
         const lordFaction = daimyo.getFactionName ? daimyo.getFactionName() : "";
         
         if (myFaction && lordFaction) {
-            if (myFaction !== lordFaction) factionBonus = 20; // 派閥不一致は独立しやすい
-            else factionBonus = -10; // 一致していると抑制
+            if (myFaction !== lordFaction) factionBonus = bonusMismatch; // 派閥不一致は独立しやすい
+            else factionBonus = bonusMatch; // 一致していると抑制
         }
 
         // B. 独立確率 P (千分率)
         // (閾値 - 現在忠誠) * 2 + (相性差 * 0.5) +/- 派閥
-        let prob = ((threshold - castellan.loyalty) * 2) + (affinityDiff * 0.5) + factionBonus;
+        let prob = ((threshold - castellan.loyalty) * probLoyalty) + (affinityDiff * probAffinity) + factionBonus;
         
         // 確率が0以下なら発生しない
         if (prob <= 0) return;
@@ -87,6 +98,9 @@ class IndependenceSystem {
      */
     executeRebellion(castle, castellan, oldDaimyo) {
         const oldClanId = castle.ownerClan;
+        const I = window.WarParams.Independence || {};
+        const initGold = I.InitialGold || 1000;
+        const initRice = I.InitialRice || 1000;
         
         // 1. 新クラン生成
         const newClanId = Math.max(...this.game.clans.map(c => c.id)) + 1;
@@ -101,8 +115,8 @@ class IndependenceSystem {
             name: newClanName,
             color: newColor,
             leaderId: castellan.id,
-            rice: 1000, // 独立資金
-            gold: 1000
+            rice: initRice, // 独立資金
+            gold: initGold
         });
         this.game.clans.push(newClan);
 
@@ -144,6 +158,10 @@ class IndependenceSystem {
         const captives = [];
         const escapees = [];
         const joiners = [];
+        
+        const I = window.WarParams.Independence || {};
+        const bonusFaction = I.JoinBonusFaction || 30;
+        const escapeDuty = I.EscapeDutyThreshold || 30;
 
         // 脱出先候補（元の主君の他の城）
         const escapeCastles = this.game.castles.filter(c => c.ownerClan === oldClanId && c.id !== castle.id);
@@ -162,8 +180,8 @@ class IndependenceSystem {
 
             // 派閥補正
             const myFaction = busho.getFactionName();
-            if (myFaction === newDaimyo.getFactionName()) joinScore += 30;
-            if (myFaction === oldDaimyo.getFactionName()) stayScore += 30;
+            if (myFaction === newDaimyo.getFactionName()) joinScore += bonusFaction;
+            if (myFaction === oldDaimyo.getFactionName()) stayScore += bonusFaction;
 
             // 判定
             if (joinScore > stayScore) {
@@ -173,7 +191,7 @@ class IndependenceSystem {
                 joiners.push(busho);
             } else {
                 // 脱出試行
-                if (hasEscapeRoute && busho.duty >= 30) { // ある程度義理があれば脱出を試みる
+                if (hasEscapeRoute && busho.duty >= escapeDuty) { // ある程度義理があれば脱出を試みる
                     // 脱出成功判定 (武力と知略で判定)
                     const escapePower = busho.strength + busho.intelligence;
                     // 捕縛側（新大名）の阻止力
@@ -218,6 +236,10 @@ class IndependenceSystem {
      * 元の主君がAIの場合、AI同士で自動解決
      */
     handleCaptives(captives, oldClanId, newClanId, newDaimyo) {
+        const I = window.WarParams.Independence || {};
+        const hateThreshold = I.ExecHateThreshold || 60;
+        const ambitionThreshold = I.ExecAmbitionThreshold || 80;
+
         // プレイヤーが「元の主君」の場合（部下を奪われた側）
         // プレイヤーの武将が捕まった -> 処遇を決めるのは「新大名(AI)」
         if (oldClanId === this.game.playerClanId) {
@@ -225,7 +247,7 @@ class IndependenceSystem {
             captives.forEach(p => {
                 // 新大名と相性が悪い、または新大名が残忍(野心高)なら処断
                 const hate = GameSystem.calcAffinityDiff(p.affinity, newDaimyo.affinity);
-                if (hate > 60 || newDaimyo.ambition > 80) {
+                if (hate > hateThreshold || newDaimyo.ambition > ambitionThreshold) {
                     p.status = 'dead';
                     p.clan = 0;
                     setTimeout(() => alert(`悲報：捕らえられた ${p.name} は、${newDaimyo.name}によって処断されました……`), 1000);

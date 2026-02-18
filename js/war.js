@@ -7,6 +7,8 @@
 
 // 戦争・軍事関連の設定定義
 // parameter.csv の値(2026-02-16時点)と同期済み
+// 注: window.WarParams は parameter.csv 読み込み時に自動的に構築・上書きされますが、
+// 安全のためデフォルト値を保持します。
 window.WarParams = {
     // 【Military】: 軍事内政、基本能力、静的な係数
     Military: {
@@ -28,7 +30,13 @@ window.WarParams = {
         ShortWarTurnLimit: 5, BaseRecoveryRate: 0.2, RetreatRecoveryRate: 0.3, RetreatCaptureRate: 0.1, DaimyoCaptureReduction: 0.3,
         RetreatResourceLossFactor: 0.2, LootingBaseRate: 0.3, LootingCharmFactor: 0.002, DaimyoCharmWeight: 0.1,
         // 新規追加: 兵糧消費
-        RiceConsumptionAtk: 0.1, RiceConsumptionDef: 0.05
+        RiceConsumptionAtk: 0.1, RiceConsumptionDef: 0.05,
+        // パラメータ外部化による追加
+        BaseStat: 30, SubGeneralFactor: 0.2, MinDamage: 50,
+        StatsLdrWeight: 1.2, StatsStrWeight: 0.3, StatsIntWeight: 0.5,
+        MoraleBase: 50, SchemeBaseIntOffset: 20, LoyaltyDamageFactor: 500,
+        AttackLoyaltyDecay: 50, AttackPopDecay: 500, WinStatIncrease: 5,
+        CaptureChanceBase: 0.4, CaptureStrFactor: 0.002, PrisonerRecruitThreshold: 60
     }
 };
 
@@ -38,7 +46,11 @@ window.WarParams = {
 class WarSystem {
     // 部隊の能力値を計算
     static calcUnitStats(bushos) { 
-        if (!bushos || bushos.length === 0) return { ldr:30, str:30, int:30, charm:30 }; 
+        const W = window.WarParams.War;
+        const M = window.WarParams.Military;
+        const baseStat = W.BaseStat || 30;
+
+        if (!bushos || bushos.length === 0) return { ldr:baseStat, str:baseStat, int:baseStat, charm:baseStat }; 
         // 配列の先頭を総大将とする（game.js/ai.js側で並び替え済みである前提）
         const leader = bushos[0]; 
         const subs = bushos.slice(1); 
@@ -49,14 +61,16 @@ class WarSystem {
         if (subs.length > 0) {
             const leaderFaction = leader.getFactionName ? leader.getFactionName() : "中立";
             let sameFactionCount = 0; let oppFactionCount = 0; 
+            const subFactor = W.SubGeneralFactor || 0.2;
+
             subs.forEach(b => { 
-                totalLdr += b.leadership * 0.2; totalStr += b.strength * 0.2; totalInt += b.intelligence * 0.2; 
+                totalLdr += b.leadership * subFactor; totalStr += b.strength * subFactor; totalInt += b.intelligence * subFactor; 
                 const f = b.getFactionName ? b.getFactionName() : "中立";
                 if (f === leaderFaction) sameFactionCount++;
                 else if ((leaderFaction === "革新派" && f === "保守派") || (leaderFaction === "保守派" && f === "革新派")) oppFactionCount++;
             });
-            if (oppFactionCount > 0) factionBonusMultiplier = window.WarParams.Military.FactionPenalty;
-            else if (sameFactionCount === subs.length) factionBonusMultiplier = window.WarParams.Military.FactionBonus;
+            if (oppFactionCount > 0) factionBonusMultiplier = M.FactionPenalty;
+            else if (sameFactionCount === subs.length) factionBonusMultiplier = M.FactionBonus;
         }
         return { ldr: Math.floor(totalLdr * factionBonusMultiplier), str: Math.floor(totalStr * factionBonusMultiplier), int: Math.floor(totalInt * factionBonusMultiplier), charm: leader.charm }; 
     }
@@ -67,11 +81,17 @@ class WarSystem {
         const W = window.WarParams.War;
         const fluctuation = M.DamageFluctuation || 0.2;
         const rand = 1.0 - fluctuation + (Math.random() * fluctuation * 2);
-        const moraleBonus = (atkMorale - 50) / 100; 
-        const trainingBonus = (defTraining - 50) / 100;
         
-        const atkPower = ((atkStats.ldr * 1.2) + (atkStats.str * 0.3) + (atkSoldiers * M.DamageSoldierPower)) * (1.0 + moraleBonus);
-        const defPower = ((defStats.ldr * 1.0) + (defStats.int * 0.5) + (defWall * M.WallDefenseEffect) + (defSoldiers * M.DamageSoldierPower)) * (1.0 + trainingBonus);
+        const moraleBase = W.MoraleBase || 50;
+        const moraleBonus = (atkMorale - moraleBase) / 100; 
+        const trainingBonus = (defTraining - moraleBase) / 100;
+        
+        const ldrW = W.StatsLdrWeight || 1.2;
+        const strW = W.StatsStrWeight || 0.3;
+        const intW = W.StatsIntWeight || 0.5;
+
+        const atkPower = ((atkStats.ldr * ldrW) + (atkStats.str * strW) + (atkSoldiers * M.DamageSoldierPower)) * (1.0 + moraleBonus);
+        const defPower = ((defStats.ldr * 1.0) + (defStats.int * intW) + (defWall * M.WallDefenseEffect) + (defSoldiers * M.DamageSoldierPower)) * (1.0 + trainingBonus);
         
         let multiplier = 1.0, soldierRate = 1.0, wallRate = 0.0, counterRisk = 1.0;
         
@@ -86,7 +106,8 @@ class WarSystem {
         
         const ratio = atkPower / (atkPower + defPower);
         let baseDmg = atkPower * ratio * multiplier * rand; 
-        baseDmg = Math.max(50, baseDmg);
+        const minDmg = W.MinDamage || 50;
+        baseDmg = Math.max(minDmg, baseDmg);
         
         let counterDmg = 0;
         const counterFactor = W.CounterAtkPowerFactor !== undefined ? W.CounterAtkPowerFactor : 0.05;
@@ -104,9 +125,11 @@ class WarSystem {
     static calcScheme(atkBusho, defBusho, defCastleLoyalty) { 
         const atkInt = atkBusho.intelligence; 
         const defInt = defBusho ? defBusho.intelligence : 30; 
-        const successRate = (atkInt / (defInt + 20)) * window.MainParams.Strategy.SchemeSuccessRate; 
+        const baseOffset = window.WarParams.War.SchemeBaseIntOffset || 20;
+        const successRate = (atkInt / (defInt + baseOffset)) * window.MainParams.Strategy.SchemeSuccessRate; 
         if (Math.random() > successRate) return { success: false, damage: 0 }; 
-        const loyaltyBonus = (1000 - defCastleLoyalty) / 500; 
+        const loyaltyDiv = window.WarParams.War.LoyaltyDamageFactor || 500;
+        const loyaltyBonus = (1000 - defCastleLoyalty) / loyaltyDiv; 
         return { success: true, damage: Math.floor(atkInt * window.WarParams.War.SchemeDamageFactor * (1.0 + loyaltyBonus)) }; 
     }
 
@@ -232,8 +255,9 @@ class WarManager {
                 deadSoldiers: { attacker: 0, defender: 0 }, defenderGuarding: false 
             };
             
-            defCastle.loyalty = Math.max(0, defCastle.loyalty - 50); 
-            defCastle.population = Math.max(0, defCastle.population - 500);
+            const W = window.WarParams.War;
+            defCastle.loyalty = Math.max(0, defCastle.loyalty - (W.AttackLoyaltyDecay || 50)); 
+            defCastle.population = Math.max(0, defCastle.population - (W.AttackPopDecay || 500));
             
             if (isPlayerInvolved) { 
                 setTimeout(() => {
@@ -594,6 +618,9 @@ class WarManager {
     endWar(attackerWon, isRetreat = false, capturedInRetreat = [], retreatTargetId = null) { 
         const s = this.state; s.active = false; 
         
+        const W = window.WarParams.War;
+        const F = window.WarParams.Faction || { BattleAchievementBase: 20 };
+
         s.atkBushos.forEach(b => {
              this.game.factionSystem.recordBattle(b, s.defender.id);
              this.game.factionSystem.updateRecognition(b, 25);
@@ -678,7 +705,8 @@ class WarManager {
         let resultMsg = "";
         
         if (attackerWon) { 
-            s.attacker.training = Math.min(120, s.attacker.training + 5); s.attacker.morale = Math.min(120, s.attacker.morale + 5); 
+            const statInc = W.WinStatIncrease || 5;
+            s.attacker.training = Math.min(120, s.attacker.training + statInc); s.attacker.morale = Math.min(120, s.attacker.morale + statInc); 
             this.processCaptures(s.defender, s.attacker.ownerClan);
             const atkBushos = s.atkBushos;
             const maxCharm = Math.max(...atkBushos.map(b => b.charm));
@@ -725,8 +753,13 @@ class WarManager {
         const losers = this.game.getCastleBushos(defeatedCastle.id); const captives = []; const escapees = [];
         const friendlyCastles = this.game.castles.filter(c => c.ownerClan === defeatedCastle.ownerClan && c.id !== defeatedCastle.id);
         const isLastStand = friendlyCastles.length === 0;
+        
+        const W = window.WarParams.War;
+        const captureBase = W.CaptureChanceBase || 0.4;
+        const captureStrFactor = W.CaptureStrFactor || 0.002;
+
         losers.forEach(b => { 
-            let chance = isLastStand ? 1.0 : (0.4 - (b.strength * 0.002) + (Math.random() * 0.3)); 
+            let chance = isLastStand ? 1.0 : (captureBase - (b.strength * captureStrFactor) + (Math.random() * 0.3)); 
             if (!isLastStand && defeatedCastle.soldiers > 1000) chance -= 0.2; 
             if (!isLastStand && b.isDaimyo) chance -= window.WarParams.War.DaimyoCaptureReduction;
             
@@ -790,10 +823,12 @@ class WarManager {
     autoResolvePrisoners(captives, winnerClanId) { 
         const aiBushos = this.game.bushos.filter(b => b.clan === winnerClanId); 
         const leaderInt = aiBushos.length > 0 ? Math.max(...aiBushos.map(b => b.intelligence)) : 50; 
+        const recruitThreshold = window.WarParams.War.PrisonerRecruitThreshold || 60;
+
         captives.forEach(p => { 
             if (p.isDaimyo) { this.handleDaimyoDeath(p); p.status = 'dead'; p.clan = 0; p.castleId = 0; return; } 
             if ((leaderInt / 100) > Math.random()) { p.clan = winnerClanId; p.loyalty = 50; return; } 
-            if (p.charm > 60) { p.status = 'ronin'; p.clan = 0; p.castleId = 0; } 
+            if (p.charm > recruitThreshold) { p.status = 'ronin'; p.clan = 0; p.castleId = 0; } 
             else { p.status = 'dead'; p.clan = 0; p.castleId = 0; } 
         }); 
     }
