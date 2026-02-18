@@ -197,7 +197,7 @@ class FactionSystem {
                     const battleOverlap = b.battleHistory.filter(h => leader.battleHistory.includes(h)).length;
                     solidarityBonus += battleOverlap * battleBonus;
 
-                    // (B) 滞在履歴ボーナス: Trigger(12)ヶ月以上重複滞在している場合 (重複期間 - Base(9)) / Div(3)
+                    // (B) 滞在履歴ボーナス: Trigger(SolidarityStayTrigger)ヶ月以上重複滞在している場合 (重複期間 - SolidarityStayBase) / SolidarityStayDiv
                     // stayHistory: [{castleId, start, end}, ...]
                     let totalOverlapMonths = 0;
                     b.stayHistory.forEach(bHist => {
