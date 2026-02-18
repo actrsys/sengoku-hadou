@@ -26,7 +26,7 @@ const COMMAND_SPECS = {
         msg: "金: 500 (1回あたり)" 
     },
     'repair': { 
-        label: "城壁修復", category: 'MILITARY', 
+        label: "城壁修復", category: 'DEVELOP', 
         costGold: 300, costRice: 0, 
         isMulti: true, hasAdvice: true, 
         startMode: 'busho_select', sortKey: 'politics',
@@ -38,6 +38,20 @@ const COMMAND_SPECS = {
         isMulti: true, hasAdvice: true, 
         startMode: 'busho_select', sortKey: 'charm',
         msg: "金: 300 / 米: 300 (選択可)" 
+    },
+    'buy_rice': {
+        label: "兵糧購入", category: 'DEVELOP',
+        costGold: 0, costRice: 0,
+        isMulti: false, hasAdvice: true,
+        startMode: 'quantity_select',
+        msg: "金を払い兵糧を買います"
+    },
+    'sell_rice': {
+        label: "兵糧売却", category: 'DEVELOP',
+        costGold: 0, costRice: 0,
+        isMulti: false, hasAdvice: true,
+        startMode: 'quantity_select',
+        msg: "兵糧を売り金を得ます"
     },
 
     // --- 軍事 (MILITARY) ---
@@ -78,13 +92,6 @@ const COMMAND_SPECS = {
     },
 
     // --- 人事 (PERSONNEL) ---
-    'appoint': { 
-        label: "城主任命", category: 'PERSONNEL', 
-        costGold: 0, costRice: 0, 
-        isMulti: false, hasAdvice: false, 
-        startMode: 'busho_select', sortKey: 'leadership',
-        msg: "城主を任命します" 
-    },
     'appoint_gunshi': { 
         label: "軍師任命", category: 'PERSONNEL', 
         costGold: 0, costRice: 0, 
@@ -92,19 +99,12 @@ const COMMAND_SPECS = {
         startMode: 'busho_select', sortKey: 'intelligence',
         msg: "軍師を任命します (知略重視)" 
     },
-    'banish': { 
-        label: "追放", category: 'PERSONNEL', 
-        costGold: 0, costRice: 0, 
-        isMulti: false, hasAdvice: false, 
-        startMode: 'busho_select', sortKey: 'loyalty',
-        msg: "武将を追放します" 
-    },
-    'interview': { 
-        label: "面談", category: 'PERSONNEL', 
+    'appoint': { 
+        label: "城主任命", category: 'PERSONNEL', 
         costGold: 0, costRice: 0, 
         isMulti: false, hasAdvice: false, 
         startMode: 'busho_select', sortKey: 'leadership',
-        msg: "武将と面談します" 
+        msg: "城主を任命します" 
     },
     'reward': { 
         label: "褒美", category: 'PERSONNEL', 
@@ -113,12 +113,12 @@ const COMMAND_SPECS = {
         startMode: 'busho_select', sortKey: 'loyalty',
         msg: "金を与えて忠誠を上げます" 
     },
-    'move': { 
-        label: "移動", category: 'PERSONNEL', 
+    'interview': { 
+        label: "面談", category: 'PERSONNEL', 
         costGold: 0, costRice: 0, 
-        isMulti: true, hasAdvice: true, 
-        startMode: 'map_select', targetType: 'ally_other',
-        sortKey: 'strength' 
+        isMulti: false, hasAdvice: false, 
+        startMode: 'busho_select', sortKey: 'leadership',
+        msg: "武将と面談します" 
     },
     'employ': { 
         label: "登用", category: 'PERSONNEL', 
@@ -127,6 +127,20 @@ const COMMAND_SPECS = {
         startMode: 'busho_select_special', subType: 'employ_target', // 特殊フロー
         sortKey: 'strength',
         msg: "在野武将を登用します" 
+    },
+    'move': { 
+        label: "移動", category: 'PERSONNEL', 
+        costGold: 0, costRice: 0, 
+        isMulti: true, hasAdvice: true, 
+        startMode: 'map_select', targetType: 'ally_other',
+        sortKey: 'strength' 
+    },
+    'banish': { 
+        label: "追放", category: 'PERSONNEL', 
+        costGold: 0, costRice: 0, 
+        isMulti: false, hasAdvice: false, 
+        startMode: 'busho_select', sortKey: 'loyalty',
+        msg: "武将を追放します" 
     },
 
     // --- 調略 (STRATEGY) ---
@@ -157,20 +171,6 @@ const COMMAND_SPECS = {
         isMulti: false, hasAdvice: true, 
         startMode: 'map_select', targetType: 'enemy_all',
         sortKey: 'intelligence'
-    },
-    'buy_rice': {
-        label: "兵糧購入", category: 'STRATEGY',
-        costGold: 0, costRice: 0,
-        isMulti: false, hasAdvice: true,
-        startMode: 'quantity_select',
-        msg: "金を払い兵糧を買います"
-    },
-    'sell_rice': {
-        label: "兵糧売却", category: 'STRATEGY',
-        costGold: 0, costRice: 0,
-        isMulti: false, hasAdvice: true,
-        startMode: 'quantity_select',
-        msg: "兵糧を売り金を得ます"
     },
     
     // --- 外交 (DIPLOMACY) ---

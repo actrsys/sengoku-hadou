@@ -1,3 +1,4 @@
+independence_system.js
 /**
  * independence_system.js
  * 城主の独立（謀反）システム
@@ -240,6 +241,26 @@ class IndependenceSystem {
         const hateThreshold = I.ExecHateThreshold || 60;
         const ambitionThreshold = I.ExecAmbitionThreshold || 80;
 
+        // 帰還先の確保（元の主君の城）
+        const returnCastles = this.game.castles.filter(c => c.ownerClan === oldClanId);
+        
+        // 帰還処理関数
+        const returnToMaster = (busho) => {
+            if (returnCastles.length > 0) {
+                const target = returnCastles[Math.floor(Math.random() * returnCastles.length)];
+                busho.clan = oldClanId;
+                busho.castleId = target.id;
+                busho.status = 'active'; // 復帰
+                target.samuraiIds.push(busho.id);
+                return target.name;
+            } else {
+                // 帰る城がない場合は在野
+                busho.status = 'ronin';
+                busho.clan = 0;
+                return null;
+            }
+        };
+
         // プレイヤーが「元の主君」の場合（部下を奪われた側）
         // プレイヤーの武将が捕まった -> 処遇を決めるのは「新大名(AI)」
         if (oldClanId === this.game.playerClanId) {
@@ -252,28 +273,32 @@ class IndependenceSystem {
                     p.clan = 0;
                     setTimeout(() => alert(`悲報：捕らえられた ${p.name} は、${newDaimyo.name}によって処断されました……`), 1000);
                 } else {
-                    // 解放 (在野へ)
-                    p.status = 'ronin';
-                    p.clan = 0;
-                    setTimeout(() => alert(`報告：${p.name} は解放されましたが、帰参せず在野に下りました。`), 1000);
+                    // 解放 -> 帰還
+                    const returnedCastleName = returnToMaster(p);
+                    if (returnedCastleName) {
+                        setTimeout(() => alert(`報告：${p.name} は解放され、${returnedCastleName}へ無事帰還しました！`), 1000);
+                    } else {
+                        setTimeout(() => alert(`報告：${p.name} は解放されましたが、帰る場所がなく在野に下りました。`), 1000);
+                    }
                 }
             });
         }
         // プレイヤーが「新大名」の場合（ここには来ない想定だが念のため）
         else if (newClanId === this.game.playerClanId) {
             // プレイヤーが独立した側なら、捕虜の処遇を選べる（既存UI利用）
+            // 注意: UI側の実装によっては在野になる可能性がありますが、ここでは手を加えません
             this.game.ui.showPrisonerModal(captives);
         }
         // AI vs AI
         else {
             captives.forEach(p => {
-                // 3割処断、7割解放(在野)
+                // 3割処断、7割解放(帰還)
                 if (Math.random() < 0.3) {
                     p.status = 'dead';
                     p.clan = 0;
                 } else {
-                    p.status = 'ronin';
-                    p.clan = 0;
+                    // 帰還
+                    returnToMaster(p);
                 }
             });
         }
