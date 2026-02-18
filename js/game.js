@@ -918,9 +918,17 @@ class UIManager {
         let bushos = []; 
         
         // --- 設定の取得 ---
-        const spec = this.game.commandSystem.getSpecs()[actionType] || {};
+        const baseType = actionType.replace('_deploy', ''); 
+        const spec = this.game.commandSystem.getSpecs()[baseType] || this.game.commandSystem.getSpecs()[actionType] || {};
+    
         let sortKey = spec.sortKey || 'strength';
+        // specに isMulti が設定されていればそれに従い、なければ false になります
         let isMulti = spec.isMulti || false;
+        // --- 設定の取得（ここまで修正） ---
+    
+        if (document.getElementById('selector-title')) {
+            document.getElementById('selector-title').textContent = isMulti ? "武将を選択（複数可）" : "武将を選択"; 
+        }
 
         let isEnemyTarget = false;
         let targetCastle = null;
@@ -1707,4 +1715,5 @@ class GameManager {
 // 起動
 window.addEventListener('DOMContentLoaded', () => {
     window.GameApp = new GameManager();
+
 });
