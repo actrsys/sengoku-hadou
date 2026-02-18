@@ -1,12 +1,342 @@
 /**
  * command_system.js
- * ゲーム内のコマンド実行ロジックを管理するクラス
+ * ゲーム内のコマンド実行ロジックおよびフロー制御を管理するクラス
  */
+
+/* ==========================================================================
+   ★ コマンド定義 (COMMAND_SPECS)
+   ========================================================================== */
+const COMMAND_SPECS = {
+    // 内政
+    'farm': { label: "石高開発", costGold: 500, costRice: 0, multi: true, next: 'execute' },
+    'commerce': { label: "商業開発", costGold: 500, costRice: 0, multi: true, next: 'execute' },
+    'repair': { label: "城壁修復", costGold: 300, costRice: 0, multi: true, next: 'execute' },
+    'training': { label: "訓練", costGold: 0, costRice: 0, multi: true, next: 'execute' },
+    'soldier_charity': { label: "兵施し", costGold: 0, costRice: 0, multi: true, next: 'execute' },
+    'charity': { label: "施し", costGold: 300, costRice: 300, multi: true, next: 'quantity_selector' }, // 特殊: タイプ選択へ
+    
+    // 軍事
+    'draft': { label: "徴兵", costGold: 0, costRice: 0, multi: true, next: 'quantity_selector' },
+    'transport': { label: "輸送", costGold: 0, costRice: 0, multi: true, next: 'quantity_selector' },
+    'war': { label: "出陣", costGold: 0, costRice: 0, multi: true, next: 'war_setup' },
+
+    // 人事
+    'appoint': { label: "城主任命", multi: false, next: 'execute' },
+    'appoint_gunshi': { label: "軍師任命", multi: false, next: 'execute' },
+    'banish': { label: "追放", multi: false, next: 'execute' },
+    'interview': { label: "面談", multi: false, next: 'modal_interview' },
+    'reward': { label: "褒美", multi: false, next: 'quantity_selector' },
+    'move': { label: "移動", multi: true, next: 'execute_move' },
+    'employ': { label: "登用", multi: false, next: 'complex_employ' }, // 登用はフローが特殊
+
+    // 調略
+    'investigate': { label: "調査", multi: true, next: 'advice_execute' },
+    'incite': { label: "扇動", multi: false, next: 'advice_execute' },
+    'rumor': { label: "流言", multi: false, next: 'complex_rumor' },
+    'headhunt': { label: "引抜", multi: false, next: 'complex_headhunt' },
+    
+    // 外交・商人
+    'diplomacy': { label: "外交", multi: false, next: 'complex_diplomacy' },
+    'trade': { label: "取引", multi: false, next: 'quantity_selector' }
+};
 
 class CommandSystem {
     constructor(game) {
         this.game = game; // GameManagerのインスタンスへの参照
     }
+
+    /* ==========================================================================
+       ★ フロー制御 (Flow Control)
+       UIから呼び出されるエントリポイント
+       ========================================================================== */
+
+    /**
+     * コマンド開始処理
+     * @param {string} type コマンドタイプ
+     * @param {number|null} targetId 対象ID（城IDなど）
+     * @param {object|null} extraData 追加データ
+     */
+    startCommand(type, targetId = null, extraData = null) {
+        const spec = COMMAND_SPECS[type];
+        const castle = this.game.getCurrentTurnCastle();
+
+        // 基本的なリソースチェック（実行前に弾けるもの）
+        if (spec) {
+            if (spec.costGold > 0 && castle.gold < spec.costGold) {
+                alert(`金が足りません (必要: ${spec.costGold})`);
+                return;
+            }
+            if (spec.costRice > 0 && castle.rice < spec.costRice) {
+                alert(`兵糧が足りません (必要: ${spec.costRice})`);
+                return;
+            }
+        }
+
+        // コマンドタイプ別の初期UI呼び出し
+        switch (type) {
+            // 武将選択から始まるもの
+            case 'farm':
+            case 'commerce':
+            case 'repair':
+            case 'training':
+            case 'soldier_charity':
+            case 'draft':
+            case 'charity':
+            case 'appoint':
+            case 'appoint_gunshi':
+            case 'banish':
+            case 'interview':
+            case 'reward':
+                this.game.ui.openBushoSelector(type, targetId, extraData);
+                break;
+
+            // マップ選択から始まるもの（UI側でMapSelectionに入るが、完了後はここに戻ってくる）
+            case 'war':
+            case 'move':
+            case 'transport':
+            case 'investigate':
+            case 'incite':
+            case 'rumor':
+            case 'headhunt':
+            case 'diplomacy':
+                // これらはUIのMenuから直接 enterMapSelection が呼ばれるため、ここには来ない想定
+                // ただし、Map選択後のコールバックで openBushoSelector が呼ばれ、その後の決定処理で handleBushoSelection に来る
+                console.warn(`startCommand called for map-based action: ${type}. Should be handled via map selection.`);
+                break;
+            
+            // 商人
+            case 'buy_rice':
+            case 'sell_rice':
+                this.game.ui.openQuantitySelector(type, null, targetId);
+                break;
+                
+            default:
+                console.warn("Unknown command start:", type);
+                break;
+        }
+    }
+
+    /**
+     * 武将選択後の処理ハンドラ
+     * UIManager.selectorConfirmBtn.onclick から呼ばれる
+     */
+    handleBushoSelection(actionType, selectedIds, targetId, extraData) {
+        if (!selectedIds || selectedIds.length === 0) return;
+        const firstId = selectedIds[0];
+
+        // --- 複合フローの分岐 ---
+
+        // 登用: 対象選択 -> 実行武将選択
+        if (actionType === 'employ_target') {
+            this.game.ui.openBushoSelector('employ_doer', null, { targetId: firstId });
+            return;
+        }
+        // 登用: 実行武将選択 -> 実行
+        if (actionType === 'employ_doer') {
+            this.showAdviceAndExecute('employ', () => this.executeEmploy(firstId, extraData.targetId), { targetId: extraData.targetId });
+            return;
+        }
+
+        // 引抜: 対象選択 -> 実行武将選択
+        if (actionType === 'headhunt_target') {
+            this.game.ui.openBushoSelector('headhunt_doer', null, { targetId: firstId });
+            return;
+        }
+        // 引抜: 実行武将選択 -> 金額入力
+        if (actionType === 'headhunt_doer') {
+            this.game.ui.openQuantitySelector('headhunt_gold', selectedIds, extraData.targetId);
+            return;
+        }
+
+        // 流言: 対象武将選択 -> 実行武将選択
+        if (actionType === 'rumor_target_busho') {
+            this.game.ui.openBushoSelector('rumor_doer', targetId, { targetBushoId: firstId });
+            return;
+        }
+        // 流言: 実行武将選択 -> 実行
+        if (actionType === 'rumor_doer') {
+            this.showAdviceAndExecute('rumor', () => this.executeRumor(firstId, targetId, extraData.targetBushoId));
+            return;
+        }
+
+        // 外交: 実行武将選択 -> (親善なら金額、同盟なら即実行)
+        if (actionType === 'diplomacy_doer') {
+            if (extraData.subAction === 'goodwill') {
+                this.game.ui.openQuantitySelector('goodwill', selectedIds, targetId);
+            } else if (extraData.subAction === 'alliance') {
+                this.showAdviceAndExecute('diplomacy', () => this.executeDiplomacy(firstId, targetId, 'alliance'));
+            } else if (extraData.subAction === 'break_alliance') {
+                // 同盟破棄は軍師助言なしで即実行（警告はMap選択時に出したいが、現状は即実行）
+                this.executeDiplomacy(firstId, targetId, 'break_alliance');
+            }
+            return;
+        }
+
+        // 面談関連
+        if (actionType === 'interview') {
+            const interviewer = this.game.getBusho(firstId);
+            this.game.ui.showInterviewModal(interviewer);
+            return;
+        }
+        if (actionType === 'interview_target') {
+            const target = this.game.getBusho(firstId);
+            const interviewer = extraData.interviewer;
+            this.executeInterviewTopic(interviewer, target);
+            return;
+        }
+
+        // 戦争: 武将選択 -> (総大将判定) -> 兵站選択
+        if (actionType === 'war_deploy') {
+             // 総大将判定ロジック
+             const selectedBushos = selectedIds.map(id => this.game.getBusho(id));
+             const leader = selectedBushos.find(b => b.isDaimyo || b.isCastellan);
+             if (leader) {
+                 // 大名か城主がいれば自動的に総大将に設定し、配列の先頭へ
+                 const others = selectedIds.filter(id => id !== leader.id);
+                 const sortedIds = [leader.id, ...others];
+                 this.game.ui.openQuantitySelector('war_supplies', sortedIds, targetId);
+             } else {
+                 // いなければ総大将選択へ
+                 this.game.ui.openBushoSelector('war_general', targetId, { candidates: selectedIds });
+             }
+             return;
+        }
+        if (actionType === 'war_general') {
+            // 総大将が選ばれた
+            const leaderId = firstId;
+            const others = extraData.candidates.filter(id => id !== leaderId);
+            const sortedIds = [leaderId, ...others];
+            this.game.ui.openQuantitySelector('war_supplies', sortedIds, targetId);
+            return;
+        }
+
+        // 移動・輸送
+        if (actionType === 'transport_deploy') {
+            this.game.ui.openQuantitySelector('transport', selectedIds, targetId);
+            return;
+        }
+        if (actionType === 'move_deploy') {
+            this.executeCommand('move_deploy', selectedIds, targetId);
+            return;
+        }
+
+        // 調査
+        if (actionType === 'investigate_deploy') {
+            this.showAdviceAndExecute('investigate', () => this.executeInvestigate(selectedIds, targetId));
+            return;
+        }
+        
+        // 扇動
+        if (actionType === 'incite_doer') {
+             this.showAdviceAndExecute('incite', () => this.executeIncite(firstId, targetId));
+             return;
+        }
+
+        // --- 単純フロー (数量選択へ) ---
+        if (['draft', 'charity', 'reward'].includes(actionType)) {
+            this.game.ui.openQuantitySelector(actionType, selectedIds, targetId);
+            return;
+        }
+
+        // --- 単純フロー (即実行) ---
+        if (['farm', 'commerce', 'repair', 'training', 'soldier_charity', 'appoint', 'appoint_gunshi', 'banish'].includes(actionType)) {
+            // appoint_gunshi, appoint, banish は軍師助言なし、その他はあり
+            if (['appoint', 'appoint_gunshi', 'banish'].includes(actionType)) {
+                if (actionType === 'appoint_gunshi') this.executeAppointGunshi(firstId);
+                else this.executeCommand(actionType, selectedIds, targetId);
+            } else {
+                this.showAdviceAndExecute(actionType, () => this.executeCommand(actionType, selectedIds, targetId));
+            }
+            return;
+        }
+
+        console.warn("Unhandled busho selection type:", actionType);
+    }
+
+    /**
+     * 数量・項目選択後の処理ハンドラ
+     * UIManager.quantityConfirmBtn.onclick から呼ばれる
+     */
+    handleQuantitySelection(type, inputs, targetId, data) {
+        // dataは通常 selectedIds (Array)
+        const castle = this.game.getCurrentTurnCastle();
+
+        if (type === 'reward') {
+            const val = parseInt(inputs.gold.num.value);
+            if (val <= 0) return;
+            this.executeReward(data[0], val);
+        }
+        else if (type === 'draft') {
+            const val = parseInt(inputs.gold.num.value);
+            if (val <= 0) return;
+            this.showAdviceAndExecute('draft', () => this.executeDraft(data, val), { val: val });
+        }
+        else if (type === 'charity') {
+            // UI側でラジオボタンの値を取得して inputs に入れている想定、あるいはUIから直接値を渡す形への変更が必要
+            // 既存UIの構造上、ラジオボタンは quantityModal 内にあるため、UI側で値を取得してここへ渡すのが理想だが、
+            // ここでは簡易的に document から取得する（既存ロジック踏襲）
+            const charityTypeEl = document.querySelector('input[name="charityType"]:checked');
+            if (!charityTypeEl) return;
+            const charityType = charityTypeEl.value;
+            this.showAdviceAndExecute('charity', () => this.executeCharity(data, charityType));
+        }
+        else if (type === 'goodwill') {
+            const val = parseInt(inputs.gold.num.value);
+            if (val < 100) { alert("金が足りません(最低100)"); return; }
+            this.showAdviceAndExecute('goodwill', () => this.executeDiplomacy(data[0], targetId, 'goodwill', val));
+        }
+        else if (type === 'headhunt_gold') {
+            const val = parseInt(inputs.gold.num.value);
+            this.showAdviceAndExecute('headhunt', () => this.executeHeadhunt(data[0], targetId, val));
+        }
+        else if (type === 'transport') {
+            const vals = {
+                gold: parseInt(inputs.gold.num.value),
+                rice: parseInt(inputs.rice.num.value),
+                soldiers: parseInt(inputs.soldiers.num.value)
+            };
+            if (vals.gold === 0 && vals.rice === 0 && vals.soldiers === 0) return;
+            this.executeTransport(data, targetId, vals);
+        }
+        else if (type === 'buy_rice') {
+            const val = parseInt(inputs.amount.num.value);
+            if (val <= 0) return;
+            this.executeTrade('buy', val);
+        }
+        else if (type === 'sell_rice') {
+            const val = parseInt(inputs.amount.num.value);
+            if (val <= 0) return;
+            this.executeTrade('sell', val);
+        }
+        else if (type === 'war_supplies') {
+            const sVal = parseInt(inputs.soldiers.num.value);
+            const rVal = parseInt(inputs.rice.num.value);
+            if (sVal <= 0) { alert("兵士0では出陣できません"); return; }
+            
+            const targetName = this.game.getCastle(targetId).name;
+            if (!confirm(`${targetName}に攻め込みますか？\n今月の命令は終了となります。`)) return;
+
+            const bushos = data.map(id => this.game.getBusho(id));
+            this.game.warManager.startWar(castle, this.game.getCastle(targetId), bushos, sVal, rVal);
+        }
+        else if (type === 'war_repair') {
+             const val = parseInt(inputs.soldiers.num.value);
+             if (val <= 0) return;
+             this.game.warManager.execWarCmd('repair', val);
+        }
+    }
+
+    /**
+     * 軍師助言を表示して実行するラッパー
+     */
+    showAdviceAndExecute(actionType, executeCallback, extraContext = {}) {
+        const adviceAction = { type: actionType, ...extraContext };
+        this.game.ui.showGunshiAdvice(adviceAction, executeCallback);
+    }
+
+    /* ==========================================================================
+       ★ コマンド実行ロジック (Execution Logic)
+       ========================================================================== */
 
     executeCommand(type, bushoIds, targetId) {
         const castle = this.game.getCurrentTurnCastle(); let totalVal = 0, cost = 0, count = 0, actionName = "";
@@ -34,8 +364,6 @@ class CommandSystem {
                     const val = GameSystem.calcDevelopment(busho); castle.gold -= 500; 
                     castle.kokudaka = Math.min(castle.maxKokudaka, castle.kokudaka + val); 
                     totalVal += val; count++; actionName = "石高開発";
-                    
-                    // 【変更】功績: 上昇値の50%
                     busho.achievementTotal += Math.floor(val * 0.5); 
                     this.game.factionSystem.updateRecognition(busho, 10);
                 }
@@ -45,8 +373,6 @@ class CommandSystem {
                     const val = GameSystem.calcDevelopment(busho); castle.gold -= 500; 
                     castle.commerce = Math.min(castle.maxCommerce, castle.commerce + val); 
                     totalVal += val; count++; actionName = "商業開発";
-                    
-                    // 【変更】功績: 上昇値の50%
                     busho.achievementTotal += Math.floor(val * 0.5);
                     this.game.factionSystem.updateRecognition(busho, 10);
                 }
@@ -56,23 +382,17 @@ class CommandSystem {
                     const val = GameSystem.calcRepair(busho); castle.gold -= 300; 
                     castle.defense = Math.min(castle.maxDefense, castle.defense + val); 
                     totalVal += val; count++; actionName = "城壁修復";
-                    
-                    // 【変更】功績: 上昇値の50%
                     busho.achievementTotal += Math.floor(val * 0.5);
                     this.game.factionSystem.updateRecognition(busho, 10);
                 }
             }
             else if (type === 'training') { 
                 const val = GameSystem.calcTraining(busho); castle.training = Math.min(100, castle.training + val); totalVal += val; count++; actionName = "訓練";
-                
-                // 【変更】功績: 上昇値の50%
                 busho.achievementTotal += Math.floor(val * 0.5);
                 this.game.factionSystem.updateRecognition(busho, 10);
             }
             else if (type === 'soldier_charity') { 
                 const val = GameSystem.calcSoldierCharity(busho); castle.morale = Math.min(100, castle.morale + val); totalVal += val; count++; actionName = "兵施し";
-                
-                // 【変更】功績: 上昇値の50%
                 busho.achievementTotal += Math.floor(val * 0.5);
                 this.game.factionSystem.updateRecognition(busho, 10);
             }
@@ -108,14 +428,13 @@ class CommandSystem {
             target.investigatedUntil = this.game.getCurrentTurnId() + 4; target.investigatedAccuracy = result.accuracy;
             msg = `潜入に成功しました！\n情報を入手しました。\n(情報の精度: ${result.accuracy}%)`;
             bushos.forEach(b => {
-                // 【変更】調査成功功績: (知略 * 0.2) + 10
                 b.achievementTotal += Math.floor(b.intelligence * 0.2) + 10;
                 this.game.factionSystem.updateRecognition(b, 20);
             });
         } else { 
             msg = `潜入に失敗しました……\n情報は得られませんでした。`; 
             bushos.forEach(b => {
-                b.achievementTotal += 5; // 失敗時は固定
+                b.achievementTotal += 5; 
                 this.game.factionSystem.updateRecognition(b, 10);
             });
         }
@@ -142,11 +461,8 @@ class CommandSystem {
             target.status = 'active'; 
             target.loyalty = 50; 
             msg = `${target.name}の登用に成功しました！`; 
-            
-            // 【変更】登用功績: 対象武将の能力最大値の30%
             const maxStat = Math.max(target.strength, target.intelligence, target.leadership, target.charm, target.diplomacy);
             doer.achievementTotal += Math.floor(maxStat * 0.3);
-
             this.game.factionSystem.updateRecognition(doer, 20); 
         } else { 
             msg = `${target.name}は登用に応じませんでした……`; 
@@ -169,8 +485,6 @@ class CommandSystem {
             const castle = this.game.getCastle(doer.castleId); 
             if(castle) castle.gold -= gold;
             msg = `${doer.name}が親善を行いました。\n友好度が${increase}上昇しました`;
-            
-            // 【変更】外交(成功=実施)功績: (外交 * 0.2) + 10
             doer.achievementTotal += Math.floor(doer.diplomacy * 0.2) + 10;
             this.game.factionSystem.updateRecognition(doer, 15);
 
@@ -179,9 +493,6 @@ class CommandSystem {
             if (chance > 120 && Math.random() > 0.3) {
                 relation.alliance = true;
                 msg = `同盟の締結に成功しました！`;
-                
-                // 【変更】外交成功功績: (外交 * 0.2) + 10
-                // ※同盟成功は難易度が高いが、一律ロジックとする
                 doer.achievementTotal += Math.floor(doer.diplomacy * 0.2) + 10;
                 this.game.factionSystem.updateRecognition(doer, 30);
             } else {
@@ -217,10 +528,8 @@ class CommandSystem {
         const targetLord = this.game.bushos.find(b => b.clan === target.clan && b.isDaimyo) || { affinity: 50 }; 
         const newLord = this.game.bushos.find(b => b.clan === this.game.playerClanId && b.isDaimyo) || { affinity: 50 }; 
         
-        // 変更: 引抜の成功判定。城主の場合は難易度上昇。
         let isSuccess = GameSystem.calcHeadhunt(doer, target, gold, targetLord, newLord);
         if (target.isCastellan && isSuccess) {
-            // 城主補正: 二次判定（成功率を1/3程度に絞る）
             if (Math.random() > 0.33) {
                 isSuccess = false;
             }
@@ -234,11 +543,8 @@ class CommandSystem {
             }
             target.clan = this.game.playerClanId; target.castleId = castle.id; target.loyalty = 50; target.isActionDone = true; castle.samuraiIds.push(target.id);
             this.game.ui.showResultModal(`${doer.name}の引抜工作が成功！\n${target.name}が我が軍に加わりました！`);
-            
-            // 【変更】引抜成功功績: 対象武将の能力最大値の30%
             const maxStat = Math.max(target.strength, target.intelligence, target.leadership, target.charm, target.diplomacy);
             doer.achievementTotal += Math.floor(maxStat * 0.3);
-
             this.game.factionSystem.updateRecognition(doer, 25);
         } else {
             this.game.ui.showResultModal(`${doer.name}の引抜工作は失敗しました……\n${target.name}は応じませんでした。`);
@@ -255,15 +561,9 @@ class CommandSystem {
         if(castle.gold < gold) { alert("金が足りません"); return; }
         castle.gold -= gold;
         const effect = GameSystem.calcRewardEffect(gold, daimyo, target);
-        
         let msg = "";
         
-        // 褒美により承認欲求を解消（マイナス値で更新）
-        // effectは正の値として計算されるため、-effect * 2 で大きく減らす
         this.game.factionSystem.updateRecognition(target, -effect * 2);
-
-        // 【変更】忠誠度の上昇ロジックを削除
-        // target.loyalty = Math.min(100, target.loyalty + effect);
 
         if (target.loyalty >= 100) {
             msg = "「もったいなきお言葉。この身、命尽きるまで殿のために！」\n(これ以上の忠誠は望めないほど、心服しているようだ)";
@@ -415,8 +715,6 @@ class CommandSystem {
         if(result.success) { 
             target.loyalty = Math.max(0, target.loyalty - result.val); 
             this.game.ui.showResultModal(`${doer.name}の扇動が成功！\n${target.name}の民忠が${result.val}低下しました`); 
-            
-            // 【変更】計略成功功績: (知略 * 0.2) + 10
             doer.achievementTotal += Math.floor(doer.intelligence * 0.2) + 10;
             this.game.factionSystem.updateRecognition(doer, 20); 
         } else { 
@@ -431,10 +729,8 @@ class CommandSystem {
         const doer = this.game.getBusho(doerId); 
         const targetBusho = this.game.getBusho(targetBushoId); 
         
-        // 変更: 流言の成功判定。城主の場合は難易度上昇。
         let result = GameSystem.calcRumor(doer, targetBusho); 
         if (targetBusho.isCastellan && result.success) {
-            // 城主補正: 二次判定（成功率を1/3程度に絞る）
             if (Math.random() > 0.33) {
                 result.success = false;
             }
@@ -443,8 +739,6 @@ class CommandSystem {
         if(result.success) { 
             targetBusho.loyalty = Math.max(0, targetBusho.loyalty - result.val); 
             this.game.ui.showResultModal(`${doer.name}の流言が成功！\n${targetBusho.name}の忠誠が${result.val}低下しました`); 
-            
-            // 【変更】計略成功功績: (知略 * 0.2) + 10
             doer.achievementTotal += Math.floor(doer.intelligence * 0.2) + 10;
             this.game.factionSystem.updateRecognition(doer, 20); 
         } else { 
@@ -475,7 +769,6 @@ class CommandSystem {
         castle.soldiers += soldiers; 
         busho.isActionDone = true; 
         
-        // 【徴兵】既存 +5 
         busho.achievementTotal += 5;
         this.game.factionSystem.updateRecognition(busho, 10);
         this.game.ui.showResultModal(`${busho.name}が徴兵を行いました\n兵士+${soldiers}`); 
@@ -496,7 +789,6 @@ class CommandSystem {
         castle.loyalty = Math.min(1000, castle.loyalty + val); 
         busho.isActionDone = true; 
         
-        // 【変更】施し功績: 上昇値の50%
         busho.achievementTotal += Math.floor(val * 0.5);
         this.game.factionSystem.updateRecognition(busho, 15);
         this.game.ui.showResultModal(`${busho.name}が施しを行いました\n民忠+${val}`); 
