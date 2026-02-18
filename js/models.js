@@ -9,6 +9,11 @@ class Clan {
         this.leaderId = Number(this.leaderId);
         // data.color, data.name 等はCSVから自動で割り当たります
     }
+
+    // UI等で表示するための軍団名取得
+    getArmyName() {
+        return this.name ? this.name.replace("家", "軍") : "不明な軍";
+    }
 }
 
 class Castle {
@@ -64,6 +69,16 @@ class Busho {
         this.innovation = Number(this.innovation || 50);
         this.cooperation = Number(this.cooperation || 50);
 
+        // 派閥・システム関連パラメータの初期化
+        this.achievementTotal = Number(this.achievementTotal || 0); // 功績累計
+        this.recognitionNeed = Number(this.recognitionNeed || 0);   // 承認欲求
+        this.factionId = Number(this.factionId || 0);               // 派閥ID
+
+        // 履歴配列の初期化
+        // 既存データ(ロード時など)にあればそれを使用、なければ空配列で初期化
+        this.battleHistory = Array.isArray(this.battleHistory) ? this.battleHistory : [];
+        this.stayHistory = Array.isArray(this.stayHistory) ? this.stayHistory : [];
+
         this.isDaimyo = false;
         this.isCastellan = false;
         this.status = this.status || 'active';
@@ -76,5 +91,12 @@ class Busho {
         if (this.isCastellan) return "城主";
         if (this.status === 'ronin') return "浪人";
         return "武将";
+    }
+
+    // 派閥名取得メソッド
+    getFactionName() {
+        if (this.factionId === 0) return "中立";
+        // 派閥IDが存在する場合、識別用の文字列を返す
+        return "派閥" + this.factionId;
     }
 }
