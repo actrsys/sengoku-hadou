@@ -1,118 +1,341 @@
 /**
  * command_system.js
  * ゲーム内のコマンド実行ロジックおよびフロー制御を管理するクラス
+ * * リファクタリング:
+ * - COMMAND_SPECS にUI表示カテゴリ、コスト、ターゲット種別、開始モードを集約
+ * - getValidTargets を実装し、GameManagerからロジックを移管
  */
 
 /* ==========================================================================
    ★ コマンド定義 (COMMAND_SPECS)
    ========================================================================== */
 const COMMAND_SPECS = {
-    // 内政
-    'farm': { label: "石高開発", costGold: 500, costRice: 0, multi: true, next: 'execute' },
-    'commerce': { label: "商業開発", costGold: 500, costRice: 0, multi: true, next: 'execute' },
-    'repair': { label: "城壁修復", costGold: 300, costRice: 0, multi: true, next: 'execute' },
-    'training': { label: "訓練", costGold: 0, costRice: 0, multi: true, next: 'execute' },
-    'soldier_charity': { label: "兵施し", costGold: 0, costRice: 0, multi: true, next: 'execute' },
-    'charity': { label: "施し", costGold: 300, costRice: 300, multi: true, next: 'quantity_selector' }, // 特殊: タイプ選択へ
-    
-    // 軍事
-    'draft': { label: "徴兵", costGold: 0, costRice: 0, multi: true, next: 'quantity_selector' },
-    'transport': { label: "輸送", costGold: 0, costRice: 0, multi: true, next: 'quantity_selector' },
-    'war': { label: "出陣", costGold: 0, costRice: 0, multi: true, next: 'war_setup' },
+    // --- 内政 (DEVELOP) ---
+    'farm': { 
+        label: "石高開発", category: 'DEVELOP', 
+        costGold: 500, costRice: 0, 
+        isMulti: true, hasAdvice: true, 
+        startMode: 'busho_select', sortKey: 'politics',
+        msg: "金: 500 (1回あたり)" 
+    },
+    'commerce': { 
+        label: "商業開発", category: 'DEVELOP', 
+        costGold: 500, costRice: 0, 
+        isMulti: true, hasAdvice: true, 
+        startMode: 'busho_select', sortKey: 'politics',
+        msg: "金: 500 (1回あたり)" 
+    },
+    'repair': { 
+        label: "城壁修復", category: 'MILITARY', 
+        costGold: 300, costRice: 0, 
+        isMulti: true, hasAdvice: true, 
+        startMode: 'busho_select', sortKey: 'politics',
+        msg: "金: 300 (1回あたり)" 
+    },
+    'charity': { 
+        label: "施し", category: 'DEVELOP', 
+        costGold: 300, costRice: 300, // 基本コスト(タイプで変動あり)
+        isMulti: true, hasAdvice: true, 
+        startMode: 'busho_select', sortKey: 'charm',
+        msg: "金: 300 / 米: 300 (選択可)" 
+    },
 
-    // 人事
-    'appoint': { label: "城主任命", multi: false, next: 'execute' },
-    'appoint_gunshi': { label: "軍師任命", multi: false, next: 'execute' },
-    'banish': { label: "追放", multi: false, next: 'execute' },
-    'interview': { label: "面談", multi: false, next: 'modal_interview' },
-    'reward': { label: "褒美", multi: false, next: 'quantity_selector' },
-    'move': { label: "移動", multi: true, next: 'execute_move' },
-    'employ': { label: "登用", multi: false, next: 'complex_employ' }, // 登用はフローが特殊
+    // --- 軍事 (MILITARY) ---
+    'war': { 
+        label: "出陣", category: 'MILITARY', 
+        costGold: 0, costRice: 0, 
+        isMulti: true, hasAdvice: true, 
+        startMode: 'map_select', targetType: 'enemy_valid', 
+        sortKey: 'strength'
+    },
+    'draft': { 
+        label: "徴兵", category: 'MILITARY', 
+        costGold: 0, costRice: 0, 
+        isMulti: true, hasAdvice: true, 
+        startMode: 'busho_select', sortKey: 'leadership',
+        msg: "資金に応じて徴兵" 
+    },
+    'training': { 
+        label: "訓練", category: 'MILITARY', 
+        costGold: 0, costRice: 0, 
+        isMulti: true, hasAdvice: true, 
+        startMode: 'busho_select', sortKey: 'leadership',
+        msg: "兵士の訓練度を上げます" 
+    },
+    'soldier_charity': { 
+        label: "兵施し", category: 'MILITARY', 
+        costGold: 0, costRice: 0, 
+        isMulti: true, hasAdvice: true, 
+        startMode: 'busho_select', sortKey: 'leadership',
+        msg: "兵士の士気を上げます" 
+    },
+    'transport': { 
+        label: "輸送", category: 'MILITARY', 
+        costGold: 0, costRice: 0, 
+        isMulti: true, hasAdvice: true, 
+        startMode: 'map_select', targetType: 'ally_other',
+        sortKey: 'strength' 
+    },
 
-    // 調略
-    'investigate': { label: "調査", multi: true, next: 'advice_execute' },
-    'incite': { label: "扇動", multi: false, next: 'advice_execute' },
-    'rumor': { label: "流言", multi: false, next: 'complex_rumor' },
-    'headhunt': { label: "引抜", multi: false, next: 'complex_headhunt' },
+    // --- 人事 (PERSONNEL) ---
+    'appoint': { 
+        label: "城主任命", category: 'PERSONNEL', 
+        costGold: 0, costRice: 0, 
+        isMulti: false, hasAdvice: false, 
+        startMode: 'busho_select', sortKey: 'leadership',
+        msg: "城主を任命します" 
+    },
+    'appoint_gunshi': { 
+        label: "軍師任命", category: 'PERSONNEL', 
+        costGold: 0, costRice: 0, 
+        isMulti: false, hasAdvice: false, 
+        startMode: 'busho_select', sortKey: 'intelligence',
+        msg: "軍師を任命します (知略重視)" 
+    },
+    'banish': { 
+        label: "追放", category: 'PERSONNEL', 
+        costGold: 0, costRice: 0, 
+        isMulti: false, hasAdvice: false, 
+        startMode: 'busho_select', sortKey: 'loyalty',
+        msg: "武将を追放します" 
+    },
+    'interview': { 
+        label: "面談", category: 'PERSONNEL', 
+        costGold: 0, costRice: 0, 
+        isMulti: false, hasAdvice: false, 
+        startMode: 'busho_select', sortKey: 'leadership',
+        msg: "武将と面談します" 
+    },
+    'reward': { 
+        label: "褒美", category: 'PERSONNEL', 
+        costGold: 0, costRice: 0, 
+        isMulti: false, hasAdvice: true, 
+        startMode: 'busho_select', sortKey: 'loyalty',
+        msg: "金を与えて忠誠を上げます" 
+    },
+    'move': { 
+        label: "移動", category: 'PERSONNEL', 
+        costGold: 0, costRice: 0, 
+        isMulti: true, hasAdvice: true, 
+        startMode: 'map_select', targetType: 'ally_other',
+        sortKey: 'strength' 
+    },
+    'employ': { 
+        label: "登用", category: 'PERSONNEL', 
+        costGold: 0, costRice: 0, 
+        isMulti: false, hasAdvice: true, 
+        startMode: 'busho_select_special', subType: 'employ_target', // 特殊フロー
+        sortKey: 'strength',
+        msg: "在野武将を登用します" 
+    },
+
+    // --- 調略 (STRATEGY) ---
+    'investigate': { 
+        label: "調査", category: 'STRATEGY', 
+        costGold: 0, costRice: 0, 
+        isMulti: true, hasAdvice: true, 
+        startMode: 'map_select', targetType: 'enemy_all',
+        sortKey: 'intelligence' 
+    },
+    'incite': { 
+        label: "扇動", category: 'STRATEGY', 
+        costGold: 0, costRice: 0, 
+        isMulti: false, hasAdvice: true, 
+        startMode: 'map_select', targetType: 'enemy_all',
+        sortKey: 'intelligence' 
+    },
+    'rumor': { 
+        label: "流言", category: 'STRATEGY', 
+        costGold: 0, costRice: 0, 
+        isMulti: false, hasAdvice: true, 
+        startMode: 'map_select', targetType: 'enemy_all',
+        sortKey: 'intelligence' 
+    },
+    'headhunt': { 
+        label: "引抜", category: 'STRATEGY', 
+        costGold: 0, costRice: 0, // 実行時に入力
+        isMulti: false, hasAdvice: true, 
+        startMode: 'map_select', targetType: 'enemy_all',
+        sortKey: 'intelligence'
+    },
+    'buy_rice': {
+        label: "兵糧購入", category: 'STRATEGY',
+        costGold: 0, costRice: 0,
+        isMulti: false, hasAdvice: true,
+        startMode: 'quantity_select',
+        msg: "金を払い兵糧を買います"
+    },
+    'sell_rice': {
+        label: "兵糧売却", category: 'STRATEGY',
+        costGold: 0, costRice: 0,
+        isMulti: false, hasAdvice: true,
+        startMode: 'quantity_select',
+        msg: "兵糧を売り金を得ます"
+    },
     
-    // 外交・商人
-    'diplomacy': { label: "外交", multi: false, next: 'complex_diplomacy' },
-    'trade': { label: "取引", multi: false, next: 'quantity_selector' }
+    // --- 外交 (DIPLOMACY) ---
+    'diplomacy': { 
+        label: "外交", category: 'DIPLOMACY', 
+        // 実際にはUIでボタンは出ないが、startCommandで分岐するための定義
+        // NOTE: UIのボタン生成は manual処理、あるいは以下のようにサブコマンド定義も可能だが
+        // 現状はUI側で goodwill/alliance/break_alliance を直接呼ぶ想定で実装されている
+    },
+    'goodwill': {
+        label: "親善", category: 'DIPLOMACY',
+        costGold: 0, costRice: 0,
+        isMulti: false, hasAdvice: true,
+        startMode: 'map_select', targetType: 'other_clan_all'
+    },
+    'alliance': {
+        label: "同盟", category: 'DIPLOMACY',
+        costGold: 0, costRice: 0,
+        isMulti: false, hasAdvice: true,
+        startMode: 'map_select', targetType: 'other_clan_all'
+    },
+    'break_alliance': {
+        label: "同盟破棄", category: 'DIPLOMACY',
+        costGold: 0, costRice: 0,
+        isMulti: false, hasAdvice: false,
+        startMode: 'map_select', targetType: 'ally_clan'
+    },
+
+    // --- システム (SYSTEM) - UI生成用プレースホルダ ---
+    'save': { label: "ファイル保存", category: 'SYSTEM', isSystem: true, action: 'save' },
+    'load': { label: "ファイル読込", category: 'SYSTEM', isSystem: true, action: 'load' },
+    'history': { label: "履歴", category: 'SYSTEM', isSystem: true, action: 'history' }
 };
 
 class CommandSystem {
     constructor(game) {
-        this.game = game; // GameManagerのインスタンスへの参照
+        this.game = game;
     }
 
     /* ==========================================================================
-       ★ フロー制御 (Flow Control)
-       UIから呼び出されるエントリポイント
+       ★ 公開API & フロー制御 (Public API & Flow Control)
        ========================================================================== */
 
     /**
-     * コマンド開始処理
+     * コマンド定義を取得
+     */
+    getSpecs() {
+        return COMMAND_SPECS;
+    }
+
+    /**
+     * マップ選択における有効ターゲットID一覧を取得
      * @param {string} type コマンドタイプ
-     * @param {number|null} targetId 対象ID（城IDなど）
-     * @param {object|null} extraData 追加データ
+     * @returns {Array<number>} CastleIDの配列
+     */
+    getValidTargets(type) {
+        const spec = COMMAND_SPECS[type];
+        if (!spec || !spec.targetType) return [];
+
+        const c = this.game.getCurrentTurnCastle();
+        const playerClanId = Number(this.game.playerClanId);
+        
+        switch (spec.targetType) {
+            case 'enemy_valid': // 攻撃可能（直近攻略済みを除くなど）
+                return this.game.warManager.getValidWarTargets(c);
+            
+            case 'enemy_all': // 全敵拠点（中立除く）
+                return this.game.castles.filter(target => 
+                    Number(target.ownerClan) !== playerClanId && target.ownerClan !== 0
+                ).map(t => t.id);
+
+            case 'ally_other': // 自分以外の自軍拠点
+                return this.game.castles.filter(target => 
+                    Number(target.ownerClan) === playerClanId && target.id !== c.id
+                ).map(t => t.id);
+            
+            case 'other_clan_all': // 他勢力すべて（外交用）
+                return this.game.castles.filter(target => 
+                    target.ownerClan !== 0 && Number(target.ownerClan) !== playerClanId
+                ).map(t => t.id);
+
+            case 'ally_clan': // 同盟国（外交破棄用）
+                return this.game.castles.filter(target => 
+                    target.ownerClan !== 0 && 
+                    Number(target.ownerClan) !== playerClanId &&
+                    this.game.getRelation(playerClanId, target.ownerClan).alliance === true
+                ).map(t => t.id);
+
+            default:
+                return [];
+        }
+    }
+
+    /**
+     * コマンド開始エントリポイント
      */
     startCommand(type, targetId = null, extraData = null) {
         const spec = COMMAND_SPECS[type];
-        const castle = this.game.getCurrentTurnCastle();
-
-        // 基本的なリソースチェック（実行前に弾けるもの）
-        if (spec) {
-            if (spec.costGold > 0 && castle.gold < spec.costGold) {
-                alert(`金が足りません (必要: ${spec.costGold})`);
-                return;
-            }
-            if (spec.costRice > 0 && castle.rice < spec.costRice) {
-                alert(`兵糧が足りません (必要: ${spec.costRice})`);
-                return;
-            }
+        if (!spec) {
+            console.warn("Unknown command:", type);
+            return;
         }
 
-        // コマンドタイプ別の初期UI呼び出し
-        switch (type) {
-            // 武将選択から始まるもの
-            case 'farm':
-            case 'commerce':
-            case 'repair':
-            case 'training':
-            case 'soldier_charity':
-            case 'draft':
-            case 'charity':
-            case 'appoint':
-            case 'appoint_gunshi':
-            case 'banish':
-            case 'interview':
-            case 'reward':
-                this.game.ui.openBushoSelector(type, targetId, extraData);
+        // 1. システム系コマンド
+        if (spec.isSystem) {
+            this.executeSystemCommand(spec.action);
+            return;
+        }
+
+        const castle = this.game.getCurrentTurnCastle();
+
+        // 2. リソースチェック (コスト定義がある場合)
+        if (spec.costGold > 0 && castle.gold < spec.costGold) {
+            alert(`金が足りません (必要: ${spec.costGold})`);
+            return;
+        }
+        if (spec.costRice > 0 && castle.rice < spec.costRice) {
+            alert(`兵糧が足りません (必要: ${spec.costRice})`);
+            return;
+        }
+
+        // 3. 開始モードによる分岐
+        switch (spec.startMode) {
+            case 'map_select':
+                // マップ選択モードへ移行
+                // UI側でenterMapSelectionを呼び、選択後に resolveMapSelection -> openBushoSelector へ戻ってくるフロー
+                this.game.enterMapSelection(type);
                 break;
 
-            // マップ選択から始まるもの（UI側でMapSelectionに入るが、完了後はここに戻ってくる）
-            case 'war':
-            case 'move':
-            case 'transport':
-            case 'investigate':
-            case 'incite':
-            case 'rumor':
-            case 'headhunt':
-            case 'diplomacy':
-                // これらはUIのMenuから直接 enterMapSelection が呼ばれるため、ここには来ない想定
-                // ただし、Map選択後のコールバックで openBushoSelector が呼ばれ、その後の決定処理で handleBushoSelection に来る
-                console.warn(`startCommand called for map-based action: ${type}. Should be handled via map selection.`);
+            case 'busho_select':
+                // 武将選択モーダルを開く
+                this.game.ui.openBushoSelector(type, targetId, extraData);
                 break;
             
-            // 商人
-            case 'buy_rice':
-            case 'sell_rice':
+            case 'busho_select_special':
+                // 特殊な武将選択 (登用など)
+                if (spec.subType) {
+                    this.game.ui.openBushoSelector(spec.subType, targetId, extraData);
+                } else {
+                    this.game.ui.openBushoSelector(type, targetId, extraData);
+                }
+                break;
+
+            case 'quantity_select':
+                // 数値入力 (商人など)
                 this.game.ui.openQuantitySelector(type, null, targetId);
                 break;
-                
+
             default:
-                console.warn("Unknown command start:", type);
+                console.warn(`Unhandled startMode: ${spec.startMode} for command ${type}`);
                 break;
+        }
+    }
+
+    /**
+     * システムコマンドの実行
+     */
+    executeSystemCommand(action) {
+        switch(action) {
+            case 'save': window.GameApp.saveGameToFile(); break;
+            case 'load': 
+                const f = document.getElementById('load-file-input'); 
+                if(f) f.click(); 
+                break;
+            case 'history': this.game.ui.showHistoryModal(); break;
         }
     }
 
@@ -166,7 +389,6 @@ class CommandSystem {
             } else if (extraData.subAction === 'alliance') {
                 this.showAdviceAndExecute('diplomacy', () => this.executeDiplomacy(firstId, targetId, 'alliance'));
             } else if (extraData.subAction === 'break_alliance') {
-                // 同盟破棄は軍師助言なしで即実行（警告はMap選択時に出したいが、現状は即実行）
                 this.executeDiplomacy(firstId, targetId, 'break_alliance');
             }
             return;
@@ -187,22 +409,18 @@ class CommandSystem {
 
         // 戦争: 武将選択 -> (総大将判定) -> 兵站選択
         if (actionType === 'war_deploy') {
-             // 総大将判定ロジック
              const selectedBushos = selectedIds.map(id => this.game.getBusho(id));
              const leader = selectedBushos.find(b => b.isDaimyo || b.isCastellan);
              if (leader) {
-                 // 大名か城主がいれば自動的に総大将に設定し、配列の先頭へ
                  const others = selectedIds.filter(id => id !== leader.id);
                  const sortedIds = [leader.id, ...others];
                  this.game.ui.openQuantitySelector('war_supplies', sortedIds, targetId);
              } else {
-                 // いなければ総大将選択へ
                  this.game.ui.openBushoSelector('war_general', targetId, { candidates: selectedIds });
              }
              return;
         }
         if (actionType === 'war_general') {
-            // 総大将が選ばれた
             const leaderId = firstId;
             const others = extraData.candidates.filter(id => id !== leaderId);
             const sortedIds = [leaderId, ...others];
@@ -239,13 +457,19 @@ class CommandSystem {
         }
 
         // --- 単純フロー (即実行) ---
-        if (['farm', 'commerce', 'repair', 'training', 'soldier_charity', 'appoint', 'appoint_gunshi', 'banish'].includes(actionType)) {
-            // appoint_gunshi, appoint, banish は軍師助言なし、その他はあり
-            if (['appoint', 'appoint_gunshi', 'banish'].includes(actionType)) {
-                if (actionType === 'appoint_gunshi') this.executeAppointGunshi(firstId);
-                else this.executeCommand(actionType, selectedIds, targetId);
-            } else {
+        // COMMAND_SPECS の hasAdvice フラグを使用
+        const spec = COMMAND_SPECS[actionType];
+        
+        if (['appoint_gunshi'].includes(actionType)) { // 特殊な即実行
+             this.executeAppointGunshi(firstId);
+             return;
+        }
+
+        if (spec && ['farm', 'commerce', 'repair', 'training', 'soldier_charity', 'appoint', 'banish'].includes(actionType)) {
+            if (spec.hasAdvice) {
                 this.showAdviceAndExecute(actionType, () => this.executeCommand(actionType, selectedIds, targetId));
+            } else {
+                this.executeCommand(actionType, selectedIds, targetId);
             }
             return;
         }
@@ -255,7 +479,6 @@ class CommandSystem {
 
     /**
      * 数量・項目選択後の処理ハンドラ
-     * UIManager.quantityConfirmBtn.onclick から呼ばれる
      */
     handleQuantitySelection(type, inputs, targetId, data) {
         // dataは通常 selectedIds (Array)
@@ -272,9 +495,6 @@ class CommandSystem {
             this.showAdviceAndExecute('draft', () => this.executeDraft(data, val), { val: val });
         }
         else if (type === 'charity') {
-            // UI側でラジオボタンの値を取得して inputs に入れている想定、あるいはUIから直接値を渡す形への変更が必要
-            // 既存UIの構造上、ラジオボタンは quantityModal 内にあるため、UI側で値を取得してここへ渡すのが理想だが、
-            // ここでは簡易的に document から取得する（既存ロジック踏襲）
             const charityTypeEl = document.querySelector('input[name="charityType"]:checked');
             if (!charityTypeEl) return;
             const charityType = charityTypeEl.value;
@@ -330,12 +550,15 @@ class CommandSystem {
      * 軍師助言を表示して実行するラッパー
      */
     showAdviceAndExecute(actionType, executeCallback, extraContext = {}) {
+        // 軍師不在チェックなどはGameManager/GameSystem側で担保するが
+        // ここではUI呼び出しを行う
         const adviceAction = { type: actionType, ...extraContext };
         this.game.ui.showGunshiAdvice(adviceAction, executeCallback);
     }
 
     /* ==========================================================================
        ★ コマンド実行ロジック (Execution Logic)
+       ここから下は変更なし（既存のロジック維持）
        ========================================================================== */
 
     executeCommand(type, bushoIds, targetId) {
@@ -794,4 +1017,3 @@ class CommandSystem {
         this.game.ui.showResultModal(`${busho.name}が施しを行いました\n民忠+${val}`); 
         this.game.ui.updatePanelHeader(); this.game.ui.renderCommandMenu();
     }
-}
