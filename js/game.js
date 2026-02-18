@@ -813,9 +813,9 @@ class UIManager {
                 btn.textContent = label; 
                 btn.onclick = () => {
                     if (this.game.isProcessingAI) return;
-                    // 【修正】クリック処理を先に実行し、最後に選択解除を行う（描画エラー対策）
-                    onClick();
+                    // 【修正】先に選択状態を解除してからコマンドを実行する
                     this.cancelMapSelection(true);
+                    onClick();
                 }; 
                 area.appendChild(btn); 
             };
