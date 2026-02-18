@@ -1426,7 +1426,36 @@ class GameManager {
         this.processTurn();
     }
     processRoninMovements() { const ronins = this.bushos.filter(b => b.status === 'ronin'); ronins.forEach(r => { const currentC = this.getCastle(r.castleId); if(!currentC) return; const neighbors = this.castles.filter(c => GameSystem.isAdjacent(currentC, c)); neighbors.forEach(n => { const castellan = this.getBusho(n.castellanId); if (Math.random() < 0.2) { currentC.samuraiIds = currentC.samuraiIds.filter(id => id !== r.id); n.samuraiIds.push(r.id); r.castleId = n.id; } }); }); }
-    optimizeCastellans() { const clanIds = [...new Set(this.castles.filter(c=>c.ownerClan!==0).map(c=>c.ownerClan))]; clanIds.forEach(clanId => { const myBushos = this.bushos.filter(b => b.clan === clanId); if(myBushos.length===0) return; let daimyoInt = Math.max(...myBushos.map(b => b.intelligence)); if (Math.random() * 100 < daimyoInt) { const clanCastles = this.castles.filter(c => c.ownerClan === clanId); clanCastles.forEach(castle => { const castleBushos = this.getCastleBushos(castle.id).filter(b => b.status !== 'ronin'); if (castleBushos.length <= 1) return; castleBushos.sort((a, b) => (b.leadership + b.politics) - (a.leadership + a.politics)); const best = castleBushos[0]; if (best.id !== castle.castellanId) { const old = this.getBusho(castle.castellanId); if(old) old.isCastellan = false; best.isCastellan = true; castle.castellanId = best.id; } }); } }); }
+    
+    optimizeCastellans() { 
+        const clanIds = [...new Set(this.castles.filter(c=>c.ownerClan!==0).map(c=>c.ownerClan))]; 
+        clanIds.forEach(clanId => { 
+            const myBushos = this.bushos.filter(b => b.clan === clanId); 
+            if(myBushos.length===0) return; 
+            
+            let daimyoInt = Math.max(...myBushos.map(b => b.intelligence)); 
+            if (Math.random() * 100 < daimyoInt) { 
+                const clanCastles = this.castles.filter(c => c.ownerClan === clanId); 
+                clanCastles.forEach(castle => { 
+                    // 【修正】大名が現在の城主である場合は交代しない
+                    const currentCastellan = this.getBusho(castle.castellanId);
+                    if (currentCastellan && currentCastellan.isDaimyo) return;
+
+                    const castleBushos = this.getCastleBushos(castle.id).filter(b => b.status !== 'ronin'); 
+                    if (castleBushos.length <= 1) return; 
+                    
+                    castleBushos.sort((a, b) => (b.leadership + b.politics) - (a.leadership + a.politics)); 
+                    const best = castleBushos[0]; 
+                    if (best.id !== castle.castellanId) { 
+                        const old = this.getBusho(castle.castellanId); 
+                        if(old) old.isCastellan = false; 
+                        best.isCastellan = true; 
+                        castle.castellanId = best.id; 
+                    } 
+                }); 
+            } 
+        }); 
+    }
     
     processTurn() {
         // AI用タイマーがあればクリアする（二重実行防止）

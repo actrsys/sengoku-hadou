@@ -685,14 +685,22 @@ class WarManager {
             let chance = isLastStand ? 1.0 : (0.4 - (b.strength * 0.002) + (Math.random() * 0.3)); 
             if (!isLastStand && defeatedCastle.soldiers > 1000) chance -= 0.2; 
             if (!isLastStand && b.isDaimyo) chance -= window.WarParams.War.DaimyoCaptureReduction;
-            if (chance > 0.5) captives.push(b); 
-            else { 
+            
+            if (chance > 0.5) { 
+                captives.push(b); 
+                // 【修正】捕虜になる武将を元の城から削除する（増殖防止）
+                defeatedCastle.samuraiIds = defeatedCastle.samuraiIds.filter(id => id !== b.id);
+            } else { 
                 if (friendlyCastles.length > 0) {
                     const escapeCastle = friendlyCastles[Math.floor(Math.random() * friendlyCastles.length)];
                     defeatedCastle.samuraiIds = defeatedCastle.samuraiIds.filter(id => id !== b.id);
                     this.game.factionSystem.handleMove(b, defeatedCastle.id, escapeCastle.id); // 履歴
                     b.castleId = escapeCastle.id; b.isCastellan = false; escapeCastle.samuraiIds.push(b.id); escapees.push(b);
-                } else { b.clan = 0; b.castleId = 0; b.isCastellan = false; b.status = 'ronin'; }
+                } else { 
+                    // 【修正】在野になる場合も元の城から削除する
+                    defeatedCastle.samuraiIds = defeatedCastle.samuraiIds.filter(id => id !== b.id);
+                    b.clan = 0; b.castleId = 0; b.isCastellan = false; b.status = 'ronin'; 
+                }
             } 
         }); 
         if (escapees.length > 0 && (defeatedCastle.ownerClan === this.game.playerClanId || winnerClanId === this.game.playerClanId)) this.game.ui.log(`${escapees.length}名の武将が自領へ逃げ帰りました。`);
