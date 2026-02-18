@@ -641,7 +641,7 @@ class WarManager {
              const totalAbsorbed = survivors + recovered;
              s.defender.soldiers = totalAtkSurvivors + totalAbsorbed;
              if (s.isPlayerInvolved && totalAbsorbed > 0) this.game.ui.log(`(敵残存兵・負傷兵 計${totalAbsorbed}名 を吸収)`);
-        } else if (!isRetreat && !attackerWon) {
+        } else if (!attackerWon) {
              const srcC = this.game.getCastle(s.sourceCastle.id); srcC.soldiers += totalAtkSurvivors; 
              const recovered = Math.floor(s.deadSoldiers.defender * baseRecov);
              s.defender.soldiers += recovered;
