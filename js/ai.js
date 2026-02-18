@@ -71,6 +71,7 @@ class AIEngine {
             const mods = this.getDifficultyMods();
             const smartness = this.getAISmartness(castellan.intelligence);
 
+            // 外交フェーズ (確率で実行)
             if (this.game.month % 3 === 0) {
                 const diplomacyChance = (window.AIParams.AI.DiplomacyChance || 0.3) * (mods.aggression); 
                 if (Math.random() < diplomacyChance) {
@@ -79,33 +80,41 @@ class AIEngine {
                 }
             }
             
-            const neighbors = this.game.castles.filter(c => 
-                c.ownerClan !== 0 && 
-                c.ownerClan !== castle.ownerClan && 
-                GameSystem.isAdjacent(castle, c)
-            );
-            
-            const validEnemies = neighbors.filter(target => {
-                const rel = this.game.getRelation(castle.ownerClan, target.ownerClan);
-                return !rel.alliance && (target.immunityUntil || 0) < this.game.getCurrentTurnId();
-            });
+            // 軍事フェーズ
+            // Optimization: 兵力が著しく少ない場合は、敵探索や攻撃計算自体をスキップする (遅延評価)
+            // 攻撃閾値の基準
+            const baseThreshold = window.AIParams.AI.AttackThreshold || 300;
+            const threshold = 500; // 攻撃を検討する最低兵力 (絶対値)
 
-            const aggroBase = (window.AIParams.AI.Aggressiveness || 1.5) * mods.aggression;
-            const threshold = 500; 
+            if (castle.soldiers > threshold) {
+                // ここで初めて周辺諸国の検索を行う（重い処理を避ける）
+                const neighbors = this.game.castles.filter(c => 
+                    c.ownerClan !== 0 && 
+                    c.ownerClan !== castle.ownerClan && 
+                    GameSystem.isAdjacent(castle, c)
+                );
+                
+                const validEnemies = neighbors.filter(target => {
+                    const rel = this.game.getRelation(castle.ownerClan, target.ownerClan);
+                    return !rel.alliance && (target.immunityUntil || 0) < this.game.getCurrentTurnId();
+                });
 
-            if (validEnemies.length > 0 && castle.soldiers > threshold) {
-                const personalityFactor = (castellan.personality === 'aggressive') ? 1.5 : 1.0;
-                const checkChance = smartness > 0.7 ? 1.0 : (0.5 * aggroBase * personalityFactor);
+                if (validEnemies.length > 0) {
+                    const aggroBase = (window.AIParams.AI.Aggressiveness || 1.5) * mods.aggression;
+                    const personalityFactor = (castellan.personality === 'aggressive') ? 1.5 : 1.0;
+                    const checkChance = smartness > 0.7 ? 1.0 : (0.5 * aggroBase * personalityFactor);
 
-                if (Math.random() < checkChance) {
-                    const target = this.decideAttackTarget(castle, castellan, validEnemies, mods, smartness);
-                    if (target) {
-                        this.executeAttack(castle, target, castellan);
-                        return; 
+                    if (Math.random() < checkChance) {
+                        const target = this.decideAttackTarget(castle, castellan, validEnemies, mods, smartness, baseThreshold);
+                        if (target) {
+                            this.executeAttack(castle, target, castellan);
+                            return; 
+                        }
                     }
                 }
             }
             
+            // 内政フェーズ (軍事行動をしなかった場合)
             this.execInternalAffairs(castle, castellan, mods, smartness);
             this.game.finishTurn();
 
@@ -115,11 +124,12 @@ class AIEngine {
         }
     }
 
-    decideAttackTarget(myCastle, myGeneral, enemies, mods, smartness) {
+    decideAttackTarget(myCastle, myGeneral, enemies, mods, smartness, baseThreshold) {
         let bestTarget = null;
         let bestScore = -Infinity;
         
         const myBushos = this.game.getCastleBushos(myCastle.id).filter(b => b.status !== 'ronin');
+        // 兵力が十分にある場合のみ、上位3名のステータス計算を行う
         const availableBushos = myBushos.sort((a,b) => b.leadership - a.leadership).slice(0, 3);
         
         // WarSystemが存在しない場合の安全策
@@ -131,7 +141,6 @@ class AIEngine {
         // パラメータの取得（デフォルト値付き）
         const riskAversion = window.AIParams.AI.RiskAversion || 2.0;
         const winBonus = window.AIParams.AI.WinBonus || 1000;
-        const baseThreshold = window.AIParams.AI.AttackThreshold || 300;
 
         enemies.forEach(target => {
             const errorMargin = (1.0 - smartness) * (mods.accuracy === 1.0 ? 0.1 : 0.5); 
