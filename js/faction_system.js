@@ -1,6 +1,7 @@
 /**
  * faction_system.js
  * 派閥・承認欲求・下野システム
+ * 修正: 相性計算を円環仕様(0-99ループ)に対応
  */
 
 class FactionSystem {
@@ -16,17 +17,26 @@ class FactionSystem {
     updateRecognition(busho, baseAmount) {
         if (!busho || busho.status === 'ronin' || busho.status === 'dead') return;
         
-        // 大名との相性による補正 (相性が良いほど、不満は溜まりにくく、恩義は感じやすい)
+        // 大名との相性による補正
         const daimyo = this.game.bushos.find(b => b.clan === busho.clan && b.isDaimyo);
         let factor = 1.0;
         
         if (daimyo) {
-            const diff = Math.abs(busho.affinity - daimyo.affinity); 
+            // 【修正】単純な引き算ではなく、円環計算(0-50)を使用する
+            const diff = GameSystem.calcAffinityDiff(busho.affinity, daimyo.affinity);
+            
             if (baseAmount > 0) {
-                factor = 0.5 + (diff / 50.0); // 0.5倍 ～ 2.5倍
+                // 不満が溜まる場合（プラス変動）
+                // 相性が悪い(差50)ほど、係数は大きくなる (最大2.5倍)
+                // 式: 0.5 + (50 / 25) = 2.5
+                factor = 0.5 + (diff / 25.0); 
             } 
             else {
-                factor = 0.5 + ((100 - diff) / 50.0); // 0.5倍 ～ 2.5倍
+                // 恩義を感じる場合（マイナス変動）
+                // 相性が良い(差0)ほど、係数は大きくなる (最大2.5倍)
+                // 差が50の場合: 0.5 + 0 = 0.5倍
+                // 差が0の場合: 0.5 + 2.0 = 2.5倍
+                factor = 0.5 + ((50 - diff) / 25.0);
             }
         }
 
@@ -44,12 +54,13 @@ class FactionSystem {
 
             // 1. 承認欲求による忠誠度変化
             if (!b.isDaimyo) {
+                // -20ごとに忠誠+1、+20ごとに忠誠-1
                 const loyaltyChange = Math.floor(b.recognitionNeed / -20);
                 if (loyaltyChange !== 0) {
                     b.loyalty = Math.max(0, Math.min(100, b.loyalty + loyaltyChange));
                 }
 
-                // 2. 承認欲求の自然減衰
+                // 2. 承認欲求の自然減衰 (0に近づく)
                 if (b.recognitionNeed > 0) {
                     b.recognitionNeed = Math.max(0, b.recognitionNeed - 10);
                 } else if (b.recognitionNeed < 0) {
@@ -152,8 +163,8 @@ class FactionSystem {
                 let minScore = 999;
 
                 factionLeaders.forEach(leader => {
-                    // 1. 相性差
-                    const affDiff = Math.abs(b.affinity - leader.affinity);
+                    // 1. 相性差 (修正: 円環計算を使用)
+                    const affDiff = GameSystem.calcAffinityDiff(b.affinity, leader.affinity);
                     
                     // 2. 思想差
                     const innoDiff = Math.abs(b.innovation - leader.innovation);
@@ -187,10 +198,11 @@ class FactionSystem {
 
                     // (C) 相性補正: 連帯感ボーナスに対し max(0, 1.0 - (affDiff / 50)) を掛ける
                     // 相性が悪い(50以上離れている)と、いくら一緒にいても連帯感は生まれない
+                    // 修正: affDiffは最大50なので、分母も50のままで正常に動作する (差が50なら0倍)
                     const correction = Math.max(0, 1.0 - (affDiff / 50.0));
                     const finalBonus = solidarityBonus * correction;
 
-                    // 判定スコア式
+                    // 判定スコア式 (値が小さいほどリーダーに近い)
                     // Score = (affDiff + (innoDiff * 0.5) + 20) - (補正済み連帯ボーナス)
                     const score = (affDiff + (innoDiff * 0.5) + 20) - finalBonus;
 
@@ -238,7 +250,7 @@ class FactionSystem {
             busho.battleHistory.push(key);
             if (busho.battleHistory.length > 20) busho.battleHistory.shift();
             
-            // 【変更】合戦功績: (実行武将の統率の 30%) + (勝利側ボーナス 20)
+            // 合戦功績: (実行武将の統率の 30%) + (勝利側ボーナス 20)
             const achievementGain = Math.floor(busho.leadership * 0.3) + 20;
             busho.achievementTotal += achievementGain;
         }
