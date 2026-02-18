@@ -1479,14 +1479,24 @@ class GameManager {
         const playerId = Number(this.playerClanId);
         const isPlayerCastle = (ownerId === playerId);
 
-        // マップを最新状態に更新
-        this.ui.renderMap();
+        // --- 処理速度の最適化 ---
+        // プレイヤーの隣接国、または調査済み（可視）の場合は通常速度で進行
+        // それ以外（遠方や無関係なAI同士）は高速進行（5ms〜）
+        const isVisible = this.isCastleVisible(castle);
+        const isNeighbor = this.castles.some(c => Number(c.ownerClan) === playerId && GameSystem.isAdjacent(c, castle));
+        const isImportant = isVisible || isNeighbor;
+
+        // 描画コストの削減: プレイヤーの手番、または重要なAI手番、または一定間隔でのみマップを更新
+        // それ以外（完全なバックグラウンド処理）ではDOM操作をスキップする
+        if (isPlayerCastle || isImportant || this.currentIndex % 5 === 0) {
+            this.ui.renderMap();
+        }
 
         if (isPlayerCastle) { 
             // プレイヤーのターンの場合、強制的にAI処理フラグをFalseにし、タイマーもセットしない
             this.isProcessingAI = false; 
 
-            // UIを強制的に再描画して操作可能にする
+            // UIを強制的に再描画して操作可能にする (ここは必ず実行)
             this.ui.renderMap(); 
             this.ui.log(`【${castle.name}】命令を下してください`); 
             
@@ -1498,12 +1508,13 @@ class GameManager {
         } else { 
             // AIのターンの場合
             this.isProcessingAI = true; 
-            // AI用ガード表示等のために再描画
-            this.ui.renderMap(); 
             
             if(this.ui.panelEl) this.ui.panelEl.classList.add('hidden'); 
             
             // AI思考タイマーをセット
+            // プレイヤーに関係する場合は400ms(少し早めた)、無関係なら10ms(超高速)
+            const delay = isImportant ? 400 : 10;
+
             this.aiTimer = setTimeout(() => {
                 // タイマー発火時に戦争が始まっていたらキャンセル
                 if (this.warManager.state.active) return;
@@ -1517,7 +1528,7 @@ class GameManager {
                     console.error("AI Error caught:", e);
                     this.finishTurn(); 
                 }
-            }, 600); 
+            }, delay); 
         }
     }
     
