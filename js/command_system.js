@@ -39,20 +39,6 @@ const COMMAND_SPECS = {
         startMode: 'busho_select', sortKey: 'charm',
         msg: "金: 300 / 米: 300 (選択可)" 
     },
-    'buy_rice': {
-        label: "兵糧購入", category: 'DEVELOP',
-        costGold: 0, costRice: 0,
-        isMulti: false, hasAdvice: true,
-        startMode: 'quantity_select',
-        msg: "金を払い兵糧を買います"
-    },
-    'sell_rice': {
-        label: "兵糧売却", category: 'DEVELOP',
-        costGold: 0, costRice: 0,
-        isMulti: false, hasAdvice: true,
-        startMode: 'quantity_select',
-        msg: "兵糧を売り金を得ます"
-    },
 
     // --- 軍事 (MILITARY) ---
     'war': { 
@@ -171,6 +157,20 @@ const COMMAND_SPECS = {
         isMulti: false, hasAdvice: true, 
         startMode: 'map_select', targetType: 'enemy_all',
         sortKey: 'intelligence'
+    },
+    'buy_rice': {
+        label: "兵糧購入", category: 'STRATEGY',
+        costGold: 0, costRice: 0,
+        isMulti: false, hasAdvice: true,
+        startMode: 'quantity_select',
+        msg: "金を払い兵糧を買います"
+    },
+    'sell_rice': {
+        label: "兵糧売却", category: 'STRATEGY',
+        costGold: 0, costRice: 0,
+        isMulti: false, hasAdvice: true,
+        startMode: 'quantity_select',
+        msg: "兵糧を売り金を得ます"
     },
     
     // --- 外交 (DIPLOMACY) ---
