@@ -1850,6 +1850,10 @@ class GameManager {
 
 // 起動
 window.addEventListener('DOMContentLoaded', () => {
-    window.GameApp = new GameManager();
+    // 【追加】右クリック・長押しメニューを禁止
+    document.addEventListener('contextmenu', (e) => {
+        e.preventDefault();
+    }, { passive: false });
 
+    window.GameApp = new GameManager();
 });

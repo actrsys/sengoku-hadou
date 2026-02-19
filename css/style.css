@@ -17,6 +17,22 @@ body {
     overflow: hidden;
     display: flex;
     flex-direction: column;
+
+    /* テキスト選択・コピーの無効化 */
+    -webkit-user-select: none;
+    -moz-user-select: none;
+    -ms-user-select: none;
+    user-select: none;
+
+    /* iOS等での長押しメニュー（リンク・画像保存）の無効化 */
+    -webkit-touch-callout: none;
+}
+
+/* 画像の保護設定 */
+img {
+    pointer-events: none;     /* 画像へのクリックイベント透過（右クリックメニュー抑止含む） */
+    -webkit-user-drag: none;  /* 画像ドラッグ禁止（WebKit） */
+    user-drag: none;          /* 画像ドラッグ禁止（標準） */
 }
 
 /* Common Helpers */
