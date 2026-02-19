@@ -3,7 +3,7 @@
  * 戦争処理マネージャー & 戦争計算ロジック
  * 責務: 合戦の進行、戦闘計算、戦後処理、捕虜対応、UIコマンド定義、攻撃可能判定
  * 設定: Military, War
- * 修正: 落城、撤退、捕虜の処遇の各タイミングに updateCastleLord を組み込み、城主を自動更新
+ * 修正: 捕虜になった武将の城主フラグ残留を防止
  */
 
 // 戦争・軍事関連の設定定義
@@ -811,6 +811,7 @@ class WarManager {
             if (!isLastStand && b.isDaimyo) chance -= window.WarParams.War.DaimyoCaptureReduction;
             
             if (chance > 0.5) { 
+                b.isCastellan = false; // ★【追加】捕虜になる時に城主権限を剥奪
                 captives.push(b); defeatedCastle.samuraiIds = defeatedCastle.samuraiIds.filter(id => id !== b.id);
             } else { 
                 if (friendlyCastles.length > 0) {
@@ -841,6 +842,7 @@ class WarManager {
             if (prisoner.isDaimyo) alert(`${prisoner.name}「敵の軍門には下らぬ！」`); 
             else if (score > Math.random()) { 
                 prisoner.clan = this.game.playerClanId; prisoner.loyalty = 50; 
+                prisoner.isCastellan = false; // ★【念のため追加】加入時に一旦フラグを折る
                 const targetC = this.game.getCastle(prisoner.castleId); 
                 if(targetC) {
                     targetC.samuraiIds.push(prisoner.id); 
@@ -885,6 +887,7 @@ class WarManager {
             if (p.isDaimyo) { this.handleDaimyoDeath(p); p.status = 'dead'; p.clan = 0; p.castleId = 0; return; } 
             if ((leaderInt / 100) > Math.random()) { 
                 p.clan = winnerClanId; p.loyalty = 50; 
+                p.isCastellan = false; // ★追加
                 const targetC = this.game.getCastle(p.castleId);
                 if (targetC && !targetC.samuraiIds.includes(p.id)) {
                     targetC.samuraiIds.push(p.id);

@@ -615,6 +615,8 @@ class CommandSystem {
             }
             else if (type === 'banish') { 
                 if(!confirm(`本当に ${busho.name} を追放しますか？`)) return; 
+                // ★【修正】追放時に武将を城の所属リストから明確に除外する
+                castle.samuraiIds = castle.samuraiIds.filter(id => id !== busho.id);
                 busho.status = 'ronin'; busho.clan = 0; busho.isCastellan = false; 
                 this.game.updateCastleLord(castle); 
                 this.game.ui.showResultModal(`${busho.name}を追放しました`); 
@@ -627,6 +629,7 @@ class CommandSystem {
                 castle.samuraiIds = castle.samuraiIds.filter(id => id !== busho.id); 
                 targetC.samuraiIds.push(busho.id); 
                 busho.castleId = targetId; 
+                busho.isCastellan = false; // ★【修正】移動時は城主を解任し、重複を防ぐ
                 
                 this.game.updateCastleLord(castle);
                 this.game.updateCastleLord(targetC);
@@ -940,6 +943,11 @@ class CommandSystem {
         bushoIds.forEach(id => {
             const b = this.game.getBusho(id);
             this.game.factionSystem.handleMove(b, c.id, targetId); 
+            // ★【修正】輸送時に武将自身も移動させ、城主フラグをリセットする
+            c.samuraiIds = c.samuraiIds.filter(sid => sid !== b.id);
+            t.samuraiIds.push(b.id);
+            b.castleId = targetId;
+            b.isCastellan = false;
             b.isActionDone = true;
         });
         
