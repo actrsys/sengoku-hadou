@@ -64,7 +64,8 @@ const COMMAND_SPECS = {
     'draft': { 
         label: "徴兵", category: 'MILITARY', 
         costGold: 0, costRice: 0, 
-        isMulti: true, hasAdvice: true, 
+        isMulti: false,  // ★ここを true から false に変更
+        hasAdvice: true, 
         startMode: 'busho_select', sortKey: 'leadership',
         msg: "資金に応じて徴兵" 
     },
@@ -96,7 +97,7 @@ const COMMAND_SPECS = {
         costGold: 0, costRice: 0, 
         isMulti: false, hasAdvice: false, 
         startMode: 'busho_select', sortKey: 'intelligence',
-        msg: "軍師を任命します (知略重視)" 
+        msg: "軍師を任命します" 
     },
     'appoint': { 
         label: "城主任命", category: 'PERSONNEL', 
@@ -1011,4 +1012,5 @@ class CommandSystem {
         this.game.ui.showResultModal(`${busho.name}が施しを行いました\n民忠+${val}`); 
         this.game.ui.updatePanelHeader(); this.game.ui.renderCommandMenu();
     }
+
 }
