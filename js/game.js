@@ -659,6 +659,12 @@ class UIManager {
             const castellan = this.game.getBusho(castle.castellanId);
             const isVisible = this.game.isCastleVisible(castle);
             const mask = (val) => isVisible ? val : "???";
+            
+            // 顔画像のHTML構築
+            let faceHtml = "";
+            if (isVisible && castellan && castellan.faceIcon) {
+                faceHtml = `<img src="data/faceicons/${castellan.faceIcon}" class="face-thumb" onerror="this.style.display='none'">`;
+            }
 
             let html = `
                 <div class="overlay-header">
@@ -668,9 +674,16 @@ class UIManager {
                 <div class="overlay-content ${this.infoPanelCollapsed ? 'collapsed' : ''}">
                     <div class="info-row"><span class="info-label">${rateStr}</span></div>
                     <hr style="margin:5px 0; border:0; border-top:1px dashed #ccc;">
-                    <div class="info-row"><span class="info-label">拠点</span><span class="info-val">${castle.name} <small>(${clanData ? clanData.name : "中立"})</small></span></div>
-                    <div class="info-row"><span class="info-label">城主</span><span class="info-val">${isVisible ? (castellan ? castellan.name : "-") : "???"}</span></div>
-                    <div class="info-row"><span class="info-label">兵数</span><span class="info-val highlight-text">${mask(castle.soldiers)}</span></div>
+                    
+                    <div style="display:flex; align-items:flex-start;">
+                        ${faceHtml}
+                        <div style="flex:1;">
+                            <div class="info-row"><span class="info-label">拠点</span><span class="info-val">${castle.name} <small>(${clanData ? clanData.name : "中立"})</small></span></div>
+                            <div class="info-row"><span class="info-label">城主</span><span class="info-val">${isVisible ? (castellan ? castellan.name : "-") : "???"}</span></div>
+                            <div class="info-row"><span class="info-label">兵数</span><span class="info-val highlight-text">${mask(castle.soldiers)}</span></div>
+                        </div>
+                    </div>
+                    
                     <div class="info-row"><span class="info-label">金</span><span class="info-val">${mask(castle.gold)}</span> <span class="info-label">兵糧</span><span class="info-val">${mask(castle.rice)}</span></div>
                     <div class="info-row"><span class="info-label">防御</span><span class="info-val">${mask(castle.defense)}</span> <span class="info-label">人口</span><span class="info-val">${mask(castle.population)}</span></div>
                     <div class="info-row"><span class="info-label">訓練</span><span class="info-val">${mask(castle.training)}</span> <span class="info-label">士気</span><span class="info-val">${mask(castle.morale)}</span></div>
@@ -683,11 +696,20 @@ class UIManager {
         if (this.mobileTopLeft) {
             const isVisible = this.game.isCastleVisible(castle);
             const mask = (val) => isVisible ? val : "??";
+            const castellan = this.game.getBusho(castle.castellanId);
             
+            // モバイル用顔画像
+            let faceHtml = "";
+            if (isVisible && castellan && castellan.faceIcon) {
+                faceHtml = `<img src="data/faceicons/${castellan.faceIcon}" style="width:40px;height:40px;object-fit:cover;border-radius:2px;margin-right:5px;border:1px solid #777;background:#ccc;" onerror="this.style.display='none'">`;
+            }
+
             const toggleIcon = this.topInfoExpanded ? "▲" : "▼";
             const toggleBtn = `<button style="margin-left:5px; padding:2px 8px; border:1px solid #999; border-radius:4px; background:#fff; cursor:pointer;" onclick="window.GameApp.ui.toggleTopInfo()">${toggleIcon}</button>`;
             
             let content = `<div style="display:flex; justify-content:space-between; align-items:flex-start; width:100%;">`;
+            content += `<div style="display:flex; flex:1;">`;
+            if(faceHtml) content += faceHtml;
             content += `<div style="flex:1;"><div style="font-weight:bold;">${castle.name}</div>`;
             
             if (this.topInfoExpanded) {
@@ -700,7 +722,7 @@ class UIManager {
                 content += `<div>金:${mask(castle.gold)} 米:${mask(castle.rice)}</div>`;
                 content += `<div>兵:${mask(castle.soldiers)}</div>`;
             }
-            content += `</div>${toggleBtn}</div>`;
+            content += `</div></div>${toggleBtn}</div>`;
 
             this.mobileTopLeft.innerHTML = content;
         }
@@ -1239,17 +1261,32 @@ class UIManager {
             if(el) el.textContent = val; 
         };
         
+        // 顔画像の更新
+        const updateFace = (id, busho) => {
+            const el = document.getElementById(id);
+            if (!el) return;
+            if (busho && busho.faceIcon) {
+                el.src = `data/faceicons/${busho.faceIcon}`;
+                el.classList.remove('hidden');
+                el.onerror = () => { el.classList.add('hidden'); }; // 画像読み込み失敗時は隠す
+            } else {
+                el.classList.add('hidden');
+            }
+        };
+
         setTxt('war-atk-name', s.attacker.name);
         setTxt('war-atk-busho', s.atkBushos[0].name);
         setTxt('war-atk-soldier', s.attacker.soldiers);
         setTxt('war-atk-morale', `${s.attacker.morale} (訓練:${s.attacker.training})`);
         setTxt('war-atk-rice', s.attacker.rice); 
+        updateFace('war-atk-face', s.atkBushos[0]);
         
         setTxt('war-def-name', s.defender.name);
         setTxt('war-def-busho', s.defBusho.name);
         setTxt('war-def-soldier', s.defender.soldiers);
         setTxt('war-def-wall', `${s.defender.defense} (士:${s.defender.morale}/訓:${s.defender.training})`);
         setTxt('war-def-rice', s.defender.rice); 
+        updateFace('war-def-face', s.defBusho);
 
         setTxt('war-round', s.round);
         
