@@ -141,11 +141,24 @@ class FieldWarManager {
         const def = this.units.find(u => !u.isAttacker);
 
         const atkEl = document.getElementById('fw-atk-status');
-        if (atkEl) atkEl.innerHTML = `<strong>[攻] ${atk.name}</strong><br>兵: ${atk.soldiers} / 糧: ${atk.rice}`;
-        
         const defEl = document.getElementById('fw-def-status');
+
+        if (atkEl) atkEl.innerHTML = `<strong>[攻] ${atk.name}</strong><br>兵: ${atk.soldiers} / 糧: ${atk.rice}`;
         if (defEl) defEl.innerHTML = `<strong>[守] ${def.name}</strong><br>兵: ${def.soldiers} / 糧: ${def.rice}`;
         
+        // プレイヤー側が必ず左に配置されるように順序を制御
+        if (atk.isPlayer) {
+            if (atkEl) atkEl.style.order = 1;
+            if (defEl) defEl.style.order = 2;
+        } else if (def.isPlayer) {
+            if (atkEl) atkEl.style.order = 2;
+            if (defEl) defEl.style.order = 1;
+        } else {
+            // プレイヤーが関与しない場合は攻撃を左に
+            if (atkEl) atkEl.style.order = 1;
+            if (defEl) defEl.style.order = 2;
+        }
+
         const turnEl = document.getElementById('fw-turn-info');
         if (turnEl) turnEl.innerText = `Turn: ${this.turnCount}/${this.maxTurns}`;
     }
@@ -208,6 +221,7 @@ class FieldWarManager {
             pEl.style.left = `${this.previewTarget.x * (this.hexW * 0.75) + (this.hexW - 24) / 2}px`;
             pEl.style.top = `${this.previewTarget.y * (this.hexH / 2) + (this.hexH - 24) / 2}px`;
             pEl.style.transform = `rotate(${unit.direction * 60}deg)`;
+            pEl.innerText = '凸';
             this.mapEl.appendChild(pEl);
         }
 
@@ -218,8 +232,7 @@ class FieldWarManager {
             uEl.style.left = `${u.x * (this.hexW * 0.75) + (this.hexW - 24) / 2}px`;
             uEl.style.top = `${u.y * (this.hexH / 2) + (this.hexH - 24) / 2}px`;
             uEl.style.transform = `rotate(${u.direction * 60}deg)`;
-            uEl.innerText = u.isAttacker ? '攻' : '守';
-            // 向きが逆さまになると文字も逆さまになるため、中身のspanで戻すなどの工夫も可だが一旦そのまま
+            uEl.innerText = '凸';
             this.mapEl.appendChild(uEl);
         });
 
