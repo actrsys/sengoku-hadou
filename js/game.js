@@ -2,7 +2,7 @@
  * game.js
  * 戦国シミュレーションゲーム (Main / UI / Data / System)
  * 設定: System, Economy, Strategy
- * 更新: 大名選択フローをマップ選択式に変更
+ * 更新: 大名選択フローをマップ選択式に変更 / 大名顔表示追加 / カットイン時のガード強化
  */
 
 // グローバルエラーハンドリング
@@ -370,7 +370,6 @@ class UIManager {
         this.selectorList = document.getElementById('selector-list'); 
         this.selectorContextInfo = document.getElementById('selector-context-info');
         this.selectorConfirmBtn = document.getElementById('selector-confirm-btn');
-        // this.startScreen = document.getElementById('start-screen'); // 廃止
         this.cutinOverlay = document.getElementById('cutin-overlay');
         this.cutinMessage = document.getElementById('cutin-message'); 
         this.quantityModal = document.getElementById('quantity-modal');
@@ -514,16 +513,20 @@ class UIManager {
         if(ts) ts.classList.remove('hidden'); 
     }
     
-    /* * showStartScreen は廃止し、マップ選択に移行するため削除・コメントアウト
-     * 代わりに showDaimyoConfirmModal を実装
-     */
-    
-    showDaimyoConfirmModal(clanName, soldiers, onStart) {
+    // ★追加: 引数にleader（大名武将データ）を追加
+    showDaimyoConfirmModal(clanName, soldiers, leader, onStart) {
         if (!this.daimyoConfirmModal) return;
         this.daimyoConfirmModal.classList.remove('hidden');
+        
+        let faceHtml = "";
+        if (leader && leader.faceIcon) {
+            faceHtml = `<img src="data/faceicons/${leader.faceIcon}" class="daimyo-confirm-face" onerror="this.style.display='none'">`;
+        }
+
         if (this.daimyoConfirmBody) {
             this.daimyoConfirmBody.innerHTML = `
                 <h3 style="margin-top:0;">${clanName}</h3>
+                ${faceHtml}
                 <p>この大名家でゲームを開始しますか？</p>
                 <p><strong>総兵士数: ${soldiers}</strong></p>
             `;
@@ -1502,7 +1505,7 @@ class GameManager {
         }
     }
     
-    // 城クリック時の大名選択処理
+    // ★修正: 城クリック時の大名選択処理 (顔画像対応 & クリック判定の即時解除)
     handleDaimyoSelect(castle) {
         if (castle.ownerClan === 0) {
             alert("その城は空き城（中立）のため選択できません。");
@@ -1514,10 +1517,12 @@ class GameManager {
 
         // 総兵力計算
         const totalSoldiers = this.getClanTotalSoldiers(clan.id);
+        const leader = this.getBusho(clan.leaderId); // 大名武将を取得
         
-        this.ui.showDaimyoConfirmModal(clan.name, totalSoldiers, () => {
+        this.ui.showDaimyoConfirmModal(clan.name, totalSoldiers, leader, () => {
              this.playerClanId = Number(clan.id);
              this.phase = 'game';
+             this.ui.renderMap(); // 大名選択のクリックイベントを消去するため即時再描画
              this.init();
         });
     }
