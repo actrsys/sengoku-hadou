@@ -174,12 +174,6 @@ const COMMAND_SPECS = {
 
     
     // --- 外交 (DIPLOMACY) ---
-    'diplomacy': { 
-        label: "外交", category: 'DIPLOMACY', 
-        // 実際にはUIでボタンは出ないが、startCommandで分岐するための定義
-        // NOTE: UIのボタン生成は manual処理、あるいは以下のようにサブコマンド定義も可能だが
-        // 現状はUI側で goodwill/alliance/break_alliance を直接呼ぶ想定で実装されている
-    },
     'goodwill': {
         label: "親善", category: 'DIPLOMACY',
         costGold: 0, costRice: 0,
