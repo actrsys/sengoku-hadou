@@ -2,7 +2,7 @@
  * game.js
  * 戦国シミュレーションゲーム (Main / UI / Data / System)
  * 設定: System, Economy, Strategy
- * 更新: 大名選択フローをマップ選択式に変更 / 大名顔表示追加 / カットイン時のガード強化
+ * 更新: 地図ドラッグ移動、コンテキストメニューの追加
  */
 
 // グローバルエラーハンドリング
@@ -394,6 +394,7 @@ class UIManager {
         this.mapResetZoomBtn = document.getElementById('map-reset-zoom');
         this.historyModal = document.getElementById('history-modal');
         this.historyList = document.getElementById('history-list');
+        
         // 戦争UI関連要素
         this.warModal = document.getElementById('war-modal');
         this.warLog = document.getElementById('war-log');
@@ -409,6 +410,157 @@ class UIManager {
         if (this.mapResetZoomBtn) {
             this.mapResetZoomBtn.onclick = (e) => { e.stopPropagation(); this.resetMapZoom(); };
         }
+
+        // 初期化追加分
+        this.initMapDrag();
+        this.initContextMenu();
+    }
+
+    // ★追加: 地図ドラッグ移動機能
+    initMapDrag() {
+        this.isDraggingMap = false;
+        this.dragStartX = 0;
+        this.dragStartY = 0;
+        this.scrollLeft = 0;
+        this.scrollTop = 0;
+        this.isMouseDown = false;
+        
+        const sc = document.getElementById('map-scroll-container');
+        if (!sc) return;
+
+        sc.addEventListener('mousedown', (e) => {
+            if (e.button !== 0) return; // 左クリックのみ
+            this.isMouseDown = true;
+            this.isDraggingMap = false;
+            this.dragStartX = e.pageX - sc.offsetLeft;
+            this.dragStartY = e.pageY - sc.offsetTop;
+            this.scrollLeft = sc.scrollLeft;
+            this.scrollTop = sc.scrollTop;
+            sc.classList.add('grabbing');
+        });
+
+        sc.addEventListener('mouseleave', () => {
+            this.isMouseDown = false;
+            sc.classList.remove('grabbing');
+        });
+
+        sc.addEventListener('mouseup', () => {
+            this.isMouseDown = false;
+            sc.classList.remove('grabbing');
+            // クリックイベントが直後に発火するため、少し待ってからドラッグ状態を解除
+            setTimeout(() => {
+                this.isDraggingMap = false;
+            }, 50);
+        });
+
+        sc.addEventListener('mousemove', (e) => {
+            if (!this.isMouseDown) return;
+            e.preventDefault(); // テキスト選択等を防止
+            const x = e.pageX - sc.offsetLeft;
+            const y = e.pageY - sc.offsetTop;
+            const walkX = (x - this.dragStartX);
+            const walkY = (y - this.dragStartY);
+            
+            // 遊び（閾値）を設けてドラッグ判定
+            if (Math.abs(walkX) > 5 || Math.abs(walkY) > 5) {
+                this.isDraggingMap = true;
+            }
+            sc.scrollLeft = this.scrollLeft - walkX;
+            sc.scrollTop = this.scrollTop - walkY;
+        });
+    }
+
+    // ★追加: コンテキストメニュー機能
+    initContextMenu() {
+        this.contextMenu = document.getElementById('custom-context-menu');
+        this.ctxMenuBack = document.getElementById('ctx-menu-back');
+        this.ctxMenuFinish = document.getElementById('ctx-menu-finish');
+        this.longPressTimer = null;
+
+        // 右クリック
+        document.addEventListener('contextmenu', (e) => {
+            e.preventDefault();
+            // 戦闘中など特定の場面では出さない
+            if(this.game.warManager && this.game.warManager.state.active) return;
+            this.showContextMenu(e.pageX, e.pageY);
+        });
+
+        // スマホ長押し
+        document.addEventListener('touchstart', (e) => {
+            if (e.touches.length > 1) return; // マルチタッチ除外
+            const touch = e.touches[0];
+            const x = touch.pageX;
+            const y = touch.pageY;
+            
+            this.longPressTimer = setTimeout(() => {
+                if(this.game.warManager && this.game.warManager.state.active) return;
+                this.showContextMenu(x, y);
+            }, 500);
+        }, { passive: true });
+
+        document.addEventListener('touchmove', () => {
+            if (this.longPressTimer) {
+                clearTimeout(this.longPressTimer);
+                this.longPressTimer = null;
+            }
+        }, { passive: true });
+
+        document.addEventListener('touchend', () => {
+            if (this.longPressTimer) {
+                clearTimeout(this.longPressTimer);
+                this.longPressTimer = null;
+            }
+        });
+
+        // 外側クリックで閉じる
+        document.addEventListener('click', (e) => {
+            if (!this.contextMenu) return;
+            if (!this.contextMenu.classList.contains('hidden')) {
+                this.hideContextMenu();
+            }
+        });
+    }
+
+    showContextMenu(x, y) {
+        if (!this.contextMenu) return;
+        // マップ画面以外では出さない
+        if (this.game.phase !== 'game' && this.game.phase !== 'daimyo_select') return;
+
+        this.contextMenu.style.left = `${x}px`;
+        this.contextMenu.style.top = `${y}px`;
+        this.contextMenu.classList.remove('hidden');
+
+        if (this.ctxMenuBack) {
+            this.ctxMenuBack.onclick = (e) => {
+                e.stopPropagation();
+                this.hideContextMenu();
+                if(this.game.isProcessingAI) return;
+                
+                // 選択モードを解除してMAINに戻す
+                this.cancelMapSelection(false); 
+
+                const myCastle = this.game.getCurrentTurnCastle();
+                if (myCastle) {
+                    this.showControlPanel(myCastle);
+                    const el = document.querySelector(`.castle-card[data-clan="${this.game.playerClanId}"]`); 
+                    if(el) el.scrollIntoView({block:"center", behavior: "smooth"});
+                }
+            };
+        }
+        if (this.ctxMenuFinish) {
+            this.ctxMenuFinish.onclick = (e) => {
+                e.stopPropagation();
+                this.hideContextMenu();
+                if(this.game.isProcessingAI) return;
+                if(confirm("今月の命令を終了しますか？")) {
+                    this.game.finishTurn();
+                }
+            };
+        }
+    }
+
+    hideContextMenu() {
+        if (this.contextMenu) this.contextMenu.classList.add('hidden');
     }
 
     forceResetModals() {
@@ -419,6 +571,7 @@ class UIManager {
         });
         if(this.cutinOverlay) this.cutinOverlay.classList.add('hidden');
         if(this.warModal) this.warModal.classList.add('hidden');
+        this.hideContextMenu();
     }
 
     log(msg) { 
@@ -513,7 +666,6 @@ class UIManager {
         if(ts) ts.classList.remove('hidden'); 
     }
     
-    // ★追加: 引数にleader（大名武将データ）を追加
     showDaimyoConfirmModal(clanName, soldiers, leader, onStart) {
         if (!this.daimyoConfirmModal) return;
         this.daimyoConfirmModal.classList.remove('hidden');
@@ -647,6 +799,7 @@ class UIManager {
                  }
                  el.onclick = (e) => {
                      e.stopPropagation();
+                     if (this.isDraggingMap) return; // ★ドラッグ移動した場合はキャンセル
                      this.game.handleDaimyoSelect(c);
                  };
             }
@@ -654,13 +807,18 @@ class UIManager {
                 if (isSelectionMode) { 
                     if (this.game.validTargets.includes(c.id)) { 
                         el.classList.add('selectable-target'); 
-                        el.onclick = (e) => { e.stopPropagation(); this.game.resolveMapSelection(c); };
+                        el.onclick = (e) => { 
+                            e.stopPropagation(); 
+                            if (this.isDraggingMap) return; // ★ドラッグ移動した場合はキャンセル
+                            this.game.resolveMapSelection(c); 
+                        };
                     } else { 
                         el.classList.add('dimmed'); 
                     }
                 } else { 
                     el.onclick = (e) => {
                         e.stopPropagation();
+                        if (this.isDraggingMap) return; // ★ドラッグ移動した場合はキャンセル
                         if (this.game.isProcessingAI) return;
 
                         if (this.mapScale < 0.8) {
@@ -792,7 +950,6 @@ class UIManager {
     showControlPanel(castle) { 
         this.currentCastle = castle; 
         
-        // 【修正】プレイヤーの操作時はAIフラグを確実に解除する
         if (Number(castle.ownerClan) === Number(this.game.playerClanId)) {
             this.game.isProcessingAI = false;
         }
@@ -852,7 +1009,6 @@ class UIManager {
         this.game.validTargets = []; 
         this.renderMap();
         if (!keepMenuState) {
-            // 【修正】メニューをメインに戻す処理を復元
             this.menuState = 'MAIN';
             this.renderCommandMenu();
         }
@@ -880,7 +1036,6 @@ class UIManager {
                 btn.textContent = label; 
                 btn.onclick = () => {
                     if (this.game.isProcessingAI) return;
-                    // 【修正】先に選択状態を解除してからコマンドを実行する
                     this.cancelMapSelection(true);
                     onClick();
                 }; 
@@ -942,7 +1097,6 @@ class UIManager {
 
         // --- SPECベースの自動判定 ---
         const spec = this.game.commandSystem.getSpecs()[action.type];
-        // 助言不要フラグがあれば即実行
         if (spec && spec.hasAdvice === false) {
              onConfirm();
              return;
@@ -984,14 +1138,11 @@ class UIManager {
         let infoHtml = ""; 
         let bushos = []; 
         
-        // --- 設定の取得 ---
         const baseType = actionType.replace('_deploy', ''); 
         const spec = this.game.commandSystem.getSpecs()[baseType] || this.game.commandSystem.getSpecs()[actionType] || {};
     
         let sortKey = spec.sortKey || 'strength';
-        // specに isMulti が設定されていればそれに従い、なければ false になります
         let isMulti = spec.isMulti || false;
-        // --- 設定の取得（ここまで修正） ---
     
         if (document.getElementById('selector-title')) {
             document.getElementById('selector-title').textContent = isMulti ? "武将を選択（複数可）" : "武将を選択"; 
@@ -1007,7 +1158,6 @@ class UIManager {
         const gunshi = this.game.getClanGunshi(this.game.playerClanId);
         const myDaimyo = this.game.bushos.find(b => b.clan === this.game.playerClanId && b.isDaimyo);
 
-        // --- 武将リストの抽出とフィルタリング ---
         if (actionType === 'employ_target') { 
             bushos = this.game.getCastleBushos(c.id).filter(b => b.status === 'ronin'); 
             infoHtml = "<div>登用する在野武将を選択してください</div>"; 
@@ -1064,7 +1214,6 @@ class UIManager {
             isMulti = false;
         }
         else if (actionType === 'appoint_gunshi') {
-            // 自勢力の全武将から検索
             bushos = this.game.bushos.filter(b => 
                 b.clan === this.game.playerClanId && 
                 b.status !== 'dead' && 
@@ -1075,10 +1224,8 @@ class UIManager {
             infoHtml = "<div>軍師に任命する武将を選択してください (知略重視)<br><small>※大名・城主は任命できません</small></div>";
         }
         else {
-            // デフォルト: 自拠点の行動可能武将
             bushos = this.game.getCastleBushos(c.id).filter(b => b.status !== 'ronin');
             
-            // スペックにメッセージがあれば表示、なければ動的生成
             if (spec.msg) {
                 infoHtml = `<div>${spec.msg}</div>`;
             } else if (['farm','commerce'].includes(actionType)) { infoHtml = `<div>金: ${c.gold} (1回500)</div>`; }
@@ -1156,7 +1303,6 @@ class UIManager {
                 this.selectorConfirmBtn.classList.add('hidden'); 
             } else {
                 this.selectorConfirmBtn.classList.remove('hidden');
-                // ロジックをCommandSystemへ委譲
                 this.selectorConfirmBtn.onclick = () => {
                     const inputs = document.querySelectorAll('input[name="sel_busho"]:checked'); if (inputs.length === 0) return;
                     const selectedIds = Array.from(inputs).map(i => parseInt(i.value)); 
@@ -1215,36 +1361,24 @@ class UIManager {
         if (this.tradeTypeInfo) this.tradeTypeInfo.classList.add('hidden'); 
         const c = this.currentCastle;
 
-        // --- 修正: 数値入力バリデーションの強化 ---
         const createSlider = (label, id, max, currentVal) => { 
             const wrap = document.createElement('div'); 
             wrap.className = 'qty-row'; 
-            // input type="number" に min, max 属性を追加
             wrap.innerHTML = `<label>${label} (Max: ${max})</label><div class="qty-control"><input type="range" id="range-${id}" min="0" max="${max}" value="${currentVal}"><input type="number" id="num-${id}" min="0" max="${max}" value="${currentVal}"></div>`; 
             const range = wrap.querySelector(`#range-${id}`); 
             const num = wrap.querySelector(`#num-${id}`); 
 
-            // スライダー操作時
             range.oninput = () => num.value = range.value; 
 
-            // 数値直接入力時のバリデーション
             num.oninput = () => {
                 let v = parseInt(num.value);
-                if (isNaN(v)) {
-                    // 入力中は空欄を許容するが、処理上は0扱い(または一時的に空)
-                    // ここでは空文字の場合は何もしない（onblurでリセット）
-                    return; 
-                }
-                // 範囲外なら強制的に修正
+                if (isNaN(v)) return; 
                 if (v < 0) v = 0;
                 if (v > max) v = max;
-                
-                // 表示とスライダーを更新
                 if (num.value != v) num.value = v; 
                 range.value = v; 
             };
             
-            // フォーカスが外れた時に空欄なら0にする
             num.onblur = () => {
                 if (num.value === "" || isNaN(parseInt(num.value))) {
                     num.value = 0;
@@ -1290,7 +1424,6 @@ class UIManager {
             inputs.soldiers = createSlider("使用兵士数", "soldiers", maxSoldiers, Math.min(50, maxSoldiers));
         }
 
-        // 確認ボタンのロジックをCommandSystemへ委譲
         this.quantityConfirmBtn.onclick = () => {
             this.quantityModal.classList.add('hidden');
             this.game.commandSystem.handleQuantitySelection(type, inputs, targetId, data);
@@ -1317,14 +1450,13 @@ class UIManager {
             if(el) el.textContent = val; 
         };
         
-        // 顔画像の更新
         const updateFace = (id, busho) => {
             const el = document.getElementById(id);
             if (!el) return;
             if (busho && busho.faceIcon) {
                 el.src = `data/faceicons/${busho.faceIcon}`;
                 el.classList.remove('hidden');
-                el.onerror = () => { el.classList.add('hidden'); }; // 画像読み込み失敗時は隠す
+                el.onerror = () => { el.classList.add('hidden'); }; 
             } else {
                 el.classList.add('hidden');
             }
@@ -1469,7 +1601,6 @@ class GameManager {
         this.independenceSystem = new IndependenceSystem(this);
         this.factionSystem = new FactionSystem(this); 
         
-        // 状態管理: title, daimyo_select, game
         this.phase = 'title';
     }
     getRelationKey(id1, id2) { return id1 < id2 ? `${id1}-${id2}` : `${id2}-${id1}`; }
@@ -1493,7 +1624,6 @@ class GameManager {
             
             document.getElementById('app').classList.remove('hidden'); 
             
-            // マップ選択モードへ移行
             this.phase = 'daimyo_select';
             this.ui.renderMap();
             await this.ui.showCutin("開始する大名家の城を選択してください");
@@ -1505,7 +1635,6 @@ class GameManager {
         }
     }
     
-    // ★修正: 城クリック時の大名選択処理 (顔画像対応 & クリック判定の即時解除)
     handleDaimyoSelect(castle) {
         if (castle.ownerClan === 0) {
             alert("その城は空き城（中立）のため選択できません。");
@@ -1515,14 +1644,13 @@ class GameManager {
         const clan = this.clans.find(c => c.id === castle.ownerClan);
         if (!clan) return;
 
-        // 総兵力計算
         const totalSoldiers = this.getClanTotalSoldiers(clan.id);
-        const leader = this.getBusho(clan.leaderId); // 大名武将を取得
+        const leader = this.getBusho(clan.leaderId); 
         
         this.ui.showDaimyoConfirmModal(clan.name, totalSoldiers, leader, () => {
              this.playerClanId = Number(clan.id);
              this.phase = 'game';
-             this.ui.renderMap(); // 大名選択のクリックイベントを消去するため即時再描画
+             this.ui.renderMap(); 
              this.init();
         });
     }
@@ -1640,7 +1768,6 @@ class GameManager {
 
         const castle = this.turnQueue[this.currentIndex]; 
         
-        // 修正: 既に行動済みの場合はスキップ（ロード時などの整合性用）
         if (castle.isDone) {
             this.finishTurn();
             return;
@@ -1716,14 +1843,12 @@ class GameManager {
         this.month++; if(this.month > 12) { this.month = 1; this.year++; } const clans = new Set(this.castles.filter(c => c.ownerClan !== 0).map(c => c.ownerClan)); const playerAlive = clans.has(this.playerClanId); if (clans.size === 1 && playerAlive) alert(`天下統一！`); else if (!playerAlive) alert(`我が軍は滅亡しました……`); else this.startMonth(); 
     }
 
-    // ターゲット判定ロジックをCommandSystemに移譲
     enterMapSelection(mode) {
         this.lastMenuState = this.ui.menuState;
         this.selectionMode = mode;
         const c = this.getCurrentTurnCastle();
         this.validTargets = []; 
         
-        // CommandSystemの汎用判定メソッドを使用
         this.validTargets = this.commandSystem.getValidTargets(mode);
         
         this.ui.renderMap();
@@ -1801,7 +1926,7 @@ class GameManager {
         const data = { 
             year: this.year, 
             month: this.month, 
-            marketRate: this.marketRate, // 修正: 米相場を保存
+            marketRate: this.marketRate,
             castles: this.castles, 
             bushos: this.bushos, 
             clans: this.clans,
@@ -1822,7 +1947,7 @@ class GameManager {
                 this.year = d.year; 
                 this.month = d.month; 
                 this.playerClanId = d.playerClanId || 1; 
-                this.marketRate = d.marketRate !== undefined ? d.marketRate : 1.0; // 修正: 米相場を復元
+                this.marketRate = d.marketRate !== undefined ? d.marketRate : 1.0; 
                 this.castles = d.castles.map(c => new Castle(c)); 
                 this.bushos = d.bushos.map(b => new Busho(b)); 
                 if(d.relations) this.relations = d.relations; 
@@ -1839,7 +1964,7 @@ class GameManager {
                 document.getElementById('title-screen').classList.add('hidden'); 
                 document.getElementById('app').classList.remove('hidden'); 
                 
-                this.phase = 'game'; // ロード時は即ゲームフェーズ
+                this.phase = 'game';
                 
                 this.turnQueue = this.castles.filter(c => c.ownerClan !== 0).sort(() => Math.random() - 0.5);
                 this.currentIndex = 0; 
