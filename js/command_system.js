@@ -14,43 +14,42 @@ const COMMAND_SPECS = {
     'farm': { 
         label: "石高開発", category: 'DEVELOP', 
         costGold: 500, costRice: 0, 
-        isMulti: true, hasAdvice: true, 
+        isMulti: true, hasAdvice: false, 
         startMode: 'busho_select', sortKey: 'politics',
         msg: "金: 500 (1回あたり)" 
     },
     'commerce': { 
         label: "商業開発", category: 'DEVELOP', 
         costGold: 500, costRice: 0, 
-        isMulti: true, hasAdvice: true, 
+        isMulti: true, hasAdvice: false, 
         startMode: 'busho_select', sortKey: 'politics',
         msg: "金: 500 (1回あたり)" 
     },
     'repair': { 
         label: "城壁修復", category: 'DEVELOP', 
         costGold: 300, costRice: 0, 
-        isMulti: true, hasAdvice: true, 
+        isMulti: true, hasAdvice: false, 
         startMode: 'busho_select', sortKey: 'politics',
         msg: "金: 300 (1回あたり)" 
     },
     'charity': { 
         label: "施し", category: 'DEVELOP', 
         costGold: 300, costRice: 300, 
-        isMulti: false,
-        hasAdvice: true, 
+        isMulti: false, hasAdvice: false, 
         startMode: 'busho_select', sortKey: 'charm',
         msg: "金: 300 / 米: 300 (選択可)" 
     },
     'buy_rice': {
         label: "兵糧購入", category: 'DEVELOP',
         costGold: 0, costRice: 0,
-        isMulti: false, hasAdvice: true,
+        isMulti: false, hasAdvice: false,
         startMode: 'quantity_select',
         msg: "金を払い兵糧を買います"
     },
     'sell_rice': {
         label: "兵糧売却", category: 'DEVELOP',
         costGold: 0, costRice: 0,
-        isMulti: false, hasAdvice: true,
+        isMulti: false, hasAdvice: false,
         startMode: 'quantity_select',
         msg: "兵糧を売り金を得ます"
     },
@@ -58,36 +57,35 @@ const COMMAND_SPECS = {
     'war': { 
         label: "出陣", category: 'MILITARY', 
         costGold: 0, costRice: 0, 
-        isMulti: true, hasAdvice: true, 
+        isMulti: true, hasAdvice: false, 
         startMode: 'map_select', targetType: 'enemy_valid', 
         sortKey: 'strength'
     },
     'draft': { 
         label: "徴兵", category: 'MILITARY', 
         costGold: 0, costRice: 0, 
-        isMulti: false,  // ★ここを true から false に変更
-        hasAdvice: true, 
+        isMulti: false, hasAdvice: false, 
         startMode: 'busho_select', sortKey: 'leadership',
         msg: "資金に応じて徴兵" 
     },
     'training': { 
         label: "訓練", category: 'MILITARY', 
         costGold: 0, costRice: 0, 
-        isMulti: true, hasAdvice: true, 
+        isMulti: true, hasAdvice: false, 
         startMode: 'busho_select', sortKey: 'leadership',
         msg: "兵士の訓練度を上げます" 
     },
     'soldier_charity': { 
         label: "兵施し", category: 'MILITARY', 
         costGold: 0, costRice: 0, 
-        isMulti: true, hasAdvice: true, 
+        isMulti: true, hasAdvice: false, 
         startMode: 'busho_select', sortKey: 'leadership',
         msg: "兵士の士気を上げます" 
     },
     'transport': { 
         label: "輸送", category: 'MILITARY', 
         costGold: 0, costRice: 0, 
-        isMulti: true, hasAdvice: true, 
+        isMulti: true, hasAdvice: false, 
         startMode: 'map_select', targetType: 'ally_other',
         sortKey: 'strength' 
     },
@@ -132,7 +130,7 @@ const COMMAND_SPECS = {
     'move': { 
         label: "移動", category: 'PERSONNEL', 
         costGold: 0, costRice: 0, 
-        isMulti: true, hasAdvice: true, 
+        isMulti: true, hasAdvice: false, 
         startMode: 'map_select', targetType: 'ally_other',
         sortKey: 'strength' 
     },
@@ -1015,4 +1013,5 @@ class CommandSystem {
     }
 
 }
+
 
