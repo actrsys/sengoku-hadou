@@ -1018,6 +1018,17 @@ class UIManager {
             infoHtml = "<div>総大将とする武将を選択してください</div>"; 
             isMulti = false;
         }
+        else if (actionType === 'appoint_gunshi') {
+            // 自勢力の全武将から検索
+            bushos = this.game.bushos.filter(b => 
+                b.clan === this.game.playerClanId && 
+                b.status !== 'dead' && 
+                b.status !== 'ronin' &&
+                !b.isDaimyo && 
+                !b.isCastellan
+            );
+            infoHtml = "<div>軍師に任命する武将を選択してください (知略重視)<br><small>※大名・城主は任命できません</small></div>";
+        }
         else {
             // デフォルト: 自拠点の行動可能武将
             bushos = this.game.getCastleBushos(c.id).filter(b => b.status !== 'ronin');

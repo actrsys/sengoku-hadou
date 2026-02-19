@@ -1,3 +1,7 @@
+{
+type: uploaded file
+fileName: war.js
+fullContent:
 /**
  * war.js
  * 戦争処理マネージャー & 戦争計算ロジック
@@ -504,15 +508,19 @@ class WarManager {
         }
         
         const result = WarSystem.calcWarDamage(atkStats, defStats, s.attacker.soldiers, s.defender.soldiers, s.defender.defense, s.attacker.morale, s.defender.training, type);
-        let actualSoldierDmg = Math.min(target.soldiers, result.soldierDmg);
-        let actualWallDmg = result.wallDmg;
+        
+        let calculatedSoldierDmg = result.soldierDmg;
+        let calculatedWallDmg = result.wallDmg;
 
         if (isAtkTurn && s.defenderGuarding) {
-             actualSoldierDmg = Math.floor(actualSoldierDmg * window.WarParams.War.RojoDamageReduction); 
-             actualWallDmg = Math.floor(actualWallDmg * window.WarParams.War.RojoDamageReduction);
+             calculatedSoldierDmg = Math.floor(calculatedSoldierDmg * window.WarParams.War.RojoDamageReduction); 
+             calculatedWallDmg = Math.floor(calculatedWallDmg * window.WarParams.War.RojoDamageReduction);
              s.defenderGuarding = false; 
              if (s.isPlayerInvolved) this.game.ui.log(`(籠城効果によりダメージ軽減)`);
         }
+
+        let actualSoldierDmg = Math.min(target.soldiers, calculatedSoldierDmg);
+        let actualWallDmg = calculatedWallDmg;
 
         target.soldiers -= actualSoldierDmg;
         if(isAtkTurn) s.deadSoldiers.defender += actualSoldierDmg; else s.deadSoldiers.attacker += actualSoldierDmg;
@@ -687,35 +695,40 @@ class WarManager {
             const currentTurnId = this.game.getCurrentTurnId();
             let resultMsg = "";
             
-            // プレイヤーが攻撃側かどうかを判定
-            const pid = Number(this.game.playerClanId);
-            const isPlayerAttacker = (Number(s.attacker.ownerClan) === pid);
-
             if (attackerWon) { 
-                // ...（中略：吸収処理などはそのまま）...
-                
-                if (isPlayerAttacker) {
-                    resultMsg = `${s.defender.name}を制圧しました！\n我が軍の勝利です。`;
-                } else {
-                    resultMsg = `${s.defender.name}が制圧されました……\n敵軍の勝利です。`;
+                const statInc = W.WinStatIncrease || 5;
+                s.attacker.training = Math.min(120, s.attacker.training + statInc); s.attacker.morale = Math.min(120, s.attacker.morale + statInc); 
+                this.processCaptures(s.defender, s.attacker.ownerClan);
+                const atkBushos = s.atkBushos;
+                const maxCharm = Math.max(...atkBushos.map(b => b.charm));
+                const subCharm = atkBushos.reduce((acc, b) => acc + b.charm, 0) - maxCharm;
+                const daimyo = this.game.bushos.find(b => b.clan === s.attacker.ownerClan && b.isDaimyo) || {charm: 50};
+                const charmScore = maxCharm + (subCharm * 0.1) + (daimyo.charm * window.WarParams.War.DaimyoCharmWeight);
+                const baseLoot = window.WarParams.War.LootingBaseRate;
+                let lossRate = baseLoot - (charmScore * window.WarParams.War.LootingCharmFactor);
+                lossRate = Math.max(0, lossRate); 
+                if (lossRate > 0) {
+                    const lostGold = Math.floor(s.defender.gold * lossRate);
+                    const lostRice = Math.floor(s.defender.rice * lossRate);
+                    s.defender.gold -= lostGold; s.defender.rice -= lostRice;
+                    if (s.isPlayerInvolved) this.game.ui.log(`(敵兵の持ち逃げにより 金${lostGold}, 米${lostRice} が失われた)`);
                 }
+                s.defender.ownerClan = s.attacker.ownerClan; s.defender.investigatedUntil = 0; s.defender.immunityUntil = currentTurnId + 1;
+                s.atkBushos.forEach((b, idx) => { 
+                    const srcC = this.game.getCastle(s.sourceCastle.id); srcC.samuraiIds = srcC.samuraiIds.filter(id => id !== b.id); 
+                    this.game.factionSystem.handleMove(b, s.sourceCastle.id, s.defender.id); 
+                    b.castleId = s.defender.id; s.defender.samuraiIds.push(b.id); 
+                    if(idx === 0) { b.isCastellan = true; s.defender.castellanId = b.id; } else b.isCastellan = false; 
+                }); 
+                resultMsg = `${s.defender.name}が制圧されました！\n勝者: ${s.attacker.name}`;
             } else { 
                 s.defender.immunityUntil = currentTurnId; 
-
                 if (isRetreat) {
-                    if (isPlayerAttacker) {
-                        resultMsg = `${s.defender.name}の攻略を断念し、撤退しました。`;
-                    } else {
-                        resultMsg = `敵軍を撃退しました！\n${s.attacker.name}は撤退していきました。`;
-                    }
+                    resultMsg = `${s.defender.name}から撤退しました……`;
                 } else {
-                    if (isPlayerAttacker) {
-                        resultMsg = `${s.defender.name}の攻略に失敗し、敗北しました……`;
-                    } else {
-                        resultMsg = `${s.defender.name}を守り抜きました！\n我が軍の勝利です。`;
-                    }
+                    resultMsg = `${s.defender.name}を守り抜きました！\n敗者: ${s.attacker.name}`;
                 }
-            }
+            } 
 
             if (s.isPlayerInvolved) {
                 this.game.ui.showResultModal(resultMsg, () => {
@@ -820,5 +833,4 @@ class WarManager {
             else { p.status = 'dead'; p.clan = 0; p.castleId = 0; } 
         }); 
     }
-
 }
