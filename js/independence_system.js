@@ -2,6 +2,7 @@
  * independence_system.js
  * 城主の独立（謀反）システム
  * 責務: 毎月の独立判定、新クラン作成、家臣の処遇処理
+ * 修正: 独立・脱出・帰還時に城主自動更新ロジック (updateCastleLord) を適用
  */
 
 class IndependenceSystem {
@@ -136,6 +137,9 @@ class IndependenceSystem {
         // 5. 部下の去就判定
         this.resolveSubordinates(castle, castellan, oldDaimyo, newClanId, oldClanId);
 
+        // ★ 新大名となった城の城主更新（大名優先ロジックの適用）
+        this.game.updateCastleLord(castle);
+
         // 6. UIログ
         const oldClanName = this.game.clans.find(c => c.id === oldClanId).name;
         this.game.ui.log(`【謀反】${oldClanName}の${castle.name}にて、${castellan.name}が独立！「${newClanName}」を旗揚げしました。`);
@@ -179,9 +183,9 @@ class IndependenceSystem {
             let stayScore = (100 - affOld) + busho.duty + (busho.loyalty * 0.5);
 
             // 派閥補正
-            const myFaction = busho.getFactionName();
-            if (myFaction === newDaimyo.getFactionName()) joinScore += bonusFaction;
-            if (myFaction === oldDaimyo.getFactionName()) stayScore += bonusFaction;
+            const myFaction = busho.getFactionName ? busho.getFactionName() : "";
+            if (myFaction && myFaction === (newDaimyo.getFactionName ? newDaimyo.getFactionName() : "")) joinScore += bonusFaction;
+            if (myFaction && myFaction === (oldDaimyo.getFactionName ? oldDaimyo.getFactionName() : "")) stayScore += bonusFaction;
 
             // 判定
             if (joinScore > stayScore) {
@@ -206,6 +210,9 @@ class IndependenceSystem {
                         busho.castleId = targetCastle.id;
                         busho.isCastellan = false; // 城主ではなくなる
                         escapees.push(busho);
+
+                        // ★ 脱出先の城の城主情報を更新（空き城だった場合などのため）
+                        this.game.updateCastleLord(targetCastle);
                     } else {
                         // 捕縛
                         castle.samuraiIds = castle.samuraiIds.filter(id => id !== busho.id);
@@ -251,6 +258,10 @@ class IndependenceSystem {
                 busho.castleId = target.id;
                 busho.status = 'active'; // 復帰
                 target.samuraiIds.push(busho.id);
+
+                // ★ 帰還先の城の城主情報を更新
+                this.game.updateCastleLord(target);
+
                 return target.name;
             } else {
                 // 帰る城がない場合は在野

@@ -4,6 +4,7 @@
  * * リファクタリング:
  * - COMMAND_SPECS にUI表示カテゴリ、コスト、ターゲット種別、開始モードを集約
  * - getValidTargets を実装し、GameManagerからロジックを移管
+ * - 城主自動更新ロジックへの対応 (移動、追放、登用、引抜、輸送時に updateCastleLord を実行)
  */
 
 /* ==========================================================================
@@ -552,7 +553,6 @@ class CommandSystem {
 
     /* ==========================================================================
        ★ コマンド実行ロジック (Execution Logic)
-       ここから下は変更なし（既存のロジック維持）
        ========================================================================== */
 
     executeCommand(type, bushoIds, targetId) {
@@ -613,10 +613,25 @@ class CommandSystem {
                 busho.achievementTotal += Math.floor(val * 0.5);
                 this.game.factionSystem.updateRecognition(busho, 10);
             }
-            else if (type === 'banish') { if(!confirm(`本当に ${busho.name} を追放しますか？`)) return; busho.status = 'ronin'; busho.clan = 0; busho.isCastellan = false; this.game.ui.showResultModal(`${busho.name}を追放しました`); this.game.ui.updatePanelHeader(); this.game.ui.renderCommandMenu(); return; }
+            else if (type === 'banish') { 
+                if(!confirm(`本当に ${busho.name} を追放しますか？`)) return; 
+                busho.status = 'ronin'; busho.clan = 0; busho.isCastellan = false; 
+                this.game.updateCastleLord(castle); 
+                this.game.ui.showResultModal(`${busho.name}を追放しました`); 
+                this.game.ui.updatePanelHeader(); this.game.ui.renderCommandMenu(); 
+                return; 
+            }
             else if (type === 'move_deploy') { 
                 this.game.factionSystem.handleMove(busho, castle.id, targetId); 
-                const targetC = this.game.getCastle(targetId); castle.samuraiIds = castle.samuraiIds.filter(id => id !== busho.id); targetC.samuraiIds.push(busho.id); busho.castleId = targetId; count++; actionName = "移動"; 
+                const targetC = this.game.getCastle(targetId); 
+                castle.samuraiIds = castle.samuraiIds.filter(id => id !== busho.id); 
+                targetC.samuraiIds.push(busho.id); 
+                busho.castleId = targetId; 
+                
+                this.game.updateCastleLord(castle);
+                this.game.updateCastleLord(targetC);
+
+                count++; actionName = "移動"; 
             }
             busho.isActionDone = true;
         });
@@ -670,13 +685,18 @@ class CommandSystem {
         let msg = ""; 
         if (success) { 
             const oldCastle = this.game.getCastle(target.castleId); 
-            if(oldCastle && oldCastle.samuraiIds.includes(target.id)) { oldCastle.samuraiIds = oldCastle.samuraiIds.filter(id => id !== target.id); } 
+            if(oldCastle && oldCastle.samuraiIds.includes(target.id)) { 
+                oldCastle.samuraiIds = oldCastle.samuraiIds.filter(id => id !== target.id); 
+                this.game.updateCastleLord(oldCastle);
+            } 
             const currentC = this.game.getCurrentTurnCastle(); 
             currentC.samuraiIds.push(target.id); 
             target.castleId = currentC.id; 
             target.clan = this.game.playerClanId; 
             target.status = 'active'; 
             target.loyalty = 50; 
+            this.game.updateCastleLord(currentC);
+            
             msg = `${target.name}の登用に成功しました！`; 
             const maxStat = Math.max(target.strength, target.intelligence, target.leadership, target.charm, target.diplomacy);
             doer.achievementTotal += Math.floor(maxStat * 0.3);
@@ -757,8 +777,11 @@ class CommandSystem {
             if(oldCastle) {
                 oldCastle.samuraiIds = oldCastle.samuraiIds.filter(id => id !== target.id);
                 if (target.isCastellan) { target.isCastellan = false; oldCastle.castellanId = 0; }
+                this.game.updateCastleLord(oldCastle);
             }
             target.clan = this.game.playerClanId; target.castleId = castle.id; target.loyalty = 50; target.isActionDone = true; castle.samuraiIds.push(target.id);
+            this.game.updateCastleLord(castle);
+            
             this.game.ui.showResultModal(`${doer.name}の引抜工作が成功！\n${target.name}が我が軍に加わりました！`);
             const maxStat = Math.max(target.strength, target.intelligence, target.leadership, target.charm, target.diplomacy);
             doer.achievementTotal += Math.floor(maxStat * 0.3);
@@ -873,7 +896,7 @@ class CommandSystem {
         }
         else if (affinityDiff > 35) { 
             if (interviewer.intelligence >= 80) {
-                loyaltyText = "あやつは危険です。,.<br>裏で妙な動きをしているとの噂も……。";
+                loyaltyText = "あやつは危険です。<br>裏で妙な動きをしているとの噂も……。";
                 togaki = "";
             } else {
                 loyaltyText = "あやつとは口もききませぬゆえ、何も存じませぬ。";
@@ -919,6 +942,9 @@ class CommandSystem {
             this.game.factionSystem.handleMove(b, c.id, targetId); 
             b.isActionDone = true;
         });
+        
+        this.game.updateCastleLord(c);
+        this.game.updateCastleLord(t);
         
         this.game.ui.showResultModal(`${this.game.getBusho(bushoIds[0]).name}が${t.name}へ物資を輸送しました`); this.game.ui.updatePanelHeader(); this.game.ui.renderCommandMenu();
     }
@@ -1013,5 +1039,3 @@ class CommandSystem {
     }
 
 }
-
-

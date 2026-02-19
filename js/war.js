@@ -3,6 +3,7 @@
  * 戦争処理マネージャー & 戦争計算ロジック
  * 責務: 合戦の進行、戦闘計算、戦後処理、捕虜対応、UIコマンド定義、攻撃可能判定
  * 設定: Military, War
+ * 修正: 落城、撤退、捕虜の処遇の各タイミングに updateCastleLord を組み込み、城主を自動更新
  */
 
 // 戦争・軍事関連の設定定義
@@ -207,11 +208,6 @@ class WarManager {
             atkCastle.soldiers = Math.max(0, atkCastle.soldiers - atkSoldierCount);
             atkCastle.rice = Math.max(0, atkCastle.rice - atkRice);
 
-            // 攻撃側の参戦武将を行動済みにする
-            if (atkBushos && atkBushos.length > 0) {
-                atkBushos.forEach(b => b.isActionDone = true);
-            }
-
             const atkClanData = this.game.clans.find(c => c.id === atkClan); 
             const atkGeneral = atkBushos[0].name;
             const atkArmyName = atkClanData ? atkClanData.getArmyName() : "敵軍";
@@ -267,7 +263,6 @@ class WarManager {
                 showInterceptDialog((choice) => {
                     if (choice === 'field') {
                         if (!isPlayerInvolved) {
-                            // ★ NPC同士なら野戦画面を出さずに自動計算スキップ
                             this.resolveAutoFieldWar();
                         } else {
                             if (!this.game.fieldWarManager) {
@@ -304,25 +299,21 @@ class WarManager {
         const consumeRate = (window.WarParams.War.RiceConsumptionAtk || 0.1) * 0.5;
 
         while (turn <= 20 && s.attacker.soldiers > 0 && s.defender.soldiers > 0 && safetyLimit > 0) {
-            // 攻撃側アクション
             let resAtk = WarSystem.calcWarDamage(atkStats, defStats, s.attacker.soldiers, s.defender.soldiers, 0, s.attacker.morale, s.defender.training, 'charge');
             s.defender.soldiers -= Math.min(s.defender.soldiers, resAtk.soldierDmg);
             s.attacker.soldiers -= Math.min(s.attacker.soldiers, resAtk.counterDmg);
 
             if (s.defender.soldiers <= 0 || s.attacker.soldiers <= 0) break;
 
-            // 守備側アクション（野戦なので攻撃として計算）
             let resDef = WarSystem.calcWarDamage(defStats, atkStats, s.defender.soldiers, s.attacker.soldiers, 0, s.defender.morale, s.attacker.training, 'charge');
             s.attacker.soldiers -= Math.min(s.attacker.soldiers, resDef.soldierDmg);
             s.defender.soldiers -= Math.min(s.defender.soldiers, resDef.counterDmg);
 
-            // ラウンド終了処理（兵糧消費等）
             s.attacker.rice = Math.max(0, s.attacker.rice - Math.floor(s.attacker.soldiers * consumeRate));
             s.defender.rice = Math.max(0, s.defender.rice - Math.floor(s.defender.soldiers * consumeRate));
 
             if (s.attacker.rice <= 0 || s.defender.rice <= 0) break;
 
-            // 撤退判定 (20%未満)
             if (s.attacker.soldiers < s.defender.soldiers * 0.2) break;
             if (s.defender.soldiers < s.attacker.soldiers * 0.2) break;
 
@@ -654,6 +645,9 @@ class WarManager {
                 });
                 defCastle.gold = lostGold; defCastle.rice = 0; defCastle.soldiers = 0; defCastle.samuraiIds = []; defCastle.castellanId = 0;
                 
+                this.game.updateCastleLord(defCastle);
+                this.game.updateCastleLord(target);
+                
                 if(s.isPlayerInvolved) {
                     this.game.ui.log(`${defCastle.name}から${target.name}へ撤退しました。`);
                     this.game.ui.log(`(物資搬出率: ${(100*(1-lossRate)).toFixed(0)}%, 捕縛者: ${capturedBushos.length}名)`);
@@ -731,12 +725,17 @@ class WarManager {
                 s.defender.ownerClan = s.attacker.ownerClan; s.defender.investigatedUntil = 0;
                 s.defender.soldiers = totalAtkSurvivors;
 
+                const srcC = this.game.getCastle(s.sourceCastle.id); 
                 s.atkBushos.forEach((b, idx) => { 
-                    const srcC = this.game.getCastle(s.sourceCastle.id); srcC.samuraiIds = srcC.samuraiIds.filter(id => id !== b.id); 
+                    srcC.samuraiIds = srcC.samuraiIds.filter(id => id !== b.id); 
                     this.game.factionSystem.handleMove(b, s.sourceCastle.id, s.defender.id); 
                     b.castleId = s.defender.id; s.defender.samuraiIds.push(b.id); 
-                    if(idx === 0) { b.isCastellan = true; s.defender.castellanId = b.id; } else b.isCastellan = false; 
+                    b.isCastellan = false; // 城主の自動選出に任せる
                 });
+                
+                this.game.updateCastleLord(srcC);
+                this.game.updateCastleLord(s.defender);
+
                 if (s.isPlayerInvolved) {
                     const msg = `撤退しました。\n${retreatTargetId ? '部隊は移動しました。' : '部隊は解散しました。'}`;
                     this.game.ui.showResultModal(msg, () => this.game.finishTurn());
@@ -765,13 +764,20 @@ class WarManager {
                     s.defender.gold -= lostGold; s.defender.rice -= lostRice;
                     if (s.isPlayerInvolved) this.game.ui.log(`(敵兵の持ち逃げにより 金${lostGold}, 米${lostRice} が失われた)`);
                 }
+                
                 s.defender.ownerClan = s.attacker.ownerClan; s.defender.investigatedUntil = 0; s.defender.immunityUntil = currentTurnId + 1;
+                
+                const srcC = this.game.getCastle(s.sourceCastle.id); 
                 s.atkBushos.forEach((b, idx) => { 
-                    const srcC = this.game.getCastle(s.sourceCastle.id); srcC.samuraiIds = srcC.samuraiIds.filter(id => id !== b.id); 
+                    srcC.samuraiIds = srcC.samuraiIds.filter(id => id !== b.id); 
                     this.game.factionSystem.handleMove(b, s.sourceCastle.id, s.defender.id); 
                     b.castleId = s.defender.id; s.defender.samuraiIds.push(b.id); 
-                    if(idx === 0) { b.isCastellan = true; s.defender.castellanId = b.id; } else b.isCastellan = false; 
+                    b.isCastellan = false; // 城主自動選出に任せる
                 }); 
+                
+                this.game.updateCastleLord(srcC);
+                this.game.updateCastleLord(s.defender);
+                
                 resultMsg = `${s.defender.name}が制圧されました！\n勝者: ${s.attacker.name}`;
             } else { 
                 s.defender.immunityUntil = currentTurnId; 
@@ -812,6 +818,7 @@ class WarManager {
                     defeatedCastle.samuraiIds = defeatedCastle.samuraiIds.filter(id => id !== b.id);
                     this.game.factionSystem.handleMove(b, defeatedCastle.id, escapeCastle.id); 
                     b.castleId = escapeCastle.id; b.isCastellan = false; escapeCastle.samuraiIds.push(b.id); escapees.push(b);
+                    this.game.updateCastleLord(escapeCastle);
                 } else { 
                     defeatedCastle.samuraiIds = defeatedCastle.samuraiIds.filter(id => id !== b.id);
                     b.clan = 0; b.castleId = 0; b.isCastellan = false; b.status = 'ronin'; 
@@ -832,7 +839,15 @@ class WarManager {
             const myBushos = this.game.bushos.filter(b=>b.clan===this.game.playerClanId); const recruiter = myBushos.find(b => b.isDaimyo) || myBushos[0]; 
             const score = (recruiter.charm * 2.0) / (prisoner.loyalty * 1.5); 
             if (prisoner.isDaimyo) alert(`${prisoner.name}「敵の軍門には下らぬ！」`); 
-            else if (score > Math.random()) { prisoner.clan = this.game.playerClanId; prisoner.loyalty = 50; const targetC = this.game.getCastle(prisoner.castleId); if(targetC) targetC.samuraiIds.push(prisoner.id); alert(`${prisoner.name}を登用しました！`); } 
+            else if (score > Math.random()) { 
+                prisoner.clan = this.game.playerClanId; prisoner.loyalty = 50; 
+                const targetC = this.game.getCastle(prisoner.castleId); 
+                if(targetC) {
+                    targetC.samuraiIds.push(prisoner.id); 
+                    this.game.updateCastleLord(targetC);
+                }
+                alert(`${prisoner.name}を登用しました！`); 
+            } 
             else alert(`${prisoner.name}は登用を拒否しました……`); 
         } else if (action === 'kill') { 
             if (prisoner.isDaimyo) this.handleDaimyoDeath(prisoner); prisoner.status = 'dead'; prisoner.clan = 0; prisoner.castleId = 0; 
@@ -842,6 +857,7 @@ class WarManager {
                 const returnCastle = friendlyCastles[Math.floor(Math.random() * friendlyCastles.length)];
                 prisoner.castleId = returnCastle.id; prisoner.isCastellan = false; prisoner.status = 'active'; returnCastle.samuraiIds.push(prisoner.id);
                 this.game.factionSystem.handleMove(prisoner, 0, returnCastle.id); 
+                this.game.updateCastleLord(returnCastle);
                 alert(`${prisoner.name}を解放しました。(自領へ帰還しました)`);
             } else { prisoner.status = 'ronin'; prisoner.clan = 0; prisoner.castleId = 0; alert(`${prisoner.name}を解放しました。(在野へ下りました)`); }
         } 
@@ -867,7 +883,15 @@ class WarManager {
 
         captives.forEach(p => { 
             if (p.isDaimyo) { this.handleDaimyoDeath(p); p.status = 'dead'; p.clan = 0; p.castleId = 0; return; } 
-            if ((leaderInt / 100) > Math.random()) { p.clan = winnerClanId; p.loyalty = 50; return; } 
+            if ((leaderInt / 100) > Math.random()) { 
+                p.clan = winnerClanId; p.loyalty = 50; 
+                const targetC = this.game.getCastle(p.castleId);
+                if (targetC && !targetC.samuraiIds.includes(p.id)) {
+                    targetC.samuraiIds.push(p.id);
+                    this.game.updateCastleLord(targetC);
+                }
+                return; 
+            } 
             if (p.charm > recruitThreshold) { p.status = 'ronin'; p.clan = 0; p.castleId = 0; } 
             else { p.status = 'dead'; p.clan = 0; p.castleId = 0; } 
         }); 

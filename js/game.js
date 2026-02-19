@@ -1,11 +1,9 @@
 /**
  * game.js
  * 戦国シミュレーションゲーム (Main / UI / Data / System)
- * 設定: System, Economy, Strategy
- * 更新: 地図ドラッグ移動、コンテキストメニューの追加
+ * 修正: 城主の自動選出・管理ロジックの統合
  */
 
-// グローバルエラーハンドリング
 window.onerror = function(message, source, lineno, colno, error) {
     console.error("Global Error:", message, "Line:", lineno);
     return false;
@@ -16,7 +14,6 @@ window.onerror = function(message, source, lineno, colno, error) {
    ========================================================================== */
 const SCENARIOS = [    { name: "群雄割拠 (1560年)", desc: "各地で有力大名が覇を競う標準シナリオ。", folder: "1560_okehazama" }];
 
-// メインパラメータ設定 (System, Economy, Strategy)
 window.MainParams = {
     StartYear: 1560, StartMonth: 1,
     System: { UseRandomNames: true },
@@ -38,7 +35,7 @@ window.MainParams = {
 };
 
 /* ==========================================================================
-   データ管理 (DataManager - 変更なし)
+   データ管理 (DataManager)
    ========================================================================== */
 class DataManager {
     static genericNames = { surnames: [], names: [] };
@@ -199,7 +196,7 @@ class DataManager {
 }
 
 /* ==========================================================================
-   GameSystem (変更なし)
+   GameSystem
    ========================================================================== */
 class GameSystem {
     static seededRandom(seed) { let x = Math.sin(seed++) * 10000; return x - Math.floor(x); }
@@ -411,12 +408,10 @@ class UIManager {
             this.mapResetZoomBtn.onclick = (e) => { e.stopPropagation(); this.resetMapZoom(); };
         }
 
-        // 初期化追加分
         this.initMapDrag();
         this.initContextMenu();
     }
 
-    // ★追加: 地図ドラッグ移動機能
     initMapDrag() {
         this.isDraggingMap = false;
         this.dragStartX = 0;
@@ -447,7 +442,6 @@ class UIManager {
         sc.addEventListener('mouseup', () => {
             this.isMouseDown = false;
             sc.classList.remove('grabbing');
-            // クリックイベントが直後に発火するため、少し待ってからドラッグ状態を解除
             setTimeout(() => {
                 this.isDraggingMap = false;
             }, 50);
@@ -455,13 +449,12 @@ class UIManager {
 
         sc.addEventListener('mousemove', (e) => {
             if (!this.isMouseDown) return;
-            e.preventDefault(); // テキスト選択等を防止
+            e.preventDefault(); 
             const x = e.pageX - sc.offsetLeft;
             const y = e.pageY - sc.offsetTop;
             const walkX = (x - this.dragStartX);
             const walkY = (y - this.dragStartY);
             
-            // 遊び（閾値）を設けてドラッグ判定
             if (Math.abs(walkX) > 5 || Math.abs(walkY) > 5) {
                 this.isDraggingMap = true;
             }
@@ -470,24 +463,20 @@ class UIManager {
         });
     }
 
-    // ★追加: コンテキストメニュー機能
     initContextMenu() {
         this.contextMenu = document.getElementById('custom-context-menu');
         this.ctxMenuBack = document.getElementById('ctx-menu-back');
         this.ctxMenuFinish = document.getElementById('ctx-menu-finish');
         this.longPressTimer = null;
 
-        // 右クリック
         document.addEventListener('contextmenu', (e) => {
             e.preventDefault();
-            // 戦闘中など特定の場面では出さない
             if(this.game.warManager && this.game.warManager.state.active) return;
             this.showContextMenu(e.pageX, e.pageY);
         });
 
-        // スマホ長押し
         document.addEventListener('touchstart', (e) => {
-            if (e.touches.length > 1) return; // マルチタッチ除外
+            if (e.touches.length > 1) return; 
             const touch = e.touches[0];
             const x = touch.pageX;
             const y = touch.pageY;
@@ -512,7 +501,6 @@ class UIManager {
             }
         });
 
-        // 外側クリックで閉じる
         document.addEventListener('click', (e) => {
             if (!this.contextMenu) return;
             if (!this.contextMenu.classList.contains('hidden')) {
@@ -523,7 +511,6 @@ class UIManager {
 
     showContextMenu(x, y) {
         if (!this.contextMenu) return;
-        // マップ画面以外では出さない
         if (this.game.phase !== 'game' && this.game.phase !== 'daimyo_select') return;
 
         this.contextMenu.style.left = `${x}px`;
@@ -536,7 +523,6 @@ class UIManager {
                 this.hideContextMenu();
                 if(this.game.isProcessingAI) return;
                 
-                // 選択モードを解除してMAINに戻す
                 this.cancelMapSelection(false); 
 
                 const myCastle = this.game.getCurrentTurnCastle();
@@ -578,7 +564,6 @@ class UIManager {
         this.logHistory.unshift(`[${this.game.year}年${this.game.month}月] ${msg}`);
         if(this.logHistory.length > 50) this.logHistory.pop();
         
-        // 合戦中かつプレイヤー関与ならwar-logにも出す
         if(this.game.warManager && this.game.warManager.state.active && this.game.warManager.state.isPlayerInvolved && this.warLog) {
              const div = document.createElement('div');
              div.textContent = msg;
@@ -783,7 +768,6 @@ class UIManager {
             if (c.isDone) el.classList.add('done'); if (this.game.getCurrentTurnCastle() === c && !c.isDone) el.classList.add('active-turn');
             const castellan = this.game.getBusho(c.castellanId); const clanData = this.game.clans.find(cl => cl.id === c.ownerClan);
             
-            // 大名選択フェーズではすべて可視化
             const isVisible = isDaimyoSelect || this.game.isCastleVisible(c);
             
             const soldierText = isVisible ? c.soldiers : "???"; const castellanName = isVisible ? (castellan ? castellan.name : '-') : "???";
@@ -795,11 +779,11 @@ class UIManager {
                  if (c.ownerClan === 0) {
                      el.classList.add('dimmed');
                  } else {
-                     el.classList.add('selectable-target'); // 選択可能であることを強調
+                     el.classList.add('selectable-target'); 
                  }
                  el.onclick = (e) => {
                      e.stopPropagation();
-                     if (this.isDraggingMap) return; // ★ドラッグ移動した場合はキャンセル
+                     if (this.isDraggingMap) return;
                      this.game.handleDaimyoSelect(c);
                  };
             }
@@ -809,7 +793,7 @@ class UIManager {
                         el.classList.add('selectable-target'); 
                         el.onclick = (e) => { 
                             e.stopPropagation(); 
-                            if (this.isDraggingMap) return; // ★ドラッグ移動した場合はキャンセル
+                            if (this.isDraggingMap) return; 
                             this.game.resolveMapSelection(c); 
                         };
                     } else { 
@@ -818,7 +802,7 @@ class UIManager {
                 } else { 
                     el.onclick = (e) => {
                         e.stopPropagation();
-                        if (this.isDraggingMap) return; // ★ドラッグ移動した場合はキャンセル
+                        if (this.isDraggingMap) return; 
                         if (this.game.isProcessingAI) return;
 
                         if (this.mapScale < 0.8) {
@@ -854,7 +838,6 @@ class UIManager {
 
     updateInfoPanel(castle) {
         if (!castle) return;
-        // 大名選択フェーズでは情報パネルを更新しない、または隠す
         if (this.game.phase === 'daimyo_select') return;
         
         if (this.pcMapOverlay) {
@@ -987,7 +970,6 @@ class UIManager {
             if(!area) return;
             area.innerHTML = '';
             
-            // Mobileのみの戻るボタン
             if (area === mobileArea) {
                  const btn = document.createElement('button');
                  btn.className = 'cmd-btn back';
@@ -1019,7 +1001,6 @@ class UIManager {
         const pcArea = document.getElementById('pc-command-area');
         const areas = [mobileArea, pcArea];
         
-        // メニュー構造定義
         const CATEGORY_MAP = {
             'DEVELOP': "内政", 'MILITARY': "軍事", 
             'DIPLOMACY': "外交", 'STRATEGY': "調略", 
@@ -1045,7 +1026,6 @@ class UIManager {
             const cmd = (type) => this.game.commandSystem.startCommand(type);
             const menu = (targetMenu) => { this.menuState = targetMenu; this.renderCommandMenu(); };
             
-            // --- MAIN MENU ---
             if (this.menuState === 'MAIN') {
                 Object.keys(CATEGORY_MAP).forEach(key => {
                     createBtn(CATEGORY_MAP[key], "category", () => menu(key));
@@ -1058,7 +1038,6 @@ class UIManager {
                 return;
             }
 
-            // --- SUB MENU (Dynamic Generation from Specs) ---
             const specs = this.game.commandSystem.getSpecs();
             const relevantCommands = Object.entries(specs).filter(([, s]) => s.category === this.menuState);
 
@@ -1066,7 +1045,6 @@ class UIManager {
                 createBtn(spec.label, "", () => cmd(key));
             });
 
-            // レイアウト調整用空div
             const emptyCount = 3 - (relevantCommands.length % 3);
             if (emptyCount < 3) {
                 for(let i=0; i<emptyCount; i++) {
@@ -1075,7 +1053,6 @@ class UIManager {
                 }
             }
 
-            // 戻るボタン
             createBtn("戻る", "back", () => menu('MAIN'));
         });
     }
@@ -1095,7 +1072,6 @@ class UIManager {
             }
         }
 
-        // --- SPECベースの自動判定 ---
         const spec = this.game.commandSystem.getSpecs()[action.type];
         if (spec && spec.hasAdvice === false) {
              onConfirm();
@@ -1430,7 +1406,6 @@ class UIManager {
         };
     }
     
-    // --- War UI Methods ---
     setWarModalVisible(visible) {
         if (!this.warModal) return;
         if (visible) this.warModal.classList.remove('hidden');
@@ -1665,6 +1640,64 @@ class GameManager {
     getClanGunshi(clanId) { return this.bushos.find(b => Number(b.clan) === Number(clanId) && b.isGunshi); }
     isCastleVisible(castle) { if (Number(castle.ownerClan) === Number(this.playerClanId)) return true; if (castle.investigatedUntil >= this.getCurrentTurnId()) return true; return false; }
     
+    // ==========================================
+    // 城主の更新・管理ロジック追加部分
+    // ==========================================
+    updateCastleLord(castle) {
+        if (!castle || castle.ownerClan === 0) {
+            if (castle) castle.castellanId = 0;
+            return;
+        }
+
+        const bushos = this.getCastleBushos(castle.id).filter(b => b.status !== 'ronin');
+        if (bushos.length === 0) {
+            castle.castellanId = 0;
+            return;
+        }
+
+        // 1. 大名がその城にいるなら無条件で大名が城主
+        const daimyo = bushos.find(b => b.isDaimyo);
+        if (daimyo) {
+            bushos.forEach(b => { 
+                b.isCastellan = false; 
+            });
+            daimyo.isCastellan = true; // 大名と城主は別枠ではなく、大名自身が城主を兼任して他を排除する
+            castle.castellanId = daimyo.id;
+            return;
+        }
+
+        // 2. 大名も城主もおらず、武将が１人以上いるなら城主を自動選出する
+        let currentLord = bushos.find(b => b.id === castle.castellanId && b.isCastellan);
+        
+        if (!currentLord) {
+            this.electCastellan(castle, bushos);
+        }
+    }
+
+    electCastellan(castle, bushos) {
+        // 統率5:政治4:魅力1 でスコア算出し、派閥主を優先する
+        bushos.forEach(b => {
+            b._lordScore = (b.leadership * 5) + (b.politics * 4) + (b.charm * 1);
+            if (b.isFactionLeader) {
+                b._lordScore += 10000; // 派閥主を絶対的に優先
+            }
+        });
+
+        // 降順ソート
+        bushos.sort((a, b) => b._lordScore - a._lordScore);
+        const best = bushos[0];
+
+        // 既存の城主権限を剥奪し、ベストな武将を任命する
+        bushos.forEach(b => b.isCastellan = false);
+        best.isCastellan = true;
+        castle.castellanId = best.id;
+    }
+
+    updateAllCastlesLords() {
+        this.castles.forEach(c => this.updateCastleLord(c));
+    }
+    // ==========================================
+
     async startMonth() { 
         this.marketRate = Math.max(window.MainParams.Economy.TradeRateMin, Math.min(window.MainParams.Economy.TradeRateMax, this.marketRate * (0.9 + Math.random()*window.MainParams.Economy.TradeFluctuation)));
         
@@ -1675,6 +1708,10 @@ class GameManager {
         this.factionSystem.processStartMonth(); 
         
         this.processRoninMovements(); 
+        
+        // ★ ターン開始時に全城の城主の整合性を保証
+        this.updateAllCastlesLords();
+        
         if (this.month % 3 === 0) this.optimizeCastellans(); 
         const isPopGrowth = (this.month % 2 === 0);
         
@@ -1710,8 +1747,24 @@ class GameManager {
         this.currentIndex = 0; 
         this.processTurn();
     }
-    processRoninMovements() { const ronins = this.bushos.filter(b => b.status === 'ronin'); ronins.forEach(r => { const currentC = this.getCastle(r.castleId); if(!currentC) return; const neighbors = this.castles.filter(c => GameSystem.isAdjacent(currentC, c)); neighbors.forEach(n => { const castellan = this.getBusho(n.castellanId); if (Math.random() < 0.2) { currentC.samuraiIds = currentC.samuraiIds.filter(id => id !== r.id); n.samuraiIds.push(r.id); r.castleId = n.id; } }); }); }
     
+    processRoninMovements() { 
+        const ronins = this.bushos.filter(b => b.status === 'ronin'); 
+        ronins.forEach(r => { 
+            const currentC = this.getCastle(r.castleId); 
+            if(!currentC) return; 
+            const neighbors = this.castles.filter(c => GameSystem.isAdjacent(currentC, c)); 
+            neighbors.forEach(n => { 
+                if (Math.random() < 0.2) { 
+                    currentC.samuraiIds = currentC.samuraiIds.filter(id => id !== r.id); 
+                    n.samuraiIds.push(r.id); 
+                    r.castleId = n.id; 
+                } 
+            }); 
+        }); 
+    }
+    
+    // ★ AIによる城主の最適化でも新しい選出ロジックを活用
     optimizeCastellans() { 
         const clanIds = [...new Set(this.castles.filter(c=>c.ownerClan!==0).map(c=>c.ownerClan))]; 
         clanIds.forEach(clanId => { 
@@ -1728,14 +1781,8 @@ class GameManager {
                     const castleBushos = this.getCastleBushos(castle.id).filter(b => b.status !== 'ronin'); 
                     if (castleBushos.length <= 1) return; 
                     
-                    castleBushos.sort((a, b) => (b.leadership + b.politics) - (a.leadership + a.politics)); 
-                    const best = castleBushos[0]; 
-                    if (best.id !== castle.castellanId) { 
-                        const old = this.getBusho(castle.castellanId); 
-                        if(old) old.isCastellan = false; 
-                        best.isCastellan = true; 
-                        castle.castellanId = best.id; 
-                    } 
+                    // 新ロジックを使って最適な城主に再任命
+                    this.electCastellan(castle, castleBushos);
                 }); 
             } 
         }); 
@@ -1836,6 +1883,7 @@ class GameManager {
         this.currentIndex++; 
         this.processTurn(); 
     }
+
     endMonth() { 
         this.factionSystem.processEndMonth(); 
         this.independenceSystem.checkIndependence(); 
@@ -1920,7 +1968,16 @@ class GameManager {
         }
     }
 
-    changeLeader(clanId, newLeaderId) { this.bushos.filter(b => b.clan === clanId).forEach(b => b.isDaimyo = false); const newLeader = this.getBusho(newLeaderId); if(newLeader) { newLeader.isDaimyo = true; this.clans.find(c => c.id === clanId).leaderId = newLeaderId; } }
+    // ★ 大名が交代した際にも城主の再計算を行うように修正
+    changeLeader(clanId, newLeaderId) { 
+        this.bushos.filter(b => b.clan === clanId).forEach(b => b.isDaimyo = false); 
+        const newLeader = this.getBusho(newLeaderId); 
+        if(newLeader) { 
+            newLeader.isDaimyo = true; 
+            this.clans.find(c => c.id === clanId).leaderId = newLeaderId; 
+        } 
+        this.updateAllCastlesLords(); 
+    }
     
     saveGameToFile() { 
         const data = { 
@@ -1968,6 +2025,10 @@ class GameManager {
                 
                 this.turnQueue = this.castles.filter(c => c.ownerClan !== 0).sort(() => Math.random() - 0.5);
                 this.currentIndex = 0; 
+
+                // ★ ロード直後に全城の城主の整合性を保証
+                this.updateAllCastlesLords();
+
                 this.ui.showCutin(`ロード完了: ${this.year}年 ${this.month}月`);
                 this.ui.hasInitializedMap = false; 
                 this.ui.renderMap();
@@ -1978,9 +2039,7 @@ class GameManager {
     }
 }
 
-// 起動
 window.addEventListener('DOMContentLoaded', () => {
-    // 【追加】右クリック・長押しメニューを禁止
     document.addEventListener('contextmenu', (e) => {
         e.preventDefault();
     }, { passive: false });
