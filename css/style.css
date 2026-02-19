@@ -341,17 +341,16 @@ img {
 
 .fw-unit {
     width: 24px; height: 24px;
-    clip-path: polygon(50% 0%, 100% 50%, 75% 50%, 75% 100%, 25% 100%, 25% 50%, 0% 50%); /* 凸型（矢印型） */
     position: absolute;
     display: flex; justify-content: center; align-items: center;
-    font-weight: bold; color: white; font-size: 10px; line-height: 24px;
-    box-shadow: 2px 2px 5px rgba(0,0,0,0.5); /* clip-path使用時は一部無効になる場合あり */
+    font-weight: bold; font-size: 24px; line-height: 24px;
+    background-color: transparent;
     transition: left 0.3s, top 0.3s, transform 0.3s;
     pointer-events: none;
     z-index: 20;
 }
-.fw-unit.attacker { background-color: #d32f2f; }
-.fw-unit.defender { background-color: #1976d2; }
+.fw-unit.attacker { color: #d32f2f; text-shadow: 1px 1px 2px rgba(0,0,0,0.5); }
+.fw-unit.defender { color: #1976d2; text-shadow: 1px 1px 2px rgba(0,0,0,0.5); }
 .fw-unit.active { filter: drop-shadow(0 0 6px #ffff00); }
 .fw-unit.preview { opacity: 0.6; animation: fw-blink 1s infinite; z-index: 18; }
 @keyframes fw-blink { 0%{opacity:0.3;} 50%{opacity:0.8;} 100%{opacity:0.3;} }
