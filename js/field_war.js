@@ -15,7 +15,8 @@ class FieldWarManager {
         this.cols = 30;
         this.rows = 20;
 
-        this.state = 'IDLE'; // 'IDLE', 'MOVE_SELECT', 'MOVE_PREVIEW', 'DIR_SELECT'
+        // state: 'IDLE', 'PHASE_MOVE', 'MOVE_PREVIEW', 'PHASE_DIR', 'PHASE_ATTACK'
+        this.state = 'IDLE'; 
         this.reachable = null;
         this.previewTarget = null;
     }
@@ -49,6 +50,7 @@ class FieldWarManager {
                 x: atkX, y: 19,
                 direction: isAtkPlayer ? 1 : 4, // 1:右上, 4:左下
                 mobility: 4,
+                ap: 4,
                 soldiers: warState.attacker.soldiers,
                 rice: warState.attacker.rice,
                 maxRice: warState.attacker.maxRice,
@@ -65,6 +67,7 @@ class FieldWarManager {
                 x: defX, y: 19,
                 direction: isDefPlayer ? 1 : 4,
                 mobility: 4,
+                ap: 4,
                 soldiers: warState.defender.soldiers,
                 rice: warState.defender.rice,
                 maxRice: warState.defender.rice, 
@@ -143,8 +146,8 @@ class FieldWarManager {
         const atkEl = document.getElementById('fw-atk-status');
         const defEl = document.getElementById('fw-def-status');
 
-        if (atkEl) atkEl.innerHTML = `<strong>[攻] ${atk.name}</strong><br>兵: ${atk.soldiers} / 糧: ${atk.rice}`;
-        if (defEl) defEl.innerHTML = `<strong>[守] ${def.name}</strong><br>兵: ${def.soldiers} / 糧: ${def.rice}`;
+        if (atkEl) atkEl.innerHTML = `<strong>[攻] ${atk.name}</strong><br>兵: ${atk.soldiers} / 糧: ${atk.rice} / AP: ${atk.ap}`;
+        if (defEl) defEl.innerHTML = `<strong>[守] ${def.name}</strong><br>兵: ${def.soldiers} / 糧: ${def.rice} / AP: ${def.ap}`;
         
         // プレイヤー側が必ず左に配置されるように順序を制御
         if (atk.isPlayer) {
@@ -189,20 +192,28 @@ class FieldWarManager {
                 hex.style.top = `${y * (this.hexH / 2)}px`;
                 
                 if (isPlayerTurn) {
-                    if (this.state === 'MOVE_SELECT') {
-                        if (x === enemy.x && y === enemy.y && this.getDistance(unit.x, unit.y, x, y) === 1) {
-                            hex.classList.add('attackable');
-                        } else if (this.reachable && this.reachable[`${x},${y}`]) {
+                    if (this.state === 'PHASE_MOVE') {
+                        if (this.reachable && this.reachable[`${x},${y}`]) {
                             hex.classList.add('movable');
                         }
                     } else if (this.state === 'MOVE_PREVIEW') {
                         if (this.reachable && this.reachable[`${x},${y}`]) {
                             hex.classList.add('movable');
                         }
-                    } else if (this.state === 'DIR_SELECT') {
+                    } else if (this.state === 'PHASE_DIR') {
                         if (this.getDistance(unit.x, unit.y, x, y) === 1) {
-                            hex.classList.add('fw-dir-highlight');
+                            let targetDir = this.getDirection(unit.x, unit.y, x, y);
+                            let turnCost = this.getTurnCost(unit.direction, targetDir);
+                            if (unit.ap >= turnCost) {
+                                hex.classList.add('fw-dir-highlight');
+                            }
                         }
+                        if (x === unit.x && y === unit.y) hex.classList.add('movable');
+                    } else if (this.state === 'PHASE_ATTACK') {
+                        if (x === enemy.x && y === enemy.y && this.getDistance(unit.x, unit.y, x, y) === 1 && unit.ap >= 1) {
+                            hex.classList.add('attackable');
+                        }
+                        if (x === unit.x && y === unit.y) hex.classList.add('movable');
                     }
                 }
                 
@@ -311,20 +322,36 @@ class FieldWarManager {
         return 0;
     }
 
+    getTurnCost(curDir, targetDir) {
+        if (curDir === targetDir) return 0;
+        let diff = Math.abs(curDir - targetDir);
+        diff = Math.min(diff, 6 - diff);
+        if (diff === 1) return 1;
+        return 2;
+    }
+
     // --- ZOC探索 ---
-    getCost(x, y, enemy) {
+    getCost(x, y, enemy, isFirstStep, startDist) {
         if (x === enemy.x && y === enemy.y) return 999;
+        
+        // 行動開始時点で敵部隊と隣接していた場合、移動力を必ず4消費
+        if (isFirstStep && startDist === 1) {
+            return 4;
+        }
+
+        // 敵部隊の周囲1～2マスの範囲はコスト一律2
         let dist = this.getDistance(x, y, enemy.x, enemy.y);
-        if (dist === 1) return 3;
-        if (dist === 2) return 2;
+        if (dist <= 2) return 2;
+        
         return 1;
     }
 
-    findPaths(unit, enemy) {
-        let maxAP = unit.mobility;
-        let queue = [{x: unit.x, y: unit.y, cost: 0, path: []}];
+    findPaths(unit, enemy, maxAP) {
+        let queue = [{x: unit.x, y: unit.y, cost: 0, path: [], steps: 0}];
         let visited = {};
         visited[`${unit.x},${unit.y}`] = { cost: 0, path: [] };
+        
+        let startDist = this.getDistance(unit.x, unit.y, enemy.x, enemy.y);
         
         while(queue.length > 0) {
             queue.sort((a,b) => a.cost - b.cost);
@@ -332,14 +359,15 @@ class FieldWarManager {
             
             let neighbors = this.getNeighbors(cur.x, cur.y);
             for(let n of neighbors) {
-                let c = this.getCost(n.x, n.y, enemy);
+                let isFirstStep = (cur.steps === 0);
+                let c = this.getCost(n.x, n.y, enemy, isFirstStep, startDist);
                 let nextCost = cur.cost + c;
                 if (nextCost <= maxAP) {
                     let key = `${n.x},${n.y}`;
                     if (!visited[key] || visited[key].cost > nextCost) {
                         let newPath = [...cur.path, {x: n.x, y: n.y}];
                         visited[key] = { cost: nextCost, path: newPath };
-                        queue.push({x: n.x, y: n.y, cost: nextCost, path: newPath});
+                        queue.push({x: n.x, y: n.y, cost: nextCost, path: newPath, steps: cur.steps + 1});
                     }
                 }
             }
@@ -355,18 +383,63 @@ class FieldWarManager {
     startTurn() {
         if (!this.active) return;
         const unit = this.units[this.activeUnitIndex];
+        const enemy = this.units[1 - this.activeUnitIndex];
+        
         unit.hasActionDone = false;
+        unit.ap = unit.mobility;
         this.state = 'IDLE';
         this.reachable = null;
         this.previewTarget = null;
 
         const isPlayerInvolved = this.units.some(u => u.isPlayer);
-        if (isPlayerInvolved) {
-            this.updateMap();
-        }
 
-        if (!unit.isPlayer) {
+        if (unit.isPlayer) {
+            this.state = 'PHASE_MOVE';
+            this.reachable = this.findPaths(unit, enemy, unit.ap);
+            if (isPlayerInvolved) {
+                this.updateMap();
+                this.updateStatus();
+                this.log(`【${unit.name}隊のターン】移動先を選択（自部隊クリックでスキップ）`);
+            }
+        } else {
+            if (isPlayerInvolved) {
+                this.updateMap();
+                this.updateStatus();
+            }
             setTimeout(() => this.processAITurn(), 800);
+        }
+    }
+
+    nextPhase() {
+        const unit = this.units[this.activeUnitIndex];
+        if (this.state === 'PHASE_MOVE' || this.state === 'MOVE_PREVIEW') {
+            this.previewTarget = null;
+            this.reachable = null;
+            this.state = 'PHASE_DIR';
+            
+            if (unit.ap <= 0) {
+                this.nextPhase();
+            } else {
+                this.updateMap();
+                this.updateStatus();
+                if (this.isPlayerTurn()) this.log(`向きを選択（自部隊クリックでスキップ）`);
+            }
+        } else if (this.state === 'PHASE_DIR') {
+            this.state = 'PHASE_ATTACK';
+            
+            if (unit.ap <= 0) {
+                this.nextPhase();
+            } else {
+                this.updateMap();
+                this.updateStatus();
+                if (this.isPlayerTurn()) this.log(`攻撃対象を選択（自部隊クリックでスキップ）`);
+            }
+        } else if (this.state === 'PHASE_ATTACK') {
+            unit.hasActionDone = true;
+            this.state = 'IDLE';
+            this.updateMap();
+            this.updateStatus();
+            setTimeout(() => this.nextTurn(), 500);
         }
     }
 
@@ -381,11 +454,6 @@ class FieldWarManager {
         }
 
         if (this.checkEndCondition()) return;
-        
-        const isPlayerInvolved = this.units.some(u => u.isPlayer);
-        if (isPlayerInvolved) {
-            this.updateStatus();
-        }
         
         this.startTurn();
     }
@@ -466,68 +534,71 @@ class FieldWarManager {
         const unit = this.units[this.activeUnitIndex];
         const enemy = this.units[1 - this.activeUnitIndex];
 
-        if (this.state === 'IDLE') {
-            if (x === unit.x && y === unit.y && !unit.hasActionDone) {
-                this.reachable = this.findPaths(unit, enemy);
-                this.state = 'MOVE_SELECT';
-                this.updateMap();
-            }
-        } else if (this.state === 'MOVE_SELECT') {
-            if (x === enemy.x && y === enemy.y) {
-                if (this.getDistance(unit.x, unit.y, enemy.x, enemy.y) === 1) {
-                    unit.direction = this.getDirection(unit.x, unit.y, enemy.x, enemy.y);
-                    this.executeAttack(unit, enemy);
-                    return;
-                }
-            }
-            
+        if (this.state === 'PHASE_MOVE') {
             if (x === unit.x && y === unit.y) {
-                this.state = 'IDLE';
-                this.reachable = null;
-                this.updateMap();
+                // 移動スキップ
+                this.nextPhase();
                 return;
             }
 
             let key = `${x},${y}`;
             if (this.reachable && this.reachable[key]) {
-                this.previewTarget = {x: x, y: y, path: this.reachable[key].path};
+                this.previewTarget = {x: x, y: y, path: this.reachable[key].path, cost: this.reachable[key].cost};
                 this.state = 'MOVE_PREVIEW';
-                this.updateMap();
-            } else {
-                this.state = 'IDLE';
-                this.reachable = null;
                 this.updateMap();
             }
 
         } else if (this.state === 'MOVE_PREVIEW') {
             if (x === this.previewTarget.x && y === this.previewTarget.y) {
+                unit.ap -= this.previewTarget.cost;
                 unit.x = x;
                 unit.y = y;
-                this.log(`${unit.name}隊が移動。`);
-                
-                this.state = 'DIR_SELECT';
-                this.previewTarget = null;
-                this.reachable = null;
-                this.updateMap();
+                this.log(`${unit.name}隊が移動。(残AP: ${unit.ap})`);
+                this.nextPhase();
             } else {
                 let key = `${x},${y}`;
                 if (this.reachable && this.reachable[key]) {
-                    this.previewTarget = {x: x, y: y, path: this.reachable[key].path};
+                    this.previewTarget = {x: x, y: y, path: this.reachable[key].path, cost: this.reachable[key].cost};
                     this.updateMap();
                 } else {
-                    this.state = 'IDLE';
+                    this.state = 'PHASE_MOVE';
                     this.previewTarget = null;
-                    this.reachable = null;
                     this.updateMap();
                 }
             }
-        } else if (this.state === 'DIR_SELECT') {
+        } else if (this.state === 'PHASE_DIR') {
+            if (x === unit.x && y === unit.y) {
+                // 向き変更スキップ
+                this.nextPhase();
+                return;
+            }
+
             if (this.getDistance(unit.x, unit.y, x, y) === 1) {
-                unit.direction = this.getDirection(unit.x, unit.y, x, y);
-                unit.hasActionDone = true;
-                this.state = 'IDLE';
-                this.updateMap();
-                setTimeout(() => this.nextTurn(), 500);
+                let targetDir = this.getDirection(unit.x, unit.y, x, y);
+                let turnCost = this.getTurnCost(unit.direction, targetDir);
+                
+                if (unit.ap >= turnCost) {
+                    if (turnCost > 0) {
+                        unit.ap -= turnCost;
+                        unit.direction = targetDir;
+                        this.log(`${unit.name}隊が向きを変更。(残AP: ${unit.ap})`);
+                    }
+                    this.nextPhase();
+                }
+            }
+        } else if (this.state === 'PHASE_ATTACK') {
+            if (x === unit.x && y === unit.y) {
+                // 攻撃スキップ（行動終了）
+                this.nextPhase();
+                return;
+            }
+
+            if (x === enemy.x && y === enemy.y && this.getDistance(unit.x, unit.y, x, y) === 1) {
+                if (unit.ap >= 1) {
+                    unit.ap -= 1;
+                    this.executeAttack(unit, enemy);
+                    // executeAttack内で行動終了と次ターンへ移行
+                }
             }
         }
     }
@@ -566,7 +637,7 @@ class FieldWarManager {
         if (dmgMultiplier === 1.5) dirMsg = "（背後からの強襲！）";
         if (dmgMultiplier === 1.3) dirMsg = "（側面からの攻撃！）";
 
-        this.log(`${attacker.name}隊の攻撃！${dirMsg} 敵に${dmgToDef}の損害！ 反撃で${dmgToAtk}の被害！`);
+        this.log(`${attacker.name}隊の攻撃！${dirMsg} 敵に${dmgToDef}の損害！ 反撃で${dmgToAtk}の被害！(残AP: ${attacker.ap})`);
         
         attacker.hasActionDone = true;
         this.state = 'IDLE';
@@ -597,8 +668,10 @@ class FieldWarManager {
 
         let dist = this.getDistance(unit.x, unit.y, enemy.x, enemy.y);
         
+        // ① 移動フェーズ
         if (dist > 1) {
-            let reachable = this.findPaths(unit, enemy);
+            // 攻撃用にAPを1残す
+            let reachable = this.findPaths(unit, enemy, unit.ap - 1);
             let bestTarget = null;
             let minDist = 999;
             
@@ -609,30 +682,51 @@ class FieldWarManager {
                 let d = this.getDistance(nx, ny, enemy.x, enemy.y);
                 if (d < minDist) {
                     minDist = d;
-                    bestTarget = {x: nx, y: ny};
+                    bestTarget = {x: nx, y: ny, cost: reachable[key].cost};
                 }
             }
             
             if (bestTarget && (bestTarget.x !== unit.x || bestTarget.y !== unit.y)) {
+                unit.ap -= bestTarget.cost;
                 unit.x = bestTarget.x;
                 unit.y = bestTarget.y;
-                unit.direction = this.getDirection(unit.x, unit.y, enemy.x, enemy.y);
                 if (isPlayerInvolved) {
-                    this.log(`${unit.name}隊が前進。`);
+                    this.log(`${unit.name}隊が前進。(残AP: ${unit.ap})`);
                     this.updateMap();
+                    this.updateStatus();
                     await new Promise(r => setTimeout(r, 600));
                 }
             }
         }
 
+        // ② 向き変更フェーズ
         dist = this.getDistance(unit.x, unit.y, enemy.x, enemy.y);
         if (dist === 1) {
-            unit.direction = this.getDirection(unit.x, unit.y, enemy.x, enemy.y);
-            this.executeAttack(unit, enemy);
-        } else {
-            if (isPlayerInvolved) this.log(`${unit.name}隊は待機した。`);
-            this.nextTurn();
+            let targetDir = this.getDirection(unit.x, unit.y, enemy.x, enemy.y);
+            let turnCost = this.getTurnCost(unit.direction, targetDir);
+            
+            if (unit.ap >= turnCost && turnCost > 0) {
+                unit.ap -= turnCost;
+                unit.direction = targetDir;
+                if (isPlayerInvolved) {
+                    this.log(`${unit.name}隊が敵に向き直った。(残AP: ${unit.ap})`);
+                    this.updateMap();
+                    this.updateStatus();
+                    await new Promise(r => setTimeout(r, 400));
+                }
+            }
         }
+
+        // ③ 攻撃フェーズ
+        if (dist === 1 && unit.ap >= 1) {
+            unit.ap -= 1;
+            this.executeAttack(unit, enemy);
+            return; // executeAttack内で次ターンへ移行
+        }
+
+        // 攻撃しなかった場合
+        if (isPlayerInvolved) this.log(`${unit.name}隊は待機した。`);
+        this.nextTurn();
     }
 }
 window.FieldWarManager = FieldWarManager;
