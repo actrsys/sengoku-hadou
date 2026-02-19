@@ -111,10 +111,7 @@ img {
     width: 100%; height: 100%;
     overflow: auto;
     display: flex;
-    flex-direction: column; /* 変更: Flex direction column */
-    /* 変更: justify/align centerを削除し、margin: auto で制御する */
-    
-    /* 上部が見切れないようにパディング確保 */
+    flex-direction: column; 
     padding: 20px;
     box-sizing: border-box; 
     -webkit-overflow-scrolling: touch;
@@ -126,10 +123,8 @@ img {
     padding: 20px; 
     transition: transform 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
     transform-origin: center center;
-    
-    /* 変更: 親がflexなのでmargin: autoで中央寄せ＆スクロール時は端寄せになる */
     margin: auto;
-    flex: none; /* 縮小防止 */
+    flex: none; 
 }
 
 /* PC Overlay Info Panel */
@@ -144,7 +139,7 @@ img {
     padding: 10px;
     box-shadow: 0 4px 10px rgba(0,0,0,0.3);
     z-index: 550;
-    display: none; /* PCのみJSで表示制御 */
+    display: none; 
     font-size: 0.9rem;
 }
 .overlay-header {
@@ -161,7 +156,7 @@ img {
 /* 縮小ボタン */
 #map-reset-zoom {
     position: absolute;
-    bottom: 20px; right: 20px; /* PCでの位置 */
+    bottom: 20px; right: 20px; 
     padding: 0;
     background: rgba(0,0,0,0.7);
     color: white; border: none; border-radius: 50%;
@@ -210,7 +205,6 @@ img {
     z-index: 200;
     box-shadow: 0 -2px 5px rgba(0,0,0,0.1);
     height: auto;
-    /* コマンドバーは少し小さく */
     display: block;
 }
 
@@ -234,8 +228,8 @@ img {
     padding: 5px 0;
 }
 .cmd-btn {
-    padding: 0; /* padding減らす */
-    height: 38px; /* 高さ減らす */
+    padding: 0; 
+    height: 38px; 
     border: 1px solid #bbb; background: #f8f9fa; border-radius: 4px;
     cursor: pointer; font-size: 0.8rem; font-weight: bold;
     display: flex; align-items: center; justify-content: center;
@@ -268,7 +262,7 @@ img {
     #pc-sidebar {
         display: flex !important;
         flex-direction: column;
-        width: 300px; /* 少し細く */
+        width: 300px; 
         background: #f5f5f5;
         border-left: 1px solid #ccc;
         box-shadow: -2px 0 5px rgba(0,0,0,0.1);
@@ -314,7 +308,6 @@ img {
 /* List Styling Update */
 .list-header {
     display: grid; 
-    /* 1列目(チェックボックス用)を0pxにして非表示化 */
     grid-template-columns: 0px 30px 90px 40px repeat(6, 1fr); 
     gap: 2px; font-weight: bold; background: #37474f; color:#fff; padding: 8px 5px; font-size: 0.8rem;
     position: sticky; top: 0;
@@ -322,7 +315,6 @@ img {
 .list-container { flex: 1; overflow-y: auto; border: 1px solid #ddd; min-height: 200px; }
 .select-item {
     display: grid; 
-    /* 1列目(チェックボックス用)を0pxにして非表示化 */
     grid-template-columns: 0px 30px 90px 40px repeat(6, 1fr); 
     gap: 2px; padding: 10px 5px; border-bottom: 1px solid #eee; cursor: pointer; font-size: 0.85rem; align-items: center;
 }
@@ -331,8 +323,8 @@ img {
 
 /* 選択された行のスタイル（ハイライト） */
 .select-item.selected {
-    background-color: #ffe0b2 !important; /* オレンジ系の薄い色で強調 */
-    border-left: 5px solid #ff9800; /* 左端にアクセント */
+    background-color: #ffe0b2 !important; 
+    border-left: 5px solid #ff9800; 
 }
 
 /* inputを非表示にする（視覚的には行クリックで制御） */
@@ -348,40 +340,39 @@ img {
     position: relative;
     align-items: center;
     justify-content: center;
-    width: 24px; /* 枠内での中央揃え用 */
+    width: 24px; 
     height: 1.2em;
     font-family: 'Arial Black', sans-serif;
 }
 
 .grade-main {
-    font-weight: normal; /* 文字自体の太字を解除 */
+    font-weight: normal; 
     font-size: 1.1rem;
-    /* 太めの黒枠（袋文字）の設定 */
     text-shadow: 
         1.5px 1.5px 0 #000, -1.5px 1.5px 0 #000, 
         1.5px -1.5px 0 #000, -1.5px -1.5px 0 #000,
         1.5px 0px 0 #000, -1.5px 0px 0 #000,
         0px 1.5px 0 #000, 0px -1.5px 0 #000,
-        2px 2px 2px rgba(0,0,0,0.5); /* 軽い影で視認性向上 */
+        2px 2px 2px rgba(0,0,0,0.5); 
 }
 
 .grade-plus {
     position: absolute;
-    top: -2px;    /* 右上へ配置 */
+    top: -2px;    
     right: -6px;
     font-size: 0.9rem;
-    font-weight: bold; /* ＋は黒い太字 */
-    color: #000000;    /* 一律黒 */
-    text-shadow: none; /* ＋には枠をつけない（視認性重視） */
+    font-weight: bold; 
+    color: #000000;    
+    text-shadow: none; 
 }
 
 /* Rank Colors (Main Character) */
-.rank-s .grade-main { color: #ffd700; } /* 金色 (Gold) */
-.rank-a .grade-main { color: #f47a4d; } /* チャイニーズレッド */
-.rank-b .grade-main { color: #f58f98; } /* 桃色/桃花色 */
-.rank-c .grade-main { color: #adff2f; } /* 黄緑 (GreenYellow) */
-.rank-d .grade-main { color: #65bbe9; } /* 天色 */
-.rank-e .grade-main { color: #9b95c9; } /* 藤紫 */
+.rank-s .grade-main { color: #ffd700; } 
+.rank-a .grade-main { color: #f47a4d; } 
+.rank-b .grade-main { color: #f58f98; } 
+.rank-c .grade-main { color: #adff2f; } 
+.rank-d .grade-main { color: #65bbe9; } 
+.rank-e .grade-main { color: #9b95c9; } 
 
 /* Footer Buttons */
 .modal-footer { margin-top: 15px; display: flex; justify-content: flex-end; gap: 10px; padding-top: 10px; border-top: 1px solid #eee; flex-shrink: 0;}
@@ -427,9 +418,12 @@ img {
     display: flex; justify-content: center; align-items: center;
     color: white; font-size: 1.5rem; font-weight: bold; flex-direction: column;
 }
+
+/* 修正箇所：カットイン表示中は裏のマップを触れないように pointer-events を auto に変更 */
 .cutin-overlay {
     position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-    background: rgba(0,0,0,0.7); z-index: 5000; pointer-events: none;
+    background: rgba(0,0,0,0.7); z-index: 5000;
+    pointer-events: auto;
     display: flex; justify-content: center; align-items: center;
     opacity: 0; transition: opacity 0.5s;
 }
@@ -475,4 +469,15 @@ img {
 #daimyo-confirm-modal p {
     font-size: 1.1rem;
     margin: 10px 0;
+}
+
+/* 追加箇所：大名選択確認画面での顔アイコン表示用スタイル */
+.daimyo-confirm-face {
+    width: 80px; height: 80px;
+    object-fit: cover;
+    border-radius: 4px;
+    border: 1px solid #777;
+    margin-bottom: 10px;
+    background: #ccc;
+    display: inline-block;
 }
