@@ -471,7 +471,6 @@ img {
     margin: 10px 0;
 }
 
-/* 追加箇所：大名選択確認画面での顔アイコン表示用スタイル */
 .daimyo-confirm-face {
     width: 80px; height: 80px;
     object-fit: cover;
@@ -481,3 +480,35 @@ img {
     background: #ccc;
     display: inline-block;
 }
+
+/* --- Field War (HEX) Styles --- */
+.fw-hex {
+    width: 60px;
+    height: 52px;
+    background-color: #aed581;
+    clip-path: polygon(25% 0%, 75% 0%, 100% 50%, 75% 100%, 25% 100%, 0% 50%);
+    position: absolute;
+    box-sizing: border-box;
+    display: flex; justify-content: center; align-items: center;
+    color: rgba(0,0,0,0.2); font-size: 10px; font-weight: bold;
+    transition: background-color 0.2s, filter 0.2s;
+    user-select: none;
+}
+.fw-hex:hover { filter: brightness(1.1); }
+.fw-hex.movable { background-color: #81d4fa; cursor: pointer; filter: brightness(1.1); }
+.fw-hex.attackable { background-color: #ef9a9a; cursor: pointer; filter: brightness(1.1); box-shadow: inset 0 0 10px red; }
+
+.fw-unit {
+    width: 40px; height: 40px;
+    border-radius: 50%;
+    position: absolute;
+    display: flex; justify-content: center; align-items: center;
+    font-weight: bold; color: white; font-size: 12px;
+    box-shadow: 2px 2px 5px rgba(0,0,0,0.5);
+    transition: left 0.3s, top 0.3s;
+    pointer-events: none;
+    z-index: 10;
+}
+.fw-unit.attacker { background-color: #d32f2f; border: 2px solid #fff; }
+.fw-unit.defender { background-color: #1976d2; border: 2px solid #fff; }
+.fw-unit.active { box-shadow: 0 0 12px 6px #ffff00; }

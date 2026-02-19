@@ -207,7 +207,7 @@ class WarManager {
         return null;
     }
 
-    startWar(atkCastle, defCastle, atkBushos, atkSoldierCount, atkRice) {
+    async startWar(atkCastle, defCastle, atkBushos, atkSoldierCount, atkRice) {
         try {
             const pid = Number(this.game.playerClanId);
             const atkClan = Number(atkCastle.ownerClan);
@@ -222,10 +222,6 @@ class WarManager {
             const atkClanData = this.game.clans.find(c => c.id === atkClan); 
             const atkGeneral = atkBushos[0].name;
             const atkArmyName = atkClanData ? atkClanData.getArmyName() : "敵軍";
-            
-            if (isPlayerInvolved) {
-                this.game.ui.showCutin(`${atkArmyName}の${atkGeneral}が\n${defCastle.name}に攻め込みました！`);
-            }
             
             let defBusho = this.game.getBusho(defCastle.castellanId); 
             if (!defBusho) defBusho = {name:"守備隊長", strength:30, leadership:30, intelligence:30, charm:30};
@@ -247,26 +243,78 @@ class WarManager {
                 turn: 'attacker', isPlayerInvolved: isPlayerInvolved, 
                 deadSoldiers: { attacker: 0, defender: 0 }, defenderGuarding: false 
             };
-            
-            const W = window.WarParams.War;
-            defCastle.loyalty = Math.max(0, defCastle.loyalty - (W.AttackLoyaltyDecay || 50)); 
-            defCastle.population = Math.max(0, defCastle.population - (W.AttackPopDecay || 500));
-            
-            if (isPlayerInvolved) { 
-                setTimeout(() => {
-                    this.game.ui.setWarModalVisible(true);
-                    this.game.ui.clearWarLog();
-                    this.game.ui.log(`★ ${atkCastle.name}が出陣(兵${atkSoldierCount}, 糧${atkRice})！ ${defCastle.name}へ攻撃！`); 
-                    this.game.ui.updateWarUI(); 
-                    this.processWarRound(); 
-                }, 1000);
-            } else { 
-                setTimeout(() => { this.resolveAutoWar(); }, 100); 
+
+            // 迎撃ダイアログとフロー制御
+            const showInterceptDialog = async (onResult) => {
+                if (isPlayerInvolved) {
+                    await this.game.ui.showCutin(`${atkArmyName}の${atkGeneral}が\n${defCastle.name}に攻め込みました！`);
+                }
+
+                if (defClan === pid) {
+                    const modal = document.getElementById('intercept-confirm-modal');
+                    if (modal) {
+                        modal.classList.remove('hidden');
+                        document.getElementById('intercept-msg').innerText = `${atkArmyName}の${atkGeneral}が攻めてきました！\n迎撃（野戦）しますか？籠城しますか？`;
+                        document.getElementById('btn-intercept').onclick = () => { modal.classList.add('hidden'); onResult('field'); };
+                        document.getElementById('btn-siege').onclick = () => { modal.classList.add('hidden'); onResult('siege'); };
+                    } else {
+                        onResult('siege');
+                    }
+                } else {
+                    // AI防御側のロジック
+                    if (defCastle.soldiers >= atkSoldierCount * 0.8) {
+                        onResult('field');
+                    } else {
+                        onResult('siege');
+                    }
+                }
+            };
+
+            if (typeof window.FieldWarManager === 'undefined') {
+                this.startSiegeWarPhase();
+            } else {
+                showInterceptDialog((choice) => {
+                    if (choice === 'field') {
+                        if (!this.game.fieldWarManager) {
+                            this.game.fieldWarManager = new window.FieldWarManager(this.game);
+                        }
+                        this.game.fieldWarManager.startFieldWar(this.state, (resultType) => {
+                            // コールバック結果処理
+                            if (resultType === 'attacker_win' || resultType === 'defender_retreat' || resultType === 'draw_to_siege') {
+                                this.startSiegeWarPhase();
+                            } else {
+                                this.endWar(false); // 攻撃側が敗北・撤退したため戦争終了
+                            }
+                        });
+                    } else {
+                        this.startSiegeWarPhase();
+                    }
+                });
             }
+
         } catch(e) { 
             console.error("StartWar Error:", e);
             this.state.active = false; 
             this.game.finishTurn(); 
+        }
+    }
+
+    startSiegeWarPhase() {
+        const s = this.state;
+        const W = window.WarParams.War;
+        s.defender.loyalty = Math.max(0, s.defender.loyalty - (W.AttackLoyaltyDecay || 50)); 
+        s.defender.population = Math.max(0, s.defender.population - (W.AttackPopDecay || 500));
+        
+        if (s.isPlayerInvolved) { 
+            setTimeout(() => {
+                this.game.ui.setWarModalVisible(true);
+                this.game.ui.clearWarLog();
+                this.game.ui.log(`★ ${s.sourceCastle.name}軍が${s.defender.name}への籠城戦を開始！`); 
+                this.game.ui.updateWarUI(); 
+                this.processWarRound(); 
+            }, 500); 
+        } else { 
+            setTimeout(() => { this.resolveAutoWar(); }, 100); 
         }
     }
 
@@ -310,9 +358,6 @@ class WarManager {
              const defCons = Math.floor(s.defender.soldiers * window.WarParams.War.RiceConsumptionDef);
              s.attacker.rice = Math.max(0, s.attacker.rice - atkCons);
              s.defender.rice = Math.max(0, s.defender.rice - defCons);
-             
-             if (s.isPlayerInvolved) {
-             }
         }
 
         if (s.defender.soldiers <= 0 || s.defender.defense <= 0) { this.endWar(true); return; } 
@@ -556,7 +601,6 @@ class WarManager {
     }
     
     executeRetreatLogic(defCastle) {
-        // UI選択を伴う可能性があるため、処理を中断しないように注意
         const candidates = this.game.castles.filter(c => c.ownerClan === defCastle.ownerClan && c.id !== defCastle.id && GameSystem.isAdjacent(c, defCastle));
         if (candidates.length === 0) { this.endWar(true); return; }
         const s = this.state;
@@ -596,11 +640,9 @@ class WarManager {
             }
         };
         if (defCastle.ownerClan === this.game.playerClanId) { 
-            // プレイヤーかつ候補がある場合、UIを表示してからcallbackで実行
             if (candidates.length === 1) runRetreat(candidates[0].id); 
             else this.game.ui.showRetreatSelector(defCastle, candidates, (id) => runRetreat(id)); 
         } else { 
-            // AIの場合は即時実行
             candidates.sort((a,b) => WarSystem.calcRetreatScore(b) - WarSystem.calcRetreatScore(a)); 
             runRetreat(candidates[0].id); 
         }
@@ -735,7 +777,6 @@ class WarManager {
             }
         } catch (e) {
             console.error("EndWar Error: ", e);
-            // エラーが発生した場合でも、プレイヤーが関与している場合はモーダルを出して進行を止めない
             if (this.state.isPlayerInvolved) {
                 this.game.ui.showResultModal("合戦処理中にエラーが発生しましたが、\nゲームを継続します。", () => {
                     this.game.finishTurn();

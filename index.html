@@ -176,11 +176,47 @@
                 </div>
                 <div id="war-controls" class="war-controls-area disabled-area"></div>
             </div>
+            <div id="war-log" style="height: 100px; overflow-y: auto; background: #fff; border: 1px solid #ccc; padding: 5px; font-size: 0.85rem; margin-top: 10px;"></div>
+        </div>
+    </div>
+
+    <div id="intercept-confirm-modal" class="modal hidden">
+        <div class="modal-content" style="max-width: 400px; text-align: center;">
+            <h3 style="margin-top:0;">敵軍襲来</h3>
+            <p id="intercept-msg" style="margin: 20px 0; font-size:1.1rem; line-height:1.5;"></p>
+            <div class="modal-footer" style="justify-content: center; gap: 20px;">
+                <button id="btn-intercept" class="btn-danger">迎撃（野戦）</button>
+                <button id="btn-siege" class="btn-primary">籠城</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="field-war-modal" class="modal hidden">
+        <div class="modal-content" style="width: 95%; max-width: 900px; height: 95dvh; display: flex; flex-direction: column; padding: 10px;">
+            <h2 style="margin:0 0 5px 0;">野戦 <span id="fw-turn-info" style="font-size: 1rem; font-weight: normal; margin-left: 20px;">Turn: 1/20</span></h2>
+            
+            <div id="fw-status-bar" style="display:flex; justify-content: space-between; margin-bottom: 5px;">
+                <div id="fw-atk-status" class="army-box attacker" style="width:45%; margin:0; padding:5px; font-size: 0.9rem;"></div>
+                <div id="fw-def-status" class="army-box defender" style="width:45%; margin:0; padding:5px; font-size: 0.9rem;"></div>
+            </div>
+
+            <div style="flex:1; overflow:auto; background:#81c784; position: relative; border: 2px solid #333; display: flex; align-items: center; justify-content: center;" id="fw-map-scroll">
+                <div id="fw-map" style="position: relative; transition: transform 0.3s;">
+                    </div>
+            </div>
+            
+            <div id="fw-log" style="height: 80px; overflow-y: auto; background: #fff; border: 1px solid #ccc; padding: 5px; font-size: 0.85rem; margin-top: 5px; flex-shrink: 0;"></div>
+
+            <div id="fw-controls" class="modal-footer" style="justify-content: center; margin-top: 5px; padding-top: 5px; gap:10px;">
+                <button id="fw-btn-wait" class="btn-secondary hidden">待機</button>
+                <button id="fw-btn-retreat" class="btn-danger hidden">撤退</button>
+            </div>
         </div>
     </div>
 
     <script src="js/models.js"></script>
     <script src="js/war.js"></script>
+    <script src="js/field_war.js"></script>
     <script src="js/faction_system.js"></script>
     <script src="js/command_system.js"></script>
     <script src="js/ai.js"></script>
