@@ -34,8 +34,9 @@ const COMMAND_SPECS = {
     },
     'charity': { 
         label: "施し", category: 'DEVELOP', 
-        costGold: 300, costRice: 300, // 基本コスト(タイプで変動あり)
-        isMulti: true, hasAdvice: true, 
+        costGold: 300, costRice: 300, 
+        isMulti: false,
+        hasAdvice: true, 
         startMode: 'busho_select', sortKey: 'charm',
         msg: "金: 300 / 米: 300 (選択可)" 
     },
@@ -1014,3 +1015,4 @@ class CommandSystem {
     }
 
 }
+
