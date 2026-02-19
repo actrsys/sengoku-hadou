@@ -37,12 +37,14 @@ class Castle {
         this.kokudaka = Number(this.kokudaka || 0);
         this.commerce = Number(this.commerce || 0);
 
-        this.samuraiIds = [];
-        this.isDone = false;
+        // 修正: ロード時に既存データがあれば維持する
+        this.samuraiIds = Array.isArray(this.samuraiIds) ? this.samuraiIds : [];
+        // isDoneはロードデータにあればそれを使う（デフォルトはfalse）
+        this.isDone = this.isDone === true;
         
         // 調査・視界関連
-        this.investigatedUntil = 0;
-        this.investigatedAccuracy = 0;
+        this.investigatedUntil = Number(this.investigatedUntil || 0);
+        this.investigatedAccuracy = Number(this.investigatedAccuracy || 0);
     }
 }
 
@@ -82,10 +84,11 @@ class Busho {
         this.battleHistory = Array.isArray(this.battleHistory) ? this.battleHistory : [];
         this.stayHistory = Array.isArray(this.stayHistory) ? this.stayHistory : [];
 
-        this.isDaimyo = false;
-        this.isCastellan = false;
+        // ステータスフラグ
+        this.isDaimyo = this.isDaimyo === true;
+        this.isCastellan = this.isCastellan === true;
         this.status = this.status || 'active';
-        this.isActionDone = false;
+        this.isActionDone = this.isActionDone === true;
     }
 
     // UI表示用メソッド

@@ -1564,6 +1564,12 @@ class GameManager {
 
         const castle = this.turnQueue[this.currentIndex]; 
         
+        // 修正: 既に行動済みの場合はスキップ（ロード時などの整合性用）
+        if (castle.isDone) {
+            this.finishTurn();
+            return;
+        }
+
         if(!castle || castle.ownerClan === 0 || !this.clans.find(c => Number(c.id) === Number(castle.ownerClan))) { 
             console.warn(`Skipping invalid castle or owner.`);
             this.currentIndex++; 
@@ -1717,9 +1723,14 @@ class GameManager {
     
     saveGameToFile() { 
         const data = { 
-            year: this.year, month: this.month, 
-            castles: this.castles, bushos: this.bushos, clans: this.clans,
-            playerClanId: this.playerClanId, relations: this.relations 
+            year: this.year, 
+            month: this.month, 
+            marketRate: this.marketRate, // 修正: 米相場を保存
+            castles: this.castles, 
+            bushos: this.bushos, 
+            clans: this.clans,
+            playerClanId: this.playerClanId, 
+            relations: this.relations 
         }; 
         const blob = new Blob([JSON.stringify(data, null, 2)], {type: 'application/json'}); 
         const url = URL.createObjectURL(blob); 
@@ -1732,7 +1743,10 @@ class GameManager {
         reader.onload = async (evt) => { 
             try { 
                 const d = JSON.parse(evt.target.result); 
-                this.year = d.year; this.month = d.month; this.playerClanId = d.playerClanId || 1; 
+                this.year = d.year; 
+                this.month = d.month; 
+                this.playerClanId = d.playerClanId || 1; 
+                this.marketRate = d.marketRate !== undefined ? d.marketRate : 1.0; // 修正: 米相場を復元
                 this.castles = d.castles.map(c => new Castle(c)); 
                 this.bushos = d.bushos.map(b => new Busho(b)); 
                 if(d.relations) this.relations = d.relations; 
