@@ -1,7 +1,3 @@
-{
-type: uploaded file
-fileName: war.js
-fullContent:
 /**
  * war.js
  * 戦争処理マネージャー & 戦争計算ロジック
