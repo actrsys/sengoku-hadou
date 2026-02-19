@@ -15,7 +15,7 @@ class FieldWarManager {
         this.cols = 30;
         this.rows = 20;
 
-        this.state = 'IDLE'; // 'IDLE', 'MOVE_SELECT', 'MOVE_PREVIEW', 'DIR_SELECT'
+        this.state = 'IDLE'; // 'IDLE', 'MOVE_SELECT', 'MOVE_PREVIEW', 'DIR_SELECT', 'ATTACK_SELECT'
         this.reachable = null;
         this.previewTarget = null;
     }
@@ -49,6 +49,8 @@ class FieldWarManager {
                 x: atkX, y: 19,
                 direction: isAtkPlayer ? 1 : 4, // 1:右上, 4:左下
                 mobility: 4,
+                ap: 4,
+                startAdjacency: false,
                 soldiers: warState.attacker.soldiers,
                 rice: warState.attacker.rice,
                 maxRice: warState.attacker.maxRice,
@@ -65,6 +67,8 @@ class FieldWarManager {
                 x: defX, y: 19,
                 direction: isDefPlayer ? 1 : 4,
                 mobility: 4,
+                ap: 4,
+                startAdjacency: false,
                 soldiers: warState.defender.soldiers,
                 rice: warState.defender.rice,
                 maxRice: warState.defender.rice, 
@@ -143,8 +147,11 @@ class FieldWarManager {
         const atkEl = document.getElementById('fw-atk-status');
         const defEl = document.getElementById('fw-def-status');
 
-        if (atkEl) atkEl.innerHTML = `<strong>[攻] ${atk.name}</strong><br>兵: ${atk.soldiers} / 糧: ${atk.rice}`;
-        if (defEl) defEl.innerHTML = `<strong>[守] ${def.name}</strong><br>兵: ${def.soldiers} / 糧: ${def.rice}`;
+        let atkAP = this.activeUnitIndex === 0 ? ` / AP: ${atk.ap}` : "";
+        let defAP = this.activeUnitIndex === 1 ? ` / AP: ${def.ap}` : "";
+
+        if (atkEl) atkEl.innerHTML = `<strong>[攻] ${atk.name}</strong><br>兵: ${atk.soldiers} / 糧: ${atk.rice}${atkAP}`;
+        if (defEl) defEl.innerHTML = `<strong>[守] ${def.name}</strong><br>兵: ${def.soldiers} / 糧: ${def.rice}${defAP}`;
         
         // プレイヤー側が必ず左に配置されるように順序を制御
         if (atk.isPlayer) {
@@ -190,19 +197,41 @@ class FieldWarManager {
                 
                 if (isPlayerTurn) {
                     if (this.state === 'MOVE_SELECT') {
-                        if (x === enemy.x && y === enemy.y && this.getDistance(unit.x, unit.y, x, y) === 1) {
+                        if (x === enemy.x && y === enemy.y && this.getDistance(unit.x, unit.y, x, y) === 1 && unit.ap >= 1) {
                             hex.classList.add('attackable');
+                            hex.style.zIndex = '30';
                         } else if (this.reachable && this.reachable[`${x},${y}`]) {
                             hex.classList.add('movable');
+                            hex.style.zIndex = '20';
                         }
                     } else if (this.state === 'MOVE_PREVIEW') {
                         if (this.reachable && this.reachable[`${x},${y}`]) {
                             hex.classList.add('movable');
+                            hex.style.zIndex = '20';
                         }
                     } else if (this.state === 'DIR_SELECT') {
-                        if (this.getDistance(unit.x, unit.y, x, y) === 1) {
-                            hex.classList.add('fw-dir-highlight');
+                        if (x === enemy.x && y === enemy.y && this.getDistance(unit.x, unit.y, x, y) === 1 && unit.ap >= 1) {
+                            hex.classList.add('attackable');
+                            hex.style.zIndex = '30';
+                        } else if (this.getDistance(unit.x, unit.y, x, y) === 1) {
+                            let targetDir = this.getDirection(unit.x, unit.y, x, y);
+                            let cost = this.getDirChangeCost(unit.direction, targetDir);
+                            if (unit.ap >= cost) {
+                                hex.classList.add('fw-dir-highlight');
+                                hex.style.zIndex = '25';
+                            }
                         }
+                    } else if (this.state === 'ATTACK_SELECT') {
+                        if (x === enemy.x && y === enemy.y && this.getDistance(unit.x, unit.y, x, y) === 1 && unit.ap >= 1) {
+                            hex.classList.add('attackable');
+                            hex.style.zIndex = '30';
+                        }
+                    }
+
+                    // 自マスのクリック可能を強調
+                    if (x === unit.x && y === unit.y && this.state !== 'IDLE') {
+                        hex.style.cursor = 'pointer';
+                        hex.style.zIndex = '25';
                     }
                 }
                 
@@ -311,18 +340,25 @@ class FieldWarManager {
         return 0;
     }
 
+    getDirChangeCost(curDir, targetDir) {
+        if (curDir === targetDir) return 0;
+        let diff = Math.abs(curDir - targetDir);
+        diff = Math.min(diff, 6 - diff);
+        if (diff === 1) return 1;
+        return 2;
+    }
+
     // --- ZOC探索 ---
     getCost(x, y, enemy) {
         if (x === enemy.x && y === enemy.y) return 999;
         let dist = this.getDistance(x, y, enemy.x, enemy.y);
-        if (dist === 1) return 3;
-        if (dist === 2) return 2;
+        if (dist === 1) return 2; // 敵に隣接するマスの消費は2
         return 1;
     }
 
     findPaths(unit, enemy) {
-        let maxAP = unit.mobility;
-        let queue = [{x: unit.x, y: unit.y, cost: 0, path: []}];
+        let maxAP = unit.ap;
+        let queue = [{x: unit.x, y: unit.y, cost: 0, path: [], isFirst: true}];
         let visited = {};
         visited[`${unit.x},${unit.y}`] = { cost: 0, path: [] };
         
@@ -332,14 +368,20 @@ class FieldWarManager {
             
             let neighbors = this.getNeighbors(cur.x, cur.y);
             for(let n of neighbors) {
-                let c = this.getCost(n.x, n.y, enemy);
+                let c = 0;
+                if (cur.isFirst && unit.startAdjacency) {
+                    c = 4; // 行動開始時点で最初から敵部隊と隣接していた場合、必ず移動力を４消費
+                } else {
+                    c = this.getCost(n.x, n.y, enemy);
+                }
+
                 let nextCost = cur.cost + c;
                 if (nextCost <= maxAP) {
                     let key = `${n.x},${n.y}`;
                     if (!visited[key] || visited[key].cost > nextCost) {
                         let newPath = [...cur.path, {x: n.x, y: n.y}];
                         visited[key] = { cost: nextCost, path: newPath };
-                        queue.push({x: n.x, y: n.y, cost: nextCost, path: newPath});
+                        queue.push({x: n.x, y: n.y, cost: nextCost, path: newPath, isFirst: false});
                     }
                 }
             }
@@ -355,7 +397,12 @@ class FieldWarManager {
     startTurn() {
         if (!this.active) return;
         const unit = this.units[this.activeUnitIndex];
+        const enemy = this.units[1 - this.activeUnitIndex];
+        
         unit.hasActionDone = false;
+        unit.ap = 4; // ターン開始時にAPリセット
+        unit.startAdjacency = (this.getDistance(unit.x, unit.y, enemy.x, enemy.y) === 1);
+
         this.state = 'IDLE';
         this.reachable = null;
         this.previewTarget = null;
@@ -363,6 +410,7 @@ class FieldWarManager {
         const isPlayerInvolved = this.units.some(u => u.isPlayer);
         if (isPlayerInvolved) {
             this.updateMap();
+            this.updateStatus();
         }
 
         if (!unit.isPlayer) {
@@ -473,16 +521,18 @@ class FieldWarManager {
                 this.updateMap();
             }
         } else if (this.state === 'MOVE_SELECT') {
+            // ショートカット：攻撃（移動と向き変更をスキップ）
             if (x === enemy.x && y === enemy.y) {
-                if (this.getDistance(unit.x, unit.y, enemy.x, enemy.y) === 1) {
-                    unit.direction = this.getDirection(unit.x, unit.y, enemy.x, enemy.y);
+                if (this.getDistance(unit.x, unit.y, enemy.x, enemy.y) === 1 && unit.ap >= 1) {
+                    unit.ap -= 1;
                     this.executeAttack(unit, enemy);
                     return;
                 }
             }
             
+            // スキップ：移動せず向き変更フェーズへ
             if (x === unit.x && y === unit.y) {
-                this.state = 'IDLE';
+                this.state = 'DIR_SELECT';
                 this.reachable = null;
                 this.updateMap();
                 return;
@@ -490,7 +540,7 @@ class FieldWarManager {
 
             let key = `${x},${y}`;
             if (this.reachable && this.reachable[key]) {
-                this.previewTarget = {x: x, y: y, path: this.reachable[key].path};
+                this.previewTarget = {x: x, y: y, path: this.reachable[key].path, cost: this.reachable[key].cost};
                 this.state = 'MOVE_PREVIEW';
                 this.updateMap();
             } else {
@@ -503,16 +553,18 @@ class FieldWarManager {
             if (x === this.previewTarget.x && y === this.previewTarget.y) {
                 unit.x = x;
                 unit.y = y;
-                this.log(`${unit.name}隊が移動。`);
+                unit.ap -= this.previewTarget.cost;
+                this.log(`${unit.name}隊が移動。(残AP:${unit.ap})`);
                 
                 this.state = 'DIR_SELECT';
                 this.previewTarget = null;
                 this.reachable = null;
                 this.updateMap();
+                this.updateStatus();
             } else {
                 let key = `${x},${y}`;
                 if (this.reachable && this.reachable[key]) {
-                    this.previewTarget = {x: x, y: y, path: this.reachable[key].path};
+                    this.previewTarget = {x: x, y: y, path: this.reachable[key].path, cost: this.reachable[key].cost};
                     this.updateMap();
                 } else {
                     this.state = 'IDLE';
@@ -522,8 +574,41 @@ class FieldWarManager {
                 }
             }
         } else if (this.state === 'DIR_SELECT') {
+            // ショートカット：攻撃（向き変更をスキップ）
+            if (x === enemy.x && y === enemy.y && this.getDistance(unit.x, unit.y, x, y) === 1 && unit.ap >= 1) {
+                unit.ap -= 1;
+                this.executeAttack(unit, enemy);
+                return;
+            }
+
+            // スキップ：向き変更せず攻撃フェーズへ
+            if (x === unit.x && y === unit.y) {
+                this.state = 'ATTACK_SELECT';
+                this.updateMap();
+                return;
+            }
+
             if (this.getDistance(unit.x, unit.y, x, y) === 1) {
-                unit.direction = this.getDirection(unit.x, unit.y, x, y);
+                let targetDir = this.getDirection(unit.x, unit.y, x, y);
+                let cost = this.getDirChangeCost(unit.direction, targetDir);
+                if (unit.ap >= cost) {
+                    unit.direction = targetDir;
+                    unit.ap -= cost;
+                    this.log(`${unit.name}隊が向きを変更。(残AP:${unit.ap})`);
+                    this.state = 'ATTACK_SELECT';
+                    this.updateMap();
+                    this.updateStatus();
+                }
+            } else {
+                this.state = 'ATTACK_SELECT';
+                this.updateMap();
+            }
+        } else if (this.state === 'ATTACK_SELECT') {
+            if (x === enemy.x && y === enemy.y && this.getDistance(unit.x, unit.y, x, y) === 1 && unit.ap >= 1) {
+                unit.ap -= 1;
+                this.executeAttack(unit, enemy);
+            } else {
+                this.log(`${unit.name}隊は行動を終了した。`);
                 unit.hasActionDone = true;
                 this.state = 'IDLE';
                 this.updateMap();
@@ -566,7 +651,7 @@ class FieldWarManager {
         if (dmgMultiplier === 1.5) dirMsg = "（背後からの強襲！）";
         if (dmgMultiplier === 1.3) dirMsg = "（側面からの攻撃！）";
 
-        this.log(`${attacker.name}隊の攻撃！${dirMsg} 敵に${dmgToDef}の損害！ 反撃で${dmgToAtk}の被害！`);
+        this.log(`${attacker.name}隊の攻撃！${dirMsg} 敵に${dmgToDef}の損害！ 反撃で${dmgToAtk}の被害！(残AP:${attacker.ap})`);
         
         attacker.hasActionDone = true;
         this.state = 'IDLE';
@@ -584,6 +669,9 @@ class FieldWarManager {
         const unit = this.units[this.activeUnitIndex];
         const enemy = this.units[1 - this.activeUnitIndex];
         
+        unit.ap = 4;
+        unit.startAdjacency = (this.getDistance(unit.x, unit.y, enemy.x, enemy.y) === 1);
+
         const isPlayerInvolved = this.units.some(u => u.isPlayer);
         if (isPlayerInvolved) {
             await new Promise(r => setTimeout(r, 600));
@@ -597,6 +685,7 @@ class FieldWarManager {
 
         let dist = this.getDistance(unit.x, unit.y, enemy.x, enemy.y);
         
+        // 1. 移動フェーズ
         if (dist > 1) {
             let reachable = this.findPaths(unit, enemy);
             let bestTarget = null;
@@ -609,25 +698,44 @@ class FieldWarManager {
                 let d = this.getDistance(nx, ny, enemy.x, enemy.y);
                 if (d < minDist) {
                     minDist = d;
-                    bestTarget = {x: nx, y: ny};
+                    bestTarget = {x: nx, y: ny, cost: reachable[key].cost};
                 }
             }
             
             if (bestTarget && (bestTarget.x !== unit.x || bestTarget.y !== unit.y)) {
                 unit.x = bestTarget.x;
                 unit.y = bestTarget.y;
-                unit.direction = this.getDirection(unit.x, unit.y, enemy.x, enemy.y);
+                unit.ap -= bestTarget.cost;
                 if (isPlayerInvolved) {
-                    this.log(`${unit.name}隊が前進。`);
+                    this.log(`${unit.name}隊が前進。(残AP:${unit.ap})`);
                     this.updateMap();
+                    this.updateStatus();
                     await new Promise(r => setTimeout(r, 600));
                 }
             }
         }
 
         dist = this.getDistance(unit.x, unit.y, enemy.x, enemy.y);
+
+        // 2. 向き変更フェーズ
         if (dist === 1) {
-            unit.direction = this.getDirection(unit.x, unit.y, enemy.x, enemy.y);
+            let targetDir = this.getDirection(unit.x, unit.y, enemy.x, enemy.y);
+            let cost = this.getDirChangeCost(unit.direction, targetDir);
+            if (unit.ap >= cost && cost > 0) {
+                unit.direction = targetDir;
+                unit.ap -= cost;
+                if (isPlayerInvolved) {
+                    this.log(`${unit.name}隊が向きを変更。(残AP:${unit.ap})`);
+                    this.updateMap();
+                    this.updateStatus();
+                    await new Promise(r => setTimeout(r, 600));
+                }
+            }
+        }
+
+        // 3. 攻撃フェーズ
+        if (dist === 1 && unit.ap >= 1) {
+            unit.ap -= 1;
             this.executeAttack(unit, enemy);
         } else {
             if (isPlayerInvolved) this.log(`${unit.name}隊は待機した。`);
