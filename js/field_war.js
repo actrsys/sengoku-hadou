@@ -9,11 +9,15 @@ class FieldWarManager {
         this.game = game;
         this.active = false;
         
-        // HEXサイズ設定（Flat-topped）
-        this.hexW = 60;
-        this.hexH = 52;
-        this.cols = 15;
-        this.rows = 15;
+        // HEXサイズ設定（縮小版）
+        this.hexW = 30;
+        this.hexH = 26;
+        this.cols = 30;
+        this.rows = 20;
+
+        this.state = 'IDLE'; // 'IDLE', 'MOVE_SELECT', 'MOVE_PREVIEW', 'DIR_SELECT'
+        this.reachable = null;
+        this.previewTarget = null;
     }
 
     startFieldWar(warState, onComplete) {
@@ -22,54 +26,57 @@ class FieldWarManager {
         this.turnCount = 1;
         this.maxTurns = 20;
         this.active = true;
+        this.state = 'IDLE';
 
         const pid = Number(this.game.playerClanId);
         const isAtkPlayer = (Number(warState.attacker.ownerClan) === pid);
         const isDefPlayer = (Number(warState.defender.ownerClan) === pid);
         const isPlayerInvolved = isAtkPlayer || isDefPlayer;
 
-        // 配置座標の決定（プレイヤーは必ず左側）
-        let atkX = 2, defX = 12;
+        // 配置座標の決定
+        let atkX = 5, defX = 25;
         if (isDefPlayer && !isAtkPlayer) {
-            atkX = 12;
-            defX = 2;
+            atkX = 25;
+            defX = 5;
         }
 
-        // ユニット情報生成
         this.units = [
             {
                 id: 'attacker',
                 name: warState.atkBushos[0].name,
                 isAttacker: true,
                 isPlayer: isAtkPlayer,
-                x: atkX, y: 14,
+                x: atkX, y: 19,
+                direction: isAtkPlayer ? 1 : 4, // 1:右上, 4:左下
+                mobility: 4,
                 soldiers: warState.attacker.soldiers,
                 rice: warState.attacker.rice,
                 maxRice: warState.attacker.maxRice,
                 morale: warState.attacker.morale,
                 training: warState.attacker.training,
                 stats: WarSystem.calcUnitStats(warState.atkBushos),
-                hasMoved: false
+                hasActionDone: false
             },
             {
                 id: 'defender',
                 name: warState.defBusho.name,
                 isAttacker: false,
                 isPlayer: isDefPlayer,
-                x: defX, y: 14,
+                x: defX, y: 19,
+                direction: isDefPlayer ? 1 : 4,
+                mobility: 4,
                 soldiers: warState.defender.soldiers,
                 rice: warState.defender.rice,
-                maxRice: warState.defender.rice, // 元のriceを最大とする
+                maxRice: warState.defender.rice, 
                 morale: warState.defender.morale,
                 training: warState.defender.training,
                 stats: WarSystem.calcUnitStats([warState.defBusho]),
-                hasMoved: false
+                hasActionDone: false
             }
         ];
 
-        this.activeUnitIndex = 0; // 攻撃側からスタート
+        this.activeUnitIndex = 0; 
         
-        // UIの初期化
         this.initUI();
         
         if (isPlayerInvolved) {
@@ -89,7 +96,6 @@ class FieldWarManager {
         if (this.modal) this.modal.classList.remove('hidden');
         if (this.logEl) this.logEl.innerHTML = '';
         
-        // マップサイズの計算 (奇数行のズレ考慮)
         const totalW = (this.cols - 1) * (this.hexW * 0.75) + this.hexW;
         const totalH = (this.rows * 2 - 1) * (this.hexH / 2) + this.hexH;
         if (this.mapEl) {
@@ -97,7 +103,6 @@ class FieldWarManager {
             this.mapEl.style.height = `${totalH}px`;
         }
 
-        // 待機・撤退ボタンの設定
         const btnWait = document.getElementById('fw-btn-wait');
         const btnRetreat = document.getElementById('fw-btn-retreat');
         
@@ -105,6 +110,8 @@ class FieldWarManager {
             btnWait.onclick = () => {
                 if (!this.isPlayerTurn()) return;
                 this.log(`${this.units[this.activeUnitIndex].name}隊は待機した。`);
+                this.units[this.activeUnitIndex].hasActionDone = true;
+                this.state = 'IDLE';
                 this.nextTurn();
             };
         }
@@ -146,6 +153,14 @@ class FieldWarManager {
     updateMap() {
         if (!this.mapEl) return;
         this.mapEl.innerHTML = '';
+
+        // SVGレイヤー追加
+        const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+        svg.id = 'fw-svg-layer';
+        svg.style.position = 'absolute'; svg.style.top = '0'; svg.style.left = '0';
+        svg.style.width = '100%'; svg.style.height = '100%';
+        svg.style.pointerEvents = 'none'; svg.style.zIndex = '15';
+        this.mapEl.appendChild(svg);
         
         const unit = this.units[this.activeUnitIndex];
         const enemy = this.units[1 - this.activeUnitIndex];
@@ -161,10 +176,20 @@ class FieldWarManager {
                 hex.style.top = `${y * (this.hexH / 2)}px`;
                 
                 if (isPlayerTurn) {
-                    if (x === enemy.x && y === enemy.y && this.getDistance(unit.x, unit.y, x, y) === 1) {
-                        hex.classList.add('attackable');
-                    } else if (!unit.hasMoved && x !== enemy.x && y !== enemy.y && x !== unit.x && y !== unit.y && this.getDistance(unit.x, unit.y, x, y) === 1) {
-                        hex.classList.add('movable');
+                    if (this.state === 'MOVE_SELECT') {
+                        if (x === enemy.x && y === enemy.y && this.getDistance(unit.x, unit.y, x, y) === 1) {
+                            hex.classList.add('attackable');
+                        } else if (this.reachable && this.reachable[`${x},${y}`]) {
+                            hex.classList.add('movable');
+                        }
+                    } else if (this.state === 'MOVE_PREVIEW') {
+                        if (this.reachable && this.reachable[`${x},${y}`]) {
+                            hex.classList.add('movable');
+                        }
+                    } else if (this.state === 'DIR_SELECT') {
+                        if (this.getDistance(unit.x, unit.y, x, y) === 1) {
+                            hex.classList.add('fw-dir-highlight');
+                        }
                     }
                 }
                 
@@ -173,13 +198,28 @@ class FieldWarManager {
             }
         }
         
+        // 軌跡描画
+        if (this.state === 'MOVE_PREVIEW' && this.previewTarget) {
+            this.drawPath(this.previewTarget.path, unit.x, unit.y);
+            
+            // プレビューユニット
+            const pEl = document.createElement('div');
+            pEl.className = `fw-unit ${unit.isAttacker ? 'attacker' : 'defender'} preview`;
+            pEl.style.left = `${this.previewTarget.x * (this.hexW * 0.75) + (this.hexW - 24) / 2}px`;
+            pEl.style.top = `${this.previewTarget.y * (this.hexH / 2) + (this.hexH - 24) / 2}px`;
+            pEl.style.transform = `rotate(${unit.direction * 60}deg)`;
+            this.mapEl.appendChild(pEl);
+        }
+
         // ユニット描画
         this.units.forEach((u, i) => {
             const uEl = document.createElement('div');
             uEl.className = `fw-unit ${u.isAttacker ? 'attacker' : 'defender'} ${i === this.activeUnitIndex ? 'active' : ''}`;
-            uEl.style.left = `${u.x * (this.hexW * 0.75) + (this.hexW - 40) / 2}px`;
-            uEl.style.top = `${u.y * (this.hexH / 2) + (this.hexH - 40) / 2}px`;
+            uEl.style.left = `${u.x * (this.hexW * 0.75) + (this.hexW - 24) / 2}px`;
+            uEl.style.top = `${u.y * (this.hexH / 2) + (this.hexH - 24) / 2}px`;
+            uEl.style.transform = `rotate(${u.direction * 60}deg)`;
             uEl.innerText = u.isAttacker ? '攻' : '守';
+            // 向きが逆さまになると文字も逆さまになるため、中身のspanで戻すなどの工夫も可だが一旦そのまま
             this.mapEl.appendChild(uEl);
         });
 
@@ -194,6 +234,31 @@ class FieldWarManager {
         }
     }
 
+    drawPath(pathArr, startX, startY) {
+        const svg = document.getElementById('fw-svg-layer');
+        if (!svg || pathArr.length === 0) return;
+
+        let pts = [];
+        const getCenter = (hx, hy) => {
+            const px = hx * (this.hexW * 0.75) + this.hexW / 2;
+            const py = hy * (this.hexH / 2) + this.hexH / 2;
+            return `${px},${py}`;
+        };
+        
+        pts.push(getCenter(startX, startY));
+        for (let p of pathArr) {
+            pts.push(getCenter(p.x, p.y));
+        }
+        
+        const polyline = document.createElementNS('http://www.w3.org/2000/svg', 'polyline');
+        polyline.setAttribute('points', pts.join(' '));
+        polyline.setAttribute('fill', 'none');
+        polyline.setAttribute('stroke', '#ffff00');
+        polyline.setAttribute('stroke-width', '4');
+        polyline.setAttribute('stroke-dasharray', '5,5');
+        svg.appendChild(polyline);
+    }
+
     // --- 座標計算系 ---
     getDistance(x1, y1, x2, y2) {
         const dx = Math.abs(x1 - x2);
@@ -204,9 +269,9 @@ class FieldWarManager {
     getNeighbors(x, y) {
         const list = [];
         const dirs = [
-            {dx: 0, dy: -2}, {dx: 0, dy: 2},
-            {dx: -1, dy: -1}, {dx: 1, dy: -1},
-            {dx: -1, dy: 1}, {dx: 1, dy: 1}
+            {dx: 0, dy: -2}, {dx: 1, dy: -1},
+            {dx: 1, dy: 1}, {dx: 0, dy: 2},
+            {dx: -1, dy: 1}, {dx: -1, dy: -1}
         ];
         for (const d of dirs) {
             const nx = x + d.dx;
@@ -218,6 +283,57 @@ class FieldWarManager {
         return list;
     }
 
+    getDirection(fromX, fromY, toX, toY) {
+        const dirs = [
+            {dx: 0, dy: -2, dir: 0},
+            {dx: 1, dy: -1, dir: 1},
+            {dx: 1, dy: 1, dir: 2},
+            {dx: 0, dy: 2, dir: 3},
+            {dx: -1, dy: 1, dir: 4},
+            {dx: -1, dy: -1, dir: 5}
+        ];
+        for(let d of dirs) {
+            if (toX - fromX === d.dx && toY - fromY === d.dy) return d.dir;
+        }
+        return 0;
+    }
+
+    // --- ZOC探索 ---
+    getCost(x, y, enemy) {
+        if (x === enemy.x && y === enemy.y) return 999;
+        let dist = this.getDistance(x, y, enemy.x, enemy.y);
+        if (dist === 1) return 3;
+        if (dist === 2) return 2;
+        return 1;
+    }
+
+    findPaths(unit, enemy) {
+        let maxAP = unit.mobility;
+        let queue = [{x: unit.x, y: unit.y, cost: 0, path: []}];
+        let visited = {};
+        visited[`${unit.x},${unit.y}`] = { cost: 0, path: [] };
+        
+        while(queue.length > 0) {
+            queue.sort((a,b) => a.cost - b.cost);
+            let cur = queue.shift();
+            
+            let neighbors = this.getNeighbors(cur.x, cur.y);
+            for(let n of neighbors) {
+                let c = this.getCost(n.x, n.y, enemy);
+                let nextCost = cur.cost + c;
+                if (nextCost <= maxAP) {
+                    let key = `${n.x},${n.y}`;
+                    if (!visited[key] || visited[key].cost > nextCost) {
+                        let newPath = [...cur.path, {x: n.x, y: n.y}];
+                        visited[key] = { cost: nextCost, path: newPath };
+                        queue.push({x: n.x, y: n.y, cost: nextCost, path: newPath});
+                    }
+                }
+            }
+        }
+        return visited;
+    }
+
     // --- ターン制御 ---
     isPlayerTurn() {
         return this.units[this.activeUnitIndex].isPlayer;
@@ -226,7 +342,10 @@ class FieldWarManager {
     startTurn() {
         if (!this.active) return;
         const unit = this.units[this.activeUnitIndex];
-        unit.hasMoved = false;
+        unit.hasActionDone = false;
+        this.state = 'IDLE';
+        this.reachable = null;
+        this.previewTarget = null;
 
         const isPlayerInvolved = this.units.some(u => u.isPlayer);
         if (isPlayerInvolved) {
@@ -243,7 +362,6 @@ class FieldWarManager {
 
         this.activeUnitIndex = 1 - this.activeUnitIndex;
 
-        // ラウンド終了時（両者が1回ずつ行動後）に兵糧消費とターン進行
         if (this.activeUnitIndex === 0) {
             this.turnCount++;
             this.consumeRice();
@@ -263,7 +381,6 @@ class FieldWarManager {
         const atkUnit = this.units.find(u => u.isAttacker);
         const defUnit = this.units.find(u => !u.isAttacker);
         
-        // お互いに攻撃側の消費量(RiceConsumptionAtk)の半分を消費
         const consumeRate = (window.WarParams.War.RiceConsumptionAtk || 0.1) * 0.5;
         
         const atkCons = Math.floor(atkUnit.soldiers * consumeRate);
@@ -308,7 +425,6 @@ class FieldWarManager {
     endFieldWar(resultType) {
         this.active = false;
         
-        // 状態の引き継ぎ
         const atkUnit = this.units.find(u => u.isAttacker);
         const defUnit = this.units.find(u => !u.isAttacker);
         
@@ -337,46 +453,110 @@ class FieldWarManager {
         const unit = this.units[this.activeUnitIndex];
         const enemy = this.units[1 - this.activeUnitIndex];
 
-        // 敵マス判定
-        if (x === enemy.x && y === enemy.y) {
-            if (this.getDistance(unit.x, unit.y, enemy.x, enemy.y) === 1) {
-                this.executeAttack(unit, enemy);
+        if (this.state === 'IDLE') {
+            if (x === unit.x && y === unit.y && !unit.hasActionDone) {
+                this.reachable = this.findPaths(unit, enemy);
+                this.state = 'MOVE_SELECT';
+                this.updateMap();
             }
-            return;
-        }
-        
-        // 味方マス判定
-        if (x === unit.x && y === unit.y) return;
+        } else if (this.state === 'MOVE_SELECT') {
+            if (x === enemy.x && y === enemy.y) {
+                if (this.getDistance(unit.x, unit.y, enemy.x, enemy.y) === 1) {
+                    unit.direction = this.getDirection(unit.x, unit.y, enemy.x, enemy.y);
+                    this.executeAttack(unit, enemy);
+                    return;
+                }
+            }
+            
+            if (x === unit.x && y === unit.y) {
+                this.state = 'IDLE';
+                this.reachable = null;
+                this.updateMap();
+                return;
+            }
 
-        // 移動判定
-        if (!unit.hasMoved && this.getDistance(unit.x, unit.y, x, y) === 1) {
-            unit.x = x;
-            unit.y = y;
-            unit.hasMoved = true;
-            this.log(`${unit.name}隊が前進。`);
-            this.updateMap();
+            let key = `${x},${y}`;
+            if (this.reachable && this.reachable[key]) {
+                this.previewTarget = {x: x, y: y, path: this.reachable[key].path};
+                this.state = 'MOVE_PREVIEW';
+                this.updateMap();
+            } else {
+                this.state = 'IDLE';
+                this.reachable = null;
+                this.updateMap();
+            }
+
+        } else if (this.state === 'MOVE_PREVIEW') {
+            if (x === this.previewTarget.x && y === this.previewTarget.y) {
+                unit.x = x;
+                unit.y = y;
+                this.log(`${unit.name}隊が移動。`);
+                
+                this.state = 'DIR_SELECT';
+                this.previewTarget = null;
+                this.reachable = null;
+                this.updateMap();
+            } else {
+                let key = `${x},${y}`;
+                if (this.reachable && this.reachable[key]) {
+                    this.previewTarget = {x: x, y: y, path: this.reachable[key].path};
+                    this.updateMap();
+                } else {
+                    this.state = 'IDLE';
+                    this.previewTarget = null;
+                    this.reachable = null;
+                    this.updateMap();
+                }
+            }
+        } else if (this.state === 'DIR_SELECT') {
+            if (this.getDistance(unit.x, unit.y, x, y) === 1) {
+                unit.direction = this.getDirection(unit.x, unit.y, x, y);
+                unit.hasActionDone = true;
+                this.state = 'IDLE';
+                this.updateMap();
+                setTimeout(() => this.nextTurn(), 500);
+            }
         }
     }
 
     // --- 戦闘処理 ---
+    getDirectionalMultiplier(atkUnit, defUnit) {
+        let atkDirIndex = this.getDirection(defUnit.x, defUnit.y, atkUnit.x, atkUnit.y);
+        let defDirIndex = defUnit.direction;
+        
+        let diff = Math.abs(defDirIndex - atkDirIndex);
+        diff = Math.min(diff, 6 - diff);
+        
+        if (diff === 3) return 1.5; 
+        if (diff === 2) return 1.3; 
+        return 1.0; 
+    }
+
     executeAttack(attacker, defender) {
-        // war.js の共通計算ロジックを利用
         const result = WarSystem.calcWarDamage(
             attacker.stats, defender.stats,
             attacker.soldiers, defender.soldiers,
-            0, // 野戦なので城壁防御は0
+            0, 
             attacker.morale, defender.training,
             'charge'
         );
 
-        let dmgToDef = Math.min(defender.soldiers, result.soldierDmg);
-        let dmgToAtk = Math.min(attacker.soldiers, result.counterDmg);
+        let dmgMultiplier = this.getDirectionalMultiplier(attacker, defender);
+
+        let dmgToDef = Math.floor(Math.min(defender.soldiers, result.soldierDmg * dmgMultiplier));
+        let dmgToAtk = Math.floor(Math.min(attacker.soldiers, result.counterDmg));
 
         defender.soldiers -= dmgToDef;
         attacker.soldiers -= dmgToAtk;
 
-        this.log(`${attacker.name}隊の攻撃！ 敵に${dmgToDef}の損害！ 反撃で${dmgToAtk}の被害！`);
+        let dirMsg = "";
+        if (dmgMultiplier === 1.5) dirMsg = "（背後からの強襲！）";
+        if (dmgMultiplier === 1.3) dirMsg = "（側面からの攻撃！）";
+
+        this.log(`${attacker.name}隊の攻撃！${dirMsg} 敵に${dmgToDef}の損害！ 反撃で${dmgToAtk}の被害！`);
         
+        attacker.hasActionDone = true;
+        this.state = 'IDLE';
         this.updateMap();
         this.updateStatus();
         
@@ -396,7 +576,6 @@ class FieldWarManager {
             await new Promise(r => setTimeout(r, 600));
         }
 
-        // 撤退判定: 兵力が敵の20%未満なら撤退
         if (unit.soldiers < enemy.soldiers * 0.2) {
             if (isPlayerInvolved) this.log(`${unit.name}隊は劣勢を悟り、撤退を決断した！`);
             this.endFieldWar(unit.isAttacker ? 'attacker_retreat' : 'defender_retreat');
@@ -405,34 +584,37 @@ class FieldWarManager {
 
         let dist = this.getDistance(unit.x, unit.y, enemy.x, enemy.y);
         
-        // 移動処理
         if (dist > 1) {
-            let bestHex = null;
+            let reachable = this.findPaths(unit, enemy);
+            let bestTarget = null;
             let minDist = 999;
-            const neighbors = this.getNeighbors(unit.x, unit.y);
             
-            for (const n of neighbors) {
-                if (n.x === enemy.x && n.y === enemy.y) continue;
-                const d = this.getDistance(n.x, n.y, enemy.x, enemy.y);
+            for (let key in reachable) {
+                let parts = key.split(',');
+                let nx = parseInt(parts[0]);
+                let ny = parseInt(parts[1]);
+                let d = this.getDistance(nx, ny, enemy.x, enemy.y);
                 if (d < minDist) {
                     minDist = d;
-                    bestHex = n;
+                    bestTarget = {x: nx, y: ny};
                 }
             }
             
-            if (bestHex) {
-                unit.x = bestHex.x;
-                unit.y = bestHex.y;
+            if (bestTarget && (bestTarget.x !== unit.x || bestTarget.y !== unit.y)) {
+                unit.x = bestTarget.x;
+                unit.y = bestTarget.y;
+                unit.direction = this.getDirection(unit.x, unit.y, enemy.x, enemy.y);
                 if (isPlayerInvolved) {
                     this.log(`${unit.name}隊が前進。`);
                     this.updateMap();
-                    await new Promise(r => setTimeout(r, 400));
+                    await new Promise(r => setTimeout(r, 600));
                 }
             }
         }
 
         dist = this.getDistance(unit.x, unit.y, enemy.x, enemy.y);
         if (dist === 1) {
+            unit.direction = this.getDirection(unit.x, unit.y, enemy.x, enemy.y);
             this.executeAttack(unit, enemy);
         } else {
             if (isPlayerInvolved) this.log(`${unit.name}隊は待機した。`);
