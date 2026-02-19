@@ -207,6 +207,11 @@ class WarManager {
             atkCastle.soldiers = Math.max(0, atkCastle.soldiers - atkSoldierCount);
             atkCastle.rice = Math.max(0, atkCastle.rice - atkRice);
 
+            // 攻撃側の参戦武将を行動済みにする
+            if (atkBushos && atkBushos.length > 0) {
+                atkBushos.forEach(b => b.isActionDone = true);
+            }
+
             const atkClanData = this.game.clans.find(c => c.id === atkClan); 
             const atkGeneral = atkBushos[0].name;
             const atkArmyName = atkClanData ? atkClanData.getArmyName() : "敵軍";
