@@ -17,30 +17,23 @@ body {
     overflow: hidden;
     display: flex;
     flex-direction: column;
-
-    /* テキスト選択・コピーの無効化 */
     -webkit-user-select: none;
     -moz-user-select: none;
     -ms-user-select: none;
     user-select: none;
-
-    /* iOS等での長押しメニュー（リンク・画像保存）の無効化 */
     -webkit-touch-callout: none;
 }
 
-/* 画像の保護設定 */
 img {
-    pointer-events: none;     /* 画像へのクリックイベント透過（右クリックメニュー抑止含む） */
-    -webkit-user-drag: none;  /* 画像ドラッグ禁止（WebKit） */
-    user-drag: none;          /* 画像ドラッグ禁止（標準） */
+    pointer-events: none;
+    -webkit-user-drag: none;
+    user-drag: none;
 }
 
-/* Common Helpers */
 .hidden { display: none !important; }
 .fade-in { animation: fadeIn 0.3s ease-in; }
 @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
 
-/* Title Screen */
 #title-screen {
     position: fixed; top: 0; left: 0; width: 100%; height: 100%;
     background: linear-gradient(135deg, #263238 0%, #37474f 100%);
@@ -57,7 +50,6 @@ img {
 }
 .title-btn:hover { background: rgba(255,255,255,0.3); }
 
-/* Layout Structure */
 #app {
     display: flex;
     flex-direction: column;
@@ -68,7 +60,6 @@ img {
     padding-right: env(safe-area-inset-right);
 }
 
-/* --- Mobile Top Info Bar --- */
 #top-info-bar {
     flex: none;
     background: rgba(255,255,255,0.95);
@@ -84,69 +75,37 @@ img {
     justify-content: space-between;
     align-items: flex-start;
 }
-/* 左詰め情報エリア */
-#mobile-top-left {
-    display: flex; flex-direction: column; gap: 2px;
-    width: 100%; /* 幅を確保してFlexレイアウトしやすくする */
-}
-/* 開閉ボタン */
+#mobile-top-left { display: flex; flex-direction: column; gap: 2px; width: 100%; }
 .toggle-btn {
     background: none; border: 1px solid #ccc; border-radius: 4px;
     padding: 2px 8px; font-size: 0.8rem; cursor: pointer; color: #555;
 }
 
-/* Map Area */
 #map-wrapper {
-    flex: 1;
-    position: relative;
-    background-color: #81c784; 
-    overflow: hidden; 
-    display: flex;
-    justify-content: center; 
-    align-items: center;
+    flex: 1; position: relative; background-color: #81c784; 
+    overflow: hidden; display: flex; justify-content: center; align-items: center;
     touch-action: none;
 }
 
 #map-scroll-container {
-    width: 100%; height: 100%;
-    overflow: auto;
-    display: flex;
-    flex-direction: column; 
-    padding: 20px;
-    box-sizing: border-box; 
+    width: 100%; height: 100%; overflow: auto; display: flex;
+    flex-direction: column; padding: 20px; box-sizing: border-box; 
     -webkit-overflow-scrolling: touch;
 }
-#map-scroll-container.grab {
-    cursor: grab;
-}
-#map-scroll-container.grabbing {
-    cursor: grabbing;
-}
+#map-scroll-container.grab { cursor: grab; }
+#map-scroll-container.grabbing { cursor: grabbing; }
 
 #map-container {
-    display: grid;
-    gap: 10px;
-    padding: 20px; 
+    display: grid; gap: 10px; padding: 20px; 
     transition: transform 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
-    transform-origin: center center;
-    margin: auto;
-    flex: none; 
+    transform-origin: center center; margin: auto; flex: none; 
 }
 
-/* PC Overlay Info Panel */
 #pc-map-overlay {
-    position: absolute;
-    top: 20px;
-    right: 20px;
-    width: 280px;
-    background: rgba(255, 255, 255, 0.9);
-    border: 1px solid #999;
-    border-radius: 8px;
-    padding: 10px;
-    box-shadow: 0 4px 10px rgba(0,0,0,0.3);
-    z-index: 550;
-    display: none; 
-    font-size: 0.9rem;
+    position: absolute; top: 20px; right: 20px; width: 280px;
+    background: rgba(255, 255, 255, 0.9); border: 1px solid #999;
+    border-radius: 8px; padding: 10px; box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+    z-index: 550; display: none; font-size: 0.9rem;
 }
 .overlay-header {
     display: flex; justify-content: space-between; align-items: center;
@@ -159,33 +118,21 @@ img {
 .info-val { font-weight: bold; }
 .highlight-text { color: #d32f2f; }
 
-/* 縮小ボタン */
 #map-reset-zoom {
-    position: absolute;
-    bottom: 20px; right: 20px; 
-    padding: 0;
-    background: rgba(0,0,0,0.7);
-    color: white; border: none; border-radius: 50%;
-    font-weight: bold; z-index: 500;
-    cursor: pointer;
-    width: 40px; height: 40px;
-    box-shadow: 0 2px 10px rgba(0,0,0,0.3);
-    display: flex; justify-content: center; align-items: center;
-    font-size: 1.2rem;
+    position: absolute; bottom: 20px; right: 20px; padding: 0;
+    background: rgba(0,0,0,0.7); color: white; border: none; border-radius: 50%;
+    font-weight: bold; z-index: 500; cursor: pointer; width: 40px; height: 40px;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.3); display: flex; justify-content: center;
+    align-items: center; font-size: 1.2rem;
 }
 
 .castle-card {
-    width: var(--map-tile-size); 
-    height: var(--map-tile-size);
+    width: var(--map-tile-size); height: var(--map-tile-size);
     background: #fff; border: 1px solid #999; border-radius: 4px;
     display: flex; flex-direction: column; justify-content: space-between;
     padding: 2px; box-shadow: 2px 2px 5px rgba(0,0,0,0.2);
-    cursor: pointer; position: relative;
-    user-select: none;
-    font-size: 0.75rem;
-    grid-column: var(--c-x);
-    grid-row: var(--c-y);
-    z-index: 10;
+    cursor: pointer; position: relative; user-select: none;
+    font-size: 0.75rem; grid-column: var(--c-x); grid-row: var(--c-y); z-index: 10;
 }
 .castle-card:hover { transform: translateY(-2px); box-shadow: 2px 4px 8px rgba(0,0,0,0.3); z-index: 20; }
 .castle-card.done { filter: grayscale(100%); opacity: 0.7; }
@@ -200,48 +147,27 @@ img {
 .param-grid { font-size: 0.7em; padding: 1px; }
 .param-item { display: flex; justify-content: space-between; }
 
-/* --- Mobile Bottom Command Bar --- */
 #bottom-command-bar {
-    flex: none;
-    background: #fff;
-    border-top: 1px solid var(--border-color);
-    padding-bottom: max(5px, env(safe-area-inset-bottom));
-    padding-left: 5px;
-    padding-right: 5px;
-    z-index: 200;
-    box-shadow: 0 -2px 5px rgba(0,0,0,0.1);
-    height: auto;
-    display: block;
+    flex: none; background: #fff; border-top: 1px solid var(--border-color);
+    padding-bottom: max(5px, env(safe-area-inset-bottom)); padding-left: 5px;
+    padding-right: 5px; z-index: 200; box-shadow: 0 -2px 5px rgba(0,0,0,0.1);
+    height: auto; display: block;
 }
 
-/* モバイル用：コマンド上の情報エリア */
 #mobile-bottom-info {
-    padding: 5px 10px;
-    background: #f1f8e9;
-    border-bottom: 1px dashed #ccc;
-    font-size: 0.8rem;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    color: #33691e;
-    font-weight: bold;
+    padding: 5px 10px; background: #f1f8e9; border-bottom: 1px dashed #ccc;
+    font-size: 0.8rem; display: flex; justify-content: space-between;
+    align-items: center; color: #33691e; font-weight: bold;
 }
 
 .command-grid {
-    display: grid; 
-    grid-template-columns: repeat(3, 1fr); 
-    gap: 4px;
-    padding: 5px 0;
+    display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; padding: 5px 0;
 }
 .cmd-btn {
-    padding: 0; 
-    height: 38px; 
-    border: 1px solid #bbb; background: #f8f9fa; border-radius: 4px;
-    cursor: pointer; font-size: 0.8rem; font-weight: bold;
+    padding: 0; height: 38px; border: 1px solid #bbb; background: #f8f9fa;
+    border-radius: 4px; cursor: pointer; font-size: 0.8rem; font-weight: bold;
     display: flex; align-items: center; justify-content: center;
-    touch-action: manipulation;
-    white-space: nowrap;
-    overflow: hidden;
+    touch-action: manipulation; white-space: nowrap; overflow: hidden;
 }
 .cmd-btn:hover { background: #e3f2fd; }
 .cmd-btn:active { background: #bbdefb; transform: translateY(1px); }
@@ -249,130 +175,73 @@ img {
 .cmd-btn.finish { background: #ffebee; border-color: #ef5350; color: #c62828; grid-column: span 3; margin-top: 2px;}
 .cmd-btn.back { background: #cfd8dc; border-color: #90a4ae; color: #455a64; grid-column: span 3; }
 
-/* PC Sidebar (Default hidden) */
-#pc-sidebar { 
-    display: none !important; 
-}
+#pc-sidebar { display: none !important; }
 
-/* PC Layout Adjustment */
 @media (min-width: 769px) {
-    #app { 
-        flex-direction: row; 
-    }
+    #app { flex-direction: row; }
     #top-info-bar { display: none !important; }
     #bottom-command-bar { display: none !important; }
     #pc-map-overlay { display: block; }
     #map-reset-zoom { bottom: 20px; right: 20px; }
-
-    /* PC Sidebar Logic */
     #pc-sidebar {
-        display: flex !important;
-        flex-direction: column;
-        width: 300px; 
-        background: #f5f5f5;
-        border-left: 1px solid #ccc;
-        box-shadow: -2px 0 5px rgba(0,0,0,0.1);
-        z-index: 200;
-        overflow-y: auto;
-        height: 100dvh;
+        display: flex !important; flex-direction: column; width: 300px; 
+        background: #f5f5f5; border-left: 1px solid #ccc;
+        box-shadow: -2px 0 5px rgba(0,0,0,0.1); z-index: 200;
+        overflow-y: auto; height: 100dvh;
     }
     #pc-command-area { padding: 10px; flex: 1; overflow-y: auto; }
-    
-    /* PCでのコマンドボタン */
     .command-grid { grid-template-columns: repeat(2, 1fr); gap: 10px; }
     .cmd-btn { padding: 15px; font-size: 1rem; height: auto; }
     .cmd-btn.finish, .cmd-btn.back { grid-column: span 2; }
 }
 
-/* Modals & Overlays */
 .modal {
     position: fixed; top: 0; left: 0; width: 100%; height: 100dvh;
-    background: rgba(0,0,0,0.6); 
-    z-index: 4000; 
+    background: rgba(0,0,0,0.6); z-index: 4000; 
     display: flex; justify-content: center; align-items: center;
     opacity: 1; transition: opacity 0.2s;
     padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
 }
 .modal.hidden { opacity: 0; pointer-events: none; display: none !important;} 
-
-/* 数量指定モーダルを合戦モーダル(4000)より手前に表示する */
-#quantity-modal {
-    z-index: 4500;
-}
+#quantity-modal { z-index: 4500; }
 
 .modal-content {
     background: #fff; padding: 20px; border-radius: 8px;
-    width: 90%; max-width: 800px; 
-    max-height: 80dvh;
+    width: 90%; max-width: 800px; max-height: 80dvh;
     display: flex; flex-direction: column;
-    box-shadow: 0 10px 25px rgba(0,0,0,0.5);
-    position: relative;
+    box-shadow: 0 10px 25px rgba(0,0,0,0.5); position: relative;
 }
 .modal-content h3 { margin-top: 0; border-bottom: 2px solid #ddd; padding-bottom: 10px; }
 .context-info { margin-bottom: 10px; padding: 10px; background: #e8eaf6; border-radius: 4px; font-size: 0.9rem; }
 
-/* List Styling Update */
 .list-header {
-    display: grid; 
-    grid-template-columns: 0px 30px 90px 40px repeat(6, 1fr); 
+    display: grid; grid-template-columns: 0px 30px 90px 40px repeat(6, 1fr); 
     gap: 2px; font-weight: bold; background: #37474f; color:#fff; padding: 8px 5px; font-size: 0.8rem;
     position: sticky; top: 0;
 }
 .list-container { flex: 1; overflow-y: auto; border: 1px solid #ddd; min-height: 200px; }
 .select-item {
-    display: grid; 
-    grid-template-columns: 0px 30px 90px 40px repeat(6, 1fr); 
+    display: grid; grid-template-columns: 0px 30px 90px 40px repeat(6, 1fr); 
     gap: 2px; padding: 10px 5px; border-bottom: 1px solid #eee; cursor: pointer; font-size: 0.85rem; align-items: center;
 }
 .select-item:hover { background: #f0f8ff; }
 .select-item.disabled { color: #aaa; pointer-events: none; background: #f9f9f9; }
+.select-item.selected { background-color: #ffe0b2 !important; border-left: 5px solid #ff9800; }
+.select-item input[type="checkbox"], .select-item input[type="radio"] { display: none; }
 
-/* 選択された行のスタイル（ハイライト） */
-.select-item.selected {
-    background-color: #ffe0b2 !important; 
-    border-left: 5px solid #ff9800; 
-}
-
-/* inputを非表示にする（視覚的には行クリックで制御） */
-.select-item input[type="checkbox"],
-.select-item input[type="radio"] {
-    display: none;
-}
-
-
-/* --- Grade Display Styling --- */
 .grade-container {
-    display: inline-flex;
-    position: relative;
-    align-items: center;
-    justify-content: center;
-    width: 24px; 
-    height: 1.2em;
-    font-family: 'Arial Black', sans-serif;
+    display: inline-flex; position: relative; align-items: center;
+    justify-content: center; width: 24px; height: 1.2em; font-family: 'Arial Black', sans-serif;
 }
-
 .grade-main {
-    font-weight: normal; 
-    font-size: 1.1rem;
-    text-shadow: 
-        1.5px 1.5px 0 #000, -1.5px 1.5px 0 #000, 
-        1.5px -1.5px 0 #000, -1.5px -1.5px 0 #000,
-        1.5px 0px 0 #000, -1.5px 0px 0 #000,
-        0px 1.5px 0 #000, 0px -1.5px 0 #000,
-        2px 2px 2px rgba(0,0,0,0.5); 
+    font-weight: normal; font-size: 1.1rem;
+    text-shadow: 1.5px 1.5px 0 #000, -1.5px 1.5px 0 #000, 1.5px -1.5px 0 #000, -1.5px -1.5px 0 #000,
+        1.5px 0px 0 #000, -1.5px 0px 0 #000, 0px 1.5px 0 #000, 0px -1.5px 0 #000, 2px 2px 2px rgba(0,0,0,0.5); 
 }
-
 .grade-plus {
-    position: absolute;
-    top: -2px;    
-    right: -6px;
-    font-size: 0.9rem;
-    font-weight: bold; 
-    color: #000000;    
-    text-shadow: none; 
+    position: absolute; top: -2px; right: -6px; font-size: 0.9rem;
+    font-weight: bold; color: #000000; text-shadow: none; 
 }
-
-/* Rank Colors (Main Character) */
 .rank-s .grade-main { color: #ffd700; } 
 .rank-a .grade-main { color: #f47a4d; } 
 .rank-b .grade-main { color: #f58f98; } 
@@ -380,26 +249,20 @@ img {
 .rank-d .grade-main { color: #65bbe9; } 
 .rank-e .grade-main { color: #9b95c9; } 
 
-/* Footer Buttons */
 .modal-footer { margin-top: 15px; display: flex; justify-content: flex-end; gap: 10px; padding-top: 10px; border-top: 1px solid #eee; flex-shrink: 0;}
-.btn-primary, .btn-secondary, .btn-danger {
-    padding: 10px 20px; border: none; border-radius: 4px; cursor: pointer; font-weight: bold;
-}
+.btn-primary, .btn-secondary, .btn-danger { padding: 10px 20px; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; }
 .btn-primary { background: #1976d2; color: #fff; }
 .btn-secondary { background: #78909c; color: #fff; }
 .btn-danger { background: #d32f2f; color: #fff; }
 
-/* Specific Screens */
 .start-content { max-width: 600px; text-align: center; }
 .clan-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 10px; margin-top: 20px; overflow-y: auto;}
 .clan-btn { 
-    padding: 15px; border: 2px solid; border-radius: 8px; 
-    font-weight: bold; cursor: pointer; background: #fff;
+    padding: 15px; border: 2px solid; border-radius: 8px; font-weight: bold; cursor: pointer; background: #fff;
     transition: transform 0.1s; display: flex; justify-content: center; align-items: center;
 }
 .clan-btn:hover { transform: scale(1.05); }
 
-/* War Screen */
 .war-screen { flex: 1; display: flex; flex-direction: column; background: #e0e0e0; padding: 5px; border-radius: 4px; overflow: hidden;}
 .war-visual { flex: 1; display: flex; flex-direction: column; justify-content: space-around; align-items: center; background: #fff; margin-bottom: 5px; padding: 10px; overflow-y: auto;}
 .army-box { width: 90%; padding: 10px; border-radius: 8px; color: #fff; margin: 5px 0; display:flex; flex-direction:column; align-items:center; }
@@ -411,132 +274,92 @@ img {
 .war-controls-area button:hover { background: #eee; }
 .disabled-area { pointer-events: none; opacity: 0.5; }
 
-/* Guide & Logs */
 #map-guide {
     position: absolute; top: 10px; left: 50%; transform: translateX(-50%);
     background: rgba(0,0,0,0.8); color: #fff; padding: 8px 20px; border-radius: 20px;
-    pointer-events: none; z-index: 600; font-weight: bold;
-    box-shadow: 0 2px 5px rgba(0,0,0,0.3);
+    pointer-events: none; z-index: 600; font-weight: bold; box-shadow: 0 2px 5px rgba(0,0,0,0.3);
 }
 #ai-guard {
     position: absolute; top: 0; left: 0; width: 100%; height: 100%;
-    background: rgba(0,0,0,0.5); z-index: 1000;
-    display: flex; justify-content: center; align-items: center;
-    color: white; font-size: 1.5rem; font-weight: bold; flex-direction: column;
+    background: rgba(0,0,0,0.5); z-index: 1000; display: flex; justify-content: center;
+    align-items: center; color: white; font-size: 1.5rem; font-weight: bold; flex-direction: column;
 }
 
-/* 修正箇所：カットイン表示中は裏のマップを触れないように pointer-events を auto に変更 */
 .cutin-overlay {
     position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-    background: rgba(0,0,0,0.7); z-index: 5000;
-    pointer-events: auto;
+    background: rgba(0,0,0,0.7); z-index: 5000; pointer-events: auto;
     display: flex; justify-content: center; align-items: center;
     opacity: 0; transition: opacity 0.5s;
 }
 .cutin-overlay.fade-in { opacity: 1; }
 .cutin-text {
-    font-size: 2rem; color: #fff; font-weight: bold;
-    text-shadow: 0 0 10px #ff0000; white-space: pre-wrap; text-align: center;
+    font-size: 2rem; color: #fff; font-weight: bold; text-shadow: 0 0 10px #ff0000;
+    white-space: pre-wrap; text-align: center;
     transform: scale(0); transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
 }
 .cutin-overlay.fade-in .cutin-text { transform: scale(1); }
 
-/* Quantity Modal Range Inputs */
 .qty-row { margin-bottom: 15px; }
 .qty-control { display: flex; align-items: center; gap: 10px; }
 .qty-control input[type="range"] { flex: 1; }
 .qty-control input[type="number"] { width: 80px; padding: 5px; text-align: right; }
 
-/* Face Icons */
 .face-thumb {
-    width: 60px; height: 60px;
-    object-fit: cover;
-    border-radius: 4px;
-    border: 1px solid #777;
-    margin-right: 8px;
-    background: #ccc;
-    flex-shrink: 0;
+    width: 60px; height: 60px; object-fit: cover; border-radius: 4px;
+    border: 1px solid #777; margin-right: 8px; background: #ccc; flex-shrink: 0;
 }
 .war-face {
-    width: 80px; height: 80px;
-    object-fit: cover;
-    border-radius: 8px;
-    border: 2px solid #fff;
-    margin-bottom: 5px;
-    background: #999;
+    width: 80px; height: 80px; object-fit: cover; border-radius: 8px;
+    border: 2px solid #fff; margin-bottom: 5px; background: #999;
 }
 
-/* Daimyo Select Styles */
-#daimyo-confirm-modal .modal-content h3 {
-    margin: 10px 0 20px 0;
-    font-size: 1.5rem;
-    color: #333;
-}
-#daimyo-confirm-modal p {
-    font-size: 1.1rem;
-    margin: 10px 0;
-}
+#daimyo-confirm-modal .modal-content h3 { margin: 10px 0 20px 0; font-size: 1.5rem; color: #333; }
+#daimyo-confirm-modal p { font-size: 1.1rem; margin: 10px 0; }
 
 .daimyo-confirm-face {
-    width: 80px; height: 80px;
-    object-fit: cover;
-    border-radius: 4px;
-    border: 1px solid #777;
-    margin-bottom: 10px;
-    background: #ccc;
-    display: inline-block;
+    width: 80px; height: 80px; object-fit: cover; border-radius: 4px;
+    border: 1px solid #777; margin-bottom: 10px; background: #ccc; display: inline-block;
 }
 
 /* --- Field War (HEX) Styles --- */
 .fw-hex {
-    width: 60px;
-    height: 52px;
+    width: 30px;
+    height: 26px;
     background-color: #aed581;
     clip-path: polygon(25% 0%, 75% 0%, 100% 50%, 75% 100%, 25% 100%, 0% 50%);
     position: absolute;
     box-sizing: border-box;
     display: flex; justify-content: center; align-items: center;
-    color: rgba(0,0,0,0.2); font-size: 10px; font-weight: bold;
+    color: rgba(0,0,0,0.3); font-size: 8px; font-weight: bold;
     transition: background-color 0.2s, filter 0.2s;
     user-select: none;
 }
 .fw-hex:hover { filter: brightness(1.1); }
 .fw-hex.movable { background-color: #81d4fa; cursor: pointer; filter: brightness(1.1); }
 .fw-hex.attackable { background-color: #ef9a9a; cursor: pointer; filter: brightness(1.1); box-shadow: inset 0 0 10px red; }
+.fw-hex.fw-dir-highlight { background-color: #fff59d; cursor: pointer; filter: brightness(1.2); box-shadow: inset 0 0 10px #fbc02d;}
 
 .fw-unit {
-    width: 40px; height: 40px;
-    border-radius: 50%;
+    width: 24px; height: 24px;
+    clip-path: polygon(50% 0%, 100% 50%, 75% 50%, 75% 100%, 25% 100%, 25% 50%, 0% 50%); /* 凸型（矢印型） */
     position: absolute;
     display: flex; justify-content: center; align-items: center;
-    font-weight: bold; color: white; font-size: 12px;
-    box-shadow: 2px 2px 5px rgba(0,0,0,0.5);
-    transition: left 0.3s, top 0.3s;
+    font-weight: bold; color: white; font-size: 10px; line-height: 24px;
+    box-shadow: 2px 2px 5px rgba(0,0,0,0.5); /* clip-path使用時は一部無効になる場合あり */
+    transition: left 0.3s, top 0.3s, transform 0.3s;
     pointer-events: none;
-    z-index: 10;
+    z-index: 20;
 }
-.fw-unit.attacker { background-color: #d32f2f; border: 2px solid #fff; }
-.fw-unit.defender { background-color: #1976d2; border: 2px solid #fff; }
-.fw-unit.active { box-shadow: 0 0 12px 6px #ffff00; }
+.fw-unit.attacker { background-color: #d32f2f; }
+.fw-unit.defender { background-color: #1976d2; }
+.fw-unit.active { filter: drop-shadow(0 0 6px #ffff00); }
+.fw-unit.preview { opacity: 0.6; animation: fw-blink 1s infinite; z-index: 18; }
+@keyframes fw-blink { 0%{opacity:0.3;} 50%{opacity:0.8;} 100%{opacity:0.3;} }
 
-/* --- コンテキストメニュー --- */
 .context-menu {
-    position: absolute;
-    background: white;
-    border: 1px solid #ccc;
-    box-shadow: 2px 2px 10px rgba(0,0,0,0.2);
-    border-radius: 4px;
-    z-index: 9999;
-    min-width: 150px;
-    padding: 5px 0;
-    font-size: 0.9rem;
+    position: absolute; background: white; border: 1px solid #ccc;
+    box-shadow: 2px 2px 10px rgba(0,0,0,0.2); border-radius: 4px;
+    z-index: 9999; min-width: 150px; padding: 5px 0; font-size: 0.9rem;
 }
-.context-menu-item {
-    padding: 10px 15px;
-    cursor: pointer;
-    color: #333;
-    font-weight: bold;
-}
-.context-menu-item:hover {
-    background-color: #e3f2fd;
-}
+.context-menu-item { padding: 10px 15px; cursor: pointer; color: #333; font-weight: bold; }
+.context-menu-item:hover { background-color: #e3f2fd; }
