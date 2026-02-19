@@ -21,9 +21,9 @@ Economy.CharityFluctuation,0.15,施し効果の変動幅。上げると民忠上
 Economy.TradeRateMin,0.5,相場の最小値。上げると米価暴落時の底値が上がり金策しやすくなる、下げると米が紙屑同然になるリスク増
 Economy.TradeRateMax,3,相場の最大値。上げると米が高騰した際に莫大な利益が出る、下げると相場変動の幅が狭まる
 Economy.TradeFluctuation,0.15,相場の変動幅。上げると毎月の相場変動が激しくなる、下げると相場が固定化される
-Military.DraftBase,50,徴兵の基礎値。上げると金銭あたりの徴兵数が増え大軍を作りやすい、下げると兵士を集めるのが困難になる
-Military.DraftStatBonus,1.5,徴兵時の能力補正最大倍率。上げると担当武将の能力による徴兵数の差が広がる
-Military.DraftPopBonusFactor,0.00005,徴兵時の人口ボーナス係数。人口1万人あたり0.5人換算。上げると人口の多い豊かな城での徴兵数が激増する
+Military.DraftBase,0,徴兵の基礎値。上げると金銭あたりの徴兵数が増え大軍を作りやすい、下げると兵士を集めるのが困難になる
+Military.DraftStatBonus,0.6,徴兵時の能力補正最大倍率。上げると担当武将の能力による徴兵数の差が広がる
+Military.DraftPopBonusFactor,0.00001,徴兵時の人口ボーナス係数。人口1万人あたり0.5人換算。上げると人口の多い豊かな城での徴兵数が激増する
 Military.DraftFluctuation,0.15,徴兵数の変動幅。上げると集まる兵数にランダム性が増す
 Military.BaseTraining,0,訓練の基礎値。上げると低能力武将でも訓練可能、下げると「統率」「武力」依存度が増す
 Military.TrainingLdrEffect,0.3,訓練時の統率影響。上げると「統率」が高い武将の訓練効率が上がる
