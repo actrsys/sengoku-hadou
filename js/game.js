@@ -2,6 +2,7 @@
  * game.js
  * 戦国シミュレーションゲーム (Main / UI / Data / System)
  * 設定: System, Economy, Strategy
+ * 更新: 大名選択フローをマップ選択式に変更
  */
 
 // グローバルエラーハンドリング
@@ -369,7 +370,7 @@ class UIManager {
         this.selectorList = document.getElementById('selector-list'); 
         this.selectorContextInfo = document.getElementById('selector-context-info');
         this.selectorConfirmBtn = document.getElementById('selector-confirm-btn');
-        this.startScreen = document.getElementById('start-screen'); 
+        // this.startScreen = document.getElementById('start-screen'); // 廃止
         this.cutinOverlay = document.getElementById('cutin-overlay');
         this.cutinMessage = document.getElementById('cutin-message'); 
         this.quantityModal = document.getElementById('quantity-modal');
@@ -398,6 +399,10 @@ class UIManager {
         this.warModal = document.getElementById('war-modal');
         this.warLog = document.getElementById('war-log');
         this.warControls = document.getElementById('war-controls');
+
+        // 大名選択UI
+        this.daimyoConfirmModal = document.getElementById('daimyo-confirm-modal');
+        this.daimyoConfirmBody = document.getElementById('daimyo-confirm-body');
 
         this.onResultModalClose = null;
 
@@ -508,20 +513,37 @@ class UIManager {
         const ts = document.getElementById('title-screen');
         if(ts) ts.classList.remove('hidden'); 
     }
-    showStartScreen(clans, onSelect) { 
-        if (!this.startScreen) return;
-        this.startScreen.classList.remove('hidden'); 
-        const container = document.getElementById('clan-selector'); 
-        if (container) {
-            container.innerHTML = ''; 
-            clans.forEach(clan => { 
-                const btn = document.createElement('div'); btn.className = 'clan-btn'; btn.textContent = clan.name; btn.style.color = clan.color; btn.style.borderColor = clan.color; 
-                btn.onclick = () => { this.startScreen.classList.add('hidden'); onSelect(clan.id); }; 
-                container.appendChild(btn); 
-            }); 
+    
+    /* * showStartScreen は廃止し、マップ選択に移行するため削除・コメントアウト
+     * 代わりに showDaimyoConfirmModal を実装
+     */
+    
+    showDaimyoConfirmModal(clanName, soldiers, onStart) {
+        if (!this.daimyoConfirmModal) return;
+        this.daimyoConfirmModal.classList.remove('hidden');
+        if (this.daimyoConfirmBody) {
+            this.daimyoConfirmBody.innerHTML = `
+                <h3 style="margin-top:0;">${clanName}</h3>
+                <p>この大名家でゲームを開始しますか？</p>
+                <p><strong>総兵士数: ${soldiers}</strong></p>
+            `;
+        }
+        
+        const startBtn = document.getElementById('daimyo-confirm-start-btn');
+        if (startBtn) {
+            startBtn.onclick = () => {
+                this.daimyoConfirmModal.classList.add('hidden');
+                onStart();
+            };
+        }
+        const backBtn = document.getElementById('daimyo-confirm-back-btn');
+        if (backBtn) {
+            backBtn.onclick = () => {
+                this.daimyoConfirmModal.classList.add('hidden');
+            };
         }
     }
-    
+
     fitMapToScreen() {
         if (!this.mapEl) return;
         const wrapper = document.getElementById('map-wrapper');
@@ -583,10 +605,15 @@ class UIManager {
         }
 
         const isSelectionMode = (this.game.selectionMode !== null);
+        const isDaimyoSelect = (this.game.phase === 'daimyo_select');
+
         if (this.mapGuide) { 
             if(isSelectionMode) {
                 this.mapGuide.classList.remove('hidden'); 
                 this.mapGuide.textContent = this.game.getSelectionGuideMessage();
+            } else if (isDaimyoSelect) {
+                this.mapGuide.classList.remove('hidden'); 
+                this.mapGuide.textContent = "開始する大名家の城を選択してください";
             } else {
                 this.mapGuide.classList.add('hidden'); 
             }
@@ -600,12 +627,27 @@ class UIManager {
             el.dataset.clan = c.ownerClan; el.style.setProperty('--c-x', c.x + 1); el.style.setProperty('--c-y', c.y + 1);
             if (c.isDone) el.classList.add('done'); if (this.game.getCurrentTurnCastle() === c && !c.isDone) el.classList.add('active-turn');
             const castellan = this.game.getBusho(c.castellanId); const clanData = this.game.clans.find(cl => cl.id === c.ownerClan);
-            const isVisible = this.game.isCastleVisible(c);
+            
+            // 大名選択フェーズではすべて可視化
+            const isVisible = isDaimyoSelect || this.game.isCastleVisible(c);
+            
             const soldierText = isVisible ? c.soldiers : "???"; const castellanName = isVisible ? (castellan ? castellan.name : '-') : "???";
             el.innerHTML = `<div class="card-header"><h3>${c.name}</h3></div><div class="card-owner">${clanData ? clanData.name : "中立"}</div><div class="param-grid"><div class="param-item"><span>城主</span> <strong>${castellanName}</strong></div><div class="param-item"><span>兵数</span> ${soldierText}</div></div>`;
             if(clanData) el.style.borderTop = `5px solid ${clanData.color}`;
             
-            if (!this.game.isProcessingAI) {
+            if (isDaimyoSelect) {
+                 el.style.cursor = 'pointer';
+                 if (c.ownerClan === 0) {
+                     el.classList.add('dimmed');
+                 } else {
+                     el.classList.add('selectable-target'); // 選択可能であることを強調
+                 }
+                 el.onclick = (e) => {
+                     e.stopPropagation();
+                     this.game.handleDaimyoSelect(c);
+                 };
+            }
+            else if (!this.game.isProcessingAI) {
                 if (isSelectionMode) { 
                     if (this.game.validTargets.includes(c.id)) { 
                         el.classList.add('selectable-target'); 
@@ -651,6 +693,8 @@ class UIManager {
 
     updateInfoPanel(castle) {
         if (!castle) return;
+        // 大名選択フェーズでは情報パネルを更新しない、または隠す
+        if (this.game.phase === 'daimyo_select') return;
         
         if (this.pcMapOverlay) {
             const dateStr = `${this.game.year}年 ${this.game.month}月`;
@@ -660,7 +704,6 @@ class UIManager {
             const isVisible = this.game.isCastleVisible(castle);
             const mask = (val) => isVisible ? val : "???";
             
-            // 顔画像のHTML構築
             let faceHtml = "";
             if (isVisible && castellan && castellan.faceIcon) {
                 faceHtml = `<img src="data/faceicons/${castellan.faceIcon}" class="face-thumb" onerror="this.style.display='none'">`;
@@ -698,7 +741,6 @@ class UIManager {
             const mask = (val) => isVisible ? val : "??";
             const castellan = this.game.getBusho(castle.castellanId);
             
-            // モバイル用顔画像
             let faceHtml = "";
             if (isVisible && castellan && castellan.faceIcon) {
                 faceHtml = `<img src="data/faceicons/${castellan.faceIcon}" style="width:40px;height:40px;object-fit:cover;border-radius:2px;margin-right:5px;border:1px solid #777;background:#ccc;" onerror="this.style.display='none'">`;
@@ -1423,6 +1465,9 @@ class GameManager {
         this.aiEngine = new AIEngine(this);
         this.independenceSystem = new IndependenceSystem(this);
         this.factionSystem = new FactionSystem(this); 
+        
+        // 状態管理: title, daimyo_select, game
+        this.phase = 'title';
     }
     getRelationKey(id1, id2) { return id1 < id2 ? `${id1}-${id2}` : `${id2}-${id1}`; }
     getRelation(id1, id2) { const key = this.getRelationKey(id1, id2); if (!this.relations[key]) this.relations[key] = { friendship: 50, alliance: false }; return this.relations[key]; }
@@ -1444,13 +1489,39 @@ class GameManager {
             this.clans = data.clans; this.castles = data.castles; this.bushos = data.bushos; 
             
             document.getElementById('app').classList.remove('hidden'); 
-            this.ui.showStartScreen(this.clans, (clanId) => { this.playerClanId = Number(clanId); this.init(); }); 
+            
+            // マップ選択モードへ移行
+            this.phase = 'daimyo_select';
+            this.ui.renderMap();
+            await this.ui.showCutin("開始する大名家の城を選択してください");
+            
         } catch (e) {
             console.error(e);
             alert("シナリオデータの読み込みに失敗しました。");
             this.ui.returnToTitle();
         }
     }
+    
+    // 城クリック時の大名選択処理
+    handleDaimyoSelect(castle) {
+        if (castle.ownerClan === 0) {
+            alert("その城は空き城（中立）のため選択できません。");
+            return;
+        }
+        
+        const clan = this.clans.find(c => c.id === castle.ownerClan);
+        if (!clan) return;
+
+        // 総兵力計算
+        const totalSoldiers = this.getClanTotalSoldiers(clan.id);
+        
+        this.ui.showDaimyoConfirmModal(clan.name, totalSoldiers, () => {
+             this.playerClanId = Number(clan.id);
+             this.phase = 'game';
+             this.init();
+        });
+    }
+
     init() { this.startMonth(); }
     getBusho(id) { return this.bushos.find(b => Number(b.id) === Number(id)); }
     getCastle(id) { return this.castles.find(c => Number(c.id) === Number(id)); }
@@ -1762,6 +1833,9 @@ class GameManager {
 
                 document.getElementById('title-screen').classList.add('hidden'); 
                 document.getElementById('app').classList.remove('hidden'); 
+                
+                this.phase = 'game'; // ロード時は即ゲームフェーズ
+                
                 this.turnQueue = this.castles.filter(c => c.ownerClan !== 0).sort(() => Math.random() - 0.5);
                 this.currentIndex = 0; 
                 this.ui.showCutin(`ロード完了: ${this.year}年 ${this.month}月`);

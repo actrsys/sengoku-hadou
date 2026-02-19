@@ -30,10 +30,15 @@
         </div>
     </div>
 
-    <div id="start-screen" class="modal hidden">
-        <div class="modal-content start-content">
-            <h2>大名家選択</h2>
-            <div id="clan-selector" class="clan-grid"></div>
+    <div id="start-screen" class="modal hidden"></div>
+    
+    <div id="daimyo-confirm-modal" class="modal hidden">
+        <div class="modal-content" style="max-width: 400px; text-align: center;">
+            <div id="daimyo-confirm-body"></div>
+            <div class="modal-footer" style="justify-content: center; gap: 20px;">
+                <button id="daimyo-confirm-start-btn" class="btn-primary">開始</button>
+                <button id="daimyo-confirm-back-btn" class="btn-secondary">戻る</button>
+            </div>
         </div>
     </div>
 

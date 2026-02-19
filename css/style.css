@@ -449,3 +449,14 @@ body {
     margin-bottom: 5px;
     background: #999;
 }
+
+/* Daimyo Select Styles */
+#daimyo-confirm-modal .modal-content h3 {
+    margin: 10px 0 20px 0;
+    font-size: 1.5rem;
+    color: #333;
+}
+#daimyo-confirm-modal p {
+    font-size: 1.1rem;
+    margin: 10px 0;
+}
