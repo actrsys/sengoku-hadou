@@ -3,7 +3,7 @@
  * 戦争処理マネージャー & 戦争計算ロジック
  * 責務: 合戦の進行、戦闘計算、戦後処理、捕虜対応、UIコマンド定義、攻撃可能判定
  * 設定: Military, War
- * 修正: 捕虜になった武将の城主フラグ残留を防止
+ * 修正: 捕虜になった武将の城主フラグ残留を防止、攻撃側出陣武将の行動済フラグ処理を追加
  */
 
 // 戦争・軍事関連の設定定義
@@ -207,6 +207,9 @@ class WarManager {
 
             atkCastle.soldiers = Math.max(0, atkCastle.soldiers - atkSoldierCount);
             atkCastle.rice = Math.max(0, atkCastle.rice - atkRice);
+
+            // 攻撃側の参戦武将を行動済みにする
+            atkBushos.forEach(b => b.isActionDone = true);
 
             const atkClanData = this.game.clans.find(c => c.id === atkClan); 
             const atkGeneral = atkBushos[0].name;
