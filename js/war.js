@@ -4,6 +4,7 @@
  * 責務: 合戦の進行、戦闘計算、戦後処理、捕虜対応、UIコマンド定義、攻撃可能判定
  * 設定: Military, War
  * 修正: 捕虜になった武将の城主フラグ残留を防止、攻撃側出陣武将の行動済フラグ処理を追加
+ * 修正: 民忠の最大値変更に伴う謀略ダメージ計算のハードコードを修正
  */
 
 // 戦争・軍事関連の設定定義
@@ -114,10 +115,11 @@ class WarSystem {
         const atkInt = atkBusho.intelligence; 
         const defInt = defBusho ? defBusho.intelligence : 30; 
         const baseOffset = window.WarParams.War.SchemeBaseIntOffset || 20;
-        const successRate = (atkInt / (defInt + baseOffset)) * window.MainParams.Strategy.SchemeSuccessRate; 
+        const successRate = (atkInt / (defInt + baseOffset)) * window.MainParams?.Strategy?.SchemeSuccessRate || 0.25; 
         if (Math.random() > successRate) return { success: false, damage: 0 }; 
-        const loyaltyDiv = window.WarParams.War.LoyaltyDamageFactor || 500;
-        const loyaltyBonus = (1000 - defCastleLoyalty) / loyaltyDiv; 
+        const loyaltyDiv = window.WarParams.War.LoyaltyDamageFactor || 50; // parameter.csvに合わせて調整推奨
+        const maxLoyalty = window.MainParams?.Economy?.MaxLoyalty || 100; // ハードコードを修正
+        const loyaltyBonus = (maxLoyalty - defCastleLoyalty) / loyaltyDiv; 
         return { success: true, damage: Math.floor(atkInt * window.WarParams.War.SchemeDamageFactor * (1.0 + loyaltyBonus)) }; 
     }
 
@@ -341,7 +343,7 @@ class WarManager {
     startSiegeWarPhase() {
         const s = this.state;
         const W = window.WarParams.War;
-        s.defender.loyalty = Math.max(0, s.defender.loyalty - (W.AttackLoyaltyDecay || 50)); 
+        s.defender.loyalty = Math.max(0, s.defender.loyalty - (W.AttackLoyaltyDecay || 5)); // parameter.csv側の修正も推奨
         s.defender.population = Math.max(0, s.defender.population - (W.AttackPopDecay || 500));
         
         if (s.isPlayerInvolved) { 
@@ -543,7 +545,8 @@ class WarManager {
         if (type === 'scheme') { 
             const actor = isAtkTurn ? s.atkBushos[0] : s.defBusho; 
             const targetBusho = isAtkTurn ? s.defBusho : s.atkBushos[0]; 
-            const result = WarSystem.calcScheme(actor, targetBusho, isAtkTurn ? s.defender.loyalty : 1000); 
+            const maxLoyalty = window.MainParams?.Economy?.MaxLoyalty || 100; // ハードコードを修正
+            const result = WarSystem.calcScheme(actor, targetBusho, isAtkTurn ? s.defender.loyalty : maxLoyalty); 
             if (!result.success) { if (s.isPlayerInvolved) this.game.ui.log(`R${s.round} 謀略失敗！`); } 
             else { 
                 target.soldiers = Math.max(0, target.soldiers - result.damage); 
