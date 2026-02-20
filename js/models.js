@@ -34,7 +34,11 @@ class Castle {
         this.rice = Number(this.rice || 0);
         this.defense = Number(this.defense || 0);
         this.population = Number(this.population || 0);
-        this.loyalty = Number(this.loyalty || 0);
+        
+        // ★修正: 城の民忠を peoplesLoyalty に変更。CSV互換性のため古い loyalty も読めるようにしておく
+        this.peoplesLoyalty = Number(data.peoplesLoyalty !== undefined ? data.peoplesLoyalty : (data.loyalty || 0));
+        delete this.loyalty;
+        
         this.training = Number(this.training || 0);
         this.morale = Number(this.morale || 0);
         this.kokudaka = Number(this.kokudaka || 0);

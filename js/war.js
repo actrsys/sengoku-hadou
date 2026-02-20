@@ -358,7 +358,8 @@ class WarManager {
     startSiegeWarPhase() {
         const s = this.state;
         const W = window.WarParams.War;
-        s.defender.loyalty = Math.max(0, s.defender.loyalty - (W.AttackLoyaltyDecay || 5)); // parameter.csv側の修正も推奨
+        // ★修正箇所: s.defender.loyalty -> s.defender.peoplesLoyalty
+        s.defender.peoplesLoyalty = Math.max(0, s.defender.peoplesLoyalty - (W.AttackLoyaltyDecay || 5)); // parameter.csv側の修正も推奨
         s.defender.population = Math.max(0, s.defender.population - (W.AttackPopDecay || 500));
         
         if (s.isPlayerInvolved) { 
@@ -561,7 +562,9 @@ class WarManager {
             const actor = isAtkTurn ? s.atkBushos[0] : s.defBusho; 
             const targetBusho = isAtkTurn ? s.defBusho : s.atkBushos[0]; 
             const maxLoyalty = window.MainParams?.Economy?.MaxLoyalty || 100; // ハードコードを修正
-            const result = WarSystem.calcScheme(actor, targetBusho, isAtkTurn ? s.defender.loyalty : maxLoyalty); 
+            
+            // ★修正箇所: s.defender.loyalty -> s.defender.peoplesLoyalty
+            const result = WarSystem.calcScheme(actor, targetBusho, isAtkTurn ? s.defender.peoplesLoyalty : maxLoyalty); 
             if (!result.success) { if (s.isPlayerInvolved) this.game.ui.log(`R${s.round} 謀略失敗！`); } 
             else { 
                 let actualDamage = result.damage;

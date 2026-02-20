@@ -4,21 +4,18 @@
  * 依存: WarSystem (war.js) の計算ロジックを使用して、parameter.csvの変更を反映させる
  * 修正: 新外交システム対応（感情値による攻撃優先、支配・従属国への攻撃禁止）
  * 修正: ゲーム開始から3ターン未満は攻撃をスキップする制限を追加
+ * 修正: 攻撃判定ロジックの全面改修
  */
 
 window.AIParams = {
     AI: {
         Difficulty: 'normal',
-        Aggressiveness: 1, SoldierSendRate: 0.8,
         AbilityBase: 50, AbilitySensitivity: 3.0,
         GunshiBiasFactor: 0.5, GunshiFairnessFactor: 0.01,
         DiplomacyChance: 0.3, 
         GoodwillThreshold: 40, 
         AllianceThreshold: 70, 
-        BreakAllianceDutyFactor: 0.5,
-        RiskAversion: 2.0,
-        WinBonus: 1000,
-        AttackThreshold: 1500
+        BreakAllianceDutyFactor: 0.5
     }
 };
 
@@ -75,41 +72,27 @@ class AIEngine {
             }
             
             // 軍事フェーズ
-            // ゲーム開始からの経過ターン（月数）を計算
             const elapsedTurns = (this.game.year - window.MainParams.StartYear) * 12 
                                + (this.game.month - window.MainParams.StartMonth);
 
-            // 開始から3ターン未満は攻撃をスキップ
             if (elapsedTurns >= 3) {
-                const baseThreshold = window.AIParams.AI.AttackThreshold || 300;
-                const threshold = 500; 
+                const neighbors = this.game.castles.filter(c => 
+                    c.ownerClan !== 0 && 
+                    c.ownerClan !== castle.ownerClan && 
+                    GameSystem.isAdjacent(castle, c)
+                );
+                
+                const validEnemies = neighbors.filter(target => {
+                    const rel = this.game.getRelation(castle.ownerClan, target.ownerClan);
+                    const isProtected = ['同盟', '支配', '従属'].includes(rel.status);
+                    return !isProtected && (target.immunityUntil || 0) < this.game.getCurrentTurnId();
+                });
 
-                if (castle.soldiers > threshold && castle.rice > 500) { 
-                    const neighbors = this.game.castles.filter(c => 
-                        c.ownerClan !== 0 && 
-                        c.ownerClan !== castle.ownerClan && 
-                        GameSystem.isAdjacent(castle, c)
-                    );
-                    
-                    // ★修正: 新外交システムに基づき、同盟・支配・従属の相手を攻撃候補から除外
-                    const validEnemies = neighbors.filter(target => {
-                        const rel = this.game.getRelation(castle.ownerClan, target.ownerClan);
-                        const isProtected = ['同盟', '支配', '従属'].includes(rel.status);
-                        return !isProtected && (target.immunityUntil || 0) < this.game.getCurrentTurnId();
-                    });
-
-                    if (validEnemies.length > 0) {
-                        const aggroBase = (window.AIParams.AI.Aggressiveness || 1.5) * mods.aggression;
-                        const personalityFactor = (castellan.personality === 'aggressive') ? 1.5 : 1.0;
-                        const checkChance = smartness > 0.7 ? 1.0 : (0.5 * aggroBase * personalityFactor);
-
-                        if (Math.random() < checkChance) {
-                            const target = this.decideAttackTarget(castle, castellan, validEnemies, mods, smartness, baseThreshold);
-                            if (target) {
-                                this.executeAttack(castle, target, castellan);
-                                return; 
-                            }
-                        }
+                if (validEnemies.length > 0) {
+                    const attackData = this.decideAttackTarget(castle, castellan, validEnemies);
+                    if (attackData) {
+                        this.executeAttack(castle, attackData.target, castellan, attackData.sendSoldiers, attackData.sendRice);
+                        return; 
                     }
                 }
             }
@@ -124,95 +107,103 @@ class AIEngine {
         }
     }
 
-    decideAttackTarget(myCastle, myGeneral, enemies, mods, smartness, baseThreshold) {
+    decideAttackTarget(myCastle, myGeneral, enemies) {
+        // 城主の性格による出陣兵士数の割合決定
+        let sendRate = 0.6; // normal (バランス)
+        if (myGeneral.personality === 'aggressive') sendRate = 0.8;
+        if (myGeneral.personality === 'conservative') sendRate = 0.4;
+        
+        const sendSoldiers = Math.floor(myCastle.soldiers * sendRate);
+        
+        // 兵糧のチェック (連れて行く兵士数の1.5倍)
+        const requiredRice = sendSoldiers * 1.5;
+        if (myCastle.rice < requiredRice) return null;
+
+        const myForce = sendSoldiers * 0.7;
+        const myDaimyo = this.game.bushos.find(b => b.clan === myCastle.ownerClan && b.isDaimyo) || { personality: 'normal' };
+
         let bestTarget = null;
-        let bestScore = -Infinity;
-        
-        const myBushos = this.game.getCastleBushos(myCastle.id).filter(b => b.status !== 'ronin');
-        const availableBushos = myBushos.sort((a,b) => b.leadership - a.leadership).slice(0, 3);
-        
-        if (typeof WarSystem === 'undefined') return null;
-
-        const myStats = WarSystem.calcUnitStats(availableBushos);
-        const sendSoldiers = Math.floor(myCastle.soldiers * (window.AIParams.AI.SoldierSendRate || 0.8));
-
-        const neededRice = sendSoldiers * 0.1 * 5;
-        if (myCastle.rice < neededRice) return null;
-
-        const riskAversion = window.AIParams.AI.RiskAversion || 2.0;
-        const winBonus = window.AIParams.AI.WinBonus || 1000;
+        let highestProb = -1;
 
         enemies.forEach(target => {
             const rel = this.game.getRelation(myCastle.ownerClan, target.ownerClan);
             
-            // 念のためここでも同盟・支配・従属を弾く
-            if (['同盟', '支配', '従属'].includes(rel.status)) return;
+            // 攻撃側の智謀による数値見積もりの誤差 (50を基準に最大30%見誤る)
+            const int = myGeneral.intelligence;
+            const errorRange = Math.min(0.3, Math.max(0, (100 - int) / 100 * 0.3));
+            const errorRate = 1.0 + (Math.random() - 0.5) * 2 * errorRange;
+            
+            const pEnemySoldiers = target.soldiers * errorRate;
+            const pEnemyDefense = target.defense * errorRate;
 
-            const errorMargin = (1.0 - smartness) * (mods.accuracy === 1.0 ? 0.1 : 0.5); 
-            const perceive = (val) => Math.floor(val * (1.0 + (Math.random() - 0.5) * 2 * errorMargin));
+            // 敵戦力の見積もり
+            const enemyForce = (pEnemySoldiers + pEnemyDefense * 2) * 1.5;
 
+            // 基準値の比較
+            const forceRatio = myForce / Math.max(1, enemyForce);
+            
+            let prob = 0;
+            if (forceRatio >= 1.0) {
+                // 基準値を満たす場合、差が大きいほど確率上昇
+                prob = 10 + (forceRatio - 1.0) * 20; 
+            } else {
+                prob = forceRatio * 10;
+            }
+
+            // 守備側武将の能力による攻撃確率低下 (最大10%)
             const enemyBushos = this.game.getCastleBushos(target.id);
-            const enemyGeneral = enemyBushos.reduce((a, b) => a.leadership > b.leadership ? a : b, { leadership: 40, strength: 40, intelligence: 40 });
-            const enemyStats = WarSystem.calcUnitStats(enemyBushos.length > 0 ? enemyBushos : [enemyGeneral]);
-            
-            const pEnemySoldiers = perceive(target.soldiers);
-            const pEnemyDefense = perceive(target.defense);
-            const pEnemyTraining = perceive(target.training);
-
-            const myDmg = WarSystem.calcWarDamage(myStats, enemyStats, sendSoldiers, pEnemySoldiers, pEnemyDefense, myCastle.morale, pEnemyTraining, 'charge');
-            const enemyDmg = WarSystem.calcWarDamage(enemyStats, myStats, pEnemySoldiers, sendSoldiers, myCastle.defense, target.morale, myCastle.training, 'charge'); 
-
-            const expectedLoss = enemyDmg.soldierDmg;
-            const expectedGain = myDmg.soldierDmg + (myDmg.wallDmg * 2.0);
-            
-            const riskFactor = riskAversion - (smartness * 0.5);
-            let score = expectedGain - (expectedLoss * riskFactor); 
-
-            if (pEnemySoldiers < myDmg.soldierDmg * 3 && expectedLoss < sendSoldiers * 0.5) {
-                 score += winBonus * smartness; 
+            let maxLdr = 0, maxInt = 0;
+            if (enemyBushos.length > 0) {
+                maxLdr = Math.max(...enemyBushos.map(b => b.leadership));
+                maxInt = Math.max(...enemyBushos.map(b => b.intelligence));
             }
+            const ldrDrop = maxLdr >= 70 ? Math.min(5, ((maxLdr - 70) / 30) * 5) : 0;
+            const intDrop = maxInt >= 70 ? Math.min(5, ((maxInt - 70) / 30) * 5) : 0;
+            prob -= (ldrDrop + intDrop);
+
+            // 友好度による補正 (50基準、最低0.1%)
+            const sentiment = typeof rel.sentiment !== 'undefined' ? rel.sentiment : 50; 
+            prob += (50 - sentiment) * 0.2;
+
+            // 性格による補正関数
+            const getPersonalityBonus = (p) => {
+                if (p === 'aggressive') return 5;
+                if (p === 'conservative') return -5;
+                return 0;
+            };
             
-            if (pEnemyDefense < 100) score += 500;
+            // 大名と城主の性格補正を適用
+            prob += getPersonalityBonus(myDaimyo.personality);
+            prob += getPersonalityBonus(myGeneral.personality);
 
-            const resourceValue = (target.gold + target.rice) * 0.5 * smartness;
-            score += resourceValue;
+            // 難易度補正
+            const diff = window.AIParams.AI.Difficulty || 'normal';
+            const diffMulti = diff === 'hard' ? 1.2 : diff === 'easy' ? 0.7 : 1.0;
+            prob *= diffMulti;
 
-            if (myGeneral.intelligence < enemyGeneral.intelligence - 10) {
-                score -= 300 * smartness; 
-            }
+            // 攻撃確率の最大値設定
+            const maxProb = rel.status === '敵対' ? 40 : 20;
+            
+            // 最大値と最小値の適用
+            prob = Math.min(prob, maxProb);
+            prob = Math.max(0.1, prob);
 
-            // ★追加: 感情値が低い相手を優先的に攻撃対象とする
-            if (rel.sentiment < 30) {
-                score += 500 * smartness;
-            }
-
-            if (score > bestScore) {
-                bestScore = score;
+            if (prob > highestProb) {
+                highestProb = prob;
                 bestTarget = target;
             }
         });
 
-        const threshold = baseThreshold * mods.accuracy; 
-
-        if (bestScore > threshold) {
-            return bestTarget;
+        if (bestTarget && Math.random() * 100 < highestProb) {
+            return { target: bestTarget, sendSoldiers, sendRice: requiredRice };
         }
         return null;
     }
 
-    executeAttack(source, target, general) {
+    executeAttack(source, target, general, sendSoldiers, sendRice) {
+        if (sendSoldiers <= 0 || sendRice <= 0) return;
         const bushos = this.game.getCastleBushos(source.id).filter(b => b.status !== 'ronin');
         const sorted = bushos.sort((a,b) => b.leadership - a.leadership).slice(0, 3);
-        const sendSoldiers = Math.floor(source.soldiers * (window.AIParams.AI.SoldierSendRate || 0.8));
-        
-        if (sendSoldiers <= 0) return;
-        
-        let sendRice = Math.floor(sendSoldiers * 1.0);
-        if (source.rice < sendRice) {
-            sendRice = source.rice;
-        }
-        if (sendRice <= 0) return; 
-
         this.game.warManager.startWar(source, target, sorted, sendSoldiers, sendRice);
     }
 
@@ -222,7 +213,8 @@ class AIEngine {
         const soldiers = castle.soldiers;
         
         let scoreCharity = 0;
-        if (castle.loyalty < 40) scoreCharity = (100 - castle.loyalty) * 2;
+        // ★修正箇所: castle.loyalty -> castle.peoplesLoyalty
+        if (castle.peoplesLoyalty < 40) scoreCharity = (100 - castle.peoplesLoyalty) * 2;
         
         let scoreDraft = 0;
         const safeSoldierCount = 300 + (smartness * 500); 
@@ -267,7 +259,8 @@ class AIEngine {
 
             if (action.type === 'charity' && gold >= action.cost) {
                  castle.gold -= action.cost;
-                 castle.loyalty = Math.min(100, castle.loyalty + GameSystem.calcCharity(castellan, 'money'));
+                 // ★修正箇所: castle.loyalty -> castle.peoplesLoyalty
+                 castle.peoplesLoyalty = Math.min(100, castle.peoplesLoyalty + GameSystem.calcCharity(castellan, 'money'));
                  castellan.isActionDone = true; return;
             }
             if (action.type === 'draft' && gold >= 200 && castle.population > 1000) {
@@ -308,9 +301,7 @@ class AIEngine {
             const targetClanTotal = this.game.getClanTotalSoldiers(targetClanId);
             const rel = this.game.getRelation(castle.ownerClan, targetClanId);
             
-            // ★修正: 新外交システムに基づき、statusを参照
             if (rel.status === '同盟') {
-                 // 敵の定義から同盟・支配・従属国を除外
                  const enemies = neighbors.filter(c => !['同盟', '支配', '従属'].includes(this.game.getRelation(castle.ownerClan, c.ownerClan).status));
                  const dutyInhibition = (myDaimyo.duty * 0.01) * (1.0 - (smartness * 0.5)); 
                  
@@ -323,7 +314,6 @@ class AIEngine {
 
             if (myPower < targetClanTotal * 0.8) {
                 if (Math.random() < smartness) {
-                    // ★修正: friendshipの代わりにsentimentを参照
                     if (rel.sentiment < (window.AIParams.AI.GoodwillThreshold || 40) && castle.gold > 500) {
                          this.game.commandSystem.executeDiplomacy(castellan.id, targetClanId, 'goodwill', 200); 
                          castellan.isActionDone = true;
