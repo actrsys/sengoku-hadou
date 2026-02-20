@@ -5,6 +5,7 @@
  * 設定: Military, War
  * 修正: 捕虜になった武将の城主フラグ残留を防止、攻撃側出陣武将の行動済フラグ処理を追加
  * 修正: 民忠の最大値変更に伴う謀略ダメージ計算のハードコードを修正
+ * 修正: AI同士の戦争時のみ、互いの与ダメージ（反撃、計略含む）を半減させる処理を追加
  */
 
 // 戦争・軍事関連の設定定義
@@ -305,12 +306,26 @@ class WarManager {
 
         while (turn <= 20 && s.attacker.soldiers > 0 && s.defender.soldiers > 0 && safetyLimit > 0) {
             let resAtk = WarSystem.calcWarDamage(atkStats, defStats, s.attacker.soldiers, s.defender.soldiers, 0, s.attacker.morale, s.defender.training, 'charge');
+            
+            // AI同士の戦闘の場合はダメージ半減
+            if (!s.isPlayerInvolved) {
+                resAtk.soldierDmg = Math.floor(resAtk.soldierDmg * 0.5);
+                resAtk.counterDmg = Math.floor(resAtk.counterDmg * 0.5);
+            }
+
             s.defender.soldiers -= Math.min(s.defender.soldiers, resAtk.soldierDmg);
             s.attacker.soldiers -= Math.min(s.attacker.soldiers, resAtk.counterDmg);
 
             if (s.defender.soldiers <= 0 || s.attacker.soldiers <= 0) break;
 
             let resDef = WarSystem.calcWarDamage(defStats, atkStats, s.defender.soldiers, s.attacker.soldiers, 0, s.defender.morale, s.attacker.training, 'charge');
+            
+            // AI同士の戦闘の場合はダメージ半減
+            if (!s.isPlayerInvolved) {
+                resDef.soldierDmg = Math.floor(resDef.soldierDmg * 0.5);
+                resDef.counterDmg = Math.floor(resDef.counterDmg * 0.5);
+            }
+
             s.attacker.soldiers -= Math.min(s.attacker.soldiers, resDef.soldierDmg);
             s.defender.soldiers -= Math.min(s.defender.soldiers, resDef.counterDmg);
 
@@ -549,8 +564,12 @@ class WarManager {
             const result = WarSystem.calcScheme(actor, targetBusho, isAtkTurn ? s.defender.loyalty : maxLoyalty); 
             if (!result.success) { if (s.isPlayerInvolved) this.game.ui.log(`R${s.round} 謀略失敗！`); } 
             else { 
-                target.soldiers = Math.max(0, target.soldiers - result.damage); 
-                if (s.isPlayerInvolved) this.game.ui.log(`R${s.round} 謀略成功！ 兵士に${result.damage}の被害`); 
+                let actualDamage = result.damage;
+                // AI同士の戦闘の場合はダメージ半減
+                if (!s.isPlayerInvolved) actualDamage = Math.floor(actualDamage * 0.5);
+
+                target.soldiers = Math.max(0, target.soldiers - actualDamage); 
+                if (s.isPlayerInvolved) this.game.ui.log(`R${s.round} 謀略成功！ 兵士に${actualDamage}の被害`); 
             } 
             this.advanceWarTurn(); return; 
         }
@@ -561,9 +580,19 @@ class WarManager {
             const result = WarSystem.calcFire(actor, targetBusho); 
             if (!result.success) { if (s.isPlayerInvolved) this.game.ui.log(`R${s.round} 火攻失敗！`); } 
             else { 
-                if(isAtkTurn) s.defender.defense = Math.max(0, s.defender.defense - result.damage); 
-                else target.soldiers = Math.max(0, target.soldiers - 50); 
-                if (s.isPlayerInvolved) this.game.ui.log(`R${s.round} 火攻成功！ ${isAtkTurn?'防御':'兵士'}に${result.damage}の被害`); 
+                let actualDamage = result.damage;
+                let actualDefSoldierDamage = 50;
+
+                // AI同士の戦闘の場合はダメージ半減
+                if (!s.isPlayerInvolved) {
+                    actualDamage = Math.floor(actualDamage * 0.5);
+                    actualDefSoldierDamage = Math.floor(actualDefSoldierDamage * 0.5);
+                }
+
+                if(isAtkTurn) s.defender.defense = Math.max(0, s.defender.defense - actualDamage); 
+                else target.soldiers = Math.max(0, target.soldiers - actualDefSoldierDamage); 
+                
+                if (s.isPlayerInvolved) this.game.ui.log(`R${s.round} 火攻成功！ ${isAtkTurn?'防御':'兵士'}に${isAtkTurn ? actualDamage : actualDefSoldierDamage}の被害`); 
             } 
             this.advanceWarTurn(); return; 
         }
@@ -572,6 +601,14 @@ class WarManager {
         
         let calculatedSoldierDmg = result.soldierDmg;
         let calculatedWallDmg = result.wallDmg;
+        let calculatedCounterDmg = result.counterDmg;
+
+        // AI同士の戦闘の場合は通常攻撃および反撃のダメージ半減
+        if (!s.isPlayerInvolved) {
+            calculatedSoldierDmg = Math.floor(calculatedSoldierDmg * 0.5);
+            calculatedWallDmg = Math.floor(calculatedWallDmg * 0.5);
+            calculatedCounterDmg = Math.floor(calculatedCounterDmg * 0.5);
+        }
 
         if (isAtkTurn && s.defenderGuarding) {
              calculatedSoldierDmg = Math.floor(calculatedSoldierDmg * window.WarParams.War.RojoDamageReduction); 
@@ -587,9 +624,9 @@ class WarManager {
         if(isAtkTurn) s.deadSoldiers.defender += actualSoldierDmg; else s.deadSoldiers.attacker += actualSoldierDmg;
         if (isAtkTurn) s.defender.defense = Math.max(0, s.defender.defense - actualWallDmg);
         
-        if(result.counterDmg > 0) { 
+        if(calculatedCounterDmg > 0) { 
             const actorArmy = isAtkTurn ? s.attacker : s.defender; 
-            const actualCounterDmg = Math.min(actorArmy.soldiers, result.counterDmg);
+            const actualCounterDmg = Math.min(actorArmy.soldiers, calculatedCounterDmg);
             actorArmy.soldiers -= actualCounterDmg;
             if(isAtkTurn) s.deadSoldiers.attacker += actualCounterDmg; else s.deadSoldiers.defender += actualCounterDmg;
             if(s.isPlayerInvolved) this.game.ui.log(`(反撃被害: ${actualCounterDmg})`); 
