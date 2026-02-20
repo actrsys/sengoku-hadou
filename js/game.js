@@ -519,18 +519,28 @@ class UIManager {
         this.contextMenu.classList.remove('hidden');
 
         if (this.ctxMenuBack) {
+            if (this.game.selectionMode) {
+                this.ctxMenuBack.textContent = "キャンセル";
+            } else {
+                this.ctxMenuBack.textContent = "自拠点に戻る";
+            }
+
             this.ctxMenuBack.onclick = (e) => {
                 e.stopPropagation();
                 this.hideContextMenu();
                 if(this.game.isProcessingAI) return;
                 
-                this.cancelMapSelection(false); 
-
-                const myCastle = this.game.getCurrentTurnCastle();
-                if (myCastle) {
-                    this.showControlPanel(myCastle);
+                if (this.game.selectionMode) {
+                    this.cancelMapSelection(false); 
                     const el = document.querySelector(`.castle-card[data-clan="${this.game.playerClanId}"]`); 
                     if(el) el.scrollIntoView({block:"center", behavior: "smooth"});
+                } else {
+                    const myCastle = this.game.getCurrentTurnCastle();
+                    if (myCastle) {
+                        this.showControlPanel(myCastle);
+                        const el = document.querySelector(`.castle-card[data-clan="${this.game.playerClanId}"]`); 
+                        if(el) el.scrollIntoView({block:"center", behavior: "smooth"});
+                    }
                 }
             };
         }
@@ -992,7 +1002,12 @@ class UIManager {
         this.game.validTargets = []; 
         this.renderMap();
         if (!keepMenuState) {
-            this.menuState = 'MAIN';
+            if (this.game.lastMenuState) {
+                this.menuState = this.game.lastMenuState;
+                this.game.lastMenuState = null;
+            } else {
+                this.menuState = 'MAIN';
+            }
             this.renderCommandMenu();
         }
     }
