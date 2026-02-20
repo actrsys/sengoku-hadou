@@ -1,4 +1,4 @@
-Economy.MaxLoyalty1/**
+/**
  * game.js
  * 戦国シミュレーションゲーム (Main / UI / Data / System)
  * 修正: 既存外交ロジックの撤廃と DiplomacyManager へのリプレイス
@@ -2123,5 +2123,3 @@ window.addEventListener('DOMContentLoaded', () => {
     window.GameApp = new GameManager();
 
 });
-
-
