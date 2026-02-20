@@ -1070,7 +1070,7 @@ class CommandSystem {
         castle.gold -= costGold; castle.rice -= costRice; 
         
         const val = GameSystem.calcCharity(busho, type); 
-        const maxLoyalty = window.MainParams.Economy.MaxLoyalty || 1000;
+        const maxLoyalty = window.MainParams.Economy.MaxLoyalty || 100;
         castle.loyalty = Math.min(maxLoyalty, castle.loyalty + val); 
         busho.isActionDone = true; 
         

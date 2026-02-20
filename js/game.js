@@ -2,6 +2,7 @@
  * game.js
  * 戦国シミュレーションゲーム (Main / UI / Data / System)
  * 修正: 既存外交ロジックの撤廃と DiplomacyManager へのリプレイス
+ * 修正: 城の民忠プロパティを loyalty から peoplesLoyalty に変更
  */
 
 window.onerror = function(message, source, lineno, colno, error) {
@@ -910,7 +911,8 @@ class UIManager {
             content += `<div style="flex:1;"><div style="font-weight:bold;">${castle.name}</div>`;
             
             if (this.topInfoExpanded) {
-                content += `<div>人口:${mask(castle.population)} 民忠:${mask(castle.loyalty)}</div>`;
+                // ★ 修正箇所
+                content += `<div>人口:${mask(castle.population)} 民忠:${mask(castle.peoplesLoyalty)}</div>`;
                 content += `<div>兵:${mask(castle.soldiers)} 防:${mask(castle.defense)}</div>`;
                 content += `<div>金:${mask(castle.gold)} 米:${mask(castle.rice)}</div>`;
                 content += `<div>訓練:${mask(castle.training)} 士気:${mask(castle.morale)}</div>`;
@@ -1231,7 +1233,10 @@ class UIManager {
             } else if (['farm','commerce'].includes(actionType)) { infoHtml = `<div>金: ${c.gold} (1回500)</div>`; }
             else if (['charity'].includes(actionType)) { infoHtml = `<div>金: ${c.gold}, 米: ${c.rice} (1回300)</div>`; }
             else if (['repair'].includes(actionType)) { infoHtml = `<div>金: ${c.gold} (1回300)</div>`; }
-            else if (['draft'].includes(actionType)) { infoHtml = `<div>民忠: ${c.loyalty}</div>`; }
+            
+            // ★ 修正箇所
+            else if (['draft'].includes(actionType)) { infoHtml = `<div>民忠: ${c.peoplesLoyalty}</div>`; }
+            
             else if (['training','soldier_charity'].includes(actionType)) { infoHtml = `<div>状態: 訓練${c.training}/士気${c.morale}</div>`; }
         }
         if (contextEl) contextEl.innerHTML = infoHtml;
@@ -1770,8 +1775,9 @@ class GameManager {
             // ★ 金収入の計算 (毎月)
             // 式: (((人口×0.001) + (民忠÷4) + (鉱山÷15)) × 金銭収入率 × 乱数補正) + 季節ボーナス
             // ======================================================================
+            // ★ 修正箇所
             // 1. 基礎値の計算
-            const baseGold = (c.population * 0.001) + (c.loyalty / 3) + (c.commerce / 10);
+            const baseGold = (c.population * 0.001) + (c.peoplesLoyalty / 3) + (c.commerce / 10);
             
             // 2. 収入率と乱数補正の適用
             let income = Math.floor(baseGold * window.MainParams.Economy.IncomeGoldRate);
@@ -1789,8 +1795,9 @@ class GameManager {
             // 式: ((石高＋民忠) × 兵糧収入率 × 乱数補正) + 季節ボーナス
             // ======================================================================
             if (this.month === 9) {
+                // ★ 修正箇所
                 // 1. 基礎値の計算
-                const baseRice = c.kokudaka + c.loyalty;
+                const baseRice = c.kokudaka + c.peoplesLoyalty;
 
                 // 2. 収入率と乱数補正の適用
                 let riceIncome = Math.floor(baseRice * window.MainParams.Economy.IncomeRiceRate);
@@ -1804,7 +1811,8 @@ class GameManager {
             
             if (isPopGrowth) { 
                 let growth = 0;
-                let currentLoyalty = Math.max(0, Math.min(100, c.loyalty));
+                // ★ 修正箇所
+                let currentLoyalty = Math.max(0, Math.min(100, c.peoplesLoyalty));
                 if (currentLoyalty >= 51) {
                     const rate = 0.001 + ((currentLoyalty - 51) / 49) * 0.004;
                     growth = Math.floor(c.population * rate);
