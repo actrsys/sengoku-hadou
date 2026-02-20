@@ -1777,10 +1777,10 @@ class GameManager {
                 let growth = 0;
                 let currentLoyalty = Math.max(0, Math.min(100, c.loyalty));
                 if (currentLoyalty >= 51) {
-                    const rate = 0.0001 + ((currentLoyalty - 51) / 49) * 0.0004;
+                    const rate = 0.001 + ((currentLoyalty - 51) / 49) * 0.004;
                     growth = Math.floor(c.population * rate);
                 } else if (currentLoyalty <= 50) {
-                    const rate = 0.0001 + ((50 - currentLoyalty) / 50) * 0.0004;
+                    const rate = 0.001 + ((50 - currentLoyalty) / 50) * 0.004;
                     growth = -Math.floor(c.population * rate);
                 }
                 c.population = Math.max(0, c.population + growth);
