@@ -3,6 +3,7 @@
  * 責務: 敵大名のターン処理、内政、外交、軍事判断
  * 依存: WarSystem (war.js) の計算ロジックを使用して、parameter.csvの変更を反映させる
  * 修正: 新外交システム対応（感情値による攻撃優先、支配・従属国への攻撃禁止）
+ * 修正: ゲーム開始から3ターン未満は攻撃をスキップする制限を追加
  */
 
 window.AIParams = {
@@ -74,33 +75,40 @@ class AIEngine {
             }
             
             // 軍事フェーズ
-            const baseThreshold = window.AIParams.AI.AttackThreshold || 300;
-            const threshold = 500; 
+            // ゲーム開始からの経過ターン（月数）を計算
+            const elapsedTurns = (this.game.year - window.MainParams.StartYear) * 12 
+                               + (this.game.month - window.MainParams.StartMonth);
 
-            if (castle.soldiers > threshold && castle.rice > 500) { 
-                const neighbors = this.game.castles.filter(c => 
-                    c.ownerClan !== 0 && 
-                    c.ownerClan !== castle.ownerClan && 
-                    GameSystem.isAdjacent(castle, c)
-                );
-                
-                // ★修正: 新外交システムに基づき、同盟・支配・従属の相手を攻撃候補から除外
-                const validEnemies = neighbors.filter(target => {
-                    const rel = this.game.getRelation(castle.ownerClan, target.ownerClan);
-                    const isProtected = ['同盟', '支配', '従属'].includes(rel.status);
-                    return !isProtected && (target.immunityUntil || 0) < this.game.getCurrentTurnId();
-                });
+            // 開始から3ターン未満は攻撃をスキップ
+            if (elapsedTurns >= 3) {
+                const baseThreshold = window.AIParams.AI.AttackThreshold || 300;
+                const threshold = 500; 
 
-                if (validEnemies.length > 0) {
-                    const aggroBase = (window.AIParams.AI.Aggressiveness || 1.5) * mods.aggression;
-                    const personalityFactor = (castellan.personality === 'aggressive') ? 1.5 : 1.0;
-                    const checkChance = smartness > 0.7 ? 1.0 : (0.5 * aggroBase * personalityFactor);
+                if (castle.soldiers > threshold && castle.rice > 500) { 
+                    const neighbors = this.game.castles.filter(c => 
+                        c.ownerClan !== 0 && 
+                        c.ownerClan !== castle.ownerClan && 
+                        GameSystem.isAdjacent(castle, c)
+                    );
+                    
+                    // ★修正: 新外交システムに基づき、同盟・支配・従属の相手を攻撃候補から除外
+                    const validEnemies = neighbors.filter(target => {
+                        const rel = this.game.getRelation(castle.ownerClan, target.ownerClan);
+                        const isProtected = ['同盟', '支配', '従属'].includes(rel.status);
+                        return !isProtected && (target.immunityUntil || 0) < this.game.getCurrentTurnId();
+                    });
 
-                    if (Math.random() < checkChance) {
-                        const target = this.decideAttackTarget(castle, castellan, validEnemies, mods, smartness, baseThreshold);
-                        if (target) {
-                            this.executeAttack(castle, target, castellan);
-                            return; 
+                    if (validEnemies.length > 0) {
+                        const aggroBase = (window.AIParams.AI.Aggressiveness || 1.5) * mods.aggression;
+                        const personalityFactor = (castellan.personality === 'aggressive') ? 1.5 : 1.0;
+                        const checkChance = smartness > 0.7 ? 1.0 : (0.5 * aggroBase * personalityFactor);
+
+                        if (Math.random() < checkChance) {
+                            const target = this.decideAttackTarget(castle, castellan, validEnemies, mods, smartness, baseThreshold);
+                            if (target) {
+                                this.executeAttack(castle, target, castellan);
+                                return; 
+                            }
                         }
                     }
                 }
