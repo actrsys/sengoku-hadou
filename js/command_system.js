@@ -12,31 +12,31 @@ const COMMAND_SPECS = {
     // --- 内政 (DEVELOP) ---
     'farm': { 
         label: "石高開発", category: 'DEVELOP', 
-        costGold: 500, costRice: 0, 
+        costGold: 200, costRice: 0, 
         isMulti: true, hasAdvice: false, 
         startMode: 'busho_select', sortKey: 'politics',
-        msg: "金: 500 (1回あたり)" 
+        msg: "金: 200 (1回あたり)" 
     },
     'commerce': { 
         label: "鉱山開発", category: 'DEVELOP', 
-        costGold: 500, costRice: 0, 
+        costGold: 200, costRice: 0, 
         isMulti: true, hasAdvice: false, 
         startMode: 'busho_select', sortKey: 'politics',
-        msg: "金: 500 (1回あたり)" 
+        msg: "金: 200 (1回あたり)" 
     },
     'repair': { 
         label: "城壁修復", category: 'DEVELOP', 
-        costGold: 300, costRice: 0, 
+        costGold: 200, costRice: 0, 
         isMulti: true, hasAdvice: false, 
         startMode: 'busho_select', sortKey: 'politics',
-        msg: "金: 300 (1回あたり)" 
+        msg: "金: 200 (1回あたり)" 
     },
     'charity': { 
         label: "施し", category: 'DEVELOP', 
-        costGold: 300, costRice: 300, 
+        costGold: 200, costRice: 200, 
         isMulti: false, hasAdvice: false, 
         startMode: 'busho_select', sortKey: 'charm',
-        msg: "金: 300 / 米: 300 (選択可)" 
+        msg: "金: 200 / 米: 200 (選択可)" 
     },
 
     // --- 軍事取引 (MIL_TRADE) ---
