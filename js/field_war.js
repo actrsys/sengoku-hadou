@@ -254,10 +254,16 @@ class FieldWarManager {
                     } else if (this.state === 'PHASE_DIR') {
                         // 距離1（隣接マス）のハイライト判定
                         if (this.getDistance(unit.x, unit.y, x, y) === 1) {
-                            let targetDir = this.getDirection(unit.x, unit.y, x, y);
-                            let turnCost = this.getTurnCost(unit.direction, targetDir);
-                            if (unit.ap >= turnCost) {
-                                hex.classList.add('fw-dir-highlight');
+                            if (x === enemy.x && y === enemy.y && unit.ap >= 1) {
+                                // 敵のマスで攻撃可能な場合は赤色
+                                hex.classList.add('attackable');
+                            } else {
+                                // 敵以外のマスは向き変更用黄色
+                                let targetDir = this.getDirection(unit.x, unit.y, x, y);
+                                let turnCost = this.getTurnCost(unit.direction, targetDir);
+                                if (unit.ap >= turnCost) {
+                                    hex.classList.add('fw-dir-highlight');
+                                }
                             }
                         }
                         if (x === unit.x && y === unit.y) hex.classList.add('movable');
@@ -504,7 +510,7 @@ class FieldWarManager {
             } else {
                 this.updateMap();
                 this.updateStatus();
-                if (this.isPlayerTurn()) this.log(`向きを選択（自部隊クリックでスキップ）`);
+                if (this.isPlayerTurn()) this.log(`向き、または攻撃対象を選択（自部隊クリックでスキップ）`);
             }
         } else if (this.state === 'PHASE_DIR') {
             this.state = 'PHASE_ATTACK';
@@ -681,6 +687,16 @@ class FieldWarManager {
             }
 
             if (this.getDistance(unit.x, unit.y, x, y) === 1) {
+                // ★ 敵マスをクリックした場合（向きを変えずに即時攻撃）
+                if (x === enemy.x && y === enemy.y) {
+                    if (unit.ap >= 1) {
+                        unit.ap -= 1;
+                        this.executeAttack(unit, enemy);
+                    }
+                    return;
+                }
+
+                // ★ それ以外は向き変更
                 let targetDir = this.getDirection(unit.x, unit.y, x, y);
                 let turnCost = this.getTurnCost(unit.direction, targetDir);
                 
