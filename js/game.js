@@ -1765,14 +1765,42 @@ class GameManager {
         this.castles.forEach(c => {
             if (c.ownerClan === 0) return;
             c.isDone = false;
-            let income = Math.floor(c.commerce * window.MainParams.Economy.IncomeGoldRate);
+
+            // ======================================================================
+            // ★ 金収入の計算 (毎月)
+            // 式: (((人口×0.001) + (民忠÷4) + (鉱山÷15)) × 金銭収入率 × 乱数補正) + 季節ボーナス
+            // ======================================================================
+            // 1. 基礎値の計算
+            const baseGold = (c.population * 0.001) + (c.loyalty / 4) + (c.commerce / 15);
+            
+            // 2. 収入率と乱数補正の適用
+            let income = Math.floor(baseGold * window.MainParams.Economy.IncomeGoldRate);
             income = GameSystem.applyVariance(income, window.MainParams.Economy.IncomeFluctuation);
-            if(this.month === 3) income += 500; c.gold += income; 
-            if(this.month === 9) {
-                let riceIncome = c.kokudaka * window.MainParams.Economy.IncomeRiceRate;
+            
+            // 3. 季節ボーナス (3月)
+            if (this.month === 3) {
+                income += 500; 
+            }
+            c.gold += income;
+
+            // ======================================================================
+            // ★ 兵糧収入の計算 (9月のみ)
+            // 式: ((石高＋民忠) × 兵糧収入率 × 乱数補正) + 季節ボーナス
+            // ======================================================================
+            if (this.month === 9) {
+                // 1. 基礎値の計算
+                const baseRice = c.kokudaka + c.loyalty;
+
+                // 2. 収入率と乱数補正の適用
+                let riceIncome = Math.floor(baseRice * window.MainParams.Economy.IncomeRiceRate);
                 riceIncome = GameSystem.applyVariance(riceIncome, window.MainParams.Economy.IncomeFluctuation);
+
+                // 3. 季節ボーナス (必要に応じて加算。ここでは例として0としています)
+                // riceIncome += 0; 
+
                 c.rice += riceIncome;
             }
+            
             if (isPopGrowth) { 
                 let growth = 0;
                 let currentLoyalty = Math.max(0, Math.min(100, c.loyalty));
@@ -2092,4 +2120,5 @@ window.addEventListener('DOMContentLoaded', () => {
     }, { passive: false });
 
     window.GameApp = new GameManager();
+
 });
