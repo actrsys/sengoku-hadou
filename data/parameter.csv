@@ -5,7 +5,7 @@ System.PersonalityStatDiff,20,性格判定：猛将/知将になるための能�
 System.FactionInnovationHigh,70,派閥判定：革新派になる革新性下限値
 System.FactionInnovationLow,30,派閥判定：保守派になる革新性上限値
 Economy.IncomeGoldRate,1,鉱山に対する金銭収入率。上げると金銭収入増『インフレ化』、下げると金欠になり難易度上昇
-Economy.IncomeRiceRate,25,石高に対する兵糧収入率。上げると9月の兵糧収入増、下げると兵糧不足で戦争継続が困難に
+Economy.IncomeRiceRate,10,石高に対する兵糧収入率。上げると9月の兵糧収入増、下げると兵糧不足で戦争継続が困難に
 Economy.IncomeFluctuation,0.15,収入のランダム変動幅。上げると収入が不安定になり運要素が増す、下げると計算通りの収入になる
 Economy.ConsumeRicePerSoldier,0.03,兵士一人あたりの兵糧消費。上げると大軍の維持が困難になる、下げると兵糧を気にせず兵を抱えられる
 Economy.ConsumeGoldPerBusho,50,武将一人あたりの金銭消費。上げると武将を多く抱えるコスト増、下げると人員維持が楽になる
