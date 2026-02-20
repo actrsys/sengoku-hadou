@@ -2,11 +2,9 @@
  * ai.js - 敵思考エンジン
  * 責務: 敵大名のターン処理、内政、外交、軍事判断
  * 依存: WarSystem (war.js) の計算ロジックを使用して、parameter.csvの変更を反映させる
- * 設定: AI
+ * 修正: 新外交システム対応（感情値による攻撃優先、支配・従属国への攻撃禁止）
  */
 
-// AI関連の設定定義
-// Parameter.csv の変更を受けて拡張
 window.AIParams = {
     AI: {
         Difficulty: 'normal',
@@ -17,7 +15,6 @@ window.AIParams = {
         GoodwillThreshold: 40, 
         AllianceThreshold: 70, 
         BreakAllianceDutyFactor: 0.5,
-        // 新規追加パラメータのデフォルト値
         RiskAversion: 2.0,
         WinBonus: 1000,
         AttackThreshold: 300
@@ -51,7 +48,6 @@ class AIEngine {
 
     execAI(castle) {
         try {
-            // 【安全装置】万が一、プレイヤーの城がAIルーチンに渡された場合、即座に制御を戻す
             if (Number(castle.ownerClan) === Number(this.game.playerClanId)) {
                 console.warn("AI Alert: Player castle detected in AI routine. Returning control to player.");
                 this.game.isProcessingAI = false;
@@ -81,17 +77,18 @@ class AIEngine {
             const baseThreshold = window.AIParams.AI.AttackThreshold || 300;
             const threshold = 500; 
 
-            if (castle.soldiers > threshold && castle.rice > 500) { // 兵糧チェック追加
-                // ここで初めて周辺諸国の検索を行う
+            if (castle.soldiers > threshold && castle.rice > 500) { 
                 const neighbors = this.game.castles.filter(c => 
                     c.ownerClan !== 0 && 
                     c.ownerClan !== castle.ownerClan && 
                     GameSystem.isAdjacent(castle, c)
                 );
                 
+                // ★修正: 新外交システムに基づき、同盟・支配・従属の相手を攻撃候補から除外
                 const validEnemies = neighbors.filter(target => {
                     const rel = this.game.getRelation(castle.ownerClan, target.ownerClan);
-                    return !rel.alliance && (target.immunityUntil || 0) < this.game.getCurrentTurnId();
+                    const isProtected = ['同盟', '支配', '従属'].includes(rel.status);
+                    return !isProtected && (target.immunityUntil || 0) < this.game.getCurrentTurnId();
                 });
 
                 if (validEnemies.length > 0) {
@@ -131,7 +128,6 @@ class AIEngine {
         const myStats = WarSystem.calcUnitStats(availableBushos);
         const sendSoldiers = Math.floor(myCastle.soldiers * (window.AIParams.AI.SoldierSendRate || 0.8));
 
-        // 兵糧チェック: 最低でも5ターン分は欲しい
         const neededRice = sendSoldiers * 0.1 * 5;
         if (myCastle.rice < neededRice) return null;
 
@@ -139,6 +135,11 @@ class AIEngine {
         const winBonus = window.AIParams.AI.WinBonus || 1000;
 
         enemies.forEach(target => {
+            const rel = this.game.getRelation(myCastle.ownerClan, target.ownerClan);
+            
+            // 念のためここでも同盟・支配・従属を弾く
+            if (['同盟', '支配', '従属'].includes(rel.status)) return;
+
             const errorMargin = (1.0 - smartness) * (mods.accuracy === 1.0 ? 0.1 : 0.5); 
             const perceive = (val) => Math.floor(val * (1.0 + (Math.random() - 0.5) * 2 * errorMargin));
 
@@ -172,6 +173,11 @@ class AIEngine {
                 score -= 300 * smartness; 
             }
 
+            // ★追加: 感情値が低い相手を優先的に攻撃対象とする
+            if (rel.sentiment < 30) {
+                score += 500 * smartness;
+            }
+
             if (score > bestScore) {
                 bestScore = score;
                 bestTarget = target;
@@ -193,13 +199,11 @@ class AIEngine {
         
         if (sendSoldiers <= 0) return;
         
-        // 兵糧計算: 兵士数 * 0.1 * 10ターン分 を目安に持参
-        // 足りなければあるだけ持っていく
         let sendRice = Math.floor(sendSoldiers * 1.0);
         if (source.rice < sendRice) {
             sendRice = source.rice;
         }
-        if (sendRice <= 0) return; // 兵糧がなければ出撃しない
+        if (sendRice <= 0) return; 
 
         this.game.warManager.startWar(source, target, sorted, sendSoldiers, sendRice);
     }
@@ -296,8 +300,10 @@ class AIEngine {
             const targetClanTotal = this.game.getClanTotalSoldiers(targetClanId);
             const rel = this.game.getRelation(castle.ownerClan, targetClanId);
             
-            if (rel.alliance) {
-                 const enemies = neighbors.filter(c => !this.game.getRelation(castle.ownerClan, c.ownerClan).alliance);
+            // ★修正: 新外交システムに基づき、statusを参照
+            if (rel.status === '同盟') {
+                 // 敵の定義から同盟・支配・従属国を除外
+                 const enemies = neighbors.filter(c => !['同盟', '支配', '従属'].includes(this.game.getRelation(castle.ownerClan, c.ownerClan).status));
                  const dutyInhibition = (myDaimyo.duty * 0.01) * (1.0 - (smartness * 0.5)); 
                  
                  if (enemies.length === 0 && myPower > targetClanTotal * 2.5 && Math.random() > dutyInhibition) {
@@ -309,10 +315,11 @@ class AIEngine {
 
             if (myPower < targetClanTotal * 0.8) {
                 if (Math.random() < smartness) {
-                    if (rel.friendship < (window.AIParams.AI.GoodwillThreshold || 40) && castle.gold > 500) {
+                    // ★修正: friendshipの代わりにsentimentを参照
+                    if (rel.sentiment < (window.AIParams.AI.GoodwillThreshold || 40) && castle.gold > 500) {
                          this.game.commandSystem.executeDiplomacy(castellan.id, targetClanId, 'goodwill', 200); 
                          castellan.isActionDone = true;
-                    } else if (rel.friendship > (window.AIParams.AI.AllianceThreshold || 70)) {
+                    } else if (rel.sentiment > (window.AIParams.AI.AllianceThreshold || 70)) {
                          this.game.commandSystem.executeDiplomacy(castellan.id, targetClanId, 'alliance');
                          castellan.isActionDone = true;
                     }

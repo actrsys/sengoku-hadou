@@ -1,10 +1,7 @@
 /**
  * command_system.js
  * ゲーム内のコマンド実行ロジックおよびフロー制御を管理するクラス
- * * リファクタリング:
- * - COMMAND_SPECS にUI表示カテゴリ、コスト、ターゲット種別、開始モードを集約
- * - getValidTargets を実装し、GameManagerからロジックを移管
- * - 城主自動更新ロジックへの対応 (移動、追放、登用、引抜、輸送時に updateCastleLord を実行)
+ * 修正: 外交コマンドを DiplomacyManager 経由の処理にリプレイス、executeSubjugationの追加
  */
 
 /* ==========================================================================
@@ -148,7 +145,7 @@ const COMMAND_SPECS = {
         label: "登用", category: 'PERSONNEL', 
         costGold: 0, costRice: 0, 
         isMulti: false, hasAdvice: true, 
-        startMode: 'busho_select_special', subType: 'employ_target', // 特殊フロー
+        startMode: 'busho_select_special', subType: 'employ_target',
         sortKey: 'strength',
         msg: "在野武将を登用します" 
     },
@@ -191,7 +188,7 @@ const COMMAND_SPECS = {
     },
     'headhunt': { 
         label: "引抜", category: 'STRATEGY', 
-        costGold: 0, costRice: 0, // 実行時に入力
+        costGold: 0, costRice: 0,
         isMulti: false, hasAdvice: true, 
         startMode: 'map_select', targetType: 'enemy_all',
         sortKey: 'intelligence'
@@ -229,22 +226,10 @@ class CommandSystem {
         this.game = game;
     }
 
-    /* ==========================================================================
-       ★ 公開API & フロー制御 (Public API & Flow Control)
-       ========================================================================== */
-
-    /**
-     * コマンド定義を取得
-     */
     getSpecs() {
         return COMMAND_SPECS;
     }
 
-    /**
-     * マップ選択における有効ターゲットID一覧を取得
-     * @param {string} type コマンドタイプ
-     * @returns {Array<number>} CastleIDの配列
-     */
     getValidTargets(type) {
         const spec = COMMAND_SPECS[type];
         if (!spec || !spec.targetType) return [];
@@ -253,29 +238,29 @@ class CommandSystem {
         const playerClanId = Number(this.game.playerClanId);
         
         switch (spec.targetType) {
-            case 'enemy_valid': // 攻撃可能（直近攻略済みを除くなど）
+            case 'enemy_valid': 
                 return this.game.warManager.getValidWarTargets(c);
             
-            case 'enemy_all': // 全敵拠点（中立除く）
+            case 'enemy_all': 
                 return this.game.castles.filter(target => 
                     Number(target.ownerClan) !== playerClanId && target.ownerClan !== 0
                 ).map(t => t.id);
 
-            case 'ally_other': // 自分以外の自軍拠点
+            case 'ally_other': 
                 return this.game.castles.filter(target => 
                     Number(target.ownerClan) === playerClanId && target.id !== c.id
                 ).map(t => t.id);
             
-            case 'other_clan_all': // 他勢力すべて（外交用）
+            case 'other_clan_all': 
                 return this.game.castles.filter(target => 
                     target.ownerClan !== 0 && Number(target.ownerClan) !== playerClanId
                 ).map(t => t.id);
 
-            case 'ally_clan': // 同盟国（外交破棄用）
+            case 'ally_clan': 
                 return this.game.castles.filter(target => 
                     target.ownerClan !== 0 && 
                     Number(target.ownerClan) !== playerClanId &&
-                    this.game.getRelation(playerClanId, target.ownerClan).alliance === true
+                    this.game.getRelation(playerClanId, target.ownerClan).status === '同盟'
                 ).map(t => t.id);
 
             default:
@@ -283,9 +268,6 @@ class CommandSystem {
         }
     }
 
-    /**
-     * コマンド開始エントリポイント
-     */
     startCommand(type, targetId = null, extraData = null) {
         const spec = COMMAND_SPECS[type];
         if (!spec) {
@@ -293,7 +275,6 @@ class CommandSystem {
             return;
         }
 
-        // 1. システム系コマンド
         if (spec.isSystem) {
             this.executeSystemCommand(spec.action);
             return;
@@ -301,7 +282,6 @@ class CommandSystem {
 
         const castle = this.game.getCurrentTurnCastle();
 
-        // 2. リソースチェック (コスト定義がある場合)
         if (spec.costGold > 0 && castle.gold < spec.costGold) {
             alert(`金が足りません (必要: ${spec.costGold})`);
             return;
@@ -311,21 +291,16 @@ class CommandSystem {
             return;
         }
 
-        // 3. 開始モードによる分岐
         switch (spec.startMode) {
             case 'map_select':
-                // マップ選択モードへ移行
-                // UI側でenterMapSelectionを呼び、選択後に resolveMapSelection -> openBushoSelector へ戻ってくるフロー
                 this.game.enterMapSelection(type);
                 break;
 
             case 'busho_select':
-                // 武将選択モーダルを開く
                 this.game.ui.openBushoSelector(type, targetId, extraData);
                 break;
             
             case 'busho_select_special':
-                // 特殊な武将選択 (登用など)
                 if (spec.subType) {
                     this.game.ui.openBushoSelector(spec.subType, targetId, extraData);
                 } else {
@@ -334,7 +309,6 @@ class CommandSystem {
                 break;
 
             case 'quantity_select':
-                // 数値入力 (商人など)
                 this.game.ui.openQuantitySelector(type, null, targetId);
                 break;
 
@@ -344,9 +318,6 @@ class CommandSystem {
         }
     }
 
-    /**
-     * システムコマンドの実行
-     */
     executeSystemCommand(action) {
         switch(action) {
             case 'save': window.GameApp.saveGameToFile(); break;
@@ -358,50 +329,37 @@ class CommandSystem {
         }
     }
 
-    /**
-     * 武将選択後の処理ハンドラ
-     * UIManager.selectorConfirmBtn.onclick から呼ばれる
-     */
     handleBushoSelection(actionType, selectedIds, targetId, extraData) {
         if (!selectedIds || selectedIds.length === 0) return;
         const firstId = selectedIds[0];
 
-        // --- 複合フローの分岐 ---
-
-        // 登用: 対象選択 -> 実行武将選択
         if (actionType === 'employ_target') {
             this.game.ui.openBushoSelector('employ_doer', null, { targetId: firstId });
             return;
         }
-        // 登用: 実行武将選択 -> 実行
         if (actionType === 'employ_doer') {
             this.showAdviceAndExecute('employ', () => this.executeEmploy(firstId, extraData.targetId), { targetId: extraData.targetId });
             return;
         }
 
-        // 引抜: 対象選択 -> 実行武将選択
         if (actionType === 'headhunt_target') {
             this.game.ui.openBushoSelector('headhunt_doer', null, { targetId: firstId });
             return;
         }
-        // 引抜: 実行武将選択 -> 金額入力
         if (actionType === 'headhunt_doer') {
             this.game.ui.openQuantitySelector('headhunt_gold', selectedIds, extraData.targetId);
             return;
         }
 
-        // 流言: 対象武将選択 -> 実行武将選択
         if (actionType === 'rumor_target_busho') {
             this.game.ui.openBushoSelector('rumor_doer', targetId, { targetBushoId: firstId });
             return;
         }
-        // 流言: 実行武将選択 -> 実行
         if (actionType === 'rumor_doer') {
             this.showAdviceAndExecute('rumor', () => this.executeRumor(firstId, targetId, extraData.targetBushoId));
             return;
         }
 
-        // 外交: 実行武将選択 -> (親善なら金額、同盟なら即実行)
         if (actionType === 'diplomacy_doer') {
             if (extraData.subAction === 'goodwill') {
                 this.game.ui.openQuantitySelector('goodwill', selectedIds, targetId);
@@ -413,7 +371,6 @@ class CommandSystem {
             return;
         }
 
-        // 面談関連
         if (actionType === 'interview') {
             const interviewer = this.game.getBusho(firstId);
             this.game.ui.showInterviewModal(interviewer);
@@ -426,7 +383,6 @@ class CommandSystem {
             return;
         }
 
-        // 戦争: 武将選択 -> (総大将判定) -> 兵站選択
         if (actionType === 'war_deploy') {
              const selectedBushos = selectedIds.map(id => this.game.getBusho(id));
              const leader = selectedBushos.find(b => b.isDaimyo || b.isCastellan);
@@ -447,7 +403,6 @@ class CommandSystem {
             return;
         }
 
-        // 移動・輸送
         if (actionType === 'transport_deploy') {
             this.game.ui.openQuantitySelector('transport', selectedIds, targetId);
             return;
@@ -457,29 +412,24 @@ class CommandSystem {
             return;
         }
 
-        // 調査
         if (actionType === 'investigate_deploy') {
             this.showAdviceAndExecute('investigate', () => this.executeInvestigate(selectedIds, targetId));
             return;
         }
         
-        // 扇動
         if (actionType === 'incite_doer') {
              this.showAdviceAndExecute('incite', () => this.executeIncite(firstId, targetId));
              return;
         }
 
-        // --- 単純フロー (数量選択へ) ---
         if (['draft', 'charity', 'reward'].includes(actionType)) {
             this.game.ui.openQuantitySelector(actionType, selectedIds, targetId);
             return;
         }
 
-        // --- 単純フロー (即実行) ---
-        // COMMAND_SPECS の hasAdvice フラグを使用
         const spec = COMMAND_SPECS[actionType];
         
-        if (['appoint_gunshi'].includes(actionType)) { // 特殊な即実行
+        if (['appoint_gunshi'].includes(actionType)) { 
              this.executeAppointGunshi(firstId);
              return;
         }
@@ -496,11 +446,7 @@ class CommandSystem {
         console.warn("Unhandled busho selection type:", actionType);
     }
 
-    /**
-     * 数量・項目選択後の処理ハンドラ
-     */
     handleQuantitySelection(type, inputs, targetId, data) {
-        // dataは通常 selectedIds (Array)
         const castle = this.game.getCurrentTurnCastle();
 
         if (type === 'reward') {
@@ -570,19 +516,10 @@ class CommandSystem {
         }
     }
 
-    /**
-     * 軍師助言を表示して実行するラッパー
-     */
     showAdviceAndExecute(actionType, executeCallback, extraContext = {}) {
-        // 軍師不在チェックなどはGameManager/GameSystem側で担保するが
-        // ここではUI呼び出しを行う
         const adviceAction = { type: actionType, ...extraContext };
         this.game.ui.showGunshiAdvice(adviceAction, executeCallback);
     }
-
-    /* ==========================================================================
-       ★ コマンド実行ロジック (Execution Logic)
-       ========================================================================== */
 
     executeCommand(type, bushoIds, targetId) {
         const castle = this.game.getCurrentTurnCastle(); let totalVal = 0, cost = 0, count = 0, actionName = "";
@@ -644,7 +581,6 @@ class CommandSystem {
             }
             else if (type === 'banish') { 
                 if(!confirm(`本当に ${busho.name} を追放しますか？`)) return; 
-                // ★【修正】追放時に武将を城の所属リストから明確に除外する
                 castle.samuraiIds = castle.samuraiIds.filter(id => id !== busho.id);
                 busho.status = 'ronin'; busho.clan = 0; busho.isCastellan = false; 
                 this.game.updateCastleLord(castle); 
@@ -658,7 +594,7 @@ class CommandSystem {
                 castle.samuraiIds = castle.samuraiIds.filter(id => id !== busho.id); 
                 targetC.samuraiIds.push(busho.id); 
                 busho.castleId = targetId; 
-                busho.isCastellan = false; // ★【修正】移動時は城主を解任し、重複を防ぐ
+                busho.isCastellan = false; 
                 
                 this.game.updateCastleLord(castle);
                 this.game.updateCastleLord(targetC);
@@ -741,6 +677,9 @@ class CommandSystem {
         doer.isActionDone = true; this.game.ui.showResultModal(msg); this.game.ui.renderCommandMenu(); 
     }
 
+    /**
+     * 外交処理の刷新 (DiplomacyManagerの呼び出し)
+     */
     executeDiplomacy(doerId, targetClanId, type, gold = 0) {
         const doer = this.game.getBusho(doerId);
         const relation = this.game.getRelation(doer.clan, targetClanId);
@@ -750,29 +689,34 @@ class CommandSystem {
         if (type === 'goodwill') {
             const baseBonus = (gold / 100) + (doer.diplomacy + doer.charm) * 0.1;
             const increase = Math.floor(baseBonus * (0.8 + Math.random() * 0.4));
-            relation.friendship = Math.min(100, relation.friendship + increase);
+            
+            this.game.diplomacyManager.updateSentiment(doer.clan, targetClanId, increase);
+            const newRelation = this.game.getRelation(doer.clan, targetClanId);
+
             const castle = this.game.getCastle(doer.castleId); 
             if(castle) castle.gold -= gold;
-            msg = `${doer.name}が親善を行いました。\n友好度が${increase}上昇しました`;
+            
+            msg = `${doer.name}が親善を行いました。\n感情値が${increase}上昇しました (現在: ${newRelation.sentiment}, 状態: ${newRelation.status})`;
             doer.achievementTotal += Math.floor(doer.diplomacy * 0.2) + 10;
             this.game.factionSystem.updateRecognition(doer, 15);
 
         } else if (type === 'alliance') {
-            const chance = relation.friendship + doer.diplomacy;
+            const chance = relation.sentiment + doer.diplomacy;
             if (chance > 120 && Math.random() > 0.3) {
-                relation.alliance = true;
+                this.game.diplomacyManager.changeStatus(doer.clan, targetClanId, '同盟');
                 msg = `同盟の締結に成功しました！`;
                 doer.achievementTotal += Math.floor(doer.diplomacy * 0.2) + 10;
                 this.game.factionSystem.updateRecognition(doer, 30);
             } else {
-                relation.friendship = Math.max(0, relation.friendship - 10);
+                this.game.diplomacyManager.updateSentiment(doer.clan, targetClanId, -10);
                 msg = `同盟の締結に失敗しました……`;
                 doer.achievementTotal += 5;
                 this.game.factionSystem.updateRecognition(doer, 10);
             }
         } else if (type === 'break_alliance') {
-            relation.alliance = false;
-            relation.friendship = Math.max(0, relation.friendship - 60);
+            this.game.diplomacyManager.changeStatus(doer.clan, targetClanId, '普通');
+            this.game.diplomacyManager.updateSentiment(doer.clan, targetClanId, -60);
+            
             msg = `同盟を破棄しました。`;
             doer.achievementTotal += 5;
             this.game.factionSystem.updateRecognition(doer, 10);
@@ -785,6 +729,18 @@ class CommandSystem {
                 this.game.ui.updatePanelHeader();
                 this.game.ui.renderCommandMenu();
             }
+        }
+    }
+
+    /**
+     * 新規追加：支配・従属が発生する処理（戦争の敗北や降伏など外部から呼ばれる想定）
+     */
+    executeSubjugation(winnerClanId, loserClanId) {
+        this.game.diplomacyManager.changeStatus(winnerClanId, loserClanId, '支配');
+        const winner = this.game.clans.find(c => Number(c.id) === Number(winnerClanId));
+        const loser = this.game.clans.find(c => Number(c.id) === Number(loserClanId));
+        if (winner && loser) {
+            this.game.ui.log(`${winner.name}が${loser.name}を従属させました。`);
         }
     }
 
@@ -972,7 +928,6 @@ class CommandSystem {
         bushoIds.forEach(id => {
             const b = this.game.getBusho(id);
             this.game.factionSystem.handleMove(b, c.id, targetId); 
-            // ★【修正】輸送時に武将自身も移動させ、城主フラグをリセットする
             c.samuraiIds = c.samuraiIds.filter(sid => sid !== b.id);
             t.samuraiIds.push(b.id);
             b.castleId = targetId;

@@ -8,6 +8,9 @@ class Clan {
         this.id = Number(this.id);
         this.leaderId = Number(this.leaderId);
         // data.color, data.name 等はCSVから自動で割り当たります
+
+        // 外交データの初期化
+        this.diplomacyValue = this.diplomacyValue || {};
     }
 
     // UI等で表示するための軍団名取得

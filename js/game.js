@@ -1,7 +1,7 @@
 /**
  * game.js
  * 戦国シミュレーションゲーム (Main / UI / Data / System)
- * 修正: 城主の自動選出・管理ロジックの統合と死者除外の安全性強化、及び物資・取引メニュー拡張
+ * 修正: 既存外交ロジックの撤廃と DiplomacyManager へのリプレイス
  */
 
 window.onerror = function(message, source, lineno, colno, error) {
@@ -1597,7 +1597,6 @@ class GameManager {
         this.ui = new UIManager(this); 
         this.selectionMode = null; 
         this.validTargets = []; 
-        this.relations = {}; 
         this.isProcessingAI = false; 
         this.marketRate = 1.0; 
         this.lastMenuState = null;
@@ -1608,11 +1607,21 @@ class GameManager {
         this.aiEngine = new AIEngine(this);
         this.independenceSystem = new IndependenceSystem(this);
         this.factionSystem = new FactionSystem(this); 
+        this.diplomacyManager = new DiplomacyManager(this);
         
         this.phase = 'title';
     }
-    getRelationKey(id1, id2) { return id1 < id2 ? `${id1}-${id2}` : `${id2}-${id1}`; }
-    getRelation(id1, id2) { const key = this.getRelationKey(id1, id2); if (!this.relations[key]) this.relations[key] = { friendship: 50, alliance: false }; return this.relations[key]; }
+    
+    // 既存の relations 関連メソッドを DiplomacyManager 経由に変更
+    // ※ 第3弾の ai.js 修正までの互換性を保つための暫定処置（alliance等の付与）を含みます
+    getRelation(id1, id2) { 
+        const rel = this.diplomacyManager.getRelation(id1, id2); 
+        if (rel) {
+            rel.alliance = (rel.status === '同盟');
+            rel.friendship = rel.sentiment;
+        }
+        return rel;
+    }
     
     startNewGame() { 
         if(this.ui) this.ui.forceResetModals();
@@ -1673,34 +1682,28 @@ class GameManager {
     getClanGunshi(clanId) { return this.bushos.find(b => Number(b.clan) === Number(clanId) && b.isGunshi); }
     isCastleVisible(castle) { if (Number(castle.ownerClan) === Number(this.playerClanId)) return true; if (castle.investigatedUntil >= this.getCurrentTurnId()) return true; return false; }
     
-    // ==========================================
-    // 城主の更新・管理ロジック追加部分
-    // ==========================================
     updateCastleLord(castle) {
         if (!castle || castle.ownerClan === 0) {
             if (castle) castle.castellanId = 0;
             return;
         }
 
-        // ★ 【修正】dead を除外。幽霊が城主に選ばれるのを防ぐ
         const bushos = this.getCastleBushos(castle.id).filter(b => b.status !== 'ronin' && b.status !== 'dead');
         if (bushos.length === 0) {
             castle.castellanId = 0;
             return;
         }
 
-        // 1. 大名がその城にいるなら無条件で大名が城主
         const daimyo = bushos.find(b => b.isDaimyo);
         if (daimyo) {
             bushos.forEach(b => { 
                 b.isCastellan = false; 
             });
-            daimyo.isCastellan = true; // 大名と城主は別枠ではなく、大名自身が城主を兼任して他を排除する
+            daimyo.isCastellan = true; 
             castle.castellanId = daimyo.id;
             return;
         }
 
-        // 2. 大名も城主もおらず、武将が１人以上いるなら城主を自動選出する
         let currentLord = bushos.find(b => b.id === castle.castellanId && b.isCastellan);
         
         if (!currentLord) {
@@ -1709,19 +1712,16 @@ class GameManager {
     }
 
     electCastellan(castle, bushos) {
-        // 統率5:政治4:魅力1 でスコア算出し、派閥主を優先する
         bushos.forEach(b => {
             b._lordScore = (b.leadership * 5) + (b.politics * 4) + (b.charm * 1);
             if (b.isFactionLeader) {
-                b._lordScore += 10000; // 派閥主を絶対的に優先
+                b._lordScore += 10000; 
             }
         });
 
-        // 降順ソート
         bushos.sort((a, b) => b._lordScore - a._lordScore);
         const best = bushos[0];
 
-        // 既存の城主権限を剥奪し、ベストな武将を任命する
         bushos.forEach(b => b.isCastellan = false);
         best.isCastellan = true;
         castle.castellanId = best.id;
@@ -1730,7 +1730,6 @@ class GameManager {
     updateAllCastlesLords() {
         this.castles.forEach(c => this.updateCastleLord(c));
     }
-    // ==========================================
 
     async startMonth() { 
         this.marketRate = Math.max(window.MainParams.Economy.TradeRateMin, Math.min(window.MainParams.Economy.TradeRateMax, this.marketRate * (0.9 + Math.random()*window.MainParams.Economy.TradeFluctuation)));
@@ -1743,7 +1742,6 @@ class GameManager {
         
         this.processRoninMovements(); 
         
-        // ★ ターン開始時に全城の城主の整合性を保証
         this.updateAllCastlesLords();
         
         if (this.month % 3 === 0) this.optimizeCastellans(); 
@@ -1798,7 +1796,6 @@ class GameManager {
         }); 
     }
     
-    // ★ AIによる城主の最適化でも新しい選出ロジックを活用
     optimizeCastellans() { 
         const clanIds = [...new Set(this.castles.filter(c=>c.ownerClan!==0).map(c=>c.ownerClan))]; 
         clanIds.forEach(clanId => { 
@@ -1815,7 +1812,6 @@ class GameManager {
                     const castleBushos = this.getCastleBushos(castle.id).filter(b => b.status !== 'ronin'); 
                     if (castleBushos.length <= 1) return; 
                     
-                    // 新ロジックを使って最適な城主に再任命
                     this.electCastellan(castle, castleBushos);
                 }); 
             } 
@@ -2002,7 +1998,6 @@ class GameManager {
         }
     }
 
-    // ★ 大名が交代した際にも城主の再計算を行うように修正
     changeLeader(clanId, newLeaderId) { 
         this.bushos.filter(b => b.clan === clanId).forEach(b => b.isDaimyo = false); 
         const newLeader = this.getBusho(newLeaderId); 
@@ -2020,9 +2015,8 @@ class GameManager {
             marketRate: this.marketRate,
             castles: this.castles, 
             bushos: this.bushos, 
-            clans: this.clans,
-            playerClanId: this.playerClanId, 
-            relations: this.relations 
+            clans: this.clans, // clansにdiplomacyValueが含まれているためこれでセーブ可能
+            playerClanId: this.playerClanId 
         }; 
         const blob = new Blob([JSON.stringify(data, null, 2)], {type: 'application/json'}); 
         const url = URL.createObjectURL(blob); 
@@ -2041,7 +2035,6 @@ class GameManager {
                 this.marketRate = d.marketRate !== undefined ? d.marketRate : 1.0; 
                 this.castles = d.castles.map(c => new Castle(c)); 
                 this.bushos = d.bushos.map(b => new Busho(b)); 
-                if(d.relations) this.relations = d.relations; 
                 
                 if (d.clans) {
                     this.clans = d.clans.map(c => new Clan(c));
@@ -2060,7 +2053,6 @@ class GameManager {
                 this.turnQueue = this.castles.filter(c => c.ownerClan !== 0).sort(() => Math.random() - 0.5);
                 this.currentIndex = 0; 
 
-                // ★ ロード直後に全城の城主の整合性を保証
                 this.updateAllCastlesLords();
 
                 this.ui.showCutin(`ロード完了: ${this.year}年 ${this.month}月`);
