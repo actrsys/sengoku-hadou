@@ -40,20 +40,44 @@ const COMMAND_SPECS = {
         startMode: 'busho_select', sortKey: 'charm',
         msg: "金: 300 / 米: 300 (選択可)" 
     },
+
+    // --- 軍事取引 (MIL_TRADE) ---
     'buy_rice': {
-        label: "兵糧購入", category: 'DEVELOP',
+        label: "兵糧購入", category: 'MIL_TRADE',
         costGold: 0, costRice: 0,
         isMulti: false, hasAdvice: false,
         startMode: 'quantity_select',
         msg: "金を払い兵糧を買います"
     },
     'sell_rice': {
-        label: "兵糧売却", category: 'DEVELOP',
+        label: "兵糧売却", category: 'MIL_TRADE',
         costGold: 0, costRice: 0,
         isMulti: false, hasAdvice: false,
         startMode: 'quantity_select',
         msg: "兵糧を売り金を得ます"
     },
+    'buy_ammo': {
+        label: "矢弾購入", category: 'MIL_TRADE',
+        costGold: 0, costRice: 0,
+        isMulti: false, hasAdvice: false,
+        startMode: 'quantity_select',
+        msg: "金を払い矢弾を買います"
+    },
+    'buy_horses': {
+        label: "騎馬購入", category: 'MIL_TRADE',
+        costGold: 0, costRice: 0,
+        isMulti: false, hasAdvice: false,
+        startMode: 'quantity_select',
+        msg: "金を払い騎馬を買います"
+    },
+    'buy_guns': {
+        label: "鉄砲購入", category: 'MIL_TRADE',
+        costGold: 0, costRice: 0,
+        isMulti: false, hasAdvice: false,
+        startMode: 'quantity_select',
+        msg: "金を払い鉄砲を買います"
+    },
+
     // --- 軍事 (MILITARY) ---
     'war': { 
         label: "出陣", category: 'MILITARY', 
@@ -516,12 +540,17 @@ class CommandSystem {
         else if (type === 'buy_rice') {
             const val = parseInt(inputs.amount.num.value);
             if (val <= 0) return;
-            this.executeTrade('buy', val);
+            this.executeTrade('buy_rice', val);
         }
         else if (type === 'sell_rice') {
             const val = parseInt(inputs.amount.num.value);
             if (val <= 0) return;
-            this.executeTrade('sell', val);
+            this.executeTrade('sell_rice', val);
+        }
+        else if (['buy_ammo', 'buy_horses', 'buy_guns'].includes(type)) {
+            const val = parseInt(inputs.amount.num.value);
+            if (val <= 0) return;
+            this.executeTrade(type, val);
         }
         else if (type === 'war_supplies') {
             const sVal = parseInt(inputs.soldiers.num.value);
@@ -1001,9 +1030,41 @@ class CommandSystem {
     }
 
     executeTrade(type, amount) {
-        const castle = this.game.getCurrentTurnCastle(); const rate = this.game.marketRate;
-        if(type === 'buy') { const cost = Math.floor(amount * rate); if(castle.gold < cost) { alert("資金不足"); return; } castle.gold -= cost; castle.rice += amount; this.game.ui.showResultModal(`兵糧${amount}を購入しました\n(金-${cost})`); } else { if(castle.rice < amount) { alert("兵糧不足"); return; } const gain = Math.floor(amount * rate); castle.rice -= amount; castle.gold += gain; this.game.ui.showResultModal(`兵糧${amount}を売却しました\n(金+${gain})`); }
-        this.game.ui.updatePanelHeader(); this.game.ui.renderCommandMenu();
+        const castle = this.game.getCurrentTurnCastle(); 
+        const rate = this.game.marketRate;
+        
+        if(type === 'buy_rice') { 
+            const cost = Math.floor(amount * rate); 
+            if(castle.gold < cost) { alert("資金不足"); return; } 
+            castle.gold -= cost; castle.rice += amount; 
+            this.game.ui.showResultModal(`兵糧${amount}を購入しました\n(金-${cost})`); 
+        } else if (type === 'sell_rice') { 
+            if(castle.rice < amount) { alert("兵糧不足"); return; } 
+            const gain = Math.floor(amount * rate); 
+            castle.rice -= amount; castle.gold += gain; 
+            this.game.ui.showResultModal(`兵糧${amount}を売却しました\n(金+${gain})`); 
+        } else if (type === 'buy_ammo') {
+            const price = Math.floor(window.MainParams.Economy.PriceAmmo * rate);
+            const cost = price * amount;
+            if(castle.gold < cost) { alert("資金不足"); return; } 
+            castle.gold -= cost; castle.ammo += amount; 
+            this.game.ui.showResultModal(`矢弾${amount}を購入しました\n(金-${cost})`); 
+        } else if (type === 'buy_horses') {
+            const price = Math.floor(window.MainParams.Economy.PriceHorse * rate);
+            const cost = price * amount;
+            if(castle.gold < cost) { alert("資金不足"); return; } 
+            castle.gold -= cost; castle.horses += amount; 
+            this.game.ui.showResultModal(`騎馬${amount}を購入しました\n(金-${cost})`); 
+        } else if (type === 'buy_guns') {
+            const price = Math.floor(window.MainParams.Economy.PriceGun * rate);
+            const cost = price * amount;
+            if(castle.gold < cost) { alert("資金不足"); return; } 
+            castle.gold -= cost; castle.guns += amount; 
+            this.game.ui.showResultModal(`鉄砲${amount}を購入しました\n(金-${cost})`); 
+        }
+        
+        this.game.ui.updatePanelHeader(); 
+        this.game.ui.renderCommandMenu();
     }
 
     executeDraft(bushoIds, gold) { 

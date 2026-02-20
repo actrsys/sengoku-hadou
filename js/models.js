@@ -36,6 +36,10 @@ class Castle {
         this.morale = Number(this.morale || 0);
         this.kokudaka = Number(this.kokudaka || 0);
         this.commerce = Number(this.commerce || 0);
+        
+        this.ammo = Number(this.ammo || 0);
+        this.horses = Number(this.horses || 0);
+        this.guns = Number(this.guns || 0);
 
         // 修正: ロード時に既存データがあれば維持する
         this.samuraiIds = Array.isArray(this.samuraiIds) ? this.samuraiIds : [];

@@ -1,7 +1,7 @@
 /**
  * game.js
  * 戦国シミュレーションゲーム (Main / UI / Data / System)
- * 修正: 城主の自動選出・管理ロジックの統合
+ * 修正: 城主の自動選出・管理ロジックの統合と死者除外の安全性強化、及び物資・取引メニュー拡張
  */
 
 window.onerror = function(message, source, lineno, colno, error) {
@@ -23,7 +23,8 @@ window.MainParams = {
         BaseDevelopment: 10, PoliticsEffect: 0.6, DevelopFluctuation: 0.15,
         BaseRepair: 20, RepairEffect: 0.6, RepairFluctuation: 0.15,
         BaseCharity: 10, CharmEffect: 0.4, CharityFluctuation: 0.15,
-        TradeRateMin: 0.5, TradeRateMax: 3.0, TradeFluctuation: 0.15
+        TradeRateMin: 0.5, TradeRateMax: 3.0, TradeFluctuation: 0.15,
+        PriceAmmo: 10, PriceHorse: 100, PriceGun: 500
     },
     Strategy: {
         InvestigateDifficulty: 50, InciteFactor: 150, RumorFactor: 50, SchemeSuccessRate: 0.6, EmploymentDiff: 1.5,
@@ -1045,7 +1046,11 @@ class UIManager {
                 createBtn(spec.label, "", () => cmd(key));
             });
 
-            const emptyCount = 3 - (relevantCommands.length % 3);
+            if (this.menuState === 'MILITARY') {
+                createBtn("取引", "category", () => menu('MIL_TRADE'));
+            }
+
+            const emptyCount = 3 - ((relevantCommands.length + (this.menuState === 'MILITARY' ? 1 : 0)) % 3);
             if (emptyCount < 3) {
                 for(let i=0; i<emptyCount; i++) {
                     const d = document.createElement('div');
@@ -1053,7 +1058,11 @@ class UIManager {
                 }
             }
 
-            createBtn("戻る", "back", () => menu('MAIN'));
+            if (this.menuState === 'MIL_TRADE') {
+                createBtn("戻る", "back", () => menu('MILITARY'));
+            } else {
+                createBtn("戻る", "back", () => menu('MAIN'));
+            }
         });
     }
     
@@ -1392,6 +1401,30 @@ class UIManager {
             document.getElementById('quantity-title').textContent = "兵糧売却"; const rate = this.game.marketRate;
             this.tradeTypeInfo.classList.remove('hidden'); this.tradeTypeInfo.textContent = `相場: ${rate.toFixed(2)} (米1 -> 金${rate.toFixed(2)})`;
             inputs.amount = createSlider("売却量(米)", "amount", c.rice, 0);
+        } else if (type === 'buy_ammo') {
+            document.getElementById('quantity-title').textContent = "矢弾購入"; 
+            const rate = this.game.marketRate; 
+            const price = Math.floor(window.MainParams.Economy.PriceAmmo * rate);
+            const maxBuy = price > 0 ? Math.floor(c.gold / price) : 0;
+            this.tradeTypeInfo.classList.remove('hidden'); 
+            this.tradeTypeInfo.textContent = `相場影響価格: 金${price} / 1個`;
+            inputs.amount = createSlider("購入量", "amount", maxBuy, 0);
+        } else if (type === 'buy_horses') {
+            document.getElementById('quantity-title').textContent = "騎馬購入"; 
+            const rate = this.game.marketRate; 
+            const price = Math.floor(window.MainParams.Economy.PriceHorse * rate);
+            const maxBuy = price > 0 ? Math.floor(c.gold / price) : 0;
+            this.tradeTypeInfo.classList.remove('hidden'); 
+            this.tradeTypeInfo.textContent = `相場影響価格: 金${price} / 1頭`;
+            inputs.amount = createSlider("購入量", "amount", maxBuy, 0);
+        } else if (type === 'buy_guns') {
+            document.getElementById('quantity-title').textContent = "鉄砲購入"; 
+            const rate = this.game.marketRate; 
+            const price = Math.floor(window.MainParams.Economy.PriceGun * rate);
+            const maxBuy = price > 0 ? Math.floor(c.gold / price) : 0;
+            this.tradeTypeInfo.classList.remove('hidden'); 
+            this.tradeTypeInfo.textContent = `相場影響価格: 金${price} / 1挺`;
+            inputs.amount = createSlider("購入量", "amount", maxBuy, 0);
         } else if (type === 'war_repair') {
             const s = this.game.warManager.state;
             const defender = s.defender;
@@ -1649,7 +1682,8 @@ class GameManager {
             return;
         }
 
-        const bushos = this.getCastleBushos(castle.id).filter(b => b.status !== 'ronin');
+        // ★ 【修正】dead を除外。幽霊が城主に選ばれるのを防ぐ
+        const bushos = this.getCastleBushos(castle.id).filter(b => b.status !== 'ronin' && b.status !== 'dead');
         if (bushos.length === 0) {
             castle.castellanId = 0;
             return;
