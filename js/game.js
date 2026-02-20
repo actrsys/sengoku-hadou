@@ -1775,8 +1775,14 @@ class GameManager {
             }
             if (isPopGrowth) { 
                 let growth = 0;
-                if(c.loyalty < 300) growth = -Math.floor(c.population * 0.01);
-                else if(c.loyalty > 600) growth = Math.floor(c.population * 0.01);
+                let currentLoyalty = Math.max(0, Math.min(100, c.loyalty));
+                if (currentLoyalty >= 51) {
+                    const rate = 0.0001 + ((currentLoyalty - 51) / 49) * 0.0004;
+                    growth = Math.floor(c.population * rate);
+                } else if (currentLoyalty <= 50) {
+                    const rate = 0.0001 + ((50 - currentLoyalty) / 50) * 0.0004;
+                    growth = -Math.floor(c.population * rate);
+                }
                 c.population = Math.max(0, c.population + growth);
             }
             const bushos = this.getCastleBushos(c.id);
