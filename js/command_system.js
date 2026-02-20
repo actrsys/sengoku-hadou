@@ -1040,7 +1040,11 @@ class CommandSystem {
         if(castle.gold < gold) { alert("資金不足"); return; } 
         castle.gold -= gold; 
         const busho = this.game.getBusho(bushoIds[0]); 
-        const soldiers = GameSystem.calcDraftFromGold(gold, busho, castle.population); 
+        
+        // 徴兵数を10分の1に設定
+        let soldiers = GameSystem.calcDraftFromGold(gold, busho, castle.population); 
+        soldiers = Math.floor(soldiers / 10);
+        
         const newMorale = Math.max(0, castle.morale - 10); 
         const newTraining = Math.max(0, castle.training - 10); 
         
