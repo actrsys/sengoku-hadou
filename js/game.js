@@ -1,4 +1,4 @@
-/**
+Economy.MaxLoyalty1/**
  * game.js
  * 戦国シミュレーションゲーム (Main / UI / Data / System)
  * 修正: 既存外交ロジックの撤廃と DiplomacyManager へのリプレイス
@@ -12,7 +12,7 @@ window.onerror = function(message, source, lineno, colno, error) {
 /* ==========================================================================
    ★ シナリオ定義 & 設定
    ========================================================================== */
-const SCENARIOS = [    { name: "群雄割拠 (1560年)", desc: "各地で有力大名が覇を競う標準シナリオ。", folder: "1560_okehazama" }];
+const SCENARIOS = [    { name: "桶狭間の戦い (1560年)", desc: "各地で有力大名が覇を競う標準シナリオ。", folder: "1560_okehazama" }];
 
 window.MainParams = {
     StartYear: 1560, StartMonth: 1,
