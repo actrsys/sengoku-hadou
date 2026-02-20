@@ -1779,7 +1779,8 @@ class GameManager {
             
             // 3. 季節ボーナス (3月)
             if (this.month === 3) {
-                income += 500; 
+                // 季節ボーナスとして、毎月もらえる金額（income）の5倍を上乗せする
+                income += income * 5;
             }
             c.gold += income;
 
@@ -2122,3 +2123,4 @@ window.addEventListener('DOMContentLoaded', () => {
     window.GameApp = new GameManager();
 
 });
+
