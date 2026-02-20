@@ -520,7 +520,7 @@ class UIManager {
 
         if (this.ctxMenuBack) {
             if (this.game.selectionMode) {
-                this.ctxMenuBack.textContent = "キャンセル";
+                this.ctxMenuBack.textContent = "戻る";
             } else {
                 this.ctxMenuBack.textContent = "自拠点に戻る";
             }
