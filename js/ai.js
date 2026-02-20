@@ -8,8 +8,8 @@
 window.AIParams = {
     AI: {
         Difficulty: 'normal',
-        Aggressiveness: 1.5, SoldierSendRate: 0.8,
-        AbilityBase: 50, AbilitySensitivity: 2.0,
+        Aggressiveness: 1, SoldierSendRate: 0.8,
+        AbilityBase: 50, AbilitySensitivity: 3.0,
         GunshiBiasFactor: 0.5, GunshiFairnessFactor: 0.01,
         DiplomacyChance: 0.3, 
         GoodwillThreshold: 40, 
@@ -17,7 +17,7 @@ window.AIParams = {
         BreakAllianceDutyFactor: 0.5,
         RiskAversion: 2.0,
         WinBonus: 1000,
-        AttackThreshold: 300
+        AttackThreshold: 500
     }
 };
 
