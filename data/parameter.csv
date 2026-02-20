@@ -18,6 +18,7 @@ Economy.RepairFluctuation,0.15,修復効果の変動幅。上げると修復値�
 Economy.BaseCharity,10,施しの基礎値。上げると民忠誠を上げやすくなる、下げると一揆対策等のコストが嵩む
 Economy.CharmEffect,0.4,施し時の魅力の影響係数。上げると「魅力」が高い武将の施し効果が激増する
 Economy.CharityFluctuation,0.15,施し効果の変動幅。上げると民忠上昇値が不安定になる
+Economy.MaxLoyalty,100,民忠の最大値。上げると一揆発生率をより低く抑えられる、下げると維持が難しくなる
 Economy.TradeRateMin,0.5,相場の最小値。上げると米価暴落時の底値が上がり金策しやすくなる、下げると米が紙屑同然になるリスク増
 Economy.TradeRateMax,3,相場の最大値。上げると米が高騰した際に莫大な利益が出る、下げると相場変動の幅が狭まる
 Economy.TradeFluctuation,0.15,相場の変動幅。上げると毎月の相場変動が激しくなる、下げると相場が固定化される
@@ -32,10 +33,12 @@ Military.BaseTraining,0,訓練の基礎値。上げると低能力武将でも�
 Military.TrainingLdrEffect,0.1,訓練時の統率影響。上げると「統率」が高い武将の訓練効率が上がる
 Military.TrainingStrEffect,0.05,訓練時の武力影響。上げると「武力」が高い武将の訓練効率が上がる
 Military.TrainingFluctuation,0.15,訓練効果の変動幅。上げると訓練上昇値がバラつく
+Military.MaxTraining,100,訓練度の最大値。上げると部隊の防御力がより強化される
 Military.BaseMorale,0,士気上げ基礎値。上げると誰でも士気を上げやすい、下げると能力依存度が増す
 Military.MoraleLdrEffect,0.1,士気上げ時の統率影響。上げると「統率」が高い武将の効果増
 Military.MoraleCharmEffect,0.05,士気上げ時の魅力影響。上げると「魅力」が高い武将の効果増
 Military.MoraleFluctuation,0.15,士気上げ変動幅。上げると士気上昇値がバラつく
+Military.MaxMorale,100,士気の最大値。上げると部隊の攻撃力がより強化される
 Military.WarMaxRounds,10,攻城戦の最大ラウンド数。上げると決着がつくまで戦う泥沼化傾向、下げると引き分けが増え守備側有利に
 Military.DamageSoldierPower,0.08,ダメージ計算時の兵数影響。上げると「兵の数」が強さに直結する、下げると武将の能力や相性が重要になる
 Military.WallDefenseEffect,0.3,ダメージ計算時の城壁防御効果。上げると城壁『防御度』がある状態での被ダメージが減り、攻城戦が長引く
@@ -143,7 +146,7 @@ Independence.ProbLoyaltyFactor,2,独立：確率計算時の忠誠差係数
 Independence.ProbAffinityFactor,0.5,独立：確率計算時の相性差係数
 Independence.FactionBonusMismatch,20,独立：派閥不一致時の確率加算ボーナス
 Independence.FactionBonusMatch,-10,独立：派閥一致時の確率減算ボーナス
-Independence.InitialGold,3000,独立：独立時の初期金銭
+Independence.InitialGold,2000,独立：独立時の初期金銭
 Independence.InitialRice,10000,独立：独立時の初期兵糧
 Independence.JoinBonusFaction,30,独立：家臣判定時の派閥一致による合流ボーナス
 Independence.EscapeDutyThreshold,30,独立：家臣判定時の脱出試行に必要な義理値
