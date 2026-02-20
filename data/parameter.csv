@@ -74,8 +74,8 @@ AI.BreakAllianceDutyFactor,0.5,AI同盟破棄の義理影響。上げると義�
 AI.RiskAversion,2.5,AIのリスク回避度。★重要：上げると自軍の損害を嫌い、慎重になる。下げると特攻しやすくなる。
 AI.WinBonus,300,AIの勝利確信ボーナス。上げると「勝てそう」と判断した時に積極的に攻めるようになる。
 AI.AttackThreshold,1000,AIの攻撃判定スコア閾値。上げると、かなり有利でないと攻め込まなくなる。
-War.ChargeMultiplier,1,攻城戦：突撃の攻撃倍率。上げると突撃ダメージが増加
-War.ChargeRisk,1.5,攻城戦：突撃の反撃リスク係数。上げると突撃失敗時に受ける被害が増える
+War.ChargeMultiplier,1.5,攻城戦：突撃の攻撃倍率。上げると突撃ダメージが増加
+War.ChargeRisk,1.8,攻城戦：突撃の反撃リスク係数。上げると突撃失敗時に受ける被害が増える
 War.ChargeSoldierDmgRate,1,攻城戦：突撃時の対兵士ダメージ倍率。上げると兵士へのダメージが増える
 War.ChargeWallDmgRate,0.1,攻城戦：突撃時の対城壁ダメージ倍率。上げると城壁へのダメージが増える
 War.BowMultiplier,0.5,攻城戦：斉射の攻撃倍率。上げると遠距離攻撃が強くなる
@@ -83,8 +83,8 @@ War.BowRisk,0.3,攻城戦：斉射の反撃リスク係数。下げると斉射�
 War.SiegeMultiplier,1,攻城戦：城攻めの対兵士攻撃倍率。上げると城攻めで兵士も減らせるようになる
 War.SiegeWallRate,0.5,攻城戦：城攻めの対城壁倍率。上げると城壁を破壊しやすくなる
 War.SiegeRisk,10,攻城戦：城攻めの反撃リスク係数。上げると城攻め時の被害が増える。※10は非常に高いリスク
-War.DefChargeMultiplier,1,攻城戦：守備側突撃の攻撃倍率。上げると守備側の反撃ダメージが増加
-War.DefChargeRisk,1.5,攻城戦：守備側突撃の反撃リスク係数。上げると守備側が突撃した際、逆に受ける被害が激増する
+War.DefChargeMultiplier,1.5,攻城戦：守備側突撃の攻撃倍率。上げると守備側の反撃ダメージが増加
+War.DefChargeRisk,1.8,攻城戦：守備側突撃の反撃リスク係数。上げると守備側が突撃した際、逆に受ける被害が激増する
 War.DefBowMultiplier,0.4,攻城戦：守備側斉射の攻撃倍率。上げると守備側の弓攻撃が強くなる
 War.RojoDamageReduction,0.7,攻城戦：籠城時の被ダメージ係数。下げると籠城した際に受けるダメージがさらに減る『0.1で1割』
 War.SchemeDamageFactor,4,攻城戦：謀略のダメージ係数。上げると知略差による謀略ダメージが増える
@@ -109,7 +109,7 @@ War.RiceConsumptionAtk,0.1,攻城戦：攻撃側の毎ラウンド兵糧消費�
 War.RiceConsumptionDef,0.05,攻城戦：守備側の毎ラウンド兵糧消費係数(対兵士数)
 War.BaseStat,30,攻城戦：部隊能力計算時の基礎能力値。武将不在時の最低保証値でもある
 War.SubGeneralFactor,0.2,攻城戦：副将の能力反映率。上げると副将の能力が部隊ステータスに大きく影響する
-War.MinDamage,10,攻城戦：最低保証ダメージ値。計算結果が低すぎても必ずこれだけは与える
+War.MinDamage,30,攻城戦：最低保証ダメージ値。計算結果が低すぎても必ずこれだけは与える
 War.StatsLdrWeight,1.2,攻城戦：攻撃力計算時の統率重み
 War.StatsStrWeight,0.3,攻城戦：攻撃力計算時の武力重み
 War.StatsIntWeight,0.5,攻城戦：防御力計算時の知略重み
