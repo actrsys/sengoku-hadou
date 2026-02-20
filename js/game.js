@@ -914,7 +914,7 @@ class UIManager {
                 content += `<div>兵:${mask(castle.soldiers)} 防:${mask(castle.defense)}</div>`;
                 content += `<div>金:${mask(castle.gold)} 米:${mask(castle.rice)}</div>`;
                 content += `<div>訓練:${mask(castle.training)} 士気:${mask(castle.morale)}</div>`;
-                content += `<div>石:${mask(castle.kokudaka)} 商:${mask(castle.commerce)}</div>`;
+                content += `<div>石:${mask(castle.kokudaka)} 鉱:${mask(castle.commerce)}</div>`;
             } else {
                 content += `<div>金:${mask(castle.gold)} 米:${mask(castle.rice)}</div>`;
                 content += `<div>兵:${mask(castle.soldiers)}</div>`;

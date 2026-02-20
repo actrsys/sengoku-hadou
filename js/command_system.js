@@ -18,7 +18,7 @@ const COMMAND_SPECS = {
         msg: "金: 500 (1回あたり)" 
     },
     'commerce': { 
-        label: "商業開発", category: 'DEVELOP', 
+        label: "鉱山開発", category: 'DEVELOP', 
         costGold: 500, costRice: 0, 
         isMulti: true, hasAdvice: false, 
         startMode: 'busho_select', sortKey: 'politics',
@@ -556,7 +556,7 @@ class CommandSystem {
                 if (castle.gold >= 500) { 
                     const val = GameSystem.calcDevelopment(busho); castle.gold -= 500; 
                     castle.commerce = Math.min(castle.maxCommerce, castle.commerce + val); 
-                    totalVal += val; count++; actionName = "商業開発";
+                    totalVal += val; count++; actionName = "鉱山開発";
                     busho.achievementTotal += Math.floor(val * 0.5);
                     this.game.factionSystem.updateRecognition(busho, 10);
                 }
@@ -614,7 +614,7 @@ class CommandSystem {
         if (count > 0 && actionName !== "移動") { 
             let detail = "";
             if (actionName === "石高開発") detail = `(現在: ${castle.kokudaka}/${castle.maxKokudaka})`;
-            if (actionName === "商業開発") detail = `(現在: ${castle.commerce}/${castle.maxCommerce})`;
+            if (actionName === "鉱山開発") detail = `(現在: ${castle.commerce}/${castle.maxCommerce})`;
             if (actionName === "城壁修復") detail = `(現在: ${castle.defense}/${castle.maxDefense})`;
             if (actionName === "訓練") {
                 const maxTraining = window.WarParams.Military.MaxTraining || 100;
