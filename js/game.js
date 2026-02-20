@@ -1771,7 +1771,7 @@ class GameManager {
             // 式: (((人口×0.001) + (民忠÷4) + (鉱山÷15)) × 金銭収入率 × 乱数補正) + 季節ボーナス
             // ======================================================================
             // 1. 基礎値の計算
-            const baseGold = (c.population * 0.001) + (c.loyalty / 4) + (c.commerce / 15);
+            const baseGold = (c.population * 0.001) + (c.loyalty / 3) + (c.commerce / 10);
             
             // 2. 収入率と乱数補正の適用
             let income = Math.floor(baseGold * window.MainParams.Economy.IncomeGoldRate);
@@ -2123,4 +2123,5 @@ window.addEventListener('DOMContentLoaded', () => {
     window.GameApp = new GameManager();
 
 });
+
 
