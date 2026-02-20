@@ -17,7 +17,7 @@ window.AIParams = {
         BreakAllianceDutyFactor: 0.5,
         RiskAversion: 2.0,
         WinBonus: 1000,
-        AttackThreshold: 500
+        AttackThreshold: 1500
     }
 };
 
