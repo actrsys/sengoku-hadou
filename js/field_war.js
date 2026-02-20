@@ -21,6 +21,7 @@ class FieldWarManager {
         this.state = 'IDLE'; 
         this.reachable = null;
         this.previewTarget = null;
+        this.turnBackup = null; // 右クリックキャンセル用の状態保存
     }
 
     startFieldWar(warState, onComplete) {
@@ -110,6 +111,12 @@ class FieldWarManager {
         if (this.mapEl) {
             this.mapEl.style.width = `${totalW}px`;
             this.mapEl.style.height = `${totalH}px`;
+            
+            // 右クリックで行動をキャンセルするイベントリスナー
+            this.mapEl.oncontextmenu = (e) => {
+                e.preventDefault();
+                this.cancelAction();
+            };
         }
 
         const btnWait = document.getElementById('fw-btn-wait');
@@ -129,10 +136,50 @@ class FieldWarManager {
                 if (!this.isPlayerTurn()) return;
                 const unit = this.units[this.activeUnitIndex];
                 if (confirm("本当に撤退しますか？")) {
-                    this.log(`${unit.name}隊は撤退を決断した。`);
+                    if (unit.isAttacker) this.log(`撤退を開始します……`);
+                    else this.log(`城内へ撤退を開始します……`);
                     this.endFieldWar(unit.isAttacker ? 'attacker_retreat' : 'defender_retreat');
                 }
             };
+        }
+    }
+
+    cancelAction() {
+        if (!this.active || !this.isPlayerTurn()) return;
+        
+        const unit = this.units[this.activeUnitIndex];
+        // 攻撃実行後など、すでに行動完了済みの場合はキャンセル不可
+        if (unit.hasActionDone) return;
+        
+        // 最初のフェーズかつ、まだ何も動いていない場合はキャンセル処理不要
+        if (this.state === 'PHASE_MOVE' && this.turnBackup && 
+            unit.x === this.turnBackup.x && unit.y === this.turnBackup.y && unit.direction === this.turnBackup.direction) {
+            // プレビュー表示中ならプレビューだけ消す
+            if (this.previewTarget) {
+                this.previewTarget = null;
+                this.updateMap();
+            }
+            return;
+        }
+
+        // バックアップからターン開始時点の状態に復元
+        if (this.turnBackup) {
+            unit.x = this.turnBackup.x;
+            unit.y = this.turnBackup.y;
+            unit.direction = this.turnBackup.direction;
+            unit.ap = this.turnBackup.ap;
+            
+            this.log(`${unit.name}隊の行動をキャンセルしました。`);
+            
+            this.state = 'PHASE_MOVE';
+            this.reachable = null;
+            this.previewTarget = null;
+            
+            const enemy = this.units[1 - this.activeUnitIndex];
+            this.reachable = this.findPaths(unit, enemy, unit.ap);
+            
+            this.updateMap();
+            this.updateStatus();
         }
     }
 
@@ -152,8 +199,9 @@ class FieldWarManager {
         const atkEl = document.getElementById('fw-atk-status');
         const defEl = document.getElementById('fw-def-status');
 
-        if (atkEl) atkEl.innerHTML = `<strong>[攻] ${atk.name}</strong><br>兵: ${atk.soldiers} / 糧: ${atk.rice} / AP: ${atk.ap}`;
-        if (defEl) defEl.innerHTML = `<strong>[守] ${def.name}</strong><br>兵: ${def.soldiers} / 糧: ${def.rice} / AP: ${def.ap}`;
+        // AP表示を削除
+        if (atkEl) atkEl.innerHTML = `<strong>[攻] ${atk.name}</strong><br>兵: ${atk.soldiers} / 糧: ${atk.rice}`;
+        if (defEl) defEl.innerHTML = `<strong>[守] ${def.name}</strong><br>兵: ${def.soldiers} / 糧: ${def.rice}`;
         
         if (atk.isPlayer) {
             if (atkEl) atkEl.style.order = 1;
@@ -410,6 +458,15 @@ class FieldWarManager {
         
         unit.hasActionDone = false;
         unit.ap = unit.mobility; // ターン開始時にAPを全回復（最大4）
+        
+        // --- ターン開始時の状態をバックアップ（キャンセルのため） ---
+        this.turnBackup = {
+            x: unit.x,
+            y: unit.y,
+            direction: unit.direction,
+            ap: unit.ap
+        };
+
         this.state = 'IDLE';
         this.reachable = null;
         this.previewTarget = null;
@@ -423,7 +480,7 @@ class FieldWarManager {
             if (isPlayerInvolved) {
                 this.updateMap();
                 this.updateStatus();
-                this.log(`【${unit.name}隊のターン】移動先を選択（自部隊クリックでスキップ）`);
+                this.log(`【${unit.name}隊のターン】移動先を選択（右クリックで行動キャンセル）`);
             }
         } else {
             if (isPlayerInvolved) {
@@ -504,28 +561,44 @@ class FieldWarManager {
         const atkUnit = this.units.find(u => u.isAttacker);
         const defUnit = this.units.find(u => !u.isAttacker);
 
+        const isAtkPlayer = atkUnit.isPlayer;
+        const isDefPlayer = defUnit.isPlayer;
+        const enemyName = isAtkPlayer ? defUnit.name + "軍" : (isDefPlayer ? atkUnit.name + "軍" : "敵軍");
+
         if (atkUnit.soldiers <= 0) {
-            this.log(`【決着】攻撃軍(${atkUnit.name})が壊滅した！`);
+            if (isAtkPlayer) this.log(`我が軍は壊滅しました……`);
+            else if (isDefPlayer) this.log(`${enemyName}を撃退しました！`);
+            else this.log(`攻撃軍(${atkUnit.name})が壊滅した！`);
+            
             this.endFieldWar('attacker_lose');
             return true;
         }
         if (defUnit.soldiers <= 0) {
-            this.log(`【決着】守備軍(${defUnit.name})が壊滅した！`);
+            if (isAtkPlayer) this.log(`${enemyName}を壊滅させました！`);
+            else if (isDefPlayer) this.log(`我が軍は壊滅しました……`);
+            else this.log(`守備軍(${defUnit.name})が壊滅した！`);
+            
             this.endFieldWar('attacker_win');
             return true;
         }
         if (atkUnit.rice <= 0) {
-            this.log(`【決着】攻撃軍の兵糧が尽き、撤退を余儀なくされた！`);
+            if (isAtkPlayer) this.log(`兵糧が尽き、これ以上の行軍は不可能です……`);
+            else if (isDefPlayer) this.log(`${enemyName}は兵糧が尽き、撤退していきました！`);
+            else this.log(`攻撃軍の兵糧が尽き、撤退を余儀なくされた！`);
+            
             this.endFieldWar('attacker_lose');
             return true;
         }
         if (defUnit.rice <= 0) {
-            this.log(`【決着】守備軍の兵糧が尽き、城へ敗走した！`);
+            if (isAtkPlayer) this.log(`${enemyName}の兵糧が尽き、城へ敗走していきました！`);
+            else if (isDefPlayer) this.log(`兵糧が底を突き、戦線を維持できません……`);
+            else this.log(`守備軍の兵糧が尽き、城へ敗走した！`);
+            
             this.endFieldWar('attacker_win');
             return true;
         }
         if (this.turnCount > this.maxTurns) {
-            this.log(`【決着】野戦では決着がつかず、舞台は籠城戦へと移る！`);
+            this.log(`野戦では決着がつかず、舞台は籠城戦へと移る！`);
             this.endFieldWar('draw_to_siege');
             return true;
         }
@@ -585,7 +658,7 @@ class FieldWarManager {
                 unit.ap -= this.previewTarget.cost; // 移動コスト分のAPを消費
                 unit.x = x;
                 unit.y = y;
-                this.log(`${unit.name}隊が移動。(残AP: ${unit.ap})`);
+                this.log(`${unit.name}隊が移動。`);
                 this.nextPhase();
             } else {
                 let key = `${x},${y}`;
@@ -615,7 +688,7 @@ class FieldWarManager {
                     if (turnCost > 0) {
                         unit.ap -= turnCost; // 振り向きコスト分のAPを消費
                         unit.direction = targetDir;
-                        this.log(`${unit.name}隊が向きを変更。(残AP: ${unit.ap})`);
+                        this.log(`${unit.name}隊が向きを変更。`);
                     }
                     this.nextPhase();
                 }
@@ -681,7 +754,7 @@ class FieldWarManager {
         if (dmgMultiplier === 1.5) dirMsg = "（背後からの強襲！）";
         if (dmgMultiplier === 1.3) dirMsg = "（側面からの攻撃！）";
 
-        this.log(`${attacker.name}隊の攻撃！${dirMsg} 敵に${dmgToDef}の損害！ 反撃で${dmgToAtk}の被害！(残AP: ${attacker.ap})`);
+        this.log(`${attacker.name}隊の攻撃！${dirMsg} 敵に${dmgToDef}の損害！ 反撃で${dmgToAtk}の被害！`);
         
         attacker.hasActionDone = true;
         this.state = 'IDLE';
@@ -706,7 +779,13 @@ class FieldWarManager {
 
         // 兵力差による撤退ロジック
         if (unit.soldiers < enemy.soldiers * 0.2) {
-            if (isPlayerInvolved) this.log(`${unit.name}隊は劣勢を悟り、撤退を決断した！`);
+            if (isPlayerInvolved) {
+                if (unit.isAttacker) {
+                    this.log(`${unit.name}軍は攻略を諦め、引き揚げていきました！`);
+                } else {
+                    this.log(`${unit.name}軍は不利を悟り、戦場から離脱しました！`);
+                }
+            }
             this.endFieldWar(unit.isAttacker ? 'attacker_retreat' : 'defender_retreat');
             return;
         }
@@ -738,7 +817,7 @@ class FieldWarManager {
                 unit.x = bestTarget.x;
                 unit.y = bestTarget.y;
                 if (isPlayerInvolved) {
-                    this.log(`${unit.name}隊が前進。(残AP: ${unit.ap})`);
+                    this.log(`${unit.name}隊が前進。`);
                     this.updateMap();
                     this.updateStatus();
                     await new Promise(r => setTimeout(r, 600));
@@ -758,7 +837,7 @@ class FieldWarManager {
                 unit.ap -= turnCost;
                 unit.direction = targetDir;
                 if (isPlayerInvolved) {
-                    this.log(`${unit.name}隊が敵に向き直った。(残AP: ${unit.ap})`);
+                    this.log(`${unit.name}隊が敵に向き直った。`);
                     this.updateMap();
                     this.updateStatus();
                     await new Promise(r => setTimeout(r, 400));

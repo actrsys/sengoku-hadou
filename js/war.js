@@ -749,6 +749,17 @@ class WarManager {
             const currentTurnId = this.game.getCurrentTurnId();
             let resultMsg = "";
             
+            // ★リザルトメッセージの生成（プレイヤー視点への変更）
+            const pid = Number(this.game.playerClanId);
+            const isAtkPlayer = (Number(s.attacker.ownerClan) === pid);
+            const isDefPlayer = (Number(s.defender.ownerClan) === pid);
+            
+            const atkArmyName = s.attacker.name; 
+            const defClanData = this.game.clans.find(c => c.id === s.defender.ownerClan);
+            const defArmyName = defClanData ? defClanData.getArmyName() : "敵軍";
+            const enemyName = isAtkPlayer ? defArmyName : atkArmyName;
+            const castleName = s.defender.name;
+
             if (attackerWon) { 
                 const statInc = W.WinStatIncrease || 5;
                 s.attacker.training = Math.min(120, s.attacker.training + statInc); s.attacker.morale = Math.min(120, s.attacker.morale + statInc); 
@@ -781,11 +792,28 @@ class WarManager {
                 this.game.updateCastleLord(srcC);
                 this.game.updateCastleLord(s.defender);
                 
-                resultMsg = `${s.defender.name}が制圧されました！\n勝者: ${s.attacker.name}`;
+                if (isAtkPlayer) {
+                    if (isRetreat) resultMsg = `${enemyName}は城を捨てて敗走しました！ 城を占領します！`;
+                    else resultMsg = `${castleName}を制圧しました！`;
+                } else if (isDefPlayer) {
+                    if (isRetreat) resultMsg = `${castleName}を放棄し、後退します……`;
+                    else resultMsg = `${castleName}が陥落しました。敵軍がなだれ込んできます……`;
+                } else {
+                    resultMsg = `${castleName}が制圧されました！\n勝者: ${atkArmyName}`;
+                }
             } else { 
                 s.defender.immunityUntil = currentTurnId; 
-                if (isRetreat) resultMsg = `${s.defender.name}から撤退しました……`;
-                else resultMsg = `${s.defender.name}を守り抜きました！\n敗者: ${s.attacker.name}`;
+                
+                if (isAtkPlayer) {
+                    if (isRetreat) resultMsg = `${castleName}からの撤退を決定しました……`;
+                    else resultMsg = `${castleName}を落としきることができませんでした……`;
+                } else if (isDefPlayer) {
+                    if (isRetreat) resultMsg = `${enemyName}は攻略を諦め、撤退していきました！`;
+                    else resultMsg = `${castleName}を守り抜きました！`;
+                } else {
+                    if (isRetreat) resultMsg = `${castleName}から撤退しました……`;
+                    else resultMsg = `${castleName}を守り抜きました！\n敗者: ${atkArmyName}`;
+                }
             } 
 
             if (s.isPlayerInvolved) {
