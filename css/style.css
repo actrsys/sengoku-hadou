@@ -494,19 +494,27 @@ img {
     text-shadow: 1px 1px 0 rgba(255,255,255,0.7), -1px -1px 0 rgba(255,255,255,0.7), 1px -1px 0 rgba(255,255,255,0.7), -1px 1px 0 rgba(255,255,255,0.7);
     line-height: 1;
 }
-/* ===== スマホでの下部見切れ防止用の調整 ===== */
+/* ===== スマホでの下部見切れ防止用の調整（修正版） ===== */
 
+/* 1. 白い枠自体がスクロールするのを防ぎ、画面に収まるサイズに固定します */
 .modal-content {
-    /* 画面の高さの「80%」のサイズまでに制限します（vhは古いスマホ用の保険、dvhは新しいスマホ用です） */
-    max-height: 80vh; 
-    max-height: 80dvh; 
-    
-    /* 文字が長くなって枠に収まらない場合は、はみ出さずに「枠の中だけでスクロール」するようにします */
-    overflow-y: auto;  
+    max-height: 85vh; 
+    max-height: 85dvh; 
+    overflow: hidden !important; /* 枠全体がスクロールしてしまうのを強制的に防ぐ魔法 */
 }
 
-.modal {
-    /* iPhoneなどの画面下にある横線（ホームインジケーター）とボタンが被らないように、下に少し隙間（クッション）を開けます */
-    padding-bottom: 20px; 
-    padding-bottom: env(safe-area-inset-bottom); 
+/* 2. リザルト画面（大名一覧など）の「文字のエリア」だけを独立してスクロールさせます */
+.result-body {
+    overflow-y: auto;
+    flex: 1;         /* 枠内の空きスペースをいい感じに埋める */
+    min-height: 0;   /* はみ出しを防ぐためのおまじない */
+    margin-bottom: 0 !important;
+    padding-bottom: 10px;
+}
+
+/* 3. 閉じるボタンがある下のエリアは、絶対に潰れずに一番下に留まるようにします */
+.modal-footer {
+    flex-shrink: 0;  /* 画面が狭くてもボタンエリアを潰さない */
+    background: #fff;
+    padding-bottom: env(safe-area-inset-bottom); /* iPhoneなどの下の横線と被らないようにする */
 }
