@@ -1,7 +1,7 @@
 /**
  * game.js
  * 戦国シミュレーションゲーム (Main / UI / Data / System)
- * 修正: 部隊兵士分配UI追加、武将選択時の最大5人制限追加
+ * 修正: 部隊兵士分配モーダルのデフォルト値を総大将1.5倍に修正
  */
 
 window.onerror = function(message, source, lineno, colno, error) {
@@ -50,7 +50,11 @@ class DataManager {
                     this.parseGenericNames(namesText);
                 } catch (e) { console.warn("汎用武将名ファイルなし"); }
             }
-            const [clansText, castlesText, bushosText] = await Promise.all([                this.fetchText(path + "clans.csv"),                this.fetchText(path + "castles.csv"),                this.fetchText(path + "warriors.csv")            ]);
+            const [clansText, castlesText, bushosText] = await Promise.all([                
+                this.fetchText(path + "clans.csv"),                
+                this.fetchText(path + "castles.csv"),                
+                this.fetchText(path + "warriors.csv")            
+            ]);
             const clans = this.parseCSV(clansText, Clan);
             const castles = this.parseCSV(castlesText, Castle);
             const bushos = this.parseCSV(bushosText, Busho);
@@ -393,16 +397,13 @@ class UIManager {
         this.historyModal = document.getElementById('history-modal');
         this.historyList = document.getElementById('history-list');
         
-        // 戦争UI関連要素
         this.warModal = document.getElementById('war-modal');
         this.warLog = document.getElementById('war-log');
         this.warControls = document.getElementById('war-controls');
 
-        // 大名選択UI
         this.daimyoConfirmModal = document.getElementById('daimyo-confirm-modal');
         this.daimyoConfirmBody = document.getElementById('daimyo-confirm-body');
 
-        // 野戦 部隊分割UI
         this.unitDivideModal = document.getElementById('unit-divide-modal');
 
         this.onResultModalClose = null;
@@ -443,7 +444,7 @@ class UIManager {
         if (!sc) return;
 
         sc.addEventListener('mousedown', (e) => {
-            if (e.button !== 0) return; // 左クリックのみ
+            if (e.button !== 0) return; 
             this.isMouseDown = true;
             this.isDraggingMap = false;
             this.dragStartX = e.pageX - sc.offsetLeft;
@@ -847,7 +848,7 @@ class UIManager {
                                 this.showControlPanel(c);
                             }
                         }
-                    }
+                    };
                 }
             } else { 
                 el.style.cursor = 'default'; 
@@ -1165,7 +1166,7 @@ class UIManager {
         let sortKey = spec.sortKey || 'strength';
         let isMulti = spec.isMulti || false;
         
-        // ★修正: 守備側の迎撃部隊選択用
+        // 守備側の迎撃部隊選択用
         if (actionType === 'def_intercept_deploy') {
              isMulti = true;
              sortKey = 'strength';
@@ -1301,7 +1302,6 @@ class UIManager {
             let isSelectable = !b.isActionDone; 
             if (extraData && extraData.allowDone) isSelectable = true; 
             if (['employ_target','appoint_gunshi','rumor_target_busho','headhunt_target','interview_target','reward','view_only','war_general'].includes(actionType)) isSelectable = true;
-            // 守備側の迎撃武将は行動済みでもOKとする（防衛戦のため）
             if (actionType === 'def_intercept_deploy') isSelectable = true;
             
             let acc = null; if (isEnemyTarget && targetCastle) acc = targetCastle.investigatedAccuracy;
@@ -1365,7 +1365,6 @@ class UIManager {
                     const inputs = document.querySelectorAll('input[name="sel_busho"]:checked'); if (inputs.length === 0) return;
                     const selectedIds = Array.from(inputs).map(i => parseInt(i.value)); 
                     this.closeSelector();
-                    // 迎撃用の特殊コールバック対応
                     if (actionType === 'def_intercept_deploy' && extraData && extraData.onConfirm) {
                         extraData.onConfirm(selectedIds);
                     } else {
@@ -1392,12 +1391,18 @@ class UIManager {
         
         let assignments = bushos.map(b => ({ id: b.id, count: 0 }));
         
-        // とりあえず均等割で初期値を設定する
-        const base = Math.floor(totalSoldiers / bushos.length);
-        let remainder = totalSoldiers % bushos.length;
-        assignments.forEach((a, i) => {
-            a.count = base + (i < remainder ? 1 : 0);
-        });
+        // ★修正: デフォルトの配分で総大将（先頭）を他の部隊の約1.5倍にする
+        let ratioSum = 1.5 + (bushos.length - 1) * 1.0;
+        let baseAmount = Math.floor(totalSoldiers / ratioSum);
+        let remain = totalSoldiers;
+
+        for (let i = 1; i < bushos.length; i++) {
+            assignments[i].count = baseAmount;
+            remain -= baseAmount;
+        }
+        if (assignments.length > 0) {
+            assignments[0].count = remain; // 大将に残りをすべて割り当て
+        }
 
         const updateRemain = () => {
             let sum = 0;
@@ -1580,9 +1585,8 @@ class UIManager {
             document.getElementById('quantity-title').textContent = "出陣兵数・兵糧指定"; 
             inputs.soldiers = createSlider("兵士数", "soldiers", c.soldiers, c.soldiers);
             inputs.rice = createSlider("持参兵糧", "rice", c.rice, c.rice);
-        } else if (type === 'def_intercept') { // ★守備側迎撃部隊用
+        } else if (type === 'def_intercept') { 
             document.getElementById('quantity-title').textContent = "迎撃部隊編成"; 
-            // 迎撃部隊は守られる城の全リソースから選べるようにする
             inputs.soldiers = createSlider("出陣兵士数", "soldiers", c.soldiers, c.soldiers);
             inputs.rice = createSlider("持参兵糧", "rice", c.rice, c.rice);
         } else if (type === 'transport') {
@@ -1629,7 +1633,6 @@ class UIManager {
 
         this.quantityConfirmBtn.onclick = () => {
             this.quantityModal.classList.add('hidden');
-            // 迎撃用の特殊コールバック対応
             if (type === 'def_intercept' && extraData && extraData.onConfirm) {
                 extraData.onConfirm(inputs);
             } else {
@@ -1811,8 +1814,6 @@ class GameManager {
         this.phase = 'title';
     }
     
-    // 既存の relations 関連メソッドを DiplomacyManager 経由に変更
-    // ※ 第3弾の ai.js 修正までの互換性を保つための暫定処置（alliance等の付与）を含みます
     getRelation(id1, id2) { 
         const rel = this.diplomacyManager.getRelation(id1, id2); 
         if (rel) {
@@ -1950,28 +1951,16 @@ class GameManager {
             if (c.ownerClan === 0) return;
             c.isDone = false;
 
-            // ======================================================================
-            // ★ 金収入の計算 (毎月)
-            // ======================================================================
             const baseGold = (c.population * 0.001) + (c.peoplesLoyalty / 3) + (c.commerce / 10);
-            
             let income = Math.floor(baseGold * window.MainParams.Economy.IncomeGoldRate);
             income = GameSystem.applyVariance(income, window.MainParams.Economy.IncomeFluctuation);
-            
-            if (this.month === 3) {
-                income += income * 5;
-            }
+            if (this.month === 3) income += income * 5;
             c.gold += income;
 
-            // ======================================================================
-            // ★ 兵糧収入の計算 (9月のみ)
-            // ======================================================================
             if (this.month === 9) {
                 const baseRice = c.kokudaka + c.peoplesLoyalty;
-
                 let riceIncome = Math.floor(baseRice * window.MainParams.Economy.IncomeRiceRate);
                 riceIncome = GameSystem.applyVariance(riceIncome, window.MainParams.Economy.IncomeFluctuation);
-
                 c.rice += riceIncome;
             }
             
