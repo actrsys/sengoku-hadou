@@ -153,6 +153,14 @@ class WarManager {
 
     async startWar(atkCastle, defCastle, atkBushos, atkSoldierCount, atkRice) {
         try {
+            // 攻撃部隊の中に大名がいれば探し、いなければ城主を探す
+            let atkLeaderIdx = atkBushos.findIndex(b => b.isDaimyo);
+            if (atkLeaderIdx === -1) atkLeaderIdx = atkBushos.findIndex(b => b.isCastellan);
+            // 大名か城主が見つかったら、列の一番前（総大将）に移動させる
+            if (atkLeaderIdx > 0) {
+                const leader = atkBushos.splice(atkLeaderIdx, 1)[0];
+                atkBushos.unshift(leader);
+            }
             const pid = Number(this.game.playerClanId);
             const atkClan = Number(atkCastle.ownerClan);
             const defClan = Number(defCastle.ownerClan);
@@ -190,6 +198,13 @@ class WarManager {
                             this.game.ui.openBushoSelector('def_intercept_deploy', defCastle.id, {
                                 onConfirm: (selectedBushoIds) => {
                                     const defBushos = selectedBushoIds.map(id => this.game.getBusho(id));
+                                    // プレイヤーが選んだ防衛部隊の中に大名か城主がいれば一番前にする
+                                    let defLeaderIdx = defBushos.findIndex(b => b.isDaimyo);
+                                    if (defLeaderIdx === -1) defLeaderIdx = defBushos.findIndex(b => b.isCastellan);
+                                    if (defLeaderIdx > 0) {
+                                        const leader = defBushos.splice(defLeaderIdx, 1)[0];
+                                        defBushos.unshift(leader);
+                                    }
                                     this.game.ui.openQuantitySelector('def_intercept', [defCastle], null, {
                                         onConfirm: (inputs) => {
                                             this.game.ui.showUnitDivideModal(defBushos, inputs.soldiers, (defAssignments) => {
@@ -205,6 +220,13 @@ class WarManager {
                 } else {
                     if (defCastle.soldiers >= atkSoldierCount * 0.8) {
                         const defBushos = this.game.getCastleBushos(defCastle.id).sort((a,b) => b.strength - a.strength).slice(0, 5);
+                        // コンピュータの防衛部隊の中に大名か城主がいれば一番前にする
+                        let defLeaderIdx = defBushos.findIndex(b => b.isDaimyo);
+                        if (defLeaderIdx === -1) defLeaderIdx = defBushos.findIndex(b => b.isCastellan);
+                        if (defLeaderIdx > 0) {
+                            const leader = defBushos.splice(defLeaderIdx, 1)[0];
+                            defBushos.unshift(leader);
+                        }
                         const defSoldiers = defCastle.soldiers;
                         const defRice = Math.min(defCastle.rice, defSoldiers); 
                         const defAssignments = this.autoDivideSoldiers(defBushos, defSoldiers);
