@@ -424,7 +424,7 @@ class CommandSystem {
              return;
         }
 
-      　if (actionType === 'charity') {
+       if (actionType === 'charity') {
             // 金か米かを選ぶ画面を出さず、直接「米(rice)」を指定して実行させます
             this.showAdviceAndExecute('charity', () => this.executeCharity(selectedIds, 'rice'));
             return;
@@ -1106,6 +1106,7 @@ class CommandSystem {
 
 
 }
+
 
 
 
