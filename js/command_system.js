@@ -165,13 +165,6 @@ const COMMAND_SPECS = {
     },
 
     // --- 調略 (STRATEGY) ---
-    'investigate': { 
-        label: "調査", category: 'STRATEGY', 
-        costGold: 0, costRice: 0, 
-        isMulti: true, hasAdvice: true, 
-        startMode: 'map_select', targetType: 'enemy_all',
-        sortKey: 'intelligence' 
-    },
     'incite': { 
         label: "扇動", category: 'STRATEGY', 
         costGold: 0, costRice: 0, 
@@ -194,7 +187,19 @@ const COMMAND_SPECS = {
         sortKey: 'intelligence'
     },
 
-    
+    // --- 情報 (INFO) ---
+    'investigate': { 
+        label: "調査", category: 'INFO', 
+        costGold: 0, costRice: 0, 
+        isMulti: true, hasAdvice: true, 
+        startMode: 'map_select', targetType: 'enemy_all',
+        sortKey: 'intelligence' 
+    },
+    'daimyo_list': {
+        label: "大名", category: 'INFO',
+        isSystem: true, action: 'daimyo_list'
+    },
+
     // --- 外交 (DIPLOMACY) ---
     'goodwill': {
         label: "親善", category: 'DIPLOMACY',
@@ -338,6 +343,7 @@ class CommandSystem {
                 if(f) f.click(); 
                 break;
             case 'history': this.game.ui.showHistoryModal(); break;
+            case 'daimyo_list': this.game.ui.showDaimyoList(); break;
         }
     }
 

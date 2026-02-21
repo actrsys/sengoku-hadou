@@ -666,6 +666,47 @@ class UIManager {
             });
         }
     }
+    
+    // ★ 追加: 大名一覧表示用の処理
+    showDaimyoList() {
+        let listHtml = `<div style="text-align:left; max-height:400px; overflow-y:auto; padding: 10px; background: #fafafa; border: 1px solid #ccc; border-radius: 4px;">`;
+        
+        const activeClans = this.game.clans.filter(c => c.id !== 0 && this.game.castles.some(cs => cs.ownerClan === c.id));
+        
+        const clanDataList = activeClans.map(clan => {
+            const castles = this.game.castles.filter(c => c.ownerClan === clan.id);
+            const leader = this.game.getBusho(clan.leaderId);
+            let pop = 0, sol = 0, koku = 0, gold = 0, rice = 0;
+            castles.forEach(c => {
+                pop += c.population;
+                sol += c.soldiers;
+                koku += c.kokudaka;
+                gold += c.gold;
+                rice += c.rice;
+            });
+            // ★ 戦力＝（総人口÷２０００）＋(総兵士数÷２０）＋（石高÷２０）＋（金÷５０）＋（兵糧÷１００）
+            const power = Math.floor(pop / 2000) + Math.floor(sol / 20) + Math.floor(koku / 20) + Math.floor(gold / 50) + Math.floor(rice / 100);
+            return {
+                name: clan.name,
+                leaderName: leader ? leader.name : "不明",
+                power: power,
+                castlesCount: castles.length
+            };
+        });
+
+        // 戦力順にソート（降順）
+        clanDataList.sort((a,b) => b.power - a.power);
+
+        clanDataList.forEach(d => {
+            listHtml += `<div style="border-bottom:1px dashed #bbb; padding:8px 0;">`;
+            listHtml += `<div style="font-weight:bold; font-size:1.1rem;">${d.name} <span style="font-size:0.9rem; font-weight:normal;">(当主: ${d.leaderName})</span></div>`;
+            listHtml += `<div style="color:#d32f2f; font-weight:bold; margin-top:3px;">戦力: ${d.power} <span style="font-size:0.8rem; color:#555; font-weight:normal;">(城数:${d.castlesCount})</span></div>`;
+            listHtml += `</div>`;
+        });
+        listHtml += `</div>`;
+        
+        this.showResultModal(`<h3 style="margin-top:0;">大名一覧</h3>${listHtml}`);
+    }
 
     showResultModal(msg, onClose = null) { 
         if (this.resultBody) this.resultBody.innerHTML = msg.replace(/\n/g, '<br>'); 
@@ -1089,10 +1130,11 @@ class UIManager {
         const pcArea = document.getElementById('pc-command-area');
         const areas = [mobileArea, pcArea];
         
+        // ★ カテゴリを修正（情報コマンドを追加）
         const CATEGORY_MAP = {
             'DEVELOP': "内政", 'MILITARY': "軍事", 
             'DIPLOMACY': "外交", 'STRATEGY': "調略", 
-            'PERSONNEL': "人事", 'SYSTEM': "機能"
+            'PERSONNEL': "人事", 'INFO': "情報"
         };
         
         areas.forEach(area => {
@@ -1115,15 +1157,38 @@ class UIManager {
             const menu = (targetMenu) => { this.menuState = targetMenu; this.renderCommandMenu(); };
             
             if (this.menuState === 'MAIN') {
+                // 通常のカテゴリボタン
                 Object.keys(CATEGORY_MAP).forEach(key => {
                     createBtn(CATEGORY_MAP[key], "category", () => menu(key));
                 });
-                // ★ confirm を showDialog に変更
-                createBtn("命令終了", "finish", () => { 
+                
+                // ★ 命令終了ボタン（span 2 にして右に空きを作る）
+                const finishBtn = document.createElement('button');
+                finishBtn.className = `cmd-btn finish`;
+                finishBtn.textContent = "命令終了";
+                finishBtn.style.gridColumn = "span 2";
+                finishBtn.onclick = () => {
+                    if (this.game.isProcessingAI) return;
+                    this.cancelMapSelection(true);
                     this.showDialog("今月の命令を終了しますか？", true, () => {
                         this.game.finishTurn();
                     });
-                });
+                };
+                area.appendChild(finishBtn);
+
+                // ★ 機能ボタン（span 1 で右端に配置）
+                const sysBtn = document.createElement('button');
+                sysBtn.className = `cmd-btn category`;
+                sysBtn.textContent = "機能";
+                sysBtn.style.gridColumn = "span 1";
+                sysBtn.style.marginTop = "2px"; 
+                sysBtn.onclick = () => {
+                    if (this.game.isProcessingAI) return;
+                    this.cancelMapSelection(true);
+                    menu('SYSTEM');
+                };
+                area.appendChild(sysBtn);
+                
                 return;
             }
 
