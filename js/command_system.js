@@ -94,7 +94,7 @@ const COMMAND_SPECS = {
     },
     'training': { 
         label: "訓練", category: 'MILITARY', 
-        costGold: 299, costRice: 0, 
+        costGold: 200, costRice: 0, 
         isMulti: true, hasAdvice: false, 
         startMode: 'busho_select', sortKey: 'leadership',
         msg: "金: 200 (1回あたり)\n兵士の訓練度を上げます" 
@@ -1106,5 +1106,6 @@ class CommandSystem {
 
 
 }
+
 
 
