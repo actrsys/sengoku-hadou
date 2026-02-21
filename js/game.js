@@ -884,7 +884,6 @@ class UIManager {
                     
                     <div class="info-row"><span class="info-label">金</span><span class="info-val">${mask(castle.gold)}</span> <span class="info-label">兵糧</span><span class="info-val">${mask(castle.rice)}</span></div>
                     <div class="info-row"><span class="info-label">防御</span><span class="info-val">${mask(castle.defense)}</span> <span class="info-label">人口</span><span class="info-val">${mask(castle.population)}</span></div>
-                    <div class="info-row"><span class="info-label">民忠</span><span class="info-val highlight-text">${mask(castle.peoplesLoyalty)}</span></div>
                     <div class="info-row"><span class="info-label">訓練</span><span class="info-val">${mask(castle.training)}</span> <span class="info-label">士気</span><span class="info-val">${mask(castle.morale)}</span></div>
                     <div style="margin-top:5px; text-align:center;"><button class="btn-primary" style="padding:4px 10px; font-size:0.8rem;" onclick="window.GameApp.ui.openBushoSelector('view_only', ${castle.id})">武将一覧</button></div>
                 </div>
@@ -2130,3 +2129,4 @@ window.addEventListener('DOMContentLoaded', () => {
 
 
 });
+
