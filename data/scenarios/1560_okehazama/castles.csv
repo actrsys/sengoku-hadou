@@ -1,4 +1,4 @@
-id,name,ownerClan,x,y,castellanId,soldiers,training,morale,gold,rice,ammo,horses,guns,kokudaka,maxKokudaka,commerce,maxCommerce,defense,maxDefense,PeoplesLoyalty,population
+id,name,ownerClan,x,y,castellanId,soldiers,training,morale,gold,rice,ammo,horses,guns,kokudaka,maxKokudaka,commerce,maxCommerce,defense,maxDefense,peoplesLoyalty,population
 1,魚津城,2,6,2,1001009,2500,50,50,2050,8100,1000,500,0,240,500,450,1200,250,500,70,190000
 2,春日山城,2,7,2,1001001,4000,70,70,2258,12390,1000,2000,0,670,1800,400,1000,1050,2100,69,230000
 3,稲葉山城,6,4,4,1005001,4000,40,40,2200,12700,1000,500,0,700,1900,500,1200,850,1900,70,210000
