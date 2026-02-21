@@ -32,12 +32,12 @@ const COMMAND_SPECS = {
         startMode: 'busho_select', sortKey: 'politics',
         msg: "金: 200 (1回あたり)" 
     },
-    'charity': { 
+   'charity': { 
         label: "施し", category: 'DEVELOP', 
-        costGold: 200, costRice: 200, 
+        costGold: 0, costRice: 200, // 金を0にします
         isMulti: false, hasAdvice: false, 
         startMode: 'busho_select', sortKey: 'charm',
-        msg: "金: 200 / 米: 200 (選択可)" 
+        msg: "米: 200 (1回あたり)" // 文章を米だけにします
     },
 
     // --- 軍事取引 (MIL_TRADE) ---
@@ -424,7 +424,14 @@ class CommandSystem {
              return;
         }
 
-        if (['draft', 'charity', 'reward'].includes(actionType)) {
+      　if (actionType === 'charity') {
+            // 金か米かを選ぶ画面を出さず、直接「米(rice)」を指定して実行させます
+            this.showAdviceAndExecute('charity', () => this.executeCharity(selectedIds, 'rice'));
+            return;
+        }
+
+        // ここから 'charity' を消して、徴兵と褒美だけ画面を出すようにします
+        if (['draft', 'reward'].includes(actionType)) {
             this.game.ui.openQuantitySelector(actionType, selectedIds, targetId);
             return;
         }
@@ -460,12 +467,6 @@ class CommandSystem {
             const val = parseInt(inputs.gold.num.value);
             if (val <= 0) return;
             this.showAdviceAndExecute('draft', () => this.executeDraft(data, val), { val: val });
-        }
-        else if (type === 'charity') {
-            const charityTypeEl = document.querySelector('input[name="charityType"]:checked');
-            if (!charityTypeEl) return;
-            const charityType = charityTypeEl.value;
-            this.showAdviceAndExecute('charity', () => this.executeCharity(data, charityType));
         }
         else if (type === 'goodwill') {
             const val = parseInt(inputs.gold.num.value);
@@ -1105,4 +1106,5 @@ class CommandSystem {
 
 
 }
+
 
