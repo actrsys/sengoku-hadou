@@ -363,29 +363,30 @@ img {
     justify-content: center;
 }
 
-/* 攻撃側の設定（親要素に枠と影をつける） */
+/* 攻撃側（赤色）：上下左右に影を落として「濃い赤の枠線」を作り、さらに「黒い影」を落とす */
 .fw-unit.attacker {
-    /* 1pxだと見えにくいことがあるので1.5pxに少し太くしています */
-    filter: drop-shadow(0px 0px 1.5px #8e0000) drop-shadow(1px 1px 2px rgba(0,0,0,0.8));
+    -webkit-filter: drop-shadow(1px 0 0 #8e0000) drop-shadow(-1px 0 0 #8e0000) drop-shadow(0 1px 0 #8e0000) drop-shadow(0 -1px 0 #8e0000) drop-shadow(2px 2px 2px rgba(0,0,0,0.8));
+    filter: drop-shadow(1px 0 0 #8e0000) drop-shadow(-1px 0 0 #8e0000) drop-shadow(0 1px 0 #8e0000) drop-shadow(0 -1px 0 #8e0000) drop-shadow(2px 2px 2px rgba(0,0,0,0.8));
 }
 
-/* 守備側の設定（親要素に枠と影をつける） */
+/* 守備側（青色）の設定 */
 .fw-unit.defender {
-    filter: drop-shadow(0px 0px 1.5px #004ba0) drop-shadow(1px 1px 2px rgba(0,0,0,0.8));
+    -webkit-filter: drop-shadow(1px 0 0 #004ba0) drop-shadow(-1px 0 0 #004ba0) drop-shadow(0 1px 0 #004ba0) drop-shadow(0 -1px 0 #004ba0) drop-shadow(2px 2px 2px rgba(0,0,0,0.8));
+    filter: drop-shadow(1px 0 0 #004ba0) drop-shadow(-1px 0 0 #004ba0) drop-shadow(0 1px 0 #004ba0) drop-shadow(0 -1px 0 #004ba0) drop-shadow(2px 2px 2px rgba(0,0,0,0.8));
 }
 
 /* 総大将の特別設定（白枠） */
 .fw-unit.general {
-    filter: drop-shadow(0px 0px 1.5px #ffffff) !important;
+    -webkit-filter: drop-shadow(1px 0 0 #ffffff) drop-shadow(-1px 0 0 #ffffff) drop-shadow(0 1px 0 #ffffff) drop-shadow(0 -1px 0 #ffffff) drop-shadow(2px 2px 2px rgba(0,0,0,0.8)) !important;
+    filter: drop-shadow(1px 0 0 #ffffff) drop-shadow(-1px 0 0 #ffffff) drop-shadow(0 1px 0 #ffffff) drop-shadow(0 -1px 0 #ffffff) drop-shadow(2px 2px 2px rgba(0,0,0,0.8)) !important;
 }
 
 /* --- ここから「型抜きされた色」を作る魔法（::before という分身を使います） --- */
 .fw-unit::before {
-    content: ""; /* 空の分身を作ります */
+    content: "";
     display: block;
-    width: 100%; /* 親と同じ大きさにします */
+    width: 100%;
     height: 100%;
-    /* ここで型抜きの画像を指定します */
     -webkit-mask-image: url('../data/images/field_war_images/butai_icon.png');
     mask-image: url('../data/images/field_war_images/butai_icon.png');
     -webkit-mask-size: contain;
@@ -396,7 +397,6 @@ img {
     mask-position: center;
 }
 
-/* 分身の内側を塗る色を指定します */
 .fw-unit.attacker::before {
     background-color: #e53935;
 }
@@ -404,9 +404,22 @@ img {
     background-color: #1e88e5;
 }
 
-.fw-unit.active { filter: drop-shadow(0 0 6px #ffff00); }
+/* ★修正ポイント：選択中（active）の時も、枠線を維持したまま黄色く光らせる */
+.fw-unit.attacker.active {
+    -webkit-filter: drop-shadow(1px 0 0 #8e0000) drop-shadow(-1px 0 0 #8e0000) drop-shadow(0 1px 0 #8e0000) drop-shadow(0 -1px 0 #8e0000) drop-shadow(0 0 6px #ffff00);
+    filter: drop-shadow(1px 0 0 #8e0000) drop-shadow(-1px 0 0 #8e0000) drop-shadow(0 1px 0 #8e0000) drop-shadow(0 -1px 0 #8e0000) drop-shadow(0 0 6px #ffff00);
+}
+.fw-unit.defender.active {
+    -webkit-filter: drop-shadow(1px 0 0 #004ba0) drop-shadow(-1px 0 0 #004ba0) drop-shadow(0 1px 0 #004ba0) drop-shadow(0 -1px 0 #004ba0) drop-shadow(0 0 6px #ffff00);
+    filter: drop-shadow(1px 0 0 #004ba0) drop-shadow(-1px 0 0 #004ba0) drop-shadow(0 1px 0 #004ba0) drop-shadow(0 -1px 0 #004ba0) drop-shadow(0 0 6px #ffff00);
+}
+.fw-unit.general.active {
+    -webkit-filter: drop-shadow(1px 0 0 #ffffff) drop-shadow(-1px 0 0 #ffffff) drop-shadow(0 1px 0 #ffffff) drop-shadow(0 -1px 0 #ffffff) drop-shadow(0 0 6px #ffff00) !important;
+    filter: drop-shadow(1px 0 0 #ffffff) drop-shadow(-1px 0 0 #ffffff) drop-shadow(0 1px 0 #ffffff) drop-shadow(0 -1px 0 #ffffff) drop-shadow(0 0 6px #ffff00) !important;
+}
+
 .fw-unit.preview { opacity: 0.6; animation: fw-blink 1s infinite; z-index: 18; }
-@keyframes fw-blink { 0%{opacity:0.3;} 50%{opacity:0.8;} 100%{opacity:0.3;} }
+@keyframes fw-blink { 0%{opacity:0.3;} 50%{opacity:0.8;} 100%{opacity:0.3;} }}
 
 .context-menu {
     position: absolute; background: white; border: 1px solid #ccc;
