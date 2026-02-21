@@ -2,7 +2,7 @@
  * field_war.js
  * HEX式 野戦システム
  * 責務: 野戦マップの描画、ターンの制御、HEXでの移動と戦闘計算
- * 修正: 操作不能バグ修正(pointer-events対応)、大将アイコン修正(凸+★)、コード圧縮解除版
+ * 修正: 操作不能バグ修正、大将アイコン修正、キャンセルの改善、スマホスクロール対応、部隊情報表示
  */
 
 class FieldWarManager {
@@ -22,6 +22,11 @@ class FieldWarManager {
         this.reachable = null;
         this.previewTarget = null;
         this.turnBackup = null; 
+        
+        // タップ待機用フラグ
+        this.selectedSameHex = false;
+        this.selectedSameHexDir = false;
+        this.selectedSameHexAtk = false;
     }
 
     startFieldWar(warState, onComplete) {
@@ -31,6 +36,10 @@ class FieldWarManager {
         this.maxTurns = 20; 
         this.active = true;
         this.state = 'IDLE';
+        this.selectedSameHex = false;
+        this.selectedSameHexDir = false;
+        this.selectedSameHexAtk = false;
+        this.hideUnitInfo();
 
         const pid = Number(this.game.playerClanId);
         const isAtkPlayer = (Number(warState.attacker.ownerClan) === pid);
@@ -163,6 +172,11 @@ class FieldWarManager {
         const unit = this.turnQueue[0];
         if (unit.hasActionDone) return;
         
+        this.selectedSameHex = false;
+        this.selectedSameHexDir = false;
+        this.selectedSameHexAtk = false;
+        this.hideUnitInfo();
+        
         if (this.state === 'PHASE_MOVE' && this.turnBackup && 
             unit.x === this.turnBackup.x && unit.y === this.turnBackup.y && unit.direction === this.turnBackup.direction) {
             if (this.previewTarget) {
@@ -229,6 +243,25 @@ class FieldWarManager {
 
         const turnEl = document.getElementById('fw-turn-info');
         if (turnEl) turnEl.innerText = `Turn: ${this.turnCount}/${this.maxTurns}`;
+    }
+
+    showUnitInfo(unit) {
+        const infoEl = document.getElementById('fw-unit-info');
+        if (!infoEl) return;
+        
+        infoEl.innerHTML = `
+            <div style="font-weight:bold; color: ${unit.isAttacker ? '#d32f2f' : '#1976d2'};">
+                ${unit.name} <span style="font-size:0.8rem; color:#555;">(${unit.isAttacker ? '攻撃' : '守備'})</span>
+            </div>
+            <div style="font-size:0.9rem; font-weight:bold;">兵士: ${unit.soldiers}</div>
+            <div style="font-size:0.8rem; color:#333;">統:${unit.stats.ldr} 武:${unit.stats.str} 智:${unit.stats.int}</div>
+        `;
+        infoEl.classList.remove('hidden');
+    }
+
+    hideUnitInfo() {
+        const infoEl = document.getElementById('fw-unit-info');
+        if (infoEl) infoEl.classList.add('hidden');
     }
 
     updateMap() {
@@ -521,6 +554,9 @@ class FieldWarManager {
         this.state = 'IDLE';
         this.reachable = null;
         this.previewTarget = null;
+        this.selectedSameHex = false;
+        this.selectedSameHexDir = false;
+        this.selectedSameHexAtk = false;
 
         const isPlayerInvolved = this.units.some(u => u.isPlayer);
 
@@ -547,6 +583,7 @@ class FieldWarManager {
             this.previewTarget = null;
             this.reachable = null;
             this.state = 'PHASE_DIR';
+            this.selectedSameHex = false;
             
             if (unit.ap <= 0) {
                 this.nextPhase();
@@ -557,6 +594,7 @@ class FieldWarManager {
             }
         } else if (this.state === 'PHASE_DIR') {
             this.state = 'PHASE_ATTACK';
+            this.selectedSameHexDir = false;
             
             if (unit.ap <= 0) {
                 this.nextPhase();
@@ -568,6 +606,7 @@ class FieldWarManager {
         } else if (this.state === 'PHASE_ATTACK') {
             unit.hasActionDone = true;
             this.state = 'IDLE';
+            this.selectedSameHexAtk = false;
             this.updateMap();
             this.updateStatus();
             setTimeout(() => this.nextPhaseTurn(), 300);
@@ -678,14 +717,33 @@ class FieldWarManager {
     }
 
     onHexClick(x, y) {
-        if (!this.active || !this.isPlayerTurn()) return;
+        if (!this.active) return;
+        
+        const clickedUnit = this.units.find(u => u.x === x && u.y === y);
+
+        // 部隊タップ時の情報表示
+        if (clickedUnit) {
+            this.showUnitInfo(clickedUnit);
+        } else {
+            this.hideUnitInfo();
+        }
+
+        if (!this.isPlayerTurn()) return;
         
         const unit = this.turnQueue[0];
 
         if (this.state === 'PHASE_MOVE') {
             if (x === unit.x && y === unit.y) {
-                this.nextPhase();
+                // 自軍部隊をタップ（1回目は情報表示と選択状態、2回目で決定）
+                if (this.selectedSameHex) {
+                    this.selectedSameHex = false;
+                    this.nextPhase();
+                } else {
+                    this.selectedSameHex = true;
+                }
                 return;
+            } else {
+                this.selectedSameHex = false;
             }
 
             let key = `${x},${y}`;
@@ -693,10 +751,25 @@ class FieldWarManager {
                 this.previewTarget = {x: x, y: y, path: this.reachable[key].path, cost: this.reachable[key].cost};
                 this.state = 'MOVE_PREVIEW';
                 this.updateMap();
+            } else {
+                // 範囲外をタップした場合はキャンセル
+                this.cancelAction();
             }
 
         } else if (this.state === 'MOVE_PREVIEW') {
-            if (x === this.previewTarget.x && y === this.previewTarget.y) {
+            if (x === unit.x && y === unit.y) {
+                if (this.selectedSameHex) {
+                    this.selectedSameHex = false;
+                    this.nextPhase();
+                } else {
+                    this.selectedSameHex = true;
+                }
+                return;
+            } else {
+                this.selectedSameHex = false;
+            }
+
+            if (this.previewTarget && x === this.previewTarget.x && y === this.previewTarget.y) {
                 unit.ap -= this.previewTarget.cost;
                 unit.x = x;
                 unit.y = y;
@@ -708,15 +781,21 @@ class FieldWarManager {
                     this.previewTarget = {x: x, y: y, path: this.reachable[key].path, cost: this.reachable[key].cost};
                     this.updateMap();
                 } else {
-                    this.state = 'PHASE_MOVE';
-                    this.previewTarget = null;
-                    this.updateMap();
+                    // 範囲外をタップした場合はキャンセル
+                    this.cancelAction();
                 }
             }
         } else if (this.state === 'PHASE_DIR') {
             if (x === unit.x && y === unit.y) {
-                this.nextPhase();
+                if (this.selectedSameHexDir) {
+                    this.selectedSameHexDir = false;
+                    this.nextPhase();
+                } else {
+                    this.selectedSameHexDir = true;
+                }
                 return;
+            } else {
+                this.selectedSameHexDir = false;
             }
 
             if (this.getDistance(unit.x, unit.y, x, y) === 1) {
@@ -725,6 +804,8 @@ class FieldWarManager {
                     if (unit.ap >= 1) {
                         unit.ap -= 1;
                         this.executeAttack(unit, targetUnit);
+                    } else {
+                        this.cancelAction();
                     }
                     return;
                 }
@@ -739,18 +820,33 @@ class FieldWarManager {
                         this.log(`${unit.name}隊が向きを変更。`);
                     }
                     this.nextPhase();
+                } else {
+                    this.cancelAction();
                 }
+            } else {
+                // 範囲外をタップした場合はキャンセル
+                this.cancelAction();
             }
         } else if (this.state === 'PHASE_ATTACK') {
             if (x === unit.x && y === unit.y) {
-                this.nextPhase();
+                if (this.selectedSameHexAtk) {
+                    this.selectedSameHexAtk = false;
+                    this.nextPhase();
+                } else {
+                    this.selectedSameHexAtk = true;
+                }
                 return;
+            } else {
+                this.selectedSameHexAtk = false;
             }
 
             const targetUnit = this.units.find(u => u.x === x && u.y === y && u.isAttacker !== unit.isAttacker);
             if (targetUnit && this.getDistance(unit.x, unit.y, x, y) === 1 && unit.ap >= 1) {
                 unit.ap -= 1;
                 this.executeAttack(unit, targetUnit);
+            } else {
+                // 範囲外をタップした場合はキャンセル
+                this.cancelAction();
             }
         }
     }
@@ -906,6 +1002,3 @@ class FieldWarManager {
 }
 
 window.FieldWarManager = FieldWarManager;
-
-
-
