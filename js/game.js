@@ -413,6 +413,21 @@ class UIManager {
         this.initContextMenu();
     }
 
+    getStatusBarHTML(value, max, colorType, isVisible) {
+        if (!isVisible) return "???";
+        if (max <= 0) return `${value}`;
+        let percent = (value / max) * 100;
+        if (percent > 100) percent = 100;
+        if (percent < 0) percent = 0;
+        const fillClass = colorType === 'blue' ? 'bar-fill-blue' : 'bar-fill-lightblue';
+        return `
+            <div class="status-bar-container">
+                <div class="status-bar-fill ${fillClass}" style="width: ${percent}%;"></div>
+                <div class="status-bar-text">${value}</div>
+            </div>
+        `;
+    }
+
     initMapDrag() {
         this.isDraggingMap = false;
         this.dragStartX = 0;
@@ -883,10 +898,10 @@ class UIManager {
                     </div>
                     
                     <div class="info-row"><span class="info-label">金</span><span class="info-val">${mask(castle.gold)}</span> <span class="info-label">兵糧</span><span class="info-val">${mask(castle.rice)}</span></div>
-                    <div class="info-row"><span class="info-label">防御</span><span class="info-val">${mask(castle.defense)}</span> <span class="info-label">人口</span><span class="info-val">${mask(castle.population)}</span></div>
+                    <div class="info-row"><span class="info-label">防御</span><span class="info-val">${this.getStatusBarHTML(castle.defense, castle.maxDefense, 'lightblue', isVisible)}</span> <span class="info-label">人口</span><span class="info-val">${mask(castle.population)}</span></div>
                     <div class="info-row"><span class="info-label">訓練</span><span class="info-val">${mask(castle.training)}</span> <span class="info-label">士気</span><span class="info-val">${mask(castle.morale)}</span></div>
-                    <div class="info-row"><span class="info-label">民忠</span><span class="info-val">${mask(castle.peoplesLoyalty)}</span> <span class="info-label">石高</span><span class="info-val">${mask(castle.kokudaka)}</span></div>
-                    <div class="info-row"><span class="info-label">鉱山</span><span class="info-val">${mask(castle.commerce)}</span> <span class="info-label"></span><span class="info-val"></span></div>
+                    <div class="info-row"><span class="info-label">民忠</span><span class="info-val">${this.getStatusBarHTML(castle.peoplesLoyalty, castle.maxPeoplesLoyalty, 'lightblue', isVisible)}</span> <span class="info-label">石高</span><span class="info-val">${this.getStatusBarHTML(castle.kokudaka, castle.maxKokudaka, 'blue', isVisible)}</span></div>
+                    <div class="info-row"><span class="info-label">鉱山</span><span class="info-val">${this.getStatusBarHTML(castle.commerce, castle.maxCommerce, 'blue', isVisible)}</span> <span class="info-label"></span><span class="info-val"></span></div>
                     <div style="margin-top:5px; text-align:center;"><button class="btn-primary" style="padding:4px 10px; font-size:0.8rem;" onclick="window.GameApp.ui.openBushoSelector('view_only', ${castle.id})">武将一覧</button></div>
                 </div>
             `;
@@ -913,11 +928,11 @@ class UIManager {
             
             if (this.topInfoExpanded) {
                 // ★修正箇所: loyalty -> peoplesLoyalty
-                content += `<div>人口:${mask(castle.population)} 民忠:${mask(castle.peoplesLoyalty)}</div>`;
-                content += `<div>兵:${mask(castle.soldiers)} 防:${mask(castle.defense)}</div>`;
+                content += `<div>人口:${mask(castle.population)} 民忠:${this.getStatusBarHTML(castle.peoplesLoyalty, castle.maxPeoplesLoyalty, 'lightblue', isVisible)}</div>`;
+                content += `<div>兵:${mask(castle.soldiers)} 防:${this.getStatusBarHTML(castle.defense, castle.maxDefense, 'lightblue', isVisible)}</div>`;
                 content += `<div>金:${mask(castle.gold)} 米:${mask(castle.rice)}</div>`;
                 content += `<div>訓練:${mask(castle.training)} 士気:${mask(castle.morale)}</div>`;
-                content += `<div>石:${mask(castle.kokudaka)} 鉱:${mask(castle.commerce)}</div>`;
+                content += `<div>石:${this.getStatusBarHTML(castle.kokudaka, castle.maxKokudaka, 'blue', isVisible)} 鉱:${this.getStatusBarHTML(castle.commerce, castle.maxCommerce, 'blue', isVisible)}</div>`;
             } else {
                 content += `<div>金:${mask(castle.gold)} 米:${mask(castle.rice)}</div>`;
                 content += `<div>兵:${mask(castle.soldiers)}</div>`;

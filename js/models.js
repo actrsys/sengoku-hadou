@@ -32,17 +32,25 @@ class Castle {
         this.soldiers = Number(this.soldiers || 0);
         this.gold = Number(this.gold || 0);
         this.rice = Number(this.rice || 0);
+        
         this.defense = Number(this.defense || 0);
+        this.maxDefense = Number(data.maxDefense !== undefined ? data.maxDefense : this.defense);
+        
         this.population = Number(this.population || 0);
         
         // ★修正: 城の民忠を peoplesLoyalty に変更。CSV互換性のため古い loyalty も読めるようにしておく
         this.peoplesLoyalty = Number(data.peoplesLoyalty !== undefined ? data.peoplesLoyalty : (data.loyalty || 0));
+        this.maxPeoplesLoyalty = Number(data.maxPeoplesLoyalty !== undefined ? data.maxPeoplesLoyalty : 100);
         delete this.loyalty;
         
         this.training = Number(this.training || 0);
         this.morale = Number(this.morale || 0);
+        
         this.kokudaka = Number(this.kokudaka || 0);
+        this.maxKokudaka = Number(data.maxKokudaka !== undefined ? data.maxKokudaka : this.kokudaka);
+        
         this.commerce = Number(this.commerce || 0);
+        this.maxCommerce = Number(data.maxCommerce !== undefined ? data.maxCommerce : this.commerce);
         
         this.ammo = Number(this.ammo || 0);
         this.horses = Number(this.horses || 0);
