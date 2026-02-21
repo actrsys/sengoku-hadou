@@ -1,7 +1,7 @@
 /**
  * game.js
  * 戦国シミュレーションゲーム (Main / UI / Data / System)
- * 修正: 部隊兵士分配モーダルのデフォルト値を総大将1.5倍に修正
+ * 修正: ブラウザ標準のダイアログ（alert/confirm）をカスタムUIに置き換えました
  */
 
 window.onerror = function(message, source, lineno, colno, error) {
@@ -63,6 +63,7 @@ class DataManager {
             return { clans, castles, bushos };
         } catch (error) {
             console.error(error);
+            // ※ここだけは画面ができる前の致命的なエラーなので、元のalertを残しています
             alert(`データの読み込みに失敗しました。\nフォルダ構成を確認してください。`);
             throw error;
         }
@@ -410,7 +411,6 @@ class UIManager {
         this.onResultModalClose = null;
 
         if (this.resultModal) this.resultModal.addEventListener('click', (e) => { if (e.target === this.resultModal) this.closeResultModal(); });
-		// ズームボタンが押された時の動きを設定
 		if (this.mapZoomInBtn) {
 		    this.mapZoomInBtn.onclick = (e) => { e.stopPropagation(); this.changeMapZoom(1); };
 		}
@@ -420,6 +420,48 @@ class UIManager {
 
         this.initMapDrag();
         this.initContextMenu();
+    }
+
+    // --- ★ 新規追加：汎用ダイアログ表示用の命令 ---
+    showDialog(msg, isConfirm, onOk, onCancel = null) {
+        const modal = document.getElementById('dialog-modal');
+        const msgEl = document.getElementById('dialog-message');
+        const okBtn = document.getElementById('dialog-btn-ok');
+        const cancelBtn = document.getElementById('dialog-btn-cancel');
+
+        if (!modal) {
+            // もしHTMLにダイアログが見つからなかった時のための保険です（今まで通り）
+            if (isConfirm) {
+                if (confirm(msg)) { if (onOk) onOk(); } else { if (onCancel) onCancel(); }
+            } else {
+                alert(msg);
+                if (onOk) onOk();
+            }
+            return;
+        }
+
+        // メッセージをセット（改行も反映されるようにしています）
+        msgEl.innerHTML = msg.replace(/\n/g, '<br>');
+        
+        // OKボタンを押した時の動き
+        okBtn.onclick = () => {
+            modal.classList.add('hidden'); // 画面を隠す
+            if (onOk) onOk();              // 用意された次の処理をする
+        };
+
+        // 確認画面（はい/いいえ等）か、単なる警告画面かでボタンの表示を変えます
+        if (isConfirm) {
+            cancelBtn.classList.remove('hidden'); // キャンセルボタンを表示
+            cancelBtn.onclick = () => {
+                modal.classList.add('hidden');
+                if (onCancel) onCancel();
+            };
+        } else {
+            cancelBtn.classList.add('hidden'); // キャンセルボタンを隠す
+        }
+
+        // 最後にダイアログを表示します
+        modal.classList.remove('hidden');
     }
 
     getStatusBarHTML(value, max, colorType, isVisible) {
@@ -573,9 +615,10 @@ class UIManager {
                 e.stopPropagation();
                 this.hideContextMenu();
                 if(this.game.isProcessingAI) return;
-                if(confirm("今月の命令を終了しますか？")) {
+                // ★ confirm を showDialog に変更
+                this.showDialog("今月の命令を終了しますか？", true, () => {
                     this.game.finishTurn();
-                }
+                });
             };
         }
     }
@@ -739,17 +782,16 @@ class UIManager {
         let minScale = Math.min(scaleX, scaleY) * 0.9; 
         if (minScale > 0.8) minScale = 0.5;
 
-        // ★ここからが新しい部分！ 3つのサイズ（最小・中間・最大）を計算して登録します
         this.zoomStages = [
-            minScale,              // 0番：一番小さい（画面全体が見える）
-            (minScale + 1.0) / 2,  // 1番：ちょうど中間
-            1.0                    // 2番：一番大きい（等倍）
+            minScale,              
+            (minScale + 1.0) / 2,  
+            1.0                    
         ];
-        this.zoomLevel = 1; // 最初は「1番（中間）」のサイズにします
+        this.zoomLevel = 1; 
         this.mapScale = this.zoomStages[this.zoomLevel];
         
         this.applyMapScale();
-        this.updateZoomButtons(); // ボタンの見た目を更新する命令です
+        this.updateZoomButtons(); 
     }
 
     applyMapScale() {
@@ -758,7 +800,6 @@ class UIManager {
         }
     }
     
-    // 1. ズームを1段階ずつ変えるための新しい命令
     changeMapZoom(delta) {
         this.zoomLevel += delta;
         if (this.zoomLevel < 0) this.zoomLevel = 0;
@@ -769,14 +810,10 @@ class UIManager {
         this.updateZoomButtons();
     }
 
-    // 2. ボタンを隠したり表示したりする新しい命令
     updateZoomButtons() {
         if (!this.mapZoomInBtn || !this.mapZoomOutBtn) return;
         
-        // 最大サイズなら「＋」ボタンを隠す
         this.mapZoomInBtn.style.display = (this.zoomLevel >= 2) ? 'none' : 'flex';
-        
-        // 最小サイズなら「ー」ボタンを隠す
         this.mapZoomOutBtn.style.display = (this.zoomLevel <= 0) ? 'none' : 'flex';
     }
     
@@ -803,7 +840,6 @@ class UIManager {
         if (this.mapGuide) { 
             if(isSelectionMode) {
                 this.mapGuide.classList.remove('hidden'); 
-                // ★修正: ガイドの文字出しも CommandSystem に任せます
                 this.mapGuide.textContent = this.game.commandSystem.getSelectionGuideMessage();
             } else if (isDaimyoSelect) {
                 this.mapGuide.classList.remove('hidden'); 
@@ -848,7 +884,6 @@ class UIManager {
                         el.onclick = (e) => { 
                             e.stopPropagation(); 
                             if (this.isDraggingMap) return; 
-                            // ★修正: 選択後の処理を CommandSystem に任せます
                             this.game.commandSystem.resolveMapSelection(c); 
                         };
                     } else { 
@@ -861,10 +896,10 @@ class UIManager {
                         if (this.game.isProcessingAI) return;
 
 						if (this.mapScale < 0.8) {
-						    this.zoomLevel = 2; // 「一番大きいサイズ」の番号にする
-						    this.mapScale = this.zoomStages[this.zoomLevel]; // 1.0サイズを適用
+						    this.zoomLevel = 2;
+						    this.mapScale = this.zoomStages[this.zoomLevel];
 						    this.applyMapScale();
-						    this.updateZoomButtons(); // 新しいボタン（＋とー）の表示を更新する
+						    this.updateZoomButtons(); 
 						    el.scrollIntoView({block: "center", inline: "center", behavior: "smooth"});
 						} else {
                             if (Number(c.ownerClan) === Number(this.game.playerClanId)) {
@@ -1085,10 +1120,11 @@ class UIManager {
                 Object.keys(CATEGORY_MAP).forEach(key => {
                     createBtn(CATEGORY_MAP[key], "category", () => menu(key));
                 });
+                // ★ confirm を showDialog に変更
                 createBtn("命令終了", "finish", () => { 
-                    if(confirm("今月の命令を終了しますか？")) {
+                    this.showDialog("今月の命令を終了しますか？", true, () => {
                         this.game.finishTurn();
-                    }
+                    });
                 });
                 return;
             }
@@ -1156,7 +1192,8 @@ class UIManager {
     }
 
     openBushoSelector(actionType, targetId = null, extraData = null, onBack = null) {
-        if (actionType === 'appoint' && this.currentCastle) { const isDaimyoHere = this.game.getCastleBushos(this.currentCastle.id).some(b => b.isDaimyo); if (isDaimyoHere) { alert("大名の居城は城主を変更できません"); return; } }
+        // ★ alert を showDialog に変更
+        if (actionType === 'appoint' && this.currentCastle) { const isDaimyoHere = this.game.getCastleBushos(this.currentCastle.id).some(b => b.isDaimyo); if (isDaimyoHere) { this.showDialog("大名の居城は城主を変更できません", false); return; } }
         
         if (this.selectorModal) this.selectorModal.classList.remove('hidden'); 
         if (document.getElementById('selector-title')) document.getElementById('selector-title').textContent = "武将を選択"; 
@@ -1183,7 +1220,6 @@ class UIManager {
         let sortKey = spec.sortKey || 'strength';
         let isMulti = spec.isMulti || false;
         
-        // 守備側の迎撃部隊選択用
         if (actionType === 'def_intercept_deploy') {
              isMulti = true;
              sortKey = 'strength';
@@ -1342,7 +1378,8 @@ class UIManager {
                              const currentChecked = this.selectorList.querySelectorAll('input[name="sel_busho"]:checked').length;
                              if(e.target.checked && currentChecked > maxSelect) {
                                  e.target.checked = false;
-                                 alert(`出陣できる武将は最大${maxSelect}人までです。`);
+                                 // ★ alert を showDialog に変更
+                                 this.showDialog(`出陣できる武将は最大${maxSelect}人までです。`, false);
                                  return;
                              }
                         }
@@ -1357,7 +1394,8 @@ class UIManager {
                              const maxSelect = (actionType === 'war_deploy' || actionType === 'def_intercept_deploy') ? 5 : 999;
                              const currentChecked = this.selectorList.querySelectorAll('input[name="sel_busho"]:checked').length;
                              if(!input.checked && currentChecked >= maxSelect) {
-                                 alert(`出陣できる武将は最大${maxSelect}人までです。`);
+                                 // ★ alert を showDialog に変更
+                                 this.showDialog(`出陣できる武将は最大${maxSelect}人までです。`, false);
                                  return;
                              }
                              input.checked = !input.checked; 
@@ -1392,7 +1430,6 @@ class UIManager {
         }
     }
     
-    // --- ★ 野戦部隊分割用モーダル ---
     showUnitDivideModal(bushos, totalSoldiers, onConfirm) {
         const modal = document.getElementById('unit-divide-modal');
         const listEl = document.getElementById('divide-list');
@@ -1497,7 +1534,8 @@ class UIManager {
             });
             
             if (sum !== totalSoldiers) {
-                alert("未分配の兵士がいます。兵士を残さず分配してください。");
+                // ★ alert を showDialog に変更
+                this.showDialog("未分配の兵士がいます。兵士を残さず分配してください。", false);
                 return;
             }
             
@@ -1859,6 +1897,7 @@ class GameManager {
             
         } catch (e) {
             console.error(e);
+            // ※ここはまだ画面が作られていない段階なのでalertのままです
             alert("シナリオデータの読み込みに失敗しました。");
             this.ui.returnToTitle();
         }
@@ -1866,7 +1905,8 @@ class GameManager {
     
     handleDaimyoSelect(castle) {
         if (castle.ownerClan === 0) {
-            alert("その城は空き城（中立）のため選択できません。");
+            // ★ alert を showDialog に変更
+            this.ui.showDialog("その城は空き城（中立）のため選択できません。", false);
             return;
         }
         
@@ -2104,7 +2144,20 @@ class GameManager {
         this.factionSystem.processEndMonth(); 
         this.independenceSystem.checkIndependence(); 
         
-        this.month++; if(this.month > 12) { this.month = 1; this.year++; } const clans = new Set(this.castles.filter(c => c.ownerClan !== 0).map(c => c.ownerClan)); const playerAlive = clans.has(this.playerClanId); if (clans.size === 1 && playerAlive) alert(`天下統一！`); else if (!playerAlive) alert(`我が軍は滅亡しました……`); else this.startMonth(); 
+        this.month++; 
+        if(this.month > 12) { this.month = 1; this.year++; } 
+        
+        const clans = new Set(this.castles.filter(c => c.ownerClan !== 0).map(c => c.ownerClan)); 
+        const playerAlive = clans.has(this.playerClanId); 
+        
+        // ★ alert を showDialog に変更
+        if (clans.size === 1 && playerAlive) {
+            this.ui.showDialog("天下統一！", false);
+        } else if (!playerAlive) {
+            this.ui.showDialog("我が軍は滅亡しました……", false);
+        } else {
+            this.startMonth(); 
+        }
     }
 
     checkAllActionsDone() {
@@ -2117,9 +2170,10 @@ class GameManager {
         
         if(bushos.length > 0 && bushos.every(b => b.isActionDone)) {
              setTimeout(() => {
-                 if(confirm("すべての武将が行動を終えました。\n今月の命令を終了しますか？")) {
+                 // ★ confirm を showDialog に変更
+                 this.ui.showDialog("すべての武将が行動を終えました。\n今月の命令を終了しますか？", true, () => {
                      this.finishTurn();
-                 }
+                 });
              }, 100);
         }
     }
