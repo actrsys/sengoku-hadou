@@ -1073,8 +1073,14 @@ class CommandSystem {
         
         if (castle.gold < costGold || castle.rice < costRice) { alert("物資不足"); return; } 
         castle.gold -= costGold; castle.rice -= costRice; 
-        
-        const val = GameSystem.calcCharity(busho, type); 
+       
+         // const を let に変えて、計算後に書き直せるようにします
+        let val = GameSystem.calcCharity(busho, type); 
+        // ここで上昇量を1/6にして、小数点以下を切り捨てます
+        val = Math.floor(val / 6); 
+        // 念のため、0になってしまった時は最低でも1上がるようにする安心設計です
+        if (val < 1) val = 1;
+
         const maxLoyalty = window.MainParams.Economy.MaxLoyalty || 100;
         castle.peoplesLoyalty = Math.min(maxLoyalty, castle.peoplesLoyalty + val); 
         busho.isActionDone = true; 
@@ -1084,5 +1090,6 @@ class CommandSystem {
         this.game.ui.showResultModal(`${busho.name}が施しを行いました\n民忠+${val}`); 
         this.game.ui.updatePanelHeader(); this.game.ui.renderCommandMenu();
     }
+
 
 }
