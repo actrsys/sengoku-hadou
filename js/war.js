@@ -224,18 +224,21 @@ class WarManager {
             else {
                 showInterceptDialog((choice, defAssignments, defRice, atkAssignments) => {
                     if (choice === 'field') {
-                        this.state.atkAssignments = atkAssignments; this.state.defAssignments = defAssignments; this.state.defender.rice = defRice || 0;
+                        this.state.atkAssignments = atkAssignments; this.state.defAssignments = defAssignments; 
+                        
                         let totalDefSoldiers = 0; if(defAssignments) defAssignments.forEach(a => totalDefSoldiers += a.soldiers);
                         defCastle.soldiers = Math.max(0, defCastle.soldiers - totalDefSoldiers);
                         defCastle.rice = Math.max(0, defCastle.rice - (defRice || 0));
+                        
                         this.state.defender.fieldSoldiers = totalDefSoldiers;
+                        this.state.defFieldRice = defRice || 0; // ★ここがポイント！野戦専用の兵糧箱を作りました
 
                         if (!isPlayerInvolved) this.resolveAutoFieldWar();
                         else {
                             if (!this.game.fieldWarManager) this.game.fieldWarManager = new window.FieldWarManager(this.game);
                             this.game.fieldWarManager.startFieldWar(this.state, (resultType) => {
                                 defCastle.soldiers += this.state.defender.fieldSoldiers;
-                                defCastle.rice += this.state.defender.rice;
+                                defCastle.rice += this.state.defFieldRice; // ★野戦が終わったら、野戦専用の箱から城に兵糧を戻します
                                 if (resultType === 'attacker_win' || resultType === 'defender_retreat' || resultType === 'draw_to_siege') this.startSiegeWarPhase();
                                 else this.endWar(false);
                             });
@@ -262,15 +265,17 @@ class WarManager {
             s.attacker.soldiers -= Math.min(s.attacker.soldiers, resDef.soldierDmg); s.defender.fieldSoldiers -= Math.min(s.defender.fieldSoldiers, resDef.counterDmg);
 
             s.attacker.rice = Math.max(0, s.attacker.rice - Math.floor(s.attacker.soldiers * consumeRate));
-            s.defender.rice = Math.max(0, s.defender.rice - Math.floor(s.defender.fieldSoldiers * consumeRate));
-            if (s.attacker.rice <= 0 || s.defender.rice <= 0 || s.attacker.soldiers < s.defender.fieldSoldiers * 0.2 || s.defender.fieldSoldiers < s.attacker.soldiers * 0.2) break;
+            s.defFieldRice = Math.max(0, s.defFieldRice - Math.floor(s.defender.fieldSoldiers * consumeRate)); // ★野戦専用の箱から消費
+            if (s.attacker.rice <= 0 || s.defFieldRice <= 0 || s.attacker.soldiers < s.defender.fieldSoldiers * 0.2 || s.defender.fieldSoldiers < s.attacker.soldiers * 0.2) break;
 
             turn++; safetyLimit--;
         }
 
         const atkLost = s.attacker.soldiers <= 0 || s.attacker.rice <= 0 || (s.attacker.soldiers < s.defender.fieldSoldiers * 0.2);
-        const defLost = s.defender.fieldSoldiers <= 0 || s.defender.rice <= 0 || (s.defender.fieldSoldiers < s.attacker.soldiers * 0.2);
-        s.defender.soldiers += s.defender.fieldSoldiers; s.defender.rice += s.defender.rice;
+        const defLost = s.defender.fieldSoldiers <= 0 || s.defFieldRice <= 0 || (s.defender.fieldSoldiers < s.attacker.soldiers * 0.2);
+        
+        s.defender.soldiers += s.defender.fieldSoldiers; 
+        s.defender.rice += s.defFieldRice; // ★野戦専用の箱から城に兵糧を戻す
 
         if (atkLost && !defLost) this.endWar(false); 
         else if (defLost && !atkLost) this.startSiegeWarPhase(); 
@@ -711,4 +716,5 @@ class WarManager {
             else { p.status = 'dead'; p.clan = 0; p.castleId = 0; } 
         }); 
     }
+
 }
