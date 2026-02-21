@@ -20,8 +20,8 @@ Economy.CharmEffect,0.4,施し時の魅力の影響係数。上げると「魅�
 Economy.CharityFluctuation,0.15,施し効果の変動幅。上げると民忠上昇値が不安定になる
 Economy.MaxLoyalty,100,民忠の最大値。上げると一揆発生率をより低く抑えられる、下げると維持が難しくなる
 Economy.TradeRateMin,0.5,相場の最小値。上げると米価暴落時の底値が上がり金策しやすくなる、下げると米が紙屑同然になるリスク増
-Economy.TradeRateMax,3,相場の最大値。上げると米が高騰した際に莫大な利益が出る、下げると相場変動の幅が狭まる
-Economy.TradeFluctuation,0.15,相場の変動幅。上げると毎月の相場変動が激しくなる、下げると相場が固定化される
+Economy.TradeRateMax,2.5,相場の最大値。上げると米が高騰した際に莫大な利益が出る、下げると相場変動の幅が狭まる
+Economy.TradeFluctuation,0.3,相場の変動幅。上げると毎月の相場変動が激しくなる、下げると相場が固定化される
 Economy.PriceAmmo,10,物資購入：矢弾の基本単価
 Economy.PriceHorse,100,物資購入：騎馬の基本単価
 Economy.PriceGun,500,物資購入：鉄砲の基本単価
@@ -63,8 +63,6 @@ Strategy.AffinityNewLordWeight,0.6,引抜計算(新主相性)。上げると、�
 Strategy.AffinityDoerWeight,0.4,引抜計算(実行者相性)。上げると、勧誘に行く武将と相手の個人的相性が重要になる
 Strategy.SchemeSuccessRate,0.25,攻城戦：謀略の成功率基準。上げると戦闘中の「謀略」が成功しやすくなる、下げると失敗リスク増
 AI.Difficulty,normal,AIの難易度設定。easy:判断ミス多め/normal:標準/hard:賢く好戦的・資源管理徹底
-AI.Aggressiveness,0.8,AIの攻撃性閾値。★重要：上げるとAIが好戦的になり頻繁に侵攻判定を行う、下げると大人しくなる
-AI.SoldierSendRate,0.8,AIの出兵率。上げるとAIは城を空にして全軍で攻めてくる、下げると守備兵を多く残すようになる
 AI.AbilityBase,50,AI能力判定の基準値。AIが武将を評価する基準点。変更時はバランス注意
 AI.AbilitySensitivity,2,AIの能力評価感度。上げるとAIが高能力武将を適切に運用する確率が上がる、下げるとAIが武将の質を無視する
 AI.GunshiBiasFactor,0.5,軍師情報のバイアス係数。上げると軍師の助言が不正確になる傾向、下げると正確になる ※現在ロジックでの適用度低
@@ -74,9 +72,6 @@ AI.DiplomacyChance,0.3,AI外交発生率。上げるとAIが頻繁に親善や�
 AI.GoodwillThreshold,40,AI親善閾値。上げるとAIは友好度が高くてもまだ親善金を送ってくる、下げるとすぐ満足して親善をやめる
 AI.AllianceThreshold,70,AI同盟閾値。上げるとAIが同盟を申し込むのに必要な友好度が高くなる『同盟しづらい』、下げるとすぐ同盟する
 AI.BreakAllianceDutyFactor,0.5,AI同盟破棄の義理影響。上げると義理堅い大名AIは同盟を破棄しなくなる、下げると義理を無視して裏切る
-AI.RiskAversion,2.5,AIのリスク回避度。★重要：上げると自軍の損害を嫌い、慎重になる。下げると特攻しやすくなる。
-AI.WinBonus,300,AIの勝利確信ボーナス。上げると「勝てそう」と判断した時に積極的に攻めるようになる。
-AI.AttackThreshold,1000,AIの攻撃判定スコア閾値。上げると、かなり有利でないと攻め込まなくなる。
 War.ChargeMultiplier,1.1,攻城戦：突撃の攻撃倍率。上げると突撃ダメージが増加
 War.ChargeRisk,1.5,攻城戦：突撃の反撃リスク係数。上げると突撃失敗時に受ける被害が増える
 War.ChargeSoldierDmgRate,1,攻城戦：突撃時の対兵士ダメージ倍率。上げると兵士へのダメージが増える
