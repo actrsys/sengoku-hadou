@@ -298,37 +298,51 @@ class FieldWarManager {
                 hex.style.top = `${y * (this.hexH / 2)}px`;
                 
                 if (isPlayerTurn && unit) {
+                    // ★ 修正箇所：現在操作している部隊や、他の味方部隊の場所も色を変えるようにしました
                     if (this.state === 'PHASE_MOVE' || this.state === 'MOVE_PREVIEW') {
-                        if (this.reachable && this.reachable[`${x},${y}`]) {
+                        if (x === unit.x && y === unit.y) {
+                            hex.classList.add('current-pos');
+                        } else if (this.reachable && this.reachable[`${x},${y}`]) {
                             hex.classList.add('movable');
+                        } else if (this.units.some(u => u.x === x && u.y === y && u.isAttacker === unit.isAttacker)) {
+                            hex.classList.add('movable'); // 味方がいる場所も同じ色に
                         }
                     } else if (this.state === 'PHASE_DIR') {
-                        if (this.getDistance(unit.x, unit.y, x, y) === 1) {
-                            const targetUnit = this.units.find(u => u.x === x && u.y === y && u.isAttacker !== unit.isAttacker);
-                            let targetDir = this.getDirection(unit.x, unit.y, x, y);
-                            let turnCost = this.getTurnCost(unit.direction, targetDir);
+                        if (x === unit.x && y === unit.y) {
+                            hex.classList.add('current-pos');
+                        } else {
+                            if (this.getDistance(unit.x, unit.y, x, y) === 1) {
+                                const targetUnit = this.units.find(u => u.x === x && u.y === y && u.isAttacker !== unit.isAttacker);
+                                let targetDir = this.getDirection(unit.x, unit.y, x, y);
+                                let turnCost = this.getTurnCost(unit.direction, targetDir);
 
-                            if (targetUnit && unit.ap >= 1 && this.isFrontDirection(unit.direction, targetDir)) {
-                                hex.classList.add('attackable');
-                            } else {
-                                if (unit.ap >= turnCost) {
-                                    hex.classList.add('fw-dir-highlight');
+                                if (targetUnit && unit.ap >= 1 && this.isFrontDirection(unit.direction, targetDir)) {
+                                    hex.classList.add('attackable');
+                                } else {
+                                    if (unit.ap >= turnCost) {
+                                        hex.classList.add('fw-dir-highlight');
+                                    }
                                 }
                             }
-                        }
-                        if (x === unit.x && y === unit.y) {
-                            hex.classList.add('movable');
-                        }
-                    } else if (this.state === 'PHASE_ATTACK') {
-                        const targetUnit = this.units.find(u => u.x === x && u.y === y && u.isAttacker !== unit.isAttacker);
-                        if (targetUnit && this.getDistance(unit.x, unit.y, x, y) === 1 && unit.ap >= 1) {
-                            let targetDir = this.getDirection(unit.x, unit.y, x, y);
-                            if (this.isFrontDirection(unit.direction, targetDir)) {
-                                hex.classList.add('attackable');
+                            // 味方がいる場所も色をつける
+                            if (this.units.some(u => u.x === x && u.y === y && u.isAttacker === unit.isAttacker)) {
+                                hex.classList.add('movable');
                             }
                         }
+                    } else if (this.state === 'PHASE_ATTACK') {
                         if (x === unit.x && y === unit.y) {
-                            hex.classList.add('movable');
+                            hex.classList.add('current-pos');
+                        } else {
+                            const targetUnit = this.units.find(u => u.x === x && u.y === y && u.isAttacker !== unit.isAttacker);
+                            if (targetUnit && this.getDistance(unit.x, unit.y, x, y) === 1 && unit.ap >= 1) {
+                                let targetDir = this.getDirection(unit.x, unit.y, x, y);
+                                if (this.isFrontDirection(unit.direction, targetDir)) {
+                                    hex.classList.add('attackable');
+                                }
+                            }
+                            if (this.units.some(u => u.x === x && u.y === y && u.isAttacker === unit.isAttacker)) {
+                                hex.classList.add('movable');
+                            }
                         }
                     }
                 }
