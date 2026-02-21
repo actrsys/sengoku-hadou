@@ -847,7 +847,7 @@ class CommandSystem {
 
         if (count > 0) {
             const lastBusho = this.game.getBusho(bushoIds[bushoIds.length - 1]);
-            this.game.ui.showResultModal(`${count}名に褒美（金${count * spec.costGold}）を与えました。\n家中の忠誠が向上しました。`);
+            this.game.ui.showResultModal(`${count}名に褒美（金${count * spec.costGold}）を与えました。`);
             this.game.ui.log(`${count}名に褒美を実行 (合計効果:${totalEffect})`);
         } else {
             alert("金が足りないため、褒美を与えられませんでした。");
@@ -875,13 +875,13 @@ class CommandSystem {
         let attitudeText = ""; 
 
         if (perceivedLoyalty >= 85) {
-            loyaltyText = "身に余る御恩、片時も忘れたことはありませぬ。<br>この身は殿のために。";
+            loyaltyText = "身に余る御恩、<br>片時も忘れたことはありませぬ。<br>この身は殿のために。";
             attitudeText = "";
         } else if (perceivedLoyalty >= 65) {
             loyaltyText = "家中はよく治まっております。<br>何も心配なさりませぬよう。";
             attitudeText = "";
         } else if (perceivedLoyalty >= 45) {
-            loyaltyText = "特に不満はありません。与えられた役目は果たします。";
+            loyaltyText = "特に不満はありません。<br>与えられた役目は果たします。";
             attitudeText = "";
         } else if (perceivedLoyalty >= 25) {
             loyaltyText = "……少し、待遇を見直してはいただけませぬか。";
@@ -905,7 +905,7 @@ class CommandSystem {
         if (interviewer.id === target.id) {
             let comment = "";
             if (interviewer.ambition > 80) comment = "「俺の力を持ってすれば、<br>天下も夢ではない……はずだ。」";
-            else if (interviewer.personality === 'cautious') comment = "「慎重に行かねば、足元をすくわれよう。」";
+            else if (interviewer.personality === 'cautious') comment = "「慎重に行かねば、<br>足元をすくわれよう。」";
             else comment = "「今のところは順調か……<br>いや、油断はできん。」";
             
             const returnScript = `window.GameApp.ui.reopenInterviewModal(window.GameApp.getBusho(${interviewer.id}))`;
@@ -918,16 +918,16 @@ class CommandSystem {
         
         let affinityText = "";
         if (dist < 15) affinityText = "あの方とは意気投合します。素晴らしいお方です。";
-        else if (dist < 30) affinityText = "話のわかる相手だと思います。信頼できます。";
-        else if (dist < 50) affinityText = "悪くはありませんが、時折意見が食い違います。";
-        else if (dist < 70) affinityText = "考え方がどうも合いません。理解に苦しみます。";
+        else if (dist < 30) affinityText = "話のわかる相手だと思います。<br>信頼できます。";
+        else if (dist < 50) affinityText = "悪くはありませんが、<br>時折意見が食い違います。";
+        else if (dist < 70) affinityText = "考え方がどうも合いません。<br>理解に苦しみます。";
         else affinityText = "あやつとは反りが合いません。<br>顔も見たくない程です。";
 
         let loyaltyText = "";
         let togaki = ""; 
 
         if (interviewer.loyalty < 40) {
-            loyaltyText = "さあ……？<br>他人の腹の内など、某には分かりかねます。";
+            loyaltyText = "さあ……？<br>他人の腹の内など、<br>某には分かりかねます。";
             togaki = "";
         }
         else if (affinityDiff > 35) { 
@@ -935,7 +935,7 @@ class CommandSystem {
                 loyaltyText = "あやつは危険です。<br>裏で妙な動きをしているとの噂も……。";
                 togaki = "";
             } else {
-                loyaltyText = "あやつとは口もききませぬゆえ、何も存じませぬ。";
+                loyaltyText = "あやつとは口もききませぬゆえ、<br>何も存じませぬ。";
                 togaki = "";
             }
         }
@@ -945,11 +945,11 @@ class CommandSystem {
         }
         else {
             const tLoyalty = target.loyalty;
-            if (tLoyalty >= 85) loyaltyText = "殿への忠義は本物でしょう。疑う余地もありません。";
-            else if (tLoyalty >= 65) loyaltyText = "不審な点はありませぬ。真面目に務めております。";
+            if (tLoyalty >= 85) loyaltyText = "殿への忠義は本物でしょう。<br>疑う余地もありません。";
+            else if (tLoyalty >= 65) loyaltyText = "不審な点はありませぬ。<br>真面目に務めております。";
             else if (tLoyalty >= 45) loyaltyText = "今のところは大人しくしておりますが……。";
             else if (tLoyalty >= 25) loyaltyText = "近頃、何やら不満を漏らしているようです。";
-            else loyaltyText = "油断なりませぬ。野心を抱いている気配があります。";
+            else loyaltyText = "油断なりませぬ。<br>野心を抱いている気配があります。";
         }
 
         const targetCall = `${target.name}殿ですか……`;
