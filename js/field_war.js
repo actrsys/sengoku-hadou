@@ -298,14 +298,17 @@ class FieldWarManager {
                 hex.style.top = `${y * (this.hexH / 2)}px`;
                 
                 if (isPlayerTurn && unit) {
-                    // ★ 修正箇所：現在操作している部隊や、他の味方部隊の場所も色を変えるようにしました
+                    // ★ 修正箇所：距離を測って、届く範囲の味方だけを塗るように変更しました！
                     if (this.state === 'PHASE_MOVE' || this.state === 'MOVE_PREVIEW') {
                         if (x === unit.x && y === unit.y) {
                             hex.classList.add('current-pos');
                         } else if (this.reachable && this.reachable[`${x},${y}`]) {
                             hex.classList.add('movable');
                         } else if (this.units.some(u => u.x === x && u.y === y && u.isAttacker === unit.isAttacker)) {
-                            hex.classList.add('movable'); // 味方がいる場所も同じ色に
+                            // 操作している部隊の移動力（ap）で届く距離にいる味方なら色を塗る
+                            if (this.getDistance(unit.x, unit.y, x, y) <= unit.ap) {
+                                hex.classList.add('movable'); 
+                            }
                         }
                     } else if (this.state === 'PHASE_DIR') {
                         if (x === unit.x && y === unit.y) {
@@ -324,10 +327,6 @@ class FieldWarManager {
                                     }
                                 }
                             }
-                            // 味方がいる場所も色をつける
-                            if (this.units.some(u => u.x === x && u.y === y && u.isAttacker === unit.isAttacker)) {
-                                hex.classList.add('movable');
-                            }
                         }
                     } else if (this.state === 'PHASE_ATTACK') {
                         if (x === unit.x && y === unit.y) {
@@ -339,9 +338,6 @@ class FieldWarManager {
                                 if (this.isFrontDirection(unit.direction, targetDir)) {
                                     hex.classList.add('attackable');
                                 }
-                            }
-                            if (this.units.some(u => u.x === x && u.y === y && u.isAttacker === unit.isAttacker)) {
-                                hex.classList.add('movable');
                             }
                         }
                     }
