@@ -2,7 +2,7 @@
  * field_war.js
  * HEX式 野戦システム
  * 責務: 野戦マップの描画、ターンの制御、HEXでの移動と戦闘計算
- * 修正: 操作不能バグ修正、大将アイコン修正、キャンセルの改善、スマホスクロール対応、部隊情報表示の改善、戦場縮小、スクロール追従、影の回転防止
+ * 修正: 操作不能バグ修正、大将アイコン修正、キャンセルの改善、スマホスクロール対応、部隊情報表示の改善、戦場縮小、スクロール追従、影の回転防止、前方３方向攻撃制限
  */
 
 class FieldWarManager {
@@ -305,11 +305,14 @@ class FieldWarManager {
                     } else if (this.state === 'PHASE_DIR') {
                         if (this.getDistance(unit.x, unit.y, x, y) === 1) {
                             const targetUnit = this.units.find(u => u.x === x && u.y === y && u.isAttacker !== unit.isAttacker);
-                            if (targetUnit && unit.ap >= 1) {
+                            let targetDir = this.getDirection(unit.x, unit.y, x, y);
+                            let turnCost = this.getTurnCost(unit.direction, targetDir);
+
+                            // ★前方３方向（正面、左右斜め前）に敵がいれば攻撃可能マスにする
+                            if (targetUnit && unit.ap >= 1 && this.isFrontDirection(unit.direction, targetDir)) {
                                 hex.classList.add('attackable');
                             } else {
-                                let targetDir = this.getDirection(unit.x, unit.y, x, y);
-                                let turnCost = this.getTurnCost(unit.direction, targetDir);
+                                // 敵がいないか、または後ろ向きの敵の場合は、向き変更の候補マスにする
                                 if (unit.ap >= turnCost) {
                                     hex.classList.add('fw-dir-highlight');
                                 }
@@ -321,7 +324,11 @@ class FieldWarManager {
                     } else if (this.state === 'PHASE_ATTACK') {
                         const targetUnit = this.units.find(u => u.x === x && u.y === y && u.isAttacker !== unit.isAttacker);
                         if (targetUnit && this.getDistance(unit.x, unit.y, x, y) === 1 && unit.ap >= 1) {
-                            hex.classList.add('attackable');
+                            let targetDir = this.getDirection(unit.x, unit.y, x, y);
+                            // ★攻撃フェーズでも前方にいる敵だけを攻撃可能にする
+                            if (this.isFrontDirection(unit.direction, targetDir)) {
+                                hex.classList.add('attackable');
+                            }
                         }
                         if (x === unit.x && y === unit.y) {
                             hex.classList.add('movable');
@@ -345,7 +352,6 @@ class FieldWarManager {
             pEl.style.height = `${iconSize}px`;
             pEl.style.left = `${this.previewTarget.x * (this.hexW * 0.75) + (this.hexW - iconSize) / 2}px`;
             pEl.style.top = `${this.previewTarget.y * (this.hexH / 2) + (this.hexH - iconSize) / 2}px`;    
-            // ★修正：箱ごと回すのをやめて、中身の画像だけを回すための設定をします！
             pEl.style.setProperty('--fw-dir', `${unit.direction * 60}deg`);
             pEl.style.pointerEvents = 'none'; 
             
@@ -366,7 +372,6 @@ class FieldWarManager {
             uEl.style.height = `${iconSize}px`; 
             uEl.style.left = `${u.x * (this.hexW * 0.75) + (this.hexW - iconSize) / 2}px`; 
             uEl.style.top = `${u.y * (this.hexH / 2) + (this.hexH - iconSize) / 2}px`;     
-            // ★修正：ここも同じように、中身の画像だけを回す設定に変えました！
             uEl.style.setProperty('--fw-dir', `${u.direction * 60}deg`);
             uEl.style.pointerEvents = 'none'; 
             
@@ -452,6 +457,13 @@ class FieldWarManager {
         diff = Math.min(diff, 6 - diff); 
         if (diff === 1) return 1;
         return 2;
+    }
+
+    // ★前方３方向（正面と左右斜め前）かどうかを判定する関数を追加
+    isFrontDirection(curDir, targetDir) {
+        let diff = Math.abs(curDir - targetDir);
+        diff = Math.min(diff, 6 - diff);
+        return diff <= 1;
     }
 
     getCost(x, y, enemies, allies, isFirstStep, startDist) {
@@ -559,7 +571,6 @@ class FieldWarManager {
 
         const isPlayerInvolved = this.units.some(u => u.isPlayer);
 
-        // ターン開始時に部隊情報を表示し、その部隊の位置へスクロール
         this.showUnitInfo(unit);
         if (isPlayerInvolved) {
             setTimeout(() => this.scrollToUnit(unit), 100);
@@ -724,11 +735,9 @@ class FieldWarManager {
         const clickedUnit = this.units.find(u => u.x === x && u.y === y);
         const currentUnit = this.turnQueue[0];
 
-        // どこをタップしても、まず部隊情報を表示の切り替えを行う
         if (clickedUnit) {
             this.showUnitInfo(clickedUnit);
         } else {
-            // 部隊のいない場所をタップした時は、現在ターンの部隊情報に戻す
             if (currentUnit) this.showUnitInfo(currentUnit);
             else this.hideUnitInfo();
         }
@@ -783,7 +792,10 @@ class FieldWarManager {
 
             if (this.getDistance(unit.x, unit.y, x, y) === 1) {
                 const targetUnit = this.units.find(u => u.x === x && u.y === y && u.isAttacker !== unit.isAttacker);
-                if (targetUnit) {
+                let targetDir = this.getDirection(unit.x, unit.y, x, y);
+
+                // ★前方に敵がいる場合のみ、攻撃を行う
+                if (targetUnit && this.isFrontDirection(unit.direction, targetDir)) {
                     if (unit.ap >= 1) {
                         unit.ap -= 1;
                         this.executeAttack(unit, targetUnit);
@@ -794,7 +806,7 @@ class FieldWarManager {
                     return;
                 }
 
-                let targetDir = this.getDirection(unit.x, unit.y, x, y);
+                // 前方にいない敵、または敵がいないマスの場合は、向きを変える
                 let turnCost = this.getTurnCost(unit.direction, targetDir);
                 
                 if (unit.ap >= turnCost) {
@@ -820,8 +832,15 @@ class FieldWarManager {
 
             const targetUnit = this.units.find(u => u.x === x && u.y === y && u.isAttacker !== unit.isAttacker);
             if (targetUnit && this.getDistance(unit.x, unit.y, x, y) === 1 && unit.ap >= 1) {
-                unit.ap -= 1;
-                this.executeAttack(unit, targetUnit);
+                let targetDir = this.getDirection(unit.x, unit.y, x, y);
+                // ★攻撃フェーズでも前方の敵しか攻撃できない
+                if (this.isFrontDirection(unit.direction, targetDir)) {
+                    unit.ap -= 1;
+                    this.executeAttack(unit, targetUnit);
+                } else {
+                    this.cancelAction();
+                    if(clickedUnit) this.showUnitInfo(clickedUnit);
+                }
             } else {
                 this.cancelAction();
                 if(clickedUnit) this.showUnitInfo(clickedUnit);
@@ -968,10 +987,14 @@ class FieldWarManager {
             }
         }
 
+        // ★AIも前方にいる敵しか攻撃しないように制限
         if (dist === 1 && unit.ap >= 1) {
-            unit.ap -= 1;
-            this.executeAttack(unit, targetEnemy);
-            return; 
+            let targetDir = this.getDirection(unit.x, unit.y, targetEnemy.x, targetEnemy.y);
+            if (this.isFrontDirection(unit.direction, targetDir)) {
+                unit.ap -= 1;
+                this.executeAttack(unit, targetEnemy);
+                return; 
+            }
         }
 
         if (isPlayerInvolved) this.log(`${unit.name}隊は待機した。`);
