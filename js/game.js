@@ -393,7 +393,8 @@ class UIManager {
         this.tradeTypeInfo = document.getElementById('trade-type-info');
         this.scenarioScreen = document.getElementById('scenario-modal');
         this.scenarioList = document.getElementById('scenario-list');
-        this.mapResetZoomBtn = document.getElementById('map-reset-zoom');
+		this.mapZoomInBtn = document.getElementById('map-zoom-in');
+		this.mapZoomOutBtn = document.getElementById('map-zoom-out');
         this.historyModal = document.getElementById('history-modal');
         this.historyList = document.getElementById('history-list');
         
@@ -409,9 +410,13 @@ class UIManager {
         this.onResultModalClose = null;
 
         if (this.resultModal) this.resultModal.addEventListener('click', (e) => { if (e.target === this.resultModal) this.closeResultModal(); });
-        if (this.mapResetZoomBtn) {
-            this.mapResetZoomBtn.onclick = (e) => { e.stopPropagation(); this.resetMapZoom(); };
-        }
+		// ズームボタンが押された時の動きを設定
+		if (this.mapZoomInBtn) {
+		    this.mapZoomInBtn.onclick = (e) => { e.stopPropagation(); this.changeMapZoom(1); };
+		}
+		if (this.mapZoomOutBtn) {
+		    this.mapZoomOutBtn.onclick = (e) => { e.stopPropagation(); this.changeMapZoom(-1); };
+		}
 
         this.initMapDrag();
         this.initContextMenu();
@@ -714,7 +719,7 @@ class UIManager {
             };
         }
     }
-
+    
     fitMapToScreen() {
         if (!this.mapEl) return;
         const wrapper = document.getElementById('map-wrapper');
@@ -731,14 +736,20 @@ class UIManager {
         
         const scaleX = wrapper.clientWidth / mapW;
         const scaleY = wrapper.clientHeight / mapH;
-        let scale = Math.min(scaleX, scaleY) * 0.9; 
-        if (scale > 1.0) scale = 1.0;
+        let minScale = Math.min(scaleX, scaleY) * 0.9; 
+        if (minScale > 0.8) minScale = 0.5;
+
+        // ★ここからが新しい部分！ 3つのサイズ（最小・中間・最大）を計算して登録します
+        this.zoomStages = [
+            minScale,              // 0番：一番小さい（画面全体が見える）
+            (minScale + 1.0) / 2,  // 1番：ちょうど中間
+            1.0                    // 2番：一番大きい（等倍）
+        ];
+        this.zoomLevel = 1; // 最初は「1番（中間）」のサイズにします
+        this.mapScale = this.zoomStages[this.zoomLevel];
         
-        this.defaultScale = scale;
-        this.mapScale = scale;
         this.applyMapScale();
-        
-        if (this.mapResetZoomBtn) this.mapResetZoomBtn.textContent = "+";
+        this.updateZoomButtons(); // ボタンの見た目を更新する命令です
     }
 
     applyMapScale() {
@@ -746,16 +757,27 @@ class UIManager {
             this.mapEl.style.transform = `scale(${this.mapScale})`;
         }
     }
-
-    resetMapZoom() {
-        if (this.mapScale >= 0.99) {
-            this.mapScale = this.defaultScale || 0.5;
-            if (this.mapResetZoomBtn) this.mapResetZoomBtn.textContent = "+";
-        } else {
-            this.mapScale = 1.0;
-            if (this.mapResetZoomBtn) this.mapResetZoomBtn.textContent = "-";
-        }
+    
+    // 1. ズームを1段階ずつ変えるための新しい命令
+    changeMapZoom(delta) {
+        this.zoomLevel += delta;
+        if (this.zoomLevel < 0) this.zoomLevel = 0;
+        if (this.zoomLevel > 2) this.zoomLevel = 2;
+        
+        this.mapScale = this.zoomStages[this.zoomLevel];
         this.applyMapScale();
+        this.updateZoomButtons();
+    }
+
+    // 2. ボタンを隠したり表示したりする新しい命令
+    updateZoomButtons() {
+        if (!this.mapZoomInBtn || !this.mapZoomOutBtn) return;
+        
+        // 最大サイズなら「＋」ボタンを隠す
+        this.mapZoomInBtn.style.display = (this.zoomLevel >= 2) ? 'none' : 'flex';
+        
+        // 最小サイズなら「ー」ボタンを隠す
+        this.mapZoomOutBtn.style.display = (this.zoomLevel <= 0) ? 'none' : 'flex';
     }
     
     renderMap() {
@@ -838,12 +860,13 @@ class UIManager {
                         if (this.isDraggingMap) return; 
                         if (this.game.isProcessingAI) return;
 
-                        if (this.mapScale < 0.8) {
-                            this.mapScale = 1.0;
-                            this.applyMapScale();
-                            if(this.mapResetZoomBtn) this.mapResetZoomBtn.textContent = "-";
-                            el.scrollIntoView({block: "center", inline: "center", behavior: "smooth"});
-                        } else {
+						if (this.mapScale < 0.8) {
+						    this.zoomLevel = 2; // 「一番大きいサイズ」の番号にする
+						    this.mapScale = this.zoomStages[this.zoomLevel]; // 1.0サイズを適用
+						    this.applyMapScale();
+						    this.updateZoomButtons(); // 新しいボタン（＋とー）の表示を更新する
+						    el.scrollIntoView({block: "center", inline: "center", behavior: "smooth"});
+						} else {
                             if (Number(c.ownerClan) === Number(this.game.playerClanId)) {
                                 this.showControlPanel(c);
                             } else {
