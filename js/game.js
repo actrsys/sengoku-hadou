@@ -781,7 +781,8 @@ class UIManager {
         if (this.mapGuide) { 
             if(isSelectionMode) {
                 this.mapGuide.classList.remove('hidden'); 
-                this.mapGuide.textContent = this.game.getSelectionGuideMessage();
+                // ★修正: ガイドの文字出しも CommandSystem に任せます
+                this.mapGuide.textContent = this.game.commandSystem.getSelectionGuideMessage();
             } else if (isDaimyoSelect) {
                 this.mapGuide.classList.remove('hidden'); 
                 this.mapGuide.textContent = "開始する大名家の城を選択してください";
@@ -825,7 +826,8 @@ class UIManager {
                         el.onclick = (e) => { 
                             e.stopPropagation(); 
                             if (this.isDraggingMap) return; 
-                            this.game.resolveMapSelection(c); 
+                            // ★修正: 選択後の処理を CommandSystem に任せます
+                            this.game.commandSystem.resolveMapSelection(c); 
                         };
                     } else { 
                         el.classList.add('dimmed'); 
@@ -1391,7 +1393,6 @@ class UIManager {
         
         let assignments = bushos.map(b => ({ id: b.id, count: 0 }));
         
-        // ★修正: デフォルトの配分で総大将（先頭）を他の部隊の約1.5倍にする
         let ratioSum = 1.5 + (bushos.length - 1) * 1.0;
         let baseAmount = Math.floor(totalSoldiers / ratioSum);
         let remain = totalSoldiers;
@@ -1401,7 +1402,7 @@ class UIManager {
             remain -= baseAmount;
         }
         if (assignments.length > 0) {
-            assignments[0].count = remain; // 大将に残りをすべて割り当て
+            assignments[0].count = remain; 
         }
 
         const updateRemain = () => {
@@ -1446,13 +1447,11 @@ class UIManager {
             const onInput = (val) => {
                 let v = parseInt(val) || 0;
                 
-                // 他の兵士数の合計を計算
                 let otherSum = 0;
                 listEl.querySelectorAll('input[type="number"]').forEach(inp => {
                     if (inp.id !== `div-num-${b.id}`) otherSum += parseInt(inp.value) || 0;
                 });
                 
-                // 最大でも総数から他を引いた値、または1
                 let maxAllowed = Math.max(1, totalSoldiers - otherSum);
                 if (v > maxAllowed) v = maxAllowed;
                 if (v < 1) v = 1;
@@ -1940,11 +1939,13 @@ class GameManager {
         
         this.factionSystem.processStartMonth(); 
         
-        this.processRoninMovements(); 
+        // ★修正：人事部の処理を呼び出すように変更
+        this.factionSystem.processRoninMovements(); 
         
         this.updateAllCastlesLords();
         
-        if (this.month % 3 === 0) this.optimizeCastellans(); 
+        // ★修正：人事部の処理を呼び出すように変更
+        if (this.month % 3 === 0) this.factionSystem.optimizeCastellans(); 
         const isPopGrowth = (this.month % 2 === 0);
         
         this.castles.forEach(c => {
@@ -1992,44 +1993,8 @@ class GameManager {
         this.processTurn();
     }
     
-    processRoninMovements() { 
-        const ronins = this.bushos.filter(b => b.status === 'ronin'); 
-        ronins.forEach(r => { 
-            const currentC = this.getCastle(r.castleId); 
-            if(!currentC) return; 
-            const neighbors = this.castles.filter(c => GameSystem.isAdjacent(currentC, c)); 
-            neighbors.forEach(n => { 
-                if (Math.random() < 0.2) { 
-                    currentC.samuraiIds = currentC.samuraiIds.filter(id => id !== r.id); 
-                    n.samuraiIds.push(r.id); 
-                    r.castleId = n.id; 
-                } 
-            }); 
-        }); 
-    }
-    
-    optimizeCastellans() { 
-        const clanIds = [...new Set(this.castles.filter(c=>c.ownerClan!==0).map(c=>c.ownerClan))]; 
-        clanIds.forEach(clanId => { 
-            const myBushos = this.bushos.filter(b => b.clan === clanId); 
-            if(myBushos.length===0) return; 
-            
-            let daimyoInt = Math.max(...myBushos.map(b => b.intelligence)); 
-            if (Math.random() * 100 < daimyoInt) { 
-                const clanCastles = this.castles.filter(c => c.ownerClan === clanId); 
-                clanCastles.forEach(castle => { 
-                    const currentCastellan = this.getBusho(castle.castellanId);
-                    if (currentCastellan && currentCastellan.isDaimyo) return;
+    // ※ ここにあった processRoninMovements と optimizeCastellans は削除されました
 
-                    const castleBushos = this.getCastleBushos(castle.id).filter(b => b.status !== 'ronin'); 
-                    if (castleBushos.length <= 1) return; 
-                    
-                    this.electCastellan(castle, castleBushos);
-                }); 
-            } 
-        }); 
-    }
-    
     processTurn() {
         if (this.aiTimer) {
             clearTimeout(this.aiTimer);
@@ -2133,65 +2098,7 @@ class GameManager {
         this.month++; if(this.month > 12) { this.month = 1; this.year++; } const clans = new Set(this.castles.filter(c => c.ownerClan !== 0).map(c => c.ownerClan)); const playerAlive = clans.has(this.playerClanId); if (clans.size === 1 && playerAlive) alert(`天下統一！`); else if (!playerAlive) alert(`我が軍は滅亡しました……`); else this.startMonth(); 
     }
 
-    enterMapSelection(mode) {
-        this.lastMenuState = this.ui.menuState;
-        this.selectionMode = mode;
-        const c = this.getCurrentTurnCastle();
-        this.validTargets = []; 
-        
-        this.validTargets = this.commandSystem.getValidTargets(mode);
-        
-        this.ui.renderMap();
-        this.ui.log(this.getSelectionGuideMessage());
-    }
-
-    getSelectionGuideMessage() {
-        switch(this.selectionMode) {
-            case 'war': return "攻撃目標を選択してください(攻略直後の城は選択不可)";
-            case 'move': return "移動先を選択してください";
-            case 'transport': return "輸送先を選択してください";
-            case 'investigate': return "調査対象の城を選択してください";
-            case 'incite': return "扇動対象の城を選択してください";
-            case 'rumor': return "流言対象の城を選択してください";
-            case 'headhunt': case 'headhunt_select_castle': return "引抜対象の居城を選択してください";
-            case 'goodwill': case 'alliance': return "外交相手を選択してください";
-            case 'break_alliance': return "同盟破棄する相手を選択してください";
-            default: return "対象を選択してください";
-        }
-    }
-
-    resolveMapSelection(targetCastle) {
-        if (!this.validTargets.includes(targetCastle.id)) return;
-        
-        const mode = this.selectionMode;
-        this.ui.cancelMapSelection(); 
-
-        const onBackToMap = () => {
-            this.enterMapSelection(mode);
-        };
-
-        if (mode === 'war') {
-            this.ui.openBushoSelector('war_deploy', targetCastle.id, null, onBackToMap);
-        } else if (mode === 'move') {
-            this.ui.openBushoSelector('move_deploy', targetCastle.id, null, onBackToMap);
-        } else if (mode === 'transport') {
-            this.ui.openBushoSelector('transport_deploy', targetCastle.id, null, onBackToMap);
-        } else if (mode === 'investigate') {
-            this.ui.openBushoSelector('investigate_deploy', targetCastle.id, null, onBackToMap);
-        } else if (mode === 'incite') {
-            this.ui.openBushoSelector('incite_doer', targetCastle.id, null, onBackToMap);
-        } else if (mode === 'rumor') {
-            this.ui.openBushoSelector('rumor_target_busho', targetCastle.id, null, onBackToMap);
-        } else if (mode === 'headhunt' || mode === 'headhunt_select_castle') {
-            this.ui.openBushoSelector('headhunt_target', targetCastle.id, null, onBackToMap);
-        } else if (mode === 'goodwill') {
-            this.ui.openBushoSelector('diplomacy_doer', targetCastle.id, { subAction: 'goodwill' }, onBackToMap);
-        } else if (mode === 'alliance') {
-            this.ui.openBushoSelector('diplomacy_doer', targetCastle.id, { subAction: 'alliance' }, onBackToMap);
-        } else if (mode === 'break_alliance') {
-            this.ui.openBushoSelector('diplomacy_doer', targetCastle.id, { subAction: 'break_alliance' }, onBackToMap);
-        }
-    }
+    // ※ ここにあった enterMapSelection や getSelectionGuideMessage などのコマンド案内処理は削除されました
 
     checkAllActionsDone() {
         const c = this.getCurrentTurnCastle();

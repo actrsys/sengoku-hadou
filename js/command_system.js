@@ -1,9 +1,7 @@
 /**
  * command_system.js
  * ゲーム内のコマンド実行ロジックおよびフロー制御を管理するクラス
- * 修正: 外交コマンドを DiplomacyManager 経由の処理にリプレイス、executeSubjugationの追加
- * 修正: 訓練・士気・民忠の最大値をparameter.csvの設定値(WarParams/MainParams)から参照するように変更
- * 修正: 消費コストを COMMAND_SPECS で一元管理するようにリファクタリング
+ * 修正: マップ選択と案内の処理(enterMapSelection等)をgame.jsからお引っ越し
  */
 
 /* ==========================================================================
@@ -295,7 +293,8 @@ class CommandSystem {
 
         switch (spec.startMode) {
             case 'map_select':
-                this.game.enterMapSelection(type);
+                // ★修正: 社長(this.game)ではなく、自分(this)の中の処理を呼ぶようにしました
+                this.enterMapSelection(type);
                 break;
 
             case 'busho_select':
@@ -762,9 +761,6 @@ class CommandSystem {
         }
     }
 
-    /**
-     * 新規追加：支配・従属が発生する処理（戦争の敗北や降伏など外部から呼ばれる想定）
-     */
     executeSubjugation(winnerClanId, loserClanId) {
         this.game.diplomacyManager.changeStatus(winnerClanId, loserClanId, '支配');
         const winner = this.game.clans.find(c => Number(c.id) === Number(winnerClanId));
@@ -1104,8 +1100,72 @@ class CommandSystem {
         this.game.ui.updatePanelHeader(); this.game.ui.renderCommandMenu();
     }
 
+    /**
+     * ★ここから追加した部分です（game.jsからのお引っ越し）
+     */
+    enterMapSelection(mode) {
+        this.game.lastMenuState = this.game.ui.menuState;
+        this.game.selectionMode = mode;
+        this.game.validTargets = []; 
+        
+        this.game.validTargets = this.getValidTargets(mode);
+        
+        this.game.ui.renderMap();
+        this.game.ui.log(this.getSelectionGuideMessage());
+    }
+
+    /**
+     * ★ここから追加した部分です（game.jsからのお引っ越し）
+     */
+    getSelectionGuideMessage() {
+        switch(this.game.selectionMode) {
+            case 'war': return "攻撃目標を選択してください(攻略直後の城は選択不可)";
+            case 'move': return "移動先を選択してください";
+            case 'transport': return "輸送先を選択してください";
+            case 'investigate': return "調査対象の城を選択してください";
+            case 'incite': return "扇動対象の城を選択してください";
+            case 'rumor': return "流言対象の城を選択してください";
+            case 'headhunt': case 'headhunt_select_castle': return "引抜対象の居城を選択してください";
+            case 'goodwill': case 'alliance': return "外交相手を選択してください";
+            case 'break_alliance': return "同盟破棄する相手を選択してください";
+            default: return "対象を選択してください";
+        }
+    }
+
+    /**
+     * ★ここから追加した部分です（game.jsからのお引っ越し）
+     */
+    resolveMapSelection(targetCastle) {
+        if (!this.game.validTargets.includes(targetCastle.id)) return;
+        
+        const mode = this.game.selectionMode;
+        this.game.ui.cancelMapSelection(); 
+
+        const onBackToMap = () => {
+            this.enterMapSelection(mode);
+        };
+
+        if (mode === 'war') {
+            this.game.ui.openBushoSelector('war_deploy', targetCastle.id, null, onBackToMap);
+        } else if (mode === 'move') {
+            this.game.ui.openBushoSelector('move_deploy', targetCastle.id, null, onBackToMap);
+        } else if (mode === 'transport') {
+            this.game.ui.openBushoSelector('transport_deploy', targetCastle.id, null, onBackToMap);
+        } else if (mode === 'investigate') {
+            this.game.ui.openBushoSelector('investigate_deploy', targetCastle.id, null, onBackToMap);
+        } else if (mode === 'incite') {
+            this.game.ui.openBushoSelector('incite_doer', targetCastle.id, null, onBackToMap);
+        } else if (mode === 'rumor') {
+            this.game.ui.openBushoSelector('rumor_target_busho', targetCastle.id, null, onBackToMap);
+        } else if (mode === 'headhunt' || mode === 'headhunt_select_castle') {
+            this.game.ui.openBushoSelector('headhunt_target', targetCastle.id, null, onBackToMap);
+        } else if (mode === 'goodwill') {
+            this.game.ui.openBushoSelector('diplomacy_doer', targetCastle.id, { subAction: 'goodwill' }, onBackToMap);
+        } else if (mode === 'alliance') {
+            this.game.ui.openBushoSelector('diplomacy_doer', targetCastle.id, { subAction: 'alliance' }, onBackToMap);
+        } else if (mode === 'break_alliance') {
+            this.game.ui.openBushoSelector('diplomacy_doer', targetCastle.id, { subAction: 'break_alliance' }, onBackToMap);
+        }
+    }
 
 }
-
-
-

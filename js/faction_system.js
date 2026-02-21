@@ -1,7 +1,7 @@
 /**
  * faction_system.js
  * 派閥・承認欲求・下野システム
- * 修正: 相性計算を円環仕様(0-99ループ)に対応、派閥リーダーフラグの付与
+ * 修正: 浪人移動(processRoninMovements)と城主最適化(optimizeCastellans)をgame.jsからお引っ越し
  */
 
 class FactionSystem {
@@ -259,5 +259,53 @@ class FactionSystem {
             const achievementGain = Math.floor(busho.leadership * achieveLdr) + achieveBase;
             busho.achievementTotal += achievementGain;
         }
+    }
+
+    /**
+     * ★ここから追加した部分です（game.jsからのお引っ越し）
+     * 月初の浪人移動処理
+     */
+    processRoninMovements() { 
+        // 変更箇所：this.bushos などを this.game.bushos と呼ぶように直しています
+        const ronins = this.game.bushos.filter(b => b.status === 'ronin'); 
+        ronins.forEach(r => { 
+            const currentC = this.game.getCastle(r.castleId); 
+            if(!currentC) return; 
+            const neighbors = this.game.castles.filter(c => GameSystem.isAdjacent(currentC, c)); 
+            neighbors.forEach(n => { 
+                if (Math.random() < 0.2) { 
+                    currentC.samuraiIds = currentC.samuraiIds.filter(id => id !== r.id); 
+                    n.samuraiIds.push(r.id); 
+                    r.castleId = n.id; 
+                } 
+            }); 
+        }); 
+    }
+
+    /**
+     * ★ここから追加した部分です（game.jsからのお引っ越し）
+     * 3ヶ月ごとの城主最適化処理（大名による自動任命）
+     */
+    optimizeCastellans() { 
+        // 変更箇所：this.castles などを this.game.castles と呼ぶように直しています
+        const clanIds = [...new Set(this.game.castles.filter(c=>c.ownerClan!==0).map(c=>c.ownerClan))]; 
+        clanIds.forEach(clanId => { 
+            const myBushos = this.game.bushos.filter(b => b.clan === clanId); 
+            if(myBushos.length===0) return; 
+            
+            let daimyoInt = Math.max(...myBushos.map(b => b.intelligence)); 
+            if (Math.random() * 100 < daimyoInt) { 
+                const clanCastles = this.game.castles.filter(c => c.ownerClan === clanId); 
+                clanCastles.forEach(castle => { 
+                    const currentCastellan = this.game.getBusho(castle.castellanId);
+                    if (currentCastellan && currentCastellan.isDaimyo) return;
+
+                    const castleBushos = this.game.getCastleBushos(castle.id).filter(b => b.status !== 'ronin'); 
+                    if (castleBushos.length <= 1) return; 
+                    
+                    this.game.electCastellan(castle, castleBushos);
+                }); 
+            } 
+        }); 
     }
 }
