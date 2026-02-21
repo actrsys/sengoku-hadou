@@ -65,7 +65,7 @@ class FieldWarManager {
         }
 
         this.atkRice = warState.attacker.rice;
-        this.defRice = warState.defender.rice || 0;
+        this.defRice = warState.defFieldRice; // ★野戦専用の箱から受け取る
         this.atkMorale = warState.attacker.morale;
         this.defMorale = warState.defender.morale;
         this.atkTraining = warState.attacker.training;
@@ -461,7 +461,8 @@ class FieldWarManager {
         let atkSoldiers = 0, defSoldiers = 0;
         this.units.forEach(u => { if (u.isAttacker) atkSoldiers += u.soldiers; else defSoldiers += u.soldiers; });
         this.warState.attacker.soldiers = atkSoldiers; this.warState.attacker.rice = this.atkRice;
-        this.warState.defender.fieldSoldiers = defSoldiers; this.warState.defender.rice = this.defRice;
+        this.warState.defender.fieldSoldiers = defSoldiers; 
+        this.warState.defFieldRice = this.defRice; // ★終わったら野戦専用の箱に結果を返す
         const isPlayerInvolved = this.units.some(u => u.isPlayer);
         if (isPlayerInvolved) { setTimeout(() => { if (this.modal) this.modal.classList.add('hidden'); if (this.onComplete) this.onComplete(resultType); }, 1500); } 
         else { if (this.modal) this.modal.classList.add('hidden'); if (this.onComplete) this.onComplete(resultType); }
@@ -599,4 +600,5 @@ class FieldWarManager {
         this.nextPhaseTurn();
     }
 }
+
 window.FieldWarManager = FieldWarManager;
