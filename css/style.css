@@ -357,7 +357,7 @@ img {
 /* 共通設定：画像をマスクとして利用する準備 */
 .fw-unit.attacker,
 .fw-unit.defender {
-    /* ここで画像のパスを指定します */
+    /* ▼フォルダ名を修正▼ */
     -webkit-mask-image: url('/data/images/field_war_images/butai_icon.png');
     mask-image: url('/data/images/field_war_images/butai_icon.png');
     /* 画像のサイズに合わせて調整してください。ここでは仮に24pxとしています */
