@@ -358,8 +358,8 @@ img {
 .fw-unit.attacker,
 .fw-unit.defender {
     /* ▼フォルダ名を修正▼ */
-    -webkit-mask-image: url('/data/images/field_war_images/butai_icon.png');
-    mask-image: url('/data/images/field_war_images/butai_icon.png');
+    -webkit-mask-image: url('../data/images/field_war_images/butai_icon.png');
+    mask-image: url('../data/images/field_war_images/butai_icon.png');
     /* 画像のサイズに合わせて調整してください。ここでは仮に24pxとしています */
     -webkit-mask-size: contain;
     mask-size: contain;
