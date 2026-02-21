@@ -352,7 +352,8 @@ class FieldWarManager {
             pEl.style.height = `${iconSize}px`;
             pEl.style.left = `${this.previewTarget.x * (this.hexW * 0.75) + (this.hexW - iconSize) / 2}px`;
             pEl.style.top = `${this.previewTarget.y * (this.hexH / 2) + (this.hexH - iconSize) / 2}px`;    
-            pEl.style.setProperty('--fw-dir', `${unit.direction * 60}deg`);
+            // 修正後：unit（今の自分）ではなく、previewTarget（未来の自分）の向きを使う
+            pEl.style.setProperty('--fw-dir', `${this.previewTarget.direction * 60}deg`);
             pEl.style.pointerEvents = 'none'; 
             
             pEl.innerHTML = '';
@@ -753,11 +754,22 @@ class FieldWarManager {
             }
 
             let key = `${x},${y}`;
-            if (this.reachable && this.reachable[key]) {
-                this.previewTarget = {x: x, y: y, path: this.reachable[key].path, cost: this.reachable[key].cost};
-                this.state = 'MOVE_PREVIEW';
-                this.updateMap();
-            } else {
+			// 修正後
+			if (this.reachable && this.reachable[key]) {
+			    // ★ここから追加：プレビュー用の向きを計算する
+			    let path = this.reachable[key].path;
+			    let previewDir = unit.direction; 
+			    if (path && path.length > 0) {
+			        let fromX = (path.length > 1) ? path[path.length - 2].x : unit.x;
+			        let fromY = (path.length > 1) ? path[path.length - 2].y : unit.y;
+			        previewDir = this.getDirection(fromX, fromY, x, y);
+			    }
+			    // direction: previewDir を追加して覚えさせる
+			    this.previewTarget = {x: x, y: y, path: path, cost: this.reachable[key].cost, direction: previewDir};
+			    // ★ここまで
+			    this.state = 'MOVE_PREVIEW';
+			    this.updateMap();
+			} else {
                 this.cancelAction();
                 if(clickedUnit) this.showUnitInfo(clickedUnit);
             }
@@ -793,10 +805,19 @@ class FieldWarManager {
 			    this.nextPhase();
 			} else {
                 let key = `${x},${y}`;
-                if (this.reachable && this.reachable[key]) {
-                    this.previewTarget = {x: x, y: y, path: this.reachable[key].path, cost: this.reachable[key].cost};
-                    this.updateMap();
-                } else {
+				// 修正後
+				if (this.reachable && this.reachable[key]) {
+				    // ★追加：プレビュー用の向きを計算
+				    let path = this.reachable[key].path;
+				    let previewDir = unit.direction;
+				    if (path && path.length > 0) {
+				        let fromX = (path.length > 1) ? path[path.length - 2].x : unit.x;
+				        let fromY = (path.length > 1) ? path[path.length - 2].y : unit.y;
+				        previewDir = this.getDirection(fromX, fromY, x, y);
+				    }
+				    this.previewTarget = {x: x, y: y, path: path, cost: this.reachable[key].cost, direction: previewDir};
+				    this.updateMap();
+				} else {
                     this.cancelAction();
                     if(clickedUnit) this.showUnitInfo(clickedUnit);
                 }
