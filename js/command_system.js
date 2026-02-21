@@ -1,7 +1,7 @@
 /**
  * command_system.js
  * ゲーム内のコマンド実行ロジックおよびフロー制御を管理するクラス
- * 修正: マップ選択と案内の処理(enterMapSelection等)をgame.jsからお引っ越し
+ * 修正: alert/confirmを全てカスタムダイアログ（showDialog）に置き換えました
  */
 
 /* ==========================================================================
@@ -32,10 +32,10 @@ const COMMAND_SPECS = {
     },
    'charity': { 
         label: "施し", category: 'DEVELOP', 
-        costGold: 0, costRice: 200, // 金を0にします
+        costGold: 0, costRice: 200, 
         isMulti: false, hasAdvice: false, 
         startMode: 'busho_select', sortKey: 'charm',
-        msg: "米: 200 (1回あたり)" // 文章を米だけにします
+        msg: "米: 200 (1回あたり)" 
     },
 
     // --- 軍事取引 (MIL_TRADE) ---
@@ -129,8 +129,8 @@ const COMMAND_SPECS = {
     },
     'reward': { 
         label: "褒美", category: 'PERSONNEL', 
-        costGold: 200, costRice: 0,  // 1人あたり200金に設定
-        isMulti: true, hasAdvice: true, // 複数選べる(true)にする
+        costGold: 200, costRice: 0, 
+        isMulti: true, hasAdvice: true, 
         startMode: 'busho_select', sortKey: 'loyalty',
         msg: "金: 200 (1人あたり)\n褒美を与えます" 
     },
@@ -282,18 +282,18 @@ class CommandSystem {
 
         const castle = this.game.getCurrentTurnCastle();
 
+        // ★ alert を showDialog に変更
         if (spec.costGold > 0 && castle.gold < spec.costGold) {
-            alert(`金が足りません (必要: ${spec.costGold})`);
+            this.game.ui.showDialog(`金が足りません (必要: ${spec.costGold})`, false);
             return;
         }
         if (spec.costRice > 0 && castle.rice < spec.costRice) {
-            alert(`兵糧が足りません (必要: ${spec.costRice})`);
+            this.game.ui.showDialog(`兵糧が足りません (必要: ${spec.costRice})`, false);
             return;
         }
 
         switch (spec.startMode) {
             case 'map_select':
-                // ★修正: 社長(this.game)ではなく、自分(this)の中の処理を呼ぶようにしました
                 this.enterMapSelection(type);
                 break;
 
@@ -424,12 +424,10 @@ class CommandSystem {
         }
 
       　if (actionType === 'charity') {
-            // 金か米かを選ぶ画面を出さず、直接「米(rice)」を指定して実行させます
             this.showAdviceAndExecute('charity', () => this.executeCharity(selectedIds, 'rice'));
             return;
         }
 
-        // ここから 'charity' を消して、徴兵と褒美だけ画面を出すようにします
         if (['draft'].includes(actionType)) {
             this.game.ui.openQuantitySelector(actionType, selectedIds, targetId);
             return;
@@ -442,16 +440,13 @@ class CommandSystem {
              return;
         }
         
-        // 褒美（reward）専用のルールをここに追加！
         if (actionType === 'reward') {
             this.showAdviceAndExecute('reward', () => this.executeReward(selectedIds));
             return;
         }
 
-        // こっちのリストからは 'reward' を消しておきます
         if (spec && ['farm', 'commerce', 'repair', 'training', 'soldier_charity', 'appoint', 'banish'].includes(actionType)) {
             if (spec.hasAdvice) {
-                // (省略)
                 this.showAdviceAndExecute(actionType, () => this.executeCommand(actionType, selectedIds, targetId));
             } else {
                 this.executeCommand(actionType, selectedIds, targetId);
@@ -472,7 +467,7 @@ class CommandSystem {
         }
         else if (type === 'goodwill') {
             const val = parseInt(inputs.gold.num.value);
-            if (val < 100) { alert("金が足りません(最低100)"); return; }
+            if (val < 100) { this.game.ui.showDialog("金が足りません(最低100)", false); return; }
             this.showAdviceAndExecute('goodwill', () => this.executeDiplomacy(data[0], targetId, 'goodwill', val));
         }
         else if (type === 'headhunt_gold') {
@@ -506,13 +501,14 @@ class CommandSystem {
         else if (type === 'war_supplies') {
             const sVal = parseInt(inputs.soldiers.num.value);
             const rVal = parseInt(inputs.rice.num.value);
-            if (sVal <= 0) { alert("兵士0では出陣できません"); return; }
+            if (sVal <= 0) { this.game.ui.showDialog("兵士0では出陣できません", false); return; }
             
             const targetName = this.game.getCastle(targetId).name;
-            if (!confirm(`${targetName}に攻め込みますか？\n今月の命令は終了となります。`)) return;
-
-            const bushos = data.map(id => this.game.getBusho(id));
-            this.game.warManager.startWar(castle, this.game.getCastle(targetId), bushos, sVal, rVal);
+            // ★ confirm を showDialog に変更
+            this.game.ui.showDialog(`${targetName}に攻め込みますか？\n今月の命令は終了となります。`, true, () => {
+                const bushos = data.map(id => this.game.getBusho(id));
+                this.game.warManager.startWar(castle, this.game.getCastle(targetId), bushos, sVal, rVal);
+            });
         }
         else if (type === 'war_repair') {
              const val = parseInt(inputs.soldiers.num.value);
@@ -529,7 +525,7 @@ class CommandSystem {
     executeCommand(type, bushoIds, targetId) {
         const castle = this.game.getCurrentTurnCastle(); 
         let totalVal = 0, cost = 0, count = 0, actionName = "";
-        const spec = COMMAND_SPECS[type]; // COMMAND_SPECSから設定値を取得
+        const spec = COMMAND_SPECS[type]; 
         
         if (type === 'appoint' || type === 'appoint_gunshi') {
             const bushos = this.game.getBusho(bushoIds[0]);
@@ -547,11 +543,25 @@ class CommandSystem {
             return;
         }
 
+        // ★ 追放処理をループから出して、showDialogで実行するように変更
+        if (type === 'banish') { 
+            const busho = this.game.getBusho(bushoIds[0]);
+            this.game.ui.showDialog(`本当に ${busho.name} を追放しますか？`, true, () => {
+                castle.samuraiIds = castle.samuraiIds.filter(id => id !== busho.id);
+                busho.status = 'ronin'; busho.clan = 0; busho.isCastellan = false; 
+                this.game.updateCastleLord(castle); 
+                this.game.ui.showResultModal(`${busho.name}を追放しました`); 
+                this.game.ui.updatePanelHeader(); 
+                this.game.ui.renderCommandMenu(); 
+            });
+            return; 
+        }
+
         bushoIds.forEach(bid => {
             const busho = this.game.getBusho(bid); if (!busho) return;
             
             if (type === 'farm') { 
-                if (castle.gold >= spec.costGold) { // 設定値を動的に参照
+                if (castle.gold >= spec.costGold) { 
                     const val = GameSystem.calcDevelopment(busho); castle.gold -= spec.costGold; 
                     castle.kokudaka = Math.min(castle.maxKokudaka, castle.kokudaka + val); 
                     totalVal += val; count++; actionName = "石高開発";
@@ -560,7 +570,7 @@ class CommandSystem {
                 }
             }
             else if (type === 'commerce') { 
-                if (castle.gold >= spec.costGold) { // 設定値を動的に参照
+                if (castle.gold >= spec.costGold) { 
                     const val = GameSystem.calcDevelopment(busho); castle.gold -= spec.costGold; 
                     castle.commerce = Math.min(castle.maxCommerce, castle.commerce + val); 
                     totalVal += val; count++; actionName = "鉱山開発";
@@ -569,7 +579,7 @@ class CommandSystem {
                 }
             }
             else if (type === 'repair') { 
-                if (castle.gold >= spec.costGold) { // 設定値を動的に参照
+                if (castle.gold >= spec.costGold) { 
                     const val = GameSystem.calcRepair(busho); castle.gold -= spec.costGold; 
                     castle.defense = Math.min(castle.maxDefense, castle.defense + val); 
                     totalVal += val; count++; actionName = "城壁修復";
@@ -578,10 +588,9 @@ class CommandSystem {
                 }
             }
             else if (type === 'training') { 
-                // 金と米が設定値以上あるか確認してから実行する
                 if (castle.gold >= spec.costGold && castle.rice >= spec.costRice) {
-                    castle.gold -= spec.costGold;  // 金を減らす
-                    castle.rice -= spec.costRice;  // 米を減らす
+                    castle.gold -= spec.costGold;  
+                    castle.rice -= spec.costRice;  
 
                     const val = GameSystem.calcTraining(busho); 
                     const maxTraining = window.WarParams.Military.MaxTraining || 100;
@@ -592,10 +601,9 @@ class CommandSystem {
                 }
             }
             else if (type === 'soldier_charity') { 
-                // 金と米が設定値以上あるか確認してから実行する
                 if (castle.gold >= spec.costGold && castle.rice >= spec.costRice) {
-                    castle.gold -= spec.costGold;  // 金を減らす
-                    castle.rice -= spec.costRice;  // 米を減らす
+                    castle.gold -= spec.costGold;  
+                    castle.rice -= spec.costRice;  
 
                     const val = GameSystem.calcSoldierCharity(busho); 
                     const maxMorale = window.WarParams.Military.MaxMorale || 100;
@@ -604,15 +612,6 @@ class CommandSystem {
                     busho.achievementTotal += Math.floor(val * 0.5);
                     this.game.factionSystem.updateRecognition(busho, 10);
                 }
-            }
-            else if (type === 'banish') { 
-                if(!confirm(`本当に ${busho.name} を追放しますか？`)) return; 
-                castle.samuraiIds = castle.samuraiIds.filter(id => id !== busho.id);
-                busho.status = 'ronin'; busho.clan = 0; busho.isCastellan = false; 
-                this.game.updateCastleLord(castle); 
-                this.game.ui.showResultModal(`${busho.name}を追放しました`); 
-                this.game.ui.updatePanelHeader(); this.game.ui.renderCommandMenu(); 
-                return; 
             }
             else if (type === 'move_deploy') { 
                 this.game.factionSystem.handleMove(busho, castle.id, targetId); 
@@ -709,9 +708,6 @@ class CommandSystem {
         doer.isActionDone = true; this.game.ui.showResultModal(msg); this.game.ui.renderCommandMenu(); 
     }
 
-    /**
-     * 外交処理の刷新 (DiplomacyManagerの呼び出し)
-     */
     executeDiplomacy(doerId, targetClanId, type, gold = 0) {
         const doer = this.game.getBusho(doerId);
         const relation = this.game.getRelation(doer.clan, targetClanId);
@@ -777,7 +773,7 @@ class CommandSystem {
         const doer = this.game.getBusho(doerId);
         const target = this.game.getBusho(targetBushoId);
         const castle = this.game.getCurrentTurnCastle();
-        if (castle.gold < gold) { alert("資金が足りません"); return; }
+        if (castle.gold < gold) { this.game.ui.showDialog("資金が足りません", false); return; }
         castle.gold -= gold;
         const targetLord = this.game.bushos.find(b => b.clan === target.clan && b.isDaimyo) || { affinity: 50 }; 
         const newLord = this.game.bushos.find(b => b.clan === this.game.playerClanId && b.isDaimyo) || { affinity: 50 }; 
@@ -824,18 +820,12 @@ class CommandSystem {
             const target = this.game.getBusho(bid);
             if (!target) return;
 
-            // お金が足りるかチェック
             if (castle.gold < spec.costGold) return;
 
-            // お金を支払う
             castle.gold -= spec.costGold;
             
-            // 200金固定での効果計算
             const effect = GameSystem.calcRewardEffect(spec.costGold, daimyo, target);
 
-            // 忠誠を直接上昇はさせない
-            // 承認欲求（recognition）を「200金の時の値」で下げる
-            // 以前は金額(gold)に連動していましたが、一律で下げるようにします
             this.game.factionSystem.updateRecognition(target, -effect * 2 - 5);
 
             target.isActionDone = true;
@@ -848,7 +838,8 @@ class CommandSystem {
             this.game.ui.showResultModal(`${count}名に褒美（金${count * spec.costGold}）を与えました。`);
             this.game.ui.log(`${count}名に褒美を実行 (合計効果:${totalEffect})`);
         } else {
-            alert("金が足りないため、褒美を与えられませんでした。");
+            // ★ alert を showDialog に変更
+            this.game.ui.showDialog("金が足りないため、褒美を与えられませんでした。", false);
         }
 
         this.game.ui.updatePanelHeader();
@@ -984,7 +975,7 @@ class CommandSystem {
         this.game.updateCastleLord(c);
         this.game.updateCastleLord(t);
         
-        this.game.ui.showResultModal(`${this.game.getBusho(bushoIds[0]).name}が${t.name}へ物希を輸送しました`); this.game.ui.updatePanelHeader(); this.game.ui.renderCommandMenu();
+        this.game.ui.showResultModal(`${this.game.getBusho(bushoIds[0]).name}が${t.name}へ物資を輸送しました`); this.game.ui.updatePanelHeader(); this.game.ui.renderCommandMenu();
     }
 
     executeAppointGunshi(bushoId) { const busho = this.game.getBusho(bushoId); const oldGunshi = this.game.bushos.find(b => b.clan === this.game.playerClanId && b.isGunshi); if (oldGunshi) oldGunshi.isGunshi = false; busho.isGunshi = true; this.game.ui.showResultModal(`${busho.name}を軍師に任命しました`); this.game.ui.updatePanelHeader(); this.game.ui.renderCommandMenu(); }
@@ -1036,30 +1027,30 @@ class CommandSystem {
         
         if(type === 'buy_rice') { 
             const cost = Math.floor(amount * rate); 
-            if(castle.gold < cost) { alert("資金不足"); return; } 
+            if(castle.gold < cost) { this.game.ui.showDialog("資金不足", false); return; } 
             castle.gold -= cost; castle.rice += amount; 
             this.game.ui.showResultModal(`兵糧${amount}を購入しました\n(金-${cost})`); 
         } else if (type === 'sell_rice') { 
-            if(castle.rice < amount) { alert("兵糧不足"); return; } 
+            if(castle.rice < amount) { this.game.ui.showDialog("兵糧不足", false); return; } 
             const gain = Math.floor(amount * rate); 
             castle.rice -= amount; castle.gold += gain; 
             this.game.ui.showResultModal(`兵糧${amount}を売却しました\n(金+${gain})`); 
         } else if (type === 'buy_ammo') {
             const price = Math.floor(window.MainParams.Economy.PriceAmmo * rate);
             const cost = price * amount;
-            if(castle.gold < cost) { alert("資金不足"); return; } 
+            if(castle.gold < cost) { this.game.ui.showDialog("資金不足", false); return; } 
             castle.gold -= cost; castle.ammo += amount; 
             this.game.ui.showResultModal(`矢弾${amount}を購入しました\n(金-${cost})`); 
         } else if (type === 'buy_horses') {
             const price = Math.floor(window.MainParams.Economy.PriceHorse * rate);
             const cost = price * amount;
-            if(castle.gold < cost) { alert("資金不足"); return; } 
+            if(castle.gold < cost) { this.game.ui.showDialog("資金不足", false); return; } 
             castle.gold -= cost; castle.horses += amount; 
             this.game.ui.showResultModal(`騎馬${amount}を購入しました\n(金-${cost})`); 
         } else if (type === 'buy_guns') {
             const price = Math.floor(window.MainParams.Economy.PriceGun * rate);
             const cost = price * amount;
-            if(castle.gold < cost) { alert("資金不足"); return; } 
+            if(castle.gold < cost) { this.game.ui.showDialog("資金不足", false); return; } 
             castle.gold -= cost; castle.guns += amount; 
             this.game.ui.showResultModal(`鉄砲${amount}を購入しました\n(金-${cost})`); 
         }
@@ -1070,11 +1061,10 @@ class CommandSystem {
 
     executeDraft(bushoIds, gold) { 
         const castle = this.game.getCurrentTurnCastle(); 
-        if(castle.gold < gold) { alert("資金不足"); return; } 
+        if(castle.gold < gold) { this.game.ui.showDialog("資金不足", false); return; } 
         castle.gold -= gold; 
         const busho = this.game.getBusho(bushoIds[0]); 
         
-        // 徴兵数を10分の1に設定
         let soldiers = GameSystem.calcDraftFromGold(gold, busho, castle.population); 
         soldiers = Math.floor(soldiers / 10);
         
@@ -1095,19 +1085,16 @@ class CommandSystem {
     executeCharity(bushoIds, type) { 
         const castle = this.game.getCurrentTurnCastle(); 
         const busho = this.game.getBusho(bushoIds[0]); 
-        const spec = COMMAND_SPECS['charity']; // 設定値を動的に参照
+        const spec = COMMAND_SPECS['charity']; 
         let costGold = 0, costRice = 0; 
         if (type === 'gold' || type === 'both') costGold = spec.costGold; 
         if (type === 'rice' || type === 'both') costRice = spec.costRice; 
         
-        if (castle.gold < costGold || castle.rice < costRice) { alert("物資不足"); return; } 
+        if (castle.gold < costGold || castle.rice < costRice) { this.game.ui.showDialog("物資不足", false); return; } 
         castle.gold -= costGold; castle.rice -= costRice; 
        
-         // const を let に変えて、計算後に書き直せるようにします
         let val = GameSystem.calcCharity(busho, type); 
-        // ここで上昇量を1/6にして、小数点以下を切り捨てます
         val = Math.floor(val / 6); 
-        // 念のため、0になってしまった時は最低でも1上がるようにする安心設計です
         if (val < 1) val = 1;
 
         const maxLoyalty = window.MainParams.Economy.MaxLoyalty || 100;
@@ -1120,9 +1107,6 @@ class CommandSystem {
         this.game.ui.updatePanelHeader(); this.game.ui.renderCommandMenu();
     }
 
-    /**
-     * ★ここから追加した部分です（game.jsからのお引っ越し）
-     */
     enterMapSelection(mode) {
         this.game.lastMenuState = this.game.ui.menuState;
         this.game.selectionMode = mode;
@@ -1134,9 +1118,6 @@ class CommandSystem {
         this.game.ui.log(this.getSelectionGuideMessage());
     }
 
-    /**
-     * ★ここから追加した部分です（game.jsからのお引っ越し）
-     */
     getSelectionGuideMessage() {
         switch(this.game.selectionMode) {
             case 'war': return "攻撃目標を選択してください(攻略直後の城は選択不可)";
@@ -1152,9 +1133,6 @@ class CommandSystem {
         }
     }
 
-    /**
-     * ★ここから追加した部分です（game.jsからのお引っ越し）
-     */
     resolveMapSelection(targetCastle) {
         if (!this.game.validTargets.includes(targetCastle.id)) return;
         
