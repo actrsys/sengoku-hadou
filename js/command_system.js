@@ -3,6 +3,7 @@
  * ゲーム内のコマンド実行ロジックおよびフロー制御を管理するクラス
  * 修正: 外交コマンドを DiplomacyManager 経由の処理にリプレイス、executeSubjugationの追加
  * 修正: 訓練・士気・民忠の最大値をparameter.csvの設定値(WarParams/MainParams)から参照するように変更
+ * 修正: 消費コストを COMMAND_SPECS で一元管理するようにリファクタリング
  */
 
 /* ==========================================================================
@@ -523,7 +524,9 @@ class CommandSystem {
     }
 
     executeCommand(type, bushoIds, targetId) {
-        const castle = this.game.getCurrentTurnCastle(); let totalVal = 0, cost = 0, count = 0, actionName = "";
+        const castle = this.game.getCurrentTurnCastle(); 
+        let totalVal = 0, cost = 0, count = 0, actionName = "";
+        const spec = COMMAND_SPECS[type]; // COMMAND_SPECSから設定値を取得
         
         if (type === 'appoint' || type === 'appoint_gunshi') {
             const bushos = this.game.getBusho(bushoIds[0]);
@@ -543,9 +546,10 @@ class CommandSystem {
 
         bushoIds.forEach(bid => {
             const busho = this.game.getBusho(bid); if (!busho) return;
+            
             if (type === 'farm') { 
-                if (castle.gold >= 500) { 
-                    const val = GameSystem.calcDevelopment(busho); castle.gold -= 500; 
+                if (castle.gold >= spec.costGold) { // 設定値を動的に参照
+                    const val = GameSystem.calcDevelopment(busho); castle.gold -= spec.costGold; 
                     castle.kokudaka = Math.min(castle.maxKokudaka, castle.kokudaka + val); 
                     totalVal += val; count++; actionName = "石高開発";
                     busho.achievementTotal += Math.floor(val * 0.5); 
@@ -553,8 +557,8 @@ class CommandSystem {
                 }
             }
             else if (type === 'commerce') { 
-                if (castle.gold >= 500) { 
-                    const val = GameSystem.calcDevelopment(busho); castle.gold -= 500; 
+                if (castle.gold >= spec.costGold) { // 設定値を動的に参照
+                    const val = GameSystem.calcDevelopment(busho); castle.gold -= spec.costGold; 
                     castle.commerce = Math.min(castle.maxCommerce, castle.commerce + val); 
                     totalVal += val; count++; actionName = "鉱山開発";
                     busho.achievementTotal += Math.floor(val * 0.5);
@@ -562,8 +566,8 @@ class CommandSystem {
                 }
             }
             else if (type === 'repair') { 
-                if (castle.gold >= 300) { 
-                    const val = GameSystem.calcRepair(busho); castle.gold -= 300; 
+                if (castle.gold >= spec.costGold) { // 設定値を動的に参照
+                    const val = GameSystem.calcRepair(busho); castle.gold -= spec.costGold; 
                     castle.defense = Math.min(castle.maxDefense, castle.defense + val); 
                     totalVal += val; count++; actionName = "城壁修復";
                     busho.achievementTotal += Math.floor(val * 0.5);
@@ -951,7 +955,7 @@ class CommandSystem {
         this.game.updateCastleLord(c);
         this.game.updateCastleLord(t);
         
-        this.game.ui.showResultModal(`${this.game.getBusho(bushoIds[0]).name}が${t.name}へ物資を輸送しました`); this.game.ui.updatePanelHeader(); this.game.ui.renderCommandMenu();
+        this.game.ui.showResultModal(`${this.game.getBusho(bushoIds[0]).name}が${t.name}へ物希を輸送しました`); this.game.ui.updatePanelHeader(); this.game.ui.renderCommandMenu();
     }
 
     executeAppointGunshi(bushoId) { const busho = this.game.getBusho(bushoId); const oldGunshi = this.game.bushos.find(b => b.clan === this.game.playerClanId && b.isGunshi); if (oldGunshi) oldGunshi.isGunshi = false; busho.isGunshi = true; this.game.ui.showResultModal(`${busho.name}を軍師に任命しました`); this.game.ui.updatePanelHeader(); this.game.ui.renderCommandMenu(); }
@@ -961,7 +965,7 @@ class CommandSystem {
         const target = this.game.getCastle(targetId); 
         const result = GameSystem.calcIncite(doer); 
         if(result.success) { 
-            target.loyalty = Math.max(0, target.loyalty - result.val); 
+            target.peoplesLoyalty = Math.max(0, target.peoplesLoyalty - result.val); 
             this.game.ui.showResultModal(`${doer.name}の扇動が成功！\n${target.name}の民忠が${result.val}低下しました`); 
             doer.achievementTotal += Math.floor(doer.intelligence * 0.2) + 10;
             this.game.factionSystem.updateRecognition(doer, 20); 
@@ -1062,16 +1066,17 @@ class CommandSystem {
     executeCharity(bushoIds, type) { 
         const castle = this.game.getCurrentTurnCastle(); 
         const busho = this.game.getBusho(bushoIds[0]); 
+        const spec = COMMAND_SPECS['charity']; // 設定値を動的に参照
         let costGold = 0, costRice = 0; 
-        if (type === 'gold' || type === 'both') costGold = 300; 
-        if (type === 'rice' || type === 'both') costRice = 300; 
+        if (type === 'gold' || type === 'both') costGold = spec.costGold; 
+        if (type === 'rice' || type === 'both') costRice = spec.costRice; 
         
         if (castle.gold < costGold || castle.rice < costRice) { alert("物資不足"); return; } 
         castle.gold -= costGold; castle.rice -= costRice; 
         
         const val = GameSystem.calcCharity(busho, type); 
         const maxLoyalty = window.MainParams.Economy.MaxLoyalty || 100;
-        castle.loyalty = Math.min(maxLoyalty, castle.loyalty + val); 
+        castle.peoplesLoyalty = Math.min(maxLoyalty, castle.peoplesLoyalty + val); 
         busho.isActionDone = true; 
         
         busho.achievementTotal += Math.floor(val * 0.5);
