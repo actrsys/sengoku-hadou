@@ -925,25 +925,18 @@ class UIManager {
                 faceHtml = `<img src="data/faceicons/${castellan.faceIcon}" style="width:40px;height:40px;object-fit:cover;border-radius:2px;margin-right:5px;border:1px solid #777;background:#ccc;" onerror="this.style.display='none'">`;
             }
 
-            const toggleIcon = this.topInfoExpanded ? "▲" : "▼";
-            const toggleBtn = `<button style="margin-left:5px; padding:2px 8px; border:1px solid #999; border-radius:4px; background:#fff; cursor:pointer;" onclick="window.GameApp.ui.toggleTopInfo()">${toggleIcon}</button>`;
-            
             let content = `<div style="display:flex; justify-content:space-between; align-items:flex-start; width:100%;">`;
             content += `<div style="display:flex; flex:1;">`;
             if(faceHtml) content += faceHtml;
             content += `<div style="flex:1;"><div style="font-weight:bold;">${castle.name}</div>`;
             
-            if (this.topInfoExpanded) {
-                content += `<div>人口:${mask(castle.population)} 民忠:${this.getStatusBarHTML(castle.peoplesLoyalty, castle.maxPeoplesLoyalty, 'lightblue', isVisible)}</div>`;
-                content += `<div>兵:${mask(castle.soldiers)} 防:${this.getStatusBarHTML(castle.defense, castle.maxDefense, 'lightblue', isVisible)}</div>`;
-                content += `<div>金:${mask(castle.gold)} 米:${mask(castle.rice)}</div>`;
-                content += `<div>訓練:${mask(castle.training)} 士気:${mask(castle.morale)}</div>`;
-                content += `<div>石:${this.getStatusBarHTML(castle.kokudaka, castle.maxKokudaka, 'blue', isVisible)} 鉱:${this.getStatusBarHTML(castle.commerce, castle.maxCommerce, 'blue', isVisible)}</div>`;
-            } else {
-                content += `<div>金:${mask(castle.gold)} 米:${mask(castle.rice)}</div>`;
-                content += `<div>兵:${mask(castle.soldiers)}</div>`;
-            }
-            content += `</div></div>${toggleBtn}</div>`;
+            content += `<div>人口:${mask(castle.population)} 民忠:${this.getStatusBarHTML(castle.peoplesLoyalty, castle.maxPeoplesLoyalty, 'lightblue', isVisible)}</div>`;
+            content += `<div>兵:${mask(castle.soldiers)} 防:${this.getStatusBarHTML(castle.defense, castle.maxDefense, 'lightblue', isVisible)}</div>`;
+            content += `<div>金:${mask(castle.gold)} 米:${mask(castle.rice)}</div>`;
+            content += `<div>訓練:${mask(castle.training)} 士気:${mask(castle.morale)}</div>`;
+            content += `<div>石:${this.getStatusBarHTML(castle.kokudaka, castle.maxKokudaka, 'blue', isVisible)} 鉱:${this.getStatusBarHTML(castle.commerce, castle.maxCommerce, 'blue', isVisible)}</div>`;
+            
+            content += `</div></div></div>`;
 
             this.mobileTopLeft.innerHTML = content;
         }
@@ -955,12 +948,11 @@ class UIManager {
                 </div>
                 <div style="display:flex; gap:5px;">
                     <button class="btn-primary" style="padding:2px 8px; font-size:0.75rem;" onclick="window.GameApp.ui.openBushoSelector('view_only', ${castle.id})">武将一覧</button>
-                    <button class="toggle-btn" onclick="window.GameApp.ui.toggleInfoPanel()">${this.infoPanelCollapsed ? '開' : '閉'}</button>
                 </div>
             `;
              const cmdGrid = document.getElementById('command-area');
              if(cmdGrid) {
-                 cmdGrid.style.display = this.infoPanelCollapsed ? 'none' : 'grid';
+                 cmdGrid.style.display = 'grid';
              }
         }
     }
@@ -1939,12 +1931,10 @@ class GameManager {
         
         this.factionSystem.processStartMonth(); 
         
-        // ★修正：人事部の処理を呼び出すように変更
         this.factionSystem.processRoninMovements(); 
         
         this.updateAllCastlesLords();
         
-        // ★修正：人事部の処理を呼び出すように変更
         if (this.month % 3 === 0) this.factionSystem.optimizeCastellans(); 
         const isPopGrowth = (this.month % 2 === 0);
         
@@ -1992,8 +1982,6 @@ class GameManager {
         this.currentIndex = 0; 
         this.processTurn();
     }
-    
-    // ※ ここにあった processRoninMovements と optimizeCastellans は削除されました
 
     processTurn() {
         if (this.aiTimer) {
@@ -2097,8 +2085,6 @@ class GameManager {
         
         this.month++; if(this.month > 12) { this.month = 1; this.year++; } const clans = new Set(this.castles.filter(c => c.ownerClan !== 0).map(c => c.ownerClan)); const playerAlive = clans.has(this.playerClanId); if (clans.size === 1 && playerAlive) alert(`天下統一！`); else if (!playerAlive) alert(`我が軍は滅亡しました……`); else this.startMonth(); 
     }
-
-    // ※ ここにあった enterMapSelection や getSelectionGuideMessage などのコマンド案内処理は削除されました
 
     checkAllActionsDone() {
         const c = this.getCurrentTurnCastle();
