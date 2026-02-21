@@ -298,10 +298,15 @@ class FieldWarManager {
         if (this.state === 'MOVE_PREVIEW' && this.previewTarget && unit) {
             this.drawPath(this.previewTarget.path, unit.x, unit.y);
             
+            // ★兵数からサイズを計算（16px ～ 最大31px）
+            let iconSize = 16 + Math.min(Math.floor(unit.soldiers / 1000), 5) * 3;
+
             const pEl = document.createElement('div');
             pEl.className = `fw-unit ${unit.isAttacker ? 'attacker' : 'defender'} preview`;
-            pEl.style.left = `${this.previewTarget.x * (this.hexW * 0.75) + (this.hexW - 24) / 2}px`;
-            pEl.style.top = `${this.previewTarget.y * (this.hexH / 2) + (this.hexH - 24) / 2}px`;
+            pEl.style.width = `${iconSize}px`;  // ★計算した幅を指定
+            pEl.style.height = `${iconSize}px`; // ★計算した高さを指定
+            pEl.style.left = `${this.previewTarget.x * (this.hexW * 0.75) + (this.hexW - iconSize) / 2}px`; // ★サイズに合わせて中心をズラす
+            pEl.style.top = `${this.previewTarget.y * (this.hexH / 2) + (this.hexH - iconSize) / 2}px`;     // ★サイズに合わせて中心をズラす
             pEl.style.transform = `rotate(${unit.direction * 60}deg)`;
             pEl.style.pointerEvents = 'none'; // ★クリック貫通
             
@@ -313,11 +318,16 @@ class FieldWarManager {
         }
 
         this.units.forEach((u) => {
+            // ★兵数からサイズを計算（16px ～ 最大31px）
+            let iconSize = 16 + Math.min(Math.floor(u.soldiers / 1000), 5) * 3;
+
             const uEl = document.createElement('div');
             const isActive = (unit && u.id === unit.id);
             uEl.className = `fw-unit ${u.isAttacker ? 'attacker' : 'defender'} ${isActive ? 'active' : ''}`;
-            uEl.style.left = `${u.x * (this.hexW * 0.75) + (this.hexW - 24) / 2}px`;
-            uEl.style.top = `${u.y * (this.hexH / 2) + (this.hexH - 24) / 2}px`;
+            uEl.style.width = `${iconSize}px`;  // ★計算した幅を指定
+            uEl.style.height = `${iconSize}px`; // ★計算した高さを指定
+            uEl.style.left = `${u.x * (this.hexW * 0.75) + (this.hexW - iconSize) / 2}px`; // ★中心を合わせる
+            uEl.style.top = `${u.y * (this.hexH / 2) + (this.hexH - iconSize) / 2}px`;     // ★中心を合わせる
             uEl.style.transform = `rotate(${u.direction * 60}deg)`;
             uEl.style.pointerEvents = 'none'; // ★クリック貫通
             
@@ -896,5 +906,6 @@ class FieldWarManager {
 }
 
 window.FieldWarManager = FieldWarManager;
+
 
 
