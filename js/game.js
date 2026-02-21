@@ -1585,9 +1585,7 @@ class UIManager {
 
         let inputs = {};
         
-        if (type === 'reward') {
-            document.getElementById('quantity-title').textContent = "褒美"; inputs.gold = createSlider("金 (1-200)", "gold", Math.min(c.gold, 200), 1);
-        } else if (type === 'draft') {
+        if (type === 'draft') {
             document.getElementById('quantity-title').textContent = "徴兵資金"; inputs.gold = createSlider("金", "gold", c.gold, 0);
         } else if (type === 'charity') {
             document.getElementById('quantity-title').textContent = "施し"; this.charityTypeSelector.classList.remove('hidden'); const count = data.length; this.quantityContainer.innerHTML = `<p>選択武将数: ${count}名</p>`;

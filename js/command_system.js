@@ -129,10 +129,10 @@ const COMMAND_SPECS = {
     },
     'reward': { 
         label: "褒美", category: 'PERSONNEL', 
-        costGold: 0, costRice: 0, 
-        isMulti: false, hasAdvice: true, 
+        costGold: 200, costRice: 0,  // 1人あたり200金に設定
+        isMulti: true, hasAdvice: true, // 複数選べる(true)にする
         startMode: 'busho_select', sortKey: 'loyalty',
-        msg: "金を与えて忠誠を上げます" 
+        msg: "金: 200 (1人あたり)\n褒美を与えます" 
     },
     'interview': { 
         label: "面談", category: 'PERSONNEL', 
@@ -430,7 +430,7 @@ class CommandSystem {
         }
 
         // ここから 'charity' を消して、徴兵と褒美だけ画面を出すようにします
-        if (['draft', 'reward'].includes(actionType)) {
+        if (['draft'].includes(actionType)) {
             this.game.ui.openQuantitySelector(actionType, selectedIds, targetId);
             return;
         }
@@ -441,9 +441,17 @@ class CommandSystem {
              this.executeAppointGunshi(firstId);
              return;
         }
+        
+        // 褒美（reward）専用のルールをここに追加！
+        if (actionType === 'reward') {
+            this.showAdviceAndExecute('reward', () => this.executeReward(selectedIds));
+            return;
+        }
 
+        // こっちのリストからは 'reward' を消しておきます
         if (spec && ['farm', 'commerce', 'repair', 'training', 'soldier_charity', 'appoint', 'banish'].includes(actionType)) {
             if (spec.hasAdvice) {
+                // (省略)
                 this.showAdviceAndExecute(actionType, () => this.executeCommand(actionType, selectedIds, targetId));
             } else {
                 this.executeCommand(actionType, selectedIds, targetId);
@@ -453,16 +461,11 @@ class CommandSystem {
 
         console.warn("Unhandled busho selection type:", actionType);
     }
-
-    handleQuantitySelection(type, inputs, targetId, data) {
+   
+   handleQuantitySelection(type, inputs, targetId, data) {
         const castle = this.game.getCurrentTurnCastle();
-
-        if (type === 'reward') {
-            const val = parseInt(inputs.gold.num.value);
-            if (val <= 0) return;
-            this.executeReward(data[0], val);
-        }
-        else if (type === 'draft') {
+        
+        if (type === 'draft') {
             const val = parseInt(inputs.gold.num.value);
             if (val <= 0) return;
             this.showAdviceAndExecute('draft', () => this.executeDraft(data, val), { val: val });
@@ -807,32 +810,51 @@ class CommandSystem {
         }
         doer.isActionDone = true; this.game.ui.updatePanelHeader(); this.game.ui.renderCommandMenu();
     }
-
-    executeReward(bushoId, gold) {
-        const target = this.game.getBusho(bushoId);
-        const daimyo = this.game.bushos.find(b => b.id === this.game.clans.find(c => c.id === this.game.playerClanId).leaderId);
+    
+    executeReward(bushoIds) {
         const castle = this.game.getCurrentTurnCastle();
-        if(castle.gold < gold) { alert("金が足りません"); return; }
-        castle.gold -= gold;
-        const effect = GameSystem.calcRewardEffect(gold, daimyo, target);
-        let msg = "";
+        const daimyo = this.game.bushos.find(b => b.id === this.game.clans.find(c => c.id === this.game.playerClanId).leaderId);
+        const spec = COMMAND_SPECS['reward'];
         
-        this.game.factionSystem.updateRecognition(target, -effect * 2);
+        let count = 0;
+        let totalEffect = 0;
+        let msgLog = "";
 
-        if (target.loyalty >= 100) {
-            msg = "「もったいなきお言葉。この身、命尽きるまで殿のために！」\n(これ以上の忠誠は望めないほど、心服しているようだ)";
+        bushoIds.forEach(bid => {
+            const target = this.game.getBusho(bid);
+            if (!target) return;
+
+            // お金が足りるかチェック
+            if (castle.gold < spec.costGold) return;
+
+            // お金を支払う
+            castle.gold -= spec.costGold;
+            
+            // 200金固定での効果計算
+            const effect = GameSystem.calcRewardEffect(spec.costGold, daimyo, target);
+            
+            // 忠誠度をアップ（最大100）
+            target.loyalty = Math.min(100, target.loyalty + effect);
+            
+            // 承認欲求（recognition）を「200金の時の値」で下げる
+            // 以前は金額(gold)に連動していましたが、一律で下げるようにします
+            this.game.factionSystem.updateRecognition(target, -effect * 2);
+
+            target.isActionDone = true;
+            count++;
+            totalEffect += effect;
+        });
+
+        if (count > 0) {
+            const lastBusho = this.game.getBusho(bushoIds[bushoIds.length - 1]);
+            this.game.ui.showResultModal(`${count}名に褒美（金${count * spec.costGold}）を与えました。\n家中の忠誠が向上しました。`);
+            this.game.ui.log(`${count}名に褒美を実行 (合計効果:${totalEffect})`);
         } else {
-            if (effect > 8) {
-                msg = "「ありがたき幸せ！」\n(顔をほころばせ、深く感謝しているようだ)";
-            } else if (effect > 0) {
-                msg = "「はっ、頂戴いたします。」\n(恭しく受け取った)";
-            } else {
-                msg = "「……。」\n(不満があるようだ)";
-            }
+            alert("金が足りないため、褒美を与えられませんでした。");
         }
 
-        this.game.ui.showResultModal(`${target.name}に金${gold}を与えました。\n${msg}`);
-        this.game.ui.updatePanelHeader(); this.game.ui.renderCommandMenu();
+        this.game.ui.updatePanelHeader();
+        this.game.ui.renderCommandMenu();
     }
 
     executeInterviewStatus(busho) {
