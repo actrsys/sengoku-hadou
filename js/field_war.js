@@ -305,7 +305,7 @@ class FieldWarManager {
             pEl.style.transform = `rotate(${unit.direction * 60}deg)`;
             pEl.style.pointerEvents = 'none'; // ★クリック貫通
             
-            pEl.innerHTML = '凸';
+            pEl.innerHTML = '';
             if (unit.isGeneral) {
                 pEl.classList.add('general');
             }
@@ -321,8 +321,8 @@ class FieldWarManager {
             uEl.style.transform = `rotate(${u.direction * 60}deg)`;
             uEl.style.pointerEvents = 'none'; // ★クリック貫通
             
-            // ★大将アイコンの対応
-            uEl.innerHTML = '凸';
+            // ★大将アイコン
+            uEl.innerHTML = '';
             if (u.isGeneral) {
                 uEl.classList.add('general');
             }
@@ -896,4 +896,5 @@ class FieldWarManager {
 }
 
 window.FieldWarManager = FieldWarManager;
+
 
