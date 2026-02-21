@@ -2,6 +2,7 @@
  * war.js
  * 戦争処理マネージャー & 戦争計算ロジック
  * 修正: 捕虜の処遇結果のアラートをカスタムダイアログ（showDialog）に置き換えました
+ * 修正: 迎撃時の出陣兵士・兵糧の取得処理を修正（ID指定のオブジェクト構造に対応）
  */
 
 window.WarParams = {
@@ -207,8 +208,13 @@ class WarManager {
                                     }
                                     this.game.ui.openQuantitySelector('def_intercept', [defCastle], null, {
                                         onConfirm: (inputs) => {
-                                            this.game.ui.showUnitDivideModal(defBushos, inputs.soldiers, (defAssignments) => {
-                                                onResult('field', defAssignments, inputs.rice, this.autoDivideSoldiers(atkBushos, atkSoldierCount));
+                                            // ここを修正しました！ お城のIDがついた箱から数字を取り出すようにしました
+                                            const inputData = inputs[defCastle.id] || inputs;
+                                            const interceptSoldiers = inputData.soldiers || 0;
+                                            const interceptRice = inputData.rice || 0;
+                                            
+                                            this.game.ui.showUnitDivideModal(defBushos, interceptSoldiers, (defAssignments) => {
+                                                onResult('field', defAssignments, interceptRice, this.autoDivideSoldiers(atkBushos, atkSoldierCount));
                                             });
                                         }
                                     });
