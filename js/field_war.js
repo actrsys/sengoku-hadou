@@ -45,7 +45,7 @@ class FieldWarManager {
         }
 
         this.units = [];
-        const yPositions = [10, 8, 12, 6, 14]; // 大将を中央(10)に配置し、他を上下に散らす
+        const yPositions = [9, 7, 11, 5, 13]; // 大将を中央(10)に配置し、他を上下に散らす
 
         // 攻撃側部隊の生成
         if (warState.atkAssignments) {
@@ -890,4 +890,5 @@ class FieldWarManager {
         this.nextPhaseTurn();
     }
 }
+
 window.FieldWarManager = FieldWarManager;
