@@ -349,36 +349,61 @@ img {
     pointer-events: none;
     z-index: 20;
 }
-/* 攻撃側（赤色）の凸 */
-.fw-unit.attacker {
-    color: #e53935 !important; /* 「絶対に」赤にする */
-    -webkit-text-fill-color: #e53935 !important; /* 「絶対に」中身を赤く塗る */
-    -webkit-text-stroke: 1px #8e0000;
-    filter: drop-shadow(1px 1px 1px #000);
-}
 
-/* 守備側（青色）の凸 */
+/* =========================================
+   部隊アイコン設定（画像マスク方式）
+========================================= */
+
+/* 共通設定：画像をマスクとして利用する準備 */
+.fw-unit.attacker,
 .fw-unit.defender {
-    color: #1e88e5 !important; /* 「絶対に」青にする */
-    -webkit-text-fill-color: #1e88e5 !important; /* 「絶対に」中身を青く塗る */
-    -webkit-text-stroke: 1px #004ba0;
-    filter: drop-shadow(1px 1px 1px #000);
+    /* ここで画像のパスを指定します */
+    -webkit-mask-image: url('/data/images/war_icons/butai_icon.png');
+    mask-image: url('/data/images/war_icons/butai_icon.png');
+    /* 画像のサイズに合わせて調整してください。ここでは仮に24pxとしています */
+    -webkit-mask-size: contain;
+    mask-size: contain;
+    -webkit-mask-repeat: no-repeat;
+    mask-repeat: no-repeat;
+    -webkit-mask-position: center;
+    mask-position: center;
+    width: 24px;  /* アイコンの幅 */
+    height: 24px; /* アイコンの高さ */
+    /* 元の文字色設定をリセット */
+    color: transparent !important;
+    display: flex;
+    align-items: center;
+    justify-content: center;
 }
 
-/* 総大将（general）だけ、枠線を白に上書きする特別な魔法 */
-.fw-unit.general {
-    -webkit-text-stroke: 1px #ffffff;
+/* 攻撃側（赤色）の設定 */
+.fw-unit.attacker {
+    /* 中身の色（赤） */
+    background-color: #e53935;
+    /* 枠線と影のフィルタ設定 */
+    /* 1つ目のdrop-shadowが「濃い赤の枠線」、2つ目が「黒い影」の役割をします */
+    filter: drop-shadow(0px 0px 1px #8e0000) drop-shadow(1px 1px 2px rgba(0,0,0,0.8));
 }
 
-/* 総大将（general）だけ、枠線を白に上書きする特別な魔法 */
-.fw-unit.general {
-    -webkit-text-stroke: 1px #ffffff;
+/* 守備側（青色）の設定 */
+.fw-unit.defender {
+    /* 中身の色（青） */
+    background-color: #1e88e5;
+    /* 枠線と影のフィルタ設定 */
+    /* 1つ目のdrop-shadowが「濃い青の枠線」、2つ目が「黒い影」の役割をします */
+    filter: drop-shadow(0px 0px 1px #004ba0) drop-shadow(1px 1px 2px rgba(0,0,0,0.8));
 }
 
-/* 総大将（general）だけ、枠線を白に上書きする特別な魔法 */
+/* 総大将（general）の特別設定 */
+/* 枠線の色を白で上書きします */
 .fw-unit.general {
-    -webkit-text-stroke: 1px #ffffff; /* 枠線を真っ白にします */
+    /* 1つ目のdrop-shadowの色を「白（#ffffff）」に変更します */
+    filter: drop-shadow(0px 0px 1px #ffffff) !important;
+    /* ※注: 複数の影を重ねると白枠が綺麗に出ないことがあるため、
+       総大将は黒い影をあえて弱くするか、なしにしています。
+       もし黒い影も強く必要な場合はご相談ください */
 }
+
 .fw-unit.active { filter: drop-shadow(0 0 6px #ffff00); }
 .fw-unit.preview { opacity: 0.6; animation: fw-blink 1s infinite; z-index: 18; }
 @keyframes fw-blink { 0%{opacity:0.3;} 50%{opacity:0.8;} 100%{opacity:0.3;} }
