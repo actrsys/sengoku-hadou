@@ -92,10 +92,10 @@ const COMMAND_SPECS = {
     },
     'training': { 
         label: "訓練", category: 'MILITARY', 
-        costGold: 200, costRice: 0, 
+        costGold: 0, costRice: 0, 
         isMulti: true, hasAdvice: false, 
         startMode: 'busho_select', sortKey: 'leadership',
-        msg: "金: 200 (1回あたり)\n兵士の訓練度を上げます" 
+        msg: "兵士の訓練度を上げます" 
     },
     'soldier_charity': { 
         label: "兵施し", category: 'MILITARY', 
@@ -288,15 +288,15 @@ class CommandSystem {
         const castle = this.game.getCurrentTurnCastle();
 
         // ★ 最大値チェック
-        if (type === 'farm' && castle.kokudaka >= castle.maxKokudaka) { this.game.ui.showDialog("これ以上石高は上げられません。", false); return; }
-        if (type === 'commerce' && castle.commerce >= castle.maxCommerce) { this.game.ui.showDialog("これ以上鉱山は上げられません。", false); return; }
-        if (type === 'repair' && castle.defense >= castle.maxDefense) { this.game.ui.showDialog("これ以上城壁は上げられません。", false); return; }
-        if (type === 'charity' && castle.peoplesLoyalty >= castle.maxPeoplesLoyalty) { this.game.ui.showDialog("これ以上民忠は上げられません。", false); return; }
+        if (type === 'farm' && castle.kokudaka >= castle.maxKokudaka) { this.game.ui.showDialog("これ以上石高は上げられません", false); return; }
+        if (type === 'commerce' && castle.commerce >= castle.maxCommerce) { this.game.ui.showDialog("これ以上鉱山は上げられません", false); return; }
+        if (type === 'repair' && castle.defense >= castle.maxDefense) { this.game.ui.showDialog("これ以上城壁は上げられません", false); return; }
+        if (type === 'charity' && castle.peoplesLoyalty >= castle.maxPeoplesLoyalty) { this.game.ui.showDialog("これ以上民忠は上げられません", false); return; }
         
         const maxTraining = (window.WarParams && window.WarParams.Military && window.WarParams.Military.MaxTraining) ? window.WarParams.Military.MaxTraining : 100;
         const maxMorale = (window.WarParams && window.WarParams.Military && window.WarParams.Military.MaxMorale) ? window.WarParams.Military.MaxMorale : 100;
-        if (type === 'training' && castle.training >= maxTraining) { this.game.ui.showDialog("これ以上訓練は上げられません。", false); return; }
-        if (type === 'soldier_charity' && castle.morale >= maxMorale) { this.game.ui.showDialog("これ以上士気は上げられません。", false); return; }
+        if (type === 'training' && castle.training >= maxTraining) { this.game.ui.showDialog("これ以上訓練は上げられません", false); return; }
+        if (type === 'soldier_charity' && castle.morale >= maxMorale) { this.game.ui.showDialog("これ以上士気は上げられません", false); return; }
 
         // ★ alert を showDialog に変更
         if (spec.costGold > 0 && castle.gold < spec.costGold) {
@@ -522,7 +522,7 @@ class CommandSystem {
             
             const targetName = this.game.getCastle(targetId).name;
             // ★ confirm を showDialog に変更
-            this.game.ui.showDialog(`${targetName}に攻め込みますか？\n今月の命令は終了となります。`, true, () => {
+            this.game.ui.showDialog(`${targetName}に攻め込みますか？\n今月の命令は終了となります`, true, () => {
                 const bushos = data.map(id => this.game.getBusho(id));
                 this.game.warManager.startWar(castle, this.game.getCastle(targetId), bushos, sVal, rVal);
             });
@@ -674,13 +674,13 @@ class CommandSystem {
         let msg = "";
         if (result.success) {
             target.investigatedUntil = this.game.getCurrentTurnId() + 4; target.investigatedAccuracy = result.accuracy;
-            msg = `潜入に成功しました！\n情報を入手しました。\n(情報の精度: ${result.accuracy}%)`;
+            msg = `潜入に成功しました！\n情報を入手しました\n(情報の精度: ${result.accuracy}%)`;
             bushos.forEach(b => {
                 b.achievementTotal += Math.floor(b.intelligence * 0.2) + 10;
                 this.game.factionSystem.updateRecognition(b, 20);
             });
         } else { 
-            msg = `潜入に失敗しました……\n情報は得られませんでした。`; 
+            msg = `潜入に失敗しました……\n情報は得られませんでした`; 
             bushos.forEach(b => {
                 b.achievementTotal += 5; 
                 this.game.factionSystem.updateRecognition(b, 10);
@@ -741,7 +741,7 @@ class CommandSystem {
             const castle = this.game.getCastle(doer.castleId); 
             if(castle) castle.gold -= gold;
             
-            msg = `${doer.name}が親善を行いました。\n感情値が${increase}上昇しました (現在: ${newRelation.sentiment}, 状態: ${newRelation.status})`;
+            msg = `${doer.name}が親善を行いました\n感情値が${increase}上昇しました (現在: ${newRelation.sentiment}, 状態: ${newRelation.status})`;
             doer.achievementTotal += Math.floor(doer.diplomacy * 0.2) + 10;
             this.game.factionSystem.updateRecognition(doer, 15);
 
@@ -762,7 +762,7 @@ class CommandSystem {
             this.game.diplomacyManager.changeStatus(doer.clan, targetClanId, '普通');
             this.game.diplomacyManager.updateSentiment(doer.clan, targetClanId, -60);
             
-            msg = `同盟を破棄しました。`;
+            msg = `同盟を破棄しました`;
             doer.achievementTotal += 5;
             this.game.factionSystem.updateRecognition(doer, 10);
         }
@@ -782,7 +782,7 @@ class CommandSystem {
         const winner = this.game.clans.find(c => Number(c.id) === Number(winnerClanId));
         const loser = this.game.clans.find(c => Number(c.id) === Number(loserClanId));
         if (winner && loser) {
-            this.game.ui.log(`${winner.name}が${loser.name}を従属させました。`);
+            this.game.ui.log(`${winner.name}が${loser.name}を従属させました`);
         }
     }
 
@@ -817,7 +817,7 @@ class CommandSystem {
             doer.achievementTotal += Math.floor(maxStat * 0.3);
             this.game.factionSystem.updateRecognition(doer, 25);
         } else {
-            this.game.ui.showResultModal(`${doer.name}の引抜工作は失敗しました……\n${target.name}は応じませんでした。`);
+            this.game.ui.showResultModal(`${doer.name}の引抜工作は失敗しました……\n${target.name}は応じませんでした`);
             doer.achievementTotal += 5;
             this.game.factionSystem.updateRecognition(doer, 10);
         }
@@ -852,7 +852,7 @@ class CommandSystem {
 
         if (count > 0) {
             const lastBusho = this.game.getBusho(bushoIds[bushoIds.length - 1]);
-            this.game.ui.showResultModal(`${count}名に褒美（金${count * spec.costGold}）を与えました。`);
+            this.game.ui.showResultModal(`${count}名に褒美（金${count * spec.costGold}）を与えました`);
             this.game.ui.log(`${count}名に褒美を実行 (合計効果:${totalEffect})`);
         } else {
             // ★ alert を showDialog に変更
