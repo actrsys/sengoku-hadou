@@ -1,7 +1,7 @@
 /**
  * game.js
  * 戦国シミュレーションゲーム (Main / UI / Data / System)
- * 修正: 既存外交ロジックの撤廃と DiplomacyManager へのリプレイス
+ * 修正: 部隊兵士分配UI追加、武将選択時の最大5人制限追加
  */
 
 window.onerror = function(message, source, lineno, colno, error) {
@@ -402,6 +402,9 @@ class UIManager {
         this.daimyoConfirmModal = document.getElementById('daimyo-confirm-modal');
         this.daimyoConfirmBody = document.getElementById('daimyo-confirm-body');
 
+        // 野戦 部隊分割UI
+        this.unitDivideModal = document.getElementById('unit-divide-modal');
+
         this.onResultModalClose = null;
 
         if (this.resultModal) this.resultModal.addEventListener('click', (e) => { if (e.target === this.resultModal) this.closeResultModal(); });
@@ -583,6 +586,7 @@ class UIManager {
         });
         if(this.cutinOverlay) this.cutinOverlay.classList.add('hidden');
         if(this.warModal) this.warModal.classList.add('hidden');
+        if(this.unitDivideModal) this.unitDivideModal.classList.add('hidden');
         this.hideContextMenu();
     }
 
@@ -843,7 +847,7 @@ class UIManager {
                                 this.showControlPanel(c);
                             }
                         }
-                    };
+                    }
                 }
             } else { 
                 el.style.cursor = 'default'; 
@@ -927,7 +931,6 @@ class UIManager {
             content += `<div style="flex:1;"><div style="font-weight:bold;">${castle.name}</div>`;
             
             if (this.topInfoExpanded) {
-                // ★修正箇所: loyalty -> peoplesLoyalty
                 content += `<div>人口:${mask(castle.population)} 民忠:${this.getStatusBarHTML(castle.peoplesLoyalty, castle.maxPeoplesLoyalty, 'lightblue', isVisible)}</div>`;
                 content += `<div>兵:${mask(castle.soldiers)} 防:${this.getStatusBarHTML(castle.defense, castle.maxDefense, 'lightblue', isVisible)}</div>`;
                 content += `<div>金:${mask(castle.gold)} 米:${mask(castle.rice)}</div>`;
@@ -1161,7 +1164,13 @@ class UIManager {
     
         let sortKey = spec.sortKey || 'strength';
         let isMulti = spec.isMulti || false;
-    
+        
+        // ★修正: 守備側の迎撃部隊選択用
+        if (actionType === 'def_intercept_deploy') {
+             isMulti = true;
+             sortKey = 'strength';
+        }
+
         if (document.getElementById('selector-title')) {
             document.getElementById('selector-title').textContent = isMulti ? "武将を選択（複数可）" : "武将を選択"; 
         }
@@ -1241,15 +1250,21 @@ class UIManager {
             );
             infoHtml = "<div>軍師に任命する武将を選択してください (知略重視)<br><small>※大名・城主は任命できません</small></div>";
         }
+        else if (actionType === 'def_intercept_deploy') {
+            bushos = this.game.getCastleBushos(c.id).filter(b => b.status !== 'ronin');
+            infoHtml = "<div>迎撃に出陣する武将を選択してください（最大5名まで）</div>";
+        }
         else {
             bushos = this.game.getCastleBushos(c.id).filter(b => b.status !== 'ronin');
             
             if (spec.msg) {
                 infoHtml = `<div>${spec.msg}</div>`;
+                if (actionType === 'war_deploy') {
+                    infoHtml = `<div>出陣する武将を選択してください（最大5名まで）</div>`;
+                }
             } else if (['farm','commerce'].includes(actionType)) { infoHtml = `<div>金: ${c.gold} (1回500)</div>`; }
             else if (['charity'].includes(actionType)) { infoHtml = `<div>金: ${c.gold}, 米: ${c.rice} (1回300)</div>`; }
             else if (['repair'].includes(actionType)) { infoHtml = `<div>金: ${c.gold} (1回300)</div>`; }
-            // ★修正箇所: loyalty -> peoplesLoyalty
             else if (['draft'].includes(actionType)) { infoHtml = `<div>民忠: ${c.peoplesLoyalty}</div>`; }
             else if (['training','soldier_charity'].includes(actionType)) { infoHtml = `<div>状態: 訓練${c.training}/士気${c.morale}</div>`; }
         }
@@ -1273,7 +1288,11 @@ class UIManager {
             if (spec.costGold > 0) { cost = checkedCount * spec.costGold; item = "金"; }
             if (spec.costRice > 0) { cost = checkedCount * spec.costRice; item = "米"; }
             
-            if (cost > 0) contextEl.innerHTML = `<div>消費予定 ${item}: ${cost} (所持: ${item==='金'?c.gold:c.rice})</div>`; 
+            if (cost > 0) {
+                 contextEl.innerHTML = `<div>消費予定 ${item}: ${cost} (所持: ${item==='金'?c.gold:c.rice})</div>`; 
+            } else if (actionType === 'war_deploy' || actionType === 'def_intercept_deploy') {
+                 contextEl.innerHTML = `<div>出陣武将: ${checkedCount}名 / 最大5名</div>`;
+            }
         };
 
         bushos.forEach(b => {
@@ -1282,6 +1301,8 @@ class UIManager {
             let isSelectable = !b.isActionDone; 
             if (extraData && extraData.allowDone) isSelectable = true; 
             if (['employ_target','appoint_gunshi','rumor_target_busho','headhunt_target','interview_target','reward','view_only','war_general'].includes(actionType)) isSelectable = true;
+            // 守備側の迎撃武将は行動済みでもOKとする（防衛戦のため）
+            if (actionType === 'def_intercept_deploy') isSelectable = true;
             
             let acc = null; if (isEnemyTarget && targetCastle) acc = targetCastle.investigatedAccuracy;
             const getStat = (stat) => GameSystem.getDisplayStatHTML(b, stat, gunshi, acc, this.game.playerClanId, myDaimyo);
@@ -1299,6 +1320,14 @@ class UIManager {
                         if(!isMulti) {
                             const siblings = this.selectorList.querySelectorAll('.select-item');
                             siblings.forEach(el => el.classList.remove('selected'));
+                        } else {
+                             const maxSelect = (actionType === 'war_deploy' || actionType === 'def_intercept_deploy') ? 5 : 999;
+                             const currentChecked = this.selectorList.querySelectorAll('input[name="sel_busho"]:checked').length;
+                             if(e.target.checked && currentChecked > maxSelect) {
+                                 e.target.checked = false;
+                                 alert(`出陣できる武将は最大${maxSelect}人までです。`);
+                                 return;
+                             }
                         }
                         if(e.target.checked) div.classList.add('selected');
                         else div.classList.remove('selected');
@@ -1307,7 +1336,17 @@ class UIManager {
                     } 
                     const input = div.querySelector('input');
                     if(input) {
-                        if (isMulti) { input.checked = !input.checked; } else { input.checked = true; const allItems = this.selectorList.querySelectorAll('.select-item'); allItems.forEach(item => item.classList.remove('selected')); }
+                        if (isMulti) { 
+                             const maxSelect = (actionType === 'war_deploy' || actionType === 'def_intercept_deploy') ? 5 : 999;
+                             const currentChecked = this.selectorList.querySelectorAll('input[name="sel_busho"]:checked').length;
+                             if(!input.checked && currentChecked >= maxSelect) {
+                                 alert(`出陣できる武将は最大${maxSelect}人までです。`);
+                                 return;
+                             }
+                             input.checked = !input.checked; 
+                        } else { 
+                             input.checked = true; const allItems = this.selectorList.querySelectorAll('.select-item'); allItems.forEach(item => item.classList.remove('selected')); 
+                        }
                         if(input.checked) div.classList.add('selected'); else div.classList.remove('selected');
                         updateContextCost(); 
                     }
@@ -1326,12 +1365,128 @@ class UIManager {
                     const inputs = document.querySelectorAll('input[name="sel_busho"]:checked'); if (inputs.length === 0) return;
                     const selectedIds = Array.from(inputs).map(i => parseInt(i.value)); 
                     this.closeSelector();
-                    this.game.commandSystem.handleBushoSelection(actionType, selectedIds, targetId, extraData);
+                    // 迎撃用の特殊コールバック対応
+                    if (actionType === 'def_intercept_deploy' && extraData && extraData.onConfirm) {
+                        extraData.onConfirm(selectedIds);
+                    } else {
+                        this.game.commandSystem.handleBushoSelection(actionType, selectedIds, targetId, extraData);
+                    }
                 };
             }
         }
     }
     
+    // --- ★ 野戦部隊分割用モーダル ---
+    showUnitDivideModal(bushos, totalSoldiers, onConfirm) {
+        const modal = document.getElementById('unit-divide-modal');
+        const listEl = document.getElementById('divide-list');
+        const confirmBtn = document.getElementById('divide-confirm-btn');
+        const remainEl = document.getElementById('divide-remain-soldiers');
+        const totalEl = document.getElementById('divide-total-soldiers');
+        
+        if (!modal || !listEl) return;
+        
+        modal.classList.remove('hidden');
+        totalEl.textContent = totalSoldiers;
+        listEl.innerHTML = '';
+        
+        let assignments = bushos.map(b => ({ id: b.id, count: 0 }));
+        
+        // とりあえず均等割で初期値を設定する
+        const base = Math.floor(totalSoldiers / bushos.length);
+        let remainder = totalSoldiers % bushos.length;
+        assignments.forEach((a, i) => {
+            a.count = base + (i < remainder ? 1 : 0);
+        });
+
+        const updateRemain = () => {
+            let sum = 0;
+            const inputs = listEl.querySelectorAll('input[type="number"]');
+            inputs.forEach(inp => sum += parseInt(inp.value) || 0);
+            
+            const rem = totalSoldiers - sum;
+            remainEl.textContent = rem;
+            
+            if (rem === 0) {
+                remainEl.style.color = "green";
+                confirmBtn.disabled = false;
+                confirmBtn.style.opacity = 1.0;
+            } else {
+                remainEl.style.color = "red";
+                confirmBtn.disabled = true;
+                confirmBtn.style.opacity = 0.5;
+            }
+        };
+
+        bushos.forEach((b, index) => {
+            const div = document.createElement('div');
+            div.style.marginBottom = "15px";
+            div.style.padding = "10px";
+            div.style.border = "1px solid #ccc";
+            div.style.borderRadius = "4px";
+            div.style.background = "#fff";
+            
+            div.innerHTML = `
+                <div style="font-weight:bold; margin-bottom:5px;">${b.name} <small>(統:${b.leadership} 武:${b.strength} 智:${b.intelligence})</small></div>
+                <div class="qty-control">
+                    <input type="range" id="div-range-${b.id}" min="1" max="${totalSoldiers}" value="${assignments[index].count}">
+                    <input type="number" id="div-num-${b.id}" min="1" max="${totalSoldiers}" value="${assignments[index].count}">
+                </div>
+            `;
+            listEl.appendChild(div);
+            
+            const range = div.querySelector(`#div-range-${b.id}`);
+            const num = div.querySelector(`#div-num-${b.id}`);
+            
+            const onInput = (val) => {
+                let v = parseInt(val) || 0;
+                
+                // 他の兵士数の合計を計算
+                let otherSum = 0;
+                listEl.querySelectorAll('input[type="number"]').forEach(inp => {
+                    if (inp.id !== `div-num-${b.id}`) otherSum += parseInt(inp.value) || 0;
+                });
+                
+                // 最大でも総数から他を引いた値、または1
+                let maxAllowed = Math.max(1, totalSoldiers - otherSum);
+                if (v > maxAllowed) v = maxAllowed;
+                if (v < 1) v = 1;
+                
+                range.value = v;
+                num.value = v;
+                updateRemain();
+            };
+
+            range.oninput = (e) => onInput(e.target.value);
+            num.oninput = (e) => onInput(e.target.value);
+            num.onblur = (e) => {
+                if(e.target.value === "" || isNaN(parseInt(e.target.value))) {
+                    onInput(1);
+                }
+            };
+        });
+
+        updateRemain();
+
+        confirmBtn.onclick = () => {
+            let sum = 0;
+            const finalAssignments = [];
+            bushos.forEach(b => {
+                const val = parseInt(document.getElementById(`div-num-${b.id}`).value) || 0;
+                sum += val;
+                finalAssignments.push({ busho: b, soldiers: val });
+            });
+            
+            if (sum !== totalSoldiers) {
+                alert("未分配の兵士がいます。兵士を残さず分配してください。");
+                return;
+            }
+            
+            modal.classList.add('hidden');
+            onConfirm(finalAssignments);
+        };
+    }
+
     showInterviewModal(busho) {
         if (!this.resultModal) return;
         this.resultModal.classList.remove('hidden');
@@ -1425,6 +1580,11 @@ class UIManager {
             document.getElementById('quantity-title').textContent = "出陣兵数・兵糧指定"; 
             inputs.soldiers = createSlider("兵士数", "soldiers", c.soldiers, c.soldiers);
             inputs.rice = createSlider("持参兵糧", "rice", c.rice, c.rice);
+        } else if (type === 'def_intercept') { // ★守備側迎撃部隊用
+            document.getElementById('quantity-title').textContent = "迎撃部隊編成"; 
+            // 迎撃部隊は守られる城の全リソースから選べるようにする
+            inputs.soldiers = createSlider("出陣兵士数", "soldiers", c.soldiers, c.soldiers);
+            inputs.rice = createSlider("持参兵糧", "rice", c.rice, c.rice);
         } else if (type === 'transport') {
             document.getElementById('quantity-title').textContent = "輸送物資指定"; inputs.gold = createSlider("金", "gold", c.gold, 0); inputs.rice = createSlider("兵糧", "rice", c.rice, 0); inputs.soldiers = createSlider("兵士", "soldiers", c.soldiers, 0);
         } else if (type === 'buy_rice') {
@@ -1469,7 +1629,12 @@ class UIManager {
 
         this.quantityConfirmBtn.onclick = () => {
             this.quantityModal.classList.add('hidden');
-            this.game.commandSystem.handleQuantitySelection(type, inputs, targetId, data);
+            // 迎撃用の特殊コールバック対応
+            if (type === 'def_intercept' && extraData && extraData.onConfirm) {
+                extraData.onConfirm(inputs);
+            } else {
+                this.game.commandSystem.handleQuantitySelection(type, inputs, targetId, data);
+            }
         };
     }
     
@@ -1787,45 +1952,31 @@ class GameManager {
 
             // ======================================================================
             // ★ 金収入の計算 (毎月)
-            // 式: (((人口×0.001) + (民忠÷4) + (鉱山÷15)) × 金銭収入率 × 乱数補正) + 季節ボーナス
             // ======================================================================
-            // ★修正箇所: c.loyalty -> c.peoplesLoyalty
-            // 1. 基礎値の計算
             const baseGold = (c.population * 0.001) + (c.peoplesLoyalty / 3) + (c.commerce / 10);
             
-            // 2. 収入率と乱数補正の適用
             let income = Math.floor(baseGold * window.MainParams.Economy.IncomeGoldRate);
             income = GameSystem.applyVariance(income, window.MainParams.Economy.IncomeFluctuation);
             
-            // 3. 季節ボーナス (3月)
             if (this.month === 3) {
-                // 季節ボーナスとして、毎月もらえる金額（income）の5倍を上乗せする
                 income += income * 5;
             }
             c.gold += income;
 
             // ======================================================================
             // ★ 兵糧収入の計算 (9月のみ)
-            // 式: ((石高＋民忠) × 兵糧収入率 × 乱数補正) + 季節ボーナス
             // ======================================================================
             if (this.month === 9) {
-                // ★修正箇所: c.loyalty -> c.peoplesLoyalty
-                // 1. 基礎値の計算
                 const baseRice = c.kokudaka + c.peoplesLoyalty;
 
-                // 2. 収入率と乱数補正の適用
                 let riceIncome = Math.floor(baseRice * window.MainParams.Economy.IncomeRiceRate);
                 riceIncome = GameSystem.applyVariance(riceIncome, window.MainParams.Economy.IncomeFluctuation);
-
-                // 3. 季節ボーナス (必要に応じて加算。ここでは例として0としています)
-                // riceIncome += 0; 
 
                 c.rice += riceIncome;
             }
             
             if (isPopGrowth) { 
                 let growth = 0;
-                // ★修正箇所: c.loyalty -> c.peoplesLoyalty
                 let currentLoyalty = Math.max(0, Math.min(100, c.peoplesLoyalty));
                 if (currentLoyalty >= 51) {
                     const rate = 0.001 + ((currentLoyalty - 51) / 49) * 0.004;
@@ -2087,7 +2238,7 @@ class GameManager {
             marketRate: this.marketRate,
             castles: this.castles, 
             bushos: this.bushos, 
-            clans: this.clans, // clansにdiplomacyValueが含まれているためこれでセーブ可能
+            clans: this.clans,
             playerClanId: this.playerClanId 
         }; 
         const blob = new Blob([JSON.stringify(data, null, 2)], {type: 'application/json'}); 
