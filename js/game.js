@@ -940,7 +940,7 @@ class UIManager {
             const mask = (val) => isVisible ? val : "???";
             
             let faceHtml = "";
-            if (isVisible && castellan && castellan.faceIcon) {
+            if (castellan && castellan.faceIcon) {
                 faceHtml = `<img src="data/faceicons/${castellan.faceIcon}" class="face-thumb" onerror="this.style.display='none'">`;
             }
 
@@ -978,7 +978,7 @@ class UIManager {
             const castellan = this.game.getBusho(castle.castellanId);
             
             let faceHtml = "";
-            if (isVisible && castellan && castellan.faceIcon) {
+            if (castellan && castellan.faceIcon) {
                 faceHtml = `<img src="data/faceicons/${castellan.faceIcon}" style="width:40px;height:40px;object-fit:cover;border-radius:2px;margin-right:5px;border:1px solid #777;background:#ccc;" onerror="this.style.display='none'">`;
             }
 

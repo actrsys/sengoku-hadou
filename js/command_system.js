@@ -30,10 +30,10 @@ const COMMAND_SPECS = {
         startMode: 'busho_select', sortKey: 'politics',
         msg: "金: 200 (1回あたり)" 
     },
-   'charity': { 
+    'charity': { 
         label: "施し", category: 'DEVELOP', 
         costGold: 0, costRice: 200, 
-        isMulti: false, hasAdvice: false, 
+        isMulti: true, hasAdvice: false, 
         startMode: 'busho_select', sortKey: 'charm',
         msg: "米: 200 (1回あたり)" 
     },
@@ -1092,30 +1092,61 @@ class CommandSystem {
         this.game.ui.showResultModal(`${busho.name}が徴兵を行いました\n兵士+${soldiers}`); 
         this.game.ui.updatePanelHeader(); this.game.ui.renderCommandMenu();
     }
-
+    
     executeCharity(bushoIds, type) { 
         const castle = this.game.getCurrentTurnCastle(); 
-        const busho = this.game.getBusho(bushoIds[0]); 
         const spec = COMMAND_SPECS['charity']; 
-        let costGold = 0, costRice = 0; 
-        if (type === 'gold' || type === 'both') costGold = spec.costGold; 
-        if (type === 'rice' || type === 'both') costRice = spec.costRice; 
         
-        if (castle.gold < costGold || castle.rice < costRice) { this.game.ui.showDialog("物資不足", false); return; } 
-        castle.gold -= costGold; castle.rice -= costRice; 
-       
-        let val = GameSystem.calcCharity(busho, type); 
-        val = Math.floor(val / 6); 
-        if (val < 1) val = 1;
+        // 1人あたりのコストを計算
+        let singleCostGold = 0, singleCostRice = 0; 
+        if (type === 'gold' || type === 'both') singleCostGold = spec.costGold; 
+        if (type === 'rice' || type === 'both') singleCostRice = spec.costRice; 
 
-        const maxLoyalty = window.MainParams.Economy.MaxLoyalty || 100;
-        castle.peoplesLoyalty = Math.min(maxLoyalty, castle.peoplesLoyalty + val); 
-        busho.isActionDone = true; 
+        // 参加する人数分の合計コストを計算
+        const totalCostGold = singleCostGold * bushoIds.length;
+        const totalCostRice = singleCostRice * bushoIds.length;
         
-        busho.achievementTotal += Math.floor(val * 0.5);
-        this.game.factionSystem.updateRecognition(busho, 15);
-        this.game.ui.showResultModal(`${busho.name}が施しを行いました\n民忠+${val}`); 
-        this.game.ui.updatePanelHeader(); this.game.ui.renderCommandMenu();
+        // 物資が足りるかチェック
+        if (castle.gold < totalCostGold || castle.rice < totalCostRice) { 
+            this.game.ui.showDialog("物資不足", false); 
+            return; 
+        } 
+        
+        // 合計コストを消費
+        castle.gold -= totalCostGold; 
+        castle.rice -= totalCostRice; 
+       
+        let totalVal = 0;
+        let count = 0;
+
+        // 選ばれた武将全員に順番に作業させるループ
+        bushoIds.forEach(bid => {
+            const busho = this.game.getBusho(bid);
+            if (!busho) return;
+
+            let val = GameSystem.calcCharity(busho, type); 
+            val = Math.floor(val / 6); 
+            if (val < 1) val = 1;
+
+            totalVal += val;
+            count++;
+
+            // 武将の功績などをアップさせて、行動済みにする
+            busho.achievementTotal += Math.floor(val * 0.5);
+            this.game.factionSystem.updateRecognition(busho, 15);
+            busho.isActionDone = true; 
+        });
+
+        // 合計の効果分、民忠をアップさせる
+        const maxLoyalty = window.MainParams.Economy.MaxLoyalty || 100;
+        castle.peoplesLoyalty = Math.min(maxLoyalty, castle.peoplesLoyalty + totalVal); 
+        
+        // 結果のメッセージを表示
+        this.game.ui.showResultModal(`${count}名で施しを行いました\n民忠+${totalVal}`); 
+        this.game.ui.updatePanelHeader(); 
+        this.game.ui.renderCommandMenu();
+        // 履歴ログにも残す
+        this.game.ui.log(`${count}名で施しを実行 (効果:${totalVal})`);
     }
 
     enterMapSelection(mode) {
