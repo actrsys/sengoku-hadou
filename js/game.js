@@ -860,8 +860,7 @@ class UIManager {
             
             const isVisible = isDaimyoSelect || this.game.isCastleVisible(c);
             
-            const soldierText = isVisible ? c.soldiers : "???"; const castellanName = isVisible ? (castellan ? castellan.name : '-') : "???";
-            el.innerHTML = `<div class="card-header"><h3>${c.name}</h3></div><div class="card-owner">${clanData ? clanData.name : "中立"}</div><div class="param-grid"><div class="param-item"><span>城主</span> <strong>${castellanName}</strong></div><div class="param-item"><span>兵数</span> ${soldierText}</div></div>`;
+            const soldierText = isVisible ? c.soldiers : "???"; const castellanName = castellan ? castellan.name : '-';            el.innerHTML = `<div class="card-header"><h3>${c.name}</h3></div><div class="card-owner">${clanData ? clanData.name : "中立"}</div><div class="param-grid"><div class="param-item"><span>城主</span> <strong>${castellanName}</strong></div><div class="param-item"><span>兵数</span> ${soldierText}</div></div>`;
             if(clanData) el.style.borderTop = `5px solid ${clanData.color}`;
             
             if (isDaimyoSelect) {
@@ -957,7 +956,7 @@ class UIManager {
                         ${faceHtml}
                         <div style="flex:1;">
                             <div class="info-row"><span class="info-label">拠点</span><span class="info-val">${castle.name} <small>(${clanData ? clanData.name : "中立"})</small></span></div>
-                            <div class="info-row"><span class="info-label">城主</span><span class="info-val">${isVisible ? (castellan ? castellan.name : "-") : "???"}</span></div>
+                            <div class="info-row"><span class="info-label">城主</span><span class="info-val">${castellan ? castellan.name : "-"}</span></div>
                             <div class="info-row"><span class="info-label">兵数</span><span class="info-val highlight-text">${mask(castle.soldiers)}</span></div>
                         </div>
                     </div>
