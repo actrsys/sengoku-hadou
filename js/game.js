@@ -1162,7 +1162,20 @@ class UIManager {
                     createBtn(CATEGORY_MAP[key], "category", () => menu(key));
                 });
                 
-                // ★ 命令終了ボタン（span 2 にして右に空きを作る）
+                // ★ 機能ボタン（span 1 で左に配置）
+                const sysBtn = document.createElement('button');
+                sysBtn.className = `cmd-btn category`;
+                sysBtn.textContent = "機能";
+                sysBtn.style.gridColumn = "span 1";
+                sysBtn.style.marginTop = "2px"; 
+                sysBtn.onclick = () => {
+                    if (this.game.isProcessingAI) return;
+                    this.cancelMapSelection(true);
+                    menu('SYSTEM');
+                };
+                area.appendChild(sysBtn);
+
+                // ★ 命令終了ボタン（span 2 にして右に配置）
                 const finishBtn = document.createElement('button');
                 finishBtn.className = `cmd-btn finish`;
                 finishBtn.textContent = "命令終了";
@@ -1175,19 +1188,6 @@ class UIManager {
                     });
                 };
                 area.appendChild(finishBtn);
-
-                // ★ 機能ボタン（span 1 で右端に配置）
-                const sysBtn = document.createElement('button');
-                sysBtn.className = `cmd-btn category`;
-                sysBtn.textContent = "機能";
-                sysBtn.style.gridColumn = "span 1";
-                sysBtn.style.marginTop = "2px"; 
-                sysBtn.onclick = () => {
-                    if (this.game.isProcessingAI) return;
-                    this.cancelMapSelection(true);
-                    menu('SYSTEM');
-                };
-                area.appendChild(sysBtn);
                 
                 return;
             }
