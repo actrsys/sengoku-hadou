@@ -351,16 +351,23 @@ img {
 }
 /* 攻撃側（赤色）の凸 */
 .fw-unit.attacker {
-    color: #e53935; /* 凸の中を明るい赤で塗ります */
-    -webkit-text-stroke: 1px #8e0000; /* 濃い赤色の枠線を1pxの太さでつけます */
-    filter: drop-shadow(1px 1px 1px #000); /* 黒くて細い影を落とします */
+    color: #e53935;
+    -webkit-text-fill-color: #e53935; /* ★中身を赤く塗る専用の呪文を追加！★ */
+    -webkit-text-stroke: 1px #8e0000;
+    filter: drop-shadow(1px 1px 1px #000);
 }
 
 /* 守備側（青色）の凸 */
 .fw-unit.defender {
-    color: #1e88e5; /* 凸の中を明るい青で塗ります */
-    -webkit-text-stroke: 1px #004ba0; /* 濃い青色の枠線を1pxの太さでつけます */
-    filter: drop-shadow(1px 1px 1px #000); /* 黒くて細い影を落とします */
+    color: #1e88e5;
+    -webkit-text-fill-color: #1e88e5; /* ★中身を青く塗る専用の呪文を追加！★ */
+    -webkit-text-stroke: 1px #004ba0;
+    filter: drop-shadow(1px 1px 1px #000);
+}
+
+/* 総大将（general）だけ、枠線を白に上書きする特別な魔法 */
+.fw-unit.general {
+    -webkit-text-stroke: 1px #ffffff;
 }
 
 /* 総大将（general）だけ、枠線を白に上書きする特別な魔法 */
