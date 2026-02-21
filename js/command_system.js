@@ -282,6 +282,17 @@ class CommandSystem {
 
         const castle = this.game.getCurrentTurnCastle();
 
+        // ★ 最大値チェック
+        if (type === 'farm' && castle.kokudaka >= castle.maxKokudaka) { this.game.ui.showDialog("これ以上石高は上げられません。", false); return; }
+        if (type === 'commerce' && castle.commerce >= castle.maxCommerce) { this.game.ui.showDialog("これ以上鉱山は上げられません。", false); return; }
+        if (type === 'repair' && castle.defense >= castle.maxDefense) { this.game.ui.showDialog("これ以上城壁は上げられません。", false); return; }
+        if (type === 'charity' && castle.peoplesLoyalty >= castle.maxPeoplesLoyalty) { this.game.ui.showDialog("これ以上民忠は上げられません。", false); return; }
+        
+        const maxTraining = (window.WarParams && window.WarParams.Military && window.WarParams.Military.MaxTraining) ? window.WarParams.Military.MaxTraining : 100;
+        const maxMorale = (window.WarParams && window.WarParams.Military && window.WarParams.Military.MaxMorale) ? window.WarParams.Military.MaxMorale : 100;
+        if (type === 'training' && castle.training >= maxTraining) { this.game.ui.showDialog("これ以上訓練は上げられません。", false); return; }
+        if (type === 'soldier_charity' && castle.morale >= maxMorale) { this.game.ui.showDialog("これ以上士気は上げられません。", false); return; }
+
         // ★ alert を showDialog に変更
         if (spec.costGold > 0 && castle.gold < spec.costGold) {
             this.game.ui.showDialog(`金が足りません (必要: ${spec.costGold})`, false);
