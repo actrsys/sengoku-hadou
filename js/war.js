@@ -1,8 +1,7 @@
 /**
  * war.js
  * 戦争処理マネージャー & 戦争計算ロジック
- * 責務: 合戦の進行、戦闘計算、戦後処理、捕虜対応、UIコマンド定義、攻撃可能判定
- * 修正: AI迎撃時に兵糧を出陣兵士数と同量（最大値制限あり）持っていくよう修正
+ * 修正: 捕虜の処遇結果のアラートをカスタムダイアログ（showDialog）に置き換えました
  */
 
 window.WarParams = {
@@ -207,7 +206,6 @@ class WarManager {
                     if (defCastle.soldiers >= atkSoldierCount * 0.8) {
                         const defBushos = this.game.getCastleBushos(defCastle.id).sort((a,b) => b.strength - a.strength).slice(0, 5);
                         const defSoldiers = defCastle.soldiers;
-                        // ★修正：AI出陣時は出陣兵士数と同量（最大全兵糧）を持参する
                         const defRice = Math.min(defCastle.rice, defSoldiers); 
                         const defAssignments = this.autoDivideSoldiers(defBushos, defSoldiers);
                         
@@ -231,14 +229,14 @@ class WarManager {
                         defCastle.rice = Math.max(0, defCastle.rice - (defRice || 0));
                         
                         this.state.defender.fieldSoldiers = totalDefSoldiers;
-                        this.state.defFieldRice = defRice || 0; // ★ここがポイント！野戦専用の兵糧箱を作りました
+                        this.state.defFieldRice = defRice || 0; 
 
                         if (!isPlayerInvolved) this.resolveAutoFieldWar();
                         else {
                             if (!this.game.fieldWarManager) this.game.fieldWarManager = new window.FieldWarManager(this.game);
                             this.game.fieldWarManager.startFieldWar(this.state, (resultType) => {
                                 defCastle.soldiers += this.state.defender.fieldSoldiers;
-                                defCastle.rice += this.state.defFieldRice; // ★野戦が終わったら、野戦専用の箱から城に兵糧を戻します
+                                defCastle.rice += this.state.defFieldRice; 
                                 if (resultType === 'attacker_win' || resultType === 'defender_retreat' || resultType === 'draw_to_siege') this.startSiegeWarPhase();
                                 else this.endWar(false);
                             });
@@ -265,7 +263,7 @@ class WarManager {
             s.attacker.soldiers -= Math.min(s.attacker.soldiers, resDef.soldierDmg); s.defender.fieldSoldiers -= Math.min(s.defender.fieldSoldiers, resDef.counterDmg);
 
             s.attacker.rice = Math.max(0, s.attacker.rice - Math.floor(s.attacker.soldiers * consumeRate));
-            s.defFieldRice = Math.max(0, s.defFieldRice - Math.floor(s.defender.fieldSoldiers * consumeRate)); // ★野戦専用の箱から消費
+            s.defFieldRice = Math.max(0, s.defFieldRice - Math.floor(s.defender.fieldSoldiers * consumeRate)); 
             if (s.attacker.rice <= 0 || s.defFieldRice <= 0 || s.attacker.soldiers < s.defender.fieldSoldiers * 0.2 || s.defender.fieldSoldiers < s.attacker.soldiers * 0.2) break;
 
             turn++; safetyLimit--;
@@ -275,7 +273,7 @@ class WarManager {
         const defLost = s.defender.fieldSoldiers <= 0 || s.defFieldRice <= 0 || (s.defender.fieldSoldiers < s.attacker.soldiers * 0.2);
         
         s.defender.soldiers += s.defender.fieldSoldiers; 
-        s.defender.rice += s.defFieldRice; // ★野戦専用の箱から城に兵糧を戻す
+        s.defender.rice += s.defFieldRice; 
 
         if (atkLost && !defLost) this.endWar(false); 
         else if (defLost && !atkLost) this.startSiegeWarPhase(); 
@@ -662,19 +660,20 @@ class WarManager {
         } 
     }
     
+    // ★ ここから修正：alertをshowDialogに置き換えました
     handlePrisonerAction(index, action) { 
         const prisoner = this.pendingPrisoners[index]; const originalClanId = prisoner.clan;
         if (action === 'hire') { 
             const myBushos = this.game.bushos.filter(b=>b.clan===this.game.playerClanId); const recruiter = myBushos.find(b => b.isDaimyo) || myBushos[0]; 
             const score = (recruiter.charm * 2.0) / (prisoner.loyalty * 1.5); 
-            if (prisoner.isDaimyo) alert(`${prisoner.name}「敵の軍門には下らぬ！」`); 
+            if (prisoner.isDaimyo) this.game.ui.showDialog(`${prisoner.name}「敵の軍門には下らぬ！」`, false); 
             else if (score > Math.random()) { 
                 prisoner.clan = this.game.playerClanId; prisoner.loyalty = 50; prisoner.isCastellan = false; 
                 const targetC = this.game.getCastle(prisoner.castleId); 
                 if(targetC) { targetC.samuraiIds.push(prisoner.id); this.game.updateCastleLord(targetC); }
-                alert(`${prisoner.name}を登用しました！`); 
+                this.game.ui.showDialog(`${prisoner.name}を登用しました！`, false); 
             } 
-            else alert(`${prisoner.name}は登用を拒否しました……`); 
+            else this.game.ui.showDialog(`${prisoner.name}は登用を拒否しました……`, false); 
         } else if (action === 'kill') { 
             if (prisoner.isDaimyo) this.handleDaimyoDeath(prisoner); prisoner.status = 'dead'; prisoner.clan = 0; prisoner.castleId = 0; 
         } else if (action === 'release') { 
@@ -683,8 +682,8 @@ class WarManager {
                 const returnCastle = friendlyCastles[Math.floor(Math.random() * friendlyCastles.length)];
                 prisoner.castleId = returnCastle.id; prisoner.isCastellan = false; prisoner.status = 'active'; returnCastle.samuraiIds.push(prisoner.id);
                 this.game.factionSystem.handleMove(prisoner, 0, returnCastle.id); this.game.updateCastleLord(returnCastle);
-                alert(`${prisoner.name}を解放しました。(自領へ帰還しました)`);
-            } else { prisoner.status = 'ronin'; prisoner.clan = 0; prisoner.castleId = 0; alert(`${prisoner.name}を解放しました。(在野へ下りました)`); }
+                this.game.ui.showDialog(`${prisoner.name}を解放しました。(自領へ帰還しました)`, false);
+            } else { prisoner.status = 'ronin'; prisoner.clan = 0; prisoner.castleId = 0; this.game.ui.showDialog(`${prisoner.name}を解放しました。(在野へ下りました)`, false); }
         } 
         this.pendingPrisoners.splice(index, 1); 
         if (this.pendingPrisoners.length === 0) this.game.ui.closePrisonerModal(); else this.game.ui.showPrisonerModal(this.pendingPrisoners); 
