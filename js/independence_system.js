@@ -108,7 +108,8 @@ class IndependenceSystem {
         // 色はランダム
         const newColor = '#' + Math.floor(Math.random()*16777215).toString(16).padStart(6, '0');
         // 名前は「姓 + 家」
-        const familyName = castellan.name.split(" ")[0] || castellan.name.slice(0, 2); 
+        // 「familyName」が空っぽなら、「name（フルネーム）」をそのまま使います
+        const familyName = castellan.familyName || castellan.name; 
         const newClanName = `${familyName}家`;
 
         const newClan = new Clan({

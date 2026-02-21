@@ -260,25 +260,29 @@ class FactionSystem {
             busho.achievementTotal += achievementGain;
         }
     }
-
     /**
-     * ★ここから追加した部分です（game.jsからのお引っ越し）
      * 月初の浪人移動処理
      */
     processRoninMovements() { 
-        // 変更箇所：this.bushos などを this.game.bushos と呼ぶように直しています
         const ronins = this.game.bushos.filter(b => b.status === 'ronin'); 
         ronins.forEach(r => { 
             const currentC = this.game.getCastle(r.castleId); 
             if(!currentC) return; 
+            
+            // 隣接する城のリストを作る
             const neighbors = this.game.castles.filter(c => GameSystem.isAdjacent(currentC, c)); 
-            neighbors.forEach(n => { 
-                if (Math.random() < 0.2) { 
-                    currentC.samuraiIds = currentC.samuraiIds.filter(id => id !== r.id); 
-                    n.samuraiIds.push(r.id); 
-                    r.castleId = n.id; 
-                } 
-            }); 
+            
+            // 隣に城があって、かつ20%の確率(サイコロ)に当たったらお引越しする
+            if (neighbors.length > 0 && Math.random() < 0.2) {
+                // クジ引きで移動先の城を「1つだけ」決める
+                const targetCastle = neighbors[Math.floor(Math.random() * neighbors.length)];
+                
+                // 今いる城のリストから名前を消す
+                currentC.samuraiIds = currentC.samuraiIds.filter(id => id !== r.id); 
+                // 新しく決まった城のリストに名前を書く
+                targetCastle.samuraiIds.push(r.id); 
+                r.castleId = targetCastle.id; 
+            }
         }); 
     }
 
