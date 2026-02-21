@@ -74,6 +74,20 @@ class Busho {
         this.clan = Number(this.clan);
         this.castleId = Number(this.castleId);
         
+        if (this.name && this.name.includes('|')) {
+            // 名前に「|」が含まれていたら、そこで真っ二つに切ります
+            let names = this.name.split('|');
+            this.familyName = names[0]; // 1つ目（姓）を familyName の箱へ
+            this.givenName = names[1];  // 2つ目（名）を givenName の箱へ
+            
+            // これまでのプログラムが困らないように、繋げた名前を元の name の箱に戻します
+            this.name = names[0] + names[1]; 
+        } else {
+            // もし「|」が入っていなかった時のお守りです
+            this.familyName = this.name;
+            this.givenName = "";
+        }
+        
         // 能力値
         this.leadership = Number(this.leadership || 0);
         this.strength = Number(this.strength || 0);
