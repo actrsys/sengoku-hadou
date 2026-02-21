@@ -200,14 +200,14 @@ img {
     background: rgba(0,0,0,0.6); z-index: 4000; 
     display: flex; justify-content: center; align-items: center;
     opacity: 1; transition: opacity 0.2s;
-    padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+    padding: env(safe-area-inset-top) env(safe-area-inset-right) calc(env(safe-area-inset-bottom) + 60px) env(safe-area-inset-left);
 }
 .modal.hidden { opacity: 0; pointer-events: none; display: none !important;} 
 #quantity-modal { z-index: 4500; }
 
 .modal-content {
     background: #fff; padding: 20px; border-radius: 8px;
-    width: 90%; max-width: 800px; max-height: 80dvh;
+    width: 90%; max-width: 800px; max-height: 75dvh;
     display: flex; flex-direction: column;
     box-shadow: 0 10px 25px rgba(0,0,0,0.5); position: relative;
 }
