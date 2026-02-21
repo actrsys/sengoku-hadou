@@ -768,13 +768,30 @@ class FieldWarManager {
                 return;
             }
 
-            if (this.previewTarget && x === this.previewTarget.x && y === this.previewTarget.y) {
-                unit.ap -= this.previewTarget.cost;
-                unit.x = x;
-                unit.y = y;
-                this.log(`${unit.name}隊が移動。`);
-                this.nextPhase();
-            } else {
+			// 修正後
+			if (this.previewTarget && x === this.previewTarget.x && y === this.previewTarget.y) {
+			    // ★ここから追加：移動した最後の１歩の向きを調べて、自動で向きを変える
+			    let path = this.previewTarget.path;
+			    if (path && path.length > 0) {
+			        let fromX = unit.x;
+			        let fromY = unit.y;
+			        // ２歩以上歩いた場合は、ゴールの１つ手前のマスの位置を調べる
+			        if (path.length > 1) {
+			            let prevStep = path[path.length - 2];
+			            fromX = prevStep.x;
+			            fromY = prevStep.y;
+			        }
+			        // 向きを自動で設定する
+			        unit.direction = this.getDirection(fromX, fromY, x, y);
+			    }
+			    // ★ここまで
+
+			    unit.ap -= this.previewTarget.cost;
+			    unit.x = x;
+			    unit.y = y;
+			    this.log(`${unit.name}隊が移動（向きも変更）。`); // メッセージも少し変えました
+			    this.nextPhase();
+			} else {
                 let key = `${x},${y}`;
                 if (this.reachable && this.reachable[key]) {
                     this.previewTarget = {x: x, y: y, path: this.reachable[key].path, cost: this.reachable[key].cost};
@@ -951,23 +968,36 @@ class FieldWarManager {
                 let nx = parseInt(parts[0]);
                 let ny = parseInt(parts[1]);
                 let d = this.getDistance(nx, ny, targetEnemy.x, targetEnemy.y);
-                if (d < minMoveDist) {
-                    minMoveDist = d;
-                    bestTarget = {x: nx, y: ny, cost: reachable[key].cost};
-                }
+				if (d < minMoveDist) {
+				    minMoveDist = d;
+				    bestTarget = {x: nx, y: ny, cost: reachable[key].cost, path: reachable[key].path}; // ←最後にpathを追加
+				}
             }
-            
             if (bestTarget && (bestTarget.x !== unit.x || bestTarget.y !== unit.y)) {
-                unit.ap -= bestTarget.cost;
-                unit.x = bestTarget.x;
-                unit.y = bestTarget.y;
-                if (isPlayerInvolved) {
-                    this.log(`${unit.name}隊が前進。`);
-                    this.updateMap();
-                    this.updateStatus();
-                    await new Promise(r => setTimeout(r, 400));
-                }
-            }
+			    // ★ここから追加：敵も移動した向きに自動で変える
+			    let path = bestTarget.path;
+			    if (path && path.length > 0) {
+			        let fromX = unit.x;
+			        let fromY = unit.y;
+			        if (path.length > 1) {
+			            let prevStep = path[path.length - 2];
+			            fromX = prevStep.x;
+			            fromY = prevStep.y;
+			        }
+			        unit.direction = this.getDirection(fromX, fromY, bestTarget.x, bestTarget.y);
+			    }
+			    // ★ここまで
+
+			    unit.ap -= bestTarget.cost;
+			    unit.x = bestTarget.x;
+			    unit.y = bestTarget.y;
+			    if (isPlayerInvolved) {
+			        this.log(`${unit.name}隊が前進。`);
+			        this.updateMap();
+			        this.updateStatus();
+			        await new Promise(r => setTimeout(r, 400));
+			    }
+			}
         }
 
         dist = this.getDistance(unit.x, unit.y, targetEnemy.x, targetEnemy.y);
