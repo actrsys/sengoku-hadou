@@ -349,8 +349,24 @@ img {
     pointer-events: none;
     z-index: 20;
 }
-.fw-unit.attacker { color: #d32f2f; text-shadow: 1px 1px 2px rgba(0,0,0,0.5); }
-.fw-unit.defender { color: #1976d2; text-shadow: 1px 1px 2px rgba(0,0,0,0.5); }
+/* 攻撃側（赤色）の凸 */
+.fw-unit.attacker {
+    color: #e53935; /* 凸の中を明るい赤で塗ります */
+    -webkit-text-stroke: 1px #8e0000; /* 濃い赤色の枠線を1pxの太さでつけます */
+    filter: drop-shadow(1px 1px 1px #000); /* 黒くて細い影を落とします */
+}
+
+/* 守備側（青色）の凸 */
+.fw-unit.defender {
+    color: #1e88e5; /* 凸の中を明るい青で塗ります */
+    -webkit-text-stroke: 1px #004ba0; /* 濃い青色の枠線を1pxの太さでつけます */
+    filter: drop-shadow(1px 1px 1px #000); /* 黒くて細い影を落とします */
+}
+
+/* 総大将（general）だけ、枠線を白に上書きする特別な魔法 */
+.fw-unit.general {
+    -webkit-text-stroke: 1px #ffffff; /* 枠線を真っ白にします */
+}
 .fw-unit.active { filter: drop-shadow(0 0 6px #ffff00); }
 .fw-unit.preview { opacity: 0.6; animation: fw-blink 1s infinite; z-index: 18; }
 @keyframes fw-blink { 0%{opacity:0.3;} 50%{opacity:0.8;} 100%{opacity:0.3;} }
