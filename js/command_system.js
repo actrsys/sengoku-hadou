@@ -832,13 +832,11 @@ class CommandSystem {
             
             // 200金固定での効果計算
             const effect = GameSystem.calcRewardEffect(spec.costGold, daimyo, target);
-            
-            // 忠誠度をアップ（最大100）
-            target.loyalty = Math.min(100, target.loyalty + effect);
-            
+
+            // 忠誠を直接上昇はさせない
             // 承認欲求（recognition）を「200金の時の値」で下げる
             // 以前は金額(gold)に連動していましたが、一律で下げるようにします
-            this.game.factionSystem.updateRecognition(target, -effect * 2);
+            this.game.factionSystem.updateRecognition(target, -effect * 2 - 5);
 
             target.isActionDone = true;
             count++;
