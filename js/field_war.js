@@ -2,7 +2,7 @@
  * field_war.js
  * HEX式 野戦システム
  * 責務: 野戦マップの描画、ターンの制御、HEXでの移動と戦闘計算
- * 修正: 操作不能バグ修正、大将アイコン修正、キャンセルの改善、スマホスクロール対応、部隊情報表示の改善、戦場縮小、スクロール追従
+ * 修正: 操作不能バグ修正、大将アイコン修正、キャンセルの改善、スマホスクロール対応、部隊情報表示の改善、戦場縮小、スクロール追従、影の回転防止
  */
 
 class FieldWarManager {
@@ -345,7 +345,8 @@ class FieldWarManager {
             pEl.style.height = `${iconSize}px`;
             pEl.style.left = `${this.previewTarget.x * (this.hexW * 0.75) + (this.hexW - iconSize) / 2}px`;
             pEl.style.top = `${this.previewTarget.y * (this.hexH / 2) + (this.hexH - iconSize) / 2}px`;    
-            pEl.style.transform = `rotate(${unit.direction * 60}deg)`;
+            // ★修正：箱ごと回すのをやめて、中身の画像だけを回すための設定をします！
+            pEl.style.setProperty('--fw-dir', `${unit.direction * 60}deg`);
             pEl.style.pointerEvents = 'none'; 
             
             pEl.innerHTML = '';
@@ -365,7 +366,8 @@ class FieldWarManager {
             uEl.style.height = `${iconSize}px`; 
             uEl.style.left = `${u.x * (this.hexW * 0.75) + (this.hexW - iconSize) / 2}px`; 
             uEl.style.top = `${u.y * (this.hexH / 2) + (this.hexH - iconSize) / 2}px`;     
-            uEl.style.transform = `rotate(${u.direction * 60}deg)`;
+            // ★修正：ここも同じように、中身の画像だけを回す設定に変えました！
+            uEl.style.setProperty('--fw-dir', `${u.direction * 60}deg`);
             uEl.style.pointerEvents = 'none'; 
             
             uEl.innerHTML = '';
