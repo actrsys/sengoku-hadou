@@ -90,21 +90,21 @@ const COMMAND_SPECS = {
         costGold: 0, costRice: 0, 
         isMulti: false, hasAdvice: false, 
         startMode: 'busho_select', sortKey: 'leadership',
-        msg: "資金に応じて徴兵" 
+        msg: "資金に応じて徴兵します" 
     },
     'training': { 
         label: "訓練", category: 'MILITARY', 
-        costGold: 0, costRice: 0, 
+        costGold: 299, costRice: 0, 
         isMulti: true, hasAdvice: false, 
         startMode: 'busho_select', sortKey: 'leadership',
-        msg: "兵士の訓練度を上げます" 
+        msg: "金: 200 (1回あたり)\n兵士の訓練度を上げます" 
     },
     'soldier_charity': { 
         label: "兵施し", category: 'MILITARY', 
-        costGold: 0, costRice: 0, 
+        costGold: 0, costRice: 200, 
         isMulti: true, hasAdvice: false, 
         startMode: 'busho_select', sortKey: 'leadership',
-        msg: "兵士の士気を上げます" 
+        msg: "米: 200 (1回あたり)\n兵士の士気を上げます" 
     },
     'transport': { 
         label: "輸送", category: 'MILITARY', 
@@ -575,20 +575,32 @@ class CommandSystem {
                 }
             }
             else if (type === 'training') { 
-                const val = GameSystem.calcTraining(busho); 
-                const maxTraining = window.WarParams.Military.MaxTraining || 100;
-                castle.training = Math.min(maxTraining, castle.training + val); 
-                totalVal += val; count++; actionName = "訓練";
-                busho.achievementTotal += Math.floor(val * 0.5);
-                this.game.factionSystem.updateRecognition(busho, 10);
+                // 金と米が設定値以上あるか確認してから実行する
+                if (castle.gold >= spec.costGold && castle.rice >= spec.costRice) {
+                    castle.gold -= spec.costGold;  // 金を減らす
+                    castle.rice -= spec.costRice;  // 米を減らす
+
+                    const val = GameSystem.calcTraining(busho); 
+                    const maxTraining = window.WarParams.Military.MaxTraining || 100;
+                    castle.training = Math.min(maxTraining, castle.training + val); 
+                    totalVal += val; count++; actionName = "訓練";
+                    busho.achievementTotal += Math.floor(val * 0.5);
+                    this.game.factionSystem.updateRecognition(busho, 10);
+                }
             }
             else if (type === 'soldier_charity') { 
-                const val = GameSystem.calcSoldierCharity(busho); 
-                const maxMorale = window.WarParams.Military.MaxMorale || 100;
-                castle.morale = Math.min(maxMorale, castle.morale + val); 
-                totalVal += val; count++; actionName = "兵施し";
-                busho.achievementTotal += Math.floor(val * 0.5);
-                this.game.factionSystem.updateRecognition(busho, 10);
+                // 金と米が設定値以上あるか確認してから実行する
+                if (castle.gold >= spec.costGold && castle.rice >= spec.costRice) {
+                    castle.gold -= spec.costGold;  // 金を減らす
+                    castle.rice -= spec.costRice;  // 米を減らす
+
+                    const val = GameSystem.calcSoldierCharity(busho); 
+                    const maxMorale = window.WarParams.Military.MaxMorale || 100;
+                    castle.morale = Math.min(maxMorale, castle.morale + val); 
+                    totalVal += val; count++; actionName = "兵施し";
+                    busho.achievementTotal += Math.floor(val * 0.5);
+                    this.game.factionSystem.updateRecognition(busho, 10);
+                }
             }
             else if (type === 'banish') { 
                 if(!confirm(`本当に ${busho.name} を追放しますか？`)) return; 
@@ -1093,3 +1105,4 @@ class CommandSystem {
 
 
 }
+
