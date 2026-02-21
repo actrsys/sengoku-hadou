@@ -179,11 +179,14 @@ class DataManager {
             for(let i=0; i<3; i++) {
                 const castle = clanCastles[Math.floor(Math.random() * clanCastles.length)];
                 const p = personalities[Math.floor(Math.random() * personalities.length)];
-                let bName = `武将${String.fromCharCode(65+i)}`;
+                
+                // ★修正：名無し武将も「武将|A」のように真ん中に「|」を入れます
+                let bName = `武将|${String.fromCharCode(65+i)}`;
                 if (useRandom) {
                     const s = this.genericNames.surnames[Math.floor(Math.random() * this.genericNames.surnames.length)];
                     const n = this.genericNames.names[Math.floor(Math.random() * this.genericNames.names.length)];
-                    bName = `${s}${n}`;
+                    // ★修正：ランダムな名前も「名字|名前」のようにはさみます
+                    bName = `${s}|${n}`;
                 }
                 bushos.push(new Busho({
                     id: idCounter++, name: bName, 
