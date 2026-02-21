@@ -64,8 +64,8 @@ img {
     flex: none;
     background: rgba(255,255,255,0.95);
     border-bottom: 1px solid var(--border-color);
-    padding-top: max(5px, env(safe-area-inset-top));
-    padding-bottom: 5px;
+    padding-top: max(20px, env(safe-area-inset-top)); /* ← 5px を 20px にしたよ */
+    padding-bottom: 10px; /* ついでに下も少し広げると綺麗だよ */
     padding-left: 10px;
     padding-right: 10px;
     z-index: 100;
