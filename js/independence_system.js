@@ -148,7 +148,8 @@ class IndependenceSystem {
         // プレイヤーへの通知（元主君の場合）
         if (oldClanId === this.game.playerClanId) {
             setTimeout(() => {
-                alert(`急報！\n${castle.name}の${castellan.name}が謀反を起こしました！\n我が軍から独立し、敵対関係となります。`);
+                // ★ alert を showDialog に変更
+                this.game.ui.showDialog(`急報！\n${castle.name}の${castellan.name}が謀反を起こしました！\n我が軍から独立し、敵対関係となります。`, false);
             }, 500);
         }
     }
@@ -281,14 +282,17 @@ class IndependenceSystem {
                 if (hate > hateThreshold || newDaimyo.ambition > ambitionThreshold) {
                     p.status = 'dead';
                     p.clan = 0;
-                    setTimeout(() => alert(`悲報：捕らえられた ${p.name} は、${newDaimyo.name}によって処断されました……`), 1000);
+                    // ★ alert を showDialog に変更
+                    setTimeout(() => this.game.ui.showDialog(`悲報：捕らえられた ${p.name} は、${newDaimyo.name}によって処断されました……`, false), 1000);
                 } else {
                     // 解放 -> 帰還
                     const returnedCastleName = returnToMaster(p);
                     if (returnedCastleName) {
-                        setTimeout(() => alert(`報告：${p.name} は解放され、${returnedCastleName}へ無事帰還しました！`), 1000);
+                        // ★ alert を showDialog に変更
+                        setTimeout(() => this.game.ui.showDialog(`報告：${p.name} は解放され、${returnedCastleName}へ無事帰還しました！`, false), 1000);
                     } else {
-                        setTimeout(() => alert(`報告：${p.name} は解放されましたが、帰る場所がなく在野に下りました。`), 1000);
+                        // ★ alert を showDialog に変更
+                        setTimeout(() => this.game.ui.showDialog(`報告：${p.name} は解放されましたが、帰る場所がなく在野に下りました。`, false), 1000);
                     }
                 }
             });
