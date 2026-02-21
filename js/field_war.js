@@ -305,8 +305,10 @@ class FieldWarManager {
             pEl.style.transform = `rotate(${unit.direction * 60}deg)`;
             pEl.style.pointerEvents = 'none'; // ★クリック貫通
             
-            let starHtml = unit.isGeneral ? `<span style="position:absolute; top:-8px; right:-8px; font-size:12px; color:gold; text-shadow:1px 1px 1px #000, -1px -1px 1px #000; transform: rotate(-${unit.direction * 60}deg);">★</span>` : '';
-            pEl.innerHTML = '凸' + starHtml;
+            pEl.innerHTML = '凸';
+            if (unit.isGeneral) {
+                pEl.classList.add('general');
+            }
             this.mapEl.appendChild(pEl);
         }
 
@@ -320,8 +322,10 @@ class FieldWarManager {
             uEl.style.pointerEvents = 'none'; // ★クリック貫通
             
             // ★大将アイコンの対応
-            let starHtml = u.isGeneral ? `<span style="position:absolute; top:-8px; right:-8px; font-size:12px; color:gold; text-shadow:1px 1px 1px #000, -1px -1px 1px #000; transform: rotate(-${u.direction * 60}deg);">★</span>` : '';
-            uEl.innerHTML = '凸' + starHtml;
+            uEl.innerHTML = '凸';
+            if (u.isGeneral) {
+                uEl.classList.add('general');
+            }
             this.mapEl.appendChild(uEl);
         });
 
@@ -892,3 +896,4 @@ class FieldWarManager {
 }
 
 window.FieldWarManager = FieldWarManager;
+
