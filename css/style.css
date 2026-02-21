@@ -382,6 +382,7 @@ img {
 }
 
 /* --- ここから「型抜きされた色」を作る魔法（::before という分身を使います） --- */
+/* ★修正：ここで部隊の画像だけを回転させるようにしました！ */
 .fw-unit::before {
     content: "";
     display: block;
@@ -395,6 +396,8 @@ img {
     mask-repeat: no-repeat;
     -webkit-mask-position: center;
     mask-position: center;
+    transform: rotate(var(--fw-dir, 0deg));
+    transition: transform 0.3s;
 }
 
 .fw-unit.attacker::before {
@@ -404,7 +407,6 @@ img {
     background-color: #1e88e5;
 }
 
-/* ★修正ポイント：選択中（active）の時も、枠線を維持したまま黄色く光らせる */
 .fw-unit.attacker.active {
     -webkit-filter: drop-shadow(1px 0 0 #8e0000) drop-shadow(-1px 0 0 #8e0000) drop-shadow(0 1px 0 #8e0000) drop-shadow(0 -1px 0 #8e0000) drop-shadow(0 0 6px #ffff00);
     filter: drop-shadow(1px 0 0 #8e0000) drop-shadow(-1px 0 0 #8e0000) drop-shadow(0 1px 0 #8e0000) drop-shadow(0 -1px 0 #8e0000) drop-shadow(0 0 6px #ffff00);
@@ -419,7 +421,7 @@ img {
 }
 
 .fw-unit.preview { opacity: 0.6; animation: fw-blink 1s infinite; z-index: 18; }
-@keyframes fw-blink { 0%{opacity:0.3;} 50%{opacity:0.8;} 100%{opacity:0.3;} }}
+@keyframes fw-blink { 0%{opacity:0.3;} 50%{opacity:0.8;} 100%{opacity:0.3;} }
 
 .context-menu {
     position: absolute; background: white; border: 1px solid #ccc;
