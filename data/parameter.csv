@@ -8,7 +8,7 @@ Economy.IncomeGoldRate,1,鉱山に対する金銭収入率。上げると金銭�
 Economy.IncomeRiceRate,10,石高に対する兵糧収入率。上げると9月の兵糧収入増、下げると兵糧不足で戦争継続が困難に
 Economy.IncomeFluctuation,0.15,収入のランダム変動幅。上げると収入が不安定になり運要素が増す、下げると計算通りの収入になる
 Economy.ConsumeRicePerSoldier,0.03,兵士一人あたりの兵糧消費。上げると大軍の維持が困難になる、下げると兵糧を気にせず兵を抱えられる
-Economy.ConsumeGoldPerBusho,50,武将一人あたりの金銭消費。上げると武将を多く抱えるコスト増、下げると人員維持が楽になる
+Economy.ConsumeGoldPerBusho,10,武将一人あたりの金銭消費。上げると武将を多く抱えるコスト増、下げると人員維持が楽になる
 Economy.BaseDevelopment,20,開発の基礎値。上げると能力の低い武将でも開発が進みやすくなる、下げると政治力が低いと開発が進まない
 Economy.PoliticsEffect,0.6,開発時の政治力の影響係数。上げると武将の「政治」能力の重要性が増す、下げると能力差による効率差が縮まる
 Economy.DevelopFluctuation,0.15,開発効果の変動幅。上げると開発成果にムラが出る、下げると毎回安定した数値が出る
