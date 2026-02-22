@@ -921,8 +921,7 @@ class CommandSystem {
         kunishu.setRelation(this.game.playerClanId, currentRel + increase);
         const newRel = kunishu.getRelation(this.game.playerClanId);
 
-        const leader = this.game.getBusho(kunishu.leaderId);
-        const kunishuName = leader ? `${leader.name}衆` : "国人衆";
+        const kunishuName = kunishu.getName(this.game);
         
         doer.isActionDone = true;
         doer.achievementTotal += Math.floor(doer.diplomacy * 0.2) + 10;
@@ -977,7 +976,7 @@ class CommandSystem {
         }
         doer.isActionDone = true; this.game.ui.updatePanelHeader(); this.game.ui.renderCommandMenu();
     }
-
+    
     // ★追加: 国人衆を攻めて壊滅させるための処理（必ず攻城戦になります）
     executeKunishuSubjugate(atkCastle, targetCastleId, atkBushosIds, sendSoldiers, sendRice, kunishu) {
         const atkBushos = atkBushosIds.map(id => this.game.getBusho(id));
@@ -989,8 +988,7 @@ class CommandSystem {
         atkBushos.forEach(b => b.isActionDone = true);
 
         // 国人衆側の準備（一時的なダミーの城と軍団を作ります）
-        const leader = this.game.getBusho(kunishu.leaderId);
-        const kunishuName = leader ? `${leader.name}衆` : "国人衆";
+        const kunishuName = kunishu.getName(this.game);
 
         // この戦い限定の「守備側データ」を作成
         const dummyDefender = {
@@ -1009,6 +1007,7 @@ class CommandSystem {
             population: 1000,
             samuraiIds: [] 
         };
+        // （これより下はそのまま同じです）
 
         const attackerForce = { 
             name: atkCastle.name + "遠征軍", ownerClan: atkCastle.ownerClan, soldiers: sendSoldiers, 

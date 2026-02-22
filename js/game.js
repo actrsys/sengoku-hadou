@@ -1796,8 +1796,7 @@ class UIManager {
         if (this.scenarioList) {
             this.scenarioList.innerHTML = '';
             kunishus.forEach(k => {
-                const leader = window.GameApp.getBusho(k.leaderId);
-                const name = leader ? `${leader.name}衆` : "国人衆";
+                const name = k.getName(window.GameApp);
                 const rel = k.getRelation(window.GameApp.playerClanId);
                 const div = document.createElement('div');
                 div.className = 'scenario-item';
