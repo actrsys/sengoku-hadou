@@ -487,7 +487,6 @@ class UIManager {
         modal.classList.remove('hidden');
     }
 
-    // ★ 修正：情報が不明な時（isVisible=false）のゲージ表示を空ゲージ＋「？」に変更
     getStatusBarHTML(value, max, colorType, isVisible) {
         let percent = 0;
         let fillClass = colorType === 'blue' ? 'bar-fill-blue' : 'bar-fill-lightblue';
@@ -947,8 +946,7 @@ class UIManager {
             
             const isVisible = isDaimyoSelect || this.game.isCastleVisible(c);
             
-            // ★ 修正：「???」を「？」にしました
-            const soldierText = isVisible ? c.soldiers : "？"; 
+            const soldierText = isVisible ? c.soldiers : "不明"; 
             const castellanName = castellan ? castellan.name : '-';            
             
             el.innerHTML = `<div class="card-header"><h3>${c.name}</h3></div><div class="card-owner">${clanData ? clanData.name : "中立"}</div><div class="param-grid"><div class="param-item"><span>城主</span> <strong>${castellanName}</strong></div><div class="param-item"><span>兵数</span> ${soldierText}</div></div>`;
@@ -1021,8 +1019,9 @@ class UIManager {
         
         const isVisible = this.game.isCastleVisible(castle);
         
-        // ★ 修正：「??」を「？」にしました
-        const mask = (val) => isVisible ? val : "？";
+        const mask = (val) => isVisible ? val : "不明";
+        // ★ 修正：人口用。見えない時は「不明人」ではなく「不明」にする
+        const maskPop = (val) => isVisible ? `${val}人` : "不明";
         
         const castellan = this.game.getBusho(castle.castellanId);
         const clanData = this.game.clans.find(cd => cd.id === castle.ownerClan);
@@ -1056,7 +1055,7 @@ class UIManager {
                     <div class="sp-label">防御</div><div class="sp-val">${this.getStatusBarHTML(castle.defense, castle.maxDefense, 'lightblue', isVisible)}</div>
                     <div class="sp-empty"></div><div class="sp-empty"></div>
                     
-                    <div class="sp-label">人口</div><div class="sp-val-left" style="grid-column: 2 / span 5;">${mask(castle.population)}人</div>
+                    <div class="sp-label">人口</div><div class="sp-val-left" style="grid-column: 2 / span 5;">${maskPop(castle.population)}</div>
                 </div>
             </div>
             <div class="sp-info-footer">
@@ -1277,7 +1276,6 @@ class UIManager {
         
         if (this.gunshiModal) {
             this.gunshiModal.classList.remove('hidden'); 
-            // ★ 修正：見えない時の軍師の名前も「不明」にしました
             if(this.gunshiName) this.gunshiName.textContent = `軍師: ${gunshi ? gunshi.name : '不明'}`; 
             if(this.gunshiMessage) this.gunshiMessage.textContent = msg;
         }
@@ -1394,7 +1392,7 @@ class UIManager {
                 !b.isDaimyo && 
                 !b.isCastellan
             );
-            infoHtml = "<div>軍師に任命する武将を選択してください</div>";
+            infoHtml = "<div>軍師に任命する武将を選択してください (知略重視)<br><small>※大名・城主は任命できません</small></div>";
         }
         else if (actionType === 'def_intercept_deploy') {
             bushos = this.game.getCastleBushos(c.id).filter(b => b.status !== 'ronin');
