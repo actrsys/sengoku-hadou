@@ -232,6 +232,43 @@ img {
     pointer-events: none; /* クリックを無効にする */
 }
 
+/* ★ 追加：地図の左下に浮かせる情報（年月・米相場） */
+#mobile-floating-info {
+    position: absolute;
+    bottom: 20px;
+    left: 10px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    z-index: 500;
+    pointer-events: none; /* 地図をスワイプする時の邪魔にならないようにします */
+}
+
+.floating-time {
+    background: rgba(0, 0, 0, 0.75);
+    color: #fff;
+    padding: 4px 12px;
+    border-radius: 12px;
+    font-size: 0.9rem;
+    font-weight: bold;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.3);
+    border: 1px solid rgba(255,255,255,0.2);
+    width: fit-content;
+    text-shadow: 1px 1px 2px rgba(0,0,0,0.8);
+}
+
+.floating-market {
+    background: rgba(255, 255, 255, 0.95);
+    color: #333;
+    padding: 3px 10px;
+    border-radius: 12px;
+    font-size: 0.8rem;
+    font-weight: bold;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.3);
+    border: 1px solid #999;
+    width: fit-content;
+}
+
 .castle-card {
     width: var(--map-tile-size); height: var(--map-tile-size);
     background: #fff; border: 1px solid #999; border-radius: 4px;
@@ -540,7 +577,7 @@ img {
     z-index: 9999; min-width: 150px; padding: 5px 0; font-size: 0.9rem;
 }
 .context-menu-item { padding: 10px 15px; cursor: pointer; color: #333; font-weight: bold; }
-.context-menu-item:hover { background-color: #e3f2fd; }
+.context-menu-item:hover { background: #e3f2fd; }
 
 /* プログレスバーUI用 */
 .status-bar-container {
