@@ -1420,6 +1420,34 @@ class UIManager {
         if (contextEl) contextEl.innerHTML = infoHtml;
         
         bushos.sort((a,b) => {
+            // ★追加: 身分ごとに優先順位の「点数」をつける魔法（数字が小さいほど上に来ます！）
+            const getRankScore = (target) => {
+                if (target.isDaimyo || target.isCastellan) return 10; // 1番目: 大名または城主
+                if (target.isGunshi) return 20; // 2番目: 軍師
+                if (target.status === 'ronin') return 90; // 一番最後: 浪人
+
+                // 国人衆に所属している場合
+                if (target.belongKunishuId && target.belongKunishuId > 0) {
+                    const kunishu = this.game.kunishuSystem.getKunishu(target.belongKunishuId);
+                    const isBoss = kunishu && (kunishu.leaderId === target.id);
+                    
+                    // IDの若い順にするため、基本の点数に「IDの数字の端数」を足します
+                    if (isBoss) return 40 + (target.belongKunishuId * 0.001); // 頭領
+                    return 50 + (target.belongKunishuId * 0.001); // 所属している国衆
+                }
+
+                return 30; // 3番目: 上のどれにも当てはまらない普通の武将
+            };
+
+            const rankA = getRankScore(a);
+            const rankB = getRankScore(b);
+
+            // ① まずは身分の点数で比べる
+            if (rankA !== rankB) {
+                return rankA - rankB;
+            }
+
+            // ② 身分が同じだったら、これまで通り能力値（武力など）で比べる
             const getSortVal = (target) => {
                  let acc = null;
                  if (isEnemyTarget && targetCastle) acc = targetCastle.investigatedAccuracy;
@@ -1429,7 +1457,6 @@ class UIManager {
             };
             return getSortVal(b) - getSortVal(a);
         });
-
         const updateContextCost = () => { 
             if (!isMulti || !contextEl) return; 
             const checkedCount = document.querySelectorAll('input[name="sel_busho"]:checked').length; 
