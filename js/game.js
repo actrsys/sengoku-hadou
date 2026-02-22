@@ -1506,6 +1506,29 @@ class UIManager {
         });
         if (bushos.length === 0 && this.selectorList) this.selectorList.innerHTML = "<div style='padding:10px;'>対象となる武将がいません</div>";
         
+        // ★追加: 武将一覧の下に、その城にいる国人衆を追加する魔法！
+        if (actionType === 'view_only') {
+            const kunishus = this.game.kunishuSystem.getKunishusInCastle(targetId);
+            if (kunishus && kunishus.length > 0) {
+                // 「ここから下は国人衆ですよ」という見出しを作ります
+                const header = document.createElement('div');
+                header.innerHTML = `<div style="padding: 5px 10px; background: #37474f; color: #fff; font-weight: bold; margin-top: 15px; font-size: 0.85rem;">国人衆一覧</div>`;
+                this.selectorList.appendChild(header);
+
+                // 先ほど作った綺麗なデザインを使って国人衆を並べます
+                kunishus.forEach(k => {
+                    const name = k.getName(this.game);
+                    const rel = k.getRelation(this.game.playerClanId);
+                    const div = document.createElement('div');
+                    div.className = 'kunishu-item'; 
+                    div.style.cursor = 'default'; // 見るだけなので指のマークにしない
+                    div.style.marginTop = '5px';
+                    div.innerHTML = `<strong style="margin-right:10px;">${name}</strong> <span style="font-size:0.9rem; color:#555;">(兵数:${k.soldiers} 防御:${k.defense} 友好度:${rel})</span>`;
+                    this.selectorList.appendChild(div);
+                });
+            }
+        }
+
         if (this.selectorConfirmBtn) {
             if (actionType === 'view_only') {
                 this.selectorConfirmBtn.classList.add('hidden'); 
