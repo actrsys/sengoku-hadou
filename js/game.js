@@ -361,8 +361,6 @@ class UIManager {
         this.game = game; this.currentCastle = null; this.menuState = 'MAIN';
         this.logHistory = [];
         this.mapScale = 1.0;
-        this.infoPanelCollapsed = false;
-        this.topInfoExpanded = false; 
 
         this.mapEl = document.getElementById('map-container'); 
         this.panelEl = document.getElementById('pc-sidebar'); 
@@ -370,10 +368,9 @@ class UIManager {
         this.mobileTopLeft = document.getElementById('mobile-top-left');
         this.mobileBottomInfo = document.getElementById('mobile-bottom-info');
         
-        // ★ 追加：浮かせる要素の取得
         this.mobileFloatingInfo = document.getElementById('mobile-floating-info'); 
-        
-        this.pcMapOverlay = document.getElementById('pc-map-overlay');
+        // ★ 追加：米相場用の箱を取得
+        this.mobileFloatingMarket = document.getElementById('mobile-floating-market'); 
         
         this.logEl = document.getElementById('log-content'); 
         this.selectorModal = document.getElementById('selector-modal');
@@ -975,125 +972,95 @@ class UIManager {
             this.mapEl.appendChild(el);
         });
     }
-    
-    toggleInfoPanel() {
-        this.infoPanelCollapsed = !this.infoPanelCollapsed;
-        this.updatePanelHeader(); 
+
+    updatePanelHeader() { 
+        if (!this.currentCastle) return; 
+        if(this.statusContainer) {
+            this.statusContainer.innerHTML = ''; 
+        }
+        this.updateInfoPanel(this.currentCastle);
     }
 
-    toggleTopInfo() {
-        this.topInfoExpanded = !this.topInfoExpanded;
-        this.updateInfoPanel(this.currentCastle || this.game.getCurrentTurnCastle());
-    }
-
+    // ★ 修正：PC版のレイアウトをスマホ版と共通化し、武将一覧ボタンを消しました
     updateInfoPanel(castle) {
         if (!castle) return;
         if (this.game.phase === 'daimyo_select') return;
         
-        if (this.pcMapOverlay) {
-            const dateStr = `${this.game.year}年 ${this.game.month}月`;
-            const rateStr = `米相場: ${this.game.marketRate.toFixed(2)}`;
-            const clanData = this.game.clans.find(cd => cd.id === castle.ownerClan);
-            const castellan = this.game.getBusho(castle.castellanId);
-            const isVisible = this.game.isCastleVisible(castle);
-            const mask = (val) => isVisible ? val : "???";
-            
-            let faceHtml = "";
-            if (castellan && castellan.faceIcon) {
-                faceHtml = `<img src="data/faceicons/${castellan.faceIcon}" class="face-thumb" onerror="this.style.display='none'">`;
-            }
-
-            let html = `
-                <div class="overlay-header">
-                    <strong>${dateStr}</strong>
-                    <button class="toggle-btn" onclick="window.GameApp.ui.toggleInfoPanel()">${this.infoPanelCollapsed ? '▼' : '▲'}</button>
-                </div>
-                <div class="overlay-content ${this.infoPanelCollapsed ? 'collapsed' : ''}">
-                    <div class="info-row"><span class="info-label">${rateStr}</span></div>
-                    <hr style="margin:5px 0; border:0; border-top:1px dashed #ccc;">
-                    
-                    <div style="display:flex; align-items:flex-start;">
-                        ${faceHtml}
-                        <div style="flex:1;">
-                            <div class="info-row"><span class="info-label">拠点</span><span class="info-val">${castle.name} <small>(${clanData ? clanData.name : "中立"})</small></span></div>
-                            <div class="info-row"><span class="info-label">城主</span><span class="info-val">${castellan ? castellan.name : "-"}</span></div>
-                            <div class="info-row"><span class="info-label">兵数</span><span class="info-val highlight-text">${mask(castle.soldiers)}</span></div>
-                        </div>
-                    </div>
-                    
-                    <div class="info-row"><span class="info-label">金</span><span class="info-val">${mask(castle.gold)}</span> <span class="info-label">兵糧</span><span class="info-val">${mask(castle.rice)}</span></div>
-                    <div class="info-row"><span class="info-label">防御</span><span class="info-val">${this.getStatusBarHTML(castle.defense, castle.maxDefense, 'lightblue', isVisible)}</span> <span class="info-label">人口</span><span class="info-val">${mask(castle.population)}</span></div>
-                    <div class="info-row"><span class="info-label">訓練</span><span class="info-val">${this.getStatusBarHTML(castle.training, 100, 'lightblue', isVisible)}</span> <span class="info-label">士気</span><span class="info-val">${this.getStatusBarHTML(castle.morale, 100, 'lightblue', isVisible)}</span></div>                    <div class="info-row"><span class="info-label">民忠</span><span class="info-val">${this.getStatusBarHTML(castle.peoplesLoyalty, castle.maxPeoplesLoyalty, 'lightblue', isVisible)}</span> <span class="info-label">石高</span><span class="info-val">${this.getStatusBarHTML(castle.kokudaka, castle.maxKokudaka, 'blue', isVisible)}</span></div>
-                    <div class="info-row"><span class="info-label">鉱山</span><span class="info-val">${this.getStatusBarHTML(castle.commerce, castle.maxCommerce, 'blue', isVisible)}</span> <span class="info-label"></span><span class="info-val"></span></div>
-                    <div style="margin-top:5px; text-align:center;"><button class="btn-primary" style="padding:4px 10px; font-size:0.8rem;" onclick="window.GameApp.ui.openBushoSelector('view_only', ${castle.id})">武将一覧</button></div>
-                </div>
-            `;
-            this.pcMapOverlay.innerHTML = html;
+        const isVisible = this.game.isCastleVisible(castle);
+        const mask = (val) => isVisible ? val : "??";
+        const castellan = this.game.getBusho(castle.castellanId);
+        const clanData = this.game.clans.find(cd => cd.id === castle.ownerClan);
+        const clanName = clanData ? clanData.name : "中立";
+        const castellanName = castellan ? castellan.name : "-";
+        
+        let faceHtml = "";
+        if (castellan && castellan.faceIcon) {
+            faceHtml = `<img src="data/faceicons/${castellan.faceIcon}" onerror="this.style.display='none'">`;
         }
 
-        if (this.mobileTopLeft) {
-            const isVisible = this.game.isCastleVisible(castle);
-            const mask = (val) => isVisible ? val : "??";
-            const castellan = this.game.getBusho(castle.castellanId);
-            const clanData = this.game.clans.find(cd => cd.id === castle.ownerClan);
-            const clanName = clanData ? clanData.name : "中立";
-            const castellanName = castellan ? castellan.name : "-";
-            
-            let faceHtml = "";
-            if (castellan && castellan.faceIcon) {
-                faceHtml = `<img src="data/faceicons/${castellan.faceIcon}" onerror="this.style.display='none'">`;
-            }
+        // スマホ・PC共通の城情報レイアウト
+        let content = `
+            <div class="sp-info-header">
+                <span class="sp-clan">${clanName}</span>
+                <span class="sp-castle">${castle.name}</span>
+                <span class="sp-lord-label">城主</span>
+                <span class="sp-lord-name">${castellanName}</span>
+            </div>
+            <div class="sp-info-body">
+                <div class="sp-face-wrapper">${faceHtml}</div>
+                <div class="sp-params-grid">
+                    <div class="sp-label">石高</div><div class="sp-val">${this.getStatusBarHTML(castle.kokudaka, castle.maxKokudaka, 'blue', isVisible)}</div>
+                    <div class="sp-label">訓練</div><div class="sp-val">${this.getStatusBarHTML(castle.training, 100, 'lightblue', isVisible)}</div>
+                    <div class="sp-label">騎馬</div><div class="sp-val-right">${mask(castle.horses)}</div>
+                    
+                    <div class="sp-label">鉱山</div><div class="sp-val">${this.getStatusBarHTML(castle.commerce, castle.maxCommerce, 'blue', isVisible)}</div>
+                    <div class="sp-label">士気</div><div class="sp-val">${this.getStatusBarHTML(castle.morale, 100, 'lightblue', isVisible)}</div>
+                    <div class="sp-label">鉄砲</div><div class="sp-val-right">${mask(castle.guns)}</div>
+                    
+                    <div class="sp-label">民忠</div><div class="sp-val">${this.getStatusBarHTML(castle.peoplesLoyalty, castle.maxPeoplesLoyalty, 'lightblue', isVisible)}</div>
+                    <div class="sp-label">防御</div><div class="sp-val">${this.getStatusBarHTML(castle.defense, castle.maxDefense, 'lightblue', isVisible)}</div>
+                    <div class="sp-empty"></div><div class="sp-empty"></div>
+                    
+                    <div class="sp-label">人口</div><div class="sp-val-left" style="grid-column: 2 / span 5;">${mask(castle.population)}人</div>
+                </div>
+            </div>
+            <div class="sp-info-footer">
+                <span>金　${mask(castle.gold)}</span>
+                <span>兵糧　${mask(castle.rice)}</span>
+                <span>兵数　${mask(castle.soldiers)}</span>
+            </div>
+        `;
 
-            let content = `
-                <div class="sp-info-header">
-                    <span class="sp-clan">${clanName}</span>
-                    <span class="sp-castle">${castle.name}</span>
-                    <span class="sp-lord-label">城主</span>
-                    <span class="sp-lord-name">${castellanName}</span>
-                </div>
-                <div class="sp-info-body">
-                    <div class="sp-face-wrapper">${faceHtml}</div>
-                    <div class="sp-params-grid">
-                        <div class="sp-label">石高</div><div class="sp-val">${this.getStatusBarHTML(castle.kokudaka, castle.maxKokudaka, 'blue', isVisible)}</div>
-                        <div class="sp-label">訓練</div><div class="sp-val">${this.getStatusBarHTML(castle.training, 100, 'lightblue', isVisible)}</div>
-                        <div class="sp-label">騎馬</div><div class="sp-val-right">${mask(castle.horses)}</div>
-                        
-                        <div class="sp-label">鉱山</div><div class="sp-val">${this.getStatusBarHTML(castle.commerce, castle.maxCommerce, 'blue', isVisible)}</div>
-                        <div class="sp-label">士気</div><div class="sp-val">${this.getStatusBarHTML(castle.morale, 100, 'lightblue', isVisible)}</div>
-                        <div class="sp-label">鉄砲</div><div class="sp-val-right">${mask(castle.guns)}</div>
-                        
-                        <div class="sp-label">民忠</div><div class="sp-val">${this.getStatusBarHTML(castle.peoplesLoyalty, castle.maxPeoplesLoyalty, 'lightblue', isVisible)}</div>
-                        <div class="sp-label">防御</div><div class="sp-val">${this.getStatusBarHTML(castle.defense, castle.maxDefense, 'lightblue', isVisible)}</div>
-                        <div class="sp-empty"></div><div class="sp-empty"></div>
-                        
-                        <div class="sp-label">人口</div><div class="sp-val-left" style="grid-column: 2 / span 5;">${mask(castle.population)}人</div>
-                    </div>
-                </div>
-                <div class="sp-info-footer">
-                    <span>金　${mask(castle.gold)}</span>
-                    <span>兵糧　${mask(castle.rice)}</span>
-                    <span>兵数　${mask(castle.soldiers)}</span>
-                </div>
-            `;
-            // ★ ここにあった米相場を削除しました
+        // スマホ上部への出力
+        if (this.mobileTopLeft) {
             this.mobileTopLeft.innerHTML = content;
         }
 
-        // ★ 追加：地図上に浮かせるための情報（年月・米相場）を更新します
+        // PCサイドバー上部への出力
+        if (this.statusContainer && window.innerWidth >= 769) {
+            this.statusContainer.innerHTML = content;
+        }
+
+        // 浮き情報（左下：年月）
         if (this.mobileFloatingInfo) {
             this.mobileFloatingInfo.innerHTML = `
                 <div class="floating-time">${this.game.year}年 ${this.game.month}月</div>
+            `;
+        }
+
+        // ★ 浮き情報（右上：米相場）
+        if (this.mobileFloatingMarket) {
+            this.mobileFloatingMarket.innerHTML = `
                 <div class="floating-market">米相場 ${this.game.marketRate.toFixed(1)}</div>
             `;
         }
 
-        // ★ コマンドエリアを表示状態にしつつ、下部の年月表示は空にします
         const cmdGrid = document.getElementById('command-area');
         if(cmdGrid) {
             cmdGrid.style.display = 'grid'; 
         }
         if (this.mobileBottomInfo) {
-            this.mobileBottomInfo.innerHTML = ``; // 空にして消しました
+            this.mobileBottomInfo.innerHTML = ``; 
         }
     }
 
@@ -1118,14 +1085,6 @@ class UIManager {
              }
         } else {
             this.renderEnemyViewMenu();
-        }
-    }
-    
-    updatePanelHeader() { 
-        if (!this.currentCastle) return; 
-        this.updateInfoPanel(this.currentCastle);
-        if(this.statusContainer) {
-            this.statusContainer.innerHTML = ''; 
         }
     }
 
