@@ -109,7 +109,7 @@ const COMMAND_SPECS = {
         label: "制圧", category: 'MILITARY', 
         costGold: 0, costRice: 0, 
         isMulti: true, hasAdvice: true, 
-        startMode: 'map_select', targetType: 'kunishu_valid', 
+        startMode: 'map_select', targetType: 'kunishu_subjugate_valid', // ← 専用の合言葉にしました！
         sortKey: 'strength'
     },
 
@@ -275,11 +275,32 @@ class CommandSystem {
                     Number(target.ownerClan) !== playerClanId &&
                     this.game.getRelation(playerClanId, target.ownerClan).status === '同盟'
                 ).map(t => t.id);
-
-            // ★追加: まだ壊滅していない国人衆がいる城を探してリストアップします
-            case 'kunishu_valid':
+                
+            // ★追加: まだ壊滅していない国人衆がいる城を探してリストアップします（親善コマンド用）
+            case 'kunishu_valid': {
                 const activeKunishus = this.game.kunishuSystem.getAliveKunishus();
                 return [...new Set(activeKunishus.map(k => k.castleId))];
+            }
+
+            // ★追加: 制圧コマンド専用！自分の城か、隣の城だけを選べるようにします
+            case 'kunishu_subjugate_valid': {
+                const activeKunishus = this.game.kunishuSystem.getAliveKunishus();
+                // まず国人衆がいるお城を全部集めます
+                const allKunishuCastleIds = [...new Set(activeKunishus.map(k => k.castleId))];
+                
+                // 集めたお城を「フィルター（ふるい）」にかけて、条件に合うものだけを残します！
+                return allKunishuCastleIds.filter(targetCastleId => {
+                    const targetCastle = this.game.getCastle(targetCastleId);
+                    
+                    // 条件①：自分が持っているお城かどうか？
+                    const isMyCastle = (Number(targetCastle.ownerClan) === playerClanId);
+                    // 条件②：今まさに命令を出そうとしているお城（c）のすぐ隣のお城かどうか？
+                    const isNeighbor = GameSystem.isAdjacent(c, targetCastle);
+                    
+                    // どちらか1つでも当てはまればOK（地図で光らせる）！
+                    return isMyCastle || isNeighbor;
+                });
+            }
 
             default:
                 return [];
@@ -989,7 +1010,7 @@ class CommandSystem {
 
         // 国人衆側の準備（一時的なダミーの城と軍団を作ります）
         const kunishuName = kunishu.getName(this.game);
-
+        const leader = this.game.getBusho(kunishu.leaderId);
         // この戦い限定の「守備側データ」を作成
         const dummyDefender = {
             id: targetCastleId,
