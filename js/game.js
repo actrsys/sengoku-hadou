@@ -1813,7 +1813,7 @@ class UIManager {
                 const name = k.getName(window.GameApp);
                 const rel = k.getRelation(window.GameApp.playerClanId);
                 const div = document.createElement('div');
-                div.className = 'select-item';
+                div.className = 'kunishu-item';
                 div.style.cursor = 'pointer';
                 div.innerHTML = `<strong style="margin-right:10px;">${name}</strong> <span style="font-size:0.9rem; color:#555;">(兵数:${k.soldiers} 防御:${k.defense} 友好度:${rel})</span>`;
                 div.onclick = () => { 
