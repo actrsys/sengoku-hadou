@@ -63,7 +63,6 @@ class DataManager {
             return { clans, castles, bushos };
         } catch (error) {
             console.error(error);
-            // ※ここだけは画面ができる前の致命的なエラーなので、元のalertを残しています
             alert(`データの読み込みに失敗しました。\nフォルダ構成を確認してください。`);
             throw error;
         }
@@ -179,13 +178,10 @@ class DataManager {
             for(let i=0; i<3; i++) {
                 const castle = clanCastles[Math.floor(Math.random() * clanCastles.length)];
                 const p = personalities[Math.floor(Math.random() * personalities.length)];
-                
-                // ★修正：名無し武将も「武将|A」のように真ん中に「|」を入れます
                 let bName = `武将|${String.fromCharCode(65+i)}`;
                 if (useRandom) {
                     const s = this.genericNames.surnames[Math.floor(Math.random() * this.genericNames.surnames.length)];
                     const n = this.genericNames.names[Math.floor(Math.random() * this.genericNames.names.length)];
-                    // ★修正：ランダムな名前も「名字|名前」のようにはさみます
                     bName = `${s}|${n}`;
                 }
                 bushos.push(new Busho({
@@ -369,7 +365,6 @@ class UIManager {
         this.mobileBottomInfo = document.getElementById('mobile-bottom-info');
         
         this.mobileFloatingInfo = document.getElementById('mobile-floating-info'); 
-        // ★ 追加：米相場用の箱を取得
         this.mobileFloatingMarket = document.getElementById('mobile-floating-market'); 
         
         this.logEl = document.getElementById('log-content'); 
@@ -424,6 +419,39 @@ class UIManager {
 
         this.initMapDrag();
         this.initContextMenu();
+        this.initSidebarResize(); // ★ 追加：サイドバーの横幅を変える機能を準備
+    }
+
+    // ★ 追加：サイドバーをマウスでドラッグして幅を変える機能です
+    initSidebarResize() {
+        const sidebar = document.getElementById('pc-sidebar');
+        const resizer = document.getElementById('sidebar-resizer');
+        if (!sidebar || !resizer) return; // スマホなどサイドバーがない場合は何もしない
+
+        let isResizing = false;
+
+        resizer.addEventListener('mousedown', (e) => {
+            isResizing = true;
+            document.body.style.cursor = 'col-resize'; // マウスの形を「左右矢印」にする
+            e.preventDefault(); // マウスを動かした時に文字が選択されないようにする
+        });
+
+        document.addEventListener('mousemove', (e) => {
+            if (!isResizing) return;
+            // 画面の右端からの距離を計算して、サイドバーの幅にします
+            const newWidth = document.body.clientWidth - e.clientX;
+            // 極端に狭くなったり広くなったりしないように制限をかけます
+            if (newWidth >= 280 && newWidth <= 800) {
+                sidebar.style.width = `${newWidth}px`;
+            }
+        });
+
+        document.addEventListener('mouseup', () => {
+            if (isResizing) {
+                isResizing = false;
+                document.body.style.cursor = ''; // マウスの形を元に戻す
+            }
+        });
     }
 
     showDialog(msg, isConfirm, onOk, onCancel = null) {
@@ -981,7 +1009,6 @@ class UIManager {
         this.updateInfoPanel(this.currentCastle);
     }
 
-    // ★ 修正：PC版のレイアウトをスマホ版と共通化し、武将一覧ボタンを消しました
     updateInfoPanel(castle) {
         if (!castle) return;
         if (this.game.phase === 'daimyo_select') return;
@@ -998,7 +1025,6 @@ class UIManager {
             faceHtml = `<img src="data/faceicons/${castellan.faceIcon}" onerror="this.style.display='none'">`;
         }
 
-        // スマホ・PC共通の城情報レイアウト
         let content = `
             <div class="sp-info-header">
                 <span class="sp-clan">${clanName}</span>
@@ -1031,24 +1057,20 @@ class UIManager {
             </div>
         `;
 
-        // スマホ上部への出力
         if (this.mobileTopLeft) {
             this.mobileTopLeft.innerHTML = content;
         }
 
-        // PCサイドバー上部への出力
         if (this.statusContainer && window.innerWidth >= 769) {
             this.statusContainer.innerHTML = content;
         }
 
-        // 浮き情報（左下：年月）
         if (this.mobileFloatingInfo) {
             this.mobileFloatingInfo.innerHTML = `
                 <div class="floating-time">${this.game.year}年 ${this.game.month}月</div>
             `;
         }
 
-        // ★ 浮き情報（右上：米相場）
         if (this.mobileFloatingMarket) {
             this.mobileFloatingMarket.innerHTML = `
                 <div class="floating-market">米相場 ${this.game.marketRate.toFixed(1)}</div>
@@ -1956,7 +1978,6 @@ class GameManager {
             
         } catch (e) {
             console.error(e);
-            // ※ここはまだ画面が作られていない段階なのでalertのままです
             alert("シナリオデータの読み込みに失敗しました。");
             this.ui.returnToTitle();
         }
