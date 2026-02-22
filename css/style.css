@@ -170,7 +170,6 @@ img {
     transform-origin: center center; margin: auto; flex: none; 
 }
 
-/* ★ PC版のオーバーレイは使わないので完全に非表示に */
 #pc-map-overlay {
     display: none !important;
 }
@@ -217,7 +216,6 @@ img {
     pointer-events: none; 
 }
 
-/* ★ 追加・変更：米相場を右上に配置 */
 #mobile-floating-market {
     position: absolute;
     top: 10px;
@@ -280,10 +278,9 @@ img {
 }
 
 #mobile-bottom-info {
-    padding: 0; margin: 0; /* JSで空にしましたが念のため余白も消します */
+    padding: 0; margin: 0;
 }
 
-/* ★ 変更：スマホ版コマンドのスリム化と文字の拡大 */
 .command-grid {
     display: grid; grid-template-columns: repeat(3, 1fr); gap: 2px; padding: 2px 0;
 }
@@ -299,25 +296,49 @@ img {
 .cmd-btn.finish { background: #ffebee; border-color: #ef5350; color: #c62828; grid-column: span 3; margin-top: 2px;}
 .cmd-btn.back { background: #cfd8dc; border-color: #90a4ae; color: #455a64; grid-column: span 3; }
 
+#sidebar-resizer { display: none; }
 #pc-sidebar { display: none !important; }
 
-/* ★ 変更：PC版レイアウトの調整 */
 @media (min-width: 769px) {
     #app { flex-direction: row; }
     #top-info-bar { display: none !important; }
     #bottom-command-bar { display: none !important; }
     #pc-map-overlay { display: none !important; }
     #map-reset-zoom { bottom: 20px; right: 20px; }
+    
+    /* ★ 変更：PC版での米相場の位置をサイドバーから離す */
+    #mobile-floating-market {
+        right: 30px; 
+        top: 20px;
+    }
+
     #pc-sidebar {
-        display: flex !important; flex-direction: column; width: 300px; 
+        display: flex !important; flex-direction: column; 
+        width: 340px; /* ★ 変更：デフォルト幅を広くしました */
         background: #f5f5f5; border-left: 1px solid #ccc;
         box-shadow: -2px 0 5px rgba(0,0,0,0.1); z-index: 200;
         overflow-y: auto; height: 100dvh;
+        position: relative; /* ★ 追加：リサイザーの基準にします */
     }
     
+    /* ★ 追加：サイドバーを広げたり狭めたりする取っ手のデザイン */
+    #sidebar-resizer {
+        display: block;
+        position: absolute;
+        top: 0; left: 0; bottom: 0;
+        width: 8px;
+        cursor: col-resize;
+        z-index: 210;
+        background-color: transparent;
+        transition: background-color 0.2s;
+    }
+    #sidebar-resizer:hover, #sidebar-resizer:active {
+        background-color: rgba(33, 150, 243, 0.3);
+    }
+
     #pc-status-panel {
-        flex: none; /* 上に詰めて表示 */
-        padding: 0; /* スマホと同じデザインなのでパディングはなし */
+        flex: none; 
+        padding: 0; 
         background: #fff;
         border-bottom: 2px solid #ccc;
     }
@@ -325,7 +346,6 @@ img {
     #pc-command-area { padding: 10px; flex: 1; overflow-y: auto; }
     .command-grid { grid-template-columns: repeat(2, 1fr); gap: 10px; }
     
-    /* PC版はコマンドボタンを押しやすく少し大きめに戻す */
     .cmd-btn { padding: 10px; font-size: 1.1rem; height: auto; }
     .cmd-btn.finish, .cmd-btn.back { grid-column: span 2; }
 }
