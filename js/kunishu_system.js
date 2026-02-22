@@ -1,6 +1,7 @@
 /**
  * kunishu_system.js
- * 新規作成: 国人衆（独立地域勢力）システムを管理するクラス
+ * 国人衆（独立地域勢力）システムを管理するクラス
+ * 修正: 国人衆同士の抗争時、国人衆用の友好度を参照するように修正しました
  */
 
 class KunishuSystem {
@@ -76,9 +77,9 @@ class KunishuSystem {
                 if (checkedPairs.has(pairId)) return;
                 checkedPairs.add(pairId);
 
-                // 互いの友好度が低い(30以下)場合は抗争発生
-                const rel1 = k1.getRelation(k2.id);
-                const rel2 = k2.getRelation(k1.id);
+                // ★修正: 国人衆同士の関係を調べるので「true」を付けます
+                const rel1 = k1.getRelation(k2.id, true);
+                const rel2 = k2.getRelation(k1.id, true);
                 if (rel1 <= 30 || rel2 <= 30) {
                     this.executeConflict(k1, k2);
                 }
@@ -141,7 +142,9 @@ class KunishuSystem {
         defender.soldiers = Math.max(0, defender.soldiers - soldierDmg);
         attacker.soldiers = Math.max(0, attacker.soldiers - counterDmg);
 
-        const msg = `【国衆抗争】${this.game.getCastle(attacker.castleId).name}にて、${atkLeader?atkLeader.name:"国衆"}と${defLeader?defLeader.name:"国衆"}が抗争を起こしました！`;
+        const atkName = attacker.getName(this.game);
+        const defName = defender.getName(this.game);
+        const msg = `【国衆抗争】${this.game.getCastle(attacker.castleId).name}にて、${atkName}と${defName}が抗争を起こしました！`;
         this.game.ui.log(msg);
 
         this.checkDestroyed(attacker);
@@ -225,11 +228,12 @@ class KunishuSystem {
         }
         atkBushos = atkBushos.concat(members.slice(0, 4));
 
-        this.game.ui.log(`【国衆蜂起】${castle.name}にて、国人衆が反乱を起こしました！`);
+        const kunishuName = kunishu.getName(this.game);
+        this.game.ui.log(`【国衆蜂起】${castle.name}にて、${kunishuName}が反乱を起こしました！`);
 
         // 国人衆を専用の一時的な大名(Clan)として扱うためのダミーデータ
         const dummyAttacker = {
-            name: `${this.game.getBusho(kunishu.leaderId).name}衆`,
+            name: kunishuName, 
             ownerClan: -1, // 特殊ID
             soldiers: atkSoldiers,
             training: 50,

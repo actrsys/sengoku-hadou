@@ -3,6 +3,7 @@
  * 戦争処理マネージャー & 戦争計算ロジック
  * 修正: 捕虜の処遇結果のアラートをカスタムダイアログ（showDialog）に置き換えました
  * 修正: 迎撃時の出陣兵士・兵糧の取得処理を修正（ID指定のオブジェクト構造に対応）
+ * ★追加: 国人衆の蜂起（反乱）・制圧時の特別な結末と、捕虜の特別ルールを追加しました
  */
 
 window.WarParams = {
@@ -172,12 +173,20 @@ class WarManager {
             atkBushos.forEach(b => b.isActionDone = true);
 
             const atkClanData = this.game.clans.find(c => c.id === atkClan); 
-            const atkArmyName = atkClanData ? atkClanData.getArmyName() : "敵軍";
+            // ★修正: 国人衆の場合は専用の名前を使う
+            const atkArmyName = atkCastle.isKunishu ? atkCastle.name : (atkClanData ? atkClanData.getArmyName() : "敵軍");
             let defBusho = this.game.getBusho(defCastle.castellanId) || {name:"守備隊長", strength:30, leadership:30, intelligence:30, charm:30};
             
             const attackerForce = { 
-                name: atkCastle.name + "遠征軍", ownerClan: atkCastle.ownerClan, soldiers: atkSoldierCount, 
-                bushos: atkBushos, training: atkCastle.training, morale: atkCastle.morale, rice: atkRice, maxRice: atkRice
+                name: atkCastle.isKunishu ? atkCastle.name : atkCastle.name + "遠征軍", 
+                ownerClan: atkCastle.ownerClan, 
+                soldiers: atkSoldierCount, 
+                bushos: atkBushos, 
+                training: atkCastle.training, 
+                morale: atkCastle.morale, 
+                rice: atkRice, 
+                maxRice: atkRice,
+                isKunishu: atkCastle.isKunishu || false // ★追加: 国人衆フラグ
             };
             
             this.state = { 
@@ -208,7 +217,6 @@ class WarManager {
                                     }
                                     this.game.ui.openQuantitySelector('def_intercept', [defCastle], null, {
                                         onConfirm: (inputs) => {
-                                            // ここを修正しました！ お城のIDがついた箱から数字を取り出すようにしました
                                             const inputData = inputs[defCastle.id] || inputs;
                                             const interceptSoldiers = inputData.soldiers || 0;
                                             const interceptRice = inputData.rice || 0;
@@ -238,16 +246,25 @@ class WarManager {
                         const defAssignments = this.autoDivideSoldiers(defBushos, defSoldiers);
                         
                         if (atkClan === pid) {
-                            this.game.ui.showUnitDivideModal(atkBushos, atkSoldierCount, (atkAssignments) => {
-                                onResult('field', defAssignments, defRice, atkAssignments);
-                            });
+                            // 国人衆の反乱時は分割画面を出さない
+                            if (attackerForce.isKunishu) {
+                                onResult('field', defAssignments, defRice, [{busho: atkBushos[0], soldiers: atkSoldierCount}]);
+                            } else {
+                                this.game.ui.showUnitDivideModal(atkBushos, atkSoldierCount, (atkAssignments) => {
+                                    onResult('field', defAssignments, defRice, atkAssignments);
+                                });
+                            }
                         } else onResult('field', defAssignments, defRice, this.autoDivideSoldiers(atkBushos, atkSoldierCount));
                     } else onResult('siege');
                 }
             };
 
-            if (typeof window.FieldWarManager === 'undefined') this.startSiegeWarPhase();
-            else {
+            // 国人衆制圧戦の場合は野戦をスキップして即攻城戦へ
+            if (this.state.isKunishuSubjugation) {
+                this.startSiegeWarPhase();
+            } else if (typeof window.FieldWarManager === 'undefined') {
+                this.startSiegeWarPhase();
+            } else {
                 showInterceptDialog((choice, defAssignments, defRice, atkAssignments) => {
                     if (choice === 'field') {
                         this.state.atkAssignments = atkAssignments; this.state.defAssignments = defAssignments; 
@@ -311,8 +328,12 @@ class WarManager {
 
     startSiegeWarPhase() {
         const s = this.state; const W = window.WarParams.War;
-        s.defender.peoplesLoyalty = Math.max(0, s.defender.peoplesLoyalty - (W.AttackLoyaltyDecay || 5)); 
-        s.defender.population = Math.max(0, s.defender.population - (W.AttackPopDecay || 500));
+        
+        // ★修正: 国人衆の制圧戦（ダミー城）の場合は民忠・人口の低下をスキップ
+        if (!s.isKunishuSubjugation) {
+            s.defender.peoplesLoyalty = Math.max(0, s.defender.peoplesLoyalty - (W.AttackLoyaltyDecay || 5)); 
+            s.defender.population = Math.max(0, s.defender.population - (W.AttackPopDecay || 500));
+        }
         
         if (s.isPlayerInvolved) { 
             setTimeout(() => {
@@ -550,6 +571,67 @@ class WarManager {
         try {
             const s = this.state; s.active = false; 
 
+            // ★追加: プレイヤーが国人衆を制圧（討伐）した時の処理
+            if (s.isKunishuSubjugation) {
+                const kunishu = this.game.kunishuSystem.getKunishu(s.defender.kunishuId);
+                if (attackerWon) {
+                    this.game.ui.log(`【国衆制圧】${s.defender.name}の討伐に成功しました！`);
+                    if (kunishu) {
+                        kunishu.isDestroyed = true;
+                        kunishu.soldiers = 0;
+                        const members = this.game.kunishuSystem.getKunishuMembers(kunishu.id);
+                        members.forEach(b => {
+                            b.belongKunishuId = 0; b.clan = 0; b.status = 'ronin'; b.isCastellan = false;
+                        });
+                    }
+                } else {
+                    this.game.ui.log(`【国衆制圧】${s.defender.name}の討伐に失敗しました……`);
+                }
+                
+                // 生き残った攻撃部隊は元の城へ帰る処理
+                const srcC = this.game.getCastle(s.sourceCastle.id); 
+                if (srcC) {
+                    srcC.soldiers += s.attacker.soldiers; 
+                    srcC.rice += s.attacker.rice;
+                }
+                this.closeWar();
+                return;
+            }
+
+            // ★追加: 国人衆が反乱（蜂起）を起こした時の処理
+            if (s.attacker.isKunishu) {
+                if (attackerWon) {
+                    const targetC = this.game.getCastle(s.defender.id);
+                    const oldOwner = targetC.ownerClan;
+                    targetC.ownerClan = 0; // 城が空き地になる
+                    targetC.castellanId = 0;
+                    this.game.getCastleBushos(targetC.id).forEach(b => {
+                        b.status = 'ronin'; b.clan = 0; b.isCastellan = false;
+                    });
+                    targetC.samuraiIds = [];
+                    this.game.ui.log(`【国衆蜂起】国人衆の反乱により、${targetC.name}が陥落し空白地となりました。`);
+                    
+                    // もし大名が城を全て失ったら滅亡
+                    if (this.game.castles.filter(c => c.ownerClan === oldOwner).length === 0) {
+                        this.game.ui.log(`${this.game.clans.find(c=>c.id===oldOwner)?.name}は滅亡しました。`);
+                        if (oldOwner === this.game.playerClanId) {
+                            setTimeout(() => {
+                                this.game.ui.showDialog("全拠点を失いました。ゲームオーバーです。", false, () => {
+                                    this.game.ui.returnToTitle();
+                                });
+                            }, 1000);
+                        } else {
+                            const leader = this.game.getBusho(this.game.clans.find(c=>c.id===oldOwner).leaderId);
+                            if (leader) leader.status = 'dead';
+                        }
+                    }
+                } else {
+                    this.game.ui.log(`【国衆蜂起】国人衆の反乱を鎮圧しました。`);
+                }
+                this.closeWar();
+                return;
+            }
+
             s.atkBushos.forEach(b => { this.game.factionSystem.recordBattle(b, s.defender.id); this.game.factionSystem.updateRecognition(b, 25); });
             const defBushos = this.game.getCastleBushos(s.defender.id).concat(this.pendingPrisoners);
             if (s.defBusho && s.defBusho.id && !defBushos.find(b => b.id === s.defBusho.id)) defBushos.push(s.defBusho);
@@ -688,30 +770,56 @@ class WarManager {
         } 
     }
     
-    // ★ ここから修正：alertをshowDialogに置き換えました
+    // ★ 修正：国人衆のルール（リーダーは引抜不可、解放時は帰還など）を追加
     handlePrisonerAction(index, action) { 
-        const prisoner = this.pendingPrisoners[index]; const originalClanId = prisoner.clan;
+        const prisoner = this.pendingPrisoners[index]; 
+        const originalClanId = prisoner.clan;
+        const kunishu = prisoner.belongKunishuId > 0 ? this.game.kunishuSystem.getKunishu(prisoner.belongKunishuId) : null;
+
         if (action === 'hire') { 
+            if (kunishu && prisoner.id === kunishu.leaderId) {
+                this.game.ui.showDialog(`${prisoner.name}「国衆を束ねるこの俺が、お前になど仕えるか！」\n(※国人衆の代表者は登用できません)`, false); 
+                return; // やり直し
+            }
+
             const myBushos = this.game.bushos.filter(b=>b.clan===this.game.playerClanId); const recruiter = myBushos.find(b => b.isDaimyo) || myBushos[0]; 
             const score = (recruiter.charm * 2.0) / (prisoner.loyalty * 1.5); 
             if (prisoner.isDaimyo) this.game.ui.showDialog(`${prisoner.name}「敵の軍門には下らぬ！」`, false); 
             else if (score > Math.random()) { 
                 prisoner.clan = this.game.playerClanId; prisoner.loyalty = 50; prisoner.isCastellan = false; 
-                const targetC = this.game.getCastle(prisoner.castleId); 
-                if(targetC) { targetC.samuraiIds.push(prisoner.id); this.game.updateCastleLord(targetC); }
+                prisoner.belongKunishuId = 0; // 国人衆を抜ける
+                const targetC = this.game.getCastle(prisoner.castleId) || this.game.getCurrentTurnCastle(); 
+                if(targetC) { 
+                    prisoner.castleId = targetC.id;
+                    if (!targetC.samuraiIds.includes(prisoner.id)) targetC.samuraiIds.push(prisoner.id); 
+                    this.game.updateCastleLord(targetC); 
+                }
                 this.game.ui.showDialog(`${prisoner.name}を登用しました！`, false); 
             } 
             else this.game.ui.showDialog(`${prisoner.name}は登用を拒否しました……`, false); 
         } else if (action === 'kill') { 
-            if (prisoner.isDaimyo) this.handleDaimyoDeath(prisoner); prisoner.status = 'dead'; prisoner.clan = 0; prisoner.castleId = 0; 
+            if (prisoner.isDaimyo) this.handleDaimyoDeath(prisoner); 
+            prisoner.status = 'dead'; prisoner.clan = 0; prisoner.castleId = 0; prisoner.belongKunishuId = 0;
         } else if (action === 'release') { 
-            const friendlyCastles = this.game.castles.filter(c => c.ownerClan === originalClanId);
-            if (friendlyCastles.length > 0) {
-                const returnCastle = friendlyCastles[Math.floor(Math.random() * friendlyCastles.length)];
-                prisoner.castleId = returnCastle.id; prisoner.isCastellan = false; prisoner.status = 'active'; returnCastle.samuraiIds.push(prisoner.id);
-                this.game.factionSystem.handleMove(prisoner, 0, returnCastle.id); this.game.updateCastleLord(returnCastle);
-                this.game.ui.showDialog(`${prisoner.name}を解放しました。(自領へ帰還しました)`, false);
-            } else { prisoner.status = 'ronin'; prisoner.clan = 0; prisoner.castleId = 0; this.game.ui.showDialog(`${prisoner.name}を解放しました。(在野へ下りました)`, false); }
+            if (kunishu && !kunishu.isDestroyed) {
+                prisoner.status = 'active'; 
+                prisoner.clan = 0;
+                prisoner.castleId = kunishu.castleId;
+                const returnCastle = this.game.getCastle(kunishu.castleId);
+                if (returnCastle && !returnCastle.samuraiIds.includes(prisoner.id)) returnCastle.samuraiIds.push(prisoner.id);
+                this.game.ui.showDialog(`${prisoner.name}を解放しました。(国人衆へ帰還しました)`, false);
+            } else {
+                const friendlyCastles = this.game.castles.filter(c => c.ownerClan === originalClanId && originalClanId !== 0);
+                if (friendlyCastles.length > 0) {
+                    const returnCastle = friendlyCastles[Math.floor(Math.random() * friendlyCastles.length)];
+                    prisoner.castleId = returnCastle.id; prisoner.isCastellan = false; prisoner.status = 'active'; returnCastle.samuraiIds.push(prisoner.id);
+                    this.game.factionSystem.handleMove(prisoner, 0, returnCastle.id); this.game.updateCastleLord(returnCastle);
+                    this.game.ui.showDialog(`${prisoner.name}を解放しました。(自領へ帰還しました)`, false);
+                } else { 
+                    prisoner.status = 'ronin'; prisoner.clan = 0; prisoner.castleId = 0; prisoner.belongKunishuId = 0; 
+                    this.game.ui.showDialog(`${prisoner.name}を解放しました。(在野へ下りました)`, false); 
+                }
+            }
         } 
         this.pendingPrisoners.splice(index, 1); 
         if (this.pendingPrisoners.length === 0) this.game.ui.closePrisonerModal(); else this.game.ui.showPrisonerModal(this.pendingPrisoners); 
@@ -727,21 +835,43 @@ class WarManager {
         else { candidates.sort((a,b) => (b.politics + b.charm) - (a.politics + a.charm)); this.game.changeLeader(clanId, candidates[0].id); } 
     }
     
+    // ★ 修正：AIの捕虜処理にも国人衆ルールを追加
     autoResolvePrisoners(captives, winnerClanId) { 
         const aiBushos = this.game.bushos.filter(b => b.clan === winnerClanId); 
         const leaderInt = aiBushos.length > 0 ? Math.max(...aiBushos.map(b => b.intelligence)) : 50; 
 
         captives.forEach(p => { 
             if (p.isDaimyo) { this.handleDaimyoDeath(p); p.status = 'dead'; p.clan = 0; p.castleId = 0; return; } 
-            if ((leaderInt / 100) > Math.random()) { 
-                p.clan = winnerClanId; p.loyalty = 50; p.isCastellan = false; 
+            
+            const isKunishuBoss = (p.belongKunishuId > 0 && p.id === this.game.kunishuSystem.getKunishu(p.belongKunishuId)?.leaderId);
+
+            if (!isKunishuBoss && (leaderInt / 100) > Math.random()) { 
+                p.clan = winnerClanId; p.loyalty = 50; p.isCastellan = false; p.belongKunishuId = 0;
                 const targetC = this.game.getCastle(p.castleId);
                 if (targetC && !targetC.samuraiIds.includes(p.id)) { targetC.samuraiIds.push(p.id); this.game.updateCastleLord(targetC); }
                 return; 
             } 
-            if (p.charm > (window.WarParams.War.PrisonerRecruitThreshold || 60)) { p.status = 'ronin'; p.clan = 0; p.castleId = 0; } 
-            else { p.status = 'dead'; p.clan = 0; p.castleId = 0; } 
+            if (p.charm > (window.WarParams.War.PrisonerRecruitThreshold || 60)) { 
+                const kunishu = p.belongKunishuId > 0 ? this.game.kunishuSystem.getKunishu(p.belongKunishuId) : null;
+                if (kunishu && !kunishu.isDestroyed) {
+                    p.status = 'active'; p.clan = 0; p.castleId = kunishu.castleId;
+                } else {
+                    p.status = 'ronin'; p.clan = 0; p.castleId = 0; 
+                }
+            } 
+            else { p.status = 'dead'; p.clan = 0; p.castleId = 0; p.belongKunishuId = 0; } 
         }); 
     }
 
+    closeWar() { 
+        this.game.ui.renderMap(); 
+        if (this.state.isPlayerInvolved) { 
+            this.game.ui.updatePanelHeader(); 
+            this.game.ui.renderCommandMenu(); 
+        }
+        
+        setTimeout(() => {
+             this.game.finishTurn(); 
+        }, 100);
+    }
 }

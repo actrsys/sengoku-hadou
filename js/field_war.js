@@ -2,6 +2,7 @@
  * field_war.js
  * HEX式 野戦システム
  * 修正: 撤退ボタンの確認アラートをカスタムダイアログ（showDialog）に置き換えました
+ * ★追加: 城が攻められた時に、仲の良い国人衆が「AIの援軍」として参戦する機能を追加しました
  */
 
 class FieldWarManager {
@@ -90,6 +91,51 @@ class FieldWarManager {
                     stats: WarSystem.calcUnitStats([assign.busho]),
                     hasActionDone: false
                 });
+            });
+        }
+
+        // ★追加: 防衛側が城を持っている場合、仲良しの国人衆が「援軍」に来るかも！
+        if (!warState.isKunishuSubjugation && warState.defender.ownerClan !== 0 && warState.defender.ownerClan !== -1) {
+            const kunishus = this.game.kunishuSystem.getKunishusInCastle(warState.defender.id);
+            kunishus.forEach(k => {
+                if (k.isDestroyed) return;
+                const rel = k.getRelation(warState.defender.ownerClan);
+                // 友好度70以上から確率で参戦
+                if (rel >= 70) {
+                    const prob = 0.2 + ((rel - 70) / 30) * 0.8;
+                    if (Math.random() <= prob) {
+                        const members = this.game.kunishuSystem.getKunishuMembers(k.id);
+                        if (members.length > 0) {
+                            // 統率が一番高い武将が率いる
+                            members.sort((a, b) => b.leadership - a.leadership);
+                            const bestBusho = members[0];
+                            
+                            // 既に別枠で参戦していなければ参加
+                            if (!this.units.some(u => u.name === bestBusho.name)) {
+                                const uSoldiers = Math.floor(k.soldiers * 0.5); // 兵力は国人衆の５割
+                                
+                                if (uSoldiers > 0) {
+                                    this.units.push({
+                                        id: 'k_' + bestBusho.id,
+                                        name: bestBusho.name + "(国衆)",
+                                        isAttacker: false,
+                                        isPlayer: false, // 援軍はプレイヤー操作不可（勝手に動くAI）
+                                        isGeneral: false,
+                                        x: defX, // 守備側と同じラインに配置
+                                        y: yPositions[this.units.length % 5], 
+                                        direction: isDefPlayer ? 1 : 4,
+                                        mobility: 4, 
+                                        ap: 4,
+                                        soldiers: uSoldiers,
+                                        stats: WarSystem.calcUnitStats([bestBusho]),
+                                        hasActionDone: false
+                                    });
+                                    this.game.ui.log(`【国衆援軍】${bestBusho.name}率いる国人衆が防衛側の援軍として駆けつけました！`);
+                                }
+                            }
+                        }
+                    }
+                }
             });
         }
 
@@ -255,8 +301,16 @@ class FieldWarManager {
         const infoEl = document.getElementById('fw-unit-info');
         if (!infoEl) return;
         
+        // ★修正: 援軍かどうかが色でわかるようにしました
+        let color = unit.isAttacker ? '#d32f2f' : '#1976d2';
+        if (!unit.isPlayer && !unit.isAttacker && this.units.some(u => u.isPlayer && !u.isAttacker)) {
+            color = '#4caf50'; // 味方の援軍は緑
+        } else if (!unit.isPlayer && !unit.isAttacker && unit.name.includes("国衆")) {
+            color = '#ff9800'; // 敵の援軍はオレンジ
+        }
+
         infoEl.innerHTML = `
-            <div style="font-weight:bold; color: ${unit.isAttacker ? '#d32f2f' : '#1976d2'};">
+            <div style="font-weight:bold; color: ${color};">
                 ${unit.name} <span style="font-size:0.8rem; color:#555;">(${unit.isAttacker ? '攻撃' : '守備'})</span>
             </div>
             <div style="font-size:0.9rem; font-weight:bold;">兵士: ${unit.soldiers}</div>
@@ -298,14 +352,12 @@ class FieldWarManager {
                 hex.style.top = `${y * (this.hexH / 2)}px`;
                 
                 if (isPlayerTurn && unit) {
-                    // ★ 修正箇所：距離を測って、届く範囲の味方だけを塗るように変更しました！
                     if (this.state === 'PHASE_MOVE' || this.state === 'MOVE_PREVIEW') {
                         if (x === unit.x && y === unit.y) {
                             hex.classList.add('current-pos');
                         } else if (this.reachable && this.reachable[`${x},${y}`]) {
                             hex.classList.add('movable');
                         } else if (this.units.some(u => u.x === x && u.y === y && u.isAttacker === unit.isAttacker)) {
-                            // 操作している部隊の移動力（ap）で届く距離にいる味方なら色を塗る
                             if (this.getDistance(unit.x, unit.y, x, y) <= unit.ap) {
                                 hex.classList.add('movable'); 
                             }
@@ -369,12 +421,23 @@ class FieldWarManager {
             this.mapEl.appendChild(pEl);
         }
 
+        const isAtkPlayer = (Number(this.warState.attacker.ownerClan) === Number(this.game.playerClanId));
+        const isDefPlayer = (Number(this.warState.defender.ownerClan) === Number(this.game.playerClanId));
+
         this.units.forEach((u) => {
             let iconSize = 16 + Math.min(Math.floor(u.soldiers / 1000), 5) * 3;
 
             const uEl = document.createElement('div');
             const isActive = (unit && u.id === unit.id);
-            uEl.className = `fw-unit ${u.isAttacker ? 'attacker' : 'defender'} ${isActive ? 'active' : ''}`;
+            
+            // ★修正: 援軍の色分け
+            let colorClass = u.isAttacker ? 'attacker' : 'defender';
+            if (!u.isPlayer && !u.isAttacker) {
+                if (isDefPlayer) uEl.style.filter = 'drop-shadow(1px 0 0 #4caf50) drop-shadow(-1px 0 0 #4caf50) drop-shadow(0 1px 0 #4caf50) drop-shadow(0 -1px 0 #4caf50) drop-shadow(2px 2px 2px rgba(0,0,0,0.8))';
+                else if (isAtkPlayer) uEl.style.filter = 'drop-shadow(1px 0 0 #ff9800) drop-shadow(-1px 0 0 #ff9800) drop-shadow(0 1px 0 #ff9800) drop-shadow(0 -1px 0 #ff9800) drop-shadow(2px 2px 2px rgba(0,0,0,0.8))';
+            }
+
+            uEl.className = `fw-unit ${colorClass} ${isActive ? 'active' : ''}`;
             uEl.style.width = `${iconSize}px`; 
             uEl.style.height = `${iconSize}px`; 
             uEl.style.left = `${u.x * (this.hexW * 0.75) + (this.hexW - iconSize) / 2}px`; 
@@ -707,14 +770,21 @@ class FieldWarManager {
         }
         return false;
     }
-
+    
     endFieldWar(resultType) {
         this.active = false;
         
         let atkSoldiers = 0, defSoldiers = 0;
         this.units.forEach(u => {
-            if (u.isAttacker) atkSoldiers += u.soldiers;
-            else defSoldiers += u.soldiers;
+            if (u.isAttacker) {
+                atkSoldiers += u.soldiers;
+            } else {
+                // 🌟 ここが変わりました！
+                // 「k_」という名札（国人衆）がついていない人だけ、お城に入れます
+                if (typeof u.id === 'string' && !u.id.startsWith('k_')) {
+                    defSoldiers += u.soldiers;
+                }
+            }
         });
         
         this.warState.attacker.soldiers = atkSoldiers;
@@ -952,7 +1022,7 @@ class FieldWarManager {
             if (d < minDist) { minDist = d; targetEnemy = e; }
         });
 
-        // 戦力差撤退判定
+        // 戦力差撤退判定（国人衆などのAI専用部隊も一緒に撤退する）
         let allySoldiers = 0, enemySoldiers = 0;
         this.units.forEach(u => {
             if (u.isAttacker === unit.isAttacker) allySoldiers += u.soldiers;
