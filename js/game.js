@@ -1792,10 +1792,16 @@ class UIManager {
         
         const title = document.getElementById('selector-title');
         if (title) title.textContent = "対象の国衆を選択";
+
+        // ★追加: 武将用の項目名（ヘッダー）を隠す
+        const listHeader = document.querySelector('#selector-modal .list-header');
+        if (listHeader) listHeader.style.display = 'none';
         
         const backBtn = document.querySelector('#selector-modal .btn-secondary');
         if(backBtn) {
             backBtn.onclick = () => {
+                // ★追加: 戻るボタンを押したときに、隠したヘッダーを元に戻す
+                if (listHeader) listHeader.style.display = '';
                 this.closeSelector();
                 if (onCancel) onCancel();
             };
@@ -1813,10 +1819,11 @@ class UIManager {
                 const name = k.getName(window.GameApp);
                 const rel = k.getRelation(window.GameApp.playerClanId);
                 const div = document.createElement('div');
-                div.className = 'kunishu-item';
-                div.style.cursor = 'pointer';
+                div.className = 'kunishu-item'; // ← さっき直していただいた綺麗なデザインの名前！
                 div.innerHTML = `<strong style="margin-right:10px;">${name}</strong> <span style="font-size:0.9rem; color:#555;">(兵数:${k.soldiers} 防御:${k.defense} 友好度:${rel})</span>`;
                 div.onclick = () => { 
+                    // ★追加: 国衆を選んだときにも、隠したヘッダーを元に戻す
+                    if (listHeader) listHeader.style.display = '';
                     this.closeSelector();
                     onSelect(k.id); 
                 };
