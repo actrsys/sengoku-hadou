@@ -53,6 +53,8 @@ const COMMAND_SPECS = {
         startMode: 'quantity_select',
         msg: "兵糧を売り金を得ます"
     },
+    //矢弾の実装は一旦保留
+    /*
     'buy_ammo': {
         label: "矢弾購入", category: 'MIL_TRADE',
         costGold: 0, costRice: 0,
@@ -60,6 +62,7 @@ const COMMAND_SPECS = {
         startMode: 'quantity_select',
         msg: "金を払い矢弾を買います"
     },
+    */
     'buy_horses': {
         label: "騎馬購入", category: 'MIL_TRADE',
         costGold: 0, costRice: 0,
