@@ -194,11 +194,17 @@ class WarManager {
                 defender: defCastle, atkBushos: atkBushos, defBusho: defBusho, 
                 turn: 'attacker', isPlayerInvolved: isPlayerInvolved, deadSoldiers: { attacker: 0, defender: 0 }, defenderGuarding: false 
             };
-
             const showInterceptDialog = async (onResult) => {
-                if (isPlayerInvolved) await this.game.ui.showCutin(`${atkArmyName}の${atkBushos[0].name}が\n${defCastle.name}に攻め込みました！`);
+	            if (isPlayerInvolved) await this.game.ui.showCutin(`${atkArmyName}の${atkBushos[0].name}が\n${defCastle.name}に攻め込みました！`);
 
-                if (defClan === pid) {
+	            if (defClan === pid) {
+	                
+	                if (defCastle.soldiers <= 0) {
+	                    // 兵士が0人以下の時は、自動的に籠城（ろうじょう）するよ！
+	                    if (isPlayerInvolved) this.game.ui.log("城に兵士がいないため、迎撃（野戦）に出られません！");
+	                    onResult('siege');
+	                } else {
+
                     const modal = document.getElementById('intercept-confirm-modal');
                     if (modal) {
                         modal.classList.remove('hidden');
@@ -231,6 +237,8 @@ class WarManager {
                         };
                         document.getElementById('btn-siege').onclick = () => { modal.classList.add('hidden'); onResult('siege'); };
                     } else onResult('siege');
+                    
+                }
                 } else {
                     if (defCastle.soldiers >= atkSoldierCount * 0.8) {
                         const defBushos = this.game.getCastleBushos(defCastle.id).sort((a,b) => b.strength - a.strength).slice(0, 5);

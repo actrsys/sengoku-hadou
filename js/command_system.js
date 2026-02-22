@@ -1381,7 +1381,7 @@ class CommandSystem {
             default: return "対象を選択してください";
         }
     }
-
+    
     resolveMapSelection(targetCastle) {
         if (!this.game.validTargets.includes(targetCastle.id)) return;
         
@@ -1392,16 +1392,32 @@ class CommandSystem {
             this.enterMapSelection(mode);
         };
 
-        // ★追加: 国人衆のコマンドなら、どの国人衆を対象にするかを調べます
-        let targetKunishuId = null;
+        // ★変更: 国人衆のコマンドなら、どの国人衆を対象にするかを選びます
         if (['kunishu_subjugate', 'kunishu_headhunt', 'kunishu_goodwill'].includes(mode)) {
             const kunishus = this.game.kunishuSystem.getKunishusInCastle(targetCastle.id);
-            if (kunishus.length > 0) {
-                targetKunishuId = kunishus[0].id; // 一旦最初の国人衆を選びます
-            } else {
+            if (kunishus.length === 0) {
                 this.game.ui.showDialog("この城には行動可能な国人衆がいません。", false);
                 return;
             }
+
+            // 選択したあとの処理をまとめる
+            const proceedKunishuCommand = (selectedKunishuId) => {
+                if (mode === 'kunishu_goodwill') {
+                    this.game.ui.openBushoSelector('kunishu_goodwill_doer', targetCastle.id, { kunishuId: selectedKunishuId }, onBackToMap);
+                } else if (mode === 'kunishu_headhunt') {
+                    this.game.ui.openBushoSelector('kunishu_headhunt_target', targetCastle.id, { kunishuId: selectedKunishuId }, onBackToMap);
+                } else if (mode === 'kunishu_subjugate') {
+                    this.game.ui.openBushoSelector('kunishu_subjugate_deploy', targetCastle.id, { kunishuId: selectedKunishuId }, onBackToMap);
+                }
+            };
+
+            // 🌟 1つしかいないならそのまま進み、複数いるなら「選ぶ画面」を出します！
+            if (kunishus.length === 1) {
+                proceedKunishuCommand(kunishus[0].id);
+            } else {
+                this.game.ui.showKunishuSelector(kunishus, proceedKunishuCommand);
+            }
+            return; // 国衆コマンドの場合はここで終了
         }
 
         if (mode === 'war') {
@@ -1424,14 +1440,6 @@ class CommandSystem {
             this.game.ui.openBushoSelector('diplomacy_doer', targetCastle.id, { subAction: 'alliance' }, onBackToMap);
         } else if (mode === 'break_alliance') {
             this.game.ui.openBushoSelector('diplomacy_doer', targetCastle.id, { subAction: 'break_alliance' }, onBackToMap);
-        }
-        // ★追加: 国人衆へのコマンド
-        else if (mode === 'kunishu_goodwill') {
-            this.game.ui.openBushoSelector('kunishu_goodwill_doer', targetCastle.id, { kunishuId: targetKunishuId }, onBackToMap);
-        } else if (mode === 'kunishu_headhunt') {
-            this.game.ui.openBushoSelector('kunishu_headhunt_target', targetCastle.id, { kunishuId: targetKunishuId }, onBackToMap);
-        } else if (mode === 'kunishu_subjugate') {
-            this.game.ui.openBushoSelector('kunishu_subjugate_deploy', targetCastle.id, { kunishuId: targetKunishuId }, onBackToMap);
         }
     }
 

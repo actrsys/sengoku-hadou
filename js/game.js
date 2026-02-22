@@ -1774,15 +1774,41 @@ class UIManager {
             document.getElementById('quantity-title').textContent = "補修 (兵士選択)";
             inputs.soldiers = createSlider("使用兵士数", "soldiers", maxSoldiers, Math.min(50, maxSoldiers));
         }
-
+        
         this.quantityConfirmBtn.onclick = () => {
             this.quantityModal.classList.add('hidden');
             if (type === 'def_intercept' && extraData && extraData.onConfirm) {
                 extraData.onConfirm(inputs);
             } else {
-                this.game.commandSystem.handleQuantitySelection(type, inputs, targetId, data);
+                this.game.commandSystem.handleQuantitySelection(type, inputs, targetId, data, extraData);
             }
         };
+    }
+    
+    // ★追加: 複数の国人衆がいる場合に選ぶ画面
+    showKunishuSelector(kunishus, onSelect) {
+        if (!this.scenarioScreen) return;
+        this.forceResetModals();
+        this.scenarioScreen.classList.remove('hidden');
+        const title = this.scenarioScreen.querySelector('h2');
+        if (title) title.textContent = "対象の国衆を選択";
+        
+        if (this.scenarioList) {
+            this.scenarioList.innerHTML = '';
+            kunishus.forEach(k => {
+                const leader = window.GameApp.getBusho(k.leaderId);
+                const name = leader ? `${leader.name}衆` : "国人衆";
+                const rel = k.getRelation(window.GameApp.playerClanId);
+                const div = document.createElement('div');
+                div.className = 'scenario-item';
+                div.innerHTML = `<div class="scenario-title">${name}</div><div class="scenario-desc">兵数:${k.soldiers} 防御:${k.defense} 友好度:${rel}</div>`;
+                div.onclick = () => { 
+                    this.scenarioScreen.classList.add('hidden'); 
+                    onSelect(k.id); 
+                };
+                this.scenarioList.appendChild(div);
+            });
+        }
     }
     
     setWarModalVisible(visible) {
