@@ -761,7 +761,7 @@ class CommandSystem {
         
         // ★追加: もし国人衆の武将だったら登用はできません（引抜を使いましょう）
         if (target.belongKunishuId > 0) {
-            this.game.ui.showDialog(`${target.name}は国人衆に所属しているため、通常の登用はできません。`, false);
+            this.game.ui.showDialog(`${target.name}は国人衆に所属しているため登用できません。`, false);
             return;
         }
 
