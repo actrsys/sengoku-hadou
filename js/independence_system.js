@@ -158,9 +158,9 @@ class IndependenceSystem {
     /**
      * 部下の去就判定 (合流 / 脱出 / 捕縛)
      */
-    resolveSubordinates(castle, newDaimyo, oldDaimyo, newClanId, oldClanId) {
-        // 城にいる他の武将（独立した本人以外）
-        const subordinates = this.game.getCastleBushos(castle.id).filter(b => b.id !== newDaimyo.id);
+     resolveSubordinates(castle, newDaimyo, oldDaimyo, newClanId, oldClanId) {
+        // 🌟 ここが変わりました！「浪人（status === 'ronin'）」は巻き込まれないように除外します
+        const subordinates = this.game.getCastleBushos(castle.id).filter(b => b.id !== newDaimyo.id && b.status !== 'ronin');
         const captives = [];
         const escapees = [];
         const joiners = [];

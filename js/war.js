@@ -547,12 +547,23 @@ class WarManager {
                 
                 const capturedBushos = [];
                 this.game.getCastleBushos(defCastle.id).forEach(b => { 
+                    // 🌟 ここが変わりました！浪人は撤退しないので無視します
+                    if (b.status === 'ronin') return;
+
                     let rate = window.WarParams.War.RetreatCaptureRate;
                     if(b.isDaimyo) rate = Math.max(0, rate - window.WarParams.War.DaimyoCaptureReduction);
                     if(Math.random() < rate) { capturedBushos.push(b); } 
                     else { b.castleId = target.id; b.isCastellan = false; target.samuraiIds.push(b.id); this.game.factionSystem.handleMove(b, defCastle.id, target.id); }
                 });
-                defCastle.gold -= carryGold; defCastle.rice = 0; defCastle.soldiers = 0; defCastle.samuraiIds = []; defCastle.castellanId = 0;
+                defCastle.gold -= carryGold; defCastle.rice = 0; defCastle.soldiers = 0; 
+                
+                // 🌟 名簿を空っぽにするのではなく、浪人だけはお城に残します！
+                defCastle.samuraiIds = defCastle.samuraiIds.filter(id => {
+                    const busho = this.game.getBusho(id);
+                    return busho && busho.status === 'ronin';
+                });
+                
+                defCastle.castellanId = 0;
                 this.game.updateCastleLord(defCastle); this.game.updateCastleLord(target);
                 
                 if(s.isPlayerInvolved) {
@@ -760,6 +771,9 @@ class WarManager {
         const isLastStand = friendlyCastles.length === 0;
 
         losers.forEach(b => { 
+            // 🌟 ここが変わりました！浪人は戦に参加していないので、捕虜にせず無視します
+            if (b.status === 'ronin') return;
+
             let chance = isLastStand ? 1.0 : ((window.WarParams.War.CaptureChanceBase || 0.4) - (b.strength * (window.WarParams.War.CaptureStrFactor || 0.002)) + (Math.random() * 0.3)); 
             if (!isLastStand && defeatedCastle.soldiers > 1000) chance -= 0.2; 
             if (!isLastStand && b.isDaimyo) chance -= window.WarParams.War.DaimyoCaptureReduction;
