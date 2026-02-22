@@ -1340,11 +1340,11 @@ class UIManager {
         } 
         else if (actionType === 'employ_doer') { 
             bushos = this.game.getCastleBushos(c.id).filter(b => b.status !== 'ronin'); 
-            infoHtml = "<div>登用を行う担当官を選択してください (魅力重視)</div>"; 
+            infoHtml = "<div>登用を行う担当官を選択してください</div>"; 
         } 
         else if (actionType === 'diplomacy_doer') { 
             bushos = this.game.getCastleBushos(c.id).filter(b => b.status !== 'ronin'); 
-            infoHtml = "<div>外交の担当官を選択してください (外交重視)</div>"; 
+            infoHtml = "<div>外交の担当官を選択してください</div>"; 
         }
         else if (actionType === 'rumor_target_busho') { 
             bushos = this.game.getCastleBushos(targetId).filter(b => b.status !== 'ronin' && !b.isDaimyo); 
@@ -1360,11 +1360,11 @@ class UIManager {
         }
         else if (actionType === 'headhunt_target') { 
             bushos = this.game.getCastleBushos(targetId).filter(b => b.status !== 'ronin' && !b.isDaimyo); 
-            infoHtml = "<div>引抜の対象とする武将を選択してください (忠誠・義理重視)</div>"; 
+            infoHtml = "<div>引抜の対象とする武将を選択してください </div>"; 
         }
         else if (actionType === 'headhunt_doer') { 
             bushos = this.game.getCastleBushos(c.id).filter(b => b.status !== 'ronin'); 
-            infoHtml = "<div>引抜を実行する担当官を選択してください (知略重視)</div>"; 
+            infoHtml = "<div>引抜を実行する担当官を選択してください</div>"; 
         }
         else if (actionType === 'interview') { 
             bushos = this.game.getCastleBushos(c.id).filter(b => b.status !== 'ronin' && !b.isDaimyo); 
@@ -1397,7 +1397,7 @@ class UIManager {
                 !b.isDaimyo && 
                 !b.isCastellan
             );
-            infoHtml = "<div>軍師に任命する武将を選択してください (知略重視)<br><small>※大名・城主は任命できません</small></div>";
+            infoHtml = "<div>軍師に任命する武将を選択してください</div>";
         }
         else if (actionType === 'def_intercept_deploy') {
             bushos = this.game.getCastleBushos(c.id).filter(b => b.status !== 'ronin');
