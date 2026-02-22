@@ -1430,12 +1430,13 @@ class CommandSystem {
                     this.game.ui.openBushoSelector('kunishu_subjugate_deploy', targetCastle.id, { kunishuId: selectedKunishuId }, onBackToMap);
                 }
             };
-
+            
             // 🌟 1つしかいないならそのまま進み、複数いるなら「選ぶ画面」を出します！
             if (kunishus.length === 1) {
                 proceedKunishuCommand(kunishus[0].id);
             } else {
-                this.game.ui.showKunishuSelector(kunishus, proceedKunishuCommand);
+                // ↓ここに「, onBackToMap」を書き足しました！
+                this.game.ui.showKunishuSelector(kunishus, proceedKunishuCommand, onBackToMap);
             }
             return; // 国衆コマンドの場合はここで終了
         }

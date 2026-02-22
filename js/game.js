@@ -1785,28 +1785,47 @@ class UIManager {
         };
     }
     
-    // ★追加: 複数の国人衆がいる場合に選ぶ画面
-    showKunishuSelector(kunishus, onSelect) {
-        if (!this.scenarioScreen) return;
-        this.forceResetModals();
-        this.scenarioScreen.classList.remove('hidden');
-        const title = this.scenarioScreen.querySelector('h2');
+    // ★修正: 複数の国人衆がいる場合に選ぶ画面（武将選択と同じ画面を使って戻れるようにします）
+    showKunishuSelector(kunishus, onSelect, onCancel) {
+        if (!this.selectorModal) return;
+        this.selectorModal.classList.remove('hidden');
+        
+        const title = document.getElementById('selector-title');
         if (title) title.textContent = "対象の国衆を選択";
         
-        if (this.scenarioList) {
-            this.scenarioList.innerHTML = '';
+        const backBtn = document.querySelector('#selector-modal .btn-secondary');
+        if(backBtn) {
+            backBtn.onclick = () => {
+                this.closeSelector();
+                if (onCancel) onCancel();
+            };
+        }
+
+        const contextEl = document.getElementById('selector-context-info');
+        if (contextEl) {
+            contextEl.innerHTML = "<div>対象とする国衆を選択してください</div>";
+            contextEl.classList.remove('hidden');
+        }
+
+        if (this.selectorList) {
+            this.selectorList.innerHTML = '';
             kunishus.forEach(k => {
                 const name = k.getName(window.GameApp);
                 const rel = k.getRelation(window.GameApp.playerClanId);
                 const div = document.createElement('div');
-                div.className = 'scenario-item';
-                div.innerHTML = `<div class="scenario-title">${name}</div><div class="scenario-desc">兵数:${k.soldiers} 防御:${k.defense} 友好度:${rel}</div>`;
+                div.className = 'select-item';
+                div.style.cursor = 'pointer';
+                div.innerHTML = `<strong style="margin-right:10px;">${name}</strong> <span style="font-size:0.9rem; color:#555;">(兵数:${k.soldiers} 防御:${k.defense} 友好度:${rel})</span>`;
                 div.onclick = () => { 
-                    this.scenarioScreen.classList.add('hidden'); 
+                    this.closeSelector();
                     onSelect(k.id); 
                 };
-                this.scenarioList.appendChild(div);
+                this.selectorList.appendChild(div);
             });
+        }
+        
+        if (this.selectorConfirmBtn) {
+            this.selectorConfirmBtn.classList.add('hidden');
         }
     }
     
