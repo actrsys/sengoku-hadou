@@ -947,8 +947,8 @@ class UIManager {
             
             const isVisible = isDaimyoSelect || this.game.isCastleVisible(c);
             
-            // ★ 修正：「???」を「不明」にしました
-            const soldierText = isVisible ? c.soldiers : "不明"; 
+            // ★ 修正：「???」を「？」にしました
+            const soldierText = isVisible ? c.soldiers : "？"; 
             const castellanName = castellan ? castellan.name : '-';            
             
             el.innerHTML = `<div class="card-header"><h3>${c.name}</h3></div><div class="card-owner">${clanData ? clanData.name : "中立"}</div><div class="param-grid"><div class="param-item"><span>城主</span> <strong>${castellanName}</strong></div><div class="param-item"><span>兵数</span> ${soldierText}</div></div>`;
@@ -1021,8 +1021,8 @@ class UIManager {
         
         const isVisible = this.game.isCastleVisible(castle);
         
-        // ★ 修正：「??」を「不明」にしました
-        const mask = (val) => isVisible ? val : "不明";
+        // ★ 修正：「??」を「？」にしました
+        const mask = (val) => isVisible ? val : "？";
         
         const castellan = this.game.getBusho(castle.castellanId);
         const clanData = this.game.clans.find(cd => cd.id === castle.ownerClan);
@@ -1394,7 +1394,7 @@ class UIManager {
                 !b.isDaimyo && 
                 !b.isCastellan
             );
-            infoHtml = "<div>軍師に任命する武将を選択してください (知略重視)<br><small>※大名・城主は任命できません</small></div>";
+            infoHtml = "<div>軍師に任命する武将を選択してください</div>";
         }
         else if (actionType === 'def_intercept_deploy') {
             bushos = this.game.getCastleBushos(c.id).filter(b => b.status !== 'ronin');
