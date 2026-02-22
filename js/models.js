@@ -1,7 +1,7 @@
 /**
  * models.js
  * モデル定義 (Clan, Castle, Busho, Kunishu)
- * 修正: 国人衆の「name」機能追加と、CSVからの「大名用/国衆用」の外交値の読み取り機能を追加
+ * 修正: 国人衆の「name」機能追加と、CSVからの「大名用/国人衆用」の外交値の読み取り機能を追加
  */
 
 class Clan {
@@ -132,8 +132,8 @@ class Busho {
     getRankName() {
         if (this.isDaimyo) return "大名";
         if (this.isCastellan) return "城主";
-        if (this.belongKunishuId > 0 && this.id === (window.GameApp ? window.GameApp.kunishuSystem.getKunishu(this.belongKunishuId)?.leaderId : 0)) return "国衆頭領";
-        if (this.belongKunishuId > 0) return "国人衆";
+        if (this.belongKunishuId > 0 && this.id === (window.GameApp ? window.GameApp.kunishuSystem.getKunishu(this.belongKunishuId)?.leaderId : 0)) return "頭領";
+        if (this.belongKunishuId > 0) return "国衆";
         if (this.status === 'ronin') return "浪人";
         return "武将";
     }
