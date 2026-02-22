@@ -1,7 +1,7 @@
 /**
  * game.js
  * 戦国シミュレーションゲーム (Main / UI / Data / System)
- * 修正: ブラウザ標準のダイアログ（alert/confirm）をカスタムUIに置き換えました
+ * 修正: 既存の機能を一切削らずに、国人衆システムの読み込み・保存・月次処理を追加しました。
  */
 
 window.onerror = function(message, source, lineno, colno, error) {
@@ -50,17 +50,22 @@ class DataManager {
                     this.parseGenericNames(namesText);
                 } catch (e) { console.warn("汎用武将名ファイルなし"); }
             }
-            const [clansText, castlesText, bushosText] = await Promise.all([                
+            // ★追加: kunishuClan.csv も一緒に読み込みます
+            const [clansText, castlesText, bushosText, kunishusText] = await Promise.all([                
                 this.fetchText(path + "clans.csv"),                
                 this.fetchText(path + "castles.csv"),                
-                this.fetchText(path + "warriors.csv")            
+                this.fetchText(path + "warriors.csv"),
+                this.fetchText(path + "kunishuClan.csv").catch(() => "") // ★追加: 無くてもエラーで止まらないようにします
             ]);
             const clans = this.parseCSV(clansText, Clan);
             const castles = this.parseCSV(castlesText, Castle);
             const bushos = this.parseCSV(bushosText, Busho);
+            // ★追加: 国人衆のデータをリストにします
+            const kunishus = kunishusText ? this.parseCSV(kunishusText, Kunishu) : [];
+
             this.joinData(clans, castles, bushos);
             if (bushos.length < 50) this.generateGenericBushos(bushos, castles, clans);
-            return { clans, castles, bushos };
+            return { clans, castles, bushos, kunishus }; // ★変更: kunishus を返り値に追加します
         } catch (error) {
             console.error(error);
             alert(`データの読み込みに失敗しました。\nフォルダ構成を確認してください。`);
@@ -1943,6 +1948,9 @@ class GameManager {
         this.lastMenuState = null;
         this.aiTimer = null; 
         
+        // ★追加: 独立した国人衆システムを新しく作ってゲームに参加させます
+        this.kunishuSystem = new KunishuSystem(this);
+
         this.commandSystem = new CommandSystem(this);
         this.warManager = new WarManager(this);
         this.aiEngine = new AIEngine(this);
@@ -1977,6 +1985,9 @@ class GameManager {
 
             const data = await DataManager.loadAll(folder); 
             this.clans = data.clans; this.castles = data.castles; this.bushos = data.bushos; 
+            
+            // ★追加: 読み込んだ国人衆のデータを国人衆システムに渡します
+            this.kunishuSystem.setKunishuData(data.kunishus || []);
             
             document.getElementById('app').classList.remove('hidden'); 
             
@@ -2231,6 +2242,9 @@ class GameManager {
         this.factionSystem.processEndMonth(); 
         this.independenceSystem.checkIndependence(); 
         
+        // ★追加: 月末に、国人衆も回復したり悪さをしたりします
+        this.kunishuSystem.processEndMonth();
+
         this.month++; 
         if(this.month > 12) { this.month = 1; this.year++; } 
         
@@ -2281,7 +2295,8 @@ class GameManager {
             castles: this.castles, 
             bushos: this.bushos, 
             clans: this.clans,
-            playerClanId: this.playerClanId 
+            playerClanId: this.playerClanId,
+            kunishus: this.kunishuSystem.kunishus // ★追加: セーブデータに国人衆の情報を保存します
         }; 
         const blob = new Blob([JSON.stringify(data, null, 2)], {type: 'application/json'}); 
         const url = URL.createObjectURL(blob); 
@@ -2301,6 +2316,13 @@ class GameManager {
                 this.castles = d.castles.map(c => new Castle(c)); 
                 this.bushos = d.bushos.map(b => new Busho(b)); 
                 
+                // ★追加: セーブデータから国人衆の情報を読み込みます
+                if (d.kunishus) {
+                    this.kunishuSystem.setKunishuData(d.kunishus.map(k => new Kunishu(k)));
+                } else {
+                    this.kunishuSystem.setKunishuData([]);
+                }
+
                 if (d.clans) {
                     this.clans = d.clans.map(c => new Clan(c));
                 } else {
@@ -2335,6 +2357,7 @@ window.addEventListener('DOMContentLoaded', () => {
         e.preventDefault();
     }, { passive: false });
 
+    // ★修正: ゲームアプリの準備をします
     window.GameApp = new GameManager();
 
 });

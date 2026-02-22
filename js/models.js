@@ -1,6 +1,8 @@
-/* ==========================================================================
-   モデル定義 (Clan, Castle, Busho)
-   ========================================================================== */
+/**
+ * models.js
+ * モデル定義 (Clan, Castle, Busho, Kunishu)
+ * 追加: 国人衆 (Kunishu) クラスの新設と、Bushoクラスへの国人衆ID追加
+ */
 
 class Clan {
     constructor(data) {
@@ -112,6 +114,9 @@ class Busho {
         this.recognitionNeed = Number(this.recognitionNeed || 0);   // 承認欲求
         this.factionId = Number(this.factionId || 0);               // 派閥ID
 
+        // 国人衆関連のパラメータ追加
+        this.belongKunishuId = Number(this.belongKunishuId || 0);   // 所属する国人衆ID（0なら未所属）
+
         // 履歴配列の初期化
         // 既存データ(ロード時など)にあればそれを使用、なければ空配列で初期化
         this.battleHistory = Array.isArray(this.battleHistory) ? this.battleHistory : [];
@@ -128,6 +133,8 @@ class Busho {
     getRankName() {
         if (this.isDaimyo) return "大名";
         if (this.isCastellan) return "城主";
+        if (this.belongKunishuId > 0 && this.id === (window.GameApp ? window.GameApp.kunishuSystem.getKunishu(this.belongKunishuId)?.leaderId : 0)) return "国衆頭領";
+        if (this.belongKunishuId > 0) return "国人衆";
         if (this.status === 'ronin') return "浪人";
         return "武将";
     }
@@ -137,5 +144,41 @@ class Busho {
         if (this.factionId === 0) return "中立";
         // 派閥IDが存在する場合、識別用の文字列を返す
         return "派閥" + this.factionId;
+    }
+}
+
+// ★追加：国人衆クラス
+class Kunishu {
+    constructor(data) {
+        Object.assign(this, data);
+        this.id = Number(this.id);
+        this.castleId = Number(this.castleId);
+        this.leaderId = Number(this.leaderId);
+        
+        // 空の場合は1500や500をデフォルトにする
+        this.maxSoldiers = Number(this.maxSoldiers || 1500);
+        this.soldiers = Number(this.soldiers !== undefined ? this.soldiers : this.maxSoldiers);
+        
+        this.maxDefense = Number(this.maxDefense || 500);
+        this.defense = Number(this.defense !== undefined ? this.defense : this.maxDefense);
+        
+        this.ideology = this.ideology || '地縁'; // 地縁, 宗教, 傭兵
+        
+        // 友好度管理 (ID -> 友好度の数値 0〜100)
+        // データが存在しない場合のために空オブジェクトで初期化
+        this.relations = this.relations || {}; 
+        
+        this.isDestroyed = this.isDestroyed === true;
+    }
+
+    getRelation(targetId) {
+        if (this.relations[targetId] !== undefined) {
+            return this.relations[targetId];
+        }
+        return 50; // 空の場合は50
+    }
+
+    setRelation(targetId, value) {
+        this.relations[targetId] = Math.max(0, Math.min(100, value));
     }
 }

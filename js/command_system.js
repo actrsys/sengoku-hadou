@@ -1,7 +1,7 @@
 /**
  * command_system.js
  * ゲーム内のコマンド実行ロジックおよびフロー制御を管理するクラス
- * 修正: alert/confirmを全てカスタムダイアログ（showDialog）に置き換えました
+ * 修正: 国人衆に対する新しいコマンド（国衆親善、制圧、国衆引抜）を追加しました
  */
 
 /* ==========================================================================
@@ -53,16 +53,6 @@ const COMMAND_SPECS = {
         startMode: 'quantity_select',
         msg: "兵糧を売り金を得ます"
     },
-    //矢弾の実装は一旦保留
-    /*
-    'buy_ammo': {
-        label: "矢弾購入", category: 'MIL_TRADE',
-        costGold: 0, costRice: 0,
-        isMulti: false, hasAdvice: false,
-        startMode: 'quantity_select',
-        msg: "金を払い矢弾を買います"
-    },
-    */
     'buy_horses': {
         label: "騎馬購入", category: 'MIL_TRADE',
         costGold: 0, costRice: 0,
@@ -113,6 +103,14 @@ const COMMAND_SPECS = {
         isMulti: true, hasAdvice: false, 
         startMode: 'map_select', targetType: 'ally_other',
         sortKey: 'strength' 
+    },
+    // ★追加: 国人衆を攻める（制圧する）ための軍事コマンド
+    'kunishu_subjugate': { 
+        label: "制圧", category: 'MILITARY', 
+        costGold: 0, costRice: 0, 
+        isMulti: true, hasAdvice: true, 
+        startMode: 'map_select', targetType: 'kunishu_valid', 
+        sortKey: 'strength'
     },
 
     // --- 人事 (PERSONNEL) ---
@@ -189,6 +187,14 @@ const COMMAND_SPECS = {
         startMode: 'map_select', targetType: 'enemy_all',
         sortKey: 'intelligence'
     },
+    // ★追加: 国人衆の武将を味方に引き抜くための調略コマンド
+    'kunishu_headhunt': { 
+        label: "国衆引抜", category: 'STRATEGY', 
+        costGold: 0, costRice: 0,
+        isMulti: false, hasAdvice: true, 
+        startMode: 'map_select', targetType: 'kunishu_valid',
+        sortKey: 'intelligence'
+    },
 
     // --- 情報 (INFO) ---
     'investigate': { 
@@ -221,6 +227,13 @@ const COMMAND_SPECS = {
         costGold: 0, costRice: 0,
         isMulti: false, hasAdvice: false,
         startMode: 'map_select', targetType: 'ally_clan'
+    },
+    // ★追加: 国人衆と仲良くするための外交コマンド
+    'kunishu_goodwill': {
+        label: "国衆親善", category: 'DIPLOMACY',
+        costGold: 0, costRice: 0,
+        isMulti: false, hasAdvice: true,
+        startMode: 'map_select', targetType: 'kunishu_valid'
     },
 
     // --- システム (SYSTEM) - UI生成用プレースホルダ ---
@@ -271,6 +284,11 @@ class CommandSystem {
                     this.game.getRelation(playerClanId, target.ownerClan).status === '同盟'
                 ).map(t => t.id);
 
+            // ★追加: まだ壊滅していない国人衆がいる城を探してリストアップします
+            case 'kunishu_valid':
+                const activeKunishus = this.game.kunishuSystem.getAliveKunishus();
+                return [...new Set(activeKunishus.map(k => k.castleId))];
+
             default:
                 return [];
         }
@@ -290,7 +308,6 @@ class CommandSystem {
 
         const castle = this.game.getCurrentTurnCastle();
 
-        // ★ 最大値チェック
         if (type === 'farm' && castle.kokudaka >= castle.maxKokudaka) { this.game.ui.showDialog("これ以上石高は上げられません", false); return; }
         if (type === 'commerce' && castle.commerce >= castle.maxCommerce) { this.game.ui.showDialog("これ以上鉱山は上げられません", false); return; }
         if (type === 'repair' && castle.defense >= castle.maxDefense) { this.game.ui.showDialog("これ以上城壁は上げられません", false); return; }
@@ -301,7 +318,6 @@ class CommandSystem {
         if (type === 'training' && castle.training >= maxTraining) { this.game.ui.showDialog("これ以上訓練は上げられません", false); return; }
         if (type === 'soldier_charity' && castle.morale >= maxMorale) { this.game.ui.showDialog("これ以上士気は上げられません", false); return; }
 
-        // ★ alert を showDialog に変更
         if (spec.costGold > 0 && castle.gold < spec.costGold) {
             this.game.ui.showDialog(`金が足りません (必要: ${spec.costGold})`, false);
             return;
@@ -392,6 +408,39 @@ class CommandSystem {
             return;
         }
 
+        // ★追加: 国人衆のコマンド用
+        if (actionType === 'kunishu_goodwill_doer') {
+            this.game.ui.openQuantitySelector('goodwill', selectedIds, targetId, { isKunishu: true, kunishuId: extraData.kunishuId });
+            return;
+        }
+        if (actionType === 'kunishu_headhunt_target') {
+            this.game.ui.openBushoSelector('kunishu_headhunt_doer', null, { targetId: firstId, kunishuId: extraData.kunishuId });
+            return;
+        }
+        if (actionType === 'kunishu_headhunt_doer') {
+            this.game.ui.openQuantitySelector('headhunt_gold', selectedIds, extraData.targetId, { isKunishu: true, kunishuId: extraData.kunishuId });
+            return;
+        }
+        if (actionType === 'kunishu_subjugate_deploy') {
+             const selectedBushos = selectedIds.map(id => this.game.getBusho(id));
+             const leader = selectedBushos.find(b => b.isDaimyo || b.isCastellan);
+             if (leader) {
+                 const others = selectedIds.filter(id => id !== leader.id);
+                 const sortedIds = [leader.id, ...others];
+                 this.game.ui.openQuantitySelector('war_supplies', sortedIds, targetId, { isKunishu: true, kunishuId: extraData.kunishuId });
+             } else {
+                 this.game.ui.openBushoSelector('kunishu_war_general', targetId, { candidates: selectedIds, kunishuId: extraData.kunishuId });
+             }
+             return;
+        }
+        if (actionType === 'kunishu_war_general') {
+            const leaderId = firstId;
+            const others = extraData.candidates.filter(id => id !== leaderId);
+            const sortedIds = [leaderId, ...others];
+            this.game.ui.openQuantitySelector('war_supplies', sortedIds, targetId, { isKunishu: true, kunishuId: extraData.kunishuId });
+            return;
+        }
+
         if (actionType === 'interview') {
             const interviewer = this.game.getBusho(firstId);
             this.game.ui.showInterviewModal(interviewer);
@@ -477,7 +526,7 @@ class CommandSystem {
         console.warn("Unhandled busho selection type:", actionType);
     }
    
-   handleQuantitySelection(type, inputs, targetId, data) {
+   handleQuantitySelection(type, inputs, targetId, data, extraData = null) {
         const castle = this.game.getCurrentTurnCastle();
         
         if (type === 'draft') {
@@ -488,11 +537,22 @@ class CommandSystem {
         else if (type === 'goodwill') {
             const val = parseInt(inputs.gold.num.value);
             if (val < 100) { this.game.ui.showDialog("金が足りません(最低100)", false); return; }
-            this.showAdviceAndExecute('goodwill', () => this.executeDiplomacy(data[0], targetId, 'goodwill', val));
+            
+            // ★追加: 国人衆への親善なら
+            if (extraData && extraData.isKunishu) {
+                this.showAdviceAndExecute('kunishu_goodwill', () => this.executeKunishuGoodwill(data[0], extraData.kunishuId, val));
+            } else {
+                this.showAdviceAndExecute('goodwill', () => this.executeDiplomacy(data[0], targetId, 'goodwill', val));
+            }
         }
         else if (type === 'headhunt_gold') {
             const val = parseInt(inputs.gold.num.value);
-            this.showAdviceAndExecute('headhunt', () => this.executeHeadhunt(data[0], targetId, val));
+            // ★追加: 国人衆からの引き抜きなら
+            if (extraData && extraData.isKunishu) {
+                this.showAdviceAndExecute('kunishu_headhunt', () => this.executeKunishuHeadhunt(data[0], targetId, val, extraData.kunishuId));
+            } else {
+                this.showAdviceAndExecute('headhunt', () => this.executeHeadhunt(data[0], targetId, val));
+            }
         }
         else if (type === 'transport') {
             const vals = {
@@ -524,11 +584,21 @@ class CommandSystem {
             if (sVal <= 0) { this.game.ui.showDialog("兵士0では出陣できません", false); return; }
             
             const targetName = this.game.getCastle(targetId).name;
-            // ★ confirm を showDialog に変更
-            this.game.ui.showDialog(`${targetName}に攻め込みますか？\n今月の命令は終了となります`, true, () => {
-                const bushos = data.map(id => this.game.getBusho(id));
-                this.game.warManager.startWar(castle, this.game.getCastle(targetId), bushos, sVal, rVal);
-            });
+            
+            // ★追加: 国人衆の制圧なら
+            if (extraData && extraData.isKunishu) {
+                const kunishu = this.game.kunishuSystem.getKunishu(extraData.kunishuId);
+                const kunishuLeader = this.game.getBusho(kunishu.leaderId);
+                
+                this.game.ui.showDialog(`${targetName}にいる ${kunishuLeader ? kunishuLeader.name : "国人"}衆 を討伐しますか？\n今月の命令は終了となります`, true, () => {
+                    this.executeKunishuSubjugate(castle, targetId, data, sVal, rVal, kunishu);
+                });
+            } else {
+                this.game.ui.showDialog(`${targetName}に攻め込みますか？\n今月の命令は終了となります`, true, () => {
+                    const bushos = data.map(id => this.game.getBusho(id));
+                    this.game.warManager.startWar(castle, this.game.getCastle(targetId), bushos, sVal, rVal);
+                });
+            }
         }
         else if (type === 'war_repair') {
              const val = parseInt(inputs.soldiers.num.value);
@@ -563,7 +633,6 @@ class CommandSystem {
             return;
         }
 
-        // ★ 追放処理をループから出して、showDialogで実行するように変更
         if (type === 'banish') { 
             const busho = this.game.getBusho(bushoIds[0]);
             this.game.ui.showDialog(`本当に ${busho.name} を追放しますか？`, true, () => {
@@ -697,6 +766,13 @@ class CommandSystem {
     executeEmploy(doerId, targetId) { 
         const doer = this.game.getBusho(doerId); 
         const target = this.game.getBusho(targetId); 
+        
+        // ★追加: もし国人衆の武将だったら登用はできません（引抜を使いましょう）
+        if (target.belongKunishuId > 0) {
+            this.game.ui.showDialog(`${target.name}は国人衆に所属しているため、通常の登用はできません。`, false);
+            return;
+        }
+
         const myPower = this.game.getClanTotalSoldiers(this.game.playerClanId); 
         const targetClanId = target.clan; 
         const targetPower = targetClanId === 0 ? 0 : this.game.getClanTotalSoldiers(targetClanId); 
@@ -794,6 +870,7 @@ class CommandSystem {
         const target = this.game.getBusho(targetBushoId);
         const castle = this.game.getCurrentTurnCastle();
         if (castle.gold < gold) { this.game.ui.showDialog("資金が足りません", false); return; }
+        
         castle.gold -= gold;
         const targetLord = this.game.bushos.find(b => b.clan === target.clan && b.isDaimyo) || { affinity: 50 }; 
         const newLord = this.game.bushos.find(b => b.clan === this.game.playerClanId && b.isDaimyo) || { affinity: 50 }; 
@@ -827,6 +904,134 @@ class CommandSystem {
         doer.isActionDone = true; this.game.ui.updatePanelHeader(); this.game.ui.renderCommandMenu();
     }
     
+    // ★追加: 国人衆との親善処理です
+    executeKunishuGoodwill(doerId, kunishuId, gold) {
+        const doer = this.game.getBusho(doerId);
+        const kunishu = this.game.kunishuSystem.getKunishu(kunishuId);
+        if (!kunishu) return;
+        
+        const castle = this.game.getCurrentTurnCastle();
+        if (castle.gold < gold) { this.game.ui.showDialog("資金が足りません", false); return; }
+        castle.gold -= gold;
+
+        const baseBonus = (gold / 100) + (doer.diplomacy + doer.charm) * 0.1;
+        const increase = Math.floor(baseBonus * (0.8 + Math.random() * 0.4));
+        
+        const currentRel = kunishu.getRelation(this.game.playerClanId);
+        kunishu.setRelation(this.game.playerClanId, currentRel + increase);
+        const newRel = kunishu.getRelation(this.game.playerClanId);
+
+        const leader = this.game.getBusho(kunishu.leaderId);
+        const kunishuName = leader ? `${leader.name}衆` : "国人衆";
+        
+        doer.isActionDone = true;
+        doer.achievementTotal += Math.floor(doer.diplomacy * 0.2) + 10;
+        this.game.factionSystem.updateRecognition(doer, 15);
+
+        this.game.ui.showResultModal(`${doer.name}が ${kunishuName} と親善を行いました\n友好度が${increase}上昇しました (現在: ${newRel})`);
+        this.game.ui.updatePanelHeader();
+        this.game.ui.renderCommandMenu();
+    }
+
+    // ★追加: 国人衆の武将を味方に引き抜く処理です
+    executeKunishuHeadhunt(doerId, targetBushoId, gold, kunishuId) {
+        const doer = this.game.getBusho(doerId);
+        const target = this.game.getBusho(targetBushoId);
+        const kunishu = this.game.kunishuSystem.getKunishu(kunishuId);
+        
+        const castle = this.game.getCurrentTurnCastle();
+        if (castle.gold < gold) { this.game.ui.showDialog("資金が足りません", false); return; }
+        
+        if (kunishu && target.id === kunishu.leaderId) {
+            this.game.ui.showDialog("国人衆の頭領は引き抜けません！", false);
+            return;
+        }
+
+        castle.gold -= gold;
+        
+        // 相手のボス（国人衆の頭領）と新しいボス（自軍の大名）のデータを用意
+        const targetLord = this.game.getBusho(kunishu.leaderId) || { affinity: 50 }; 
+        const newLord = this.game.bushos.find(b => b.clan === this.game.playerClanId && b.isDaimyo) || { affinity: 50 }; 
+        
+        let isSuccess = GameSystem.calcHeadhunt(doer, target, gold, targetLord, newLord);
+
+        if (isSuccess) {
+            // 在野（国人衆）から大名家の武将になる処理
+            target.clan = this.game.playerClanId; 
+            target.belongKunishuId = 0; // 国人衆を抜ける
+            target.castleId = castle.id; 
+            target.loyalty = 50; 
+            target.isActionDone = true; 
+            target.status = 'active';
+            castle.samuraiIds.push(target.id);
+            this.game.updateCastleLord(castle);
+            
+            this.game.ui.showResultModal(`${doer.name}の引抜工作が成功！\n${target.name}が国人衆を離れ、我が軍に加わりました！`);
+            const maxStat = Math.max(target.strength, target.intelligence, target.leadership, target.charm, target.diplomacy);
+            doer.achievementTotal += Math.floor(maxStat * 0.3);
+            this.game.factionSystem.updateRecognition(doer, 25);
+        } else {
+            this.game.ui.showResultModal(`${doer.name}の引抜工作は失敗しました……\n${target.name}は応じませんでした`);
+            doer.achievementTotal += 5;
+            this.game.factionSystem.updateRecognition(doer, 10);
+        }
+        doer.isActionDone = true; this.game.ui.updatePanelHeader(); this.game.ui.renderCommandMenu();
+    }
+
+    // ★追加: 国人衆を攻めて壊滅させるための処理（必ず攻城戦になります）
+    executeKunishuSubjugate(atkCastle, targetCastleId, atkBushosIds, sendSoldiers, sendRice, kunishu) {
+        const atkBushos = atkBushosIds.map(id => this.game.getBusho(id));
+        const targetCastle = this.game.getCastle(targetCastleId);
+        
+        // 攻撃する側（プレイヤー）の準備
+        atkCastle.soldiers = Math.max(0, atkCastle.soldiers - sendSoldiers);
+        atkCastle.rice = Math.max(0, atkCastle.rice - sendRice);
+        atkBushos.forEach(b => b.isActionDone = true);
+
+        // 国人衆側の準備（一時的なダミーの城と軍団を作ります）
+        const leader = this.game.getBusho(kunishu.leaderId);
+        const kunishuName = leader ? `${leader.name}衆` : "国人衆";
+
+        // この戦い限定の「守備側データ」を作成
+        const dummyDefender = {
+            id: targetCastleId,
+            name: `${targetCastle.name} (${kunishuName})`,
+            ownerClan: -1, 
+            soldiers: kunishu.soldiers,
+            defense: kunishu.defense,
+            maxDefense: kunishu.maxDefense,
+            training: 50,
+            morale: 80,
+            rice: Math.floor(kunishu.soldiers * 1.5), 
+            isKunishu: true,
+            kunishuId: kunishu.id,
+            peoplesLoyalty: 100, // 下がっても国人衆には影響なし
+            population: 1000,
+            samuraiIds: [] 
+        };
+
+        const attackerForce = { 
+            name: atkCastle.name + "遠征軍", ownerClan: atkCastle.ownerClan, soldiers: sendSoldiers, 
+            bushos: atkBushos, training: atkCastle.training, morale: atkCastle.morale, rice: sendRice, maxRice: sendRice
+        };
+
+        // 国人衆への攻撃をしたので、友好度を0にします
+        kunishu.setRelation(this.game.playerClanId, 0);
+
+        // 戦争マネージャーにデータを渡してスタート
+        this.game.warManager.state = { 
+            active: true, round: 1, attacker: attackerForce, sourceCastle: atkCastle, 
+            defender: dummyDefender, atkBushos: atkBushos, defBusho: leader || {name:"国人衆", strength:50, intelligence:50, leadership:50}, 
+            turn: 'attacker', isPlayerInvolved: true, deadSoldiers: { attacker: 0, defender: 0 }, defenderGuarding: false,
+            isKunishuSubjugation: true // 制圧戦であることをマーク
+        };
+
+        // 野戦を飛ばして、いきなり攻城戦からスタート
+        this.game.warManager.startSiegeWarPhase();
+        this.game.ui.updatePanelHeader();
+        this.game.ui.renderCommandMenu();
+    }
+
     executeReward(bushoIds) {
         const castle = this.game.getCurrentTurnCastle();
         const daimyo = this.game.bushos.find(b => b.id === this.game.clans.find(c => c.id === this.game.playerClanId).leaderId);
@@ -858,7 +1063,6 @@ class CommandSystem {
             this.game.ui.showResultModal(`${count}名に褒美（金${count * spec.costGold}）を与えました`);
             this.game.ui.log(`${count}名に褒美を実行 (合計効果:${totalEffect})`);
         } else {
-            // ★ alert を showDialog に変更
             this.game.ui.showDialog("金が足りないため、褒美を与えられませんでした。", false);
         }
 
@@ -1106,29 +1310,24 @@ class CommandSystem {
         const castle = this.game.getCurrentTurnCastle(); 
         const spec = COMMAND_SPECS['charity']; 
         
-        // 1人あたりのコストを計算
         let singleCostGold = 0, singleCostRice = 0; 
         if (type === 'gold' || type === 'both') singleCostGold = spec.costGold; 
         if (type === 'rice' || type === 'both') singleCostRice = spec.costRice; 
 
-        // 参加する人数分の合計コストを計算
         const totalCostGold = singleCostGold * bushoIds.length;
         const totalCostRice = singleCostRice * bushoIds.length;
         
-        // 物資が足りるかチェック
         if (castle.gold < totalCostGold || castle.rice < totalCostRice) { 
             this.game.ui.showDialog("物資不足", false); 
             return; 
         } 
         
-        // 合計コストを消費
         castle.gold -= totalCostGold; 
         castle.rice -= totalCostRice; 
        
         let totalVal = 0;
         let count = 0;
 
-        // 選ばれた武将全員に順番に作業させるループ
         bushoIds.forEach(bid => {
             const busho = this.game.getBusho(bid);
             if (!busho) return;
@@ -1140,21 +1339,17 @@ class CommandSystem {
             totalVal += val;
             count++;
 
-            // 武将の功績などをアップさせて、行動済みにする
             busho.achievementTotal += Math.floor(val * 0.5);
             this.game.factionSystem.updateRecognition(busho, 15);
             busho.isActionDone = true; 
         });
 
-        // 合計の効果分、民忠をアップさせる
         const maxLoyalty = window.MainParams.Economy.MaxLoyalty || 100;
         castle.peoplesLoyalty = Math.min(maxLoyalty, castle.peoplesLoyalty + totalVal); 
         
-        // 結果のメッセージを表示
         this.game.ui.showResultModal(`${count}名で施しを行いました\n民忠+${totalVal}`); 
         this.game.ui.updatePanelHeader(); 
         this.game.ui.renderCommandMenu();
-        // 履歴ログにも残す
         this.game.ui.log(`${count}名で施しを実行 (効果:${totalVal})`);
     }
 
@@ -1172,13 +1367,16 @@ class CommandSystem {
     getSelectionGuideMessage() {
         switch(this.game.selectionMode) {
             case 'war': return "攻撃目標を選択してください(攻略直後の城は選択不可)";
+            case 'kunishu_subjugate': return "討伐する国人衆がいる城を選択してください";
             case 'move': return "移動先を選択してください";
             case 'transport': return "輸送先を選択してください";
             case 'investigate': return "調査対象の城を選択してください";
             case 'incite': return "扇動対象の城を選択してください";
             case 'rumor': return "流言対象の城を選択してください";
             case 'headhunt': case 'headhunt_select_castle': return "引抜対象の居城を選択してください";
+            case 'kunishu_headhunt': return "引抜対象の国人衆がいる城を選択してください";
             case 'goodwill': case 'alliance': return "外交相手を選択してください";
+            case 'kunishu_goodwill': return "親善を行う国人衆がいる城を選択してください";
             case 'break_alliance': return "同盟破棄する相手を選択してください";
             default: return "対象を選択してください";
         }
@@ -1193,6 +1391,18 @@ class CommandSystem {
         const onBackToMap = () => {
             this.enterMapSelection(mode);
         };
+
+        // ★追加: 国人衆のコマンドなら、どの国人衆を対象にするかを調べます
+        let targetKunishuId = null;
+        if (['kunishu_subjugate', 'kunishu_headhunt', 'kunishu_goodwill'].includes(mode)) {
+            const kunishus = this.game.kunishuSystem.getKunishusInCastle(targetCastle.id);
+            if (kunishus.length > 0) {
+                targetKunishuId = kunishus[0].id; // 一旦最初の国人衆を選びます
+            } else {
+                this.game.ui.showDialog("この城には行動可能な国人衆がいません。", false);
+                return;
+            }
+        }
 
         if (mode === 'war') {
             this.game.ui.openBushoSelector('war_deploy', targetCastle.id, null, onBackToMap);
@@ -1214,6 +1424,14 @@ class CommandSystem {
             this.game.ui.openBushoSelector('diplomacy_doer', targetCastle.id, { subAction: 'alliance' }, onBackToMap);
         } else if (mode === 'break_alliance') {
             this.game.ui.openBushoSelector('diplomacy_doer', targetCastle.id, { subAction: 'break_alliance' }, onBackToMap);
+        }
+        // ★追加: 国人衆へのコマンド
+        else if (mode === 'kunishu_goodwill') {
+            this.game.ui.openBushoSelector('kunishu_goodwill_doer', targetCastle.id, { kunishuId: targetKunishuId }, onBackToMap);
+        } else if (mode === 'kunishu_headhunt') {
+            this.game.ui.openBushoSelector('kunishu_headhunt_target', targetCastle.id, { kunishuId: targetKunishuId }, onBackToMap);
+        } else if (mode === 'kunishu_subjugate') {
+            this.game.ui.openBushoSelector('kunishu_subjugate_deploy', targetCastle.id, { kunishuId: targetKunishuId }, onBackToMap);
         }
     }
 
