@@ -1453,7 +1453,7 @@ class UIManager {
                 // 国人衆に所属している場合
                 if (target.belongKunishuId && target.belongKunishuId > 0) {
                     const kunishu = this.game.kunishuSystem.getKunishu(target.belongKunishuId);
-                    const isBoss = kunishu && (kunishu.leaderId === target.id);
+                    const isBoss = kunishu && (Number(kunishu.leaderId) === Number(target.id));
                     
                     // IDの若い順にするため、基本の点数に「IDの数字の端数」を足します
                     if (isBoss) return 40 + (target.belongKunishuId * 0.001); // 頭領
