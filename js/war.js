@@ -597,7 +597,7 @@ class WarManager {
                 this.closeWar();
                 return;
             }
-
+            
             // ★追加: 国人衆が反乱（蜂起）を起こした時の処理
             if (s.attacker.isKunishu) {
                 if (attackerWon) {
@@ -605,10 +605,27 @@ class WarManager {
                     const oldOwner = targetC.ownerClan;
                     targetC.ownerClan = 0; // 城が空き地になる
                     targetC.castellanId = 0;
+                    
+                    // 国人衆のメンバーのIDリストを作っておきます
+                    const kunishuMembers = this.game.kunishuSystem.getKunishuMembers(s.attacker.kunishuId).map(b => b.id);
+                    
+                    // お城にいた武将たち（守備側）の処理
                     this.game.getCastleBushos(targetC.id).forEach(b => {
-                        b.status = 'ronin'; b.clan = 0; b.isCastellan = false;
+                        // 国人衆のメンバー「以外」は全員浪人になり、この城に留まります
+                        if (!kunishuMembers.includes(b.id)) {
+                            b.status = 'ronin'; 
+                            b.clan = 0; 
+                            b.isCastellan = false;
+                        }
                     });
-                    targetC.samuraiIds = [];
+                    
+                    // 🌟 ここが新しいお約束です！
+                    // 名簿には「国人衆のメンバー」か、または「浪人」の人だけを残します
+                    targetC.samuraiIds = targetC.samuraiIds.filter(id => {
+                        const busho = this.game.getBusho(id);
+                        return kunishuMembers.includes(id) || (busho && busho.status === 'ronin');
+                    });
+
                     this.game.ui.log(`【国衆蜂起】国人衆の反乱により、${targetC.name}が陥落し空白地となりました。`);
                     
                     // もし大名が城を全て失ったら滅亡

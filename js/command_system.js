@@ -881,18 +881,26 @@ class CommandSystem {
                 isSuccess = false;
             }
         }
-
+        
         if (isSuccess) {
+            // まず「元々いた城」を見つけて、そこの名簿から名前を消してあげます
             const oldCastle = this.game.getCastle(target.castleId);
             if(oldCastle) {
                 oldCastle.samuraiIds = oldCastle.samuraiIds.filter(id => id !== target.id);
-                if (target.isCastellan) { target.isCastellan = false; oldCastle.castellanId = 0; }
                 this.game.updateCastleLord(oldCastle);
             }
-            target.clan = this.game.playerClanId; target.castleId = castle.id; target.loyalty = 50; target.isActionDone = true; castle.samuraiIds.push(target.id);
+
+            // 在野（国人衆）から大名家の武将になる処理
+            target.clan = this.game.playerClanId; 
+            target.belongKunishuId = 0; // 国人衆を抜ける
+            target.castleId = castle.id; 
+            target.loyalty = 50; 
+            target.isActionDone = true; 
+            target.status = 'active';
+            castle.samuraiIds.push(target.id);
             this.game.updateCastleLord(castle);
             
-            this.game.ui.showResultModal(`${doer.name}の引抜工作が成功！\n${target.name}が我が軍に加わりました！`);
+            this.game.ui.showResultModal(`${doer.name}の引抜工作が成功！\n${target.name}が国人衆を離れ、我が軍に加わりました！`);
             const maxStat = Math.max(target.strength, target.intelligence, target.leadership, target.charm, target.diplomacy);
             doer.achievementTotal += Math.floor(maxStat * 0.3);
             this.game.factionSystem.updateRecognition(doer, 25);
