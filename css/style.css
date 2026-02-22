@@ -83,12 +83,13 @@ img {
     font-size: 0.85rem;
 }
 
+/* ★変更：情報パネルの余白を少し詰めてスリム化しました */
 .sp-info-header {
     display: flex;
     align-items: center;
     background: #333;
     color: #fff;
-    padding: 4px 8px;
+    padding: 2px 8px;
     font-weight: bold;
 }
 .sp-clan { margin-right: 10px; color: #ffeb3b; }
@@ -98,7 +99,7 @@ img {
 
 .sp-info-body {
     display: flex;
-    padding: 5px;
+    padding: 3px 5px;
     background: #fff;
     border-bottom: 1px solid #ccc;
 }
@@ -124,7 +125,7 @@ img {
     display: grid;
     grid-template-columns: auto auto auto auto auto 1fr;
     column-gap: 6px;
-    row-gap: 3px;
+    row-gap: 1px;
     flex: 1;
     align-items: center;
 }
@@ -139,7 +140,7 @@ img {
     display: flex;
     justify-content: space-around;
     background: #e0e0e0;
-    padding: 4px 0;
+    padding: 2px 0;
     font-weight: bold;
     border-bottom: 1px solid #ccc;
     font-size: 0.85rem;
@@ -281,11 +282,12 @@ img {
     padding: 0; margin: 0;
 }
 
+/* ★変更：コマンドの隙間(gap)を少し広げ、誤タップ防止用に高さを少し確保しました */
 .command-grid {
-    display: grid; grid-template-columns: repeat(3, 1fr); gap: 2px; padding: 2px 0;
+    display: grid; grid-template-columns: repeat(3, 1fr); gap: 5px; padding: 4px 0;
 }
 .cmd-btn {
-    padding: 0; height: 26px; border: 1px solid #bbb; background: #f8f9fa;
+    padding: 0; height: 28px; border: 1px solid #bbb; background: #f8f9fa;
     border-radius: 4px; cursor: pointer; font-size: 1rem; font-weight: bold;
     display: flex; align-items: center; justify-content: center;
     touch-action: manipulation; white-space: nowrap; overflow: hidden;
@@ -306,7 +308,6 @@ img {
     #pc-map-overlay { display: none !important; }
     #map-reset-zoom { bottom: 20px; right: 20px; }
     
-    /* ★ 変更：PC版での米相場の位置をサイドバーから離す */
     #mobile-floating-market {
         right: 30px; 
         top: 20px;
@@ -314,14 +315,13 @@ img {
 
     #pc-sidebar {
         display: flex !important; flex-direction: column; 
-        width: 340px; /* ★ 変更：デフォルト幅を広くしました */
+        width: 340px; 
         background: #f5f5f5; border-left: 1px solid #ccc;
         box-shadow: -2px 0 5px rgba(0,0,0,0.1); z-index: 200;
         overflow-y: auto; height: 100dvh;
-        position: relative; /* ★ 追加：リサイザーの基準にします */
+        position: relative; 
     }
     
-    /* ★ 追加：サイドバーを広げたり狭めたりする取っ手のデザイン */
     #sidebar-resizer {
         display: block;
         position: absolute;
