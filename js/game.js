@@ -369,6 +369,10 @@ class UIManager {
         this.statusContainer = document.getElementById('pc-status-panel'); 
         this.mobileTopLeft = document.getElementById('mobile-top-left');
         this.mobileBottomInfo = document.getElementById('mobile-bottom-info');
+        
+        // ★ 追加：浮かせる要素の取得
+        this.mobileFloatingInfo = document.getElementById('mobile-floating-info'); 
+        
         this.pcMapOverlay = document.getElementById('pc-map-overlay');
         
         this.logEl = document.getElementById('log-content'); 
@@ -425,7 +429,6 @@ class UIManager {
         this.initContextMenu();
     }
 
-    // --- ★ 新規追加：汎用ダイアログ表示用の命令 ---
     showDialog(msg, isConfirm, onOk, onCancel = null) {
         const modal = document.getElementById('dialog-modal');
         const msgEl = document.getElementById('dialog-message');
@@ -433,7 +436,6 @@ class UIManager {
         const cancelBtn = document.getElementById('dialog-btn-cancel');
 
         if (!modal) {
-            // もしHTMLにダイアログが見つからなかった時のための保険です（今まで通り）
             if (isConfirm) {
                 if (confirm(msg)) { if (onOk) onOk(); } else { if (onCancel) onCancel(); }
             } else {
@@ -443,43 +445,37 @@ class UIManager {
             return;
         }
 
-        // メッセージをセット（改行も反映されるようにしています）
         msgEl.innerHTML = msg.replace(/\n/g, '<br>');
         
-        // OKボタンを押した時の動き
         okBtn.onclick = () => {
-            modal.classList.add('hidden'); // 画面を隠す
-            if (onOk) onOk();              // 用意された次の処理をする
+            modal.classList.add('hidden'); 
+            if (onOk) onOk();              
         };
 
-        // 確認画面（はい/いいえ等）か、単なる警告画面かでボタンの表示を変えます
         if (isConfirm) {
-            cancelBtn.classList.remove('hidden'); // キャンセルボタンを表示
+            cancelBtn.classList.remove('hidden'); 
             cancelBtn.onclick = () => {
                 modal.classList.add('hidden');
                 if (onCancel) onCancel();
             };
         } else {
-            cancelBtn.classList.add('hidden'); // キャンセルボタンを隠す
+            cancelBtn.classList.add('hidden'); 
         }
 
-        // 最後にダイアログを表示します
         modal.classList.remove('hidden');
     }
 
-    // ★ 修正：鉱山などが0の時も空のゲージを出すようにしました
     getStatusBarHTML(value, max, colorType, isVisible) {
         if (!isVisible) return "???";
         let percent = 0;
         let fillClass = colorType === 'blue' ? 'bar-fill-blue' : 'bar-fill-lightblue';
-        let emptyBgClass = ''; // 最大値が0のときの背景を暗くするための目印
+        let emptyBgClass = ''; 
 
         if (max > 0) {
             percent = (value / max) * 100;
             if (percent > 100) percent = 100;
             if (percent < 0) percent = 0;
         } else {
-            // 最大値が0の場合は、ゲージを0%のままにし、背景色を変えるクラスを付けます
             percent = 0;
             emptyBgClass = 'status-bar-empty-bg';
         }
@@ -628,7 +624,6 @@ class UIManager {
                 e.stopPropagation();
                 this.hideContextMenu();
                 if(this.game.isProcessingAI) return;
-                // ★ confirm を showDialog に変更
                 this.showDialog("今月の命令を終了しますか？", true, () => {
                     this.game.finishTurn();
                 });
@@ -680,7 +675,6 @@ class UIManager {
         }
     }
     
-    // ★ 追加: 大名一覧表示用の処理
     showDaimyoList() {
         let listHtml = `<div style="text-align:left; max-height:400px; overflow-y:auto; padding: 10px; background: #fafafa; border: 1px solid #ccc; border-radius: 4px;">`;
         
@@ -697,7 +691,6 @@ class UIManager {
                 gold += c.gold;
                 rice += c.rice;
             });
-            // ★ 戦力＝（総人口÷２０００）＋(総兵士数÷２０）＋（石高÷２０）＋（金÷５０）＋（兵糧÷１００）
             const power = Math.floor(pop / 2000) + Math.floor(sol / 20) + Math.floor(koku / 20) + Math.floor(gold / 50) + Math.floor(rice / 100);
             return {
                 name: clan.name,
@@ -707,7 +700,6 @@ class UIManager {
             };
         });
 
-        // 戦力順にソート（降順）
         clanDataList.sort((a,b) => b.power - a.power);
 
         clanDataList.forEach(d => {
@@ -871,17 +863,16 @@ class UIManager {
         this.mapZoomOutBtn.style.display = (this.zoomLevel <= 0) ? 'none' : 'flex';
     }
 
-    // ★ 追加：城を2回タップした時に呼ばれる、城メニュー（武将一覧用）を開く命令です
     showCastleMenuModal(castle) {
         const modal = document.getElementById('castle-menu-modal');
         if (!modal) return;
-        modal.classList.remove('hidden'); // 白いウインドウを表示します
+        modal.classList.remove('hidden'); 
         
         const btnBusho = document.getElementById('btn-busho-list');
         if (btnBusho) {
             btnBusho.onclick = () => {
-                modal.classList.add('hidden'); // ウインドウを閉じてから
-                this.openBushoSelector('view_only', castle.id); // 武将一覧を開きます
+                modal.classList.add('hidden'); 
+                this.openBushoSelector('view_only', castle.id); 
             };
         }
     }
@@ -970,7 +961,6 @@ class UIManager {
 						    this.updateZoomButtons(); 
 						    el.scrollIntoView({block: "center", inline: "center", behavior: "smooth"});
 						} else {
-                            // ★ 修正：もし、今すでに選ばれている城をもう一度タップしたら、城メニューを開くようにします
                             if (this.currentCastle && this.currentCastle.id === c.id) {
                                 this.showCastleMenuModal(c);
                             } else {
@@ -996,7 +986,6 @@ class UIManager {
         this.updateInfoPanel(this.currentCastle || this.game.getCurrentTurnCastle());
     }
 
-    // ★ 修正：スマホの画面上部に表示される城の情報を、画像と同じレイアウトに作り直しました
     updateInfoPanel(castle) {
         if (!castle) return;
         if (this.game.phase === 'daimyo_select') return;
@@ -1042,7 +1031,6 @@ class UIManager {
             this.pcMapOverlay.innerHTML = html;
         }
 
-        // ★ ここから下がスマホ上部の情報パネルの組み立てです
         if (this.mobileTopLeft) {
             const isVisible = this.game.isCastleVisible(castle);
             const mask = (val) => isVisible ? val : "??";
@@ -1053,11 +1041,9 @@ class UIManager {
             
             let faceHtml = "";
             if (castellan && castellan.faceIcon) {
-                // 顔画像が見つからない時は隠すようにしています
                 faceHtml = `<img src="data/faceicons/${castellan.faceIcon}" onerror="this.style.display='none'">`;
             }
 
-            // 画像の案に合わせて、細かく区切りを入れながら並べていきます
             let content = `
                 <div class="sp-info-header">
                     <span class="sp-clan">${clanName}</span>
@@ -1088,26 +1074,26 @@ class UIManager {
                     <span>兵糧　${mask(castle.rice)}</span>
                     <span>兵数　${mask(castle.soldiers)}</span>
                 </div>
-                <div class="sp-market-rate">
-                    米相場　${this.game.marketRate.toFixed(1)}
-                </div>
             `;
+            // ★ ここにあった米相場を削除しました
             this.mobileTopLeft.innerHTML = content;
         }
 
-        // ★ 修正：スマホの下側にあった「武将一覧」ボタンなどは消し、年月だけを表示するようにしました
-        if (this.mobileBottomInfo) {
-            this.mobileBottomInfo.innerHTML = `
-                <div style="display:flex; justify-content:flex-start; align-items:flex-end;">
-                    <div style="border:1px solid #333; padding:2px 8px; font-weight:bold; background:#fff; font-size:1rem;">
-                        ${this.game.year}年 ${this.game.month}月
-                    </div>
-                </div>
+        // ★ 追加：地図上に浮かせるための情報（年月・米相場）を更新します
+        if (this.mobileFloatingInfo) {
+            this.mobileFloatingInfo.innerHTML = `
+                <div class="floating-time">${this.game.year}年 ${this.game.month}月</div>
+                <div class="floating-market">米相場 ${this.game.marketRate.toFixed(1)}</div>
             `;
-             const cmdGrid = document.getElementById('command-area');
-             if(cmdGrid) {
-                 cmdGrid.style.display = 'grid'; // コマンドエリアを表示状態にします
-             }
+        }
+
+        // ★ コマンドエリアを表示状態にしつつ、下部の年月表示は空にします
+        const cmdGrid = document.getElementById('command-area');
+        if(cmdGrid) {
+            cmdGrid.style.display = 'grid'; 
+        }
+        if (this.mobileBottomInfo) {
+            this.mobileBottomInfo.innerHTML = ``; // 空にして消しました
         }
     }
 
@@ -1187,7 +1173,6 @@ class UIManager {
         const pcArea = document.getElementById('pc-command-area');
         const areas = [mobileArea, pcArea];
         
-        // ★ カテゴリを修正（情報コマンドを追加）
         const CATEGORY_MAP = {
             'DEVELOP': "内政", 'MILITARY': "軍事", 
             'DIPLOMACY': "外交", 'STRATEGY': "調略", 
@@ -1214,12 +1199,10 @@ class UIManager {
             const menu = (targetMenu) => { this.menuState = targetMenu; this.renderCommandMenu(); };
             
             if (this.menuState === 'MAIN') {
-                // 通常のカテゴリボタン
                 Object.keys(CATEGORY_MAP).forEach(key => {
                     createBtn(CATEGORY_MAP[key], "category", () => menu(key));
                 });
                 
-                // ★ 機能ボタン（span 1 で左に配置）
                 const sysBtn = document.createElement('button');
                 sysBtn.className = `cmd-btn category`;
                 sysBtn.textContent = "機能";
@@ -1232,7 +1215,6 @@ class UIManager {
                 };
                 area.appendChild(sysBtn);
 
-                // ★ 命令終了ボタン（span 2 にして右に配置）
                 const finishBtn = document.createElement('button');
                 finishBtn.className = `cmd-btn finish`;
                 finishBtn.textContent = "命令終了";
@@ -1312,7 +1294,6 @@ class UIManager {
     }
 
     openBushoSelector(actionType, targetId = null, extraData = null, onBack = null) {
-        // ★ alert を showDialog に変更
         if (actionType === 'appoint' && this.currentCastle) { const isDaimyoHere = this.game.getCastleBushos(this.currentCastle.id).some(b => b.isDaimyo); if (isDaimyoHere) { this.showDialog("大名の居城は城主を変更できません", false); return; } }
         
         if (this.selectorModal) this.selectorModal.classList.remove('hidden'); 
@@ -1472,7 +1453,7 @@ class UIManager {
         bushos.forEach(b => {
             if (actionType === 'banish' && b.isCastellan) return; 
             if (actionType === 'employ_target' && b.isDaimyo) return;
-            if (actionType === 'reward' && b.isDaimyo) return; // ★ 褒美で大名を除外
+            if (actionType === 'reward' && b.isDaimyo) return; 
             
             let isSelectable = !b.isActionDone; 
             if (extraData && extraData.allowDone) isSelectable = true; 
@@ -1500,7 +1481,6 @@ class UIManager {
                              const currentChecked = this.selectorList.querySelectorAll('input[name="sel_busho"]:checked').length;
                              if(e.target.checked && currentChecked > maxSelect) {
                                  e.target.checked = false;
-                                 // ★ alert を showDialog に変更
                                  this.showDialog(`出陣できる武将は最大${maxSelect}人までです。`, false);
                                  return;
                              }
@@ -1516,7 +1496,6 @@ class UIManager {
                              const maxSelect = (actionType === 'war_deploy' || actionType === 'def_intercept_deploy') ? 5 : 999;
                              const currentChecked = this.selectorList.querySelectorAll('input[name="sel_busho"]:checked').length;
                              if(!input.checked && currentChecked >= maxSelect) {
-                                 // ★ alert を showDialog に変更
                                  this.showDialog(`出陣できる武将は最大${maxSelect}人までです。`, false);
                                  return;
                              }
@@ -1656,7 +1635,6 @@ class UIManager {
             });
             
             if (sum !== totalSoldiers) {
-                // ★ alert を showDialog に変更
                 this.showDialog("未分配の兵士がいます。兵士を残さず分配してください。", false);
                 return;
             }
@@ -2027,7 +2005,6 @@ class GameManager {
     
     handleDaimyoSelect(castle) {
         if (castle.ownerClan === 0) {
-            // ★ alert を showDialog に変更
             this.ui.showDialog("その城は空き城（中立）のため選択できません。", false);
             return;
         }
@@ -2272,7 +2249,6 @@ class GameManager {
         const clans = new Set(this.castles.filter(c => c.ownerClan !== 0).map(c => c.ownerClan)); 
         const playerAlive = clans.has(this.playerClanId); 
         
-        // ★ alert を showDialog に変更
         if (clans.size === 1 && playerAlive) {
             this.ui.showDialog("天下統一！", false);
         } else if (!playerAlive) {
@@ -2292,7 +2268,6 @@ class GameManager {
         
         if(bushos.length > 0 && bushos.every(b => b.isActionDone)) {
              setTimeout(() => {
-                 // ★ confirm を showDialog に変更
                  this.ui.showDialog("すべての武将が行動を終えました。\n今月の命令を終了しますか？", true, () => {
                      this.finishTurn();
                  });
