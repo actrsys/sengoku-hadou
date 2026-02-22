@@ -642,3 +642,36 @@ img {
     background: #fff;
     padding-bottom: env(safe-area-inset-bottom); 
 }
+/* 国衆選択用のリストアイテム */
+.kunishu-item {
+    padding: 12px 15px;
+    border: 1px solid #d0b080;
+    margin-bottom: 8px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    background: rgba(250, 240, 230, 0.95);
+    border-radius: 6px;
+    transition: all 0.2s ease;
+    font-family: 'Sawarabi Mincho', serif;
+    box-shadow: 1px 1px 3px rgba(0,0,0,0.1);
+}
+
+.kunishu-item:hover {
+    background: #fff5e0;
+    transform: translateX(3px);
+    box-shadow: 2px 2px 5px rgba(0,0,0,0.15);
+    border-color: #c0a070;
+}
+
+.kunishu-item strong {
+    font-size: 1.1rem;
+    color: #333;
+    margin-right: 15px !important;
+    min-width: 120px;
+}
+
+.kunishu-item span {
+    font-size: 0.95rem !important;
+    color: #555 !important;
+}
