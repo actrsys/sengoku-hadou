@@ -263,9 +263,11 @@ class FactionSystem {
     /**
      * 月初の浪人移動処理
      */
-    processRoninMovements() { 
-        const ronins = this.game.bushos.filter(b => b.status === 'ronin'); 
-        ronins.forEach(r => { 
+     processRoninMovements() {
+        // 全武将から「浪人」かつ「国人衆に所属していない（IDが0または未定義）」武将を抽出
+        const ronins = this.game.bushos.filter(b => b.status === 'ronin' && !b.belongKunishuId);
+        
+        ronins.forEach(r => {
             const currentC = this.game.getCastle(r.castleId); 
             if(!currentC) return; 
             
