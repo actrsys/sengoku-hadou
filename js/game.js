@@ -419,28 +419,25 @@ class UIManager {
 
         this.initMapDrag();
         this.initContextMenu();
-        this.initSidebarResize(); // ★ 追加：サイドバーの横幅を変える機能を準備
+        this.initSidebarResize(); 
     }
 
-    // ★ 追加：サイドバーをマウスでドラッグして幅を変える機能です
     initSidebarResize() {
         const sidebar = document.getElementById('pc-sidebar');
         const resizer = document.getElementById('sidebar-resizer');
-        if (!sidebar || !resizer) return; // スマホなどサイドバーがない場合は何もしない
+        if (!sidebar || !resizer) return; 
 
         let isResizing = false;
 
         resizer.addEventListener('mousedown', (e) => {
             isResizing = true;
-            document.body.style.cursor = 'col-resize'; // マウスの形を「左右矢印」にする
-            e.preventDefault(); // マウスを動かした時に文字が選択されないようにする
+            document.body.style.cursor = 'col-resize'; 
+            e.preventDefault(); 
         });
 
         document.addEventListener('mousemove', (e) => {
             if (!isResizing) return;
-            // 画面の右端からの距離を計算して、サイドバーの幅にします
             const newWidth = document.body.clientWidth - e.clientX;
-            // 極端に狭くなったり広くなったりしないように制限をかけます
             if (newWidth >= 280 && newWidth <= 800) {
                 sidebar.style.width = `${newWidth}px`;
             }
@@ -449,7 +446,7 @@ class UIManager {
         document.addEventListener('mouseup', () => {
             if (isResizing) {
                 isResizing = false;
-                document.body.style.cursor = ''; // マウスの形を元に戻す
+                document.body.style.cursor = ''; 
             }
         });
     }
@@ -490,13 +487,18 @@ class UIManager {
         modal.classList.remove('hidden');
     }
 
+    // ★ 修正：情報が不明な時（isVisible=false）のゲージ表示を空ゲージ＋「？」に変更
     getStatusBarHTML(value, max, colorType, isVisible) {
-        if (!isVisible) return "???";
         let percent = 0;
         let fillClass = colorType === 'blue' ? 'bar-fill-blue' : 'bar-fill-lightblue';
         let emptyBgClass = ''; 
+        let displayText = value;
 
-        if (max > 0) {
+        if (!isVisible) {
+            percent = 0;
+            emptyBgClass = 'status-bar-empty-bg';
+            displayText = "？";
+        } else if (max > 0) {
             percent = (value / max) * 100;
             if (percent > 100) percent = 100;
             if (percent < 0) percent = 0;
@@ -508,7 +510,7 @@ class UIManager {
         return `
             <div class="status-bar-container ${emptyBgClass}">
                 <div class="status-bar-fill ${fillClass}" style="width: ${percent}%;"></div>
-                <div class="status-bar-text">${value}</div>
+                <div class="status-bar-text">${displayText}</div>
             </div>
         `;
     }
@@ -945,7 +947,11 @@ class UIManager {
             
             const isVisible = isDaimyoSelect || this.game.isCastleVisible(c);
             
-            const soldierText = isVisible ? c.soldiers : "???"; const castellanName = castellan ? castellan.name : '-';            el.innerHTML = `<div class="card-header"><h3>${c.name}</h3></div><div class="card-owner">${clanData ? clanData.name : "中立"}</div><div class="param-grid"><div class="param-item"><span>城主</span> <strong>${castellanName}</strong></div><div class="param-item"><span>兵数</span> ${soldierText}</div></div>`;
+            // ★ 修正：「???」を「不明」にしました
+            const soldierText = isVisible ? c.soldiers : "不明"; 
+            const castellanName = castellan ? castellan.name : '-';            
+            
+            el.innerHTML = `<div class="card-header"><h3>${c.name}</h3></div><div class="card-owner">${clanData ? clanData.name : "中立"}</div><div class="param-grid"><div class="param-item"><span>城主</span> <strong>${castellanName}</strong></div><div class="param-item"><span>兵数</span> ${soldierText}</div></div>`;
             if(clanData) el.style.borderTop = `5px solid ${clanData.color}`;
             
             if (isDaimyoSelect) {
@@ -1014,7 +1020,10 @@ class UIManager {
         if (this.game.phase === 'daimyo_select') return;
         
         const isVisible = this.game.isCastleVisible(castle);
-        const mask = (val) => isVisible ? val : "??";
+        
+        // ★ 修正：「??」を「不明」にしました
+        const mask = (val) => isVisible ? val : "不明";
+        
         const castellan = this.game.getBusho(castle.castellanId);
         const clanData = this.game.clans.find(cd => cd.id === castle.ownerClan);
         const clanName = clanData ? clanData.name : "中立";
@@ -1246,7 +1255,7 @@ class UIManager {
                 const gunshi = this.game.getClanGunshi(this.game.playerClanId);
                 if (this.gunshiModal) {
                     this.gunshiModal.classList.remove('hidden'); 
-                    if(this.gunshiName) this.gunshiName.textContent = `軍師: ${gunshi ? gunshi.name : '???'}`; 
+                    if(this.gunshiName) this.gunshiName.textContent = `軍師: ${gunshi ? gunshi.name : '不明'}`; 
                     if(this.gunshiMessage) this.gunshiMessage.textContent = warAdvice;
                 }
                 if (this.gunshiExecuteBtn) this.gunshiExecuteBtn.onclick = () => { if(this.gunshiModal) this.gunshiModal.classList.add('hidden'); onConfirm(); };
@@ -1268,7 +1277,8 @@ class UIManager {
         
         if (this.gunshiModal) {
             this.gunshiModal.classList.remove('hidden'); 
-            if(this.gunshiName) this.gunshiName.textContent = `軍師: ${gunshi.name}`; 
+            // ★ 修正：見えない時の軍師の名前も「不明」にしました
+            if(this.gunshiName) this.gunshiName.textContent = `軍師: ${gunshi ? gunshi.name : '不明'}`; 
             if(this.gunshiMessage) this.gunshiMessage.textContent = msg;
         }
         if (this.gunshiExecuteBtn) this.gunshiExecuteBtn.onclick = () => { if(this.gunshiModal) this.gunshiModal.classList.add('hidden'); onConfirm(); };
