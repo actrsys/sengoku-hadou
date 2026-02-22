@@ -467,15 +467,25 @@ class UIManager {
         modal.classList.remove('hidden');
     }
 
+    // ★ 修正：鉱山などが0の時も空のゲージを出すようにしました
     getStatusBarHTML(value, max, colorType, isVisible) {
         if (!isVisible) return "???";
-        if (max <= 0) return `${value}`;
-        let percent = (value / max) * 100;
-        if (percent > 100) percent = 100;
-        if (percent < 0) percent = 0;
-        const fillClass = colorType === 'blue' ? 'bar-fill-blue' : 'bar-fill-lightblue';
+        let percent = 0;
+        let fillClass = colorType === 'blue' ? 'bar-fill-blue' : 'bar-fill-lightblue';
+        let emptyBgClass = ''; // 最大値が0のときの背景を暗くするための目印
+
+        if (max > 0) {
+            percent = (value / max) * 100;
+            if (percent > 100) percent = 100;
+            if (percent < 0) percent = 0;
+        } else {
+            // 最大値が0の場合は、ゲージを0%のままにし、背景色を変えるクラスを付けます
+            percent = 0;
+            emptyBgClass = 'status-bar-empty-bg';
+        }
+
         return `
-            <div class="status-bar-container">
+            <div class="status-bar-container ${emptyBgClass}">
                 <div class="status-bar-fill ${fillClass}" style="width: ${percent}%;"></div>
                 <div class="status-bar-text">${value}</div>
             </div>
@@ -860,6 +870,21 @@ class UIManager {
         this.mapZoomInBtn.style.display = (this.zoomLevel >= 2) ? 'none' : 'flex';
         this.mapZoomOutBtn.style.display = (this.zoomLevel <= 0) ? 'none' : 'flex';
     }
+
+    // ★ 追加：城を2回タップした時に呼ばれる、城メニュー（武将一覧用）を開く命令です
+    showCastleMenuModal(castle) {
+        const modal = document.getElementById('castle-menu-modal');
+        if (!modal) return;
+        modal.classList.remove('hidden'); // 白いウインドウを表示します
+        
+        const btnBusho = document.getElementById('btn-busho-list');
+        if (btnBusho) {
+            btnBusho.onclick = () => {
+                modal.classList.add('hidden'); // ウインドウを閉じてから
+                this.openBushoSelector('view_only', castle.id); // 武将一覧を開きます
+            };
+        }
+    }
     
     renderMap() {
         if (!this.mapEl) return;
@@ -945,8 +970,9 @@ class UIManager {
 						    this.updateZoomButtons(); 
 						    el.scrollIntoView({block: "center", inline: "center", behavior: "smooth"});
 						} else {
-                            if (Number(c.ownerClan) === Number(this.game.playerClanId)) {
-                                this.showControlPanel(c);
+                            // ★ 修正：もし、今すでに選ばれている城をもう一度タップしたら、城メニューを開くようにします
+                            if (this.currentCastle && this.currentCastle.id === c.id) {
+                                this.showCastleMenuModal(c);
                             } else {
                                 this.showControlPanel(c);
                             }
@@ -970,6 +996,7 @@ class UIManager {
         this.updateInfoPanel(this.currentCastle || this.game.getCurrentTurnCastle());
     }
 
+    // ★ 修正：スマホの画面上部に表示される城の情報を、画像と同じレイアウトに作り直しました
     updateInfoPanel(castle) {
         if (!castle) return;
         if (this.game.phase === 'daimyo_select') return;
@@ -1015,44 +1042,71 @@ class UIManager {
             this.pcMapOverlay.innerHTML = html;
         }
 
+        // ★ ここから下がスマホ上部の情報パネルの組み立てです
         if (this.mobileTopLeft) {
             const isVisible = this.game.isCastleVisible(castle);
             const mask = (val) => isVisible ? val : "??";
             const castellan = this.game.getBusho(castle.castellanId);
+            const clanData = this.game.clans.find(cd => cd.id === castle.ownerClan);
+            const clanName = clanData ? clanData.name : "中立";
+            const castellanName = castellan ? castellan.name : "-";
             
             let faceHtml = "";
             if (castellan && castellan.faceIcon) {
-                faceHtml = `<img src="data/faceicons/${castellan.faceIcon}" style="width:40px;height:40px;object-fit:cover;border-radius:2px;margin-right:5px;border:1px solid #777;background:#ccc;" onerror="this.style.display='none'">`;
+                // 顔画像が見つからない時は隠すようにしています
+                faceHtml = `<img src="data/faceicons/${castellan.faceIcon}" onerror="this.style.display='none'">`;
             }
 
-            let content = `<div style="display:flex; justify-content:space-between; align-items:flex-start; width:100%;">`;
-            content += `<div style="display:flex; flex:1;">`;
-            if(faceHtml) content += faceHtml;
-            content += `<div style="flex:1;"><div style="font-weight:bold;">${castle.name}</div>`;
-            
-            content += `<div>人口:${mask(castle.population)} 民忠:${this.getStatusBarHTML(castle.peoplesLoyalty, castle.maxPeoplesLoyalty, 'lightblue', isVisible)}</div>`;
-            content += `<div>兵:${mask(castle.soldiers)} 防:${this.getStatusBarHTML(castle.defense, castle.maxDefense, 'lightblue', isVisible)}</div>`;
-            content += `<div>金:${mask(castle.gold)} 米:${mask(castle.rice)}</div>`;
-            content += `<div>訓練:${this.getStatusBarHTML(castle.training, 100, 'lightblue', isVisible)} 士気:${this.getStatusBarHTML(castle.morale, 100, 'lightblue', isVisible)}</div>`;
-            content += `<div>石:${this.getStatusBarHTML(castle.kokudaka, castle.maxKokudaka, 'blue', isVisible)} 鉱:${this.getStatusBarHTML(castle.commerce, castle.maxCommerce, 'blue', isVisible)}</div>`;
-            
-            content += `</div></div></div>`;
-
+            // 画像の案に合わせて、細かく区切りを入れながら並べていきます
+            let content = `
+                <div class="sp-info-header">
+                    <span class="sp-clan">${clanName}</span>
+                    <span class="sp-castle">${castle.name}</span>
+                    <span class="sp-lord-label">城主</span>
+                    <span class="sp-lord-name">${castellanName}</span>
+                </div>
+                <div class="sp-info-body">
+                    <div class="sp-face-wrapper">${faceHtml}</div>
+                    <div class="sp-params-grid">
+                        <div class="sp-label">石高</div><div class="sp-val">${this.getStatusBarHTML(castle.kokudaka, castle.maxKokudaka, 'blue', isVisible)}</div>
+                        <div class="sp-label">訓練</div><div class="sp-val">${this.getStatusBarHTML(castle.training, 100, 'lightblue', isVisible)}</div>
+                        <div class="sp-label">騎馬</div><div class="sp-val-right">${mask(castle.horses)}</div>
+                        
+                        <div class="sp-label">鉱山</div><div class="sp-val">${this.getStatusBarHTML(castle.commerce, castle.maxCommerce, 'blue', isVisible)}</div>
+                        <div class="sp-label">士気</div><div class="sp-val">${this.getStatusBarHTML(castle.morale, 100, 'lightblue', isVisible)}</div>
+                        <div class="sp-label">鉄砲</div><div class="sp-val-right">${mask(castle.guns)}</div>
+                        
+                        <div class="sp-label">民忠</div><div class="sp-val">${this.getStatusBarHTML(castle.peoplesLoyalty, castle.maxPeoplesLoyalty, 'lightblue', isVisible)}</div>
+                        <div class="sp-label">防御</div><div class="sp-val">${this.getStatusBarHTML(castle.defense, castle.maxDefense, 'lightblue', isVisible)}</div>
+                        <div class="sp-empty"></div><div class="sp-empty"></div>
+                        
+                        <div class="sp-label">人口</div><div class="sp-val-left" style="grid-column: 2 / span 5;">${mask(castle.population)}人</div>
+                    </div>
+                </div>
+                <div class="sp-info-footer">
+                    <span>金　${mask(castle.gold)}</span>
+                    <span>兵糧　${mask(castle.rice)}</span>
+                    <span>兵数　${mask(castle.soldiers)}</span>
+                </div>
+                <div class="sp-market-rate">
+                    米相場　${this.game.marketRate.toFixed(1)}
+                </div>
+            `;
             this.mobileTopLeft.innerHTML = content;
         }
+
+        // ★ 修正：スマホの下側にあった「武将一覧」ボタンなどは消し、年月だけを表示するようにしました
         if (this.mobileBottomInfo) {
             this.mobileBottomInfo.innerHTML = `
-                <div style="display:flex; gap:10px; align-items:center;">
-                    <span>${this.game.year}年${this.game.month}月</span>
-                    <span>米相場:${this.game.marketRate.toFixed(2)}</span>
-                </div>
-                <div style="display:flex; gap:5px;">
-                    <button class="btn-primary" style="padding:2px 8px; font-size:0.75rem;" onclick="window.GameApp.ui.openBushoSelector('view_only', ${castle.id})">武将一覧</button>
+                <div style="display:flex; justify-content:flex-start; align-items:flex-end;">
+                    <div style="border:1px solid #333; padding:2px 8px; font-weight:bold; background:#fff; font-size:1rem;">
+                        ${this.game.year}年 ${this.game.month}月
+                    </div>
                 </div>
             `;
              const cmdGrid = document.getElementById('command-area');
              if(cmdGrid) {
-                 cmdGrid.style.display = 'grid';
+                 cmdGrid.style.display = 'grid'; // コマンドエリアを表示状態にします
              }
         }
     }
