@@ -903,7 +903,8 @@ class UIManager {
         if (btnBusho) {
             btnBusho.onclick = () => {
                 modal.classList.add('hidden'); 
-                this.openBushoSelector('view_only', castle.id); 
+                // ★修正: 戻るボタンを押したときに、城コマンドに戻るお約束を書き足しました！
+                this.openBushoSelector('view_only', castle.id, null, () => { this.showCastleMenuModal(castle); }); 
             };
         }
 
