@@ -585,7 +585,7 @@ class WarManager {
             if (candidates.length === 1) runRetreat(candidates[0].id); else this.game.ui.showRetreatSelector(defCastle, candidates, (id) => runRetreat(id)); 
         } else { candidates.sort((a,b) => WarSystem.calcRetreatScore(b) - WarSystem.calcRetreatScore(a)); runRetreat(candidates[0].id); }
     }
-
+    
     endWar(attackerWon, isRetreat = false, capturedInRetreat = [], retreatTargetId = null) { 
         try {
             const s = this.state; s.active = false; 
@@ -593,7 +593,10 @@ class WarManager {
             // プレイヤーが国人衆を制圧（討伐）した時の処理
             if (s.isKunishuSubjugation) {
                 const kunishu = this.game.kunishuSystem.getKunishu(s.defender.kunishuId);
+                let resultMsg = ""; // 🌟追加：お知らせ用のメッセージ枠
+                
                 if (attackerWon) {
+                    resultMsg = `【国衆制圧】\n${s.defender.name}の討伐に成功しました！`;
                     this.game.ui.log(`【国衆制圧】${s.defender.name}の討伐に成功しました！`);
                     if (kunishu) {
                         kunishu.isDestroyed = true;
@@ -604,39 +607,44 @@ class WarManager {
                         });
                     }
                 } else {
+                    resultMsg = `【討伐失敗】\n${s.defender.name}の討伐に失敗しました……`;
                     this.game.ui.log(`【国衆制圧】${s.defender.name}の討伐に失敗しました……`);
                     
-                    // 戦いで減った「身代わり（s.defender）」の兵士数と城壁の耐久力を、本物の国人衆データに上書きしてあげます
                     if (kunishu) {
                         kunishu.soldiers = s.defender.soldiers;
                         kunishu.defense = s.defender.defense;
                     }
                 }
                 
-                // 生き残った攻撃部隊は元の城へ帰る処理
                 const srcC = this.game.getCastle(s.sourceCastle.id);
                 if (srcC) {
                     srcC.soldiers += s.attacker.soldiers; 
                     srcC.rice += s.attacker.rice;
                 }
-                this.closeWar();
+                
+                // 🌟 ここが変わりました！戦争画面を隠して、結果のウィンドウを出します
+                if (s.isPlayerInvolved) {
+                    this.game.ui.setWarModalVisible(false);
+                    this.game.ui.showResultModal(resultMsg, () => { this.closeWar(); });
+                } else {
+                    this.closeWar();
+                }
                 return;
             }
             
-            // ★追加: 国人衆が反乱（蜂起）を起こした時の処理
+            // 国人衆が反乱（蜂起）を起こした時の処理
             if (s.attacker.isKunishu) {
+                let resultMsg = ""; // 🌟追加：お知らせ用のメッセージ枠
+                
                 if (attackerWon) {
                     const targetC = this.game.getCastle(s.defender.id);
                     const oldOwner = targetC.ownerClan;
-                    targetC.ownerClan = 0; // 城が空き地になる
+                    targetC.ownerClan = 0; 
                     targetC.castellanId = 0;
                     
-                    // 国人衆のメンバーのIDリストを作っておきます
                     const kunishuMembers = this.game.kunishuSystem.getKunishuMembers(s.attacker.kunishuId).map(b => b.id);
                     
-                    // お城にいた武将たち（守備側）の処理
                     this.game.getCastleBushos(targetC.id).forEach(b => {
-                        // 国人衆のメンバー「以外」は全員浪人になり、この城に留まります
                         if (!kunishuMembers.includes(b.id)) {
                             b.status = 'ronin'; 
                             b.clan = 0; 
@@ -644,16 +652,14 @@ class WarManager {
                         }
                     });
                     
-                    // 🌟 ここが新しいお約束です！
-                    // 名簿には「国人衆のメンバー」か、または「浪人」の人だけを残します
                     targetC.samuraiIds = targetC.samuraiIds.filter(id => {
                         const busho = this.game.getBusho(id);
                         return kunishuMembers.includes(id) || (busho && busho.status === 'ronin');
                     });
 
+                    resultMsg = `【国衆蜂起】\n国人衆の反乱により、${targetC.name}が陥落し空白地となりました。`;
                     this.game.ui.log(`【国衆蜂起】国人衆の反乱により、${targetC.name}が陥落し空白地となりました。`);
                     
-                    // もし大名が城を全て失ったら滅亡
                     if (this.game.castles.filter(c => c.ownerClan === oldOwner).length === 0) {
                         this.game.ui.log(`${this.game.clans.find(c=>c.id===oldOwner)?.name}は滅亡しました。`);
                         if (oldOwner === this.game.playerClanId) {
@@ -668,11 +674,21 @@ class WarManager {
                         }
                     }
                 } else {
+                    resultMsg = `【国衆蜂起】\n国人衆の反乱を鎮圧しました。`;
                     this.game.ui.log(`【国衆蜂起】国人衆の反乱を鎮圧しました。`);
                 }
-                this.closeWar();
+                
+                // 🌟 ここが変わりました！戦争画面を隠して、結果のウィンドウを出します
+                if (s.isPlayerInvolved) {
+                    this.game.ui.setWarModalVisible(false);
+                    this.game.ui.showResultModal(resultMsg, () => { this.closeWar(); });
+                } else {
+                    this.closeWar();
+                }
                 return;
             }
+
+            // （これより下の s.atkBushos.forEach... の行はそのままで大丈夫です！）
 
             s.atkBushos.forEach(b => { this.game.factionSystem.recordBattle(b, s.defender.id); this.game.factionSystem.updateRecognition(b, 25); });
             const defBushos = this.game.getCastleBushos(s.defender.id).concat(this.pendingPrisoners);

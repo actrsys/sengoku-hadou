@@ -296,17 +296,21 @@ class FieldWarManager {
         const turnEl = document.getElementById('fw-turn-info');
         if (turnEl) turnEl.innerText = `Turn: ${this.turnCount}/${this.maxTurns}`;
     }
-
+    
     showUnitInfo(unit) {
         const infoEl = document.getElementById('fw-unit-info');
         if (!infoEl) return;
         
         // ★修正: 援軍かどうかが色でわかるようにしました
         let color = unit.isAttacker ? '#d32f2f' : '#1976d2';
-        if (!unit.isPlayer && !unit.isAttacker && this.units.some(u => u.isPlayer && !u.isAttacker)) {
-            color = '#4caf50'; // 味方の援軍は緑
-        } else if (!unit.isPlayer && !unit.isAttacker && unit.name.includes("国衆")) {
-            color = '#ff9800'; // 敵の援軍はオレンジ
+        
+        // 🌟「IDが k_ から始まる（＝国人衆の援軍）」時だけ色を変えるように直します！
+        if (typeof unit.id === 'string' && unit.id.startsWith('k_')) {
+            if (this.units.some(u => u.isPlayer && !u.isAttacker)) {
+                color = '#4caf50'; // 味方の援軍は緑
+            } else {
+                color = '#ff9800'; // 敵の援軍はオレンジ
+            }
         }
 
         infoEl.innerHTML = `
@@ -423,7 +427,7 @@ class FieldWarManager {
 
         const isAtkPlayer = (Number(this.warState.attacker.ownerClan) === Number(this.game.playerClanId));
         const isDefPlayer = (Number(this.warState.defender.ownerClan) === Number(this.game.playerClanId));
-
+        
         this.units.forEach((u) => {
             let iconSize = 16 + Math.min(Math.floor(u.soldiers / 1000), 5) * 3;
 
@@ -432,9 +436,14 @@ class FieldWarManager {
             
             // ★修正: 援軍の色分け
             let colorClass = u.isAttacker ? 'attacker' : 'defender';
-            if (!u.isPlayer && !u.isAttacker) {
-                if (isDefPlayer) uEl.style.filter = 'drop-shadow(1px 0 0 #4caf50) drop-shadow(-1px 0 0 #4caf50) drop-shadow(0 1px 0 #4caf50) drop-shadow(0 -1px 0 #4caf50) drop-shadow(2px 2px 2px rgba(0,0,0,0.8))';
-                else if (isAtkPlayer) uEl.style.filter = 'drop-shadow(1px 0 0 #ff9800) drop-shadow(-1px 0 0 #ff9800) drop-shadow(0 1px 0 #ff9800) drop-shadow(0 -1px 0 #ff9800) drop-shadow(2px 2px 2px rgba(0,0,0,0.8))';
+            
+            // 🌟「IDが k_ から始まる（＝国人衆の援軍）」時だけ色を変えるように直します！
+            if (typeof u.id === 'string' && u.id.startsWith('k_')) {
+                if (isDefPlayer) {
+                    uEl.style.filter = 'drop-shadow(1px 0 0 #4caf50) drop-shadow(-1px 0 0 #4caf50) drop-shadow(0 1px 0 #4caf50) drop-shadow(0 -1px 0 #4caf50) drop-shadow(2px 2px 2px rgba(0,0,0,0.8))';
+                } else if (isAtkPlayer) {
+                    uEl.style.filter = 'drop-shadow(1px 0 0 #ff9800) drop-shadow(-1px 0 0 #ff9800) drop-shadow(0 1px 0 #ff9800) drop-shadow(0 -1px 0 #ff9800) drop-shadow(2px 2px 2px rgba(0,0,0,0.8))';
+                }
             }
 
             uEl.className = `fw-unit ${colorClass} ${isActive ? 'active' : ''}`;
