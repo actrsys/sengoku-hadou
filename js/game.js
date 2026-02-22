@@ -893,7 +893,7 @@ class UIManager {
         this.mapZoomInBtn.style.display = (this.zoomLevel >= 2) ? 'none' : 'flex';
         this.mapZoomOutBtn.style.display = (this.zoomLevel <= 0) ? 'none' : 'flex';
     }
-
+    
     showCastleMenuModal(castle) {
         const modal = document.getElementById('castle-menu-modal');
         if (!modal) return;
@@ -905,6 +905,29 @@ class UIManager {
                 modal.classList.add('hidden'); 
                 this.openBushoSelector('view_only', castle.id); 
             };
+        }
+
+        // ★追加: 国衆一覧ボタンの動き
+        const btnKunishu = document.getElementById('btn-kunishu-list');
+        if (btnKunishu) {
+            // この城に国人衆がいるかチェック！
+            const kunishus = this.game.kunishuSystem.getKunishusInCastle(castle.id);
+            if (kunishus && kunishus.length > 0) {
+                btnKunishu.style.display = ''; // 国衆がいる場合はボタンを表示
+                btnKunishu.onclick = () => {
+                    modal.classList.add('hidden'); 
+                    // 見るだけモード（isViewOnly = true）で開く
+                    this.showKunishuSelector(
+                        kunishus, 
+                        null, 
+                        () => { this.showCastleMenuModal(castle); }, // 戻るボタンで城メニューに戻る
+                        true // これが「見るだけモード」のスイッチです！
+                    );
+                };
+            } else {
+                // 国衆がいない城の場合は、ボタンを隠しておく
+                btnKunishu.style.display = 'none'; 
+            }
         }
     }
     
@@ -1532,29 +1555,6 @@ class UIManager {
             this.selectorList.appendChild(div);
         });
         if (bushos.length === 0 && this.selectorList) this.selectorList.innerHTML = "<div style='padding:10px;'>対象となる武将がいません</div>";
-        
-        // ★追加: 武将一覧の下に、その城にいる国人衆を追加する魔法！
-        if (actionType === 'view_only') {
-            const kunishus = this.game.kunishuSystem.getKunishusInCastle(targetId);
-            if (kunishus && kunishus.length > 0) {
-                // 「ここから下は国人衆ですよ」という見出しを作ります
-                const header = document.createElement('div');
-                header.innerHTML = `<div style="padding: 5px 10px; background: #37474f; color: #fff; font-weight: bold; margin-top: 15px; font-size: 0.85rem;">国人衆一覧</div>`;
-                this.selectorList.appendChild(header);
-
-                // 先ほど作った綺麗なデザインを使って国人衆を並べます
-                kunishus.forEach(k => {
-                    const name = k.getName(this.game);
-                    const rel = k.getRelation(this.game.playerClanId);
-                    const div = document.createElement('div');
-                    div.className = 'kunishu-item'; 
-                    div.style.cursor = 'default'; // 見るだけなので指のマークにしない
-                    div.style.marginTop = '5px';
-                    div.innerHTML = `<strong style="margin-right:10px;">${name}</strong> <span style="font-size:0.9rem; color:#555;">(兵数:${k.soldiers} 防御:${k.defense} 友好度:${rel})</span>`;
-                    this.selectorList.appendChild(div);
-                });
-            }
-        }
 
         if (this.selectorConfirmBtn) {
             if (actionType === 'view_only') {
@@ -1835,22 +1835,21 @@ class UIManager {
         };
     }
     
-    // ★修正: 複数の国人衆がいる場合に選ぶ画面（武将選択と同じ画面を使って戻れるようにします）
-    showKunishuSelector(kunishus, onSelect, onCancel) {
+    // ★修正: 複数の国人衆がいる場合に選ぶ画面（見るだけモード対応）
+    showKunishuSelector(kunishus, onSelect, onCancel, isViewOnly = false) {
         if (!this.selectorModal) return;
         this.selectorModal.classList.remove('hidden');
         
         const title = document.getElementById('selector-title');
-        if (title) title.textContent = "対象の国衆を選択";
+        // ★追加: 見るだけモードならタイトルを変える
+        if (title) title.textContent = isViewOnly ? "国人衆一覧" : "対象の国衆を選択";
 
-        // ★追加: 武将用の項目名（ヘッダー）を隠す
         const listHeader = document.querySelector('#selector-modal .list-header');
         if (listHeader) listHeader.style.display = 'none';
         
         const backBtn = document.querySelector('#selector-modal .btn-secondary');
         if(backBtn) {
             backBtn.onclick = () => {
-                // ★追加: 戻るボタンを押したときに、隠したヘッダーを元に戻す
                 if (listHeader) listHeader.style.display = '';
                 this.closeSelector();
                 if (onCancel) onCancel();
@@ -1859,7 +1858,8 @@ class UIManager {
 
         const contextEl = document.getElementById('selector-context-info');
         if (contextEl) {
-            contextEl.innerHTML = "<div>対象とする国衆を選択してください</div>";
+            // ★追加: 見るだけモードなら説明文を変える
+            contextEl.innerHTML = isViewOnly ? "<div>この城に存在する国人衆です</div>" : "<div>対象とする国衆を選択してください</div>";
             contextEl.classList.remove('hidden');
         }
 
@@ -1869,14 +1869,19 @@ class UIManager {
                 const name = k.getName(window.GameApp);
                 const rel = k.getRelation(window.GameApp.playerClanId);
                 const div = document.createElement('div');
-                div.className = 'kunishu-item'; // ← さっき直していただいた綺麗なデザインの名前！
+                div.className = 'kunishu-item'; 
                 div.innerHTML = `<strong style="margin-right:10px;">${name}</strong> <span style="font-size:0.9rem; color:#555;">(兵数:${k.soldiers} 防御:${k.defense} 友好度:${rel})</span>`;
-                div.onclick = () => { 
-                    // ★追加: 国衆を選んだときにも、隠したヘッダーを元に戻す
-                    if (listHeader) listHeader.style.display = '';
-                    this.closeSelector();
-                    onSelect(k.id); 
-                };
+                
+                // ★追加: 見るだけモードならクリックしても何も起きないようにする
+                if (isViewOnly) {
+                    div.style.cursor = 'default';
+                } else {
+                    div.onclick = () => { 
+                        if (listHeader) listHeader.style.display = '';
+                        this.closeSelector();
+                        if (onSelect) onSelect(k.id); 
+                    };
+                }
                 this.selectorList.appendChild(div);
             });
         }
