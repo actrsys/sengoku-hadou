@@ -1,7 +1,7 @@
 /**
  * command_system.js
  * ゲーム内のコマンド実行ロジックおよびフロー制御を管理するクラス
- * 修正: 国人衆に対する新しいコマンド（国衆親善、制圧、国衆引抜）を追加しました
+ * 修正: 国人衆に対する新しいコマンド（国衆親善、制圧）を追加しました
  */
 
 /* ==========================================================================
@@ -185,14 +185,6 @@ const COMMAND_SPECS = {
         costGold: 0, costRice: 0,
         isMulti: false, hasAdvice: true, 
         startMode: 'map_select', targetType: 'enemy_all',
-        sortKey: 'intelligence'
-    },
-    // ★追加: 国人衆の武将を味方に引き抜くための調略コマンド
-    'kunishu_headhunt': { 
-        label: "国衆引抜", category: 'STRATEGY', 
-        costGold: 0, costRice: 0,
-        isMulti: false, hasAdvice: true, 
-        startMode: 'map_select', targetType: 'kunishu_valid',
         sortKey: 'intelligence'
     },
 
