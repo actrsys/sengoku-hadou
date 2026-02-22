@@ -581,8 +581,8 @@ class WarManager {
     endWar(attackerWon, isRetreat = false, capturedInRetreat = [], retreatTargetId = null) { 
         try {
             const s = this.state; s.active = false; 
-
-            // ★追加: プレイヤーが国人衆を制圧（討伐）した時の処理
+            
+            // プレイヤーが国人衆を制圧（討伐）した時の処理
             if (s.isKunishuSubjugation) {
                 const kunishu = this.game.kunishuSystem.getKunishu(s.defender.kunishuId);
                 if (attackerWon) {
@@ -597,10 +597,16 @@ class WarManager {
                     }
                 } else {
                     this.game.ui.log(`【国衆制圧】${s.defender.name}の討伐に失敗しました……`);
+                    
+                    // 戦いで減った「身代わり（s.defender）」の兵士数と城壁の耐久力を、本物の国人衆データに上書きしてあげます
+                    if (kunishu) {
+                        kunishu.soldiers = s.defender.soldiers;
+                        kunishu.defense = s.defender.defense;
+                    }
                 }
                 
                 // 生き残った攻撃部隊は元の城へ帰る処理
-                const srcC = this.game.getCastle(s.sourceCastle.id); 
+                const srcC = this.game.getCastle(s.sourceCastle.id);
                 if (srcC) {
                     srcC.soldiers += s.attacker.soldiers; 
                     srcC.rice += s.attacker.rice;
