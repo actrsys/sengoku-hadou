@@ -1444,13 +1444,13 @@ class UIManager {
         if (contextEl) contextEl.innerHTML = infoHtml;
         
         bushos.sort((a,b) => {
+        
             // ★追加: 身分ごとに優先順位の「点数」をつける魔法（数字が小さいほど上に来ます！）
             const getRankScore = (target) => {
                 if (target.isDaimyo || target.isCastellan) return 10; // 1番目: 大名または城主
                 if (target.isGunshi) return 20; // 2番目: 軍師
-                if (target.status === 'ronin') return 90; // 一番最後: 浪人
 
-                // 国人衆に所属している場合
+                // ★修正: 「浪人」か調べるより先に、国人衆かどうかを調べます！
                 if (target.belongKunishuId && target.belongKunishuId > 0) {
                     const kunishu = this.game.kunishuSystem.getKunishu(target.belongKunishuId);
                     const isBoss = kunishu && (Number(kunishu.leaderId) === Number(target.id));
@@ -1459,6 +1459,8 @@ class UIManager {
                     if (isBoss) return 40 + (target.belongKunishuId * 0.001); // 頭領
                     return 50 + (target.belongKunishuId * 0.001); // 所属している国衆
                 }
+
+                if (target.status === 'ronin') return 90; // 一番最後: （国衆ではない）本当の浪人
 
                 return 30; // 3番目: 上のどれにも当てはまらない普通の武将
             };
