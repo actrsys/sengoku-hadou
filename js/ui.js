@@ -354,7 +354,7 @@ class UIManager {
     }
     
     showDaimyoList() {
-        let listHtml = `<div style="text-align:left; max-height:400px; overflow-y:auto; padding: 10px; background: #fafafa; border: 1px solid #ccc; border-radius: 4px;">`;
+        let listHtml = `<div style="text-align:left; padding: 10px; background: #fafafa; border: 1px solid #ccc; border-radius: 4px;">`;
         
         const activeClans = this.game.clans.filter(c => c.id !== 0 && this.game.castles.some(cs => cs.ownerClan === c.id));
         
@@ -371,6 +371,7 @@ class UIManager {
             });
             const power = Math.floor(pop / 2000) + Math.floor(sol / 20) + Math.floor(koku / 20) + Math.floor(gold / 50) + Math.floor(rice / 100);
             return {
+                id: clan.id,
                 name: clan.name,
                 leaderName: leader ? leader.name : "不明",
                 power: power,
@@ -381,7 +382,7 @@ class UIManager {
         clanDataList.sort((a,b) => b.power - a.power);
 
         clanDataList.forEach(d => {
-            listHtml += `<div style="border-bottom:1px dashed #bbb; padding:8px 0;">`;
+            listHtml += `<div style="border-bottom:1px dashed #bbb; padding:8px 0; cursor:pointer;" onclick="window.GameApp.ui.showFactionList(${d.id})" onmouseover="this.style.backgroundColor='#e3f2fd'" onmouseout="this.style.backgroundColor='transparent'">`;
             listHtml += `<div style="font-weight:bold; font-size:1.1rem;">${d.name} <span style="font-size:0.9rem; font-weight:normal;">(当主: ${d.leaderName})</span></div>`;
             listHtml += `<div style="color:#d32f2f; font-weight:bold; margin-top:3px;">戦力: ${d.power} <span style="font-size:0.8rem; color:#555; font-weight:normal;">(城数:${d.castlesCount})</span></div>`;
             listHtml += `</div>`;
@@ -389,6 +390,61 @@ class UIManager {
         listHtml += `</div>`;
         
         this.showResultModal(`<h3 style="margin-top:0;">大名一覧</h3>${listHtml}`);
+    }
+
+    showFactionList(clanId) {
+        const clan = this.game.clans.find(c => c.id === clanId);
+        if (!clan) return;
+
+        const bushos = this.game.bushos.filter(b => b.clan === clanId && b.status === 'active');
+        const factions = {};
+        
+        bushos.forEach(b => {
+            const fId = b.factionId;
+            if (!factions[fId]) {
+                factions[fId] = {
+                    count: 0,
+                    leader: null
+                };
+            }
+            factions[fId].count++;
+            if (b.isFactionLeader) {
+                factions[fId].leader = b;
+            }
+        });
+
+        let listHtml = `<div style="text-align:left; padding: 10px; background: #fafafa; border: 1px solid #ccc; border-radius: 4px;">`;
+        
+        const fIds = Object.keys(factions).map(Number).filter(id => id !== 0);
+        
+        if (fIds.length === 0) {
+            listHtml += `<div style="padding:8px 0;">派閥はありません。</div>`;
+        } else {
+            fIds.forEach(fId => {
+                const fData = factions[fId];
+                let factionName = "不明派閥";
+                if (fData.leader) {
+                    const familyName = fData.leader.familyName || fData.leader.name;
+                    factionName = `${familyName}派閥`;
+                }
+                listHtml += `<div style="border-bottom:1px dashed #bbb; padding:8px 0;">`;
+                listHtml += `<div style="font-weight:bold; font-size:1.1rem;">${factionName}</div>`;
+                listHtml += `<div style="margin-top:3px;">所属人数: ${fData.count}名</div>`;
+                listHtml += `</div>`;
+            });
+        }
+        
+        if (factions[0] && factions[0].count > 0) {
+            listHtml += `<div style="padding:8px 0;">`;
+            listHtml += `<div style="font-weight:bold; font-size:1.1rem;">無派閥</div>`;
+            listHtml += `<div style="margin-top:3px;">所属人数: ${factions[0].count}名</div>`;
+            listHtml += `</div>`;
+        }
+        
+        listHtml += `</div>`;
+        listHtml += `<div style="margin-top:15px;"><button class="btn-secondary" onclick="window.GameApp.ui.showDaimyoList()">戻る</button></div>`;
+
+        this.showResultModal(`<h3 style="margin-top:0;">${clan.name} 派閥一覧</h3>${listHtml}`);
     }
 
     showResultModal(msg, onClose = null) { 
