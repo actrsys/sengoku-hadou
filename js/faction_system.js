@@ -222,20 +222,20 @@ class FactionSystem {
                     const leaderStatVal = leader[bestStatKey];
                     const abilityBonus = Math.floor(leaderStatVal * 0.15);
                     
-                    // ★変更：魅力の補正を少し下げました（前の半分の強さにしました）
+                    // 魅力の補正
                     const charmBonus = Math.floor((50 - leader.charm) * 0.1);
 
-                    // ★追加：リーダーの功績の高さによるボーナス（功績200につき1点入りやすくなります）
-                    const achievementBonus = Math.floor(leader.achievementTotal / 200);
+                    // ★変更：リーダーの功績の高さによるボーナス（功績500を基準に、100につき1点入りやすくなります）
+                    // （万が一リーダーの功績が500未満になってもマイナスにならないように念のため Math.max を入れています）
+                    const achievementBonus = Math.max(0, Math.floor((leader.achievementTotal - 500) / 100));
 
-                    // ★追加：相性が特別良い（差が0〜5）場合の特別ボーナス
-                    // 差が0なら10点、1なら8点…5なら0点のボーナスが段階的につきます
+                    // 相性が特別良い（差が0〜5）場合の特別ボーナス
                     let affinitySpecialBonus = 0;
                     if (affDiff <= 5) {
                         affinitySpecialBonus = (5 - affDiff) * 2;
                     }
 
-                    // ★変更：全体の入りやすさをやや落とすため、基本値を「25」から「30」に上げました
+                    // 全体の入りやすさ（基本値30）から各ボーナスを計算
                     const score = (affDiff + (innoDiff * 0.5) + 30) - finalBonus - abilityBonus + charmBonus - achievementBonus - affinitySpecialBonus;
 
                     if (score < joinThreshold && score < minScore) {
