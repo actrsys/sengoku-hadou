@@ -565,7 +565,16 @@ class GameManager {
             const bushos = this.getCastleBushos(c.id);
             c.rice = Math.max(0, c.rice - Math.floor(c.soldiers * window.MainParams.Economy.ConsumeRicePerSoldier));
             c.gold = Math.max(0, c.gold - (bushos.length * window.MainParams.Economy.ConsumeGoldPerBusho));
-            bushos.forEach(b => b.isActionDone = false);
+            
+            // ★あや瀨さんへ：ここで武将たちの行動を元に戻すと同時に、城主には功績を＋10するように書き足しました！
+            bushos.forEach(b => {
+                b.isActionDone = false;
+                
+                // もしこの武将が「城主」だったら、功績を10足してあげる
+                if (b.isCastellan) {
+                    b.achievementTotal += 10;
+                }
+            });
         });
 
         const allCastles = this.castles.filter(c => c.ownerClan !== 0);
