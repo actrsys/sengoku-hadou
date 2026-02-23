@@ -129,7 +129,7 @@ class FactionSystem {
         const F = window.WarParams.Faction || {};
         const achieveLeader = F.AchievementLeader || 500;
         
-        // ★修正ポイント：CSV設定ファイルに上書きされないように、数値を「強制指定」にしました！
+        // CSV設定ファイルに上書きされないように、数値を「強制指定」にしています
         const battleBonus = 2; // 強制的に2
         const stayBonusTrigger = F.SolidarityStayTrigger || 12; 
         const stayBonusBase = F.SolidarityStayBase || 9;
@@ -169,6 +169,12 @@ class FactionSystem {
             // 実際に結成される派閥リーダー
             const factionLeaders = candidates.slice(0, maxFactions);
             
+            // ★追加：リーダー以外に「派閥に入れるメンバー候補」が1人もいない場合は、ここでやめて派閥を作らない
+            const potentialMembers = members.filter(b => !b.isDaimyo && !factionLeaders.includes(b));
+            if (potentialMembers.length === 0) {
+                return;
+            }
+
             // リーダー自身にIDとリーダーフラグ付与
             factionLeaders.forEach((leader, index) => {
                 leader.factionId = (clan.id * 100) + index + 1;
