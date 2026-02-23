@@ -128,12 +128,13 @@ class FactionSystem {
     updateFactions() {
         const F = window.WarParams.Faction || {};
         const achieveLeader = F.AchievementLeader || 500;
-        // 共闘ボーナスは2
-        const battleBonus = F.SolidarityBattle || 2;
+        
+        // ★修正ポイント：CSV設定ファイルに上書きされないように、数値を「強制指定」にしました！
+        const battleBonus = 2; // 強制的に2
         const stayBonusTrigger = F.SolidarityStayTrigger || 12; 
         const stayBonusBase = F.SolidarityStayBase || 9;
         const stayBonusDiv = F.SolidarityStayDiv || 3;
-        const joinThreshold = F.JoinScoreThreshold || 40;
+        const joinThreshold = 40; // 派閥に入るための合格ライン（強制的に40）
 
         const clans = this.game.clans;
         
@@ -235,7 +236,7 @@ class FactionSystem {
                     // 魅力の補正
                     const charmBonus = Math.floor((50 - (Number(leader.charm) || 0)) * 0.1);
 
-                    // ★変更：功績ボーナスを「25につき1点」にしました
+                    // 功績ボーナス（25につき1点）
                     const achievementBonus = Math.max(0, Math.floor(((Number(leader.achievementTotal) || 0) - 500) / 25));
 
                     // 性格（パーソナリティ）が同じ場合の特別ボーナス（5点）
