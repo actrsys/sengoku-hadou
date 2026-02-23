@@ -149,12 +149,13 @@ class FactionSystem {
                 b.isFactionLeader = false;
             });
 
-            // リーダー候補選出（まずは基本条件を満たす人を功績順に並べておく）
+            // リーダー候補選出
+            // 条件: 功績500以上 かつ 性格がhermit(隠遁者)ではない
             const candidates = members.filter(b => 
                 !b.isDaimyo && 
                 b.achievementTotal >= achieveLeader && 
                 b.personality !== 'hermit'
-            ).sort((a, b) => b.achievementTotal - a.achievementTotal);
+            );
 
             // 資格を満たす武将が2名以上いない場合は派閥なし
             if (candidates.length < 2) return;
@@ -165,7 +166,7 @@ class FactionSystem {
             if (members.length >= 15) maxFactions = 4;
             if (members.length >= 20) maxFactions = 5;
 
-            // ★追加：点数計算ルールを「共通の道具（calcScore）」としてまとめました！
+            // 点数計算ルールを「共通の道具（calcScore）」としてまとめました
             const calcScore = (voter, leader, availableLeaders) => {
                 const stats = [
                     { key: 'leadership', val: Number(voter.leadership) || 0 },
@@ -221,7 +222,6 @@ class FactionSystem {
                     personalityBonus = 5;
                 }
 
-                // 計算したスコアを返す
                 return ((affDiff * 0.5) + (innoDiff * 0.25) + 35) - finalBonus - abilityBonus + charmBonus - achievementBonus - personalityBonus;
             };
 
@@ -258,9 +258,7 @@ class FactionSystem {
                 let minScore = 999;
 
                 candidates.forEach(candidate => {
-                    // 自分自身には投票しない
                     if (voter === candidate) return; 
-                    
                     const score = calcScore(voter, candidate, candidates);
                     if (score < joinThreshold && score < minScore) {
                         minScore = score;
@@ -268,31 +266,37 @@ class FactionSystem {
                     }
                 });
 
-                // 一番スコアが良かった（入りたいと思った）人に1票入れる
                 if (bestCandidate) {
                     supportCounts.set(bestCandidate, supportCounts.get(bestCandidate) + 1);
                 }
             });
 
-            // 支持者数が多い順番に並べ替える（もし同じ票数なら、これまで通り功績が高い方が勝つ）
-            candidates.sort((a, b) => {
-                const supportDiff = supportCounts.get(b) - supportCounts.get(a);
-                if (supportDiff !== 0) {
-                    return supportDiff;
-                }
-                return b.achievementTotal - a.achievementTotal;
-            });
+            // ★変更：まずは「支持者が1人でもいる（派閥ができそう）」な候補者をピックアップします！
+            let potentialLeaders = candidates.filter(c => supportCounts.get(c) > 0);
 
-            // 支持者が多いトップ数名が、実際に結成される「仮の派閥リーダー」になります
-            const factionLeaders = candidates.slice(0, maxFactions);
-            
-            // リーダー以外に「派閥に入れるメンバー候補」が1人もいない場合は、ここでやめて派閥を作らない
-            const potentialMembers = members.filter(b => !b.isDaimyo && !factionLeaders.includes(b));
-            if (potentialMembers.length === 0) {
+            // ★変更：「派閥ができそうな人」が最大枠をオーバーしてしまった場合だけ、人気投票で削ります！
+            if (potentialLeaders.length > maxFactions) {
+                potentialLeaders.sort((a, b) => {
+                    const supportDiff = supportCounts.get(b) - supportCounts.get(a);
+                    if (supportDiff !== 0) {
+                        return supportDiff; // 支持者が多い順
+                    }
+                    return b.achievementTotal - a.achievementTotal; // 同点なら功績が高い順
+                });
+                
+                // 下位の人を切り捨てて、最大枠に収めます
+                potentialLeaders = potentialLeaders.slice(0, maxFactions);
+            }
+
+            // 削った結果、残ったリーダーが「1人以下」なら、ライバルがいないので派閥争いにならない（終了）
+            if (potentialLeaders.length < 2) {
                 return;
             }
 
-            // 選ばれた人にリーダーIDとフラグ付与
+            // 残った人たちが、晴れて「仮の派閥リーダー」になります
+            const factionLeaders = potentialLeaders;
+            
+            // リーダー自身にIDとリーダーフラグ付与
             factionLeaders.forEach((leader, index) => {
                 leader.factionId = (clan.id * 100) + index + 1;
                 leader.isFactionLeader = true;
@@ -302,12 +306,11 @@ class FactionSystem {
             const nonLeaders = members.filter(b => !b.isDaimyo && b.factionId === 0);
             evaluateJoin(nonLeaders, factionLeaders);
 
-            // 【チェック】誰も入ってこなかった悲しいリーダーをあぶり出す
+            // 【チェック】（念のため）誰も入ってこなかった悲しいリーダーをあぶり出す
             const validLeaders = [];
             const invalidLeaders = [];
 
             factionLeaders.forEach(leader => {
-                // 自分以外の派閥員が何人いるか数える
                 const followerCount = members.filter(b => b.factionId === leader.factionId && b !== leader).length;
                 if (followerCount === 0) {
                     // 誰もいないのでリーダー失格！
@@ -320,12 +323,11 @@ class FactionSystem {
                 }
             });
 
-            // 【2段階目】リーダーになれなかった元リーダーたちが、生き残った人気リーダーの派閥に入る
+            // 【2段階目】万が一リーダーになれなかった元リーダーがいれば、生き残った人気リーダーの派閥に入る
             if (invalidLeaders.length > 0) {
                 if (validLeaders.length > 0) {
                     evaluateJoin(invalidLeaders, validLeaders);
                 } else {
-                    // 全員が失格（誰にもメンバーがつかなかった）場合は、誰も派閥を作れないので全員解散！
                     members.forEach(b => {
                         b.factionId = 0;
                         b.isFactionLeader = false;
