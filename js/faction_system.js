@@ -215,14 +215,17 @@ class FactionSystem {
                 }
                 
                 const charmBonus = Math.floor((50 - (Number(leader.charm) || 0)) * 0.1);
-                const achievementBonus = Math.max(0, Math.floor(((Number(leader.achievementTotal) || 0) - 500) / 25));
+                
+                // ★変更：功績ボーナスを「20につき1点」にしました
+                const achievementBonus = Math.max(0, Math.floor(((Number(leader.achievementTotal) || 0) - 500) / 20));
 
                 let personalityBonus = 0;
                 if (voter.personality && leader.personality && voter.personality === leader.personality) {
                     personalityBonus = 5;
                 }
-
-                return ((affDiff * 0.5) + (innoDiff * 0.25) + 35) - finalBonus - abilityBonus + charmBonus - achievementBonus - personalityBonus;
+                
+                //基本となる点数４０点からスタート
+                return ((affDiff * 0.5) + (innoDiff * 0.25) + 40) - finalBonus - abilityBonus + charmBonus - achievementBonus - personalityBonus;
             };
 
             // 派閥に入れる処理の共通ルール
@@ -246,7 +249,7 @@ class FactionSystem {
             };
 
             // ==============================================
-            // ★事前アンケート（モック選挙）で人気を測る！
+            // 事前アンケート（モック選挙）で人気を測る！
             // ==============================================
             const supportCounts = new Map();
             candidates.forEach(c => supportCounts.set(c, 0));
@@ -271,10 +274,10 @@ class FactionSystem {
                 }
             });
 
-            // ★変更：まずは「支持者が1人でもいる（派閥ができそう）」な候補者をピックアップします！
+            // 「支持者が1人でもいる（派閥ができそう）」な候補者をピックアップします！
             let potentialLeaders = candidates.filter(c => supportCounts.get(c) > 0);
 
-            // ★変更：「派閥ができそうな人」が最大枠をオーバーしてしまった場合だけ、人気投票で削ります！
+            // 「派閥ができそうな人」が最大枠をオーバーしてしまった場合だけ、人気投票で削ります！
             if (potentialLeaders.length > maxFactions) {
                 potentialLeaders.sort((a, b) => {
                     const supportDiff = supportCounts.get(b) - supportCounts.get(a);
