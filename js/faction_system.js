@@ -128,7 +128,7 @@ class FactionSystem {
     updateFactions() {
         const F = window.WarParams.Faction || {};
         const achieveLeader = F.AchievementLeader || 500;
-        // 共闘ボーナスをデフォルトの5から2に変更しました
+        // 共闘ボーナスは2
         const battleBonus = F.SolidarityBattle || 2;
         const stayBonusTrigger = F.SolidarityStayTrigger || 12; 
         const stayBonusBase = F.SolidarityStayBase || 9;
@@ -181,18 +181,18 @@ class FactionSystem {
                 let bestLeader = null;
                 let minScore = 999;
 
-                // 魅力(charm)は外し、残り5つの能力から一番高い長所を見つけます
+                // 【安全装置付き】各能力をしっかり数字（Number）として取り出します
                 const stats = [
-                    { key: 'leadership', val: b.leadership },
-                    { key: 'strength', val: b.strength },
-                    { key: 'politics', val: b.politics },
-                    { key: 'diplomacy', val: b.diplomacy },
-                    { key: 'intelligence', val: b.intelligence }
+                    { key: 'leadership', val: Number(b.leadership) || 0 },
+                    { key: 'strength', val: Number(b.strength) || 0 },
+                    { key: 'politics', val: Number(b.politics) || 0 },
+                    { key: 'diplomacy', val: Number(b.diplomacy) || 0 },
+                    { key: 'intelligence', val: Number(b.intelligence) || 0 }
                 ];
                 const bestStatKey = stats.reduce((max, stat) => stat.val > max.val ? stat : max, stats[0]).key;
 
-                // 派閥リーダーたちの中で、その能力（長所）が一番高い数値を探しておきます
-                const maxLeaderStatVal = Math.max(...factionLeaders.map(l => l[bestStatKey]));
+                // 【安全装置付き】リーダーたちの中で、その能力（長所）が一番高い数値を探します
+                const maxLeaderStatVal = Math.max(...factionLeaders.map(l => Number(l[bestStatKey]) || 0));
 
                 factionLeaders.forEach(leader => {
                     const affDiff = GameSystem.calcAffinityDiff(b.affinity, leader.affinity);
@@ -224,21 +224,21 @@ class FactionSystem {
                     
                     // リーダーが「武将と同じ長所」をどれくらい持っているかのボーナス
                     let abilityBonus = 0;
-                    // ★修正：コンピューターがパニックにならないように、ここでしっかり数値を教えてあげます！
-                    const leaderStatVal = leader[bestStatKey];
-                    
-                    if (leaderStatVal > b[bestStatKey] && leaderStatVal === maxLeaderStatVal) {
-                        // ボーナスが最大10点になるように制限（Math.min）をつけました
+                    const leaderStatVal = Number(leader[bestStatKey]) || 0;
+                    const myStatVal = Number(b[bestStatKey]) || 0;
+
+                    if (leaderStatVal > myStatVal && leaderStatVal === maxLeaderStatVal) {
+                        // ボーナスが最大10点になるように制限
                         abilityBonus = Math.min(10, Math.floor(leaderStatVal * 0.15));
                     }
                     
                     // 魅力の補正
-                    const charmBonus = Math.floor((50 - leader.charm) * 0.1);
+                    const charmBonus = Math.floor((50 - (Number(leader.charm) || 0)) * 0.1);
 
-                    // 功績ボーナスを「100につき3点」にしました
-                    const achievementBonus = Math.max(0, Math.floor((leader.achievementTotal - 500) / 100) * 3);
+                    // 功績ボーナス（100につき3点）
+                    const achievementBonus = Math.max(0, Math.floor(((Number(leader.achievementTotal) || 0) - 500) / 100) * 3);
 
-                    // 運命の人ボーナスを半分（最大5点）にしました
+                    // 運命の人ボーナス（最大5点）
                     let affinitySpecialBonus = 0;
                     if (affDiff <= 2) {
                         affinitySpecialBonus = 5;
@@ -252,8 +252,15 @@ class FactionSystem {
                         affinitySpecialBonus = 1;
                     }
 
+                    // ★追加：性格（パーソナリティ）が同じ場合の特別ボーナス（5点）
+                    let personalityBonus = 0;
+                    if (b.personality && leader.personality && b.personality === leader.personality) {
+                        personalityBonus = 5;
+                    }
+
                     // 全体の入りやすさ（基本値40）から各ボーナスを計算
-                    const score = ((affDiff * 0.5) + (innoDiff * 0.5) + 40) - finalBonus - abilityBonus + charmBonus - achievementBonus - affinitySpecialBonus;
+                    // ★変更：計算式の一番最後に「 - personalityBonus 」を書き足しました
+                    const score = ((affDiff * 0.5) + (innoDiff * 0.5) + 40) - finalBonus - abilityBonus + charmBonus - achievementBonus - affinitySpecialBonus - personalityBonus;
 
                     if (score < joinThreshold && score < minScore) {
                         minScore = score;
