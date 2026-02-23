@@ -224,6 +224,9 @@ class FactionSystem {
                     
                     // リーダーが「武将と同じ長所」をどれくらい持っているかのボーナス
                     let abilityBonus = 0;
+                    // ★修正：コンピューターがパニックにならないように、ここでしっかり数値を教えてあげます！
+                    const leaderStatVal = leader[bestStatKey];
+                    
                     if (leaderStatVal > b[bestStatKey] && leaderStatVal === maxLeaderStatVal) {
                         // ボーナスが最大10点になるように制限（Math.min）をつけました
                         abilityBonus = Math.min(10, Math.floor(leaderStatVal * 0.15));
@@ -249,7 +252,7 @@ class FactionSystem {
                         affinitySpecialBonus = 1;
                     }
 
-                    // ★変更：全体の入りやすさ（基本値）を「40」に上げました
+                    // 全体の入りやすさ（基本値40）から各ボーナスを計算
                     const score = ((affDiff * 0.5) + (innoDiff * 0.5) + 40) - finalBonus - abilityBonus + charmBonus - achievementBonus - affinitySpecialBonus;
 
                     if (score < joinThreshold && score < minScore) {
