@@ -424,8 +424,8 @@ class UIManager {
                 const fData = factions[fId];
                 let factionName = "不明派閥";
                 if (fData.leader) {
-                    const familyName = fData.leader.familyName || fData.leader.name;
-                    factionName = `${familyName}派閥`;
+                    const fullName = fData.leader.name.replace(/\|/g, '');
+                    factionName = `${fullName}派閥`;
                 }
                 listHtml += `<div style="border-bottom:1px dashed #bbb; padding:8px 0;">`;
                 listHtml += `<div style="font-weight:bold; font-size:1.1rem;">${factionName}</div>`;
@@ -442,13 +442,21 @@ class UIManager {
         }
         
         listHtml += `</div>`;
-        listHtml += `<div style="margin-top:15px;"><button class="btn-secondary" onclick="window.GameApp.ui.showDaimyoList()">戻る</button></div>`;
 
-        this.showResultModal(`<h3 style="margin-top:0;">${clan.name} 派閥一覧</h3>${listHtml}`);
+        const customFooter = `<button class="btn-secondary" onclick="window.GameApp.ui.showDaimyoList()">戻る</button>`;
+        this.showResultModal(`<h3 style="margin-top:0;">${clan.name} 派閥一覧</h3>${listHtml}`, null, customFooter);
     }
 
-    showResultModal(msg, onClose = null) { 
+    showResultModal(msg, onClose = null, customFooterHtml = null) { 
         if (this.resultBody) this.resultBody.innerHTML = msg.replace(/\n/g, '<br>'); 
+        const footer = document.getElementById('result-footer');
+        if (footer) {
+            if (customFooterHtml !== null) {
+                footer.innerHTML = customFooterHtml;
+            } else {
+                footer.innerHTML = `<button class="btn-primary" onclick="window.GameApp.ui.closeResultModal()">閉じる</button>`;
+            }
+        }
         if (this.resultModal) this.resultModal.classList.remove('hidden'); 
         this.onResultModalClose = onClose;
     }
