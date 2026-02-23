@@ -180,7 +180,7 @@ class FactionSystem {
                 let bestLeader = null;
                 let minScore = 999;
 
-                // ★変更：魅力(charm)は外し、残り5つの能力から一番高い長所を見つけます
+                // 魅力(charm)は外し、残り5つの能力から一番高い長所を見つけます
                 const stats = [
                     { key: 'leadership', val: b.leadership },
                     { key: 'strength', val: b.strength },
@@ -218,17 +218,25 @@ class FactionSystem {
                     const correction = Math.max(0, 1.0 - (affDiff / 50.0));
                     const finalBonus = solidarityBonus * correction;
                     
-                    // ★追加・変更：バランス調整のため、能力一致ボーナスの量を少し（15%に）減らしました
+                    // リーダーが「武将と同じ長所」をどれくらい持っているかのボーナス
                     const leaderStatVal = leader[bestStatKey];
                     const abilityBonus = Math.floor(leaderStatVal * 0.15);
                     
-                    // ★追加：リーダーの「魅力」による補正（50を基準に、高ければボーナス、低ければ悪印象）
-                    // 魅力が高いほど数値がマイナスになり、スコア計算で有利になります
-                    const charmBonus = Math.floor((50 - leader.charm) * 0.2);
+                    // ★変更：魅力の補正を少し下げました（前の半分の強さにしました）
+                    const charmBonus = Math.floor((50 - leader.charm) * 0.1);
 
-                    // ★変更：入りやすくなりすぎないように、基本の「20」を「25」に少し上げました
-                    // そこからボーナスを引き、魅力の評価を足し引きして最終的な点数を出します
-                    const score = (affDiff + (innoDiff * 0.5) + 25) - finalBonus - abilityBonus + charmBonus;
+                    // ★追加：リーダーの功績の高さによるボーナス（功績200につき1点入りやすくなります）
+                    const achievementBonus = Math.floor(leader.achievementTotal / 200);
+
+                    // ★追加：相性が特別良い（差が0〜5）場合の特別ボーナス
+                    // 差が0なら10点、1なら8点…5なら0点のボーナスが段階的につきます
+                    let affinitySpecialBonus = 0;
+                    if (affDiff <= 5) {
+                        affinitySpecialBonus = (5 - affDiff) * 2;
+                    }
+
+                    // ★変更：全体の入りやすさをやや落とすため、基本値を「25」から「30」に上げました
+                    const score = (affDiff + (innoDiff * 0.5) + 30) - finalBonus - abilityBonus + charmBonus - achievementBonus - affinitySpecialBonus;
 
                     if (score < joinThreshold && score < minScore) {
                         minScore = score;
