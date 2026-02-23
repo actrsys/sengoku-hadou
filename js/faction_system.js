@@ -190,6 +190,9 @@ class FactionSystem {
                 ];
                 const bestStatKey = stats.reduce((max, stat) => stat.val > max.val ? stat : max, stats[0]).key;
 
+                // ★追加：派閥リーダーたちの中で、その能力（長所）が一番高い数値を探しておきます
+                const maxLeaderStatVal = Math.max(...factionLeaders.map(l => l[bestStatKey]));
+
                 factionLeaders.forEach(leader => {
                     const affDiff = GameSystem.calcAffinityDiff(b.affinity, leader.affinity);
                     const innoDiff = Math.abs(b.innovation - leader.innovation);
@@ -218,21 +221,32 @@ class FactionSystem {
                     const correction = Math.max(0, 1.0 - (affDiff / 50.0));
                     const finalBonus = solidarityBonus * correction;
                     
-                    // リーダーが「武将と同じ長所」をどれくらい持っているかのボーナス
+                    // ★変更：リーダーが「武将と同じ長所」をどれくらい持っているかのボーナス
+                    // リーダーの能力が、武将自身の能力を上回っており、かつ「派閥リーダーの中で一番高い」時だけボーナスが入るようにしました
                     const leaderStatVal = leader[bestStatKey];
-                    const abilityBonus = Math.floor(leaderStatVal * 0.15);
+                    let abilityBonus = 0;
+                    if (leaderStatVal > b[bestStatKey] && leaderStatVal === maxLeaderStatVal) {
+                        abilityBonus = Math.floor(leaderStatVal * 0.15);
+                    }
                     
                     // 魅力の補正
                     const charmBonus = Math.floor((50 - leader.charm) * 0.1);
 
-                    // ★変更：リーダーの功績の高さによるボーナス（功績500を基準に、100につき1点入りやすくなります）
-                    // （万が一リーダーの功績が500未満になってもマイナスにならないように念のため Math.max を入れています）
+                    // リーダーの功績の高さによるボーナス（功績500を基準に、100につき1点入りやすくなります）
                     const achievementBonus = Math.max(0, Math.floor((leader.achievementTotal - 500) / 100));
 
-                    // 相性が特別良い（差が0〜5）場合の特別ボーナス
+                    // 相性が特別良い（差が0〜10）場合の特別ボーナス
                     let affinitySpecialBonus = 0;
-                    if (affDiff <= 5) {
-                        affinitySpecialBonus = (5 - affDiff) * 2;
+                    if (affDiff <= 2) {
+                        affinitySpecialBonus = 10;
+                    } else if (affDiff <= 4) {
+                        affinitySpecialBonus = 8;
+                    } else if (affDiff <= 6) {
+                        affinitySpecialBonus = 6;
+                    } else if (affDiff <= 8) {
+                        affinitySpecialBonus = 4;
+                    } else if (affDiff <= 10) {
+                        affinitySpecialBonus = 2;
                     }
 
                     // 全体の入りやすさ（基本値30）から各ボーナスを計算
