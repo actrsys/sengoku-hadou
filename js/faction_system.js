@@ -235,8 +235,8 @@ class FactionSystem {
                     // 魅力の補正
                     const charmBonus = Math.floor((50 - (Number(leader.charm) || 0)) * 0.1);
 
-                    // 功績ボーナス（100につき3点）
-                    const achievementBonus = Math.max(0, Math.floor(((Number(leader.achievementTotal) || 0) - 500) / 100) * 3);
+                    // ★変更：功績ボーナスを「25につき1点」にしました
+                    const achievementBonus = Math.max(0, Math.floor(((Number(leader.achievementTotal) || 0) - 500) / 25));
 
                     // 性格（パーソナリティ）が同じ場合の特別ボーナス（5点）
                     let personalityBonus = 0;
@@ -244,9 +244,8 @@ class FactionSystem {
                         personalityBonus = 5;
                     }
 
-                    // 全体の入りやすさ（基本値40）から各ボーナスを計算
-                    // ★変更：特別仲良しボーナス（affinitySpecialBonus）を引き算から消しました
-                    const score = ((affDiff * 0.5) + (innoDiff * 0.5) + 40) - finalBonus - abilityBonus + charmBonus - achievementBonus - personalityBonus;
+                    // 全体の入りやすさ（基本値35）から各ボーナスを計算
+                    const score = ((affDiff * 0.5) + (innoDiff * 0.25) + 35) - finalBonus - abilityBonus + charmBonus - achievementBonus - personalityBonus;
 
                     if (score < joinThreshold && score < minScore) {
                         minScore = score;
