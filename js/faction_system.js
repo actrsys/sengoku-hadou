@@ -134,7 +134,7 @@ class FactionSystem {
         const stayBonusTrigger = F.SolidarityStayTrigger || 12; 
         const stayBonusBase = F.SolidarityStayBase || 9;
         const stayBonusDiv = F.SolidarityStayDiv || 3;
-        const joinThreshold = 40; // 派閥に入るための合格ライン（強制的に40）
+        const joinThreshold = 35; // ★派閥に入るための合格ライン（強制的に35）
 
         const clans = this.game.clans;
         
@@ -166,104 +166,126 @@ class FactionSystem {
             if (members.length >= 15) maxFactions = 4;
             if (members.length >= 20) maxFactions = 5;
 
-            // 実際に結成される派閥リーダー
+            // 実際に結成される派閥リーダー（最初は仮リーダーとして扱う）
             const factionLeaders = candidates.slice(0, maxFactions);
             
-            // ★追加：リーダー以外に「派閥に入れるメンバー候補」が1人もいない場合は、ここでやめて派閥を作らない
-            const potentialMembers = members.filter(b => !b.isDaimyo && !factionLeaders.includes(b));
-            if (potentialMembers.length === 0) {
-                return;
-            }
-
             // リーダー自身にIDとリーダーフラグ付与
             factionLeaders.forEach((leader, index) => {
                 leader.factionId = (clan.id * 100) + index + 1;
                 leader.isFactionLeader = true;
             });
 
-            // メンバーの加入判定
-            const nonLeaders = members.filter(b => !b.isDaimyo && b.factionId === 0);
-            
-            nonLeaders.forEach(b => {
-                let bestLeader = null;
-                let minScore = 999;
+            // ★追加：点数計算の仕組みを「共通の道具（関数）」としてまとめました
+            const evaluateJoin = (evaluatingBushos, availableLeaders) => {
+                evaluatingBushos.forEach(b => {
+                    let bestLeader = null;
+                    let minScore = 999;
 
-                // 【安全装置付き】各能力をしっかり数字（Number）として取り出します
-                const stats = [
-                    { key: 'leadership', val: Number(b.leadership) || 0 },
-                    { key: 'strength', val: Number(b.strength) || 0 },
-                    { key: 'politics', val: Number(b.politics) || 0 },
-                    { key: 'diplomacy', val: Number(b.diplomacy) || 0 },
-                    { key: 'intelligence', val: Number(b.intelligence) || 0 }
-                ];
-                const bestStatKey = stats.reduce((max, stat) => stat.val > max.val ? stat : max, stats[0]).key;
+                    const stats = [
+                        { key: 'leadership', val: Number(b.leadership) || 0 },
+                        { key: 'strength', val: Number(b.strength) || 0 },
+                        { key: 'politics', val: Number(b.politics) || 0 },
+                        { key: 'diplomacy', val: Number(b.diplomacy) || 0 },
+                        { key: 'intelligence', val: Number(b.intelligence) || 0 }
+                    ];
+                    const bestStatKey = stats.reduce((max, stat) => stat.val > max.val ? stat : max, stats[0]).key;
 
-                // 【安全装置付き】リーダーたちの中で、その能力（長所）が一番高い数値を探します
-                const maxLeaderStatVal = Math.max(...factionLeaders.map(l => Number(l[bestStatKey]) || 0));
+                    const maxLeaderStatVal = Math.max(...availableLeaders.map(l => Number(l[bestStatKey]) || 0));
 
-                factionLeaders.forEach(leader => {
-                    const affDiff = GameSystem.calcAffinityDiff(b.affinity, leader.affinity);
-                    const innoDiff = Math.abs(b.innovation - leader.innovation);
+                    availableLeaders.forEach(leader => {
+                        const affDiff = GameSystem.calcAffinityDiff(b.affinity, leader.affinity);
+                        const innoDiff = Math.abs(b.innovation - leader.innovation);
 
-                    let solidarityBonus = 0;
-                    const battleOverlap = b.battleHistory.filter(h => leader.battleHistory.includes(h)).length;
-                    solidarityBonus += battleOverlap * battleBonus;
+                        let solidarityBonus = 0;
+                        const battleOverlap = b.battleHistory.filter(h => leader.battleHistory.includes(h)).length;
+                        solidarityBonus += battleOverlap * battleBonus;
 
-                    let totalOverlapMonths = 0;
-                    b.stayHistory.forEach(bHist => {
-                        leader.stayHistory.forEach(lHist => {
-                            if (bHist.castleId === lHist.castleId) {
-                                const start = Math.max(bHist.start, lHist.start);
-                                const end = Math.min(bHist.end, lHist.end);
-                                if (end > start) {
-                                    totalOverlapMonths += (end - start);
+                        let totalOverlapMonths = 0;
+                        b.stayHistory.forEach(bHist => {
+                            leader.stayHistory.forEach(lHist => {
+                                if (bHist.castleId === lHist.castleId) {
+                                    const start = Math.max(bHist.start, lHist.start);
+                                    const end = Math.min(bHist.end, lHist.end);
+                                    if (end > start) {
+                                        totalOverlapMonths += (end - start);
+                                    }
                                 }
-                            }
+                            });
                         });
+
+                        if (totalOverlapMonths >= stayBonusTrigger) {
+                            solidarityBonus += Math.floor((totalOverlapMonths - stayBonusBase) / stayBonusDiv);
+                        }
+
+                        const correction = Math.max(0, 1.0 - (affDiff / 50.0));
+                        const finalBonus = solidarityBonus * correction;
+                        
+                        let abilityBonus = 0;
+                        const leaderStatVal = Number(leader[bestStatKey]) || 0;
+                        const myStatVal = Number(b[bestStatKey]) || 0;
+
+                        if (leaderStatVal > myStatVal && leaderStatVal === maxLeaderStatVal) {
+                            abilityBonus = Math.min(10, Math.floor(leaderStatVal * 0.15));
+                        }
+                        
+                        const charmBonus = Math.floor((50 - (Number(leader.charm) || 0)) * 0.1);
+                        const achievementBonus = Math.max(0, Math.floor(((Number(leader.achievementTotal) || 0) - 500) / 25));
+
+                        let personalityBonus = 0;
+                        if (b.personality && leader.personality && b.personality === leader.personality) {
+                            personalityBonus = 5;
+                        }
+
+                        // ★変更：全体の入りやすさ（基本値35）
+                        const score = ((affDiff * 0.5) + (innoDiff * 0.25) + 35) - finalBonus - abilityBonus + charmBonus - achievementBonus - personalityBonus;
+
+                        if (score < joinThreshold && score < minScore) {
+                            minScore = score;
+                            bestLeader = leader;
+                        }
                     });
 
-                    if (totalOverlapMonths >= stayBonusTrigger) {
-                        solidarityBonus += Math.floor((totalOverlapMonths - stayBonusBase) / stayBonusDiv);
-                    }
-
-                    const correction = Math.max(0, 1.0 - (affDiff / 50.0));
-                    const finalBonus = solidarityBonus * correction;
-                    
-                    // リーダーが「武将と同じ長所」をどれくらい持っているかのボーナス
-                    let abilityBonus = 0;
-                    const leaderStatVal = Number(leader[bestStatKey]) || 0;
-                    const myStatVal = Number(b[bestStatKey]) || 0;
-
-                    if (leaderStatVal > myStatVal && leaderStatVal === maxLeaderStatVal) {
-                        // ボーナスが最大10点になるように制限
-                        abilityBonus = Math.min(10, Math.floor(leaderStatVal * 0.15));
-                    }
-                    
-                    // 魅力の補正
-                    const charmBonus = Math.floor((50 - (Number(leader.charm) || 0)) * 0.1);
-
-                    // 功績ボーナス（25につき1点）
-                    const achievementBonus = Math.max(0, Math.floor(((Number(leader.achievementTotal) || 0) - 500) / 25));
-
-                    // 性格（パーソナリティ）が同じ場合の特別ボーナス（5点）
-                    let personalityBonus = 0;
-                    if (b.personality && leader.personality && b.personality === leader.personality) {
-                        personalityBonus = 5;
-                    }
-
-                    // 全体の入りやすさ（基本値35）から各ボーナスを計算
-                    const score = ((affDiff * 0.5) + (innoDiff * 0.25) + 35) - finalBonus - abilityBonus + charmBonus - achievementBonus - personalityBonus;
-
-                    if (score < joinThreshold && score < minScore) {
-                        minScore = score;
-                        bestLeader = leader;
+                    if (bestLeader) {
+                        b.factionId = bestLeader.factionId;
                     }
                 });
+            };
 
-                if (bestLeader) {
-                    b.factionId = bestLeader.factionId;
+            // 【1段階目】リーダー以外のメンバーが、仮リーダーの誰かを選ぶ
+            const nonLeaders = members.filter(b => !b.isDaimyo && b.factionId === 0);
+            evaluateJoin(nonLeaders, factionLeaders);
+
+            // 【チェック】誰も入ってこなかったリーダーをあぶり出す
+            const validLeaders = [];
+            const invalidLeaders = [];
+
+            factionLeaders.forEach(leader => {
+                // 自分以外の派閥員が何人いるか数える
+                const followerCount = members.filter(b => b.factionId === leader.factionId && b !== leader).length;
+                if (followerCount === 0) {
+                    // 誰もいないのでリーダー失格！
+                    leader.isFactionLeader = false;
+                    leader.factionId = 0; // 無所属に戻す
+                    invalidLeaders.push(leader);
+                } else {
+                    // メンバーがいるので正式なリーダー！
+                    validLeaders.push(leader);
                 }
             });
+
+            // 【2段階目】リーダーになれなかった元リーダーたちが、生き残ったリーダーの派閥に入る
+            if (invalidLeaders.length > 0) {
+                if (validLeaders.length > 0) {
+                    // 生き残ったリーダーがいるなら、そこへの加入を試みる
+                    evaluateJoin(invalidLeaders, validLeaders);
+                } else {
+                    // 全員が失格（誰にもメンバーがつかなかった）場合は、誰も派閥を作れないので全員解散！
+                    members.forEach(b => {
+                        b.factionId = 0;
+                        b.isFactionLeader = false;
+                    });
+                }
+            }
         });
     }
 
