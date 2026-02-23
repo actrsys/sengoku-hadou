@@ -224,8 +224,8 @@ class FactionSystem {
                     personalityBonus = 5;
                 }
                 
-                //基本となる点数４０点からスタート
-                return ((affDiff * 0.5) + (innoDiff * 0.25) + 40) - finalBonus - abilityBonus + charmBonus - achievementBonus - personalityBonus;
+                //基本となる点数30点からスタート
+                return ((affDiff * 0.5) + (innoDiff * 0.25) + 30) - finalBonus - abilityBonus + charmBonus - achievementBonus - personalityBonus;
             };
 
             // 派閥に入れる処理の共通ルール
