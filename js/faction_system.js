@@ -128,7 +128,8 @@ class FactionSystem {
     updateFactions() {
         const F = window.WarParams.Faction || {};
         const achieveLeader = F.AchievementLeader || 500;
-        const battleBonus = F.SolidarityBattle || 5;
+        // ★変更：共闘ボーナスをデフォルトの5から2に変更しました
+        const battleBonus = F.SolidarityBattle || 2;
         const stayBonusTrigger = F.SolidarityStayTrigger || 12; 
         const stayBonusBase = F.SolidarityStayBase || 9;
         const stayBonusDiv = F.SolidarityStayDiv || 3;
@@ -190,7 +191,7 @@ class FactionSystem {
                 ];
                 const bestStatKey = stats.reduce((max, stat) => stat.val > max.val ? stat : max, stats[0]).key;
 
-                // ★追加：派閥リーダーたちの中で、その能力（長所）が一番高い数値を探しておきます
+                // 派閥リーダーたちの中で、その能力（長所）が一番高い数値を探しておきます
                 const maxLeaderStatVal = Math.max(...factionLeaders.map(l => l[bestStatKey]));
 
                 factionLeaders.forEach(leader => {
@@ -221,36 +222,35 @@ class FactionSystem {
                     const correction = Math.max(0, 1.0 - (affDiff / 50.0));
                     const finalBonus = solidarityBonus * correction;
                     
-                    // ★変更：リーダーが「武将と同じ長所」をどれくらい持っているかのボーナス
-                    // リーダーの能力が、武将自身の能力を上回っており、かつ「派閥リーダーの中で一番高い」時だけボーナスが入るようにしました
-                    const leaderStatVal = leader[bestStatKey];
+                    // リーダーが「武将と同じ長所」をどれくらい持っているかのボーナス
                     let abilityBonus = 0;
                     if (leaderStatVal > b[bestStatKey] && leaderStatVal === maxLeaderStatVal) {
-                        abilityBonus = Math.floor(leaderStatVal * 0.15);
+                        // ★変更：ボーナスが最大10点になるように制限（Math.min）をつけました
+                        abilityBonus = Math.min(10, Math.floor(leaderStatVal * 0.15));
                     }
                     
                     // 魅力の補正
                     const charmBonus = Math.floor((50 - leader.charm) * 0.1);
 
-                    // リーダーの功績の高さによるボーナス（功績500を基準に、100につき1点入りやすくなります）
-                    const achievementBonus = Math.max(0, Math.floor((leader.achievementTotal - 500) / 100));
+                    // ★変更：功績ボーナスを「100につき3点」にしました
+                    const achievementBonus = Math.max(0, Math.floor((leader.achievementTotal - 500) / 100) * 3);
 
-                    // 相性が特別良い（差が0〜10）場合の特別ボーナス
+                    // ★変更：運命の人ボーナスを半分（最大5点）にしました
                     let affinitySpecialBonus = 0;
                     if (affDiff <= 2) {
-                        affinitySpecialBonus = 10;
+                        affinitySpecialBonus = 5;
                     } else if (affDiff <= 4) {
-                        affinitySpecialBonus = 8;
-                    } else if (affDiff <= 6) {
-                        affinitySpecialBonus = 6;
-                    } else if (affDiff <= 8) {
                         affinitySpecialBonus = 4;
-                    } else if (affDiff <= 10) {
+                    } else if (affDiff <= 6) {
+                        affinitySpecialBonus = 3;
+                    } else if (affDiff <= 8) {
                         affinitySpecialBonus = 2;
+                    } else if (affDiff <= 10) {
+                        affinitySpecialBonus = 1;
                     }
 
-                    // 全体の入りやすさ（基本値30）から各ボーナスを計算
-                    const score = (affDiff + (innoDiff * 0.5) + 30) - finalBonus - abilityBonus + charmBonus - achievementBonus - affinitySpecialBonus;
+                    // ★変更：相性の悪さ（affDiff）の影響を半分（0.5がけ）にしました
+                    const score = ((affDiff * 0.5) + (innoDiff * 0.5) + 35) - finalBonus - abilityBonus + charmBonus - achievementBonus - affinitySpecialBonus;
 
                     if (score < joinThreshold && score < minScore) {
                         minScore = score;
