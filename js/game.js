@@ -306,8 +306,22 @@ class GameSystem {
         }
         return { success: isSuccess, accuracy: Math.floor(accuracy) };
     }
-    static calcIncite(busho) { const score = (busho.intelligence * 0.7) + (busho.strength * 0.3); const success = Math.random() < (score / window.MainParams.Strategy.InciteFactor); if(!success) return { success: false, val: 0 }; return { success: true, val: Math.floor(score * 2) }; }
-    static calcRumor(busho, targetBusho) { const score = (busho.intelligence * 0.7) + (busho.strength * 0.3); const defScore = (targetBusho.intelligence * 0.5) + (targetBusho.loyalty * 0.5); const success = Math.random() < (score / (defScore + window.MainParams.Strategy.RumorFactor)); if(!success) return { success: false, val: 0 }; return { success: true, val: Math.floor(20 + Math.random()*20) }; }
+    
+    // ★ 扇動と流言の低下量を修正しました
+    static calcIncite(busho) { 
+        const score = (busho.intelligence * 0.7) + (busho.strength * 0.3); 
+        const success = Math.random() < (score / window.MainParams.Strategy.InciteFactor); 
+        if(!success) return { success: false, val: 0 }; 
+        return { success: true, val: Math.max(1, Math.floor((score * 2) / 15)) }; // 約15分の1に減らしました
+    }
+    static calcRumor(busho, targetBusho) { 
+        const score = (busho.intelligence * 0.7) + (busho.strength * 0.3); 
+        const defScore = (targetBusho.intelligence * 0.5) + (targetBusho.loyalty * 0.5); 
+        const success = Math.random() < (score / (defScore + window.MainParams.Strategy.RumorFactor)); 
+        if(!success) return { success: false, val: 0 }; 
+        return { success: true, val: Math.floor((20 + Math.random()*20) / 4) }; // 約4分の1に減らしました
+    }
+
     static calcAffinityDiff(a, b) { const diff = Math.abs(a - b); return Math.min(diff, 100 - diff); }
     static calcValueDistance(a, b) {
         const diffInno = Math.abs(a.innovation - b.innovation);
