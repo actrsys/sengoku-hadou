@@ -238,29 +238,15 @@ class FactionSystem {
                     // 功績ボーナス（100につき3点）
                     const achievementBonus = Math.max(0, Math.floor(((Number(leader.achievementTotal) || 0) - 500) / 100) * 3);
 
-                    // 運命の人ボーナス（最大5点）
-                    let affinitySpecialBonus = 0;
-                    if (affDiff <= 2) {
-                        affinitySpecialBonus = 5;
-                    } else if (affDiff <= 4) {
-                        affinitySpecialBonus = 4;
-                    } else if (affDiff <= 6) {
-                        affinitySpecialBonus = 3;
-                    } else if (affDiff <= 8) {
-                        affinitySpecialBonus = 2;
-                    } else if (affDiff <= 10) {
-                        affinitySpecialBonus = 1;
-                    }
-
-                    // ★追加：性格（パーソナリティ）が同じ場合の特別ボーナス（5点）
+                    // 性格（パーソナリティ）が同じ場合の特別ボーナス（5点）
                     let personalityBonus = 0;
                     if (b.personality && leader.personality && b.personality === leader.personality) {
                         personalityBonus = 5;
                     }
 
                     // 全体の入りやすさ（基本値40）から各ボーナスを計算
-                    // ★変更：計算式の一番最後に「 - personalityBonus 」を書き足しました
-                    const score = ((affDiff * 0.5) + (innoDiff * 0.5) + 40) - finalBonus - abilityBonus + charmBonus - achievementBonus - affinitySpecialBonus - personalityBonus;
+                    // ★変更：特別仲良しボーナス（affinitySpecialBonus）を引き算から消しました
+                    const score = ((affDiff * 0.5) + (innoDiff * 0.5) + 40) - finalBonus - abilityBonus + charmBonus - achievementBonus - personalityBonus;
 
                     if (score < joinThreshold && score < minScore) {
                         minScore = score;
