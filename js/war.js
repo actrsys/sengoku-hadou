@@ -4,6 +4,7 @@
  * 修正: 捕虜の処遇結果のアラートをカスタムダイアログ（showDialog）に置き換えました
  * 修正: 迎撃時の出陣兵士・兵糧の取得処理を修正（ID指定のオブジェクト構造に対応）
  * ★追加: 国人衆の蜂起（反乱）・制圧時の特別な結末と、捕虜の特別ルールを追加しました
+ * ★追加: 部隊分割時に兵科（troopType）の情報を保持・伝達するようにしました
  */
 
 window.WarParams = {
@@ -141,19 +142,20 @@ class WarManager {
         return null;
     }
 
+    // ★修正: 自動分配時（AIや城の守備兵など）の兵科をデフォルトで「足軽」にします
     autoDivideSoldiers(bushos, totalSoldiers) {
         if (!bushos || bushos.length === 0) return [];
-        if (bushos.length === 1) return [{ busho: bushos[0], soldiers: totalSoldiers }];
+        if (bushos.length === 1) return [{ busho: bushos[0], soldiers: totalSoldiers, troopType: 'ashigaru' }];
         const assignments = [];
         const ratioSum = 1.5 + (bushos.length - 1) * 1.0;
         const baseAmount = Math.floor(totalSoldiers / ratioSum);
         let remain = totalSoldiers;
-        for (let i = 1; i < bushos.length; i++) { assignments.push({ busho: bushos[i], soldiers: baseAmount }); remain -= baseAmount; }
-        assignments.unshift({ busho: bushos[0], soldiers: remain });
+        for (let i = 1; i < bushos.length; i++) { assignments.push({ busho: bushos[i], soldiers: baseAmount, troopType: 'ashigaru' }); remain -= baseAmount; }
+        assignments.unshift({ busho: bushos[0], soldiers: remain, troopType: 'ashigaru' });
         return assignments;
     }
 
-    async startWar(atkCastle, defCastle, atkBushos, atkSoldierCount, atkRice) {
+    async startWar(atkCastle, defCastle, atkBushos, atkSoldierCount, atkRice, atkHorses = 0, atkGuns = 0) {
         try {
             // 攻撃部隊の中に大名がいれば探し、いなければ城主を探す
             let atkLeaderIdx = atkBushos.findIndex(b => b.isDaimyo);
@@ -170,10 +172,12 @@ class WarManager {
 
             atkCastle.soldiers = Math.max(0, atkCastle.soldiers - atkSoldierCount);
             atkCastle.rice = Math.max(0, atkCastle.rice - atkRice);
+            atkCastle.horses = Math.max(0, (atkCastle.horses || 0) - atkHorses);
+            atkCastle.guns = Math.max(0, (atkCastle.guns || 0) - atkGuns);
             atkBushos.forEach(b => b.isActionDone = true);
 
             const atkClanData = this.game.clans.find(c => c.id === atkClan); 
-            // ★修正: 国人衆の場合は専用の名前を使う
+            // 国人衆の場合は専用の名前を使う
             const atkArmyName = atkCastle.isKunishu ? atkCastle.name : (atkClanData ? atkClanData.getArmyName() : "敵軍");
             let defBusho = this.game.getBusho(defCastle.castellanId) || {name:"守備隊長", strength:30, leadership:30, intelligence:30, charm:30};
             
@@ -186,7 +190,9 @@ class WarManager {
                 morale: atkCastle.morale, 
                 rice: atkRice, 
                 maxRice: atkRice,
-                isKunishu: atkCastle.isKunishu || false // ★追加: 国人衆フラグ
+                horses: atkHorses,
+                guns: atkGuns,
+                isKunishu: atkCastle.isKunishu || false 
             };
             
             this.state = { 
@@ -224,11 +230,13 @@ class WarManager {
                                     this.game.ui.openQuantitySelector('def_intercept', [defCastle], null, {
                                         onConfirm: (inputs) => {
                                             const inputData = inputs[defCastle.id] || inputs;
-                                            const interceptSoldiers = inputData.soldiers || 0;
-                                            const interceptRice = inputData.rice || 0;
+                                            const interceptSoldiers = inputData.soldiers ? parseInt(inputData.soldiers.num.value) : (inputData.soldiers || 0);
+                                            const interceptRice = inputData.rice ? parseInt(inputData.rice.num.value) : (inputData.rice || 0);
+                                            const interceptHorses = inputData.horses ? parseInt(inputData.horses.num.value) : 0;
+                                            const interceptGuns = inputData.guns ? parseInt(inputData.guns.num.value) : 0;
                                             
-                                            this.game.ui.showUnitDivideModal(defBushos, interceptSoldiers, (defAssignments) => {
-                                                onResult('field', defAssignments, interceptRice, this.autoDivideSoldiers(atkBushos, atkSoldierCount));
+                                            this.game.ui.showUnitDivideModal(defBushos, interceptSoldiers, interceptHorses, interceptGuns, (defAssignments) => {
+                                                onResult('field', defAssignments, interceptRice, this.autoDivideSoldiers(atkBushos, atkSoldierCount), interceptHorses, interceptGuns);
                                             });
                                         }
                                     });
@@ -256,9 +264,9 @@ class WarManager {
                         if (atkClan === pid) {
                             // 国人衆の反乱時は分割画面を出さない
                             if (attackerForce.isKunishu) {
-                                onResult('field', defAssignments, defRice, [{busho: atkBushos[0], soldiers: atkSoldierCount}]);
+                                onResult('field', defAssignments, defRice, [{busho: atkBushos[0], soldiers: atkSoldierCount, troopType: 'ashigaru'}]);
                             } else {
-                                this.game.ui.showUnitDivideModal(atkBushos, atkSoldierCount, (atkAssignments) => {
+                                this.game.ui.showUnitDivideModal(atkBushos, atkSoldierCount, atkHorses, atkGuns, (atkAssignments) => {
                                     onResult('field', defAssignments, defRice, atkAssignments);
                                 });
                             }
@@ -273,16 +281,20 @@ class WarManager {
             } else if (typeof window.FieldWarManager === 'undefined') {
                 this.startSiegeWarPhase();
             } else {
-                showInterceptDialog((choice, defAssignments, defRice, atkAssignments) => {
+                showInterceptDialog((choice, defAssignments, defRice, atkAssignments, interceptHorses = 0, interceptGuns = 0) => {
                     if (choice === 'field') {
                         this.state.atkAssignments = atkAssignments; this.state.defAssignments = defAssignments; 
                         
                         let totalDefSoldiers = 0; if(defAssignments) defAssignments.forEach(a => totalDefSoldiers += a.soldiers);
                         defCastle.soldiers = Math.max(0, defCastle.soldiers - totalDefSoldiers);
                         defCastle.rice = Math.max(0, defCastle.rice - (defRice || 0));
+                        defCastle.horses = Math.max(0, (defCastle.horses || 0) - interceptHorses);
+                        defCastle.guns = Math.max(0, (defCastle.guns || 0) - interceptGuns);
                         
                         this.state.defender.fieldSoldiers = totalDefSoldiers;
                         this.state.defFieldRice = defRice || 0; 
+                        this.state.defender.fieldHorses = interceptHorses;
+                        this.state.defender.fieldGuns = interceptGuns;
 
                         if (!isPlayerInvolved) this.resolveAutoFieldWar();
                         else {
@@ -290,6 +302,8 @@ class WarManager {
                             this.game.fieldWarManager.startFieldWar(this.state, (resultType) => {
                                 defCastle.soldiers += this.state.defender.fieldSoldiers;
                                 defCastle.rice += this.state.defFieldRice; 
+                                defCastle.horses = (defCastle.horses || 0) + (this.state.defender.fieldHorses || 0);
+                                defCastle.guns = (defCastle.guns || 0) + (this.state.defender.fieldGuns || 0);
                                 if (resultType === 'attacker_win' || resultType === 'defender_retreat' || resultType === 'draw_to_siege') this.startSiegeWarPhase();
                                 else this.endWar(false);
                             });
@@ -327,6 +341,8 @@ class WarManager {
         
         s.defender.soldiers += s.defender.fieldSoldiers; 
         s.defender.rice += s.defFieldRice; 
+        s.defender.horses = (s.defender.horses || 0) + (s.defender.fieldHorses || 0);
+        s.defender.guns = (s.defender.guns || 0) + (s.defender.fieldGuns || 0);
 
         if (atkLost && !defLost) this.endWar(false); 
         else if (defLost && !atkLost) this.startSiegeWarPhase(); 
@@ -337,7 +353,7 @@ class WarManager {
     startSiegeWarPhase() {
         const s = this.state; const W = window.WarParams.War;
         
-        // ★修正: 国人衆の制圧戦（ダミー城）の場合は民忠・人口の低下をスキップ
+        // 国人衆の制圧戦（ダミー城）の場合は民忠・人口の低下をスキップ
         if (!s.isKunishuSubjugation) {
             s.defender.peoplesLoyalty = Math.max(0, s.defender.peoplesLoyalty - (W.AttackLoyaltyDecay || 5)); 
             s.defender.population = Math.max(0, s.defender.population - (W.AttackPopDecay || 500));
@@ -552,10 +568,11 @@ class WarManager {
                 let lossRate = Math.min(0.9, Math.max(0.05, window.WarParams.War.RetreatResourceLossFactor + (s.attacker.soldiers / (defCastle.soldiers + 1)) * 0.1)); 
                 const carryGold = Math.floor(defCastle.gold * (1.0 - lossRate)); const carryRice = Math.floor(defCastle.rice * (1.0 - lossRate));
                 target.gold += carryGold; target.rice += carryRice; target.soldiers += defCastle.soldiers;
+                target.horses = (target.horses || 0) + (defCastle.horses || 0);
+                target.guns = (target.guns || 0) + (defCastle.guns || 0);
                 
                 const capturedBushos = [];
                 this.game.getCastleBushos(defCastle.id).forEach(b => { 
-                    // 🌟 ここが変わりました！浪人は撤退しないので無視します
                     if (b.status === 'ronin') return;
 
                     let rate = window.WarParams.War.RetreatCaptureRate;
@@ -564,8 +581,8 @@ class WarManager {
                     else { b.castleId = target.id; b.isCastellan = false; target.samuraiIds.push(b.id); this.game.factionSystem.handleMove(b, defCastle.id, target.id); }
                 });
                 defCastle.gold -= carryGold; defCastle.rice = 0; defCastle.soldiers = 0; 
+                defCastle.horses = 0; defCastle.guns = 0;
                 
-                // 🌟 名簿を空っぽにするのではなく、浪人だけはお城に残します！
                 defCastle.samuraiIds = defCastle.samuraiIds.filter(id => {
                     const busho = this.game.getBusho(id);
                     return busho && busho.status === 'ronin';
@@ -593,7 +610,7 @@ class WarManager {
             // プレイヤーが国人衆を制圧（討伐）した時の処理
             if (s.isKunishuSubjugation) {
                 const kunishu = this.game.kunishuSystem.getKunishu(s.defender.kunishuId);
-                let resultMsg = ""; // 🌟追加：お知らせ用のメッセージ枠
+                let resultMsg = ""; 
                 
                 if (attackerWon) {
                     resultMsg = `【国衆制圧】\n${s.defender.name}の討伐に成功しました！`;
@@ -620,9 +637,10 @@ class WarManager {
                 if (srcC) {
                     srcC.soldiers += s.attacker.soldiers; 
                     srcC.rice += s.attacker.rice;
+                    srcC.horses = (srcC.horses || 0) + (s.attacker.horses || 0);
+                    srcC.guns = (srcC.guns || 0) + (s.attacker.guns || 0);
                 }
                 
-                // 🌟 ここが変わりました！戦争画面を隠して、結果のウィンドウを出します
                 if (s.isPlayerInvolved) {
                     this.game.ui.setWarModalVisible(false);
                     this.game.ui.showResultModal(resultMsg, () => { this.closeWar(); });
@@ -634,7 +652,7 @@ class WarManager {
             
             // 国人衆が反乱（蜂起）を起こした時の処理
             if (s.attacker.isKunishu) {
-                let resultMsg = ""; // 🌟追加：お知らせ用のメッセージ枠
+                let resultMsg = ""; 
                 
                 if (attackerWon) {
                     const targetC = this.game.getCastle(s.defender.id);
@@ -678,7 +696,6 @@ class WarManager {
                     this.game.ui.log(`【国衆蜂起】国人衆の反乱を鎮圧しました。`);
                 }
                 
-                // 🌟 ここが変わりました！戦争画面を隠して、結果のウィンドウを出します
                 if (s.isPlayerInvolved) {
                     this.game.ui.setWarModalVisible(false);
                     this.game.ui.showResultModal(resultMsg, () => { this.closeWar(); });
@@ -687,8 +704,6 @@ class WarManager {
                 }
                 return;
             }
-
-            // （これより下の s.atkBushos.forEach... の行はそのままで大丈夫です！）
 
             s.atkBushos.forEach(b => { this.game.factionSystem.recordBattle(b, s.defender.id); this.game.factionSystem.updateRecognition(b, 25); });
             const defBushos = this.game.getCastleBushos(s.defender.id).concat(this.pendingPrisoners);
@@ -718,9 +733,13 @@ class WarManager {
                 const recovered = Math.floor(s.deadSoldiers.defender * 0.2);
                 const totalAbsorbed = survivors + recovered;
                 s.defender.soldiers = totalAtkSurvivors + totalAbsorbed;
+                s.defender.horses = (s.defender.horses || 0) + (s.attacker.horses || 0);
+                s.defender.guns = (s.defender.guns || 0) + (s.attacker.guns || 0);
                 if (s.isPlayerInvolved && totalAbsorbed > 0) this.game.ui.log(`(敵残存兵・負傷兵 計${totalAbsorbed}名 を吸収)`);
             } else if (!attackerWon) {
                 const srcC = this.game.getCastle(s.sourceCastle.id); srcC.soldiers += totalAtkSurvivors; 
+                srcC.horses = (srcC.horses || 0) + (s.attacker.horses || 0);
+                srcC.guns = (srcC.guns || 0) + (s.attacker.guns || 0);
                 const recovered = Math.floor(s.deadSoldiers.defender * window.WarParams.War.BaseRecoveryRate);
                 s.defender.soldiers += recovered;
                 if (s.isPlayerInvolved && attackerRecovered > 0) this.game.ui.log(`(遠征軍 負傷兵 ${attackerRecovered}名 が帰還)`);
@@ -801,7 +820,6 @@ class WarManager {
         const isLastStand = friendlyCastles.length === 0;
 
         losers.forEach(b => { 
-            // 🌟 ここが変わりました！浪人は戦に参加していないので、捕虜にせず無視します
             if (b.status === 'ronin') return;
 
             let chance = isLastStand ? 1.0 : ((window.WarParams.War.CaptureChanceBase || 0.4) - (b.strength * (window.WarParams.War.CaptureStrFactor || 0.002)) + (Math.random() * 0.3)); 
@@ -831,7 +849,6 @@ class WarManager {
         } 
     }
     
-    // ★ 修正：国人衆のルール（リーダーは引抜不可、解放時は帰還など）を追加
     handlePrisonerAction(index, action) { 
         const prisoner = this.pendingPrisoners[index]; 
         const originalClanId = prisoner.clan;
@@ -848,7 +865,7 @@ class WarManager {
             if (prisoner.isDaimyo) this.game.ui.showDialog(`${prisoner.name}「敵の軍門には下らぬ！」`, false); 
             else if (score > Math.random()) { 
                 prisoner.clan = this.game.playerClanId; prisoner.loyalty = 50; prisoner.isCastellan = false; 
-                prisoner.belongKunishuId = 0; // 国人衆を抜ける
+                prisoner.belongKunishuId = 0; 
                 const targetC = this.game.getCastle(prisoner.castleId) || this.game.getCurrentTurnCastle(); 
                 if(targetC) { 
                     prisoner.castleId = targetC.id;
@@ -896,7 +913,6 @@ class WarManager {
         else { candidates.sort((a,b) => (b.politics + b.charm) - (a.politics + a.charm)); this.game.changeLeader(clanId, candidates[0].id); } 
     }
     
-    // ★ 修正：AIの捕虜処理にも国人衆ルールを追加
     autoResolvePrisoners(captives, winnerClanId) { 
         const aiBushos = this.game.bushos.filter(b => b.clan === winnerClanId); 
         const leaderInt = aiBushos.length > 0 ? Math.max(...aiBushos.map(b => b.intelligence)) : 50; 

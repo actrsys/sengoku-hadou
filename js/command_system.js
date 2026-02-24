@@ -1,7 +1,7 @@
 /**
  * command_system.js
  * ゲーム内のコマンド実行ロジックおよびフロー制御を管理するクラス
- * 修正: 国人衆に対する新しいコマンド（国衆親善、制圧）を追加しました
+ * 修正: 出陣時・国人衆討伐時に、指定した「騎馬」と「鉄砲」を持参する処理を追加しました
  */
 
 /* ==========================================================================
@@ -591,9 +591,12 @@ class CommandSystem {
             if (val <= 0) return;
             this.executeTrade(type, val);
         }
+        // ★修正: 出陣時に騎馬と鉄砲の数をスライダーから読み取って渡すようにしました
         else if (type === 'war_supplies') {
             const sVal = parseInt(inputs.soldiers.num.value);
             const rVal = parseInt(inputs.rice.num.value);
+            const hVal = inputs.horses ? parseInt(inputs.horses.num.value) : 0;
+            const gVal = inputs.guns ? parseInt(inputs.guns.num.value) : 0;
             if (sVal <= 0) { this.game.ui.showDialog("兵士0では出陣できません", false); return; }
             
             const targetName = this.game.getCastle(targetId).name;
@@ -604,12 +607,12 @@ class CommandSystem {
                 const kunishuLeader = this.game.getBusho(kunishu.leaderId);
                 
                 this.game.ui.showDialog(`${targetName}にいる ${kunishuLeader ? kunishuLeader.name : "国人"}衆 を討伐しますか？\n今月の命令は終了となります`, true, () => {
-                    this.executeKunishuSubjugate(castle, targetId, data, sVal, rVal, kunishu);
+                    this.executeKunishuSubjugate(castle, targetId, data, sVal, rVal, hVal, gVal, kunishu);
                 });
             } else {
                 this.game.ui.showDialog(`${targetName}に攻め込みますか？\n今月の命令は終了となります`, true, () => {
                     const bushos = data.map(id => this.game.getBusho(id));
-                    this.game.warManager.startWar(castle, this.game.getCastle(targetId), bushos, sVal, rVal);
+                    this.game.warManager.startWar(castle, this.game.getCastle(targetId), bushos, sVal, rVal, hVal, gVal);
                 });
             }
         }
@@ -999,13 +1002,16 @@ class CommandSystem {
     }
     
     // ★追加: 国人衆を攻めて壊滅させるための処理（必ず攻城戦になります）
-    executeKunishuSubjugate(atkCastle, targetCastleId, atkBushosIds, sendSoldiers, sendRice, kunishu) {
+    // ★修正: 騎馬（sendHorses）と鉄砲（sendGuns）も出陣時に持っていくようにしました
+    executeKunishuSubjugate(atkCastle, targetCastleId, atkBushosIds, sendSoldiers, sendRice, sendHorses, sendGuns, kunishu) {
         const atkBushos = atkBushosIds.map(id => this.game.getBusho(id));
         const targetCastle = this.game.getCastle(targetCastleId);
         
-        // 攻撃する側（プレイヤー）の準備
+        // 攻撃する側（プレイヤー）のお城から、出陣する数だけ兵士や兵糧、騎馬、鉄砲を減らします
         atkCastle.soldiers = Math.max(0, atkCastle.soldiers - sendSoldiers);
         atkCastle.rice = Math.max(0, atkCastle.rice - sendRice);
+        atkCastle.horses = Math.max(0, (atkCastle.horses || 0) - sendHorses);
+        atkCastle.guns = Math.max(0, (atkCastle.guns || 0) - sendGuns);
         atkBushos.forEach(b => b.isActionDone = true);
 
         // 国人衆側の準備（一時的なダミーの城と軍団を作ります）
@@ -1028,11 +1034,12 @@ class CommandSystem {
             population: 1000,
             samuraiIds: [] 
         };
-        // （これより下はそのまま同じです）
 
+        // ★修正: 出陣する遠征軍の荷物に「horses（騎馬）」と「guns（鉄砲）」を追加しました！
         const attackerForce = { 
             name: atkCastle.name + "遠征軍", ownerClan: atkCastle.ownerClan, soldiers: sendSoldiers, 
-            bushos: atkBushos, training: atkCastle.training, morale: atkCastle.morale, rice: sendRice, maxRice: sendRice
+            bushos: atkBushos, training: atkCastle.training, morale: atkCastle.morale, rice: sendRice, maxRice: sendRice,
+            horses: sendHorses, guns: sendGuns
         };
 
         // 国人衆への攻撃をしたので、友好度を0にします

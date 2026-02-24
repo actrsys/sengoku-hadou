@@ -3,6 +3,7 @@
  * HEX式 野戦システム
  * 修正: 撤退ボタンの確認アラートをカスタムダイアログ（showDialog）に置き換えました
  * ★追加: 城が攻められた時に、仲の良い国人衆が「AIの援軍」として参戦する機能を追加しました
+ * ★追加: 「足軽」「騎馬」「鉄砲」の兵科概念を導入し、移動力や攻撃範囲、ダメージ倍率を反映しました
  */
 
 class FieldWarManager {
@@ -46,28 +47,30 @@ class FieldWarManager {
         }
 
         this.units = [];
-        // X座標が奇数の場合、Y座標は row * 2 + 1 となるため奇数にする必要がある
-        // 大将を中央(11)に配置し、他を上下に散らす
         const yPositions = [11, 7, 15, 3, 19]; 
 
         // 攻撃側部隊の生成
         if (warState.atkAssignments) {
             warState.atkAssignments.forEach((assign, index) => {
                 if (assign.soldiers <= 0) return;
+                const type = assign.troopType || 'ashigaru';
+                const mobility = (type === 'kiba') ? 6 : 4; // ★ 騎馬は行動力6
                 this.units.push({
                     id: `atk_${index}`,
                     name: assign.busho.name,
                     isAttacker: true,
                     isPlayer: isAtkPlayer,
-                    isGeneral: index === 0, // 0番目が総大将
+                    isGeneral: index === 0,
                     x: atkX, 
                     y: yPositions[index % 5],
                     direction: isAtkPlayer ? 1 : 4,
-                    mobility: 4, 
-                    ap: 4,
+                    mobility: mobility, 
+                    ap: mobility,
                     soldiers: assign.soldiers,
+                    troopType: type, // ★ 兵科を保存
                     stats: WarSystem.calcUnitStats([assign.busho]),
-                    hasActionDone: false
+                    hasActionDone: false,
+                    hasMoved: false // ★ 鉄砲の移動後攻撃不可判定用
                 });
             });
         }
@@ -76,6 +79,8 @@ class FieldWarManager {
         if (warState.defAssignments) {
             warState.defAssignments.forEach((assign, index) => {
                 if (assign.soldiers <= 0) return;
+                const type = assign.troopType || 'ashigaru';
+                const mobility = (type === 'kiba') ? 6 : 4;
                 this.units.push({
                     id: `def_${index}`,
                     name: assign.busho.name,
@@ -85,50 +90,51 @@ class FieldWarManager {
                     x: defX, 
                     y: yPositions[index % 5],
                     direction: isDefPlayer ? 1 : 4,
-                    mobility: 4, 
-                    ap: 4,
+                    mobility: mobility, 
+                    ap: mobility,
                     soldiers: assign.soldiers,
+                    troopType: type,
                     stats: WarSystem.calcUnitStats([assign.busho]),
-                    hasActionDone: false
+                    hasActionDone: false,
+                    hasMoved: false
                 });
             });
         }
 
-        // ★追加: 防衛側が城を持っている場合、仲良しの国人衆が「援軍」に来るかも！
+        // 防衛側が城を持っている場合、仲良しの国人衆が「援軍」に来る
         if (!warState.isKunishuSubjugation && warState.defender.ownerClan !== 0 && warState.defender.ownerClan !== -1) {
             const kunishus = this.game.kunishuSystem.getKunishusInCastle(warState.defender.id);
             kunishus.forEach(k => {
                 if (k.isDestroyed) return;
                 const rel = k.getRelation(warState.defender.ownerClan);
-                // 友好度70以上から確率で参戦
                 if (rel >= 70) {
                     const prob = 0.2 + ((rel - 70) / 30) * 0.8;
                     if (Math.random() <= prob) {
                         const members = this.game.kunishuSystem.getKunishuMembers(k.id);
                         if (members.length > 0) {
-                            // 統率が一番高い武将が率いる
                             members.sort((a, b) => b.leadership - a.leadership);
                             const bestBusho = members[0];
                             
-                            // 既に別枠で参戦していなければ参加
                             if (!this.units.some(u => u.name === bestBusho.name)) {
-                                const uSoldiers = Math.floor(k.soldiers * 0.5); // 兵力は国人衆の５割
+                                const uSoldiers = Math.floor(k.soldiers * 0.5); 
                                 
                                 if (uSoldiers > 0) {
                                     this.units.push({
                                         id: 'k_' + bestBusho.id,
                                         name: bestBusho.name + "(国衆)",
                                         isAttacker: false,
-                                        isPlayer: false, // 援軍はプレイヤー操作不可（勝手に動くAI）
+                                        isPlayer: false, 
                                         isGeneral: false,
-                                        x: defX, // 守備側と同じラインに配置
+                                        x: defX, 
                                         y: yPositions[this.units.length % 5], 
                                         direction: isDefPlayer ? 1 : 4,
                                         mobility: 4, 
                                         ap: 4,
                                         soldiers: uSoldiers,
+                                        troopType: 'ashigaru', // 国衆援軍はデフォルトで足軽
                                         stats: WarSystem.calcUnitStats([bestBusho]),
-                                        hasActionDone: false
+                                        hasActionDone: false,
+                                        hasMoved: false
                                     });
                                     this.game.ui.log(`【国衆援軍】${bestBusho.name}率いる国人衆が防衛側の援軍として駆けつけました！`);
                                 }
@@ -196,7 +202,6 @@ class FieldWarManager {
             btnRetreat.onclick = () => {
                 if (!this.isPlayerTurn()) return;
                 const unit = this.turnQueue[0];
-                // ★ ここを showDialog に変更しました
                 this.game.ui.showDialog("全軍を撤退させますか？", true, () => {
                     if (unit.isAttacker) this.log(`撤退を開始します……`);
                     else this.log(`城内へ撤退を開始します……`);
@@ -226,6 +231,7 @@ class FieldWarManager {
             unit.y = this.turnBackup.y;
             unit.direction = this.turnBackup.direction;
             unit.ap = this.turnBackup.ap;
+            unit.hasMoved = false; // ★ キャンセル時は移動フラグも戻す
             
             this.log(`${unit.name}隊の行動をキャンセルしました。`);
             
@@ -301,21 +307,22 @@ class FieldWarManager {
         const infoEl = document.getElementById('fw-unit-info');
         if (!infoEl) return;
         
-        // ★修正: 援軍かどうかが色でわかるようにしました
         let color = unit.isAttacker ? '#d32f2f' : '#1976d2';
-        
-        // 🌟「IDが k_ から始まる（＝国人衆の援軍）」時だけ色を変えるように直します！
         if (typeof unit.id === 'string' && unit.id.startsWith('k_')) {
             if (this.units.some(u => u.isPlayer && !u.isAttacker)) {
-                color = '#4caf50'; // 味方の援軍は緑
+                color = '#4caf50';
             } else {
-                color = '#ff9800'; // 敵の援軍はオレンジ
+                color = '#ff9800';
             }
         }
+        
+        let typeName = '足軽';
+        if (unit.troopType === 'kiba') typeName = '騎馬';
+        if (unit.troopType === 'teppo') typeName = '鉄砲';
 
         infoEl.innerHTML = `
             <div style="font-weight:bold; color: ${color};">
-                ${unit.name} <span style="font-size:0.8rem; color:#555;">(${unit.isAttacker ? '攻撃' : '守備'})</span>
+                ${unit.name} <span style="font-size:0.8rem; color:#555;">(${unit.isAttacker ? '攻撃' : '守備'} / ${typeName})</span>
             </div>
             <div style="font-size:0.9rem; font-weight:bold;">兵士: ${unit.soldiers}</div>
             <div style="font-size:0.8rem; color:#333;">統:${unit.stats.ldr} 武:${unit.stats.str} 智:${unit.stats.int}</div>
@@ -326,6 +333,23 @@ class FieldWarManager {
     hideUnitInfo() {
         const infoEl = document.getElementById('fw-unit-info');
         if (infoEl) infoEl.classList.add('hidden');
+    }
+
+    // ★追加: 攻撃可能かどうかの判定関数（兵科による違いを吸収）
+    canAttackTarget(attacker, targetX, targetY) {
+        const dist = this.getDistance(attacker.x, attacker.y, targetX, targetY);
+        let targetDir = this.getDirection(attacker.x, attacker.y, targetX, targetY);
+
+        if (attacker.troopType === 'teppo') {
+            if (attacker.hasMoved) return false; // 鉄砲は移動後攻撃不可
+            if (dist < 2 || dist > 3) return false; // 射程は2〜3マス
+            if (!this.isFrontDirection(attacker.direction, targetDir)) return false; // 前方3方向のみ
+            return true;
+        } else {
+            if (dist !== 1) return false; // 足軽・騎馬は射程1
+            if (!this.isFrontDirection(attacker.direction, targetDir)) return false; // 前方3方向のみ
+            return true;
+        }
     }
 
     updateMap() {
@@ -370,17 +394,15 @@ class FieldWarManager {
                         if (x === unit.x && y === unit.y) {
                             hex.classList.add('current-pos');
                         } else {
-                            if (this.getDistance(unit.x, unit.y, x, y) === 1) {
-                                const targetUnit = this.units.find(u => u.x === x && u.y === y && u.isAttacker !== unit.isAttacker);
+                            const targetUnit = this.units.find(u => u.x === x && u.y === y && u.isAttacker !== unit.isAttacker);
+                            // ★修正: 攻撃可能範囲かどうかの判定を共通関数化
+                            if (targetUnit && unit.ap >= 1 && this.canAttackTarget(unit, x, y)) {
+                                hex.classList.add('attackable');
+                            } else if (this.getDistance(unit.x, unit.y, x, y) === 1) {
                                 let targetDir = this.getDirection(unit.x, unit.y, x, y);
                                 let turnCost = this.getTurnCost(unit.direction, targetDir);
-
-                                if (targetUnit && unit.ap >= 1 && this.isFrontDirection(unit.direction, targetDir)) {
-                                    hex.classList.add('attackable');
-                                } else {
-                                    if (unit.ap >= turnCost) {
-                                        hex.classList.add('fw-dir-highlight');
-                                    }
+                                if (unit.ap >= turnCost) {
+                                    hex.classList.add('fw-dir-highlight');
                                 }
                             }
                         }
@@ -389,11 +411,9 @@ class FieldWarManager {
                             hex.classList.add('current-pos');
                         } else {
                             const targetUnit = this.units.find(u => u.x === x && u.y === y && u.isAttacker !== unit.isAttacker);
-                            if (targetUnit && this.getDistance(unit.x, unit.y, x, y) === 1 && unit.ap >= 1) {
-                                let targetDir = this.getDirection(unit.x, unit.y, x, y);
-                                if (this.isFrontDirection(unit.direction, targetDir)) {
-                                    hex.classList.add('attackable');
-                                }
+                            // ★修正: 攻撃可能範囲かどうかの判定を共通関数化
+                            if (targetUnit && unit.ap >= 1 && this.canAttackTarget(unit, x, y)) {
+                                hex.classList.add('attackable');
                             }
                         }
                     }
@@ -434,16 +454,20 @@ class FieldWarManager {
             const uEl = document.createElement('div');
             const isActive = (unit && u.id === unit.id);
             
-            // ★修正: 援軍の色分け
             let colorClass = u.isAttacker ? 'attacker' : 'defender';
-            
-            // 🌟「IDが k_ から始まる（＝国人衆の援軍）」時だけ色を変えるように直します！
             if (typeof u.id === 'string' && u.id.startsWith('k_')) {
                 if (isDefPlayer) {
                     uEl.style.filter = 'drop-shadow(1px 0 0 #4caf50) drop-shadow(-1px 0 0 #4caf50) drop-shadow(0 1px 0 #4caf50) drop-shadow(0 -1px 0 #4caf50) drop-shadow(2px 2px 2px rgba(0,0,0,0.8))';
                 } else if (isAtkPlayer) {
                     uEl.style.filter = 'drop-shadow(1px 0 0 #ff9800) drop-shadow(-1px 0 0 #ff9800) drop-shadow(0 1px 0 #ff9800) drop-shadow(0 -1px 0 #ff9800) drop-shadow(2px 2px 2px rgba(0,0,0,0.8))';
                 }
+            }
+
+            // ★追加: 兵科によるアイコンの装飾
+            if (u.troopType === 'kiba') {
+                uEl.style.border = '2px dashed #000'; // 騎馬は破線ボーダー
+            } else if (u.troopType === 'teppo') {
+                uEl.style.borderRadius = '0'; // 鉄砲は四角形
             }
 
             uEl.className = `fw-unit ${colorClass} ${isActive ? 'active' : ''}`;
@@ -527,7 +551,22 @@ class FieldWarManager {
         for(let d of dirs) {
             if (toX - fromX === d.dx && toY - fromY === d.dy) return d.dir;
         }
-        return 0;
+        // 距離が離れている場合の方向計算（簡易版）
+        let bestDir = 0;
+        let maxDot = -Infinity;
+        const vecX = toX - fromX;
+        const vecY = toY - fromY;
+        const mag = Math.sqrt(vecX*vecX + vecY*vecY);
+        if (mag === 0) return 0;
+        
+        for(let d of dirs) {
+            const dot = ((d.dx/Math.sqrt(d.dx*d.dx + d.dy*d.dy)) * (vecX/mag)) + ((d.dy/Math.sqrt(d.dx*d.dx + d.dy*d.dy)) * (vecY/mag));
+            if (dot > maxDot) {
+                maxDot = dot;
+                bestDir = d.dir;
+            }
+        }
+        return bestDir;
     }
 
     getTurnCost(curDir, targetDir) {
@@ -606,6 +645,7 @@ class FieldWarManager {
         
         this.units.forEach(u => {
             u.hasActionDone = false;
+            u.hasMoved = false; // ★ ターン開始時に移動フラグをリセット
             u.ap = u.mobility;
         });
         
@@ -788,8 +828,6 @@ class FieldWarManager {
             if (u.isAttacker) {
                 atkSoldiers += u.soldiers;
             } else {
-                // 🌟 ここが変わりました！
-                // 「k_」という名札（国人衆）がついていない人だけ、お城に入れます
                 if (typeof u.id === 'string' && !u.id.startsWith('k_')) {
                     defSoldiers += u.soldiers;
                 }
@@ -876,6 +914,7 @@ class FieldWarManager {
 			    unit.ap -= this.previewTarget.cost;
 			    unit.x = x;
 			    unit.y = y;
+                unit.hasMoved = true; // ★ 移動したことを記録
 			    this.log(`${unit.name}隊が移動（向きも変更）。`);
 			    this.nextPhase();
 			} else {
@@ -901,21 +940,23 @@ class FieldWarManager {
                 return;
             }
 
-            if (this.getDistance(unit.x, unit.y, x, y) === 1) {
-                const targetUnit = this.units.find(u => u.x === x && u.y === y && u.isAttacker !== unit.isAttacker);
-                let targetDir = this.getDirection(unit.x, unit.y, x, y);
-
-                if (targetUnit && this.isFrontDirection(unit.direction, targetDir)) {
-                    if (unit.ap >= 1) {
-                        unit.ap -= 1;
-                        this.executeAttack(unit, targetUnit);
-                    } else {
-                        this.cancelAction();
-                        if(clickedUnit) this.showUnitInfo(clickedUnit);
-                    }
-                    return;
+            const targetUnit = this.units.find(u => u.x === x && u.y === y && u.isAttacker !== unit.isAttacker);
+            
+            // ★修正: 攻撃可能範囲なら攻撃
+            if (targetUnit && this.canAttackTarget(unit, x, y)) {
+                if (unit.ap >= 1) {
+                    unit.ap -= 1;
+                    this.executeAttack(unit, targetUnit);
+                } else {
+                    this.cancelAction();
+                    if(clickedUnit) this.showUnitInfo(clickedUnit);
                 }
+                return;
+            }
 
+            // それ以外は振り向き処理
+            if (this.getDistance(unit.x, unit.y, x, y) === 1) {
+                let targetDir = this.getDirection(unit.x, unit.y, x, y);
                 let turnCost = this.getTurnCost(unit.direction, targetDir);
                 
                 if (unit.ap >= turnCost) {
@@ -940,15 +981,10 @@ class FieldWarManager {
             }
 
             const targetUnit = this.units.find(u => u.x === x && u.y === y && u.isAttacker !== unit.isAttacker);
-            if (targetUnit && this.getDistance(unit.x, unit.y, x, y) === 1 && unit.ap >= 1) {
-                let targetDir = this.getDirection(unit.x, unit.y, x, y);
-                if (this.isFrontDirection(unit.direction, targetDir)) {
-                    unit.ap -= 1;
-                    this.executeAttack(unit, targetUnit);
-                } else {
-                    this.cancelAction();
-                    if(clickedUnit) this.showUnitInfo(clickedUnit);
-                }
+            // ★修正: 攻撃可能範囲なら攻撃
+            if (targetUnit && unit.ap >= 1 && this.canAttackTarget(unit, x, y)) {
+                unit.ap -= 1;
+                this.executeAttack(unit, targetUnit);
             } else {
                 this.cancelAction();
                 if(clickedUnit) this.showUnitInfo(clickedUnit);
@@ -956,17 +992,46 @@ class FieldWarManager {
         }
     }
 
-    getDirectionalMultiplier(atkUnit, defUnit) {
-        let atkDirIndex = this.getDirection(defUnit.x, defUnit.y, atkUnit.x, atkUnit.y);
-        let defDirIndex = defUnit.direction;
-        let diff = Math.abs(defDirIndex - atkDirIndex);
-        diff = Math.min(diff, 6 - diff); 
-        if (diff === 3) return 1.5; 
-        if (diff === 2) return 1.2; 
-        return 1.0; 
+    // ★修正: 兵科や攻撃方向によるダメージ倍率を計算
+    getDamageMultipliers(attacker, defender) {
+        let atkDirIndex = this.getDirection(attacker.x, attacker.y, defender.x, defender.y);
+        let defDirIndex = defender.direction;
+        
+        // 防御側から見た攻撃の飛んできた方向とのズレ
+        let defToAtkDiff = Math.abs(defDirIndex - atkDirIndex);
+        defToAtkDiff = Math.min(defToAtkDiff, 6 - defToAtkDiff); 
+        
+        // 攻撃側から見たターゲットの方向と自身の向きとのズレ
+        let atkToDefDiff = Math.abs(attacker.direction - atkDirIndex);
+        atkToDefDiff = Math.min(atkToDefDiff, 6 - atkToDefDiff);
+
+        let atkMult = 1.0;
+        let defMult = 1.0; // 防御側の被ダメ補正
+
+        // 攻撃側の兵科による与ダメ補正
+        if (attacker.troopType === 'kiba') {
+            if (atkToDefDiff === 0) atkMult = 1.2; // 正面
+            else if (atkToDefDiff === 1) atkMult = 1.1; // 前斜め
+        } else if (attacker.troopType === 'teppo') {
+            atkMult = 1.2; // 鉄砲は常に1.2倍
+        } else {
+            // 足軽などは向きのみで背後・側面ボーナス（既存の仕様を少しマイルドに統合）
+            if (defToAtkDiff === 3) atkMult = 1.5;
+            else if (defToAtkDiff === 2) atkMult = 1.2;
+        }
+
+        // 防御側の兵科による被ダメ補正
+        if (defender.troopType === 'kiba') {
+            if (defToAtkDiff === 2 || defToAtkDiff === 3) defMult = 1.1; // 側面・背面の被ダメ増
+        } else if (defender.troopType === 'teppo') {
+            defMult = 1.3; // 鉄砲は全方向から被ダメ増
+        }
+
+        return { attack: atkMult, defense: defMult, defToAtkDiff: defToAtkDiff };
     }
 
     executeAttack(attacker, defender) {
+        // 基本ダメージ計算
         const result = WarSystem.calcWarDamage(
             attacker.stats, defender.stats,
             attacker.soldiers, defender.soldiers,
@@ -975,19 +1040,37 @@ class FieldWarManager {
             'charge'
         );
 
-        let dmgMultiplier = this.getDirectionalMultiplier(attacker, defender);
+        // ★ 兵科による倍率を計算
+        const mults = this.getDamageMultipliers(attacker, defender);
+        
+        let dmgToDef = Math.floor(result.soldierDmg * mults.attack * mults.defense);
+        // 兵数以上のダメージは受けない
+        dmgToDef = Math.min(defender.soldiers, dmgToDef);
 
-        let dmgToDef = Math.floor(Math.min(defender.soldiers, result.soldierDmg * dmgMultiplier));
-        let dmgToAtk = Math.floor(Math.min(attacker.soldiers, result.counterDmg));
+        let dmgToAtk = 0;
+        // 反撃は距離1のときのみ発生
+        const dist = this.getDistance(attacker.x, attacker.y, defender.x, defender.y);
+        if (dist === 1) {
+            // 反撃側（defender）の与ダメ補正を計算（立場を逆転）
+            const counterMults = this.getDamageMultipliers(defender, attacker);
+            dmgToAtk = Math.floor(result.counterDmg * counterMults.attack * counterMults.defense);
+            dmgToAtk = Math.min(attacker.soldiers, dmgToAtk);
+        }
 
         defender.soldiers -= dmgToDef;
         attacker.soldiers -= dmgToAtk;
 
         let dirMsg = "";
-        if (dmgMultiplier === 1.5) dirMsg = "（背後からの強襲！）";
-        if (dmgMultiplier === 1.2) dirMsg = "（側面からの攻撃！）";
+        if (mults.defToAtkDiff === 3) dirMsg = "（背後からの強襲！）";
+        if (mults.defToAtkDiff === 2) dirMsg = "（側面からの攻撃！）";
+        
+        let atkWeapon = "攻撃";
+        if (attacker.troopType === 'teppo') atkWeapon = "射撃";
+        else if (attacker.troopType === 'kiba') atkWeapon = "突撃";
 
-        this.log(`${attacker.name}隊の攻撃！${dirMsg} 敵に${dmgToDef}の損害！ 反撃で${dmgToAtk}の被害！`);
+        let counterMsg = (dmgToAtk > 0) ? ` 反撃で${dmgToAtk}の被害！` : ``;
+
+        this.log(`${attacker.name}隊の${atkWeapon}！${dirMsg} 敵に${dmgToDef}の損害！${counterMsg}`);
 
         if (defender.soldiers <= 0) {
             this.log(`${defender.name}隊が壊滅した！`);
@@ -1031,7 +1114,7 @@ class FieldWarManager {
             if (d < minDist) { minDist = d; targetEnemy = e; }
         });
 
-        // 戦力差撤退判定（国人衆などのAI専用部隊も一緒に撤退する）
+        // 戦力差撤退判定
         let allySoldiers = 0, enemySoldiers = 0;
         this.units.forEach(u => {
             if (u.isAttacker === unit.isAttacker) allySoldiers += u.soldiers;
@@ -1049,7 +1132,22 @@ class FieldWarManager {
 
         let dist = this.getDistance(unit.x, unit.y, targetEnemy.x, targetEnemy.y);
         
-        if (dist > 1) {
+        // ★ 鉄砲は距離2〜3が最適射程なので、距離2〜3で前を向いていたら移動せずに撃つ
+        let shouldMove = true;
+        if (unit.troopType === 'teppo') {
+            if (dist >= 2 && dist <= 3) {
+                let targetDir = this.getDirection(unit.x, unit.y, targetEnemy.x, targetEnemy.y);
+                if (this.isFrontDirection(unit.direction, targetDir)) {
+                    shouldMove = false; // 射程内で前を向いているなら移動しない
+                }
+            }
+        } else {
+            if (dist === 1) {
+                shouldMove = false;
+            }
+        }
+        
+        if (shouldMove) {
             let reachable = this.findPaths(unit, unit.ap - 1); 
             let bestTarget = null;
             let minMoveDist = 999;
@@ -1059,10 +1157,20 @@ class FieldWarManager {
                 let nx = parseInt(parts[0]);
                 let ny = parseInt(parts[1]);
                 let d = this.getDistance(nx, ny, targetEnemy.x, targetEnemy.y);
-				if (d < minMoveDist) {
-				    minMoveDist = d;
-				    bestTarget = {x: nx, y: ny, cost: reachable[key].cost, path: reachable[key].path};
-				}
+                
+                // 鉄砲なら距離2を維持しようとする
+                if (unit.troopType === 'teppo') {
+                    let score = Math.abs(d - 2); 
+                    if (score < minMoveDist) {
+                        minMoveDist = score;
+                        bestTarget = {x: nx, y: ny, cost: reachable[key].cost, path: reachable[key].path};
+                    }
+                } else {
+                    if (d < minMoveDist) {
+                        minMoveDist = d;
+                        bestTarget = {x: nx, y: ny, cost: reachable[key].cost, path: reachable[key].path};
+                    }
+                }
             }
             if (bestTarget && (bestTarget.x !== unit.x || bestTarget.y !== unit.y)) {
 			    let path = bestTarget.path;
@@ -1080,6 +1188,7 @@ class FieldWarManager {
 			    unit.ap -= bestTarget.cost;
 			    unit.x = bestTarget.x;
 			    unit.y = bestTarget.y;
+                unit.hasMoved = true;
 			    if (isPlayerInvolved) {
 			        this.log(`${unit.name}隊が前進。`);
 			        this.updateMap();
@@ -1090,7 +1199,9 @@ class FieldWarManager {
         }
 
         dist = this.getDistance(unit.x, unit.y, targetEnemy.x, targetEnemy.y);
-        if (dist === 1) {
+        
+        // 向き直り処理（攻撃可能な相手がいるならそちらを向く）
+        if (this.canAttackTarget({...unit, direction: this.getDirection(unit.x, unit.y, targetEnemy.x, targetEnemy.y)}, targetEnemy.x, targetEnemy.y)) {
             let targetDir = this.getDirection(unit.x, unit.y, targetEnemy.x, targetEnemy.y);
             let turnCost = this.getTurnCost(unit.direction, targetDir);
             
@@ -1106,13 +1217,11 @@ class FieldWarManager {
             }
         }
 
-        if (dist === 1 && unit.ap >= 1) {
-            let targetDir = this.getDirection(unit.x, unit.y, targetEnemy.x, targetEnemy.y);
-            if (this.isFrontDirection(unit.direction, targetDir)) {
-                unit.ap -= 1;
-                this.executeAttack(unit, targetEnemy);
-                return; 
-            }
+        // 攻撃処理
+        if (this.canAttackTarget(unit, targetEnemy.x, targetEnemy.y) && unit.ap >= 1) {
+            unit.ap -= 1;
+            this.executeAttack(unit, targetEnemy);
+            return; 
         }
 
         if (isPlayerInvolved) this.log(`${unit.name}隊は待機した。`);

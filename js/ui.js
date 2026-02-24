@@ -1,7 +1,7 @@
 /**
  * ui.js
  * 画面の見た目や操作（UI）を担当するファイルです。
- * game.js からお引っ越ししてきました。
+ * 修正：野戦用の兵科（騎馬・鉄砲）を指定するためのUIと兵力分配画面のロジックを追加
  */
 
 class UIManager {
@@ -1278,7 +1278,8 @@ class UIManager {
         }
     }
     
-    showUnitDivideModal(bushos, totalSoldiers, onConfirm) {
+    // ★ 修正: 兵科（足軽・騎馬・鉄砲）の選択UIと、持参した兵器（騎馬・鉄砲）の数による制限ロジックを追加
+    showUnitDivideModal(bushos, totalSoldiers, totalHorses, totalGuns, onConfirm) {
         const modal = document.getElementById('unit-divide-modal');
         const listEl = document.getElementById('divide-list');
         const confirmBtn = document.getElementById('divide-confirm-btn');
@@ -1287,11 +1288,18 @@ class UIManager {
         
         if (!modal || !listEl) return;
         
+        // フォールバック処理（旧呼び出し用）
+        if (typeof totalHorses === 'function') {
+            onConfirm = totalHorses;
+            totalHorses = 0;
+            totalGuns = 0;
+        }
+
         modal.classList.remove('hidden');
         totalEl.textContent = totalSoldiers;
         listEl.innerHTML = '';
         
-        let assignments = bushos.map(b => ({ id: b.id, count: 0 }));
+        let assignments = bushos.map(b => ({ id: b.id, count: 0, type: 'ashigaru' }));
         
         let ratioSum = 1.5 + (bushos.length - 1) * 1.0;
         let baseAmount = Math.floor(totalSoldiers / ratioSum);
@@ -1305,13 +1313,74 @@ class UIManager {
             assignments[0].count = remain; 
         }
 
-        const updateRemain = () => {
+        const updateRemain = (triggerBushoId = null, triggerType = null) => {
             let sum = 0;
-            const inputs = listEl.querySelectorAll('input[type="number"]');
-            inputs.forEach(inp => sum += parseInt(inp.value) || 0);
+            let usedHorses = 0;
+            let usedGuns = 0;
+            
+            // 各部隊の兵科と設定兵士数を取得
+            const currentData = bushos.map(b => {
+                const typeEl = document.getElementById(`div-type-${b.id}`);
+                const numEl = document.getElementById(`div-num-${b.id}`);
+                const typeVal = typeEl ? typeEl.value : 'ashigaru';
+                let numVal = numEl ? parseInt(numEl.value) || 0 : 0;
+                return { id: b.id, type: typeVal, count: numVal };
+            });
+
+            // 兵科変更や数値変更時に持参上限を超えていないかチェックしてクリップする
+            if (triggerType === 'type_change' && triggerBushoId) {
+                const bData = currentData.find(d => d.id === triggerBushoId);
+                if (bData && bData.type === 'kiba') {
+                    const otherKiba = currentData.filter(d => d.id !== triggerBushoId && d.type === 'kiba').reduce((s, d) => s + d.count, 0);
+                    const maxKiba = Math.max(0, totalHorses - otherKiba);
+                    if (bData.count > maxKiba) {
+                        bData.count = maxKiba;
+                        if (bData.count < 1) bData.count = 1; 
+                        if (maxKiba === 0) {
+                            bData.type = 'ashigaru';
+                            document.getElementById(`div-type-${triggerBushoId}`).value = 'ashigaru';
+                        }
+                    }
+                } else if (bData && bData.type === 'teppo') {
+                    const otherTeppo = currentData.filter(d => d.id !== triggerBushoId && d.type === 'teppo').reduce((s, d) => s + d.count, 0);
+                    const maxTeppo = Math.max(0, totalGuns - otherTeppo);
+                    if (bData.count > maxTeppo) {
+                        bData.count = maxTeppo;
+                        if (bData.count < 1) bData.count = 1;
+                        if (maxTeppo === 0) {
+                            bData.type = 'ashigaru';
+                            document.getElementById(`div-type-${triggerBushoId}`).value = 'ashigaru';
+                        }
+                    }
+                }
+            } else if (triggerType === 'num_change' && triggerBushoId) {
+                const bData = currentData.find(d => d.id === triggerBushoId);
+                if (bData && bData.type === 'kiba') {
+                    const otherKiba = currentData.filter(d => d.id !== triggerBushoId && d.type === 'kiba').reduce((s, d) => s + d.count, 0);
+                    const maxKiba = Math.max(0, totalHorses - otherKiba);
+                    if (bData.count > maxKiba) bData.count = maxKiba;
+                } else if (bData && bData.type === 'teppo') {
+                    const otherTeppo = currentData.filter(d => d.id !== triggerBushoId && d.type === 'teppo').reduce((s, d) => s + d.count, 0);
+                    const maxTeppo = Math.max(0, totalGuns - otherTeppo);
+                    if (bData.count > maxTeppo) bData.count = maxTeppo;
+                }
+            }
+
+            // UIへの反映と再計算
+            currentData.forEach(d => {
+                const range = document.getElementById(`div-range-${d.id}`);
+                const num = document.getElementById(`div-num-${d.id}`);
+                if (range && num && parseInt(num.value) !== d.count) {
+                    num.value = d.count;
+                    range.value = d.count;
+                }
+                sum += d.count;
+                if (d.type === 'kiba') usedHorses += d.count;
+                if (d.type === 'teppo') usedGuns += d.count;
+            });
             
             const rem = totalSoldiers - sum;
-            remainEl.textContent = rem;
+            remainEl.innerHTML = `${rem} <span style="font-size:0.8rem; color:#333; margin-left: 10px;">(騎馬残:${Math.max(0, totalHorses - usedHorses)} 鉄砲残:${Math.max(0, totalGuns - usedGuns)})</span>`;
             
             if (rem === 0) {
                 remainEl.style.color = "green";
@@ -1334,6 +1403,13 @@ class UIManager {
             
             div.innerHTML = `
                 <div style="font-weight:bold; margin-bottom:5px;">${b.name} <small>(統:${b.leadership} 武:${b.strength} 智:${b.intelligence})</small></div>
+                <div style="margin-bottom:5px;">
+                    <select id="div-type-${b.id}" style="padding:4px; font-size:0.9rem;">
+                        <option value="ashigaru">足軽</option>
+                        <option value="kiba">騎馬</option>
+                        <option value="teppo">鉄砲</option>
+                    </select>
+                </div>
                 <div class="qty-control">
                     <input type="range" id="div-range-${b.id}" min="1" max="${totalSoldiers}" value="${assignments[index].count}">
                     <input type="number" id="div-num-${b.id}" min="1" max="${totalSoldiers}" value="${assignments[index].count}">
@@ -1343,6 +1419,7 @@ class UIManager {
             
             const range = div.querySelector(`#div-range-${b.id}`);
             const num = div.querySelector(`#div-num-${b.id}`);
+            const typeSel = div.querySelector(`#div-type-${b.id}`);
             
             const onInput = (val) => {
                 let v = parseInt(val) || 0;
@@ -1358,7 +1435,7 @@ class UIManager {
                 
                 range.value = v;
                 num.value = v;
-                updateRemain();
+                updateRemain(b.id, 'num_change');
             };
 
             range.oninput = (e) => onInput(e.target.value);
@@ -1367,6 +1444,9 @@ class UIManager {
                 if(e.target.value === "" || isNaN(parseInt(e.target.value))) {
                     onInput(1);
                 }
+            };
+            typeSel.onchange = () => {
+                updateRemain(b.id, 'type_change');
             };
         });
 
@@ -1377,8 +1457,9 @@ class UIManager {
             const finalAssignments = [];
             bushos.forEach(b => {
                 const val = parseInt(document.getElementById(`div-num-${b.id}`).value) || 0;
+                const typeVal = document.getElementById(`div-type-${b.id}`).value;
                 sum += val;
-                finalAssignments.push({ busho: b, soldiers: val });
+                finalAssignments.push({ busho: b, soldiers: val, troopType: typeVal });
             });
             
             if (sum !== totalSoldiers) {
@@ -1431,6 +1512,7 @@ class UIManager {
         this.onResultModalClose = onProceed;
     }
 
+    // ★ 修正: 出陣時、迎撃時に「持参騎馬」「持参鉄砲」を指定するスライダーを追加
     openQuantitySelector(type, data, targetId, extraData = null) {
         if (!this.quantityModal) return;
         this.quantityModal.classList.remove('hidden'); 
@@ -1479,13 +1561,17 @@ class UIManager {
         } else if (type === 'headhunt_gold') {
             document.getElementById('quantity-title').textContent = "持参金 (任意)"; inputs.gold = createSlider("金", "gold", c.gold, 0);
         } else if (type === 'war_supplies') {
-            document.getElementById('quantity-title').textContent = "出陣兵数・兵糧指定"; 
+            document.getElementById('quantity-title').textContent = "出陣兵数・兵糧・兵器指定"; 
             inputs.soldiers = createSlider("兵士数", "soldiers", c.soldiers, c.soldiers);
             inputs.rice = createSlider("持参兵糧", "rice", c.rice, c.rice);
+            inputs.horses = createSlider("持参騎馬", "horses", c.horses, 0);
+            inputs.guns = createSlider("持参鉄砲", "guns", c.guns, 0);
         } else if (type === 'def_intercept') { 
             document.getElementById('quantity-title').textContent = "迎撃部隊編成"; 
             inputs.soldiers = createSlider("出陣兵士数", "soldiers", c.soldiers, c.soldiers);
             inputs.rice = createSlider("持参兵糧", "rice", c.rice, c.rice);
+            inputs.horses = createSlider("持参騎馬", "horses", c.horses, 0);
+            inputs.guns = createSlider("持参鉄砲", "guns", c.guns, 0);
         } else if (type === 'transport') {
             document.getElementById('quantity-title').textContent = "輸送物資指定"; inputs.gold = createSlider("金", "gold", c.gold, 0); inputs.rice = createSlider("兵糧", "rice", c.rice, 0); inputs.soldiers = createSlider("兵士", "soldiers", c.soldiers, 0);
         } else if (type === 'buy_rice') {
