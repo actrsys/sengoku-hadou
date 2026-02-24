@@ -83,6 +83,7 @@ class FieldWarManager {
                 const mobility = (type === 'kiba') ? 6 : 4;
                 this.units.push({
                     id: `def_${index}`,
+                    bushoId: assign.busho.id,
                     name: assign.busho.name,
                     isAttacker: false,
                     isPlayer: isDefPlayer,
@@ -893,20 +894,49 @@ class FieldWarManager {
         this.active = false;
         
         let atkSoldiers = 0, defSoldiers = 0;
+        let atkHorses = 0, atkGuns = 0;
+        let defHorses = 0, defGuns = 0;
+
+        if (this.warState.atkAssignments) {
+            this.warState.atkAssignments.forEach(a => a.soldiers = 0);
+        }
+        if (this.warState.defAssignments) {
+            this.warState.defAssignments.forEach(a => a.soldiers = 0);
+        }
+
         this.units.forEach(u => {
             if (u.isAttacker) {
                 atkSoldiers += u.soldiers;
+                if (u.troopType === 'kiba') atkHorses += u.soldiers;
+                if (u.troopType === 'teppo') atkGuns += u.soldiers;
+                
+                if (this.warState.atkAssignments) {
+                    const assign = this.warState.atkAssignments.find(a => a.busho.id === u.bushoId);
+                    if (assign) assign.soldiers = u.soldiers;
+                }
             } else {
                 if (typeof u.id === 'string' && !u.id.startsWith('k_')) {
                     defSoldiers += u.soldiers;
+                    if (u.troopType === 'kiba') defHorses += u.soldiers;
+                    if (u.troopType === 'teppo') defGuns += u.soldiers;
+                    
+                    if (this.warState.defAssignments) {
+                        const assign = this.warState.defAssignments.find(a => a.busho.id === u.bushoId);
+                        if (assign) assign.soldiers = u.soldiers;
+                    }
                 }
             }
         });
         
         this.warState.attacker.soldiers = atkSoldiers;
         this.warState.attacker.rice = this.atkRice;
+        this.warState.attacker.horses = atkHorses;
+        this.warState.attacker.guns = atkGuns;
+
         this.warState.defender.fieldSoldiers = defSoldiers;
         this.warState.defFieldRice = this.defRice;
+        this.warState.defender.fieldHorses = defHorses;
+        this.warState.defender.fieldGuns = defGuns;
 
         const isPlayerInvolved = this.units.some(u => u.isPlayer);
         

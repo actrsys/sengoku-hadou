@@ -231,11 +231,18 @@ class AIEngine {
 
         let scoreCommerce = 0;
         let scoreFarm = 0;
-        if (gold < 500) scoreCommerce = (500 - gold) * 0.5; 
-        else scoreCommerce = 20; 
         
-        scoreFarm = 20;
-        if (smartness > 0.6 && this.game.month < 8) scoreFarm += 10;
+        // 鉱山が最大値に達していない時だけ考える
+        if (castle.commerce < castle.maxCommerce) {
+            if (gold < 500) scoreCommerce = (500 - gold) * 0.5; 
+            else scoreCommerce = 20; 
+        }
+        
+        // 石高が最大値に達していない時だけ考える
+        if (castle.kokudaka < castle.maxKokudaka) {
+            scoreFarm = 20;
+            if (smartness > 0.6 && this.game.month < 8) scoreFarm += 10;
+        }
 
         const actions = [
             { type: 'charity', score: scoreCharity, cost: 300 },
@@ -278,8 +285,16 @@ class AIEngine {
             if ((action.type === 'commerce' || action.type === 'farm') && gold >= 500) {
                  castle.gold -= 500;
                  const val = GameSystem.calcDevelopment(castellan);
-                 if (action.type === 'commerce') castle.commerce += val;
-                 else castle.kokudaka += val;
+                 
+                 // 鉱山開発の時、最大値を超えないようにするストッパー
+                 if (action.type === 'commerce') {
+                     castle.commerce = Math.min(castle.maxCommerce, castle.commerce + val);
+                 } 
+                 // 石高開発の時、最大値を超えないようにするストッパー
+                 else {
+                     castle.kokudaka = Math.min(castle.maxKokudaka, castle.kokudaka + val);
+                 }
+                 
                  castellan.isActionDone = true; return;
             }
         }

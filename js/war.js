@@ -428,7 +428,33 @@ class WarManager {
         const atkLost = s.attacker.soldiers <= 0 || s.attacker.rice <= 0 || (s.attacker.soldiers < s.defender.fieldSoldiers * 0.2);
         const defLost = s.defender.fieldSoldiers <= 0 || s.defFieldRice <= 0 || (s.defender.fieldSoldiers < s.attacker.soldiers * 0.2);
         
-        s.defender.soldiers += s.defender.fieldSoldiers; 
+        if (s.atkAssignments) {
+            const originalAtkSoldiers = s.atkAssignments.reduce((sum, a) => sum + a.soldiers, 0);
+            const atkSurviveRate = originalAtkSoldiers > 0 ? Math.max(0, s.attacker.soldiers) / originalAtkSoldiers : 0;
+            let atkHorses = 0, atkGuns = 0;
+            s.atkAssignments.forEach(a => {
+                a.soldiers = Math.floor(a.soldiers * atkSurviveRate);
+                if (a.troopType === 'kiba') atkHorses += a.soldiers;
+                if (a.troopType === 'teppo') atkGuns += a.soldiers;
+            });
+            s.attacker.horses = atkHorses;
+            s.attacker.guns = atkGuns;
+        }
+
+        if (s.defAssignments) {
+            const originalDefSoldiers = s.defAssignments.reduce((sum, a) => sum + a.soldiers, 0);
+            const defSurviveRate = originalDefSoldiers > 0 ? Math.max(0, s.defender.fieldSoldiers) / originalDefSoldiers : 0;
+            let defHorses = 0, defGuns = 0;
+            s.defAssignments.forEach(a => {
+                a.soldiers = Math.floor(a.soldiers * defSurviveRate);
+                if (a.troopType === 'kiba') defHorses += a.soldiers;
+                if (a.troopType === 'teppo') defGuns += a.soldiers;
+            });
+            s.defender.fieldHorses = defHorses;
+            s.defender.fieldGuns = defGuns;
+        }
+
+        s.defender.soldiers += s.defender.fieldSoldiers;
         s.defender.rice += s.defFieldRice; 
         s.defender.horses = (s.defender.horses || 0) + (s.defender.fieldHorses || 0);
         s.defender.guns = (s.defender.guns || 0) + (s.defender.fieldGuns || 0);
@@ -697,12 +723,11 @@ class WarManager {
             const s = this.state; s.active = false;
             
             // 兵士の減った割合を計算して、馬と鉄砲も減らす（壊れる）処理
-            const originalAtkSoldiers = s.attacker.bushos.reduce((sum, b) => {
-                const assign = s.atkAssignments ? s.atkAssignments.find(a => a.busho.id === b.id) : null;
-                return sum + (assign ? assign.soldiers : 0);
-            }, 0) || Math.max(1, s.attacker.soldiers + s.deadSoldiers.attacker);
-            
+            // 野戦があった場合、ここでの horses と guns は既に野戦生き残り数に更新されており、
+            // originalAtkSoldiers も攻城戦開始時の兵数（野戦生き残り数）となるため、攻城戦での損耗だけが反映される。
+            const originalAtkSoldiers = Math.max(1, s.attacker.soldiers + s.deadSoldiers.attacker);
             const atkSurviveRate = Math.max(0, s.attacker.soldiers) / originalAtkSoldiers;
+            
             s.attacker.horses = Math.floor((s.attacker.horses || 0) * atkSurviveRate);
             s.attacker.guns = Math.floor((s.attacker.guns || 0) * atkSurviveRate);            
 
