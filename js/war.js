@@ -130,7 +130,7 @@ class WarManager {
 
     getValidWarTargets(currentCastle) {
         return this.game.castles.filter(target => 
-            GameSystem.isAdjacent(currentCastle, target) && 
+            GameSystem.isReachable(this.game, currentCastle, target, this.game.playerClanId) && 
             target.ownerClan !== this.game.playerClanId &&
             !this.game.getRelation(this.game.playerClanId, target.ownerClan).alliance &&
             (target.immunityUntil || 0) < this.game.getCurrentTurnId()
@@ -147,7 +147,7 @@ class WarManager {
             commands.push({ label: "突撃", type: "charge" }, { label: "斉射", type: "bow" }, { label: "城攻め", type: "siege" }, { label: "火計", type: "fire" }, { label: "謀略", type: "scheme" }, { label: "撤退", type: "retreat" });
         } else {
             commands.push({ label: "突撃", type: "def_charge" }, { label: "斉射", type: "def_bow" }, { label: "籠城", type: "def_attack" }, { label: "謀略", type: "scheme" }, { label: "補修", type: "repair_setup" }); 
-            if (this.game.castles.some(c => c.ownerClan === s.defender.ownerClan && c.id !== s.defender.id && GameSystem.isAdjacent(c, s.defender))) commands.push({ label: "撤退", type: "retreat" });
+            if (this.game.castles.some(c => c.ownerClan === s.defender.ownerClan && c.id !== s.defender.id && GameSystem.isReachable(this.game, s.defender, c, s.defender.ownerClan))) commands.push({ label: "撤退", type: "retreat" });
         }
         return commands;
     }
@@ -693,7 +693,7 @@ class WarManager {
     }
     
     executeRetreatLogic(defCastle) {
-        const candidates = this.game.castles.filter(c => c.ownerClan === defCastle.ownerClan && c.id !== defCastle.id && GameSystem.isAdjacent(c, defCastle));
+        const candidates = this.game.castles.filter(c => c.ownerClan === defCastle.ownerClan && c.id !== defCastle.id && GameSystem.isReachable(this.game, defCastle, c, defCastle.ownerClan));
         if (candidates.length === 0) { this.endWar(true); return; }
         const s = this.state;
         

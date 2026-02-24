@@ -79,7 +79,7 @@ class AIEngine {
                 const neighbors = this.game.castles.filter(c => 
                     c.ownerClan !== 0 && 
                     c.ownerClan !== castle.ownerClan && 
-                    GameSystem.isAdjacent(castle, c)
+                    GameSystem.isReachable(this.game, castle, c, castle.ownerClan)
                 );
                 
                 const validEnemies = neighbors.filter(target => {
@@ -301,9 +301,9 @@ class AIEngine {
 
         castellan.isActionDone = true;
     }
-
+    
     execAIDiplomacy(castle, castellan, smartness) {
-        const neighbors = this.game.castles.filter(c => c.ownerClan !== 0 && c.ownerClan !== castle.ownerClan && GameSystem.isAdjacent(castle, c));
+        const neighbors = this.game.castles.filter(c => c.ownerClan !== 0 && c.ownerClan !== castle.ownerClan && GameSystem.isReachable(this.game, castle, c, castle.ownerClan));
         if (neighbors.length === 0) return;
         
         const uniqueNeighbors = [...new Set(neighbors.map(c => c.ownerClan))];

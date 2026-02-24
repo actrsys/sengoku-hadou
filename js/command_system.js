@@ -269,7 +269,8 @@ class CommandSystem {
 
             case 'ally_other': 
                 return this.game.castles.filter(target => 
-                    Number(target.ownerClan) === playerClanId && target.id !== c.id
+                    Number(target.ownerClan) === playerClanId && target.id !== c.id &&
+                    GameSystem.isReachable(this.game, c, target, playerClanId) // ★道が繋がっているか調べます！
                 ).map(t => t.id);
             
             case 'other_clan_all': 
@@ -302,8 +303,8 @@ class CommandSystem {
                     
                     // 条件①：自分が持っているお城かどうか？
                     const isMyCastle = (Number(targetCastle.ownerClan) === playerClanId);
-                    // 条件②：今まさに命令を出そうとしているお城（c）のすぐ隣のお城かどうか？
-                    const isNeighbor = GameSystem.isAdjacent(c, targetCastle);
+                    // 条件②：今まさに命令を出そうとしているお城（c）から道が繋がっているか？
+                    const isNeighbor = GameSystem.isReachable(this.game, c, targetCastle, playerClanId);
                     
                     // どちらか1つでも当てはまればOK（地図で光らせる）！
                     return isMyCastle || isNeighbor;

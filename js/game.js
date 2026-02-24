@@ -214,6 +214,7 @@ class GameSystem {
         const rate = min + Math.random() * (max - min);
         return Math.floor(val * rate);
     }
+    static isAdjacent(c1, c2) { return (Math.abs(c1.x - c2.x) + Math.abs(c1.y - c2.y)) === 1; }
     
     static toGradeHTML(val) {
         let base = "", plus = "", cls = "";
@@ -286,25 +287,50 @@ class GameSystem {
     static calcTraining(busho) { const base = window.WarParams.Military.BaseTraining + (busho.leadership * window.WarParams.Military.TrainingLdrEffect + busho.strength * window.WarParams.Military.TrainingStrEffect); return this.applyVariance(base, window.WarParams.Military.TrainingFluctuation); }
     static calcSoldierCharity(busho) { const base = window.WarParams.Military.BaseMorale + (busho.leadership * window.WarParams.Military.MoraleLdrEffect) + (busho.charm * window.WarParams.Military.MoraleCharmEffect); return this.applyVariance(base, window.WarParams.Military.MoraleFluctuation); }
     static calcDraftFromGold(gold, busho, castlePopulation) { const bonus = 1.0 + ((busho.leadership + busho.strength + busho.charm) / 300) * (window.WarParams.Military.DraftStatBonus - 1.0); const popBonus = 1.0 + (castlePopulation * window.WarParams.Military.DraftPopBonusFactor); return Math.floor(gold * 1.0 * bonus * popBonus); }
-    static isAdjacent(c1, c2) { return (Math.abs(c1.x - c2.x) + Math.abs(c1.y - c2.y)) === 1; }
-    static calcWeightedAvg(currVal, currNum, newVal, newNum) { if(currNum + newNum === 0) return currVal; return Math.floor(((currVal * currNum) + (newVal * newNum)) / (currNum + newNum)); }
-    
-    static calcInvestigate(bushos, targetCastle) {
-        if (!bushos || bushos.length === 0) return { success: false, accuracy: 0 };
-        const maxStrBusho = bushos.reduce((a,b) => a.strength > b.strength ? a : b);
-        const maxIntBusho = bushos.reduce((a,b) => a.intelligence > b.intelligence ? a : b);
-        const assistStr = bushos.filter(b => b !== maxStrBusho).reduce((sum, b) => sum + b.strength, 0) * 0.2;
-        const assistInt = bushos.filter(b => b !== maxIntBusho).reduce((sum, b) => sum + b.intelligence, 0) * 0.2;
-        const totalStr = maxStrBusho.strength + assistStr;
-        const totalInt = maxIntBusho.intelligence + assistInt;
-        
-        const difficulty = 30 + Math.random() * window.MainParams.Strategy.InvestigateDifficulty;
-        const isSuccess = totalStr > difficulty;
-        let accuracy = 0;
-        if (isSuccess) {
-            accuracy = Math.min(100, Math.max(10, (totalInt * 0.8) + (Math.random() * 20)));
+    static isReachable(game, startCastle, targetCastle, movingClanId) {
+        // すぐ隣なら、もちろん行けます！
+        if (this.isAdjacent(startCastle, targetCastle)) return true;
+
+        const visited = new Set();
+        const queue = [startCastle];
+        visited.add(startCastle.id);
+
+        // 繋がっているお城を順番に調べていきます
+        while (queue.length > 0) {
+            const current = queue.shift();
+            const neighbors = game.castles.filter(c => this.isAdjacent(current, c));
+            
+            for (const next of neighbors) {
+                // 目的地にたどり着いたらゴール！
+                if (next.id === targetCastle.id) return true;
+                
+                if (!visited.has(next.id)) {
+                    let canPass = false;
+                    
+                    // 自分の城なら通れます
+                    if (Number(next.ownerClan) === Number(movingClanId)) {
+                        canPass = true;
+                    } 
+                    // 他の勢力の城なら、関係を調べます
+                    else if (next.ownerClan !== 0) {
+                        const rel = game.getRelation(movingClanId, next.ownerClan);
+                        // 「同盟」しているか、自分が「支配」している相手なら通れます！
+                        // （自分が「従属」している相手の領地は通れません）
+                        if (rel && (rel.status === '同盟' || rel.status === '支配')) {
+                            canPass = true;
+                        }
+                    }
+                    
+                    // 通れるお城だったら、そこからさらに道を探します
+                    if (canPass) {
+                        visited.add(next.id);
+                        queue.push(next);
+                    }
+                }
+            }
         }
-        return { success: isSuccess, accuracy: Math.floor(accuracy) };
+        // どこにも道が繋がっていなかったらダメです
+        return false;
     }
     
     // ★ 扇動と流言の低下量を修正しました
