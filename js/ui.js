@@ -1072,7 +1072,12 @@ class UIManager {
         }
 
         if (document.getElementById('selector-title')) {
-            document.getElementById('selector-title').textContent = isMulti ? "武将を選択（複数可）" : "武将を選択"; 
+            // ★変更：ただ見るだけの時は「武将一覧」という名前にします
+            if (actionType === 'view_only' || actionType === 'all_busho_list') {
+                document.getElementById('selector-title').textContent = "武将一覧";
+            } else {
+                document.getElementById('selector-title').textContent = isMulti ? "武将を選択（複数可）" : "武将を選択"; 
+            }
         }
 
         let isEnemyTarget = false;
@@ -1132,6 +1137,11 @@ class UIManager {
         else if (actionType === 'view_only') { 
             bushos = this.game.getCastleBushos(targetId); 
             infoHtml = "<div>武将一覧 (精度により情報は隠蔽されます)</div>"; 
+        }
+        else if (actionType === 'all_busho_list') { 
+            bushos = this.game.bushos.filter(b => b.clan === this.game.playerClanId && b.status !== 'dead' && b.status !== 'ronin'); 
+            infoHtml = "<div>我が軍の武将一覧です</div>"; 
+            isMulti = false;
         }
         else if (actionType === 'war_general') {
             if (extraData && extraData.candidates) {
@@ -1226,7 +1236,7 @@ class UIManager {
             
             let isSelectable = !b.isActionDone; 
             if (extraData && extraData.allowDone) isSelectable = true; 
-            if (['employ_target','appoint_gunshi','rumor_target_busho','headhunt_target','interview','interview_target','reward','view_only','war_general'].includes(actionType)) isSelectable = true;
+            if (['employ_target','appoint_gunshi','rumor_target_busho','headhunt_target','interview','interview_target','reward','view_only','war_general', 'all_busho_list'].includes(actionType)) isSelectable = true;
             if (actionType === 'def_intercept_deploy') isSelectable = true;
             
             let acc = null; if (isEnemyTarget && targetCastle) acc = targetCastle.investigatedAccuracy;
@@ -1235,12 +1245,12 @@ class UIManager {
             const div = document.createElement('div'); div.className = `select-item ${!isSelectable ? 'disabled' : ''}`;
             const inputType = isMulti ? 'checkbox' : 'radio';
             
-            const inputHtml = actionType === 'view_only' ? '' : `<input type="${inputType}" name="sel_busho" value="${b.id}" ${!isSelectable ? 'disabled' : ''} style="grid-column:1;">`;
+            const inputHtml = (actionType === 'view_only' || actionType === 'all_busho_list') ? '' : `<input type="${inputType}" name="sel_busho" value="${b.id}" ${!isSelectable ? 'disabled' : ''} style="grid-column:1;">`;
             
             div.innerHTML = `${inputHtml}<span class="col-act" style="grid-column:2;">${b.isActionDone?'[済]':'[未]'}</span><span class="col-name" style="grid-column:3;">${b.name}</span><span class="col-rank" style="grid-column:4;">${b.getRankName()}</span><span class="col-stat" style="grid-column:5;">${getStat('leadership')}</span><span class="col-stat" style="grid-column:6;">${getStat('strength')}</span><span class="col-stat" style="grid-column:7;">${getStat('politics')}</span><span class="col-stat" style="grid-column:8;">${getStat('diplomacy')}</span><span class="col-stat" style="grid-column:9;">${getStat('intelligence')}</span><span class="col-stat" style="grid-column:10;">${getStat('charm')}</span>`;
             
-            if(isSelectable && actionType !== 'view_only') { 
-                div.onclick = (e) => { 
+            if(isSelectable && actionType !== 'view_only' && actionType !== 'all_busho_list') { 
+                div.onclick = (e) => {
                     if(e.target.tagName === 'INPUT') { 
                         if(!isMulti) {
                             const siblings = this.selectorList.querySelectorAll('.select-item');
@@ -1282,7 +1292,7 @@ class UIManager {
         if (bushos.length === 0 && this.selectorList) this.selectorList.innerHTML = "<div style='padding:10px;'>対象となる武将がいません</div>";
 
         if (this.selectorConfirmBtn) {
-            if (actionType === 'view_only') {
+            if (actionType === 'view_only' || actionType === 'all_busho_list') {
                 this.selectorConfirmBtn.classList.add('hidden'); 
             } else {
                 this.selectorConfirmBtn.classList.remove('hidden');
