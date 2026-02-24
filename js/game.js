@@ -606,10 +606,9 @@ class GameManager {
         });
 
         const allCastles = this.castles.filter(c => c.ownerClan !== 0);
-        const myCastles = allCastles.filter(c => Number(c.ownerClan) === Number(this.playerClanId));
-        const otherCastles = allCastles.filter(c => Number(c.ownerClan) !== Number(this.playerClanId));
-        otherCastles.sort(() => Math.random() - 0.5); 
-        this.turnQueue = [...myCastles, ...otherCastles];
+        // ★修正: 自分の城も敵の城も全部ごちゃ混ぜにして、完全にランダムな順番に並べ替えます
+        allCastles.sort(() => Math.random() - 0.5); 
+        this.turnQueue = [...allCastles];
 
         this.currentIndex = 0; 
         this.processTurn();
@@ -623,17 +622,8 @@ class GameManager {
 
         if (this.warManager.state.active) return;
 
-        for (let i = this.currentIndex; i < this.turnQueue.length; i++) {
-            const c = this.turnQueue[i];
-            if (Number(c.ownerClan) === Number(this.playerClanId)) {
-                if (i !== this.currentIndex) {
-                    const temp = this.turnQueue[this.currentIndex];
-                    this.turnQueue[this.currentIndex] = this.turnQueue[i];
-                    this.turnQueue[i] = temp;
-                }
-                break; 
-            }
-        }
+        // ★修正: ここにあった「自分の城を無理やり順番の最初に持ってくる」という処理をまるごと消しました！
+        // これによって、完全にシャッフルされた順番通りにお城のターンが回るようになります。
 
         if (this.currentIndex >= this.turnQueue.length) { 
             this.endMonth(); 
