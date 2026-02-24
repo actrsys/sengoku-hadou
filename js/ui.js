@@ -322,6 +322,7 @@ class UIManager {
         if(this.cutinOverlay) this.cutinOverlay.classList.add('hidden');
         if(this.warModal) this.warModal.classList.add('hidden');
         if(this.unitDivideModal) this.unitDivideModal.classList.add('hidden');
+        if(this.aiGuard) this.aiGuard.classList.add('hidden'); // ★追加：リセットする時にガードも一緒に隠します
         this.hideContextMenu();
     }
 

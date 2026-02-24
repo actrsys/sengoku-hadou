@@ -642,6 +642,7 @@ class GameManager {
 
         if (isPlayerCastle) { 
             this.isProcessingAI = false; 
+            if(this.ui.aiGuard) this.ui.aiGuard.classList.add('hidden'); // ★追加：プレイヤーの番になったらガードを隠します
 
             this.ui.renderMap(); 
             this.ui.log(`【${castle.name}】命令を下してください`); 
@@ -652,8 +653,9 @@ class GameManager {
 
         } else { 
             this.isProcessingAI = true; 
+            if(this.ui.aiGuard) this.ui.aiGuard.classList.remove('hidden'); // ★追加：AIの番になったらガードを出します
             
-            if(this.ui.panelEl) this.ui.panelEl.classList.add('hidden'); 
+            if(this.ui.panelEl) this.ui.panelEl.classList.add('hidden');
             
             const delay = isImportant ? 400 : 10;
 
