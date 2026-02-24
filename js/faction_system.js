@@ -216,7 +216,7 @@ class FactionSystem {
                 
                 const charmBonus = Math.floor((50 - (Number(leader.charm) || 0)) * 0.1);
                 
-                // ★変更：功績ボーナスを「20につき1点」にしました
+                // 功績ボーナスを「20につき1点」にしました
                 const achievementBonus = Math.max(0, Math.floor(((Number(leader.achievementTotal) || 0) - 500) / 20));
 
                 let personalityBonus = 0;
@@ -224,8 +224,8 @@ class FactionSystem {
                     personalityBonus = 5;
                 }
                 
-                //基本となる点数30点からスタート
-                return ((affDiff * 0.5) + (innoDiff * 0.25) + 30) - finalBonus - abilityBonus + charmBonus - achievementBonus - personalityBonus;
+                //基準となる持ち点を「25」点に設定しました。
+                return ((affDiff * 0.5) + (innoDiff * 0.25) + 25) - finalBonus - abilityBonus + charmBonus - achievementBonus - personalityBonus;
             };
 
             // 派閥に入れる処理の共通ルール
@@ -326,16 +326,18 @@ class FactionSystem {
                 }
             });
 
+            // ★追加：本番の組み分けが終わった後、生き残ったリーダーが「1人以下」なら、派閥争いにならないので全員解散！
+            if (validLeaders.length < 2) {
+                members.forEach(b => {
+                    b.factionId = 0;
+                    b.isFactionLeader = false;
+                });
+                return; // ここで終了！
+            }
+
             // 【2段階目】万が一リーダーになれなかった元リーダーがいれば、生き残った人気リーダーの派閥に入る
             if (invalidLeaders.length > 0) {
-                if (validLeaders.length > 0) {
-                    evaluateJoin(invalidLeaders, validLeaders);
-                } else {
-                    members.forEach(b => {
-                        b.factionId = 0;
-                        b.isFactionLeader = false;
-                    });
-                }
+                evaluateJoin(invalidLeaders, validLeaders);
             }
         });
     }
