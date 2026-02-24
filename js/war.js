@@ -243,9 +243,18 @@ class WarManager {
             const atkClanData = this.game.clans.find(c => c.id === atkClan); 
             // 国人衆の場合は専用の名前を使う
             const atkArmyName = atkCastle.isKunishu ? atkCastle.name : (atkClanData ? atkClanData.getArmyName() : "敵軍");
-            let defBusho = this.game.getBusho(defCastle.castellanId) || {name:"守備隊長", strength:30, leadership:30, intelligence:30, charm:30};
             
-            const attackerForce = { 
+            // ★修正1：守備側の総大将を正しく設定する（国人衆の頭領にも対応）
+            let defBusho = null;
+            if (defCastle.isKunishu) {
+                const kunishu = this.game.kunishuSystem.getKunishu(defCastle.kunishuId);
+                defBusho = kunishu ? this.game.getBusho(kunishu.leaderId) : null;
+            } else {
+                defBusho = this.game.getBusho(defCastle.castellanId);
+            }
+            if (!defBusho) defBusho = {name:"守備隊長", strength:30, leadership:30, intelligence:30, charm:30};
+            
+            const attackerForce = {
                 name: atkCastle.isKunishu ? atkCastle.name : atkCastle.name + "遠征軍", 
                 ownerClan: atkCastle.ownerClan, 
                 soldiers: atkSoldierCount, 
@@ -313,7 +322,15 @@ class WarManager {
                 }
                 } else {
                     if (defCastle.soldiers >= atkSoldierCount * 0.8) {
-                        const defBushos = this.game.getCastleBushos(defCastle.id).sort((a,b) => b.strength - a.strength).slice(0, 5);
+                        // ★修正2：浪人や無関係な国人衆など、部外者を防衛軍から除外する！
+                        let availableDefBushos = this.game.getCastleBushos(defCastle.id).filter(b => b.status !== 'dead');
+                        if (!defCastle.isKunishu) {
+                            availableDefBushos = availableDefBushos.filter(b => Number(b.clan) === Number(defCastle.ownerClan));
+                        } else {
+                            availableDefBushos = availableDefBushos.filter(b => b.belongKunishuId === defCastle.kunishuId);
+                        }
+                        const defBushos = availableDefBushos.sort((a,b) => b.strength - a.strength).slice(0, 5);
+                        
                         // コンピュータの防衛部隊の中に大名か城主がいれば一番前にする
                         let defLeaderIdx = defBushos.findIndex(b => b.isDaimyo);
                         if (defLeaderIdx === -1) defLeaderIdx = defBushos.findIndex(b => b.isCastellan);
