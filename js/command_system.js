@@ -665,27 +665,33 @@ class CommandSystem {
             if (type === 'farm') { 
                 if (castle.gold >= spec.costGold) { 
                     const val = GameSystem.calcDevelopment(busho); castle.gold -= spec.costGold; 
+                    const oldVal = castle.kokudaka;
                     castle.kokudaka = Math.min(castle.maxKokudaka, castle.kokudaka + val); 
-                    totalVal += val; count++; actionName = "石高開発";
-                    busho.achievementTotal += Math.floor(val * 0.5); 
+                    const actualVal = castle.kokudaka - oldVal;
+                    totalVal += actualVal; count++; actionName = "石高開発";
+                    busho.achievementTotal += Math.floor(actualVal * 0.5); 
                     this.game.factionSystem.updateRecognition(busho, 10);
                 }
             }
             else if (type === 'commerce') { 
                 if (castle.gold >= spec.costGold) { 
                     const val = GameSystem.calcDevelopment(busho); castle.gold -= spec.costGold; 
+                    const oldVal = castle.commerce;
                     castle.commerce = Math.min(castle.maxCommerce, castle.commerce + val); 
-                    totalVal += val; count++; actionName = "鉱山開発";
-                    busho.achievementTotal += Math.floor(val * 0.5);
+                    const actualVal = castle.commerce - oldVal;
+                    totalVal += actualVal; count++; actionName = "鉱山開発";
+                    busho.achievementTotal += Math.floor(actualVal * 0.5);
                     this.game.factionSystem.updateRecognition(busho, 10);
                 }
             }
             else if (type === 'repair') { 
                 if (castle.gold >= spec.costGold) { 
                     const val = GameSystem.calcRepair(busho); castle.gold -= spec.costGold; 
+                    const oldVal = castle.defense;
                     castle.defense = Math.min(castle.maxDefense, castle.defense + val); 
-                    totalVal += val; count++; actionName = "城壁修復";
-                    busho.achievementTotal += Math.floor(val * 0.5);
+                    const actualVal = castle.defense - oldVal;
+                    totalVal += actualVal; count++; actionName = "城壁修復";
+                    busho.achievementTotal += Math.floor(actualVal * 0.5);
                     this.game.factionSystem.updateRecognition(busho, 10);
                 }
             }
@@ -696,9 +702,11 @@ class CommandSystem {
 
                     const val = GameSystem.calcTraining(busho); 
                     const maxTraining = window.WarParams.Military.MaxTraining || 100;
+                    const oldVal = castle.training;
                     castle.training = Math.min(maxTraining, castle.training + val); 
-                    totalVal += val; count++; actionName = "訓練";
-                    busho.achievementTotal += Math.floor(val * 0.5);
+                    const actualVal = castle.training - oldVal;
+                    totalVal += actualVal; count++; actionName = "訓練";
+                    busho.achievementTotal += Math.floor(actualVal * 0.5);
                     this.game.factionSystem.updateRecognition(busho, 10);
                 }
             }
@@ -709,9 +717,11 @@ class CommandSystem {
 
                     const val = GameSystem.calcSoldierCharity(busho); 
                     const maxMorale = window.WarParams.Military.MaxMorale || 100;
+                    const oldVal = castle.morale;
                     castle.morale = Math.min(maxMorale, castle.morale + val); 
-                    totalVal += val; count++; actionName = "兵施し";
-                    busho.achievementTotal += Math.floor(val * 0.5);
+                    const actualVal = castle.morale - oldVal;
+                    totalVal += actualVal; count++; actionName = "兵施し";
+                    busho.achievementTotal += Math.floor(actualVal * 0.5);
                     this.game.factionSystem.updateRecognition(busho, 10);
                 }
             }
@@ -1237,8 +1247,10 @@ class CommandSystem {
         const target = this.game.getCastle(targetId); 
         const result = GameSystem.calcIncite(doer); 
         if(result.success) { 
+            const oldVal = target.peoplesLoyalty;
             target.peoplesLoyalty = Math.max(0, target.peoplesLoyalty - result.val); 
-            this.game.ui.showResultModal(`${doer.name}の扇動が成功！\n${target.name}の民忠が${result.val}低下しました`); 
+            const actualDrop = oldVal - target.peoplesLoyalty;
+            this.game.ui.showResultModal(`${doer.name}の扇動が成功！\n${target.name}の民忠が${actualDrop}低下しました`); 
             doer.achievementTotal += Math.floor(doer.intelligence * 0.2) + 10;
             this.game.factionSystem.updateRecognition(doer, 20); 
         } else { 
@@ -1261,8 +1273,10 @@ class CommandSystem {
         }
 
         if(result.success) { 
+            const oldVal = targetBusho.loyalty;
             targetBusho.loyalty = Math.max(0, targetBusho.loyalty - result.val); 
-            this.game.ui.showResultModal(`${doer.name}の流言が成功！\n${targetBusho.name}の忠誠が${result.val}低下しました`); 
+            const actualDrop = oldVal - targetBusho.loyalty;
+            this.game.ui.showResultModal(`${doer.name}の流言が成功！\n${targetBusho.name}の忠誠が低下しました`);
             doer.achievementTotal += Math.floor(doer.intelligence * 0.2) + 10;
             this.game.factionSystem.updateRecognition(doer, 20); 
         } else { 
@@ -1373,12 +1387,14 @@ class CommandSystem {
         });
 
         const maxLoyalty = window.MainParams.Economy.MaxLoyalty || 100;
+        const oldLoyalty = castle.peoplesLoyalty;
         castle.peoplesLoyalty = Math.min(maxLoyalty, castle.peoplesLoyalty + totalVal); 
+        const actualIncrease = castle.peoplesLoyalty - oldLoyalty;
         
-        this.game.ui.showResultModal(`${count}名で施しを行いました\n民忠+${totalVal}`); 
+        this.game.ui.showResultModal(`${count}名で施しを行いました\n民忠+${actualIncrease}`); 
         this.game.ui.updatePanelHeader(); 
         this.game.ui.renderCommandMenu();
-        this.game.ui.log(`${count}名で施しを実行 (効果:${totalVal})`);
+        this.game.ui.log(`${count}名で施しを実行 (効果:${actualIncrease})`);
     }
 
     enterMapSelection(mode) {
