@@ -287,17 +287,26 @@ class GameSystem {
     static calcTraining(busho) { const base = window.WarParams.Military.BaseTraining + (busho.leadership * window.WarParams.Military.TrainingLdrEffect + busho.strength * window.WarParams.Military.TrainingStrEffect); return this.applyVariance(base, window.WarParams.Military.TrainingFluctuation); }
     static calcSoldierCharity(busho) { const base = window.WarParams.Military.BaseMorale + (busho.leadership * window.WarParams.Military.MoraleLdrEffect) + (busho.charm * window.WarParams.Military.MoraleCharmEffect); return this.applyVariance(base, window.WarParams.Military.MoraleFluctuation); }
     static calcDraftFromGold(gold, busho, castlePopulation) { const bonus = 1.0 + ((busho.leadership + busho.strength + busho.charm) / 300) * (window.WarParams.Military.DraftStatBonus - 1.0); const popBonus = 1.0 + (castlePopulation * window.WarParams.Military.DraftPopBonusFactor); return Math.floor(gold * 1.0 * bonus * popBonus); }
+    // 【直した後】（ここから下を丸ごとコピーして、古いものに上書きしてください）
     static isReachable(game, startCastle, targetCastle, movingClanId) {
-        // すぐ隣なら、もちろん行けます！
+        // すぐ隣なら、もちろん行けます！（距離1マス）
         if (this.isAdjacent(startCastle, targetCastle)) return true;
 
         const visited = new Set();
-        const queue = [startCastle];
+        // ★ 変更：「お城」と一緒に「そこまで何マス歩いたか（distance）」もメモするようにします！
+        const queue = [{ castle: startCastle, distance: 0 }];
         visited.add(startCastle.id);
 
-        // 繋がっているお城を順番に調べていきます
         while (queue.length > 0) {
-            const current = queue.shift();
+            // メモから1つ取り出します
+            const currentData = queue.shift();
+            const current = currentData.castle;
+            const currentDist = currentData.distance;
+
+            // ★ 追加：すでに3マス歩いているなら、これ以上先には進みません！（ストッパー）
+            if (currentDist >= 3) continue;
+
+            // 今いるお城の隣のお城を探します
             const neighbors = game.castles.filter(c => this.isAdjacent(current, c));
             
             for (const next of neighbors) {
@@ -314,22 +323,21 @@ class GameSystem {
                     // 他の勢力の城なら、関係を調べます
                     else if (next.ownerClan !== 0) {
                         const rel = game.getRelation(movingClanId, next.ownerClan);
-                        // 「同盟」しているか、自分が「支配」している相手なら通れます！
-                        // （自分が「従属」している相手の領地は通れません）
+                        // 「同盟」しているか、自分が「支配」している相手なら通れます
                         if (rel && (rel.status === '同盟' || rel.status === '支配')) {
                             canPass = true;
                         }
                     }
                     
-                    // 通れるお城だったら、そこからさらに道を探します
+                    // 通れるお城だったら、次へ進むメモに残します（歩数を+1します！）
                     if (canPass) {
                         visited.add(next.id);
-                        queue.push(next);
+                        queue.push({ castle: next, distance: currentDist + 1 });
                     }
                 }
             }
         }
-        // どこにも道が繋がっていなかったらダメです
+        // 3マスの範囲を探しても見つからなかったらダメです
         return false;
     }
     
