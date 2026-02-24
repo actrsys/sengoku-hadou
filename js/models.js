@@ -30,15 +30,16 @@ class Castle {
         this.x = Number(this.x);
         this.y = Number(this.y);
         
-        // 数値データの初期化（CSVに値がない場合の安全策）
-        this.soldiers = Number(this.soldiers || 0);
-        this.gold = Number(this.gold || 0);
-        this.rice = Number(this.rice || 0);
+        // 数値データの初期化（上限をセットする魔法を追加しました！）
+        this.soldiers = Math.min(99999, Number(this.soldiers || 0));
+        this.gold = Math.min(99999, Number(this.gold || 0));
+        this.rice = Math.min(99999, Number(this.rice || 0));
         
         this.defense = Number(this.defense || 0);
         this.maxDefense = Number(data.maxDefense !== undefined ? data.maxDefense : this.defense);
         
-        this.population = Number(this.population || 0);
+        // 人口だけは上限が99万9999です
+        this.population = Math.min(999999, Number(this.population || 0));
         
         // 城の民忠を peoplesLoyalty に変更。CSV互換性のため古い loyalty も読めるようにしておく
         this.peoplesLoyalty = Number(data.peoplesLoyalty !== undefined ? data.peoplesLoyalty : (data.loyalty || 0));
@@ -54,9 +55,9 @@ class Castle {
         this.commerce = Number(this.commerce || 0);
         this.maxCommerce = Number(data.maxCommerce !== undefined ? data.maxCommerce : this.commerce);
         
-        this.ammo = Number(this.ammo || 0);
-        this.horses = Number(this.horses || 0);
-        this.guns = Number(this.guns || 0);
+        this.ammo = Math.min(99999, Number(this.ammo || 0));
+        this.horses = Math.min(99999, Number(this.horses || 0));
+        this.guns = Math.min(99999, Number(this.guns || 0));
 
         // ロード時に既存データがあれば維持する
         this.samuraiIds = Array.isArray(this.samuraiIds) ? this.samuraiIds : [];
@@ -196,13 +197,20 @@ class Kunishu {
         
         this.isDestroyed = this.isDestroyed === true;
     }
-
+    
     getName(game) {
+        // ① まず、CSVに名前が設定されているか確認して、あればそれを答えます
         if (this.name && this.name.trim() !== "") {
             return this.name;
         }
+        // ② もし名前が空っぽなら、頭領の武将データを探します
         const leader = game.getBusho(this.leaderId);
-        return leader ? `${leader.name}衆` : "国人衆";
+        if (leader) {
+            // 武将の名前（例：上杉|謙信）を「|」で割って、前の部分（上杉）だけを取ります
+            const surname = leader.name.split('|')[0];
+            return `${surname}衆`;
+        }
+        return "国人衆";
     }
 
     // ★修正: 仲良し度を調べる機能（isKunishu が true なら国人衆、何もなければ大名を調べる）

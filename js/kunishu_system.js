@@ -171,11 +171,20 @@ class KunishuSystem {
             if (amount < 10) return;
 
             if (Math.random() > 0.5) {
-                castle.gold += amount;
-                this.game.ui.log(`【国衆支援】${castle.name}の国人衆が、金${amount}を献上してきました。`);
+                // ★追加：あとどれくらい入るか計算して、はみ出ないようにします
+                let maxAdd = 99999 - castle.gold;
+                let actualAmount = Math.min(amount, maxAdd);
+                if (actualAmount > 0) {
+                    castle.gold += actualAmount;
+                    this.game.ui.log(`【国衆支援】${castle.name}の国人衆が、金${actualAmount}を献上してきました。`);
+                }
             } else {
-                castle.rice += amount;
-                this.game.ui.log(`【国衆支援】${castle.name}の国人衆が、兵糧${amount}を献上してきました。`);
+                let maxAdd = 99999 - castle.rice;
+                let actualAmount = Math.min(amount, maxAdd);
+                if (actualAmount > 0) {
+                    castle.rice += actualAmount;
+                    this.game.ui.log(`【国衆支援】${castle.name}の国人衆が、兵糧${actualAmount}を献上してきました。`);
+                }
             }
         } 
         // 敵対 (30以下)

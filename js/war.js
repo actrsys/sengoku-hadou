@@ -687,9 +687,12 @@ class WarManager {
             if(target) {
                 let lossRate = Math.min(0.9, Math.max(0.05, window.WarParams.War.RetreatResourceLossFactor + (s.attacker.soldiers / (defCastle.soldiers + 1)) * 0.1)); 
                 const carryGold = Math.floor(defCastle.gold * (1.0 - lossRate)); const carryRice = Math.floor(defCastle.rice * (1.0 - lossRate));
-                target.gold += carryGold; target.rice += carryRice; target.soldiers += defCastle.soldiers;
-                target.horses = (target.horses || 0) + (defCastle.horses || 0);
-                target.guns = (target.guns || 0) + (defCastle.guns || 0);
+                // ★追加：逃げ込んだ先の城がパンクしないように上限をかけます
+                target.gold = Math.min(99999, target.gold + carryGold); 
+                target.rice = Math.min(99999, target.rice + carryRice); 
+                target.soldiers = Math.min(99999, target.soldiers + defCastle.soldiers);
+                target.horses = Math.min(99999, (target.horses || 0) + (defCastle.horses || 0));
+                target.guns = Math.min(99999, (target.guns || 0) + (defCastle.guns || 0));
                 
                 const capturedBushos = [];
                 this.game.getCastleBushos(defCastle.id).forEach(b => { 
@@ -772,10 +775,11 @@ class WarManager {
                 
                 const srcC = this.game.getCastle(s.sourceCastle.id);
                 if (srcC) {
-                    srcC.soldiers += s.attacker.soldiers; 
-                    srcC.rice += s.attacker.rice;
-                    srcC.horses = (srcC.horses || 0) + (s.attacker.horses || 0);
-                    srcC.guns = (srcC.guns || 0) + (s.attacker.guns || 0);
+                    // ★追加：帰還した城が上限を超えないようにします
+                    srcC.soldiers = Math.min(99999, srcC.soldiers + s.attacker.soldiers); 
+                    srcC.rice = Math.min(99999, srcC.rice + s.attacker.rice);
+                    srcC.horses = Math.min(99999, (srcC.horses || 0) + (s.attacker.horses || 0));
+                    srcC.guns = Math.min(99999, (srcC.guns || 0) + (s.attacker.guns || 0));
                 }
                 
                 if (s.isPlayerInvolved) {
@@ -854,31 +858,36 @@ class WarManager {
             const totalAtkSurvivors = s.attacker.soldiers + attackerRecovered;
 
             if (s.attacker.rice > 0) {
-                if (attackerWon) s.defender.rice += s.attacker.rice; 
-                else { const srcC = this.game.getCastle(s.sourceCastle.id); if (srcC) srcC.rice += s.attacker.rice; }
+                // ★追加：戦争終了時の兵糧合流でも上限を超えないようにします
+                if (attackerWon) s.defender.rice = Math.min(99999, s.defender.rice + s.attacker.rice); 
+                else { const srcC = this.game.getCastle(s.sourceCastle.id); if (srcC) srcC.rice = Math.min(99999, srcC.rice + s.attacker.rice); }
             }
 
             if (isRetreat && retreatTargetId) {
                 const targetC = this.game.getCastle(retreatTargetId);
                 if (targetC) {
                     const recovered = Math.floor(s.deadSoldiers.defender * (isShortWar ? window.WarParams.War.RetreatRecoveryRate : window.WarParams.War.BaseRecoveryRate));
-                    targetC.soldiers += (s.defender.soldiers + recovered);
+                    // ★追加：撤退先での兵士合流にストッパー！
+                    targetC.soldiers = Math.min(99999, targetC.soldiers + s.defender.soldiers + recovered);
                     if (s.isPlayerInvolved && recovered > 0) this.game.ui.log(`(撤退先にて負傷兵 ${recovered}名 が復帰)`);
                 }
             } else if (!isRetreat && attackerWon) {
                 const survivors = Math.max(0, s.defender.soldiers);
                 const recovered = Math.floor(s.deadSoldiers.defender * 0.2);
                 const totalAbsorbed = survivors + recovered;
-                s.defender.soldiers = totalAtkSurvivors + totalAbsorbed;
-                s.defender.horses = (s.defender.horses || 0) + (s.attacker.horses || 0);
-                s.defender.guns = (s.defender.guns || 0) + (s.attacker.guns || 0);
+                // ★追加：城を奪った時の兵士や馬、鉄砲の合流にストッパー！
+                s.defender.soldiers = Math.min(99999, totalAtkSurvivors + totalAbsorbed);
+                s.defender.horses = Math.min(99999, (s.defender.horses || 0) + (s.attacker.horses || 0));
+                s.defender.guns = Math.min(99999, (s.defender.guns || 0) + (s.attacker.guns || 0));
                 if (s.isPlayerInvolved && totalAbsorbed > 0) this.game.ui.log(`(敵残存兵・負傷兵 計${totalAbsorbed}名 を吸収)`);
             } else if (!attackerWon) {
-                const srcC = this.game.getCastle(s.sourceCastle.id); srcC.soldiers += totalAtkSurvivors; 
-                srcC.horses = (srcC.horses || 0) + (s.attacker.horses || 0);
-                srcC.guns = (srcC.guns || 0) + (s.attacker.guns || 0);
+                const srcC = this.game.getCastle(s.sourceCastle.id);
+                // ★追加：負けて帰ってきた遠征軍の兵士、馬、鉄砲の合流にストッパー！
+                srcC.soldiers = Math.min(99999, srcC.soldiers + totalAtkSurvivors);
+                srcC.horses = Math.min(99999, (srcC.horses || 0) + (s.attacker.horses || 0));
+                srcC.guns = Math.min(99999, (srcC.guns || 0) + (s.attacker.guns || 0));
                 const recovered = Math.floor(s.deadSoldiers.defender * window.WarParams.War.BaseRecoveryRate);
-                s.defender.soldiers += recovered;
+                s.defender.soldiers = Math.min(99999, s.defender.soldiers + recovered);
                 if (s.isPlayerInvolved && attackerRecovered > 0) this.game.ui.log(`(遠征軍 負傷兵 ${attackerRecovered}名 が帰還)`);
             }
 

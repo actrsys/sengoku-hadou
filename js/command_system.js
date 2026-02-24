@@ -1214,9 +1214,17 @@ class CommandSystem {
         msg += `<br><br><button class='btn-secondary' onclick='${returnScript}'>戻る</button>`;
         this.game.ui.showResultModal(msg);
     }
-
+    
     executeTransport(bushoIds, targetId, vals) {
         const c = this.game.getCurrentTurnCastle(); const t = this.game.getCastle(targetId);
+        
+        // ★ここから追加：輸送先が上限を超えないか事前にチェックして、超えるならお断りします！
+        if (t.gold + vals.gold > 99999) { this.game.ui.showDialog("輸送先の「金」が上限(99,999)を超えてしまうため、輸送できません。", false); return; }
+        if (t.rice + vals.rice > 99999) { this.game.ui.showDialog("輸送先の「兵糧」が上限(99,999)を超えてしまうため、輸送できません。", false); return; }
+        if (t.soldiers + vals.soldiers > 99999) { this.game.ui.showDialog("輸送先の「兵数」が上限(99,999)を超えてしまうため、輸送できません。", false); return; }
+        if ((t.horses || 0) + vals.horses > 99999) { this.game.ui.showDialog("輸送先の「騎馬」が上限(99,999)を超えてしまうため、輸送できません。", false); return; }
+        if ((t.guns || 0) + vals.guns > 99999) { this.game.ui.showDialog("輸送先の「鉄砲」が上限(99,999)を超えてしまうため、輸送できません。", false); return; }
+
         if(vals.soldiers > 0) { t.training = GameSystem.calcWeightedAvg(t.training, t.soldiers, c.training, vals.soldiers); t.morale = GameSystem.calcWeightedAvg(t.morale, t.soldiers, c.morale, vals.soldiers); }
         c.gold -= vals.gold; c.rice -= vals.rice; c.soldiers -= vals.soldiers; t.gold += vals.gold; t.rice += vals.rice; t.soldiers += vals.soldiers;
         c.horses = Math.max(0, (c.horses || 0) - vals.horses);
@@ -1294,30 +1302,40 @@ class CommandSystem {
         if(type === 'buy_rice') { 
             const cost = Math.floor(amount * rate); 
             if(castle.gold < cost) { this.game.ui.showDialog("資金不足", false); return; } 
+            // ★追加: 買うと上限を超えるならストップ
+            if(castle.rice + amount > 99999) { this.game.ui.showDialog("これ以上兵糧は買えません", false); return; }
             castle.gold -= cost; castle.rice += amount; 
             this.game.ui.showResultModal(`兵糧${amount}を購入しました\n(金-${cost})`); 
         } else if (type === 'sell_rice') { 
             if(castle.rice < amount) { this.game.ui.showDialog("兵糧不足", false); return; } 
             const gain = Math.floor(amount * rate); 
+            // ★追加: 売ると金が上限を超えるならストップ
+            if(castle.gold + gain > 99999) { this.game.ui.showDialog("これ以上兵糧は売れません", false); return; }
             castle.rice -= amount; castle.gold += gain; 
             this.game.ui.showResultModal(`兵糧${amount}を売却しました\n(金+${gain})`); 
         } else if (type === 'buy_ammo') {
             const price = Math.floor(window.MainParams.Economy.PriceAmmo * rate);
             const cost = price * amount;
             if(castle.gold < cost) { this.game.ui.showDialog("資金不足", false); return; } 
-            castle.gold -= cost; castle.ammo += amount; 
+            // ★追加: 矢弾のストッパー
+            if((castle.ammo || 0) + amount > 99999) { this.game.ui.showDialog("これ以上矢弾は買えません", false); return; }
+            castle.gold -= cost; castle.ammo = (castle.ammo || 0) + amount; 
             this.game.ui.showResultModal(`矢弾${amount}を購入しました\n(金-${cost})`); 
         } else if (type === 'buy_horses') {
             const price = Math.floor(window.MainParams.Economy.PriceHorse * rate);
             const cost = price * amount;
             if(castle.gold < cost) { this.game.ui.showDialog("資金不足", false); return; } 
-            castle.gold -= cost; castle.horses += amount; 
+            // ★追加: 騎馬のストッパー
+            if((castle.horses || 0) + amount > 99999) { this.game.ui.showDialog("これ以上騎馬は買えません", false); return; }
+            castle.gold -= cost; castle.horses = (castle.horses || 0) + amount; 
             this.game.ui.showResultModal(`騎馬${amount}を購入しました\n(金-${cost})`); 
         } else if (type === 'buy_guns') {
             const price = Math.floor(window.MainParams.Economy.PriceGun * rate);
             const cost = price * amount;
             if(castle.gold < cost) { this.game.ui.showDialog("資金不足", false); return; } 
-            castle.gold -= cost; castle.guns += amount; 
+            // ★追加: 鉄砲のストッパー
+            if((castle.guns || 0) + amount > 99999) { this.game.ui.showDialog("これ以上鉄砲は買えません", false); return; }
+            castle.gold -= cost; castle.guns = (castle.guns || 0) + amount; 
             this.game.ui.showResultModal(`鉄砲${amount}を購入しました\n(金-${cost})`); 
         }
         
@@ -1328,11 +1346,18 @@ class CommandSystem {
     executeDraft(bushoIds, gold) { 
         const castle = this.game.getCurrentTurnCastle(); 
         if(castle.gold < gold) { this.game.ui.showDialog("資金不足", false); return; } 
-        castle.gold -= gold; 
-        const busho = this.game.getBusho(bushoIds[0]); 
         
+        const busho = this.game.getBusho(bushoIds[0]); 
         let soldiers = GameSystem.calcDraftFromGold(gold, busho, castle.population); 
         soldiers = Math.floor(soldiers / 10);
+        
+        // ★ここから追加：徴兵で上限を超える場合はストップ！
+        if (castle.soldiers + soldiers > 99999) {
+            this.game.ui.showDialog(`兵数が上限(99,999)を超えるため、これ以上徴兵できません。\n(現在の兵数: ${castle.soldiers})`, false);
+            return;
+        }
+        // ★追加ここまで
+        castle.gold -= gold;
         
         const newMorale = Math.max(0, castle.morale - 10); 
         const newTraining = Math.max(0, castle.training - 10); 

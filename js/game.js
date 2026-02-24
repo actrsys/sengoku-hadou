@@ -541,13 +541,15 @@ class GameManager {
             let income = Math.floor(baseGold * window.MainParams.Economy.IncomeGoldRate);
             income = GameSystem.applyVariance(income, window.MainParams.Economy.IncomeFluctuation);
             if (this.month === 3) income += income * 5;
-            c.gold += income;
+            // ★ 金の増加にストッパーをかけました
+            c.gold = Math.min(99999, c.gold + income);
 
             if (this.month === 9) {
                 const baseRice = c.kokudaka + c.peoplesLoyalty;
                 let riceIncome = Math.floor(baseRice * window.MainParams.Economy.IncomeRiceRate);
                 riceIncome = GameSystem.applyVariance(riceIncome, window.MainParams.Economy.IncomeFluctuation);
-                c.rice += riceIncome;
+                // ★ 兵糧の増加にストッパーをかけました
+                c.rice = Math.min(99999, c.rice + riceIncome);
             }
             
             if (isPopGrowth) { 
@@ -560,13 +562,13 @@ class GameManager {
                     const rate = 0.001 + ((50 - currentLoyalty) / 50) * 0.004;
                     growth = -Math.floor(c.population * rate);
                 }
-                c.population = Math.max(0, c.population + growth);
+                // ★ 人口の増加にストッパーをかけました（上限99万9999）
+                c.population = Math.min(999999, Math.max(0, c.population + growth));
             }
             const bushos = this.getCastleBushos(c.id);
             c.rice = Math.max(0, c.rice - Math.floor(c.soldiers * window.MainParams.Economy.ConsumeRicePerSoldier));
             c.gold = Math.max(0, c.gold - (bushos.length * window.MainParams.Economy.ConsumeGoldPerBusho));
             
-            // ★あや瀨さんへ：ここで武将たちの行動を元に戻すと同時に、城主には功績を＋10するように書き足しました！
             bushos.forEach(b => {
                 b.isActionDone = false;
                 
