@@ -786,9 +786,23 @@ class FieldWarManager {
             if (unit.ap <= 0) {
                 this.nextPhase();
             } else {
-                this.updateMap();
-                this.updateStatus();
-                if (this.isPlayerTurn()) this.log(`攻撃対象を選択`);
+                // ★追加: 攻撃可能な敵が1人もいない場合は、攻撃フェイズをスキップして即終了！
+                let canAttackAny = false;
+                const enemies = this.units.filter(u => u.isAttacker !== unit.isAttacker);
+                for (let e of enemies) {
+                    if (this.canAttackTarget(unit, e.x, e.y)) {
+                        canAttackAny = true;
+                        break;
+                    }
+                }
+
+                if (!canAttackAny) {
+                    this.nextPhase(); // 誰も攻撃できないので、次の処理（ターン終了）へ進む
+                } else {
+                    this.updateMap();
+                    this.updateStatus();
+                    if (this.isPlayerTurn()) this.log(`攻撃対象を選択`);
+                }
             }
         } else if (this.state === 'PHASE_ATTACK') {
             unit.hasActionDone = true;
@@ -1205,19 +1219,27 @@ class FieldWarManager {
             }
         }
         
-        // ★ 鉄砲は距離2〜3が最適射程なので、距離2〜3で前を向いていたら移動せずに撃つ
         let shouldMove = true;
+        let isFleeing = false; // ★追加：逃げるモードのフラグ
+        
         if (unit.troopType === 'teppo') {
             if (dist >= 2 && dist <= 3) {
-                let targetDir = this.getDirection(unit.x, unit.y, targetEnemy.x, targetEnemy.y);
-                if (this.isFrontDirection(unit.direction, targetDir)) {
-                    shouldMove = false; // 射程内で前を向いているなら移動しない
-                }
+                shouldMove = false; // 射程内(2〜3)なら移動せず、その場で撃つ（または振り向く）
             } else if (dist === 1) {
-                // ★追加：敵が近接してきても、味方が隣にいる（守られている）なら逃げずに撃つ！
-                const alliesNearby = this.units.filter(u => u.isAttacker === unit.isAttacker && u.id !== unit.id && this.getDistance(unit.x, unit.y, u.x, u.y) === 1);
-                if (alliesNearby.length > 0) {
-                    shouldMove = false; 
+                // 距離1の時、盾役（足軽・騎馬）が自分と敵の間にいるかチェック！
+                // 条件：自分に隣接していて、かつ、ターゲットの敵にも隣接している味方
+                const shields = this.units.filter(u => 
+                    u.isAttacker === unit.isAttacker && 
+                    u.id !== unit.id && 
+                    u.troopType !== 'teppo' && 
+                    this.getDistance(unit.x, unit.y, u.x, u.y) === 1 &&
+                    this.getDistance(targetEnemy.x, targetEnemy.y, u.x, u.y) === 1
+                );
+                if (shields.length > 0) {
+                    shouldMove = false; // 盾に守られているので逃げずに至近距離射撃！
+                } else {
+                    shouldMove = true;  // 守られていないので逃げる！
+                    isFleeing = true;
                 }
             }
         } else {
@@ -1227,67 +1249,95 @@ class FieldWarManager {
         }
         
         if (shouldMove) {
-            // ★ カーナビを使って敵までのルートを検索！
-            let path = this.findAStarPath(unit, targetEnemy.x, targetEnemy.y);
             let bestTarget = null;
             
-            if (path && path.length > 0) {
-                let accumulatedCost = 0;
-                let availableAP = unit.ap - 1; // 攻撃用に1AP残す
-                let stopAtDist = (unit.troopType === 'teppo') ? 2 : 1; // 鉄砲は距離2で止まる
-
-                // カーナビのルートに沿って、APの限界まで進むマスを探す
-                for (let i = 0; i < path.length; i++) {
-                    let step = path[i];
-                    accumulatedCost += step.cost;
-                    
-                    if (accumulatedCost <= availableAP) {
-                        let dToEnemy = this.getDistance(step.x, step.y, targetEnemy.x, targetEnemy.y);
-                        bestTarget = { x: step.x, y: step.y, cost: accumulatedCost, path: path.slice(0, i + 1) };
-                        
-                        if (dToEnemy === stopAtDist) break; // 理想の距離に着いたらストップ
-
-                        // ★追加: 盾役の陣形（味方に鉄砲隊がいるなら、鉄砲隊の目の前でストップして壁になる！）
-                        if (unit.troopType !== 'teppo') {
-                            const friendlyTeppos = this.units.filter(u => u.isAttacker === unit.isAttacker && u.troopType === 'teppo');
-                            if (friendlyTeppos.length > 0) {
-                                let myTeppo = friendlyTeppos[0]; // 最初の鉄砲隊を守る
-                                let dToTeppo = this.getDistance(step.x, step.y, myTeppo.x, myTeppo.y);
-                                let teppoToEnemy = this.getDistance(myTeppo.x, myTeppo.y, targetEnemy.x, targetEnemy.y);
-                                
-                                // 鉄砲隊のすぐ隣(距離1)で、かつ鉄砲隊よりも敵に近い位置なら、そこをベストポジションとして止まる
-                                if (dToTeppo === 1 && dToEnemy < teppoToEnemy) {
-                                    break;
-                                }
-                            }
-                        }
-                    } else {
-                        break; // AP切れ
-                    }
-                }
-            }
-            
-            // もし完全に囲まれるなどしてカーナビで道が見つからなかったら、今までの「とりあえず近くに」を使う
-            if (!bestTarget) {
-                let reachable = this.findPaths(unit, unit.ap - 1); 
-                let minMoveDist = 999;
+            if (isFleeing) {
+                // ★ 逃走モード：カーナビではなく、自分が行ける範囲で一番敵から「遠ざかる」マスを探す
+                let reachable = this.findPaths(unit, unit.ap); // 攻撃は諦めて全APで逃げる
+                let bestScore = -1;
                 
                 for (let key in reachable) {
                     let parts = key.split(',');
                     let nx = parseInt(parts[0]);
                     let ny = parseInt(parts[1]);
-                    let d = this.getDistance(nx, ny, targetEnemy.x, targetEnemy.y);
+                    let dToEnemy = this.getDistance(nx, ny, targetEnemy.x, targetEnemy.y);
                     
-                    if (unit.troopType === 'teppo') {
-                        let score = Math.abs(d - 2); 
-                        if (score < minMoveDist) {
-                            minMoveDist = score;
-                            bestTarget = {x: nx, y: ny, cost: reachable[key].cost, path: reachable[key].path};
+                    // 距離が2以上になれるなら安全圏
+                    if (dToEnemy >= 2) {
+                        let score = dToEnemy * 10;
+                        // 他の敵からも遠い方が良い
+                        enemies.forEach(e => {
+                            score += this.getDistance(nx, ny, e.x, e.y);
+                        });
+                        
+                        if (score > bestScore) {
+                            bestScore = score;
+                            bestTarget = { x: nx, y: ny, cost: reachable[key].cost, path: reachable[key].path };
                         }
-                    } else {
-                        if (d < minMoveDist) {
-                            minMoveDist = d;
-                            bestTarget = {x: nx, y: ny, cost: reachable[key].cost, path: reachable[key].path};
+                    }
+                }
+            } else {
+                // ★ 通常モード：カーナビを使って敵に近づく
+                let path = this.findAStarPath(unit, targetEnemy.x, targetEnemy.y);
+                
+                if (path && path.length > 0) {
+                    let accumulatedCost = 0;
+                    let availableAP = unit.ap - 1; // 攻撃用に1AP残す
+                    let stopAtDist = (unit.troopType === 'teppo') ? 2 : 1; // 鉄砲は距離2で止まる
+
+                    // カーナビのルートに沿って、APの限界まで進むマスを探す
+                    for (let i = 0; i < path.length; i++) {
+                        let step = path[i];
+                        accumulatedCost += step.cost;
+                        
+                        if (accumulatedCost <= availableAP) {
+                            let dToEnemy = this.getDistance(step.x, step.y, targetEnemy.x, targetEnemy.y);
+                            bestTarget = { x: step.x, y: step.y, cost: accumulatedCost, path: path.slice(0, i + 1) };
+                            
+                            if (dToEnemy === stopAtDist) break; // 理想の距離に着いたらストップ
+
+                            // 盾役の陣形（味方に鉄砲隊がいるなら、鉄砲隊の目の前でストップして壁になる！）
+                            if (unit.troopType !== 'teppo') {
+                                const friendlyTeppos = this.units.filter(u => u.isAttacker === unit.isAttacker && u.troopType === 'teppo');
+                                if (friendlyTeppos.length > 0) {
+                                    let myTeppo = friendlyTeppos[0]; // 最初の鉄砲隊を守る
+                                    let dToTeppo = this.getDistance(step.x, step.y, myTeppo.x, myTeppo.y);
+                                    let teppoToEnemy = this.getDistance(myTeppo.x, myTeppo.y, targetEnemy.x, targetEnemy.y);
+                                    
+                                    // 鉄砲隊のすぐ隣(距離1)で、かつ鉄砲隊よりも敵に近い位置なら、そこをベストポジションとして止まる
+                                    if (dToTeppo === 1 && dToEnemy < teppoToEnemy) {
+                                        break;
+                                    }
+                                }
+                            }
+                        } else {
+                            break; // AP切れ
+                        }
+                    }
+                }
+                
+                // もし完全に囲まれるなどしてカーナビで道が見つからなかったら、今までの「とりあえず近くに」を使う
+                if (!bestTarget) {
+                    let reachable = this.findPaths(unit, unit.ap - 1); 
+                    let minMoveDist = 999;
+                    
+                    for (let key in reachable) {
+                        let parts = key.split(',');
+                        let nx = parseInt(parts[0]);
+                        let ny = parseInt(parts[1]);
+                        let d = this.getDistance(nx, ny, targetEnemy.x, targetEnemy.y);
+                        
+                        if (unit.troopType === 'teppo') {
+                            let score = Math.abs(d - 2); 
+                            if (score < minMoveDist) {
+                                minMoveDist = score;
+                                bestTarget = {x: nx, y: ny, cost: reachable[key].cost, path: reachable[key].path};
+                            }
+                        } else {
+                            if (d < minMoveDist) {
+                                minMoveDist = d;
+                                bestTarget = {x: nx, y: ny, cost: reachable[key].cost, path: reachable[key].path};
+                            }
                         }
                     }
                 }
@@ -1311,7 +1361,7 @@ class FieldWarManager {
 			    unit.y = bestTarget.y;
                 unit.hasMoved = true;
 			    if (isPlayerInvolved) {
-			        this.log(`${unit.name}隊が前進。`);
+			        this.log(`${unit.name}隊が${isFleeing ? '後退' : '前進'}。`);
 			        this.updateMap();
 			        this.updateStatus();
 			        await new Promise(r => setTimeout(r, 400));
