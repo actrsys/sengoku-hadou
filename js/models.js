@@ -13,6 +13,25 @@ class Clan {
 
         // 外交データの初期化
         this.diplomacyValue = this.diplomacyValue || {};
+
+        // CSVの initDiplomacy を翻訳して、外交の箱に入れます
+        if (typeof data.initDiplomacy === 'string' && data.initDiplomacy.trim() !== "") {
+            const parts = data.initDiplomacy.split('|');
+            parts.forEach(part => {
+                const items = part.split(':');
+                if (items.length >= 3) {
+                    const targetId = Number(items[0].trim());
+                    const statusStr = items[1].trim();
+                    const sentimentVal = Number(items[2].trim());
+                    if (!isNaN(targetId) && !isNaN(sentimentVal)) {
+                        this.diplomacyValue[targetId] = {
+                            status: statusStr,
+                            sentiment: sentimentVal
+                        };
+                    }
+                }
+            });
+        }
     }
 
     // UI等で表示するための軍団名取得
