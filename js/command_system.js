@@ -1087,7 +1087,6 @@ class CommandSystem {
 
             this.game.factionSystem.updateRecognition(target, -effect * 2 - 5);
 
-            target.isActionDone = true;
             count++;
             totalEffect += effect;
         });

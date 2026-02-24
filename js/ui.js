@@ -1204,7 +1204,7 @@ class UIManager {
             
             let isSelectable = !b.isActionDone; 
             if (extraData && extraData.allowDone) isSelectable = true; 
-            if (['employ_target','appoint_gunshi','rumor_target_busho','headhunt_target','interview_target','reward','view_only','war_general'].includes(actionType)) isSelectable = true;
+            if (['employ_target','appoint_gunshi','rumor_target_busho','headhunt_target','interview','interview_target','reward','view_only','war_general'].includes(actionType)) isSelectable = true;
             if (actionType === 'def_intercept_deploy') isSelectable = true;
             
             let acc = null; if (isEnemyTarget && targetCastle) acc = targetCastle.investigatedAccuracy;
