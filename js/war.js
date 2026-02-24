@@ -605,7 +605,17 @@ class WarManager {
     
     endWar(attackerWon, isRetreat = false, capturedInRetreat = [], retreatTargetId = null) { 
         try {
-            const s = this.state; s.active = false; 
+            const s = this.state; s.active = false;
+            
+            // 兵士の減った割合を計算して、馬と鉄砲も減らす（壊れる）処理
+            const originalAtkSoldiers = s.attacker.bushos.reduce((sum, b) => {
+                const assign = s.atkAssignments ? s.atkAssignments.find(a => a.busho.id === b.id) : null;
+                return sum + (assign ? assign.soldiers : 0);
+            }, 0) || Math.max(1, s.attacker.soldiers + s.deadSoldiers.attacker);
+            
+            const atkSurviveRate = Math.max(0, s.attacker.soldiers) / originalAtkSoldiers;
+            s.attacker.horses = Math.floor((s.attacker.horses || 0) * atkSurviveRate);
+            s.attacker.guns = Math.floor((s.attacker.guns || 0) * atkSurviveRate);            
             
             // プレイヤーが国人衆を制圧（討伐）した時の処理
             if (s.isKunishuSubjugation) {

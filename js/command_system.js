@@ -571,15 +571,12 @@ class CommandSystem {
             const vals = {
                 gold: parseInt(inputs.gold.num.value),
                 rice: parseInt(inputs.rice.num.value),
-                soldiers: parseInt(inputs.soldiers.num.value)
+                soldiers: parseInt(inputs.soldiers.num.value),
+                horses: inputs.horses ? parseInt(inputs.horses.num.value) : 0,
+                guns: inputs.guns ? parseInt(inputs.guns.num.value) : 0
             };
-            if (vals.gold === 0 && vals.rice === 0 && vals.soldiers === 0) return;
+            if (vals.gold === 0 && vals.rice === 0 && vals.soldiers === 0 && vals.horses === 0 && vals.guns === 0) return;
             this.executeTransport(data, targetId, vals);
-        }
-        else if (type === 'buy_rice') {
-            const val = parseInt(inputs.amount.num.value);
-            if (val <= 0) return;
-            this.executeTrade('buy_rice', val);
         }
         else if (type === 'sell_rice') {
             const val = parseInt(inputs.amount.num.value);
@@ -1212,6 +1209,10 @@ class CommandSystem {
         const c = this.game.getCurrentTurnCastle(); const t = this.game.getCastle(targetId);
         if(vals.soldiers > 0) { t.training = GameSystem.calcWeightedAvg(t.training, t.soldiers, c.training, vals.soldiers); t.morale = GameSystem.calcWeightedAvg(t.morale, t.soldiers, c.morale, vals.soldiers); }
         c.gold -= vals.gold; c.rice -= vals.rice; c.soldiers -= vals.soldiers; t.gold += vals.gold; t.rice += vals.rice; t.soldiers += vals.soldiers;
+        c.horses = Math.max(0, (c.horses || 0) - vals.horses);
+        c.guns = Math.max(0, (c.guns || 0) - vals.guns);
+        t.horses = (t.horses || 0) + vals.horses;
+        t.guns = (t.guns || 0) + vals.guns;
         
         bushoIds.forEach(id => {
             const b = this.game.getBusho(id);

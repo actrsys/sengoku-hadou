@@ -1573,7 +1573,12 @@ class UIManager {
             inputs.horses = createSlider("持参騎馬", "horses", c.horses, 0);
             inputs.guns = createSlider("持参鉄砲", "guns", c.guns, 0);
         } else if (type === 'transport') {
-            document.getElementById('quantity-title').textContent = "輸送物資指定"; inputs.gold = createSlider("金", "gold", c.gold, 0); inputs.rice = createSlider("兵糧", "rice", c.rice, 0); inputs.soldiers = createSlider("兵士", "soldiers", c.soldiers, 0);
+            document.getElementById('quantity-title').textContent = "輸送物資指定"; 
+            inputs.gold = createSlider("金", "gold", c.gold, 0); 
+            inputs.rice = createSlider("兵糧", "rice", c.rice, 0); 
+            inputs.soldiers = createSlider("兵士", "soldiers", c.soldiers, 0);
+            inputs.horses = createSlider("騎馬", "horses", c.horses || 0, 0);
+            inputs.guns = createSlider("鉄砲", "guns", c.guns || 0, 0);
         } else if (type === 'buy_rice') {
             document.getElementById('quantity-title').textContent = "兵糧購入"; const rate = this.game.marketRate; const maxBuy = Math.floor(c.gold / rate);
             this.tradeTypeInfo.classList.remove('hidden'); this.tradeTypeInfo.textContent = `相場: ${rate.toFixed(2)} (金1 -> 米${(1/rate).toFixed(2)})`;
