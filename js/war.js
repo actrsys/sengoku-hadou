@@ -141,18 +141,75 @@ class WarManager {
         if (this.state.active) { const gunshi = this.game.getClanGunshi(this.game.playerClanId); return gunshi ? WarSystem.getWarAdvice(gunshi, this.state) : null; }
         return null;
     }
-
-    // ★修正: 自動分配時（AIや城の守備兵など）の兵科をデフォルトで「足軽」にします
-    autoDivideSoldiers(bushos, totalSoldiers) {
+    
+    // ★修正: 自動分配時、AIが鉄砲・騎馬を賢く配分するロジックを追加
+    autoDivideSoldiers(bushos, totalSoldiers, totalHorses = 0, totalGuns = 0) {
         if (!bushos || bushos.length === 0) return [];
         if (bushos.length === 1) return [{ busho: bushos[0], soldiers: totalSoldiers, troopType: 'ashigaru' }];
-        const assignments = [];
-        const ratioSum = 1.5 + (bushos.length - 1) * 1.0;
+        
+        const N = bushos.length;
+        // 総大将は他部隊の1.3倍の兵力にする
+        const ratioSum = 1.3 + (N - 1) * 1.0;
         const baseAmount = Math.floor(totalSoldiers / ratioSum);
-        let remain = totalSoldiers;
-        for (let i = 1; i < bushos.length; i++) { assignments.push({ busho: bushos[i], soldiers: baseAmount, troopType: 'ashigaru' }); remain -= baseAmount; }
-        assignments.unshift({ busho: bushos[0], soldiers: remain, troopType: 'ashigaru' });
-        return assignments;
+        
+        let assignments = bushos.map((b, i) => {
+            let req = (i === 0) ? Math.floor(baseAmount * 1.3) : baseAmount;
+            return { busho: b, req: req, soldiers: 0, troopType: 'ashigaru' };
+        });
+
+        // 割り切れない余り兵士を総大将に足す
+        let totalReq = assignments.reduce((sum, a) => sum + a.req, 0);
+        assignments[0].req += (totalSoldiers - totalReq);
+
+        let availableHorses = totalHorses;
+        let availableGuns = totalGuns;
+        let poolSoldiers = 0; // 余った兵士を貯めるプール
+        
+        // 鉄砲隊の最大数（必ず同数以上の足軽か騎馬ができるように、全体の半分以下にする）
+        const maxTeppoCount = Math.floor(N / 2);
+        let teppoCount = 0;
+
+        // 余った兵士を押し付けるための「足軽隊」を1部隊だけ予約しておく（一番最後の部隊）
+        const ashigaruReservedIndex = N - 1;
+
+        for (let i = 0; i < N; i++) {
+            if (i === ashigaruReservedIndex) continue;
+
+            let req = assignments[i].req;
+            
+            // 騎馬の判定（要求数の半分以上の馬があれば騎馬隊にする）
+            if (availableHorses >= req * 0.5) {
+                assignments[i].troopType = 'kiba';
+                let assignCount = Math.min(req, availableHorses); // 馬の数と要求数の少ない方に合わせる
+                assignments[i].soldiers = assignCount;
+                availableHorses -= assignCount;
+                poolSoldiers += (req - assignCount); // 減らした分の兵士はプールへ
+            } 
+            // 鉄砲の判定（要求数の半分以上の鉄砲があり、かつ制限枠内なら鉄砲隊にする）
+            else if (availableGuns >= req * 0.5 && teppoCount < maxTeppoCount) {
+                assignments[i].troopType = 'teppo';
+                let assignCount = Math.min(req, availableGuns);
+                assignments[i].soldiers = assignCount;
+                availableGuns -= assignCount;
+                poolSoldiers += (req - assignCount);
+                teppoCount++;
+            }
+            // どちらにもならない場合
+            else {
+                assignments[i].troopType = 'ashigaru';
+                assignments[i].soldiers = req;
+            }
+        }
+
+        // 予約しておいた最後の部隊を足軽隊にし、プールに貯まった余剰兵士をすべて引き受けさせる
+        assignments[ashigaruReservedIndex].troopType = 'ashigaru';
+        assignments[ashigaruReservedIndex].soldiers = assignments[ashigaruReservedIndex].req + poolSoldiers;
+
+        return assignments.map(a => ({
+            busho: a.busho,
+            soldiers: a.soldiers,
+            troopType: a.troopType
+        }));
     }
 
     async startWar(atkCastle, defCastle, atkBushos, atkSoldierCount, atkRice, atkHorses = 0, atkGuns = 0) {
@@ -165,10 +222,17 @@ class WarManager {
                 const leader = atkBushos.splice(atkLeaderIdx, 1)[0];
                 atkBushos.unshift(leader);
             }
+            
             const pid = Number(this.game.playerClanId);
             const atkClan = Number(atkCastle.ownerClan);
             const defClan = Number(defCastle.ownerClan);
             let isPlayerInvolved = (atkClan === pid || defClan === pid);
+
+            // ★追加: AI（プレイヤー以外）が攻撃を仕掛ける場合、城にある馬と鉄砲をすべて持ち出す！
+            if (atkClan !== pid && !atkCastle.isKunishu) {
+                atkHorses = atkCastle.horses || 0;
+                atkGuns = atkCastle.guns || 0;
+            }
 
             atkCastle.soldiers = Math.max(0, atkCastle.soldiers - atkSoldierCount);
             atkCastle.rice = Math.max(0, atkCastle.rice - atkRice);
@@ -257,18 +321,28 @@ class WarManager {
                             const leader = defBushos.splice(defLeaderIdx, 1)[0];
                             defBushos.unshift(leader);
                         }
+                        
                         const defSoldiers = defCastle.soldiers;
                         const defRice = Math.min(defCastle.rice, defSoldiers); 
-                        const defAssignments = this.autoDivideSoldiers(defBushos, defSoldiers);
+                        
+                        // ★追加・修正：防衛側のAIも、城の馬と鉄砲をありったけ使って迎撃する！
+                        const defHorses = defCastle.horses || 0;
+                        const defGuns = defCastle.guns || 0;
+                        const defAssignments = this.autoDivideSoldiers(defBushos, defSoldiers, defHorses, defGuns);
                         
                         if (atkClan === pid) {
                             // 国人衆の反乱時は分割画面を出さない
                             if (attackerForce.isKunishu) {
-                                onResult('field', defAssignments, defRice, [{busho: atkBushos[0], soldiers: atkSoldierCount, troopType: 'ashigaru'}]);
+                                onResult('field', defAssignments, defRice, [{busho: atkBushos[0], soldiers: atkSoldierCount, troopType: 'ashigaru'}], defHorses, defGuns);
                             } else {
                                 this.game.ui.showUnitDivideModal(atkBushos, atkSoldierCount, atkHorses, atkGuns, (atkAssignments) => {
-                                    onResult('field', defAssignments, defRice, atkAssignments);
+                                    onResult('field', defAssignments, defRice, atkAssignments, defHorses, defGuns);
                                 });
+                            }
+                        } else {
+                            // 攻撃側AIの兵器も autoDivideSoldiers に渡して計算させる
+                            onResult('field', defAssignments, defRice, this.autoDivideSoldiers(atkBushos, atkSoldierCount, atkHorses, atkGuns), defHorses, defGuns);
+                        }                                });
                             }
                         } else onResult('field', defAssignments, defRice, this.autoDivideSoldiers(atkBushos, atkSoldierCount));
                     } else onResult('siege');
