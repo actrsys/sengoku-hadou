@@ -22,10 +22,22 @@ class DiplomacyManager {
         }
 
         if (!clan.diplomacyValue[targetId]) {
-            clan.diplomacyValue[targetId] = {
-                status: '普通', // 状態: '普通', '友好', '敵対', '同盟', '支配', '従属'
-                sentiment: 50  // 感情値: 0 - 100
-            };
+            // 相手側(targetId)のデータに自分(clanId)への設定があるか確認します
+            const targetClan = this.game.clans.find(c => Number(c.id) === Number(targetId));
+            if (targetClan && targetClan.diplomacyValue && targetClan.diplomacyValue[clanId]) {
+                // もし相手側が設定を持っていれば、同じ値をコピーします
+                const oppData = targetClan.diplomacyValue[clanId];
+                clan.diplomacyValue[targetId] = {
+                    status: oppData.status,
+                    sentiment: oppData.sentiment
+                };
+            } else {
+                // どちらも持っていなければ、初期値の50になります
+                clan.diplomacyValue[targetId] = {
+                    status: '普通', // 状態: '普通', '友好', '敵対', '同盟', '支配', '従属'
+                    sentiment: 50  // 感情値: 0 - 100
+                };
+            }
         }
         return clan.diplomacyValue[targetId];
     }
