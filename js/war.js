@@ -690,6 +690,14 @@ class WarManager {
             const atkSurviveRate = Math.max(0, s.attacker.soldiers) / originalAtkSoldiers;
             s.attacker.horses = Math.floor((s.attacker.horses || 0) * atkSurviveRate);
             s.attacker.guns = Math.floor((s.attacker.guns || 0) * atkSurviveRate);            
+
+            // ★追加: 防衛側（城）の馬と鉄砲も、兵士の損耗に合わせて壊れるようにする
+            if (!s.defender.isKunishu) {
+                const originalDefSoldiers = s.defender.soldiers + s.deadSoldiers.defender;
+                const defSurviveRate = originalDefSoldiers > 0 ? (Math.max(0, s.defender.soldiers) / originalDefSoldiers) : 0;
+                s.defender.horses = Math.floor((s.defender.horses || 0) * defSurviveRate);
+                s.defender.guns = Math.floor((s.defender.guns || 0) * defSurviveRate);
+            }
             
             // プレイヤーが国人衆を制圧（討伐）した時の処理
             if (s.isKunishuSubjugation) {
@@ -837,7 +845,12 @@ class WarManager {
             
             if (isRetreat && attackerWon) {
                 s.defender.ownerClan = s.attacker.ownerClan; s.defender.investigatedUntil = 0; s.defender.soldiers = totalAtkSurvivors;
-                const srcC = this.game.getCastle(s.sourceCastle.id); 
+                
+                // ★追加: 敵が撤退して空になった城を占領した時、持ってきた馬と鉄砲を城に格納する
+                s.defender.horses = (s.attacker.horses || 0);
+                s.defender.guns = (s.attacker.guns || 0);
+
+                const srcC = this.game.getCastle(s.sourceCastle.id);
                 s.atkBushos.forEach((b) => { 
                     srcC.samuraiIds = srcC.samuraiIds.filter(id => id !== b.id); 
                     this.game.factionSystem.handleMove(b, s.sourceCastle.id, s.defender.id); 
