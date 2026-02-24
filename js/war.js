@@ -342,9 +342,7 @@ class WarManager {
                         } else {
                             // 攻撃側AIの兵器も autoDivideSoldiers に渡して計算させる
                             onResult('field', defAssignments, defRice, this.autoDivideSoldiers(atkBushos, atkSoldierCount, atkHorses, atkGuns), defHorses, defGuns);
-                        }                                });
-                            }
-                        } else onResult('field', defAssignments, defRice, this.autoDivideSoldiers(atkBushos, atkSoldierCount));
+                        }
                     } else onResult('siege');
                 }
             };
