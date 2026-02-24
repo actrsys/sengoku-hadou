@@ -451,9 +451,13 @@ img {
     pointer-events: none; z-index: 600; font-weight: bold; box-shadow: 0 2px 5px rgba(0,0,0,0.3);
 }
 #ai-guard {
-    position: absolute; top: 0; left: 0; width: 100%; height: 100%;
-    background: rgba(0,0,0,0.5); z-index: 1000; display: flex; justify-content: center;
+    position: fixed; /* 画面全体に固定するように変更します */
+    top: 0; left: 0; width: 100vw; height: 100dvh; /* 画面の端から端まで覆うようにします */
+    background: rgba(0,0,0,0.5); 
+    z-index: 4500; /* 他のボタンよりも手前に来るように数字を大きくします */
+    display: flex; justify-content: center;
     align-items: center; color: white; font-size: 1.5rem; font-weight: bold; flex-direction: column;
+    pointer-events: auto; /* ここが重要！裏側のボタンを押せなくする魔法です */
 }
 
 .cutin-overlay {
