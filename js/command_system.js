@@ -834,8 +834,14 @@ class CommandSystem {
         doer.isActionDone = true; this.game.ui.showResultModal(msg); this.game.ui.renderCommandMenu(); 
     }
 
-    executeDiplomacy(doerId, targetClanId, type, gold = 0) {
+    executeDiplomacy(doerId, targetCastleId, type, gold = 0) {
         const doer = this.game.getBusho(doerId);
+        const targetCastle = this.game.getCastle(targetCastleId);
+        if (!targetCastle) return;
+        
+        // 城のデータから、相手の大名家IDを取得します！
+        const targetClanId = targetCastle.ownerClan;
+
         const relation = this.game.getRelation(doer.clan, targetClanId);
         let msg = "";
         const isPlayerInvolved = (doer.clan === this.game.playerClanId || targetClanId === this.game.playerClanId);
