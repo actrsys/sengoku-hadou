@@ -463,13 +463,6 @@ class FieldWarManager {
                 }
             }
 
-            // ★追加: 兵科によるアイコンの装飾
-            if (u.troopType === 'kiba') {
-                uEl.style.border = '2px dashed #000'; // 騎馬は破線ボーダー
-            } else if (u.troopType === 'teppo') {
-                uEl.style.borderRadius = '0'; // 鉄砲は四角形
-            }
-
             uEl.className = `fw-unit ${colorClass} ${isActive ? 'active' : ''}`;
             uEl.style.width = `${iconSize}px`; 
             uEl.style.height = `${iconSize}px`; 
