@@ -383,8 +383,20 @@ class UIManager {
         clanDataList.sort((a,b) => b.power - a.power);
 
         clanDataList.forEach(d => {
+            // ↓ここから書き足した部分です
+            let diplomacyText = "";
+            // もし自分の大名家じゃなかったら、友好度と状態の文字を作ります
+            if (d.id !== this.game.playerClanId) {
+                const relation = this.game.getRelation(this.game.playerClanId, d.id);
+                if (relation) {
+                    diplomacyText = `<span style="font-size:0.9rem; color:#1976d2; margin-left: 10px;">友好度: ${relation.sentiment} (${relation.status})</span>`;
+                }
+            }
+            // ↑書き足しここまで
+
             listHtml += `<div style="border-bottom:1px dashed #bbb; padding:8px 0; cursor:pointer;" onclick="window.GameApp.ui.showFactionList(${d.id})" onmouseover="this.style.backgroundColor='#e3f2fd'" onmouseout="this.style.backgroundColor='transparent'">`;
-            listHtml += `<div style="font-weight:bold; font-size:1.1rem;">${d.name} <span style="font-size:0.9rem; font-weight:normal;">(当主: ${d.leaderName})</span></div>`;
+            // ↓名前の横に、さっき作った diplomacyText を表示するように変えています
+            listHtml += `<div style="font-weight:bold; font-size:1.1rem;">${d.name} <span style="font-size:0.9rem; font-weight:normal;">(当主: ${d.leaderName})</span>${diplomacyText}</div>`;
             listHtml += `<div style="color:#d32f2f; font-weight:bold; margin-top:3px;">戦力: ${d.power} <span style="font-size:0.8rem; color:#555; font-weight:normal;">(城数:${d.castlesCount})</span></div>`;
             listHtml += `</div>`;
         });
@@ -393,7 +405,8 @@ class UIManager {
         this.showResultModal(`<h3 style="margin-top:0;">大名一覧</h3>${listHtml}`);
     }
 
-    showFactionList(clanId) {
+    // 引数に「isDirect = false」というのを追加して、丸ごと差し替えます
+    showFactionList(clanId, isDirect = false) {
         const clan = this.game.clans.find(c => c.id === clanId);
         if (!clan) return;
 
@@ -444,7 +457,15 @@ class UIManager {
         
         listHtml += `</div>`;
 
-        const customFooter = `<button class="btn-secondary" onclick="window.GameApp.ui.showDaimyoList()">戻る</button>`;
+        // ↓ここが変わりました！
+        // コマンドから直接開かれた時は「閉じる」、大名一覧から来た時は「戻る」にします
+        let customFooter = "";
+        if (isDirect) {
+            customFooter = `<button class="btn-primary" onclick="window.GameApp.ui.closeResultModal()">閉じる</button>`;
+        } else {
+            customFooter = `<button class="btn-secondary" onclick="window.GameApp.ui.showDaimyoList()">戻る</button>`;
+        }
+        
         this.showResultModal(`<h3 style="margin-top:0;">${clan.name} 派閥一覧</h3>${listHtml}`, null, customFooter);
     }
 

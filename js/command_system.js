@@ -200,6 +200,11 @@ const COMMAND_SPECS = {
         label: "大名", category: 'INFO',
         isSystem: true, action: 'daimyo_list'
     },
+    // ↓ここから下の4行を書き足します！
+    'faction_list': {
+        label: "派閥", category: 'INFO',
+        isSystem: true, action: 'faction_list'
+    },
 
     // --- 外交 (DIPLOMACY) ---
     'goodwill': {
@@ -376,6 +381,8 @@ class CommandSystem {
                 break;
             case 'history': this.game.ui.showHistoryModal(); break;
             case 'daimyo_list': this.game.ui.showDaimyoList(); break;
+            // ↓ここから下の1行を書き足します！
+            case 'faction_list': this.game.ui.showFactionList(this.game.playerClanId, true); break;
         }
     }
 
