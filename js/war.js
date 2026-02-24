@@ -80,12 +80,28 @@ class WarSystem {
         const ratio = atkPower / (atkPower + defPower);
         let baseDmg = Math.max(W.MinDamage || 50, atkPower * ratio * multiplier * rand);
         
+        // ★ここがゾンビアタック対策の追加部分です★
+        // 攻撃側、守備側の兵士数がそれぞれ200人以下の時、ダメージを減らすための「弱体化パワー（ペナルティ）」を計算します。
+        // 人数が少ないほど、2乗のカーブで急激に弱くなります。
+        let atkPenalty = atkSoldiers <= 200 ? Math.pow(Math.max(0, atkSoldiers) / 200, 2) : 1.0;
+        let defPenalty = defSoldiers <= 200 ? Math.pow(Math.max(0, defSoldiers) / 200, 2) : 1.0;
+
+        // どっちが攻撃を仕掛けているかで、ペナルティを逆にします
+        const activePenalty = type.startsWith('def_') ? defPenalty : atkPenalty;
+        const passivePenalty = type.startsWith('def_') ? atkPenalty : defPenalty;
+        
         let counterDmg = 0;
         if (counterRisk > 0 && type !== 'def_attack') {
             const opponentPower = type.startsWith('def_') ? atkPower : defPower;
-            counterDmg = Math.floor(opponentPower * (W.CounterAtkPowerFactor !== undefined ? W.CounterAtkPowerFactor : 0.05) * counterRisk);
+            // 反撃ダメージにも、反撃する側の兵士数が少ない場合のペナルティを掛けます
+            counterDmg = Math.floor(opponentPower * (W.CounterAtkPowerFactor !== undefined ? W.CounterAtkPowerFactor : 0.05) * counterRisk * passivePenalty);
         }
-        return { soldierDmg: Math.floor(baseDmg * soldierRate), wallDmg: Math.floor(baseDmg * wallRate * 0.5), counterDmg: counterDmg };
+        
+        return { 
+            soldierDmg: Math.floor(baseDmg * soldierRate * activePenalty), 
+            wallDmg: Math.floor(baseDmg * wallRate * 0.5 * activePenalty), 
+            counterDmg: counterDmg 
+        };
     }
 
     static calcScheme(atkBusho, defBusho, defCastleLoyalty) { 
