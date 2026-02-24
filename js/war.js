@@ -470,8 +470,13 @@ class WarManager {
         
         // 国人衆の制圧戦（ダミー城）の場合は民忠・人口の低下をスキップ
         if (!s.isKunishuSubjugation) {
-            s.defender.peoplesLoyalty = Math.max(0, s.defender.peoplesLoyalty - (W.AttackLoyaltyDecay || 5)); 
-            s.defender.population = Math.max(0, s.defender.population - (W.AttackPopDecay || 500));
+            // ★変更：民忠を現在の2割減らす
+            const dropLoyalty = Math.floor(s.defender.peoplesLoyalty * 0.2);
+            s.defender.peoplesLoyalty = Math.max(0, s.defender.peoplesLoyalty - dropLoyalty); 
+            
+            // ★変更：人口を攻撃側の兵士数の2割減らす
+            const dropPopulation = Math.floor(s.attacker.soldiers * 0.2);
+            s.defender.population = Math.max(0, s.defender.population - dropPopulation);
         }
         
         if (s.isPlayerInvolved) { 
@@ -908,6 +913,18 @@ class WarManager {
             const enemyName = isAtkPlayer ? (this.game.clans.find(c => c.id === s.defender.ownerClan)?.getArmyName() || "敵軍") : s.attacker.name;
 
             if (attackerWon) { 
+                // ★ここから書き足し：城側が負けた・撤退した時の追加減少
+                if (!s.defender.isKunishu && !s.isKunishuSubjugation && !s.attacker.isKunishu) {
+                    // 民忠をさらに現在の2割減らす
+                    const dropLoyaltyEnd = Math.floor(s.defender.peoplesLoyalty * 0.2);
+                    s.defender.peoplesLoyalty = Math.max(0, s.defender.peoplesLoyalty - dropLoyaltyEnd);
+
+                    // 人口を制圧時点の攻撃側の兵士数の2割減らす
+                    const dropPopulationEnd = Math.floor(s.attacker.soldiers * 0.2);
+                    s.defender.population = Math.max(0, s.defender.population - dropPopulationEnd);
+                }
+                // ★書き足しここまで
+
                 s.attacker.training = Math.min(120, s.attacker.training + (window.WarParams.War.WinStatIncrease || 5)); s.attacker.morale = Math.min(120, s.attacker.morale + (window.WarParams.War.WinStatIncrease || 5)); 
                 this.processCaptures(s.defender, s.attacker.ownerClan);
                 

@@ -1253,24 +1253,19 @@ class FieldWarManager {
         let isFleeing = false; // ★追加：逃げるモードのフラグ
         
         if (unit.troopType === 'teppo') {
-            if (dist >= 2 && dist <= 3) {
-                shouldMove = false; // 射程内(2〜3)なら移動せず、その場で撃つ（または振り向く）
-            } else if (dist === 1) {
-                // 距離1の時、盾役（足軽・騎馬）が自分と敵の間にいるかチェック！
-                // 条件：自分に隣接していて、かつ、ターゲットの敵にも隣接している味方
-                const shields = this.units.filter(u => 
-                    u.isAttacker === unit.isAttacker && 
-                    u.id !== unit.id && 
-                    u.troopType !== 'teppo' && 
-                    this.getDistance(unit.x, unit.y, u.x, u.y) === 1 &&
-                    this.getDistance(targetEnemy.x, targetEnemy.y, u.x, u.y) === 1
-                );
-                if (shields.length > 0) {
-                    shouldMove = false; // 盾に守られているので逃げずに至近距離射撃！
-                } else {
-                    shouldMove = true;  // 守られていないので逃げる！
-                    isFleeing = true;
-                }
+            if (dist === 1) {
+                // 距離1（敵が直接隣り合っている！）
+                // 間に盾はいない大ピンチなので、無条件で真っ直ぐ逃げる！
+                shouldMove = true;
+                isFleeing = true;
+            } else if (dist >= 2 && dist <= 3) {
+                // 距離2〜3（射程内）
+                // 盾がいてもいなくても、安全な距離なので移動せずにその場から撃つ！
+                shouldMove = false;
+            } else {
+                // 遠すぎる場合は近づく
+                shouldMove = true;
+                isFleeing = false;
             }
         } else {
             if (dist === 1) {
@@ -1282,22 +1277,40 @@ class FieldWarManager {
             let bestTarget = null;
             
             if (isFleeing) {
-                // ★ 逃走モード：カーナビではなく、自分が行ける範囲で一番敵から「遠ざかる」マスを探す
-                let reachable = this.findPaths(unit, unit.ap); // 攻撃は諦めて全APで逃げる
-                let bestScore = -1;
+                // ★ 逃走モード：敵から見て自分と真逆の方向へ「真っ直ぐ下がる」マスを探す
+                let reachable = this.findPaths(unit, unit.ap); 
+                let bestScore = -9999;
                 
+                // 敵から見た自分の方向（この方向に真っ直ぐ逃げたい！）
+                let idealDir = this.getDirection(targetEnemy.x, targetEnemy.y, unit.x, unit.y);
+
                 for (let key in reachable) {
                     let parts = key.split(',');
                     let nx = parseInt(parts[0]);
                     let ny = parseInt(parts[1]);
+                    
+                    if (nx === unit.x && ny === unit.y) continue; 
+
                     let dToEnemy = this.getDistance(nx, ny, targetEnemy.x, targetEnemy.y);
                     
-                    // 距離が2以上になれるなら安全圏
-                    if (dToEnemy >= 2) {
-                        let score = dToEnemy * 10;
+                    // 今より距離が縮まらない場所を探す
+                    if (dToEnemy >= dist) {
+                        // 距離が離れるほど高得点
+                        let score = dToEnemy * 100;
+                        
+                        // 敵からそのマスを見た方向が、真っ直ぐ後ろ（idealDir）とどれくらいズレているか計算
+                        let dirToCell = this.getDirection(targetEnemy.x, targetEnemy.y, nx, ny);
+                        let dirDiff = Math.abs(idealDir - dirToCell);
+                        dirDiff = Math.min(dirDiff, 6 - dirDiff);
+                        
+                        // ズレるほど減点（真っ直ぐ下がるのを優先させる）
+                        score -= dirDiff * 30;
+
                         // 他の敵からも遠い方が良い
                         enemies.forEach(e => {
-                            score += this.getDistance(nx, ny, e.x, e.y);
+                            if (e.id !== targetEnemy.id) {
+                                score += this.getDistance(nx, ny, e.x, e.y) * 5;
+                            }
                         });
                         
                         if (score > bestScore) {
