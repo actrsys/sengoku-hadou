@@ -166,6 +166,13 @@ const COMMAND_SPECS = {
     },
 
     // --- 調略 (STRATEGY) ---
+    'investigate': { 
+        label: "調査", category: 'STRATEGY', 
+        costGold: 0, costRice: 0, 
+        isMulti: true, hasAdvice: true, 
+        startMode: 'map_select', targetType: 'enemy_all',
+        sortKey: 'intelligence' 
+    },
     'incite': { 
         label: "扇動", category: 'STRATEGY', 
         costGold: 0, costRice: 0, 
@@ -189,13 +196,6 @@ const COMMAND_SPECS = {
     },
 
     // --- 情報 (INFO) ---
-    'investigate': { 
-        label: "調査", category: 'INFO', 
-        costGold: 0, costRice: 0, 
-        isMulti: true, hasAdvice: true, 
-        startMode: 'map_select', targetType: 'enemy_all',
-        sortKey: 'intelligence' 
-    },
     'busho_list': {
         label: "武将", category: 'INFO',
         isSystem: true, action: 'busho_list'
