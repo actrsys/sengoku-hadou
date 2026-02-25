@@ -365,7 +365,7 @@ class FieldWarManager {
             if (busho && busho.clan > 0) {
                 const clanData = this.game.clans.find(c => c.id === busho.clan);
                 if (clanData) {
-                    clanNameText = `${clanData.name}家 `; // 「〇〇家 」という文字を作ります
+                    clanNameText = `${clanData.name} `;
                 }
             }
         }
