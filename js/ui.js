@@ -1084,14 +1084,20 @@ class UIManager {
         
         const backBtn = document.querySelector('#selector-modal .btn-secondary');
         if(backBtn) {
-            backBtn.onclick = () => {
-                this.closeSelector();
-                if (onBack) {
-                    onBack(); 
-                } else if (extraData && extraData.onCancel) {
-                    extraData.onCancel(); // ★追加：キャンセルの合図を送る！
-                }
-            };
+            // ★追加：hideCancel という合図があったら、ボタンを隠す！
+            if (extraData && extraData.hideCancel) {
+                backBtn.style.display = 'none';
+            } else {
+                backBtn.style.display = ''; // 隠れていたものを元に戻す
+                backBtn.onclick = () => {
+                    this.closeSelector();
+                    if (onBack) {
+                        onBack(); 
+                    } else if (extraData && extraData.onCancel) {
+                        extraData.onCancel(); 
+                    }
+                };
+            }
         }
 
         if (this.selectorList) this.selectorList.innerHTML = '';
@@ -1106,7 +1112,7 @@ class UIManager {
         let sortKey = spec.sortKey || 'strength';
         let isMulti = spec.isMulti || false;
         
-        if (actionType === 'def_intercept_deploy') {
+        if (actionType === 'def_intercept_deploy' || actionType === 'def_reinf_deploy') {
              isMulti = true;
              sortKey = 'strength';
         }
@@ -1204,6 +1210,10 @@ class UIManager {
             bushos = this.game.getCastleBushos(c.id).filter(b => b.status !== 'ronin');
             infoHtml = "<div>迎撃に出陣する武将を選択してください（最大5名まで）</div>";
         }
+        else if (actionType === 'def_reinf_deploy') {
+            bushos = this.game.getCastleBushos(targetId).filter(b => b.status !== 'ronin');
+            infoHtml = "<div>援軍に派遣する武将を選択してください（最大5名まで）</div>";
+        }
         else {
             bushos = this.game.getCastleBushos(c.id).filter(b => b.status !== 'ronin');
             
@@ -1277,7 +1287,7 @@ class UIManager {
             let isSelectable = !b.isActionDone; 
             if (extraData && extraData.allowDone) isSelectable = true; 
             if (['employ_target','appoint_gunshi','rumor_target_busho','headhunt_target','interview','interview_target','reward','view_only','war_general', 'all_busho_list'].includes(actionType)) isSelectable = true;
-            if (actionType === 'def_intercept_deploy') isSelectable = true;
+            if (actionType === 'def_intercept_deploy' || actionType === 'def_reinf_deploy') isSelectable = true;
             
             let acc = null; if (isEnemyTarget && targetCastle) acc = targetCastle.investigatedAccuracy;
             const getStat = (stat) => GameSystem.getDisplayStatHTML(b, stat, gunshi, acc, this.game.playerClanId, myDaimyo);
@@ -1296,7 +1306,7 @@ class UIManager {
                             const siblings = this.selectorList.querySelectorAll('.select-item');
                             siblings.forEach(el => el.classList.remove('selected'));
                         } else {
-                             const maxSelect = (actionType === 'war_deploy' || actionType === 'def_intercept_deploy') ? 5 : 999;
+                             const maxSelect = (actionType === 'war_deploy' || actionType === 'def_intercept_deploy' || actionType === 'def_reinf_deploy') ? 5 : 999;
                              const currentChecked = this.selectorList.querySelectorAll('input[name="sel_busho"]:checked').length;
                              if(e.target.checked && currentChecked > maxSelect) {
                                  e.target.checked = false;
@@ -1312,7 +1322,7 @@ class UIManager {
                     const input = div.querySelector('input');
                     if(input) {
                         if (isMulti) { 
-                             const maxSelect = (actionType === 'war_deploy' || actionType === 'def_intercept_deploy') ? 5 : 999;
+                             const maxSelect = (actionType === 'war_deploy' || actionType === 'def_intercept_deploy' || actionType === 'def_reinf_deploy') ? 5 : 999;
                              const currentChecked = this.selectorList.querySelectorAll('input[name="sel_busho"]:checked').length;
                              if(!input.checked && currentChecked >= maxSelect) {
                                  this.showDialog(`出陣できる武将は最大${maxSelect}人までです。`, false);
@@ -1340,7 +1350,7 @@ class UIManager {
                     const inputs = document.querySelectorAll('input[name="sel_busho"]:checked'); if (inputs.length === 0) return;
                     const selectedIds = Array.from(inputs).map(i => parseInt(i.value)); 
                     this.closeSelector();
-                    if (actionType === 'def_intercept_deploy' && extraData && extraData.onConfirm) {
+                    if ((actionType === 'def_intercept_deploy' || actionType === 'def_reinf_deploy') && extraData && extraData.onConfirm) {
                         extraData.onConfirm(selectedIds);
                     } else {
                         this.game.commandSystem.handleBushoSelection(actionType, selectedIds, targetId, extraData);
@@ -1603,10 +1613,10 @@ class UIManager {
         if (this.tradeTypeInfo) this.tradeTypeInfo.classList.add('hidden'); 
         const c = this.currentCastle;
 
-        const createSlider = (label, id, max, currentVal) => { 
+        const createSlider = (label, id, max, currentVal, minVal = 0) => { 
             const wrap = document.createElement('div'); 
             wrap.className = 'qty-row'; 
-            wrap.innerHTML = `<label>${label} (Max: ${max})</label><div class="qty-control"><input type="range" id="range-${id}" min="0" max="${max}" value="${currentVal}"><input type="number" id="num-${id}" min="0" max="${max}" value="${currentVal}"></div>`; 
+            wrap.innerHTML = `<label>${label} (Max: ${max})</label><div class="qty-control"><input type="range" id="range-${id}" min="${minVal}" max="${max}" value="${currentVal}"><input type="number" id="num-${id}" min="${minVal}" max="${max}" value="${currentVal}"></div>`; 
             const range = wrap.querySelector(`#range-${id}`); 
             const num = wrap.querySelector(`#num-${id}`); 
 
@@ -1615,7 +1625,7 @@ class UIManager {
             num.oninput = () => {
                 let v = parseInt(num.value);
                 if (isNaN(v)) return; 
-                if (v < 0) v = 0;
+                if (v < minVal) v = minVal;
                 if (v > max) v = max;
                 if (num.value != v) num.value = v; 
                 range.value = v; 
@@ -1623,8 +1633,8 @@ class UIManager {
             
             num.onblur = () => {
                 if (num.value === "" || isNaN(parseInt(num.value))) {
-                    num.value = 0;
-                    range.value = 0;
+                    num.value = minVal;
+                    range.value = minVal;
                 }
             };
 
@@ -1656,6 +1666,13 @@ class UIManager {
             inputs.rice = createSlider("持参兵糧", "rice", interceptCastle.rice, interceptCastle.rice);
             inputs.horses = createSlider("持参騎馬", "horses", interceptCastle.horses || 0, 0);
             inputs.guns = createSlider("持参鉄砲", "guns", interceptCastle.guns || 0, 0);
+        } else if (type === 'def_reinf_supplies') { 
+            const helperCastle = (data && data.length > 0) ? data[0] : c;
+            document.getElementById('quantity-title').textContent = "防衛援軍の部隊編成"; 
+            inputs.soldiers = createSlider("出陣兵士数", "soldiers", helperCastle.soldiers, helperCastle.soldiers, 500);
+            inputs.rice = createSlider("持参兵糧", "rice", helperCastle.rice, helperCastle.rice, 500);
+            inputs.horses = createSlider("持参騎馬", "horses", helperCastle.horses || 0, 0, 0);
+            inputs.guns = createSlider("持参鉄砲", "guns", helperCastle.guns || 0, 0, 0);
         } else if (type === 'transport') {
             document.getElementById('quantity-title').textContent = "輸送物資指定"; 
             inputs.gold = createSlider("金", "gold", c.gold, 0); 
@@ -1705,7 +1722,7 @@ class UIManager {
         
         this.quantityConfirmBtn.onclick = () => {
             this.quantityModal.classList.add('hidden');
-            if (type === 'def_intercept' && extraData && extraData.onConfirm) {
+            if ((type === 'def_intercept' || type === 'def_reinf_supplies') && extraData && extraData.onConfirm) {
                 extraData.onConfirm(inputs);
             } else {
                 this.game.commandSystem.handleQuantitySelection(type, inputs, targetId, data, extraData);

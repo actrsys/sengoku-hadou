@@ -1451,7 +1451,6 @@ class WarManager {
         }
     }
 
-    // ★ここから下を丸ごと差し替えます
     executeDefReinforcement(gold, helperCastle, defCastle, onComplete) {
         if (gold > 0) defCastle.gold -= gold;
 
@@ -1462,28 +1461,24 @@ class WarManager {
         const myToHelperRel = this.game.getRelation(myClanId, helperClanId);
         const helperToEnemyRel = this.game.getRelation(helperClanId, enemyClanId);
 
-        // ★追加：もし援軍を頼まれたのが「プレイヤー」だったら、受けるか断るか選びます！
         if (helperClanId === this.game.playerClanId) {
             const myClanName = this.game.clans.find(c => c.id === myClanId)?.name || "不明";
-            
-            // 自分から見て、頼んできた相手が「主君」かどうか調べます
-            const myToHelperRel = this.game.getRelation(helperClanId, myClanId); 
-            const isBoss = (myToHelperRel.status === '従属'); // 自分が従属している＝相手が主君
+            const isBoss = (myToHelperRel.status === '従属');
 
-            // プレイヤーが選べるように「思考中」のフタを外します
             if (this.game.ui.aiGuard) this.game.ui.aiGuard.classList.add('hidden');
 
+            // ★武将選択画面を呼び出す合図
+            const startSelection = () => {
+                this._promptPlayerDefReinforcement(helperCastle, defCastle, myToHelperRel, onComplete, isBoss);
+            };
+
             if (isBoss) {
-                // 主君からの命令なので拒否できません！
                 const msg = `主家である ${myClanName} (${defCastle.name}) から防衛の援軍要請が届きました。\n（使者持参金: ${gold}）\n当家は従属しているため、直ちに出陣します！`;
-                this.game.ui.showDialog(msg, false, () => {
-                    this._applyDefReinforcement(helperCastle, defCastle, myToHelperRel, onComplete);
-                });
+                this.game.ui.showDialog(msg, false, startSelection);
             } else {
-                // いつも通り「はい・いいえ」が選べます
                 const msg = `${myClanName} (${defCastle.name}) から防衛の援軍要請が届きました。\n（使者持参金: ${gold}）\n援軍を派遣しますか？`;
                 this.game.ui.showDialog(msg, true, 
-                    () => { this._applyDefReinforcement(helperCastle, defCastle, myToHelperRel, onComplete); },
+                    startSelection,
                     () => {
                         this.game.diplomacyManager.updateSentiment(myClanId, helperClanId, -10);
                         this.game.ui.showDialog(`援軍要請を断りました。`, false, onComplete);
@@ -1505,7 +1500,7 @@ class WarManager {
             if (helperToEnemyRel && helperToEnemyRel.sentiment >= 50) {
                 prob -= Math.floor((helperToEnemyRel.sentiment - 50) * (20 / 50)) + 1; 
             }
-            prob += 10; // 守備側は少しだけ来てくれやすいボーナス
+            prob += 10; 
             if (Math.random() * 100 < prob) isSuccess = true;
         }
 
@@ -1588,6 +1583,68 @@ class WarManager {
             onComplete();
         }
     }
-    // ★差し替え・追加ここまで
+    
+    // ★ここから追加：プレイヤーが武将と兵数を選ぶための新しい処理
+    _promptPlayerDefReinforcement(helperCastle, defCastle, myToHelperRel, onComplete, isBoss) {
+        const promptBusho = () => {
+            this.game.ui.openBushoSelector('def_reinf_deploy', helperCastle.id, {
+                hideCancel: isBoss, // ★追加：主君からの命令なら「戻る(キャンセル)」ボタンを隠す！
+                onConfirm: (selectedBushoIds) => {
+                    const reinfBushos = selectedBushoIds.map(id => this.game.getBusho(id));
+                    promptQuantity(reinfBushos);
+                },
+                onCancel: () => {
+                    // ★主君の時はそもそもボタンが見えないので、ここに来るのは主君じゃない時だけです！
+                    this.game.ui.showDialog("援軍の派遣を取りやめました。", false, onComplete);
+                }
+            });
+        };
+
+        const promptQuantity = (reinfBushos) => {
+            this.game.ui.openQuantitySelector('def_reinf_supplies', [helperCastle], null, {
+                onConfirm: (inputs) => {
+                    const inputData = inputs[helperCastle.id] || inputs;
+                    const reinfSoldiers = inputData.soldiers ? parseInt(inputData.soldiers.num.value) : 500;
+                    const reinfRice = inputData.rice ? parseInt(inputData.rice.num.value) : 500;
+                    const reinfHorses = inputData.horses ? parseInt(inputData.horses.num.value) : 0;
+                    const reinfGuns = inputData.guns ? parseInt(inputData.guns.num.value) : 0;
+
+                    this._applyManualDefReinforcement(helperCastle, defCastle, myToHelperRel, reinfBushos, reinfSoldiers, reinfRice, reinfHorses, reinfGuns, onComplete);
+                },
+                onCancel: () => {
+                    promptBusho(); // 戻るボタンで武将選択に戻ります
+                }
+            });
+        };
+
+        promptBusho(); // 最初に武将選択画面を呼び出します
+    }
+
+    _applyManualDefReinforcement(helperCastle, defCastle, myToHelperRel, reinfBushos, reinfSoldiers, reinfRice, reinfHorses, reinfGuns, onComplete) {
+        const myClanId = defCastle.ownerClan;
+        const helperClanId = helperCastle.ownerClan;
+
+        // 援軍元の城から減らす
+        helperCastle.soldiers = Math.max(0, helperCastle.soldiers - reinfSoldiers);
+        helperCastle.rice = Math.max(0, helperCastle.rice - reinfRice);
+        helperCastle.horses = Math.max(0, (helperCastle.horses || 0) - reinfHorses);
+        helperCastle.guns = Math.max(0, (helperCastle.guns || 0) - reinfGuns);
+        reinfBushos.forEach(b => b.isActionDone = true);
+
+        // 守備側の援軍パックとして state に保存
+        this.state.defReinforcement = {
+            castle: helperCastle,
+            bushos: reinfBushos,
+            soldiers: reinfSoldiers,
+            rice: reinfRice,
+            horses: reinfHorses,
+            guns: reinfGuns
+        };
+
+        this.state.isPlayerInvolved = true;
+        const helperClanName = this.game.clans.find(c => c.id === helperClanId)?.name || "援軍";
+        this.game.ui.showDialog(`${helperClanName} (${helperCastle.name}) が防衛の援軍に出発しました！`, false, onComplete);
+    }
+    // ★追加ここまで
     
 }
