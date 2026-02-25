@@ -1340,9 +1340,9 @@ class WarManager {
             const enemyRel = this.game.getRelation(c.ownerClan, atkClanId);
             if (['同盟', '支配', '従属'].includes(enemyRel.status)) return;
 
-            // 守備側は「自領と隣接している城」にだけ呼べます
-            const isNextToMe = GameSystem.isAdjacent(c, defCastle);
-            if (!isNextToMe) return;
+            // ★変更: 守備側は「攻められている大名が所有しているいずれかの城」に隣接している城にだけ呼べます
+            const isNextToMyAnyCastle = this.game.castles.some(myC => myC.ownerClan === defClanId && GameSystem.isAdjacent(c, myC));
+            if (!isNextToMyAnyCastle) return;
 
             if (c.soldiers < 1000) return;
 

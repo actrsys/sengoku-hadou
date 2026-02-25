@@ -1800,10 +1800,10 @@ class CommandSystem {
             const enemyRel = this.game.getRelation(c.ownerClan, enemyClanId);
             if (['同盟', '支配', '従属'].includes(enemyRel.status)) return;
 
-            // 攻撃側の条件: 自領か攻撃先に隣接しているか
-            const isNextToMe = GameSystem.isAdjacent(c, atkCastle);
+            // ★変更: 攻撃側の条件: 自分の所有しているいずれかの城、または攻撃先に隣接しているか
+            const isNextToMyAnyCastle = this.game.castles.some(myC => myC.ownerClan === myClanId && GameSystem.isAdjacent(c, myC));
             const isNextToEnemy = GameSystem.isAdjacent(c, targetCastle);
-            if (!isNextToMe && !isNextToEnemy) return;
+            if (!isNextToMyAnyCastle && !isNextToEnemy) return;
 
             // 兵士が1000人以上いるか
             if (c.soldiers < 1000) return;
