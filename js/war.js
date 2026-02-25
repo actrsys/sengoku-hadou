@@ -146,18 +146,20 @@ class WarManager {
         return this.game.castles.filter(target => {
             // 基本的なチェック（道が繋がっているか、自分の城じゃないか、免疫期間じゃないか）
             if (!GameSystem.isReachable(this.game, currentCastle, target, myClanId)) return false;
-            if (target.ownerClan === myClanId || target.ownerClan === 0) return false;
+            if (target.ownerClan === myClanId) return false; // ★ここにあった「|| target.ownerClan === 0」を消しました！
             if ((target.immunityUntil || 0) >= this.game.getCurrentTurnId()) return false;
             
-            // 直接の「同盟・支配・従属」は攻撃不可
-            const rel = this.game.getRelation(myClanId, target.ownerClan);
-            if (['同盟', '支配', '従属'].includes(rel.status)) return false;
+            // 直接の「同盟・支配・従属」は攻撃不可（※中立の城以外でチェックします）
+            if (target.ownerClan !== 0) {
+                const rel = this.game.getRelation(myClanId, target.ownerClan);
+                if (['同盟', '支配', '従属'].includes(rel.status)) return false;
 
-            // ★追加：親大名がいる場合、親の「同盟国」や「他の従属国（親が支配している国）」は攻撃できない
-            if (myBossId !== 0) {
-                const bossRel = this.game.getRelation(myBossId, target.ownerClan);
-                if (bossRel && ['同盟', '支配'].includes(bossRel.status)) {
-                    return false; // 攻撃先リストに入れません
+                // ★追加：親大名がいる場合、親の「同盟国」や「他の従属国（親が支配している国）」は攻撃できない
+                if (myBossId !== 0) {
+                    const bossRel = this.game.getRelation(myBossId, target.ownerClan);
+                    if (bossRel && ['同盟', '支配'].includes(bossRel.status)) {
+                        return false; // 攻撃先リストに入れません
+                    }
                 }
             }
 
