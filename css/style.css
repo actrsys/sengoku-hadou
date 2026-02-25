@@ -1,3 +1,7 @@
+@font-face {
+    font-family: 'FudeGoshirae'; /* プログラムの中で使う「あだ名」です */
+    src: url('../data/fonts/fude-goshirae.woff2') format('woff2'); /* ファイルへの道順 */
+}
 :root {
     --bg-color: #eceff1;
     --panel-bg: #ffffff;
@@ -8,7 +12,7 @@
 }
 
 body {
-    font-family: "Helvetica Neue", Arial, sans-serif;
+    font-family: 'FudeGoshirae', serif; /* ここを書き換え！ */
     margin: 0; padding: 0;
     background-color: var(--bg-color);
     color: var(--text-color);
