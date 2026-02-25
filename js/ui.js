@@ -1854,4 +1854,188 @@ class UIManager {
             });
         }
     }
+    
+    // ★ここから下を追加：援軍を選ぶ画面を出す機能です
+    showReinforcementSelector(candidateCastles, atkCastle, targetCastle, atkBushos, sVal, rVal, hVal, gVal) {
+        if (!this.selectorModal) return;
+        this.selectorModal.classList.remove('hidden');
+        
+        const title = document.getElementById('selector-title');
+        if (title) title.textContent = "援軍の要請";
+
+        const listHeader = document.querySelector('#selector-modal .list-header');
+        if (listHeader) listHeader.style.display = 'none'; // ヘッダーは消す
+        
+        const backBtn = document.querySelector('#selector-modal .btn-secondary');
+        if(backBtn) {
+            backBtn.onclick = () => {
+                // キャンセルしたら援軍なしで戦争スタート！
+                if (listHeader) listHeader.style.display = '';
+                this.closeSelector();
+                this.game.warManager.startWar(atkCastle, targetCastle, atkBushos, sVal, rVal, hVal, gVal);
+            };
+        }
+
+        const contextEl = document.getElementById('selector-context-info');
+        if (contextEl) {
+            contextEl.innerHTML = `<div>援軍を要請する城を選択してください。<br>（キャンセルすると援軍なしで出陣します）</div>`;
+            contextEl.classList.remove('hidden');
+        }
+
+        if (this.selectorList) {
+            this.selectorList.innerHTML = '';
+            candidateCastles.forEach(c => {
+                const clanData = this.game.clans.find(clan => clan.id === c.ownerClan);
+                const clanName = clanData ? clanData.name : "不明";
+                const rel = this.game.getRelation(this.game.playerClanId, c.ownerClan);
+                
+                const div = document.createElement('div');
+                div.className = 'kunishu-item'; // デザインは国衆のものを流用して綺麗にします
+                div.innerHTML = `<strong style="margin-right:10px;">${clanName} (${c.name})</strong> <span style="font-size:0.9rem; color:#555;">(兵数:${c.soldiers} 友好度:${rel.sentiment} [${rel.status}])</span>`;
+                
+                div.onclick = () => { 
+                    if (listHeader) listHeader.style.display = '';
+                    this.closeSelector();
+                    // 城を選んだら、お金を送る画面に進みます！
+                    this.showReinforcementGoldSelector(c, atkCastle, targetCastle, atkBushos, sVal, rVal, hVal, gVal);
+                };
+                this.selectorList.appendChild(div);
+            });
+        }
+        
+        if (this.selectorConfirmBtn) {
+            this.selectorConfirmBtn.classList.add('hidden');
+        }
+    }
+
+    showReinforcementGoldSelector(helperCastle, atkCastle, targetCastle, atkBushos, sVal, rVal, hVal, gVal) {
+        // 相手を「支配」しているならお金は送らない
+        const rel = this.game.getRelation(this.game.playerClanId, helperCastle.ownerClan);
+        if (rel.status === '支配') {
+            this.game.commandSystem.executeReinforcementRequest(0, helperCastle, atkCastle, targetCastle, atkBushos, sVal, rVal, hVal, gVal);
+            return;
+        }
+
+        // お金を送るスライダー画面の準備
+        if (!this.quantityModal) return;
+        this.quantityModal.classList.remove('hidden'); 
+        if (this.quantityContainer) this.quantityContainer.innerHTML = '';
+        if (this.charityTypeSelector) this.charityTypeSelector.classList.add('hidden'); 
+        if (this.tradeTypeInfo) this.tradeTypeInfo.classList.add('hidden'); 
+
+        document.getElementById('quantity-title').textContent = "援軍の使者に持たせる金 (最大1500)"; 
+        
+        // 自分の城の金と1500の、少ない方が上限です
+        const maxGold = Math.min(1500, atkCastle.gold);
+
+        const wrap = document.createElement('div'); 
+        wrap.className = 'qty-row'; 
+        wrap.innerHTML = `<label>持参金 (Max: ${maxGold})</label><div class="qty-control"><input type="range" id="range-reinf-gold" min="0" max="${maxGold}" value="0"><input type="number" id="num-reinf-gold" min="0" max="${maxGold}" value="0"></div>`; 
+        this.quantityContainer.appendChild(wrap); 
+
+        const range = wrap.querySelector(`#range-reinf-gold`); 
+        const num = wrap.querySelector(`#num-reinf-gold`); 
+        range.oninput = () => num.value = range.value; 
+        num.oninput = () => {
+            let v = parseInt(num.value);
+            if (isNaN(v)) return; 
+            if (v < 0) v = 0; if (v > maxGold) v = maxGold;
+            if (num.value != v) num.value = v; 
+            range.value = v; 
+        };
+
+        this.quantityConfirmBtn.onclick = () => {
+            this.quantityModal.classList.add('hidden');
+            const gold = parseInt(num.value) || 0;
+            // お金が決まったら、実際に要請する機能（次回作ります）にバトンタッチ！
+            this.game.commandSystem.executeReinforcementRequest(gold, helperCastle, atkCastle, targetCastle, atkBushos, sVal, rVal, hVal, gVal);
+        };
+    }
+    
+    // ★ここから追加: 守備側（攻められた時）の援軍を選ぶ画面です
+    showDefReinforcementSelector(candidateCastles, defCastle, onComplete) {
+        if (!this.selectorModal) return;
+        this.selectorModal.classList.remove('hidden');
+        const title = document.getElementById('selector-title');
+        if (title) title.textContent = "防衛の援軍要請";
+
+        const listHeader = document.querySelector('#selector-modal .list-header');
+        if (listHeader) listHeader.style.display = 'none'; 
+        
+        const backBtn = document.querySelector('#selector-modal .btn-secondary');
+        if(backBtn) {
+            backBtn.onclick = () => {
+                if (listHeader) listHeader.style.display = '';
+                this.closeSelector();
+                // キャンセルしたら援軍なしで迎撃・籠城の選択へ進みます
+                onComplete();
+            };
+        }
+
+        const contextEl = document.getElementById('selector-context-info');
+        if (contextEl) {
+            contextEl.innerHTML = `<div>敵が攻めてきました！援軍を要請する城を選択してください。<br>（キャンセルすると援軍なしで戦います）</div>`;
+            contextEl.classList.remove('hidden');
+        }
+
+        if (this.selectorList) {
+            this.selectorList.innerHTML = '';
+            candidateCastles.forEach(c => {
+                const clanData = this.game.clans.find(clan => clan.id === c.ownerClan);
+                const rel = this.game.getRelation(this.game.playerClanId, c.ownerClan);
+                const div = document.createElement('div');
+                div.className = 'kunishu-item'; 
+                div.innerHTML = `<strong style="margin-right:10px;">${clanData ? clanData.name : "不明"} (${c.name})</strong> <span style="font-size:0.9rem; color:#555;">(兵数:${c.soldiers} 友好度:${rel.sentiment} [${rel.status}])</span>`;
+                
+                div.onclick = () => { 
+                    if (listHeader) listHeader.style.display = '';
+                    this.closeSelector();
+                    // 城を選んだら、お金の選択画面へ！
+                    this.showDefReinforcementGoldSelector(c, defCastle, onComplete);
+                };
+                this.selectorList.appendChild(div);
+            });
+        }
+        if (this.selectorConfirmBtn) this.selectorConfirmBtn.classList.add('hidden');
+    }
+
+    showDefReinforcementGoldSelector(helperCastle, defCastle, onComplete) {
+        const rel = this.game.getRelation(this.game.playerClanId, helperCastle.ownerClan);
+        if (rel.status === '支配') {
+            this.game.warManager.executeDefReinforcement(0, helperCastle, defCastle, onComplete);
+            return;
+        }
+
+        if (!this.quantityModal) return;
+        this.quantityModal.classList.remove('hidden'); 
+        if (this.quantityContainer) this.quantityContainer.innerHTML = '';
+        if (this.charityTypeSelector) this.charityTypeSelector.classList.add('hidden'); 
+        if (this.tradeTypeInfo) this.tradeTypeInfo.classList.add('hidden'); 
+
+        document.getElementById('quantity-title').textContent = "援軍の使者に持たせる金 (最大1500)"; 
+        const maxGold = Math.min(1500, defCastle.gold);
+
+        const wrap = document.createElement('div'); 
+        wrap.className = 'qty-row'; 
+        wrap.innerHTML = `<label>持参金 (Max: ${maxGold})</label><div class="qty-control"><input type="range" id="range-def-gold" min="0" max="${maxGold}" value="0"><input type="number" id="num-def-gold" min="0" max="${maxGold}" value="0"></div>`; 
+        this.quantityContainer.appendChild(wrap); 
+
+        const range = wrap.querySelector(`#range-def-gold`); 
+        const num = wrap.querySelector(`#num-def-gold`); 
+        range.oninput = () => num.value = range.value; 
+        num.oninput = () => {
+            let v = parseInt(num.value) || 0;
+            if (v < 0) v = 0; if (v > maxGold) v = maxGold;
+            if (num.value != v) num.value = v; 
+            range.value = v; 
+        };
+
+        this.quantityConfirmBtn.onclick = () => {
+            this.quantityModal.classList.add('hidden');
+            const gold = parseInt(num.value) || 0;
+            // 決定したら援軍の計算処理にバトンタッチ！
+            this.game.warManager.executeDefReinforcement(gold, helperCastle, defCastle, onComplete);
+        };
+    }
+    
 }

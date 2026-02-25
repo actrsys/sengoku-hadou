@@ -256,7 +256,8 @@ class WarManager {
         }));
     }
 
-    async startWar(atkCastle, defCastle, atkBushos, atkSoldierCount, atkRice, atkHorses = 0, atkGuns = 0) {
+    // ★修正: 一番最後に「reinforcementData = null」を追加して、援軍パックを受け取れるようにします！
+    async startWar(atkCastle, defCastle, atkBushos, atkSoldierCount, atkRice, atkHorses = 0, atkGuns = 0, reinforcementData = null) {
         try {
             // 攻撃部隊の中に大名がいれば探し、いなければ城主を探す
             let atkLeaderIdx = atkBushos.findIndex(b => b.isDaimyo);
@@ -271,6 +272,31 @@ class WarManager {
             const atkClan = Number(atkCastle.ownerClan);
             const defClan = Number(defCastle.ownerClan);
             let isPlayerInvolved = (atkClan === pid || defClan === pid);
+
+            // ★追加: 援軍が来ている場合、援軍元の城から兵士や物資を減らして、攻撃軍に合流させます！
+            if (reinforcementData) {
+                const helperCastle = reinforcementData.castle;
+                // 援軍の城から出陣する分を引く
+                helperCastle.soldiers = Math.max(0, helperCastle.soldiers - reinforcementData.soldiers);
+                helperCastle.rice = Math.max(0, helperCastle.rice - reinforcementData.rice);
+                helperCastle.horses = Math.max(0, (helperCastle.horses || 0) - reinforcementData.horses);
+                helperCastle.guns = Math.max(0, (helperCastle.guns || 0) - reinforcementData.guns);
+                reinforcementData.bushos.forEach(b => b.isActionDone = true);
+                
+                // 攻撃軍の総戦力に、援軍の分を足し算する（一緒に戦うため）
+                atkSoldierCount += reinforcementData.soldiers;
+                atkRice += reinforcementData.rice;
+                atkHorses += reinforcementData.horses;
+                atkGuns += reinforcementData.guns;
+                
+                // 武将たちも攻撃軍のリストに合流させます
+                atkBushos = atkBushos.concat(reinforcementData.bushos);
+                
+                // 援軍として参加したのがプレイヤーだった場合、プレイヤーが関わっている戦争として扱います
+                if (helperCastle.ownerClan === pid) {
+                    isPlayerInvolved = true;
+                }
+            }
 
             // ★追加: AI（プレイヤー以外）が攻撃を仕掛ける場合、城にある馬と鉄砲をすべて持ち出す！
             if (atkClan !== pid && !atkCastle.isKunishu) {
@@ -315,100 +341,102 @@ class WarManager {
             this.state = { 
                 active: true, round: 1, attacker: attackerForce, sourceCastle: atkCastle, 
                 defender: defCastle, atkBushos: atkBushos, defBusho: defBusho, 
-                turn: 'attacker', isPlayerInvolved: isPlayerInvolved, deadSoldiers: { attacker: 0, defender: 0 }, defenderGuarding: false 
+                turn: 'attacker', isPlayerInvolved: isPlayerInvolved, deadSoldiers: { attacker: 0, defender: 0 }, defenderGuarding: false,
+                // ★追加: あとで援軍を自分の城に帰せるように、戦争データに援軍パックを覚えておきます
+                reinforcement: reinforcementData 
             };
+            // ★ここから差し替え
             const showInterceptDialog = async (onResult) => {
 	            if (isPlayerInvolved) await this.game.ui.showCutin(`${atkArmyName}の${atkBushos[0].name}が\n${defCastle.name}に攻め込みました！`);
 
-	            if (defClan === pid) {
-	                
-	                if (defCastle.soldiers <= 0) {
-	                    // 兵士が0人以下の時は、自動的に籠城（ろうじょう）するよ！
-	                    if (isPlayerInvolved) this.game.ui.log("城に兵士がいないため、迎撃（野戦）に出られません！");
-	                    onResult('siege');
-	                } else {
+                // ★追加：カットインが出た直後に、防衛側の援軍要請チェックを挟みます！
+                this.checkDefenderReinforcement(defCastle, atkClan, () => {
 
-                    const modal = document.getElementById('intercept-confirm-modal');
-                    if (modal) {
-                        // ★追加：プレイヤーが操作できるように「思考中」のガードを一旦外します
-                        if (this.game.ui.aiGuard) this.game.ui.aiGuard.classList.add('hidden');
-                        modal.classList.remove('hidden');
-                        document.getElementById('intercept-msg').innerText = `${atkArmyName}の${atkBushos[0].name}が攻めてきました！\n迎撃（野戦）しますか？籠城しますか？`;
-                        document.getElementById('btn-intercept').onclick = () => { 
-                            modal.classList.add('hidden'); 
-                            this.game.ui.openBushoSelector('def_intercept_deploy', defCastle.id, {
-                                onConfirm: (selectedBushoIds) => {
-                                    const defBushos = selectedBushoIds.map(id => this.game.getBusho(id));
-                                    // プレイヤーが選んだ防衛部隊の中に大名か城主がいれば一番前にする
-                                    let defLeaderIdx = defBushos.findIndex(b => b.isDaimyo);
-                                    if (defLeaderIdx === -1) defLeaderIdx = defBushos.findIndex(b => b.isCastellan);
-                                    if (defLeaderIdx > 0) {
-                                        const leader = defBushos.splice(defLeaderIdx, 1)[0];
-                                        defBushos.unshift(leader);
-                                    }
-                                    this.game.ui.openQuantitySelector('def_intercept', [defCastle], null, {
-                                        onConfirm: (inputs) => {
-                                            const inputData = inputs[defCastle.id] || inputs;
-                                            const interceptSoldiers = inputData.soldiers ? parseInt(inputData.soldiers.num.value) : (inputData.soldiers || 0);
-                                            const interceptRice = inputData.rice ? parseInt(inputData.rice.num.value) : (inputData.rice || 0);
-                                            const interceptHorses = inputData.horses ? parseInt(inputData.horses.num.value) : 0;
-                                            const interceptGuns = inputData.guns ? parseInt(inputData.guns.num.value) : 0;
-                                            
-                                            this.game.ui.showUnitDivideModal(defBushos, interceptSoldiers, interceptHorses, interceptGuns, (defAssignments) => {
-                                                onResult('field', defAssignments, interceptRice, this.autoDivideSoldiers(atkBushos, atkSoldierCount), interceptHorses, interceptGuns);
-                                            });
+    	            if (defClan === pid) {
+    	                
+    	                if (defCastle.soldiers <= 0) {
+    	                    // 兵士が0人以下の時は、自動的に籠城（ろうじょう）するよ！
+    	                    if (isPlayerInvolved) this.game.ui.log("城に兵士がいないため、迎撃（野戦）に出られません！");
+    	                    onResult('siege');
+    	                } else {
+
+                        const modal = document.getElementById('intercept-confirm-modal');
+                        if (modal) {
+                            if (this.game.ui.aiGuard) this.game.ui.aiGuard.classList.add('hidden');
+                            modal.classList.remove('hidden');
+                            // ★迎撃確認画面で、敵と自分の兵士数も表示してあげます
+                            document.getElementById('intercept-msg').innerText = `${atkArmyName}の${atkBushos[0].name}が攻めてきました！\n敵軍: ${atkSoldierCount} 対 自軍: ${defCastle.soldiers}\n迎撃（野戦）しますか？籠城しますか？`;
+                            document.getElementById('btn-intercept').onclick = () => { 
+                                modal.classList.add('hidden'); 
+                                this.game.ui.openBushoSelector('def_intercept_deploy', defCastle.id, {
+                                    onConfirm: (selectedBushoIds) => {
+                                        const defBushos = selectedBushoIds.map(id => this.game.getBusho(id));
+                                        let defLeaderIdx = defBushos.findIndex(b => b.isDaimyo);
+                                        if (defLeaderIdx === -1) defLeaderIdx = defBushos.findIndex(b => b.isCastellan);
+                                        if (defLeaderIdx > 0) {
+                                            const leader = defBushos.splice(defLeaderIdx, 1)[0];
+                                            defBushos.unshift(leader);
                                         }
+                                        this.game.ui.openQuantitySelector('def_intercept', [defCastle], null, {
+                                            onConfirm: (inputs) => {
+                                                const inputData = inputs[defCastle.id] || inputs;
+                                                const interceptSoldiers = inputData.soldiers ? parseInt(inputData.soldiers.num.value) : (inputData.soldiers || 0);
+                                                const interceptRice = inputData.rice ? parseInt(inputData.rice.num.value) : (inputData.rice || 0);
+                                                const interceptHorses = inputData.horses ? parseInt(inputData.horses.num.value) : 0;
+                                                const interceptGuns = inputData.guns ? parseInt(inputData.guns.num.value) : 0;
+                                                
+                                                this.game.ui.showUnitDivideModal(defBushos, interceptSoldiers, interceptHorses, interceptGuns, (defAssignments) => {
+                                                    onResult('field', defAssignments, interceptRice, this.autoDivideSoldiers(atkBushos, atkSoldierCount), interceptHorses, interceptGuns);
+                                                });
+                                            }
+                                        });
+                                    }
+                                });
+                            };
+                            document.getElementById('btn-siege').onclick = () => { modal.classList.add('hidden'); onResult('siege'); };
+                        } else onResult('siege');
+                        
+                    }
+                    } else {
+                        if (defCastle.soldiers >= atkSoldierCount * 0.8) {
+                            let availableDefBushos = this.game.getCastleBushos(defCastle.id).filter(b => b.status !== 'dead');
+                            if (!defCastle.isKunishu) {
+                                availableDefBushos = availableDefBushos.filter(b => Number(b.clan) === Number(defCastle.ownerClan));
+                            } else {
+                                availableDefBushos = availableDefBushos.filter(b => b.belongKunishuId === defCastle.kunishuId);
+                            }
+                            const defBushos = availableDefBushos.sort((a,b) => b.strength - a.strength).slice(0, 5);
+                            
+                            let defLeaderIdx = defBushos.findIndex(b => b.isDaimyo);
+                            if (defLeaderIdx === -1) defLeaderIdx = defBushos.findIndex(b => b.isCastellan);
+                            if (defLeaderIdx > 0) {
+                                const leader = defBushos.splice(defLeaderIdx, 1)[0];
+                                defBushos.unshift(leader);
+                            }
+                            
+                            const defSoldiers = defCastle.soldiers;
+                            const defRice = Math.min(defCastle.rice, defSoldiers); 
+                            
+                            const defHorses = defCastle.horses || 0;
+                            const defGuns = defCastle.guns || 0;
+                            const defAssignments = this.autoDivideSoldiers(defBushos, defSoldiers, defHorses, defGuns);
+                            
+                            if (atkClan === pid) {
+                                if (attackerForce.isKunishu) {
+                                    onResult('field', defAssignments, defRice, [{busho: atkBushos[0], soldiers: atkSoldierCount, troopType: 'ashigaru'}], defHorses, defGuns);
+                                } else {
+                                    this.game.ui.showUnitDivideModal(atkBushos, atkSoldierCount, atkHorses, atkGuns, (atkAssignments) => {
+                                        onResult('field', defAssignments, defRice, atkAssignments, defHorses, defGuns);
                                     });
                                 }
-                            });
-                        };
-                        document.getElementById('btn-siege').onclick = () => { modal.classList.add('hidden'); onResult('siege'); };
-                    } else onResult('siege');
-                    
-                }
-                } else {
-                    if (defCastle.soldiers >= atkSoldierCount * 0.8) {
-                        // ★修正2：浪人や無関係な国人衆など、部外者を防衛軍から除外する！
-                        let availableDefBushos = this.game.getCastleBushos(defCastle.id).filter(b => b.status !== 'dead');
-                        if (!defCastle.isKunishu) {
-                            availableDefBushos = availableDefBushos.filter(b => Number(b.clan) === Number(defCastle.ownerClan));
-                        } else {
-                            availableDefBushos = availableDefBushos.filter(b => b.belongKunishuId === defCastle.kunishuId);
-                        }
-                        const defBushos = availableDefBushos.sort((a,b) => b.strength - a.strength).slice(0, 5);
-                        
-                        // コンピュータの防衛部隊の中に大名か城主がいれば一番前にする
-                        let defLeaderIdx = defBushos.findIndex(b => b.isDaimyo);
-                        if (defLeaderIdx === -1) defLeaderIdx = defBushos.findIndex(b => b.isCastellan);
-                        if (defLeaderIdx > 0) {
-                            const leader = defBushos.splice(defLeaderIdx, 1)[0];
-                            defBushos.unshift(leader);
-                        }
-                        
-                        const defSoldiers = defCastle.soldiers;
-                        const defRice = Math.min(defCastle.rice, defSoldiers); 
-                        
-                        // ★追加・修正：防衛側のAIも、城の馬と鉄砲をありったけ使って迎撃する！
-                        const defHorses = defCastle.horses || 0;
-                        const defGuns = defCastle.guns || 0;
-                        const defAssignments = this.autoDivideSoldiers(defBushos, defSoldiers, defHorses, defGuns);
-                        
-                        if (atkClan === pid) {
-                            // 国人衆の反乱時は分割画面を出さない
-                            if (attackerForce.isKunishu) {
-                                onResult('field', defAssignments, defRice, [{busho: atkBushos[0], soldiers: atkSoldierCount, troopType: 'ashigaru'}], defHorses, defGuns);
                             } else {
-                                this.game.ui.showUnitDivideModal(atkBushos, atkSoldierCount, atkHorses, atkGuns, (atkAssignments) => {
-                                    onResult('field', defAssignments, defRice, atkAssignments, defHorses, defGuns);
-                                });
+                                onResult('field', defAssignments, defRice, this.autoDivideSoldiers(atkBushos, atkSoldierCount, atkHorses, atkGuns), defHorses, defGuns);
                             }
-                        } else {
-                            // 攻撃側AIの兵器も autoDivideSoldiers に渡して計算させる
-                            onResult('field', defAssignments, defRice, this.autoDivideSoldiers(atkBushos, atkSoldierCount, atkHorses, atkGuns), defHorses, defGuns);
-                        }
-                    } else onResult('siege');
-                }
+                        } else onResult('siege');
+                    }
+                }); // ★追加: 援軍要請チェックの終わり
             };
+            // ★ここまで差し替え
 
             // 国人衆制圧戦の場合は野戦をスキップして即攻城戦へ
             if (this.state.isKunishuSubjugation) {
@@ -785,12 +813,140 @@ class WarManager {
             s.attacker.horses = Math.floor((s.attacker.horses || 0) * atkSurviveRate);
             s.attacker.guns = Math.floor((s.attacker.guns || 0) * atkSurviveRate);            
 
-            // ★追加: 防衛側（城）の馬と鉄砲も、兵士の損耗に合わせて壊れるようにする
+            // 防衛側（城）の馬と鉄砲も、兵士の損耗に合わせて壊れるようにする
             if (!s.defender.isKunishu) {
                 const originalDefSoldiers = s.defender.soldiers + s.deadSoldiers.defender;
                 const defSurviveRate = originalDefSoldiers > 0 ? (Math.max(0, s.defender.soldiers) / originalDefSoldiers) : 0;
                 s.defender.horses = Math.floor((s.defender.horses || 0) * defSurviveRate);
                 s.defender.guns = Math.floor((s.defender.guns || 0) * defSurviveRate);
+            }
+            
+            // 援軍部隊を元の城に帰還させる処理
+            if (s.reinforcement) {
+                const reinf = s.reinforcement;
+                const helperCastle = this.game.getCastle(reinf.castle.id); 
+                
+                if (helperCastle) {
+                    let surviveRate = 0;
+                    if (reinf.isAttacker) {
+                        surviveRate = atkSurviveRate;
+                    } else {
+                        // 守備側の援軍用（次回以降作ります！）
+                        const originalDefSoldiers = s.defender.soldiers + s.deadSoldiers.defender;
+                        surviveRate = originalDefSoldiers > 0 ? (Math.max(0, s.defender.soldiers) / originalDefSoldiers) : 0;
+                    }
+
+                    // 援軍の兵士も、全体の損耗率に合わせて減らします
+                    const returnSoldiers = Math.floor(reinf.soldiers * surviveRate);
+                    const returnHorses = Math.floor(reinf.horses * surviveRate);
+                    const returnGuns = Math.floor(reinf.guns * surviveRate);
+                    
+                    let returnRice = 0;
+                    if (reinf.isAttacker) {
+                        const ratio = s.attacker.soldiers > 0 ? (returnSoldiers / s.attacker.soldiers) : 0;
+                        returnRice = Math.floor(s.attacker.rice * Math.min(1.0, ratio));
+                        
+                        // メインの攻撃軍のデータから、援軍の分を引いておきます（借りパク防止！）
+                        s.attacker.rice = Math.max(0, s.attacker.rice - returnRice);
+                        s.attacker.soldiers = Math.max(0, s.attacker.soldiers - returnSoldiers);
+                        s.attacker.horses = Math.max(0, (s.attacker.horses || 0) - returnHorses);
+                        s.attacker.guns = Math.max(0, (s.attacker.guns || 0) - returnGuns);
+                        
+                        // 攻撃軍の武将リストから、援軍武将を抜きます
+                        reinf.bushos.forEach(rb => {
+                            s.atkBushos = s.atkBushos.filter(b => b.id !== rb.id);
+                        });
+                    }
+
+                    // 援軍元の城に、残った物資と兵士を戻します
+                    helperCastle.soldiers = Math.min(99999, helperCastle.soldiers + returnSoldiers);
+                    helperCastle.rice = Math.min(99999, helperCastle.rice + returnRice);
+                    helperCastle.horses = Math.min(99999, (helperCastle.horses || 0) + returnHorses);
+                    helperCastle.guns = Math.min(99999, (helperCastle.guns || 0) + returnGuns);
+                    
+                    // 武将を元の城に戻します（捕虜になる処理をすっ飛ばして無事に帰ります）
+                    reinf.bushos.forEach(b => {
+                        b.castleId = helperCastle.id;
+                        b.isCastellan = false;
+                        if (!helperCastle.samuraiIds.includes(b.id)) {
+                            helperCastle.samuraiIds.push(b.id);
+                        }
+                    });
+                    this.game.updateCastleLord(helperCastle);
+
+                    // 友好度の増減（勝ったら+10、負けや撤退は-10）
+                    const myClanId = reinf.isAttacker ? s.sourceCastle.ownerClan : s.defender.ownerClan;
+                    const helperClanId = helperCastle.ownerClan;
+                    
+                    let isWin = false;
+                    if (reinf.isAttacker) {
+                        isWin = attackerWon && !isRetreat;
+                    } else {
+                        isWin = !attackerWon && !isRetreat;
+                    }
+                    
+                    if (isWin) {
+                        this.game.diplomacyManager.updateSentiment(myClanId, helperClanId, 10);
+                        if (s.isPlayerInvolved) this.game.ui.log(`(援軍が勝利に貢献し、${this.game.clans.find(c=>c.id===helperClanId)?.name}との友好度が上がりました)`);
+                    } else {
+                        this.game.diplomacyManager.updateSentiment(myClanId, helperClanId, -10);
+                        if (s.isPlayerInvolved) this.game.ui.log(`(敗北/撤退により、${this.game.clans.find(c=>c.id===helperClanId)?.name}との友好度が下がりました)`);
+                    }
+                }
+            }
+            
+            // ★最終追加: 守備側の援軍部隊も元の城に帰還させる処理
+            if (s.defReinforcement) {
+                const defReinf = s.defReinforcement;
+                const helperCastle = this.game.getCastle(defReinf.castle.id);
+                
+                if (helperCastle) {
+                    const originalDefSoldiers = s.defender.soldiers + s.deadSoldiers.defender;
+                    const surviveRate = originalDefSoldiers > 0 ? (Math.max(0, s.defender.soldiers) / originalDefSoldiers) : 0;
+
+                    // 残った兵士、馬、鉄砲の計算
+                    const returnSoldiers = Math.floor(defReinf.soldiers * surviveRate);
+                    const returnHorses = Math.floor(defReinf.horses * surviveRate);
+                    const returnGuns = Math.floor(defReinf.guns * surviveRate);
+                    
+                    // 防衛側の城のデータから、援軍分を差し引く（借りパク防止！）
+                    s.defender.soldiers = Math.max(0, s.defender.soldiers - returnSoldiers);
+                    s.defender.horses = Math.max(0, (s.defender.horses || 0) - returnHorses);
+                    s.defender.guns = Math.max(0, (s.defender.guns || 0) - returnGuns);
+
+                    // 援軍元の城に、残った物資と兵士を戻す
+                    helperCastle.soldiers = Math.min(99999, helperCastle.soldiers + returnSoldiers);
+                    helperCastle.horses = Math.min(99999, (helperCastle.horses || 0) + returnHorses);
+                    helperCastle.guns = Math.min(99999, (helperCastle.guns || 0) + returnGuns);
+
+                    // 守備側の城の武将リストから援軍武将を抜く
+                    defReinf.bushos.forEach(rb => {
+                        const idx = s.defender.samuraiIds.indexOf(rb.id);
+                        if (idx !== -1) s.defender.samuraiIds.splice(idx, 1);
+                    });
+
+                    // 援軍武将を元の城に戻す
+                    defReinf.bushos.forEach(b => {
+                        b.castleId = helperCastle.id;
+                        b.isCastellan = false;
+                        if (!helperCastle.samuraiIds.includes(b.id)) {
+                            helperCastle.samuraiIds.push(b.id);
+                        }
+                    });
+                    this.game.updateCastleLord(helperCastle);
+
+                    // 友好度の増減（防衛成功で+10、陥落で-10）
+                    const myClanId = s.defender.ownerClan;
+                    const helperClanId = helperCastle.ownerClan;
+                    
+                    if (!attackerWon && !isRetreat) {
+                        this.game.diplomacyManager.updateSentiment(myClanId, helperClanId, 10);
+                        if (s.isPlayerInvolved) this.game.ui.log(`(防衛援軍が成功し、${this.game.clans.find(c=>c.id===helperClanId)?.name}との友好度が上がりました)`);
+                    } else {
+                        this.game.diplomacyManager.updateSentiment(myClanId, helperClanId, -10);
+                        if (s.isPlayerInvolved) this.game.ui.log(`(防衛失敗により、${this.game.clans.find(c=>c.id===helperClanId)?.name}との友好度が下がりました)`);
+                    }
+                }
             }
             
             // プレイヤーが国人衆を制圧（討伐）した時の処理
@@ -1160,4 +1316,165 @@ class WarManager {
              this.game.finishTurn(); 
         }, 100);
     }
+    
+    // ★ここから追加: 守備側が援軍を呼べるかチェックする機能
+    checkDefenderReinforcement(defCastle, atkClanId, onComplete) {
+        const defClanId = defCastle.ownerClan;
+        const pid = this.game.playerClanId;
+        
+        // 国人衆の反乱など、特殊な戦いなら援軍は呼べません
+        if (defClanId === 0 || defCastle.isKunishu || this.state.isKunishuSubjugation) {
+            onComplete();
+            return;
+        }
+
+        let candidateCastles = [];
+
+        this.game.castles.forEach(c => {
+            if (c.ownerClan === 0 || c.ownerClan === defClanId || c.ownerClan === atkClanId) return;
+
+            const rel = this.game.getRelation(defClanId, c.ownerClan);
+            if (!['普通', '友好', '同盟', '支配', '従属'].includes(rel.status)) return;
+            if (rel.sentiment < 50) return;
+
+            const enemyRel = this.game.getRelation(c.ownerClan, atkClanId);
+            if (['同盟', '支配', '従属'].includes(enemyRel.status)) return;
+
+            // 守備側は「自領と隣接している城」にだけ呼べます
+            const isNextToMe = GameSystem.isAdjacent(c, defCastle);
+            if (!isNextToMe) return;
+
+            if (c.soldiers < 1000) return;
+
+            const normalBushos = this.game.getCastleBushos(c.id).filter(b => 
+                !b.isDaimyo && !b.isCastellan && b.status !== 'ronin' && b.belongKunishuId === 0
+            );
+            if (normalBushos.length === 0) return;
+
+            candidateCastles.push(c);
+        });
+
+        if (candidateCastles.length === 0) {
+            onComplete();
+            return;
+        }
+
+        if (defClanId === pid) {
+            // プレイヤーが守備側なら、UIを出して選ばせる
+            this.game.ui.showDefReinforcementSelector(candidateCastles, defCastle, onComplete);
+        } else {
+            // AIが守備側なら、一番兵士が多いところに自動で頼みます
+            candidateCastles.sort((a,b) => b.soldiers - a.soldiers);
+            const bestCastle = candidateCastles[0];
+            // AIは金を持たせません（ケチ）
+            this.executeDefReinforcement(0, bestCastle, defCastle, onComplete);
+        }
+    }
+
+    // ★追加: 守備側の援軍が来るか計算して合流させる機能
+    executeDefReinforcement(gold, helperCastle, defCastle, onComplete) {
+        if (gold > 0) defCastle.gold -= gold;
+
+        const myClanId = defCastle.ownerClan;
+        const helperClanId = helperCastle.ownerClan;
+        const enemyClanId = this.state.attacker.ownerClan;
+
+        const myToHelperRel = this.game.getRelation(myClanId, helperClanId);
+        const helperToEnemyRel = this.game.getRelation(helperClanId, enemyClanId);
+
+        let isSuccess = false;
+
+        if (myToHelperRel.status === '支配') {
+            isSuccess = true;
+        } else {
+            let prob = 0;
+            if (myToHelperRel.sentiment >= 50) prob += (myToHelperRel.sentiment - 49); 
+            prob += Math.floor((gold / 1500) * 15);
+            if (myToHelperRel.status === '同盟' || myToHelperRel.status === '従属') prob += 30;
+            if (helperToEnemyRel && helperToEnemyRel.sentiment >= 50) {
+                prob -= Math.floor((helperToEnemyRel.sentiment - 50) * (20 / 50)) + 1; 
+            }
+            prob += 10; // 守備側は少しだけ来てくれやすいボーナス
+            if (Math.random() * 100 < prob) isSuccess = true;
+        }
+
+        if (!isSuccess) {
+            if (myClanId === this.game.playerClanId) {
+                this.game.ui.showDialog(`${helperCastle.name}への防衛援軍要請は断られました……。\n自軍のみで防衛します。`, false, onComplete);
+            } else {
+                onComplete();
+            }
+            return;
+        }
+
+        if (!['支配', '従属', '同盟'].includes(myToHelperRel.status)) {
+            this.game.diplomacyManager.updateSentiment(myClanId, helperClanId, 10);
+        }
+
+        const helperDaimyo = this.game.bushos.find(b => b.clan === helperClanId && b.isDaimyo) || { duty: 50 };
+        let maxSendable = Math.floor(helperCastle.soldiers * 0.5);
+        if (maxSendable < 500) maxSendable = 500;
+        if (maxSendable > helperCastle.soldiers) maxSendable = helperCastle.soldiers;
+
+        let reinfSoldiers = Math.floor(maxSendable * (((myToHelperRel.sentiment / 100) + (helperDaimyo.duty / 100)) / 2 + 0.5));
+        if (reinfSoldiers < 500) reinfSoldiers = 500;
+        if (reinfSoldiers > 3000) reinfSoldiers = 3000;
+        if (reinfSoldiers > helperCastle.soldiers) reinfSoldiers = helperCastle.soldiers;
+
+        const availableBushos = this.game.getCastleBushos(helperCastle.id).filter(b => 
+            !b.isDaimyo && !b.isCastellan && b.status !== 'ronin' && b.belongKunishuId === 0
+        ).sort((a,b) => b.strength - a.strength);
+
+        let bushoCount = 1;
+        if (reinfSoldiers >= 1500) bushoCount = 2;
+        if (reinfSoldiers >= 2500) bushoCount = 3;
+        if (bushoCount > availableBushos.length) bushoCount = availableBushos.length;
+
+        const reinfBushos = availableBushos.slice(0, bushoCount);
+        const reinfRice = reinfSoldiers; 
+        const reinfHorses = Math.min(helperCastle.horses || 0, Math.floor(reinfSoldiers * 0.5)); 
+        const reinfGuns = Math.min(helperCastle.guns || 0, Math.floor(reinfSoldiers * 0.5));
+
+        // 援軍元の城から減らす
+        helperCastle.soldiers = Math.max(0, helperCastle.soldiers - reinfSoldiers);
+        helperCastle.rice = Math.max(0, helperCastle.rice - reinfRice);
+        helperCastle.horses = Math.max(0, (helperCastle.horses || 0) - reinfHorses);
+        helperCastle.guns = Math.max(0, (helperCastle.guns || 0) - reinfGuns);
+        reinfBushos.forEach(b => b.isActionDone = true);
+
+        // 防衛側の城に一時的に合流させる（戦争データに追加）
+        defCastle.soldiers += reinfSoldiers;
+        defCastle.rice += reinfRice;
+        defCastle.horses = (defCastle.horses || 0) + reinfHorses;
+        defCastle.guns = (defCastle.guns || 0) + reinfGuns;
+
+        // 守備側の援軍パックとして state に保存（終わった後の帰還用）
+        this.state.defReinforcement = {
+            castle: helperCastle,
+            bushos: reinfBushos,
+            soldiers: reinfSoldiers,
+            horses: reinfHorses,
+            guns: reinfGuns
+        };
+        
+        // 防衛側の武将リストに援軍武将を合流させる
+        reinfBushos.forEach(b => {
+            b.castleId = defCastle.id;
+            if (!defCastle.samuraiIds.includes(b.id)) defCastle.samuraiIds.push(b.id);
+        });
+
+        // プレイヤーが援軍元なら、プレイヤーが関わる戦争にする
+        if (helperClanId === this.game.playerClanId) {
+            this.state.isPlayerInvolved = true;
+        }
+
+        const helperClanName = this.game.clans.find(c => c.id === helperClanId)?.name || "援軍";
+
+        if (myClanId === this.game.playerClanId || helperClanId === this.game.playerClanId) {
+            this.game.ui.showDialog(`${helperClanName} (${helperCastle.name}) が防衛の援軍に駆けつけました！`, false, onComplete);
+        } else {
+            onComplete();
+        }
+    }
+    
 }
