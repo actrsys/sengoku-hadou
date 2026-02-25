@@ -81,6 +81,26 @@ class UIManager {
 		    }
 		    lastTouchEnd = now;
 		}, false);
+		
+		// --- ここから書き足し ---
+		const titleScreen = document.getElementById('title-screen');
+		const tapMessage = document.getElementById('tap-to-proceed');
+		const menuButtons = document.getElementById('menu-buttons');
+
+		if (titleScreen && tapMessage && menuButtons) {
+		    // 画面がクリック（タップ）された時の処理
+		    const onTitleClick = () => {
+		        // メッセージを消す
+		        tapMessage.classList.add('hidden');
+		        // ボタンを表示する
+		        menuButtons.classList.remove('hidden');
+		        // 一回動いたら、この命令はもう使わないので消します
+		        titleScreen.removeEventListener('click', onTitleClick);
+		    };
+
+		    // 画面全体に「クリックを監視してね」と命令します
+		    titleScreen.addEventListener('click', onTitleClick);
+		}
 		// --- 書き足しここまで ---
     }
 
