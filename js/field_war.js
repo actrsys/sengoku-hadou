@@ -515,35 +515,24 @@ class FieldWarManager {
             const isActive = (unit && u.id === unit.id);
             
             let colorClass = u.isAttacker ? 'attacker' : 'defender';
-            uEl.className = `fw-unit ${colorClass} ${isActive ? 'active' : ''}`;
             
-            // ★再々修正: 友軍の凸型（背景）と枠線の色指定
             if (u.isReinforcement || (typeof u.id === 'string' && u.id.startsWith('k_'))) {
-                const rColor = u.isAttacker ? '#ff9800' : '#4caf50'; // 凸型はオレンジ(攻)か緑(防)
-                let rBorder = u.isAttacker ? '#e65100' : '#1b5e20';  // 枠線は濃いオレンジか濃い緑
-                
-                // 友軍かつリーダー（総大将）の場合は枠線を白にする
-                if (u.isGeneral) {
-                    rBorder = '#ffffff';
-                }
-                
-                uEl.style.setProperty('background-color', rColor, 'important');
-                uEl.style.setProperty('border-color', rBorder, 'important');
-                uEl.style.filter = 'none'; // 以前の影などの効果を消す
+                colorClass = u.isAttacker ? 'ally-attacker' : 'ally-defender';
             }
 
             uEl.className = `fw-unit ${colorClass} ${isActive ? 'active' : ''}`;
+            if (u.isGeneral) {
+                uEl.classList.add('general'); // 総大将なら白枠の設計図を追加
+            }
+            
             uEl.style.width = `${iconSize}px`; 
             uEl.style.height = `${iconSize}px`; 
             uEl.style.left = `${u.x * (this.hexW * 0.75) + (this.hexW - iconSize) / 2}px`; 
             uEl.style.top = `${u.y * (this.hexH / 2) + (this.hexH - iconSize) / 2}px`;     
             uEl.style.setProperty('--fw-dir', `${u.direction * 60}deg`);
             uEl.style.pointerEvents = 'none'; 
-            
             uEl.innerHTML = '';
-            if (u.isGeneral) {
-                uEl.classList.add('general');
-            }
+            
             this.mapEl.appendChild(uEl);
         });
 
