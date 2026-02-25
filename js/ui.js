@@ -420,7 +420,6 @@ class UIManager {
         clanDataList.sort((a,b) => b.power - a.power);
 
         clanDataList.forEach(d => {
-            // ↓ここから書き足した部分です
             let diplomacyText = "";
             // もし自分の大名家じゃなかったら、友好度と状態の文字を作ります
             if (d.id !== this.game.playerClanId) {
@@ -429,17 +428,17 @@ class UIManager {
                     diplomacyText = `<span style="font-size:0.9rem; color:#1976d2; margin-left: 10px;">友好度: ${relation.sentiment} (${relation.status})</span>`;
                 }
             }
-            // ↑書き足しここまで
 
-            listHtml += `<div style="border-bottom:1px dashed #bbb; padding:8px 0; cursor:pointer;" onclick="window.GameApp.ui.showFactionList(${d.id})" onmouseover="this.style.backgroundColor='#e3f2fd'" onmouseout="this.style.backgroundColor='transparent'">`;
-            // ↓名前の横に、さっき作った diplomacyText を表示するように変えています
+            // ★変更：クリック処理（onclick）を消し、普通に表示するだけのリストにしました。
+            listHtml += `<div style="border-bottom:1px dashed #bbb; padding:8px 0;">`;
             listHtml += `<div style="font-weight:bold; font-size:1.1rem;">${d.name} <span style="font-size:0.9rem; font-weight:normal;">(当主: ${d.leaderName})</span>${diplomacyText}</div>`;
             listHtml += `<div style="color:#d32f2f; font-weight:bold; margin-top:3px;">戦力: ${d.power} <span style="font-size:0.8rem; color:#555; font-weight:normal;">(城数:${d.castlesCount})</span></div>`;
             listHtml += `</div>`;
         });
         listHtml += `</div>`;
         
-        this.showResultModal(`<h3 style="margin-top:0;">大名一覧</h3>${listHtml}`);
+        // ★変更：「大名一覧」の文字がスクロールに巻き込まれないよう、上にくっつく（sticky）ようにしました。
+        this.showResultModal(`<h3 style="margin:0; position: sticky; top: 0; background: #fff; z-index: 10; padding-bottom: 10px; border-bottom: 2px solid #ddd;">大名一覧</h3><div style="margin-top: 10px;">${listHtml}</div>`);
     }
 
     // 引数に「isDirect = false」というのを追加して、丸ごと差し替えます
@@ -1751,6 +1750,8 @@ class UIManager {
         const backBtn = document.querySelector('#selector-modal .btn-secondary');
         if(backBtn) {
             backBtn.onclick = () => {
+                const listHeader = document.querySelector('#selector-modal .list-header');
+                if (listHeader) listHeader.style.display = ''; // ヘッダーを戻す
                 this.closeSelector();
                 if (onCancel) onCancel(); // 国衆画面の正しいキャンセル処理
             };
@@ -1762,6 +1763,12 @@ class UIManager {
             contextEl.classList.remove('hidden');
         }
 
+        // ★追加：武将リスト用のヘッダー（名前、統率など）を隠します
+        const listHeader = document.querySelector('#selector-modal .list-header');
+        if (listHeader) listHeader.style.display = 'none';
+
+        let selectedKunishuId = null; // ★追加：選んだ国衆を記憶する箱
+
         if (this.selectorList) {
             this.selectorList.innerHTML = '';
             kunishus.forEach(k => {
@@ -1769,15 +1776,33 @@ class UIManager {
                 const rel = k.getRelation(window.GameApp.playerClanId);
                 const div = document.createElement('div');
                 div.className = 'kunishu-item'; 
-                div.innerHTML = `<strong style="margin-right:10px;">${name}</strong> <span style="font-size:0.9rem; color:#555;">(兵数:${k.soldiers} 防御:${k.defense} 友好度:${rel})</span>`;
                 
                 if (isViewOnly) {
+                    // ★見るだけモード（城から見た時）
+                    div.innerHTML = `<strong style="margin-right:10px;">${name}</strong> <span style="font-size:0.9rem; color:#555;">(兵数:${k.soldiers} 防御:${k.defense} 友好度:${rel})</span>`;
                     div.style.cursor = 'default';
                 } else {
-                    div.onclick = () => { 
-                        if (listHeader) listHeader.style.display = '';
-                        this.closeSelector();
-                        if (onSelect) onSelect(k.id); 
+                    // ★選択モード（親善や引抜など）ラジオボタンを付けます
+                    div.innerHTML = `
+                        <input type="radio" name="sel_kunishu" value="${k.id}" style="margin-right:10px;">
+                        <strong style="margin-right:10px;">${name}</strong> 
+                        <span style="font-size:0.9rem; color:#555;">(兵数:${k.soldiers} 防御:${k.defense} 友好度:${rel})</span>
+                    `;
+                    div.style.cursor = 'pointer';
+                    
+                    div.onclick = (e) => { 
+                        // クリックしたらチェックを入れる
+                        const radio = div.querySelector('input[type="radio"]');
+                        if (e.target.tagName !== 'INPUT') {
+                            radio.checked = true;
+                        }
+                        selectedKunishuId = k.id;
+                        
+                        // 決定ボタンを押せるようにする
+                        if (this.selectorConfirmBtn) {
+                            this.selectorConfirmBtn.disabled = false;
+                            this.selectorConfirmBtn.style.opacity = 1.0;
+                        }
                     };
                 }
                 this.selectorList.appendChild(div);
@@ -1785,7 +1810,23 @@ class UIManager {
         }
         
         if (this.selectorConfirmBtn) {
-            this.selectorConfirmBtn.classList.add('hidden');
+            if (isViewOnly) {
+                // 見るだけの時は決定ボタンを隠す
+                this.selectorConfirmBtn.classList.add('hidden');
+            } else {
+                // 選ぶ時は決定ボタンを表示して、最初は押せないようにしておく
+                this.selectorConfirmBtn.classList.remove('hidden');
+                this.selectorConfirmBtn.disabled = true;
+                this.selectorConfirmBtn.style.opacity = 0.5;
+
+                this.selectorConfirmBtn.onclick = () => {
+                    if (selectedKunishuId !== null) {
+                        if (listHeader) listHeader.style.display = ''; // ヘッダーを戻す
+                        this.closeSelector();
+                        if (onSelect) onSelect(selectedKunishuId); 
+                    }
+                };
+            }
         }
     }
     
