@@ -525,7 +525,7 @@ img {
 }
 
 /* =========================================
-   éƒ¨éšŠã‚¢ã‚¤ã‚³ãƒ³è¨­å®šï¼ˆç”»åƒãƒã‚¹ã‚¯æ–¹å¼ãƒ»å½±å¯¾å¿œç‰ˆï¼‰
+   •”‘àƒAƒCƒRƒ“İ’èi‰æ‘œƒ}ƒXƒN•û®E‰e‘Î‰”Åj
 ========================================= */
 .fw-unit.attacker,
 .fw-unit.defender {
@@ -594,7 +594,7 @@ img {
 .context-menu-item { padding: 10px 15px; cursor: pointer; color: #333; font-weight: bold; }
 .context-menu-item:hover { background: #e3f2fd; }
 
-/* ãƒ—ãƒ­ã‚°ãƒ¬ã‚¹ãƒãƒ¼UIç”¨ */
+/* ƒvƒƒOƒŒƒXƒo[UI—p */
 .status-bar-container {
     display: inline-block;
     vertical-align: middle;
@@ -630,7 +630,7 @@ img {
     line-height: 1;
 }
 
-/* ===== ã‚¹ãƒãƒ›ã§ã®ä¸‹éƒ¨è¦‹åˆ‡ã‚Œé˜²æ­¢ç”¨ã®èª¿æ•´ ===== */
+/* ===== ƒXƒ}ƒz‚Å‚Ì‰º•”Œ©Ø‚ê–h~—p‚Ì’²® ===== */
 .result-body {
     overflow-y: auto;
     flex: 1;
@@ -644,7 +644,7 @@ img {
     background: #fff;
     padding-bottom: env(safe-area-inset-bottom); 
 }
-/* å›½è¡†é¸æŠç”¨ã®ãƒªã‚¹ãƒˆã‚¢ã‚¤ãƒ†ãƒ  */
+/* ‘O‘I‘ğ—p‚ÌƒŠƒXƒgƒAƒCƒeƒ€ */
 .kunishu-item {
     padding: 12px 15px;
     border: 1px solid #d0b080;
@@ -676,4 +676,27 @@ img {
 .kunishu-item span {
     font-size: 0.95rem !important;
     color: #555 !important;
+}
+/* š–ìíFUŒ‚‘¤‚Ì—FŒRiƒIƒŒƒ“ƒWj */
+.fw-unit.ally-attacker {
+    background-color: #ff9800;
+    border-top-color: #e65100;
+    border-bottom-color: #e65100;
+}
+/* —FŒR‚Ì‘‘å«‚Í”’˜g */
+.fw-unit.ally-attacker.general {
+    border-top-color: #ffffff;
+    border-bottom-color: #ffffff;
+}
+
+/* š–ìíFç”õ‘¤‚Ì—FŒRE‘lOi—Îj */
+.fw-unit.ally-defender {
+    background-color: #4caf50;
+    border-top-color: #1b5e20;
+    border-bottom-color: #1b5e20;
+}
+/* —FŒR‚Ì‘‘å«‚Í”’˜g */
+.fw-unit.ally-defender.general {
+    border-top-color: #ffffff;
+    border-bottom-color: #ffffff;
 }
