@@ -711,3 +711,16 @@ img {
     -webkit-filter: drop-shadow(1px 0 0 #27e372) drop-shadow(-1px 0 0 #27e372) drop-shadow(0 1px 0 #27e372) drop-shadow(0 -1px 0 #27e372) drop-shadow(0 0 6px #ffff00) drop-shadow(2px 2px 2px rgba(0,0,0,0.8));
     filter: drop-shadow(1px 0 0 #27e372) drop-shadow(-1px 0 0 #27e372) drop-shadow(0 1px 0 #27e372) drop-shadow(0 -1px 0 #27e372) drop-shadow(0 0 6px #ffff00) drop-shadow(2px 2px 2px rgba(0,0,0,0.8));
 }
+
+.game-title {
+    font-size: 4rem; /* ”š‚ğ‘å‚«‚­‚·‚é‚Æ•¶š‚à‘å‚«‚­‚È‚è‚Ü‚· */
+    color: #ffd700; /* •¶š‚ğ‹àF‚É‚µ‚Ü‚· */
+    text-shadow: 3px 3px 5px rgba(0,0,0,0.8); /* •‚¢‰e‚ğ‚Â‚¯‚Ä•‚‚©‚Ñã‚ª‚ç‚¹‚Ü‚· */
+}
+
+.card-header h3 {
+    font-weight: 900; /* Å‘å‹‰‚É‘¾‚­‚µ‚Ü‚· */
+    background: #333; /* ”wŒi‚ğ•‚­‚µ‚Ü‚· */
+    color: #fff; /* •¶š‚ğ”’‚­‚µ‚Ü‚· */
+    padding: 2px 0;
+}
