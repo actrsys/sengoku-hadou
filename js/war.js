@@ -132,7 +132,7 @@ class WarManager {
         return this.game.castles.filter(target => 
             GameSystem.isReachable(this.game, currentCastle, target, this.game.playerClanId) && 
             target.ownerClan !== this.game.playerClanId &&
-            !this.game.getRelation(this.game.playerClanId, target.ownerClan).alliance &&
+            !['同盟', '支配', '従属'].includes(this.game.getRelation(this.game.playerClanId, target.ownerClan).status) &&
             (target.immunityUntil || 0) < this.game.getCurrentTurnId()
         ).map(t => t.id);
     }
