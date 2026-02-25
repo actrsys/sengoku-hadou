@@ -1413,7 +1413,7 @@ class WarManager {
             if (c.ownerClan === 0 || c.ownerClan === defClanId || c.ownerClan === atkClanId) return;
 
             const rel = this.game.getRelation(defClanId, c.ownerClan);
-            if (!['普通', '友好', '同盟', '支配', '従属'].includes(rel.status)) return;
+            if (!['友好', '同盟', '支配', '従属'].includes(rel.status)) return;
             if (rel.sentiment < 50) return;
 
             const enemyRel = this.game.getRelation(c.ownerClan, atkClanId);

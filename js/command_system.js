@@ -1793,7 +1793,7 @@ class CommandSystem {
 
             // 関係と友好度のチェック
             const rel = this.game.getRelation(myClanId, c.ownerClan);
-            if (!['普通', '友好', '同盟', '支配', '従属'].includes(rel.status)) return;
+            if (!['友好', '同盟', '支配', '従属'].includes(rel.status)) return;
             if (rel.sentiment < 50) return;
 
             // 相手が戦争相手と仲良し（同盟・支配・従属）ならダメ
