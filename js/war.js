@@ -1424,6 +1424,7 @@ class WarManager {
             if (!isNextToMyAnyCastle) return;
 
             if (c.soldiers < 1000) return;
+            if (c.rice < 500) return;
 
             const normalBushos = this.game.getCastleBushos(c.id).filter(b => 
                 !b.isDaimyo && !b.isCastellan && b.status !== 'ronin' && b.belongKunishuId === 0
@@ -1464,22 +1465,31 @@ class WarManager {
         // ★追加：もし援軍を頼まれたのが「プレイヤー」だったら、受けるか断るか選びます！
         if (helperClanId === this.game.playerClanId) {
             const myClanName = this.game.clans.find(c => c.id === myClanId)?.name || "不明";
-            const msg = `${myClanName} (${defCastle.name}) から防衛の援軍要請が届きました。\n（使者持参金: ${gold}）\n援軍を派遣しますか？`;
             
+            // 自分から見て、頼んできた相手が「主君」かどうか調べます
+            const myToHelperRel = this.game.getRelation(helperClanId, myClanId); 
+            const isBoss = (myToHelperRel.status === '従属'); // 自分が従属している＝相手が主君
+
             // プレイヤーが選べるように「思考中」のフタを外します
             if (this.game.ui.aiGuard) this.game.ui.aiGuard.classList.add('hidden');
 
-            this.game.ui.showDialog(msg, true, 
-                // 受諾（OK）した時
-                () => {
+            if (isBoss) {
+                // 主君からの命令なので拒否できません！
+                const msg = `主家である ${myClanName} (${defCastle.name}) から防衛の援軍要請が届きました。\n（使者持参金: ${gold}）\n当家は従属しているため、直ちに出陣します！`;
+                this.game.ui.showDialog(msg, false, () => {
                     this._applyDefReinforcement(helperCastle, defCastle, myToHelperRel, onComplete);
-                },
-                // 拒否（キャンセル）した時
-                () => {
-                    this.game.diplomacyManager.updateSentiment(myClanId, helperClanId, -10);
-                    this.game.ui.showDialog(`援軍要請を断りました。`, false, onComplete);
-                }
-            );
+                });
+            } else {
+                // いつも通り「はい・いいえ」が選べます
+                const msg = `${myClanName} (${defCastle.name}) から防衛の援軍要請が届きました。\n（使者持参金: ${gold}）\n援軍を派遣しますか？`;
+                this.game.ui.showDialog(msg, true, 
+                    () => { this._applyDefReinforcement(helperCastle, defCastle, myToHelperRel, onComplete); },
+                    () => {
+                        this.game.diplomacyManager.updateSentiment(myClanId, helperClanId, -10);
+                        this.game.ui.showDialog(`援軍要請を断りました。`, false, onComplete);
+                    }
+                );
+            }
             return;
         }
 
@@ -1540,7 +1550,13 @@ class WarManager {
         if (bushoCount > availableBushos.length) bushoCount = availableBushos.length;
 
         const reinfBushos = availableBushos.slice(0, bushoCount);
-        const reinfRice = reinfSoldiers; 
+        const reinfBushos = availableBushos.slice(0, bushoCount);
+
+        let reinfRice = reinfSoldiers; 
+        if (reinfRice < 500) reinfRice = 500; // 最低でも兵糧500は持っていく！
+        if (reinfRice > helperCastle.rice) reinfRice = helperCastle.rice; // 城にある限界は超えないようにする
+        
+        const reinfHorses = Math.min(helperCastle.horses || 0, Math.floor(reinfSoldiers * 0.5));
         const reinfHorses = Math.min(helperCastle.horses || 0, Math.floor(reinfSoldiers * 0.5)); 
         const reinfGuns = Math.min(helperCastle.guns || 0, Math.floor(reinfSoldiers * 0.5));
 
