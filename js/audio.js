@@ -5,7 +5,7 @@
 class AudioManager {
     constructor() {
         this.bgm = null;
-        this.defaultVolume = 0.3; // デフォルト音量を30%に設定
+        this.defaultVolume = 0.1; // デフォルト音量を10%に設定
     }
 
     /**
