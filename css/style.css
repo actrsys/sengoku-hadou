@@ -683,26 +683,26 @@ img {
 
 /* --- 攻撃側の友軍（オレンジ） --- */
 .fw-unit.attacker.ally {
-    -webkit-filter: drop-shadow(1px 0 0 #e8641c) drop-shadow(-1px 0 0 #e8641c) drop-shadow(0 1px 0 #e8641c) drop-shadow(0 -1px 0 #e8641c) drop-shadow(2px 2px 2px rgba(0,0,0,0.8));
-    filter: drop-shadow(1px 0 0 #e8641c) drop-shadow(-1px 0 0 #e8641c) drop-shadow(0 1px 0 #e8641c) drop-shadow(0 -1px 0 #e8641c) drop-shadow(2px 2px 2px rgba(0,0,0,0.8));
+    -webkit-filter: drop-shadow(1px 0 0 #e65100) drop-shadow(-1px 0 0 #e65100) drop-shadow(0 1px 0 #e65100) drop-shadow(0 -1px 0 #e65100) drop-shadow(2px 2px 2px rgba(0,0,0,0.8));
+    filter: drop-shadow(1px 0 0 #e65100) drop-shadow(-1px 0 0 #e65100) drop-shadow(0 1px 0 #e65100) drop-shadow(0 -1px 0 #e65100) drop-shadow(2px 2px 2px rgba(0,0,0,0.8));
 }
 .fw-unit.attacker.ally::before { 
     background-color: #ff9800; /* コマの中身をオレンジに */
 }
 .fw-unit.attacker.ally.active {
-    -webkit-filter: drop-shadow(1px 0 0 #e8641c) drop-shadow(-1px 0 0 #e8641c) drop-shadow(0 1px 0 #e8641c) drop-shadow(0 -1px 0 #e8641c) drop-shadow(0 0 6px #ffff00) drop-shadow(2px 2px 2px rgba(0,0,0,0.8));
-    filter: drop-shadow(1px 0 0 #e8641c) drop-shadow(-1px 0 0 #e8641c) drop-shadow(0 1px 0 #e8641c) drop-shadow(0 -1px 0 #e8641c) drop-shadow(0 0 6px #ffff00) drop-shadow(2px 2px 2px rgba(0,0,0,0.8));
+    -webkit-filter: drop-shadow(1px 0 0 #e65100) drop-shadow(-1px 0 0 #e65100) drop-shadow(0 1px 0 #e65100) drop-shadow(0 -1px 0 #e65100) drop-shadow(0 0 6px #ffff00) drop-shadow(2px 2px 2px rgba(0,0,0,0.8));
+    filter: drop-shadow(1px 0 0 #e65100) drop-shadow(-1px 0 0 #e65100) drop-shadow(0 1px 0 #e65100) drop-shadow(0 -1px 0 #e65100) drop-shadow(0 0 6px #ffff00) drop-shadow(2px 2px 2px rgba(0,0,0,0.8));
 }
 
 /* --- 守備側の友軍（緑） --- */
 .fw-unit.defender.ally {
-    -webkit-filter: drop-shadow(1px 0 0 #2fd4ad) drop-shadow(-1px 0 0 #33b868) drop-shadow(0 1px 0 #33b868) drop-shadow(0 -1px 0 #33b868) drop-shadow(2px 2px 2px rgba(0,0,0,0.8));
-    filter: drop-shadow(1px 0 0 #33b868) drop-shadow(-1px 0 0 #33b868) drop-shadow(0 1px 0 #33b868) drop-shadow(0 -1px 0 #33b868) drop-shadow(2px 2px 2px rgba(0,0,0,0.8));
+    -webkit-filter: drop-shadow(1px 0 0 #27e372) drop-shadow(-1px 0 0 #27e372) drop-shadow(0 1px 0 #27e372) drop-shadow(0 -1px 0 #27e372) drop-shadow(2px 2px 2px rgba(0,0,0,0.8));
+    filter: drop-shadow(1px 0 0 #27e372) drop-shadow(-1px 0 0 #27e372) drop-shadow(0 1px 0 #27e372) drop-shadow(0 -1px 0 #27e372) drop-shadow(2px 2px 2px rgba(0,0,0,0.8));
 }
 .fw-unit.defender.ally::before { 
     background-color: #4caf50; /* コマの中身を緑に */
 }
 .fw-unit.defender.ally.active {
-    -webkit-filter: drop-shadow(1px 0 0 #33b868) drop-shadow(-1px 0 0 #33b868) drop-shadow(0 1px 0 #33b868) drop-shadow(0 -1px 0 #33b868) drop-shadow(0 0 6px #ffff00) drop-shadow(2px 2px 2px rgba(0,0,0,0.8));
-    filter: drop-shadow(1px 0 0 #33b868) drop-shadow(-1px 0 0 #33b868) drop-shadow(0 1px 0 #33b868) drop-shadow(0 -1px 0 #33b868) drop-shadow(0 0 6px #ffff00) drop-shadow(2px 2px 2px rgba(0,0,0,0.8));
+    -webkit-filter: drop-shadow(1px 0 0 #27e372) drop-shadow(-1px 0 0 #27e372) drop-shadow(0 1px 0 #27e372) drop-shadow(0 -1px 0 #27e372) drop-shadow(0 0 6px #ffff00) drop-shadow(2px 2px 2px rgba(0,0,0,0.8));
+    filter: drop-shadow(1px 0 0 #27e372) drop-shadow(-1px 0 0 #27e372) drop-shadow(0 1px 0 #27e372) drop-shadow(0 -1px 0 #27e372) drop-shadow(0 0 6px #ffff00) drop-shadow(2px 2px 2px rgba(0,0,0,0.8));
 }
