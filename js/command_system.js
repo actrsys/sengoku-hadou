@@ -1884,9 +1884,9 @@ class CommandSystem {
         }
 
         // 見事、援軍が来てくれることになりました！
-        // 支配・従属・同盟の特別な関係じゃない場合は、助けてくれたお礼に友好度が+10されます
+        // 支配・従属・同盟の特別な関係じゃない場合は、参戦するかわりに友好度が-10されます
         if (!['支配', '従属', '同盟'].includes(myToHelperRel.status)) {
-            this.game.diplomacyManager.updateSentiment(myClanId, helperClanId, 10);
+            this.game.diplomacyManager.updateSentiment(myClanId, helperClanId, -10);
         }
 
         // 援軍の兵士数を決めます（AIは自分の城の半分までしか出しません）

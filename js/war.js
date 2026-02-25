@@ -886,10 +886,10 @@ class WarManager {
                     }
                     
                     if (isWin) {
-                        this.game.diplomacyManager.updateSentiment(myClanId, helperClanId, 10);
+                        this.game.diplomacyManager.updateSentiment(myClanId, helperClanId, 5);
                         if (s.isPlayerInvolved) this.game.ui.log(`(援軍が勝利に貢献し、${this.game.clans.find(c=>c.id===helperClanId)?.name}との友好度が上がりました)`);
                     } else {
-                        this.game.diplomacyManager.updateSentiment(myClanId, helperClanId, -10);
+                        this.game.diplomacyManager.updateSentiment(myClanId, helperClanId, -5);
                         if (s.isPlayerInvolved) this.game.ui.log(`(敗北/撤退により、${this.game.clans.find(c=>c.id===helperClanId)?.name}との友好度が下がりました)`);
                     }
                 }
