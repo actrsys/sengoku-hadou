@@ -860,6 +860,32 @@ class CommandSystem {
         } 
         doer.isActionDone = true; this.game.ui.showResultModal(msg); this.game.ui.renderCommandMenu(); 
     }
+    
+    // ★追加：親善の友好度アップを計算する専用の数式
+    calcGoodwillIncrease(gold, doer) {
+        let baseIncrease = 0;
+        if (gold <= 1000) {
+            // 1000までは 金100につき1 上がる（金500なら5、金1000なら10）
+            baseIncrease = gold / 100; 
+        } else {
+            // 1000を超えた分は上がり幅が小さくなる（金3000で約13になる計算）
+            baseIncrease = 10 + (Math.sqrt(gold - 1000) / Math.sqrt(2000)) * 3;
+        }
+
+        // 武将の外交ステータスによる補正（平均50を基準に -5 〜 +5）
+        let dipBonus = (doer.diplomacy - 50) / 10;
+        dipBonus = Math.max(-5, Math.min(5, dipBonus)); // 最大5、最小-5に制限
+
+        // 金額が少ない時は、補正の影響も小さくする（金500なら最大±2.5）
+        let scale = Math.min(1.0, gold / 1000);
+        dipBonus *= scale;
+
+        // 基準値に補正を足して、最後に±10%程度のランダムな揺らぎを入れる
+        let totalFloat = (baseIncrease + dipBonus) * (0.9 + Math.random() * 0.2);
+        
+        // 最低でも1は上がるようにして、整数にする
+        return Math.max(1, Math.round(totalFloat));
+    }
 
     executeDiplomacy(doerId, targetCastleId, type, gold = 0) {
         const doer = this.game.getBusho(doerId);
@@ -874,8 +900,7 @@ class CommandSystem {
         const isPlayerInvolved = (doer.clan === this.game.playerClanId || targetClanId === this.game.playerClanId);
 
         if (type === 'goodwill') {
-            const baseBonus = (gold / 100) + (doer.diplomacy + doer.charm) * 0.1;
-            const increase = Math.floor(baseBonus * (0.8 + Math.random() * 0.4));
+            const increase = this.calcGoodwillIncrease(gold, doer);
             
             this.game.diplomacyManager.updateSentiment(doer.clan, targetClanId, increase);
             const newRelation = this.game.getRelation(doer.clan, targetClanId);
@@ -1050,8 +1075,7 @@ class CommandSystem {
         if (castle.gold < gold) { this.game.ui.showDialog("資金が足りません", false); return; }
         castle.gold -= gold;
 
-        const baseBonus = (gold / 100) + (doer.diplomacy + doer.charm) * 0.1;
-        const increase = Math.floor(baseBonus * (0.8 + Math.random() * 0.4));
+        const increase = this.calcGoodwillIncrease(gold, doer);
         
         const currentRel = kunishu.getRelation(this.game.playerClanId);
         kunishu.setRelation(this.game.playerClanId, currentRel + increase);
@@ -1663,8 +1687,7 @@ class CommandSystem {
                 if (type === 'goodwill') {
                     const myCastle = this.game.castles.find(c => c.ownerClan === targetClanId);
                     if (myCastle) myCastle.gold = Math.min(99999, myCastle.gold + gold);
-                    const baseBonus = (gold / 100) + (doer.diplomacy + doer.charm) * 0.1;
-                    const increase = Math.floor(baseBonus * (0.8 + Math.random() * 0.4));
+                    const increase = this.calcGoodwillIncrease(gold, doer);
                     this.game.diplomacyManager.updateSentiment(doer.clan, targetClanId, increase);
                     this.game.ui.showResultModal(`${doerClan.name} からの親善を受け入れました！\n感情値が ${increase} 上昇しました`, () => {
                         if (onComplete) onComplete();
