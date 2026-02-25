@@ -935,15 +935,15 @@ class WarManager {
                     });
                     this.game.updateCastleLord(helperCastle);
 
-                    // 友好度の増減（防衛成功で+10、陥落で-10）
+                    // 友好度の増減（防衛成功で+5、陥落で-5）
                     const myClanId = s.defender.ownerClan;
                     const helperClanId = helperCastle.ownerClan;
                     
                     if (!attackerWon && !isRetreat) {
-                        this.game.diplomacyManager.updateSentiment(myClanId, helperClanId, 10);
+                        this.game.diplomacyManager.updateSentiment(myClanId, helperClanId, 5);
                         if (s.isPlayerInvolved) this.game.ui.log(`(防衛援軍が成功し、${this.game.clans.find(c=>c.id===helperClanId)?.name}との友好度が上がりました)`);
                     } else {
-                        this.game.diplomacyManager.updateSentiment(myClanId, helperClanId, -10);
+                        this.game.diplomacyManager.updateSentiment(myClanId, helperClanId, -5);
                         if (s.isPlayerInvolved) this.game.ui.log(`(防衛失敗により、${this.game.clans.find(c=>c.id===helperClanId)?.name}との友好度が下がりました)`);
                     }
                 }
@@ -1408,7 +1408,7 @@ class WarManager {
         }
 
         if (!['支配', '従属', '同盟'].includes(myToHelperRel.status)) {
-            this.game.diplomacyManager.updateSentiment(myClanId, helperClanId, 10);
+            this.game.diplomacyManager.updateSentiment(myClanId, helperClanId, -10);
         }
 
         const helperDaimyo = this.game.bushos.find(b => b.clan === helperClanId && b.isDaimyo) || { duty: 50 };
