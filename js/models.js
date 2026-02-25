@@ -186,13 +186,17 @@ class Kunishu {
         
         // CSVの大名用データを翻訳して箱に入れる
         if (typeof data.daimyoRelations === 'string' && data.daimyoRelations.trim() !== "") {
-            const parts = data.daimyoRelations.split(',');
+            const parts = data.daimyoRelations.split('|'); // ★「,」ではなく「|」で区切るようにしました
             parts.forEach(part => {
                 const items = part.split(':');
-                if (items.length >= 2) {
+                if (items.length >= 3) { // ★ID、状態、関係値の3つがあるかチェックします
                     const targetId = Number(items[0].trim());
-                    const value = Number(items[1].trim());
-                    if (!isNaN(targetId) && !isNaN(value)) this.daimyoRelations[targetId] = value;
+                    const statusStr = items[1].trim(); // 状態（友好など）
+                    const value = Number(items[2].trim()); // 関係値
+                    if (!isNaN(targetId) && !isNaN(value)) {
+                        // 状態と関係値をセットにして箱にしまいます
+                        this.daimyoRelations[targetId] = { status: statusStr, sentiment: value };
+                    }
                 }
             });
         } else if (typeof data.daimyoRelations === 'object') {
@@ -201,13 +205,16 @@ class Kunishu {
 
         // CSVの国人衆用データを翻訳して箱に入れる
         if (typeof data.kunishuRelations === 'string' && data.kunishuRelations.trim() !== "") {
-            const parts = data.kunishuRelations.split(',');
+            const parts = data.kunishuRelations.split('|'); // ★こちらも「|」で区切ります
             parts.forEach(part => {
                 const items = part.split(':');
-                if (items.length >= 2) {
+                if (items.length >= 3) { // ★3つあるかチェック
                     const targetId = Number(items[0].trim());
-                    const value = Number(items[1].trim());
-                    if (!isNaN(targetId) && !isNaN(value)) this.kunishuRelations[targetId] = value;
+                    const statusStr = items[1].trim();
+                    const value = Number(items[2].trim());
+                    if (!isNaN(targetId) && !isNaN(value)) {
+                        this.kunishuRelations[targetId] = { status: statusStr, sentiment: value };
+                    }
                 }
             });
         } else if (typeof data.kunishuRelations === 'object') {
@@ -232,21 +239,26 @@ class Kunishu {
         return "国人衆";
     }
 
-    // ★修正: 仲良し度を調べる機能（isKunishu が true なら国人衆、何もなければ大名を調べる）
+    // ★修正: 仲良し度を調べる機能
     getRelation(targetId, isKunishu = false) {
         if (isKunishu) {
-            return this.kunishuRelations[targetId] !== undefined ? this.kunishuRelations[targetId] : 50;
+            // 箱の中の「sentiment（関係値）」だけを取り出して返します
+            return this.kunishuRelations[targetId] !== undefined ? this.kunishuRelations[targetId].sentiment : 50;
         } else {
-            return this.daimyoRelations[targetId] !== undefined ? this.daimyoRelations[targetId] : 50;
+            return this.daimyoRelations[targetId] !== undefined ? this.daimyoRelations[targetId].sentiment : 50;
         }
     }
 
     // ★修正: 仲良し度を書き込む機能
     setRelation(targetId, value, isKunishu = false) {
+        let newVal = Math.max(0, Math.min(100, value));
         if (isKunishu) {
-            this.kunishuRelations[targetId] = Math.max(0, Math.min(100, value));
+            // まだデータがない相手なら、新しくセットを作ります
+            if (!this.kunishuRelations[targetId]) this.kunishuRelations[targetId] = { status: '普通', sentiment: 50 };
+            this.kunishuRelations[targetId].sentiment = newVal;
         } else {
-            this.daimyoRelations[targetId] = Math.max(0, Math.min(100, value));
+            if (!this.daimyoRelations[targetId]) this.daimyoRelations[targetId] = { status: '普通', sentiment: 50 };
+            this.daimyoRelations[targetId].sentiment = newVal;
         }
     }
 }
