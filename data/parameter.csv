@@ -69,7 +69,7 @@ AI.GunshiBiasFactor,0.5,軍師情報のバイアス係数。上げると軍師�
 AI.GunshiFairnessFactor,0.01,軍師の誠実さ係数。上げると軍師の性格による嘘が減る ※現在ロジックでの適用度低
 AI.WarHighIntThreshold,80,合戦AIの高知能判定ライン。上げるとAIが「賢い戦術『計略等』」を使う条件が厳しくなる＝脳筋AI化、下げると多くのAIが計略を使う
 AI.DiplomacyChance,0.3,AI外交発生率。上げるとAIが頻繁に親善や同盟を行う、下げると外交をしなくなる
-AI.GoodwillThreshold,40,AI親善閾値。上げるとAIは友好度が高くてもまだ親善金を送ってくる、下げるとすぐ満足して親善をやめる
+AI.GoodwillThreshold,69,AI親善閾値。上げるとAIは友好度が高くてもまだ親善金を送ってくる、下げるとすぐ満足して親善をやめる
 AI.AllianceThreshold,70,AI同盟閾値。上げるとAIが同盟を申し込むのに必要な友好度が高くなる『同盟しづらい』、下げるとすぐ同盟する
 AI.BreakAllianceDutyFactor,0.5,AI同盟破棄の義理影響。上げると義理堅い大名AIは同盟を破棄しなくなる、下げると義理を無視して裏切る
 War.ChargeMultiplier,1.1,攻城戦：突撃の攻撃倍率。上げると突撃ダメージが増加
