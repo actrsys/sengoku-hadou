@@ -517,10 +517,15 @@ class FieldWarManager {
             let colorClass = u.isAttacker ? 'attacker' : 'defender';
             uEl.className = `fw-unit ${colorClass} ${isActive ? 'active' : ''}`;
             
-            // ★修正: 援軍や国人衆のコマの色（背景色）を、影ではなく本体の色としてオレンジや緑に変更します！
+            // ★再々修正: 友軍の凸型（背景）と枠線の色指定
             if (u.isReinforcement || (typeof u.id === 'string' && u.id.startsWith('k_'))) {
-                const rColor = u.isAttacker ? '#ff9800' : '#4caf50'; // オレンジ(攻)か緑(防)
-                const rBorder = u.isAttacker ? '#e65100' : '#1b5e20';
+                const rColor = u.isAttacker ? '#ff9800' : '#4caf50'; // 凸型はオレンジ(攻)か緑(防)
+                let rBorder = u.isAttacker ? '#e65100' : '#1b5e20';  // 枠線は濃いオレンジか濃い緑
+                
+                // 友軍かつリーダー（総大将）の場合は枠線を白にする
+                if (u.isGeneral) {
+                    rBorder = '#ffffff';
+                }
                 
                 uEl.style.setProperty('background-color', rColor, 'important');
                 uEl.style.setProperty('border-color', rBorder, 'important');
