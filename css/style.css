@@ -677,22 +677,32 @@ img {
     font-size: 0.95rem !important;
     color: #555 !important;
 }
-/* ★野戦：攻撃側の友軍（凸型オレンジ、枠が濃いオレンジ） */
+/* =========================================================
+   ★野戦：友軍（援軍・国人衆）のカラー設定
+   ========================================================= */
+
+/* --- 攻撃側の友軍（オレンジ） --- */
 .fw-unit.attacker.ally {
-    background-color: #ff9800 !important;
-    filter: drop-shadow(1px 0 0 #e65100) drop-shadow(-1px 0 0 #e65100) drop-shadow(0 1px 0 #e65100) drop-shadow(0 -1px 0 #e65100) drop-shadow(2px 2px 2px rgba(0,0,0,0.8)) !important;
+    -webkit-filter: drop-shadow(1px 0 0 #e65100) drop-shadow(-1px 0 0 #e65100) drop-shadow(0 1px 0 #e65100) drop-shadow(0 -1px 0 #e65100) drop-shadow(2px 2px 2px rgba(0,0,0,0.8));
+    filter: drop-shadow(1px 0 0 #e65100) drop-shadow(-1px 0 0 #e65100) drop-shadow(0 1px 0 #e65100) drop-shadow(0 -1px 0 #e65100) drop-shadow(2px 2px 2px rgba(0,0,0,0.8));
 }
-/* 攻撃側・友軍の総大将（枠が白） */
-.fw-unit.attacker.ally.general {
-    filter: drop-shadow(1px 0 0 #ffffff) drop-shadow(-1px 0 0 #ffffff) drop-shadow(0 1px 0 #ffffff) drop-shadow(0 -1px 0 #ffffff) drop-shadow(2px 2px 2px rgba(0,0,0,0.8)) !important;
+.fw-unit.attacker.ally::before { 
+    background-color: #ff9800; /* コマの中身をオレンジに */
+}
+.fw-unit.attacker.ally.active {
+    -webkit-filter: drop-shadow(1px 0 0 #e65100) drop-shadow(-1px 0 0 #e65100) drop-shadow(0 1px 0 #e65100) drop-shadow(0 -1px 0 #e65100) drop-shadow(0 0 6px #ffff00) drop-shadow(2px 2px 2px rgba(0,0,0,0.8));
+    filter: drop-shadow(1px 0 0 #e65100) drop-shadow(-1px 0 0 #e65100) drop-shadow(0 1px 0 #e65100) drop-shadow(0 -1px 0 #e65100) drop-shadow(0 0 6px #ffff00) drop-shadow(2px 2px 2px rgba(0,0,0,0.8));
 }
 
-/* ★野戦：守備側の友軍・国人衆（凸型緑、枠が濃い緑） */
+/* --- 守備側の友軍（緑） --- */
 .fw-unit.defender.ally {
-    background-color: #4caf50 !important;
-    filter: drop-shadow(1px 0 0 #1b5e20) drop-shadow(-1px 0 0 #1b5e20) drop-shadow(0 1px 0 #1b5e20) drop-shadow(0 -1px 0 #1b5e20) drop-shadow(2px 2px 2px rgba(0,0,0,0.8)) !important;
+    -webkit-filter: drop-shadow(1px 0 0 #1b5e20) drop-shadow(-1px 0 0 #1b5e20) drop-shadow(0 1px 0 #1b5e20) drop-shadow(0 -1px 0 #1b5e20) drop-shadow(2px 2px 2px rgba(0,0,0,0.8));
+    filter: drop-shadow(1px 0 0 #1b5e20) drop-shadow(-1px 0 0 #1b5e20) drop-shadow(0 1px 0 #1b5e20) drop-shadow(0 -1px 0 #1b5e20) drop-shadow(2px 2px 2px rgba(0,0,0,0.8));
 }
-/* 守備側・友軍の総大将（枠が白） */
-.fw-unit.defender.ally.general {
-    filter: drop-shadow(1px 0 0 #ffffff) drop-shadow(-1px 0 0 #ffffff) drop-shadow(0 1px 0 #ffffff) drop-shadow(0 -1px 0 #ffffff) drop-shadow(2px 2px 2px rgba(0,0,0,0.8)) !important;
+.fw-unit.defender.ally::before { 
+    background-color: #4caf50; /* コマの中身を緑に */
+}
+.fw-unit.defender.ally.active {
+    -webkit-filter: drop-shadow(1px 0 0 #1b5e20) drop-shadow(-1px 0 0 #1b5e20) drop-shadow(0 1px 0 #1b5e20) drop-shadow(0 -1px 0 #1b5e20) drop-shadow(0 0 6px #ffff00) drop-shadow(2px 2px 2px rgba(0,0,0,0.8));
+    filter: drop-shadow(1px 0 0 #1b5e20) drop-shadow(-1px 0 0 #1b5e20) drop-shadow(0 1px 0 #1b5e20) drop-shadow(0 -1px 0 #1b5e20) drop-shadow(0 0 6px #ffff00) drop-shadow(2px 2px 2px rgba(0,0,0,0.8));
 }
