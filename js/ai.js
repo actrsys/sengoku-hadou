@@ -76,16 +76,39 @@ class AIEngine {
                                + (this.game.month - window.MainParams.StartMonth);
 
             if (elapsedTurns >= 3) {
+                // ★追加：自分が従属している「親大名」を探します
+                const myClanId = castle.ownerClan;
+                let myBossId = 0;
+                for (const c of this.game.clans) {
+                    if (c.id !== myClanId) {
+                        const r = this.game.getRelation(myClanId, c.id);
+                        if (r && r.status === '従属') {
+                            myBossId = c.id;
+                            break;
+                        }
+                    }
+                }
+
                 const neighbors = this.game.castles.filter(c => 
                     c.ownerClan !== 0 && 
-                    c.ownerClan !== castle.ownerClan && 
-                    GameSystem.isReachable(this.game, castle, c, castle.ownerClan)
+                    c.ownerClan !== myClanId && 
+                    GameSystem.isReachable(this.game, castle, c, myClanId)
                 );
                 
                 const validEnemies = neighbors.filter(target => {
-                    const rel = this.game.getRelation(castle.ownerClan, target.ownerClan);
+                    const rel = this.game.getRelation(myClanId, target.ownerClan);
                     const isProtected = ['同盟', '支配', '従属'].includes(rel.status);
-                    return !isProtected && (target.immunityUntil || 0) < this.game.getCurrentTurnId();
+                    if (isProtected || (target.immunityUntil || 0) >= this.game.getCurrentTurnId()) return false;
+
+                    // ★追加：親大名がいる場合、親の「同盟国」や「他の従属国（親が支配している国）」は攻撃できない
+                    if (myBossId !== 0) {
+                        const bossRel = this.game.getRelation(myBossId, target.ownerClan);
+                        if (bossRel && ['同盟', '支配'].includes(bossRel.status)) {
+                            return false;
+                        }
+                    }
+
+                    return true;
                 });
 
                 if (validEnemies.length > 0) {

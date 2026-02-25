@@ -129,12 +129,40 @@ class WarManager {
     constructor(game) { this.game = game; this.state = { active: false }; this.pendingPrisoners = []; }
 
     getValidWarTargets(currentCastle) {
-        return this.game.castles.filter(target => 
-            GameSystem.isReachable(this.game, currentCastle, target, this.game.playerClanId) && 
-            target.ownerClan !== this.game.playerClanId &&
-            !['同盟', '支配', '従属'].includes(this.game.getRelation(this.game.playerClanId, target.ownerClan).status) &&
-            (target.immunityUntil || 0) < this.game.getCurrentTurnId()
-        ).map(t => t.id);
+        const myClanId = this.game.playerClanId;
+        
+        // 自分が従属している「親大名」を探します
+        let myBossId = 0;
+        for (const c of this.game.clans) {
+            if (c.id !== myClanId) {
+                const r = this.game.getRelation(myClanId, c.id);
+                if (r && r.status === '従属') {
+                    myBossId = c.id;
+                    break;
+                }
+            }
+        }
+
+        return this.game.castles.filter(target => {
+            // 基本的なチェック（道が繋がっているか、自分の城じゃないか、免疫期間じゃないか）
+            if (!GameSystem.isReachable(this.game, currentCastle, target, myClanId)) return false;
+            if (target.ownerClan === myClanId || target.ownerClan === 0) return false;
+            if ((target.immunityUntil || 0) >= this.game.getCurrentTurnId()) return false;
+            
+            // 直接の「同盟・支配・従属」は攻撃不可
+            const rel = this.game.getRelation(myClanId, target.ownerClan);
+            if (['同盟', '支配', '従属'].includes(rel.status)) return false;
+
+            // ★追加：親大名がいる場合、親の「同盟国」や「他の従属国（親が支配している国）」は攻撃できない
+            if (myBossId !== 0) {
+                const bossRel = this.game.getRelation(myBossId, target.ownerClan);
+                if (bossRel && ['同盟', '支配'].includes(bossRel.status)) {
+                    return false; // 攻撃先リストに入れません
+                }
+            }
+
+            return true;
+        }).map(t => t.id);
     }
 
     getAvailableCommands(isAtkTurn) {
