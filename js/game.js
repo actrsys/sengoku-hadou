@@ -444,7 +444,6 @@ class GameManager {
     // 【修正後】
     startNewGame() {
         if(this.ui) this.ui.forceResetModals();
-        window.AudioManager.playBGM('SC_ex_Town1_Castle.ogg');
         this.boot();
     }
     
@@ -816,7 +815,6 @@ class GameManager {
                 this.updateAllCastlesLords();
 
                 this.ui.showCutin(`ロード完了: ${this.year}年 ${this.month}月`);
-                window.AudioManager.playBGM('SC_ex_Town1_Castle.ogg');
                 this.ui.hasInitializedMap = false; 
                 this.ui.renderMap();
                 this.processTurn();
