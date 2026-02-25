@@ -1763,11 +1763,11 @@ class UIManager {
             contextEl.classList.remove('hidden');
         }
 
-        // ★追加：武将リスト用のヘッダー（名前、統率など）を隠します
+        // 武将リスト用のヘッダー（名前、統率など）を隠します
         const listHeader = document.querySelector('#selector-modal .list-header');
         if (listHeader) listHeader.style.display = 'none';
 
-        let selectedKunishuId = null; // ★追加：選んだ国衆を記憶する箱
+        let selectedKunishuId = null; // 選んだ国衆を記憶する箱
 
         if (this.selectorList) {
             this.selectorList.innerHTML = '';
@@ -1782,20 +1782,26 @@ class UIManager {
                     div.innerHTML = `<strong style="margin-right:10px;">${name}</strong> <span style="font-size:0.9rem; color:#555;">(兵数:${k.soldiers} 防御:${k.defense} 友好度:${rel})</span>`;
                     div.style.cursor = 'default';
                 } else {
-                    // ★選択モード（親善や引抜など）ラジオボタンを付けます
+                    // ★選択モード（親善や引抜など）ラジオボタンを消しました！
                     div.innerHTML = `
-                        <input type="radio" name="sel_kunishu" value="${k.id}" style="margin-right:10px;">
                         <strong style="margin-right:10px;">${name}</strong> 
                         <span style="font-size:0.9rem; color:#555;">(兵数:${k.soldiers} 防御:${k.defense} 友好度:${rel})</span>
                     `;
                     div.style.cursor = 'pointer';
                     
-                    div.onclick = (e) => { 
-                        // クリックしたらチェックを入れる
-                        const radio = div.querySelector('input[type="radio"]');
-                        if (e.target.tagName !== 'INPUT') {
-                            radio.checked = true;
-                        }
+                    div.onclick = () => { 
+                        // ★追加：選んだことが分かるように色を変えます
+                        // まずは全員の色を元に戻す
+                        const allItems = this.selectorList.querySelectorAll('.kunishu-item');
+                        allItems.forEach(item => {
+                            item.style.backgroundColor = '';
+                            item.style.borderColor = '';
+                        });
+                        
+                        // 今クリックした行だけ、目立つ色（薄いオレンジ色）にする
+                        div.style.backgroundColor = '#ffe0b2';
+                        div.style.borderColor = '#ff9800';
+
                         selectedKunishuId = k.id;
                         
                         // 決定ボタンを押せるようにする
