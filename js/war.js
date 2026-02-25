@@ -330,6 +330,8 @@ class WarManager {
 
                     const modal = document.getElementById('intercept-confirm-modal');
                     if (modal) {
+                        // ★追加：プレイヤーが操作できるように「思考中」のガードを一旦外します
+                        if (this.game.ui.aiGuard) this.game.ui.aiGuard.classList.add('hidden');
                         modal.classList.remove('hidden');
                         document.getElementById('intercept-msg').innerText = `${atkArmyName}の${atkBushos[0].name}が攻めてきました！\n迎撃（野戦）しますか？籠城しますか？`;
                         document.getElementById('btn-intercept').onclick = () => { 
