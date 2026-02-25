@@ -406,10 +406,17 @@ class WarManager {
                                                         }
 
                                                         onResult('field', finalDefAssignments, interceptRice, finalAtkAssignments, interceptHorses, interceptGuns);
-                                                    });
-                                                }
+                                                    },
+                                                    // ★兵士配分画面でキャンセルしたら、最初の選択画面に戻す
+                                                    () => { modal.classList.remove('hidden'); }
+                                                    );
+                                                },
+                                                // ★兵数入力画面でキャンセルしたら、最初の選択画面に戻す
+                                                onCancel: () => { modal.classList.remove('hidden'); }
                                             });
-                                        }
+                                        },
+                                        // ★武将選択画面でキャンセルしたら、最初の選択画面に戻す
+                                        onCancel: () => { modal.classList.remove('hidden'); }
                                     });
                                 };
                                 document.getElementById('btn-siege').onclick = () => { modal.classList.add('hidden'); onResult('siege'); };
