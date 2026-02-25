@@ -740,3 +740,19 @@ img {
     color: #fff; /* 文字を白くします */
     padding: 2px 0;
 }
+/* ★追加：野戦と攻城戦の画面をスマホのバーを避けて全画面にする魔法 */
+#war-modal,
+#fw-modal {
+    padding: 0 !important; /* 画面の周りの隙間（黒いモヤモヤ部分）をなくします */
+}
+
+#war-modal .modal-content,
+#fw-modal .modal-content {
+    width: 100vw !important;     /* 横幅を画面いっぱいに！ */
+    height: 100dvh !important;   /* スマホのバーを避けて、縦幅を画面いっぱいに！ */
+    max-width: none !important;  /* 「これ以上大きくしない」という制限を外します */
+    max-height: none !important; /* 上と同じく制限を外します */
+    margin: 0 !important;        /* 外側の余白をゼロにします */
+    border-radius: 0 !important; /* 角の丸みをなくして、四角い全画面にします */
+    border: none !important;     /* 枠線を消してスッキリさせます */
+}
