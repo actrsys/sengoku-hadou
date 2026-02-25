@@ -90,6 +90,9 @@ class UIManager {
 		if (titleScreen && tapMessage && menuButtons) {
 		    // 画面がクリック（タップ）された時の処理
 		    const onTitleClick = () => {
+		        if (window.AudioEngine) {
+			        window.AudioEngine.playBGM('title'); 
+			    }
 		        // メッセージを消す
 		        tapMessage.classList.add('hidden');
 		        // ボタンを表示する
