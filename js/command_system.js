@@ -924,7 +924,7 @@ class CommandSystem {
             const powerRatio = myPower / targetPower;
             
             if (powerRatio < 5) {
-                msg = `戦力差が足りず、支配の要求を跳ね除けられました……\n(戦力が相手の5倍以上必要です)`;
+                msg = `要求を跳ね除けられました……`;
                 doer.achievementTotal += 5;
                 this.game.factionSystem.updateRecognition(doer, 10);
             } else {
@@ -1630,6 +1630,74 @@ class CommandSystem {
                 }
             }
         });
+    }
+    
+    // ★追加: AIからプレイヤーへの外交提案を受ける処理
+    proposeDiplomacyToPlayer(doer, targetClanId, type, gold, onComplete) {
+        const doerClan = this.game.clans.find(c => c.id === doer.clan);
+
+        // ★追加：使者を出したAIの城からお金を減らす処理
+        if (type === 'goodwill') {
+            const doerCastle = this.game.getCastle(doer.castleId);
+            if (doerCastle) doerCastle.gold = Math.max(0, doerCastle.gold - gold);
+        }
+
+        let title = "使者の来訪";
+        let msg = "";
+        
+        if (type === 'goodwill') {
+            msg = `${doerClan.name} の ${doer.name} が使者として訪れました。\n親善の証として 金${gold} を持参しています。\n受け取りますか？`;
+        } else if (type === 'alliance') {
+            msg = `${doerClan.name} の ${doer.name} が使者として訪れました。\n当家との「同盟」を提案しています。\n受諾しますか？`;
+        } else if (type === 'dominate') {
+            msg = `${doerClan.name} の ${doer.name} が使者として訪れました。\n当家に「従属」するよう要求しています。\n（受諾すると相手が支配、当家が従属となります）\n受諾しますか？`;
+        }
+
+        // はい／いいえ を選べるダイアログを出します
+        this.game.ui.showDialog(msg, true, 
+            () => {
+                // 【受諾（OK）を選んだ時】
+                if (type === 'goodwill') {
+                    const myCastle = this.game.castles.find(c => c.ownerClan === targetClanId);
+                    if (myCastle) myCastle.gold = Math.min(99999, myCastle.gold + gold);
+                    const baseBonus = (gold / 100) + (doer.diplomacy + doer.charm) * 0.1;
+                    const increase = Math.floor(baseBonus * (0.8 + Math.random() * 0.4));
+                    this.game.diplomacyManager.updateSentiment(doer.clan, targetClanId, increase);
+                    this.game.ui.showResultModal(`${doerClan.name} からの親善を受け入れました！\n感情値が ${increase} 上昇しました`, () => {
+                        if (onComplete) onComplete();
+                    });
+                } else if (type === 'alliance') {
+                    this.game.diplomacyManager.changeStatus(doer.clan, targetClanId, '同盟');
+                    this.game.ui.showResultModal(`${doerClan.name} と同盟を結びました！`, () => {
+                        if (onComplete) onComplete();
+                    });
+                } else if (type === 'dominate') {
+                    this.clearDominationRelations(targetClanId);
+                    this.game.diplomacyManager.changeStatus(doer.clan, targetClanId, '支配');
+                    this.game.ui.showResultModal(`${doerClan.name} に従属しました……`, () => {
+                        if (onComplete) onComplete();
+                    });
+                }
+            },
+            () => {
+                // 【拒否（キャンセル）を選んだ時】
+                if (type === 'goodwill') {
+                    this.game.ui.showResultModal(`親善の品を突き返しました。`, () => {
+                        if (onComplete) onComplete();
+                    });
+                } else if (type === 'alliance') {
+                    this.game.diplomacyManager.updateSentiment(doer.clan, targetClanId, -10);
+                    this.game.ui.showResultModal(`同盟の提案を拒否しました。`, () => {
+                        if (onComplete) onComplete();
+                    });
+                } else if (type === 'dominate') {
+                    this.game.diplomacyManager.updateSentiment(doer.clan, targetClanId, -20);
+                    this.game.ui.showResultModal(`従属の要求を断固として拒否しました！`, () => {
+                        if (onComplete) onComplete();
+                    });
+                }
+            }
+        );
     }
     
 }

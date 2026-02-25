@@ -66,7 +66,8 @@ class AIEngine {
             if (this.game.month % 3 === 0) {
                 const diplomacyChance = (window.AIParams.AI.DiplomacyChance || 0.3) * (mods.aggression); 
                 if (Math.random() < diplomacyChance) {
-                    this.execAIDiplomacy(castle, castellan, smartness); 
+                    const dipResult = this.execAIDiplomacy(castle, castellan, smartness); 
+                    if (dipResult === 'waiting') return; // ★ プレイヤーのお返事待ちならここで一旦ストップ！
                     if (castellan.isActionDone) { this.game.finishTurn(); return; }
                 }
             }
@@ -375,9 +376,19 @@ class AIEngine {
             // 相手の戦力が自分の1/5以下なら、稀に支配を試みます
             if (targetClanTotal * 5 <= myPower) {
                 if (Math.random() < 0.2) { // 20%の確率で支配コマンドを実行します
-                    this.game.commandSystem.executeDiplomacy(castellan.id, targetClanId, 'dominate');
-                    castellan.isActionDone = true;
-                    continue;
+                    if (targetClanId === this.game.playerClanId) {
+                        // ★相手がプレイヤーならお返事を待つ
+                        this.game.commandSystem.proposeDiplomacyToPlayer(castellan, targetClanId, 'dominate', 0, () => {
+                            castellan.isActionDone = true;
+                            this.game.finishTurn(); // お返事のあとにターンを進める
+                        });
+                        return 'waiting';
+                    } else {
+                        // 相手がAIならそのまま実行
+                        this.game.commandSystem.executeDiplomacy(castellan.id, targetClanId, 'dominate');
+                        castellan.isActionDone = true;
+                        continue;
+                    }
                 }
             }
 
@@ -385,11 +396,29 @@ class AIEngine {
             if (myPower < targetClanTotal * 0.8) {
                 if (Math.random() < smartness) {
                     if (rel.sentiment < (window.AIParams.AI.GoodwillThreshold || 40) && castle.gold > 500) {
-                         this.game.commandSystem.executeDiplomacy(castellan.id, targetClanId, 'goodwill', 200); 
-                         castellan.isActionDone = true;
+                         if (targetClanId === this.game.playerClanId) {
+                             // ★相手がプレイヤーならお返事を待つ
+                             this.game.commandSystem.proposeDiplomacyToPlayer(castellan, targetClanId, 'goodwill', 200, () => {
+                                 castellan.isActionDone = true;
+                                 this.game.finishTurn();
+                             });
+                             return 'waiting';
+                         } else {
+                             this.game.commandSystem.executeDiplomacy(castellan.id, targetClanId, 'goodwill', 200); 
+                             castellan.isActionDone = true;
+                         }
                     } else if (rel.sentiment > (window.AIParams.AI.AllianceThreshold || 70)) {
-                         this.game.commandSystem.executeDiplomacy(castellan.id, targetClanId, 'alliance');
-                         castellan.isActionDone = true;
+                         if (targetClanId === this.game.playerClanId) {
+                             // ★相手がプレイヤーならお返事を待つ
+                             this.game.commandSystem.proposeDiplomacyToPlayer(castellan, targetClanId, 'alliance', 0, () => {
+                                 castellan.isActionDone = true;
+                                 this.game.finishTurn();
+                             });
+                             return 'waiting';
+                         } else {
+                             this.game.commandSystem.executeDiplomacy(castellan.id, targetClanId, 'alliance');
+                             castellan.isActionDone = true;
+                         }
                     }
                 }
             }
