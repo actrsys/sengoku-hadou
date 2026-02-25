@@ -1311,7 +1311,7 @@ class UIManager {
     }
     
     // ★ 修正: 兵科（足軽・騎馬・鉄砲）の選択UIと、持参した兵器（騎馬・鉄砲）の数による制限ロジックを追加
-    showUnitDivideModal(bushos, totalSoldiers, totalHorses, totalGuns, onConfirm) {
+    showUnitDivideModal(bushos, totalSoldiers, totalHorses, totalGuns, onConfirm, onCancel = null) { // ★修正：onCancel を受け取れるように追加
         const modal = document.getElementById('unit-divide-modal');
         const listEl = document.getElementById('divide-list');
         const confirmBtn = document.getElementById('divide-confirm-btn');
@@ -1322,9 +1322,19 @@ class UIManager {
         
         // フォールバック処理（旧呼び出し用）
         if (typeof totalHorses === 'function') {
+            onCancel = totalGuns; // ★引数がずれた場合の対応を追加
             onConfirm = totalHorses;
             totalHorses = 0;
             totalGuns = 0;
+        }
+
+        // ★追加：キャンセルボタンが押されたときの処理
+        const cancelBtn = modal.querySelector('.btn-secondary');
+        if (cancelBtn) {
+            cancelBtn.onclick = () => {
+                modal.classList.add('hidden');
+                if (onCancel) onCancel(); // キャンセルの合図を送る！
+            };
         }
 
         modal.classList.remove('hidden');
@@ -1676,9 +1686,12 @@ class UIManager {
         const backBtn = document.querySelector('#selector-modal .btn-secondary');
         if(backBtn) {
             backBtn.onclick = () => {
-                if (listHeader) listHeader.style.display = '';
                 this.closeSelector();
-                if (onCancel) onCancel();
+                if (onBack) {
+                    onBack(); 
+                } else if (extraData && extraData.onCancel) {
+                    extraData.onCancel(); // ★追加：キャンセルの合図を送る！
+                }
             };
         }
 
@@ -1948,10 +1961,23 @@ class UIManager {
 
         this.quantityConfirmBtn.onclick = () => {
             this.quantityModal.classList.add('hidden');
-            const gold = parseInt(num.value) || 0;
-            // お金が決まったら、実際に要請する機能（次回作ります）にバトンタッチ！
-            this.game.commandSystem.executeReinforcementRequest(gold, helperCastle, atkCastle, targetCastle, atkBushos, sVal, rVal, hVal, gVal);
+            if (type === 'def_intercept' && extraData && extraData.onConfirm) {
+                extraData.onConfirm(inputs);
+            } else {
+                this.game.commandSystem.handleQuantitySelection(type, inputs, targetId, data, extraData);
+            }
         };
+
+        // ★追加：キャンセルボタン（戻る）を押したときの処理
+        const cancelBtn = this.quantityModal.querySelector('.btn-secondary');
+        if (cancelBtn) {
+            cancelBtn.onclick = () => {
+                this.quantityModal.classList.add('hidden');
+                if (extraData && extraData.onCancel) {
+                    extraData.onCancel(); // キャンセルの合図を送る！
+                }
+            };
+        }
     }
     
     // ★ここから追加: 守備側（攻められた時）の援軍を選ぶ画面です
@@ -2038,6 +2064,15 @@ class UIManager {
             // 決定したら援軍の計算処理にバトンタッチ！
             this.game.warManager.executeDefReinforcement(gold, helperCastle, defCastle, onComplete);
         };
+
+        // ★追加：キャンセルボタンが押されたときの処理
+        const cancelBtn = this.quantityModal.querySelector('.btn-secondary');
+        if (cancelBtn) {
+            cancelBtn.onclick = () => {
+                this.quantityModal.classList.add('hidden');
+                onComplete(); // キャンセルしたら援軍なしで進める！
+            };
+        }
     }
     
 }
