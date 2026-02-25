@@ -1555,7 +1555,6 @@ class WarManager {
         if (reinfRice < 500) reinfRice = 500; // 最低でも兵糧500は持っていく！
         if (reinfRice > helperCastle.rice) reinfRice = helperCastle.rice; // 城にある限界は超えないようにする
         
-        const reinfHorses = Math.min(helperCastle.horses || 0, Math.floor(reinfSoldiers * 0.5));
         const reinfHorses = Math.min(helperCastle.horses || 0, Math.floor(reinfSoldiers * 0.5)); 
         const reinfGuns = Math.min(helperCastle.guns || 0, Math.floor(reinfSoldiers * 0.5));
 
