@@ -1050,6 +1050,8 @@ class UIManager {
                 this.closeSelector();
                 if (onBack) {
                     onBack(); 
+                } else if (extraData && extraData.onCancel) {
+                    extraData.onCancel(); // ★追加：キャンセルの合図を送る！
                 }
             };
         }
@@ -1671,6 +1673,17 @@ class UIManager {
                 this.game.commandSystem.handleQuantitySelection(type, inputs, targetId, data, extraData);
             }
         };
+
+        // ★追加：キャンセルボタン（戻る）を押したときの処理
+        const cancelBtn = this.quantityModal.querySelector('.btn-secondary');
+        if (cancelBtn) {
+            cancelBtn.onclick = () => {
+                this.quantityModal.classList.add('hidden');
+                if (extraData && extraData.onCancel) {
+                    extraData.onCancel(); // キャンセルの合図を送る！
+                }
+            };
+        }
     }
     
     showKunishuSelector(kunishus, onSelect, onCancel, isViewOnly = false) {
@@ -1680,18 +1693,11 @@ class UIManager {
         const title = document.getElementById('selector-title');
         if (title) title.textContent = isViewOnly ? "国人衆一覧" : "対象の国衆を選択";
 
-        const listHeader = document.querySelector('#selector-modal .list-header');
-        if (listHeader) listHeader.style.display = 'none';
-        
         const backBtn = document.querySelector('#selector-modal .btn-secondary');
         if(backBtn) {
             backBtn.onclick = () => {
                 this.closeSelector();
-                if (onBack) {
-                    onBack(); 
-                } else if (extraData && extraData.onCancel) {
-                    extraData.onCancel(); // ★追加：キャンセルの合図を送る！
-                }
+                if (onCancel) onCancel(); // 国衆画面の正しいキャンセル処理
             };
         }
 
@@ -1961,21 +1967,17 @@ class UIManager {
 
         this.quantityConfirmBtn.onclick = () => {
             this.quantityModal.classList.add('hidden');
-            if (type === 'def_intercept' && extraData && extraData.onConfirm) {
-                extraData.onConfirm(inputs);
-            } else {
-                this.game.commandSystem.handleQuantitySelection(type, inputs, targetId, data, extraData);
-            }
+            const gold = parseInt(num.value) || 0;
+            // 決定したら援軍の計算処理にバトンタッチ！
+            this.game.commandSystem.executeReinforcementRequest(gold, helperCastle, atkCastle, targetCastle, atkBushos, sVal, rVal, hVal, gVal);
         };
 
-        // ★追加：キャンセルボタン（戻る）を押したときの処理
         const cancelBtn = this.quantityModal.querySelector('.btn-secondary');
         if (cancelBtn) {
             cancelBtn.onclick = () => {
                 this.quantityModal.classList.add('hidden');
-                if (extraData && extraData.onCancel) {
-                    extraData.onCancel(); // キャンセルの合図を送る！
-                }
+                // キャンセルしたら援軍なしで戦争をスタートする！
+                this.game.warManager.startWar(atkCastle, targetCastle, atkBushos, sVal, rVal, hVal, gVal);
             };
         }
     }
