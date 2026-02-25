@@ -138,6 +138,7 @@ class UIManager {
     }
 
     showDialog(msg, isConfirm, onOk, onCancel = null) {
+        if (this.aiGuard) this.aiGuard.classList.add('hidden');
         const modal = document.getElementById('dialog-modal');
         const msgEl = document.getElementById('dialog-message');
         const okBtn = document.getElementById('dialog-btn-ok');
@@ -319,14 +320,16 @@ class UIManager {
                 
                 if (this.game.selectionMode) {
                     this.cancelMapSelection(false); 
-                    const el = document.querySelector(`.castle-card[data-clan="${this.game.playerClanId}"]`); 
-                    if(el) el.scrollIntoView({block:"center", behavior: "smooth"});
+                    // ★変更：縦も横も真ん中（inline: "center"）になるように追加しました！
+                    const el = document.querySelector('.castle-card.active-turn'); 
+                    if(el) el.scrollIntoView({block:"center", inline: "center", behavior: "smooth"});
                 } else {
                     const myCastle = this.game.getCurrentTurnCastle();
                     if (myCastle) {
                         this.showControlPanel(myCastle);
-                        const el = document.querySelector(`.castle-card[data-clan="${this.game.playerClanId}"]`); 
-                        if(el) el.scrollIntoView({block:"center", behavior: "smooth"});
+                        // ★変更：縦も横も真ん中（inline: "center"）になるように追加しました！
+                        const el = document.querySelector('.castle-card.active-turn'); 
+                        if(el) el.scrollIntoView({block:"center", inline: "center", behavior: "smooth"});
                     }
                 }
             };
@@ -504,6 +507,7 @@ class UIManager {
     }
 
     showResultModal(msg, onClose = null, customFooterHtml = null) { 
+        if (this.aiGuard) this.aiGuard.classList.add('hidden');
         if (this.resultBody) this.resultBody.innerHTML = msg.replace(/\n/g, '<br>'); 
         const footer = document.getElementById('result-footer');
         if (footer) {
@@ -916,19 +920,19 @@ class UIManager {
             if(!area) return;
             area.innerHTML = '';
             
-            if (area === mobileArea) {
-                 const btn = document.createElement('button');
-                 btn.className = 'cmd-btn back';
-                 btn.textContent = "自拠点へ戻る";
-                 btn.onclick = () => {
-                     if(this.game.isProcessingAI) return;
-                     const myCastle = this.game.getCurrentTurnCastle();
-                     this.showControlPanel(myCastle);
-                     const el = document.querySelector(`.castle-card[data-clan="${this.game.playerClanId}"]`); 
-                     if(el) el.scrollIntoView({block:"center"});
-                 };
-                 area.appendChild(btn);
-            }
+            // ★変更：スマホ(mobileArea)だけでなく、PC版でもボタンを作るように「if」を消しました！
+            const btn = document.createElement('button');
+            btn.className = 'cmd-btn back';
+            btn.textContent = "自拠点へ戻る";
+            btn.onclick = () => {
+                if(this.game.isProcessingAI) return;
+                const myCastle = this.game.getCurrentTurnCastle();
+                this.showControlPanel(myCastle);
+                // ★変更：現在ターンの自分の城を探して、縦も横も真ん中に持ってくるように直しました！
+                const el = document.querySelector('.castle-card.active-turn'); 
+                if(el) el.scrollIntoView({block:"center", inline: "center", behavior: "smooth"});
+            };
+            area.appendChild(btn);
         });
     }
 

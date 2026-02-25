@@ -1450,7 +1450,7 @@ class WarManager {
         }
     }
 
-    // ★追加: 守備側の援軍が来るか計算して合流させる機能
+    // ★ここから下を丸ごと差し替えます
     executeDefReinforcement(gold, helperCastle, defCastle, onComplete) {
         if (gold > 0) defCastle.gold -= gold;
 
@@ -1460,6 +1460,28 @@ class WarManager {
 
         const myToHelperRel = this.game.getRelation(myClanId, helperClanId);
         const helperToEnemyRel = this.game.getRelation(helperClanId, enemyClanId);
+
+        // ★追加：もし援軍を頼まれたのが「プレイヤー」だったら、受けるか断るか選びます！
+        if (helperClanId === this.game.playerClanId) {
+            const myClanName = this.game.clans.find(c => c.id === myClanId)?.name || "不明";
+            const msg = `${myClanName} (${defCastle.name}) から防衛の援軍要請が届きました。\n（使者持参金: ${gold}）\n援軍を派遣しますか？`;
+            
+            // プレイヤーが選べるように「思考中」のフタを外します
+            if (this.game.ui.aiGuard) this.game.ui.aiGuard.classList.add('hidden');
+
+            this.game.ui.showDialog(msg, true, 
+                // 受諾（OK）した時
+                () => {
+                    this._applyDefReinforcement(helperCastle, defCastle, myToHelperRel, onComplete);
+                },
+                // 拒否（キャンセル）した時
+                () => {
+                    this.game.diplomacyManager.updateSentiment(myClanId, helperClanId, -10);
+                    this.game.ui.showDialog(`援軍要請を断りました。`, false, onComplete);
+                }
+            );
+            return;
+        }
 
         let isSuccess = false;
 
@@ -1485,6 +1507,14 @@ class WarManager {
             }
             return;
         }
+
+        this._applyDefReinforcement(helperCastle, defCastle, myToHelperRel, onComplete);
+    }
+
+    // ★追加：援軍が来る処理を新しく作って分離しました
+    _applyDefReinforcement(helperCastle, defCastle, myToHelperRel, onComplete) {
+        const myClanId = defCastle.ownerClan;
+        const helperClanId = helperCastle.ownerClan;
 
         if (!['支配', '従属', '同盟'].includes(myToHelperRel.status)) {
             this.game.diplomacyManager.updateSentiment(myClanId, helperClanId, -10);
@@ -1521,21 +1551,17 @@ class WarManager {
         helperCastle.guns = Math.max(0, (helperCastle.guns || 0) - reinfGuns);
         reinfBushos.forEach(b => b.isActionDone = true);
 
-        // ★削除: 防衛側の城に一時的に合流させるのをやめる（編成画面でプレイヤーが操作できてしまうため）
-
-        // 守備側の援軍パックとして state に保存（終わった後の帰還用 兼 後で合流させる用）
+        // 守備側の援軍パックとして state に保存
         this.state.defReinforcement = {
             castle: helperCastle,
             bushos: reinfBushos,
             soldiers: reinfSoldiers,
-            rice: reinfRice,      // ★追加: 兵糧も保存しておく
+            rice: reinfRice,      
             horses: reinfHorses,
             guns: reinfGuns
         };
         
-        // ★削除: 武将の合流も後回しにする
-
-        // プレイヤーが援軍元なら、プレイヤーが関わる戦争にする
+        // プレイヤーが関わる戦争にする
         if (helperClanId === this.game.playerClanId) {
             this.state.isPlayerInvolved = true;
         }
@@ -1548,5 +1574,6 @@ class WarManager {
             onComplete();
         }
     }
+    // ★差し替え・追加ここまで
     
 }
