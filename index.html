@@ -13,11 +13,16 @@
         <div class="title-content">
             <h1 class="game-title">戦国覇道</h1>
             <div class="title-menu">
-                <button id="start-btn" class="title-btn" onclick="window.GameApp.startNewGame()">はじめから</button>
-                
-                <button class="title-btn" onclick="document.getElementById('load-file-input').click()">続きから</button>
-                <input type="file" id="load-file-input" accept=".json" style="display:none" onchange="window.GameApp.loadGameFromFile(event)">
-            </div>
+			    <div id="menu-buttons" class="hidden">
+			        <button id="start-btn" class="title-btn" onclick="window.GameApp.startNewGame()">はじめから</button>
+			        <button class="title-btn" onclick="document.getElementById('load-file-input').click()">続きから</button>
+			        <input type="file" id="load-file-input" accept=".json" style="display:none" onchange="window.GameApp.loadGameFromFile(event)">
+			    </div>
+
+			    <div id="tap-to-proceed" class="title-tap-message">
+			        Tap or click to proceed.
+			    </div>
+			</div>
         </div>
     </div>
 
