@@ -1599,11 +1599,13 @@ class UIManager {
             inputs.horses = createSlider("持参騎馬", "horses", c.horses, 0);
             inputs.guns = createSlider("持参鉄砲", "guns", c.guns, 0);
         } else if (type === 'def_intercept') { 
+            // ★修正：別の城（c）ではなく、攻められた城（interceptCastle）のデータを正しく読み込むようにしました！
+            const interceptCastle = (data && data.length > 0) ? data[0] : c;
             document.getElementById('quantity-title').textContent = "迎撃部隊編成"; 
-            inputs.soldiers = createSlider("出陣兵士数", "soldiers", c.soldiers, c.soldiers);
-            inputs.rice = createSlider("持参兵糧", "rice", c.rice, c.rice);
-            inputs.horses = createSlider("持参騎馬", "horses", c.horses, 0);
-            inputs.guns = createSlider("持参鉄砲", "guns", c.guns, 0);
+            inputs.soldiers = createSlider("出陣兵士数", "soldiers", interceptCastle.soldiers, interceptCastle.soldiers);
+            inputs.rice = createSlider("持参兵糧", "rice", interceptCastle.rice, interceptCastle.rice);
+            inputs.horses = createSlider("持参騎馬", "horses", interceptCastle.horses || 0, 0);
+            inputs.guns = createSlider("持参鉄砲", "guns", interceptCastle.guns || 0, 0);
         } else if (type === 'transport') {
             document.getElementById('quantity-title').textContent = "輸送物資指定"; 
             inputs.gold = createSlider("金", "gold", c.gold, 0); 
