@@ -91,7 +91,7 @@ class UIManager {
 		    // 画面がクリック（タップ）された時の処理
 		    const onTitleClick = () => {
 		        if (window.AudioEngine) {
-			        window.AudioEngine.playBGM('title'); 
+			        window.AudioEngine.playBGM('SC_ex_Town1_Castle.ogg'); 
 			    }
 		        // メッセージを消す
 		        tapMessage.classList.add('hidden');
