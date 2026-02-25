@@ -1690,36 +1690,42 @@ class CommandSystem {
                     const increase = this.calcGoodwillIncrease(gold, doer);
                     this.game.diplomacyManager.updateSentiment(doer.clan, targetClanId, increase);
                     this.game.ui.showResultModal(`${doerClan.name} からの親善を受け入れました！\n感情値が ${increase} 上昇しました`, () => {
-                        if (onComplete) onComplete();
+                        // ★修正: 画面がフリーズしないように、0.1秒だけ待ってから次に進むようにしました
+                        if (onComplete) setTimeout(onComplete, 100);
                     });
                 } else if (type === 'alliance') {
                     this.game.diplomacyManager.changeStatus(doer.clan, targetClanId, '同盟');
                     this.game.ui.showResultModal(`${doerClan.name} と同盟を結びました！`, () => {
-                        if (onComplete) onComplete();
+                        // ★修正: 画面がフリーズしないように、0.1秒だけ待ってから次に進むようにしました
+                        if (onComplete) setTimeout(onComplete, 100);
                     });
                 } else if (type === 'dominate') {
                     this.clearDominationRelations(targetClanId);
                     this.game.diplomacyManager.changeStatus(doer.clan, targetClanId, '支配');
                     this.game.ui.showResultModal(`${doerClan.name} に従属しました……`, () => {
-                        if (onComplete) onComplete();
+                        // ★修正: 画面がフリーズしないように、0.1秒だけ待ってから次に進むようにしました
+                        if (onComplete) setTimeout(onComplete, 100);
                     });
                 }
             },
             () => {
                 // 【拒否（キャンセル）を選んだ時】
                 if (type === 'goodwill') {
+                    // おまけ：もし親善を拒否されたら、AIの城にお金を返してあげる処理を追加しました
+                    const doerCastle = this.game.getCastle(doer.castleId);
+                    if (doerCastle) doerCastle.gold = Math.min(99999, doerCastle.gold + gold);
                     this.game.ui.showResultModal(`親善の品を突き返しました。`, () => {
-                        if (onComplete) onComplete();
+                        if (onComplete) setTimeout(onComplete, 100);
                     });
                 } else if (type === 'alliance') {
                     this.game.diplomacyManager.updateSentiment(doer.clan, targetClanId, -10);
                     this.game.ui.showResultModal(`同盟の提案を拒否しました。`, () => {
-                        if (onComplete) onComplete();
+                        if (onComplete) setTimeout(onComplete, 100);
                     });
                 } else if (type === 'dominate') {
                     this.game.diplomacyManager.updateSentiment(doer.clan, targetClanId, -20);
                     this.game.ui.showResultModal(`従属の要求を断固として拒否しました！`, () => {
-                        if (onComplete) onComplete();
+                        if (onComplete) setTimeout(onComplete, 100);
                     });
                 }
             }
