@@ -13,7 +13,7 @@ window.AIParams = {
         AbilityBase: 50, AbilitySensitivity: 3.0,
         GunshiBiasFactor: 0.5, GunshiFairnessFactor: 0.01,
         DiplomacyChance: 0.3, 
-        GoodwillThreshold: 40, 
+        GoodwillThreshold: 69, 
         AllianceThreshold: 70, 
         BreakAllianceDutyFactor: 0.5
     }
