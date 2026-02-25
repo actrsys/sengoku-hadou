@@ -341,6 +341,33 @@ class GameSystem {
         return false;
     }
     
+    static calcInvestigate(bushos, targetCastle) {
+        if (!bushos || bushos.length === 0) return { success: false, accuracy: 0 };
+        
+        // 1. 選んだ武将の中で、一番「武力」が高い人と「智謀」が高い人を探します
+        const maxStrBusho = bushos.reduce((a,b) => a.strength > b.strength ? a : b);
+        const maxIntBusho = bushos.reduce((a,b) => a.intelligence > b.intelligence ? a : b);
+        
+        // 2. 他の武将たちはサポート役として、能力の20%（0.2）を足してくれます
+        const assistStr = bushos.filter(b => b !== maxStrBusho).reduce((sum, b) => sum + b.strength, 0) * 0.2;
+        const assistInt = bushos.filter(b => b !== maxIntBusho).reduce((sum, b) => sum + b.intelligence, 0) * 0.2;
+        
+        const totalStr = maxStrBusho.strength + assistStr;
+        const totalInt = maxIntBusho.intelligence + assistInt;
+        
+        // 3. 潜入の難しさを決めて、「武力チーム」が成功するかどうかサイコロを振ります
+        const difficulty = 30 + Math.random() * window.MainParams.Strategy.InvestigateDifficulty;
+        const isSuccess = totalStr > difficulty;
+        
+        let accuracy = 0;
+        // 4. 潜入に成功したら、今度は「智謀チーム」の賢さで情報の「精度」を計算します
+        if (isSuccess) {
+            accuracy = Math.min(100, Math.max(10, (totalInt * 0.8) + (Math.random() * 20)));
+        }
+        
+        return { success: isSuccess, accuracy: Math.floor(accuracy) };
+    }
+    
     // ★ 扇動と流言の低下量を修正しました
     static calcIncite(busho) { 
         const score = (busho.intelligence * 0.7) + (busho.strength * 0.3); 
