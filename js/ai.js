@@ -420,7 +420,7 @@ class AIEngine {
                                  this.game.commandSystem.executeDiplomacy(castellan.id, targetClanId, 'goodwill', goodwillGold); 
                                  castellan.isActionDone = true;
                              }
-                         }d
+                         }
                     } else if (rel.sentiment > (window.AIParams.AI.AllianceThreshold || 70)) {
                          if (targetClanId === this.game.playerClanId) {
                              // ★相手がプレイヤーならお返事を待つ
