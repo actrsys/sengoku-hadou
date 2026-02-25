@@ -15,7 +15,7 @@ window.onerror = function(message, source, lineno, colno, error) {
 const SCENARIOS = [    { name: "桶狭間の戦い (1560年)", desc: "各地で有力大名が覇を競う標準シナリオ。", folder: "1560_okehazama" }];
 
 window.MainParams = {
-    StartYear: 1560, StartMonth: 1,
+    StartYear: 1560, StartMonth: 4,
     System: { UseRandomNames: true },
     Economy: {
         IncomeGoldRate: 0.5, IncomeRiceRate: 10.0, IncomeFluctuation: 0.15,
