@@ -63,13 +63,11 @@ class AIEngine {
             const smartness = this.getAISmartness(castellan.intelligence);
 
             // 外交フェーズ (確率で実行)
-            if (this.game.month % 3 === 0) {
-                const diplomacyChance = (window.AIParams.AI.DiplomacyChance || 0.3) * (mods.aggression); 
-                if (Math.random() < diplomacyChance) {
-                    const dipResult = this.execAIDiplomacy(castle, castellan, smartness); 
-                    if (dipResult === 'waiting') return; // ★ プレイヤーのお返事待ちならここで一旦ストップ！
-                    if (castellan.isActionDone) { this.game.finishTurn(); return; }
-                }
+            const diplomacyChance = ((window.AIParams.AI.DiplomacyChance || 0.3) / 3) * (mods.aggression); 
+            if (Math.random() < diplomacyChance) {
+                const dipResult = this.execAIDiplomacy(castle, castellan, smartness); 
+                if (dipResult === 'waiting') return; // ★ プレイヤーのお返事待ちならここで一旦ストップ！
+                if (castellan.isActionDone) { this.game.finishTurn(); return; }
             }
             
             // 軍事フェーズ
