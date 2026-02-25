@@ -699,11 +699,18 @@ class GameManager {
             this.ui.renderMap(); 
             this.ui.log(`【${castle.name}】命令を下してください`); 
             
+            // ★追加：小姓がしゃべる前に、今ターンが来ているお城を画面のど真ん中に持ってくる魔法！
+            const activeCastleEl = document.querySelector('.castle-card.active-turn');
+            if (activeCastleEl) {
+                // block:"center"で縦の真ん中、inline:"center"で横の真ん中にお願いしています
+                activeCastleEl.scrollIntoView({ block: "center", inline: "center", behavior: "smooth" });
+            }
+            
             this.ui.showTurnStartDialog(castle, () => {
                 this.ui.showControlPanel(castle); 
             });
 
-        } else { 
+        } else {
             this.isProcessingAI = true; 
             if(this.ui.aiGuard) this.ui.aiGuard.classList.remove('hidden'); // ★追加：AIの番になったらガードを出します
             
