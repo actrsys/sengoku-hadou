@@ -55,6 +55,22 @@ img {
 }
 .title-btn:hover { background: rgba(255,255,255,0.3); }
 
+/* 新しく作ったメッセージのデザイン */
+.title-tap-message {
+    font-size: 1.5rem;
+    color: #fff;
+    margin-top: 20px;
+    cursor: pointer;
+    animation: blink 2s infinite; /* 2秒ごとに点滅させます */
+}
+
+/* 点滅させるためのアニメーション設定 */
+@keyframes blink {
+    0% { opacity: 0.2; }
+    50% { opacity: 1; }
+    100% { opacity: 0.2; }
+}
+
 #app {
     display: flex;
     flex-direction: column;
