@@ -332,15 +332,10 @@ class FieldWarManager {
         
         let color = unit.isAttacker ? '#d32f2f' : '#1976d2';
         
-        // ★修正: 援軍なら情報パネルの文字色をオレンジか緑にします！
-        if (unit.isReinforcement) {
-            color = unit.isAttacker ? '#ff9800' : '#4caf50';
-        } else if (typeof unit.id === 'string' && unit.id.startsWith('k_')) {
-            if (this.units.some(u => u.isPlayer && !u.isAttacker)) {
-                color = '#4caf50';
-            } else {
-                color = '#ff9800';
-            }
+        // ★修正: 援軍・国人衆なら情報パネルの文字色をオレンジか緑にします！
+        const isReinfOrKunishu = unit.isReinforcement || (typeof unit.id === 'string' && unit.id.startsWith('k_'));
+        if (isReinfOrKunishu) {
+            color = unit.isAttacker ? '#e65100' : '#2e7d32'; 
         }
         
         let typeName = '足軽';
@@ -413,7 +408,49 @@ class FieldWarManager {
                         } else if (this.reachable && this.reachable[`${x},${y}`]) {
                             hex.classList.add('movable');
                         } else if (this.units.some(u => u.x === x && u.y === y && u.isAttacker === unit.isAttacker)) {
-                            if (this.getDistance(unit.x, unit.y, x, y) <= unit.ap) {
+                            // ★修正: ZOCを考慮して「もし味方がいなかったら到達できるマスか？」を判定する
+                            let canReachAlly = false;
+                            const enemies = this.units.filter(u => u.isAttacker !== unit.isAttacker);
+                            
+                            // 今いる場所から敵までの最短距離
+                            let startDist = 999;
+                            enemies.forEach(e => {
+                                let d = this.getDistance(unit.x, unit.y, e.x, e.y);
+                                if (d < startDist) startDist = d;
+                            });
+
+                            // 味方がいるマスから敵までの最短距離
+                            let minEnemyDist = 999;
+                            enemies.forEach(e => {
+                                let d = this.getDistance(x, y, e.x, e.y);
+                                if (d < minEnemyDist) minEnemyDist = d;
+                            });
+
+                            let isFirstStep = (this.getDistance(unit.x, unit.y, x, y) === 1);
+                            
+                            // そのマスに入るためのコスト（ZOC）を計算
+                            let costToAlly = 1;
+                            if (isFirstStep && startDist === 1) costToAlly = 4;
+                            else if (minEnemyDist <= 2) costToAlly = 2;
+
+                            if (isFirstStep) {
+                                // 直接の隣なら、一歩目のコストが払えるかチェック
+                                if (costToAlly <= unit.ap) canReachAlly = true;
+                            } else {
+                                // 離れている場合は、隣の「水色に塗られたマス」からコストを払って入れるかチェック
+                                let neighbors = this.getNeighbors(x, y);
+                                for (let n of neighbors) {
+                                    let key = `${n.x},${n.y}`;
+                                    if (this.reachable && this.reachable[key]) {
+                                        if (this.reachable[key].cost + costToAlly <= unit.ap) {
+                                            canReachAlly = true;
+                                            break;
+                                        }
+                                    }
+                                }
+                            }
+
+                            if (canReachAlly) {
                                 hex.classList.add('movable'); 
                             }
                         }
@@ -483,15 +520,18 @@ class FieldWarManager {
             
             let colorClass = u.isAttacker ? 'attacker' : 'defender';
             
-            // ★追加: 援軍のコマの色（背景色）をオレンジや緑に変更します！
-            if (u.isReinforcement) {
-                uEl.style.backgroundColor = u.isAttacker ? '#ff9800' : '#4caf50';
-                uEl.style.borderColor = u.isAttacker ? '#e65100' : '#1b5e20';
-            } else if (typeof u.id === 'string' && u.id.startsWith('k_')) {
-                if (isDefPlayer) {
-                    uEl.style.filter = 'drop-shadow(1px 0 0 #4caf50) drop-shadow(-1px 0 0 #4caf50) drop-shadow(0 1px 0 #4caf50) drop-shadow(0 -1px 0 #4caf50) drop-shadow(2px 2px 2px rgba(0,0,0,0.8))';
-                } else if (isAtkPlayer) {
-                    uEl.style.filter = 'drop-shadow(1px 0 0 #ff9800) drop-shadow(-1px 0 0 #ff9800) drop-shadow(0 1px 0 #ff9800) drop-shadow(0 -1px 0 #ff9800) drop-shadow(2px 2px 2px rgba(0,0,0,0.8))';
+            // ★修正: 援軍や国人衆のコマの色
+            const isReinfOrKunishu = u.isReinforcement || (typeof u.id === 'string' && u.id.startsWith('k_'));
+            
+            if (isReinfOrKunishu) {
+                if (u.isAttacker) {
+                    // 攻撃側の援軍（オレンジのグラデーション）
+                    uEl.style.background = 'linear-gradient(to bottom, #ffb74d, #e65100)';
+                    uEl.style.borderColor = '#e65100';
+                } else {
+                    // 守備側の援軍・国人衆（緑のグラデーション）
+                    uEl.style.background = 'linear-gradient(to bottom, #81c784, #1b5e20)';
+                    uEl.style.borderColor = '#1b5e20';
                 }
             }
 
