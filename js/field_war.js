@@ -67,6 +67,7 @@ class FieldWarManager {
 
                 this.units.push({
                     id: `atk_${index}`,
+                    bushoId: assign.busho.id,
                     name: assign.busho.name,
                     isAttacker: true,
                     isPlayer: unitIsPlayer,    // ★修正: 援軍か本隊かで操作権限を変えます
@@ -144,7 +145,9 @@ class FieldWarManager {
                                 if (uSoldiers > 0) {
                                     this.units.push({
                                         id: 'k_' + bestBusho.id,
-                                        name: bestBusho.name + "(国衆)",
+                                        bushoId: bestBusho.id,
+                                        kunishuId: k.id,
+                                        name: bestBusho.name,
                                         isAttacker: false,
                                         isPlayer: false, 
                                         isGeneral: false,
@@ -347,9 +350,29 @@ class FieldWarManager {
         if (unit.troopType === 'kiba') typeName = '騎馬';
         if (unit.troopType === 'teppo') typeName = '鉄砲';
 
+        // 大名家や国衆の名前を調べる処理
+        let clanNameText = "";
+        
+        if (unit.kunishuId) {
+            // 国人衆の場合：国衆の名称を引っ張ってきます
+            const kunishu = this.game.kunishuSystem.getKunishu(unit.kunishuId);
+            if (kunishu) {
+                clanNameText = `${kunishu.getName(this.game)} `; // 「〇〇衆 」という文字を作ります
+            }
+        } else if (unit.bushoId) {
+            // 大名家に所属している武将の場合
+            const busho = this.game.getBusho(unit.bushoId);
+            if (busho && busho.clan > 0) {
+                const clanData = this.game.clans.find(c => c.id === busho.clan);
+                if (clanData) {
+                    clanNameText = `${clanData.name}家 `; // 「〇〇家 」という文字を作ります
+                }
+            }
+        }
+
         infoEl.innerHTML = `
             <div style="font-weight:bold; color: ${color};">
-                ${unit.name} <span style="font-size:0.8rem; color:#555;">(${unit.isAttacker ? '攻撃' : '守備'} / ${typeName})</span>
+                ${clanNameText}${unit.name} <span style="font-size:0.8rem; color:#555;">(${typeName})</span>
             </div>
             <div style="font-size:0.9rem; font-weight:bold;">兵士: ${unit.soldiers}</div>
             <div style="font-size:0.8rem; color:#333;">統:${unit.stats.ldr} 武:${unit.stats.str} 智:${unit.stats.int}</div>
@@ -916,7 +939,7 @@ class FieldWarManager {
 
         if (!atkAlive || !atkGeneralAlive) {
             if (isAtkPlayer) this.log(`総大将が討ち取られ、我が軍は敗北しました……`);
-            else if (isDefPlayer) this.log(`敵の総大将を討ち取りました！`);
+            else if (isDefPlayer) this.log(`敵の総大将を撃破しました！`);
             else this.log(`攻撃軍の総大将が敗走した！`);
             this.endFieldWar('attacker_lose');
             return true;
