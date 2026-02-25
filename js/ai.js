@@ -313,13 +313,35 @@ class AIEngine {
         for (let targetClanId of uniqueNeighbors) {
             if (castellan.isActionDone) break;
 
-            const targetClanTotal = this.game.getClanTotalSoldiers(targetClanId);
+            const targetClanTotal = this.game.getClanTotalSoldiers(targetClanId) || 1;
             const rel = this.game.getRelation(castle.ownerClan, targetClanId);
+            const dutyInhibition = (myDaimyo.duty * 0.01) * (1.0 - (smartness * 0.5)); 
             
-            if (rel.status === '同盟') {
+            // 自分が相手に従属している場合（相手が支配者）
+            if (rel.status === '従属') {
+                // 相手と自分の戦力の「倍率」を計算します
+                const ratio = targetClanTotal / myPower;
+                
+                // 支配者の戦力が自分の2倍以下なら、独立（破棄）を考え始めます
+                if (ratio <= 2.0) {
+                    // 2.0倍の時は1%(0.01)、1.0倍以下の時は90%(0.90)になるように確率を計算する魔法です
+                    const breakProb = 0.01 + (2.0 - Math.max(1.0, ratio)) * 0.89;
+                    
+                    // サイコロを振って、確率(breakProb)を引き当てたら独立します！
+                    if (Math.random() < breakProb && Math.random() > dutyInhibition) {
+                        this.game.commandSystem.executeDiplomacy(castellan.id, targetClanId, 'break_alliance'); 
+                        castellan.isActionDone = true;
+                    }
+                }
+                // それ以外は破棄を考えません（これ以上何もしない）
+                continue;
+            }
+
+            // 同盟または支配している場合
+            if (rel.status === '同盟' || rel.status === '支配') {
                  const enemies = neighbors.filter(c => !['同盟', '支配', '従属'].includes(this.game.getRelation(castle.ownerClan, c.ownerClan).status));
-                 const dutyInhibition = (myDaimyo.duty * 0.01) * (1.0 - (smartness * 0.5)); 
                  
+                 // 敵がいなくて、自分の戦力が相手の2.5倍以上あり、義理のストッパーを越えたら破棄します
                  if (enemies.length === 0 && myPower > targetClanTotal * 2.5 && Math.random() > dutyInhibition) {
                       this.game.commandSystem.executeDiplomacy(castellan.id, targetClanId, 'break_alliance'); 
                       castellan.isActionDone = true;
@@ -327,6 +349,16 @@ class AIEngine {
                  continue;
             }
 
+            // 相手の戦力が自分の1/5以下なら、稀に支配を試みます
+            if (targetClanTotal * 5 <= myPower) {
+                if (Math.random() < 0.2) { // 20%の確率で支配コマンドを実行します
+                    this.game.commandSystem.executeDiplomacy(castellan.id, targetClanId, 'dominate');
+                    castellan.isActionDone = true;
+                    continue;
+                }
+            }
+
+            // 通常の親善・同盟のロジック
             if (myPower < targetClanTotal * 0.8) {
                 if (Math.random() < smartness) {
                     if (rel.sentiment < (window.AIParams.AI.GoodwillThreshold || 40) && castle.gold > 500) {

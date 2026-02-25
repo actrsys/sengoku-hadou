@@ -222,11 +222,23 @@ const COMMAND_SPECS = {
         isMulti: false, hasAdvice: true,
         startMode: 'map_select', targetType: 'other_clan_all'
     },
+    'dominate': {
+        label: "支配", category: 'DIPLOMACY',
+        costGold: 0, costRice: 0,
+        isMulti: false, hasAdvice: true,
+        startMode: 'map_select', targetType: 'other_clan_all'
+    },
+    'subordinate': {
+        label: "従属", category: 'DIPLOMACY',
+        costGold: 0, costRice: 0,
+        isMulti: false, hasAdvice: true,
+        startMode: 'map_select', targetType: 'other_clan_all'
+    },
     'break_alliance': {
-        label: "同盟破棄", category: 'DIPLOMACY',
+        label: "破棄", category: 'DIPLOMACY',
         costGold: 0, costRice: 0,
         isMulti: false, hasAdvice: false,
-        startMode: 'map_select', targetType: 'ally_clan'
+        startMode: 'map_select', targetType: 'breakable_clan'
     },
     // ★追加: 国人衆と仲良くするための外交コマンド
     'kunishu_goodwill': {
@@ -284,6 +296,13 @@ class CommandSystem {
                     Number(target.ownerClan) !== playerClanId &&
                     this.game.getRelation(playerClanId, target.ownerClan).status === '同盟'
                 ).map(t => t.id);
+
+            case 'breakable_clan': 
+                return this.game.castles.filter(target => {
+                    if (target.ownerClan === 0 || Number(target.ownerClan) === playerClanId) return false;
+                    const status = this.game.getRelation(playerClanId, target.ownerClan).status;
+                    return ['同盟', '支配', '従属'].includes(status);
+                }).map(t => t.id);
                 
             // ★追加: まだ壊滅していない国人衆がいる城を探してリストアップします（親善コマンド用）
             case 'kunishu_valid': {
@@ -428,6 +447,10 @@ class CommandSystem {
                 this.showAdviceAndExecute('diplomacy', () => this.executeDiplomacy(firstId, targetId, 'alliance'));
             } else if (extraData.subAction === 'break_alliance') {
                 this.executeDiplomacy(firstId, targetId, 'break_alliance');
+            } else if (extraData.subAction === 'subordinate') {
+                this.showAdviceAndExecute('diplomacy', () => this.executeDiplomacy(firstId, targetId, 'subordinate'));
+            } else if (extraData.subAction === 'dominate') {
+                this.showAdviceAndExecute('diplomacy', () => this.executeDiplomacy(firstId, targetId, 'dominate'));
             }
             return;
         }
@@ -878,12 +901,77 @@ class CommandSystem {
                 this.game.factionSystem.updateRecognition(doer, 10);
             }
         } else if (type === 'break_alliance') {
+            const oldStatus = relation.status;
             this.game.diplomacyManager.changeStatus(doer.clan, targetClanId, '普通');
             this.game.diplomacyManager.updateSentiment(doer.clan, targetClanId, -60);
             
-            msg = `同盟を破棄しました`;
+            msg = `${oldStatus}関係を破棄しました`;
             doer.achievementTotal += 5;
             this.game.factionSystem.updateRecognition(doer, 10);
+        } else if (type === 'subordinate') {
+            // 他の大名との支配・従属関係をすべて解消します
+            this.clearDominationRelations(doer.clan);
+            
+            // 相手との関係を「従属」にします
+            this.game.diplomacyManager.changeStatus(doer.clan, targetClanId, '従属');
+            msg = `${this.game.clans.find(c => c.id === targetClanId).name} に従属しました！`;
+            doer.achievementTotal += Math.floor(doer.diplomacy * 0.2) + 10;
+            this.game.factionSystem.updateRecognition(doer, 30);
+        } else if (type === 'dominate') {
+            const myPower = this.game.getClanTotalSoldiers(doer.clan);
+            const targetPower = this.game.getClanTotalSoldiers(targetClanId) || 1; // 0除算防止
+            
+            const powerRatio = myPower / targetPower;
+            
+            if (powerRatio < 5) {
+                msg = `戦力差が足りず、支配の要求を跳ね除けられました……\n(戦力が相手の5倍以上必要です)`;
+                doer.achievementTotal += 5;
+                this.game.factionSystem.updateRecognition(doer, 10);
+            } else {
+                // 基本確率 (5倍で20%、15倍以上で70%)
+                let prob = 20;
+                if (powerRatio >= 15) {
+                    prob = 70;
+                } else {
+                    prob = 20 + (powerRatio - 5) * (50 / 10);
+                }
+                
+                // 外交補正 (50以上で最大+10%)
+                if (doer.diplomacy >= 50) {
+                    const dipBonus = Math.min(10, (doer.diplomacy - 50) * 0.2);
+                    prob += dipBonus;
+                }
+                
+                // 相手が既に他の大名に従属しているか確認
+                let isAlreadySubordinate = false;
+                this.game.clans.forEach(c => {
+                    if (c.id !== targetClanId && c.id !== doer.clan) {
+                        const rel = this.game.getRelation(targetClanId, c.id);
+                        if (rel && rel.status === '従属') {
+                            isAlreadySubordinate = true;
+                        }
+                    }
+                });
+                
+                if (isAlreadySubordinate) {
+                    prob *= 0.2; // 確率を8割減らします
+                }
+                
+                if (Math.random() * 100 < prob) {
+                    // 成功！
+                    this.clearDominationRelations(targetClanId);
+                    this.game.diplomacyManager.changeStatus(doer.clan, targetClanId, '支配');
+                    msg = `${this.game.clans.find(c => c.id === targetClanId).name} を支配下に置くことに成功しました！`;
+                    doer.achievementTotal += Math.floor(doer.diplomacy * 0.2) + 20;
+                    this.game.factionSystem.updateRecognition(doer, 40);
+                } else {
+                    // 失敗……
+                    this.game.diplomacyManager.updateSentiment(doer.clan, targetClanId, -20);
+                    msg = `支配の要求は拒否されました……`;
+                    doer.achievementTotal += 5;
+                    this.game.factionSystem.updateRecognition(doer, 10);
+                }
+            }
         }
         
         doer.isActionDone = true;
@@ -1526,7 +1614,22 @@ class CommandSystem {
             this.game.ui.openBushoSelector('diplomacy_doer', targetCastle.id, { subAction: 'alliance' }, onBackToMap);
         } else if (mode === 'break_alliance') {
             this.game.ui.openBushoSelector('diplomacy_doer', targetCastle.id, { subAction: 'break_alliance' }, onBackToMap);
+        } else if (mode === 'subordinate') {
+            this.game.ui.openBushoSelector('diplomacy_doer', targetCastle.id, { subAction: 'subordinate' }, onBackToMap);
+        } else if (mode === 'dominate') {
+            this.game.ui.openBushoSelector('diplomacy_doer', targetCastle.id, { subAction: 'dominate' }, onBackToMap);
         }
     }
-
+    
+    clearDominationRelations(clanId) {
+        this.game.clans.forEach(c => {
+            if (c.id !== clanId) {
+                const rel = this.game.getRelation(clanId, c.id);
+                if (rel && (rel.status === '支配' || rel.status === '従属')) {
+                    this.game.diplomacyManager.changeStatus(clanId, c.id, '普通');
+                }
+            }
+        });
+    }
+    
 }
