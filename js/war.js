@@ -1550,7 +1550,6 @@ class WarManager {
         if (bushoCount > availableBushos.length) bushoCount = availableBushos.length;
 
         const reinfBushos = availableBushos.slice(0, bushoCount);
-        const reinfBushos = availableBushos.slice(0, bushoCount);
 
         let reinfRice = reinfSoldiers; 
         if (reinfRice < 500) reinfRice = 500; // 最低でも兵糧500は持っていく！
