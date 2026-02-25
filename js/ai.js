@@ -396,27 +396,33 @@ class AIEngine {
                     if (rel.sentiment < (window.AIParams.AI.GoodwillThreshold || 40)) {
                          // ★変更: 相手の戦力に合わせて親善の金額を決める
                          const ratio = targetClanTotal / Math.max(1, myPower); // 相手が自分の何倍強いか
-                         let goodwillGold = 300; // 最低は金300
-                         if (ratio >= 3.0) {
-                             goodwillGold = 1000; // 3倍以上強い相手なら最大1000
-                         } else if (ratio > 1.5) {
-                             // 1.5倍から3.0倍の間で、300〜1000に増えていく計算
-                             goodwillGold = 300 + ((ratio - 1.5) / 1.5) * 700;
-                         }
-                         goodwillGold = Math.floor(goodwillGold / 100) * 100; // キリ良く100単位にする
+                         
+                         // ★追加: 友好度30以下の険悪な相手には、戦力差3倍以上ないと絶対に親善しない！
+                         if (rel.sentiment <= 30 && ratio < 3.0) {
+                             // 何もしないで諦める（親善はスキップ）
+                         } else {
+                             let goodwillGold = 300; // 最低は金300
+                             if (ratio >= 3.0) {
+                                 goodwillGold = 1000; // 3倍以上強い相手なら最大1000
+                             } else if (ratio > 1.5) {
+                                 // 1.5倍から3.0倍の間で、300〜1000に増えていく計算
+                                 goodwillGold = 300 + ((ratio - 1.5) / 1.5) * 700;
+                             }
+                             goodwillGold = Math.floor(goodwillGold / 100) * 100; // キリ良く100単位にする
 
-                         // ★城にその金額があるかチェックしてから行う
-                         if (castle.gold >= goodwillGold) {
-                             if (targetClanId === this.game.playerClanId) {
-                                 // ★相手がプレイヤーならお返事を待つ
-                                 this.game.commandSystem.proposeDiplomacyToPlayer(castellan, targetClanId, 'goodwill', goodwillGold, () => {
+                             // ★城にその金額があるかチェックしてから行う
+                             if (castle.gold >= goodwillGold) {
+                                 if (targetClanId === this.game.playerClanId) {
+                                     // ★相手がプレイヤーならお返事を待つ
+                                     this.game.commandSystem.proposeDiplomacyToPlayer(castellan, targetClanId, 'goodwill', goodwillGold, () => {
+                                         castellan.isActionDone = true;
+                                         this.game.finishTurn();
+                                     });
+                                     return 'waiting';
+                                 } else {
+                                     this.game.commandSystem.executeDiplomacy(castellan.id, targetClanId, 'goodwill', goodwillGold); 
                                      castellan.isActionDone = true;
-                                     this.game.finishTurn();
-                                 });
-                                 return 'waiting';
-                             } else {
-                                 this.game.commandSystem.executeDiplomacy(castellan.id, targetClanId, 'goodwill', goodwillGold); 
-                                 castellan.isActionDone = true;
+                                 }
                              }
                          }
                     } else if (rel.sentiment > (window.AIParams.AI.AllianceThreshold || 70)) {

@@ -927,10 +927,47 @@ class CommandSystem {
             }
         } else if (type === 'break_alliance') {
             const oldStatus = relation.status;
+            const oldSentiment = relation.sentiment; // ★追加：破棄前の友好度を覚えておく
+            
             this.game.diplomacyManager.changeStatus(doer.clan, targetClanId, '普通');
-            this.game.diplomacyManager.updateSentiment(doer.clan, targetClanId, -60);
+            
+            // ★追加：破棄のペナルティを計算する
+            let targetDrop = -60; // デフォルトは-60
+            let globalDrop = 0;   // 他の大名への影響
+            let isBetrayal = false;
+
+            if (oldStatus === '同盟') {
+                if (oldSentiment >= 70) {
+                    targetDrop = -70; // 相手との友好度ダウン
+                    globalDrop = -10; // 他の大名との友好度ダウン
+                    isBetrayal = true;
+                }
+            } else if (oldStatus === '従属') {
+                if (oldSentiment >= 70) {
+                    targetDrop = -100; // 相手との友好度ダウン
+                    globalDrop = -10;  // 他の大名との友好度ダウン
+                    isBetrayal = true;
+                }
+            }
+
+            // 相手との友好度を下げる（0未満にはならない仕組みが裏で動いています）
+            this.game.diplomacyManager.updateSentiment(doer.clan, targetClanId, targetDrop);
+            
+            // 信義に背いた場合、他のすべての大名との友好度も下がる
+            if (isBetrayal) {
+                this.game.clans.forEach(c => {
+                    // 自分と破棄相手以外で、かつ中立(0)ではない大名すべてにペナルティ
+                    if (c.id !== 0 && c.id !== doer.clan && c.id !== targetClanId) {
+                        this.game.diplomacyManager.updateSentiment(doer.clan, c.id, globalDrop);
+                    }
+                });
+            }
             
             msg = `${oldStatus}関係を破棄しました`;
+            if (isBetrayal) {
+                msg += `\n諸大名からの心証が悪化しました……`;
+            }
+
             doer.achievementTotal += 5;
             this.game.factionSystem.updateRecognition(doer, 10);
         } else if (type === 'subordinate') {
