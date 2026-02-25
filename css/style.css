@@ -677,26 +677,22 @@ img {
     font-size: 0.95rem !important;
     color: #555 !important;
 }
-/* š–ìíFUŒ‚‘¤‚Ì—FŒRiƒIƒŒƒ“ƒWj */
-.fw-unit.ally-attacker {
-    background-color: #ff9800;
-    border-top-color: #e65100;
-    border-bottom-color: #e65100;
+/* š–ìíFUŒ‚‘¤‚Ì—FŒRi“ÊŒ^ƒIƒŒƒ“ƒWA˜g‚ª”Z‚¢ƒIƒŒƒ“ƒWj */
+.fw-unit.attacker.ally {
+    background-color: #ff9800 !important;
+    filter: drop-shadow(1px 0 0 #e65100) drop-shadow(-1px 0 0 #e65100) drop-shadow(0 1px 0 #e65100) drop-shadow(0 -1px 0 #e65100) drop-shadow(2px 2px 2px rgba(0,0,0,0.8)) !important;
 }
-/* —FŒR‚Ì‘‘å«‚Í”’˜g */
-.fw-unit.ally-attacker.general {
-    border-top-color: #ffffff;
-    border-bottom-color: #ffffff;
+/* UŒ‚‘¤E—FŒR‚Ì‘‘å«i˜g‚ª”’j */
+.fw-unit.attacker.ally.general {
+    filter: drop-shadow(1px 0 0 #ffffff) drop-shadow(-1px 0 0 #ffffff) drop-shadow(0 1px 0 #ffffff) drop-shadow(0 -1px 0 #ffffff) drop-shadow(2px 2px 2px rgba(0,0,0,0.8)) !important;
 }
 
-/* š–ìíFç”õ‘¤‚Ì—FŒRE‘lOi—Îj */
-.fw-unit.ally-defender {
-    background-color: #4caf50;
-    border-top-color: #1b5e20;
-    border-bottom-color: #1b5e20;
+/* š–ìíFç”õ‘¤‚Ì—FŒRE‘lOi“ÊŒ^—ÎA˜g‚ª”Z‚¢—Îj */
+.fw-unit.defender.ally {
+    background-color: #4caf50 !important;
+    filter: drop-shadow(1px 0 0 #1b5e20) drop-shadow(-1px 0 0 #1b5e20) drop-shadow(0 1px 0 #1b5e20) drop-shadow(0 -1px 0 #1b5e20) drop-shadow(2px 2px 2px rgba(0,0,0,0.8)) !important;
 }
-/* —FŒR‚Ì‘‘å«‚Í”’˜g */
-.fw-unit.ally-defender.general {
-    border-top-color: #ffffff;
-    border-bottom-color: #ffffff;
+/* ç”õ‘¤E—FŒR‚Ì‘‘å«i˜g‚ª”’j */
+.fw-unit.defender.ally.general {
+    filter: drop-shadow(1px 0 0 #ffffff) drop-shadow(-1px 0 0 #ffffff) drop-shadow(0 1px 0 #ffffff) drop-shadow(0 -1px 0 #ffffff) drop-shadow(2px 2px 2px rgba(0,0,0,0.8)) !important;
 }
