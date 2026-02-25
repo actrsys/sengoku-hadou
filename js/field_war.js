@@ -55,13 +55,24 @@ class FieldWarManager {
                 if (assign.soldiers <= 0) return;
                 const type = assign.troopType || 'ashigaru';
                 const mobility = (type === 'kiba') ? 6 : 4; // ★ 騎馬は行動力6
+
+                // ★追加: この部隊が援軍かどうか、そして誰が操作するかをチェックします！
+                let isReinf = false;
+                let unitIsPlayer = isAtkPlayer;
+                if (warState.reinforcement && warState.reinforcement.bushos.some(b => b.id === assign.busho.id)) {
+                    isReinf = true;
+                    // 援軍の城の持ち主がプレイヤーなら、プレイヤーが操作できる！
+                    unitIsPlayer = (Number(warState.reinforcement.castle.ownerClan) === pid);
+                }
+
                 this.units.push({
                     id: `atk_${index}`,
                     name: assign.busho.name,
                     isAttacker: true,
-                    isPlayer: isAtkPlayer,
+                    isPlayer: unitIsPlayer,    // ★修正: 援軍か本隊かで操作権限を変えます
+                    isReinforcement: isReinf,  // ★追加: 援軍マークをつけます
                     isGeneral: index === 0,
-                    x: atkX, 
+                    x: atkX,
                     y: yPositions[index % 5],
                     direction: isAtkPlayer ? 1 : 4,
                     mobility: mobility, 
@@ -81,14 +92,25 @@ class FieldWarManager {
                 if (assign.soldiers <= 0) return;
                 const type = assign.troopType || 'ashigaru';
                 const mobility = (type === 'kiba') ? 6 : 4;
+
+                // ★追加: 守備側の援軍チェック！
+                let isReinf = false;
+                let unitIsPlayer = isDefPlayer;
+                if (warState.defReinforcement && warState.defReinforcement.bushos.some(b => b.id === assign.busho.id)) {
+                    isReinf = true;
+                    // 援軍の城の持ち主がプレイヤーなら、プレイヤーが操作できる！
+                    unitIsPlayer = (Number(warState.defReinforcement.castle.ownerClan) === pid);
+                }
+
                 this.units.push({
                     id: `def_${index}`,
                     bushoId: assign.busho.id,
                     name: assign.busho.name,
                     isAttacker: false,
-                    isPlayer: isDefPlayer,
+                    isPlayer: unitIsPlayer,    // ★修正: 援軍か本隊かで操作権限を変えます
+                    isReinforcement: isReinf,  // ★追加: 援軍マークをつけます
                     isGeneral: index === 0,
-                    x: defX, 
+                    x: defX,
                     y: yPositions[index % 5],
                     direction: isDefPlayer ? 1 : 4,
                     mobility: mobility, 
@@ -309,7 +331,11 @@ class FieldWarManager {
         if (!infoEl) return;
         
         let color = unit.isAttacker ? '#d32f2f' : '#1976d2';
-        if (typeof unit.id === 'string' && unit.id.startsWith('k_')) {
+        
+        // ★修正: 援軍なら情報パネルの文字色をオレンジか緑にします！
+        if (unit.isReinforcement) {
+            color = unit.isAttacker ? '#ff9800' : '#4caf50';
+        } else if (typeof unit.id === 'string' && unit.id.startsWith('k_')) {
             if (this.units.some(u => u.isPlayer && !u.isAttacker)) {
                 color = '#4caf50';
             } else {
@@ -456,7 +482,12 @@ class FieldWarManager {
             const isActive = (unit && u.id === unit.id);
             
             let colorClass = u.isAttacker ? 'attacker' : 'defender';
-            if (typeof u.id === 'string' && u.id.startsWith('k_')) {
+            
+            // ★追加: 援軍のコマの色（背景色）をオレンジや緑に変更します！
+            if (u.isReinforcement) {
+                uEl.style.backgroundColor = u.isAttacker ? '#ff9800' : '#4caf50';
+                uEl.style.borderColor = u.isAttacker ? '#e65100' : '#1b5e20';
+            } else if (typeof u.id === 'string' && u.id.startsWith('k_')) {
                 if (isDefPlayer) {
                     uEl.style.filter = 'drop-shadow(1px 0 0 #4caf50) drop-shadow(-1px 0 0 #4caf50) drop-shadow(0 1px 0 #4caf50) drop-shadow(0 -1px 0 #4caf50) drop-shadow(2px 2px 2px rgba(0,0,0,0.8))';
                 } else if (isAtkPlayer) {
