@@ -740,39 +740,39 @@ img {
     color: #fff; /* 文字を白くします */
     padding: 2px 0;
 }
-/* ★追加：野戦と攻城戦の画面をスマホのバーを避けて全画面にする魔法 */
+/* ★修正：野戦と攻城戦の画面をスマホのバーを避けて全画面にする魔法 */
 #war-modal,
-#fw-modal {
-    padding: 0 !important; /* 画面の周りの隙間（黒いモヤモヤ部分）をなくします */
+#field-war-modal {
+    padding: 0 !important; 
 }
 
 #war-modal .modal-content,
-#fw-modal .modal-content {
+#field-war-modal .modal-content {
     width: 100vw !important;     /* 横幅を画面いっぱいに！ */
     height: 100dvh !important;   /* スマホのバーを避けて、縦幅を画面いっぱいに！ */
-    max-width: none !important;  /* 「これ以上大きくしない」という制限を外します */
-    max-height: none !important; /* 上と同じく制限を外します */
+    max-width: none !important;  /* 制限を外します */
+    max-height: none !important; /* 制限を外します */
     margin: 0 !important;        /* 外側の余白をゼロにします */
-    border-radius: 0 !important; /* 角の丸みをなくして、四角い全画面にします */
-    border: none !important;     /* 枠線を消してスッキリさせます */
+    border-radius: 0 !important; /* 角の丸みをなくします */
+    border: none !important;     /* 枠線を消します */
+    padding: 0 !important;       /* ★内側の余白も完全にゼロにします！ */
 }
-/* ★追加：ログを2行分にして、その分メイン画面を広くする魔法 */
+
+/* ★追加：ログを2行分にして、その分メイン画面（マップ等）を広くする魔法 */
 #war-log,
 #fw-log {
-    height: 45px !important; /* ログの高さを2行分くらいまで縮めます */
+    height: 45px !important; 
+    min-height: 45px !important;
+    margin-bottom: 5px !important;
 }
 
-/* ★追加：野戦の横の透明なクッション（余白）を消して、マップを画面端まで広げる魔法 */
-#fw-modal .modal-content {
-    padding: 5px 0 !important; /* 上下は5だけ残して、左右の余白をゼロにします */
-}
-
-/* 文字やボタンが画面の端にくっつきすぎないようにする微調整 */
-#fw-title,
-#fw-top-info,
+/* 野戦画面の文字やボタンが画面の端にくっつきすぎないようにする微調整 */
+#field-war-modal h2,
+#fw-status-bar,
 #fw-controls {
     padding-left: 10px !important;
     padding-right: 10px !important;
+    margin-top: 5px !important;
 }
 
 /* マップの横の枠線も消してスッキリさせます */
@@ -780,4 +780,3 @@ img {
     border-left: none !important; 
     border-right: none !important;
 }
-
