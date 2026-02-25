@@ -756,3 +756,28 @@ img {
     border-radius: 0 !important; /* 角の丸みをなくして、四角い全画面にします */
     border: none !important;     /* 枠線を消してスッキリさせます */
 }
+/* ★追加：ログを2行分にして、その分メイン画面を広くする魔法 */
+#war-log,
+#fw-log {
+    height: 45px !important; /* ログの高さを2行分くらいまで縮めます */
+}
+
+/* ★追加：野戦の横の透明なクッション（余白）を消して、マップを画面端まで広げる魔法 */
+#fw-modal .modal-content {
+    padding: 5px 0 !important; /* 上下は5だけ残して、左右の余白をゼロにします */
+}
+
+/* 文字やボタンが画面の端にくっつきすぎないようにする微調整 */
+#fw-title,
+#fw-top-info,
+#fw-controls {
+    padding-left: 10px !important;
+    padding-right: 10px !important;
+}
+
+/* マップの横の枠線も消してスッキリさせます */
+#fw-map-scroll {
+    border-left: none !important; 
+    border-right: none !important;
+}
+
