@@ -332,10 +332,15 @@ class FieldWarManager {
         
         let color = unit.isAttacker ? '#d32f2f' : '#1976d2';
         
-        // ★修正: 援軍・国人衆なら情報パネルの文字色をオレンジか緑にします！
-        const isReinfOrKunishu = unit.isReinforcement || (typeof unit.id === 'string' && unit.id.startsWith('k_'));
-        if (isReinfOrKunishu) {
-            color = unit.isAttacker ? '#e65100' : '#2e7d32'; 
+        // ★修正: 援軍なら情報パネルの文字色をオレンジか緑にします！
+        if (unit.isReinforcement) {
+            color = unit.isAttacker ? '#ff9800' : '#4caf50';
+        } else if (typeof unit.id === 'string' && unit.id.startsWith('k_')) {
+            if (this.units.some(u => u.isPlayer && !u.isAttacker)) {
+                color = '#4caf50';
+            } else {
+                color = '#ff9800';
+            }
         }
         
         let typeName = '足軽';
@@ -408,50 +413,41 @@ class FieldWarManager {
                         } else if (this.reachable && this.reachable[`${x},${y}`]) {
                             hex.classList.add('movable');
                         } else if (this.units.some(u => u.x === x && u.y === y && u.isAttacker === unit.isAttacker)) {
-                            // ★修正: ZOCを考慮して「もし味方がいなかったら到達できるマスか？」を判定する
-                            let canReachAlly = false;
+                            // ★修正: 味方がいるマスの水色塗りを、ZOC(コスト)を考慮した正確な判定に変更
                             const enemies = this.units.filter(u => u.isAttacker !== unit.isAttacker);
-                            
-                            // 今いる場所から敵までの最短距離
-                            let startDist = 999;
+                            let minStartDist = 999;
                             enemies.forEach(e => {
                                 let d = this.getDistance(unit.x, unit.y, e.x, e.y);
-                                if (d < startDist) startDist = d;
+                                if (d < minStartDist) minStartDist = d;
                             });
-
-                            // 味方がいるマスから敵までの最短距離
-                            let minEnemyDist = 999;
+                            
+                            let minEnemyDistToTarget = 999;
                             enemies.forEach(e => {
                                 let d = this.getDistance(x, y, e.x, e.y);
-                                if (d < minEnemyDist) minEnemyDist = d;
+                                if (d < minEnemyDistToTarget) minEnemyDistToTarget = d;
                             });
 
-                            let isFirstStep = (this.getDistance(unit.x, unit.y, x, y) === 1);
+                            // その味方マスに入るための必要コスト（敵と隣接していれば2、それ以外は1）
+                            let costToEnter = (minEnemyDistToTarget <= 2) ? 2 : 1;
                             
-                            // そのマスに入るためのコスト（ZOC）を計算
-                            let costToAlly = 1;
-                            if (isFirstStep && startDist === 1) costToAlly = 4;
-                            else if (minEnemyDist <= 2) costToAlly = 2;
-
-                            if (isFirstStep) {
-                                // 直接の隣なら、一歩目のコストが払えるかチェック
-                                if (costToAlly <= unit.ap) canReachAlly = true;
+                            if (this.getDistance(unit.x, unit.y, x, y) === 1) {
+                                // 自分のすぐ隣にいる味方の場合
+                                if (minStartDist === 1) costToEnter = 4;
+                                if (costToEnter <= unit.ap) hex.classList.add('movable');
                             } else {
-                                // 離れている場合は、隣の「水色に塗られたマス」からコストを払って入れるかチェック
-                                let neighbors = this.getNeighbors(x, y);
+                                // 離れた味方の場合、すでに塗られている隣のマスからコスト計算して届くかチェック
+                                let canReach = false;
+                                const neighbors = this.getNeighbors(x, y);
                                 for (let n of neighbors) {
                                     let key = `${n.x},${n.y}`;
                                     if (this.reachable && this.reachable[key]) {
-                                        if (this.reachable[key].cost + costToAlly <= unit.ap) {
-                                            canReachAlly = true;
+                                        if (this.reachable[key].cost + costToEnter <= unit.ap) {
+                                            canReach = true;
                                             break;
                                         }
                                     }
                                 }
-                            }
-
-                            if (canReachAlly) {
-                                hex.classList.add('movable'); 
+                                if (canReach) hex.classList.add('movable');
                             }
                         }
                     } else if (this.state === 'PHASE_DIR') {
@@ -519,20 +515,16 @@ class FieldWarManager {
             const isActive = (unit && u.id === unit.id);
             
             let colorClass = u.isAttacker ? 'attacker' : 'defender';
+            uEl.className = `fw-unit ${colorClass} ${isActive ? 'active' : ''}`;
             
-            // ★修正: 援軍や国人衆のコマの色
-            const isReinfOrKunishu = u.isReinforcement || (typeof u.id === 'string' && u.id.startsWith('k_'));
-            
-            if (isReinfOrKunishu) {
-                if (u.isAttacker) {
-                    // 攻撃側の援軍（オレンジのグラデーション）
-                    uEl.style.background = 'linear-gradient(to bottom, #ffb74d, #e65100)';
-                    uEl.style.borderColor = '#e65100';
-                } else {
-                    // 守備側の援軍・国人衆（緑のグラデーション）
-                    uEl.style.background = 'linear-gradient(to bottom, #81c784, #1b5e20)';
-                    uEl.style.borderColor = '#1b5e20';
-                }
+            // ★修正: 援軍や国人衆のコマの色（背景色）を、影ではなく本体の色としてオレンジや緑に変更します！
+            if (u.isReinforcement || (typeof u.id === 'string' && u.id.startsWith('k_'))) {
+                const rColor = u.isAttacker ? '#ff9800' : '#4caf50'; // オレンジ(攻)か緑(防)
+                const rBorder = u.isAttacker ? '#e65100' : '#1b5e20';
+                
+                uEl.style.setProperty('background-color', rColor, 'important');
+                uEl.style.setProperty('border-color', rBorder, 'important');
+                uEl.style.filter = 'none'; // 以前の影などの効果を消す
             }
 
             uEl.className = `fw-unit ${colorClass} ${isActive ? 'active' : ''}`;
