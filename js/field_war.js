@@ -514,16 +514,19 @@ class FieldWarManager {
             const uEl = document.createElement('div');
             const isActive = (unit && u.id === unit.id);
             
+            // ★ここから差し替え
             let colorClass = u.isAttacker ? 'attacker' : 'defender';
             
+            // ★修正: 元の attacker/defender の名前は消さずに、ally (友軍) というタグを後ろに足す！
             if (u.isReinforcement || (typeof u.id === 'string' && u.id.startsWith('k_'))) {
-                colorClass = u.isAttacker ? 'ally-attacker' : 'ally-defender';
+                colorClass += ' ally'; 
             }
 
             uEl.className = `fw-unit ${colorClass} ${isActive ? 'active' : ''}`;
             if (u.isGeneral) {
                 uEl.classList.add('general'); // 総大将なら白枠の設計図を追加
             }
+            // ★ここまで差し替え
             
             uEl.style.width = `${iconSize}px`; 
             uEl.style.height = `${iconSize}px`; 
