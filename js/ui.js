@@ -2001,37 +2001,85 @@ class UIManager {
             if(el) el.textContent = val; 
         };
         
+        const setHtml = (id, val) => { 
+            const el = document.getElementById(id); 
+            if(el) el.innerHTML = val; 
+        };
+
         const updateFace = (id, busho) => {
             const el = document.getElementById(id);
             if (!el) return;
             if (busho && busho.faceIcon) {
                 el.src = `data/faceicons/${busho.faceIcon}`;
                 el.classList.remove('hidden');
-                el.onerror = () => { el.classList.add('hidden'); }; 
+                el.onerror = () => { el.src = 'data/portraits/default.jpg'; }; // 画像がない時は初期画像に
             } else {
-                el.classList.add('hidden');
+                el.src = 'data/portraits/default.jpg';
             }
         };
 
-        setTxt('war-atk-name', s.attacker.name);
-        setTxt('war-atk-busho', s.atkBushos[0].name);
-        setTxt('war-atk-soldier', s.attacker.soldiers);
-        setTxt('war-atk-morale', `${s.attacker.morale} (訓練:${s.attacker.training})`);
-        setTxt('war-atk-rice', s.attacker.rice); 
-        updateFace('war-atk-face', s.atkBushos[0]);
-        
-        setTxt('war-def-name', s.defender.name);
-        setTxt('war-def-busho', s.defBusho.name);
-        setTxt('war-def-soldier', s.defender.soldiers);
-        setTxt('war-def-wall', `${s.defender.defense} (士:${s.defender.morale}/訓:${s.defender.training})`);
-        setTxt('war-def-rice', s.defender.rice); 
-        updateFace('war-def-face', s.defBusho);
+        const updateBar = (barId, textId, val, maxVal, label) => {
+            const bar = document.getElementById(barId);
+            const text = document.getElementById(textId);
+            if (!bar || !text) return;
+            const percent = maxVal > 0 ? Math.min(100, Math.max(0, (val / maxVal) * 100)) : 0;
+            bar.style.width = `${percent}%`;
+            text.textContent = `${label}: ${val}`;
+        };
 
-        setTxt('war-round', s.round);
+        // 攻撃側の更新
+        setTxt('war-attacker-name', s.attacker.name);
+        
+        const atkOriginalSoldiers = s.attacker.soldiers + s.deadSoldiers.attacker;
+        updateBar('war-attacker-bar', 'war-attacker-info', s.attacker.soldiers, atkOriginalSoldiers, '兵数');
+        updateBar('war-attacker-morale-bar', 'war-attacker-morale-text', s.attacker.morale, 100, '士気');
+        
+        updateFace('war-attacker-commander-img', s.atkBushos[0]);
+        setTxt('war-atk-stat-ldr', `統 ${s.atkBushos[0].leadership}`);
+        setTxt('war-atk-stat-str', `武 ${s.atkBushos[0].strength}`);
+        setTxt('war-atk-stat-int', `知 ${s.atkBushos[0].intelligence}`);
+        setTxt('war-atk-stat-pol', `政 ${s.atkBushos[0].politics}`);
+
+        let atkTroopsHtml = "";
+        if(s.attacker.horses > 0) atkTroopsHtml += `<span style="font-size:0.8rem; background:#795548; color:#fff; padding:2px 4px; border-radius:3px; margin-right:3px;">騎馬: ${s.attacker.horses}</span>`;
+        if(s.attacker.guns > 0) atkTroopsHtml += `<span style="font-size:0.8rem; background:#424242; color:#fff; padding:2px 4px; border-radius:3px;">鉄砲: ${s.attacker.guns}</span>`;
+        setHtml('war-attacker-troops', atkTroopsHtml);
+
+        // 守備側の更新
+        setTxt('war-defender-name', s.defender.name);
+        
+        const defOriginalSoldiers = s.defender.soldiers + s.deadSoldiers.defender;
+        updateBar('war-defender-bar', 'war-defender-info', s.defender.soldiers, defOriginalSoldiers, '兵数');
+        updateBar('war-defender-morale-bar', 'war-defender-morale-text', s.defender.morale, 100, '士気');
+        updateBar('war-defender-wall-bar', 'war-defender-wall-text', s.defender.defense, s.defender.maxDefense, '城壁');
+        
+        updateFace('war-defender-commander-img', s.defBusho);
+        setTxt('war-def-stat-ldr', `統 ${s.defBusho.leadership}`);
+        setTxt('war-def-stat-str', `武 ${s.defBusho.strength}`);
+        setTxt('war-def-stat-int', `知 ${s.defBusho.intelligence}`);
+        setTxt('war-def-stat-pol', `政 ${s.defBusho.politics}`);
+
+        let defTroopsHtml = "";
+        if(s.defender.horses > 0) defTroopsHtml += `<span style="font-size:0.8rem; background:#795548; color:#fff; padding:2px 4px; border-radius:3px; margin-right:3px;">騎馬: ${s.defender.horses}</span>`;
+        if(s.defender.guns > 0) defTroopsHtml += `<span style="font-size:0.8rem; background:#424242; color:#fff; padding:2px 4px; border-radius:3px;">鉄砲: ${s.defender.guns}</span>`;
+        setHtml('war-defender-troops', defTroopsHtml);
+
+        setTxt('war-title', `攻城戦 - ${s.round}ターン目`);
         
         const isAtkTurn = (s.turn === 'attacker');
-        const actorName = isAtkTurn ? "攻撃側" : "守備側";
-        setTxt('war-turn-actor', actorName);
+        
+        // 自分のターンじゃない方を少し暗くする魔法
+        const atkSide = document.getElementById('war-attacker-side');
+        const defSide = document.getElementById('war-defender-side');
+        if(atkSide && defSide) {
+            if(isAtkTurn) {
+                atkSide.style.opacity = '1.0';
+                defSide.style.opacity = '0.6';
+            } else {
+                atkSide.style.opacity = '0.6';
+                defSide.style.opacity = '1.0';
+            }
+        }
     }
 
     renderWarControls(isAtkTurn) {
