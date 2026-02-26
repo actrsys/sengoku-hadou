@@ -1213,7 +1213,7 @@ class UIManager {
             infoHtml = "<div>軍師に任命する武将を選択してください</div>";
         }
         else if (actionType === 'def_intercept_deploy') {
-            bushos = this.game.getCastleBushos(c.id).filter(b => b.status !== 'ronin');
+            bushos = this.game.getCastleBushos(targetId).filter(b => b.status !== 'ronin');
             infoHtml = "<div>迎撃に出陣する武将を選択してください（最大5名まで）</div>";
         }
         else if (actionType === 'def_reinf_deploy') {
