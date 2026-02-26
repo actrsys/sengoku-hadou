@@ -190,6 +190,7 @@
         <div class="modal-content" style="max-width: 800px; width: 90%;">
             <div class="modal-header">
                 <h2 id="war-title">攻城戦</h2>
+                <div style="font-size:1.1rem; color:#d32f2f; font-weight:bold;">手番: <span id="war-turn-actor"></span></div>
             </div>
             <div class="modal-body" style="padding: 10px;">
                 
@@ -210,7 +211,10 @@
                             <div id="war-attacker-info" style="font-size:0.9rem;"></div>
                             <div class="war-bar-container"><div id="war-attacker-bar" class="war-bar-fill" style="background-color:#c62828;"></div></div>
                             <div class="war-morale-container" style="margin-top:5px;"><div id="war-attacker-morale-bar" class="war-morale-fill" style="background-color:#ffb74d;"></div></div>
-                            <div id="war-attacker-morale-text" style="font-size:0.8rem; text-align:right;">士気: 0</div>
+                            <div style="display:flex; justify-content:space-between; font-size:0.8rem; margin-top:2px;">
+                                <span id="war-attacker-rice-text">兵糧: 0</span>
+                                <span id="war-attacker-morale-text">士気: 0</span>
+                            </div>
                             <div id="war-attacker-troops" class="war-troop-icons" style="margin-top:5px;"></div>
                         </div>
                     </div>
@@ -232,7 +236,10 @@
                             <div id="war-defender-info" style="font-size:0.9rem;"></div>
                             <div class="war-bar-container"><div id="war-defender-bar" class="war-bar-fill" style="background-color:#1565c0;"></div></div>
                             <div class="war-morale-container" style="margin-top:5px;"><div id="war-defender-morale-bar" class="war-morale-fill" style="background-color:#ffb74d;"></div></div>
-                            <div id="war-defender-morale-text" style="font-size:0.8rem; text-align:right;">士気: 0</div>
+                            <div style="display:flex; justify-content:space-between; font-size:0.8rem; margin-top:2px;">
+                                <span id="war-defender-rice-text">兵糧: 0</span>
+                                <span id="war-defender-morale-text">士気: 0</span>
+                            </div>
                             <div id="war-defender-wall-container" class="war-wall-container" style="margin-top:5px;"><div id="war-defender-wall-bar" class="war-wall-fill" style="background-color:#757575;"></div></div>
                             <div id="war-defender-wall-text" style="font-size:0.8rem; text-align:right;">城壁: 0</div>
                             <div id="war-defender-troops" class="war-troop-icons" style="margin-top:5px;"></div>
@@ -247,11 +254,8 @@
                 </div>
 
                 <div id="war-log" style="height: 100px; overflow-y: auto; background: #fff; border: 1px solid #ccc; padding: 5px; font-size: 0.9rem; margin-top: 10px;"></div>
-                <div class="modal-footer" style="justify-content: center; margin-top: 10px;">
-                    <button id="war-btn-next" class="btn-primary">次のターンへ</button>
-                    <button id="war-btn-retreat" class="btn-danger hidden">退却</button>
-                    <button id="war-btn-close" class="btn-secondary hidden">閉じる</button>
-                </div>
+                
+                <div id="war-controls" class="modal-footer" style="justify-content: center; margin-top: 10px; gap: 10px;"></div>
             </div>
         </div>
     </div>
