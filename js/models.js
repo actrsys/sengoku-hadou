@@ -136,6 +136,10 @@ class Busho {
             // 何もなければ、とりあえず 0 だけが入ったリストにします
             this.familyIds = [Number(data.familyId || 0)];
         }
+        // ★追加：自分のIDも一門リストに入れておくことで、すれ違いを防ぎます！
+        if (!this.familyIds.includes(this.id)) {
+            this.familyIds.push(this.id);
+        }
         
         // --- 忠誠・義理など（ここから下は既存の続き） ---
         this.loyalty = Number(this.loyalty || 0);

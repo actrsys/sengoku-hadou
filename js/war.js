@@ -1313,7 +1313,8 @@ class WarManager {
         const isLastStand = friendlyCastles.length === 0;
 
         losers.forEach(b => { 
-            if (b.status === 'ronin') return;
+            // ★ 修正: 未登場の武将を巻き込んで捕虜や浪人にしないように守ります！
+            if (b.status === 'ronin' || b.status === 'unborn' || b.status === 'dead') return;
 
             let chance = isLastStand ? 1.0 : ((window.WarParams.War.CaptureChanceBase || 0.7) - (b.strength * (window.WarParams.War.CaptureStrFactor || 0.002)) + (Math.random() * 0.3));
             if (!isLastStand && defeatedCastle.soldiers > 1000) chance -= 0.2; 
@@ -1445,7 +1446,7 @@ class WarManager {
             }
         }
 
-        // 同じ大名家の、死んでいない＆浪人じゃない武将をさがします
+        // ★修正：緊急登場が終わった「後」で、同じ大名家の候補を探し直します！
         const candidates = this.game.bushos.filter(b => b.clan === clanId && b.id !== daimyo.id && b.status !== 'dead' && b.status !== 'ronin'); 
         
         // もし誰もいなかったら、その大名家は滅亡です…
@@ -1453,6 +1454,8 @@ class WarManager {
             this.game.castles.filter(c => c.ownerClan === clanId).forEach(c => { 
                 c.ownerClan = 0; 
                 this.game.getCastleBushos(c.id).forEach(l => { 
+                    // ★ 修正：出番待ち（未登場）や死亡した武将を巻き込んで浪人にしないように守ります！
+                    if (l.status === 'unborn' || l.status === 'dead') return;
                     l.clan = 0; 
                     l.status = 'ronin'; 
                 }); 

@@ -189,7 +189,7 @@ class LifeSystem {
             }
         }
 
-        // 同じ大名家の中から、大名以外の生きている武将を探します
+        // ★修正：緊急登場が終わった「後」で、同じ大名家の中から候補を探し直します！
         const clanBushos = this.game.bushos.filter(b => b.clan === daimyo.clan && b.status === 'active' && !b.isDaimyo);
         
         if (clanBushos.length > 0) {
