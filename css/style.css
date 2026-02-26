@@ -919,10 +919,12 @@ img {
     font-size: 1.2rem;
     padding-bottom: 2px;
     color: #fff; /* タイトルは白文字 */
-    /* ★追加：絶対に2行にさせないための保険 */
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
+    /* ★追加：箱が上下に潰れるのを防ぎ、文字の高さも整える魔法 */
+    flex-shrink: 0;
+    line-height: 1.4;
 }
 
 /* ★追加：文字が長い時だけ、文字を少し小さくする魔法 */
