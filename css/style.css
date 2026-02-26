@@ -919,6 +919,15 @@ img {
     font-size: 1.2rem;
     padding-bottom: 2px;
     color: #fff; /* タイトルは白文字 */
+    /* ★追加：絶対に2行にさせないための保険 */
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* ★追加：文字が長い時だけ、文字を少し小さくする魔法 */
+.title-long-text {
+    font-size: 0.95rem !important;
 }
 
 .responsive-army-content {
@@ -1002,5 +1011,10 @@ img {
     .responsive-army-title {
         font-size: 1.4rem; /* タイトルも少し大きく */
         text-align: center; /* タイトルも真ん中揃えにしてカッコよく */
+    }
+    
+    /* ★追加：PC版の時に文字が長い場合の専用サイズ */
+    .title-long-text {
+        font-size: 1.15rem !important;
     }
 }
