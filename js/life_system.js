@@ -89,9 +89,9 @@ class LifeSystem {
     checkDeath() {
         const currentYear = this.game.year;
         
-        // すでに没年（endYear）を迎えている生きている武将を探します
+        // 【変更点①】没年の「1年前（endYear - 1）」を迎えている武将を探すようにしました！
         const targetBushos = this.game.bushos.filter(b => 
-            b.status !== 'unborn' && b.status !== 'dead' && currentYear >= b.endYear
+            b.status !== 'unborn' && b.status !== 'dead' && currentYear >= (b.endYear - 1)
         );
 
         let diedPlayerBushos = [];
@@ -100,10 +100,10 @@ class LifeSystem {
             // プレイヤーの大名だけは絶対に死なない魔法をかけます！
             if (b.isDaimyo && b.clan === this.game.playerClanId) return;
 
-            // 没年から何年過ぎたかを計算します
-            const yearsPassed = currentYear - b.endYear;
+            // 【変更点②】没年の「1年前」をスタート地点として、そこから何年過ぎたかを計算します
+            const yearsPassed = currentYear - (b.endYear - 1);
             
-            // 確率は、没年ぴったりで2%(0.02)、1年過ぎるごとに2%ずつ増えます
+            // 【変更点③】確率は、スタート（没年1年前）が2%(0.02)、次の年（没年）が4%(0.04)...と増えます
             const deathProb = 0.02 + (yearsPassed * 0.02);
 
             // サイコロを振って、確率に当たってしまったらお別れです…
