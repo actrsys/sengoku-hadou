@@ -1464,30 +1464,11 @@ class UIManager {
             
             const rem = totalSoldiers - sum;
 
-            // UIへの反映と、スライダーの最大値（Max）の動的更新
+            // UIへの反映（最大値の変更はせず、値だけを合わせます）
             currentData.forEach(d => {
                 const range = document.getElementById(`div-range-${d.id}`);
                 const num = document.getElementById(`div-num-${d.id}`);
-                const maxLabel = document.getElementById(`div-max-label-${d.id}`);
                 if (!range || !num) return;
-
-                // スライダーを動かせる限界 ＝ 今の値 ＋ 未分配の兵士
-                let maxAllowed = d.count + rem;
-                
-                // 騎馬や鉄砲の場合は、全体の残り数も限界に影響します
-                if (d.type === 'kiba') {
-                    maxAllowed = Math.min(maxAllowed, d.count + Math.max(0, totalHorses - usedHorses));
-                } else if (d.type === 'teppo') {
-                    maxAllowed = Math.min(maxAllowed, d.count + Math.max(0, totalGuns - usedGuns));
-                }
-                
-                // 兵士は最低1人なので、限界も最低1です
-                if (maxAllowed < 1) maxAllowed = 1;
-
-                // スライダーの限界値を更新
-                range.max = maxAllowed;
-                num.max = maxAllowed;
-                if (maxLabel) maxLabel.textContent = maxAllowed;
 
                 if (parseInt(num.value) !== d.count) {
                     num.value = d.count;
@@ -1518,13 +1499,12 @@ class UIManager {
             
             div.innerHTML = `
                 <div style="font-weight:bold; margin-bottom:5px;">${b.name} <small>(統:${b.leadership} 武:${b.strength} 智:${b.intelligence})</small></div>
-                <div style="margin-bottom:5px; display:flex; justify-content:space-between; align-items:center;">
+                <div style="margin-bottom:5px;">
                     <select id="div-type-${b.id}" style="padding:4px; font-size:0.9rem;">
                         <option value="ashigaru">足軽</option>
                         <option value="kiba">騎馬</option>
                         <option value="teppo">鉄砲</option>
                     </select>
-                    <span style="font-size:0.8rem; color:#555;">限界: <span id="div-max-label-${b.id}">${totalSoldiers}</span></span>
                 </div>
                 <div class="qty-control">
                     <input type="range" id="div-range-${b.id}" min="1" max="${totalSoldiers}" value="${assignments[index].count}">
@@ -1542,13 +1522,39 @@ class UIManager {
             const num = div.querySelector(`#div-num-${b.id}`);
             const typeSel = div.querySelector(`#div-type-${b.id}`);
             
-            const onInput = (val) => {
+            const onInput = (val, mode = 'normal') => {
                 let v = parseInt(val) || 0;
                 
-                // 動的に変わった今の限界値を基準にします
-                let currentMax = parseInt(range.max) || totalSoldiers;
-                if (v > currentMax) v = currentMax;
-                if (v < 1) v = 1;
+                // 動的に限界値を計算します
+                let otherSum = 0;
+                let otherHorses = 0;
+                let otherGuns = 0;
+                bushos.forEach(busho => {
+                    if (busho.id !== b.id) {
+                        const tEl = document.getElementById(`div-type-${busho.id}`);
+                        const nEl = document.getElementById(`div-num-${busho.id}`);
+                        const t = tEl ? tEl.value : 'ashigaru';
+                        const c = parseInt(nEl ? nEl.value : 0) || 0;
+                        otherSum += c;
+                        if (t === 'kiba') otherHorses += c;
+                        if (t === 'teppo') otherGuns += c;
+                    }
+                });
+                
+                let maxAllowed = totalSoldiers - otherSum;
+                const myType = typeSel.value;
+                if (myType === 'kiba') maxAllowed = Math.min(maxAllowed, totalHorses - otherHorses);
+                if (myType === 'teppo') maxAllowed = Math.min(maxAllowed, totalGuns - otherGuns);
+                if (maxAllowed < 1) maxAllowed = 1;
+
+                if (mode === 'max') {
+                    v = maxAllowed;
+                } else if (mode === 'half') {
+                    v = Math.floor((1 + maxAllowed) / 2);
+                } else {
+                    if (v > maxAllowed) v = maxAllowed;
+                    if (v < 1) v = 1;
+                }
                 
                 range.value = v;
                 num.value = v;
@@ -1558,14 +1564,13 @@ class UIManager {
             range.oninput = (e) => onInput(e.target.value);
             num.oninput = (e) => onInput(e.target.value);
 
-            // 追加したショートカットボタンの動き
             const btnMin = div.querySelector(`#div-btn-min-${b.id}`);
             const btnHalf = div.querySelector(`#div-btn-half-${b.id}`);
             const btnMax = div.querySelector(`#div-btn-max-${b.id}`);
             
             btnMin.onclick = () => onInput(1);
-            btnHalf.onclick = () => onInput(Math.floor((1 + parseInt(range.max)) / 2));
-            btnMax.onclick = () => onInput(parseInt(range.max));
+            btnHalf.onclick = () => onInput(0, 'half');
+            btnMax.onclick = () => onInput(0, 'max');
             num.onblur = (e) => {
                 if(e.target.value === "" || isNaN(parseInt(e.target.value))) {
                     onInput(1);
