@@ -2018,27 +2018,13 @@ class UIManager {
         setTxt('war-turn-info', `残り ${Math.max(0, maxRounds - s.round + 1)}ターン`);
         setTxt('war-def-wall-info', `城防御 ${s.defender.defense}`);
 
-        // ★変更：守備側が国人衆かどうかで、タイトルと名前を切り替える魔法です！
-        let titleText = `${s.defender.name} 攻防戦`;
-        let defNameText = "";
-
+        // ★大元を直したおかげで、こんなにシンプルになりました！
+        // 国人衆（isKunishu）なら「鎮圧戦」、普通なら「攻防戦」にするだけです。
         if (s.defender.isKunishu) {
-            // 「伊賀上野城（伊賀衆）」から、カッコの中の「伊賀衆」だけを抜き出します
-            let kunishuName = s.defender.name;
-            const match = s.defender.name.match(/（(.+?)）/);
-            if (match) {
-                kunishuName = match[1]; // カッコの中身だけを取り出す
-            }
-            titleText = `${kunishuName} 鎮圧戦`;
-            defNameText = kunishuName;
+            setTxt('war-title-name', `${s.defender.name} 鎮圧戦`);
         } else {
-            // 普通の大名家の場合は今まで通りです
-            const defClan = this.game.clans.find(c => c.id === s.defender.ownerClan);
-            defNameText = defClan ? defClan.name : "不明な勢力";
+            setTxt('war-title-name', `${s.defender.name} 攻防戦`);
         }
-
-        // タイトルを表示します
-        setTxt('war-title-name', titleText);
 
         // 攻撃軍の情報を入れます
         const atkClan = this.game.clans.find(c => c.id === s.attacker.ownerClan);
@@ -2053,7 +2039,11 @@ class UIManager {
         updateFace('war-atk-face', s.atkBushos[0]);
         
         // 守備軍の情報を入れます
-        setTxt('war-def-name', defNameText); // ★ここでさっき決めた名前を入れます
+        const defClan = this.game.clans.find(c => c.id === s.defender.ownerClan);
+        // ★守備側が国人衆の時はそのままの名前、大名家の時は大名名を出します
+        const defNameText = s.defender.isKunishu ? s.defender.name : (defClan ? defClan.name : "不明な勢力");
+        
+        setTxt('war-def-name', defNameText);
         setTxt('war-def-busho', s.defBusho.name);
         setTxt('war-def-soldier', s.defender.soldiers);
         setTxt('war-def-morale', s.defender.morale);

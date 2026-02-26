@@ -1194,8 +1194,8 @@ class CommandSystem {
         // この戦い限定の「守備側データ」を作成
         const dummyDefender = {
             id: targetCastleId,
-            name: `${targetCastle.name} (${kunishuName})`,
-            ownerClan: -1, 
+            name: kunishuName, // ←★お城の名前をくっつけず、国人衆の名前（伊賀衆など）だけにします！
+            ownerClan: -1,
             soldiers: kunishu.soldiers,
             defense: kunishu.defense,
             maxDefense: kunishu.maxDefense,
