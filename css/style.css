@@ -886,3 +886,121 @@ img {
 #war-controls button:hover {
     background: #f0f0f0;
 }
+/* =========================================================
+   攻城戦レイアウト（画面サイズで自動変化する魔法）
+   ========================================================= */
+
+/* ① まずはスマホなど「狭い画面」の時の基本ルール */
+.responsive-war-visual {
+    flex: 1;
+    display: flex;
+    flex-direction: row; /* 左右に並べる */
+    background: #fff;
+    overflow: hidden;
+    align-items: stretch;
+    justify-content: center; /* 全体を真ん中に寄せる */
+}
+
+.responsive-army-box {
+    flex: 1;
+    max-width: 450px; /* 広がりすぎ防止 */
+    padding: 10px;
+    display: flex;
+    flex-direction: column;
+    overflow-y: auto;
+    color: #333; /* 文字を読みやすく */
+}
+
+.responsive-army-title {
+    margin: 0 0 5px 0;
+    border-bottom: 2px solid rgba(255,255,255,0.8);
+    width: 100%;
+    text-align: left;
+    font-size: 1.2rem;
+    padding-bottom: 2px;
+    color: #fff; /* タイトルは白文字 */
+}
+
+.responsive-army-content {
+    display: flex;
+    flex-wrap: wrap; /* 狭い時は画像と文字を横並び、無理なら下に落とす */
+    gap: 10px;
+    width: 100%;
+    align-items: flex-start;
+}
+
+.responsive-war-face {
+    margin: 0;
+    width: 100px; /* スマホならこの大きさ */
+    height: 100px;
+    border: 2px solid #333;
+    box-shadow: 2px 2px 5px rgba(0,0,0,0.5);
+    background: #fff;
+    object-fit: cover;
+}
+
+.responsive-army-stats {
+    flex: 1 1 120px;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    font-size: 0.95rem; /* スマホ用の文字サイズ */
+    color: #fff;
+}
+
+.stat-busho {
+    background: rgba(0,0,0,0.4);
+    padding: 2px 5px;
+    font-weight: bold;
+    white-space: nowrap;
+    margin-bottom: 5px;
+    color: #fff;
+}
+
+.stat-row {
+    display: flex;
+    justify-content: space-between;
+    border-bottom: 4px solid rgba(255,255,255,0.3);
+    padding-bottom: 2px;
+    font-weight: bold;
+}
+
+.stat-val-large {
+    font-size: 1.1rem; /* 兵士数だけ少し強調 */
+}
+
+
+/* ② ここからが魔法！「画面が広い（幅768px以上）」時の特別ルール */
+@media (min-width: 768px) {
+    .responsive-army-content {
+        flex-direction: column; /* 画像と文字を「縦（上と下）」に並べる！ */
+        align-items: center; /* ど真ん中に揃える */
+    }
+
+    .responsive-war-face {
+        width: 180px; /* 画像をドーンと大きく！ */
+        height: 180px;
+        border-width: 3px; /* 枠線も少し太く */
+    }
+
+    .responsive-army-stats {
+        width: 100%; /* 横幅いっぱいに使う */
+        font-size: 1.1rem; /* 文字全体を大きく */
+        gap: 6px; /* 行と行の隙間をあけて見やすく */
+        margin-top: 5px;
+    }
+
+    .stat-busho {
+        font-size: 1.2rem; /* 部隊名も大きく */
+        text-align: center; /* 部隊名は真ん中揃え */
+    }
+
+    .stat-val-large {
+        font-size: 1.3rem; /* 兵士数はさらに大きく！ */
+    }
+
+    .responsive-army-title {
+        font-size: 1.4rem; /* タイトルも少し大きく */
+        text-align: center; /* タイトルも真ん中揃えにしてカッコよく */
+    }
+}
