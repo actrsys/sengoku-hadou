@@ -42,13 +42,15 @@ img {
 #title-screen {
     position: fixed; top: 0; left: 0; width: 100%; height: 100%;
     background: linear-gradient(135deg, #263238 0%, #37474f 100%);
-    display: flex; justify-content: center; align-items: center;
+    display: flex; justify-content: center; 
+    align-items: flex-start; /* ★ center から flex-start に変えました */
     z-index: 3000;
 }
 .title-content { 
     text-align: center; 
     color: #fff; 
-    transform: translateY(-50px); /* ★ここを書き足し！全体を上に引っ張ります */
+    padding-top: 20dvh; /* ★これ！上から画面の20%の位置に固定します */
+    width: 100%;        /* 真ん中に寄せるために必要です */
 }
 .game-title { font-size: 3rem; margin-bottom: 30px; text-shadow: 2px 2px 4px rgba(0,0,0,0.5); }
 .title-menu { display: flex; flex-direction: column; gap: 15px; }
