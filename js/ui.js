@@ -2018,8 +2018,6 @@ class UIManager {
         setTxt('war-turn-info', `残り ${Math.max(0, maxRounds - s.round + 1)}ターン`);
         setTxt('war-def-wall-info', `城防御 ${s.defender.defense}`);
 
-        // ★大元を直したおかげで、こんなにシンプルになりました！
-        // 国人衆（isKunishu）なら「鎮圧戦」、普通なら「攻防戦」にするだけです。
         if (s.defender.isKunishu) {
             setTxt('war-title-name', `${s.defender.name} 鎮圧戦`);
         } else {
@@ -2031,6 +2029,14 @@ class UIManager {
         const atkName = s.attacker.isKunishu ? s.attacker.name : (atkClan ? atkClan.name : "不明な勢力");
         setTxt('war-atk-name', atkName);
         
+        // ★ここを追加：名前が5文字以上なら、タイトル全体を小さくする魔法をかけます！
+        const atkTitleEl = document.getElementById('war-atk-name').parentElement;
+        if (atkName.length >= 5) {
+            atkTitleEl.classList.add('title-long-text');
+        } else {
+            atkTitleEl.classList.remove('title-long-text');
+        }
+        
         setTxt('war-atk-busho', s.atkBushos[0].name);
         setTxt('war-atk-soldier', s.attacker.soldiers);
         setTxt('war-atk-morale', s.attacker.morale);
@@ -2040,10 +2046,17 @@ class UIManager {
         
         // 守備軍の情報を入れます
         const defClan = this.game.clans.find(c => c.id === s.defender.ownerClan);
-        // ★守備側が国人衆の時はそのままの名前、大名家の時は大名名を出します
         const defNameText = s.defender.isKunishu ? s.defender.name : (defClan ? defClan.name : "不明な勢力");
-        
         setTxt('war-def-name', defNameText);
+        
+        // ★ここを追加：守備側も同じように、長ければ小さくする魔法をかけます！
+        const defTitleEl = document.getElementById('war-def-name').parentElement;
+        if (defNameText.length >= 5) {
+            defTitleEl.classList.add('title-long-text');
+        } else {
+            defTitleEl.classList.remove('title-long-text');
+        }
+
         setTxt('war-def-busho', s.defBusho.name);
         setTxt('war-def-soldier', s.defender.soldiers);
         setTxt('war-def-morale', s.defender.morale);
