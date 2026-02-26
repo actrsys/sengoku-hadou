@@ -45,7 +45,11 @@ img {
     display: flex; justify-content: center; align-items: center;
     z-index: 3000;
 }
-.title-content { text-align: center; color: #fff; }
+.title-content { 
+    text-align: center; 
+    color: #fff; 
+    transform: translateY(-50px); /* ★ここを書き足し！全体を上に引っ張ります */
+}
 .game-title { font-size: 3rem; margin-bottom: 30px; text-shadow: 2px 2px 4px rgba(0,0,0,0.5); }
 .title-menu { display: flex; flex-direction: column; gap: 15px; }
 .title-btn {
@@ -54,6 +58,15 @@ img {
     transition: all 0.3s;
 }
 .title-btn:hover { background: rgba(255,255,255,0.3); }
+
+/* ボタンの箱の中身を縦に並べる魔法 */
+#menu-buttons {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 20px; /* ボタンとボタンの隙間です */
+    margin-top: 20px;
+}
 
 /* 新しく作ったメッセージのデザイン */
 .title-tap-message {
