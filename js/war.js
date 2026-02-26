@@ -5,6 +5,7 @@
  * 修正: 迎撃時の出陣兵士・兵糧の取得処理を修正（ID指定のオブジェクト構造に対応）
  * ★追加: 国人衆の蜂起（反乱）・制圧時の特別な結末と、捕虜の特別ルールを追加しました
  * ★追加: 部隊分割時に兵科（troopType）の情報を保持・伝達するようにしました
+ * ★修正: 大名死亡時の後継者選択で、一門・相性・年齢を優先するようにしました
  */
 
 window.WarParams = {
@@ -347,7 +348,7 @@ class WarManager {
                 // ★追加: あとで援軍を自分の城に帰せるように、戦争データに援軍パックを覚えておきます
                 reinforcement: reinforcementData 
             };
-            // ★ここから差し替え
+            
             const showInterceptDialog = async (onResult) => {
 	            if (isPlayerInvolved) await this.game.ui.showCutin(`${atkArmyName}の${atkBushos[0].name}が\n${defCastle.name}に攻め込みました！`);
 
@@ -525,7 +526,6 @@ class WarManager {
                     }
 
                     if (choice === 'field') {
-                    // ★ここまで差し替え
                     
                         this.state.atkAssignments = atkAssignments; this.state.defAssignments = defAssignments; 
                         
@@ -906,8 +906,6 @@ class WarManager {
                 }
             };
             // ★追加ここまで
-            
-            // 兵士の減った割合を計算して、馬と鉄砲も減らす（壊れる）処理
             
             // 兵士の減った割合を計算して、馬と鉄砲も減らす（壊れる）処理
             // 野戦があった場合、ここでの horses と guns は既に野戦生き残り数に更新されており、
@@ -1369,8 +1367,16 @@ class WarManager {
             } 
             else this.game.ui.showDialog(`${prisoner.name}は登用を拒否しました……`, false); 
         } else if (action === 'kill') { 
-            if (prisoner.isDaimyo) this.handleDaimyoDeath(prisoner); 
-            prisoner.status = 'dead'; prisoner.clan = 0; prisoner.castleId = 0; prisoner.belongKunishuId = 0;
+            // ★変更：大名の場合は、先に後継ぎを決める特別な処理をします
+            if (prisoner.isDaimyo) {
+                this.handleDaimyoDeath(prisoner); 
+                prisoner.isDaimyo = false; // 後継ぎに譲ったので大名マークを外します
+            }
+            // ★変更：共通の「お星さまになる魔法」でお片付けします！
+            this.game.lifeSystem.executeDeath(prisoner); 
+            // 念のため、どこにも属していない状態にしておきます
+            prisoner.clan = 0; prisoner.castleId = 0; prisoner.belongKunishuId = 0;
+            
         } else if (action === 'release') { 
             if (kunishu && !kunishu.isDestroyed) {
                 prisoner.status = 'active'; 
@@ -1402,14 +1408,61 @@ class WarManager {
         }
     }
     
+    // ★ここを書き換えました！大名が亡くなった時の後継者選びです！
     handleDaimyoDeath(daimyo) { 
-        const clanId = daimyo.clan; if(clanId === 0) return; 
+        const clanId = daimyo.clan; 
+        if(clanId === 0) return; 
+        
+        // 同じ大名家の、死んでいない＆浪人じゃない武将をさがします
         const candidates = this.game.bushos.filter(b => b.clan === clanId && b.id !== daimyo.id && b.status !== 'dead' && b.status !== 'ronin'); 
+        
+        // もし誰もいなかったら、その大名家は滅亡です…
         if (candidates.length === 0) { 
-            this.game.castles.filter(c => c.ownerClan === clanId).forEach(c => { c.ownerClan = 0; this.game.getCastleBushos(c.id).forEach(l => { l.clan=0; l.status='ronin'; }); }); return; 
+            this.game.castles.filter(c => c.ownerClan === clanId).forEach(c => { 
+                c.ownerClan = 0; 
+                this.game.getCastleBushos(c.id).forEach(l => { 
+                    l.clan = 0; 
+                    l.status = 'ronin'; 
+                }); 
+            }); 
+            return; 
         } 
-        if (clanId === this.game.playerClanId) this.game.ui.showSuccessionModal(candidates, (newLeaderId) => this.game.changeLeader(clanId, newLeaderId)); 
-        else { candidates.sort((a,b) => (b.politics + b.charm) - (a.politics + a.charm)); this.game.changeLeader(clanId, candidates[0].id); } 
+        
+        // プレイヤーの場合は、自分で選ぶ画面を出します！
+        if (clanId === this.game.playerClanId) {
+            this.game.ui.showSuccessionModal(candidates, (newLeaderId) => this.game.changeLeader(clanId, newLeaderId)); 
+        } else { 
+            // AIの場合は、自動で一番ふさわしい人を計算して選びます
+            candidates.forEach(b => {
+                // 1. 一門（家族・親戚）かどうかをチェック！
+                b._isRelative = daimyo.familyIds.some(fId => b.familyIds.includes(fId));
+                // 2. 仲良し度（相性）の差を計算！差が小さいほど仲良し！
+                b._affinityDiff = Math.abs((daimyo.affinity || 0) - (b.affinity || 0));
+                // 3. 今までの計算式（政治＋魅力）！
+                b._baseScore = b.politics + b.charm;
+            });
+
+            // 順番に並べ替えます
+            candidates.sort((a,b) => {
+                // まずは一門かどうかを最優先！
+                if (a._isRelative && !b._isRelative) return -1;
+                if (!a._isRelative && b._isRelative) return 1;
+                
+                // 一門同士、または一門じゃない者同士なら次へ
+                if (a._isRelative && b._isRelative) {
+                    // 相性の差が小さい人を優先！
+                    if (a._affinityDiff !== b._affinityDiff) return a._affinityDiff - b._affinityDiff;
+                    // 相性も同じなら、年齢が上の人（生まれた年が昔の人）を優先！
+                    if (a.birthYear !== b.birthYear) return a.birthYear - b.birthYear;
+                }
+                
+                // それでも同じ、または一門じゃない場合は、今までの計算式で勝負！
+                return b._baseScore - a._baseScore;
+            });
+            
+            // 一番上に来た人を新しい大名にします！
+            this.game.changeLeader(clanId, candidates[0].id); 
+        } 
     }
     
     autoResolvePrisoners(captives, winnerClanId) { 
@@ -1417,7 +1470,14 @@ class WarManager {
         const leaderInt = aiBushos.length > 0 ? Math.max(...aiBushos.map(b => b.intelligence)) : 50; 
 
         captives.forEach(p => { 
-            if (p.isDaimyo) { this.handleDaimyoDeath(p); p.status = 'dead'; p.clan = 0; p.castleId = 0; return; } 
+            // ★変更：大名が処断される時
+            if (p.isDaimyo) { 
+                this.handleDaimyoDeath(p); 
+                p.isDaimyo = false; // 大名マークを外します
+                this.game.lifeSystem.executeDeath(p); // 共通のお片付け魔法
+                p.clan = 0; p.castleId = 0; p.belongKunishuId = 0; 
+                return; 
+            } 
             
             const isKunishuBoss = (p.belongKunishuId > 0 && p.id === this.game.kunishuSystem.getKunishu(p.belongKunishuId)?.leaderId);
 
@@ -1435,7 +1495,11 @@ class WarManager {
                     p.status = 'ronin'; p.clan = 0; p.castleId = 0; 
                 }
             } 
-            else { p.status = 'dead'; p.clan = 0; p.castleId = 0; p.belongKunishuId = 0; } 
+            else { 
+                // ★変更：一般武将が処断される時
+                this.game.lifeSystem.executeDeath(p); // 共通のお片付け魔法
+                p.clan = 0; p.castleId = 0; p.belongKunishuId = 0; 
+            } 
         }); 
     }
 

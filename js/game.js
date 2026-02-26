@@ -117,18 +117,40 @@ class DataManager {
         }
         return text;
     }
+    
+    // ★ 変更：ゲーム開始時の状態を作る魔法です！
     static joinData(clans, castles, bushos) {
+        const startYear = window.MainParams.StartYear; // 今のシナリオの開始年（例：1560年）
+        
         castles.forEach(c => c.samuraiIds = []);
         bushos.forEach(b => {
-            const clan = clans.find(cl => Number(cl.leaderId) === Number(b.id));
-            if (clan) b.isDaimyo = true;
-            const castleAsCastellan = castles.find(cs => Number(cs.castellanId) === Number(b.id));
-            if (castleAsCastellan) b.isCastellan = true;
-            if (b.clan === 0) b.status = 'ronin';
-            const c = castles.find(castle => Number(castle.id) === Number(b.castleId));
-            if(c) c.samuraiIds.push(b.id);
+            // もし武将の「登場年」が「開始年」よりも未来だったら…（まだ生まれてない、または元服前）
+            if (b.startYear > startYear) {
+                b.status = 'unborn'; // 「未登場」の印をつけます
+                b.clan = 0;          // まだどこの家にも属していません
+                b.isDaimyo = false;
+                b.isCastellan = false;
+                // まだ登場していないので、お城の中には入れません！
+            } else {
+                // 既に登場している武将は、いつも通りの準備をします
+                const clan = clans.find(cl => Number(cl.leaderId) === Number(b.id));
+                if (clan) b.isDaimyo = true;
+                const castleAsCastellan = castles.find(cs => Number(cs.castellanId) === Number(b.id));
+                if (castleAsCastellan) b.isCastellan = true;
+                
+                if (b.clan === 0) {
+                    b.status = 'ronin';
+                } else {
+                    b.status = 'active'; // 明確に「活動中」にします
+                }
+                
+                // お城の中に武将を入れてあげます
+                const c = castles.find(castle => Number(castle.id) === Number(b.castleId));
+                if(c) c.samuraiIds.push(b.id);
+            }
         });
     }
+    
     static parseCSV(text, ModelClass) {
         const lines = text.split('\n').map(l => l.trim()).filter(l => l);
         if (lines.length === 0) return [];
@@ -287,49 +309,39 @@ class GameSystem {
     static calcTraining(busho) { const base = window.WarParams.Military.BaseTraining + (busho.leadership * window.WarParams.Military.TrainingLdrEffect + busho.strength * window.WarParams.Military.TrainingStrEffect); return this.applyVariance(base, window.WarParams.Military.TrainingFluctuation); }
     static calcSoldierCharity(busho) { const base = window.WarParams.Military.BaseMorale + (busho.leadership * window.WarParams.Military.MoraleLdrEffect) + (busho.charm * window.WarParams.Military.MoraleCharmEffect); return this.applyVariance(base, window.WarParams.Military.MoraleFluctuation); }
     static calcDraftFromGold(gold, busho, castlePopulation) { const bonus = 1.0 + ((busho.leadership + busho.strength + busho.charm) / 300) * (window.WarParams.Military.DraftStatBonus - 1.0); const popBonus = 1.0 + (castlePopulation * window.WarParams.Military.DraftPopBonusFactor); return Math.floor(gold * 1.0 * bonus * popBonus); }
-    // 【直した後】（ここから下を丸ごとコピーして、古いものに上書きしてください）
+
     static isReachable(game, startCastle, targetCastle, movingClanId) {
-        // すぐ隣なら、もちろん行けます！（距離1マス）
         if (this.isAdjacent(startCastle, targetCastle)) return true;
 
         const visited = new Set();
-        // ★ 変更：「お城」と一緒に「そこまで何マス歩いたか（distance）」もメモするようにします！
         const queue = [{ castle: startCastle, distance: 0 }];
         visited.add(startCastle.id);
 
         while (queue.length > 0) {
-            // メモから1つ取り出します
             const currentData = queue.shift();
             const current = currentData.castle;
             const currentDist = currentData.distance;
 
-            // ★ 追加：すでに3マス歩いているなら、これ以上先には進みません！（ストッパー）
             if (currentDist >= 3) continue;
 
-            // 今いるお城の隣のお城を探します
             const neighbors = game.castles.filter(c => this.isAdjacent(current, c));
             
             for (const next of neighbors) {
-                // 目的地にたどり着いたらゴール！
                 if (next.id === targetCastle.id) return true;
                 
                 if (!visited.has(next.id)) {
                     let canPass = false;
                     
-                    // 自分の城なら通れます
                     if (Number(next.ownerClan) === Number(movingClanId)) {
                         canPass = true;
                     } 
-                    // 他の勢力の城なら、関係を調べます
                     else if (next.ownerClan !== 0) {
                         const rel = game.getRelation(movingClanId, next.ownerClan);
-                        // 「同盟」しているか、自分が「支配」している相手なら通れます
                         if (rel && (rel.status === '同盟' || rel.status === '支配')) {
                             canPass = true;
                         }
                     }
                     
-                    // 通れるお城だったら、次へ進むメモに残します（歩数を+1します！）
                     if (canPass) {
                         visited.add(next.id);
                         queue.push({ castle: next, distance: currentDist + 1 });
@@ -337,30 +349,25 @@ class GameSystem {
                 }
             }
         }
-        // 3マスの範囲を探しても見つからなかったらダメです
         return false;
     }
     
     static calcInvestigate(bushos, targetCastle) {
         if (!bushos || bushos.length === 0) return { success: false, accuracy: 0 };
         
-        // 1. 選んだ武将の中で、一番「武力」が高い人と「智謀」が高い人を探します
         const maxStrBusho = bushos.reduce((a,b) => a.strength > b.strength ? a : b);
         const maxIntBusho = bushos.reduce((a,b) => a.intelligence > b.intelligence ? a : b);
         
-        // 2. 他の武将たちはサポート役として、能力の20%（0.2）を足してくれます
         const assistStr = bushos.filter(b => b !== maxStrBusho).reduce((sum, b) => sum + b.strength, 0) * 0.2;
         const assistInt = bushos.filter(b => b !== maxIntBusho).reduce((sum, b) => sum + b.intelligence, 0) * 0.2;
         
         const totalStr = maxStrBusho.strength + assistStr;
         const totalInt = maxIntBusho.intelligence + assistInt;
         
-        // 3. 潜入の難しさを決めて、「武力チーム」が成功するかどうかサイコロを振ります
         const difficulty = 30 + Math.random() * window.MainParams.Strategy.InvestigateDifficulty;
         const isSuccess = totalStr > difficulty;
         
         let accuracy = 0;
-        // 4. 潜入に成功したら、今度は「智謀チーム」の賢さで情報の「精度」を計算します
         if (isSuccess) {
             accuracy = Math.min(100, Math.max(10, (totalInt * 0.8) + (Math.random() * 20)));
         }
@@ -368,19 +375,18 @@ class GameSystem {
         return { success: isSuccess, accuracy: Math.floor(accuracy) };
     }
     
-    // ★ 扇動と流言の低下量を修正しました
     static calcIncite(busho) { 
         const score = (busho.intelligence * 0.7) + (busho.strength * 0.3); 
         const success = Math.random() < (score / window.MainParams.Strategy.InciteFactor); 
         if(!success) return { success: false, val: 0 }; 
-        return { success: true, val: Math.max(1, Math.floor((score * 2) / 15)) }; // 約15分の1に減らしました
+        return { success: true, val: Math.max(1, Math.floor((score * 2) / 15)) }; 
     }
     static calcRumor(busho, targetBusho) { 
         const score = (busho.intelligence * 0.7) + (busho.strength * 0.3); 
         const defScore = (targetBusho.intelligence * 0.5) + (targetBusho.loyalty * 0.5); 
         const success = Math.random() < (score / (defScore + window.MainParams.Strategy.RumorFactor)); 
         if(!success) return { success: false, val: 0 }; 
-        return { success: true, val: Math.floor((20 + Math.random()*20) / 4) }; // 約4分の1に減らしました
+        return { success: true, val: Math.floor((20 + Math.random()*20) / 4) }; 
     }
 
     static calcAffinityDiff(a, b) { const diff = Math.abs(a - b); return Math.min(diff, 100 - diff); }
@@ -448,13 +454,15 @@ class GameManager {
         this.aiTimer = null; 
         
         this.kunishuSystem = new KunishuSystem(this);
-
         this.commandSystem = new CommandSystem(this);
         this.warManager = new WarManager(this);
         this.aiEngine = new AIEngine(this);
         this.independenceSystem = new IndependenceSystem(this);
         this.factionSystem = new FactionSystem(this); 
         this.diplomacyManager = new DiplomacyManager(this);
+        
+        // ★ 追加：寿命と登場を管理するシステムを呼び出します
+        this.lifeSystem = new LifeSystem(this);
         
         this.phase = 'title';
     }
@@ -468,7 +476,6 @@ class GameManager {
         return rel;
     }
     
-    // 【修正後】
     startNewGame() {
         if(this.ui) this.ui.forceResetModals();
         this.boot();
@@ -523,11 +530,12 @@ class GameManager {
     init() { this.startMonth(); }
     getBusho(id) { return this.bushos.find(b => Number(b.id) === Number(id)); }
     getCastle(id) { return this.castles.find(c => Number(c.id) === Number(id)); }
-    getCastleBushos(cid) { const c = this.castles.find(c => Number(c.id) === Number(cid)); return c ? c.samuraiIds.map(id => this.getBusho(id)).filter(b => b) : []; }
+    // ★ 修正：まだ生まれていない人（unborn）や亡くなった人（dead）は無視するようにします
+    getCastleBushos(cid) { const c = this.castles.find(c => Number(c.id) === Number(cid)); return c ? c.samuraiIds.map(id => this.getBusho(id)).filter(b => b && b.status !== 'unborn' && b.status !== 'dead') : []; }
     getCurrentTurnCastle() { return this.turnQueue[this.currentIndex]; }
     getCurrentTurnId() { return this.year * 12 + this.month; }
     getClanTotalSoldiers(clanId) { return this.castles.filter(c => Number(c.ownerClan) === Number(clanId)).reduce((sum, c) => sum + c.soldiers, 0); }
-    getClanGunshi(clanId) { return this.bushos.find(b => Number(b.clan) === Number(clanId) && b.isGunshi); }
+    getClanGunshi(clanId) { return this.bushos.find(b => Number(b.clan) === Number(clanId) && b.isGunshi && b.status === 'active'); }
     isCastleVisible(castle) { if (Number(castle.ownerClan) === Number(this.playerClanId)) return true; if (castle.investigatedUntil >= this.getCurrentTurnId()) return true; return false; }
     
     updateCastleLord(castle) {
@@ -536,7 +544,7 @@ class GameManager {
             return;
         }
 
-        const bushos = this.getCastleBushos(castle.id).filter(b => b.status !== 'ronin' && b.status !== 'dead');
+        const bushos = this.getCastleBushos(castle.id).filter(b => b.status !== 'ronin' && b.status !== 'dead' && b.status !== 'unborn');
         if (bushos.length === 0) {
             castle.castellanId = 0;
             return;
@@ -586,8 +594,10 @@ class GameManager {
         
         this.ui.log(`=== ${this.year}年 ${this.month}月 ===`);
         
-        this.factionSystem.processStartMonth(); 
+        // ★ 追加：月の初めに、登場年を迎えた武将がいないかチェックします！
+        this.lifeSystem.processStartMonth();
         
+        this.factionSystem.processStartMonth(); 
         this.factionSystem.processRoninMovements(); 
         
         this.updateAllCastlesLords();
@@ -603,14 +613,12 @@ class GameManager {
             let income = Math.floor(baseGold * window.MainParams.Economy.IncomeGoldRate);
             income = GameSystem.applyVariance(income, window.MainParams.Economy.IncomeFluctuation);
             if (this.month === 3) income += income * 5;
-            // ★ 金の増加にストッパーをかけました
             c.gold = Math.min(99999, c.gold + income);
 
             if (this.month === 9) {
                 const baseRice = c.kokudaka + c.peoplesLoyalty;
                 let riceIncome = Math.floor(baseRice * window.MainParams.Economy.IncomeRiceRate);
                 riceIncome = GameSystem.applyVariance(riceIncome, window.MainParams.Economy.IncomeFluctuation);
-                // ★ 兵糧の増加にストッパーをかけました
                 c.rice = Math.min(99999, c.rice + riceIncome);
             }
             
@@ -624,7 +632,6 @@ class GameManager {
                     const rate = 0.001 + ((50 - currentLoyalty) / 50) * 0.004;
                     growth = -Math.floor(c.population * rate);
                 }
-                // ★ 人口の増加にストッパーをかけました（上限99万9999）
                 c.population = Math.min(999999, Math.max(0, c.population + growth));
             }
             const bushos = this.getCastleBushos(c.id);
@@ -633,8 +640,6 @@ class GameManager {
             
             bushos.forEach(b => {
                 b.isActionDone = false;
-                
-                // もしこの武将が「城主」だったら、功績を10足してあげる
                 if (b.isCastellan) {
                     b.achievementTotal += 10;
                 }
@@ -642,7 +647,6 @@ class GameManager {
         });
 
         const allCastles = this.castles.filter(c => c.ownerClan !== 0);
-        // ★修正: 自分の城も敵の城も全部ごちゃ混ぜにして、完全にランダムな順番に並べ替えます
         allCastles.sort(() => Math.random() - 0.5); 
         this.turnQueue = [...allCastles];
 
@@ -657,9 +661,6 @@ class GameManager {
         }
 
         if (this.warManager.state.active) return;
-
-        // ★修正: ここにあった「自分の城を無理やり順番の最初に持ってくる」という処理をまるごと消しました！
-        // これによって、完全にシャッフルされた順番通りにお城のターンが回るようになります。
 
         if (this.currentIndex >= this.turnQueue.length) { 
             this.endMonth(); 
@@ -694,15 +695,13 @@ class GameManager {
 
         if (isPlayerCastle) { 
             this.isProcessingAI = false; 
-            if(this.ui.aiGuard) this.ui.aiGuard.classList.add('hidden'); // ★追加：プレイヤーの番になったらガードを隠します
+            if(this.ui.aiGuard) this.ui.aiGuard.classList.add('hidden'); 
 
             this.ui.renderMap(); 
             this.ui.log(`【${castle.name}】命令を下してください`); 
             
-            // ★追加：小姓がしゃべる前に、今ターンが来ているお城を画面のど真ん中に持ってくる魔法！
             const activeCastleEl = document.querySelector('.castle-card.active-turn');
             if (activeCastleEl) {
-                // block:"center"で縦の真ん中、inline:"center"で横の真ん中にお願いしています
                 activeCastleEl.scrollIntoView({ block: "center", inline: "center", behavior: "smooth" });
             }
             
@@ -712,7 +711,7 @@ class GameManager {
 
         } else {
             this.isProcessingAI = true; 
-            if(this.ui.aiGuard) this.ui.aiGuard.classList.remove('hidden'); // ★追加：AIの番になったらガードを出します
+            if(this.ui.aiGuard) this.ui.aiGuard.classList.remove('hidden'); 
             
             if(this.ui.panelEl) this.ui.panelEl.classList.add('hidden');
             
@@ -749,8 +748,10 @@ class GameManager {
     endMonth() { 
         this.factionSystem.processEndMonth(); 
         this.independenceSystem.checkIndependence(); 
-        
         this.kunishuSystem.processEndMonth();
+        
+        // ★ 追加：月の終わりに、寿命を迎えた武将がいないかチェックします！
+        this.lifeSystem.processEndMonth();
 
         this.month++; 
         if(this.month > 12) { this.month = 1; this.year++; } 
