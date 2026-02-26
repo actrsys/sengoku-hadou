@@ -853,9 +853,10 @@ class WarManager {
                 this.game.getCastleBushos(defCastle.id).forEach(b => { 
                     if (b.status === 'ronin') return;
 
-                    let rate = window.WarParams.War.RetreatCaptureRate;
-                    if(b.isDaimyo) rate = Math.max(0, rate - window.WarParams.War.DaimyoCaptureReduction);
-                    if(Math.random() < rate) { capturedBushos.push(b); } 
+                    let chance = 0.5 - (b.strength * (window.WarParams.War.CaptureStrFactor || 0.002)) + (Math.random() * 0.3);
+                    if (defCastle.soldiers > 1000) chance -= 0.2;
+                    if (b.isDaimyo) chance -= window.WarParams.War.DaimyoCaptureReduction;
+                    if (chance > 0.5) { capturedBushos.push(b); }
                     else { b.castleId = target.id; b.isCastellan = false; target.samuraiIds.push(b.id); this.game.factionSystem.handleMove(b, defCastle.id, target.id); }
                 });
                 defCastle.gold -= carryGold; defCastle.rice = 0; defCastle.soldiers = 0; 
