@@ -187,32 +187,72 @@
     </div>
 
     <div id="war-modal" class="modal hidden">
-        <div class="modal-content" style="max-width: 700px; height: 90vh; display: flex; flex-direction: column;">
-            <h2 class="war-title" style="margin:0; padding-bottom:5px;">攻城戦</h2>
-            <div class="war-screen">
-                <div class="war-visual">
-                    <div class="army-box attacker">
-                        <h3 class="army-title">攻撃軍: <span id="war-atk-name"></span></h3>
-                        <img id="war-atk-face" class="war-face hidden" src="" alt="">
-                        <div>大将: <span id="war-atk-busho"></span></div>
-                        <div>兵士: <span id="war-atk-soldier" class="highlight-val"></span> / 兵糧: <span id="war-atk-rice"></span></div>
-                        <div>士気: <span id="war-atk-morale"></span></div>
-                    </div>
-                    <div style="font-weight:bold; font-size:1.2rem;">VS</div>
-                    <div class="army-box defender">
-                        <h3 class="army-title">守備軍: <span id="war-def-name"></span></h3>
-                        <img id="war-def-face" class="war-face hidden" src="" alt="">
-                        <div>大将: <span id="war-def-busho"></span></div>
-                        <div>兵士: <span id="war-def-soldier" class="highlight-val"></span> / 兵糧: <span id="war-def-rice"></span></div>
-                        <div>防御: <span id="war-def-wall"></span></div>
-                    </div>
-                </div>
-                <div class="war-info-bar" style="background:#333; color:#fff; text-align:center; padding:2px;">
-                    R: <span id="war-round">1</span>/10 | 手番: <span id="war-turn-actor">--</span>
-                </div>
-                <div id="war-controls" class="war-controls-area disabled-area"></div>
+        <div class="modal-content" style="max-width: 800px; width: 90%;">
+            <div class="modal-header">
+                <h2 id="war-title">攻城戦</h2>
             </div>
-            <div id="war-log" style="height: 100px; overflow-y: auto; background: #fff; border: 1px solid #ccc; padding: 5px; font-size: 0.85rem; margin-top: 10px;"></div>
+            <div class="modal-body" style="padding: 10px;">
+                
+                <div id="war-combat-area" class="war-combat-area">
+                    
+                    <div id="war-attacker-side" class="war-side-panel attacker-panel">
+                        <div class="war-commander-section">
+                            <img id="war-attacker-commander-img" src="data/portraits/default.jpg" onerror="this.src='data/portraits/default.jpg'" alt="大将" class="war-commander-img">
+                            <div id="war-attacker-commander-stats" class="war-commander-stats">
+                                <span id="war-atk-stat-ldr">統 0</span>
+                                <span id="war-atk-stat-str">武 0</span>
+                                <span id="war-atk-stat-int">知 0</span>
+                                <span id="war-atk-stat-pol">政 0</span>
+                            </div>
+                        </div>
+                        <div class="war-info-section">
+                            <h3 id="war-attacker-name" style="margin-top:0; color:#c62828; font-size:1.1rem;">攻撃軍</h3>
+                            <div id="war-attacker-info" style="font-size:0.9rem;"></div>
+                            <div class="war-bar-container"><div id="war-attacker-bar" class="war-bar-fill" style="background-color:#c62828;"></div></div>
+                            <div class="war-morale-container" style="margin-top:5px;"><div id="war-attacker-morale-bar" class="war-morale-fill" style="background-color:#ffb74d;"></div></div>
+                            <div id="war-attacker-morale-text" style="font-size:0.8rem; text-align:right;">士気: 0</div>
+                            <div id="war-attacker-troops" class="war-troop-icons" style="margin-top:5px;"></div>
+                        </div>
+                    </div>
+                    
+                    <div class="war-vs-mark">VS</div>
+                    
+                    <div id="war-defender-side" class="war-side-panel defender-panel">
+                        <div class="war-commander-section">
+                            <img id="war-defender-commander-img" src="data/portraits/default.jpg" onerror="this.src='data/portraits/default.jpg'" alt="大将" class="war-commander-img">
+                            <div id="war-defender-commander-stats" class="war-commander-stats">
+                                <span id="war-def-stat-ldr">統 0</span>
+                                <span id="war-def-stat-str">武 0</span>
+                                <span id="war-def-stat-int">知 0</span>
+                                <span id="war-def-stat-pol">政 0</span>
+                            </div>
+                        </div>
+                        <div class="war-info-section">
+                            <h3 id="war-defender-name" style="margin-top:0; color:#1565c0; font-size:1.1rem;">守備軍</h3>
+                            <div id="war-defender-info" style="font-size:0.9rem;"></div>
+                            <div class="war-bar-container"><div id="war-defender-bar" class="war-bar-fill" style="background-color:#1565c0;"></div></div>
+                            <div class="war-morale-container" style="margin-top:5px;"><div id="war-defender-morale-bar" class="war-morale-fill" style="background-color:#ffb74d;"></div></div>
+                            <div id="war-defender-morale-text" style="font-size:0.8rem; text-align:right;">士気: 0</div>
+                            <div id="war-defender-wall-container" class="war-wall-container" style="margin-top:5px;"><div id="war-defender-wall-bar" class="war-wall-fill" style="background-color:#757575;"></div></div>
+                            <div id="war-defender-wall-text" style="font-size:0.8rem; text-align:right;">城壁: 0</div>
+                            <div id="war-defender-troops" class="war-troop-icons" style="margin-top:5px;"></div>
+                        </div>
+                    </div>
+
+                </div>
+
+                <div style="display: flex; gap: 10px; margin-top: 10px;">
+                    <div id="war-attacker-bushos" class="war-busho-list" style="flex:1;"></div>
+                    <div id="war-defender-bushos" class="war-busho-list" style="flex:1;"></div>
+                </div>
+
+                <div id="war-log" style="height: 100px; overflow-y: auto; background: #fff; border: 1px solid #ccc; padding: 5px; font-size: 0.9rem; margin-top: 10px;"></div>
+                <div class="modal-footer" style="justify-content: center; margin-top: 10px;">
+                    <button id="war-btn-next" class="btn-primary">次のターンへ</button>
+                    <button id="war-btn-retreat" class="btn-danger hidden">退却</button>
+                    <button id="war-btn-close" class="btn-secondary hidden">閉じる</button>
+                </div>
+            </div>
         </div>
     </div>
 
