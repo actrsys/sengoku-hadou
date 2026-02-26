@@ -885,6 +885,29 @@ class WarManager {
     endWar(attackerWon, isRetreat = false, capturedInRetreat = [], retreatTargetId = null) { 
         try {
             const s = this.state; s.active = false;
+
+            // ★ここから追加：戦争が終わった後の「順番待ちの列」を作ります！
+            const finishWarProcess = () => {
+                const winnerClan = s.attacker.ownerClan; // 勝ったのは攻撃側です
+                if (this.pendingPrisoners && this.pendingPrisoners.length > 0) {
+                    // 捕虜がいる場合
+                    if (winnerClan === this.game.playerClanId) {
+                        // プレイヤーが勝ったなら、ここで初めて捕虜画面を出します
+                        this.game.ui.showPrisonerModal(this.pendingPrisoners);
+                    } else {
+                        // コンピューターが勝ったなら、自動で処理して時間を進めます
+                        this.autoResolvePrisoners(this.pendingPrisoners, winnerClan);
+                        this.pendingPrisoners = [];
+                        this.game.finishTurn();
+                    }
+                } else {
+                    // 捕虜がいなければ、そのまま時間を進めます
+                    this.game.finishTurn();
+                }
+            };
+            // ★追加ここまで
+            
+            // 兵士の減った割合を計算して、馬と鉄砲も減らす（壊れる）処理
             
             // 兵士の減った割合を計算して、馬と鉄砲も減らす（壊れる）処理
             // 野戦があった場合、ここでの horses と guns は既に野戦生き残り数に更新されており、
@@ -1177,8 +1200,6 @@ class WarManager {
 
             if (isRetreat && capturedInRetreat.length > 0) {
                 this.pendingPrisoners = capturedInRetreat;
-                if (s.attacker.ownerClan === this.game.playerClanId) this.game.ui.showPrisonerModal(capturedInRetreat);
-                else this.autoResolvePrisoners(capturedInRetreat, s.attacker.ownerClan);
             }
             
             if (isRetreat && attackerWon) {
@@ -1195,8 +1216,12 @@ class WarManager {
                     b.castleId = s.defender.id; s.defender.samuraiIds.push(b.id); b.isCastellan = false; 
                 });
                 this.game.updateCastleLord(srcC); this.game.updateCastleLord(s.defender);
-                if (s.isPlayerInvolved) this.game.ui.showResultModal(`撤退しました。\n${retreatTargetId ? '部隊は移動しました。' : '部隊は解散しました。'}`, () => this.game.finishTurn());
-                else this.game.finishTurn();
+                
+                if (s.isPlayerInvolved) {
+                    this.game.ui.showResultModal(`撤退しました。\n${retreatTargetId ? '部隊は移動しました。' : '部隊は解散しました。'}`, finishWarProcess);
+                } else {
+                    finishWarProcess();
+                }
                 return;
             }
 
@@ -1252,8 +1277,8 @@ class WarManager {
                 else resultMsg = isRetreat ? `${s.defender.name}から撤退しました……` : `${s.defender.name}を守り抜きました！\n敗者: ${s.attacker.name}`;
             } 
 
-            if (s.isPlayerInvolved) this.game.ui.showResultModal(resultMsg, () => { this.game.finishTurn(); });
-            else this.game.finishTurn();
+            if (s.isPlayerInvolved) this.game.ui.showResultModal(resultMsg, finishWarProcess);
+            else finishWarProcess();
         } catch (e) {
             console.error("EndWar Error: ", e);
             if (this.state.isPlayerInvolved) this.game.ui.showResultModal("合戦処理中にエラーが発生しましたが、\nゲームを継続します。", () => { this.game.finishTurn(); });
@@ -1291,8 +1316,6 @@ class WarManager {
         if (escapees.length > 0 && (defeatedCastle.ownerClan === this.game.playerClanId || winnerClanId === this.game.playerClanId)) this.game.ui.log(`${escapees.length}名の武将が自領へ逃げ帰りました。`);
         if (captives.length > 0) { 
             this.pendingPrisoners = captives; 
-            if (winnerClanId === this.game.playerClanId) this.game.ui.showPrisonerModal(captives); 
-            else this.autoResolvePrisoners(captives, winnerClanId); 
         } 
     }
     
@@ -1347,7 +1370,13 @@ class WarManager {
             }
         } 
         this.pendingPrisoners.splice(index, 1); 
-        if (this.pendingPrisoners.length === 0) this.game.ui.closePrisonerModal(); else this.game.ui.showPrisonerModal(this.pendingPrisoners); 
+        if (this.pendingPrisoners.length === 0) {
+            this.game.ui.closePrisonerModal();
+            // ★捕虜がいなくなったら、ここで初めて時間を進めます！
+            this.game.finishTurn();
+        } else {
+            this.game.ui.showPrisonerModal(this.pendingPrisoners); 
+        }
     }
     
     handleDaimyoDeath(daimyo) { 
