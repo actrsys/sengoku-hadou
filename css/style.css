@@ -841,3 +841,34 @@ img {
     border-left: none !important; 
     border-right: none !important;
 }
+/* ★ 項目が多い時に中身だけをスクロールさせ、ボタンを見切れなくする魔法 ★ */
+
+/* 輸送などの入力画面用 */
+#quantity-modal h3,
+#trade-type-info,
+#charity-type-selector,
+#quantity-modal .modal-footer {
+    flex-shrink: 0;
+}
+#quantity-container {
+    flex: 1;
+    overflow-y: auto;
+    min-height: 0;
+    padding-right: 5px;
+    margin-bottom: 10px;
+}
+
+/* 部隊編成（兵士分配）画面用 */
+#unit-divide-modal h3,
+#unit-divide-modal > div:not(#divide-list),
+#unit-divide-modal .modal-footer {
+    flex-shrink: 0;
+}
+#divide-list {
+    flex: 1;
+    overflow-y: auto;
+    min-height: 0;
+    max-height: none !important; /* HTMLの指定を上書き */
+    padding-right: 5px;
+    margin-bottom: 10px;
+}
