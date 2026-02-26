@@ -163,6 +163,7 @@ class Busho {
         // ステータスフラグ
         this.isDaimyo = this.isDaimyo === true;
         this.isCastellan = this.isCastellan === true;
+        this.isGunshi = this.isGunshi === true;
         this.status = this.status || 'active';
         this.isActionDone = this.isActionDone === true;
     }
