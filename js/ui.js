@@ -1285,6 +1285,21 @@ class UIManager {
             }
         };
 
+        // ★追加：誰も選んでいない時は決定ボタンを押せなくする魔法
+        const updateBushoConfirmBtn = () => {
+            if (!this.selectorConfirmBtn) return;
+            if (actionType === 'view_only' || actionType === 'all_busho_list') return; 
+
+            const checkedCount = this.selectorList.querySelectorAll('input[name="sel_busho"]:checked').length;
+            if (checkedCount > 0) {
+                this.selectorConfirmBtn.disabled = false;
+                this.selectorConfirmBtn.style.opacity = 1.0;
+            } else {
+                this.selectorConfirmBtn.disabled = true;
+                this.selectorConfirmBtn.style.opacity = 0.5;
+            }
+        };
+
         bushos.forEach(b => {
             if (actionType === 'banish' && b.isCastellan) return; 
             if (actionType === 'employ_target' && b.isDaimyo) return;
@@ -1323,6 +1338,7 @@ class UIManager {
                         if(e.target.checked) div.classList.add('selected');
                         else div.classList.remove('selected');
                         updateContextCost();
+                        updateBushoConfirmBtn(); // ★追加
                         return;
                     } 
                     const input = div.querySelector('input');
@@ -1340,6 +1356,7 @@ class UIManager {
                         }
                         if(input.checked) div.classList.add('selected'); else div.classList.remove('selected');
                         updateContextCost(); 
+                        updateBushoConfirmBtn(); // ★追加
                     }
                 }; 
             }
@@ -1352,6 +1369,10 @@ class UIManager {
                 this.selectorConfirmBtn.classList.add('hidden'); 
             } else {
                 this.selectorConfirmBtn.classList.remove('hidden');
+                
+                // ★追加：画面を開いた直後は「誰も選んでいない状態」にセットする
+                updateBushoConfirmBtn();
+
                 this.selectorConfirmBtn.onclick = () => {
                     const inputs = document.querySelectorAll('input[name="sel_busho"]:checked'); if (inputs.length === 0) return;
                     const selectedIds = Array.from(inputs).map(i => parseInt(i.value)); 
@@ -1659,6 +1680,42 @@ class UIManager {
         if (this.tradeTypeInfo) this.tradeTypeInfo.classList.add('hidden'); 
         const c = this.currentCastle;
 
+        // ★追加：スライダーの値を見て、0だったら決定ボタンを押せなくする魔法
+        const checkValidQuantity = () => {
+            if (!this.quantityConfirmBtn) return;
+            let isValid = true;
+
+            if (type === 'transport') {
+                const g = parseInt(document.getElementById('num-gold')?.value) || 0;
+                const r = parseInt(document.getElementById('num-rice')?.value) || 0;
+                const s = parseInt(document.getElementById('num-soldiers')?.value) || 0;
+                const h = parseInt(document.getElementById('num-horses')?.value) || 0;
+                const gun = parseInt(document.getElementById('num-guns')?.value) || 0;
+                if (g === 0 && r === 0 && s === 0 && h === 0 && gun === 0) isValid = false;
+            } else if (type === 'headhunt_gold' || type === 'charity') {
+                // 引抜の持参金は任意（0でもOK）、施しは金米固定なので常にOK
+                isValid = true; 
+            } else if (type === 'war_supplies' || type === 'def_intercept' || type === 'def_reinf_supplies') {
+                const s = parseInt(document.getElementById('num-soldiers')?.value) || 0;
+                if (s <= 0) isValid = false; // 兵士0での出陣はダメ
+            } else {
+                // その他の購入や徴兵などは、代表的な入力欄が0ならダメ
+                const inputsEl = document.querySelectorAll('.qty-control input[type="number"]');
+                if (inputsEl.length > 0) {
+                    const val = parseInt(inputsEl[0].value) || 0;
+                    if (val <= 0) isValid = false;
+                }
+            }
+
+            if (isValid) {
+                this.quantityConfirmBtn.disabled = false;
+                this.quantityConfirmBtn.style.opacity = 1.0;
+            } else {
+                this.quantityConfirmBtn.disabled = true;
+                this.quantityConfirmBtn.style.opacity = 0.5;
+            }
+        };
+
         const createSlider = (label, id, max, currentVal, minVal = 0) => { 
             const wrap = document.createElement('div'); 
             wrap.className = 'qty-row'; 
@@ -1684,6 +1741,7 @@ class UIManager {
                 if (v > actualMax) v = actualMax;
                 range.value = v;
                 num.value = v;
+                checkValidQuantity(); // ★追加
             };
 
             wrap.querySelector(`#btn-min-${id}`).onclick = () => setVal(minVal);
@@ -1693,7 +1751,7 @@ class UIManager {
             };
             wrap.querySelector(`#btn-max-${id}`).onclick = () => setVal(parseInt(range.max));
 
-            range.oninput = () => num.value = range.value; 
+            range.oninput = () => { num.value = range.value; checkValidQuantity(); }; // ★変更
 
             num.oninput = () => {
                 let actualMax = parseInt(range.max);
@@ -1703,6 +1761,7 @@ class UIManager {
                 if (v > actualMax) v = actualMax;
                 if (num.value != v) num.value = v; 
                 range.value = v; 
+                checkValidQuantity(); // ★追加
             };
             
             num.onblur = () => {
@@ -1710,6 +1769,7 @@ class UIManager {
                     num.value = minVal;
                     range.value = minVal;
                 }
+                checkValidQuantity(); // ★追加
             };
 
             this.quantityContainer.appendChild(wrap); 
@@ -1794,8 +1854,19 @@ class UIManager {
             inputs.soldiers = createSlider("使用兵士数", "soldiers", maxSoldiers, Math.min(50, maxSoldiers));
         }
         
-        this.quantityConfirmBtn.onclick = () => {
+        checkValidQuantity(); // ★追加：画面を開いた直後に一度チェックする
+
+        // ★追加：ウインドウを閉じる時にボタンを元気な状態に戻す魔法
+        const closeQuantityModal = () => {
             this.quantityModal.classList.add('hidden');
+            if (this.quantityConfirmBtn) {
+                this.quantityConfirmBtn.disabled = false;
+                this.quantityConfirmBtn.style.opacity = 1.0;
+            }
+        };
+
+        this.quantityConfirmBtn.onclick = () => {
+            closeQuantityModal(); // ★変更
             if ((type === 'def_intercept' || type === 'def_reinf_supplies') && extraData && extraData.onConfirm) {
                 extraData.onConfirm(inputs);
             } else {
@@ -1807,7 +1878,7 @@ class UIManager {
         const cancelBtn = this.quantityModal.querySelector('.btn-secondary');
         if (cancelBtn) {
             cancelBtn.onclick = () => {
-                this.quantityModal.classList.add('hidden');
+                closeQuantityModal(); // ★変更
                 if (extraData && extraData.onCancel) {
                     extraData.onCancel(); // キャンセルの合図を送る！
                 }
