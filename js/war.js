@@ -30,7 +30,7 @@ window.WarParams = {
         StatsLdrWeight: 1.2, StatsStrWeight: 0.3, StatsIntWeight: 0.5,
         MoraleBase: 50, SchemeBaseIntOffset: 20, LoyaltyDamageFactor: 500,
         AttackLoyaltyDecay: 50, AttackPopDecay: 500, WinStatIncrease: 5,
-        CaptureChanceBase: 0.4, CaptureStrFactor: 0.002, PrisonerRecruitThreshold: 60
+        CaptureChanceBase: 0.7, CaptureStrFactor: 0.002, PrisonerRecruitThreshold: 60
     }
 };
 
@@ -1268,7 +1268,7 @@ class WarManager {
         losers.forEach(b => { 
             if (b.status === 'ronin') return;
 
-            let chance = isLastStand ? 1.0 : ((window.WarParams.War.CaptureChanceBase || 0.4) - (b.strength * (window.WarParams.War.CaptureStrFactor || 0.002)) + (Math.random() * 0.3)); 
+            let chance = isLastStand ? 1.0 : ((window.WarParams.War.CaptureChanceBase || 0.7) - (b.strength * (window.WarParams.War.CaptureStrFactor || 0.002)) + (Math.random() * 0.3));
             if (!isLastStand && defeatedCastle.soldiers > 1000) chance -= 0.2; 
             if (!isLastStand && b.isDaimyo) chance -= window.WarParams.War.DaimyoCaptureReduction;
             
