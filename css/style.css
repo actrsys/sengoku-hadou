@@ -55,8 +55,15 @@ img {
 .game-title { font-size: 3rem; margin-bottom: 30px; text-shadow: 2px 2px 4px rgba(0,0,0,0.5); }
 .title-menu { display: flex; flex-direction: column; gap: 15px; }
 .title-btn {
-    padding: 12px 40px; font-size: 1.2rem; background: rgba(255,255,255,0.1);
-    color: #fff; border: 1px solid rgba(255,255,255,0.3); cursor: pointer;
+    width: 240px;          /* ★横幅を240ピクセルで固定します */
+    text-align: center;    /* ★中の文字を真ん中に寄せます */
+    padding: 12px 0;       /* ★横の余白(40px)を0にして、widthの幅に従わせます */
+    
+    font-size: 1.2rem; 
+    background: rgba(255,255,255,0.1);
+    color: #fff; 
+    border: 1px solid rgba(255,255,255,0.3); 
+    cursor: pointer;
     transition: all 0.3s;
 }
 .title-btn:hover { background: rgba(255,255,255,0.3); }
