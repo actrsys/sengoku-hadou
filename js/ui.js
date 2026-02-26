@@ -532,7 +532,14 @@ class UIManager {
         }
     }
     
-    closeSelector() { if (this.selectorModal) this.selectorModal.classList.add('hidden'); }
+    closeSelector() { 
+        if (this.selectorModal) this.selectorModal.classList.add('hidden'); 
+        // ★追加：ウインドウを閉じる時に、必ず決定ボタンを元の押せる状態にリセットします
+        if (this.selectorConfirmBtn) {
+            this.selectorConfirmBtn.disabled = false;
+            this.selectorConfirmBtn.style.opacity = 1.0;
+        }
+    }
 
     showCutin(msg) { 
         return new Promise((resolve) => {
