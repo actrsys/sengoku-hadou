@@ -212,24 +212,15 @@ class FieldWarManager {
                     isReinforcement: isReinf,
                     isGeneral: index === 0,
                     x: atkX,
-                    y: deployY, // ★ココを「yPositions[index % 5]」から「deployY」に書き換える！
-                    direction: isAtkPlayer ? 1 : 4,
-                    bushoId: assign.busho.id,
-                    name: assign.busho.name,
-                    isAttacker: true,
-                    isPlayer: unitIsPlayer,    // ★修正: 援軍か本隊かで操作権限を変えます
-                    isReinforcement: isReinf,  // ★追加: 援軍マークをつけます
-                    isGeneral: index === 0,
-                    x: atkX,
-                    y: yPositions[index % 5],
+                    y: deployY,
                     direction: isAtkPlayer ? 1 : 4,
                     mobility: mobility, 
                     ap: mobility,
                     soldiers: assign.soldiers,
-                    troopType: type, // ★ 兵科を保存
+                    troopType: type,
                     stats: WarSystem.calcUnitStats([assign.busho]),
                     hasActionDone: false,
-                    hasMoved: false // ★ 鉄砲の移動後攻撃不可判定用
+                    hasMoved: false
                 });
             });
         }
@@ -270,16 +261,7 @@ class FieldWarManager {
                     isReinforcement: isReinf,
                     isGeneral: index === 0,
                     x: defX,
-                    y: deployY, // ★ココを「yPositions[index % 5]」から「deployY」に書き換える！
-                    direction: isDefPlayer ? 1 : 4,
-                    bushoId: assign.busho.id,
-                    name: assign.busho.name,
-                    isAttacker: false,
-                    isPlayer: unitIsPlayer,    // ★修正: 援軍か本隊かで操作権限を変えます
-                    isReinforcement: isReinf,  // ★追加: 援軍マークをつけます
-                    isGeneral: index === 0,
-                    x: defX,
-                    y: yPositions[index % 5],
+                    y: deployY,
                     direction: isDefPlayer ? 1 : 4,
                     mobility: mobility, 
                     ap: mobility,
