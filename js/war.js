@@ -6,6 +6,7 @@
  * ★追加: 国人衆の蜂起（反乱）・制圧時の特別な結末と、捕虜の特別ルールを追加しました
  * ★追加: 部隊分割時に兵科（troopType）の情報を保持・伝達するようにしました
  * ★修正: 大名死亡時の後継者選択で、一門・相性・年齢を優先するようにしました
+ * ★追加: 既存の一門がいない場合、未登場の一門を強制的に元服させて後継者にする処理を追加しました
  */
 
 window.WarParams = {
@@ -147,7 +148,7 @@ class WarManager {
         return this.game.castles.filter(target => {
             // 基本的なチェック（道が繋がっているか、自分の城じゃないか、免疫期間じゃないか）
             if (!GameSystem.isReachable(this.game, currentCastle, target, myClanId)) return false;
-            if (target.ownerClan === myClanId) return false; // ★ここにあった「|| target.ownerClan === 0」を消しました！
+            if (target.ownerClan === myClanId) return false;
             if ((target.immunityUntil || 0) >= this.game.getCurrentTurnId()) return false;
             
             // 直接の「同盟・支配・従属」は攻撃不可（※中立の城以外でチェックします）
@@ -259,7 +260,6 @@ class WarManager {
         }));
     }
 
-    // ★修正: 一番最後に「reinforcementData = null」を追加して、援軍パックを受け取れるようにします！
     async startWar(atkCastle, defCastle, atkBushos, atkSoldierCount, atkRice, atkHorses = 0, atkGuns = 0, reinforcementData = null) {
         try {
             // 攻撃部隊の中に大名がいれば探し、いなければ城主を探す
@@ -1413,6 +1413,38 @@ class WarManager {
         const clanId = daimyo.clan; 
         if(clanId === 0) return; 
         
+        // 1. 生きている一門がいるかチェック
+        const activeFamily = this.game.bushos.filter(b => b.clan === clanId && b.id !== daimyo.id && b.status === 'active' && daimyo.familyIds.some(fId => b.familyIds.includes(fId)));
+        
+        // ★追加: もし生きている一門が0人なら、未登場の一門を探して強制的に登場させる
+        if (activeFamily.length === 0) {
+            const unbornFamily = this.game.bushos.filter(b => b.status === 'unborn' && daimyo.familyIds.some(fId => b.familyIds.includes(fId)));
+            
+            if (unbornFamily.length > 0) {
+                // 相性 -> 年齢順に並べ替え
+                unbornFamily.sort((a,b) => {
+                    const diffA = Math.abs((daimyo.affinity || 0) - (a.affinity || 0));
+                    const diffB = Math.abs((daimyo.affinity || 0) - (b.affinity || 0));
+                    if (diffA !== diffB) return diffA - diffB;
+                    return a.birthYear - b.birthYear;
+                });
+
+                // 一番有力な候補を強制登場させる
+                const heir = unbornFamily[0];
+                const clanCastles = this.game.castles.filter(c => c.ownerClan === clanId);
+                const baseCastle = clanCastles.length > 0 ? clanCastles[0] : null;
+
+                if (baseCastle) {
+                    heir.status = 'active';
+                    heir.clan = clanId;
+                    heir.castleId = baseCastle.id;
+                    heir.loyalty = 100;
+                    if (!baseCastle.samuraiIds.includes(heir.id)) baseCastle.samuraiIds.push(heir.id);
+                    this.game.ui.log(`【緊急継承】${daimyo.name.replace('|','')}の血縁、まだ幼い${heir.name.replace('|','')}が元服し、家督を継ぐため立ち上がりました！`);
+                }
+            }
+        }
+
         // 同じ大名家の、死んでいない＆浪人じゃない武将をさがします
         const candidates = this.game.bushos.filter(b => b.clan === clanId && b.id !== daimyo.id && b.status !== 'dead' && b.status !== 'ronin'); 
         

@@ -1,7 +1,6 @@
 /**
  * life_system.js
  * 武将の登場・死亡を管理するシステムです！
- * ★修正: 大名死亡時の後継者選択で、一門・相性・年齢を優先するようにしました
  */
 
 class LifeSystem {
@@ -158,6 +157,38 @@ class LifeSystem {
 
     // ★ここを書き換えました！大名が亡くなった時の後継ぎ選びです
     handleDaimyoDeath(daimyo) {
+        // 1. 生きている一門がいるかチェック
+        const activeFamily = this.game.bushos.filter(b => b.clan === daimyo.clan && b.id !== daimyo.id && b.status === 'active' && !b.isDaimyo && daimyo.familyIds.some(fId => b.familyIds.includes(fId)));
+        
+        // ★追加: もし生きている一門が0人なら、未登場の一門を探して強制的に登場させる
+        if (activeFamily.length === 0) {
+            const unbornFamily = this.game.bushos.filter(b => b.status === 'unborn' && daimyo.familyIds.some(fId => b.familyIds.includes(fId)));
+            
+            if (unbornFamily.length > 0) {
+                // 相性 -> 年齢順に並べ替え
+                unbornFamily.sort((a,b) => {
+                    const diffA = Math.abs((daimyo.affinity || 0) - (a.affinity || 0));
+                    const diffB = Math.abs((daimyo.affinity || 0) - (b.affinity || 0));
+                    if (diffA !== diffB) return diffA - diffB;
+                    return a.birthYear - b.birthYear;
+                });
+
+                // 一番有力な候補を強制登場させる
+                const heir = unbornFamily[0];
+                const clanCastles = this.game.castles.filter(c => c.ownerClan === daimyo.clan);
+                const baseCastle = clanCastles.length > 0 ? clanCastles[0] : null;
+
+                if (baseCastle) {
+                    heir.status = 'active';
+                    heir.clan = daimyo.clan;
+                    heir.castleId = baseCastle.id;
+                    heir.loyalty = 100;
+                    if (!baseCastle.samuraiIds.includes(heir.id)) baseCastle.samuraiIds.push(heir.id);
+                    this.game.ui.log(`【緊急継承】${daimyo.name.replace('|','')}の血縁、まだ幼い${heir.name.replace('|','')}が元服し、家督を継ぐため立ち上がりました！`);
+                }
+            }
+        }
+
         // 同じ大名家の中から、大名以外の生きている武将を探します
         const clanBushos = this.game.bushos.filter(b => b.clan === daimyo.clan && b.status === 'active' && !b.isDaimyo);
         
