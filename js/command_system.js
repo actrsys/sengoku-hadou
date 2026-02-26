@@ -104,9 +104,9 @@ const COMMAND_SPECS = {
         startMode: 'map_select', targetType: 'ally_other',
         sortKey: 'strength' 
     },
-    // ★追加: 国人衆を攻める（制圧する）ための軍事コマンド
+    // ★追加: 国人衆を攻める（鎮圧する）ための軍事コマンド
     'kunishu_subjugate': { 
-        label: "制圧", category: 'MILITARY', 
+        label: "鎮圧", category: 'MILITARY', 
         costGold: 0, costRice: 0, 
         isMulti: true, hasAdvice: true, 
         startMode: 'map_select', targetType: 'kunishu_subjugate_valid', // ← 専用の合言葉にしました！
