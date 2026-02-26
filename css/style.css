@@ -872,3 +872,17 @@ img {
     padding-right: 5px;
     margin-bottom: 10px;
 }
+/* 攻城戦のコマンドボタンを四角くカッコよくする魔法 */
+#war-controls button {
+    padding: 15px 5px !important;
+    font-size: 1.2rem !important;
+    font-weight: bold;
+    background: #fff;
+    border: 2px solid #ccc !important;
+    border-radius: 0 !important;
+    color: #333;
+    transition: background 0.2s;
+}
+#war-controls button:hover {
+    background: #f0f0f0;
+}
