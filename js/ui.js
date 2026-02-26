@@ -2017,9 +2017,30 @@ class UIManager {
         const maxRounds = window.WarParams?.Military?.WarMaxRounds || 10;
         setTxt('war-turn-info', `残り ${Math.max(0, maxRounds - s.round + 1)}ターン`);
         setTxt('war-def-wall-info', `城防御 ${s.defender.defense}`);
-        setTxt('war-title-name', `${s.defender.name} 攻防戦`);
 
-        // ★変更：攻撃軍の名前を「大名家（クラン名）」にします
+        // ★変更：守備側が国人衆かどうかで、タイトルと名前を切り替える魔法です！
+        let titleText = `${s.defender.name} 攻防戦`;
+        let defNameText = "";
+
+        if (s.defender.isKunishu) {
+            // 「伊賀上野城（伊賀衆）」から、カッコの中の「伊賀衆」だけを抜き出します
+            let kunishuName = s.defender.name;
+            const match = s.defender.name.match(/（(.+?)）/);
+            if (match) {
+                kunishuName = match[1]; // カッコの中身だけを取り出す
+            }
+            titleText = `${kunishuName} 鎮圧戦`;
+            defNameText = kunishuName;
+        } else {
+            // 普通の大名家の場合は今まで通りです
+            const defClan = this.game.clans.find(c => c.id === s.defender.ownerClan);
+            defNameText = defClan ? defClan.name : "不明な勢力";
+        }
+
+        // タイトルを表示します
+        setTxt('war-title-name', titleText);
+
+        // 攻撃軍の情報を入れます
         const atkClan = this.game.clans.find(c => c.id === s.attacker.ownerClan);
         const atkName = s.attacker.isKunishu ? s.attacker.name : (atkClan ? atkClan.name : "不明な勢力");
         setTxt('war-atk-name', atkName);
@@ -2031,11 +2052,8 @@ class UIManager {
         setTxt('war-atk-rice', s.attacker.rice); 
         updateFace('war-atk-face', s.atkBushos[0]);
         
-        // ★変更：守備軍の名前も「大名家（クラン名）」にします
-        const defClan = this.game.clans.find(c => c.id === s.defender.ownerClan);
-        const defName = s.defender.isKunishu ? s.defender.name : (defClan ? defClan.name : "不明な勢力");
-        setTxt('war-def-name', defName);
-        
+        // 守備軍の情報を入れます
+        setTxt('war-def-name', defNameText); // ★ここでさっき決めた名前を入れます
         setTxt('war-def-busho', s.defBusho.name);
         setTxt('war-def-soldier', s.defender.soldiers);
         setTxt('war-def-morale', s.defender.morale);
