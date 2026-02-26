@@ -305,20 +305,18 @@ class FieldWarManager {
                                     this.units.push({
                                         id: 'k_' + bestBusho.id,
                                         bushoId: bestBusho.id,
-                         
-                                        y: defAllyYs[defAllyCount % defAllyYs.length], 
-                                        direction: isDefPlayer ? 1 : 4, // ←★ココを直します！               kunishuId: k.id,
+                                        kunishuId: k.id,
                                         name: bestBusho.name,
                                         isAttacker: false,
                                         isPlayer: false, 
                                         isGeneral: false,
                                         x: defX, 
                                         y: defAllyYs[defAllyCount % defAllyYs.length], 
-                                        direction: (defX === leftX) ? 1 : 4, // ←★ココを書き換えました！
+                                        direction: (defX === leftX) ? 1 : 4,
                                         mobility: 4, 
                                         ap: 4,
                                         soldiers: uSoldiers,
-                                        troopType: 'ashigaru', // 国衆援軍はデフォルトで足軽
+                                        troopType: 'ashigaru', 
                                         stats: WarSystem.calcUnitStats([bestBusho]),
                                         hasActionDone: false,
                                         hasMoved: false
