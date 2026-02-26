@@ -96,29 +96,48 @@ class Busho {
         this.clan = Number(this.clan);
         this.castleId = Number(this.castleId);
         
+        // --- 名前（既存の処理） ---
         if (this.name && this.name.includes('|')) {
-            // 名前に「|」が含まれていたら、そこで真っ二つに切ります
             let names = this.name.split('|');
-            this.familyName = names[0]; // 1つ目（姓）を familyName の箱へ
-            this.givenName = names[1];  // 2つ目（名）を givenName の箱へ
-            
-            // これまでのプログラムが困らないように、繋げた名前を元の name の箱に戻します
+            this.familyName = names[0];
+            this.givenName = names[1];
             this.name = names[0] + names[1]; 
         } else {
-            // もし「|」が入っていなかった時のお守りです
             this.familyName = this.name;
             this.givenName = "";
         }
         
-        // 能力値
+        // --- 能力値（既存の処理） ---
         this.leadership = Number(this.leadership || 0);
         this.strength = Number(this.strength || 0);
         this.politics = Number(this.politics || 0);
         this.diplomacy = Number(this.diplomacy || 0);
         this.intelligence = Number(this.intelligence || 0);
         this.charm = Number(this.charm || 0);
+
+        // ★【ここから書き足し：兵科適性】
+        // 何も入っていない（空っぽ）なら、最低ランクの 'E' を入れる設定です
+        this.aptAshigaru = data.aptAshigaru || 'E'; // 足軽適性
+        this.aptKiba = data.aptKiba || 'E';         // 騎馬適性
+        this.aptTeppo = data.aptTeppo || 'E';       // 鉄砲適性
+
+        // ★【ここから書き足し：生没年・登場年】
+        // 数字として扱うために Number() で囲みます
+        this.birthYear = Number(data.birthYear || 0); // 生年
+        this.endYear = Number(data.endYear || 9999);  // 没年（空ならずっと死なない設定）
+        this.startYear = Number(data.startYear || 0); // 登場年
+
+        // ★【ここから書き足し：一門設定】
+        // familyId が「1|2|3」のように届くので、使いやすいようにバラバラのリスト（配列）にします
+        if (typeof data.familyId === 'string' && data.familyId.trim() !== "") {
+            // 「|」で区切って、それぞれを数字に変換してリストにします
+            this.familyIds = data.familyId.split('|').map(id => Number(id.trim()));
+        } else {
+            // 何もなければ、とりあえず 0 だけが入ったリストにします
+            this.familyIds = [Number(data.familyId || 0)];
+        }
         
-        // 忠誠・義理・野心など
+        // --- 忠誠・義理など（ここから下は既存の続き） ---
         this.loyalty = Number(this.loyalty || 0);
         this.duty = Number(this.duty || 0);
         this.ambition = Number(this.ambition || 0);
