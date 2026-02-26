@@ -187,42 +187,54 @@
     </div>
 
     <div id="war-modal" class="modal hidden">
-        <div class="modal-content" style="max-width: 700px; height: 90vh; display: flex; flex-direction: column;">
-            <h2 class="war-title" style="margin:0; padding-bottom:5px;">攻城戦</h2>
-            <div class="war-screen">
-                <div class="war-visual">
-                    <div class="army-box attacker">
-                        <h3 class="army-title">攻撃軍: <span id="war-atk-name"></span></h3>
-                        <img id="war-atk-face" class="war-face hidden" src="" alt="">
-                        <div>大将: <span id="war-atk-busho"></span></div>
-                        <div>兵士: <span id="war-atk-soldier" class="highlight-val"></span> / 兵糧: <span id="war-atk-rice"></span></div>
-                        <div>士気: <span id="war-atk-morale"></span></div>
-                    </div>
-                    <div style="font-weight:bold; font-size:1.2rem;">VS</div>
-                    <div class="army-box defender">
-                        <h3 class="army-title">守備軍: <span id="war-def-name"></span></h3>
-                        <img id="war-def-face" class="war-face hidden" src="" alt="">
-                        <div>大将: <span id="war-def-busho"></span></div>
-                        <div>兵士: <span id="war-def-soldier" class="highlight-val"></span> / 兵糧: <span id="war-def-rice"></span></div>
-                        <div>防御: <span id="war-def-wall"></span></div>
-                    </div>
-                </div>
-                <div class="war-info-bar" style="background:#333; color:#fff; text-align:center; padding:2px;">
-                    R: <span id="war-round">1</span>/10 | 手番: <span id="war-turn-actor">--</span>
-                </div>
-                <div id="war-controls" class="war-controls-area disabled-area"></div>
+        <div class="modal-content" style="max-width: 700px; height: 90vh; display: flex; flex-direction: column; background: #fff; border: 2px solid #333;">
+            <div id="war-top-bar" style="background:#000; color:#fff; display:flex; justify-content:space-between; padding:5px 10px; font-size:1.1rem; font-weight:bold;">
+                <span id="war-date-info"></span>
+                <span id="war-turn-info"></span>
+                <span id="war-def-wall-info"></span>
             </div>
-            <div id="war-log" style="height: 100px; overflow-y: auto; background: #fff; border: 1px solid #ccc; padding: 5px; font-size: 0.85rem; margin-top: 10px;"></div>
-        </div>
-    </div>
+            
+            <h2 class="war-title" id="war-title-name" style="margin:0; padding:10px 0; text-align:center; border-bottom:2px solid #333; font-size:1.5rem; font-weight:normal; background:#fff;"></h2>
 
-    <div id="intercept-confirm-modal" class="modal hidden">
-        <div class="modal-content" style="max-width: 400px; text-align: center;">
-            <h3 style="margin-top:0;">敵軍襲来</h3>
-            <p id="intercept-msg" style="margin: 20px 0; font-size:1.1rem; line-height:1.5;"></p>
-            <div class="modal-footer" style="justify-content: center; gap: 20px;">
-                <button id="btn-intercept" class="btn-danger">迎撃（野戦）</button>
-                <button id="btn-siege" class="btn-primary">籠城</button>
+            <div class="war-screen" style="flex:1; display:flex; flex-direction:column; padding:0; background:#fff; border-radius:0;">
+                <div class="war-visual" style="flex:1; display:flex; flex-direction:row; padding:0; margin:0; background:#fff; overflow-y:auto; justify-content: stretch;">
+                    
+                    <div class="army-box attacker" style="flex:1; margin:0; border-radius:0; border-right:1px solid #fff; padding:10px; display:flex; flex-direction:column; align-items:flex-start; background:#ef5350;">
+                        <h3 class="army-title" style="margin:0 0 5px 0; border-bottom:2px solid rgba(255,255,255,0.8); width:100%; text-align:left; font-size:1.2rem; padding-bottom:2px;">攻撃軍 <span id="war-atk-name"></span></h3>
+                        
+                        <div style="display:flex; flex-wrap:wrap; gap:10px; width:100%; align-items:flex-start;">
+                            <img id="war-atk-face" class="war-face hidden" src="" alt="" style="margin:0; width:100px; height:100px; border-radius:0; border:2px solid #333; box-shadow:2px 2px 5px rgba(0,0,0,0.5);">
+                            
+                            <div style="flex:1 1 120px; display:flex; flex-direction:column; gap:2px; font-size:0.95rem;">
+                                <div style="background:rgba(0,0,0,0.4); padding:2px 5px; font-weight:bold; white-space:nowrap; margin-bottom:5px;"><span id="war-atk-busho"></span> 軍</div>
+                                <div style="display:flex; justify-content:space-between; border-bottom:4px solid rgba(255,255,255,0.3); padding-bottom:2px;"><span style="font-weight:bold;">兵士</span> <span><span id="war-atk-soldier" style="font-size:1.1rem; font-weight:bold;"></span>人</span></div>
+                                <div style="display:flex; justify-content:space-between; border-bottom:4px solid rgba(255,255,255,0.3); padding-bottom:2px;"><span style="font-weight:bold;">士気</span> <span id="war-atk-morale"></span></div>
+                                <div style="display:flex; justify-content:space-between; border-bottom:4px solid rgba(255,255,255,0.3); padding-bottom:2px;"><span style="font-weight:bold;">訓練</span> <span id="war-atk-training"></span></div>
+                                <div style="display:flex; justify-content:space-between; border-bottom:4px solid rgba(255,255,255,0.3); padding-bottom:2px;"><span style="font-weight:bold;">兵糧</span> <span id="war-atk-rice"></span></div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="army-box defender" style="flex:1; margin:0; border-radius:0; padding:10px; display:flex; flex-direction:column; align-items:flex-start; background:#42a5f5;">
+                        <h3 class="army-title" style="margin:0 0 5px 0; border-bottom:2px solid rgba(255,255,255,0.8); width:100%; text-align:left; font-size:1.2rem; padding-bottom:2px;">守備軍 <span id="war-def-name"></span></h3>
+                        
+                        <div style="display:flex; flex-wrap:wrap; gap:10px; width:100%; align-items:flex-start;">
+                            <img id="war-def-face" class="war-face hidden" src="" alt="" style="margin:0; width:100px; height:100px; border-radius:0; border:2px solid #333; box-shadow:2px 2px 5px rgba(0,0,0,0.5);">
+                            
+                            <div style="flex:1 1 120px; display:flex; flex-direction:column; gap:2px; font-size:0.95rem;">
+                                <div style="background:rgba(0,0,0,0.4); padding:2px 5px; font-weight:bold; white-space:nowrap; margin-bottom:5px;"><span id="war-def-busho"></span> 軍</div>
+                                <div style="display:flex; justify-content:space-between; border-bottom:4px solid rgba(255,255,255,0.3); padding-bottom:2px;"><span style="font-weight:bold;">兵士</span> <span><span id="war-def-soldier" style="font-size:1.1rem; font-weight:bold;"></span>人</span></div>
+                                <div style="display:flex; justify-content:space-between; border-bottom:4px solid rgba(255,255,255,0.3); padding-bottom:2px;"><span style="font-weight:bold;">訓練</span> <span id="war-def-training"></span></div>
+                                <div style="display:flex; justify-content:space-between; border-bottom:4px solid rgba(255,255,255,0.3); padding-bottom:2px;"><span style="font-weight:bold;">士気</span> <span id="war-def-morale"></span></div>
+                                <div style="display:flex; justify-content:space-between; border-bottom:4px solid rgba(255,255,255,0.3); padding-bottom:2px;"><span style="font-weight:bold;">兵糧</span> <span id="war-def-rice"></span></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div id="war-controls" class="war-controls-area disabled-area" style="padding:10px; background:#fff; grid-template-columns: repeat(3, 1fr); gap:10px; border-top:2px solid #333;"></div>
+                
+                <div id="war-log" style="height: 60px !important; overflow-y: auto; background: #fff; border-top: 2px solid #333; padding: 5px; font-size: 0.85rem; margin-top: 0; min-height:60px !important; color:#333; text-align:left;"></div>
             </div>
         </div>
     </div>
