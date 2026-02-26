@@ -42,40 +42,18 @@ img {
 #title-screen {
     position: fixed; top: 0; left: 0; width: 100%; height: 100%;
     background: linear-gradient(135deg, #263238 0%, #37474f 100%);
-    display: flex; justify-content: center; 
-    align-items: flex-start; /* ★ center から flex-start に変えました */
+    display: flex; justify-content: center; align-items: center;
     z-index: 3000;
 }
-.title-content { 
-    text-align: center; 
-    color: #fff; 
-    padding-top: 20dvh; /* ★これ！上から画面の20%の位置に固定します */
-    width: 100%;        /* 真ん中に寄せるために必要です */
-}
+.title-content { text-align: center; color: #fff; }
 .game-title { font-size: 3rem; margin-bottom: 30px; text-shadow: 2px 2px 4px rgba(0,0,0,0.5); }
 .title-menu { display: flex; flex-direction: column; gap: 15px; }
 .title-btn {
-    width: 240px;          /* ★横幅を240ピクセルで固定します */
-    text-align: center;    /* ★中の文字を真ん中に寄せます */
-    padding: 12px 0;       /* ★横の余白(40px)を0にして、widthの幅に従わせます */
-    
-    font-size: 1.2rem; 
-    background: rgba(255,255,255,0.1);
-    color: #fff; 
-    border: 1px solid rgba(255,255,255,0.3); 
-    cursor: pointer;
+    padding: 12px 40px; font-size: 1.2rem; background: rgba(255,255,255,0.1);
+    color: #fff; border: 1px solid rgba(255,255,255,0.3); cursor: pointer;
     transition: all 0.3s;
 }
 .title-btn:hover { background: rgba(255,255,255,0.3); }
-
-/* ボタンの箱の中身を縦に並べる魔法 */
-#menu-buttons {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 20px; /* ボタンとボタンの隙間です */
-    margin-top: 20px;
-}
 
 /* 新しく作ったメッセージのデザイン */
 .title-tap-message {
