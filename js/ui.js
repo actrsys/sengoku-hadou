@@ -2013,25 +2013,32 @@ class UIManager {
             }
         };
 
+        // 一番上の黒いバーとタイトルの文字を入れます
+        setTxt('war-date-info', `${this.game.year}年 ${this.game.month}月`);
+        const maxRounds = window.WarParams?.Military?.WarMaxRounds || 10;
+        setTxt('war-turn-info', `残り ${Math.max(0, maxRounds - s.round + 1)}ターン`);
+        setTxt('war-def-wall-info', `城防御 ${s.defender.defense}`);
+        setTxt('war-title-name', `${s.defender.name} 攻防戦`);
+
+        // 攻撃軍の情報を入れます
         setTxt('war-atk-name', s.attacker.name);
         setTxt('war-atk-busho', s.atkBushos[0].name);
         setTxt('war-atk-soldier', s.attacker.soldiers);
-        setTxt('war-atk-morale', `${s.attacker.morale} (訓練:${s.attacker.training})`);
+        setTxt('war-atk-morale', s.attacker.morale);
+        setTxt('war-atk-training', s.attacker.training);
         setTxt('war-atk-rice', s.attacker.rice); 
         updateFace('war-atk-face', s.atkBushos[0]);
         
+        // 守備軍の情報を入れます
         setTxt('war-def-name', s.defender.name);
         setTxt('war-def-busho', s.defBusho.name);
         setTxt('war-def-soldier', s.defender.soldiers);
-        setTxt('war-def-wall', `${s.defender.defense} (士:${s.defender.morale}/訓:${s.defender.training})`);
+        setTxt('war-def-morale', s.defender.morale);
+        setTxt('war-def-training', s.defender.training);
         setTxt('war-def-rice', s.defender.rice); 
         updateFace('war-def-face', s.defBusho);
 
-        setTxt('war-round', s.round);
-        
-        const isAtkTurn = (s.turn === 'attacker');
-        const actorName = isAtkTurn ? "攻撃側" : "守備側";
-        setTxt('war-turn-actor', actorName);
+        // ※「手番」の表示は今回画面から消したので、内部だけでの処理になります
     }
 
     renderWarControls(isAtkTurn) {
