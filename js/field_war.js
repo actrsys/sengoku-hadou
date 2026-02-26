@@ -30,6 +30,43 @@ class FieldWarManager {
         });
     }
     
+    // ↓↓↓ここから追加↓↓↓
+    /**
+     * マップの広さに合わせて、重ならないように配置マスを自動計算する魔法です
+     * @param {number} x - 配置するX座標
+     * @param {boolean} isTop - 上半分に配置するかどうか
+     */
+    getDeploymentPositions(x, isTop) {
+        let validYs = [];
+        // x座標が偶数なら偶数のYマス、奇数なら奇数のYマスだけを集めます
+        for (let row = 0; row < this.rows; row++) {
+            validYs.push((x % 2 === 0) ? row * 2 : row * 2 + 1);
+        }
+        
+        // 縦の長さを半分に割って、上エリアか下エリアかを決めます
+        let half = Math.floor(validYs.length / 2);
+        let regionYs = isTop ? validYs.slice(0, half) : validYs.slice(half);
+        
+        // 万が一マップが狭すぎた場合の保険
+        if (regionYs.length === 0) regionYs = validYs;
+
+        // 陣形がきれいに見えるように、エリアの「真ん中」から外側に向かって順番を作ります
+        let centerIdx = Math.floor((regionYs.length - 1) / 2);
+        let orderedYs = [];
+        orderedYs.push(regionYs[centerIdx]); // 1番目（総大将）はど真ん中
+        
+        let offset = 1;
+        while (orderedYs.length < regionYs.length) {
+            // 上下交互に配置していきます
+            if (centerIdx + offset < regionYs.length) orderedYs.push(regionYs[centerIdx + offset]);
+            if (centerIdx - offset >= 0) orderedYs.push(regionYs[centerIdx - offset]);
+            offset++;
+        }
+        
+        return orderedYs; // 出来上がった配置リストを返します
+    }
+    // ↑↑↑ここまで追加↑↑↑
+    
     /**
      * マップを緑の画面に合わせてギリギリまで大きくする魔法（完全版）
      */
@@ -99,15 +136,45 @@ class FieldWarManager {
         const isDefPlayer = (Number(warState.defender.ownerClan) === pid);
         const isPlayerInvolved = isAtkPlayer || isDefPlayer;
 
-        // 配置座標の決定（X=3, 17 は共に奇数）
-        let atkX = 3, defX = 17;
+        // ↓↓↓ここから差し替え↓↓↓
+        // ★修正: HEXサイズやマップの広さが変わっても対応できるようにX座標を自動計算
+        let leftX = Math.max(1, Math.floor(this.cols * 0.15));
+        let rightX = this.cols - 1 - leftX;
+        
+        // 奇数・偶数のズレを防ぐため、X座標を奇数に統一（従来の3, 17と同じになるように調整）
+        if (leftX % 2 === 0) leftX++;
+        if (rightX % 2 === 0) rightX--;
+
+        let atkX = leftX, defX = rightX;
+        let atkIsLeft = true;
+
         if (isDefPlayer && !isAtkPlayer) {
-            atkX = 17;
-            defX = 3;
+            atkX = rightX;
+            defX = leftX;
+            atkIsLeft = false;
         }
 
+        // ★追加: 各陣営のY座標リストを生成
+        // 左側（プレイヤー等）：メイン＝上、友軍＝下
+        // 右側（敵等）　　　：メイン＝下、友軍＝上
+        const leftMainYs = this.getDeploymentPositions(leftX, true);
+        const leftAllyYs = this.getDeploymentPositions(leftX, false);
+        const rightMainYs = this.getDeploymentPositions(rightX, false);
+        const rightAllyYs = this.getDeploymentPositions(rightX, true);
+
+        const atkMainYs = atkIsLeft ? leftMainYs : rightMainYs;
+        const atkAllyYs = atkIsLeft ? leftAllyYs : rightAllyYs;
+        const defMainYs = !atkIsLeft ? leftMainYs : rightMainYs;
+        const defAllyYs = !atkIsLeft ? leftAllyYs : rightAllyYs;
+
         this.units = [];
-        const yPositions = [11, 7, 15, 3, 19]; 
+        
+        // 部隊の配置数をカウントするための変数
+        let atkMainCount = 0;
+        let atkAllyCount = 0;
+        let defMainCount = 0;
+        let defAllyCount = 0;
+        // ↑↑↑ここまで差し替え↑↑↑
 
         // 攻撃側部隊の生成
         if (warState.atkAssignments) {
@@ -125,8 +192,28 @@ class FieldWarManager {
                     unitIsPlayer = (Number(warState.reinforcement.castle.ownerClan) === pid);
                 }
 
+                // ↓↓↓ここから書き足す↓↓↓
+                let deployY;
+                if (isReinf) {
+                    deployY = atkAllyYs[atkAllyCount % atkAllyYs.length];
+                    atkAllyCount++;
+                } else {
+                    deployY = atkMainYs[atkMainCount % atkMainYs.length];
+                    atkMainCount++;
+                }
+                // ↑↑↑ここまで書き足す↑↑↑
+
                 this.units.push({
                     id: `atk_${index}`,
+                    bushoId: assign.busho.id,
+                    name: assign.busho.name,
+                    isAttacker: true,
+                    isPlayer: unitIsPlayer,
+                    isReinforcement: isReinf,
+                    isGeneral: index === 0,
+                    x: atkX,
+                    y: deployY, // ★ココを「yPositions[index % 5]」から「deployY」に書き換える！
+                    direction: isAtkPlayer ? 1 : 4,
                     bushoId: assign.busho.id,
                     name: assign.busho.name,
                     isAttacker: true,
@@ -163,8 +250,28 @@ class FieldWarManager {
                     unitIsPlayer = (Number(warState.defReinforcement.castle.ownerClan) === pid);
                 }
 
+                // ↓↓↓ここから書き足す↓↓↓
+                let deployY;
+                if (isReinf) {
+                    deployY = defAllyYs[defAllyCount % defAllyYs.length];
+                    defAllyCount++;
+                } else {
+                    deployY = defMainYs[defMainCount % defMainYs.length];
+                    defMainCount++;
+                }
+                // ↑↑↑ここまで書き足す↑↑↑
+
                 this.units.push({
                     id: `def_${index}`,
+                    bushoId: assign.busho.id,
+                    name: assign.busho.name,
+                    isAttacker: false,
+                    isPlayer: unitIsPlayer,
+                    isReinforcement: isReinf,
+                    isGeneral: index === 0,
+                    x: defX,
+                    y: deployY, // ★ココを「yPositions[index % 5]」から「deployY」に書き換える！
+                    direction: isDefPlayer ? 1 : 4,
                     bushoId: assign.busho.id,
                     name: assign.busho.name,
                     isAttacker: false,
@@ -212,7 +319,7 @@ class FieldWarManager {
                                         isPlayer: false, 
                                         isGeneral: false,
                                         x: defX, 
-                                        y: yPositions[this.units.length % 5], 
+                                        y: defAllyYs[defAllyCount % defAllyYs.length], // ←★ここが新しくなりました！
                                         direction: isDefPlayer ? 1 : 4,
                                         mobility: 4, 
                                         ap: 4,
@@ -222,6 +329,7 @@ class FieldWarManager {
                                         hasActionDone: false,
                                         hasMoved: false
                                     });
+                                    defAllyCount++; // ←★ここに「数え棒」を新しく書き足しました！
                                     this.game.ui.log(`【国衆援軍】${bestBusho.name}率いる国人衆が防衛側の援軍として駆けつけました！`);
                                 }
                             }
