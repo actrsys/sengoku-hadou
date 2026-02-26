@@ -1495,7 +1495,6 @@ class UIManager {
                 }
             });
             
-            const rem = totalSoldiers - sum;
             remainEl.innerHTML = `${rem} <span style="font-size:0.8rem; color:#333; margin-left: 10px;">(騎馬残:${Math.max(0, totalHorses - usedHorses)} 鉄砲残:${Math.max(0, totalGuns - usedGuns)})</span>`;
             
             if (rem === 0) {
