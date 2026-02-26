@@ -2013,15 +2013,17 @@ class UIManager {
             }
         };
 
-        // 一番上の黒いバーとタイトルの文字を入れます
         setTxt('war-date-info', `${this.game.year}年 ${this.game.month}月`);
         const maxRounds = window.WarParams?.Military?.WarMaxRounds || 10;
         setTxt('war-turn-info', `残り ${Math.max(0, maxRounds - s.round + 1)}ターン`);
         setTxt('war-def-wall-info', `城防御 ${s.defender.defense}`);
         setTxt('war-title-name', `${s.defender.name} 攻防戦`);
 
-        // 攻撃軍の情報を入れます
-        setTxt('war-atk-name', s.attacker.name);
+        // ★変更：攻撃軍の名前を「大名家（クラン名）」にします
+        const atkClan = this.game.clans.find(c => c.id === s.attacker.ownerClan);
+        const atkName = s.attacker.isKunishu ? s.attacker.name : (atkClan ? atkClan.name : "不明な勢力");
+        setTxt('war-atk-name', atkName);
+        
         setTxt('war-atk-busho', s.atkBushos[0].name);
         setTxt('war-atk-soldier', s.attacker.soldiers);
         setTxt('war-atk-morale', s.attacker.morale);
@@ -2029,37 +2031,77 @@ class UIManager {
         setTxt('war-atk-rice', s.attacker.rice); 
         updateFace('war-atk-face', s.atkBushos[0]);
         
-        // 守備軍の情報を入れます
-        setTxt('war-def-name', s.defender.name);
+        // ★変更：守備軍の名前も「大名家（クラン名）」にします
+        const defClan = this.game.clans.find(c => c.id === s.defender.ownerClan);
+        const defName = s.defender.isKunishu ? s.defender.name : (defClan ? defClan.name : "不明な勢力");
+        setTxt('war-def-name', defName);
+        
         setTxt('war-def-busho', s.defBusho.name);
         setTxt('war-def-soldier', s.defender.soldiers);
         setTxt('war-def-morale', s.defender.morale);
         setTxt('war-def-training', s.defender.training);
         setTxt('war-def-rice', s.defender.rice); 
         updateFace('war-def-face', s.defBusho);
-
-        // ※「手番」の表示は今回画面から消したので、内部だけでの処理になります
     }
 
     renderWarControls(isAtkTurn) {
         if (!this.warControls) return;
-        this.warControls.innerHTML = '';
         
-        const commands = this.game.warManager.getAvailableCommands(isAtkTurn);
-
-        if (commands.length === 0) {
-            this.warControls.classList.add('disabled-area');
-            return;
+        const s = this.game.warManager.state;
+        const pid = Number(this.game.playerClanId);
+        
+        // 自分が攻撃側か守備側かを判定
+        const amIAttacker = (Number(s.attacker.ownerClan) === pid);
+        const amIDefender = (Number(s.defender.ownerClan) === pid);
+        
+        // 今がプレイヤーの操作する番かどうか
+        const isMyTurn = (isAtkTurn && amIAttacker) || (!isAtkTurn && amIDefender);
+        
+        // ★変更：自分の番じゃなくてもコマンドを組み立てて画面に出すようにしました
+        let options = [];
+        if (amIAttacker || (isAtkTurn && !amIDefender)) {
+            // 自分が攻撃側（または完全観戦中）なら攻撃コマンド
+            options = [
+                { label: "突撃", type: "charge" }, { label: "斉射", type: "bow" }, { label: "城攻め", type: "siege" },
+                { label: "火計", type: "fire" }, { label: "謀略", type: "scheme" }, { label: "撤退", type: "retreat" }
+            ];
         } else {
-            this.warControls.classList.remove('disabled-area');
+            // 自分が守備側なら守備コマンド
+            options = [
+                { label: "突撃", type: "def_charge" }, { label: "斉射", type: "def_bow" }, { label: "籠城", type: "def_attack" },
+                { label: "謀略", type: "scheme" }, { label: "補修", type: "repair_setup" }
+            ];
+            if (this.game.castles.some(c => c.ownerClan === s.defender.ownerClan && c.id !== s.defender.id && GameSystem.isReachable(this.game, s.defender, c, s.defender.ownerClan))) {
+                options.push({ label: "撤退", type: "retreat" });
+            }
         }
 
-        commands.forEach(cmd => {
+        // コマンドボタンを画面に作ります（消さずに残します）
+        this.warControls.innerHTML = '';
+        options.forEach(cmd => {
             const btn = document.createElement('button');
             btn.textContent = cmd.label;
-            btn.onclick = () => this.game.warManager.execWarCmd(cmd.type);
+            btn.onclick = () => {
+                // 自分の番の時だけボタンが効くようにします
+                if(isMyTurn) this.game.warManager.execWarCmd(cmd.type);
+            };
             this.warControls.appendChild(btn);
         });
+
+        // ★追加：自分の番じゃない時は、ボタンの上に半透明の黒い膜（思考中ガード）をかぶせます！
+        const guard = document.getElementById('war-ai-guard');
+        if (!isMyTurn) {
+            this.warControls.classList.add('disabled-area');
+            if (guard) {
+                guard.classList.remove('hidden');
+                const textEl = document.getElementById('war-ai-guard-text');
+                if (textEl) textEl.textContent = isAtkTurn ? "攻撃軍 思考中..." : "守備軍 思考中...";
+            }
+        } else {
+            // 自分の番が回ってきたら膜を取り除きます
+            this.warControls.classList.remove('disabled-area');
+            if (guard) guard.classList.add('hidden');
+        }
     }
 
     showRetreatSelector(castle, candidates, onSelect) {
