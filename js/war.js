@@ -1170,6 +1170,11 @@ class WarManager {
                 else { const srcC = this.game.getCastle(s.sourceCastle.id); if (srcC) srcC.rice = Math.min(99999, srcC.rice + s.attacker.rice); }
             }
 
+            // ★修正：攻撃軍が城に入って「兵士数」が勘違いされる前に、捕縛の処理を行います！
+            if (!isRetreat && attackerWon) {
+                this.processCaptures(s.defender, s.attacker.ownerClan);
+            }
+
             if (isRetreat && retreatTargetId) {
                 const targetC = this.game.getCastle(retreatTargetId);
                 if (targetC) {
@@ -1244,7 +1249,6 @@ class WarManager {
                 // ★書き足しここまで
 
                 s.attacker.training = Math.min(120, s.attacker.training + (window.WarParams.War.WinStatIncrease || 5)); s.attacker.morale = Math.min(120, s.attacker.morale + (window.WarParams.War.WinStatIncrease || 5)); 
-                this.processCaptures(s.defender, s.attacker.ownerClan);
                 
                 const maxCharm = Math.max(...s.atkBushos.map(b => b.charm));
                 const subCharm = s.atkBushos.reduce((acc, b) => acc + b.charm, 0) - maxCharm;
