@@ -1222,6 +1222,11 @@ class WarManager {
                 });
                 this.game.updateCastleLord(srcC); this.game.updateCastleLord(s.defender);
                 
+                // ★書き足し１：守備側が撤退した時の履歴ログ
+                const atkClanData1 = this.game.clans.find(c => c.id === s.attacker.ownerClan);
+                const atkArmyName1 = s.attacker.isKunishu ? s.attacker.name : (atkClanData1 ? atkClanData1.getArmyName() : "敵軍");
+                this.game.ui.log(`【合戦結果】守備軍の撤退により、${atkArmyName1}が${s.defender.name}を占領しました。`);
+                
                 if (s.isPlayerInvolved) {
                     this.game.ui.showResultModal(`撤退しました。\n${retreatTargetId ? '部隊は移動しました。' : '部隊は解散しました。'}`, finishWarProcess);
                 } else {
@@ -1274,11 +1279,25 @@ class WarManager {
                 if (isAtkPlayer) resultMsg = isRetreat ? `${enemyName}は城を捨てて敗走しました！ 城を占領します！` : `${s.defender.name}を制圧しました！`;
                 else if (isDefPlayer) resultMsg = isRetreat ? `${s.defender.name}を放棄し、後退します……` : `${s.defender.name}が陥落しました。敵軍がなだれ込んできます……`;
                 else resultMsg = `${s.defender.name}が制圧されました！\n勝者: ${s.attacker.name}`;
+                // ★書き足し２：攻撃側が勝利して制圧した時の履歴ログ
+                const atkClanData2 = this.game.clans.find(c => c.id === s.attacker.ownerClan);
+                const atkArmyName2 = s.attacker.isKunishu ? s.attacker.name : (atkClanData2 ? atkClanData2.getArmyName() : "敵軍");
+                this.game.ui.log(`【合戦結果】${atkArmyName2}が${s.defender.name}を制圧しました。`);
             } else { 
                 s.defender.immunityUntil = this.game.getCurrentTurnId(); 
                 if (isAtkPlayer) resultMsg = isRetreat ? `${s.defender.name}からの撤退を決定しました……` : `${s.defender.name}を落としきることができませんでした……`;
                 else if (isDefPlayer) resultMsg = isRetreat ? `${enemyName}は攻略を諦め、撤退していきました！` : `${s.defender.name}を守り抜きました！`;
                 else resultMsg = isRetreat ? `${s.defender.name}から撤退しました……` : `${s.defender.name}を守り抜きました！\n敗者: ${s.attacker.name}`;
+                // ★書き足し３：攻撃側が負けた（または撤退した）時の履歴ログ
+                const defClanData = this.game.clans.find(c => c.id === s.defender.ownerClan);
+                const defArmyName = s.defender.isKunishu ? s.defender.name : (defClanData ? defClanData.getArmyName() : "守備軍");
+                if (isRetreat) {
+                     const atkClanData3 = this.game.clans.find(c => c.id === s.attacker.ownerClan);
+                     const atkArmyName3 = s.attacker.isKunishu ? s.attacker.name : (atkClanData3 ? atkClanData3.getArmyName() : "攻撃軍");
+                     this.game.ui.log(`【合戦結果】${atkArmyName3}は${s.defender.name}の攻略を諦め、撤退しました。`);
+                } else {
+                     this.game.ui.log(`【合戦結果】${defArmyName}が${s.defender.name}の防衛に成功しました。`);
+                }
             } 
 
             if (s.isPlayerInvolved) this.game.ui.showResultModal(resultMsg, finishWarProcess);
