@@ -23,65 +23,68 @@ class FieldWarManager {
         this.reachable = null;
         this.previewTarget = null;
         this.turnBackup = null; 
-        // ↓↓↓ここから書き足す↓↓↓
-        // 画面の大きさが変わったときに、マップの大きさを自動でピッタリにするおまじないです
         window.addEventListener('resize', () => {
-            if (this.active) { // 野戦をしている時だけ動かします
+            if (this.active) {
                 this.adjustMapScale();
             }
         });
-        // ↑↑↑ここまで書き足す↑↑↑
-    } // ← この「}」が constructor の終わりです
+    }
     
-    // ↓↓↓ここから新しい魔法を書き足す↓↓↓
     /**
-     * マップを緑の画面に合わせてギリギリまで大きくする魔法です
+     * マップを緑の画面に合わせてギリギリまで大きくする魔法（完全版）
      */
     adjustMapScale() {
-        // スマホ画面（横幅が768ピクセル未満）なら、何もしません（今のままにします）
+        const mapArea = document.getElementById('fw-map');
+        const scrollArea = document.getElementById('fw-map-scroll');
+
+        if (!mapArea || !scrollArea) return;
+
+        // スマホ画面なら、魔法を解除して普通の配置に戻します
         if (window.innerWidth < 768) {
-            document.getElementById('fw-map').style.transform = 'scale(1)';
+            mapArea.style.transform = 'scale(1)';
+            mapArea.style.transformOrigin = 'top left';
+            mapArea.style.margin = '0';
+            scrollArea.style.display = 'block';
             return;
         }
 
-        // 緑色の枠（表示できる広さ）の要素を取ってきます
-        const scrollArea = document.getElementById('fw-map-scroll');
-        // マップ本体（コマが乗っている板）の要素を取ってきます
-        const mapArea = document.getElementById('fw-map');
-
-        // もしどちらかが見つからなければ、魔法は失敗なのでストップします
-        if (!scrollArea || !mapArea) return;
-
-        // 緑の枠の広さを測ります（端っこがぶつからないよう、少し余裕を持たせるため20引いています）
-        const availableWidth = scrollArea.clientWidth - 20; 
+        // マップの本来の広さを測ります（万が一取れない時のために予備も用意）
+        const mapWidth = parseFloat(mapArea.style.width) || mapArea.offsetWidth;
+        const mapHeight = parseFloat(mapArea.style.height) || mapArea.offsetHeight;
+        
+        // スクロール枠の広さを測ります（端がぶつからないように20引きます）
+        const availableWidth = scrollArea.clientWidth - 20;
         const availableHeight = scrollArea.clientHeight - 20;
 
-        // マップ本来の広さを測ります
-        const mapWidth = mapArea.offsetWidth;
-        const mapHeight = mapArea.offsetHeight;
+        if (!mapWidth || !mapHeight) return;
 
-        // もしマップの広さが0だったら計算できないのでストップします
-        if (mapWidth === 0 || mapHeight === 0) return;
+        // 縦と横、どちらかはみ出さない「小さい方」の倍率を選びます
+        let scale = Math.min(availableWidth / mapWidth, availableHeight / mapHeight);
 
-        // 緑の枠に対して、マップを何倍まで大きくできるか、縦と横でそれぞれ計算します
-        const scaleX = availableWidth / mapWidth;
-        const scaleY = availableHeight / mapHeight;
-
-        // 縦と横、どちらかはみ出さないように「小さい方」の倍率を選びます
-        let scale = Math.min(scaleX, scaleY);
-
-        // 今の大きさ（1倍）を最低保証にします。これ以上小さくはしません！
-        if (scale < 1.0) {
-            scale = 1.0;
+        if (scale <= 1.0) {
+            // 【ウインドウが小さい時】
+            // 最低保証の1倍にして、スクロールできるように左上にピッタリ寄せます
+            mapArea.style.transformOrigin = 'top left';
+            mapArea.style.transform = 'scale(1)';
+            mapArea.style.margin = '0';
+            
+            // 緑の枠を普通のスクロール状態に戻します
+            scrollArea.style.display = 'block';
+        } else {
+            // 【ウインドウが大きい時】
+            // ギリギリまで拡大します
+            mapArea.style.transformOrigin = 'center center';
+            mapArea.style.transform = `scale(${scale})`;
+            mapArea.style.margin = '0';
+            
+            // 緑の枠に「Flexbox（フレックスボックス）」という仕組みを使って、
+            // 拡大したマップを画面のド真ん中にガッチリ固定します
+            scrollArea.style.display = 'flex';
+            scrollArea.style.justifyContent = 'center';
+            scrollArea.style.alignItems = 'center';
         }
-
-        // マップの大きさを変える魔法をかけます！えいっ！
-        mapArea.style.transform = `scale(${scale})`;
-        mapArea.style.transformOrigin = 'center center';
     }
-    // ↑↑↑ここまで書き足す↑↑↑
     
-
     startFieldWar(warState, onComplete) {
         this.warState = warState;
         this.onComplete = onComplete;
