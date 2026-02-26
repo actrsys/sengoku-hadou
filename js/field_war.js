@@ -138,7 +138,7 @@ class FieldWarManager {
 
         // ↓↓↓ここから差し替え↓↓↓
         // ★修正: HEXサイズやマップの広さが変わっても対応できるようにX座標を自動計算
-        let leftX = Math.max(1, Math.floor(this.cols * 0.15));
+        let leftX = Math.max(1, Math.floor(this.cols * 0.05)); // ←★ココを 0.05 に変えました！
         let rightX = this.cols - 1 - leftX;
         
         // 奇数・偶数のズレを防ぐため、X座標を奇数に統一（従来の3, 17と同じになるように調整）
@@ -192,16 +192,20 @@ class FieldWarManager {
                     unitIsPlayer = (Number(warState.reinforcement.castle.ownerClan) === pid);
                 }
 
-                // ↓↓↓ここから書き足す↓↓↓
+                // ↓↓↓ここから差し替え↓↓↓
                 let deployY;
+                let deployDir; // ★新しく「向き」を決める箱を用意します
                 if (isReinf) {
                     deployY = atkAllyYs[atkAllyCount % atkAllyYs.length];
+                    // 援軍（友軍）の場合：左側(下)なら右上向き(1)、右側(上)なら左下向き(4)
+                    deployDir = (atkX === leftX) ? 1 : 4;
                     atkAllyCount++;
                 } else {
                     deployY = atkMainYs[atkMainCount % atkMainYs.length];
+                    // メイン軍の場合：左側(上)なら右下向き(2)、右側(下)なら左上向き(5)
+                    deployDir = (atkX === leftX) ? 2 : 5;
                     atkMainCount++;
                 }
-                // ↑↑↑ここまで書き足す↑↑↑
 
                 this.units.push({
                     id: `atk_${index}`,
@@ -213,7 +217,8 @@ class FieldWarManager {
                     isGeneral: index === 0,
                     x: atkX,
                     y: deployY,
-                    direction: isAtkPlayer ? 1 : 4,
+                    direction: deployDir, // ★古い向きの魔法を消して、新しい箱に書き換えました！
+                // ↑↑↑ここまで差し替え↑↑↑
                     mobility: mobility, 
                     ap: mobility,
                     soldiers: assign.soldiers,
@@ -241,16 +246,20 @@ class FieldWarManager {
                     unitIsPlayer = (Number(warState.defReinforcement.castle.ownerClan) === pid);
                 }
 
-                // ↓↓↓ここから書き足す↓↓↓
+                // ↓↓↓ここから差し替え↓↓↓
                 let deployY;
+                let deployDir; // ★新しく「向き」を決める箱を用意します
                 if (isReinf) {
                     deployY = defAllyYs[defAllyCount % defAllyYs.length];
+                    // 援軍（友軍）の場合：左側(下)なら右上向き(1)、右側(上)なら左下向き(4)
+                    deployDir = (defX === leftX) ? 1 : 4;
                     defAllyCount++;
                 } else {
                     deployY = defMainYs[defMainCount % defMainYs.length];
+                    // メイン軍の場合：左側(上)なら右下向き(2)、右側(下)なら左上向き(5)
+                    deployDir = (defX === leftX) ? 2 : 5;
                     defMainCount++;
                 }
-                // ↑↑↑ここまで書き足す↑↑↑
 
                 this.units.push({
                     id: `def_${index}`,
@@ -262,7 +271,8 @@ class FieldWarManager {
                     isGeneral: index === 0,
                     x: defX,
                     y: deployY,
-                    direction: isDefPlayer ? 1 : 4,
+                    direction: deployDir, // ★古い向きの魔法を消して、新しい箱に書き換えました！
+                // ↑↑↑ここまで差し替え↑↑↑
                     mobility: mobility, 
                     ap: mobility,
                     soldiers: assign.soldiers,
@@ -295,14 +305,16 @@ class FieldWarManager {
                                     this.units.push({
                                         id: 'k_' + bestBusho.id,
                                         bushoId: bestBusho.id,
-                                        kunishuId: k.id,
+                         
+                                        y: defAllyYs[defAllyCount % defAllyYs.length], 
+                                        direction: isDefPlayer ? 1 : 4, // ←★ココを直します！               kunishuId: k.id,
                                         name: bestBusho.name,
                                         isAttacker: false,
                                         isPlayer: false, 
                                         isGeneral: false,
                                         x: defX, 
-                                        y: defAllyYs[defAllyCount % defAllyYs.length], // ←★ここが新しくなりました！
-                                        direction: isDefPlayer ? 1 : 4,
+                                        y: defAllyYs[defAllyCount % defAllyYs.length], 
+                                        direction: (defX === leftX) ? 1 : 4, // ←★ココを書き換えました！
                                         mobility: 4, 
                                         ap: 4,
                                         soldiers: uSoldiers,
