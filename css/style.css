@@ -1044,21 +1044,22 @@ img {
 /* ② PC版（横幅768px以上）の特別ルール（ログは右） */
 @media (min-width: 768px) {
     .responsive-war-layout {
-        flex-direction: row; /* ★全体を「横並び」にする魔法です！ */
+        flex-direction: row; 
     }
     
     .responsive-war-left {
-        flex: 7; /* 左側（赤青＋コマンド）を全体の7割の広さに */
-        border-right: 2px solid #333; /* ログとの間に縦線を引く */
+        flex: 1; /* ★魔法変更：左側は「ログが取った以外の残りのスペース全部」を使います！ */
+        border-right: 2px solid #333; 
     }
     
     /* 以前の#war-logの設定を上書きして、右側に縦長く配置します */
     #war-log.responsive-war-log {
-        flex: 3 !important; /* 右側のログを全体の3割の広さに */
-        height: 100% !important; /* 高さを親の枠いっぱいに！ */
+        flex: 0 0 220px !important; /* ★魔法変更：右側のログは「絶対に220pxの幅」から変わらないようにします！ */
+        width: 220px !important; /* ★念押しの幅指定 */
+        height: 100% !important; 
         min-height: 0 !important;
-        border-top: none !important; /* 上の横線を消す */
+        border-top: none !important; 
         margin-bottom: 0 !important;
-        padding: 10px !important; /* 少し余白を広くして読みやすく */
+        padding: 10px !important; 
     }
 }
