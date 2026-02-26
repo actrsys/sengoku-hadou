@@ -1020,3 +1020,45 @@ img {
         font-size: 1.15rem !important;
     }
 }
+/* =========================================================
+   PC版でログを右側に配置する魔法
+   ========================================================= */
+
+/* ① スマホ時の基本ルール（今まで通り、ログは下） */
+.responsive-war-layout {
+    display: flex;
+    flex-direction: column;
+}
+
+.responsive-war-left {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    overflow: hidden;
+}
+
+.responsive-war-log {
+    border-top: 2px solid #333;
+}
+
+/* ② PC版（横幅768px以上）の特別ルール（ログは右） */
+@media (min-width: 768px) {
+    .responsive-war-layout {
+        flex-direction: row; /* ★全体を「横並び」にする魔法です！ */
+    }
+    
+    .responsive-war-left {
+        flex: 7; /* 左側（赤青＋コマンド）を全体の7割の広さに */
+        border-right: 2px solid #333; /* ログとの間に縦線を引く */
+    }
+    
+    /* 以前の#war-logの設定を上書きして、右側に縦長く配置します */
+    #war-log.responsive-war-log {
+        flex: 3 !important; /* 右側のログを全体の3割の広さに */
+        height: 100% !important; /* 高さを親の枠いっぱいに！ */
+        min-height: 0 !important;
+        border-top: none !important; /* 上の横線を消す */
+        margin-bottom: 0 !important;
+        padding: 10px !important; /* 少し余白を広くして読みやすく */
+    }
+}
