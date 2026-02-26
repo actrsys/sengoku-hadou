@@ -196,53 +196,55 @@
             
             <h2 class="war-title" id="war-title-name" style="margin:0; padding:10px 0; text-align:center; border-bottom:2px solid #333; font-size:1.5rem; font-weight:normal; background:#fff;"></h2>
 
-            <div class="war-screen" style="flex:1; display:flex; flex-direction:column; padding:0; background:#fff; border-radius:0; overflow:hidden;">
+            <div class="war-screen responsive-war-layout" style="flex:1; display:flex; flex-direction:column; padding:0; background:#fff; border-radius:0; overflow:hidden;">
                 
-                <div class="war-visual responsive-war-visual">
-                    
-                    <div class="army-box attacker responsive-army-box" style="background:#ef5350;">
-                        <h3 class="army-title responsive-army-title">攻撃軍 <span id="war-atk-name"></span></h3>
+                <div class="responsive-war-left" style="display:flex; flex-direction:column; flex:1; overflow:hidden;">
+                    <div class="war-visual responsive-war-visual">
                         
-                        <div class="responsive-army-content">
-                            <img id="war-atk-face" class="war-face hidden responsive-war-face" src="" alt="">
+                        <div class="army-box attacker responsive-army-box" style="background:#ef5350;">
+                            <h3 class="army-title responsive-army-title">攻撃軍 <span id="war-atk-name"></span></h3>
                             
-                            <div class="responsive-army-stats">
-                                <div class="stat-busho"><span id="war-atk-busho"></span> 軍</div>
-                                <div class="stat-row"><span>兵士</span> <span><span id="war-atk-soldier" class="stat-val-large"></span>人</span></div>
-                                <div class="stat-row"><span>士気</span> <span id="war-atk-morale"></span></div>
-                                <div class="stat-row"><span>訓練</span> <span id="war-atk-training"></span></div>
-                                <div class="stat-row"><span>兵糧</span> <span id="war-atk-rice"></span></div>
+                            <div class="responsive-army-content">
+                                <img id="war-atk-face" class="war-face hidden responsive-war-face" src="" alt="">
+                                
+                                <div class="responsive-army-stats">
+                                    <div class="stat-busho"><span id="war-atk-busho"></span> 軍</div>
+                                    <div class="stat-row"><span>兵士</span> <span><span id="war-atk-soldier" class="stat-val-large"></span>人</span></div>
+                                    <div class="stat-row"><span>士気</span> <span id="war-atk-morale"></span></div>
+                                    <div class="stat-row"><span>訓練</span> <span id="war-atk-training"></span></div>
+                                    <div class="stat-row"><span>兵糧</span> <span id="war-atk-rice"></span></div>
+                                </div>
                             </div>
                         </div>
-                    </div>
 
-                    <div class="army-box defender responsive-army-box" style="background:#42a5f5;">
-                        <h3 class="army-title responsive-army-title">守備軍 <span id="war-def-name"></span></h3>
-                        
-                        <div class="responsive-army-content">
-                            <img id="war-def-face" class="war-face hidden responsive-war-face" src="" alt="">
+                        <div class="army-box defender responsive-army-box" style="background:#42a5f5;">
+                            <h3 class="army-title responsive-army-title">守備軍 <span id="war-def-name"></span></h3>
                             
-                            <div class="responsive-army-stats">
-                                <div class="stat-busho"><span id="war-def-busho"></span> 軍</div>
-                                <div class="stat-row"><span>兵士</span> <span><span id="war-def-soldier" class="stat-val-large"></span>人</span></div>
-                                <div class="stat-row"><span>訓練</span> <span id="war-def-training"></span></div>
-                                <div class="stat-row"><span>士気</span> <span id="war-def-morale"></span></div>
-                                <div class="stat-row"><span>兵糧</span> <span id="war-def-rice"></span></div>
+                            <div class="responsive-army-content">
+                                <img id="war-def-face" class="war-face hidden responsive-war-face" src="" alt="">
+                                
+                                <div class="responsive-army-stats">
+                                    <div class="stat-busho"><span id="war-def-busho"></span> 軍</div>
+                                    <div class="stat-row"><span>兵士</span> <span><span id="war-def-soldier" class="stat-val-large"></span>人</span></div>
+                                    <div class="stat-row"><span>訓練</span> <span id="war-def-training"></span></div>
+                                    <div class="stat-row"><span>士気</span> <span id="war-def-morale"></span></div>
+                                    <div class="stat-row"><span>兵糧</span> <span id="war-def-rice"></span></div>
+                                </div>
                             </div>
+                        </div>
+                    </div>
+                    
+                    <div style="position: relative; flex-shrink: 0;">
+                        <div id="war-controls" class="war-controls-area disabled-area" style="padding:10px; background:#fff; grid-template-columns: repeat(3, 1fr); gap:10px; border-top:2px solid #333;"></div>
+                        
+                        <div id="war-ai-guard" class="hidden" style="position: absolute; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); color:#fff; display:flex; flex-direction:column; justify-content:center; align-items:center; font-size:1.5rem; font-weight:bold; z-index:10;">
+                            <div class="loading-spinner" style="margin-bottom:10px;"></div>
+                            <span id="war-ai-guard-text">敵軍思考中...</span>
                         </div>
                     </div>
                 </div>
                 
-                <div style="position: relative;">
-                    <div id="war-controls" class="war-controls-area disabled-area" style="padding:10px; background:#fff; grid-template-columns: repeat(3, 1fr); gap:10px; border-top:2px solid #333;"></div>
-                    
-                    <div id="war-ai-guard" class="hidden" style="position: absolute; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); color:#fff; display:flex; flex-direction:column; justify-content:center; align-items:center; font-size:1.5rem; font-weight:bold; z-index:10;">
-                        <div class="loading-spinner" style="margin-bottom:10px;"></div>
-                        <span id="war-ai-guard-text">敵軍思考中...</span>
-                    </div>
-                </div>
-                
-                <div id="war-log" style="height: 60px !important; overflow-y: auto; background: #fff; border-top: 2px solid #333; padding: 5px; font-size: 0.85rem; margin-top: 0; min-height:60px !important; color:#333; text-align:left;"></div>
+                <div id="war-log" class="responsive-war-log" style="overflow-y: auto; background: #fff; padding: 5px; font-size: 0.85rem; color:#333; text-align:left;"></div>
             </div>
         </div>
     </div>
