@@ -1457,17 +1457,42 @@ class UIManager {
                 }
             }
 
-            // UIへの反映と再計算
+            // 各武将の兵士数合計を計算
+            sum = currentData.reduce((s, d) => s + d.count, 0);
+            usedHorses = currentData.filter(d => d.type === 'kiba').reduce((s, d) => s + d.count, 0);
+            usedGuns = currentData.filter(d => d.type === 'teppo').reduce((s, d) => s + d.count, 0);
+            
+            const rem = totalSoldiers - sum;
+
+            // UIへの反映と、スライダーの最大値（Max）の動的更新
             currentData.forEach(d => {
                 const range = document.getElementById(`div-range-${d.id}`);
                 const num = document.getElementById(`div-num-${d.id}`);
-                if (range && num && parseInt(num.value) !== d.count) {
+                const maxLabel = document.getElementById(`div-max-label-${d.id}`);
+                if (!range || !num) return;
+
+                // スライダーを動かせる限界 ＝ 今の値 ＋ 未分配の兵士
+                let maxAllowed = d.count + rem;
+                
+                // 騎馬や鉄砲の場合は、全体の残り数も限界に影響します
+                if (d.type === 'kiba') {
+                    maxAllowed = Math.min(maxAllowed, d.count + Math.max(0, totalHorses - usedHorses));
+                } else if (d.type === 'teppo') {
+                    maxAllowed = Math.min(maxAllowed, d.count + Math.max(0, totalGuns - usedGuns));
+                }
+                
+                // 兵士は最低1人なので、限界も最低1です
+                if (maxAllowed < 1) maxAllowed = 1;
+
+                // スライダーの限界値を更新
+                range.max = maxAllowed;
+                num.max = maxAllowed;
+                if (maxLabel) maxLabel.textContent = maxAllowed;
+
+                if (parseInt(num.value) !== d.count) {
                     num.value = d.count;
                     range.value = d.count;
                 }
-                sum += d.count;
-                if (d.type === 'kiba') usedHorses += d.count;
-                if (d.type === 'teppo') usedGuns += d.count;
             });
             
             const rem = totalSoldiers - sum;
@@ -1494,16 +1519,22 @@ class UIManager {
             
             div.innerHTML = `
                 <div style="font-weight:bold; margin-bottom:5px;">${b.name} <small>(統:${b.leadership} 武:${b.strength} 智:${b.intelligence})</small></div>
-                <div style="margin-bottom:5px;">
+                <div style="margin-bottom:5px; display:flex; justify-content:space-between; align-items:center;">
                     <select id="div-type-${b.id}" style="padding:4px; font-size:0.9rem;">
                         <option value="ashigaru">足軽</option>
                         <option value="kiba">騎馬</option>
                         <option value="teppo">鉄砲</option>
                     </select>
+                    <span style="font-size:0.8rem; color:#555;">限界: <span id="div-max-label-${b.id}">${totalSoldiers}</span></span>
                 </div>
                 <div class="qty-control">
                     <input type="range" id="div-range-${b.id}" min="1" max="${totalSoldiers}" value="${assignments[index].count}">
                     <input type="number" id="div-num-${b.id}" min="1" max="${totalSoldiers}" value="${assignments[index].count}">
+                </div>
+                <div class="qty-shortcuts">
+                    <button class="qty-shortcut-btn" id="div-btn-min-${b.id}">最小</button>
+                    <button class="qty-shortcut-btn" id="div-btn-half-${b.id}">半分</button>
+                    <button class="qty-shortcut-btn" id="div-btn-max-${b.id}">最大</button>
                 </div>
             `;
             listEl.appendChild(div);
@@ -1515,13 +1546,9 @@ class UIManager {
             const onInput = (val) => {
                 let v = parseInt(val) || 0;
                 
-                let otherSum = 0;
-                listEl.querySelectorAll('input[type="number"]').forEach(inp => {
-                    if (inp.id !== `div-num-${b.id}`) otherSum += parseInt(inp.value) || 0;
-                });
-                
-                let maxAllowed = Math.max(1, totalSoldiers - otherSum);
-                if (v > maxAllowed) v = maxAllowed;
+                // 動的に変わった今の限界値を基準にします
+                let currentMax = parseInt(range.max) || totalSoldiers;
+                if (v > currentMax) v = currentMax;
                 if (v < 1) v = 1;
                 
                 range.value = v;
@@ -1531,6 +1558,15 @@ class UIManager {
 
             range.oninput = (e) => onInput(e.target.value);
             num.oninput = (e) => onInput(e.target.value);
+
+            // 追加したショートカットボタンの動き
+            const btnMin = div.querySelector(`#div-btn-min-${b.id}`);
+            const btnHalf = div.querySelector(`#div-btn-half-${b.id}`);
+            const btnMax = div.querySelector(`#div-btn-max-${b.id}`);
+            
+            btnMin.onclick = () => onInput(1);
+            btnHalf.onclick = () => onInput(Math.floor((1 + parseInt(range.max)) / 2));
+            btnMax.onclick = () => onInput(parseInt(range.max));
             num.onblur = (e) => {
                 if(e.target.value === "" || isNaN(parseInt(e.target.value))) {
                     onInput(1);
@@ -1615,17 +1651,45 @@ class UIManager {
         const createSlider = (label, id, max, currentVal, minVal = 0) => { 
             const wrap = document.createElement('div'); 
             wrap.className = 'qty-row'; 
-            wrap.innerHTML = `<label>${label} (Max: ${max})</label><div class="qty-control"><input type="range" id="range-${id}" min="${minVal}" max="${max}" value="${currentVal}"><input type="number" id="num-${id}" min="${minVal}" max="${max}" value="${currentVal}"></div>`; 
+            wrap.innerHTML = `
+                <label>${label} (Max: <span id="max-label-${id}">${max}</span>)</label>
+                <div class="qty-control">
+                    <input type="range" id="range-${id}" min="${minVal}" max="${max}" value="${currentVal}">
+                    <input type="number" id="num-${id}" min="${minVal}" max="${max}" value="${currentVal}">
+                </div>
+                <div class="qty-shortcuts">
+                    <button class="qty-shortcut-btn" id="btn-min-${id}">最小</button>
+                    <button class="qty-shortcut-btn" id="btn-half-${id}">半分</button>
+                    <button class="qty-shortcut-btn" id="btn-max-${id}">最大</button>
+                </div>
+            `; 
+            
             const range = wrap.querySelector(`#range-${id}`); 
             const num = wrap.querySelector(`#num-${id}`); 
+
+            const setVal = (v) => {
+                let actualMax = parseInt(range.max);
+                if (v < minVal) v = minVal;
+                if (v > actualMax) v = actualMax;
+                range.value = v;
+                num.value = v;
+            };
+
+            wrap.querySelector(`#btn-min-${id}`).onclick = () => setVal(minVal);
+            wrap.querySelector(`#btn-half-${id}`).onclick = () => {
+                let actualMax = parseInt(range.max);
+                setVal(Math.floor((minVal + actualMax) / 2));
+            };
+            wrap.querySelector(`#btn-max-${id}`).onclick = () => setVal(parseInt(range.max));
 
             range.oninput = () => num.value = range.value; 
 
             num.oninput = () => {
+                let actualMax = parseInt(range.max);
                 let v = parseInt(num.value);
                 if (isNaN(v)) return; 
                 if (v < minVal) v = minVal;
-                if (v > max) v = max;
+                if (v > actualMax) v = actualMax;
                 if (num.value != v) num.value = v; 
                 range.value = v; 
             };
@@ -2053,18 +2117,36 @@ class UIManager {
 
         const wrap = document.createElement('div'); 
         wrap.className = 'qty-row'; 
-        wrap.innerHTML = `<label>持参金 (Max: ${maxGold})</label><div class="qty-control"><input type="range" id="range-reinf-gold" min="0" max="${maxGold}" value="0"><input type="number" id="num-reinf-gold" min="0" max="${maxGold}" value="0"></div>`; 
+        wrap.innerHTML = `
+            <label>持参金 (Max: ${maxGold})</label>
+            <div class="qty-control">
+                <input type="range" id="range-reinf-gold" min="0" max="${maxGold}" value="0">
+                <input type="number" id="num-reinf-gold" min="0" max="${maxGold}" value="0">
+            </div>
+            <div class="qty-shortcuts">
+                <button class="qty-shortcut-btn" id="btn-min-reinf">最小</button>
+                <button class="qty-shortcut-btn" id="btn-half-reinf">半分</button>
+                <button class="qty-shortcut-btn" id="btn-max-reinf">最大</button>
+            </div>
+        `; 
         this.quantityContainer.appendChild(wrap); 
 
         const range = wrap.querySelector(`#range-reinf-gold`); 
         const num = wrap.querySelector(`#num-reinf-gold`); 
+        
+        const setVal = (v) => {
+            if (v < 0) v = 0; if (v > maxGold) v = maxGold;
+            range.value = v; num.value = v;
+        };
+        wrap.querySelector('#btn-min-reinf').onclick = () => setVal(0);
+        wrap.querySelector('#btn-half-reinf').onclick = () => setVal(Math.floor(maxGold / 2));
+        wrap.querySelector('#btn-max-reinf').onclick = () => setVal(maxGold);
+
         range.oninput = () => num.value = range.value; 
         num.oninput = () => {
             let v = parseInt(num.value);
             if (isNaN(v)) return; 
-            if (v < 0) v = 0; if (v > maxGold) v = maxGold;
-            if (num.value != v) num.value = v; 
-            range.value = v; 
+            setVal(v);
         };
 
         this.quantityConfirmBtn.onclick = () => {
@@ -2149,17 +2231,35 @@ class UIManager {
 
         const wrap = document.createElement('div'); 
         wrap.className = 'qty-row'; 
-        wrap.innerHTML = `<label>持参金 (Max: ${maxGold})</label><div class="qty-control"><input type="range" id="range-def-gold" min="0" max="${maxGold}" value="0"><input type="number" id="num-def-gold" min="0" max="${maxGold}" value="0"></div>`; 
+        wrap.innerHTML = `
+            <label>持参金 (Max: ${maxGold})</label>
+            <div class="qty-control">
+                <input type="range" id="range-def-gold" min="0" max="${maxGold}" value="0">
+                <input type="number" id="num-def-gold" min="0" max="${maxGold}" value="0">
+            </div>
+            <div class="qty-shortcuts">
+                <button class="qty-shortcut-btn" id="btn-min-def">最小</button>
+                <button class="qty-shortcut-btn" id="btn-half-def">半分</button>
+                <button class="qty-shortcut-btn" id="btn-max-def">最大</button>
+            </div>
+        `; 
         this.quantityContainer.appendChild(wrap); 
 
         const range = wrap.querySelector(`#range-def-gold`); 
         const num = wrap.querySelector(`#num-def-gold`); 
+        
+        const setVal = (v) => {
+            if (v < 0) v = 0; if (v > maxGold) v = maxGold;
+            range.value = v; num.value = v;
+        };
+        wrap.querySelector('#btn-min-def').onclick = () => setVal(0);
+        wrap.querySelector('#btn-half-def').onclick = () => setVal(Math.floor(maxGold / 2));
+        wrap.querySelector('#btn-max-def').onclick = () => setVal(maxGold);
+
         range.oninput = () => num.value = range.value; 
         num.oninput = () => {
             let v = parseInt(num.value) || 0;
-            if (v < 0) v = 0; if (v > maxGold) v = maxGold;
-            if (num.value != v) num.value = v; 
-            range.value = v; 
+            setVal(v);
         };
 
         this.quantityConfirmBtn.onclick = () => {
