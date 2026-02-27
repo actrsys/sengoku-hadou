@@ -2015,8 +2015,6 @@ class UIManager {
 
         setTxt('war-date-info', `${this.game.year}年 ${this.game.month}月`);
         const maxRounds = window.WarParams?.Military?.WarMaxRounds || 10;
-        setTxt('war-date-info', `${this.game.year}年 ${this.game.month}月`);
-        const maxRounds = window.WarParams?.Military?.WarMaxRounds || 10;
         
         const turnEl = document.getElementById('war-turn-info');
         if (turnEl) turnEl.innerHTML = `残り <span style="color:#fdea60;">${Math.max(0, maxRounds - s.round + 1)}</span>ターン`;
