@@ -795,12 +795,12 @@ class UIManager {
         const scaleX = wrapper.clientWidth / mapW;
         const scaleY = wrapper.clientHeight / mapH;
         
-        // ★変更1：スマホ版の時は最小サイズをさらに小さくして、確実に入るようにします！
+        // ★変更1：余白を少し戻して（ズームを少し大きくして）画面にピッタリ合わせます
         let minScale = Math.min(scaleX, scaleY); 
         if (document.body.classList.contains('is-pc')) {
-            minScale *= 0.85; // PCは今まで通り少し余裕を持たせる
+            minScale *= 0.90; // PCは元々の丁度よかったサイズに戻します
         } else {
-            minScale *= 0.70; // スマホはさらに小さくして見切れを防ぐ！
+            minScale *= 0.82; // スマホは小さくしすぎたので、見切れないギリギリのサイズに調整します！
         }
         
         // ★変更2：最大サイズを計算します（スマホは1.0、PCはウィンドウサイズに合わせて現在の2倍くらいに！）
