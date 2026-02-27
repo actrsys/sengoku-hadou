@@ -680,7 +680,8 @@ class UIManager {
         let nonFactionCount = factions[0] ? factions[0].count : 0;
         
         // ★ 無派閥を右上に出し、表のヘッダーを作ります（改行をなくして1行に繋げます！）
-        let listHtml = `<div style="text-align:right; font-weight:bold; color:#555; font-size:0.9rem; margin-bottom:5px;">無派閥: ${nonFactionCount}名 </div><div class="faction-list-container"><div class="faction-list-header"><span>派閥主</span><span>武将数</span><span>性格</span><span>方針</span></div>`;
+        // ★変更：高さを文字サイズにピッタリ合わせ（line-height:1;）、右にほんの少し余白（margin-right:5px;）を追加しました！
+        let listHtml = `<div style="text-align:right; font-weight:bold; color:#555; font-size:0.9rem; margin-bottom:5px; margin-right:5px; line-height:1;">無派閥: ${nonFactionCount}名</div><div class="faction-list-container"><div class="faction-list-header"><span>派閥主</span><span>武将数</span><span>性格</span><span>方針</span></div>`;
         
         if (fIds.length === 0) {
             listHtml += `<div style="padding:10px;">派閥はありません。</div>`;
@@ -694,16 +695,9 @@ class UIManager {
                 let hoshin = "不明";
                 
                 if (leader) {
-                    const mil = (leader.leadership + leader.strength) / 2;
-                    const pol = (leader.politics + leader.diplomacy) / 2;
-                    if (mil > pol * 1.2) seikaku = "武闘派";
-                    else if (pol > mil * 1.2) seikaku = "穏健派";
-                    else seikaku = "中道";
-                    
-                    const inn = leader.innovation || 0;
-                    if (inn >= 66) hoshin = "革新派";
-                    else if (inn >= 36) hoshin = "中道";
-                    else hoshin = "保守派";
+                    // ★変更：毎回ここで計算するのをやめて、武将の記憶の箱から直接読み取るようにしました！
+                    seikaku = leader.factionSeikaku || "中道";
+                    hoshin = leader.factionHoshin || "保守派";
                 }
                 
                 // ★性格と方針で色を決める魔法です
