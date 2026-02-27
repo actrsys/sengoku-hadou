@@ -892,8 +892,10 @@ class UIManager {
         // ==========================================
         // ★ここを今のゲームの設定に合わせてください！
         // ==========================================
-        const MIN_SCALE = 0.5; // 最小の倍率
-        const MAX_SCALE = 2.0; // 最大の倍率
+        // ★変更：大名を選ぶ時の「一番引いたサイズ」を最小の倍率にします！
+        const MIN_SCALE = this.zoomStages ? this.zoomStages[0] : 0.5; 
+        // ★変更：最大サイズも、画面に合わせた綺麗なサイズにします！
+        const MAX_SCALE = this.zoomStages ? this.zoomStages[2] : 2.0; 
 
         if (isPC) {
             // 【PCの場合】 ホイールを回すと、最大か最小へ一気にジャンプ！
