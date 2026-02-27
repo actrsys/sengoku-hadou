@@ -569,17 +569,23 @@ class UIManager {
         clanDataList.forEach(d => {
             let friendScore = "-";
             let friendStatus = "-";
+            let statusColor = ""; // ★ここに追加：色を覚えておくための箱
             
             if (d.id !== this.game.playerClanId) {
                 const relation = this.game.getRelation(this.game.playerClanId, d.id);
                 if (relation) {
                     friendScore = relation.sentiment;
                     friendStatus = relation.status;
+                    
+                    // ★関係によって文字の色を変える魔法です！
+                    if (friendStatus === '敵対') statusColor = 'color:#d32f2f;';
+                    else if (friendStatus === '友好') statusColor = 'color:#388e3c;';
+                    else if (['同盟', '支配', '従属'].includes(friendStatus)) statusColor = 'color:#1976d2;';
                 }
             }
 
-            // ★名前を左寄せにするための目印（col-daimyo-name など）をつけます
-            listHtml += `<div class="daimyo-list-item"><span class="col-daimyo-name" style="font-weight:bold;">${d.name}</span><span class="col-leader-name">${d.leaderName}</span><span style="color:#d32f2f; font-weight:bold;">${d.power}</span><span>${d.castlesCount}</span><span style="color:#1976d2;">${friendScore}</span><span>${friendStatus}</span></div>`;
+            // ★戦力と友好度の色を消して、クリックできるように「onclick」を追加しました！
+            listHtml += `<div class="daimyo-list-item" style="cursor:pointer;" onclick="window.GameApp.ui.showDiplomacyList(${d.id}, '${d.name}')"><span class="col-daimyo-name" style="font-weight:bold;">${d.name}</span><span class="col-leader-name">${d.leaderName}</span><span style="font-weight:bold;">${d.power}</span><span>${d.castlesCount}</span><span>${friendScore}</span><span style="${statusColor}">${friendStatus}</span></div>`;
         });
         listHtml += '</div>';
         
@@ -594,6 +600,59 @@ class UIManager {
         });
 
         // ★ 大名一覧を開いている間だけ、外側の箱のスクロールを消して内側だけを動かします！
+        if (this.resultBody) {
+            this.resultBody.style.overflowY = 'hidden';
+            this.resultBody.style.display = 'flex';
+            this.resultBody.style.flexDirection = 'column';
+        }
+    }
+    
+    // ★ここから新しく追加：大名の外交関係一覧を表示する機能
+    showDiplomacyList(clanId, clanName) {
+        // 表のヘッダーを作ります（3列にする魔法をかけています）
+        let listHtml = '<div class="daimyo-list-container"><div class="daimyo-list-header" style="grid-template-columns: 2fr 1fr 1fr;"><span>大名家名</span><span>友好度</span><span>関係</span></div>';
+        
+        // 選んだ大名以外の、生き残っている大名を集めます
+        const activeClans = this.game.clans.filter(c => c.id !== 0 && c.id !== clanId && this.game.castles.some(cs => cs.ownerClan === c.id));
+        
+        // 相手との関係を調べます
+        const relations = activeClans.map(c => {
+            const rel = this.game.getRelation(clanId, c.id);
+            return {
+                id: c.id,
+                name: c.name,
+                sentiment: rel ? rel.sentiment : 50,
+                status: rel ? rel.status : "普通"
+            };
+        });
+
+        // 仲の良い順（友好度が高い順）に並べ替えます
+        relations.sort((a,b) => b.sentiment - a.sentiment);
+
+        relations.forEach(r => {
+            let statusColor = "";
+            // 関係によって文字の色を変えます
+            if (r.status === '敵対') statusColor = 'color:#d32f2f;';
+            else if (r.status === '友好') statusColor = 'color:#388e3c;';
+            else if (['同盟', '支配', '従属'].includes(r.status)) statusColor = 'color:#1976d2;';
+
+            // 1行分のデータを作ります
+            listHtml += `<div class="daimyo-list-item" style="grid-template-columns: 2fr 1fr 1fr;"><span class="col-daimyo-name" style="font-weight:bold;">${r.name}</span><span>${r.sentiment}</span><span style="${statusColor}">${r.status}</span></div>`;
+        });
+        listHtml += '</div>';
+        
+        // 戻るボタンを作ります
+        const customFooter = `<button class="btn-secondary" onclick="window.GameApp.ui.showDaimyoList()">戻る</button>`;
+        
+        // 画面に表示します
+        this.showResultModal(`<h3 style="margin-top:0; border-bottom: 2px solid #ddd; padding-bottom: 10px; flex-shrink:0;">${clanName} 外交関係</h3>${listHtml}`, () => {
+            if (this.resultBody) {
+                this.resultBody.style.overflowY = '';
+                this.resultBody.style.display = '';
+                this.resultBody.style.flexDirection = '';
+            }
+        }, customFooter);
+
         if (this.resultBody) {
             this.resultBody.style.overflowY = 'hidden';
             this.resultBody.style.display = 'flex';
@@ -635,6 +694,7 @@ class UIManager {
                 let hoshin = "不明";
                 
                 if (leader) {
+                    if (leader) {
                     const mil = (leader.leadership + leader.strength) / 2;
                     const pol = (leader.politics + leader.diplomacy) / 2;
                     if (mil > pol * 1.2) seikaku = "武闘派";
@@ -647,8 +707,17 @@ class UIManager {
                     else hoshin = "保守派";
                 }
                 
-                // ★ ここも改行をなくして1行に繋げます！
-                listHtml += `<div class="faction-list-item"><strong class="col-faction-name">${leaderName}</strong><span>${count}</span><span style="color:${seikaku === '武闘派' ? '#d32f2f' : (seikaku === '穏健派' ? '#1976d2' : '#388e3c')};">${seikaku}</span><span style="color:${hoshin === '革新派' ? '#e91e63' : (hoshin === '保守派' ? '#795548' : '#388e3c')};">${hoshin}</span></div>`;
+                // ★性格と方針で色を決める魔法です
+                let seikakuColor = "";
+                if (seikaku === '武闘派') seikakuColor = 'color:#d32f2f;';
+                else if (seikaku === '穏健派') seikakuColor = 'color:#1976d2;';
+
+                let hoshinColor = "";
+                if (hoshin === '革新派') hoshinColor = 'color:#e91e63;';
+                else if (hoshin === '保守派') hoshinColor = 'color:#1976d2;';
+
+                // ★ ここも改行をなくして1行に繋げます！（色指定の変数を使うように直しました）
+                listHtml += `<div class="faction-list-item"><strong class="col-faction-name">${leaderName}</strong><span>${count}</span><span style="${seikakuColor}">${seikaku}</span><span style="${hoshinColor}">${hoshin}</span></div>`;
             });
         }
         listHtml += `</div>`;
