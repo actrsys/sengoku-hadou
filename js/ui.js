@@ -809,7 +809,7 @@ class UIManager {
         // ★変更1：余白を少し戻して（ズームを少し大きくして）画面にピッタリ合わせます
         let minScale = Math.min(scaleX, scaleY); 
         if (document.body.classList.contains('is-pc')) {
-            minScale *= 0.96; // ★ここの数字を「0.90」から「0.98」に差し替えました！
+            minScale *= 0.95; // ★ここの数字を「0.90」から「0.98」に差し替えました！
         } else {
             minScale *= 0.82; // スマホは小さくしすぎたので、見切れないギリギリのサイズに調整します！
         }
@@ -892,10 +892,10 @@ class UIManager {
         // ==========================================
         // ★ここを今のゲームの設定に合わせてください！
         // ==========================================
-        // ★変更：大名を選ぶ時の「一番引いたサイズ」を最小の倍率にします！
-        const MIN_SCALE = this.zoomStages ? this.zoomStages[0] : 0.5; 
-        // ★変更：最大サイズも、画面に合わせた綺麗なサイズにします！
-        const MAX_SCALE = this.zoomStages ? this.zoomStages[2] : 2.0; 
+        // ★変更：PCの時だけ画面に合わせたサイズにして、スマホは元の数字(0.5)にします！
+        const MIN_SCALE = isPC && this.zoomStages ? this.zoomStages[0] : 0.5; 
+        // ★変更：PCの時だけ画面に合わせたサイズにして、スマホは元の数字(2.0)にします！
+        const MAX_SCALE = isPC && this.zoomStages ? this.zoomStages[2] : 2.0; 
 
         if (isPC) {
             // 【PCの場合】 ホイールを回すと、最大か最小へ一気にジャンプ！
