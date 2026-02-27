@@ -897,6 +897,9 @@ class UIManager {
         if (sc && cx !== null && cy !== null) {
             this.isAnimatingZoom = true;
             
+            // ★追加：スクロールバーの残像や、出たり消えたりする揺れを防ぐため、アニメーション中はスクロールバーを隠して固定します！
+            sc.style.overflow = 'hidden';
+            
             const rect = sc.getBoundingClientRect();
             const relX = cx - rect.left;
             const relY = cy - rect.top;
@@ -916,7 +919,7 @@ class UIManager {
                 return { x: mX, y: mY };
             };
 
-            // ★追加：マップの「描画上の本当の左上座標（余白も考慮）」を計算する魔法！
+            // マップの「描画上の本当の左上座標（余白も考慮）」を計算する魔法
             const getActualPos = (scale) => {
                 const padding = 20; // 箱の内側のクッション
                 let left = padding;
@@ -926,17 +929,12 @@ class UIManager {
                 return { x: left, y: top };
             };
 
-            // ★ここまではそのままです
             const oldPos = getActualPos(oldScale);
 
             // マウス（または画面中央）がある場所の「マップ上の本来の座標」を正確に割り出します
             const trueMapX = (sc.scrollLeft + relX - oldPos.x) / oldScale;
             const trueMapY = (sc.scrollTop + relY - oldPos.y) / oldScale;
 
-            // =========================================================
-            // ★究極の魔法：毎フレーム計算するから蛇行する！
-            // 最初から「ゴールの位置」を計算しておき、そこに向かって真っ直ぐ進みます！
-            // =========================================================
             const targetPos = getActualPos(targetScale);
             const targetMargin = getMargin(targetScale);
             const startMargin = getMargin(oldScale);
@@ -945,10 +943,19 @@ class UIManager {
             const startScrollTop = sc.scrollTop;
             
             // これがズーム完了時の最終的な「ゴールのスクロール位置」です
-            const targetScrollLeft = (trueMapX * targetScale) + targetPos.x - relX;
-            const targetScrollTop = (trueMapY * targetScale) + targetPos.y - relY;
+            let targetScrollLeft = (trueMapX * targetScale) + targetPos.x - relX;
+            let targetScrollTop = (trueMapY * targetScale) + targetPos.y - relY;
 
-            const duration = 250; 
+            // ★追加：マイナスになる（画面外に飛ぶ）のを防ぐ最強のストッパー！
+            if (targetScrollLeft < 0) targetScrollLeft = 0;
+            if (targetScrollTop < 0) targetScrollTop = 0;
+            
+            // ★追加：縮小してマップが画面にすっぽり収まる場合は、確実にスクロールを0に固定します！
+            if (mapW * targetScale <= scW) targetScrollLeft = 0;
+            if (mapH * targetScale <= scH) targetScrollTop = 0;
+
+            // ★修正：推移をもっと早く！シュバッと動くように短縮（250 -> 150）
+            const duration = 150; 
             const startTime = performance.now();
 
             const animate = (currentTime) => {
@@ -968,13 +975,16 @@ class UIManager {
                 const currentMarginY = startMargin.y + (targetMargin.y - startMargin.y) * easeOut;
                 this.mapEl.style.margin = `${currentMarginY}px ${currentMarginX}px`;
                 
-                // 3. スクロール位置もスタートからゴールへ真っ直ぐ繋ぐ（これで絶対に蛇行しません！）
+                // 3. スクロール位置もスタートからゴールへ真っ直ぐ繋ぐ
                 sc.scrollLeft = startScrollLeft + (targetScrollLeft - startScrollLeft) * easeOut;
                 sc.scrollTop = startScrollTop + (targetScrollTop - startScrollTop) * easeOut;
 
                 if (progress < 1) {
                     requestAnimationFrame(animate);
                 } else {
+                    // ★追加：アニメーションが完全に終わってから、スクロールバーを元に戻します
+                    sc.style.overflow = 'auto';
+                    
                     this.applyMapScale(); 
                     this.updateZoomButtons();
                     this.isAnimatingZoom = false;
