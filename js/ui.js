@@ -719,13 +719,22 @@ class UIManager {
         
         const scaleX = wrapper.clientWidth / mapW;
         const scaleY = wrapper.clientHeight / mapH;
-        let minScale = Math.min(scaleX, scaleY) * 0.9; 
-        if (minScale > 0.8) minScale = 0.5;
+        
+        // ★変更1：最小サイズは、必ず全体が入り、ほんの少し上下左右に余白ができるようにします
+        let minScale = Math.min(scaleX, scaleY) * 0.85; 
+        
+        // ★変更2：最大サイズを計算します（スマホは1.0、PCはウィンドウサイズに合わせて現在の2倍くらいに！）
+        let maxScale = 1.0;
+        if (document.body.classList.contains('is-pc')) {
+            // PCのウィンドウ幅に合わせて、大体2.0倍くらいになるように計算します
+            maxScale = Math.max(1.5, wrapper.clientWidth / 600); 
+            if (maxScale > 2.5) maxScale = 2.5; // 大きくなりすぎないためのストッパー
+        }
 
         this.zoomStages = [
             minScale,              
-            (minScale + 1.0) / 2,  
-            1.0                    
+            (minScale + maxScale) / 2,  
+            maxScale                    
         ];
         this.zoomLevel = 1; 
         this.mapScale = this.zoomStages[this.zoomLevel];
@@ -870,18 +879,11 @@ class UIManager {
                         if (this.isDraggingMap) return; 
                         if (this.game.isProcessingAI) return;
 
-						if (this.mapScale < 0.8) {
-						    this.zoomLevel = 2;
-						    this.mapScale = this.zoomStages[this.zoomLevel];
-						    this.applyMapScale();
-						    this.updateZoomButtons(); 
-						    el.scrollIntoView({block: "center", inline: "center", behavior: "smooth"});
-						} else {
-                            if (this.currentCastle && this.currentCastle.id === c.id) {
-                                this.showCastleMenuModal(c);
-                            } else {
-                                this.showControlPanel(c);
-                            }
+                        // ★変更：自動拡大（ズーム）の魔法を消して、いつでもすぐにメニューを開くようにしました！
+                        if (this.currentCastle && this.currentCastle.id === c.id) {
+                            this.showCastleMenuModal(c);
+                        } else {
+                            this.showControlPanel(c);
                         }
                     };
                 }
