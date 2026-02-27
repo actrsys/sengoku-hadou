@@ -879,38 +879,59 @@ class UIManager {
         }
     }
     
-    changeMapZoom(delta, cx = null, cy = null) {
-        if (this.isAnimatingZoom) return; // アニメーション中は次のズームを無視！
-        
-        const oldLevel = this.zoomLevel;
-        this.zoomLevel += delta;
-        if (this.zoomLevel < 0) this.zoomLevel = 0;
-        if (this.zoomLevel > 2) this.zoomLevel = 2;
-        
-        if (this.zoomLevel === oldLevel) return; // 限界ならストップ
-
-        const oldScale = this.mapScale;
-        const targetScale = this.zoomStages[this.zoomLevel];
-
+    changeMapZoom(direction, cx = null, cy = null) {
         const sc = document.getElementById('map-scroll-container');
-        
+        const isPC = document.body.classList.contains('is-pc'); // ★PCかどうかを判定する魔法！
+
+        // PCでホイールを連続で回した時にカクつかないよう、アニメーション中でも次のズームを受け付ける！
+        if (this.isAnimatingZoom && !isPC) return;
+
+        let oldScale = this.mapScale;
+        let targetScale = oldScale;
+
+        // ==========================================
+        // ★ここを今のゲームの設定に合わせてください！
+        // ==========================================
+        const MIN_SCALE = 0.5; // 最小の倍率
+        const MAX_SCALE = 2.0; // 最大の倍率
+
+        if (isPC) {
+            // 【PCの場合】 0.05 ずつ細かく線形にズーム（数字を0.1などに変えると変化量が大きくなります）
+            targetScale += direction * 0.05;
+            if (targetScale < MIN_SCALE) targetScale = MIN_SCALE;
+            if (targetScale > MAX_SCALE) targetScale = MAX_SCALE;
+        } else {
+            // 【スマホの場合】 今まで通り3段階（※真ん中の1.0は必要に応じて変えてください）
+            const scales = [MIN_SCALE, 1.0, MAX_SCALE]; 
+            let closestIdx = 0;
+            let minDiff = Infinity;
+            // 一番近い倍率を探す
+            scales.forEach((s, i) => {
+                let diff = Math.abs(s - oldScale);
+                if (diff < minDiff) { minDiff = diff; closestIdx = i; }
+            });
+            let nextIdx = closestIdx + direction;
+            if (nextIdx < 0) nextIdx = 0;
+            if (nextIdx >= scales.length) nextIdx = scales.length - 1;
+            targetScale = scales[nextIdx];
+        }
+
+        // もし倍率が変わっていなければ（上限・下限に達していたら）何もしない
+        if (Math.abs(targetScale - oldScale) < 0.01) return;
+
         if (sc && cx !== null && cy !== null) {
             this.isAnimatingZoom = true;
-            
-            // ★追加：スクロールバーの残像や、出たり消えたりする揺れを防ぐため、アニメーション中はスクロールバーを隠して固定します！
             sc.style.overflow = 'hidden';
             
             const rect = sc.getBoundingClientRect();
             const relX = cx - rect.left;
             const relY = cy - rect.top;
 
-            // マップ本来のサイズと、画面のサイズ
             const mapW = this.mapEl.offsetWidth;
             const mapH = this.mapEl.offsetHeight;
             const scW = sc.clientWidth - 40; 
             const scH = sc.clientHeight - 40;
 
-            // 倍率から正確な「透明な余白（マージン）」を計算する関数
             const getMargin = (scale) => {
                 let mX = -(mapW - mapW * scale) / 2;
                 let mY = -(mapH - mapH * scale) / 2;
@@ -919,9 +940,8 @@ class UIManager {
                 return { x: mX, y: mY };
             };
 
-            // マップの「描画上の本当の左上座標（余白も考慮）」を計算する魔法
             const getActualPos = (scale) => {
-                const padding = 20; // 箱の内側のクッション
+                const padding = 20; 
                 let left = padding;
                 let top = padding;
                 if (mapW * scale < scW) left += (scW - mapW * scale) / 2;
@@ -931,7 +951,6 @@ class UIManager {
 
             const oldPos = getActualPos(oldScale);
 
-            // マウス（または画面中央）がある場所の「マップ上の本来の座標」を正確に割り出します
             const trueMapX = (sc.scrollLeft + relX - oldPos.x) / oldScale;
             const trueMapY = (sc.scrollTop + relY - oldPos.y) / oldScale;
 
@@ -942,20 +961,18 @@ class UIManager {
             const startScrollLeft = sc.scrollLeft;
             const startScrollTop = sc.scrollTop;
             
-            // これがズーム完了時の最終的な「ゴールのスクロール位置」です
             let targetScrollLeft = (trueMapX * targetScale) + targetPos.x - relX;
             let targetScrollTop = (trueMapY * targetScale) + targetPos.y - relY;
 
-            // ★追加：マイナスになる（画面外に飛ぶ）のを防ぐ最強のストッパー！
             if (targetScrollLeft < 0) targetScrollLeft = 0;
             if (targetScrollTop < 0) targetScrollTop = 0;
             
-            // ★追加：縮小してマップが画面にすっぽり収まる場合は、確実にスクロールを0に固定します！
             if (mapW * targetScale <= scW) targetScrollLeft = 0;
             if (mapH * targetScale <= scH) targetScrollTop = 0;
 
-            // ★修正：推移をもっと早く！シュバッと動くように短縮（250 -> 150）
-            const duration = 150; 
+            // ★PCのホイールは連続で回すので、アニメーションを極短(50ms)にして指に吸い付かせる！
+            // スマホは今まで通り(150ms)でシュバッと動かす！
+            const duration = isPC ? 50 : 150; 
             const startTime = performance.now();
 
             const animate = (currentTime) => {
@@ -965,36 +982,33 @@ class UIManager {
                 
                 const easeOut = 1 - Math.pow(1 - progress, 3);
                 
-                // 1. スケールをスタートからゴールへ滑らかに変化させる
                 const currentScale = oldScale + (targetScale - oldScale) * easeOut;
                 this.mapScale = currentScale;
                 this.mapEl.style.transform = `scale(${currentScale})`;
                 
-                // 2. 余白（マージン）もスタートからゴールへ真っ直ぐ繋ぐ
                 const currentMarginX = startMargin.x + (targetMargin.x - startMargin.x) * easeOut;
                 const currentMarginY = startMargin.y + (targetMargin.y - startMargin.y) * easeOut;
                 this.mapEl.style.margin = `${currentMarginY}px ${currentMarginX}px`;
                 
-                // 3. スクロール位置もスタートからゴールへ真っ直ぐ繋ぐ
                 sc.scrollLeft = startScrollLeft + (targetScrollLeft - startScrollLeft) * easeOut;
                 sc.scrollTop = startScrollTop + (targetScrollTop - startScrollTop) * easeOut;
 
                 if (progress < 1) {
                     requestAnimationFrame(animate);
                 } else {
-                    // ★追加：アニメーションが完全に終わってから、スクロールバーを元に戻します
                     sc.style.overflow = 'auto';
-                    
                     this.applyMapScale(); 
-                    this.updateZoomButtons();
+                    if (this.updateZoomButtons) this.updateZoomButtons();
                     this.isAnimatingZoom = false;
                 }
             };
             requestAnimationFrame(animate);
         } else {
+            // フォールバック（念のため）
             this.mapScale = targetScale;
             this.applyMapScale();
-            this.updateZoomButtons();
+            if (this.updateZoomButtons) this.updateZoomButtons();
+            this.isAnimatingZoom = false;
         }
     }
 
