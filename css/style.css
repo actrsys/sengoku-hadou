@@ -210,7 +210,8 @@ img {
 
 #map-container {
     display: grid; gap: 10px; padding: 20px; 
-    /* ★変更：狙った位置へのズームを完璧に正確にするため、フワッとするアニメーションを消してサクッと切り替えます！ */
+    /* ★変更：ぬるっと動くアニメーションを復活させます！ */
+    transition: transform 0.3s cubic-bezier(0.25, 0.8, 0.25, 1), margin 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
     transform-origin: center center; margin: auto; flex: none; 
 }
 
@@ -1440,3 +1441,11 @@ body.is-pc .faction-list-container { scroll-padding-top: 38px; }
 .faction-list-container::-webkit-scrollbar-button:vertical:decrement { background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 10 10"><polygon points="1,7 5,3 9,7" fill="%23555"/></svg>'); background-position: center; background-repeat: no-repeat; }
 .faction-list-container::-webkit-scrollbar-button:vertical:increment { background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 10 10"><polygon points="1,3 5,7 9,3" fill="%23555"/></svg>'); background-position: center; background-repeat: no-repeat; }
 .faction-list-container::-webkit-scrollbar-button:hover { background-color: #cfd8dc; }
+
+/* =========================================================
+   ★ 選択中の武将にカーソルが乗った時だけ「濃いオレンジ」にする魔法
+   ========================================================= */
+.select-item.selected:hover, 
+.kunishu-list-item.selected:hover {
+    background-color: #ffcc80 !important; /* 選択中（薄いオレンジ）より少し濃い色 */
+}
