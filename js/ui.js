@@ -926,11 +926,27 @@ class UIManager {
                 return { x: left, y: top };
             };
 
+            // ★ここまではそのままです
             const oldPos = getActualPos(oldScale);
 
-            // ★修正：マウス（または画面中央）がある場所の「マップ上の本来の座標」を正確に割り出します
+            // マウス（または画面中央）がある場所の「マップ上の本来の座標」を正確に割り出します
             const trueMapX = (sc.scrollLeft + relX - oldPos.x) / oldScale;
             const trueMapY = (sc.scrollTop + relY - oldPos.y) / oldScale;
+
+            // =========================================================
+            // ★究極の魔法：毎フレーム計算するから蛇行する！
+            // 最初から「ゴールの位置」を計算しておき、そこに向かって真っ直ぐ進みます！
+            // =========================================================
+            const targetPos = getActualPos(targetScale);
+            const targetMargin = getMargin(targetScale);
+            const startMargin = getMargin(oldScale);
+            
+            const startScrollLeft = sc.scrollLeft;
+            const startScrollTop = sc.scrollTop;
+            
+            // これがズーム完了時の最終的な「ゴールのスクロール位置」です
+            const targetScrollLeft = (trueMapX * targetScale) + targetPos.x - relX;
+            const targetScrollTop = (trueMapY * targetScale) + targetPos.y - relY;
 
             const duration = 250; 
             const startTime = performance.now();
@@ -941,21 +957,20 @@ class UIManager {
                 if (progress > 1) progress = 1;
                 
                 const easeOut = 1 - Math.pow(1 - progress, 3);
-                const currentScale = oldScale + (targetScale - oldScale) * easeOut;
                 
-                // 1. スケールと余白（マージン）を変化させる
+                // 1. スケールをスタートからゴールへ滑らかに変化させる
+                const currentScale = oldScale + (targetScale - oldScale) * easeOut;
                 this.mapScale = currentScale;
                 this.mapEl.style.transform = `scale(${currentScale})`;
                 
-                const currentMargin = getMargin(currentScale);
-                this.mapEl.style.margin = `${currentMargin.y}px ${currentMargin.x}px`;
+                // 2. 余白（マージン）もスタートからゴールへ真っ直ぐ繋ぐ
+                const currentMarginX = startMargin.x + (targetMargin.x - startMargin.x) * easeOut;
+                const currentMarginY = startMargin.y + (targetMargin.y - startMargin.y) * easeOut;
+                this.mapEl.style.margin = `${currentMarginY}px ${currentMarginX}px`;
                 
-                // 2. 新しいスケールでのマップ左上座標を計算
-                const currentPos = getActualPos(currentScale);
-
-                // 3. マウス位置が絶対にズレないようにスクロールを同期！
-                sc.scrollLeft = (trueMapX * currentScale) + currentPos.x - relX;
-                sc.scrollTop = (trueMapY * currentScale) + currentPos.y - relY;
+                // 3. スクロール位置もスタートからゴールへ真っ直ぐ繋ぐ（これで絶対に蛇行しません！）
+                sc.scrollLeft = startScrollLeft + (targetScrollLeft - startScrollLeft) * easeOut;
+                sc.scrollTop = startScrollTop + (targetScrollTop - startScrollTop) * easeOut;
 
                 if (progress < 1) {
                     requestAnimationFrame(animate);
