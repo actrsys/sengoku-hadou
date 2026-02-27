@@ -363,7 +363,6 @@ class UIManager {
         // ★ 2本指のピンチ操作でマップを拡大縮小する魔法（スマホ用）
         // =========================================================
         let initialPinchDist = null;
-        let pinchCenter = null; // ★追加：指と指の中心点を記憶する箱
 
         sc.addEventListener('touchstart', (e) => {
             if (e.touches.length === 2) {
@@ -371,11 +370,6 @@ class UIManager {
                     e.touches[0].pageX - e.touches[1].pageX,
                     e.touches[0].pageY - e.touches[1].pageY
                 );
-                // ★追加：指と指の真ん中の座標を計算して記録します
-                pinchCenter = {
-                    x: (e.touches[0].clientX + e.touches[1].clientX) / 2,
-                    y: (e.touches[0].clientY + e.touches[1].clientY) / 2
-                };
             }
         }, { passive: false });
 
@@ -390,21 +384,18 @@ class UIManager {
                 );
                 
                 const diff = currentDist - initialPinchDist;
-                if (diff > 50) {
-                    this.changeMapZoom(1, pinchCenter.x, pinchCenter.y);  // 中心点を指定して拡大！
+                // ★変更：指の座標がズレて暴走しやすいので、常に「画面のど真ん中」を基準にズームさせます！
+                if (Math.abs(diff) > 50) {
+                    const rect = sc.getBoundingClientRect();
+                    const centerX = rect.left + rect.width / 2;
+                    const centerY = rect.top + rect.height / 2;
+
+                    if (diff > 50) {
+                        this.changeMapZoom(1, centerX, centerY);  
+                    } else if (diff < -50) {
+                        this.changeMapZoom(-1, centerX, centerY); 
+                    }
                     initialPinchDist = currentDist; 
-                    // ★ズームするたびに中心点も更新
-                    pinchCenter = {
-                        x: (e.touches[0].clientX + e.touches[1].clientX) / 2,
-                        y: (e.touches[0].clientY + e.touches[1].clientY) / 2
-                    };
-                } else if (diff < -50) {
-                    this.changeMapZoom(-1, pinchCenter.x, pinchCenter.y); // 中心点を指定して縮小！
-                    initialPinchDist = currentDist;
-                    pinchCenter = {
-                        x: (e.touches[0].clientX + e.touches[1].clientX) / 2,
-                        y: (e.touches[0].clientY + e.touches[1].clientY) / 2
-                    };
                 }
             }
         }, { passive: false });
@@ -412,7 +403,6 @@ class UIManager {
         sc.addEventListener('touchend', (e) => {
             if (e.touches.length < 2) {
                 initialPinchDist = null;
-                pinchCenter = null; // リセット
             }
         });
     }
