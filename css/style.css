@@ -1171,7 +1171,7 @@ body.is-pc #ai-guard {
     font-size: 0.65rem;
     position: relative;
     left: -3px; /* ★左（アルファベットの方向）へ無理やり引っ張って食い込ませる！ */
-    top: -5px;  /* ★さらに上へ持ち上げる！ */
+    top: -10px;  /* ★さらに上へ持ち上げる！ */
 }
 /* 武将一覧 */
 .list-header, .select-item {
