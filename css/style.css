@@ -1207,3 +1207,11 @@ body.is-pc {
 
 /* 大名一覧などを表示するウインドウの幅を少し広げて窮屈さをなくす魔法 */
 .result-content { max-width: 550px !important; }
+/* =========================================================
+   ★ リストの行を交互に色分けする魔法（ゼブラ柄）
+   ========================================================= */
+.select-item:nth-child(even), 
+.daimyo-list-item:nth-child(even), 
+.kunishu-list-item:nth-child(even) {
+    background-color: #f0f4f8; /* 薄い灰色っぽい青っぽい色 */
+}
