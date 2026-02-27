@@ -1123,12 +1123,15 @@ class UIManager {
         }
 
         // ★項目名をスクロールの箱の中に作り直します！
+        const isViewMode = (actionType === 'view_only' || actionType === 'all_busho_list');
         if (this.selectorList) {
             this.selectorList.innerHTML = `
-                <div class="list-header" id="selector-list-header">
-                    <span></span><span>行動</span><span>名前</span><span>身分</span><span>統率</span><span>武力</span><span>内政</span><span>外交</span><span>智謀</span><span>魅力</span>
+                <div class="list-header ${isViewMode ? 'view-mode' : ''}" id="selector-list-header">
+                    ${isViewMode ? '' : '<span></span>'}<span>行動</span><span>名前</span><span>身分</span><span>統率</span><span>武力</span><span>内政</span><span>外交</span><span>智謀</span><span>魅力</span>
                 </div>
             `;
+            if (isViewMode) this.selectorList.classList.add('view-mode');
+            else this.selectorList.classList.remove('view-mode');
         }
         const contextEl = document.getElementById('selector-context-info'); if(contextEl) contextEl.classList.remove('hidden'); 
         const c = this.currentCastle; 
@@ -1339,9 +1342,13 @@ class UIManager {
             const div = document.createElement('div'); div.className = `select-item ${!isSelectable ? 'disabled' : ''}`;
             const inputType = isMulti ? 'checkbox' : 'radio';
             
-            const inputHtml = (actionType === 'view_only' || actionType === 'all_busho_list') ? '' : `<input type="${inputType}" name="sel_busho" value="${b.id}" ${!isSelectable ? 'disabled' : ''} style="grid-column:1;">`;
+            let inputHtml = '';
+            if (!isViewMode) {
+                // ★先頭のチェックボックスを <span> という透明な箱で包むのがポイントです！
+                inputHtml = `<span><input type="${inputType}" name="sel_busho" value="${b.id}" ${!isSelectable ? 'disabled' : ''}></span>`;
+            }
             
-            div.innerHTML = `${inputHtml}<span class="col-act" style="grid-column:2;">${b.isActionDone?'[済]':'[未]'}</span><span class="col-name" style="grid-column:3;">${b.name}</span><span class="col-rank" style="grid-column:4;">${b.getRankName()}</span><span class="col-stat" style="grid-column:5;">${getStat('leadership')}</span><span class="col-stat" style="grid-column:6;">${getStat('strength')}</span><span class="col-stat" style="grid-column:7;">${getStat('politics')}</span><span class="col-stat" style="grid-column:8;">${getStat('diplomacy')}</span><span class="col-stat" style="grid-column:9;">${getStat('intelligence')}</span><span class="col-stat" style="grid-column:10;">${getStat('charm')}</span>`;
+            div.innerHTML = `${inputHtml}<span class="col-act">${b.isActionDone?'[済]':'[未]'}</span><span class="col-name">${b.name}</span><span class="col-rank">${b.getRankName()}</span><span class="col-stat">${getStat('leadership')}</span><span class="col-stat">${getStat('strength')}</span><span class="col-stat">${getStat('politics')}</span><span class="col-stat">${getStat('diplomacy')}</span><span class="col-stat">${getStat('intelligence')}</span><span class="col-stat">${getStat('charm')}</span>`;
             
             if(isSelectable && actionType !== 'view_only' && actionType !== 'all_busho_list') { 
                 div.onclick = (e) => {
@@ -1939,12 +1946,13 @@ class UIManager {
         let selectedKunishuId = null; // 選んだ国衆を記憶する箱
 
         if (this.selectorList) {
-            // ★ リストの中身を空にして、最初にヘッダーを作ります
             this.selectorList.innerHTML = `
-                <div class="kunishu-list-header">
-                    <span></span><span>勢力名</span><span>兵数</span><span>防御</span><span>友好度</span>
+                <div class="kunishu-list-header ${isViewOnly ? 'view-mode' : ''}">
+                    ${isViewOnly ? '' : '<span></span>'}<span>勢力名</span><span>兵数</span><span>防御</span><span>友好度</span>
                 </div>
             `;
+            if (isViewOnly) this.selectorList.classList.add('view-mode');
+            else this.selectorList.classList.remove('view-mode');
             
             kunishus.forEach(k => {
                 const name = k.getName(window.GameApp);
@@ -1953,11 +1961,11 @@ class UIManager {
                 div.className = 'kunishu-list-item'; 
                 
                 if (isViewOnly) {
-                    // ★見るだけモード（表の形に整え、左寄せの目印をつけます）
-                    div.innerHTML = `<span></span><strong class="col-kunishu-name">${name}</strong><span>${k.soldiers}</span><span>${k.defense}</span><span>${rel}</span>`;
+                    // ★見るだけモード（先頭の空箱なし）
+                    div.innerHTML = `<strong class="col-kunishu-name">${name}</strong><span>${k.soldiers}</span><span>${k.defense}</span><span>${rel}</span>`;
                     div.style.cursor = 'default';
                 } else {
-                    // ★選択モード
+                    // ★選択モード（先頭に空箱あり）
                     div.innerHTML = `<span></span><strong class="col-kunishu-name">${name}</strong><span>${k.soldiers}</span><span>${k.defense}</span><span>${rel}</span>`;
                     div.style.cursor = 'pointer';
                     
