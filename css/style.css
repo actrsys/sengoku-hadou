@@ -1098,8 +1098,15 @@ body.is-pc #ai-guard {
 .result-body {
     flex: 1; overflow-y: auto; min-height: 200px;
     scroll-snap-type: y mandatory;
-    scroll-padding-top: 36px; /* ★スクロール時にヘッダーの裏に隠れないようにする魔法！ */
     border: 1px solid #ddd;
+    scroll-padding-top: 32px; /* ★スマホのヘッダー高さに正確に合わせました！ */
+}
+
+/* ★追加：一番下までスクロールした時に、見切れないように透明な余白を足す魔法 */
+.select-item:last-child, 
+.daimyo-list-item:last-child, 
+.kunishu-list-item:last-child {
+    margin-bottom: 25px; 
 }
 
 /* 縦の区切り線を入れ、スマホではみ出さないようにする共通ルール */
@@ -1157,6 +1164,11 @@ body.is-pc #ai-guard {
 }
 
 /* --- スマホ時のフレキシブルなレイアウト（1行に収める魔法） --- */
+
+/* ★追加：スマホの時はステータス（S, A, Bなど）の文字を少し小さくします */
+.grade-main { font-size: 0.95rem; }
+.grade-plus { font-size: 0.75rem; right: -4px; top: -1px; }
+
 /* 武将一覧 */
 .list-header, .select-item {
     display: grid; 
@@ -1287,4 +1299,55 @@ body.is-pc {
 .result-body::-webkit-scrollbar-thumb:hover,
 #divide-list::-webkit-scrollbar-thumb:hover {
     background: #546e7a;
+}
+/* （中略）輸送や出陣の項目をタイル状にする魔法など... */
+    .qty-row {
+        background: #f9f9f9;
+        padding: 10px;
+        border: 1px solid #ddd;
+        border-radius: 6px;
+    }
+
+    /* ★追加：PCの時はヘッダーが高いので、スクロール位置と文字サイズをPC用に戻します */
+    .list-container, .daimyo-list-container, .result-body { scroll-padding-top: 38px; }
+    .grade-main { font-size: 1.1rem; }
+    .grade-plus { font-size: 0.9rem; right: -6px; top: -2px; }
+
+} /* ←★これが body.is-pc の大きな箱を閉じるフタ（元からあるはずです） */
+
+/* =========================================================
+   ★ スクロールバーの上下に「▲▼」ボタンを復活させる魔法
+   ========================================================= */
+.list-container::-webkit-scrollbar-button,
+.daimyo-list-container::-webkit-scrollbar-button,
+.result-body::-webkit-scrollbar-button,
+#divide-list::-webkit-scrollbar-button {
+    display: block;
+    height: 14px;
+    background-color: #e0e0e0;
+    border: 1px solid #ccc;
+    cursor: pointer;
+}
+/* 上ボタン（▲） */
+.list-container::-webkit-scrollbar-button:vertical:decrement,
+.daimyo-list-container::-webkit-scrollbar-button:vertical:decrement,
+.result-body::-webkit-scrollbar-button:vertical:decrement,
+#divide-list::-webkit-scrollbar-button:vertical:decrement {
+    background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 10 10"><polygon points="1,7 5,3 9,7" fill="%23555"/></svg>');
+    background-position: center; background-repeat: no-repeat;
+}
+/* 下ボタン（▼） */
+.list-container::-webkit-scrollbar-button:vertical:increment,
+.daimyo-list-container::-webkit-scrollbar-button:vertical:increment,
+.result-body::-webkit-scrollbar-button:vertical:increment,
+#divide-list::-webkit-scrollbar-button:vertical:increment {
+    background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 10 10"><polygon points="1,3 5,7 9,3" fill="%23555"/></svg>');
+    background-position: center; background-repeat: no-repeat;
+}
+/* マウスが乗った時 */
+.list-container::-webkit-scrollbar-button:hover,
+.daimyo-list-container::-webkit-scrollbar-button:hover,
+.result-body::-webkit-scrollbar-button:hover,
+#divide-list::-webkit-scrollbar-button:hover {
+    background-color: #cfd8dc;
 }
