@@ -132,7 +132,7 @@
                 <div style="margin-bottom: 10px; font-weight: bold;">
                     出陣兵力: <span id="divide-total-soldiers">0</span> / 未分配: <span id="divide-remain-soldiers" style="color:red;">0</span>
                 </div>
-                <div id="divide-list" class="list-container" style="max-height: 50vh; overflow-y: auto; padding: 10px; background:#f9f9f9;"></div>
+                <div id="divide-list" class="list-container" style="max-height: 50%; overflow-y: auto; padding: 10px; background:#f9f9f9;"></div>
                 <div class="modal-footer" style="justify-content: center;">
                     <button id="divide-confirm-btn" class="btn-primary" disabled style="opacity:0.5;">決定</button>
                 </div>
@@ -142,7 +142,7 @@
         <div id="history-modal" class="modal hidden">
             <div class="modal-content">
                 <h3>行動履歴</h3>
-                <div id="history-list" class="list-container" style="max-height: 60vh; background:#fafafa;"></div>
+                <div id="history-list" class="list-container" style="max-height: 60%; background:#fafafa;"></div>
                 <div class="modal-footer">
                     <button class="btn-primary" onclick="document.getElementById('history-modal').classList.add('hidden')">閉じる</button>
                 </div>
@@ -188,7 +188,7 @@
         </div>
 
         <div id="war-modal" class="modal hidden">
-            <div class="modal-content" style="max-width: 900px; height: 90vh; display: flex; flex-direction: column; background: #fff; border: 2px solid #333;">
+            <div class="modal-content" style="max-width: 900px; height: 90%; display: flex; flex-direction: column; background: #fff; border: 2px solid #333;">
                 <div id="war-top-bar" style="background:#000; color:#fff; display:flex; justify-content:space-between; padding:5px 10px; font-size:1.1rem; font-weight:bold;">
                     <span id="war-date-info"></span>
                     <span id="war-turn-info"></span>
@@ -261,7 +261,7 @@
         </div>
 
         <div id="field-war-modal" class="modal hidden">
-            <div class="modal-content" style="width: 95%; max-width: 900px; height: 95dvh; display: flex; flex-direction: column; padding: 10px;">
+            <div class="modal-content" style="width: 95%; max-width: 900px; height: 95%; display: flex; flex-direction: column; padding: 10px;">
                 <h2 style="margin:0 0 5px 0;">野戦 <span id="fw-turn-info" style="font-size: 1rem; font-weight: normal; margin-left: 20px;">Turn: 1/20</span></h2>
                 
                 <div id="fw-status-bar" style="display:flex; justify-content: space-between; margin-bottom: 5px;">
