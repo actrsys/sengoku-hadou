@@ -384,18 +384,18 @@ class UIManager {
                 );
                 
                 const diff = currentDist - initialPinchDist;
-                // ★変更：指の座標がズレて暴走しやすいので、常に「画面のど真ん中」を基準にズームさせます！
-                if (Math.abs(diff) > 50) {
-                    const rect = sc.getBoundingClientRect();
-                    const centerX = rect.left + rect.width / 2;
-                    const centerY = rect.top + rect.height / 2;
+                
+                // ★修正：指と指の間ではなく「今見ている画面のど真ん中」の座標を計算します！
+                const rect = sc.getBoundingClientRect();
+                const centerX = rect.left + rect.width / 2;
+                const centerY = rect.top + rect.height / 2;
 
-                    if (diff > 50) {
-                        this.changeMapZoom(1, centerX, centerY);  
-                    } else if (diff < -50) {
-                        this.changeMapZoom(-1, centerX, centerY); 
-                    }
+                if (diff > 50) {
+                    this.changeMapZoom(1, centerX, centerY);  // 画面の中心を指定して拡大！
                     initialPinchDist = currentDist; 
+                } else if (diff < -50) {
+                    this.changeMapZoom(-1, centerX, centerY); // 画面の中心を指定して縮小！
+                    initialPinchDist = currentDist;
                 }
             }
         }, { passive: false });
@@ -918,9 +918,12 @@ class UIManager {
 
             const oldMargin = getMargin(oldScale);
 
-            // ★ 修正：余白も考慮した、マップの「真の絶対座標」を計算します！
-            const trueMapX = (sc.scrollLeft + relX - oldMargin.x) / oldScale;
-            const trueMapY = (sc.scrollTop + relY - oldMargin.y) / oldScale;
+            // ★追加：マップを入れている箱の「内側のクッション（パディング20px）」を計算に含めます！
+            const padding = 20;
+
+            // ★修正：パディングを引いて、マップの「真の絶対座標」を正確に計算し直します！
+            const trueMapX = (sc.scrollLeft + relX - padding - oldMargin.x) / oldScale;
+            const trueMapY = (sc.scrollTop + relY - padding - oldMargin.y) / oldScale;
 
             const duration = 250; 
             const startTime = performance.now();
@@ -941,8 +944,9 @@ class UIManager {
                 this.mapEl.style.margin = `${currentMargin.y}px ${currentMargin.x}px`;
                 
                 // 2. 余白が変わっても、マウス位置が絶対にズレないようにスクロールを同期！
-                sc.scrollLeft = (trueMapX * currentScale) + currentMargin.x - relX;
-                sc.scrollTop = (trueMapY * currentScale) + currentMargin.y - relY;
+                // ★修正：ここでもパディングを足して、ズレを完全に防ぎます！
+                sc.scrollLeft = (trueMapX * currentScale) + currentMargin.x + padding - relX;
+                sc.scrollTop = (trueMapY * currentScale) + currentMargin.y + padding - relY;
 
                 if (progress < 1) {
                     requestAnimationFrame(animate);
