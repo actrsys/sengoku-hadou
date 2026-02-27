@@ -403,13 +403,8 @@ class UIManager {
     }
     
     showDaimyoList() {
-        // ★ ヘッダー部分（外側に固定される項目名）を作ります
-        let listHtml = `
-            <div class="daimyo-list-header">
-                <span>大名家名</span><span>当主名</span><span>戦力</span><span>城数</span><span>友好度</span><span>関係</span>
-            </div>
-            <div class="daimyo-list-container">
-        `;
+        // ★ 余計な隙間が作られないように、１行に繋げて書きます
+        let listHtml = '<div class="daimyo-list-header"><span>大名家名</span><span>当主名</span><span>戦力</span><span>城数</span><span>友好度</span><span>関係</span></div><div class="daimyo-list-container">';
         
         const activeClans = this.game.clans.filter(c => c.id !== 0 && this.game.castles.some(cs => cs.ownerClan === c.id));
         
@@ -431,7 +426,6 @@ class UIManager {
             let friendScore = "-";
             let friendStatus = "-";
             
-            // 自分の大名家じゃなかったら、友好度と状態を入れます
             if (d.id !== this.game.playerClanId) {
                 const relation = this.game.getRelation(this.game.playerClanId, d.id);
                 if (relation) {
@@ -440,20 +434,27 @@ class UIManager {
                 }
             }
 
-            // ★変更：横1行に並べる専用の魔法の箱に入れます
-            listHtml += `<div class="daimyo-list-item">`;
-            listHtml += `<span style="font-weight:bold;">${d.name}</span>`;
-            listHtml += `<span>${d.leaderName}</span>`;
-            listHtml += `<span style="color:#d32f2f; font-weight:bold;">${d.power}</span>`;
-            listHtml += `<span>${d.castlesCount}</span>`;
-            listHtml += `<span style="color:#1976d2;">${friendScore}</span>`;
-            listHtml += `<span>${friendStatus}</span>`;
-            listHtml += `</div>`;
+            // ★ここも改行をなくしてスッキリさせます
+            listHtml += `<div class="daimyo-list-item"><span style="font-weight:bold;">${d.name}</span><span>${d.leaderName}</span><span style="color:#d32f2f; font-weight:bold;">${d.power}</span><span>${d.castlesCount}</span><span style="color:#1976d2;">${friendScore}</span><span>${friendStatus}</span></div>`;
         });
-        listHtml += `</div>`; // .daimyo-list-container の終わり
+        listHtml += '</div>';
         
         // 結果画面のタイトル部分にくっつけて表示します
-        this.showResultModal(`<h3 style="margin-top:0; border-bottom: 2px solid #ddd; padding-bottom: 10px;">大名一覧</h3>${listHtml}`);
+        this.showResultModal(`<h3 style="margin-top:0; border-bottom: 2px solid #ddd; padding-bottom: 10px; flex-shrink:0;">大名一覧</h3>${listHtml}`, () => {
+            // ★ ウインドウを閉じる時に、外側の箱の魔法を解除します
+            if (this.resultBody) {
+                this.resultBody.style.overflowY = '';
+                this.resultBody.style.display = '';
+                this.resultBody.style.flexDirection = '';
+            }
+        });
+
+        // ★ 大名一覧を開いている間だけ、外側の箱のスクロールを消して内側だけを動かします！
+        if (this.resultBody) {
+            this.resultBody.style.overflowY = 'hidden';
+            this.resultBody.style.display = 'flex';
+            this.resultBody.style.flexDirection = 'column';
+        }
     }
 
     // 引数に「isDirect = false」というのを追加して、丸ごと差し替えます
