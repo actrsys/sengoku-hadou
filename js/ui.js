@@ -609,14 +609,8 @@ class UIManager {
         const fIds = Object.keys(factions).map(Number).filter(id => id !== 0);
         let nonFactionCount = factions[0] ? factions[0].count : 0;
         
-        // ★ 無派閥を右上に出し、表のヘッダーを作ります
-        let listHtml = `
-            <div style="text-align:right; font-weight:bold; color:#555; font-size:0.9rem; margin-bottom:5px;">無派閥: ${nonFactionCount}名</div>
-            <div class="faction-list-container">
-                <div class="faction-list-header">
-                    <span>派閥主</span><span>武将数</span><span>性格</span><span>方針</span>
-                </div>
-        `;
+        // ★ 無派閥を右上に出し、表のヘッダーを作ります（改行をなくして1行に繋げます！）
+        let listHtml = `<div style="text-align:right; font-weight:bold; color:#555; font-size:0.9rem; margin-bottom:5px;">無派閥: ${nonFactionCount}名</div><div class="faction-list-container"><div class="faction-list-header"><span>派閥主</span><span>武将数</span><span>性格</span><span>方針</span></div>`;
         
         if (fIds.length === 0) {
             listHtml += `<div style="padding:10px;">派閥はありません。</div>`;
@@ -630,28 +624,20 @@ class UIManager {
                 let hoshin = "不明";
                 
                 if (leader) {
-                    // ★性格の判定魔法
                     const mil = (leader.leadership + leader.strength) / 2;
                     const pol = (leader.politics + leader.diplomacy) / 2;
                     if (mil > pol * 1.2) seikaku = "武闘派";
                     else if (pol > mil * 1.2) seikaku = "穏健派";
                     else seikaku = "中道";
                     
-                    // ★方針の判定魔法
                     const inn = leader.innovation || 0;
                     if (inn >= 66) hoshin = "革新派";
                     else if (inn >= 36) hoshin = "中道";
                     else hoshin = "保守派";
                 }
                 
-                // 見やすいように色もつけちゃいます！
-                listHtml += `
-                <div class="faction-list-item">
-                    <strong class="col-faction-name">${leaderName}</strong>
-                    <span>${count}</span>
-                    <span style="color:${seikaku === '武闘派' ? '#d32f2f' : (seikaku === '穏健派' ? '#1976d2' : '#388e3c')};">${seikaku}</span>
-                    <span style="color:${hoshin === '革新派' ? '#e91e63' : (hoshin === '保守派' ? '#795548' : '#388e3c')};">${hoshin}</span>
-                </div>`;
+                // ★ ここも改行をなくして1行に繋げます！
+                listHtml += `<div class="faction-list-item"><strong class="col-faction-name">${leaderName}</strong><span>${count}</span><span style="color:${seikaku === '武闘派' ? '#d32f2f' : (seikaku === '穏健派' ? '#1976d2' : '#388e3c')};">${seikaku}</span><span style="color:${hoshin === '革新派' ? '#e91e63' : (hoshin === '保守派' ? '#795548' : '#388e3c')};">${hoshin}</span></div>`;
             });
         }
         listHtml += `</div>`;
