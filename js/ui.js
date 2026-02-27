@@ -76,8 +76,8 @@ class UIManager {
 		let lastTouchEnd = 0;
 		document.addEventListener('touchend', (event) => {
 		    const now = (new Date()).getTime();
-		    if (now - lastTouchEnd <= 300) {
-		        event.preventDefault(); // 0.3秒以内の2回タップを「無効」にします
+		    if (now - lastTouchEnd <= 600) {
+		        event.preventDefault(); // 0.6秒以内の2回タップを「無効」にします
 		    }
 		    lastTouchEnd = now;
 		}, false);
@@ -342,21 +342,15 @@ class UIManager {
         // =========================================================
         // ★ マウスホイールでマップを拡大縮小する魔法（PC用）
         // =========================================================
-        sc.addEventListener('wheel', (e) => {
-            if (document.body.classList.contains('is-pc')) {
-                e.preventDefault(); // 画面がスクロールしちゃうのを防ぐ
-                if (e.deltaY < 0) this.changeMapZoom(1);       // 上に回したら拡大
-                else if (e.deltaY > 0) this.changeMapZoom(-1); // 下に回したら縮小
-            }
-        }, { passive: false });
-
-        // =========================================================
-        // ★ マウスホイールでマップを拡大縮小する魔法（PC用）
-        // =========================================================
+        let isZooming = false; // ★追加：連続ズームを防ぐストッパー
         sc.addEventListener('wheel', (e) => {
             if (document.body.classList.contains('is-pc')) {
                 e.preventDefault(); 
-                // ★追加：マウスの現在の座標（clientX, clientY）を一緒に渡します！
+                if (isZooming) return; // ズーム中は次の命令を無視します！
+                
+                isZooming = true;
+                setTimeout(() => { isZooming = false; }, 350); // アニメーションが終わるまで待つ
+
                 if (e.deltaY < 0) this.changeMapZoom(1, e.clientX, e.clientY);       
                 else if (e.deltaY > 0) this.changeMapZoom(-1, e.clientX, e.clientY); 
             }
@@ -908,26 +902,43 @@ class UIManager {
         
         if (sc && cx !== null && cy !== null) {
             const rect = sc.getBoundingClientRect();
-            // 画面の左上を基準にしたマウス・指の座標から、スクロール枠内の相対座標を出す
+            // コンテナ内での相対座標
             const relX = cx - rect.left;
             const relY = cy - rect.top;
 
-            // スクロール量を含めた、マップ全体での絶対座標
-            const absX = sc.scrollLeft + relX;
-            const absY = sc.scrollTop + relY;
+            // ★ 画面を9分割して、どこを起点にするか決める賢い魔法！
+            let anchorX = 0.5; // デフォルトは中央
+            let anchorY = 0.5;
+
+            // X軸の判定（左:0、中:0.5、右:1）
+            if (relX < rect.width / 3) anchorX = 0;
+            else if (relX > rect.width * 2 / 3) anchorX = 1;
+
+            // Y軸の判定（上:0、中:0.5、下:1）
+            if (relY < rect.height / 3) anchorY = 0;
+            else if (relY > rect.height * 2 / 3) anchorY = 1;
+
+            // アンカーポイントの現在の絶対座標
+            const absAnchorX = sc.scrollLeft + (rect.width * anchorX);
+            const absAnchorY = sc.scrollTop + (rect.height * anchorY);
 
             // スケール変更後の新しい絶対座標
             const ratio = newScale / oldScale;
-            const newAbsX = absX * ratio;
-            const newAbsY = absY * ratio;
+            const newAbsAnchorX = absAnchorX * ratio;
+            const newAbsAnchorY = absAnchorY * ratio;
 
-            // マップの大きさを先に適用
+            // マップの大きさを先に適用（アニメーションが走ります）
             this.applyMapScale();
             this.updateZoomButtons();
 
-            // 新しい絶対座標から相対座標を引いて、狙った位置にスクロールバーを合わせる！
-            sc.scrollLeft = newAbsX - relX;
-            sc.scrollTop = newAbsY - relY;
+            // ★ アニメーションに合わせて「ぬるっと」スクロールさせる魔法！
+            setTimeout(() => {
+                sc.scrollTo({
+                    left: newAbsAnchorX - (rect.width * anchorX),
+                    top: newAbsAnchorY - (rect.height * anchorY),
+                    behavior: 'smooth'
+                });
+            }, 10);
         } else {
             this.applyMapScale();
             this.updateZoomButtons();
