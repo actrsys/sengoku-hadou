@@ -1380,3 +1380,64 @@ body.is-pc .grade-plus { font-size: 0.8rem !important; }
 #zoom-controls {
     display: none !important;
 }
+/* =========================================================
+   ★ 派閥一覧を大名・武将と同じ「表形式」にする究極魔法
+   ========================================================= */
+.faction-list-container {
+    flex: 1; overflow-y: auto; min-height: 150px;
+    scroll-snap-type: y mandatory;
+    border: 1px solid #ddd;
+    scroll-padding-top: 32px; 
+    border-radius: 4px;
+}
+.faction-list-header > span, .faction-list-item > span, .faction-list-item > strong {
+    border-right: 1px solid #ddd;
+    padding: 0 2px;
+    display: flex; align-items: center; justify-content: center;
+    box-sizing: border-box; overflow: hidden; white-space: nowrap; text-overflow: ellipsis;
+}
+.faction-list-header > span { border-right: 1px solid #546e7a; }
+.faction-list-header > span:last-child, .faction-list-item > span:last-child { border-right: none; }
+
+.faction-list-header {
+    background: #37474f; color: #fff; font-weight: bold;
+    position: sticky; top: 0; z-index: 10;
+}
+.faction-list-item {
+    border-bottom: 2px solid #e0e0e0;
+    scroll-snap-align: start;
+}
+.faction-list-item:nth-child(even) { background-color: #f0f4f8; }
+.faction-list-item:hover { background-color: #e3f2fd !important; }
+.faction-list-item:last-child { margin-bottom: 25px; }
+
+/* スマホ用レイアウト */
+.faction-list-header, .faction-list-item {
+    display: grid;
+    grid-template-columns: 2.5fr 1fr 1.5fr 1.5fr; /* 派閥主の幅を少し広め */
+    font-size: clamp(0.7rem, 2.8vw, 0.95rem);
+    padding: 0; min-height: 30px; gap: 0;
+}
+.faction-list-item .col-faction-name {
+    justify-content: flex-start !important;
+    padding-left: 5px;
+}
+
+/* PC用レイアウト */
+body.is-pc .faction-list-header, 
+body.is-pc .faction-list-item {
+    grid-template-columns: 140px 80px 100px 100px;
+    font-size: 0.95rem; min-height: 36px;
+    margin: 0 auto;
+}
+body.is-pc .faction-list-container { scroll-padding-top: 38px; }
+
+/* スクロールバーのデザイン */
+.faction-list-container::-webkit-scrollbar { width: 14px; height: 14px; }
+.faction-list-container::-webkit-scrollbar-track { background: #e0e0e0; border-left: 1px solid #ccc; }
+.faction-list-container::-webkit-scrollbar-thumb { background: #78909c; border: 2px solid #e0e0e0; }
+.faction-list-container::-webkit-scrollbar-thumb:hover { background: #546e7a; }
+.faction-list-container::-webkit-scrollbar-button { display: block; height: 14px; background-color: #e0e0e0; border: 1px solid #ccc; cursor: pointer; }
+.faction-list-container::-webkit-scrollbar-button:vertical:decrement { background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 10 10"><polygon points="1,7 5,3 9,7" fill="%23555"/></svg>'); background-position: center; background-repeat: no-repeat; }
+.faction-list-container::-webkit-scrollbar-button:vertical:increment { background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 10 10"><polygon points="1,3 5,7 9,3" fill="%23555"/></svg>'); background-position: center; background-repeat: no-repeat; }
+.faction-list-container::-webkit-scrollbar-button:hover { background-color: #cfd8dc; }
