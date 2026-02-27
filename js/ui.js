@@ -2015,8 +2015,14 @@ class UIManager {
 
         setTxt('war-date-info', `${this.game.year}年 ${this.game.month}月`);
         const maxRounds = window.WarParams?.Military?.WarMaxRounds || 10;
-        setTxt('war-turn-info', `残り ${Math.max(0, maxRounds - s.round + 1)}ターン`);
-        setTxt('war-def-wall-info', `城防御 ${s.defender.defense}`);
+        setTxt('war-date-info', `${this.game.year}年 ${this.game.month}月`);
+        const maxRounds = window.WarParams?.Military?.WarMaxRounds || 10;
+        
+        const turnEl = document.getElementById('war-turn-info');
+        if (turnEl) turnEl.innerHTML = `残り <span style="color:#fdea60;">${Math.max(0, maxRounds - s.round + 1)}</span>ターン`;
+        
+        const wallEl = document.getElementById('war-def-wall-info');
+        if (wallEl) wallEl.innerHTML = `城防御 <span style="color:#fdea60;">${s.defender.defense}</span>`;
 
         if (s.defender.isKunishu) {
             setTxt('war-title-name', `${s.defender.name} 鎮圧戦`);
