@@ -1082,3 +1082,12 @@ body.is-pc {
         position: relative;
     }
 }
+/* =========================================================
+   ★ PC版で各種画面を16:9のダンボール箱に閉じ込める魔法
+   ========================================================= */
+body.is-pc #title-screen,
+body.is-pc .modal,
+body.is-pc .cutin-overlay,
+body.is-pc #ai-guard {
+    position: absolute !important;
+}
