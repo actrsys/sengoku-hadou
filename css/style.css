@@ -1063,3 +1063,35 @@ img {
         padding: 10px !important; 
     }
 }
+/* =========================================================
+   ★ PC版で画面を16:9の横長に固定する魔法
+   ========================================================= */
+@media (min-width: 769px) {
+    body {
+        /* 画面の外側（余白）を黒くします。映画館みたいな感じです */
+        background-color: #111111; 
+        display: flex;
+        justify-content: center; /* ど真ん中に置く */
+        align-items: center;     /* ど真ん中に置く */
+    }
+    
+    #game-screen {
+        /* ① 縦横の比率を「横16 : 縦9」に固定します！ */
+        aspect-ratio: 16 / 9;
+        
+        /* ② 画面からはみ出さないように自動で計算する魔法の呪文です */
+        width: 100vw;
+        height: 100dvh;
+        max-width: calc(100dvh * 16 / 9);
+        max-height: calc(100vw * 9 / 16);
+        
+        /* ③ ゲームの中身がはみ出したら切り取ります */
+        overflow: hidden;
+        
+        /* ④ 背景色を元のゲームの色に戻します */
+        background-color: var(--bg-color);
+
+        /* ⑤ 【超重要】ポンと出る画面（モーダル）が、箱の外に逃げないようにする魔法の鍵です！ */
+        transform: translate(0, 0); 
+    }
+}
