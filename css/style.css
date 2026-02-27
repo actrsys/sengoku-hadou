@@ -1160,18 +1160,15 @@ body.is-pc #ai-guard {
 /* 武将一覧 */
 .list-header, .select-item {
     display: grid; 
-    grid-template-columns: 20px 25px 3fr 1.5fr repeat(6, 1fr); 
-    font-size: clamp(0.6rem, 2.2vw, 0.85rem); /* 画面に合わせて小さく！ */
+    grid-template-columns: 35px 3fr 1.5fr repeat(6, 1fr); 
+    font-size: clamp(0.6rem, 2.2vw, 0.85rem); 
     padding: 0; min-height: 30px; gap: 0;
-}
-.view-mode .list-header, .view-mode .select-item {
-    grid-template-columns: 35px 3.5fr 1.5fr repeat(6, 1fr); /* ★不要な余白を詰める魔法 */
 }
 
 /* 大名一覧 */
 .daimyo-list-header, .daimyo-list-item {
     display: grid;
-    grid-template-columns: 3fr 2.5fr 1.5fr 1fr 1fr 1fr;
+    grid-template-columns: 2.5fr 2.5fr 1.5fr 1fr 1fr 1fr;
     font-size: clamp(0.65rem, 2.5vw, 0.9rem);
     padding: 0; min-height: 30px; gap: 0;
 }
@@ -1190,7 +1187,7 @@ body.is-pc #ai-guard {
 /* --- PC版（画面が広い時）の固定レイアウト --- */
 body.is-pc {
     .list-header, .select-item {
-        grid-template-columns: 25px 40px 110px 50px repeat(6, 1fr); 
+        grid-template-columns: 45px 100px 55px repeat(6, 1fr); 
         font-size: 0.85rem; min-height: 36px;
     }
     .view-mode .list-header, .view-mode .select-item {
@@ -1198,7 +1195,7 @@ body.is-pc {
     }
 
     .daimyo-list-header, .daimyo-list-item {
-        grid-template-columns: 100px 110px 70px 60px 70px 60px;
+        grid-template-columns: 80px 110px 70px 60px 70px 60px;
         font-size: 0.9rem; min-height: 36px;
     }
 
