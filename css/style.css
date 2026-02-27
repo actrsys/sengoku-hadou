@@ -994,36 +994,45 @@ body.is-pc {
     }
 
     .responsive-war-face {
-        width: 140px; /* ★変更：スクロールしないように、顔を少しだけ小さくしました！ */
+        width: 140px; 
         height: 140px;
         border-width: 3px; 
     }
 
     .responsive-army-stats {
         width: 100%; 
-        font-size: 1.05rem; /* ★変更：文字も少しだけスリムに */
-        gap: 2px; /* ★変更：行と行の隙間をギューッと詰めます */
-        margin-top: 5px;
+        font-size: 1.2rem; /* ★変更：文字を全体的に大きく！ */
+        gap: 8px; /* ★変更：行と行の隙間を少し広げます */
+        margin-top: 15px; /* ★変更：顔画像との間を少し開けます */
+        display: flex;
+        flex-direction: column;
+        align-items: center; /* ★追加：中身をど真ん中に集めます */
     }
 
     .stat-busho {
-        font-size: 1.15rem; 
+        font-size: 1.3rem; /* ★変更：文字を大きく */
         text-align: center; 
-        margin-bottom: 2px; /* ★変更：下の隙間を詰めます */
+        margin-bottom: 10px; /* ★変更：下の隙間を広げます */
+        width: 75%; /* ★追加：背景の幅を短くしてカッコよく！ */
+    }
+
+    /* ★追加：パラメーターの行を短くして真ん中に寄せます */
+    .stat-row {
+        width: 65%; /* 短くする割合（お好みで調整できます） */
     }
 
     .stat-val-large {
-        font-size: 1.2rem; 
+        font-size: 1.5rem; /* ★変更：兵士数をさらに大きく！ */
     }
 
     .responsive-army-title {
-        font-size: 1.3rem; 
+        font-size: 1.4rem; /* ★変更：タイトルも少し大きく */
         text-align: center; 
         margin-bottom: 5px; 
     }
     
     .title-long-text {
-        font-size: 1.1rem !important;
+        font-size: 1.15rem !important;
     }
 }
 /* =========================================================
