@@ -1220,14 +1220,16 @@ body.is-pc {
    ========================================================= */
 .select-item:nth-child(even), 
 .daimyo-list-item:nth-child(even), 
-.kunishu-list-item:nth-child(even) {
+.kunishu-list-item:nth-child(even),
+.faction-list-item:nth-child(even) {
     background-color: #f0f4f8; /* 薄い灰色っぽい青っぽい色 */
 }
 
 /* ★追加：マウスが乗った時は「必ず」この色にする（ゼブラに負けない魔法） */
 .select-item:hover, 
 .daimyo-list-item:hover, 
-.kunishu-list-item:hover {
+.kunishu-list-item:hover,
+.faction-list-item:hover {
     background-color: #e3f2fd !important; /* 少し明るい水色で光らせます */
 }
 /* =========================================================
@@ -1407,8 +1409,6 @@ body.is-pc .grade-plus { font-size: 0.8rem !important; }
     border-bottom: 2px solid #e0e0e0;
     scroll-snap-align: start;
 }
-.faction-list-item:nth-child(even) { background-color: #f0f4f8; }
-.faction-list-item:hover { background-color: #e3f2fd !important; }
 .faction-list-item:last-child { margin-bottom: 25px; }
 
 /* スマホ用レイアウト */
@@ -1428,7 +1428,6 @@ body.is-pc .faction-list-header,
 body.is-pc .faction-list-item {
     grid-template-columns: 140px 80px 100px 100px;
     font-size: 0.95rem; min-height: 36px;
-    margin: 0 auto;
 }
 body.is-pc .faction-list-container { scroll-padding-top: 38px; }
 
