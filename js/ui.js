@@ -82,7 +82,6 @@ class UIManager {
 		    lastTouchEnd = now;
 		}, false);
 		
-		// --- ここから書き足し ---
 		const titleScreen = document.getElementById('title-screen');
 		const tapMessage = document.getElementById('tap-to-proceed');
 		const menuButtons = document.getElementById('menu-buttons');
@@ -105,9 +104,21 @@ class UIManager {
 		    // 画面全体に「クリックを監視してね」と命令します
 		    titleScreen.addEventListener('click', onTitleClick);
 		}
-		// --- 書き足しここまで ---
-    }
+		
+        document.addEventListener('wheel', (e) => {
+            // カクカクスクロールするリストの箱を探します
+            const listObj = e.target.closest('.list-container, .result-body, #divide-list, .daimyo-list-container');
+            if (listObj) {
+                // いつもの「複数行一気にスクロールしちゃう動き」を強制ストップ！
+                e.preventDefault();
+                // ホイールを回した方向に、ほんの少しだけ動かします。
+                // あとは「カクカクスクロール（scroll-snap）」の魔法が、次の1行に自動でピタッと吸い寄せてくれます！
+                listObj.scrollBy({ top: Math.sign(e.deltaY) * 30, behavior: 'smooth' });
+            }
+        }, { passive: false });
 
+    }
+    
     initSidebarResize() {
         const sidebar = document.getElementById('pc-sidebar');
         const resizer = document.getElementById('sidebar-resizer');
@@ -392,7 +403,13 @@ class UIManager {
     }
     
     showDaimyoList() {
-        let listHtml = `<div style="text-align:left; padding: 10px; background: #fafafa; border: 1px solid #ccc; border-radius: 4px;">`;
+        // ★ ヘッダー部分（外側に固定される項目名）を作ります
+        let listHtml = `
+            <div class="daimyo-list-header">
+                <span>大名家名</span><span>当主名</span><span>戦力</span><span>城数</span><span>友好度</span><span>関係</span>
+            </div>
+            <div class="daimyo-list-container">
+        `;
         
         const activeClans = this.game.clans.filter(c => c.id !== 0 && this.game.castles.some(cs => cs.ownerClan === c.id));
         
@@ -400,45 +417,43 @@ class UIManager {
             const castles = this.game.castles.filter(c => c.ownerClan === clan.id);
             const leader = this.game.getBusho(clan.leaderId);
             let pop = 0, sol = 0, koku = 0, gold = 0, rice = 0;
-            castles.forEach(c => {
-                pop += c.population;
-                sol += c.soldiers;
-                koku += c.kokudaka;
-                gold += c.gold;
-                rice += c.rice;
-            });
+            castles.forEach(c => { pop += c.population; sol += c.soldiers; koku += c.kokudaka; gold += c.gold; rice += c.rice; });
             const power = Math.floor(pop / 2000) + Math.floor(sol / 20) + Math.floor(koku / 20) + Math.floor(gold / 50) + Math.floor(rice / 100);
             return {
-                id: clan.id,
-                name: clan.name,
-                leaderName: leader ? leader.name : "不明",
-                power: power,
-                castlesCount: castles.length
+                id: clan.id, name: clan.name, leaderName: leader ? leader.name : "不明",
+                power: power, castlesCount: castles.length
             };
         });
 
         clanDataList.sort((a,b) => b.power - a.power);
 
         clanDataList.forEach(d => {
-            let diplomacyText = "";
-            // もし自分の大名家じゃなかったら、友好度と状態の文字を作ります
+            let friendScore = "-";
+            let friendStatus = "-";
+            
+            // 自分の大名家じゃなかったら、友好度と状態を入れます
             if (d.id !== this.game.playerClanId) {
                 const relation = this.game.getRelation(this.game.playerClanId, d.id);
                 if (relation) {
-                    diplomacyText = `<span style="font-size:0.9rem; color:#1976d2; margin-left: 10px;">友好度: ${relation.sentiment} (${relation.status})</span>`;
+                    friendScore = relation.sentiment;
+                    friendStatus = relation.status;
                 }
             }
 
-            // ★変更：クリック処理（onclick）を消し、普通に表示するだけのリストにしました。
-            listHtml += `<div style="border-bottom:1px dashed #bbb; padding:8px 0;">`;
-            listHtml += `<div style="font-weight:bold; font-size:1.1rem;">${d.name} <span style="font-size:0.9rem; font-weight:normal;">(当主: ${d.leaderName})</span>${diplomacyText}</div>`;
-            listHtml += `<div style="color:#d32f2f; font-weight:bold; margin-top:3px;">戦力: ${d.power} <span style="font-size:0.8rem; color:#555; font-weight:normal;">(城数:${d.castlesCount})</span></div>`;
+            // ★変更：横1行に並べる専用の魔法の箱に入れます
+            listHtml += `<div class="daimyo-list-item">`;
+            listHtml += `<span style="font-weight:bold;">${d.name}</span>`;
+            listHtml += `<span>${d.leaderName}</span>`;
+            listHtml += `<span style="color:#d32f2f; font-weight:bold;">${d.power}</span>`;
+            listHtml += `<span>${d.castlesCount}</span>`;
+            listHtml += `<span style="color:#1976d2;">${friendScore}</span>`;
+            listHtml += `<span>${friendStatus}</span>`;
             listHtml += `</div>`;
         });
-        listHtml += `</div>`;
+        listHtml += `</div>`; // .daimyo-list-container の終わり
         
-        // ★変更：「大名一覧」の文字がスクロールに巻き込まれないよう、上にくっつく（sticky）ようにしました。
-        this.showResultModal(`<h3 style="margin:0; position: sticky; top: 0; background: #fff; z-index: 10; padding-bottom: 10px; border-bottom: 2px solid #ddd;">大名一覧</h3><div style="margin-top: 10px;">${listHtml}</div>`);
+        // 結果画面のタイトル部分にくっつけて表示します
+        this.showResultModal(`<h3 style="margin-top:0; border-bottom: 2px solid #ddd; padding-bottom: 10px;">大名一覧</h3>${listHtml}`);
     }
 
     // 引数に「isDirect = false」というのを追加して、丸ごと差し替えます
