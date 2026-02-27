@@ -1525,55 +1525,12 @@ class UIManager {
         const isViewMode = (actionType === 'view_only' || actionType === 'all_busho_list');
         if (this.selectorList) {
             this.selectorList.innerHTML = `
-                <div class="kunishu-list-header ${isViewOnly ? 'view-mode' : ''}">
-                    ${isViewOnly ? '' : '<span></span>'}<span>勢力名</span><span>兵数</span><span>防御</span><span>友好度</span>
+                <div class="list-header">
+                    <span class="col-act">行動</span><span class="col-name">名前</span><span class="col-rank">身分</span><span class="col-stat">統率</span><span class="col-stat">武勇</span><span class="col-stat">政務</span><span class="col-stat">外交</span><span class="col-stat">智謀</span><span class="col-stat">魅力</span>
                 </div>
             `;
-            if (isViewOnly) this.selectorList.classList.add('view-mode');
-            else this.selectorList.classList.remove('view-mode');
-            
-            kunishus.forEach(k => {
-                const name = k.getName(window.GameApp);
-                const relVal = k.getRelation(window.GameApp.playerClanId);
-                
-                // ★追加：友好度を赤・青のゲージにする魔法
-                const relPercent = Math.min(100, Math.max(0, Number(relVal) || 0));
-                const friendBarHtml = `<div class="bar-bg bar-bg-friend"><div class="bar-fill bar-fill-friend" style="width:${relPercent}%;"></div></div>`;
-
-                const div = document.createElement('div');
-                div.className = 'kunishu-list-item'; 
-                
-                if (isViewOnly) {
-                    // ★変更：数字の代わりにゲージを表示します
-                    div.innerHTML = `<strong class="col-kunishu-name">${name}</strong><span>${k.soldiers}</span><span>${k.defense}</span><span>${friendBarHtml}</span>`;
-                    div.style.cursor = 'default';
-                } else {
-                    // ★変更：数字の代わりにゲージを表示します
-                    div.innerHTML = `<span></span><strong class="col-kunishu-name">${name}</strong><span>${k.soldiers}</span><span>${k.defense}</span><span>${friendBarHtml}</span>`;
-                    div.style.cursor = 'pointer';
-                    
-                    div.onclick = () => {
-                        // 一旦すべての選択色を消す
-                        const allItems = this.selectorList.querySelectorAll('.kunishu-list-item');
-                        allItems.forEach(item => {
-                            item.classList.remove('selected');
-                        });
-                        
-                        // クリックした行に色を付ける
-                        div.classList.add('selected');
-                        selectedKunishuId = k.id;
-                        
-                        // 決定ボタンを押せるようにする
-                        if (this.selectorConfirmBtn) {
-                            this.selectorConfirmBtn.disabled = false;
-                            this.selectorConfirmBtn.style.opacity = 1.0;
-                        }
-                    };
-                }
-                this.selectorList.appendChild(div);
-            });
         }
-        const contextEl = document.getElementById('selector-context-info'); if(contextEl) contextEl.classList.remove('hidden'); 
+        const contextEl = document.getElementById('selector-context-info'); if(contextEl) contextEl.classList.remove('hidden');
         const c = this.currentCastle; 
         let infoHtml = ""; 
         let bushos = []; 
@@ -2397,17 +2354,22 @@ class UIManager {
             
             kunishus.forEach(k => {
                 const name = k.getName(window.GameApp);
-                const rel = k.getRelation(window.GameApp.playerClanId);
+                const relVal = k.getRelation(window.GameApp.playerClanId);
+                
+                // ★追加：友好度を赤・青のゲージにする魔法
+                const relPercent = Math.min(100, Math.max(0, Number(relVal) || 0));
+                const friendBarHtml = `<div class="bar-bg bar-bg-friend"><div class="bar-fill bar-fill-friend" style="width:${relPercent}%;"></div></div>`;
+
                 const div = document.createElement('div');
                 div.className = 'kunishu-list-item'; 
                 
                 if (isViewOnly) {
-                    // ★見るだけモード（先頭の空箱なし）
-                    div.innerHTML = `<strong class="col-kunishu-name">${name}</strong><span>${k.soldiers}</span><span>${k.defense}</span><span>${rel}</span>`;
+                    // ★変更：数字の代わりにゲージを表示します
+                    div.innerHTML = `<strong class="col-kunishu-name">${name}</strong><span>${k.soldiers}</span><span>${k.defense}</span><span>${friendBarHtml}</span>`;
                     div.style.cursor = 'default';
                 } else {
-                    // ★選択モード（先頭に空箱あり）
-                    div.innerHTML = `<span></span><strong class="col-kunishu-name">${name}</strong><span>${k.soldiers}</span><span>${k.defense}</span><span>${rel}</span>`;
+                    // ★変更：数字の代わりにゲージを表示します
+                    div.innerHTML = `<span></span><strong class="col-kunishu-name">${name}</strong><span>${k.soldiers}</span><span>${k.defense}</span><span>${friendBarHtml}</span>`;
                     div.style.cursor = 'pointer';
                     
                     div.onclick = () => {
