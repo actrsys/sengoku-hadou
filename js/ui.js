@@ -351,47 +351,71 @@ class UIManager {
         }, { passive: false });
 
         // =========================================================
+        // ★ マウスホイールでマップを拡大縮小する魔法（PC用）
+        // =========================================================
+        sc.addEventListener('wheel', (e) => {
+            if (document.body.classList.contains('is-pc')) {
+                e.preventDefault(); 
+                // ★追加：マウスの現在の座標（clientX, clientY）を一緒に渡します！
+                if (e.deltaY < 0) this.changeMapZoom(1, e.clientX, e.clientY);       
+                else if (e.deltaY > 0) this.changeMapZoom(-1, e.clientX, e.clientY); 
+            }
+        }, { passive: false });
+
+        // =========================================================
         // ★ 2本指のピンチ操作でマップを拡大縮小する魔法（スマホ用）
         // =========================================================
         let initialPinchDist = null;
+        let pinchCenter = null; // ★追加：指と指の中心点を記憶する箱
 
         sc.addEventListener('touchstart', (e) => {
             if (e.touches.length === 2) {
-                // 2本指の間の距離を測ります
                 initialPinchDist = Math.hypot(
                     e.touches[0].pageX - e.touches[1].pageX,
                     e.touches[0].pageY - e.touches[1].pageY
                 );
+                // ★追加：指と指の真ん中の座標を計算して記録します
+                pinchCenter = {
+                    x: (e.touches[0].clientX + e.touches[1].clientX) / 2,
+                    y: (e.touches[0].clientY + e.touches[1].clientY) / 2
+                };
             }
         }, { passive: false });
 
         sc.addEventListener('touchmove', (e) => {
             if (e.touches.length === 2) {
-                e.preventDefault(); // マップ上での誤動作を完全に防ぐ
+                e.preventDefault(); 
                 if (initialPinchDist === null) return;
                 
-                // 動かした後の2本指の距離を測ります
                 const currentDist = Math.hypot(
                     e.touches[0].pageX - e.touches[1].pageX,
                     e.touches[0].pageY - e.touches[1].pageY
                 );
                 
-                // 指の距離が50ピクセル変わるごとにズームを切り替える
                 const diff = currentDist - initialPinchDist;
                 if (diff > 50) {
-                    this.changeMapZoom(1);  // 指を広げたら拡大
-                    initialPinchDist = currentDist; // 基準をリセット
+                    this.changeMapZoom(1, pinchCenter.x, pinchCenter.y);  // 中心点を指定して拡大！
+                    initialPinchDist = currentDist; 
+                    // ★ズームするたびに中心点も更新
+                    pinchCenter = {
+                        x: (e.touches[0].clientX + e.touches[1].clientX) / 2,
+                        y: (e.touches[0].clientY + e.touches[1].clientY) / 2
+                    };
                 } else if (diff < -50) {
-                    this.changeMapZoom(-1); // 指を縮めたら縮小
+                    this.changeMapZoom(-1, pinchCenter.x, pinchCenter.y); // 中心点を指定して縮小！
                     initialPinchDist = currentDist;
+                    pinchCenter = {
+                        x: (e.touches[0].clientX + e.touches[1].clientX) / 2,
+                        y: (e.touches[0].clientY + e.touches[1].clientY) / 2
+                    };
                 }
             }
         }, { passive: false });
 
         sc.addEventListener('touchend', (e) => {
-            // 指を離したらリセット
             if (e.touches.length < 2) {
                 initialPinchDist = null;
+                pinchCenter = null; // リセット
             }
         });
     }
@@ -868,14 +892,46 @@ class UIManager {
         }
     }
     
-    changeMapZoom(delta) {
+    changeMapZoom(delta, cx = null, cy = null) {
+        const oldLevel = this.zoomLevel;
         this.zoomLevel += delta;
         if (this.zoomLevel < 0) this.zoomLevel = 0;
         if (this.zoomLevel > 2) this.zoomLevel = 2;
         
+        if (this.zoomLevel === oldLevel) return; // 限界ならストップ
+
+        const oldScale = this.mapScale;
         this.mapScale = this.zoomStages[this.zoomLevel];
-        this.applyMapScale();
-        this.updateZoomButtons();
+        const newScale = this.mapScale;
+
+        const sc = document.getElementById('map-scroll-container');
+        
+        if (sc && cx !== null && cy !== null) {
+            const rect = sc.getBoundingClientRect();
+            // 画面の左上を基準にしたマウス・指の座標から、スクロール枠内の相対座標を出す
+            const relX = cx - rect.left;
+            const relY = cy - rect.top;
+
+            // スクロール量を含めた、マップ全体での絶対座標
+            const absX = sc.scrollLeft + relX;
+            const absY = sc.scrollTop + relY;
+
+            // スケール変更後の新しい絶対座標
+            const ratio = newScale / oldScale;
+            const newAbsX = absX * ratio;
+            const newAbsY = absY * ratio;
+
+            // マップの大きさを先に適用
+            this.applyMapScale();
+            this.updateZoomButtons();
+
+            // 新しい絶対座標から相対座標を引いて、狙った位置にスクロールバーを合わせる！
+            sc.scrollLeft = newAbsX - relX;
+            sc.scrollTop = newAbsY - relY;
+        } else {
+            this.applyMapScale();
+            this.updateZoomButtons();
+        }
     }
 
     updateZoomButtons() {
