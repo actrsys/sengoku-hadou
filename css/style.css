@@ -1171,7 +1171,7 @@ body.is-pc #ai-guard {
     font-size: 0.65rem;
     position: relative;
     left: -4px; /* ★左（アルファベットの方向）へ無理やり引っ張って食い込ませる！ */
-    top: -20px;  /* ★さらに上へ持ち上げる！ */
+    top: -50px;  /* ★さらに上へ持ち上げる！ */
 }
 /* 武将一覧 */
 .list-header, .select-item {
@@ -1361,4 +1361,30 @@ body.is-pc {
 .result-body::-webkit-scrollbar-button:hover,
 #divide-list::-webkit-scrollbar-button:hover {
     background-color: #cfd8dc;
+}
+/* =========================================================
+   ★ ステータスの「＋」を絶対に右上に重ねる最強の魔法
+   ========================================================= */
+.grade-main {
+    font-size: 0.95rem !important; /* スマホのベースサイズ */
+}
+.grade-plus {
+    position: absolute !important;
+    font-size: 0.65rem !important;
+    top: 0 !important;
+    right: 0 !important;
+    left: auto !important; /* 余計な設定をキャンセル */
+    bottom: auto !important; /* 余計な設定をキャンセル */
+    transform: translate(30%, -10%) !important; /* ★右上に食い込ませる！ */
+}
+
+/* PCの時はサイズだけ少し大きくする */
+body.is-pc .grade-main { font-size: 1.1rem !important; }
+body.is-pc .grade-plus { font-size: 0.8rem !important; }
+
+/* =========================================================
+   ★ マップの「＋－」ボタンを消し去る魔法
+   ========================================================= */
+#zoom-controls {
+    display: none !important;
 }
