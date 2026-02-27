@@ -809,7 +809,7 @@ class UIManager {
         // ★変更1：余白を少し戻して（ズームを少し大きくして）画面にピッタリ合わせます
         let minScale = Math.min(scaleX, scaleY); 
         if (document.body.classList.contains('is-pc')) {
-            minScale *= 0.98; // ★ここの数字を「0.90」から「0.98」に差し替えました！
+            minScale *= 0.96; // ★ここの数字を「0.90」から「0.98」に差し替えました！
         } else {
             minScale *= 0.82; // スマホは小さくしすぎたので、見切れないギリギリのサイズに調整します！
         }
