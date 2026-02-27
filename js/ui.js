@@ -82,6 +82,13 @@ class UIManager {
 		    lastTouchEnd = now;
 		}, false);
 		
+		// ★ スマホブラウザ全体の2本指拡大（ピンチズーム）を禁止する強力な呪文
+		document.addEventListener('touchmove', (e) => {
+		    if (e.touches.length > 1) {
+		        e.preventDefault();
+		    }
+		}, { passive: false });
+		
 		const titleScreen = document.getElementById('title-screen');
 		const tapMessage = document.getElementById('tap-to-proceed');
 		const menuButtons = document.getElementById('menu-buttons');
@@ -331,8 +338,64 @@ class UIManager {
             sc.scrollLeft = this.scrollLeft - walkX;
             sc.scrollTop = this.scrollTop - walkY;
         });
-    }
+        
+        // =========================================================
+        // ★ マウスホイールでマップを拡大縮小する魔法（PC用）
+        // =========================================================
+        sc.addEventListener('wheel', (e) => {
+            if (document.body.classList.contains('is-pc')) {
+                e.preventDefault(); // 画面がスクロールしちゃうのを防ぐ
+                if (e.deltaY < 0) this.changeMapZoom(1);       // 上に回したら拡大
+                else if (e.deltaY > 0) this.changeMapZoom(-1); // 下に回したら縮小
+            }
+        }, { passive: false });
 
+        // =========================================================
+        // ★ 2本指のピンチ操作でマップを拡大縮小する魔法（スマホ用）
+        // =========================================================
+        let initialPinchDist = null;
+
+        sc.addEventListener('touchstart', (e) => {
+            if (e.touches.length === 2) {
+                // 2本指の間の距離を測ります
+                initialPinchDist = Math.hypot(
+                    e.touches[0].pageX - e.touches[1].pageX,
+                    e.touches[0].pageY - e.touches[1].pageY
+                );
+            }
+        }, { passive: false });
+
+        sc.addEventListener('touchmove', (e) => {
+            if (e.touches.length === 2) {
+                e.preventDefault(); // マップ上での誤動作を完全に防ぐ
+                if (initialPinchDist === null) return;
+                
+                // 動かした後の2本指の距離を測ります
+                const currentDist = Math.hypot(
+                    e.touches[0].pageX - e.touches[1].pageX,
+                    e.touches[0].pageY - e.touches[1].pageY
+                );
+                
+                // 指の距離が50ピクセル変わるごとにズームを切り替える
+                const diff = currentDist - initialPinchDist;
+                if (diff > 50) {
+                    this.changeMapZoom(1);  // 指を広げたら拡大
+                    initialPinchDist = currentDist; // 基準をリセット
+                } else if (diff < -50) {
+                    this.changeMapZoom(-1); // 指を縮めたら縮小
+                    initialPinchDist = currentDist;
+                }
+            }
+        }, { passive: false });
+
+        sc.addEventListener('touchend', (e) => {
+            // 指を離したらリセット
+            if (e.touches.length < 2) {
+                initialPinchDist = null;
+            }
+        });
+    }
+    
     initContextMenu() {
         this.contextMenu = document.getElementById('custom-context-menu');
         this.ctxMenuBack = document.getElementById('ctx-menu-back');
