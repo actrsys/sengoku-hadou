@@ -427,26 +427,6 @@ body.is-pc {
 .modal-content h3 { margin-top: 0; border-bottom: 2px solid #ddd; padding-bottom: 10px; }
 .context-info { margin-bottom: 10px; padding: 10px; background: #e8eaf6; border-radius: 4px; font-size: 0.9rem; }
 
-.list-header {
-    display: grid; 
-    grid-template-columns: 25px 40px 110px 50px repeat(6, 1fr); /* ★横幅を調整 */
-    gap: 2px; font-weight: bold; background: #37474f; color:#fff; padding: 8px 5px; font-size: 0.8rem;
-    position: sticky; top: 0; z-index: 10;
-    text-align: center; 
-}
-.list-container { flex: 1; overflow-y: auto; border: 1px solid #ddd; min-height: 200px; }
-.select-item {
-    display: grid; 
-    grid-template-columns: 25px 40px 110px 50px repeat(6, 1fr); /* ★横幅を調整 */
-    gap: 2px; padding: 10px 5px; border-bottom: 1px solid #eee; cursor: pointer; font-size: 0.85rem; align-items: center;
-    text-align: center; 
-}
-.select-item .col-name { text-align: left; padding-left: 5px; } /* ★名前を左寄せに */
-.select-item:hover { background: #f0f8ff; }
-.select-item.disabled { color: #aaa; pointer-events: none; background: #f9f9f9; }
-.select-item.selected { background-color: #ffe0b2 !important; border-left: 5px solid #ff9800; }
-.select-item input[type="checkbox"], .select-item input[type="radio"] { display: none; }
-
 .grade-container {
     display: inline-flex; position: relative; align-items: center;
     justify-content: center; width: 24px; height: 1.2em; font-family: 'Arial Black', sans-serif;
@@ -1111,117 +1091,125 @@ body.is-pc #ai-guard {
     position: absolute !important;
 }
 /* =========================================================
-   ★ リストを1行ずつカクカク（ピタッと）スクロールさせる魔法
+   ★ リストの縦線とスマホ対応、ズレ防止の究極魔法！
    ========================================================= */
-/* スクロールの動きをカクカクに設定します */
 .list-container,
+.daimyo-list-container,
 .result-body {
+    flex: 1; overflow-y: auto; min-height: 200px;
     scroll-snap-type: y mandatory;
+    scroll-padding-top: 36px; /* ★スクロール時にヘッダーの裏に隠れないようにする魔法！ */
+    border: 1px solid #ddd;
 }
 
-/* 各行の「一番上」を基準にピタッと止まるように設定します */
-.select-item,
-.kunishu-item,
-.kunishu-list-item, /* ★これを追加！ */
-.result-body > div > div {
+/* 縦の区切り線を入れ、スマホではみ出さないようにする共通ルール */
+.list-header > span, .select-item > span,
+.daimyo-list-header > span, .daimyo-list-item > span,
+.kunishu-list-header > span, .kunishu-list-item > span,
+.kunishu-list-header > strong, .kunishu-list-item > strong {
+    border-right: 1px solid #ddd; /* 縦の細い線 */
+    padding: 0 2px; 
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-sizing: border-box;
+    overflow: hidden; 
+    white-space: nowrap;
+    text-overflow: ellipsis; /* 文字がはみ出たら「…」にする */
+}
+/* ヘッダー部分の線は少し濃くします */
+.list-header > span, .daimyo-list-header > span, .kunishu-list-header > span, .kunishu-list-header > strong {
+    border-right: 1px solid #546e7a;
+}
+/* 一番右の列には線を引かない！ */
+.list-header > span:last-child, .select-item > span:last-child,
+.daimyo-list-header > span:last-child, .daimyo-list-item > span:last-child,
+.kunishu-list-header > span:last-child, .kunishu-list-item > span:last-child {
+    border-right: none;
+}
+
+/* ヘッダーの共通デザイン */
+.list-header, .daimyo-list-header, .kunishu-list-header {
+    background: #37474f; color: #fff; font-weight: bold;
+    position: sticky; top: 0; z-index: 10;
+}
+
+/* リストアイテムの共通デザイン */
+.select-item, .daimyo-list-item, .kunishu-list-item {
+    border-bottom: 1px solid #eee;
     scroll-snap-align: start;
-}
-
-/* =========================================================
-   ★ PC版で輸送・兵力分配・出陣画面を広く、3列にする魔法
-   ========================================================= */
-body.is-pc {
-    /* 縦と横の「白い箱」をドーンと大きく広げて見切れを防ぎます */
-    #quantity-modal .modal-content,
-    #unit-divide-modal .modal-content {
-        max-width: 900px !important; 
-        max-height: 90% !important;  
-    }
-
-    /* 中身を「縦に3つ並べてから、次の列へ移る」マス目に変えます */
-    #quantity-container,
-    #divide-list {
-        display: grid !important;
-        grid-auto-flow: column; /* まずは縦（下方向）に向かって並べます */
-        grid-template-rows: repeat(3, min-content); /* 縦は「3項目」までに制限します */
-        grid-auto-columns: 1fr; /* 新しくできた列の幅をみんな同じにします */
-        gap: 15px; /* マス目とマス目の隙間 */
-        align-items: start;
-    }
-
-    /* マス目になったので、元の「下側の余白」はゼロにしてスッキリさせます */
-    .qty-row,
-    #divide-list > div {
-        margin-bottom: 0 !important; 
-    }
-
-    /* 輸送や出陣の項目を、タイル状にしてカッコよく見やすくします */
-    .qty-row {
-        background: #f9f9f9;
-        padding: 10px;
-        border: 1px solid #ddd;
-        border-radius: 6px;
-    }
-}
-/* =========================================================
-   ★ 大名一覧を横並びにする魔法
-   ========================================================= */
-.daimyo-list-header {
-    display: grid;
-    grid-template-columns: 100px 110px 70px 60px 70px 60px; /* ★項目に合わせた固定幅 */
-    gap: 5px; font-weight: bold; background: #37474f; color: #fff; padding: 8px 5px; font-size: 0.85rem;
-    position: sticky; top: 0; z-index: 10;
-    text-align: center;
-}
-.daimyo-list-item {
-    display: grid;
-    grid-template-columns: 100px 110px 70px 60px 70px 60px;
-    gap: 5px; padding: 10px 5px; border-bottom: 1px solid #eee; font-size: 0.9rem; align-items: center;
-    scroll-snap-align: start; text-align: center;
-}
-.daimyo-list-item .col-daimyo-name, 
-.daimyo-list-item .col-leader-name {
-    text-align: left; padding-left: 5px; /* ★名前を左寄せに */
-}
-/* マウスが乗ったらほんのり青く光る魔法 */
-.daimyo-list-item:hover { background: #f0f8ff; }
-
-/* リスト全体を囲む大きな箱 */
-.daimyo-list-container {
-    flex: 1; 
-    overflow-y: auto; 
-    border: 1px solid #ddd; 
-    min-height: 200px; 
-    max-height: 60vh;
-    scroll-snap-type: y mandatory; /* カクカクスクロールの設定 */
-}
-/* =========================================================
-   ★ 国人衆一覧を大名・武将と同じ「表形式」にする魔法
-   ========================================================= */
-.kunishu-list-header {
-    display: grid;
-    grid-template-columns: 25px 130px 80px 80px 80px; /* ★項目に合わせた固定幅 */
-    gap: 5px; font-weight: bold; background: #37474f; color: #fff; padding: 8px 5px; font-size: 0.85rem;
-    position: sticky; top: 0; z-index: 10;
-    text-align: center;
-}
-.kunishu-list-item {
-    display: grid;
-    grid-template-columns: 25px 130px 80px 80px 80px;
-    gap: 5px; padding: 10px 5px; border-bottom: 1px solid #eee; font-size: 0.9rem; align-items: center;
-    scroll-snap-align: start; text-align: center;
-}
-.kunishu-list-item .col-kunishu-name {
-    text-align: left; padding-left: 5px; /* ★名前を左寄せに */
-}
-
-.kunishu-list-item.selectable {
     cursor: pointer;
 }
+.select-item:hover, .daimyo-list-item:hover, .kunishu-list-item:hover { background: #f0f8ff; }
 
-.kunishu-list-item:hover { background: #f0f8ff; }
-.kunishu-list-item.selected { background-color: #ffe0b2 !important; border-left: 5px solid #ff9800; }
-/* 大名一覧などを表示するウインドウの幅を少し広げて窮屈さをなくす魔法 */
-.result-content {
-    max-width: 550px !important;
+/* その他アイテムの状態 */
+.select-item.disabled { color: #aaa; pointer-events: none; background: #f9f9f9; }
+.select-item.selected, .kunishu-list-item.selected { background-color: #ffe0b2 !important; border-left: 5px solid #ff9800; }
+.select-item input[type="checkbox"], .select-item input[type="radio"] { display: none; }
+
+/* 左寄せにしたい項目の設定 */
+.select-item .col-name,
+.daimyo-list-item .col-daimyo-name, 
+.daimyo-list-item .col-leader-name,
+.kunishu-list-item .col-kunishu-name {
+    justify-content: flex-start !important;
+    padding-left: 5px;
 }
+
+/* --- スマホ時のフレキシブルなレイアウト（1行に収める魔法） --- */
+/* 武将一覧 */
+.list-header, .select-item {
+    display: grid; 
+    grid-template-columns: 20px 25px 3fr 1.5fr repeat(6, 1fr); 
+    font-size: clamp(0.6rem, 2.2vw, 0.85rem); /* 画面に合わせて小さく！ */
+    padding: 0; min-height: 30px; gap: 0;
+}
+.view-mode .list-header, .view-mode .select-item {
+    grid-template-columns: 35px 3.5fr 1.5fr repeat(6, 1fr); /* ★不要な余白を詰める魔法 */
+}
+
+/* 大名一覧 */
+.daimyo-list-header, .daimyo-list-item {
+    display: grid;
+    grid-template-columns: 3fr 2.5fr 1.5fr 1fr 1fr 1fr;
+    font-size: clamp(0.65rem, 2.5vw, 0.9rem);
+    padding: 0; min-height: 30px; gap: 0;
+}
+
+/* 国人衆一覧 */
+.kunishu-list-header, .kunishu-list-item {
+    display: grid;
+    grid-template-columns: 20px 3fr 1.5fr 1.5fr 1.5fr; 
+    font-size: clamp(0.7rem, 2.8vw, 0.9rem);
+    padding: 0; min-height: 30px; gap: 0;
+}
+.view-mode .kunishu-list-header, .view-mode .kunishu-list-item {
+    grid-template-columns: 3fr 1.5fr 1.5fr 1.5fr; /* ★不要な余白を詰める魔法 */
+}
+
+/* --- PC版（画面が広い時）の固定レイアウト --- */
+body.is-pc {
+    .list-header, .select-item {
+        grid-template-columns: 25px 40px 110px 50px repeat(6, 1fr); 
+        font-size: 0.85rem; min-height: 36px;
+    }
+    .view-mode .list-header, .view-mode .select-item {
+        grid-template-columns: 45px 120px 55px repeat(6, 1fr); 
+    }
+
+    .daimyo-list-header, .daimyo-list-item {
+        grid-template-columns: 100px 110px 70px 60px 70px 60px;
+        font-size: 0.9rem; min-height: 36px;
+    }
+
+    .kunishu-list-header, .kunishu-list-item {
+        grid-template-columns: 25px 130px 80px 80px 80px;
+        font-size: 0.9rem; min-height: 36px;
+    }
+    .view-mode .kunishu-list-header, .view-mode .kunishu-list-item {
+        grid-template-columns: 140px 80px 80px 80px;
+    }
+}
+
+/* 大名一覧などを表示するウインドウの幅を少し広げて窮屈さをなくす魔法 */
+.result-content { max-width: 550px !important; }
