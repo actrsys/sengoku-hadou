@@ -1190,9 +1190,6 @@ body.is-pc {
         grid-template-columns: 45px 100px 55px repeat(6, 1fr); 
         font-size: 0.85rem; min-height: 36px;
     }
-    .view-mode .list-header, .view-mode .select-item {
-        grid-template-columns: 45px 120px 55px repeat(6, 1fr); 
-    }
 
     .daimyo-list-header, .daimyo-list-item {
         grid-template-columns: 80px 110px 70px 60px 70px 60px;
