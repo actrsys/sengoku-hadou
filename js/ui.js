@@ -114,7 +114,7 @@ class UIManager {
 		
         document.addEventListener('wheel', (e) => {
             // カクカクスクロールするリストの箱を探します
-            const listObj = e.target.closest('.list-container, .result-body, #divide-list, .daimyo-list-container');
+            const listObj = e.target.closest('.list-container, .result-body, #divide-list, .daimyo-list-container, .faction-list-container');
             if (listObj) {
                 // いつもの「複数行一気にスクロールしちゃう動き」を強制ストップ！
                 e.preventDefault();
@@ -135,7 +135,7 @@ class UIManager {
         let lastDragDelta = 0; // ★追加：最後に動かした方向を記憶する箱
 
         document.addEventListener('mousedown', (e) => {
-            const listObj = e.target.closest('.list-container, .result-body, #divide-list, .daimyo-list-container');
+            const listObj = e.target.closest('.list-container, .result-body, #divide-list, .daimyo-list-container, .faction-list-container');
             if (listObj) {
                 const rect = listObj.getBoundingClientRect();
                 const isScrollbar = (e.clientX > rect.right - 20); 
@@ -590,7 +590,6 @@ class UIManager {
         }
     }
 
-    // 引数に「isDirect = false」というのを追加して、丸ごと差し替えます
     showFactionList(clanId, isDirect = false) {
         const clan = this.game.clans.find(c => c.id === clanId);
         if (!clan) return;
@@ -601,49 +600,62 @@ class UIManager {
         bushos.forEach(b => {
             const fId = b.factionId;
             if (!factions[fId]) {
-                factions[fId] = {
-                    count: 0,
-                    leader: null
-                };
+                factions[fId] = { count: 0, leader: null };
             }
             factions[fId].count++;
-            if (b.isFactionLeader) {
-                factions[fId].leader = b;
-            }
+            if (b.isFactionLeader) { factions[fId].leader = b; }
         });
 
-        let listHtml = `<div style="text-align:left; padding: 10px; background: #fafafa; border: 1px solid #ccc; border-radius: 4px;">`;
-        
         const fIds = Object.keys(factions).map(Number).filter(id => id !== 0);
+        let nonFactionCount = factions[0] ? factions[0].count : 0;
+        
+        // ★ 無派閥を右上に出し、表のヘッダーを作ります
+        let listHtml = `
+            <div style="text-align:right; font-weight:bold; color:#555; font-size:0.9rem; margin-bottom:5px;">無派閥: ${nonFactionCount}名</div>
+            <div class="faction-list-container">
+                <div class="faction-list-header">
+                    <span>派閥主</span><span>武将数</span><span>性格</span><span>方針</span>
+                </div>
+        `;
         
         if (fIds.length === 0) {
-            listHtml += `<div style="padding:8px 0;">派閥はありません。</div>`;
+            listHtml += `<div style="padding:10px;">派閥はありません。</div>`;
         } else {
             fIds.forEach(fId => {
                 const fData = factions[fId];
-                let factionName = "不明派閥";
-                if (fData.leader) {
-                    const fullName = fData.leader.name.replace(/\|/g, '');
-                    factionName = `${fullName}派閥`;
+                const leader = fData.leader;
+                let leaderName = leader ? leader.name : "不明";
+                let count = fData.count;
+                let seikaku = "不明";
+                let hoshin = "不明";
+                
+                if (leader) {
+                    // ★性格の判定魔法
+                    const mil = (leader.leadership + leader.strength) / 2;
+                    const pol = (leader.politics + leader.diplomacy) / 2;
+                    if (mil > pol * 1.2) seikaku = "武闘派";
+                    else if (pol > mil * 1.2) seikaku = "穏健派";
+                    else seikaku = "中道";
+                    
+                    // ★方針の判定魔法
+                    const inn = leader.innovation || 0;
+                    if (inn >= 66) hoshin = "革新派";
+                    else if (inn >= 36) hoshin = "中道";
+                    else hoshin = "保守派";
                 }
-                listHtml += `<div style="border-bottom:1px dashed #bbb; padding:8px 0;">`;
-                listHtml += `<div style="font-weight:bold; font-size:1.1rem;">${factionName}</div>`;
-                listHtml += `<div style="margin-top:3px;">所属人数: ${fData.count}名</div>`;
-                listHtml += `</div>`;
+                
+                // 見やすいように色もつけちゃいます！
+                listHtml += `
+                <div class="faction-list-item">
+                    <strong class="col-faction-name">${leaderName}</strong>
+                    <span>${count}</span>
+                    <span style="color:${seikaku === '武闘派' ? '#d32f2f' : (seikaku === '穏健派' ? '#1976d2' : '#388e3c')};">${seikaku}</span>
+                    <span style="color:${hoshin === '革新派' ? '#e91e63' : (hoshin === '保守派' ? '#795548' : '#388e3c')};">${hoshin}</span>
+                </div>`;
             });
         }
-        
-        if (factions[0] && factions[0].count > 0) {
-            listHtml += `<div style="padding:8px 0;">`;
-            listHtml += `<div style="font-weight:bold; font-size:1.1rem;">無派閥</div>`;
-            listHtml += `<div style="margin-top:3px;">所属人数: ${factions[0].count}名</div>`;
-            listHtml += `</div>`;
-        }
-        
         listHtml += `</div>`;
 
-        // ↓ここが変わりました！
-        // コマンドから直接開かれた時は「閉じる」、大名一覧から来た時は「戻る」にします
         let customFooter = "";
         if (isDirect) {
             customFooter = `<button class="btn-primary" onclick="window.GameApp.ui.closeResultModal()">閉じる</button>`;
@@ -651,7 +663,21 @@ class UIManager {
             customFooter = `<button class="btn-secondary" onclick="window.GameApp.ui.showDaimyoList()">戻る</button>`;
         }
         
-        this.showResultModal(`<h3 style="margin-top:0;">${clan.name} 派閥一覧</h3>${listHtml}`, null, customFooter);
+        this.showResultModal(`<h3 style="margin-top:0; border-bottom: 2px solid #ddd; padding-bottom: 10px; flex-shrink:0;">${clan.name} 派閥一覧</h3>${listHtml}`, () => {
+            // ウインドウを閉じる時に外側の箱の魔法を解除します
+            if (this.resultBody) {
+                this.resultBody.style.overflowY = '';
+                this.resultBody.style.display = '';
+                this.resultBody.style.flexDirection = '';
+            }
+        }, customFooter);
+
+        // 表を開いている間だけ、外側の箱のスクロールを消して内側だけを動かします
+        if (this.resultBody) {
+            this.resultBody.style.overflowY = 'hidden';
+            this.resultBody.style.display = 'flex';
+            this.resultBody.style.flexDirection = 'column';
+        }
     }
 
     showResultModal(msg, onClose = null, customFooterHtml = null) { 
@@ -783,8 +809,13 @@ class UIManager {
         const scaleX = wrapper.clientWidth / mapW;
         const scaleY = wrapper.clientHeight / mapH;
         
-        // ★変更1：最小サイズは、必ず全体が入り、ほんの少し上下左右に余白ができるようにします
-        let minScale = Math.min(scaleX, scaleY) * 0.85; 
+        // ★変更1：スマホ版の時は最小サイズをさらに小さくして、確実に入るようにします！
+        let minScale = Math.min(scaleX, scaleY); 
+        if (document.body.classList.contains('is-pc')) {
+            minScale *= 0.85; // PCは今まで通り少し余裕を持たせる
+        } else {
+            minScale *= 0.70; // スマホはさらに小さくして見切れを防ぐ！
+        }
         
         // ★変更2：最大サイズを計算します（スマホは1.0、PCはウィンドウサイズに合わせて現在の2倍くらいに！）
         let maxScale = 1.0;
@@ -799,7 +830,13 @@ class UIManager {
             (minScale + maxScale) / 2,  
             maxScale                    
         ];
-        this.zoomLevel = 1; 
+        
+        // ★変更3：大名選択の時は、最初から一番引いた状態（最小ズーム）でスタート！
+        if (this.game.phase === 'daimyo_select') {
+            this.zoomLevel = 0; 
+        } else {
+            this.zoomLevel = 1; 
+        }
         this.mapScale = this.zoomStages[this.zoomLevel];
         
         this.applyMapScale();
