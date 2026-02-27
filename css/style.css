@@ -1448,3 +1448,14 @@ body.is-pc .faction-list-container { scroll-padding-top: 38px; }
 .kunishu-list-item.selected:hover {
     background-color: #ffcc80 !important; /* 選択中（薄いオレンジ）より少し濃い色 */
 }
+/* =========================================================
+   マップのスクロールバーを完全に隠す魔法
+   （スクロール自体はマウスのドラッグで今まで通りできます！）
+   ========================================================= */
+#map-scroll-container {
+    -ms-overflow-style: none;    /* IE, Edgeブラウザ用 */
+    scrollbar-width: none;       /* Firefoxブラウザ用 */
+}
+#map-scroll-container::-webkit-scrollbar {
+    display: none;               /* Chrome, Safari, スマホブラウザ用 */
+}
