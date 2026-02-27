@@ -135,6 +135,9 @@ class UIManager {
         let lastDragDelta = 0; // ★追加：最後に動かした方向を記憶する箱
 
         document.addEventListener('mousedown', (e) => {
+            // ★追加：スマホのタップ操作に誤爆しないよう、PCの時だけこの魔法を動かします！
+            if (!document.body.classList.contains('is-pc')) return;
+
             const listObj = e.target.closest('.list-container, .result-body, #divide-list, .daimyo-list-container, .faction-list-container');
             if (listObj) {
                 const rect = listObj.getBoundingClientRect();
@@ -898,7 +901,6 @@ class UIManager {
 
         const oldScale = this.mapScale;
         const targetScale = this.zoomStages[this.zoomLevel];
-        this.mapScale = targetScale;
 
         const sc = document.getElementById('map-scroll-container');
         
@@ -906,48 +908,63 @@ class UIManager {
             this.isAnimatingZoom = true;
             
             const rect = sc.getBoundingClientRect();
-            // コンテナ内でのマウス・指の相対座標
             const relX = cx - rect.left;
             const relY = cy - rect.top;
 
-            // ★ 記事の理論の核心：マウスが指しているマップの「絶対座標（スケール1の時の本来の位置）」を逆算します！
-            const mapBaseX = (sc.scrollLeft + relX) / oldScale;
-            const mapBaseY = (sc.scrollTop + relY) / oldScale;
+            // マップ本来のサイズと、画面のサイズ
+            const mapW = this.mapEl.offsetWidth;
+            const mapH = this.mapEl.offsetHeight;
+            const scW = sc.clientWidth - 40; 
+            const scH = sc.clientHeight - 40;
 
-            const duration = 250; // アニメーション時間（0.25秒）
+            // 倍率から正確な「透明な余白（マージン）」を計算する関数
+            const getMargin = (scale) => {
+                let mX = -(mapW - mapW * scale) / 2;
+                let mY = -(mapH - mapH * scale) / 2;
+                if (mapW * scale < scW) mX += (scW - mapW * scale) / 2;
+                if (mapH * scale < scH) mY += (scH - mapH * scale) / 2;
+                return { x: mX, y: mY };
+            };
+
+            const oldMargin = getMargin(oldScale);
+
+            // ★ 修正：余白も考慮した、マップの「真の絶対座標」を計算します！
+            const trueMapX = (sc.scrollLeft + relX - oldMargin.x) / oldScale;
+            const trueMapY = (sc.scrollTop + relY - oldMargin.y) / oldScale;
+
+            const duration = 250; 
             const startTime = performance.now();
 
-            // JSで1秒間に60回、スケールとスクロール位置を同期させる最強のアニメーション魔法
             const animate = (currentTime) => {
                 const elapsed = currentTime - startTime;
                 let progress = elapsed / duration;
                 if (progress > 1) progress = 1;
                 
-                // イージング関数（最初早く、最後ゆっくり「ぬるっと」止まる）
                 const easeOut = 1 - Math.pow(1 - progress, 3);
-                
-                // 現在のコマのスケールを計算
                 const currentScale = oldScale + (targetScale - oldScale) * easeOut;
                 
-                // マップの見た目を大きく（小さく）する
+                // 1. スケールと余白（マージン）を毎フレーム滑らかに変化させる！
+                this.mapScale = currentScale;
                 this.mapEl.style.transform = `scale(${currentScale})`;
                 
-                // ★ スケールが変わっても、マウス位置の「絶対座標」が常に画面の同じ場所(relX, relY)に来るようにスクロールを合わせ続ける！
-                sc.scrollLeft = (mapBaseX * currentScale) - relX;
-                sc.scrollTop = (mapBaseY * currentScale) - relY;
+                const currentMargin = getMargin(currentScale);
+                this.mapEl.style.margin = `${currentMargin.y}px ${currentMargin.x}px`;
+                
+                // 2. 余白が変わっても、マウス位置が絶対にズレないようにスクロールを同期！
+                sc.scrollLeft = (trueMapX * currentScale) + currentMargin.x - relX;
+                sc.scrollTop = (trueMapY * currentScale) + currentMargin.y - relY;
 
                 if (progress < 1) {
-                    requestAnimationFrame(animate); // まだアニメーション中なら次も呼ぶ
+                    requestAnimationFrame(animate);
                 } else {
-                    // アニメーション完了時に、はみ出し防止の margin などを綺麗に再計算する
-                    this.applyMapScale();
+                    this.applyMapScale(); // 最後に念のため綺麗に整える
                     this.updateZoomButtons();
                     this.isAnimatingZoom = false;
                 }
             };
             requestAnimationFrame(animate);
         } else {
-            // マウス座標がない場合（ボタンでのズーム等）は中央基準で一気に変更
+            this.mapScale = targetScale;
             this.applyMapScale();
             this.updateZoomButtons();
         }
