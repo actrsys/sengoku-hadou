@@ -1125,13 +1125,12 @@ class UIManager {
         // ★項目名をスクロールの箱の中に作り直します！
         const isViewMode = (actionType === 'view_only' || actionType === 'all_busho_list');
         if (this.selectorList) {
+            // ★変更：常に9列（空白列なし）にします！
             this.selectorList.innerHTML = `
-                <div class="list-header ${isViewMode ? 'view-mode' : ''}" id="selector-list-header">
-                    ${isViewMode ? '' : '<span></span>'}<span>行動</span><span>名前</span><span>身分</span><span>統率</span><span>武力</span><span>内政</span><span>外交</span><span>智謀</span><span>魅力</span>
+                <div class="list-header" id="selector-list-header">
+                    <span>行動</span><span>名前</span><span>身分</span><span>統率</span><span>武力</span><span>内政</span><span>外交</span><span>智謀</span><span>魅力</span>
                 </div>
             `;
-            if (isViewMode) this.selectorList.classList.add('view-mode');
-            else this.selectorList.classList.remove('view-mode');
         }
         const contextEl = document.getElementById('selector-context-info'); if(contextEl) contextEl.classList.remove('hidden'); 
         const c = this.currentCastle; 
@@ -1344,11 +1343,12 @@ class UIManager {
             
             let inputHtml = '';
             if (!isViewMode) {
-                // ★先頭のチェックボックスを <span> という透明な箱で包むのがポイントです！
-                inputHtml = `<span><input type="${inputType}" name="sel_busho" value="${b.id}" ${!isSelectable ? 'disabled' : ''}></span>`;
+                // ★変更：透明な箱（span）をなくして、inputだけをこっそり作ります
+                inputHtml = `<input type="${inputType}" name="sel_busho" value="${b.id}" ${!isSelectable ? 'disabled' : ''} style="display:none;">`;
             }
             
-            div.innerHTML = `${inputHtml}<span class="col-act">${b.isActionDone?'[済]':'[未]'}</span><span class="col-name">${b.name}</span><span class="col-rank">${b.getRankName()}</span><span class="col-stat">${getStat('leadership')}</span><span class="col-stat">${getStat('strength')}</span><span class="col-stat">${getStat('politics')}</span><span class="col-stat">${getStat('diplomacy')}</span><span class="col-stat">${getStat('intelligence')}</span><span class="col-stat">${getStat('charm')}</span>`;
+            // ★変更：一番左にあった透明な箱を消して、inputを「行動」の中に隠します！
+            div.innerHTML = `<span class="col-act">${inputHtml}${b.isActionDone?'[済]':'[未]'}</span><span class="col-name">${b.name}</span><span class="col-rank">${b.getRankName()}</span><span class="col-stat">${getStat('leadership')}</span><span class="col-stat">${getStat('strength')}</span><span class="col-stat">${getStat('politics')}</span><span class="col-stat">${getStat('diplomacy')}</span><span class="col-stat">${getStat('intelligence')}</span><span class="col-stat">${getStat('charm')}</span>`;
             
             if(isSelectable && actionType !== 'view_only' && actionType !== 'all_busho_list') { 
                 div.onclick = (e) => {
