@@ -1136,7 +1136,7 @@ body.is-pc #ai-guard {
 
 /* リストアイテムの共通デザイン */
 .select-item, .daimyo-list-item, .kunishu-list-item {
-    border-bottom: 1px solid #eee;
+    border-bottom: 2px solid #e0e0e0; 
     scroll-snap-align: start;
     cursor: pointer;
 }
@@ -1160,7 +1160,7 @@ body.is-pc #ai-guard {
 /* 武将一覧 */
 .list-header, .select-item {
     display: grid; 
-    grid-template-columns: 35px 3fr 1.5fr repeat(6, 1fr); 
+    grid-template-columns: 35px 2.5fr 1.5fr repeat(6, 1fr); 
     font-size: clamp(0.6rem, 2.2vw, 0.85rem); 
     padding: 0; min-height: 30px; gap: 0;
 }
@@ -1168,7 +1168,7 @@ body.is-pc #ai-guard {
 /* 大名一覧 */
 .daimyo-list-header, .daimyo-list-item {
     display: grid;
-    grid-template-columns: 2.5fr 2.5fr 1.5fr 1fr 1fr 1fr;
+    grid-template-columns: 2fr 2fr 1.5fr 1fr 1fr 1fr;
     font-size: clamp(0.65rem, 2.5vw, 0.9rem);
     padding: 0; min-height: 30px; gap: 0;
 }
