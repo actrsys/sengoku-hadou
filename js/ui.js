@@ -76,8 +76,8 @@ class UIManager {
 		let lastTouchEnd = 0;
 		document.addEventListener('touchend', (event) => {
 		    const now = (new Date()).getTime();
-		    if (now - lastTouchEnd <= 600) {
-		        event.preventDefault(); // 0.6秒以内の2回タップを「無効」にします
+		    if (now - lastTouchEnd <= 300) {
+		        event.preventDefault(); // 0.3秒以内の2回タップを「無効」にします
 		    }
 		    lastTouchEnd = now;
 		}, false);
