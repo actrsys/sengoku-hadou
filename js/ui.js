@@ -832,6 +832,39 @@ class UIManager {
     applyMapScale() {
         if(this.mapEl) {
             this.mapEl.style.transform = `scale(${this.mapScale})`;
+            
+            // ★ スクロール領域のはみ出し（透明な余白）を消し去る魔法
+            const mapW = this.mapEl.offsetWidth;
+            const mapH = this.mapEl.offsetHeight;
+            const sc = document.getElementById('map-scroll-container');
+            
+            if (mapW && mapH && sc) {
+                // transform: scale によって出来てしまう余白のサイズを計算
+                const diffX = (mapW - mapW * this.mapScale) / 2;
+                const diffY = (mapH - mapH * this.mapScale) / 2;
+                
+                // スクロールエリアの大きさ（パディング 20px * 2 を引いた実際の広さ）
+                const scW = sc.clientWidth - 40; 
+                const scH = sc.clientHeight - 40;
+                
+                // 実際の見た目のマップサイズ
+                const scaledW = mapW * this.mapScale;
+                const scaledH = mapH * this.mapScale;
+                
+                // 基本はマイナスのマージンで余白を相殺
+                let marginX = -diffX;
+                let marginY = -diffY;
+                
+                // もし画面よりマップの方が小さければ、中央に寄せるためにプラスの余白を足す
+                if (scaledW < scW) {
+                    marginX += (scW - scaledW) / 2;
+                }
+                if (scaledH < scH) {
+                    marginY += (scH - scaledH) / 2;
+                }
+                
+                this.mapEl.style.margin = `${marginY}px ${marginX}px`;
+            }
         }
     }
     
