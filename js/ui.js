@@ -881,9 +881,9 @@ class UIManager {
     
     changeMapZoom(direction, cx = null, cy = null) {
         const sc = document.getElementById('map-scroll-container');
-        const isPC = document.body.classList.contains('is-pc'); // ★PCかどうかを判定する魔法！
+        const isPC = document.body.classList.contains('is-pc'); 
 
-        // PCでホイールを連続で回した時にカクつかないよう、アニメーション中でも次のズームを受け付ける！
+        // アニメーション中は次のズームを無視して、ガタガタするのを防ぎます
         if (this.isAnimatingZoom && !isPC) return;
 
         let oldScale = this.mapScale;
@@ -896,16 +896,17 @@ class UIManager {
         const MAX_SCALE = 2.0; // 最大の倍率
 
         if (isPC) {
-            // 【PCの場合】 0.05 ずつ細かく線形にズーム（数字を0.1などに変えると変化量が大きくなります）
-            targetScale += direction * 0.05;
-            if (targetScale < MIN_SCALE) targetScale = MIN_SCALE;
-            if (targetScale > MAX_SCALE) targetScale = MAX_SCALE;
+            // 【PCの場合】 ホイールを回すと、最大か最小へ一気にジャンプ！
+            if (direction > 0) {
+                targetScale = MAX_SCALE; // 上に回す（拡大）→ 最大へ！
+            } else {
+                targetScale = MIN_SCALE; // 下に回す（縮小）→ 最小へ！
+            }
         } else {
-            // 【スマホの場合】 今まで通り3段階（※真ん中の1.0は必要に応じて変えてください）
+            // 【スマホの場合】 今まで通り完璧な3段階！
             const scales = [MIN_SCALE, 1.0, MAX_SCALE]; 
             let closestIdx = 0;
             let minDiff = Infinity;
-            // 一番近い倍率を探す
             scales.forEach((s, i) => {
                 let diff = Math.abs(s - oldScale);
                 if (diff < minDiff) { minDiff = diff; closestIdx = i; }
@@ -916,12 +917,12 @@ class UIManager {
             targetScale = scales[nextIdx];
         }
 
-        // もし倍率が変わっていなければ（上限・下限に達していたら）何もしない
+        // 既に最大（または最小）の時に、同じ方向に回しても何もしない
         if (Math.abs(targetScale - oldScale) < 0.01) return;
 
         if (sc && cx !== null && cy !== null) {
             this.isAnimatingZoom = true;
-            sc.style.overflow = 'hidden';
+            sc.style.overflow = 'hidden'; // アニメーション中の念のためのガタつき防止
             
             const rect = sc.getBoundingClientRect();
             const relX = cx - rect.left;
@@ -970,9 +971,8 @@ class UIManager {
             if (mapW * targetScale <= scW) targetScrollLeft = 0;
             if (mapH * targetScale <= scH) targetScrollTop = 0;
 
-            // ★PCのホイールは連続で回すので、アニメーションを極短(50ms)にして指に吸い付かせる！
-            // スマホは今まで通り(150ms)でシュバッと動かす！
-            const duration = isPC ? 50 : 150; 
+            // アニメーションの速さをスマホと同じ（150）に揃えます
+            const duration = 150; 
             const startTime = performance.now();
 
             const animate = (currentTime) => {
@@ -996,7 +996,7 @@ class UIManager {
                 if (progress < 1) {
                     requestAnimationFrame(animate);
                 } else {
-                    sc.style.overflow = 'auto';
+                    sc.style.overflow = 'auto'; // アニメーションが終わったら元に戻す
                     this.applyMapScale(); 
                     if (this.updateZoomButtons) this.updateZoomButtons();
                     this.isAnimatingZoom = false;
@@ -1004,7 +1004,6 @@ class UIManager {
             };
             requestAnimationFrame(animate);
         } else {
-            // フォールバック（念のため）
             this.mapScale = targetScale;
             this.applyMapScale();
             if (this.updateZoomButtons) this.updateZoomButtons();
