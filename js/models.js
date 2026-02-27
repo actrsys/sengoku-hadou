@@ -156,6 +156,10 @@ class Busho {
         this.achievementTotal = Number(this.achievementTotal || 0); // 功績累計
         this.recognitionNeed = Number(this.recognitionNeed || 0);   // 承認欲求
         this.factionId = Number(this.factionId || 0);               // 派閥ID
+        
+        // ★ここに追加：派閥の「性格」と「方針」を覚えておくための箱です！
+        this.factionSeikaku = this.factionSeikaku || "無所属";
+        this.factionHoshin = this.factionHoshin || "無所属";
 
         // 国人衆関連のパラメータ追加
         this.belongKunishuId = Number(this.belongKunishuId || 0);   // 所属する国人衆ID（0なら未所属）
