@@ -1251,3 +1251,40 @@ body.is-pc {
         border-radius: 6px;
     }
 }
+/* =========================================================
+   ★ スクロールバーを四角いカッコいいゲージにする魔法
+   ========================================================= */
+/* スクロールバー全体の太さを指定します（縦も横も） */
+.list-container::-webkit-scrollbar,
+.daimyo-list-container::-webkit-scrollbar,
+.result-body::-webkit-scrollbar,
+#divide-list::-webkit-scrollbar {
+    width: 14px;  /* 縦スクロールバーの太さ */
+    height: 14px; /* 横スクロールバーの太さ */
+}
+
+/* スクロールバーの背景（レール部分） */
+.list-container::-webkit-scrollbar-track,
+.daimyo-list-container::-webkit-scrollbar-track,
+.result-body::-webkit-scrollbar-track,
+#divide-list::-webkit-scrollbar-track {
+    background: #e0e0e0;
+    border-left: 1px solid #ccc; /* リストとの境界線 */
+}
+
+/* スクロールバーの動く部分（ゲージ部分） */
+.list-container::-webkit-scrollbar-thumb,
+.daimyo-list-container::-webkit-scrollbar-thumb,
+.result-body::-webkit-scrollbar-thumb,
+#divide-list::-webkit-scrollbar-thumb {
+    background: #78909c; /* 少し落ち着いた青灰色 */
+    border: 2px solid #e0e0e0; /* 背景と同じ色の枠線で少し立体感と隙間を出します */
+}
+
+/* マウスが乗った時に少し濃くする */
+.list-container::-webkit-scrollbar-thumb:hover,
+.daimyo-list-container::-webkit-scrollbar-thumb:hover,
+.result-body::-webkit-scrollbar-thumb:hover,
+#divide-list::-webkit-scrollbar-thumb:hover {
+    background: #546e7a;
+}
