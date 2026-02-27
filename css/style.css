@@ -50,7 +50,7 @@ img {
 .title-content { 
     text-align: center; 
     color: #fff; 
-    padding-top: 20%; /* ★これ！上から画面の20%の位置に固定します */
+    padding-top: 10%;   /* ★これ！上から画面の10%の位置に固定します */
     width: 100%;        /* 真ん中に寄せるために必要です */
 }
 .game-title { font-size: 3rem; margin-bottom: 30px; text-shadow: 2px 2px 4px rgba(0,0,0,0.5); }
