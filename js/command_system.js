@@ -909,7 +909,7 @@ class CommandSystem {
             const castle = this.game.getCastle(doer.castleId); 
             if(castle) castle.gold -= gold;
             
-            msg = `${doer.name}が親善を行いました\n感情値が${increase}上昇しました (現在: ${newRelation.sentiment}, 状態: ${newRelation.status})`;
+            msg = `${doer.name}が親善を行いました\n友好度が上昇しました (現在: ${newRelation.sentiment}, 状態: ${newRelation.status})`;
             doer.achievementTotal += Math.floor(doer.diplomacy * 0.2) + 10;
             this.game.factionSystem.updateRecognition(doer, 15);
 
@@ -1125,7 +1125,7 @@ class CommandSystem {
         doer.achievementTotal += Math.floor(doer.diplomacy * 0.2) + 10;
         this.game.factionSystem.updateRecognition(doer, 15);
 
-        this.game.ui.showResultModal(`${doer.name}が ${kunishuName} と親善を行いました\n友好度が${increase}上昇しました (現在: ${newRel})`);
+        this.game.ui.showResultModal(`${doer.name}が ${kunishuName} と親善を行いました\n友好度が上昇しました (現在: ${newRel})`);
         this.game.ui.updatePanelHeader();
         this.game.ui.renderCommandMenu();
     }
@@ -1736,7 +1736,7 @@ class CommandSystem {
                     if (myCastle) myCastle.gold = Math.min(99999, myCastle.gold + gold);
                     const increase = this.calcGoodwillIncrease(gold, doer);
                     this.game.diplomacyManager.updateSentiment(doer.clan, targetClanId, increase);
-                    this.game.ui.showResultModal(`${doerClan.name} からの親善を受け入れました！\n感情値が ${increase} 上昇しました`, () => {
+                    this.game.ui.showResultModal(`${doerClan.name} からの親善を受け入れました！\n友好度が上昇しました`, () => {
                         // ★修正: 画面がフリーズしないように、0.1秒だけ待ってから次に進むようにしました
                         if (onComplete) setTimeout(onComplete, 100);
                     });
