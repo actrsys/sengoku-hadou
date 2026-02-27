@@ -1105,3 +1105,55 @@ body.is-pc .cutin-overlay,
 body.is-pc #ai-guard {
     position: absolute !important;
 }
+/* =========================================================
+   ★ リストを1行ずつカクカク（ピタッと）スクロールさせる魔法
+   ========================================================= */
+/* スクロールの動きをカクカクに設定します */
+.list-container,
+.result-body {
+    scroll-snap-type: y mandatory;
+}
+
+/* 各行の「一番上」を基準にピタッと止まるように設定します */
+.select-item,
+.kunishu-item,
+.result-body > div > div {
+    scroll-snap-align: start;
+}
+
+/* =========================================================
+   ★ PC版で輸送・兵力分配・出陣画面を広く、3列にする魔法
+   ========================================================= */
+body.is-pc {
+    /* 縦と横の「白い箱」をドーンと大きく広げて見切れを防ぎます */
+    #quantity-modal .modal-content,
+    #unit-divide-modal .modal-content {
+        max-width: 900px !important; 
+        max-height: 90% !important;  
+    }
+
+    /* 中身を「縦に3つ並べてから、次の列へ移る」マス目に変えます */
+    #quantity-container,
+    #divide-list {
+        display: grid !important;
+        grid-auto-flow: column; /* まずは縦（下方向）に向かって並べます */
+        grid-template-rows: repeat(3, min-content); /* 縦は「3項目」までに制限します */
+        grid-auto-columns: 1fr; /* 新しくできた列の幅をみんな同じにします */
+        gap: 15px; /* マス目とマス目の隙間 */
+        align-items: start;
+    }
+
+    /* マス目になったので、元の「下側の余白」はゼロにしてスッキリさせます */
+    .qty-row,
+    #divide-list > div {
+        margin-bottom: 0 !important; 
+    }
+
+    /* 輸送や出陣の項目を、タイル状にしてカッコよく見やすくします */
+    .qty-row {
+        background: #f9f9f9;
+        padding: 10px;
+        border: 1px solid #ddd;
+        border-radius: 6px;
+    }
+}
