@@ -887,6 +887,8 @@ class UIManager {
     }
     
     changeMapZoom(delta, cx = null, cy = null) {
+        if (this.isAnimatingZoom) return; // アニメーション中は次のズームを無視！
+        
         const oldLevel = this.zoomLevel;
         this.zoomLevel += delta;
         if (this.zoomLevel < 0) this.zoomLevel = 0;
@@ -895,51 +897,57 @@ class UIManager {
         if (this.zoomLevel === oldLevel) return; // 限界ならストップ
 
         const oldScale = this.mapScale;
-        this.mapScale = this.zoomStages[this.zoomLevel];
-        const newScale = this.mapScale;
+        const targetScale = this.zoomStages[this.zoomLevel];
+        this.mapScale = targetScale;
 
         const sc = document.getElementById('map-scroll-container');
         
         if (sc && cx !== null && cy !== null) {
+            this.isAnimatingZoom = true;
+            
             const rect = sc.getBoundingClientRect();
-            // コンテナ内での相対座標
+            // コンテナ内でのマウス・指の相対座標
             const relX = cx - rect.left;
             const relY = cy - rect.top;
 
-            // ★ 画面を9分割して、どこを起点にするか決める賢い魔法！
-            let anchorX = 0.5; // デフォルトは中央
-            let anchorY = 0.5;
+            // ★ 記事の理論の核心：マウスが指しているマップの「絶対座標（スケール1の時の本来の位置）」を逆算します！
+            const mapBaseX = (sc.scrollLeft + relX) / oldScale;
+            const mapBaseY = (sc.scrollTop + relY) / oldScale;
 
-            // X軸の判定（左:0、中:0.5、右:1）
-            if (relX < rect.width / 3) anchorX = 0;
-            else if (relX > rect.width * 2 / 3) anchorX = 1;
+            const duration = 250; // アニメーション時間（0.25秒）
+            const startTime = performance.now();
 
-            // Y軸の判定（上:0、中:0.5、下:1）
-            if (relY < rect.height / 3) anchorY = 0;
-            else if (relY > rect.height * 2 / 3) anchorY = 1;
+            // JSで1秒間に60回、スケールとスクロール位置を同期させる最強のアニメーション魔法
+            const animate = (currentTime) => {
+                const elapsed = currentTime - startTime;
+                let progress = elapsed / duration;
+                if (progress > 1) progress = 1;
+                
+                // イージング関数（最初早く、最後ゆっくり「ぬるっと」止まる）
+                const easeOut = 1 - Math.pow(1 - progress, 3);
+                
+                // 現在のコマのスケールを計算
+                const currentScale = oldScale + (targetScale - oldScale) * easeOut;
+                
+                // マップの見た目を大きく（小さく）する
+                this.mapEl.style.transform = `scale(${currentScale})`;
+                
+                // ★ スケールが変わっても、マウス位置の「絶対座標」が常に画面の同じ場所(relX, relY)に来るようにスクロールを合わせ続ける！
+                sc.scrollLeft = (mapBaseX * currentScale) - relX;
+                sc.scrollTop = (mapBaseY * currentScale) - relY;
 
-            // アンカーポイントの現在の絶対座標
-            const absAnchorX = sc.scrollLeft + (rect.width * anchorX);
-            const absAnchorY = sc.scrollTop + (rect.height * anchorY);
-
-            // スケール変更後の新しい絶対座標
-            const ratio = newScale / oldScale;
-            const newAbsAnchorX = absAnchorX * ratio;
-            const newAbsAnchorY = absAnchorY * ratio;
-
-            // マップの大きさを先に適用（アニメーションが走ります）
-            this.applyMapScale();
-            this.updateZoomButtons();
-
-            // ★ アニメーションに合わせて「ぬるっと」スクロールさせる魔法！
-            setTimeout(() => {
-                sc.scrollTo({
-                    left: newAbsAnchorX - (rect.width * anchorX),
-                    top: newAbsAnchorY - (rect.height * anchorY),
-                    behavior: 'smooth'
-                });
-            }, 10);
+                if (progress < 1) {
+                    requestAnimationFrame(animate); // まだアニメーション中なら次も呼ぶ
+                } else {
+                    // アニメーション完了時に、はみ出し防止の margin などを綺麗に再計算する
+                    this.applyMapScale();
+                    this.updateZoomButtons();
+                    this.isAnimatingZoom = false;
+                }
+            };
+            requestAnimationFrame(animate);
         } else {
+            // マウス座標がない場合（ボタンでのズーム等）は中央基準で一気に変更
             this.applyMapScale();
             this.updateZoomButtons();
         }
