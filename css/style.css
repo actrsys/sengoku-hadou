@@ -891,7 +891,7 @@ body.is-pc {
    攻城戦レイアウト（画面サイズで自動変化する魔法）
    ========================================================= */
 
-/* ① まずはスマホなど「狭い画面」の時の基本ルール */
+/* まずはスマホなど「狭い画面」の時の基本ルール */
 .responsive-war-visual {
     flex: 1;
     display: flex;
@@ -900,16 +900,20 @@ body.is-pc {
     overflow: hidden;
     align-items: stretch;
     justify-content: center; /* 全体を真ん中に寄せる */
+    padding: 0 !important; /* ★変更：周りの白い余白を完全に消し去ります！ */
+    margin: 0 !important;
 }
 
 .responsive-army-box {
     flex: 1;
-    max-width: 450px; /* 広がりすぎ防止 */
+    max-width: none !important; /* ★変更：制限をなくして、枠いっぱいまで広げます！ */
     padding: 10px;
+    margin: 0 !important; /* ★変更：外側の隙間をなくします */
+    border-radius: 0 !important; /* ★変更：角の丸みをなくして四角くします */
     display: flex;
     flex-direction: column;
-    overflow-y: auto;
-    color: #333; /* 文字を読みやすく */
+    overflow-y: hidden !important; /* ★変更：はみ出してもスクロールさせない魔法！ */
+    color: #333; 
 }
 
 .responsive-army-title {
@@ -923,12 +927,10 @@ body.is-pc {
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
-    /* ★追加：箱が上下に潰れるのを防ぎ、文字の高さも整える魔法 */
     flex-shrink: 0;
     line-height: 1.4;
 }
 
-/* ★追加：文字が長い時だけ、文字を少し小さくする魔法 */
 .title-long-text {
     font-size: 0.95rem !important;
 }
@@ -982,43 +984,46 @@ body.is-pc {
 }
 
 
-/* ② ここからが魔法！「画面が広い（幅768px以上）」時の特別ルール */
+/* 「画面が広い（幅768px以上）」時の特別ルール */
 body.is-pc {
     .responsive-army-content {
         flex-direction: column; /* 画像と文字を「縦（上と下）」に並べる！ */
         align-items: center; /* ど真ん中に揃える */
+        height: 100%;
+        justify-content: center; /* 中身を縦の真ん中あたりに集めます */
     }
 
     .responsive-war-face {
-        width: 180px; /* 画像をドーンと大きく！ */
-        height: 180px;
-        border-width: 3px; /* 枠線も少し太く */
+        width: 140px; /* ★変更：スクロールしないように、顔を少しだけ小さくしました！ */
+        height: 140px;
+        border-width: 3px; 
     }
 
     .responsive-army-stats {
-        width: 100%; /* 横幅いっぱいに使う */
-        font-size: 1.1rem; /* 文字全体を大きく */
-        gap: 6px; /* 行と行の隙間をあけて見やすく */
+        width: 100%; 
+        font-size: 1.05rem; /* ★変更：文字も少しだけスリムに */
+        gap: 2px; /* ★変更：行と行の隙間をギューッと詰めます */
         margin-top: 5px;
     }
 
     .stat-busho {
-        font-size: 1.2rem; /* 部隊名も大きく */
-        text-align: center; /* 部隊名は真ん中揃え */
+        font-size: 1.15rem; 
+        text-align: center; 
+        margin-bottom: 2px; /* ★変更：下の隙間を詰めます */
     }
 
     .stat-val-large {
-        font-size: 1.3rem; /* 兵士数はさらに大きく！ */
+        font-size: 1.2rem; 
     }
 
     .responsive-army-title {
-        font-size: 1.4rem; /* タイトルも少し大きく */
-        text-align: center; /* タイトルも真ん中揃えにしてカッコよく */
+        font-size: 1.3rem; 
+        text-align: center; 
+        margin-bottom: 5px; 
     }
     
-    /* ★追加：PC版の時に文字が長い場合の専用サイズ */
     .title-long-text {
-        font-size: 1.15rem !important;
+        font-size: 1.1rem !important;
     }
 }
 /* =========================================================
@@ -1042,7 +1047,7 @@ body.is-pc {
     border-top: 2px solid #333;
 }
 
-/* ② PC版（横幅768px以上）の特別ルール（ログは右） */
+/* PC版（横幅768px以上）の特別ルール（ログは右） */
 body.is-pc {
     .responsive-war-layout {
         flex-direction: row; 
