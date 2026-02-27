@@ -1157,3 +1157,46 @@ body.is-pc {
         border-radius: 6px;
     }
 }
+/* =========================================================
+   ★ 大名一覧を横並びにする魔法
+   ========================================================= */
+/* ① 項目名（ヘッダー）の箱 */
+.daimyo-list-header {
+    display: grid;
+    /* 大名家名、当主名、戦力、城数、友好度、関係 の6つの幅の割合を決めます */
+    grid-template-columns: 2fr 2fr 1fr 1fr 1fr 1fr;
+    gap: 5px;
+    font-weight: bold; 
+    background: #37474f; 
+    color: #fff; 
+    padding: 8px 5px; 
+    font-size: 0.85rem;
+    position: sticky; /* 上にピタッとくっつく魔法 */
+    top: 0; 
+    z-index: 10;
+}
+
+/* ② データ1行分の箱 */
+.daimyo-list-item {
+    display: grid;
+    grid-template-columns: 2fr 2fr 1fr 1fr 1fr 1fr; /* ヘッダーと同じ幅にします */
+    gap: 5px;
+    padding: 10px 5px; 
+    border-bottom: 1px solid #eee; 
+    font-size: 0.9rem; 
+    align-items: center;
+    scroll-snap-align: start; /* ここでもカクカク止まる魔法を使います！ */
+}
+
+/* マウスが乗ったらほんのり青く光る魔法 */
+.daimyo-list-item:hover { background: #f0f8ff; }
+
+/* ③ リスト全体を囲む大きな箱 */
+.daimyo-list-container {
+    flex: 1; 
+    overflow-y: auto; 
+    border: 1px solid #ddd; 
+    min-height: 200px; 
+    max-height: 60vh;
+    scroll-snap-type: y mandatory; /* カクカクスクロールの設定 */
+}
