@@ -680,7 +680,7 @@ class UIManager {
         let nonFactionCount = factions[0] ? factions[0].count : 0;
         
         // ★ 無派閥を右上に出し、表のヘッダーを作ります（改行をなくして1行に繋げます！）
-        let listHtml = `<div style="text-align:right; font-weight:bold; color:#555; font-size:0.9rem; margin-bottom:5px;">無派閥: ${nonFactionCount}名</div><div class="faction-list-container"><div class="faction-list-header"><span>派閥主</span><span>武将数</span><span>性格</span><span>方針</span></div>`;
+        let listHtml = `<div style="text-align:right; font-weight:bold; color:#555; font-size:0.9rem; margin-bottom:5px;">無派閥: ${nonFactionCount}名 </div><div class="faction-list-container"><div class="faction-list-header"><span>派閥主</span><span>武将数</span><span>性格</span><span>方針</span></div>`;
         
         if (fIds.length === 0) {
             listHtml += `<div style="padding:10px;">派閥はありません。</div>`;
