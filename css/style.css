@@ -1170,8 +1170,8 @@ body.is-pc #ai-guard {
 .grade-plus { 
     font-size: 0.65rem;
     position: relative;
-    left: -3px; /* ★左（アルファベットの方向）へ無理やり引っ張って食い込ませる！ */
-    top: -10px;  /* ★さらに上へ持ち上げる！ */
+    left: -4px; /* ★左（アルファベットの方向）へ無理やり引っ張って食い込ませる！ */
+    top: -20px;  /* ★さらに上へ持ち上げる！ */
 }
 /* 武将一覧 */
 .list-header, .select-item {
