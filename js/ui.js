@@ -403,8 +403,8 @@ class UIManager {
     }
     
     showDaimyoList() {
-        // ★ 余計な隙間が作られないように、１行に繋げて書きます
-        let listHtml = '<div class="daimyo-list-header"><span>大名家名</span><span>当主名</span><span>戦力</span><span>城数</span><span>友好度</span><span>関係</span></div><div class="daimyo-list-container">';
+        // ★ ヘッダーをスクロールの箱の中に【入れ込む】ことで、スクロールバーの食い込みズレを防ぎます！
+        let listHtml = '<div class="daimyo-list-container"><div class="daimyo-list-header"><span>大名家名</span><span>当主名</span><span>戦力</span><span>城数</span><span>友好度</span><span>関係</span></div>';
         
         const activeClans = this.game.clans.filter(c => c.id !== 0 && this.game.castles.some(cs => cs.ownerClan === c.id));
         
@@ -434,8 +434,8 @@ class UIManager {
                 }
             }
 
-            // ★ここも改行をなくしてスッキリさせます
-            listHtml += `<div class="daimyo-list-item"><span style="font-weight:bold;">${d.name}</span><span>${d.leaderName}</span><span style="color:#d32f2f; font-weight:bold;">${d.power}</span><span>${d.castlesCount}</span><span style="color:#1976d2;">${friendScore}</span><span>${friendStatus}</span></div>`;
+            // ★名前を左寄せにするための目印（col-daimyo-name など）をつけます
+            listHtml += `<div class="daimyo-list-item"><span class="col-daimyo-name" style="font-weight:bold;">${d.name}</span><span class="col-leader-name">${d.leaderName}</span><span style="color:#d32f2f; font-weight:bold;">${d.power}</span><span>${d.castlesCount}</span><span style="color:#1976d2;">${friendScore}</span><span>${friendStatus}</span></div>`;
         });
         listHtml += '</div>';
         
@@ -1122,7 +1122,14 @@ class UIManager {
             }
         }
 
-        if (this.selectorList) this.selectorList.innerHTML = '';
+        // ★項目名をスクロールの箱の中に作り直します！
+        if (this.selectorList) {
+            this.selectorList.innerHTML = `
+                <div class="list-header" id="selector-list-header">
+                    <span></span><span>行動</span><span>名前</span><span>身分</span><span>統率</span><span>武力</span><span>内政</span><span>外交</span><span>智謀</span><span>魅力</span>
+                </div>
+            `;
+        }
         const contextEl = document.getElementById('selector-context-info'); if(contextEl) contextEl.classList.remove('hidden'); 
         const c = this.currentCastle; 
         let infoHtml = ""; 
@@ -1946,14 +1953,15 @@ class UIManager {
                 div.className = 'kunishu-list-item'; 
                 
                 if (isViewOnly) {
-                    // ★見るだけモード
-                    div.innerHTML = `<span></span><strong>${name}</strong><span>${k.soldiers}</span><span>${k.defense}</span><span>${rel}</span>`;
+                    // ★見るだけモード（表の形に整え、左寄せの目印をつけます）
+                    div.innerHTML = `<span></span><strong class="col-kunishu-name">${name}</strong><span>${k.soldiers}</span><span>${k.defense}</span><span>${rel}</span>`;
+                    div.style.cursor = 'default';
                 } else {
                     // ★選択モード
-                    div.classList.add('selectable');
-                    div.innerHTML = `<span></span><strong>${name}</strong><span>${k.soldiers}</span><span>${k.defense}</span><span>${rel}</span>`;
+                    div.innerHTML = `<span></span><strong class="col-kunishu-name">${name}</strong><span>${k.soldiers}</span><span>${k.defense}</span><span>${rel}</span>`;
+                    div.style.cursor = 'pointer';
                     
-                    div.onclick = () => { 
+                    div.onclick = () => {
                         // 一旦すべての選択色を消す
                         const allItems = this.selectorList.querySelectorAll('.kunishu-list-item');
                         allItems.forEach(item => {
