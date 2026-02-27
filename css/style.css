@@ -431,11 +431,13 @@ body.is-pc {
     display: grid; grid-template-columns: 0px 30px 90px 40px repeat(6, 1fr); 
     gap: 2px; font-weight: bold; background: #37474f; color:#fff; padding: 8px 5px; font-size: 0.8rem;
     position: sticky; top: 0;
+    text-align: center; /* ★追加：中央寄せ */
 }
 .list-container { flex: 1; overflow-y: auto; border: 1px solid #ddd; min-height: 200px; }
 .select-item {
     display: grid; grid-template-columns: 0px 30px 90px 40px repeat(6, 1fr); 
     gap: 2px; padding: 10px 5px; border-bottom: 1px solid #eee; cursor: pointer; font-size: 0.85rem; align-items: center;
+    text-align: center; /* ★追加：中央寄せ */
 }
 .select-item:hover { background: #f0f8ff; }
 .select-item.disabled { color: #aaa; pointer-events: none; background: #f9f9f9; }
@@ -1117,6 +1119,7 @@ body.is-pc #ai-guard {
 /* 各行の「一番上」を基準にピタッと止まるように設定します */
 .select-item,
 .kunishu-item,
+.kunishu-list-item, /* ★これを追加！ */
 .result-body > div > div {
     scroll-snap-align: start;
 }
@@ -1174,6 +1177,7 @@ body.is-pc {
     position: sticky; /* 上にピタッとくっつく魔法 */
     top: 0; 
     z-index: 10;
+    text-align: center; /* ★追加：中央寄せ */
 }
 
 /* ② データ1行分の箱 */
@@ -1186,6 +1190,7 @@ body.is-pc {
     font-size: 0.9rem; 
     align-items: center;
     scroll-snap-align: start; /* ここでもカクカク止まる魔法を使います！ */
+    text-align: center; /* ★追加：中央寄せ */
 }
 
 /* マウスが乗ったらほんのり青く光る魔法 */
@@ -1200,3 +1205,39 @@ body.is-pc {
     max-height: 60vh;
     scroll-snap-type: y mandatory; /* カクカクスクロールの設定 */
 }
+/* =========================================================
+   ★ 国人衆一覧を大名・武将と同じ「表形式」にする魔法
+   ========================================================= */
+.kunishu-list-header {
+    display: grid;
+    grid-template-columns: 0px 2fr 1fr 1fr 1fr; /* 選択ボタンの幅、勢力名、兵数、防御、友好度 */
+    gap: 5px;
+    font-weight: bold; 
+    background: #37474f; 
+    color: #fff; 
+    padding: 8px 5px; 
+    font-size: 0.85rem;
+    position: sticky; 
+    top: 0; 
+    z-index: 10;
+    text-align: center;
+}
+
+.kunishu-list-item {
+    display: grid;
+    grid-template-columns: 0px 2fr 1fr 1fr 1fr;
+    gap: 5px;
+    padding: 10px 5px; 
+    border-bottom: 1px solid #eee; 
+    font-size: 0.9rem; 
+    align-items: center;
+    scroll-snap-align: start;
+    text-align: center;
+}
+
+.kunishu-list-item.selectable {
+    cursor: pointer;
+}
+
+.kunishu-list-item:hover { background: #f0f8ff; }
+.kunishu-list-item.selected { background-color: #ffe0b2 !important; border-left: 5px solid #ff9800; }
