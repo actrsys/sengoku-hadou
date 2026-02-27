@@ -1165,10 +1165,14 @@ body.is-pc #ai-guard {
 
 /* --- スマホ時のフレキシブルなレイアウト（1行に収める魔法） --- */
 
-/* ★追加：スマホの時はステータス（S, A, Bなど）の文字を少し小さくします */
+/* ★変更：スマホの時はステータスの文字を小さくし、＋を右下に重ねます */
 .grade-main { font-size: 0.95rem; }
-.grade-plus { font-size: 0.75rem; right: -4px; top: -1px; }
-
+.grade-plus { 
+    font-size: 0.7rem; 
+    top: auto;      /* 上からの指定を解除（これが重要！） */
+    bottom: -2px;   /* 下から少しはみ出すくらい */
+    right: -2px;    /* 右から少しはみ出すくらい */
+}
 /* 武将一覧 */
 .list-header, .select-item {
     display: grid; 
