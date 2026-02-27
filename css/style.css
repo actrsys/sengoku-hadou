@@ -428,17 +428,20 @@ body.is-pc {
 .context-info { margin-bottom: 10px; padding: 10px; background: #e8eaf6; border-radius: 4px; font-size: 0.9rem; }
 
 .list-header {
-    display: grid; grid-template-columns: 0px 30px 90px 40px repeat(6, 1fr); 
+    display: grid; 
+    grid-template-columns: 25px 40px 110px 50px repeat(6, 1fr); /* ★横幅を調整 */
     gap: 2px; font-weight: bold; background: #37474f; color:#fff; padding: 8px 5px; font-size: 0.8rem;
-    position: sticky; top: 0;
-    text-align: center; /* ★追加：中央寄せ */
+    position: sticky; top: 0; z-index: 10;
+    text-align: center; 
 }
 .list-container { flex: 1; overflow-y: auto; border: 1px solid #ddd; min-height: 200px; }
 .select-item {
-    display: grid; grid-template-columns: 0px 30px 90px 40px repeat(6, 1fr); 
+    display: grid; 
+    grid-template-columns: 25px 40px 110px 50px repeat(6, 1fr); /* ★横幅を調整 */
     gap: 2px; padding: 10px 5px; border-bottom: 1px solid #eee; cursor: pointer; font-size: 0.85rem; align-items: center;
-    text-align: center; /* ★追加：中央寄せ */
+    text-align: center; 
 }
+.select-item .col-name { text-align: left; padding-left: 5px; } /* ★名前を左寄せに */
 .select-item:hover { background: #f0f8ff; }
 .select-item.disabled { color: #aaa; pointer-events: none; background: #f9f9f9; }
 .select-item.selected { background-color: #ffe0b2 !important; border-left: 5px solid #ff9800; }
@@ -1163,40 +1166,27 @@ body.is-pc {
 /* =========================================================
    ★ 大名一覧を横並びにする魔法
    ========================================================= */
-/* ① 項目名（ヘッダー）の箱 */
 .daimyo-list-header {
     display: grid;
-    /* 大名家名、当主名、戦力、城数、友好度、関係 の6つの幅の割合を決めます */
-    grid-template-columns: 2fr 2fr 1fr 1fr 1fr 1fr;
-    gap: 5px;
-    font-weight: bold; 
-    background: #37474f; 
-    color: #fff; 
-    padding: 8px 5px; 
-    font-size: 0.85rem;
-    position: sticky; /* 上にピタッとくっつく魔法 */
-    top: 0; 
-    z-index: 10;
-    text-align: center; /* ★追加：中央寄せ */
+    grid-template-columns: 100px 110px 70px 60px 70px 60px; /* ★項目に合わせた固定幅 */
+    gap: 5px; font-weight: bold; background: #37474f; color: #fff; padding: 8px 5px; font-size: 0.85rem;
+    position: sticky; top: 0; z-index: 10;
+    text-align: center;
 }
-
-/* ② データ1行分の箱 */
 .daimyo-list-item {
     display: grid;
-    grid-template-columns: 2fr 2fr 1fr 1fr 1fr 1fr; /* ヘッダーと同じ幅にします */
-    gap: 5px;
-    padding: 10px 5px; 
-    border-bottom: 1px solid #eee; 
-    font-size: 0.9rem; 
-    align-items: center;
-    scroll-snap-align: start; /* ここでもカクカク止まる魔法を使います！ */
-    text-align: center; /* ★追加：中央寄せ */
+    grid-template-columns: 100px 110px 70px 60px 70px 60px;
+    gap: 5px; padding: 10px 5px; border-bottom: 1px solid #eee; font-size: 0.9rem; align-items: center;
+    scroll-snap-align: start; text-align: center;
 }
-
+.daimyo-list-item .col-daimyo-name, 
+.daimyo-list-item .col-leader-name {
+    text-align: left; padding-left: 5px; /* ★名前を左寄せに */
+}
 /* マウスが乗ったらほんのり青く光る魔法 */
 .daimyo-list-item:hover { background: #f0f8ff; }
 
-/* ③ リスト全体を囲む大きな箱 */
+/* リスト全体を囲む大きな箱 */
 .daimyo-list-container {
     flex: 1; 
     overflow-y: auto; 
@@ -1210,29 +1200,19 @@ body.is-pc {
    ========================================================= */
 .kunishu-list-header {
     display: grid;
-    grid-template-columns: 0px 2fr 1fr 1fr 1fr; /* 選択ボタンの幅、勢力名、兵数、防御、友好度 */
-    gap: 5px;
-    font-weight: bold; 
-    background: #37474f; 
-    color: #fff; 
-    padding: 8px 5px; 
-    font-size: 0.85rem;
-    position: sticky; 
-    top: 0; 
-    z-index: 10;
+    grid-template-columns: 25px 130px 80px 80px 80px; /* ★項目に合わせた固定幅 */
+    gap: 5px; font-weight: bold; background: #37474f; color: #fff; padding: 8px 5px; font-size: 0.85rem;
+    position: sticky; top: 0; z-index: 10;
     text-align: center;
 }
-
 .kunishu-list-item {
     display: grid;
-    grid-template-columns: 0px 2fr 1fr 1fr 1fr;
-    gap: 5px;
-    padding: 10px 5px; 
-    border-bottom: 1px solid #eee; 
-    font-size: 0.9rem; 
-    align-items: center;
-    scroll-snap-align: start;
-    text-align: center;
+    grid-template-columns: 25px 130px 80px 80px 80px;
+    gap: 5px; padding: 10px 5px; border-bottom: 1px solid #eee; font-size: 0.9rem; align-items: center;
+    scroll-snap-align: start; text-align: center;
+}
+.kunishu-list-item .col-kunishu-name {
+    text-align: left; padding-left: 5px; /* ★名前を左寄せに */
 }
 
 .kunishu-list-item.selectable {
@@ -1241,3 +1221,7 @@ body.is-pc {
 
 .kunishu-list-item:hover { background: #f0f8ff; }
 .kunishu-list-item.selected { background-color: #ffe0b2 !important; border-left: 5px solid #ff9800; }
+/* 大名一覧などを表示するウインドウの幅を少し広げて窮屈さをなくす魔法 */
+.result-content {
+    max-width: 550px !important;
+}
