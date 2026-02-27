@@ -694,7 +694,6 @@ class UIManager {
                 let hoshin = "不明";
                 
                 if (leader) {
-                    if (leader) {
                     const mil = (leader.leadership + leader.strength) / 2;
                     const pol = (leader.politics + leader.diplomacy) / 2;
                     if (mil > pol * 1.2) seikaku = "武闘派";
