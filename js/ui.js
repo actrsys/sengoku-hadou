@@ -1932,38 +1932,36 @@ class UIManager {
         let selectedKunishuId = null; // 選んだ国衆を記憶する箱
 
         if (this.selectorList) {
-            this.selectorList.innerHTML = '';
+            // ★ リストの中身を空にして、最初にヘッダーを作ります
+            this.selectorList.innerHTML = `
+                <div class="kunishu-list-header">
+                    <span></span><span>勢力名</span><span>兵数</span><span>防御</span><span>友好度</span>
+                </div>
+            `;
+            
             kunishus.forEach(k => {
                 const name = k.getName(window.GameApp);
                 const rel = k.getRelation(window.GameApp.playerClanId);
                 const div = document.createElement('div');
-                div.className = 'kunishu-item'; 
+                div.className = 'kunishu-list-item'; 
                 
                 if (isViewOnly) {
-                    // ★見るだけモード（城から見た時）
-                    div.innerHTML = `<strong style="margin-right:10px;">${name}</strong> <span style="font-size:0.9rem; color:#555;">(兵数:${k.soldiers} 防御:${k.defense} 友好度:${rel})</span>`;
-                    div.style.cursor = 'default';
+                    // ★見るだけモード
+                    div.innerHTML = `<span></span><strong>${name}</strong><span>${k.soldiers}</span><span>${k.defense}</span><span>${rel}</span>`;
                 } else {
-                    // ★選択モード（親善や引抜など）ラジオボタンを消しました！
-                    div.innerHTML = `
-                        <strong style="margin-right:10px;">${name}</strong> 
-                        <span style="font-size:0.9rem; color:#555;">(兵数:${k.soldiers} 防御:${k.defense} 友好度:${rel})</span>
-                    `;
-                    div.style.cursor = 'pointer';
+                    // ★選択モード
+                    div.classList.add('selectable');
+                    div.innerHTML = `<span></span><strong>${name}</strong><span>${k.soldiers}</span><span>${k.defense}</span><span>${rel}</span>`;
                     
                     div.onclick = () => { 
-                        // ★追加：選んだことが分かるように色を変えます
-                        // まずは全員の色を元に戻す
-                        const allItems = this.selectorList.querySelectorAll('.kunishu-item');
+                        // 一旦すべての選択色を消す
+                        const allItems = this.selectorList.querySelectorAll('.kunishu-list-item');
                         allItems.forEach(item => {
-                            item.style.backgroundColor = '';
-                            item.style.borderColor = '';
+                            item.classList.remove('selected');
                         });
                         
-                        // 今クリックした行だけ、目立つ色（薄いオレンジ色）にする
-                        div.style.backgroundColor = '#ffe0b2';
-                        div.style.borderColor = '#ff9800';
-
+                        // クリックした行に色を付ける
+                        div.classList.add('selected');
                         selectedKunishuId = k.id;
                         
                         // 決定ボタンを押せるようにする
