@@ -681,7 +681,7 @@ class UIManager {
         
         // ★ 無派閥を右上に出し、表のヘッダーを作ります（改行をなくして1行に繋げます！）
         // ★変更：高さを文字サイズにピッタリ合わせ（line-height:1;）、右にほんの少し余白（margin-right:5px;）を追加しました！
-        let listHtml = `<div style="text-align:right; font-weight:bold; color:#555; font-size:0.9rem; margin-bottom:5px; margin-right:5px; line-height:1;">無派閥: ${nonFactionCount}名</div><div class="faction-list-container"><div class="faction-list-header"><span>派閥主</span><span>武将数</span><span>性格</span><span>方針</span></div>`;
+        let listHtml = `<div style="text-align:right; font-weight:bold; color:#555; font-size:0.9rem; margin-bottom:5px; margin-right:5px; line-height:1;">無派閥: ${nonFactionCount}名</div><div class="faction-list-container"><div class="faction-list-header"><span>派閥主</span><span>武将数</span><span>方針</span><span>思想</span></div>`;
         
         if (fIds.length === 0) {
             listHtml += `<div style="padding:10px;">派閥はありません。</div>`;
@@ -697,17 +697,17 @@ class UIManager {
                 if (leader) {
                     // ★変更：毎回ここで計算するのをやめて、武将の記憶の箱から直接読み取るようにしました！
                     seikaku = leader.factionSeikaku || "中道";
-                    hoshin = leader.factionHoshin || "保守派";
+                    hoshin = leader.factionHoshin || "保守的";
                 }
                 
-                // ★性格と方針で色を決める魔法です
+                // ★方針と思想で色を決める魔法です
                 let seikakuColor = "";
                 if (seikaku === '武闘派') seikakuColor = 'color:#d32f2f;';
                 else if (seikaku === '穏健派') seikakuColor = 'color:#1976d2;';
 
                 let hoshinColor = "";
-                if (hoshin === '革新派') hoshinColor = 'color:#e91e63;';
-                else if (hoshin === '保守派') hoshinColor = 'color:#1976d2;';
+                if (hoshin === '革新的') hoshinColor = 'color:#e91e63;';
+                else if (hoshin === '保守的') hoshinColor = 'color:#1976d2;';
 
                 // ★ ここも改行をなくして1行に繋げます！（色指定の変数を使うように直しました）
                 listHtml += `<div class="faction-list-item"><strong class="col-faction-name">${leaderName}</strong><span>${count}</span><span style="${seikakuColor}">${seikaku}</span><span style="${hoshinColor}">${hoshin}</span></div>`;

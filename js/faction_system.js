@@ -147,13 +147,13 @@ class FactionSystem {
             members.forEach(b => {
                 b.factionId = 0;
                 b.isFactionLeader = false;
-                // ★ここに追加：派閥が解散したら、性格と方針も「無所属」に戻します！
+                // ★ここに追加：派閥が解散したら、方針と思想も「無所属」に戻します！
                 b.factionSeikaku = "無所属";
                 b.factionHoshin = "無所属";
             });
 
             // リーダー候補選出
-            // 条件: 功績500以上 かつ 性格がhermit(隠遁者)ではない
+            // 条件: 功績500以上 かつ 方針がhermit(隠遁者)ではない
             const candidates = members.filter(b => 
                 !b.isDaimyo && 
                 b.achievementTotal >= achieveLeader && 
@@ -343,23 +343,23 @@ class FactionSystem {
                 evaluateJoin(invalidLeaders, validLeaders);
             }
 
-            // ★ここから追加：正式な派閥が決まったら、リーダーの性格と方針を計算してメンバー全員に教えます！
+            // ★ここから追加：正式な派閥が決まったら、リーダーの方針と思想を計算してメンバー全員に教えます！
             validLeaders.forEach(leader => {
-                // 1. リーダーの能力から「性格」を計算します
+                // 1. リーダーの能力から「方針」を計算します
                 const mil = (leader.leadership + leader.strength) / 2;
                 const pol = (leader.politics + leader.diplomacy) / 2;
                 let seikaku = "中道";
                 if (mil > pol * 1.2) seikaku = "武闘派";
                 else if (pol > mil * 1.2) seikaku = "穏健派";
 
-                // 2. リーダーの革新性から「方針」を計算します
+                // 2. リーダーの革新性から「思想」を計算します
                 const inn = leader.innovation || 0;
-                let hoshin = "保守派";
-                if (inn >= 66) hoshin = "革新派";
+                let hoshin = "保守的";
+                if (inn >= 66) hoshin = "革新的";
                 else if (inn >= 36) hoshin = "中道";
-                else hoshin = "保守派";
+                else hoshin = "保守的";
 
-                // 3. このリーダーと同じ派閥IDを持つメンバー全員（自分も含む）に、性格と方針を配ります
+                // 3. このリーダーと同じ派閥IDを持つメンバー全員（自分も含む）に、方針と思想を配ります
                 const factionMembers = members.filter(b => b.factionId === leader.factionId);
                 factionMembers.forEach(b => {
                     b.factionSeikaku = seikaku;
