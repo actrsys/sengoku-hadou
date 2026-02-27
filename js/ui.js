@@ -116,6 +116,72 @@ class UIManager {
                 listObj.scrollBy({ top: Math.sign(e.deltaY) * 30, behavior: 'smooth' });
             }
         }, { passive: false });
+        
+        // =========================================================
+        // ★ マウスドラッグでスマホみたいにスクロールさせる魔法
+        // =========================================================
+        let isListMouseDown = false;
+        let hasListDragged = false;
+        let listStartY = 0;
+        let listStartScrollY = 0;
+        let currentDragList = null;
+
+        document.addEventListener('mousedown', (e) => {
+            const listObj = e.target.closest('.list-container, .result-body, #divide-list, .daimyo-list-container');
+            // スクロールバー自体を掴んだ時はドラッグを発動させない安全装置
+            if (listObj) {
+                const rect = listObj.getBoundingClientRect();
+                const isScrollbar = (e.clientX > rect.right - 20); 
+                
+                if (!isScrollbar) {
+                    isListMouseDown = true;
+                    hasListDragged = false;
+                    currentDragList = listObj;
+                    listStartY = e.pageY;
+                    listStartScrollY = listObj.scrollTop;
+                }
+            }
+        });
+
+        document.addEventListener('mousemove', (e) => {
+            if (!isListMouseDown || !currentDragList) return;
+            const walk = (e.pageY - listStartY) * 1.2; // 1.2はスクロールの勢いです
+            
+            // 少しでも動かしたら「ドラッグ中」と判定！
+            if (Math.abs(walk) > 5) {
+                hasListDragged = true;
+                // ドラッグ中は文字が青く選択されるのを防ぎ、カクカクを解除して滑らかにします
+                document.body.style.userSelect = 'none';
+                currentDragList.style.scrollSnapType = 'none';
+                currentDragList.scrollTop = listStartScrollY - walk;
+            }
+        });
+
+        const endListDrag = () => {
+            if (isListMouseDown) {
+                if (currentDragList && hasListDragged) {
+                    currentDragList.style.scrollSnapType = 'y mandatory';
+                    document.body.style.userSelect = '';
+                    // 離した瞬間に、一番近い項目にピタッと吸着させる魔法！
+                    currentDragList.scrollBy({ top: 1, behavior: 'smooth' });
+                    currentDragList.scrollBy({ top: -1, behavior: 'smooth' });
+                }
+                isListMouseDown = false;
+                currentDragList = null;
+            }
+        };
+
+        document.addEventListener('mouseup', endListDrag);
+
+        // ドラッグして手を離した瞬間に「カチッ」と武将を選んでしまう誤動作を防ぐ強力な盾
+        document.addEventListener('click', (e) => {
+            if (hasListDragged) {
+                e.stopPropagation();
+                e.preventDefault();
+                hasListDragged = false; // 1回防いだら盾をリセット
+            }
+        }, true);
+        // =========================================================
 
     }
     
