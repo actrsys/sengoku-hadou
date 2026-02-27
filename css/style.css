@@ -1165,13 +1165,13 @@ body.is-pc #ai-guard {
 
 /* --- スマホ時のフレキシブルなレイアウト（1行に収める魔法） --- */
 
-/* ★変更：スマホの時はステータスの文字を小さくし、＋を右上に重ねます */
+/* ★変更：アルファベットの右上に「＋」を重ねる強力な魔法 */
 .grade-main { font-size: 0.95rem; }
 .grade-plus { 
-    font-size: 0.65rem; /* ちょっとだけ小さく */
-    top: 0px;      /* 一番上にくっつけます */
-    bottom: auto;  /* 下からの指定を消します */
-    right: 2px;    /* 右から少し内側に入れて、文字の右上に重ねます！ */
+    font-size: 0.65rem;
+    position: relative;
+    left: -4px; /* ★左（アルファベットの方向）へ無理やり引っ張って食い込ませる！ */
+    top: -3px;  /* ★さらに上へ持ち上げる！ */
 }
 /* 武将一覧 */
 .list-header, .select-item {
@@ -1230,6 +1230,13 @@ body.is-pc {
 .daimyo-list-item:nth-child(even), 
 .kunishu-list-item:nth-child(even) {
     background-color: #f0f4f8; /* 薄い灰色っぽい青っぽい色 */
+}
+
+/* ★追加：マウスが乗った時は「必ず」この色にする（ゼブラに負けない魔法） */
+.select-item:hover, 
+.daimyo-list-item:hover, 
+.kunishu-list-item:hover {
+    background-color: #e3f2fd !important; /* 少し明るい水色で光らせます */
 }
 /* =========================================================
    ★ PC版で輸送・兵力分配・出陣画面を広く、縦に3項目ずつ並べる魔法（復活！）
