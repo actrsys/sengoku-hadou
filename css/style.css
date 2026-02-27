@@ -1165,14 +1165,6 @@ body.is-pc #ai-guard {
 
 /* --- スマホ時のフレキシブルなレイアウト（1行に収める魔法） --- */
 
-/* ★変更：アルファベットの右上に「＋」を重ねる強力な魔法 */
-.grade-main { font-size: 0.95rem; }
-.grade-plus { 
-    font-size: 0.65rem;
-    position: relative;
-    left: -4px; /* ★左（アルファベットの方向）へ無理やり引っ張って食い込ませる！ */
-    top: -50px;  /* ★さらに上へ持ち上げる！ */
-}
 /* 武将一覧 */
 .list-header, .select-item {
     display: grid; 
