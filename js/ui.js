@@ -547,8 +547,8 @@ class UIManager {
     }
     
     showDaimyoList() {
-        // ★ ヘッダーをスクロールの箱の中に【入れ込む】ことで、スクロールバーの食い込みズレを防ぎます！
-        let listHtml = '<div class="daimyo-list-container"><div class="daimyo-list-header"><span>大名家名</span><span>当主名</span><span>戦力</span><span>城数</span><span>友好度</span><span>関係</span></div>';
+        // ★変更：城数と戦力の順序を入れ替えました！
+        let listHtml = '<div class="daimyo-list-container"><div class="daimyo-list-header"><span>大名家名</span><span>当主名</span><span>城数</span><span>戦力</span><span>友好度</span><span>関係</span></div>';
         
         const activeClans = this.game.clans.filter(c => c.id !== 0 && this.game.castles.some(cs => cs.ownerClan === c.id));
         
@@ -565,33 +565,48 @@ class UIManager {
         });
 
         clanDataList.sort((a,b) => b.power - a.power);
+        
+        // ★追加：全大名の中で一番高い戦力を記憶しておきます
+        const maxPower = clanDataList.length > 0 ? clanDataList[0].power : 1;
 
         clanDataList.forEach(d => {
-            let friendScore = "-";
+            let friendScore = 50;
             let friendStatus = "-";
-            let statusColor = ""; // ★ここに追加：色を覚えておくための箱
+            let statusColor = "";
+            let hasRelation = false;
             
             if (d.id !== this.game.playerClanId) {
                 const relation = this.game.getRelation(this.game.playerClanId, d.id);
                 if (relation) {
                     friendScore = relation.sentiment;
                     friendStatus = relation.status;
+                    hasRelation = true;
                     
-                    // ★関係によって文字の色を変える魔法です！
                     if (friendStatus === '敵対') statusColor = 'color:#d32f2f;';
                     else if (friendStatus === '友好') statusColor = 'color:#388e3c;';
                     else if (['同盟', '支配', '従属'].includes(friendStatus)) statusColor = 'color:#1976d2;';
                 }
             }
 
-            // ★戦力と友好度の色を消して、クリックできるように「onclick」を追加しました！
-            listHtml += `<div class="daimyo-list-item" style="cursor:pointer;" onclick="window.GameApp.ui.showDiplomacyList(${d.id}, '${d.name}')"><span class="col-daimyo-name" style="font-weight:bold;">${d.name}</span><span class="col-leader-name">${d.leaderName}</span><span style="font-weight:bold;">${d.power}</span><span>${d.castlesCount}</span><span>${friendScore}</span><span style="${statusColor}">${friendStatus}</span></div>`;
+            // ★追加：戦力をゲージ化する魔法（数値は消しました）
+            const powerPercent = Math.min(100, (d.power / maxPower) * 100);
+            const powerBarHtml = `<div class="bar-bg bar-bg-power"><div class="bar-fill bar-fill-power" style="width:${powerPercent}%;"></div></div>`;
+
+            // ★追加：友好度をゲージ化する魔法（数値は消しました）
+            let friendBarHtml = "-";
+            if (d.id === this.game.playerClanId) {
+                friendBarHtml = "-"; // 自分自身にはゲージなし
+            } else {
+                const friendPercent = Math.min(100, Math.max(0, friendScore));
+                friendBarHtml = `<div class="bar-bg bar-bg-friend"><div class="bar-fill bar-fill-friend" style="width:${friendPercent}%;"></div></div>`;
+            }
+
+            // ★変更：順番を入れ替え、ゲージを表示するように組み込みました
+            listHtml += `<div class="daimyo-list-item" style="cursor:pointer;" onclick="window.GameApp.ui.showDiplomacyList(${d.id}, '${d.name}')"><span class="col-daimyo-name" style="font-weight:bold;">${d.name}</span><span class="col-leader-name">${d.leaderName}</span><span>${d.castlesCount}</span><span>${powerBarHtml}</span><span>${friendBarHtml}</span><span style="${statusColor}">${friendStatus}</span></div>`;
         });
         listHtml += '</div>';
         
-        // 結果画面のタイトル部分にくっつけて表示します
         this.showResultModal(`<h3 style="margin-top:0; border-bottom: 2px solid #ddd; padding-bottom: 10px; flex-shrink:0;">大名一覧</h3>${listHtml}`, () => {
-            // ★ ウインドウを閉じる時に、外側の箱の魔法を解除します
             if (this.resultBody) {
                 this.resultBody.style.overflowY = '';
                 this.resultBody.style.display = '';
@@ -599,7 +614,6 @@ class UIManager {
             }
         });
 
-        // ★ 大名一覧を開いている間だけ、外側の箱のスクロールを消して内側だけを動かします！
         if (this.resultBody) {
             this.resultBody.style.overflowY = 'hidden';
             this.resultBody.style.display = 'flex';
@@ -607,15 +621,12 @@ class UIManager {
         }
     }
     
-    // ★ここから新しく追加：大名の外交関係一覧を表示する機能
     showDiplomacyList(clanId, clanName) {
-        // 表のヘッダーを作ります（3列にする魔法をかけています）
-        let listHtml = '<div class="daimyo-list-container"><div class="daimyo-list-header" style="grid-template-columns: 2fr 1fr 1fr;"><span>大名家名</span><span>友好度</span><span>関係</span></div>';
+        // ★変更：真ん中の列（友好度）をゲージを入れるために少し広げました
+        let listHtml = '<div class="daimyo-list-container"><div class="daimyo-list-header" style="grid-template-columns: 2fr 1.5fr 1fr;"><span>大名家名</span><span>友好度</span><span>関係</span></div>';
         
-        // 選んだ大名以外の、生き残っている大名を集めます
         const activeClans = this.game.clans.filter(c => c.id !== 0 && c.id !== clanId && this.game.castles.some(cs => cs.ownerClan === c.id));
         
-        // 相手との関係を調べます
         const relations = activeClans.map(c => {
             const rel = this.game.getRelation(clanId, c.id);
             return {
@@ -626,25 +637,25 @@ class UIManager {
             };
         });
 
-        // 仲の良い順（友好度が高い順）に並べ替えます
         relations.sort((a,b) => b.sentiment - a.sentiment);
 
         relations.forEach(r => {
             let statusColor = "";
-            // 関係によって文字の色を変えます
             if (r.status === '敵対') statusColor = 'color:#d32f2f;';
             else if (r.status === '友好') statusColor = 'color:#388e3c;';
             else if (['同盟', '支配', '従属'].includes(r.status)) statusColor = 'color:#1976d2;';
 
-            // 1行分のデータを作ります
-            listHtml += `<div class="daimyo-list-item" style="grid-template-columns: 2fr 1fr 1fr;"><span class="col-daimyo-name" style="font-weight:bold;">${r.name}</span><span>${r.sentiment}</span><span style="${statusColor}">${r.status}</span></div>`;
+            // ★追加：友好度をゲージにする魔法
+            const friendPercent = Math.min(100, Math.max(0, r.sentiment));
+            const friendBarHtml = `<div class="bar-bg bar-bg-friend"><div class="bar-fill bar-fill-friend" style="width:${friendPercent}%;"></div></div>`;
+
+            // ★変更：数字の代わりにゲージを表示します
+            listHtml += `<div class="daimyo-list-item" style="grid-template-columns: 2fr 1.5fr 1fr;"><span class="col-daimyo-name" style="font-weight:bold;">${r.name}</span><span>${friendBarHtml}</span><span style="${statusColor}">${r.status}</span></div>`;
         });
         listHtml += '</div>';
         
-        // 戻るボタンを作ります
         const customFooter = `<button class="btn-secondary" onclick="window.GameApp.ui.showDaimyoList()">戻る</button>`;
         
-        // 画面に表示します
         this.showResultModal(`<h3 style="margin-top:0; border-bottom: 2px solid #ddd; padding-bottom: 10px; flex-shrink:0;">${clanName} 外交関係</h3>${listHtml}`, () => {
             if (this.resultBody) {
                 this.resultBody.style.overflowY = '';
@@ -1513,12 +1524,54 @@ class UIManager {
         // ★項目名をスクロールの箱の中に作り直します！
         const isViewMode = (actionType === 'view_only' || actionType === 'all_busho_list');
         if (this.selectorList) {
-            // ★変更：常に9列（空白列なし）にします！
             this.selectorList.innerHTML = `
-                <div class="list-header" id="selector-list-header">
-                    <span>行動</span><span>名前</span><span>身分</span><span>統率</span><span>武力</span><span>内政</span><span>外交</span><span>智謀</span><span>魅力</span>
+                <div class="kunishu-list-header ${isViewOnly ? 'view-mode' : ''}">
+                    ${isViewOnly ? '' : '<span></span>'}<span>勢力名</span><span>兵数</span><span>防御</span><span>友好度</span>
                 </div>
             `;
+            if (isViewOnly) this.selectorList.classList.add('view-mode');
+            else this.selectorList.classList.remove('view-mode');
+            
+            kunishus.forEach(k => {
+                const name = k.getName(window.GameApp);
+                const relVal = k.getRelation(window.GameApp.playerClanId);
+                
+                // ★追加：友好度を赤・青のゲージにする魔法
+                const relPercent = Math.min(100, Math.max(0, Number(relVal) || 0));
+                const friendBarHtml = `<div class="bar-bg bar-bg-friend"><div class="bar-fill bar-fill-friend" style="width:${relPercent}%;"></div></div>`;
+
+                const div = document.createElement('div');
+                div.className = 'kunishu-list-item'; 
+                
+                if (isViewOnly) {
+                    // ★変更：数字の代わりにゲージを表示します
+                    div.innerHTML = `<strong class="col-kunishu-name">${name}</strong><span>${k.soldiers}</span><span>${k.defense}</span><span>${friendBarHtml}</span>`;
+                    div.style.cursor = 'default';
+                } else {
+                    // ★変更：数字の代わりにゲージを表示します
+                    div.innerHTML = `<span></span><strong class="col-kunishu-name">${name}</strong><span>${k.soldiers}</span><span>${k.defense}</span><span>${friendBarHtml}</span>`;
+                    div.style.cursor = 'pointer';
+                    
+                    div.onclick = () => {
+                        // 一旦すべての選択色を消す
+                        const allItems = this.selectorList.querySelectorAll('.kunishu-list-item');
+                        allItems.forEach(item => {
+                            item.classList.remove('selected');
+                        });
+                        
+                        // クリックした行に色を付ける
+                        div.classList.add('selected');
+                        selectedKunishuId = k.id;
+                        
+                        // 決定ボタンを押せるようにする
+                        if (this.selectorConfirmBtn) {
+                            this.selectorConfirmBtn.disabled = false;
+                            this.selectorConfirmBtn.style.opacity = 1.0;
+                        }
+                    };
+                }
+                this.selectorList.appendChild(div);
+            });
         }
         const contextEl = document.getElementById('selector-context-info'); if(contextEl) contextEl.classList.remove('hidden'); 
         const c = this.currentCastle; 
