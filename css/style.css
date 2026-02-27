@@ -342,7 +342,7 @@ img {
 #sidebar-resizer { display: none; }
 #pc-sidebar { display: none !important; }
 
-@media (min-width: 769px) {
+body.is-pc {
     #app { flex-direction: row; }
     #top-info-bar { display: none !important; }
     #bottom-command-bar { display: none !important; }
@@ -983,7 +983,7 @@ img {
 
 
 /* ② ここからが魔法！「画面が広い（幅768px以上）」時の特別ルール */
-@media (min-width: 768px) {
+body.is-pc {
     .responsive-army-content {
         flex-direction: column; /* 画像と文字を「縦（上と下）」に並べる！ */
         align-items: center; /* ど真ん中に揃える */
@@ -1043,7 +1043,7 @@ img {
 }
 
 /* ② PC版（横幅768px以上）の特別ルール（ログは右） */
-@media (min-width: 768px) {
+body.is-pc {
     .responsive-war-layout {
         flex-direction: row; 
     }
@@ -1067,15 +1067,13 @@ img {
 /* =========================================================
    ★ PC版で画面を「固定サイズ」にしてズームする準備
    ========================================================= */
-@media (min-width: 769px) {
-    body {
-        /* 映画館の暗闇を作って、画面をど真ん中に置きます */
-        background-color: #111111; 
-        display: flex;
-        justify-content: center; 
-        align-items: center;
-        margin: 0;
-    }
+body.is-pc {
+    /* 映画館の暗闇を作って、画面をど真ん中に置きます */
+    background-color: #111111; 
+    display: flex;
+    justify-content: center; 
+    align-items: center;
+    margin: 0;
     
     #game-screen {
         /* 大きさはJS(魔法のスクリプト)が決めるので、ここでは色とハミ出し防止だけ！ */
