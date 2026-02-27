@@ -307,33 +307,35 @@
     function resizeGameScreen() {
         const screen = document.getElementById('game-screen');
         
-        // PC版の時（画面幅が769px以上の時）だけ魔法をかけます
-        if (window.innerWidth >= 769) {
-            // ① 基準となる「理想のゲームサイズ」を決めます（ここでは横1280px、縦720px）
+        // スマホやタブレットかどうかを見分ける魔法！
+        const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+        
+        // パソコンなら
+        if (!isMobile) {
+            document.body.classList.add('is-pc'); // PC用の目印シールを貼る
+            
             const baseWidth = 1280;
             const baseHeight = 720;
             
-            // ② 今のブラウザの大きさと、理想のサイズを比べて「倍率」を計算します
             const scaleW = window.innerWidth / baseWidth;
             const scaleH = window.innerHeight / baseHeight;
             
-            // ③ はみ出さないように、縦と横で「小さい方の倍率」に合わせます
             const scale = Math.min(scaleW, scaleH);
             
-            // ④ 理想のサイズで画用紙を作って、倍率に合わせて「拡大・縮小コピー(zoom)」します！
             screen.style.width = baseWidth + 'px';
             screen.style.height = baseHeight + 'px';
             screen.style.zoom = scale; 
             
         } else {
-            // スマホの時は魔法を解除して、元のスマホ画面に戻します
+            // スマホなら
+            document.body.classList.remove('is-pc'); // PC用の目印シールを剥がす
+            
             screen.style.width = '100%';
             screen.style.height = '100%';
             screen.style.zoom = 1;
         }
     }
     
-    // ブラウザの大きさが変わった時と、ゲームが始まった時に魔法をかけるお約束
     window.addEventListener('resize', resizeGameScreen);
     window.addEventListener('DOMContentLoaded', resizeGameScreen);
     </script>
