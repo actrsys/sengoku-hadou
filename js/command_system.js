@@ -1216,8 +1216,13 @@ class CommandSystem {
             horses: sendHorses, guns: sendGuns
         };
 
-        // 国人衆への攻撃をしたので、友好度を0にします
-        kunishu.setRelation(this.game.playerClanId, 0);
+        // ★修正: 国人衆への攻撃をしたので、友好度を低下させます
+        let currentRel = kunishu.getRelation(this.game.playerClanId);
+        let nextRel = currentRel;
+        if (currentRel >= 60) nextRel = 30;
+        else if (currentRel >= 31) nextRel -= 30;
+        else nextRel = 0;
+        kunishu.setRelation(this.game.playerClanId, nextRel);
 
         // 戦争マネージャーにデータを渡してスタート
         this.game.warManager.state = { 

@@ -374,8 +374,25 @@ class WarManager {
                 maxRice: atkRice,
                 horses: atkHorses,
                 guns: atkGuns,
-                isKunishu: atkCastle.isKunishu || false 
+                isKunishu: atkCastle.isKunishu || false,
+                kunishuId: atkCastle.kunishuId || 0 // ★追加
             };
+
+            // ★追加：戦争開始による主敵と攻撃側援軍の友好度低下
+            const atkIsKunishu = atkCastle.isKunishu || false;
+            const atkId = atkIsKunishu ? atkCastle.kunishuId : atkClan;
+            const defIsKunishu = defCastle.isKunishu || false;
+            const defId = defIsKunishu ? defCastle.kunishuId : defClan;
+            
+            this.applyWarHostility(atkId, atkIsKunishu, defId, defIsKunishu, false);
+
+            if (reinforcementData) {
+                const helperCastle = reinforcementData.castle;
+                const helperClan = helperCastle.ownerClan;
+                const helperIsKunishu = helperCastle.isKunishu || false;
+                const helperId = helperIsKunishu ? helperCastle.kunishuId : helperClan;
+                this.applyWarHostility(helperId, helperIsKunishu, defId, defIsKunishu, true);
+            }
             
             this.state = { 
                 active: true, round: 1, attacker: attackerForce, sourceCastle: atkCastle, 
@@ -1833,6 +1850,14 @@ class WarManager {
             guns: reinfGuns
         };
         
+        // ★追加: 守備側援軍による友好度低下 (攻撃側に対して)
+        const atkForce = this.state.attacker;
+        const atkIsKunishu = atkForce.isKunishu || false;
+        const atkId = atkIsKunishu ? atkForce.kunishuId : atkForce.ownerClan;
+        const helperIsKunishu = helperCastle.isKunishu || false;
+        const helperId = helperIsKunishu ? helperCastle.kunishuId : helperClanId;
+        this.applyWarHostility(helperId, helperIsKunishu, atkId, atkIsKunishu, true);
+        
         // プレイヤーが関わる戦争にする
         if (helperClanId === this.game.playerClanId) {
             this.state.isPlayerInvolved = true;
@@ -1847,7 +1872,6 @@ class WarManager {
         }
     }
     
-    // ★ここから追加：プレイヤーが武将と兵数を選ぶための新しい処理
     _promptPlayerDefReinforcement(helperCastle, defCastle, myToHelperRel, onComplete, isBoss) {
         const promptBusho = () => {
             this.game.ui.openBushoSelector('def_reinf_deploy', helperCastle.id, {
@@ -1903,11 +1927,82 @@ class WarManager {
             horses: reinfHorses,
             guns: reinfGuns
         };
-
+        
+        // ★追加: 守備側援軍による友好度低下 (攻撃側に対して)
+        const atkForce = this.state.attacker;
+        const atkIsKunishu = atkForce.isKunishu || false;
+        const atkId = atkIsKunishu ? atkForce.kunishuId : atkForce.ownerClan;
+        const helperIsKunishu = helperCastle.isKunishu || false;
+        const helperId = helperIsKunishu ? helperCastle.kunishuId : helperClanId;
+        this.applyWarHostility(helperId, helperIsKunishu, atkId, atkIsKunishu, true);
+        
         this.state.isPlayerInvolved = true;
         const helperClanName = this.game.clans.find(c => c.id === helperClanId)?.name || "援軍";
         this.game.ui.showDialog(`${helperClanName} (${helperCastle.name}) が防衛の援軍に出発しました！`, false, onComplete);
     }
-    // ★追加ここまで
     
+    // ★追加: 戦争や援軍による友好度低下の共通処理
+    applyWarHostility(clanA, isKunishuA, clanB, isKunishuB, isReinforcement = false) {
+        if (!isKunishuA && clanA === 0) return;
+        if (!isKunishuB && clanB === 0) return;
+        if (isKunishuA && isKunishuB) return;
+
+        let currentSentiment = 0;
+        let daimyoId = 0;
+        let kunishuId = 0;
+        let isKunishuRel = false;
+
+        if (isKunishuA) {
+            kunishuId = clanA;
+            daimyoId = clanB;
+            isKunishuRel = true;
+        } else if (isKunishuB) {
+            kunishuId = clanB;
+            daimyoId = clanA;
+            isKunishuRel = true;
+        }
+
+        if (isKunishuRel) {
+            const kunishu = this.game.kunishuSystem.getKunishu(kunishuId);
+            if (!kunishu) return;
+            currentSentiment = kunishu.getRelation(daimyoId);
+        } else {
+            const rel = this.game.getRelation(clanA, clanB);
+            if (!rel) return;
+            currentSentiment = rel.sentiment;
+        }
+
+        let diff = 0;
+        if (isReinforcement) {
+            diff = -20; // 援軍の時は20下がる
+            if (currentSentiment + diff < 0) diff = -currentSentiment; // 0より下にはならない
+        } else {
+            // 主敵同士の時は特別なルール
+            let next = currentSentiment;
+            if (currentSentiment >= 60) next = 30;
+            else if (currentSentiment >= 31) next -= 30;
+            else next = 0;
+            diff = next - currentSentiment;
+        }
+
+        if (diff !== 0) {
+            if (isKunishuRel) {
+                const kunishu = this.game.kunishuSystem.getKunishu(kunishuId);
+                kunishu.setRelation(daimyoId, currentSentiment + diff);
+            } else {
+                this.game.diplomacyManager.updateSentiment(clanA, clanB, diff);
+            }
+            
+            if (daimyoId === this.game.playerClanId || (!isKunishuRel && (clanA === this.game.playerClanId || clanB === this.game.playerClanId))) {
+                let nameA = isKunishuA ? this.game.kunishuSystem.getKunishu(clanA)?.getName(this.game) : this.game.clans.find(c=>c.id===clanA)?.name;
+                let nameB = isKunishuB ? this.game.kunishuSystem.getKunishu(clanB)?.getName(this.game) : this.game.clans.find(c=>c.id===clanB)?.name;
+                if (isReinforcement) {
+                    this.game.ui.log(`援軍参戦により、${nameA}と${nameB}の友好度が低下しました。`);
+                } else {
+                    this.game.ui.log(`開戦により、${nameA}と${nameB}の友好度が低下しました。`);
+                }
+            }
+        }
+    }
+        
 }
