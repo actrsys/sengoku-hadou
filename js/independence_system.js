@@ -132,8 +132,11 @@ class IndependenceSystem {
         castle.ownerClan = newClanId;
 
         // 4. 外交関係の更新（敵対設定）
-        const relKey = this.game.getRelationKey(oldClanId, newClanId);
-        this.game.relations[relKey] = { friendship: 0, alliance: false };
+        const oldClan = this.game.clans.find(c => c.id === oldClanId);
+        if (oldClan) {
+            oldClan.diplomacyValue[newClanId] = { status: '敵対', sentiment: 0 };
+        }
+        newClan.diplomacyValue[oldClanId] = { status: '敵対', sentiment: 0 };
 
         // 5. 部下の去就判定
         const captiveMsgs = this.resolveSubordinates(castle, castellan, oldDaimyo, newClanId, oldClanId);

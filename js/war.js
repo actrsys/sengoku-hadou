@@ -1529,7 +1529,13 @@ class WarManager {
         
         // プレイヤーの場合は、自分で選ぶ画面を出します！
         if (clanId === this.game.playerClanId) {
-            this.game.ui.showSuccessionModal(candidates, (newLeaderId) => this.game.changeLeader(clanId, newLeaderId)); 
+            // ★追加：プレイヤーが選ぶまで「待つ」ように Promise の魔法をかけます！
+            return new Promise(resolve => {
+                this.game.ui.showSuccessionModal(candidates, (newLeaderId) => {
+                    this.game.changeLeader(clanId, newLeaderId);
+                    resolve(); // 選び終わったら次へ進む合図
+                });
+            });
         } else { 
             // AIの場合は、自動で一番ふさわしい人を計算して選びます
             candidates.forEach(b => {
