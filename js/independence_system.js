@@ -143,10 +143,8 @@ class IndependenceSystem {
         this.game.updateCastleLord(castle);
 
         // 6. UIログ
-        // ★修正：エラーにならないように、名前を安全に取得します
         const oldClanName = this.game.clans.find(c => c.id === oldClanId)?.name || "不明";
-        newClan = this.game.clans.find(c => c.id === newClanId);
-        newClanName = newClan ? newClan.name : `${castellan.name.split('|')[0]}家`;
+        // ★上で既に箱があるので、エラーの原因だった2行を消しました！
 
         let msg = `【謀反】${oldClanName}の${castle.name}にて、${castellan.name}が独立！「${newClanName}」を旗揚げしました。`;
         this.game.ui.log(msg);
@@ -154,8 +152,8 @@ class IndependenceSystem {
         if (captiveMsgs && captiveMsgs.length > 0) {
             msg += '\n\n' + captiveMsgs.join('\n');
         }
-        // ★独立のメッセージも1行にするだけです！
-        await this.game.ui.showDialogAsync(msg, false, 5000);
+        // ★プレイヤーがOKを押すまで安全に時間を止めるため、5000を「0」にします
+        await this.game.ui.showDialogAsync(msg, false, 0);
     }
 
     /**
