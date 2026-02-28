@@ -33,7 +33,7 @@ class HexMapGenerator {
 
         // 平地以外の残りマスを、森(3~6) : 川(1~3) : 山(1~3) の割合で分けます
         const wForest = this.rand(3, 6);
-        const wRiver = this.rand(1, 3);
+        const wRiver = this.rand(0, 3); // 川が出ないこともある
         const wMountain = this.rand(1, 3);
         const wTotal = wForest + wRiver + wMountain;
 
@@ -74,13 +74,21 @@ class HexMapGenerator {
     // 川を作る魔法（上から下へ、クネクネと線を引きます）
     _generateRivers(map, cols, rows, targetCount) {
         let currentCount = 0;
-        let maxRivers = 3; // 川のスタート地点を最大3つまで作ります
+        let maxRivers = 3; 
         
+        // ★修正: 川のスタート位置が右に偏らないように、「左・中・右」の候補地を用意してシャッフルします！
+        let startXCandidates = [
+            this.rand(1, Math.floor(cols / 3)),                          // 左側
+            this.rand(Math.floor(cols / 3), Math.floor(cols * 2 / 3)),   // 真ん中
+            this.rand(Math.floor(cols * 2 / 3), cols - 2)                // 右側
+        ];
+        startXCandidates.sort(() => Math.random() - 0.5); // 順番をランダムに！
+
         for (let i = 0; i < maxRivers; i++) {
             if (currentCount >= targetCount) break;
             
-            // 上の端からスタート
-            let x = this.rand(1, cols - 2);
+            // 用意した候補地からスタート
+            let x = startXCandidates[i];
             let y = 0;
 
             while (y < rows && currentCount < targetCount) {
@@ -89,17 +97,15 @@ class HexMapGenerator {
                     currentCount++;
                 }
 
-                // HEXマップの性質に合わせて、真下か、斜め下（段差）に進む
                 let dirs = [];
                 const isEven = (x % 2 === 0);
-                if (isEven) dirs = [ [0, 1], [-1, 0], [1, 0] ];  // 偶数列の斜め下
-                else        dirs = [ [0, 1], [-1, 1], [1, 1] ];  // 奇数列の斜め下
+                if (isEven) dirs = [ [0, 1], [-1, 0], [1, 0] ];  
+                else        dirs = [ [0, 1], [-1, 1], [1, 1] ];  
 
                 let d = dirs[this.rand(0, 2)];
                 x += d[0];
                 y += d[1];
 
-                // マップからはみ出さないように調整
                 if (x < 0) x = 0;
                 if (x >= cols) x = cols - 1;
             }
