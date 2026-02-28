@@ -1168,21 +1168,8 @@ class WarManager {
                         const extMsg = `${clanName}は滅亡しました。`;
                         this.game.ui.log(extMsg);
                         
-                        // ★追加：滅亡のダイアログを出して時間を止めます
-                        await new Promise(resolve => {
-                            const autoClose = setTimeout(() => {
-                                const modal = document.getElementById('dialog-modal');
-                                const okBtn = document.getElementById('dialog-ok-btn');
-                                if (modal && !modal.classList.contains('hidden') && okBtn) {
-                                    okBtn.click();
-                                }
-                            }, 5000);
-
-                            this.game.ui.showDialog(extMsg, false, () => {
-                                clearTimeout(autoClose);
-                                resolve();
-                            });
-                        });
+                        // ★たった1行で「表示・5秒タイマー・順番待ち」を全部やってくれます！
+                        await this.game.ui.showDialogAsync(extMsg, false, 5000);
 
                         if (oldOwner === this.game.playerClanId) {
                             setTimeout(() => {
