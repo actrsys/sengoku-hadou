@@ -195,11 +195,10 @@ img {
 }
 
 #map-wrapper {
-    flex: 1; position: relative; background-color: #37474f; /* ★ここを暗い色に変更（これがグリッド線になります！） */
+    flex: 1; position: relative; background-color: #81c784;
     overflow: hidden; display: flex; justify-content: center; align-items: center;
     touch-action: none;
 }
-
 #map-scroll-container {
     width: 100%; height: 100%; overflow: auto; display: flex;
     flex-direction: column; padding: 20px; box-sizing: border-box; 
@@ -1485,3 +1484,7 @@ body.is-pc .faction-list-container { scroll-padding-top: 38px; }
 .hex-forest { background-color: #2e7d32 !important; } /* 森：深い緑 */
 .hex-river { background-color: #4fc3f7 !important; } /* 川：水色 */
 .hex-mountain { background-color: #795548 !important; } /* 山：茶色 */
+/* ★追加: 野戦マップの裏地（グリッド線の色）だけを暗い色にします！ */
+#fw-map {
+    background-color: #37474f; 
+}
