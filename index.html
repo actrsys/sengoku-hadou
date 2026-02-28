@@ -280,7 +280,16 @@
                 </div>
             </div>
         </div>
-
+        <div id="intercept-confirm-modal" class="modal hidden" style="z-index: 6000;">
+            <div class="modal-content" style="max-width: 400px; text-align: center;">
+                <h3 style="margin-top: 0;">城を出て迎え撃ちますか？</h3>
+                <div id="intercept-msg" style="margin: 20px 0; font-size:1.1rem; line-height:1.5; white-space: pre-wrap;"></div>
+                <div class="modal-footer" style="justify-content: center; gap: 20px;">
+                    <button id="btn-intercept" class="btn-primary" style="background-color: #ef5350;">迎撃</button>
+                    <button id="btn-siege" class="btn-secondary" style="background-color: #42a5f5; color: white;">籠城</button>
+                </div>
+            </div>
+        </div>
         <div id="custom-context-menu" class="hidden context-menu">
             <div class="context-menu-item" id="ctx-menu-back">自拠点に戻る</div>
             <div class="context-menu-item" id="ctx-menu-finish">命令終了</div>
@@ -291,7 +300,8 @@
     <script src="js/models.js"></script>
     <script src="js/diplomacy.js"></script>
     <script src="js/kunishu_system.js"></script>
-    <script src="js/life_system.js"></script> <script src="js/war.js"></script>
+    <script src="js/life_system.js"></script>
+    <script src="js/war.js"></script>
     <script src="js/map_generator.js"></script>
     <script src="js/field_war.js"></script>
     <script src="js/faction_system.js"></script>
