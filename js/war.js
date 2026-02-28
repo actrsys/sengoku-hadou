@@ -923,6 +923,42 @@ class WarManager {
             const s = this.state; s.active = false;
             const oldDefClanId = s.defender.ownerClan; 
             
+            // ★滅亡をチェックしてダイアログを出す共通の魔法
+            const checkExtinction = async () => {
+                if (oldDefClanId !== 0 && this.game.castles.filter(c => c.ownerClan === oldDefClanId).length === 0) {
+                    const deadClanName = this.game.clans.find(c => c.id === oldDefClanId)?.name || "不明";
+                    // ここで「家家」にならないように調整します！
+                    const displayClanName = deadClanName.endsWith('家') ? deadClanName : deadClanName + '家';
+                    const extMsg = `【大名家滅亡】\n拠点を全て失い、${displayClanName}は滅亡しました。`;
+                    this.game.ui.log(extMsg);
+                    
+                    await new Promise(resolve => {
+                        const autoClose = setTimeout(() => {
+                            const modal = document.getElementById('dialog-modal');
+                            const okBtn = document.getElementById('dialog-ok-btn');
+                            if (modal && !modal.classList.contains('hidden') && okBtn) {
+                                okBtn.click();
+                            }
+                        }, 5000);
+
+                        this.game.ui.showDialog(extMsg, false, () => {
+                            clearTimeout(autoClose);
+                            resolve();
+                        });
+                    });
+
+                    if (oldDefClanId === this.game.playerClanId) {
+                        return new Promise(resolve => {
+                            setTimeout(() => {
+                                this.game.ui.showDialog("全拠点を失いました。ゲームオーバーです。", false, () => {
+                                    this.game.ui.returnToTitle();
+                                });
+                            }, 1000);
+                        });
+                    }
+                }
+            };
+
             // ★変更：順番待ちができるように async を付けます
             const finishWarProcess = async () => {
                 const winnerClan = s.attacker.ownerClan; // 勝ったのは攻撃側です
@@ -935,10 +971,13 @@ class WarManager {
                         // ★変更：AIの捕虜処理が終わるまで「待つ(await)」ようにします
                         await this.autoResolvePrisoners(this.pendingPrisoners, winnerClan);
                         this.pendingPrisoners = [];
+                        // ★ここでAIの滅亡チェック！
+                        await checkExtinction();
                         this.game.finishTurn();
                     }
                 } else {
-                    // 捕虜がいなければ、そのまま時間を進めます
+                    // 捕虜がいなければ、滅亡チェックして時間を進めます
+                    await checkExtinction();
                     this.game.finishTurn();
                 }
             };
@@ -1279,37 +1318,6 @@ class WarManager {
                 const atkClanData1 = this.game.clans.find(c => c.id === s.attacker.ownerClan);
                 const atkArmyName1 = s.attacker.isKunishu ? s.attacker.name : (atkClanData1 ? atkClanData1.getArmyName() : "敵軍");
                 this.game.ui.log(`【合戦結果】守備軍の撤退により、${atkArmyName1}が${s.defender.name}を占領しました。`);
-
-                // ★ここから追加！旧大名家が滅亡したかチェックしてダイアログを出します！
-                if (oldDefClanId !== 0 && this.game.castles.filter(c => c.ownerClan === oldDefClanId).length === 0) {
-                    const deadClanName = this.game.clans.find(c => c.id === oldDefClanId)?.name || "不明";
-                    const extMsg = `【大名家滅亡】\n拠点を全て失い、${deadClanName}は滅亡しました。`;
-                    this.game.ui.log(extMsg);
-                    
-                    await new Promise(resolve => {
-                        const autoClose = setTimeout(() => {
-                            const modal = document.getElementById('dialog-modal');
-                            const okBtn = document.getElementById('dialog-ok-btn');
-                            if (modal && !modal.classList.contains('hidden') && okBtn) {
-                                okBtn.click();
-                            }
-                        }, 5000);
-
-                        this.game.ui.showDialog(extMsg, false, () => {
-                            clearTimeout(autoClose);
-                            resolve();
-                        });
-                    });
-
-                    if (oldDefClanId === this.game.playerClanId) {
-                        setTimeout(() => {
-                            this.game.ui.showDialog("全拠点を失いました。ゲームオーバーです。", false, () => {
-                                this.game.ui.returnToTitle();
-                            });
-                        }, 1000);
-                    }
-                }
-                // ★ここまで追加！
                 
                 if (s.isPlayerInvolved) {
                     this.game.ui.showResultModal(`撤退しました。\n${retreatTargetId ? '部隊は移動しました。' : '部隊は解散しました。'}`, finishWarProcess);
@@ -1367,37 +1375,6 @@ class WarManager {
                 const atkClanData2 = this.game.clans.find(c => c.id === s.attacker.ownerClan);
                 const atkArmyName2 = s.attacker.isKunishu ? s.attacker.name : (atkClanData2 ? atkClanData2.getArmyName() : "敵軍");
                 this.game.ui.log(`【合戦結果】${atkArmyName2}が${s.defender.name}を制圧しました。`);
-
-                // ★ここから追加！旧大名家が滅亡したかチェックしてダイアログを出します！
-                if (oldDefClanId !== 0 && this.game.castles.filter(c => c.ownerClan === oldDefClanId).length === 0) {
-                    const deadClanName = this.game.clans.find(c => c.id === oldDefClanId)?.name || "不明";
-                    const extMsg = `【大名家滅亡】\n拠点を全て失い、${deadClanName}は滅亡しました。`;
-                    this.game.ui.log(extMsg);
-                    
-                    await new Promise(resolve => {
-                        const autoClose = setTimeout(() => {
-                            const modal = document.getElementById('dialog-modal');
-                            const okBtn = document.getElementById('dialog-ok-btn');
-                            if (modal && !modal.classList.contains('hidden') && okBtn) {
-                                okBtn.click();
-                            }
-                        }, 5000);
-
-                        this.game.ui.showDialog(extMsg, false, () => {
-                            clearTimeout(autoClose);
-                            resolve();
-                        });
-                    });
-
-                    if (oldDefClanId === this.game.playerClanId) {
-                        setTimeout(() => {
-                            this.game.ui.showDialog("全拠点を失いました。ゲームオーバーです。", false, () => {
-                                this.game.ui.returnToTitle();
-                            });
-                        }, 1000);
-                    }
-                }
-                // ★ここまで追加！
             } else {
                 s.defender.immunityUntil = this.game.getCurrentTurnId(); 
                 if (isAtkPlayer) resultMsg = isRetreat ? `${s.defender.name}からの撤退を決定しました……` : `${s.defender.name}を落としきることができませんでした……`;
@@ -1464,16 +1441,36 @@ class WarManager {
         const kunishu = prisoner.belongKunishuId > 0 ? this.game.kunishuSystem.getKunishu(prisoner.belongKunishuId) : null;
 
         // ★追加：ダイアログの「OKボタン」を押した後に、次の処理へ進むための特別な箱を用意しました
-        const nextStep = () => {
+        const nextStep = async () => { // ★ async をつけます
             this.pendingPrisoners.splice(index, 1); 
             if (this.pendingPrisoners.length === 0) {
                 this.game.ui.closePrisonerModal();
-                this.game.finishTurn();
+                
+                // ★プレイヤーの捕虜処理がすべて終わったので、ここで１回だけ滅亡チェック！
+                const oldDefClanId = this.state.defender.ownerClan;
+                if (oldDefClanId !== 0 && this.game.castles.filter(c => c.ownerClan === oldDefClanId).length === 0) {
+                    const deadClanName = this.game.clans.find(c => c.id === oldDefClanId)?.name || "不明";
+                    const displayClanName = deadClanName.endsWith('家') ? deadClanName : deadClanName + '家';
+                    const extMsg = `【大名家滅亡】\n拠点を全て失い、${displayClanName}は滅亡しました。`;
+                    this.game.ui.log(extMsg);
+                    
+                    this.game.ui.showDialog(extMsg, false, () => {
+                        if (oldDefClanId === this.game.playerClanId) {
+                            this.game.ui.showDialog("全拠点を失いました。我が大名家は滅亡しました……", false, () => {
+                                this.game.ui.returnToTitle();
+                            });
+                        } else {
+                            this.game.finishTurn();
+                        }
+                    });
+                } else {
+                    this.game.finishTurn();
+                }
             } else {
                 this.game.ui.showPrisonerModal(this.pendingPrisoners); 
             }
         };
-
+        
         if (action === 'hire') { 
             if (kunishu && prisoner.id === kunishu.leaderId) {
                 this.game.ui.showDialog(`${prisoner.name}「国衆を束ねるこの俺が、お前になど仕えるか！」\n(※国人衆の代表者は登用できません)`, false); 
@@ -1576,34 +1573,18 @@ class WarManager {
         
         // もし誰もいなかったら、その大名家は滅亡です…
         if (candidates.length === 0) { 
-            const clan = this.game.clans.find(c => c.id === clanId);
-            const msg = `${daimyo.name.replace('|','')}が処断され、後継ぎがいないため【${clan ? clan.name : '不明'}家】は滅亡しました……`;
+            const msg = `【処断】${daimyo.name.replace('|','')} は処断されました。`;
             this.game.ui.log(msg);
-
-            // ★追加：滅亡のダイアログを出して時間を止めます
-            await new Promise(resolve => {
-                const autoClose = setTimeout(() => {
-                    const modal = document.getElementById('dialog-modal');
-                    const okBtn = document.getElementById('dialog-ok-btn');
-                    if (modal && !modal.classList.contains('hidden') && okBtn) {
-                        okBtn.click();
-                    }
-                }, 5000);
-
-                this.game.ui.showDialog(msg, false, () => {
-                    clearTimeout(autoClose);
-                    resolve();
-                });
-            });
-
+            
+            // 後継ぎがいないので、持っていた城をすべて空き城（浪人）にします
             this.game.castles.filter(c => c.ownerClan === clanId).forEach(c => { 
                 c.ownerClan = 0; 
                 this.game.getCastleBushos(c.id).forEach(l => { 
-                    // ★ 修正：出番待ち（未登場）や死亡した武将を巻き込んで浪人にしないように守ります！
                     if (l.status === 'unborn' || l.status === 'dead') return;
                     l.clan = 0; 
                     l.status = 'ronin'; 
                 }); 
+                this.game.updateCastleLord(c); // 城主情報をリセット
             }); 
             return; 
         }
