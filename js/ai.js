@@ -394,11 +394,34 @@ class AIEngine {
                     doer.isActionDone = true; actionDoneInThisStep = true; break;
                 }
                 if (action.type === 'draft' && castle.gold >= 500 && castle.population > 1000) {
-                    castle.gold -= 500;
-                    const gain = GameSystem.calcDraftFromGold(500, doer, castle.population);
-                    castle.soldiers += gain;
-                    castle.population -= Math.floor(gain * 0.1);
-                    doer.isActionDone = true; actionDoneInThisStep = true; break;
+                    // ① プレイヤーと同じ計算式で兵士の数を出し、最後に「10で割る」をします！
+                    let soldiers = GameSystem.calcDraftFromGold(500, doer, castle.population);
+                    soldiers = Math.floor(soldiers / 10);
+
+                    // ② 上限(99,999)を超えないようにストッパーをかけます
+                    if (castle.soldiers + soldiers > 99999) {
+                        soldiers = 99999 - castle.soldiers;
+                    }
+
+                    if (soldiers > 0) {
+                        castle.gold -= 500;
+
+                        // ③ プレイヤーと同じように、新兵が入ることで訓練と士気が少し下がる計算をします
+                        const newMorale = Math.max(0, castle.morale - 10);
+                        const newTraining = Math.max(0, castle.training - 10);
+                        castle.training = Math.floor(((castle.training * castle.soldiers) + (newTraining * soldiers)) / (castle.soldiers + soldiers));
+                        castle.morale = Math.floor(((castle.morale * castle.soldiers) + (newMorale * soldiers)) / (castle.soldiers + soldiers));
+
+                        // 兵士を増やします（AIだけ人口が減る謎の処理も、不公平なので消しました！）
+                        castle.soldiers += soldiers;
+
+                        doer.isActionDone = true; 
+                        actionDoneInThisStep = true; 
+                        break;
+                    } else {
+                        // もし上限いっぱいで兵士が増やせなかったら、この行動は諦めて次を探します
+                        continue;
+                    }
                 }
                 if (action.type === 'training') {
                     castle.training = Math.min(100, castle.training + GameSystem.calcTraining(doer));
