@@ -2515,7 +2515,7 @@ class UIManager {
 
         // 攻撃軍の情報を入れます
         const atkClan = this.game.clans.find(c => c.id === s.attacker.ownerClan);
-        const atkName = s.attacker.isKunishu ? s.attacker.name : (atkClan ? atkClan.name : "不明な勢力");
+        const atkName = s.attacker.isKunishu ? s.attacker.name : (atkClan ? atkClan.name : "野武士");
         setTxt('war-atk-name', atkName);
         
         // ★ここを追加：名前が5文字以上なら、タイトル全体を小さくする魔法をかけます！
@@ -2535,7 +2535,7 @@ class UIManager {
         
         // 守備軍の情報を入れます
         const defClan = this.game.clans.find(c => c.id === s.defender.ownerClan);
-        const defNameText = s.defender.isKunishu ? s.defender.name : (defClan ? defClan.name : "不明な勢力");
+        const defNameText = s.defender.isKunishu ? s.defender.name : (defClan ? defClan.name : "野武士");
         setTxt('war-def-name', defNameText);
         
         // ★ここを追加：守備側も同じように、長ければ小さくする魔法をかけます！
