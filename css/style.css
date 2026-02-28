@@ -576,10 +576,25 @@ body.is-pc {
     user-select: none;
 }
 .fw-hex:hover { filter: brightness(1.1); }
-.fw-hex.movable { background-color: #81d4fa; cursor: pointer; filter: brightness(1.1); }
-.fw-hex.current-pos { background-color: #29b6f6; cursor: pointer; filter: brightness(1.1); }
-.fw-hex.attackable { background-color: #ef9a9a; cursor: pointer; filter: brightness(1.1); box-shadow: inset 0 0 10px red; }
-.fw-hex.fw-dir-highlight { background-color: #fff59d; cursor: pointer; filter: brightness(1.2); box-shadow: inset 0 0 10px #fbc02d;}
+/* ★修正: 移動範囲などを「半透明のフィルム」にして地形を透けさせる魔法 */
+.fw-hex::after {
+    content: "";
+    position: absolute;
+    top: 0; left: 0; width: 100%; height: 100%;
+    pointer-events: none; /* クリックの邪魔をしないようにします */
+}
+
+.fw-hex.movable { cursor: pointer; filter: brightness(1.1); }
+.fw-hex.movable::after { background-color: rgba(41, 182, 246, 0.6); } /* 透ける水色 */
+
+.fw-hex.current-pos { cursor: pointer; filter: brightness(1.1); }
+.fw-hex.current-pos::after { background-color: rgba(255, 255, 255, 0.4); } /* 現在地は白っぽく光る */
+
+.fw-hex.attackable { cursor: pointer; filter: brightness(1.1); }
+.fw-hex.attackable::after { background-color: rgba(239, 83, 80, 0.6); box-shadow: inset 0 0 15px red; } /* 透ける赤色 */
+
+.fw-hex.fw-dir-highlight { cursor: pointer; filter: brightness(1.2); }
+.fw-hex.fw-dir-highlight::after { background-color: rgba(255, 235, 59, 0.5); box-shadow: inset 0 0 10px #fbc02d; } /* 透ける黄色 */
 
 .fw-unit {
     width: 24px; height: 24px;
