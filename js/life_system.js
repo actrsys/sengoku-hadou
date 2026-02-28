@@ -78,12 +78,9 @@ class LifeSystem {
         if (messages.length > 0) {
             const msgText = messages.join('\n');
             this.game.ui.log(msgText);
-            // 少しだけ待ってからダイアログを出します
-            setTimeout(() => {
-                this.game.ui.showDialog(msgText, false);
-            }, 500);
+            // ★自動で順番待ちしてくれるので、そのままダイアログの命令を出して大丈夫です！
+            this.game.ui.showDialog(msgText, false);
         }
-    }
 
     // ★ 寿命のチェック（毎月行います）
     async checkDeath() {
@@ -120,9 +117,8 @@ class LifeSystem {
         if (diedPlayerBushos.length > 0) {
             const names = diedPlayerBushos.map(b => b.name.replace('|', '')).join('、');
             this.game.ui.log(`${names}が病によりこの世を去りました…。`);
-            setTimeout(() => {
-                this.game.ui.showDialog(`${names}が病によりこの世を去りました…。`, false);
-            }, 1000);
+            // ★大名の時と同じように、ダイアログを出して5秒間待ちます！
+            await this.game.ui.showDialogAsync(`${names}が病によりこの世を去りました…。`, false, 5000);
         }
     }
 

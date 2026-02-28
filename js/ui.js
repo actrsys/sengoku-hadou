@@ -286,11 +286,12 @@ class UIManager {
             this.processDialogQueue(); // 次のダイアログへ！
         };
 
-        okBtn.onclick = () => cleanupAndNext(dialog.onOk);
+        // ★連打防止！一度クリックしたら即座にボタンの反応を消します
+        okBtn.onclick = () => { okBtn.onclick = null; cleanupAndNext(dialog.onOk); };
 
         if (dialog.isConfirm) {
             cancelBtn.classList.remove('hidden'); 
-            cancelBtn.onclick = () => cleanupAndNext(dialog.onCancel);
+            cancelBtn.onclick = () => { cancelBtn.onclick = null; cleanupAndNext(dialog.onCancel); };
         } else {
             cancelBtn.classList.add('hidden'); 
         }
@@ -2909,5 +2910,4 @@ class UIManager {
             };
         }
     }
-    
 }
