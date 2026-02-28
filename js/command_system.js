@@ -1727,7 +1727,7 @@ class CommandSystem {
         } else if (type === 'alliance') {
             msg = `${doerClan.name} の ${doer.name} が使者として訪れました。\n当家との「同盟」を提案しています。\n受諾しますか？`;
         } else if (type === 'dominate') {
-            msg = `${doerClan.name} の ${doer.name} が使者として訪れました。\n当家に「従属」するよう要求しています。\n（受諾すると相手が支配、当家が従属となります）\n受諾しますか？`;
+            msg = `${doerClan.name} の ${doer.name} が使者として訪れました。\n当家に「従属」するよう要求しています。\n受諾しますか？`;
         }
 
         // はい／いいえ を選べるダイアログを出します
