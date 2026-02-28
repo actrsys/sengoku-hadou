@@ -1394,7 +1394,7 @@ class FieldWarManager {
         let defToAtkDiff = Math.abs(defDirIndex - oppositeAtkDir);
         defToAtkDiff = Math.min(defToAtkDiff, 6 - defToAtkDiff); 
         
-        // ★追加: 鉄砲隊の攻撃は相手の向きに関係なく常に「正面扱い（0）」にする
+        // 鉄砲隊の攻撃は相手の向きに関係なく常に「正面扱い（0）」にする
         if (attacker.troopType === 'teppo') {
             defToAtkDiff = 0;
         }
@@ -1418,12 +1418,20 @@ class FieldWarManager {
             else if (defToAtkDiff === 2) atkMult = 1.2; // 側面（2に変更）
         }
 
-        // 防御側の兵科による被ダメ補正
+        // ★修正: 「=」ではなく「*=」にすることで、この後の地形効果と掛け合わせられるようにします！
         if (defender.troopType === 'kiba') {
-            if (defToAtkDiff === 2 || defToAtkDiff === 3) defMult = 1.1; // 側面・背面の被ダメ増
+            if (defToAtkDiff === 2 || defToAtkDiff === 3) defMult *= 1.1; 
         } else if (defender.troopType === 'teppo') {
-            defMult = 1.3; // 鉄砲は全方向から被ダメ増
+            defMult *= 1.3; 
         }
+
+        // ★追加: 地形による被ダメージ補正！
+        let row = Math.floor(defender.y / 2);
+        let terrain = (this.grid && this.grid[row] && this.grid[row][defender.x]) ? this.grid[row][defender.x].terrain : 'plain';
+        
+        if (terrain === 'forest') defMult *= 0.9;      // 森はダメージ10%減少
+        else if (terrain === 'mountain') defMult *= 0.8; // 山はダメージ20%減少
+        else if (terrain === 'river') defMult *= 1.2;    // 川はダメージ20%増加（危険！）
 
         return { attack: atkMult, defense: defMult, defToAtkDiff: defToAtkDiff };
     }
@@ -1608,6 +1616,18 @@ class FieldWarManager {
                 
                 let score = 0;
                 let dToEnemy = this.getDistance(nx, ny, targetEnemy.x, targetEnemy.y);
+
+                // ★追加: 最終的に止まるマスの「地形」を見てスコアを調整します
+                let row_t = Math.floor(ny / 2);
+                let terrain_t = (this.grid && this.grid[row_t] && this.grid[row_t][nx]) ? this.grid[row_t][nx].terrain : 'plain';
+                
+                if (terrain_t === 'river') {
+                    score -= 50; // 川の上で止まると被ダメージが増えるので極力避ける！
+                } else if (terrain_t === 'mountain') {
+                    score += 15; // 山は防御力が上がるので、陣取るには良い場所！
+                } else if (terrain_t === 'forest') {
+                    score += 10; // 森も防御力が少し上がるので好き
+                }
 
                 if (isFleeing) {
                     if (dToEnemy >= distToTarget) {
