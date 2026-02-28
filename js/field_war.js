@@ -614,7 +614,7 @@ class FieldWarManager {
                         } else if (this.reachable && this.reachable[`${x},${y}`]) {
                             hex.classList.add('movable');
                         } else if (this.units.some(u => u.x === x && u.y === y && u.isAttacker === unit.isAttacker)) {
-                            // ★修正: 味方がいるマスの水色塗りを、ZOC(コスト)を考慮した正確な判定に変更
+                            // ★修正: 味方がいるマスは「通過」しかできないため、残り歩数に「通り抜ける余力」がある時だけ塗る！
                             const enemies = this.units.filter(u => u.isAttacker !== unit.isAttacker);
                             let minStartDist = 999;
                             enemies.forEach(e => {
@@ -628,27 +628,36 @@ class FieldWarManager {
                                 if (d < minEnemyDistToTarget) minEnemyDistToTarget = d;
                             });
 
-                            // その味方マスに入るための必要コスト（敵と隣接していれば2、それ以外は1）
-                            let costToEnter = (minEnemyDistToTarget <= 2) ? 2 : 1;
+                            // 描画時もそのマスの「地形コスト」を正しく見るようにしました
+                            let row_t = Math.floor(y / 2);
+                            let terrain_t = (this.grid && this.grid[row_t] && this.grid[row_t][x]) ? this.grid[row_t][x].terrain : 'plain';
+                            let baseCost = 1;
+                            if (terrain_t === 'forest') baseCost = 2;
+                            else if (terrain_t === 'river') baseCost = 3;
+                            else if (terrain_t === 'mountain') baseCost = 3;
+
+                            let costToEnter = (minEnemyDistToTarget <= 2) ? baseCost + 1 : baseCost;
                             
                             if (this.getDistance(unit.x, unit.y, x, y) === 1) {
                                 // 自分のすぐ隣にいる味方の場合
-                                if (minStartDist === 1) costToEnter = 4;
-                                if (costToEnter <= unit.ap) hex.classList.add('movable');
+                                if (minStartDist === 1) costToEnter = baseCost + 3;
+                                // ★変更: "<=" ではなく "<" にすることで、ここで歩数が尽きる一番外側のマスは塗られません！
+                                if (costToEnter < unit.ap) hex.classList.add('movable');
                             } else {
-                                // 離れた味方の場合、すでに塗られている隣のマスからコスト計算して届くかチェック
-                                let canReach = false;
+                                // 離れた味方の場合
+                                let canPass = false;
                                 const neighbors = this.getNeighbors(x, y);
                                 for (let n of neighbors) {
                                     let key = `${n.x},${n.y}`;
                                     if (this.reachable && this.reachable[key]) {
-                                        if (this.reachable[key].cost + costToEnter <= unit.ap) {
-                                            canReach = true;
+                                        // ★変更: ここも "<" にして、通り抜けられる余力があるかを見ます
+                                        if (this.reachable[key].cost + costToEnter < unit.ap) {
+                                            canPass = true;
                                             break;
                                         }
                                     }
                                 }
-                                if (canReach) hex.classList.add('movable');
+                                if (canPass) hex.classList.add('movable');
                             }
                         }
                     } else if (this.state === 'PHASE_DIR') {
@@ -947,7 +956,7 @@ class FieldWarManager {
                     let terrain = (this.grid && this.grid[row] && this.grid[row][n.x]) ? this.grid[row][n.x].terrain : 'plain';
                     if (terrain === 'forest') c = 2;
                     else if (terrain === 'river') c = 3;
-                    else if (terrain === 'mountain') c = 4;
+                    else if (terrain === 'mountain') c = 3;
                 }
 
                 let gCost = currentNode.g + c;
