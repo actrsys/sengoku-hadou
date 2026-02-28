@@ -408,13 +408,13 @@ body.is-pc {
 
 .modal {
     position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-    background: rgba(0,0,0,0.6); z-index: 4000; 
+    background: rgba(0,0,0,0.6); z-index: 6000; /* ★変更: ai-guard(5500) より手前に来るようにします */
     display: flex; justify-content: center; align-items: center;
     opacity: 1; transition: opacity 0.2s;
     padding: env(safe-area-inset-top) env(safe-area-inset-right) calc(env(safe-area-inset-bottom) + 60px) env(safe-area-inset-left);
 }
 .modal.hidden { opacity: 0; pointer-events: none; display: none !important;} 
-#quantity-modal { z-index: 4500; }
+#quantity-modal { z-index: 6500; } /* ★変更: 数値入力画面も一緒に上げます */
 
 .modal-content {
     background: #fff; padding: 20px; border-radius: 8px;
@@ -480,7 +480,7 @@ body.is-pc {
     position: fixed;
     top: 0; left: 0; width: 100%; height: 100%;
     background: rgba(0,0,0,0.5); 
-    z-index: 4500;
+    z-index: 5500; /* ★変更: コマンドやマップより手前（上）に来るようにします */
     display: flex; justify-content: center;
     align-items: center; color: white; font-size: 1.5rem; font-weight: bold; flex-direction: column;
     pointer-events: auto;
