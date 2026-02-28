@@ -736,7 +736,7 @@ class WarManager {
 
         if (isDefender) {
             if (s.defender.soldiers / (s.attacker.soldiers + 1) < (0.2 + smartness * 0.2) && s.defender.defense < 200) { this.resolveWarAction('retreat'); return; }
-            if (s.defender.defense / (s.defender.maxDefense || 1000) < 0.7 && s.defender.soldiers > 500 && Math.random() < smartness) { this.resolveWarAction('repair', Math.min(s.defender.soldiers, 100)); return; }
+            if (s.defender.defense / (s.defender.maxDefense || 1000) < 0.2 && s.defender.soldiers > 1000 && Math.random() < smartness) { this.resolveWarAction('repair', Math.min(s.defender.soldiers, 100)); return; }
         } else {
             if (s.attacker.rice < s.attacker.soldiers * 0.2 && s.attacker.soldiers < s.defender.soldiers * 0.5) { this.resolveWarAction('retreat'); return; }
             if (s.attacker.soldiers < s.defender.soldiers * 0.3 && smartness > 0.5) { this.resolveWarAction('retreat'); return; }
