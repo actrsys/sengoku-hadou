@@ -921,7 +921,8 @@ class WarManager {
     async endWar(attackerWon, isRetreat = false, capturedInRetreat = [], retreatTargetId = null) { // ★ async を追加
         try {
             const s = this.state; s.active = false;
-
+            const oldDefClanId = s.defender.ownerClan; 
+            
             // ★変更：順番待ちができるように async を付けます
             const finishWarProcess = async () => {
                 const winnerClan = s.attacker.ownerClan; // 勝ったのは攻撃側です
@@ -1278,6 +1279,37 @@ class WarManager {
                 const atkClanData1 = this.game.clans.find(c => c.id === s.attacker.ownerClan);
                 const atkArmyName1 = s.attacker.isKunishu ? s.attacker.name : (atkClanData1 ? atkClanData1.getArmyName() : "敵軍");
                 this.game.ui.log(`【合戦結果】守備軍の撤退により、${atkArmyName1}が${s.defender.name}を占領しました。`);
+
+                // ★ここから追加！旧大名家が滅亡したかチェックしてダイアログを出します！
+                if (oldDefClanId !== 0 && this.game.castles.filter(c => c.ownerClan === oldDefClanId).length === 0) {
+                    const deadClanName = this.game.clans.find(c => c.id === oldDefClanId)?.name || "不明";
+                    const extMsg = `【大名家滅亡】\n拠点を全て失い、${deadClanName}は滅亡しました。`;
+                    this.game.ui.log(extMsg);
+                    
+                    await new Promise(resolve => {
+                        const autoClose = setTimeout(() => {
+                            const modal = document.getElementById('dialog-modal');
+                            const okBtn = document.getElementById('dialog-ok-btn');
+                            if (modal && !modal.classList.contains('hidden') && okBtn) {
+                                okBtn.click();
+                            }
+                        }, 5000);
+
+                        this.game.ui.showDialog(extMsg, false, () => {
+                            clearTimeout(autoClose);
+                            resolve();
+                        });
+                    });
+
+                    if (oldDefClanId === this.game.playerClanId) {
+                        setTimeout(() => {
+                            this.game.ui.showDialog("全拠点を失いました。ゲームオーバーです。", false, () => {
+                                this.game.ui.returnToTitle();
+                            });
+                        }, 1000);
+                    }
+                }
+                // ★ここまで追加！
                 
                 if (s.isPlayerInvolved) {
                     this.game.ui.showResultModal(`撤退しました。\n${retreatTargetId ? '部隊は移動しました。' : '部隊は解散しました。'}`, finishWarProcess);
@@ -1335,7 +1367,38 @@ class WarManager {
                 const atkClanData2 = this.game.clans.find(c => c.id === s.attacker.ownerClan);
                 const atkArmyName2 = s.attacker.isKunishu ? s.attacker.name : (atkClanData2 ? atkClanData2.getArmyName() : "敵軍");
                 this.game.ui.log(`【合戦結果】${atkArmyName2}が${s.defender.name}を制圧しました。`);
-            } else { 
+
+                // ★ここから追加！旧大名家が滅亡したかチェックしてダイアログを出します！
+                if (oldDefClanId !== 0 && this.game.castles.filter(c => c.ownerClan === oldDefClanId).length === 0) {
+                    const deadClanName = this.game.clans.find(c => c.id === oldDefClanId)?.name || "不明";
+                    const extMsg = `【大名家滅亡】\n拠点を全て失い、${deadClanName}は滅亡しました。`;
+                    this.game.ui.log(extMsg);
+                    
+                    await new Promise(resolve => {
+                        const autoClose = setTimeout(() => {
+                            const modal = document.getElementById('dialog-modal');
+                            const okBtn = document.getElementById('dialog-ok-btn');
+                            if (modal && !modal.classList.contains('hidden') && okBtn) {
+                                okBtn.click();
+                            }
+                        }, 5000);
+
+                        this.game.ui.showDialog(extMsg, false, () => {
+                            clearTimeout(autoClose);
+                            resolve();
+                        });
+                    });
+
+                    if (oldDefClanId === this.game.playerClanId) {
+                        setTimeout(() => {
+                            this.game.ui.showDialog("全拠点を失いました。ゲームオーバーです。", false, () => {
+                                this.game.ui.returnToTitle();
+                            });
+                        }, 1000);
+                    }
+                }
+                // ★ここまで追加！
+            } else {
                 s.defender.immunityUntil = this.game.getCurrentTurnId(); 
                 if (isAtkPlayer) resultMsg = isRetreat ? `${s.defender.name}からの撤退を決定しました……` : `${s.defender.name}を落としきることができませんでした……`;
                 else if (isDefPlayer) resultMsg = isRetreat ? `${enemyName}は攻略を諦め、撤退していきました！` : `${s.defender.name}を守り抜きました！`;
