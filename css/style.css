@@ -195,7 +195,7 @@ img {
 }
 
 #map-wrapper {
-    flex: 1; position: relative; background-color: #81c784; 
+    flex: 1; position: relative; background-color: #37474f; /* ★ここを暗い色に変更（これがグリッド線になります！） */
     overflow: hidden; display: flex; justify-content: center; align-items: center;
     touch-action: none;
 }
@@ -574,7 +574,9 @@ body.is-pc {
     color: rgba(0,0,0,0.3); font-size: 8px; font-weight: bold;
     transition: background-color 0.2s, filter 0.2s;
     user-select: none;
+    transform: scale(0.98); /* ★追加：六角形を98%の大きさに縮めて、綺麗な隙間（グリッド線）を作ります！ */
 }
+
 .fw-hex:hover { filter: brightness(1.1); }
 /* ★修正: 移動範囲などを「半透明のフィルム」にして地形を透けさせる魔法 */
 .fw-hex::after {
@@ -585,7 +587,7 @@ body.is-pc {
 }
 
 .fw-hex.movable { cursor: pointer; filter: brightness(1.1); }
-.fw-hex.movable::after { background-color: rgba(41, 182, 246, 0.6); } /* 透ける水色 */
+.fw-hex.movable::after { background-color: rgba(244, 143, 177, 0.65); } /* ★透ける可愛いピンク色に変更！ */
 
 .fw-hex.current-pos { cursor: pointer; filter: brightness(1.1); }
 .fw-hex.current-pos::after { background-color: rgba(255, 255, 255, 0.4); } /* 現在地は白っぽく光る */
