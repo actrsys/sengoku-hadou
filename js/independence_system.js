@@ -13,7 +13,7 @@ class IndependenceSystem {
     /**
      * 月末に呼び出されるメイン処理
      */
-    checkIndependence() {
+    async checkIndependence() {
         // プレイヤー以外の全城主（プレイヤー大名は対象外だが、プレイヤー配下の城主は対象）
         // 判定対象: 城主IDが存在し、かつ大名本人ではない（＝拠点の城主）
         const potentialRebels = this.game.castles.filter(c => {
@@ -36,12 +36,12 @@ class IndependenceSystem {
         const ambDiv = I.ThresholdAmbitionDiv || 5;
 
         // 判定実行
-        potentialRebels.forEach(castle => {
+        for (const castle of potentialRebels) {
             const castellan = this.game.getBusho(castle.castellanId);
             const clan = this.game.clans.find(c => c.id === castle.ownerClan);
             const daimyo = this.game.bushos.find(b => b.clan === castle.ownerClan && b.isDaimyo);
             
-            if (!castellan || !clan || !daimyo) return;
+            if (!castellan || !clan || !daimyo) continue;
 
             // A. 有効忠誠閾値 (T) の算出
             // 基本値29 + 義理が低いほど上昇 + 野心が高いほど上昇
@@ -51,15 +51,15 @@ class IndependenceSystem {
 
             // 現在の忠誠が閾値以下なら判定へ
             if (castellan.loyalty <= threshold) {
-                this.calculateAndExecute(castle, castellan, daimyo, threshold);
+                await this.calculateAndExecute(castle, castellan, daimyo, threshold);
             }
-        });
+        }
     }
 
     /**
      * 確率計算と実行
      */
-    calculateAndExecute(castle, castellan, daimyo, threshold) {
+    async calculateAndExecute(castle, castellan, daimyo, threshold) {
         const I = window.WarParams.Independence || {};
         const bonusMismatch = I.FactionBonusMismatch || 20;
         const bonusMatch = I.FactionBonusMatch || -10;
@@ -90,14 +90,14 @@ class IndependenceSystem {
         const roll = Math.random() * 1000;
 
         if (roll < prob) {
-            this.executeRebellion(castle, castellan, daimyo);
+            await this.executeRebellion(castle, castellan, daimyo);
         }
     }
 
     /**
      * 独立実行処理
      */
-    executeRebellion(castle, castellan, oldDaimyo) {
+    async executeRebellion(castle, castellan, oldDaimyo) {
         const oldClanId = castle.ownerClan;
         const I = window.WarParams.Independence || {};
         const initGold = I.InitialGold || 1000;
@@ -143,16 +143,23 @@ class IndependenceSystem {
 
         // 6. UIログ
         const oldClanName = this.game.clans.find(c => c.id === oldClanId).name;
-        this.game.ui.log(`【謀反】${oldClanName}の${castle.name}にて、${castellan.name}が独立！「${newClanName}」を旗揚げしました。`);
-        this.game.ui.showCutin(`${castellan.name} 謀反！\n${newClanName} 独立`);
+        const msg = `【謀反】${oldClanName}の${castle.name}にて、${castellan.name}が独立！「${newClanName}」を旗揚げしました。`;
+        this.game.ui.log(msg);
 
-        // プレイヤーへの通知（元主君の場合）
-        if (oldClanId === this.game.playerClanId) {
-            setTimeout(() => {
-                // ★ alert を showDialog に変更
-                this.game.ui.showDialog(`急報！\n${castle.name}の${castellan.name}が謀反を起こしました！\n我が軍から独立し、敵対関係となります。`, false);
-            }, 500);
-        }
+        await new Promise(resolve => {
+            const autoClose = setTimeout(() => {
+                const modal = document.getElementById('dialog-modal');
+                const okBtn = document.getElementById('dialog-ok-btn');
+                if (modal && !modal.classList.contains('hidden') && okBtn) {
+                    okBtn.click();
+                }
+            }, 5000);
+
+            this.game.ui.showDialog(msg, false, () => {
+                clearTimeout(autoClose);
+                resolve();
+            });
+        });
     }
 
     /**

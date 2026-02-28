@@ -16,8 +16,8 @@ class LifeSystem {
     }
 
     // 毎月の終わりに「寿命を迎えて亡くなる武将がいないか」をチェックします
-    processEndMonth() {
-        this.checkDeath();
+    async processEndMonth() {
+        await this.checkDeath();
     }
 
     // ★ 登場のチェック（毎年1月に行います）
@@ -86,7 +86,7 @@ class LifeSystem {
     }
 
     // ★ 寿命のチェック（毎月行います）
-    checkDeath() {
+    async checkDeath() {
         const currentYear = this.game.year;
         
         // 【変更点①】没年の「1年前（endYear - 1）」を迎えている武将を探すようにしました！
@@ -96,9 +96,9 @@ class LifeSystem {
 
         let diedPlayerBushos = [];
 
-        targetBushos.forEach(b => {
+        for (const b of targetBushos) {
             // プレイヤーの大名だけは絶対に死なない魔法をかけます！
-            if (b.isDaimyo && b.clan === this.game.playerClanId) return;
+            if (b.isDaimyo && b.clan === this.game.playerClanId) continue;
 
             // 【変更点②】没年の「1年前」をスタート地点として、そこから何年過ぎたかを計算します
             const yearsPassed = currentYear - (b.endYear - 1);
@@ -108,13 +108,13 @@ class LifeSystem {
 
             // サイコロを振って、確率に当たってしまったらお別れです…
             if (Math.random() < deathProb) {
-                this.executeDeath(b);
+                await this.executeDeath(b);
                 // もしプレイヤーの家臣だったら、お知らせリストに入れます
                 if (b.clan === this.game.playerClanId) {
                     diedPlayerBushos.push(b);
                 }
             }
-        });
+        }
 
         // お別れした家臣がいたら、悲しいお知らせを表示します
         if (diedPlayerBushos.length > 0) {
@@ -127,7 +127,7 @@ class LifeSystem {
     }
 
     // お別れの処理をするところです
-    executeDeath(busho) {
+    async executeDeath(busho) {
         busho.status = 'dead'; // ステータスを「死亡」にします
         
         const castle = this.game.getCastle(busho.castleId);
@@ -146,7 +146,7 @@ class LifeSystem {
 
         // もし大名だったら、後継ぎを決めます
         if (busho.isDaimyo) {
-            this.handleDaimyoDeath(busho);
+            await this.handleDaimyoDeath(busho);
         }
 
         // 軍師だったら役職を外します
@@ -156,7 +156,7 @@ class LifeSystem {
     }
 
     // ★ここを書き換えました！大名が亡くなった時の後継ぎ選びです
-    handleDaimyoDeath(daimyo) {
+    async handleDaimyoDeath(daimyo) {
         // 1. 生きている一門がいるかチェック
         const activeFamily = this.game.bushos.filter(b => b.clan === daimyo.clan && b.id !== daimyo.id && b.status === 'active' && !b.isDaimyo && daimyo.familyIds.some(fId => b.familyIds.includes(fId)));
         
@@ -229,7 +229,23 @@ class LifeSystem {
         } else {
             // もし誰も残っていなかったら、その大名家は滅亡してしまいます
             const clan = this.game.clans.find(c => c.id === daimyo.clan);
-            this.game.ui.log(`${daimyo.name.replace('|','')}が死亡し、後継ぎがいないため${clan ? clan.name : '大名'}家は滅亡しました。`);
+            const msg = `${daimyo.name.replace('|','')}が死亡し、後継ぎがいないため${clan ? clan.name : '大名'}家は滅亡しました。`;
+            this.game.ui.log(msg);
+            
+            await new Promise(resolve => {
+                const autoClose = setTimeout(() => {
+                    const modal = document.getElementById('dialog-modal');
+                    const okBtn = document.getElementById('dialog-ok-btn');
+                    if (modal && !modal.classList.contains('hidden') && okBtn) {
+                        okBtn.click();
+                    }
+                }, 5000);
+
+                this.game.ui.showDialog(msg, false, () => {
+                    clearTimeout(autoClose);
+                    resolve();
+                });
+            });
             
             // 持っていたお城をすべて「空き城」にします
             this.game.castles.filter(c => c.ownerClan === daimyo.clan).forEach(c => {
