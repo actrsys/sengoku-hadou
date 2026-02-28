@@ -586,10 +586,10 @@ body.is-pc {
 }
 
 .fw-hex.movable { cursor: pointer; filter: brightness(1.1); }
-.fw-hex.movable::after { background-color: rgba(244, 143, 177, 0.4); }
+.fw-hex.movable::after { background-color: rgba(244, 143, 177, 0.65); }
 
 .fw-hex.current-pos { cursor: pointer; filter: brightness(1.1); }
-.fw-hex.current-pos::after { background-color: rgba(255, 255, 255, 0.4); } /* Œ»İ’n‚Í”’‚Á‚Û‚­Œõ‚é */
+.fw-hex.current-pos::after { background-color: rgba(255, 255, 255, 0.65); } /* Œ»İ’n‚Í”’‚Á‚Û‚­Œõ‚é */
 
 .fw-hex.attackable { cursor: pointer; filter: brightness(1.1); }
 .fw-hex.attackable::after { background-color: rgba(239, 83, 80, 0.6); box-shadow: inset 0 0 15px red; } /* “§‚¯‚éÔF */
