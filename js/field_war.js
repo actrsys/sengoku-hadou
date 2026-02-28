@@ -1446,7 +1446,7 @@ class FieldWarManager {
         }, 800);
     }
 
-    // ★修正: AIの行動スコアに「智謀による正確さ」と「性格による前進意欲」を反映！
+    // ★修正: AIの行動スコアに「智謀」「性格」に加えて「孤立ペナルティ（5マス以上離れない）」を追加！
     async processAITurn() {
         if (!this.active) return;
         const unit = this.turnQueue[0];
@@ -1468,8 +1468,7 @@ class FieldWarManager {
         const myInt = myBusho ? myBusho.intelligence : 50;
         const myPersonality = myBusho ? myBusho.personality : 'balanced';
 
-        // ★追加: 智謀による「揺らぎ（ブレ）」の倍率を計算します！
-        // 90なら0(ブレなし)、50なら1.0(通常)、50未満なら1.0より大きくなりブレやすくなります
+        // 智謀による「揺らぎ（ブレ）」の倍率
         const randMult = Math.max(0, (90 - myInt) / 40);
 
         // --- 戦力差撤退判定 ---
@@ -1502,7 +1501,6 @@ class FieldWarManager {
             if (e.isGeneral) score += 30; 
             if (e.troopType === 'teppo') score += 20; 
             
-            // ★修正: 智謀の倍率を掛けて、賢いほどサイコロに頼らない的確な判断をします
             score += Math.random() * 10 * randMult; 
             
             if (score > bestTargetScore) {
@@ -1601,14 +1599,14 @@ class FieldWarManager {
                         });
                     }
 
-                    // ★追加: 性格による前進意欲の調整（ほんの少しの揺らぎ）
+                    // 性格による前進意欲の調整
                     if (myPersonality === 'aggressive') {
-                        score -= dToEnemy * 3; // 敵に近いほどスコアが下がりにくくなる（前に出やすい）
+                        score -= dToEnemy * 3; 
                     } else if (myPersonality === 'conservative') {
-                        score += dToEnemy * 3; // 敵から遠いほどスコアが高くなる（前に出にくい）
+                        score += dToEnemy * 3; 
                     }
 
-                    // 総大将の引きこもり評価（aggressiveなら無視して突撃）
+                    // 総大将の引きこもり評価
                     if (unit.isGeneral && myPersonality !== 'aggressive' && allies.length > 0) {
                         if (dToEnemy <= allyMinDistToTarget) {
                             score -= 200; 
@@ -1616,9 +1614,24 @@ class FieldWarManager {
                             score += dToEnemy * 10; 
                         }
                     }
+
+                    // ★追加: 孤立ペナルティ（一番近い味方と5マス以上離れると怖がってスコアを下げる）
+                    if (allies.length > 0) {
+                        let minDistToAlly = 999;
+                        allies.forEach(a => {
+                            let dToAlly = this.getDistance(nx, ny, a.x, a.y);
+                            if (dToAlly < minDistToAlly) minDistToAlly = dToAlly;
+                        });
+                        
+                        // 一番近い味方でも5マス以上離れているなら減点！
+                        if (minDistToAlly >= 5) {
+                            // 5マスなら-40点、6マスなら-80点...と、離れるほど強く嫌がるようにします
+                            score -= (minDistToAlly - 4) * 40; 
+                        }
+                    }
                 }
 
-                // ★修正: 智謀の倍率を掛けて、動きのブレを計算
+                // 智謀の倍率を掛けて、動きのブレを計算
                 score += Math.random() * 5 * randMult; 
 
                 if (score > bestMoveScore) {
@@ -1668,7 +1681,6 @@ class FieldWarManager {
                 
                 if (targetEnemy && e.id === targetEnemy.id) score += 50; 
                 
-                // ★修正: 智謀の倍率を掛けて攻撃先のブレを計算
                 score += Math.random() * 5 * randMult;
 
                 if (score > finalBestScore) {
