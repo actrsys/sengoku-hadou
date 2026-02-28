@@ -145,8 +145,8 @@ class IndependenceSystem {
         // 6. UIログ
         // ★修正：エラーにならないように、名前を安全に取得します
         const oldClanName = this.game.clans.find(c => c.id === oldClanId)?.name || "不明";
-        const newClan = this.game.clans.find(c => c.id === newClanId);
-        const newClanName = newClan ? newClan.name : `${castellan.name.split('|')[0]}家`;
+        newClan = this.game.clans.find(c => c.id === newClanId);
+        newClanName = newClan ? newClan.name : `${castellan.name.split('|')[0]}家`;
 
         let msg = `【謀反】${oldClanName}の${castle.name}にて、${castellan.name}が独立！「${newClanName}」を旗揚げしました。`;
         this.game.ui.log(msg);
