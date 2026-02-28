@@ -762,7 +762,7 @@ class GameManager {
         if (clans.size === 1 && playerAlive) {
             this.ui.showDialog("天下統一！", false);
         } else if (!playerAlive) {
-            this.ui.showDialog("我が軍は滅亡しました……", false);
+            this.ui.showDialog("我が大名家は滅亡しました……", false);
         } else {
             this.startMonth(); 
         }
