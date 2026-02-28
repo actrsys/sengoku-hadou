@@ -1446,7 +1446,7 @@ class FieldWarManager {
         }, 800);
     }
 
-    // ★修正: AIの移動と攻撃にスコア制を導入！兵数や性格、位置関係から行動を柔軟に決定します
+    // ★修正: AIの行動スコアに「智謀による正確さ」と「性格による前進意欲」を反映！
     async processAITurn() {
         if (!this.active) return;
         const unit = this.turnQueue[0];
@@ -1463,6 +1463,15 @@ class FieldWarManager {
             await new Promise(r => setTimeout(r, 600)); 
         }
 
+        // --- 武将のデータ（智謀・性格）を読み込む ---
+        const myBusho = this.game.getBusho(unit.bushoId);
+        const myInt = myBusho ? myBusho.intelligence : 50;
+        const myPersonality = myBusho ? myBusho.personality : 'balanced';
+
+        // ★追加: 智謀による「揺らぎ（ブレ）」の倍率を計算します！
+        // 90なら0(ブレなし)、50なら1.0(通常)、50未満なら1.0より大きくなりブレやすくなります
+        const randMult = Math.max(0, (90 - myInt) / 40);
+
         // --- 戦力差撤退判定 ---
         let allySoldiers = unit.soldiers, enemySoldiers = 0;
         allies.forEach(a => allySoldiers += a.soldiers);
@@ -1477,7 +1486,6 @@ class FieldWarManager {
             return;
         }
 
-        // 相対的な評価のための準備（自軍と敵軍の最大兵力）
         const maxEnemySoldiers = Math.max(...enemies.map(e => e.soldiers), 1);
         const maxAllySoldiers = Math.max(...allies.map(a => a.soldiers), unit.soldiers, 1);
 
@@ -1489,11 +1497,13 @@ class FieldWarManager {
             let score = 0;
             let d = this.getDistance(unit.x, unit.y, e.x, e.y);
             
-            score += (50 - d * 2); // 近い敵を狙う
-            score += ((maxEnemySoldiers - e.soldiers) / maxEnemySoldiers) * 20; // 兵数の少ない敵を狙う（割合で計算）
-            if (e.isGeneral) score += 30; // 総大将を狙う
-            if (e.troopType === 'teppo') score += 20; // 鉄砲隊を狙う
-            score += Math.random() * 10; // ランダムな揺らぎで行動の固定化（無限ループ）を防ぐ
+            score += (50 - d * 2); 
+            score += ((maxEnemySoldiers - e.soldiers) / maxEnemySoldiers) * 20; 
+            if (e.isGeneral) score += 30; 
+            if (e.troopType === 'teppo') score += 20; 
+            
+            // ★修正: 智謀の倍率を掛けて、賢いほどサイコロに頼らない的確な判断をします
+            score += Math.random() * 10 * randMult; 
             
             if (score > bestTargetScore) {
                 bestTargetScore = score;
@@ -1515,7 +1525,6 @@ class FieldWarManager {
         let isFleeing = (unit.troopType === 'teppo' && distToTarget === 1);
         let shouldMove = true;
         
-        // 足軽や騎馬は敵に隣接したら止まる（鉄砲はより良い陣形を探すため動けるようにする）
         if (unit.troopType !== 'teppo' && distToTarget === 1) {
             shouldMove = false; 
         }
@@ -1526,18 +1535,14 @@ class FieldWarManager {
             let bestTargetHex = null;
             let bestMoveScore = -Infinity;
             
-            const myBusho = this.game.getBusho(unit.bushoId);
-            const isAggressive = myBusho && myBusho.personality === 'aggressive';
-            const mySoldierRatio = unit.soldiers / maxAllySoldiers; // 自軍トップと比べた兵力の割合(0.0 ~ 1.0)
+            const mySoldierRatio = unit.soldiers / maxAllySoldiers; 
             
-            // 味方の最前線（敵に一番近い距離）を調べる
             let allyMinDistToTarget = 999;
             allies.forEach(a => {
                 let d = this.getDistance(a.x, a.y, targetEnemy.x, targetEnemy.y);
                 if (d < allyMinDistToTarget) allyMinDistToTarget = d;
             });
 
-            // 遠くのターゲットを見失わないための「カーナビ」の経路をボーナスにする
             let aStarPath = this.findAStarPath(unit, targetEnemy.x, targetEnemy.y);
             let aStarIdealHexes = {};
             if (aStarPath && !isFleeing) {
@@ -1552,8 +1557,6 @@ class FieldWarManager {
             }
 
             const idealDir = this.getDirection(targetEnemy.x, targetEnemy.y, unit.x, unit.y);
-
-            // 現在地も評価対象に入れる（動かない方がスコアが高い場合は止まる）
             reachable[`${unit.x},${unit.y}`] = { cost: 0, path: [] };
 
             for (let key in reachable) {
@@ -1566,37 +1569,28 @@ class FieldWarManager {
                 let dToEnemy = this.getDistance(nx, ny, targetEnemy.x, targetEnemy.y);
 
                 if (isFleeing) {
-                    // 逃走モードのスコア
                     if (dToEnemy >= distToTarget) {
                         score += dToEnemy * 50;
                         let dirToCell = this.getDirection(targetEnemy.x, targetEnemy.y, nx, ny);
                         let dirDiff = Math.abs(idealDir - dirToCell);
                         dirDiff = Math.min(dirDiff, 6 - dirDiff);
-                        score -= dirDiff * 20; // 真っ直ぐ下がる
+                        score -= dirDiff * 20; 
                     } else {
                         score -= 9999;
                     }
                 } else {
-                    // カーナビ（A*）のルート上なら迷子防止ボーナス
                     if (aStarIdealHexes[`${nx},${ny}`]) score += 30; 
 
                     if (unit.troopType === 'teppo') {
-                        // 鉄砲は距離2~3がベスト
                         if (dToEnemy === 2) score += 100;
                         else if (dToEnemy === 3) score += 80;
                         else if (dToEnemy === 1) score -= 100;
                         else score -= dToEnemy * 10;
-                        
-                        // 鉄砲でも兵数が少なければ前に出たがらない
                         score -= (1.0 - mySoldierRatio) * (10 - dToEnemy) * 2;
                     } else {
-                        // 足軽・騎馬は近づく
                         score -= dToEnemy * 20; 
-                        
-                        // 兵力による前進抑制（兵が少ないほど、敵に近いマスへのスコアが下がる）
                         score -= (1.0 - mySoldierRatio) * (20 - dToEnemy) * 4; 
                         
-                        // 鉄砲の盾になる評価
                         const friendlyTeppos = allies.filter(a => a.troopType === 'teppo');
                         friendlyTeppos.forEach(teppo => {
                             let dToTeppo = this.getDistance(nx, ny, teppo.x, teppo.y);
@@ -1607,17 +1601,25 @@ class FieldWarManager {
                         });
                     }
 
-                    // 総大将の引きこもり評価
-                    if (unit.isGeneral && !isAggressive && allies.length > 0) {
+                    // ★追加: 性格による前進意欲の調整（ほんの少しの揺らぎ）
+                    if (myPersonality === 'aggressive') {
+                        score -= dToEnemy * 3; // 敵に近いほどスコアが下がりにくくなる（前に出やすい）
+                    } else if (myPersonality === 'conservative') {
+                        score += dToEnemy * 3; // 敵から遠いほどスコアが高くなる（前に出にくい）
+                    }
+
+                    // 総大将の引きこもり評価（aggressiveなら無視して突撃）
+                    if (unit.isGeneral && myPersonality !== 'aggressive' && allies.length > 0) {
                         if (dToEnemy <= allyMinDistToTarget) {
-                            score -= 200; // 最前線に出るのは絶対避ける
+                            score -= 200; 
                         } else {
-                            score += dToEnemy * 10; // 後ろにいるほどプラス
+                            score += dToEnemy * 10; 
                         }
                     }
                 }
 
-                score += Math.random() * 5; // ランダムな揺らぎで固定化を防ぐ
+                // ★修正: 智謀の倍率を掛けて、動きのブレを計算
+                score += Math.random() * 5 * randMult; 
 
                 if (score > bestMoveScore) {
                     bestMoveScore = score;
@@ -1625,7 +1627,6 @@ class FieldWarManager {
                 }
             }
 
-            // 移動の実行
             if (bestTargetHex && (bestTargetHex.x !== unit.x || bestTargetHex.y !== unit.y)) {
                 let path = bestTargetHex.path;
                 if (path && path.length > 0) {
@@ -1652,7 +1653,7 @@ class FieldWarManager {
             }
         }
 
-        // --- 4. 攻撃対象の再選定 (移動後の位置から実際に攻撃できる敵をスコアで選ぶ) ---
+        // --- 4. 攻撃対象の再選定 ---
         let finalTargetEnemy = null;
         let finalBestScore = -Infinity;
         
@@ -1665,10 +1666,10 @@ class FieldWarManager {
                 if (e.isGeneral) score += 30; 
                 if (e.troopType === 'teppo') score += 20; 
                 
-                // 本来狙いたかった敵への固執ボーナス（これよりスコアが高い敵が間にいれば、そっちを殴る！）
                 if (targetEnemy && e.id === targetEnemy.id) score += 50; 
                 
-                score += Math.random() * 5;
+                // ★修正: 智謀の倍率を掛けて攻撃先のブレを計算
+                score += Math.random() * 5 * randMult;
 
                 if (score > finalBestScore) {
                     finalBestScore = score;
@@ -1677,7 +1678,6 @@ class FieldWarManager {
             }
         });
 
-        // 向き直り
         if (finalTargetEnemy) {
             let targetDir = this.getDirection(unit.x, unit.y, finalTargetEnemy.x, finalTargetEnemy.y);
             let turnCost = this.getTurnCost(unit.direction, targetDir);
@@ -1692,7 +1692,6 @@ class FieldWarManager {
                 }
             }
         } else {
-            // 攻撃できる敵がいなくても、一番近い敵の方を向く
             let targetDir = this.getDirection(unit.x, unit.y, targetEnemy.x, targetEnemy.y);
             let turnCost = this.getTurnCost(unit.direction, targetDir);
             if (unit.ap >= turnCost && turnCost > 0) {
