@@ -10,7 +10,7 @@ class HexMapGenerator {
             plain: { id: 'plain', cost: 1, name: '平地' },
             forest: { id: 'forest', cost: 2, name: '森' },
             river: { id: 'river', cost: 3, name: '川' },
-            mountain: { id: 'mountain', cost: 4, name: '山' }
+            mountain: { id: 'mountain', cost: 3, name: '山' }
         };
     }
 
