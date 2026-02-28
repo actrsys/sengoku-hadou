@@ -511,6 +511,11 @@ class AIEngine {
             const rel = this.game.getRelation(castle.ownerClan, targetClanId);
             const dutyInhibition = (myDaimyo.duty * 0.01) * (1.0 - (smartness * 0.5)); 
             
+            // ★追加: 相手の大名家(targetClanId)の城をどれか一つ選びます（外交コマンドを実行する的として使います）
+            const targetCastle = neighbors.find(c => c.ownerClan === targetClanId);
+            if (!targetCastle) continue; // もしお城が見つからなかったらスキップ！
+            const targetCastleId = targetCastle.id;
+            
             // 自分が相手に従属している場合（相手が支配者）
             if (rel.status === '従属') {
                 // 相手と自分の戦力の「倍率」を計算します
@@ -523,7 +528,7 @@ class AIEngine {
                     
                     // サイコロを振って、確率(breakProb)を引き当てたら独立します！
                     if (Math.random() < breakProb && Math.random() > dutyInhibition) {
-                        this.game.commandSystem.executeDiplomacy(castellan.id, targetClanId, 'break_alliance'); 
+                        this.game.commandSystem.executeDiplomacy(castellan.id, targetCastleId, 'break_alliance'); // ★変更：targetClanId を targetCastleId に直しました！
                         castellan.isActionDone = true;
                     }
                 }
@@ -537,7 +542,7 @@ class AIEngine {
                  
                  // 敵がいなくて、自分の戦力が相手の2.5倍以上あり、義理のストッパーを越えたら破棄します
                  if (enemies.length === 0 && myPower > targetClanTotal * 2.5 && Math.random() > dutyInhibition) {
-                      this.game.commandSystem.executeDiplomacy(castellan.id, targetClanId, 'break_alliance'); 
+                      this.game.commandSystem.executeDiplomacy(castellan.id, targetCastleId, 'break_alliance'); // ★変更：targetClanId を targetCastleId に直しました！
                       castellan.isActionDone = true;
                  }
                  continue;
@@ -555,7 +560,7 @@ class AIEngine {
                         return 'waiting';
                     } else {
                         // 相手がAIならそのまま実行
-                        this.game.commandSystem.executeDiplomacy(castellan.id, targetClanId, 'dominate');
+                        this.game.commandSystem.executeDiplomacy(castellan.id, targetCastleId, 'dominate'); // ★変更：targetClanId を targetCastleId に直しました！
                         castellan.isActionDone = true;
                         continue;
                     }
@@ -592,7 +597,7 @@ class AIEngine {
                                      });
                                      return 'waiting';
                                  } else {
-                                     this.game.commandSystem.executeDiplomacy(castellan.id, targetClanId, 'goodwill', goodwillGold); 
+                                     this.game.commandSystem.executeDiplomacy(castellan.id, targetCastleId, 'goodwill', goodwillGold); // ★変更：targetClanId を targetCastleId に直しました！
                                      castellan.isActionDone = true;
                                  }
                              }
@@ -606,7 +611,7 @@ class AIEngine {
                              });
                              return 'waiting';
                          } else {
-                             this.game.commandSystem.executeDiplomacy(castellan.id, targetClanId, 'alliance');
+                             this.game.commandSystem.executeDiplomacy(castellan.id, targetCastleId, 'alliance'); // ★変更：targetClanId を targetCastleId に直しました！
                              castellan.isActionDone = true;
                          }
                     }
