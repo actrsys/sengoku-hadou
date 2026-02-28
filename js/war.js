@@ -190,7 +190,7 @@ class WarManager {
         return null;
     }
     
-    // ★修正: 自動分配時、AIが鉄砲・騎馬を賢く配分するロジックを追加
+    // ★修正: AIが鉄砲・騎馬を「強さ順」に賢く配分し、余った兵士を足軽で均等に分けるロジックを追加
     autoDivideSoldiers(bushos, totalSoldiers, totalHorses = 0, totalGuns = 0) {
         if (!bushos || bushos.length === 0) return [];
         if (bushos.length === 1) return [{ busho: bushos[0], soldiers: totalSoldiers, troopType: 'ashigaru' }];
@@ -200,59 +200,95 @@ class WarManager {
         const ratioSum = 1.3 + (N - 1) * 1.0;
         const baseAmount = Math.floor(totalSoldiers / ratioSum);
         
+        // 1. まずは全員「足軽」として、必要な兵数（req）の目標を決めます
         let assignments = bushos.map((b, i) => {
             let req = (i === 0) ? Math.floor(baseAmount * 1.3) : baseAmount;
-            return { busho: b, req: req, soldiers: 0, troopType: 'ashigaru' };
+            return { 
+                index: i,             // 元の順番を覚えておくための番号札
+                busho: b, 
+                req: req, 
+                soldiers: req,        // とりあえず目標人数をセット
+                troopType: 'ashigaru',
+                score: b.leadership + b.strength // ★強さ（統率＋武勇）の合計点！
+            };
         });
 
         // 割り切れない余り兵士を総大将に足す
         let totalReq = assignments.reduce((sum, a) => sum + a.req, 0);
         assignments[0].req += (totalSoldiers - totalReq);
+        assignments[0].soldiers = assignments[0].req;
 
         let availableHorses = totalHorses;
         let availableGuns = totalGuns;
         let poolSoldiers = 0; // 余った兵士を貯めるプール
         
-        // 鉄砲隊の最大数（必ず同数以上の足軽か騎馬ができるように、全体の半分以下にする）
         const maxTeppoCount = Math.floor(N / 2);
         let teppoCount = 0;
 
-        // 余った兵士を押し付けるための「足軽隊」を1部隊だけ予約しておく（一番最後の部隊）
-        const ashigaruReservedIndex = N - 1;
+        // ★追加: 順番待ちの列を「合計点（強さ）が高い順」に並び替えます！
+        let sortedAssigns = [...assignments].sort((a, b) => b.score - a.score);
 
-        for (let i = 0; i < N; i++) {
-            if (i === ashigaruReservedIndex) continue;
+        // 万が一、全員が馬か鉄砲になってしまった時に、「最後に変身した人」を覚えておく箱です
+        let lastChangedAssign = null;
 
-            let req = assignments[i].req;
+        // 2. 強い人から順番に、馬や鉄砲を配っていきます
+        for (let a of sortedAssigns) {
+            let isGeneral = (a.index === 0);
+            let req = a.req;
             
-            // 騎馬の判定（要求数の半分以上の馬があれば騎馬隊にする）
-            if (availableHorses >= req * 0.5) {
-                assignments[i].troopType = 'kiba';
-                let assignCount = Math.min(req, availableHorses); // 馬の数と要求数の少ない方に合わせる
-                assignments[i].soldiers = assignCount;
+            // ★追加: 総大将は100%揃わないとダメ。他の人は50%でOKというルール
+            let threshold = isGeneral ? req : req * 0.5;
+
+            // 騎馬の判定
+            if (availableHorses >= threshold) {
+                a.troopType = 'kiba';
+                let assignCount = Math.min(req, availableHorses);
+                a.soldiers = assignCount;
                 availableHorses -= assignCount;
                 poolSoldiers += (req - assignCount); // 減らした分の兵士はプールへ
+                lastChangedAssign = a;               // 最後に変身した人を記憶
             } 
-            // 鉄砲の判定（要求数の半分以上の鉄砲があり、かつ制限枠内なら鉄砲隊にする）
-            else if (availableGuns >= req * 0.5 && teppoCount < maxTeppoCount) {
-                assignments[i].troopType = 'teppo';
+            // 鉄砲の判定
+            else if (availableGuns >= threshold && teppoCount < maxTeppoCount) {
+                a.troopType = 'teppo';
                 let assignCount = Math.min(req, availableGuns);
-                assignments[i].soldiers = assignCount;
+                a.soldiers = assignCount;
                 availableGuns -= assignCount;
                 poolSoldiers += (req - assignCount);
                 teppoCount++;
-            }
-            // どちらにもならない場合
-            else {
-                assignments[i].troopType = 'ashigaru';
-                assignments[i].soldiers = req;
+                lastChangedAssign = a;               // 最後に変身した人を記憶
             }
         }
 
-        // 予約しておいた最後の部隊を足軽隊にし、プールに貯まった余剰兵士をすべて引き受けさせる
-        assignments[ashigaruReservedIndex].troopType = 'ashigaru';
-        assignments[ashigaruReservedIndex].soldiers = assignments[ashigaruReservedIndex].req + poolSoldiers;
+        // 3. 今「足軽」のままの部隊をピックアップします
+        let ashigaruAssigns = assignments.filter(a => a.troopType === 'ashigaru');
 
+        // ★追加: もし足軽が「ゼロ」になってしまった時の特別ルール！
+        if (ashigaruAssigns.length === 0 && lastChangedAssign) {
+            // 最後に変身した人に「ごめん、足軽に戻って！」とお願いします
+            lastChangedAssign.troopType = 'ashigaru';
+            // 足軽に戻るので、プールに貯めていた「減らした分の兵士」を元に戻して帳尻を合わせます
+            poolSoldiers -= (lastChangedAssign.req - lastChangedAssign.soldiers);
+            lastChangedAssign.soldiers = lastChangedAssign.req;
+            // この人を足軽グループに入れます
+            ashigaruAssigns.push(lastChangedAssign);
+        }
+
+        // ★追加: 余った兵士（プール）を、足軽みんなで「均等に」分け合います
+        if (poolSoldiers > 0 && ashigaruAssigns.length > 0) {
+            let share = Math.floor(poolSoldiers / ashigaruAssigns.length); // 1人あたりの配分
+            let remainder = poolSoldiers % ashigaruAssigns.length;         // 割り切れなかった余り
+            
+            ashigaruAssigns.forEach((a, i) => {
+                a.soldiers += share;
+                // 割り切れなかった分は、先頭の人から順番に1人ずつ足していきます
+                if (i < remainder) {
+                    a.soldiers += 1;
+                }
+            });
+        }
+
+        // 4. 配り終わったら、元の「総大将が一番上」の順番に戻して結果を返します
         return assignments.map(a => ({
             busho: a.busho,
             soldiers: a.soldiers,
