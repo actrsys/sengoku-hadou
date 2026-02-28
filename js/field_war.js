@@ -1585,6 +1585,16 @@ class FieldWarManager {
             if (e.isGeneral) score += 30; 
             if (e.troopType === 'teppo') score += 20; 
             
+            // ★追加: 味方と隣接して戦っている敵を優先的に狙って前に出るようにします！
+            let isEngaged = false;
+            for (let a of allies) {
+                if (this.getDistance(e.x, e.y, a.x, a.y) === 1) {
+                    isEngaged = true;
+                    break;
+                }
+            }
+            if (isEngaged) score += 30;
+            
             score += Math.random() * 10 * randMult; 
             
             if (score > bestTargetScore) {
@@ -1776,6 +1786,27 @@ class FieldWarManager {
                 if (e.troopType === 'teppo') score += 20; 
                 
                 if (targetEnemy && e.id === targetEnemy.id) score += 50; 
+                
+                // ★追加: 背面や側面を向いている敵なら大チャンスとしてスコアアップ！（鉄砲は除外）
+                if (unit.troopType !== 'teppo') {
+                    let atkDirIndex = this.getDirection(unit.x, unit.y, e.x, e.y);
+                    let oppositeAtkDir = (atkDirIndex + 3) % 6; // 相手から見たこちらの方向
+                    let defToAtkDiff = Math.abs(e.direction - oppositeAtkDir);
+                    defToAtkDiff = Math.min(defToAtkDiff, 6 - defToAtkDiff); 
+                    
+                    if (defToAtkDiff === 3) score += 40; // 背後（大ダメージのチャンス！）
+                    else if (defToAtkDiff === 2) score += 20; // 側面
+                }
+
+                // ★追加: 味方と隣接して戦っている敵を優先して叩く！
+                let isEngaged = false;
+                for (let a of allies) {
+                    if (this.getDistance(e.x, e.y, a.x, a.y) === 1) {
+                        isEngaged = true;
+                        break;
+                    }
+                }
+                if (isEngaged) score += 30;
                 
                 score += Math.random() * 5 * randMult;
 
