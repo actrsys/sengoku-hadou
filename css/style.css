@@ -488,7 +488,8 @@ body.is-pc {
 
 .cutin-overlay {
     position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-    background: rgba(0,0,0,0.7); z-index: 5000; pointer-events: auto;
+    background: rgba(0,0,0,0.7); z-index: 7000; /* ★変更: 「思考中(5500)」や他の画面よりも一番手前に出します！ */
+    pointer-events: auto;
     display: flex; justify-content: center; align-items: center;
     opacity: 0; transition: opacity 0.5s;
 }
