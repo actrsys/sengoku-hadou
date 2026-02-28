@@ -61,7 +61,8 @@ class HexMapGenerator {
         this._ensureConnectivity(map, cols, rows);
 
         // 6. 森を生成する（塊になるように配置）
-        this._generateClusters(map, cols, rows, 'forest', targetForest, 3, 6);
+        // ★修正: 森のサイズを 1〜5 マスに変更し、単独（1マス）でも発生するようにしました！
+        this._generateClusters(map, cols, rows, 'forest', targetForest, 1, 5);
 
         // 完成したマップのデータを返します！
         return {

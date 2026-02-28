@@ -614,7 +614,6 @@ class FieldWarManager {
                         } else if (this.reachable && this.reachable[`${x},${y}`]) {
                             hex.classList.add('movable');
                         } else if (this.units.some(u => u.x === x && u.y === y && u.isAttacker === unit.isAttacker)) {
-                            // ★修正: 味方がいるマスは「通過」しかできないため、残り歩数に「通り抜ける余力」がある時だけ塗る！
                             const enemies = this.units.filter(u => u.isAttacker !== unit.isAttacker);
                             let minStartDist = 999;
                             enemies.forEach(e => {
@@ -622,12 +621,6 @@ class FieldWarManager {
                                 if (d < minStartDist) minStartDist = d;
                             });
                             
-                            let minEnemyDistToTarget = 999;
-                            enemies.forEach(e => {
-                                let d = this.getDistance(x, y, e.x, e.y);
-                                if (d < minEnemyDistToTarget) minEnemyDistToTarget = d;
-                            });
-
                             // 描画時もそのマスの「地形コスト」を正しく見るようにしました
                             let row_t = Math.floor(y / 2);
                             let terrain_t = (this.grid && this.grid[row_t] && this.grid[row_t][x]) ? this.grid[row_t][x].terrain : 'plain';
@@ -636,11 +629,19 @@ class FieldWarManager {
                             else if (terrain_t === 'river') baseCost = 3;
                             else if (terrain_t === 'mountain') baseCost = 3;
 
-                            let costToEnter = (minEnemyDistToTarget <= 2) ? baseCost + 1 : baseCost;
+                            let minEnemyDistToTarget = 999;
+                            enemies.forEach(e => {
+                                let d = this.getDistance(x, y, e.x, e.y);
+                                if (d < minEnemyDistToTarget) minEnemyDistToTarget = d;
+                            });
+
+                            // ★追加: ZOCと地形の大きい方を採用
+                            let zocCost = (minEnemyDistToTarget <= 2) ? 2 : 1;
+                            let costToEnter = Math.max(baseCost, zocCost);
                             
                             if (this.getDistance(unit.x, unit.y, x, y) === 1) {
                                 // 自分のすぐ隣にいる味方の場合
-                                if (minStartDist === 1) costToEnter = baseCost + 3;
+                                if (minStartDist === 1) costToEnter = Math.max(baseCost, 4); // 離脱ペナルティ
                                 // ★変更: "<=" ではなく "<" にすることで、ここで歩数が尽きる一番外側のマスは塗られません！
                                 if (costToEnter < unit.ap) hex.classList.add('movable');
                             } else {
@@ -857,7 +858,6 @@ class FieldWarManager {
             if (d < minEnemyDist) minEnemyDist = d;
         });
 
-        // ★追加: Y座標を計算して、そのマスの地形を調べます
         let row = Math.floor(y / 2);
         let terrain = (this.grid && this.grid[row] && this.grid[row][x]) ? this.grid[row][x].terrain : 'plain';
         
@@ -865,12 +865,16 @@ class FieldWarManager {
         let baseCost = 1; // 平地
         if (terrain === 'forest') baseCost = 2; // 森
         else if (terrain === 'river') baseCost = 3; // 川
-        else if (terrain === 'mountain') baseCost = 4; // 山
+        else if (terrain === 'mountain') baseCost = 3; // 山（コスト3に変更済）
 
-        // 敵の近くを歩く時のZOCペナルティ（地形コストにさらに足します）
-        if (isFirstStep && startDist === 1) return baseCost + 3;
-        if (minEnemyDist <= 2) return baseCost + 1; 
-        return baseCost;
+        // ★修正: 離脱・接近などのZOCペナルティ（敵のプレッシャー）を計算
+        let zocCost = 1;
+        if (isFirstStep && startDist === 1) zocCost = 4; // 敵に密着している状態からの離脱は非常に困難（コスト4）
+        else if (minEnemyDist <= 2) zocCost = 2;         // 敵のすぐ近く（2マス以内）を歩く時は警戒が必要（コスト2）
+
+        // ★最強の魔法: 地形コストとZOCコストを「足し算」せず、「数字が大きい方（キツイ方）」だけを採用します！
+        // これにより、山(3)の近くに敵(2)がいても 3+2=5 ではなく MAX(3,2)=3 となり、行動力4の部隊がフリーズしなくなります。
+        return Math.max(baseCost, zocCost);
     }
 
     findPaths(unit, maxAP) {
