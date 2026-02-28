@@ -285,7 +285,8 @@ class AIEngine {
             }
 
             // 3. 徴兵（お隣の敵と比べて、自分が少ないほど焦る）
-            if (castle.population > 1000) {
+            // ★追加：ただし、兵士の数が兵糧の半分以上いる時は、徴兵を我慢します！
+            if (castle.population > 1000 && castle.soldiers < castle.rice / 2) {
                 let scoreDraft = 0;
                 let mySoldiers = Math.max(1, castle.soldiers);
                 let enemyMaxSoldiers = 0;
