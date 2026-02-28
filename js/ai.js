@@ -284,7 +284,7 @@ class AIEngine {
                 actions.push({ type: 'charity', stat: 'charm', score: score, cost: 200 }); // ※お米200
             }
 
-            // 3. 徴兵（お隣の敵と比べて、自分が少ないほど焦る）
+            // 3. 徴兵（お隣の敵と比べて、自分が少ないほど焦る、または最低限の備え）
             // ★追加：ただし、兵士の数が兵糧の半分以上いる時は、徴兵を我慢します！
             if (castle.population > 1000 && castle.soldiers < castle.rice / 2) {
                 let scoreDraft = 0;
@@ -294,12 +294,20 @@ class AIEngine {
                     if (n.soldiers > enemyMaxSoldiers) enemyMaxSoldiers = n.soldiers;
                 });
                 
+                // ★追加：城主と大名の統率から「最低限キープしたい兵士数」を計算します
+                const keepSoldiers = (castellan.leadership + daimyo.leadership) * 50;
+
                 if (enemyMaxSoldiers > mySoldiers) {
                     scoreDraft = ((enemyMaxSoldiers / mySoldiers) * 50); // 負けている割合で点数アップ
-                } else if (castle.soldiers < 3000) {
-                    scoreDraft = 30; // 敵がいなくても兵士が少ないなら少し考える
+                } else if (castle.soldiers < keepSoldiers) {
+                    // ★変更：お隣より少なくなくても、キープしたい数より少なければ「低確率（低い点数）」で徴兵を考えます
+                    scoreDraft = 15; // 15点にすることで、他の行動より優先度は低いけれど、たまに選ばれるようになります
                 }
-                actions.push({ type: 'draft', stat: 'leadership', score: scoreDraft, cost: 500 }); // 金500
+
+                // 点数が0より大きい時だけ、お仕事の候補に入れます
+                if (scoreDraft > 0) {
+                    actions.push({ type: 'draft', stat: 'leadership', score: scoreDraft, cost: 500 }); // 金500
+                }
             }
 
             // 4. 訓練
