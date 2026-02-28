@@ -586,7 +586,8 @@ body.is-pc {
 }
 
 .fw-hex.movable { cursor: pointer; filter: brightness(1.1); }
-.fw-hex.movable::after { background-color: rgba(244, 143, 177, 0.65); } /* ★透ける可愛いピンク色に変更！ */
+// 0.4で移動範囲の透過率は60％
+.fw-hex.movable::after { background-color: rgba(244, 143, 177, 0.4); }
 
 .fw-hex.current-pos { cursor: pointer; filter: brightness(1.1); }
 .fw-hex.current-pos::after { background-color: rgba(255, 255, 255, 0.4); } /* 現在地は白っぽく光る */
