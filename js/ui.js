@@ -197,7 +197,10 @@ class UIManager {
         }, true);
         // =========================================================
 
-    }
+        // ★ここから追加：ダイアログの順番待ちの列を作ります
+        this.dialogQueue = []; 
+        this.isDialogShowing = false; 
+    } // ← これが constructor の終わりのカッコです
     
     initSidebarResize() {
         const sidebar = document.getElementById('pc-sidebar');
@@ -228,41 +231,80 @@ class UIManager {
         });
     }
 
+    // ★新設：自動で順番待ちして、指定時間で勝手に閉じてくれる神の関数！
+    showDialogAsync(msg, isConfirm = false, autoCloseTime = 0) {
+        return new Promise(resolve => {
+            this.dialogQueue.push({ msg, isConfirm, onOk: resolve, onCancel: resolve, autoCloseTime });
+            if (!this.isDialogShowing) {
+                this.processDialogQueue();
+            }
+        });
+    }
+
+    // ★変更：従来の showDialog も順番待ちの列に並ぶように直します
     showDialog(msg, isConfirm, onOk, onCancel = null) {
-        // ★ aiGuard を消す魔法を削除しました
+        this.dialogQueue.push({ msg, isConfirm, onOk, onCancel, autoCloseTime: 0 });
+        if (!this.isDialogShowing) {
+            this.processDialogQueue();
+        }
+    }
+
+    // ★新設：列に並んだダイアログを1つずつ案内する魔法
+    processDialogQueue() {
+        if (this.dialogQueue.length === 0) {
+            this.isDialogShowing = false;
+            return;
+        }
+
+        this.isDialogShowing = true;
+        const dialog = this.dialogQueue.shift(); // 先頭の人を案内
+
         const modal = document.getElementById('dialog-modal');
         const msgEl = document.getElementById('dialog-message');
         const okBtn = document.getElementById('dialog-btn-ok');
         const cancelBtn = document.getElementById('dialog-btn-cancel');
 
         if (!modal) {
-            if (isConfirm) {
-                if (confirm(msg)) { if (onOk) onOk(); } else { if (onCancel) onCancel(); }
+            if (dialog.isConfirm) {
+                if (confirm(dialog.msg)) { if (dialog.onOk) dialog.onOk(); } else { if (dialog.onCancel) dialog.onCancel(); }
             } else {
-                alert(msg);
-                if (onOk) onOk();
+                alert(dialog.msg);
+                if (dialog.onOk) dialog.onOk();
             }
+            this.processDialogQueue(); // 次の人へ
             return;
         }
 
-        msgEl.innerHTML = msg.replace(/\n/g, '<br>');
+        msgEl.innerHTML = dialog.msg.replace(/\n/g, '<br>');
         
-        okBtn.onclick = () => {
-            modal.classList.add('hidden'); 
-            if (onOk) onOk();              
+        let autoCloseTimer = null;
+
+        const cleanupAndNext = (callback) => {
+            if (autoCloseTimer) clearTimeout(autoCloseTimer);
+            modal.classList.add('hidden');
+            if (callback) callback();
+            this.processDialogQueue(); // 次のダイアログへ！
         };
 
-        if (isConfirm) {
+        okBtn.onclick = () => cleanupAndNext(dialog.onOk);
+
+        if (dialog.isConfirm) {
             cancelBtn.classList.remove('hidden'); 
-            cancelBtn.onclick = () => {
-                modal.classList.add('hidden');
-                if (onCancel) onCancel();
-            };
+            cancelBtn.onclick = () => cleanupAndNext(dialog.onCancel);
         } else {
             cancelBtn.classList.add('hidden'); 
         }
 
         modal.classList.remove('hidden');
+
+        // ★自動で閉じるタイマー（指定された場合のみ動く）
+        if (dialog.autoCloseTime > 0) {
+            autoCloseTimer = setTimeout(() => {
+                if (!modal.classList.contains('hidden')) {
+                    okBtn.click();
+                }
+            }, dialog.autoCloseTime);
+        }
     }
 
     getStatusBarHTML(value, max, colorType, isVisible) {

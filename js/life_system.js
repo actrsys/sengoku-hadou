@@ -223,20 +223,7 @@ class LifeSystem {
             this.game.ui.log(`【当主交代】${daimyo.name.replace('|','')}が死亡し、${successor.name.replace('|','')}が家督を継ぎました。`);
             
             // ★追加：ダイアログを出して時間を止めます！
-            await new Promise(resolve => {
-                const autoClose = setTimeout(() => {
-                    const modal = document.getElementById('dialog-modal');
-                    const okBtn = document.getElementById('dialog-ok-btn');
-                    if (modal && !modal.classList.contains('hidden') && okBtn) {
-                        okBtn.click();
-                    }
-                }, 5000);
-
-                this.game.ui.showDialog(msg, false, () => {
-                    clearTimeout(autoClose);
-                    resolve();
-                });
-            });
+            await this.game.ui.showDialogAsync(msg, false, 5000);
 
         } else {
             // もし誰も残っていなかったら、その大名家は滅亡してしまいます
@@ -246,20 +233,8 @@ class LifeSystem {
             const msg = `【大名家滅亡】\n${daimyo.name.replace('|','')}が死亡し、後継ぎがいないため${displayClanName}は滅亡しました。`;
             this.game.ui.log(msg);
             
-            await new Promise(resolve => {
-                const autoClose = setTimeout(() => {
-                    const modal = document.getElementById('dialog-modal');
-                    const okBtn = document.getElementById('dialog-ok-btn');
-                    if (modal && !modal.classList.contains('hidden') && okBtn) {
-                        okBtn.click();
-                    }
-                }, 5000);
-
-                this.game.ui.showDialog(msg, false, () => {
-                    clearTimeout(autoClose);
-                    resolve();
-                });
-            });
+            // ★ここも1行にするだけです！（2箇所ともコレに置き換えます）
+            await this.game.ui.showDialogAsync(msg, false, 5000);
             
             // 持っていたお城をすべて「空き城」にします
             this.game.castles.filter(c => c.ownerClan === daimyo.clan).forEach(c => {

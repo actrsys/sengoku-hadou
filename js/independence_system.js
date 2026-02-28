@@ -143,30 +143,19 @@ class IndependenceSystem {
         this.game.updateCastleLord(castle);
 
         // 6. UIログ
-        const oldClanName = this.game.clans.find(c => c.id === oldClanId).name;
+        // ★修正：エラーにならないように、名前を安全に取得します
+        const oldClanName = this.game.clans.find(c => c.id === oldClanId)?.name || "不明";
+        const newClan = this.game.clans.find(c => c.id === newClanId);
+        const newClanName = newClan ? newClan.name : `${castellan.name.split('|')[0]}家`;
+
         let msg = `【謀反】${oldClanName}の${castle.name}にて、${castellan.name}が独立！「${newClanName}」を旗揚げしました。`;
         this.game.ui.log(msg);
         
-        // ★追加：もし捕まった武将の結末があれば、メッセージの下にくっつけます！
         if (captiveMsgs && captiveMsgs.length > 0) {
             msg += '\n\n' + captiveMsgs.join('\n');
         }
-
-        await new Promise(resolve => {
-            const autoClose = setTimeout(() => {
-                const modal = document.getElementById('dialog-modal');
-                const okBtn = document.getElementById('dialog-ok-btn');
-                if (modal && !modal.classList.contains('hidden') && okBtn) {
-                    okBtn.click();
-                }
-            }, 5000);
-
-            this.game.ui.showDialog(msg, false, () => {
-                clearTimeout(autoClose);
-                resolve();
-            });
-        });
-    }
+        // ★独立のメッセージも1行にするだけです！
+        await this.game.ui.showDialogAsync(msg, false, 5000);
 
     /**
      * 部下の去就判定 (合流 / 脱出 / 捕縛)
