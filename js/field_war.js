@@ -136,14 +136,13 @@ class FieldWarManager {
         const isDefPlayer = (Number(warState.defender.ownerClan) === pid);
         const isPlayerInvolved = isAtkPlayer || isDefPlayer;
 
-        // ↓↓↓ここから差し替え↓↓↓
         // ★修正: HEXサイズやマップの広さが変わっても対応できるようにX座標を自動計算
-        let leftX = Math.max(1, Math.floor(this.cols * 0.05)); // ←★ココを 0.05 に変えました！
+        let leftX = Math.max(1, Math.floor(this.cols * 0.05));
         let rightX = this.cols - 1 - leftX;
         
-        // 奇数・偶数のズレを防ぐため、X座標を奇数に統一（従来の3, 17と同じになるように調整）
+        // 左側だけ奇数・偶数のズレを防ぐための調整を残し、右側は右から2マス目を維持します！
         if (leftX % 2 === 0) leftX++;
-        if (rightX % 2 === 0) rightX--;
+        // ★ rightX の奇数調整（rightX--）を削除して、右から2マス目に配置されるようにしました！
 
         let atkX = leftX, defX = rightX;
         let atkIsLeft = true;
@@ -1104,15 +1103,15 @@ class FieldWarManager {
         const enemyName = isAtkPlayer ? this.warState.defender.name + "軍" : (isDefPlayer ? this.warState.attacker.name + "軍" : "敵軍");
 
         if (!atkAlive || !atkGeneralAlive) {
-            if (isAtkPlayer) this.log(`総大将が討ち取られ、我が軍は敗北しました……`);
+            if (isAtkPlayer) this.log(`総大将が撃破され、我が軍は敗北しました……`);
             else if (isDefPlayer) this.log(`敵の総大将を撃破しました！`);
             else this.log(`攻撃軍の総大将が敗走した！`);
             this.endFieldWar('attacker_lose');
             return true;
         }
         if (!defAlive || !defGeneralAlive) {
-            if (isAtkPlayer) this.log(`敵の総大将を討ち取りました！`);
-            else if (isDefPlayer) this.log(`総大将が討ち取られ、我が軍は敗北しました……`);
+            if (isAtkPlayer) this.log(`敵の総大将を撃破しました！`);
+            else if (isDefPlayer) this.log(`総大将が撃破され、我が軍は敗北しました……`);
             else this.log(`守備軍の総大将が敗走した！`);
             this.endFieldWar('attacker_win');
             return true;
@@ -1120,20 +1119,22 @@ class FieldWarManager {
         if (this.atkRice <= 0) {
             if (isAtkPlayer) this.log(`兵糧が尽き、これ以上の行軍は不可能です……`);
             else if (isDefPlayer) this.log(`${enemyName}は兵糧が尽き、撤退していきました！`);
-            else this.log(`攻撃軍の兵糧が尽き、撤退を余儀なくされた！`);
+            else this.log(`兵糧が尽き、攻撃軍は撤退を余儀なくされた！`);
             this.endFieldWar('attacker_lose');
             return true;
         }
         if (this.defRice <= 0) {
             if (isAtkPlayer) this.log(`${enemyName}の兵糧が尽き、城へ敗走していきました！`);
             else if (isDefPlayer) this.log(`兵糧が底を突き、戦線を維持できません……`);
-            else this.log(`守備軍の兵糧が尽き、城へ敗走した！`);
+            else this.log(`兵糧が尽き、守備軍は城へ敗走した！`);
             this.endFieldWar('attacker_win');
             return true;
         }
         if (this.turnCount > this.maxTurns) {
-            this.log(`野戦では決着がつかず、舞台は籠城戦へと移る！`);
-            this.endFieldWar('draw_to_siege');
+            if (isAtkPlayer) this.log(`これ以上の野戦は不利と判断し撤退します……`);
+            else if (isDefPlayer) this.log(`${enemyName}は攻めきれずに撤退していきました！`);
+            else this.log(`野戦では決着がつかず、攻撃軍は撤退を余儀なくされた！`);
+            this.endFieldWar('attacker_retreat');
             return true;
         }
         return false;
