@@ -265,14 +265,6 @@ class WarManager {
 
         // ★追加: もし足軽が「ゼロ」になってしまった時の特別ルール！
         if (ashigaruAssigns.length === 0 && lastChangedAssign) {
-            // 最後に変身した人に「ごめん、足軽に戻って！」とお願いします
-            lastChangedAssign.troopType = 'ashigaru';
-            // 足軽に戻るので、プールに貯めていた「減らした分の兵士」を元に戻して帳尻を合わせます
-            poolSoldiers -= (lastChangedAssign.req - lastChangedAssign.soldiers);
-            lastChangedAssign.soldiers = lastChangedAssign.req;
-            // この人を足軽グループに入れます
-            ashigaruAssigns.push(lastChangedAssign);
-        }
 
         // ★追加: 余った兵士（プール）を、足軽みんなで「均等に」分け合います
         if (poolSoldiers > 0 && ashigaruAssigns.length > 0) {
