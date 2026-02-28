@@ -15,13 +15,13 @@ class LifeSystem {
         }
     }
 
-    // ★ 登場のチェック（毎年1月に行います）
-    async checkBirth() {
+    // 毎月の終わりに「寿命を迎えて亡くなる武将がいないか」をチェックします
+    async processEndMonth() {
         await this.checkDeath();
     }
 
     // ★ 登場のチェック（毎年1月に行います）
-    checkBirth() {
+    async checkBirth() {
         const currentYear = this.game.year;
         
         // まだ登場していない（statusが'unborn'）武将の中で、登場年を迎えた人を探します
@@ -118,7 +118,7 @@ class LifeSystem {
         if (diedPlayerBushos.length > 0) {
             const names = diedPlayerBushos.map(b => b.name.replace('|', '')).join('、');
             this.game.ui.log(`${names}が病によりこの世を去りました…。`);
-            // ★大名の時と同じように、ダイアログを出して5秒間待ちます！
+            // ★大名の時と同じように、ダイアログを出して0秒（押すまで）待ちます！
             await this.game.ui.showDialogAsync(`${names}が病によりこの世を去りました…。`, false, 0);
         }
     }
@@ -219,7 +219,7 @@ class LifeSystem {
             const msg = `【当主交代】\n${daimyo.name.replace('|','')}が病により死亡し、${successor.name.replace('|','')}が家督を継ぎました。${extraMsg}`;
             this.game.ui.log(`【当主交代】${daimyo.name.replace('|','')}が死亡し、${successor.name.replace('|','')}が家督を継ぎました。`);
             
-            // ★追加：ダイアログを出して時間を止めます！
+            // ★追加：ダイアログを出して0秒（押すまで）待ちます！
             await this.game.ui.showDialogAsync(msg, false, 0);
 
         } else {
@@ -230,7 +230,7 @@ class LifeSystem {
             const msg = `【大名家滅亡】\n${daimyo.name.replace('|','')}が死亡し、後継ぎがいないため${displayClanName}は滅亡しました。`;
             this.game.ui.log(msg);
             
-            // ★ここも1行にするだけです！（2箇所ともコレに置き換えます）
+            // ★ここも0秒にするだけです！
             await this.game.ui.showDialogAsync(msg, false, 0);
             
             // 持っていたお城をすべて「空き城」にします
