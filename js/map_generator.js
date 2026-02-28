@@ -27,14 +27,14 @@ class HexMapGenerator {
         const totalHexes = cols * rows;
 
         // 2. 地形の割合（ノルマ）を決める
-        // 平地は最低40%。ここでは「40%〜60%」を平地にします。
-        const plainPercent = this.rand(40, 60);
+        // 平地は最低40%。ここでは「40%〜80%」を平地にします。
+        const plainPercent = this.rand(40, 80);
         const remainHexes = Math.floor(totalHexes * (100 - plainPercent) / 100);
 
-        // 平地以外の残りマスを、森(3~6) : 川(1~3) : 山(1~3) の割合で分けます
-        const wForest = this.rand(3, 6);
-        const wRiver = this.rand(0, 3); // 川が出ないこともある
-        const wMountain = this.rand(1, 3);
+        // 平地以外の残りマスを、森(1~6) : 川(0~3) : 山(0~3) の割合で分けます
+        const wForest = this.rand(1, 6);
+        const wRiver = this.rand(0, 3);
+        const wMountain = this.rand(0, 3);
         const wTotal = wForest + wRiver + wMountain;
 
         let targetForest = Math.floor(remainHexes * (wForest / wTotal));
