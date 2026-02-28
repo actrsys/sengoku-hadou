@@ -84,7 +84,7 @@ War.SiegeRisk,10,攻城戦：城攻めの反撃リスク係数。上げると城
 War.DefChargeMultiplier,1.1,攻城戦：守備側突撃の攻撃倍率。上げると守備側の反撃ダメージが増加
 War.DefChargeRisk,1.5,攻城戦：守備側突撃の反撃リスク係数。上げると守備側が突撃した際、逆に受ける被害が激増する
 War.DefBowMultiplier,0.7,攻城戦：守備側斉射の攻撃倍率。上げると守備側の弓攻撃が強くなる
-War.RojoDamageReduction,0.7,攻城戦：籠城時の被ダメージ係数。下げると籠城した際に受けるダメージがさらに減る『0.1で1割』
+War.RojoDamageReduction,0.5,攻城戦：籠城時の被ダメージ係数。下げると籠城した際に受けるダメージがさらに減る『0.1で1割』
 War.SchemeDamageFactor,4,攻城戦：謀略のダメージ係数。上げると知略差による謀略ダメージが増える
 War.FireSuccessBase,0.25,攻城戦：火計の成功率基礎値。上げると火計が成功しやすくなる
 War.FireDamageFactor,0.8,攻城戦：火計のダメージ係数。上げると火計による城壁・兵士ダメージが増える
