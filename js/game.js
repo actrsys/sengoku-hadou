@@ -745,16 +745,16 @@ class GameManager {
         this.processTurn(); 
     }
 
-    endMonth() { 
+    async endMonth() { // ★ async を追加します！
         this.factionSystem.processEndMonth(); 
-        this.independenceSystem.checkIndependence(); 
+        await this.independenceSystem.checkIndependence(); // ★ await を追加して待ちます！
         this.kunishuSystem.processEndMonth();
         
         // ★ 追加：月の終わりに、寿命を迎えた武将がいないかチェックします！
-        this.lifeSystem.processEndMonth();
+        await this.lifeSystem.processEndMonth(); // ★ await を追加して待ちます！
 
         this.month++; 
-        if(this.month > 12) { this.month = 1; this.year++; } 
+        if(this.month > 12) { this.month = 1; this.year++; }
         
         const clans = new Set(this.castles.filter(c => c.ownerClan !== 0).map(c => c.ownerClan)); 
         const playerAlive = clans.has(this.playerClanId); 

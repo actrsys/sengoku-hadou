@@ -160,6 +160,8 @@ class LifeSystem {
         // 1. 生きている一門がいるかチェック
         const activeFamily = this.game.bushos.filter(b => b.clan === daimyo.clan && b.id !== daimyo.id && b.status === 'active' && !b.isDaimyo && daimyo.familyIds.some(fId => b.familyIds.includes(fId)));
         
+        let extraMsg = ""; // ★追加：緊急で元服した時の追加メッセージ
+
         // ★追加: もし生きている一門が0人なら、未登場の一門を探して強制的に登場させる
         if (activeFamily.length === 0) {
             const unbornFamily = this.game.bushos.filter(b => b.status === 'unborn' && daimyo.familyIds.some(fId => b.familyIds.includes(fId)));
@@ -184,7 +186,8 @@ class LifeSystem {
                     heir.castleId = baseCastle.id;
                     heir.loyalty = 100;
                     if (!baseCastle.samuraiIds.includes(heir.id)) baseCastle.samuraiIds.push(heir.id);
-                    this.game.ui.log(`【緊急継承】${daimyo.name.replace('|','')}の血縁、まだ幼い${heir.name.replace('|','')}が元服し、家督を継ぐため立ち上がりました！`);
+                    // ★変更：ログを直接出さずに、メッセージ文として後でまとめて出します！
+                    extraMsg = `\n(※血縁である まだ幼い ${heir.name.replace('|','')} が急遽元服し、立ち上がりました)`;
                 }
             }
         }
@@ -195,29 +198,18 @@ class LifeSystem {
         if (clanBushos.length > 0) {
             // 誰を後継ぎにするか、計算して決めます
             clanBushos.forEach(b => {
-                // 1. 一門（家族・親戚）かどうかをチェック！
                 b._isRelative = daimyo.familyIds.some(fId => b.familyIds.includes(fId));
-                // 2. 仲良し度（相性）の差を計算！差が小さいほど仲良し！
                 b._affinityDiff = Math.abs((daimyo.affinity || 0) - (b.affinity || 0));
-                // 3. 今までの計算式（統率と智謀）！
                 b._baseScore = b.leadership + b.intelligence;
             });
             
-            // 一番ふさわしい人を順番に並べ替えます
             clanBushos.sort((a, b) => {
-                // まずは一門かどうかを最優先！
                 if (a._isRelative && !b._isRelative) return -1;
                 if (!a._isRelative && b._isRelative) return 1;
-                
-                // 一門同士、または一門じゃない者同士なら次へ
                 if (a._isRelative && b._isRelative) {
-                    // 相性の差が小さい人を優先！
                     if (a._affinityDiff !== b._affinityDiff) return a._affinityDiff - b._affinityDiff;
-                    // 相性も同じなら、年齢が上の人（生まれた年が昔の人）を優先！
                     if (a.birthYear !== b.birthYear) return a.birthYear - b.birthYear;
                 }
-                
-                // それでも同じ、または一門じゃない場合は、今までの計算式で勝負！
                 return b._baseScore - a._baseScore;
             });
             
@@ -225,11 +217,33 @@ class LifeSystem {
             const successor = clanBushos[0];
             
             this.game.changeLeader(daimyo.clan, successor.id);
-            this.game.ui.log(`${daimyo.name.replace('|','')}が死亡し、${successor.name.replace('|','')}が家督を継ぎました。`);
+            
+            // ★変更：ログが2つ出ないように、1つのメッセージにまとめました！
+            const msg = `【当主交代】\n${daimyo.name.replace('|','')}が病により死亡し、${successor.name.replace('|','')}が家督を継ぎました。${extraMsg}`;
+            this.game.ui.log(`【当主交代】${daimyo.name.replace('|','')}が死亡し、${successor.name.replace('|','')}が家督を継ぎました。`);
+            
+            // ★追加：ダイアログを出して時間を止めます！
+            await new Promise(resolve => {
+                const autoClose = setTimeout(() => {
+                    const modal = document.getElementById('dialog-modal');
+                    const okBtn = document.getElementById('dialog-ok-btn');
+                    if (modal && !modal.classList.contains('hidden') && okBtn) {
+                        okBtn.click();
+                    }
+                }, 5000);
+
+                this.game.ui.showDialog(msg, false, () => {
+                    clearTimeout(autoClose);
+                    resolve();
+                });
+            });
+
         } else {
             // もし誰も残っていなかったら、その大名家は滅亡してしまいます
             const clan = this.game.clans.find(c => c.id === daimyo.clan);
-            const msg = `${daimyo.name.replace('|','')}が死亡し、後継ぎがいないため${clan ? clan.name : '大名'}家は滅亡しました。`;
+            const clanName = clan ? clan.name : '不明';
+            const displayClanName = clanName.endsWith('家') ? clanName : clanName + '家';
+            const msg = `【大名家滅亡】\n${daimyo.name.replace('|','')}が死亡し、後継ぎがいないため${displayClanName}は滅亡しました。`;
             this.game.ui.log(msg);
             
             await new Promise(resolve => {
@@ -251,6 +265,13 @@ class LifeSystem {
             this.game.castles.filter(c => c.ownerClan === daimyo.clan).forEach(c => {
                 c.ownerClan = 0;
                 c.castellanId = 0;
+                // ★追加：城の武将たちを浪人にします
+                this.game.getCastleBushos(c.id).forEach(l => { 
+                    if (l.status === 'unborn' || l.status === 'dead') return;
+                    l.clan = 0; 
+                    l.status = 'ronin'; 
+                }); 
+                this.game.updateCastleLord(c); // 城主情報をリセット
             });
         }
         daimyo.isDaimyo = false;
