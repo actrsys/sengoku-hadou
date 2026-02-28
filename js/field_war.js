@@ -131,6 +131,13 @@ class FieldWarManager {
         this.state = 'IDLE';
         this.hideUnitInfo();
 
+        // ★追加: 新しく作ったマップ工場でランダムなマップを作る
+        const mapFactory = new HexMapGenerator();
+        const mapData = mapFactory.generate();
+        this.cols = mapData.cols;
+        this.rows = mapData.rows;
+        this.grid = mapData.grid;
+
         const pid = Number(this.game.playerClanId);
         const isAtkPlayer = (Number(warState.attacker.ownerClan) === pid);
         const isDefPlayer = (Number(warState.defender.ownerClan) === pid);
@@ -591,6 +598,12 @@ class FieldWarManager {
                 
                 const hex = document.createElement('div');
                 hex.className = 'fw-hex';
+
+                // ★追加: 地形に合わせてCSSのクラスを追加（色を塗る指示）
+                if (this.grid && this.grid[row] && this.grid[row][x]) {
+                    hex.classList.add(`hex-${this.grid[row][x].terrain}`);
+                }
+                
                 hex.style.left = `${x * (this.hexW * 0.75)}px`;
                 hex.style.top = `${y * (this.hexH / 2)}px`;
                 
@@ -835,9 +848,20 @@ class FieldWarManager {
             if (d < minEnemyDist) minEnemyDist = d;
         });
 
-        if (isFirstStep && startDist === 1) return 4;
-        if (minEnemyDist <= 2) return 2; 
-        return 1;
+        // ★追加: Y座標を計算して、そのマスの地形を調べます
+        let row = Math.floor(y / 2);
+        let terrain = (this.grid && this.grid[row] && this.grid[row][x]) ? this.grid[row][x].terrain : 'plain';
+        
+        // ★修正: 地形ごとの基本コストを設定
+        let baseCost = 1; // 平地
+        if (terrain === 'forest') baseCost = 2; // 森
+        else if (terrain === 'river') baseCost = 3; // 川
+        else if (terrain === 'mountain') baseCost = 4; // 山
+
+        // 敵の近くを歩く時のZOCペナルティ（地形コストにさらに足します）
+        if (isFirstStep && startDist === 1) return baseCost + 3;
+        if (minEnemyDist <= 2) return baseCost + 1; 
+        return baseCost;
     }
 
     findPaths(unit, maxAP) {
@@ -913,11 +937,17 @@ class FieldWarManager {
                 let neighborKey = `${n.x},${n.y}`;
                 if (closedList[neighborKey]) continue;
 
-                // 敵のマス自体はゴール判定のために「コスト1」として計算
                 let c = 1;
                 if (n.x !== targetX || n.y !== targetY) {
                     c = this.getCost(n.x, n.y, enemies, allies, false, 999);
                     if (c >= 999) continue; // 味方がいるマスなどは通れない
+                } else {
+                    // ★追加: AIが狙うターゲットマスも、地形に合わせてコスト計算させます
+                    let row = Math.floor(n.y / 2);
+                    let terrain = (this.grid && this.grid[row] && this.grid[row][n.x]) ? this.grid[row][n.x].terrain : 'plain';
+                    if (terrain === 'forest') c = 2;
+                    else if (terrain === 'river') c = 3;
+                    else if (terrain === 'mountain') c = 4;
                 }
 
                 let gCost = currentNode.g + c;
