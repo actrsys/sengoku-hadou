@@ -184,7 +184,7 @@ class LifeSystem {
                     heir.loyalty = 100;
                     if (!baseCastle.samuraiIds.includes(heir.id)) baseCastle.samuraiIds.push(heir.id);
                     // ★変更：ログを直接出さずに、メッセージ文として後でまとめて出します！
-                    extraMsg = `\n(※血縁である まだ幼い ${heir.name.replace('|','')} が急遽元服し、立ち上がりました)`;
+                    extraMsg = `\n ${heir.name.replace('|','')} が急遽元服しました。`;
                 }
             }
         }
