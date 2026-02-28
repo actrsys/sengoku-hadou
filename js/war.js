@@ -918,12 +918,12 @@ class WarManager {
         } else { candidates.sort((a,b) => WarSystem.calcRetreatScore(b) - WarSystem.calcRetreatScore(a)); runRetreat(candidates[0].id); }
     }
     
-    endWar(attackerWon, isRetreat = false, capturedInRetreat = [], retreatTargetId = null) { 
+    async endWar(attackerWon, isRetreat = false, capturedInRetreat = [], retreatTargetId = null) { // ★ async を追加
         try {
             const s = this.state; s.active = false;
 
-            // ★ここから追加：戦争が終わった後の「順番待ちの列」を作ります！
-            const finishWarProcess = () => {
+            // ★変更：順番待ちができるように async を付けます
+            const finishWarProcess = async () => {
                 const winnerClan = s.attacker.ownerClan; // 勝ったのは攻撃側です
                 if (this.pendingPrisoners && this.pendingPrisoners.length > 0) {
                     // 捕虜がいる場合
@@ -931,8 +931,8 @@ class WarManager {
                         // プレイヤーが勝ったなら、ここで初めて捕虜画面を出します
                         this.game.ui.showPrisonerModal(this.pendingPrisoners);
                     } else {
-                        // コンピューターが勝ったなら、自動で処理して時間を進めます
-                        this.autoResolvePrisoners(this.pendingPrisoners, winnerClan);
+                        // ★変更：AIの捕虜処理が終わるまで「待つ(await)」ようにします
+                        await this.autoResolvePrisoners(this.pendingPrisoners, winnerClan);
                         this.pendingPrisoners = [];
                         this.game.finishTurn();
                     }
@@ -941,7 +941,6 @@ class WarManager {
                     this.game.finishTurn();
                 }
             };
-            // ★追加ここまで
             
             // 兵士の減った割合を計算して、馬と鉄砲も減らす（壊れる）処理
             // 野戦があった場合、ここでの horses と guns は既に野戦生き残り数に更新されており、
@@ -1161,7 +1160,26 @@ class WarManager {
                     this.game.ui.log(`【国衆蜂起】国人衆の反乱により、${targetC.name}が陥落し空白地となりました。`);
                     
                     if (this.game.castles.filter(c => c.ownerClan === oldOwner).length === 0) {
-                        this.game.ui.log(`${this.game.clans.find(c=>c.id===oldOwner)?.name}は滅亡しました。`);
+                        const clanName = this.game.clans.find(c=>c.id===oldOwner)?.name || "不明";
+                        const extMsg = `${clanName}は滅亡しました。`;
+                        this.game.ui.log(extMsg);
+                        
+                        // ★追加：滅亡のダイアログを出して時間を止めます
+                        await new Promise(resolve => {
+                            const autoClose = setTimeout(() => {
+                                const modal = document.getElementById('dialog-modal');
+                                const okBtn = document.getElementById('dialog-ok-btn');
+                                if (modal && !modal.classList.contains('hidden') && okBtn) {
+                                    okBtn.click();
+                                }
+                            }, 5000);
+
+                            this.game.ui.showDialog(extMsg, false, () => {
+                                clearTimeout(autoClose);
+                                resolve();
+                            });
+                        });
+
                         if (oldOwner === this.game.playerClanId) {
                             setTimeout(() => {
                                 this.game.ui.showDialog("全拠点を失いました。ゲームオーバーです。", false, () => {
@@ -1377,7 +1395,7 @@ class WarManager {
         } 
     }
     
-    handlePrisonerAction(index, action) { 
+    async handlePrisonerAction(index, action) { // ★ async を追加
         const prisoner = this.pendingPrisoners[index]; 
         const originalClanId = prisoner.clan;
         const kunishu = prisoner.belongKunishuId > 0 ? this.game.kunishuSystem.getKunishu(prisoner.belongKunishuId) : null;
@@ -1420,10 +1438,10 @@ class WarManager {
             }
         } else if (action === 'kill') { 
             if (prisoner.isDaimyo) {
-                this.handleDaimyoDeath(prisoner); 
+                await this.handleDaimyoDeath(prisoner); // ★ await を追加
                 prisoner.isDaimyo = false; 
             }
-            this.game.lifeSystem.executeDeath(prisoner); 
+            this.game.lifeSystem.executeDeath(prisoner);
             prisoner.clan = 0; prisoner.castleId = 0; prisoner.belongKunishuId = 0;
             
             // 処断はメッセージがないので、そのまま次へ進めます
@@ -1454,7 +1472,7 @@ class WarManager {
     }
     
     // ★ここを書き換えました！大名が亡くなった時の後継者選びです！
-    handleDaimyoDeath(daimyo) { 
+    async handleDaimyoDeath(daimyo) { // ★ async を追加
         const clanId = daimyo.clan; 
         if(clanId === 0) return; 
         
@@ -1495,6 +1513,26 @@ class WarManager {
         
         // もし誰もいなかったら、その大名家は滅亡です…
         if (candidates.length === 0) { 
+            const clan = this.game.clans.find(c => c.id === clanId);
+            const msg = `${daimyo.name.replace('|','')}が処断され、後継ぎがいないため【${clan ? clan.name : '不明'}家】は滅亡しました……`;
+            this.game.ui.log(msg);
+
+            // ★追加：滅亡のダイアログを出して時間を止めます
+            await new Promise(resolve => {
+                const autoClose = setTimeout(() => {
+                    const modal = document.getElementById('dialog-modal');
+                    const okBtn = document.getElementById('dialog-ok-btn');
+                    if (modal && !modal.classList.contains('hidden') && okBtn) {
+                        okBtn.click();
+                    }
+                }, 5000);
+
+                this.game.ui.showDialog(msg, false, () => {
+                    clearTimeout(autoClose);
+                    resolve();
+                });
+            });
+
             this.game.castles.filter(c => c.ownerClan === clanId).forEach(c => { 
                 c.ownerClan = 0; 
                 this.game.getCastleBushos(c.id).forEach(l => { 
@@ -1505,7 +1543,7 @@ class WarManager {
                 }); 
             }); 
             return; 
-        } 
+        }
         
         // プレイヤーの場合は、自分で選ぶ画面を出します！
         if (clanId === this.game.playerClanId) {
@@ -1544,18 +1582,19 @@ class WarManager {
         } 
     }
     
-    autoResolvePrisoners(captives, winnerClanId) { 
+    async autoResolvePrisoners(captives, winnerClanId) { // ★ async を追加
         const aiBushos = this.game.bushos.filter(b => b.clan === winnerClanId); 
         const leaderInt = aiBushos.length > 0 ? Math.max(...aiBushos.map(b => b.intelligence)) : 50; 
 
-        captives.forEach(p => { 
+        // ★変更：forEach を for...of に変えて順番待ちできるようにします
+        for (const p of captives) { 
             // ★変更：大名が処断される時
             if (p.isDaimyo) { 
-                this.handleDaimyoDeath(p); 
+                await this.handleDaimyoDeath(p); // ★ await を追加
                 p.isDaimyo = false; // 大名マークを外します
                 this.game.lifeSystem.executeDeath(p); // 共通のお片付け魔法
                 p.clan = 0; p.castleId = 0; p.belongKunishuId = 0; 
-                return; 
+                continue; // ★ return を continue に変更します
             } 
             
             const isKunishuBoss = (p.belongKunishuId > 0 && p.id === this.game.kunishuSystem.getKunishu(p.belongKunishuId)?.leaderId);
@@ -1564,7 +1603,7 @@ class WarManager {
                 p.clan = winnerClanId; p.loyalty = 50; p.isCastellan = false; p.belongKunishuId = 0;
                 const targetC = this.game.getCastle(p.castleId);
                 if (targetC && !targetC.samuraiIds.includes(p.id)) { targetC.samuraiIds.push(p.id); this.game.updateCastleLord(targetC); }
-                return; 
+                continue; // ★修正！「return;」を「continue;」に直しました！これで途中で終わらなくなります！
             } 
             if (p.charm > (window.WarParams.War.PrisonerRecruitThreshold || 60)) { 
                 const kunishu = p.belongKunishuId > 0 ? this.game.kunishuSystem.getKunishu(p.belongKunishuId) : null;
@@ -1579,7 +1618,7 @@ class WarManager {
                 this.game.lifeSystem.executeDeath(p); // 共通のお片付け魔法
                 p.clan = 0; p.castleId = 0; p.belongKunishuId = 0; 
             } 
-        }); 
+        } // ★ for...of に変えたので閉じカッコを変更します
     }
 
     closeWar() { 
