@@ -230,98 +230,270 @@ class AIEngine {
     }
 
     execInternalAffairs(castle, castellan, mods, smartness) {
-        const gold = castle.gold;
-        const rice = castle.rice;
-        const soldiers = castle.soldiers;
-        
-        let scoreCharity = 0;
-        // ★修正箇所: castle.loyalty -> castle.peoplesLoyalty
-        if (castle.peoplesLoyalty < 40) scoreCharity = (100 - castle.peoplesLoyalty) * 2;
-        
-        let scoreDraft = 0;
-        const safeSoldierCount = 300 + (smartness * 500); 
-        if (soldiers < safeSoldierCount && castle.population > 1000) {
-            scoreDraft = (safeSoldierCount - soldiers) * 0.2;
-            if (mods.aggression > 1.0) scoreDraft *= 1.5;
-        }
+        // ① 大名を取得します（行動回数の計算に使います）
+        const daimyo = this.game.bushos.find(b => b.clan === castle.ownerClan && b.isDaimyo) || castellan;
 
-        let scoreTraining = 0;
-        if (castle.training < 100) {
-            scoreTraining = (100 - castle.training) * 0.5;
-            if (soldiers > 500) scoreTraining *= 1.5;
-        }
+        // ② 行動回数の計算：「(城主内政＋城主魅力＋大名内政＋大名魅力) ÷ 2」
+        const baseAP = Math.floor((castellan.politics + castellan.charm + daimyo.politics + daimyo.charm) / 2);
+        // 最低1回、40ごとに+1回
+        let maxActions = 1 + Math.floor(baseAP / 40);
 
-        let scoreCommerce = 0;
-        let scoreFarm = 0;
-        
-        // 鉱山が最大値に達していない時だけ考える
-        if (castle.commerce < castle.maxCommerce) {
-            if (gold < 500) scoreCommerce = (500 - gold) * 0.5; 
-            else scoreCommerce = 20; 
-        }
-        
-        // 石高が最大値に達していない時だけ考える
-        if (castle.kokudaka < castle.maxKokudaka) {
-            scoreFarm = 20;
-            if (smartness > 0.6 && this.game.month < 8) scoreFarm += 10;
-        }
+        // お城にいる動ける武将（浪人や国人衆ではない人）をリストアップします
+        let availableBushos = this.game.getCastleBushos(castle.id).filter(b => 
+            !b.isActionDone && b.status !== 'ronin' && b.belongKunishuId === 0
+        );
 
-        const actions = [
-            { type: 'charity', score: scoreCharity, cost: 300 },
-            { type: 'draft', score: scoreDraft, cost: Math.min(gold, 500) }, 
-            { type: 'training', score: scoreTraining, cost: 0 },
-            { type: 'commerce', score: scoreCommerce, cost: 500 },
-            { type: 'farm', score: scoreFarm, cost: 500 }
-        ];
+        // 武将の人数より多くは行動できません
+        maxActions = Math.min(maxActions, availableBushos.length);
 
-        actions.forEach(a => {
-            a.score *= (0.8 + Math.random() * 0.4); 
-            if (castellan.politics > 70 && (a.type === 'commerce' || a.type === 'farm')) a.score *= 1.2;
-            if (castellan.leadership > 70 && (a.type === 'draft' || a.type === 'training')) a.score *= 1.2;
-            if (castellan.charm > 70 && a.type === 'charity') a.score *= 1.2;
-        });
+        if (maxActions <= 0) return;
 
-        actions.sort((a,b) => b.score - a.score);
+        // 城主の性格による好みの計算（相対値で最大±20%のブレ）
+        const isConservative = castellan.personality === 'conservative';
+        const isAggressive = castellan.personality === 'aggressive';
 
-        for (let action of actions) {
-            if (action.score < 10) continue; 
+        // お隣の敵のお城を調べておきます（徴兵の判断用）
+        const neighbors = this.game.castles.filter(c => 
+            c.ownerClan !== 0 && c.ownerClan !== castle.ownerClan && GameSystem.isAdjacent(castle, c)
+        );
 
-            if (action.type === 'charity' && gold >= action.cost) {
-                 castle.gold -= action.cost;
-                 // ★修正箇所: castle.loyalty -> castle.peoplesLoyalty
-                 castle.peoplesLoyalty = Math.min(100, castle.peoplesLoyalty + GameSystem.calcCharity(castellan, 'money'));
-                 castellan.isActionDone = true; return;
+        // ③ 決められた回数だけ、行動を繰り返します！
+        for (let step = 0; step < maxActions; step++) {
+            // まだ動ける武将を再確認します
+            availableBushos = this.game.getCastleBushos(castle.id).filter(b => 
+                !b.isActionDone && b.status !== 'ronin' && b.belongKunishuId === 0
+            );
+            if (availableBushos.length === 0) break; // もう誰もいなければ終了です
+
+            // --- 候補となる行動の点数（スコア）をつける表を作ります ---
+            let actions = [];
+
+            // 1. 城壁修復（最大値の1/4以下なら超優先！）
+            if (castle.defense < castle.maxDefense) {
+                let score = 0;
+                if (castle.defense <= castle.maxDefense / 4) score = 1000; // 緊急事態！
+                else score = 20;
+                actions.push({ type: 'repair', stat: 'politics', score: score, cost: 200 });
             }
-            if (action.type === 'draft' && gold >= 200 && castle.population > 1000) {
-                 const useGold = Math.min(gold, 500);
-                 castle.gold -= useGold;
-                 const gain = GameSystem.calcDraftFromGold(useGold, castellan, castle.population);
-                 castle.soldiers += gain;
-                 castle.population -= Math.floor(gain * 0.1);
-                 castellan.isActionDone = true; return;
-            }
-            if (action.type === 'training') {
-                 castle.training = Math.min(120, castle.training + GameSystem.calcTraining(castellan));
-                 castellan.isActionDone = true; return;
-            }
-            if ((action.type === 'commerce' || action.type === 'farm') && gold >= 500) {
-                 castle.gold -= 500;
-                 const val = GameSystem.calcDevelopment(castellan);
-                 
-                 // 鉱山開発の時、最大値を超えないようにするストッパー
-                 if (action.type === 'commerce') {
-                     castle.commerce = Math.min(castle.maxCommerce, castle.commerce + val);
-                 } 
-                 // 石高開発の時、最大値を超えないようにするストッパー
-                 else {
-                     castle.kokudaka = Math.min(castle.maxKokudaka, castle.kokudaka + val);
-                 }
-                 
-                 castellan.isActionDone = true; return;
-            }
-        }
 
-        castellan.isActionDone = true;
+            // 2. 施し（民忠70以下なら優先！）
+            if (castle.peoplesLoyalty < 100) {
+                let score = 0;
+                if (castle.peoplesLoyalty <= 70) score = 500; // 結構優先！
+                else score = (100 - castle.peoplesLoyalty) * 2;
+                actions.push({ type: 'charity', stat: 'charm', score: score, cost: 200 }); // ※お米200
+            }
+
+            // 3. 徴兵（お隣の敵と比べて、自分が少ないほど焦る）
+            if (castle.population > 1000) {
+                let scoreDraft = 0;
+                let mySoldiers = Math.max(1, castle.soldiers);
+                let enemyMaxSoldiers = 0;
+                neighbors.forEach(n => {
+                    if (n.soldiers > enemyMaxSoldiers) enemyMaxSoldiers = n.soldiers;
+                });
+                
+                if (enemyMaxSoldiers > mySoldiers) {
+                    scoreDraft = ((enemyMaxSoldiers / mySoldiers) * 50); // 負けている割合で点数アップ
+                } else if (castle.soldiers < 3000) {
+                    scoreDraft = 30; // 敵がいなくても兵士が少ないなら少し考える
+                }
+                actions.push({ type: 'draft', stat: 'leadership', score: scoreDraft, cost: 500 }); // 金500
+            }
+
+            // 4. 訓練
+            if (castle.training < 100) {
+                let score = (100 - castle.training) * 0.5;
+                actions.push({ type: 'training', stat: 'leadership', score: score, cost: 0 }); // コストは仮で0(本来は不要)
+            }
+
+            // 5. 兵施し（士気）
+            if (castle.morale < 100) {
+                let score = (100 - castle.morale) * 0.5;
+                actions.push({ type: 'soldier_charity', stat: 'leadership', score: score, cost: 200 }); // ※お米200
+            }
+
+            // 6. 石高開発
+            if (castle.kokudaka < castle.maxKokudaka) {
+                actions.push({ type: 'farm', stat: 'politics', score: 30, cost: 200 });
+            }
+
+            // 7. 鉱山開発
+            if (castle.commerce < castle.maxCommerce) {
+                actions.push({ type: 'commerce', stat: 'politics', score: 30, cost: 200 });
+            }
+
+            // --- 性格による点数の調整 ---
+            actions.forEach(a => {
+                if (isConservative && ['farm', 'commerce', 'repair', 'charity'].includes(a.type)) {
+                    a.score *= 1.2; // 守りや内政が好きなら20%アップ
+                }
+                if (isAggressive && ['draft', 'training', 'soldier_charity'].includes(a.type)) {
+                    a.score *= 1.2; // 攻めや軍備が好きなら20%アップ
+                }
+                // 少しだけランダムな揺らぎを入れます
+                a.score *= (0.9 + Math.random() * 0.2);
+            });
+
+            // 8. 兵糧売買（特殊な判断）
+            if (castle.gold < 500 && castle.rice > 3000) {
+                const targetRice = Math.max(3000, Math.floor(castle.soldiers * 1.5));
+                if (castle.rice > targetRice) {
+                    actions.push({ type: 'sell_rice', stat: 'politics', score: 800, cost: 0 }); // お金がない時は高優先
+                }
+            }
+            if (castle.rice <= castle.soldiers * 1) {
+                actions.push({ type: 'buy_rice', stat: 'politics', score: 800, cost: 0 }); // ご飯がない時も高優先
+            }
+
+            // 9. 輸送（大名のいない城のみ）
+            if (!daimyo || daimyo.castleId !== castle.id) {
+                const allyCastles = this.game.castles.filter(c => c.ownerClan === castle.ownerClan && c.id !== castle.id);
+                for (const target of allyCastles) {
+                    if ((target.soldiers <= 500 || target.gold <= 500) && castle.soldiers >= 2000 && castle.gold >= 2000) {
+                        actions.push({ type: 'transport', stat: 'leadership', score: 400, cost: 0, targetId: target.id, res: 'gold_soldier' });
+                        break; // 1ターンに1回見つかればOK
+                    }
+                    if (target.rice <= 2000 && castle.rice >= 5000) {
+                        actions.push({ type: 'transport', stat: 'leadership', score: 400, cost: 0, targetId: target.id, res: 'rice' });
+                        break;
+                    }
+                }
+            }
+
+            // 10. 武将の移動
+            const emptyCastles = this.game.castles.filter(c => c.ownerClan === castle.ownerClan && c.id !== castle.id && c.samuraiIds.length <= 1);
+            if (emptyCastles.length > 0) {
+                actions.push({ type: 'move', stat: 'leadership', score: 300, cost: 0, targetId: emptyCastles[0].id });
+            }
+
+
+            // 点数が高い順に並べ替えます
+            actions.sort((a, b) => b.score - a.score);
+
+            let actionDoneInThisStep = false;
+
+            // 一番点数が高い行動から順番に「できるかどうか」試していきます
+            for (let action of actions) {
+                if (action.score < 10) continue;
+
+                // その行動に一番向いている武将を探します（能力値40以上が条件）
+                const bestBushos = availableBushos.filter(b => b[action.stat] >= 40).sort((a, b) => b[action.stat] - a[action.stat]);
+                if (bestBushos.length === 0) continue; // 基準を満たす人がいなければ、この行動は諦めます
+                const doer = bestBushos[0];
+
+                // 実行処理
+                if (action.type === 'repair' && castle.gold >= 200) {
+                    castle.gold -= 200;
+                    castle.defense = Math.min(castle.maxDefense, castle.defense + GameSystem.calcRepair(doer));
+                    doer.isActionDone = true; actionDoneInThisStep = true; break;
+                }
+                if (action.type === 'charity' && castle.rice >= 200) {
+                    castle.rice -= 200;
+                    castle.peoplesLoyalty = Math.min(100, castle.peoplesLoyalty + GameSystem.calcCharity(doer, 'rice'));
+                    doer.isActionDone = true; actionDoneInThisStep = true; break;
+                }
+                if (action.type === 'draft' && castle.gold >= 500 && castle.population > 1000) {
+                    castle.gold -= 500;
+                    const gain = GameSystem.calcDraftFromGold(500, doer, castle.population);
+                    castle.soldiers += gain;
+                    castle.population -= Math.floor(gain * 0.1);
+                    doer.isActionDone = true; actionDoneInThisStep = true; break;
+                }
+                if (action.type === 'training') {
+                    castle.training = Math.min(100, castle.training + GameSystem.calcTraining(doer));
+                    doer.isActionDone = true; actionDoneInThisStep = true; break;
+                }
+                if (action.type === 'soldier_charity' && castle.rice >= 200) {
+                    castle.rice -= 200;
+                    castle.morale = Math.min(100, castle.morale + GameSystem.calcSoldierCharity(doer));
+                    doer.isActionDone = true; actionDoneInThisStep = true; break;
+                }
+                if (action.type === 'farm' && castle.gold >= 200) {
+                    castle.gold -= 200;
+                    castle.kokudaka = Math.min(castle.maxKokudaka, castle.kokudaka + GameSystem.calcDevelopment(doer));
+                    doer.isActionDone = true; actionDoneInThisStep = true; break;
+                }
+                if (action.type === 'commerce' && castle.gold >= 200) {
+                    castle.gold -= 200;
+                    castle.commerce = Math.min(castle.maxCommerce, castle.commerce + GameSystem.calcDevelopment(doer));
+                    doer.isActionDone = true; actionDoneInThisStep = true; break;
+                }
+                
+                // 特殊行動群
+                if (action.type === 'sell_rice') {
+                    const sellAmount = castle.rice - Math.max(3000, Math.floor(castle.soldiers * 1.5));
+                    if (sellAmount > 0) {
+                        const gain = Math.floor(sellAmount * this.game.marketRate);
+                        castle.rice -= sellAmount;
+                        castle.gold += gain;
+                        doer.isActionDone = true; actionDoneInThisStep = true; break;
+                    }
+                }
+                if (action.type === 'buy_rice') {
+                    const buyAmount = Math.floor(castle.soldiers * 1.5) - castle.rice;
+                    const cost = Math.floor(buyAmount * this.game.marketRate);
+                    if (buyAmount > 0 && castle.gold >= cost + 500) { // 最低500金は残すように買う
+                        castle.gold -= cost;
+                        castle.rice += buyAmount;
+                        doer.isActionDone = true; actionDoneInThisStep = true; break;
+                    }
+                }
+                if (action.type === 'transport') {
+                    const targetCastle = this.game.getCastle(action.targetId);
+                    if (action.res === 'gold_soldier') {
+                        castle.gold -= 500; castle.soldiers -= 500;
+                        targetCastle.gold += 500; targetCastle.soldiers += 500;
+                    } else if (action.res === 'rice') {
+                        castle.rice -= 1000;
+                        targetCastle.rice += 1000;
+                    }
+                    doer.isActionDone = true; actionDoneInThisStep = true; break; // 武将は移動しない
+                }
+                if (action.type === 'move') {
+                    // 誰を送るか選ぶ（城主以外）
+                    let moveCandidates = availableBushos.filter(b => b.id !== castle.castellanId);
+                    let mover = null;
+                    
+                    // 派閥の主を優先
+                    const factionLeader = moveCandidates.find(b => b.isFactionLeader);
+                    if (factionLeader) mover = factionLeader;
+                    
+                    // 城主と相性が悪い人を優先
+                    if (!mover) {
+                        for (let b of moveCandidates) {
+                            if (GameSystem.calcAffinityDiff(castellan.affinity, b.affinity) >= 20) {
+                                mover = b; break;
+                            }
+                        }
+                    }
+                    
+                    // 条件に合う人がいれば移動
+                    if (mover) {
+                        const targetCastle = this.game.getCastle(action.targetId);
+                        
+                        // ★追加：送ったあとの人数を計算して、元のお城が少なくなっちゃうならストップ！
+                        const sourceCountAfter = castle.samuraiIds.length - 1;       // 送ったあとの元のお城の人数
+                        const targetCountAfter = targetCastle.samuraiIds.length + 1; // 送ったあとの先のお城の人数
+                        
+                        if (sourceCountAfter < targetCountAfter) {
+                            // 移動すると人数が逆転して少なくなる場合は、移動を諦めて別の行動を考えます
+                            continue;
+                        }
+
+                        this.game.factionSystem.handleMove(mover, castle.id, action.targetId);
+                        castle.samuraiIds = castle.samuraiIds.filter(id => id !== mover.id);
+                        targetCastle.samuraiIds.push(mover.id);
+                        mover.castleId = action.targetId;
+                        mover.isActionDone = true;
+                        actionDoneInThisStep = true; break;
+                    }
+                }
+            }
+            
+            // もし何も実行できる行動がなかったら、もうこのお城の行動は終わりにします
+            if (!actionDoneInThisStep) break;
+        }
     }
     
     execAIDiplomacy(castle, castellan, smartness) {
