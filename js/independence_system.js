@@ -136,7 +136,6 @@ class IndependenceSystem {
         this.game.relations[relKey] = { friendship: 0, alliance: false };
 
         // 5. 部下の去就判定
-        // ★変更：返ってきたメッセージを受け取ります！
         const captiveMsgs = this.resolveSubordinates(castle, castellan, oldDaimyo, newClanId, oldClanId);
 
         // ★ 新大名となった城の城主更新（大名優先ロジックの適用）
@@ -152,7 +151,7 @@ class IndependenceSystem {
         if (captiveMsgs && captiveMsgs.length > 0) {
             msg += '\n\n' + captiveMsgs.join('\n');
         }
-        // ★プレイヤーがOKを押すまで安全に時間を止めるため、5000を「0」にします
+        // ★プレイヤーがOKを押すまで安全に時間を止めるため、0にします
         await this.game.ui.showDialogAsync(msg, false, 0);
     }
 
