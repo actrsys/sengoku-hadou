@@ -148,7 +148,7 @@ class IndependenceSystem {
         const oldClanName = this.game.clans.find(c => c.id === oldClanId)?.name || "不明";
         // ★上で既に箱があるので、エラーの原因だった2行を消しました！
 
-        let msg = `【謀反】${oldClanName}の${castle.name}にて、${castellan.name}が独立！「${newClanName}」を旗揚げしました。`;
+        let msg = `【謀反】${oldClanName}の${castellan.name}が${castle.name}にて独立しました！`;
         this.game.ui.log(msg);
         
         if (captiveMsgs && captiveMsgs.length > 0) {
