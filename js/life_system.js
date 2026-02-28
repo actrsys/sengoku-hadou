@@ -9,14 +9,14 @@ class LifeSystem {
     }
 
     // 毎月の初め（1月）に「新しく登場する武将がいないか」をチェックします
-    processStartMonth() {
+    async processStartMonth() {
         if (this.game.month === 1) {
-            this.checkBirth();
+            await this.checkBirth();
         }
     }
 
-    // 毎月の終わりに「寿命を迎えて亡くなる武将がいないか」をチェックします
-    async processEndMonth() {
+    // ★ 登場のチェック（毎年1月に行います）
+    async checkBirth() {
         await this.checkDeath();
     }
 
@@ -78,8 +78,8 @@ class LifeSystem {
         if (messages.length > 0) {
             const msgText = messages.join('\n');
             this.game.ui.log(msgText);
-            // ★自動で順番待ちしてくれるので、そのままダイアログの命令を出して大丈夫です！
-            this.game.ui.showDialog(msgText, false);
+            // ★awaitを追加して、プレイヤーが「OK」を押すまで時間を完全に止めます！
+            await this.game.ui.showDialogAsync(msgText, false, 0); 
         }
     }
 

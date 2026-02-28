@@ -264,6 +264,11 @@ class UIManager {
         const okBtn = document.getElementById('dialog-btn-ok');
         const cancelBtn = document.getElementById('dialog-btn-cancel');
 
+        // ★追加：ダイアログを出す時は、AIの「思考中ガード」を一時的に隠します！
+        const aiGuard = document.getElementById('ai-guard');
+        const wasGuardActive = aiGuard && !aiGuard.classList.contains('hidden');
+        if (wasGuardActive) aiGuard.classList.add('hidden');
+
         if (!modal) {
             if (dialog.isConfirm) {
                 if (confirm(dialog.msg)) { if (dialog.onOk) dialog.onOk(); } else { if (dialog.onCancel) dialog.onCancel(); }
@@ -282,6 +287,10 @@ class UIManager {
         const cleanupAndNext = (callback) => {
             if (autoCloseTimer) clearTimeout(autoCloseTimer);
             modal.classList.add('hidden');
+            
+            // ★追加：ダイアログを閉じたら、ガードを元の状態に戻します！
+            if (wasGuardActive && aiGuard) aiGuard.classList.remove('hidden');
+
             if (callback) callback();
             this.processDialogQueue(); // 次のダイアログへ！
         };
