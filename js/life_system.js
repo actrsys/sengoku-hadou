@@ -119,7 +119,7 @@ class LifeSystem {
             const names = diedPlayerBushos.map(b => b.name.replace('|', '')).join('、');
             this.game.ui.log(`${names}が病によりこの世を去りました…。`);
             // ★大名の時と同じように、ダイアログを出して5秒間待ちます！
-            await this.game.ui.showDialogAsync(`${names}が病によりこの世を去りました…。`, false, 5000);
+            await this.game.ui.showDialogAsync(`${names}が病によりこの世を去りました…。`, false, 0);
         }
     }
 
@@ -220,7 +220,7 @@ class LifeSystem {
             this.game.ui.log(`【当主交代】${daimyo.name.replace('|','')}が死亡し、${successor.name.replace('|','')}が家督を継ぎました。`);
             
             // ★追加：ダイアログを出して時間を止めます！
-            await this.game.ui.showDialogAsync(msg, false, 5000);
+            await this.game.ui.showDialogAsync(msg, false, 0);
 
         } else {
             // もし誰も残っていなかったら、その大名家は滅亡してしまいます
@@ -231,7 +231,7 @@ class LifeSystem {
             this.game.ui.log(msg);
             
             // ★ここも1行にするだけです！（2箇所ともコレに置き換えます）
-            await this.game.ui.showDialogAsync(msg, false, 5000);
+            await this.game.ui.showDialogAsync(msg, false, 0);
             
             // 持っていたお城をすべて「空き城」にします
             this.game.castles.filter(c => c.ownerClan === daimyo.clan).forEach(c => {

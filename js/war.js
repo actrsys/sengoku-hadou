@@ -1169,7 +1169,7 @@ class WarManager {
                         this.game.ui.log(extMsg);
                         
                         // ★たった1行で「表示・5秒タイマー・順番待ち」を全部やってくれます！
-                        await this.game.ui.showDialogAsync(extMsg, false, 5000);
+                        await this.game.ui.showDialogAsync(extMsg, false, 0);
 
                         if (oldOwner === this.game.playerClanId) {
                             setTimeout(() => {
@@ -1639,7 +1639,7 @@ class WarManager {
             this.game.ui.log(extMsg);
             
             // ★たった1行で「表示・5秒タイマー・順番待ち」を全部やってくれます！
-            await this.game.ui.showDialogAsync(extMsg, false, 5000);
+            await this.game.ui.showDialogAsync(extMsg, false, 0);
 
             if (clanId === this.game.playerClanId) {
                 return new Promise(resolve => {
