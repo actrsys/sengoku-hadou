@@ -400,7 +400,7 @@ class WarManager {
     	                } else {
                             const modal = document.getElementById('intercept-confirm-modal');
                             if (modal) {
-                                if (this.game.ui.aiGuard) this.game.ui.aiGuard.classList.add('hidden');
+                                // ★ aiGuard を消す魔法を削除しました
                                 modal.classList.remove('hidden');
                                 document.getElementById('intercept-msg').innerText = `${atkArmyName}の${atkBushos[0].name}が攻めてきました！\n敵軍: ${atkSoldierCount} 対 自軍: ${totalDefSoldiers}\n迎撃（野戦）しますか？籠城しますか？`;
                                 
@@ -671,8 +671,8 @@ class WarManager {
         }
         
         if (s.isPlayerInvolved) { 
+            this.game.ui.setWarModalVisible(true); this.game.ui.clearWarLog();
             setTimeout(() => {
-                this.game.ui.setWarModalVisible(true); this.game.ui.clearWarLog();
                 this.game.ui.log(`★ ${s.sourceCastle.name}軍が${s.defender.name}への籠城戦を開始！`); 
                 this.game.ui.updateWarUI(); this.processWarRound(); 
             }, 500); 
@@ -1382,6 +1382,17 @@ class WarManager {
         const originalClanId = prisoner.clan;
         const kunishu = prisoner.belongKunishuId > 0 ? this.game.kunishuSystem.getKunishu(prisoner.belongKunishuId) : null;
 
+        // ★追加：ダイアログの「OKボタン」を押した後に、次の処理へ進むための特別な箱を用意しました
+        const nextStep = () => {
+            this.pendingPrisoners.splice(index, 1); 
+            if (this.pendingPrisoners.length === 0) {
+                this.game.ui.closePrisonerModal();
+                this.game.finishTurn();
+            } else {
+                this.game.ui.showPrisonerModal(this.pendingPrisoners); 
+            }
+        };
+
         if (action === 'hire') { 
             if (kunishu && prisoner.id === kunishu.leaderId) {
                 this.game.ui.showDialog(`${prisoner.name}「国衆を束ねるこの俺が、お前になど仕えるか！」\n(※国人衆の代表者は登用できません)`, false); 
@@ -1390,8 +1401,11 @@ class WarManager {
 
             const myBushos = this.game.bushos.filter(b=>b.clan===this.game.playerClanId); const recruiter = myBushos.find(b => b.isDaimyo) || myBushos[0]; 
             const score = (recruiter.charm * 2.0) / (prisoner.loyalty * 1.5); 
-            if (prisoner.isDaimyo) this.game.ui.showDialog(`${prisoner.name}「敵の軍門には下らぬ！」`, false); 
-            else if (score > Math.random()) { 
+            
+            // ★変更：メッセージの後に「nextStep」を渡して、ボタンが押されるまで待つようにしました
+            if (prisoner.isDaimyo) {
+                this.game.ui.showDialog(`${prisoner.name}「敵の軍門には下らぬ！」`, false, nextStep); 
+            } else if (score > Math.random()) { 
                 prisoner.clan = this.game.playerClanId; prisoner.loyalty = 50; prisoner.isCastellan = false; 
                 prisoner.belongKunishuId = 0; 
                 const targetC = this.game.getCastle(prisoner.castleId) || this.game.getCurrentTurnCastle(); 
@@ -1400,49 +1414,43 @@ class WarManager {
                     if (!targetC.samuraiIds.includes(prisoner.id)) targetC.samuraiIds.push(prisoner.id); 
                     this.game.updateCastleLord(targetC); 
                 }
-                this.game.ui.showDialog(`${prisoner.name}を登用しました！`, false); 
-            } 
-            else this.game.ui.showDialog(`${prisoner.name}は登用を拒否しました……`, false); 
+                this.game.ui.showDialog(`${prisoner.name}を登用しました！`, false, nextStep); 
+            } else {
+                this.game.ui.showDialog(`${prisoner.name}は登用を拒否しました……`, false, nextStep); 
+            }
         } else if (action === 'kill') { 
-            // ★変更：大名の場合は、先に後継ぎを決める特別な処理をします
             if (prisoner.isDaimyo) {
                 this.handleDaimyoDeath(prisoner); 
-                prisoner.isDaimyo = false; // 後継ぎに譲ったので大名マークを外します
+                prisoner.isDaimyo = false; 
             }
-            // ★変更：共通の「お星さまになる魔法」でお片付けします！
             this.game.lifeSystem.executeDeath(prisoner); 
-            // 念のため、どこにも属していない状態にしておきます
             prisoner.clan = 0; prisoner.castleId = 0; prisoner.belongKunishuId = 0;
             
+            // 処断はメッセージがないので、そのまま次へ進めます
+            nextStep();
+            
         } else if (action === 'release') { 
+            // ★変更：こちらもメッセージの後に「nextStep」を渡して待つようにしました
             if (kunishu && !kunishu.isDestroyed) {
                 prisoner.status = 'active'; 
                 prisoner.clan = 0;
                 prisoner.castleId = kunishu.castleId;
                 const returnCastle = this.game.getCastle(kunishu.castleId);
                 if (returnCastle && !returnCastle.samuraiIds.includes(prisoner.id)) returnCastle.samuraiIds.push(prisoner.id);
-                this.game.ui.showDialog(`${prisoner.name}を解放しました。(国人衆へ帰還しました)`, false);
+                this.game.ui.showDialog(`${prisoner.name}を解放しました。(国人衆へ帰還しました)`, false, nextStep);
             } else {
                 const friendlyCastles = this.game.castles.filter(c => c.ownerClan === originalClanId && originalClanId !== 0);
                 if (friendlyCastles.length > 0) {
                     const returnCastle = friendlyCastles[Math.floor(Math.random() * friendlyCastles.length)];
                     prisoner.castleId = returnCastle.id; prisoner.isCastellan = false; prisoner.status = 'active'; returnCastle.samuraiIds.push(prisoner.id);
                     this.game.factionSystem.handleMove(prisoner, 0, returnCastle.id); this.game.updateCastleLord(returnCastle);
-                    this.game.ui.showDialog(`${prisoner.name}を解放しました。(自領へ帰還しました)`, false);
+                    this.game.ui.showDialog(`${prisoner.name}を解放しました。(自領へ帰還しました)`, false, nextStep);
                 } else { 
                     prisoner.status = 'ronin'; prisoner.clan = 0; prisoner.castleId = 0; prisoner.belongKunishuId = 0; 
-                    this.game.ui.showDialog(`${prisoner.name}を解放しました。(在野へ下りました)`, false); 
+                    this.game.ui.showDialog(`${prisoner.name}を解放しました。(在野へ下りました)`, false, nextStep); 
                 }
             }
         } 
-        this.pendingPrisoners.splice(index, 1); 
-        if (this.pendingPrisoners.length === 0) {
-            this.game.ui.closePrisonerModal();
-            // ★捕虜がいなくなったら、ここで初めて時間を進めます！
-            this.game.finishTurn();
-        } else {
-            this.game.ui.showPrisonerModal(this.pendingPrisoners); 
-        }
     }
     
     // ★ここを書き換えました！大名が亡くなった時の後継者選びです！
@@ -1655,7 +1663,7 @@ class WarManager {
             const myClanName = this.game.clans.find(c => c.id === myClanId)?.name || "不明";
             const isBoss = (myToHelperRel.status === '従属');
 
-            if (this.game.ui.aiGuard) this.game.ui.aiGuard.classList.add('hidden');
+            // ★ aiGuard を消す魔法を削除しました
 
             // ★武将選択画面を呼び出す合図
             const startSelection = () => {

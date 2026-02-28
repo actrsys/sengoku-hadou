@@ -1705,9 +1705,7 @@ class CommandSystem {
     
     // ★追加: AIからプレイヤーへの外交提案を受ける処理
     proposeDiplomacyToPlayer(doer, targetClanId, type, gold, onComplete) {
-        // ★ここを追加：プレイヤーが操作できるように「思考中」のガードを一旦外します
-        if (this.game.ui.aiGuard) this.game.ui.aiGuard.classList.add('hidden');
-
+        // ★ aiGuard を消す魔法を削除しました
         const doerClan = this.game.clans.find(c => c.id === doer.clan);
 
         // ★追加：使者を出したAIの城からお金を減らす処理

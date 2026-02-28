@@ -229,7 +229,7 @@ class UIManager {
     }
 
     showDialog(msg, isConfirm, onOk, onCancel = null) {
-        if (this.aiGuard) this.aiGuard.classList.add('hidden');
+        // ★ aiGuard を消す魔法を削除しました
         const modal = document.getElementById('dialog-modal');
         const msgEl = document.getElementById('dialog-message');
         const okBtn = document.getElementById('dialog-btn-ok');
@@ -751,8 +751,8 @@ class UIManager {
     }
 
     showResultModal(msg, onClose = null, customFooterHtml = null) { 
-        if (this.aiGuard) this.aiGuard.classList.add('hidden');
-        if (this.resultBody) this.resultBody.innerHTML = msg.replace(/\n/g, '<br>'); 
+        // ★ aiGuard を消す魔法を削除しました
+        if (this.resultBody) this.resultBody.innerHTML = msg.replace(/\n/g, '<br>');
         const footer = document.getElementById('result-footer');
         if (footer) {
             if (customFooterHtml !== null) {
