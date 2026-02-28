@@ -120,9 +120,11 @@ class HexMapGenerator {
 
         while (currentCount < targetCount && attempts < 1000) {
             attempts++;
-            // 塊の種となるスタート地点をランダムに選ぶ
             let startX = this.rand(0, cols - 1);
             let startY = this.rand(0, rows - 1);
+
+            // ★修正：山の場合、初期位置が塞がれないように「左端から2列」「右端から2列」には絶対に生成しません！
+            if (terrainType === 'mountain' && (startX <= 1 || startX >= cols - 2)) continue;
 
             // 平地じゃなければやり直し
             if (map[startY][startX].terrain !== 'plain') continue;
@@ -132,16 +134,17 @@ class HexMapGenerator {
             let clustered = 0;
 
             while (queue.length > 0 && clustered < clusterSize && currentCount < targetCount) {
-                // 配列からランダムに取り出すことで、いびつで自然な塊にします
                 let idx = this.rand(0, queue.length - 1);
                 let pos = queue.splice(idx, 1)[0];
+
+                // ★修正：塊が広がる時も、端っこのエリアには絶対に入らないようにします！
+                if (terrainType === 'mountain' && (pos.x <= 1 || pos.x >= cols - 2)) continue;
 
                 if (map[pos.y][pos.x].terrain === 'plain') {
                     map[pos.y][pos.x].terrain = terrainType;
                     currentCount++;
                     clustered++;
 
-                    // 隣のマスを候補に入れる
                     let neighbors = this._getNeighbors(pos.x, pos.y, cols, rows);
                     for (let n of neighbors) {
                         if (map[n.y][n.x].terrain === 'plain') {

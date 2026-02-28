@@ -143,13 +143,9 @@ class FieldWarManager {
         const isDefPlayer = (Number(warState.defender.ownerClan) === pid);
         const isPlayerInvolved = isAtkPlayer || isDefPlayer;
 
-        // ★修正: HEXサイズやマップの広さが変わっても対応できるようにX座標を自動計算
-        let leftX = Math.max(1, Math.floor(this.cols * 0.05));
-        let rightX = this.cols - 1 - leftX;
-        
-        // 左側だけ奇数・偶数のズレを防ぐための調整を残し、右側は右から2マス目を維持します！
-        if (leftX % 2 === 0) leftX++;
-        // ★ rightX の奇数調整（rightX--）を削除して、右から2マス目に配置されるようにしました！
+        // ★修正: 部隊の開始位置を、マップの「一番左端」と「一番右端」に固定します！
+        let leftX = 0;
+        let rightX = this.cols - 1;
 
         let atkX = leftX, defX = rightX;
         let atkIsLeft = true;
@@ -848,7 +844,8 @@ class FieldWarManager {
         return diff <= 1;
     }
 
-    getCost(x, y, enemies, allies, isFirstStep, startDist) {
+    // ★修正: 誰が動いているか（unit）を受け取って、騎馬のペナルティを計算できるようにします！
+    getCost(x, y, enemies, allies, isFirstStep, startDist, unit) {
         if (enemies.some(e => e.x === x && e.y === y)) return 999;
         if (allies.some(a => a.x === x && a.y === y)) return 999;
         
@@ -861,19 +858,22 @@ class FieldWarManager {
         let row = Math.floor(y / 2);
         let terrain = (this.grid && this.grid[row] && this.grid[row][x]) ? this.grid[row][x].terrain : 'plain';
         
-        // ★修正: 地形ごとの基本コストを設定
         let baseCost = 1; // 平地
         if (terrain === 'forest') baseCost = 2; // 森
         else if (terrain === 'river') baseCost = 3; // 川
-        else if (terrain === 'mountain') baseCost = 3; // 山（コスト3に変更済）
+        else if (terrain === 'mountain') baseCost = 3; // 山
 
-        // ★修正: 離脱・接近などのZOCペナルティ（敵のプレッシャー）を計算
+        // ★追加: 騎馬の地形ペナルティ
+        if (unit && unit.troopType === 'kiba') {
+            if (terrain === 'mountain') return 999; // 山は通行不可！
+            if (terrain === 'forest') baseCost += 1; // 森はコスト+1
+            if (terrain === 'river') baseCost += 1;  // 川もコスト+1
+        }
+
         let zocCost = 1;
-        if (isFirstStep && startDist === 1) zocCost = 4; // 敵に密着している状態からの離脱は非常に困難（コスト4）
-        else if (minEnemyDist <= 2) zocCost = 2;         // 敵のすぐ近く（2マス以内）を歩く時は警戒が必要（コスト2）
+        if (isFirstStep && startDist === 1) zocCost = 4;
+        else if (minEnemyDist <= 2) zocCost = 2;
 
-        // ★最強の魔法: 地形コストとZOCコストを「足し算」せず、「数字が大きい方（キツイ方）」だけを採用します！
-        // これにより、山(3)の近くに敵(2)がいても 3+2=5 ではなく MAX(3,2)=3 となり、行動力4の部隊がフリーズしなくなります。
         return Math.max(baseCost, zocCost);
     }
 
@@ -894,11 +894,11 @@ class FieldWarManager {
         while(queue.length > 0) {
             queue.sort((a,b) => a.cost - b.cost);
             let cur = queue.shift();
-            
+
             let neighbors = this.getNeighbors(cur.x, cur.y);
             for(let n of neighbors) {
                 let isFirstStep = (cur.steps === 0);
-                let c = this.getCost(n.x, n.y, enemies, allies, isFirstStep, minStartDist);
+                let c = this.getCost(n.x, n.y, enemies, allies, isFirstStep, minStartDist, unit);
                 let nextCost = cur.cost + c;
                 
                 if (nextCost <= maxAP) {
@@ -952,15 +952,21 @@ class FieldWarManager {
 
                 let c = 1;
                 if (n.x !== targetX || n.y !== targetY) {
-                    c = this.getCost(n.x, n.y, enemies, allies, false, 999);
-                    if (c >= 999) continue; // 味方がいるマスなどは通れない
+                    // ★修正: unit を渡します
+                    c = this.getCost(n.x, n.y, enemies, allies, false, 999, unit);
+                    if (c >= 999) continue; 
                 } else {
-                    // ★追加: AIが狙うターゲットマスも、地形に合わせてコスト計算させます
                     let row = Math.floor(n.y / 2);
                     let terrain = (this.grid && this.grid[row] && this.grid[row][n.x]) ? this.grid[row][n.x].terrain : 'plain';
                     if (terrain === 'forest') c = 2;
                     else if (terrain === 'river') c = 3;
                     else if (terrain === 'mountain') c = 3;
+                    
+                    // ★追加: ターゲットマスの計算にも騎馬ペナルティを含めます
+                    if (unit.troopType === 'kiba') {
+                        if (terrain === 'forest') c += 1;
+                        if (terrain === 'river') c += 1;
+                    }
                 }
 
                 let gCost = currentNode.g + c;
