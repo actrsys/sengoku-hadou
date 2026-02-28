@@ -136,15 +136,21 @@ class IndependenceSystem {
         this.game.relations[relKey] = { friendship: 0, alliance: false };
 
         // 5. 部下の去就判定
-        this.resolveSubordinates(castle, castellan, oldDaimyo, newClanId, oldClanId);
+        // ★変更：返ってきたメッセージを受け取ります！
+        const captiveMsgs = this.resolveSubordinates(castle, castellan, oldDaimyo, newClanId, oldClanId);
 
         // ★ 新大名となった城の城主更新（大名優先ロジックの適用）
         this.game.updateCastleLord(castle);
 
         // 6. UIログ
         const oldClanName = this.game.clans.find(c => c.id === oldClanId).name;
-        const msg = `【謀反】${oldClanName}の${castle.name}にて、${castellan.name}が独立！「${newClanName}」を旗揚げしました。`;
+        let msg = `【謀反】${oldClanName}の${castle.name}にて、${castellan.name}が独立！「${newClanName}」を旗揚げしました。`;
         this.game.ui.log(msg);
+        
+        // ★追加：もし捕まった武将の結末があれば、メッセージの下にくっつけます！
+        if (captiveMsgs && captiveMsgs.length > 0) {
+            msg += '\n\n' + captiveMsgs.join('\n');
+        }
 
         await new Promise(resolve => {
             const autoClose = setTimeout(() => {
@@ -240,10 +246,17 @@ class IndependenceSystem {
         // ログ出力
         if (joiners.length > 0) this.game.ui.log(`  -> ${joiners.length}名が${newDaimyo.name}に追随しました。`);
         if (escapees.length > 0) this.game.ui.log(`  -> ${escapees.length}名が脱出し、帰還しました。`);
+        
+        // ★追加：捕虜メッセージを受け取れるようにします
+        let captiveMsgs = [];
         if (captives.length > 0) {
             this.game.ui.log(`  -> ${captives.length}名が脱出に失敗し、捕らえられました。`);
-            this.handleCaptives(captives, oldClanId, newClanId, newDaimyo);
+            // ★変更：受け取ったメッセージを箱に入れます
+            captiveMsgs = this.handleCaptives(captives, oldClanId, newClanId, newDaimyo);
         }
+        
+        // ★追加：メッセージを大元の処理に返します
+        return captiveMsgs;
     }
 
     /**
@@ -258,6 +271,9 @@ class IndependenceSystem {
 
         // 帰還先の確保（元の主君の城）
         const returnCastles = this.game.castles.filter(c => c.ownerClan === oldClanId);
+        
+        // ★追加：ダイアログに出すメッセージをまとめる箱
+        let alertMsgs = [];
         
         // 帰還処理関数
         const returnToMaster = (busho) => {
@@ -281,48 +297,41 @@ class IndependenceSystem {
         };
 
         // プレイヤーが「元の主君」の場合（部下を奪われた側）
-        // プレイヤーの武将が捕まった -> 処遇を決めるのは「新大名(AI)」
         if (oldClanId === this.game.playerClanId) {
-            // AIによる処断/解放判定
             captives.forEach(p => {
-                // 新大名と相性が悪い、または新大名が残忍(野心高)なら処断
                 const hate = GameSystem.calcAffinityDiff(p.affinity, newDaimyo.affinity);
                 if (hate > hateThreshold || newDaimyo.ambition > ambitionThreshold) {
                     p.status = 'dead';
                     p.clan = 0;
-                    // ★ alert を showDialog に変更
-                    setTimeout(() => this.game.ui.showDialog(`悲報：捕らえられた ${p.name} は、${newDaimyo.name}によって処断されました……`, false), 1000);
+                    // ★変更：ダイアログを直接出さず、メッセージ箱に入れます
+                    alertMsgs.push(`悲報：捕らえられた ${p.name} は処断されました……`);
                 } else {
-                    // 解放 -> 帰還
                     const returnedCastleName = returnToMaster(p);
                     if (returnedCastleName) {
-                        // ★ alert を showDialog に変更
-                        setTimeout(() => this.game.ui.showDialog(`報告：${p.name} は解放され、${returnedCastleName}へ無事帰還しました！`, false), 1000);
+                        alertMsgs.push(`報告：${p.name} は解放され帰還しました！`);
                     } else {
-                        // ★ alert を showDialog に変更
-                        setTimeout(() => this.game.ui.showDialog(`報告：${p.name} は解放されましたが、帰る場所がなく在野に下りました。`, false), 1000);
+                        alertMsgs.push(`報告：${p.name} は解放され在野に下りました。`);
                     }
                 }
             });
         }
-        // プレイヤーが「新大名」の場合（ここには来ない想定だが念のため）
+        // プレイヤーが「新大名」の場合
         else if (newClanId === this.game.playerClanId) {
-            // プレイヤーが独立した側なら、捕虜の処遇を選べる（既存UI利用）
-            // 注意: UI側の実装によっては在野になる可能性がありますが、ここでは手を加えません
             this.game.ui.showPrisonerModal(captives);
         }
         // AI vs AI
         else {
             captives.forEach(p => {
-                // 3割処断、7割解放(帰還)
                 if (Math.random() < 0.3) {
                     p.status = 'dead';
                     p.clan = 0;
                 } else {
-                    // 帰還
                     returnToMaster(p);
                 }
             });
         }
+        
+        // ★追加：集めたメッセージを返します
+        return alertMsgs;
     }
 }
