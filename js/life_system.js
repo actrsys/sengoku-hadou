@@ -81,6 +81,7 @@ class LifeSystem {
             // ★自動で順番待ちしてくれるので、そのままダイアログの命令を出して大丈夫です！
             this.game.ui.showDialog(msgText, false);
         }
+    }
 
     // ★ 寿命のチェック（毎月行います）
     async checkDeath() {
