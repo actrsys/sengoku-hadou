@@ -156,6 +156,7 @@ class IndependenceSystem {
         }
         // ★独立のメッセージも1行にするだけです！
         await this.game.ui.showDialogAsync(msg, false, 5000);
+    }
 
     /**
      * 部下の去就判定 (合流 / 脱出 / 捕縛)
