@@ -476,8 +476,9 @@ class FieldWarManager {
         const atkEl = document.getElementById('fw-atk-status');
         const defEl = document.getElementById('fw-def-status');
 
-        if (atkEl) atkEl.innerHTML = `<strong>[攻] ${this.warState.attacker.name}</strong><br>兵: ${atkSoldiers} / 糧: ${this.atkRice}`;
-        if (defEl) defEl.innerHTML = `<strong>[守] ${this.warState.defender.name}</strong><br>兵: ${defSoldiers} / 糧: ${this.defRice}`;
+        // ★変更: 士気(Morale)も画面に表示して、変動がリアルタイムで見えるようにしました！
+        if (atkEl) atkEl.innerHTML = `<strong>[攻] ${this.warState.attacker.name}</strong><br>兵: ${atkSoldiers} / 糧: ${this.atkRice} / 士気: ${this.atkMorale}`;
+        if (defEl) defEl.innerHTML = `<strong>[守] ${this.warState.defender.name}</strong><br>兵: ${defSoldiers} / 糧: ${this.defRice} / 士気: ${this.defMorale}`;
         
         const isAtkPlayer = (Number(this.warState.attacker.ownerClan) === Number(this.game.playerClanId));
         const isDefPlayer = (Number(this.warState.defender.ownerClan) === Number(this.game.playerClanId));
@@ -1231,11 +1232,15 @@ class FieldWarManager {
         this.warState.attacker.rice = this.atkRice;
         this.warState.attacker.horses = atkHorses;
         this.warState.attacker.guns = atkGuns;
+        // ★追加: 変化した攻撃側の士気を、元のゲームデータにしっかり保存（引き継ぎ）します
+        this.warState.attacker.morale = this.atkMorale; 
 
         this.warState.defender.fieldSoldiers = defSoldiers;
         this.warState.defFieldRice = this.defRice;
         this.warState.defender.fieldHorses = defHorses;
         this.warState.defender.fieldGuns = defGuns;
+        // ★追加: 守備側の士気も同じように保存します
+        this.warState.defender.morale = this.defMorale; 
 
         const isPlayerInvolved = this.units.some(u => u.isPlayer);
         
@@ -1487,10 +1492,32 @@ class FieldWarManager {
         if (defender.soldiers <= 0) {
             this.log(`${defender.name}隊が壊滅した！`);
             this.units = this.units.filter(u => u.id !== defender.id);
+            
+            // ★追加: 壊滅した側の士気を下げ、倒した側の士気を上げる魔法
+            if (defender.isAttacker) {
+                this.atkMorale = Math.max(0, this.atkMorale - 3);
+                this.defMorale = Math.min(120, this.defMorale + 3);
+                this.log(`部隊の壊滅により、攻撃軍の士気が下がり、守備軍の士気が上がった！`);
+            } else {
+                this.defMorale = Math.max(0, this.defMorale - 3);
+                this.atkMorale = Math.min(120, this.atkMorale + 3);
+                this.log(`部隊の壊滅により、守備軍の士気が下がり、攻撃軍の士気が上がった！`);
+            }
         }
         if (attacker.soldiers <= 0) {
             this.log(`${attacker.name}隊が壊滅した！`);
             this.units = this.units.filter(u => u.id !== attacker.id);
+            
+            // ★追加: 反撃などで攻撃側が壊滅した場合も同じように処理します
+            if (attacker.isAttacker) {
+                this.atkMorale = Math.max(0, this.atkMorale - 3);
+                this.defMorale = Math.min(120, this.defMorale + 3);
+                this.log(`部隊の壊滅により、攻撃軍の士気が下がり、守備軍の士気が上がった！`);
+            } else {
+                this.defMorale = Math.max(0, this.defMorale - 3);
+                this.atkMorale = Math.min(120, this.atkMorale + 3);
+                this.log(`部隊の壊滅により、守備軍の士気が下がり、攻撃軍の士気が上がった！`);
+            }
         }
         
         attacker.hasActionDone = true;
