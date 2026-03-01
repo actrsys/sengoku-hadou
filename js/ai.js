@@ -385,13 +385,7 @@ class AIEngine {
             if (emptyCastles.length > 0) {
                 actions.push({ type: 'move', stat: 'leadership', score: 300, cost: 0, targetId: emptyCastles[0].id });
             }
-
-            // 10. 武将の移動
-            const emptyCastles = this.game.castles.filter(c => c.ownerClan === castle.ownerClan && c.id !== castle.id && c.samuraiIds.length <= 1);
-            if (emptyCastles.length > 0) {
-                actions.push({ type: 'move', stat: 'leadership', score: 300, cost: 0, targetId: emptyCastles[0].id });
-            }
-
+            
             // ★追加 11. 登用（浪人がいる場合、超低確率）
             const ronins = this.game.getCastleBushos(castle.id).filter(b => b.status === 'ronin');
             if (ronins.length > 0) {
