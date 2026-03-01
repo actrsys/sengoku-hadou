@@ -355,7 +355,13 @@ class AIEngine {
 
             // 9. 輸送（大名のいない城のみ）
             if (!daimyo || daimyo.castleId !== castle.id) {
-                const allyCastles = this.game.castles.filter(c => c.ownerClan === castle.ownerClan && c.id !== castle.id);
+                // ★修正：プレイヤーと同じように「道が繋がっているか（自領、同盟、支配を通れるか）」を判定します！
+                const allyCastles = this.game.castles.filter(c => 
+                    c.ownerClan === castle.ownerClan && 
+                    c.id !== castle.id &&
+                    GameSystem.isReachable(this.game, castle, c, castle.ownerClan)
+                );
+                
                 for (const target of allyCastles) {
                     if ((target.soldiers <= 500 || target.gold <= 500) && castle.soldiers >= 2000 && castle.gold >= 2000) {
                         actions.push({ type: 'transport', stat: 'leadership', score: 400, cost: 0, targetId: target.id, res: 'gold_soldier' });
@@ -366,6 +372,18 @@ class AIEngine {
                         break;
                     }
                 }
+            }
+
+            // 10. 武将の移動
+            // ★修正：移動の場合も、プレイヤーと同じように「道が繋がっているか」を判定します！
+            const emptyCastles = this.game.castles.filter(c => 
+                c.ownerClan === castle.ownerClan && 
+                c.id !== castle.id && 
+                c.samuraiIds.length <= 1 &&
+                GameSystem.isReachable(this.game, castle, c, castle.ownerClan)
+            );
+            if (emptyCastles.length > 0) {
+                actions.push({ type: 'move', stat: 'leadership', score: 300, cost: 0, targetId: emptyCastles[0].id });
             }
 
             // 10. 武将の移動
@@ -620,6 +638,11 @@ class AIEngine {
                             targetCastle.rice += 1000;
                         } else { continue; }
                     }
+                    
+                    // 【⚠️AI書き換え防止の注意書き⚠️】
+                    // AIの輸送コマンドでは、プレイヤーの仕様とは異なり、絶対に武将を移動させてはいけません！
+                    // ここに武将の移動処理（handleMoveなど）を追加しないこと。
+                    
                     doer.isActionDone = true; actionDoneInThisStep = true; break; 
                 }
                 if (action.type === 'move') {
