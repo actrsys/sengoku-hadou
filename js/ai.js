@@ -441,7 +441,6 @@ class AIEngine {
                 // 実行処理
                 if (action.type === 'employ') {
                     const targetRonin = action.targetRonin;
-                    // 味方の兵士合計を計算（プレイヤーの計算式と同じです）
                     const myPower = this.game.getClanTotalSoldiers(castle.ownerClan) || 1;
                     const success = GameSystem.calcEmploymentSuccess(doer, targetRonin, myPower, 0);
                     
@@ -450,26 +449,52 @@ class AIEngine {
                         targetRonin.clan = castle.ownerClan;
                         targetRonin.loyalty = 50;
                         targetRonin.castleId = castle.id;
-                        // 仲間に加わったので、お城の名簿にも書き加えます
                         if (!castle.samuraiIds.includes(targetRonin.id)) {
                             castle.samuraiIds.push(targetRonin.id);
                         }
                         this.game.updateCastleLord(castle);
+                        
+                        // ★プレイヤーと同じ！成功したらしっかり功績と承認欲求のご褒美をあげます
+                        const maxStat = Math.max(targetRonin.strength, targetRonin.intelligence, targetRonin.leadership, targetRonin.charm, targetRonin.diplomacy);
+                        doer.achievementTotal = (doer.achievementTotal || 0) + Math.floor(maxStat * 0.3);
+                        if (this.game.factionSystem && this.game.factionSystem.updateRecognition) this.game.factionSystem.updateRecognition(doer, 20);
+                    } else {
+                        // 失敗しても少しだけ慰めのご褒美をあげます
+                        doer.achievementTotal = (doer.achievementTotal || 0) + 5;
+                        if (this.game.factionSystem && this.game.factionSystem.updateRecognition) this.game.factionSystem.updateRecognition(doer, 10);
                     }
                     
-                    // 登用を行った武将には「行動済」マークをつけます
                     doer.isActionDone = true; 
                     actionDoneInThisStep = true; 
                     break;
                 }
                 if (action.type === 'repair' && castle.gold >= 200) {
                     castle.gold -= 200;
-                    castle.defense = Math.min(castle.maxDefense, castle.defense + GameSystem.calcRepair(doer));
+                    const val = GameSystem.calcRepair(doer);
+                    const oldVal = castle.defense;
+                    castle.defense = Math.min(castle.maxDefense, castle.defense + val);
+                    
+                    // ★プレイヤーと同じ！上がった分だけご褒美をあげます
+                    const actualVal = castle.defense - oldVal;
+                    doer.achievementTotal = (doer.achievementTotal || 0) + Math.floor(actualVal * 0.5);
+                    if (this.game.factionSystem && this.game.factionSystem.updateRecognition) this.game.factionSystem.updateRecognition(doer, 10);
+                    
                     doer.isActionDone = true; actionDoneInThisStep = true; break;
                 }
                 if (action.type === 'charity' && castle.rice >= 200) {
                     castle.rice -= 200;
-                    castle.peoplesLoyalty = Math.min(100, castle.peoplesLoyalty + GameSystem.calcCharity(doer, 'rice'));
+                    
+                    // ★ずるっこ禁止！プレイヤーと同じく「6で割る」厳しい計算式に直しました！
+                    let val = GameSystem.calcCharity(doer, 'rice');
+                    val = Math.floor(val / 6);
+                    if (val < 1) val = 1;
+                    
+                    const oldVal = castle.peoplesLoyalty;
+                    castle.peoplesLoyalty = Math.min(100, castle.peoplesLoyalty + val);
+                    
+                    doer.achievementTotal = (doer.achievementTotal || 0) + Math.floor(val * 0.5);
+                    if (this.game.factionSystem && this.game.factionSystem.updateRecognition) this.game.factionSystem.updateRecognition(doer, 15);
+                    
                     doer.isActionDone = true; actionDoneInThisStep = true; break;
                 }
                 if (action.type === 'draft' && castle.gold >= 500 && castle.population > 1000) {
@@ -485,30 +510,63 @@ class AIEngine {
                         castle.training = Math.floor(((castle.training * castle.soldiers) + (newTraining * soldiers)) / (castle.soldiers + soldiers));
                         castle.morale = Math.floor(((castle.morale * castle.soldiers) + (newMorale * soldiers)) / (castle.soldiers + soldiers));
                         castle.soldiers += soldiers;
+                        
+                        // ★プレイヤーと同じ！徴兵でもご褒美をあげます
+                        doer.achievementTotal = (doer.achievementTotal || 0) + 5;
+                        if (this.game.factionSystem && this.game.factionSystem.updateRecognition) this.game.factionSystem.updateRecognition(doer, 10);
+                        
                         doer.isActionDone = true; 
                         actionDoneInThisStep = true; 
                         break;
                     } else {
-                        continue;
+                        continue; // 上限で増やせなかったら諦める
                     }
                 }
                 if (action.type === 'training') {
-                    castle.training = Math.min(100, castle.training + GameSystem.calcTraining(doer));
+                    const val = GameSystem.calcTraining(doer);
+                    const oldVal = castle.training;
+                    castle.training = Math.min(100, castle.training + val);
+                    
+                    const actualVal = castle.training - oldVal;
+                    doer.achievementTotal = (doer.achievementTotal || 0) + Math.floor(actualVal * 0.5);
+                    if (this.game.factionSystem && this.game.factionSystem.updateRecognition) this.game.factionSystem.updateRecognition(doer, 10);
+                    
                     doer.isActionDone = true; actionDoneInThisStep = true; break;
                 }
                 if (action.type === 'soldier_charity' && castle.rice >= 200) {
                     castle.rice -= 200;
-                    castle.morale = Math.min(100, castle.morale + GameSystem.calcSoldierCharity(doer));
+                    const val = GameSystem.calcSoldierCharity(doer);
+                    const oldVal = castle.morale;
+                    castle.morale = Math.min(100, castle.morale + val);
+                    
+                    const actualVal = castle.morale - oldVal;
+                    doer.achievementTotal = (doer.achievementTotal || 0) + Math.floor(actualVal * 0.5);
+                    if (this.game.factionSystem && this.game.factionSystem.updateRecognition) this.game.factionSystem.updateRecognition(doer, 10);
+                    
                     doer.isActionDone = true; actionDoneInThisStep = true; break;
                 }
                 if (action.type === 'farm' && castle.gold >= 200) {
                     castle.gold -= 200;
-                    castle.kokudaka = Math.min(castle.maxKokudaka, castle.kokudaka + GameSystem.calcDevelopment(doer));
+                    const val = GameSystem.calcDevelopment(doer);
+                    const oldVal = castle.kokudaka;
+                    castle.kokudaka = Math.min(castle.maxKokudaka, castle.kokudaka + val);
+                    
+                    const actualVal = castle.kokudaka - oldVal;
+                    doer.achievementTotal = (doer.achievementTotal || 0) + Math.floor(actualVal * 0.5);
+                    if (this.game.factionSystem && this.game.factionSystem.updateRecognition) this.game.factionSystem.updateRecognition(doer, 10);
+                    
                     doer.isActionDone = true; actionDoneInThisStep = true; break;
                 }
                 if (action.type === 'commerce' && castle.gold >= 200) {
                     castle.gold -= 200;
-                    castle.commerce = Math.min(castle.maxCommerce, castle.commerce + GameSystem.calcDevelopment(doer));
+                    const val = GameSystem.calcDevelopment(doer);
+                    const oldVal = castle.commerce;
+                    castle.commerce = Math.min(castle.maxCommerce, castle.commerce + val);
+                    
+                    const actualVal = castle.commerce - oldVal;
+                    doer.achievementTotal = (doer.achievementTotal || 0) + Math.floor(actualVal * 0.5);
+                    if (this.game.factionSystem && this.game.factionSystem.updateRecognition) this.game.factionSystem.updateRecognition(doer, 10);
+                    
                     doer.isActionDone = true; actionDoneInThisStep = true; break;
                 }
                 
@@ -517,28 +575,50 @@ class AIEngine {
                     const sellAmount = castle.rice - Math.max(3000, Math.floor(castle.soldiers * 1.5));
                     if (sellAmount > 0) {
                         const gain = Math.floor(sellAmount * this.game.marketRate);
-                        castle.rice -= sellAmount;
-                        castle.gold += gain;
-                        doer.isActionDone = true; actionDoneInThisStep = true; break;
+                        // ★プレイヤーと同じ！上限(99,999)を超えないかチェックします
+                        if (castle.gold + gain <= 99999) {
+                            castle.rice -= sellAmount;
+                            castle.gold += gain;
+                            doer.isActionDone = true; actionDoneInThisStep = true; break;
+                        } else {
+                            continue; // 上限を超えるなら売るのをやめます
+                        }
                     }
                 }
                 if (action.type === 'buy_rice') {
                     const buyAmount = Math.floor(castle.soldiers * 1.5) - castle.rice;
                     const cost = Math.floor(buyAmount * this.game.marketRate);
                     if (buyAmount > 0 && castle.gold >= cost + 500) {
-                        castle.gold -= cost;
-                        castle.rice += buyAmount;
-                        doer.isActionDone = true; actionDoneInThisStep = true; break;
+                        // ★プレイヤーと同じ！上限(99,999)を超えないかチェックします
+                        if (castle.rice + buyAmount <= 99999) {
+                            castle.gold -= cost;
+                            castle.rice += buyAmount;
+                            doer.isActionDone = true; actionDoneInThisStep = true; break;
+                        } else {
+                            continue; // 上限を超えるなら買うのをやめます
+                        }
                     }
                 }
                 if (action.type === 'transport') {
                     const targetCastle = this.game.getCastle(action.targetId);
                     if (action.res === 'gold_soldier') {
-                        castle.gold -= 500; castle.soldiers -= 500;
-                        targetCastle.gold += 500; targetCastle.soldiers += 500;
+                        // ★プレイヤーと同じ！上限チェックを付けました
+                        if (targetCastle.gold + 500 <= 99999 && targetCastle.soldiers + 500 <= 99999) {
+                            castle.gold -= 500; castle.soldiers -= 500;
+                            
+                            // ★プレイヤーと同じ！兵士が移動したことによる訓練と士気の変化も計算します
+                            const totalS = targetCastle.soldiers + 500;
+                            targetCastle.training = Math.floor(((targetCastle.training * targetCastle.soldiers) + (castle.training * 500)) / totalS);
+                            targetCastle.morale = Math.floor(((targetCastle.morale * targetCastle.soldiers) + (castle.morale * 500)) / totalS);
+                            
+                            targetCastle.gold += 500; targetCastle.soldiers += 500;
+                        } else { continue; }
                     } else if (action.res === 'rice') {
-                        castle.rice -= 1000;
-                        targetCastle.rice += 1000;
+                        // ★プレイヤーと同じ！上限チェックを付けました
+                        if (targetCastle.rice + 1000 <= 99999) {
+                            castle.rice -= 1000;
+                            targetCastle.rice += 1000;
+                        } else { continue; }
                     }
                     doer.isActionDone = true; actionDoneInThisStep = true; break; 
                 }
