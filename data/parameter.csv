@@ -30,13 +30,13 @@ Military.DraftStatBonus,1.1,徴兵時の能力補正最大倍率。上げると�
 Military.DraftPopBonusFactor,0.00001,徴兵時の人口ボーナス係数。人口1万人あたり0.5人換算。上げると人口の多い豊かな城での徴兵数が激増する
 Military.DraftFluctuation,0.15,徴兵数の変動幅。上げると集まる兵数にランダム性が増す
 Military.BaseTraining,1,訓練の基礎値。上げると低能力武将でも訓練可能、下げると「統率」「武力」依存度が増す
-Military.TrainingLdrEffect,0.06,訓練時の統率影響。上げると「統率」が高い武将の訓練効率が上がる
-Military.TrainingStrEffect,0.03,訓練時の武力影響。上げると「武力」が高い武将の訓練効率が上がる
+Military.TrainingLdrEffect,0.04,訓練時の統率影響。上げると「統率」が高い武将の訓練効率が上がる
+Military.TrainingStrEffect,0.02,訓練時の武力影響。上げると「武力」が高い武将の訓練効率が上がる
 Military.TrainingFluctuation,0.2,訓練効果の変動幅。上げると訓練上昇値がバラつく
 Military.MaxTraining,100,訓練度の最大値。上げると部隊の防御力がより強化される
 Military.BaseMorale,0,士気上げ基礎値。上げると誰でも士気を上げやすい、下げると能力依存度が増す
-Military.MoraleLdrEffect,0.06,士気上げ時の統率影響。上げると「統率」が高い武将の効果増
-Military.MoraleCharmEffect,0.03,士気上げ時の魅力影響。上げると「魅力」が高い武将の効果増
+Military.MoraleLdrEffect,0.04,士気上げ時の統率影響。上げると「統率」が高い武将の効果増
+Military.MoraleCharmEffect,0.02,士気上げ時の魅力影響。上げると「魅力」が高い武将の効果増
 Military.MoraleFluctuation,0.2,士気上げ変動幅。上げると士気上昇値がバラつく
 Military.MaxMorale,100,士気の最大値。上げると部隊の攻撃力がより強化される
 Military.WarMaxRounds,10,攻城戦の最大ラウンド数。上げると決着がつくまで戦う泥沼化傾向、下げると引き分けが増え守備側有利に
