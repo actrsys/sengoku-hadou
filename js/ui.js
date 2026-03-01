@@ -1014,13 +1014,10 @@ class UIManager {
         const sc = document.getElementById('map-scroll-container');
         const isPC = document.body.classList.contains('is-pc'); 
 
-        // アニメーション中は次のズームを無視して、ガタガタするのを防ぎます
-        if (this.isAnimatingZoom && !isPC) return;
-
         let oldScale = this.mapScale;
         let targetScale = oldScale;
 
-        // ★設定で作った3段階のサイズを読み込みます
+        // ★さっき作った3段階のサイズを読み込みます
         const scales = this.zoomStages; 
 
         // 今の大きさが3段階のうちどれに一番近いかを探します
@@ -1031,106 +1028,78 @@ class UIManager {
             if (diff < minDiff) { minDiff = diff; closestIdx = i; }
         });
 
-        // ホイールを回した方向（direction）に合わせて、次の段階を決めます
+        // 回した方向に合わせて、次の段階を決めます
         let nextIdx = closestIdx + direction;
         if (nextIdx < 0) nextIdx = 0;
         if (nextIdx >= scales.length) nextIdx = scales.length - 1;
 
         targetScale = scales[nextIdx];
-        this.zoomLevel = nextIdx; // 今のズームレベルを記憶しておきます
+        this.zoomLevel = nextIdx;
 
         // 既に最大（または最小）の時に、同じ方向に回しても何もしない
         if (Math.abs(targetScale - oldScale) < 0.01) return;
 
-        if (sc && cx !== null && cy !== null) {
-            this.isAnimatingZoom = true;
-            sc.style.overflow = 'hidden'; // アニメーション中の念のためのガタつき防止
-            
-            const rect = sc.getBoundingClientRect();
-            const relX = cx - rect.left;
-            const relY = cy - rect.top;
-
-            const mapW = this.mapEl.offsetWidth;
-            const mapH = this.mapEl.offsetHeight;
-            const scW = sc.clientWidth - 40; 
-            const scH = sc.clientHeight - 40;
-
-            const getMargin = (scale) => {
-                let mX = -(mapW - mapW * scale) / 2;
-                let mY = -(mapH - mapH * scale) / 2;
-                if (mapW * scale < scW) mX += (scW - mapW * scale) / 2;
-                if (mapH * scale < scH) mY += (scH - mapH * scale) / 2;
-                return { x: mX, y: mY };
-            };
-
-            const getActualPos = (scale) => {
-                const padding = 20; 
-                let left = padding;
-                let top = padding;
-                if (mapW * scale < scW) left += (scW - mapW * scale) / 2;
-                if (mapH * scale < scH) top += (scH - mapH * scale) / 2;
-                return { x: left, y: top };
-            };
-
-            const oldPos = getActualPos(oldScale);
-
-            const trueMapX = (sc.scrollLeft + relX - oldPos.x) / oldScale;
-            const trueMapY = (sc.scrollTop + relY - oldPos.y) / oldScale;
-
-            const targetPos = getActualPos(targetScale);
-            const targetMargin = getMargin(targetScale);
-            const startMargin = getMargin(oldScale);
-            
-            const startScrollLeft = sc.scrollLeft;
-            const startScrollTop = sc.scrollTop;
-            
-            let targetScrollLeft = (trueMapX * targetScale) + targetPos.x - relX;
-            let targetScrollTop = (trueMapY * targetScale) + targetPos.y - relY;
-
-            if (targetScrollLeft < 0) targetScrollLeft = 0;
-            if (targetScrollTop < 0) targetScrollTop = 0;
-            
-            if (mapW * targetScale <= scW) targetScrollLeft = 0;
-            if (mapH * targetScale <= scH) targetScrollTop = 0;
-
-            // アニメーションの速さをスマホと同じ（150）に揃えます
-            const duration = 150; 
-            const startTime = performance.now();
-
-            const animate = (currentTime) => {
-                const elapsed = currentTime - startTime;
-                let progress = elapsed / duration;
-                if (progress > 1) progress = 1;
-                
-                const easeOut = 1 - Math.pow(1 - progress, 3);
-                
-                const currentScale = oldScale + (targetScale - oldScale) * easeOut;
-                this.mapScale = currentScale;
-                this.mapEl.style.transform = `scale(${currentScale})`;
-                
-                const currentMarginX = startMargin.x + (targetMargin.x - startMargin.x) * easeOut;
-                const currentMarginY = startMargin.y + (targetMargin.y - startMargin.y) * easeOut;
-                this.mapEl.style.margin = `${currentMarginY}px ${currentMarginX}px`;
-                
-                sc.scrollLeft = startScrollLeft + (targetScrollLeft - startScrollLeft) * easeOut;
-                sc.scrollTop = startScrollTop + (targetScrollTop - startScrollTop) * easeOut;
-
-                if (progress < 1) {
-                    requestAnimationFrame(animate);
-                } else {
-                    sc.style.overflow = 'auto'; // アニメーションが終わったら元に戻す
-                    this.applyMapScale(); 
-                    if (this.updateZoomButtons) this.updateZoomButtons();
-                    this.isAnimatingZoom = false;
-                }
-            };
-            requestAnimationFrame(animate);
-        } else {
+        // ==========================================
+        // ★ パソコン版：CSSの魔法で「ぬるっと」させる！
+        // ==========================================
+        if (isPC) {
             this.mapScale = targetScale;
-            this.applyMapScale();
-            if (this.updateZoomButtons) this.updateZoomButtons();
-            this.isAnimatingZoom = false;
+            
+            // ★ここが超重要！ブラウザ（CSS）に「0.25秒かけて滑らかに変化してね」とお願いします
+            this.mapEl.style.transition = 'transform 0.25s cubic-bezier(0.2, 0.8, 0.2, 1), margin 0.25s cubic-bezier(0.2, 0.8, 0.2, 1)';
+            
+            if (sc && cx !== null && cy !== null) {
+                // マウスがある場所を中心にズームするための計算です
+                const rect = sc.getBoundingClientRect();
+                const mouseX = cx - rect.left;
+                const mouseY = cy - rect.top;
+                
+                const realMapX = (sc.scrollLeft + mouseX) / oldScale;
+                const realMapY = (sc.scrollTop + mouseY) / oldScale;
+                
+                this.applyMapScale(); 
+                
+                // ズーム後も、マウスの位置がズレないようにスクロールバーを調整します
+                sc.scrollLeft = (realMapX * targetScale) - mouseX;
+                sc.scrollTop = (realMapY * targetScale) - mouseY;
+            } else {
+                this.applyMapScale();
+            }
+            
+            this.updateZoomButtons();
+            
+            // アニメーションが終わる頃に、CSSの魔法を解きます（ドラッグ操作の邪魔にならないようにするため）
+            setTimeout(() => {
+                if (this.mapEl) this.mapEl.style.transition = '';
+            }, 250);
+            
+            return; // PC版はこれでおしまい！
         }
+
+        // ==========================================
+        // ★ スマホ版：指にピタッと吸い付くように「即時反映」！
+        // ==========================================
+        // スマホは2本指でウネウネ動かすので、アニメーションさせると指の動きから遅れて気持ち悪くなります。
+        // なので、アニメーション無しで一瞬でサイズを変えます！
+        this.mapScale = targetScale;
+        
+        if (sc && cx !== null && cy !== null) {
+            const rect = sc.getBoundingClientRect();
+            const mouseX = cx - rect.left;
+            const mouseY = cy - rect.top;
+            
+            const realMapX = (sc.scrollLeft + mouseX) / oldScale;
+            const realMapY = (sc.scrollTop + mouseY) / oldScale;
+            
+            this.applyMapScale(); 
+            
+            sc.scrollLeft = (realMapX * targetScale) - mouseX;
+            sc.scrollTop = (realMapY * targetScale) - mouseY;
+        } else {
+            this.applyMapScale();
+        }
+        
+        this.updateZoomButtons();
     }
 
     updateZoomButtons() {
