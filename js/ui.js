@@ -1045,6 +1045,8 @@ class UIManager {
         // ==========================================
         if (isPC && sc && cx !== null && cy !== null) {
             this.isAnimatingZoom = true;
+            
+            // ★アニメーション中のスクロールバーのカクつきを防ぐため、一時的に隠します
             sc.style.overflow = 'hidden'; 
             
             const rect = sc.getBoundingClientRect();
@@ -1075,28 +1077,11 @@ class UIManager {
                 return { x: offsetX, y: offsetY };
             };
 
+            // 今のマウス位置がマップ上のどこにあたるか（基準サイズでの座標）を記憶
             const oldOffset = getMapOffset(oldScale);
             const realX = (sc.scrollLeft + mouseX - oldOffset.x) / oldScale;
             const realY = (sc.scrollTop + mouseY - oldOffset.y) / oldScale;
 
-            const targetOffset = getMapOffset(targetScale);
-            const targetCanvasX = realX * targetScale + targetOffset.x;
-            const targetCanvasY = realY * targetScale + targetOffset.y;
-
-            let targetScrollLeft = targetCanvasX - mouseX;
-            let targetScrollTop = targetCanvasY - mouseY;
-
-            if (targetScrollLeft < 0) targetScrollLeft = 0;
-            if (targetScrollTop < 0) targetScrollTop = 0;
-            if (mapW * targetScale <= scW) targetScrollLeft = 0;
-            if (mapH * targetScale <= scH) targetScrollTop = 0;
-
-            // アニメーションの準備
-            const startScrollLeft = sc.scrollLeft;
-            const startScrollTop = sc.scrollTop;
-            const startMargin = getMapMargin(oldScale);
-            const targetMargin = getMapMargin(targetScale);
-            
             const duration = 200; 
             const startTime = performance.now();
 
@@ -1104,25 +1089,41 @@ class UIManager {
                 let progress = (currentTime - startTime) / duration;
                 if (progress > 1) progress = 1;
                 
+                // ぬるっとさせるためのカーブ
                 const easeOut = 1 - Math.pow(1 - progress, 3);
                 
-                // ★毎フレーム定規で測る（applyMapScaleを呼ぶ）のをやめて、計算済みの数値を素早く当てはめます！
+                // ★スケール（大きさ）だけをアニメーションで進めます
                 const currentScale = oldScale + (targetScale - oldScale) * easeOut;
+                
                 this.mapScale = currentScale;
                 this.mapEl.style.transform = `scale(${currentScale})`;
                 
-                const currentMarginX = startMargin.x + (targetMargin.x - startMargin.x) * easeOut;
-                const currentMarginY = startMargin.y + (targetMargin.y - startMargin.y) * easeOut;
-                this.mapEl.style.margin = `${currentMarginY}px ${currentMarginX}px`;
+                // ★「その瞬間の大きさ」に合わせて、余白を計算し直します
+                const currentMargin = getMapMargin(currentScale);
+                this.mapEl.style.margin = `${currentMargin.y}px ${currentMargin.x}px`;
                 
-                sc.scrollLeft = startScrollLeft + (targetScrollLeft - startScrollLeft) * easeOut;
-                sc.scrollTop = startScrollTop + (targetScrollTop - startScrollTop) * easeOut;
+                // ★「その瞬間の大きさ」に合わせて、マウスがズレないスクロール位置を完璧に計算し直します
+                const currentOffset = getMapOffset(currentScale);
+                const currentCanvasX = realX * currentScale + currentOffset.x;
+                const currentCanvasY = realY * currentScale + currentOffset.y;
+                
+                let currentScrollLeft = currentCanvasX - mouseX;
+                let currentScrollTop = currentCanvasY - mouseY;
+                
+                // 画面の端っこにぶつかった時の処理
+                if (currentScrollLeft < 0) currentScrollLeft = 0;
+                if (currentScrollTop < 0) currentScrollTop = 0;
+                if (mapW * currentScale <= scW) currentScrollLeft = 0;
+                if (mapH * currentScale <= scH) currentScrollTop = 0;
+
+                sc.scrollLeft = currentScrollLeft;
+                sc.scrollTop = currentScrollTop;
 
                 if (progress < 1) {
                     requestAnimationFrame(animate); 
                 } else {
                     sc.style.overflow = 'auto'; 
-                    this.applyMapScale(); // 全部終わった後に、1回だけ綺麗に整える
+                    this.applyMapScale(); // 最後に1回だけ綺麗に整える
                     this.updateZoomButtons();
                     this.isAnimatingZoom = false;
                 }
