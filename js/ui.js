@@ -4,6 +4,20 @@
  * 修正：野戦用の兵科（騎馬・鉄砲）を指定するためのUIと兵力分配画面のロジックを追加
  */
 
+// ★ マップのズーム設定を1箇所で管理する箱
+const MAP_ZOOM_CONFIG = {
+    PC: {
+        minMargin: 0.95, // PCの最小サイズの時の余白（1.0でピッタリ）
+        mid: 1.5,        // PCの中間サイズ
+        max: 2.5         // PCの最大サイズ
+    },
+    MOBILE: {
+        minMargin: 0.85, // スマホの最小サイズの時の余白
+        mid: 1.0,        // スマホの中間サイズ
+        max: 2.0         // スマホの最大サイズ
+    }
+};
+
 class UIManager {
     constructor(game) {
         this.game = game; this.currentCastle = null; this.menuState = 'MAIN';
@@ -931,29 +945,21 @@ class UIManager {
         const scaleX = wrapper.clientWidth / mapW;
         const scaleY = wrapper.clientHeight / mapH;
         
-        // ★変更1：余白を少し戻して（ズームを少し大きくして）画面にピッタリ合わせます
-        let minScale = Math.min(scaleX, scaleY); 
-        if (document.body.classList.contains('is-pc')) {
-            minScale *= 0.95; // ★ここの数字を「0.90」から「0.98」に差し替えました！
-        } else {
-            minScale *= 0.82; // スマホは小さくしすぎたので、見切れないギリギリのサイズに調整します！
-        }
-        
-        // ★変更2：最大サイズを計算します（スマホは1.0、PCはウィンドウサイズに合わせて現在の2倍くらいに！）
-        let maxScale = 1.0;
-        if (document.body.classList.contains('is-pc')) {
-            // PCのウィンドウ幅に合わせて、大体2.0倍くらいになるように計算します
-            maxScale = Math.max(1.5, wrapper.clientWidth / 600); 
-            if (maxScale > 2.5) maxScale = 2.5; // 大きくなりすぎないためのストッパー
-        }
+        // ★パソコンかスマホかを判断して、使う設定を選びます
+        const isPC = document.body.classList.contains('is-pc');
+        const config = isPC ? MAP_ZOOM_CONFIG.PC : MAP_ZOOM_CONFIG.MOBILE;
 
+        // ★最小サイズは「全体が収まるサイズ」を計算して、設定の余白分をかけます
+        let minScale = Math.min(scaleX, scaleY) * config.minMargin; 
+
+        // ★設定からMIN（計算値）、MID、MAXの3段階を用意します
         this.zoomStages = [
-            minScale,              
-            (minScale + maxScale) / 2,  
-            maxScale                    
+            minScale,      
+            config.mid,    
+            config.max     
         ];
         
-        // ★変更3：大名選択の時は、最初から一番引いた状態（最小ズーム）でスタート！
+        // ★大名選択の時は、最初から一番引いた状態（最小ズーム）でスタート！
         if (this.game.phase === 'daimyo_select') {
             this.zoomLevel = 0; 
         } else {
@@ -1014,35 +1020,24 @@ class UIManager {
         let oldScale = this.mapScale;
         let targetScale = oldScale;
 
-        // ==========================================
-        // ★ここを今のゲームの設定に合わせてください！
-        // ==========================================
-        // ★変更：PCの時だけ画面に合わせたサイズにして、スマホは元の数字(0.5)にします！
-        const MIN_SCALE = isPC && this.zoomStages ? this.zoomStages[0] : 0.5; 
-        // ★変更：PCの時だけ画面に合わせたサイズにして、スマホは元の数字(2.0)にします！
-        const MAX_SCALE = isPC && this.zoomStages ? this.zoomStages[2] : 2.0; 
+        // ★設定で作った3段階のサイズを読み込みます
+        const scales = this.zoomStages; 
 
-        if (isPC) {
-            // 【PCの場合】 ホイールを回すと、最大か最小へ一気にジャンプ！
-            if (direction > 0) {
-                targetScale = MAX_SCALE; // 上に回す（拡大）→ 最大へ！
-            } else {
-                targetScale = MIN_SCALE; // 下に回す（縮小）→ 最小へ！
-            }
-        } else {
-            // 【スマホの場合】 今まで通り完璧な3段階！
-            const scales = [MIN_SCALE, 1.0, MAX_SCALE]; 
-            let closestIdx = 0;
-            let minDiff = Infinity;
-            scales.forEach((s, i) => {
-                let diff = Math.abs(s - oldScale);
-                if (diff < minDiff) { minDiff = diff; closestIdx = i; }
-            });
-            let nextIdx = closestIdx + direction;
-            if (nextIdx < 0) nextIdx = 0;
-            if (nextIdx >= scales.length) nextIdx = scales.length - 1;
-            targetScale = scales[nextIdx];
-        }
+        // 今の大きさが3段階のうちどれに一番近いかを探します
+        let closestIdx = 0;
+        let minDiff = Infinity;
+        scales.forEach((s, i) => {
+            let diff = Math.abs(s - oldScale);
+            if (diff < minDiff) { minDiff = diff; closestIdx = i; }
+        });
+
+        // ホイールを回した方向（direction）に合わせて、次の段階を決めます
+        let nextIdx = closestIdx + direction;
+        if (nextIdx < 0) nextIdx = 0;
+        if (nextIdx >= scales.length) nextIdx = scales.length - 1;
+
+        targetScale = scales[nextIdx];
+        this.zoomLevel = nextIdx; // 今のズームレベルを記憶しておきます
 
         // 既に最大（または最小）の時に、同じ方向に回しても何もしない
         if (Math.abs(targetScale - oldScale) < 0.01) return;
