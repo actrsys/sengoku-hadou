@@ -1085,8 +1085,15 @@ class UIManager {
             let targetScrollLeft = targetCanvasX - mouseX;
             let targetScrollTop = targetCanvasY - mouseY;
 
+            // ★ ここが原因でした！「限界までスクロールした時」の最大値を計算してストッパーをかけます！
+            let maxScrollLeft = Math.max(0, mapW * targetScale - scW);
+            let maxScrollTop  = Math.max(0, mapH * targetScale - scH);
+
             if (targetScrollLeft < 0) targetScrollLeft = 0;
             if (targetScrollTop < 0) targetScrollTop = 0;
+            if (targetScrollLeft > maxScrollLeft) targetScrollLeft = maxScrollLeft;
+            if (targetScrollTop > maxScrollTop) targetScrollTop = maxScrollTop;
+
             if (mapW * targetScale <= scW) targetScrollLeft = 0;
             if (mapH * targetScale <= scH) targetScrollTop = 0;
 
@@ -1168,8 +1175,23 @@ class UIManager {
             const targetCanvasX = realX * targetScale + targetOffset.x;
             const targetCanvasY = realY * targetScale + targetOffset.y;
             
-            sc.scrollLeft = targetCanvasX - mouseX;
-            sc.scrollTop = targetCanvasY - mouseY;
+            let targetScrollLeft = targetCanvasX - mouseX;
+            let targetScrollTop = targetCanvasY - mouseY;
+
+            // ★ スマホ版にも限界値ストッパーを追加します！
+            let maxScrollLeft = Math.max(0, mapW * targetScale - scW);
+            let maxScrollTop  = Math.max(0, mapH * targetScale - scH);
+
+            if (targetScrollLeft < 0) targetScrollLeft = 0;
+            if (targetScrollTop < 0) targetScrollTop = 0;
+            if (targetScrollLeft > maxScrollLeft) targetScrollLeft = maxScrollLeft;
+            if (targetScrollTop > maxScrollTop) targetScrollTop = maxScrollTop;
+
+            if (mapW * targetScale <= scW) targetScrollLeft = 0;
+            if (mapH * targetScale <= scH) targetScrollTop = 0;
+
+            sc.scrollLeft = targetScrollLeft;
+            sc.scrollTop = targetScrollTop;
         } else {
             this.applyMapScale();
         }
