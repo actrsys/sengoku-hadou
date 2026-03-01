@@ -1040,6 +1040,10 @@ class UIManager {
         // 既に最大（または最小）の時に、同じ方向に回しても何もしない
         if (Math.abs(targetScale - oldScale) < 0.01) return;
 
+        // ★ここが新しい魔法！画面全体にかかっている「黒帯用のズーム（縮尺率）」を取得します
+        const gameScreen = document.getElementById('game-screen');
+        const globalZoom = (gameScreen && gameScreen.style.zoom) ? parseFloat(gameScreen.style.zoom) : 1;
+
         // ==========================================
         // ★ パソコン版：GPUパワーで完璧に「ぬるっと」させる究極魔法！
         // ==========================================
@@ -1048,8 +1052,10 @@ class UIManager {
             sc.style.overflow = 'hidden'; // アニメーション中の壁の衝突判定をオフにします
             
             const rect = sc.getBoundingClientRect();
-            const mouseX = cx - rect.left;
-            const mouseY = cy - rect.top;
+            
+            // ★画面の縮尺（globalZoom）で割り算して、マウスの「本当の座標」を計算します！
+            const mouseX = (cx - rect.left) / globalZoom;
+            const mouseY = (cy - rect.top) / globalZoom;
 
             const mapW = this.mapEl.offsetWidth;
             const mapH = this.mapEl.offsetHeight;
@@ -1085,7 +1091,6 @@ class UIManager {
             let targetScrollLeft = targetCanvasX - mouseX;
             let targetScrollTop = targetCanvasY - mouseY;
 
-            // ★ ここが原因でした！「限界までスクロールした時」の最大値を計算してストッパーをかけます！
             let maxScrollLeft = Math.max(0, mapW * targetScale - scW);
             let maxScrollTop  = Math.max(0, mapH * targetScale - scH);
 
@@ -1112,7 +1117,6 @@ class UIManager {
                 const easeOut = 1 - Math.pow(1 - progress, 3);
                 const currentScale = oldScale + (targetScale - oldScale) * easeOut;
                 
-                // ★余白やスクロールは一切いじらず、「本来あるべき見かけの位置」だけを計算します
                 const currentMarginX = startMargin.x + (targetMargin.x - startMargin.x) * easeOut;
                 const currentMarginY = startMargin.y + (targetMargin.y - startMargin.y) * easeOut;
                 const currentScrollLeft = startScrollLeft + (targetScrollLeft - startScrollLeft) * easeOut;
@@ -1121,13 +1125,11 @@ class UIManager {
                 const deltaX = (currentMarginX - startMargin.x) - (currentScrollLeft - startScrollLeft);
                 const deltaY = (currentMarginY - startMargin.y) - (currentScrollTop - startScrollTop);
                 
-                // ★CSSのtransformだけでGPUにアニメーションを任せます（これが絶対にカクつかない秘密！）
                 this.mapEl.style.transform = `translate(${deltaX}px, ${deltaY}px) scale(${currentScale})`;
 
                 if (progress < 1) {
                     requestAnimationFrame(animate); 
                 } else {
-                    // アニメーションが終わった瞬間に、1回だけ本当のレイアウトを反映させます
                     this.mapScale = targetScale;
                     this.applyMapScale(); 
                     sc.scrollLeft = targetScrollLeft;
@@ -1149,8 +1151,10 @@ class UIManager {
         
         if (sc && cx !== null && cy !== null) {
             const rect = sc.getBoundingClientRect();
-            const mouseX = cx - rect.left;
-            const mouseY = cy - rect.top;
+            
+            // ★こちらにも縮尺（globalZoom）の割り算を追加します！
+            const mouseX = (cx - rect.left) / globalZoom;
+            const mouseY = (cy - rect.top) / globalZoom;
             
             const mapW = this.mapEl.offsetWidth;
             const mapH = this.mapEl.offsetHeight;
@@ -1178,7 +1182,6 @@ class UIManager {
             let targetScrollLeft = targetCanvasX - mouseX;
             let targetScrollTop = targetCanvasY - mouseY;
 
-            // ★ スマホ版にも限界値ストッパーを追加します！
             let maxScrollLeft = Math.max(0, mapW * targetScale - scW);
             let maxScrollTop  = Math.max(0, mapH * targetScale - scH);
 
