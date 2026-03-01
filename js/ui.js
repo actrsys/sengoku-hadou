@@ -13,7 +13,7 @@ const MAP_ZOOM_CONFIG = {
     },
     MOBILE: {
         minMargin: 0.85, // スマホの最小サイズの時の余白
-        mid: 0.2,        // スマホの中間サイズ
+        mid: 0.4,        // スマホの中間サイズ
         max: 0.8         // スマホの最大サイズ
     }
 };
