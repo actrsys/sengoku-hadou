@@ -1041,19 +1041,16 @@ class UIManager {
         if (Math.abs(targetScale - oldScale) < 0.01) return;
 
         // ==========================================
-        // ★ パソコン版：重い処理を省いて「ぬるっと」させる！
+        // ★ パソコン版：GPUパワーで完璧に「ぬるっと」させる究極魔法！
         // ==========================================
         if (isPC && sc && cx !== null && cy !== null) {
             this.isAnimatingZoom = true;
-            
-            // ★アニメーション中のスクロールバーのカクつきを防ぐため、一時的に隠します
-            sc.style.overflow = 'hidden'; 
+            sc.style.overflow = 'hidden'; // アニメーション中の壁の衝突判定をオフにします
             
             const rect = sc.getBoundingClientRect();
             const mouseX = cx - rect.left;
             const mouseY = cy - rect.top;
 
-            // ★アニメーションの前に、あらかじめ「1回だけ」サイズを測っておきます！
             const mapW = this.mapEl.offsetWidth;
             const mapH = this.mapEl.offsetHeight;
             const scW = sc.clientWidth - 40; 
@@ -1077,11 +1074,27 @@ class UIManager {
                 return { x: offsetX, y: offsetY };
             };
 
-            // 今のマウス位置がマップ上のどこにあたるか（基準サイズでの座標）を記憶
             const oldOffset = getMapOffset(oldScale);
             const realX = (sc.scrollLeft + mouseX - oldOffset.x) / oldScale;
             const realY = (sc.scrollTop + mouseY - oldOffset.y) / oldScale;
 
+            const targetOffset = getMapOffset(targetScale);
+            const targetCanvasX = realX * targetScale + targetOffset.x;
+            const targetCanvasY = realY * targetScale + targetOffset.y;
+
+            let targetScrollLeft = targetCanvasX - mouseX;
+            let targetScrollTop = targetCanvasY - mouseY;
+
+            if (targetScrollLeft < 0) targetScrollLeft = 0;
+            if (targetScrollTop < 0) targetScrollTop = 0;
+            if (mapW * targetScale <= scW) targetScrollLeft = 0;
+            if (mapH * targetScale <= scH) targetScrollTop = 0;
+
+            const startScrollLeft = sc.scrollLeft;
+            const startScrollTop = sc.scrollTop;
+            const startMargin = getMapMargin(oldScale);
+            const targetMargin = getMapMargin(targetScale);
+            
             const duration = 200; 
             const startTime = performance.now();
 
@@ -1089,41 +1102,31 @@ class UIManager {
                 let progress = (currentTime - startTime) / duration;
                 if (progress > 1) progress = 1;
                 
-                // ぬるっとさせるためのカーブ
                 const easeOut = 1 - Math.pow(1 - progress, 3);
-                
-                // ★スケール（大きさ）だけをアニメーションで進めます
                 const currentScale = oldScale + (targetScale - oldScale) * easeOut;
                 
-                this.mapScale = currentScale;
-                this.mapEl.style.transform = `scale(${currentScale})`;
+                // ★余白やスクロールは一切いじらず、「本来あるべき見かけの位置」だけを計算します
+                const currentMarginX = startMargin.x + (targetMargin.x - startMargin.x) * easeOut;
+                const currentMarginY = startMargin.y + (targetMargin.y - startMargin.y) * easeOut;
+                const currentScrollLeft = startScrollLeft + (targetScrollLeft - startScrollLeft) * easeOut;
+                const currentScrollTop = startScrollTop + (targetScrollTop - startScrollTop) * easeOut;
                 
-                // ★「その瞬間の大きさ」に合わせて、余白を計算し直します
-                const currentMargin = getMapMargin(currentScale);
-                this.mapEl.style.margin = `${currentMargin.y}px ${currentMargin.x}px`;
+                const deltaX = (currentMarginX - startMargin.x) - (currentScrollLeft - startScrollLeft);
+                const deltaY = (currentMarginY - startMargin.y) - (currentScrollTop - startScrollTop);
                 
-                // ★「その瞬間の大きさ」に合わせて、マウスがズレないスクロール位置を完璧に計算し直します
-                const currentOffset = getMapOffset(currentScale);
-                const currentCanvasX = realX * currentScale + currentOffset.x;
-                const currentCanvasY = realY * currentScale + currentOffset.y;
-                
-                let currentScrollLeft = currentCanvasX - mouseX;
-                let currentScrollTop = currentCanvasY - mouseY;
-                
-                // 画面の端っこにぶつかった時の処理
-                if (currentScrollLeft < 0) currentScrollLeft = 0;
-                if (currentScrollTop < 0) currentScrollTop = 0;
-                if (mapW * currentScale <= scW) currentScrollLeft = 0;
-                if (mapH * currentScale <= scH) currentScrollTop = 0;
-
-                sc.scrollLeft = currentScrollLeft;
-                sc.scrollTop = currentScrollTop;
+                // ★CSSのtransformだけでGPUにアニメーションを任せます（これが絶対にカクつかない秘密！）
+                this.mapEl.style.transform = `translate(${deltaX}px, ${deltaY}px) scale(${currentScale})`;
 
                 if (progress < 1) {
                     requestAnimationFrame(animate); 
                 } else {
+                    // アニメーションが終わった瞬間に、1回だけ本当のレイアウトを反映させます
+                    this.mapScale = targetScale;
+                    this.applyMapScale(); 
+                    sc.scrollLeft = targetScrollLeft;
+                    sc.scrollTop = targetScrollTop;
+                    
                     sc.style.overflow = 'auto'; 
-                    this.applyMapScale(); // 最後に1回だけ綺麗に整える
                     this.updateZoomButtons();
                     this.isAnimatingZoom = false;
                 }
