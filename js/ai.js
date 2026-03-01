@@ -246,6 +246,10 @@ class AIEngine {
         // 武将の人数より多くは行動できません
         maxActions = Math.min(maxActions, availableBushos.length);
 
+        // ★追加：NPCが賢すぎるのを防ぐため、ランダムで「0回」「1回」「2回」のどれかだけ行動回数を減らします
+        const reduceActions = Math.floor(Math.random() * 3); // 0, 1, 2のどれかを作る魔法です
+        maxActions = Math.max(1, maxActions - reduceActions); // 減らしても、最低1回は必ず行動させます
+
         if (maxActions <= 0) return;
 
         // 城主の性格による好みの計算（相対値で最大±20%のブレ）
@@ -298,7 +302,7 @@ class AIEngine {
                 const keepSoldiers = (castellan.leadership + daimyo.leadership) * 50;
 
                 if (enemyMaxSoldiers > mySoldiers) {
-                    scoreDraft = ((enemyMaxSoldiers / mySoldiers) * 50); // 負けている割合で点数アップ
+                    scoreDraft = ((enemyMaxSoldiers / mySoldiers) * 15); // 負けている割合で点数アップ
                 } else if (castle.soldiers < keepSoldiers) {
                     // ★変更：お隣より少なくなくても、キープしたい数より少なければ「低確率（低い点数）」で徴兵を考えます
                     scoreDraft = 15; // 15点にすることで、他の行動より優先度は低いけれど、たまに選ばれるようになります
