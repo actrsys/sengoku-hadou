@@ -1173,48 +1173,6 @@ class UIManager {
         this.updateZoomButtons();
     }
 
-        // ==========================================
-        // ★ スマホ版（またはマウス位置が取れなかった時）：一瞬でズーム
-        // ==========================================
-        this.mapScale = targetScale;
-        
-        if (sc && cx !== null && cy !== null) {
-            const rect = sc.getBoundingClientRect();
-            const mouseX = cx - rect.left;
-            const mouseY = cy - rect.top;
-            
-            const mapW = this.mapEl.offsetWidth;
-            const mapH = this.mapEl.offsetHeight;
-            const scW = sc.clientWidth - 40; 
-            const scH = sc.clientHeight - 40;
-            
-            const getMapOffset = (scale) => {
-                let offsetX = 20;
-                let offsetY = 20;
-                if (mapW * scale < scW) offsetX += (scW - mapW * scale) / 2;
-                if (mapH * scale < scH) offsetY += (scH - mapH * scale) / 2;
-                return { x: offsetX, y: offsetY };
-            };
-            
-            const oldOffset = getMapOffset(oldScale);
-            const realX = (sc.scrollLeft + mouseX - oldOffset.x) / oldScale;
-            const realY = (sc.scrollTop + mouseY - oldOffset.y) / oldScale;
-            
-            this.applyMapScale(); 
-            
-            const targetOffset = getMapOffset(targetScale);
-            const targetCanvasX = realX * targetScale + targetOffset.x;
-            const targetCanvasY = realY * targetScale + targetOffset.y;
-            
-            sc.scrollLeft = targetCanvasX - mouseX;
-            sc.scrollTop = targetCanvasY - mouseY;
-        } else {
-            this.applyMapScale();
-        }
-        
-        this.updateZoomButtons();
-    }
-
     updateZoomButtons() {
         if (!this.mapZoomInBtn || !this.mapZoomOutBtn) return;
         
