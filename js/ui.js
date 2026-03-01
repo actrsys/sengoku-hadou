@@ -1041,24 +1041,32 @@ class UIManager {
         if (Math.abs(targetScale - oldScale) < 0.01) return;
 
         // ==========================================
-        // ★ パソコン版：JSの魔法で完璧に計算して「ぬるっと」させる！
+        // ★ パソコン版：重い処理を省いて「ぬるっと」させる！
         // ==========================================
         if (isPC && sc && cx !== null && cy !== null) {
             this.isAnimatingZoom = true;
-            sc.style.overflow = 'hidden'; // アニメーション中のガタつき防止
+            sc.style.overflow = 'hidden'; 
             
-            // マウスの位置を取得
             const rect = sc.getBoundingClientRect();
             const mouseX = cx - rect.left;
             const mouseY = cy - rect.top;
 
-            // マップの元のサイズと、表示エリアのサイズ
+            // ★アニメーションの前に、あらかじめ「1回だけ」サイズを測っておきます！
             const mapW = this.mapEl.offsetWidth;
             const mapH = this.mapEl.offsetHeight;
             const scW = sc.clientWidth - 40; 
             const scH = sc.clientHeight - 40;
 
-            // スケールに応じた、マップ左上までの距離を計算する魔法の数式！
+            const getMapMargin = (scale) => {
+                const diffX = (mapW - mapW * scale) / 2;
+                const diffY = (mapH - mapH * scale) / 2;
+                let marginX = -diffX;
+                let marginY = -diffY;
+                if (mapW * scale < scW) marginX += (scW - mapW * scale) / 2;
+                if (mapH * scale < scH) marginY += (scH - mapH * scale) / 2;
+                return { x: marginX, y: marginY };
+            };
+
             const getMapOffset = (scale) => {
                 let offsetX = 20;
                 let offsetY = 20;
@@ -1067,21 +1075,17 @@ class UIManager {
                 return { x: offsetX, y: offsetY };
             };
 
-            // 今のマウス位置が、マップ上のどの位置（scale=1の時の座標）か計算
             const oldOffset = getMapOffset(oldScale);
             const realX = (sc.scrollLeft + mouseX - oldOffset.x) / oldScale;
             const realY = (sc.scrollTop + mouseY - oldOffset.y) / oldScale;
 
-            // 目標のスケールになった時、その位置が画面のどこに来るか計算
             const targetOffset = getMapOffset(targetScale);
             const targetCanvasX = realX * targetScale + targetOffset.x;
             const targetCanvasY = realY * targetScale + targetOffset.y;
 
-            // マウスの位置がズレないようにするための目標スクロール位置
             let targetScrollLeft = targetCanvasX - mouseX;
             let targetScrollTop = targetCanvasY - mouseY;
 
-            // スクロール位置の限界（マイナスにならないように）
             if (targetScrollLeft < 0) targetScrollLeft = 0;
             if (targetScrollTop < 0) targetScrollTop = 0;
             if (mapW * targetScale <= scW) targetScrollLeft = 0;
@@ -1090,39 +1094,84 @@ class UIManager {
             // アニメーションの準備
             const startScrollLeft = sc.scrollLeft;
             const startScrollTop = sc.scrollTop;
+            const startMargin = getMapMargin(oldScale);
+            const targetMargin = getMapMargin(targetScale);
             
-            const duration = 200; // アニメーションの長さ（0.2秒）
+            const duration = 200; 
             const startTime = performance.now();
 
             const animate = (currentTime) => {
                 let progress = (currentTime - startTime) / duration;
                 if (progress > 1) progress = 1;
                 
-                // ぬるっと動かすための計算（ease-out）
                 const easeOut = 1 - Math.pow(1 - progress, 3);
                 
-                // 今の瞬間のスケールを計算して適用
+                // ★毎フレーム定規で測る（applyMapScaleを呼ぶ）のをやめて、計算済みの数値を素早く当てはめます！
                 const currentScale = oldScale + (targetScale - oldScale) * easeOut;
                 this.mapScale = currentScale;
-                this.applyMapScale(); 
+                this.mapEl.style.transform = `scale(${currentScale})`;
                 
-                // 今の瞬間のスクロール位置を適用
+                const currentMarginX = startMargin.x + (targetMargin.x - startMargin.x) * easeOut;
+                const currentMarginY = startMargin.y + (targetMargin.y - startMargin.y) * easeOut;
+                this.mapEl.style.margin = `${currentMarginY}px ${currentMarginX}px`;
+                
                 sc.scrollLeft = startScrollLeft + (targetScrollLeft - startScrollLeft) * easeOut;
                 sc.scrollTop = startScrollTop + (targetScrollTop - startScrollTop) * easeOut;
 
                 if (progress < 1) {
-                    requestAnimationFrame(animate); // まだ終わってなければ次へ
+                    requestAnimationFrame(animate); 
                 } else {
-                    // アニメーション完了！
                     sc.style.overflow = 'auto'; 
-                    this.applyMapScale(); 
+                    this.applyMapScale(); // 全部終わった後に、1回だけ綺麗に整える
                     this.updateZoomButtons();
                     this.isAnimatingZoom = false;
                 }
             };
-            requestAnimationFrame(animate); // アニメーション開始！
+            requestAnimationFrame(animate); 
             return;
         }
+
+        // ==========================================
+        // ★ スマホ版（またはマウス位置が取れなかった時）：一瞬でズーム
+        // ==========================================
+        this.mapScale = targetScale;
+        
+        if (sc && cx !== null && cy !== null) {
+            const rect = sc.getBoundingClientRect();
+            const mouseX = cx - rect.left;
+            const mouseY = cy - rect.top;
+            
+            const mapW = this.mapEl.offsetWidth;
+            const mapH = this.mapEl.offsetHeight;
+            const scW = sc.clientWidth - 40; 
+            const scH = sc.clientHeight - 40;
+            
+            const getMapOffset = (scale) => {
+                let offsetX = 20;
+                let offsetY = 20;
+                if (mapW * scale < scW) offsetX += (scW - mapW * scale) / 2;
+                if (mapH * scale < scH) offsetY += (scH - mapH * scale) / 2;
+                return { x: offsetX, y: offsetY };
+            };
+            
+            const oldOffset = getMapOffset(oldScale);
+            const realX = (sc.scrollLeft + mouseX - oldOffset.x) / oldScale;
+            const realY = (sc.scrollTop + mouseY - oldOffset.y) / oldScale;
+            
+            this.applyMapScale(); 
+            
+            const targetOffset = getMapOffset(targetScale);
+            const targetCanvasX = realX * targetScale + targetOffset.x;
+            const targetCanvasY = realY * targetScale + targetOffset.y;
+            
+            sc.scrollLeft = targetCanvasX - mouseX;
+            sc.scrollTop = targetCanvasY - mouseY;
+        } else {
+            this.applyMapScale();
+        }
+        
+        this.updateZoomButtons();
+    }
 
         // ==========================================
         // ★ スマホ版（またはマウス位置が取れなかった時）：一瞬でズーム
