@@ -267,7 +267,6 @@ class AIEngine {
             availableBushos = this.game.getCastleBushos(castle.id).filter(b => 
                 !b.isActionDone && b.status !== 'ronin' && b.belongKunishuId === 0
             );
-            if (availableBushos.length === 0) break; // もう誰もいなければ終了です
 
             // --- 候補となる行動の点数（スコア）をつける表を作ります ---
             let actions = [];
@@ -285,11 +284,10 @@ class AIEngine {
                 let score = 0;
                 if (castle.peoplesLoyalty <= 70) score = 500; // 結構優先！
                 else score = (100 - castle.peoplesLoyalty) * 2;
-                actions.push({ type: 'charity', stat: 'charm', score: score, cost: 200 }); // ※お米200
+                actions.push({ type: 'charity', stat: 'charm', score: score, cost: 200 }); 
             }
 
             // 3. 徴兵（お隣の敵と比べて、自分が少ないほど焦る、または最低限の備え）
-            // ★追加：ただし、兵士の数が兵糧の半分以上いる時は、徴兵を我慢します！
             if (castle.population > 1000 && castle.soldiers < castle.rice / 2) {
                 let scoreDraft = 0;
                 let mySoldiers = Math.max(1, castle.soldiers);
@@ -298,32 +296,29 @@ class AIEngine {
                     if (n.soldiers > enemyMaxSoldiers) enemyMaxSoldiers = n.soldiers;
                 });
                 
-                // ★追加：城主と大名の統率から「最低限キープしたい兵士数」を計算します
                 const keepSoldiers = (castellan.leadership + daimyo.leadership) * 50;
 
                 if (enemyMaxSoldiers > mySoldiers) {
-                    scoreDraft = ((enemyMaxSoldiers / mySoldiers) * 15); // 負けている割合で点数アップ
+                    scoreDraft = ((enemyMaxSoldiers / mySoldiers) * 10); 
                 } else if (castle.soldiers < keepSoldiers) {
-                    // ★変更：お隣より少なくなくても、キープしたい数より少なければ「低確率（低い点数）」で徴兵を考えます
-                    scoreDraft = 15; // 15点にすることで、他の行動より優先度は低いけれど、たまに選ばれるようになります
+                    scoreDraft = 15; 
                 }
 
-                // 点数が0より大きい時だけ、お仕事の候補に入れます
                 if (scoreDraft > 0) {
-                    actions.push({ type: 'draft', stat: 'leadership', score: scoreDraft, cost: 500 }); // 金500
+                    actions.push({ type: 'draft', stat: 'leadership', score: scoreDraft, cost: 500 }); 
                 }
             }
 
             // 4. 訓練
             if (castle.training < 100) {
                 let score = (100 - castle.training) * 0.5;
-                actions.push({ type: 'training', stat: 'leadership', score: score, cost: 0 }); // コストは仮で0(本来は不要)
+                actions.push({ type: 'training', stat: 'leadership', score: score, cost: 0 }); 
             }
 
             // 5. 兵施し（士気）
             if (castle.morale < 100) {
                 let score = (100 - castle.morale) * 0.5;
-                actions.push({ type: 'soldier_charity', stat: 'leadership', score: score, cost: 200 }); // ※お米200
+                actions.push({ type: 'soldier_charity', stat: 'leadership', score: score, cost: 200 }); 
             }
 
             // 6. 石高開発
@@ -339,12 +334,11 @@ class AIEngine {
             // --- 性格による点数の調整 ---
             actions.forEach(a => {
                 if (isConservative && ['farm', 'commerce', 'repair', 'charity'].includes(a.type)) {
-                    a.score *= 1.2; // 守りや内政が好きなら20%アップ
+                    a.score *= 1.2; 
                 }
                 if (isAggressive && ['draft', 'training', 'soldier_charity'].includes(a.type)) {
-                    a.score *= 1.2; // 攻めや軍備が好きなら20%アップ
+                    a.score *= 1.2; 
                 }
-                // 少しだけランダムな揺らぎを入れます
                 a.score *= (0.9 + Math.random() * 0.2);
             });
 
@@ -352,11 +346,11 @@ class AIEngine {
             if (castle.gold < 500 && castle.rice > 3000) {
                 const targetRice = Math.max(3000, Math.floor(castle.soldiers * 1.5));
                 if (castle.rice > targetRice) {
-                    actions.push({ type: 'sell_rice', stat: 'politics', score: 800, cost: 0 }); // お金がない時は高優先
+                    actions.push({ type: 'sell_rice', stat: 'politics', score: 800, cost: 0 }); 
                 }
             }
             if (castle.rice <= castle.soldiers * 1) {
-                actions.push({ type: 'buy_rice', stat: 'politics', score: 800, cost: 0 }); // ご飯がない時も高優先
+                actions.push({ type: 'buy_rice', stat: 'politics', score: 800, cost: 0 }); 
             }
 
             // 9. 輸送（大名のいない城のみ）
@@ -365,7 +359,7 @@ class AIEngine {
                 for (const target of allyCastles) {
                     if ((target.soldiers <= 500 || target.gold <= 500) && castle.soldiers >= 2000 && castle.gold >= 2000) {
                         actions.push({ type: 'transport', stat: 'leadership', score: 400, cost: 0, targetId: target.id, res: 'gold_soldier' });
-                        break; // 1ターンに1回見つかればOK
+                        break; 
                     }
                     if (target.rice <= 2000 && castle.rice >= 5000) {
                         actions.push({ type: 'transport', stat: 'leadership', score: 400, cost: 0, targetId: target.id, res: 'rice' });
@@ -380,6 +374,23 @@ class AIEngine {
                 actions.push({ type: 'move', stat: 'leadership', score: 300, cost: 0, targetId: emptyCastles[0].id });
             }
 
+            // ★追加 11. 登用（浪人がいる場合、超低確率）
+            const ronins = this.game.getCastleBushos(castle.id).filter(b => b.status === 'ronin');
+            if (ronins.length > 0) {
+                // 雀の涙ほどの優先度（5点）にしてあります
+                actions.push({ type: 'employ', stat: 'charm', score: 5, cost: 0, targetRonin: ronins[0] });
+            }
+
+            // ★追加 12. 褒美（承認欲求がたまっている武将がいる場合）
+            // プログラム内で承認欲求や不満を表す「achievementTotal」や「recognition」が30を超えている人を探します
+            let rewardTargets = this.game.getCastleBushos(castle.id).filter(b => 
+                b.status !== 'ronin' && b.belongKunishuId === 0 && 
+                ((b.achievementTotal || 0) > 30 || (b.recognition || 0) > 30)
+            );
+            if (rewardTargets.length > 0 && castle.gold >= 200) {
+                // 優先度は低め（15点）にしてあります
+                actions.push({ type: 'reward', stat: 'none', score: 15, cost: 200, targets: rewardTargets });
+            }
 
             // 点数が高い順に並べ替えます
             actions.sort((a, b) => b.score - a.score);
@@ -388,7 +399,39 @@ class AIEngine {
 
             // 一番点数が高い行動から順番に「できるかどうか」試していきます
             for (let action of actions) {
-                if (action.score < 10) continue;
+                if (action.score < 5) continue; // ★変更：登用の5点も拾えるように、足切りラインを10から5に下げました！
+
+                // ★追加：褒美は「実行する武将（doer）」を必要としない特別な行動です！
+                if (action.type === 'reward') {
+                    // 承認欲求が一番高い人を1人選びます
+                    action.targets.sort((a, b) => {
+                        const aVal = Math.max(a.achievementTotal || 0, a.recognition || 0);
+                        const bVal = Math.max(b.achievementTotal || 0, b.recognition || 0);
+                        return bVal - aVal; // 高い順に並び替え
+                    });
+                    const targetBusho = action.targets[0];
+                    
+                    if (castle.gold >= 200) {
+                        castle.gold -= 200;
+                        // 褒美の効果をプレイヤーと同じように計算します
+                        const effect = GameSystem.calcRewardEffect(200, daimyo, targetBusho);
+                        if (this.game.factionSystem && this.game.factionSystem.updateRecognition) {
+                            this.game.factionSystem.updateRecognition(targetBusho, -effect * 2 - 5);
+                        }
+                        if (targetBusho.achievementTotal !== undefined) {
+                            // 念のためこちらの数値も下げておきます
+                            targetBusho.achievementTotal = Math.max(0, targetBusho.achievementTotal - 30);
+                        }
+                        
+                        // ★あや瀨さんのお約束通り、誰の「行動済」マークもつけません！
+                        actionDoneInThisStep = true; 
+                        break; 
+                    }
+                    continue; // もしお金が足りなかったら、この行動は諦めて次を探します
+                }
+
+                // --- これより下は、実行する武将（doer）が必要な行動です ---
+                if (availableBushos.length === 0) continue; // 動ける武将がいなければパスします
 
                 // その行動に一番向いている武将を探します（能力値40以上が条件）
                 const bestBushos = availableBushos.filter(b => b[action.stat] >= 40).sort((a, b) => b[action.stat] - a[action.stat]);
@@ -396,6 +439,29 @@ class AIEngine {
                 const doer = bestBushos[0];
 
                 // 実行処理
+                if (action.type === 'employ') {
+                    const targetRonin = action.targetRonin;
+                    // 味方の兵士合計を計算（プレイヤーの計算式と同じです）
+                    const myPower = this.game.getClanTotalSoldiers(castle.ownerClan) || 1;
+                    const success = GameSystem.calcEmploymentSuccess(doer, targetRonin, myPower, 0);
+                    
+                    if (success) {
+                        targetRonin.status = 'active';
+                        targetRonin.clan = castle.ownerClan;
+                        targetRonin.loyalty = 50;
+                        targetRonin.castleId = castle.id;
+                        // 仲間に加わったので、お城の名簿にも書き加えます
+                        if (!castle.samuraiIds.includes(targetRonin.id)) {
+                            castle.samuraiIds.push(targetRonin.id);
+                        }
+                        this.game.updateCastleLord(castle);
+                    }
+                    
+                    // 登用を行った武将には「行動済」マークをつけます
+                    doer.isActionDone = true; 
+                    actionDoneInThisStep = true; 
+                    break;
+                }
                 if (action.type === 'repair' && castle.gold >= 200) {
                     castle.gold -= 200;
                     castle.defense = Math.min(castle.maxDefense, castle.defense + GameSystem.calcRepair(doer));
@@ -407,32 +473,22 @@ class AIEngine {
                     doer.isActionDone = true; actionDoneInThisStep = true; break;
                 }
                 if (action.type === 'draft' && castle.gold >= 500 && castle.population > 1000) {
-                    // ① プレイヤーと同じ計算式で兵士の数を出し、最後に「10で割る」をします！
                     let soldiers = GameSystem.calcDraftFromGold(500, doer, castle.population);
                     soldiers = Math.floor(soldiers / 10);
-
-                    // ② 上限(99,999)を超えないようにストッパーをかけます
                     if (castle.soldiers + soldiers > 99999) {
                         soldiers = 99999 - castle.soldiers;
                     }
-
                     if (soldiers > 0) {
                         castle.gold -= 500;
-
-                        // ③ プレイヤーと同じように、新兵が入ることで訓練と士気が少し下がる計算をします
                         const newMorale = Math.max(0, castle.morale - 10);
                         const newTraining = Math.max(0, castle.training - 10);
                         castle.training = Math.floor(((castle.training * castle.soldiers) + (newTraining * soldiers)) / (castle.soldiers + soldiers));
                         castle.morale = Math.floor(((castle.morale * castle.soldiers) + (newMorale * soldiers)) / (castle.soldiers + soldiers));
-
-                        // 兵士を増やします（AIだけ人口が減る謎の処理も、不公平なので消しました！）
                         castle.soldiers += soldiers;
-
                         doer.isActionDone = true; 
                         actionDoneInThisStep = true; 
                         break;
                     } else {
-                        // もし上限いっぱいで兵士が増やせなかったら、この行動は諦めて次を探します
                         continue;
                     }
                 }
@@ -469,7 +525,7 @@ class AIEngine {
                 if (action.type === 'buy_rice') {
                     const buyAmount = Math.floor(castle.soldiers * 1.5) - castle.rice;
                     const cost = Math.floor(buyAmount * this.game.marketRate);
-                    if (buyAmount > 0 && castle.gold >= cost + 500) { // 最低500金は残すように買う
+                    if (buyAmount > 0 && castle.gold >= cost + 500) {
                         castle.gold -= cost;
                         castle.rice += buyAmount;
                         doer.isActionDone = true; actionDoneInThisStep = true; break;
@@ -484,18 +540,13 @@ class AIEngine {
                         castle.rice -= 1000;
                         targetCastle.rice += 1000;
                     }
-                    doer.isActionDone = true; actionDoneInThisStep = true; break; // 武将は移動しない
+                    doer.isActionDone = true; actionDoneInThisStep = true; break; 
                 }
                 if (action.type === 'move') {
-                    // 誰を送るか選ぶ（城主以外）
                     let moveCandidates = availableBushos.filter(b => b.id !== castle.castellanId);
                     let mover = null;
-                    
-                    // 派閥の主を優先
                     const factionLeader = moveCandidates.find(b => b.isFactionLeader);
                     if (factionLeader) mover = factionLeader;
-                    
-                    // 城主と相性が悪い人を優先
                     if (!mover) {
                         for (let b of moveCandidates) {
                             if (GameSystem.calcAffinityDiff(castellan.affinity, b.affinity) >= 20) {
@@ -503,17 +554,12 @@ class AIEngine {
                             }
                         }
                     }
-                    
-                    // 条件に合う人がいれば移動
                     if (mover) {
                         const targetCastle = this.game.getCastle(action.targetId);
-                        
-                        // ★追加：送ったあとの人数を計算して、元のお城が少なくなっちゃうならストップ！
-                        const sourceCountAfter = castle.samuraiIds.length - 1;       // 送ったあとの元のお城の人数
-                        const targetCountAfter = targetCastle.samuraiIds.length + 1; // 送ったあとの先のお城の人数
+                        const sourceCountAfter = castle.samuraiIds.length - 1;       
+                        const targetCountAfter = targetCastle.samuraiIds.length + 1; 
                         
                         if (sourceCountAfter < targetCountAfter) {
-                            // 移動すると人数が逆転して少なくなる場合は、移動を諦めて別の行動を考えます
                             continue;
                         }
 
