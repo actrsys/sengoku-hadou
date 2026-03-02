@@ -322,7 +322,7 @@ class AIEngine {
                 const keepSoldiers = (castellan.leadership + daimyo.leadership) * 50;
 
                 if (enemyMaxSoldiers > mySoldiers) {
-                    scoreDraft = ((enemyMaxSoldiers * 1.5 / mySoldiers) * 15); 
+                    scoreDraft = ((enemyMaxSoldiers * 1.5 / mySoldiers) * 20); 
                 } else if (castle.soldiers < keepSoldiers) {
                     scoreDraft = 30; 
                 }
