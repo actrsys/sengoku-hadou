@@ -144,9 +144,8 @@ class AIEngine {
         const requiredRice = sendSoldiers * 1.5;
         if (myCastle.rice < requiredRice) return null;
 
-        // --- 修正後：正確な見積もりと「3乗の魔法」による足切り ---
+        // --- 修正後：正確な見積もりと戦力比の計算 ---
 
-        const myForce = sendSoldiers * 1.0; // 自分の力は正しく1.0倍で計算
         const myDaimyo = this.game.bushos.find(b => b.clan === myCastle.ownerClan && b.isDaimyo) || { personality: 'normal' };
 
         let bestTarget = null;
@@ -164,11 +163,11 @@ class AIEngine {
             const pEnemySoldiers = target.soldiers * errorRate;
             const pEnemyDefense = target.defense * errorRate;
 
-            // 城の守りを含めて、敵は「1.5倍」程度の手強さと見積もる
-            const enemyForce = (pEnemySoldiers + pEnemyDefense * 2) * 1.5;
+            // ★修正：敵の強さを「兵士の数 ＋ 城の防御力」で素直に見積もります
+            const enemyForce = pEnemySoldiers + pEnemyDefense;
 
-            // 基準値の比較
-            const forceRatio = myForce / Math.max(1, enemyForce);
+            // ★修正：自分の強さも、お城の全兵士数を使って比べます
+            const forceRatio = myCastle.soldiers / Math.max(1, enemyForce);
             
             let prob = 0;
             if (forceRatio < 0.8) {
