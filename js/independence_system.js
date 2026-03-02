@@ -32,10 +32,9 @@ class IndependenceSystem {
 
         for (const castle of potentialRebels) {
             const castellan = this.game.getBusho(castle.castellanId);
-            const clan = this.game.clans.find(c => c.id === castle.ownerClan);
             const daimyo = this.game.bushos.find(b => b.clan === castle.ownerClan && b.isDaimyo);
             
-            if (!castellan || !clan || !daimyo) continue;
+            if (!castellan || !daimyo) continue;
 
             // 大名と同じ派閥なら独立しない
             if (daimyo.factionId !== 0 && castellan.factionId === daimyo.factionId) {
@@ -115,7 +114,7 @@ class IndependenceSystem {
         // 1. その城にいる部下の去就判定
         const captiveMsgs = this.resolveSubordinates(castle, castellan, oldDaimyo, newClanId, oldClanId);
 
-        // 2. ★追加：他の城から同派閥のメンバーが駆けつける
+        // 2. 遠方の他城から同派閥メンバーが駆けつける
         this.resolveDistantFactionMembers(castellan, oldClanId, newClanId, castle);
 
         this.game.updateCastleLord(castle);
@@ -131,7 +130,7 @@ class IndependenceSystem {
     }
 
     /**
-     * 部下の去就判定 (修正版)
+     * 部下の去就判定 (線形・優先度調整版)
      */
      resolveSubordinates(castle, newDaimyo, oldDaimyo, newClanId, oldClanId) {
         const subordinates = this.game.getCastleBushos(castle.id).filter(b => b.id !== newDaimyo.id && b.status !== 'ronin');
@@ -139,10 +138,7 @@ class IndependenceSystem {
         const escapees = [];
         const joiners = [];
         
-        const I = window.WarParams.Independence || {};
-        // 派閥ボーナスを強化 (30 -> 50)
-        const bonusFactionPriority = 50; 
-        const escapeDuty = I.EscapeDutyThreshold || 30;
+        const bonusFactionPriority = 50; // 同派閥は非常に強力
 
         const escapeCastles = this.game.castles.filter(c => c.ownerClan === oldClanId && c.id !== castle.id);
         const hasEscapeRoute = escapeCastles.length > 0;
@@ -151,21 +147,20 @@ class IndependenceSystem {
             const affNew = GameSystem.calcAffinityDiff(busho.affinity, newDaimyo.affinity);
             const affOld = GameSystem.calcAffinityDiff(busho.affinity, oldDaimyo.affinity);
             
-            // ★相性の重みを1.5倍にアップ
+            // ★最優先：相性（1.5倍の重み）
             let joinScore = (100 - affNew) * 1.5 + (busho.ambition * 0.5);
             let stayScore = (100 - affOld) * 1.5 + (busho.loyalty * 0.5);
 
-            // ★忠誠度が90未満なら、低いほど合流しやすくなる（不満ボーナス）
+            // ★忠誠度：90未満から合流確率が上昇 (1.0倍の重み)
             if (busho.loyalty < 90) {
-                joinScore += (90 - busho.loyalty) * 2;
+                joinScore += (90 - busho.loyalty) * 1.0;
             }
 
-            // ★義理の判定を50基準に
-            const dutyFactor = busho.duty - 50;
-            if (dutyFactor > 0) stayScore += dutyFactor; // 50より高ければ残りたい
-            else joinScore += Math.abs(dutyFactor);      // 50より低ければ裏切りたい
+            // ★義理：50を基準とした線形判定 (1.0倍の重み)
+            // 50より低ければ合流スコアに、高ければ残留スコアに加算されます
+            joinScore += (50 - busho.duty) * 1.0;
 
-            // ★派閥補正（優先度アップ）
+            // ★派閥補正：最優先クラスのボーナス
             const myFaction = busho.getFactionName ? busho.getFactionName() : "";
             if (myFaction && myFaction === (newDaimyo.getFactionName ? newDaimyo.getFactionName() : "")) joinScore += bonusFactionPriority;
             if (myFaction && myFaction === (oldDaimyo.getFactionName ? oldDaimyo.getFactionName() : "")) stayScore += bonusFactionPriority;
@@ -175,7 +170,7 @@ class IndependenceSystem {
                 busho.loyalty = 80;
                 joiners.push(busho);
             } else {
-                if (hasEscapeRoute && busho.duty >= escapeDuty) {
+                if (hasEscapeRoute && busho.duty >= 30) {
                     const escapePower = busho.strength + busho.intelligence;
                     const blockPower = newDaimyo.leadership + newDaimyo.intelligence;
                     
@@ -212,13 +207,11 @@ class IndependenceSystem {
      }
 
     /**
-     * ★新機能：他の城にいる同派閥のメンバーが駆けつける処理
+     * 遠方の同派閥メンバーが駆けつける処理
      */
     resolveDistantFactionMembers(newDaimyo, oldClanId, newClanId, targetCastle) {
-        // 大名が派閥に入っていなければ発生しない
         if (newDaimyo.factionId === 0) return; 
 
-        // 全武将の中から、「前のクランにいて」「別の城にいて」「同じ派閥」の人を探す
         const potentialDefectors = this.game.bushos.filter(b => 
             b.clan === oldClanId && 
             b.castleId !== targetCastle.id && 
@@ -228,24 +221,19 @@ class IndependenceSystem {
 
         const joiners = [];
         potentialDefectors.forEach(busho => {
-            // 駆けつけるかどうかの判定（相性が良くて、今のクランに不満があれば来やすい）
             const affNew = GameSystem.calcAffinityDiff(busho.affinity, newDaimyo.affinity);
             let prob = (100 - affNew) + (busho.ambition * 0.5);
             if (busho.loyalty < 90) prob += (90 - busho.loyalty);
 
-            // 確率判定 (少し厳しめ)
-            if (Math.random() * 250 < prob) {
-                // 元の城から削除
+            if (Math.random() * 300 < prob) { // 駆けつけ確率は少し慎重に
                 const oldCastle = this.game.castles.find(c => c.id === busho.castleId);
                 if (oldCastle) {
                     oldCastle.samuraiIds = oldCastle.samuraiIds.filter(id => id !== busho.id);
                     this.game.updateCastleLord(oldCastle);
                 }
-
-                // 新しい城へ移動
                 busho.clan = newClanId;
                 busho.castleId = targetCastle.id;
-                busho.loyalty = 100; // 志を共にして駆けつけたので忠誠MAX
+                busho.loyalty = 100; 
                 targetCastle.samuraiIds.push(busho.id);
                 joiners.push(busho);
             }
