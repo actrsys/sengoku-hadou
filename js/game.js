@@ -680,11 +680,13 @@ class GameManager {
         
         this.ui.log(`=== ${this.year}年 ${this.month}月 ===`);
         
-        // ★ 追加：月の初めに、登場年を迎えた武将がいないかチェックします！
-        this.lifeSystem.processStartMonth();
+        // ★修正：await を書き足して、元服の処理が終わるまでしっかり待ちます！
+        await this.lifeSystem.processStartMonth();
         
-        this.factionSystem.processStartMonth(); 
-        this.factionSystem.processRoninMovements(); 
+        // ★修正：ここも await を書き足して、武将の下野（出奔）が終わるまで待ちます！
+        await this.factionSystem.processStartMonth(); 
+        
+        this.factionSystem.processRoninMovements();
         
         this.updateAllCastlesLords();
         

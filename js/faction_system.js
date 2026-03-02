@@ -76,7 +76,7 @@ class FactionSystem {
     /**
      * 月初処理: 下野判定と派閥形成
      */
-    processStartMonth() {
+    async processStartMonth() { // ★ async を追加します！
         const F = window.WarParams.Faction || {};
         const roninThreshold = F.RoninLoyaltyThreshold || 30;
         const roninChanceBase = F.RoninChanceBase || 0.5;
@@ -90,18 +90,19 @@ class FactionSystem {
             b.loyalty <= roninThreshold
         );
 
-        roninCandidates.forEach(b => {
+        // ★修正：forEach をやめて、順番待ちができる for...of に変えます！
+        for (const b of roninCandidates) {
             const chance = roninChanceBase - (b.loyalty * 0.01); 
             if (Math.random() < chance) {
-                this.executeRonin(b);
+                await this.executeRonin(b); // ★ await を追加します！
             }
-        });
+        }
 
         // 2. 派閥形成・更新
         this.updateFactions();
     }
 
-    executeRonin(busho) {
+    async executeRonin(busho) { // ★ async を追加します！
         const clan = this.game.clans.find(c => c.id === busho.clan);
         const clanName = clan ? clan.name : "当家";
         
@@ -118,7 +119,7 @@ class FactionSystem {
 
         if (clan && clan.id === this.game.playerClanId) {
             this.game.ui.log(`【出奔】${busho.name}は${clanName}に愛想を尽かし、下野しました。`);
-            this.game.ui.showCutin(`${busho.name} 出奔！`);
+            await this.game.ui.showCutin(`${busho.name} 出奔！`); // ★ await を追加します！
         }
     }
 
