@@ -795,7 +795,7 @@ class WarManager {
 
             score -= (risk * 50 * smartness);
             if (cmd === 'scheme' || cmd === 'fire') score = ((actor.intelligence / 100) * 150) - (50 * smartness); 
-            score += (Math.random() * 200) * (1.0 - smartness);
+            score += (Math.random() * 50) * (1.0 - smartness);
             if (score > bestScore) { bestScore = score; bestCmd = cmd; }
         });
         this.resolveWarAction(bestCmd); 
