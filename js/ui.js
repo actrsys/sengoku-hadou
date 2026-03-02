@@ -2276,7 +2276,6 @@ class UIManager {
                     
                     // 寿命を1年延ばしてあげます
                     busho.endYear = Number(busho.endYear) + 1;
-                    busho.isActionDone = true; // おまけで行動済みにします
                     this.showResultModal(`${busho.name}は快方に向かいました！`);
                     
                     // ★ここを追加：減ったお金の数字を、画面の左側にすぐ反映させます！
