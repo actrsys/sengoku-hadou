@@ -15,13 +15,10 @@ class IndependenceSystem {
         const potentialRebels = this.game.castles.filter(c => {
             if (c.ownerClan === 0) return false; 
             if (!c.castellanId) return false; 
-
             const castellan = this.game.getBusho(c.castellanId);
             if (!castellan || castellan.isDaimyo) return false; 
-
             const clanCastles = this.game.castles.filter(cl => cl.ownerClan === c.ownerClan);
             if (clanCastles.length <= 1) return false;
-
             return true;
         });
 
@@ -33,15 +30,10 @@ class IndependenceSystem {
         for (const castle of potentialRebels) {
             const castellan = this.game.getBusho(castle.castellanId);
             const daimyo = this.game.bushos.find(b => b.clan === castle.ownerClan && b.isDaimyo);
-            
             if (!castellan || !daimyo) continue;
-
-            if (daimyo.factionId !== 0 && castellan.factionId === daimyo.factionId) {
-                continue; 
-            }
+            if (daimyo.factionId !== 0 && castellan.factionId === daimyo.factionId) continue; 
 
             const threshold = thresholdBase + ((50 - castellan.duty) / dutyDiv) + ((castellan.ambition - 50) / ambDiv);
-
             if (castellan.loyalty <= threshold) {
                 await this.calculateAndExecute(castle, castellan, daimyo, threshold);
             }
@@ -49,33 +41,31 @@ class IndependenceSystem {
     }
 
     /**
-     * ★新機能：大名の総合ステータスによる補正値の計算 (200~400の範囲で -20~+20)
+     * 大名の総合ステータスによる補正値の計算 (200~400の範囲で -20~+20)
      */
     calcDaimyoPowerBonus(busho) {
-        // 指定された5つのステータスを合計
         const total = busho.leadership + busho.strength + busho.politics + busho.diplomacy + busho.intelligence;
-        
-        // 300を基準に、上下100の範囲で判定 (200〜400)
         const diff = total - 300;
-        
-        // -100から100の間に収める（200以下は-100、400以上は100になる）
         const clampedDiff = Math.max(-100, Math.min(100, diff));
-        
-        // 線形に最大20ポイントの補正に変換 (100で20点、50で10点)
         return (clampedDiff / 100) * 20;
+    }
+
+    /**
+     * ★新機能：新しい主君への忠誠度を動的に計算する
+     * 元の忠誠が低いほど、新しい体制への期待で忠誠が上がる（最大100）
+     */
+    calcNewLoyalty(oldLoyalty) {
+        const bonus = 100 - oldLoyalty;
+        return Math.min(100, 80 + bonus);
     }
 
     async calculateAndExecute(castle, castellan, daimyo, threshold) {
         const I = window.WarParams.Independence || {};
         const probLoyalty = I.ProbLoyaltyFactor || 2;
         const probAffinity = I.ProbAffinityFactor || 0.5;
-
-        // 大名の能力による補正（能力が高いほど、最初の謀反確率を下げる）
         const daimyoBonus = this.calcDaimyoPowerBonus(daimyo);
-
         const affinityDiff = GameSystem.calcAffinityDiff(castellan.affinity, daimyo.affinity);
         
-        // 確率計算（大名が有能なら prob が減り、無能なら増える）
         let prob = ((threshold - castellan.loyalty) * probLoyalty) + (affinityDiff * probAffinity) - (daimyoBonus * 2);
         
         if (prob <= 0) return;
@@ -87,19 +77,14 @@ class IndependenceSystem {
     async executeRebellion(castle, castellan, oldDaimyo) {
         const oldClanId = castle.ownerClan;
         const I = window.WarParams.Independence || {};
-        
         const newClanId = Math.max(...this.game.clans.map(c => c.id)) + 1;
         const newColor = '#' + Math.floor(Math.random()*16777215).toString(16).padStart(6, '0');
         const familyName = castellan.familyName || castellan.name; 
         const newClanName = `${familyName}家`;
 
         const newClan = new Clan({
-            id: newClanId,
-            name: newClanName,
-            color: newColor,
-            leaderId: castellan.id,
-            rice: I.InitialRice || 1000,
-            gold: I.InitialGold || 1000
+            id: newClanId, name: newClanName, color: newColor, leaderId: castellan.id,
+            rice: I.InitialRice || 1000, gold: I.InitialGold || 1000
         });
         this.game.clans.push(newClan);
 
@@ -126,43 +111,36 @@ class IndependenceSystem {
         await this.game.ui.showDialogAsync(msg, false, 0);
     }
 
-    /**
-     * 去就判定の共通計算ロジック
-     */
     calculateLoyaltyScores(busho, newDaimyo, oldDaimyo) {
         const affNew = GameSystem.calcAffinityDiff(busho.affinity, newDaimyo.affinity);
         const affOld = GameSystem.calcAffinityDiff(busho.affinity, oldDaimyo.affinity);
-        
         let joinScore = (100 - affNew) * 2.0 + (busho.ambition * 0.5);
         let stayScore = (100 - affOld) * 2.0 + (busho.loyalty * 0.5);
 
-        // ★大名の能力補正をスコアに加算
-        joinScore += this.calcDaimyoPowerBonus(newDaimyo); // 新大名が有能なら合流したい
-        stayScore += this.calcDaimyoPowerBonus(oldDaimyo); // 旧大名が有能なら残りたいたい
+        joinScore += this.calcDaimyoPowerBonus(newDaimyo);
+        stayScore += this.calcDaimyoPowerBonus(oldDaimyo);
 
         if (busho.loyalty < 90) joinScore += (90 - busho.loyalty);
         joinScore += (50 - busho.duty) * 0.4;
 
-        const bonusFaction = 50;
         if (busho.factionId !== 0) {
-            if (busho.factionId === newDaimyo.factionId) joinScore += bonusFaction;
-            if (busho.factionId === oldDaimyo.factionId) stayScore += bonusFaction;
+            if (busho.factionId === newDaimyo.factionId) joinScore += 50;
+            if (busho.factionId === oldDaimyo.factionId) stayScore += 50;
         }
-
         return { joinScore, stayScore };
     }
 
     resolveSubordinates(castle, newDaimyo, oldDaimyo, newClanId, oldClanId) {
         const subordinates = this.game.getCastleBushos(castle.id).filter(b => b.id !== newDaimyo.id && b.status !== 'ronin' && b.clan === oldClanId);
-        const captives = [], escapees = [], joiners = [];
+        const captives = [], joiners = [];
         const escapeCastles = this.game.castles.filter(c => c.ownerClan === oldClanId && c.id !== castle.id);
 
         subordinates.forEach(busho => {
             const { joinScore, stayScore } = this.calculateLoyaltyScores(busho, newDaimyo, oldDaimyo);
-
             if (joinScore > stayScore) {
+                const oldLoy = busho.loyalty;
                 busho.clan = newClanId;
-                busho.loyalty = 80;
+                busho.loyalty = this.calcNewLoyalty(oldLoy);
                 joiners.push(busho);
             } else {
                 if (escapeCastles.length > 0 && busho.duty >= 30) {
@@ -170,23 +148,20 @@ class IndependenceSystem {
                         const target = escapeCastles[Math.floor(Math.random() * escapeCastles.length)];
                         castle.samuraiIds = castle.samuraiIds.filter(id => id !== busho.id);
                         target.samuraiIds.push(busho.id);
-                        busho.castleId = target.id;
-                        busho.isCastellan = false;
-                        escapees.push(busho);
+                        busho.castleId = target.id; busho.isCastellan = false;
                         this.game.updateCastleLord(target);
                     } else {
                         castle.samuraiIds = castle.samuraiIds.filter(id => id !== busho.id);
-                        busho.castleId = 0;
-                        captives.push(busho);
+                        busho.castleId = 0; captives.push(busho);
                     }
                 } else {
+                    const oldLoy = busho.loyalty;
                     busho.clan = newClanId;
-                    busho.loyalty = 30;
+                    busho.loyalty = Math.min(40, this.calcNewLoyalty(oldLoy) - 50); // 消極的合流は低めに設定
                     joiners.push(busho);
                 }
             }
         });
-
         if (joiners.length > 0) this.game.ui.log(`  -> ${castle.name}にて${joiners.length}名が追随しました。`);
         return captives.length > 0 ? this.handleCaptives(captives, oldClanId, newClanId, newDaimyo) : [];
     }
@@ -199,9 +174,10 @@ class IndependenceSystem {
                 const { joinScore, stayScore } = this.calculateLoyaltyScores(busho, leader, oldDaimyo);
                 if (joinScore > stayScore) {
                     this.game.ui.log(`  -> 呼応！${castle.name}城主の${busho.name}が${leader.name}に組みしました！`);
+                    const oldLoy = busho.loyalty;
                     castle.ownerClan = newClanId;
                     busho.clan = newClanId;
-                    busho.loyalty = 90;
+                    busho.loyalty = this.calcNewLoyalty(oldLoy);
                     this.resolveSubordinates(castle, leader, oldDaimyo, newClanId, oldClanId);
                     this.game.updateCastleLord(castle);
                 }
@@ -225,7 +201,7 @@ class IndependenceSystem {
                 }
                 busho.clan = newClanId;
                 busho.castleId = mainCastle.id;
-                busho.loyalty = 100; 
+                busho.loyalty = 100; // 駆けつけた場合は特別に100
                 mainCastle.samuraiIds.push(busho.id);
                 this.game.ui.log(`  -> ${busho.name}が城を脱出し、${newDaimyo.name}の元へ駆けつけました！`);
             }
