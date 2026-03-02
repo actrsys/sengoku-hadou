@@ -171,18 +171,21 @@ class AIEngine {
             const forceRatio = myForce / Math.max(1, enemyForce);
             
             let prob = 0;
-            if (forceRatio < 1.2) {
-                // ★足切り魔法：自分の戦力が相手の1.2倍未満なら、絶対に攻撃しない！
+            if (forceRatio < 0.8) {
+                // ★足切り魔法：自分の戦力が相手の0.8倍未満なら、絶対に攻撃しない！
                 prob = -999;
+            } else if (forceRatio >= 3.0) {
+                // 相手の3倍以上の戦力がある時
+                prob = 40 + (forceRatio - 3.0) * 5;
             } else if (forceRatio >= 2.0) {
-                // 相手の2倍以上の戦力がある時
+                // 相手の2倍から3倍までの時
                 prob = 30 + (forceRatio - 2.0) * 10; 
-            } else if (forceRatio >= 1.5) {
-                // 1.5倍から2倍までの時
-                prob = 20 + (forceRatio - 1.5) * 20; 
+            } else if (forceRatio >= 1.0) {
+                // 相手と互角から2倍までの時
+                prob = 10 + (forceRatio - 1.0) * 20;
             } else {
-                // 1.2倍から1.5倍までの時
-                prob = 5 + (forceRatio - 1.2) * 50;
+                // 相手の0.8倍から互角までの時
+                prob = (forceRatio - 0.8) * 50;
             }
 
             // 守備側武将の能力による攻撃確率低下 (最大10%)
