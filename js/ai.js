@@ -171,17 +171,19 @@ class AIEngine {
             const forceRatio = myForce / Math.max(1, enemyForce);
             
             let prob = 0;
-            if (forceRatio >= 1.5) {
-                // 相手の1.5倍以上の戦力がある時（6000 vs 3000など）
-                // 1.5倍で40%、そこから戦力差に応じて50%前後まで上がります
-                prob = 40 + (forceRatio - 1.5) * 60; 
+            if (forceRatio >= 2.0) {
+                // 相手の2倍以上の戦力がある時
+                // 2倍の時に30%になり、それ以上強くても少しずつしか上がりません
+                prob = 30 + (forceRatio - 2.0) * 10; 
+            } else if (forceRatio >= 1.5) {
+                // 1.5倍から2倍までの時（20%〜30%くらいになります）
+                prob = 20 + (forceRatio - 1.5) * 20; 
             } else if (forceRatio >= 1.0) {
-                // 互角から1.5倍までの時
-                prob = 10 + (forceRatio - 1.0) * 60;
+                // 互角から1.5倍までの時（5%〜20%くらいになります）
+                prob = 5 + (forceRatio - 1.0) * 30;
             } else {
-                // 相手より弱い時：3乗の魔法を使用
-                // 比率を3回かけることで、0.2(20%)などの低い比率は「0.008」まで叩き落とされます
-                prob = Math.pow(forceRatio, 3) * 10;
+                // 相手より弱い時：ものすごく慎重になります
+                prob = Math.pow(forceRatio, 3) * 5;
             }
 
             // 守備側武将の能力による攻撃確率低下 (最大10%)
