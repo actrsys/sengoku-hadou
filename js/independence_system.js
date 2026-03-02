@@ -1,8 +1,6 @@
 /**
  * independence_system.js
  * 城主の独立（謀反）システム
- * 責務: 毎月の独立判定、新クラン作成、家臣の処遇処理
- * 修正: 独立・脱出・帰還時に城主自動更新ロジック (updateCastleLord) を適用
  */
 
 class IndependenceSystem {
@@ -14,16 +12,13 @@ class IndependenceSystem {
      * 月末に呼び出されるメイン処理
      */
     async checkIndependence() {
-        // プレイヤー以外の全城主（プレイヤー大名は対象外だが、プレイヤー配下の城主は対象）
-        // 判定対象: 城主IDが存在し、かつ大名本人ではない（＝拠点の城主）
         const potentialRebels = this.game.castles.filter(c => {
-            if (c.ownerClan === 0) return false; // 中立は対象外
-            if (!c.castellanId) return false; // 城主不在
+            if (c.ownerClan === 0) return false; 
+            if (!c.castellanId) return false; 
 
             const castellan = this.game.getBusho(c.castellanId);
-            if (!castellan || castellan.isDaimyo) return false; // 大名本人の城は対象外
+            if (!castellan || castellan.isDaimyo) return false; 
 
-            // 所属クランの拠点が1つしかない場合は独立しない（最低2城必要）
             const clanCastles = this.game.castles.filter(cl => cl.ownerClan === c.ownerClan);
             if (clanCastles.length <= 1) return false;
 
@@ -35,7 +30,6 @@ class IndependenceSystem {
         const dutyDiv = I.ThresholdDutyDiv || 2;
         const ambDiv = I.ThresholdAmbitionDiv || 5;
 
-        // 判定実行
         for (const castle of potentialRebels) {
             const castellan = this.game.getBusho(castle.castellanId);
             const clan = this.game.clans.find(c => c.id === castle.ownerClan);
@@ -43,27 +37,19 @@ class IndependenceSystem {
             
             if (!castellan || !clan || !daimyo) continue;
 
-            // ★追加：大名が派閥に入っていて、かつ城主が大名と同じ派閥なら、絶対に独立しません！（スルーします）
+            // 大名と同じ派閥なら独立しない
             if (daimyo.factionId !== 0 && castellan.factionId === daimyo.factionId) {
-                continue; // 「ここで考えるのをやめて、次の城主のチェックへ行く」という魔法です
+                continue; 
             }
 
-            // A. 有効忠誠閾値 (T) の算出
-            // 基本値29 + 義理が低いほど上昇 + 野心が高いほど上昇
-            // 例: 義理10, 野心90 => 29 + 20 + 8 = 57 (忠誠57以下なら危険)
-            // 例: 義理90, 野心10 => 29 - 20 - 8 = 1 (ほぼ裏切らない)
             const threshold = thresholdBase + ((50 - castellan.duty) / dutyDiv) + ((castellan.ambition - 50) / ambDiv);
 
-            // 現在の忠誠が閾値以下なら判定へ
             if (castellan.loyalty <= threshold) {
                 await this.calculateAndExecute(castle, castellan, daimyo, threshold);
             }
         }
     }
 
-    /**
-     * 確率計算と実行
-     */
     async calculateAndExecute(castle, castellan, daimyo, threshold) {
         const I = window.WarParams.Independence || {};
         const bonusMismatch = I.FactionBonusMismatch || 20;
@@ -71,49 +57,35 @@ class IndependenceSystem {
         const probLoyalty = I.ProbLoyaltyFactor || 2;
         const probAffinity = I.ProbAffinityFactor || 0.5;
 
-        // 相性差 (0~100)
         const affinityDiff = GameSystem.calcAffinityDiff(castellan.affinity, daimyo.affinity);
         
-        // 派閥ボーナス
         let factionBonus = 0;
         const myFaction = castellan.getFactionName ? castellan.getFactionName() : "";
         const lordFaction = daimyo.getFactionName ? daimyo.getFactionName() : "";
         
         if (myFaction && lordFaction) {
-            if (myFaction !== lordFaction) factionBonus = bonusMismatch; // 派閥不一致は独立しやすい
-            else factionBonus = bonusMatch; // 一致していると抑制
+            if (myFaction !== lordFaction) factionBonus = bonusMismatch;
+            else factionBonus = bonusMatch;
         }
 
-        // B. 独立確率 P (千分率)
-        // (閾値 - 現在忠誠) * 2 + (相性差 * 0.5) +/- 派閥
         let prob = ((threshold - castellan.loyalty) * probLoyalty) + (affinityDiff * probAffinity) + factionBonus;
         
-        // 確率が0以下なら発生しない
         if (prob <= 0) return;
 
-        // 乱数判定 (0.0 ~ 1000.0)
         const roll = Math.random() * 1000;
-
         if (roll < prob) {
             await this.executeRebellion(castle, castellan, daimyo);
         }
     }
 
-    /**
-     * 独立実行処理
-     */
     async executeRebellion(castle, castellan, oldDaimyo) {
         const oldClanId = castle.ownerClan;
         const I = window.WarParams.Independence || {};
         const initGold = I.InitialGold || 1000;
         const initRice = I.InitialRice || 1000;
         
-        // 1. 新クラン生成
         const newClanId = Math.max(...this.game.clans.map(c => c.id)) + 1;
-        // 色はランダム
         const newColor = '#' + Math.floor(Math.random()*16777215).toString(16).padStart(6, '0');
-        // 名前は「姓 + 家」
-        // 「familyName」が空っぽなら、「name（フルネーム）」をそのまま使います
         const familyName = castellan.familyName || castellan.name; 
         const newClanName = `${familyName}家`;
 
@@ -122,183 +94,198 @@ class IndependenceSystem {
             name: newClanName,
             color: newColor,
             leaderId: castellan.id,
-            rice: initRice, // 独立資金
+            rice: initRice,
             gold: initGold
         });
         this.game.clans.push(newClan);
 
-        // 2. 身分更新
         castellan.isDaimyo = true;
-        castellan.isCastellan = true; // 自身が城主兼大名
+        castellan.isCastellan = true;
         castellan.clan = newClanId;
-        castellan.loyalty = 100; // 自身への忠誠
+        castellan.loyalty = 100;
 
-        // 3. 拠点移譲
         castle.ownerClan = newClanId;
 
-        // 4. 外交関係の更新（敵対設定）
         const oldClan = this.game.clans.find(c => c.id === oldClanId);
         if (oldClan) {
             oldClan.diplomacyValue[newClanId] = { status: '敵対', sentiment: 0 };
         }
         newClan.diplomacyValue[oldClanId] = { status: '敵対', sentiment: 0 };
 
-        // 5. 部下の去就判定
+        // 1. その城にいる部下の去就判定
         const captiveMsgs = this.resolveSubordinates(castle, castellan, oldDaimyo, newClanId, oldClanId);
 
-        // ★ 新大名となった城の城主更新（大名優先ロジックの適用）
+        // 2. ★追加：他の城から同派閥のメンバーが駆けつける
+        this.resolveDistantFactionMembers(castellan, oldClanId, newClanId, castle);
+
         this.game.updateCastleLord(castle);
 
-        // 6. UIログ
-        const oldClanName = this.game.clans.find(c => c.id === oldClanId)?.name || "不明";
-        // ★上で既に箱があるので、エラーの原因だった2行を消しました！
-
+        const oldClanName = oldClan?.name || "不明";
         let msg = `【謀反】${oldClanName}の${castellan.name}が${castle.name}にて独立しました！`;
         this.game.ui.log(msg);
         
         if (captiveMsgs && captiveMsgs.length > 0) {
             msg += '\n\n' + captiveMsgs.join('\n');
         }
-        // ★プレイヤーがOKを押すまで安全に時間を止めるため、0にします
         await this.game.ui.showDialogAsync(msg, false, 0);
     }
 
     /**
-     * 部下の去就判定 (合流 / 脱出 / 捕縛)
+     * 部下の去就判定 (修正版)
      */
      resolveSubordinates(castle, newDaimyo, oldDaimyo, newClanId, oldClanId) {
-        // 🌟 ここが変わりました！「浪人（status === 'ronin'）」は巻き込まれないように除外します
         const subordinates = this.game.getCastleBushos(castle.id).filter(b => b.id !== newDaimyo.id && b.status !== 'ronin');
         const captives = [];
         const escapees = [];
         const joiners = [];
         
         const I = window.WarParams.Independence || {};
-        const bonusFaction = I.JoinBonusFaction || 30;
+        // 派閥ボーナスを強化 (30 -> 50)
+        const bonusFactionPriority = 50; 
         const escapeDuty = I.EscapeDutyThreshold || 30;
 
-        // 脱出先候補（元の主君の他の城）
         const escapeCastles = this.game.castles.filter(c => c.ownerClan === oldClanId && c.id !== castle.id);
         const hasEscapeRoute = escapeCastles.length > 0;
 
         subordinates.forEach(busho => {
-            // 判定値計算
-            // 新大名への親和性 vs 旧大名への義理・忠誠
             const affNew = GameSystem.calcAffinityDiff(busho.affinity, newDaimyo.affinity);
             const affOld = GameSystem.calcAffinityDiff(busho.affinity, oldDaimyo.affinity);
             
-            // 合流スコア: 相性が良い(差が小さい)ほど高い。野心が高いと勝ち馬に乗る。
-            let joinScore = (100 - affNew) + (busho.ambition * 0.5);
-            // 残留(脱出)スコア: 義理堅い、旧主との相性が良い、現在の忠誠が高い
-            let stayScore = (100 - affOld) + busho.duty + (busho.loyalty * 0.5);
+            // ★相性の重みを1.5倍にアップ
+            let joinScore = (100 - affNew) * 1.5 + (busho.ambition * 0.5);
+            let stayScore = (100 - affOld) * 1.5 + (busho.loyalty * 0.5);
 
-            // 派閥補正
+            // ★忠誠度が90未満なら、低いほど合流しやすくなる（不満ボーナス）
+            if (busho.loyalty < 90) {
+                joinScore += (90 - busho.loyalty) * 2;
+            }
+
+            // ★義理の判定を50基準に
+            const dutyFactor = busho.duty - 50;
+            if (dutyFactor > 0) stayScore += dutyFactor; // 50より高ければ残りたい
+            else joinScore += Math.abs(dutyFactor);      // 50より低ければ裏切りたい
+
+            // ★派閥補正（優先度アップ）
             const myFaction = busho.getFactionName ? busho.getFactionName() : "";
-            if (myFaction && myFaction === (newDaimyo.getFactionName ? newDaimyo.getFactionName() : "")) joinScore += bonusFaction;
-            if (myFaction && myFaction === (oldDaimyo.getFactionName ? oldDaimyo.getFactionName() : "")) stayScore += bonusFaction;
+            if (myFaction && myFaction === (newDaimyo.getFactionName ? newDaimyo.getFactionName() : "")) joinScore += bonusFactionPriority;
+            if (myFaction && myFaction === (oldDaimyo.getFactionName ? oldDaimyo.getFactionName() : "")) stayScore += bonusFactionPriority;
 
-            // 判定
             if (joinScore > stayScore) {
-                // 合流
                 busho.clan = newClanId;
-                busho.loyalty = 80; // 新体制への期待
+                busho.loyalty = 80;
                 joiners.push(busho);
             } else {
-                // 脱出試行
-                if (hasEscapeRoute && busho.duty >= escapeDuty) { // ある程度義理があれば脱出を試みる
-                    // 脱出成功判定 (武力と知略で判定)
+                if (hasEscapeRoute && busho.duty >= escapeDuty) {
                     const escapePower = busho.strength + busho.intelligence;
-                    // 捕縛側（新大名）の阻止力
                     const blockPower = newDaimyo.leadership + newDaimyo.intelligence;
                     
-                    // ランダム要素
                     if ((escapePower * (Math.random() + 0.5)) > (blockPower * 0.8)) {
-                        // 脱出成功
                         const targetCastle = escapeCastles[Math.floor(Math.random() * escapeCastles.length)];
                         castle.samuraiIds = castle.samuraiIds.filter(id => id !== busho.id);
                         targetCastle.samuraiIds.push(busho.id);
                         busho.castleId = targetCastle.id;
-                        busho.isCastellan = false; // 城主ではなくなる
+                        busho.isCastellan = false;
                         escapees.push(busho);
-
-                        // ★ 脱出先の城の城主情報を更新（空き城だった場合などのため）
                         this.game.updateCastleLord(targetCastle);
                     } else {
-                        // 捕縛
                         castle.samuraiIds = castle.samuraiIds.filter(id => id !== busho.id);
-                        busho.castleId = 0; // 牢獄状態（便宜上）
+                        busho.castleId = 0;
                         captives.push(busho);
                     }
                 } else {
-                    // 脱出先がない、または義理が低すぎて逃げる気もない -> 消極的合流
                     busho.clan = newClanId;
-                    busho.loyalty = 30; // 仕方なく従う
+                    busho.loyalty = 30;
                     joiners.push(busho);
                 }
             }
         });
 
-        // ログ出力
         if (joiners.length > 0) this.game.ui.log(`  -> ${joiners.length}名が${newDaimyo.name}に追随しました。`);
         if (escapees.length > 0) this.game.ui.log(`  -> ${escapees.length}名が脱出し、帰還しました。`);
         
-        // ★追加：捕虜メッセージを受け取れるようにします
         let captiveMsgs = [];
         if (captives.length > 0) {
             this.game.ui.log(`  -> ${captives.length}名が脱出に失敗し、捕らえられました。`);
-            // ★変更：受け取ったメッセージを箱に入れます
             captiveMsgs = this.handleCaptives(captives, oldClanId, newClanId, newDaimyo);
         }
-        
-        // ★追加：メッセージを大元の処理に返します
         return captiveMsgs;
-    }
+     }
 
     /**
-     * 捕縛者の処理
-     * 元の主君がプレイヤーの場合、UIで選択させる
-     * 元の主君がAIの場合、AI同士で自動解決
+     * ★新機能：他の城にいる同派閥のメンバーが駆けつける処理
      */
+    resolveDistantFactionMembers(newDaimyo, oldClanId, newClanId, targetCastle) {
+        // 大名が派閥に入っていなければ発生しない
+        if (newDaimyo.factionId === 0) return; 
+
+        // 全武将の中から、「前のクランにいて」「別の城にいて」「同じ派閥」の人を探す
+        const potentialDefectors = this.game.bushos.filter(b => 
+            b.clan === oldClanId && 
+            b.castleId !== targetCastle.id && 
+            b.status === 'active' &&
+            b.factionId === newDaimyo.factionId
+        );
+
+        const joiners = [];
+        potentialDefectors.forEach(busho => {
+            // 駆けつけるかどうかの判定（相性が良くて、今のクランに不満があれば来やすい）
+            const affNew = GameSystem.calcAffinityDiff(busho.affinity, newDaimyo.affinity);
+            let prob = (100 - affNew) + (busho.ambition * 0.5);
+            if (busho.loyalty < 90) prob += (90 - busho.loyalty);
+
+            // 確率判定 (少し厳しめ)
+            if (Math.random() * 250 < prob) {
+                // 元の城から削除
+                const oldCastle = this.game.castles.find(c => c.id === busho.castleId);
+                if (oldCastle) {
+                    oldCastle.samuraiIds = oldCastle.samuraiIds.filter(id => id !== busho.id);
+                    this.game.updateCastleLord(oldCastle);
+                }
+
+                // 新しい城へ移動
+                busho.clan = newClanId;
+                busho.castleId = targetCastle.id;
+                busho.loyalty = 100; // 志を共にして駆けつけたので忠誠MAX
+                targetCastle.samuraiIds.push(busho.id);
+                joiners.push(busho);
+            }
+        });
+
+        if (joiners.length > 0) {
+            const names = joiners.map(j => j.name).join('、');
+            this.game.ui.log(`  -> 遠方の城から同派閥の${names}らが駆けつけました！`);
+        }
+    }
+
     handleCaptives(captives, oldClanId, newClanId, newDaimyo) {
         const I = window.WarParams.Independence || {};
         const hateThreshold = I.ExecHateThreshold || 60;
         const ambitionThreshold = I.ExecAmbitionThreshold || 80;
-
-        // 帰還先の確保（元の主君の城）
         const returnCastles = this.game.castles.filter(c => c.ownerClan === oldClanId);
-        
-        // ★追加：ダイアログに出すメッセージをまとめる箱
         let alertMsgs = [];
         
-        // 帰還処理関数
         const returnToMaster = (busho) => {
             if (returnCastles.length > 0) {
                 const target = returnCastles[Math.floor(Math.random() * returnCastles.length)];
                 busho.clan = oldClanId;
                 busho.castleId = target.id;
-                busho.status = 'active'; // 復帰
+                busho.status = 'active';
                 target.samuraiIds.push(busho.id);
-
-                // ★ 帰還先の城の城主情報を更新
                 this.game.updateCastleLord(target);
-
                 return target.name;
             } else {
-                // 帰る城がない場合は在野
                 busho.status = 'ronin';
                 busho.clan = 0;
                 return null;
             }
         };
 
-        // プレイヤーが「元の主君」の場合（部下を奪われた側）
         if (oldClanId === this.game.playerClanId) {
             captives.forEach(p => {
                 const hate = GameSystem.calcAffinityDiff(p.affinity, newDaimyo.affinity);
                 if (hate > hateThreshold || newDaimyo.ambition > ambitionThreshold) {
                     p.status = 'dead';
                     p.clan = 0;
-                    // ★変更：ダイアログを直接出さず、メッセージ箱に入れます
                     alertMsgs.push(`悲報：捕らえられた ${p.name} は処断されました……`);
                 } else {
                     const returnedCastleName = returnToMaster(p);
@@ -309,13 +296,9 @@ class IndependenceSystem {
                     }
                 }
             });
-        }
-        // プレイヤーが「新大名」の場合
-        else if (newClanId === this.game.playerClanId) {
+        } else if (newClanId === this.game.playerClanId) {
             this.game.ui.showPrisonerModal(captives);
-        }
-        // AI vs AI
-        else {
+        } else {
             captives.forEach(p => {
                 if (Math.random() < 0.3) {
                     p.status = 'dead';
@@ -325,8 +308,6 @@ class IndependenceSystem {
                 }
             });
         }
-        
-        // ★追加：集めたメッセージを返します
         return alertMsgs;
     }
 }
