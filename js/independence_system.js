@@ -78,48 +78,55 @@ class IndependenceSystem {
         const oldClanId = castle.ownerClan;
         const I = window.WarParams.Independence || {};
 
+        // --- ★追加：派閥主を神輿（みこし）に担ぐ処理 ---
+        let rebellionLeader = castellan; // デフォルトは謀反を起こした城主
+        let isProxyRebellion = false;    // 神輿担ぎかどうかを覚える旗
+
+        // もし独立を起こす城主が派閥に属していて、なおかつ派閥主ではない場合
+        if (castellan.factionId !== 0 && !castellan.isFactionLeader) {
+            // 同じ大名家で、同じ派閥のリーダー（派閥主）を探す
+            const factionLeader = this.game.bushos.find(b => b.clan === oldClanId && b.factionId === castellan.factionId && b.isFactionLeader);
+            if (factionLeader) {
+                // 派閥主が、今の殿様よりも独立計画に賛同してくれるかを計算
+                const { joinScore, stayScore } = this.calculateLoyaltyScores(factionLeader, castellan, oldDaimyo);
+                if (joinScore > stayScore) {
+                    rebellionLeader = factionLeader; // 派閥主が神輿になる！
+                    isProxyRebellion = true;
+                }
+            }
+        }
+
         // --- ★ここから：寝返り先を探す処理 ---
         let targetClanId = null;
         let targetDaimyo = null;
         let bestScore = -1;
 
-        // 今の大名家の戦力と、謀反を起こす城の戦力を計算します
         const oldClanPower = this.calcClanPower(oldClanId);
         const castlePower = this.calcCastlePower(castle);
-        
-        // 謀反を起こされた後の、今の大名家の戦力予想
         const oldClanFuturePower = oldClanPower - castlePower;
 
-        // 今の殿様との相性の差（数字が小さいほど相性が良い）
-        const oldAffinityDiff = GameSystem.calcAffinityDiff(castellan.affinity, oldDaimyo.affinity);
+        // ★変更：相性の計算基準を rebellionLeader（神輿になる人物）に変更
+        const oldAffinityDiff = GameSystem.calcAffinityDiff(rebellionLeader.affinity, oldDaimyo.affinity);
 
-        // 世界中の大名家を順番に調べます
         for (const clan of this.game.clans) {
-            if (clan.id === 0 || clan.id === oldClanId) continue; // 空き地や自分の家は無視
-            
-            // 敵対しているかチェック
+            if (clan.id === 0 || clan.id === oldClanId) continue; 
             const rel = this.game.getRelation(oldClanId, clan.id);
             if (!rel || rel.status !== '敵対') continue;
 
-            // 敵の大名（殿様）を探す
             const enemyDaimyo = this.game.bushos.find(b => b.clan === clan.id && b.isDaimyo);
             if (!enemyDaimyo) continue;
 
-            // もし寝返ったら、敵対大名の戦力はどれくらいになるか？
             let enemyFuturePower = this.calcClanPower(clan.id) + castlePower;
             
-            // 相性によるボーナス（ほんの少しだけ戦力にゲタを履かせます！）
-            const enemyAffinityDiff = GameSystem.calcAffinityDiff(castellan.affinity, enemyDaimyo.affinity);
+            // ★変更：相性の計算基準を rebellionLeader に変更
+            const enemyAffinityDiff = GameSystem.calcAffinityDiff(rebellionLeader.affinity, enemyDaimyo.affinity);
             let affinityBonus = 0;
-            // 今の殿様より相性が良い場合だけ、その差分を戦力に足してあげます
             if (enemyAffinityDiff < oldAffinityDiff) {
                 affinityBonus = oldAffinityDiff - enemyAffinityDiff; 
             }
 
-            // 「寝返った後の敵対大名の戦力 ＞ 寝返られた後の元大名戦力」になるなら候補に入れます
             if ((enemyFuturePower + affinityBonus) > oldClanFuturePower) {
                 const score = enemyFuturePower + affinityBonus;
-                // 一番条件の良い大名家を記憶します
                 if (score > bestScore) {
                     bestScore = score;
                     targetClanId = clan.id;
@@ -129,11 +136,10 @@ class IndependenceSystem {
         }
         // --- ★ここまで ---
 
-        let isDefection = false; // 寝返りかどうかを覚える旗
+        let isDefection = false;
         let newClanId;
         let newClanName;
 
-        // 良い寝返り先が見つかった場合
         if (targetClanId) {
             isDefection = true;
             newClanId = targetClanId;
@@ -141,50 +147,89 @@ class IndependenceSystem {
             newClanName = targetClan ? targetClan.name : "敵対大名";
 
             castellan.clan = newClanId;
-            castellan.loyalty = 100; // 寝返った直後は忠誠MAX！
+            castellan.loyalty = 100;
             castle.ownerClan = newClanId;
-            // 寝返り先の大名とは最初から外交関係があるので、新しく作る必要はありません
             
         } else {
-            // 見つからなかった場合は、今まで通りの「独立」をします
             newClanId = Math.max(...this.game.clans.map(c => c.id)) + 1;
             const newColor = '#' + Math.floor(Math.random()*16777215).toString(16).padStart(6, '0');
-            const familyName = castellan.familyName || castellan.name; 
+            // ★変更：新大名家の名前は神輿の人物ベース
+            const familyName = rebellionLeader.familyName || rebellionLeader.name; 
             newClanName = `${familyName}家`;
 
             const newClan = new Clan({
-                id: newClanId, name: newClanName, color: newColor, leaderId: castellan.id,
-                rice: I.InitialRice || 1000, gold: I.InitialGold || 1000
+                id: newClanId, name: newClanName, color: newColor, leaderId: rebellionLeader.id
             });
             this.game.clans.push(newClan);
 
-            castellan.isDaimyo = true;
-            castellan.isCastellan = true;
+            rebellionLeader.isDaimyo = true;
+            
             castellan.clan = newClanId;
             castellan.loyalty = 100;
             castle.ownerClan = newClanId;
 
-            // 新大名と旧大名を敵対関係にする
             const oldClan = this.game.clans.find(c => c.id === oldClanId);
             if (oldClan) oldClan.diplomacyValue[newClanId] = { status: '敵対', sentiment: 0 };
             newClan.diplomacyValue[oldClanId] = { status: '敵対', sentiment: 0 };
         }
 
-        // ▼部下たちの去就（ここは寝返りでも独立でも同じように動きます）
-        let captiveMsgs = this.resolveSubordinates(castle, castellan, oldDaimyo, newClanId, oldClanId);
-        this.resolveFactionWideRebellion(castellan, oldClanId, newClanId, oldDaimyo);
-        this.resolveDistantFactionMembers(castellan, oldClanId, newClanId, oldDaimyo);
+        // ★追加：神輿（派閥主）本人の処遇
+        if (isProxyRebellion) {
+            const leaderCastle = this.game.castles.find(c => c.id === rebellionLeader.castleId);
+            if (rebellionLeader.isCastellan && leaderCastle) {
+                // 派閥主がどこかの城主なら、その城も新勢力になる
+                leaderCastle.ownerClan = newClanId;
+                rebellionLeader.clan = newClanId;
+                rebellionLeader.loyalty = 100;
+            } else {
+                // 城主でない（どこかの城の部下）なら、脱出して起点の城に合流する
+                if (leaderCastle) {
+                    leaderCastle.samuraiIds = leaderCastle.samuraiIds.filter(id => id !== rebellionLeader.id);
+                    this.game.updateCastleLord(leaderCastle);
+                }
+                rebellionLeader.clan = newClanId;
+                rebellionLeader.loyalty = 100;
+                rebellionLeader.castleId = castle.id;
+                castle.samuraiIds.push(rebellionLeader.id);
+            }
+        }
+
+        // 部下たちの去就
+        // ★変更：主君の基準を rebellionLeader にする
+        let captiveMsgs = this.resolveSubordinates(castle, rebellionLeader, oldDaimyo, newClanId, oldClanId);
+
+        // ★追加：派閥主が別の城の城主だった場合、その城の部下たちも処遇を決定する
+        if (isProxyRebellion && rebellionLeader.isCastellan) {
+            const leaderCastle = this.game.castles.find(c => c.id === rebellionLeader.castleId);
+            if (leaderCastle && leaderCastle.id !== castle.id) {
+                const extraMsgs = this.resolveSubordinates(leaderCastle, rebellionLeader, oldDaimyo, newClanId, oldClanId);
+                if (extraMsgs.length > 0) captiveMsgs = captiveMsgs.concat(extraMsgs);
+                this.game.updateCastleLord(leaderCastle);
+            }
+        }
+
+        // ★変更：基準を rebellionLeader にして派閥全体の呼応を処理
+        this.resolveFactionWideRebellion(rebellionLeader, oldClanId, newClanId, oldDaimyo);
+        this.resolveDistantFactionMembers(rebellionLeader, oldClanId, newClanId, oldDaimyo);
 
         this.game.updateCastleLord(castle);
 
         const oldClanName = this.game.clans.find(c => c.id === oldClanId)?.name || "不明";
         let msg = "";
         
-        // メッセージを出し分けます
-        if (isDefection) {
-            msg = `【寝返り】${oldClanName}の${castellan.name}が${castle.name}ごと、敵対する${newClanName}へ寝返りました！`;
+        // ★変更：メッセージの出し分け
+        if (isProxyRebellion) {
+            if (isDefection) {
+                msg = `【派閥寝返り】${oldClanName}の${castellan.name}が派閥主・${rebellionLeader.name}を擁立し、${castle.name}ごと敵対する${newClanName}へ寝返りました！`;
+            } else {
+                msg = `【派閥独立】${oldClanName}の${castellan.name}が派閥主・${rebellionLeader.name}を大名として擁立し、${castle.name}にて独立を宣言しました！`;
+            }
         } else {
-            msg = `【謀反】${oldClanName}の${castellan.name}が${castle.name}にて独立しました！`;
+            if (isDefection) {
+                msg = `【寝返り】${oldClanName}の${castellan.name}が${castle.name}ごと、敵対する${newClanName}へ寝返りました！`;
+            } else {
+                msg = `【謀反】${oldClanName}の${castellan.name}が${castle.name}にて独立しました！`;
+            }
         }
         
         this.game.ui.log(msg);
