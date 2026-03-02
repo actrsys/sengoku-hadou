@@ -951,6 +951,9 @@ class WarManager {
     }
     
     async endWar(attackerWon, isRetreat = false, capturedInRetreat = [], retreatTargetId = null) { // ★ async を追加
+        // ★ここを書き足します：既に「終わったよ」の処理中なら、2回目は無視するストッパーです！
+        if (!this.state.active) return;
+
         try {
             const s = this.state; s.active = false;
             

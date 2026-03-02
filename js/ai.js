@@ -137,6 +137,9 @@ class AIEngine {
         
         const sendSoldiers = Math.floor(myCastle.soldiers * sendRate);
         
+        // ★ここを書き足します：出陣する兵士が0人以下の時は、攻撃を諦めます！
+        if (sendSoldiers <= 0) return null;
+        
         // 兵糧のチェック (連れて行く兵士数の1.5倍)
         const requiredRice = sendSoldiers * 1.5;
         if (myCastle.rice < requiredRice) return null;
@@ -224,7 +227,11 @@ class AIEngine {
 
     // ★ここを async に書き足します
     async executeAttack(source, target, general, sendSoldiers, sendRice) {
-    if (sendSoldiers <= 0 || sendRice <= 0) return;
+    // ★ここを書き換えます：条件を満たさず攻撃できなかった時も、ターンを終わらせて固まるのを防ぎます！
+    if (sendSoldiers <= 0 || sendRice <= 0) {
+        this.game.finishTurn();
+        return;
+    }
     const bushos = this.game.getCastleBushos(source.id).filter(b => b.status !== 'ronin');
     const sorted = bushos.sort((a,b) => b.leadership - a.leadership).slice(0, 3);
     this.game.warManager.startWar(source, target, sorted, sendSoldiers, sendRice);
