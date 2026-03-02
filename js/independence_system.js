@@ -48,13 +48,35 @@ class IndependenceSystem {
         }
     }
 
+    /**
+     * ★新機能：大名の総合ステータスによる補正値の計算 (200~400の範囲で -20~+20)
+     */
+    calcDaimyoPowerBonus(busho) {
+        // 指定された5つのステータスを合計
+        const total = busho.leadership + busho.strength + busho.politics + busho.diplomacy + busho.intelligence;
+        
+        // 300を基準に、上下100の範囲で判定 (200〜400)
+        const diff = total - 300;
+        
+        // -100から100の間に収める（200以下は-100、400以上は100になる）
+        const clampedDiff = Math.max(-100, Math.min(100, diff));
+        
+        // 線形に最大20ポイントの補正に変換 (100で20点、50で10点)
+        return (clampedDiff / 100) * 20;
+    }
+
     async calculateAndExecute(castle, castellan, daimyo, threshold) {
         const I = window.WarParams.Independence || {};
         const probLoyalty = I.ProbLoyaltyFactor || 2;
         const probAffinity = I.ProbAffinityFactor || 0.5;
 
+        // 大名の能力による補正（能力が高いほど、最初の謀反確率を下げる）
+        const daimyoBonus = this.calcDaimyoPowerBonus(daimyo);
+
         const affinityDiff = GameSystem.calcAffinityDiff(castellan.affinity, daimyo.affinity);
-        let prob = ((threshold - castellan.loyalty) * probLoyalty) + (affinityDiff * probAffinity);
+        
+        // 確率計算（大名が有能なら prob が減り、無能なら増える）
+        let prob = ((threshold - castellan.loyalty) * probLoyalty) + (affinityDiff * probAffinity) - (daimyoBonus * 2);
         
         if (prob <= 0) return;
         if (Math.random() * 1000 < prob) {
@@ -91,13 +113,8 @@ class IndependenceSystem {
         if (oldClan) oldClan.diplomacyValue[newClanId] = { status: '敵対', sentiment: 0 };
         newClan.diplomacyValue[oldClanId] = { status: '敵対', sentiment: 0 };
 
-        // 1. その城にいる部下の判定
         let captiveMsgs = this.resolveSubordinates(castle, castellan, oldDaimyo, newClanId, oldClanId);
-
-        // 2. 同派閥の他城主が「呼応」
         this.resolveFactionWideRebellion(castellan, oldClanId, newClanId, oldDaimyo);
-
-        // 3. 遠方の武将が「駆けつけ」
         this.resolveDistantFactionMembers(castellan, oldClanId, newClanId, oldDaimyo);
 
         this.game.updateCastleLord(castle);
@@ -110,23 +127,22 @@ class IndependenceSystem {
     }
 
     /**
-     * 去就判定の共通計算ロジック（ここが一番大事！）
+     * 去就判定の共通計算ロジック
      */
     calculateLoyaltyScores(busho, newDaimyo, oldDaimyo) {
         const affNew = GameSystem.calcAffinityDiff(busho.affinity, newDaimyo.affinity);
         const affOld = GameSystem.calcAffinityDiff(busho.affinity, oldDaimyo.affinity);
         
-        // ★相性重視 (重みを 2.0 にアップ)
         let joinScore = (100 - affNew) * 2.0 + (busho.ambition * 0.5);
         let stayScore = (100 - affOld) * 2.0 + (busho.loyalty * 0.5);
 
-        // ★忠誠度90未満の不満
-        if (busho.loyalty < 90) joinScore += (90 - busho.loyalty);
+        // ★大名の能力補正をスコアに加算
+        joinScore += this.calcDaimyoPowerBonus(newDaimyo); // 新大名が有能なら合流したい
+        stayScore += this.calcDaimyoPowerBonus(oldDaimyo); // 旧大名が有能なら残りたいたい
 
-        // ★義理を線形に (重みを 0.4 にダウン。100でも最大20点の影響)
+        if (busho.loyalty < 90) joinScore += (90 - busho.loyalty);
         joinScore += (50 - busho.duty) * 0.4;
 
-        // ★派閥ボーナス
         const bonusFaction = 50;
         if (busho.factionId !== 0) {
             if (busho.factionId === newDaimyo.factionId) joinScore += bonusFaction;
