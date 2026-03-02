@@ -2275,7 +2275,7 @@ class UIManager {
                     castle.gold -= 200;
                     
                     // 寿命を1年延ばしてあげます
-                    busho.endYear += 1;
+                    busho.endYear = Number(busho.endYear) + 1;
                     busho.isActionDone = true; // おまけで行動済みにします
                     this.showResultModal(`${busho.name}は快方に向かいました！`);
                     
