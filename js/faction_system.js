@@ -343,6 +343,27 @@ class FactionSystem {
                 evaluateJoin(invalidLeaders, validLeaders);
             }
 
+            // ★追加：大名もいずれかの派閥に属するようにします！（一番スコアが良い＝一番数値が低い派閥を選びます）
+            const daimyo = members.find(b => b.isDaimyo);
+            if (daimyo && validLeaders.length > 0) {
+                let bestLeader = null;
+                let minScore = 999; // 最初はありえないくらい高い点数にしておきます
+                
+                validLeaders.forEach(leader => {
+                    const score = calcScore(daimyo, leader, validLeaders);
+                    // 点数が低い（＝相性が良い）派閥を見つけたら、記憶を上書きします
+                    if (score < minScore) {
+                        minScore = score;
+                        bestLeader = leader;
+                    }
+                });
+                
+                // 一番マシな派閥のリーダーが見つかったら、その派閥に入ります！
+                if (bestLeader) {
+                    daimyo.factionId = bestLeader.factionId;
+                }
+            }
+
             // ★ここから追加：正式な派閥が決まったら、リーダーの方針と思想を計算してメンバー全員に教えます！
             validLeaders.forEach(leader => {
                 // 1. リーダーの能力から「方針」を計算します

@@ -43,6 +43,11 @@ class IndependenceSystem {
             
             if (!castellan || !clan || !daimyo) continue;
 
+            // ★追加：大名が派閥に入っていて、かつ城主が大名と同じ派閥なら、絶対に独立しません！（スルーします）
+            if (daimyo.factionId !== 0 && castellan.factionId === daimyo.factionId) {
+                continue; // 「ここで考えるのをやめて、次の城主のチェックへ行く」という魔法です
+            }
+
             // A. 有効忠誠閾値 (T) の算出
             // 基本値29 + 義理が低いほど上昇 + 野心が高いほど上昇
             // 例: 義理10, 野心90 => 29 + 20 + 8 = 57 (忠誠57以下なら危険)
