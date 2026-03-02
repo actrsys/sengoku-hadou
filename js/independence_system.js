@@ -77,35 +77,116 @@ class IndependenceSystem {
     async executeRebellion(castle, castellan, oldDaimyo) {
         const oldClanId = castle.ownerClan;
         const I = window.WarParams.Independence || {};
-        const newClanId = Math.max(...this.game.clans.map(c => c.id)) + 1;
-        const newColor = '#' + Math.floor(Math.random()*16777215).toString(16).padStart(6, '0');
-        const familyName = castellan.familyName || castellan.name; 
-        const newClanName = `${familyName}家`;
 
-        const newClan = new Clan({
-            id: newClanId, name: newClanName, color: newColor, leaderId: castellan.id,
-            rice: I.InitialRice || 1000, gold: I.InitialGold || 1000
-        });
-        this.game.clans.push(newClan);
+        // --- ★ここから：寝返り先を探す処理 ---
+        let targetClanId = null;
+        let targetDaimyo = null;
+        let bestScore = -1;
 
-        castellan.isDaimyo = true;
-        castellan.isCastellan = true;
-        castellan.clan = newClanId;
-        castellan.loyalty = 100;
-        castle.ownerClan = newClanId;
+        // 今の大名家の戦力と、謀反を起こす城の戦力を計算します
+        const oldClanPower = this.calcClanPower(oldClanId);
+        const castlePower = this.calcCastlePower(castle);
+        
+        // 謀反を起こされた後の、今の大名家の戦力予想
+        const oldClanFuturePower = oldClanPower - castlePower;
 
-        const oldClan = this.game.clans.find(c => c.id === oldClanId);
-        if (oldClan) oldClan.diplomacyValue[newClanId] = { status: '敵対', sentiment: 0 };
-        newClan.diplomacyValue[oldClanId] = { status: '敵対', sentiment: 0 };
+        // 今の殿様との相性の差（数字が小さいほど相性が良い）
+        const oldAffinityDiff = GameSystem.calcAffinityDiff(castellan.affinity, oldDaimyo.affinity);
 
+        // 世界中の大名家を順番に調べます
+        for (const clan of this.game.clans) {
+            if (clan.id === 0 || clan.id === oldClanId) continue; // 空き地や自分の家は無視
+            
+            // 敵対しているかチェック
+            const rel = this.game.getRelation(oldClanId, clan.id);
+            if (!rel || rel.status !== '敵対') continue;
+
+            // 敵の大名（殿様）を探す
+            const enemyDaimyo = this.game.bushos.find(b => b.clan === clan.id && b.isDaimyo);
+            if (!enemyDaimyo) continue;
+
+            // もし寝返ったら、敵対大名の戦力はどれくらいになるか？
+            let enemyFuturePower = this.calcClanPower(clan.id) + castlePower;
+            
+            // 相性によるボーナス（ほんの少しだけ戦力にゲタを履かせます！）
+            const enemyAffinityDiff = GameSystem.calcAffinityDiff(castellan.affinity, enemyDaimyo.affinity);
+            let affinityBonus = 0;
+            // 今の殿様より相性が良い場合だけ、その差分を戦力に足してあげます
+            if (enemyAffinityDiff < oldAffinityDiff) {
+                affinityBonus = oldAffinityDiff - enemyAffinityDiff; 
+            }
+
+            // 「寝返った後の敵対大名の戦力 ＞ 寝返られた後の元大名戦力」になるなら候補に入れます
+            if ((enemyFuturePower + affinityBonus) > oldClanFuturePower) {
+                const score = enemyFuturePower + affinityBonus;
+                // 一番条件の良い大名家を記憶します
+                if (score > bestScore) {
+                    bestScore = score;
+                    targetClanId = clan.id;
+                    targetDaimyo = enemyDaimyo;
+                }
+            }
+        }
+        // --- ★ここまで ---
+
+        let isDefection = false; // 寝返りかどうかを覚える旗
+        let newClanId;
+        let newClanName;
+
+        // 良い寝返り先が見つかった場合
+        if (targetClanId) {
+            isDefection = true;
+            newClanId = targetClanId;
+            const targetClan = this.game.clans.find(c => c.id === targetClanId);
+            newClanName = targetClan ? targetClan.name : "敵対大名";
+
+            castellan.clan = newClanId;
+            castellan.loyalty = 100; // 寝返った直後は忠誠MAX！
+            castle.ownerClan = newClanId;
+            // 寝返り先の大名とは最初から外交関係があるので、新しく作る必要はありません
+            
+        } else {
+            // 見つからなかった場合は、今まで通りの「独立」をします
+            newClanId = Math.max(...this.game.clans.map(c => c.id)) + 1;
+            const newColor = '#' + Math.floor(Math.random()*16777215).toString(16).padStart(6, '0');
+            const familyName = castellan.familyName || castellan.name; 
+            newClanName = `${familyName}家`;
+
+            const newClan = new Clan({
+                id: newClanId, name: newClanName, color: newColor, leaderId: castellan.id,
+                rice: I.InitialRice || 1000, gold: I.InitialGold || 1000
+            });
+            this.game.clans.push(newClan);
+
+            castellan.isDaimyo = true;
+            castellan.isCastellan = true;
+            castellan.clan = newClanId;
+            castellan.loyalty = 100;
+            castle.ownerClan = newClanId;
+
+            // 新大名と旧大名を敵対関係にする
+            const oldClan = this.game.clans.find(c => c.id === oldClanId);
+            if (oldClan) oldClan.diplomacyValue[newClanId] = { status: '敵対', sentiment: 0 };
+            newClan.diplomacyValue[oldClanId] = { status: '敵対', sentiment: 0 };
+        }
+
+        // ▼部下たちの去就（ここは寝返りでも独立でも同じように動きます）
         let captiveMsgs = this.resolveSubordinates(castle, castellan, oldDaimyo, newClanId, oldClanId);
         this.resolveFactionWideRebellion(castellan, oldClanId, newClanId, oldDaimyo);
         this.resolveDistantFactionMembers(castellan, oldClanId, newClanId, oldDaimyo);
 
         this.game.updateCastleLord(castle);
 
-        const oldClanName = oldClan?.name || "不明";
-        let msg = `【謀反】${oldClanName}の${castellan.name}が${castle.name}にて独立しました！`;
+        const oldClanName = this.game.clans.find(c => c.id === oldClanId)?.name || "不明";
+        let msg = "";
+        
+        // メッセージを出し分けます
+        if (isDefection) {
+            msg = `【寝返り】${oldClanName}の${castellan.name}が${castle.name}ごと、敵対する${newClanName}へ寝返りました！`;
+        } else {
+            msg = `【謀反】${oldClanName}の${castellan.name}が${castle.name}にて独立しました！`;
+        }
+        
         this.game.ui.log(msg);
         if (captiveMsgs && captiveMsgs.length > 0) msg += '\n\n' + captiveMsgs.join('\n');
         await this.game.ui.showDialogAsync(msg, false, 0);
@@ -237,4 +318,24 @@ class IndependenceSystem {
         });
         return alertMsgs;
     }
+    
+    /**
+     * 大名家の総戦力を計算する道具
+     */
+    calcClanPower(clanId) {
+        let pop = 0, sol = 0, koku = 0, gold = 0, rice = 0;
+        const clanCastles = this.game.castles.filter(c => c.ownerClan === clanId);
+        clanCastles.forEach(c => { 
+            pop += c.population; sol += c.soldiers; koku += c.kokudaka; gold += c.gold; rice += c.rice; 
+        });
+        return Math.floor(pop / 2000) + Math.floor(sol / 20) + Math.floor(koku / 20) + Math.floor(gold / 50) + Math.floor(rice / 100);
+    }
+
+    /**
+     * 城単体の戦力を計算する道具
+     */
+    calcCastlePower(castle) {
+        return Math.floor(castle.population / 2000) + Math.floor(castle.soldiers / 20) + Math.floor(castle.kokudaka / 20) + Math.floor(castle.gold / 50) + Math.floor(castle.rice / 100);
+    }
+    
 }
