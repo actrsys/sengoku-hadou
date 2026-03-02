@@ -227,8 +227,8 @@ class FactionSystem {
                     personalityBonus = 5;
                 }
                 
-                //基準となる持ち点を「25」点に設定しました。
-                return ((affDiff * 0.5) + (innoDiff * 0.25) + 25) - finalBonus - abilityBonus + charmBonus - achievementBonus - personalityBonus;
+                //基準となる持ち点を「15」点に設定しました。
+                return ((affDiff * 0.5) + (innoDiff * 0.25) + 15) - finalBonus - abilityBonus + charmBonus - achievementBonus - personalityBonus;
             };
 
             // 派閥に入れる処理の共通ルール
