@@ -2247,7 +2247,56 @@ class UIManager {
         };
     }
 
+    // 面談の画面を出す処理（寿命チェック付き！）
     showInterviewModal(busho) {
+        const currentYear = this.game.year;
+        
+        // ★ここを追加：今命令を出しているお城のデータを持ってきます！
+        const castle = this.game.getCurrentTurnCastle();
+
+        if (currentYear >= (busho.endYear - 1)) {
+            // 寿命が近い場合は、まずお医者さんに診せるか聞きます
+            // ★変更：メッセージに「消費：金２００」を付け足しました！
+            this.showDialog(`${busho.name}は調子が悪そうだ。\n医師に診せますか？\n（消費：金２００）`, true, 
+                () => {
+                    // 「はい」を選んだ場合の処理です
+
+                    // ★ここを追加：お城の貯金箱に、金が200以上あるかチェックします！
+                    if (castle.gold < 200) {
+                        // お金が足りない時は、ごめんなさいのメッセージを出します
+                        this.showDialog("金が足りないため、医師を呼べませんでした……", false, () => {
+                            // そのあと、いつもの面談画面へ進みます
+                            this.renderNormalInterview(busho);
+                        });
+                        return; // ここで一旦ストップします
+                    }
+
+                    // お金が足りた場合は、お城の貯金箱から200減らします！
+                    castle.gold -= 200;
+                    
+                    // 寿命を1年延ばしてあげます
+                    busho.endYear += 1;
+                    busho.isActionDone = true; // おまけで行動済みにします
+                    this.showResultModal(`${busho.name}は快方に向かいました！`);
+                    
+                    // ★ここを追加：減ったお金の数字を、画面の左側にすぐ反映させます！
+                    this.updatePanelHeader();
+                    this.renderCommandMenu();
+                },
+                () => {
+                    // 「いいえ」を選んだ場合は、いつもの面談画面を出します
+                    this.renderNormalInterview(busho);
+                }
+            );
+            return; // ここで一旦ストップします
+        }
+
+        // 寿命が近くない場合は、最初からいつもの面談画面を出します
+        this.renderNormalInterview(busho);
+    }
+
+    // いつもの面談画面を作るための専用の魔法（さきほどと同じです！）
+    renderNormalInterview(busho) {
         if (!this.resultModal) return;
         this.resultModal.classList.remove('hidden');
         let content = "";
@@ -2268,6 +2317,7 @@ class UIManager {
             this.openBushoSelector('interview_target', null, { interviewer: busho }); 
         };
     }
+    
     reopenInterviewSelector() { this.closeResultModal(); this.openBushoSelector('interview', null, {allowDone: true}); }
     
     reopenInterviewModal(busho) {
