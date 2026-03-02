@@ -127,7 +127,7 @@ class DataManager {
             // もし武将の「登場年」が「開始年」よりも未来だったら…（まだ生まれてない、または元服前）
             if (b.startYear > startYear) {
                 b.status = 'unborn'; // 「未登場」の印をつけます
-                b.clan = 0;          // まだどこの家にも属していません
+                // ここにあった「b.clan = 0;」を消しました！元々の所属データを残します！
                 b.isDaimyo = false;
                 b.isCastellan = false;
                 // まだ登場していないので、お城の中には入れません！

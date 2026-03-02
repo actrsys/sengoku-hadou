@@ -30,36 +30,53 @@ class LifeSystem {
         let messages = [];
 
         unbornBushos.forEach(b => {
-            // 登場する予定のお城を探します
-            const targetCastle = this.game.getCastle(b.castleId);
-            if (!targetCastle) return;
-
-            // 元から「浪人（clanが0）」の設定なら、そのまま浪人として登場します
+            // ★変更：ゲーム開始時にclanが0なら浪人、0以外なら仕官として処理します
             if (b.clan === 0) {
+                // 登場前:浪人 の場合
                 b.status = 'ronin';
+                const targetCastle = this.game.getCastle(b.castleId);
+                if (targetCastle) {
+                    targetCastle.samuraiIds.push(b.id);
+                }
             } else {
-                // お城を今支配している大名家を調べます
-                const ownerClanId = targetCastle.ownerClan;
+                // 登場前:仕官 の場合
+                b.status = 'active';
                 
-                // お城が「空き城」になっていたら、行く当てがないので浪人になります
-                if (ownerClanId === 0) {
-                    b.status = 'ronin';
-                    b.clan = 0;
-                } else {
-                    // お城の持ち主の家来として登場します！
-                    b.clan = ownerClanId;
-                    b.status = 'active';
+                // ★追加：「登場前:仕官」の武将に一門武将がいるかチェックします
+                // 条件：すでに登場して生きている（浪人ではない）、自分自身ではない、一門IDが共通している
+                const activeRelatives = this.game.bushos.filter(other => 
+                    other.status !== 'unborn' && other.status !== 'dead' && other.status !== 'ronin' &&
+                    other.id !== b.id &&
+                    b.familyIds.some(fId => other.familyIds.includes(fId))
+                );
+
+                let hasRelative = false;
+                if (activeRelatives.length > 0) {
+                    hasRelative = true;
+                    // 一門武将がいる場合、その武将のお城に移動して、所属する大名家も合わせます
+                    b.castleId = activeRelatives[0].castleId;
+                    b.clan = activeRelatives[0].clan;
+                }
+
+                const targetCastle = this.game.getCastle(b.castleId);
+                
+                if (targetCastle) {
+                    // もし一門がいなくて、予定されていた城の持ち主が変わっていたら、その城の今の大名家に仕えます
+                    if (!hasRelative) {
+                        const ownerClanId = targetCastle.ownerClan;
+                        if (ownerClanId === 0) {
+                            // 城が空き城なら、仕方なく浪人になります
+                            b.status = 'ronin';
+                            b.clan = 0;
+                        } else {
+                            b.clan = ownerClanId;
+                        }
+                    }
+
+                    targetCastle.samuraiIds.push(b.id);
                     
                     // プレイヤーの大名家にやってきた場合は、お知らせのメッセージを作ります
-                    if (ownerClanId === this.game.playerClanId) {
-                        // 一門（親戚）がいるかチェックします
-                        const hasRelative = this.game.bushos.some(other => 
-                            other.clan === this.game.playerClanId &&
-                            other.status !== 'unborn' && other.status !== 'dead' && other.id !== b.id &&
-                            b.familyIds.some(fId => other.familyIds.includes(fId))
-                        );
-
-                        // 名前の「|」を消して綺麗にします（例：織田|信長 → 織田信長）
+                    if (b.status === 'active' && b.clan === this.game.playerClanId) {
                         const nameStr = b.name.replace('|', '');
                         if (hasRelative) {
                             messages.push(`${nameStr}が元服し、当家に加わりました！`);
@@ -67,11 +84,12 @@ class LifeSystem {
                             messages.push(`${nameStr}が当家に仕官しました！`);
                         }
                     }
+                } else {
+                    // 万が一城が見つからなかった時の安全策
+                    b.status = 'ronin';
+                    b.clan = 0;
                 }
             }
-            
-            // お城の中に武将を入れてあげます
-            targetCastle.samuraiIds.push(b.id);
         });
 
         // お知らせがあれば、画面に表示します
