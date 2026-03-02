@@ -228,7 +228,38 @@ class UIManager {
             this.guardHiddenCount++; // 他の画面が既に隠している場合はカウントだけ増やす
         }
     }
+    
+    // ==========================================
+    // ★ここから追加：画面のメッセージが全部消えるまで「待て！」をする魔法
+    // ==========================================
+    async waitForDialogs() {
+        // メッセージの画面が「今、開いているか？」を確認する小さな魔法
+        const isVisible = (id) => {
+            const el = document.getElementById(id);
+            return el && !el.classList.contains('hidden');
+        };
 
+        // キュー（メッセージの順番待ち）が残っているか、
+        // どれかの画面が開いていたら、ずっと待ち続けます
+        while (
+            (this.dialogQueue && this.dialogQueue.length > 0) ||
+            isVisible('dialog-modal') ||
+            isVisible('result-modal') ||
+            isVisible('intercept-confirm-modal') ||
+            isVisible('unit-divide-modal') ||
+            isVisible('prisoner-modal')
+        ) {
+            // 「まだ画面開いてるかな？」と0.2秒ごとに確認します
+            await new Promise(resolve => setTimeout(resolve, 200));
+        }
+        
+        // 画面が全部閉じたら、念のため「ほんの少しだけ（0.1秒）」余韻を残してから進みます
+        await new Promise(resolve => setTimeout(resolve, 100));
+    }
+    // ==========================================
+    // ★追加ここまで
+    // ==========================================
+    
     restoreAIGuard() {
         if (this.guardHiddenCount > 0) {
             this.guardHiddenCount--;

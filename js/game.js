@@ -740,7 +740,7 @@ class GameManager {
         this.processTurn();
     }
 
-    processTurn() {
+    async processTurn() {  // ★最初に async を付けます！
         if (this.aiTimer) {
             clearTimeout(this.aiTimer);
             this.aiTimer = null;
@@ -774,7 +774,15 @@ class GameManager {
         const isVisible = this.isCastleVisible(castle);
         const isNeighbor = this.castles.some(c => Number(c.ownerClan) === playerId && GameSystem.isAdjacent(c, castle));
         const isImportant = isVisible || isNeighbor;
-
+        
+        // ==========================================
+        // ★ここに追加：画面を動かしたり「ご命令ください」を出す前に、
+        // 画面上のメッセージが全部終わるまでじっと待ちます！
+        if (this.ui && this.ui.waitForDialogs) {
+            await this.ui.waitForDialogs();
+        }
+        // ==========================================
+        
         if (isPlayerCastle || isImportant || this.currentIndex % 5 === 0) {
             this.ui.renderMap();
         }
