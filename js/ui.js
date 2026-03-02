@@ -760,6 +760,14 @@ class UIManager {
         const daimyo = bushos.find(b => b.isDaimyo);
         const daimyoFactionId = daimyo ? daimyo.factionId : -1;
         
+        // ★追加：殿様の派閥を一番上に持ってくる並び替え（ソート）の魔法です！
+        // ついでに、他の派閥は「武将が多い順」に並ぶようにしておきました
+        fIds.sort((a, b) => {
+            if (a === daimyoFactionId) return -1; // aが殿様なら一番上！
+            if (b === daimyoFactionId) return 1;  // bが殿様なら一番上！
+            return factions[b].count - factions[a].count; // それ以外は人数の多い順
+        });
+        
         // ★変更：右上の無派閥の表示を消して、スッキリしたヘッダーにします！
         let listHtml = `<div class="faction-list-container"><div class="faction-list-header"><span>派閥主</span><span>武将数</span><span>方針</span><span>思想</span></div>`;
         
