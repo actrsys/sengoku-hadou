@@ -375,13 +375,37 @@ class AIEngine {
             }
 
             // 10. 武将の移動
-            // ★修正：移動の場合も、プレイヤーと同じように「道が繋がっているか」を判定します！
-            const emptyCastles = this.game.castles.filter(c => 
+            const myClanCastles = this.game.castles.filter(c => 
                 c.ownerClan === castle.ownerClan && 
                 c.id !== castle.id && 
-                c.samuraiIds.length <= 1 &&
                 GameSystem.isReachable(this.game, castle, c, castle.ownerClan)
             );
+            
+            // ① 従来の空き城への移動
+            const emptyCastles = myClanCastles.filter(c => c.samuraiIds.length <= 1);
+            if (emptyCastles.length > 0) {
+                actions.push({ type: 'move', stat: 'leadership', score: 300, cost: 0, targetId: emptyCastles[0].id });
+            }
+            
+            // ② 派閥に属する武将は、派閥主のいる城やその隣の城に積極的に移動する
+            availableBushos.forEach(b => {
+                if (b.factionId !== 0 && !b.isFactionLeader && b.id !== castle.castellanId && !b.isDaimyo) {
+                    const leader = this.game.bushos.find(lb => lb.isFactionLeader && lb.factionId === b.factionId);
+                    if (leader && leader.castleId !== castle.id) {
+                        const leaderCastle = this.game.getCastle(leader.castleId);
+                        if (leaderCastle && myClanCastles.some(c => c.id === leaderCastle.id)) {
+                            // 派閥主の城へ移動
+                            actions.push({ type: 'move', stat: 'leadership', score: 350, cost: 0, targetId: leaderCastle.id, specificMover: b });
+                        } else if (leaderCastle) {
+                            // 派閥主の城に直接行けない場合、隣の城を探す
+                            const neighborCastles = myClanCastles.filter(c => GameSystem.isAdjacent(c, leaderCastle));
+                            if (neighborCastles.length > 0) {
+                                actions.push({ type: 'move', stat: 'leadership', score: 320, cost: 0, targetId: neighborCastles[0].id, specificMover: b });
+                            }
+                        }
+                    }
+                }
+            });
             if (emptyCastles.length > 0) {
                 actions.push({ type: 'move', stat: 'leadership', score: 300, cost: 0, targetId: emptyCastles[0].id });
             }
@@ -640,32 +664,61 @@ class AIEngine {
                     doer.isActionDone = true; actionDoneInThisStep = true; break; 
                 }
                 if (action.type === 'move') {
-                    let moveCandidates = availableBushos.filter(b => b.id !== castle.castellanId);
-                    let mover = null;
-                    const factionLeader = moveCandidates.find(b => b.isFactionLeader);
-                    if (factionLeader) mover = factionLeader;
-                    if (!mover) {
-                        for (let b of moveCandidates) {
-                            if (GameSystem.calcAffinityDiff(castellan.affinity, b.affinity) >= 20) {
-                                mover = b; break;
+                    let movers = [];
+                    
+                    if (action.specificMover) {
+                        // 派閥主の元へ合流する武将の場合は、その人だけ移動リストに入れます
+                        movers.push(action.specificMover);
+                    } else {
+                        // 従来の空き城への移動など
+                        let moveCandidates = availableBushos.filter(b => b.id !== castle.castellanId);
+                        let mainMover = null;
+                        const factionLeader = moveCandidates.find(b => b.isFactionLeader);
+                        
+                        if (factionLeader) {
+                            // 派閥主が見つかったら、移動リストのリーダーにします
+                            mainMover = factionLeader;
+                            movers.push(mainMover);
+                            // 派閥主が移動する場合は、大名以外の、その城にいて、派閥に属する武将は全員お供にします
+                            const followers = moveCandidates.filter(b => 
+                                b.id !== mainMover.id && 
+                                b.factionId === mainMover.factionId && 
+                                !b.isDaimyo && 
+                                !b.isFactionLeader // 別の派閥主は巻き込まない（２人同時の派閥主移動を防ぐ）
+                            );
+                            movers = movers.concat(followers); // リーダーとお供を合流させます
+                        } else {
+                            // 派閥主がいなければ、仲の悪い人を探して移動させます
+                            for (let b of moveCandidates) {
+                                if (GameSystem.calcAffinityDiff(castellan.affinity, b.affinity) >= 20) {
+                                    mainMover = b; 
+                                    movers.push(mainMover);
+                                    break;
+                                }
                             }
                         }
                     }
-                    if (mover) {
+
+                    if (movers.length > 0) {
                         const targetCastle = this.game.getCastle(action.targetId);
-                        const sourceCountAfter = castle.samuraiIds.length - 1;       
-                        const targetCountAfter = targetCastle.samuraiIds.length + 1; 
                         
-                        if (sourceCountAfter < targetCountAfter) {
-                            continue;
+                        // 元の城に最低３人残るかチェックします
+                        const sourceCountAfter = castle.samuraiIds.length - movers.length;
+                        if (sourceCountAfter < 3) {
+                            continue; // ３人未満になるなら、今回の移動は諦めます
                         }
 
-                        this.game.factionSystem.handleMove(mover, castle.id, action.targetId);
-                        castle.samuraiIds = castle.samuraiIds.filter(id => id !== mover.id);
-                        targetCastle.samuraiIds.push(mover.id);
-                        mover.castleId = action.targetId;
-                        mover.isActionDone = true;
-                        actionDoneInThisStep = true; break;
+                        // リストに入っている全員を一斉に移動させます
+                        movers.forEach(mover => {
+                            this.game.factionSystem.handleMove(mover, castle.id, action.targetId);
+                            castle.samuraiIds = castle.samuraiIds.filter(id => id !== mover.id);
+                            targetCastle.samuraiIds.push(mover.id);
+                            mover.castleId = action.targetId;
+                            mover.isActionDone = true;
+                        });
+                        
+                        actionDoneInThisStep = true; 
+                        break;
                     }
                 }
             }

@@ -649,6 +649,10 @@ class GameManager {
             if (b.isFactionLeader) {
                 b._lordScore += 10000; 
             }
+            // ★ここを追加：軍師の点数をものすごく下げて一番後回しにします！
+            if (b.isGunshi) {
+                b._lordScore -= 100000; 
+            }
         });
 
         bushos.sort((a, b) => b._lordScore - a._lordScore);
@@ -656,6 +660,12 @@ class GameManager {
 
         bushos.forEach(b => b.isCastellan = false);
         best.isCastellan = true;
+        
+        // ★ここを追加：もし他に誰もいなくて、仕方なく軍師が城主になったら、軍師はクビ（解任）にします
+        if (best.isGunshi) {
+            best.isGunshi = false;
+        }
+        
         castle.castellanId = best.id;
     }
 
