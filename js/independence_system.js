@@ -173,7 +173,7 @@ class IndependenceSystem {
             if (busho && busho.factionId !== 0 && busho.factionId === leader.factionId) {
                 const { joinScore, stayScore } = this.calculateLoyaltyScores(busho, leader, oldDaimyo);
                 if (joinScore > stayScore) {
-                    this.game.ui.log(`  -> 呼応！${castle.name}城主の${busho.name}が${leader.name}に組みしました！`);
+                    this.game.ui.log(`  -> 呼応！${castle.name}城主の${busho.name}が${leader.name}に与しました！`);
                     const oldLoy = busho.loyalty;
                     castle.ownerClan = newClanId;
                     busho.clan = newClanId;
