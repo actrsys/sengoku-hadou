@@ -969,15 +969,17 @@ class WarManager {
             const originalAtkSoldiers = Math.max(1, s.attacker.soldiers + s.deadSoldiers.attacker);
             const atkSurviveRate = Math.max(0, s.attacker.soldiers) / originalAtkSoldiers;
             
-            s.attacker.horses = Math.floor((s.attacker.horses || 0) * atkSurviveRate);
-            s.attacker.guns = Math.floor((s.attacker.guns || 0) * atkSurviveRate);            
+            // ★修正：攻城戦では攻撃側の馬と鉄砲が減らないように、以下の2行の先頭に「//」をつけてお休みにします！
+            // s.attacker.horses = Math.floor((s.attacker.horses || 0) * atkSurviveRate);
+            // s.attacker.guns = Math.floor((s.attacker.guns || 0) * atkSurviveRate);            
 
             // 防衛側（城）の馬と鉄砲も、兵士の損耗に合わせて壊れるようにする
             if (!s.defender.isKunishu) {
                 const originalDefSoldiers = s.defender.soldiers + s.deadSoldiers.defender;
                 const defSurviveRate = originalDefSoldiers > 0 ? (Math.max(0, s.defender.soldiers) / originalDefSoldiers) : 0;
-                s.defender.horses = Math.floor((s.defender.horses || 0) * defSurviveRate);
-                s.defender.guns = Math.floor((s.defender.guns || 0) * defSurviveRate);
+                // ★修正：守備側の馬と鉄砲も減らないように、以下の2行の先頭に「//」をつけてお休みにします！
+                // s.defender.horses = Math.floor((s.defender.horses || 0) * defSurviveRate);
+                // s.defender.guns = Math.floor((s.defender.guns || 0) * defSurviveRate);
             }
             
             // 援軍部隊を元の城に帰還させる処理
