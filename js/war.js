@@ -417,12 +417,14 @@ class WarManager {
     	                } else {
                             const modal = document.getElementById('intercept-confirm-modal');
                             if (modal) {
-                                // ★ aiGuard を消す魔法を削除しました
+                                // ★変更：ui.js に作った魔法を呼び出してガードを隠します
+                                this.game.ui.hideAIGuardTemporarily();
                                 modal.classList.remove('hidden');
                                 document.getElementById('intercept-msg').innerText = `${atkArmyName}の${atkBushos[0].name}が攻めてきました！\n敵軍: ${atkSoldierCount} 対 自軍: ${totalDefSoldiers}\n迎撃（野戦）しますか？籠城しますか？`;
                                 
                                 document.getElementById('btn-intercept').onclick = () => { 
                                     modal.classList.add('hidden'); 
+                                    this.game.ui.restoreAIGuard(); // ★追加：画面を閉じたらガードを戻す
                                     this.game.ui.openBushoSelector('def_intercept_deploy', defCastle.id, {
                                         onConfirm: (selectedBushoIds) => {
                                             const defBushos = selectedBushoIds.map(id => this.game.getBusho(id));
@@ -464,18 +466,31 @@ class WarManager {
                                                         onResult('field', finalDefAssignments, interceptRice, finalAtkAssignments, interceptHorses, interceptGuns);
                                                     },
                                                     // ★兵士配分画面でキャンセルしたら、最初の選択画面に戻す
-                                                    () => { modal.classList.remove('hidden'); }
+                                                    () => { 
+                                                        this.game.ui.hideAIGuardTemporarily(); // ★追加：戻ってきたらまた隠す
+                                                        modal.classList.remove('hidden'); 
+                                                    }
                                                     );
                                                 },
                                                 // ★兵数入力画面でキャンセルしたら、最初の選択画面に戻す
-                                                onCancel: () => { modal.classList.remove('hidden'); }
+                                                onCancel: () => { 
+                                                    this.game.ui.hideAIGuardTemporarily(); // ★追加
+                                                    modal.classList.remove('hidden'); 
+                                                }
                                             });
                                         },
                                         // ★武将選択画面でキャンセルしたら、最初の選択画面に戻す
-                                        onCancel: () => { modal.classList.remove('hidden'); }
+                                        onCancel: () => { 
+                                            this.game.ui.hideAIGuardTemporarily(); // ★追加
+                                            modal.classList.remove('hidden'); 
+                                        }
                                     });
                                 };
-                                document.getElementById('btn-siege').onclick = () => { modal.classList.add('hidden'); onResult('siege'); };
+                                document.getElementById('btn-siege').onclick = () => { 
+                                    modal.classList.add('hidden'); 
+                                    this.game.ui.restoreAIGuard(); // ★追加
+                                    onResult('siege'); 
+                                };
                             } else onResult('siege');
                         }
                     } else {
@@ -1684,7 +1699,8 @@ class WarManager {
         const pid = this.game.playerClanId;
         
         // 国人衆の反乱など、特殊な戦いなら援軍は呼べません
-        if (defClanId === 0 || defCastle.isKunishu || this.state.isKunishuSubjugation) {
+        // ★追加：敵が国人衆（this.state.attacker.isKunishu）の場合も援軍は呼べないようにします！
+        if (defClanId === 0 || defCastle.isKunishu || this.state.isKunishuSubjugation || this.state.attacker.isKunishu) {
             onComplete();
             return;
         }

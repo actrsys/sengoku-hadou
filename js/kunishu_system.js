@@ -49,7 +49,7 @@ class KunishuSystem {
     }
 
     // 月末処理
-    processEndMonth() {
+    async processEndMonth() { // ★追加：async を付けます
         const activeKunishus = this.getAliveKunishus();
 
         activeKunishus.forEach(kunishu => {
@@ -87,13 +87,14 @@ class KunishuSystem {
         });
 
         // 3. 城の所有者（大名）に対するアクション
-        survivingKunishus.forEach(kunishu => {
+        // ★変更：forEach をやめて、順番待ちができる for...of に変えます
+        for (const kunishu of survivingKunishus) {
             const castle = this.game.getCastle(kunishu.castleId);
-            if (!castle || castle.ownerClan === 0) return; // 中立の城は何もしない
+            if (!castle || castle.ownerClan === 0) continue; // ★変更：return を continue にします
 
             // 毎月末、最大20%の確率で発動
             if (Math.random() < 0.20) {
-                this.executeActionToLord(kunishu, castle);
+                await this.executeActionToLord(kunishu, castle); // ★追加：await を付けます
             }
             
             // 毎ターン、相性による友好度の自然変動 (最大±3)
@@ -107,7 +108,7 @@ class KunishuSystem {
                 const currentRel = kunishu.getRelation(castle.ownerClan);
                 kunishu.setRelation(castle.ownerClan, currentRel + change);
             }
-        });
+        }
     }
 
     // 国人衆同士の抗争処理
@@ -152,7 +153,7 @@ class KunishuSystem {
     }
 
     // 城主（大名）へのアクション
-    executeActionToLord(kunishu, castle) {
+    async executeActionToLord(kunishu, castle) {
         const clanId = castle.ownerClan;
         const currentRel = kunishu.getRelation(clanId);
         const castellan = this.game.getBusho(castle.castellanId);
@@ -212,14 +213,15 @@ class KunishuSystem {
                 if (leader.personality === 'cautious') uprisingChance -= 0.2;
 
                 if (Math.random() < uprisingChance && kunishu.soldiers > 500) {
-                    this.executeUprising(kunishu, castle);
+                    await this.executeUprising(kunishu, castle); // ★変更：await を付けます
                 }
             }
         }
     }
 
     // 蜂起処理 (国人衆からの城攻め)
-    executeUprising(kunishu, castle) {
+    // ★変更：async を付けます
+    async executeUprising(kunishu, castle) {
         const atkSoldiers = Math.floor(kunishu.soldiers * 0.5);
         if (atkSoldiers <= 0) return;
         kunishu.soldiers -= atkSoldiers;
@@ -255,6 +257,12 @@ class KunishuSystem {
 
         // WarManagerの開始フローに合流
         this.game.warManager.startWar(dummyAttacker, castle, atkBushos, atkSoldiers, atkRice);
+        
+        // ★ここから追加：戦争画面が終わるまで、次の処理に進まずにじっと待つ魔法！
+        while (this.game.warManager.state.active) {
+            await new Promise(resolve => setTimeout(resolve, 500));
+        }
+        // ★追加ここまで
     }
 
     // 壊滅と継承のチェック

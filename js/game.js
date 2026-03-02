@@ -824,6 +824,12 @@ class GameManager {
         if (this.aiTimer) { clearTimeout(this.aiTimer); this.aiTimer = null; }
 
         this.selectionMode = null; 
+        
+        // ★追加：月末のイベント処理中（独立や反乱など）は、ここでストップします！
+        if (this.currentIndex >= this.turnQueue.length) {
+            return;
+        }
+
         const castle = this.getCurrentTurnCastle(); 
         if(castle) castle.isDone = true; 
         
@@ -834,7 +840,9 @@ class GameManager {
     async endMonth() { // ★ async を追加します！
         this.factionSystem.processEndMonth(); 
         await this.independenceSystem.checkIndependence(); // ★ await を追加して待ちます！
-        this.kunishuSystem.processEndMonth();
+        
+        // ★修正：国人衆の処理が終わるまで「待つ」ようにします！
+        await this.kunishuSystem.processEndMonth();
         
         // ★ 追加：月の終わりに、寿命を迎えた武将がいないかチェックします！
         await this.lifeSystem.processEndMonth(); // ★ await を追加して待ちます！

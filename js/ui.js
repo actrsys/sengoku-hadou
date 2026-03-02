@@ -216,6 +216,32 @@ class UIManager {
         this.isDialogShowing = false; 
     } // ← これが constructor の終わりのカッコです
     
+    // ==========================================
+    // ★ここから追加：AIのガードを安全に隠す・戻す魔法
+    // ==========================================
+    hideAIGuardTemporarily() {
+        const aiGuard = document.getElementById('ai-guard');
+        if (aiGuard && !aiGuard.classList.contains('hidden')) {
+            aiGuard.classList.add('hidden');
+            this.guardHiddenCount = (this.guardHiddenCount || 0) + 1;
+        } else if (this.guardHiddenCount > 0) {
+            this.guardHiddenCount++; // 他の画面が既に隠している場合はカウントだけ増やす
+        }
+    }
+
+    restoreAIGuard() {
+        if (this.guardHiddenCount > 0) {
+            this.guardHiddenCount--;
+            if (this.guardHiddenCount === 0 && this.game && this.game.isProcessingAI) {
+                const aiGuard = document.getElementById('ai-guard');
+                if (aiGuard) aiGuard.classList.remove('hidden');
+            }
+        }
+    }
+    // ==========================================
+    // ★追加ここまで
+    // ==========================================
+    
     initSidebarResize() {
         const sidebar = document.getElementById('pc-sidebar');
         const resizer = document.getElementById('sidebar-resizer');
@@ -278,10 +304,8 @@ class UIManager {
         const okBtn = document.getElementById('dialog-btn-ok');
         const cancelBtn = document.getElementById('dialog-btn-cancel');
 
-        // ★追加：ダイアログを出す時は、AIの「思考中ガード」を一時的に隠します！
-        const aiGuard = document.getElementById('ai-guard');
-        const wasGuardActive = aiGuard && !aiGuard.classList.contains('hidden');
-        if (wasGuardActive) aiGuard.classList.add('hidden');
+        // ★変更：新しく作った魔法で、どんな時でも安全にガードを隠します！
+        this.hideAIGuardTemporarily();
 
         if (!modal) {
             if (dialog.isConfirm) {
@@ -290,6 +314,7 @@ class UIManager {
                 alert(dialog.msg);
                 if (dialog.onOk) dialog.onOk();
             }
+            this.restoreAIGuard(); // ガードを戻す
             this.processDialogQueue(); // 次の人へ
             return;
         }
@@ -302,11 +327,30 @@ class UIManager {
             if (autoCloseTimer) clearTimeout(autoCloseTimer);
             modal.classList.add('hidden');
             
-            // ★追加：ダイアログを閉じたら、ガードを元の状態に戻します！
-            if (wasGuardActive && aiGuard) aiGuard.classList.remove('hidden');
+            // ★変更：新しく作った魔法で、必要な時だけガードを戻します！
+            this.restoreAIGuard();
 
-            if (callback) callback();
-            this.processDialogQueue(); // 次のダイアログへ！
+            // エラーが起きても絶対に次の画面に進めるように、おまじないをかけます
+            const executeNext = () => {
+                setTimeout(() => {
+                    this.processDialogQueue();
+                }, 10);
+            };
+
+            try {
+                if (callback) {
+                    const result = callback();
+                    // もし「待つ」設定の処理だったら、終わるまで待ってから次へ
+                    if (result instanceof Promise) {
+                        result.catch(e => console.error(e)).finally(executeNext);
+                        return; 
+                    }
+                }
+            } catch (e) {
+                console.error("ダイアログの処理中にエラー:", e);
+            }
+            
+            executeNext();
         };
 
         // ★連打防止！一度クリックしたら即座にボタンの反応を消します
@@ -837,6 +881,7 @@ class UIManager {
     }
 
     showResultModal(msg, onClose = null, customFooterHtml = null) { 
+    this.hideAIGuardTemporarily(); // ★ここに追加
         // ★ aiGuard を消す魔法を削除しました
         if (this.resultBody) this.resultBody.innerHTML = msg.replace(/\n/g, '<br>');
         const footer = document.getElementById('result-footer');
@@ -852,7 +897,8 @@ class UIManager {
     }
     
     closeResultModal() { 
-        if (this.resultModal) this.resultModal.classList.add('hidden'); 
+    if (this.resultModal) this.resultModal.classList.add('hidden'); 
+    this.restoreAIGuard(); // ★ここに追加
         
         if (this.onResultModalClose) {
             const cb = this.onResultModalClose;
@@ -865,6 +911,7 @@ class UIManager {
     
     closeSelector() { 
         if (this.selectorModal) this.selectorModal.classList.add('hidden'); 
+        this.restoreAIGuard(); // ★ここに追加
         // ★追加：ウインドウを閉じる時に、必ず決定ボタンを元の押せる状態にリセットします
         if (this.selectorConfirmBtn) {
             this.selectorConfirmBtn.disabled = false;
@@ -1639,6 +1686,7 @@ class UIManager {
     openBushoSelector(actionType, targetId = null, extraData = null, onBack = null) {
         if (actionType === 'appoint' && this.currentCastle) { const isDaimyoHere = this.game.getCastleBushos(this.currentCastle.id).some(b => b.isDaimyo); if (isDaimyoHere) { this.showDialog("大名の居城は城主を変更できません", false); return; } }
         
+        this.hideAIGuardTemporarily(); // ★ここに追加
         if (this.selectorModal) this.selectorModal.classList.remove('hidden'); 
         if (document.getElementById('selector-title')) document.getElementById('selector-title').textContent = "武将を選択"; 
         
@@ -2235,6 +2283,7 @@ class UIManager {
             </div>
         `;
         if (this.resultBody) this.resultBody.innerHTML = msg;
+        this.hideAIGuardTemporarily(); // ★ここに追加
         if (this.resultModal) this.resultModal.classList.remove('hidden');
         this.onResultModalClose = onProceed;
     }
