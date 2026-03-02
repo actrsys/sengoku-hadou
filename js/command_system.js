@@ -426,7 +426,12 @@ class CommandSystem {
             return;
         }
         if (actionType === 'employ_doer') {
-            this.showAdviceAndExecute('employ', () => this.executeEmploy(firstId, extraData.targetId), { targetId: extraData.targetId });
+            const doer = this.game.getBusho(firstId);
+            const target = this.game.getBusho(extraData.targetId);
+            const myPower = this.game.getClanTotalSoldiers(this.game.playerClanId);
+            const targetPower = target.clan === 0 ? 0 : this.game.getClanTotalSoldiers(target.clan);
+            const trueProb = GameSystem.getEmployProb(doer, target, myPower, targetPower);
+            this.showAdviceAndExecute('employ', () => this.executeEmploy(firstId, extraData.targetId), { targetId: extraData.targetId, trueProb: trueProb });
             return;
         }
 
@@ -444,7 +449,10 @@ class CommandSystem {
             return;
         }
         if (actionType === 'rumor_doer') {
-            this.showAdviceAndExecute('rumor', () => this.executeRumor(firstId, targetId, extraData.targetBushoId));
+            const doer = this.game.getBusho(firstId);
+            const targetBusho = this.game.getBusho(extraData.targetBushoId);
+            const trueProb = GameSystem.getRumorProb(doer, targetBusho);
+            this.showAdviceAndExecute('rumor', () => this.executeRumor(firstId, targetId, extraData.targetBushoId), { trueProb: trueProb });
             return;
         }
 
@@ -452,13 +460,40 @@ class CommandSystem {
             if (extraData.subAction === 'goodwill') {
                 this.game.ui.openQuantitySelector('goodwill', selectedIds, targetId);
             } else if (extraData.subAction === 'alliance') {
-                this.showAdviceAndExecute('diplomacy', () => this.executeDiplomacy(firstId, targetId, 'alliance'));
+                const doer = this.game.getBusho(firstId);
+                const targetCastle = this.game.getCastle(targetId);
+                const relation = this.game.getRelation(doer.clan, targetCastle.ownerClan);
+                const chance = relation.sentiment + doer.diplomacy;
+                const trueProb = chance > 120 ? 0.7 : 0.0;
+                this.showAdviceAndExecute('diplomacy', () => this.executeDiplomacy(firstId, targetId, 'alliance'), { trueProb: trueProb });
             } else if (extraData.subAction === 'break_alliance') {
                 this.executeDiplomacy(firstId, targetId, 'break_alliance');
             } else if (extraData.subAction === 'subordinate') {
-                this.showAdviceAndExecute('diplomacy', () => this.executeDiplomacy(firstId, targetId, 'subordinate'));
+                this.showAdviceAndExecute('diplomacy', () => this.executeDiplomacy(firstId, targetId, 'subordinate'), { trueProb: 1.0 });
             } else if (extraData.subAction === 'dominate') {
-                this.showAdviceAndExecute('diplomacy', () => this.executeDiplomacy(firstId, targetId, 'dominate'));
+                const doer = this.game.getBusho(firstId);
+                const targetCastle = this.game.getCastle(targetId);
+                const targetClanId = targetCastle.ownerClan;
+                const myPower = this.game.getClanTotalSoldiers(doer.clan);
+                const targetPower = this.game.getClanTotalSoldiers(targetClanId) || 1;
+                const powerRatio = myPower / targetPower;
+                let trueProb = 0;
+                if (powerRatio >= 5) {
+                    let prob = 20;
+                    if (powerRatio >= 15) prob = 70;
+                    else prob = 20 + (powerRatio - 5) * (50 / 10);
+                    if (doer.diplomacy >= 50) prob += Math.min(10, (doer.diplomacy - 50) * 0.2);
+                    let isAlreadySubordinate = false;
+                    this.game.clans.forEach(c => {
+                        if (c.id !== targetClanId && c.id !== doer.clan) {
+                            const rel = this.game.getRelation(targetClanId, c.id);
+                            if (rel && rel.status === '従属') isAlreadySubordinate = true;
+                        }
+                    });
+                    if (isAlreadySubordinate) prob *= 0.2;
+                    trueProb = prob / 100;
+                }
+                this.showAdviceAndExecute('diplomacy', () => this.executeDiplomacy(firstId, targetId, 'dominate'), { trueProb: trueProb });
             }
             return;
         }
@@ -538,17 +573,21 @@ class CommandSystem {
         }
 
         if (actionType === 'investigate_deploy') {
-            this.showAdviceAndExecute('investigate', () => this.executeInvestigate(selectedIds, targetId));
+            const bushos = selectedIds.map(id => this.game.getBusho(id));
+            const trueProb = GameSystem.getInvestigateProb(bushos);
+            this.showAdviceAndExecute('investigate', () => this.executeInvestigate(selectedIds, targetId), { trueProb: trueProb });
             return;
         }
         
         if (actionType === 'incite_doer') {
-             this.showAdviceAndExecute('incite', () => this.executeIncite(firstId, targetId));
+             const doer = this.game.getBusho(firstId);
+             const trueProb = GameSystem.getInciteProb(doer);
+             this.showAdviceAndExecute('incite', () => this.executeIncite(firstId, targetId), { trueProb: trueProb });
              return;
         }
 
-      　if (actionType === 'charity') {
-            this.showAdviceAndExecute('charity', () => this.executeCharity(selectedIds, 'rice'));
+        if (actionType === 'charity') {
+            this.showAdviceAndExecute('charity', () => this.executeCharity(selectedIds, 'rice'), { trueProb: 1.0 });
             return;
         }
 
@@ -565,13 +604,13 @@ class CommandSystem {
         }
         
         if (actionType === 'reward') {
-            this.showAdviceAndExecute('reward', () => this.executeReward(selectedIds));
+            this.showAdviceAndExecute('reward', () => this.executeReward(selectedIds), { trueProb: 1.0 });
             return;
         }
 
         if (spec && ['farm', 'commerce', 'repair', 'training', 'soldier_charity', 'appoint', 'banish'].includes(actionType)) {
             if (spec.hasAdvice) {
-                this.showAdviceAndExecute(actionType, () => this.executeCommand(actionType, selectedIds, targetId));
+                this.showAdviceAndExecute(actionType, () => this.executeCommand(actionType, selectedIds, targetId), { trueProb: 1.0 });
             } else {
                 this.executeCommand(actionType, selectedIds, targetId);
             }
@@ -587,7 +626,7 @@ class CommandSystem {
         if (type === 'draft') {
             const val = parseInt(inputs.gold.num.value);
             if (val <= 0) return;
-            this.showAdviceAndExecute('draft', () => this.executeDraft(data, val), { val: val });
+            this.showAdviceAndExecute('draft', () => this.executeDraft(data, val), { val: val, trueProb: 1.0 });
         }
         else if (type === 'goodwill') {
             const val = parseInt(inputs.gold.num.value);
@@ -595,18 +634,29 @@ class CommandSystem {
             
             // ★追加: 国人衆への親善なら
             if (extraData && extraData.isKunishu) {
-                this.showAdviceAndExecute('kunishu_goodwill', () => this.executeKunishuGoodwill(data[0], extraData.kunishuId, val));
+                this.showAdviceAndExecute('kunishu_goodwill', () => this.executeKunishuGoodwill(data[0], extraData.kunishuId, val), { trueProb: 1.0 });
             } else {
-                this.showAdviceAndExecute('goodwill', () => this.executeDiplomacy(data[0], targetId, 'goodwill', val));
+                this.showAdviceAndExecute('goodwill', () => this.executeDiplomacy(data[0], targetId, 'goodwill', val), { trueProb: 1.0 });
             }
         }
         else if (type === 'headhunt_gold') {
             const val = parseInt(inputs.gold.num.value);
             // ★追加: 国人衆からの引き抜きなら
             if (extraData && extraData.isKunishu) {
-                this.showAdviceAndExecute('kunishu_headhunt', () => this.executeKunishuHeadhunt(data[0], targetId, val, extraData.kunishuId));
+                const doer = this.game.getBusho(data[0]);
+                const target = this.game.getBusho(targetId);
+                const kunishu = this.game.kunishuSystem.getKunishu(extraData.kunishuId);
+                const targetLord = this.game.getBusho(kunishu.leaderId) || { affinity: 50 }; 
+                const newLord = this.game.bushos.find(b => b.clan === this.game.playerClanId && b.isDaimyo) || { affinity: 50 };
+                const trueProb = GameSystem.getHeadhuntProb(doer, target, val, targetLord, newLord);
+                this.showAdviceAndExecute('kunishu_headhunt', () => this.executeKunishuHeadhunt(data[0], targetId, val, extraData.kunishuId), { trueProb: trueProb });
             } else {
-                this.showAdviceAndExecute('headhunt', () => this.executeHeadhunt(data[0], targetId, val));
+                const doer = this.game.getBusho(data[0]);
+                const target = this.game.getBusho(targetId);
+                const targetLord = this.game.bushos.find(b => b.clan === target.clan && b.isDaimyo) || { affinity: 50 }; 
+                const newLord = this.game.bushos.find(b => b.clan === this.game.playerClanId && b.isDaimyo) || { affinity: 50 }; 
+                const trueProb = GameSystem.getHeadhuntProb(doer, target, val, targetLord, newLord);
+                this.showAdviceAndExecute('headhunt', () => this.executeHeadhunt(data[0], targetId, val), { trueProb: trueProb });
             }
         }
         else if (type === 'transport') {

@@ -18,16 +18,16 @@ window.MainParams = {
     StartYear: 1560, StartMonth: 4,
     System: { UseRandomNames: true },
     Economy: {
-        IncomeGoldRate: 0.5, IncomeRiceRate: 10.0, IncomeFluctuation: 0.15,
-        ConsumeRicePerSoldier: 0.05, ConsumeGoldPerBusho: 50,
+        IncomeGoldRate: 1,IncomeRiceRate: 10.0, IncomeFluctuation: 0.15,
+        ConsumeRicePerSoldier: 0.03, ConsumeGoldPerBusho: 10,
         BaseDevelopment: 10, PoliticsEffect: 0.6, DevelopFluctuation: 0.15,
         BaseRepair: 20, RepairEffect: 0.6, RepairFluctuation: 0.15,
         BaseCharity: 10, CharmEffect: 0.4, CharityFluctuation: 0.15,
-        TradeRateMin: 0.5, TradeRateMax: 3.0, TradeFluctuation: 0.15,
-        PriceAmmo: 10, PriceHorse: 100, PriceGun: 500
+        TradeRateMin: 0.5, TradeRateMax: 2.5, TradeFluctuation: 0.3,
+        PriceAmmo: 10, PriceHorse: 15, PriceGun: 50
     },
     Strategy: {
-        InvestigateDifficulty: 50, InciteFactor: 150, RumorFactor: 50, SchemeSuccessRate: 0.6, EmploymentDiff: 1.5,
+        InvestigateDifficulty: 50, InciteFactor: 150, RumorFactor: 50, SchemeSuccessRate: 0.25, EmploymentDiff: 1.5,
         HeadhuntBaseDiff: 50, HeadhuntGoldEffect: 0.01, HeadhuntGoldMaxEffect: 15,
         HeadhuntIntWeight: 0.8, HeadhuntLoyaltyWeight: 1.0, HeadhuntDutyWeight: 0.8,
         RewardBaseEffect: 10, RewardGoldFactor: 0.1, RewardDistancePenalty: 0.2,
@@ -375,6 +375,61 @@ class GameSystem {
         return { success: isSuccess, accuracy: Math.floor(accuracy) };
     }
     
+    static getInvestigateProb(bushos) {
+        if (!bushos || bushos.length === 0) return 0;
+        const maxStrBusho = bushos.reduce((a,b) => a.strength > b.strength ? a : b);
+        const assistStr = bushos.filter(b => b !== maxStrBusho).reduce((sum, b) => sum + b.strength, 0) * 0.2;
+        const totalStr = maxStrBusho.strength + assistStr;
+        const diffMax = 30 + window.MainParams.Strategy.InvestigateDifficulty;
+        if (totalStr >= diffMax) return 1.0;
+        if (totalStr <= 30) return 0.0;
+        return (totalStr - 30) / window.MainParams.Strategy.InvestigateDifficulty;
+    }
+
+    static getInciteProb(busho) {
+        const score = (busho.intelligence * 0.7) + (busho.strength * 0.3); 
+        return Math.min(1.0, score / window.MainParams.Strategy.InciteFactor);
+    }
+
+    static getRumorProb(busho, targetBusho) {
+        const score = (busho.intelligence * 0.7) + (busho.strength * 0.3); 
+        const defScore = (targetBusho.intelligence * 0.5) + (targetBusho.loyalty * 0.5); 
+        let prob = Math.min(1.0, score / (defScore + window.MainParams.Strategy.RumorFactor));
+        if (targetBusho.isCastellan) prob *= 0.67;
+        return prob;
+    }
+
+    static getHeadhuntProb(doer, target, gold, targetLord, newLord) {
+        const S = window.MainParams.Strategy;
+        const goldEffect = Math.min(S.HeadhuntGoldMaxEffect, gold * S.HeadhuntGoldEffect);
+        const offense = (doer.intelligence * S.HeadhuntIntWeight) + goldEffect;
+        const defense = (target.loyalty * S.HeadhuntLoyaltyWeight) + (target.duty * S.HeadhuntDutyWeight) + S.HeadhuntBaseDiff;
+        const affLord = this.calcAffinityDiff(target.affinity, targetLord.affinity); 
+        const lordBonus = (50 - affLord) * S.AffinityLordWeight; 
+        const affNew = this.calcAffinityDiff(target.affinity, newLord.affinity);
+        const newBonus = (50 - affNew) * S.AffinityNewLordWeight; 
+        const affDoer = this.calcAffinityDiff(target.affinity, doer.affinity);
+        const doerBonus = (50 - affDoer) * S.AffinityDoerWeight; 
+        const totalOffense = offense + newBonus + doerBonus;
+        const totalDefense = defense + lordBonus;
+        let successRate = (totalOffense / totalDefense) * 0.5; 
+        if (target.isCastellan) successRate *= 0.67;
+        return Math.min(1.0, successRate);
+    }
+
+    static getEmployProb(recruiter, target, recruiterClanPower, targetClanPower) {
+        if (target.clan !== 0 && target.ambition > 70 && recruiterClanPower < targetClanPower * 0.7) return 0; 
+        const affDiff = this.calcAffinityDiff(recruiter.affinity, target.affinity); 
+        let affBonus = (affDiff < 10) ? 30 : (affDiff < 25) ? 15 : (affDiff > 40) ? -10 : 0; 
+        const resistance = target.clan === 0 ? target.ambition : target.loyalty * window.MainParams.Strategy.EmploymentDiff; 
+        const base = recruiter.charm + affBonus;
+        if (base <= 0) return 0;
+        const threshold = resistance / base - 0.5;
+        if (threshold >= 1.0) return 0;
+        if (threshold <= 0.0) return 1.0;
+        return 1.0 - threshold;
+    }
+    
     static calcIncite(busho) { 
         const score = (busho.intelligence * 0.7) + (busho.strength * 0.3); 
         const success = Math.random() < (score / window.MainParams.Strategy.InciteFactor); 
@@ -430,7 +485,28 @@ class GameSystem {
         const resistance = target.clan === 0 ? target.ambition : target.loyalty * window.MainParams.Strategy.EmploymentDiff; 
         return ((recruiter.charm + affBonus) * (Math.random() + 0.5)) > resistance; 
     }
-    static getGunshiAdvice(gunshi, action, seed) { const luck = this.seededRandom(seed); const errorMargin = (100 - gunshi.intelligence) / 200; const perceivedLuck = Math.min(1.0, Math.max(0.0, luck + (this.seededRandom(seed+1)-0.5)*errorMargin*2)); if (perceivedLuck > 0.8) return "必ずや成功するでしょう。好機です！"; if (perceivedLuck > 0.6) return "おそらく上手くいくでしょう。"; if (perceivedLuck > 0.4) return "五分五分といったところです。油断めさるな。"; if (perceivedLuck > 0.2) return "厳しい結果になるかもしれません。"; return "おやめください。失敗する未来が見えます。"; }
+    static getGunshiAdvice(gunshi, action, seed) { 
+        // 実際の成功確率を受け取ります（無い場合は絶対に成功するコマンドとして扱います）
+        let trueProb = action.trueProb !== undefined ? action.trueProb : 1.0;
+        
+        // 正確さを計算します（智謀95以上で最大0.99になります）
+        let accuracy = 0.5 + (gunshi.intelligence / 95) * 0.49;
+        if (accuracy > 0.99 || gunshi.intelligence >= 95) accuracy = 0.99;
+
+        // 推測がどれくらいブレるかの幅を決めます
+        const maxError = 1.0 - accuracy;
+        
+        // ランダムなノイズ（-1.0 〜 +1.0）を作ってブレさせます
+        const noise = (this.seededRandom(seed) - 0.5) * 2;
+        let perceivedProb = trueProb + noise * maxError;
+        perceivedProb = Math.max(0.0, Math.min(1.0, perceivedProb));
+
+        if (perceivedProb > 0.9) return "必ずや成功するでしょう。好機です！"; 
+        if (perceivedProb > 0.7) return "おそらく上手くいくでしょう。"; 
+        if (perceivedProb > 0.4) return "五分五分といったところです。油断めさるな。"; 
+        if (perceivedProb > 0.2) return "厳しい結果になるかもしれません。"; 
+        return "おやめください。失敗する未来が見えます。"; 
+    }
 }
 
 /* ==========================================================================
