@@ -144,7 +144,9 @@ class AIEngine {
         const requiredRice = sendSoldiers * 1.5;
         if (myCastle.rice < requiredRice) return null;
 
-        const myForce = sendSoldiers * 0.7;
+        // --- 修正後：正確な見積もりと「3乗の魔法」による足切り ---
+
+        const myForce = sendSoldiers * 1.0; // 自分の力は正しく1.0倍で計算
         const myDaimyo = this.game.bushos.find(b => b.clan === myCastle.ownerClan && b.isDaimyo) || { personality: 'normal' };
 
         let bestTarget = null;
@@ -153,26 +155,33 @@ class AIEngine {
         enemies.forEach(target => {
             const rel = this.game.getRelation(myCastle.ownerClan, target.ownerClan);
             
-            // 攻撃側の智謀による数値見積もりの誤差 (50を基準に最大30%見誤る)
+            // 知略が低いほど、敵の数を見誤る（誤差が出る）計算
             const int = myGeneral.intelligence;
             const errorRange = Math.min(0.3, Math.max(0, (100 - int) / 100 * 0.3));
             const errorRate = 1.0 + (Math.random() - 0.5) * 2 * errorRange;
-            
+
+            // 誤差を含めた敵の兵数と防御力
             const pEnemySoldiers = target.soldiers * errorRate;
             const pEnemyDefense = target.defense * errorRate;
 
-            // 敵戦力の見積もり
+            // 城の守りを含めて、敵は「1.5倍」程度の手強さと見積もる
             const enemyForce = (pEnemySoldiers + pEnemyDefense * 2) * 1.5;
 
             // 基準値の比較
             const forceRatio = myForce / Math.max(1, enemyForce);
             
             let prob = 0;
-            if (forceRatio >= 1.0) {
-                // 基準値を満たす場合、差が大きいほど確率上昇
-                prob = 10 + (forceRatio - 1.0) * 20; 
+            if (forceRatio >= 1.5) {
+                // 相手の1.5倍以上の戦力がある時（6000 vs 3000など）
+                // 1.5倍で40%、そこから戦力差に応じて50%前後まで上がります
+                prob = 40 + (forceRatio - 1.5) * 60; 
+            } else if (forceRatio >= 1.0) {
+                // 互角から1.5倍までの時
+                prob = 10 + (forceRatio - 1.0) * 60;
             } else {
-                prob = forceRatio * 10;
+                // 相手より弱い時：3乗の魔法を使用
+                // 比率を3回かけることで、0.2(20%)などの低い比率は「0.008」まで叩き落とされます
+                prob = Math.pow(forceRatio, 3) * 10;
             }
 
             // 守備側武将の能力による攻撃確率低下 (最大10%)
