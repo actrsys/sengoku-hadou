@@ -30,7 +30,7 @@ class KunishuSystem {
 
     // 特定の国人衆に所属している武将一覧を取得
     getKunishuMembers(kunishuId) {
-        return this.game.bushos.filter(b => b.belongKunishuId === kunishuId && b.status !== 'dead');
+        return this.game.bushos.filter(b => b.belongKunishuId === kunishuId && b.status !== 'dead' && b.status !== 'unborn');
     }
 
     // イデオロギーによる相性計算の補正

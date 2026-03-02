@@ -1431,7 +1431,7 @@ class WarManager {
                 return; // やり直し
             }
 
-            const myBushos = this.game.bushos.filter(b=>b.clan===this.game.playerClanId); const recruiter = myBushos.find(b => b.isDaimyo) || myBushos[0]; 
+            const myBushos = this.game.bushos.filter(b=>b.clan===this.game.playerClanId && b.status !== 'unborn'); const recruiter = myBushos.find(b => b.isDaimyo) || myBushos[0];
             const score = (recruiter.charm * 2.0) / (prisoner.loyalty * 1.5); 
             
             // ★変更：メッセージの後に「nextStep」を渡して、ボタンが押されるまで待つようにしました
@@ -1590,8 +1590,8 @@ class WarManager {
     }
     
     async autoResolvePrisoners(captives, winnerClanId) { // ★ async を追加
-        const aiBushos = this.game.bushos.filter(b => b.clan === winnerClanId); 
-        const leaderInt = aiBushos.length > 0 ? Math.max(...aiBushos.map(b => b.intelligence)) : 50; 
+        const aiBushos = this.game.bushos.filter(b => b.clan === winnerClanId && b.status !== 'unborn'); 
+        const leaderInt = aiBushos.length > 0 ? Math.max(...aiBushos.map(b => b.intelligence)) : 50;
 
         // ★変更：forEach を for...of に変えて順番待ちできるようにします
         for (const p of captives) { 

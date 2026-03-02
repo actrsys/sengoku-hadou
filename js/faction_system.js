@@ -466,10 +466,10 @@ class FactionSystem {
         // 変更箇所：this.castles などを this.game.castles と呼ぶように直しています
         const clanIds = [...new Set(this.game.castles.filter(c=>c.ownerClan!==0).map(c=>c.ownerClan))]; 
         clanIds.forEach(clanId => { 
-            const myBushos = this.game.bushos.filter(b => b.clan === clanId); 
+            const myBushos = this.game.bushos.filter(b => b.clan === clanId && b.status !== 'unborn'); 
             if(myBushos.length===0) return; 
             
-            let daimyoInt = Math.max(...myBushos.map(b => b.intelligence)); 
+            let daimyoInt = Math.max(...myBushos.map(b => b.intelligence));
             if (Math.random() * 100 < daimyoInt) { 
                 const clanCastles = this.game.castles.filter(c => c.ownerClan === clanId); 
                 clanCastles.forEach(castle => { 

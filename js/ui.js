@@ -1741,7 +1741,7 @@ class UIManager {
             infoHtml = "<div>面談する武将を選択してください</div>"; 
         }
         else if (actionType === 'interview_target') { 
-            bushos = this.game.bushos.filter(b => b.clan === this.game.playerClanId && b.status !== 'dead' && b.status !== 'ronin' && b.id !== extraData.interviewer.id && !b.isDaimyo); 
+            bushos = this.game.bushos.filter(b => b.clan === this.game.playerClanId && b.status !== 'dead' && b.status !== 'ronin' && b.status !== 'unborn' && b.id !== extraData.interviewer.id && !b.isDaimyo);
             infoHtml = `<div>誰についての印象を聞きますか？</div>`; 
         }
         else if (actionType === 'investigate_deploy') { 
@@ -1753,7 +1753,7 @@ class UIManager {
             infoHtml = "<div>武将一覧 (精度により情報は隠蔽されます)</div>"; 
         }
         else if (actionType === 'all_busho_list') { 
-            bushos = this.game.bushos.filter(b => b.clan === this.game.playerClanId && b.status !== 'dead' && b.status !== 'ronin'); 
+            bushos = this.game.bushos.filter(b => b.clan === this.game.playerClanId && b.status !== 'dead' && b.status !== 'ronin' && b.status !== 'unborn');
             infoHtml = "<div>我が軍の武将一覧です</div>"; 
             isMulti = false;
         }
@@ -1769,6 +1769,7 @@ class UIManager {
                 b.clan === this.game.playerClanId && 
                 b.status !== 'dead' && 
                 b.status !== 'ronin' &&
+                b.status !== 'unborn' &&
                 !b.isDaimyo && 
                 !b.isCastellan
             );
