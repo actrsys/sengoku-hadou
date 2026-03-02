@@ -222,12 +222,18 @@ class AIEngine {
         return null;
     }
 
-    executeAttack(source, target, general, sendSoldiers, sendRice) {
-        if (sendSoldiers <= 0 || sendRice <= 0) return;
-        const bushos = this.game.getCastleBushos(source.id).filter(b => b.status !== 'ronin');
-        const sorted = bushos.sort((a,b) => b.leadership - a.leadership).slice(0, 3);
-        this.game.warManager.startWar(source, target, sorted, sendSoldiers, sendRice);
+    // ★ここを async に書き足します
+    async executeAttack(source, target, general, sendSoldiers, sendRice) {
+    if (sendSoldiers <= 0 || sendRice <= 0) return;
+    const bushos = this.game.getCastleBushos(source.id).filter(b => b.status !== 'ronin');
+    const sorted = bushos.sort((a,b) => b.leadership - a.leadership).slice(0, 3);
+    this.game.warManager.startWar(source, target, sorted, sendSoldiers, sendRice);
+
+    // ★ここから下を書き足します（戦争が終わるまで待つ魔法！）
+    while (this.game.warManager.state.active) {
+        await new Promise(resolve => setTimeout(resolve, 500));
     }
+}
 
     execInternalAffairs(castle, castellan, mods, smartness) {
         // ① 大名を取得します（行動回数の計算に使います）
@@ -299,9 +305,9 @@ class AIEngine {
                 const keepSoldiers = (castellan.leadership + daimyo.leadership) * 50;
 
                 if (enemyMaxSoldiers > mySoldiers) {
-                    scoreDraft = ((enemyMaxSoldiers / mySoldiers) * 10); 
+                    scoreDraft = ((enemyMaxSoldiers * 1.5 / mySoldiers) * 15); 
                 } else if (castle.soldiers < keepSoldiers) {
-                    scoreDraft = 15; 
+                    scoreDraft = 30; 
                 }
 
                 if (scoreDraft > 0) {
