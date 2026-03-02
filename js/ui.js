@@ -1044,7 +1044,7 @@ class UIManager {
         const globalZoom = (gameScreen && gameScreen.style.zoom) ? parseFloat(gameScreen.style.zoom) : 1;
 
         // ==========================================
-        // ★ パソコン版：横ズレを完全に無くす完璧な計算魔法！
+        // ★ パソコン版：角の引っかかりを完全に無くした【完全体】の魔法！
         // ==========================================
         if (isPC && sc && cx !== null && cy !== null) {
             this.isAnimatingZoom = true;
@@ -1055,7 +1055,6 @@ class UIManager {
             const mouseX = (cx - rect.left) / globalZoom;
             const mouseY = (cy - rect.top) / globalZoom;
 
-            // 最初だけ定規で測ります
             const mapW = this.mapEl.offsetWidth;
             const mapH = this.mapEl.offsetHeight;
             const scW = sc.clientWidth - 40; 
@@ -1090,6 +1089,7 @@ class UIManager {
             let targetScrollLeft = targetCanvasX - mouseX;
             let targetScrollTop = targetCanvasY - mouseY;
 
+            // ★ 出発前に「壁の限界」を計算し、ゴール地点を確定させます
             let maxScrollLeft = Math.max(0, mapW * targetScale - scW);
             let maxScrollTop  = Math.max(0, mapH * targetScale - scH);
 
@@ -1101,9 +1101,11 @@ class UIManager {
             if (mapW * targetScale <= scW) targetScrollLeft = 0;
             if (mapH * targetScale <= scH) targetScrollTop = 0;
 
+            // スタートとゴールの数値を準備
             const startScrollLeft = sc.scrollLeft;
             const startScrollTop = sc.scrollTop;
             const startMargin = getMapMargin(oldScale);
+            const targetMargin = getMapMargin(targetScale); // ゴールのクッションも最初に計算！
             
             const duration = 200; 
             const startTime = performance.now();
@@ -1114,40 +1116,24 @@ class UIManager {
                 
                 const easeOut = 1 - Math.pow(1 - progress, 3);
                 
-                // 大きさは少しずつ変わっていきます
                 const currentScale = oldScale + (targetScale - oldScale) * easeOut;
                 
-                // ★ここが超重要！直線でサボらず、その一瞬の「完璧なクッションとスクロール量」を毎フレーム計算し直します！
-                const currentMargin = getMapMargin(currentScale);
-                const currentOffset = getMapOffset(currentScale);
+                // ★ アニメーション中は「スタートからゴールへ向かうだけ」！
+                // 途中で壁のチェック（急ブレーキ）をしないから、引っかかりゼロでスーッと動きます。
+                const currentMarginX = startMargin.x + (targetMargin.x - startMargin.x) * easeOut;
+                const currentMarginY = startMargin.y + (targetMargin.y - startMargin.y) * easeOut;
                 
-                const currentCanvasX = realX * currentScale + currentOffset.x;
-                const currentCanvasY = realY * currentScale + currentOffset.y;
+                const currentScrollLeft = startScrollLeft + (targetScrollLeft - startScrollLeft) * easeOut;
+                const currentScrollTop = startScrollTop + (targetScrollTop - startScrollTop) * easeOut;
                 
-                let currentScrollLeft = currentCanvasX - mouseX;
-                let currentScrollTop = currentCanvasY - mouseY;
-                
-                let currentMaxScrollLeft = Math.max(0, mapW * currentScale - scW);
-                let currentMaxScrollTop  = Math.max(0, mapH * currentScale - scH);
-                
-                if (currentScrollLeft < 0) currentScrollLeft = 0;
-                if (currentScrollTop < 0) currentScrollTop = 0;
-                if (currentScrollLeft > currentMaxScrollLeft) currentScrollLeft = currentMaxScrollLeft;
-                if (currentScrollTop > currentMaxScrollTop) currentScrollTop = currentMaxScrollTop;
-                
-                if (mapW * currentScale <= scW) currentScrollLeft = 0;
-                if (mapH * currentScale <= scH) currentScrollTop = 0;
-                
-                // 完璧な数値を使って、見かけ上のズレ（Delta）を出します
-                const deltaX = (currentMargin.x - startMargin.x) - (currentScrollLeft - startScrollLeft);
-                const deltaY = (currentMargin.y - startMargin.y) - (currentScrollTop - startScrollTop);
+                const deltaX = (currentMarginX - startMargin.x) - (currentScrollLeft - startScrollLeft);
+                const deltaY = (currentMarginY - startMargin.y) - (currentScrollTop - startScrollTop);
                 
                 this.mapEl.style.transform = `translate(${deltaX}px, ${deltaY}px) scale(${currentScale})`;
 
                 if (progress < 1) {
                     requestAnimationFrame(animate); 
                 } else {
-                    // アニメーションが終わったら、計算済みの最終結果をスッと適用します。ズレがないのでカクつきません！
                     this.mapScale = targetScale;
                     this.applyMapScale(); 
                     sc.scrollLeft = targetScrollLeft;
