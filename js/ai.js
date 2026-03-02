@@ -187,6 +187,11 @@ class AIEngine {
                 prob = (forceRatio - 0.8) * 50;
             }
 
+            // ★大魔法：最終的な確率に0.2をかけて、全体を5分の1まで落とします！
+            if (prob > 0) {
+                prob = prob * 0.2;
+            }
+
             // 守備側武将の能力による攻撃確率低下 (最大10%)
             const enemyBushos = this.game.getCastleBushos(target.id);
             let maxLdr = 0, maxInt = 0;
