@@ -1526,14 +1526,10 @@ class WarManager {
         if (activeFamily.length === 0) {
             const unbornFamily = this.game.bushos.filter(b => b.status === 'unborn' && daimyo.familyIds.some(fId => b.familyIds.includes(fId)));
             
-            if (unbornFamily.length > 0) {
-                // 相性 -> 年齢順に並べ替え
+            // 相性 -> 年齢順に並べ替え
                 unbornFamily.sort((a,b) => {
-                    let diffA = Math.abs((daimyo.affinity || 0) - (a.affinity || 0));
-                    if (diffA > 50) diffA = 100 - diffA; // ★ぐるっとループさせる魔法！
-                    
-                    let diffB = Math.abs((daimyo.affinity || 0) - (b.affinity || 0));
-                    if (diffB > 50) diffB = 100 - diffB; // ★ぐるっとループさせる魔法！
+                    let diffA = GameSystem.calcAffinityDiff(daimyo.affinity || 0, a.affinity || 0);
+                    let diffB = GameSystem.calcAffinityDiff(daimyo.affinity || 0, b.affinity || 0);
                     
                     if (diffA !== diffB) return diffA - diffB;
                     return a.birthYear - b.birthYear;
@@ -1594,10 +1590,8 @@ class WarManager {
                 // 1. 一門（家族・親戚）かどうかをチェック！
                 b._isRelative = daimyo.familyIds.some(fId => b.familyIds.includes(fId));
                 
-                // 2. 仲良し度（相性）の差を計算！差が小さいほど仲良し！
-                let diff = Math.abs((daimyo.affinity || 0) - (b.affinity || 0));
-                if (diff > 50) diff = 100 - diff; // ★ぐるっとループさせる魔法！
-                b._affinityDiff = diff;
+                // 2. 仲良し度（相性）の差を計算！差が小さいほど仲良し！（共通の魔法を使います）
+                b._affinityDiff = GameSystem.calcAffinityDiff(daimyo.affinity || 0, b.affinity || 0);
                 
                 // 3. 今までの計算式（政治＋魅力）！
                 b._baseScore = b.politics + b.charm;
