@@ -30,8 +30,11 @@ class AudioManager {
                 const setupLoop = () => {
                     const duration = player.duration();
                     
-                    // もし曲の長さがまだ「0」だったら、うまく測れていないので何もしません
-                    if (duration === 0) return;
+                    // もし曲の長さがまだ「0」だったら、少し待ってからもう一度長さを測り直します！
+                    if (duration === 0) {
+                        setTimeout(setupLoop, 100);
+                        return;
+                    }
 
                     const leadTime = 0.1;
                     const checkInterval = (duration - player.seek() - leadTime) * 1000;
@@ -63,10 +66,15 @@ class AudioManager {
         this.players[nextIndex] = this._createPlayer(fileName, loopStart);
         const nextPlayer = this.players[nextIndex];
 
-        // ★ここがポイント：読み込みが終わった瞬間に「loopStartの秒数」へジャンプさせます
-        nextPlayer.once('load', () => {
+        // ★ここがポイント：すでに曲を知っている（キャッシュ）場合はすぐジャンプ！
+        // 知らない場合は、読み込みが終わるまで待ってからジャンプします
+        if (nextPlayer.state() === 'loaded') {
             nextPlayer.seek(loopStart);
-        });
+        } else {
+            nextPlayer.once('load', () => {
+                nextPlayer.seek(loopStart);
+            });
+        }
         
         // 再生を開始！
         nextPlayer.play();
