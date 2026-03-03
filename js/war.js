@@ -1462,8 +1462,13 @@ class WarManager {
             if (prisoner.isDaimyo) {
                 this.game.ui.showDialog(`${prisoner.name}「敵の軍門には下らぬ！」`, false, nextStep); 
             } else if (score > Math.random()) { 
-                prisoner.clan = this.game.playerClanId; prisoner.loyalty = 50; prisoner.isCastellan = false; 
-                prisoner.belongKunishuId = 0; 
+                // ★元の忠誠度を覚えておきます！
+                const oldLoyalty = prisoner.loyalty;
+                prisoner.clan = this.game.playerClanId; 
+                // ★50を基準に、元の忠誠度が低いほど新しく上がるようにします！(最大100まで)
+                prisoner.loyalty = Math.min(100, 50 + (100 - oldLoyalty)); 
+                prisoner.isCastellan = false; 
+                prisoner.belongKunishuId = 0;
                 const targetC = this.game.getCastle(prisoner.castleId) || this.game.getCurrentTurnCastle(); 
                 if(targetC) { 
                     prisoner.castleId = targetC.id;
@@ -1631,7 +1636,12 @@ class WarManager {
             const isKunishuBoss = (p.belongKunishuId > 0 && p.id === this.game.kunishuSystem.getKunishu(p.belongKunishuId)?.leaderId);
 
             if (!isKunishuBoss && (leaderInt / 100) > Math.random()) { 
-                p.clan = winnerClanId; p.loyalty = 50; p.isCastellan = false; p.belongKunishuId = 0;
+                // ★元の忠誠度を覚えておきます！
+                const oldLoyalty = p.loyalty;
+                p.clan = winnerClanId; 
+                // ★こちらも50を基準に計算します！(最大100まで)
+                p.loyalty = Math.min(100, 50 + (100 - oldLoyalty)); 
+                p.isCastellan = false; p.belongKunishuId = 0;
                 const targetC = this.game.getCastle(p.castleId);
                 if (targetC && !targetC.samuraiIds.includes(p.id)) { targetC.samuraiIds.push(p.id); this.game.updateCastleLord(targetC); }
                 continue; // ★修正！「return;」を「continue;」に直しました！これで途中で終わらなくなります！
