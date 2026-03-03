@@ -23,7 +23,7 @@ window.MainParams = {
         BaseDevelopment: 10, PoliticsEffect: 0.6, DevelopFluctuation: 0.15,
         BaseRepair: 20, RepairEffect: 0.6, RepairFluctuation: 0.15,
         BaseCharity: 10, CharmEffect: 0.4, CharityFluctuation: 0.15,
-        TradeRateMin: 0.5, TradeRateMax: 2.5, TradeFluctuation: 0.3,
+        TradeRateMin: 0.3, TradeRateMax: 2.5, TradeFluctuation: 0.3,
         PriceAmmo: 1, PriceHorse: 5, PriceGun: 50
     },
     Strategy: {
