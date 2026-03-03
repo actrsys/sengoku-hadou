@@ -1526,7 +1526,8 @@ class WarManager {
         if (activeFamily.length === 0) {
             const unbornFamily = this.game.bushos.filter(b => b.status === 'unborn' && daimyo.familyIds.some(fId => b.familyIds.includes(fId)));
             
-            // 相性 -> 年齢順に並べ替え
+            if (unbornFamily.length > 0) {
+                // 相性 -> 年齢順に並べ替え
                 unbornFamily.sort((a,b) => {
                     let diffA = GameSystem.calcAffinityDiff(daimyo.affinity || 0, a.affinity || 0);
                     let diffB = GameSystem.calcAffinityDiff(daimyo.affinity || 0, b.affinity || 0);
