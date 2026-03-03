@@ -112,7 +112,21 @@ class IndependenceSystem {
             if (clan.id === 0 || clan.id === oldClanId) continue; 
             const rel = this.game.getRelation(oldClanId, clan.id);
             if (!rel || rel.status !== '敵対') continue;
-
+            
+            // その敵対大名が持っている城の中に、ここから「3マス以内」の城があるか探します
+            const enemyCastles = this.game.castles.filter(c => c.ownerClan === clan.id);
+            let isNear = false; // 最初は「近くない」としておきます
+            for (const ec of enemyCastles) {
+                // タテの距離とヨコの距離を足して、何マス離れているか計算します
+                const distance = Math.abs(castle.x - ec.x) + Math.abs(castle.y - ec.y);
+                if (distance <= 3) {
+                    isNear = true; // 3マス以内の城が見つかったら「近い！」とメモします
+                    break; // 1つでも見つかればOKなので、探すのをやめます
+                }
+            }
+            // もし3マス以内に城が1つもなかったら、この大名家は遠すぎるので無視（スキップ）します
+            if (!isNear) continue; 
+            
             const enemyDaimyo = this.game.bushos.find(b => b.clan === clan.id && b.isDaimyo);
             if (!enemyDaimyo) continue;
 
