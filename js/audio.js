@@ -6,8 +6,8 @@ class AudioManager {
         // BGM用の演奏者を2人（bgm1, bgm2）用意します
         this.players = [null, null];
         this.currentPlayerIndex = 0;
-        this.defaultVolume = 0.05; // BGMの音量
-        this.seVolume = 0.025;      // ★追加：SE専用の音量
+        this.defaultVolume = 0.02; // BGMの音量
+        this.seVolume = 0.01;      // ★追加：SE専用の音量
     }
 
     // ==========================================
