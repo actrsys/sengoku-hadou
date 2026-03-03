@@ -674,7 +674,9 @@ class GameManager {
     }
 
     async startMonth() { 
-        this.marketRate = Math.max(window.MainParams.Economy.TradeRateMin, Math.min(window.MainParams.Economy.TradeRateMax, this.marketRate * (0.9 + Math.random()*window.MainParams.Economy.TradeFluctuation)));
+        // 変動幅の半分を基準にして、上がる確率と下がる確率をピッタリ半々にします！
+        const fluc = window.MainParams.Economy.TradeFluctuation;
+        this.marketRate = Math.max(window.MainParams.Economy.TradeRateMin, Math.min(window.MainParams.Economy.TradeRateMax, this.marketRate * ((1.0 - fluc / 2) + Math.random() * fluc)));
         
         await this.ui.showCutin(`${this.year}年 ${this.month}月`);
         
