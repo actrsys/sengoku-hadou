@@ -89,12 +89,18 @@ class AIEngine {
                 }
 
                 const neighbors = this.game.castles.filter(c => 
-                    c.ownerClan !== 0 && 
+                    // ★ c.ownerClan !== 0 && （空き城も対象にしました！）
                     c.ownerClan !== myClanId && 
                     GameSystem.isReachable(this.game, castle, c, myClanId)
                 );
                 
                 const validEnemies = neighbors.filter(target => {
+                    // ★追加：空き城（0）の時は、同盟などの関係がないのでそのまま攻撃対象にします！
+                    if (target.ownerClan === 0) {
+                        if ((target.immunityUntil || 0) >= this.game.getCurrentTurnId()) return false;
+                        return true;
+                    }
+
                     const rel = this.game.getRelation(myClanId, target.ownerClan);
                     const isProtected = ['同盟', '支配', '従属'].includes(rel.status);
                     if (isProtected || (target.immunityUntil || 0) >= this.game.getCurrentTurnId()) return false;
@@ -152,7 +158,11 @@ class AIEngine {
         let highestProb = -1;
 
         enemies.forEach(target => {
-            const rel = this.game.getRelation(myCastle.ownerClan, target.ownerClan);
+            // ★追加：空き城の時は外交データがないので、仮の「敵対」データを作ってあげます！
+            let rel = { status: '敵対', sentiment: 0 };
+            if (target.ownerClan !== 0) {
+                rel = this.game.getRelation(myCastle.ownerClan, target.ownerClan);
+            }
             
             // 知略が低いほど、敵の数を見誤る（誤差が出る）計算
             const int = myGeneral.intelligence;
@@ -229,6 +239,11 @@ class AIEngine {
             // 最大値と最小値の適用
             prob = Math.min(prob, maxProb);
             prob = Math.max(0, prob); // ★ここを0.1から0に変えました！
+
+            // ★大魔法：空き城の時は、攻め込むハードルを3倍（確率を3分の1）にします！
+            if (target.ownerClan === 0) {
+                prob = prob / 3;
+            }
 
             if (prob > highestProb) {
                 highestProb = prob;
