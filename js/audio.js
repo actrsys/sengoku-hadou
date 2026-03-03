@@ -1,47 +1,71 @@
 /**
- * audio.js
- * 音楽（BGM）と効果音を管理するクラス
+ * audio.js (Howler.js 豪華版 - 完全シームレスループ)
  */
 class AudioManager {
     constructor() {
-        this.bgm = null;
-        this.defaultVolume = 0.1; // デフォルト音量を10%に設定
+        // 演奏者を2人（bgm1, bgm2）用意します
+        this.players = [null, null];
+        this.currentPlayerIndex = 0;
+        this.defaultVolume = 0.1;
     }
 
-    /**
-     * BGMを再生する関数
-     * @param {string} fileName ファイル名 (例: 'op_Snowy Sacred Approach.wav')
-     * @param {boolean} loop ループするかどうか
-     */
-    playBGM(fileName, loop = true) {
-        // すでに鳴っている曲があれば止める
-        if (this.bgm) {
-            this.bgm.pause();
-            this.bgm = null;
-        }
+    playBGM(fileName, loopStart = 0) {
+        // 全員一度止めます
+        this.stopBGM();
 
-        // 新しい音楽ファイルを読み込む
-        this.bgm = new Audio(`data/music/bgm/${fileName}`);
-        this.bgm.loop = loop;
-        this.bgm.volume = this.defaultVolume;
+        // 1人目の演奏者でスタート
+        this.currentPlayerIndex = 0;
+        this.players[0] = this._createPlayer(fileName, loopStart);
+        this.players[0].play();
+    }
 
-        // OGGのループタグ（LOOPSTART等）は、標準のAudioタグでは自動対応しないため
-        // ここでは単純なループ再生を行いますが、再生開始を試みます
-        this.bgm.play().catch(e => {
-            console.log("ユーザーが画面を操作するまで再生は待機されます:", e);
+    // 内部で使う「演奏者を作る」仕組み
+    _createPlayer(fileName, loopStart) {
+        const player = new Howl({
+            src: [`data/music/bgm/${fileName}`],
+            volume: this.defaultVolume,
+            onplay: (id) => {
+                // 曲の長さ（秒）を取得
+                const duration = player.duration();
+                // ループ地点の数秒前に「次の人、準備して！」というタイマーをセット
+                const leadTime = 0.1; // 0.1秒だけ重ねる
+                const checkInterval = (duration - leadTime) * 1000;
+
+                setTimeout(() => {
+                    if (this.players[this.currentPlayerIndex] === player) {
+                        this._prepareNextLoop(fileName, loopStart);
+                    }
+                }, checkInterval);
+            }
         });
+        return player;
     }
 
-    /**
-     * 音量を変更したい場合
-     */
+    _prepareNextLoop(fileName, loopStart) {
+        const nextIndex = 1 - this.currentPlayerIndex;
+        
+        // 2人目の演奏者を作成して再生
+        this.players[nextIndex] = this._createPlayer(fileName, loopStart);
+        this.players[nextIndex].seek(loopStart); // ループ地点から開始
+        this.players[nextIndex].play();
+
+        // 前の演奏者を0.1秒かけて静かに消して、その後さようならする
+        const oldPlayer = this.players[this.currentPlayerIndex];
+        oldPlayer.fade(this.defaultVolume, 0, 100);
+        setTimeout(() => oldPlayer.stop(), 100);
+
+        this.currentPlayerIndex = nextIndex;
+    }
+
+    stopBGM() {
+        this.players.forEach(p => { if (p) p.stop(); });
+        this.players = [null, null];
+    }
+
     setVolume(value) {
         this.defaultVolume = value;
-        if (this.bgm) {
-            this.bgm.volume = value;
-        }
+        this.players.forEach(p => { if (p) p.volume(value); });
     }
 }
 
-// ゲーム全体で使えるように登録
 window.AudioManager = new AudioManager();
