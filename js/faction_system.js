@@ -40,6 +40,12 @@ class FactionSystem {
         }
 
         let change = Math.floor(baseAmount * factor);
+
+        // ★追加：忠誠度が95以上なら、不満（プラスの承認欲求）の溜まり方を半分にします！
+        if (busho.loyalty >= 95 && change > 0) {
+            change = Math.floor(change / 2);
+        }
+
         busho.recognitionNeed = Math.max(-100, Math.min(100, busho.recognitionNeed + change));
     }
 
@@ -67,7 +73,9 @@ class FactionSystem {
                 if (b.recognitionNeed > 0) {
                     b.recognitionNeed = Math.max(0, b.recognitionNeed - decay);
                 } else if (b.recognitionNeed < 0) {
-                    b.recognitionNeed = Math.min(0, b.recognitionNeed + decay);
+                    // ★変更：恩義（マイナスの承認欲求）が消えるペースを半分（5ずつ）にして長持ちさせます！
+                    const minusDecay = Math.max(1, Math.floor(decay / 2));
+                    b.recognitionNeed = Math.min(0, b.recognitionNeed + minusDecay);
                 }
             }
         });
