@@ -453,9 +453,9 @@ class AIEngine {
                 b.status !== 'ronin' && b.belongKunishuId === 0 && 
                 ((b.achievementTotal || 0) > 30 || (b.recognition || 0) > 30)
             );
-            if (rewardTargets.length > 0 && castle.gold >= 200) {
+            if (rewardTargets.length > 0 && castle.gold >= 100) {
                 // 優先度は低め（15点）にしてあります
-                actions.push({ type: 'reward', stat: 'none', score: 15, cost: 200, targets: rewardTargets });
+                actions.push({ type: 'reward', stat: 'none', score: 15, cost: 100, targets: rewardTargets });
             }
 
             // 点数が高い順に並べ替えます
@@ -477,9 +477,9 @@ class AIEngine {
                     });
                     const targetBusho = action.targets[0];
                     
-                    if (castle.gold >= 200) {
-                        castle.gold -= 200;
-                        // 褒美の効果をプレイヤーと同じように計算します
+                    if (castle.gold >= 100) {
+                        castle.gold -= 100;
+                        // 褒美の効果をプレイヤーと同じように計算（効果は200相当で据え置き）
                         const effect = GameSystem.calcRewardEffect(200, daimyo, targetBusho);
                         if (this.game.factionSystem && this.game.factionSystem.updateRecognition) {
                             this.game.factionSystem.updateRecognition(targetBusho, -effect * 2 - 5);
@@ -489,7 +489,11 @@ class AIEngine {
                             targetBusho.achievementTotal = Math.max(0, targetBusho.achievementTotal - 30);
                         }
                         
-                        // ★あや瀨さんのお約束通り、誰の「行動済」マークもつけません！
+                        // ★追加：忠誠度をランダムで1～3アップさせる（プレイヤーと同じ！）
+                        const loyaltyUp = Math.floor(Math.random() * 3) + 1;
+                        targetBusho.loyalty = Math.min(100, targetBusho.loyalty + loyaltyUp);
+                        
+                        // ★「行動済」マークもつけません！
                         actionDoneInThisStep = true; 
                         break; 
                     }
