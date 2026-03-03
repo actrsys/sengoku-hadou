@@ -1529,8 +1529,12 @@ class WarManager {
             if (unbornFamily.length > 0) {
                 // 相性 -> 年齢順に並べ替え
                 unbornFamily.sort((a,b) => {
-                    const diffA = Math.abs((daimyo.affinity || 0) - (a.affinity || 0));
-                    const diffB = Math.abs((daimyo.affinity || 0) - (b.affinity || 0));
+                    let diffA = Math.abs((daimyo.affinity || 0) - (a.affinity || 0));
+                    if (diffA > 50) diffA = 100 - diffA; // ★ぐるっとループさせる魔法！
+                    
+                    let diffB = Math.abs((daimyo.affinity || 0) - (b.affinity || 0));
+                    if (diffB > 50) diffB = 100 - diffB; // ★ぐるっとループさせる魔法！
+                    
                     if (diffA !== diffB) return diffA - diffB;
                     return a.birthYear - b.birthYear;
                 });
@@ -1589,8 +1593,12 @@ class WarManager {
             candidates.forEach(b => {
                 // 1. 一門（家族・親戚）かどうかをチェック！
                 b._isRelative = daimyo.familyIds.some(fId => b.familyIds.includes(fId));
+                
                 // 2. 仲良し度（相性）の差を計算！差が小さいほど仲良し！
-                b._affinityDiff = Math.abs((daimyo.affinity || 0) - (b.affinity || 0));
+                let diff = Math.abs((daimyo.affinity || 0) - (b.affinity || 0));
+                if (diff > 50) diff = 100 - diff; // ★ぐるっとループさせる魔法！
+                b._affinityDiff = diff;
+                
                 // 3. 今までの計算式（政治＋魅力）！
                 b._baseScore = b.politics + b.charm;
             });
@@ -1688,12 +1696,30 @@ class WarManager {
                 this.game.lifeSystem.executeDeath(p); // 共通のお片付け魔法
                 p.clan = 0; p.castleId = 0; p.belongKunishuId = 0; 
             } else {
-                // 見逃された！在野に下るか、国人衆へ帰還します
+                // 見逃された！
                 const kunishu = p.belongKunishuId > 0 ? this.game.kunishuSystem.getKunishu(p.belongKunishuId) : null;
                 if (kunishu && !kunishu.isDestroyed) {
+                    // 国人衆へ帰還します
                     p.status = 'active'; p.clan = 0; p.castleId = kunishu.castleId;
                 } else {
-                    p.status = 'ronin'; p.clan = 0; p.castleId = 0; 
+                    // ★追加：元の大名家がまだ生き残っていれば、仲間の城へ帰してあげます！
+                    const originalClanId = p.clan; // 元の所属を思い出します
+                    // 仲間の城が残っているか探します
+                    const friendlyCastles = this.game.castles.filter(c => c.ownerClan === originalClanId && originalClanId !== 0);
+                    
+                    if (friendlyCastles.length > 0) {
+                        // 帰るお城がある場合、ランダムな仲間の城に無事帰還します
+                        const returnCastle = friendlyCastles[Math.floor(Math.random() * friendlyCastles.length)];
+                        p.castleId = returnCastle.id; 
+                        p.isCastellan = false; 
+                        p.status = 'active'; 
+                        returnCastle.samuraiIds.push(p.id);
+                        this.game.factionSystem.handleMove(p, 0, returnCastle.id); 
+                        this.game.updateCastleLord(returnCastle);
+                    } else {
+                        // 帰るお城がない（大名家が滅亡してしまった）場合は、浪人になります
+                        p.status = 'ronin'; p.clan = 0; p.castleId = 0; p.belongKunishuId = 0; 
+                    }
                 }
             }
         }
