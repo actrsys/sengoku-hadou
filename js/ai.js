@@ -278,8 +278,55 @@ class AIEngine {
         // ① 大名を取得します（行動回数の計算に使います）
         const daimyo = this.game.bushos.find(b => b.clan === castle.ownerClan && b.isDaimyo) || castellan;
 
-        // ② 行動回数の計算：「(城主内政＋城主魅力＋大名内政＋大名魅力) ÷ 2」
-        const baseAP = Math.floor((castellan.politics + castellan.charm + daimyo.politics + daimyo.charm) / 2);
+        // ★追加：大名の城と「自領で地続き」で繋がっているかを調べる魔法
+        let isConnected = false;
+        
+        // もし大名がいない、またはこの城がまさに大名のいる城なら、繋がっている扱いにします
+        if (!daimyo.castleId || daimyo.castleId === castle.id) {
+            isConnected = true;
+        } else {
+            // 大名のいるお城を探します
+            const daimyoCastle = this.game.castles.find(c => c.id === daimyo.castleId);
+            if (daimyoCastle) {
+                // 自領の城だけをたどって、大名の城から今の城まで行けるか調べます
+                const visited = new Set();
+                const queue = [daimyoCastle];
+                visited.add(daimyoCastle.id);
+
+                while (queue.length > 0) {
+                    const currentCastle = queue.shift();
+                    
+                    // ゴール（今の城）にたどり着いたら、繋がっている証拠！
+                    if (currentCastle.id === castle.id) {
+                        isConnected = true;
+                        break;
+                    }
+                    
+                    // お隣の城を探します（同じ大名家の城だけを通ります）
+                    const neighbors = this.game.castles.filter(c => 
+                        c.ownerClan === castle.ownerClan && 
+                        GameSystem.isAdjacent(currentCastle, c) &&
+                        !visited.has(c.id)
+                    );
+                    
+                    for (const n of neighbors) {
+                        visited.add(n.id);
+                        queue.push(n);
+                    }
+                }
+            }
+        }
+
+        // ② 行動回数の計算
+        let baseAP = 0;
+        if (isConnected) {
+            // 大名と地続きの城：「(城主内政＋城主魅力＋大名内政＋大名魅力) ÷ 2」
+            baseAP = Math.floor((castellan.politics + castellan.charm + daimyo.politics + daimyo.charm) / 2);
+        } else {
+            // 飛び地（地続きではない）城：「(城主内政＋城主魅力) ÷ 2」
+            baseAP = Math.floor((castellan.politics + castellan.charm) / 2);
+        }
+
         // 最低1回、40ごとに+1回
         let maxActions = 1 + Math.floor(baseAP / 40);
 
