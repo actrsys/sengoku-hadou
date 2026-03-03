@@ -230,13 +230,13 @@ class UIManager {
 
             // 音を鳴らすためのオーディオマネージャーがいるか確認します
             if (window.AudioManager) {
-                // もしボタンの文字が、以下の前向きな言葉なら「decision.ogg」を鳴らします
-                if (["決定", "受諾", "開始", "実行", "迎撃", "籠城", "登用"].includes(text)) {
-                    window.AudioManager.playSE('decision.ogg');
-                } 
-                // もしボタンの文字が、以下のキャンセル系の言葉なら「cancel.ogg」を鳴らします
-                else if (["戻る", "閉じる", "拒否", "やめる", "撤退", "解放", "処断"].includes(text)) {
+                // キャンセルや戻るなど、うしろ向きな言葉の時は「cancel.ogg」を鳴らします
+                if (["戻る", "閉じる", "拒否", "やめる", "撤退", "解放", "処断"].includes(text)) {
                     window.AudioManager.playSE('cancel.ogg');
+                } 
+                // それ以外のボタン（内政や戦争のコマンドなど）は、ぜんぶ「decision.ogg」を鳴らします！
+                else {
+                    window.AudioManager.playSE('decision.ogg');
                 }
             }
         }, true); // ボタンが押された瞬間に、他の処理より優先して音を鳴らすおまじないです
