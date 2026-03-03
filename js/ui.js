@@ -1012,7 +1012,13 @@ class UIManager {
             scenarios.forEach(s => {
                 const div = document.createElement('div'); div.className = 'clan-btn';
                 div.innerHTML = `<div style="text-align:left;"><strong>${s.name}</strong><br><small>${s.desc}</small></div>`;
-                div.onclick = () => { this.scenarioScreen.classList.add('hidden'); onSelect(s.folder); };
+                div.onclick = () => { 
+                    // ★ここに追加：シナリオを選んだ時の音
+                    if (window.AudioManager) window.AudioManager.playSE('choice.ogg');
+                    
+                    this.scenarioScreen.classList.add('hidden'); 
+                    onSelect(s.folder); 
+                };
                 this.scenarioList.appendChild(div);
             });
         }
@@ -1438,6 +1444,10 @@ class UIManager {
                  el.onclick = (e) => {
                      e.stopPropagation();
                      if (this.isDraggingMap) return;
+                     // ★ここに追加：中立以外の城（大名）を選んだ時の音
+                     if (window.AudioManager && c.ownerClan !== 0) {
+                         window.AudioManager.playSE('choice.ogg');
+                     }
                      this.game.handleDaimyoSelect(c);
                  };
             }
@@ -2005,7 +2015,11 @@ class UIManager {
             
             if(isSelectable && actionType !== 'view_only' && actionType !== 'all_busho_list') { 
                 div.onclick = (e) => {
+                    // ★ここに追加：武将を選んだ時（チェックを付けた時）の音
+                    if (window.AudioManager) window.AudioManager.playSE('choice.ogg');
+
                     if(e.target.tagName === 'INPUT') { 
+                        // ... 以降の処理はそのまま ...
                         if(!isMulti) {
                             const siblings = this.selectorList.querySelectorAll('.select-item');
                             siblings.forEach(el => el.classList.remove('selected'));
