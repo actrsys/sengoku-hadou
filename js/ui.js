@@ -111,7 +111,7 @@ class UIManager {
 		    // 画面がクリック（タップ）された時の処理
 		    const onTitleClick = () => {
 		        if (window.AudioManager) {
-			        window.AudioManager.playBGM('op_Snowy_Sacred_Approach.wav');
+			        window.AudioManager.playBGM('SC_ex_Town1_Castle.ogg');
 			    }
 		        
 		        // メッセージを消す

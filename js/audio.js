@@ -10,7 +10,7 @@ class AudioManager {
 
     /**
      * BGMを再生する関数
-     * @param {string} fileName ファイル名 (例: 'SC_ex_Town1_Castle.ogg')
+     * @param {string} fileName ファイル名 (例: 'op_Snowy Sacred Approach.wav')
      * @param {boolean} loop ループするかどうか
      */
     playBGM(fileName, loop = true) {
@@ -21,7 +21,7 @@ class AudioManager {
         }
 
         // 新しい音楽ファイルを読み込む
-        this.bgm = new Audio(`data/music/${fileName}`);
+        this.bgm = new Audio(`data/music/bgm/${fileName}`);
         this.bgm.loop = loop;
         this.bgm.volume = this.defaultVolume;
 
