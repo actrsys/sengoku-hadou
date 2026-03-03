@@ -1551,7 +1551,8 @@ class CommandSystem {
             castle.rice -= amount; castle.gold += gain; 
             this.game.ui.showResultModal(`兵糧${amount}を売却しました\n(金+${gain})`); 
         } else if (type === 'buy_ammo') {
-            const price = Math.floor(window.MainParams.Economy.PriceAmmo * rate);
+            // ★相場を消して、固定金額にします
+            const price = parseInt(window.MainParams.Economy.PriceAmmo, 10) || 1;
             const cost = price * amount;
             if(castle.gold < cost) { this.game.ui.showDialog("資金不足", false); return; } 
             // ★追加: 矢弾のストッパー
@@ -1559,7 +1560,8 @@ class CommandSystem {
             castle.gold -= cost; castle.ammo = (castle.ammo || 0) + amount; 
             this.game.ui.showResultModal(`矢弾${amount}を購入しました\n(金-${cost})`); 
         } else if (type === 'buy_horses') {
-            const price = Math.floor(window.MainParams.Economy.PriceHorse * rate);
+            // ★相場を消して、固定金額にします
+            const price = parseInt(window.MainParams.Economy.PriceHorse, 10) || 5;
             const cost = price * amount;
             if(castle.gold < cost) { this.game.ui.showDialog("資金不足", false); return; } 
             // ★追加: 騎馬のストッパー
@@ -1567,7 +1569,8 @@ class CommandSystem {
             castle.gold -= cost; castle.horses = (castle.horses || 0) + amount; 
             this.game.ui.showResultModal(`騎馬${amount}を購入しました\n(金-${cost})`); 
         } else if (type === 'buy_guns') {
-            const price = Math.floor(window.MainParams.Economy.PriceGun * rate);
+            // ★相場を消して、固定金額にします
+            const price = parseInt(window.MainParams.Economy.PriceGun, 10) || 50;
             const cost = price * amount;
             if(castle.gold < cost) { this.game.ui.showDialog("資金不足", false); return; } 
             // ★追加: 鉄砲のストッパー

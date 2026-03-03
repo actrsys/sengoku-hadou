@@ -2523,27 +2523,27 @@ class UIManager {
             inputs.amount = createSlider("売却量(米)", "amount", c.rice, 0);
         } else if (type === 'buy_ammo') {
             document.getElementById('quantity-title').textContent = "矢弾購入"; 
-            const rate = this.game.marketRate; 
-            const price = Math.floor(window.MainParams.Economy.PriceAmmo * rate);
+            // ★相場を消して、固定金額（もし設定が無ければ1）にします
+            const price = parseInt(window.MainParams.Economy.PriceAmmo, 10) || 1;
             const maxBuy = price > 0 ? Math.floor(c.gold / price) : 0;
             this.tradeTypeInfo.classList.remove('hidden'); 
-            this.tradeTypeInfo.textContent = `相場影響価格: 金${price} / 1個`;
+            this.tradeTypeInfo.textContent = `固定価格: 金${price} / 1個`;
             inputs.amount = createSlider("購入量", "amount", maxBuy, 0);
         } else if (type === 'buy_horses') {
             document.getElementById('quantity-title').textContent = "騎馬購入"; 
-            const rate = this.game.marketRate; 
-            const price = Math.floor(window.MainParams.Economy.PriceHorse * rate);
+            // ★相場を消して、固定金額（もし設定が無ければ5）にします
+            const price = parseInt(window.MainParams.Economy.PriceHorse, 10) || 5;
             const maxBuy = price > 0 ? Math.floor(c.gold / price) : 0;
             this.tradeTypeInfo.classList.remove('hidden'); 
-            this.tradeTypeInfo.textContent = `相場影響価格: 金${price} / 1頭`;
+            this.tradeTypeInfo.textContent = `固定価格: 金${price} / 1頭`;
             inputs.amount = createSlider("購入量", "amount", maxBuy, 0);
         } else if (type === 'buy_guns') {
             document.getElementById('quantity-title').textContent = "鉄砲購入"; 
-            const rate = this.game.marketRate; 
-            const price = Math.floor(window.MainParams.Economy.PriceGun * rate);
+            // ★相場を消して、固定金額（もし設定が無ければ50）にします
+            const price = parseInt(window.MainParams.Economy.PriceGun, 10) || 50;
             const maxBuy = price > 0 ? Math.floor(c.gold / price) : 0;
             this.tradeTypeInfo.classList.remove('hidden'); 
-            this.tradeTypeInfo.textContent = `相場影響価格: 金${price} / 1挺`;
+            this.tradeTypeInfo.textContent = `固定価格: 金${price} / 1挺`;
             inputs.amount = createSlider("購入量", "amount", maxBuy, 0);
         } else if (type === 'war_repair') {
             const s = this.game.warManager.state;
