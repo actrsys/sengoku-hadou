@@ -970,9 +970,23 @@ class WarManager {
             // ★変更：順番待ちができるように async を付けます
             const finishWarProcess = async () => {
                 const winnerClan = s.attacker.ownerClan; // 勝ったのは攻撃側です
+                
+                // ★追加：大名を登用した時のご褒美パワーをリセットしておきます
+                this.daimyoHiredBonus = 0; 
+
                 if (this.pendingPrisoners && this.pendingPrisoners.length > 0) {
                     if (winnerClan === this.game.playerClanId) {
-                        this.game.ui.showPrisonerModal(this.pendingPrisoners);
+                        
+                        // ★追加：捕虜の中に大名がいるか一番最初にチェックします！
+                        const daimyoIndex = this.pendingPrisoners.findIndex(p => p.isDaimyo);
+                        if (daimyoIndex !== -1) {
+                            // 大名がいたら、先ほど作った大名専用の画面を最初に出します
+                            this.game.ui.showDaimyoPrisonerModal(this.pendingPrisoners[daimyoIndex]);
+                        } else {
+                            // 大名がいなければ、いつもの一覧画面を出します
+                            this.game.ui.showPrisonerModal(this.pendingPrisoners);
+                        }
+                        
                     } else {
                         await this.autoResolvePrisoners(this.pendingPrisoners, winnerClan);
                         this.pendingPrisoners = [];
@@ -1429,10 +1443,24 @@ class WarManager {
         } 
     }
     
+    
+    handleDaimyoPrisonerAction(action) {
+        // 大名の画面を閉じてから、いつもの処遇の魔法にバトンタッチします
+        this.game.ui.closeResultModal();
+        const index = this.pendingPrisoners.findIndex(p => p.isDaimyo);
+        if (index !== -1) {
+            this.handlePrisonerAction(index, action);
+        }
+    }
+    
     async handlePrisonerAction(index, action) { // ★ async を追加
         const prisoner = this.pendingPrisoners[index]; 
         const originalClanId = prisoner.clan;
         const kunishu = prisoner.belongKunishuId > 0 ? this.game.kunishuSystem.getKunishu(prisoner.belongKunishuId) : null;
+
+        // ★追加：大名家が滅亡している（他に城がない）かをチェックします
+        const friendlyCastles = this.game.castles.filter(c => c.ownerClan === originalClanId && originalClanId !== 0);
+        const isExtinct = (friendlyCastles.length === 0);
 
         // ★追加：ダイアログの「OKボタン」を押した後に、次の処理へ進むための特別な箱を用意しました
         const nextStep = async () => { // ★ async をつけます
@@ -1458,30 +1486,57 @@ class WarManager {
             const myBushos = this.game.bushos.filter(b=>b.clan===this.game.playerClanId && b.status !== 'unborn'); const recruiter = myBushos.find(b => b.isDaimyo) || myBushos[0];
             const score = (recruiter.charm * 2.0) / (prisoner.loyalty * 1.5); 
             
-            // ★変更：メッセージの後に「nextStep」を渡して、ボタンが押されるまで待つようにしました
-            if (prisoner.isDaimyo) {
+            // ★変更：大名で、かつ城が残っているなら絶対に拒否します
+            if (prisoner.isDaimyo && !isExtinct) {
                 this.game.ui.showDialog(`${prisoner.name}「敵の軍門には下らぬ！」`, false, nextStep); 
-            } else if (score > Math.random()) { 
-                // ★元の忠誠度を覚えておきます！
-                const oldLoyalty = prisoner.loyalty;
-                prisoner.clan = this.game.playerClanId; 
-                // ★50を基準に、元の忠誠度が低いほど新しく上がるようにします！(最大100まで)
-                prisoner.loyalty = Math.min(100, 50 + (100 - oldLoyalty)); 
-                prisoner.isCastellan = false; 
-                prisoner.belongKunishuId = 0;
-                const targetC = this.game.getCastle(prisoner.castleId) || this.game.getCurrentTurnCastle(); 
-                if(targetC) { 
-                    prisoner.castleId = targetC.id;
-                    if (!targetC.samuraiIds.includes(prisoner.id)) targetC.samuraiIds.push(prisoner.id); 
-                    this.game.updateCastleLord(targetC); 
-                }
-                this.game.ui.showDialog(`${prisoner.name}を登用しました！`, false, nextStep); 
             } else {
-                this.game.ui.showDialog(`${prisoner.name}は登用を拒否しました……`, false, nextStep); 
+                // ★追加：滅亡時の大名は登用確率が1/3になります
+                let hireProb = score;
+                if (prisoner.isDaimyo && isExtinct) {
+                    hireProb = score / 3.0;
+                } else if (!prisoner.isDaimyo && this.daimyoHiredBonus) {
+                    // ★追加：もし大名を登用できていたら、他の武将の登用確率が50%(0.5)アップします！
+                    hireProb += this.daimyoHiredBonus;
+                }
+
+                if (hireProb > Math.random()) { 
+                    // ★追加：大名が登用に応じた場合は、大名の看板を下ろさせます
+                    if (prisoner.isDaimyo) {
+                        prisoner.isDaimyo = false;
+                        this.daimyoHiredBonus = 0.5; // ★大名を登用できたご褒美をセット！
+                    }
+
+                    const oldLoyalty = prisoner.loyalty;
+                    prisoner.clan = this.game.playerClanId; 
+                    prisoner.loyalty = Math.min(100, 50 + (100 - oldLoyalty)); 
+                    prisoner.isCastellan = false; 
+                    prisoner.belongKunishuId = 0;
+                    const targetC = this.game.getCastle(prisoner.castleId) || this.game.getCurrentTurnCastle(); 
+                    if(targetC) { 
+                        prisoner.castleId = targetC.id;
+                        if (!targetC.samuraiIds.includes(prisoner.id)) targetC.samuraiIds.push(prisoner.id); 
+                        this.game.updateCastleLord(targetC); 
+                    }
+                    // ★滅亡した大名専用の胸熱メッセージ！
+                    if (isExtinct && originalClanId === prisoner.clan) { 
+                        this.game.ui.showDialog(`${prisoner.name}は臣従を誓いました！`, false, nextStep); 
+                    } else {
+                        this.game.ui.showDialog(`${prisoner.name}を登用しました！`, false, nextStep); 
+                    }
+                } else {
+                    if (prisoner.isDaimyo && isExtinct) {
+                        this.game.ui.showDialog(`${prisoner.name}「……煮るなり焼くなり好きにせい。」\n${prisoner.name}は拒否しました`, false, nextStep);
+                    } else {
+                        this.game.ui.showDialog(`${prisoner.name}は登用を拒否しました……`, false, nextStep); 
+                    }
+                }
             }
         } else if (action === 'kill') { 
             if (prisoner.isDaimyo) {
-                await this.handleDaimyoDeath(prisoner); // ★ await を追加
+                // ★変更：城がまだ残っている（滅亡していない）場合だけ、次の後継者を選びます！
+                if (!isExtinct) {
+                    await this.handleDaimyoDeath(prisoner); 
+                }
                 prisoner.isDaimyo = false; 
             }
             this.game.lifeSystem.executeDeath(prisoner);
@@ -1491,7 +1546,14 @@ class WarManager {
             nextStep();
             
         } else if (action === 'release') { 
-            // ★変更：こちらもメッセージの後に「nextStep」を渡して待つようにしました
+            // ★変更：解放する場合、滅亡した時だけ大名の看板を下ろします。
+            // まだ城がある場合は、大名のまま自分の城に帰します！
+            if (prisoner.isDaimyo) {
+                if (isExtinct) {
+                    prisoner.isDaimyo = false;
+                }
+            }
+
             if (kunishu && !kunishu.isDestroyed) {
                 prisoner.status = 'active'; 
                 prisoner.clan = 0;
@@ -1500,8 +1562,7 @@ class WarManager {
                 if (returnCastle && !returnCastle.samuraiIds.includes(prisoner.id)) returnCastle.samuraiIds.push(prisoner.id);
                 this.game.ui.showDialog(`${prisoner.name}を解放しました。(国人衆へ帰還しました)`, false, nextStep);
             } else {
-                const friendlyCastles = this.game.castles.filter(c => c.ownerClan === originalClanId && originalClanId !== 0);
-                if (friendlyCastles.length > 0) {
+                if (!isExtinct) {
                     const returnCastle = friendlyCastles[Math.floor(Math.random() * friendlyCastles.length)];
                     prisoner.castleId = returnCastle.id; prisoner.isCastellan = false; prisoner.status = 'active'; returnCastle.samuraiIds.push(prisoner.id);
                     this.game.factionSystem.handleMove(prisoner, 0, returnCastle.id); this.game.updateCastleLord(returnCastle);
@@ -1625,10 +1686,17 @@ class WarManager {
         const aiBushos = this.game.bushos.filter(b => b.clan === winnerClanId && b.status !== 'unborn'); 
         const leaderInt = aiBushos.length > 0 ? Math.max(...aiBushos.map(b => b.intelligence)) : 50;
 
-        // ★変更：forEach を for...of に変えて順番待ちできるようにします
+        // ★追加：大名から先に処理するように並べ替えます
+        captives.sort((a, b) => (b.isDaimyo ? 1 : 0) - (a.isDaimyo ? 1 : 0));
+        let daimyoHiredBonus = 0; // ★ご褒美の箱
+
         for (const p of captives) { 
-            // ★変更：大名が処断される時
-            if (p.isDaimyo) { 
+            // ★追加：大名家が滅亡している（他に城がない）かをチェックします
+            const friendlyCastles = this.game.castles.filter(c => c.ownerClan === p.clan && p.clan !== 0);
+            const isExtinct = (friendlyCastles.length === 0);
+
+            // ★変更：大名で、かつ城が残っているなら問答無用で処断
+            if (p.isDaimyo && !isExtinct) { 
                 await this.handleDaimyoDeath(p); // ★ await を追加
                 p.isDaimyo = false; // 大名マークを外します
                 this.game.lifeSystem.executeDeath(p); // 共通のお片付け魔法
@@ -1638,73 +1706,90 @@ class WarManager {
             
             const isKunishuBoss = (p.belongKunishuId > 0 && p.id === this.game.kunishuSystem.getKunishu(p.belongKunishuId)?.leaderId);
 
-            if (!isKunishuBoss && (leaderInt / 100) > Math.random()) { 
-                // ★元の忠誠度を覚えておきます！
+            // ★追加：滅亡時の大名は登用確率が1/3になります。大名を登用できたら他も50%アップ
+            let hireProb = (leaderInt / 100);
+            if (p.isDaimyo && isExtinct) {
+                hireProb = hireProb / 3.0;
+            } else if (!p.isDaimyo && daimyoHiredBonus > 0) {
+                hireProb += daimyoHiredBonus;
+            }
+
+            if (!isKunishuBoss && hireProb > Math.random()) { 
+                // ★追加：大名が登用に応じた場合は、看板を下ろさせてご褒美をセット！
+                if (p.isDaimyo) {
+                    p.isDaimyo = false;
+                    daimyoHiredBonus = 0.5;
+                }
+
                 const oldLoyalty = p.loyalty;
                 p.clan = winnerClanId; 
-                // ★こちらも50を基準に計算します！(最大100まで)
                 p.loyalty = Math.min(100, 50 + (100 - oldLoyalty)); 
                 p.isCastellan = false; p.belongKunishuId = 0;
                 const targetC = this.game.getCastle(p.castleId);
                 if (targetC && !targetC.samuraiIds.includes(p.id)) { targetC.samuraiIds.push(p.id); this.game.updateCastleLord(targetC); }
-                continue; // ★修正！「return;」を「continue;」に直しました！これで途中で終わらなくなります！
+                continue; 
             } 
-            // ★ここから「処断されるか、見逃されるか」の計算式を新しく作ります！
+            
+            // ★ここから「処断されるか、見逃されるか」の計算式
             let killProb = 0;
             
-            // 1. 魅力によるベース処断率（最大50%、最小0%）
             if (p.charm <= 10) {
                 killProb = 50;
             } else if (p.charm >= 70) {
                 killProb = 0;
             } else {
-                // 10から70の間で、魅力が高いほど処断率が下がる計算です
                 killProb = 50 - (p.charm - 10) * (50 / 60);
             }
 
-            // 2. 能力値合計による補正
-            // diplomacy（外交）がない場合は0として計算するように、エラー防止の魔法（|| 0）をつけています
             const totalStats = p.leadership + p.strength + (p.politics || 0) + (p.diplomacy || 0) + p.intelligence;
             
-            let totalBonus = (250 - totalStats) / 10; // 250より低ければプラス（処断率アップ）、高ければマイナス
-            totalBonus = Math.max(-10, Math.min(10, totalBonus)); // どんなに高くても低くても、上限下限は10%まで！
+            let totalBonus = (250 - totalStats) / 10; 
+            totalBonus = Math.max(-10, Math.min(10, totalBonus)); 
             killProb += totalBonus;
 
-            // 3. 個別ステータスによる優秀補正（処断率ダウン）
             const statsList = [p.leadership, p.strength, p.politics || 0, p.diplomacy || 0, p.intelligence];
             let individualBonus = 0;
             statsList.forEach(stat => {
                 if (stat >= 61) {
-                    // 61で0.2%、100で8.0%下がる、特製の計算式です！
                     individualBonus += (stat - 60) * 0.2;
                 }
             });
-            killProb -= individualBonus; // 優秀な分だけ処断率を引いてあげます
+            killProb -= individualBonus; 
 
-            // 確率が0より下になったり、100より上にならないようにストッパーをかけます
+            // ★追加：大名が滅亡して登用拒否した場合、処断確率を20%アップ（容赦なく斬る）
+            if (p.isDaimyo && isExtinct) {
+                killProb += 20;
+            }
+
             killProb = Math.max(0, Math.min(100, killProb));
 
-            // ★いざ、運命のサイコロ！
-            // Math.random() は 0〜1 の数字を出すので、100倍して % と比べます
             if (Math.random() * 100 < killProb) {
-                // 処断されます……
-                this.game.lifeSystem.executeDeath(p); // 共通のお片付け魔法
+                // ★追加：大名が処断される場合、城があるなら後継者選びをします
+                if (p.isDaimyo) {
+                    if (!isExtinct) {
+                        await this.handleDaimyoDeath(p);
+                    }
+                    p.isDaimyo = false;
+                }
+                this.game.lifeSystem.executeDeath(p); 
                 p.clan = 0; p.castleId = 0; p.belongKunishuId = 0; 
             } else {
+                // ★追加：大名が解放される場合、滅亡していたら看板を下ろします
+                if (p.isDaimyo) {
+                    if (isExtinct) {
+                        p.isDaimyo = false;
+                    }
+                }
                 // 見逃された！
                 const kunishu = p.belongKunishuId > 0 ? this.game.kunishuSystem.getKunishu(p.belongKunishuId) : null;
                 if (kunishu && !kunishu.isDestroyed) {
-                    // 国人衆へ帰還します
                     p.status = 'active'; p.clan = 0; p.castleId = kunishu.castleId;
                 } else {
-                    // ★追加：元の大名家がまだ生き残っていれば、仲間の城へ帰してあげます！
-                    const originalClanId = p.clan; // 元の所属を思い出します
-                    // 仲間の城が残っているか探します
-                    const friendlyCastles = this.game.castles.filter(c => c.ownerClan === originalClanId && originalClanId !== 0);
+                    const originalClanId = p.clan; 
+                    const friendlyCastlesExt = this.game.castles.filter(c => c.ownerClan === originalClanId && originalClanId !== 0);
                     
-                    if (friendlyCastles.length > 0) {
-                        // 帰るお城がある場合、ランダムな仲間の城に無事帰還します
-                        const returnCastle = friendlyCastles[Math.floor(Math.random() * friendlyCastles.length)];
+                    if (friendlyCastlesExt.length > 0) {
+                        const returnCastle = friendlyCastlesExt[Math.floor(Math.random() * friendlyCastlesExt.length)];
                         p.castleId = returnCastle.id; 
                         p.isCastellan = false; 
                         p.status = 'active'; 
@@ -1712,7 +1797,6 @@ class WarManager {
                         this.game.factionSystem.handleMove(p, 0, returnCastle.id); 
                         this.game.updateCastleLord(returnCastle);
                     } else {
-                        // 帰るお城がない（大名家が滅亡してしまった）場合は、浪人になります
                         p.status = 'ronin'; p.clan = 0; p.castleId = 0; p.belongKunishuId = 0; 
                     }
                 }

@@ -2883,7 +2883,24 @@ class UIManager {
     closePrisonerModal() {
         if(this.prisonerModal) this.prisonerModal.classList.add('hidden');
     }
-
+    
+    showDaimyoPrisonerModal(prisoner) {
+        this.hideAIGuardTemporarily();
+        const content = `
+            <div style="text-align:center; padding: 10px;">
+                <h3 style="margin-top:0;">敵大名 捕縛！</h3>
+                <p style="font-size:1.1rem;">敵大名・<strong>${prisoner.name}</strong>を捕縛しました。<br>処遇を決めてください。</p>
+                <div style="margin-top:20px; display:flex; justify-content:center; gap:10px;">
+                    <button class="btn-primary" onclick="window.GameApp.warManager.handleDaimyoPrisonerAction('hire')">登用</button>
+                    <button class="btn-secondary" onclick="window.GameApp.warManager.handleDaimyoPrisonerAction('release')">解放</button>
+                    <button class="btn-danger" onclick="window.GameApp.warManager.handleDaimyoPrisonerAction('kill')">処断</button>
+                </div>
+            </div>
+        `;
+        // ボタンだけの特別な画面を出します
+        this.showResultModal(content, null, ""); 
+    }
+    
     showSuccessionModal(candidates, onSelect) {
         if (!this.successionModal) return;
         this.successionModal.classList.remove('hidden');
