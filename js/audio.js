@@ -34,7 +34,7 @@ class AudioManager {
                     if (duration === 0) return;
 
                     const leadTime = 0.1;
-                    const checkInterval = (duration - leadTime) * 1000;
+                    const checkInterval = (duration - player.seek() - leadTime) * 1000;
 
                     setTimeout(() => {
                         if (this.players[this.currentPlayerIndex] === player) {
@@ -59,9 +59,17 @@ class AudioManager {
     _prepareNextLoop(fileName, loopStart) {
         const nextIndex = 1 - this.currentPlayerIndex;
         
+        // 新しいプレイヤーを作ります
         this.players[nextIndex] = this._createPlayer(fileName, loopStart);
-        this.players[nextIndex].seek(loopStart);
-        this.players[nextIndex].play();
+        const nextPlayer = this.players[nextIndex];
+
+        // ★ここがポイント：読み込みが終わった瞬間に「loopStartの秒数」へジャンプさせます
+        nextPlayer.once('load', () => {
+            nextPlayer.seek(loopStart);
+        });
+        
+        // 再生を開始！
+        nextPlayer.play();
 
         const oldPlayer = this.players[this.currentPlayerIndex];
         oldPlayer.fade(this.defaultVolume, 0, 100);
