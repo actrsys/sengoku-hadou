@@ -981,7 +981,7 @@ class CommandSystem {
             const castle = this.game.getCastle(doer.castleId); 
             if(castle) castle.gold -= gold;
             
-            msg = `${doer.name}が親善を行いました\n友好度が上昇しました\n状態: ${newRelation.status}`;
+            msg = `${doer.name}が親善を行いました\n友好度が上昇しました`;
             doer.achievementTotal += Math.floor(doer.diplomacy * 0.2) + 10;
             this.game.factionSystem.updateRecognition(doer, 15);
 
@@ -1242,7 +1242,7 @@ class CommandSystem {
         doer.achievementTotal += Math.floor(doer.diplomacy * 0.2) + 10;
         this.game.factionSystem.updateRecognition(doer, 15);
 
-        this.game.ui.showResultModal(`${doer.name}が ${kunishuName} と親善を行いました\n友好度が上昇しました (現在: ${newRel})`);
+        this.game.ui.showResultModal(`${doer.name}が ${kunishuName} と親善を行いました\n友好度が上昇しました`);
         this.game.ui.updatePanelHeader();
         this.game.ui.renderCommandMenu();
     }
@@ -1422,7 +1422,7 @@ class CommandSystem {
         let attitudeText = ""; 
 
         if (perceivedLoyalty >= 85) {
-            loyaltyText = "身に余る御恩、<br>片時も忘れたことはありませぬ。<br>この身は殿のために。";
+            loyaltyText = "身に余る御恩、片時も忘れたことはありませぬ。<br>この身は殿のために。";
             attitudeText = "";
         } else if (perceivedLoyalty >= 65) {
             loyaltyText = "家中はよく治まっております。<br>何も心配なさりませぬよう。";
@@ -1434,7 +1434,7 @@ class CommandSystem {
             loyaltyText = "……少し、待遇を見直してはいただけませぬか。";
             attitudeText = "";
         } else {
-            loyaltyText = "……。";
+            loyaltyText = "……";
             attitudeText = "(目を合わせようとしない。<br>危険な気配を感じる。)";
         }
 
@@ -1451,9 +1451,9 @@ class CommandSystem {
     executeInterviewTopic(interviewer, target) {
         if (interviewer.id === target.id) {
             let comment = "";
-            if (interviewer.ambition > 80) comment = "「俺の力を持ってすれば、<br>天下も夢ではない……はずだ。」";
-            else if (interviewer.personality === 'cautious') comment = "「慎重に行かねば、<br>足元をすくわれよう。」";
-            else comment = "「今のところは順調か……<br>いや、油断はできん。」";
+            if (interviewer.ambition > 80) comment = "「俺の力を持ってすれば、<br>天下も夢ではない……はずだ」";
+            else if (interviewer.personality === 'cautious') comment = "「慎重に行かねば、<br>足元をすくわれよう」";
+            else comment = "「今のところは順調か……<br>いや、油断はできん」";
             
             const returnScript = `window.GameApp.ui.reopenInterviewModal(window.GameApp.getBusho(${interviewer.id}))`;
             this.game.ui.showResultModal(`<strong>${interviewer.name}</strong><br>「${target.name}か……」<br><br>${comment}<br><br><button class='btn-secondary' onclick='${returnScript}'>戻る</button>`);
@@ -1466,7 +1466,7 @@ class CommandSystem {
         let affinityText = "";
         if (dist < 15) affinityText = "あの方とは意気投合します。素晴らしいお方です。";
         else if (dist < 30) affinityText = "話のわかる相手だと思います。<br>信頼できます。";
-        else if (dist < 50) affinityText = "悪くはありませんが、<br>時折意見が食い違います。";
+        else if (dist < 50) affinityText = "悪くはありませんが、時折意見が食い違います。";
         else if (dist < 70) affinityText = "考え方がどうも合いません。<br>理解に苦しみます。";
         else affinityText = "あやつとは反りが合いません。<br>顔も見たくない程です。";
 
@@ -1474,12 +1474,12 @@ class CommandSystem {
         let togaki = ""; 
 
         if (interviewer.loyalty < 40) {
-            loyaltyText = "さあ……？<br>他人の腹の内など、<br>某には分かりかねます。";
+            loyaltyText = "さあ……？<br>他人の腹の内など某には量りかねます。";
             togaki = "";
         }
         else if (affinityDiff > 35) { 
             if (interviewer.intelligence >= 80) {
-                loyaltyText = "あやつは危険です。<br>裏で妙な動きをしているとの噂も……。";
+                loyaltyText = "あやつは危険です。<br>裏で妙な動きをしているとの噂も……";
                 togaki = "";
             } else {
                 loyaltyText = "あやつとは口もききませぬゆえ、<br>何も存じませぬ。";
@@ -1494,7 +1494,7 @@ class CommandSystem {
             const tLoyalty = target.loyalty;
             if (tLoyalty >= 85) loyaltyText = "殿への忠義は本物でしょう。<br>疑う余地もありません。";
             else if (tLoyalty >= 65) loyaltyText = "不審な点はありませぬ。<br>真面目に務めております。";
-            else if (tLoyalty >= 45) loyaltyText = "今のところは大人しくしておりますが……。";
+            else if (tLoyalty >= 45) loyaltyText = "今のところは大人しくしておりますが……";
             else if (tLoyalty >= 25) loyaltyText = "近頃、何やら不満を漏らしているようです。";
             else loyaltyText = "油断なりませぬ。<br>野心を抱いている気配があります。";
         }
@@ -2011,7 +2011,7 @@ class CommandSystem {
 
         // もし断られてしまったら……
         if (!isSuccess) {
-            this.game.ui.showDialog(`${helperCastle.name}への援軍要請は断られました……。\n自軍のみで出陣します。`, false, () => {
+            this.game.ui.showDialog(`${helperCastle.name}への援軍要請は断られました……\n自軍のみで出陣します。`, false, () => {
                 // 援軍なし（今まで通り）で戦争を始めます
                 this.game.warManager.startWar(atkCastle, targetCastle, atkBushos, sVal, rVal, hVal, gVal);
             });
