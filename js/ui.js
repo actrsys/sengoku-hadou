@@ -216,6 +216,32 @@ class UIManager {
         // ★ここから追加：ダイアログの順番待ちの列を作ります
         this.dialogQueue = []; 
         this.isDialogShowing = false; 
+
+        // =========================================================
+        // ★ ここから追加！画面のどこかのボタンが押されたら音を鳴らす魔法
+        // =========================================================
+        document.addEventListener('click', (e) => {
+            // クリックされた場所が「ボタン（button）」かどうか調べます
+            const btn = e.target.closest('button');
+            if (!btn) return; // ボタンじゃなかったら何もしないで戻ります
+
+            // ボタンに書かれている文字を読み取ります
+            const text = btn.textContent.trim();
+
+            // 音を鳴らすためのオーディオマネージャーがいるか確認します
+            if (window.AudioManager) {
+                // もしボタンの文字が、以下の前向きな言葉なら「decision.ogg」を鳴らします
+                if (["決定", "受諾", "開始", "実行", "迎撃", "籠城", "登用"].includes(text)) {
+                    window.AudioManager.playSE('decision.ogg');
+                } 
+                // もしボタンの文字が、以下のキャンセル系の言葉なら「cancel.ogg」を鳴らします
+                else if (["戻る", "閉じる", "拒否", "やめる", "撤退", "解放", "処断"].includes(text)) {
+                    window.AudioManager.playSE('cancel.ogg');
+                }
+            }
+        }, true); // ボタンが押された瞬間に、他の処理より優先して音を鳴らすおまじないです
+        // =========================================================
+
     } // ← これが constructor の終わりのカッコです
     
     // ==========================================
