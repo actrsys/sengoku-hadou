@@ -140,7 +140,7 @@ class IndependenceSystem {
             }
 
             // ★変更：「今の敵対大名戦力」 ＞ 「今の元大名戦力」 になるなら候補に入れます
-            if ((enemyCurrentPower + affinityBonus) > oldClanPower * 0.8) {
+            if ((enemyCurrentPower + affinityBonus) > oldClanPower) {
                 const score = enemyCurrentPower + affinityBonus;
                 if (score > bestScore) {
                     bestScore = score;
