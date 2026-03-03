@@ -674,9 +674,9 @@ class GameManager {
     }
 
     async startMonth() { 
-        // 変動幅の半分を基準にして、上がる確率と下がる確率をピッタリ半々にします！
+        // ★設定した数字の分だけ、上にも下にもフルパワーで動くようにしました！
         const fluc = window.MainParams.Economy.TradeFluctuation;
-        this.marketRate = Math.max(window.MainParams.Economy.TradeRateMin, Math.min(window.MainParams.Economy.TradeRateMax, this.marketRate * ((1.0 - fluc / 2) + Math.random() * fluc)));
+        this.marketRate = Math.max(window.MainParams.Economy.TradeRateMin, Math.min(window.MainParams.Economy.TradeRateMax, this.marketRate * ((1.0 - fluc) + Math.random() * (fluc * 2))));
         
         await this.ui.showCutin(`${this.year}年 ${this.month}月`);
         
