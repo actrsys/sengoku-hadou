@@ -1655,11 +1655,17 @@ class WarManager {
                 }
             } 
             else { 
-                // ★変更：一般武将が処断される時
-                this.game.lifeSystem.executeDeath(p); // 共通のお片付け魔法
-                p.clan = 0; p.castleId = 0; p.belongKunishuId = 0; 
-            } 
-        } // ★ for...of に変えたので閉じカッコを変更します
+                // ★追加：処断する確率を半分（50%）に下げる優しい魔法です！
+                // サイコロを振って、半分（0.5）の確率で見逃してあげます
+                if (Math.random() < 0.5) {
+                    p.status = 'ronin'; p.clan = 0; p.castleId = 0; p.belongKunishuId = 0;
+                } else {
+                    // 運が悪かった半分は、今まで通り処断されます
+                    this.game.lifeSystem.executeDeath(p); // 共通のお片付け魔法
+                    p.clan = 0; p.castleId = 0; p.belongKunishuId = 0; 
+                }
+            }
+        }
     }
 
     closeWar() { 

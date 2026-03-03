@@ -1191,7 +1191,14 @@ class CommandSystem {
                 target.clan = newClanId; 
                 target.belongKunishuId = 0; 
                 target.castleId = castle.id; 
-                target.loyalty = 50; 
+                
+                // ★ここから書き換え：普通の引抜時の忠誠度計算です！
+                const daimyo = this.game.bushos.find(b => b.clan === newClanId && b.isDaimyo) || { affinity: 50 };
+                const affDiff = GameSystem.calcAffinityDiff(daimyo.affinity, target.affinity);
+                const loyaltyUp = 50 - affDiff;
+                target.loyalty = Math.min(100, 50 + loyaltyUp);
+                // ★ここまで書き換え
+                
                 target.isActionDone = true; 
                 target.status = 'active';
                 castle.samuraiIds.push(target.id);
@@ -1267,7 +1274,14 @@ class CommandSystem {
             target.clan = this.game.playerClanId; 
             target.belongKunishuId = 0; // 国人衆を抜ける
             target.castleId = castle.id; 
-            target.loyalty = 50; 
+            
+            // ★ここから書き換え：国人衆の引抜時の忠誠度計算です！
+            const daimyo = this.game.bushos.find(b => b.clan === this.game.playerClanId && b.isDaimyo) || { affinity: 50 };
+            const affDiff = GameSystem.calcAffinityDiff(daimyo.affinity, target.affinity);
+            const loyaltyUp = 50 - affDiff;
+            target.loyalty = Math.min(100, 50 + loyaltyUp);
+            // ★ここまで書き換え
+            
             target.isActionDone = true; 
             target.status = 'active';
             castle.samuraiIds.push(target.id);
