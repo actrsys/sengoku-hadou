@@ -633,14 +633,14 @@ class WarManager {
 
         while (turn <= 20 && s.attacker.soldiers > 0 && s.defender.fieldSoldiers > 0 && safetyLimit > 0) {
             let resAtk = WarSystem.calcWarDamage(atkStats, defStats, s.attacker.soldiers, s.defender.fieldSoldiers, 0, s.attacker.morale, s.defender.training, 'charge');
-            // ★0.5を0.33に変更しました！
-            if (!s.isPlayerInvolved) { resAtk.soldierDmg = Math.floor(resAtk.soldierDmg * 0.33); resAtk.counterDmg = Math.floor(resAtk.counterDmg * 0.33); }
+            // ★0.5を0.195に変更しました！
+            if (!s.isPlayerInvolved) { resAtk.soldierDmg = Math.floor(resAtk.soldierDmg * 0.195); resAtk.counterDmg = Math.floor(resAtk.counterDmg * 0.195); }
             s.defender.fieldSoldiers -= Math.min(s.defender.fieldSoldiers, resAtk.soldierDmg); s.attacker.soldiers -= Math.min(s.attacker.soldiers, resAtk.counterDmg);
             if (s.defender.fieldSoldiers <= 0 || s.attacker.soldiers <= 0) break;
             
             let resDef = WarSystem.calcWarDamage(defStats, atkStats, s.defender.fieldSoldiers, s.attacker.soldiers, 0, s.defender.morale, s.attacker.training, 'charge');
-            // ★0.5を0.33に変更しました！
-            if (!s.isPlayerInvolved) { resDef.soldierDmg = Math.floor(resDef.soldierDmg * 0.33); resDef.counterDmg = Math.floor(resDef.counterDmg * 0.33); }
+            // ★0.5を0.195に変更しました！
+            if (!s.isPlayerInvolved) { resDef.soldierDmg = Math.floor(resDef.soldierDmg * 0.195); resDef.counterDmg = Math.floor(resDef.counterDmg * 0.195); }
             s.attacker.soldiers -= Math.min(s.attacker.soldiers, resDef.soldierDmg); s.defender.fieldSoldiers -= Math.min(s.defender.fieldSoldiers, resDef.counterDmg);
 
             s.attacker.rice = Math.max(0, s.attacker.rice - Math.floor(s.attacker.soldiers * consumeRate));
@@ -835,8 +835,8 @@ class WarManager {
             const result = WarSystem.calcScheme(isAtkTurn ? s.atkBushos[0] : s.defBusho, isAtkTurn ? s.defBusho : s.atkBushos[0], isAtkTurn ? s.defender.peoplesLoyalty : (window.MainParams?.Economy?.MaxLoyalty || 100));
             if (!result.success) { if (s.isPlayerInvolved) this.game.ui.log(`R${s.round} 謀略失敗！`); }
             else {
-                // ★0.5を0.33に変更しました！
-                let actualDamage = s.isPlayerInvolved ? result.damage : Math.floor(result.damage * 0.33);
+                // ★0.5を0.195に変更しました！
+                let actualDamage = s.isPlayerInvolved ? result.damage : Math.floor(result.damage * 0.195);
                 target.soldiers = Math.max(0, target.soldiers - actualDamage);
                 if (s.isPlayerInvolved) this.game.ui.log(`R${s.round} 謀略成功！ 兵士に${actualDamage}の被害`);
             }
@@ -847,8 +847,8 @@ class WarManager {
             const result = WarSystem.calcFire(isAtkTurn ? s.atkBushos[0] : s.defBusho, isAtkTurn ? s.defBusho : s.atkBushos[0]);
             if (!result.success) { if (s.isPlayerInvolved) this.game.ui.log(`R${s.round} 火攻失敗！`); }
             else {
-                // ★0.5を0.33に変更しました！
-                let actualDamage = s.isPlayerInvolved ? result.damage : Math.floor(result.damage * 0.33);
+                // ★0.5を0.195に変更しました！
+                let actualDamage = s.isPlayerInvolved ? result.damage : Math.floor(result.damage * 0.195);
                 // ★25（半分のダメージ）を16（3分の1のダメージ）に変更しました！
                 let actualDefSoldierDamage = s.isPlayerInvolved ? 50 : 16;
                 if(isAtkTurn) s.defender.defense = Math.max(0, s.defender.defense - actualDamage);
@@ -862,8 +862,8 @@ class WarManager {
         let calculatedSoldierDmg = result.soldierDmg; let calculatedWallDmg = result.wallDmg; let calculatedCounterDmg = result.counterDmg;
 
         if (!s.isPlayerInvolved) {
-            // ★0.5を0.33に変更しました！
-            calculatedSoldierDmg = Math.floor(calculatedSoldierDmg * 0.33); calculatedWallDmg = Math.floor(calculatedWallDmg * 0.33); calculatedCounterDmg = Math.floor(calculatedCounterDmg * 0.33);
+            // ★0.5を0.195に変更しました！
+            calculatedSoldierDmg = Math.floor(calculatedSoldierDmg * 0.195); calculatedWallDmg = Math.floor(calculatedWallDmg * 0.195); calculatedCounterDmg = Math.floor(calculatedCounterDmg * 0.195);
         }
 
         if (isAtkTurn && s.defenderGuarding) {
