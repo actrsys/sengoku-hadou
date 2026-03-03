@@ -25,15 +25,31 @@ class AudioManager {
             src: [`data/music/bgm/${fileName}`],
             volume: this.defaultVolume,
             onplay: () => {
-                const duration = player.duration();
-                const leadTime = 0.1;
-                const checkInterval = (duration - leadTime) * 1000;
+                // ★ ここから修正：ループの準備をする「魔法」を定義します
+                const setupLoop = () => {
+                    const duration = player.duration();
+                    
+                    // もし曲の長さがまだ「0」だったら、うまく測れていないので何もしません
+                    if (duration === 0) return;
 
-                setTimeout(() => {
-                    if (this.players[this.currentPlayerIndex] === player) {
-                        this._prepareNextLoop(fileName, loopStart);
-                    }
-                }, checkInterval);
+                    const leadTime = 0.1;
+                    const checkInterval = (duration - leadTime) * 1000;
+
+                    setTimeout(() => {
+                        if (this.players[this.currentPlayerIndex] === player) {
+                            this._prepareNextLoop(fileName, loopStart);
+                        }
+                    }, checkInterval);
+                };
+
+                // 曲の読み込みが終わっているかチェックします
+                if (player.state() === 'loaded') {
+                    // もう読み込めていたら、すぐにループの準備をします
+                    setupLoop();
+                } else {
+                    // まだ読み込み中なら、終わった瞬間に準備をするように予約します
+                    player.once('load', setupLoop);
+                }
             }
         });
         return player;
