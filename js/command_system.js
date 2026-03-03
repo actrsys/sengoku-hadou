@@ -130,10 +130,10 @@ const COMMAND_SPECS = {
     },
     'reward': { 
         label: "褒美", category: 'PERSONNEL', 
-        costGold: 200, costRice: 0, 
+        costGold: 100, costRice: 0, 
         isMulti: true, hasAdvice: false, 
         startMode: 'busho_select', sortKey: 'loyalty',
-        msg: "金: 200 (1人あたり)\n褒美を与えます" 
+        msg: "金: 100 (1人あたり)\n褒美を与えます" 
     },
     'interview': { 
         label: "面談", category: 'PERSONNEL', 
@@ -967,7 +967,7 @@ class CommandSystem {
             const castle = this.game.getCastle(doer.castleId); 
             if(castle) castle.gold -= gold;
             
-            msg = `${doer.name}が親善を行いました\n友好度が上昇しました (現在: ${newRelation.sentiment}, 状態: ${newRelation.status})`;
+            msg = `${doer.name}が親善を行いました\n友好度が上昇しました\n状態: ${newRelation.status}`;
             doer.achievementTotal += Math.floor(doer.diplomacy * 0.2) + 10;
             this.game.factionSystem.updateRecognition(doer, 15);
 
@@ -1341,7 +1341,6 @@ class CommandSystem {
         
         let count = 0;
         let totalEffect = 0;
-        let msgLog = "";
 
         bushoIds.forEach(bid => {
             const target = this.game.getBusho(bid);
@@ -1351,9 +1350,14 @@ class CommandSystem {
 
             castle.gold -= spec.costGold;
             
-            const effect = GameSystem.calcRewardEffect(spec.costGold, daimyo, target);
+            // ★変更：費用を100にしても効果量は元(200)と同じにするため、計算には「200」を渡します
+            const effect = GameSystem.calcRewardEffect(200, daimyo, target);
 
             this.game.factionSystem.updateRecognition(target, -effect * 2 - 5);
+
+            // ★追加：忠誠度をランダムで1～3アップさせる
+            const loyaltyUp = Math.floor(Math.random() * 3) + 1;
+            target.loyalty = Math.min(100, target.loyalty + loyaltyUp);
 
             count++;
             totalEffect += effect;
@@ -1361,6 +1365,7 @@ class CommandSystem {
 
         if (count > 0) {
             const lastBusho = this.game.getBusho(bushoIds[bushoIds.length - 1]);
+            // ★変更：メッセージに「忠誠が上がった」ことも書き足しました
             this.game.ui.showResultModal(`${count}名に褒美（金${count * spec.costGold}）を与えました`);
             this.game.ui.log(`${count}名に褒美を実行 (合計効果:${totalEffect})`);
         } else {
