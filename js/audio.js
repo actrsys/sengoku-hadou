@@ -6,7 +6,8 @@ class AudioManager {
         // BGM用の演奏者を2人（bgm1, bgm2）用意します
         this.players = [null, null];
         this.currentPlayerIndex = 0;
-        this.defaultVolume = 0.05;
+        this.defaultVolume = 0.05; // BGMの音量
+        this.seVolume = 0.025;      // ★追加：SE専用の音量
     }
 
     // ==========================================
@@ -77,21 +78,26 @@ class AudioManager {
         this.players.forEach(p => { if (p) p.stop(); });
         this.players = [null, null];
     }
-
+    
+    // BGMの音量を変える命令
     setVolume(value) {
         this.defaultVolume = value;
         this.players.forEach(p => { if (p) p.volume(value); });
-    }
+    } // ← ここで一度ドアを閉めます！
 
+    // SEの音量を変える命令（別の新しいお部屋として作ります）
+    setSEVolume(value) {
+        this.seVolume = value;
+    }
+    
     // ==========================================
     // ★ ここから新しく追加！効果音（SE）を鳴らす仕組み
     // ==========================================
     playSE(fileName) {
         // SE用の新しい演奏者をその都度作って、鳴らします
         const se = new window.Howl({
-            // あや瀨さんのご要望通り、se フォルダを見に行くように設定しています！
             src: [`data/music/se/${fileName}`], 
-            volume: this.defaultVolume // BGMと同じ音量にしています
+            volume: this.seVolume // ★ここを変更：SE専用の音量を使います！
         });
         se.play();
     }
