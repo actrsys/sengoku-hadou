@@ -101,11 +101,10 @@ class IndependenceSystem {
         let targetDaimyo = null;
         let bestScore = -1;
 
+        // ★変更：寝返り前の「今のままの大名家の戦力」を計算します
         const oldClanPower = this.calcClanPower(oldClanId);
-        const castlePower = this.calcCastlePower(castle);
-        const oldClanFuturePower = oldClanPower - castlePower;
 
-        // ★変更：相性の計算基準を rebellionLeader（神輿になる人物）に変更
+        // 相性の計算基準を rebellionLeader（神輿になる人物）に変更
         const oldAffinityDiff = GameSystem.calcAffinityDiff(rebellionLeader.affinity, oldDaimyo.affinity);
 
         for (const clan of this.game.clans) {
@@ -130,17 +129,19 @@ class IndependenceSystem {
             const enemyDaimyo = this.game.bushos.find(b => b.clan === clan.id && b.isDaimyo);
             if (!enemyDaimyo) continue;
 
-            let enemyFuturePower = this.calcClanPower(clan.id) + castlePower;
+            // ★変更：寝返り前の「そのままの敵対大名の戦力」を計算します
+            let enemyCurrentPower = this.calcClanPower(clan.id);
             
-            // ★変更：相性の計算基準を rebellionLeader に変更
+            // 相性の計算基準を rebellionLeader に変更
             const enemyAffinityDiff = GameSystem.calcAffinityDiff(rebellionLeader.affinity, enemyDaimyo.affinity);
             let affinityBonus = 0;
             if (enemyAffinityDiff < oldAffinityDiff) {
                 affinityBonus = oldAffinityDiff - enemyAffinityDiff; 
             }
 
-            if ((enemyFuturePower + affinityBonus) > oldClanFuturePower) {
-                const score = enemyFuturePower + affinityBonus;
+            // ★変更：「今の敵対大名戦力」 ＞ 「今の元大名戦力」 になるなら候補に入れます
+            if ((enemyCurrentPower + affinityBonus) > oldClanPower) {
+                const score = enemyCurrentPower + affinityBonus;
                 if (score > bestScore) {
                     bestScore = score;
                     targetClanId = clan.id;
