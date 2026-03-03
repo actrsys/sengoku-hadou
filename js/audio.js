@@ -21,10 +21,10 @@ class AudioManager {
 
     // 内部で使う「演奏者を作る」仕組み
     _createPlayer(fileName, loopStart) {
-        const player = new Howl({
+        const player = new window.Howl({
             src: [`data/music/bgm/${fileName}`],
             volume: this.defaultVolume,
-            onplay: (id) => {
+            onplay: () => {
                 // 曲の長さ（秒）を取得
                 const duration = player.duration();
                 // ループ地点の数秒前に「次の人、準備して！」というタイマーをセット
@@ -52,7 +52,13 @@ class AudioManager {
         // 前の演奏者を0.1秒かけて静かに消して、その後さようならする
         const oldPlayer = this.players[this.currentPlayerIndex];
         oldPlayer.fade(this.defaultVolume, 0, 100);
-        setTimeout(() => oldPlayer.stop(), 100);
+        
+        // ★ここから差し替え
+        setTimeout(() => {
+            oldPlayer.stop();   // 止まって！
+            oldPlayer.unload(); // 楽器を片付けてお家に帰って！（メモリの掃除）
+        }, 100);
+        // ★ここまで差し替え
 
         this.currentPlayerIndex = nextIndex;
     }
