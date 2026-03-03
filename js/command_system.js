@@ -1132,24 +1132,62 @@ class CommandSystem {
         }
         
         if (isSuccess) {
-            // まず「元々いた城」を見つけて、そこの名簿から名前を消してあげます
+            // ▼ ここから大きく変わります ▼
             const oldCastle = this.game.getCastle(target.castleId);
-            if(oldCastle) {
-                oldCastle.samuraiIds = oldCastle.samuraiIds.filter(id => id !== target.id);
-                this.game.updateCastleLord(oldCastle);
-            }
-
-            // 在野（国人衆）から大名家の武将になる処理
-            target.clan = this.game.playerClanId; 
-            target.belongKunishuId = 0; // 国人衆を抜ける
-            target.castleId = castle.id; 
-            target.loyalty = 50; 
-            target.isActionDone = true; 
-            target.status = 'active';
-            castle.samuraiIds.push(target.id);
-            this.game.updateCastleLord(castle);
+            const oldClanId = target.clan;
+            const newClanId = this.game.playerClanId;
             
-            this.game.ui.showResultModal(`${doer.name}の引抜工作が成功！\n${target.name}が国人衆を離れ、我が軍に加わりました！`);
+            if (target.isCastellan && oldCastle) {
+                // ■ 城主を引き抜いた場合（城ごと寝返る！）
+                
+                // お城の持ち主をプレイヤーの大名家に変更
+                oldCastle.ownerClan = newClanId;
+                
+                // 城主自身のデータもプレイヤーの大名家に変更
+                target.clan = newClanId;
+                target.loyalty = 100; // 寝返ったので忠誠はMAX！
+                target.isActionDone = true;
+                target.status = 'active';
+                
+                // ■ 同じ城にいる部下たちの処理（independence_systemの機能を使います）
+                // これにより、部下がついてくるか、逃げるか、捕まるかが自動で決まります
+                const indSys = this.game.independenceSystem;
+                const captiveMsgs = indSys.resolveSubordinates(oldCastle, target, targetLord, newClanId, oldClanId);
+                
+                // お城の城主データを更新
+                this.game.updateCastleLord(oldCastle);
+
+                // メッセージの作成
+                let msg = `${doer.name}の引抜工作が成功！\n${target.name}が【${oldCastle.name}】ごと我が軍に寝返りました！`;
+                if (captiveMsgs && captiveMsgs.length > 0) {
+                    msg += '\n\n' + captiveMsgs.join('\n');
+                }
+                this.game.ui.showResultModal(msg);
+
+            } else {
+                // ■ 普通の武将（城主以外）を引き抜いた場合
+                
+                if(oldCastle) {
+                    // 元の城の名簿から名前を消します
+                    oldCastle.samuraiIds = oldCastle.samuraiIds.filter(id => id !== target.id);
+                    this.game.updateCastleLord(oldCastle);
+                }
+
+                // プレイヤーの城に移動させます
+                target.clan = newClanId; 
+                target.belongKunishuId = 0; 
+                target.castleId = castle.id; 
+                target.loyalty = 50; 
+                target.isActionDone = true; 
+                target.status = 'active';
+                castle.samuraiIds.push(target.id);
+                this.game.updateCastleLord(castle);
+                
+                // メッセージ表示（国人衆を離れ～という誤字を直しました）
+                this.game.ui.showResultModal(`${doer.name}の引抜工作が成功！\n${target.name}が我が軍に加わりました！`);
+            }
+            // ▲ ここまで ▲
+            
             const maxStat = Math.max(target.strength, target.intelligence, target.leadership, target.charm, target.diplomacy);
             doer.achievementTotal += Math.floor(maxStat * 0.3);
             this.game.factionSystem.updateRecognition(doer, 25);
