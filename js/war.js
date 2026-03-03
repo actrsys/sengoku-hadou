@@ -1646,23 +1646,54 @@ class WarManager {
                 if (targetC && !targetC.samuraiIds.includes(p.id)) { targetC.samuraiIds.push(p.id); this.game.updateCastleLord(targetC); }
                 continue; // ★修正！「return;」を「continue;」に直しました！これで途中で終わらなくなります！
             } 
-            if (p.charm > (window.WarParams.War.PrisonerRecruitThreshold || 60)) { 
+            // ★ここから「処断されるか、見逃されるか」の計算式を新しく作ります！
+            let killProb = 0;
+            
+            // 1. 魅力によるベース処断率（最大50%、最小0%）
+            if (p.charm <= 10) {
+                killProb = 50;
+            } else if (p.charm >= 70) {
+                killProb = 0;
+            } else {
+                // 10から70の間で、魅力が高いほど処断率が下がる計算です
+                killProb = 50 - (p.charm - 10) * (50 / 60);
+            }
+
+            // 2. 能力値合計による補正
+            // diplomacy（外交）がない場合は0として計算するように、エラー防止の魔法（|| 0）をつけています
+            const totalStats = p.leadership + p.strength + (p.politics || 0) + (p.diplomacy || 0) + p.intelligence;
+            
+            let totalBonus = (250 - totalStats) / 10; // 250より低ければプラス（処断率アップ）、高ければマイナス
+            totalBonus = Math.max(-10, Math.min(10, totalBonus)); // どんなに高くても低くても、上限下限は10%まで！
+            killProb += totalBonus;
+
+            // 3. 個別ステータスによる優秀補正（処断率ダウン）
+            const statsList = [p.leadership, p.strength, p.politics || 0, p.diplomacy || 0, p.intelligence];
+            let individualBonus = 0;
+            statsList.forEach(stat => {
+                if (stat >= 61) {
+                    // 61で0.2%、100で8.0%下がる、特製の計算式です！
+                    individualBonus += (stat - 60) * 0.2;
+                }
+            });
+            killProb -= individualBonus; // 優秀な分だけ処断率を引いてあげます
+
+            // 確率が0より下になったり、100より上にならないようにストッパーをかけます
+            killProb = Math.max(0, Math.min(100, killProb));
+
+            // ★いざ、運命のサイコロ！
+            // Math.random() は 0〜1 の数字を出すので、100倍して % と比べます
+            if (Math.random() * 100 < killProb) {
+                // 処断されます……
+                this.game.lifeSystem.executeDeath(p); // 共通のお片付け魔法
+                p.clan = 0; p.castleId = 0; p.belongKunishuId = 0; 
+            } else {
+                // 見逃された！在野に下るか、国人衆へ帰還します
                 const kunishu = p.belongKunishuId > 0 ? this.game.kunishuSystem.getKunishu(p.belongKunishuId) : null;
                 if (kunishu && !kunishu.isDestroyed) {
                     p.status = 'active'; p.clan = 0; p.castleId = kunishu.castleId;
                 } else {
                     p.status = 'ronin'; p.clan = 0; p.castleId = 0; 
-                }
-            } 
-            else { 
-                // ★追加：処断する確率を半分（50%）に下げる優しい魔法です！
-                // サイコロを振って、半分（0.5）の確率で見逃してあげます
-                if (Math.random() < 0.5) {
-                    p.status = 'ronin'; p.clan = 0; p.castleId = 0; p.belongKunishuId = 0;
-                } else {
-                    // 運が悪かった半分は、今まで通り処断されます
-                    this.game.lifeSystem.executeDeath(p); // 共通のお片付け魔法
-                    p.clan = 0; p.castleId = 0; p.belongKunishuId = 0; 
                 }
             }
         }
