@@ -1016,6 +1016,12 @@ class UIManager {
         const startBtn = document.getElementById('daimyo-confirm-start-btn');
         if (startBtn) {
             startBtn.onclick = () => {
+                // ★ ここで新しい曲を鳴らします！
+                // （前の曲は playBGM が勝手に止めてくれます）
+                if (window.AudioManager) {
+                    window.AudioManager.playBGM('SC_ex_Town2_Fortress.ogg'); // ここに鳴らしたいファイル名を書いてください
+                }
+
                 this.daimyoConfirmModal.classList.add('hidden');
                 onStart();
             };
