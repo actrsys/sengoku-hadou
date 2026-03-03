@@ -6,7 +6,7 @@ class AudioManager {
         // 演奏者を2人（bgm1, bgm2）用意します
         this.players = [null, null];
         this.currentPlayerIndex = 0;
-        this.defaultVolume = 0.1;
+        this.defaultVolume = 0.05;
     }
 
     playBGM(fileName, loopStart = 0) {
