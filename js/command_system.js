@@ -131,7 +131,7 @@ const COMMAND_SPECS = {
     'reward': { 
         label: "褒美", category: 'PERSONNEL', 
         costGold: 200, costRice: 0, 
-        isMulti: true, hasAdvice: true, 
+        isMulti: true, hasAdvice: false, 
         startMode: 'busho_select', sortKey: 'loyalty',
         msg: "金: 200 (1人あたり)\n褒美を与えます" 
     },
