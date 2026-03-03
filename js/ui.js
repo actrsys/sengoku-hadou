@@ -2865,13 +2865,21 @@ class UIManager {
                 div.style.justifyContent = 'space-between';
                 div.style.alignItems = 'center';
                 
+                // ★追加：登用を拒否した武将はボタンを押せないようにする魔法
+                let hireBtnHtml = '';
+                if (p.hasRefusedHire) {
+                    hireBtnHtml = `<button class="btn-primary" disabled style="opacity:0.5; background-color: #666;">拒否</button>`;
+                } else {
+                    hireBtnHtml = `<button class="btn-primary" onclick="window.GameApp.warManager.handlePrisonerAction(${index}, 'hire')">登用</button>`;
+                }
+                
                 div.innerHTML = `
                     <div style="flex:1;">
                         <strong>${p.name}</strong> (${p.getRankName()})<br>
                         統:${p.leadership} 武:${p.strength} 智:${p.intelligence} 忠:${p.loyalty}
                     </div>
                     <div style="display:flex; gap:5px;">
-                        <button class="btn-primary" onclick="window.GameApp.warManager.handlePrisonerAction(${index}, 'hire')">登用</button>
+                        ${hireBtnHtml}
                         <button class="btn-secondary" onclick="window.GameApp.warManager.handlePrisonerAction(${index}, 'release')">解放</button>
                         <button class="btn-danger" onclick="window.GameApp.warManager.handlePrisonerAction(${index}, 'kill')">処断</button>
                     </div>
@@ -2886,12 +2894,21 @@ class UIManager {
     
     showDaimyoPrisonerModal(prisoner) {
         this.hideAIGuardTemporarily();
+        
+        // ★追加：登用を拒否した大名はボタンを押せないようにする魔法
+        let hireBtnHtml = '';
+        if (prisoner.hasRefusedHire) {
+            hireBtnHtml = `<button class="btn-primary" disabled style="opacity:0.5; background-color: #666;">拒否</button>`;
+        } else {
+            hireBtnHtml = `<button class="btn-primary" onclick="window.GameApp.warManager.handleDaimyoPrisonerAction('hire')">登用</button>`;
+        }
+
         const content = `
             <div style="text-align:center; padding: 10px;">
                 <h3 style="margin-top:0;">敵大名 捕縛！</h3>
                 <p style="font-size:1.1rem;">敵大名・<strong>${prisoner.name}</strong>を捕縛しました。<br>処遇を決めてください。</p>
                 <div style="margin-top:20px; display:flex; justify-content:center; gap:10px;">
-                    <button class="btn-primary" onclick="window.GameApp.warManager.handleDaimyoPrisonerAction('hire')">登用</button>
+                    ${hireBtnHtml}
                     <button class="btn-secondary" onclick="window.GameApp.warManager.handleDaimyoPrisonerAction('release')">解放</button>
                     <button class="btn-danger" onclick="window.GameApp.warManager.handleDaimyoPrisonerAction('kill')">処断</button>
                 </div>

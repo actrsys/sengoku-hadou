@@ -1462,8 +1462,8 @@ class WarManager {
         const friendlyCastles = this.game.castles.filter(c => c.ownerClan === originalClanId && originalClanId !== 0);
         const isExtinct = (friendlyCastles.length === 0);
 
-        // ★追加：ダイアログの「OKボタン」を押した後に、次の処理へ進むための特別な箱を用意しました
-        const nextStep = async () => { // ★ async をつけます
+        // ★追加：ダイアログの「OKボタン」を押した後に、武将をリストから消して次の処理へ進む魔法
+        const nextStep = async () => { 
             this.pendingPrisoners.splice(index, 1); 
             if (this.pendingPrisoners.length === 0) {
                 this.game.ui.closePrisonerModal();
@@ -1476,6 +1476,15 @@ class WarManager {
                 this.game.ui.showPrisonerModal(this.pendingPrisoners); 
             }
         };
+
+        // ★新規追加：登用を拒否された時に、武将をリストから消さずに画面を描き直す魔法
+        const stayStep = () => {
+             if (prisoner.isDaimyo) {
+                 this.game.ui.showDaimyoPrisonerModal(prisoner);
+             } else {
+                 this.game.ui.showPrisonerModal(this.pendingPrisoners);
+             }
+        };
         
         if (action === 'hire') { 
             if (kunishu && prisoner.id === kunishu.leaderId) {
@@ -1486,25 +1495,27 @@ class WarManager {
             const myBushos = this.game.bushos.filter(b=>b.clan===this.game.playerClanId && b.status !== 'unborn'); const recruiter = myBushos.find(b => b.isDaimyo) || myBushos[0];
             const score = (recruiter.charm * 2.0) / (prisoner.loyalty * 1.5); 
             
-            // ★変更：大名で、かつ城が残っているなら絶対に拒否します
+            // ★変更：大名で、かつ城が残っているなら絶対に拒否し、stayStepで画面に戻します
             if (prisoner.isDaimyo && !isExtinct) {
-                this.game.ui.showDialog(`${prisoner.name}「敵の軍門には下らぬ！」`, false, nextStep); 
+                prisoner.hasRefusedHire = true; // ★追加：拒否したという印をつけます
+                this.game.ui.showDialog(`${prisoner.name}「敵の軍門には下らぬ！」`, false, stayStep); 
             } else {
                 // ★追加：滅亡時の大名は登用確率が1/3になります
                 let hireProb = score;
                 if (prisoner.isDaimyo && isExtinct) {
                     hireProb = score / 3.0;
                 } else if (!prisoner.isDaimyo && this.daimyoHiredBonus) {
-                    // ★追加：もし大名を登用できていたら、他の武将の登用確率が50%(0.5)アップします！
                     hireProb += this.daimyoHiredBonus;
                 }
 
                 if (hireProb > Math.random()) { 
-                    // ★追加：大名が登用に応じた場合は、大名の看板を下ろさせます
                     if (prisoner.isDaimyo) {
                         prisoner.isDaimyo = false;
-                        this.daimyoHiredBonus = 0.5; // ★大名を登用できたご褒美をセット！
+                        this.daimyoHiredBonus = 0.5; 
                     }
+
+                    // ★バグ修正：所属（clan）を書き換える前に「臣従メッセージ」を出す条件を満たしているかチェックします！
+                    const isSubmission = (isExtinct && originalClanId === prisoner.clan);
 
                     const oldLoyalty = prisoner.loyalty;
                     prisoner.clan = this.game.playerClanId; 
@@ -1517,23 +1528,24 @@ class WarManager {
                         if (!targetC.samuraiIds.includes(prisoner.id)) targetC.samuraiIds.push(prisoner.id); 
                         this.game.updateCastleLord(targetC); 
                     }
+                    
                     // ★滅亡した大名専用の胸熱メッセージ！
-                    if (isExtinct && originalClanId === prisoner.clan) { 
+                    if (isSubmission) { 
                         this.game.ui.showDialog(`${prisoner.name}は臣従を誓いました！`, false, nextStep); 
                     } else {
                         this.game.ui.showDialog(`${prisoner.name}を登用しました！`, false, nextStep); 
                     }
                 } else {
+                    prisoner.hasRefusedHire = true; // ★追加：拒否したという印をつけます
                     if (prisoner.isDaimyo && isExtinct) {
-                        this.game.ui.showDialog(`${prisoner.name}「……煮るなり焼くなり好きにせい。」\n${prisoner.name}は拒否しました`, false, nextStep);
+                        this.game.ui.showDialog(`${prisoner.name}「……煮るなり焼くなり好きにせい。」\n${prisoner.name}は拒否しました`, false, stayStep);
                     } else {
-                        this.game.ui.showDialog(`${prisoner.name}は登用を拒否しました……`, false, nextStep); 
+                        this.game.ui.showDialog(`${prisoner.name}は登用を拒否しました……`, false, stayStep); 
                     }
                 }
             }
         } else if (action === 'kill') { 
             if (prisoner.isDaimyo) {
-                // ★変更：城がまだ残っている（滅亡していない）場合だけ、次の後継者を選びます！
                 if (!isExtinct) {
                     await this.handleDaimyoDeath(prisoner); 
                 }
@@ -1546,8 +1558,6 @@ class WarManager {
             nextStep();
             
         } else if (action === 'release') { 
-            // ★変更：解放する場合、滅亡した時だけ大名の看板を下ろします。
-            // まだ城がある場合は、大名のまま自分の城に帰します！
             if (prisoner.isDaimyo) {
                 if (isExtinct) {
                     prisoner.isDaimyo = false;
