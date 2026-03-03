@@ -905,7 +905,21 @@ class CommandSystem {
             target.castleId = currentC.id; 
             target.clan = this.game.playerClanId; 
             target.status = 'active'; 
-            target.loyalty = 50; 
+            
+            // ★ここから書き換え：大名との相性を計算して忠誠度を決める処理です！
+            // ① 自分の軍の「大名（殿様）」を探します
+            const daimyo = this.game.bushos.find(b => b.clan === this.game.playerClanId && b.isDaimyo) || { affinity: 50 };
+            
+            // ② 大名と、新しく入る武将の相性の「差」を計算します（差は0〜50になります）
+            const affDiff = GameSystem.calcAffinityDiff(daimyo.affinity, target.affinity);
+            
+            // ③ 相性の差が0なら50アップ、差が50なら0アップになるように計算します
+            const loyaltyUp = 50 - affDiff;
+            
+            // ④ 基本の50に、アップ分を足して忠誠度をセットします（最高100まで）
+            target.loyalty = Math.min(100, 50 + loyaltyUp); 
+            // ★ここまで書き換え
+            
             this.game.updateCastleLord(currentC);
             
             msg = `${target.name}の登用に成功しました！`; 
