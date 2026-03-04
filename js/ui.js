@@ -1554,80 +1554,139 @@ class UIManager {
         svg.style.left = "0px";
         svg.style.top = "0px";
         svg.style.pointerEvents = "none"; // マウスの邪魔をしないようにします
-        svg.style.zIndex = "5"; // ★重要：地図（0）より手前、お城（10）より奥になるように「5」にします！
+        svg.style.zIndex = "5"; // 地図（0）より手前、お城（10）より奥になるように「5」にします！
 
-        // 一度引いた道をメモしておく箱です（往復で2回線を引かないようにするため）
-        const drawnLines = new Set();
-
+        // ① どのお城とどのお城が繋がっているか、全体の関係図（リスト）を作ります
+        const adj = new Map();
+        this.game.castles.forEach(c => adj.set(c.id, new Set()));
         this.game.castles.forEach(c1 => {
-            // お城1の場所を計算します
-            const pos1X = c1.pixelX !== undefined ? c1.pixelX : (c1.x * 80 + 40);
-            const pos1Y = c1.pixelY !== undefined ? c1.pixelY : (c1.y * 80 + 40);
-
-            // 隣のお城リストがあるかチェックします
             if (c1.adjacentCastleIds) {
                 c1.adjacentCastleIds.forEach(adjId => {
-                    // お城1とお城2のIDを比べて、必ず小さい方を左にして名前（合言葉）を作ります
-                    // 例：城3と城5なら「3-5」になります。これで「5-3」と同じ道だと分かります！
-                    const pairKey = c1.id < adjId ? `${c1.id}-${adjId}` : `${adjId}-${c1.id}`;
-                    
-                    // まだ線を引いていないペアだったら、線を引きます
-                    if (!drawnLines.has(pairKey)) {
-                        drawnLines.add(pairKey); // 「もう引いたよ！」とメモします
-                        
-                        const c2 = this.game.getCastle(adjId); // お城2のデータを取ってきます
-                        if (c2) {
-                            // お城2の場所を計算します
-                            const pos2X = c2.pixelX !== undefined ? c2.pixelX : (c2.x * 80 + 40);
-                            const pos2Y = c2.pixelY !== undefined ? c2.pixelY : (c2.y * 80 + 40);
-                            
-                            // --- ここからが「曲がる道」を作るための計算（ルール）です ---
-                            // 直線にならないように、カーブの強さと向きを決めます。
-                            // 毎回同じ形になるように、ランダムではなくお城の「ID」を使って計算します！
-
-                            // ① 2つのお城の距離を測ります
-                            const dx = pos2X - pos1X;
-                            const dy = pos2Y - pos1Y;
-                            const dist = Math.hypot(dx, dy);
-                            
-                            // ② カーブのふくらみ具合を決めます（距離の10%〜19%くらい膨らませます）
-                            // ID同士を掛け算した結果を使うことで、毎回必ず同じ膨らみ方になります
-                            const curveSize = dist * (0.1 + ((c1.id * c2.id) % 10) * 0.01);
-                            
-                            // ③ どっちに膨らませるかを決めます（IDの足し算が偶数なら右、奇数なら左）
-                            const dir = ((c1.id + c2.id) % 2 === 0) ? 1 : -1;
-                            
-                            // ④ 2つのお城のちょうど真ん中の場所を計算します
-                            const midX = (pos1X + pos2X) / 2;
-                            const midY = (pos1Y + pos2Y) / 2;
-                            
-                            // ⑤ 真ん中から直角（90度）の方向に、どれくらいずらすかを計算します
-                            const nx = -dy / dist;
-                            const ny = dx / dist;
-                            
-                            // ⑥ これが「線を引っ張る見えない手（制御点）」の場所です！
-                            const cpX = midX + nx * curveSize * dir;
-                            const cpY = midY + ny * curveSize * dir;
-
-                            // SVGの線（パス）を作ります
-                            const path = document.createElementNS(svgNS, "path");
-                            
-                            // M:お城1からスタート、Q:見えない手に向かって曲がりながらお城2へゴール！
-                            path.setAttribute("d", `M ${pos1X} ${pos1Y} Q ${cpX} ${cpY} ${pos2X} ${pos2Y}`);
-                            
-                            path.setAttribute("fill", "transparent"); // 中身は塗りつぶさない
-                            path.setAttribute("stroke", "rgba(255, 250, 200, 0.7)"); // ★「黄色っぽい白い線」を少し半透明にします
-                            path.setAttribute("stroke-width", "3"); // 線の太さです
-                            
-                            // 下敷きに線を貼り付けます
-                            svg.appendChild(path);
-                        }
+                    if (adj.has(adjId)) {
+                        adj.get(c1.id).add(adjId);
+                        adj.get(adjId).add(c1.id); // お互いに繋がっているとメモします
                     }
                 });
             }
         });
-        
-        // 最後に、線がいっぱい描かれた下敷きをマップに敷きます！
+
+        // ② ３つのお城が互いに繋がっている「三角形」のグループを探します
+        const triangles = [];
+        const castles = this.game.castles;
+        for (let i = 0; i < castles.length; i++) {
+            for (let j = i + 1; j < castles.length; j++) {
+                for (let k = j + 1; k < castles.length; k++) {
+                    const id1 = castles[i].id;
+                    const id2 = castles[j].id;
+                    const id3 = castles[k].id;
+
+                    // ３つが全員お互いに繋がっているかチェック！
+                    if (adj.get(id1).has(id2) && adj.get(id2).has(id3) && adj.get(id3).has(id1)) {
+                        // ③ ４つ以上のグループになっていないかチェックします
+                        let is4Clique = false;
+                        for (let n = 0; n < castles.length; n++) {
+                            const id4 = castles[n].id;
+                            if (id4 !== id1 && id4 !== id2 && id4 !== id3) {
+                                // ４つ目のお城が、前の３つ全てと繋がっていたらアウト！
+                                if (adj.get(id4).has(id1) && adj.get(id4).has(id2) && adj.get(id4).has(id3)) {
+                                    is4Clique = true;
+                                    break;
+                                }
+                            }
+                        }
+
+                        // ４つ以上のグループじゃなければ、Y字にするリストに加えます
+                        if (!is4Clique) {
+                            triangles.push([castles[i], castles[j], castles[k]]);
+                        }
+                    }
+                }
+            }
+        }
+
+        // ④ Y字にするための元の線（三角形の３辺）は、後で描かないようにメモしておきます
+        const skipEdges = new Set();
+        triangles.forEach(tri => {
+            const ids = [tri[0].id, tri[1].id, tri[2].id].sort((a,b) => a - b);
+            skipEdges.add(`${ids[0]}-${ids[1]}`);
+            skipEdges.add(`${ids[1]}-${ids[2]}`);
+            skipEdges.add(`${ids[0]}-${ids[2]}`);
+        });
+
+        // ⑤ まずはY字の道を描きます！
+        triangles.forEach(tri => {
+            let sumX = 0, sumY = 0;
+            const pts = tri.map(c => {
+                const px = c.pixelX !== undefined ? c.pixelX : (c.x * 80 + 40);
+                const py = c.pixelY !== undefined ? c.pixelY : (c.y * 80 + 40);
+                sumX += px; sumY += py;
+                return { x: px, y: py };
+            });
+
+            // ３つのお城のちょうど真ん中（重心）を計算します
+            const centerX = sumX / 3;
+            const centerY = sumY / 3;
+
+            // 真ん中から、それぞれのお城へ向かって線を引きます
+            pts.forEach(pt => {
+                const path = document.createElementNS(svgNS, "path");
+                // Y字を綺麗に見せるため、直線を引きます（QではなくLを使います）
+                path.setAttribute("d", `M ${centerX} ${centerY} L ${pt.x} ${pt.y}`);
+                path.setAttribute("fill", "transparent");
+                path.setAttribute("stroke", "rgba(255, 250, 200, 0.7)");
+                path.setAttribute("stroke-width", "3");
+                svg.appendChild(path);
+            });
+        });
+
+        // ⑥ ここからは今まで通りの、２つのお城を繋ぐカーブの道です
+        const drawnLines = new Set();
+
+        this.game.castles.forEach(c1 => {
+            const pos1X = c1.pixelX !== undefined ? c1.pixelX : (c1.x * 80 + 40);
+            const pos1Y = c1.pixelY !== undefined ? c1.pixelY : (c1.y * 80 + 40);
+
+            if (c1.adjacentCastleIds) {
+                c1.adjacentCastleIds.forEach(adjId => {
+                    const c2 = this.game.getCastle(adjId);
+                    if (!c2) return;
+
+                    const pairKey = c1.id < adjId ? `${c1.id}-${adjId}` : `${adjId}-${c1.id}`;
+
+                    // まだ線を引いていなくて、かつ「Y字」で使われていない道なら引きます！
+                    if (!drawnLines.has(pairKey) && !skipEdges.has(pairKey)) {
+                        drawnLines.add(pairKey);
+
+                        const pos2X = c2.pixelX !== undefined ? c2.pixelX : (c2.x * 80 + 40);
+                        const pos2Y = c2.pixelY !== undefined ? c2.pixelY : (c2.y * 80 + 40);
+
+                        const dx = pos2X - pos1X;
+                        const dy = pos2Y - pos1Y;
+                        const dist = Math.hypot(dx, dy);
+
+                        const curveSize = dist * (0.1 + ((c1.id * c2.id) % 10) * 0.01);
+                        const dir = ((c1.id + c2.id) % 2 === 0) ? 1 : -1;
+
+                        const midX = (pos1X + pos2X) / 2;
+                        const midY = (pos1Y + pos2Y) / 2;
+
+                        const nx = -dy / dist;
+                        const ny = dx / dist;
+
+                        const cpX = midX + nx * curveSize * dir;
+                        const cpY = midY + ny * curveSize * dir;
+
+                        const path = document.createElementNS(svgNS, "path");
+                        path.setAttribute("d", `M ${pos1X} ${pos1Y} Q ${cpX} ${cpY} ${pos2X} ${pos2Y}`);
+                        path.setAttribute("fill", "transparent");
+                        path.setAttribute("stroke", "rgba(255, 250, 200, 0.7)");
+                        path.setAttribute("stroke-width", "3");
+                        svg.appendChild(path);
+                    }
+                });
+            }
+        });
+
         this.mapEl.appendChild(svg);
         // ==========================================
         // ★道の魔法 ここまで！
