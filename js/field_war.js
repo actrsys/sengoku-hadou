@@ -30,7 +30,7 @@ class FieldWarManager {
         });
     }
     
-     /**
+    /**
      * マップの広さに合わせて、2列分のマスを使って重ならないように配置を計算する魔法です。
      * 最初の1枠は、総大将のための「一番端の列の、一番端っこ」を特別に確保します！
      */
@@ -68,35 +68,37 @@ class FieldWarManager {
         }
 
         let orderedSlots = [];
+        let generalSlot = null;
+        
         // 見つけた特等席を、必ず1番目（index 0）のリストに入れます
         if (generalSlotIndex !== -1) {
-            orderedSlots.push(regionSlots[generalSlotIndex]);
+            generalSlot = regionSlots[generalSlotIndex];
+            orderedSlots.push(generalSlot);
             regionSlots.splice(generalSlotIndex, 1);
+        } else {
+            // 万が一の保険
+            generalSlot = regionSlots[0];
+            orderedSlots.push(generalSlot);
+            regionSlots.splice(0, 1);
         }
 
-        // 残りの席は、陣形がきれいに見えるようにエリアの中央から散らして配置します
-        if (regionSlots.length > 0) {
-            let centerIdx = Math.floor((regionSlots.length - 1) / 2);
-            let offset = 0;
-            while (true) {
-                let added = false;
-                if (offset === 0) {
-                    orderedSlots.push(regionSlots[centerIdx]);
-                    added = true;
-                } else {
-                    if (centerIdx + offset < regionSlots.length) {
-                        orderedSlots.push(regionSlots[centerIdx + offset]);
-                        added = true;
-                    }
-                    if (centerIdx - offset >= 0) {
-                        orderedSlots.push(regionSlots[centerIdx - offset]);
-                        added = true;
-                    }
-                }
-                offset++;
-                if (!added) break; // 全部入れ終わったら終了
+        // ★修正：残りの部隊を「一番端っこの列（x1）」かつ「総大将に近い順」に並べる魔法！
+        regionSlots.sort((a, b) => {
+            // 1. まず「一番端の列（x1）」かどうかをチェックします（x1なら最優先！）
+            let aIsEdge = (a.x === x1) ? 0 : 1;
+            let bIsEdge = (b.x === x1) ? 0 : 1;
+            if (aIsEdge !== bIsEdge) {
+                return aIsEdge - bIsEdge; 
             }
-        }
+            
+            // 2. 同じ列なら、総大将からの「縦の距離（yの差）」が近い順に並べます！
+            let distA = Math.abs(a.y - generalSlot.y);
+            let distB = Math.abs(b.y - generalSlot.y);
+            return distA - distB;
+        });
+
+        // 綺麗に並べ終わったものを、総大将の後ろにくっつけます
+        orderedSlots = orderedSlots.concat(regionSlots);
 
         return orderedSlots; // 出来上がった配置リストを返します
     }
