@@ -1263,10 +1263,6 @@ class UIManager {
                 if (scaledW < sc.clientWidth) marginLeft = (sc.clientWidth - scaledW) / 2;
                 if (scaledH < sc.clientHeight) marginTop = (sc.clientHeight - scaledH) / 2;
                 
-                // チラつき防止
-                this.mapEl.style.willChange = 'transform, left, top';
-                this.mapEl.style.backfaceVisibility = 'hidden';
-                
                 // ★ 究極の魔法：地図を宙に浮かせて（absolute）、ブラウザの余計な余白計算を完全に防ぎます！
                 this.mapEl.style.position = 'absolute';
                 this.mapEl.style.left = `${marginLeft}px`;
@@ -1380,12 +1376,9 @@ class UIManager {
             const duration = 200; 
             const startTime = performance.now();
 
-            // ★追加：アニメーションが始まる前に「１回だけ」魔法をかけて、一瞬消えるのを防ぎます！
-            this.mapEl.style.willChange = 'transform, left, top';
-            this.mapEl.style.backfaceVisibility = 'hidden';
-
             const animate = (currentTime) => {
                 let progress = (currentTime - startTime) / duration;
+                if (progress < 0) progress = 0; // ★追加：時間がマイナスになってワープするのを防ぐ！
                 if (progress > 1) progress = 1;
                 
                 const easeOut = 1 - Math.pow(1 - progress, 3);
@@ -1426,8 +1419,6 @@ class UIManager {
                     requestAnimationFrame(animate); 
                 } else {
                     this.mapScale = targetScale;
-                    // ★ 修正：チラつき防止のために、アニメーション用の魔法を一度リセットする
-                    this.mapEl.style.willChange = 'auto'; 
                     this.applyMapScale(); 
                     sc.scrollLeft = targetScrollLeft;
                     sc.scrollTop = targetScrollTop;
