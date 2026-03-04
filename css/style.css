@@ -203,21 +203,20 @@ img {
     width: 100%; height: 100%; overflow: auto; display: flex;
     flex-direction: column; padding: 0; box-sizing: border-box; 
     -webkit-overflow-scrolling: touch;
+    overscroll-behavior: none; /* ★これを書き足します！端っこでバウンドしなくなります */
 }
 #map-scroll-container.grab { cursor: grab; }
 #map-scroll-container.grabbing { cursor: grabbing; }
 
 #map-container {
-    /* ★ここを差し替え！：マス目（grid）の魔法を消して、背景画像を表示する魔法に変えます */
-    /* 【消す行】display: grid; gap: 10px; padding: 20px; */
-    
-    /* 【代わりの行】↓ */
-    position: relative; /* お城のシールを貼るための土台にします */
-    background-image: url('../data/images/map/japan_map.png'); /* 実際の日本地図の画像 */
-    background-size: 100% 100%; /* 画像のサイズをピッタリ合わせます */
+    position: relative; 
+    background-image: url('../data/images/map/japan_map.png'); 
+    background-size: 100% 100%; 
     background-repeat: no-repeat;
     
-    transform-origin: center center; margin: auto; flex: none; 
+    transform-origin: 0 0; /* ★ここを差し替え！ center center から 0 0 にします */
+    margin: 0; /* ★ここを差し替え！ auto から 0 にします */
+    flex: none; 
 }
 
 #pc-map-overlay {
