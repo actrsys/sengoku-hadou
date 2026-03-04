@@ -245,33 +245,49 @@ class UIManager {
         // =========================================================
         // ★ 画面の大きさが変わった時にズーム位置を合わせ直す魔法
         // =========================================================
+        let resizeTimer = null;
+        let savedLogicalX = null;
+        let savedLogicalY = null;
+
         window.addEventListener('resize', () => {
             if (this.hasInitializedMap && this.game && (this.game.phase === 'game' || this.game.phase === 'daimyo_select')) {
                 const sc = document.getElementById('map-scroll-container');
                 if (!sc) return;
                 
-                // 今の画面のど真ん中が、地図上のどこなのかをしっかり覚えておきます
-                const rect = sc.getBoundingClientRect();
-                const centerX = rect.width / 2;
-                const centerY = rect.height / 2;
-                
-                const currentMarginLeft = parseFloat(this.mapEl.style.marginLeft || 0);
-                const currentMarginTop = parseFloat(this.mapEl.style.marginTop || 0);
+                // 画面の大きさが変わり「始めた瞬間」のど真ん中の場所を、しっかりと記憶します！
+                if (savedLogicalX === null) {
+                    const rect = sc.getBoundingClientRect();
+                    const centerX = rect.width / 2;
+                    const centerY = rect.height / 2;
+                    const currentMarginLeft = parseFloat(this.mapEl.style.marginLeft || 0);
+                    const currentMarginTop = parseFloat(this.mapEl.style.marginTop || 0);
 
-                const logicalX = (sc.scrollLeft + centerX - currentMarginLeft) / this.mapScale;
-                const logicalY = (sc.scrollTop + centerY - currentMarginTop) / this.mapScale;
+                    savedLogicalX = (sc.scrollLeft + centerX - currentMarginLeft) / this.mapScale;
+                    savedLogicalY = (sc.scrollTop + centerY - currentMarginTop) / this.mapScale;
+                }
 
-                // 画面の大きさに合わせて倍率と余白を作り直します
-                this.fitMapToScreen();
-                this.mapScale = this.zoomStages[this.zoomLevel];
-                this.applyMapScale();
+                // 画面を動かしている間は、計算をジッと我慢して待ちます…
+                if (resizeTimer) clearTimeout(resizeTimer);
                 
-                // 新しい大きさでも、さっき覚えておいた場所がど真ん中に来るように正確に合わせます
-                const newMarginLeft = parseFloat(this.mapEl.style.marginLeft || 0);
-                const newMarginTop = parseFloat(this.mapEl.style.marginTop || 0);
-                
-                sc.scrollLeft = (logicalX * this.mapScale + newMarginLeft) - centerX;
-                sc.scrollTop = (logicalY * this.mapScale + newMarginTop) - centerY;
+                resizeTimer = setTimeout(() => {
+                    // 動かすのが終わって落ち着いたら、１回だけ正確に計算して場所を合わせます！
+                    this.fitMapToScreen();
+                    this.mapScale = this.zoomStages[this.zoomLevel];
+                    this.applyMapScale();
+                    
+                    const rect = sc.getBoundingClientRect();
+                    const centerX = rect.width / 2;
+                    const centerY = rect.height / 2;
+                    const newMarginLeft = parseFloat(this.mapEl.style.marginLeft || 0);
+                    const newMarginTop = parseFloat(this.mapEl.style.marginTop || 0);
+                    
+                    sc.scrollLeft = (savedLogicalX * this.mapScale + newMarginLeft) - centerX;
+                    sc.scrollTop = (savedLogicalY * this.mapScale + newMarginTop) - centerY;
+                    
+                    // 次の時のために、記憶をリセットしておきます
+                    savedLogicalX = null;
+                    savedLogicalY = null;
+                }, 200); // 0.2秒待ってから実行するお約束です
             }
         });
         // =========================================================
@@ -1183,9 +1199,9 @@ class UIManager {
                 this.mapEl.style.marginLeft = `${marginLeft}px`;
                 this.mapEl.style.marginTop = `${marginTop}px`;
                 
-                // transformによる見た目のサイズのズレを補正して、スクロール領域を確保します
-                this.mapEl.style.marginRight = `${scaledW - mapW + marginLeft}px`;
-                this.mapEl.style.marginBottom = `${scaledH - mapH + marginTop}px`;
+                // ブラウザくんが賢くなったので、純粋な余白だけを設定します！
+                this.mapEl.style.marginRight = `${marginLeft}px`;
+                this.mapEl.style.marginBottom = `${marginTop}px`;
             }
         }
     }
@@ -1294,10 +1310,14 @@ class UIManager {
                     requestAnimationFrame(animate); 
                 } else {
                     this.mapScale = targetScale;
+                    // ★ここが大事！先に「auto」に戻して、ブラウザくんに幅を教えてあげます！
+                    sc.style.overflow = 'auto'; 
+                    
+                    // そのあとに大きさを適用すれば、ズレずにピタッと決まります！
                     this.applyMapScale(); 
                     sc.scrollLeft = targetScrollLeft;
                     sc.scrollTop = targetScrollTop;
-                    sc.style.overflow = 'auto'; 
+                    
                     this.updateZoomButtons();
                     this.isAnimatingZoom = false;
                 }
