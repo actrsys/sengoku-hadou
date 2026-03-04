@@ -1,113 +1,59 @@
 /**
- * audio.js (Howler.js 豪華版 - 完全シームレスループ ＋ 効果音対応)
+ * audio.js (Howler.js オーディオスプライト版 - 完全シームレスループ ＋ 効果音対応)
  */
 class AudioManager {
     constructor() {
-        // BGM用の演奏者を2人（bgm1, bgm2）用意します
-        this.players = [null, null];
-        this.currentPlayerIndex = 0;
+        // 今回から、BGMの演奏者は「1人」だけで良くなります！とてもシンプル！
+        this.bgmPlayer = null;
         this.defaultVolume = 0.02; // BGMの音量
         this.seVolume = 0.01;      // SE専用の音量
     }
 
     // ==========================================
-    // ★ BGMを鳴らす仕組み
+    // ★ BGMを鳴らす仕組み（サイトの情報を元に大改造！）
     // ==========================================
     playBGM(fileName, loopStart = 0) {
         this.stopBGM(); // 今鳴っている曲を止めます
 
-        this.currentPlayerIndex = 0;
-        // 最初の曲は「0秒」からスタートするよ、と教えます
-        this.players[0] = this._createPlayer(fileName, loopStart, 0);
-        this.players[0].play();
-    }
+        // 指定された秒数（0.83など）をミリ秒（1000倍）に直します
+        const startMs = loopStart * 1000;
 
-    // ★ 曲の読み込みと、次に繋ぐ準備をする魔法
-    _createPlayer(fileName, loopStart, currentStartPos = 0) {
-        const player = new window.Howl({
+        this.bgmPlayer = new window.Howl({
             src: [`data/music/bgm/${fileName}`],
             volume: this.defaultVolume,
-            onplay: () => {
-                const setupLoop = () => {
-                    const duration = player.duration();
-                    
-                    // もし曲の長さがまだ「0」だったら、少し待ってからもう一度長さを測り直します
-                    if (duration === 0) {
-                        setTimeout(setupLoop, 100);
-                        return;
-                    }
+            onload: () => {
+                // 曲の読み込みが終わったら、曲の全体の長さをミリ秒で測ります
+                const durationMs = this.bgmPlayer.duration() * 1000;
 
-                    const leadTime = 0.1;
-                    // スタート地点（currentStartPos）を使って、いつ次の曲を準備するか計算します
-                    const checkInterval = (duration - currentStartPos - leadTime) * 1000;
+                // ★サイトで紹介されていた「スプライト」という魔法の切り取り線を作ります！
+                // 'start'：曲の頭(0)から最後まで。ループはしない(false)
+                // 'loop' ：指定の位置(startMs)から最後まで。ループする(true)
+                this.bgmPlayer._sprite.start = [0, durationMs, false];
+                this.bgmPlayer._sprite.loop = [startMs, durationMs - startMs, true];
 
-                    // 念のため、前のタイマーが残っていたら消します
-                    if(player._loopTimer) clearTimeout(player._loopTimer);
-
-                    // 時間が来たら、次のループの準備を始めます
-                    player._loopTimer = setTimeout(() => {
-                        if (this.players[this.currentPlayerIndex] === player) {
-                            this._prepareNextLoop(fileName, loopStart);
-                        }
-                    }, checkInterval);
-                };
-
-                if (player.state() === 'loaded') {
-                    setupLoop();
+                if (loopStart === 0) {
+                    // 最初からループする曲なら、いきなり「loop」を鳴らします
+                    this.bgmPlayer.play('loop');
                 } else {
-                    player.once('load', setupLoop);
+                    // 途中からループする曲なら、まずは「start」を鳴らします
+                    this.bgmPlayer.play('start');
+
+                    // 「start」が1回終わった瞬間に、次から「loop」を鳴らすように予約します
+                    this.bgmPlayer.once('end', () => {
+                        this.bgmPlayer.play('loop');
+                    });
                 }
-            },
-            onstop: () => {
-                // 途中で止められた時は、タイマーも一緒に止めます
-                if (player._loopTimer) clearTimeout(player._loopTimer);
             }
         });
-        return player;
-    }
-
-    // ★ 次のループへジャンプする魔法
-    _prepareNextLoop(fileName, loopStart) {
-        const nextIndex = 1 - this.currentPlayerIndex;
-        
-        // 新しいプレイヤーに「次は loopStart の位置からだよ！」と教えます
-        this.players[nextIndex] = this._createPlayer(fileName, loopStart, loopStart);
-        const nextPlayer = this.players[nextIndex];
-
-        // ★超重要：先にジャンプ先を決めてから、再生ボタンを押します！
-        const playNext = () => {
-            nextPlayer.seek(loopStart); // 先に「ここからだよ！」と針を置く
-            nextPlayer.play();          // そのあとに「再生！」
-        };
-
-        // 曲の準備（読み込み）が完全に終わってから再生するようにします
-        if (nextPlayer.state() === 'loaded') {
-            playNext();
-        } else {
-            nextPlayer.once('load', playNext);
-        }
-
-        const oldPlayer = this.players[this.currentPlayerIndex];
-        if (oldPlayer) {
-            oldPlayer.fade(this.defaultVolume, 0, 100);
-            setTimeout(() => {
-                oldPlayer.stop();
-                oldPlayer.unload();
-            }, 100);
-        }
-
-        this.currentPlayerIndex = nextIndex;
     }
 
     stopBGM() {
-        this.players.forEach(p => { 
-            if (p) {
-                if (p._loopTimer) clearTimeout(p._loopTimer);
-                p.stop();
-                p.unload();
-            }
-        });
-        this.players = [null, null];
+        // 曲を止める時は、演奏者を解散させます
+        if (this.bgmPlayer) {
+            this.bgmPlayer.stop();
+            this.bgmPlayer.unload();
+            this.bgmPlayer = null;
+        }
     }
     
     // ==========================================
@@ -115,7 +61,9 @@ class AudioManager {
     // ==========================================
     setVolume(value) {
         this.defaultVolume = value;
-        this.players.forEach(p => { if (p) p.volume(value); });
+        if (this.bgmPlayer) {
+            this.bgmPlayer.volume(value);
+        }
     }
 
     setSEVolume(value) {
