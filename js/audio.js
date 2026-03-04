@@ -1,27 +1,17 @@
-/**
- * audio.js (Howler.js 豪華版 - 完全シームレスループ ＋ 効果音対応)
- */
-class AudioManager {
-    constructor() {
-        // BGM用の演奏者を2人（bgm1, bgm2）用意します
-        this.players = [null, null];
-        this.currentPlayerIndex = 0;
-        this.defaultVolume = 0.02; // BGMの音量
-        this.seVolume = 0.01;      // ★追加：SE専用の音量
-    }
-
-    // ==========================================
+// ==========================================
     // ★ BGMを鳴らす仕組み（今まで通りです）
     // ==========================================
     playBGM(fileName, loopStart = 0) {
         this.stopBGM();
 
         this.currentPlayerIndex = 0;
-        this.players[0] = this._createPlayer(fileName, loopStart);
+        // ★変更：最初は「0秒」からスタートするよ、としっかり教えます
+        this.players[0] = this._createPlayer(fileName, loopStart, 0);
         this.players[0].play();
     }
 
-    _createPlayer(fileName, loopStart) {
+    // ★変更：「今のスタート地点（currentStartPos）」を受け取れるように箱を増やします
+    _createPlayer(fileName, loopStart, currentStartPos = 0) {
         const player = new window.Howl({
             src: [`data/music/bgm/${fileName}`],
             volume: this.defaultVolume,
@@ -37,7 +27,9 @@ class AudioManager {
                     }
 
                     const leadTime = 0.1;
-                    const checkInterval = (duration - player.seek() - leadTime) * 1000;
+                    // ★変更：パソコンが慌てて「今どこ？」を見失わないように、
+                    // 最初に教えた「スタート地点（currentStartPos）」を使って確実に計算させます！
+                    const checkInterval = (duration - currentStartPos - leadTime) * 1000;
 
                     setTimeout(() => {
                         if (this.players[this.currentPlayerIndex] === player) {
@@ -62,22 +54,21 @@ class AudioManager {
     _prepareNextLoop(fileName, loopStart) {
         const nextIndex = 1 - this.currentPlayerIndex;
         
-        // 新しいプレイヤーを作ります
-        this.players[nextIndex] = this._createPlayer(fileName, loopStart);
+        // ★変更：新しいプレイヤーを作る時に「次は loopStart の位置からだよ！」としっかり教えます
+        this.players[nextIndex] = this._createPlayer(fileName, loopStart, loopStart);
         const nextPlayer = this.players[nextIndex];
 
-        // ★ここがポイント：すでに曲を知っている（キャッシュ）場合はすぐジャンプ！
-        // 知らない場合は、読み込みが終わるまで待ってからジャンプします
+        // ★変更：再生ボタンを押してから、すぐに指定の場所へジャンプ！という順番に直します
+        // これで確実に指定した場所（0.83秒）から音が鳴るようになります
         if (nextPlayer.state() === 'loaded') {
-            nextPlayer.seek(loopStart);
+            const soundId = nextPlayer.play();
+            nextPlayer.seek(loopStart, soundId);
         } else {
             nextPlayer.once('load', () => {
-                nextPlayer.seek(loopStart);
+                const soundId = nextPlayer.play();
+                nextPlayer.seek(loopStart, soundId);
             });
         }
-        
-        // 再生を開始！
-        nextPlayer.play();
 
         const oldPlayer = this.players[this.currentPlayerIndex];
         oldPlayer.fade(this.defaultVolume, 0, 100);
@@ -89,34 +80,3 @@ class AudioManager {
 
         this.currentPlayerIndex = nextIndex;
     }
-
-    stopBGM() {
-        this.players.forEach(p => { if (p) p.stop(); });
-        this.players = [null, null];
-    }
-    
-    // BGMの音量を変える命令
-    setVolume(value) {
-        this.defaultVolume = value;
-        this.players.forEach(p => { if (p) p.volume(value); });
-    } // ← ここで一度ドアを閉めます！
-
-    // SEの音量を変える命令（別の新しいお部屋として作ります）
-    setSEVolume(value) {
-        this.seVolume = value;
-    }
-    
-    // ==========================================
-    // ★ ここから新しく追加！効果音（SE）を鳴らす仕組み
-    // ==========================================
-    playSE(fileName) {
-        // SE用の新しい演奏者をその都度作って、鳴らします
-        const se = new window.Howl({
-            src: [`data/music/se/${fileName}`], 
-            volume: this.seVolume // ★ここを変更：SE専用の音量を使います！
-        });
-        se.play();
-    }
-}
-
-window.AudioManager = new AudioManager();
