@@ -30,42 +30,76 @@ class FieldWarManager {
         });
     }
     
-    // ↓↓↓ここから追加↓↓↓
-    /**
-     * マップの広さに合わせて、重ならないように配置マスを自動計算する魔法です
-     * @param {number} x - 配置するX座標
-     * @param {boolean} isTop - 上半分に配置するかどうか
+     /**
+     * マップの広さに合わせて、2列分のマスを使って重ならないように配置を計算する魔法です。
+     * 最初の1枠は、総大将のための「一番端の列の、一番端っこ」を特別に確保します！
      */
-    getDeploymentPositions(x, isTop) {
-        let validYs = [];
-        // x座標が偶数なら偶数のYマス、奇数なら奇数のYマスだけを集めます
-        for (let row = 0; row < this.rows; row++) {
-            validYs.push((x % 2 === 0) ? row * 2 : row * 2 + 1);
+    getDeploymentSlots(x1, x2, isTop) {
+        let slots = [];
+        
+        // 2列分の使えるマス（Y座標）をすべて集めます
+        for (let x of [x1, x2]) {
+            for (let row = 0; row < this.rows; row++) {
+                let y = (x % 2 === 0) ? row * 2 : row * 2 + 1;
+                slots.push({ x: x, y: y });
+            }
         }
+        
+        // Y座標の順番にキレイに並べ替えます
+        slots.sort((a, b) => a.y - b.y);
         
         // 縦の長さを半分に割って、上エリアか下エリアかを決めます
-        let half = Math.floor(validYs.length / 2);
-        let regionYs = isTop ? validYs.slice(0, half) : validYs.slice(half);
+        let half = Math.floor(slots.length / 2);
+        let regionSlots = isTop ? slots.slice(0, half) : slots.slice(half);
         
-        // 万が一マップが狭すぎた場合の保険
-        if (regionYs.length === 0) regionYs = validYs;
+        if (regionSlots.length === 0) regionSlots = slots; // 万が一の保険
 
-        // 陣形がきれいに見えるように、エリアの「真ん中」から外側に向かって順番を作ります
-        let centerIdx = Math.floor((regionYs.length - 1) / 2);
-        let orderedYs = [];
-        orderedYs.push(regionYs[centerIdx]); // 1番目（総大将）はど真ん中
-        
-        let offset = 1;
-        while (orderedYs.length < regionYs.length) {
-            // 上下交互に配置していきます
-            if (centerIdx + offset < regionYs.length) orderedYs.push(regionYs[centerIdx + offset]);
-            if (centerIdx - offset >= 0) orderedYs.push(regionYs[centerIdx - offset]);
-            offset++;
+        // ★総大将用の「特等席」を探します
+        // 一番端の列（x1）の中で、一番上（または一番下）のマスを見つけます
+        let generalSlotIndex = -1;
+        if (isTop) {
+            for (let i = 0; i < regionSlots.length; i++) {
+                if (regionSlots[i].x === x1) { generalSlotIndex = i; break; }
+            }
+        } else {
+            for (let i = regionSlots.length - 1; i >= 0; i--) {
+                if (regionSlots[i].x === x1) { generalSlotIndex = i; break; }
+            }
         }
-        
-        return orderedYs; // 出来上がった配置リストを返します
+
+        let orderedSlots = [];
+        // 見つけた特等席を、必ず1番目（index 0）のリストに入れます
+        if (generalSlotIndex !== -1) {
+            orderedSlots.push(regionSlots[generalSlotIndex]);
+            regionSlots.splice(generalSlotIndex, 1);
+        }
+
+        // 残りの席は、陣形がきれいに見えるようにエリアの中央から散らして配置します
+        if (regionSlots.length > 0) {
+            let centerIdx = Math.floor((regionSlots.length - 1) / 2);
+            let offset = 0;
+            while (true) {
+                let added = false;
+                if (offset === 0) {
+                    orderedSlots.push(regionSlots[centerIdx]);
+                    added = true;
+                } else {
+                    if (centerIdx + offset < regionSlots.length) {
+                        orderedSlots.push(regionSlots[centerIdx + offset]);
+                        added = true;
+                    }
+                    if (centerIdx - offset >= 0) {
+                        orderedSlots.push(regionSlots[centerIdx - offset]);
+                        added = true;
+                    }
+                }
+                offset++;
+                if (!added) break; // 全部入れ終わったら終了
+            }
+        }
+
+        return orderedSlots; // 出来上がった配置リストを返します
     }
-    // ↑↑↑ここまで追加↑↑↑
     
     /**
      * マップを緑の画面に合わせてギリギリまで大きくする魔法（完全版）
@@ -143,40 +177,41 @@ class FieldWarManager {
         const isDefPlayer = (Number(warState.defender.ownerClan) === pid);
         const isPlayerInvolved = isAtkPlayer || isDefPlayer;
 
-        // ★修正: 部隊の開始位置を、マップの「一番左端」と「一番右端」に固定します！
-        let leftX = 0;
-        let rightX = this.cols - 1;
+        // ★修正: 部隊の開始位置を、マップの「端から2列分」に拡張します！
+        const leftX1 = 0;
+        const leftX2 = 1;
+        const rightX1 = this.cols - 1;
+        const rightX2 = this.cols - 2;
 
-        let atkX = leftX, defX = rightX;
+        let atkX1 = leftX1, atkX2 = leftX2;
+        let defX1 = rightX1, defX2 = rightX2;
         let atkIsLeft = true;
 
         if (isDefPlayer && !isAtkPlayer) {
-            atkX = rightX;
-            defX = leftX;
+            atkX1 = rightX1; atkX2 = rightX2;
+            defX1 = leftX1; defX2 = leftX2;
             atkIsLeft = false;
         }
 
-        // ★追加: 各陣営のY座標リストを生成
+        // 2列分のマスリストを生成します
         // 左側（プレイヤー等）：メイン＝上、友軍＝下
         // 右側（敵等）　　　：メイン＝下、友軍＝上
-        const leftMainYs = this.getDeploymentPositions(leftX, true);
-        const leftAllyYs = this.getDeploymentPositions(leftX, false);
-        const rightMainYs = this.getDeploymentPositions(rightX, false);
-        const rightAllyYs = this.getDeploymentPositions(rightX, true);
+        const leftMainSlots = this.getDeploymentSlots(leftX1, leftX2, true);
+        const leftAllySlots = this.getDeploymentSlots(leftX1, leftX2, false);
+        const rightMainSlots = this.getDeploymentSlots(rightX1, rightX2, false);
+        const rightAllySlots = this.getDeploymentSlots(rightX1, rightX2, true);
 
-        const atkMainYs = atkIsLeft ? leftMainYs : rightMainYs;
-        const atkAllyYs = atkIsLeft ? leftAllyYs : rightAllyYs;
-        const defMainYs = !atkIsLeft ? leftMainYs : rightMainYs;
-        const defAllyYs = !atkIsLeft ? leftAllyYs : rightAllyYs;
+        const atkMainSlots = atkIsLeft ? leftMainSlots : rightMainSlots;
+        const atkAllySlots = atkIsLeft ? leftAllySlots : rightAllySlots;
+        const defMainSlots = !atkIsLeft ? leftMainSlots : rightMainSlots;
+        const defAllySlots = !atkIsLeft ? leftAllySlots : rightAllySlots;
 
         this.units = [];
         
-        // 部隊の配置数をカウントするための変数
         let atkMainCount = 0;
         let atkAllyCount = 0;
         let defMainCount = 0;
         let defAllyCount = 0;
-        // ↑↑↑ここまで差し替え↑↑↑
 
         // 攻撃側部隊の生成
         if (warState.atkAssignments) {
@@ -193,19 +228,16 @@ class FieldWarManager {
                     // 援軍の城の持ち主がプレイヤーなら、プレイヤーが操作できる！
                     unitIsPlayer = (Number(warState.reinforcement.castle.ownerClan) === pid);
                 }
-
-                // ↓↓↓ここから差し替え↓↓↓
-                let deployY;
-                let deployDir; // ★新しく「向き」を決める箱を用意します
+                
+                let deployPos;
+                let deployDir;
                 if (isReinf) {
-                    deployY = atkAllyYs[atkAllyCount % atkAllyYs.length];
-                    // 援軍（友軍）の場合：左側(下)なら右上向き(1)、右側(上)なら左下向き(4)
-                    deployDir = (atkX === leftX) ? 1 : 4;
+                    deployPos = atkAllySlots[atkAllyCount % atkAllySlots.length];
+                    deployDir = (atkX1 === leftX1) ? 1 : 4;
                     atkAllyCount++;
                 } else {
-                    deployY = atkMainYs[atkMainCount % atkMainYs.length];
-                    // メイン軍の場合：左側(上)なら右下向き(2)、右側(下)なら左上向き(5)
-                    deployDir = (atkX === leftX) ? 2 : 5;
+                    deployPos = atkMainSlots[atkMainCount % atkMainSlots.length];
+                    deployDir = (atkX1 === leftX1) ? 2 : 5;
                     atkMainCount++;
                 }
 
@@ -217,10 +249,9 @@ class FieldWarManager {
                     isPlayer: unitIsPlayer,
                     isReinforcement: isReinf,
                     isGeneral: index === 0,
-                    x: atkX,
-                    y: deployY,
-                    direction: deployDir, // ★古い向きの魔法を消して、新しい箱に書き換えました！
-                // ↑↑↑ここまで差し替え↑↑↑
+                    x: deployPos.x,
+                    y: deployPos.y,
+                    direction: deployDir,
                     mobility: mobility, 
                     ap: mobility,
                     soldiers: assign.soldiers,
@@ -247,19 +278,16 @@ class FieldWarManager {
                     // 援軍の城の持ち主がプレイヤーなら、プレイヤーが操作できる！
                     unitIsPlayer = (Number(warState.defReinforcement.castle.ownerClan) === pid);
                 }
-
-                // ↓↓↓ここから差し替え↓↓↓
-                let deployY;
-                let deployDir; // ★新しく「向き」を決める箱を用意します
+                
+                let deployPos;
+                let deployDir;
                 if (isReinf) {
-                    deployY = defAllyYs[defAllyCount % defAllyYs.length];
-                    // 援軍（友軍）の場合：左側(下)なら右上向き(1)、右側(上)なら左下向き(4)
-                    deployDir = (defX === leftX) ? 1 : 4;
+                    deployPos = defAllySlots[defAllyCount % defAllySlots.length];
+                    deployDir = (defX1 === leftX1) ? 1 : 4;
                     defAllyCount++;
                 } else {
-                    deployY = defMainYs[defMainCount % defMainYs.length];
-                    // メイン軍の場合：左側(上)なら右下向き(2)、右側(下)なら左上向き(5)
-                    deployDir = (defX === leftX) ? 2 : 5;
+                    deployPos = defMainSlots[defMainCount % defMainSlots.length];
+                    deployDir = (defX1 === leftX1) ? 2 : 5;
                     defMainCount++;
                 }
 
@@ -271,10 +299,9 @@ class FieldWarManager {
                     isPlayer: unitIsPlayer,
                     isReinforcement: isReinf,
                     isGeneral: index === 0,
-                    x: defX,
-                    y: deployY,
-                    direction: deployDir, // ★古い向きの魔法を消して、新しい箱に書き換えました！
-                // ↑↑↑ここまで差し替え↑↑↑
+                    x: deployPos.x,
+                    y: deployPos.y,
+                    direction: deployDir,
                     mobility: mobility, 
                     ap: mobility,
                     soldiers: assign.soldiers,
@@ -304,6 +331,7 @@ class FieldWarManager {
                                 const uSoldiers = Math.floor(k.soldiers * 0.5); 
                                 
                                 if (uSoldiers > 0) {
+                                    let deployPos = defAllySlots[defAllyCount % defAllySlots.length];
                                     this.units.push({
                                         id: 'k_' + bestBusho.id,
                                         bushoId: bestBusho.id,
@@ -312,9 +340,9 @@ class FieldWarManager {
                                         isAttacker: false,
                                         isPlayer: false, 
                                         isGeneral: false,
-                                        x: defX, 
-                                        y: defAllyYs[defAllyCount % defAllyYs.length], 
-                                        direction: (defX === leftX) ? 1 : 4,
+                                        x: deployPos.x, 
+                                        y: deployPos.y, 
+                                        direction: (defX1 === leftX1) ? 1 : 4,
                                         mobility: 4, 
                                         ap: 4,
                                         soldiers: uSoldiers,
