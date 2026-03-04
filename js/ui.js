@@ -508,32 +508,64 @@ class UIManager {
         this.scrollTop = 0;
         this.isMouseDown = false;
         
+        // ★追加：どれくらい滑るか（慣性）を覚えておくための箱
+        this.velocityX = 0;
+        this.velocityY = 0;
+        this.lastDragTime = 0;
+        this.lastDragX = 0;
+        this.lastDragY = 0;
+        this.inertiaFrame = null;
+        
         const sc = document.getElementById('map-scroll-container');
         if (!sc) return;
 
         sc.addEventListener('mousedown', (e) => {
             if (e.button !== 0) return; 
+            
+            const isPC = document.body.classList.contains('is-pc');
+
+            // ★追加：新しくドラッグを始めたら、前の滑りアニメーションをピタッと止める
+            if (this.inertiaFrame) {
+                cancelAnimationFrame(this.inertiaFrame);
+                this.inertiaFrame = null;
+            }
+
             this.isMouseDown = true;
             this.isDraggingMap = false;
             this.dragStartX = e.pageX - sc.offsetLeft;
             this.dragStartY = e.pageY - sc.offsetTop;
             this.scrollLeft = sc.scrollLeft;
             this.scrollTop = sc.scrollTop;
+            
+            // ★追加：PCの時だけ、スピードを計算する準備をする
+            if (isPC) {
+                this.lastDragTime = performance.now();
+                this.lastDragX = this.dragStartX;
+                this.lastDragY = this.dragStartY;
+                this.velocityX = 0;
+                this.velocityY = 0;
+            }
+
             sc.classList.add('grabbing');
         });
 
-        sc.addEventListener('mouseleave', () => {
+        const endDrag = () => {
+            if (!this.isMouseDown) return;
             this.isMouseDown = false;
             sc.classList.remove('grabbing');
-        });
-
-        sc.addEventListener('mouseup', () => {
-            this.isMouseDown = false;
-            sc.classList.remove('grabbing');
+            
             setTimeout(() => {
                 this.isDraggingMap = false;
             }, 50);
-        });
+
+            // ★追加：PCの時だけ、マウスを離した瞬間に残ったスピードで「スーッ」と滑らせる
+            if (document.body.classList.contains('is-pc') && (Math.abs(this.velocityX) > 0.5 || Math.abs(this.velocityY) > 0.5)) {
+                this.applyInertia(sc);
+            }
+        };
+
+        sc.addEventListener('mouseleave', endDrag);
+        sc.addEventListener('mouseup', endDrag);
 
         sc.addEventListener('mousemove', (e) => {
             if (!this.isMouseDown) return;
@@ -548,6 +580,20 @@ class UIManager {
             }
             sc.scrollLeft = this.scrollLeft - walkX;
             sc.scrollTop = this.scrollTop - walkY;
+
+            // ★追加：PCの時は、どれくらいのスピードでマウスが動いたかを計算しておく
+            if (document.body.classList.contains('is-pc')) {
+                const now = performance.now();
+                const dt = now - this.lastDragTime;
+                if (dt > 0) {
+                    // 動かした距離を時間で割ってスピードを出します（15倍にして調整）
+                    this.velocityX = (x - this.lastDragX) / dt * 15;
+                    this.velocityY = (y - this.lastDragY) / dt * 15;
+                }
+                this.lastDragTime = now;
+                this.lastDragX = x;
+                this.lastDragY = y;
+            }
         });
         
         // =========================================================
@@ -617,8 +663,37 @@ class UIManager {
                 initialPinchDist = null;
             }
         });
+    } // ← ここが initMapDrag() の終わりのカッコです！
+
+    // ★ここに書き足します！
+    applyInertia(sc) {
+        // 摩擦（ブレーキの強さ）です。0.92くらいがちょうどいい滑り具合になります
+        const friction = 0.92; 
+        
+        const animate = () => {
+            // スピードにブレーキをかけて、徐々に落としていきます
+            this.velocityX *= friction;
+            this.velocityY *= friction;
+            
+            // スピードが十分遅くなったら、アニメーションを終わらせます
+            if (Math.abs(this.velocityX) < 0.5 && Math.abs(this.velocityY) < 0.5) {
+                this.inertiaFrame = null;
+                return;
+            }
+            
+            // スクロール位置を更新します
+            // （画面の端っこに到達したら、ブラウザが自動でピッタリ止めてくれます！）
+            sc.scrollLeft -= this.velocityX;
+            sc.scrollTop -= this.velocityY;
+            
+            // スピードが落ちきるまで、この動きを繰り返します
+            this.inertiaFrame = requestAnimationFrame(animate);
+        };
+        
+        this.inertiaFrame = requestAnimationFrame(animate);
     }
-    
+    // ★書き足すのはここまで！
+
     initContextMenu() {
         this.contextMenu = document.getElementById('custom-context-menu');
         this.ctxMenuBack = document.getElementById('ctx-menu-back');
