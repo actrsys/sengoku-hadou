@@ -66,7 +66,8 @@ class DataManager {
             
             // ★ここを書き足し！：お城のデータが揃った後で、色を探す魔法を発動させます！
             try {
-                await this.loadColorMap('./data/images/map/japan_colorcode_map.png', castles);
+                // ★差し替え！：.png を .webp に変更しました！
+                await this.loadColorMap('./data/images/map/japan_colorcode_map.webp', castles);
             } catch (e) {
                 console.log("マップ画像の解析をスキップしました");
             }
@@ -1062,5 +1063,11 @@ window.addEventListener('DOMContentLoaded', () => {
     }, { passive: false });
 
     window.GameApp = new GameManager();
+
+    // ★ここから書き足し！：タイトル画面の裏で、重いマップ画像をこっそりダウンロードしておく魔法です！
+    const preloadImg = new Image();
+    // もし画像の場所や名前が違う場合は、ここをあや瀨さんのファイルに合わせて書き換えてくださいね
+    preloadImg.src = './data/images/map/japan_colorcode_map.webp'; 
+    // ★書き足しここまで！
 
 });
