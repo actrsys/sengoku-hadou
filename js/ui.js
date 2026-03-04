@@ -1162,11 +1162,19 @@ class UIManager {
             config.max     
         ];
         
-        // ★大名選択の時は、最初から一番引いた状態（最小ズーム）でスタート！
-        if (this.game.phase === 'daimyo_select') {
-            this.zoomLevel = 0; 
+        // ★ここを修正！勝手にリセットせず、今の記憶（ズームレベル）を保ちます！
+        if (this.zoomLevel === undefined) {
+            // 初めての時だけ初期セットをします
+            if (this.game.phase === 'daimyo_select') {
+                this.zoomLevel = 0; 
+            } else {
+                this.zoomLevel = 1; 
+            }
         } else {
-            this.zoomLevel = 1; 
+            // すでに記憶があるなら、そのまま維持します！
+            if (this.zoomLevel >= this.zoomStages.length) {
+                this.zoomLevel = this.zoomStages.length - 1;
+            }
         }
         this.mapScale = this.zoomStages[this.zoomLevel];
         
@@ -1256,8 +1264,9 @@ class UIManager {
         const clientX = cx - rect.left;
         const clientY = cy - rect.top;
 
-        const mapW = this.mapEl.offsetWidth;
-        const mapH = this.mapEl.offsetHeight;
+        // ★ここを修正！ブラウザくんの勘違いを防ぐため、設計図から直接サイズをもらいます！
+        const mapW = this.game.mapWidth || 1200;
+        const mapH = this.game.mapHeight || 800;
         const scW = sc.clientWidth; 
         const scH = sc.clientHeight;
 
