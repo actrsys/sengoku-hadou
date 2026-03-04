@@ -1130,9 +1130,9 @@ class UIManager {
                 const diffX = (mapW - mapW * this.mapScale) / 2;
                 const diffY = (mapH - mapH * this.mapScale) / 2;
                 
-                // スクロールエリアの大きさ（パディング 20px * 2 を引いた実際の広さ）
-                const scW = sc.clientWidth - 40; 
-                const scH = sc.clientHeight - 40;
+                // スクロールエリアの大きさ（余白をなくしたのでそのままの広さ）
+                const scW = sc.clientWidth; 
+                const scH = sc.clientHeight;
                 
                 // 実際の見た目のマップサイズ
                 const scaledW = mapW * this.mapScale;
@@ -1202,8 +1202,8 @@ class UIManager {
 
             const mapW = this.mapEl.offsetWidth;
             const mapH = this.mapEl.offsetHeight;
-            const scW = sc.clientWidth - 40; 
-            const scH = sc.clientHeight - 40;
+            const scW = sc.clientWidth; 
+            const scH = sc.clientHeight;
 
             const getMapMargin = (scale) => {
                 const diffX = (mapW - mapW * scale) / 2;
@@ -1216,8 +1216,8 @@ class UIManager {
             };
 
             const getMapOffset = (scale) => {
-                let offsetX = 20;
-                let offsetY = 20;
+                let offsetX = 0;
+                let offsetY = 0;
                 if (mapW * scale < scW) offsetX += (scW - mapW * scale) / 2;
                 if (mapH * scale < scH) offsetY += (scH - mapH * scale) / 2;
                 return { x: offsetX, y: offsetY };
@@ -1306,12 +1306,12 @@ class UIManager {
             
             const mapW = this.mapEl.offsetWidth;
             const mapH = this.mapEl.offsetHeight;
-            const scW = sc.clientWidth - 40; 
-            const scH = sc.clientHeight - 40;
+            const scW = sc.clientWidth; 
+            const scH = sc.clientHeight;
             
             const getMapOffset = (scale) => {
-                let offsetX = 20;
-                let offsetY = 20;
+                let offsetX = 0;
+                let offsetY = 0;
                 if (mapW * scale < scW) offsetX += (scW - mapW * scale) / 2;
                 if (mapH * scale < scH) offsetY += (scH - mapH * scale) / 2;
                 return { x: offsetX, y: offsetY };
