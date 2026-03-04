@@ -74,12 +74,13 @@ class AudioManager {
         this.players[nextIndex] = this._createPlayer(fileName, loopStart, loopStart);
         const nextPlayer = this.players[nextIndex];
 
-        // 再生ボタンを押してから、すぐに指定の場所へジャンプ！
+        // ★超重要：先にジャンプ先を決めてから、再生ボタンを押します！
         const playNext = () => {
-            const soundId = nextPlayer.play();
-            nextPlayer.seek(loopStart, soundId);
+            nextPlayer.seek(loopStart); // 先に「ここからだよ！」と針を置く
+            nextPlayer.play();          // そのあとに「再生！」
         };
 
+        // 曲の準備（読み込み）が完全に終わってから再生するようにします
         if (nextPlayer.state() === 'loaded') {
             playNext();
         } else {
@@ -110,7 +111,7 @@ class AudioManager {
     }
     
     // ==========================================
-    // ★ 音量を調整する命令（消えちゃってたのはコレです！）
+    // ★ 音量を調整する命令
     // ==========================================
     setVolume(value) {
         this.defaultVolume = value;
