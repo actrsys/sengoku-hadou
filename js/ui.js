@@ -254,23 +254,21 @@ class UIManager {
                 const sc = document.getElementById('map-scroll-container');
                 if (!sc) return;
                 
-                // 画面の大きさが変わり「始めた瞬間」のど真ん中の場所を、しっかりと記憶します！
                 if (savedLogicalX === null) {
                     const rect = sc.getBoundingClientRect();
                     const centerX = rect.width / 2;
                     const centerY = rect.height / 2;
-                    const currentMarginLeft = parseFloat(this.mapEl.style.marginLeft || 0);
-                    const currentMarginTop = parseFloat(this.mapEl.style.marginTop || 0);
+                    // ★ marginではなく「left」と「top」から読み取るように直しました！
+                    const currentLeft = parseFloat(this.mapEl.style.left || 0);
+                    const currentTop = parseFloat(this.mapEl.style.top || 0);
 
-                    savedLogicalX = (sc.scrollLeft + centerX - currentMarginLeft) / this.mapScale;
-                    savedLogicalY = (sc.scrollTop + centerY - currentMarginTop) / this.mapScale;
+                    savedLogicalX = (sc.scrollLeft + centerX - currentLeft) / this.mapScale;
+                    savedLogicalY = (sc.scrollTop + centerY - currentTop) / this.mapScale;
                 }
 
-                // 画面を動かしている間は、計算をジッと我慢して待ちます…
                 if (resizeTimer) clearTimeout(resizeTimer);
                 
                 resizeTimer = setTimeout(() => {
-                    // 動かすのが終わって落ち着いたら、１回だけ正確に計算して場所を合わせます！
                     this.fitMapToScreen();
                     this.mapScale = this.zoomStages[this.zoomLevel];
                     this.applyMapScale();
@@ -278,16 +276,16 @@ class UIManager {
                     const rect = sc.getBoundingClientRect();
                     const centerX = rect.width / 2;
                     const centerY = rect.height / 2;
-                    const newMarginLeft = parseFloat(this.mapEl.style.marginLeft || 0);
-                    const newMarginTop = parseFloat(this.mapEl.style.marginTop || 0);
+                    // ★ ここも「left」と「top」から読み取ります！
+                    const newLeft = parseFloat(this.mapEl.style.left || 0);
+                    const newTop = parseFloat(this.mapEl.style.top || 0);
                     
-                    sc.scrollLeft = (savedLogicalX * this.mapScale + newMarginLeft) - centerX;
-                    sc.scrollTop = (savedLogicalY * this.mapScale + newMarginTop) - centerY;
+                    sc.scrollLeft = (savedLogicalX * this.mapScale + newLeft) - centerX;
+                    sc.scrollTop = (savedLogicalY * this.mapScale + newTop) - centerY;
                     
-                    // 次の時のために、記憶をリセットしておきます
                     savedLogicalX = null;
                     savedLogicalY = null;
-                }, 200); // 0.2秒待ってから実行するお約束です
+                }, 200); 
             }
         });
         // =========================================================
@@ -1178,8 +1176,9 @@ class UIManager {
 
     applyMapScale() {
         if(this.mapEl) {
-            const mapW = this.mapEl.offsetWidth;
-            const mapH = this.mapEl.offsetHeight;
+            // ★ offsetWidthだとブラウザくんが勘違いするので、固定の設計図から直接サイズをもらいます！
+            const mapW = this.game.mapWidth || 1200; 
+            const mapH = this.game.mapHeight || 800;
             const sc = document.getElementById('map-scroll-container');
             
             if (mapW && mapH && sc) {
@@ -1192,18 +1191,21 @@ class UIManager {
                 if (scaledW < sc.clientWidth) marginLeft = (sc.clientWidth - scaledW) / 2;
                 if (scaledH < sc.clientHeight) marginTop = (sc.clientHeight - scaledH) / 2;
                 
-                // ★追加：画像のチラつきを防ぐ魔法（ハードウェアをフル活用します！）
-                this.mapEl.style.willChange = 'transform';
+                // チラつき防止
+                this.mapEl.style.willChange = 'transform, left, top';
                 this.mapEl.style.backfaceVisibility = 'hidden';
                 
-                this.mapEl.style.transformOrigin = '0 0';
-                // 位置の調整も translate にまとめることで、余白のバグを完全に防ぎます！
-                this.mapEl.style.transform = `translate(${marginLeft}px, ${marginTop}px) scale(${this.mapScale})`;
+                // ★ 究極の魔法：地図を宙に浮かせて（absolute）、ブラウザの余計な余白計算を完全に防ぎます！
+                this.mapEl.style.position = 'absolute';
+                this.mapEl.style.left = `${marginLeft}px`;
+                this.mapEl.style.top = `${marginTop}px`;
+                this.mapEl.style.margin = '0px'; // marginの悪さを封印
                 
-                // 元の margin は全部リセット（これが右に無限スクロールする原因でした！）
-                this.mapEl.style.margin = '0px';
+                // 大きさは scale だけで表現
+                this.mapEl.style.transformOrigin = '0 0';
+                this.mapEl.style.transform = `scale(${this.mapScale})`;
 
-                // 代わりに、スクロール範囲を正確に決める透明な「つっかえ棒（spacer）」を置きます
+                // スクロール範囲を決める透明な「つっかえ棒」
                 let spacer = document.getElementById('map-spacer');
                 if (!spacer) {
                     spacer = document.createElement('div');
@@ -1211,12 +1213,13 @@ class UIManager {
                     spacer.style.position = 'absolute';
                     spacer.style.pointerEvents = 'none';
                     sc.appendChild(spacer);
-                    sc.style.position = 'relative'; // sc自身を基準にするおまじない
+                    sc.style.position = 'relative'; 
                 }
                 spacer.style.left = '0px';
                 spacer.style.top = '0px';
-                spacer.style.width = `${scaledW + marginLeft}px`;
-                spacer.style.height = `${scaledH + marginTop}px`;
+                // ★余白を「両側」に足すことで、無限スクロールを完全に封じ込めます！
+                spacer.style.width = `${scaledW + marginLeft * 2}px`;
+                spacer.style.height = `${scaledH + marginTop * 2}px`;
             }
         }
     }
@@ -1315,10 +1318,10 @@ class UIManager {
                 const currentScrollTop = startScrollTop + (targetScrollTop - startScrollTop) * easeOut;
                 
                 // 画像のチラつき防止
-                this.mapEl.style.willChange = 'transform';
+                this.mapEl.style.willChange = 'transform, left, top';
                 this.mapEl.style.backfaceVisibility = 'hidden';
 
-                // 1. 先に透明な「つっかえ棒」のサイズを更新して、スクロールバーを自然に動かします！
+                // 1. 先に透明な「つっかえ棒」のサイズを更新
                 let spacer = document.getElementById('map-spacer');
                 if (!spacer) {
                     spacer = document.createElement('div');
@@ -1328,12 +1331,15 @@ class UIManager {
                     sc.appendChild(spacer);
                     sc.style.position = 'relative';
                 }
-                spacer.style.width = `${mapW * currentScale + currentMarginX}px`;
-                spacer.style.height = `${mapH * currentScale + currentMarginY}px`;
+                spacer.style.width = `${mapW * currentScale + currentMarginX * 2}px`;
+                spacer.style.height = `${mapH * currentScale + currentMarginY * 2}px`;
 
-                // 2. マップ自体の見た目（transform）を更新
+                // 2. マップ自体の見た目を更新（absoluteにしてleftとtopを動かします）
+                this.mapEl.style.position = 'absolute';
+                this.mapEl.style.left = `${currentMarginX}px`;
+                this.mapEl.style.top = `${currentMarginY}px`;
                 this.mapEl.style.transformOrigin = '0 0';
-                this.mapEl.style.transform = `translate(${currentMarginX}px, ${currentMarginY}px) scale(${currentScale})`;
+                this.mapEl.style.transform = `scale(${currentScale})`;
 
                 // 3. スクロール位置をピッタリ合わせます
                 sc.scrollLeft = currentScrollLeft;
@@ -1371,8 +1377,12 @@ class UIManager {
         const posX = targetCastle.pixelX !== undefined ? targetCastle.pixelX : (targetCastle.x * 80 + 40);
         const posY = targetCastle.pixelY !== undefined ? targetCastle.pixelY : (targetCastle.y * 80 + 40);
         
-        const scaledX = posX * this.mapScale + parseFloat(this.mapEl.style.marginLeft || 0);
-        const scaledY = posY * this.mapScale + parseFloat(this.mapEl.style.marginTop || 0);
+        // ★修正：marginではなく、leftとtopから位置を読み取ります！これで右下に飛んでいくバグが直ります！
+        const currentLeft = parseFloat(this.mapEl.style.left || 0);
+        const currentTop = parseFloat(this.mapEl.style.top || 0);
+        
+        const scaledX = posX * this.mapScale + currentLeft;
+        const scaledY = posY * this.mapScale + currentTop;
         
         sc.scrollTo({
             left: scaledX - sc.clientWidth / 2,
