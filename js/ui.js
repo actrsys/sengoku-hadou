@@ -772,8 +772,8 @@ class UIManager {
                 friendBarHtml = `<div class="bar-bg bar-bg-friend"><div class="bar-fill bar-fill-friend" style="width:${friendPercent}%;"></div></div>`;
             }
 
-            // ★変更：順番を入れ替え、ゲージを表示するように組み込みました
-            listHtml += `<div class="daimyo-list-item" style="cursor:pointer;" onclick="window.GameApp.ui.showDiplomacyList(${d.id}, '${d.name}')"><span class="col-daimyo-name" style="font-weight:bold;">${d.name}</span><span class="col-leader-name">${d.leaderName}</span><span>${d.castlesCount}</span><span>${powerBarHtml}</span><span>${friendBarHtml}</span><span style="${statusColor}">${friendStatus}</span></div>`;
+            // ★変更：大名をクリックした時に音（choice.ogg）を鳴らす魔法を追加しました！
+            listHtml += `<div class="daimyo-list-item" style="cursor:pointer;" onclick="if(window.AudioManager) window.AudioManager.playSE('choice.ogg'); window.GameApp.ui.showDiplomacyList(${d.id}, '${d.name}')"><span class="col-daimyo-name" style="font-weight:bold;">${d.name}</span><span class="col-leader-name">${d.leaderName}</span><span>${d.castlesCount}</span><span>${powerBarHtml}</span><span>${friendBarHtml}</span><span style="${statusColor}">${friendStatus}</span></div>`;
         });
         listHtml += '</div>';
         
@@ -1458,6 +1458,8 @@ class UIManager {
                         el.onclick = (e) => { 
                             e.stopPropagation(); 
                             if (this.isDraggingMap) return; 
+                            // ★追加：対象の城を選んだ時の音
+                            if (window.AudioManager) window.AudioManager.playSE('choice.ogg');
                             this.game.commandSystem.resolveMapSelection(c); 
                         };
                     } else { 
@@ -1469,6 +1471,9 @@ class UIManager {
                         if (this.isDraggingMap) return; 
                         if (this.game.isProcessingAI) return;
 
+                        // ★追加：自分の城や敵の城を選んだ時の音
+                        if (window.AudioManager) window.AudioManager.playSE('choice.ogg');
+
                         // ★変更：自動拡大（ズーム）の魔法を消して、いつでもすぐにメニューを開くようにしました！
                         if (this.currentCastle && this.currentCastle.id === c.id) {
                             this.showCastleMenuModal(c);
@@ -1477,7 +1482,7 @@ class UIManager {
                         }
                     };
                 }
-            } else { 
+            } else {
                 el.style.cursor = 'default'; 
             }
             this.mapEl.appendChild(el);
@@ -2692,6 +2697,9 @@ class UIManager {
                     div.style.cursor = 'pointer';
                     
                     div.onclick = () => {
+                        // ★追加：国人衆を選んだ時の音
+                        if (window.AudioManager) window.AudioManager.playSE('choice.ogg');
+                        
                         // 一旦すべての選択色を消す
                         const allItems = this.selectorList.querySelectorAll('.kunishu-list-item');
                         allItems.forEach(item => {
@@ -2893,6 +2901,9 @@ class UIManager {
                 const div = document.createElement('div'); div.className = 'scenario-item';
                 div.innerHTML = `<div class="scenario-title">${c.name}</div><div class="scenario-desc">兵数:${c.soldiers} 防御:${c.defense}</div>`;
                 div.onclick = () => { 
+                    // ★追加：撤退先を選んだ時の音
+                    if (window.AudioManager) window.AudioManager.playSE('choice.ogg');
+                    
                     this.scenarioScreen.classList.add('hidden'); 
                     onSelect(c.id); 
                 };
@@ -3023,6 +3034,9 @@ class UIManager {
                 div.innerHTML = `<strong style="margin-right:10px;">${clanName} (${c.name})</strong> <span style="font-size:0.9rem; color:#555;">(兵数:${c.soldiers} 友好度:${rel.sentiment} [${rel.status}])</span>`;
                 
                 div.onclick = () => { 
+                    // ★追加：援軍の城を選んだ時の音
+                    if (window.AudioManager) window.AudioManager.playSE('choice.ogg');
+                    
                     if (listHeader) listHeader.style.display = '';
                     this.closeSelector();
                     // 城を選んだら、お金を送る画面に進みます！
@@ -3144,6 +3158,9 @@ class UIManager {
                 div.innerHTML = `<strong style="margin-right:10px;">${clanData ? clanData.name : "不明"} (${c.name})</strong> <span style="font-size:0.9rem; color:#555;">(兵数:${c.soldiers} 友好度:${rel.sentiment} [${rel.status}])</span>`;
                 
                 div.onclick = () => { 
+                    // ★追加：防衛の援軍の城を選んだ時の音
+                    if (window.AudioManager) window.AudioManager.playSE('choice.ogg');
+                    
                     if (listHeader) listHeader.style.display = '';
                     this.closeSelector();
                     // 城を選んだら、お金の選択画面へ！
