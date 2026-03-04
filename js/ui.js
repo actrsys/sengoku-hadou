@@ -247,24 +247,31 @@ class UIManager {
         // =========================================================
         window.addEventListener('resize', () => {
             if (this.hasInitializedMap && this.game && (this.game.phase === 'game' || this.game.phase === 'daimyo_select')) {
-                // 画面の大きさに合わせて倍率を再計算します
+                const sc = document.getElementById('map-scroll-container');
+                if (!sc) return;
+                
+                // 今の画面のど真ん中が、地図上のどこなのかをしっかり覚えておきます
+                const rect = sc.getBoundingClientRect();
+                const centerX = rect.width / 2;
+                const centerY = rect.height / 2;
+                
+                const currentMarginLeft = parseFloat(this.mapEl.style.marginLeft || 0);
+                const currentMarginTop = parseFloat(this.mapEl.style.marginTop || 0);
+
+                const logicalX = (sc.scrollLeft + centerX - currentMarginLeft) / this.mapScale;
+                const logicalY = (sc.scrollTop + centerY - currentMarginTop) / this.mapScale;
+
+                // 画面の大きさに合わせて倍率と余白を作り直します
                 this.fitMapToScreen();
                 this.mapScale = this.zoomStages[this.zoomLevel];
                 this.applyMapScale();
                 
-                // 左上に引っ張られる原因だった複雑な計算を消して、
-                // 今のお城にカメラをピタッと合わせ直す魔法に差し替えます！
-                this.scrollToActiveCastle();
-            }
-        });
-        
-        // =========================================================
-        // ★ ここから追加！画面の大きさが変わった時に、地図を真ん中に直す魔法
-        // =========================================================
-        window.addEventListener('resize', () => {
-            // もしマップが既に表示されていたら、余白の計算をやり直します！
-            if (this.mapEl && this.hasInitializedMap) {
-                this.applyMapScale();
+                // 新しい大きさでも、さっき覚えておいた場所がど真ん中に来るように正確に合わせます
+                const newMarginLeft = parseFloat(this.mapEl.style.marginLeft || 0);
+                const newMarginTop = parseFloat(this.mapEl.style.marginTop || 0);
+                
+                sc.scrollLeft = (logicalX * this.mapScale + newMarginLeft) - centerX;
+                sc.scrollTop = (logicalY * this.mapScale + newMarginTop) - centerY;
             }
         });
         // =========================================================
@@ -1185,6 +1192,8 @@ class UIManager {
     
     changeMapZoom(direction, cx = null, cy = null) {
         const sc = document.getElementById('map-scroll-container');
+        const isPC = document.body.classList.contains('is-pc'); 
+
         if (this.isAnimatingZoom) return;
 
         let oldScale = this.mapScale;
@@ -1206,7 +1215,6 @@ class UIManager {
 
         if (Math.abs(targetScale - oldScale) < 0.01) return;
 
-        // ★複雑なアニメーションを廃止し、座標を正確に合わせて一瞬でズームさせます（チラつき防止！）
         const rect = sc.getBoundingClientRect();
         cx = cx !== null ? cx : rect.left + rect.width / 2;
         cy = cy !== null ? cy : rect.top + rect.height / 2;
@@ -1214,30 +1222,96 @@ class UIManager {
         const clientX = cx - rect.left;
         const clientY = cy - rect.top;
 
-        const currentMarginLeft = parseFloat(this.mapEl.style.marginLeft || 0);
-        const currentMarginTop = parseFloat(this.mapEl.style.marginTop || 0);
+        const mapW = this.mapEl.offsetWidth;
+        const mapH = this.mapEl.offsetHeight;
+        const scW = sc.clientWidth; 
+        const scH = sc.clientHeight;
 
-        // ズーム中心の論理座標（ピクセルベース）
-        const logicalX = (sc.scrollLeft + clientX - currentMarginLeft) / oldScale;
-        const logicalY = (sc.scrollTop + clientY - currentMarginTop) / oldScale;
+        // ★ 今の画像地図に合わせた余白（マージン）の計算式です
+        const getMargin = (scale) => {
+            let ml = 0, mt = 0;
+            if (mapW * scale < scW) ml = (scW - mapW * scale) / 2;
+            if (mapH * scale < scH) mt = (scH - mapH * scale) / 2;
+            return { x: ml, y: mt };
+        };
 
-        this.mapScale = targetScale;
-        this.applyMapScale();
+        const oldMargin = getMargin(oldScale);
+        const targetMargin = getMargin(targetScale);
 
-        // ★追加：ブラウザに「今の大きさを確定させて！」と強制的に命令します。これで一瞬消えるのを防ぎます！
-        void sc.scrollHeight;
+        // ズーム中心の場所（論理座標）を計算
+        const logicalX = (sc.scrollLeft + clientX - oldMargin.x) / oldScale;
+        const logicalY = (sc.scrollTop + clientY - oldMargin.y) / oldScale;
 
-        const newMarginLeft = parseFloat(this.mapEl.style.marginLeft || 0);
-        const newMarginTop = parseFloat(this.mapEl.style.marginTop || 0);
+        // 新しいスケールでのスクロールのゴール地点を計算
+        let targetScrollLeft = (logicalX * targetScale + targetMargin.x) - clientX;
+        let targetScrollTop = (logicalY * targetScale + targetMargin.y) - clientY;
 
-        // 新しいスケールでのスクロール位置を計算
-        let targetScrollLeft = (logicalX * targetScale + newMarginLeft) - clientX;
-        let targetScrollTop = (logicalY * targetScale + newMarginTop) - clientY;
+        // 壁の限界を設定（はみ出し防止）
+        let maxScrollLeft = Math.max(0, mapW * targetScale - scW);
+        let maxScrollTop  = Math.max(0, mapH * targetScale - scH);
 
-        sc.scrollLeft = targetScrollLeft;
-        sc.scrollTop = targetScrollTop;
-        
-        this.updateZoomButtons();
+        if (targetScrollLeft < 0) targetScrollLeft = 0;
+        if (targetScrollTop < 0) targetScrollTop = 0;
+        if (targetScrollLeft > maxScrollLeft) targetScrollLeft = maxScrollLeft;
+        if (targetScrollTop > maxScrollTop) targetScrollTop = maxScrollTop;
+
+        // 画面より小さい時はスクロールさせない
+        if (mapW * targetScale <= scW) targetScrollLeft = 0;
+        if (mapH * targetScale <= scH) targetScrollTop = 0;
+
+        // ★ パソコン版：苦心して作られた美しいアニメーションを復活！
+        if (isPC) {
+            this.isAnimatingZoom = true;
+            sc.style.overflow = 'hidden'; 
+            
+            const startScrollLeft = sc.scrollLeft;
+            const startScrollTop = sc.scrollTop;
+            
+            const duration = 200; 
+            const startTime = performance.now();
+
+            const animate = (currentTime) => {
+                let progress = (currentTime - startTime) / duration;
+                if (progress > 1) progress = 1;
+                
+                const easeOut = 1 - Math.pow(1 - progress, 3);
+                const currentScale = oldScale + (targetScale - oldScale) * easeOut;
+                
+                const currentMarginX = oldMargin.x + (targetMargin.x - oldMargin.x) * easeOut;
+                const currentMarginY = oldMargin.y + (targetMargin.y - oldMargin.y) * easeOut;
+                
+                const currentScrollLeft = startScrollLeft + (targetScrollLeft - startScrollLeft) * easeOut;
+                const currentScrollTop = startScrollTop + (targetScrollTop - startScrollTop) * easeOut;
+                
+                // アニメーション中の位置ズレを translate で完璧に補正します
+                const deltaX = (currentMarginX - oldMargin.x) - (currentScrollLeft - startScrollLeft);
+                const deltaY = (currentMarginY - oldMargin.y) - (currentScrollTop - startScrollTop);
+                
+                this.mapEl.style.transformOrigin = '0 0';
+                this.mapEl.style.transform = `translate(${deltaX}px, ${deltaY}px) scale(${currentScale})`;
+
+                if (progress < 1) {
+                    requestAnimationFrame(animate); 
+                } else {
+                    this.mapScale = targetScale;
+                    this.applyMapScale(); 
+                    sc.scrollLeft = targetScrollLeft;
+                    sc.scrollTop = targetScrollTop;
+                    sc.style.overflow = 'auto'; 
+                    this.updateZoomButtons();
+                    this.isAnimatingZoom = false;
+                }
+            };
+            requestAnimationFrame(animate); 
+        } else {
+            // スマホ版：一瞬でズーム
+            this.mapScale = targetScale;
+            this.applyMapScale();
+            void sc.scrollHeight; // ブラウザに再描画を強制
+            sc.scrollLeft = targetScrollLeft;
+            sc.scrollTop = targetScrollTop;
+            this.updateZoomButtons();
+        }
     }
     
     // ★追加：絶対座標になったお城を画面の中央に捉えるための魔法
