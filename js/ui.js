@@ -1570,67 +1570,59 @@ class UIManager {
             }
         });
 
-        // ② ３つのお城が互いに繋がっている「三角形」のグループを探します
-        const triangles = [];
-        const castles = this.game.castles;
-        for (let i = 0; i < castles.length; i++) {
-            for (let j = i + 1; j < castles.length; j++) {
-                for (let k = j + 1; k < castles.length; k++) {
-                    const id1 = castles[i].id;
-                    const id2 = castles[j].id;
-                    const id3 = castles[k].id;
+        // ② ３つ以上のお城が互いに全て繋がっているグループ（最大派閥）を探す探索の魔法です！
+        const targetGroups = [];
+        const findCliques = (R, P, X) => {
+            if (P.length === 0 && X.length === 0) {
+                if (R.length >= 3) targetGroups.push([...R]); // 3つ以上のグループなら採用！
+                return;
+            }
+            const pCopy = [...P];
+            for (const v of pCopy) {
+                const neighbors = Array.from(adj.get(v));
+                findCliques(
+                    [...R, v],
+                    P.filter(n => neighbors.includes(n)),
+                    X.filter(n => neighbors.includes(n))
+                );
+                P.splice(P.indexOf(v), 1);
+                X.push(v);
+            }
+        };
+        const allNodes = Array.from(adj.keys());
+        findCliques([], allNodes, []); // 探索スタート！
 
-                    // ３つが全員お互いに繋がっているかチェック！
-                    if (adj.get(id1).has(id2) && adj.get(id2).has(id3) && adj.get(id3).has(id1)) {
-                        // ③ ４つ以上のグループになっていないかチェックします
-                        let is4Clique = false;
-                        for (let n = 0; n < castles.length; n++) {
-                            const id4 = castles[n].id;
-                            if (id4 !== id1 && id4 !== id2 && id4 !== id3) {
-                                // ４つ目のお城が、前の３つ全てと繋がっていたらアウト！
-                                if (adj.get(id4).has(id1) && adj.get(id4).has(id2) && adj.get(id4).has(id3)) {
-                                    is4Clique = true;
-                                    break;
-                                }
-                            }
-                        }
-
-                        // ４つ以上のグループじゃなければ、Y字にするリストに加えます
-                        if (!is4Clique) {
-                            triangles.push([castles[i], castles[j], castles[k]]);
-                        }
-                    }
+        // ③ まとめて繋ぐための元の線は、後で描かないようにメモしておきます
+        const skipEdges = new Set();
+        targetGroups.forEach(group => {
+            for (let i = 0; i < group.length; i++) {
+                for (let j = i + 1; j < group.length; j++) {
+                    const id1 = group[i];
+                    const id2 = group[j];
+                    const pairKey = id1 < id2 ? `${id1}-${id2}` : `${id2}-${id1}`;
+                    skipEdges.add(pairKey);
                 }
             }
-        }
-
-        // ④ Y字にするための元の線（三角形の３辺）は、後で描かないようにメモしておきます
-        const skipEdges = new Set();
-        triangles.forEach(tri => {
-            const ids = [tri[0].id, tri[1].id, tri[2].id].sort((a,b) => a - b);
-            skipEdges.add(`${ids[0]}-${ids[1]}`);
-            skipEdges.add(`${ids[1]}-${ids[2]}`);
-            skipEdges.add(`${ids[0]}-${ids[2]}`);
         });
 
-        // ⑤ まずはY字の道を描きます！
-        triangles.forEach(tri => {
+        // ④ グループごとに真ん中（中心点）を決めて、そこから放射状に道を描きます！
+        targetGroups.forEach(group => {
             let sumX = 0, sumY = 0;
-            const pts = tri.map(c => {
+            const pts = group.map(id => {
+                const c = this.game.getCastle(id);
                 const px = c.pixelX !== undefined ? c.pixelX : (c.x * 80 + 40);
                 const py = c.pixelY !== undefined ? c.pixelY : (c.y * 80 + 40);
                 sumX += px; sumY += py;
                 return { x: px, y: py };
             });
 
-            // ３つのお城のちょうど真ん中（重心）を計算します
-            const centerX = sumX / 3;
-            const centerY = sumY / 3;
+            // グループ全員のちょうど真ん中を計算します
+            const centerX = sumX / group.length;
+            const centerY = sumY / group.length;
 
-            // 真ん中から、それぞれのお城へ向かって線を引きます
+            // 真ん中から、それぞれのお城へ向かって直線を引きます
             pts.forEach(pt => {
                 const path = document.createElementNS(svgNS, "path");
-                // Y字を綺麗に見せるため、直線を引きます（QではなくLを使います）
                 path.setAttribute("d", `M ${centerX} ${centerY} L ${pt.x} ${pt.y}`);
                 path.setAttribute("fill", "transparent");
                 path.setAttribute("stroke", "rgba(255, 250, 200, 0.7)");
@@ -1639,7 +1631,7 @@ class UIManager {
             });
         });
 
-        // ⑥ ここからは今まで通りの、２つのお城を繋ぐカーブの道です
+        // ⑤ ここからは今まで通りの、２つのお城を繋ぐカーブの道です
         const drawnLines = new Set();
 
         this.game.castles.forEach(c1 => {
@@ -1653,7 +1645,7 @@ class UIManager {
 
                     const pairKey = c1.id < adjId ? `${c1.id}-${adjId}` : `${adjId}-${c1.id}`;
 
-                    // まだ線を引いていなくて、かつ「Y字」で使われていない道なら引きます！
+                    // まだ線を引いていなくて、かつ「まとめ繋ぎ」で使われていない道なら引きます！
                     if (!drawnLines.has(pairKey) && !skipEdges.has(pairKey)) {
                         drawnLines.add(pairKey);
 
