@@ -1708,7 +1708,8 @@ class UIManager {
                         const dy = pos2Y - pos1Y;
                         const dist = Math.hypot(dx, dy);
 
-                        const curveSize = dist * (0.1 + ((c1.id * c2.id) % 10) * 0.01);
+                        // ★ここを変更！ 0.1 を 0.05 に、0.01 を 0.005 にして、曲がり具合を半分にしました！
+                        const curveSize = dist * (0.05 + ((c1.id * c2.id) % 10) * 0.005);
                         const dir = ((c1.id + c2.id) % 2 === 0) ? 1 : -1;
 
                         const nx = -dy / dist;
