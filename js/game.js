@@ -958,8 +958,22 @@ class GameManager {
                 this.ui.showCutin(`ロード完了: ${this.year}年 ${this.month}月`);
                 this.ui.hasInitializedMap = false; 
                 this.ui.renderMap();
+
+                // ★ ここから追加！ セーブデータを読み込んだ瞬間にBGMを切り替えます
+                if (window.AudioManager) {
+                    // 第1引数：ファイル名
+                    // 第2引数：ループ開始位置（秒）
+                    window.AudioManager.playBGM(
+                        'SC_ex_Town2_Fortress.ogg', 
+                        36603 / 44100,                     // スタート地点：LOOPSTART ÷ Hz
+                        (36603 + 5733088) / 44100          // ゴール地点：(LOOPSTART ＋ LOOPLENGTH) ÷ Hz
+                    );
+                }
+                // ★ ここまで追加
+
                 this.processTurn();
             } catch(err) { console.error(err); alert("セーブデータの読み込みに失敗しました"); } 
+// ------------------------------
         }; 
         reader.readAsText(file); 
     }
