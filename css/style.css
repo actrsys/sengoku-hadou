@@ -323,12 +323,12 @@ img {
     
     /* 【代わりの行】↓ */
     position: absolute; /* 自由な位置に置けるシールに変身！ */
-    transform: translate(-50%, -50%) scale(0.48); /* ズレを直しつつ、全体の大きさを４８％(0.48)にします */
+    transform: translate(-50%, -50%) scale(0.41); /* ズレを直しつつ、全体の大きさを４１％(0.41)にします */
     z-index: 10;
 }
 
 /* 選択された時なども、お城の形に合わせて光るように調整しました */
-.castle-card:hover { transform: translate(-50%, calc(-50% - 2px)) scale(0.48); filter: drop-shadow(2px 4px 5px rgba(0,0,0,0.5)); z-index: 20; }
+.castle-card:hover { transform: translate(-50%, calc(-50% - 2px)) scale(0.41); filter: drop-shadow(2px 4px 5px rgba(0,0,0,0.5)); z-index: 20; }
 .castle-card.active-turn { filter: drop-shadow(0 0 8px #ff9800); z-index: 15; }
 .castle-card.selectable-target { filter: drop-shadow(0 0 8px #e91e63); animation: pulse-shadow 1s infinite; z-index: 25; cursor: crosshair; }
 .castle-card.dimmed { opacity: 0.3; filter: grayscale(80%); }
