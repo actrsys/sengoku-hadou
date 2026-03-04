@@ -446,6 +446,7 @@ body.is-pc {
 }
 .modal.hidden { opacity: 0; pointer-events: none; display: none !important;} 
 #quantity-modal { z-index: 6500; } /* ★変更: 数値入力画面も一緒に上げます */
+#dialog-modal { z-index: 8000 !important; } /* ★追加: 確認ダイアログが野戦画面の裏に隠れないように一番手前に出します！ */
 
 .modal-content {
     background: #fff; padding: 20px; border-radius: 8px;
