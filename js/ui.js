@@ -1534,9 +1534,108 @@ class UIManager {
         }
         if (this.aiGuard) { if (this.game.isProcessingAI) this.aiGuard.classList.remove('hidden'); else this.aiGuard.classList.add('hidden'); }
 
-        this.updateInfoPanel(this.currentCastle || this.game.getCurrentTurnCastle());
+                this.updateInfoPanel(this.currentCastle || this.game.getCurrentTurnCastle());
+
+        // ==========================================
+        // ★ここから書き足し！：城同士を繋ぐ「道」を描く魔法です！
+        // ==========================================
+        // 透明な下敷き（SVG）を作って、そこに線を引いていきます
+        const svgNS = "http://www.w3.org/2000/svg";
+        const svg = document.createElementNS(svgNS, "svg");
+        
+        // 下敷きの大きさを、地図の大きさとピッタリ合わせます
+        const mapW = this.game.mapWidth || 1200;
+        const mapH = this.game.mapHeight || 800;
+        svg.setAttribute("width", mapW);
+        svg.setAttribute("height", mapH);
+        
+        // 下敷きの位置を設定します
+        svg.style.position = "absolute";
+        svg.style.left = "0px";
+        svg.style.top = "0px";
+        svg.style.pointerEvents = "none"; // マウスの邪魔をしないようにします
+        svg.style.zIndex = "5"; // ★重要：地図（0）より手前、お城（10）より奥になるように「5」にします！
+
+        // 一度引いた道をメモしておく箱です（往復で2回線を引かないようにするため）
+        const drawnLines = new Set();
+
+        this.game.castles.forEach(c1 => {
+            // お城1の場所を計算します
+            const pos1X = c1.pixelX !== undefined ? c1.pixelX : (c1.x * 80 + 40);
+            const pos1Y = c1.pixelY !== undefined ? c1.pixelY : (c1.y * 80 + 40);
+
+            // 隣のお城リストがあるかチェックします
+            if (c1.adjacentCastleIds) {
+                c1.adjacentCastleIds.forEach(adjId => {
+                    // お城1とお城2のIDを比べて、必ず小さい方を左にして名前（合言葉）を作ります
+                    // 例：城3と城5なら「3-5」になります。これで「5-3」と同じ道だと分かります！
+                    const pairKey = c1.id < adjId ? `${c1.id}-${adjId}` : `${adjId}-${c1.id}`;
+                    
+                    // まだ線を引いていないペアだったら、線を引きます
+                    if (!drawnLines.has(pairKey)) {
+                        drawnLines.add(pairKey); // 「もう引いたよ！」とメモします
+                        
+                        const c2 = this.game.getCastle(adjId); // お城2のデータを取ってきます
+                        if (c2) {
+                            // お城2の場所を計算します
+                            const pos2X = c2.pixelX !== undefined ? c2.pixelX : (c2.x * 80 + 40);
+                            const pos2Y = c2.pixelY !== undefined ? c2.pixelY : (c2.y * 80 + 40);
+                            
+                            // --- ここからが「曲がる道」を作るための計算（ルール）です ---
+                            // 直線にならないように、カーブの強さと向きを決めます。
+                            // 毎回同じ形になるように、ランダムではなくお城の「ID」を使って計算します！
+
+                            // ① 2つのお城の距離を測ります
+                            const dx = pos2X - pos1X;
+                            const dy = pos2Y - pos1Y;
+                            const dist = Math.hypot(dx, dy);
+                            
+                            // ② カーブのふくらみ具合を決めます（距離の10%〜19%くらい膨らませます）
+                            // ID同士を掛け算した結果を使うことで、毎回必ず同じ膨らみ方になります
+                            const curveSize = dist * (0.1 + ((c1.id * c2.id) % 10) * 0.01);
+                            
+                            // ③ どっちに膨らませるかを決めます（IDの足し算が偶数なら右、奇数なら左）
+                            const dir = ((c1.id + c2.id) % 2 === 0) ? 1 : -1;
+                            
+                            // ④ 2つのお城のちょうど真ん中の場所を計算します
+                            const midX = (pos1X + pos2X) / 2;
+                            const midY = (pos1Y + pos2Y) / 2;
+                            
+                            // ⑤ 真ん中から直角（90度）の方向に、どれくらいずらすかを計算します
+                            const nx = -dy / dist;
+                            const ny = dx / dist;
+                            
+                            // ⑥ これが「線を引っ張る見えない手（制御点）」の場所です！
+                            const cpX = midX + nx * curveSize * dir;
+                            const cpY = midY + ny * curveSize * dir;
+
+                            // SVGの線（パス）を作ります
+                            const path = document.createElementNS(svgNS, "path");
+                            
+                            // M:お城1からスタート、Q:見えない手に向かって曲がりながらお城2へゴール！
+                            path.setAttribute("d", `M ${pos1X} ${pos1Y} Q ${cpX} ${cpY} ${pos2X} ${pos2Y}`);
+                            
+                            path.setAttribute("fill", "transparent"); // 中身は塗りつぶさない
+                            path.setAttribute("stroke", "rgba(255, 250, 200, 0.7)"); // ★「黄色っぽい白い線」を少し半透明にします
+                            path.setAttribute("stroke-width", "3"); // 線の太さです
+                            
+                            // 下敷きに線を貼り付けます
+                            svg.appendChild(path);
+                        }
+                    }
+                });
+            }
+        });
+        
+        // 最後に、線がいっぱい描かれた下敷きをマップに敷きます！
+        this.mapEl.appendChild(svg);
+        // ==========================================
+        // ★道の魔法 ここまで！
+        // ==========================================
 
         this.game.castles.forEach(c => {
+            const el = document.createElement('div'); el.className = 'castle-card';
+
             const el = document.createElement('div'); el.className = 'castle-card';
             el.dataset.clan = c.ownerClan; 
             
