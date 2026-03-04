@@ -1178,9 +1178,6 @@ class UIManager {
 
     applyMapScale() {
         if(this.mapEl) {
-            this.mapEl.style.transformOrigin = '0 0';
-            this.mapEl.style.transform = `scale(${this.mapScale})`;
-            
             const mapW = this.mapEl.offsetWidth;
             const mapH = this.mapEl.offsetHeight;
             const sc = document.getElementById('map-scroll-container');
@@ -1192,17 +1189,34 @@ class UIManager {
                 let marginLeft = 0;
                 let marginTop = 0;
                 
-                // スケールした結果が画面より小さい場合のみ、中央に寄せるための余白を追加します
                 if (scaledW < sc.clientWidth) marginLeft = (sc.clientWidth - scaledW) / 2;
                 if (scaledH < sc.clientHeight) marginTop = (sc.clientHeight - scaledH) / 2;
                 
-                this.mapEl.style.marginLeft = `${marginLeft}px`;
-                this.mapEl.style.marginTop = `${marginTop}px`;
+                // ★追加：画像のチラつきを防ぐ魔法（ハードウェアをフル活用します！）
+                this.mapEl.style.willChange = 'transform';
+                this.mapEl.style.backfaceVisibility = 'hidden';
                 
-                // ★元の「引き算」の魔法に戻します！
-                // 見た目が小さくなった分だけ、見えない床（余白）を削ってピッタリ合わせます
-                this.mapEl.style.marginRight = `${scaledW - mapW + marginLeft}px`;
-                this.mapEl.style.marginBottom = `${scaledH - mapH + marginTop}px`;
+                this.mapEl.style.transformOrigin = '0 0';
+                // 位置の調整も translate にまとめることで、余白のバグを完全に防ぎます！
+                this.mapEl.style.transform = `translate(${marginLeft}px, ${marginTop}px) scale(${this.mapScale})`;
+                
+                // 元の margin は全部リセット（これが右に無限スクロールする原因でした！）
+                this.mapEl.style.margin = '0px';
+
+                // 代わりに、スクロール範囲を正確に決める透明な「つっかえ棒（spacer）」を置きます
+                let spacer = document.getElementById('map-spacer');
+                if (!spacer) {
+                    spacer = document.createElement('div');
+                    spacer.id = 'map-spacer';
+                    spacer.style.position = 'absolute';
+                    spacer.style.pointerEvents = 'none';
+                    sc.appendChild(spacer);
+                    sc.style.position = 'relative'; // sc自身を基準にするおまじない
+                }
+                spacer.style.left = '0px';
+                spacer.style.top = '0px';
+                spacer.style.width = `${scaledW + marginLeft}px`;
+                spacer.style.height = `${scaledH + marginTop}px`;
             }
         }
     }
@@ -1276,10 +1290,10 @@ class UIManager {
         if (mapW * targetScale <= scW) targetScrollLeft = 0;
         if (mapH * targetScale <= scH) targetScrollTop = 0;
 
-        // ★ パソコン版：苦心して作られた美しいアニメーションを復活！
+        // ★ パソコン版：苦心して作られた美しいアニメーションを完全無欠に！
         if (isPC) {
             this.isAnimatingZoom = true;
-            sc.style.overflow = 'hidden'; 
+            // スクロールバーを隠す悪さをする魔法（overflow: hidden）は消し去りました！
             
             const startScrollLeft = sc.scrollLeft;
             const startScrollTop = sc.scrollTop;
@@ -1300,25 +1314,38 @@ class UIManager {
                 const currentScrollLeft = startScrollLeft + (targetScrollLeft - startScrollLeft) * easeOut;
                 const currentScrollTop = startScrollTop + (targetScrollTop - startScrollTop) * easeOut;
                 
-                // アニメーション中の位置ズレを translate で完璧に補正します
-                const deltaX = (currentMarginX - oldMargin.x) - (currentScrollLeft - startScrollLeft);
-                const deltaY = (currentMarginY - oldMargin.y) - (currentScrollTop - startScrollTop);
-                
+                // 画像のチラつき防止
+                this.mapEl.style.willChange = 'transform';
+                this.mapEl.style.backfaceVisibility = 'hidden';
+
+                // 1. 先に透明な「つっかえ棒」のサイズを更新して、スクロールバーを自然に動かします！
+                let spacer = document.getElementById('map-spacer');
+                if (!spacer) {
+                    spacer = document.createElement('div');
+                    spacer.id = 'map-spacer';
+                    spacer.style.position = 'absolute';
+                    spacer.style.pointerEvents = 'none';
+                    sc.appendChild(spacer);
+                    sc.style.position = 'relative';
+                }
+                spacer.style.width = `${mapW * currentScale + currentMarginX}px`;
+                spacer.style.height = `${mapH * currentScale + currentMarginY}px`;
+
+                // 2. マップ自体の見た目（transform）を更新
                 this.mapEl.style.transformOrigin = '0 0';
-                this.mapEl.style.transform = `translate(${deltaX}px, ${deltaY}px) scale(${currentScale})`;
+                this.mapEl.style.transform = `translate(${currentMarginX}px, ${currentMarginY}px) scale(${currentScale})`;
+
+                // 3. スクロール位置をピッタリ合わせます
+                sc.scrollLeft = currentScrollLeft;
+                sc.scrollTop = currentScrollTop;
 
                 if (progress < 1) {
                     requestAnimationFrame(animate); 
                 } else {
                     this.mapScale = targetScale;
-                    // ★ここが大事！先に「auto」に戻して、ブラウザくんに幅を教えてあげます！
-                    sc.style.overflow = 'auto'; 
-                    
-                    // そのあとに大きさを適用すれば、ズレずにピタッと決まります！
                     this.applyMapScale(); 
                     sc.scrollLeft = targetScrollLeft;
                     sc.scrollTop = targetScrollTop;
-                    
                     this.updateZoomButtons();
                     this.isAnimatingZoom = false;
                 }
