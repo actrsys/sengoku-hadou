@@ -312,7 +312,20 @@ class GameSystem {
         const rate = min + Math.random() * (max - min);
         return Math.floor(val * rate);
     }
-    static isAdjacent(c1, c2) { return (Math.abs(c1.x - c2.x) + Math.abs(c1.y - c2.y)) === 1; }
+    
+    // ★ここをごっそり差し替え！：マスの位置（xとy）の計算を消して、リストの数字で判断します！
+    static isAdjacent(c1, c2) { 
+        // どちらかのお城のデータが無かったら「繋がってない」にします
+        if (!c1 || !c2) return false;
+        
+        // お城1のリストに、お城2のIDが入っているか？
+        const c1HasC2 = c1.adjacentCastleIds && c1.adjacentCastleIds.includes(c2.id);
+        // お城2のリストに、お城1のIDが入っているか？
+        const c2HasC1 = c2.adjacentCastleIds && c2.adjacentCastleIds.includes(c1.id);
+        
+        // どちらか片方のリストにでもIDが書いてあれば「道が繋がっている」ということにします！
+        return c1HasC2 || c2HasC1;
+    }
     
     static toGradeHTML(val) {
         let base = "", plus = "", cls = "";

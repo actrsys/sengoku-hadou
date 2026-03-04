@@ -48,8 +48,16 @@ class Castle {
         this.castellanId = Number(this.castellanId);
         this.x = Number(this.x);
         this.y = Number(this.y);
-        
-        // ★ここを書き足します！：カラーコードを読み込む箱を用意します！
+        if (data.adjacentCastleIds && Array.isArray(data.adjacentCastleIds)) {
+            // セーブデータから読み込んだ時はそのまま使います
+            this.adjacentCastleIds = data.adjacentCastleIds;
+        } else if (typeof data.adjacentCastle === 'string' && data.adjacentCastle.trim() !== "") {
+            // CSVから「2|3|10」のような文字で届いたら、「|」で区切って数字のリストに変身させます！
+            this.adjacentCastleIds = data.adjacentCastle.split('|').map(id => Number(id.trim()));
+        } else {
+            // 何も書かれていなかったら空っぽのリストにしておきます
+            this.adjacentCastleIds = [];
+        }
         this.castlesColorCode = data.castlesColorCode || "";
         
         // 数値データの初期化（上限をセットする魔法を追加しました！）
