@@ -1619,26 +1619,7 @@ class UIManager {
         // ひし形になるグループをリストから消し去ります！
         targetGroups = targetGroups.filter((_, index) => !invalidGroups.has(index));
 
-        // 【自動ルール2】お城同士の距離を測って、細長すぎる（バランスが悪い）三角形も弾きます
-        targetGroups = targetGroups.filter(group => {
-            let distances = [];
-            for (let i = 0; i < group.length; i++) {
-                for (let j = i + 1; j < group.length; j++) {
-                    const c1 = this.game.getCastle(group[i]);
-                    const c2 = this.game.getCastle(group[j]);
-                    const px1 = c1.pixelX !== undefined ? c1.pixelX : (c1.x * 80 + 40);
-                    const py1 = c1.pixelY !== undefined ? c1.pixelY : (c1.y * 80 + 40);
-                    const px2 = c2.pixelX !== undefined ? c2.pixelX : (c2.x * 80 + 40);
-                    const py2 = c2.pixelY !== undefined ? c2.pixelY : (c2.y * 80 + 40);
-                    distances.push(Math.hypot(px1 - px2, py1 - py2));
-                }
-            }
-            const maxDist = Math.max(...distances);
-            const minDist = Math.min(...distances);
-            
-            // 一番長い道が、一番短い道の「1.8倍」以上あったらY字にしません
-            return maxDist <= minDist * 1.8;
-        });
+        // ★ ここにあった「距離を測って弾く自動ルール2」を完全に消し去りました！ ★
 
         // 【手動ルール】それでも絶対にY字にしたくない組み合わせがあれば、ここにIDを書きます（例："1,2,3"）
         const exceptionGroups = [
