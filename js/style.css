@@ -329,7 +329,7 @@ img {
 }
 
 /* ‘I‘ğ‚³‚ê‚½‚È‚Ç‚àA‚¨é‚ÌŒ`‚É‡‚í‚¹‚ÄŒõ‚é‚æ‚¤‚É’²®‚µ‚Ü‚µ‚½ */
-.castle-card:hover { filter: drop-shadow(2px 4px 5px rgba(0,0,0,0.5)); z-index: 20; }
+.castle-card:hover { transform: translateY(-2px); filter: drop-shadow(2px 4px 5px rgba(0,0,0,0.5)); z-index: 20; }
 .castle-card.active-turn { filter: drop-shadow(0 0 8px #ff9800); z-index: 15; }
 .castle-card.selectable-target { filter: drop-shadow(0 0 8px #e91e63); animation: pulse-shadow 1s infinite; z-index: 25; cursor: crosshair; }
 .castle-card.dimmed { opacity: 0.3; filter: grayscale(80%); }
