@@ -257,12 +257,13 @@ class UIManager {
                     // ★ 修正：今の中心位置を、倍率に関係ない「素の地図」の座標として覚える
                     const sc = document.getElementById('map-scroll-container');
                     if (!sc) return;
-                    const rect = sc.getBoundingClientRect();
+                    // const rect = sc.getBoundingClientRect();
                     const currentLeft = parseFloat(this.mapEl.style.left || 0);
                     const currentTop = parseFloat(this.mapEl.style.top || 0);
                     
-                    const logX = (sc.scrollLeft + rect.width / 2 - currentLeft) / this.mapScale;
-                    const logY = (sc.scrollTop + rect.height / 2 - currentTop) / this.mapScale;
+                    // ★修正：画面がCSSで縮小されていても正しく中心を取るために、見た目のrectではなく内部のclientWidthを使います！
+                    const logX = (sc.scrollLeft + sc.clientWidth / 2 - currentLeft) / this.mapScale;
+                    const logY = (sc.scrollTop + sc.clientHeight / 2 - currentTop) / this.mapScale;
 
                     // ★ 画面に合わせて倍率の限界（minScale）を計算し直す
                     this.fitMapToScreen();
@@ -270,8 +271,9 @@ class UIManager {
                     // ★ 覚えた位置が中心に来るように、新しい倍率でスクロール位置を計算し直す
                     const newLeft = parseFloat(this.mapEl.style.left || 0);
                     const newTop = parseFloat(this.mapEl.style.top || 0);
-                    sc.scrollLeft = (logX * this.mapScale + newLeft) - rect.width / 2;
-                    sc.scrollTop = (logY * this.mapScale + newTop) - rect.height / 2;
+                    // ★修正：こちらも rect ではなく clientWidth に直します
+                    sc.scrollLeft = (logX * this.mapScale + newLeft) - sc.clientWidth / 2;
+                    sc.scrollTop = (logY * this.mapScale + newTop) - sc.clientHeight / 2;
                 }, 200); 
             }
         });
@@ -1250,8 +1252,12 @@ class UIManager {
         cy = cy !== null ? cy : rect.top + rect.height / 2;
         
         // ★ 修正：マウスの位置から、画面全体のズレ（黒帯など）を引くようにします
-        const clientX = cx - rect.left;
-        const clientY = cy - rect.top;
+        // ★ さらに追加：画面が黒帯などで縮小・拡大されている場合の「縮尺のズレ」を翻訳して直します！
+        const scaleX = rect.width / sc.offsetWidth || 1;
+        const scaleY = rect.height / sc.offsetHeight || 1;
+
+        const clientX = (cx - rect.left) / scaleX;
+        const clientY = (cy - rect.top) / scaleY;
 
         // ★ここを修正！ブラウザくんの勘違いを防ぐため、設計図から直接サイズをもらいます！
         const mapW = this.game.mapWidth || 1200;
