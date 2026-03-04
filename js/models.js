@@ -49,6 +49,9 @@ class Castle {
         this.x = Number(this.x);
         this.y = Number(this.y);
         
+        // ★ここを書き足します！：カラーコードを読み込む箱を用意します！
+        this.castlesColorCode = data.castlesColorCode || "";
+        
         // 数値データの初期化（上限をセットする魔法を追加しました！）
         this.soldiers = Math.min(99999, Number(this.soldiers || 0));
         this.gold = Math.min(99999, Number(this.gold || 0));

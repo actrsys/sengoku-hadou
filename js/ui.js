@@ -1070,12 +1070,19 @@ class UIManager {
         if (!this.mapEl) return;
         const wrapper = document.getElementById('map-wrapper');
         const container = this.mapEl;
-        const maxX = Math.max(...this.game.castles.map(c => c.x)) + 2;
-        const maxY = Math.max(...this.game.castles.map(c => c.y)) + 2;
-        const tileSize = 80;
-        const gap = 10;
-        const mapW = maxX * (tileSize + gap);
-        const mapH = maxY * (tileSize + gap);
+        
+        // ★ここをごっそり差し替え！：マス目（80pxとか）の計算を消して、画像の大きさに合わせます！
+        // 【消す行】
+        // const maxX = Math.max(...this.game.castles.map(c => c.x)) + 2;
+        // const maxY = Math.max(...this.game.castles.map(c => c.y)) + 2;
+        // const tileSize = 80;
+        // const gap = 10;
+        // const mapW = maxX * (tileSize + gap);
+        // const mapH = maxY * (tileSize + gap);
+        
+        // 【代わりの行】↓
+        const mapW = this.game.mapWidth || 1200;
+        const mapH = this.game.mapHeight || 800;
         
         container.style.width = `${mapW}px`;
         container.style.height = `${mapH}px`;
@@ -1420,8 +1427,22 @@ class UIManager {
 
         this.game.castles.forEach(c => {
             const el = document.createElement('div'); el.className = 'castle-card';
-            el.dataset.clan = c.ownerClan; el.style.setProperty('--c-x', c.x + 1); el.style.setProperty('--c-y', c.y + 1);
-            if (c.isDone) el.classList.add('done'); if (this.game.getCurrentTurnCastle() === c && !c.isDone) el.classList.add('active-turn');
+            el.dataset.clan = c.ownerClan; 
+            
+            // ★ここをごっそり差し替え！：マス目の指定（--c-xなど）ではなく、ピクセルの位置を直接書き込みます！
+            // 【消す行】
+            // el.style.setProperty('--c-x', c.x + 1); el.style.setProperty('--c-y', c.y + 1);
+            
+            // 【代わりの行】↓
+            // 色が見つかったお城は pixelX と pixelY が入っています。
+            // まだ色を設定していないお城は、昔の x と y から適当な位置を計算して仮置きします。
+            const posX = c.pixelX !== undefined ? c.pixelX : (c.x * 80 + 40);
+            const posY = c.pixelY !== undefined ? c.pixelY : (c.y * 80 + 40);
+            
+            el.style.left = `${posX}px`;
+            el.style.top = `${posY}px`;
+
+            if (c.isDone) el.classList.add('done');
             const castellan = this.game.getBusho(c.castellanId); const clanData = this.game.clans.find(cl => cl.id === c.ownerClan);
             
             const isVisible = isDaimyoSelect || this.game.isCastleVisible(c);

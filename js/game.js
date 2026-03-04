@@ -60,10 +60,18 @@ class DataManager {
             const castles = this.parseCSV(castlesText, Castle);
             const bushos = this.parseCSV(bushosText, Busho);
             const kunishus = kunishusText ? this.parseCSV(kunishusText, Kunishu) : [];
-
+            
             this.joinData(clans, castles, bushos);
             if (bushos.length < 50) this.generateGenericBushos(bushos, castles, clans);
-            return { clans, castles, bushos, kunishus };
+            
+            // ★ここを書き足し！：お城のデータが揃った後で、色を探す魔法を発動させます！
+            try {
+                await this.loadColorMap('./data/images/map/japan_colorcode_map.png', castles);
+            } catch (e) {
+                console.log("マップ画像の解析をスキップしました");
+            }
+            // ★ここを差し替え！：画像の大きさも一緒に渡すようにします！
+            return { clans, castles, bushos, kunishus, mapWidth: this.mapImageWidth, mapHeight: this.mapImageHeight };
         } catch (error) {
             console.error(error);
             alert(`データの読み込みに失敗しました。\nフォルダ構成を確認してください。`);
@@ -223,6 +231,73 @@ class DataManager {
             }
         });
     }
+    
+        // ============================================
+    // ★ここから書き足し！：画像から色を探す魔法です！
+    // ============================================
+    static async loadColorMap(url, castles) {
+        return new Promise((resolve, reject) => {
+            const img = new Image();
+            img.onload = () => {
+                // 透明な画用紙（キャンバス）を作って画像を写し取ります
+                const canvas = document.createElement('canvas');
+                canvas.width = img.width;
+                canvas.height = img.height;
+                const ctx = canvas.getContext('2d');
+                ctx.drawImage(img, 0, 0);
+                
+                // 画像の点（ピクセル）のデータを全部読み取ります
+                const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+                const data = imageData.data;
+
+                // お城のリストを一つずつ見ていきます
+                for (let c of castles) {
+                    if (c.castlesColorCode) {
+                        const targetColor = this.hexToRgb(c.castlesColorCode);
+                        let found = false;
+                        
+                        // 点を一つずつ調べて、同じ色かチェックします
+                        for (let i = 0; i < data.length; i += 4) {
+                            if (data[i] === targetColor.r && data[i+1] === targetColor.g && data[i+2] === targetColor.b) {
+                                // 同じ色を見つけたら、その場所（XとY）をメモします！
+                                const pixelIndex = i / 4;
+                                c.pixelX = pixelIndex % canvas.width;
+                                c.pixelY = Math.floor(pixelIndex / canvas.width);
+                                found = true;
+                                break; // 見つけたら次のお城へ
+                            }
+                        }
+                        if (!found) {
+                            console.warn(`色 ${c.castlesColorCode} が ${c.name} のために見つかりませんでした！`);
+                        }
+                    }
+                }
+                
+                // 画像の大きさもメモしておきます
+                this.mapImageWidth = img.width;
+                this.mapImageHeight = img.height;
+                resolve();
+            };
+            img.onerror = () => {
+                console.warn("カラーマップの画像の読み込みに失敗しました！");
+                resolve(); // 失敗してもゲームが止まらないようにします
+            };
+            img.src = url;
+        });
+    }
+
+    static hexToRgb(hex) {
+        // "#ff0000" のような文字を、赤・緑・青の数字に変換する魔法です
+        const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+        return result ? {
+            r: parseInt(result[1], 16),
+            g: parseInt(result[2], 16),
+            b: parseInt(result[3], 16)
+        } : { r: 0, g: 0, b: 0 };
+    }
+    // ============================================
+    // ★画像から色を探す魔法ここまで！
+    // ============================================
 }
 
 /* ==========================================================================
@@ -570,7 +645,11 @@ class GameManager {
             
             this.kunishuSystem.setKunishuData(data.kunishus || []);
             
-            document.getElementById('app').classList.remove('hidden'); 
+            // ★ここを書き足し！：画像の大きさをゲーム全体で覚えるようにします！
+            this.mapWidth = data.mapWidth || 1200;
+            this.mapHeight = data.mapHeight || 800;
+
+            document.getElementById('app').classList.remove('hidden');
             
             this.phase = 'daimyo_select';
             this.ui.renderMap();
