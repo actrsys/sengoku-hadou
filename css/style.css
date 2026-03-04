@@ -201,7 +201,7 @@ img {
 }
 #map-scroll-container {
     width: 100%; height: 100%; overflow: auto; display: flex;
-    flex-direction: column; padding: 20px; box-sizing: border-box; 
+    flex-direction: column; padding: 0; box-sizing: border-box; 
     -webkit-overflow-scrolling: touch;
 }
 #map-scroll-container.grab { cursor: grab; }
