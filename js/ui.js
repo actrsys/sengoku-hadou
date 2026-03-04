@@ -7,7 +7,7 @@
 // ★ マップのズーム設定を1箇所で管理する箱
 const MAP_ZOOM_CONFIG = {
     PC: {
-        minMargin: 1, // PCの最小サイズの時の余白（1.0でピッタリ）
+        minMargin: 1.05, // PCの最小サイズの時の余白（1.0でピッタリ）
         mid: 2,        // PCの中間サイズ
         max: 3.5         // PCの最大サイズ
     },
@@ -275,6 +275,17 @@ class UIManager {
                 sc.scrollTop = (logicalY * this.mapScale + newMarginTop) - centerY;
             }
         });
+        
+        // =========================================================
+        // ★ ここから追加！画面の大きさが変わった時に、地図を真ん中に直す魔法
+        // =========================================================
+        window.addEventListener('resize', () => {
+            // もしマップが既に表示されていたら、余白の計算をやり直します！
+            if (this.mapEl && this.hasInitializedMap) {
+                this.applyMapScale();
+            }
+        });
+        // =========================================================
         
     } // ← これが constructor の終わりのカッコです
     
