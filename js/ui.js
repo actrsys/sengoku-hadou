@@ -1635,9 +1635,7 @@ class UIManager {
 
         this.game.castles.forEach(c => {
             const el = document.createElement('div'); el.className = 'castle-card';
-
-            const el = document.createElement('div'); el.className = 'castle-card';
-            el.dataset.clan = c.ownerClan; 
+            el.dataset.clan = c.ownerClan;
             
             // ★ここをごっそり差し替え！：マス目の指定（--c-xなど）ではなく、ピクセルの位置を直接書き込みます！
             // 【消す行】
