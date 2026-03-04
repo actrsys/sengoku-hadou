@@ -294,22 +294,39 @@ img {
 
 .castle-card {
     width: var(--map-tile-size); height: var(--map-tile-size);
-    background: #fff; border: 1px solid #999; border-radius: 4px;
+    
+    /* ★ここから！お城の画像を表示する魔法です */
+    background-image: url('../data/images/map/shiro_icon001.png');
+    background-size: contain;      /* 画像がはみ出さずピッタリ収まるようにします */
+    background-position: center;   /* 画像をど真ん中に置きます */
+    background-repeat: no-repeat;  /* 画像が分身しないようにします */
+    background-color: transparent; /* 白い背景を透明にして、マップの景色になじませます */
+    border: none;                  /* 四角い枠線を消します */
+    box-shadow: none;              /* 四角い影を消します */
+    filter: drop-shadow(2px 2px 3px rgba(0,0,0,0.5)); /* お城の形に合わせてカッコいい影をつけます */
+    /* ★ここまで */
+
+    border-radius: 4px;
     display: flex; flex-direction: column; justify-content: space-between;
-    padding: 2px; box-shadow: 2px 2px 5px rgba(0,0,0,0.2);
+    padding: 2px; 
     cursor: pointer; position: relative; user-select: none;
     font-size: 0.75rem; grid-column: var(--c-x); grid-row: var(--c-y); z-index: 10;
 }
-.castle-card:hover { transform: translateY(-2px); box-shadow: 2px 4px 8px rgba(0,0,0,0.3); z-index: 20; }
-.castle-card.active-turn { border: 3px solid #ff9800; box-shadow: 0 0 15px #ff9800; z-index: 15; }
-.castle-card.selectable-target { border: 3px solid #e91e63; animation: pulse 1s infinite; z-index: 25; cursor: crosshair; }
+
+/* 選択された時なども、お城の形に合わせて光るように調整しました */
+.castle-card:hover { transform: translateY(-2px); filter: drop-shadow(2px 4px 5px rgba(0,0,0,0.5)); z-index: 20; }
+.castle-card.active-turn { filter: drop-shadow(0 0 8px #ff9800); z-index: 15; }
+.castle-card.selectable-target { filter: drop-shadow(0 0 8px #e91e63); animation: pulse-shadow 1s infinite; z-index: 25; cursor: crosshair; }
 .castle-card.dimmed { opacity: 0.3; filter: grayscale(80%); }
 
+/* ピカピカ光るアニメーションも、お城のシルエット用に追加します */
 @keyframes pulse { 0% { box-shadow: 0 0 0 0 rgba(233, 30, 99, 0.7); } 70% { box-shadow: 0 0 0 10px rgba(233, 30, 99, 0); } 100% { box-shadow: 0 0 0 0 rgba(233, 30, 99, 0); } }
+@keyframes pulse-shadow { 0% { filter: drop-shadow(0 0 0 rgba(233, 30, 99, 0.7)); } 70% { filter: drop-shadow(0 0 10px rgba(233, 30, 99, 0)); } 100% { filter: drop-shadow(0 0 0 rgba(233, 30, 99, 0)); } }
 
-.card-header h3 { margin: 0; font-size: 0.9em; text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; background:#eee;}
-.card-owner { font-size: 0.7em; text-align: center; color: #555; }
-.param-grid { font-size: 0.7em; padding: 1px; }
+/* ★画像の上に文字が乗るので、文字の後ろに黒い半透明のフィルムを貼って読みやすくします */
+.card-header h3 { margin: 0; font-size: 0.9em; text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; background: rgba(0,0,0,0.6); color: #fff;}
+.card-owner { font-size: 0.7em; text-align: center; color: #fff; background: rgba(0,0,0,0.6); margin-top: auto; /* ★勢力名を下の方に寄せて、お城のイラストを見やすくします */ }
+.param-grid { font-size: 0.7em; padding: 1px; background: rgba(0,0,0,0.6); color: #fff; }
 .param-item { display: flex; justify-content: space-between; }
 
 #bottom-command-bar {
