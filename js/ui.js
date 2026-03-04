@@ -247,32 +247,14 @@ class UIManager {
         // =========================================================
         window.addEventListener('resize', () => {
             if (this.hasInitializedMap && this.game && (this.game.phase === 'game' || this.game.phase === 'daimyo_select')) {
-                const sc = document.getElementById('map-scroll-container');
-                if (!sc) return;
-                
-                // 今の画面のど真ん中の座標を覚えておきます
-                const rect = sc.getBoundingClientRect();
-                const centerX = rect.width / 2;
-                const centerY = rect.height / 2;
-                
-                const currentMarginLeft = parseFloat(this.mapEl.style.marginLeft || 0);
-                const currentMarginTop = parseFloat(this.mapEl.style.marginTop || 0);
-
-                // マップの絵の中のどこを見ているか（論理座標）を計算
-                const logicalX = (sc.scrollLeft + centerX - currentMarginLeft) / this.mapScale;
-                const logicalY = (sc.scrollTop + centerY - currentMarginTop) / this.mapScale;
-
                 // 画面の大きさに合わせて倍率を再計算します
                 this.fitMapToScreen();
                 this.mapScale = this.zoomStages[this.zoomLevel];
                 this.applyMapScale();
                 
-                // 新しい大きさで、さっきと同じ場所がど真ん中に来るようにスクロールします
-                const newMarginLeft = parseFloat(this.mapEl.style.marginLeft || 0);
-                const newMarginTop = parseFloat(this.mapEl.style.marginTop || 0);
-                
-                sc.scrollLeft = (logicalX * this.mapScale + newMarginLeft) - centerX;
-                sc.scrollTop = (logicalY * this.mapScale + newMarginTop) - centerY;
+                // 左上に引っ張られる原因だった複雑な計算を消して、
+                // 今のお城にカメラをピタッと合わせ直す魔法に差し替えます！
+                this.scrollToActiveCastle();
             }
         });
         
