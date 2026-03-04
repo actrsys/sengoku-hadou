@@ -241,7 +241,41 @@ class UIManager {
             }
         }, true); // ボタンが押された瞬間に、他の処理より優先して音を鳴らすおまじないです
         // =========================================================
+        
+        // =========================================================
+        // ★ 画面の大きさが変わった時にズーム位置を合わせ直す魔法
+        // =========================================================
+        window.addEventListener('resize', () => {
+            if (this.hasInitializedMap && this.game && (this.game.phase === 'game' || this.game.phase === 'daimyo_select')) {
+                const sc = document.getElementById('map-scroll-container');
+                if (!sc) return;
+                
+                // 今の画面のど真ん中の座標を覚えておきます
+                const rect = sc.getBoundingClientRect();
+                const centerX = rect.width / 2;
+                const centerY = rect.height / 2;
+                
+                const currentMarginLeft = parseFloat(this.mapEl.style.marginLeft || 0);
+                const currentMarginTop = parseFloat(this.mapEl.style.marginTop || 0);
 
+                // マップの絵の中のどこを見ているか（論理座標）を計算
+                const logicalX = (sc.scrollLeft + centerX - currentMarginLeft) / this.mapScale;
+                const logicalY = (sc.scrollTop + centerY - currentMarginTop) / this.mapScale;
+
+                // 画面の大きさに合わせて倍率を再計算します
+                this.fitMapToScreen();
+                this.mapScale = this.zoomStages[this.zoomLevel];
+                this.applyMapScale();
+                
+                // 新しい大きさで、さっきと同じ場所がど真ん中に来るようにスクロールします
+                const newMarginLeft = parseFloat(this.mapEl.style.marginLeft || 0);
+                const newMarginTop = parseFloat(this.mapEl.style.marginTop || 0);
+                
+                sc.scrollLeft = (logicalX * this.mapScale + newMarginLeft) - centerX;
+                sc.scrollTop = (logicalY * this.mapScale + newMarginTop) - centerY;
+            }
+        });
+        
     } // ← これが constructor の終わりのカッコです
     
     // ==========================================
@@ -516,14 +550,14 @@ class UIManager {
         // =========================================================
         // ★ マウスホイールでマップを拡大縮小する魔法（PC用）
         // =========================================================
-        let isZooming = false; // ★追加：連続ズームを防ぐストッパー
+        this.isZooming = false; // ★変更：isZoomingを「this.」をつけてどこからでも使える箱にします！
         sc.addEventListener('wheel', (e) => {
             if (document.body.classList.contains('is-pc')) {
                 e.preventDefault(); 
-                if (isZooming) return; // ズーム中は次の命令を無視します！
+                if (this.isZooming) return; // ズーム中は次の命令を無視します！
                 
-                isZooming = true;
-                setTimeout(() => { isZooming = false; }, 350); // アニメーションが終わるまで待つ
+                this.isZooming = true;
+                setTimeout(() => { this.isZooming = false; }, 350); // アニメーションが終わるまで待つ
 
                 if (e.deltaY < 0) this.changeMapZoom(1, e.clientX, e.clientY);       
                 else if (e.deltaY > 0) this.changeMapZoom(-1, e.clientX, e.clientY); 
@@ -549,6 +583,9 @@ class UIManager {
                 e.preventDefault(); 
                 if (initialPinchDist === null) return;
                 
+                // ★追加：スマホでもズーム中は一旦ストップさせます！
+                if (this.isZooming) return;
+
                 const currentDist = Math.hypot(
                     e.touches[0].pageX - e.touches[1].pageX,
                     e.touches[0].pageY - e.touches[1].pageY
@@ -556,16 +593,17 @@ class UIManager {
                 
                 const diff = currentDist - initialPinchDist;
                 
-                // ★修正：指と指の間ではなく「今見ている画面のど真ん中」の座標を計算します！
                 const rect = sc.getBoundingClientRect();
                 const centerX = rect.left + rect.width / 2;
                 const centerY = rect.top + rect.height / 2;
 
                 if (diff > 50) {
-                    this.changeMapZoom(1, centerX, centerY);  // 画面の中心を指定して拡大！
+                    this.isZooming = true; setTimeout(() => { this.isZooming = false; }, 350); // ★追加
+                    this.changeMapZoom(1, centerX, centerY);
                     initialPinchDist = currentDist; 
                 } else if (diff < -50) {
-                    this.changeMapZoom(-1, centerX, centerY); // 画面の中心を指定して縮小！
+                    this.isZooming = true; setTimeout(() => { this.isZooming = false; }, 350); // ★追加
+                    this.changeMapZoom(-1, centerX, centerY);
                     initialPinchDist = currentDist;
                 }
             }
@@ -1192,6 +1230,9 @@ class UIManager {
 
         this.mapScale = targetScale;
         this.applyMapScale();
+
+        // ★追加：ブラウザに「今の大きさを確定させて！」と強制的に命令します。これで一瞬消えるのを防ぎます！
+        void sc.scrollHeight;
 
         const newMarginLeft = parseFloat(this.mapEl.style.marginLeft || 0);
         const newMarginTop = parseFloat(this.mapEl.style.marginTop || 0);
