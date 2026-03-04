@@ -1571,10 +1571,10 @@ class UIManager {
         });
 
         // ② ３つ以上のお城が互いに全て繋がっているグループ（最大派閥）を探す探索の魔法です！
-        const targetGroups = [];
+        let targetGroups = []; // ★ `const` から `let` に変えました！
         const findCliques = (R, P, X) => {
             if (P.length === 0 && X.length === 0) {
-                if (R.length >= 3) targetGroups.push([...R]); // 3つ以上のグループなら採用！
+                if (R.length >= 3) targetGroups.push([...R]); // 3つ以上のグループなら一旦候補に！
                 return;
             }
             const pCopy = [...P];
@@ -1591,6 +1591,66 @@ class UIManager {
         };
         const allNodes = Array.from(adj.keys());
         findCliques([], allNodes, []); // 探索スタート！
+
+        // ==========================================
+        // ★ここから追加：「Y字にするとおかしくなるグループ」を自動で弾く魔法です！
+        // ==========================================
+        
+        // 【自動ルール1】他のY字グループと「道（2つのお城）」を共有していると「ひし形」になるので弾きます
+        const invalidGroups = new Set();
+        for (let i = 0; i < targetGroups.length; i++) {
+            for (let j = i + 1; j < targetGroups.length; j++) {
+                const g1 = targetGroups[i];
+                const g2 = targetGroups[j];
+                
+                // お互いのグループに共通しているお城の数を数えます
+                let commonCount = 0;
+                for (const id of g1) {
+                    if (g2.includes(id)) commonCount++;
+                }
+                
+                // 共通のお城が2つ以上（つまり道を共有している）なら、両方ともY字にするのをやめます！
+                if (commonCount >= 2) {
+                    invalidGroups.add(i);
+                    invalidGroups.add(j);
+                }
+            }
+        }
+        // ひし形になるグループをリストから消し去ります！
+        targetGroups = targetGroups.filter((_, index) => !invalidGroups.has(index));
+
+        // 【自動ルール2】お城同士の距離を測って、細長すぎる（バランスが悪い）三角形も弾きます
+        targetGroups = targetGroups.filter(group => {
+            let distances = [];
+            for (let i = 0; i < group.length; i++) {
+                for (let j = i + 1; j < group.length; j++) {
+                    const c1 = this.game.getCastle(group[i]);
+                    const c2 = this.game.getCastle(group[j]);
+                    const px1 = c1.pixelX !== undefined ? c1.pixelX : (c1.x * 80 + 40);
+                    const py1 = c1.pixelY !== undefined ? c1.pixelY : (c1.y * 80 + 40);
+                    const px2 = c2.pixelX !== undefined ? c2.pixelX : (c2.x * 80 + 40);
+                    const py2 = c2.pixelY !== undefined ? c2.pixelY : (c2.y * 80 + 40);
+                    distances.push(Math.hypot(px1 - px2, py1 - py2));
+                }
+            }
+            const maxDist = Math.max(...distances);
+            const minDist = Math.min(...distances);
+            
+            // 一番長い道が、一番短い道の「1.8倍」以上あったらY字にしません
+            return maxDist <= minDist * 1.8;
+        });
+
+        // 【手動ルール】それでも絶対にY字にしたくない組み合わせがあれば、ここにIDを書きます（例："1,2,3"）
+        const exceptionGroups = [
+            // "1,2,3", 
+        ];
+        targetGroups = targetGroups.filter(group => {
+            const groupName = [...group].sort((a, b) => a - b).join(",");
+            return !exceptionGroups.includes(groupName);
+        });
+        // ==========================================
+        // ★追加ここまで
+        // ==========================================
 
         // ③ まとめて繋ぐための元の線は、後で描かないようにメモしておきます
         const skipEdges = new Set();
