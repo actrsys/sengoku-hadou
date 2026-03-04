@@ -270,9 +270,8 @@ class UIManager {
                 const newMarginLeft = parseFloat(this.mapEl.style.marginLeft || 0);
                 const newMarginTop = parseFloat(this.mapEl.style.marginTop || 0);
                 
-                // はみ出さないように、0より小さくならないようにするストッパーです！
-                sc.scrollLeft = Math.max(0, (logicalX * this.mapScale + newMarginLeft) - centerX);
-                sc.scrollTop = Math.max(0, (logicalY * this.mapScale + newMarginTop) - centerY);
+                sc.scrollLeft = (logicalX * this.mapScale + newMarginLeft) - centerX;
+                sc.scrollTop = (logicalY * this.mapScale + newMarginTop) - centerY;
             }
         });
         // =========================================================
@@ -1185,8 +1184,8 @@ class UIManager {
                 this.mapEl.style.marginTop = `${marginTop}px`;
                 
                 // transformによる見た目のサイズのズレを補正して、スクロール領域を確保します
-                this.mapEl.style.marginRight = `${Math.max(0, scaledW - mapW)}px`;
-                this.mapEl.style.marginBottom = `${Math.max(0, scaledH - mapH)}px`;
+                this.mapEl.style.marginRight = `${scaledW - mapW + marginLeft}px`;
+                this.mapEl.style.marginBottom = `${scaledH - mapH + marginTop}px`;
             }
         }
     }
