@@ -1556,123 +1556,7 @@ class UIManager {
         svg.style.pointerEvents = "none"; // マウスの邪魔をしないようにします
         svg.style.zIndex = "5"; // 地図（0）より手前、お城（10）より奥になるように「5」にします！
 
-        // ① どのお城とどのお城が繋がっているか、全体の関係図（リスト）を作ります
-        const adj = new Map();
-        this.game.castles.forEach(c => adj.set(c.id, new Set()));
-        this.game.castles.forEach(c1 => {
-            if (c1.adjacentCastleIds) {
-                c1.adjacentCastleIds.forEach(adjId => {
-                    if (adj.has(adjId)) {
-                        adj.get(c1.id).add(adjId);
-                        adj.get(adjId).add(c1.id); // お互いに繋がっているとメモします
-                    }
-                });
-            }
-        });
-
-        // ② ３つ以上のお城が互いに全て繋がっているグループ（最大派閥）を探す探索の魔法です！
-        let targetGroups = []; // ★ `const` から `let` に変えました！
-        const findCliques = (R, P, X) => {
-            if (P.length === 0 && X.length === 0) {
-                if (R.length >= 3) targetGroups.push([...R]); // 3つ以上のグループなら一旦候補に！
-                return;
-            }
-            const pCopy = [...P];
-            for (const v of pCopy) {
-                const neighbors = Array.from(adj.get(v));
-                findCliques(
-                    [...R, v],
-                    P.filter(n => neighbors.includes(n)),
-                    X.filter(n => neighbors.includes(n))
-                );
-                P.splice(P.indexOf(v), 1);
-                X.push(v);
-            }
-        };
-        const allNodes = Array.from(adj.keys());
-        findCliques([], allNodes, []); // 探索スタート！
-
-        // ==========================================
-        // ★ここから追加：「Y字にするとおかしくなるグループ」を自動で弾く魔法です！
-        // ==========================================
-        
-        // 【自動ルール1】他のY字グループと「道（2つのお城）」を共有していると「ひし形」になるので弾きます
-        const invalidGroups = new Set();
-        for (let i = 0; i < targetGroups.length; i++) {
-            for (let j = i + 1; j < targetGroups.length; j++) {
-                const g1 = targetGroups[i];
-                const g2 = targetGroups[j];
-                
-                // お互いのグループに共通しているお城の数を数えます
-                let commonCount = 0;
-                for (const id of g1) {
-                    if (g2.includes(id)) commonCount++;
-                }
-                
-                // 共通のお城が2つ以上（つまり道を共有している）なら、両方ともY字にするのをやめます！
-                if (commonCount >= 2) {
-                    invalidGroups.add(i);
-                    invalidGroups.add(j);
-                }
-            }
-        }
-        // ひし形になるグループをリストから消し去ります！
-        targetGroups = targetGroups.filter((_, index) => !invalidGroups.has(index));
-
-        // ★ ここにあった「距離を測って弾く自動ルール2」を完全に消し去りました！ ★
-
-        // 【手動ルール】それでも絶対にY字にしたくない組み合わせがあれば、ここにIDを書きます（例："1,2,3"）
-        const exceptionGroups = [
-            // "1,2,3", 
-        ];
-        targetGroups = targetGroups.filter(group => {
-            const groupName = [...group].sort((a, b) => a - b).join(",");
-            return !exceptionGroups.includes(groupName);
-        });
-        // ==========================================
-        // ★追加ここまで
-        // ==========================================
-
-        // ③ まとめて繋ぐための元の線は、後で描かないようにメモしておきます
-        const skipEdges = new Set();
-        targetGroups.forEach(group => {
-            for (let i = 0; i < group.length; i++) {
-                for (let j = i + 1; j < group.length; j++) {
-                    const id1 = group[i];
-                    const id2 = group[j];
-                    const pairKey = id1 < id2 ? `${id1}-${id2}` : `${id2}-${id1}`;
-                    skipEdges.add(pairKey);
-                }
-            }
-        });
-
-        // ④ グループごとに真ん中（中心点）を決めて、そこから放射状に道を描きます！
-        targetGroups.forEach(group => {
-            let sumX = 0, sumY = 0;
-            const pts = group.map(id => {
-                const c = this.game.getCastle(id);
-                const px = c.pixelX !== undefined ? c.pixelX : (c.x * 80 + 40);
-                const py = c.pixelY !== undefined ? c.pixelY : (c.y * 80 + 40);
-                sumX += px; sumY += py;
-                return { x: px, y: py };
-            });
-
-            // グループ全員のちょうど真ん中を計算します
-            const centerX = sumX / group.length;
-            const centerY = sumY / group.length;
-
-            // 真ん中から、それぞれのお城へ向かって直線を引きます
-            pts.forEach(pt => {
-                const path = document.createElementNS(svgNS, "path");
-                path.setAttribute("d", `M ${centerX} ${centerY} L ${pt.x} ${pt.y}`);
-                path.setAttribute("fill", "transparent");
-                path.setAttribute("stroke", "rgba(255, 250, 200, 0.7)");
-                path.setAttribute("stroke-width", "3");
-                svg.appendChild(path);
-            });
-        });
-
-        // ⑤ ここからは２つのお城を繋ぐカーブの道です
+        // 一度引いた道をメモしておく箱です（往復で2回線を引かないようにするため）
         const drawnLines = new Set();
         
         // ==========================================
@@ -1697,8 +1581,8 @@ class UIManager {
 
                     const pairKey = c1.id < adjId ? `${c1.id}-${adjId}` : `${adjId}-${c1.id}`;
 
-                    // まだ線を引いていなくて、かつ「まとめ繋ぎ」で使われていない道なら引きます！
-                    if (!drawnLines.has(pairKey) && !skipEdges.has(pairKey)) {
+                    // まだ線を引いていない道なら引きます！
+                    if (!drawnLines.has(pairKey)) {
                         drawnLines.add(pairKey);
 
                         const pos2X = c2.pixelX !== undefined ? c2.pixelX : (c2.x * 80 + 40);
@@ -1708,7 +1592,7 @@ class UIManager {
                         const dy = pos2Y - pos1Y;
                         const dist = Math.hypot(dx, dy);
 
-                        // ★ここを変更！ 0.1 を 0.05 に、0.01 を 0.005 にして、曲がり具合を半分にしました！
+                        // ★以前調整した「半分の曲がり具合」をそのまま残しています！
                         const curveSize = dist * (0.05 + ((c1.id * c2.id) % 10) * 0.005);
                         const dir = ((c1.id + c2.id) % 2 === 0) ? 1 : -1;
 
@@ -1717,7 +1601,7 @@ class UIManager {
 
                         const path = document.createElementNS(svgNS, "path");
 
-                        // ★ここから：自動または手動で「S字」か「直線」か「普通のカーブ」かを決めます！
+                        // 自動または手動で「S字」か「直線」か「普通のカーブ」かを決めます！
                         let lineType = "curve"; // 基本は普通のカーブ
                         
                         // IDの足し算が3で割り切れる時は、自動的にS字カーブにしてバリエーションを出します
@@ -1731,10 +1615,8 @@ class UIManager {
 
                         if (lineType === "s-curve") {
                             // 途中で曲がる「S字カーブ（三次ベジェ曲線）」
-                            // 1つ目の見えない手（1/3の地点）
                             const cp1X = pos1X + dx * 0.33 + nx * curveSize * dir;
                             const cp1Y = pos1Y + dy * 0.33 + ny * curveSize * dir;
-                            // 2つ目の見えない手（2/3の地点で、逆向きに膨らませます）
                             const cp2X = pos1X + dx * 0.67 + nx * curveSize * -dir; 
                             const cp2Y = pos1Y + dy * 0.67 + ny * curveSize * -dir; 
                             
@@ -1743,7 +1625,7 @@ class UIManager {
                             // まっすぐな直線
                             path.setAttribute("d", `M ${pos1X} ${pos1Y} L ${pos2X} ${pos2Y}`);
                         } else {
-                            // 今まで通りの「普通のカーブ（二次ベジェ曲線）」
+                            // 「普通のカーブ（二次ベジェ曲線）」
                             const midX = (pos1X + pos2X) / 2;
                             const midY = (pos1Y + pos2Y) / 2;
                             const cpX = midX + nx * curveSize * dir;
@@ -1753,7 +1635,7 @@ class UIManager {
                         }
 
                         path.setAttribute("fill", "transparent");
-                        path.setAttribute("stroke", "rgba(255, 250, 200, 0.7)");
+                        path.setAttribute("stroke", "rgba(255, 250, 200, 0.7)"); // 黄色っぽい白い線
                         path.setAttribute("stroke-width", "3");
                         svg.appendChild(path);
                     }
