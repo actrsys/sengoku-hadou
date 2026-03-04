@@ -251,40 +251,27 @@ class UIManager {
 
         window.addEventListener('resize', () => {
             if (this.hasInitializedMap && this.game && (this.game.phase === 'game' || this.game.phase === 'daimyo_select')) {
-                const sc = document.getElementById('map-scroll-container');
-                if (!sc) return;
-                
-                if (savedLogicalX === null) {
-                    const rect = sc.getBoundingClientRect();
-                    const centerX = rect.width / 2;
-                    const centerY = rect.height / 2;
-                    // ★ marginではなく「left」と「top」から読み取るように直しました！
-                    const currentLeft = parseFloat(this.mapEl.style.left || 0);
-                    const currentTop = parseFloat(this.mapEl.style.top || 0);
-
-                    savedLogicalX = (sc.scrollLeft + centerX - currentLeft) / this.mapScale;
-                    savedLogicalY = (sc.scrollTop + centerY - currentTop) / this.mapScale;
-                }
-
                 if (resizeTimer) clearTimeout(resizeTimer);
                 
                 resizeTimer = setTimeout(() => {
-                    this.fitMapToScreen();
-                    this.mapScale = this.zoomStages[this.zoomLevel];
-                    this.applyMapScale();
-                    
+                    // ★ 修正：今の中心位置を、倍率に関係ない「素の地図」の座標として覚える
+                    const sc = document.getElementById('map-scroll-container');
+                    if (!sc) return;
                     const rect = sc.getBoundingClientRect();
-                    const centerX = rect.width / 2;
-                    const centerY = rect.height / 2;
-                    // ★ ここも「left」と「top」から読み取ります！
+                    const currentLeft = parseFloat(this.mapEl.style.left || 0);
+                    const currentTop = parseFloat(this.mapEl.style.top || 0);
+                    
+                    const logX = (sc.scrollLeft + rect.width / 2 - currentLeft) / this.mapScale;
+                    const logY = (sc.scrollTop + rect.height / 2 - currentTop) / this.mapScale;
+
+                    // ★ 画面に合わせて倍率の限界（minScale）を計算し直す
+                    this.fitMapToScreen();
+                    
+                    // ★ 覚えた位置が中心に来るように、新しい倍率でスクロール位置を計算し直す
                     const newLeft = parseFloat(this.mapEl.style.left || 0);
                     const newTop = parseFloat(this.mapEl.style.top || 0);
-                    
-                    sc.scrollLeft = (savedLogicalX * this.mapScale + newLeft) - centerX;
-                    sc.scrollTop = (savedLogicalY * this.mapScale + newTop) - centerY;
-                    
-                    savedLogicalX = null;
-                    savedLogicalY = null;
+                    sc.scrollLeft = (logX * this.mapScale + newLeft) - rect.width / 2;
+                    sc.scrollTop = (logY * this.mapScale + newTop) - rect.height / 2;
                 }, 200); 
             }
         });
@@ -1261,6 +1248,7 @@ class UIManager {
         cx = cx !== null ? cx : rect.left + rect.width / 2;
         cy = cy !== null ? cy : rect.top + rect.height / 2;
         
+        // ★ 修正：マウスの位置から、画面全体のズレ（黒帯など）を引くようにします
         const clientX = cx - rect.left;
         const clientY = cy - rect.top;
 
@@ -1358,6 +1346,8 @@ class UIManager {
                     requestAnimationFrame(animate); 
                 } else {
                     this.mapScale = targetScale;
+                    // ★ 修正：チラつき防止のために、アニメーション用の魔法を一度リセットする
+                    this.mapEl.style.willChange = 'auto'; 
                     this.applyMapScale(); 
                     sc.scrollLeft = targetScrollLeft;
                     sc.scrollTop = targetScrollTop;
