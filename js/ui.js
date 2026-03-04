@@ -1199,9 +1199,10 @@ class UIManager {
                 this.mapEl.style.marginLeft = `${marginLeft}px`;
                 this.mapEl.style.marginTop = `${marginTop}px`;
                 
-                // ブラウザくんが賢くなったので、純粋な余白だけを設定します！
-                this.mapEl.style.marginRight = `${marginLeft}px`;
-                this.mapEl.style.marginBottom = `${marginTop}px`;
+                // ★元の「引き算」の魔法に戻します！
+                // 見た目が小さくなった分だけ、見えない床（余白）を削ってピッタリ合わせます
+                this.mapEl.style.marginRight = `${scaledW - mapW + marginLeft}px`;
+                this.mapEl.style.marginBottom = `${scaledH - mapH + marginTop}px`;
             }
         }
     }
