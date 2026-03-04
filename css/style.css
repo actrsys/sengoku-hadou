@@ -208,8 +208,15 @@ img {
 #map-scroll-container.grabbing { cursor: grabbing; }
 
 #map-container {
-    display: grid; gap: 10px; padding: 20px; 
-    /* ★変更：JSで完璧に計算してアニメーションさせるため、CSSのtransitionは消します！ */
+    /* ★ここを差し替え！：マス目（grid）の魔法を消して、背景画像を表示する魔法に変えます */
+    /* 【消す行】display: grid; gap: 10px; padding: 20px; */
+    
+    /* 【代わりの行】↓ */
+    position: relative; /* お城のシールを貼るための土台にします */
+    background-image: url('../data/images/map/japan_map.png'); /* 実際の日本地図の画像 */
+    background-size: 100% 100%; /* 画像のサイズをピッタリ合わせます */
+    background-repeat: no-repeat;
+    
     transform-origin: center center; margin: auto; flex: none; 
 }
 
@@ -303,14 +310,22 @@ img {
     background-color: transparent; /* 白い背景を透明にして、マップの景色になじませます */
     border: none;                  /* 四角い枠線を消します */
     box-shadow: none;              /* 四角い影を消します */
-    filter: drop-shadow(2px 2px 3px rgba(0,0,0,0.5)); /* お城の形に合わせてカッコいい影をつけます */
+    filter: drop-shadow(2px 2px 3px rgba(0,0,0,0.5)); 
     /* ★ここまで */
 
     border-radius: 4px;
     display: flex; flex-direction: column; justify-content: space-between;
     padding: 2px; 
     cursor: pointer; position: relative; user-select: none;
-    font-size: 0.75rem; grid-column: var(--c-x); grid-row: var(--c-y); z-index: 10;
+    font-size: 0.75rem;
+    
+    /* ★ここを差し替え！：マス目の指定を消して、自由な場所に置けるようにします！ */
+    /* 【消す行】grid-column: var(--c-x); grid-row: var(--c-y); z-index: 10; */
+    
+    /* 【代わりの行】↓ */
+    position: absolute; /* 自由な位置に置けるシールに変身！ */
+    transform: translate(-50%, -50%); /* 色の点が「お城のど真ん中」に来るようにズレを直します */
+    z-index: 10;
 }
 
 /* 選択された時なども、お城の形に合わせて光るように調整しました */
