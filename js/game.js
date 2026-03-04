@@ -877,10 +877,14 @@ class GameManager {
             this.ui.renderMap(); 
             this.ui.log(`【${castle.name}】命令を下してください`); 
             
-            const activeCastleEl = document.querySelector('.castle-card.active-turn');
-            if (activeCastleEl) {
-                activeCastleEl.scrollIntoView({ block: "center", inline: "center", behavior: "smooth" });
-            }
+            // 【消す行】
+            // const activeCastleEl = document.querySelector('.castle-card.active-turn');
+            // if (activeCastleEl) {
+            //     activeCastleEl.scrollIntoView({ block: "center", inline: "center", behavior: "smooth" });
+            // }
+
+            // 【代わりの行】↓
+            this.ui.scrollToActiveCastle(castle);
             
             this.ui.showTurnStartDialog(castle, () => {
                 this.ui.showControlPanel(castle); 

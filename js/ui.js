@@ -646,16 +646,22 @@ class UIManager {
                 
                 if (this.game.selectionMode) {
                     this.cancelMapSelection(false); 
-                    // ★変更：縦も横も真ん中（inline: "center"）になるように追加しました！
-                    const el = document.querySelector('.castle-card.active-turn'); 
-                    if(el) el.scrollIntoView({block:"center", inline: "center", behavior: "smooth"});
+                    // 【消す行】
+                // const el = document.querySelector('.castle-card.active-turn'); 
+                // if(el) el.scrollIntoView({block:"center", inline: "center", behavior: "smooth"});
+
+                // 【代わりの行】↓
+                this.scrollToActiveCastle();
                 } else {
                     const myCastle = this.game.getCurrentTurnCastle();
                     if (myCastle) {
                         this.showControlPanel(myCastle);
-                        // ★変更：縦も横も真ん中（inline: "center"）になるように追加しました！
-                        const el = document.querySelector('.castle-card.active-turn'); 
-                        if(el) el.scrollIntoView({block:"center", inline: "center", behavior: "smooth"});
+                        // 【消す行】
+	                // const el = document.querySelector('.castle-card.active-turn'); 
+	                // if(el) el.scrollIntoView({block:"center", inline: "center", behavior: "smooth"});
+
+	                // 【代わりの行】↓
+	                this.scrollToActiveCastle();
                     }
                 }
             };
@@ -1094,8 +1100,8 @@ class UIManager {
         const isPC = document.body.classList.contains('is-pc');
         const config = isPC ? MAP_ZOOM_CONFIG.PC : MAP_ZOOM_CONFIG.MOBILE;
 
-        // ★最小サイズは「全体が収まるサイズ」を計算して、設定の余白分をかけます
-        let minScale = Math.min(scaleX, scaleY) * config.minMargin; 
+        // ★修正: スマホの時は画面に隙間ができないように大きい方（Math.max）に合わせます
+        let minScale = isPC ? Math.min(scaleX, scaleY) * config.minMargin : Math.max(scaleX, scaleY) * config.minMargin;
 
         // ★設定からMIN（計算値）、MID、MAXの3段階を用意します
         this.zoomStages = [
@@ -1118,54 +1124,39 @@ class UIManager {
 
     applyMapScale() {
         if(this.mapEl) {
+            this.mapEl.style.transformOrigin = '0 0';
             this.mapEl.style.transform = `scale(${this.mapScale})`;
             
-            // ★ スクロール領域のはみ出し（透明な余白）を消し去る魔法
             const mapW = this.mapEl.offsetWidth;
             const mapH = this.mapEl.offsetHeight;
             const sc = document.getElementById('map-scroll-container');
             
             if (mapW && mapH && sc) {
-                // transform: scale によって出来てしまう余白のサイズを計算
-                const diffX = (mapW - mapW * this.mapScale) / 2;
-                const diffY = (mapH - mapH * this.mapScale) / 2;
-                
-                // スクロールエリアの大きさ（余白をなくしたのでそのままの広さ）
-                const scW = sc.clientWidth; 
-                const scH = sc.clientHeight;
-                
-                // 実際の見た目のマップサイズ
                 const scaledW = mapW * this.mapScale;
                 const scaledH = mapH * this.mapScale;
                 
-                // 基本はマイナスのマージンで余白を相殺
-                let marginX = -diffX;
-                let marginY = -diffY;
+                let marginLeft = 0;
+                let marginTop = 0;
                 
-                // もし画面よりマップの方が小さければ、中央に寄せるためにプラスの余白を足す
-                if (scaledW < scW) {
-                    marginX += (scW - scaledW) / 2;
-                }
-                if (scaledH < scH) {
-                    marginY += (scH - scaledH) / 2;
-                }
+                // スケールした結果が画面より小さい場合のみ、中央に寄せるための余白を追加します
+                if (scaledW < sc.clientWidth) marginLeft = (sc.clientWidth - scaledW) / 2;
+                if (scaledH < sc.clientHeight) marginTop = (sc.clientHeight - scaledH) / 2;
                 
-                this.mapEl.style.margin = `${marginY}px ${marginX}px`;
+                this.mapEl.style.marginLeft = `${marginLeft}px`;
+                this.mapEl.style.marginTop = `${marginTop}px`;
+                
+                // transformによる見た目のサイズのズレを補正して、スクロール領域を確保します
+                this.mapEl.style.marginRight = `${scaledW - mapW + marginLeft}px`;
+                this.mapEl.style.marginBottom = `${scaledH - mapH + marginTop}px`;
             }
         }
     }
     
     changeMapZoom(direction, cx = null, cy = null) {
         const sc = document.getElementById('map-scroll-container');
-        const isPC = document.body.classList.contains('is-pc'); 
-
-        // アニメーション中は次のズームを無視して、ガタガタするのを防ぎます
         if (this.isAnimatingZoom) return;
 
         let oldScale = this.mapScale;
-        let targetScale = oldScale;
-
-        // ★設定で作った3段階のサイズを読み込みます
         const scales = this.zoomStages; 
 
         let closestIdx = 0;
@@ -1179,177 +1170,61 @@ class UIManager {
         if (nextIdx < 0) nextIdx = 0;
         if (nextIdx >= scales.length) nextIdx = scales.length - 1;
 
-        targetScale = scales[nextIdx];
+        let targetScale = scales[nextIdx];
         this.zoomLevel = nextIdx;
 
-        // 既に最大（または最小）の時に、同じ方向に回しても何もしない
         if (Math.abs(targetScale - oldScale) < 0.01) return;
 
-        const gameScreen = document.getElementById('game-screen');
-        const globalZoom = (gameScreen && gameScreen.style.zoom) ? parseFloat(gameScreen.style.zoom) : 1;
-
-        // ==========================================
-        // ★ パソコン版：角の引っかかりを完全に無くした【完全体】の魔法！
-        // ==========================================
-        if (isPC && sc && cx !== null && cy !== null) {
-            this.isAnimatingZoom = true;
-            sc.style.overflow = 'hidden'; 
-            
-            const rect = sc.getBoundingClientRect();
-            
-            const mouseX = (cx - rect.left) / globalZoom;
-            const mouseY = (cy - rect.top) / globalZoom;
-
-            const mapW = this.mapEl.offsetWidth;
-            const mapH = this.mapEl.offsetHeight;
-            const scW = sc.clientWidth; 
-            const scH = sc.clientHeight;
-
-            const getMapMargin = (scale) => {
-                const diffX = (mapW - mapW * scale) / 2;
-                const diffY = (mapH - mapH * scale) / 2;
-                let marginX = -diffX;
-                let marginY = -diffY;
-                if (mapW * scale < scW) marginX += (scW - mapW * scale) / 2;
-                if (mapH * scale < scH) marginY += (scH - mapH * scale) / 2;
-                return { x: marginX, y: marginY };
-            };
-
-            const getMapOffset = (scale) => {
-                let offsetX = 0;
-                let offsetY = 0;
-                if (mapW * scale < scW) offsetX += (scW - mapW * scale) / 2;
-                if (mapH * scale < scH) offsetY += (scH - mapH * scale) / 2;
-                return { x: offsetX, y: offsetY };
-            };
-
-            const oldOffset = getMapOffset(oldScale);
-            const realX = (sc.scrollLeft + mouseX - oldOffset.x) / oldScale;
-            const realY = (sc.scrollTop + mouseY - oldOffset.y) / oldScale;
-
-            const targetOffset = getMapOffset(targetScale);
-            const targetCanvasX = realX * targetScale + targetOffset.x;
-            const targetCanvasY = realY * targetScale + targetOffset.y;
-
-            let targetScrollLeft = targetCanvasX - mouseX;
-            let targetScrollTop = targetCanvasY - mouseY;
-
-            // ★ 出発前に「壁の限界」を計算し、ゴール地点を確定させます
-            let maxScrollLeft = Math.max(0, mapW * targetScale - scW);
-            let maxScrollTop  = Math.max(0, mapH * targetScale - scH);
-
-            if (targetScrollLeft < 0) targetScrollLeft = 0;
-            if (targetScrollTop < 0) targetScrollTop = 0;
-            if (targetScrollLeft > maxScrollLeft) targetScrollLeft = maxScrollLeft;
-            if (targetScrollTop > maxScrollTop) targetScrollTop = maxScrollTop;
-
-            if (mapW * targetScale <= scW) targetScrollLeft = 0;
-            if (mapH * targetScale <= scH) targetScrollTop = 0;
-
-            // スタートとゴールの数値を準備
-            const startScrollLeft = sc.scrollLeft;
-            const startScrollTop = sc.scrollTop;
-            const startMargin = getMapMargin(oldScale);
-            const targetMargin = getMapMargin(targetScale); // ゴールのクッションも最初に計算！
-            
-            const duration = 200; 
-            const startTime = performance.now();
-
-            const animate = (currentTime) => {
-                let progress = (currentTime - startTime) / duration;
-                if (progress > 1) progress = 1;
-                
-                const easeOut = 1 - Math.pow(1 - progress, 3);
-                
-                const currentScale = oldScale + (targetScale - oldScale) * easeOut;
-                
-                // ★ アニメーション中は「スタートからゴールへ向かうだけ」！
-                // 途中で壁のチェック（急ブレーキ）をしないから、引っかかりゼロでスーッと動きます。
-                const currentMarginX = startMargin.x + (targetMargin.x - startMargin.x) * easeOut;
-                const currentMarginY = startMargin.y + (targetMargin.y - startMargin.y) * easeOut;
-                
-                const currentScrollLeft = startScrollLeft + (targetScrollLeft - startScrollLeft) * easeOut;
-                const currentScrollTop = startScrollTop + (targetScrollTop - startScrollTop) * easeOut;
-                
-                const deltaX = (currentMarginX - startMargin.x) - (currentScrollLeft - startScrollLeft);
-                const deltaY = (currentMarginY - startMargin.y) - (currentScrollTop - startScrollTop);
-                
-                this.mapEl.style.transform = `translate(${deltaX}px, ${deltaY}px) scale(${currentScale})`;
-
-                if (progress < 1) {
-                    requestAnimationFrame(animate); 
-                } else {
-                    this.mapScale = targetScale;
-                    this.applyMapScale(); 
-                    sc.scrollLeft = targetScrollLeft;
-                    sc.scrollTop = targetScrollTop;
-                    
-                    sc.style.overflow = 'auto'; 
-                    this.updateZoomButtons();
-                    this.isAnimatingZoom = false;
-                }
-            };
-            requestAnimationFrame(animate); 
-            return;
-        }
-
-        // ==========================================
-        // ★ スマホ版（またはマウス位置が取れなかった時）：一瞬でズーム
-        // ==========================================
-        this.mapScale = targetScale;
+        // ★複雑なアニメーションを廃止し、座標を正確に合わせて一瞬でズームさせます（チラつき防止！）
+        const rect = sc.getBoundingClientRect();
+        cx = cx !== null ? cx : rect.left + rect.width / 2;
+        cy = cy !== null ? cy : rect.top + rect.height / 2;
         
-        if (sc && cx !== null && cy !== null) {
-            const rect = sc.getBoundingClientRect();
-            
-            const mouseX = (cx - rect.left) / globalZoom;
-            const mouseY = (cy - rect.top) / globalZoom;
-            
-            const mapW = this.mapEl.offsetWidth;
-            const mapH = this.mapEl.offsetHeight;
-            const scW = sc.clientWidth; 
-            const scH = sc.clientHeight;
-            
-            const getMapOffset = (scale) => {
-                let offsetX = 0;
-                let offsetY = 0;
-                if (mapW * scale < scW) offsetX += (scW - mapW * scale) / 2;
-                if (mapH * scale < scH) offsetY += (scH - mapH * scale) / 2;
-                return { x: offsetX, y: offsetY };
-            };
-            
-            const oldOffset = getMapOffset(oldScale);
-            const realX = (sc.scrollLeft + mouseX - oldOffset.x) / oldScale;
-            const realY = (sc.scrollTop + mouseY - oldOffset.y) / oldScale;
-            
-            this.applyMapScale(); 
-            
-            const targetOffset = getMapOffset(targetScale);
-            const targetCanvasX = realX * targetScale + targetOffset.x;
-            const targetCanvasY = realY * targetScale + targetOffset.y;
-            
-            let targetScrollLeft = targetCanvasX - mouseX;
-            let targetScrollTop = targetCanvasY - mouseY;
+        const clientX = cx - rect.left;
+        const clientY = cy - rect.top;
 
-            let maxScrollLeft = Math.max(0, mapW * targetScale - scW);
-            let maxScrollTop  = Math.max(0, mapH * targetScale - scH);
+        const currentMarginLeft = parseFloat(this.mapEl.style.marginLeft || 0);
+        const currentMarginTop = parseFloat(this.mapEl.style.marginTop || 0);
 
-            if (targetScrollLeft < 0) targetScrollLeft = 0;
-            if (targetScrollTop < 0) targetScrollTop = 0;
-            if (targetScrollLeft > maxScrollLeft) targetScrollLeft = maxScrollLeft;
-            if (targetScrollTop > maxScrollTop) targetScrollTop = maxScrollTop;
+        // ズーム中心の論理座標（ピクセルベース）
+        const logicalX = (sc.scrollLeft + clientX - currentMarginLeft) / oldScale;
+        const logicalY = (sc.scrollTop + clientY - currentMarginTop) / oldScale;
 
-            if (mapW * targetScale <= scW) targetScrollLeft = 0;
-            if (mapH * targetScale <= scH) targetScrollTop = 0;
+        this.mapScale = targetScale;
+        this.applyMapScale();
 
-            sc.scrollLeft = targetScrollLeft;
-            sc.scrollTop = targetScrollTop;
-        } else {
-            this.applyMapScale();
-        }
+        const newMarginLeft = parseFloat(this.mapEl.style.marginLeft || 0);
+        const newMarginTop = parseFloat(this.mapEl.style.marginTop || 0);
+
+        // 新しいスケールでのスクロール位置を計算
+        let targetScrollLeft = (logicalX * targetScale + newMarginLeft) - clientX;
+        let targetScrollTop = (logicalY * targetScale + newMarginTop) - clientY;
+
+        sc.scrollLeft = targetScrollLeft;
+        sc.scrollTop = targetScrollTop;
         
         this.updateZoomButtons();
     }
-
+    
+    // ★追加：絶対座標になったお城を画面の中央に捉えるための魔法
+    scrollToActiveCastle(castle = null) {
+        const targetCastle = castle || this.currentCastle || this.game.getCurrentTurnCastle();
+        const sc = document.getElementById('map-scroll-container');
+        if (!sc || !targetCastle) return;
+        
+        const posX = targetCastle.pixelX !== undefined ? targetCastle.pixelX : (targetCastle.x * 80 + 40);
+        const posY = targetCastle.pixelY !== undefined ? targetCastle.pixelY : (targetCastle.y * 80 + 40);
+        
+        const scaledX = posX * this.mapScale + parseFloat(this.mapEl.style.marginLeft || 0);
+        const scaledY = posY * this.mapScale + parseFloat(this.mapEl.style.marginTop || 0);
+        
+        sc.scrollTo({
+            left: scaledX - sc.clientWidth / 2,
+            top: scaledY - sc.clientHeight / 2,
+            behavior: 'smooth'
+        });
+    }
+    
     updateZoomButtons() {
         if (!this.mapZoomInBtn || !this.mapZoomOutBtn) return;
         
@@ -1636,9 +1511,12 @@ class UIManager {
                 if(this.game.isProcessingAI) return;
                 const myCastle = this.game.getCurrentTurnCastle();
                 this.showControlPanel(myCastle);
-                // ★変更：現在ターンの自分の城を探して、縦も横も真ん中に持ってくるように直しました！
-                const el = document.querySelector('.castle-card.active-turn'); 
-                if(el) el.scrollIntoView({block:"center", inline: "center", behavior: "smooth"});
+            // 【消す行】
+            // const el = document.querySelector('.castle-card.active-turn'); 
+            // if(el) el.scrollIntoView({block:"center", inline: "center", behavior: "smooth"});
+
+            // 【代わりの行】↓
+            this.scrollToActiveCastle(myCastle);
             };
             area.appendChild(btn);
         });
