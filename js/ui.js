@@ -1691,8 +1691,19 @@ class UIManager {
             });
         });
 
-        // ⑤ ここからは今まで通りの、２つのお城を繋ぐカーブの道です
+        // ⑤ ここからは２つのお城を繋ぐカーブの道です
         const drawnLines = new Set();
+        
+        // ==========================================
+        // 【手動ルール】どうしても線の形が気に入らない場所は、ここで名指しで指定できます！
+        // 必ず「小さい数字-大きい数字」の順で書いてください（例："3-5"）
+        // ==========================================
+        const forceSCurve = [
+            // "1-5", // ここに書いた道は、強制的に「S字カーブ」になります
+        ];
+        const forceStraight = [
+            // "2-8", // ここに書いた道は、強制的に「真っ直ぐな直線」になります
+        ];
 
         this.game.castles.forEach(c1 => {
             const pos1X = c1.pixelX !== undefined ? c1.pixelX : (c1.x * 80 + 40);
@@ -1719,17 +1730,46 @@ class UIManager {
                         const curveSize = dist * (0.1 + ((c1.id * c2.id) % 10) * 0.01);
                         const dir = ((c1.id + c2.id) % 2 === 0) ? 1 : -1;
 
-                        const midX = (pos1X + pos2X) / 2;
-                        const midY = (pos1Y + pos2Y) / 2;
-
                         const nx = -dy / dist;
                         const ny = dx / dist;
 
-                        const cpX = midX + nx * curveSize * dir;
-                        const cpY = midY + ny * curveSize * dir;
-
                         const path = document.createElementNS(svgNS, "path");
-                        path.setAttribute("d", `M ${pos1X} ${pos1Y} Q ${cpX} ${cpY} ${pos2X} ${pos2Y}`);
+
+                        // ★ここから：自動または手動で「S字」か「直線」か「普通のカーブ」かを決めます！
+                        let lineType = "curve"; // 基本は普通のカーブ
+                        
+                        // IDの足し算が3で割り切れる時は、自動的にS字カーブにしてバリエーションを出します
+                        if (((c1.id + c2.id) % 3 === 0)) {
+                            lineType = "s-curve";
+                        }
+                        
+                        // 手動ルールに書かれている場合は、それを最優先します！
+                        if (forceSCurve.includes(pairKey)) lineType = "s-curve";
+                        if (forceStraight.includes(pairKey)) lineType = "straight";
+
+                        if (lineType === "s-curve") {
+                            // 途中で曲がる「S字カーブ（三次ベジェ曲線）」
+                            // 1つ目の見えない手（1/3の地点）
+                            const cp1X = pos1X + dx * 0.33 + nx * curveSize * dir;
+                            const cp1Y = pos1Y + dy * 0.33 + ny * curveSize * dir;
+                            // 2つ目の見えない手（2/3の地点で、逆向きに膨らませます）
+                            const cp2X = pos1X + dx * 0.67 + nx * curveSize * -dir; 
+                            const cp2Y = pos1Y + dy * 0.67 + ny * curveSize * -dir; 
+                            
+                            path.setAttribute("d", `M ${pos1X} ${pos1Y} C ${cp1X} ${cp1Y}, ${cp2X} ${cp2Y}, ${pos2X} ${pos2Y}`);
+                        } else if (lineType === "straight") {
+                            // まっすぐな直線
+                            path.setAttribute("d", `M ${pos1X} ${pos1Y} L ${pos2X} ${pos2Y}`);
+                        } else {
+                            // 今まで通りの「普通のカーブ（二次ベジェ曲線）」
+                            const midX = (pos1X + pos2X) / 2;
+                            const midY = (pos1Y + pos2Y) / 2;
+                            const cpX = midX + nx * curveSize * dir;
+                            const cpY = midY + ny * curveSize * dir;
+                            
+                            path.setAttribute("d", `M ${pos1X} ${pos1Y} Q ${cpX} ${cpY} ${pos2X} ${pos2Y}`);
+                        }
+
                         path.setAttribute("fill", "transparent");
                         path.setAttribute("stroke", "rgba(255, 250, 200, 0.7)");
                         path.setAttribute("stroke-width", "3");
