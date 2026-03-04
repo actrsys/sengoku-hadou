@@ -1051,11 +1051,7 @@ class UIManager {
         if (startBtn) {
             startBtn.onclick = () => {
                 if (window.AudioManager) {
-                    window.AudioManager.playBGM(
-                        'SC_ex_Town2_Fortress.ogg', 
-                        36603 / 44100,                     // スタート地点：LOOPSTART ÷ Hz
-                        (36603 + 5733088) / 44100          // ゴール地点：(LOOPSTART ＋ LOOPLENGTH) ÷ Hz
-                    );
+                    window.AudioManager.playBGM('SC_ex_Town2_Fortress.ogg');
                 }
 
                 this.daimyoConfirmModal.classList.add('hidden');

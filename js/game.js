@@ -961,13 +961,7 @@ class GameManager {
 
                 // ★ ここから追加！ セーブデータを読み込んだ瞬間にBGMを切り替えます
                 if (window.AudioManager) {
-                    // 第1引数：ファイル名
-                    // 第2引数：ループ開始位置（秒）
-                    window.AudioManager.playBGM(
-                        'SC_ex_Town2_Fortress.ogg', 
-                        36603 / 44100,                     // スタート地点：LOOPSTART ÷ Hz
-                        (36603 + 5733088) / 44100          // ゴール地点：(LOOPSTART ＋ LOOPLENGTH) ÷ Hz
-                    );
+                    window.AudioManager.playBGM('SC_ex_Town2_Fortress.ogg');
                 }
                 // ★ ここまで追加
 
