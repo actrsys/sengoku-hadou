@@ -1213,8 +1213,9 @@ class UIManager {
                 spacer.style.left = '0px';
                 spacer.style.top = '0px';
                 // ★余白を「両側」に足すことで、無限スクロールを完全に封じ込めます！
-                spacer.style.width = `${scaledW + marginLeft * 2}px`;
-                spacer.style.height = `${scaledH + marginTop * 2}px`;
+                // （端数を切り捨てて、スクロールバーの迷いを断ち切ります）
+                spacer.style.width = `${Math.floor(scaledW + marginLeft * 2)}px`;
+                spacer.style.height = `${Math.floor(scaledH + marginTop * 2)}px`;
             }
         }
     }
@@ -1258,24 +1259,21 @@ class UIManager {
         const scW = sc.clientWidth; 
         const scH = sc.clientHeight;
 
-        // ★ 今の画像地図に合わせた余白（マージン）の計算式です
-        const getMargin = (scale) => {
-            let ml = 0, mt = 0;
-            if (mapW * scale < scW) ml = (scW - mapW * scale) / 2;
-            if (mapH * scale < scH) mt = (scH - mapH * scale) / 2;
-            return { x: ml, y: mt };
-        };
+        // ★ 修正：開始時の場所は、予想ではなく「今の実際の見た目」から正確に読み取ります！
+        const oldMarginX = parseFloat(this.mapEl.style.left || 0);
+        const oldMarginY = parseFloat(this.mapEl.style.top || 0);
 
-        const oldMargin = getMargin(oldScale);
-        const targetMargin = getMargin(targetScale);
+        let targetMarginX = 0, targetMarginY = 0;
+        if (mapW * targetScale < scW) targetMarginX = (scW - mapW * targetScale) / 2;
+        if (mapH * targetScale < scH) targetMarginY = (scH - mapH * targetScale) / 2;
 
         // ズーム中心の場所（論理座標）を計算
-        const logicalX = (sc.scrollLeft + clientX - oldMargin.x) / oldScale;
-        const logicalY = (sc.scrollTop + clientY - oldMargin.y) / oldScale;
+        const logicalX = (sc.scrollLeft + clientX - oldMarginX) / oldScale;
+        const logicalY = (sc.scrollTop + clientY - oldMarginY) / oldScale;
 
         // 新しいスケールでのスクロールのゴール地点を計算
-        let targetScrollLeft = (logicalX * targetScale + targetMargin.x) - clientX;
-        let targetScrollTop = (logicalY * targetScale + targetMargin.y) - clientY;
+        let targetScrollLeft = (logicalX * targetScale + targetMarginX) - clientX;
+        let targetScrollTop = (logicalY * targetScale + targetMarginY) - clientY;
 
         // 壁の限界を設定（はみ出し防止）
         let maxScrollLeft = Math.max(0, mapW * targetScale - scW);
@@ -1301,6 +1299,10 @@ class UIManager {
             const duration = 200; 
             const startTime = performance.now();
 
+            // ★追加：アニメーションが始まる前に「１回だけ」魔法をかけて、一瞬消えるのを防ぎます！
+            this.mapEl.style.willChange = 'transform, left, top';
+            this.mapEl.style.backfaceVisibility = 'hidden';
+
             const animate = (currentTime) => {
                 let progress = (currentTime - startTime) / duration;
                 if (progress > 1) progress = 1;
@@ -1308,15 +1310,11 @@ class UIManager {
                 const easeOut = 1 - Math.pow(1 - progress, 3);
                 const currentScale = oldScale + (targetScale - oldScale) * easeOut;
                 
-                const currentMarginX = oldMargin.x + (targetMargin.x - oldMargin.x) * easeOut;
-                const currentMarginY = oldMargin.y + (targetMargin.y - oldMargin.y) * easeOut;
+                const currentMarginX = oldMarginX + (targetMarginX - oldMarginX) * easeOut;
+                const currentMarginY = oldMarginY + (targetMarginY - oldMarginY) * easeOut;
                 
                 const currentScrollLeft = startScrollLeft + (targetScrollLeft - startScrollLeft) * easeOut;
                 const currentScrollTop = startScrollTop + (targetScrollTop - startScrollTop) * easeOut;
-                
-                // 画像のチラつき防止
-                this.mapEl.style.willChange = 'transform, left, top';
-                this.mapEl.style.backfaceVisibility = 'hidden';
 
                 // 1. 先に透明な「つっかえ棒」のサイズを更新
                 let spacer = document.getElementById('map-spacer');
@@ -1328,8 +1326,9 @@ class UIManager {
                     sc.appendChild(spacer);
                     sc.style.position = 'relative';
                 }
-                spacer.style.width = `${mapW * currentScale + currentMarginX * 2}px`;
-                spacer.style.height = `${mapH * currentScale + currentMarginY * 2}px`;
+                // ★追加：ここでも端数を切り捨てて、アニメーション中のめちゃくちゃバグを防ぎます！
+                spacer.style.width = `${Math.floor(mapW * currentScale + currentMarginX * 2)}px`;
+                spacer.style.height = `${Math.floor(mapH * currentScale + currentMarginY * 2)}px`;
 
                 // 2. マップ自体の見た目を更新（absoluteにしてleftとtopを動かします）
                 this.mapEl.style.position = 'absolute';
