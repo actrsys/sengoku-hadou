@@ -1668,13 +1668,17 @@ class UIManager {
             if (c.isDone) el.classList.add('done');
             const castellan = this.game.getBusho(c.castellanId); const clanData = this.game.clans.find(cl => cl.id === c.ownerClan);
             
-            const isVisible = isDaimyoSelect || this.game.isCastleVisible(c);
-            
-            const soldierText = isVisible ? c.soldiers : "不明"; 
             const castellanName = castellan ? castellan.name : '-';            
             
-            el.innerHTML = `<div class="card-header"><h3>${c.name}</h3></div><div class="card-owner">${clanData ? clanData.name : "中立"}</div><div class="param-grid"><div class="param-item"><span>城主</span> <strong>${castellanName}</strong></div><div class="param-item"><span>兵数</span> ${soldierText}</div></div>`;
-            if(clanData) el.style.borderTop = `5px solid ${clanData.color}`;
+            // 普段は隠しておき、ホバーした時だけ左寄せで出す情報箱を作ります！
+            // 兵数や「城主」という文字は削ってスッキリさせました。
+            el.innerHTML = `
+                <div class="hover-info">
+                    <div class="info-line name">${c.name}</div>
+                    <div class="info-line">${clanData ? clanData.name : "中立"}</div>
+                    <div class="info-line">${castellanName}</div>
+                </div>
+            `;
             
             if (isDaimyoSelect) {
                  el.style.cursor = 'pointer';
