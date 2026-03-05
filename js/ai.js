@@ -59,6 +59,74 @@ class AIEngine {
                 return; 
             }
             
+            // ★追加：大名のお引越し（特殊な移動処理）の魔法！
+            // 自分がお殿様（大名）で、性格が「好戦的（aggressive）」ではない場合だけ発動します
+            if (castellan.isDaimyo && castellan.personality !== 'aggressive') {
+                // 道が繋がっている自分の城をぜんぶ探します
+                const myClanCastles = this.game.castles.filter(c => 
+                    c.ownerClan === castle.ownerClan && 
+                    GameSystem.isReachable(this.game, castle, c, castle.ownerClan)
+                );
+                
+                // もし城が2つ以上あるなら、引っ越しを考えます
+                if (myClanCastles.length > 1) {
+                    // 城壁（maxDefense）が高い順番に並べ替えて、一番固い城を見つけます！
+                    myClanCastles.sort((a, b) => b.maxDefense - a.maxDefense);
+                    const bestCastle = myClanCastles[0];
+                    
+                    // 今いる城が「一番固い城」じゃなかったら、そこへ引っ越します！
+                    if (bestCastle.id !== castle.id) {
+                        // まず、今いる城と引っ越し先の城の荷物を全部「合体」させます
+                        const totalGold = castle.gold + bestCastle.gold;
+                        const totalRice = castle.rice + bestCastle.rice;
+                        const totalSoldiers = castle.soldiers + bestCastle.soldiers;
+                        const totalHorses = (castle.horses || 0) + (bestCastle.horses || 0);
+                        const totalGuns = (castle.guns || 0) + (bestCastle.guns || 0);
+
+                        // 訓練度と士気も、兵士の数に合わせて平均を計算します
+                        const avgTraining = Math.floor(((castle.training * castle.soldiers) + (bestCastle.training * bestCastle.soldiers)) / Math.max(1, totalSoldiers));
+                        const avgMorale = Math.floor(((castle.morale * castle.soldiers) + (bestCastle.morale * bestCastle.soldiers)) / Math.max(1, totalSoldiers));
+
+                        // 合体させた荷物の「6割」を引っ越し先に、残り「4割」を今いる城に分けます
+                        bestCastle.gold = Math.min(99999, Math.ceil(totalGold * 0.6));
+                        castle.gold = totalGold - bestCastle.gold;
+                        
+                        bestCastle.rice = Math.min(99999, Math.ceil(totalRice * 0.6));
+                        castle.rice = totalRice - bestCastle.rice;
+                        
+                        bestCastle.soldiers = Math.min(99999, Math.ceil(totalSoldiers * 0.6));
+                        castle.soldiers = totalSoldiers - bestCastle.soldiers;
+                        
+                        bestCastle.horses = Math.min(99999, Math.ceil(totalHorses * 0.6));
+                        castle.horses = totalHorses - bestCastle.horses;
+                        
+                        bestCastle.guns = Math.min(99999, Math.ceil(totalGuns * 0.6));
+                        castle.guns = totalGuns - bestCastle.guns;
+
+                        castle.training = avgTraining;
+                        bestCastle.training = avgTraining;
+                        castle.morale = avgMorale;
+                        bestCastle.morale = avgMorale;
+
+                        // 荷物を運んだら、最後にお殿様（大名）自身が引っ越します！
+                        if (this.game.factionSystem && this.game.factionSystem.handleMove) {
+                            this.game.factionSystem.handleMove(castellan, castle.id, bestCastle.id);
+                        }
+                        castle.samuraiIds = castle.samuraiIds.filter(id => id !== castellan.id);
+                        bestCastle.samuraiIds.push(castellan.id);
+                        castellan.castleId = bestCastle.id;
+                        castellan.isActionDone = true;
+                        
+                        this.game.updateCastleLord(castle);
+                        this.game.updateCastleLord(bestCastle);
+                        
+                        // お引越しをしたので、このお城のターンはおしまいです！
+                        this.game.finishTurn();
+                        return;
+                    }
+                }
+            }
+            
             const mods = this.getDifficultyMods();
             const smartness = this.getAISmartness(castellan.intelligence);
 
@@ -147,7 +215,7 @@ class AIEngine {
         if (sendSoldiers <= 0) return null;
         
         // 兵糧のチェック (連れて行く兵士数の1.5倍)
-        const requiredRice = sendSoldiers * 1.5;
+        const requiredRice = Math.floor(sendSoldiers * 1.5);
         if (myCastle.rice < requiredRice) return null;
 
         // --- 修正後：正確な見積もりと戦力比の計算 ---
