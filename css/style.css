@@ -1771,3 +1771,84 @@ body.is-pc #daimyo-confirm-modal .modal-content {
     flex-direction: column;
     justify-content: center; /* 中身を縦の真ん中に */
 }
+/* =========================================================
+   ★ スマホ版：大名選択時の専用ボトムバーと、マップ領域の魔法
+   ========================================================= */
+body:not(.is-pc).daimyo-select-mode #map-wrapper {
+    /* マップの下をスパッと切り取って、ボトムバーの場所を確保します！ */
+    height: calc(100% - 140px) !important;
+    flex: none !important;
+}
+
+body:not(.is-pc).daimyo-select-mode #daimyo-confirm-modal {
+    /* いつもの「画面全体を覆う黒いカバー」をやめて、下部に固定します */
+    position: absolute !important;
+    top: auto !important;
+    bottom: 0 !important;
+    left: 0 !important;
+    width: 100% !important;
+    height: 140px !important;
+    background: #fdfdfd !important; /* 背景を白にしてしっかり見せます */
+    border-top: 3px solid #333;
+    pointer-events: auto !important; /* タップできるようにします */
+    display: flex !important;
+    flex-direction: column !important;
+    z-index: 1000 !important;
+    align-items: center !important;
+}
+
+body:not(.is-pc).daimyo-select-mode #daimyo-confirm-modal .modal-content {
+    /* ボトムバーの中の箱の設定です。枠線などを消してスッキリさせます */
+    background: transparent !important;
+    box-shadow: none !important;
+    border: none !important;
+    padding: 10px 15px !important;
+    height: 100% !important;
+    display: flex !important;
+    flex-direction: column !important;
+    justify-content: space-between !important;
+}
+
+/* ★顔とステータスを横に並べるコンパクト魔法 */
+.daimyo-confirm-compact {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+    width: 100%;
+}
+
+/* 顔画像のサイズを少し小さくします */
+.daimyo-confirm-compact .daimyo-confirm-face {
+    width: 60px !important;
+    height: 60px !important;
+    margin: 0 !important;
+    border-radius: 5px;
+    border: 2px solid #555;
+}
+
+/* 文字を左寄せにして整えます */
+.daimyo-confirm-info {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    text-align: left;
+}
+
+/* ボタンを横に並べて小さめにします */
+body:not(.is-pc).daimyo-select-mode #daimyo-confirm-modal .modal-footer {
+    margin-top: auto !important;
+    padding-top: 5px !important;
+    border-top: none !important;
+    display: flex !important;
+    justify-content: center !important;
+    gap: 15px !important;
+    width: 100%;
+}
+
+/* ボタンを少し丸くして可愛く押しやすくします */
+body:not(.is-pc).daimyo-select-mode #daimyo-confirm-modal .btn-primary,
+body:not(.is-pc).daimyo-select-mode #daimyo-confirm-modal .btn-secondary {
+    padding: 8px 25px !important;
+    font-size: 1.05rem !important;
+    border-radius: 20px !important; 
+}
