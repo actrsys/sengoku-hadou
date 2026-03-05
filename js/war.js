@@ -519,12 +519,12 @@ class WarManager {
                                     // プレイヤーが守備側の援軍として参加した場合
                                     const r = this.state.defReinforcement;
                                     this.game.ui.showUnitDivideModal(r.bushos, r.soldiers, r.horses, r.guns, (myAssigns) => {
-                                        const mainDefAssigns = this.autoDivideSoldiers(defBushos, defSoldiers, defHorses, defGuns);
+                                        const mainDefAssigns = this.autoDivideSoldiers(defBushos, defCastle.soldiers, defCastle.horses || 0, defCastle.guns || 0);
                                         callback(mainDefAssigns.concat(myAssigns));
                                     });
                                 } else {
                                     // AIのみ、またはAIとAI援軍の場合
-                                    let finalDefAssignments = this.autoDivideSoldiers(defBushos, defSoldiers, defHorses, defGuns);
+                                    let finalDefAssignments = this.autoDivideSoldiers(defBushos, defCastle.soldiers, defCastle.horses || 0, defCastle.guns || 0);
                                     if (this.state.defReinforcement) {
                                         const r = this.state.defReinforcement;
                                         finalDefAssignments = finalDefAssignments.concat(this.autoDivideSoldiers(r.bushos, r.soldiers, r.horses, r.guns));
@@ -587,7 +587,7 @@ class WarManager {
                             // ★順番に実行して、最後に野戦をスタートさせます！
                             handleDefDivide((finalDefAssignments) => {
                                 handleAtkDivide(finalDefAssignments, (defAssigns, finalAtkAssignments) => {
-                                    onResult('field', defAssigns, defRice, finalAtkAssignments, defHorses, defGuns);
+                                    onResult('field', defAssigns, defCastle.rice, finalAtkAssignments, defCastle.horses || 0, defCastle.guns || 0);
                                 });
                             });
                         } else onResult('siege');
