@@ -1038,6 +1038,9 @@ class UIManager {
         this.selectedDaimyoId = clanId;
         this.updateCastleGlows();
 
+        // ★追加：大名を選んだら、マップをスッキリさせるために名前シールを隠す合図を出します！
+        document.body.classList.add('hide-daimyo-labels');
+
         this.daimyoConfirmModal.classList.remove('hidden');
         
         let faceHtml = "";
@@ -1046,7 +1049,6 @@ class UIManager {
         }
 
         if (this.daimyoConfirmBody) {
-            // ★変更：顔画像と文字を「横」に並べて、高さをキュッと半分にします！
             this.daimyoConfirmBody.innerHTML = `
                 <div class="daimyo-confirm-compact">
                     ${faceHtml}
@@ -1062,15 +1064,17 @@ class UIManager {
         const startBtn = document.getElementById('daimyo-confirm-start-btn');
         if (startBtn) {
             startBtn.style.display = '';
-            startBtn.textContent = "この大名で開始"; // ★文字を短くしてスッキリさせました
+            startBtn.textContent = "この大名で開始"; 
             startBtn.onclick = () => {
                 if (window.AudioManager) {
                     window.AudioManager.playBGM('SC_ex_Town2_Fortress.ogg');
                 }
 
                 this.daimyoConfirmModal.classList.add('hidden');
-                this.selectedDaimyoId = null; // ★選択をリセット
-                document.body.classList.remove('daimyo-select-mode'); // ★ゲーム開始時に専用モードを解除します
+                this.selectedDaimyoId = null; 
+                document.body.classList.remove('daimyo-select-mode'); 
+                // ★追加：ゲームが始まったら隠す合図を解除します
+                document.body.classList.remove('hide-daimyo-labels'); 
                 onStart();
             };
         }
@@ -1079,9 +1083,11 @@ class UIManager {
             backBtn.style.display = '';
             backBtn.textContent = "やめる";
             backBtn.onclick = () => {
-                this.selectedDaimyoId = null; // ★選択をリセット
-                this.updateCastleGlows();     // ★光を消す
-                this.renderMap(); // ★「選んでください」のメッセージに戻すために、もう一度マップの魔法をかけます
+                this.selectedDaimyoId = null; 
+                this.updateCastleGlows();     
+                // ★追加：「やめる」を押したら隠す合図を解除して、名前シールを復活させます
+                document.body.classList.remove('hide-daimyo-labels'); 
+                this.renderMap(); 
             };
         }
     }
@@ -1637,10 +1643,11 @@ class UIManager {
                     labelsData.push({
                         clanId: clan.id,
                         name: clan.name,
+                        castle: castle, // ★ここを追加！：お城のデータを丸ごと持たせておきます！
                         x: posX,
-                        y: posY - 25, // 城の少し上をスタート地点にします
-                        width: clan.name.length * 18 + 20, // 文字数から大体の幅を予想します
-                        height: 28, // 大体の高さを設定します
+                        y: posY - 25, 
+                        width: clan.name.length * 18 + 20, 
+                        height: 28, 
                         offsetY: 0
                     });
                 }
@@ -1650,7 +1657,7 @@ class UIManager {
         // 2. ぶつかり稽古！重ならないように上下に散らばらせます
         let iterations = 0;
         let hasCollision = true;
-        while (hasCollision && iterations < 20) { // 最大20回まで調整します
+        while (hasCollision && iterations < 20) { 
             hasCollision = false;
             for (let i = 0; i < labelsData.length; i++) {
                 for (let j = i + 1; j < labelsData.length; j++) {
@@ -1662,17 +1669,10 @@ class UIManager {
                     const top1 = l1.y + l1.offsetY - l1.height;
                     const bottom1 = l1.y + l1.offsetY;
                     
-                    const left2 = l2.x - l2.width / 2;
-                    const right2 = l2.x + l2.width / 2;
-                    const top2 = l2.y + l2.offsetY - l2.height;
-                    const bottom2 = l2.y + l2.offsetY;
-
-                    // ぶつかっているかチェックします
                     if (left1 < right2 + 5 && right1 + 5 > left2 &&
                         top1 < bottom2 + 5 && bottom1 + 5 > top2) {
                         hasCollision = true;
                         
-                        // ぶつかっていたら、上下に少しずつ押し退けます
                         if (top1 < top2) {
                             l1.offsetY -= 8;
                             l2.offsetY += 8;
@@ -1695,8 +1695,17 @@ class UIManager {
             el.style.left = `${l.x}px`;
             el.style.top = `${l.y + l.offsetY}px`;
             el.style.transform = 'translate(-50%, -100%)';
-            el.style.zIndex = '200'; // ★ここで他のどんな城よりも絶対に手前に出します！
+            el.style.zIndex = '200'; 
             
+            // ★ここから追加！：名前シール自体をクリックできるようにする魔法
+            el.onclick = (e) => {
+                e.stopPropagation(); 
+                if (this.isDraggingMap) return; // スクロール中は反応しないようにします
+                if (window.AudioManager) window.AudioManager.playSE('choice.ogg');
+                this.game.handleDaimyoSelect(l.castle); // お城をクリックしたのと同じ魔法を発動！
+            };
+            // ★追加ここまで！
+
             this.mapEl.appendChild(el);
         });
     }
