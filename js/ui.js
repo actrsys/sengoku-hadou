@@ -1378,8 +1378,16 @@ class UIManager {
             const sc = document.getElementById('map-scroll-container');
             if (sc) {
                 setTimeout(() => {
-                    sc.scrollTop = (sc.scrollHeight - sc.clientHeight) / 2;
-                    sc.scrollLeft = (sc.scrollWidth - sc.clientWidth) / 2;
+                    // ★ここを差し替え！：ID35番のお城を探して、そこにカメラを合わせる魔法です！
+                    const centerCastle = this.game.getCastle(35);
+                    if (centerCastle) {
+                        // お城が見つかったら、そこを真ん中にして映します
+                        this.scrollToActiveCastle(centerCastle);
+                    } else {
+                        // もしお城が見つからなかった時のためのお守りです（今まで通り全体の真ん中を映します）
+                        sc.scrollTop = (sc.scrollHeight - sc.clientHeight) / 2;
+                        sc.scrollLeft = (sc.scrollWidth - sc.clientWidth) / 2;
+                    }
                 }, 0);
             }
         }
