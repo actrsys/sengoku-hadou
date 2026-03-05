@@ -2383,10 +2383,13 @@ class UIManager {
             totalGuns = 0;
         }
 
+        this.hideAIGuardTemporarily(); // ★これを追加します！
+
         const cancelBtn = modal.querySelector('.btn-secondary');
         if (cancelBtn) {
             cancelBtn.onclick = () => {
                 modal.classList.add('hidden');
+                this.restoreAIGuard(); // ★これを追加します！
                 if (onCancel) onCancel(); 
             };
         }
@@ -2599,6 +2602,7 @@ class UIManager {
             }
             
             modal.classList.add('hidden');
+            this.restoreAIGuard(); // ★これを追加します！
             onConfirm(finalAssignments);
         };
     }
@@ -2678,6 +2682,7 @@ class UIManager {
 
     openQuantitySelector(type, data, targetId, extraData = null) {
         if (!this.quantityModal) return;
+        this.hideAIGuardTemporarily(); // ★これを追加します！
         this.quantityModal.classList.remove('hidden'); 
         if (this.quantityContainer) this.quantityContainer.innerHTML = '';
         if (this.charityTypeSelector) this.charityTypeSelector.classList.add('hidden'); 
@@ -2855,6 +2860,7 @@ class UIManager {
 
         const closeQuantityModal = () => {
             this.quantityModal.classList.add('hidden');
+            this.restoreAIGuard(); // ★これを追加します！
             if (this.quantityConfirmBtn) {
                 this.quantityConfirmBtn.disabled = false;
                 this.quantityConfirmBtn.style.opacity = 1.0;
