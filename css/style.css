@@ -311,20 +311,18 @@ img {
     box-shadow: none;              /* 四角い影を消します */
     filter: drop-shadow(2px 2px 3px rgba(0,0,0,0.5)); 
     /* ★ここまで */
-
+    
     border-radius: 4px;
     display: flex; flex-direction: column; justify-content: space-between;
     padding: 2px; 
     cursor: pointer; position: relative; user-select: none;
     font-size: 0.75rem;
     
-    /* ★ここを差し替え！：マス目の指定を消して、自由な場所に置けるようにします！ */
-    /* 【消す行】grid-column: var(--c-x); grid-row: var(--c-y); z-index: 10; */
-    
     /* 【代わりの行】↓ */
     position: absolute; /* 自由な位置に置けるシールに変身！ */
     transform: translate(-50%, -50%) scale(0.41); /* ズレを直しつつ、全体の大きさを４１％(0.41)にします */
     z-index: 10;
+    transform-style: preserve-3d; /* ★これを1行書き足します！ */
 }
 
 /* 選択された時なども、お城の形に合わせて光るように調整しました */
@@ -1658,12 +1656,12 @@ body.is-pc .faction-list-container { scroll-padding-top: 38px; }
     position: absolute;
     bottom: 10px; 
     left: 50%;
-    transform: translateX(-50%);
+    transform: translateX(-50%) translateZ(-1px); /* ★うしろに translateZ(-1px) を足します */
     width: 70%;  
     height: 15%; 
     background: rgba(0, 0, 0, 0.9); 
     border-radius: 50%; 
     filter: blur(4px);  
-    z-index: -2; 
+    z-index: -1; 
     pointer-events: none; 
 }
