@@ -1,7 +1,6 @@
 /**
  * ui.js
  * 画面の見た目や操作（UI）を担当するファイルです。
- * 修正：野戦用の兵科（騎馬・鉄砲）を指定するためのUIと兵力分配画面のロジックを追加
  */
 
 // ★ マップのズーム設定を1箇所で管理する箱
@@ -23,6 +22,7 @@ class UIManager {
         this.game = game; this.currentCastle = null; this.menuState = 'MAIN';
         this.logHistory = [];
         this.mapScale = 1.0;
+        this.selectedDaimyoId = null; // ★追加：選択中の大名を記憶する箱
 
         this.mapEl = document.getElementById('map-container'); 
         this.panelEl = document.getElementById('pc-sidebar'); 
@@ -86,17 +86,15 @@ class UIManager {
         this.initMapDrag();
         this.initContextMenu();
         this.initSidebarResize(); 
-        // ダブルタップによるズームを禁止する呪文
         let lastTouchEnd = 0;
         document.addEventListener('touchend', (event) => {
             const now = (new Date()).getTime();
             if (now - lastTouchEnd <= 300) {
-                event.preventDefault(); // 0.3秒以内の2回タップを「無効」にします
+                event.preventDefault(); 
             }
             lastTouchEnd = now;
         }, false);
         
-        // ★ スマホブラウザ全体の2本指拡大（ピンチズーム）を禁止する強力な呪文
         document.addEventListener('touchmove', (e) => {
             if (e.touches.length > 1) {
                 e.preventDefault();
@@ -108,50 +106,33 @@ class UIManager {
         const menuButtons = document.getElementById('menu-buttons');
 
         if (titleScreen && tapMessage && menuButtons) {
-            // 画面がクリック（タップ）された時の処理
             const onTitleClick = () => {
                 if (window.AudioManager) {
-                    // 第1引数：ファイル名
-                    // 第2引数：ループして戻ってくる地点（秒数） ← ここがポイント！
                     window.AudioManager.playBGM('SC_ex_Town1_Castle.ogg', 0);
                 }
-                
-                // メッセージを消す
                 tapMessage.classList.add('hidden');
-                // ボタンを表示する
                 menuButtons.classList.remove('hidden');
-                // 一回動いたら、この命令はもう使わないので消します
                 titleScreen.removeEventListener('click', onTitleClick);
             };
-
-            // 画面全体に「クリックを監視してね」と命令します
             titleScreen.addEventListener('click', onTitleClick);
         }
         
         document.addEventListener('wheel', (e) => {
-            // カクカクスクロールするリストの箱を探します
             const listObj = e.target.closest('.list-container, .result-body, #divide-list, .daimyo-list-container, .faction-list-container');
             if (listObj) {
-                // いつもの「複数行一気にスクロールしちゃう動き」を強制ストップ！
                 e.preventDefault();
-                // ホイールを回した方向に、ほんの少しだけ動かします。
-                // あとは「カクカクスクロール（scroll-snap）」の魔法が、次の1行に自動でピタッと吸い寄せてくれます！
                 listObj.scrollBy({ top: Math.sign(e.deltaY) * 30, behavior: 'smooth' });
             }
         }, { passive: false });
         
-        // =========================================================
-        // ★ マウスドラッグでスマホみたいにスクロールさせる魔法
-        // =========================================================
         let isListMouseDown = false;
         let hasListDragged = false;
         let listStartY = 0;
         let listStartScrollY = 0;
         let currentDragList = null;
-        let lastDragDelta = 0; // ★追加：最後に動かした方向を記憶する箱
+        let lastDragDelta = 0; 
 
         document.addEventListener('mousedown', (e) => {
-            // ★追加：スマホのタップ操作に誤爆しないよう、PCの時だけこの魔法を動かします！
             if (!document.body.classList.contains('is-pc')) return;
 
             const listObj = e.target.closest('.list-container, .result-body, #divide-list, .daimyo-list-container, .faction-list-container');
@@ -165,7 +146,7 @@ class UIManager {
                     currentDragList = listObj;
                     listStartY = e.pageY;
                     listStartScrollY = listObj.scrollTop;
-                    lastDragDelta = 0; // 記憶をリセット
+                    lastDragDelta = 0; 
                 }
             }
         });
@@ -179,7 +160,7 @@ class UIManager {
                 document.body.style.userSelect = 'none';
                 currentDragList.style.scrollSnapType = 'none';
                 currentDragList.scrollTop = listStartScrollY - walk;
-                lastDragDelta = walk; // ★追加：どちらにどれくらいドラッグしたか記憶！
+                lastDragDelta = walk; 
             }
         });
 
@@ -188,13 +169,10 @@ class UIManager {
                 if (currentDragList && hasListDragged) {
                     currentDragList.style.scrollSnapType = 'y mandatory';
                     document.body.style.userSelect = '';
-                    
-                    // ★変更：ドラッグした方向に向かって、素直にピタッと吸い寄せる魔法！
-                    // （lastDragDelta がマイナス ＝ マウスを上に動かした ＝ リストを下へ見ようとした）
                     if (lastDragDelta < 0) {
-                        currentDragList.scrollBy({ top: 15, behavior: 'smooth' }); // 下の項目へ吸着！
+                        currentDragList.scrollBy({ top: 15, behavior: 'smooth' }); 
                     } else {
-                        currentDragList.scrollBy({ top: -15, behavior: 'smooth' }); // 上の項目へ吸着！
+                        currentDragList.scrollBy({ top: -15, behavior: 'smooth' }); 
                     }
                 }
                 isListMouseDown = false;
@@ -211,40 +189,24 @@ class UIManager {
                 hasListDragged = false; 
             }
         }, true);
-        // =========================================================
 
-        // ★ここから追加：ダイアログの順番待ちの列を作ります
         this.dialogQueue = []; 
         this.isDialogShowing = false; 
 
-        // =========================================================
-        // ★ ここから追加！画面のどこかのボタンが押されたら音を鳴らす魔法
-        // =========================================================
         document.addEventListener('click', (e) => {
-            // クリックされた場所が「ボタン（button）」かどうか調べます
             const btn = e.target.closest('button');
-            if (!btn) return; // ボタンじゃなかったら何もしないで戻ります
+            if (!btn) return; 
 
-            // ボタンに書かれている文字を読み取ります
             const text = btn.textContent.trim();
-
-            // 音を鳴らすためのオーディオマネージャーがいるか確認します
             if (window.AudioManager) {
-                // キャンセルや戻るなど、うしろ向きな言葉の時は「cancel.ogg」を鳴らします
                 if (["戻る", "閉じる", "拒否", "やめる", "撤退", "解放", "処断"].includes(text)) {
                     window.AudioManager.playSE('cancel.ogg');
-                } 
-                // それ以外のボタン（内政や戦争のコマンドなど）は、ぜんぶ「decision.ogg」を鳴らします！
-                else {
+                } else {
                     window.AudioManager.playSE('decision.ogg');
                 }
             }
-        }, true); // ボタンが押された瞬間に、他の処理より優先して音を鳴らすおまじないです
-        // =========================================================
+        }, true); 
         
-        // =========================================================
-        // ★ 画面の大きさが変わった時にズーム位置を合わせ直す魔法
-        // =========================================================
         let resizeTimer = null;
         let savedLogicalX = null;
         let savedLogicalY = null;
@@ -254,56 +216,41 @@ class UIManager {
                 if (resizeTimer) clearTimeout(resizeTimer);
                 
                 resizeTimer = setTimeout(() => {
-                    // ★ 修正：今の中心位置を、倍率に関係ない「素の地図」の座標として覚える
                     const sc = document.getElementById('map-scroll-container');
                     if (!sc) return;
-                    // const rect = sc.getBoundingClientRect();
                     const currentLeft = parseFloat(this.mapEl.style.left || 0);
                     const currentTop = parseFloat(this.mapEl.style.top || 0);
-                    
-                    // ★修正：画面がCSSで縮小されていても正しく中心を取るために、見た目のrectではなく内部のclientWidthを使います！
                     const logX = (sc.scrollLeft + sc.clientWidth / 2 - currentLeft) / this.mapScale;
                     const logY = (sc.scrollTop + sc.clientHeight / 2 - currentTop) / this.mapScale;
 
-                    // ★ 画面に合わせて倍率の限界（minScale）を計算し直す
                     this.fitMapToScreen();
                     
-                    // ★ 覚えた位置が中心に来るように、新しい倍率でスクロール位置を計算し直す
                     const newLeft = parseFloat(this.mapEl.style.left || 0);
                     const newTop = parseFloat(this.mapEl.style.top || 0);
-                    // ★修正：こちらも rect ではなく clientWidth に直します
                     sc.scrollLeft = (logX * this.mapScale + newLeft) - sc.clientWidth / 2;
                     sc.scrollTop = (logY * this.mapScale + newTop) - sc.clientHeight / 2;
                 }, 200); 
             }
         });
-        // =========================================================
-        
-    } // ← これが constructor の終わりのカッコです
+    } 
     
-    // ==========================================
-    // ★ここから追加：AIのガードを安全に隠す・戻す魔法
-    // ==========================================
     hideAIGuardTemporarily() {
         const aiGuard = document.getElementById('ai-guard');
         if (aiGuard && !aiGuard.classList.contains('hidden')) {
             aiGuard.classList.add('hidden');
             this.guardHiddenCount = (this.guardHiddenCount || 0) + 1;
         } else if (this.guardHiddenCount > 0) {
-            this.guardHiddenCount++; // 他の画面が既に隠している場合はカウントだけ増やす
+            this.guardHiddenCount++; 
         }
     }
     
-    // ==========================================
-    // ★ここから追加：画面のメッセージが全部消えるまで「待て！」をする魔法（賢い版）
-    // ==========================================
     async waitForDialogs() {
         const isVisible = (id) => {
             const el = document.getElementById(id);
             return el && !el.classList.contains('hidden');
         };
 
-        let didWait = false; // ★追加：「待つ必要があったか？」を記憶する箱
+        let didWait = false; 
 
         while (
             (this.dialogQueue && this.dialogQueue.length > 0) ||
@@ -313,19 +260,13 @@ class UIManager {
             isVisible('unit-divide-modal') ||
             isVisible('prisoner-modal')
         ) {
-            didWait = true; // 「待つ必要があった！」と記憶します
+            didWait = true; 
             await new Promise(resolve => setTimeout(resolve, 200));
         }
-        
-        // ★変更：もし「待つ必要があった時」だけ、少しだけ余韻を残します。
-        // メッセージが何も出ていない時は、1ミリ秒も待たずに爆速でスルーします！
         if (didWait) {
             await new Promise(resolve => setTimeout(resolve, 100));
         }
     }
-    // ==========================================
-    // ★追加ここまで
-    // ==========================================
     
     restoreAIGuard() {
         if (this.guardHiddenCount > 0) {
@@ -336,9 +277,6 @@ class UIManager {
             }
         }
     }
-    // ==========================================
-    // ★追加ここまで
-    // ==========================================
     
     initSidebarResize() {
         const sidebar = document.getElementById('pc-sidebar');
@@ -369,7 +307,6 @@ class UIManager {
         });
     }
 
-    // ★新設：自動で順番待ちして、指定時間で勝手に閉じてくれる神の関数！
     showDialogAsync(msg, isConfirm = false, autoCloseTime = 0) {
         return new Promise(resolve => {
             this.dialogQueue.push({ msg, isConfirm, onOk: resolve, onCancel: resolve, autoCloseTime });
@@ -379,7 +316,6 @@ class UIManager {
         });
     }
 
-    // ★変更：従来の showDialog も順番待ちの列に並ぶように直します
     showDialog(msg, isConfirm, onOk, onCancel = null) {
         this.dialogQueue.push({ msg, isConfirm, onOk, onCancel, autoCloseTime: 0 });
         if (!this.isDialogShowing) {
@@ -387,7 +323,6 @@ class UIManager {
         }
     }
 
-    // ★新設：列に並んだダイアログを1つずつ案内する魔法
     processDialogQueue() {
         if (this.dialogQueue.length === 0) {
             this.isDialogShowing = false;
@@ -395,14 +330,13 @@ class UIManager {
         }
 
         this.isDialogShowing = true;
-        const dialog = this.dialogQueue.shift(); // 先頭の人を案内
+        const dialog = this.dialogQueue.shift(); 
 
         const modal = document.getElementById('dialog-modal');
         const msgEl = document.getElementById('dialog-message');
         const okBtn = document.getElementById('dialog-btn-ok');
         const cancelBtn = document.getElementById('dialog-btn-cancel');
 
-        // ★変更：新しく作った魔法で、どんな時でも安全にガードを隠します！
         this.hideAIGuardTemporarily();
 
         if (!modal) {
@@ -412,8 +346,8 @@ class UIManager {
                 alert(dialog.msg);
                 if (dialog.onOk) dialog.onOk();
             }
-            this.restoreAIGuard(); // ガードを戻す
-            this.processDialogQueue(); // 次の人へ
+            this.restoreAIGuard(); 
+            this.processDialogQueue(); 
             return;
         }
 
@@ -425,10 +359,8 @@ class UIManager {
             if (autoCloseTimer) clearTimeout(autoCloseTimer);
             modal.classList.add('hidden');
             
-            // ★変更：新しく作った魔法で、必要な時だけガードを戻します！
             this.restoreAIGuard();
 
-            // エラーが起きても絶対に次の画面に進めるように、おまじないをかけます
             const executeNext = () => {
                 setTimeout(() => {
                     this.processDialogQueue();
@@ -438,7 +370,6 @@ class UIManager {
             try {
                 if (callback) {
                     const result = callback();
-                    // もし「待つ」設定の処理だったら、終わるまで待ってから次へ
                     if (result instanceof Promise) {
                         result.catch(e => console.error(e)).finally(executeNext);
                         return; 
@@ -451,7 +382,6 @@ class UIManager {
             executeNext();
         };
 
-        // ★連打防止！一度クリックしたら即座にボタンの反応を消します
         okBtn.onclick = () => { okBtn.onclick = null; cleanupAndNext(dialog.onOk); };
 
         if (dialog.isConfirm) {
@@ -463,7 +393,6 @@ class UIManager {
 
         modal.classList.remove('hidden');
 
-        // ★自動で閉じるタイマー（指定された場合のみ動く）
         if (dialog.autoCloseTime > 0) {
             autoCloseTimer = setTimeout(() => {
                 if (!modal.classList.contains('hidden')) {
@@ -508,7 +437,6 @@ class UIManager {
         this.scrollTop = 0;
         this.isMouseDown = false;
         
-        // ★追加：どれくらい滑るか（慣性）を覚えておくための箱
         this.velocityX = 0;
         this.velocityY = 0;
         this.lastDragTime = 0;
@@ -524,7 +452,6 @@ class UIManager {
             
             const isPC = document.body.classList.contains('is-pc');
 
-            // ★追加：新しくドラッグを始めたら、前の滑りアニメーションをピタッと止める
             if (this.inertiaFrame) {
                 cancelAnimationFrame(this.inertiaFrame);
                 this.inertiaFrame = null;
@@ -537,7 +464,6 @@ class UIManager {
             this.scrollLeft = sc.scrollLeft;
             this.scrollTop = sc.scrollTop;
             
-            // ★追加：PCの時だけ、スピードを計算する準備をする
             if (isPC) {
                 this.lastDragTime = performance.now();
                 this.lastDragX = this.dragStartX;
@@ -558,7 +484,6 @@ class UIManager {
                 this.isDraggingMap = false;
             }, 50);
 
-            // ★追加：PCの時だけ、マウスを離した瞬間に残ったスピードで「スーッ」と滑らせる
             if (document.body.classList.contains('is-pc') && (Math.abs(this.velocityX) > 0.5 || Math.abs(this.velocityY) > 0.5)) {
                 this.applyInertia(sc);
             }
@@ -581,12 +506,10 @@ class UIManager {
             sc.scrollLeft = this.scrollLeft - walkX;
             sc.scrollTop = this.scrollTop - walkY;
 
-            // ★追加：PCの時は、どれくらいのスピードでマウスが動いたかを計算しておく
             if (document.body.classList.contains('is-pc')) {
                 const now = performance.now();
                 const dt = now - this.lastDragTime;
                 if (dt > 0) {
-                    // 動かした距離を時間で割ってスピードを出します（15倍にして調整）
                     this.velocityX = (x - this.lastDragX) / dt * 15;
                     this.velocityY = (y - this.lastDragY) / dt * 15;
                 }
@@ -596,26 +519,20 @@ class UIManager {
             }
         });
         
-        // =========================================================
-        // ★ マウスホイールでマップを拡大縮小する魔法（PC用）
-        // =========================================================
-        this.isZooming = false; // ★変更：isZoomingを「this.」をつけてどこからでも使える箱にします！
+        this.isZooming = false; 
         sc.addEventListener('wheel', (e) => {
             if (document.body.classList.contains('is-pc')) {
                 e.preventDefault(); 
-                if (this.isZooming) return; // ズーム中は次の命令を無視します！
+                if (this.isZooming) return; 
                 
                 this.isZooming = true;
-                setTimeout(() => { this.isZooming = false; }, 350); // アニメーションが終わるまで待つ
+                setTimeout(() => { this.isZooming = false; }, 350); 
 
                 if (e.deltaY < 0) this.changeMapZoom(1, e.clientX, e.clientY);       
                 else if (e.deltaY > 0) this.changeMapZoom(-1, e.clientX, e.clientY); 
             }
         }, { passive: false });
 
-        // =========================================================
-        // ★ 2本指のピンチ操作でマップを拡大縮小する魔法（スマホ用）
-        // =========================================================
         let initialPinchDist = null;
 
         sc.addEventListener('touchstart', (e) => {
@@ -632,7 +549,6 @@ class UIManager {
                 e.preventDefault(); 
                 if (initialPinchDist === null) return;
                 
-                // ★追加：スマホでもズーム中は一旦ストップさせます！
                 if (this.isZooming) return;
 
                 const currentDist = Math.hypot(
@@ -647,11 +563,11 @@ class UIManager {
                 const centerY = rect.top + rect.height / 2;
 
                 if (diff > 50) {
-                    this.isZooming = true; setTimeout(() => { this.isZooming = false; }, 350); // ★追加
+                    this.isZooming = true; setTimeout(() => { this.isZooming = false; }, 350); 
                     this.changeMapZoom(1, centerX, centerY);
                     initialPinchDist = currentDist; 
                 } else if (diff < -50) {
-                    this.isZooming = true; setTimeout(() => { this.isZooming = false; }, 350); // ★追加
+                    this.isZooming = true; setTimeout(() => { this.isZooming = false; }, 350); 
                     this.changeMapZoom(-1, centerX, centerY);
                     initialPinchDist = currentDist;
                 }
@@ -663,36 +579,28 @@ class UIManager {
                 initialPinchDist = null;
             }
         });
-    } // ← ここが initMapDrag() の終わりのカッコです！
+    }
 
-    // ★ここに書き足します！
     applyInertia(sc) {
-        // 摩擦（ブレーキの強さ）です。0.92くらいがちょうどいい滑り具合になります
         const friction = 0.92; 
         
         const animate = () => {
-            // スピードにブレーキをかけて、徐々に落としていきます
             this.velocityX *= friction;
             this.velocityY *= friction;
             
-            // スピードが十分遅くなったら、アニメーションを終わらせます
             if (Math.abs(this.velocityX) < 0.5 && Math.abs(this.velocityY) < 0.5) {
                 this.inertiaFrame = null;
                 return;
             }
             
-            // スクロール位置を更新します
-            // （画面の端っこに到達したら、ブラウザが自動でピッタリ止めてくれます！）
             sc.scrollLeft -= this.velocityX;
             sc.scrollTop -= this.velocityY;
             
-            // スピードが落ちきるまで、この動きを繰り返します
             this.inertiaFrame = requestAnimationFrame(animate);
         };
         
         this.inertiaFrame = requestAnimationFrame(animate);
     }
-    // ★書き足すのはここまで！
 
     initContextMenu() {
         this.contextMenu = document.getElementById('custom-context-menu');
@@ -762,22 +670,12 @@ class UIManager {
                 
                 if (this.game.selectionMode) {
                     this.cancelMapSelection(false); 
-                    // 【消す行】
-                // const el = document.querySelector('.castle-card.active-turn'); 
-                // if(el) el.scrollIntoView({block:"center", inline: "center", behavior: "smooth"});
-
-                // 【代わりの行】↓
-                this.scrollToActiveCastle();
+                    this.scrollToActiveCastle();
                 } else {
                     const myCastle = this.game.getCurrentTurnCastle();
                     if (myCastle) {
                         this.showControlPanel(myCastle);
-                        // 【消す行】
-                    // const el = document.querySelector('.castle-card.active-turn'); 
-                    // if(el) el.scrollIntoView({block:"center", inline: "center", behavior: "smooth"});
-
-                    // 【代わりの行】↓
-                    this.scrollToActiveCastle();
+                        this.scrollToActiveCastle();
                     }
                 }
             };
@@ -807,7 +705,7 @@ class UIManager {
         if(this.cutinOverlay) this.cutinOverlay.classList.add('hidden');
         if(this.warModal) this.warModal.classList.add('hidden');
         if(this.unitDivideModal) this.unitDivideModal.classList.add('hidden');
-        if(this.aiGuard) this.aiGuard.classList.add('hidden'); // ★追加：リセットする時にガードも一緒に隠します
+        if(this.aiGuard) this.aiGuard.classList.add('hidden'); 
         this.hideContextMenu();
     }
 
@@ -840,7 +738,6 @@ class UIManager {
     }
     
     showDaimyoList() {
-        // ★変更：城数と戦力の順序を入れ替えました！
         let listHtml = '<div class="daimyo-list-container"><div class="daimyo-list-header"><span>大名家名</span><span>当主名</span><span>城数</span><span>戦力</span><span>友好度</span><span>関係</span></div>';
         
         const activeClans = this.game.clans.filter(c => c.id !== 0 && this.game.castles.some(cs => cs.ownerClan === c.id));
@@ -859,7 +756,6 @@ class UIManager {
 
         clanDataList.sort((a,b) => b.power - a.power);
         
-        // ★追加：全大名の中で一番高い戦力を記憶しておきます
         const maxPower = clanDataList.length > 0 ? clanDataList[0].power : 1;
 
         clanDataList.forEach(d => {
@@ -881,20 +777,17 @@ class UIManager {
                 }
             }
 
-            // ★追加：戦力をゲージ化する魔法（数値は消しました）
             const powerPercent = Math.min(100, (d.power / maxPower) * 100);
             const powerBarHtml = `<div class="bar-bg bar-bg-power"><div class="bar-fill bar-fill-power" style="width:${powerPercent}%;"></div></div>`;
 
-            // ★追加：友好度をゲージ化する魔法（数値は消しました）
             let friendBarHtml = "-";
             if (d.id === this.game.playerClanId) {
-                friendBarHtml = "-"; // 自分自身にはゲージなし
+                friendBarHtml = "-"; 
             } else {
                 const friendPercent = Math.min(100, Math.max(0, friendScore));
                 friendBarHtml = `<div class="bar-bg bar-bg-friend"><div class="bar-fill bar-fill-friend" style="width:${friendPercent}%;"></div></div>`;
             }
 
-            // ★変更：大名をクリックした時に音（choice.ogg）を鳴らす魔法を追加しました！
             listHtml += `<div class="daimyo-list-item" style="cursor:pointer;" onclick="if(window.AudioManager) window.AudioManager.playSE('choice.ogg'); window.GameApp.ui.showDiplomacyList(${d.id}, '${d.name}')"><span class="col-daimyo-name" style="font-weight:bold;">${d.name}</span><span class="col-leader-name">${d.leaderName}</span><span>${d.castlesCount}</span><span>${powerBarHtml}</span><span>${friendBarHtml}</span><span style="${statusColor}">${friendStatus}</span></div>`;
         });
         listHtml += '</div>';
@@ -915,7 +808,6 @@ class UIManager {
     }
     
     showDiplomacyList(clanId, clanName) {
-        // ★変更：真ん中の列（友好度）をゲージを入れるために少し広げました
         let listHtml = '<div class="daimyo-list-container"><div class="daimyo-list-header" style="grid-template-columns: 2fr 1.5fr 1fr;"><span>大名家名</span><span>友好度</span><span>関係</span></div>';
         
         const activeClans = this.game.clans.filter(c => c.id !== 0 && c.id !== clanId && this.game.castles.some(cs => cs.ownerClan === c.id));
@@ -938,11 +830,9 @@ class UIManager {
             else if (r.status === '友好') statusColor = 'color:#388e3c;';
             else if (['同盟', '支配', '従属'].includes(r.status)) statusColor = 'color:#1976d2;';
 
-            // ★追加：友好度をゲージにする魔法
             const friendPercent = Math.min(100, Math.max(0, r.sentiment));
             const friendBarHtml = `<div class="bar-bg bar-bg-friend"><div class="bar-fill bar-fill-friend" style="width:${friendPercent}%;"></div></div>`;
 
-            // ★変更：数字の代わりにゲージを表示します
             listHtml += `<div class="daimyo-list-item" style="grid-template-columns: 2fr 1.5fr 1fr;"><span class="col-daimyo-name" style="font-weight:bold;">${r.name}</span><span>${friendBarHtml}</span><span style="${statusColor}">${r.status}</span></div>`;
         });
         listHtml += '</div>';
@@ -983,19 +873,15 @@ class UIManager {
         const fIds = Object.keys(factions).map(Number).filter(id => id !== 0);
         let nonFactionCount = factions[0] ? factions[0].count : 0;
         
-        // ★追加：大名がどの派閥にいるかを確認します！
         const daimyo = bushos.find(b => b.isDaimyo);
         const daimyoFactionId = daimyo ? daimyo.factionId : -1;
         
-        // ★追加：殿様の派閥を一番上に持ってくる並び替え（ソート）の魔法です！
-        // ついでに、他の派閥は「武将が多い順」に並ぶようにしておきました
         fIds.sort((a, b) => {
-            if (a === daimyoFactionId) return -1; // aが殿様なら一番上！
-            if (b === daimyoFactionId) return 1;  // bが殿様なら一番上！
-            return factions[b].count - factions[a].count; // それ以外は人数の多い順
+            if (a === daimyoFactionId) return -1; 
+            if (b === daimyoFactionId) return 1;  
+            return factions[b].count - factions[a].count; 
         });
         
-        // ★変更：右上の無派閥の表示を消して、スッキリしたヘッダーにします！
         let listHtml = `<div class="faction-list-container"><div class="faction-list-header"><span>派閥主</span><span>武将数</span><span>方針</span><span>思想</span></div>`;
         
         if (fIds.length === 0) {
@@ -1022,7 +908,6 @@ class UIManager {
                 if (hoshin === '革新的') hoshinColor = 'color:#e91e63;';
                 else if (hoshin === '保守的') hoshinColor = 'color:#1976d2;';
 
-                // ★追加：この派閥が大名の所属している派閥なら、名前を濃いオレンジ色（darkorange）にします！
                 let nameStyle = "";
                 if (fId === daimyoFactionId) {
                     nameStyle = "color: darkorange;";
@@ -1032,7 +917,6 @@ class UIManager {
             });
         }
         
-        // ★追加：無派閥の人たちを、表の一番下に追加します！（方針と思想はハイフンにします）
         if (nonFactionCount > 0) {
             listHtml += `<div class="faction-list-item"><strong class="col-faction-name">無派閥</strong><span>${nonFactionCount}</span><span>-</span><span>-</span></div>`;
         }
@@ -1047,7 +931,6 @@ class UIManager {
         }
         
         this.showResultModal(`<h3 style="margin-top:0; border-bottom: 2px solid #ddd; padding-bottom: 10px; flex-shrink:0;">${clan.name} 派閥一覧</h3>${listHtml}`, () => {
-            // ウインドウを閉じる時に外側の箱の魔法を解除します
             if (this.resultBody) {
                 this.resultBody.style.overflowY = '';
                 this.resultBody.style.display = '';
@@ -1055,7 +938,6 @@ class UIManager {
             }
         }, customFooter);
 
-        // 表を開いている間だけ、外側の箱のスクロールを消して内側だけを動かします
         if (this.resultBody) {
             this.resultBody.style.overflowY = 'hidden';
             this.resultBody.style.display = 'flex';
@@ -1064,8 +946,7 @@ class UIManager {
     }
 
     showResultModal(msg, onClose = null, customFooterHtml = null) { 
-    this.hideAIGuardTemporarily(); // ★ここに追加
-        // ★ aiGuard を消す魔法を削除しました
+        this.hideAIGuardTemporarily(); 
         if (this.resultBody) this.resultBody.innerHTML = msg.replace(/\n/g, '<br>');
         const footer = document.getElementById('result-footer');
         if (footer) {
@@ -1080,8 +961,8 @@ class UIManager {
     }
     
     closeResultModal() { 
-    if (this.resultModal) this.resultModal.classList.add('hidden'); 
-    this.restoreAIGuard(); // ★ここに追加
+        if (this.resultModal) this.resultModal.classList.add('hidden'); 
+        this.restoreAIGuard(); 
         
         if (this.onResultModalClose) {
             const cb = this.onResultModalClose;
@@ -1094,8 +975,7 @@ class UIManager {
     
     closeSelector() { 
         if (this.selectorModal) this.selectorModal.classList.add('hidden'); 
-        this.restoreAIGuard(); // ★ここに追加
-        // ★追加：ウインドウを閉じる時に、必ず決定ボタンを元の押せる状態にリセットします
+        this.restoreAIGuard(); 
         if (this.selectorConfirmBtn) {
             this.selectorConfirmBtn.disabled = false;
             this.selectorConfirmBtn.style.opacity = 1.0;
@@ -1135,7 +1015,6 @@ class UIManager {
                 const div = document.createElement('div'); div.className = 'clan-btn';
                 div.innerHTML = `<div style="text-align:left;"><strong>${s.name}</strong><br><small>${s.desc}</small></div>`;
                 div.onclick = () => { 
-                    // ★ここに追加：シナリオを選んだ時の音
                     if (window.AudioManager) window.AudioManager.playSE('choice.ogg');
                     
                     this.scenarioScreen.classList.add('hidden'); 
@@ -1151,8 +1030,14 @@ class UIManager {
         if(ts) ts.classList.remove('hidden'); 
     }
     
-    showDaimyoConfirmModal(clanName, soldiers, leader, onStart) {
+    // ★ 修正：大名選択の確認画面を表示する魔法
+    showDaimyoConfirmModal(clanId, clanName, soldiers, leader, onStart) {
         if (!this.daimyoConfirmModal) return;
+
+        // ★選択中の大名を記憶して、光を更新します
+        this.selectedDaimyoId = clanId;
+        this.updateCastleGlows();
+
         this.daimyoConfirmModal.classList.remove('hidden');
         
         let faceHtml = "";
@@ -1177,6 +1062,7 @@ class UIManager {
                 }
 
                 this.daimyoConfirmModal.classList.add('hidden');
+                this.selectedDaimyoId = null; // ★選択解除
                 onStart();
             };
         }
@@ -1184,6 +1070,8 @@ class UIManager {
         if (backBtn) {
             backBtn.onclick = () => {
                 this.daimyoConfirmModal.classList.add('hidden');
+                this.selectedDaimyoId = null; // ★選択解除
+                this.updateCastleGlows();     // ★光を消す
             };
         }
     }
@@ -1193,16 +1081,6 @@ class UIManager {
         const wrapper = document.getElementById('map-wrapper');
         const container = this.mapEl;
         
-        // ★ここをごっそり差し替え！：マス目（80pxとか）の計算を消して、画像の大きさに合わせます！
-        // 【消す行】
-        // const maxX = Math.max(...this.game.castles.map(c => c.x)) + 2;
-        // const maxY = Math.max(...this.game.castles.map(c => c.y)) + 2;
-        // const tileSize = 80;
-        // const gap = 10;
-        // const mapW = maxX * (tileSize + gap);
-        // const mapH = maxY * (tileSize + gap);
-        
-        // 【代わりの行】↓
         const mapW = this.game.mapWidth || 1200;
         const mapH = this.game.mapHeight || 800;
         
@@ -1212,30 +1090,24 @@ class UIManager {
         const scaleX = wrapper.clientWidth / mapW;
         const scaleY = wrapper.clientHeight / mapH;
         
-        // ★パソコンかスマホかを判断して、使う設定を選びます
         const isPC = document.body.classList.contains('is-pc');
         const config = isPC ? MAP_ZOOM_CONFIG.PC : MAP_ZOOM_CONFIG.MOBILE;
 
-        // ★修正: スマホの時は画面に隙間ができないように大きい方（Math.max）に合わせます
         let minScale = isPC ? Math.min(scaleX, scaleY) * config.minMargin : Math.max(scaleX, scaleY) * config.minMargin;
 
-        // ★設定からMIN（計算値）、MID、MAXの3段階を用意します
         this.zoomStages = [
             minScale,      
             config.mid,    
             config.max     
         ];
         
-        // ★ここを修正！勝手にリセットせず、今の記憶（ズームレベル）を保ちます！
         if (this.zoomLevel === undefined) {
-            // 初めての時だけ初期セットをします
             if (this.game.phase === 'daimyo_select') {
                 this.zoomLevel = 0; 
             } else {
                 this.zoomLevel = 1; 
             }
         } else {
-            // すでに記憶があるなら、そのまま維持します！
             if (this.zoomLevel >= this.zoomStages.length) {
                 this.zoomLevel = this.zoomStages.length - 1;
             }
@@ -1248,7 +1120,6 @@ class UIManager {
 
     applyMapScale() {
         if(this.mapEl) {
-            // ★ offsetWidthだとブラウザくんが勘違いするので、固定の設計図から直接サイズをもらいます！
             const mapW = this.game.mapWidth || 1200; 
             const mapH = this.game.mapHeight || 800;
             const sc = document.getElementById('map-scroll-container');
@@ -1263,17 +1134,14 @@ class UIManager {
                 if (scaledW < sc.clientWidth) marginLeft = (sc.clientWidth - scaledW) / 2;
                 if (scaledH < sc.clientHeight) marginTop = (sc.clientHeight - scaledH) / 2;
                 
-                // ★ 究極の魔法：地図を宙に浮かせて（absolute）、ブラウザの余計な余白計算を完全に防ぎます！
                 this.mapEl.style.position = 'absolute';
                 this.mapEl.style.left = `${marginLeft}px`;
                 this.mapEl.style.top = `${marginTop}px`;
-                this.mapEl.style.margin = '0px'; // marginの悪さを封印
+                this.mapEl.style.margin = '0px'; 
                 
-                // 大きさは scale だけで表現
                 this.mapEl.style.transformOrigin = '0 0';
                 this.mapEl.style.transform = `scale(${this.mapScale})`;
 
-                // スクロール範囲を決める透明な「つっかえ棒」
                 let spacer = document.getElementById('map-spacer');
                 if (!spacer) {
                     spacer = document.createElement('div');
@@ -1285,8 +1153,6 @@ class UIManager {
                 }
                 spacer.style.left = '0px';
                 spacer.style.top = '0px';
-                // ★余白を「両側」に足すことで、無限スクロールを完全に封じ込めます！
-                // （端数を切り捨てて、スクロールバーの迷いを断ち切ります）
                 spacer.style.width = `${Math.floor(scaledW + marginLeft * 2)}px`;
                 spacer.style.height = `${Math.floor(scaledH + marginTop * 2)}px`;
             }
@@ -1322,21 +1188,17 @@ class UIManager {
         cx = cx !== null ? cx : rect.left + rect.width / 2;
         cy = cy !== null ? cy : rect.top + rect.height / 2;
         
-        // ★ 修正：マウスの位置から、画面全体のズレ（黒帯など）を引くようにします
-        // ★ さらに追加：画面が黒帯などで縮小・拡大されている場合の「縮尺のズレ」を翻訳して直します！
         const scaleX = rect.width / sc.offsetWidth || 1;
         const scaleY = rect.height / sc.offsetHeight || 1;
 
         const clientX = (cx - rect.left) / scaleX;
         const clientY = (cy - rect.top) / scaleY;
 
-        // ★ここを修正！ブラウザくんの勘違いを防ぐため、設計図から直接サイズをもらいます！
         const mapW = this.game.mapWidth || 1200;
         const mapH = this.game.mapHeight || 800;
         const scW = sc.clientWidth; 
         const scH = sc.clientHeight;
 
-        // ★ 修正：開始時の場所は、予想ではなく「今の実際の見た目」から正確に読み取ります！
         const oldMarginX = parseFloat(this.mapEl.style.left || 0);
         const oldMarginY = parseFloat(this.mapEl.style.top || 0);
 
@@ -1344,15 +1206,12 @@ class UIManager {
         if (mapW * targetScale < scW) targetMarginX = (scW - mapW * targetScale) / 2;
         if (mapH * targetScale < scH) targetMarginY = (scH - mapH * targetScale) / 2;
 
-        // ズーム中心の場所（論理座標）を計算
         const logicalX = (sc.scrollLeft + clientX - oldMarginX) / oldScale;
         const logicalY = (sc.scrollTop + clientY - oldMarginY) / oldScale;
 
-        // 新しいスケールでのスクロールのゴール地点を計算
         let targetScrollLeft = (logicalX * targetScale + targetMarginX) - clientX;
         let targetScrollTop = (logicalY * targetScale + targetMarginY) - clientY;
 
-        // 壁の限界を設定（はみ出し防止）
         let maxScrollLeft = Math.max(0, mapW * targetScale - scW);
         let maxScrollTop  = Math.max(0, mapH * targetScale - scH);
 
@@ -1361,14 +1220,11 @@ class UIManager {
         if (targetScrollLeft > maxScrollLeft) targetScrollLeft = maxScrollLeft;
         if (targetScrollTop > maxScrollTop) targetScrollTop = maxScrollTop;
 
-        // 画面より小さい時はスクロールさせない
         if (mapW * targetScale <= scW) targetScrollLeft = 0;
         if (mapH * targetScale <= scH) targetScrollTop = 0;
 
-        // ★ パソコン版：苦心して作られた美しいアニメーションを完全無欠に！
         if (isPC) {
             this.isAnimatingZoom = true;
-            // スクロールバーを隠す悪さをする魔法（overflow: hidden）は消し去りました！
             
             const startScrollLeft = sc.scrollLeft;
             const startScrollTop = sc.scrollTop;
@@ -1378,7 +1234,7 @@ class UIManager {
 
             const animate = (currentTime) => {
                 let progress = (currentTime - startTime) / duration;
-                if (progress < 0) progress = 0; // ★追加：時間がマイナスになってワープするのを防ぐ！
+                if (progress < 0) progress = 0; 
                 if (progress > 1) progress = 1;
                 
                 const easeOut = 1 - Math.pow(1 - progress, 3);
@@ -1390,7 +1246,6 @@ class UIManager {
                 const currentScrollLeft = startScrollLeft + (targetScrollLeft - startScrollLeft) * easeOut;
                 const currentScrollTop = startScrollTop + (targetScrollTop - startScrollTop) * easeOut;
 
-                // 1. 先に透明な「つっかえ棒」のサイズを更新
                 let spacer = document.getElementById('map-spacer');
                 if (!spacer) {
                     spacer = document.createElement('div');
@@ -1400,18 +1255,15 @@ class UIManager {
                     sc.appendChild(spacer);
                     sc.style.position = 'relative';
                 }
-                // ★追加：ここでも端数を切り捨てて、アニメーション中のめちゃくちゃバグを防ぎます！
                 spacer.style.width = `${Math.floor(mapW * currentScale + currentMarginX * 2)}px`;
                 spacer.style.height = `${Math.floor(mapH * currentScale + currentMarginY * 2)}px`;
 
-                // 2. マップ自体の見た目を更新（absoluteにしてleftとtopを動かします）
                 this.mapEl.style.position = 'absolute';
                 this.mapEl.style.left = `${currentMarginX}px`;
                 this.mapEl.style.top = `${currentMarginY}px`;
                 this.mapEl.style.transformOrigin = '0 0';
                 this.mapEl.style.transform = `scale(${currentScale})`;
 
-                // 3. スクロール位置をピッタリ合わせます
                 sc.scrollLeft = currentScrollLeft;
                 sc.scrollTop = currentScrollTop;
 
@@ -1428,17 +1280,15 @@ class UIManager {
             };
             requestAnimationFrame(animate); 
         } else {
-            // スマホ版：一瞬でズーム
             this.mapScale = targetScale;
             this.applyMapScale();
-            void sc.scrollHeight; // ブラウザに再描画を強制
+            void sc.scrollHeight; 
             sc.scrollLeft = targetScrollLeft;
             sc.scrollTop = targetScrollTop;
             this.updateZoomButtons();
         }
     }
     
-    // ★追加：絶対座標になったお城を画面の中央に捉えるための魔法
     scrollToActiveCastle(castle = null) {
         const targetCastle = castle || this.currentCastle || this.game.getCurrentTurnCastle();
         const sc = document.getElementById('map-scroll-container');
@@ -1447,7 +1297,6 @@ class UIManager {
         const posX = targetCastle.pixelX !== undefined ? targetCastle.pixelX : (targetCastle.x * 80 + 40);
         const posY = targetCastle.pixelY !== undefined ? targetCastle.pixelY : (targetCastle.y * 80 + 40);
         
-        // ★修正：marginではなく、leftとtopから位置を読み取ります！これで右下に飛んでいくバグが直ります！
         const currentLeft = parseFloat(this.mapEl.style.left || 0);
         const currentTop = parseFloat(this.mapEl.style.top || 0);
         
@@ -1534,41 +1383,26 @@ class UIManager {
         }
         if (this.aiGuard) { if (this.game.isProcessingAI) this.aiGuard.classList.remove('hidden'); else this.aiGuard.classList.add('hidden'); }
 
-                this.updateInfoPanel(this.currentCastle || this.game.getCurrentTurnCastle());
+        this.updateInfoPanel(this.currentCastle || this.game.getCurrentTurnCastle());
 
-        // ==========================================
-        // ★ここから書き足し！：城同士を繋ぐ「道」を描く魔法です！
-        // ==========================================
-        // 透明な下敷き（SVG）を作って、そこに線を引いていきます
         const svgNS = "http://www.w3.org/2000/svg";
         const svg = document.createElementNS(svgNS, "svg");
         
-        // 下敷きの大きさを、地図の大きさとピッタリ合わせます
         const mapW = this.game.mapWidth || 1200;
         const mapH = this.game.mapHeight || 800;
         svg.setAttribute("width", mapW);
         svg.setAttribute("height", mapH);
         
-        // 下敷きの位置を設定します
         svg.style.position = "absolute";
         svg.style.left = "0px";
         svg.style.top = "0px";
-        svg.style.pointerEvents = "none"; // マウスの邪魔をしないようにします
-        svg.style.zIndex = "5"; // 地図（0）より手前、お城（10）より奥になるように「5」にします！
+        svg.style.pointerEvents = "none"; 
+        svg.style.zIndex = "5"; 
 
-        // 一度引いた道をメモしておく箱です（往復で2回線を引かないようにするため）
         const drawnLines = new Set();
         
-        // ==========================================
-        // 【手動ルール】どうしても線の形が気に入らない場所は、ここで名指しで指定できます！
-        // 必ず「小さい数字-大きい数字」の順で書いてください（例："3-5"）
-        // ==========================================
-        const forceSCurve = [
-            // "1-5", // ここに書いた道は、強制的に「S字カーブ」になります
-        ];
-        const forceStraight = [
-            // "2-8", // ここに書いた道は、強制的に「真っ直ぐな直線」になります
-        ];
+        const forceSCurve = [];
+        const forceStraight = [];
 
         this.game.castles.forEach(c1 => {
             const pos1X = c1.pixelX !== undefined ? c1.pixelX : (c1.x * 80 + 40);
@@ -1581,7 +1415,6 @@ class UIManager {
 
                     const pairKey = c1.id < adjId ? `${c1.id}-${adjId}` : `${adjId}-${c1.id}`;
 
-                    // まだ線を引いていない道なら引きます！
                     if (!drawnLines.has(pairKey)) {
                         drawnLines.add(pairKey);
 
@@ -1592,7 +1425,6 @@ class UIManager {
                         const dy = pos2Y - pos1Y;
                         const dist = Math.hypot(dx, dy);
 
-                        // ★以前調整した「半分の曲がり具合」をそのまま残しています！
                         const curveSize = dist * (0.05 + ((c1.id * c2.id) % 10) * 0.005);
                         const dir = ((c1.id + c2.id) % 2 === 0) ? 1 : -1;
 
@@ -1601,20 +1433,16 @@ class UIManager {
 
                         const path = document.createElementNS(svgNS, "path");
 
-                        // 自動または手動で「S字」か「直線」か「普通のカーブ」かを決めます！
-                        let lineType = "curve"; // 基本は普通のカーブ
+                        let lineType = "curve"; 
                         
-                        // IDの足し算が3で割り切れる時は、自動的にS字カーブにしてバリエーションを出します
                         if (((c1.id + c2.id) % 3 === 0)) {
                             lineType = "s-curve";
                         }
                         
-                        // 手動ルールに書かれている場合は、それを最優先します！
                         if (forceSCurve.includes(pairKey)) lineType = "s-curve";
                         if (forceStraight.includes(pairKey)) lineType = "straight";
 
                         if (lineType === "s-curve") {
-                            // 途中で曲がる「S字カーブ（三次ベジェ曲線）」
                             const cp1X = pos1X + dx * 0.33 + nx * curveSize * dir;
                             const cp1Y = pos1Y + dy * 0.33 + ny * curveSize * dir;
                             const cp2X = pos1X + dx * 0.67 + nx * curveSize * -dir; 
@@ -1622,10 +1450,8 @@ class UIManager {
                             
                             path.setAttribute("d", `M ${pos1X} ${pos1Y} C ${cp1X} ${cp1Y}, ${cp2X} ${cp2Y}, ${pos2X} ${pos2Y}`);
                         } else if (lineType === "straight") {
-                            // まっすぐな直線
                             path.setAttribute("d", `M ${pos1X} ${pos1Y} L ${pos2X} ${pos2Y}`);
                         } else {
-                            // 「普通のカーブ（二次ベジェ曲線）」
                             const midX = (pos1X + pos2X) / 2;
                             const midY = (pos1Y + pos2Y) / 2;
                             const cpX = midX + nx * curveSize * dir;
@@ -1635,7 +1461,7 @@ class UIManager {
                         }
 
                         path.setAttribute("fill", "transparent");
-                        path.setAttribute("stroke", "rgba(255, 250, 200, 0.9)"); // 黄色っぽい白い線
+                        path.setAttribute("stroke", "rgba(255, 250, 200, 0.9)"); 
                         path.setAttribute("stroke-width", "1.5");
                         svg.appendChild(path);
                     }
@@ -1644,21 +1470,11 @@ class UIManager {
         });
 
         this.mapEl.appendChild(svg);
-        // ==========================================
-        // ★道の魔法 ここまで！
-        // ==========================================
 
         this.game.castles.forEach(c => {
             const el = document.createElement('div'); el.className = 'castle-card';
             el.dataset.clan = c.ownerClan;
             
-            // ★ここをごっそり差し替え！：マス目の指定（--c-xなど）ではなく、ピクセルの位置を直接書き込みます！
-            // 【消す行】
-            // el.style.setProperty('--c-x', c.x + 1); el.style.setProperty('--c-y', c.y + 1);
-            
-            // 【代わりの行】↓
-            // 色が見つかったお城は pixelX と pixelY が入っています。
-            // まだ色を設定していないお城は、昔の x と y から適当な位置を計算して仮置きします。
             const posX = c.pixelX !== undefined ? c.pixelX : (c.x * 80 + 40);
             const posY = c.pixelY !== undefined ? c.pixelY : (c.y * 80 + 40);
             
@@ -1670,27 +1486,43 @@ class UIManager {
             
             const castellanName = castellan ? castellan.name : '-';            
             
-            // 普段は隠しておき、ホバーした時だけ左寄せで出す情報箱を作ります！
-            // 兵数や「城主」という文字は削ってスッキリさせました。
-            el.innerHTML = `
-                <div class="hover-info">
-                    <div class="info-line name">${c.name}</div>
-                    <div class="info-line">${clanData ? clanData.name : "中立"}</div>
-                    <div class="info-line">${castellanName}</div>
-                </div>
-            `;
+            // ★ 修正：大名選択画面の時はホバー情報を出さず、居城に名前を表示する
+            if (isDaimyoSelect) {
+                let isDaimyoCastle = false;
+                let daimyoName = "";
+                if (c.ownerClan !== 0 && clanData) {
+                    const leader = this.game.getBusho(clanData.leaderId);
+                    if (leader && Number(leader.castleId) === Number(c.id)) {
+                        isDaimyoCastle = true;
+                        daimyoName = clanData.name;
+                    }
+                }
+                
+                if (isDaimyoCastle) {
+                    el.innerHTML = `<div class="daimyo-name-label">${daimyoName}</div>`;
+                } else {
+                    el.innerHTML = '';
+                }
+            } else {
+                el.innerHTML = `
+                    <div class="hover-info">
+                        <div class="info-line name">${c.name}</div>
+                        <div class="info-line">${clanData ? clanData.name : "中立"}</div>
+                        <div class="info-line">${castellanName}</div>
+                    </div>
+                `;
+            }
             
             if (isDaimyoSelect) {
                  el.style.cursor = 'pointer';
                  if (c.ownerClan === 0) {
                      el.classList.add('dimmed');
-                 } else {
-                     el.classList.add('selectable-target'); 
-                 }
+                 } 
+                 // ★ 修正：赤いピカピカをなくすため selectable-target を削除
+                 
                  el.onclick = (e) => {
                      e.stopPropagation();
                      if (this.isDraggingMap) return;
-                     // ★ここに追加：中立以外の城（大名）を選んだ時の音
                      if (window.AudioManager && c.ownerClan !== 0) {
                          window.AudioManager.playSE('choice.ogg');
                      }
@@ -1704,7 +1536,6 @@ class UIManager {
                         el.onclick = (e) => { 
                             e.stopPropagation(); 
                             if (this.isDraggingMap) return; 
-                            // ★追加：対象の城を選んだ時の音
                             if (window.AudioManager) window.AudioManager.playSE('choice.ogg');
                             this.game.commandSystem.resolveMapSelection(c); 
                         };
@@ -1717,10 +1548,8 @@ class UIManager {
                         if (this.isDraggingMap) return; 
                         if (this.game.isProcessingAI) return;
 
-                        // ★追加：自分の城や敵の城を選んだ時の音
                         if (window.AudioManager) window.AudioManager.playSE('choice.ogg');
 
-                        // ★変更：自動拡大（ズーム）の魔法を消して、いつでもすぐにメニューを開くようにしました！
                         if (this.currentCastle && this.currentCastle.id === c.id) {
                             this.showCastleMenuModal(c);
                         } else {
@@ -1732,7 +1561,6 @@ class UIManager {
                 el.style.cursor = 'default'; 
             }
             
-            // ★追加：マウスが乗った時に画面の端っこか計算して、見切れないようにする魔法
             el.onmouseenter = () => {
                 const rect = el.getBoundingClientRect();
                 const containerRect = document.getElementById('map-scroll-container').getBoundingClientRect();
@@ -1742,16 +1570,12 @@ class UIManager {
 
                 el.classList.remove('tooltip-bottom', 'tooltip-left', 'tooltip-right');
 
-                // ★変更：端っこの判定をかなりゆるく（余裕を大きく）しました！
-                // 上にはみ出しそうな時（上枠から150px以内）
                 if (cy - containerRect.top < 150) { 
                     el.classList.add('tooltip-bottom');
                 }
-                // 左にはみ出しそうな時（左枠から200px以内）
                 if (cx - containerRect.left < 200) { 
                     el.classList.add('tooltip-left');
                 } 
-                // 右にはみ出しそうな時（右枠から200px以内）
                 else if (containerRect.right - cx < 200) { 
                     el.classList.add('tooltip-right');
                 }
@@ -1763,53 +1587,53 @@ class UIManager {
             
             this.mapEl.appendChild(el);
         });
-        // ★追加：すべてのお城を描き終わったら、光の縁取りを更新します！
         this.updateCastleGlows();
     }
     
-    // ==========================================
-    // ★ここから追加：外交関係に合わせてお城を光らせる魔法
-    // ==========================================
     updateCastleGlows() {
-        // 地図がない時は何もしないで戻ります
         if (!this.mapEl) return;
         
-        // 基準となる大名家（最初はプレイヤーに設定しておきます）
+        // ★ 修正：大名選択画面では、選んだ大名の城だけを青く光らせます
+        if (this.game.phase === 'daimyo_select') {
+            const cards = this.mapEl.querySelectorAll('.castle-card');
+            cards.forEach(card => {
+                card.classList.remove('glow-blue', 'glow-red', 'glow-green');
+                const clanId = parseInt(card.dataset.clan, 10);
+                if (this.selectedDaimyoId && clanId === this.selectedDaimyoId) {
+                    card.classList.add('glow-blue');
+                }
+            });
+            return;
+        }
+
         let baseClanId = this.game.playerClanId;
         
-        // もしどこかのお城を選択中なら、そのお城の持ち主を基準にします
         if (this.currentCastle && this.currentCastle.ownerClan !== 0) {
             baseClanId = this.currentCastle.ownerClan;
         }
 
-        // マップ上のすべてのお城カードを探して、１つずつ調べます
         const cards = this.mapEl.querySelectorAll('.castle-card');
         cards.forEach(card => {
             const clanId = parseInt(card.dataset.clan, 10);
             
-            // 一旦すべての光（色）を消してリセットします
             card.classList.remove('glow-blue', 'glow-red', 'glow-green');
             
-            // 中立（持ち主がいない）のお城は光りません
             if (clanId === 0) return;
             
-            // 基準の大名家（自分や、今見ている相手）なら青く光ります
             if (clanId === baseClanId) {
                 card.classList.add('glow-blue');
             } else {
-                // それ以外は、相手との外交関係を調べます
                 const rel = this.game.getRelation(baseClanId, clanId);
                 if (rel) {
                     if (rel.status === '敵対') {
-                        card.classList.add('glow-red');   // 敵対は赤色！
+                        card.classList.add('glow-red');   
                     } else if (['友好', '同盟', '支配', '従属'].includes(rel.status)) {
-                        card.classList.add('glow-green'); // 仲良しは緑色！
+                        card.classList.add('glow-green'); 
                     }
                 }
             }
         });
     }
-    // ==========================================
     
     updatePanelHeader() { 
         if (!this.currentCastle) return; 
@@ -1921,7 +1745,6 @@ class UIManager {
         } else {
             this.renderEnemyViewMenu();
         }
-        // ★ここを追加：選択したお城の持ち主の目線に合わせて、光を更新します！
         this.updateCastleGlows();
     }
     renderEnemyViewMenu() {
@@ -1932,7 +1755,6 @@ class UIManager {
             if(!area) return;
             area.innerHTML = '';
             
-            // ★変更：スマホ(mobileArea)だけでなく、PC版でもボタンを作るように「if」を消しました！
             const btn = document.createElement('button');
             btn.className = 'cmd-btn back';
             btn.textContent = "自拠点へ戻る";
@@ -1940,12 +1762,7 @@ class UIManager {
                 if(this.game.isProcessingAI) return;
                 const myCastle = this.game.getCurrentTurnCastle();
                 this.showControlPanel(myCastle);
-            // 【消す行】
-            // const el = document.querySelector('.castle-card.active-turn'); 
-            // if(el) el.scrollIntoView({block:"center", inline: "center", behavior: "smooth"});
-
-            // 【代わりの行】↓
-            this.scrollToActiveCastle(myCastle);
+                this.scrollToActiveCastle(myCastle);
             };
             area.appendChild(btn);
         });
@@ -2094,17 +1911,16 @@ class UIManager {
     openBushoSelector(actionType, targetId = null, extraData = null, onBack = null) {
         if (actionType === 'appoint' && this.currentCastle) { const isDaimyoHere = this.game.getCastleBushos(this.currentCastle.id).some(b => b.isDaimyo); if (isDaimyoHere) { this.showDialog("大名の居城は城主を変更できません", false); return; } }
         
-        this.hideAIGuardTemporarily(); // ★ここに追加
+        this.hideAIGuardTemporarily(); 
         if (this.selectorModal) this.selectorModal.classList.remove('hidden'); 
         if (document.getElementById('selector-title')) document.getElementById('selector-title').textContent = "武将を選択"; 
         
         const backBtn = document.querySelector('#selector-modal .btn-secondary');
         if(backBtn) {
-            // ★追加：hideCancel という合図があったら、ボタンを隠す！
             if (extraData && extraData.hideCancel) {
                 backBtn.style.display = 'none';
             } else {
-                backBtn.style.display = ''; // 隠れていたものを元に戻す
+                backBtn.style.display = ''; 
                 backBtn.onclick = () => {
                     this.closeSelector();
                     if (onBack) {
@@ -2116,7 +1932,6 @@ class UIManager {
             }
         }
 
-        // ★項目名をスクロールの箱の中に作り直します！
         const isViewMode = (actionType === 'view_only' || actionType === 'all_busho_list');
         if (this.selectorList) {
             this.selectorList.innerHTML = `
@@ -2142,7 +1957,6 @@ class UIManager {
         }
 
         if (document.getElementById('selector-title')) {
-            // ★変更：ただ見るだけの時は「武将一覧」という名前にします
             if (actionType === 'view_only' || actionType === 'all_busho_list') {
                 document.getElementById('selector-title').textContent = "武将一覧";
             } else {
@@ -2304,7 +2118,6 @@ class UIManager {
             }
         };
 
-        // ★追加：誰も選んでいない時は決定ボタンを押せなくする魔法
         const updateBushoConfirmBtn = () => {
             if (!this.selectorConfirmBtn) return;
             if (actionType === 'view_only' || actionType === 'all_busho_list') return; 
@@ -2337,20 +2150,16 @@ class UIManager {
             
             let inputHtml = '';
             if (!isViewMode) {
-                // ★変更：透明な箱（span）をなくして、inputだけをこっそり作ります
                 inputHtml = `<input type="${inputType}" name="sel_busho" value="${b.id}" ${!isSelectable ? 'disabled' : ''} style="display:none;">`;
             }
             
-            // ★変更：一番左にあった透明な箱を消して、inputを「行動」の中に隠します！
             div.innerHTML = `<span class="col-act">${inputHtml}${b.isActionDone?'[済]':'[未]'}</span><span class="col-name">${b.name}</span><span class="col-rank">${b.getRankName()}</span><span class="col-stat">${getStat('leadership')}</span><span class="col-stat">${getStat('strength')}</span><span class="col-stat">${getStat('politics')}</span><span class="col-stat">${getStat('diplomacy')}</span><span class="col-stat">${getStat('intelligence')}</span><span class="col-stat">${getStat('charm')}</span>`;
             
             if(isSelectable && actionType !== 'view_only' && actionType !== 'all_busho_list') { 
                 div.onclick = (e) => {
-                    // ★ここに追加：武将を選んだ時（チェックを付けた時）の音
                     if (window.AudioManager) window.AudioManager.playSE('choice.ogg');
 
                     if(e.target.tagName === 'INPUT') { 
-                        // ... 以降の処理はそのまま ...
                         if(!isMulti) {
                             const siblings = this.selectorList.querySelectorAll('.select-item');
                             siblings.forEach(el => el.classList.remove('selected'));
@@ -2366,7 +2175,7 @@ class UIManager {
                         if(e.target.checked) div.classList.add('selected');
                         else div.classList.remove('selected');
                         updateContextCost();
-                        updateBushoConfirmBtn(); // ★追加
+                        updateBushoConfirmBtn(); 
                         return;
                     } 
                     const input = div.querySelector('input');
@@ -2384,7 +2193,7 @@ class UIManager {
                         }
                         if(input.checked) div.classList.add('selected'); else div.classList.remove('selected');
                         updateContextCost(); 
-                        updateBushoConfirmBtn(); // ★追加
+                        updateBushoConfirmBtn(); 
                     }
                 }; 
             }
@@ -2398,7 +2207,6 @@ class UIManager {
             } else {
                 this.selectorConfirmBtn.classList.remove('hidden');
                 
-                // ★追加：画面を開いた直後は「誰も選んでいない状態」にセットする
                 updateBushoConfirmBtn();
 
                 this.selectorConfirmBtn.onclick = () => {
@@ -2415,8 +2223,7 @@ class UIManager {
         }
     }
     
-    // ★ 修正: 兵科（足軽・騎馬・鉄砲）の選択UIと、持参した兵器（騎馬・鉄砲）の数による制限ロジックを追加
-    showUnitDivideModal(bushos, totalSoldiers, totalHorses, totalGuns, onConfirm, onCancel = null) { // ★修正：onCancel を受け取れるように追加
+    showUnitDivideModal(bushos, totalSoldiers, totalHorses, totalGuns, onConfirm, onCancel = null) { 
         const modal = document.getElementById('unit-divide-modal');
         const listEl = document.getElementById('divide-list');
         const confirmBtn = document.getElementById('divide-confirm-btn');
@@ -2425,20 +2232,18 @@ class UIManager {
         
         if (!modal || !listEl) return;
         
-        // フォールバック処理（旧呼び出し用）
         if (typeof totalHorses === 'function') {
-            onCancel = totalGuns; // ★引数がずれた場合の対応を追加
+            onCancel = totalGuns; 
             onConfirm = totalHorses;
             totalHorses = 0;
             totalGuns = 0;
         }
 
-        // ★追加：キャンセルボタンが押されたときの処理
         const cancelBtn = modal.querySelector('.btn-secondary');
         if (cancelBtn) {
             cancelBtn.onclick = () => {
                 modal.classList.add('hidden');
-                if (onCancel) onCancel(); // キャンセルの合図を送る！
+                if (onCancel) onCancel(); 
             };
         }
 
@@ -2465,7 +2270,6 @@ class UIManager {
             let usedHorses = 0;
             let usedGuns = 0;
             
-            // 各部隊の兵科と設定兵士数を取得
             const currentData = bushos.map(b => {
                 const typeEl = document.getElementById(`div-type-${b.id}`);
                 const numEl = document.getElementById(`div-num-${b.id}`);
@@ -2474,7 +2278,6 @@ class UIManager {
                 return { id: b.id, type: typeVal, count: numVal };
             });
 
-            // 兵科変更や数値変更時に持参上限を超えていないかチェックしてクリップする
             if (triggerType === 'type_change' && triggerBushoId) {
                 const bData = currentData.find(d => d.id === triggerBushoId);
                 if (bData && bData.type === 'kiba') {
@@ -2513,14 +2316,12 @@ class UIManager {
                 }
             }
 
-            // 各武将の兵士数合計を計算
             sum = currentData.reduce((s, d) => s + d.count, 0);
             usedHorses = currentData.filter(d => d.type === 'kiba').reduce((s, d) => s + d.count, 0);
             usedGuns = currentData.filter(d => d.type === 'teppo').reduce((s, d) => s + d.count, 0);
             
             const rem = totalSoldiers - sum;
 
-            // UIへの反映（最大値の変更はせず、値だけを合わせます）
             currentData.forEach(d => {
                 const range = document.getElementById(`div-range-${d.id}`);
                 const num = document.getElementById(`div-num-${d.id}`);
@@ -2581,7 +2382,6 @@ class UIManager {
             const onInput = (val, mode = 'normal') => {
                 let v = parseInt(val) || 0;
                 
-                // 動的に限界値を計算します
                 let otherSum = 0;
                 let otherHorses = 0;
                 let otherGuns = 0;
@@ -2659,54 +2459,37 @@ class UIManager {
         };
     }
 
-    // 面談の画面を出す処理（寿命チェック付き！）
     showInterviewModal(busho) {
         const currentYear = this.game.year;
-        
-        // ★ここを追加：今命令を出しているお城のデータを持ってきます！
         const castle = this.game.getCurrentTurnCastle();
 
         if (currentYear >= (busho.endYear - 1)) {
-            // 寿命が近い場合は、まずお医者さんに診せるか聞きます
-            // ★変更：メッセージに「消費：金２００」を付け足しました！
             this.showDialog(`${busho.name}は調子が悪そうだ。\n医師に診せますか？\n（消費：金２００）`, true, 
                 () => {
-                    // 「はい」を選んだ場合の処理です
-
-                    // ★ここを追加：お城の貯金箱に、金が200以上あるかチェックします！
                     if (castle.gold < 200) {
-                        // お金が足りない時は、ごめんなさいのメッセージを出します
                         this.showDialog("金が足りないため、医師を呼べませんでした……", false, () => {
-                            // そのあと、いつもの面談画面へ進みます
                             this.renderNormalInterview(busho);
                         });
-                        return; // ここで一旦ストップします
+                        return; 
                     }
 
-                    // お金が足りた場合は、お城の貯金箱から200減らします！
                     castle.gold -= 200;
-                    
-                    // 寿命を1年延ばしてあげます
                     busho.endYear = Number(busho.endYear) + 1;
                     this.showResultModal(`${busho.name}は少し顔色が良くなったようです`);
                     
-                    // ★ここを追加：減ったお金の数字を、画面の左側にすぐ反映させます！
                     this.updatePanelHeader();
                     this.renderCommandMenu();
                 },
                 () => {
-                    // 「いいえ」を選んだ場合は、いつもの面談画面を出します
                     this.renderNormalInterview(busho);
                 }
             );
-            return; // ここで一旦ストップします
+            return; 
         }
 
-        // 寿命が近くない場合は、最初からいつもの面談画面を出します
         this.renderNormalInterview(busho);
     }
 
-    // いつもの面談画面を作るための専用の魔法（さきほどと同じです！）
     renderNormalInterview(busho) {
         if (!this.resultModal) return;
         this.resultModal.classList.remove('hidden');
@@ -2744,12 +2527,11 @@ class UIManager {
             </div>
         `;
         if (this.resultBody) this.resultBody.innerHTML = msg;
-        this.hideAIGuardTemporarily(); // ★ここに追加
+        this.hideAIGuardTemporarily(); 
         if (this.resultModal) this.resultModal.classList.remove('hidden');
         this.onResultModalClose = onProceed;
     }
 
-    // ★ 修正: 出陣時、迎撃時に「持参騎馬」「持参鉄砲」を指定するスライダーを追加
     openQuantitySelector(type, data, targetId, extraData = null) {
         if (!this.quantityModal) return;
         this.quantityModal.classList.remove('hidden'); 
@@ -2758,7 +2540,6 @@ class UIManager {
         if (this.tradeTypeInfo) this.tradeTypeInfo.classList.add('hidden'); 
         const c = this.currentCastle;
 
-        // ★追加：スライダーの値を見て、0だったら決定ボタンを押せなくする魔法
         const checkValidQuantity = () => {
             if (!this.quantityConfirmBtn) return;
             let isValid = true;
@@ -2771,13 +2552,11 @@ class UIManager {
                 const gun = parseInt(document.getElementById('num-guns')?.value) || 0;
                 if (g === 0 && r === 0 && s === 0 && h === 0 && gun === 0) isValid = false;
             } else if (type === 'headhunt_gold' || type === 'charity') {
-                // 引抜の持参金は任意（0でもOK）、施しは金米固定なので常にOK
                 isValid = true; 
             } else if (type === 'war_supplies' || type === 'def_intercept' || type === 'def_reinf_supplies') {
                 const s = parseInt(document.getElementById('num-soldiers')?.value) || 0;
-                if (s <= 0) isValid = false; // 兵士0での出陣はダメ
+                if (s <= 0) isValid = false; 
             } else {
-                // その他の購入や徴兵などは、代表的な入力欄が0ならダメ
                 const inputsEl = document.querySelectorAll('.qty-control input[type="number"]');
                 if (inputsEl.length > 0) {
                     const val = parseInt(inputsEl[0].value) || 0;
@@ -2819,7 +2598,7 @@ class UIManager {
                 if (v > actualMax) v = actualMax;
                 range.value = v;
                 num.value = v;
-                checkValidQuantity(); // ★追加
+                checkValidQuantity(); 
             };
 
             wrap.querySelector(`#btn-min-${id}`).onclick = () => setVal(minVal);
@@ -2829,7 +2608,7 @@ class UIManager {
             };
             wrap.querySelector(`#btn-max-${id}`).onclick = () => setVal(parseInt(range.max));
 
-            range.oninput = () => { num.value = range.value; checkValidQuantity(); }; // ★変更
+            range.oninput = () => { num.value = range.value; checkValidQuantity(); }; 
 
             num.oninput = () => {
                 let actualMax = parseInt(range.max);
@@ -2839,7 +2618,7 @@ class UIManager {
                 if (v > actualMax) v = actualMax;
                 if (num.value != v) num.value = v; 
                 range.value = v; 
-                checkValidQuantity(); // ★追加
+                checkValidQuantity(); 
             };
             
             num.onblur = () => {
@@ -2847,7 +2626,7 @@ class UIManager {
                     num.value = minVal;
                     range.value = minVal;
                 }
-                checkValidQuantity(); // ★追加
+                checkValidQuantity(); 
             };
 
             this.quantityContainer.appendChild(wrap); 
@@ -2871,7 +2650,6 @@ class UIManager {
             inputs.horses = createSlider("持参騎馬", "horses", c.horses, 0);
             inputs.guns = createSlider("持参鉄砲", "guns", c.guns, 0);
         } else if (type === 'def_intercept') { 
-            // ★修正：別の城（c）ではなく、攻められた城（interceptCastle）のデータを正しく読み込むようにしました！
             const interceptCastle = (data && data.length > 0) ? data[0] : c;
             document.getElementById('quantity-title').textContent = "迎撃部隊編成"; 
             inputs.soldiers = createSlider("出陣兵士数", "soldiers", interceptCastle.soldiers, interceptCastle.soldiers);
@@ -2902,7 +2680,6 @@ class UIManager {
             inputs.amount = createSlider("売却量(米)", "amount", c.rice, 0);
         } else if (type === 'buy_ammo') {
             document.getElementById('quantity-title').textContent = "矢弾購入"; 
-            // ★相場を消して、固定金額（もし設定が無ければ1）にします
             const price = parseInt(window.MainParams.Economy.PriceAmmo, 10) || 1;
             const maxBuy = price > 0 ? Math.floor(c.gold / price) : 0;
             this.tradeTypeInfo.classList.remove('hidden'); 
@@ -2910,7 +2687,6 @@ class UIManager {
             inputs.amount = createSlider("購入量", "amount", maxBuy, 0);
         } else if (type === 'buy_horses') {
             document.getElementById('quantity-title').textContent = "騎馬購入"; 
-            // ★相場を消して、固定金額（もし設定が無ければ5）にします
             const price = parseInt(window.MainParams.Economy.PriceHorse, 10) || 5;
             const maxBuy = price > 0 ? Math.floor(c.gold / price) : 0;
             this.tradeTypeInfo.classList.remove('hidden'); 
@@ -2918,7 +2694,6 @@ class UIManager {
             inputs.amount = createSlider("購入量", "amount", maxBuy, 0);
         } else if (type === 'buy_guns') {
             document.getElementById('quantity-title').textContent = "鉄砲購入"; 
-            // ★相場を消して、固定金額（もし設定が無ければ50）にします
             const price = parseInt(window.MainParams.Economy.PriceGun, 10) || 50;
             const maxBuy = price > 0 ? Math.floor(c.gold / price) : 0;
             this.tradeTypeInfo.classList.remove('hidden'); 
@@ -2932,9 +2707,8 @@ class UIManager {
             inputs.soldiers = createSlider("使用兵士数", "soldiers", maxSoldiers, Math.min(50, maxSoldiers));
         }
         
-        checkValidQuantity(); // ★追加：画面を開いた直後に一度チェックする
+        checkValidQuantity(); 
 
-        // ★追加：ウインドウを閉じる時にボタンを元気な状態に戻す魔法
         const closeQuantityModal = () => {
             this.quantityModal.classList.add('hidden');
             if (this.quantityConfirmBtn) {
@@ -2944,7 +2718,7 @@ class UIManager {
         };
 
         this.quantityConfirmBtn.onclick = () => {
-            closeQuantityModal(); // ★変更
+            closeQuantityModal(); 
             if ((type === 'def_intercept' || type === 'def_reinf_supplies') && extraData && extraData.onConfirm) {
                 extraData.onConfirm(inputs);
             } else {
@@ -2952,13 +2726,12 @@ class UIManager {
             }
         };
 
-        // ★追加：キャンセルボタン（戻る）を押したときの処理
         const cancelBtn = this.quantityModal.querySelector('.btn-secondary');
         if (cancelBtn) {
             cancelBtn.onclick = () => {
-                closeQuantityModal(); // ★変更
+                closeQuantityModal(); 
                 if (extraData && extraData.onCancel) {
-                    extraData.onCancel(); // キャンセルの合図を送る！
+                    extraData.onCancel(); 
                 }
             };
         }
@@ -2975,9 +2748,9 @@ class UIManager {
         if(backBtn) {
             backBtn.onclick = () => {
                 const listHeader = document.querySelector('#selector-modal .list-header');
-                if (listHeader) listHeader.style.display = ''; // ヘッダーを戻す
+                if (listHeader) listHeader.style.display = ''; 
                 this.closeSelector();
-                if (onCancel) onCancel(); // 国衆画面の正しいキャンセル処理
+                if (onCancel) onCancel(); 
             };
         }
 
@@ -2987,11 +2760,10 @@ class UIManager {
             contextEl.classList.remove('hidden');
         }
 
-        // 武将リスト用のヘッダー（名前、統率など）を隠します
         const listHeader = document.querySelector('#selector-modal .list-header');
         if (listHeader) listHeader.style.display = 'none';
 
-        let selectedKunishuId = null; // 選んだ国衆を記憶する箱
+        let selectedKunishuId = null; 
 
         if (this.selectorList) {
             this.selectorList.innerHTML = `
@@ -3006,7 +2778,6 @@ class UIManager {
                 const name = k.getName(window.GameApp);
                 const relVal = k.getRelation(window.GameApp.playerClanId);
                 
-                // ★追加：友好度を赤・青のゲージにする魔法
                 const relPercent = Math.min(100, Math.max(0, Number(relVal) || 0));
                 const friendBarHtml = `<div class="bar-bg bar-bg-friend"><div class="bar-fill bar-fill-friend" style="width:${relPercent}%;"></div></div>`;
 
@@ -3014,29 +2785,23 @@ class UIManager {
                 div.className = 'kunishu-list-item'; 
                 
                 if (isViewOnly) {
-                    // ★変更：数字の代わりにゲージを表示します
                     div.innerHTML = `<strong class="col-kunishu-name">${name}</strong><span>${k.soldiers}</span><span>${k.defense}</span><span>${friendBarHtml}</span>`;
                     div.style.cursor = 'default';
                 } else {
-                    // ★変更：数字の代わりにゲージを表示します
                     div.innerHTML = `<span></span><strong class="col-kunishu-name">${name}</strong><span>${k.soldiers}</span><span>${k.defense}</span><span>${friendBarHtml}</span>`;
                     div.style.cursor = 'pointer';
                     
                     div.onclick = () => {
-                        // ★追加：国人衆を選んだ時の音
                         if (window.AudioManager) window.AudioManager.playSE('choice.ogg');
                         
-                        // 一旦すべての選択色を消す
                         const allItems = this.selectorList.querySelectorAll('.kunishu-list-item');
                         allItems.forEach(item => {
                             item.classList.remove('selected');
                         });
                         
-                        // クリックした行に色を付ける
                         div.classList.add('selected');
                         selectedKunishuId = k.id;
                         
-                        // 決定ボタンを押せるようにする
                         if (this.selectorConfirmBtn) {
                             this.selectorConfirmBtn.disabled = false;
                             this.selectorConfirmBtn.style.opacity = 1.0;
@@ -3049,17 +2814,15 @@ class UIManager {
         
         if (this.selectorConfirmBtn) {
             if (isViewOnly) {
-                // 見るだけの時は決定ボタンを隠す
                 this.selectorConfirmBtn.classList.add('hidden');
             } else {
-                // 選ぶ時は決定ボタンを表示して、最初は押せないようにしておく
                 this.selectorConfirmBtn.classList.remove('hidden');
                 this.selectorConfirmBtn.disabled = true;
                 this.selectorConfirmBtn.style.opacity = 0.5;
 
                 this.selectorConfirmBtn.onclick = () => {
                     if (selectedKunishuId !== null) {
-                        if (listHeader) listHeader.style.display = ''; // ヘッダーを戻す
+                        if (listHeader) listHeader.style.display = ''; 
                         this.closeSelector();
                         if (onSelect) onSelect(selectedKunishuId); 
                     }
@@ -3114,12 +2877,10 @@ class UIManager {
             setTxt('war-title-name', `${s.defender.name} 攻防戦`);
         }
 
-        // 攻撃軍の情報を入れます
         const atkClan = this.game.clans.find(c => c.id === s.attacker.ownerClan);
         const atkName = s.attacker.isKunishu ? s.attacker.name : (atkClan ? atkClan.name : "野武士");
         setTxt('war-atk-name', atkName);
         
-        // ★ここを追加：名前が5文字以上なら、タイトル全体を小さくする魔法をかけます！
         const atkTitleEl = document.getElementById('war-atk-name').parentElement;
         if (atkName.length >= 5) {
             atkTitleEl.classList.add('title-long-text');
@@ -3134,12 +2895,10 @@ class UIManager {
         setTxt('war-atk-rice', s.attacker.rice); 
         updateFace('war-atk-face', s.atkBushos[0]);
         
-        // 守備軍の情報を入れます
         const defClan = this.game.clans.find(c => c.id === s.defender.ownerClan);
         const defNameText = s.defender.isKunishu ? s.defender.name : (defClan ? defClan.name : "野武士");
         setTxt('war-def-name', defNameText);
         
-        // ★ここを追加：守備側も同じように、長ければ小さくする魔法をかけます！
         const defTitleEl = document.getElementById('war-def-name').parentElement;
         if (defNameText.length >= 5) {
             defTitleEl.classList.add('title-long-text');
@@ -3161,23 +2920,18 @@ class UIManager {
         const s = this.game.warManager.state;
         const pid = Number(this.game.playerClanId);
         
-        // 自分が攻撃側か守備側かを判定
         const amIAttacker = (Number(s.attacker.ownerClan) === pid);
         const amIDefender = (Number(s.defender.ownerClan) === pid);
         
-        // 今がプレイヤーの操作する番かどうか
         const isMyTurn = (isAtkTurn && amIAttacker) || (!isAtkTurn && amIDefender);
         
-        // ★変更：自分の番じゃなくてもコマンドを組み立てて画面に出すようにしました
         let options = [];
         if (amIAttacker || (isAtkTurn && !amIDefender)) {
-            // 自分が攻撃側（または完全観戦中）なら攻撃コマンド
             options = [
                 { label: "突撃", type: "charge" }, { label: "斉射", type: "bow" }, { label: "城攻め", type: "siege" },
                 { label: "火計", type: "fire" }, { label: "謀略", type: "scheme" }, { label: "撤退", type: "retreat" }
             ];
         } else {
-            // 自分が守備側なら守備コマンド
             options = [
                 { label: "突撃", type: "def_charge" }, { label: "斉射", type: "def_bow" }, { label: "籠城", type: "def_attack" },
                 { label: "謀略", type: "scheme" }, { label: "補修", type: "repair_setup" }
@@ -3187,19 +2941,16 @@ class UIManager {
             }
         }
 
-        // コマンドボタンを画面に作ります（消さずに残します）
         this.warControls.innerHTML = '';
         options.forEach(cmd => {
             const btn = document.createElement('button');
             btn.textContent = cmd.label;
             btn.onclick = () => {
-                // 自分の番の時だけボタンが効くようにします
                 if(isMyTurn) this.game.warManager.execWarCmd(cmd.type);
             };
             this.warControls.appendChild(btn);
         });
 
-        // ★追加：自分の番じゃない時は、ボタンの上に半透明の黒い膜（思考中ガード）をかぶせます！
         const guard = document.getElementById('war-ai-guard');
         if (!isMyTurn) {
             this.warControls.classList.add('disabled-area');
@@ -3209,7 +2960,6 @@ class UIManager {
                 if (textEl) textEl.textContent = isAtkTurn ? "攻撃軍 思考中..." : "守備軍 思考中...";
             }
         } else {
-            // 自分の番が回ってきたら膜を取り除きます
             this.warControls.classList.remove('disabled-area');
             if (guard) guard.classList.add('hidden');
         }
@@ -3227,7 +2977,6 @@ class UIManager {
                 const div = document.createElement('div'); div.className = 'scenario-item';
                 div.innerHTML = `<div class="scenario-title">${c.name}</div><div class="scenario-desc">兵数:${c.soldiers} 防御:${c.defense}</div>`;
                 div.onclick = () => { 
-                    // ★追加：撤退先を選んだ時の音
                     if (window.AudioManager) window.AudioManager.playSE('choice.ogg');
                     
                     this.scenarioScreen.classList.add('hidden'); 
@@ -3250,7 +2999,6 @@ class UIManager {
                 div.style.justifyContent = 'space-between';
                 div.style.alignItems = 'center';
                 
-                // ★追加：登用を拒否した武将はボタンを押せないようにする魔法
                 let hireBtnHtml = '';
                 if (p.hasRefusedHire) {
                     hireBtnHtml = `<button class="btn-primary" disabled style="opacity:0.5; background-color: #666;">拒否</button>`;
@@ -3280,7 +3028,6 @@ class UIManager {
     showDaimyoPrisonerModal(prisoner) {
         this.hideAIGuardTemporarily();
         
-        // ★追加：登用を拒否した大名はボタンを押せないようにする魔法
         let hireBtnHtml = '';
         if (prisoner.hasRefusedHire) {
             hireBtnHtml = `<button class="btn-primary" disabled style="opacity:0.5; background-color: #666;">拒否</button>`;
@@ -3299,7 +3046,6 @@ class UIManager {
                 </div>
             </div>
         `;
-        // ボタンだけの特別な画面を出します
         this.showResultModal(content, null, ""); 
     }
     
@@ -3321,7 +3067,6 @@ class UIManager {
         }
     }
     
-    // ★ここから下を追加：援軍を選ぶ画面を出す機能です
     showReinforcementSelector(candidateCastles, atkCastle, targetCastle, atkBushos, sVal, rVal, hVal, gVal) {
         if (!this.selectorModal) return;
         this.selectorModal.classList.remove('hidden');
@@ -3330,12 +3075,11 @@ class UIManager {
         if (title) title.textContent = "援軍の要請";
 
         const listHeader = document.querySelector('#selector-modal .list-header');
-        if (listHeader) listHeader.style.display = 'none'; // ヘッダーは消す
+        if (listHeader) listHeader.style.display = 'none'; 
         
         const backBtn = document.querySelector('#selector-modal .btn-secondary');
         if(backBtn) {
             backBtn.onclick = () => {
-                // キャンセルしたら援軍なしで戦争スタート！
                 if (listHeader) listHeader.style.display = '';
                 this.closeSelector();
                 this.game.warManager.startWar(atkCastle, targetCastle, atkBushos, sVal, rVal, hVal, gVal);
@@ -3356,16 +3100,14 @@ class UIManager {
                 const rel = this.game.getRelation(this.game.playerClanId, c.ownerClan);
                 
                 const div = document.createElement('div');
-                div.className = 'kunishu-item'; // デザインは国衆のものを流用して綺麗にします
+                div.className = 'kunishu-item'; 
                 div.innerHTML = `<strong style="margin-right:10px;">${clanName} (${c.name})</strong> <span style="font-size:0.9rem; color:#555;">(兵数:${c.soldiers} 友好度:${rel.sentiment} [${rel.status}])</span>`;
                 
                 div.onclick = () => { 
-                    // ★追加：援軍の城を選んだ時の音
                     if (window.AudioManager) window.AudioManager.playSE('choice.ogg');
                     
                     if (listHeader) listHeader.style.display = '';
                     this.closeSelector();
-                    // 城を選んだら、お金を送る画面に進みます！
                     this.showReinforcementGoldSelector(c, atkCastle, targetCastle, atkBushos, sVal, rVal, hVal, gVal);
                 };
                 this.selectorList.appendChild(div);
@@ -3378,14 +3120,12 @@ class UIManager {
     }
 
     showReinforcementGoldSelector(helperCastle, atkCastle, targetCastle, atkBushos, sVal, rVal, hVal, gVal) {
-        // 相手を「支配」しているならお金は送らない
         const rel = this.game.getRelation(this.game.playerClanId, helperCastle.ownerClan);
         if (rel.status === '支配') {
             this.game.commandSystem.executeReinforcementRequest(0, helperCastle, atkCastle, targetCastle, atkBushos, sVal, rVal, hVal, gVal);
             return;
         }
 
-        // お金を送るスライダー画面の準備
         if (!this.quantityModal) return;
         this.quantityModal.classList.remove('hidden'); 
         if (this.quantityContainer) this.quantityContainer.innerHTML = '';
@@ -3394,7 +3134,6 @@ class UIManager {
 
         document.getElementById('quantity-title').textContent = "援軍の使者に持たせる金 (最大1500)"; 
         
-        // 自分の城の金と1500の、少ない方が上限です
         const maxGold = Math.min(1500, atkCastle.gold);
 
         const wrap = document.createElement('div'); 
@@ -3434,7 +3173,6 @@ class UIManager {
         this.quantityConfirmBtn.onclick = () => {
             this.quantityModal.classList.add('hidden');
             const gold = parseInt(num.value) || 0;
-            // 決定したら援軍の計算処理にバトンタッチ！
             this.game.commandSystem.executeReinforcementRequest(gold, helperCastle, atkCastle, targetCastle, atkBushos, sVal, rVal, hVal, gVal);
         };
 
@@ -3442,13 +3180,11 @@ class UIManager {
         if (cancelBtn) {
             cancelBtn.onclick = () => {
                 this.quantityModal.classList.add('hidden');
-                // キャンセルしたら援軍なしで戦争をスタートする！
                 this.game.warManager.startWar(atkCastle, targetCastle, atkBushos, sVal, rVal, hVal, gVal);
             };
         }
     }
     
-    // ★ここから追加: 守備側（攻められた時）の援軍を選ぶ画面です
     showDefReinforcementSelector(candidateCastles, defCastle, onComplete) {
         if (!this.selectorModal) return;
         this.selectorModal.classList.remove('hidden');
@@ -3463,7 +3199,6 @@ class UIManager {
             backBtn.onclick = () => {
                 if (listHeader) listHeader.style.display = '';
                 this.closeSelector();
-                // キャンセルしたら援軍なしで迎撃・籠城の選択へ進みます
                 onComplete();
             };
         }
@@ -3484,12 +3219,10 @@ class UIManager {
                 div.innerHTML = `<strong style="margin-right:10px;">${clanData ? clanData.name : "不明"} (${c.name})</strong> <span style="font-size:0.9rem; color:#555;">(兵数:${c.soldiers} 友好度:${rel.sentiment} [${rel.status}])</span>`;
                 
                 div.onclick = () => { 
-                    // ★追加：防衛の援軍の城を選んだ時の音
                     if (window.AudioManager) window.AudioManager.playSE('choice.ogg');
                     
                     if (listHeader) listHeader.style.display = '';
                     this.closeSelector();
-                    // 城を選んだら、お金の選択画面へ！
                     this.showDefReinforcementGoldSelector(c, defCastle, onComplete);
                 };
                 this.selectorList.appendChild(div);
@@ -3550,16 +3283,14 @@ class UIManager {
         this.quantityConfirmBtn.onclick = () => {
             this.quantityModal.classList.add('hidden');
             const gold = parseInt(num.value) || 0;
-            // 決定したら援軍の計算処理にバトンタッチ！
             this.game.warManager.executeDefReinforcement(gold, helperCastle, defCastle, onComplete);
         };
 
-        // ★追加：キャンセルボタンが押されたときの処理
         const cancelBtn = this.quantityModal.querySelector('.btn-secondary');
         if (cancelBtn) {
             cancelBtn.onclick = () => {
                 this.quantityModal.classList.add('hidden');
-                onComplete(); // キャンセルしたら援軍なしで進める！
+                onComplete(); 
             };
         }
     }
