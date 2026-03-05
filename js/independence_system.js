@@ -249,10 +249,7 @@ class IndependenceSystem {
         
         this.game.ui.log(msg);
         if (captiveMsgs && captiveMsgs.length > 0) msg += '\n\n' + captiveMsgs.join('\n');
-        // 「閉じる」が押されるまで、ここで処理をストップさせます
-        await new Promise(resolve => {
-            this.game.ui.showResultModal(msg, resolve);
-        });
+        await this.game.ui.showDialogAsync(msg, false, 0);
     }
 
     calculateLoyaltyScores(busho, newDaimyo, oldDaimyo) {
