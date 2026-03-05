@@ -1950,6 +1950,9 @@ class CommandSystem {
             );
             if (normalBushos.length === 0) return;
 
+            // ★追加: プレイヤーの城は、現状「AIからの援軍要請を受けるUI」がないため対象から外します
+            if (c.ownerClan === pid && myClanId !== pid) return;
+
             candidateCastles.push(c);
         });
 
@@ -1960,7 +1963,15 @@ class CommandSystem {
         }
 
         // 呼べる城があったら、UIに「誰を呼ぶ？」と聞く画面を出してもらいます
-        this.game.ui.showReinforcementSelector(candidateCastles, atkCastle, targetCastle, atkBushos, sVal, rVal, hVal, gVal);
+        if (myClanId === pid) {
+            // プレイヤーならUIに「誰を呼ぶ？」と聞く画面を出してもらいます
+            this.game.ui.showReinforcementSelector(candidateCastles, atkCastle, targetCastle, atkBushos, sVal, rVal, hVal, gVal);
+        } else {
+            // ★追加: AIが攻撃側の場合、一番兵士が多い城に自動で援軍を頼みます！
+            candidateCastles.sort((a,b) => b.soldiers - a.soldiers);
+            const bestCastle = candidateCastles[0];
+            this.executeReinforcementRequest(0, bestCastle, atkCastle, targetCastle, atkBushos, sVal, rVal, hVal, gVal);
+        }
     }
     
     // ★追加: 援軍が来てくれるかどうかの計算をして、出陣準備をする機能です
@@ -2011,10 +2022,14 @@ class CommandSystem {
 
         // もし断られてしまったら……
         if (!isSuccess) {
-            this.game.ui.showDialog(`${helperCastle.name}への援軍要請は断られました……\n自軍のみで出陣します。`, false, () => {
-                // 援軍なし（今まで通り）で戦争を始めます
+            if (myClanId === this.game.playerClanId) {
+                this.game.ui.showDialog(`${helperCastle.name}への援軍要請は断られました……\n自軍のみで出陣します。`, false, () => {
+                    this.game.warManager.startWar(atkCastle, targetCastle, atkBushos, sVal, rVal, hVal, gVal);
+                });
+            } else {
+                // AIならダイアログを出さずに出陣
                 this.game.warManager.startWar(atkCastle, targetCastle, atkBushos, sVal, rVal, hVal, gVal);
-            });
+            }
             return;
         }
 
@@ -2071,11 +2086,20 @@ class CommandSystem {
 
         const helperClanName = this.game.clans.find(c => c.id === helperClanId)?.name || "援軍";
         
-        // メッセージを出して、いざ出陣！
-        this.game.ui.showDialog(`${helperClanName} (${helperCastle.name}) が援軍要請を承諾しました！\n共に ${targetCastle.name} へ出陣します！`, false, () => {
-            // ★第３歩目で改造する予定の startWar に、まとめた「援軍パック(reinforcementData)」を渡します！
+        // ★追加: 攻撃側援軍が参戦したことによる、守備側との友好度低下
+        this.game.warManager.applyWarHostility(helperClanId, false, enemyClanId, targetCastle.isKunishu, true);
+        
+        if (myClanId === this.game.playerClanId) {
+            // メッセージを出して、いざ出陣！
+            this.game.ui.showDialog(`${helperClanName} (${helperCastle.name}) が援軍要請を承諾しました！\n共に ${targetCastle.name} へ出陣します！`, false, () => {
+                // まとめた「援軍パック(reinforcementData)」を渡します！
+                this.game.warManager.startWar(atkCastle, targetCastle, atkBushos, sVal, rVal, hVal, gVal, reinforcementData);
+            });
+        } else {
+            // ★AIの場合はダイアログを出さず、ログだけ残して出陣
+            this.game.ui.log(`【援軍情報】${atkCastle.name}軍の要請により、${helperClanName}が攻撃の援軍として参戦しました。`);
             this.game.warManager.startWar(atkCastle, targetCastle, atkBushos, sVal, rVal, hVal, gVal, reinforcementData);
-        });
+        }
     }
     
 }

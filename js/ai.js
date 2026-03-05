@@ -372,14 +372,17 @@ class AIEngine {
 
     // ★ここを async に書き足します
     async executeAttack(source, target, general, sendSoldiers, sendRice) {
-    // ★ここを書き換えます：条件を満たさず攻撃できなかった時も、ターンを終わらせて固まるのを防ぎます！
     if (sendSoldiers <= 0 || sendRice <= 0) {
         this.game.finishTurn();
         return;
     }
     const bushos = this.game.getCastleBushos(source.id).filter(b => b.status !== 'ronin');
     const sorted = bushos.sort((a,b) => b.leadership - a.leadership).slice(0, 3);
-    this.game.warManager.startWar(source, target, sorted, sendSoldiers, sendRice);
+
+    // ★修正: AIもプレイヤーと同様に、援軍を探す処理へバトンタッチします
+    const sendHorses = source.horses || 0;
+    const sendGuns = source.guns || 0;
+    this.game.commandSystem.checkReinforcementAndStartWar(source, target.id, sorted, sendSoldiers, sendRice, sendHorses, sendGuns);
 
     // ★ここから下を書き足します（戦争が終わるまで待つ魔法！）
     while (this.game.warManager.state.active) {

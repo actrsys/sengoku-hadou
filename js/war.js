@@ -2125,6 +2125,8 @@ class WarManager {
         if (myClanId === this.game.playerClanId || helperClanId === this.game.playerClanId) {
             this.game.ui.showDialog(`${helperClanName} (${helperCastle.name}) が防衛の援軍に駆けつけました！`, false, onComplete);
         } else {
+            // ★ AI同士の防衛援軍でもログを残す
+            this.game.ui.log(`【援軍情報】${defCastle.name}の要請により、${helperClanName}が防衛の援軍として駆けつけました。`);
             onComplete();
         }
     }
