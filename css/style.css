@@ -1672,3 +1672,35 @@ body.is-pc .faction-list-container { scroll-padding-top: 38px; }
     z-index: -1; 
     pointer-events: none; 
 }
+/* =========================================================
+   ★ 城の外交関係による光の縁取り魔法
+   ========================================================= */
+/* 自領（青） */
+.castle-card.glow-blue { 
+    filter: drop-shadow(0 0 6px rgba(66, 165, 245, 0.8)) drop-shadow(0 0 10px rgba(30, 136, 229, 0.8)); 
+}
+.castle-card.glow-blue:hover { 
+    filter: drop-shadow(0 0 8px rgba(66, 165, 245, 1)) drop-shadow(0 0 12px rgba(30, 136, 229, 1)); 
+    transform: translate(-50%, calc(-50% - 2px)) scale(0.41); 
+    z-index: 20;
+}
+
+/* 敵対（赤） */
+.castle-card.glow-red { 
+    filter: drop-shadow(0 0 6px rgba(239, 83, 80, 0.8)) drop-shadow(0 0 10px rgba(229, 57, 53, 0.8)); 
+}
+.castle-card.glow-red:hover { 
+    filter: drop-shadow(0 0 8px rgba(239, 83, 80, 1)) drop-shadow(0 0 12px rgba(229, 57, 53, 1)); 
+    transform: translate(-50%, calc(-50% - 2px)) scale(0.41); 
+    z-index: 20;
+}
+
+/* 友好・同盟・支配・従属（緑） */
+.castle-card.glow-green { 
+    filter: drop-shadow(0 0 6px rgba(102, 187, 106, 0.8)) drop-shadow(0 0 10px rgba(67, 160, 71, 0.8)); 
+}
+.castle-card.glow-green:hover { 
+    filter: drop-shadow(0 0 8px rgba(102, 187, 106, 1)) drop-shadow(0 0 12px rgba(67, 160, 71, 1)); 
+    transform: translate(-50%, calc(-50% - 2px)) scale(0.41); 
+    z-index: 20;
+}
