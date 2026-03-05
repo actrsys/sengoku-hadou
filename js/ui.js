@@ -1119,7 +1119,8 @@ class UIManager {
         
         if (this.zoomLevel === undefined) {
             if (this.game.phase === 'daimyo_select') {
-                this.zoomLevel = 0; 
+                // 0 番目：一番小さいサイズ（min） 1 番目：中くらいのサイズ（mid） 2 番目：一番大きいサイズ（max）
+                this.zoomLevel = 1; 
             } else {
                 this.zoomLevel = 1; 
             }
