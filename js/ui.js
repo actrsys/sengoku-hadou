@@ -1731,6 +1731,39 @@ class UIManager {
             } else {
                 el.style.cursor = 'default'; 
             }
+            
+            // ★追加：マウスが乗った時に画面の端っこか計算して、見切れないようにする魔法
+            el.onmouseenter = () => {
+                // お城の今の位置と、画面（マップが見えている範囲）の枠の大きさを測ります
+                const rect = el.getBoundingClientRect();
+                const containerRect = document.getElementById('map-scroll-container').getBoundingClientRect();
+                
+                // お城のど真ん中の座標を計算します
+                const cx = rect.left + rect.width / 2;
+                const cy = rect.top + rect.height / 2;
+
+                // 一旦、過去のズラし設定をリセットします
+                el.classList.remove('tooltip-bottom', 'tooltip-left', 'tooltip-right');
+
+                // 上にはみ出しそうな時（上枠から100px以内）は、下に出す合図を出します
+                if (cy - containerRect.top < 100) { 
+                    el.classList.add('tooltip-bottom');
+                }
+                // 左にはみ出しそうな時（左枠から120px以内）は、右寄りにする合図を出します
+                if (cx - containerRect.left < 120) { 
+                    el.classList.add('tooltip-left');
+                } 
+                // 右にはみ出しそうな時（右枠から120px以内）は、左寄りにする合図を出します
+                else if (containerRect.right - cx < 120) { 
+                    el.classList.add('tooltip-right');
+                }
+            };
+
+            // マウスが離れたら、ズラし設定をリセットしておきます
+            el.onmouseleave = () => {
+                el.classList.remove('tooltip-bottom', 'tooltip-left', 'tooltip-right');
+            };
+            
             this.mapEl.appendChild(el);
         });
     }
