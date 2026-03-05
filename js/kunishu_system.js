@@ -163,6 +163,13 @@ class KunishuSystem {
         const clanData = this.game.clans.find(c => c.id === clanId);
         if (!leader || !clanData) return;
 
+        // 国人衆の名前と、大名家の名前を準備します！
+        const kunishuName = kunishu.getName(this.game);
+        const clanName = clanData.name;
+        
+        // ★ここから追加：この城が「プレイヤー（自分）の城」かどうかを調べる魔法です
+        const isPlayerCastle = (clanId === this.game.playerClanId);
+
         // 友好 (70以上)
         if (currentRel >= 70) {
             // 献上 (無から湧く、最大現在兵力÷3、魅力で増加)
@@ -172,19 +179,28 @@ class KunishuSystem {
             if (amount < 10) return;
 
             if (Math.random() > 0.5) {
-                // ★追加：あとどれくらい入るか計算して、はみ出ないようにします
                 let maxAdd = 99999 - castle.gold;
                 let actualAmount = Math.min(amount, maxAdd);
                 if (actualAmount > 0) {
                     castle.gold += actualAmount;
-                    this.game.ui.log(`【国衆支援】${castle.name}の国人衆が、金${actualAmount}を献上してきました。`);
+                    
+                    // 文章を作って、まずはいつものようにログに書き込みます
+                    const msg = `【国衆支援】\n${kunishuName}が、${clanName}の${castle.name}に金${actualAmount}を献上しました。`;
+                    this.game.ui.log(msg.replace('\n', '')); // ログ用には改行を消してスッキリさせます
+                    
+                    // ★ここを追加：自分の城なら、画面にメッセージを出して「閉じる」まで待ちます！
+                    if (isPlayerCastle) await this.game.ui.showDialogAsync(msg);
                 }
             } else {
                 let maxAdd = 99999 - castle.rice;
                 let actualAmount = Math.min(amount, maxAdd);
                 if (actualAmount > 0) {
                     castle.rice += actualAmount;
-                    this.game.ui.log(`【国衆支援】${castle.name}の国人衆が、兵糧${actualAmount}を献上してきました。`);
+                    
+                    const msg = `【国衆支援】\n${kunishuName}が、${clanName}の${castle.name}に兵糧${actualAmount}を献上しました。`;
+                    this.game.ui.log(msg.replace('\n', ''));
+                    
+                    if (isPlayerCastle) await this.game.ui.showDialogAsync(msg);
                 }
             }
         } 
@@ -200,20 +216,27 @@ class KunishuSystem {
 
                 if (Math.random() > 0.5 && castle.gold > amount) {
                     castle.gold -= amount;
-                    this.game.ui.log(`【国衆妨害】${castle.name}の国人衆に、金${amount}を奪われました！`);
+                    
+                    const msg = `【国衆妨害】\n${kunishuName}が、${clanName}の${castle.name}で略奪を働き、金${amount}を奪いました！`;
+                    this.game.ui.log(msg.replace('\n', ''));
+                    
+                    if (isPlayerCastle) await this.game.ui.showDialogAsync(msg);
                 } else if (castle.rice > amount) {
                     castle.rice -= amount;
-                    this.game.ui.log(`【国衆妨害】${castle.name}の国人衆に、兵糧${amount}を奪われました！`);
+                    
+                    const msg = `【国衆妨害】\n${kunishuName}が、${clanName}の${castle.name}で略奪を働き、兵糧${amount}を奪いました！`;
+                    this.game.ui.log(msg.replace('\n', ''));
+                    
+                    if (isPlayerCastle) await this.game.ui.showDialogAsync(msg);
                 }
             } else {
                 // 蜂起（戦争）
-                // 強気・弱気の性格補正
                 let uprisingChance = 0.5;
                 if (leader.personality === 'aggressive') uprisingChance += 0.2;
                 if (leader.personality === 'cautious') uprisingChance -= 0.2;
 
                 if (Math.random() < uprisingChance && kunishu.soldiers > 500) {
-                    await this.executeUprising(kunishu, castle); // ★変更：await を付けます
+                    await this.executeUprising(kunishu, castle);
                 }
             }
         }
