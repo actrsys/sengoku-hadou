@@ -688,7 +688,8 @@ class GameManager {
         const totalSoldiers = this.getClanTotalSoldiers(clan.id);
         const leader = this.getBusho(clan.leaderId); 
         
-        this.ui.showDaimyoConfirmModal(clan.name, totalSoldiers, leader, () => {
+        // ★ 変更：引数に clan.id を追加して大名選択の光を制御します
+        this.ui.showDaimyoConfirmModal(clan.id, clan.name, totalSoldiers, leader, () => {
              this.playerClanId = Number(clan.id);
              this.phase = 'game';
              this.ui.renderMap(); 
