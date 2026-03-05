@@ -1543,26 +1543,29 @@ body.is-pc .faction-list-container { scroll-padding-top: 38px; }
     background-color: #37474f; 
 }
 /* =========================================================
-   ★ 城のホバー情報（普段は消しておき、カーソルが乗った時だけ出す魔法）
+   ★ 城のホバー情報（カーソルが乗った時だけ出す魔法）
    ========================================================= */
 .hover-info {
     position: absolute;
-    bottom: 90%; /* お城の画像の少し上に浮かせます */
+    bottom: 80%; /* お城の頭あたりをスタート地点にします */
     left: 50%;
-    transform: translateX(-50%);
-    background: rgba(0, 0, 0, 0.85); /* 半透明の黒い箱 */
+    
+    /* 揺れ防止！最初から小さくして、アニメーションは大きさ(scale)と透明度(opacity)だけにします */
+    transform: translateX(-50%) scale(0.5); 
+    transform-origin: bottom center; /* 下の真ん中を根元（飛び出してくる出発点）にします */
+    
+    background: rgba(0, 0, 0, 0.85);
     color: #fff;
     padding: 8px 15px;
-    border-radius: 6px; /* 少し丸っこくします */
+    border-radius: 6px;
     border: 1px solid #777;
-    pointer-events: none; /* マウスのクリックの邪魔をしないように */
+    pointer-events: none;
     
-    /* ★普段は消しておく魔法 */
     opacity: 0;           
     visibility: hidden;
-    transition: opacity 0.2s ease, transform 0.2s ease; 
+    /* transitionから位置移動を外すことで、謎の揺れを完全に防ぎます */
+    transition: opacity 0.15s ease-out, transform 0.15s ease-out; 
     
-    /* ★中身を縦に並べて「すべて左寄せ」にする魔法 */
     display: flex;
     flex-direction: column;
     align-items: flex-start;
@@ -1570,90 +1573,97 @@ body.is-pc .faction-list-container { scroll-padding-top: 38px; }
     z-index: 100;
 }
 
-/* お城にカーソルが乗った時にフワッと出して、少し上に浮かせる魔法 */
+/* お城にカーソルが乗った時に、元の大きさ(scale(1))に戻りながら現れる魔法 */
 .castle-card:hover .hover-info {
     opacity: 1;
     visibility: visible;
-    transform: translateX(-50%) translateY(-10px); 
+    transform: translateX(-50%) scale(1); 
 }
 
-/* 中の文字の大きさ（お城全体が0.41倍に縮小されているので、数字を大きく設定しています） */
 .hover-info .info-line {
     font-size: 2.2em; 
     line-height: 1.4;
     text-shadow: 1px 1px 2px #000;
 }
 
-/* 城名だけはさらに大きく、色を金色にして目立たせます */
 .hover-info .name {
     font-size: 2.8em; 
     font-weight: 900;
     color: #ffd700; 
     margin-bottom: 5px;
 }
-/* =========================================================
-   ★ 城画像の下側に、横長の楕円形の黒い影をつける魔法
-   ========================================================= */
-.castle-card {
-    /* 前にかかっていた「お城全体がボヤッと浮く影」を消してスッキリさせます */
-    filter: none !important; 
-}
-
-.castle-card::after {
-    content: "";
-    position: absolute;
-    bottom: 0px; /* お城の画像の足元ギリギリに配置 */
-    left: 50%;
-    transform: translateX(-50%);
-    width: 70%;  /* 横幅を広めにとって横長に */
-    height: 15%; /* 縦幅をペチャンコにして楕円形にします */
-    background: rgba(0, 0, 0, 0.6); /* 黒い半透明の影 */
-    border-radius: 50%; /* まん丸ではなく、潰れた楕円にします */
-    filter: blur(4px);  /* 影のフチを少しぼかして自然な影に！ */
-    z-index: -1; /* お城のイラストより奥（下）に置きます */
-    pointer-events: none; /* マウスの邪魔にならないようにします */
-}
 
 /* =========================================================
    ★ 見切れ防止！画面端にいる時のツールチップ位置ズラし魔法
    ========================================================= */
 
-/* --- 上に見切れそうな時は「城の下側」に出す --- */
-.castle-card.tooltip-bottom .hover-info {
-    bottom: auto; /* 上に出す設定を解除 */
-    top: 90%;     /* 代わりに下に出す */
-}
-.castle-card.tooltip-bottom:hover .hover-info {
-    transform: translateX(-50%) translateY(10px); /* フワッと動く方向も下向きに！ */
-}
-
 /* --- 左に見切れそうな時は「右寄り」に出す --- */
 .castle-card.tooltip-left .hover-info {
-    left: 0; /* 左端を基準にして内側に寄せます */
+    left: 0;
+    transform: translateX(0) scale(0.5);
+    transform-origin: bottom left; /* 左下を根元にする */
 }
 .castle-card.tooltip-left:hover .hover-info {
-    transform: translateX(0%) translateY(-10px); /* 横にズレないように固定 */
-}
-/* 上と左が両方重なった時（左上のカド） */
-.castle-card.tooltip-bottom.tooltip-left:hover .hover-info {
-    transform: translateX(0%) translateY(10px);
+    transform: translateX(0) scale(1); 
 }
 
 /* --- 右に見切れそうな時は「左寄り」に出す --- */
 .castle-card.tooltip-right .hover-info {
     left: auto;
-    right: 0; /* 右端を基準にして内側に寄せます */
+    right: 0;
+    transform: translateX(0) scale(0.5);
+    transform-origin: bottom right; /* 右下を根元にする */
 }
 .castle-card.tooltip-right:hover .hover-info {
-    transform: translateX(0%) translateY(-10px); /* 横にズレないように固定 */
+    transform: translateX(0) scale(1); 
 }
-/* 上と右が両方重なった時（右上のカド） */
-.castle-card.tooltip-bottom.tooltip-right:hover .hover-info {
-    transform: translateX(0%) translateY(10px);
+
+/* --- 上に見切れそうな時は「城の下側」に出す --- */
+.castle-card.tooltip-bottom .hover-info {
+    bottom: auto; 
+    top: 80%; /* 上から下に飛び出すように */
+    transform-origin: top center; /* 上の真ん中を根元にする */
 }
+.castle-card.tooltip-bottom:not(.tooltip-left):not(.tooltip-right) .hover-info {
+    transform: translateX(-50%) scale(0.5);
+}
+.castle-card.tooltip-bottom:not(.tooltip-left):not(.tooltip-right):hover .hover-info {
+    transform: translateX(-50%) scale(1);
+}
+
+/* 上と左が重なった時 */
+.castle-card.tooltip-bottom.tooltip-left .hover-info {
+    transform-origin: top left;
+}
+/* 上と右が重なった時 */
+.castle-card.tooltip-bottom.tooltip-right .hover-info {
+    transform-origin: top right;
+}
+
 /* =========================================================
    ★ 城情報（吹き出し）を他の城より絶対に手前に出す魔法
    ========================================================= */
 .castle-card:hover {
-    z-index: 100 !important; /* マウスが乗っているお城を、他のどのお城よりも一番手前に持ってくる！ */
+    z-index: 100 !important; 
+}
+
+/* =========================================================
+   ★ 城画像の下側に、横長の楕円形の黒い影をつける魔法
+   ========================================================= */
+.castle-card {
+    filter: none !important; 
+}
+.castle-card::after {
+    content: "";
+    position: absolute;
+    bottom: 0px; 
+    left: 50%;
+    transform: translateX(-50%);
+    width: 70%;  
+    height: 15%; 
+    background: rgba(0, 0, 0, 0.6); 
+    border-radius: 50%; 
+    filter: blur(4px);  
+    z-index: -1; 
+    pointer-events: none; 
 }
