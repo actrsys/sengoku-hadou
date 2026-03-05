@@ -1656,12 +1656,12 @@ body.is-pc .faction-list-container { scroll-padding-top: 38px; }
 .castle-card::after {
     content: "";
     position: absolute;
-    bottom: 0px; 
+    bottom: 20px; 
     left: 50%;
     transform: translateX(-50%);
     width: 70%;  
     height: 15%; 
-    background: rgba(0, 0, 0, 0.6); 
+    background: rgba(0, 0, 0, 0.9); 
     border-radius: 50%; 
     filter: blur(4px);  
     z-index: -1; 
