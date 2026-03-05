@@ -1546,11 +1546,16 @@ body.is-pc .faction-list-container { scroll-padding-top: 38px; }
 .hover-info {
     position: absolute;
     bottom: 80%; /* お城の頭あたりをスタート地点にします */
-    left: 50%;
     
-    /* 揺れ防止！最初から小さくして、アニメーションは大きさ(scale)と透明度(opacity)だけにします */
-    transform: translateX(-50%) scale(0.5); 
-    transform-origin: bottom center; /* 下の真ん中を根元（飛び出してくる出発点）にします */
+    /* ★究極の揺れ防止魔法！横ズラしを使わず、透明な余白でド真ん中に固定します */
+    left: -200%; 
+    right: -200%;
+    margin: 0 auto;
+    width: max-content;
+
+    /* ★移動(translate)を消したので、純粋に「大きさ」だけがアニメーションします */
+    transform: scale(0.5); 
+    transform-origin: bottom center; /* 下の真ん中を根元にします */
     
     background: rgba(0, 0, 0, 0.85);
     color: #fff;
@@ -1561,7 +1566,6 @@ body.is-pc .faction-list-container { scroll-padding-top: 38px; }
     
     opacity: 0;           
     visibility: hidden;
-    /* transitionから位置移動を外すことで、謎の揺れを完全に防ぎます */
     transition: opacity 0.15s ease-out, transform 0.15s ease-out; 
     
     display: flex;
@@ -1575,7 +1579,7 @@ body.is-pc .faction-list-container { scroll-padding-top: 38px; }
 .castle-card:hover .hover-info {
     opacity: 1;
     visibility: visible;
-    transform: translateX(-50%) scale(1); 
+    transform: scale(1); 
 }
 
 .hover-info .info-line {
@@ -1598,22 +1602,25 @@ body.is-pc .faction-list-container { scroll-padding-top: 38px; }
 /* --- 左に見切れそうな時は「右寄り」に出す --- */
 .castle-card.tooltip-left .hover-info {
     left: 0;
-    transform: translateX(0) scale(0.5);
+    right: auto;
+    margin: 0;
+    transform: scale(0.5);
     transform-origin: bottom left; /* 左下を根元にする */
 }
 .castle-card.tooltip-left:hover .hover-info {
-    transform: translateX(0) scale(1); 
+    transform: scale(1); 
 }
 
 /* --- 右に見切れそうな時は「左寄り」に出す --- */
 .castle-card.tooltip-right .hover-info {
     left: auto;
     right: 0;
-    transform: translateX(0) scale(0.5);
+    margin: 0;
+    transform: scale(0.5);
     transform-origin: bottom right; /* 右下を根元にする */
 }
 .castle-card.tooltip-right:hover .hover-info {
-    transform: translateX(0) scale(1); 
+    transform: scale(1); 
 }
 
 /* --- 上に見切れそうな時は「城の下側」に出す --- */
@@ -1623,10 +1630,10 @@ body.is-pc .faction-list-container { scroll-padding-top: 38px; }
     transform-origin: top center; /* 上の真ん中を根元にする */
 }
 .castle-card.tooltip-bottom:not(.tooltip-left):not(.tooltip-right) .hover-info {
-    transform: translateX(-50%) scale(0.5);
+    transform: scale(0.5);
 }
 .castle-card.tooltip-bottom:not(.tooltip-left):not(.tooltip-right):hover .hover-info {
-    transform: translateX(-50%) scale(1);
+    transform: scale(1);
 }
 
 /* 上と左が重なった時 */
