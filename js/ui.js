@@ -1635,8 +1635,8 @@ class UIManager {
                         }
 
                         path.setAttribute("fill", "transparent");
-                        path.setAttribute("stroke", "rgba(255, 250, 200, 1.0)"); // 黄色っぽい白い線
-                        path.setAttribute("stroke-width", "1");
+                        path.setAttribute("stroke", "rgba(255, 250, 200, 0.9)"); // 黄色っぽい白い線
+                        path.setAttribute("stroke-width", "1.5");
                         svg.appendChild(path);
                     }
                 });
