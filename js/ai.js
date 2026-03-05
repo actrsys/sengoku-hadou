@@ -630,13 +630,25 @@ class AIEngine {
                     doer.isActionDone = true; actionDoneInThisStep = true; break;
                 }
                 if (action.type === 'draft' && castle.gold >= 500 && castle.population > 1000) {
-                    let soldiers = GameSystem.calcDraftFromGold(500, doer, castle.population);
+                    // ★追加：お城の貯金箱を見て、使う金額を決める魔法！
+                    let draftCost = 500; // 最初は500
+                    if (castle.gold >= 5000) {
+                        draftCost = 2000; // 5000以上持っていたら2000使う！
+                    } else if (castle.gold >= 3000) {
+                        draftCost = 1000; // 3000以上持っていたら1000使う！
+                    }
+                    
+                    // ★修正：決めた金額（draftCost）で兵士を集めます！
+                    let soldiers = GameSystem.calcDraftFromGold(draftCost, doer, castle.population);
                     soldiers = Math.floor(soldiers / 10);
+                    
                     if (castle.soldiers + soldiers > 99999) {
                         soldiers = 99999 - castle.soldiers;
                     }
                     if (soldiers > 0) {
-                        castle.gold -= 500;
+                        // ★修正：決めた金額（draftCost）だけ、お城の貯金箱から減らします！
+                        castle.gold -= draftCost; 
+                        
                         const newMorale = Math.max(0, castle.morale - 10);
                         const newTraining = Math.max(0, castle.training - 10);
                         castle.training = Math.floor(((castle.training * castle.soldiers) + (newTraining * soldiers)) / (castle.soldiers + soldiers));
