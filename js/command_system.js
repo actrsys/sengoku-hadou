@@ -670,6 +670,13 @@ class CommandSystem {
             if (vals.gold === 0 && vals.rice === 0 && vals.soldiers === 0 && vals.horses === 0 && vals.guns === 0) return;
             this.executeTransport(data, targetId, vals);
         }
+        // ★ここから追加！ 米を買うときの受け取り窓口です
+        else if (type === 'buy_rice') {
+            const val = parseInt(inputs.amount.num.value);
+            if (val <= 0) return;
+            this.executeTrade('buy_rice', val);
+        }
+        // ★追加ここまで！
         else if (type === 'sell_rice') {
             const val = parseInt(inputs.amount.num.value);
             if (val <= 0) return;

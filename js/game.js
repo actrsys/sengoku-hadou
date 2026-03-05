@@ -768,9 +768,13 @@ class GameManager {
     }
 
     async startMonth() { 
-        // ★設定した数字の分だけ、上にも下にもフルパワーで動くようにしました！
-        const fluc = window.MainParams.Economy.TradeFluctuation;
-        this.marketRate = Math.max(window.MainParams.Economy.TradeRateMin, Math.min(window.MainParams.Economy.TradeRateMax, this.marketRate * ((1.0 - fluc) + Math.random() * (fluc * 2))));
+        // ★ここを差し替え！ 相場を「足し算・引き算」で動くようにします
+        const fluc = window.MainParams.Economy.TradeFluctuation; // 動く幅（0.3）
+        const change = (Math.random() * (fluc * 2)) - fluc; // -0.3 から +0.3 の間でランダムな数字を作ります
+        
+        // 今の相場に、さっき作った数字を足し引きします
+        this.marketRate = Math.max(window.MainParams.Economy.TradeRateMin, Math.min(window.MainParams.Economy.TradeRateMax, this.marketRate + change));
+        // ★差し替えここまで！
         
         await this.ui.showCutin(`${this.year}年 ${this.month}月`);
         
