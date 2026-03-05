@@ -59,8 +59,8 @@ class UIManager {
         this.tradeTypeInfo = document.getElementById('trade-type-info');
         this.scenarioScreen = document.getElementById('scenario-modal');
         this.scenarioList = document.getElementById('scenario-list');
-		this.mapZoomInBtn = document.getElementById('map-zoom-in');
-		this.mapZoomOutBtn = document.getElementById('map-zoom-out');
+        this.mapZoomInBtn = document.getElementById('map-zoom-in');
+        this.mapZoomOutBtn = document.getElementById('map-zoom-out');
         this.historyModal = document.getElementById('history-modal');
         this.historyList = document.getElementById('history-list');
         
@@ -76,58 +76,58 @@ class UIManager {
         this.onResultModalClose = null;
 
         if (this.resultModal) this.resultModal.addEventListener('click', (e) => { if (e.target === this.resultModal) this.closeResultModal(); });
-		if (this.mapZoomInBtn) {
-		    this.mapZoomInBtn.onclick = (e) => { e.stopPropagation(); this.changeMapZoom(1); };
-		}
-		if (this.mapZoomOutBtn) {
-		    this.mapZoomOutBtn.onclick = (e) => { e.stopPropagation(); this.changeMapZoom(-1); };
-		}
+        if (this.mapZoomInBtn) {
+            this.mapZoomInBtn.onclick = (e) => { e.stopPropagation(); this.changeMapZoom(1); };
+        }
+        if (this.mapZoomOutBtn) {
+            this.mapZoomOutBtn.onclick = (e) => { e.stopPropagation(); this.changeMapZoom(-1); };
+        }
 
         this.initMapDrag();
         this.initContextMenu();
         this.initSidebarResize(); 
-		// ダブルタップによるズームを禁止する呪文
-		let lastTouchEnd = 0;
-		document.addEventListener('touchend', (event) => {
-		    const now = (new Date()).getTime();
-		    if (now - lastTouchEnd <= 300) {
-		        event.preventDefault(); // 0.3秒以内の2回タップを「無効」にします
-		    }
-		    lastTouchEnd = now;
-		}, false);
-		
-		// ★ スマホブラウザ全体の2本指拡大（ピンチズーム）を禁止する強力な呪文
-		document.addEventListener('touchmove', (e) => {
-		    if (e.touches.length > 1) {
-		        e.preventDefault();
-		    }
-		}, { passive: false });
-		
-		const titleScreen = document.getElementById('title-screen');
-		const tapMessage = document.getElementById('tap-to-proceed');
-		const menuButtons = document.getElementById('menu-buttons');
+        // ダブルタップによるズームを禁止する呪文
+        let lastTouchEnd = 0;
+        document.addEventListener('touchend', (event) => {
+            const now = (new Date()).getTime();
+            if (now - lastTouchEnd <= 300) {
+                event.preventDefault(); // 0.3秒以内の2回タップを「無効」にします
+            }
+            lastTouchEnd = now;
+        }, false);
+        
+        // ★ スマホブラウザ全体の2本指拡大（ピンチズーム）を禁止する強力な呪文
+        document.addEventListener('touchmove', (e) => {
+            if (e.touches.length > 1) {
+                e.preventDefault();
+            }
+        }, { passive: false });
+        
+        const titleScreen = document.getElementById('title-screen');
+        const tapMessage = document.getElementById('tap-to-proceed');
+        const menuButtons = document.getElementById('menu-buttons');
 
-		if (titleScreen && tapMessage && menuButtons) {
-		    // 画面がクリック（タップ）された時の処理
-		    const onTitleClick = () => {
-		        if (window.AudioManager) {
+        if (titleScreen && tapMessage && menuButtons) {
+            // 画面がクリック（タップ）された時の処理
+            const onTitleClick = () => {
+                if (window.AudioManager) {
                     // 第1引数：ファイル名
                     // 第2引数：ループして戻ってくる地点（秒数） ← ここがポイント！
                     window.AudioManager.playBGM('SC_ex_Town1_Castle.ogg', 0);
                 }
-		        
-		        // メッセージを消す
-		        tapMessage.classList.add('hidden');
-		        // ボタンを表示する
-		        menuButtons.classList.remove('hidden');
-		        // 一回動いたら、この命令はもう使わないので消します
-		        titleScreen.removeEventListener('click', onTitleClick);
-		    };
+                
+                // メッセージを消す
+                tapMessage.classList.add('hidden');
+                // ボタンを表示する
+                menuButtons.classList.remove('hidden');
+                // 一回動いたら、この命令はもう使わないので消します
+                titleScreen.removeEventListener('click', onTitleClick);
+            };
 
-		    // 画面全体に「クリックを監視してね」と命令します
-		    titleScreen.addEventListener('click', onTitleClick);
-		}
-		
+            // 画面全体に「クリックを監視してね」と命令します
+            titleScreen.addEventListener('click', onTitleClick);
+        }
+        
         document.addEventListener('wheel', (e) => {
             // カクカクスクロールするリストの箱を探します
             const listObj = e.target.closest('.list-container, .result-body, #divide-list, .daimyo-list-container, .faction-list-container');
@@ -773,11 +773,11 @@ class UIManager {
                     if (myCastle) {
                         this.showControlPanel(myCastle);
                         // 【消す行】
-	                // const el = document.querySelector('.castle-card.active-turn'); 
-	                // if(el) el.scrollIntoView({block:"center", inline: "center", behavior: "smooth"});
+                    // const el = document.querySelector('.castle-card.active-turn'); 
+                    // if(el) el.scrollIntoView({block:"center", inline: "center", behavior: "smooth"});
 
-	                // 【代わりの行】↓
-	                this.scrollToActiveCastle();
+                    // 【代わりの行】↓
+                    this.scrollToActiveCastle();
                     }
                 }
             };
@@ -1802,7 +1802,7 @@ class UIManager {
                 if (rel) {
                     if (rel.status === '敵対') {
                         card.classList.add('glow-red');   // 敵対は赤色！
-                    } else if ['友好', '同盟', '支配', '従属'].includes(rel.status)) {
+                    } else if (['友好', '同盟', '支配', '従属'].includes(rel.status)) {
                         card.classList.add('glow-green'); // 仲良しは緑色！
                     }
                 }
