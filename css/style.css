@@ -1697,10 +1697,10 @@ body.is-pc .faction-list-container { scroll-padding-top: 38px; }
 
 /* 友好・同盟・支配・従属（緑） */
 .castle-card.glow-green { 
-    filter: drop-shadow(0 0 6px rgba(102, 187, 106, 0.8)) drop-shadow(0 0 10px rgba(67, 160, 71, 0.8)) !important; 
+    filter: drop-shadow(0 0 6px rgba(59, 255, 156, 0.8)) drop-shadow(0 0 10px rgba(67, 160, 71, 0.8)) !important; 
 }
 .castle-card.glow-green:hover { 
-    filter: drop-shadow(0 0 8px rgba(102, 187, 106, 1)) drop-shadow(0 0 12px rgba(67, 160, 71, 1)) !important; 
+    filter: drop-shadow(0 0 8px rgba(59, 255, 156, 1)) drop-shadow(0 0 12px rgba(67, 160, 71, 1)) !important; 
     transform: translate(-50%, calc(-50% - 2px)) scale(0.41); 
     z-index: 20;
 }
