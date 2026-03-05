@@ -622,12 +622,44 @@ class AIEngine {
                 actions.push({ type: 'employ', stat: 'charm', score: 5, cost: 0, targetRonin: ronins[0] });
             }
 
-            // ★追加 12. 褒美（承認欲求がたまっている武将がいる場合）
-            // プログラム内で承認欲求や不満を表す「achievementTotal」や「recognition」が30を超えている人を探します
-            let rewardTargets = this.game.getCastleBushos(castle.id).filter(b => 
-                b.status !== 'ronin' && b.belongKunishuId === 0 && 
-                ((b.achievementTotal || 0) > 30 || (b.recognition || 0) > 30)
-            );
+            // ★追加 12. 褒美（承認欲求がたまっている、または忠誠度が低い武将がいる場合）
+            let rewardTargets = [];
+            const castleBushos = this.game.getCastleBushos(castle.id).filter(b => b.status !== 'ronin' && b.belongKunishuId === 0);
+            
+            for (let b of castleBushos) {
+                // ① 承認欲求がたまっている場合（これは今まで通り、無条件で対象にします！）
+                if ((b.achievementTotal || 0) > 30 || (b.recognition || 0) > 30) {
+                    rewardTargets.push(b);
+                    continue; // この人はもうリストに入れたので、次の人へ
+                }
+                
+                // ② 忠誠度が90以下の場合（サイコロを振って対象にする魔法です！）
+                if (b.loyalty <= 90) {
+                    // 1. 忠誠度による基本の確率 (90で0.5%、70以下で10%)
+                    let prob = 10; // 70以下の時は問答無用で10%
+                    if (b.loyalty > 70) {
+                        prob = 0.5 + ((90 - b.loyalty) / 20) * 9.5; 
+                    }
+                    
+                    // 2. お殿様（大名）の義理(duty)による確率の増減
+                    // 義理が51〜100ならアップ、49〜0ならダウンします
+                    const dutyMod = (daimyo.duty - 50) * 0.1;
+                    
+                    // 3. お殿様との相性(affinity)による確率の増減
+                    // ★修正：差が0(ピッタリ)なら10%アップ、差が50(真逆)なら10%ダウンします！
+                    const diff = GameSystem.calcAffinityDiff(daimyo.affinity, b.affinity);
+                    const affinityMod = (25 - diff) * 0.4; // ★ここの数字を 0.1 から 0.4 にしました！
+                    
+                    // 全部を足して最終的な確率を出します
+                    let finalProb = prob + dutyMod + affinityMod;
+                    
+                    // 確率のサイコロを振ります！（100面ダイス）
+                    if (Math.random() * 100 < finalProb) {
+                        rewardTargets.push(b);
+                    }
+                }
+            }
+
             if (rewardTargets.length > 0 && castle.gold >= 100) {
                 // 優先度は低め（15点）にしてあります
                 actions.push({ type: 'reward', stat: 'none', score: 15, cost: 100, targets: rewardTargets });
@@ -644,11 +676,17 @@ class AIEngine {
 
                 // ★追加：褒美は「実行する武将（doer）」を必要としない特別な行動です！
                 if (action.type === 'reward') {
-                    // 承認欲求が一番高い人を1人選びます
+                    // 承認欲求が一番高い人、または忠誠度が一番低い人を1人選びます
                     action.targets.sort((a, b) => {
-                        const aVal = Math.max(a.achievementTotal || 0, a.recognition || 0);
-                        const bVal = Math.max(b.achievementTotal || 0, b.recognition || 0);
-                        return bVal - aVal; // 高い順に並び替え
+                        const aAchieve = Math.max(a.achievementTotal || 0, a.recognition || 0);
+                        const bAchieve = Math.max(b.achievementTotal || 0, b.recognition || 0);
+                        
+                        // まずは承認欲求が高い人を優先します
+                        if (bAchieve !== aAchieve) {
+                            return bAchieve - aAchieve; 
+                        }
+                        // 承認欲求が同じ（ゼロなど）なら、忠誠度が低い人を優先します
+                        return a.loyalty - b.loyalty; 
                     });
                     const targetBusho = action.targets[0];
                     
