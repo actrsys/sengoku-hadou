@@ -1774,20 +1774,29 @@ body.is-pc #daimyo-confirm-modal .modal-content {
 /* =========================================================
    ★ スマホ版：大名選択時の専用ボトムバーと、マップ領域の魔法
    ========================================================= */
+/* ★修正：マップ自体を切り取らず、透明な座布団（余白）を敷いて隠れないようにします */
 body:not(.is-pc).daimyo-select-mode #map-wrapper {
-    /* マップの下をスパッと切り取って、ボトムバーの場所を確保します！ */
-    height: calc(100% - 140px) !important;
-    flex: none !important;
+    height: auto !important;
+    flex: 1 !important;
+}
+body:not(.is-pc).daimyo-select-mode #map-scroll-container {
+    padding-bottom: 160px !important; 
+}
+
+/* ★修正：謎の「余白の枠」の正体だった、使っていない元のボトムバーを完全に隠します */
+body:not(.is-pc).daimyo-select-mode #bottom-command-bar {
+    display: none !important;
 }
 
 body:not(.is-pc).daimyo-select-mode #daimyo-confirm-modal {
-    /* ★変更：absolute から fixed にして、ブラウザのツールバーの上にピタッと固定します！ */
     position: fixed !important;
     top: auto !important;
     bottom: 0 !important;
     left: 0 !important;
     width: 100% !important;
-    height: calc(140px + env(safe-area-inset-bottom)) !important; /* スマホ特有の下の余白を足します */
+    /* ★修正：高さを「固定」ではなく「中身に合わせて伸びる」ようにして、見切れを防ぎます */
+    height: auto !important; 
+    min-height: 140px !important;
     background: #fdfdfd !important; 
     border-top: 3px solid #333;
     pointer-events: auto !important; 
@@ -1795,22 +1804,25 @@ body:not(.is-pc).daimyo-select-mode #daimyo-confirm-modal {
     flex-direction: column !important;
     z-index: 1000 !important;
     align-items: center !important;
-    padding-bottom: env(safe-area-inset-bottom) !important; /* スマホ特有の下の余白分だけ中身を上に押し上げます */
-    box-sizing: border-box !important;
+    padding: 0 !important; 
 }
 
 body:not(.is-pc).daimyo-select-mode #daimyo-confirm-modal .modal-content {
     background: transparent !important;
     box-shadow: none !important;
     border: none !important;
-    padding: 10px 15px !important;
-    height: 100% !important;
+    /* ★一番下にスマホ特有のツールバー避け(safe-area)を足して、ボタンを上に押し上げます */
+    padding: 15px 15px calc(15px + env(safe-area-inset-bottom)) !important;
+    height: auto !important; 
+    width: 100% !important;
     display: flex !important;
     flex-direction: column !important;
     justify-content: space-between !important;
+    box-sizing: border-box !important;
+    gap: 10px !important; 
 }
 
-/* ★顔とステータスを並べるコンパクト魔法（スマホは横、PCは縦） */
+/* ★顔とステータスを横に並べるコンパクト魔法 */
 .daimyo-confirm-compact {
     display: flex;
     align-items: center;
@@ -1825,6 +1837,7 @@ body:not(.is-pc).daimyo-select-mode #daimyo-confirm-modal .modal-content {
     border-radius: 5px;
     border: 2px solid #555;
     object-fit: cover;
+    flex-shrink: 0; /* ★画像が潰れないようにする魔法 */
 }
 
 .daimyo-confirm-info {
@@ -1846,7 +1859,7 @@ body:not(.is-pc).daimyo-select-mode #daimyo-confirm-modal .modal-footer {
 
 body:not(.is-pc).daimyo-select-mode #daimyo-confirm-modal .btn-primary,
 body:not(.is-pc).daimyo-select-mode #daimyo-confirm-modal .btn-secondary {
-    padding: 8px 25px !important;
+    padding: 10px 25px !important; 
     font-size: 1.05rem !important;
     border-radius: 20px !important; 
 }
@@ -1855,33 +1868,33 @@ body:not(.is-pc).daimyo-select-mode #daimyo-confirm-modal .btn-secondary {
    ★ PC版：大名選択画面を大きく、縦に並べる魔法
    ========================================================= */
 body.is-pc .daimyo-confirm-compact {
-    flex-direction: column !important; /* 画像と文字を縦に並べます */
-    gap: 20px !important; /* 顔と文字の隙間を少し広げます */
+    flex-direction: column !important; 
+    gap: 20px !important; 
 }
 
 body.is-pc .daimyo-confirm-compact .daimyo-confirm-face {
-    width: 160px !important; /* 顔画像をドーンと大きく！ */
+    width: 160px !important; 
     height: 160px !important;
     border-width: 3px !important;
 }
 
 body.is-pc .daimyo-confirm-info {
-    align-items: center !important; /* 文字を真ん中に寄せます */
+    align-items: center !important; 
     text-align: center !important;
 }
 
 body.is-pc .daimyo-confirm-info h3 {
-    font-size: 1.8rem !important; /* 大名家の名前を大きく */
+    font-size: 1.8rem !important; 
     margin-bottom: 15px !important;
 }
 
 body.is-pc .daimyo-confirm-info div {
-    font-size: 1.3rem !important; /* 当主や兵数も大きく */
+    font-size: 1.3rem !important; 
     margin-bottom: 8px !important;
 }
 
 body.is-pc #daimyo-confirm-modal .btn-primary,
 body.is-pc #daimyo-confirm-modal .btn-secondary {
-    padding: 12px 30px !important; /* ボタンも少し大きく押しやすく */
+    padding: 12px 30px !important; 
     font-size: 1.2rem !important;
 }
