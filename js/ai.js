@@ -187,8 +187,53 @@ class AIEngine {
                 if (validEnemies.length > 0) {
                     const attackData = this.decideAttackTarget(castle, castellan, validEnemies);
                     if (attackData) {
-                        this.executeAttack(castle, attackData.target, castellan, attackData.sendSoldiers, attackData.sendRice);
-                        return; 
+                        // ★追加：40%の確率で「やっぱりや〜めた！」を発動する魔法
+                        if (Math.random() < 0.40) {
+                            // まず、自分の大名（殿様）を探します
+                            const daimyo = this.game.bushos.find(b => b.clan === castle.ownerClan && b.isDaimyo) || castellan;
+                            
+                            // 城主と大名の「innovation（新しいもの好き度）」を足します（0〜200になります）
+                            const totalInno = castellan.innovation + daimyo.innovation;
+                            
+                            // 少しだけ気分屋にするために、ランダムで -20 から +20 の揺らぎ（サイコロ）を足します
+                            const randomInno = totalInno + (Math.random() * 40 - 20);
+                            
+                            // お城の貯金箱から、きっちり半分の金額を取り出します（端数は切り捨て！）
+                            const useGold = Math.floor(castle.gold / 2);
+                            
+                            // 数字が100以上なら鉄砲、100未満なら騎馬を買うことにします！
+                            if (randomInno >= 100) {
+                                // --- 鉄砲を買う魔法 ---
+                                const priceGun = parseInt(window.MainParams.Economy.PriceGun, 10) || 50;
+                                const buyAmount = Math.floor(useGold / priceGun); // 買える数を計算
+                                const actualCost = buyAmount * priceGun; // 実際に払うお金
+                                
+                                if (buyAmount > 0) {
+                                    castle.gold -= actualCost; // お金を払います
+                                    castle.guns = Math.min(99999, (castle.guns || 0) + buyAmount); // 鉄砲を増やします
+                                    castellan.isActionDone = true; // 城主さんはお買い物に出かけたので「行動済み(行動力消費)」になります
+                                }
+                            } else {
+                                // --- 騎馬を買う魔法 ---
+                                const priceHorse = parseInt(window.MainParams.Economy.PriceHorse, 10) || 5;
+                                const buyAmount = Math.floor(useGold / priceHorse); // 買える数を計算
+                                const actualCost = buyAmount * priceHorse; // 実際に払うお金
+                                
+                                if (buyAmount > 0) {
+                                    castle.gold -= actualCost; // お金を払います
+                                    castle.horses = Math.min(99999, (castle.horses || 0) + buyAmount); // 騎馬を増やします
+                                    castellan.isActionDone = true; // 城主さんはお買い物に出かけたので「行動済み(行動力消費)」になります
+                                }
+                            }
+                            
+                            // 普段はここにある「return;（ここでターン終了）」を消しました！
+                            // これにより、このあと自動的に下にある「普通の内政フェイズ」へ進んでくれます！
+                            
+                        } else {
+                            // 残りの60%は、予定通り攻撃に出発します！
+                            this.executeAttack(castle, attackData.target, castellan, attackData.sendSoldiers, attackData.sendRice);
+                            return; 
+                        }
                     }
                 }
             }
