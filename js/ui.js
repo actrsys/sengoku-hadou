@@ -1030,7 +1030,7 @@ class UIManager {
         if(ts) ts.classList.remove('hidden'); 
     }
     
-    // ★ 修正：大名選択の確認画面を表示する魔法
+    // ★ ここをごっそり差し替え！：大名選択の確認画面を、ギュッと小さくコンパクトにする魔法です！
     showDaimyoConfirmModal(clanId, clanName, soldiers, leader, onStart) {
         if (!this.daimyoConfirmModal) return;
 
@@ -1046,32 +1046,42 @@ class UIManager {
         }
 
         if (this.daimyoConfirmBody) {
+            // ★変更：顔画像と文字を「横」に並べて、高さをキュッと半分にします！
             this.daimyoConfirmBody.innerHTML = `
-                <h3 style="margin-top:0;">${clanName}</h3>
-                ${faceHtml}
-                <p>この大名家でゲームを開始しますか？</p>
-                <p><strong>総兵士数: ${soldiers}</strong></p>
+                <div class="daimyo-confirm-compact">
+                    ${faceHtml}
+                    <div class="daimyo-confirm-info">
+                        <h3 style="margin:0 0 5px 0; font-size:1.2rem; border:none; padding:0;">${clanName}</h3>
+                        <div style="font-size:0.95rem; margin-bottom: 3px;">当主：${leader ? leader.name : "不明"}</div>
+                        <div style="font-size:0.95rem; font-weight:bold; color:#d32f2f;">総兵数：${soldiers}</div>
+                    </div>
+                </div>
             `;
         }
         
         const startBtn = document.getElementById('daimyo-confirm-start-btn');
         if (startBtn) {
+            startBtn.style.display = '';
+            startBtn.textContent = "この大名で開始"; // ★文字を短くしてスッキリさせました
             startBtn.onclick = () => {
                 if (window.AudioManager) {
                     window.AudioManager.playBGM('SC_ex_Town2_Fortress.ogg');
                 }
 
                 this.daimyoConfirmModal.classList.add('hidden');
-                this.selectedDaimyoId = null; // ★選択解除
+                this.selectedDaimyoId = null; // ★選択をリセット
+                document.body.classList.remove('daimyo-select-mode'); // ★ゲーム開始時に専用モードを解除します
                 onStart();
             };
         }
         const backBtn = document.getElementById('daimyo-confirm-back-btn');
         if (backBtn) {
+            backBtn.style.display = '';
+            backBtn.textContent = "やめる";
             backBtn.onclick = () => {
-                this.daimyoConfirmModal.classList.add('hidden');
-                this.selectedDaimyoId = null; // ★選択解除
+                this.selectedDaimyoId = null; // ★選択をリセット
                 this.updateCastleGlows();     // ★光を消す
+                this.renderMap(); // ★「選んでください」のメッセージに戻すために、もう一度マップの魔法をかけます
             };
         }
     }
@@ -1588,6 +1598,33 @@ class UIManager {
             this.mapEl.appendChild(el);
         });
         this.updateCastleGlows();
+
+        // ==========================================
+        // ★スマホで大名を選ぶ時専用の「ボトムバー」を出す魔法です！
+        // ==========================================
+        const isDaimyoSelect = (this.game.phase === 'daimyo_select');
+        if (isDaimyoSelect) {
+            document.body.classList.add('daimyo-select-mode'); // 「今は大名選択中だよ！」という目印をつけます
+            
+            // まだ大名を選んでいない時は、案内メッセージを出しておきます
+            if (this.daimyoConfirmModal && !this.selectedDaimyoId) {
+                this.daimyoConfirmModal.classList.remove('hidden');
+                if (this.daimyoConfirmBody) {
+                    this.daimyoConfirmBody.innerHTML = `
+                        <div style="text-align:center; padding: 20px 0; color: #555; font-size: 1.05rem; font-weight: bold;">
+                            光っている城をタップして、<br>開始する大名を選んでください。
+                        </div>
+                    `;
+                }
+                const startBtn = document.getElementById('daimyo-confirm-start-btn');
+                const backBtn = document.getElementById('daimyo-confirm-back-btn');
+                if(startBtn) startBtn.style.display = 'none'; // ボタンは隠します
+                if(backBtn) backBtn.style.display = 'none';
+            }
+        } else {
+            document.body.classList.remove('daimyo-select-mode'); // 終わったら目印を外します
+        }
+        // ==========================================
     }
     
     updateCastleGlows() {
