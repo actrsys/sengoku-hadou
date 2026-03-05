@@ -1763,8 +1763,54 @@ class UIManager {
             
             this.mapEl.appendChild(el);
         });
+        // ★追加：すべてのお城を描き終わったら、光の縁取りを更新します！
+        this.updateCastleGlows();
     }
+    
+    // ==========================================
+    // ★ここから追加：外交関係に合わせてお城を光らせる魔法
+    // ==========================================
+    updateCastleGlows() {
+        // 地図がない時は何もしないで戻ります
+        if (!this.mapEl) return;
+        
+        // 基準となる大名家（最初はプレイヤーに設定しておきます）
+        let baseClanId = this.game.playerClanId;
+        
+        // もしどこかのお城を選択中なら、そのお城の持ち主を基準にします
+        if (this.currentCastle && this.currentCastle.ownerClan !== 0) {
+            baseClanId = this.currentCastle.ownerClan;
+        }
 
+        // マップ上のすべてのお城カードを探して、１つずつ調べます
+        const cards = this.mapEl.querySelectorAll('.castle-card');
+        cards.forEach(card => {
+            const clanId = parseInt(card.dataset.clan, 10);
+            
+            // 一旦すべての光（色）を消してリセットします
+            card.classList.remove('glow-blue', 'glow-red', 'glow-green');
+            
+            // 中立（持ち主がいない）のお城は光りません
+            if (clanId === 0) return;
+            
+            // 基準の大名家（自分や、今見ている相手）なら青く光ります
+            if (clanId === baseClanId) {
+                card.classList.add('glow-blue');
+            } else {
+                // それ以外は、相手との外交関係を調べます
+                const rel = this.game.getRelation(baseClanId, clanId);
+                if (rel) {
+                    if (rel.status === '敵対') {
+                        card.classList.add('glow-red');   // 敵対は赤色！
+                    } else if ['友好', '同盟', '支配', '従属'].includes(rel.status)) {
+                        card.classList.add('glow-green'); // 仲良しは緑色！
+                    }
+                }
+            }
+        });
+    }
+    // ==========================================
+    
     updatePanelHeader() { 
         if (!this.currentCastle) return; 
         if(this.statusContainer) {
@@ -1875,8 +1921,9 @@ class UIManager {
         } else {
             this.renderEnemyViewMenu();
         }
+        // ★ここを追加：選択したお城の持ち主の目線に合わせて、光を更新します！
+        this.updateCastleGlows();
     }
-
     renderEnemyViewMenu() {
         const mobileArea = document.getElementById('command-area');
         const pcArea = document.getElementById('pc-command-area');
