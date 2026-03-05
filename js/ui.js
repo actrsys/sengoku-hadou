@@ -1386,7 +1386,7 @@ class UIManager {
                 this.mapGuide.textContent = this.game.commandSystem.getSelectionGuideMessage();
             } else if (isDaimyoSelect) {
                 this.mapGuide.classList.remove('hidden'); 
-                this.mapGuide.textContent = "開始する大名家の城を選択してください";
+                this.mapGuide.textContent = "操作する大名家を選択してください";
             } else {
                 this.mapGuide.classList.add('hidden'); 
             }
@@ -1611,7 +1611,7 @@ class UIManager {
                 if (this.daimyoConfirmBody) {
                     this.daimyoConfirmBody.innerHTML = `
                         <div style="text-align:center; padding: 20px 0; color: #555; font-size: 1.05rem; font-weight: bold;">
-                            // 開始する大名を選んでください。
+                            操作する大名家を選択してください。
                         </div>
                     `;
                 }
