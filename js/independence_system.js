@@ -249,7 +249,7 @@ class IndependenceSystem {
         
         this.game.ui.log(msg);
         if (captiveMsgs && captiveMsgs.length > 0) msg += '\n\n' + captiveMsgs.join('\n');
-        await this.game.ui.showDialogAsync(msg, false, 0);
+        this.game.ui.showResultModal(msg);
     }
 
     calculateLoyaltyScores(busho, newDaimyo, oldDaimyo) {
