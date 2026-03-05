@@ -2089,7 +2089,7 @@ class UIManager {
         let sortKey = spec.sortKey || 'strength';
         let isMulti = spec.isMulti || false;
         
-        if (actionType === 'def_intercept_deploy' || actionType === 'def_reinf_deploy') {
+        if (actionType === 'def_intercept_deploy' || actionType === 'def_reinf_deploy' || actionType === 'atk_reinf_deploy') {
              isMulti = true;
              sortKey = 'strength';
         }
@@ -2191,6 +2191,12 @@ class UIManager {
             bushos = this.game.getCastleBushos(targetId).filter(b => b.status !== 'ronin');
             infoHtml = "<div>援軍に派遣する武将を選択してください（最大5名まで）</div>";
         }
+        // ★ここを追加！
+        else if (actionType === 'atk_reinf_deploy') {
+            bushos = this.game.getCastleBushos(targetId).filter(b => b.status !== 'ronin');
+            infoHtml = "<div>攻撃の援軍に派遣する武将を選択してください（最大5名まで）</div>";
+        }
+        // ★追加ここまで！
         else {
             bushos = this.game.getCastleBushos(c.id).filter(b => b.status !== 'ronin');
             
@@ -2278,7 +2284,7 @@ class UIManager {
             let isSelectable = !b.isActionDone; 
             if (extraData && extraData.allowDone) isSelectable = true; 
             if (['employ_target','appoint_gunshi','rumor_target_busho','headhunt_target','interview','interview_target','reward','view_only','war_general', 'kunishu_war_general', 'all_busho_list'].includes(actionType)) isSelectable = true;
-            if (actionType === 'def_intercept_deploy' || actionType === 'def_reinf_deploy') isSelectable = true;
+            if (actionType === 'def_intercept_deploy' || actionType === 'def_reinf_deploy' || actionType === 'atk_reinf_deploy') isSelectable = true;
             
             let acc = null; if (isEnemyTarget && targetCastle) acc = targetCastle.investigatedAccuracy;
             const getStat = (stat) => GameSystem.getDisplayStatHTML(b, stat, gunshi, acc, this.game.playerClanId, myDaimyo);
@@ -2302,7 +2308,7 @@ class UIManager {
                             const siblings = this.selectorList.querySelectorAll('.select-item');
                             siblings.forEach(el => el.classList.remove('selected'));
                         } else {
-                             const maxSelect = (actionType === 'war_deploy' || actionType === 'def_intercept_deploy' || actionType === 'def_reinf_deploy') ? 5 : 999;
+                             const maxSelect = (actionType === 'war_deploy' || actionType === 'def_intercept_deploy' || actionType === 'def_reinf_deploy' || actionType === 'atk_reinf_deploy') ? 5 : 999;
                              const currentChecked = this.selectorList.querySelectorAll('input[name="sel_busho"]:checked').length;
                              if(e.target.checked && currentChecked > maxSelect) {
                                  e.target.checked = false;
@@ -2351,7 +2357,7 @@ class UIManager {
                     const inputs = document.querySelectorAll('input[name="sel_busho"]:checked'); if (inputs.length === 0) return;
                     const selectedIds = Array.from(inputs).map(i => parseInt(i.value)); 
                     this.closeSelector();
-                    if ((actionType === 'def_intercept_deploy' || actionType === 'def_reinf_deploy') && extraData && extraData.onConfirm) {
+                    if ((actionType === 'def_intercept_deploy' || actionType === 'def_reinf_deploy' || actionType === 'atk_reinf_deploy') && extraData && extraData.onConfirm) {
                         extraData.onConfirm(selectedIds);
                     } else {
                         this.game.commandSystem.handleBushoSelection(actionType, selectedIds, targetId, extraData);
@@ -2691,7 +2697,7 @@ class UIManager {
                 if (g === 0 && r === 0 && s === 0 && h === 0 && gun === 0) isValid = false;
             } else if (type === 'headhunt_gold' || type === 'charity') {
                 isValid = true; 
-            } else if (type === 'war_supplies' || type === 'def_intercept' || type === 'def_reinf_supplies') {
+            } else if (type === 'war_supplies' || type === 'def_intercept' || type === 'def_reinf_supplies' || type === 'atk_reinf_supplies') {
                 const s = parseInt(document.getElementById('num-soldiers')?.value) || 0;
                 if (s <= 0) isValid = false; 
             } else {
@@ -2794,9 +2800,9 @@ class UIManager {
             inputs.rice = createSlider("持参兵糧", "rice", interceptCastle.rice, interceptCastle.rice);
             inputs.horses = createSlider("持参騎馬", "horses", interceptCastle.horses || 0, 0);
             inputs.guns = createSlider("持参鉄砲", "guns", interceptCastle.guns || 0, 0);
-        } else if (type === 'def_reinf_supplies') { 
+        } else if (type === 'def_reinf_supplies' || type === 'atk_reinf_supplies') { 
             const helperCastle = (data && data.length > 0) ? data[0] : c;
-            document.getElementById('quantity-title').textContent = "防衛援軍の部隊編成"; 
+            document.getElementById('quantity-title').textContent = type === 'def_reinf_supplies' ? "防衛援軍の部隊編成" : "攻撃援軍の部隊編成";
             inputs.soldiers = createSlider("出陣兵士数", "soldiers", helperCastle.soldiers, helperCastle.soldiers, 500);
             inputs.rice = createSlider("持参兵糧", "rice", helperCastle.rice, helperCastle.rice, 500);
             inputs.horses = createSlider("持参騎馬", "horses", helperCastle.horses || 0, 0, 0);
@@ -2857,7 +2863,7 @@ class UIManager {
 
         this.quantityConfirmBtn.onclick = () => {
             closeQuantityModal(); 
-            if ((type === 'def_intercept' || type === 'def_reinf_supplies') && extraData && extraData.onConfirm) {
+            if ((type === 'def_intercept' || type === 'def_reinf_supplies' || type === 'atk_reinf_supplies') && extraData && extraData.onConfirm) {
                 extraData.onConfirm(inputs);
             } else {
                 this.game.commandSystem.handleQuantitySelection(type, inputs, targetId, data, extraData);
