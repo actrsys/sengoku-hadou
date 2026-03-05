@@ -1611,7 +1611,7 @@ class UIManager {
                 if (this.daimyoConfirmBody) {
                     this.daimyoConfirmBody.innerHTML = `
                         <div style="text-align:center; padding: 20px 0; color: #555; font-size: 1.05rem; font-weight: bold;">
-                            光っている城をタップして、<br>開始する大名を選んでください。
+                            開始する大名を選んでください。
                         </div>
                     `;
                 }
