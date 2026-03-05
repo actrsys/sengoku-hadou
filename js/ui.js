@@ -244,6 +244,16 @@ class UIManager {
         }
     }
     
+    // ==========================================
+    // ★ここから追加！：AI思考中に進捗を表示する魔法です！
+    updateAIProgress(current, total) {
+        if (!this.aiGuard) return;
+        // ぐるぐる回るアイコンと一緒に、「思考中... (今の数/全部の数)」と表示します
+        this.aiGuard.innerHTML = `<div class="loading-spinner"></div>思考中... (${current}/${total})`;
+    }
+    // ★追加ここまで！
+    // ==========================================
+
     async waitForDialogs() {
         const isVisible = (id) => {
             const el = document.getElementById(id);

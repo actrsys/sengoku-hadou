@@ -896,13 +896,6 @@ class GameManager {
             this.ui.renderMap(); 
             this.ui.log(`【${castle.name}】命令を下してください`); 
             
-            // 【消す行】
-            // const activeCastleEl = document.querySelector('.castle-card.active-turn');
-            // if (activeCastleEl) {
-            //     activeCastleEl.scrollIntoView({ block: "center", inline: "center", behavior: "smooth" });
-            // }
-
-            // 【代わりの行】↓
             this.ui.scrollToActiveCastle(castle);
             
             this.ui.showTurnStartDialog(castle, () => {
@@ -913,6 +906,13 @@ class GameManager {
             this.isProcessingAI = true; 
             if(this.ui.aiGuard) this.ui.aiGuard.classList.remove('hidden'); 
             
+            // ==========================================
+            // ★ここから追加！：進捗を表示する魔法を呼び出します！
+            // this.currentIndex が「今何番目か（0からスタートするので+1します）」、this.turnQueue.length が「全部の数」です
+            this.ui.updateAIProgress(this.currentIndex + 1, this.turnQueue.length);
+            // ★追加ここまで！
+            // ==========================================
+
             if(this.ui.panelEl) this.ui.panelEl.classList.add('hidden');
             
             const delay = isImportant ? 400 : 10;
