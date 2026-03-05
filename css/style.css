@@ -337,12 +337,6 @@ img {
 @keyframes pulse { 0% { box-shadow: 0 0 0 0 rgba(233, 30, 99, 0.7); } 70% { box-shadow: 0 0 0 10px rgba(233, 30, 99, 0); } 100% { box-shadow: 0 0 0 0 rgba(233, 30, 99, 0); } }
 @keyframes pulse-shadow { 0% { filter: drop-shadow(0 0 0 rgba(233, 30, 99, 0.7)); } 70% { filter: drop-shadow(0 0 10px rgba(233, 30, 99, 0)); } 100% { filter: drop-shadow(0 0 0 rgba(233, 30, 99, 0)); } }
 
-/* ★画像の上に文字が乗るので、文字の後ろに黒い半透明のフィルムを貼って読みやすくします */
-.card-header h3 { margin: 0; font-size: 0.9em; text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; background: rgba(0,0,0,0.6); color: #fff;}
-.card-owner { font-size: 0.7em; text-align: center; color: #fff; background: rgba(0,0,0,0.6); margin-top: auto; /* ★勢力名を下の方に寄せて、お城のイラストを見やすくします */ }
-.param-grid { font-size: 0.7em; padding: 1px; background: rgba(0,0,0,0.6); color: #fff; }
-.param-item { display: flex; justify-content: space-between; }
-
 #bottom-command-bar {
     flex: none; background: #fff; border-top: 1px solid var(--border-color);
     padding-bottom: max(5px, env(safe-area-inset-bottom)); padding-left: 5px;
@@ -830,12 +824,6 @@ body.is-pc {
     text-shadow: 3px 3px 5px rgba(0,0,0,0.8); /* 黒い影をつけて浮かび上がらせます */
 }
 
-.card-header h3 {
-    font-weight: 900; /* 最大級に太くします */
-    background: #333; /* 背景を黒くします */
-    color: #fff; /* 文字を白くします */
-    padding: 2px 0;
-}
 /* ★修正：野戦と攻城戦の画面をスマホのバーを避けて全画面にする魔法 */
 #war-modal,
 #field-war-modal {
@@ -1553,4 +1541,53 @@ body.is-pc .faction-list-container { scroll-padding-top: 38px; }
 /* ★追加: 野戦マップの裏地（グリッド線の色）だけを暗い色にします！ */
 #fw-map {
     background-color: #37474f; 
+}
+/* =========================================================
+   ★ 城のホバー情報（普段は消しておき、カーソルが乗った時だけ出す魔法）
+   ========================================================= */
+.hover-info {
+    position: absolute;
+    bottom: 90%; /* お城の画像の少し上に浮かせます */
+    left: 50%;
+    transform: translateX(-50%);
+    background: rgba(0, 0, 0, 0.85); /* 半透明の黒い箱 */
+    color: #fff;
+    padding: 8px 15px;
+    border-radius: 6px; /* 少し丸っこくします */
+    border: 1px solid #777;
+    pointer-events: none; /* マウスのクリックの邪魔をしないように */
+    
+    /* ★普段は消しておく魔法 */
+    opacity: 0;           
+    visibility: hidden;
+    transition: opacity 0.2s ease, transform 0.2s ease; 
+    
+    /* ★中身を縦に並べて「すべて左寄せ」にする魔法 */
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    white-space: nowrap;
+    z-index: 100;
+}
+
+/* お城にカーソルが乗った時にフワッと出して、少し上に浮かせる魔法 */
+.castle-card:hover .hover-info {
+    opacity: 1;
+    visibility: visible;
+    transform: translateX(-50%) translateY(-10px); 
+}
+
+/* 中の文字の大きさ（お城全体が0.41倍に縮小されているので、数字を大きく設定しています） */
+.hover-info .info-line {
+    font-size: 2.2em; 
+    line-height: 1.4;
+    text-shadow: 1px 1px 2px #000;
+}
+
+/* 城名だけはさらに大きく、色を金色にして目立たせます */
+.hover-info .name {
+    font-size: 2.8em; 
+    font-weight: 900;
+    color: #ffd700; 
+    margin-bottom: 5px;
 }
