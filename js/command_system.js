@@ -1919,7 +1919,8 @@ class CommandSystem {
         const myClanId = atkCastle.ownerClan;
         const targetCastle = this.game.getCastle(targetCastleId);
         const enemyClanId = targetCastle.ownerClan;
-
+        const pid = this.game.playerClanId;
+        
         // 援軍を呼べる城をリストアップします
         let candidateCastles = [];
 
