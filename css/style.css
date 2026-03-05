@@ -1716,9 +1716,27 @@ body.is-pc .faction-list-container { scroll-padding-top: 38px; }
     border-radius: 4px;
     font-size: 1.1rem;
     white-space: nowrap;
-    pointer-events: none; /* マウスの邪魔をしない */
     font-weight: bold;
     box-shadow: 0 2px 4px rgba(0,0,0,0.5);
+    z-index: 200;
+    
+    /* ★変更：「マウスの邪魔をしない」をやめて、クリックできるようにします！ */
+    pointer-events: auto; 
+    cursor: pointer; 
+    transition: opacity 0.3s, transform 0.2s; /* ★フワッと消えたり動いたりするアニメーション */
+}
+
+/* ★追加：マウスが乗った時に少し明るく・大きくして、押せることをアピールします */
+.daimyo-name-label:hover {
+    background: rgba(50, 50, 50, 0.9) !important;
+    border-color: #ffe066 !important;
+    transform: translate(-50%, -100%) scale(1.05) !important; 
+}
+
+/* ★追加：大名を選んでボトムバーが出ている間は、名前シールをフワッと消す魔法 */
+body.hide-daimyo-labels .daimyo-name-label {
+    opacity: 0 !important;
+    pointer-events: none !important; /* 消えている間はクリックできなくします */
 }
 
 /* 大名選択確認ダイアログのカスタマイズ（マップを隠さないように） */
