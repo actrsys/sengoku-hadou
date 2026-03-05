@@ -189,7 +189,11 @@ class KunishuSystem {
                     this.game.ui.log(msg.replace('\n', '')); // ログ用には改行を消してスッキリさせます
                     
                     // ★ここを追加：自分の城なら、画面にメッセージを出して「閉じる」まで待ちます！
-                    if (isPlayerCastle) await this.game.ui.showDialogAsync(msg);
+                    if (isPlayerCastle) {
+                        await new Promise(resolve => {
+                            this.game.ui.showResultModal(msg, resolve);
+                        });
+                    }
                 }
             } else {
                 let maxAdd = 99999 - castle.rice;
@@ -200,7 +204,11 @@ class KunishuSystem {
                     const msg = `【国衆支援】\n${kunishuName}が、${clanName}の${castle.name}に兵糧${actualAmount}を献上しました。`;
                     this.game.ui.log(msg.replace('\n', ''));
                     
-                    if (isPlayerCastle) await this.game.ui.showDialogAsync(msg);
+                    if (isPlayerCastle) {
+                        await new Promise(resolve => {
+                            this.game.ui.showResultModal(msg, resolve);
+                        });
+                    }
                 }
             }
         } 
@@ -220,14 +228,22 @@ class KunishuSystem {
                     const msg = `【国衆妨害】\n${kunishuName}が、${clanName}の${castle.name}で略奪を働き、金${amount}を奪いました！`;
                     this.game.ui.log(msg.replace('\n', ''));
                     
-                    if (isPlayerCastle) await this.game.ui.showDialogAsync(msg);
+                    if (isPlayerCastle) {
+                        await new Promise(resolve => {
+                            this.game.ui.showResultModal(msg, resolve);
+                        });
+                    }
                 } else if (castle.rice > amount) {
                     castle.rice -= amount;
                     
                     const msg = `【国衆妨害】\n${kunishuName}が、${clanName}の${castle.name}で略奪を働き、兵糧${amount}を奪いました！`;
                     this.game.ui.log(msg.replace('\n', ''));
                     
-                    if (isPlayerCastle) await this.game.ui.showDialogAsync(msg);
+                    if (isPlayerCastle) {
+                        await new Promise(resolve => {
+                            this.game.ui.showResultModal(msg, resolve);
+                        });
+                    }
                 }
             } else {
                 // 蜂起（戦争）
