@@ -1709,10 +1709,6 @@ body.is-pc .faction-list-container { scroll-padding-top: 38px; }
 
 /* マップ上の大名家名ラベル（居城のみ表示） */
 .daimyo-name-label {
-    position: absolute;
-    bottom: 110%; /* 城の少し上に出します */
-    left: 50%;
-    transform: translateX(-50%);
     background: rgba(0, 0, 0, 0.8);
     border: 2px solid #d4af37; /* 金色の縁取り */
     color: #fff;
@@ -1721,7 +1717,6 @@ body.is-pc .faction-list-container { scroll-padding-top: 38px; }
     font-size: 1.1rem;
     white-space: nowrap;
     pointer-events: none; /* マウスの邪魔をしない */
-    z-index: 10;
     font-weight: bold;
     box-shadow: 0 2px 4px rgba(0,0,0,0.5);
 }
