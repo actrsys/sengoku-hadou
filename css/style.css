@@ -1651,3 +1651,9 @@ body.is-pc .faction-list-container { scroll-padding-top: 38px; }
 .castle-card.tooltip-bottom.tooltip-right:hover .hover-info {
     transform: translateX(0%) translateY(10px);
 }
+/* =========================================================
+   ★ 城情報（吹き出し）を他の城より絶対に手前に出す魔法
+   ========================================================= */
+.castle-card:hover {
+    z-index: 100 !important; /* マウスが乗っているお城を、他のどのお城よりも一番手前に持ってくる！ */
+}
