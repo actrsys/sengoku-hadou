@@ -1591,3 +1591,63 @@ body.is-pc .faction-list-container { scroll-padding-top: 38px; }
     color: #ffd700; 
     margin-bottom: 5px;
 }
+/* =========================================================
+   ★ 城画像の下側に、横長の楕円形の黒い影をつける魔法
+   ========================================================= */
+.castle-card {
+    /* 前にかかっていた「お城全体がボヤッと浮く影」を消してスッキリさせます */
+    filter: none !important; 
+}
+
+.castle-card::after {
+    content: "";
+    position: absolute;
+    bottom: 0px; /* お城の画像の足元ギリギリに配置 */
+    left: 50%;
+    transform: translateX(-50%);
+    width: 70%;  /* 横幅を広めにとって横長に */
+    height: 15%; /* 縦幅をペチャンコにして楕円形にします */
+    background: rgba(0, 0, 0, 0.6); /* 黒い半透明の影 */
+    border-radius: 50%; /* まん丸ではなく、潰れた楕円にします */
+    filter: blur(4px);  /* 影のフチを少しぼかして自然な影に！ */
+    z-index: -1; /* お城のイラストより奥（下）に置きます */
+    pointer-events: none; /* マウスの邪魔にならないようにします */
+}
+
+/* =========================================================
+   ★ 見切れ防止！画面端にいる時のツールチップ位置ズラし魔法
+   ========================================================= */
+
+/* --- 上に見切れそうな時は「城の下側」に出す --- */
+.castle-card.tooltip-bottom .hover-info {
+    bottom: auto; /* 上に出す設定を解除 */
+    top: 90%;     /* 代わりに下に出す */
+}
+.castle-card.tooltip-bottom:hover .hover-info {
+    transform: translateX(-50%) translateY(10px); /* フワッと動く方向も下向きに！ */
+}
+
+/* --- 左に見切れそうな時は「右寄り」に出す --- */
+.castle-card.tooltip-left .hover-info {
+    left: 0; /* 左端を基準にして内側に寄せます */
+}
+.castle-card.tooltip-left:hover .hover-info {
+    transform: translateX(0%) translateY(-10px); /* 横にズレないように固定 */
+}
+/* 上と左が両方重なった時（左上のカド） */
+.castle-card.tooltip-bottom.tooltip-left:hover .hover-info {
+    transform: translateX(0%) translateY(10px);
+}
+
+/* --- 右に見切れそうな時は「左寄り」に出す --- */
+.castle-card.tooltip-right .hover-info {
+    left: auto;
+    right: 0; /* 右端を基準にして内側に寄せます */
+}
+.castle-card.tooltip-right:hover .hover-info {
+    transform: translateX(0%) translateY(-10px); /* 横にズレないように固定 */
+}
+/* 上と右が両方重なった時（右上のカド） */
+.castle-card.tooltip-bottom.tooltip-right:hover .hover-info {
+    transform: translateX(0%) translateY(10px);
+}
