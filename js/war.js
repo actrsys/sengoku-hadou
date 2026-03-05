@@ -1219,16 +1219,35 @@ class WarManager {
                     
                     const kunishuMembers = this.game.kunishuSystem.getKunishuMembers(s.attacker.kunishuId).map(b => b.id);
                     
+                    // ★ここから追加：逃げ込める「味方の城」が他にあるか探します！
+                    const friendlyCastles = this.game.castles.filter(c => c.ownerClan === oldOwner && c.id !== targetC.id);
+                    
                     this.game.getCastleBushos(targetC.id).forEach(b => {
+                        // もし国人衆のメンバーじゃなかったら（大名家の武将だったら）
                         if (!kunishuMembers.includes(b.id)) {
-                            b.status = 'ronin'; 
-                            b.clan = 0; 
-                            b.isCastellan = false;
+                            if (friendlyCastles.length > 0) {
+                                // ★味方の城がある場合：ランダムに選んだ味方の城へ避難します！
+                                const escapeCastle = friendlyCastles[Math.floor(Math.random() * friendlyCastles.length)];
+                                b.castleId = escapeCastle.id;
+                                b.isCastellan = false;
+                                escapeCastle.samuraiIds.push(b.id);
+                                // 派閥などの情報も一緒にお引越しさせます
+                                if (this.game.factionSystem) {
+                                    this.game.factionSystem.handleMove(b, targetC.id, escapeCastle.id);
+                                }
+                            } else {
+                                // ★味方の城がない場合（最後のお城だった場合）：今まで通り浪人になります
+                                b.status = 'ronin'; 
+                                b.clan = 0; 
+                                b.isCastellan = false;
+                            }
                         }
                     });
                     
+                    // 城のお留守番リスト（samuraiIds）を整理します
                     targetC.samuraiIds = targetC.samuraiIds.filter(id => {
                         const busho = this.game.getBusho(id);
+                        // 国人衆のメンバーか、浪人になって城に残った人だけリストに残します
                         return kunishuMembers.includes(id) || (busho && busho.status === 'ronin');
                     });
 
@@ -1240,7 +1259,7 @@ class WarManager {
                         const extMsg = `${clanName}は滅亡しました。`;
                         this.game.ui.log(extMsg);
                         
-                        // ★たった1行で「表示・5秒タイマー・順番待ち」を全部やってくれます！
+                        // たった1行で「表示・5秒タイマー・順番待ち」を全部やってくれます！
                         await this.game.ui.showDialogAsync(extMsg, false, 0);
 
                         if (oldOwner === this.game.playerClanId) {
@@ -1302,15 +1321,32 @@ class WarManager {
                 const survivors = Math.max(0, s.defender.soldiers);
                 const recovered = Math.floor(s.deadSoldiers.defender * 0.2);
                 const totalAbsorbed = survivors + recovered;
+
+                // ★追加：攻め込んだ元気な兵士と、城に残っていた兵士の士気と訓練をまぜまぜします！
+                const newTotalSoldiers = totalAtkSurvivors + totalAbsorbed;
+                if (newTotalSoldiers > 0) {
+                    s.defender.training = Math.floor(((s.defender.training || 0) * totalAbsorbed + (s.attacker.training || 0) * totalAtkSurvivors) / newTotalSoldiers);
+                    s.defender.morale = Math.floor(((s.defender.morale || 0) * totalAbsorbed + (s.attacker.morale || 0) * totalAtkSurvivors) / newTotalSoldiers);
+                }
+
                 // ★追加：城を奪った時の兵士や馬、鉄砲の合流にストッパー！
-                s.defender.soldiers = Math.min(99999, totalAtkSurvivors + totalAbsorbed);
+                s.defender.soldiers = Math.min(99999, newTotalSoldiers);
                 s.defender.horses = Math.min(99999, (s.defender.horses || 0) + (s.attacker.horses || 0));
                 s.defender.guns = Math.min(99999, (s.defender.guns || 0) + (s.attacker.guns || 0));
                 if (s.isPlayerInvolved && totalAbsorbed > 0) this.game.ui.log(`(敵残存兵・負傷兵 計${totalAbsorbed}名 を吸収)`);
             } else if (!attackerWon) {
                 const srcC = this.game.getCastle(s.sourceCastle.id);
+
+                // ★追加：帰ってきた兵士と、お留守番していた兵士の士気と訓練をまぜまぜします！
+                const originalSoldiers = srcC.soldiers;
+                const newTotalSoldiers = originalSoldiers + totalAtkSurvivors;
+                if (newTotalSoldiers > 0) {
+                    srcC.training = Math.floor(((srcC.training || 0) * originalSoldiers + (s.attacker.training || 0) * totalAtkSurvivors) / newTotalSoldiers);
+                    srcC.morale = Math.floor(((srcC.morale || 0) * originalSoldiers + (s.attacker.morale || 0) * totalAtkSurvivors) / newTotalSoldiers);
+                }
+
                 // ★追加：負けて帰ってきた遠征軍の兵士、馬、鉄砲の合流にストッパー！
-                srcC.soldiers = Math.min(99999, srcC.soldiers + totalAtkSurvivors);
+                srcC.soldiers = Math.min(99999, newTotalSoldiers);
                 srcC.horses = Math.min(99999, (srcC.horses || 0) + (s.attacker.horses || 0));
                 srcC.guns = Math.min(99999, (srcC.guns || 0) + (s.attacker.guns || 0));
                 const recovered = Math.floor(s.deadSoldiers.defender * window.WarParams.War.BaseRecoveryRate);
@@ -1324,7 +1360,13 @@ class WarManager {
             
             if (isRetreat && attackerWon) {
                 const oldOwner = s.defender.ownerClan; // ★追加：前の持ち主を記憶しておきます
-                s.defender.ownerClan = s.attacker.ownerClan; s.defender.investigatedUntil = 0; s.defender.soldiers = totalAtkSurvivors;
+                s.defender.ownerClan = s.attacker.ownerClan; 
+                s.defender.investigatedUntil = 0; 
+                s.defender.soldiers = totalAtkSurvivors;
+
+                // ★追加：敵が逃げて空っぽになった城に入るので、自分たちの士気と訓練をそのまま使います！
+                s.defender.training = s.attacker.training || 0;
+                s.defender.morale = s.attacker.morale || 0;
                 
                 // ★追加：城の持ち主が変わった時の国人衆の反発チェック魔法を使います！
                 if (oldOwner !== s.defender.ownerClan) {
