@@ -1496,23 +1496,9 @@ class UIManager {
             
             const castellanName = castellan ? castellan.name : '-';            
             
-            // ★ 修正：大名選択画面の時はホバー情報を出さず、居城に名前を表示する
+            // ★ 修正：大名選択画面の時はホバー情報を出さない（名前シールは後でまとめて貼ります！）
             if (isDaimyoSelect) {
-                let isDaimyoCastle = false;
-                let daimyoName = "";
-                if (c.ownerClan !== 0 && clanData) {
-                    const leader = this.game.getBusho(clanData.leaderId);
-                    if (leader && Number(leader.castleId) === Number(c.id)) {
-                        isDaimyoCastle = true;
-                        daimyoName = clanData.name;
-                    }
-                }
-                
-                if (isDaimyoCastle) {
-                    el.innerHTML = `<div class="daimyo-name-label">${daimyoName}</div>`;
-                } else {
-                    el.innerHTML = '';
-                }
+                el.innerHTML = '';
             } else {
                 el.innerHTML = `
                     <div class="hover-info">
@@ -1597,6 +1583,14 @@ class UIManager {
             
             this.mapEl.appendChild(el);
         });
+
+        // ==========================================
+        // ★名前を絶対に手前に出して、重ならないように避ける魔法！
+        // ==========================================
+        if (isDaimyoSelect) {
+            this.renderDaimyoLabels();
+        }
+        
         this.updateCastleGlows();
 
         // ==========================================
@@ -1624,6 +1618,87 @@ class UIManager {
             document.body.classList.remove('daimyo-select-mode'); // 終わったら目印を外します
         }
         // ==========================================
+    }
+    
+    // ★新魔法：大名家の名前を賢く並べる魔法です
+    renderDaimyoLabels() {
+        const labelsData = [];
+
+        // 1. 居城を持っている大名を探して、大体の大きさを計算します
+        this.game.clans.forEach(clan => {
+            if (clan.id === 0) return;
+            const leader = this.game.getBusho(clan.leaderId);
+            if (leader && leader.castleId) {
+                const castle = this.game.getCastle(leader.castleId);
+                if (castle) {
+                    const posX = castle.pixelX !== undefined ? castle.pixelX : (castle.x * 80 + 40);
+                    const posY = castle.pixelY !== undefined ? castle.pixelY : (castle.y * 80 + 40);
+                    
+                    labelsData.push({
+                        clanId: clan.id,
+                        name: clan.name,
+                        x: posX,
+                        y: posY - 25, // 城の少し上をスタート地点にします
+                        width: clan.name.length * 18 + 20, // 文字数から大体の幅を予想します
+                        height: 28, // 大体の高さを設定します
+                        offsetY: 0
+                    });
+                }
+            }
+        });
+
+        // 2. ぶつかり稽古！重ならないように上下に散らばらせます
+        let iterations = 0;
+        let hasCollision = true;
+        while (hasCollision && iterations < 20) { // 最大20回まで調整します
+            hasCollision = false;
+            for (let i = 0; i < labelsData.length; i++) {
+                for (let j = i + 1; j < labelsData.length; j++) {
+                    const l1 = labelsData[i];
+                    const l2 = labelsData[j];
+                    
+                    const left1 = l1.x - l1.width / 2;
+                    const right1 = l1.x + l1.width / 2;
+                    const top1 = l1.y + l1.offsetY - l1.height;
+                    const bottom1 = l1.y + l1.offsetY;
+                    
+                    const left2 = l2.x - l2.width / 2;
+                    const right2 = l2.x + l2.width / 2;
+                    const top2 = l2.y + l2.offsetY - l2.height;
+                    const bottom2 = l2.y + l2.offsetY;
+
+                    // ぶつかっているかチェックします
+                    if (left1 < right2 + 5 && right1 + 5 > left2 &&
+                        top1 < bottom2 + 5 && bottom1 + 5 > top2) {
+                        hasCollision = true;
+                        
+                        // ぶつかっていたら、上下に少しずつ押し退けます
+                        if (top1 < top2) {
+                            l1.offsetY -= 8;
+                            l2.offsetY += 8;
+                        } else {
+                            l1.offsetY += 8;
+                            l2.offsetY -= 8;
+                        }
+                    }
+                }
+            }
+            iterations++;
+        }
+
+        // 3. 計算が終わったら、実際にマップの一番手前に貼り付けます！
+        labelsData.forEach(l => {
+            const el = document.createElement('div');
+            el.className = 'daimyo-name-label';
+            el.textContent = l.name;
+            el.style.position = 'absolute';
+            el.style.left = `${l.x}px`;
+            el.style.top = `${l.y + l.offsetY}px`;
+            el.style.transform = 'translate(-50%, -100%)';
+            el.style.zIndex = '200'; // ★ここで他のどんな城よりも絶対に手前に出します！
+            
+            this.mapEl.appendChild(el);
+        });
     }
     
     updateCastleGlows() {
