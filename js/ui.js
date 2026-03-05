@@ -1602,7 +1602,6 @@ class UIManager {
         // ==========================================
         // ★スマホで大名を選ぶ時専用の「ボトムバー」を出す魔法です！
         // ==========================================
-        const isDaimyoSelect = (this.game.phase === 'daimyo_select');
         if (isDaimyoSelect) {
             document.body.classList.add('daimyo-select-mode'); // 「今は大名選択中だよ！」という目印をつけます
             
