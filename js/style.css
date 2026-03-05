@@ -201,23 +201,22 @@ img {
 }
 #map-scroll-container {
     width: 100%; height: 100%; overflow: auto; display: flex;
-    flex-direction: column; padding: 20px; box-sizing: border-box; 
+    flex-direction: column; padding: 0; box-sizing: border-box; 
     -webkit-overflow-scrolling: touch;
+    overscroll-behavior: none; /* ★これを書き足します！端っこでバウンドしなくなります */
 }
 #map-scroll-container.grab { cursor: grab; }
 #map-scroll-container.grabbing { cursor: grabbing; }
 
 #map-container {
-    /* ★ここを差し替え！：マス目（grid）の魔法を消して、背景画像を表示する魔法に変えます */
-    /* 【消す行】display: grid; gap: 10px; padding: 20px; */
-    
-    /* 【代わりの行】↓ */
-    position: relative; /* お城のシールを貼るための土台にします */
-    background-image: url('../data/images/map/japan_map.png'); /* 実際の日本地図の画像 */
-    background-size: 100% 100%; /* 画像のサイズをピッタリ合わせます */
+    position: relative; 
+    background-image: url('../data/images/map/japan_map.png'); 
+    background-size: 100% 100%; 
     background-repeat: no-repeat;
     
-    transform-origin: center center; margin: auto; flex: none; 
+    transform-origin: 0 0; /* ★ここを差し替え！ center center から 0 0 にします */
+    margin: 0; /* ★ここを差し替え！ auto から 0 にします */
+    flex: none; 
 }
 
 #pc-map-overlay {
@@ -312,24 +311,22 @@ img {
     box-shadow: none;              /* 四角い影を消します */
     filter: drop-shadow(2px 2px 3px rgba(0,0,0,0.5)); 
     /* ★ここまで */
-
+    
     border-radius: 4px;
     display: flex; flex-direction: column; justify-content: space-between;
     padding: 2px; 
     cursor: pointer; position: relative; user-select: none;
     font-size: 0.75rem;
     
-    /* ★ここを差し替え！：マス目の指定を消して、自由な場所に置けるようにします！ */
-    /* 【消す行】grid-column: var(--c-x); grid-row: var(--c-y); z-index: 10; */
-    
     /* 【代わりの行】↓ */
     position: absolute; /* 自由な位置に置けるシールに変身！ */
-    transform: translate(-50%, -50%); /* 色の点が「お城のど真ん中」に来るようにズレを直します */
+    transform: translate(-50%, -50%) scale(0.41); /* ズレを直しつつ、全体の大きさを４１％(0.41)にします */
     z-index: 10;
+    transform-style: preserve-3d; /* ★これを1行書き足します！ */
 }
 
 /* 選択された時なども、お城の形に合わせて光るように調整しました */
-.castle-card:hover { transform: translateY(-2px); filter: drop-shadow(2px 4px 5px rgba(0,0,0,0.5)); z-index: 20; }
+.castle-card:hover { transform: translate(-50%, calc(-50% - 2px)) scale(0.41); filter: drop-shadow(2px 4px 5px rgba(0,0,0,0.5)); z-index: 20; }
 .castle-card.active-turn { filter: drop-shadow(0 0 8px #ff9800); z-index: 15; }
 .castle-card.selectable-target { filter: drop-shadow(0 0 8px #e91e63); animation: pulse-shadow 1s infinite; z-index: 25; cursor: crosshair; }
 .castle-card.dimmed { opacity: 0.3; filter: grayscale(80%); }
@@ -337,12 +334,6 @@ img {
 /* ピカピカ光るアニメーションも、お城のシルエット用に追加します */
 @keyframes pulse { 0% { box-shadow: 0 0 0 0 rgba(233, 30, 99, 0.7); } 70% { box-shadow: 0 0 0 10px rgba(233, 30, 99, 0); } 100% { box-shadow: 0 0 0 0 rgba(233, 30, 99, 0); } }
 @keyframes pulse-shadow { 0% { filter: drop-shadow(0 0 0 rgba(233, 30, 99, 0.7)); } 70% { filter: drop-shadow(0 0 10px rgba(233, 30, 99, 0)); } 100% { filter: drop-shadow(0 0 0 rgba(233, 30, 99, 0)); } }
-
-/* ★画像の上に文字が乗るので、文字の後ろに黒い半透明のフィルムを貼って読みやすくします */
-.card-header h3 { margin: 0; font-size: 0.9em; text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; background: rgba(0,0,0,0.6); color: #fff;}
-.card-owner { font-size: 0.7em; text-align: center; color: #fff; background: rgba(0,0,0,0.6); margin-top: auto; /* ★勢力名を下の方に寄せて、お城のイラストを見やすくします */ }
-.param-grid { font-size: 0.7em; padding: 1px; background: rgba(0,0,0,0.6); color: #fff; }
-.param-item { display: flex; justify-content: space-between; }
 
 #bottom-command-bar {
     flex: none; background: #fff; border-top: 1px solid var(--border-color);
@@ -447,6 +438,7 @@ body.is-pc {
 }
 .modal.hidden { opacity: 0; pointer-events: none; display: none !important;} 
 #quantity-modal { z-index: 6500; } /* ★変更: 数値入力画面も一緒に上げます */
+#dialog-modal { z-index: 8000 !important; } /* ★追加: 確認ダイアログが野戦画面の裏に隠れないように一番手前に出します！ */
 
 .modal-content {
     background: #fff; padding: 20px; border-radius: 8px;
@@ -830,12 +822,6 @@ body.is-pc {
     text-shadow: 3px 3px 5px rgba(0,0,0,0.8); /* 黒い影をつけて浮かび上がらせます */
 }
 
-.card-header h3 {
-    font-weight: 900; /* 最大級に太くします */
-    background: #333; /* 背景を黒くします */
-    color: #fff; /* 文字を白くします */
-    padding: 2px 0;
-}
 /* ★修正：野戦と攻城戦の画面をスマホのバーを避けて全画面にする魔法 */
 #war-modal,
 #field-war-modal {
@@ -1553,4 +1539,129 @@ body.is-pc .faction-list-container { scroll-padding-top: 38px; }
 /* ★追加: 野戦マップの裏地（グリッド線の色）だけを暗い色にします！ */
 #fw-map {
     background-color: #37474f; 
+}
+/* =========================================================
+   ★ 城のホバー情報（カーソルが乗った時だけ出す魔法）
+   ========================================================= */
+.hover-info {
+    position: absolute;
+    bottom: 80%; /* お城の頭あたりをスタート地点にします */
+    left: 50%;
+    
+    /* 揺れ防止！最初から小さくして、アニメーションは大きさ(scale)と透明度(opacity)だけにします */
+    transform: translateX(-50%) scale(0.5); 
+    transform-origin: bottom center; /* 下の真ん中を根元（飛び出してくる出発点）にします */
+    
+    background: rgba(0, 0, 0, 0.85);
+    color: #fff;
+    padding: 8px 15px;
+    border-radius: 6px;
+    border: 1px solid #777;
+    pointer-events: none;
+    
+    opacity: 0;           
+    visibility: hidden;
+    /* transitionから位置移動を外すことで、謎の揺れを完全に防ぎます */
+    transition: opacity 0.15s ease-out, transform 0.15s ease-out; 
+    
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    white-space: nowrap;
+    z-index: 100;
+}
+
+/* お城にカーソルが乗った時に、元の大きさ(scale(1))に戻りながら現れる魔法 */
+.castle-card:hover .hover-info {
+    opacity: 1;
+    visibility: visible;
+    transform: translateX(-50%) scale(1); 
+}
+
+.hover-info .info-line {
+    font-size: 2.2em; 
+    line-height: 1.4;
+    text-shadow: 1px 1px 2px #000;
+}
+
+.hover-info .name {
+    font-size: 2.8em; 
+    font-weight: 900;
+    color: #ffd700; 
+    margin-bottom: 5px;
+}
+
+/* =========================================================
+   ★ 見切れ防止！画面端にいる時のツールチップ位置ズラし魔法
+   ========================================================= */
+
+/* --- 左に見切れそうな時は「右寄り」に出す --- */
+.castle-card.tooltip-left .hover-info {
+    left: 0;
+    transform: translateX(0) scale(0.5);
+    transform-origin: bottom left; /* 左下を根元にする */
+}
+.castle-card.tooltip-left:hover .hover-info {
+    transform: translateX(0) scale(1); 
+}
+
+/* --- 右に見切れそうな時は「左寄り」に出す --- */
+.castle-card.tooltip-right .hover-info {
+    left: auto;
+    right: 0;
+    transform: translateX(0) scale(0.5);
+    transform-origin: bottom right; /* 右下を根元にする */
+}
+.castle-card.tooltip-right:hover .hover-info {
+    transform: translateX(0) scale(1); 
+}
+
+/* --- 上に見切れそうな時は「城の下側」に出す --- */
+.castle-card.tooltip-bottom .hover-info {
+    bottom: auto; 
+    top: 80%; /* 上から下に飛び出すように */
+    transform-origin: top center; /* 上の真ん中を根元にする */
+}
+.castle-card.tooltip-bottom:not(.tooltip-left):not(.tooltip-right) .hover-info {
+    transform: translateX(-50%) scale(0.5);
+}
+.castle-card.tooltip-bottom:not(.tooltip-left):not(.tooltip-right):hover .hover-info {
+    transform: translateX(-50%) scale(1);
+}
+
+/* 上と左が重なった時 */
+.castle-card.tooltip-bottom.tooltip-left .hover-info {
+    transform-origin: top left;
+}
+/* 上と右が重なった時 */
+.castle-card.tooltip-bottom.tooltip-right .hover-info {
+    transform-origin: top right;
+}
+
+/* =========================================================
+   ★ 城情報（吹き出し）を他の城より絶対に手前に出す魔法
+   ========================================================= */
+.castle-card:hover {
+    z-index: 100 !important; 
+}
+
+/* =========================================================
+   ★ 城画像の下側に、横長の楕円形の黒い影をつける魔法
+   ========================================================= */
+.castle-card {
+    filter: none !important; 
+}
+.castle-card::after {
+    content: "";
+    position: absolute;
+    bottom: 10px; 
+    left: 50%;
+    transform: translateX(-50%) translateZ(-1px); /* ★うしろに translateZ(-1px) を足します */
+    width: 70%;  
+    height: 15%; 
+    background: rgba(0, 0, 0, 0.9); 
+    border-radius: 50%; 
+    filter: blur(4px);  
+    z-index: -1; 
+    pointer-events: none; 
 }
