@@ -386,7 +386,6 @@ class AIEngine {
         
         // （「待つ魔法」は消しました！あとはwar.jsが最後までやってくれます）
     }
-}
 
     execInternalAffairs(castle, castellan, mods, smartness) {
         // ① 大名を取得します（行動回数の計算に使います）
