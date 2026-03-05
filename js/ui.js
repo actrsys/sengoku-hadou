@@ -1669,6 +1669,15 @@ class UIManager {
                     const top1 = l1.y + l1.offsetY - l1.height;
                     const bottom1 = l1.y + l1.offsetY;
                     
+                    // ==========================================
+                    // ★ここから下の４行が抜けていました！ごめんなさい！
+                    const left2 = l2.x - l2.width / 2;
+                    const right2 = l2.x + l2.width / 2;
+                    const top2 = l2.y + l2.offsetY - l2.height;
+                    const bottom2 = l2.y + l2.offsetY;
+                    // ★書き足すのはここまで！
+                    // ==========================================
+
                     if (left1 < right2 + 5 && right1 + 5 > left2 &&
                         top1 < bottom2 + 5 && bottom1 + 5 > top2) {
                         hasCollision = true;
