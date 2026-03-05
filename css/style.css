@@ -1656,7 +1656,7 @@ body.is-pc .faction-list-container { scroll-padding-top: 38px; }
 .castle-card::after {
     content: "";
     position: absolute;
-    bottom: 20px; 
+    bottom: 10px; 
     left: 50%;
     transform: translateX(-50%);
     width: 70%;  
@@ -1664,6 +1664,6 @@ body.is-pc .faction-list-container { scroll-padding-top: 38px; }
     background: rgba(0, 0, 0, 0.9); 
     border-radius: 50%; 
     filter: blur(4px);  
-    z-index: -1; 
+    z-index: -2; 
     pointer-events: none; 
 }
