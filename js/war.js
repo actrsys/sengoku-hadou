@@ -635,14 +635,29 @@ class WarManager {
             let resAtk = WarSystem.calcWarDamage(atkStats, defStats, s.attacker.soldiers, s.defender.fieldSoldiers, 0, s.attacker.morale, s.defender.training, 'charge');
             // ★0.5を0.195に変更しました！
             if (!s.isPlayerInvolved) { resAtk.soldierDmg = Math.floor(resAtk.soldierDmg * 0.195); resAtk.counterDmg = Math.floor(resAtk.counterDmg * 0.195); }
-            s.defender.fieldSoldiers -= Math.min(s.defender.fieldSoldiers, resAtk.soldierDmg); s.attacker.soldiers -= Math.min(s.attacker.soldiers, resAtk.counterDmg);
+            
+            // ★修正: 減った兵士の数を計算して、負傷兵の箱（deadSoldiers）に入れます！
+            let actDefDmg1 = Math.min(s.defender.fieldSoldiers, resAtk.soldierDmg);
+            let actAtkDmg1 = Math.min(s.attacker.soldiers, resAtk.counterDmg);
+            s.defender.fieldSoldiers -= actDefDmg1; 
+            s.attacker.soldiers -= actAtkDmg1;
+            s.deadSoldiers.defender += actDefDmg1;
+            s.deadSoldiers.attacker += actAtkDmg1;
+
             if (s.defender.fieldSoldiers <= 0 || s.attacker.soldiers <= 0) break;
             
             let resDef = WarSystem.calcWarDamage(defStats, atkStats, s.defender.fieldSoldiers, s.attacker.soldiers, 0, s.defender.morale, s.attacker.training, 'charge');
             // ★0.5を0.195に変更しました！
             if (!s.isPlayerInvolved) { resDef.soldierDmg = Math.floor(resDef.soldierDmg * 0.195); resDef.counterDmg = Math.floor(resDef.counterDmg * 0.195); }
-            s.attacker.soldiers -= Math.min(s.attacker.soldiers, resDef.soldierDmg); s.defender.fieldSoldiers -= Math.min(s.defender.fieldSoldiers, resDef.counterDmg);
-
+            
+            // ★修正: こちらも同じように減った兵士を負傷兵の箱に入れます！
+            let actAtkDmg2 = Math.min(s.attacker.soldiers, resDef.soldierDmg);
+            let actDefDmg2 = Math.min(s.defender.fieldSoldiers, resDef.counterDmg);
+            s.attacker.soldiers -= actAtkDmg2; 
+            s.defender.fieldSoldiers -= actDefDmg2;
+            s.deadSoldiers.attacker += actAtkDmg2;
+            s.deadSoldiers.defender += actDefDmg2;
+            
             s.attacker.rice = Math.max(0, s.attacker.rice - Math.floor(s.attacker.soldiers * consumeRate));
             s.defFieldRice = Math.max(0, s.defFieldRice - Math.floor(s.defender.fieldSoldiers * consumeRate)); 
             if (s.attacker.rice <= 0 || s.defFieldRice <= 0 || s.attacker.soldiers < s.defender.fieldSoldiers * 0.2 || s.defender.fieldSoldiers < s.attacker.soldiers * 0.2) break;

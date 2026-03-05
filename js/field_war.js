@@ -1506,6 +1506,17 @@ class FieldWarManager {
 
         defender.soldiers -= dmgToDef;
         attacker.soldiers -= dmgToAtk;
+
+        // ★書き足し: 野戦での被害を負傷兵の箱（deadSoldiers）に記録します！
+        if (attacker.isAttacker) {
+            // 攻撃軍から仕掛けた場合
+            this.warState.deadSoldiers.defender += dmgToDef;
+            this.warState.deadSoldiers.attacker += dmgToAtk;
+        } else {
+            // 守備軍から仕掛けた場合
+            this.warState.deadSoldiers.attacker += dmgToDef;
+            this.warState.deadSoldiers.defender += dmgToAtk;
+        }
         
         let dirMsg = "";
         if (mults.defToAtkDiff === 3) dirMsg = "（背後からの強襲！）";
