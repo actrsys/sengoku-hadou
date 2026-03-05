@@ -1664,11 +1664,11 @@ body.is-pc .faction-list-container { scroll-padding-top: 38px; }
     bottom: 10px; 
     left: 50%;
     transform: translateX(-50%) translateZ(-1px); /* š‚¤‚µ‚ë‚É translateZ(-1px) ‚ğ‘«‚µ‚Ü‚· */
-    width: 70%;  
+    width: 90%;  
     height: 15%; 
-    background: rgba(0, 0, 0, 0.9); 
+    background: rgba(0, 0, 0, 1.0); 
     border-radius: 50%; 
-    filter: blur(4px);  
+    filter: blur(0px);  
     z-index: -1; 
     pointer-events: none; 
 }
