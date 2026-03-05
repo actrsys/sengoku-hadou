@@ -1556,11 +1556,10 @@ class WarManager {
                         this.game.updateCastleLord(targetC); 
                     }
                     
-                    // ★滅亡した大名専用の胸熱メッセージ！
                     if (isSubmission) { 
-                        this.game.ui.showDialog(`${prisoner.name}を登用しました！`, false, nextStep); 
-                    } else {
                         this.game.ui.showDialog(`${prisoner.name}は臣従を誓いました！`, false, nextStep); 
+                    } else {
+                        this.game.ui.showDialog(`${prisoner.name}を登用しました！`, false, nextStep); 
                     }
                 } else {
                     prisoner.hasRefusedHire = true; // ★追加：拒否したという印をつけます
