@@ -627,8 +627,9 @@ class AIEngine {
             const castleBushos = this.game.getCastleBushos(castle.id).filter(b => b.status !== 'ronin' && b.belongKunishuId === 0);
             
             for (let b of castleBushos) {
-                // ① 承認欲求がたまっている場合（これは今まで通り、無条件で対象にします！）
-                if ((b.achievementTotal || 0) > 30 || (b.recognition || 0) > 30) {
+                // ① 承認欲求(recognition)がたまっている場合
+                // ★修正：累計功績(achievementTotal)は条件から外しました！
+                if ((b.recognition || 0) > 30) {
                     rewardTargets.push(b);
                     continue; // この人はもうリストに入れたので、次の人へ
                 }
@@ -678,8 +679,9 @@ class AIEngine {
                 if (action.type === 'reward') {
                     // 承認欲求が一番高い人、または忠誠度が一番低い人を1人選びます
                     action.targets.sort((a, b) => {
-                        const aAchieve = Math.max(a.achievementTotal || 0, a.recognition || 0);
-                        const bAchieve = Math.max(b.achievementTotal || 0, b.recognition || 0);
+                        // ★修正：ここでも累計功績は無視して、純粋に承認欲求(recognition)だけで比べます！
+                        const aAchieve = a.recognition || 0;
+                        const bAchieve = b.recognition || 0;
                         
                         // まずは承認欲求が高い人を優先します
                         if (bAchieve !== aAchieve) {
@@ -696,10 +698,6 @@ class AIEngine {
                         const effect = GameSystem.calcRewardEffect(200, daimyo, targetBusho);
                         if (this.game.factionSystem && this.game.factionSystem.updateRecognition) {
                             this.game.factionSystem.updateRecognition(targetBusho, -effect * 2 - 5);
-                        }
-                        if (targetBusho.achievementTotal !== undefined) {
-                            // 念のためこちらの数値も下げておきます
-                            targetBusho.achievementTotal = Math.max(0, targetBusho.achievementTotal - 30);
                         }
                         
                         // ★追加：忠誠度をランダムで1～3アップさせる（プレイヤーと同じ！）
