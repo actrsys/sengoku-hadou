@@ -1053,7 +1053,7 @@ class AIEngine {
 
             // 相手の戦力が自分の1/5以下なら、稀に支配を試みます
             if (targetClanTotal * 5 <= myPower) {
-                if (Math.random() < 0.2) { // 20%の確率で支配コマンドを実行します
+                if (Math.random() < 0.05) { // 5％の確率で支配コマンドを実行します
                     if (targetClanId === this.game.playerClanId) {
                         // ★相手がプレイヤーならお返事を待つ
                         this.game.commandSystem.proposeDiplomacyToPlayer(castellan, targetClanId, 'dominate', 0, () => {
