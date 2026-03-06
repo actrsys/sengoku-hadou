@@ -19,6 +19,11 @@ class AudioManager {
                 end: (36603 + 5733088) / 44100,
                 baseVolume: 0.02 // ★ここがこの曲の「基本の音量」です！
             },
+            
+            'SC_ex_Town1_Castle.ogg': { 
+                baseVolume: 0.02 
+            },
+            
             // 他の曲もここに書き足せます
             // '新しい曲.ogg': { baseVolume: 0.05 }, // ループがない曲はこれだけでもOK！
         };
