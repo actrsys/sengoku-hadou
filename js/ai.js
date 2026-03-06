@@ -143,10 +143,16 @@ class AIEngine {
             }
             
             // 軍事フェーズ
-            const elapsedTurns = (this.game.year - window.MainParams.StartYear) * 12
-                               + (this.game.month - window.MainParams.StartMonth);
+            // プレイヤーの城で「城攻 不可」の場合は、攻撃をスキップします
+            let skipAttack = false;
+            if (Number(castle.ownerClan) === Number(this.game.playerClanId) && castle.isDelegated && !castle.allowAttack) {
+                skipAttack = true; // ストップの目印をつけます
+            }
 
-            if (elapsedTurns >= 3) {
+            const elapsedTurns = (this.game.year - window.MainParams.StartYear) * 12;
+            
+            // ★ここも書き換え！ ストップの目印（skipAttack）がついていない時だけ攻撃します
+            if (elapsedTurns >= 3 && !skipAttack) {
                 // ★追加：自分が従属している「親大名」を探します
                 const myClanId = castle.ownerClan;
                 let myBossId = 0;
@@ -924,6 +930,11 @@ class AIEngine {
                     doer.isActionDone = true; actionDoneInThisStep = true; break; 
                 }
                 if (action.type === 'move') {
+                    // ★ここを書き足し！：プレイヤーの城で「武将移動 不可」の場合は、移動を中止して別の行動を探します
+                    if (Number(castle.ownerClan) === Number(this.game.playerClanId) && castle.isDelegated && !castle.allowMove) {
+                        continue; 
+                    }
+
                     let movers = [];
                     
                     if (action.specificMover) {

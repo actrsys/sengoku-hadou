@@ -98,8 +98,12 @@ class Castle {
         this.investigatedUntil = Number(this.investigatedUntil || 0);
         this.investigatedAccuracy = Number(this.investigatedAccuracy || 0);
         
-        // ★ここを書き足し！：委任されているかどうかを覚える箱（最初はfalse＝直轄）
+        // ★前回書き足し：委任されているかどうかを覚える箱（最初はfalse＝直轄）
         this.isDelegated = data.isDelegated === true;
+
+        // ★今回書き足し！：委任中の細かい許可設定（デフォルトは false ＝ 不可）
+        this.allowAttack = data.allowAttack === true;
+        this.allowMove = data.allowMove === true;
     }
 }
 
