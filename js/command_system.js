@@ -128,6 +128,10 @@ const COMMAND_SPECS = {
         startMode: 'busho_select', sortKey: 'leadership',
         msg: "城主を任命します" 
     },
+    'delegate': { 
+        label: "城主委任", category: 'PERSONNEL', 
+        isSystem: true, action: 'delegate_list' 
+    },
     'reward': { 
         label: "褒美", category: 'PERSONNEL', 
         costGold: 100, costRice: 0, 
@@ -163,11 +167,6 @@ const COMMAND_SPECS = {
         isMulti: false, hasAdvice: false, 
         startMode: 'busho_select', sortKey: 'loyalty',
         msg: "武将を追放します" 
-    },
-    // ★ここを書き足し！
-    'delegate': { 
-        label: "城主委任", category: 'PERSONNEL', 
-        isSystem: true, action: 'delegate_list' 
     },
 
     // --- 調略 (STRATEGY) ---
