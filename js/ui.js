@@ -1733,12 +1733,12 @@ class UIManager {
 
         // 変更後
         this.mapEl.appendChild(svg);
-
+        
         this.game.castles.forEach(c => {
             const el = document.createElement('div'); el.className = 'castle-card';
             
-            // ★追加：自分の操作する城（委任していない）のターンなら、特別な目印シールを貼ります！
-            if (activeCastle && c.id === activeCastle.id && c.ownerClan === this.game.playerClanId && !c.isDelegated) {
+            // ★修正：対象を選ぶモードじゃない時だけ、特別な目印シールを貼ります！
+            if (!isSelectionMode && activeCastle && c.id === activeCastle.id && c.ownerClan === this.game.playerClanId && !c.isDelegated) {
                 el.classList.add('current-turn');
             }
 
