@@ -523,8 +523,58 @@ class AIEngine {
             this.game.finishTurn();
             return;
         }
+        
+        // 城にいる武将（浪人以外）を集めます
         const bushos = this.game.getCastleBushos(source.id).filter(b => b.status !== 'ronin');
-        const sorted = bushos.sort((a,b) => b.leadership - a.leadership).slice(0, 3);
+        
+        // ★ここから追加・書き換え：戦闘力による足切りと、智謀による「見誤り」の魔法！
+        // 1. 城主(general)の智謀によって、どれくらい戦闘力を見誤るか（誤差）を決めます
+        let evaluatorInt = general.intelligence;
+        let maxError = 0;
+        if (evaluatorInt <= 50) {
+            maxError = 0.2; // 智謀50以下なら最大2割（±20%）見誤る
+        } else if (evaluatorInt >= 95) {
+            maxError = 0;   // 智謀95以上なら正確（誤差なし）
+        } else {
+            // 智謀51〜94の間は、グラフの一直線のように少しずつ誤差が減っていきます
+            maxError = 0.2 * (95 - evaluatorInt) / 45;
+        }
+
+        // 2. 各武将の戦闘力を見積もります
+        const evaluatedBushos = bushos.map(b => {
+            // 本当の戦闘力 ＝（統率 ＋ 武力 ＋ 智謀）÷ ２
+            const truePower = (b.leadership + b.strength + b.intelligence) / 2;
+            
+            // とりあえず最初は「本当の強さ」をセットしておきます
+            let perceivedPower = truePower;
+            
+            // ★追加：もし自分自身（城主）じゃなかったら、勘違いの計算をします！
+            if (b.id !== general.id) {
+                // 誤差のサイコロを振ります（1.0を中心に、-maxError から +maxError まで揺れます）
+                const errorRate = 1.0 + (Math.random() - 0.5) * 2 * maxError;
+                // 城主が「このくらい強いだろう」と思い込んでいる戦闘力
+                perceivedPower = truePower * errorRate;
+            }
+            
+            return { busho: b, perceivedPower: perceivedPower };
+        });
+
+        // 3. 見積もった戦闘力の中で、一番高い数値を基準（エース）にします
+        let maxPower = 0;
+        evaluatedBushos.forEach(eb => {
+            if (eb.perceivedPower > maxPower) {
+                maxPower = eb.perceivedPower;
+            }
+        });
+
+        // 4. 一番強い武将の「7割以下」の武将はお留守番させます（足切り）
+        const threshold = maxPower * 0.7;
+        const sorted = evaluatedBushos
+            .filter(eb => eb.perceivedPower > threshold) // 7割より大きい人だけ残す
+            .sort((a, b) => b.perceivedPower - a.perceivedPower) // 見積もり戦闘力が強い順に並べる
+            .slice(0, 3) // 最大3人まで選ぶ（既存の仕組みに合わせます）
+            .map(eb => eb.busho); // 魔法の箱から武将データだけを取り出す
+        // ★書き換えはここまで！
 
         // 援軍を探す処理へバトンタッチします
         const sendHorses = source.horses || 0;
