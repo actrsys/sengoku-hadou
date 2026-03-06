@@ -667,7 +667,8 @@ class UIManager {
 
     showContextMenu(x, y) {
         if (!this.contextMenu) return;
-        if (this.game.phase !== 'game' && this.game.phase !== 'daimyo_select') return;
+        // ★ここを差し替え！：ゲーム中（game）以外の時は、メニューを封印します！
+        if (this.game.phase !== 'game') return;
 
         this.contextMenu.style.left = `${x}px`;
         this.contextMenu.style.top = `${y}px`;
