@@ -744,8 +744,16 @@ class WarManager {
         
         if (s.isPlayerInvolved) { 
             this.game.ui.setWarModalVisible(true); this.game.ui.clearWarLog();
+            
+            // ★ここから追加：攻城戦スタート時にBGMを切り替える！
+            if (window.AudioManager) {
+                window.AudioManager.memorizeCurrentBgm(); 
+                window.AudioManager.playBGM('05_Ogre Island.ogg'); 
+            }
+            // ★追加ここまで
+            
             setTimeout(() => {
-                this.game.ui.log(`★ ${s.sourceCastle.name}軍が${s.defender.name}への籠城戦を開始！`); 
+                this.game.ui.log(`★ ${s.sourceCastle.name}軍が${s.defender.name}への攻城戦を開始！`);
                 this.game.ui.updateWarUI(); this.processWarRound(); 
             }, 500); 
         } else { setTimeout(() => { this.resolveAutoWar(); }, 100); }
@@ -1007,10 +1015,17 @@ class WarManager {
 
             // ★変更：順番待ちができるように async を付けます
             const finishWarProcess = async () => {
+                
+                // ★ここから追加：合戦結果の画面を閉じたら、平時のBGMに戻す！
+                if (window.AudioManager && s.isPlayerInvolved) {
+                    window.AudioManager.restoreMemorizedBgm();
+                }
+                // ★追加ここまで
+                
                 const winnerClan = s.attacker.ownerClan; // 勝ったのは攻撃側です
                 
                 // ★追加：大名を登用した時のご褒美パワーをリセットしておきます
-                this.daimyoHiredBonus = 0; 
+                this.daimyoHiredBonus = 0;
 
                 if (this.pendingPrisoners && this.pendingPrisoners.length > 0) {
                     if (winnerClan === this.game.playerClanId) {
@@ -1908,9 +1923,13 @@ class WarManager {
     }
 
     closeWar() { 
+        // ★ここから追加：国人衆との戦いが終わった時も平時のBGMに戻す！
+        if (window.AudioManager && this.state.isPlayerInvolved) {
+            window.AudioManager.restoreMemorizedBgm();
+        }
         this.game.ui.renderMap(); 
         if (this.state.isPlayerInvolved) { 
-            this.game.ui.updatePanelHeader(); 
+            this.game.ui.updatePanelHeader();
             this.game.ui.renderCommandMenu(); 
         }
         
