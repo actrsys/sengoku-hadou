@@ -729,7 +729,7 @@ class GameManager {
         });
 
         // 画像があるフォルダの道順をくっつけます
-        const urls = Array.from(faceFiles).map(filename => `./data/faceicons/${filename}`);
+        const urls = Array.from(faceFiles).map(filename => `./data/images/faceicons/${filename}`);
 
         // 一気に何百枚も読み込むとブラウザがパンクするので、1枚ずつ順番に読み込みます
         let i = 0;

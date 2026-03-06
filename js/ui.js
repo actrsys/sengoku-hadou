@@ -1301,7 +1301,7 @@ class UIManager {
         
         let faceHtml = "";
         if (leader && leader.faceIcon) {
-            faceHtml = `<img src="data/faceicons/${leader.faceIcon}" class="daimyo-confirm-face" onerror="this.style.display='none'">`;
+            faceHtml = `<img src="data/images/faceicons/${leader.faceIcon}" class="daimyo-confirm-face" onerror="this.style.display='none'">`;
         }
 
         if (this.daimyoConfirmBody) {
@@ -2076,7 +2076,7 @@ class UIManager {
         
         let faceHtml = "";
         if (castellan && castellan.faceIcon) {
-            faceHtml = `<img src="data/faceicons/${castellan.faceIcon}" onerror="this.style.display='none'">`;
+            faceHtml = `<img src="data/images/faceicons/${castellan.faceIcon}" onerror="this.style.display='none'">`;
         }
 
         let content = `
@@ -3330,7 +3330,7 @@ class UIManager {
             const el = document.getElementById(id);
             if (!el) return;
             if (busho && busho.faceIcon) {
-                el.src = `data/faceicons/${busho.faceIcon}`;
+                el.src = `data/images/faceicons/${busho.faceIcon}`;
                 el.classList.remove('hidden');
                 el.onerror = () => { el.classList.add('hidden'); }; 
             } else {
