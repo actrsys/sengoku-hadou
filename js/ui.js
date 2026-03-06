@@ -835,6 +835,38 @@ class UIManager {
         // 自分の城のリストを作成（大名のいる城は除外します）
         const myCastles = this.game.castles.filter(c => c.ownerClan === this.game.playerClanId && c.id !== daimyoCastleId);
 
+        // ==========================================
+        // ★ここから追加！：一括切替ボタンの魔法
+        // ==========================================
+        const toggleAllBtn = document.getElementById('btn-toggle-all-delegate');
+        if (toggleAllBtn) {
+            // 今、リストにあるお城が「すべて委任状態」になっているか調べます
+            const isAllDelegated = myCastles.length > 0 && myCastles.every(c => c.isDelegated);
+            
+            // ボタンの文字を、今の状態に合わせて分かりやすく変えます
+            if (isAllDelegated) {
+                toggleAllBtn.textContent = '一括：直轄にする';
+                toggleAllBtn.style.color = '#d32f2f'; // 赤っぽく
+            } else {
+                toggleAllBtn.textContent = '一括：委任にする';
+                toggleAllBtn.style.color = '#1976d2'; // 青っぽく
+            }
+
+            // ボタンを押した時の処理
+            toggleAllBtn.onclick = () => {
+                if (window.AudioManager) window.AudioManager.playSE('choice.ogg');
+                
+                // 今が「すべて委任」なら全員「直轄(false)」に、それ以外なら全員「委任(true)」にします！
+                const newState = !isAllDelegated;
+                myCastles.forEach(c => c.isDelegated = newState);
+                
+                // もう一度画面を描き直して、文字や色を更新します
+                this.showDelegateListModal();
+            };
+        }
+        // ★追加ここまで！
+        // ==========================================
+
         listEl.innerHTML = '';
         if (myCastles.length === 0) {
             listEl.innerHTML = '<div style="padding: 10px; text-align: center;">委任できる城がありません。</div>';
