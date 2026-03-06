@@ -722,8 +722,8 @@ class GameManager {
         // 同じ顔画像を何度も読み込まないように、必要なファイル名だけをリストアップします
         const faceFiles = new Set();
         this.bushos.forEach(b => {
-            // unknown_face.png（のっぺらぼう）以外の、ちゃんと設定されている顔画像を集めます
-            if (b.faceIcon && b.faceIcon !== 'unknown_face.png') {
+            // unknown_face.webp（のっぺらぼう）以外の、ちゃんと設定されている顔画像を集めます
+            if (b.faceIcon && b.faceIcon !== 'unknown_face.webp') {
                 faceFiles.add(b.faceIcon);
             }
         });
