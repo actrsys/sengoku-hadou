@@ -17,11 +17,11 @@ class AudioManager {
             'SC_ex_Town2_Fortress.ogg': { 
                 start: 36603 / 44100, 
                 end: (36603 + 5733088) / 44100,
-                baseVolume: 0.02 // ★ここがこの曲の「基本の音量」です！
+                baseVolume: 0.05 // ★ここがこの曲の「基本の音量」です！
             },
             
             'SC_ex_Town1_Castle.ogg': { 
-                baseVolume: 0.02 
+                baseVolume: 0.05 
             },
             
             // 他の曲もここに書き足せます
@@ -32,9 +32,9 @@ class AudioManager {
         // ★ SEのカタログ（個別の音量調整つき！）
         // ==========================================
         this.seList = {
-            'decision.ogg': { baseVolume: 0.02 },
-            'cancel.ogg': { baseVolume: 0.02 },
-            'choice.ogg': { baseVolume: 0.02 },
+            'decision.ogg': { baseVolume: 0.05 },
+            'cancel.ogg': { baseVolume: 0.03 },
+            'choice.ogg': { baseVolume: 0.05 },
             // 特定の音が大きすぎる場合は、ここで小さくできます
             // 'loud_explosion.ogg': { baseVolume: 0.005 },
         };
