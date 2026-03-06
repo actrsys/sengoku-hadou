@@ -2031,7 +2031,8 @@ class CommandSystem {
         }
 
         // 呼べる城があったら、UIに「誰を呼ぶ？」と聞く画面を出してもらいます
-        if (myClanId === pid) {
+        // ★変更: 委任城の場合はプレイヤーに聞かず、AIが自動で援軍を頼みます！
+        if (myClanId === pid && !atkCastle.isDelegated) {
             // プレイヤーならUIに「誰を呼ぶ？」と聞く画面を出してもらいます
             this.game.ui.showReinforcementSelector(candidateCastles, atkCastle, targetCastle, atkBushos, sVal, rVal, hVal, gVal);
         } else {

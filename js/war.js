@@ -172,7 +172,12 @@ class WarManager {
     getAvailableCommands(isAtkTurn) {
         const s = this.state;
         if (!s.isPlayerInvolved) return [];
-        const isMyTurn = (isAtkTurn && Number(s.attacker.ownerClan) === Number(this.game.playerClanId)) || (!isAtkTurn && Number(s.defender.ownerClan) === Number(this.game.playerClanId));
+        
+        // ★変更：委任城の場合はコマンドを選べないようにします
+        let isMyTurn = false;
+        if (isAtkTurn && Number(s.attacker.ownerClan) === Number(this.game.playerClanId) && !s.sourceCastle.isDelegated) isMyTurn = true;
+        if (!isAtkTurn && Number(s.defender.ownerClan) === Number(this.game.playerClanId) && !s.defender.isDelegated) isMyTurn = true;
+        
         if (!isMyTurn) return []; 
         const commands = [];
         if (isAtkTurn) {
@@ -310,7 +315,11 @@ class WarManager {
             const pid = Number(this.game.playerClanId);
             const atkClan = Number(atkCastle.ownerClan);
             const defClan = Number(defCastle.ownerClan);
-            let isPlayerInvolved = (atkClan === pid || defClan === pid);
+            
+            // ★変更: 委任されている城の場合はプレイヤー操作（手動戦闘）から外します！
+            let isPlayerInvolved = false;
+            if (atkClan === pid && !atkCastle.isDelegated) isPlayerInvolved = true;
+            if (defClan === pid && !defCastle.isDelegated) isPlayerInvolved = true;
 
             // ★追加: 援軍が来ている場合、援軍元の城から兵士や物資を減らして、攻撃軍に合流させます！
             if (reinforcementData) {
@@ -331,8 +340,8 @@ class WarManager {
                 // 武将たちも攻撃軍のリストに合流させます
                 atkBushos = atkBushos.concat(reinforcementData.bushos);
                 
-                // 援軍として参加したのがプレイヤーだった場合、プレイヤーが関わっている戦争として扱います
-                if (helperCastle.ownerClan === pid) {
+                // 援軍として参加したのがプレイヤー（かつ直轄城）だった場合、プレイヤーが関わっている戦争として扱います
+                if (helperCastle.ownerClan === pid && !helperCastle.isDelegated) {
                     isPlayerInvolved = true;
                 }
             }
@@ -414,7 +423,8 @@ class WarManager {
                     // ★ここに追加：守備側の援軍でプレイヤーが参加した場合、お休み状態を解除する！
                     isPlayerInvolved = this.state.isPlayerInvolved;
 
-    	            if (defClan === pid) {
+                    // ★変更: プレイヤーの直轄城のみ、手動で野戦か籠城かを選びます！
+    	            if (defClan === pid && !defCastle.isDelegated) {
     	                if (totalDefSoldiers <= 0) {
     	                    if (isPlayerInvolved) this.game.ui.log("城に兵士がいないため、迎撃（野戦）に出られません！");
     	                    onResult('siege');
@@ -578,7 +588,8 @@ class WarManager {
                             };
 
                             const handleAtkDivide = (defAssigns, callback) => {
-                                if (atkClan === pid) {
+                                // ★変更: プレイヤーの直轄城のみ、手動で兵士を分けます！
+                                if (atkClan === pid && !atkCastle.isDelegated) {
                                     if (attackerForce.isKunishu) {
                                         callback(defAssigns, [{busho: atkBushos[0], soldiers: atkSoldierCount, troopType: 'ashigaru'}]);
                                     } else {
@@ -806,7 +817,8 @@ class WarManager {
     resolveAutoWar() { 
         try { 
             const s = this.state;
-            if (s.isPlayerInvolved || Number(s.defender.ownerClan) === Number(this.game.playerClanId)) {
+            // ★変更: 委任城なら強制的に手動戦闘になるのを防ぎます！
+            if (s.isPlayerInvolved || (Number(s.defender.ownerClan) === Number(this.game.playerClanId) && !s.defender.isDelegated)) {
                 s.isPlayerInvolved = true; this.game.ui.setWarModalVisible(true); this.game.ui.updateWarUI(); this.processWarRound(); return;
             }
 
@@ -851,9 +863,15 @@ class WarManager {
     execWarAI() { 
         if (!this.state.active) return; 
         const s = this.state; const isDefender = (s.turn === 'defender');
-        if ((isDefender ? Number(s.defender.ownerClan) : Number(s.attacker.ownerClan)) === Number(this.game.playerClanId)) return;
+        
+        // ★変更: 委任されている城はAIが操作するようにします！
+        let isPlayerControlled = false;
+        if (isDefender && Number(s.defender.ownerClan) === Number(this.game.playerClanId) && !s.defender.isDelegated) isPlayerControlled = true;
+        if (!isDefender && Number(s.attacker.ownerClan) === Number(this.game.playerClanId) && !s.sourceCastle.isDelegated) isPlayerControlled = true;
+        
+        if (isPlayerControlled) return;
 
-        const actor = isDefender ? s.defBusho : s.atkBushos[0]; 
+        const actor = isDefender ? s.defBusho : s.atkBushos[0];
         let smartness = actor.intelligence / 100.0;
         if (window.AIParams.AI.Difficulty === 'hard') smartness = Math.min(1.0, smartness + 0.2);
         if (window.AIParams.AI.Difficulty === 'easy') smartness = Math.max(0.1, smartness - 0.2);
@@ -2064,7 +2082,8 @@ class WarManager {
             return;
         }
 
-        if (defClanId === pid) {
+        // ★変更: 委任城の場合はプレイヤーに聞かず、AIが自動で援軍を要請します！
+        if (defClanId === pid && !defCastle.isDelegated) {
             // プレイヤーが守備側なら、UIを出して選ばせる
             this.game.ui.showDefReinforcementSelector(candidateCastles, defCastle, onComplete);
         } else {
