@@ -380,7 +380,7 @@ class FieldWarManager {
             
             if (window.AudioManager) {
                 window.AudioManager.memorizeCurrentBgm(); // 今の曲をメモ
-                window.AudioManager.playBGM('05_Ogre Island.ogg'); // 野戦BGM再生
+                window.AudioManager.playBGM('08_Legend of bear slaying.ogg'); // 野戦BGM再生
             }
         }
         
@@ -1278,13 +1278,7 @@ class FieldWarManager {
         const isPlayerInvolved = this.units.some(u => u.isPlayer);
         
         if (isPlayerInvolved) {
-            setTimeout(() => {
-                // ★ここから追加：画面が閉じる直前にBGMを元に戻す！
-                if (window.AudioManager) {
-                    window.AudioManager.restoreMemorizedBgm();
-                }
-                // ★追加ここまで
-                
+            setTimeout(() => {                
                 if (this.modal) this.modal.classList.add('hidden');
                 if (this.onComplete) this.onComplete(resultType);
             }, 1500);

@@ -26,8 +26,12 @@ class AudioManager {
             'SC_ex_Town1_Castle.ogg': { 
                 baseVolume: 0.02 
             },
-            // ★ここを書き足し！野戦のBGMです（音量はお好みで調整してくださいね）
-            '05_Ogre Island.ogg': {
+            // ★野戦のBGM
+            '08_Legend of bear slaying.ogg': {
+                baseVolume: 0.02
+            },
+            // ★ここを書き足し！：攻城戦のBGM
+            '07_Underworld dance.ogg': {
                 baseVolume: 0.02
             },
             // '新しい曲.ogg': { baseVolume: 0.05 }, // ループがない曲はこれだけでもOK！
@@ -38,7 +42,7 @@ class AudioManager {
         // ==========================================
         this.seList = {
             'decision.ogg': { baseVolume: 0.05 },
-            'cancel.ogg': { baseVolume: 0.03 },
+            'cancel.ogg': { baseVolume: 0.02 },
             'choice.ogg': { baseVolume: 0.05 },
             // 特定の音が大きすぎる場合は、ここで小さくできます
             // 'loud_explosion.ogg': { baseVolume: 0.005 },
@@ -130,9 +134,12 @@ class AudioManager {
         se.play();
     }
     
-    // 今のBGMをメモ帳に書き写す魔法
+    // 今のBGMをメモ帳に書き写す魔法（上書き禁止バージョン！）
     memorizeCurrentBgm() {
-        this.memoBgmName = this.currentBgmName;
+        // ★追加：メモ帳が「白紙」の時だけ書き込みます！
+        if (!this.memoBgmName) {
+            this.memoBgmName = this.currentBgmName;
+        }
     }
 
     // メモ帳に書いてあるBGMをもう一度鳴らす魔法

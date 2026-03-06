@@ -748,7 +748,7 @@ class WarManager {
             // ★ここから追加：攻城戦スタート時にBGMを切り替える！
             if (window.AudioManager) {
                 window.AudioManager.memorizeCurrentBgm(); 
-                window.AudioManager.playBGM('05_Ogre Island.ogg'); 
+                window.AudioManager.playBGM('07_Underworld dance.ogg'); // ←★ここを、先ほどカタログに登録した攻城戦用の曲名に変えます！
             }
             // ★追加ここまで
             
