@@ -1,49 +1,59 @@
 /**
- * audio.js (Web Audio API ネイティブ直結版 ＋ BGMカタログ機能つき)
+ * audio.js (Web Audio API ネイティブ直結版 ＋ BGM・SEカタログ機能＋ユーザー設定つき)
  */
 class AudioManager {
     constructor() {
         this.bgmPlayer = null;
-        this.defaultVolume = 0.02; // BGMの音量
-        this.seVolume = 0.02;      // SE専用の音量
+
+        // ★ユーザーが設定した音量（最初は1.0＝100%）を覚えておきます。
+        // ブラウザに記憶があればそれを読み込みます！
+        this.userBgmVolume = parseFloat(localStorage.getItem('userBgmVolume')) || 1.0;
+        this.userSeVolume = parseFloat(localStorage.getItem('userSeVolume')) || 1.0;
 
         // ==========================================
-        // ★ ここに「BGMのカタログ」を作ります！
+        // ★ BGMのカタログ（個別の音量調整つき！）
         // ==========================================
         this.bgmList = {
-            // 曲の名前と、スタート地点・ゴール地点をメモしておきます
             'SC_ex_Town2_Fortress.ogg': { 
                 start: 36603 / 44100, 
-                end: (36603 + 5733088) / 44100 
+                end: (36603 + 5733088) / 44100,
+                baseVolume: 0.02 // ★ここがこの曲の「基本の音量」です！
             },
-            
-            // ★新しい曲が増えたら、ここに同じように書き足していけばOKです！
-            // '新しい曲の名前.ogg': {
-            //     start: スタートの数字 / Hz,
-            //     end: (スタートの数字 ＋ 長さの数字) / Hz
-            // }
+            // 他の曲もここに書き足せます
+            // '新しい曲.ogg': { baseVolume: 0.05 }, // ループがない曲はこれだけでもOK！
         };
+
+        // ==========================================
+        // ★ SEのカタログ（個別の音量調整つき！）
+        // ==========================================
+        this.seList = {
+            'decision.ogg': { baseVolume: 0.02 },
+            'cancel.ogg': { baseVolume: 0.02 },
+            'choice.ogg': { baseVolume: 0.02 },
+            // 特定の音が大きすぎる場合は、ここで小さくできます
+            // 'loud_explosion.ogg': { baseVolume: 0.005 },
+        };
+        
+        // もしカタログに書いていない音が呼ばれたときの「とりあえずの音量」
+        this.fallbackBgmVolume = 0.02;
+        this.fallbackSeVolume = 0.02;
     }
 
-    // ==========================================
-    // ★ BGMを鳴らす仕組み（ハイブリッド版！）
-    // ==========================================
-    // 命令を受け取る時、念のため「今まで通りの数字（fallbackStart, fallbackEnd）」も受け取れるようにしておきます
+    // BGMを鳴らす魔法
     playBGM(fileName, fallbackStart = 0, fallbackEnd = 0) {
         this.stopBGM();
 
-        // １．カタログ（bgmList）の中に、呼ばれた曲のメモがあるか探します
         const bgmData = this.bgmList[fileName];
+        const loopStart = bgmData && bgmData.start !== undefined ? bgmData.start : fallbackStart;
+        const loopEnd = bgmData && bgmData.end !== undefined ? bgmData.end : fallbackEnd;
         
-        // ２．★ここがハイブリッドの魔法です！
-        // もしカタログにメモがあればそれを使います。
-        // もしカタログにまだ書いていなければ、今まで通り渡された数字（fallbackStartなど）を使います！
-        const loopStart = bgmData ? bgmData.start : fallbackStart;
-        const loopEnd = bgmData ? bgmData.end : fallbackEnd;
+        // ★ここで「基本の音量」と「ユーザーが設定した音量」を掛け算します！
+        const baseVol = bgmData && bgmData.baseVolume !== undefined ? bgmData.baseVolume : this.fallbackBgmVolume;
+        const finalVolume = baseVol * this.userBgmVolume;
 
         this.bgmPlayer = new window.Howl({
             src: [`data/music/bgm/${fileName}`],
-            volume: this.defaultVolume,
+            volume: finalVolume,
             loop: true, 
             onplay: (id) => {
                 if (loopStart > 0 && this.bgmPlayer) {
@@ -69,21 +79,40 @@ class AudioManager {
         }
     }
     
-    setVolume(value) {
-        this.defaultVolume = value;
+    // BGMの音量を変える（設定画面から呼ばれる魔法です）
+    setBgmVolume(ratio) {
+        this.userBgmVolume = ratio;
+        localStorage.setItem('userBgmVolume', ratio); // ブラウザに記憶させます
+        
+        // 今鳴っているBGMがあれば、リアルタイムに音量を変えます
         if (this.bgmPlayer) {
-            this.bgmPlayer.volume(value);
+            // 今鳴っている曲の名前を取り出します
+            const src = this.bgmPlayer._src[0]; 
+            const fileName = src.split('/').pop();
+            const bgmData = this.bgmList[fileName];
+            const baseVol = bgmData && bgmData.baseVolume !== undefined ? bgmData.baseVolume : this.fallbackBgmVolume;
+            
+            this.bgmPlayer.volume(baseVol * this.userBgmVolume);
         }
     }
 
-    setSEVolume(value) {
-        this.seVolume = value;
+    // SEの音量を変える（設定画面から呼ばれる魔法です）
+    setSeVolume(ratio) {
+        this.userSeVolume = ratio;
+        localStorage.setItem('userSeVolume', ratio); // ブラウザに記憶させます
     }
     
+    // SEを鳴らす魔法
     playSE(fileName) {
+        const seData = this.seList[fileName];
+        
+        // ★ここでも「基本の音量」と「ユーザー設定」を掛け算します！
+        const baseVol = seData && seData.baseVolume !== undefined ? seData.baseVolume : this.fallbackSeVolume;
+        const finalVolume = baseVol * this.userSeVolume;
+
         const se = new window.Howl({
             src: [`data/music/se/${fileName}`], 
-            volume: this.seVolume
+            volume: finalVolume
         });
         se.play();
     }

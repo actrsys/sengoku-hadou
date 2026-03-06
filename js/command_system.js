@@ -255,7 +255,9 @@ const COMMAND_SPECS = {
     // --- システム (SYSTEM) - UI生成用プレースホルダ ---
     'save': { label: "ファイル保存", category: 'SYSTEM', isSystem: true, action: 'save' },
     'load': { label: "ファイル読込", category: 'SYSTEM', isSystem: true, action: 'load' },
-    'history': { label: "履歴", category: 'SYSTEM', isSystem: true, action: 'history' }
+    'history': { label: "履歴", category: 'SYSTEM', isSystem: true, action: 'history' },
+    // ★ここを書き足し！：設定コマンドのリスト入りです
+    'settings': { label: "設定", category: 'SYSTEM', isSystem: true, action: 'settings' }
 };
 
 class CommandSystem {
@@ -418,8 +420,9 @@ class CommandSystem {
             case 'daimyo_list': this.game.ui.showDaimyoList(); break;
             case 'faction_list': this.game.ui.showFactionList(this.game.playerClanId, true); break;
             case 'busho_list': this.game.ui.openBushoSelector('all_busho_list', null, null, null); break;
-            // ★ここを書き足し！
             case 'delegate_list': this.game.ui.showDelegateListModal(); break;
+            // ★ここを書き足し！：「settings」と呼ばれたら小窓を開きます
+            case 'settings': this.game.ui.showSettingsModal(); break;
         }
     }
 

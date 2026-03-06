@@ -2230,7 +2230,7 @@ class UIManager {
             if (this.menuState === 'MILITARY') {
                 createBtn("取引", "category", () => menu('MIL_TRADE'));
             }
-
+            
             const emptyCount = 3 - ((relevantCommands.length + (this.menuState === 'MILITARY' ? 1 : 0)) % 3);
             if (emptyCount < 3) {
                 for(let i=0; i<emptyCount; i++) {
@@ -3727,4 +3727,50 @@ class UIManager {
             };
         }
     }
+    // ★ ここからまるごと追加！：設定画面を開いて、スライダーを動かせるようにする魔法です！
+    showSettingsModal() {
+        const modal = document.getElementById('settings-modal');
+        const bgmSlider = document.getElementById('setting-bgm-volume');
+        const bgmText = document.getElementById('setting-bgm-text');
+        const seSlider = document.getElementById('setting-se-volume');
+        const seText = document.getElementById('setting-se-text');
+
+        if (!modal || !bgmSlider || !seSlider) return;
+
+        // 今の音量（1.0なら100%）をスライダーにセットします
+        if (window.AudioManager) {
+            bgmSlider.value = Math.round(window.AudioManager.userBgmVolume * 100);
+            bgmText.textContent = bgmSlider.value + '%';
+            
+            seSlider.value = Math.round(window.AudioManager.userSeVolume * 100);
+            seText.textContent = seSlider.value + '%';
+        }
+
+        // BGMのスライダーを動かしたときの処理
+        bgmSlider.oninput = (e) => {
+            const val = e.target.value;
+            bgmText.textContent = val + '%';
+            if (window.AudioManager) {
+                // 100を1.0に直して渡します
+                window.AudioManager.setBgmVolume(val / 100); 
+            }
+        };
+
+        // SEのスライダーを動かしたときの処理
+        seSlider.oninput = (e) => {
+            const val = e.target.value;
+            seText.textContent = val + '%';
+            if (window.AudioManager) {
+                window.AudioManager.setSeVolume(val / 100);
+            }
+        };
+        
+        // つまみを離したときに「ピロッ」と鳴らして音量を確認できるようにします
+        seSlider.onchange = () => {
+             if (window.AudioManager) window.AudioManager.playSE('choice.ogg');
+        };
+
+        modal.classList.remove('hidden');
+    }
+    // ★ 追加ここまで！
 }
