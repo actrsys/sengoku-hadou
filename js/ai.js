@@ -507,7 +507,8 @@ class AIEngine {
         }
         
         // ★追加：どこにも攻められなかった場合、警戒対象の中で一番戦力が高い相手との親善を提案します！
-        if (adjacentEnemyClans.length > 0) {
+        // ただし、プレイヤーの委任城（城主）は勝手に外交しないように制限をかけます！
+        if (adjacentEnemyClans.length > 0 && myClanId !== this.game.playerClanId) {
             // 戦力が高い順に並べ替え
             adjacentEnemyClans.sort((a, b) => b.power - a.power);
             return { action: 'diplomacy', targetClanId: adjacentEnemyClans[0].clanId };
