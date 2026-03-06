@@ -2079,8 +2079,9 @@ class WarManager {
             if (myToHelperRel.sentiment >= 50) prob += (myToHelperRel.sentiment - 49); 
             prob += Math.floor((gold / 1500) * 15);
             if (myToHelperRel.status === '同盟' || myToHelperRel.status === '従属') prob += 30;
-            if (helperToEnemyRel && helperToEnemyRel.sentiment >= 50) {
-                prob -= Math.floor((helperToEnemyRel.sentiment - 50) * (20 / 50)) + 1; 
+            if (helperToEnemyRel) {
+                // 50を基準にして、敵との仲が悪い（50より下）と参加しやすくなり、仲が良い（50より上）と参加しにくくなる魔法だよ！
+                prob -= Math.floor((helperToEnemyRel.sentiment - 50) * (20 / 50)); 
             }
             prob += 10; 
             if (Math.random() * 100 < prob) isSuccess = true;
