@@ -1611,9 +1611,22 @@ class CommandSystem {
         
         this.game.ui.showResultModal(`${this.game.getBusho(bushoIds[0]).name}が${t.name}へ物資を輸送しました`); this.game.ui.updatePanelHeader(); this.game.ui.renderCommandMenu();
     }
+    
+    executeAppointGunshi(bushoId) { 
+        const busho = this.game.getBusho(bushoId); 
+        const oldGunshi = this.game.bushos.find(b => b.clan === this.game.playerClanId && b.isGunshi); 
+        if (oldGunshi) oldGunshi.isGunshi = false; 
+        busho.isGunshi = true; 
 
-    executeAppointGunshi(bushoId) { const busho = this.game.getBusho(bushoId); const oldGunshi = this.game.bushos.find(b => b.clan === this.game.playerClanId && b.isGunshi); if (oldGunshi) oldGunshi.isGunshi = false; busho.isGunshi = true; this.game.ui.showResultModal(`${busho.name}を軍師に任命しました`); this.game.ui.updatePanelHeader(); this.game.ui.renderCommandMenu(); }
+        // ★ここから追加！：軍師に任命された時に、この軍師専用の「秘密の番号（タネ）」を作ります！
+        busho.gunshiSeed = Math.floor(Math.random() * 10000);
+        // ★追加ここまで！
 
+        this.game.ui.showResultModal(`${busho.name}を軍師に任命しました`); 
+        this.game.ui.updatePanelHeader(); 
+        this.game.ui.renderCommandMenu(); 
+    }
+    
     executeIncite(doerId, targetId) { 
         const doer = this.game.getBusho(doerId); 
         const target = this.game.getCastle(targetId); 

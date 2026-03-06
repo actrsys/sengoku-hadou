@@ -179,6 +179,9 @@ class Busho {
         this.factionSeikaku = this.factionSeikaku || "無所属";
         this.factionHoshin = this.factionHoshin || "無所属";
 
+        // ★今回追加：軍師としての「秘密の番号（タネ）」を覚えておく箱です！
+        this.gunshiSeed = Number(data.gunshiSeed || 0);
+
         // 国人衆関連のパラメータ追加
         this.belongKunishuId = Number(this.belongKunishuId || 0);   // 所属する国人衆ID（0なら未所属）
 

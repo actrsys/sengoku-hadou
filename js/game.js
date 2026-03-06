@@ -350,6 +350,20 @@ class GameSystem {
     }
     static getPerceivedStatValue(target, statName, gunshi, castleAccuracy, playerClanId, daimyo = null) {
         const realVal = target[statName];
+
+        // ==========================================
+        // ★ここから追加！：毎回コロコロ変わらないための「固定されたサイコロ」を作ります！
+        // 「ステータスの種類(statName)」を簡単な数字に変換します（武勇なら何番、智謀なら何番…という風に）
+        const statNum = statName.charCodeAt(0) + statName.length; 
+        
+        // 「軍師の秘密の番号」＋「相手のID」＋「ステータスの番号」を足して、専用のタネを作ります
+        // もし軍師がいない場合は、相手のIDだけでタネを作ります
+        const seed = gunshi ? (gunshi.gunshiSeed + target.id * 10 + statNum) : (target.id * 10 + statNum);
+        
+        // seededRandomという魔法を使って、タネから「毎回必ず同じ」ランダムな小数（0.0〜1.0）を作ります！
+        const fixedRandom = this.seededRandom(seed);
+        // ==========================================
+
         if (target.clan === playerClanId) {
             if (target.isDaimyo) return realVal;
             if (!gunshi) return null; 
@@ -363,13 +377,19 @@ class GameSystem {
                 biasFactor = 1.0 + (biasFactor - 1.0) * (1.0 - fairness);
             }
             const randomErrorRange = (120 - baseAcc) * 0.5; 
-            const randomError = (Math.random() - 0.5) * randomErrorRange;
+            
+            // ★ここを書き換え！ Math.random() の代わりに、さっき作った「固定されたサイコロ」を使います
+            const randomError = (fixedRandom - 0.5) * randomErrorRange;
+            
             let perceived = (realVal + randomError) * biasFactor;
             return Math.max(1, Math.min(120, Math.floor(perceived)));
         }
         if (castleAccuracy !== null && castleAccuracy > 0) {
             const maxErr = 50 * (1.0 - (castleAccuracy / 100));
-            const err = (Math.random() - 0.5) * 2 * maxErr;
+            
+            // ★ここも書き換え！
+            const err = (fixedRandom - 0.5) * 2 * maxErr;
+            
             return Math.max(1, Math.min(120, Math.floor(realVal + err)));
         }
         
@@ -379,7 +399,10 @@ class GameSystem {
 
         if (gunshi) {
             const noise = (130 - gunshi.intelligence);
-            const err = (Math.random() - 0.5) * noise * 2;
+            
+            // ★ここも書き換え！
+            const err = (fixedRandom - 0.5) * noise * 2;
+            
             return Math.max(1, Math.min(120, Math.floor(realVal + err)));
         }
         return null;
