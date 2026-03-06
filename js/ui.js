@@ -2550,7 +2550,7 @@ class UIManager {
                              const currentChecked = this.selectorList.querySelectorAll('input[name="sel_busho"]:checked').length;
                              if(e.target.checked && currentChecked > maxSelect) {
                                  e.target.checked = false;
-                                 this.showDialog(`出陣できる武将は最大${maxSelect}人までです。`, false);
+                                 this.showDialog(`出陣できる武将は最大${maxSelect}名までです。`, false);
                                  return;
                              }
 
@@ -2584,7 +2584,7 @@ class UIManager {
                              const maxSelect = (actionType === 'war_deploy' || actionType === 'def_intercept_deploy' || actionType === 'def_reinf_deploy') ? 5 : 999;
                              const currentChecked = this.selectorList.querySelectorAll('input[name="sel_busho"]:checked').length;
                              if(!input.checked && currentChecked >= maxSelect) {
-                                 this.showDialog(`出陣できる武将は最大${maxSelect}人までです。`, false);
+                                 this.showDialog(`出陣できる武将は最大${maxSelect}名までです。`, false);
                                  return;
                              }
 
