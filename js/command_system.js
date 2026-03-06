@@ -980,21 +980,63 @@ class CommandSystem {
         const isPlayerInvolved = (doer.clan === this.game.playerClanId || targetClanId === this.game.playerClanId);
 
         if (type === 'goodwill') {
-            const increase = this.calcGoodwillIncrease(gold, doer);
-            
-            this.game.diplomacyManager.updateSentiment(doer.clan, targetClanId, increase);
-            const newRelation = this.game.getRelation(doer.clan, targetClanId);
+            let isSuccess = true;
 
-            const castle = this.game.getCastle(doer.castleId); 
-            if(castle) castle.gold -= gold;
-            
-            msg = `${doer.name}が親善を行いました\n友好度が上昇しました`;
-            doer.achievementTotal += Math.floor(doer.diplomacy * 0.2) + 10;
-            this.game.factionSystem.updateRecognition(doer, 15);
+            // ★追加: 相手の大名がAIの場合、友好度によって親善を受ける確率を変動させる（線形で受けづらくなる）
+            if (targetClanId !== this.game.playerClanId) {
+                if (relation.sentiment <= 50) {
+                    let acceptProb = relation.sentiment * 2; // 友好度50で100%、0で0%
+                    
+                    // 共通の敵対大名がいるかチェック
+                    const commonEnemy = this.game.clans.some(c => {
+                        if (c.id === 0 || c.id === doer.clan || c.id === targetClanId) return false;
+                        const r1 = this.game.getRelation(doer.clan, c.id);
+                        const r2 = this.game.getRelation(targetClanId, c.id);
+                        return r1 && r2 && r1.status === '敵対' && r2.status === '敵対';
+                    });
+
+                    if (commonEnemy) {
+                        acceptProb += 30; // 共通の敵がいれば受け入れやすくする
+                    }
+
+                    if (Math.random() * 100 > acceptProb) {
+                        isSuccess = false;
+                    }
+                }
+            }
+
+            if (isSuccess) {
+                const increase = this.calcGoodwillIncrease(gold, doer);
+                
+                this.game.diplomacyManager.updateSentiment(doer.clan, targetClanId, increase);
+                const newRelation = this.game.getRelation(doer.clan, targetClanId);
+
+                const castle = this.game.getCastle(doer.castleId); 
+                if(castle) castle.gold -= gold;
+                
+                msg = `${doer.name}が親善を行いました\n友好度が上昇しました`;
+                doer.achievementTotal += Math.floor(doer.diplomacy * 0.2) + 10;
+                this.game.factionSystem.updateRecognition(doer, 15);
+            } else {
+                msg = `${this.game.clans.find(c => c.id === targetClanId).name} に親善の品を突き返されました……\n友好度は変わりませんでした`;
+                doer.achievementTotal += 5;
+                this.game.factionSystem.updateRecognition(doer, 5);
+            }
 
         } else if (type === 'alliance') {
+            // ★追加: 共通の敵対大名がいるかチェックし、同盟をしやすくする
+            const commonEnemy = this.game.clans.some(c => {
+                if (c.id === 0 || c.id === doer.clan || c.id === targetClanId) return false;
+                const r1 = this.game.getRelation(doer.clan, c.id);
+                const r2 = this.game.getRelation(targetClanId, c.id);
+                return r1 && r2 && r1.status === '敵対' && r2.status === '敵対';
+            });
+
+            const threshold = commonEnemy ? 90 : 120; // 共通の敵がいれば閾値を下げる
+            const randThreshold = commonEnemy ? 0.1 : 0.3; // 確率も緩和
+
             const chance = relation.sentiment + doer.diplomacy;
-            if (chance > 120 && Math.random() > 0.3) {
+            if (chance > threshold && Math.random() > randThreshold) {
                 this.game.diplomacyManager.changeStatus(doer.clan, targetClanId, '同盟');
                 msg = `同盟の締結に成功しました！`;
                 doer.achievementTotal += Math.floor(doer.diplomacy * 0.2) + 10;

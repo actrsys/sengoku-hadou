@@ -1058,12 +1058,35 @@ class AIEngine {
             // 通常の親善・同盟のロジック
             if (myPower < targetClanTotal * 0.8) {
                 if (Math.random() < smartness) {
-                    if (rel.sentiment < (window.AIParams.AI.GoodwillThreshold || 40)) {
-                         // ★変更: 相手の戦力に合わせて親善の金額を決める
+                    // ★追加：共通の敵対大名がいるか判定
+                    const commonEnemy = this.game.clans.some(c => {
+                        if (c.id === 0 || c.id === castle.ownerClan || c.id === targetClanId) return false;
+                        const r1 = this.game.getRelation(castle.ownerClan, c.id);
+                        const r2 = this.game.getRelation(targetClanId, c.id);
+                        return r1 && r2 && r1.status === '敵対' && r2.status === '敵対';
+                    });
+
+                    // 共通の敵がいれば同盟や親善の閾値を少し緩和する
+                    const allianceThreshold = commonEnemy ? (window.AIParams.AI.AllianceThreshold || 70) - 15 : (window.AIParams.AI.AllianceThreshold || 70);
+                    const goodwillThreshold = commonEnemy ? (window.AIParams.AI.GoodwillThreshold || 40) + 20 : (window.AIParams.AI.GoodwillThreshold || 40);
+
+                    if (rel.sentiment < goodwillThreshold) {
                          const ratio = targetClanTotal / Math.max(1, myPower); // 相手が自分の何倍強いか
                          
-                         // ★追加: 友好度30以下の険悪な相手には、戦力差3倍以上ないと絶対に親善しない！
-                         if (rel.sentiment <= 30 && ratio < 3.0) {
+                         // ★変更: 友好度50以下〜0になるにつれて線形で親善を渋るようにする
+                         let willGoodwill = true;
+                         if (rel.sentiment <= 50) {
+                             let skipProb = (50 - rel.sentiment) * 2; // 50で0%、0で100%
+                             if (commonEnemy) {
+                                 skipProb -= 30; // 共通の敵がいれば親善を渋る確率を減らす
+                             }
+                             if (Math.random() * 100 < skipProb) {
+                                 willGoodwill = false;
+                             }
+                         }
+
+                         // 元の「戦力差3倍以上ないと絶対に親善しない」ロジックも組み込む
+                         if (!willGoodwill || (rel.sentiment <= 30 && ratio < 3.0)) {
                              // 何もしないで諦める（親善はスキップ）
                          } else {
                              let goodwillGold = 300; // 最低は金300
@@ -1085,12 +1108,12 @@ class AIEngine {
                                      });
                                      return 'waiting';
                                  } else {
-                                     this.game.commandSystem.executeDiplomacy(castellan.id, targetCastleId, 'goodwill', goodwillGold); // ★変更：targetClanId を targetCastleId に直しました！
+                                     this.game.commandSystem.executeDiplomacy(castellan.id, targetCastleId, 'goodwill', goodwillGold);
                                      castellan.isActionDone = true;
                                  }
                              }
                          }
-                    } else if (rel.sentiment > (window.AIParams.AI.AllianceThreshold || 70)) {
+                    } else if (rel.sentiment > allianceThreshold) {
                          if (targetClanId === this.game.playerClanId) {
                              // ★相手がプレイヤーならお返事を待つ
                              this.game.commandSystem.proposeDiplomacyToPlayer(castellan, targetClanId, 'alliance', 0, () => {
@@ -1099,7 +1122,7 @@ class AIEngine {
                              });
                              return 'waiting';
                          } else {
-                             this.game.commandSystem.executeDiplomacy(castellan.id, targetCastleId, 'alliance'); // ★変更：targetClanId を targetCastleId に直しました！
+                             this.game.commandSystem.executeDiplomacy(castellan.id, targetCastleId, 'alliance');
                              castellan.isActionDone = true;
                          }
                     }
