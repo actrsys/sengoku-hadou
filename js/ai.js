@@ -299,6 +299,7 @@ class AIEngine {
                                         // 相手がAIならそのまま親善を実行します
                                         this.game.commandSystem.executeDiplomacy(castellan.id, targetCastle.id, 'goodwill', goodwillGold);
                                         castellan.isActionDone = true;
+                                        this.game.finishTurn(); // ★これを新しく書き足します！
                                     }
                                     return; // 外交をしたらターン終了！
                                 }
