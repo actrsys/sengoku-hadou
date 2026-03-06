@@ -572,7 +572,7 @@ class AIEngine {
         const sorted = evaluatedBushos
             .filter(eb => eb.perceivedPower > threshold) // 7割より大きい人だけ残す
             .sort((a, b) => b.perceivedPower - a.perceivedPower) // 見積もり戦闘力が強い順に並べる
-            .slice(0, 3) // 最大3人まで選ぶ（既存の仕組みに合わせます）
+            .slice(0, 5) // 最大5人まで選ぶ（既存の仕組みに合わせます）
             .map(eb => eb.busho); // 魔法の箱から武将データだけを取り出す
         // ★書き換えはここまで！
 

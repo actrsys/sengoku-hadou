@@ -500,21 +500,64 @@ class WarManager {
                     } else {
                         if (totalDefSoldiers >= atkSoldierCount * 0.8) {
                             let availableDefBushos = this.game.getCastleBushos(defCastle.id).filter(b => b.status !== 'dead');
-                            if (!defCastle.isKunishu) {
-                                availableDefBushos = availableDefBushos.filter(b => Number(b.clan) === Number(defCastle.ownerClan));
-                            } else {
-                                availableDefBushos = availableDefBushos.filter(b => b.belongKunishuId === defCastle.kunishuId);
-                            }
-                            const defBushos = availableDefBushos.sort((a,b) => b.strength - a.strength).slice(0, 5);
+                            // ★ここから下を差し替えます！
+                            // 1. 誰がみんなの強さを見積もるか（評価者）を決めます！
+                            // その城にいる大名、いなければ城主が評価者になります
+                            let evaluator = availableDefBushos.find(b => b.isDaimyo);
+                            if (!evaluator) evaluator = availableDefBushos.find(b => b.isCastellan);
                             
+                            let evaluatorInt = 50;
+                            let evaluatorId = 0;
+                            if (evaluator) {
+                                evaluatorInt = evaluator.intelligence;
+                                evaluatorId = evaluator.id;
+                            }
+
+                            // 2. 評価者の智謀によって、どれくらい見誤るかを決めます
+                            let maxError = 0;
+                            if (evaluatorInt <= 50) {
+                                maxError = 0.2; 
+                            } else if (evaluatorInt >= 95) {
+                                maxError = 0;   
+                            } else {
+                                maxError = 0.2 * (95 - evaluatorInt) / 45;
+                            }
+
+                            // 3. 各武将の戦闘力を見積もります
+                            const evaluatedBushos = availableDefBushos.map(b => {
+                                const truePower = (b.leadership + b.strength + b.intelligence) / 2;
+                                let perceivedPower = truePower;
+                                
+                                // 自分自身（評価者）じゃなかったら勘違いのサイコロを振ります！
+                                if (b.id !== evaluatorId) {
+                                    const errorRate = 1.0 + (Math.random() - 0.5) * 2 * maxError;
+                                    perceivedPower = truePower * errorRate;
+                                }
+                                return { busho: b, perceivedPower: perceivedPower };
+                            });
+
+                            // 4. 一番高い戦闘力を基準にします
+                            let maxPower = 0;
+                            evaluatedBushos.forEach(eb => {
+                                if (eb.perceivedPower > maxPower) maxPower = eb.perceivedPower;
+                            });
+
+                            // 5. 7割以下の人はお留守番！強い順に並べて最大5人選びます
+                            const threshold = maxPower * 0.7;
+                            const defBushos = evaluatedBushos
+                                .filter(eb => eb.perceivedPower > threshold) 
+                                .sort((a, b) => b.perceivedPower - a.perceivedPower) 
+                                .slice(0, 5) // 迎撃時は最大5人まで出陣できます
+                                .map(eb => eb.busho);
+                                
+                            // 6. 選ばれた人の中に大名か城主がいれば、総大将（一番前）にします
                             let defLeaderIdx = defBushos.findIndex(b => b.isDaimyo);
                             if (defLeaderIdx === -1) defLeaderIdx = defBushos.findIndex(b => b.isCastellan);
                             if (defLeaderIdx > 0) {
                                 const leader = defBushos.splice(defLeaderIdx, 1)[0];
                                 defBushos.unshift(leader);
                             }
-                            
-                            // ★ここから書き換え：プレイヤーが援軍にいる場合は編成画面を出す
+                            // ★ここまでを差し替えます！
                             const handleDefDivide = (callback) => {
                                 if (this.state.defReinforcement && this.state.defReinforcement.castle.ownerClan === pid) {
                                     // プレイヤーが守備側の援軍として参加した場合
