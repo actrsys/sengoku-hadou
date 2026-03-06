@@ -1970,24 +1970,3 @@ body.is-pc #daimyo-confirm-modal .btn-secondary {
     opacity: 0.5;
     cursor: not-allowed;
 }
-/* =========================================================
-   ★ ウインドウ全体を「ほんのり黄色（和紙風のクリーム色）」にする魔法
-   ========================================================= */
-/* 1. 基本となるウインドウの背景色を設定 */
-:root {
-    --panel-bg: #fdfaf0; 
-}
-
-/* 2. HTMLやJSで直接「真っ白(#fff)」に指定されている部分を強制的に上書き */
-.modal-content,
-#pc-sidebar,
-.war-screen,
-#war-modal .modal-content,
-#war-title-name,
-#war-controls,
-#war-log,
-#fw-unit-info,
-#fw-log,
-#divide-list > div {
-    background-color: #fdfaf0 !important;
-}
