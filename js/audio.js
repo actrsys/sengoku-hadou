@@ -28,11 +28,11 @@ class AudioManager {
             },
             // ★野戦のBGM
             '08_Legend of bear slaying.ogg': {
-                baseVolume: 0.02
+                baseVolume: 0.03
             },
             // ★ここを書き足し！：攻城戦のBGM
             '07_Underworld dance.ogg': {
-                baseVolume: 0.02
+                baseVolume: 0.015
             },
             // '新しい曲.ogg': { baseVolume: 0.05 }, // ループがない曲はこれだけでもOK！
         };
@@ -41,7 +41,7 @@ class AudioManager {
         // ★ SEのカタログ（個別の音量調整つき！）
         // ==========================================
         this.seList = {
-            'decision.ogg': { baseVolume: 0.05 },
+            'decision.ogg': { baseVolume: 0.04 },
             'cancel.ogg': { baseVolume: 0.02 },
             'choice.ogg': { baseVolume: 0.05 },
             // 特定の音が大きすぎる場合は、ここで小さくできます
