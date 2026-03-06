@@ -371,6 +371,9 @@ class UIManager {
             
             this.restoreAIGuard();
 
+            // ★ここを書き足します！：今のダイアログが閉じたので「表示中」の合図を消します！
+            this.isDialogShowing = false;
+
             const executeNext = () => {
                 setTimeout(() => {
                     this.processDialogQueue();
