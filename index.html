@@ -333,6 +333,31 @@
                 </div>
             </div>
         </div>
+        <div id="settings-modal" class="modal hidden" style="z-index: 7000;">
+            <div class="modal-content" style="max-width: 400px; text-align: center;">
+                <h3 style="margin-top:0; border-bottom: 2px solid #ddd; padding-bottom: 10px;">設定</h3>
+                
+                <div style="margin: 20px 0; text-align: left;">
+                    <label style="font-weight: bold; display: block; margin-bottom: 5px;">BGM 音量</label>
+                    <div style="display: flex; align-items: center; gap: 10px;">
+                        <input type="range" id="setting-bgm-volume" min="0" max="100" value="100" style="flex: 1;">
+                        <span id="setting-bgm-text" style="width: 40px; text-align: right;">100%</span>
+                    </div>
+                </div>
+
+                <div style="margin: 20px 0; text-align: left;">
+                    <label style="font-weight: bold; display: block; margin-bottom: 5px;">SE 音量</label>
+                    <div style="display: flex; align-items: center; gap: 10px;">
+                        <input type="range" id="setting-se-volume" min="0" max="100" value="100" style="flex: 1;">
+                        <span id="setting-se-text" style="width: 40px; text-align: right;">100%</span>
+                    </div>
+                </div>
+
+                <div class="modal-footer" style="justify-content: center;">
+                    <button class="btn-primary" onclick="document.getElementById('settings-modal').classList.add('hidden')">閉じる</button>
+                </div>
+            </div>
+        </div>
         <div id="custom-context-menu" class="hidden context-menu">
             <div class="context-menu-item" id="ctx-menu-back">自拠点に戻る</div>
             <div class="context-menu-item" id="ctx-menu-finish">命令終了</div>
