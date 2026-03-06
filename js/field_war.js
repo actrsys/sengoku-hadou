@@ -377,15 +377,18 @@ class FieldWarManager {
             this.updateMap();
             this.updateStatus();
             this.log("両軍、布陣を完了。野戦を開始します！");
+            
+            if (window.AudioManager) {
+                window.AudioManager.memorizeCurrentBgm(); // 今の曲をメモ
+                window.AudioManager.playBGM('05_Ogre Island.ogg'); // 野戦BGM再生
+            }
         }
         
         this.startTurn();
-    // ↓↓↓ 一番最後に、ここから書き足す ↓↓↓
         // 野戦の画面が表示されたあとに、大きさをピッタリに合わせる魔法を使います
         setTimeout(() => {
             this.adjustMapScale();
         }, 100); // 画面ができるまで一瞬（0.1秒）だけ待ってから魔法をかけます
-        // ↑↑↑ ここまで書き足す ↑↑↑
     } // ← この「}」が startFieldWar の終わりのカッコです
 
     initUI() {
@@ -1276,6 +1279,12 @@ class FieldWarManager {
         
         if (isPlayerInvolved) {
             setTimeout(() => {
+                // ★ここから追加：画面が閉じる直前にBGMを元に戻す！
+                if (window.AudioManager) {
+                    window.AudioManager.restoreMemorizedBgm();
+                }
+                // ★追加ここまで
+                
                 if (this.modal) this.modal.classList.add('hidden');
                 if (this.onComplete) this.onComplete(resultType);
             }, 1500);
