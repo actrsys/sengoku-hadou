@@ -106,13 +106,45 @@ class UIManager {
         const menuButtons = document.getElementById('menu-buttons');
 
         if (titleScreen && tapMessage && menuButtons) {
-            const onTitleClick = () => {
+            // ★ async（アシンク）をつけて、「待つ」魔法を使えるようにします
+            const onTitleClick = async () => {
+                // 何度も押されないように、1回押されたらクリックの魔法を解除します
+                titleScreen.removeEventListener('click', onTitleClick);
+
+                // メッセージを「準備中」に変えて、点滅も止めます
+                tapMessage.textContent = "データを準備しています...";
+                tapMessage.style.animation = "none";
+                tapMessage.style.opacity = "1";
+
+                // 音を鳴らす準備（ブラウザのルールで、ユーザーが画面を触った瞬間に鳴らすのが一番安全です）
                 if (window.AudioManager) {
                     window.AudioManager.playBGM('SC_ex_Town1_Castle.ogg');
                 }
+
+                // ★ ここによく使う重い画像の道順（URL）を書きます！
+                // 他にも最初からサクッと出したい画像があれば、ここに「,」で区切って足してくださいね
+                const imageUrls = [
+                    './data/images/map/japan_map.png',
+                    './data/images/map/shiro_icon001.png',
+                    './data/images/field_war_images/butai_icon.png'
+                ];
+
+                // 画像を裏側でこっそり読み込む魔法
+                const loadImages = imageUrls.map(url => {
+                    return new Promise((resolve) => {
+                        const img = new Image();
+                        img.onload = () => resolve();  // 成功したらOK！
+                        img.onerror = () => resolve(); // 失敗しても、ゲームを止めないためにOK扱いにします
+                        img.src = url;
+                    });
+                });
+
+                // 画像が全部読み終わるまで、ここでじっと待ちます
+                await Promise.all(loadImages);
+
+                // 準備が終わったら、メッセージを隠してメニューボタンを出します！
                 tapMessage.classList.add('hidden');
                 menuButtons.classList.remove('hidden');
-                titleScreen.removeEventListener('click', onTitleClick);
             };
             titleScreen.addEventListener('click', onTitleClick);
         }
