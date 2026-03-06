@@ -977,6 +977,14 @@ class UIManager {
         if (this.resultModal) this.resultModal.classList.add('hidden'); 
         this.restoreAIGuard(); 
         
+        // ★ここから書き足します！
+        // 小窓を閉じる時に、必ず「いつもの閉じるボタン」に戻しておきます！
+        const footer = document.getElementById('result-footer');
+        if (footer) {
+            footer.innerHTML = `<button class="btn-primary" onclick="window.GameApp.ui.closeResultModal()">閉じる</button>`;
+        }
+        // ★書き足すのはここまで！
+        
         if (this.onResultModalClose) {
             const cb = this.onResultModalClose;
             this.onResultModalClose = null;
