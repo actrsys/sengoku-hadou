@@ -4,7 +4,11 @@
 class AudioManager {
     constructor() {
         this.bgmPlayer = null;
-
+        // ★ここから書き足し！
+        this.currentBgmName = null; // 今鳴っている曲の名前を入れておく箱
+        this.memoBgmName = null;    // 元の曲を覚えておくためのメモ帳
+        // ★書き足しここまで！
+        
         // ★ユーザーが設定した音量（最初は1.0＝100%）を覚えておきます。
         // ブラウザに記憶があればそれを読み込みます！
         this.userBgmVolume = parseFloat(localStorage.getItem('userBgmVolume')) || 1.0;
@@ -17,15 +21,16 @@ class AudioManager {
             'SC_ex_Town2_Fortress.ogg': { 
                 start: 36603 / 44100, 
                 end: (36603 + 5733088) / 44100,
-                baseVolume: 0.05 // ★ここがこの曲の「基本の音量」です！
+                baseVolume: 0.02 
             },
-            
             'SC_ex_Town1_Castle.ogg': { 
-                baseVolume: 0.05 
+                baseVolume: 0.02 
             },
-            
-            // 他の曲もここに書き足せます
-            // '新しい曲.ogg': { baseVolume: 0.05 }, // ループがない曲はこれだけでもOK！
+            // ★ここを書き足し！野戦のBGMです（音量はお好みで調整してくださいね）
+            '05_Ogre Island.ogg': {
+                baseVolume: 0.02
+            },
+        };'新しい曲.ogg': { baseVolume: 0.05 }, // ループがない曲はこれだけでもOK！
         };
 
         // ==========================================
@@ -46,8 +51,11 @@ class AudioManager {
 
     // BGMを鳴らす魔法
     playBGM(fileName, fallbackStart = 0, fallbackEnd = 0) {
-        this.stopBGM();
+        // 鳴らした曲の名前を覚えさせます
+        this.currentBgmName = fileName;
 
+        this.stopBGM();
+        
         const bgmData = this.bgmList[fileName];
         const loopStart = bgmData && bgmData.start !== undefined ? bgmData.start : fallbackStart;
         const loopEnd = bgmData && bgmData.end !== undefined ? bgmData.end : fallbackEnd;
@@ -121,6 +129,23 @@ class AudioManager {
         });
         se.play();
     }
+    
+    // 今のBGMをメモ帳に書き写す魔法
+    memorizeCurrentBgm() {
+        this.memoBgmName = this.currentBgmName;
+    }
+
+    // メモ帳に書いてあるBGMをもう一度鳴らす魔法
+    restoreMemorizedBgm() {
+        if (this.memoBgmName) {
+            this.playBGM(this.memoBgmName);
+            this.memoBgmName = null; // 鳴らしたらメモは消しておきます
+        } else {
+            // 万が一メモが白紙だった時は、とりあえずいつもの曲を鳴らします
+            this.playBGM('SC_ex_Town2_Fortress.ogg'); 
+        }
+    }
+    
 }
 
 window.AudioManager = new AudioManager();
