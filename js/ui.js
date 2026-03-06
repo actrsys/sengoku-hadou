@@ -1644,8 +1644,12 @@ class UIManager {
         }
         if (this.aiGuard) { if (this.game.isProcessingAI) this.aiGuard.classList.remove('hidden'); else this.aiGuard.classList.add('hidden'); }
 
+        // 変更後
         const activeCastle = this.currentCastle || this.game.getCurrentTurnCastle(); // ★今ターンが来ている城を覚えておきます
         this.updateInfoPanel(activeCastle);
+
+        // ★追加：ポップアップの目印シールを貼るために、絶対に「今のターンの城」を取得する魔法です
+        const turnCastle = this.game.getCurrentTurnCastle();
 
         const svgNS = "http://www.w3.org/2000/svg";
         const svg = document.createElementNS(svgNS, "svg");
@@ -1730,15 +1734,14 @@ class UIManager {
                 });
             }
         });
-
-        // 変更後
+        
         this.mapEl.appendChild(svg);
         
         this.game.castles.forEach(c => {
             const el = document.createElement('div'); el.className = 'castle-card';
             
-            // ★修正：対象を選ぶモードじゃない時だけ、特別な目印シールを貼ります！
-            if (!isSelectionMode && activeCastle && c.id === activeCastle.id && c.ownerClan === this.game.playerClanId && !c.isDelegated) {
+            // ★修正：『activeCastle』の代わりに、さっき覚えた『turnCastle』を使うようにします！
+            if (!isSelectionMode && turnCastle && c.id === turnCastle.id && c.ownerClan === this.game.playerClanId && !c.isDelegated) {
                 el.classList.add('current-turn');
             }
 
