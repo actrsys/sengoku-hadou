@@ -361,7 +361,8 @@ class WarManager {
             } else {
                 defBusho = this.game.getBusho(defCastle.castellanId);
             }
-            if (!defBusho) defBusho = {name:"守備隊長", strength:30, leadership:30, intelligence:30, charm:30};
+            // ★ここを書き足し！誰もいない時の「守備隊長」にも顔（のっぺらぼう）をセットします！
+            if (!defBusho) defBusho = {name:"守備隊長", strength:30, leadership:30, intelligence:30, charm:30, faceIcon: "unknown_face.webp"};
             
             const attackerForce = {
                 name: atkCastle.isKunishu ? atkCastle.name : atkCastle.name + "遠征軍", 

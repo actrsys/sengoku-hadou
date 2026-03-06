@@ -3332,9 +3332,12 @@ class UIManager {
             if (busho && busho.faceIcon) {
                 el.src = `data/images/faceicons/${busho.faceIcon}`;
                 el.classList.remove('hidden');
-                el.onerror = () => { el.classList.add('hidden'); }; 
+                // ★書き換え：もし画像が見つからなかったら、のっぺらぼうを表示します
+                el.onerror = () => { el.src = 'data/images/faceicons/unknown_face.webp'; }; 
             } else {
-                el.classList.add('hidden');
+                // ★書き換え：武将がいない時や画像が設定されていない時は、のっぺらぼうを表示します
+                el.src = 'data/images/faceicons/unknown_face.webp';
+                el.classList.remove('hidden');
             }
         };
 
