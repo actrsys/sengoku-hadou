@@ -2106,9 +2106,9 @@ class CommandSystem {
                 prob += 30;
             }
 
-            // 要請先が、攻撃先の敵とも仲良しだった場合、確率が下がります（最大-20%）
-            if (helperToEnemyRel && helperToEnemyRel.sentiment >= 50) {
-                const drop = Math.floor((helperToEnemyRel.sentiment - 50) * (20 / 50)) + 1; 
+            // 50を基準にして、敵との仲が悪い（50より下）と参加しやすくなり、仲が良い（50より上）と参加しにくくなります
+            if (helperToEnemyRel) {
+                const drop = Math.floor((helperToEnemyRel.sentiment - 50) * (20 / 50)); 
                 prob -= drop;
             }
 
