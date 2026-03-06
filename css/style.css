@@ -1578,6 +1578,7 @@ body.is-pc .faction-list-container { scroll-padding-top: 38px; }
     z-index: 100;
 }
 
+/* 変更後 */
 /* お城にカーソルが乗った時に、元の大きさ(scale(1))に戻りながら現れる魔法 */
 .castle-card:hover .hover-info {
     opacity: 1;
@@ -1585,8 +1586,23 @@ body.is-pc .faction-list-container { scroll-padding-top: 38px; }
     transform: scale(1); 
 }
 
+/* ★追加：自分のターンが来ている城のポップアップは常に表示する魔法！ */
+.castle-card.current-turn .hover-info {
+    opacity: 1;
+    visibility: visible;
+    transform: scale(1);
+    z-index: 90; /* 普段のポップアップより少しだけ奥にしておきます */
+}
+
+/* ★追加：ただし、他の城にカーソルを合わせた時は、邪魔にならないようにサッと隠れます */
+#map-container:has(.castle-card:hover) .castle-card.current-turn:not(:hover) .hover-info {
+    opacity: 0;
+    visibility: hidden;
+    transform: scale(0.5);
+}
+
 .hover-info .info-line {
-    font-size: 2.2em; 
+    font-size: 2.2em;
     line-height: 1.4;
     text-shadow: 1px 1px 2px #000;
 }
