@@ -168,7 +168,7 @@ class Busho {
         this.cooperation = Number(this.cooperation || 50);
 
         // 顔画像ファイル名 (例: "nobunaga.png")。未設定なら null または undefined
-        this.faceIcon = data.faceIcon || 'unknown_face.png';
+        this.faceIcon = data.faceIcon || 'unknown_face.webp';
 
         // 派閥・システム関連パラメータの初期化
         this.achievementTotal = Number(this.achievementTotal || 0); // 功績累計
