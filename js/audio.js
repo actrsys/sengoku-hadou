@@ -30,7 +30,7 @@ class AudioManager {
             '05_Ogre Island.ogg': {
                 baseVolume: 0.02
             },
-        };'新しい曲.ogg': { baseVolume: 0.05 }, // ループがない曲はこれだけでもOK！
+            // '新しい曲.ogg': { baseVolume: 0.05 }, // ループがない曲はこれだけでもOK！
         };
 
         // ==========================================
