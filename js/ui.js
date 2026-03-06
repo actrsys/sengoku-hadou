@@ -871,42 +871,104 @@ class UIManager {
     }
 
     // 個別の「直轄・委任」切り替え画面を出す魔法
+    // 個別の「直轄・委任・詳細設定」画面を出す魔法
     showDelegateSettingModal(castle, onBack) {
         const modal = document.getElementById('delegate-setting-modal');
         const title = document.getElementById('delegate-setting-title');
         const btnDirect = document.getElementById('btn-direct-control');
         const btnDelegate = document.getElementById('btn-delegate-control');
+        
+        // 詳細設定のボタンたち
+        const optionsDiv = document.getElementById('delegate-options');
+        const btnAttackDeny = document.getElementById('btn-attack-deny');
+        const btnAttackAllow = document.getElementById('btn-attack-allow');
+        const btnMoveDeny = document.getElementById('btn-move-deny');
+        const btnMoveAllow = document.getElementById('btn-move-allow');
+
         if (!modal || !title || !btnDirect || !btnDelegate) return;
 
         title.textContent = `${castle.name} の委任設定`;
 
-        // ボタンの色を現在の設定に合わせて切り替える魔法
+        // ボタンの色や状態を更新する魔法
         const updateButtons = () => {
+            // ① 直轄か委任かの表示
             if (castle.isDelegated) {
                 btnDelegate.classList.add('active');
                 btnDirect.classList.remove('active');
+                
+                // 委任中は詳細設定を選べるようにします
+                optionsDiv.style.opacity = '1';
+                btnAttackDeny.disabled = false;
+                btnAttackAllow.disabled = false;
+                btnMoveDeny.disabled = false;
+                btnMoveAllow.disabled = false;
             } else {
                 btnDirect.classList.add('active');
                 btnDelegate.classList.remove('active');
+                
+                // 直轄中は詳細設定を選べないように（半透明に）します
+                optionsDiv.style.opacity = '0.5';
+                btnAttackDeny.disabled = true;
+                btnAttackAllow.disabled = true;
+                btnMoveDeny.disabled = true;
+                btnMoveAllow.disabled = true;
+            }
+
+            // ② 城攻の設定表示
+            if (castle.allowAttack) {
+                btnAttackAllow.classList.add('active-allow');
+                btnAttackAllow.classList.remove('active');
+                btnAttackDeny.classList.remove('active', 'active-allow');
+            } else {
+                btnAttackDeny.classList.add('active');
+                btnAttackDeny.classList.remove('active-allow');
+                btnAttackAllow.classList.remove('active', 'active-allow');
+            }
+
+            // ③ 武将移動の設定表示
+            if (castle.allowMove) {
+                btnMoveAllow.classList.add('active-allow');
+                btnMoveAllow.classList.remove('active');
+                btnMoveDeny.classList.remove('active', 'active-allow');
+            } else {
+                btnMoveDeny.classList.add('active');
+                btnMoveDeny.classList.remove('active-allow');
+                btnMoveAllow.classList.remove('active', 'active-allow');
             }
         };
 
         updateButtons(); // 画面を開いた時の色をセット
 
-        // 「直轄」を押した時
+        // それぞれのボタンを押した時の処理
         btnDirect.onclick = () => {
             if (window.AudioManager) window.AudioManager.playSE('choice.ogg');
             castle.isDelegated = false;
             updateButtons();
-            this.log(`${castle.name} を直轄に設定しました`);
         };
-
-        // 「委任」を押した時
         btnDelegate.onclick = () => {
             if (window.AudioManager) window.AudioManager.playSE('choice.ogg');
             castle.isDelegated = true;
             updateButtons();
-            this.log(`${castle.name} を委任に設定しました`);
+        };
+        btnAttackDeny.onclick = () => {
+            if (window.AudioManager) window.AudioManager.playSE('choice.ogg');
+            castle.allowAttack = false;
+            updateButtons();
+        };
+        btnAttackAllow.onclick = () => {
+            if (window.AudioManager) window.AudioManager.playSE('choice.ogg');
+            castle.allowAttack = true;
+            updateButtons();
+        };
+        btnMoveDeny.onclick = () => {
+            if (window.AudioManager) window.AudioManager.playSE('choice.ogg');
+            castle.allowMove = false;
+            updateButtons();
+        };
+        btnMoveAllow.onclick = () => {
+            if (window.AudioManager) window.AudioManager.playSE('choice.ogg');
+            castle.allowMove = true;
+            updateButtons();
         };
 
         const backBtn = modal.querySelector('.btn-secondary');
@@ -919,8 +981,6 @@ class UIManager {
 
         modal.classList.remove('hidden');
     }
-    // ★追加ここまで
-    // ==========================================
     
     showDiplomacyList(clanId, clanName) {
         let listHtml = '<div class="daimyo-list-container"><div class="daimyo-list-header" style="grid-template-columns: 2fr 1.5fr 1fr;"><span>大名家名</span><span>友好度</span><span>関係</span></div>';
