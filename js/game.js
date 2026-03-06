@@ -960,7 +960,8 @@ class GameManager {
                 if(this.ui.aiGuard) this.ui.aiGuard.classList.add('hidden'); 
 
                 this.ui.renderMap(); 
-                this.ui.log(`【${castle.name}】命令を下してください`); 
+                // ターン開始時のログはお休み
+                // this.ui.log(`【${castle.name}】命令を下してください`); 
                 
                 this.ui.scrollToActiveCastle(castle);
                 

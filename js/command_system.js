@@ -1812,7 +1812,7 @@ class CommandSystem {
         this.game.validTargets = this.getValidTargets(mode);
         
         this.game.ui.renderMap();
-        this.game.ui.log(this.getSelectionGuideMessage());
+        // this.game.ui.log(this.getSelectionGuideMessage()); // ←★行の頭に「//」を付けてお休みにしました！
     }
 
     getSelectionGuideMessage() {

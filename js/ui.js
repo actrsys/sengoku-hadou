@@ -108,7 +108,7 @@ class UIManager {
         if (titleScreen && tapMessage && menuButtons) {
             const onTitleClick = () => {
                 if (window.AudioManager) {
-                    window.AudioManager.playBGM('SC_ex_Town1_Castle.ogg', 0);
+                    window.AudioManager.playBGM('SC_ex_Town1_Castle.ogg');
                 }
                 tapMessage.classList.add('hidden');
                 menuButtons.classList.remove('hidden');
