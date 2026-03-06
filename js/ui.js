@@ -2540,6 +2540,7 @@ class UIManager {
                 div.onclick = (e) => {
                     if (window.AudioManager) window.AudioManager.playSE('choice.ogg');
 
+                    // 【パターン1】チェックボックスの四角い部分を直接ポチッと押した時の動き
                     if(e.target.tagName === 'INPUT') { 
                         if(!isMulti) {
                             const siblings = this.selectorList.querySelectorAll('.select-item');
@@ -2552,6 +2553,22 @@ class UIManager {
                                  this.showDialog(`出陣できる武将は最大${maxSelect}人までです。`, false);
                                  return;
                              }
+
+                             // ★ ここから追加：金や兵糧のオーバーチェック（チェックボックスを直接押した時）
+                             if (e.target.checked) {
+                                 // spec.costGold は1人あたりの必要な金、c.gold はお城の今の貯金です
+                                 if (spec.costGold > 0 && currentChecked * spec.costGold > c.gold) {
+                                     e.target.checked = false; // 無理なのでチェックを外します
+                                     this.showDialog(`金が足りないため、これ以上選べません。`, false);
+                                     return;
+                                 }
+                                 if (spec.costRice > 0 && currentChecked * spec.costRice > c.rice) {
+                                     e.target.checked = false; // 無理なのでチェックを外します
+                                     this.showDialog(`兵糧が足りないため、これ以上選べません。`, false);
+                                     return;
+                                 }
+                             }
+                             // ★ 追加ここまで
                         }
                         if(e.target.checked) div.classList.add('selected');
                         else div.classList.remove('selected');
@@ -2559,6 +2576,8 @@ class UIManager {
                         updateBushoConfirmBtn(); 
                         return;
                     } 
+                    
+                    // 【パターン2】武将の名前など、行のどこかを押した時の動き
                     const input = div.querySelector('input');
                     if(input) {
                         if (isMulti) { 
@@ -2568,6 +2587,20 @@ class UIManager {
                                  this.showDialog(`出陣できる武将は最大${maxSelect}人までです。`, false);
                                  return;
                              }
+
+                             // ★ ここから追加：金や兵糧のオーバーチェック（武将の行を押した時）
+                             if (!input.checked) {
+                                 if (spec.costGold > 0 && (currentChecked + 1) * spec.costGold > c.gold) {
+                                     this.showDialog(`金が足りないため、これ以上選べません。`, false);
+                                     return;
+                                 }
+                                 if (spec.costRice > 0 && (currentChecked + 1) * spec.costRice > c.rice) {
+                                     this.showDialog(`兵糧が足りないため、これ以上選べません。`, false);
+                                     return;
+                                 }
+                             }
+                             // ★ 追加ここまで
+
                              input.checked = !input.checked; 
                         } else { 
                              input.checked = true; const allItems = this.selectorList.querySelectorAll('.select-item'); allItems.forEach(item => item.classList.remove('selected')); 
@@ -2576,7 +2609,7 @@ class UIManager {
                         updateContextCost(); 
                         updateBushoConfirmBtn(); 
                     }
-                }; 
+                };
             }
             this.selectorList.appendChild(div);
         });
