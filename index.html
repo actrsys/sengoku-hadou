@@ -94,7 +94,30 @@
                 </div>
             </div>
         </div>
+        
+        <div id="delegate-list-modal" class="modal hidden">
+            <div class="modal-content" style="max-width: 600px;">
+                <h3 style="margin-top:0;">委任設定</h3>
+                <div id="delegate-list" class="list-container" style="max-height: 50vh; overflow-y: auto;"></div>
+                <div class="modal-footer" style="justify-content: center;">
+                    <button class="btn-secondary" onclick="document.getElementById('delegate-list-modal').classList.add('hidden')">閉じる</button>
+                </div>
+            </div>
+        </div>
 
+        <div id="delegate-setting-modal" class="modal hidden" style="z-index: 6600;">
+            <div class="modal-content" style="max-width: 400px; text-align: center;">
+                <h3 id="delegate-setting-title" style="margin-top:0;">城名</h3>
+                <div style="margin: 20px 0; display: flex; justify-content: center; gap: 20px;">
+                    <button id="btn-direct-control" class="delegate-btn">直轄</button>
+                    <button id="btn-delegate-control" class="delegate-btn">委任</button>
+                </div>
+                <div class="modal-footer" style="justify-content: center;">
+                    <button class="btn-secondary" onclick="document.getElementById('delegate-setting-modal').classList.add('hidden')">戻る</button>
+                </div>
+            </div>
+        </div>
+        
         <div id="selector-modal" class="modal hidden">
             <div class="modal-content">
                 <h3 id="selector-title">選択</h3>
