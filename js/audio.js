@@ -5,7 +5,7 @@ class AudioManager {
     constructor() {
         this.bgmPlayer = null;
         this.defaultVolume = 0.02; // BGMの音量
-        this.seVolume = 0.01;      // SE専用の音量
+        this.seVolume = 0.02;      // SE専用の音量
 
         // ==========================================
         // ★ ここに「BGMのカタログ」を作ります！
