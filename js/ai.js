@@ -381,11 +381,11 @@ class AIEngine {
                 // 見積もった戦力で倍率を計算します
                 const powerRatio = perceivedEnemyPower / myTotalPower;
                 let penalty = 0;
-                // 0.5倍から警戒しはじめ、2倍で警戒心マックスになります
-                if (powerRatio >= 0.5) {
-                    let cautionLevel = (powerRatio - 0.5) / (2.0 - 0.5);
+                // 1.0倍から警戒しはじめ、2.5倍で警戒心マックスになります
+                if (powerRatio >= 1.0) {
+                    let cautionLevel = (powerRatio - 0.5) / (2.5 - 1.0);
                     cautionLevel = Math.min(1.0, Math.max(0.0, cautionLevel));
-                    penalty = cautionLevel * 30; 
+                    penalty = cautionLevel * 25; 
                 }
                 if (penalty > 0) {
                     // ★powerには「見誤った戦力」を入れておき、後で一番脅威に感じた敵を選べるようにします
