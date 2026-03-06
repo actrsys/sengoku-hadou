@@ -727,6 +727,10 @@ class GameManager {
             });
             daimyo.isCastellan = true; 
             castle.castellanId = daimyo.id;
+            
+            // ★ここに移動しました！：大名が城主になった（＝この城にいる）なら、問答無用で直轄に戻します！
+            castle.isDelegated = false;
+            
             return;
         }
 
