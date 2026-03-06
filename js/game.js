@@ -699,7 +699,9 @@ class GameManager {
             // ★ここを書き足し！：画像の大きさをゲーム全体で覚えるようにします！
             this.mapWidth = data.mapWidth || 1200;
             this.mapHeight = data.mapHeight || 800;
-
+            
+            this.preloadFaceIcons();
+            
             document.getElementById('app').classList.remove('hidden');
             
             this.phase = 'daimyo_select';
@@ -712,6 +714,41 @@ class GameManager {
             this.ui.returnToTitle();
         }
     }
+    
+    // ==========================================
+    // ★ここから追加！：ゲームの裏側で、武将の顔画像を少しずつ読み込んでおく魔法です！
+    // ==========================================
+    preloadFaceIcons() {
+        // 同じ顔画像を何度も読み込まないように、必要なファイル名だけをリストアップします
+        const faceFiles = new Set();
+        this.bushos.forEach(b => {
+            // unknown_face.png（のっぺらぼう）以外の、ちゃんと設定されている顔画像を集めます
+            if (b.faceIcon && b.faceIcon !== 'unknown_face.png') {
+                faceFiles.add(b.faceIcon);
+            }
+        });
+
+        // 画像があるフォルダの道順をくっつけます
+        const urls = Array.from(faceFiles).map(filename => `./data/faceicons/${filename}`);
+
+        // 一気に何百枚も読み込むとブラウザがパンクするので、1枚ずつ順番に読み込みます
+        let i = 0;
+        const loadNext = () => {
+            if (i >= urls.length) return; // 全部終わったらお仕事終了です！
+            
+            const img = new Image();
+            // 成功しても失敗しても、立ち止まらずに次の画像を読み込みに行きます
+            img.onload = () => { i++; loadNext(); };
+            img.onerror = () => { i++; loadNext(); };
+            img.src = urls[i];
+        };
+
+        // 魔法スタート！
+        loadNext();
+    }
+    // ==========================================
+    // ★顔画像の裏側読み込み魔法ここまで！
+    // ==========================================
     
     handleDaimyoSelect(castle) {
         if (castle.ownerClan === 0) {
