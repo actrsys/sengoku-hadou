@@ -1791,9 +1791,11 @@ body.is-pc #daimyo-confirm-modal .modal-content {
 body:not(.is-pc).daimyo-select-mode #map-wrapper {
     height: auto !important;
     flex: 1 !important;
+    /* ★変更：内側のクッションではなく、外側の余白でボトムバーを避けます */
+    margin-bottom: calc(150px + env(safe-area-inset-bottom)) !important;
 }
 body:not(.is-pc).daimyo-select-mode #map-scroll-container {
-    padding-bottom: 160px !important; 
+    padding-bottom: 0 !important; 
 }
 
 /* ★修正：謎の「余白の枠」の正体だった、使っていない元のボトムバーを完全に隠します */
