@@ -1051,8 +1051,8 @@ class AIEngine {
                  continue;
             }
 
-            // 相手の戦力が自分の1/5以下なら、稀に支配を試みます
-            if (targetClanTotal * 5 <= myPower) {
+            // 相手の戦力が自分の1/8以下なら、稀に支配を試みます
+            if (targetClanTotal * 8 <= myPower) {
                 if (Math.random() < 0.05) { // 5％の確率で支配コマンドを実行します
                     if (targetClanId === this.game.playerClanId) {
                         // ★相手がプレイヤーならお返事を待つ
