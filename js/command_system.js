@@ -1058,12 +1058,10 @@ class CommandSystem {
         } else if (type === 'break_alliance') {
             const oldStatus = relation.status;
             const oldSentiment = relation.sentiment; // ★追加：破棄前の友好度を覚えておく
-            
-            this.game.diplomacyManager.changeStatus(doer.clan, targetClanId, '普通');
-            
+
             // ★追加：破棄のペナルティを計算する
             let targetDrop = -60; // デフォルトは-60
-            let globalDrop = 0;   // 他の大名への影響
+            let globalDrop = 0; // 他の大名への影響
             let isBetrayal = false;
 
             if (oldStatus === '同盟') {
@@ -1075,14 +1073,25 @@ class CommandSystem {
             } else if (oldStatus === '従属') {
                 if (oldSentiment >= 70) {
                     targetDrop = -100; // 相手との友好度ダウン
-                    globalDrop = -10;  // 他の大名との友好度ダウン
+                    globalDrop = -10; // 他の大名との友好度ダウン
                     isBetrayal = true;
                 }
             }
 
             // 相手との友好度を下げる（0未満にはならない仕組みが裏で動いています）
             this.game.diplomacyManager.updateSentiment(doer.clan, targetClanId, targetDrop);
-            
+
+            // ★ここを修正：下がった後の友好度に応じて、ステータスを当てはめ直します！
+            const newRel = this.game.getRelation(doer.clan, targetClanId);
+            let newStatus = '普通';
+            if (newRel.sentiment <= 39) {
+                newStatus = '敵対'; // 39以下なら敵対
+            } else if (newRel.sentiment >= 70) {
+                newStatus = '友好'; // 70以上なら友好
+            }
+            // 計算した新しいステータス（関係）をセットします！
+            this.game.diplomacyManager.changeStatus(doer.clan, targetClanId, newStatus);
+
             // 信義に背いた場合、他のすべての大名との友好度も下がる
             if (isBetrayal) {
                 this.game.clans.forEach(c => {
@@ -1092,14 +1101,14 @@ class CommandSystem {
                     }
                 });
             }
-            
+
             msg = `${oldStatus}関係を破棄しました`;
             if (isBetrayal) {
                 msg += `\n諸大名からの心証が悪化しました……`;
             }
-
             doer.achievementTotal += 5;
             this.game.factionSystem.updateRecognition(doer, 10);
+
         } else if (type === 'subordinate') {
             // 他の大名との支配・従属関係をすべて解消します
             this.clearDominationRelations(doer.clan);
@@ -2004,7 +2013,7 @@ class CommandSystem {
 
             // 相手が戦争相手と仲良し（同盟・支配・従属）ならダメ
             const enemyRel = this.game.getRelation(c.ownerClan, enemyClanId);
-            if (['同盟', '支配', '従属'].includes(enemyRel.status)) return;
+            if (enemyRel && ['同盟', '支配', '従属'].includes(enemyRel.status)) return; // ★「enemyRel &&」を書き足してエラーを防ぎます！
 
             // ★変更: 攻撃側の条件: 自分の所有しているいずれかの城、または攻撃先に隣接しているか
             const isNextToMyAnyCastle = this.game.castles.some(myC => myC.ownerClan === myClanId && GameSystem.isAdjacent(c, myC));
