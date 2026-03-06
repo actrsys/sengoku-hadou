@@ -1520,11 +1520,23 @@ class UIManager {
             };
             requestAnimationFrame(animate); 
         } else {
+            // ★ここをごっそり差し替え！：スクロールのガタつきを防ぐための魔法
+            sc.style.overflow = 'hidden'; 
+            
+            // ズームアウト（小さく）する時は、先にスクロール位置を移動させておきます
+            if (targetScale < oldScale) {
+                sc.scrollLeft = targetScrollLeft;
+                sc.scrollTop = targetScrollTop;
+            }
+            
             this.mapScale = targetScale;
             this.applyMapScale();
-            void sc.scrollHeight; 
+            
+            // ズームイン（大きく）する時は、サイズを変えた後に移動させます
             sc.scrollLeft = targetScrollLeft;
             sc.scrollTop = targetScrollTop;
+            
+            sc.style.overflow = 'auto';
             this.updateZoomButtons();
         }
     }
