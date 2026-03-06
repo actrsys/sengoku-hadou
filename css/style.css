@@ -1586,6 +1586,12 @@ body.is-pc .faction-list-container { scroll-padding-top: 38px; }
     transform: scale(1); 
 }
 
+/* 変更後 */
+/* ★追加：自分のターンの城は、他の城の下敷きにならないように手前に出します！ */
+.castle-card.current-turn {
+    z-index: 80;
+}
+
 /* ★追加：自分のターンが来ている城のポップアップは常に表示する魔法！ */
 .castle-card.current-turn .hover-info {
     opacity: 1;
