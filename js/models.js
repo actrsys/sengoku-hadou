@@ -97,6 +97,9 @@ class Castle {
         // 調査・視界関連
         this.investigatedUntil = Number(this.investigatedUntil || 0);
         this.investigatedAccuracy = Number(this.investigatedAccuracy || 0);
+        
+        // ★ここを書き足し！：委任されているかどうかを覚える箱（最初はfalse＝直轄）
+        this.isDelegated = data.isDelegated === true;
     }
 }
 

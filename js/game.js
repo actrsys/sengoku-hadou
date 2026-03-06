@@ -890,20 +890,47 @@ class GameManager {
         }
 
         if (isPlayerCastle) { 
-            this.isProcessingAI = false; 
-            if(this.ui.aiGuard) this.ui.aiGuard.classList.add('hidden'); 
+            // ==========================================
+            // ★ごっそり差し替え！委任のチェックを入れます
+            // ==========================================
+            if (castle.isDelegated) {
+                // 委任されている場合はAIに任せます！
+                this.isProcessingAI = true; 
+                if(this.ui.aiGuard) this.ui.aiGuard.classList.remove('hidden'); 
+                
+                this.ui.updateAIProgress(this.currentIndex + 1, this.turnQueue.length);
+                if(this.ui.panelEl) this.ui.panelEl.classList.add('hidden');
+                
+                const delay = isImportant ? 400 : 10;
 
-            this.ui.renderMap(); 
-            this.ui.log(`【${castle.name}】命令を下してください`); 
-            
-            this.ui.scrollToActiveCastle(castle);
-            
-            this.ui.showTurnStartDialog(castle, () => {
-                this.ui.showControlPanel(castle); 
-            });
+                this.aiTimer = setTimeout(() => {
+                    if (this.warManager.state.active) return;
+                    if (this.turnQueue[this.currentIndex] !== castle) return;
+                    try {
+                        this.aiEngine.execAI(castle); // AIにバトンタッチ！
+                    } catch(e) {
+                        console.error("AI Error caught:", e);
+                        this.finishTurn(); 
+                    }
+                }, delay); 
+            } else {
+                // 直轄（今まで通りプレイヤーが動かす）の場合
+                this.isProcessingAI = false; 
+                if(this.ui.aiGuard) this.ui.aiGuard.classList.add('hidden'); 
+
+                this.ui.renderMap(); 
+                this.ui.log(`【${castle.name}】命令を下してください`); 
+                
+                this.ui.scrollToActiveCastle(castle);
+                
+                this.ui.showTurnStartDialog(castle, () => {
+                    this.ui.showControlPanel(castle); 
+                });
+            }
+            // ==========================================
 
         } else {
-            this.isProcessingAI = true; 
+            this.isProcessingAI = true;
             if(this.ui.aiGuard) this.ui.aiGuard.classList.remove('hidden'); 
             
             // ==========================================

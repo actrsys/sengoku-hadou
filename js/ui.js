@@ -820,6 +820,108 @@ class UIManager {
         }
     }
     
+    // ==========================================
+    // ★ここから追加：委任する城の一覧を出す魔法
+    // ==========================================
+    showDelegateListModal() {
+        const modal = document.getElementById('delegate-list-modal');
+        const listEl = document.getElementById('delegate-list');
+        if (!modal || !listEl) return;
+
+        // 大名のいる城（本拠地）を探します
+        const daimyo = this.game.bushos.find(b => b.clan === this.game.playerClanId && b.isDaimyo);
+        const daimyoCastleId = daimyo ? daimyo.castleId : -1;
+
+        // 自分の城のリストを作成（大名のいる城は除外します）
+        const myCastles = this.game.castles.filter(c => c.ownerClan === this.game.playerClanId && c.id !== daimyoCastleId);
+
+        listEl.innerHTML = '';
+        if (myCastles.length === 0) {
+            listEl.innerHTML = '<div style="padding: 10px; text-align: center;">委任できる城がありません。</div>';
+        } else {
+            myCastles.forEach(c => {
+                const div = document.createElement('div');
+                div.className = 'select-item';
+                div.style.display = 'flex';
+                div.style.justifyContent = 'space-between';
+                div.style.padding = '15px';
+                
+                // 直轄なら赤っぽく、委任なら青っぽく文字色を変えます
+                const statusColor = c.isDelegated ? '#1976d2' : '#d32f2f';
+                const statusText = c.isDelegated ? '委任' : '直轄';
+                
+                div.innerHTML = `
+                    <span style="font-weight:bold; font-size: 1.1rem;">${c.name}</span>
+                    <span style="color:${statusColor}; font-weight:bold; font-size: 1.1rem;">${statusText}</span>
+                `;
+                
+                div.onclick = () => {
+                    if (window.AudioManager) window.AudioManager.playSE('choice.ogg');
+                    // 城をクリックしたら、個別の設定画面を開きます
+                    this.showDelegateSettingModal(c, () => {
+                        // 戻ってきたら一覧を更新して出し直します
+                        this.showDelegateListModal();
+                    });
+                };
+                listEl.appendChild(div);
+            });
+        }
+
+        modal.classList.remove('hidden');
+    }
+
+    // 個別の「直轄・委任」切り替え画面を出す魔法
+    showDelegateSettingModal(castle, onBack) {
+        const modal = document.getElementById('delegate-setting-modal');
+        const title = document.getElementById('delegate-setting-title');
+        const btnDirect = document.getElementById('btn-direct-control');
+        const btnDelegate = document.getElementById('btn-delegate-control');
+        if (!modal || !title || !btnDirect || !btnDelegate) return;
+
+        title.textContent = `${castle.name} の委任設定`;
+
+        // ボタンの色を現在の設定に合わせて切り替える魔法
+        const updateButtons = () => {
+            if (castle.isDelegated) {
+                btnDelegate.classList.add('active');
+                btnDirect.classList.remove('active');
+            } else {
+                btnDirect.classList.add('active');
+                btnDelegate.classList.remove('active');
+            }
+        };
+
+        updateButtons(); // 画面を開いた時の色をセット
+
+        // 「直轄」を押した時
+        btnDirect.onclick = () => {
+            if (window.AudioManager) window.AudioManager.playSE('choice.ogg');
+            castle.isDelegated = false;
+            updateButtons();
+            this.log(`${castle.name} を直轄に設定しました`);
+        };
+
+        // 「委任」を押した時
+        btnDelegate.onclick = () => {
+            if (window.AudioManager) window.AudioManager.playSE('choice.ogg');
+            castle.isDelegated = true;
+            updateButtons();
+            this.log(`${castle.name} を委任に設定しました`);
+        };
+
+        const backBtn = modal.querySelector('.btn-secondary');
+        if (backBtn) {
+            backBtn.onclick = () => {
+                modal.classList.add('hidden');
+                if (onBack) onBack(); // 戻るボタンで一覧画面に戻ります
+            };
+        }
+
+        modal.classList.remove('hidden');
+    }
+    // ★追加ここまで
+    // ==========================================
+    
     showDiplomacyList(clanId, clanName) {
         let listHtml = '<div class="daimyo-list-container"><div class="daimyo-list-header" style="grid-template-columns: 2fr 1.5fr 1fr;"><span>大名家名</span><span>友好度</span><span>関係</span></div>';
         

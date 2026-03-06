@@ -46,7 +46,8 @@ class AIEngine {
 
     execAI(castle) {
         try {
-            if (Number(castle.ownerClan) === Number(this.game.playerClanId)) {
+            // ★書き換え！：自分の城で、かつ「委任されていない（直轄）」の時だけプレイヤーに操作を戻します
+            if (Number(castle.ownerClan) === Number(this.game.playerClanId) && !castle.isDelegated) {
                 console.warn("AI Alert: Player castle detected in AI routine. Returning control to player.");
                 this.game.isProcessingAI = false;
                 this.game.ui.showControlPanel(castle);
@@ -131,15 +132,18 @@ class AIEngine {
             const smartness = this.getAISmartness(castellan.intelligence);
 
             // 外交フェーズ (確率で実行)
-            const diplomacyChance = ((window.AIParams.AI.DiplomacyChance || 0.3) / 3) * (mods.aggression); 
-            if (Math.random() < diplomacyChance) {
-                const dipResult = this.execAIDiplomacy(castle, castellan, smartness); 
-                if (dipResult === 'waiting') return; // ★ プレイヤーのお返事待ちならここで一旦ストップ！
-                if (castellan.isActionDone) { this.game.finishTurn(); return; }
+            // ★書き換え！：プレイヤーの城（委任中）の場合は、勝手に外交させないようにします
+            if (Number(castle.ownerClan) !== Number(this.game.playerClanId)) {
+                const diplomacyChance = ((window.AIParams.AI.DiplomacyChance || 0.3) / 3) * (mods.aggression); 
+                if (Math.random() < diplomacyChance) {
+                    const dipResult = this.execAIDiplomacy(castle, castellan, smartness); 
+                    if (dipResult === 'waiting') return; // ★ プレイヤーのお返事待ちならここで一旦ストップ！
+                    if (castellan.isActionDone) { this.game.finishTurn(); return; }
+                }
             }
             
             // 軍事フェーズ
-            const elapsedTurns = (this.game.year - window.MainParams.StartYear) * 12 
+            const elapsedTurns = (this.game.year - window.MainParams.StartYear) * 12
                                + (this.game.month - window.MainParams.StartMonth);
 
             if (elapsedTurns >= 3) {

@@ -164,6 +164,11 @@ const COMMAND_SPECS = {
         startMode: 'busho_select', sortKey: 'loyalty',
         msg: "武将を追放します" 
     },
+    // ★ここを書き足し！
+    'delegate': { 
+        label: "城主委任", category: 'PERSONNEL', 
+        isSystem: true, action: 'delegate_list' 
+    },
 
     // --- 調略 (STRATEGY) ---
     'investigate': { 
@@ -414,6 +419,8 @@ class CommandSystem {
             case 'daimyo_list': this.game.ui.showDaimyoList(); break;
             case 'faction_list': this.game.ui.showFactionList(this.game.playerClanId, true); break;
             case 'busho_list': this.game.ui.openBushoSelector('all_busho_list', null, null, null); break;
+            // ★ここを書き足し！
+            case 'delegate_list': this.game.ui.showDelegateListModal(); break;
         }
     }
 
