@@ -112,6 +112,19 @@
                     <button id="btn-direct-control" class="delegate-btn">直轄</button>
                     <button id="btn-delegate-control" class="delegate-btn">委任</button>
                 </div>
+                
+                <div id="delegate-options" style="margin-bottom: 20px; padding: 15px; background: #f9f9f9; border-radius: 8px; text-align: left; transition: opacity 0.3s;">
+                    <div style="margin-bottom: 15px;">
+                        <span style="font-weight: bold; display: inline-block; width: 100px;">城攻め：</span>
+                        <button id="btn-attack-deny" class="delegate-sub-btn">不可</button>
+                        <button id="btn-attack-allow" class="delegate-sub-btn">許可</button>
+                    </div>
+                    <div>
+                        <span style="font-weight: bold; display: inline-block; width: 100px;">武将移動：</span>
+                        <button id="btn-move-deny" class="delegate-sub-btn">不可</button>
+                        <button id="btn-move-allow" class="delegate-sub-btn">許可</button>
+                    </div>
+                </div>
                 <div class="modal-footer" style="justify-content: center;">
                     <button class="btn-secondary" onclick="document.getElementById('delegate-setting-modal').classList.add('hidden')">戻る</button>
                 </div>
