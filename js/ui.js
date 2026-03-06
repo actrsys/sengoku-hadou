@@ -1644,7 +1644,8 @@ class UIManager {
         }
         if (this.aiGuard) { if (this.game.isProcessingAI) this.aiGuard.classList.remove('hidden'); else this.aiGuard.classList.add('hidden'); }
 
-        this.updateInfoPanel(this.currentCastle || this.game.getCurrentTurnCastle());
+        const activeCastle = this.currentCastle || this.game.getCurrentTurnCastle(); // ★今ターンが来ている城を覚えておきます
+        this.updateInfoPanel(activeCastle);
 
         const svgNS = "http://www.w3.org/2000/svg";
         const svg = document.createElementNS(svgNS, "svg");
@@ -1730,10 +1731,17 @@ class UIManager {
             }
         });
 
+        // 変更後
         this.mapEl.appendChild(svg);
 
         this.game.castles.forEach(c => {
             const el = document.createElement('div'); el.className = 'castle-card';
+            
+            // ★追加：自分の操作する城（委任していない）のターンなら、特別な目印シールを貼ります！
+            if (activeCastle && c.id === activeCastle.id && c.ownerClan === this.game.playerClanId && !c.isDelegated) {
+                el.classList.add('current-turn');
+            }
+
             el.dataset.clan = c.ownerClan;
             
             const posX = c.pixelX !== undefined ? c.pixelX : (c.x * 80 + 40);
