@@ -3429,7 +3429,7 @@ class UIManager {
                 div.innerHTML = `
                     <div style="flex:1;">
                         <strong>${p.name}</strong> (${p.getRankName()})<br>
-                        統:${p.leadership} 武:${p.strength} 智:${p.intelligence} 忠:${p.loyalty}
+                        統:${p.leadership} 武:${p.strength} 智:${p.intelligence}
                     </div>
                     <div style="display:flex; gap:5px;">
                         ${hireBtnHtml}

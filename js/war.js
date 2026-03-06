@@ -1601,13 +1601,13 @@ class WarManager {
                 }
 
                 if (hireProb > Math.random()) { 
+                    // ★ここから変更：大名だったかどうかを最初に記憶しておきます！
+                    const wasDaimyo = prisoner.isDaimyo;
+
                     if (prisoner.isDaimyo) {
                         prisoner.isDaimyo = false;
                         this.daimyoHiredBonus = 0.5; 
                     }
-
-                    // ★バグ修正：所属（clan）を書き換える前に「臣従メッセージ」を出す条件を満たしているかチェックします！
-                    const isSubmission = (isExtinct && originalClanId === prisoner.clan);
 
                     const oldLoyalty = prisoner.loyalty;
                     prisoner.clan = this.game.playerClanId; 
@@ -1621,11 +1621,13 @@ class WarManager {
                         this.game.updateCastleLord(targetC); 
                     }
                     
-                    if (isSubmission) { 
+                    // ★記憶しておいた情報を使ってメッセージを使い分けます！
+                    if (wasDaimyo) { 
                         this.game.ui.showDialog(`${prisoner.name}は臣従を誓いました！`, false, nextStep); 
                     } else {
                         this.game.ui.showDialog(`${prisoner.name}を登用しました！`, false, nextStep); 
                     }
+                    // ★変更ここまで
                 } else {
                     prisoner.hasRefusedHire = true; // ★追加：拒否したという印をつけます
                     if (prisoner.isDaimyo && isExtinct) {
