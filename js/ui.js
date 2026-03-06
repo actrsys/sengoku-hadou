@@ -843,13 +843,17 @@ class UIManager {
             // 今、リストにあるお城が「すべて委任状態」になっているか調べます
             const isAllDelegated = myCastles.length > 0 && myCastles.every(c => c.isDelegated);
             
-            // ボタンの文字を、今の状態に合わせて分かりやすく変えます
+            // ★書き換え！：ボタンの文字だけでなく、背景色と枠線の色も一緒に変えます
             if (isAllDelegated) {
-                toggleAllBtn.textContent = '一括：直轄にする';
-                toggleAllBtn.style.color = '#d32f2f'; // 赤っぽく
+                toggleAllBtn.textContent = '一括';
+                toggleAllBtn.style.color = '#d32f2f';             // 文字を赤に
+                toggleAllBtn.style.backgroundColor = '#ffebee';   // 背景を薄い赤に
+                toggleAllBtn.style.borderColor = '#d32f2f';       // 枠線を赤に
             } else {
-                toggleAllBtn.textContent = '一括：委任にする';
-                toggleAllBtn.style.color = '#1976d2'; // 青っぽく
+                toggleAllBtn.textContent = '一括';
+                toggleAllBtn.style.color = '#1976d2';             // 文字を青に
+                toggleAllBtn.style.backgroundColor = '#e3f2fd';   // 背景を薄い青に
+                toggleAllBtn.style.borderColor = '#1976d2';       // 枠線を青に
             }
 
             // ボタンを押した時の処理
