@@ -198,6 +198,10 @@ class UIManager {
             if (!btn) return; 
 
             const text = btn.textContent.trim();
+            
+            // ★ここを書き足し！：個別に音を鳴らす設定をしたボタンは、共通の「decision.ogg」をキャンセルします
+            if (["一括", "直轄", "委任", "不可", "許可"].includes(text)) return;
+
             if (window.AudioManager) {
                 if (["戻る", "閉じる", "拒否", "やめる", "撤退", "解放", "処断"].includes(text)) {
                     window.AudioManager.playSE('cancel.ogg');
@@ -205,7 +209,7 @@ class UIManager {
                     window.AudioManager.playSE('decision.ogg');
                 }
             }
-        }, true); 
+        }, true);
         
         let resizeTimer = null;
         let savedLogicalX = null;
