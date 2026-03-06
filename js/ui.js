@@ -2410,13 +2410,27 @@ class UIManager {
             bushos = this.game.getCastleBushos(targetId).filter(b => b.status !== 'ronin');
             infoHtml = "<div>援軍に派遣する武将を選択してください（最大5名まで）</div>";
         }
-        // ★ここを追加！
+        
         else if (actionType === 'atk_reinf_deploy') {
             bushos = this.game.getCastleBushos(targetId).filter(b => b.status !== 'ronin');
             infoHtml = "<div>攻撃の援軍に派遣する武将を選択してください（最大5名まで）</div>";
         }
-        // ★追加ここまで！
+        
+        // =====================================
+        // 褒美の対象を「自軍全員（大名以外）」にします！
+        else if (actionType === 'reward') {
+            bushos = this.game.bushos.filter(b => 
+                b.clan === this.game.playerClanId && // 自分の大名家の武将で
+                b.status !== 'dead' &&               // 亡くなっておらず
+                b.status !== 'ronin' &&              // 浪人ではなく
+                b.status !== 'unborn' &&             // まだ生まれていないわけでもなく
+                !b.isDaimyo                          // 大名（殿様）ではない人
+            );
+            infoHtml = "<div>褒美を与える武将を選択してください</div>"; 
+        }
+        
         else {
+            bushos = this.game.getCastleBushos(c.id).filter(b => b.status !== 'ronin');
             bushos = this.game.getCastleBushos(c.id).filter(b => b.status !== 'ronin');
             
             if (spec.msg) {
@@ -2502,7 +2516,7 @@ class UIManager {
             
             let isSelectable = !b.isActionDone; 
             if (extraData && extraData.allowDone) isSelectable = true; 
-            if (['employ_target','appoint_gunshi','rumor_target_busho','headhunt_target','interview','interview_target','reward','view_only','war_general', 'kunishu_war_general', 'all_busho_list'].includes(actionType)) isSelectable = true;
+            if (['appoint','employ_target','appoint_gunshi','rumor_target_busho','headhunt_target','interview','interview_target','reward','view_only','war_general', 'kunishu_war_general', 'all_busho_list'].includes(actionType)) isSelectable = true;
             if (actionType === 'def_intercept_deploy' || actionType === 'def_reinf_deploy' || actionType === 'atk_reinf_deploy') isSelectable = true;
             
             let acc = null; if (isEnemyTarget && targetCastle) acc = targetCastle.investigatedAccuracy;
