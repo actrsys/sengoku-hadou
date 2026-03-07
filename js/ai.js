@@ -476,6 +476,25 @@ class AIEngine {
                     }
                 }
             }
+            // =========================================================================
+            // ★：同盟国を通って遠くを攻める（飛び地への攻撃）のを控えめにする魔法！
+            let isDirectlyAdjacent = false;
+            
+            // 攻めようとしているお城の「お隣さん（道が繋がっている城）」をチェックします
+            if (target.adjacentCastleIds) {
+                isDirectlyAdjacent = target.adjacentCastleIds.some(adjId => {
+                    const adjCastle = this.game.getCastle(adjId);
+                    // お隣のお城の中に「自分の大名家(clan.id)の城」があるか確認します
+                    return adjCastle && adjCastle.ownerClan === clan.id;
+                });
+            }
+
+            // もし自分のお城と直接くっついていなかったら（同盟国を通る遠征だったら）
+            if (!isDirectlyAdjacent) {
+                // 攻めたい気持ち（確率）をガクッと減らします！
+                // 確率を「半分」にした上で、さらに「10」引くことで、よっぽどの隙がない限り攻めなくなります。
+                prob = (prob * 0.5) - 10; 
+            }
             
             // 攻撃確率の最大値設定
             const maxProb = rel.status === '敵対' ? 40 : 20;
