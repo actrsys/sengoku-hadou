@@ -437,7 +437,7 @@ class AIEngine {
             const diffMulti = diff === 'hard' ? 1.2 : diff === 'easy' ? 0.7 : 1.0;
             prob *= diffMulti;
 
-            // ★複数警戒ここから：周りの敵からのペナルティをすべて足し算します
+            // ★複数警戒：周りの敵からのペナルティをすべて足し算します
             let totalCautionPenalty = 0;
             adjacentEnemyClans.forEach(enemy => {
                 // 「いま攻めようとしている相手」以外の敵からのペナルティだけ足します
@@ -446,8 +446,37 @@ class AIEngine {
                 }
             });
             prob -= totalCautionPenalty;
-            // ★複数警戒ここまで
+            
+            // ★新しく戦線を広げる場合、周辺大名と戦力を比較して弱いところを狙う魔法！
+            // まだ「敵対」していない相手で、空き城(0)ではない場合だけ発動します
+            if (target.ownerClan !== 0 && rel.status !== '敵対') {
+                // ターゲットの大名家全体の兵力を取得します（さっき智謀で見誤った値を使います）
+                const targetData = adjacentEnemyClans.find(e => e.clanId === target.ownerClan);
+                const perceivedTargetPower = targetData ? targetData.power : (this.game.getClanTotalSoldiers(target.ownerClan) || 1);
 
+                // 周り（自分の領地に隣り合っている）の大名たちの「平均戦力」を計算します
+                let totalPower = 0;
+                let count = 0;
+                adjacentEnemyClans.forEach(e => {
+                    totalPower += e.power;
+                    count++;
+                });
+
+                if (count > 0) {
+                    const avgPower = totalPower / count;
+                    const ratio = perceivedTargetPower / avgPower; // 平均と比べてどれくらい強いか？
+
+                    if (ratio < 1.0) {
+                        // 平均より弱い場合：狙い目なので確率をアップ！（最大で約 +8%）
+                        prob += (1.0 - ratio) * 8; 
+                    } else {
+                        // 平均より強い場合：手強いので確率をダウン！（最大で約 -20%）
+                        // 周りの平均の「2倍」の強さがある大名なら、約-15%も攻撃確率が下がります
+                        prob -= (ratio - 1.0) * 15; 
+                    }
+                }
+            }
+            
             // 攻撃確率の最大値設定
             const maxProb = rel.status === '敵対' ? 40 : 20;
             
