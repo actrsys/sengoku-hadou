@@ -149,7 +149,9 @@ class AIEngine {
                 skipAttack = true; // ストップの目印をつけます
             }
 
-            const elapsedTurns = (this.game.year - window.MainParams.StartYear) * 12;
+            // ★修正：「年」の差だけでなく、「月」の差も足し算して正確なターン数を数えます！
+            const startMonth = window.MainParams.StartMonth || 1; // 開始月（わからなければ1月とします）
+            const elapsedTurns = ((this.game.year - window.MainParams.StartYear) * 12) + (this.game.month - startMonth);
             
             // ★ここも書き換え！ ストップの目印（skipAttack）がついていない時だけ攻撃します
             if (elapsedTurns >= 3 && !skipAttack) {
