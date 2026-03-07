@@ -177,7 +177,8 @@ class FieldWarManager {
         const pid = Number(this.game.playerClanId);
         const isAtkPlayer = (Number(warState.attacker.ownerClan) === pid);
         const isDefPlayer = (Number(warState.defender.ownerClan) === pid);
-        const isPlayerInvolved = isAtkPlayer || isDefPlayer;
+        // ★修正：ここではまだプレイヤーが参加しているか決めず、後で部隊リストを見て判定します
+        // const isPlayerInvolved = isAtkPlayer || isDefPlayer;
 
         // ★修正: 部隊の開始位置を、マップの「端から2列分」に拡張します！
         const leftX1 = 0;
@@ -373,6 +374,9 @@ class FieldWarManager {
         this.turnQueue = [];
         this.initUI();
         
+        // ★追加：援軍も含めて、プレイヤーが操作する部隊が1つでもあるか調べます！
+        const isPlayerInvolved = this.units.some(u => u.isPlayer);
+
         if (isPlayerInvolved) {
             this.updateMap();
             this.updateStatus();
