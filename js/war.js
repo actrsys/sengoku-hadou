@@ -368,11 +368,11 @@ class WarManager {
             const defClanData = this.game.clans.find(c => c.id === defClan);
             const defDaimyoName = defClanData ? defClanData.name : (defCastle.isKunishu ? defCastle.name : "中立");
             
-            const startMsg = `${atkDaimyoName}の${atkCastle.name}が\n${defDaimyoName}の${defCastle.name}に攻め込みました！`;
+            // ★攻撃軍の総大将（武将）の名前を出すようにします！
+            const startMsg = `${atkDaimyoName}の${atkBushos[0].name}が\n${defDaimyoName}の${defCastle.name}に攻め込みました！`;
             
             // ① ログに「攻め込みました」を追加します（改行は消して1行で出します）
             this.game.ui.log(startMsg.replace('\n', ''));
-            // ==========================================
             
             // ★修正1：守備側の総大将を正しく設定する（国人衆の頭領にも対応）
             let defBusho = null;
