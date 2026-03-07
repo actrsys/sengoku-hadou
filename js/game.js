@@ -855,8 +855,22 @@ class GameManager {
             this.electCastellan(castle, bushos);
         }
     }
-
+    
     electCastellan(castle, bushos) {
+        // ==========================================
+        // ★委任城の城主を勝手に変えない魔法です！
+        // もし自分の大名家のお城で、委任されているなら…
+        if (castle.ownerClan === this.playerClanId && castle.isDelegated) {
+            // 前回の城主がまだこのお城にいるか探します
+            const currentLord = bushos.find(b => b.id === castle.castellanId);
+            if (currentLord) {
+                // まだいるなら、他の人の城主マークを外して、元の城主にマークを付け直します！
+                bushos.forEach(b => b.isCastellan = false);
+                currentLord.isCastellan = true;
+                return; // ここで処理を終わらせて、新しい城主を選ばないようにします！
+            }
+        }
+        
         bushos.forEach(b => {
             b._lordScore = (b.leadership * 5) + (b.politics * 4) + (b.charm * 1);
             if (b.isFactionLeader) {
