@@ -990,26 +990,52 @@ class CommandSystem {
         if (type === 'goodwill') {
             let isSuccess = true;
 
-            // ★追加: 相手の大名がAIの場合、友好度によって親善を受ける確率を変動させる（線形で受けづらくなる）
+            // ★修正: 相手の大名がAIの場合、受ける確率を厳しく計算します
             if (targetClanId !== this.game.playerClanId) {
+                let acceptProb = 100;
+                
+                // ① 友好度が50以下の場合は、基本確率を下げる
                 if (relation.sentiment <= 50) {
-                    let acceptProb = relation.sentiment * 2; // 友好度50で100%、0で0%
-                    
-                    // 共通の敵対大名がいるかチェック
-                    const commonEnemy = this.game.clans.some(c => {
-                        if (c.id === 0 || c.id === doer.clan || c.id === targetClanId) return false;
-                        const r1 = this.game.getRelation(doer.clan, c.id);
-                        const r2 = this.game.getRelation(targetClanId, c.id);
-                        return r1 && r2 && r1.status === '敵対' && r2.status === '敵対';
-                    });
+                    acceptProb = relation.sentiment * 2; // 友好度50で100%、0で0%
+                }
+                
+                // 共通の敵対大名がいるかチェック
+                const commonEnemy = this.game.clans.some(c => {
+                    if (c.id === 0 || c.id === doer.clan || c.id === targetClanId) return false;
+                    const r1 = this.game.getRelation(doer.clan, c.id);
+                    const r2 = this.game.getRelation(targetClanId, c.id);
+                    return r1 && r2 && r1.status === '敵対' && r2.status === '敵対';
+                });
 
-                    if (commonEnemy) {
-                        acceptProb += 30; // 共通の敵がいれば受け入れやすくする
-                    }
+                if (commonEnemy) {
+                    acceptProb += 30; // 共通の敵がいれば受け入れやすくする
+                }
 
-                    if (Math.random() * 100 > acceptProb) {
-                        isSuccess = false;
+                // ② ★追加：自分がすでに仲良くしている大名の数で確率を下げる
+                let allyCount = 0;
+                this.game.clans.forEach(c => {
+                    if (c.id !== 0 && c.id !== targetClanId) {
+                        const r = this.game.getRelation(targetClanId, c.id);
+                        if (r && ['同盟', '支配', '従属'].includes(r.status)) {
+                            allyCount++;
+                        }
                     }
+                });
+                if (allyCount >= 2) {
+                    acceptProb -= (allyCount - 1) * 20; // 2個で-20%、3個で-40%
+                }
+
+                // ③ ★追加：相手の戦力が自分より低い場合、確率を線形で削る
+                const myPower = this.game.getClanTotalSoldiers(targetClanId) || 1;
+                const doerPower = this.game.getClanTotalSoldiers(doer.clan) || 1;
+                if (myPower > doerPower) {
+                    // 相手の戦力が自分の半分なら確率も半分にする魔法
+                    const ratio = doerPower / myPower;
+                    acceptProb *= ratio;
+                }
+
+                if (Math.random() * 100 > acceptProb) {
+                    isSuccess = false;
                 }
             }
 
@@ -1032,7 +1058,7 @@ class CommandSystem {
             }
 
         } else if (type === 'alliance') {
-            // ★追加: 共通の敵対大名がいるかチェックし、同盟をしやすくする
+            // ★修正: 同盟を受ける確率も厳しく計算します
             const commonEnemy = this.game.clans.some(c => {
                 if (c.id === 0 || c.id === doer.clan || c.id === targetClanId) return false;
                 const r1 = this.game.getRelation(doer.clan, c.id);
@@ -1040,11 +1066,36 @@ class CommandSystem {
                 return r1 && r2 && r1.status === '敵対' && r2.status === '敵対';
             });
 
-            const threshold = commonEnemy ? 90 : 120; // 共通の敵がいれば閾値を下げる
-            const randThreshold = commonEnemy ? 0.1 : 0.3; // 確率も緩和
+            let threshold = commonEnemy ? 90 : 120; // 閾値（これを超えないと土俵に上がれない）
+            let acceptProb = commonEnemy ? 90 : 70; // 基本の成功確率（100%中）
+
+            // ① ★追加：自分がすでに仲良くしている大名の数で確率を下げる
+            let allyCount = 0;
+            this.game.clans.forEach(c => {
+                if (c.id !== 0 && c.id !== targetClanId) {
+                    const r = this.game.getRelation(targetClanId, c.id);
+                    if (r && ['同盟', '支配', '従属'].includes(r.status)) {
+                        allyCount++;
+                    }
+                }
+            });
+            if (allyCount >= 2) {
+                acceptProb -= (allyCount - 1) * 20; // 確率を下げる
+                threshold += (allyCount - 1) * 10;  // 閾値を上げる（厳しくなる）
+            }
+
+            // ② ★追加：相手の戦力が自分より低い場合、確率を線形で削る
+            const myPower = this.game.getClanTotalSoldiers(targetClanId) || 1;
+            const doerPower = this.game.getClanTotalSoldiers(doer.clan) || 1;
+            if (myPower > doerPower) {
+                const ratio = doerPower / myPower;
+                acceptProb *= ratio;
+            }
 
             const chance = relation.sentiment + doer.diplomacy;
-            if (chance > threshold && Math.random() > randThreshold) {
+            
+            // サイコロを振ります！ (chance が threshold を超えていて、かつ確率のサイコロをクリアしたら成功)
+            if (chance > threshold && (Math.random() * 100) < acceptProb) {
                 this.game.diplomacyManager.changeStatus(doer.clan, targetClanId, '同盟');
                 msg = `同盟の締結に成功しました！`;
                 doer.achievementTotal += Math.floor(doer.diplomacy * 0.2) + 10;

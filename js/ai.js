@@ -1119,6 +1119,24 @@ class AIEngine {
         const myPower = this.game.getClanTotalSoldiers(myClanId) || 1;
         const myDaimyo = this.game.bushos.find(b => b.clan === myClanId && b.isDaimyo) || { duty: 50, intelligence: 50 };
 
+        // ★ここから追加：現在仲良くしている（同盟・支配・従属）大名家の数を数えます
+        let allyCount = 0;
+        this.game.clans.forEach(c => {
+            if (c.id !== 0 && c.id !== myClanId) {
+                const r = this.game.getRelation(myClanId, c.id);
+                if (r && ['同盟', '支配', '従属'].includes(r.status)) {
+                    allyCount++;
+                }
+            }
+        });
+        
+        // ★追加：仲良しが2つ以上なら、外交する確率を下げる魔法（1つ増えるごとに20%ダウン）
+        let sendProbModifier = 1.0;
+        if (allyCount >= 2) {
+            sendProbModifier = Math.max(0.1, 1.0 - (allyCount - 1) * 0.2); 
+        }
+        // ★追加ここまで！
+
         // ★追加：ここで改めて周辺の敵を判断します！
         let evaluatorInt = 50;
         if (myClanId === this.game.playerClanId) {
@@ -1211,7 +1229,8 @@ class AIEngine {
 
             // 通常の親善・同盟のロジック
             if (myPower < perceivedTargetTotal * 0.8) {
-                if (Math.random() < smartness) {
+                // ★修正：仲良しが多いと、外交に消極的になります！
+                if (Math.random() < smartness * sendProbModifier) {
                     const commonEnemy = this.game.clans.some(c => {
                         if (c.id === 0 || c.id === myClanId || c.id === targetClanId) return false;
                         const r1 = this.game.getRelation(myClanId, c.id);
