@@ -801,18 +801,24 @@ class UIManager {
         
         const activeClans = this.game.clans.filter(c => c.id !== 0 && this.game.castles.some(cs => cs.ownerClan === c.id));
         
+        // 念のため、一覧を開く直前にも最新の戦力を計算し直しておきます
+        this.game.updateAllClanPrestige();
+        
         const clanDataList = activeClans.map(clan => {
-            const castles = this.game.castles.filter(c => c.ownerClan === clan.id);
             const leader = this.game.getBusho(clan.leaderId);
-            let pop = 0, sol = 0, koku = 0, gold = 0, rice = 0;
-            castles.forEach(c => { pop += c.population; sol += c.soldiers; koku += c.kokudaka; gold += c.gold; rice += c.rice; });
-            const power = Math.floor(pop / 2000) + Math.floor(sol / 20) + Math.floor(koku / 20) + Math.floor(gold / 50) + Math.floor(rice / 100);
+            // お城の数だけ、ここで数えます
+            const castlesCount = this.game.castles.filter(c => c.ownerClan === clan.id).length;
+            
             return {
-                id: clan.id, name: clan.name, leaderName: leader ? leader.name : "不明",
-                power: power, castlesCount: castles.length
+                id: clan.id, 
+                name: clan.name, 
+                leaderName: leader ? leader.name : "不明",
+                // ★今まで計算していた部分を消して、大名の箱から直接取り出します！
+                power: clan.daimyoPrestige, 
+                castlesCount: castlesCount
             };
         });
-
+        
         clanDataList.sort((a,b) => b.power - a.power);
         
         const maxPower = clanDataList.length > 0 ? clanDataList[0].power : 1;

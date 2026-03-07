@@ -823,6 +823,26 @@ class GameManager {
     getClanGunshi(clanId) { return this.bushos.find(b => Number(b.clan) === Number(clanId) && b.isGunshi && b.status === 'active'); }
     isCastleVisible(castle) { if (Number(castle.ownerClan) === Number(this.playerClanId)) return true; if (castle.investigatedUntil >= this.getCurrentTurnId()) return true; return false; }
     
+    // ==========================================
+    // ★全ての大名の「戦力（daimyoPrestige）」を計算して箱に入れる魔法です
+    updateAllClanPrestige() {
+        this.clans.forEach(clan => {
+            if (clan.id === 0) return; // 空き家（中立）は計算しません
+            const castles = this.castles.filter(c => c.ownerClan === clan.id);
+            let pop = 0, sol = 0, koku = 0, gold = 0, rice = 0;
+            castles.forEach(c => { 
+                pop += c.population; 
+                sol += c.soldiers; 
+                koku += c.kokudaka; 
+                gold += c.gold; 
+                rice += c.rice; 
+            });
+            // 今まで大名一覧で計算していた式をそのまま使って、大名の箱にしまいます
+            clan.daimyoPrestige = Math.floor(pop / 2000) + Math.floor(sol / 20) + Math.floor(koku / 20) + Math.floor(gold / 50) + Math.floor(rice / 100);
+        });
+    }
+    // ==========================================
+
     updateCastleLord(castle) {
         if (!castle || castle.ownerClan === 0) {
             if (castle) castle.castellanId = 0;
@@ -970,6 +990,9 @@ class GameManager {
         const allCastles = this.castles.filter(c => c.ownerClan !== 0);
         allCastles.sort(() => Math.random() - 0.5); 
         this.turnQueue = [...allCastles];
+
+        // ★毎月の初めに、最新の戦力を計算し直します！
+        this.updateAllClanPrestige();
 
         this.currentIndex = 0; 
         this.processTurn();

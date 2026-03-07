@@ -13,7 +13,11 @@ class Clan {
 
         // 外交データの初期化
         this.diplomacyValue = this.diplomacyValue || {};
-
+        
+        // 大名の戦力（威信）を覚えておく箱です
+        this.daimyoPrestige = Number(data.daimyoPrestige || 0);
+        
+        // CSVの initDiplomacy を翻訳して、外交の箱に入れます
         // CSVの initDiplomacy を翻訳して、外交の箱に入れます
         if (typeof data.initDiplomacy === 'string' && data.initDiplomacy.trim() !== "") {
             const parts = data.initDiplomacy.split('|');
