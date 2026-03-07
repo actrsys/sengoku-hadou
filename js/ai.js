@@ -234,76 +234,6 @@ class AIEngine {
                                 this.executeAttack(castle, decision.target, castellan, decision.sendSoldiers, decision.sendRice);
                                 return; 
                             }
-                        } else if (decision.action === 'diplomacy') {
-                            // ★追加：周りが怖すぎて攻撃を諦めた場合、一番怖い敵に親善を送ります！
-                            const targetClanId = decision.targetClanId;
-                            
-                            // 1. 相手と自分の戦力差を計算して、親善の金額を決めます（普段の外交と同じ計算）
-                            // ★追加：見積もる人の智謀を決めます（プレイヤーなら城主、AIなら大名）
-                            let evaluatorInt = 50;
-                            if (castle.ownerClan === this.game.playerClanId) {
-                                evaluatorInt = castellan.intelligence;
-                            } else {
-                                const myDaimyo = this.game.bushos.find(b => b.clan === castle.ownerClan && b.isDaimyo);
-                                evaluatorInt = myDaimyo ? (myDaimyo.intelligence || 50) : 50;
-                            }
-                            
-                            const trueTargetTotal = this.game.getClanTotalSoldiers(targetClanId) || 1;
-                            const myTotalPower = this.game.getClanTotalSoldiers(castle.ownerClan) || 1;
-                            
-                            // ★追加：智謀によって敵の戦力を見誤る魔法
-                            const errorRange = Math.min(0.3, Math.max(0, (100 - evaluatorInt) / 100 * 0.3));
-                            const errorRate = 1.0 + (Math.random() - 0.5) * 2 * errorRange;
-                            const perceivedTargetTotal = trueTargetTotal * errorRate;
-                            
-                            const ratio = perceivedTargetTotal / myTotalPower;
-                            
-                            let goodwillGold = 300; // 最低は金300
-                            if (ratio >= 3.0) {
-                                goodwillGold = 1000; // 3倍以上強い相手なら最大1000
-                            } else if (ratio > 1.5) {
-                                // 1.5倍から3.0倍の間で、300〜1000に増えていく計算
-                                goodwillGold = 300 + ((ratio - 1.5) / 1.5) * 700;
-                            }
-                            goodwillGold = Math.floor(goodwillGold / 100) * 100; // キリ良く100単位にする
-
-                            // 2. 相手が親善を受け入れてくれる確率を予想します
-                            const rel = this.game.getRelation(castle.ownerClan, targetClanId);
-                            let acceptProb = rel ? rel.sentiment * 2 : 100; // 友好度50で100%
-                            
-                            // 共通の敵がいるかどうかも考慮に入れます
-                            const commonEnemy = this.game.clans.some(c => {
-                                if (c.id === 0 || c.id === castle.ownerClan || c.id === targetClanId) return false;
-                                const r1 = this.game.getRelation(castle.ownerClan, c.id);
-                                const r2 = this.game.getRelation(targetClanId, c.id);
-                                return r1 && r2 && r1.status === '敵対' && r2.status === '敵対';
-                            });
-                            if (commonEnemy) {
-                                acceptProb += 30; // 共通の敵がいれば受け入れてもらいやすい
-                            }
-                            
-                            // 3. もし予想される成功率が20%未満、または手持ちのお金が足りない場合は諦めます
-                            if (acceptProb < 20 || castle.gold < goodwillGold) {
-                                // ここで「return」せずに何もしなければ、そのまま下の「内政フェーズ」へ自動で進んでくれます！
-                            } else {
-                                // 相手の城を適当に見つけます（コマンド実行に必要です）
-                                const targetCastle = this.game.castles.find(c => c.ownerClan === targetClanId);
-                                if (targetCastle) {
-                                    if (targetClanId === this.game.playerClanId) {
-                                        // 相手がプレイヤーならお返事を待ちます
-                                        this.game.commandSystem.proposeDiplomacyToPlayer(castellan, targetClanId, 'goodwill', goodwillGold, () => {
-                                            castellan.isActionDone = true;
-                                            this.game.finishTurn();
-                                        });
-                                    } else {
-                                        // 相手がAIならそのまま親善を実行します
-                                        this.game.commandSystem.executeDiplomacy(castellan.id, targetCastle.id, 'goodwill', goodwillGold);
-                                        castellan.isActionDone = true;
-                                        this.game.finishTurn(); // ★これを新しく書き足します！
-                                    }
-                                    return; // 外交をしたらターン終了！
-                                }
-                            }
                         }
                     }
                 }
@@ -507,14 +437,7 @@ class AIEngine {
             return { action: 'attack', target: bestTarget, sendSoldiers, sendRice: requiredRice };
         }
         
-        // ★追加：どこにも攻められなかった場合、警戒対象の中で一番戦力が高い相手との親善を提案します！
-        // ただし、プレイヤーの委任城（城主）は勝手に外交しないように制限をかけます！
-        if (adjacentEnemyClans.length > 0 && myClanId !== this.game.playerClanId) {
-            // 戦力が高い順に並べ替え
-            adjacentEnemyClans.sort((a, b) => b.power - a.power);
-            return { action: 'diplomacy', targetClanId: adjacentEnemyClans[0].clanId };
-        }
-
+        // 攻撃する相手がいなかったら、おとなしく諦めます
         return null;
     }
 
@@ -1192,48 +1115,78 @@ class AIEngine {
         if (neighbors.length === 0) return;
         
         const uniqueNeighbors = [...new Set(neighbors.map(c => c.ownerClan))];
-        const myPower = this.game.getClanTotalSoldiers(castle.ownerClan);
-        const myDaimyo = this.game.bushos.find(b => b.clan === castle.ownerClan && b.isDaimyo) || { duty: 50 };
+        const myClanId = castle.ownerClan;
+        const myPower = this.game.getClanTotalSoldiers(myClanId) || 1;
+        const myDaimyo = this.game.bushos.find(b => b.clan === myClanId && b.isDaimyo) || { duty: 50, intelligence: 50 };
 
-        for (let targetClanId of uniqueNeighbors) {
+        // ★追加：ここで改めて周辺の敵を判断します！
+        let evaluatorInt = 50;
+        if (myClanId === this.game.playerClanId) {
+            evaluatorInt = castellan.intelligence; // プレイヤーの委任城なら城主の頭の良さ
+        } else {
+            evaluatorInt = myDaimyo.intelligence || 50; // AIなら大名の頭の良さ
+        }
+
+        const enemyThreats = [];
+        uniqueNeighbors.forEach(clanId => {
+            const rel = this.game.getRelation(myClanId, clanId);
+            const isProtected = rel && ['同盟', '支配', '従属'].includes(rel.status);
+            
+            // 同盟などの保護関係になければ、どれくらい怖いか（兵力）を予想します
+            if (!isProtected) {
+                const trueEnemyPower = this.game.getClanTotalSoldiers(clanId) || 0;
+                const errorRange = Math.min(0.3, Math.max(0, (100 - evaluatorInt) / 100 * 0.3));
+                const errorRate = 1.0 + (Math.random() - 0.5) * 2 * errorRange;
+                const perceivedEnemyPower = trueEnemyPower * errorRate;
+                
+                enemyThreats.push({ clanId: clanId, power: perceivedEnemyPower });
+            }
+        });
+
+        // 怖い順（戦力が多い順）に並べ替えます
+        enemyThreats.sort((a, b) => b.power - a.power);
+
+        // 怖い敵から順番に外交を考えるように、リストを作り直します
+        const orderedTargets = [];
+        enemyThreats.forEach(t => orderedTargets.push(t.clanId));
+        uniqueNeighbors.forEach(id => {
+            if (!orderedTargets.includes(id)) orderedTargets.push(id);
+        });
+
+        for (let targetClanId of orderedTargets) {
             if (castellan.isActionDone) break;
 
             const targetClanTotal = this.game.getClanTotalSoldiers(targetClanId) || 1;
-            const rel = this.game.getRelation(castle.ownerClan, targetClanId);
+            
+            // さっき計算した「見誤った戦力」を使います
+            const threatData = enemyThreats.find(t => t.clanId === targetClanId);
+            const perceivedTargetTotal = threatData ? threatData.power : targetClanTotal;
+
+            const rel = this.game.getRelation(myClanId, targetClanId);
             const dutyInhibition = (myDaimyo.duty * 0.01) * (1.0 - (smartness * 0.5)); 
             
-            // ★追加: 相手の大名家(targetClanId)の城をどれか一つ選びます（外交コマンドを実行する的として使います）
             const targetCastle = neighbors.find(c => c.ownerClan === targetClanId);
-            if (!targetCastle) continue; // もしお城が見つからなかったらスキップ！
+            if (!targetCastle) continue; 
             const targetCastleId = targetCastle.id;
             
             // 自分が相手に従属している場合（相手が支配者）
             if (rel.status === '従属') {
-                // 相手と自分の戦力の「倍率」を計算します
                 const ratio = targetClanTotal / myPower;
-                
-                // 支配者の戦力が自分の2倍以下なら、独立（破棄）を考え始めます
                 if (ratio <= 2.0) {
-                    // 2.0倍の時は1%(0.01)、1.0倍以下の時は90%(0.90)になるように確率を計算する魔法です
                     const breakProb = 0.01 + (2.0 - Math.max(1.0, ratio)) * 0.89;
-                    
-                    // サイコロを振って、確率(breakProb)を引き当てたら独立します！
                     if (Math.random() < breakProb && Math.random() > dutyInhibition) {
-                        this.game.commandSystem.executeDiplomacy(castellan.id, targetCastleId, 'break_alliance'); // ★変更：targetClanId を targetCastleId に直しました！
+                        this.game.commandSystem.executeDiplomacy(castellan.id, targetCastleId, 'break_alliance'); 
                         castellan.isActionDone = true;
                     }
                 }
-                // それ以外は破棄を考えません（これ以上何もしない）
                 continue;
             }
 
             // 同盟または支配している場合
             if (rel.status === '同盟' || rel.status === '支配') {
-                 const enemies = neighbors.filter(c => !['同盟', '支配', '従属'].includes(this.game.getRelation(castle.ownerClan, c.ownerClan).status));
-                 
-                 // 敵がいなくて、自分の戦力が相手の2.5倍以上あり、義理のストッパーを越えたら破棄します
+                 const enemies = neighbors.filter(c => !['同盟', '支配', '従属'].includes(this.game.getRelation(myClanId, c.ownerClan).status));
                  if (enemies.length === 0 && myPower > targetClanTotal * 2.5 && Math.random() > dutyInhibition) {
-                      this.game.commandSystem.executeDiplomacy(castellan.id, targetCastleId, 'break_alliance'); // ★変更：targetClanId を targetCastleId に直しました！
+                      this.game.commandSystem.executeDiplomacy(castellan.id, targetCastleId, 'break_alliance'); 
                       castellan.isActionDone = true;
                  }
                  continue;
@@ -1241,17 +1194,15 @@ class AIEngine {
 
             // 相手の戦力が自分の1/8以下なら、稀に支配を試みます
             if (targetClanTotal * 8 <= myPower) {
-                if (Math.random() < 0.05) { // 5％の確率で支配コマンドを実行します
+                if (Math.random() < 0.05) { 
                     if (targetClanId === this.game.playerClanId) {
-                        // ★相手がプレイヤーならお返事を待つ
                         this.game.commandSystem.proposeDiplomacyToPlayer(castellan, targetClanId, 'dominate', 0, () => {
                             castellan.isActionDone = true;
-                            this.game.finishTurn(); // お返事のあとにターンを進める
+                            this.game.finishTurn(); 
                         });
                         return 'waiting';
                     } else {
-                        // 相手がAIならそのまま実行
-                        this.game.commandSystem.executeDiplomacy(castellan.id, targetCastleId, 'dominate'); // ★変更：targetClanId を targetCastleId に直しました！
+                        this.game.commandSystem.executeDiplomacy(castellan.id, targetCastleId, 'dominate'); 
                         castellan.isActionDone = true;
                         continue;
                     }
@@ -1259,52 +1210,45 @@ class AIEngine {
             }
 
             // 通常の親善・同盟のロジック
-            if (myPower < targetClanTotal * 0.8) {
+            if (myPower < perceivedTargetTotal * 0.8) {
                 if (Math.random() < smartness) {
-                    // ★追加：共通の敵対大名がいるか判定
                     const commonEnemy = this.game.clans.some(c => {
-                        if (c.id === 0 || c.id === castle.ownerClan || c.id === targetClanId) return false;
-                        const r1 = this.game.getRelation(castle.ownerClan, c.id);
+                        if (c.id === 0 || c.id === myClanId || c.id === targetClanId) return false;
+                        const r1 = this.game.getRelation(myClanId, c.id);
                         const r2 = this.game.getRelation(targetClanId, c.id);
                         return r1 && r2 && r1.status === '敵対' && r2.status === '敵対';
                     });
 
-                    // 共通の敵がいれば同盟や親善の閾値を少し緩和する
                     const allianceThreshold = commonEnemy ? (window.AIParams.AI.AllianceThreshold || 70) - 15 : (window.AIParams.AI.AllianceThreshold || 70);
                     const goodwillThreshold = commonEnemy ? (window.AIParams.AI.GoodwillThreshold || 40) + 20 : (window.AIParams.AI.GoodwillThreshold || 40);
 
                     if (rel.sentiment < goodwillThreshold) {
-                         const ratio = targetClanTotal / Math.max(1, myPower); // 相手が自分の何倍強いか
+                         const ratio = perceivedTargetTotal / Math.max(1, myPower); 
                          
-                         // ★変更: 友好度50以下〜0になるにつれて線形で親善を渋るようにする
                          let willGoodwill = true;
                          if (rel.sentiment <= 50) {
-                             let skipProb = (50 - rel.sentiment) * 2; // 50で0%、0で100%
+                             let skipProb = (50 - rel.sentiment) * 2; 
                              if (commonEnemy) {
-                                 skipProb -= 30; // 共通の敵がいれば親善を渋る確率を減らす
+                                 skipProb -= 30; 
                              }
                              if (Math.random() * 100 < skipProb) {
                                  willGoodwill = false;
                              }
                          }
 
-                         // 元の「戦力差3倍以上ないと絶対に親善しない」ロジックも組み込む
                          if (!willGoodwill || (rel.sentiment <= 30 && ratio < 3.0)) {
-                             // 何もしないで諦める（親善はスキップ）
+                             // 何もしないで諦める
                          } else {
-                             let goodwillGold = 300; // 最低は金300
+                             let goodwillGold = 300; 
                              if (ratio >= 3.0) {
-                                 goodwillGold = 1000; // 3倍以上強い相手なら最大1000
+                                 goodwillGold = 1000; 
                              } else if (ratio > 1.5) {
-                                 // 1.5倍から3.0倍の間で、300〜1000に増えていく計算
                                  goodwillGold = 300 + ((ratio - 1.5) / 1.5) * 700;
                              }
-                             goodwillGold = Math.floor(goodwillGold / 100) * 100; // キリ良く100単位にする
+                             goodwillGold = Math.floor(goodwillGold / 100) * 100; 
 
-                             // ★城にその金額があるかチェックしてから行う
                              if (castle.gold >= goodwillGold) {
                                  if (targetClanId === this.game.playerClanId) {
-                                     // ★相手がプレイヤーならお返事を待つ
                                      this.game.commandSystem.proposeDiplomacyToPlayer(castellan, targetClanId, 'goodwill', goodwillGold, () => {
                                          castellan.isActionDone = true;
                                          this.game.finishTurn();
@@ -1318,7 +1262,6 @@ class AIEngine {
                          }
                     } else if (rel.sentiment > allianceThreshold) {
                          if (targetClanId === this.game.playerClanId) {
-                             // ★相手がプレイヤーならお返事を待つ
                              this.game.commandSystem.proposeDiplomacyToPlayer(castellan, targetClanId, 'alliance', 0, () => {
                                  castellan.isActionDone = true;
                                  this.game.finishTurn();
