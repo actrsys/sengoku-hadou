@@ -1238,28 +1238,65 @@ class UIManager {
         }
     }
 
-    showCutin(msg) { 
+    // ==========================================
+    // ★ここから追加：画面のどこを触っても消せるメッセージの魔法！
+    // ==========================================
+    showTapMessage(msg) {
         return new Promise((resolve) => {
-            if (this.cutinMessage) this.cutinMessage.textContent = msg; 
-            if (this.cutinOverlay) {
-                this.cutinOverlay.classList.remove('hidden'); 
-                this.cutinOverlay.classList.add('fade-in'); 
-                
-                setTimeout(() => { 
-                    this.cutinOverlay.classList.remove('fade-in'); 
-                    this.cutinOverlay.classList.add('fade-out'); 
-                    
-                    setTimeout(() => { 
-                        this.cutinOverlay.classList.add('hidden'); 
-                        this.cutinOverlay.classList.remove('fade-out'); 
-                        resolve();
-                    }, 500); 
-                }, 2000); 
-            } else {
-                resolve();
+            // メッセージを映すための「透明な下敷き（オーバーレイ）」を探します
+            let overlay = document.getElementById('tap-message-overlay');
+            
+            // もし無かったら、新しく作ります！
+            if (!overlay) {
+                overlay = document.createElement('div');
+                overlay.id = 'tap-message-overlay';
+                // 画面全体を覆うようにスタイル（見た目）を設定します
+                overlay.style.position = 'fixed';
+                overlay.style.top = '0';
+                overlay.style.left = '0';
+                overlay.style.width = '100vw';
+                overlay.style.height = '100vh';
+                overlay.style.backgroundColor = 'rgba(0, 0, 0, 0.6)'; // 少しだけ背景を暗くします
+                overlay.style.color = '#fff'; // 文字は白
+                overlay.style.display = 'flex';
+                overlay.style.flexDirection = 'column'; // 縦に並べる
+                overlay.style.alignItems = 'center';
+                overlay.style.justifyContent = 'center';
+                overlay.style.zIndex = '99999'; // 一番手前に出します！
+                overlay.style.fontSize = '1.5rem';
+                overlay.style.fontWeight = 'bold';
+                overlay.style.textAlign = 'center';
+                overlay.style.cursor = 'pointer';
+                document.body.appendChild(overlay);
             }
+            
+            // 下敷きにメッセージを書きます
+            overlay.innerHTML = `
+                <div style="background-color: rgba(0, 0, 0, 0.8); padding: 20px 40px; border-radius: 10px; border: 2px solid #fff;">
+                    ${msg.replace(/\n/g, '<br>')}
+                    <div style="font-size:1rem; color:#aaa; margin-top:20px;">(画面をタッチして進む)</div>
+                </div>
+            `;
+            
+            // 隠していた下敷きを見えるようにします
+            overlay.classList.remove('hidden');
+            overlay.style.display = 'flex';
+
+            // 画面のどこかを触った時に発動する魔法（クリックの処理）
+            const onClick = (e) => {
+                e.stopPropagation();
+                e.preventDefault();
+                overlay.style.display = 'none'; // メッセージを隠す
+                overlay.removeEventListener('click', onClick); // クリックの魔法を解除
+                if (window.AudioManager) window.AudioManager.playSE('decision.ogg'); // 「決定」の音を鳴らす
+                resolve(); // 止めていた時間を動かします！
+            };
+            
+            // 下敷きにクリックの魔法をセット！
+            overlay.addEventListener('click', onClick);
         });
     }
+    // ==========================================
     
     showScenarioSelection(scenarios, onSelect) {
         this.forceResetModals();
