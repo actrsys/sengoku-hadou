@@ -1104,9 +1104,11 @@ class WarManager {
                 
                 let resultMsg = "";
                 if (attackerWon) {
-                    resultMsg = `${atkDaimyoName}の${s.sourceCastle.name}が\n${defDaimyoName}の${s.defender.name}を攻め落としました！`;
+                    // ★変更：お城の名前の代わりに、攻撃軍の総大将（s.atkBushos[0].name）にします！
+                    resultMsg = `${atkDaimyoName}の${s.atkBushos[0].name}が\n${defDaimyoName}の${s.defender.name}を攻め落としました！`;
                 } else {
-                    resultMsg = `${defDaimyoName}の${s.defender.name}が\n${atkDaimyoName}の攻撃を撃退しました！`;
+                    // ★変更：守備成功した時も、守備隊の総大将（s.defBusho.name）にします！
+                    resultMsg = `${defDaimyoName}の${s.defBusho.name}が\n${atkDaimyoName}の攻撃を撃退しました！`;
                 }
                 
                 // どこを触っても消せるメッセージを表示します！
