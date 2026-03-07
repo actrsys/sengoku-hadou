@@ -1237,6 +1237,33 @@ class UIManager {
             this.selectorConfirmBtn.style.opacity = 1.0;
         }
     }
+    // （これより上には closeSelector という魔法があります）
+
+    // ==========================================
+    // ★ここを書き足し！：間違えて消えてしまったカットインの魔法を復活させます！
+    showCutin(msg) { 
+        return new Promise((resolve) => {
+            if (this.cutinMessage) this.cutinMessage.textContent = msg; 
+            if (this.cutinOverlay) {
+                this.cutinOverlay.classList.remove('hidden'); 
+                this.cutinOverlay.classList.add('fade-in'); 
+                
+                setTimeout(() => { 
+                    this.cutinOverlay.classList.remove('fade-in'); 
+                    this.cutinOverlay.classList.add('fade-out'); 
+                    
+                    setTimeout(() => { 
+                        this.cutinOverlay.classList.add('hidden'); 
+                        this.cutinOverlay.classList.remove('fade-out'); 
+                        resolve();
+                    }, 500); 
+                }, 2000); 
+            } else {
+                resolve();
+            }
+        });
+    }
+    // ==========================================
 
     // ==========================================
     // ★ここから追加：画面のどこを触っても消せるメッセージの魔法！
