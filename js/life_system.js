@@ -28,7 +28,6 @@ class LifeSystem {
     // ★ 改名のチェック（毎年1月に行います）
     async checkNameChange() {
         const currentYear = this.game.year;
-        let messages = [];
 
         // 武将全員をチェックします（まだ登場していない人や亡くなった人も、内部的に名前は変えておきます）
         for (const b of this.game.bushos) {
@@ -54,12 +53,11 @@ class LifeSystem {
                         b.givenName = newGivenName;
                         b.name = newName;
 
-                        // すでにゲームに登場して生きている武将（activeかronin）なら、お知らせリストに入れます
+                        // すでにゲームに登場して生きている武将（activeかronin）なら、お知らせを出します
                         if (b.status === 'active' || b.status === 'ronin') {
-                            // ★ここを書き足し！：前の名前と違う時だけメッセージを出します
+                            // 前の名前と違う時だけメッセージを出します
                             if (oldName !== newName) {
-                                // ==========================================
-                                // ★ここを書き換え！：大名家に所属していたら「〇〇家の」と付けます！
+                                // 大名家に所属していたら「〇〇家の」と付けます
                                 let prefix = "";
                                 if (b.clan !== 0) {
                                     const currentClan = this.game.clans.find(c => c.id === b.clan);
@@ -68,7 +66,14 @@ class LifeSystem {
                                     }
                                 }
                                 
-                                messages.push(`${prefix}${oldName}は「${newName}」に改名しました。`);
+                                // ==========================================
+                                // ★ここが新しい魔法！：リストに溜め込まず、ここで直接画面に出します！
+                                const msg = `${prefix}${oldName}は「${newName}」に改名しました。`;
+                                this.game.ui.log(msg); // 履歴に残します
+                                
+                                // ★ここで「await（待て）」の魔法を使います！
+                                // プレイヤーが画面をクリックしてメッセージを閉じるまで、次の処理には絶対に進みません。
+                                await this.game.ui.showTapMessage(msg); 
                                 // ==========================================
                                 
                                 // もし大名だったら、大名家の名前も新しくします
@@ -77,22 +82,20 @@ class LifeSystem {
                                     if (clan) {
                                         const oldClanName = clan.name;
                                         clan.name = `${newFamilyName}家`;
-                                        messages.push(`当主の改名により、${oldClanName}は今後「${clan.name}」となります。`);
+                                        
+                                        // ==========================================
+                                        // ★大名家の名前が変わった時も、新しくメッセージを作って1回ずつ待ちます！
+                                        const clanMsg = `当主の改名により、${oldClanName}は今後「${clan.name}」となります。`;
+                                        this.game.ui.log(clanMsg);
+                                        await this.game.ui.showTapMessage(clanMsg);
+                                        // ==========================================
                                     }
                                 }
-                            } // ★if文の閉じカッコも忘れずに！
+                            }
                         }
                     }
                 }
             }
-        }
-
-        // お知らせメッセージが1つでもあれば、画面に表示します
-        if (messages.length > 0) {
-            const msgText = messages.join('\n');
-            this.game.ui.log(msgText); // ログ（履歴）にも残します
-            // ★ウインドウの外を押しても閉じる「いつものやつ（TapMessage）」で表示します！
-            await this.game.ui.showTapMessage(msgText); 
         }
     }
     
