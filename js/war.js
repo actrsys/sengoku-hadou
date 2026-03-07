@@ -1093,7 +1093,27 @@ class WarManager {
             // ★変更：城の所有者が変わる前に、古い大名家のIDをしっかり記憶しておきます！
             s.oldDefClanId = s.defender.ownerClan; 
             s.extinctionNotified = false; // フラグの初期化
-
+            
+            // ==========================================
+            // ★ここから追加：AI同士の戦争の結果メッセージを出して時間を止めます！
+            if (!s.isPlayerInvolved) {
+                const atkClanData = this.game.clans.find(c => c.id === s.attacker.ownerClan);
+                const defClanData = this.game.clans.find(c => c.id === s.oldDefClanId);
+                const atkDaimyoName = atkClanData ? atkClanData.name : (s.attacker.isKunishu ? s.attacker.name : "中立");
+                const defDaimyoName = defClanData ? defClanData.name : (s.defender.isKunishu ? s.defender.name : "中立");
+                
+                let resultMsg = "";
+                if (attackerWon) {
+                    resultMsg = `${atkDaimyoName}の${s.sourceCastle.name}が\n${defDaimyoName}の${s.defender.name}を攻め落としました！`;
+                } else {
+                    resultMsg = `${defDaimyoName}の${s.defender.name}が\n${atkDaimyoName}の攻撃を撃退しました！`;
+                }
+                
+                // どこを触っても消せるメッセージを表示します！
+                await this.game.ui.showTapMessage(resultMsg);
+            }
+            // ==========================================
+            
             // ★変更：順番待ちができるように async を付けます
             const finishWarProcess = async () => {
                 
