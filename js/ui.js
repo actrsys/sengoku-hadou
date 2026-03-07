@@ -1237,10 +1237,7 @@ class UIManager {
             this.selectorConfirmBtn.style.opacity = 1.0;
         }
     }
-    // （これより上には closeSelector という魔法があります）
-
-    // ==========================================
-    // ★ここを書き足し！：間違えて消えてしまったカットインの魔法を復活させます！
+    
     showCutin(msg) { 
         return new Promise((resolve) => {
             if (this.cutinMessage) this.cutinMessage.textContent = msg; 
@@ -1263,63 +1260,53 @@ class UIManager {
             }
         });
     }
-    // ==========================================
-
+    
     // ==========================================
     // ★ここから追加：画面のどこを触っても消せるメッセージの魔法！
     // ==========================================
     showTapMessage(msg) {
         return new Promise((resolve) => {
-            // メッセージを映すための「透明な下敷き（オーバーレイ）」を探します
             let overlay = document.getElementById('tap-message-overlay');
             
             // もし無かったら、新しく作ります！
             if (!overlay) {
                 overlay = document.createElement('div');
                 overlay.id = 'tap-message-overlay';
-                // 画面全体を覆うようにスタイル（見た目）を設定します
-                overlay.style.position = 'fixed';
-                overlay.style.top = '0';
-                overlay.style.left = '0';
-                overlay.style.width = '100vw';
-                overlay.style.height = '100vh';
-                overlay.style.backgroundColor = 'rgba(0, 0, 0, 0.6)'; // 少しだけ背景を暗くします
-                overlay.style.color = '#fff'; // 文字は白
-                overlay.style.display = 'flex';
-                overlay.style.flexDirection = 'column'; // 縦に並べる
-                overlay.style.alignItems = 'center';
-                overlay.style.justifyContent = 'center';
-                overlay.style.zIndex = '99999'; // 一番手前に出します！
-                overlay.style.fontSize = '1.5rem';
-                overlay.style.fontWeight = 'bold';
-                overlay.style.textAlign = 'center';
+                // ★書き換え：他の画面と同じ「modal」というクラス（見た目のルール）を使います
+                overlay.className = 'modal'; 
+                overlay.style.zIndex = '99999'; // 一番手前に出します
                 overlay.style.cursor = 'pointer';
                 document.body.appendChild(overlay);
             }
             
-            // 下敷きにメッセージを書きます
+            // ★書き換え：他の画面と同じ白いウィンドウ（modal-content）を使います
+            // pointer-events: none; をつけると、ウィンドウの真ん中を触っても判定がすり抜けて、
+            // 確実に「画面全体」のタッチとして反応するようになります！
             overlay.innerHTML = `
-                <div style="background-color: rgba(0, 0, 0, 0.8); padding: 20px 40px; border-radius: 10px; border: 2px solid #fff;">
-                    ${msg.replace(/\n/g, '<br>')}
-                    <div style="font-size:1rem; color:#aaa; margin-top:20px;">(画面をタッチして進む)</div>
+                <div class="modal-content" style="max-width: 450px; text-align: center; pointer-events: none;">
+                    <div style="font-size: 1.1rem; line-height: 1.5; font-weight: bold; color: #333; margin-bottom: 20px;">
+                        ${msg.replace(/\n/g, '<br>')}
+                    </div>
+                    <div style="font-size: 0.9rem; color: #888;">
+                        (画面をタッチして進む)
+                    </div>
                 </div>
             `;
             
-            // 隠していた下敷きを見えるようにします
+            // 隠していた画面を見えるようにします
             overlay.classList.remove('hidden');
-            overlay.style.display = 'flex';
 
             // 画面のどこかを触った時に発動する魔法（クリックの処理）
             const onClick = (e) => {
                 e.stopPropagation();
                 e.preventDefault();
-                overlay.style.display = 'none'; // メッセージを隠す
+                overlay.classList.add('hidden'); // 画面を隠します
                 overlay.removeEventListener('click', onClick); // クリックの魔法を解除
                 if (window.AudioManager) window.AudioManager.playSE('decision.ogg'); // 「決定」の音を鳴らす
                 resolve(); // 止めていた時間を動かします！
             };
             
-            // 下敷きにクリックの魔法をセット！
+            // クリックの魔法をセット！
             overlay.addEventListener('click', onClick);
         });
     }
