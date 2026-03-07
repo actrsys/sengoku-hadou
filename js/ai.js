@@ -778,21 +778,26 @@ class AIEngine {
 
             // ★追加 12. 褒美（承認欲求がたまっている、または忠誠度が低い武将がいる場合）
             let rewardTargets = [];
+            // ★追加：選ばれた人の中で「一番低い忠誠度」を覚えておく箱です！
+            let minLoyaltyForReward = 100;
+            
             const castleBushos = this.game.getCastleBushos(castle.id).filter(b => b.status !== 'ronin' && b.belongKunishuId === 0);
             
             for (let b of castleBushos) {
                 // ① 承認欲求(recognitionNeed)がたまっている場合
-                if ((b.recognitionNeed || 0) > 30) { // ★修正：箱の名前を正しい recognitionNeed に直しました！
+                if ((b.recognitionNeed || 0) > 30) { 
                     rewardTargets.push(b);
+                    // 忠誠度の低さをチェックして箱を更新します
+                    if (b.loyalty < minLoyaltyForReward) minLoyaltyForReward = b.loyalty;
                     continue; // この人はもうリストに入れたので、次の人へ
                 }
                 
-                // ② 忠誠度が90以下の場合（サイコロを振って対象にする魔法です！）
-                if (b.loyalty <= 90) {
-                    // ★修正：確率を全体的に「半分」にしました！(90で0.25%、70以下で5%)
-                    let prob = 5; // 70以下の時は問答無用で5%
+                // ② 忠誠度が95以下の場合（サイコロを振って対象にする魔法です！）
+                if (b.loyalty <= 95) {
+                    // ★修正：確率を全体的に上げました！(95で0.5%、70以下で10%)
+                    let prob = 10; // 70以下の時は問答無用で10%
                     if (b.loyalty > 70) {
-                        prob = 0.25 + ((90 - b.loyalty) / 20) * 4.75; 
+                        prob = 0.5 + ((95 - b.loyalty) / 25) * 9.5; 
                     }
                     
                     // 2. お殿様（大名）の義理(duty)による確率の増減
@@ -800,9 +805,9 @@ class AIEngine {
                     const dutyMod = (daimyo.duty - 50) * 0.1;
                     
                     // 3. お殿様との相性(affinity)による確率の増減
-                    // ★修正：差が0(ピッタリ)なら10%アップ、差が50(真逆)なら10%ダウンします！
+                    // 差が0(ピッタリ)なら10%アップ、差が50(真逆)なら10%ダウンします
                     const diff = GameSystem.calcAffinityDiff(daimyo.affinity, b.affinity);
-                    const affinityMod = (25 - diff) * 0.4; // ★ここの数字を 0.1 から 0.4 にしました！
+                    const affinityMod = (25 - diff) * 0.4; 
                     
                     // 全部を足して最終的な確率を出します
                     let finalProb = prob + dutyMod + affinityMod;
@@ -810,13 +815,23 @@ class AIEngine {
                     // 確率のサイコロを振ります！（100面ダイス）
                     if (Math.random() * 100 < finalProb) {
                         rewardTargets.push(b);
+                        if (b.loyalty < minLoyaltyForReward) minLoyaltyForReward = b.loyalty;
                     }
                 }
             }
 
             if (rewardTargets.length > 0 && castle.gold >= 100) {
-                // 優先度は低め（15点）にしてあります
-                actions.push({ type: 'reward', stat: 'none', score: 15, cost: 100, targets: rewardTargets });
+                // ★修正：一番忠誠度が低い武将に合わせて、優先度スコア（やりたさ）を計算します！
+                // 忠誠95なら1点、60以下なら40点になります。
+                let rewardScore = 15; // 承認欲求だけで選ばれた時などの基本点です
+                if (minLoyaltyForReward <= 60) {
+                    rewardScore = 40; // 60以下なら最優先の40点！
+                } else if (minLoyaltyForReward <= 95) {
+                    // 60〜95の間を、点数がなめらかに変わるように計算する魔法です！
+                    rewardScore = 1 + ((95 - minLoyaltyForReward) / 35) * 39;
+                }
+                
+                actions.push({ type: 'reward', stat: 'none', score: rewardScore, cost: 100, targets: rewardTargets });
             }
 
             // 点数が高い順に並べ替えます
