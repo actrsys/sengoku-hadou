@@ -24,6 +24,13 @@ class AIEngine {
         this.game = game;
     }
 
+    // ★追加：大名の威信（daimyoPrestige）を取り出す魔法です！
+    getClanPrestige(clanId) {
+        if (clanId === 0) return 0;
+        const clan = this.game.clans.find(c => c.id === clanId);
+        return clan ? Math.max(1, clan.daimyoPrestige) : 1;
+    }
+
     getDifficultyMods() {
         const diff = window.AIParams.AI.Difficulty || 'normal';
         switch(diff) {
@@ -46,7 +53,9 @@ class AIEngine {
 
     execAI(castle) {
         try {
-            // ★書き換え！：自分の城で、かつ「委任されていない（直轄）」の時だけプレイヤーに操作を戻します
+            // ★AIが考え始める前に、すべての大名の威信を最新にします！
+            this.game.updateAllClanPrestige();
+            // ★自分の城で、かつ「委任されていない（直轄）」の時だけプレイヤーに操作を戻します
             if (Number(castle.ownerClan) === Number(this.game.playerClanId) && !castle.isDelegated) {
                 console.warn("AI Alert: Player castle detected in AI routine. Returning control to player.");
                 this.game.isProcessingAI = false;
@@ -60,7 +69,7 @@ class AIEngine {
                 return; 
             }
             
-            // ★追加：大名のお引越し（特殊な移動処理）の魔法！
+            // ★大名のお引越し（特殊な移動処理）の魔法！
             // 自分がお殿様（大名）で、性格が「好戦的（aggressive）」ではない場合だけ発動します
             if (castellan.isDaimyo && castellan.personality !== 'aggressive') {
                 // 道が繋がっている自分の城をぜんぶ探します
@@ -266,7 +275,7 @@ class AIEngine {
         const requiredRice = Math.floor(sendSoldiers * 1.5);
         if (myCastle.rice < requiredRice) return null;
 
-        // --- 修正後：正確な見積もりと戦力比の計算 ---
+        // --- 修正後：正確な見積もりと戦闘力比の計算 ---
 
         const myDaimyo = this.game.bushos.find(b => b.clan === myCastle.ownerClan && b.isDaimyo) || { personality: 'normal' };
 
@@ -274,9 +283,9 @@ class AIEngine {
         // ★新規追加：周囲の敵対大名をすべて調べて、それぞれの警戒度を計算します！
         const myClanId = myCastle.ownerClan;
         const myClanCastles = this.game.castles.filter(c => c.ownerClan === myClanId);
-        const myTotalPower = this.game.getClanTotalSoldiers(myClanId) || 1;
+        const myTotalPower = this.getClanPrestige(myClanId);
         
-        // ★追加：見積もりをする人（評価者）の智謀を決めます
+        // ★見積もりをする人（評価者）の智謀を決めます
         // プレイヤーの委任城なら「城主（myGeneral）」、敵AIなら「大名（myDaimyo）」の智謀を使います
         let evaluatorInt = 50;
         if (myClanId === this.game.playerClanId) {
@@ -303,14 +312,14 @@ class AIEngine {
             
             // 同盟などの保護関係になければ警戒対象！
             if (!isProtected) {
-                const trueEnemyPower = this.game.getClanTotalSoldiers(clanId) || 0;
+                const trueEnemyPower = this.getClanPrestige(clanId);
                 
-                // ★追加：智謀によって敵の戦力を見誤る魔法（智謀95以上ならほぼ正確！）
+                // ★智謀によって敵の威信を見誤る魔法（智謀95以上ならほぼ正確！）
                 const errorRange = Math.min(0.3, Math.max(0, (100 - evaluatorInt) / 100 * 0.3));
                 const errorRate = 1.0 + (Math.random() - 0.5) * 2 * errorRange;
                 const perceivedEnemyPower = trueEnemyPower * errorRate;
                 
-                // 見積もった戦力で倍率を計算します
+                // 見積もった威信で倍率を計算します
                 const powerRatio = perceivedEnemyPower / myTotalPower;
                 let penalty = 0;
                 // 0.8倍から警戒しはじめ、2.5倍で警戒心マックスになります
@@ -320,7 +329,7 @@ class AIEngine {
                     penalty = cautionLevel * 25; 
                 }
                 if (penalty > 0) {
-                    // ★powerには「見誤った戦力」を入れておき、後で一番脅威に感じた敵を選べるようにします
+                    // ★powerには「見誤った威信」を入れておき、後で一番脅威に感じた敵を選べるようにします
                     adjacentEnemyClans.push({ clanId: clanId, penalty: penalty, power: perceivedEnemyPower });
                 }
             }
@@ -387,10 +396,10 @@ class AIEngine {
             
             let prob = 0;
             if (forceRatio < 0.8) {
-                // ★足切り魔法：自分の戦力が相手の0.8倍未満なら、絶対に攻撃しない！
+                // ★足切り魔法：自分の総兵力が相手の0.8倍未満なら、絶対に攻撃しない！
                 prob = -999;
             } else if (forceRatio >= 3.0) {
-                // 相手の3倍以上の戦力がある時
+                // 相手の3倍以上の総兵力がある時
                 prob = 40 + (forceRatio - 3.0) * 5;
             } else if (forceRatio >= 2.0) {
                 // 相手の2倍から3倍までの時
@@ -444,14 +453,14 @@ class AIEngine {
             });
             prob -= totalCautionPenalty;
             
-            // ★新しく戦線を広げる場合、周辺大名と戦力を比較して弱いところを狙う魔法！
+            // ★新しく戦線を広げる場合、周辺大名と威信を比較して弱いところを狙う魔法！
             // まだ「敵対」していない相手で、空き城(0)ではない場合だけ発動します
             if (target.ownerClan !== 0 && rel.status !== '敵対') {
-                // ターゲットの大名家全体の兵力を取得します（さっき智謀で見誤った値を使います）
+                // ターゲットの大名家全体の威信を取得します（さっき智謀で見誤った値を使います）
                 const targetData = adjacentEnemyClans.find(e => e.clanId === target.ownerClan);
-                const perceivedTargetPower = targetData ? targetData.power : (this.game.getClanTotalSoldiers(target.ownerClan) || 1);
+                const perceivedTargetPower = targetData ? targetData.power : this.getClanPrestige(target.ownerClan);
 
-                // 周り（自分の領地に隣り合っている）の大名たちの「平均戦力」を計算します
+                // 周り（自分の領地に隣り合っている）の大名たちの「平均威信」を計算します
                 let totalPower = 0;
                 let count = 0;
                 adjacentEnemyClans.forEach(e => {
@@ -1227,7 +1236,7 @@ class AIEngine {
         
         const uniqueNeighbors = [...new Set(neighbors.map(c => c.ownerClan))];
         const myClanId = castle.ownerClan;
-        const myPower = this.game.getClanTotalSoldiers(myClanId) || 1;
+        const myPower = this.getClanPrestige(myClanId);
         const myDaimyo = this.game.bushos.find(b => b.clan === myClanId && b.isDaimyo) || { duty: 50, intelligence: 50 };
 
         // ★ここから追加：現在仲良くしている（同盟・支配・従属）大名家の数を数えます
@@ -1261,9 +1270,9 @@ class AIEngine {
             const rel = this.game.getRelation(myClanId, clanId);
             const isProtected = rel && ['同盟', '支配', '従属'].includes(rel.status);
             
-            // 同盟などの保護関係になければ、どれくらい怖いか（兵力）を予想します
+            // 同盟などの保護関係になければ、どれくらい怖いか（威信）を予想します
             if (!isProtected) {
-                const trueEnemyPower = this.game.getClanTotalSoldiers(clanId) || 0;
+                const trueEnemyPower = this.getClanPrestige(clanId);
                 const errorRange = Math.min(0.3, Math.max(0, (100 - evaluatorInt) / 100 * 0.3));
                 const errorRate = 1.0 + (Math.random() - 0.5) * 2 * errorRange;
                 const perceivedEnemyPower = trueEnemyPower * errorRate;
@@ -1272,7 +1281,7 @@ class AIEngine {
             }
         });
 
-        // 怖い順（戦力が多い順）に並べ替えます
+        // 怖い順（威信が高い順）に並べ替えます
         enemyThreats.sort((a, b) => b.power - a.power);
         const mainThreatId = enemyThreats.length > 0 ? enemyThreats[0].clanId : 0; // ★追加：一番怖い敵を覚えておきます
 
@@ -1339,9 +1348,9 @@ class AIEngine {
         for (let targetClanId of orderedTargets) {
             if (castellan.isActionDone) break;
 
-            const targetClanTotal = this.game.getClanTotalSoldiers(targetClanId) || 1;
+            const targetClanTotal = this.getClanPrestige(targetClanId);
             
-            // さっき計算した「見誤った戦力」を使います
+            // さっき計算した「見誤った威信」を使います
             const threatData = enemyThreats.find(t => t.clanId === targetClanId);
             const perceivedTargetTotal = threatData ? threatData.power : targetClanTotal;
 
@@ -1375,7 +1384,7 @@ class AIEngine {
                  continue;
             }
 
-            // 相手の戦力が自分の1/8以下なら、稀に支配を試みます
+            // 相手の威信が自分の1/8以下なら、稀に支配を試みます
             if (targetClanTotal * 8 <= myPower) {
                 if (Math.random() < 0.05) { 
                     if (targetClanId === this.game.playerClanId) {
@@ -1439,7 +1448,7 @@ class AIEngine {
                              if (isStrategicPartner) { 
                                  skipProb -= 30; 
                              }
-                             // ★追加：直接敵対している大名には、親善の確率をガクッと落とします！
+                             // ★直接敵対している大名には、親善の確率をガクッと落とします！
                              if (rel.status === '敵対' && !isStrategicPartner) { 
                                  skipProb += 60; 
                              }
@@ -1449,7 +1458,7 @@ class AIEngine {
                              }
                          }
 
-                         // ★修正：戦略的パートナーなら、戦力に関わらず親善を諦めないようにします
+                         // ★戦略的パートナーなら、威信に関わらず親善を諦めないようにします
                          if (!willGoodwill || (rel.sentiment <= 30 && ratio < 3.0 && !isStrategicPartner)) {
                              // 何もしないで諦める
                          } else {
