@@ -58,7 +58,18 @@ class LifeSystem {
                         if (b.status === 'active' || b.status === 'ronin') {
                             // ★ここを書き足し！：前の名前と違う時だけメッセージを出します
                             if (oldName !== newName) {
-                                messages.push(`${oldName}は「${newName}」に改名しました。`);
+                                // ==========================================
+                                // ★ここを書き換え！：大名家に所属していたら「〇〇家の」と付けます！
+                                let prefix = "";
+                                if (b.clan !== 0) {
+                                    const currentClan = this.game.clans.find(c => c.id === b.clan);
+                                    if (currentClan) {
+                                        prefix = `${currentClan.name}の`;
+                                    }
+                                }
+                                
+                                messages.push(`${prefix}${oldName}は「${newName}」に改名しました。`);
+                                // ==========================================
                                 
                                 // もし大名だったら、大名家の名前も新しくします
                                 if (b.isDaimyo && b.clan !== 0) {
