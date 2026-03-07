@@ -72,7 +72,7 @@ class IndependenceSystem {
         // 城主(castellan)と大名(daimyo)の家族ID(familyIds)に共通のものがあるか調べます
         const isFamily = castellan.familyIds.some(id => daimyo.familyIds.includes(id));
         if (isFamily) {
-            prob = prob * 0.1; // 一門なら、独立する確率を10分の1（0.1倍）に減らします！
+            prob = prob * 0.7; // 一門なら、独立する確率を７０％に減らします！
         }
         
         if (prob <= 0) return;

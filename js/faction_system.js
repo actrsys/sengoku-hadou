@@ -100,7 +100,20 @@ class FactionSystem {
 
         // ★修正：forEach をやめて、順番待ちができる for...of に変えます！
         for (const b of roninCandidates) {
-            const chance = roninChanceBase - (b.loyalty * 0.01); 
+            let chance = roninChanceBase - (b.loyalty * 0.01); 
+            
+            // ★ここから書き足し：大名と一門なら下野しにくくする魔法！
+            // まずは自分の仕えている大名（殿様）を探します
+            const daimyo = this.game.bushos.find(db => db.clan === b.clan && db.isDaimyo);
+            if (daimyo) {
+                // 自分と大名の家族ID(familyIds)に共通のものがあるか調べます
+                const isFamily = b.familyIds.some(id => daimyo.familyIds.includes(id));
+                if (isFamily) {
+                    chance = chance * 0.7; // 一門なら、下野する確率を70％に減らします！
+                }
+            }
+            // ★書き足しここまで！
+
             if (Math.random() < chance) {
                 await this.executeRonin(b); // ★ await を追加します！
             }
