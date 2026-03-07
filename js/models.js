@@ -17,7 +17,15 @@ class Clan {
         // 大名の戦力（威信）を覚えておく箱です
         this.daimyoPrestige = Number(data.daimyoPrestige || 0);
         
-        // CSVの initDiplomacy を翻訳して、外交の箱に入れます
+        // CSVから「3000|征夷大将軍」のような官位のデータを読み込みます
+        // （何も書かれていない場合は、プラス0の「なし」にします）
+        this.courtRank = data.courtRank || "0|なし"; 
+        
+        // 「|」で真っ二つに割って、左側を数字に、右側を文字にします
+        const rankParts = this.courtRank.split('|');
+        this.courtRankBonus = Number(rankParts[0]) || 0; // 足し算するボーナス値（デフォルトは0）
+        this.courtRankName = rankParts[1] || "なし";      // 役職の名前
+        
         // CSVの initDiplomacy を翻訳して、外交の箱に入れます
         if (typeof data.initDiplomacy === 'string' && data.initDiplomacy.trim() !== "") {
             const parts = data.initDiplomacy.split('|');

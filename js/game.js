@@ -824,7 +824,7 @@ class GameManager {
     isCastleVisible(castle) { if (Number(castle.ownerClan) === Number(this.playerClanId)) return true; if (castle.investigatedUntil >= this.getCurrentTurnId()) return true; return false; }
     
     // ==========================================
-    // ★全ての大名の「戦力（daimyoPrestige）」を計算して箱に入れる魔法です
+    // ★全ての大名の「威信（daimyoPrestige）」を計算して箱に入れる魔法です
     updateAllClanPrestige() {
         this.clans.forEach(clan => {
             if (clan.id === 0) return; // 空き家（中立）は計算しません
@@ -837,8 +837,13 @@ class GameManager {
                 gold += c.gold; 
                 rice += c.rice; 
             });
-            // 今まで大名一覧で計算していた式をそのまま使って、大名の箱にしまいます
-            clan.daimyoPrestige = Math.floor(pop / 2000) + Math.floor(sol / 20) + Math.floor(koku / 20) + Math.floor(gold / 50) + Math.floor(rice / 100);
+            
+            // まずは今まで通り、兵士やお金から「基本の威信」を計算します
+            const basePrestige = Math.floor(pop / 2000) + Math.floor(sol / 20) + Math.floor(koku / 20) + Math.floor(gold / 50) + Math.floor(rice / 100);
+            
+            // そして最後に、官位の「ボーナス値」を足し算して、大名の箱にしまいます！
+            clan.daimyoPrestige = basePrestige + (clan.courtRankBonus || 0);
+            
         });
     }
     // ==========================================
