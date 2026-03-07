@@ -1214,7 +1214,7 @@ body.is-pc #ai-guard {
 /* 大名一覧（スマホ用） */
 .daimyo-list-header, .daimyo-list-item {
     display: grid;
-    /* ★変更：城数(1fr)を狭く、戦力・友好度(1.5fr)を広く取りました */
+    /* ★変更：城数(1fr)を狭く、威信・友好度(1.5fr)を広く取りました */
     grid-template-columns: 2fr 2fr 1fr 1.5fr 1.5fr 1fr;
     font-size: clamp(0.65rem, 2.5vw, 0.9rem);
     padding: 0; min-height: 30px; gap: 0;
@@ -1500,7 +1500,7 @@ body.is-pc .faction-list-container { scroll-padding-top: 38px; }
     display: none;               /* Chrome, Safari, スマホブラウザ用 */
 }
 /* =========================================================
-   ★ 戦力・友好度のゲージバーを描く魔法
+   ★ 威信・友好度のゲージバーを描く魔法
    ========================================================= */
 .bar-bg {
     width: 90%; /* 枠いっぱいにならないように少し余裕を持たせます */
@@ -1517,7 +1517,7 @@ body.is-pc .faction-list-container { scroll-padding-top: 38px; }
     transition: width 0.3s ease; /* ゲージが伸びる時にスッと動くアニメーション */
 }
 
-/* 戦力ゲージ（背景: 黒茶、ゲージ: 青緑） */
+/* 威信ゲージ（背景: 黒茶、ゲージ: 青緑） */
 .bar-bg-power {
     background-color: #3e2723; /* 暗い黒茶色 */
 }
