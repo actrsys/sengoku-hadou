@@ -1268,27 +1268,27 @@ class UIManager {
         return new Promise((resolve) => {
             let overlay = document.getElementById('tap-message-overlay');
             
-            // もし無かったら、新しく作ります！
             if (!overlay) {
                 overlay = document.createElement('div');
                 overlay.id = 'tap-message-overlay';
-                // ★書き換え：他の画面と同じ「modal」というクラス（見た目のルール）を使います
                 overlay.className = 'modal'; 
-                overlay.style.zIndex = '99999'; // 一番手前に出します
+                overlay.style.zIndex = '99999';
                 overlay.style.cursor = 'pointer';
                 document.body.appendChild(overlay);
             }
             
-            // ★書き換え：他の画面と同じ白いウィンドウ（modal-content）を使います
-            // pointer-events: none; をつけると、ウィンドウの真ん中を触っても判定がすり抜けて、
-            // 確実に「画面全体」のタッチとして反応するようになります！
+            // ★書き換え：いつもの「閉じる」ボタンをつけました！
+            // 以前つけていた「pointer-events: none」を外して、ボタンを押せるようにしています。
             overlay.innerHTML = `
-                <div class="modal-content" style="max-width: 450px; text-align: center; pointer-events: none;">
-                    <div style="font-size: 1.1rem; line-height: 1.5; font-weight: bold; color: #333; margin-bottom: 20px;">
+                <div class="modal-content" style="max-width: 450px; text-align: center;">
+                    <div style="font-size: 1.1rem; line-height: 1.5; font-weight: bold; color: #333; margin-bottom: 20px; padding-top: 10px;">
                         ${msg.replace(/\n/g, '<br>')}
                     </div>
-                    <div style="font-size: 0.9rem; color: #888;">
-                        (画面をタッチして進む)
+                    <div class="modal-footer" style="justify-content: center; border-top: none; padding-bottom: 0;">
+                        <button class="btn-primary">閉じる</button>
+                    </div>
+                    <div style="font-size: 0.85rem; color: #888; margin-top: 15px;">
+                        (画面のどこをタッチしても進めます)
                     </div>
                 </div>
             `;
@@ -1302,7 +1302,14 @@ class UIManager {
                 e.preventDefault();
                 overlay.classList.add('hidden'); // 画面を隠します
                 overlay.removeEventListener('click', onClick); // クリックの魔法を解除
-                if (window.AudioManager) window.AudioManager.playSE('decision.ogg'); // 「決定」の音を鳴らす
+                
+                // ★書き換え：ボタンを押した時は共通の魔法で音が鳴るので、
+                // 「ボタン以外の場所（背景など）」を押した時だけ、ここで音を鳴らすようにしました！
+                const isButton = e.target.closest('button');
+                if (!isButton && window.AudioManager) {
+                    window.AudioManager.playSE('decision.ogg'); 
+                }
+                
                 resolve(); // 止めていた時間を動かします！
             };
             
