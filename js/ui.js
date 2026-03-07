@@ -797,11 +797,11 @@ class UIManager {
     }
     
     showDaimyoList() {
-        let listHtml = '<div class="daimyo-list-container"><div class="daimyo-list-header"><span>大名家名</span><span>当主名</span><span>城数</span><span>戦力</span><span>友好度</span><span>関係</span></div>';
+        let listHtml = '<div class="daimyo-list-container"><div class="daimyo-list-header"><span>大名家名</span><span>当主名</span><span>城数</span><span>威信</span><span>友好度</span><span>関係</span></div>';
         
         const activeClans = this.game.clans.filter(c => c.id !== 0 && this.game.castles.some(cs => cs.ownerClan === c.id));
         
-        // 念のため、一覧を開く直前にも最新の戦力を計算し直しておきます
+        // 念のため、一覧を開く直前にも最新の威信を計算し直しておきます
         this.game.updateAllClanPrestige();
         
         const clanDataList = activeClans.map(clan => {
