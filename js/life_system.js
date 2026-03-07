@@ -12,6 +12,7 @@ class LifeSystem {
     async processStartMonth() {
         if (this.game.month === 1) {
             await this.checkBirth();
+            await this.checkNameChange(); // ★この行を書き足しました！
         }
     }
 
@@ -19,6 +20,74 @@ class LifeSystem {
     async processEndMonth() {
         await this.checkDeath();
     }
+
+    // ==========================================
+    // ★↓↓ここから下を、まるごと書き足します！↓↓★
+    // ==========================================
+    
+    // ★ 改名のチェック（毎年1月に行います）
+    async checkNameChange() {
+        const currentYear = this.game.year;
+        let messages = [];
+
+        // 武将全員をチェックします（まだ登場していない人や亡くなった人も、内部的に名前は変えておきます）
+        for (const b of this.game.bushos) {
+            if (!b.nameChange) continue;
+
+            // 「|」で区切られている複数の改名予定を一つずつ確認します
+            const changes = b.nameChange.split('|');
+            for (const change of changes) {
+                const parts = change.split(':');
+                if (parts.length === 3) {
+                    const targetYear = Number(parts[0].trim());
+                    
+                    // 今の年が、改名する年と一致したら…
+                    if (targetYear === currentYear) {
+                        const newFamilyName = parts[1].trim(); // 新しい姓
+                        const newGivenName = parts[2].trim();  // 新しい名
+                        
+                        const oldName = b.name; // 今の名前をメモしておきます
+                        const newName = newFamilyName + newGivenName; // 新しいフルネーム
+
+                        // 名前データを書き換えます！
+                        b.familyName = newFamilyName;
+                        b.givenName = newGivenName;
+                        b.name = newName;
+
+                        // すでにゲームに登場して生きている武将（activeかronin）なら、お知らせリストに入れます
+                        if (b.status === 'active' || b.status === 'ronin') {
+                            // ★ここを書き足し！：前の名前と違う時だけメッセージを出します
+                            if (oldName !== newName) {
+                                messages.push(`${oldName}は「${newName}」に改名しました。`);
+                                
+                                // もし大名だったら、大名家の名前も新しくします
+                                if (b.isDaimyo && b.clan !== 0) {
+                                    const clan = this.game.clans.find(c => c.id === b.clan);
+                                    if (clan) {
+                                        const oldClanName = clan.name;
+                                        clan.name = `${newFamilyName}家`;
+                                        messages.push(`当主の改名により、${oldClanName}は今後「${clan.name}」となります。`);
+                                    }
+                                }
+                            } // ★if文の閉じカッコも忘れずに！
+                        }
+                    }
+                }
+            }
+        }
+
+        // お知らせメッセージが1つでもあれば、画面に表示します
+        if (messages.length > 0) {
+            const msgText = messages.join('\n');
+            this.game.ui.log(msgText); // ログ（履歴）にも残します
+            // ★ウインドウの外を押しても閉じる「いつものやつ（TapMessage）」で表示します！
+            await this.game.ui.showTapMessage(msgText); 
+        }
+    }
+    
+    // ==========================================
+    // ★↑↑書き足すのはここまで！↑↑★
+    // ==========================================
 
     // ★ 登場のチェック（毎年1月に行います）
     async checkBirth() {
