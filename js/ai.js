@@ -400,12 +400,7 @@ class AIEngine {
                 // 相手の0.8倍から互角までの時
                 prob = (forceRatio - 0.8) * 50;
             }
-
-            // ★大魔法：最終的な確率に0.04をかけて、全体の４％まで落とします！
-            if (prob > 0) {
-                prob = prob * 0.04;
-            }
-
+            
             // 守備側武将の能力による攻撃確率低下 (最大10%)
             const enemyBushos = this.game.getCastleBushos(target.id);
             let maxLdr = 0, maxInt = 0;
@@ -484,8 +479,8 @@ class AIEngine {
             if (target.adjacentCastleIds) {
                 isDirectlyAdjacent = target.adjacentCastleIds.some(adjId => {
                     const adjCastle = this.game.getCastle(adjId);
-                    // ★修正：clan.id ではなく castle.ownerClan を使って迷子エラーを防ぎます！
-                    return adjCastle && adjCastle.ownerClan === castle.ownerClan;
+                    // ★修正：castle ではなく myCastle に直しました！
+                    return adjCastle && adjCastle.ownerClan === myCastle.ownerClan;
                 });
             }
 
@@ -501,9 +496,16 @@ class AIEngine {
             // 攻撃確率の最大値設定
             const maxProb = rel.status === '敵対' ? 40 : 20;
             
-            // 最大値と最小値の適用
+            // 最大値の適用
             prob = Math.min(prob, maxProb);
-            prob = Math.max(0, prob); // ★ここを0.1から0に変えました！
+
+            // ★ここにお引っ越し！すべての引き算が終わった最後に４％の魔法をかけます！
+            if (prob > 0) {
+                prob = prob * 0.04;
+            }
+
+            // 最小値の適用（マイナスになっていたらゼロにします）
+            prob = Math.max(0, prob); 
 
             // ★大魔法：空き城の時は、攻め込むハードルを3倍（確率を3分の1）にします！
             if (target.ownerClan === 0) {
