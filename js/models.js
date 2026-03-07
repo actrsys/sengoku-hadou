@@ -144,7 +144,7 @@ class Busho {
         this.birthYear = Number(data.birthYear || 1500); // 生年（空なら1500）
         this.endYear = Number(data.endYear || 1650);     // 没年（空なら1650）
         this.startYear = Number(data.startYear || 1500); // 登場年（空なら1500）
-
+        this.nameChange = data.nameChange || ""; // 年:姓:名|年:姓:名... の形式の改名データ
         // ★【ここから書き足し：一門設定】
         // familyId が「1|2|3」のように届くので、使いやすいようにバラバラのリスト（配列）にします
         if (typeof data.familyId === 'string' && data.familyId.trim() !== "") {

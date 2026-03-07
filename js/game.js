@@ -127,20 +127,49 @@ class DataManager {
         return text;
     }
     
-    // ★ 変更：ゲーム開始時の状態を作る魔法です！
+    // ★ゲーム開始時の状態を作る魔法です！
     static joinData(clans, castles, bushos) {
         const startYear = window.MainParams.StartYear; // 今のシナリオの開始年（例：1560年）
         
         castles.forEach(c => c.samuraiIds = []);
         bushos.forEach(b => {
-            // ★【ここから追加】ゲーム開始時点で既に寿命を迎えている（昔に亡くなっている）武将の処理です！
+            // ==========================================
+            // ★ゲーム開始時点で「すでに改名しているはず」の武将の名前を変えておく魔法です！
+            if (b.nameChange) {
+                const changes = b.nameChange.split('|');
+                let latestYear = -1;
+                let latestFamilyName = "";
+                let latestGivenName = "";
+
+                for (const change of changes) {
+                    const parts = change.split(':');
+                    if (parts.length === 3) {
+                        const targetYear = Number(parts[0].trim());
+                        // ゲーム開始年「以前」に起きた改名イベントの中で、一番新しいものを探します
+                        if (targetYear <= startYear && targetYear > latestYear) {
+                            latestYear = targetYear;
+                            latestFamilyName = parts[1].trim();
+                            latestGivenName = parts[2].trim();
+                        }
+                    }
+                }
+
+                // もし改名データが見つかったら、最初からその名前にしておきます！
+                if (latestYear !== -1) {
+                    b.familyName = latestFamilyName;
+                    b.givenName = latestGivenName;
+                    b.name = latestFamilyName + latestGivenName;
+                }
+            }
+            
+            // ★ゲーム開始時点で既に寿命を迎えている（昔に亡くなっている）武将の処理です！
             if (b.endYear < startYear) {
                 b.status = 'dead'; // 「死亡」の印をつけます
                 b.isDaimyo = false;
                 b.isCastellan = false;
                 // 既に亡くなっているので、お城の中には入れません！
             }
-            // ★【追加ここまで】以下は「else if」に変えました！
+            
             // もし武将の「登場年」が「開始年」よりも未来だったら…（まだ生まれてない、または元服前）
             else if (b.startYear > startYear) {
                 b.status = 'unborn'; // 「未登場」の印をつけます
@@ -151,7 +180,11 @@ class DataManager {
             } else {
                 // 既に登場している武将は、いつも通りの準備をします
                 const clan = clans.find(cl => Number(cl.leaderId) === Number(b.id));
-                if (clan) b.isDaimyo = true;
+                if (clan) {
+                    b.isDaimyo = true;
+                    // ★\大名の名前が変わっていたら、大名家の名前も自動で「〇〇家」に合わせます！
+                    clan.name = b.familyName + "家";
+                }
                 const castleAsCastellan = castles.find(cs => Number(cs.castellanId) === Number(b.id));
                 if (castleAsCastellan) b.isCastellan = true;
                 
