@@ -75,7 +75,16 @@ class UIManager {
 
         this.onResultModalClose = null;
 
-        if (this.resultModal) this.resultModal.addEventListener('click', (e) => { if (e.target === this.resultModal) this.closeResultModal(); });
+        // ★結果画面の外側（黒い背景）を押して閉じた時にも音が鳴る
+        if (this.resultModal) {
+            this.resultModal.addEventListener('click', (e) => { 
+                if (e.target === this.resultModal) { 
+                    if (window.AudioManager) window.AudioManager.playSE('cancel.ogg'); 
+                    this.closeResultModal(); 
+                } 
+            });
+        }
+        
         if (this.mapZoomInBtn) {
             this.mapZoomInBtn.onclick = (e) => { e.stopPropagation(); this.changeMapZoom(1); };
         }
@@ -1262,7 +1271,7 @@ class UIManager {
     }
     
     // ==========================================
-    // ★ここから追加：画面のどこを触っても消せるメッセージの魔法！
+    // ★ここから追加：メッセージの魔法！
     // ==========================================
     showTapMessage(msg) {
         return new Promise((resolve) => {
@@ -1271,49 +1280,48 @@ class UIManager {
             if (!overlay) {
                 overlay = document.createElement('div');
                 overlay.id = 'tap-message-overlay';
-                overlay.className = 'modal'; 
+                overlay.className = 'modal'; // 他の画面と同じ黒い下敷きを使います
                 overlay.style.zIndex = '99999';
-                overlay.style.cursor = 'pointer';
                 document.body.appendChild(overlay);
             }
             
-            // ★書き換え：いつもの「閉じる」ボタンをつけました！
-            // 以前つけていた「pointer-events: none」を外して、ボタンを押せるようにしています。
+            // 白いウィンドウの中に、メッセージと「閉じる」ボタンを置きます
             overlay.innerHTML = `
                 <div class="modal-content" style="max-width: 450px; text-align: center;">
                     <div style="font-size: 1.1rem; line-height: 1.5; font-weight: bold; color: #333; margin-bottom: 20px; padding-top: 10px;">
                         ${msg.replace(/\n/g, '<br>')}
                     </div>
                     <div class="modal-footer" style="justify-content: center; border-top: none; padding-bottom: 0;">
-                        <button class="btn-primary">閉じる</button>
-                    </div>
-                    <div style="font-size: 0.85rem; color: #888; margin-top: 15px;">
-                        (画面のどこをタッチしても進めます)
+                        <button class="btn-primary" id="tap-msg-close-btn">閉じる</button>
                     </div>
                 </div>
             `;
             
-            // 隠していた画面を見えるようにします
             overlay.classList.remove('hidden');
 
-            // 画面のどこかを触った時に発動する魔法（クリックの処理）
             const onClick = (e) => {
-                e.stopPropagation();
-                e.preventDefault();
-                overlay.classList.add('hidden'); // 画面を隠します
-                overlay.removeEventListener('click', onClick); // クリックの魔法を解除
-                
-                // ★書き換え：ボタンを押した時は共通の魔法で音が鳴るので、
-                // 「ボタン以外の場所（背景など）」を押した時だけ、ここで音を鳴らすようにしました！
-                const isButton = e.target.closest('button');
-                if (!isButton && window.AudioManager) {
-                    window.AudioManager.playSE('decision.ogg'); 
+                // ウィンドウの「外側（黒い背景）」か、「閉じるボタン」を押したか調べます
+                const isBackground = (e.target === overlay);
+                const isCloseBtn = (e.target.id === 'tap-msg-close-btn');
+
+                // 外側かボタンを押した時だけ、画面を閉じる魔法を発動します！
+                if (isBackground || isCloseBtn) {
+                    e.stopPropagation();
+                    e.preventDefault();
+                    overlay.classList.add('hidden');
+                    overlay.removeEventListener('click', onClick);
+                    
+                    // 背景を押して閉じた時だけ、ここで「閉じる音（cancel.ogg）」を鳴らします
+                    // （ボタンを押した時は、ゲーム共通の魔法で自動で音が鳴ります）
+                    if (isBackground && window.AudioManager) {
+                        window.AudioManager.playSE('cancel.ogg');
+                    }
+                    
+                    resolve(); // 止めていた時間を動かします！
                 }
-                
-                resolve(); // 止めていた時間を動かします！
             };
             
-            // クリックの魔法をセット！
+            // 下敷き全体にクリックの魔法をセット！
             overlay.addEventListener('click', onClick);
         });
     }
