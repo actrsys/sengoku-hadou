@@ -838,6 +838,9 @@ class AIEngine {
             const castleBushos = this.game.getCastleBushos(castle.id).filter(b => b.status !== 'ronin' && b.belongKunishuId === 0);
             
             for (let b of castleBushos) {
+                if ((b.recognitionNeed || 0) < 0) {
+                    continue; // マイナスの人は飛ばして、次の人の順番に行きます！
+                }
                 // ① 承認欲求(recognitionNeed)がたまっている場合
                 if ((b.recognitionNeed || 0) > 30) { 
                     rewardTargets.push(b);
