@@ -68,6 +68,13 @@ class IndependenceSystem {
         
         let prob = ((threshold - castellan.loyalty) * probLoyalty) + (affinityDiff * probAffinity) - (daimyoBonus * 2);
         
+        // 大名と「一門」関係なら、独立する確率をグッと減らすおまじない！
+        // 城主(castellan)と大名(daimyo)の家族ID(familyIds)に共通のものがあるか調べます
+        const isFamily = castellan.familyIds.some(id => daimyo.familyIds.includes(id));
+        if (isFamily) {
+            prob = prob * 0.1; // 一門なら、独立する確率を10分の1（0.1倍）に減らします！
+        }
+        
         if (prob <= 0) return;
         if (Math.random() * 1000 < prob) {
             await this.executeRebellion(castle, castellan, daimyo);
