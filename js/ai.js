@@ -830,18 +830,24 @@ class AIEngine {
 
                 // ★追加：褒美は「実行する武将（doer）」を必要としない特別な行動です！
                 if (action.type === 'reward') {
-                    // 承認欲求が一番高い人、または忠誠度が一番低い人を1人選びます
+                    // ★変更：城主を最優先し、次に忠誠度が低い人、最後に承認欲求が高い人を1人選びます
                     action.targets.sort((a, b) => {
-                        // ★修正：箱の名前を正しい recognitionNeed に直しました！
+                        // ① まずは「このお城の城主かどうか」をチェックして、城主を一番前に並べます
+                        const aIsCastellan = (a.id === castle.castellanId) ? 1 : 0;
+                        const bIsCastellan = (b.id === castle.castellanId) ? 1 : 0;
+                        if (bIsCastellan !== aIsCastellan) {
+                            return bIsCastellan - aIsCastellan;
+                        }
+
+                        // ② 次に、忠誠度の低さを比べます（忠誠度が低い人が先に来ます）
+                        if (a.loyalty !== b.loyalty) {
+                            return a.loyalty - b.loyalty;
+                        }
+
+                        // ③ 忠誠度も同じなら、最後は承認欲求の大きさを比べます
                         const aAchieve = a.recognitionNeed || 0;
                         const bAchieve = b.recognitionNeed || 0;
-                        
-                        // まずは承認欲求が高い人を優先します
-                        if (bAchieve !== aAchieve) {
-                            return bAchieve - aAchieve; 
-                        }
-                        // 承認欲求が同じ（ゼロなど）なら、忠誠度が低い人を優先します
-                        return a.loyalty - b.loyalty; 
+                        return bAchieve - aAchieve; 
                     });
                     const targetBusho = action.targets[0];
                     
