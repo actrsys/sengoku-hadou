@@ -251,16 +251,29 @@ class LifeSystem {
         if (busho.isGunshi) {
             busho.isGunshi = false;
         }
+        
+        busho.clan = 0;
+        busho.castleId = 0;
+        busho.belongKunishuId = 0;
     }
 
-    // ★ここを書き換えました！大名が亡くなった時の後継ぎ選びです
+    // 大名が亡くなった時の後継ぎ選びです
     async handleDaimyoDeath(daimyo) {
+        // ==========================================
+        // ★すでにすべてのお城を失って「滅亡」している場合は、後継ぎは選びません！
+        const clanCastles = this.game.castles.filter(c => c.ownerClan === daimyo.clan);
+        if (clanCastles.length === 0) {
+            daimyo.isDaimyo = false;
+            return; 
+        }
+        // ==========================================
+
         // 1. 生きている一門がいるかチェック
         const activeFamily = this.game.bushos.filter(b => b.clan === daimyo.clan && b.id !== daimyo.id && b.status === 'active' && !b.isDaimyo && daimyo.familyIds.some(fId => b.familyIds.includes(fId)));
         
-        let extraMsg = ""; // ★追加：緊急で元服した時の追加メッセージ
+        let extraMsg = ""; // 緊急で元服した時の追加メッセージ
 
-        // ★追加: もし生きている一門が0人なら、未登場の一門を探して強制的に登場させる
+        // もし生きている一門が0人なら、未登場の一門を探して強制的に登場させる
         if (activeFamily.length === 0) {
             const unbornFamily = this.game.bushos.filter(b => b.status === 'unborn' && daimyo.familyIds.some(fId => b.familyIds.includes(fId)));
             
@@ -275,7 +288,6 @@ class LifeSystem {
 
                 // 一番有力な候補を強制登場させる
                 const heir = unbornFamily[0];
-                const clanCastles = this.game.castles.filter(c => c.ownerClan === daimyo.clan);
                 const baseCastle = clanCastles.length > 0 ? clanCastles[0] : null;
 
                 if (baseCastle) {
@@ -284,13 +296,12 @@ class LifeSystem {
                     heir.castleId = baseCastle.id;
                     heir.loyalty = 100;
                     if (!baseCastle.samuraiIds.includes(heir.id)) baseCastle.samuraiIds.push(heir.id);
-                    // ★変更：ログを直接出さずに、メッセージ文として後でまとめて出します！
                     extraMsg = `\n ${heir.name.replace('|','')}が急遽元服しました。`;
                 }
             }
         }
 
-        // ★修正：緊急登場が終わった「後」で、同じ大名家の中から候補を探し直します！
+        // 緊急登場が終わった「後」で、同じ大名家の中から候補を探し直します！
         const clanBushos = this.game.bushos.filter(b => b.clan === daimyo.clan && b.status === 'active' && !b.isDaimyo);
         
         if (clanBushos.length > 0) {
@@ -316,40 +327,84 @@ class LifeSystem {
             
             this.game.changeLeader(daimyo.clan, successor.id);
             
-            // ★変更：ログが2つ出ないように、1つのメッセージにまとめました！
-            const msg = `【当主交代】\n${daimyo.name.replace('|','')}が病により死亡し、${successor.name.replace('|','')}が家督を継ぎました。${extraMsg}`;
+            const msg = `【当主交代】\n${daimyo.name.replace('|','')}が死亡し、${successor.name.replace('|','')}が家督を継ぎました。${extraMsg}`;
             this.game.ui.log(`【当主交代】${daimyo.name.replace('|','')}が死亡し、${successor.name.replace('|','')}が家督を継ぎました。`);
             
-            // ★追加：ダイアログを出して0秒（押すまで）待ちます！
             await this.game.ui.showDialogAsync(msg, false, 0);
 
         } else {
-            // もし誰も残っていなかったら、その大名家は滅亡してしまいます
-            const clan = this.game.clans.find(c => c.id === daimyo.clan);
-            const clanName = clan ? clan.name : '不明';
-            const displayClanName = clanName.endsWith('家') ? clanName : clanName + '家';
-            const msg = `【大名家滅亡】\n${daimyo.name.replace('|','')}が死亡し、後継ぎがいないため${displayClanName}は滅亡しました。`;
-            this.game.ui.log(msg);
+            // ★変更：誰もいなかったら、新しく作った滅亡チェックの魔法にバトンタッチします！
+            daimyo.isDaimyo = false;
+        }
+    }
+    
+    // ★大名家の滅亡を処理する魔法です！
+    async checkClanExtinction(clanId, reason = 'no_castle') {
+        if (!clanId || clanId === 0) return;
+        
+        // 大名家のデータを探します
+        const clan = this.game.clans.find(c => c.id === clanId);
+        if (!clan || clan.extinctionNotified) return; // すでに通知済みなら二重に出さないようにします
 
-            // ★大名家が滅亡して勢力が変わるので、威信を最新に更新しておきます！
-            if (window.GameApp) window.GameApp.updateAllClanPrestige();
+        // その大名家が持っているお城を数えます
+        const clanCastles = this.game.castles.filter(c => c.ownerClan === clanId);
+        
+        // 滅亡の条件：お城が0個になった、または後継ぎがいない場合です
+        if (clanCastles.length === 0 || reason === 'no_heir') {
+            clan.extinctionNotified = true; // 二度と呼ばれないように印をつけます
+
+            const displayClanName = clan.name.endsWith('家') ? clan.name : clan.name + '家';
             
-            // ★ここも0秒にするだけです！
-            await this.game.ui.showDialogAsync(msg, false, 0);
+            let extMsg = "";
+            if (reason === 'no_heir') {
+                extMsg = `【大名家滅亡】\n当主が死亡し、後継ぎがいないため\n${displayClanName}は滅亡しました。`;
+            } else {
+                extMsg = `【大名家滅亡】\n拠点を全て失い、\n${displayClanName}は滅亡しました。`;
+            }
             
-            // 持っていたお城をすべて「空き城」にします
-            this.game.castles.filter(c => c.ownerClan === daimyo.clan).forEach(c => {
+            // 履歴にメッセージを残します
+            this.game.ui.log(extMsg);
+            
+            // 画面にメッセージを出して、プレイヤーが押すまで待ちます
+            await this.game.ui.showDialogAsync(extMsg, false, 0);
+
+            // もし残っている武将がいたら、全員「浪人」にします
+            this.game.bushos.filter(b => b.clan === clanId && b.status === 'active').forEach(b => {
+                // 大名家の武将が浪人になるので功績を半分にします
+                if ((b.belongKunishuId || 0) === 0) {
+                    b.achievementTotal = Math.floor((b.achievementTotal || 0) / 2);
+                }
+                this.game.affiliationSystem.becomeRonin(b);
+            });
+
+            // 城主や大名がまだ城に残っている判定になっていれば、お城を空っぽにします
+            clanCastles.forEach(c => {
                 c.ownerClan = 0;
                 c.castellanId = 0;
-                // ★城の武将たちを浪人にします
-                this.game.getCastleBushos(c.id).forEach(l => { 
+                this.game.getCastleBushos(c.id).forEach(l => {
                     if (l.status === 'unborn' || l.status === 'dead') return;
-                    // ★新しいお引越しセンターの魔法を使います！
                     this.game.affiliationSystem.becomeRonin(l);
                 });
                 this.game.updateCastleLord(c); // 城主情報をリセット
             });
+
+            // もしプレイヤーの大名家が滅亡してしまったら…ゲームオーバーです！
+            if (clanId === this.game.playerClanId) {
+                return new Promise(resolve => {
+                    setTimeout(() => {
+                        this.game.ui.showDialog("全拠点を失いました。我が大名家は滅亡しました……", false, () => {
+                            this.game.ui.returnToTitle(); // タイトル画面に戻ります
+                        });
+                    }, 1000);
+                });
+            } else {
+                // プレイヤー以外の滅亡時、大名が生きていれば浪人にします
+                const leader = this.game.getBusho(clan.leaderId);
+                if (leader && leader.status !== 'dead') {
+                    leader.isDaimyo = false;
+                    this.game.affiliationSystem.becomeRonin(leader);
+                }
+            }
         }
-        daimyo.isDaimyo = false;
-    }
+    }    
 }

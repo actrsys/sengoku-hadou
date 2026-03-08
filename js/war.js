@@ -1153,13 +1153,16 @@ class WarManager {
                     } else {
                         await this.autoResolvePrisoners(this.pendingPrisoners, winnerClan);
                         this.pendingPrisoners = [];
-                    await this.checkClanExtinction(s.oldDefClanId, 'no_castle');
-                    if (window.GameApp) window.GameApp.updateAllClanPrestige(); // ★威信を更新
+                    }
+                    // ★life_system.js の滅亡チェック魔法を呼び出します！
+                    await this.game.lifeSystem.checkClanExtinction(s.oldDefClanId, 'no_castle');
+                    if (window.GameApp) window.GameApp.updateAllClanPrestige(); // 威信を更新
                     this.game.finishTurn();
                 }
             } else {
-                await this.checkClanExtinction(s.oldDefClanId, 'no_castle');
-                if (window.GameApp) window.GameApp.updateAllClanPrestige(); // ★威信を更新
+                // ★life_system.js の滅亡チェック魔法を呼び出します！
+                await this.game.lifeSystem.checkClanExtinction(s.oldDefClanId, 'no_castle');
+                if (window.GameApp) window.GameApp.updateAllClanPrestige(); // 威信を更新
                 this.game.finishTurn();
             }
             };
@@ -1403,29 +1406,15 @@ class WarManager {
                         // 国人衆のメンバーか、浪人になって城に残った人だけリストに残します
                         return kunishuMembers.includes(id) || (busho && busho.status === 'ronin');
                     });
-
+                    
                     resultMsg = `【国衆蜂起】\n国人衆の反乱により、${targetC.name}が陥落し空白地となりました。`;
                     this.game.ui.log(`【国衆蜂起】国人衆の反乱により、${targetC.name}が陥落し空白地となりました。`);
                     
+                    // ★お城をすべて失ったら、life_system.js の滅亡チェック魔法にお任せします！
                     if (this.game.castles.filter(c => c.ownerClan === oldOwner).length === 0) {
-                        const clanName = this.game.clans.find(c=>c.id===oldOwner)?.name || "不明";
-                        const extMsg = `${clanName}は滅亡しました。`;
-                        this.game.ui.log(extMsg);
-                        
-                        // たった1行で「表示・5秒タイマー・順番待ち」を全部やってくれます！
-                        await this.game.ui.showDialogAsync(extMsg, false, 0);
-
-                        if (oldOwner === this.game.playerClanId) {
-                            setTimeout(() => {
-                                this.game.ui.showDialog("全拠点を失いました。ゲームオーバーです。", false, () => {
-                                    this.game.ui.returnToTitle();
-                                });
-                            }, 1000);
-                        } else {
-                            const leader = this.game.getBusho(this.game.clans.find(c=>c.id===oldOwner).leaderId);
-                            if (leader) leader.status = 'dead';
-                        }
+                        await this.game.lifeSystem.checkClanExtinction(oldOwner, 'no_castle');
                     }
+                    
                 } else {
                     resultMsg = `【国衆蜂起】\n国人衆の反乱を鎮圧しました。`;
                     this.game.ui.log(`【国衆蜂起】国人衆の反乱を鎮圧しました。`);
@@ -1764,19 +1753,14 @@ class WarManager {
                 }
             }
         } else if (action === 'kill') { 
-            if (prisoner.isDaimyo) {
-                if (!isExtinct) {
-                    await this.handleDaimyoDeath(prisoner); 
-                }
-                prisoner.isDaimyo = false; 
-            }
-            this.game.lifeSystem.executeDeath(prisoner);
-            prisoner.clan = 0; prisoner.castleId = 0; prisoner.belongKunishuId = 0;
+            // ★処断の処理を、life_system.js の魔法にすべてお任せします！
+            await this.game.lifeSystem.executeDeath(prisoner);
             
             // 処断はメッセージがないので、そのまま次へ進めます
             nextStep();
+            // ==========================================
             
-        } else if (action === 'release') { 
+        } else if (action === 'release') {
             if (prisoner.isDaimyo) {
                 if (isExtinct) {
                     prisoner.isDaimyo = false;
@@ -1807,141 +1791,28 @@ class WarManager {
         } 
     }
     
-    // ★ここを書き換えました！大名が亡くなった時の後継者選びです！
-    async handleDaimyoDeath(daimyo) { // ★ async を追加
-        const clanId = daimyo.clan; 
-        if(clanId === 0) return; 
-        
-        // 1. 生きている一門がいるかチェック
-        const activeFamily = this.game.bushos.filter(b => b.clan === clanId && b.id !== daimyo.id && b.status === 'active' && daimyo.familyIds.some(fId => b.familyIds.includes(fId)));
-        
-        // ★追加: もし生きている一門が0人なら、未登場の一門を探して強制的に登場させる
-        if (activeFamily.length === 0) {
-            const unbornFamily = this.game.bushos.filter(b => b.status === 'unborn' && daimyo.familyIds.some(fId => b.familyIds.includes(fId)));
-            
-            if (unbornFamily.length > 0) {
-                // 相性 -> 年齢順に並べ替え
-                unbornFamily.sort((a,b) => {
-                    let diffA = GameSystem.calcAffinityDiff(daimyo.affinity || 0, a.affinity || 0);
-                    let diffB = GameSystem.calcAffinityDiff(daimyo.affinity || 0, b.affinity || 0);
-                    
-                    if (diffA !== diffB) return diffA - diffB;
-                    return a.birthYear - b.birthYear;
-                });
-
-                // 一番有力な候補を強制登場させる
-                const heir = unbornFamily[0];
-                const clanCastles = this.game.castles.filter(c => c.ownerClan === clanId);
-                const baseCastle = clanCastles.length > 0 ? clanCastles[0] : null;
-
-                if (baseCastle) {
-                    heir.status = 'active';
-                    heir.clan = clanId;
-                    heir.castleId = baseCastle.id;
-                    heir.loyalty = 100;
-                    if (!baseCastle.samuraiIds.includes(heir.id)) baseCastle.samuraiIds.push(heir.id);
-                    this.game.ui.log(`【緊急継承】${daimyo.name.replace('|','')}の血縁、まだ幼い${heir.name.replace('|','')}が元服し、家督を継ぐため立ち上がりました！`);
-                }
-            }
-        }
-
-        // ★修正：緊急登場が終わった「後」で、同じ大名家の候補を探し直します！
-        const candidates = this.game.bushos.filter(b => b.clan === clanId && b.id !== daimyo.id && b.status !== 'dead' && b.status !== 'ronin'); 
-        
-        // もし誰もいなかったら、その大名家は滅亡です…
-        if (candidates.length === 0) { 
-            const msg = `【処断】${daimyo.name.replace('|','')} は処断されました。`;
-            this.game.ui.log(msg);
-            
-            // 後継ぎがいないので、持っていた城をすべて空き城（浪人）にします
-            this.game.castles.filter(c => c.ownerClan === clanId).forEach(c => { 
-                this.game.getCastleBushos(c.id).forEach(l => { 
-                    if (l.status === 'unborn' || l.status === 'dead') return;
-                    // ★大名家の武将が浪人になるので功績を半分にします！
-                    if ((l.belongKunishuId || 0) === 0 && l.clan !== 0) {
-                        l.achievementTotal = Math.floor((l.achievementTotal || 0) / 2);
-                    }
-                    l.clan = 0; 
-                    l.status = 'ronin'; 
-                });
-                this.game.updateCastleLord(c); // 城主情報をリセット
-            }); 
-            
-            // ★追加：新しく作った魔法を使って、後継者不在による滅亡を出します！
-            await this.checkClanExtinction(clanId, 'no_heir');
-            return; 
-        }
-        
-        // プレイヤーの場合は、自分で選ぶ画面を出します！
-        if (clanId === this.game.playerClanId) {
-            // ★追加：プレイヤーが選ぶまで「待つ」ように Promise の魔法をかけます！
-            return new Promise(resolve => {
-                this.game.ui.showSuccessionModal(candidates, (newLeaderId) => {
-                    this.game.changeLeader(clanId, newLeaderId);
-                    resolve(); // 選び終わったら次へ進む合図
-                });
-            });
-        } else { 
-            // AIの場合は、自動で一番ふさわしい人を計算して選びます
-            candidates.forEach(b => {
-                // 1. 一門（家族・親戚）かどうかをチェック！
-                b._isRelative = daimyo.familyIds.some(fId => b.familyIds.includes(fId));
-                
-                // 2. 仲良し度（相性）の差を計算！差が小さいほど仲良し！（共通の魔法を使います）
-                b._affinityDiff = GameSystem.calcAffinityDiff(daimyo.affinity || 0, b.affinity || 0);
-                
-                // 3. 今までの計算式（政治＋魅力）！
-                b._baseScore = b.politics + b.charm;
-            });
-
-            // 順番に並べ替えます
-            candidates.sort((a,b) => {
-                // まずは一門かどうかを最優先！
-                if (a._isRelative && !b._isRelative) return -1;
-                if (!a._isRelative && b._isRelative) return 1;
-                
-                // 一門同士、または一門じゃない者同士なら次へ
-                if (a._isRelative && b._isRelative) {
-                    // 相性の差が小さい人を優先！
-                    if (a._affinityDiff !== b._affinityDiff) return a._affinityDiff - b._affinityDiff;
-                    // 相性も同じなら、年齢が上の人（生まれた年が昔の人）を優先！
-                    if (a.birthYear !== b.birthYear) return a.birthYear - b.birthYear;
-                }
-                
-                // それでも同じ、または一門じゃない場合は、今までの計算式で勝負！
-                return b._baseScore - a._baseScore;
-            });
-            
-            // 一番上に来た人を新しい大名にします！
-            this.game.changeLeader(clanId, candidates[0].id); 
-        } 
-    }
-    
     async autoResolvePrisoners(captives, winnerClanId) { // ★ async を追加
         const aiBushos = this.game.bushos.filter(b => b.clan === winnerClanId && b.status !== 'unborn'); 
         const leaderInt = aiBushos.length > 0 ? Math.max(...aiBushos.map(b => b.intelligence)) : 50;
 
-        // ★追加：大名から先に処理するように並べ替えます
+        // ★大名から先に処理するように並べ替えます
         captives.sort((a, b) => (b.isDaimyo ? 1 : 0) - (a.isDaimyo ? 1 : 0));
         let daimyoHiredBonus = 0; // ★ご褒美の箱
 
         for (const p of captives) { 
-            // ★追加：大名家が滅亡している（他に城がない）かをチェックします
+            // ★大名家が滅亡している（他に城がない）かをチェックします
             const friendlyCastles = this.game.castles.filter(c => c.ownerClan === p.clan && p.clan !== 0);
             const isExtinct = (friendlyCastles.length === 0);
 
-            // ★変更：大名で、かつ城が残っているなら問答無用で処断
+            // ★変更：fe_system.js の魔法にお任せします！
             if (p.isDaimyo && !isExtinct) { 
-                await this.handleDaimyoDeath(p); // ★ await を追加
-                p.isDaimyo = false; // 大名マークを外します
-                this.game.lifeSystem.executeDeath(p); // 共通のお片付け魔法
-                p.clan = 0; p.castleId = 0; p.belongKunishuId = 0; 
-                continue; // ★ return を continue に変更します
-            } 
+                await this.game.lifeSystem.executeDeath(p); 
+                continue; 
+            }
             
             const isKunishuBoss = (p.belongKunishuId > 0 && p.id === this.game.kunishuSystem.getKunishu(p.belongKunishuId)?.leaderId);
 
-            // ★追加：滅亡時の大名は登用確率が1/3になります。大名を登用できたら他も50%アップ
+            // ★滅亡時の大名は登用確率が1/3になります。大名を登用できたら他も50%アップ
             let hireProb = (leaderInt / 100);
             if (p.isDaimyo && isExtinct) {
                 hireProb = hireProb / 3.0;
@@ -1999,17 +1870,12 @@ class WarManager {
             killProb = Math.max(0, Math.min(100, killProb));
 
             if (Math.random() * 100 < killProb) {
-                // ★追加：大名が処断される場合、城があるなら後継者選びをします
-                if (p.isDaimyo) {
-                    if (!isExtinct) {
-                        await this.handleDaimyoDeath(p);
-                    }
-                    p.isDaimyo = false;
-                }
-                this.game.lifeSystem.executeDeath(p); 
-                p.clan = 0; p.castleId = 0; p.belongKunishuId = 0; 
+                // ==========================================
+                // ★処断される場合も、life_system.js の魔法にお任せします！
+                await this.game.lifeSystem.executeDeath(p);
+                // ==========================================
             } else {
-                // ★追加：大名が解放される場合、滅亡していたら看板を下ろします
+                // ★大名が解放される場合、滅亡していたら看板を下ろします
                 if (p.isDaimyo) {
                     if (isExtinct) {
                         p.isDaimyo = false;
@@ -2056,51 +1922,13 @@ class WarManager {
         }, 100);
     }
     
-    // ★共通の滅亡チェック魔法です！
-    async checkClanExtinction(clanId, reason = 'no_castle') {
-        if (!clanId || clanId === 0) return;
-        if (this.state.extinctionNotified) return; // すでに通知済みなら二重に出さない
-
-        const clanCastles = this.game.castles.filter(c => c.ownerClan === clanId);
-        
-        // 滅亡条件：城が0個、または後継者不在
-        if (clanCastles.length === 0 || reason === 'no_heir') {
-            this.state.extinctionNotified = true;
-
-            const deadClanName = this.game.clans.find(c => c.id === clanId)?.name || "不明";
-            const displayClanName = deadClanName.endsWith('家') ? deadClanName : deadClanName + '家';
-            
-            let extMsg = "";
-            if (reason === 'no_heir') {
-                extMsg = `【大名家滅亡】\n当主が死亡し、後継ぎがいないため\n${displayClanName}は滅亡しました。`;
-            } else {
-                extMsg = `【大名家滅亡】\n拠点を全て失い、\n${displayClanName}は滅亡しました。`;
-            }
-            
-            this.game.ui.log(extMsg);
-            
-            // ★たった1行で「表示・5秒タイマー・順番待ち」を全部やってくれます！
-            await this.game.ui.showDialogAsync(extMsg, false, 0);
-
-            if (clanId === this.game.playerClanId) {
-                return new Promise(resolve => {
-                    setTimeout(() => {
-                        this.game.ui.showDialog("全拠点を失いました。我が大名家は滅亡しました……", false, () => {
-                            this.game.ui.returnToTitle();
-                        });
-                    }, 1000);
-                });
-            }
-        }
-    }
-    
-    // ★ここから追加: 守備側が援軍を呼べるかチェックする機能
+    // ★守備側が援軍を呼べるかチェックする機能
     checkDefenderReinforcement(defCastle, atkClanId, onComplete) {
         const defClanId = defCastle.ownerClan;
         const pid = this.game.playerClanId;
         
         // 国人衆の反乱など、特殊な戦いなら援軍は呼べません
-        // ★追加：敵が国人衆（this.state.attacker.isKunishu）の場合も援軍は呼べないようにします！
+        // ★敵が国人衆（this.state.attacker.isKunishu）の場合も援軍は呼べないようにします！
         if (defClanId === 0 || defCastle.isKunishu || this.state.isKunishuSubjugation || this.state.attacker.isKunishu) {
             onComplete();
             return;
@@ -2138,7 +1966,7 @@ class WarManager {
             return;
         }
 
-        // ★変更: 委任城の場合はプレイヤーに聞かず、AIが自動で援軍を要請します！
+        // ★委任城の場合はプレイヤーに聞かず、AIが自動で援軍を要請します！
         if (defClanId === pid && !defCastle.isDelegated) {
             // プレイヤーが守備側なら、UIを出して選ばせる
             this.game.ui.showDefReinforcementSelector(candidateCastles, defCastle, onComplete);
