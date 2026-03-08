@@ -386,9 +386,12 @@ class LifeSystem {
             this.game.ui.log(`【当主交代】${daimyo.name.replace('|','')}が死亡し、${successor.name.replace('|','')}が家督を継ぎました。`);
             
             await this.game.ui.showDialogAsync(msg, false, 0);
+            
+            // ★後継ぎにバトンタッチしたので、死んだ大名のマークを外します
+            daimyo.isDaimyo = false;
 
         } else {
-            // ★変更：誰もいなかったら、新しく作った滅亡チェックの魔法にバトンタッチします！
+            // ★誰もいなかったら、新しく作った滅亡チェックの魔法にバトンタッチします！
             daimyo.isDaimyo = false;
             await this.checkClanExtinction(daimyo.clan, 'no_heir');
         }
