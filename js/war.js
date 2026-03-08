@@ -1679,8 +1679,8 @@ class WarManager {
             if (this.pendingPrisoners.length === 0) {
                 this.game.ui.closePrisonerModal();
                 
-                // ★記憶しておいた古い大名家のIDを使って、新しく作った魔法を呼び出します！
-                await this.checkClanExtinction(this.state.oldDefClanId, 'no_castle');
+                // ★lifeSystem の魔法を呼び出します！
+                await this.game.lifeSystem.checkClanExtinction(this.state.oldDefClanId, 'no_castle');
                 if (window.GameApp) window.GameApp.updateAllClanPrestige(); // 威信を更新
                 this.game.finishTurn();
                 
