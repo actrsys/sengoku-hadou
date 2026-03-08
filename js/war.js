@@ -1057,8 +1057,15 @@ class WarManager {
                     let chance = 0.5 - (b.strength * (window.WarParams.War.CaptureStrFactor || 0.002)) + (Math.random() * 0.3);
                     if (defCastle.soldiers > 1000) chance -= 0.2;
                     if (b.isDaimyo) chance -= window.WarParams.War.DaimyoCaptureReduction;
-                    if (chance > 0.5) { capturedBushos.push(b); }
-                    else { b.castleId = target.id; b.isCastellan = false; target.samuraiIds.push(b.id); this.game.factionSystem.handleMove(b, defCastle.id, target.id); }
+                    if (chance > 0.5) { 
+                        captives.push(b); 
+                        // ★お城から出て捕虜になります
+                        this.game.affiliationSystem.leaveCastle(b);
+                    } else { 
+                        this.game.factionSystem.handleMove(b, defCastle.id, target.id);
+                        // ★新しいお引越しセンターの魔法を使います！
+                        this.game.affiliationSystem.moveCastle(b, target.id); 
+                    }
                 });
                 defCastle.gold -= carryGold; defCastle.rice = 0; defCastle.soldiers = 0; 
                 defCastle.horses = 0; defCastle.guns = 0;
@@ -1525,11 +1532,10 @@ class WarManager {
 
                 const srcC = this.game.getCastle(s.sourceCastle.id);
                 s.atkBushos.forEach((b) => { 
-                    srcC.samuraiIds = srcC.samuraiIds.filter(id => id !== b.id); 
                     this.game.factionSystem.handleMove(b, s.sourceCastle.id, s.defender.id); 
-                    b.castleId = s.defender.id; s.defender.samuraiIds.push(b.id); b.isCastellan = false; 
+                    // ★新しいお引越しセンターの魔法を使います！
+                    this.game.affiliationSystem.moveCastle(b, s.defender.id);
                 });
-                this.game.updateCastleLord(srcC); this.game.updateCastleLord(s.defender);
                 
                 // ★書き足し１：守備側が撤退した時の履歴ログ
                 const atkClanData1 = this.game.clans.find(c => c.id === s.attacker.ownerClan);
@@ -1585,11 +1591,10 @@ class WarManager {
                 
                 const srcC = this.game.getCastle(s.sourceCastle.id);
                 s.atkBushos.forEach((b) => { 
-                    srcC.samuraiIds = srcC.samuraiIds.filter(id => id !== b.id); 
                     this.game.factionSystem.handleMove(b, s.sourceCastle.id, s.defender.id); 
-                    b.castleId = s.defender.id; s.defender.samuraiIds.push(b.id); b.isCastellan = false; 
-                }); 
-                this.game.updateCastleLord(srcC); this.game.updateCastleLord(s.defender);
+                    // ★新しいお引越しセンターの魔法を使います！
+                    this.game.affiliationSystem.moveCastle(b, s.defender.id);
+                });
                 
                 if (isAtkPlayer) resultMsg = isRetreat ? `${enemyName}は城を捨てて敗走しました！ 城を占領します！` : `${s.defender.name}を制圧しました！`;
                 else if (isDefPlayer) resultMsg = isRetreat ? `${s.defender.name}を放棄し、後退します……` : `${s.defender.name}が陥落しました。敵軍がなだれ込んできます……`;
@@ -1638,23 +1643,21 @@ class WarManager {
             if (!isLastStand && b.isDaimyo) chance -= window.WarParams.War.DaimyoCaptureReduction;
             
             if (chance > 0.5) { 
-                b.isCastellan = false; captives.push(b); defeatedCastle.samuraiIds = defeatedCastle.samuraiIds.filter(id => id !== b.id);
+                captives.push(b); 
+                // ★お城から出て捕虜になります
+                this.game.affiliationSystem.leaveCastle(b);
             } else { 
                 if (friendlyCastles.length > 0) {
                     const escapeCastle = friendlyCastles[Math.floor(Math.random() * friendlyCastles.length)];
-                    defeatedCastle.samuraiIds = defeatedCastle.samuraiIds.filter(id => id !== b.id);
                     this.game.factionSystem.handleMove(b, defeatedCastle.id, escapeCastle.id); 
-                    b.castleId = escapeCastle.id; b.isCastellan = false; escapeCastle.samuraiIds.push(b.id); escapees.push(b);
-                    this.game.updateCastleLord(escapeCastle);
+                    // ★新しいお引越しセンターの魔法を使います！
+                    this.game.affiliationSystem.moveCastle(b, escapeCastle.id);
+                    escapees.push(b);
                 } else { 
-                    defeatedCastle.samuraiIds = defeatedCastle.samuraiIds.filter(id => id !== b.id);
-                    // ★大名家の武将が浪人になるので功績を半分にします！
-                    if ((b.belongKunishuId || 0) === 0 && b.clan !== 0) {
-                        b.achievementTotal = Math.floor((b.achievementTotal || 0) / 2);
-                    }
-                    b.clan = 0; b.castleId = 0; b.isCastellan = false; b.status = 'ronin'; 
+                    // ★新しいお引越しセンターの魔法を使います！
+                    this.game.affiliationSystem.becomeRonin(b);
                 }
-            } 
+            }
         }); 
         if (escapees.length > 0 && (defeatedCastle.ownerClan === this.game.playerClanId || winnerClanId === this.game.playerClanId)) this.game.ui.log(`${escapees.length}名の武将が自領へ逃げ帰りました。`);
         if (captives.length > 0) { 
@@ -1737,20 +1740,11 @@ class WarManager {
                         this.daimyoHiredBonus = 0.5; 
                     }
 
-                    const oldLoyalty = prisoner.loyalty;
-                    // ★他の大名家に移るので功績を半分にします！
-                    if ((prisoner.belongKunishuId || 0) === 0 && prisoner.clan !== 0 && prisoner.clan !== this.game.playerClanId) {
-                        prisoner.achievementTotal = Math.floor((prisoner.achievementTotal || 0) / 2);
-                    }
-                    prisoner.clan = this.game.playerClanId;
-                    prisoner.loyalty = Math.min(100, 50 + (100 - oldLoyalty)); 
-                    prisoner.isCastellan = false; 
                     prisoner.belongKunishuId = 0;
                     const targetC = this.game.getCastle(prisoner.castleId) || this.game.getCurrentTurnCastle(); 
                     if(targetC) { 
-                        prisoner.castleId = targetC.id;
-                        if (!targetC.samuraiIds.includes(prisoner.id)) targetC.samuraiIds.push(prisoner.id); 
-                        this.game.updateCastleLord(targetC); 
+                        // ★新しいお引越しセンターの魔法を使います！
+                        this.game.affiliationSystem.joinClan(prisoner, this.game.playerClanId, targetC.id);
                     }
                     
                     // ★記憶しておいた情報を使ってメッセージを使い分けます！
@@ -1790,24 +1784,23 @@ class WarManager {
             }
 
             if (kunishu && !kunishu.isDestroyed) {
-                prisoner.status = 'active'; 
-                prisoner.clan = 0;
-                prisoner.castleId = kunishu.castleId;
                 const returnCastle = this.game.getCastle(kunishu.castleId);
-                if (returnCastle && !returnCastle.samuraiIds.includes(prisoner.id)) returnCastle.samuraiIds.push(prisoner.id);
-                this.game.ui.showDialog(`${prisoner.name}を解放しました。(国人衆へ帰還しました)`, false, nextStep);
+                if (returnCastle) {
+                    this.game.affiliationSystem.enterCastle(prisoner, returnCastle.id);
+                    prisoner.status = 'active'; 
+                }
+                this.game.ui.showDialog(`${prisoner.name}を解放しました。`, false, nextStep);
             } else {
                 if (!isExtinct) {
                     const returnCastle = friendlyCastles[Math.floor(Math.random() * friendlyCastles.length)];
-                    prisoner.castleId = returnCastle.id; prisoner.isCastellan = false; prisoner.status = 'active'; returnCastle.samuraiIds.push(prisoner.id);
-                    this.game.factionSystem.handleMove(prisoner, 0, returnCastle.id); this.game.updateCastleLord(returnCastle);
-                    this.game.ui.showDialog(`${prisoner.name}を解放しました。(自領へ帰還しました)`, false, nextStep);
+                    this.game.factionSystem.handleMove(prisoner, 0, returnCastle.id); 
+                    this.game.affiliationSystem.enterCastle(prisoner, returnCastle.id);
+                    prisoner.status = 'active'; 
+                    prisoner.isCastellan = false;
+                    this.game.ui.showDialog(`${prisoner.name}を解放しました。`, false, nextStep);
                 } else { 
-                    // 大名家の武将が浪人になるので功績を半分にします！
-                    if ((prisoner.belongKunishuId || 0) === 0 && prisoner.clan !== 0) {
-                        prisoner.achievementTotal = Math.floor((prisoner.achievementTotal || 0) / 2);
-                    }
-                    prisoner.status = 'ronin'; prisoner.clan = 0; prisoner.castleId = 0; prisoner.belongKunishuId = 0; 
+                    // ★新しいお引越しセンターの魔法を使います！
+                    this.game.affiliationSystem.becomeRonin(prisoner);
                     this.game.ui.showDialog(`${prisoner.name}を解放しました。`, false, nextStep); 
                 }
             }
@@ -1963,16 +1956,12 @@ class WarManager {
                     daimyoHiredBonus = 0.5;
                 }
                 
-                const oldLoyalty = p.loyalty;
-                // ★他の大名家に移るので功績を半分にします！
-                if ((p.belongKunishuId || 0) === 0 && p.clan !== 0 && p.clan !== winnerClanId) {
-                    p.achievementTotal = Math.floor((p.achievementTotal || 0) / 2);
-                }
-                p.clan = winnerClanId;
-                p.loyalty = Math.min(100, 50 + (100 - oldLoyalty)); 
-                p.isCastellan = false; p.belongKunishuId = 0;
+                p.belongKunishuId = 0;
                 const targetC = this.game.getCastle(p.castleId);
-                if (targetC && !targetC.samuraiIds.includes(p.id)) { targetC.samuraiIds.push(p.id); this.game.updateCastleLord(targetC); }
+                if (targetC) { 
+                    // ★新しいお引越しセンターの魔法を使います！
+                    this.game.affiliationSystem.joinClan(p, winnerClanId, targetC.id);
+                }
                 continue; 
             } 
             
@@ -2029,25 +2018,21 @@ class WarManager {
                 // 見逃された！
                 const kunishu = p.belongKunishuId > 0 ? this.game.kunishuSystem.getKunishu(p.belongKunishuId) : null;
                 if (kunishu && !kunishu.isDestroyed) {
-                    p.status = 'active'; p.clan = 0; p.castleId = kunishu.castleId;
+                    this.game.affiliationSystem.enterCastle(p, kunishu.castleId);
+                    p.status = 'active'; 
                 } else {
                     const originalClanId = p.clan; 
                     const friendlyCastlesExt = this.game.castles.filter(c => c.ownerClan === originalClanId && originalClanId !== 0);
                     
                     if (friendlyCastlesExt.length > 0) {
                         const returnCastle = friendlyCastlesExt[Math.floor(Math.random() * friendlyCastlesExt.length)];
-                        p.castleId = returnCastle.id; 
-                        p.isCastellan = false; 
-                        p.status = 'active'; 
-                        returnCastle.samuraiIds.push(p.id);
                         this.game.factionSystem.handleMove(p, 0, returnCastle.id); 
-                        this.game.updateCastleLord(returnCastle);
+                        this.game.affiliationSystem.enterCastle(p, returnCastle.id);
+                        p.status = 'active'; 
+                        p.isCastellan = false;
                     } else {
-                        // ★大名家の武将が浪人になるので功績を半分にします！
-                        if ((p.belongKunishuId || 0) === 0 && p.clan !== 0) {
-                            p.achievementTotal = Math.floor((p.achievementTotal || 0) / 2);
-                        }
-                        p.status = 'ronin'; p.clan = 0; p.castleId = 0; p.belongKunishuId = 0; 
+                        // ★新しいお引越しセンターの魔法を使います！
+                        this.game.affiliationSystem.becomeRonin(p);
                     }
                 }
             }
