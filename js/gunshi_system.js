@@ -71,4 +71,62 @@ class GunshiSystem {
             if (onComplete) onComplete();
         }
     }
+    // ==========================================
+    // ★コマンド実行前のアドバイスを表示する魔法です
+    showCommandAdvice(action, onConfirm) {
+        // 戦争のアドバイスがあれば、それを優先して表示します
+        if (action.type === 'war' || this.game.warManager.state.active) {
+            const warAdvice = this.game.warManager.getGunshiAdvice(action);
+            if (warAdvice) {
+                const gunshi = this.game.getClanGunshi(this.game.playerClanId);
+                // ui.js の小窓を開く魔法を呼び出します
+                this.game.ui.openGunshiModal(gunshi, warAdvice, onConfirm);
+                return;
+            }
+        }
+
+        // アドバイスが要らないコマンドの場合は、すぐに実行(onConfirm)します
+        const spec = this.game.commandSystem.getSpecs()[action.type];
+        if (spec && spec.hasAdvice === false) {
+             onConfirm();
+             return;
+        }
+
+        // 自分の軍師を探します（いなければすぐに実行します）
+        const gunshi = this.game.getClanGunshi(this.game.playerClanId); 
+        if (!gunshi) { onConfirm(); return; }
+        
+        // 秘密の番号（シード）を作って、アドバイスのメッセージを作ります
+        const seed = this.game.year * 100 + this.game.month + (action.type.length) + (action.targetId || 0) + (action.val || 0);
+        const msg = this.getAdviceMessage(gunshi, action, seed);
+        
+        // ui.js の小窓を開く魔法を呼び出します
+        this.game.ui.openGunshiModal(gunshi, msg, onConfirm);
+    }
+
+    // ★軍師の賢さによって、言うこと（予測）が変わる魔法です
+    getAdviceMessage(gunshi, action, seed) { 
+        // 実際の成功確率を受け取ります（無い場合は絶対に成功するコマンドとして扱います）
+        let trueProb = action.trueProb !== undefined ? action.trueProb : 1.0;
+        
+        // 正確さを計算します（智謀95以上で最大0.99になります）
+        let accuracy = 0.5 + (gunshi.intelligence / 95) * 0.49;
+        if (accuracy > 0.99 || gunshi.intelligence >= 95) accuracy = 0.99;
+
+        // 推測がどれくらいブレるかの幅を決めます
+        const maxError = 1.0 - accuracy;
+        
+        // ランダムなノイズ（-1.0 〜 +1.0）を作ってブレさせます
+        // ※ GameSystem.seededRandom を使うようにしました
+        const noise = (GameSystem.seededRandom(seed) - 0.5) * 2;
+        let perceivedProb = trueProb + noise * maxError;
+        perceivedProb = Math.max(0.0, Math.min(1.0, perceivedProb));
+
+        if (perceivedProb > 0.9) return "必ずや成功するでしょう。好機です！"; 
+        if (perceivedProb > 0.7) return "おそらく上手くいくでしょう。"; 
+        if (perceivedProb > 0.4) return "五分五分といったところです。油断めさるな。"; 
+        if (perceivedProb > 0.2) return "厳しい結果になるかもしれません。"; 
+        return "おやめください。失敗する未来が見えます。"; 
+    }
+    // ==========================================
 }

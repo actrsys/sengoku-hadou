@@ -2362,41 +2362,20 @@ class UIManager {
         });
     }
     
-    showGunshiAdvice(action, onConfirm) {
-        if (action.type === 'war' || this.game.warManager.state.active) {
-            const warAdvice = this.game.warManager.getGunshiAdvice(action);
-            if (warAdvice) {
-                const gunshi = this.game.getClanGunshi(this.game.playerClanId);
-                if (this.gunshiModal) {
-                    this.gunshiModal.classList.remove('hidden'); 
-                    if(this.gunshiName) this.gunshiName.textContent = `軍師: ${gunshi ? gunshi.name : '不明'}`; 
-                    if(this.gunshiMessage) this.gunshiMessage.textContent = warAdvice;
-                }
-                if (this.gunshiExecuteBtn) this.gunshiExecuteBtn.onclick = () => { if(this.gunshiModal) this.gunshiModal.classList.add('hidden'); onConfirm(); };
-                return;
-            }
-        }
-
-        const spec = this.game.commandSystem.getSpecs()[action.type];
-        if (spec && spec.hasAdvice === false) {
-             onConfirm();
-             return;
-        }
-
-        const gunshi = this.game.getClanGunshi(this.game.playerClanId); 
-        if (!gunshi) { onConfirm(); return; }
-        
-        const seed = this.game.year * 100 + this.game.month + (action.type.length) + (action.targetId || 0) + (action.val || 0);
-        const msg = GameSystem.getGunshiAdvice(gunshi, action, seed);
-        
+    openGunshiModal(gunshi, msg, onConfirm) {
         if (this.gunshiModal) {
             this.gunshiModal.classList.remove('hidden'); 
-            if(this.gunshiName) this.gunshiName.textContent = `軍師: ${gunshi ? gunshi.name : '不明'}`; 
-            if(this.gunshiMessage) this.gunshiMessage.textContent = msg;
+            if (this.gunshiName) this.gunshiName.textContent = `軍師: ${gunshi ? gunshi.name : '不明'}`; 
+            if (this.gunshiMessage) this.gunshiMessage.textContent = msg;
         }
-        if (this.gunshiExecuteBtn) this.gunshiExecuteBtn.onclick = () => { if(this.gunshiModal) this.gunshiModal.classList.add('hidden'); onConfirm(); };
+        if (this.gunshiExecuteBtn) {
+            this.gunshiExecuteBtn.onclick = () => { 
+                if (this.gunshiModal) this.gunshiModal.classList.add('hidden'); 
+                onConfirm(); // 実行ボタンを押したら、約束の処理(onConfirm)を進めます
+            };
+        }
     }
-
+    
     openBushoSelector(actionType, targetId = null, extraData = null, onBack = null) {
         if (actionType === 'appoint' && this.currentCastle) { const isDaimyoHere = this.game.getCastleBushos(this.currentCastle.id).some(b => b.isDaimyo); if (isDaimyoHere) { this.showDialog("大名の居城は城主を変更できません", false); return; } }
         

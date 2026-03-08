@@ -730,7 +730,7 @@ class CommandSystem {
 
     showAdviceAndExecute(actionType, executeCallback, extraContext = {}) {
         const adviceAction = { type: actionType, ...extraContext };
-        this.game.ui.showGunshiAdvice(adviceAction, executeCallback);
+        this.game.gunshiSystem.showCommandAdvice(adviceAction, executeCallback);
     }
 
     executeCommand(type, bushoIds, targetId) {
