@@ -705,18 +705,21 @@ class CommandSystem {
             
             const targetName = this.game.getCastle(targetId).name;
             
-            // ★追加: 国人衆の制圧なら
+            // ★国人衆の制圧なら
             if (extraData && extraData.isKunishu) {
                 const kunishu = this.game.kunishuSystem.getKunishu(extraData.kunishuId);
-                const kunishuLeader = this.game.getBusho(kunishu.leaderId);
                 
-                this.game.ui.showDialog(`${targetName}にいる ${kunishuLeader ? kunishuLeader.name : "国人"}衆 を討伐しますか？\n今月の命令は終了となります`, true, () => {
+                // ★頭領の名前ではなく、国人衆の正式な名前を取得する魔法を使います
+                const kunishuName = kunishu.getName(this.game);
+                
+                // ★メッセージの中身も、取得した「kunishuName」をそのまま表示するように直しました
+                this.game.ui.showDialog(`${targetName}周辺に根付く ${kunishuName} を討伐しますか？\n今月の命令は終了となります`, true, () => {
                     this.executeKunishuSubjugate(castle, targetId, data, sVal, rVal, hVal, gVal, kunishu);
                 });
             } else {
                 this.game.ui.showDialog(`${targetName}に攻め込みますか？\n今月の命令は終了となります`, true, () => {
                     const bushos = data.map(id => this.game.getBusho(id));
-                    // ★ここを書き換え！いきなり戦争を始めず、援軍を探す機能にバトンタッチします！
+                    // ★いきなり戦争を始めず、援軍を探す機能にバトンタッチします！
                     this.checkReinforcementAndStartWar(castle, targetId, bushos, sVal, rVal, hVal, gVal);
                 });
             }
