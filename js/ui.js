@@ -1556,22 +1556,23 @@ class UIManager {
                 </div>
             `;
         }
-        const contextEl = document.getElementById('selector-context-info'); if(contextEl) contextEl.classList.remove('hidden');
+        
         const c = this.currentCastle; 
-        let infoHtml = ""; 
-        let bushos = []; 
         
-        const baseType = actionType.replace('_deploy', ''); 
-        const spec = this.game.commandSystem.getSpecs()[baseType] || this.game.commandSystem.getSpecs()[actionType] || {};
-    
-        let sortKey = spec.sortKey || 'strength';
-        let isMulti = spec.isMulti || false;
-        
-        if (actionType === 'def_intercept_deploy' || actionType === 'def_reinf_deploy' || actionType === 'atk_reinf_deploy') {
-             isMulti = true;
-             sortKey = 'strength';
+        // ★さっき作った新しい魔法で、武将のリストとメッセージをまとめて受け取ります！
+        const data = this.game.commandSystem.getBushoSelectorData(actionType, targetId, extraData, c);
+        let bushos = data.bushos;
+        let infoHtml = data.infoHtml;
+        let isMulti = data.isMulti;
+        let spec = data.spec;
+
+        const contextEl = document.getElementById('selector-context-info'); 
+        if(contextEl) {
+            contextEl.classList.remove('hidden');
+            contextEl.innerHTML = infoHtml;
         }
 
+        // 画面のタイトルを変えます
         if (document.getElementById('selector-title')) {
             if (actionType === 'view_only' || actionType === 'all_busho_list') {
                 document.getElementById('selector-title').textContent = "武将一覧";
@@ -1580,166 +1581,15 @@ class UIManager {
             }
         }
 
+        // 相手の城を調べるかどうかの準備（表示の時に使います）
         let isEnemyTarget = false;
         let targetCastle = null;
         if (['rumor_target_busho','headhunt_target','view_only'].includes(actionType)) {
              isEnemyTarget = true;
              targetCastle = this.game.getCastle(targetId);
         }
-
         const gunshi = this.game.getClanGunshi(this.game.playerClanId);
         const myDaimyo = this.game.bushos.find(b => b.clan === this.game.playerClanId && b.isDaimyo);
-
-        if (actionType === 'employ_target') { 
-            bushos = this.game.getCastleBushos(c.id).filter(b => b.status === 'ronin'); 
-            infoHtml = "<div>登用する在野武将を選択してください</div>"; 
-        } 
-        else if (actionType === 'employ_doer') { 
-            bushos = this.game.getCastleBushos(c.id).filter(b => b.status !== 'ronin'); 
-            infoHtml = "<div>登用を行う担当官を選択してください</div>"; 
-        } 
-        else if (actionType === 'diplomacy_doer') { 
-            bushos = this.game.getCastleBushos(c.id).filter(b => b.status !== 'ronin'); 
-            infoHtml = "<div>外交の担当官を選択してください</div>"; 
-        }
-        else if (actionType === 'rumor_target_busho') { 
-            bushos = this.game.getCastleBushos(targetId).filter(b => b.status !== 'ronin' && !b.isDaimyo); 
-            infoHtml = "<div>流言の対象とする武将を選択してください</div>"; 
-        }
-        else if (actionType === 'rumor_doer') { 
-            bushos = this.game.getCastleBushos(c.id).filter(b => b.status !== 'ronin'); 
-            infoHtml = "<div>流言を実行する担当官を選択してください</div>"; 
-        }
-        else if (actionType === 'incite_doer') { 
-            bushos = this.game.getCastleBushos(c.id).filter(b => b.status !== 'ronin'); 
-            infoHtml = "<div>扇動を実行する担当官を選択してください</div>"; 
-        }
-        else if (actionType === 'headhunt_target') { 
-            bushos = this.game.getCastleBushos(targetId).filter(b => b.status !== 'ronin' && !b.isDaimyo); 
-            infoHtml = "<div>引抜の対象とする武将を選択してください </div>"; 
-        }
-        else if (actionType === 'headhunt_doer') { 
-            bushos = this.game.getCastleBushos(c.id).filter(b => b.status !== 'ronin'); 
-            infoHtml = "<div>引抜を実行する担当官を選択してください</div>"; 
-        }
-        else if (actionType === 'interview') { 
-            bushos = this.game.getCastleBushos(c.id).filter(b => b.status !== 'ronin' && !b.isDaimyo); 
-            infoHtml = "<div>面談する武将を選択してください</div>"; 
-        }
-        else if (actionType === 'interview_target') { 
-            bushos = this.game.bushos.filter(b => b.clan === this.game.playerClanId && b.status !== 'dead' && b.status !== 'ronin' && b.status !== 'unborn' && b.id !== extraData.interviewer.id && !b.isDaimyo);
-            infoHtml = `<div>誰についての印象を聞きますか？</div>`; 
-        }
-        else if (actionType === 'investigate_deploy') { 
-            bushos = this.game.getCastleBushos(c.id).filter(b => b.status !== 'ronin'); 
-            infoHtml = "<div>調査を行う武将を選択してください(複数可)</div>"; 
-        }
-        else if (actionType === 'view_only') { 
-            bushos = this.game.getCastleBushos(targetId); 
-            infoHtml = "<div>武将一覧 (精度により情報は隠蔽されます)</div>"; 
-        }
-        else if (actionType === 'all_busho_list') { 
-            bushos = this.game.bushos.filter(b => b.clan === this.game.playerClanId && b.status !== 'dead' && b.status !== 'ronin' && b.status !== 'unborn');
-            infoHtml = "<div>我が軍の武将一覧です</div>"; 
-            isMulti = false;
-        }
-        else if (actionType === 'war_general' || actionType === 'kunishu_war_general') {
-            if (extraData && extraData.candidates) {
-                bushos = extraData.candidates.map(id => this.game.getBusho(id));
-            }
-            infoHtml = "<div>総大将とする武将を選択してください</div>"; 
-            isMulti = false;
-        }
-        else if (actionType === 'appoint_gunshi') {
-            bushos = this.game.bushos.filter(b => 
-                b.clan === this.game.playerClanId && 
-                b.status !== 'dead' && 
-                b.status !== 'ronin' &&
-                b.status !== 'unborn' &&
-                !b.isDaimyo && 
-                !b.isCastellan
-            );
-            infoHtml = "<div>軍師に任命する武将を選択してください</div>";
-        }
-        else if (actionType === 'def_intercept_deploy') {
-            bushos = this.game.getCastleBushos(targetId).filter(b => b.status !== 'ronin');
-            infoHtml = "<div>迎撃に出陣する武将を選択してください（最大5名まで）</div>";
-        }
-        else if (actionType === 'def_reinf_deploy') {
-            bushos = this.game.getCastleBushos(targetId).filter(b => b.status !== 'ronin');
-            infoHtml = "<div>援軍に派遣する武将を選択してください（最大5名まで）</div>";
-        }
-        
-        else if (actionType === 'atk_reinf_deploy') {
-            bushos = this.game.getCastleBushos(targetId).filter(b => b.status !== 'ronin');
-            infoHtml = "<div>攻撃の援軍に派遣する武将を選択してください（最大5名まで）</div>";
-        }
-        
-        // =====================================
-        // 褒美の対象を「自軍全員（大名以外）」にします！
-        else if (actionType === 'reward') {
-            bushos = this.game.bushos.filter(b => 
-                b.clan === this.game.playerClanId && // 自分の大名家の武将で
-                b.status !== 'dead' &&               // 亡くなっておらず
-                b.status !== 'ronin' &&              // 浪人ではなく
-                b.status !== 'unborn' &&             // まだ生まれていないわけでもなく
-                !b.isDaimyo                          // 大名（殿様）ではない人
-            );
-            infoHtml = "<div>褒美を与える武将を選択してください</div>"; 
-        }
-        
-        else {
-            bushos = this.game.getCastleBushos(c.id).filter(b => b.status !== 'ronin');
-            bushos = this.game.getCastleBushos(c.id).filter(b => b.status !== 'ronin');
-            
-            if (spec.msg) {
-                infoHtml = `<div>${spec.msg}</div>`;
-                if (actionType === 'war_deploy') {
-                    infoHtml = `<div>出陣する武将を選択してください（最大5名まで）</div>`;
-                }
-            } else if (['farm','commerce'].includes(actionType)) { infoHtml = `<div>金: ${c.gold} (1回500)</div>`; }
-            else if (['charity'].includes(actionType)) { infoHtml = `<div>金: ${c.gold}, 米: ${c.rice} (1回300)</div>`; }
-            else if (['repair'].includes(actionType)) { infoHtml = `<div>金: ${c.gold} (1回300)</div>`; }
-            else if (['draft'].includes(actionType)) { infoHtml = `<div>民忠: ${c.peoplesLoyalty}</div>`; }
-            else if (['training','soldier_charity'].includes(actionType)) { infoHtml = `<div>状態: 訓練${c.training}/士気${c.morale}</div>`; }
-        }
-        if (contextEl) contextEl.innerHTML = infoHtml;
-        
-        bushos.sort((a,b) => {
-        
-            const getRankScore = (target) => {
-                if (target.isDaimyo || target.isCastellan) return 10; 
-                if (target.isGunshi) return 20; 
-
-                if (target.belongKunishuId && target.belongKunishuId > 0) {
-                    const kunishu = this.game.kunishuSystem.getKunishu(target.belongKunishuId);
-                    const isBoss = kunishu && (Number(kunishu.leaderId) === Number(target.id));
-                    
-                    if (isBoss) return 40 + (target.belongKunishuId * 0.001); 
-                    return 50 + (target.belongKunishuId * 0.001); 
-                }
-
-                if (target.status === 'ronin') return 90; 
-
-                return 30; 
-            };
-
-            const rankA = getRankScore(a);
-            const rankB = getRankScore(b);
-
-            if (rankA !== rankB) {
-                return rankA - rankB;
-            }
-
-            const getSortVal = (target) => {
-                 let acc = null;
-                 if (isEnemyTarget && targetCastle) acc = targetCastle.investigatedAccuracy;
-                 if (isEnemyTarget) return GameSystem.getPerceivedStatValue(target, sortKey, gunshi, acc, this.game.playerClanId, myDaimyo) || 0;
-                 const val = GameSystem.getPerceivedStatValue(target, sortKey, gunshi, null, this.game.playerClanId, myDaimyo);
-                 return val === null ? 0 : val;
-            };
-            return getSortVal(b) - getSortVal(a);
-        });
         const updateContextCost = () => { 
             if (!isMulti || !contextEl) return; 
             const checkedCount = document.querySelectorAll('input[name="sel_busho"]:checked').length; 
