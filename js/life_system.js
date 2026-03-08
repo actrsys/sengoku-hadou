@@ -344,13 +344,9 @@ class LifeSystem {
                 // ★城の武将たちを浪人にします
                 this.game.getCastleBushos(c.id).forEach(l => { 
                     if (l.status === 'unborn' || l.status === 'dead') return;
-                    // ★大名家の武将が浪人になるので功績を半分にします！
-                    if ((l.belongKunishuId || 0) === 0 && l.clan !== 0) {
-                        l.achievementTotal = Math.floor((l.achievementTotal || 0) / 2);
-                    }
-                    l.clan = 0; 
-                    l.status = 'ronin'; 
-                }); 
+                    // ★新しいお引越しセンターの魔法を使います！
+                    this.game.affiliationSystem.becomeRonin(l);
+                });
                 this.game.updateCastleLord(c); // 城主情報をリセット
             });
         }

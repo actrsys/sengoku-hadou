@@ -313,9 +313,8 @@ class IndependenceSystem {
                 if (escapeCastles.length > 0 && busho.duty >= 30) {
                     if ((busho.strength + busho.intelligence) * (Math.random() + 0.5) > (newDaimyo.leadership + newDaimyo.intelligence) * 0.8) {
                         const target = escapeCastles[Math.floor(Math.random() * escapeCastles.length)];
-                        castle.samuraiIds = castle.samuraiIds.filter(id => id !== busho.id);
-                        target.samuraiIds.push(busho.id);
-                        busho.castleId = target.id; busho.isCastellan = false;
+                        // ★新しいお引越しセンターの魔法を使います！
+                        this.game.affiliationSystem.moveCastle(busho, target.id);
                         this.game.updateCastleLord(target);
                     } else {
                         castle.samuraiIds = castle.samuraiIds.filter(id => id !== busho.id);
@@ -401,11 +400,8 @@ class IndependenceSystem {
                         p.clan = oldClanId; p.castleId = target.id; target.samuraiIds.push(p.id);
                         this.game.updateCastleLord(target);
                     } else { 
-                        // ★大名家の武将が浪人になるので功績を半分にします！
-                        if ((p.belongKunishuId || 0) === 0 && p.clan !== 0) {
-                            p.achievementTotal = Math.floor((p.achievementTotal || 0) / 2);
-                        }
-                        p.status = 'ronin'; p.clan = 0; 
+                        // ★新しいお引越しセンターの魔法を使います！
+                        this.game.affiliationSystem.becomeRonin(p);
                     }
                     alertMsgs.push(`解放：${p.name} は解放されました。`);
                 }

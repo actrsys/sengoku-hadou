@@ -127,24 +127,8 @@ class FactionSystem {
         const clan = this.game.clans.find(c => c.id === busho.clan);
         const clanName = clan ? clan.name : "当家";
         
-        // ==========================================
-        // ★浪人になる前に、功績を半分にします！
-        if (busho.clan !== 0) {
-            // 今の功績を2で割って、余り（小数点）を切り捨ててから箱に戻します
-            busho.achievementTotal = Math.floor(busho.achievementTotal / 2);
-        }
-        // ==========================================
-        
-        busho.status = 'ronin';
-        busho.clan = 0;
-        busho.factionId = 0;
-        busho.recognitionNeed = 0;
-        busho.isFactionLeader = false;
-        
-        const castle = this.game.getCastle(busho.castleId);
-        if (castle) {
-            castle.samuraiIds = castle.samuraiIds.filter(id => id !== busho.id);
-        }
+        // ★新しいお引越しセンターの魔法を使います！
+        this.game.affiliationSystem.becomeRonin(busho);
 
         if (clan && clan.id === this.game.playerClanId) {
             this.game.ui.log(`【出奔】${busho.name}は${clanName}に愛想を尽かし、下野しました。`);
@@ -479,11 +463,8 @@ class FactionSystem {
                 // クジ引きで移動先の城を「1つだけ」決める
                 const targetCastle = neighbors[Math.floor(Math.random() * neighbors.length)];
                 
-                // 今いる城のリストから名前を消す
-                currentC.samuraiIds = currentC.samuraiIds.filter(id => id !== r.id); 
-                // 新しく決まった城のリストに名前を書く
-                targetCastle.samuraiIds.push(r.id); 
-                r.castleId = targetCastle.id; 
+                // ★新しいお引越しセンターの魔法を使います！
+                this.game.affiliationSystem.moveCastle(r, targetCastle.id);
             }
         }); 
     }

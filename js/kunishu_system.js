@@ -303,9 +303,8 @@ class KunishuSystem {
             // 残った武将は在野へ
             members.forEach(b => {
                 b.belongKunishuId = 0;
-                b.clan = 0;
-                b.status = 'ronin';
-                b.isCastellan = false;
+                // ★新しいお引越しセンターの魔法を使います！
+                this.game.affiliationSystem.becomeRonin(b);
             });
             this.game.ui.log(`【国衆壊滅】${this.game.getCastle(kunishu.castleId).name}の国人衆は壊滅しました。`);
             return;
