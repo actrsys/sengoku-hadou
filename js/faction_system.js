@@ -127,6 +127,14 @@ class FactionSystem {
         const clan = this.game.clans.find(c => c.id === busho.clan);
         const clanName = clan ? clan.name : "当家";
         
+        // ==========================================
+        // ★浪人になる前に、功績を半分にします！
+        if (busho.clan !== 0) {
+            // 今の功績を2で割って、余り（小数点）を切り捨ててから箱に戻します
+            busho.achievementTotal = Math.floor(busho.achievementTotal / 2);
+        }
+        // ==========================================
+        
         busho.status = 'ronin';
         busho.clan = 0;
         busho.factionId = 0;

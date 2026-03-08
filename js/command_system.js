@@ -758,8 +758,16 @@ class CommandSystem {
             const busho = this.game.getBusho(bushoIds[0]);
             this.game.ui.showDialog(`本当に ${busho.name} を追放しますか？`, true, () => {
                 castle.samuraiIds = castle.samuraiIds.filter(id => id !== busho.id);
+
+                // ==========================================
+                // ★追放されて浪人になるので、功績を半分にします！
+                if (busho.clan !== 0) {
+                    busho.achievementTotal = Math.floor(busho.achievementTotal / 2);
+                }
+                // ==========================================
+
                 busho.status = 'ronin'; busho.clan = 0; busho.isCastellan = false; 
-                this.game.updateCastleLord(castle); 
+                this.game.updateCastleLord(castle);
                 this.game.ui.showResultModal(`${busho.name}を追放しました`); 
                 this.game.ui.updatePanelHeader(); 
                 this.game.ui.renderCommandMenu(); 
@@ -1263,10 +1271,17 @@ class CommandSystem {
         }
         
         if (isSuccess) {
-            // ▼ ここから大きく変わります ▼
             const oldCastle = this.game.getCastle(target.castleId);
             const oldClanId = target.clan;
             const newClanId = this.game.playerClanId;
+            
+            // ==========================================
+            // ★ここから書き足し！：他の大名家から移ってくるので、功績を半分にします！
+            // 元々大名家にいて、しかも「違う大名家」に移る時だけ半分にします
+            if (oldClanId !== 0 && oldClanId !== newClanId) {
+                target.achievementTotal = Math.floor(target.achievementTotal / 2);
+            }
+            // ==========================================
             
             if (target.isCastellan && oldCastle) {
                 // ■ 城主を引き抜いた場合（城ごと寝返る！）

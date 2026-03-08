@@ -1146,15 +1146,15 @@ class WarManager {
                     } else {
                         await this.autoResolvePrisoners(this.pendingPrisoners, winnerClan);
                         this.pendingPrisoners = [];
-                        // ★新しく作った魔法を呼び出します！
-                        await this.checkClanExtinction(s.oldDefClanId, 'no_castle');
-                        this.game.finishTurn();
-                    }
-                } else {
-                    // ★新しく作った魔法を呼び出します！
                     await this.checkClanExtinction(s.oldDefClanId, 'no_castle');
+                    if (window.GameApp) window.GameApp.updateAllClanPrestige(); // ★威信を更新
                     this.game.finishTurn();
                 }
+            } else {
+                await this.checkClanExtinction(s.oldDefClanId, 'no_castle');
+                if (window.GameApp) window.GameApp.updateAllClanPrestige(); // ★威信を更新
+                this.game.finishTurn();
+            }
             };
             
             // 兵士の減った割合を計算して、馬と鉄砲も減らす（壊れる）処理
@@ -1376,8 +1376,13 @@ class WarManager {
                                 if (this.game.factionSystem) {
                                     this.game.factionSystem.handleMove(b, targetC.id, escapeCastle.id);
                                 }
+                            // ▼ 書き換えた後
                             } else {
                                 // ★味方の城がない場合（最後のお城だった場合）：今まで通り浪人になります
+                                // ★大名家の武将が浪人になるので功績を半分にします！
+                                if ((b.belongKunishuId || 0) === 0 && b.clan !== 0) {
+                                    b.achievementTotal = Math.floor((b.achievementTotal || 0) / 2);
+                                }
                                 b.status = 'ronin'; 
                                 b.clan = 0; 
                                 b.isCastellan = false;
@@ -1643,6 +1648,10 @@ class WarManager {
                     this.game.updateCastleLord(escapeCastle);
                 } else { 
                     defeatedCastle.samuraiIds = defeatedCastle.samuraiIds.filter(id => id !== b.id);
+                    // ★大名家の武将が浪人になるので功績を半分にします！
+                    if ((b.belongKunishuId || 0) === 0 && b.clan !== 0) {
+                        b.achievementTotal = Math.floor((b.achievementTotal || 0) / 2);
+                    }
                     b.clan = 0; b.castleId = 0; b.isCastellan = false; b.status = 'ronin'; 
                 }
             } 
@@ -1680,6 +1689,7 @@ class WarManager {
                 
                 // ★記憶しておいた古い大名家のIDを使って、新しく作った魔法を呼び出します！
                 await this.checkClanExtinction(this.state.oldDefClanId, 'no_castle');
+                if (window.GameApp) window.GameApp.updateAllClanPrestige(); // 威信を更新
                 this.game.finishTurn();
                 
             } else {
@@ -1721,14 +1731,18 @@ class WarManager {
                 if (hireProb > Math.random()) { 
                     // ★ここから変更：大名だったかどうかを最初に記憶しておきます！
                     const wasDaimyo = prisoner.isDaimyo;
-
+                    
                     if (prisoner.isDaimyo) {
                         prisoner.isDaimyo = false;
                         this.daimyoHiredBonus = 0.5; 
                     }
 
                     const oldLoyalty = prisoner.loyalty;
-                    prisoner.clan = this.game.playerClanId; 
+                    // ★他の大名家に移るので功績を半分にします！
+                    if ((prisoner.belongKunishuId || 0) === 0 && prisoner.clan !== 0 && prisoner.clan !== this.game.playerClanId) {
+                        prisoner.achievementTotal = Math.floor((prisoner.achievementTotal || 0) / 2);
+                    }
+                    prisoner.clan = this.game.playerClanId;
                     prisoner.loyalty = Math.min(100, 50 + (100 - oldLoyalty)); 
                     prisoner.isCastellan = false; 
                     prisoner.belongKunishuId = 0;
@@ -1789,8 +1803,12 @@ class WarManager {
                     this.game.factionSystem.handleMove(prisoner, 0, returnCastle.id); this.game.updateCastleLord(returnCastle);
                     this.game.ui.showDialog(`${prisoner.name}を解放しました。(自領へ帰還しました)`, false, nextStep);
                 } else { 
+                    // 大名家の武将が浪人になるので功績を半分にします！
+                    if ((prisoner.belongKunishuId || 0) === 0 && prisoner.clan !== 0) {
+                        prisoner.achievementTotal = Math.floor((prisoner.achievementTotal || 0) / 2);
+                    }
                     prisoner.status = 'ronin'; prisoner.clan = 0; prisoner.castleId = 0; prisoner.belongKunishuId = 0; 
-                    this.game.ui.showDialog(`${prisoner.name}を解放しました。(在野へ下りました)`, false, nextStep); 
+                    this.game.ui.showDialog(`${prisoner.name}を解放しました。`, false, nextStep); 
                 }
             }
         } 
@@ -1844,12 +1862,15 @@ class WarManager {
             
             // 後継ぎがいないので、持っていた城をすべて空き城（浪人）にします
             this.game.castles.filter(c => c.ownerClan === clanId).forEach(c => { 
-                c.ownerClan = 0; 
                 this.game.getCastleBushos(c.id).forEach(l => { 
                     if (l.status === 'unborn' || l.status === 'dead') return;
+                    // ★大名家の武将が浪人になるので功績を半分にします！
+                    if ((l.belongKunishuId || 0) === 0 && l.clan !== 0) {
+                        l.achievementTotal = Math.floor((l.achievementTotal || 0) / 2);
+                    }
                     l.clan = 0; 
                     l.status = 'ronin'; 
-                }); 
+                });
                 this.game.updateCastleLord(c); // 城主情報をリセット
             }); 
             
@@ -1936,14 +1957,18 @@ class WarManager {
             }
 
             if (!isKunishuBoss && hireProb > Math.random()) { 
-                // ★追加：大名が登用に応じた場合は、看板を下ろさせてご褒美をセット！
+                // ★大名が登用に応じた場合は、看板を下ろさせてご褒美をセット！
                 if (p.isDaimyo) {
                     p.isDaimyo = false;
                     daimyoHiredBonus = 0.5;
                 }
-
+                
                 const oldLoyalty = p.loyalty;
-                p.clan = winnerClanId; 
+                // ★他の大名家に移るので功績を半分にします！
+                if ((p.belongKunishuId || 0) === 0 && p.clan !== 0 && p.clan !== winnerClanId) {
+                    p.achievementTotal = Math.floor((p.achievementTotal || 0) / 2);
+                }
+                p.clan = winnerClanId;
                 p.loyalty = Math.min(100, 50 + (100 - oldLoyalty)); 
                 p.isCastellan = false; p.belongKunishuId = 0;
                 const targetC = this.game.getCastle(p.castleId);
@@ -2018,6 +2043,10 @@ class WarManager {
                         this.game.factionSystem.handleMove(p, 0, returnCastle.id); 
                         this.game.updateCastleLord(returnCastle);
                     } else {
+                        // ★大名家の武将が浪人になるので功績を半分にします！
+                        if ((p.belongKunishuId || 0) === 0 && p.clan !== 0) {
+                            p.achievementTotal = Math.floor((p.achievementTotal || 0) / 2);
+                        }
                         p.status = 'ronin'; p.clan = 0; p.castleId = 0; p.belongKunishuId = 0; 
                     }
                 }
@@ -2026,7 +2055,7 @@ class WarManager {
     }
 
     closeWar() { 
-        // ★ここから追加：国人衆との戦いが終わった時も平時のBGMに戻す！
+        // ★国人衆との戦いが終わった時も平時のBGMに戻す！
         if (window.AudioManager && this.state.isPlayerInvolved) {
             window.AudioManager.restoreMemorizedBgm();
         }
@@ -2037,11 +2066,11 @@ class WarManager {
         }
         
         setTimeout(() => {
+             if (window.GameApp) window.GameApp.updateAllClanPrestige(); // ★威信を更新
              this.game.finishTurn(); 
         }, 100);
-    }
     
-    // ★ここから追加：共通の滅亡チェック魔法です！
+    // ★共通の滅亡チェック魔法です！
     async checkClanExtinction(clanId, reason = 'no_castle') {
         if (!clanId || clanId === 0) return;
         if (this.state.extinctionNotified) return; // すでに通知済みなら二重に出さない
