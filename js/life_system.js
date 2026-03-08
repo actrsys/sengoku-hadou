@@ -335,6 +335,7 @@ class LifeSystem {
         } else {
             // ★変更：誰もいなかったら、新しく作った滅亡チェックの魔法にバトンタッチします！
             daimyo.isDaimyo = false;
+            await this.checkClanExtinction(daimyo.clan, 'no_heir');
         }
     }
     
