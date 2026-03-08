@@ -706,6 +706,9 @@ class GameManager {
         
         // ★ 追加：寿命と登場を管理するシステムを呼び出します
         this.lifeSystem = new LifeSystem(this);
+
+        // ★ 追加：軍師のシステムを呼び出します
+        this.gunshiSystem = new GunshiSystem(this);
         
         this.phase = 'title';
     }
@@ -926,6 +929,9 @@ class GameManager {
     }
 
     async startMonth() { 
+        // ★ここを書き足し！ 月が替わったら軍師の報告印を消します
+        if (this.gunshiSystem) this.gunshiSystem.onStartMonth();
+        
         // ★ここを差し替え！ 相場を「足し算・引き算」で動くようにします
         const fluc = window.MainParams.Economy.TradeFluctuation; // 動く幅（0.3）
         const change = (Math.random() * (fluc * 2)) - fluc; // -0.3 から +0.3 の間でランダムな数字を作ります
@@ -1080,13 +1086,16 @@ class GameManager {
                 if(this.ui.aiGuard) this.ui.aiGuard.classList.add('hidden'); 
 
                 this.ui.renderMap(); 
-                // ターン開始時のログはお休み
-                // this.ui.log(`【${castle.name}】命令を下してください`); 
                 
                 this.ui.scrollToActiveCastle(castle);
                 
+                // ★修正：小姓のダイアログを出した「あと」に軍師のチェックを入れます！
                 this.ui.showTurnStartDialog(castle, () => {
-                    this.ui.showControlPanel(castle); 
+                    // 小姓のダイアログが閉じたら、軍師にチェックさせます
+                    this.gunshiSystem.checkAndShowAdvice(castle, () => {
+                        // 軍師の処理が終わったら、いつものメニュー画面を出します
+                        this.ui.showControlPanel(castle); 
+                    });
                 });
             }
             // ==========================================
