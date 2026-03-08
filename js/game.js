@@ -682,11 +682,12 @@ class GameManager {
         this.factionSystem = new FactionSystem(this); 
         this.diplomacyManager = new DiplomacyManager(this);
         
-        // ★ 追加：寿命と登場を管理するシステムを呼び出します
+        // ★ 寿命と登場を管理するシステムを呼び出します
         this.lifeSystem = new LifeSystem(this);
-
-        // ★ 追加：軍師のシステムを呼び出します
+        // ★ 軍師のシステムを呼び出します
         this.gunshiSystem = new GunshiSystem(this);
+        // ★ お引越しセンターを開店します！
+        this.affiliationSystem = new AffiliationSystem(this);
         
         this.phase = 'title';
     }
