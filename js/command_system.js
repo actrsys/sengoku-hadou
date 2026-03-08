@@ -757,18 +757,11 @@ class CommandSystem {
         if (type === 'banish') { 
             const busho = this.game.getBusho(bushoIds[0]);
             this.game.ui.showDialog(`本当に ${busho.name} を追放しますか？`, true, () => {
-                castle.samuraiIds = castle.samuraiIds.filter(id => id !== busho.id);
+                
+                // ★新しいお引越しセンターの魔法を使います！
+                this.game.affiliationSystem.becomeRonin(busho);
 
-                // ==========================================
-                // ★追放されて浪人になるので、功績を半分にします！
-                if (busho.clan !== 0) {
-                    busho.achievementTotal = Math.floor(busho.achievementTotal / 2);
-                }
-                // ==========================================
-
-                busho.status = 'ronin'; busho.clan = 0; busho.isCastellan = false; 
-                this.game.updateCastleLord(castle);
-                this.game.ui.showResultModal(`${busho.name}を追放しました`); 
+                this.game.ui.showResultModal(`${busho.name}を追放しました`);
                 this.game.ui.updatePanelHeader(); 
                 this.game.ui.renderCommandMenu(); 
             });
@@ -843,14 +836,9 @@ class CommandSystem {
             }
             else if (type === 'move_deploy') { 
                 this.game.factionSystem.handleMove(busho, castle.id, targetId); 
-                const targetC = this.game.getCastle(targetId); 
-                castle.samuraiIds = castle.samuraiIds.filter(id => id !== busho.id); 
-                targetC.samuraiIds.push(busho.id); 
-                busho.castleId = targetId; 
-                busho.isCastellan = false; 
                 
-                this.game.updateCastleLord(castle);
-                this.game.updateCastleLord(targetC);
+                // ★新しいお引越しセンターの魔法を使います！
+                this.game.affiliationSystem.moveCastle(busho, targetId);
 
                 count++; actionName = "移動"; 
             }
@@ -918,34 +906,12 @@ class CommandSystem {
         const success = GameSystem.calcEmploymentSuccess(doer, target, myPower, targetPower); 
         let msg = ""; 
         if (success) { 
-            const oldCastle = this.game.getCastle(target.castleId); 
-            if(oldCastle && oldCastle.samuraiIds.includes(target.id)) { 
-                oldCastle.samuraiIds = oldCastle.samuraiIds.filter(id => id !== target.id); 
-                this.game.updateCastleLord(oldCastle);
-            } 
             const currentC = this.game.getCurrentTurnCastle(); 
-            currentC.samuraiIds.push(target.id); 
-            target.castleId = currentC.id; 
-            target.clan = this.game.playerClanId; 
-            target.status = 'active'; 
             
-            // ★ここから書き換え：大名との相性を計算して忠誠度を決める処理です！
-            // ① 自分の軍の「大名（殿様）」を探します
-            const daimyo = this.game.bushos.find(b => b.clan === this.game.playerClanId && b.isDaimyo) || { affinity: 50 };
+            // ★新しいお引越しセンターの魔法を使います！
+            this.game.affiliationSystem.joinClan(target, this.game.playerClanId, currentC.id);
             
-            // ② 大名と、新しく入る武将の相性の「差」を計算します（差は0〜50になります）
-            const affDiff = GameSystem.calcAffinityDiff(daimyo.affinity, target.affinity);
-            
-            // ③ 相性の差が0なら50アップ、差が50なら0アップになるように計算します
-            const loyaltyUp = 50 - affDiff;
-            
-            // ④ 基本の50に、アップ分を足して忠誠度をセットします（最高100まで）
-            target.loyalty = Math.min(100, 50 + loyaltyUp); 
-            // ★ここまで書き換え
-            
-            this.game.updateCastleLord(currentC);
-            
-            msg = `${target.name}の登用に成功しました！`; 
+            msg = `${target.name}の登用に成功しました！`;
             const maxStat = Math.max(target.strength, target.intelligence, target.leadership, target.charm, target.diplomacy);
             doer.achievementTotal += Math.floor(maxStat * 0.3);
             this.game.factionSystem.updateRecognition(doer, 20); 
@@ -1313,33 +1279,15 @@ class CommandSystem {
             } else {
                 // ■ 普通の武将（城主以外）を引き抜いた場合
                 
-                if(oldCastle) {
-                    // 元の城の名簿から名前を消します
-                    oldCastle.samuraiIds = oldCastle.samuraiIds.filter(id => id !== target.id);
-                    this.game.updateCastleLord(oldCastle);
-                }
-
-                // プレイヤーの城に移動させます
-                target.clan = newClanId; 
                 target.belongKunishuId = 0; 
-                target.castleId = castle.id; 
-                
-                // ★ここから書き換え：普通の引抜時の忠誠度計算です！
-                const daimyo = this.game.bushos.find(b => b.clan === newClanId && b.isDaimyo) || { affinity: 50 };
-                const affDiff = GameSystem.calcAffinityDiff(daimyo.affinity, target.affinity);
-                const loyaltyUp = 50 - affDiff;
-                target.loyalty = Math.min(100, 50 + loyaltyUp);
-                // ★ここまで書き換え
-                
                 target.isActionDone = true; 
-                target.status = 'active';
-                castle.samuraiIds.push(target.id);
-                this.game.updateCastleLord(castle);
                 
-                // メッセージ表示（国人衆を離れ～という誤字を直しました）
+                // ★新しいお引越しセンターの魔法を使います！
+                this.game.affiliationSystem.joinClan(target, newClanId, castle.id);
+                
+                // メッセージ表示
                 this.game.ui.showResultModal(`${doer.name}の引抜工作が成功！\n${target.name}が我が軍に加わりました！`);
             }
-            // ▲ ここまで ▲
             
             const maxStat = Math.max(target.strength, target.intelligence, target.leadership, target.charm, target.diplomacy);
             doer.achievementTotal += Math.floor(maxStat * 0.3);
@@ -1402,22 +1350,11 @@ class CommandSystem {
         let isSuccess = GameSystem.calcHeadhunt(doer, target, gold, targetLord, newLord);
 
         if (isSuccess) {
-            // 在野（国人衆）から大名家の武将になる処理
-            target.clan = this.game.playerClanId; 
             target.belongKunishuId = 0; // 国人衆を抜ける
-            target.castleId = castle.id; 
-            
-            // ★ここから書き換え：国人衆の引抜時の忠誠度計算です！
-            const daimyo = this.game.bushos.find(b => b.clan === this.game.playerClanId && b.isDaimyo) || { affinity: 50 };
-            const affDiff = GameSystem.calcAffinityDiff(daimyo.affinity, target.affinity);
-            const loyaltyUp = 50 - affDiff;
-            target.loyalty = Math.min(100, 50 + loyaltyUp);
-            // ★ここまで書き換え
-            
             target.isActionDone = true; 
-            target.status = 'active';
-            castle.samuraiIds.push(target.id);
-            this.game.updateCastleLord(castle);
+            
+            // ★新しいお引越しセンターの魔法を使います！
+            this.game.affiliationSystem.joinClan(target, this.game.playerClanId, castle.id);
             
             this.game.ui.showResultModal(`${doer.name}の引抜工作が成功！\n${target.name}が国人衆を離れ、我が軍に加わりました！`);
             const maxStat = Math.max(target.strength, target.intelligence, target.leadership, target.charm, target.diplomacy);
@@ -1675,15 +1612,12 @@ class CommandSystem {
         bushoIds.forEach(id => {
             const b = this.game.getBusho(id);
             this.game.factionSystem.handleMove(b, c.id, targetId); 
-            c.samuraiIds = c.samuraiIds.filter(sid => sid !== b.id);
-            t.samuraiIds.push(b.id);
-            b.castleId = targetId;
-            b.isCastellan = false;
+            
+            // ★新しいお引越しセンターの魔法を使います！
+            this.game.affiliationSystem.moveCastle(b, targetId);
+            
             b.isActionDone = true;
         });
-        
-        this.game.updateCastleLord(c);
-        this.game.updateCastleLord(t);
         
         this.game.ui.showResultModal(`${this.game.getBusho(bushoIds[0]).name}が${t.name}へ物資を輸送しました`); this.game.ui.updatePanelHeader(); this.game.ui.renderCommandMenu();
     }
