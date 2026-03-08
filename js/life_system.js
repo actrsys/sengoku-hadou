@@ -330,6 +330,9 @@ class LifeSystem {
             const displayClanName = clanName.endsWith('家') ? clanName : clanName + '家';
             const msg = `【大名家滅亡】\n${daimyo.name.replace('|','')}が死亡し、後継ぎがいないため${displayClanName}は滅亡しました。`;
             this.game.ui.log(msg);
+
+            // ★大名家が滅亡して勢力が変わるので、威信を最新に更新しておきます！
+            if (window.GameApp) window.GameApp.updateAllClanPrestige();
             
             // ★ここも0秒にするだけです！
             await this.game.ui.showDialogAsync(msg, false, 0);
@@ -338,9 +341,13 @@ class LifeSystem {
             this.game.castles.filter(c => c.ownerClan === daimyo.clan).forEach(c => {
                 c.ownerClan = 0;
                 c.castellanId = 0;
-                // ★追加：城の武将たちを浪人にします
+                // ★城の武将たちを浪人にします
                 this.game.getCastleBushos(c.id).forEach(l => { 
                     if (l.status === 'unborn' || l.status === 'dead') return;
+                    // ★大名家の武将が浪人になるので功績を半分にします！
+                    if ((l.belongKunishuId || 0) === 0 && l.clan !== 0) {
+                        l.achievementTotal = Math.floor((l.achievementTotal || 0) / 2);
+                    }
                     l.clan = 0; 
                     l.status = 'ronin'; 
                 }); 

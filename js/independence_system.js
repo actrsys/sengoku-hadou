@@ -161,13 +161,17 @@ class IndependenceSystem {
         let isDefection = false;
         let newClanId;
         let newClanName;
-
+        
         if (targetClanId) {
             isDefection = true;
             newClanId = targetClanId;
             const targetClan = this.game.clans.find(c => c.id === targetClanId);
             newClanName = targetClan ? targetClan.name : "敵対大名";
 
+            // ★追加：大名家が変わるので功績半分！
+            if (castellan.clan !== 0 && castellan.clan !== newClanId) {
+                castellan.achievementTotal = Math.floor((castellan.achievementTotal || 0) / 2);
+            }
             castellan.clan = newClanId;
             castellan.loyalty = 100;
             castle.ownerClan = newClanId;
@@ -175,7 +179,7 @@ class IndependenceSystem {
         } else {
             newClanId = Math.max(...this.game.clans.map(c => c.id)) + 1;
             const newColor = '#' + Math.floor(Math.random()*16777215).toString(16).padStart(6, '0');
-            // ★変更：新大名家の名前は神輿の人物ベース
+            // ★新大名家の名前は神輿の人物ベース
             const familyName = rebellionLeader.familyName || rebellionLeader.name; 
             newClanName = `${familyName}家`;
 
@@ -186,6 +190,10 @@ class IndependenceSystem {
 
             rebellionLeader.isDaimyo = true;
             
+            // ★大名家が変わる（新設）ので功績半分！
+            if (castellan.clan !== 0 && castellan.clan !== newClanId) {
+                castellan.achievementTotal = Math.floor((castellan.achievementTotal || 0) / 2);
+            }
             castellan.clan = newClanId;
             castellan.loyalty = 100;
             castle.ownerClan = newClanId;
@@ -195,9 +203,13 @@ class IndependenceSystem {
             newClan.diplomacyValue[oldClanId] = { status: '敵対', sentiment: 0 };
         }
 
-        // ★追加：神輿（派閥主）本人の処遇
+        // ★神輿（派閥主）本人の処遇
         if (isProxyRebellion) {
             const leaderCastle = this.game.castles.find(c => c.id === rebellionLeader.castleId);
+            // ★神輿（派閥主）も大名家が変わるので功績半分！
+            if (rebellionLeader.clan !== 0 && rebellionLeader.clan !== newClanId) {
+                rebellionLeader.achievementTotal = Math.floor((rebellionLeader.achievementTotal || 0) / 2);
+            }
             if (rebellionLeader.isCastellan && leaderCastle) {
                 // 派閥主がどこかの城主なら、その城も新勢力になる
                 leaderCastle.ownerClan = newClanId;
@@ -217,10 +229,10 @@ class IndependenceSystem {
         }
 
         // 部下たちの去就
-        // ★変更：主君の基準を rebellionLeader にする
+        // ★主君の基準を rebellionLeader にする
         let captiveMsgs = this.resolveSubordinates(castle, rebellionLeader, oldDaimyo, newClanId, oldClanId);
 
-        // ★追加：派閥主が別の城の城主だった場合、その城の部下たちも処遇を決定する
+        // ★派閥主が別の城の城主だった場合、その城の部下たちも処遇を決定する
         if (isProxyRebellion && rebellionLeader.isCastellan) {
             const leaderCastle = this.game.castles.find(c => c.id === rebellionLeader.castleId);
             if (leaderCastle && leaderCastle.id !== castle.id) {
@@ -230,7 +242,7 @@ class IndependenceSystem {
             }
         }
 
-        // ★変更：基準を rebellionLeader にして派閥全体の呼応を処理
+        // ★基準を rebellionLeader にして派閥全体の呼応を処理
         this.resolveFactionWideRebellion(rebellionLeader, oldClanId, newClanId, oldDaimyo);
         this.resolveDistantFactionMembers(rebellionLeader, oldClanId, newClanId, oldDaimyo);
 
@@ -239,7 +251,7 @@ class IndependenceSystem {
         const oldClanName = this.game.clans.find(c => c.id === oldClanId)?.name || "不明";
         let msg = "";
         
-        // ★変更：メッセージの出し分け
+        // ★メッセージの出し分け
         if (isProxyRebellion) {
             if (isDefection) {
                 msg = `【派閥寝返り】${oldClanName}の${castellan.name}が派閥主・${rebellionLeader.name}を擁立し、${castle.name}ごと敵対する${newClanName}へ寝返りました！`;
@@ -253,6 +265,9 @@ class IndependenceSystem {
                 msg = `【謀反】${oldClanName}の${castellan.name}が${castle.name}にて独立しました！`;
             }
         }
+        
+        // ★追加：独立や寝返りで勢力が大きく変わるので、威信を最新に更新しておきます！
+        if (window.GameApp) window.GameApp.updateAllClanPrestige();
         
         this.game.ui.log(msg);
         if (captiveMsgs && captiveMsgs.length > 0) msg += '\n\n' + captiveMsgs.join('\n');
@@ -282,11 +297,15 @@ class IndependenceSystem {
         const subordinates = this.game.getCastleBushos(castle.id).filter(b => b.id !== newDaimyo.id && b.status !== 'ronin' && b.clan === oldClanId);
         const captives = [], joiners = [];
         const escapeCastles = this.game.castles.filter(c => c.ownerClan === oldClanId && c.id !== castle.id);
-
+        
         subordinates.forEach(busho => {
             const { joinScore, stayScore } = this.calculateLoyaltyScores(busho, newDaimyo, oldDaimyo);
             if (joinScore > stayScore) {
                 const oldLoy = busho.loyalty;
+                // ★大名家が変わるので功績半分！
+                if (busho.clan !== 0 && busho.clan !== newClanId) {
+                    busho.achievementTotal = Math.floor((busho.achievementTotal || 0) / 2);
+                }
                 busho.clan = newClanId;
                 busho.loyalty = this.calcNewLoyalty(oldLoy);
                 joiners.push(busho);
@@ -304,6 +323,10 @@ class IndependenceSystem {
                     }
                 } else {
                     const oldLoy = busho.loyalty;
+                    // ★大名家が変わるので功績半分！
+                    if (busho.clan !== 0 && busho.clan !== newClanId) {
+                        busho.achievementTotal = Math.floor((busho.achievementTotal || 0) / 2);
+                    }
                     busho.clan = newClanId;
                     busho.loyalty = Math.min(40, this.calcNewLoyalty(oldLoy) - 50); // 消極的合流は低めに設定
                     joiners.push(busho);
@@ -324,6 +347,10 @@ class IndependenceSystem {
                     this.game.ui.log(`  -> 呼応！${castle.name}城主の${busho.name}が${leader.name}に与しました！`);
                     const oldLoy = busho.loyalty;
                     castle.ownerClan = newClanId;
+                    // ★大名家が変わるので功績半分！
+                    if (busho.clan !== 0 && busho.clan !== newClanId) {
+                        busho.achievementTotal = Math.floor((busho.achievementTotal || 0) / 2);
+                    }
                     busho.clan = newClanId;
                     busho.loyalty = this.calcNewLoyalty(oldLoy);
                     this.resolveSubordinates(castle, leader, oldDaimyo, newClanId, oldClanId);
@@ -347,6 +374,10 @@ class IndependenceSystem {
                     oldCastle.samuraiIds = oldCastle.samuraiIds.filter(id => id !== busho.id);
                     this.game.updateCastleLord(oldCastle);
                 }
+                // ★大名家が変わるので功績半分！
+                if (busho.clan !== 0 && busho.clan !== newClanId) {
+                    busho.achievementTotal = Math.floor((busho.achievementTotal || 0) / 2);
+                }
                 busho.clan = newClanId;
                 busho.castleId = mainCastle.id;
                 busho.loyalty = 100; // 駆けつけた場合は特別に100
@@ -369,7 +400,13 @@ class IndependenceSystem {
                         const target = returnCastles[Math.floor(Math.random() * returnCastles.length)];
                         p.clan = oldClanId; p.castleId = target.id; target.samuraiIds.push(p.id);
                         this.game.updateCastleLord(target);
-                    } else { p.status = 'ronin'; p.clan = 0; }
+                    } else { 
+                        // ★大名家の武将が浪人になるので功績を半分にします！
+                        if ((p.belongKunishuId || 0) === 0 && p.clan !== 0) {
+                            p.achievementTotal = Math.floor((p.achievementTotal || 0) / 2);
+                        }
+                        p.status = 'ronin'; p.clan = 0; 
+                    }
                     alertMsgs.push(`解放：${p.name} は解放されました。`);
                 }
             } else if (newClanId === this.game.playerClanId) {
