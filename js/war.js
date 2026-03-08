@@ -1150,21 +1150,32 @@ class WarManager {
                             this.game.ui.showPrisonerModal(this.pendingPrisoners);
                         }
                         
+                        // ==========================================
+                        // ★ここが大事！
+                        // プレイヤーが選ぶのを「待つ」ので、ここでは何もしません！
+                        // （選んだ後の nextStep 魔法にお任せします）
+                        // ==========================================
+                        
                     } else {
+                        // AIが勝った場合は自動で処理します
                         await this.autoResolvePrisoners(this.pendingPrisoners, winnerClan);
                         this.pendingPrisoners = [];
+                        
+                        // ==========================================
+                        // ★AIの場合は、そのまま滅亡チェックとターン終了へ進みます！
+                        await this.game.lifeSystem.checkClanExtinction(s.oldDefClanId, 'no_castle');
+                        if (window.GameApp) window.GameApp.updateAllClanPrestige(); // 威信を更新
+                        this.game.finishTurn();
+                        // ==========================================
                     }
-                    // ★life_system.js の滅亡チェック魔法を呼び出します！
+                } else {
+                    // ==========================================
+                    // ★捕虜がいなかった場合も、そのまま滅亡チェックとターン終了へ進みます！
                     await this.game.lifeSystem.checkClanExtinction(s.oldDefClanId, 'no_castle');
                     if (window.GameApp) window.GameApp.updateAllClanPrestige(); // 威信を更新
                     this.game.finishTurn();
+                    // ==========================================
                 }
-            } else {
-                // ★life_system.js の滅亡チェック魔法を呼び出します！
-                await this.game.lifeSystem.checkClanExtinction(s.oldDefClanId, 'no_castle');
-                if (window.GameApp) window.GameApp.updateAllClanPrestige(); // 威信を更新
-                this.game.finishTurn();
-            }
             };
             
             // 兵士の減った割合を計算して、馬と鉄砲も減らす（壊れる）処理
@@ -1700,7 +1711,8 @@ class WarManager {
         
         if (action === 'hire') { 
             if (kunishu && prisoner.id === kunishu.leaderId) {
-                this.game.ui.showDialog(`${prisoner.name}「国衆を束ねるこの俺が、お前になど仕えるか！」\n(※国人衆の代表者は登用できません)`, false); 
+                // ★ここを修正：「stayStep」を付け足して、ちゃんとやり直せるようにしました！
+                this.game.ui.showDialog(`${prisoner.name}「国衆を束ねるこの俺が、お前になど仕えるか！」\n(※国人衆の代表者は登用できません)`, false, stayStep); 
                 return; // やり直し
             }
 
