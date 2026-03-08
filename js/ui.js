@@ -954,7 +954,9 @@ class UIManager {
                 listEl.appendChild(div);
             });
         }
-
+        if (listEl) {
+            listEl.scrollTop = 0;
+        }
         modal.classList.remove('hidden');
     }
 
@@ -1210,7 +1212,11 @@ class UIManager {
 
     showResultModal(msg, onClose = null, customFooterHtml = null) { 
         this.hideAIGuardTemporarily(); 
-        if (this.resultBody) this.resultBody.innerHTML = msg.replace(/\n/g, '<br>');
+        if (this.resultBody) {
+            this.resultBody.innerHTML = msg.replace(/\n/g, '<br>');
+            // ここがリストを一番上に戻す魔法です！
+            this.resultBody.scrollTop = 0;
+        }
         const footer = document.getElementById('result-footer');
         if (footer) {
             if (customFooterHtml !== null) {
@@ -2721,7 +2727,11 @@ class UIManager {
             this.selectorList.appendChild(div);
         });
         if (bushos.length === 0 && this.selectorList) this.selectorList.innerHTML = "<div style='padding:10px;'>対象となる武将がいません</div>";
-
+        
+        if (this.selectorList) {
+            this.selectorList.scrollTop = 0;
+        }
+        
         if (this.selectorConfirmBtn) {
             if (actionType === 'view_only' || actionType === 'all_busho_list') {
                 this.selectorConfirmBtn.classList.add('hidden'); 
