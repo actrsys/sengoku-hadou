@@ -305,29 +305,42 @@ class LifeSystem {
         const clanBushos = this.game.bushos.filter(b => b.clan === daimyo.clan && b.status === 'active' && !b.isDaimyo);
         
         if (clanBushos.length > 0) {
-            // 誰を後継ぎにするか、計算して決めます
-            clanBushos.forEach(b => {
-                b._isRelative = daimyo.familyIds.some(fId => b.familyIds.includes(fId));
-                b._affinityDiff = Math.abs((daimyo.affinity || 0) - (b.affinity || 0));
-                b._baseScore = b.leadership + b.intelligence;
-            });
             
-            clanBushos.sort((a, b) => {
-                if (a._isRelative && !b._isRelative) return -1;
-                if (!a._isRelative && b._isRelative) return 1;
-                if (a._isRelative && b._isRelative) {
-                    if (a._affinityDiff !== b._affinityDiff) return a._affinityDiff - b._affinityDiff;
-                    if (a.birthYear !== b.birthYear) return a.birthYear - b.birthYear;
-                }
-                return b._baseScore - a._baseScore;
-            });
+            let successor = null;
             
-            // 一番上に来た人を後継ぎにします！
-            const successor = clanBushos[0];
+            // ★ここから変更：プレイヤーの家なら自分で選ぶ魔法を復活させます！
+            if (daimyo.clan === this.game.playerClanId) {
+                // プレイヤーが選ぶまで「待つ」魔法です
+                await new Promise(resolve => {
+                    this.game.ui.showSuccessionModal(clanBushos, (newLeaderId) => {
+                        successor = this.game.getBusho(newLeaderId);
+                        resolve();
+                    });
+                });
+            } else {
+                // AIの場合は、自動で一番ふさわしい人を計算して選びます
+                clanBushos.forEach(b => {
+                    b._isRelative = daimyo.familyIds.some(fId => b.familyIds.includes(fId));
+                    b._affinityDiff = Math.abs((daimyo.affinity || 0) - (b.affinity || 0));
+                    b._baseScore = b.leadership + b.intelligence;
+                });
+                
+                clanBushos.sort((a, b) => {
+                    if (a._isRelative && !b._isRelative) return -1;
+                    if (!a._isRelative && b._isRelative) return 1;
+                    if (a._isRelative && b._isRelative) {
+                        if (a._affinityDiff !== b._affinityDiff) return a._affinityDiff - b._affinityDiff;
+                        if (a.birthYear !== b.birthYear) return a.birthYear - b.birthYear;
+                    }
+                    return b._baseScore - a._baseScore;
+                });
+                
+                // 一番上に来た人を後継ぎにします！
+                successor = clanBushos[0];
+            }
             
             this.game.changeLeader(daimyo.clan, successor.id);
-
-            // ==========================================
+            
             // ★新旧大名の能力比較と、忠誠・民忠への影響！
             
             // 1. 交代前の大名と、新しい大名の「6つの能力の合計」を計算します
