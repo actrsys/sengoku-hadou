@@ -2069,6 +2069,7 @@ class WarManager {
              if (window.GameApp) window.GameApp.updateAllClanPrestige(); // ★威信を更新
              this.game.finishTurn(); 
         }, 100);
+    }
     
     // ★共通の滅亡チェック魔法です！
     async checkClanExtinction(clanId, reason = 'no_castle') {
