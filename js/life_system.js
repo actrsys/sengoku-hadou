@@ -326,6 +326,48 @@ class LifeSystem {
             const successor = clanBushos[0];
             
             this.game.changeLeader(daimyo.clan, successor.id);
+
+            // ==========================================
+            // ★新旧大名の能力比較と、忠誠・民忠への影響！
+            
+            // 1. 交代前の大名と、新しい大名の「6つの能力の合計」を計算します
+            const oldTotal = daimyo.leadership + daimyo.strength + (daimyo.politics || 0) + (daimyo.diplomacy || 0) + daimyo.intelligence + daimyo.charm;
+            const newTotal = successor.leadership + successor.strength + (successor.politics || 0) + (successor.diplomacy || 0) + successor.intelligence + successor.charm;
+            
+            // 2. 差額を計算します（プラスなら優秀、マイナスなら不安）
+            const diff = newTotal - oldTotal;
+            
+            // 3. 最大±15になるように計算します（差額100で15変動なので、0.15を掛けます）
+            let changeVal = Math.floor(diff * 0.15);
+            
+            // 上限15、下限-15でストッパーをかけます
+            changeVal = Math.max(-15, Math.min(15, changeVal));
+
+            // もし能力に差があって、変動する数値が0じゃないなら魔法発動！
+            if (changeVal !== 0) {
+                // ① 配下武将の忠誠を変動させます（新当主本人は除きます）
+                const retainers = this.game.bushos.filter(b => b.clan === daimyo.clan && b.id !== successor.id && b.status === 'active');
+                retainers.forEach(b => {
+                    // 忠誠度は0～100の間で収まるようにします
+                    b.loyalty = Math.max(0, Math.min(100, b.loyalty + changeVal));
+                });
+                
+                // ② 所有しているお城の民忠を変動させます
+                const clanCastlesInfo = this.game.castles.filter(c => c.ownerClan === daimyo.clan);
+                clanCastlesInfo.forEach(c => {
+                    // 民忠も0～100の間で収まるようにします
+                    c.peoplesLoyalty = Math.max(0, Math.min(100, (c.peoplesLoyalty || 50) + changeVal));
+                });
+
+                // ③ プレイヤーの大名家なら、メッセージに結果を書き足してお知らせします！
+                if (daimyo.clan === this.game.playerClanId) {
+                    if (changeVal > 0) {
+                        extraMsg += `\n新当主への期待から、家臣の忠誠と領内の民忠が ${changeVal} 上昇しました！`;
+                    } else {
+                        extraMsg += `\n当主の交代による不安から、家臣の忠誠と領内の民忠が ${Math.abs(changeVal)} 低下しました……。`;
+                    }
+                }
+            }
             
             const msg = `【当主交代】\n${daimyo.name.replace('|','')}が死亡し、${successor.name.replace('|','')}が家督を継ぎました。${extraMsg}`;
             this.game.ui.log(`【当主交代】${daimyo.name.replace('|','')}が死亡し、${successor.name.replace('|','')}が家督を継ぎました。`);
