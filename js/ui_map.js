@@ -170,7 +170,7 @@ Object.assign(UIManager.prototype, {
                 initialPinchDist = null;
             }
         });
-    }
+    },
 
     applyInertia(sc) {
         const friction = 0.92; 
@@ -191,7 +191,7 @@ Object.assign(UIManager.prototype, {
         };
         
         this.inertiaFrame = requestAnimationFrame(animate);
-    }
+    },
     
     fitMapToScreen() {
         if (!this.mapEl) return;
@@ -213,7 +213,7 @@ Object.assign(UIManager.prototype, {
         let minScale = isPC ? Math.min(scaleX, scaleY) * config.minMargin : Math.max(scaleX, scaleY) * config.minMargin;
 
         this.zoomStages = [
-            minScale,      
+            minScale,       
             config.mid,    
             config.max     
         ];
@@ -234,7 +234,7 @@ Object.assign(UIManager.prototype, {
         
         this.applyMapScale();
         this.updateZoomButtons(); 
-    }
+    },
     
     applyMapScale() {
         if(this.mapEl) {
@@ -275,7 +275,7 @@ Object.assign(UIManager.prototype, {
                 spacer.style.height = `${Math.floor(scaledH + marginTop * 2)}px`;
             }
         }
-    }
+    },
     
     changeMapZoom(direction, cx = null, cy = null) {
         const sc = document.getElementById('map-scroll-container');
@@ -417,7 +417,8 @@ Object.assign(UIManager.prototype, {
             sc.style.overflow = 'auto';
             this.updateZoomButtons();
         }
-    }
+    },
+    
     scrollToActiveCastle(castle = null) {
         const targetCastle = castle || this.currentCastle || this.game.getCurrentTurnCastle();
         const sc = document.getElementById('map-scroll-container');
@@ -437,13 +438,15 @@ Object.assign(UIManager.prototype, {
             top: scaledY - sc.clientHeight / 2,
             behavior: 'smooth'
         });
-    }
+    },
+    
     updateZoomButtons() {
         if (!this.mapZoomInBtn || !this.mapZoomOutBtn) return;
         
         this.mapZoomInBtn.style.display = (this.zoomLevel >= 2) ? 'none' : 'flex';
         this.mapZoomOutBtn.style.display = (this.zoomLevel <= 0) ? 'none' : 'flex';
-    }
+    },
+    
     renderMap() {
         if (!this.mapEl) return;
         this.mapEl.innerHTML = ''; 
@@ -721,7 +724,8 @@ Object.assign(UIManager.prototype, {
             document.body.classList.remove('daimyo-select-mode'); // 終わったら目印を外します
         }
         // ==========================================
-    }
+    },
+    
     // ★新魔法：大名家の名前を賢く並べる魔法です
     renderDaimyoLabels() {
         const labelsData = [];
@@ -813,7 +817,8 @@ Object.assign(UIManager.prototype, {
 
             this.mapEl.appendChild(el);
         });
-    }
+    },
+    
     updateCastleGlows() {
         if (!this.mapEl) return;
         
