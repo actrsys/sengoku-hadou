@@ -122,13 +122,11 @@ class AIEngine {
                         if (this.game.factionSystem && this.game.factionSystem.handleMove) {
                             this.game.factionSystem.handleMove(castellan, castle.id, bestCastle.id);
                         }
-                        castle.samuraiIds = castle.samuraiIds.filter(id => id !== castellan.id);
-                        bestCastle.samuraiIds.push(castellan.id);
-                        castellan.castleId = bestCastle.id;
-                        castellan.isActionDone = true;
                         
-                        this.game.updateCastleLord(castle);
-                        this.game.updateCastleLord(bestCastle);
+                        // ★新しいお引越しセンターの魔法を使います！
+                        this.game.affiliationSystem.moveCastle(castellan, bestCastle.id);
+                        
+                        castellan.isActionDone = true;
                         
                         // お引越しをしたので、このお城のターンはおしまいです！
                         this.game.finishTurn();
@@ -966,14 +964,8 @@ class AIEngine {
                     const success = GameSystem.calcEmploymentSuccess(doer, targetRonin, myPower, 0);
                     
                     if (success) {
-                        targetRonin.status = 'active';
-                        targetRonin.clan = castle.ownerClan;
-                        targetRonin.loyalty = 50;
-                        targetRonin.castleId = castle.id;
-                        if (!castle.samuraiIds.includes(targetRonin.id)) {
-                            castle.samuraiIds.push(targetRonin.id);
-                        }
-                        this.game.updateCastleLord(castle);
+                        // ★新しいお引越しセンターの魔法を使います！
+                        this.game.affiliationSystem.joinClan(targetRonin, castle.ownerClan, castle.id);
                         
                         // ★プレイヤーと同じ！成功したらしっかり功績と承認欲求のご褒美をあげます
                         const maxStat = Math.max(targetRonin.strength, targetRonin.intelligence, targetRonin.leadership, targetRonin.charm, targetRonin.diplomacy);
@@ -1213,9 +1205,10 @@ class AIEngine {
                         // リストに入っている全員を一斉に移動させます
                         movers.forEach(mover => {
                             this.game.factionSystem.handleMove(mover, castle.id, action.targetId);
-                            castle.samuraiIds = castle.samuraiIds.filter(id => id !== mover.id);
-                            targetCastle.samuraiIds.push(mover.id);
-                            mover.castleId = action.targetId;
+                            
+                            // ★新しいお引越しセンターの魔法を使います！
+                            this.game.affiliationSystem.moveCastle(mover, action.targetId);
+                            
                             mover.isActionDone = true;
                         });
                         
