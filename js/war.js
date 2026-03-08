@@ -1103,7 +1103,8 @@ class WarManager {
             
             // ==========================================
             // ★ここから追加：AI同士の戦争の結果メッセージを出して時間を止めます！
-            if (!s.isPlayerInvolved) {
+            // ★修正：国人衆の戦いの時は専用のメッセージがあるので、ここではお休みします！
+            if (!s.isPlayerInvolved && !s.isKunishuSubjugation && !s.attacker.isKunishu) {
                 const atkClanData = this.game.clans.find(c => c.id === s.attacker.ownerClan);
                 const defClanData = this.game.clans.find(c => c.id === s.oldDefClanId);
                 const atkDaimyoName = atkClanData ? atkClanData.name : (s.attacker.isKunishu ? s.attacker.name : "中立");
@@ -1364,6 +1365,8 @@ class WarManager {
                     this.game.ui.setWarModalVisible(false);
                     this.game.ui.showResultModal(resultMsg, () => { this.closeWar(); });
                 } else {
+                    // ★追加：AIが討伐した時も、専用のメッセージを出してタップを待ちます！
+                    await this.game.ui.showTapMessage(resultMsg);
                     this.closeWar();
                 }
                 return;
@@ -1435,6 +1438,8 @@ class WarManager {
                     this.game.ui.setWarModalVisible(false);
                     this.game.ui.showResultModal(resultMsg, () => { this.closeWar(); });
                 } else {
+                    // ★追加：AIの城で反乱が起きた時も、専用のメッセージを出してタップを待ちます！
+                    await this.game.ui.showTapMessage(resultMsg);
                     this.closeWar();
                 }
                 return;
