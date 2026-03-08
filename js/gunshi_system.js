@@ -50,7 +50,7 @@ class GunshiSystem {
             let msg = "";
             // 軍師自身が不満を持っている場合
             if (gunshiIsUnhappy) {
-                msg += `「殿、恐れながら申し上げます。一族郎党を養う為にも、待遇の改善を賜りたく存じます。」<br>`;
+                msg += `「殿、恐れながら申し上げます。一族郎党を養う為にも、待遇の見直しを賜りたく存じます。」<br>`;
             }
             // 他の武将が不満を持っている場合
             if (othersUnhappy.length > 0) {
