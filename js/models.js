@@ -217,7 +217,7 @@ class Busho {
         }
         if (this.isDaimyo) return "大名";
         if (this.isCastellan) return "城主";
-        if (this.isGunshi) return "軍師"; // ★これを書き足します！
+        if (this.isGunshi) return "軍師";
         if (this.belongKunishuId > 0 && this.id === (window.GameApp ? window.GameApp.kunishuSystem.getKunishu(this.belongKunishuId)?.leaderId : 0)) return "頭領";
         if (this.belongKunishuId > 0) return "国衆";
         if (this.status === 'ronin') return "浪人";
