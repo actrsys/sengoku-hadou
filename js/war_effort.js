@@ -339,7 +339,7 @@ Object.assign(WarManager.prototype, {
                         }
                     } else {
                         if (totalDefSoldiers >= atkSoldierCount * 0.8) {
-                            let availableDefBushos = this.game.getCastleBushos(defCastle.id).filter(b => b.status !== 'dead');
+                            let availableDefBushos = this.game.getCastleBushos(defCastle.id).filter(b => b.status !== 'dead' && b.status !== 'ronin' && b.status !== 'unborn');
                             // ★ここから下を差し替えます！
                             // 1. 誰がみんなの強さを見積もるか（評価者）を決めます！
                             // その城にいる大名、いなければ城主が評価者になります
@@ -887,7 +887,7 @@ Object.assign(WarManager.prototype, {
             }
 
             s.atkBushos.forEach(b => { this.game.factionSystem.recordBattle(b, s.defender.id); this.game.factionSystem.updateRecognition(b, 25); });
-            const defBushos = this.game.getCastleBushos(s.defender.id).concat(this.pendingPrisoners);
+            const defBushos = this.game.getCastleBushos(s.defender.id).filter(b => b.status !== 'ronin').concat(this.pendingPrisoners);
             if (s.defBusho && s.defBusho.id && !defBushos.find(b => b.id === s.defBusho.id)) defBushos.push(s.defBusho);
             defBushos.forEach(b => { this.game.factionSystem.recordBattle(b, s.defender.id); this.game.factionSystem.updateRecognition(b, 25); });
 
