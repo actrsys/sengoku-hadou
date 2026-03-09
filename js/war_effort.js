@@ -1479,10 +1479,10 @@ Object.assign(WarManager.prototype, {
 
     executeDefSelfReinforcementAuto(helperCastle, defCastle, onComplete) {
         const myClanId = defCastle.ownerClan;
-        let maxSendable = Math.max(500, Math.floor(helperCastle.soldiers * 0.5));
-        if (maxSendable > helperCastle.soldiers) maxSendable = helperCastle.soldiers;
-        let reinfSoldiers = Math.min(3000, maxSendable);
-
+        
+        let reinfSoldiers = Math.max(500, Math.floor(helperCastle.soldiers * 0.5));
+        if (reinfSoldiers > helperCastle.soldiers) reinfSoldiers = helperCastle.soldiers;
+        
         const availableBushos = this.game.getCastleBushos(helperCastle.id).filter(b => !b.isDaimyo && !b.isCastellan && b.status !== 'ronin' && b.belongKunishuId === 0).sort((a,b) => b.strength - a.strength);
         let bushoCount = reinfSoldiers >= 2500 ? 3 : (reinfSoldiers >= 1500 ? 2 : 1);
         const reinfBushos = availableBushos.slice(0, Math.min(bushoCount, availableBushos.length));
@@ -1605,12 +1605,11 @@ Object.assign(WarManager.prototype, {
         if (!['支配', '従属', '同盟'].includes(myToHelperRel.status)) this.game.diplomacyManager.updateSentiment(myClanId, helperClanId, -10);
 
         const helperDaimyo = this.game.bushos.find(b => b.clan === helperClanId && b.isDaimyo) || { duty: 50 };
-        let maxSendable = Math.max(500, Math.floor(helperCastle.soldiers * 0.5));
-        if (maxSendable > helperCastle.soldiers) maxSendable = helperCastle.soldiers;
-
-        let reinfSoldiers = Math.floor(maxSendable * (((myToHelperRel.sentiment / 100) + (helperDaimyo.duty / 100)) / 2 + 0.5));
-        reinfSoldiers = Math.max(500, Math.min(3000, Math.min(reinfSoldiers, helperCastle.soldiers)));
-
+        
+        const rate = (myToHelperRel.sentiment + helperDaimyo.duty) / 400;
+        let reinfSoldiers = Math.floor(helperCastle.soldiers * rate);
+        reinfSoldiers = Math.max(500, Math.min(reinfSoldiers, helperCastle.soldiers));
+        
         const availableBushos = this.game.getCastleBushos(helperCastle.id).filter(b => !b.isDaimyo && !b.isCastellan && b.status !== 'ronin' && b.belongKunishuId === 0).sort((a,b) => b.strength - a.strength);
         let bushoCount = reinfSoldiers >= 2500 ? 3 : (reinfSoldiers >= 1500 ? 2 : 1);
         const reinfBushos = availableBushos.slice(0, Math.min(bushoCount, availableBushos.length));
