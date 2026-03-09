@@ -1440,8 +1440,9 @@ Object.assign(WarManager.prototype, {
             rice: reinfRice, horses: reinfHorses, guns: reinfGuns, isSelf: true
         };
         
-        let color = myClanId === this.game.playerClanId ? "lightblue" : "pink";
-        this.game.ui.log(`【自軍援軍】<span style="color:${color};">${helperCastle.name}</span> から防衛の援軍が参戦しました。`);
+        // ★修正：防衛軍はプレイヤー・敵に関係なく「水色(log-color-def)」にします
+        let colorClass = "log-color-def";
+        this.game.ui.log(`【自軍援軍】<span class="${colorClass}">${helperCastle.name}</span> から防衛の援軍が参戦しました。`);
         onComplete(selfReinfData);
     }
 
@@ -1480,8 +1481,10 @@ Object.assign(WarManager.prototype, {
                     castle: helperCastle, bushos: reinfBushos, soldiers: rS,
                     rice: rR, horses: rH, guns: rG, isSelf: true
                 };
-                let color = "lightblue";
-                this.game.ui.log(`【自軍援軍】<span style="color:${color};">${helperCastle.name}</span> が防衛の援軍に出発しました！`);
+                
+                // ★修正：こちらも同じく「水色(log-color-def)」にします
+                let colorClass = "log-color-def";
+                this.game.ui.log(`【自軍援軍】<span class="${colorClass}">${helperCastle.name}</span> が防衛の援軍に出発しました！`);
                 onComplete(selfReinfData);
             },
             onCancel: () => this.game.ui.openBushoSelector('def_self_reinf_deploy', helperCastleId, null, () => onComplete(null))

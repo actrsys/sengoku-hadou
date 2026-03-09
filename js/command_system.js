@@ -2267,8 +2267,9 @@ class CommandSystem {
             rice: reinfRice, horses: reinfHorses, guns: reinfGuns, isAttacker: true, isSelf: true
         };
         
-        let color = myClanId === this.game.playerClanId ? "lightblue" : "pink";
-        this.game.ui.log(`【自軍援軍】<span style="color:${color};">${helperCastle.name}</span> から攻撃の援軍が参戦しました。`);
+        // ★修正：攻撃軍はプレイヤー・敵に関係なく「ピンク(log-color-atk)」にします
+        let colorClass = "log-color-atk";
+        this.game.ui.log(`【自軍援軍】<span class="${colorClass}">${helperCastle.name}</span> から攻撃の援軍が参戦しました。`);
         onComplete(selfReinfData);
     }
 
@@ -2307,8 +2308,10 @@ class CommandSystem {
                     castle: helperCastle, bushos: reinfBushos, soldiers: reinfSoldiers,
                     rice: reinfRice, horses: reinfHorses, guns: reinfGuns, isAttacker: true, isSelf: true
                 };
-                let color = "lightblue";
-                this.game.ui.log(`【自軍援軍】<span style="color:${color};">${helperCastle.name}</span> から攻撃の援軍が出発しました。`);
+                
+                // ★修正：こちらも同じく「ピンク(log-color-atk)」にします
+                let colorClass = "log-color-atk";
+                this.game.ui.log(`【自軍援軍】<span class="${colorClass}">${helperCastle.name}</span> から攻撃の援軍が出発しました。`);
                 onComplete(selfReinfData);
             },
             onCancel: () => this.game.ui.openBushoSelector('atk_self_reinf_deploy', helperCastleId, null, () => onComplete(null))
