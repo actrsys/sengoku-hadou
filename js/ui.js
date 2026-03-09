@@ -474,97 +474,16 @@ class UIManager {
     }
 
     initContextMenu() {
+        // 右クリックや長押しのメニューはバグの温床になるので、まるごと封印しました！
         this.contextMenu = document.getElementById('custom-context-menu');
-        this.ctxMenuBack = document.getElementById('ctx-menu-back');
-        this.ctxMenuFinish = document.getElementById('ctx-menu-finish');
-        this.longPressTimer = null;
-
-        document.addEventListener('contextmenu', (e) => {
-            e.preventDefault();
-            if(this.game.warManager && this.game.warManager.state.active) return;
-            this.showContextMenu(e.pageX, e.pageY);
-        });
-
-        document.addEventListener('touchstart', (e) => {
-            if (e.touches.length > 1) return; 
-            const touch = e.touches[0];
-            const x = touch.pageX;
-            const y = touch.pageY;
-            
-            this.longPressTimer = setTimeout(() => {
-                if(this.game.warManager && this.game.warManager.state.active) return;
-                this.showContextMenu(x, y);
-            }, 500);
-        }, { passive: true });
-
-        document.addEventListener('touchmove', () => {
-            if (this.longPressTimer) {
-                clearTimeout(this.longPressTimer);
-                this.longPressTimer = null;
-            }
-        }, { passive: true });
-
-        document.addEventListener('touchend', () => {
-            if (this.longPressTimer) {
-                clearTimeout(this.longPressTimer);
-                this.longPressTimer = null;
-            }
-        });
-
-        document.addEventListener('click', (e) => {
-            if (!this.contextMenu) return;
-            if (!this.contextMenu.classList.contains('hidden')) {
-                this.hideContextMenu();
-            }
-        });
     }
 
     showContextMenu(x, y) {
-        if (!this.contextMenu) return;
-        // ★ここを差し替え！：ゲーム中（game）以外の時は、メニューを封印します！
-        if (this.game.phase !== 'game') return;
-
-        this.contextMenu.style.left = `${x}px`;
-        this.contextMenu.style.top = `${y}px`;
-        this.contextMenu.classList.remove('hidden');
-
-        if (this.ctxMenuBack) {
-            if (this.game.selectionMode) {
-                this.ctxMenuBack.textContent = "戻る";
-            } else {
-                this.ctxMenuBack.textContent = "自拠点に戻る";
-            }
-
-            this.ctxMenuBack.onclick = (e) => {
-                e.stopPropagation();
-                this.hideContextMenu();
-                if(this.game.isProcessingAI) return;
-                
-                if (this.game.selectionMode) {
-                    this.cancelMapSelection(false); 
-                    this.scrollToActiveCastle();
-                } else {
-                    const myCastle = this.game.getCurrentTurnCastle();
-                    if (myCastle) {
-                        this.showControlPanel(myCastle);
-                        this.scrollToActiveCastle();
-                    }
-                }
-            };
-        }
-        if (this.ctxMenuFinish) {
-            this.ctxMenuFinish.onclick = (e) => {
-                e.stopPropagation();
-                this.hideContextMenu();
-                if(this.game.isProcessingAI) return;
-                this.showDialog("今月の命令を終了しますか？", true, () => {
-                    this.game.finishTurn();
-                });
-            };
-        }
+        // メニューを出さないように、魔法を空っぽにしました！
     }
 
     hideContextMenu() {
+        // エラーが出ないように、念のため「メニューを隠す」お約束だけ残しておきます
         if (this.contextMenu) this.contextMenu.classList.add('hidden');
     }
 
