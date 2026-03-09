@@ -2228,7 +2228,17 @@ class CommandSystem {
             proceedToAlly(null);
         } else {
             if (myClanId === pid && !atkCastle.isDelegated) {
-                this.game.ui.showSelfReinforcementSelector(selfCandidates, atkCastle, targetCastle, proceedToAlly);
+                // ★修正：いきなり城を選ばせず、援軍を呼ぶかどうかのワンクッションを入れます！
+                this.game.ui.showDialog("他の城から援軍を呼びますか？", true, 
+                    () => {
+                        // 「はい」を選んだら、お城を選ぶ画面へ
+                        this.game.ui.showSelfReinforcementSelector(selfCandidates, atkCastle, targetCastle, proceedToAlly);
+                    },
+                    () => {
+                        // 「いいえ」を選んだら、自軍援軍なしで次へ進む
+                        proceedToAlly(null);
+                    }
+                );
             } else {
                 selfCandidates.sort((a,b) => b.soldiers - a.soldiers);
                 this.executeSelfReinforcementAuto(selfCandidates[0], atkCastle, targetCastle, proceedToAlly);
