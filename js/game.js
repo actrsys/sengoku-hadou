@@ -13,8 +13,8 @@ window.onerror = function(message, source, lineno, colno, error) {
    ★ シナリオ定義 & 設定
    ========================================================================== */
 const SCENARIOS = [
-    { name: "1560年 桶狭間の戦い", desc: "海道一の弓取り・今川義元が大軍で上洛を狙う。", folder: "1560_okehazama", year: 1560, month: 4 },
-    { name: "1562年 清洲同盟", desc: "桶狭間より２年。２人の英雄は清州の地にて再会を果たす。", folder: "1562_kiyosudoumei", year: 1562, month: 2 }
+    { name: "1560年 桶狭間の戦い", desc: "海道一の弓取り・今川義元が大軍で上洛を狙う。", folder: "1560_okehazama", startYear: 1560, startMonth: 4 },
+    { name: "1562年 清洲同盟", desc: "桶狭間より２年。２人の英雄は清州の地にて再会を果たす。", folder: "1562_kiyosudoumei", startYear: 1562, startMonth: 1 }
 ];
 
 window.MainParams = {
@@ -44,11 +44,10 @@ window.MainParams = {
 class DataManager {
     static genericNames = { surnames: [], names: [] };
     static async loadAll(folderName) {
-        const scenario = SCENARIOS.find(s => s.folder === folderName);
-        if (scenario) {
-            window.MainParams.StartYear = scenario.year;
-            window.MainParams.StartMonth = scenario.month;
-            console.log(`シナリオ開始設定：${window.MainParams.StartYear}年${window.MainParams.StartMonth}月`);
+        const selectedScenario = SCENARIOS.find(s => s.folder === folderName);
+        if (selectedScenario) {
+            window.MainParams.StartYear = selectedScenario.startYear;
+            window.MainParams.StartMonth = selectedScenario.startMonth;
         }
         const path = `./data/scenarios/${folderName}/`;
         try {
