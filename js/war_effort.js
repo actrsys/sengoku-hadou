@@ -567,7 +567,7 @@ Object.assign(WarManager.prototype, {
                     if (b.isDaimyo) chance -= window.WarParams.War.DaimyoCaptureReduction;
                     if (chance > 0.5) { 
                         capturedBushos.push(b); 
-                        // ★お城から出て捕虜になります
+                        // ★城から出て捕虜になります
                         this.game.affiliationSystem.leaveCastle(b);
                     } else { 
                         this.game.factionSystem.handleMove(b, defCastle.id, target.id);
@@ -620,7 +620,7 @@ Object.assign(WarManager.prototype, {
                 
                 let resultMsg = "";
                 if (attackerWon) {
-                    // ★変更：お城の名前の代わりに、攻撃軍の総大将（s.atkBushos[0].name）にします！
+                    // ★変更：城の名前の代わりに、攻撃軍の総大将（s.atkBushos[0].name）にします！
                     resultMsg = `${atkDaimyoName}の${s.atkBushos[0].name}が\n${defDaimyoName}の${s.defender.name}を攻め落としました！`;
                 } else {
                     // ★変更：守備成功した時も、守備隊の総大将（s.defBusho.name）にします！
@@ -842,7 +842,7 @@ Object.assign(WarManager.prototype, {
                                 // ★新しいお引越しセンターの魔法を使います！
                                 this.game.affiliationSystem.moveCastle(b, escapeCastle.id);
                             } else {
-                                // ★味方の城がない場合（最後のお城だった場合）：浪人になります
+                                // ★味方の城がない場合（最後の城だった場合）：浪人になります
                                 // ★新しいお引越しセンターの魔法を使います！
                                 this.game.affiliationSystem.becomeRonin(b);
                             }
@@ -859,7 +859,7 @@ Object.assign(WarManager.prototype, {
                     resultMsg = `【国衆蜂起】\n国人衆の反乱により、${targetC.name}が陥落し空白地となりました。`;
                     this.game.ui.log(`【国衆蜂起】国人衆の反乱により、${targetC.name}が陥落し空白地となりました。`);
                     
-                    // ★お城をすべて失ったら、life_system.js の滅亡チェック魔法にお任せします！
+                    // ★城をすべて失ったら、life_system.js の滅亡チェック魔法にお任せします！
                     if (this.game.castles.filter(c => c.ownerClan === oldOwner).length === 0) {
                         await this.game.lifeSystem.checkClanExtinction(oldOwner, 'no_castle');
                     }
@@ -1084,7 +1084,7 @@ Object.assign(WarManager.prototype, {
             
             if (chance > 0.5) { 
                 captives.push(b); 
-                // ★お城から出て捕虜になります
+                // ★城から出て捕虜になります
                 this.game.affiliationSystem.leaveCastle(b);
             } else { 
                 if (friendlyCastles.length > 0) {
@@ -1374,7 +1374,7 @@ Object.assign(WarManager.prototype, {
         }, 100);
     },
     
-    // ★守備側が「自分の別のお城」から援軍を呼べるかチェックする魔法
+    // ★守備側が「自分の別の城」から援軍を呼べるかチェックする魔法
     checkDefenderSelfReinforcement(defCastle, onComplete) {
         const defClanId = defCastle.ownerClan;
         const pid = this.game.playerClanId;
@@ -1388,7 +1388,7 @@ Object.assign(WarManager.prototype, {
         let candidateCastles = [];
 
         this.game.castles.forEach(c => {
-            // 自分のお城で、攻められているお城以外を探す
+            // 自分の城で、攻められている城以外を探す
             if (c.ownerClan !== defClanId || c.id === defCastle.id) return;
             // 道が繋がっているか（到達可能か）
             if (!GameSystem.isReachable(this.game, defCastle, c, defClanId)) return;
@@ -1416,7 +1416,7 @@ Object.assign(WarManager.prototype, {
                 onComplete(reinfData);
             });
         } else {
-            // AIなら自動で一番兵士が多いお城から送る
+            // AIなら自動で一番兵士が多い城から送る
             candidateCastles.sort((a,b) => b.soldiers - a.soldiers);
             const bestCastle = candidateCastles[0];
             this.executeDefSelfReinforcementAuto(bestCastle, defCastle, (reinfData) => {

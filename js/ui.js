@@ -619,7 +619,7 @@ class UIManager {
         
         const clanDataList = activeClans.map(clan => {
             const leader = this.game.getBusho(clan.leaderId);
-            // お城の数だけ、ここで数えます
+            // 城の数だけ、ここで数えます
             const castlesCount = this.game.castles.filter(c => c.ownerClan === clan.id).length;
             
             return {
@@ -705,7 +705,7 @@ class UIManager {
         // ==========================================
         const toggleAllBtn = document.getElementById('btn-toggle-all-delegate');
         if (toggleAllBtn) {
-            // 今、リストにあるお城が「すべて委任状態」になっているか調べます
+            // 今、リストにある城が「すべて委任状態」になっているか調べます
             const isAllDelegated = myCastles.length > 0 && myCastles.every(c => c.isDelegated);
             
             // ★書き換え！：ボタンの文字だけでなく、背景色と枠線の色も一緒に変えます
@@ -1696,7 +1696,7 @@ class UIManager {
 
                              // ★ ここから追加：金や兵糧のオーバーチェック（チェックボックスを直接押した時）
                              if (e.target.checked) {
-                                 // spec.costGold は1人あたりの必要な金、c.gold はお城の今の貯金です
+                                 // spec.costGold は1人あたりの必要な金、c.gold は城の今の貯金です
                                  if (spec.costGold > 0 && currentChecked * spec.costGold > c.gold) {
                                      e.target.checked = false; // 無理なのでチェックを外します
                                      this.showDialog(`金が足りないため、これ以上選べません。`, false);

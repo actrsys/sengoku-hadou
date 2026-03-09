@@ -470,7 +470,7 @@ class CommandSystem {
                 return this.game.castles.filter(target => {
                     if (target.ownerClan === 0 || Number(target.ownerClan) === playerClanId) return false;
                     
-                    // ★ここを追加：その大名家の「大名（当主）」を探して、その人がいるお城だけをOK（選択可能）にします！
+                    // ★ここを追加：その大名家の「大名（当主）」を探して、その人がいる城だけをOK（選択可能）にします！
                     const daimyo = this.game.bushos.find(b => b.clan === target.ownerClan && b.isDaimyo);
                     return daimyo && Number(daimyo.castleId) === Number(target.id);
                 }).map(t => t.id);
@@ -503,16 +503,16 @@ class CommandSystem {
             // ★追加: 制圧コマンド専用！自分の城か、隣の城だけを選べるようにします
             case 'kunishu_subjugate_valid': {
                 const activeKunishus = this.game.kunishuSystem.getAliveKunishus();
-                // まず国人衆がいるお城を全部集めます
+                // まず国人衆がいる城を全部集めます
                 const allKunishuCastleIds = [...new Set(activeKunishus.map(k => k.castleId))];
                 
-                // 集めたお城を「フィルター（ふるい）」にかけて、条件に合うものだけを残します！
+                // 集めた城を「フィルター（ふるい）」にかけて、条件に合うものだけを残します！
                 return allKunishuCastleIds.filter(targetCastleId => {
                     const targetCastle = this.game.getCastle(targetCastleId);
                     
-                    // 条件①：自分が持っているお城かどうか？
+                    // 条件①：自分が持っている城かどうか？
                     const isMyCastle = (Number(targetCastle.ownerClan) === playerClanId);
-                    // 条件②：今まさに命令を出そうとしているお城（c）から道が繋がっているか？
+                    // 条件②：今まさに命令を出そうとしている城（c）から道が繋がっているか？
                     const isNeighbor = GameSystem.isReachable(this.game, c, targetCastle, playerClanId);
                     
                     // どちらか1つでも当てはまればOK（地図で光らせる）！
@@ -1430,7 +1430,7 @@ class CommandSystem {
             if (target.isCastellan && oldCastle) {
                 // ■ 城主を引き抜いた場合（城ごと寝返る！）
                 
-                // お城の持ち主をプレイヤーの大名家に変更
+                // 城の持ち主をプレイヤーの大名家に変更
                 oldCastle.ownerClan = newClanId;
                 
                 // 城主自身のデータもプレイヤーの大名家に変更
@@ -1444,7 +1444,7 @@ class CommandSystem {
                 const indSys = this.game.independenceSystem;
                 const captiveMsgs = indSys.resolveSubordinates(oldCastle, target, targetLord, newClanId, oldClanId);
                 
-                // お城の城主データを更新
+                // 城の城主データを更新
                 this.game.updateCastleLord(oldCastle);
 
                 // メッセージの作成
@@ -1552,7 +1552,7 @@ class CommandSystem {
         const atkBushos = atkBushosIds.map(id => this.game.getBusho(id));
         const targetCastle = this.game.getCastle(targetCastleId);
         
-        // 攻撃する側（プレイヤー）のお城から、出陣する数だけ兵士や兵糧、騎馬、鉄砲を減らします
+        // 攻撃する側（プレイヤー）の城から、出陣する数だけ兵士や兵糧、騎馬、鉄砲を減らします
         atkCastle.soldiers = Math.max(0, atkCastle.soldiers - sendSoldiers);
         atkCastle.rice = Math.max(0, atkCastle.rice - sendRice);
         atkCastle.horses = Math.max(0, (atkCastle.horses || 0) - sendHorses);
@@ -1565,7 +1565,7 @@ class CommandSystem {
         // この戦い限定の「守備側データ」を作成
         const dummyDefender = {
             id: targetCastleId,
-            name: kunishuName, // ←★お城の名前をくっつけず、国人衆の名前（伊賀衆など）だけにします！
+            name: kunishuName, // ←★城の名前をくっつけず、国人衆の名前（伊賀衆など）だけにします！
             ownerClan: -1,
             soldiers: kunishu.soldiers,
             defense: kunishu.defense,
@@ -2275,7 +2275,7 @@ class CommandSystem {
                         proceedToAlly(selfReinfData);
                     },
                     () => {
-                        // 「いいえ」：キャンセルした時は、もし自軍の援軍が決まっていたらお城に帰してあげます！
+                        // 「いいえ」：キャンセルした時は、もし自軍の援軍が決まっていたら城に帰してあげます！
                         if (selfReinfData) {
                             const hc = selfReinfData.castle;
                             // 減らした兵士や物資を戻します
@@ -2300,7 +2300,7 @@ class CommandSystem {
             askConfirmAndProceedToAlly(null);
         } else {
             if (myClanId === pid && !atkCastle.isDelegated) {
-                this.game.ui.showDialog("他のお城から自軍の援軍を呼びますか？", true, 
+                this.game.ui.showDialog("他の城から自軍の援軍を呼びますか？", true, 
                     () => {
                         this.game.ui.showSelfReinforcementSelector(selfCandidates, atkCastle, targetCastle, askConfirmAndProceedToAlly);
                     },
