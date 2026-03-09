@@ -227,12 +227,18 @@ class FieldWarManager {
                 let isReinf = false;
                 let unitIsPlayer = isAtkPlayer;
                 let isSelfReinf = false; // ★追加：自勢力の援軍かどうかのメモ
+                
+                // 1. 同盟国からの援軍チェック
                 if (warState.reinforcement && warState.reinforcement.bushos.some(b => b.id === assign.busho.id)) {
                     isReinf = true;
-                    // 援軍の城の持ち主がプレイヤーなら、プレイヤーが操作できる！
                     unitIsPlayer = (Number(warState.reinforcement.castle.ownerClan) === pid);
-                    // ★追加：援軍の城の持ち主と、攻撃メインの持ち主が同じなら「自勢力の援軍」！
                     isSelfReinf = (Number(warState.reinforcement.castle.ownerClan) === Number(warState.attacker.ownerClan));
+                }
+                // 2. 自勢力の別城からの援軍チェック（ここで漏れていたのが原因です！）
+                else if (warState.selfReinforcement && warState.selfReinforcement.bushos.some(b => b.id === assign.busho.id)) {
+                    isReinf = true;
+                    unitIsPlayer = (Number(warState.selfReinforcement.castle.ownerClan) === pid);
+                    isSelfReinf = true;
                 }
                 
                 let deployPos;
@@ -281,12 +287,18 @@ class FieldWarManager {
                 let isReinf = false;
                 let unitIsPlayer = isDefPlayer;
                 let isSelfReinf = false; // ★追加：自勢力の援軍かどうかのメモ
+                
+                // 1. 同盟国からの援軍チェック
                 if (warState.defReinforcement && warState.defReinforcement.bushos.some(b => b.id === assign.busho.id)) {
                     isReinf = true;
-                    // 援軍の城の持ち主がプレイヤーなら、プレイヤーが操作できる！
                     unitIsPlayer = (Number(warState.defReinforcement.castle.ownerClan) === pid);
-                    // ★追加：援軍の城の持ち主と、守備メインの持ち主が同じなら「自勢力の援軍」！
                     isSelfReinf = (Number(warState.defReinforcement.castle.ownerClan) === Number(warState.defender.ownerClan));
+                }
+                // 2. 自勢力の別城からの援軍チェック（ここで漏れていたのが原因です！）
+                else if (warState.defSelfReinforcement && warState.defSelfReinforcement.bushos.some(b => b.id === assign.busho.id)) {
+                    isReinf = true;
+                    unitIsPlayer = (Number(warState.defSelfReinforcement.castle.ownerClan) === pid);
+                    isSelfReinf = true;
                 }
                 
                 let deployPos;
