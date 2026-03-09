@@ -354,6 +354,20 @@ class AIEngine {
             let myReinfPower = 0;
             let enemyReinfPower = 0;
 
+            // ★ここから追加：① 自分と相手の「別の城からの援軍（自家援軍）」を見積もります！
+            this.game.castles.forEach(c => {
+                // 自分が呼べそうな自家援軍（出撃元の城以外で、兵力1000以上の城）
+                if (c.ownerClan === myCastle.ownerClan && c.id !== myCastle.id && c.soldiers >= 1000) {
+                    myReinfPower += (c.soldiers * 0.5) * errorRate; // 兵力の半分くらい来てくれると予想
+                }
+                // 相手が呼べそうな自家援軍（守る城以外で、兵力1000以上の城）
+                if (c.ownerClan === target.ownerClan && c.id !== target.id && c.soldiers >= 1000) {
+                    enemyReinfPower += (c.soldiers * 0.5) * errorRate; // 相手の別のお城からの援軍も警戒！
+                }
+            });
+            // ★追加ここまで
+
+            // ② 同盟国からの援軍を見積もる
             this.game.clans.forEach(c => {
                 if (c.id === 0 || c.id === myCastle.ownerClan || c.id === target.ownerClan) return;
                 
