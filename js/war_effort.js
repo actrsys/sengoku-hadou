@@ -818,6 +818,18 @@ Object.assign(WarManager.prototype, {
             if (s.attacker.isKunishu) {
                 let resultMsg = ""; 
                 
+                // ★生き残った国人衆の兵士をお家に帰してあげます！
+                const kunishu = this.game.kunishuSystem.getKunishu(s.attacker.kunishuId);
+                if (kunishu) {
+                    // 戦って無事だった兵士と、ケガから回復した兵士（負傷兵の2割）を合わせます
+                    const recovered = Math.floor(s.deadSoldiers.attacker * 0.2); 
+                    const survivors = Math.max(0, s.attacker.soldiers) + recovered;
+                    
+                    // 国人衆の基地に兵士を戻します（上限は超えないようにストッパーをかけます）
+                    kunishu.soldiers = Math.min(kunishu.maxSoldiers, kunishu.soldiers + survivors);
+                }
+                // ★書き足しここまで！
+                
                 if (attackerWon) {
                     const targetC = this.game.getCastle(s.defender.id);
                     const oldOwner = targetC.ownerClan;
