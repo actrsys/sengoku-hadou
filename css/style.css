@@ -271,6 +271,8 @@ img {
     right: 10px;
     z-index: 500;
     pointer-events: none;
+    display: flex; /* ★横にきれいに並べる魔法！ */
+    gap: 10px;     /* ★2つの間に少し隙間をあける魔法！ */
 }
 
 .floating-time {
@@ -287,15 +289,16 @@ img {
 }
 
 .floating-market {
-    background: rgba(255, 255, 255, 0.95);
-    color: #333;
-    padding: 3px 10px;
+    background: rgba(0, 0, 0, 0.75); /* ★黒っぽい半透明に！ */
+    color: #fff;                     /* ★文字を真っ白に！ */
+    padding: 4px 12px;               /* ★少しふっくらさせます */
     border-radius: 12px;
-    font-size: 0.8rem;
+    font-size: 0.9rem;               /* ★文字を少し大きく！ */
     font-weight: bold;
     box-shadow: 0 2px 5px rgba(0,0,0,0.3);
-    border: 1px solid #999;
+    border: 1px solid rgba(255,255,255,0.2); /* ★枠線を薄い白に！ */
     width: fit-content;
+    text-shadow: 1px 1px 2px rgba(0,0,0,0.8); /* ★文字に影をつけて読みやすく！ */
 }
 
 .castle-card {
@@ -796,16 +799,16 @@ body.is-pc {
 /* =========================================================
    ★ 援軍ログの文字色を部隊カラーに合わせる魔法
    ========================================================= */
-/* 味方の援軍（スッキリした水色：川の地形や青い光と同じ色合い） */
-.log-color-ally {
-    color: #4fc3f7;
+/* 攻撃側（赤側）の援軍：ピンク */
+.log-color-atk {
+    color: #f48fb1;
     font-weight: bold;
     text-shadow: 1px 1px 2px rgba(0,0,0,0.8);
 }
 
-/* 敵の援軍（少し警戒感のあるピンク：マップの移動範囲と同じ色合い） */
-.log-color-enemy {
-    color: #f48fb1;
+/* 防衛側（青側）の援軍：水色 */
+.log-color-def {
+    color: #4fc3f7;
     font-weight: bold;
     text-shadow: 1px 1px 2px rgba(0,0,0,0.8);
 }
