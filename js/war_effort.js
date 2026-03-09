@@ -6,9 +6,19 @@
 // Object.assign を使って、WarManager に魔法をくっつけます！
 Object.assign(WarManager.prototype, {
 
+    // ★攻撃側と守備側の敵対関係をセットする魔法
+    applyWarHostility(atkId, atkIsKunishu, defId, defIsKunishu, isReinforcement) {
+        // どちらかが国人衆の場合、あるいは中立（0）の場合は外交関係がないので何もしません
+        if (atkIsKunishu || defIsKunishu || atkId === 0 || defId === 0) return;
+        
+        // 両者の関係を「敵対」にします
+        if (this.game.diplomacyManager) {
+            this.game.diplomacyManager.changeStatus(atkId, defId, '敵対');
+        }
+    },
+    
     getValidWarTargets(currentCastle) {
         const myClanId = this.game.playerClanId;
-        
         let myBossId = 0;
         for (const c of this.game.clans) {
             // ★バリア追加：中立(0)を除外します
