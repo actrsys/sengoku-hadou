@@ -1345,10 +1345,11 @@ class UIManager {
             `;
         }
 
-        // ★このお城にいる浪人（大名に仕えていない武将）の数を数える魔法！
+        // ★城にいる「生きている」浪人の数を数える魔法！
         let roninCount = 0;
         if (this.game && this.game.bushos) {
-            roninCount = this.game.bushos.filter(b => b.castleId === castle.id && b.clan === 0).length;
+            // clan === 0（どこにも仕えていない）に加えて、status === 'active'（ちゃんと活動中）かどうかも調べます！
+            roninCount = this.game.bushos.filter(b => b.castleId === castle.id && b.clan === 0 && b.status === 'active').length;
         }
 
         if (this.mobileFloatingMarket) {
