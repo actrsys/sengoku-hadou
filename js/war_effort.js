@@ -200,12 +200,6 @@ Object.assign(WarManager.prototype, {
             };
             processReinforcement(selfReinforcementData);
             processReinforcement(reinforcementData);
-
-            // ★修正：出撃元の城（atkCastle）からは、援軍を含まない「base」の分だけを減らします！
-            atkCastle.soldiers = Math.max(0, atkCastle.soldiers - baseAtkSoldiers);
-            atkCastle.rice = Math.max(0, atkCastle.rice - baseAtkRice);
-            atkCastle.horses = Math.max(0, (atkCastle.horses || 0) - baseAtkHorses);
-            atkCastle.guns = Math.max(0, (atkCastle.guns || 0) - baseAtkGuns);
             
             atkBushos.forEach(b => b.isActionDone = true);
             
@@ -262,10 +256,10 @@ Object.assign(WarManager.prototype, {
                     isPlayerInvolved = this.state.isPlayerInvolved;
 
                     if (defClan === pid && !defCastle.isDelegated) {
-    	                if (totalDefSoldiers <= 0) {
-    	                    if (isPlayerInvolved) this.game.ui.log("城に兵士がいないため、迎撃（野戦）に出られません！");
-    	                    onResult('siege');
-    	                } else {
+                        if (totalDefSoldiers <= 0) {
+                            if (isPlayerInvolved) this.game.ui.log("城に兵士がいないため、迎撃（野戦）に出られません！");
+                            onResult('siege');
+                        } else {
                             const modal = document.getElementById('intercept-confirm-modal');
                             if (modal) {
                                 // ★変更：ui.js に作った魔法を呼び出してガードを隠します
@@ -506,9 +500,16 @@ Object.assign(WarManager.prototype, {
             if (this.state.isKunishuSubjugation) {
                 this.startSiegeWarPhase();
             } else if (typeof window.FieldWarManager === 'undefined') {
+                console.error("野戦マネージャーが見つかりません！field_war.jsが読み込まれているか確認してください。");
                 this.startSiegeWarPhase();
             } else {
                 showInterceptDialog((choice, defAssignments, defRice, atkAssignments, interceptHorses = 0, interceptGuns = 0) => {
+                
+                    // ★ここへ貼り付け！ 実際に戦うことが決まってから兵士を減らします
+                    atkCastle.soldiers = Math.max(0, atkCastle.soldiers - baseAtkSoldiers);
+                    atkCastle.rice = Math.max(0, atkCastle.rice - baseAtkRice);
+                    atkCastle.horses = Math.max(0, (atkCastle.horses || 0) - baseAtkHorses);
+                    atkCastle.guns = Math.max(0, (atkCastle.guns || 0) - baseAtkGuns);
                     
                     // ★追加: 野戦か籠城かが決まったこのタイミングで、守備側の援軍を城（防衛軍）に正式合流させる！
                     const applyDefReinf = (reinf) => {
@@ -1401,8 +1402,8 @@ Object.assign(WarManager.prototype, {
     
     // ★守備側が「自分の別の城」から援軍を呼べるかチェックする魔法
     checkDefenderSelfReinforcement(defCastle, onComplete) {
-        const defClanId = defCastle.ownerClan;
-        const pid = this.game.playerClanId;
+        const defClanId = Number(defCastle.ownerClan); // ★変更：Number()で包みます！
+        const pid = Number(this.game.playerClanId);    // ★変更：Number()で包みます！
         
         // 守備側が中立や国人衆の場合は自家援軍はなし
         if (defClanId === 0 || defCastle.isKunishu || this.state.isKunishuSubjugation || this.state.attacker.isKunishu) {
@@ -1452,8 +1453,8 @@ Object.assign(WarManager.prototype, {
     
     // ★守備側が援軍を呼べるかチェックする機能
     checkDefenderReinforcement(defCastle, atkClanId, onComplete) {
-        const defClanId = defCastle.ownerClan;
-        const pid = this.game.playerClanId;
+        const defClanId = Number(defCastle.ownerClan); // ★変更：Number()で包みます！
+        const pid = Number(this.game.playerClanId);    // ★変更：Number()で包みます！
         
         if (defClanId === 0 || defCastle.isKunishu || this.state.isKunishuSubjugation || this.state.attacker.isKunishu) {
             onComplete();
