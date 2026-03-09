@@ -1428,15 +1428,6 @@ class UIManager {
             this.renderCommandMenu();
         }
     }
-            if (this.game.lastMenuState) {
-                this.menuState = this.game.lastMenuState;
-                this.game.lastMenuState = null;
-            } else {
-                this.menuState = 'MAIN';
-            }
-            this.renderCommandMenu();
-        }
-    }
 
     renderCommandMenu() {
         const mobileArea = document.getElementById('command-area');
