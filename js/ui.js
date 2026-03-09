@@ -587,7 +587,7 @@ class UIManager {
         
         if(this.game.warManager && this.game.warManager.state.active && this.game.warManager.state.isPlayerInvolved && this.warLog) {
              const div = document.createElement('div');
-             div.textContent = msg;
+             div.innerHTML = msg; // ★textContent から innerHTML に変更しました！
              this.warLog.appendChild(div);
              this.warLog.scrollTop = this.warLog.scrollHeight;
         }
@@ -600,7 +600,7 @@ class UIManager {
             this.historyList.innerHTML = '';
             this.logHistory.forEach(log => {
                 const div = document.createElement('div');
-                div.textContent = log;
+                div.innerHTML = log; // ★textContent から innerHTML に変更しました！
                 div.style.borderBottom = "1px solid #eee";
                 div.style.padding = "5px";
                 div.style.fontSize = "0.85rem";
@@ -1736,7 +1736,7 @@ class UIManager {
                     const inputs = document.querySelectorAll('input[name="sel_busho"]:checked'); if (inputs.length === 0) return;
                     const selectedIds = Array.from(inputs).map(i => parseInt(i.value)); 
                     this.closeSelector();
-                    if ((actionType === 'def_intercept_deploy' || actionType === 'def_reinf_deploy' || actionType === 'atk_reinf_deploy') && extraData && extraData.onConfirm) {
+                    if (extraData && extraData.onConfirm) {
                         extraData.onConfirm(selectedIds);
                     } else {
                         this.game.commandSystem.handleBushoSelection(actionType, selectedIds, targetId, extraData);
@@ -2253,7 +2253,7 @@ class UIManager {
 
         this.quantityConfirmBtn.onclick = () => {
             closeQuantityModal(); 
-            if ((type === 'def_intercept' || type === 'def_reinf_supplies' || type === 'atk_reinf_supplies') && extraData && extraData.onConfirm) {
+            if (extraData && extraData.onConfirm) {
                 extraData.onConfirm(inputs);
             } else {
                 this.game.commandSystem.handleQuantitySelection(type, inputs, targetId, data, extraData);

@@ -741,60 +741,6 @@ Object.assign(WarManager.prototype, {
             returnReinforcement(s.defSelfReinforcement, false);
             returnReinforcement(s.defReinforcement, false);
             
-            // ★最終追加: 守備側の援軍部隊も元の城に帰還させる処理
-            if (s.defReinforcement) {
-                const defReinf = s.defReinforcement;
-                const helperCastle = this.game.getCastle(defReinf.castle.id);
-                
-                if (helperCastle) {
-                    const originalDefSoldiers = s.defender.soldiers + s.deadSoldiers.defender;
-                    const surviveRate = originalDefSoldiers > 0 ? (Math.max(0, s.defender.soldiers) / originalDefSoldiers) : 0;
-
-                    // 残った兵士、馬、鉄砲の計算
-                    const returnSoldiers = Math.floor(defReinf.soldiers * surviveRate);
-                    const returnHorses = Math.floor(defReinf.horses * surviveRate);
-                    const returnGuns = Math.floor(defReinf.guns * surviveRate);
-                    
-                    // 防衛側の城のデータから、援軍分を差し引く（借りパク防止！）
-                    s.defender.soldiers = Math.max(0, s.defender.soldiers - returnSoldiers);
-                    s.defender.horses = Math.max(0, (s.defender.horses || 0) - returnHorses);
-                    s.defender.guns = Math.max(0, (s.defender.guns || 0) - returnGuns);
-
-                    // 援軍元の城に、残った物資と兵士を戻す
-                    helperCastle.soldiers = Math.min(99999, helperCastle.soldiers + returnSoldiers);
-                    helperCastle.horses = Math.min(99999, (helperCastle.horses || 0) + returnHorses);
-                    helperCastle.guns = Math.min(99999, (helperCastle.guns || 0) + returnGuns);
-
-                    // 守備側の城の武将リストから援軍武将を抜く
-                    defReinf.bushos.forEach(rb => {
-                        const idx = s.defender.samuraiIds.indexOf(rb.id);
-                        if (idx !== -1) s.defender.samuraiIds.splice(idx, 1);
-                    });
-
-                    // 援軍武将を元の城に戻す
-                    defReinf.bushos.forEach(b => {
-                        b.castleId = helperCastle.id;
-                        b.isCastellan = false;
-                        if (!helperCastle.samuraiIds.includes(b.id)) {
-                            helperCastle.samuraiIds.push(b.id);
-                        }
-                    });
-                    this.game.updateCastleLord(helperCastle);
-
-                    // 友好度の増減（防衛成功で+5、陥落で-5）
-                    const myClanId = s.defender.ownerClan;
-                    const helperClanId = helperCastle.ownerClan;
-                    
-                    if (!attackerWon && !isRetreat) {
-                        this.game.diplomacyManager.updateSentiment(myClanId, helperClanId, 5);
-                        if (s.isPlayerInvolved) this.game.ui.log(`(防衛援軍が成功し、${this.game.clans.find(c=>c.id===helperClanId)?.name}との友好度が上がりました)`);
-                    } else {
-                        this.game.diplomacyManager.updateSentiment(myClanId, helperClanId, -5);
-                        if (s.isPlayerInvolved) this.game.ui.log(`(防衛失敗により、${this.game.clans.find(c=>c.id===helperClanId)?.name}との友好度が下がりました)`);
-                    }
-                }
-            }
-            
             // プレイヤーが国人衆を制圧（討伐）した時の処理
             if (s.isKunishuSubjugation) {
                 const kunishu = this.game.kunishuSystem.getKunishu(s.defender.kunishuId);
@@ -1501,8 +1447,13 @@ Object.assign(WarManager.prototype, {
 
     _promptPlayerDefSelfReinforcement(helperCastle, defCastle, onComplete) {
         const promptBusho = () => {
-            this.game.ui.openBushoSelector('def_self_reinf_deploy', helperCastle.id, null, () => {
-                this.game.ui.showDialog("自軍からの援軍派遣を取りやめました。", false, () => onComplete(null));
+            this.game.ui.openBushoSelector('def_self_reinf_deploy', helperCastle.id, {
+                onConfirm: (selectedIds) => {
+                    this.handleBushoSelectionForDefSelfReinf(helperCastle.id, selectedIds, onComplete);
+                },
+                onCancel: () => {
+                    this.game.ui.showDialog("自軍からの援軍派遣を取りやめました。", false, () => onComplete(null));
+                }
             });
         };
         promptBusho();

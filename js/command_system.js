@@ -2274,8 +2274,13 @@ class CommandSystem {
 
     _promptPlayerAtkSelfReinforcement(helperCastle, atkCastle, targetCastle, onComplete) {
         const promptBusho = () => {
-            this.game.ui.openBushoSelector('atk_self_reinf_deploy', helperCastle.id, null, () => {
-                this.game.ui.showDialog("自軍からの援軍派遣を取りやめました。", false, () => onComplete(null));
+            this.game.ui.openBushoSelector('atk_self_reinf_deploy', helperCastle.id, {
+                onConfirm: (selectedIds) => {
+                    this.handleBushoSelectionForSelfReinf(helperCastle.id, selectedIds, onComplete);
+                },
+                onCancel: () => {
+                    this.game.ui.showDialog("自軍からの援軍派遣を取りやめました。", false, () => onComplete(null));
+                }
             });
         };
         promptBusho();
