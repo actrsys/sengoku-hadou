@@ -226,10 +226,13 @@ class FieldWarManager {
                 // ★追加: この部隊が援軍かどうか、そして誰が操作するかをチェックします！
                 let isReinf = false;
                 let unitIsPlayer = isAtkPlayer;
+                let isSelfReinf = false; // ★追加：自勢力の援軍かどうかのメモ
                 if (warState.reinforcement && warState.reinforcement.bushos.some(b => b.id === assign.busho.id)) {
                     isReinf = true;
                     // 援軍の城の持ち主がプレイヤーなら、プレイヤーが操作できる！
                     unitIsPlayer = (Number(warState.reinforcement.castle.ownerClan) === pid);
+                    // ★追加：援軍の城の持ち主と、攻撃メインの持ち主が同じなら「自勢力の援軍」！
+                    isSelfReinf = (Number(warState.reinforcement.castle.ownerClan) === Number(warState.attacker.ownerClan));
                 }
                 
                 let deployPos;
@@ -251,6 +254,7 @@ class FieldWarManager {
                     isAttacker: true,
                     isPlayer: unitIsPlayer,
                     isReinforcement: isReinf,
+                    isSelfReinforcement: isSelfReinf, // ★追加：メモを部隊に持たせます
                     isGeneral: index === 0,
                     x: deployPos.x,
                     y: deployPos.y,
@@ -276,10 +280,13 @@ class FieldWarManager {
                 // ★追加: 守備側の援軍チェック！
                 let isReinf = false;
                 let unitIsPlayer = isDefPlayer;
+                let isSelfReinf = false; // ★追加：自勢力の援軍かどうかのメモ
                 if (warState.defReinforcement && warState.defReinforcement.bushos.some(b => b.id === assign.busho.id)) {
                     isReinf = true;
                     // 援軍の城の持ち主がプレイヤーなら、プレイヤーが操作できる！
                     unitIsPlayer = (Number(warState.defReinforcement.castle.ownerClan) === pid);
+                    // ★追加：援軍の城の持ち主と、守備メインの持ち主が同じなら「自勢力の援軍」！
+                    isSelfReinf = (Number(warState.defReinforcement.castle.ownerClan) === Number(warState.defender.ownerClan));
                 }
                 
                 let deployPos;
@@ -301,6 +308,7 @@ class FieldWarManager {
                     isAttacker: false,
                     isPlayer: unitIsPlayer,
                     isReinforcement: isReinf,
+                    isSelfReinforcement: isSelfReinf, // ★追加：メモを部隊に持たせます
                     isGeneral: index === 0,
                     x: deployPos.x,
                     y: deployPos.y,
@@ -541,10 +549,15 @@ class FieldWarManager {
         
         let color = unit.isAttacker ? '#d32f2f' : '#1976d2';
         
-        // ★修正: 援軍なら情報パネルの文字色をオレンジか緑にします！
-        if (unit.isReinforcement) {
+        // ★修正: 援軍の種類に合わせて、情報パネルの文字色を変えます！
+        if (unit.isSelfReinforcement) {
+            // 自勢力の援軍なら、ピンクか水色
+            color = unit.isAttacker ? '#f48fb1' : '#4fc3f7';
+        } else if (unit.isReinforcement) {
+            // 他国の援軍なら、オレンジか緑
             color = unit.isAttacker ? '#ff9800' : '#4caf50';
         } else if (typeof unit.id === 'string' && unit.id.startsWith('k_')) {
+            // 国人衆なら、味方側か敵側かで緑かオレンジ
             if (this.units.some(u => u.isPlayer && !u.isAttacker)) {
                 color = '#4caf50';
             } else {
@@ -762,8 +775,10 @@ class FieldWarManager {
             // ★ここから差し替え
             let colorClass = u.isAttacker ? 'attacker' : 'defender';
             
-            // ★修正: 元の attacker/defender の名前は消さずに、ally (友軍) というタグを後ろに足す！
-            if (u.isReinforcement || (typeof u.id === 'string' && u.id.startsWith('k_'))) {
+            // ★修正: 自勢力の援軍なら「self-ally」、他国や国人衆の援軍なら「ally」のタグを足します！
+            if (u.isSelfReinforcement) {
+                colorClass += ' self-ally'; 
+            } else if (u.isReinforcement || (typeof u.id === 'string' && u.id.startsWith('k_'))) {
                 colorClass += ' ally'; 
             }
 
