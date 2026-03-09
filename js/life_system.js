@@ -81,14 +81,19 @@ class LifeSystem {
                                     const clan = this.game.clans.find(c => c.id === b.clan);
                                     if (clan) {
                                         const oldClanName = clan.name;
-                                        clan.name = `${newFamilyName}家`;
+                                        const newClanName = `${newFamilyName}家`;
                                         
-                                        // ==========================================
-                                        // ★大名家の名前が変わった時も、新しくメッセージを作って1回ずつ待ちます！
-                                        const clanMsg = `当主の改名により、${oldClanName}は今後「${clan.name}」となります。`;
-                                        this.game.ui.log(clanMsg);
-                                        await this.game.ui.showTapMessage(clanMsg);
-                                        // ==========================================
+                                        // ★大名家の名前が本当に変わる時だけ、お知らせを出します！
+                                        if (oldClanName !== newClanName) {
+                                            clan.name = newClanName;
+                                            
+                                            // ==========================================
+                                            // ★大名家の名前が変わった時も、新しくメッセージを作って1回ずつ待ちます！
+                                            const clanMsg = `当主の改名により、${oldClanName}は今後「${clan.name}」となります。`;
+                                            this.game.ui.log(clanMsg);
+                                            await this.game.ui.showTapMessage(clanMsg);
+                                            // ==========================================
+                                        }
                                     }
                                 }
                             }
