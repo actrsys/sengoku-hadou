@@ -476,17 +476,25 @@ class CommandSystem {
                 }).map(t => t.id);
                 
             case 'ally_clan': 
-                return this.game.castles.filter(target => 
-                    target.ownerClan !== 0 && 
-                    Number(target.ownerClan) !== playerClanId &&
-                    this.game.getRelation(playerClanId, target.ownerClan).status === '同盟'
-                ).map(t => t.id);
+                return this.game.castles.filter(target => {
+                    const tClan = Number(target.ownerClan);
+                    // ★バリア追加：国人衆（0以下）や自分自身は除外してエラーを防ぎます！
+                    if (tClan <= 0 || tClan === playerClanId) return false;
+                    
+                    const rel = this.game.getRelation(playerClanId, tClan);
+                    // ★relが存在するかどうかも確認します
+                    return rel && rel.status === '同盟';
+                }).map(t => t.id);
 
             case 'breakable_clan': 
                 return this.game.castles.filter(target => {
-                    if (target.ownerClan === 0 || Number(target.ownerClan) === playerClanId) return false;
-                    const status = this.game.getRelation(playerClanId, target.ownerClan).status;
-                    if (!['同盟', '支配', '従属'].includes(status)) return false;
+                    const tClan = Number(target.ownerClan);
+                    // ★バリア追加：国人衆（0以下）や自分自身は除外してエラーを防ぎます！
+                    if (tClan <= 0 || tClan === playerClanId) return false;
+                    
+                    const rel = this.game.getRelation(playerClanId, tClan);
+                    // ★relが存在するかどうかも確認します
+                    if (!rel || !['同盟', '支配', '従属'].includes(rel.status)) return false;
                     
                     // ★ここを追加：こちらも「大名（当主）」がいるお城だけをOK（選択可能）にします！
                     const daimyo = this.game.bushos.find(b => b.clan === target.ownerClan && b.isDaimyo);

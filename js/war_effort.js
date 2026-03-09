@@ -7,13 +7,12 @@
 Object.assign(WarManager.prototype, {
 
     getValidWarTargets(currentCastle) {
-        // ★修正: 必ず「数字」として扱うように Number() で包みます
         const myClanId = Number(this.game.playerClanId);
         
         // 自分が従属している「親大名」を探します
         let myBossId = 0;
         for (const c of this.game.clans) {
-            // ★変更：中立(0)やダミー城などの不正なIDを完全に除外する最強ガード！
+            // ★変更：中立(0)やダミー城などの不正なIDを除外するガード！
             if (c.id > 0 && c.id !== myClanId) {
                 const r = this.game.getRelation(myClanId, c.id);
                 if (r && r.status === '従属') {
@@ -33,9 +32,10 @@ Object.assign(WarManager.prototype, {
             if ((target.immunityUntil || 0) >= this.game.getCurrentTurnId()) return false;
             
             // 直接の「同盟・支配・従属」は攻撃不可
-            // ★変更：ここも「0」より大きい正規の大名家だけを調べて、エラーを防ぎます！
+            // ★超重要ガード：相手が「1以上（正規の大名）」の時だけ外交データを調べます！
             if (targetClan > 0) {
                 const rel = this.game.getRelation(myClanId, targetClan);
+                // ★ここで「rel」が存在するかどうかの確認（rel &&）を追加しました！
                 if (rel && ['同盟', '支配', '従属'].includes(rel.status)) return false;
 
                 // 親大名がいる場合、親の「同盟国」や「他の従属国（親が支配している国）」は攻撃できない
