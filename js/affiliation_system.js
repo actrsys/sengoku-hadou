@@ -125,6 +125,7 @@ class AffiliationSystem {
         busho.recognitionNeed = 0;
         busho.factionSeikaku = "無所属";
         busho.factionHoshin = "無所属";
+        busho.belongKunishuId = 0;
     }
 
     /**
@@ -143,4 +144,5 @@ class AffiliationSystem {
         // 基本の50にアップ分を足して、最高100までにします
         busho.loyalty = Math.min(100, 50 + loyaltyUp);
     }
+    
 }
