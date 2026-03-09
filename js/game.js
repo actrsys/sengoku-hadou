@@ -733,7 +733,7 @@ class GameManager {
             
             this.phase = 'daimyo_select';
             this.ui.renderMap();
-            await this.ui.showCutin("操作する大名家を選択してください");
+            await this.ui.showCutin("開始する大名家の城を選択してください");
             
         } catch (e) {
             console.error(e);
