@@ -196,9 +196,10 @@ Object.assign(WarManager.prototype, {
             };
             processReinforcement(selfReinforcementData);
             processReinforcement(reinforcementData);
-            // ★修正ここまで
-
-            const atkClanData = this.game.clans.find(c => c.id === atkClan); 
+            
+            atkBushos.forEach(b => b.isActionDone = true);
+            
+            const atkClanData = this.game.clans.find(c => c.id === atkClan);
             const atkArmyName = atkCastle.isKunishu ? atkCastle.name : (atkClanData ? atkClanData.getArmyName() : "敵軍");
             const atkDaimyoName = atkClanData ? atkClanData.name : (atkCastle.isKunishu ? atkCastle.name : "中立");
             const defClanData = this.game.clans.find(c => c.id === defClan);
