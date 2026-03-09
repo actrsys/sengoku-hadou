@@ -480,7 +480,7 @@ class UIManager {
 
     showContextMenu(x, y) {
         // メニューを出さないように、魔法を空っぽにしました！
-    }
+    }s
 
     hideContextMenu() {
         // エラーが出ないように、念のため「メニューを隠す」お約束だけ残しておきます
@@ -2577,6 +2577,7 @@ class UIManager {
         this.game.validTargets = candidateCastles.map(c => c.id);
         this.renderMap();
         this.log("同盟援軍を要請する城を選択してください。");
+        this.renderSelectionModeMenu(); // ★これを追加してメニューを「戻る」だけにします！
     }
 
     showReinforcementGoldSelector(helperCastle, atkCastle, targetCastle, atkBushos, sVal, rVal, hVal, gVal, selfReinfData, backToMap) {
@@ -2632,7 +2633,8 @@ class UIManager {
         this.game.selectionMode = 'atk_self_reinforcement';
         this.game.validTargets = candidateCastles.map(c => c.id);
         this.renderMap();
-        this.log("自軍の別城から援軍を出陣させる城を選択してください。");
+        this.log("援軍を出陣させる城を選択してください。");
+        this.renderSelectionModeMenu(); // ★これを追加してメニューを「戻る」だけにします！
     }
     
     showDefReinforcementSelector(candidateCastles, defCastle, selfReinfData, onComplete) {
@@ -2650,7 +2652,8 @@ class UIManager {
         this.game.selectionMode = 'def_ally_reinforcement';
         this.game.validTargets = candidateCastles.map(c => c.id);
         this.renderMap();
-        this.log("同盟国に防衛の援軍を要請する城を選択してください。");
+        this.log("援軍を要請する同盟国の城を選択してください。");
+        this.renderSelectionModeMenu(); // ★これを追加してメニューを「戻る」だけにします！
     }
 
     showDefReinforcementGoldSelector(helperCastle, defCastle, onComplete, backToMap) {
@@ -2705,7 +2708,8 @@ class UIManager {
         this.game.selectionMode = 'def_self_reinforcement';
         this.game.validTargets = candidateCastles.map(c => c.id);
         this.renderMap();
-        this.log("自軍の別城から防衛の援軍を出陣させる城を選択してください。");
+        this.log("援軍を出陣させる城を選択してください。");
+        this.renderSelectionModeMenu(); // ★これを追加してメニューを「戻る」だけにします！
     }
     
     // ★ ここからまるごと追加！：設定画面を開いて、スライダーを動かせるようにする魔法です！
