@@ -7,13 +7,15 @@
 Object.assign(WarManager.prototype, {
 
     getValidWarTargets(currentCastle) {
-        const myClanId = this.game.playerClanId;
-        
-        // 自分が従属している「親大名」を探します
-        let myBossId = 0;
-        for (const c of this.game.clans) {
-            if (c.id !== myClanId) {
-                const r = this.game.getRelation(myClanId, c.id);
+        // ★修正: 必ず「数字」として扱うように Number() で包みます
+        const myClanId = Number(this.game.playerClanId);
+        
+        // 自分が従属している「親大名」を探します
+        let myBossId = 0;
+        for (const c of this.game.clans) {
+            // ↓★ここを修正！：中立（c.id !== 0）を調べる対象から外す魔法を付け足しました！
+            if (c.id !== myClanId && c.id !== 0) {
+                const r = this.game.getRelation(myClanId, c.id);
                 if (r && r.status === '従属') {
                     myBossId = c.id;
                     break;
@@ -22,21 +24,26 @@ Object.assign(WarManager.prototype, {
         }
 
         return this.game.castles.filter(target => {
+            // ★修正: 相手のIDも念のため数字にします
+            const targetClan = Number(target.ownerClan);
+            
             // 基本的なチェック（道が繋がっているか、自分の城じゃないか、免疫期間じゃないか）
             if (!GameSystem.isReachable(this.game, currentCastle, target, myClanId)) return false;
-            if (target.ownerClan === myClanId) return false;
+            // ★これで確実に「自分の城」はリストから弾かれます！
+            if (targetClan === myClanId) return false;
             if ((target.immunityUntil || 0) >= this.game.getCurrentTurnId()) return false;
             
             // 直接の「同盟・支配・従属」は攻撃不可（※中立の城以外でチェックします）
-            if (target.ownerClan !== 0) {
-                const rel = this.game.getRelation(myClanId, target.ownerClan);
-                if (['同盟', '支配', '従属'].includes(rel.status)) return false;
+            if (targetClan !== 0) {
+                const rel = this.game.getRelation(myClanId, targetClan);
+                // ★修正: rel が空っぽ（undefined）の時にクラッシュしないよう安全装置を追加
+                if (rel && ['同盟', '支配', '従属'].includes(rel.status)) return false;
 
-                // ★追加：親大名がいる場合、親の「同盟国」や「他の従属国（親が支配している国）」は攻撃できない
+                // 親大名がいる場合、親の「同盟国」や「他の従属国（親が支配している国）」は攻撃できない
                 if (myBossId !== 0) {
-                    const bossRel = this.game.getRelation(myBossId, target.ownerClan);
+                    const bossRel = this.game.getRelation(myBossId, targetClan);
                     if (bossRel && ['同盟', '支配'].includes(bossRel.status)) {
-                        return false; // 攻撃先リストに入れません
+                        return false; 
                     }
                 }
             }
