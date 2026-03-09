@@ -1999,7 +1999,8 @@ class CommandSystem {
         this.game.validTargets = this.getValidTargets(mode);
         
         this.game.ui.renderMap();
-        // this.game.ui.log(this.getSelectionGuideMessage()); // ←★行の頭に「//」を付けてお休みにしました！
+        this.game.ui.renderSelectionModeMenu(); // ★ マップを描くのと同時にメニューも「戻る」だけにします
+        // this.game.ui.log(this.getSelectionGuideMessage());
     }
 
     getSelectionGuideMessage() {
@@ -2030,7 +2031,7 @@ class CommandSystem {
         if (!this.game.validTargets.includes(targetCastle.id)) return;
         
         const mode = this.game.selectionMode;
-
+        
         // ==========================================
         // ★援軍要請のマップ選択時の処理
         if (['atk_self_reinforcement', 'atk_ally_reinforcement', 'def_self_reinforcement', 'def_ally_reinforcement'].includes(mode)) {
@@ -2038,19 +2039,35 @@ class CommandSystem {
             this.game.tempReinfData = null; // 使い終わったら消す
             this.game.ui.cancelMapSelection(true); 
 
+            // ★ 追加：「城を選ぶマップ」に復帰するための魔法のチケットを作ります
+            const backToMap = () => {
+                if (mode === 'atk_self_reinforcement') {
+                    this.game.ui.showSelfReinforcementSelector(temp.candidates, temp.atkCastle, temp.targetCastle, temp.onComplete);
+                } else if (mode === 'atk_ally_reinforcement') {
+                    this.game.ui.showReinforcementSelector(temp.candidates, temp.atkCastle, temp.targetCastle, temp.atkBushos, temp.sVal, temp.rVal, temp.hVal, temp.gVal, temp.selfReinfData);
+                } else if (mode === 'def_self_reinforcement') {
+                    this.game.ui.showDefSelfReinforcementSelector(temp.candidates, temp.defCastle, temp.onComplete);
+                } else if (mode === 'def_ally_reinforcement') {
+                    this.game.ui.showDefReinforcementSelector(temp.candidates, temp.defCastle, temp.selfReinfData, temp.onComplete);
+                }
+            };
+
+            // 各画面に「戻るチケット(backToMap)」を渡して開きます
             if (mode === 'atk_self_reinforcement') {
-                this._promptPlayerAtkSelfReinforcement(targetCastle, temp.atkCastle, temp.targetCastle, temp.onComplete);
+                this._promptPlayerAtkSelfReinforcement(targetCastle, temp.atkCastle, temp.targetCastle, temp.onComplete, backToMap);
             } else if (mode === 'atk_ally_reinforcement') {
-                this.game.ui.showReinforcementGoldSelector(targetCastle, temp.atkCastle, temp.targetCastle, temp.atkBushos, temp.sVal, temp.rVal, temp.hVal, temp.gVal, temp.selfReinfData);
+                this.game.ui.showReinforcementGoldSelector(targetCastle, temp.atkCastle, temp.targetCastle, temp.atkBushos, temp.sVal, temp.rVal, temp.hVal, temp.gVal, temp.selfReinfData, backToMap);
             } else if (mode === 'def_self_reinforcement') {
-                this.game.warManager._promptPlayerDefSelfReinforcement(targetCastle, temp.defCastle, temp.onComplete);
+                if (this.game.warManager && this.game.warManager._promptPlayerDefSelfReinforcement) {
+                    this.game.warManager._promptPlayerDefSelfReinforcement(targetCastle, temp.defCastle, temp.onComplete, backToMap);
+                }
             } else if (mode === 'def_ally_reinforcement') {
-                this.game.ui.showDefReinforcementGoldSelector(targetCastle, temp.defCastle, temp.onComplete);
+                this.game.ui.showDefReinforcementGoldSelector(targetCastle, temp.defCastle, temp.onComplete, backToMap);
             }
             return;
         }
         // ==========================================
-
+        
         this.game.ui.cancelMapSelection(); 
 
         const onBackToMap = () => {
@@ -2336,14 +2353,17 @@ class CommandSystem {
         onComplete(selfReinfData);
     }
 
-    _promptPlayerAtkSelfReinforcement(helperCastle, atkCastle, targetCastle, onComplete) {
+    // ★ 引数の最後に「backToMap」を追加
+    _promptPlayerAtkSelfReinforcement(helperCastle, atkCastle, targetCastle, onComplete, backToMap) {
         const promptBusho = () => {
             this.game.ui.openBushoSelector('atk_self_reinf_deploy', helperCastle.id, {
                 onConfirm: (selectedIds) => {
-                    this.handleBushoSelectionForSelfReinf(helperCastle.id, selectedIds, onComplete, promptBusho);
+                    this.handleBushoSelectionForSelfReinf(helperCastle.id, selectedIds, onComplete, promptBusho, backToMap);
                 },
                 onCancel: () => {
-                    this.game.ui.showDialog("自軍からの援軍派遣を取りやめました。", false, () => onComplete(null));
+                    // ★ 変更：キャンセルした時は、完全にやめるのではなく城選択マップに戻ります！
+                    if (backToMap) backToMap();
+                    else onComplete(null);
                 }
             });
         };

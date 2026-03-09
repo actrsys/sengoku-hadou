@@ -1370,7 +1370,11 @@ class UIManager {
         if(this.panelEl) this.panelEl.classList.remove('hidden');
         this.updatePanelHeader(); 
         
-        if (Number(castle.ownerClan) === Number(this.game.playerClanId)) {
+        // ★ 変更：マップで何かを選んでいる最中は、専用の「戻る」メニューにします！
+        if (this.game.selectionMode) {
+            this.renderSelectionModeMenu();
+        }
+        else if (Number(castle.ownerClan) === Number(this.game.playerClanId)) {
              if (!this.game.selectionMode) {
                  if (this.game.getCurrentTurnCastle() === castle) {
                      this.menuState = 'MAIN';
@@ -1384,6 +1388,28 @@ class UIManager {
         }
         this.updateCastleGlows();
     }
+    // ★ 追加：マップ選択中専用の、スッキリしたメニューを描く魔法
+    renderSelectionModeMenu() {
+        const mobileArea = document.getElementById('command-area');
+        const pcArea = document.getElementById('pc-command-area');
+        const areas = [mobileArea, pcArea];
+        areas.forEach(area => {
+            if(!area) return;
+            area.innerHTML = '';
+            
+            const btn = document.createElement('button');
+            btn.className = 'cmd-btn back';
+            btn.textContent = "戻る（キャンセル）";
+            btn.onclick = () => {
+                if(this.game.isProcessingAI) return;
+                // 右クリックと同じように、選択をキャンセルする処理を呼びます
+                this.cancelMapSelection(false); 
+                this.scrollToActiveCastle();
+            };
+            area.appendChild(btn);
+        });
+    }
+    
     renderEnemyViewMenu() {
         const mobileArea = document.getElementById('command-area');
         const pcArea = document.getElementById('pc-command-area');
@@ -2616,6 +2642,7 @@ class UIManager {
     showReinforcementSelector(candidateCastles, atkCastle, targetCastle, atkBushos, sVal, rVal, hVal, gVal, selfReinfData) {
         this.forceResetModals();
         this.game.tempReinfData = {
+            candidates: candidateCastles, // ★ これを追加！
             atkCastle, targetCastle, atkBushos, sVal, rVal, hVal, gVal, selfReinfData,
             onCancel: () => this.game.warManager.startWar(atkCastle, targetCastle, atkBushos, sVal, rVal, hVal, gVal, null, selfReinfData)
         };
@@ -2625,7 +2652,7 @@ class UIManager {
         this.log("同盟援軍を要請する城を選択してください。(右クリックでキャンセル)");
     }
 
-    showReinforcementGoldSelector(helperCastle, atkCastle, targetCastle, atkBushos, sVal, rVal, hVal, gVal, selfReinfData) {
+    showReinforcementGoldSelector(helperCastle, atkCastle, targetCastle, atkBushos, sVal, rVal, hVal, gVal, selfReinfData, backToMap) {
         const rel = this.game.getRelation(this.game.playerClanId, helperCastle.ownerClan);
         if (rel.status === '支配') {
             this.game.commandSystem.executeReinforcementRequest(0, helperCastle, atkCastle, targetCastle, atkBushos, sVal, rVal, hVal, gVal, selfReinfData);
@@ -2656,12 +2683,14 @@ class UIManager {
             this.quantityModal.classList.add('hidden');
             this.game.commandSystem.executeReinforcementRequest(parseInt(num.value) || 0, helperCastle, atkCastle, targetCastle, atkBushos, sVal, rVal, hVal, gVal, selfReinfData);
         };
-
+        
         const cancelBtn = this.quantityModal.querySelector('.btn-secondary');
         if (cancelBtn) {
             cancelBtn.onclick = () => {
                 this.quantityModal.classList.add('hidden');
-                this.game.warManager.startWar(atkCastle, targetCastle, atkBushos, sVal, rVal, hVal, gVal, null, selfReinfData);
+                // ★ 変更：キャンセルした時にマップ選択に戻ります
+                if (backToMap) backToMap();
+                else this.game.warManager.startWar(atkCastle, targetCastle, atkBushos, sVal, rVal, hVal, gVal, null, selfReinfData);
             };
         }
     }
@@ -2669,6 +2698,7 @@ class UIManager {
     showSelfReinforcementSelector(candidateCastles, atkCastle, targetCastle, onComplete) {
         this.forceResetModals();
         this.game.tempReinfData = {
+            candidates: candidateCastles, // ★ これを追加！
             atkCastle, targetCastle, onComplete,
             onCancel: () => onComplete(null)
         };
@@ -2686,7 +2716,8 @@ class UIManager {
         }
         this.forceResetModals();
         this.game.tempReinfData = {
-            defCastle, onComplete,
+            candidates: candidateCastles, // ★ これを追加！
+            defCastle, onComplete, selfReinfData,
             onCancel: () => onComplete()
         };
         this.game.selectionMode = 'def_ally_reinforcement';
@@ -2695,7 +2726,7 @@ class UIManager {
         this.log("同盟国に防衛の援軍を要請する城を選択してください。(右クリックでキャンセル)");
     }
 
-    showDefReinforcementGoldSelector(helperCastle, defCastle, onComplete) {
+    showDefReinforcementGoldSelector(helperCastle, defCastle, onComplete, backToMap) {
         const rel = this.game.getRelation(this.game.playerClanId, helperCastle.ownerClan);
         if (rel.status === '支配') {
             this.game.warManager.executeDefReinforcement(0, helperCastle, defCastle, onComplete);
@@ -2727,12 +2758,20 @@ class UIManager {
             this.game.warManager.executeDefReinforcement(parseInt(num.value) || 0, helperCastle, defCastle, onComplete);
         };
         const cancelBtn = this.quantityModal.querySelector('.btn-secondary');
-        if (cancelBtn) { cancelBtn.onclick = () => { this.quantityModal.classList.add('hidden'); onComplete(); }; }
+        if (cancelBtn) { 
+            cancelBtn.onclick = () => { 
+                this.quantityModal.classList.add('hidden'); 
+                // ★ 変更：キャンセルした時にマップ選択に戻ります
+                if (backToMap) backToMap();
+                else onComplete(); 
+            }; 
+        }
     }
 
     showDefSelfReinforcementSelector(candidateCastles, defCastle, onComplete) {
         this.forceResetModals();
         this.game.tempReinfData = {
+            candidates: candidateCastles, // ★ これを追加！
             defCastle, onComplete,
             onCancel: () => onComplete(null)
         };
