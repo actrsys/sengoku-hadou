@@ -28,11 +28,15 @@ class AudioManager {
             },
             // ★野戦のBGM
             '08_Legend of bear slaying.ogg': {
+                start: 671034 / 44100, 
+                end: (671034 + 5327048) / 44100,
                 baseVolume: 0.03
             },
             // ★ここを書き足し！：攻城戦のBGM
             '07_Underworld dance.ogg': {
-                baseVolume: 0.015
+                start: 4943179 / 44100, 
+                end: (4943179 + 3587798) / 44100,
+                baseVolume: 0.025
             },
             // '新しい曲.ogg': { baseVolume: 0.05 }, // ループがない曲はこれだけでもOK！
         };
