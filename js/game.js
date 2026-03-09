@@ -478,6 +478,9 @@ class GameSystem {
     static calcDraftFromGold(gold, busho, castlePopulation) { const bonus = 1.0 + ((busho.leadership + busho.strength + busho.charm) / 300) * (window.WarParams.Military.DraftStatBonus - 1.0); const popBonus = 1.0 + (castlePopulation * window.WarParams.Military.DraftPopBonusFactor); return Math.floor(gold * 1.0 * bonus * popBonus); }
 
     static isReachable(game, startCastle, targetCastle, movingClanId) {
+        // ★追加：もし城のデータが空っぽだったら、エラーになる前にすぐストップします！
+        if (!startCastle || !targetCastle) return false;
+
         if (this.isAdjacent(startCastle, targetCastle)) return true;
 
         const visited = new Set();
@@ -502,7 +505,8 @@ class GameSystem {
                     if (Number(next.ownerClan) === Number(movingClanId)) {
                         canPass = true;
                     } 
-                    else if (next.ownerClan !== 0) {
+                    // ★変更：ここも「0」より大きい（正規の大名家）時だけ調べるようにガードを強化しました！
+                    else if (Number(next.ownerClan) > 0) {
                         const rel = game.getRelation(movingClanId, next.ownerClan);
                         if (rel && (rel.status === '同盟' || rel.status === '支配')) {
                             canPass = true;
