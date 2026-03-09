@@ -7,13 +7,12 @@
 Object.assign(WarManager.prototype, {
 
     getValidWarTargets(currentCastle) {
-        const myClanId = Number(this.game.playerClanId);
+        const myClanId = this.game.playerClanId;
         
-        // 自分が従属している「親大名」を探します
         let myBossId = 0;
         for (const c of this.game.clans) {
-            // ★変更：中立(0)やダミー城などの不正なIDを除外するガード！
-            if (c.id > 0 && c.id !== myClanId) {
+            // ★バリア追加：中立(0)を除外します
+            if (c.id !== myClanId && c.id !== 0) {
                 const r = this.game.getRelation(myClanId, c.id);
                 if (r && r.status === '従属') {
                     myBossId = c.id;
@@ -23,30 +22,22 @@ Object.assign(WarManager.prototype, {
         }
 
         return this.game.castles.filter(target => {
-            const targetClan = Number(target.ownerClan);
-            
-            // 基本的なチェック（道が繋がっているか、自分の城じゃないか、免疫期間じゃないか）
             if (!GameSystem.isReachable(this.game, currentCastle, target, myClanId)) return false;
-            // ★これで確実に「自分の城」はリストから弾かれます！
-            if (targetClan === myClanId) return false;
+            if (target.ownerClan === myClanId) return false;
             if ((target.immunityUntil || 0) >= this.game.getCurrentTurnId()) return false;
             
-            // 直接の「同盟・支配・従属」は攻撃不可
-            // ★超重要ガード：相手が「1以上（正規の大名）」の時だけ外交データを調べます！
-            if (targetClan > 0) {
-                const rel = this.game.getRelation(myClanId, targetClan);
-                // ★ここで「rel」が存在するかどうかの確認（rel &&）を追加しました！
+            if (target.ownerClan !== 0) {
+                const rel = this.game.getRelation(myClanId, target.ownerClan);
+                // ★バリア追加：rel が空っぽの時はエラーにせず無視します（rel && を追加）
                 if (rel && ['同盟', '支配', '従属'].includes(rel.status)) return false;
 
-                // 親大名がいる場合、親の「同盟国」や「他の従属国（親が支配している国）」は攻撃できない
                 if (myBossId !== 0) {
-                    const bossRel = this.game.getRelation(myBossId, targetClan);
+                    const bossRel = this.game.getRelation(myBossId, target.ownerClan);
                     if (bossRel && ['同盟', '支配'].includes(bossRel.status)) {
                         return false; 
                     }
                 }
             }
-
             return true;
         }).map(t => t.id);
     },
@@ -1370,56 +1361,47 @@ Object.assign(WarManager.prototype, {
             return;
         }
 
-        const proceedToAlly = (selfReinfData) => {
-            this.state.defSelfReinforcement = selfReinfData;
-            let allyCandidates = [];
-            this.game.castles.forEach(c => {
-                if (c.ownerClan === 0 || c.ownerClan === defClanId || c.ownerClan === atkClanId) return;
-                const rel = this.game.getRelation(defClanId, c.ownerClan);
-                if (!['友好', '同盟', '支配', '従属'].includes(rel.status) || rel.sentiment < 50) return;
-                const enemyRel = this.game.getRelation(c.ownerClan, atkClanId);
-                if (enemyRel && ['同盟', '支配', '従属'].includes(enemyRel.status)) return;
-                const isNextToMyAnyCastle = this.game.castles.some(myC => myC.ownerClan === defClanId && GameSystem.isAdjacent(c, myC));
-                if (!isNextToMyAnyCastle || c.soldiers < 1000 || c.rice < 500) return;
-                const normalBushos = this.game.getCastleBushos(c.id).filter(b => !b.isDaimyo && !b.isCastellan && b.status !== 'ronin' && b.belongKunishuId === 0);
-                if (normalBushos.length === 0) return;
-                allyCandidates.push(c);
-            });
+        let candidateCastles = [];
 
-            if (allyCandidates.length === 0) {
-                onComplete();
-                return;
-            }
-
-            if (defClanId === pid && !defCastle.isDelegated) {
-                this.game.ui.showDefReinforcementSelector(allyCandidates, defCastle, selfReinfData, onComplete);
-            } else {
-                allyCandidates.sort((a,b) => b.soldiers - a.soldiers);
-                this.executeDefReinforcement(0, allyCandidates[0], defCastle, onComplete);
-            }
-        };
-
-        let selfCandidates = [];
         this.game.castles.forEach(c => {
-            if (c.ownerClan !== defClanId || c.id === defCastle.id) return;
+            if (c.ownerClan === 0 || c.ownerClan === defClanId || c.ownerClan === atkClanId) return;
+
+            const rel = this.game.getRelation(defClanId, c.ownerClan);
+            // ★バリア追加：rel が空っぽの時に落ちないように「!rel ||」を追加しました！
+            if (!rel || !['友好', '同盟', '支配', '従属'].includes(rel.status)) return;
+            if (rel.sentiment < 50) return;
+
+            const enemyRel = this.game.getRelation(c.ownerClan, atkClanId);
+            // ★バリア追加：enemyRel が空っぽの時に落ちないように「enemyRel &&」を追加しました！
+            if (enemyRel && ['同盟', '支配', '従属'].includes(enemyRel.status)) return;
+
             const isNextToMyAnyCastle = this.game.castles.some(myC => myC.ownerClan === defClanId && GameSystem.isAdjacent(c, myC));
-            if (!isNextToMyAnyCastle || c.soldiers < 1000 || c.rice < 500) return;
-            const normalBushos = this.game.getCastleBushos(c.id).filter(b => !b.isDaimyo && !b.isCastellan && b.status !== 'ronin' && b.belongKunishuId === 0);
+            if (!isNextToMyAnyCastle) return;
+
+            if (c.soldiers < 1000) return;
+            if (c.rice < 500) return;
+
+            const normalBushos = this.game.getCastleBushos(c.id).filter(b => 
+                !b.isDaimyo && !b.isCastellan && b.status !== 'ronin' && b.belongKunishuId === 0
+            );
             if (normalBushos.length === 0) return;
-            selfCandidates.push(c);
+
+            candidateCastles.push(c);
         });
 
-        if (selfCandidates.length === 0) {
-            proceedToAlly(null);
-        } else {
-            if (defClanId === pid && !defCastle.isDelegated) {
-                this.game.ui.showDefSelfReinforcementSelector(selfCandidates, defCastle, proceedToAlly);
-            } else {
-                selfCandidates.sort((a,b) => b.soldiers - a.soldiers);
-                this.executeDefSelfReinforcementAuto(selfCandidates[0], defCastle, proceedToAlly);
-            }
+        if (candidateCastles.length === 0) {
+            onComplete();
+            return;
         }
-    }
+
+        if (defClanId === pid && !defCastle.isDelegated) {
+            this.game.ui.showDefReinforcementSelector(candidateCastles, defCastle, onComplete);
+        } else {
+            candidateCastles.sort((a,b) => b.soldiers - a.soldiers);
+            const bestCastle = candidateCastles[0];
+            this.executeDefReinforcement(0, bestCastle, defCastle, onComplete);
+        }
+    },
 
     executeDefSelfReinforcementAuto(helperCastle, defCastle, onComplete) {
         const myClanId = defCastle.ownerClan;
@@ -1450,7 +1432,7 @@ Object.assign(WarManager.prototype, {
         let colorClass = "log-color-def";
         this.game.ui.log(`【自軍援軍】<span class="${colorClass}">${helperCastle.name}</span> から防衛の援軍が参戦しました。`);
         onComplete(selfReinfData);
-    }
+    },
 
     _promptPlayerDefSelfReinforcement(helperCastle, defCastle, onComplete) {
         const promptBusho = () => {
@@ -1464,7 +1446,7 @@ Object.assign(WarManager.prototype, {
             });
         };
         promptBusho();
-    }
+    },
 
     handleBushoSelectionForDefSelfReinf(helperCastleId, selectedIds, onComplete) {
         const helperCastle = this.game.getCastle(helperCastleId);
@@ -1495,7 +1477,7 @@ Object.assign(WarManager.prototype, {
             },
             onCancel: () => this.game.ui.openBushoSelector('def_self_reinf_deploy', helperCastleId, null, () => onComplete(null))
         });
-    }
+    },
 
     executeDefReinforcement(gold, helperCastle, defCastle, onComplete) {
         if (gold > 0) defCastle.gold -= gold;
@@ -1540,7 +1522,7 @@ Object.assign(WarManager.prototype, {
         }
 
         this._applyDefReinforcement(helperCastle, defCastle, myToHelperRel, onComplete);
-    }
+    },
     
     _applyDefReinforcement(helperCastle, defCastle, myToHelperRel, onComplete) {
         const myClanId = defCastle.ownerClan;
@@ -1591,7 +1573,7 @@ Object.assign(WarManager.prototype, {
             this.game.ui.log(`【同盟援軍】${defCastle.name}の要請により、${helperClanName}が防衛の援軍として駆けつけました。`);
             onComplete();
         }
-    }
+    },
 
     _promptPlayerDefReinforcement(helperCastle, defCastle, myToHelperRel, onComplete, isBoss) {
         const promptBusho = () => {
@@ -1615,7 +1597,7 @@ Object.assign(WarManager.prototype, {
             });
         };
         promptBusho();
-    }
+    },
 
     _applyManualDefReinforcement(helperCastle, defCastle, myToHelperRel, reinfBushos, reinfSoldiers, reinfRice, reinfHorses, reinfGuns, onComplete) {
         const helperClanId = helperCastle.ownerClan;

@@ -477,26 +477,19 @@ class CommandSystem {
                 
             case 'ally_clan': 
                 return this.game.castles.filter(target => {
-                    const tClan = Number(target.ownerClan);
-                    // ★バリア追加：国人衆（0以下）や自分自身は除外してエラーを防ぎます！
-                    if (tClan <= 0 || tClan === playerClanId) return false;
-                    
-                    const rel = this.game.getRelation(playerClanId, tClan);
-                    // ★relが存在するかどうかも確認します
+                    if (target.ownerClan === 0 || Number(target.ownerClan) === playerClanId) return false;
+                    const rel = this.game.getRelation(playerClanId, target.ownerClan);
+                    // ★バリア追加：rel が空っぽの時に落ちないようにガードしました！
                     return rel && rel.status === '同盟';
                 }).map(t => t.id);
 
             case 'breakable_clan': 
                 return this.game.castles.filter(target => {
-                    const tClan = Number(target.ownerClan);
-                    // ★バリア追加：国人衆（0以下）や自分自身は除外してエラーを防ぎます！
-                    if (tClan <= 0 || tClan === playerClanId) return false;
-                    
-                    const rel = this.game.getRelation(playerClanId, tClan);
-                    // ★relが存在するかどうかも確認します
+                    if (target.ownerClan === 0 || Number(target.ownerClan) === playerClanId) return false;
+                    const rel = this.game.getRelation(playerClanId, target.ownerClan);
+                    // ★バリア追加：rel が空っぽの時に落ちないようにガードしました！
                     if (!rel || !['同盟', '支配', '従属'].includes(rel.status)) return false;
                     
-                    // ★ここを追加：こちらも「大名（当主）」がいるお城だけをOK（選択可能）にします！
                     const daimyo = this.game.bushos.find(b => b.clan === target.ownerClan && b.isDaimyo);
                     return daimyo && Number(daimyo.castleId) === Number(target.id);
                 }).map(t => t.id);
@@ -2186,7 +2179,6 @@ class CommandSystem {
         const targetCastle = this.game.getCastle(targetCastleId);
         const pid = this.game.playerClanId;
         
-        // 1. まず自軍の別城援軍候補を探す
         let selfCandidates = [];
         this.game.castles.forEach(c => {
             if (c.ownerClan !== myClanId || c.id === atkCastle.id) return;
@@ -2200,13 +2192,14 @@ class CommandSystem {
         });
 
         const proceedToAlly = (selfReinfData) => {
-            // 2. 次に同盟の援軍候補を探す
             let allyCandidates = [];
             this.game.castles.forEach(c => {
                 if (c.ownerClan === 0 || c.ownerClan === myClanId || c.ownerClan === targetCastle.ownerClan) return;
                 const rel = this.game.getRelation(myClanId, c.ownerClan);
-                if (!['友好', '同盟', '支配', '従属'].includes(rel.status) || rel.sentiment < 50) return;
+                // ★バリア追加：rel が空っぽの時に落ちないように「!rel ||」を追加しました！
+                if (!rel || !['友好', '同盟', '支配', '従属'].includes(rel.status) || rel.sentiment < 50) return;
                 const enemyRel = this.game.getRelation(c.ownerClan, targetCastle.ownerClan);
+                // ★バリア追加：enemyRel は安全ですが念のため確認
                 if (enemyRel && ['同盟', '支配', '従属'].includes(enemyRel.status)) return;
                 
                 const isNextToMyAnyCastle = this.game.castles.some(myC => myC.ownerClan === myClanId && GameSystem.isAdjacent(c, myC));
