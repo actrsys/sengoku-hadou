@@ -1406,10 +1406,28 @@ class UIManager {
     }
 
     cancelMapSelection(keepMenuState = false) { 
+        const prevMode = this.game.selectionMode; // ★これを追加
         this.game.selectionMode = null; 
         this.game.validTargets = []; 
         this.renderMap();
+
+        // ★援軍要請をキャンセルした時の処理
+        if (this.game.tempReinfData && ['atk_self_reinforcement', 'atk_ally_reinforcement', 'def_self_reinforcement', 'def_ally_reinforcement'].includes(prevMode)) {
+            const temp = this.game.tempReinfData;
+            this.game.tempReinfData = null;
+            if (temp.onCancel) temp.onCancel();
+        }
+        
         if (!keepMenuState) {
+            if (this.game.lastMenuState) {
+                this.menuState = this.game.lastMenuState;
+                this.game.lastMenuState = null;
+            } else {
+                this.menuState = 'MAIN';
+            }
+            this.renderCommandMenu();
+        }
+    }
             if (this.game.lastMenuState) {
                 this.menuState = this.game.lastMenuState;
                 this.game.lastMenuState = null;
@@ -2605,50 +2623,15 @@ class UIManager {
     }
     
     showReinforcementSelector(candidateCastles, atkCastle, targetCastle, atkBushos, sVal, rVal, hVal, gVal, selfReinfData) {
-        if (!this.selectorModal) return;
-        this.selectorModal.classList.remove('hidden');
-        
-        const title = document.getElementById('selector-title');
-        if (title) title.textContent = "同盟援軍の要請";
-
-        const listHeader = document.querySelector('#selector-modal .list-header');
-        if (listHeader) listHeader.style.display = 'none'; 
-        
-        const backBtn = document.querySelector('#selector-modal .btn-secondary');
-        if(backBtn) {
-            backBtn.onclick = () => {
-                if (listHeader) listHeader.style.display = '';
-                this.closeSelector();
-                this.game.warManager.startWar(atkCastle, targetCastle, atkBushos, sVal, rVal, hVal, gVal, null, selfReinfData);
-            };
-        }
-
-        const contextEl = document.getElementById('selector-context-info');
-        if (contextEl) {
-            contextEl.innerHTML = `<div>同盟国へ援軍を要請する城を選択してください。<br>（キャンセルすると出陣します）</div>`;
-            contextEl.classList.remove('hidden');
-        }
-
-        if (this.selectorList) {
-            this.selectorList.innerHTML = '';
-            candidateCastles.forEach(c => {
-                const clanData = this.game.clans.find(clan => clan.id === c.ownerClan);
-                const rel = this.game.getRelation(this.game.playerClanId, c.ownerClan);
-                const div = document.createElement('div');
-                div.className = 'select-item'; 
-                div.style.padding = '10px';
-                div.innerHTML = `<strong style="margin-right:10px;">${clanData ? clanData.name : "不明"} (${c.name})</strong> <span style="font-size:0.9rem; color:#555;">(兵数:${c.soldiers} 友好度:${rel.sentiment} [${rel.status}])</span>`;
-                
-                div.onclick = () => { 
-                    if (window.AudioManager) window.AudioManager.playSE('choice.ogg');
-                    if (listHeader) listHeader.style.display = '';
-                    this.closeSelector();
-                    this.showReinforcementGoldSelector(c, atkCastle, targetCastle, atkBushos, sVal, rVal, hVal, gVal, selfReinfData);
-                };
-                this.selectorList.appendChild(div);
-            });
-        }
-        if (this.selectorConfirmBtn) this.selectorConfirmBtn.classList.add('hidden');
+        this.forceResetModals();
+        this.game.tempReinfData = {
+            atkCastle, targetCastle, atkBushos, sVal, rVal, hVal, gVal, selfReinfData,
+            onCancel: () => this.game.warManager.startWar(atkCastle, targetCastle, atkBushos, sVal, rVal, hVal, gVal, null, selfReinfData)
+        };
+        this.game.selectionMode = 'atk_ally_reinforcement';
+        this.game.validTargets = candidateCastles.map(c => c.id);
+        this.renderMap();
+        this.log("同盟援軍を要請する城を選択してください。(右クリックでキャンセル)");
     }
 
     showReinforcementGoldSelector(helperCastle, atkCastle, targetCastle, atkBushos, sVal, rVal, hVal, gVal, selfReinfData) {
@@ -2693,81 +2676,32 @@ class UIManager {
     }
 
     showSelfReinforcementSelector(candidateCastles, atkCastle, targetCastle, onComplete) {
-        if (!this.selectorModal) return;
-        this.selectorModal.classList.remove('hidden');
-        const title = document.getElementById('selector-title');
-        if (title) title.textContent = "自軍別城からの出陣";
-        const listHeader = document.querySelector('#selector-modal .list-header');
-        if (listHeader) listHeader.style.display = 'none'; 
-        const backBtn = document.querySelector('#selector-modal .btn-secondary');
-        if(backBtn) {
-            backBtn.onclick = () => {
-                if (listHeader) listHeader.style.display = '';
-                this.closeSelector();
-                onComplete(null);
-            };
-        }
-        const contextEl = document.getElementById('selector-context-info');
-        if (contextEl) {
-            contextEl.innerHTML = `<div>自軍の別城から援軍を出陣させますか？<br>（キャンセルすると自軍援軍なしで進みます）</div>`;
-            contextEl.classList.remove('hidden');
-        }
-        if (this.selectorList) {
-            this.selectorList.innerHTML = '';
-            candidateCastles.forEach(c => {
-                const div = document.createElement('div');
-                div.className = 'select-item'; div.style.padding = '10px';
-                div.innerHTML = `<strong style="margin-right:10px;">${c.name}</strong> <span style="font-size:0.9rem; color:#555;">(兵数:${c.soldiers} 馬:${c.horses||0} 鉄砲:${c.guns||0})</span>`;
-                div.onclick = () => { 
-                    if (window.AudioManager) window.AudioManager.playSE('choice.ogg');
-                    if (listHeader) listHeader.style.display = '';
-                    this.closeSelector();
-                    this.game.commandSystem._promptPlayerAtkSelfReinforcement(c, atkCastle, targetCastle, onComplete);
-                };
-                this.selectorList.appendChild(div);
-            });
-        }
-        if (this.selectorConfirmBtn) this.selectorConfirmBtn.classList.add('hidden');
+        this.forceResetModals();
+        this.game.tempReinfData = {
+            atkCastle, targetCastle, onComplete,
+            onCancel: () => onComplete(null)
+        };
+        this.game.selectionMode = 'atk_self_reinforcement';
+        this.game.validTargets = candidateCastles.map(c => c.id);
+        this.renderMap();
+        this.log("自軍の別城から援軍を出陣させる城を選択してください。(右クリックでキャンセル)");
     }
     
     showDefReinforcementSelector(candidateCastles, defCastle, selfReinfData, onComplete) {
-        if (!this.selectorModal) return;
-        this.selectorModal.classList.remove('hidden');
-        const title = document.getElementById('selector-title');
-        if (title) title.textContent = "防衛の同盟援軍要請";
-        const listHeader = document.querySelector('#selector-modal .list-header');
-        if (listHeader) listHeader.style.display = 'none'; 
-        const backBtn = document.querySelector('#selector-modal .btn-secondary');
-        if(backBtn) {
-            backBtn.onclick = () => {
-                if (listHeader) listHeader.style.display = '';
-                this.closeSelector();
-                onComplete();
-            };
+        // ※引数のズレを吸収する処理
+        if (typeof selfReinfData === 'function') {
+            onComplete = selfReinfData;
+            selfReinfData = null;
         }
-        const contextEl = document.getElementById('selector-context-info');
-        if (contextEl) {
-            contextEl.innerHTML = `<div>同盟国に防衛の援軍を要請する城を選択してください。<br>（キャンセルすると要請せずに戦います）</div>`;
-            contextEl.classList.remove('hidden');
-        }
-        if (this.selectorList) {
-            this.selectorList.innerHTML = '';
-            candidateCastles.forEach(c => {
-                const clanData = this.game.clans.find(clan => clan.id === c.ownerClan);
-                const rel = this.game.getRelation(this.game.playerClanId, c.ownerClan);
-                const div = document.createElement('div');
-                div.className = 'select-item'; div.style.padding = '10px';
-                div.innerHTML = `<strong style="margin-right:10px;">${clanData ? clanData.name : "不明"} (${c.name})</strong> <span style="font-size:0.9rem; color:#555;">(兵数:${c.soldiers} 友好度:${rel.sentiment} [${rel.status}])</span>`;
-                div.onclick = () => { 
-                    if (window.AudioManager) window.AudioManager.playSE('choice.ogg');
-                    if (listHeader) listHeader.style.display = '';
-                    this.closeSelector();
-                    this.showDefReinforcementGoldSelector(c, defCastle, onComplete);
-                };
-                this.selectorList.appendChild(div);
-            });
-        }
-        if (this.selectorConfirmBtn) this.selectorConfirmBtn.classList.add('hidden');
+        this.forceResetModals();
+        this.game.tempReinfData = {
+            defCastle, onComplete,
+            onCancel: () => onComplete()
+        };
+        this.game.selectionMode = 'def_ally_reinforcement';
+        this.game.validTargets = candidateCastles.map(c => c.id);
+        this.renderMap();
+        this.log("同盟国に防衛の援軍を要請する城を選択してください。(右クリックでキャンセル)");
     }
 
     showDefReinforcementGoldSelector(helperCastle, defCastle, onComplete) {
@@ -2806,41 +2740,15 @@ class UIManager {
     }
 
     showDefSelfReinforcementSelector(candidateCastles, defCastle, onComplete) {
-        if (!this.selectorModal) return;
-        this.selectorModal.classList.remove('hidden');
-        const title = document.getElementById('selector-title');
-        if (title) title.textContent = "自軍別城からの防衛出陣";
-        const listHeader = document.querySelector('#selector-modal .list-header');
-        if (listHeader) listHeader.style.display = 'none'; 
-        const backBtn = document.querySelector('#selector-modal .btn-secondary');
-        if(backBtn) {
-            backBtn.onclick = () => {
-                if (listHeader) listHeader.style.display = '';
-                this.closeSelector();
-                onComplete(null);
-            };
-        }
-        const contextEl = document.getElementById('selector-context-info');
-        if (contextEl) {
-            contextEl.innerHTML = `<div>自軍の別城から防衛の援軍を出陣させますか？<br>（キャンセルすると自軍援軍なしで進みます）</div>`;
-            contextEl.classList.remove('hidden');
-        }
-        if (this.selectorList) {
-            this.selectorList.innerHTML = '';
-            candidateCastles.forEach(c => {
-                const div = document.createElement('div');
-                div.className = 'select-item'; div.style.padding = '10px';
-                div.innerHTML = `<strong style="margin-right:10px;">${c.name}</strong> <span style="font-size:0.9rem; color:#555;">(兵数:${c.soldiers} 馬:${c.horses||0} 鉄砲:${c.guns||0})</span>`;
-                div.onclick = () => { 
-                    if (window.AudioManager) window.AudioManager.playSE('choice.ogg');
-                    if (listHeader) listHeader.style.display = '';
-                    this.closeSelector();
-                    this.game.warManager._promptPlayerDefSelfReinforcement(c, defCastle, onComplete);
-                };
-                this.selectorList.appendChild(div);
-            });
-        }
-        if (this.selectorConfirmBtn) this.selectorConfirmBtn.classList.add('hidden');
+        this.forceResetModals();
+        this.game.tempReinfData = {
+            defCastle, onComplete,
+            onCancel: () => onComplete(null)
+        };
+        this.game.selectionMode = 'def_self_reinforcement';
+        this.game.validTargets = candidateCastles.map(c => c.id);
+        this.renderMap();
+        this.log("自軍の別城から防衛の援軍を出陣させる城を選択してください。(右クリックでキャンセル)");
     }
     
     // ★ ここからまるごと追加！：設定画面を開いて、スライダーを動かせるようにする魔法です！

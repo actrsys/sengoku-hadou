@@ -2016,6 +2016,12 @@ class CommandSystem {
             case 'goodwill': case 'alliance': return "外交相手を選択してください";
             case 'kunishu_goodwill': return "親善を行う国人衆がいる城を選択してください";
             case 'break_alliance': return "同盟破棄する相手を選択してください";
+            // ★ここから下を追加！
+            case 'atk_self_reinforcement': return "援軍を出陣させる城を選択してください";
+            case 'atk_ally_reinforcement': return "援軍を要請する城を選択してください";
+            case 'def_self_reinforcement': return "援軍を出陣させる城を選択してください";
+            case 'def_ally_reinforcement': return "援軍を要請する城を選択してください";
+            // ★追加ここまで
             default: return "対象を選択してください";
         }
     }
@@ -2024,6 +2030,27 @@ class CommandSystem {
         if (!this.game.validTargets.includes(targetCastle.id)) return;
         
         const mode = this.game.selectionMode;
+
+        // ==========================================
+        // ★援軍要請のマップ選択時の処理
+        if (['atk_self_reinforcement', 'atk_ally_reinforcement', 'def_self_reinforcement', 'def_ally_reinforcement'].includes(mode)) {
+            const temp = this.game.tempReinfData;
+            this.game.tempReinfData = null; // 使い終わったら消す
+            this.game.ui.cancelMapSelection(true); 
+
+            if (mode === 'atk_self_reinforcement') {
+                this._promptPlayerAtkSelfReinforcement(targetCastle, temp.atkCastle, temp.targetCastle, temp.onComplete);
+            } else if (mode === 'atk_ally_reinforcement') {
+                this.game.ui.showReinforcementGoldSelector(targetCastle, temp.atkCastle, temp.targetCastle, temp.atkBushos, temp.sVal, temp.rVal, temp.hVal, temp.gVal, temp.selfReinfData);
+            } else if (mode === 'def_self_reinforcement') {
+                this.game.warManager._promptPlayerDefSelfReinforcement(targetCastle, temp.defCastle, temp.onComplete);
+            } else if (mode === 'def_ally_reinforcement') {
+                this.game.ui.showDefReinforcementGoldSelector(targetCastle, temp.defCastle, temp.onComplete);
+            }
+            return;
+        }
+        // ==========================================
+
         this.game.ui.cancelMapSelection(); 
 
         const onBackToMap = () => {
