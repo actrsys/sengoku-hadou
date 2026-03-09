@@ -2428,7 +2428,7 @@ class CommandSystem {
         };
 
         const helperClanName = this.game.clans.find(c => c.id === helperClanId)?.name || "同盟援軍";
-        this.game.warManager.applyWarHostility(helperClanId, false, enemyClanId, targetCastle.isKunishu, true);
+        this.game.warManager.applyWarHostility(helperCastle.ownerClan, false, targetCastle.ownerClan, targetCastle.isKunishu, true);
         
         if (myClanId === this.game.playerClanId) {
             this.game.ui.showDialog(`${helperClanName} (${helperCastle.name}) が共に ${targetCastle.name} へ出陣します！`, false, () => {

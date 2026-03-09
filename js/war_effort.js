@@ -219,13 +219,15 @@ Object.assign(WarManager.prototype, {
                 horses: atkHorses, guns: atkGuns, isKunishu: atkCastle.isKunishu || false, kunishuId: atkCastle.kunishuId || 0
             };
 
-            const atkIsKunishu = atkCastle.isKunishu || false; const atkId = atkIsKunishu ? atkCastle.kunishuId : atkClan;
-            const defIsKunishu = defCastle.isKunishu || false; const defId = defIsKunishu ? defCastle.kunishuId : defClan;
-            this.applyWarHostility(atkId, atkIsKunishu, defId, defIsKunishu, false);
-
-            if (reinforcementData) {
-                const hId = reinforcementData.castle.isKunishu ? reinforcementData.castle.kunishuId : reinforcementData.castle.ownerClan;
-                this.applyWarHostility(hId, reinforcementData.castle.isKunishu||false, defId, defIsKunishu, true);
+            // ★攻撃側と守備側を「敵対」にする処理（直接書き込みます！）
+            if (this.game.diplomacyManager && !atkCastle.isKunishu && !defCastle.isKunishu && atkClan !== 0 && defClan !== 0) {
+                this.game.diplomacyManager.changeStatus(atkClan, defClan, '敵対');
+            }
+            if (reinforcementData && this.game.diplomacyManager && !reinforcementData.castle.isKunishu && !defCastle.isKunishu) {
+                const helperClan = reinforcementData.castle.ownerClan;
+                if (helperClan !== 0 && defClan !== 0) {
+                    this.game.diplomacyManager.changeStatus(helperClan, defClan, '敵対');
+                }
             }
 
             this.state = { 
@@ -546,7 +548,7 @@ Object.assign(WarManager.prototype, {
                     if (defCastle.soldiers > 1000) chance -= 0.2;
                     if (b.isDaimyo) chance -= window.WarParams.War.DaimyoCaptureReduction;
                     if (chance > 0.5) { 
-                        captives.push(b); 
+                        capturedBushos.push(b); 
                         // ★お城から出て捕虜になります
                         this.game.affiliationSystem.leaveCastle(b);
                     } else { 
@@ -1570,8 +1572,10 @@ Object.assign(WarManager.prototype, {
         const atkIsKunishu = atkForce.isKunishu || false;
         const atkId = atkIsKunishu ? atkForce.kunishuId : atkForce.ownerClan;
         const helperIsKunishu = helperCastle.isKunishu || false;
-        const helperId = helperIsKunishu ? helperCastle.kunishuId : helperClanId;
-        this.applyWarHostility(helperId, helperIsKunishu, atkId, atkIsKunishu, true);
+        // ★復元：守備の援軍と攻撃側を「敵対」にする処理
+        if (this.game.diplomacyManager && !helperIsKunishu && !atkIsKunishu && helperClanId !== 0 && atkId !== 0) {
+            this.game.diplomacyManager.changeStatus(helperClanId, atkId, '敵対');
+        }
         
         if (helperClanId === this.game.playerClanId) this.state.isPlayerInvolved = true;
 
@@ -1627,11 +1631,36 @@ Object.assign(WarManager.prototype, {
         const atkIsKunishu = atkForce.isKunishu || false;
         const atkId = atkIsKunishu ? atkForce.kunishuId : atkForce.ownerClan;
         const helperIsKunishu = helperCastle.isKunishu || false;
-        const helperId = helperIsKunishu ? helperCastle.kunishuId : helperClanId;
-        this.applyWarHostility(helperId, helperIsKunishu, atkId, atkIsKunishu, true);
+        // ★守備の援軍と攻撃側を「敵対」にする処理
+        if (this.game.diplomacyManager && !helperIsKunishu && !atkIsKunishu && helperClanId !== 0 && atkId !== 0) {
+            this.game.diplomacyManager.changeStatus(helperClanId, atkId, '敵対');
+        }
         
         this.state.isPlayerInvolved = true;
         const helperClanName = this.game.clans.find(c => c.id === helperClanId)?.name || "援軍";
         this.game.ui.showDialog(`${helperClanName} (${helperCastle.name}) が防衛の同盟援軍に出発しました！`, false, onComplete);
+    }, // ←★ここにカンマ（,）を付けるのがとっても大事です！
+    
+    // ★城の所有者が変わった時、その城にいる国人衆の友好度をチェックして低下させる魔法
+    applyKunishuRelationDropOnCapture(castle, newOwnerClan) {
+        if (newOwnerClan === 0) return; // 空き城になった時は何もしません
+        
+        // この城にいる国人衆を探します
+        const kunishusInCastle = this.game.kunishuSystem.getKunishusInCastle(castle.id);
+        
+        kunishusInCastle.forEach(kunishu => {
+            // 新しい殿様との友好度をチェック！
+            const currentRel = kunishu.getRelation(newOwnerClan);
+            if (currentRel <= 69) {
+                // 友好度が69以下なら、20下げます（0より下にはならないようにします）
+                const newRel = Math.max(0, currentRel - 20);
+                kunishu.setRelation(newOwnerClan, newRel);
+                
+                // もしプレイヤーが関わっていたら、メッセージを出します！
+                if (newOwnerClan === this.game.playerClanId) {
+                    this.game.ui.log(`(城の主が変わったため、${kunishu.getName(this.game)}との友好度が低下しました)`);
+                }
+            }
+        });
     }
 });
