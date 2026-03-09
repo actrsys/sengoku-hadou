@@ -174,6 +174,17 @@ Object.assign(WarManager.prototype, {
             if (atkClan === pid && !atkCastle.isDelegated) isPlayerInvolved = true;
             if (defClan === pid && !defCastle.isDelegated) isPlayerInvolved = true;
 
+            // ★援軍を足す「前」に、元の城（A）から出撃する分だけを引き算します！
+            if (atkClan !== pid && !atkCastle.isKunishu) {
+                atkHorses = atkCastle.horses || 0; atkGuns = atkCastle.guns || 0;
+            }
+
+            atkCastle.soldiers = Math.max(0, atkCastle.soldiers - atkSoldierCount);
+            atkCastle.rice = Math.max(0, atkCastle.rice - atkRice);
+            atkCastle.horses = Math.max(0, (atkCastle.horses || 0) - atkHorses);
+            atkCastle.guns = Math.max(0, (atkCastle.guns || 0) - atkGuns);
+
+            // その後に、援軍の数を足して攻撃軍全体のパワーにします！
             const processReinforcement = (reinfData) => {
                 if (reinfData) {
                     const hC = reinfData.castle;
@@ -185,16 +196,7 @@ Object.assign(WarManager.prototype, {
             };
             processReinforcement(selfReinforcementData);
             processReinforcement(reinforcementData);
-
-            if (atkClan !== pid && !atkCastle.isKunishu) {
-                atkHorses = atkCastle.horses || 0; atkGuns = atkCastle.guns || 0;
-            }
-
-            atkCastle.soldiers = Math.max(0, atkCastle.soldiers - atkSoldierCount);
-            atkCastle.rice = Math.max(0, atkCastle.rice - atkRice);
-            atkCastle.horses = Math.max(0, (atkCastle.horses || 0) - atkHorses);
-            atkCastle.guns = Math.max(0, (atkCastle.guns || 0) - atkGuns);
-            atkBushos.forEach(b => b.isActionDone = true);
+            // ★修正ここまで
 
             const atkClanData = this.game.clans.find(c => c.id === atkClan); 
             const atkArmyName = atkCastle.isKunishu ? atkCastle.name : (atkClanData ? atkClanData.getArmyName() : "敵軍");
