@@ -339,8 +339,8 @@ Object.assign(WarManager.prototype, {
                         }
                     } else {
                         if (totalDefSoldiers >= atkSoldierCount * 0.8) {
-                            let availableDefBushos = this.game.getCastleBushos(defCastle.id).filter(b => b.status !== 'dead' && b.status !== 'ronin' && b.status !== 'unborn');
-                            // ★ここから下を差し替えます！
+                            // ★国人衆（belongKunishuIdが0以外）を弾く魔法を追加！
+                            let availableDefBushos = this.game.getCastleBushos(defCastle.id).filter(b => b.status !== 'dead' && b.status !== 'ronin' && b.status !== 'unborn' && b.belongKunishuId === 0);
                             // 1. 誰がみんなの強さを見積もるか（評価者）を決めます！
                             // その城にいる大名、いなければ城主が評価者になります
                             let evaluator = availableDefBushos.find(b => b.isDaimyo);
@@ -887,7 +887,8 @@ Object.assign(WarManager.prototype, {
             }
 
             s.atkBushos.forEach(b => { this.game.factionSystem.recordBattle(b, s.defender.id); this.game.factionSystem.updateRecognition(b, 25); });
-            const defBushos = this.game.getCastleBushos(s.defender.id).filter(b => b.status !== 'ronin').concat(this.pendingPrisoners);
+            // ★大名の戦いなら国人衆を弾き、国衆の戦いなら大名を弾く魔法！
+            const defBushos = this.game.getCastleBushos(s.defender.id).filter(b => b.status !== 'ronin' && (s.defender.isKunishu ? b.belongKunishuId === s.defender.kunishuId : b.belongKunishuId === 0)).concat(this.pendingPrisoners);
             if (s.defBusho && s.defBusho.id && !defBushos.find(b => b.id === s.defBusho.id)) defBushos.push(s.defBusho);
             defBushos.forEach(b => { this.game.factionSystem.recordBattle(b, s.defender.id); this.game.factionSystem.updateRecognition(b, 25); });
 
@@ -1083,6 +1084,8 @@ Object.assign(WarManager.prototype, {
         losers.forEach(b => { 
             // ★ 修正: 未登場の武将を巻き込んで捕虜や浪人にしないように守ります！
             if (b.status === 'ronin' || b.status === 'unborn' || b.status === 'dead') return;
+            // ★ 追加: 普通の大名の城が落ちた時に、同居している国人衆が巻き添えで捕虜にならないように守ります！
+            if (!defeatedCastle.isKunishu && b.belongKunishuId > 0) return;
 
             let chance = isLastStand ? 1.0 : ((window.WarParams.War.CaptureChanceBase || 0.7) - (b.strength * (window.WarParams.War.CaptureStrFactor || 0.002)) + (Math.random() * 0.3));
             if (!isLastStand && defeatedCastle.soldiers > 1000) chance -= 0.2; 

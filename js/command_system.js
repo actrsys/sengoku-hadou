@@ -284,7 +284,8 @@ class CommandSystem {
 
         let isEnemyTarget = false;
         let targetCastle = null;
-        if (['rumor_target_busho','headhunt_target','view_only'].includes(actionType)) {
+        // ★追加: 'kunishu_headhunt_target' も敵の城を見に行くコマンドとして追加します！
+        if (['rumor_target_busho','headhunt_target','kunishu_headhunt_target','view_only'].includes(actionType)) {
              isEnemyTarget = true;
              targetCastle = this.game.getCastle(targetId);
         }
@@ -319,10 +320,15 @@ class CommandSystem {
             infoHtml = "<div>扇動を実行する担当官を選択してください</div>"; 
         }
         else if (actionType === 'headhunt_target') { 
-            bushos = this.game.getCastleBushos(targetId).filter(b => b.status !== 'ronin' && !b.isDaimyo); 
+            bushos = this.game.getCastleBushos(targetId).filter(b => b.status !== 'ronin' && !b.isDaimyo && b.belongKunishuId === 0); 
             infoHtml = "<div>引抜の対象とする武将を選択してください </div>"; 
         }
-        else if (actionType === 'headhunt_doer') { 
+        // ★追加: 国人衆を引き抜く時に、自分の城の武将が表示されてしまうバグを直す魔法のブロックです！
+        else if (actionType === 'kunishu_headhunt_target') { 
+            bushos = this.game.getCastleBushos(targetId).filter(b => b.status !== 'ronin' && b.belongKunishuId === extraData.kunishuId); 
+            infoHtml = "<div>引抜の対象とする国衆武将を選択してください </div>"; 
+        }
+        else if (actionType === 'headhunt_doer') {
             bushos = this.game.getCastleBushos(c.id).filter(b => b.status !== 'ronin'); 
             infoHtml = "<div>引抜を実行する担当官を選択してください</div>"; 
         }
@@ -366,19 +372,19 @@ class CommandSystem {
             infoHtml = "<div>軍師に任命する武将を選択してください</div>";
         }
         else if (actionType === 'def_intercept_deploy') {
-            bushos = this.game.getCastleBushos(targetId).filter(b => b.status !== 'ronin');
+            bushos = this.game.getCastleBushos(targetId).filter(b => b.status !== 'ronin' && b.status !== 'dead' && b.status !== 'unborn' && b.belongKunishuId === 0);
             infoHtml = "<div>迎撃に出陣する武将を選択してください（最大5名まで）</div>";
         }
         else if (actionType === 'def_reinf_deploy') {
-            bushos = this.game.getCastleBushos(targetId).filter(b => b.status !== 'ronin');
+            bushos = this.game.getCastleBushos(targetId).filter(b => b.status !== 'ronin' && b.status !== 'dead' && b.status !== 'unborn' && b.belongKunishuId === 0);
             infoHtml = "<div>援軍に派遣する武将を選択してください（最大5名まで）</div>";
         }
         else if (actionType === 'atk_reinf_deploy') {
-            bushos = this.game.getCastleBushos(targetId).filter(b => b.status !== 'ronin');
+            bushos = this.game.getCastleBushos(targetId).filter(b => b.status !== 'ronin' && b.status !== 'dead' && b.status !== 'unborn' && b.belongKunishuId === 0);
             infoHtml = "<div>攻撃の同盟援軍に派遣する武将を選択してください（最大5名まで）</div>";
         }
         else if (actionType === 'def_self_reinf_deploy' || actionType === 'atk_self_reinf_deploy') {
-            bushos = this.game.getCastleBushos(targetId).filter(b => b.status !== 'ronin');
+            bushos = this.game.getCastleBushos(targetId).filter(b => b.status !== 'ronin' && b.status !== 'dead' && b.status !== 'unborn' && b.belongKunishuId === 0);
             infoHtml = "<div>自軍援軍として出陣する武将を選択してください（最大5名まで）</div>";
         }
         
@@ -393,7 +399,8 @@ class CommandSystem {
             infoHtml = "<div>褒美を与える武将を選択してください</div>"; 
         }
         else {
-            bushos = this.game.getCastleBushos(c.id).filter(b => b.status !== 'ronin');
+            // ★追加: 内政などの通常の命令でも、未登場の武将や国人衆が勝手にリストに出ないようにします
+            bushos = this.game.getCastleBushos(c.id).filter(b => b.status !== 'ronin' && b.status !== 'dead' && b.status !== 'unborn' && b.belongKunishuId === 0);
             
             if (spec.msg) {
                 infoHtml = `<div>${spec.msg}</div>`;
