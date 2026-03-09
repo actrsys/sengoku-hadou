@@ -174,17 +174,21 @@ Object.assign(WarManager.prototype, {
             if (atkClan === pid && !atkCastle.isDelegated) isPlayerInvolved = true;
             if (defClan === pid && !defCastle.isDelegated) isPlayerInvolved = true;
 
-            // ★援軍を足す「前」に、元の城（A）から出撃する分だけを引き算します！
+            // ★出撃元の城から減らす「本来の出撃数」を覚えておきます
+            const baseAtkSoldiers = atkSoldierCount;
+            const baseAtkRice = atkRice;
+            let baseAtkHorses = atkHorses;
+            let baseAtkGuns = atkGuns;
+
             if (atkClan !== pid && !atkCastle.isKunishu) {
-                atkHorses = atkCastle.horses || 0; atkGuns = atkCastle.guns || 0;
+                baseAtkHorses = atkCastle.horses || 0; 
+                baseAtkGuns = atkCastle.guns || 0;
+                // AIの場合の変数も更新しておく
+                atkHorses = baseAtkHorses;
+                atkGuns = baseAtkGuns;
             }
 
-            atkCastle.soldiers = Math.max(0, atkCastle.soldiers - atkSoldierCount);
-            atkCastle.rice = Math.max(0, atkCastle.rice - atkRice);
-            atkCastle.horses = Math.max(0, (atkCastle.horses || 0) - atkHorses);
-            atkCastle.guns = Math.max(0, (atkCastle.guns || 0) - atkGuns);
-
-            // その後に、援軍の数を足して攻撃軍全体のパワーにします！
+            // ★ここで援軍を攻撃軍全体（atkSoldierCount等）に足し込みます
             const processReinforcement = (reinfData) => {
                 if (reinfData) {
                     const hC = reinfData.castle;
@@ -196,6 +200,12 @@ Object.assign(WarManager.prototype, {
             };
             processReinforcement(selfReinforcementData);
             processReinforcement(reinforcementData);
+
+            // ★修正：出撃元の城（atkCastle）からは、援軍を含まない「base」の分だけを減らします！
+            atkCastle.soldiers = Math.max(0, atkCastle.soldiers - baseAtkSoldiers);
+            atkCastle.rice = Math.max(0, atkCastle.rice - baseAtkRice);
+            atkCastle.horses = Math.max(0, (atkCastle.horses || 0) - baseAtkHorses);
+            atkCastle.guns = Math.max(0, (atkCastle.guns || 0) - baseAtkGuns);
             
             atkBushos.forEach(b => b.isActionDone = true);
             
