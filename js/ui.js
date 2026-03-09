@@ -2184,9 +2184,14 @@ class UIManager {
             inputs.rice = createSlider("持参兵糧", "rice", interceptCastle.rice, interceptCastle.rice);
             inputs.horses = createSlider("持参騎馬", "horses", interceptCastle.horses || 0, 0);
             inputs.guns = createSlider("持参鉄砲", "guns", interceptCastle.guns || 0, 0);
-        } else if (type === 'def_reinf_supplies' || type === 'atk_reinf_supplies') { 
+        } else if (type === 'def_reinf_supplies' || type === 'atk_reinf_supplies' || type === 'def_self_reinf_supplies' || type === 'atk_self_reinf_supplies') { 
             const helperCastle = (data && data.length > 0) ? data[0] : c;
-            document.getElementById('quantity-title').textContent = type === 'def_reinf_supplies' ? "防衛援軍の部隊編成" : "攻撃援軍の部隊編成";
+            let titleText = "";
+            if (type === 'def_reinf_supplies') titleText = "防衛援軍の部隊編成";
+            else if (type === 'atk_reinf_supplies') titleText = "攻撃援軍の部隊編成";
+            else if (type === 'def_self_reinf_supplies') titleText = "防衛自軍援軍の部隊編成";
+            else if (type === 'atk_self_reinf_supplies') titleText = "攻撃自軍援軍の部隊編成";
+            document.getElementById('quantity-title').textContent = titleText;
             inputs.soldiers = createSlider("出陣兵士数", "soldiers", helperCastle.soldiers, helperCastle.soldiers, 500);
             inputs.rice = createSlider("持参兵糧", "rice", helperCastle.rice, helperCastle.rice, 500);
             inputs.horses = createSlider("持参騎馬", "horses", helperCastle.horses || 0, 0, 0);
@@ -2599,12 +2604,12 @@ class UIManager {
         }
     }
     
-    showReinforcementSelector(candidateCastles, atkCastle, targetCastle, atkBushos, sVal, rVal, hVal, gVal) {
+    showReinforcementSelector(candidateCastles, atkCastle, targetCastle, atkBushos, sVal, rVal, hVal, gVal, selfReinfData) {
         if (!this.selectorModal) return;
         this.selectorModal.classList.remove('hidden');
         
         const title = document.getElementById('selector-title');
-        if (title) title.textContent = "援軍の要請";
+        if (title) title.textContent = "同盟援軍の要請";
 
         const listHeader = document.querySelector('#selector-modal .list-header');
         if (listHeader) listHeader.style.display = 'none'; 
@@ -2614,13 +2619,13 @@ class UIManager {
             backBtn.onclick = () => {
                 if (listHeader) listHeader.style.display = '';
                 this.closeSelector();
-                this.game.warManager.startWar(atkCastle, targetCastle, atkBushos, sVal, rVal, hVal, gVal);
+                this.game.warManager.startWar(atkCastle, targetCastle, atkBushos, sVal, rVal, hVal, gVal, null, selfReinfData);
             };
         }
 
         const contextEl = document.getElementById('selector-context-info');
         if (contextEl) {
-            contextEl.innerHTML = `<div>援軍を要請する城を選択してください。<br>（キャンセルすると援軍なしで出陣します）</div>`;
+            contextEl.innerHTML = `<div>同盟国へ援軍を要請する城を選択してください。<br>（キャンセルすると出陣します）</div>`;
             contextEl.classList.remove('hidden');
         }
 
@@ -2628,33 +2633,28 @@ class UIManager {
             this.selectorList.innerHTML = '';
             candidateCastles.forEach(c => {
                 const clanData = this.game.clans.find(clan => clan.id === c.ownerClan);
-                const clanName = clanData ? clanData.name : "不明";
                 const rel = this.game.getRelation(this.game.playerClanId, c.ownerClan);
-                
                 const div = document.createElement('div');
-                div.className = 'kunishu-item'; 
-                div.innerHTML = `<strong style="margin-right:10px;">${clanName} (${c.name})</strong> <span style="font-size:0.9rem; color:#555;">(兵数:${c.soldiers} 友好度:${rel.sentiment} [${rel.status}])</span>`;
+                div.className = 'select-item'; 
+                div.style.padding = '10px';
+                div.innerHTML = `<strong style="margin-right:10px;">${clanData ? clanData.name : "不明"} (${c.name})</strong> <span style="font-size:0.9rem; color:#555;">(兵数:${c.soldiers} 友好度:${rel.sentiment} [${rel.status}])</span>`;
                 
                 div.onclick = () => { 
                     if (window.AudioManager) window.AudioManager.playSE('choice.ogg');
-                    
                     if (listHeader) listHeader.style.display = '';
                     this.closeSelector();
-                    this.showReinforcementGoldSelector(c, atkCastle, targetCastle, atkBushos, sVal, rVal, hVal, gVal);
+                    this.showReinforcementGoldSelector(c, atkCastle, targetCastle, atkBushos, sVal, rVal, hVal, gVal, selfReinfData);
                 };
                 this.selectorList.appendChild(div);
             });
         }
-        
-        if (this.selectorConfirmBtn) {
-            this.selectorConfirmBtn.classList.add('hidden');
-        }
+        if (this.selectorConfirmBtn) this.selectorConfirmBtn.classList.add('hidden');
     }
 
-    showReinforcementGoldSelector(helperCastle, atkCastle, targetCastle, atkBushos, sVal, rVal, hVal, gVal) {
+    showReinforcementGoldSelector(helperCastle, atkCastle, targetCastle, atkBushos, sVal, rVal, hVal, gVal, selfReinfData) {
         const rel = this.game.getRelation(this.game.playerClanId, helperCastle.ownerClan);
         if (rel.status === '支配') {
-            this.game.commandSystem.executeReinforcementRequest(0, helperCastle, atkCastle, targetCastle, atkBushos, sVal, rVal, hVal, gVal);
+            this.game.commandSystem.executeReinforcementRequest(0, helperCastle, atkCastle, targetCastle, atkBushos, sVal, rVal, hVal, gVal, selfReinfData);
             return;
         }
 
@@ -2664,68 +2664,79 @@ class UIManager {
         if (this.charityTypeSelector) this.charityTypeSelector.classList.add('hidden'); 
         if (this.tradeTypeInfo) this.tradeTypeInfo.classList.add('hidden'); 
 
-        document.getElementById('quantity-title').textContent = "援軍の使者に持たせる金 (最大1500)"; 
-        
+        document.getElementById('quantity-title').textContent = "使者に持たせる金 (最大1500)"; 
         const maxGold = Math.min(1500, atkCastle.gold);
 
         const wrap = document.createElement('div'); 
         wrap.className = 'qty-row'; 
-        wrap.innerHTML = `
-            <label>持参金 (Max: ${maxGold})</label>
-            <div class="qty-control">
-                <input type="range" id="range-reinf-gold" min="0" max="${maxGold}" value="0">
-                <input type="number" id="num-reinf-gold" min="0" max="${maxGold}" value="0">
-            </div>
-            <div class="qty-shortcuts">
-                <button class="qty-shortcut-btn" id="btn-min-reinf">最小</button>
-                <button class="qty-shortcut-btn" id="btn-half-reinf">半分</button>
-                <button class="qty-shortcut-btn" id="btn-max-reinf">最大</button>
-            </div>
-        `; 
+        wrap.innerHTML = `<label>持参金 (Max: ${maxGold})</label><div class="qty-control"><input type="range" id="range-reinf-gold" min="0" max="${maxGold}" value="0"><input type="number" id="num-reinf-gold" min="0" max="${maxGold}" value="0"></div>`; 
         this.quantityContainer.appendChild(wrap); 
 
         const range = wrap.querySelector(`#range-reinf-gold`); 
         const num = wrap.querySelector(`#num-reinf-gold`); 
-        
-        const setVal = (v) => {
-            if (v < 0) v = 0; if (v > maxGold) v = maxGold;
-            range.value = v; num.value = v;
-        };
-        wrap.querySelector('#btn-min-reinf').onclick = () => setVal(0);
-        wrap.querySelector('#btn-half-reinf').onclick = () => setVal(Math.floor(maxGold / 2));
-        wrap.querySelector('#btn-max-reinf').onclick = () => setVal(maxGold);
-
+        const setVal = (v) => { if (v < 0) v = 0; if (v > maxGold) v = maxGold; range.value = v; num.value = v; };
         range.oninput = () => num.value = range.value; 
-        num.oninput = () => {
-            let v = parseInt(num.value);
-            if (isNaN(v)) return; 
-            setVal(v);
-        };
+        num.oninput = () => { let v = parseInt(num.value); if (!isNaN(v)) setVal(v); };
 
         this.quantityConfirmBtn.onclick = () => {
             this.quantityModal.classList.add('hidden');
-            const gold = parseInt(num.value) || 0;
-            this.game.commandSystem.executeReinforcementRequest(gold, helperCastle, atkCastle, targetCastle, atkBushos, sVal, rVal, hVal, gVal);
+            this.game.commandSystem.executeReinforcementRequest(parseInt(num.value) || 0, helperCastle, atkCastle, targetCastle, atkBushos, sVal, rVal, hVal, gVal, selfReinfData);
         };
 
         const cancelBtn = this.quantityModal.querySelector('.btn-secondary');
         if (cancelBtn) {
             cancelBtn.onclick = () => {
                 this.quantityModal.classList.add('hidden');
-                this.game.warManager.startWar(atkCastle, targetCastle, atkBushos, sVal, rVal, hVal, gVal);
+                this.game.warManager.startWar(atkCastle, targetCastle, atkBushos, sVal, rVal, hVal, gVal, null, selfReinfData);
             };
         }
     }
-    
-    showDefReinforcementSelector(candidateCastles, defCastle, onComplete) {
+
+    showSelfReinforcementSelector(candidateCastles, atkCastle, targetCastle, onComplete) {
         if (!this.selectorModal) return;
         this.selectorModal.classList.remove('hidden');
         const title = document.getElementById('selector-title');
-        if (title) title.textContent = "防衛の援軍要請";
-
+        if (title) title.textContent = "自軍別城からの出陣";
         const listHeader = document.querySelector('#selector-modal .list-header');
         if (listHeader) listHeader.style.display = 'none'; 
-        
+        const backBtn = document.querySelector('#selector-modal .btn-secondary');
+        if(backBtn) {
+            backBtn.onclick = () => {
+                if (listHeader) listHeader.style.display = '';
+                this.closeSelector();
+                onComplete(null);
+            };
+        }
+        const contextEl = document.getElementById('selector-context-info');
+        if (contextEl) {
+            contextEl.innerHTML = `<div>自軍の別城から援軍を出陣させますか？<br>（キャンセルすると自軍援軍なしで進みます）</div>`;
+            contextEl.classList.remove('hidden');
+        }
+        if (this.selectorList) {
+            this.selectorList.innerHTML = '';
+            candidateCastles.forEach(c => {
+                const div = document.createElement('div');
+                div.className = 'select-item'; div.style.padding = '10px';
+                div.innerHTML = `<strong style="margin-right:10px;">${c.name}</strong> <span style="font-size:0.9rem; color:#555;">(兵数:${c.soldiers} 馬:${c.horses||0} 鉄砲:${c.guns||0})</span>`;
+                div.onclick = () => { 
+                    if (window.AudioManager) window.AudioManager.playSE('choice.ogg');
+                    if (listHeader) listHeader.style.display = '';
+                    this.closeSelector();
+                    this.game.commandSystem._promptPlayerAtkSelfReinforcement(c, atkCastle, targetCastle, onComplete);
+                };
+                this.selectorList.appendChild(div);
+            });
+        }
+        if (this.selectorConfirmBtn) this.selectorConfirmBtn.classList.add('hidden');
+    }
+    
+    showDefReinforcementSelector(candidateCastles, defCastle, selfReinfData, onComplete) {
+        if (!this.selectorModal) return;
+        this.selectorModal.classList.remove('hidden');
+        const title = document.getElementById('selector-title');
+        if (title) title.textContent = "防衛の同盟援軍要請";
+        const listHeader = document.querySelector('#selector-modal .list-header');
+        if (listHeader) listHeader.style.display = 'none'; 
         const backBtn = document.querySelector('#selector-modal .btn-secondary');
         if(backBtn) {
             backBtn.onclick = () => {
@@ -2734,25 +2745,21 @@ class UIManager {
                 onComplete();
             };
         }
-
         const contextEl = document.getElementById('selector-context-info');
         if (contextEl) {
-            contextEl.innerHTML = `<div>敵が攻めてきました！援軍を要請する城を選択してください。<br>（キャンセルすると援軍なしで戦います）</div>`;
+            contextEl.innerHTML = `<div>同盟国に防衛の援軍を要請する城を選択してください。<br>（キャンセルすると要請せずに戦います）</div>`;
             contextEl.classList.remove('hidden');
         }
-
         if (this.selectorList) {
             this.selectorList.innerHTML = '';
             candidateCastles.forEach(c => {
                 const clanData = this.game.clans.find(clan => clan.id === c.ownerClan);
                 const rel = this.game.getRelation(this.game.playerClanId, c.ownerClan);
                 const div = document.createElement('div');
-                div.className = 'kunishu-item'; 
+                div.className = 'select-item'; div.style.padding = '10px';
                 div.innerHTML = `<strong style="margin-right:10px;">${clanData ? clanData.name : "不明"} (${c.name})</strong> <span style="font-size:0.9rem; color:#555;">(兵数:${c.soldiers} 友好度:${rel.sentiment} [${rel.status}])</span>`;
-                
                 div.onclick = () => { 
                     if (window.AudioManager) window.AudioManager.playSE('choice.ogg');
-                    
                     if (listHeader) listHeader.style.display = '';
                     this.closeSelector();
                     this.showDefReinforcementGoldSelector(c, defCastle, onComplete);
@@ -2776,56 +2783,66 @@ class UIManager {
         if (this.charityTypeSelector) this.charityTypeSelector.classList.add('hidden'); 
         if (this.tradeTypeInfo) this.tradeTypeInfo.classList.add('hidden'); 
 
-        document.getElementById('quantity-title').textContent = "援軍の使者に持たせる金 (最大1500)"; 
+        document.getElementById('quantity-title').textContent = "使者に持たせる金 (最大1500)"; 
         const maxGold = Math.min(1500, defCastle.gold);
 
         const wrap = document.createElement('div'); 
         wrap.className = 'qty-row'; 
-        wrap.innerHTML = `
-            <label>持参金 (Max: ${maxGold})</label>
-            <div class="qty-control">
-                <input type="range" id="range-def-gold" min="0" max="${maxGold}" value="0">
-                <input type="number" id="num-def-gold" min="0" max="${maxGold}" value="0">
-            </div>
-            <div class="qty-shortcuts">
-                <button class="qty-shortcut-btn" id="btn-min-def">最小</button>
-                <button class="qty-shortcut-btn" id="btn-half-def">半分</button>
-                <button class="qty-shortcut-btn" id="btn-max-def">最大</button>
-            </div>
-        `; 
+        wrap.innerHTML = `<label>持参金 (Max: ${maxGold})</label><div class="qty-control"><input type="range" id="range-def-gold" min="0" max="${maxGold}" value="0"><input type="number" id="num-def-gold" min="0" max="${maxGold}" value="0"></div>`; 
         this.quantityContainer.appendChild(wrap); 
 
         const range = wrap.querySelector(`#range-def-gold`); 
         const num = wrap.querySelector(`#num-def-gold`); 
-        
-        const setVal = (v) => {
-            if (v < 0) v = 0; if (v > maxGold) v = maxGold;
-            range.value = v; num.value = v;
-        };
-        wrap.querySelector('#btn-min-def').onclick = () => setVal(0);
-        wrap.querySelector('#btn-half-def').onclick = () => setVal(Math.floor(maxGold / 2));
-        wrap.querySelector('#btn-max-def').onclick = () => setVal(maxGold);
-
+        const setVal = (v) => { if (v < 0) v = 0; if (v > maxGold) v = maxGold; range.value = v; num.value = v; };
         range.oninput = () => num.value = range.value; 
-        num.oninput = () => {
-            let v = parseInt(num.value) || 0;
-            setVal(v);
-        };
+        num.oninput = () => { let v = parseInt(num.value) || 0; setVal(v); };
 
         this.quantityConfirmBtn.onclick = () => {
             this.quantityModal.classList.add('hidden');
-            const gold = parseInt(num.value) || 0;
-            this.game.warManager.executeDefReinforcement(gold, helperCastle, defCastle, onComplete);
+            this.game.warManager.executeDefReinforcement(parseInt(num.value) || 0, helperCastle, defCastle, onComplete);
         };
-
         const cancelBtn = this.quantityModal.querySelector('.btn-secondary');
-        if (cancelBtn) {
-            cancelBtn.onclick = () => {
-                this.quantityModal.classList.add('hidden');
-                onComplete(); 
+        if (cancelBtn) { cancelBtn.onclick = () => { this.quantityModal.classList.add('hidden'); onComplete(); }; }
+    }
+
+    showDefSelfReinforcementSelector(candidateCastles, defCastle, onComplete) {
+        if (!this.selectorModal) return;
+        this.selectorModal.classList.remove('hidden');
+        const title = document.getElementById('selector-title');
+        if (title) title.textContent = "自軍別城からの防衛出陣";
+        const listHeader = document.querySelector('#selector-modal .list-header');
+        if (listHeader) listHeader.style.display = 'none'; 
+        const backBtn = document.querySelector('#selector-modal .btn-secondary');
+        if(backBtn) {
+            backBtn.onclick = () => {
+                if (listHeader) listHeader.style.display = '';
+                this.closeSelector();
+                onComplete(null);
             };
         }
+        const contextEl = document.getElementById('selector-context-info');
+        if (contextEl) {
+            contextEl.innerHTML = `<div>自軍の別城から防衛の援軍を出陣させますか？<br>（キャンセルすると自軍援軍なしで進みます）</div>`;
+            contextEl.classList.remove('hidden');
+        }
+        if (this.selectorList) {
+            this.selectorList.innerHTML = '';
+            candidateCastles.forEach(c => {
+                const div = document.createElement('div');
+                div.className = 'select-item'; div.style.padding = '10px';
+                div.innerHTML = `<strong style="margin-right:10px;">${c.name}</strong> <span style="font-size:0.9rem; color:#555;">(兵数:${c.soldiers} 馬:${c.horses||0} 鉄砲:${c.guns||0})</span>`;
+                div.onclick = () => { 
+                    if (window.AudioManager) window.AudioManager.playSE('choice.ogg');
+                    if (listHeader) listHeader.style.display = '';
+                    this.closeSelector();
+                    this.game.warManager._promptPlayerDefSelfReinforcement(c, defCastle, onComplete);
+                };
+                this.selectorList.appendChild(div);
+            });
+        }
+        if (this.selectorConfirmBtn) this.selectorConfirmBtn.classList.add('hidden');
     }
+    
     // ★ ここからまるごと追加！：設定画面を開いて、スライダーを動かせるようにする魔法です！
     showSettingsModal() {
         const modal = document.getElementById('settings-modal');
