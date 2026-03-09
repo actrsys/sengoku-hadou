@@ -240,9 +240,11 @@ Object.assign(WarManager.prototype, {
             if (!isPlayerInvolved) await this.game.ui.showTapMessage(startMsg);
 
             const showInterceptDialog = async (onResult) => {
-	            if (isPlayerInvolved) await this.game.ui.showCutin(`${atkArmyName}の${atkBushos[0].name}が\n${defCastle.name}に攻め込みました！`);
+                if (isPlayerInvolved) await this.game.ui.showCutin(`${atkArmyName}の${atkBushos[0].name}が\n${defCastle.name}に攻め込みました！`);
 
-                this.checkDefenderReinforcement(defCastle, atkClan, () => {
+                // ★追加：同盟軍のチェックを一時的に「箱（startAllyReinforcement）」にしまいます
+                const startAllyReinforcement = () => {
+                    this.checkDefenderReinforcement(defCastle, atkClan, () => {
                     const totalDefSoldiers = defCastle.soldiers + (this.state.defReinforcement ? this.state.defReinforcement.soldiers : 0) + (this.state.defSelfReinforcement ? this.state.defSelfReinforcement.soldiers : 0);
                     isPlayerInvolved = this.state.isPlayerInvolved;
 
@@ -477,6 +479,14 @@ Object.assign(WarManager.prototype, {
                         } else onResult('siege');
                     }
                 }); 
+                
+                }; // ★ここで同盟軍チェックの「箱」を閉じます
+
+                // ★追加：ここからが本番！まずは自軍の援軍をチェックして、そのあとに同盟軍チェック（箱）を呼び出します！
+                this.checkDefenderSelfReinforcement(defCastle, (selfReinfData) => {
+                    if (selfReinfData) this.state.defSelfReinforcement = selfReinfData;
+                    startAllyReinforcement();
+                });
             };
 
             // 国人衆制圧戦の場合は野戦をスキップして即攻城戦へ
@@ -1362,6 +1372,57 @@ Object.assign(WarManager.prototype, {
              if (window.GameApp) window.GameApp.updateAllClanPrestige(); // ★威信を更新
              this.game.finishTurn(); 
         }, 100);
+    },
+    
+    // ★守備側が「自分の別のお城」から援軍を呼べるかチェックする魔法
+    checkDefenderSelfReinforcement(defCastle, onComplete) {
+        const defClanId = defCastle.ownerClan;
+        const pid = this.game.playerClanId;
+        
+        // 守備側が中立や国人衆の場合は自家援軍はなし
+        if (defClanId === 0 || defCastle.isKunishu || this.state.isKunishuSubjugation || this.state.attacker.isKunishu) {
+            onComplete(null);
+            return;
+        }
+
+        let candidateCastles = [];
+
+        this.game.castles.forEach(c => {
+            // 自分のお城で、攻められているお城以外を探す
+            if (c.ownerClan !== defClanId || c.id === defCastle.id) return;
+            // 道が繋がっているか（到達可能か）
+            if (!GameSystem.isReachable(this.game, defCastle, c, defClanId)) return;
+            // 兵力と兵糧の余裕があるか
+            if (c.soldiers < 1000) return;
+            if (c.rice < 500) return;
+
+            // 大名・城主以外の、動かせる一般武将がいるか
+            const normalBushos = this.game.getCastleBushos(c.id).filter(b => 
+                !b.isDaimyo && !b.isCastellan && b.status !== 'ronin' && b.belongKunishuId === 0
+            );
+            if (normalBushos.length === 0) return;
+
+            candidateCastles.push(c);
+        });
+
+        if (candidateCastles.length === 0) {
+            onComplete(null);
+            return;
+        }
+
+        if (defClanId === pid && !defCastle.isDelegated) {
+            // プレイヤーなら画面を出して選ばせる
+            this.game.ui.showDefSelfReinforcementSelector(candidateCastles, defCastle, (reinfData) => {
+                onComplete(reinfData);
+            });
+        } else {
+            // AIなら自動で一番兵士が多いお城から送る
+            candidateCastles.sort((a,b) => b.soldiers - a.soldiers);
+            const bestCastle = candidateCastles[0];
+            this.executeDefSelfReinforcementAuto(bestCastle, defCastle, (reinfData) => {
+                onComplete(reinfData);
+            });
+        }
     },
     
     // ★守備側が援軍を呼べるかチェックする機能
