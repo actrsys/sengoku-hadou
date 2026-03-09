@@ -1345,8 +1345,15 @@ class UIManager {
             `;
         }
 
+        // ★このお城にいる浪人（大名に仕えていない武将）の数を数える魔法！
+        let roninCount = 0;
+        if (this.game && this.game.bushos) {
+            roninCount = this.game.bushos.filter(b => b.castleId === castle.id && b.clan === 0).length;
+        }
+
         if (this.mobileFloatingMarket) {
             this.mobileFloatingMarket.innerHTML = `
+                <div class="floating-market">浪人 ${roninCount}人</div>
                 <div class="floating-market">米相場 ${this.game.marketRate.toFixed(1)}</div>
             `;
         }
