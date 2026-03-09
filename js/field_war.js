@@ -216,24 +216,37 @@ class FieldWarManager {
         let defMainCount = 0;
         let defAllyCount = 0;
 
+        let defAllyCount = 0;
+
+        // ==============================================
+        // ★修正：攻撃側の「大名家の番号」を、本隊の武将から確実に教えてもらいます！
+        let atkClanId = 0;
+        if (warState.atkAssignments && warState.atkAssignments.length > 0) {
+            atkClanId = warState.atkAssignments[0].busho.clan;
+        }
+        // 守備側の「大名家の番号」は、守備しているお城から教えてもらいます！
+        let defClanId = 0;
+        if (warState.defender) {
+            defClanId = warState.defender.ownerClan || 0;
+        }
+        // ==============================================
+
         // 攻撃側部隊の生成
         if (warState.atkAssignments) {
             warState.atkAssignments.forEach((assign, index) => {
                 if (assign.soldiers <= 0) return;
                 const type = assign.troopType || 'ashigaru';
-                const mobility = (type === 'kiba') ? 6 : 4; // ★ 騎馬は行動力6
+                const mobility = (type === 'kiba') ? 6 : 4;
 
-                // ★追加: この部隊が援軍かどうか、そして誰が操作するかをチェックします！
                 let isReinf = false;
-                let isSelfReinf = false; // ★追加：自領からの援軍かどうかの判定
+                let isSelfReinf = false; 
                 let unitIsPlayer = isAtkPlayer;
                 if (warState.reinforcement && warState.reinforcement.bushos.some(b => b.id === assign.busho.id)) {
                     isReinf = true;
-                    // 援軍の城の持ち主がプレイヤーなら、プレイヤーが操作できる！
                     unitIsPlayer = (Number(warState.reinforcement.castle.ownerClan) === pid);
                     
-                    // ★追加：援軍を出した城と、攻撃側の勢力が同じなら「自領からの援軍」
-                    if (Number(warState.reinforcement.castle.ownerClan) === Number(warState.attacker.ownerClan)) {
+                    // ★修正：援軍に来た武将の所属が、攻撃側の大名家と同じなら「自領からの援軍」！
+                    if (Number(assign.busho.clan) === Number(atkClanId)) {
                         isSelfReinf = true;
                     }
                 }
@@ -257,7 +270,7 @@ class FieldWarManager {
                     isAttacker: true,
                     isPlayer: unitIsPlayer,
                     isReinforcement: isReinf,
-                    isSelfReinforcement: isSelfReinf, // ★追加
+                    isSelfReinforcement: isSelfReinf, 
                     isGeneral: index === 0,
                     x: deployPos.x,
                     y: deployPos.y,
@@ -280,17 +293,15 @@ class FieldWarManager {
                 const type = assign.troopType || 'ashigaru';
                 const mobility = (type === 'kiba') ? 6 : 4;
 
-                // ★追加: 守備側の援軍チェック！
                 let isReinf = false;
-                let isSelfReinf = false; // ★追加：自領からの援軍かどうかの判定
+                let isSelfReinf = false; 
                 let unitIsPlayer = isDefPlayer;
                 if (warState.defReinforcement && warState.defReinforcement.bushos.some(b => b.id === assign.busho.id)) {
                     isReinf = true;
-                    // 援軍の城の持ち主がプレイヤーなら、プレイヤーが操作できる！
                     unitIsPlayer = (Number(warState.defReinforcement.castle.ownerClan) === pid);
                     
-                    // ★追加：援軍を出した城と、守備側の勢力が同じなら「自領からの援軍」
-                    if (Number(warState.defReinforcement.castle.ownerClan) === Number(warState.defender.ownerClan)) {
+                    // ★修正：援軍に来た武将の所属が、守備側の大名家と同じなら「自領からの援軍」！
+                    if (Number(assign.busho.clan) === Number(defClanId)) {
                         isSelfReinf = true;
                     }
                 }
@@ -314,7 +325,7 @@ class FieldWarManager {
                     isAttacker: false,
                     isPlayer: unitIsPlayer,
                     isReinforcement: isReinf,
-                    isSelfReinforcement: isSelfReinf, // ★追加
+                    isSelfReinforcement: isSelfReinf, 
                     isGeneral: index === 0,
                     x: deployPos.x,
                     y: deployPos.y,
@@ -555,10 +566,14 @@ class FieldWarManager {
         
         let color = unit.isAttacker ? '#d32f2f' : '#1976d2';
         
-        // ★修正: 援軍なら情報パネルの文字色をオレンジか緑にします！
-        if (unit.isReinforcement) {
+        // ★さらに修正: 自領からの援軍なら、ピンクと水色にします！
+        if (unit.isSelfReinforcement) {
+            color = unit.isAttacker ? '#f48fb1' : '#4fc3f7'; 
+        } else if (unit.isReinforcement) {
+            // 他の大名からの援軍は今まで通りオレンジと緑です
             color = unit.isAttacker ? '#ff9800' : '#4caf50';
         } else if (typeof unit.id === 'string' && unit.id.startsWith('k_')) {
+            // 国衆からの援軍
             if (this.units.some(u => u.isPlayer && !u.isAttacker)) {
                 color = '#4caf50';
             } else {
