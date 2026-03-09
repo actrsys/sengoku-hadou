@@ -499,8 +499,11 @@ Object.assign(WarManager.prototype, {
             // 国人衆制圧戦の場合は野戦をスキップして即攻城戦へ
             if (this.state.isKunishuSubjugation) {
                 this.startSiegeWarPhase();
+                
             } else if (typeof window.FieldWarManager === 'undefined') {
-                console.error("野戦マネージャーが見つかりません！field_war.jsが読み込まれているか確認してください。");
+                // コンソール（F12）という秘密の画面にメッセージを出します
+                console.error("【注意】野戦のプログラム（FieldWarManager）が読み込まれていません！");
+                this.game.ui.log("野戦の準備ができていないため、攻城戦を開始します。"); // ゲーム画面にも出す
                 this.startSiegeWarPhase();
             } else {
                 showInterceptDialog((choice, defAssignments, defRice, atkAssignments, interceptHorses = 0, interceptGuns = 0) => {
