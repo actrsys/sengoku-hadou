@@ -1399,7 +1399,7 @@ class UIManager {
             
             const btn = document.createElement('button');
             btn.className = 'cmd-btn back';
-            btn.textContent = "戻る（キャンセル）";
+            btn.textContent = "戻る";
             btn.onclick = () => {
                 if(this.game.isProcessingAI) return;
                 // 右クリックと同じように、選択をキャンセルする処理を呼びます
@@ -2649,7 +2649,7 @@ class UIManager {
         this.game.selectionMode = 'atk_ally_reinforcement';
         this.game.validTargets = candidateCastles.map(c => c.id);
         this.renderMap();
-        this.log("同盟援軍を要請する城を選択してください。(右クリックでキャンセル)");
+        this.log("同盟援軍を要請する城を選択してください。");
     }
 
     showReinforcementGoldSelector(helperCastle, atkCastle, targetCastle, atkBushos, sVal, rVal, hVal, gVal, selfReinfData, backToMap) {
@@ -2705,7 +2705,7 @@ class UIManager {
         this.game.selectionMode = 'atk_self_reinforcement';
         this.game.validTargets = candidateCastles.map(c => c.id);
         this.renderMap();
-        this.log("自軍の別城から援軍を出陣させる城を選択してください。(右クリックでキャンセル)");
+        this.log("自軍の別城から援軍を出陣させる城を選択してください。");
     }
     
     showDefReinforcementSelector(candidateCastles, defCastle, selfReinfData, onComplete) {
@@ -2723,7 +2723,7 @@ class UIManager {
         this.game.selectionMode = 'def_ally_reinforcement';
         this.game.validTargets = candidateCastles.map(c => c.id);
         this.renderMap();
-        this.log("同盟国に防衛の援軍を要請する城を選択してください。(右クリックでキャンセル)");
+        this.log("同盟国に防衛の援軍を要請する城を選択してください。");
     }
 
     showDefReinforcementGoldSelector(helperCastle, defCastle, onComplete, backToMap) {
@@ -2778,7 +2778,7 @@ class UIManager {
         this.game.selectionMode = 'def_self_reinforcement';
         this.game.validTargets = candidateCastles.map(c => c.id);
         this.renderMap();
-        this.log("自軍の別城から防衛の援軍を出陣させる城を選択してください。(右クリックでキャンセル)");
+        this.log("自軍の別城から防衛の援軍を出陣させる城を選択してください。");
     }
     
     // ★ ここからまるごと追加！：設定画面を開いて、スライダーを動かせるようにする魔法です！
