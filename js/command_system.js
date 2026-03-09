@@ -2278,7 +2278,7 @@ class CommandSystem {
         const promptBusho = () => {
             this.game.ui.openBushoSelector('atk_self_reinf_deploy', helperCastle.id, {
                 onConfirm: (selectedIds) => {
-                    this.handleBushoSelectionForSelfReinf(helperCastle.id, selectedIds, onComplete);
+                    this.handleBushoSelectionForSelfReinf(helperCastle.id, selectedIds, onComplete, promptBusho);
                 },
                 onCancel: () => {
                     this.game.ui.showDialog("自軍からの援軍派遣を取りやめました。", false, () => onComplete(null));
@@ -2288,7 +2288,7 @@ class CommandSystem {
         promptBusho();
     }
 
-    handleBushoSelectionForSelfReinf(helperCastleId, selectedIds, onComplete) {
+    handleBushoSelectionForSelfReinf(helperCastleId, selectedIds, onComplete, promptBusho) {
         const helperCastle = this.game.getCastle(helperCastleId);
         const reinfBushos = selectedIds.map(id => this.game.getBusho(id));
         this.game.ui.openQuantitySelector('atk_self_reinf_supplies', [helperCastle], null, {
@@ -2315,7 +2315,7 @@ class CommandSystem {
                 this.game.ui.log(`【自軍援軍】<span class="${colorClass}">${helperCastle.name}</span> から攻撃の援軍が出発しました。`);
                 onComplete(selfReinfData);
             },
-            onCancel: () => this.game.ui.openBushoSelector('atk_self_reinf_deploy', helperCastleId, null, () => onComplete(null))
+            onCancel: promptBusho
         });
     }
 

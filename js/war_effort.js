@@ -1438,7 +1438,7 @@ Object.assign(WarManager.prototype, {
         const promptBusho = () => {
             this.game.ui.openBushoSelector('def_self_reinf_deploy', helperCastle.id, {
                 onConfirm: (selectedIds) => {
-                    this.handleBushoSelectionForDefSelfReinf(helperCastle.id, selectedIds, onComplete);
+                    this.handleBushoSelectionForDefSelfReinf(helperCastle.id, selectedIds, onComplete, promptBusho);
                 },
                 onCancel: () => {
                     this.game.ui.showDialog("自軍からの援軍派遣を取りやめました。", false, () => onComplete(null));
@@ -1448,7 +1448,7 @@ Object.assign(WarManager.prototype, {
         promptBusho();
     },
 
-    handleBushoSelectionForDefSelfReinf(helperCastleId, selectedIds, onComplete) {
+    handleBushoSelectionForDefSelfReinf(helperCastleId, selectedIds, onComplete, promptBusho) {
         const helperCastle = this.game.getCastle(helperCastleId);
         const reinfBushos = selectedIds.map(id => this.game.getBusho(id));
         this.game.ui.openQuantitySelector('def_self_reinf_supplies', [helperCastle], null, {
@@ -1475,7 +1475,7 @@ Object.assign(WarManager.prototype, {
                 this.game.ui.log(`【自軍援軍】<span class="${colorClass}">${helperCastle.name}</span> が防衛の援軍に出発しました！`);
                 onComplete(selfReinfData);
             },
-            onCancel: () => this.game.ui.openBushoSelector('def_self_reinf_deploy', helperCastleId, null, () => onComplete(null))
+            onCancel: promptBusho
         });
     },
 
