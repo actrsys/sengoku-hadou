@@ -526,6 +526,9 @@ class CommandSystem {
     }
 
     startCommand(type, targetId = null, extraData = null) {
+        if (this.game.selectionMode) {
+            return; 
+        }
         const spec = COMMAND_SPECS[type];
         if (!spec) {
             console.warn("Unknown command:", type);
