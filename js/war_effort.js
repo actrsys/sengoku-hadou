@@ -817,23 +817,16 @@ Object.assign(WarManager.prototype, {
                             if (friendlyCastles.length > 0) {
                                 // ★味方の城がある場合：ランダムに選んだ味方の城へ避難します！
                                 const escapeCastle = friendlyCastles[Math.floor(Math.random() * friendlyCastles.length)];
-                                b.castleId = escapeCastle.id;
-                                b.isCastellan = false;
-                                escapeCastle.samuraiIds.push(b.id);
                                 // 派閥などの情報も一緒にお引越しさせます
                                 if (this.game.factionSystem) {
                                     this.game.factionSystem.handleMove(b, targetC.id, escapeCastle.id);
                                 }
-                            // ▼ 書き換えた後
+                                // ★新しいお引越しセンターの魔法を使います！
+                                this.game.affiliationSystem.moveCastle(b, escapeCastle.id);
                             } else {
-                                // ★味方の城がない場合（最後のお城だった場合）：今まで通り浪人になります
-                                // ★大名家の武将が浪人になるので功績を半分にします！
-                                if ((b.belongKunishuId || 0) === 0 && b.clan !== 0) {
-                                    b.achievementTotal = Math.floor((b.achievementTotal || 0) / 2);
-                                }
-                                b.status = 'ronin'; 
-                                b.clan = 0; 
-                                b.isCastellan = false;
+                                // ★味方の城がない場合（最後のお城だった場合）：浪人になります
+                                // ★新しいお引越しセンターの魔法を使います！
+                                this.game.affiliationSystem.becomeRonin(b);
                             }
                         }
                     });
@@ -1641,7 +1634,7 @@ Object.assign(WarManager.prototype, {
         this.game.ui.showDialog(`${helperClanName} (${helperCastle.name}) が防衛の同盟援軍に出発しました！`, false, onComplete);
     }, // ←★ここにカンマ（,）を付けるのがとっても大事です！
     
-    // ★城の所有者が変わった時、その城にいる国人衆の友好度をチェックして低下させる魔法
+    // ★追加: 城の所有者が変わった時、その城にいる国人衆の友好度をチェックして低下させる魔法
     applyKunishuRelationDropOnCapture(castle, newOwnerClan) {
         if (newOwnerClan === 0) return; // 空き城になった時は何もしません
         
@@ -1663,4 +1656,5 @@ Object.assign(WarManager.prototype, {
             }
         });
     }
+    
 });
