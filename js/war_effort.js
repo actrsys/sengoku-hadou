@@ -173,28 +173,34 @@ Object.assign(WarManager.prototype, {
             let isPlayerInvolved = false;
             if (atkClan === pid && !atkCastle.isDelegated) isPlayerInvolved = true;
             if (defClan === pid && !defCastle.isDelegated) isPlayerInvolved = true;
+            
+            // 1. AIの場合は、城にある馬と鉄砲を全部持っていく準備をします
+            if (atkClan !== pid && !atkCastle.isKunishu) {
+                atkHorses = atkCastle.horses || 0; 
+                atkGuns = atkCastle.guns || 0;
+            }
 
+            // 2. 援軍を合流させる「前」に、出陣元の城から本隊の兵士や兵糧を減らしておきます！
+            atkCastle.soldiers = Math.max(0, atkCastle.soldiers - atkSoldierCount);
+            atkCastle.rice = Math.max(0, atkCastle.rice - atkRice);
+            atkCastle.horses = Math.max(0, (atkCastle.horses || 0) - atkHorses);
+            atkCastle.guns = Math.max(0, (atkCastle.guns || 0) - atkGuns);
+            atkBushos.forEach(b => b.isActionDone = true);
+
+            // 3. 城のお留守番の数が確定したら、合戦で戦う「全体の数」として援軍を合流（足し算）させます！
             const processReinforcement = (reinfData) => {
                 if (reinfData) {
                     const hC = reinfData.castle;
-                    atkSoldierCount += reinfData.soldiers; atkRice += reinfData.rice;
-                    atkHorses += reinfData.horses; atkGuns += reinfData.guns;
+                    atkSoldierCount += reinfData.soldiers; 
+                    atkRice += reinfData.rice;
+                    atkHorses += reinfData.horses; 
+                    atkGuns += reinfData.guns;
                     atkBushos = atkBushos.concat(reinfData.bushos);
                     if (hC.ownerClan === pid && !hC.isDelegated) isPlayerInvolved = true;
                 }
             };
             processReinforcement(selfReinforcementData);
             processReinforcement(reinforcementData);
-
-            if (atkClan !== pid && !atkCastle.isKunishu) {
-                atkHorses = atkCastle.horses || 0; atkGuns = atkCastle.guns || 0;
-            }
-
-            atkCastle.soldiers = Math.max(0, atkCastle.soldiers - atkSoldierCount);
-            atkCastle.rice = Math.max(0, atkCastle.rice - atkRice);
-            atkCastle.horses = Math.max(0, (atkCastle.horses || 0) - atkHorses);
-            atkCastle.guns = Math.max(0, (atkCastle.guns || 0) - atkGuns);
-            atkBushos.forEach(b => b.isActionDone = true);
 
             const atkClanData = this.game.clans.find(c => c.id === atkClan); 
             const atkArmyName = atkCastle.isKunishu ? atkCastle.name : (atkClanData ? atkClanData.getArmyName() : "敵軍");
