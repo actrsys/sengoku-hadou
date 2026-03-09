@@ -12,7 +12,8 @@ window.onerror = function(message, source, lineno, colno, error) {
 /* ==========================================================================
    ★ シナリオ定義 & 設定
    ========================================================================== */
-const SCENARIOS = [    { name: "桶狭間の戦い (1560年)", desc: "各地で有力大名が覇を競う標準シナリオ。", folder: "1560_okehazama" }];
+const SCENARIOS = [    { name: "1560年 桶狭間の戦い", desc: "海道一の弓取り・今川義元が大軍で上洛を狙う。", folder: "1560_okehazama" }];
+const SCENARIOS = [    { name: "1562年 清洲同盟", desc: "桶狭間より２年。２人の英雄は清州の地にて再会を果たす。", folder: "1562_kiyosudoumei" }];
 
 window.MainParams = {
     StartYear: 1560, StartMonth: 4,
