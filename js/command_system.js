@@ -894,11 +894,9 @@ class CommandSystem {
                     this.executeKunishuSubjugate(castle, targetId, data, sVal, rVal, hVal, gVal, kunishu);
                 });
             } else {
-                this.game.ui.showDialog(`${targetName}に攻め込みますか？\n今月の命令は終了となります`, true, () => {
-                    const bushos = data.map(id => this.game.getBusho(id));
-                    // ★いきなり戦争を始めず、援軍を探す機能にバトンタッチします！
-                    this.checkReinforcementAndStartWar(castle, targetId, bushos, sVal, rVal, hVal, gVal);
-                });
+                // ★修正：「攻め込みますか？」の確認は後回しにして、まずは自軍の援軍を探す魔法に直結させます！
+                const bushos = data.map(id => this.game.getBusho(id));
+                this.checkReinforcementAndStartWar(castle, targetId, bushos, sVal, rVal, hVal, gVal);
             }
         }
         else if (type === 'war_repair') {
@@ -2224,24 +2222,51 @@ class CommandSystem {
             }
         };
 
-        if (selfCandidates.length === 0) {
-            proceedToAlly(null);
-        } else {
+        // ★追加：自軍援軍の処理が終わったあとに、「攻め込みますか？」の最終確認を挟むための魔法
+        const askConfirmAndProceedToAlly = (selfReinfData) => {
             if (myClanId === pid && !atkCastle.isDelegated) {
-                // ★修正：いきなり城を選ばせず、援軍を呼ぶかどうかのワンクッションを入れます！
-                this.game.ui.showDialog("他の城から援軍を呼びますか？", true, 
+                this.game.ui.showDialog(`${targetCastle.name}に攻め込みますか？\n今月の命令は終了となります`, true, 
                     () => {
-                        // 「はい」を選んだら、お城を選ぶ画面へ
-                        this.game.ui.showSelfReinforcementSelector(selfCandidates, atkCastle, targetCastle, proceedToAlly);
+                        // 「はい」：そのまま同盟軍を探す（出陣）に進みます！
+                        proceedToAlly(selfReinfData);
                     },
                     () => {
-                        // 「いいえ」を選んだら、自軍援軍なしで次へ進む
-                        proceedToAlly(null);
+                        // 「いいえ」：キャンセルした時は、もし自軍の援軍が決まっていたらお城に帰してあげます！
+                        if (selfReinfData) {
+                            const hc = selfReinfData.castle;
+                            // 減らした兵士や物資を戻します
+                            hc.soldiers += selfReinfData.soldiers;
+                            hc.rice += selfReinfData.rice;
+                            hc.horses = (hc.horses || 0) + selfReinfData.horses;
+                            hc.guns = (hc.guns || 0) + selfReinfData.guns;
+                            // 行動済みを解除します
+                            selfReinfData.bushos.forEach(b => b.isActionDone = false);
+                            
+                            let colorClass = "log-color-atk";
+                            this.game.ui.log(`【自軍援軍】出陣が取りやめられたため、<span class="${colorClass}">${hc.name}</span> の援軍は帰還しました。`);
+                        }
+                    }
+                );
+            } else {
+                proceedToAlly(selfReinfData);
+            }
+        };
+
+        if (selfCandidates.length === 0) {
+            askConfirmAndProceedToAlly(null);
+        } else {
+            if (myClanId === pid && !atkCastle.isDelegated) {
+                this.game.ui.showDialog("他のお城から自軍の援軍を呼びますか？", true, 
+                    () => {
+                        this.game.ui.showSelfReinforcementSelector(selfCandidates, atkCastle, targetCastle, askConfirmAndProceedToAlly);
+                    },
+                    () => {
+                        askConfirmAndProceedToAlly(null);
                     }
                 );
             } else {
                 selfCandidates.sort((a,b) => b.soldiers - a.soldiers);
-                this.executeSelfReinforcementAuto(selfCandidates[0], atkCastle, targetCastle, proceedToAlly);
+                this.executeSelfReinforcementAuto(selfCandidates[0], atkCastle, targetCastle, askConfirmAndProceedToAlly);
             }
         }
     }
