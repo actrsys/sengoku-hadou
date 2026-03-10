@@ -2229,7 +2229,7 @@ class CommandSystem {
             const allyCastles = [...new Set(allyForceCandidates.map(fc => fc.castle))];
 
             if (myClanId === pid && !atkCastle.isDelegated) {
-                this.game.ui.showDialog("他勢力（他大名・国衆）に援軍を要請しますか？", true, 
+                this.game.ui.showDialog("他勢力に援軍を要請しますか？", true, 
                     () => {
                         this.game.ui.showReinforcementSelector(allyCastles, atkCastle, targetCastle, atkBushos, sVal, rVal, hVal, gVal, selfReinfData);
                     },
