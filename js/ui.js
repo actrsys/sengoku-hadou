@@ -1743,19 +1743,43 @@ class UIManager {
         const age = this.game.year - busho.birthYear;
 
         let rankName = "";
-        if (busho.courtRankIds && busho.courtRankIds.length > 0 && this.game.courtRankSystem) {
-            let highestRank = null;
-            busho.courtRankIds.forEach(id => {
-                const rank = this.game.courtRankSystem.getRank(id);
-                if (rank) {
-                    if (!highestRank || rank.rankNo < highestRank.rankNo) {
-                        highestRank = rank;
+        try {
+            if (busho.courtRankIds && this.game.courtRankSystem) {
+                let ids = busho.courtRankIds;
+                
+                if (typeof ids === 'string') {
+                    ids = ids.split(',').map(id => Number(id));
+                }
+
+                if (Array.isArray(ids)) {
+                    let highestRank = null;
+                    ids.forEach(id => {
+                        let rank = null;
+                        if (typeof this.game.courtRankSystem.getRank === 'function') {
+                            rank = this.game.courtRankSystem.getRank(id);
+                        } else if (this.game.courtRankSystem.ranks) {
+                            rank = this.game.courtRankSystem.ranks[id] || this.game.courtRankSystem.ranks.find(r => r.id === id);
+                        }
+
+                        if (rank) {
+                            if (!highestRank || rank.rankNo < highestRank.rankNo) {
+                                highestRank = rank;
+                            }
+                        }
+                    });
+                    
+                    // ★ここが修正ポイント！ name ではなく rankName2（征夷大将軍など）を探します
+                    if (highestRank) {
+                        let displayName = highestRank.rankName2 || highestRank.rankName1 || "";
+                        if (displayName) {
+                            rankName = `<span style="font-size: 0.9rem; background: #d4af37; color: #fff; padding: 2px 6px; border-radius: 4px; margin-left: 10px; vertical-align: middle;">${displayName}</span>`;
+                        }
                     }
                 }
-            });
-            if (highestRank) {
-                rankName = `<span style="font-size: 0.9rem; background: #d4af37; color: #fff; padding: 2px 6px; border-radius: 4px; margin-left: 10px; vertical-align: middle;">${highestRank.name}</span>`;
             }
+        } catch (error) {
+            console.log("官位エラー回避", error);
+            rankName = "";
         }
 
         const gunshi = this.game.getClanGunshi(this.game.playerClanId);
