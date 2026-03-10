@@ -1320,6 +1320,10 @@ class UIManager {
     }
     // ★ マップ選択中専用の、スッキリしたメニューを描く魔法
     renderSelectionModeMenu() {
+        // ★ 追加：メニューを作った時の「モード」と「援軍データ」を記憶しておきます！
+        const activeMode = this.game.selectionMode;
+        const activeReinfData = this.game.tempReinfData;
+
         const mobileArea = document.getElementById('command-area');
         const pcArea = document.getElementById('pc-command-area');
         const areas = [mobileArea, pcArea];
@@ -1335,15 +1339,20 @@ class UIManager {
                 
                 // ★ 修正：モードの文字だけでなく、裏にある「援軍のデータ」も見て確実に小窓を出します！
                 let confirmMessage = "";
-                const isSelf = ['atk_self_reinforcement', 'def_self_reinforcement'].includes(this.game.selectionMode);
-                const isAlly = ['atk_ally_reinforcement', 'def_ally_reinforcement'].includes(this.game.selectionMode);
+                
+                // ★ 追加：もしデータが消えてしまっていても、記憶しておいたデータを使って判定します！
+                const currentMode = this.game.selectionMode || activeMode;
+                const currentData = this.game.tempReinfData || activeReinfData;
+
+                const isSelf = ['atk_self_reinforcement', 'def_self_reinforcement'].includes(currentMode);
+                const isAlly = ['atk_ally_reinforcement', 'def_ally_reinforcement'].includes(currentMode);
                 
                 // 自軍の援軍かどうかをデータからも判定します
-                const isSelfData = this.game.tempReinfData && this.game.tempReinfData.candidates && this.game.tempReinfData.candidates.length > 0 && this.game.tempReinfData.candidates[0].ownerClan === this.game.playerClanId;
+                const isSelfData = currentData && currentData.candidates && currentData.candidates.length > 0 && currentData.candidates[0].ownerClan === this.game.playerClanId;
 
                 if (isSelf || isSelfData) {
                     confirmMessage = "援軍を出すのをやめますか？";
-                } else if (isAlly || this.game.tempReinfData) {
+                } else if (isAlly || currentData) {
                     confirmMessage = "援軍を要請するのをやめますか？";
                 }
 
@@ -1351,6 +1360,14 @@ class UIManager {
                 if (confirmMessage !== "") {
                     this.showDialog(confirmMessage, true, 
                         () => {
+                            // ★ 追加：キャンセルする時にデータが消えていたら、記憶から復元してあげます！
+                            if (!this.game.tempReinfData && currentData) {
+                                this.game.tempReinfData = currentData;
+                            }
+                            if (!this.game.selectionMode && currentMode) {
+                                this.game.selectionMode = currentMode;
+                            }
+
                             // 「はい（やめる）」を選んだ時は、そのままキャンセルして次に進みます
                             this.cancelMapSelection(false); 
                             this.scrollToActiveCastle();
