@@ -2157,7 +2157,14 @@ class CommandSystem {
             }
 
             if (myClanId === pid && !atkCastle.isDelegated) {
-                this.game.ui.showReinforcementSelector(allyCandidates, atkCastle, targetCastle, atkBushos, sVal, rVal, hVal, gVal, selfReinfData);
+                this.game.ui.showDialog("他大名家に援軍を要請しますか？", true, 
+                    () => {
+                        this.game.ui.showReinforcementSelector(allyCandidates, atkCastle, targetCastle, atkBushos, sVal, rVal, hVal, gVal, selfReinfData);
+                    },
+                    () => {
+                        this.game.warManager.startWar(atkCastle, targetCastle, atkBushos, sVal, rVal, hVal, gVal, null, selfReinfData);
+                    }
+                );
             } else {
                 allyCandidates.sort((a,b) => b.soldiers - a.soldiers);
                 this.executeReinforcementRequest(0, allyCandidates[0], atkCastle, targetCastle, atkBushos, sVal, rVal, hVal, gVal, selfReinfData);
