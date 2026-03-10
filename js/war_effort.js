@@ -201,7 +201,8 @@ Object.assign(WarManager.prototype, {
                     atkHorses += reinfData.horses; 
                     atkGuns += reinfData.guns;
                     atkBushos = atkBushos.concat(reinfData.bushos);
-                    if (hC.ownerClan === pid && !hC.isDelegated) isPlayerInvolved = true;
+                    // ★修正：国人衆の援軍だった場合は、プレイヤーを強制的に合戦に巻き込まないようにします！
+                    if (hC.ownerClan === pid && !hC.isDelegated && !reinfData.isKunishuForce) isPlayerInvolved = true;
                 }
             };
             processReinforcement(selfReinforcementData);
@@ -415,7 +416,8 @@ Object.assign(WarManager.prototype, {
                                 };
 
                                 const processNextDef = () => {
-                                    if (this.state.defReinforcement && this.state.defReinforcement.castle.ownerClan === pid) {
+                                    // ★修正：国人衆の援軍なら勝手にAI配分されるように、バリケード（!this.state.defReinforcement.isKunishuForce）を追加します！
+                                    if (this.state.defReinforcement && this.state.defReinforcement.castle.ownerClan === pid && !this.state.defReinforcement.isKunishuForce) {
                                         this.game.ui.showUnitDivideModal(this.state.defReinforcement.bushos, this.state.defReinforcement.soldiers, this.state.defReinforcement.horses, this.state.defReinforcement.guns, (rAssigns) => {
                                             finalDefAssignments = finalDefAssignments.concat(rAssigns);
                                             finishDef();
@@ -461,7 +463,8 @@ Object.assign(WarManager.prototype, {
                                 };
 
                                 const processNextAtk = () => {
-                                    if (this.state.reinforcement && this.state.reinforcement.castle.ownerClan === pid) {
+                                    // ★修正：こちらも同じように国人衆のバリケードを追加します！
+                                    if (this.state.reinforcement && this.state.reinforcement.castle.ownerClan === pid && !this.state.reinforcement.isKunishuForce) {
                                         this.game.ui.showUnitDivideModal(this.state.reinforcement.bushos, this.state.reinforcement.soldiers, this.state.reinforcement.horses, this.state.reinforcement.guns, (rAssigns) => {
                                             finalAtkAssignments = finalAtkAssignments.concat(rAssigns);
                                             finishAtk();
@@ -1692,7 +1695,8 @@ Object.assign(WarManager.prototype, {
                 rice: reinfRice, horses: reinfHorses, guns: reinfGuns, isSelf: false, isKunishuForce: true
             };
             
-            this.state.isPlayerInvolved = true;
+            // ★修正：国人衆の援軍が勝手に出ただけで、無関係なプレイヤーが強制的に合戦に巻き込まれるのを防ぎます！
+            // this.state.isPlayerInvolved = true; を削除しました
             
             if (myClanId === this.game.playerClanId) {
                 const leader = this.game.getBusho(kunishu.leaderId);
