@@ -1580,7 +1580,7 @@ Object.assign(WarManager.prototype, {
             if (isBoss) this.game.ui.showDialog(`主家である ${myClanName} から防衛の援軍要請が届きました。\n当家は従属しているため直ちに出陣します！`, false, startSelection);
             else {
                 this.game.ui.showDialog(`${myClanName} から防衛の援軍要請が届きました。(持参金: ${gold})\n派遣しますか？`, true, startSelection, () => {
-                    this.game.diplomacyManager.updateSentiment(myClanId, helperClanId, -10);
+                    this.game.diplomacyManager.updateSentiment(myClanId, helperClanId, -5);
                     this.game.ui.showDialog(`援軍要請を断りました。`, false, onComplete);
                 });
             }
