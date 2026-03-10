@@ -2972,7 +2972,7 @@ class UIManager {
 
 Object.assign(UIManager.prototype, {
     // ---------------------------------------------------------
-    // 魔法①：大名家と諸勢力が混ざった「援軍用」のリスト（外交デザイン版）
+    // 魔法①：大名家と諸勢力が混ざった「援軍用」のリスト（外交デザイン版・空白なし）
     // ---------------------------------------------------------
     showForceSelector(forces, onSelect, onCancel) {
         const modal = document.getElementById('selector-modal');
@@ -2984,13 +2984,13 @@ Object.assign(UIManager.prototype, {
         
         contextInfo.innerHTML = "<div>援軍を要請する勢力を選択してください</div>";
         
-        // ★修正: デフォルトのヘッダーを隠して、諸勢力（外交）と同じデザインを使います
         const listHeader = modal.querySelector('.list-header');
         if (listHeader) listHeader.style.display = 'none';
 
+        // ★修正：左の空白を消して、4つの項目が綺麗に並ぶように幅を直接指定します
         list.innerHTML = `
-            <div class="kunishu-list-header">
-                <span></span><span>勢力名</span><span>代表者</span><span>兵数</span><span>友好度</span>
+            <div class="kunishu-list-header" style="grid-template-columns: 1.5fr 1fr 1fr 1.5fr;">
+                <span>勢力名</span><span>代表者</span><span>兵数</span><span>友好度</span>
             </div>
         `;
         list.classList.remove('view-mode');
@@ -2999,11 +2999,11 @@ Object.assign(UIManager.prototype, {
         
         forces.forEach(force => {
             const item = document.createElement('div');
-            // ★変更: 'select-item' ではなく、外交一覧と同じ 'kunishu-list-item' を使います！
             item.className = 'kunishu-list-item';
             item.style.cursor = 'pointer';
+            // ★修正：こちらも幅を直接指定して形を揃えます
+            item.style.gridTemplateColumns = '1.5fr 1fr 1fr 1.5fr';
             
-            // ★追加：友好度を計算して、バーを作ります
             let relVal = 50;
             if (force.isKunishu) {
                 const k = this.game.kunishuSystem.getKunishu(force.id);
@@ -3015,9 +3015,8 @@ Object.assign(UIManager.prototype, {
             const relPercent = Math.min(100, Math.max(0, Number(relVal) || 0));
             const friendBarHtml = `<div class="bar-bg bar-bg-friend"><div class="bar-fill bar-fill-friend" style="width:${relPercent}%;"></div></div>`;
             
-            // ★変更: 5つの列（チェック枠・勢力名・代表者・兵数・友好度）に合わせます
+            // ★修正：左の余分な <span></span> を消しました
             item.innerHTML = `
-                <span></span>
                 <strong class="col-kunishu-name">${force.name}</strong>
                 <span>${force.leaderName}</span>
                 <span>${force.soldiers}</span>
@@ -3047,7 +3046,7 @@ Object.assign(UIManager.prototype, {
                     this.showDialog("勢力を選択してください", false);
                     return;
                 }
-                if (listHeader) listHeader.style.display = ''; // 隠していたヘッダーを元に戻す
+                if (listHeader) listHeader.style.display = ''; 
                 modal.classList.add('hidden');
                 onSelect(selectedForce);
             };
@@ -3056,7 +3055,7 @@ Object.assign(UIManager.prototype, {
         const cancelBtn = document.getElementById('selector-cancel-btn');
         if (cancelBtn) {
             cancelBtn.onclick = () => {
-                if (listHeader) listHeader.style.display = ''; // 隠していたヘッダーを元に戻す
+                if (listHeader) listHeader.style.display = ''; 
                 modal.classList.add('hidden');
                 if (onCancel) onCancel();
             };
@@ -3064,9 +3063,9 @@ Object.assign(UIManager.prototype, {
         
         modal.classList.remove('hidden');
     },
-    
+
     // ---------------------------------------------------------
-    // 魔法②：諸勢力専用のリスト（元の見た目を復元した完全版！）
+    // 魔法②：諸勢力専用のリスト（空白なし完全版）
     // ---------------------------------------------------------
     showKunishuSelector(kunishus, onSelect, onCancel, isViewOnly = false) {
         const modal = document.getElementById('selector-modal');
@@ -3081,35 +3080,38 @@ Object.assign(UIManager.prototype, {
 
         contextInfo.innerHTML = isViewOnly ? "<div>この城に存在する諸勢力です</div>" : "<div>対象とする諸勢力を選択してください</div>";
         
-        // ★修正: デフォルトのヘッダーを隠して、諸勢力専用のヘッダーを使います
         const listHeader = modal.querySelector('.list-header');
         if (listHeader) listHeader.style.display = 'none';
 
+        // ★修正：左の空白を消して、4つの項目が綺麗に並ぶように幅を直接指定します
         list.innerHTML = `
-            <div class="kunishu-list-header ${isViewOnly ? 'view-mode' : ''}">
-                ${isViewOnly ? '' : '<span></span>'}<span>勢力名</span><span>兵数</span><span>防御</span><span>友好度</span>
+            <div class="kunishu-list-header" style="grid-template-columns: 1.5fr 1fr 1fr 1.5fr;">
+                <span>勢力名</span><span>兵数</span><span>防御</span><span>友好度</span>
             </div>
         `;
         
-        if (isViewOnly) list.classList.add('view-mode');
-        else list.classList.remove('view-mode');
+        // 空白を消したので、見え方を分ける view-mode クラスは不要になりました
+        list.classList.remove('view-mode');
         
         let selectedKunishuId = null;
         
         kunishus.forEach(kunishu => {
             const item = document.createElement('div');
             item.className = 'kunishu-list-item';
+            // ★修正：こちらも幅を直接指定して形を揃えます
+            item.style.gridTemplateColumns = '1.5fr 1fr 1fr 1.5fr';
             
             const kunishuName = kunishu.getName(this.game);
             const relVal = kunishu.getRelation(this.game.playerClanId);
             const relPercent = Math.min(100, Math.max(0, Number(relVal) || 0));
             const friendBarHtml = `<div class="bar-bg bar-bg-friend"><div class="bar-fill bar-fill-friend" style="width:${relPercent}%;"></div></div>`;
             
+            // ★修正：isViewOnlyの場合もそうでない場合も、左の余分な <span></span> を消しました
+            item.innerHTML = `<strong class="col-kunishu-name">${kunishuName}</strong><span>${kunishu.soldiers}</span><span>${kunishu.defense}</span><span>${friendBarHtml}</span>`;
+            
             if (isViewOnly) {
-                item.innerHTML = `<strong class="col-kunishu-name">${kunishuName}</strong><span>${kunishu.soldiers}</span><span>${kunishu.defense}</span><span>${friendBarHtml}</span>`;
                 item.style.cursor = 'default';
             } else {
-                item.innerHTML = `<span></span><strong class="col-kunishu-name">${kunishuName}</strong><span>${kunishu.soldiers}</span><span>${kunishu.defense}</span><span>${friendBarHtml}</span>`;
                 item.style.cursor = 'pointer';
                 item.onclick = () => {
                     if (window.AudioManager) window.AudioManager.playSE('choice.ogg');
@@ -3139,7 +3141,7 @@ Object.assign(UIManager.prototype, {
                         this.showDialog("諸勢力を選択してください", false);
                         return;
                     }
-                    if (listHeader) listHeader.style.display = ''; // 隠していたヘッダーを元に戻す
+                    if (listHeader) listHeader.style.display = ''; 
                     modal.classList.add('hidden');
                     if (onSelect) onSelect(selectedKunishuId);
                 };
@@ -3149,7 +3151,7 @@ Object.assign(UIManager.prototype, {
         const cancelBtn = document.getElementById('selector-cancel-btn');
         if (cancelBtn) {
             cancelBtn.onclick = () => {
-                if (listHeader) listHeader.style.display = ''; // 隠していたヘッダーを元に戻す
+                if (listHeader) listHeader.style.display = ''; 
                 modal.classList.add('hidden');
                 if (onCancel) onCancel();
             };
