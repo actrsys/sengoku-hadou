@@ -3098,7 +3098,10 @@ Object.assign(UIManager.prototype, {
             };
         }
         
-        const cancelBtn = document.getElementById('selector-cancel-btn');
+        // ==========================================
+        // ★超重要修正！：IDではなくクラス名でキャンセルボタンを確実に探し出し、
+        // 前の画面の「出陣モードに戻る」という間違った魔法を上書きして消し去ります！
+        const cancelBtn = modal.querySelector('.btn-secondary');
         if (cancelBtn) {
             cancelBtn.onclick = () => {
                 if (listHeader) listHeader.style.display = ''; 
@@ -3106,6 +3109,7 @@ Object.assign(UIManager.prototype, {
                 if (onCancel) onCancel();
             };
         }
+        // ==========================================
         
         modal.classList.remove('hidden');
     },
@@ -3194,7 +3198,10 @@ Object.assign(UIManager.prototype, {
             }
         }
         
-        const cancelBtn = document.getElementById('selector-cancel-btn');
+        // ==========================================
+        // ★超重要修正！：IDではなくクラス名でキャンセルボタンを確実に探し出し、
+        // 前の画面の「出陣モードに戻る」という間違った魔法を上書きして消し去ります！
+        const cancelBtn = modal.querySelector('.btn-secondary');
         if (cancelBtn) {
             cancelBtn.onclick = () => {
                 if (listHeader) listHeader.style.display = ''; 
@@ -3202,6 +3209,7 @@ Object.assign(UIManager.prototype, {
                 if (onCancel) onCancel();
             };
         }
+        // ==========================================
         
         modal.classList.remove('hidden');
     }
