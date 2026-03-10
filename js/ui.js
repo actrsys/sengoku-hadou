@@ -1333,14 +1333,17 @@ class UIManager {
             btn.onclick = () => {
                 if(this.game.isProcessingAI) return;
                 
-                // ★ 自軍か他大名家かで、聞く言葉を変える魔法です！
-                const selfReinfModes = ['atk_self_reinforcement', 'def_self_reinforcement'];
-                const allyReinfModes = ['atk_ally_reinforcement', 'def_ally_reinforcement'];
-                
+                // ★ 修正：モードの文字だけでなく、裏にある「援軍のデータ」も見て確実に小窓を出します！
                 let confirmMessage = "";
-                if (selfReinfModes.includes(this.game.selectionMode)) {
+                const isSelf = ['atk_self_reinforcement', 'def_self_reinforcement'].includes(this.game.selectionMode);
+                const isAlly = ['atk_ally_reinforcement', 'def_ally_reinforcement'].includes(this.game.selectionMode);
+                
+                // 自軍の援軍かどうかをデータからも判定します
+                const isSelfData = this.game.tempReinfData && this.game.tempReinfData.candidates && this.game.tempReinfData.candidates.length > 0 && this.game.tempReinfData.candidates[0].ownerClan === this.game.playerClanId;
+
+                if (isSelf || isSelfData) {
                     confirmMessage = "援軍を出すのをやめますか？";
-                } else if (allyReinfModes.includes(this.game.selectionMode)) {
+                } else if (isAlly || this.game.tempReinfData) {
                     confirmMessage = "援軍を要請するのをやめますか？";
                 }
 
