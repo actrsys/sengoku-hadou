@@ -2969,8 +2969,10 @@ class UIManager {
         modal.classList.remove('hidden');
     }
 }
-
 Object.assign(UIManager.prototype, {
+    // ---------------------------------------------------------
+    // 魔法①：大名家と諸勢力が混ざった「援軍用」のリスト
+    // ---------------------------------------------------------
     showForceSelector(forces, onSelect, onCancel) {
         const modal = document.getElementById('selector-modal');
         const list = document.getElementById('selector-list');
@@ -2981,7 +2983,6 @@ Object.assign(UIManager.prototype, {
         
         contextInfo.innerHTML = "<div>援軍を要請する勢力を選択してください</div>";
         
-        // ★修正: リストの見出し（ヘッダー）を追加して綺麗に並べます
         list.innerHTML = `
             <div class="list-header" style="display: grid; grid-template-columns: 1fr 1fr 1fr; font-weight: bold; padding-bottom: 5px; border-bottom: 1px solid #ccc; margin-bottom: 5px;">
                 <span>勢力名</span><span>代表者</span><span>兵数</span>
@@ -2992,7 +2993,6 @@ Object.assign(UIManager.prototype, {
         
         forces.forEach(force => {
             const item = document.createElement('div');
-            // ★修正: 'list-item' を 'select-item' に変更！これでクリック時に青く光るようになります
             item.className = 'select-item';
             item.style.display = 'grid';
             item.style.gridTemplateColumns = '1fr 1fr 1fr';
@@ -3011,7 +3011,6 @@ Object.assign(UIManager.prototype, {
                 item.classList.add('selected');
                 selectedForce = force;
                 
-                // ★追加: 選んだら決定ボタンを押せるように（明るく）します
                 if (confirmBtn) {
                     confirmBtn.disabled = false;
                     confirmBtn.style.opacity = 1.0;
@@ -3020,7 +3019,6 @@ Object.assign(UIManager.prototype, {
             list.appendChild(item);
         });
         
-        // ★追加: 画面を開いた時は決定ボタンを無効（半透明）にしておきます
         if (confirmBtn) {
             confirmBtn.disabled = true;
             confirmBtn.style.opacity = 0.5;
@@ -3033,6 +3031,100 @@ Object.assign(UIManager.prototype, {
                 modal.classList.add('hidden');
                 onSelect(selectedForce);
             };
+        }
+        
+        const cancelBtn = document.getElementById('selector-cancel-btn');
+        if (cancelBtn) {
+            cancelBtn.onclick = () => {
+                modal.classList.add('hidden');
+                if (onCancel) onCancel();
+            };
+        }
+        
+        modal.classList.remove('hidden');
+    },
+
+    // ---------------------------------------------------------
+    // 魔法②：諸勢力専用のリスト（見るだけ機能も合体した完全版！）
+    // ---------------------------------------------------------
+    showKunishuSelector(kunishus, onSelect, onCancel, isViewOnly = false) {
+        const modal = document.getElementById('selector-modal');
+        const list = document.getElementById('selector-list');
+        const contextInfo = document.getElementById('selector-context-info');
+        const confirmBtn = document.getElementById('selector-confirm-btn');
+        
+        if (!modal || !list || !contextInfo) return;
+        
+        const title = document.getElementById('selector-title');
+        if (title) title.textContent = isViewOnly ? "諸勢力一覧" : "対象とする諸勢力を選択";
+
+        contextInfo.innerHTML = isViewOnly ? "<div>この城に存在する諸勢力です</div>" : "<div>対象とする諸勢力を選択してください</div>";
+        
+        list.innerHTML = `
+            <div class="list-header" style="display: grid; grid-template-columns: 1fr 1fr 1fr; font-weight: bold; padding-bottom: 5px; border-bottom: 1px solid #ccc; margin-bottom: 5px;">
+                <span>勢力名</span><span>代表者</span><span>兵数</span>
+            </div>
+        `;
+        
+        let selectedKunishuId = null;
+        
+        kunishus.forEach(kunishu => {
+            const item = document.createElement('div');
+            item.className = 'select-item';
+            item.style.display = 'grid';
+            item.style.gridTemplateColumns = '1fr 1fr 1fr';
+            item.style.alignItems = 'center';
+            
+            const kunishuName = kunishu.getName(this.game);
+            const leader = this.game.getBusho(kunishu.leaderId);
+            const leaderName = leader ? leader.name : "頭領";
+            
+            item.innerHTML = `
+                <span style="font-weight: bold;">${kunishuName}</span>
+                <span>${leaderName}</span>
+                <span>${kunishu.soldiers}</span>
+            `;
+            
+            if (isViewOnly) {
+                // 見るだけの時は、クリックできなくします（指マークにしない）
+                item.style.cursor = 'default';
+            } else {
+                // 選ぶ時は、クリックできるようにします
+                item.style.cursor = 'pointer';
+                item.onclick = () => {
+                    if (window.AudioManager) window.AudioManager.playSE('choice.ogg');
+                    Array.from(list.querySelectorAll('.select-item')).forEach(c => c.classList.remove('selected'));
+                    item.classList.add('selected');
+                    selectedKunishuId = kunishu.id;
+                    
+                    if (confirmBtn) {
+                        confirmBtn.disabled = false;
+                        confirmBtn.style.opacity = 1.0;
+                    }
+                };
+            }
+            list.appendChild(item);
+        });
+        
+        if (confirmBtn) {
+            if (isViewOnly) {
+                // 見るだけの時は決定ボタンを隠します
+                confirmBtn.classList.add('hidden');
+            } else {
+                // 選ぶ時は決定ボタンを出します
+                confirmBtn.classList.remove('hidden');
+                confirmBtn.disabled = true;
+                confirmBtn.style.opacity = 0.5;
+                
+                confirmBtn.onclick = () => {
+                    if (!selectedKunishuId) {
+                        this.showDialog("諸勢力を選択してください", false);
+                        return;
+                    }
+                    modal.classList.add('hidden');
+                    if (onSelect) onSelect(selectedKunishuId);
+                };
+            }
         }
         
         const cancelBtn = document.getElementById('selector-cancel-btn');
