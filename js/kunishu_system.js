@@ -53,12 +53,12 @@ class KunishuSystem {
         const activeKunishus = this.getAliveKunishus();
 
         activeKunishus.forEach(kunishu => {
-            // 1. 兵力と防御力の自動回復 (最大値の1割)
+            // 1. 兵力と防御力の自動回復 (最大値の５％)
             if (kunishu.soldiers < kunishu.maxSoldiers) {
-                kunishu.soldiers = Math.min(kunishu.maxSoldiers, kunishu.soldiers + Math.floor(kunishu.maxSoldiers * 0.1));
+                kunishu.soldiers = Math.min(kunishu.maxSoldiers, kunishu.soldiers + Math.floor(kunishu.maxSoldiers * 0.05));
             }
             if (kunishu.defense < kunishu.maxDefense) {
-                kunishu.defense = Math.min(kunishu.maxDefense, kunishu.defense + Math.floor(kunishu.maxDefense * 0.1));
+                kunishu.defense = Math.min(kunishu.maxDefense, kunishu.defense + Math.floor(kunishu.maxDefense * 0.05));
             }
 
             // 組織の壊滅チェック
