@@ -677,7 +677,7 @@ class AIEngine {
         // 最低1回、40ごとに+1回
         let maxActions = 1 + Math.floor(baseAP / 40);
 
-        // お城にいる動ける武将（浪人や国人衆ではない人）をリストアップします
+        // お城にいる動ける武将（浪人や諸勢力ではない人）をリストアップします
         let availableBushos = this.game.getCastleBushos(castle.id).filter(b => 
             !b.isActionDone && b.status !== 'ronin' && b.belongKunishuId === 0
         );

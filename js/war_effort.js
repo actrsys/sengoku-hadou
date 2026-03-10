@@ -8,7 +8,7 @@ Object.assign(WarManager.prototype, {
 
     // ★攻撃側と守備側の敵対関係をセットする魔法
     applyWarHostility(atkId, atkIsKunishu, defId, defIsKunishu, isReinforcement) {
-        // どちらかが国人衆の場合、あるいは中立（0）の場合は外交関係がないので何もしません
+        // どちらかが諸勢力の場合、あるいは中立（0）の場合は外交関係がないので何もしません
         if (atkIsKunishu || defIsKunishu || atkId === 0 || defId === 0) return;
         
         // 両者の関係を「敵対」にします
@@ -201,7 +201,7 @@ Object.assign(WarManager.prototype, {
                     atkHorses += reinfData.horses; 
                     atkGuns += reinfData.guns;
                     atkBushos = atkBushos.concat(reinfData.bushos);
-                    // ★修正：国人衆の援軍だった場合は、プレイヤーを強制的に合戦に巻き込まないようにします！
+                    // ★修正：諸勢力の援軍だった場合は、プレイヤーを強制的に合戦に巻き込まないようにします！
                     if (hC.ownerClan === pid && !hC.isDelegated && !reinfData.isKunishuForce) isPlayerInvolved = true;
                 }
             };
@@ -347,7 +347,7 @@ Object.assign(WarManager.prototype, {
                         }
                     } else {
                         if (totalDefSoldiers >= atkSoldierCount * 0.8) {
-                            // ★国人衆（belongKunishuIdが0以外）を弾く魔法を追加！
+                            // ★諸勢力（belongKunishuIdが0以外）を弾く魔法を追加！
                             let availableDefBushos = this.game.getCastleBushos(defCastle.id).filter(b => b.status !== 'dead' && b.status !== 'ronin' && b.status !== 'unborn' && b.belongKunishuId === 0);
                             // 1. 誰がみんなの強さを見積もるか（評価者）を決めます！
                             // その城にいる大名、いなければ城主が評価者になります
@@ -416,7 +416,7 @@ Object.assign(WarManager.prototype, {
                                 };
 
                                 const processNextDef = () => {
-                                    // ★修正：国人衆の援軍なら勝手にAI配分されるように、バリケード（!this.state.defReinforcement.isKunishuForce）を追加します！
+                                    // ★修正：諸勢力の援軍なら勝手にAI配分されるように、バリケード（!this.state.defReinforcement.isKunishuForce）を追加します！
                                     if (this.state.defReinforcement && this.state.defReinforcement.castle.ownerClan === pid && !this.state.defReinforcement.isKunishuForce) {
                                         this.game.ui.showUnitDivideModal(this.state.defReinforcement.bushos, this.state.defReinforcement.soldiers, this.state.defReinforcement.horses, this.state.defReinforcement.guns, (rAssigns) => {
                                             finalDefAssignments = finalDefAssignments.concat(rAssigns);
@@ -463,7 +463,7 @@ Object.assign(WarManager.prototype, {
                                 };
 
                                 const processNextAtk = () => {
-                                    // ★修正：こちらも同じように国人衆のバリケードを追加します！
+                                    // ★修正：こちらも同じように諸勢力のバリケードを追加します！
                                     if (this.state.reinforcement && this.state.reinforcement.castle.ownerClan === pid && !this.state.reinforcement.isKunishuForce) {
                                         this.game.ui.showUnitDivideModal(this.state.reinforcement.bushos, this.state.reinforcement.soldiers, this.state.reinforcement.horses, this.state.reinforcement.guns, (rAssigns) => {
                                             finalAtkAssignments = finalAtkAssignments.concat(rAssigns);
@@ -505,7 +505,7 @@ Object.assign(WarManager.prototype, {
                 });
             };
 
-            // 国人衆制圧戦の場合は野戦をスキップして即攻城戦へ
+            // 諸勢力制圧戦の場合は野戦をスキップして即攻城戦へ
             if (this.state.isKunishuSubjugation) {
                 this.startSiegeWarPhase();
             } else if (typeof window.FieldWarManager === 'undefined') {
@@ -627,7 +627,7 @@ Object.assign(WarManager.prototype, {
             
             // ==========================================
             // ★ここから追加：AI同士の戦争の結果メッセージを出して時間を止めます！
-            // ★修正：国人衆の戦いの時は専用のメッセージがあるので、ここではお休みします！
+            // ★修正：諸勢力の戦いの時は専用のメッセージがあるので、ここではお休みします！
             if (!s.isPlayerInvolved && !s.isKunishuSubjugation && !s.attacker.isKunishu) {
                 const atkClanData = this.game.clans.find(c => c.id === s.attacker.ownerClan);
                 const defClanData = this.game.clans.find(c => c.id === s.oldDefClanId);
@@ -726,7 +726,7 @@ Object.assign(WarManager.prototype, {
             const returnReinforcement = (reinf, isAttackerData) => {
                 if (!reinf) return;
                 
-                // ★ 追加：国衆の援軍だった場合の帰還処理です！
+                // ★ 追加：諸勢力の援軍だった場合の帰還処理です！
                 if (reinf.isKunishuForce) {
                     const kunishu = this.game.kunishuSystem.getKunishu(reinf.kunishuId);
                     if (kunishu && !kunishu.isDestroyed) {
@@ -850,14 +850,14 @@ Object.assign(WarManager.prototype, {
                 }
             }
             
-            // プレイヤーが国人衆を制圧（討伐）した時の処理
+            // プレイヤーが諸勢力を制圧（討伐）した時の処理
             if (s.isKunishuSubjugation) {
                 const kunishu = this.game.kunishuSystem.getKunishu(s.defender.kunishuId);
                 let resultMsg = ""; 
                 
                 if (attackerWon) {
-                    resultMsg = `【国衆制圧】\n${s.defender.name}の討伐に成功しました！`;
-                    this.game.ui.log(`【国衆制圧】${s.defender.name}の討伐に成功しました！`);
+                    resultMsg = `【諸勢力制圧】\n${s.defender.name}の討伐に成功しました！`;
+                    this.game.ui.log(`【諸勢力制圧】${s.defender.name}の討伐に成功しました！`);
                     if (kunishu) {
                         kunishu.isDestroyed = true;
                         kunishu.soldiers = 0;
@@ -868,7 +868,7 @@ Object.assign(WarManager.prototype, {
                     }
                 } else {
                     resultMsg = `【討伐失敗】\n${s.defender.name}の討伐に失敗しました……`;
-                    this.game.ui.log(`【国衆制圧】${s.defender.name}の討伐に失敗しました……`);
+                    this.game.ui.log(`【諸勢力制圧】${s.defender.name}の討伐に失敗しました……`);
                     
                     if (kunishu) {
                         kunishu.soldiers = s.defender.soldiers;
@@ -896,7 +896,7 @@ Object.assign(WarManager.prototype, {
                 return;
             }
             
-            // 国人衆が反乱（蜂起）を起こした時の処理
+            // 諸勢力が反乱（蜂起）を起こした時の処理
             if (s.attacker.isKunishu) {
                 let resultMsg = ""; 
                 
@@ -912,7 +912,7 @@ Object.assign(WarManager.prototype, {
                     const friendlyCastles = this.game.castles.filter(c => c.ownerClan === oldOwner && c.id !== targetC.id);
                     
                     this.game.getCastleBushos(targetC.id).forEach(b => {
-                        // もし国人衆のメンバーじゃなかったら（大名家の武将だったら）
+                        // もし諸勢力のメンバーじゃなかったら（大名家の武将だったら）
                         if (!kunishuMembers.includes(b.id)) {
                             if (friendlyCastles.length > 0) {
                                 // ★味方の城がある場合：ランダムに選んだ味方の城へ避難します！
@@ -934,12 +934,12 @@ Object.assign(WarManager.prototype, {
                     // 城のお留守番リスト（samuraiIds）を整理します
                     targetC.samuraiIds = targetC.samuraiIds.filter(id => {
                         const busho = this.game.getBusho(id);
-                        // 国人衆のメンバーか、浪人になって城に残った人だけリストに残します
+                        // 諸勢力のメンバーか、浪人になって城に残った人だけリストに残します
                         return kunishuMembers.includes(id) || (busho && busho.status === 'ronin');
                     });
                     
-                    resultMsg = `【国衆蜂起】\n国人衆の反乱により、${targetC.name}が陥落し空白地となりました。`;
-                    this.game.ui.log(`【国衆蜂起】国人衆の反乱により、${targetC.name}が陥落し空白地となりました。`);
+                    resultMsg = `【諸勢力蜂起】\n諸勢力の反乱により、${targetC.name}が陥落し空白地となりました。`;
+                    this.game.ui.log(`【諸勢力蜂起】諸勢力の反乱により、${targetC.name}が陥落し空白地となりました。`);
                     
                     // ★城をすべて失ったら、life_system.js の滅亡チェック魔法にお任せします！
                     if (this.game.castles.filter(c => c.ownerClan === oldOwner).length === 0) {
@@ -947,8 +947,8 @@ Object.assign(WarManager.prototype, {
                     }
                     
                 } else {
-                    resultMsg = `【国衆蜂起】\n国人衆の反乱を鎮圧しました。`;
-                    this.game.ui.log(`【国衆蜂起】国人衆の反乱を鎮圧しました。`);
+                    resultMsg = `【諸勢力蜂起】\n諸勢力の反乱を鎮圧しました。`;
+                    this.game.ui.log(`【諸勢力蜂起】諸勢力の反乱を鎮圧しました。`);
                 }
                 
                 if (s.isPlayerInvolved) {
@@ -963,7 +963,7 @@ Object.assign(WarManager.prototype, {
             }
 
             s.atkBushos.forEach(b => { this.game.factionSystem.recordBattle(b, s.defender.id); this.game.factionSystem.updateRecognition(b, 25); });
-            // ★大名の戦いなら国人衆を弾き、国衆の戦いなら大名を弾く魔法！
+            // ★大名の戦いなら諸勢力を弾き、諸勢力の戦いなら大名を弾く魔法！
             const defBushos = this.game.getCastleBushos(s.defender.id).filter(b => b.status !== 'ronin' && (s.defender.isKunishu ? b.belongKunishuId === s.defender.kunishuId : b.belongKunishuId === 0)).concat(this.pendingPrisoners);
             if (s.defBusho && s.defBusho.id && !defBushos.find(b => b.id === s.defBusho.id)) defBushos.push(s.defBusho);
             defBushos.forEach(b => { this.game.factionSystem.recordBattle(b, s.defender.id); this.game.factionSystem.updateRecognition(b, 25); });
@@ -1044,7 +1044,7 @@ Object.assign(WarManager.prototype, {
                 s.defender.training = s.attacker.training || 0;
                 s.defender.morale = s.attacker.morale || 0;
                 
-                // ★追加：城の持ち主が変わった時の国人衆の反発チェック魔法を使います！
+                // ★追加：城の持ち主が変わった時の諸勢力の反発チェック魔法を使います！
                 if (oldOwner !== s.defender.ownerClan) {
                     this.applyKunishuRelationDropOnCapture(s.defender, s.defender.ownerClan);
                 }
@@ -1107,7 +1107,7 @@ Object.assign(WarManager.prototype, {
                 const oldOwner = s.defender.ownerClan; // ★追加：前の持ち主を記憶しておきます
                 s.defender.ownerClan = s.attacker.ownerClan; s.defender.investigatedUntil = 0; s.defender.immunityUntil = this.game.getCurrentTurnId() + 1;
                 
-                // ★追加：城の持ち主が変わった時の国人衆の反発チェック魔法を使います！
+                // ★追加：城の持ち主が変わった時の諸勢力の反発チェック魔法を使います！
                 if (oldOwner !== s.defender.ownerClan) {
                     this.applyKunishuRelationDropOnCapture(s.defender, s.defender.ownerClan);
                 }
@@ -1160,7 +1160,7 @@ Object.assign(WarManager.prototype, {
         losers.forEach(b => { 
             // ★ 修正: 未登場の武将を巻き込んで捕虜や浪人にしないように守ります！
             if (b.status === 'ronin' || b.status === 'unborn' || b.status === 'dead') return;
-            // ★ 追加: 普通の大名の城が落ちた時に、同居している国人衆が巻き添えで捕虜にならないように守ります！
+            // ★ 追加: 普通の大名の城が落ちた時に、同居している諸勢力が巻き添えで捕虜にならないように守ります！
             if (!defeatedCastle.isKunishu && b.belongKunishuId > 0) return;
 
             let chance = isLastStand ? 1.0 : ((window.WarParams.War.CaptureChanceBase || 0.7) - (b.strength * (window.WarParams.War.CaptureStrFactor || 0.002)) + (Math.random() * 0.3));
@@ -1236,7 +1236,7 @@ Object.assign(WarManager.prototype, {
         if (action === 'hire') { 
             if (kunishu && prisoner.id === kunishu.leaderId) {
                 // ★ここを修正：「stayStep」を付け足して、ちゃんとやり直せるようにしました！
-                this.game.ui.showDialog(`${prisoner.name}「国衆を束ねるこの俺が、お前になど仕えるか！」\n(※国人衆の代表者は登用できません)`, false, stayStep); 
+                this.game.ui.showDialog(`${prisoner.name}「諸勢力を束ねるこの俺が、お前になど仕えるか！」\n(※諸勢力の代表者は登用できません)`, false, stayStep); 
                 return; // やり直し
             }
 
@@ -1443,7 +1443,7 @@ Object.assign(WarManager.prototype, {
 
     
     closeWar() { 
-        // ★国人衆との戦いが終わった時も平時のBGMに戻す！
+        // ★諸勢力との戦いが終わった時も平時のBGMに戻す！
         if (window.AudioManager && this.state.isPlayerInvolved) {
             window.AudioManager.restoreMemorizedBgm();
         }
@@ -1464,7 +1464,7 @@ Object.assign(WarManager.prototype, {
         const defClanId = defCastle.ownerClan;
         const pid = this.game.playerClanId;
         
-        // 守備側が中立や国人衆の場合は自家援軍はなし
+        // 守備側が中立や諸勢力の場合は自家援軍はなし
         if (defClanId === 0 || defCastle.isKunishu || this.state.isKunishuSubjugation || this.state.attacker.isKunishu) {
             onComplete(null);
             return;
@@ -1540,7 +1540,7 @@ Object.assign(WarManager.prototype, {
                 }
             }
 
-            // 2. 国人衆
+            // 2. 諸勢力
             const kunishus = this.game.kunishuSystem.getKunishusInCastle(c.id);
             kunishus.forEach(k => {
                 const kRel = k.getRelation(defClanId);
@@ -1651,7 +1651,7 @@ Object.assign(WarManager.prototype, {
         const force = helperCastle.selectedForce;
         const myClanId = defCastle.ownerClan;
 
-        // ★ 追加：国人衆が選ばれていた場合の特別な処理です！
+        // ★ 追加：諸勢力が選ばれていた場合の特別な処理です！
         if (force && force.isKunishu) {
             const kunishu = this.game.kunishuSystem.getKunishu(force.id);
             const currentRel = kunishu.getRelation(myClanId);
@@ -1695,7 +1695,7 @@ Object.assign(WarManager.prototype, {
                 rice: reinfRice, horses: reinfHorses, guns: reinfGuns, isSelf: false, isKunishuForce: true
             };
             
-            // ★修正：国人衆の援軍が勝手に出ただけで、無関係なプレイヤーが強制的に合戦に巻き込まれるのを防ぎます！
+            // ★修正：諸勢力の援軍が勝手に出ただけで、無関係なプレイヤーが強制的に合戦に巻き込まれるのを防ぎます！
             // this.state.isPlayerInvolved = true; を削除しました
             
             if (myClanId === this.game.playerClanId) {
@@ -1878,11 +1878,11 @@ Object.assign(WarManager.prototype, {
         this.game.ui.showDialog(`${helperClanName} (${helperCastle.name}) が守備側の援軍に出発しました！`, false, onComplete);
     }, // ←★ここにカンマ（,）を付けるのがとっても大事です！
     
-    // ★追加: 城の所有者が変わった時、その城にいる国人衆の友好度をチェックして低下させる魔法
+    // ★追加: 城の所有者が変わった時、その城にいる諸勢力の友好度をチェックして低下させる魔法
     applyKunishuRelationDropOnCapture(castle, newOwnerClan) {
         if (newOwnerClan === 0) return; // 空き城になった時は何もしません
         
-        // この城にいる国人衆を探します
+        // この城にいる諸勢力を探します
         const kunishusInCastle = this.game.kunishuSystem.getKunishusInCastle(castle.id);
         
         kunishusInCastle.forEach(kunishu => {

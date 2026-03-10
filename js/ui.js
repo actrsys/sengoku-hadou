@@ -1270,7 +1270,7 @@ class UIManager {
         // ★城にいる浪人の数を数える魔法！
         let roninCount = 0;
         if (this.game && this.game.bushos) {
-            // 「死んでいない（deadじゃない）」かつ「未登場（unbornじゃない）」かつ「国人衆ではない（belongKunishuIdが0）」人を数えるように変更します！
+            // 「死んでいない（deadじゃない）」かつ「未登場（unbornじゃない）」かつ「諸勢力ではない（belongKunishuIdが0）」人を数えるように変更します！
             roninCount = this.game.bushos.filter(b => b.castleId === castle.id && Number(b.clan) === 0 && Number(b.belongKunishuId) === 0 && b.status !== 'dead' && b.status !== 'unborn').length;
         }
 
@@ -1484,11 +1484,11 @@ class UIManager {
             if (this.menuState === 'MILITARY') {
                 createBtn("取引", "category", () => menu('MIL_TRADE'));
             }
-            // ★追加：対外メニューの時に「大名家」「調略」「国衆」「朝廷」へのボタンを出します
+            // ★追加：対外メニューの時に「大名家」「調略」「諸勢力」「朝廷」へのボタンを出します
             if (this.menuState === 'FOREIGN') {
                 createBtn("大名家", "category", () => menu('FOREIGN_DAIMYO'));
                 createBtn("調略", "category", () => menu('FOREIGN_STRATEGY'));
-                createBtn("国衆", "category", () => menu('FOREIGN_KUNISHU'));
+                createBtn("諸勢力", "category", () => menu('FOREIGN_KUNISHU'));
                 createBtn("朝廷", "category", () => menu('DIPLOMACY_COURT'));
             }
             
@@ -1790,7 +1790,7 @@ class UIManager {
                     }
                 }
             } else {
-                affiliationName = "国人衆";
+                affiliationName = "諸勢力";
             }
             
         } else if (busho.clan > 0) {
@@ -2447,7 +2447,7 @@ class UIManager {
         this.selectorModal.classList.remove('hidden');
         
         const title = document.getElementById('selector-title');
-        if (title) title.textContent = isViewOnly ? "国人衆一覧" : "対象の国衆を選択";
+        if (title) title.textContent = isViewOnly ? "諸勢力一覧" : "対象の諸勢力を選択";
 
         const backBtn = document.querySelector('#selector-modal .btn-secondary');
         if(backBtn) {
@@ -2461,7 +2461,7 @@ class UIManager {
 
         const contextEl = document.getElementById('selector-context-info');
         if (contextEl) {
-            contextEl.innerHTML = isViewOnly ? "<div>この城に存在する国人衆です</div>" : "<div>対象とする国衆を選択してください</div>";
+            contextEl.innerHTML = isViewOnly ? "<div>この城に存在する諸勢力です</div>" : "<div>対象とする諸勢力を選択してください</div>";
             contextEl.classList.remove('hidden');
         }
 

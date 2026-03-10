@@ -33,7 +33,7 @@ class GunshiSystem {
         // ここを通ったら「今月は報告した」という印をつける
         this.hasShownAdviceThisMonth = true;
 
-        // 不満を持つ武将をリストアップ（大名や国人衆は除く）
+        // 不満を持つ武将をリストアップ（大名や諸勢力は除く）
         const unhappyBushos = this.game.bushos.filter(b => 
             b.clan === this.game.playerClanId && 
             b.status === 'active' && 

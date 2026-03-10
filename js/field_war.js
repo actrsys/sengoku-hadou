@@ -2,7 +2,7 @@
  * field_war.js
  * HEX式 野戦システム
  * 修正: 撤退ボタンの確認アラートをカスタムダイアログ（showDialog）に置き換えました
- * ★追加: 城が攻められた時に、仲の良い国人衆が「AIの援軍」として参戦する機能を追加しました
+ * ★追加: 城が攻められた時に、仲の良い諸勢力が「AIの援軍」として参戦する機能を追加しました
  * ★追加: 「足軽」「騎馬」「鉄砲」の兵科概念を導入し、移動力や攻撃範囲、ダメージ倍率を反映しました
  */
 
@@ -227,12 +227,12 @@ class FieldWarManager {
                 let isReinf = false;
                 let unitIsPlayer = isAtkPlayer;
                 let isSelfReinf = false; // ★追加：自勢力の援軍かどうかのメモ
-                let unitKunishuId = null; // ★追加：国衆IDのメモ
+                let unitKunishuId = null; // ★追加：諸勢力IDのメモ
                 
                 // 1. 同盟国からの援軍チェック
                 if (warState.reinforcement && warState.reinforcement.bushos.some(b => b.id === assign.busho.id)) {
                     isReinf = true;
-                    // ★修正：国人衆の援軍なら、絶対に「AI操作」で「他勢力の色」にします！
+                    // ★修正：諸勢力の援軍なら、絶対に「AI操作」で「他勢力の色」にします！
                     if (warState.reinforcement.isKunishuForce) {
                         unitIsPlayer = false;
                         isSelfReinf = false;
@@ -296,12 +296,12 @@ class FieldWarManager {
                 let isReinf = false;
                 let unitIsPlayer = isDefPlayer;
                 let isSelfReinf = false; 
-                let unitKunishuId = null; // ★追加：国衆IDのメモ
+                let unitKunishuId = null; // ★追加：諸勢力IDのメモ
                 
                 // 1. 同盟国からの援軍チェック
                 if (warState.defReinforcement && warState.defReinforcement.bushos.some(b => b.id === assign.busho.id)) {
                     isReinf = true;
-                    // ★修正：国人衆の援軍なら、絶対に「AI操作」で「他勢力の色」にします！
+                    // ★修正：諸勢力の援軍なら、絶対に「AI操作」で「他勢力の色」にします！
                     if (warState.defReinforcement.isKunishuForce) {
                         unitIsPlayer = false;
                         isSelfReinf = false;
@@ -354,7 +354,7 @@ class FieldWarManager {
             });
         }
 
-        // 防衛側が城を持っている場合、仲良しの国人衆が「援軍」に来る
+        // 防衛側が城を持っている場合、仲良しの諸勢力が「援軍」に来る
         if (!warState.isKunishuSubjugation && warState.defender.ownerClan !== 0 && warState.defender.ownerClan !== -1) {
             const kunishus = this.game.kunishuSystem.getKunishusInCastle(warState.defender.id);
             kunishus.forEach(k => {
@@ -393,7 +393,7 @@ class FieldWarManager {
                                         hasMoved: false
                                     });
                                     defAllyCount++; // ←★ここに「数え棒」を新しく書き足しました！
-                                    this.game.ui.log(`【国衆援軍】${bestBusho.name}率いる国人衆が防衛側の援軍として駆けつけました！`);
+                                    this.game.ui.log(`【諸勢力援軍】${bestBusho.name}率いる諸勢力が防衛側の援軍として駆けつけました！`);
                                 }
                             }
                         }
@@ -587,7 +587,7 @@ class FieldWarManager {
             // 他国の援軍なら、オレンジか緑
             color = unit.isAttacker ? '#ff9800' : '#4caf50';
         } else if (typeof unit.id === 'string' && unit.id.startsWith('k_')) {
-            // 国人衆なら、味方側か敵側かで緑かオレンジ
+            // 諸勢力なら、味方側か敵側かで緑かオレンジ
             if (this.units.some(u => u.isPlayer && !u.isAttacker)) {
                 color = '#4caf50';
             } else {
@@ -599,11 +599,11 @@ class FieldWarManager {
         if (unit.troopType === 'kiba') typeName = '騎馬';
         if (unit.troopType === 'teppo') typeName = '鉄砲';
 
-        // 大名家や国衆の名前を調べる処理
+        // 大名家や諸勢力の名前を調べる処理
         let clanNameText = "";
         
         if (unit.kunishuId) {
-            // 国人衆の場合：国衆の名称を引っ張ってきます
+            // 諸勢力の場合：諸勢力の名称を引っ張ってきます
             const kunishu = this.game.kunishuSystem.getKunishu(unit.kunishuId);
             if (kunishu) {
                 clanNameText = `${kunishu.getName(this.game)} `; // 「〇〇衆 」という文字を作ります
@@ -805,7 +805,7 @@ class FieldWarManager {
             // ★ここから差し替え
             let colorClass = u.isAttacker ? 'attacker' : 'defender';
             
-            // ★修正: 自勢力の援軍なら「self-ally」、他国や国人衆の援軍なら「ally」のタグを足します！
+            // ★修正: 自勢力の援軍なら「self-ally」、他国や諸勢力の援軍なら「ally」のタグを足します！
             if (u.isSelfReinforcement) {
                 colorClass += ' self-ally'; 
             } else if (u.isReinforcement || (typeof u.id === 'string' && u.id.startsWith('k_'))) {

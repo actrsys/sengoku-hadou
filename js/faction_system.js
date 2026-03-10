@@ -448,7 +448,7 @@ class FactionSystem {
      * 月初の浪人移動処理
      */
      processRoninMovements() {
-        // 全武将から「浪人」かつ「国人衆に所属していない（IDが0または未定義）」武将を抽出
+        // 全武将から「浪人」かつ「諸勢力に所属していない（IDが0または未定義）」武将を抽出
         const ronins = this.game.bushos.filter(b => b.status === 'ronin' && !b.belongKunishuId);
         
         ronins.forEach(r => {

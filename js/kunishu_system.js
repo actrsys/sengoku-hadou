@@ -1,7 +1,7 @@
 /**
  * kunishu_system.js
- * 国人衆（独立地域勢力）システムを管理するクラス
- * 修正: 国人衆同士の抗争時、国人衆用の友好度を参照するように修正しました
+ * 諸勢力（独立地域勢力）システムを管理するクラス
+ * 修正: 諸勢力同士の抗争時、諸勢力用の友好度を参照するように修正しました
  */
 
 class KunishuSystem {
@@ -23,12 +23,12 @@ class KunishuSystem {
         return this.kunishus.filter(k => !k.isDestroyed);
     }
 
-    // 指定した城にいる国人衆を取得
+    // 指定した城にいる諸勢力を取得
     getKunishusInCastle(castleId) {
         return this.getAliveKunishus().filter(k => k.castleId === castleId);
     }
 
-    // 特定の国人衆に所属している武将一覧を取得
+    // 特定の諸勢力に所属している武将一覧を取得
     getKunishuMembers(kunishuId) {
         return this.game.bushos.filter(b => b.belongKunishuId === kunishuId && b.status !== 'dead' && b.status !== 'unborn');
     }
@@ -68,7 +68,7 @@ class KunishuSystem {
         // 壊滅していないものを再度取得
         const survivingKunishus = this.getAliveKunishus();
 
-        // 2. 国人衆同士の抗争 (同一城内のチェック)
+        // 2. 諸勢力同士の抗争 (同一城内のチェック)
         const checkedPairs = new Set();
         survivingKunishus.forEach(k1 => {
             survivingKunishus.forEach(k2 => {
@@ -77,7 +77,7 @@ class KunishuSystem {
                 if (checkedPairs.has(pairId)) return;
                 checkedPairs.add(pairId);
 
-                // ★修正: 国人衆同士の関係を調べるので「true」を付けます
+                // ★修正: 諸勢力同士の関係を調べるので「true」を付けます
                 const rel1 = k1.getRelation(k2.id, true);
                 const rel2 = k2.getRelation(k1.id, true);
                 if (rel1 <= 30 || rel2 <= 30) {
@@ -111,7 +111,7 @@ class KunishuSystem {
         }
     }
 
-    // 国人衆同士の抗争処理
+    // 諸勢力同士の抗争処理
     executeConflict(k1, k2) {
         // k1が攻撃側、k2が防御側とする（ランダムで決定）
         let attacker = k1;
@@ -145,7 +145,7 @@ class KunishuSystem {
 
         const atkName = attacker.getName(this.game);
         const defName = defender.getName(this.game);
-        const msg = `【国衆抗争】${this.game.getCastle(attacker.castleId).name}にて、${atkName}と${defName}が抗争を起こしました！`;
+        const msg = `【諸勢力抗争】${this.game.getCastle(attacker.castleId).name}にて、${atkName}と${defName}が抗争を起こしました！`;
         this.game.ui.log(msg);
 
         this.checkDestroyed(attacker);
@@ -163,7 +163,7 @@ class KunishuSystem {
         const clanData = this.game.clans.find(c => c.id === clanId);
         if (!leader || !clanData) return;
 
-        // 国人衆の名前と、大名家の名前を準備します！
+        // 諸勢力の名前と、大名家の名前を準備します！
         const kunishuName = kunishu.getName(this.game);
         const clanName = clanData.name;
         
@@ -185,7 +185,7 @@ class KunishuSystem {
                     castle.gold += actualAmount;
                     
                     // 文章を作って、まずはいつものようにログに書き込みます
-                    const msg = `【国衆支援】\n${kunishuName}が、${clanName}の${castle.name}に金${actualAmount}を献上しました。`;
+                    const msg = `【諸勢力支援】\n${kunishuName}が、${clanName}の${castle.name}に金${actualAmount}を献上しました。`;
                     this.game.ui.log(msg.replace('\n', '')); // ログ用には改行を消してスッキリさせます
                     
                     // ★ここを追加：自分の城なら、画面にメッセージを出して「閉じる」まで待ちます！
@@ -197,7 +197,7 @@ class KunishuSystem {
                 if (actualAmount > 0) {
                     castle.rice += actualAmount;
                     
-                    const msg = `【国衆支援】\n${kunishuName}が、${clanName}の${castle.name}に兵糧${actualAmount}を献上しました。`;
+                    const msg = `【諸勢力支援】\n${kunishuName}が、${clanName}の${castle.name}に兵糧${actualAmount}を献上しました。`;
                     this.game.ui.log(msg.replace('\n', ''));
                     
                     if (isPlayerCastle) await this.game.ui.showDialogAsync(msg);
@@ -217,14 +217,14 @@ class KunishuSystem {
                 if (Math.random() > 0.5 && castle.gold > amount) {
                     castle.gold -= amount;
                     
-                    const msg = `【国衆妨害】\n${kunishuName}が、${clanName}の${castle.name}で略奪を働き、金${amount}を奪いました！`;
+                    const msg = `【諸勢力妨害】\n${kunishuName}が、${clanName}の${castle.name}で略奪を働き、金${amount}を奪いました！`;
                     this.game.ui.log(msg.replace('\n', ''));
                     
                     if (isPlayerCastle) await this.game.ui.showDialogAsync(msg);
                 } else if (castle.rice > amount) {
                     castle.rice -= amount;
                     
-                    const msg = `【国衆妨害】\n${kunishuName}が、${clanName}の${castle.name}で略奪を働き、兵糧${amount}を奪いました！`;
+                    const msg = `【諸勢力妨害】\n${kunishuName}が、${clanName}の${castle.name}で略奪を働き、兵糧${amount}を奪いました！`;
                     this.game.ui.log(msg.replace('\n', ''));
                     
                     if (isPlayerCastle) await this.game.ui.showDialogAsync(msg);
@@ -242,7 +242,7 @@ class KunishuSystem {
         }
     }
 
-    // 蜂起処理 (国人衆からの城攻め)
+    // 蜂起処理 (諸勢力からの城攻め)
     // ★変更：async を付けます
     async executeUprising(kunishu, castle) {
         const atkSoldiers = Math.floor(kunishu.soldiers * 0.5);
@@ -263,9 +263,9 @@ class KunishuSystem {
         atkBushos = atkBushos.concat(members.slice(0, 4));
 
         const kunishuName = kunishu.getName(this.game);
-        this.game.ui.log(`【国衆蜂起】${castle.name}にて、${kunishuName}が反乱を起こしました！`);
+        this.game.ui.log(`【諸勢力蜂起】${castle.name}にて、${kunishuName}が反乱を起こしました！`);
 
-        // 国人衆を専用の一時的な大名(Clan)として扱うためのダミーデータ
+        // 諸勢力を専用の一時的な大名(Clan)として扱うためのダミーデータ
         const dummyAttacker = {
             name: kunishuName, 
             ownerClan: -1, // 特殊ID
@@ -311,7 +311,7 @@ class KunishuSystem {
                 // ★新しいお引越しセンターの魔法を使います！
                 this.game.affiliationSystem.becomeRonin(b);
             });
-            this.game.ui.log(`【国衆壊滅】${this.game.getCastle(kunishu.castleId).name}の国人衆は壊滅しました。`);
+            this.game.ui.log(`【諸勢力壊滅】${this.game.getCastle(kunishu.castleId).name}の諸勢力は壊滅しました。`);
             return;
         }
 
@@ -320,7 +320,7 @@ class KunishuSystem {
             // 能力（統率＋知略）が一番高い者が継ぐ
             members.sort((a, b) => (b.leadership + b.intelligence) - (a.leadership + a.intelligence));
             kunishu.leaderId = members[0].id;
-            this.game.ui.log(`【国衆継承】${members[0].name}が新たな国衆の頭領となりました。`);
+            this.game.ui.log(`【諸勢力継承】${members[0].name}が新たな諸勢力の頭領となりました。`);
         }
     }
 }

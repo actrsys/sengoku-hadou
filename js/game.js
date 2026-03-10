@@ -1209,7 +1209,7 @@ class GameManager {
             this.diplomacyManager.processEndMonth();
         }
 
-        // ★修正：国人衆の処理が終わるまで「待つ」ようにします！
+        // ★修正：諸勢力の処理が終わるまで「待つ」ようにします！
         await this.kunishuSystem.processEndMonth();
         
         // ★ 追加：月の終わりに、寿命を迎えた武将がいないかチェックします！

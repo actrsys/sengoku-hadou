@@ -1,7 +1,7 @@
 /**
  * models.js
  * モデル定義 (Clan, Castle, Busho, Kunishu)
- * 修正: 国人衆の「name」機能追加と、CSVからの「大名用/国人衆用」の外交値の読み取り機能を追加
+ * 修正: 諸勢力の「name」機能追加と、CSVからの「大名用/諸勢力用」の外交値の読み取り機能を追加
  */
 
 class Clan {
@@ -217,8 +217,8 @@ class Busho {
         // ★今回追加：軍師としての「秘密の番号（タネ）」を覚えておく箱です！
         this.gunshiSeed = Number(data.gunshiSeed || 0);
 
-        // 国人衆関連のパラメータ追加
-        this.belongKunishuId = Number(this.belongKunishuId || 0);   // 所属する国人衆ID（0なら未所属）
+        // 諸勢力関連のパラメータ追加
+        this.belongKunishuId = Number(this.belongKunishuId || 0);   // 所属する諸勢力ID（0なら未所属）
 
         // 履歴配列の初期化
         this.battleHistory = Array.isArray(this.battleHistory) ? this.battleHistory : [];
@@ -242,7 +242,7 @@ class Busho {
         if (this.isCastellan) return "城主";
         if (this.isGunshi) return "軍師";
         if (this.belongKunishuId > 0 && this.id === (window.GameApp ? window.GameApp.kunishuSystem.getKunishu(this.belongKunishuId)?.leaderId : 0)) return "頭領";
-        if (this.belongKunishuId > 0) return "国衆";
+        if (this.belongKunishuId > 0) return "諸勢力";
         if (this.status === 'ronin') return "浪人";
         return "武将";
     }
@@ -252,7 +252,7 @@ class Busho {
     }
 }
 
-// 国人衆クラス
+// 諸勢力クラス
 class Kunishu {
     constructor(data) {
         Object.assign(this, data);
@@ -268,7 +268,7 @@ class Kunishu {
         
         this.ideology = this.ideology || '地縁'; 
         
-        // ★修正: 友好度管理の箱を「大名用」と「国人衆用」に分けました
+        // ★修正: 友好度管理の箱を「大名用」と「諸勢力用」に分けました
         this.daimyoRelations = {};
         this.kunishuRelations = {};
         
@@ -291,7 +291,7 @@ class Kunishu {
             this.daimyoRelations = data.daimyoRelations;
         }
 
-        // CSVの国人衆用データを翻訳して箱に入れる
+        // CSVの諸勢力用データを翻訳して箱に入れる
         if (typeof data.kunishuRelations === 'string' && data.kunishuRelations.trim() !== "") {
             const parts = data.kunishuRelations.split('|'); // ★こちらも「|」で区切ります
             parts.forEach(part => {
@@ -324,7 +324,7 @@ class Kunishu {
             const surname = leader.name.split('|')[0];
             return `${surname}衆`;
         }
-        return "国人衆";
+        return "諸勢力";
     }
 
     // ★修正: 仲良し度を調べる機能

@@ -731,7 +731,7 @@ Object.assign(UIManager.prototype, {
     renderDaimyoLabels() {
         const labelsData = [];
 
-        // ★追加：国衆コマンドや、出陣・援軍などで城を選ぶ時は大名の名前シールを出さないようにします！
+        // ★追加：諸勢力コマンドや、出陣・援軍などで城を選ぶ時は大名の名前シールを出さないようにします！
         const hiddenModes = [
             'kunishu_goodwill', 'kunishu_subjugate', 'kunishu_headhunt',
             'war',
