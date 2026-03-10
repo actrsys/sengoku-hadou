@@ -417,10 +417,18 @@ class GameSystem {
         const seed = gunshi ? (gunshi.gunshiSeed + target.id * 10 + statNum) : (target.id * 10 + statNum);
         const fixedRandom = this.seededRandom(seed);
         // ==========================================
-
-        // ▼▼▼ ここから下をごっそり差し替えます！ ▼▼▼
-        if (target.clan === playerClanId) {
-            if (target.isDaimyo) return realVal; // 大名のステータスは正確に見えます
+        
+        // ★ここから追加：相手が「同盟」か「支配」の相手か調べる魔法！
+        let isAllyOrDominated = false;
+        if (target.clan !== 0 && target.clan !== playerClanId && window.GameApp) {
+            const rel = window.GameApp.getRelation(playerClanId, target.clan);
+            if (rel && (rel.status === '同盟' || rel.status === '支配')) {
+                isAllyOrDominated = true;
+            }
+        }
+        // ★書き換え：自分の武将か、同盟・支配している相手なら軍師が評価します！
+        if (target.clan === playerClanId || isAllyOrDominated) {
+            if (target.clan === playerClanId && target.isDaimyo) return realVal; // 自分の大名のステータスは正確に見えます
             if (!gunshi) return null; // 軍師がいなければ見えません
 
             // ① まずは軍師の「好み」や「忠誠」による【えこひいき（バイアス）】を計算します！
@@ -828,7 +836,19 @@ class GameManager {
     getCurrentTurnId() { return this.year * 12 + this.month; }
     getClanTotalSoldiers(clanId) { return this.castles.filter(c => Number(c.ownerClan) === Number(clanId)).reduce((sum, c) => sum + c.soldiers, 0); }
     getClanGunshi(clanId) { return this.bushos.find(b => Number(b.clan) === Number(clanId) && b.isGunshi && b.status === 'active'); }
-    isCastleVisible(castle) { if (Number(castle.ownerClan) === Number(this.playerClanId)) return true; if (castle.investigatedUntil >= this.getCurrentTurnId()) return true; return false; }
+    isCastleVisible(castle) { 
+        if (Number(castle.ownerClan) === Number(this.playerClanId)) return true; 
+        if (castle.investigatedUntil >= this.getCurrentTurnId()) return true; 
+        
+        // ★追加：同盟か支配している相手の城なら見えるようにする魔法！
+        if (castle.ownerClan !== 0) {
+            const rel = this.getRelation(this.playerClanId, castle.ownerClan);
+            if (rel && (rel.status === '同盟' || rel.status === '支配')) {
+                return true;
+            }
+        }
+        return false; 
+    }
     
     // ==========================================
     // ★全ての大名の「威信（daimyoPrestige）」を計算して箱に入れる魔法です
