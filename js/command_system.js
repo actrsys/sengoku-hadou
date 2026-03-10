@@ -1179,30 +1179,9 @@ class CommandSystem {
         doer.isActionDone = true; this.game.ui.showResultModal(msg); this.game.ui.renderCommandMenu(); 
     }
     
-    // ★追加：親善の友好度アップを計算する専用の数式
+    // ★修正：外交専用の魔法を呼び出すようにしました
     calcGoodwillIncrease(gold, doer) {
-        let baseIncrease = 0;
-        if (gold <= 1000) {
-            // 1000までは 金100につき1 上がる（金500なら5、金1000なら10）
-            baseIncrease = gold / 100; 
-        } else {
-            // 1000を超えた分は上がり幅が小さくなる（金3000で約13になる計算）
-            baseIncrease = 10 + (Math.sqrt(gold - 1000) / Math.sqrt(2000)) * 3;
-        }
-
-        // 武将の外交ステータスによる補正（平均50を基準に -5 〜 +5）
-        let dipBonus = (doer.diplomacy - 50) / 10;
-        dipBonus = Math.max(-5, Math.min(5, dipBonus)); // 最大5、最小-5に制限
-
-        // 金額が少ない時は、補正の影響も小さくする（金500なら最大±2.5）
-        let scale = Math.min(1.0, gold / 1000);
-        dipBonus *= scale;
-
-        // 基準値に補正を足して、最後に±10%程度のランダムな揺らぎを入れる
-        let totalFloat = (baseIncrease + dipBonus) * (0.9 + Math.random() * 0.2);
-        
-        // 最低でも1は上がるようにして、整数にする
-        return Math.max(1, Math.round(totalFloat));
+        return this.game.diplomacyManager.calcGoodwillIncrease(gold, doer.diplomacy);
     }
 
     executeDiplomacy(doerId, targetCastleId, type, gold = 0) {
@@ -1210,71 +1189,23 @@ class CommandSystem {
         const targetCastle = this.game.getCastle(targetCastleId);
         if (!targetCastle) return;
         
-        // 城のデータから、相手の大名家IDを取得します！
         const targetClanId = targetCastle.ownerClan;
-
-        const relation = this.game.getRelation(doer.clan, targetClanId);
         let msg = "";
         const isPlayerInvolved = (doer.clan === this.game.playerClanId || targetClanId === this.game.playerClanId);
 
+        const myPower = this.game.getClanTotalSoldiers(doer.clan) || 1;
+        const targetPower = this.game.getClanTotalSoldiers(targetClanId) || 1;
+
         if (type === 'goodwill') {
             let isSuccess = true;
-
-            // ★修正: 相手の大名がAIの場合、受ける確率を厳しく計算します
             if (targetClanId !== this.game.playerClanId) {
-                let acceptProb = 100;
-                
-                // ① 友好度が50以下の場合は、基本確率を下げる
-                if (relation.sentiment <= 50) {
-                    acceptProb = relation.sentiment * 2; // 友好度50で100%、0で0%
-                }
-                
-                // 共通の敵対大名がいるかチェック
-                const commonEnemy = this.game.clans.some(c => {
-                    if (c.id === 0 || c.id === doer.clan || c.id === targetClanId) return false;
-                    const r1 = this.game.getRelation(doer.clan, c.id);
-                    const r2 = this.game.getRelation(targetClanId, c.id);
-                    return r1 && r2 && r1.status === '敵対' && r2.status === '敵対';
-                });
-
-                if (commonEnemy) {
-                    acceptProb += 30; // 共通の敵がいれば受け入れやすくする
-                }
-
-                // ② ★追加：自分がすでに仲良くしている大名の数で確率を下げる
-                let allyCount = 0;
-                this.game.clans.forEach(c => {
-                    if (c.id !== 0 && c.id !== targetClanId) {
-                        const r = this.game.getRelation(targetClanId, c.id);
-                        if (r && ['同盟', '支配', '従属'].includes(r.status)) {
-                            allyCount++;
-                        }
-                    }
-                });
-                if (allyCount >= 2) {
-                    acceptProb -= (allyCount - 1) * 20; // 2個で-20%、3個で-40%
-                }
-
-                // ③ ★追加：相手の戦力が自分より低い場合、確率を線形で削る
-                const myPower = this.game.getClanTotalSoldiers(targetClanId) || 1;
-                const doerPower = this.game.getClanTotalSoldiers(doer.clan) || 1;
-                if (myPower > doerPower) {
-                    // 相手の戦力が自分の半分なら確率も半分にする魔法
-                    const ratio = doerPower / myPower;
-                    acceptProb *= ratio;
-                }
-
-                if (Math.random() * 100 > acceptProb) {
-                    isSuccess = false;
-                }
+                isSuccess = this.game.diplomacyManager.checkDiplomacySuccess(doer.clan, targetClanId, type, doer.diplomacy, myPower, targetPower);
             }
 
             if (isSuccess) {
                 const increase = this.calcGoodwillIncrease(gold, doer);
-                
                 this.game.diplomacyManager.updateSentiment(doer.clan, targetClanId, increase);
-                const newRelation = this.game.getRelation(doer.clan, targetClanId);
-
+                
                 const castle = this.game.getCastle(doer.castleId); 
                 if(castle) castle.gold -= gold;
                 
@@ -1288,44 +1219,9 @@ class CommandSystem {
             }
 
         } else if (type === 'alliance') {
-            // ★修正: 同盟を受ける確率も厳しく計算します
-            const commonEnemy = this.game.clans.some(c => {
-                if (c.id === 0 || c.id === doer.clan || c.id === targetClanId) return false;
-                const r1 = this.game.getRelation(doer.clan, c.id);
-                const r2 = this.game.getRelation(targetClanId, c.id);
-                return r1 && r2 && r1.status === '敵対' && r2.status === '敵対';
-            });
+            let isSuccess = this.game.diplomacyManager.checkDiplomacySuccess(doer.clan, targetClanId, type, doer.diplomacy, myPower, targetPower);
 
-            let threshold = commonEnemy ? 90 : 120; // 閾値（これを超えないと土俵に上がれない）
-            let acceptProb = commonEnemy ? 90 : 70; // 基本の成功確率（100%中）
-
-            // ① ★追加：自分がすでに仲良くしている大名の数で確率を下げる
-            let allyCount = 0;
-            this.game.clans.forEach(c => {
-                if (c.id !== 0 && c.id !== targetClanId) {
-                    const r = this.game.getRelation(targetClanId, c.id);
-                    if (r && ['同盟', '支配', '従属'].includes(r.status)) {
-                        allyCount++;
-                    }
-                }
-            });
-            if (allyCount >= 2) {
-                acceptProb -= (allyCount - 1) * 20; // 確率を下げる
-                threshold += (allyCount - 1) * 10;  // 閾値を上げる（厳しくなる）
-            }
-
-            // ② ★追加：相手の戦力が自分より低い場合、確率を線形で削る
-            const myPower = this.game.getClanTotalSoldiers(targetClanId) || 1;
-            const doerPower = this.game.getClanTotalSoldiers(doer.clan) || 1;
-            if (myPower > doerPower) {
-                const ratio = doerPower / myPower;
-                acceptProb *= ratio;
-            }
-
-            const chance = relation.sentiment + doer.diplomacy;
-            
-            // サイコロを振ります！ (chance が threshold を超えていて、かつ確率のサイコロをクリアしたら成功)
-            if (chance > threshold && (Math.random() * 100) < acceptProb) {
+            if (isSuccess) {
                 this.game.diplomacyManager.changeStatus(doer.clan, targetClanId, '同盟');
                 msg = `同盟の締結に成功しました！`;
                 doer.achievementTotal += Math.floor(doer.diplomacy * 0.2) + 10;
@@ -1336,123 +1232,42 @@ class CommandSystem {
                 doer.achievementTotal += 5;
                 this.game.factionSystem.updateRecognition(doer, 10);
             }
+
         } else if (type === 'break_alliance') {
-            const oldStatus = relation.status;
-            const oldSentiment = relation.sentiment; // ★追加：破棄前の友好度を覚えておく
+            const result = this.game.diplomacyManager.applyBreakAlliancePenalty(doer.clan, targetClanId);
 
-            // ★追加：破棄のペナルティを計算する
-            let targetDrop = -60; // デフォルトは-60
-            let globalDrop = 0; // 他の大名への影響
-            let isBetrayal = false;
-
-            if (oldStatus === '同盟') {
-                if (oldSentiment >= 70) {
-                    targetDrop = -70; // 相手との友好度ダウン
-                    globalDrop = -10; // 他の大名との友好度ダウン
-                    isBetrayal = true;
-                }
-            } else if (oldStatus === '従属') {
-                if (oldSentiment >= 70) {
-                    targetDrop = -100; // 相手との友好度ダウン
-                    globalDrop = -10; // 他の大名との友好度ダウン
-                    isBetrayal = true;
-                }
-            }
-
-            // 相手との友好度を下げる（0未満にはならない仕組みが裏で動いています）
-            this.game.diplomacyManager.updateSentiment(doer.clan, targetClanId, targetDrop);
-
-            // ★ここを修正：下がった後の友好度に応じて、ステータスを当てはめ直します！
-            const newRel = this.game.getRelation(doer.clan, targetClanId);
-            let newStatus = '普通';
-            if (newRel.sentiment <= 39) {
-                newStatus = '敵対'; // 39以下なら敵対
-            } else if (newRel.sentiment >= 70) {
-                newStatus = '友好'; // 70以上なら友好
-            }
-            // 計算した新しいステータス（関係）をセットします！
-            this.game.diplomacyManager.changeStatus(doer.clan, targetClanId, newStatus);
-
-            // 信義に背いた場合、他のすべての大名との友好度も下がる
-            if (isBetrayal) {
-                this.game.clans.forEach(c => {
-                    // 自分と破棄相手以外で、かつ中立(0)ではない大名すべてにペナルティ
-                    if (c.id !== 0 && c.id !== doer.clan && c.id !== targetClanId) {
-                        this.game.diplomacyManager.updateSentiment(doer.clan, c.id, globalDrop);
-                    }
-                });
-            }
-
-            msg = `${oldStatus}関係を破棄しました`;
-            if (isBetrayal) {
+            msg = `${result.oldStatus}関係を破棄しました`;
+            if (result.isBetrayal) {
                 msg += `\n諸大名からの心証が悪化しました……`;
             }
             doer.achievementTotal += 5;
             this.game.factionSystem.updateRecognition(doer, 10);
 
         } else if (type === 'subordinate') {
-            // 他の大名との支配・従属関係をすべて解消します
             this.clearDominationRelations(doer.clan);
-            
-            // 相手との関係を「従属」にします
             this.game.diplomacyManager.changeStatus(doer.clan, targetClanId, '従属');
             msg = `${this.game.clans.find(c => c.id === targetClanId).name} に従属しました！`;
             doer.achievementTotal += Math.floor(doer.diplomacy * 0.2) + 10;
             this.game.factionSystem.updateRecognition(doer, 30);
+
         } else if (type === 'dominate') {
-            const myPower = this.game.getClanTotalSoldiers(doer.clan);
-            const targetPower = this.game.getClanTotalSoldiers(targetClanId) || 1; // 0除算防止
+            let isSuccess = this.game.diplomacyManager.checkDiplomacySuccess(doer.clan, targetClanId, type, doer.diplomacy, myPower, targetPower);
             
-            const powerRatio = myPower / targetPower;
-            
-            if (powerRatio < 5) {
+            if (myPower / targetPower < 5) {
                 msg = `要求を跳ね除けられました……`;
                 doer.achievementTotal += 5;
                 this.game.factionSystem.updateRecognition(doer, 10);
+            } else if (isSuccess) {
+                this.clearDominationRelations(targetClanId);
+                this.game.diplomacyManager.changeStatus(doer.clan, targetClanId, '支配');
+                msg = `${this.game.clans.find(c => c.id === targetClanId).name} を支配下に置くことに成功しました！`;
+                doer.achievementTotal += Math.floor(doer.diplomacy * 0.2) + 20;
+                this.game.factionSystem.updateRecognition(doer, 40);
             } else {
-                // 基本確率 (5倍で20%、15倍以上で70%)
-                let prob = 20;
-                if (powerRatio >= 15) {
-                    prob = 70;
-                } else {
-                    prob = 20 + (powerRatio - 5) * (50 / 10);
-                }
-                
-                // 外交補正 (50以上で最大+10%)
-                if (doer.diplomacy >= 50) {
-                    const dipBonus = Math.min(10, (doer.diplomacy - 50) * 0.2);
-                    prob += dipBonus;
-                }
-                
-                // 相手が既に他の大名に従属しているか確認
-                let isAlreadySubordinate = false;
-                this.game.clans.forEach(c => {
-                    if (c.id !== targetClanId && c.id !== doer.clan) {
-                        const rel = this.game.getRelation(targetClanId, c.id);
-                        if (rel && rel.status === '従属') {
-                            isAlreadySubordinate = true;
-                        }
-                    }
-                });
-                
-                if (isAlreadySubordinate) {
-                    prob *= 0.2; // 確率を8割減らします
-                }
-                
-                if (Math.random() * 100 < prob) {
-                    // 成功！
-                    this.clearDominationRelations(targetClanId);
-                    this.game.diplomacyManager.changeStatus(doer.clan, targetClanId, '支配');
-                    msg = `${this.game.clans.find(c => c.id === targetClanId).name} を支配下に置くことに成功しました！`;
-                    doer.achievementTotal += Math.floor(doer.diplomacy * 0.2) + 20;
-                    this.game.factionSystem.updateRecognition(doer, 40);
-                } else {
-                    // 失敗……
-                    this.game.diplomacyManager.updateSentiment(doer.clan, targetClanId, -20);
-                    msg = `支配の要求は拒否されました……`;
-                    doer.achievementTotal += 5;
-                    this.game.factionSystem.updateRecognition(doer, 10);
-                }
+                this.game.diplomacyManager.updateSentiment(doer.clan, targetClanId, -20);
+                msg = `支配の要求は拒否されました……`;
+                doer.achievementTotal += 5;
+                this.game.factionSystem.updateRecognition(doer, 10);
             }
         }
         

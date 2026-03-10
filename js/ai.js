@@ -1246,30 +1246,21 @@ class AIEngine {
         const myPower = this.getClanPrestige(myClanId);
         const myDaimyo = this.game.bushos.find(b => b.clan === myClanId && b.isDaimyo) || { duty: 50, intelligence: 50 };
 
-        // ★ここから追加：現在仲良くしている（同盟・支配・従属）大名家の数を数えます
-        let allyCount = 0;
-        this.game.clans.forEach(c => {
-            if (c.id !== 0 && c.id !== myClanId) {
-                const r = this.game.getRelation(myClanId, c.id);
-                if (r && ['同盟', '支配', '従属'].includes(r.status)) {
-                    allyCount++;
-                }
-            }
-        });
+        // ★修正：diplomacy.js のお引越しセンターを使って数えます！
+        const allyCount = this.game.diplomacyManager.getAllyCount(myClanId);
         
         // ★追加：仲良しが2つ以上なら、外交する確率を下げる魔法（1つ増えるごとに20%ダウン）
         let sendProbModifier = 1.0;
         if (allyCount >= 2) {
             sendProbModifier = Math.max(0.1, 1.0 - (allyCount - 1) * 0.2); 
         }
-        // ★追加ここまで！
 
-        // ★追加：ここで改めて周辺の敵を判断します！
+        // ★追加：ここで改めて周辺の敵を判断します！（智謀による見誤りがあるためAIに残します）
         let evaluatorInt = 50;
         if (myClanId === this.game.playerClanId) {
-            evaluatorInt = castellan.intelligence; // プレイヤーの委任城なら城主の頭の良さ
+            evaluatorInt = castellan.intelligence; 
         } else {
-            evaluatorInt = myDaimyo.intelligence || 50; // AIなら大名の頭の良さ
+            evaluatorInt = myDaimyo.intelligence || 50; 
         }
 
         const enemyThreats = [];
@@ -1277,7 +1268,6 @@ class AIEngine {
             const rel = this.game.getRelation(myClanId, clanId);
             const isProtected = rel && ['同盟', '支配', '従属'].includes(rel.status);
             
-            // 同盟などの保護関係になければ、どれくらい怖いか（威信）を予想します
             if (!isProtected) {
                 const trueEnemyPower = this.getClanPrestige(clanId);
                 const errorRange = Math.min(0.3, Math.max(0, (100 - evaluatorInt) / 100 * 0.3));
@@ -1288,76 +1278,18 @@ class AIEngine {
             }
         });
 
-        // 怖い順（威信が高い順）に並べ替えます
         enemyThreats.sort((a, b) => b.power - a.power);
-        const mainThreatId = enemyThreats.length > 0 ? enemyThreats[0].clanId : 0; // ★追加：一番怖い敵を覚えておきます
+        const mainThreatId = enemyThreats.length > 0 ? enemyThreats[0].clanId : 0; 
 
-        // ★修正：怖い順ではなく、連携しやすそうな「優先度」でリストを作り直します！
-        const diplomacyTargets = [];
-        uniqueNeighbors.forEach(targetClanId => {
-            let priority = 0;
-            const rel = this.game.getRelation(myClanId, targetClanId);
-            
-            // 1. 一番怖い敵（mainThreat）に対する戦略的価値を調べます
-            if (mainThreatId !== 0 && mainThreatId !== targetClanId) {
-                const targetToThreatRel = this.game.getRelation(targetClanId, mainThreatId);
-                const myToThreatRel = this.game.getRelation(myClanId, mainThreatId);
-                
-                // ① 共通の敵がいる場合（敵の敵は最優先の味方！）
-                if (targetToThreatRel && targetToThreatRel.status === '敵対' && myToThreatRel && myToThreatRel.status === '敵対') {
-                    priority += 1000; 
-                } 
-                // ★ここから書き足した魔法：「自分と敵対していない」かつ「怖い敵の隣にいて、仲も良くない相手」に牽制を頼む！
-                else if (rel.status !== '敵対') {
-                    // 相手が、自分の「怖い敵」と仲良しじゃないか調べます
-                    const isFriendlyWithThreat = targetToThreatRel && ['同盟', '支配', '従属', '友好'].includes(targetToThreatRel.status);
-                    
-                    if (!isFriendlyWithThreat) {
-                        // 相手が「怖い敵」の領地と隣り合っているか調べます
-                        let isAdjacent = false;
-                        const threatCastles = this.game.castles.filter(c => c.ownerClan === mainThreatId);
-                        const targetCastles = this.game.castles.filter(c => c.ownerClan === targetClanId);
-                        
-                        for (let tc of targetCastles) {
-                            for (let mc of threatCastles) {
-                                if (GameSystem.isAdjacent(tc, mc)) {
-                                    isAdjacent = true;
-                                    break;
-                                }
-                            }
-                            if (isAdjacent) break;
-                        }
-                        
-                        // 隣り合っているなら、背後を突いてくれそうなので「300点」プラスします！
-                        // （これで普通の関係でも合計400点になり、3位と4位の間にピッタリ入ります！）
-                        if (isAdjacent) {
-                            priority += 300;
-                        }
-                    }
-                }
-                // ★書き足した魔法はここまでです！
-            }
-            
-            // 2. 現在の仲の良さで評価します
-            if (rel.status !== '敵対') {
-                priority += rel.sentiment * 2; // 普通や友好なら、仲が良いほど優先！
-            } else {
-                priority -= 500; // 直接敵対している相手は一番後回し！
-            }
-            
-            diplomacyTargets.push({ clanId: targetClanId, priority: priority });
-        });
+        // ★修正：diplomacy.js から優先度の高い順番リストをもらいます！
+        const diplomacyTargets = this.game.diplomacyManager.getDiplomacyPriorityList(myClanId, uniqueNeighbors, mainThreatId);
 
-        // 優先度が高い順に並べ替えます
-        diplomacyTargets.sort((a, b) => b.priority - a.priority);
-        const orderedTargets = diplomacyTargets.map(t => t.clanId);
-
-        for (let targetClanId of orderedTargets) {
+        for (let targetData of diplomacyTargets) {
             if (castellan.isActionDone) break;
-
+            
+            const targetClanId = targetData.clanId;
             const targetClanTotal = this.getClanPrestige(targetClanId);
             
-            // さっき計算した「見誤った威信」を使います
             const threatData = enemyThreats.find(t => t.clanId === targetClanId);
             const perceivedTargetTotal = threatData ? threatData.power : targetClanTotal;
 
@@ -1368,7 +1300,6 @@ class AIEngine {
             if (!targetCastle) continue; 
             const targetCastleId = targetCastle.id;
             
-            // 自分が相手に従属している場合（相手が支配者）
             if (rel.status === '従属') {
                 const ratio = targetClanTotal / myPower;
                 if (ratio <= 2.0) {
@@ -1381,7 +1312,6 @@ class AIEngine {
                 continue;
             }
 
-            // 同盟または支配している場合
             if (rel.status === '同盟' || rel.status === '支配') {
                  const enemies = neighbors.filter(c => !['同盟', '支配', '従属'].includes(this.game.getRelation(myClanId, c.ownerClan).status));
                  if (enemies.length === 0 && myPower > targetClanTotal * 2.5 && Math.random() > dutyInhibition) {
@@ -1391,7 +1321,6 @@ class AIEngine {
                  continue;
             }
 
-            // 相手の威信が自分の1/8以下なら、稀に支配を試みます
             if (targetClanTotal * 8 <= myPower) {
                 if (Math.random() < 0.05) { 
                     if (targetClanId === this.game.playerClanId) {
@@ -1409,36 +1338,8 @@ class AIEngine {
             }
 
             // 通常の親善・同盟のロジック
-            // ★ここから差し替えます！
-            let isStrategicPartner = false; // 共通の敵、または背後を突ける相手かどうかの目印です
-
-            if (mainThreatId !== 0 && mainThreatId !== targetClanId) {
-                const myToThreatRel = this.game.getRelation(myClanId, mainThreatId);
-                const targetToThreatRel = this.game.getRelation(targetClanId, mainThreatId);
-                
-                // ① 共通の敵がいるか（互いに敵対している）
-                if (targetToThreatRel && targetToThreatRel.status === '敵対' && myToThreatRel && myToThreatRel.status === '敵対') {
-                    isStrategicPartner = true;
-                } 
-                // ② 敵対していない相手で、怖い敵の背後を突けるか
-                else if (rel.status !== '敵対') {
-                    const isFriendlyWithThreat = targetToThreatRel && ['同盟', '支配', '従属', '友好'].includes(targetToThreatRel.status);
-                    if (!isFriendlyWithThreat) {
-                        let isAdjacent = false;
-                        const threatCastles = this.game.castles.filter(cas => cas.ownerClan === mainThreatId);
-                        const targetCastles = this.game.castles.filter(cas => cas.ownerClan === targetClanId);
-                        for (let tc of targetCastles) {
-                            for (let mc of threatCastles) {
-                                if (GameSystem.isAdjacent(tc, mc)) {
-                                    isAdjacent = true; break;
-                                }
-                            }
-                            if (isAdjacent) break;
-                        }
-                        if (isAdjacent) isStrategicPartner = true;
-                    }
-                }
-            }
+            // ★修正：diplomacy.js で計算済みの結果をそのまま使います！
+            let isStrategicPartner = targetData.isStrategicPartner;
 
             // 「自分より相手が強い」か「戦略的パートナー（isStrategicPartner）」なら外交を考えます！
             if (myPower < perceivedTargetTotal * 0.8 || isStrategicPartner) {

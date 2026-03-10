@@ -133,4 +133,218 @@ class DiplomacyManager {
             }
         });
     }
+    
+    /**
+     * 指定した大名家の同盟・支配・従属の数を数えます
+     */
+    getAllyCount(clanId) {
+        let count = 0;
+        this.game.clans.forEach(c => {
+            if (c.id !== 0 && c.id !== clanId) {
+                const r = this.getRelation(clanId, c.id);
+                if (r && ['同盟', '支配', '従属'].includes(r.status)) {
+                    count++;
+                }
+            }
+        });
+        return count;
+    }
+
+    /**
+     * 戦略的パートナー（共通の敵がいる、または背後を突ける）かどうかと、そのスコアを判定します
+     */
+    evaluateStrategicValue(myClanId, targetClanId, mainThreatId) {
+        let isStrategicPartner = false;
+        let priorityBonus = 0;
+
+        if (mainThreatId !== 0 && mainThreatId !== targetClanId) {
+            const targetToThreatRel = this.getRelation(targetClanId, mainThreatId);
+            const myToThreatRel = this.getRelation(myClanId, mainThreatId);
+            const rel = this.getRelation(myClanId, targetClanId);
+            
+            // ① 共通の敵がいる場合
+            if (targetToThreatRel && targetToThreatRel.status === '敵対' && myToThreatRel && myToThreatRel.status === '敵対') {
+                isStrategicPartner = true;
+                priorityBonus += 1000;
+            } 
+            // ② 敵対していない相手で、怖い敵の背後を突ける場合
+            else if (rel.status !== '敵対') {
+                const isFriendlyWithThreat = targetToThreatRel && ['同盟', '支配', '従属', '友好'].includes(targetToThreatRel.status);
+                if (!isFriendlyWithThreat) {
+                    let isAdjacent = false;
+                    const threatCastles = this.game.castles.filter(cas => cas.ownerClan === mainThreatId);
+                    const targetCastles = this.game.castles.filter(cas => cas.ownerClan === targetClanId);
+                    
+                    for (let tc of targetCastles) {
+                        for (let mc of threatCastles) {
+                            if (GameSystem.isAdjacent(tc, mc)) {
+                                isAdjacent = true; break;
+                            }
+                        }
+                        if (isAdjacent) break;
+                    }
+                    if (isAdjacent) {
+                        isStrategicPartner = true;
+                        priorityBonus += 300;
+                    }
+                }
+            }
+        }
+        return { isStrategicPartner, priorityBonus };
+    }
+
+    /**
+     * AIが外交相手を選ぶための「優先度リスト」を作成します
+     */
+    getDiplomacyPriorityList(myClanId, uniqueNeighbors, mainThreatId) {
+        const diplomacyTargets = [];
+        uniqueNeighbors.forEach(targetClanId => {
+            let priority = 0;
+            const rel = this.getRelation(myClanId, targetClanId);
+            
+            // 1. 戦略的価値を調べる
+            const strategic = this.evaluateStrategicValue(myClanId, targetClanId, mainThreatId);
+            priority += strategic.priorityBonus;
+            
+            // 2. 現在の仲の良さで評価する
+            if (rel.status !== '敵対') {
+                priority += rel.sentiment * 2;
+            } else {
+                priority -= 500;
+            }
+            
+            diplomacyTargets.push({ 
+                clanId: targetClanId, 
+                priority: priority,
+                isStrategicPartner: strategic.isStrategicPartner 
+            });
+        });
+
+        // 優先度が高い順に並べ替える
+        diplomacyTargets.sort((a, b) => b.priority - a.priority);
+        return diplomacyTargets;
+    }
+    
+    /**
+     * 親善による友好度の上昇量を計算します
+     */
+    calcGoodwillIncrease(gold, doerDiplomacy) {
+        let baseIncrease = 0;
+        if (gold <= 1000) {
+            baseIncrease = gold / 100; 
+        } else {
+            baseIncrease = 10 + (Math.sqrt(gold - 1000) / Math.sqrt(2000)) * 3;
+        }
+
+        let dipBonus = (doerDiplomacy - 50) / 10;
+        dipBonus = Math.max(-5, Math.min(5, dipBonus)); 
+
+        let scale = Math.min(1.0, gold / 1000);
+        dipBonus *= scale;
+
+        let totalFloat = (baseIncrease + dipBonus) * (0.9 + Math.random() * 0.2);
+        return Math.max(1, Math.round(totalFloat));
+    }
+
+    /**
+     * 外交の成功判定を行います（AI相手の場合）
+     */
+    checkDiplomacySuccess(doerClanId, targetClanId, type, doerDiplomacy, myPower, targetPower) {
+        const relation = this.getRelation(doerClanId, targetClanId);
+        
+        // 共通の敵がいるか
+        const commonEnemy = this.game.clans.some(c => {
+            if (c.id === 0 || c.id === doerClanId || c.id === targetClanId) return false;
+            const r1 = this.getRelation(doerClanId, c.id);
+            const r2 = this.getRelation(targetClanId, c.id);
+            return r1 && r2 && r1.status === '敵対' && r2.status === '敵対';
+        });
+
+        // 仲良しの大名家の数
+        const allyCount = this.getAllyCount(targetClanId);
+
+        if (type === 'goodwill') {
+            let acceptProb = 100;
+            if (relation.sentiment <= 50) acceptProb = relation.sentiment * 2;
+            if (commonEnemy) acceptProb += 30;
+            if (allyCount >= 2) acceptProb -= (allyCount - 1) * 20;
+            if (targetPower > myPower) acceptProb *= (myPower / targetPower);
+            
+            return (Math.random() * 100) <= acceptProb;
+        } 
+        else if (type === 'alliance') {
+            let threshold = commonEnemy ? 90 : 120; 
+            let acceptProb = commonEnemy ? 90 : 70; 
+
+            if (allyCount >= 2) {
+                acceptProb -= (allyCount - 1) * 20; 
+                threshold += (allyCount - 1) * 10;  
+            }
+            if (targetPower > myPower) {
+                acceptProb *= (myPower / targetPower);
+            }
+
+            const chance = relation.sentiment + doerDiplomacy;
+            return (chance > threshold) && ((Math.random() * 100) < acceptProb);
+        }
+        else if (type === 'dominate') {
+            const powerRatio = myPower / Math.max(1, targetPower);
+            if (powerRatio < 5) return false;
+
+            let prob = 20;
+            if (powerRatio >= 15) prob = 70;
+            else prob = 20 + (powerRatio - 5) * (50 / 10);
+            
+            if (doerDiplomacy >= 50) prob += Math.min(10, (doerDiplomacy - 50) * 0.2);
+            
+            let isAlreadySubordinate = false;
+            this.game.clans.forEach(c => {
+                if (c.id !== targetClanId && c.id !== doerClanId) {
+                    const rel = this.getRelation(targetClanId, c.id);
+                    if (rel && rel.status === '従属') isAlreadySubordinate = true;
+                }
+            });
+            
+            if (isAlreadySubordinate) prob *= 0.2;
+            
+            return (Math.random() * 100) < prob;
+        }
+        return false;
+    }
+    
+    /**
+     * 同盟や従属を破棄した時のペナルティを計算して適用します
+     */
+    applyBreakAlliancePenalty(doerClanId, targetClanId) {
+        const relation = this.getRelation(doerClanId, targetClanId);
+        const oldStatus = relation.status;
+        const oldSentiment = relation.sentiment;
+
+        let targetDrop = -60; 
+        let globalDrop = 0; 
+        let isBetrayal = false;
+
+        if (oldStatus === '同盟' && oldSentiment >= 70) {
+            targetDrop = -70; globalDrop = -10; isBetrayal = true;
+        } else if (oldStatus === '従属' && oldSentiment >= 70) {
+            targetDrop = -100; globalDrop = -10; isBetrayal = true;
+        }
+
+        this.updateSentiment(doerClanId, targetClanId, targetDrop);
+
+        const newRel = this.getRelation(doerClanId, targetClanId);
+        let newStatus = '普通';
+        if (newRel.sentiment <= 39) newStatus = '敵対';
+        else if (newRel.sentiment >= 70) newStatus = '友好';
+        this.changeStatus(doerClanId, targetClanId, newStatus);
+
+        if (isBetrayal) {
+            this.game.clans.forEach(c => {
+                if (c.id !== 0 && c.id !== doerClanId && c.id !== targetClanId) {
+                    this.updateSentiment(doerClanId, c.id, globalDrop);
+                }
+            });
+        }
+        return { oldStatus, isBetrayal };
+    }
 }
