@@ -1549,7 +1549,7 @@ Object.assign(WarManager.prototype, {
         const leaderName = reinfBushos.length > 0 ? reinfBushos[0].name : "総大将";
         
         if (atkClanId === this.game.playerClanId) {
-            this.game.ui.showDialog(`${helperCastle.name}の${leaderName}が敵の援軍として向かっています！`, false, () => {
+            this.game.ui.showDialog(`${helperCastle.name}の${leaderName}が敵の援軍として参戦しました！`, false, () => {
                 onComplete(selfReinfData);
             });
         } else {
@@ -1694,7 +1694,7 @@ Object.assign(WarManager.prototype, {
             const atkClanId = atkForce.isKunishu ? 0 : atkForce.ownerClan;
             const leaderName = reinfBushos.length > 0 ? reinfBushos[0].name : "総大将";
             if (atkClanId === this.game.playerClanId) {
-                this.game.ui.showDialog(`${helperClanName}の${leaderName}が敵の援軍として向かっています！`, false, onComplete);
+                this.game.ui.showDialog(`${helperClanName}の${leaderName}が敵の援軍として参戦しました！`, false, onComplete);
             } else {
                 this.game.ui.log(`【同盟援軍】${defCastle.name}の要請により、${helperClanName}が守備側の援軍として駆けつけました。`);
                 onComplete();
