@@ -2972,7 +2972,7 @@ class UIManager {
 
 Object.assign(UIManager.prototype, {
     // ---------------------------------------------------------
-    // 魔法①：大名家と諸勢力が混ざった「援軍用」のリスト
+    // 魔法①：大名家と諸勢力が混ざった「援軍用」のリスト（外交デザイン版）
     // ---------------------------------------------------------
     showForceSelector(forces, onSelect, onCancel) {
         const modal = document.getElementById('selector-modal');
@@ -2984,31 +2984,49 @@ Object.assign(UIManager.prototype, {
         
         contextInfo.innerHTML = "<div>援軍を要請する勢力を選択してください</div>";
         
+        // ★修正: デフォルトのヘッダーを隠して、諸勢力（外交）と同じデザインを使います
+        const listHeader = modal.querySelector('.list-header');
+        if (listHeader) listHeader.style.display = 'none';
+
         list.innerHTML = `
-            <div class="list-header" style="display: grid; grid-template-columns: 1fr 1fr 1fr; font-weight: bold; padding-bottom: 5px; border-bottom: 1px solid #ccc; margin-bottom: 5px;">
-                <span>勢力名</span><span>代表者</span><span>兵数</span>
+            <div class="kunishu-list-header">
+                <span></span><span>勢力名</span><span>代表者</span><span>兵数</span><span>友好度</span>
             </div>
         `;
+        list.classList.remove('view-mode');
         
         let selectedForce = null;
         
         forces.forEach(force => {
             const item = document.createElement('div');
-            item.className = 'select-item';
-            item.style.display = 'grid';
-            item.style.gridTemplateColumns = '1fr 1fr 1fr';
-            item.style.alignItems = 'center';
+            // ★変更: 'select-item' ではなく、外交一覧と同じ 'kunishu-list-item' を使います！
+            item.className = 'kunishu-list-item';
             item.style.cursor = 'pointer';
             
+            // ★追加：友好度を計算して、バーを作ります
+            let relVal = 50;
+            if (force.isKunishu) {
+                const k = this.game.kunishuSystem.getKunishu(force.id);
+                if (k) relVal = k.getRelation(this.game.playerClanId);
+            } else {
+                const rel = this.game.getRelation(this.game.playerClanId, force.id);
+                if (rel) relVal = rel.sentiment;
+            }
+            const relPercent = Math.min(100, Math.max(0, Number(relVal) || 0));
+            const friendBarHtml = `<div class="bar-bg bar-bg-friend"><div class="bar-fill bar-fill-friend" style="width:${relPercent}%;"></div></div>`;
+            
+            // ★変更: 5つの列（チェック枠・勢力名・代表者・兵数・友好度）に合わせます
             item.innerHTML = `
-                <span style="font-weight: bold;">${force.name}</span>
+                <span></span>
+                <strong class="col-kunishu-name">${force.name}</strong>
                 <span>${force.leaderName}</span>
                 <span>${force.soldiers}</span>
+                <span>${friendBarHtml}</span>
             `;
             
             item.onclick = () => {
                 if (window.AudioManager) window.AudioManager.playSE('choice.ogg');
-                Array.from(list.querySelectorAll('.select-item')).forEach(c => c.classList.remove('selected'));
+                Array.from(list.querySelectorAll('.kunishu-list-item')).forEach(c => c.classList.remove('selected'));
                 item.classList.add('selected');
                 selectedForce = force;
                 
@@ -3029,6 +3047,7 @@ Object.assign(UIManager.prototype, {
                     this.showDialog("勢力を選択してください", false);
                     return;
                 }
+                if (listHeader) listHeader.style.display = ''; // 隠していたヘッダーを元に戻す
                 modal.classList.add('hidden');
                 onSelect(selectedForce);
             };
@@ -3037,6 +3056,7 @@ Object.assign(UIManager.prototype, {
         const cancelBtn = document.getElementById('selector-cancel-btn');
         if (cancelBtn) {
             cancelBtn.onclick = () => {
+                if (listHeader) listHeader.style.display = ''; // 隠していたヘッダーを元に戻す
                 modal.classList.add('hidden');
                 if (onCancel) onCancel();
             };
@@ -3044,7 +3064,7 @@ Object.assign(UIManager.prototype, {
         
         modal.classList.remove('hidden');
     },
-
+    
     // ---------------------------------------------------------
     // 魔法②：諸勢力専用のリスト（元の見た目を復元した完全版！）
     // ---------------------------------------------------------
