@@ -65,8 +65,7 @@ class CourtRankSystem {
         }
         return false; // 朝廷が持っていなかったら失敗…
     }
-    // ==========================================
-
+    
     // 指定したIDの官位データを取り出す魔法です
     getRankData(id) {
         return this.ranks.find(r => r.id === id);
@@ -84,22 +83,6 @@ class CourtRankSystem {
             }
         });
         return bonus;
-    }
-
-// 朝廷から武将に官位を与える魔法です（これから使います！）
-    grantRank(busho, rankId) {
-        const index = this.availableRanks.indexOf(rankId);
-        // 朝廷がその官位を持っていれば
-        if (index !== -1) {
-            // 朝廷の在庫から消して…
-            this.availableRanks.splice(index, 1);
-            // 武将の持ち物リストに入れます！
-            if (!busho.courtRankIds.includes(rankId)) {
-                busho.courtRankIds.push(rankId);
-            }
-            return true; // 成功！
-        }
-        return false; // 朝廷が持っていなかったら失敗…
     }
     
     // ==========================================
