@@ -373,7 +373,7 @@ class WarManager {
         
         if (type === 'def_attack') { 
              s.defenderGuarding = true;
-             if(s.isPlayerInvolved) this.game.ui.log(`R${s.round} [守] 籠城し、守りを固めている！`);
+             if(s.isPlayerInvolved) this.game.ui.addWarDetailLog(`R${s.round} [守] 籠城し、守りを固めている！`);
              this.advanceWarTurn(); return;
         }
         if (type === 'repair') { 
@@ -386,26 +386,26 @@ class WarManager {
                  let subPolSum = 0; for(let i=1; i<polList.length; i++) subPolSum += polList[i];
                  let recover = Math.floor(((soldierCost * W.RepairSoldierFactor) + (maxPol * W.RepairMainPolFactor) + (subPolSum * W.RepairSubPolFactor)) * W.RepairGlobalMultiplier);
                  s.defender.defense += recover;
-                 if(s.isPlayerInvolved) this.game.ui.log(`R${s.round} [守] 補修を実行！ (兵-${soldierCost} 防+${recover})`);
-             } else { if(s.isPlayerInvolved) this.game.ui.log(`R${s.round} [守] 補修しようとしたが兵が足りない！`); }
+                 if(s.isPlayerInvolved) this.game.ui.addWarDetailLog(`R${s.round} [守] 補修を実行！ (兵-${soldierCost} 防+${recover})`);
+             } else { if(s.isPlayerInvolved) this.game.ui.addWarDetailLog(`R${s.round} [守] 補修しようとしたが兵が足りない！`); }
              this.advanceWarTurn(); return;
         }
 
         if (type === 'scheme') {
             const result = WarSystem.calcScheme(isAtkTurn ? s.atkBushos[0] : s.defBusho, isAtkTurn ? s.defBusho : s.atkBushos[0], isAtkTurn ? s.defender.peoplesLoyalty : (window.MainParams?.Economy?.MaxLoyalty || 100));
-            if (!result.success) { if (s.isPlayerInvolved) this.game.ui.log(`R${s.round} 謀略失敗！`); }
+            if (!result.success) { if (s.isPlayerInvolved) this.game.ui.addWarDetailLog(`R${s.round} 謀略失敗！`); }
             else {
                 // ★0.5を0.195に変更しました！
                 let actualDamage = s.isPlayerInvolved ? result.damage : Math.floor(result.damage * 0.195);
                 target.soldiers = Math.max(0, target.soldiers - actualDamage);
-                if (s.isPlayerInvolved) this.game.ui.log(`R${s.round} 謀略成功！ 兵士に${actualDamage}の被害`);
+                if (s.isPlayerInvolved) this.game.ui.addWarDetailLog(`R${s.round} 謀略成功！ 兵士に${actualDamage}の被害`);
             }
             this.advanceWarTurn(); return;
         }
 
         if (type === 'fire') {
             const result = WarSystem.calcFire(isAtkTurn ? s.atkBushos[0] : s.defBusho, isAtkTurn ? s.defBusho : s.atkBushos[0]);
-            if (!result.success) { if (s.isPlayerInvolved) this.game.ui.log(`R${s.round} 火攻失敗！`); }
+            if (!result.success) { if (s.isPlayerInvolved) this.game.ui.addWarDetailLog(`R${s.round} 火攻失敗！`); }
             else {
                 // ★0.5を0.195に変更しました！
                 let actualDamage = s.isPlayerInvolved ? result.damage : Math.floor(result.damage * 0.195);
@@ -413,7 +413,7 @@ class WarManager {
                 let actualDefSoldierDamage = s.isPlayerInvolved ? 50 : 16;
                 if(isAtkTurn) s.defender.defense = Math.max(0, s.defender.defense - actualDamage);
                 else target.soldiers = Math.max(0, target.soldiers - actualDefSoldierDamage);
-                if (s.isPlayerInvolved) this.game.ui.log(`R${s.round} 火攻成功！ ${isAtkTurn?'防御':'兵士'}に${isAtkTurn ? actualDamage : actualDefSoldierDamage}の被害`);
+                if (s.isPlayerInvolved) this.game.ui.addWarDetailLog(`R${s.round} 火攻成功！ ${isAtkTurn?'防御':'兵士'}に${isAtkTurn ? actualDamage : actualDefSoldierDamage}の被害`);
             }
             this.advanceWarTurn(); return;
         }
@@ -429,7 +429,7 @@ class WarManager {
         if (isAtkTurn && s.defenderGuarding) {
              calculatedSoldierDmg = Math.floor(calculatedSoldierDmg * window.WarParams.War.RojoDamageReduction); 
              calculatedWallDmg = Math.floor(calculatedWallDmg * window.WarParams.War.RojoDamageReduction);
-             s.defenderGuarding = false; if (s.isPlayerInvolved) this.game.ui.log(`(籠城効果によりダメージ軽減)`);
+             s.defenderGuarding = false; if (s.isPlayerInvolved) this.game.ui.addWarDetailLog(`(籠城効果によりダメージ軽減)`);
         }
 
         let actualSoldierDmg = Math.min(target.soldiers, calculatedSoldierDmg);
@@ -442,14 +442,14 @@ class WarManager {
             const actualCounterDmg = Math.min(actorArmy.soldiers, calculatedCounterDmg);
             actorArmy.soldiers -= actualCounterDmg;
             if(isAtkTurn) s.deadSoldiers.attacker += actualCounterDmg; else s.deadSoldiers.defender += actualCounterDmg;
-            if(s.isPlayerInvolved) this.game.ui.log(`(反撃被害: ${actualCounterDmg})`); 
+            if(s.isPlayerInvolved) this.game.ui.addWarDetailLog(`(反撃被害: ${actualCounterDmg})`); 
         }
         
         if (s.isPlayerInvolved) { 
             let actionName = type.includes('bow') ? "弓攻撃" : type.includes('siege') ? "城攻め" : "力攻め"; 
             if (type.includes('def_')) actionName = type === 'def_bow' ? "斉射" : type === 'def_charge' ? "突撃" : "反撃"; 
             let msg = (calculatedWallDmg > 0) ? `${actionName} (兵-${actualSoldierDmg} 防-${calculatedWallDmg})` : `${actionName} (兵-${actualSoldierDmg})`; 
-            this.game.ui.log(`R${s.round} [${isAtkTurn?'攻':'守'}] ${msg}`); 
+            this.game.ui.addWarDetailLog(`R${s.round} [${isAtkTurn?'攻':'守'}] ${msg}`); 
         }
         this.advanceWarTurn();
     }

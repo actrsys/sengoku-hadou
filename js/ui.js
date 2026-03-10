@@ -2337,6 +2337,15 @@ class UIManager {
         if (this.warLog) this.warLog.innerHTML = '';
     }
 
+    addWarDetailLog(msg) {
+        if(this.game.warManager && this.game.warManager.state.active && this.game.warManager.state.isPlayerInvolved && this.warLog) {
+             const div = document.createElement('div');
+             div.innerHTML = msg;
+             this.warLog.appendChild(div);
+             this.warLog.scrollTop = this.warLog.scrollHeight;
+        }
+    }
+
     updateWarUI() {
         if (!this.game.warManager.state.active) return;
         const s = this.game.warManager.state;
