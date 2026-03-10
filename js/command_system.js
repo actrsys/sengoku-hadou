@@ -2134,13 +2134,13 @@ class CommandSystem {
             let allyCandidates = [];
             this.game.castles.forEach(c => {
                 if (c.ownerClan === 0 || c.ownerClan === myClanId || c.ownerClan === targetCastle.ownerClan) return;
+                
                 const rel = this.game.getRelation(myClanId, c.ownerClan);
                 // ★バリア追加：rel が空っぽの時に落ちないように「!rel ||」を追加しました！
                 if (!rel || !['友好', '同盟', '支配', '従属'].includes(rel.status) || rel.sentiment < 50) return;
                 const enemyRel = this.game.getRelation(c.ownerClan, targetCastle.ownerClan);
-                // ★バリア追加：enemyRel は安全ですが念のため確認
-                if (enemyRel && ['同盟', '支配', '従属'].includes(enemyRel.status)) return;
-                
+                // ★修正：外交専用の魔法を使います！
+                if (enemyRel && this.game.diplomacyManager.isNonAggression(enemyRel.status)) return;
                 const isNextToMyAnyCastle = this.game.castles.some(myC => myC.ownerClan === myClanId && GameSystem.isAdjacent(c, myC));
                 const isNextToEnemy = GameSystem.isAdjacent(c, targetCastle);
                 if (!isNextToMyAnyCastle && !isNextToEnemy) return;

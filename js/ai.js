@@ -187,15 +187,17 @@ class AIEngine {
                         if ((target.immunityUntil || 0) >= this.game.getCurrentTurnId()) return false;
                         return true;
                     }
-
+                    
                     const rel = this.game.getRelation(myClanId, target.ownerClan);
-                    const isProtected = ['同盟', '支配', '従属'].includes(rel.status);
+                    // ★修正：外交専用の魔法を使います！
+                    const isProtected = rel && this.game.diplomacyManager.isNonAggression(rel.status);
                     if (isProtected || (target.immunityUntil || 0) >= this.game.getCurrentTurnId()) return false;
 
                     // ★追加：親大名がいる場合、親の「同盟国」や「他の従属国（親が支配している国）」は攻撃できない
                     if (myBossId !== 0) {
                         const bossRel = this.game.getRelation(myBossId, target.ownerClan);
-                        if (bossRel && ['同盟', '支配'].includes(bossRel.status)) {
+                        // ★修正：親大名の方も魔法を使います！
+                        if (bossRel && this.game.diplomacyManager.isNonAggression(bossRel.status)) {
                             return false;
                         }
                     }
@@ -301,12 +303,13 @@ class AIEngine {
                 }
             });
         });
-
+        
         // 警戒すべき敵対大名を複数リストアップします！
         const adjacentEnemyClans = [];
         adjacentClans.forEach(clanId => {
             const rel = this.game.getRelation(myClanId, clanId);
-            const isProtected = rel && ['同盟', '支配', '従属'].includes(rel.status);
+            // ★修正：外交専用の魔法を使います！
+            const isProtected = rel && this.game.diplomacyManager.isNonAggression(rel.status);
             
             // 同盟などの保護関係になければ警戒対象！
             if (!isProtected) {
@@ -374,12 +377,13 @@ class AIEngine {
                 // その大名から来てくれそうな兵士数を予想します（大体の目安として総兵力の15%くらいと予想）
                 const trueClanPower = this.game.getClanTotalSoldiers(c.id) || 0;
                 let expectedReinf = (trueClanPower * 0.15) * errorRate; // ここでも智謀で見誤る魔法がかかります！
-
+                
                 // 自分が呼べそうか？（同盟等で仲良し＆相手とは仲良くない）
                 const myRel = this.game.getRelation(myCastle.ownerClan, c.id);
                 const cToTargetRel = this.game.getRelation(c.id, target.ownerClan);
-                if (myRel && ['同盟', '支配', '従属'].includes(myRel.status) && myRel.sentiment >= 50) {
-                    if (!cToTargetRel || !['同盟', '支配', '従属'].includes(cToTargetRel.status)) {
+                if (myRel && this.game.diplomacyManager.isNonAggression(myRel.status) && myRel.sentiment >= 50) {
+                    // ★修正：魔法を使います！
+                    if (!cToTargetRel || !this.game.diplomacyManager.isNonAggression(cToTargetRel.status)) {
                         myReinfPower += expectedReinf;
                     }
                 }
@@ -387,8 +391,9 @@ class AIEngine {
                 // 相手が呼べそうか？（敵と同盟等で仲良し＆自分とは仲良くない）
                 const targetRel = this.game.getRelation(target.ownerClan, c.id);
                 const cToMyRel = this.game.getRelation(c.id, myCastle.ownerClan);
-                if (targetRel && ['同盟', '支配', '従属'].includes(targetRel.status) && targetRel.sentiment >= 50) {
-                    if (!cToMyRel || !['同盟', '支配', '従属'].includes(cToMyRel.status)) {
+                if (targetRel && this.game.diplomacyManager.isNonAggression(targetRel.status) && targetRel.sentiment >= 50) {
+                    // ★修正：魔法を使います！
+                    if (!cToMyRel || !this.game.diplomacyManager.isNonAggression(cToMyRel.status)) {
                         enemyReinfPower += expectedReinf;
                     }
                 }
@@ -1262,11 +1267,12 @@ class AIEngine {
         } else {
             evaluatorInt = myDaimyo.intelligence || 50; 
         }
-
+        
         const enemyThreats = [];
         uniqueNeighbors.forEach(clanId => {
             const rel = this.game.getRelation(myClanId, clanId);
-            const isProtected = rel && ['同盟', '支配', '従属'].includes(rel.status);
+            // ★修正：外交専用の魔法を使います！
+            const isProtected = rel && this.game.diplomacyManager.isNonAggression(rel.status);
             
             if (!isProtected) {
                 const trueEnemyPower = this.getClanPrestige(clanId);

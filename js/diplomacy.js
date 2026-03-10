@@ -347,4 +347,11 @@ class DiplomacyManager {
         }
         return { oldStatus, isBetrayal };
     }
+    
+    /**
+     * 指定した関係が「攻撃してはいけない関係（不可侵）」かどうかを判定します
+     */
+    isNonAggression(status) {
+        return ['同盟', '支配', '従属', '和睦'].includes(status);
+    }
 }

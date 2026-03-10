@@ -40,15 +40,15 @@ Object.assign(WarManager.prototype, {
             if (!GameSystem.isReachable(this.game, currentCastle, target, myClanId)) return false;
             if (target.ownerClan === myClanId) return false;
             if ((target.immunityUntil || 0) >= this.game.getCurrentTurnId()) return false;
-            
             if (target.ownerClan !== 0) {
                 const rel = this.game.getRelation(myClanId, target.ownerClan);
-                // ★バリア追加：rel が空っぽの時はエラーにせず無視します（rel && を追加）
-                if (rel && ['同盟', '支配', '従属'].includes(rel.status)) return false;
+                // ★修正：外交専用の魔法を使います！
+                if (rel && this.game.diplomacyManager.isNonAggression(rel.status)) return false;
 
                 if (myBossId !== 0) {
                     const bossRel = this.game.getRelation(myBossId, target.ownerClan);
-                    if (bossRel && ['同盟', '支配'].includes(bossRel.status)) {
+                    // ★修正：親大名の関係も同じ魔法でチェックします！
+                    if (bossRel && this.game.diplomacyManager.isNonAggression(bossRel.status)) {
                         return false; 
                     }
                 }
@@ -1479,15 +1479,15 @@ Object.assign(WarManager.prototype, {
 
         this.game.castles.forEach(c => {
             if (c.ownerClan === 0 || c.ownerClan === defClanId || c.ownerClan === atkClanId) return;
-
+            
             const rel = this.game.getRelation(defClanId, c.ownerClan);
             // ★バリア追加：rel が空っぽの時に落ちないように「!rel ||」を追加しました！
             if (!rel || !['友好', '同盟', '支配', '従属'].includes(rel.status)) return;
             if (rel.sentiment < 50) return;
 
             const enemyRel = this.game.getRelation(c.ownerClan, atkClanId);
-            // ★バリア追加：enemyRel が空っぽの時に落ちないように「enemyRel &&」を追加しました！
-            if (enemyRel && ['同盟', '支配', '従属'].includes(enemyRel.status)) return;
+            // ★修正：外交専用の魔法を使います！
+            if (enemyRel && this.game.diplomacyManager.isNonAggression(enemyRel.status)) return;
 
             const isNextToMyAnyCastle = this.game.castles.some(myC => myC.ownerClan === defClanId && GameSystem.isAdjacent(c, myC));
             if (!isNextToMyAnyCastle) return;
