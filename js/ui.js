@@ -483,7 +483,7 @@ class UIManager {
 
     showContextMenu(x, y) {
         // メニューを出さないように、魔法を空っぽにしました！
-    }s
+    }
 
     hideContextMenu() {
         // エラーが出ないように、念のため「メニューを隠す」お約束だけ残しておきます
