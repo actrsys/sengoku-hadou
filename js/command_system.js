@@ -260,6 +260,13 @@ const COMMAND_SPECS = {
         startMode: 'busho_select_special', subType: 'tribute_doer', sortKey: 'politics',
         msg: "朝廷に使者を送り、金を献上します"
     },
+    'court_truce': {
+        label: "和睦", category: 'DIPLOMACY_COURT',
+        costGold: 2000, costRice: 0,
+        isMulti: false, hasAdvice: true,
+        startMode: 'map_select', targetType: 'hostile_clan_only',
+        msg: "朝廷の威光により、敵対大名と和睦します"
+    },
 
     // --- システム (SYSTEM) - UI生成用プレースホルダ ---
     'save': { label: "ファイル保存", category: 'SYSTEM', isSystem: true, action: 'save' },
@@ -524,6 +531,18 @@ class CommandSystem {
                     return daimyo && Number(daimyo.castleId) === Number(target.id);
                 }).map(t => t.id);
                 
+            // ★追加：敵対している大名だけを選べるようにする絞り込みです！
+            case 'hostile_clan_only':
+                return this.game.castles.filter(target => {
+                    if (target.ownerClan === 0 || Number(target.ownerClan) === playerClanId) return false;
+                    const rel = this.game.getRelation(playerClanId, target.ownerClan);
+                    // 敵対状態のみ選択可能にします！
+                    if (!rel || rel.status !== '敵対') return false;
+                    
+                    const daimyo = this.game.bushos.find(b => b.clan === target.ownerClan && b.isDaimyo);
+                    return daimyo && Number(daimyo.castleId) === Number(target.id);
+                }).map(t => t.id);
+
             // ★追加: まだ壊滅していない国人衆がいる城を探してリストアップします（親善コマンド用）
             case 'kunishu_valid': {
                 const activeKunishus = this.game.kunishuSystem.getAliveKunishus();
@@ -591,6 +610,15 @@ class CommandSystem {
         if (spec.costRice > 0 && castle.rice < spec.costRice) {
             this.game.ui.showDialog(`兵糧が足りません (必要: ${spec.costRice})`, false);
             return;
+        }
+
+        // ★追加：朝廷による和睦の時、信用の値をチェックします（具体的な数字は見せません）
+        if (type === 'court_truce') {
+            const currentTrust = this.game.courtRankSystem.getTrust(this.game.playerClanId);
+            if (currentTrust < 500) {
+                this.game.ui.showDialog("朝廷に働きかけるための信用が足りないようです……", false);
+                return;
+            }
         }
 
         switch (spec.startMode) {
@@ -714,6 +742,9 @@ class CommandSystem {
                     trueProb = prob / 100;
                 }
                 this.showAdviceAndExecute('diplomacy', () => this.executeDiplomacy(firstId, targetId, 'dominate'), { trueProb: trueProb });
+            } else if (extraData.subAction === 'court_truce') {
+                // ★追加：朝廷和睦は条件を満たしていれば確実に成功します！
+                this.showAdviceAndExecute('diplomacy', () => this.executeCourtTruce(firstId, targetId), { trueProb: 1.0 });
             }
             return;
         }
@@ -2064,6 +2095,7 @@ class CommandSystem {
             case 'goodwill': case 'alliance': return "外交相手を選択してください";
             case 'kunishu_goodwill': return "親善を行う国人衆がいる城を選択してください";
             case 'break_alliance': return "同盟破棄する相手を選択してください";
+            case 'court_truce': return "和睦を行う相手を選択してください"; // ★これを追加！
             // ★ここから下を追加！
             case 'atk_self_reinforcement': return "援軍を出陣させる城を選択してください";
             case 'atk_ally_reinforcement': return "援軍を要請する城を選択してください";
@@ -2174,6 +2206,9 @@ class CommandSystem {
             this.game.ui.openBushoSelector('diplomacy_doer', targetCastle.id, { subAction: 'subordinate' }, onBackToMap);
         } else if (mode === 'dominate') {
             this.game.ui.openBushoSelector('diplomacy_doer', targetCastle.id, { subAction: 'dominate' }, onBackToMap);
+        } else if (mode === 'court_truce') {
+            // ★追加：朝廷和睦の使者選びへ繋げます
+            this.game.ui.openBushoSelector('diplomacy_doer', targetCastle.id, { subAction: 'court_truce' }, onBackToMap);
         }
     }
     
@@ -2610,10 +2645,51 @@ class CommandSystem {
         doer.achievementTotal += 5 + Math.floor(gold / 500);
         this.game.factionSystem.updateRecognition(doer, 10);
         
-        this.game.ui.showResultModal(`${doer.name}を使者として、朝廷に 金${gold} を献上しました！\n（朝廷への累計貢献額: ${currentContribution}）`);
+        this.game.ui.showResultModal(`${doer.name}を使者として、朝廷に 金${gold} を献上しました！\n（現在の朝廷貢献度: ${currentContribution} / 朝廷からの信用: ${currentTrust}）`);
         
         this.game.ui.updatePanelHeader();
         this.game.ui.renderCommandMenu();
     }
     
+    // ==========================================
+    // ★追加：朝廷の信用を消費して強制的に和睦する魔法！
+    // ==========================================
+    executeCourtTruce(doerId, targetCastleId) {
+        const doer = this.game.getBusho(doerId);
+        const targetCastle = this.game.getCastle(targetCastleId);
+        if (!targetCastle) return;
+
+        const targetClanId = targetCastle.ownerClan;
+        const targetClanName = this.game.clans.find(c => c.id === targetClanId).name;
+        
+        const castle = this.game.getCurrentTurnCastle();
+        const costGold = 2000;
+
+        // 金と信用の最終確認（念のためもう一度チェックします）
+        const currentTrust = this.game.courtRankSystem.getTrust(this.game.playerClanId);
+        if (castle.gold < costGold || currentTrust < 500) {
+            this.game.ui.showDialog("金や信用が足りないため、実行できませんでした。", false);
+            return;
+        }
+
+        // お城の貯金箱からお金を減らします
+        castle.gold -= costGold;
+        
+        // 信用を「500」消費（マイナス）します！
+        this.game.courtRankSystem.addTrust(this.game.playerClanId, -500);
+
+        // ★あや瀨さんが作ってくれた魔法を使って、外交状態を強制的に「和睦」にし、期間を「6」にセットします！
+        this.game.diplomacyManager.changeStatus(this.game.playerClanId, targetClanId, '和睦', 6);
+
+        // 使者は行動済みにします
+        doer.isActionDone = true;
+        doer.achievementTotal += Math.floor(doer.diplomacy * 0.2) + 10;
+        this.game.factionSystem.updateRecognition(doer, 20);
+
+        // 信用がどれくらい減ったかは見せないようにします
+        this.game.ui.showResultModal(`朝廷の威光により、${targetClanName} との間に和睦が結ばれました！\n（和睦期間：６ヶ月）`);
+        
+        this.game.ui.updatePanelHeader();
+        this.game.ui.renderCommandMenu();
+    }
 }
