@@ -7,12 +7,65 @@ class CourtRankSystem {
     constructor(game) {
         this.game = game;
         this.ranks = []; // ここに読み込んだ全ての官位データをしまっておきます
+        
+        // ★追加：朝廷が現在持っている（誰も持っていない）官位のIDリストです
+        this.availableRanks = []; 
     }
 
     // CSVから読み込んだデータをセットする魔法です
     setRankData(data) {
         this.ranks = data;
+        
+        // ★追加：データがセットされたら、まずは全ての官位を朝廷の在庫に入れます
+        this.availableRanks = this.ranks.map(r => r.id);
+        
+        // ★追加：その後、すでに武将が持っている官位を在庫から消す魔法を使います！
+        this.syncAvailableRanks();
     }
+
+    // ==========================================
+    // ★ここから追加：官位の在庫管理システム
+    // ==========================================
+    
+    // 全武将をチェックして、誰かが持っている官位を朝廷の在庫から消す魔法です
+    syncAvailableRanks() {
+        if (!this.game || !this.game.bushos) return;
+
+        const usedRankIds = new Set();
+        this.game.bushos.forEach(b => {
+            // 死んでいない（活動中など）武将が持っている官位をチェックします
+            if (b.status !== 'dead' && b.courtRankIds && b.courtRankIds.length > 0) {
+                b.courtRankIds.forEach(id => usedRankIds.add(id));
+            }
+        });
+
+        // 誰かが持っているIDは、朝廷の空きリスト(availableRanks)から外します
+        this.availableRanks = this.availableRanks.filter(id => !usedRankIds.has(id));
+    }
+
+    // 武将が死んだ時などに、官位を朝廷に返す魔法です
+    returnRank(rankId) {
+        if (!this.availableRanks.includes(rankId)) {
+            this.availableRanks.push(rankId);
+        }
+    }
+
+    // 朝廷から武将に官位を与える魔法です（これから使います！）
+    grantRank(busho, rankId) {
+        const index = this.availableRanks.indexOf(rankId);
+        // 朝廷がその官位を持っていれば
+        if (index !== -1) {
+            // 朝廷の在庫から消して…
+            this.availableRanks.splice(index, 1);
+            // 武将の持ち物リストに入れます！
+            if (!busho.courtRankIds.includes(rankId)) {
+                busho.courtRankIds.push(rankId);
+            }
+            return true; // 成功！
+        }
+        return false; // 朝廷が持っていなかったら失敗…
+    }
+    // ==========================================
 
     // 指定したIDの官位データを取り出す魔法です
     getRankData(id) {

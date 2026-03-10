@@ -233,6 +233,14 @@ class LifeSystem {
     async executeDeath(busho) {
         busho.status = 'dead'; // ステータスを「死亡」にします
         
+        // ★ここを追加：官位を持っていたら朝廷に返す魔法！
+        if (busho.courtRankIds && busho.courtRankIds.length > 0) {
+            busho.courtRankIds.forEach(rankId => {
+                this.game.courtRankSystem.returnRank(rankId);
+            });
+            busho.courtRankIds = []; // 自分の持ち物リストは空っぽにします
+        }
+        
         const castle = this.game.getCastle(busho.castleId);
         if (castle) {
             // お城の武将リストから外します
