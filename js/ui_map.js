@@ -731,9 +731,14 @@ Object.assign(UIManager.prototype, {
     renderDaimyoLabels() {
         const labelsData = [];
 
-        // ★追加：国衆コマンド（親善、討伐、引抜）の時は大名の名前シールを出さないようにします！
-        const isKunishuMode = ['kunishu_goodwill', 'kunishu_subjugate', 'kunishu_headhunt'].includes(this.game.selectionMode);
-        if (isKunishuMode) return;
+        // ★追加：国衆コマンドや、出陣・援軍などで城を選ぶ時は大名の名前シールを出さないようにします！
+        const hiddenModes = [
+            'kunishu_goodwill', 'kunishu_subjugate', 'kunishu_headhunt',
+            'war',
+            'atk_self_reinforcement', 'atk_ally_reinforcement',
+            'def_self_reinforcement', 'def_ally_reinforcement'
+        ];
+        if (hiddenModes.includes(this.game.selectionMode)) return;
 
         // 1. 居城を持っている大名を探して、大体の大きさを計算します
         this.game.clans.forEach(clan => {
