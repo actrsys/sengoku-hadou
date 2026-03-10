@@ -59,6 +59,9 @@ class UIManager {
 
         this.unitDivideModal = document.getElementById('unit-divide-modal');
 
+        this.bushoDetailModal = document.getElementById('busho-detail-modal');
+        this.bushoDetailBody = document.getElementById('busho-detail-body');
+
         this.onResultModalClose = null;
 
         // ★結果画面の外側（黒い背景）を押して閉じた時にも音が鳴る
@@ -1612,7 +1615,13 @@ class UIManager {
             
             div.innerHTML = `<span class="col-act">${inputHtml}${b.isActionDone?'[済]':'[未]'}</span><span class="col-name">${b.name}</span><span class="col-rank">${b.getRankName()}</span><span class="col-stat">${getStat('leadership')}</span><span class="col-stat">${getStat('strength')}</span><span class="col-stat">${getStat('politics')}</span><span class="col-stat">${getStat('diplomacy')}</span><span class="col-stat">${getStat('intelligence')}</span><span class="col-stat">${getStat('charm')}</span>`;
             
-            if(isSelectable && actionType !== 'view_only' && actionType !== 'all_busho_list') { 
+            if (actionType === 'view_only' || actionType === 'all_busho_list') {
+                div.onclick = () => {
+                    if (window.AudioManager) window.AudioManager.playSE('choice.ogg');
+                    this.showBushoDetailModal(b);
+                };
+                div.style.cursor = 'pointer'; // カーソルを指の形にする魔法
+            } else if (isSelectable) { 
                 div.onclick = (e) => {
                     if (window.AudioManager) window.AudioManager.playSE('choice.ogg');
 
@@ -1717,7 +1726,79 @@ class UIManager {
         }
     }
     
-    showUnitDivideModal(bushos, totalSoldiers, totalHorses, totalGuns, onConfirm, onCancel = null) { 
+    showBushoDetailModal(busho) {
+        if (!this.bushoDetailModal || !this.bushoDetailBody) return;
+
+        let faceHtml = "";
+        if (busho.faceIcon) {
+            faceHtml = `<img src="data/images/faceicons/${busho.faceIcon}" style="width: 100px; height: 100px; object-fit: cover; border: 2px solid #333; border-radius: 4px; background: #eee;" onerror="this.src='data/images/faceicons/unknown_face.webp'">`;
+        }
+
+        const clan = this.game.clans.find(c => c.id === busho.clan);
+        const clanName = clan ? clan.name : "浪人";
+        
+        const castle = this.game.getCastle(busho.castleId);
+        const castleName = castle ? castle.name : "不明";
+
+        const age = this.game.year - busho.birthYear;
+
+        let rankName = "";
+        if (busho.courtRankIds && busho.courtRankIds.length > 0 && this.game.courtRankSystem) {
+            let highestRank = null;
+            busho.courtRankIds.forEach(id => {
+                const rank = this.game.courtRankSystem.getRank(id);
+                if (rank) {
+                    if (!highestRank || rank.rankNo < highestRank.rankNo) {
+                        highestRank = rank;
+                    }
+                }
+            });
+            if (highestRank) {
+                rankName = `<span style="font-size: 0.9rem; background: #d4af37; color: #fff; padding: 2px 6px; border-radius: 4px; margin-left: 10px; vertical-align: middle;">${highestRank.name}</span>`;
+            }
+        }
+
+        const gunshi = this.game.getClanGunshi(this.game.playerClanId);
+        const myDaimyo = this.game.bushos.find(b => b.clan === this.game.playerClanId && b.isDaimyo);
+        
+        let acc = null;
+        if (busho.clan !== this.game.playerClanId && busho.clan !== 0) {
+            if (castle) acc = castle.investigatedAccuracy;
+        }
+
+        const getStat = (stat) => GameSystem.getDisplayStatHTML(busho, stat, gunshi, acc, this.game.playerClanId, myDaimyo);
+
+        this.bushoDetailBody.innerHTML = `
+            <div style="display: flex; gap: 20px; align-items: flex-start; margin-bottom: 20px;">
+                <div style="flex-shrink: 0;">${faceHtml}</div>
+                <div style="flex: 1;">
+                    <div style="font-size: 1.3rem; font-weight: bold; margin-bottom: 10px; border-bottom: 2px solid #ccc; padding-bottom: 5px;">
+                        ${busho.name}${rankName}
+                    </div>
+                    <div style="display: grid; grid-template-columns: 80px 1fr; gap: 5px; font-size: 0.95rem;">
+                        <div style="color: #666;">所属大名</div><div style="font-weight: bold;">${clanName}</div>
+                        <div style="color: #666;">所在城</div><div style="font-weight: bold;">${castleName}</div>
+                        <div style="color: #666;">身分</div><div style="font-weight: bold;">${busho.getRankName()}</div>
+                        <div style="color: #666;">年齢</div><div style="font-weight: bold;">${age}歳</div>
+                    </div>
+                </div>
+            </div>
+            <div style="background: #f9f9f9; padding: 15px; border-radius: 8px; border: 1px solid #ddd;">
+                <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; text-align: center;">
+                    <div><div style="font-size: 0.8rem; color: #666;">統率</div><div style="font-size: 1.2rem; font-weight: bold;">${getStat('leadership')}</div></div>
+                    <div><div style="font-size: 0.8rem; color: #666;">武勇</div><div style="font-size: 1.2rem; font-weight: bold;">${getStat('strength')}</div></div>
+                    <div><div style="font-size: 0.8rem; color: #666;">政務</div><div style="font-size: 1.2rem; font-weight: bold;">${getStat('politics')}</div></div>
+                    <div><div style="font-size: 0.8rem; color: #666;">外交</div><div style="font-size: 1.2rem; font-weight: bold;">${getStat('diplomacy')}</div></div>
+                    <div><div style="font-size: 0.8rem; color: #666;">智謀</div><div style="font-size: 1.2rem; font-weight: bold;">${getStat('intelligence')}</div></div>
+                    <div><div style="font-size: 0.8rem; color: #666;">魅力</div><div style="font-size: 1.2rem; font-weight: bold;">${getStat('charm')}</div></div>
+                </div>
+            </div>
+        `;
+
+        this.bushoDetailModal.classList.remove('hidden');
+    }
+
+    showUnitDivideModal(bushos, totalSoldiers, totalHorses, totalGuns, onConfirm, onCancel = null) {
         const modal = document.getElementById('unit-divide-modal');
         const listEl = document.getElementById('divide-list');
         const confirmBtn = document.getElementById('divide-confirm-btn');
