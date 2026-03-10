@@ -1318,7 +1318,7 @@ class UIManager {
         }
         this.updateCastleGlows();
     }
-    // ★ 追加：マップ選択中専用の、スッキリしたメニューを描く魔法
+    // ★ マップ選択中専用の、スッキリしたメニューを描く魔法
     renderSelectionModeMenu() {
         const mobileArea = document.getElementById('command-area');
         const pcArea = document.getElementById('pc-command-area');
@@ -1332,9 +1332,25 @@ class UIManager {
             btn.textContent = "戻る";
             btn.onclick = () => {
                 if(this.game.isProcessingAI) return;
-                // 右クリックと同じように、選択をキャンセルする処理を呼びます
-                this.cancelMapSelection(false); 
-                this.scrollToActiveCastle();
+                
+                // ★ 援軍を呼ぶモードの時に「戻る」を押したら、やめるかどうかを聞く魔法です！
+                const reinfModes = ['atk_self_reinforcement', 'atk_ally_reinforcement', 'def_self_reinforcement', 'def_ally_reinforcement'];
+                if (reinfModes.includes(this.game.selectionMode)) {
+                    this.showDialog("援軍を出すのをやめますか？", true, 
+                        () => {
+                            // 「はい（やめる）」を選んだ時は、そのままキャンセルして次に進みます
+                            this.cancelMapSelection(false); 
+                            this.scrollToActiveCastle();
+                        },
+                        () => {
+                            // 「いいえ（やめない）」を選んだ時は、何もしないので城を選ぶ画面のままになります
+                        }
+                    );
+                } else {
+                    // 援軍以外の普通のマップ選択の時は、いつも通りすぐにキャンセルします
+                    this.cancelMapSelection(false); 
+                    this.scrollToActiveCastle();
+                }
             };
             area.appendChild(btn);
         });
