@@ -285,6 +285,11 @@ class KunishuSystem {
         while (this.game.warManager.state.active) {
             await new Promise(resolve => setTimeout(resolve, 500));
         }
+        
+        // ★さらに追加：戦争後の「鎮圧しました」などのメッセージを読み終わるまで待ちます！
+        if (this.game.ui && this.game.ui.waitForDialogs) {
+            await this.game.ui.waitForDialogs();
+        }
         // ★追加ここまで
     }
 
