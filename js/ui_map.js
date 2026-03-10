@@ -745,6 +745,14 @@ Object.assign(UIManager.prototype, {
             if (leader && leader.castleId) {
                 const castle = this.game.getCastle(leader.castleId);
                 if (castle) {
+                    // ★ここから追加：選べない相手の時は、名前シールを「出さない」ようにする魔法！
+                    // マップ上で何かを選んでいる最中（selectionMode）で、
+                    // かつ、その城が「選べるリスト（validTargets）」に入っていないなら、ここでストップします。
+                    if (this.game.selectionMode && !this.game.validTargets.includes(castle.id)) {
+                        return;
+                    }
+                    // ★追加ここまで！
+
                     const posX = castle.pixelX !== undefined ? castle.pixelX : (castle.x * 80 + 40);
                     const posY = castle.pixelY !== undefined ? castle.pixelY : (castle.y * 80 + 40);
                     

@@ -480,6 +480,7 @@ class CommandSystem {
                     // ★追加：すでにその関係になっている場合は、選べないように（暗く）する魔法！
                     const rel = this.game.getRelation(playerClanId, target.ownerClan);
                     if (rel) {
+                        if (type === 'goodwill' && rel.sentiment >= 100) return false; // ★ここを追加！友好度100なら親善できないようにします
                         if (type === 'alliance' && rel.status === '同盟') return false;
                         if (type === 'dominate' && rel.status === '支配') return false;
                         if (type === 'subordinate' && rel.status === '従属') return false;
@@ -512,7 +513,12 @@ class CommandSystem {
             // ★追加: まだ壊滅していない国人衆がいる城を探してリストアップします（親善コマンド用）
             case 'kunishu_valid': {
                 const activeKunishus = this.game.kunishuSystem.getAliveKunishus();
-                return [...new Set(activeKunishus.map(k => k.castleId))];
+                // ★ここを追加！：親善の時は、すでに友好度100の国人衆は選べないようにします
+                let validKunishus = activeKunishus;
+                if (type === 'kunishu_goodwill') {
+                    validKunishus = activeKunishus.filter(k => k.getRelation(playerClanId) < 100);
+                }
+                return [...new Set(validKunishus.map(k => k.castleId))];
             }
 
             // ★追加: 制圧コマンド専用！自分の城か、隣の城だけを選べるようにします
