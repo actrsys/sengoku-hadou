@@ -44,4 +44,26 @@ class CourtRankSystem {
         validRanks.sort((a, b) => a.rankNo - b.rankNo);
         return validRanks[0].rankName2; // （例：征夷大将軍、など）
     }
+
+    // ==========================================
+    // ★ここから追加：朝廷への貢献度システム
+    // ==========================================
+
+    // 指定した大名家の「朝廷への貢献度」を調べる魔法です
+    getContribution(clanId) {
+        const clan = this.game.clans.find(c => c.id === clanId);
+        return clan ? (clan.courtContribution || 0) : 0;
+    }
+
+    // お金を積んで、朝廷への貢献度を上げる魔法です
+    addContribution(clanId, goldAmount) {
+        const clan = this.game.clans.find(c => c.id === clanId);
+        if (!clan) return false;
+
+        // とりあえず今回は「払ったお金の分だけ貢献度が上がる」という計算にしておきます
+        // 上限の99999を超えないように見張る魔法（Math.min）をかけておきます！
+        clan.courtContribution = Math.min(99999, (clan.courtContribution || 0) + goldAmount);
+        
+        return true;
+    }
 }

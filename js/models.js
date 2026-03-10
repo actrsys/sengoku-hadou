@@ -16,8 +16,11 @@ class Clan {
         
         // 大名の戦力（威信）を覚えておく箱です
         this.daimyoPrestige = Number(data.daimyoPrestige || 0);
+
+        // ★今回追加：朝廷への貢献度を覚えておく箱です（上限は99999にします）
+        this.courtContribution = Number(data.courtContribution || 0);
         
-        // 大名自身が持っていた官位の仕組みは、武将の機能にお引っ越ししたため削除しました！
+        // 大名家が持っていた官位の仕組みは、武将の機能にお引っ越ししたため削除しました！
         
         // CSVの initDiplomacy を翻訳して、外交の箱に入れます
         if (typeof data.initDiplomacy === 'string' && data.initDiplomacy.trim() !== "") {
