@@ -1320,13 +1320,14 @@ class UIManager {
     }
     // ★ マップ選択中専用の、スッキリしたメニューを描く魔法
     renderSelectionModeMenu() {
-        // ★ 追加：メニューを作った時の「モード」と「援軍データ」を記憶しておきます！
-        const activeMode = this.game.selectionMode;
-        const activeReinfData = this.game.tempReinfData;
+        // ★ メニューが作られた瞬間の「絶対に正しい記憶」をカプセルに閉じ込めます！
+        const capturedMode = this.game.selectionMode;
+        const capturedData = this.game.tempReinfData;
 
         const mobileArea = document.getElementById('command-area');
         const pcArea = document.getElementById('pc-command-area');
         const areas = [mobileArea, pcArea];
+        
         areas.forEach(area => {
             if(!area) return;
             area.innerHTML = '';
@@ -1337,50 +1338,46 @@ class UIManager {
             btn.onclick = () => {
                 if(this.game.isProcessingAI) return;
 
-                // ★ 修正：ボタンを押した瞬間に、データが消えていたら記憶から確実に復元します！
-                if (!this.game.tempReinfData && activeReinfData) {
-                    this.game.tempReinfData = activeReinfData;
-                }
-                if (!this.game.selectionMode && activeMode) {
-                    this.game.selectionMode = activeMode;
-                }
-                
+                // ★ 修正：今の状態がどうであれ、カプセルに記憶したデータを最優先で信じます！
+                const evalMode = this.game.selectionMode || capturedMode;
+                const evalData = this.game.tempReinfData || capturedData;
+
                 let confirmMessage = "";
                 
-                const currentMode = this.game.selectionMode;
-                const currentData = this.game.tempReinfData;
-
-                const isSelf = currentMode && ['atk_self_reinforcement', 'def_self_reinforcement'].includes(currentMode);
-                const isAlly = currentMode && ['atk_ally_reinforcement', 'def_ally_reinforcement'].includes(currentMode);
+                // ★ 修正：文字が少しでも含まれていたらOKという、より安全な判定に変えました！
+                const isSelf = evalMode && (evalMode.indexOf('self_reinforcement') !== -1);
+                const isAlly = evalMode && (evalMode.indexOf('ally_reinforcement') !== -1);
                 
-                // 自軍の援軍かどうかを安全に判定します
                 let isSelfData = false;
-                if (currentData && currentData.candidates && currentData.candidates.length > 0) {
-                    if (currentData.candidates[0] && currentData.candidates[0].ownerClan === this.game.playerClanId) {
+                if (evalData && evalData.candidates && evalData.candidates.length > 0) {
+                    if (evalData.candidates[0] && evalData.candidates[0].ownerClan === this.game.playerClanId) {
                         isSelfData = true;
                     }
                 }
 
                 if (isSelf || isSelfData) {
                     confirmMessage = "援軍を出すのをやめますか？";
-                } else if (isAlly || currentData) {
+                } else if (isAlly || evalData) {
                     confirmMessage = "援軍を要請するのをやめますか？";
                 }
 
-                // ★ メッセージがセットされていたら、確認の小窓を出します
+                // メッセージがセットされていたら、確認のダイアログを出します
                 if (confirmMessage !== "") {
                     this.showDialog(confirmMessage, true, 
                         () => {
-                            // 「はい（やめる）」を選んだ時は、そのままキャンセルして次に進みます
+                            // ★ 追加：「はい（やめる）」を選んだ時は、ゲームの裏側のデータを
+                            // 完全に復元してからキャンセル処理へ向かうようにします！
+                            this.game.selectionMode = evalMode;
+                            this.game.tempReinfData = evalData;
+                            
                             this.cancelMapSelection(false); 
                             this.scrollToActiveCastle();
                         },
                         () => {
-                            // 「いいえ（やめない）」を選んだ時は、何もしないので城を選ぶ画面のままになります
+                            // 「いいえ（やめない）」を選んだ時は、何もしません
                         }
                     );
                 } else {
-                    // 援軍以外の普通のマップ選択の時は、いつも通りすぐにキャンセルします
                     this.cancelMapSelection(false); 
                     this.scrollToActiveCastle();
                 }
