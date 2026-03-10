@@ -2040,13 +2040,8 @@ class CommandSystem {
                 }
             };
             
-            // 🌟 1つしかいないならそのまま進み、複数いるなら「選ぶ画面」を出します！
-            if (kunishus.length === 1) {
-                proceedKunishuCommand(kunishus[0].id);
-            } else {
-                // ↓ここに「, onBackToMap」を書き足しました！
-                this.game.ui.showKunishuSelector(kunishus, proceedKunishuCommand, onBackToMap);
-            }
+            // ★修正: 1つしかない場合でも、必ず一覧画面を開いて確認できるようにします！
+            this.game.ui.showKunishuSelector(kunishus, proceedKunishuCommand, onBackToMap);
             return; // 諸勢力コマンドの場合はここで終了
         }
 

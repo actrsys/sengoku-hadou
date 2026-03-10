@@ -2443,97 +2443,90 @@ class UIManager {
     }
     
     showKunishuSelector(kunishus, onSelect, onCancel, isViewOnly = false) {
-        if (!this.selectorModal) return;
-        this.selectorModal.classList.remove('hidden');
+        const modal = document.getElementById('selector-modal');
+        const list = document.getElementById('selector-list');
+        const contextInfo = document.getElementById('selector-context-info');
+        const confirmBtn = document.getElementById('selector-confirm-btn');
+        
+        if (!modal || !list || !contextInfo) return;
         
         const title = document.getElementById('selector-title');
-        if (title) title.textContent = isViewOnly ? "諸勢力一覧" : "対象の諸勢力を選択";
+        if (title) title.textContent = isViewOnly ? "諸勢力一覧" : "対象とする諸勢力を選択";
 
-        const backBtn = document.querySelector('#selector-modal .btn-secondary');
-        if(backBtn) {
-            backBtn.onclick = () => {
-                const listHeader = document.querySelector('#selector-modal .list-header');
-                if (listHeader) listHeader.style.display = ''; 
-                this.closeSelector();
-                if (onCancel) onCancel(); 
-            };
-        }
-
-        const contextEl = document.getElementById('selector-context-info');
-        if (contextEl) {
-            contextEl.innerHTML = isViewOnly ? "<div>この城に存在する諸勢力です</div>" : "<div>対象とする諸勢力を選択してください</div>";
-            contextEl.classList.remove('hidden');
-        }
-
-        const listHeader = document.querySelector('#selector-modal .list-header');
-        if (listHeader) listHeader.style.display = 'none';
-
-        let selectedKunishuId = null; 
-
-        if (this.selectorList) {
-            this.selectorList.innerHTML = `
-                <div class="kunishu-list-header ${isViewOnly ? 'view-mode' : ''}">
-                    ${isViewOnly ? '' : '<span></span>'}<span>勢力名</span><span>兵数</span><span>防御</span><span>友好度</span>
-                </div>
-            `;
-            if (isViewOnly) this.selectorList.classList.add('view-mode');
-            else this.selectorList.classList.remove('view-mode');
-            
-            kunishus.forEach(k => {
-                const name = k.getName(window.GameApp);
-                const relVal = k.getRelation(window.GameApp.playerClanId);
-                
-                const relPercent = Math.min(100, Math.max(0, Number(relVal) || 0));
-                const friendBarHtml = `<div class="bar-bg bar-bg-friend"><div class="bar-fill bar-fill-friend" style="width:${relPercent}%;"></div></div>`;
-
-                const div = document.createElement('div');
-                div.className = 'kunishu-list-item'; 
-                
-                if (isViewOnly) {
-                    div.innerHTML = `<strong class="col-kunishu-name">${name}</strong><span>${k.soldiers}</span><span>${k.defense}</span><span>${friendBarHtml}</span>`;
-                    div.style.cursor = 'default';
-                } else {
-                    div.innerHTML = `<span></span><strong class="col-kunishu-name">${name}</strong><span>${k.soldiers}</span><span>${k.defense}</span><span>${friendBarHtml}</span>`;
-                    div.style.cursor = 'pointer';
-                    
-                    div.onclick = () => {
-                        if (window.AudioManager) window.AudioManager.playSE('choice.ogg');
-                        
-                        const allItems = this.selectorList.querySelectorAll('.kunishu-list-item');
-                        allItems.forEach(item => {
-                            item.classList.remove('selected');
-                        });
-                        
-                        div.classList.add('selected');
-                        selectedKunishuId = k.id;
-                        
-                        if (this.selectorConfirmBtn) {
-                            this.selectorConfirmBtn.disabled = false;
-                            this.selectorConfirmBtn.style.opacity = 1.0;
-                        }
-                    };
-                }
-                this.selectorList.appendChild(div);
-            });
-        }
+        contextInfo.innerHTML = isViewOnly ? "<div>この城に存在する諸勢力です</div>" : "<div>対象とする諸勢力を選択してください</div>";
         
-        if (this.selectorConfirmBtn) {
+        list.innerHTML = `
+            <div class="list-header" style="display: grid; grid-template-columns: 1fr 1fr 1fr; font-weight: bold; padding-bottom: 5px; border-bottom: 1px solid #ccc; margin-bottom: 5px;">
+                <span>勢力名</span><span>代表者</span><span>兵数</span>
+            </div>
+        `;
+        
+        let selectedKunishuId = null;
+        
+        kunishus.forEach(kunishu => {
+            const item = document.createElement('div');
+            item.className = 'select-item';
+            item.style.display = 'grid';
+            item.style.gridTemplateColumns = '1fr 1fr 1fr';
+            item.style.alignItems = 'center';
+            
+            const kunishuName = kunishu.getName(this.game);
+            const leader = this.game.getBusho(kunishu.leaderId);
+            const leaderName = leader ? leader.name : "頭領";
+            
+            item.innerHTML = `
+                <span style="font-weight: bold;">${kunishuName}</span>
+                <span>${leaderName}</span>
+                <span>${kunishu.soldiers}</span>
+            `;
+            
             if (isViewOnly) {
-                this.selectorConfirmBtn.classList.add('hidden');
+                item.style.cursor = 'default';
             } else {
-                this.selectorConfirmBtn.classList.remove('hidden');
-                this.selectorConfirmBtn.disabled = true;
-                this.selectorConfirmBtn.style.opacity = 0.5;
-
-                this.selectorConfirmBtn.onclick = () => {
-                    if (selectedKunishuId !== null) {
-                        if (listHeader) listHeader.style.display = ''; 
-                        this.closeSelector();
-                        if (onSelect) onSelect(selectedKunishuId); 
+                item.style.cursor = 'pointer';
+                item.onclick = () => {
+                    if (window.AudioManager) window.AudioManager.playSE('choice.ogg');
+                    Array.from(list.querySelectorAll('.select-item')).forEach(c => c.classList.remove('selected'));
+                    item.classList.add('selected');
+                    selectedKunishuId = kunishu.id;
+                    
+                    if (confirmBtn) {
+                        confirmBtn.disabled = false;
+                        confirmBtn.style.opacity = 1.0;
                     }
                 };
             }
+            list.appendChild(item);
+        });
+        
+        if (confirmBtn) {
+            if (isViewOnly) {
+                confirmBtn.classList.add('hidden');
+            } else {
+                confirmBtn.classList.remove('hidden');
+                confirmBtn.disabled = true;
+                confirmBtn.style.opacity = 0.5;
+                
+                confirmBtn.onclick = () => {
+                    if (!selectedKunishuId) {
+                        this.showDialog("諸勢力を選択してください", false);
+                        return;
+                    }
+                    modal.classList.add('hidden');
+                    if (onSelect) onSelect(selectedKunishuId);
+                };
+            }
         }
+        
+        const cancelBtn = document.getElementById('selector-cancel-btn');
+        if (cancelBtn) {
+            cancelBtn.onclick = () => {
+                modal.classList.add('hidden');
+                if (onCancel) onCancel();
+            };
+        }
+        
+        modal.classList.remove('hidden');
     }
     
     setWarModalVisible(visible) {

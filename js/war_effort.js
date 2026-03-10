@@ -201,7 +201,7 @@ Object.assign(WarManager.prototype, {
                     atkHorses += reinfData.horses; 
                     atkGuns += reinfData.guns;
                     atkBushos = atkBushos.concat(reinfData.bushos);
-                    // ★修正：諸勢力の援軍だった場合は、プレイヤーを強制的に合戦に巻き込まないようにします！
+                    // ★修正：諸勢力の援軍だった場合は、プレイヤーを強制的に巻き込まないようにします！
                     if (hC.ownerClan === pid && !hC.isDelegated && !reinfData.isKunishuForce) isPlayerInvolved = true;
                 }
             };
@@ -416,7 +416,7 @@ Object.assign(WarManager.prototype, {
                                 };
 
                                 const processNextDef = () => {
-                                    // ★修正：諸勢力の援軍なら勝手にAI配分されるように、バリケード（!this.state.defReinforcement.isKunishuForce）を追加します！
+                                    // ★修正：諸勢力の援軍なら勝手にAI配分されるように、バリケードを追加します！
                                     if (this.state.defReinforcement && this.state.defReinforcement.castle.ownerClan === pid && !this.state.defReinforcement.isKunishuForce) {
                                         this.game.ui.showUnitDivideModal(this.state.defReinforcement.bushos, this.state.defReinforcement.soldiers, this.state.defReinforcement.horses, this.state.defReinforcement.guns, (rAssigns) => {
                                             finalDefAssignments = finalDefAssignments.concat(rAssigns);
@@ -1533,7 +1533,7 @@ Object.assign(WarManager.prototype, {
                         if (isNextToMyAnyCastle) {
                             const normalBushos = this.game.getCastleBushos(c.id).filter(b => !b.isDaimyo && !b.isCastellan && b.status !== 'ronin' && b.belongKunishuId === 0);
                             if (c.soldiers >= 1000 && c.rice >= 500 && normalBushos.length > 0) {
-                                allyForceCandidates.push({ castle: c, force: { isKunishu: false, id: c.ownerClan, name: this.game.clans.find(clan=>clan.id===c.ownerClan)?.name || "大名", soldiers: c.soldiers } });
+                                allyForceCandidates.push({ castle: c, force: { isKunishu: false, id: c.ownerClan, name: this.game.clans.find(clan=>clan.id===c.ownerClan)?.name || "勢力", soldiers: c.soldiers } });
                             }
                         }
                     }
@@ -1694,9 +1694,6 @@ Object.assign(WarManager.prototype, {
                 castle: helperCastle, kunishuId: kunishu.id, bushos: reinfBushos, soldiers: reinfSoldiers,
                 rice: reinfRice, horses: reinfHorses, guns: reinfGuns, isSelf: false, isKunishuForce: true
             };
-            
-            // ★修正：諸勢力の援軍が勝手に出ただけで、無関係なプレイヤーが強制的に合戦に巻き込まれるのを防ぎます！
-            // this.state.isPlayerInvolved = true; を削除しました
             
             if (myClanId === this.game.playerClanId) {
                 const leader = this.game.getBusho(kunishu.leaderId);
