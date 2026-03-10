@@ -693,7 +693,8 @@ Object.assign(UIManager.prototype, {
         // ==========================================
         // ★名前を絶対に手前に出して、重ならないように避ける魔法！
         // ==========================================
-        if (isDaimyoSelect) {
+        // ★書き換え：大名選択の時だけじゃなく、外交などを選んでいる時(isSelectionMode)にもシールを出します！
+        if (isDaimyoSelect || isSelectionMode) {
             this.renderDaimyoLabels();
         }
         
@@ -805,13 +806,28 @@ Object.assign(UIManager.prototype, {
             el.style.top = `${l.y + l.offsetY}px`;
             el.style.transform = 'translate(-50%, -100%)';
             el.style.zIndex = '200'; 
+
+            // ★追加：外交先などを選んでいる時で、もし選べない相手なら少し暗くします
+            if (this.game.selectionMode && !this.game.validTargets.includes(l.castle.id)) {
+                el.classList.add('dimmed');
+            }
             
             // ★ここから追加！：名前シール自体をクリックできるようにする魔法
             el.onclick = (e) => {
                 e.stopPropagation(); 
                 if (this.isDraggingMap) return; // スクロール中は反応しないようにします
+                
+                // ★選べない相手の時は反応しないようにします
+                if (this.game.selectionMode && !this.game.validTargets.includes(l.castle.id)) return;
+
                 if (window.AudioManager) window.AudioManager.playSE('choice.ogg');
-                this.game.handleDaimyoSelect(l.castle); // お城をクリックしたのと同じ魔法を発動！
+                
+                // ★大名選択中と、マップ選択中（外交など）で魔法を使い分けます！
+                if (this.game.phase === 'daimyo_select') {
+                    this.game.handleDaimyoSelect(l.castle); // お城をクリックしたのと同じ魔法を発動！
+                } else if (this.game.selectionMode) {
+                    this.game.commandSystem.resolveMapSelection(l.castle); // 外交などの魔法を発動！
+                }
             };
             // ★追加ここまで！
 
