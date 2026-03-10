@@ -252,6 +252,15 @@ const COMMAND_SPECS = {
         startMode: 'map_select', targetType: 'kunishu_valid'
     },
 
+    // --- 朝廷 (DIPLOMACY_COURT) ---
+    'tribute': {
+        label: "貢物", category: 'DIPLOMACY_COURT',
+        costGold: 0, costRice: 0,
+        isMulti: false, hasAdvice: true,
+        startMode: 'busho_select_special', subType: 'tribute_doer', sortKey: 'politics',
+        msg: "朝廷に使者を送り、金を献上します"
+    },
+
     // --- システム (SYSTEM) - UI生成用プレースホルダ ---
     'save': { label: "ファイル保存", category: 'SYSTEM', isSystem: true, action: 'save' },
     'load': { label: "ファイル読込", category: 'SYSTEM', isSystem: true, action: 'load' },
@@ -306,6 +315,11 @@ class CommandSystem {
         else if (actionType === 'diplomacy_doer') { 
             bushos = this.game.getCastleBushos(c.id).filter(b => b.status !== 'ronin'); 
             infoHtml = "<div>外交の担当官を選択してください</div>"; 
+        }
+        // ★追加：貢物を持っていく使者を選ぶリスト
+        else if (actionType === 'tribute_doer') { 
+            bushos = this.game.getCastleBushos(c.id).filter(b => b.status !== 'ronin'); 
+            infoHtml = "<div>朝廷への使者を選択してください</div>"; 
         }
         else if (actionType === 'rumor_target_busho') { 
             bushos = this.game.getCastleBushos(targetId).filter(b => b.status !== 'ronin' && !b.isDaimyo); 
@@ -704,6 +718,12 @@ class CommandSystem {
             return;
         }
 
+        // ★追加: 貢物の使者を選んだら、いくら払うか（金額指定）の画面を開きます！
+        if (actionType === 'tribute_doer') {
+            this.game.ui.openQuantitySelector('tribute_gold', selectedIds, null);
+            return;
+        }
+
         // ★追加: 国人衆のコマンド用
         if (actionType === 'kunishu_goodwill_doer') {
             this.game.ui.openQuantitySelector('goodwill', selectedIds, targetId, { isKunishu: true, kunishuId: extraData.kunishuId });
@@ -844,6 +864,12 @@ class CommandSystem {
             } else {
                 this.showAdviceAndExecute('goodwill', () => this.executeDiplomacy(data[0], targetId, 'goodwill', val), { trueProb: 1.0 });
             }
+        }
+        else if (type === 'tribute_gold') {
+            // ★追加：貢物の金額が決まったら、実行の魔法を呼び出します
+            const val = parseInt(inputs.gold.num.value);
+            if (val <= 0) return;
+            this.showAdviceAndExecute('tribute', () => this.executeTribute(data[0], val), { trueProb: 1.0 });
         }
         else if (type === 'headhunt_gold') {
             const val = parseInt(inputs.gold.num.value);
@@ -2549,4 +2575,42 @@ class CommandSystem {
             this.game.warManager.startWar(atkCastle, targetCastle, atkBushos, sVal, rVal, hVal, gVal, reinforcementData, selfReinfData);
         });
     }
+    
+    // ==========================================
+    // ★追加：朝廷に貢物を贈る魔法！
+    // ==========================================
+    executeTribute(doerId, gold) {
+        const doer = this.game.getBusho(doerId);
+        const castle = this.game.getCurrentTurnCastle();
+        
+        if (castle.gold < gold) {
+            this.game.ui.showDialog("資金が足りません", false);
+            return;
+        }
+        
+        // お城の貯金箱からお金を減らします
+        castle.gold -= gold;
+        
+        // 前回作った魔法で、大名家の「朝廷への貢献度」をアップさせます！
+        this.game.courtRankSystem.addContribution(this.game.playerClanId, gold);
+        
+        // 確認のために、今の貢献度がいくつになったか取得しておきます
+        const currentContribution = this.game.courtRankSystem.getContribution(this.game.playerClanId);
+        
+        // ★ここに「貢献度が一定を超えたら官位をもらえる」ような魔法を将来追加します！
+        // （今はまだガワだけなので、コメントのまま残しておきます）
+        // this.game.courtRankSystem.checkRankPromotion(this.game.playerClanId);
+        
+        // 使者は行動済みにします
+        doer.isActionDone = true;
+        // 頑張って貢物を運んだので、少しだけ実績を与えます（金額が多いほど少しボーナス）
+        doer.achievementTotal += 5 + Math.floor(gold / 500);
+        this.game.factionSystem.updateRecognition(doer, 10);
+        
+        this.game.ui.showResultModal(`${doer.name}を使者として、朝廷に 金${gold} を献上しました！\n（現在の朝廷貢献度: ${currentContribution}）`);
+        
+        this.game.ui.updatePanelHeader();
+        this.game.ui.renderCommandMenu();
+    }
+    
 }

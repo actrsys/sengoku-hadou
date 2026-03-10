@@ -1455,8 +1455,14 @@ class UIManager {
             if (this.menuState === 'MILITARY') {
                 createBtn("取引", "category", () => menu('MIL_TRADE'));
             }
+            // ★追加：外交メニューの時に「朝廷」へのボタンを出します
+            if (this.menuState === 'DIPLOMACY') {
+                createBtn("朝廷", "category", () => menu('DIPLOMACY_COURT'));
+            }
             
-            const emptyCount = 3 - ((relevantCommands.length + (this.menuState === 'MILITARY' ? 1 : 0)) % 3);
+            // 空きマスの計算も少しだけ変えます
+            const extraBtnCount = (this.menuState === 'MILITARY' ? 1 : 0) + (this.menuState === 'DIPLOMACY' ? 1 : 0);
+            const emptyCount = 3 - ((relevantCommands.length + extraBtnCount) % 3);
             if (emptyCount < 3) {
                 for(let i=0; i<emptyCount; i++) {
                     const d = document.createElement('div');
@@ -1466,6 +1472,9 @@ class UIManager {
 
             if (this.menuState === 'MIL_TRADE') {
                 createBtn("戻る", "back", () => menu('MILITARY'));
+            } else if (this.menuState === 'DIPLOMACY_COURT') {
+                // ★追加：朝廷メニューにいる時は、戻るボタンで「外交」に戻ります
+                createBtn("戻る", "back", () => menu('DIPLOMACY'));
             } else {
                 createBtn("戻る", "back", () => menu('MAIN'));
             }
@@ -2133,6 +2142,9 @@ class UIManager {
             document.getElementById('quantity-title').textContent = "贈与金指定"; inputs.gold = createSlider("金", "gold", c.gold, 100);
         } else if (type === 'headhunt_gold') {
             document.getElementById('quantity-title').textContent = "持参金 (任意)"; inputs.gold = createSlider("金", "gold", c.gold, 0);
+        } else if (type === 'tribute_gold') {
+            // ★追加：献上金のスライダーです
+            document.getElementById('quantity-title').textContent = "献上金"; inputs.gold = createSlider("金", "gold", c.gold, 0);
         } else if (type === 'war_supplies') {
             document.getElementById('quantity-title').textContent = "出陣兵数・兵糧・兵器指定"; 
             inputs.soldiers = createSlider("兵士数", "soldiers", c.soldiers, c.soldiers);
