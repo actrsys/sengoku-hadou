@@ -135,40 +135,49 @@ class CourtRankSystem {
             const leader = this.game.getBusho(clan.leaderId);
             if (!leader || leader.status === 'dead' || leader.status === 'unborn') return;
 
-            // 当主の現在の最高ランクを調べます
-            let targetRankNo = 19; // 何も持っていなければ、最下位の19を目指します
+            // 当主の現在の最高ランクを調べます (rankNoは小さいほど偉い)
+            let currentMaxRankNo = 20; // 何も持っていなければ一番下（20相当）とします
             
             if (leader.courtRankIds && leader.courtRankIds.length > 0) {
                 const validRanks = leader.courtRankIds.map(id => this.getRankData(id)).filter(r => r);
                 if (validRanks.length > 0) {
-                    // rankNo は小さいほど偉いので、昇順に並べ替えて一番小さいものを取ります
                     validRanks.sort((a, b) => a.rankNo - b.rankNo);
-                    targetRankNo = validRanks[0].rankNo - 1; // 今持っている最高ランクの「1つ上」を目指します
+                    currentMaxRankNo = validRanks[0].rankNo; // 今持っている一番偉いランクの数字
                 }
             }
 
-            // 献金で上がれるのは rankNo: 4 までです（イベント用に取っておきます）
-            if (targetRankNo < 4) return;
-
-            // 朝廷の「空いている官位」の中から、ターゲットランクのものを探します
-            let candidates = this.ranks.filter(r => r.rankNo === targetRankNo && this.availableRanks.includes(r.id));
-            if (candidates.length === 0) return; // 空きが一つもなければ今回は見送りです
-
-            // 威信と貢献度の条件を満たしているかチェックします
+            // 威信と貢献度を取得
             const basePrestige = clan.basePrestige || 0;
             const contribution = clan.courtContribution || 0;
 
-            candidates = candidates.filter(r => {
-                // 素の威信が necessaryPrestige 以上、かつ
-                // 貢献度が necessaryPrestige の 4.5倍 以上
+            // 朝廷の「空いている官位」の中から、条件を満たすものを【すべて】探します
+            let candidates = this.ranks.filter(r => {
+                // 条件1：朝廷の在庫にあるか
+                if (!this.availableRanks.includes(r.id)) return false;
+                
+                // 条件2：献金で上がれるのは rankNo: 4 まで（1〜3は除外）
+                if (r.rankNo < 4) return false;
+                
+                // 条件3：今持っている最高ランクより「上（rankNoが小さい）」であるか
+                // ※これで、今のランク以下の官位をもらってしまうのを防ぎます！
+                if (r.rankNo >= currentMaxRankNo) return false;
+                
+                // 条件4：威信と貢献度の基準を満たしているか
                 return basePrestige >= r.necessaryPrestige && contribution >= (r.necessaryPrestige * 4.5);
             });
 
-            if (candidates.length === 0) return; // 条件を満たす官位がない場合は見送りです
+            if (candidates.length === 0) return; // 条件を満たす空き官位が一つもなければ見送り
+
+            // 候補の中で「一番偉い（rankNoが一番小さい）ランク」を見つけます
+            candidates.sort((a, b) => a.rankNo - b.rankNo);
+            const bestRankNo = candidates[0].rankNo;
+
+            // 一番偉いランクと同じ rankNo を持つ官位だけを残します（飛び級で一気に上がる！）
+            const finalCandidates = candidates.filter(r => r.rankNo === bestRankNo);
 
             // 同じランクの候補が複数ある場合は、ランダムに1つ選びます
-            const index = Math.floor(Math.random() * candidates.length);
-            const selectedRank = candidates[index];
+            const index = Math.floor(Math.random() * finalCandidates.length);
+            const selectedRank = finalCandidates[index];
 
             // いよいよ官位を授与します！
             if (this.grantRank(leader, selectedRank.id)) {
