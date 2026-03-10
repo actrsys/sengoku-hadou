@@ -128,7 +128,16 @@ class DataManager {
         current[keys[keys.length - 1]] = value;
     }
     static async fetchText(url) {
-        const response = await fetch(url);
+        // ★ここから追加した魔法です！
+        // 「Date.now()」を使って、今この瞬間の「時間」の数字を作ります。
+        // それをURLの最後にくっつけることで、ブラウザに「これは新しいファイルだよ！」と信じ込ませます。
+        const mark = url.includes('?') ? '&v=' : '?v=';
+        const noCacheUrl = url + mark + Date.now();
+        
+        // 元々は fetch(url) だったところを、おまじない付きの fetch(noCacheUrl) に変えています！
+        const response = await fetch(noCacheUrl);
+        // ★追加した魔法ここまで！
+
         if (!response.ok) throw new Error(`Failed to load ${url}`);
         let text = await response.text();
         if (text.charCodeAt(0) === 0xFEFF) {
