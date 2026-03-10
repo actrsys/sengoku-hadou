@@ -1318,9 +1318,10 @@ class UIManager {
         }
         this.updateCastleGlows();
     }
+    
     // ★ マップ選択中専用の、スッキリしたメニューを描く魔法
     renderSelectionModeMenu() {
-        // ★ メニューが作られた瞬間の「絶対に正しい記憶」をカプセルに閉じ込めます！
+        // ボタンを作った瞬間の「最初の目的」を記憶しておきます
         const capturedMode = this.game.selectionMode;
         const capturedData = this.game.tempReinfData;
 
@@ -1338,46 +1339,51 @@ class UIManager {
             btn.onclick = () => {
                 if(this.game.isProcessingAI) return;
 
-                // ★ 修正：今の状態がどうであれ、カプセルに記憶したデータを最優先で信じます！
-                const evalMode = this.game.selectionMode || capturedMode;
-                const evalData = this.game.tempReinfData || capturedData;
+                // ★ 超重要修正：「いまのモード」と「記憶していたモード」の文字をくっつけます！
+                // こうすることで、途中でモード名が変わっていても確実に見つけ出せます。
+                const combinedModeStr = String(this.game.selectionMode || "") + "_" + String(capturedMode || "");
+                const currentData = this.game.tempReinfData || capturedData;
 
                 let confirmMessage = "";
                 
-                // ★ 修正：文字が少しでも含まれていたらOKという、より安全な判定に変えました！
-                const isSelf = evalMode && (evalMode.indexOf('self_reinforcement') !== -1);
-                const isAlly = evalMode && (evalMode.indexOf('ally_reinforcement') !== -1);
-                
+                // くっつけた文字の中に「self_reinforcement（自軍の援軍）」「ally_reinforcement（同盟の援軍）」
+                // または「reinf（援軍）」が含まれているかを確認します
+                const isSelfMode = combinedModeStr.indexOf('self_reinforcement') !== -1;
+                const isAllyMode = combinedModeStr.indexOf('ally_reinforcement') !== -1;
+                const isAnyReinforcement = combinedModeStr.indexOf('reinf') !== -1;
+
+                // 自軍のデータが入っているかどうかの確認
                 let isSelfData = false;
-                if (evalData && evalData.candidates && evalData.candidates.length > 0) {
-                    if (evalData.candidates[0] && evalData.candidates[0].ownerClan === this.game.playerClanId) {
+                if (currentData && currentData.candidates && currentData.candidates.length > 0) {
+                    if (currentData.candidates[0] && currentData.candidates[0].ownerClan === this.game.playerClanId) {
                         isSelfData = true;
                     }
                 }
 
-                if (isSelf || isSelfData) {
+                // 判定をして、出すメッセージを決めます
+                if (isSelfMode || isSelfData) {
                     confirmMessage = "援軍を出すのをやめますか？";
-                } else if (isAlly || evalData) {
+                } else if (isAllyMode || isAnyReinforcement || currentData) {
                     confirmMessage = "援軍を要請するのをやめますか？";
                 }
 
-                // メッセージがセットされていたら、確認のダイアログを出します
+                // メッセージがセットされていたら、確認の小窓を出します
                 if (confirmMessage !== "") {
                     this.showDialog(confirmMessage, true, 
                         () => {
-                            // ★ 追加：「はい（やめる）」を選んだ時は、ゲームの裏側のデータを
-                            // 完全に復元してからキャンセル処理へ向かうようにします！
-                            this.game.selectionMode = evalMode;
-                            this.game.tempReinfData = evalData;
+                            // 「はい（やめる）」を選んだ時は、安全のために記憶していたデータに戻してからキャンセルします
+                            this.game.selectionMode = capturedMode || this.game.selectionMode;
+                            this.game.tempReinfData = currentData;
                             
                             this.cancelMapSelection(false); 
                             this.scrollToActiveCastle();
                         },
                         () => {
-                            // 「いいえ（やめない）」を選んだ時は、何もしません
+                            // 「いいえ（やめない）」を選んだ時は何もしません
                         }
                     );
                 } else {
+                    // 援軍以外の普通の行動（攻撃など）の時は、小窓を出さずにすぐキャンセルします
                     this.cancelMapSelection(false); 
                     this.scrollToActiveCastle();
                 }
