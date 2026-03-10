@@ -2982,6 +2982,10 @@ Object.assign(UIManager.prototype, {
         
         if (!modal || !list || !contextInfo) return;
         
+        // ★追加：他の画面に影響しないように、ここ専用のタイトルを付けます！
+        const title = document.getElementById('selector-title');
+        if (title) title.textContent = "勢力一覧";
+
         contextInfo.innerHTML = "<div>援軍を要請する勢力を選択してください</div>";
         
         const listHeader = modal.querySelector('.list-header');

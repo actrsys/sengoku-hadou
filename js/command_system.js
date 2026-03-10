@@ -1998,8 +1998,13 @@ class CommandSystem {
                     }
                 };
 
-                // ★修正：勢力が1つしかない場合でも、必ず一覧画面を開いて確認できるようにします
-                this.game.ui.showForceSelector(forces, proceedWithForce, backToMap);
+                // ★修正：諸勢力がいる場合は必ずリストを出し、大名家しかいない場合はリストを飛ばします！
+                const hasKunishu = forces.some(f => f.isKunishu);
+                if (!hasKunishu && forces.length === 1) {
+                    proceedWithForce(forces[0]);
+                } else {
+                    this.game.ui.showForceSelector(forces, proceedWithForce, backToMap);
+                }
                 return;
             }
 
