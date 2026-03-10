@@ -1267,8 +1267,8 @@ class UIManager {
         // ★城にいる浪人の数を数える魔法！
         let roninCount = 0;
         if (this.game && this.game.bushos) {
-            // 「死んでいない（deadじゃない）」かつ「未登場（unbornじゃない）」人を数えるように変更します！
-            roninCount = this.game.bushos.filter(b => b.castleId === castle.id && Number(b.clan) === 0 && b.status !== 'dead' && b.status !== 'unborn').length;
+            // 「死んでいない（deadじゃない）」かつ「未登場（unbornじゃない）」かつ「国人衆ではない（belongKunishuIdが0）」人を数えるように変更します！
+            roninCount = this.game.bushos.filter(b => b.castleId === castle.id && Number(b.clan) === 0 && Number(b.belongKunishuId) === 0 && b.status !== 'dead' && b.status !== 'unborn').length;
         }
 
         if (this.mobileFloatingMarket) {
