@@ -32,12 +32,25 @@ class Clan {
                 const items = part.split(':');
                 if (items.length >= 3) {
                     const targetId = Number(items[0].trim());
-                    const statusStr = items[1].trim();
+                    let statusStr = items[1].trim();
                     const sentimentVal = Number(items[2].trim());
                     if (!isNaN(targetId) && !isNaN(sentimentVal)) {
+                        // ★ここから追加：和睦の期間を記録する箱を用意します
+                        let trucePeriod = 0;
+                        if (statusStr.startsWith('和睦')) {
+                            // 「和睦6」の「和睦」という文字だけ消して、数字の「6」を取り出します
+                            const periodStr = statusStr.replace('和睦', '');
+                            if (periodStr !== '') {
+                                trucePeriod = Number(periodStr);
+                            }
+                            // 状態の名前は「和睦」という文字だけに揃えます
+                            statusStr = '和睦';
+                        }
+                        
                         this.diplomacyValue[targetId] = {
                             status: statusStr,
-                            sentiment: sentimentVal
+                            sentiment: sentimentVal,
+                            trucePeriod: trucePeriod // ★取り出した期間も一緒にメモしておきます
                         };
                     }
                 }

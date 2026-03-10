@@ -29,13 +29,15 @@ class DiplomacyManager {
                 const oppData = targetClan.diplomacyValue[clanId];
                 clan.diplomacyValue[targetId] = {
                     status: oppData.status,
-                    sentiment: oppData.sentiment
+                    sentiment: oppData.sentiment,
+                    trucePeriod: oppData.trucePeriod || 0 // ★和睦の期間もコピーします
                 };
             } else {
                 // どちらも持っていなければ、初期値の50になります
                 clan.diplomacyValue[targetId] = {
-                    status: '普通', // 状態: '普通', '友好', '敵対', '同盟', '支配', '従属'
-                    sentiment: 50  // 感情値: 0 - 100
+                    status: '普通', // 状態: '普通', '友好', '敵対', '同盟', '支配', '従属', '和睦'
+                    sentiment: 50,  // 感情値: 0 - 100
+                    trucePeriod: 0  // ★初期値は0にします
                 };
             }
         }
@@ -61,7 +63,7 @@ class DiplomacyManager {
         const update = (data) => {
             data.sentiment = Math.max(0, Math.min(100, data.sentiment + delta));
             
-            // 同盟・支配・従属はイベント等による強制変更のみとし、感情値による自動解除は行わない
+            // ★変更：和睦中も、勝手に状態が戻らないように保護します！
             if (['普通', '友好', '敵対'].includes(data.status)) {
                 if (data.sentiment >= 70) {
                     data.status = '友好';
@@ -79,14 +81,16 @@ class DiplomacyManager {
 
     /**
      * 強制的に状態を変更し、相手側も同期する
+     * ★追加：和睦の時に、期間（trucePeriod）も一緒に設定できるようにしました！
      */
-    changeStatus(clanId, targetId, newStatus) {
+    changeStatus(clanId, targetId, newStatus, trucePeriod = 0) {
         const dataA = this.getDiplomacyData(clanId, targetId);
         const dataB = this.getDiplomacyData(targetId, clanId);
 
         if (!dataA || !dataB) return;
 
         dataA.status = newStatus;
+        if (newStatus === '和睦') dataA.trucePeriod = trucePeriod;
 
         // 状態の反転処理と同調
         if (newStatus === '支配') {
@@ -94,8 +98,39 @@ class DiplomacyManager {
         } else if (newStatus === '従属') {
             dataB.status = '支配';
         } else {
-            // 同盟・敵対などは共通
+            // 同盟・敵対・和睦などは共通
             dataB.status = newStatus;
+            if (newStatus === '和睦') dataB.trucePeriod = trucePeriod;
         }
+    }
+
+    /**
+     * ★新しく追加！：毎月末に呼ばれて、和睦の期間を減らす魔法です
+     */
+    processEndMonth() {
+        this.game.clans.forEach(clan => {
+            if (!clan.diplomacyValue) return;
+            
+            for (const targetId in clan.diplomacyValue) {
+                const data = clan.diplomacyValue[targetId];
+                
+                // もし状態が「和睦」で、期間が1以上残っていたら…
+                if (data.status === '和睦' && data.trucePeriod > 0) {
+                    data.trucePeriod -= 1; // 期間を1ヶ月減らします
+                    
+                    // 減らした結果、期間が0になったら…
+                    if (data.trucePeriod <= 0) {
+                        // 感情値（仲の良さ）に合わせて、元の状態に戻します！
+                        if (data.sentiment >= 70) {
+                            data.status = '友好';
+                        } else if (data.sentiment <= 30) {
+                            data.status = '敵対';
+                        } else {
+                            data.status = '普通';
+                        }
+                    }
+                }
+            }
+        });
     }
 }

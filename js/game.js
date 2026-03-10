@@ -1171,6 +1171,11 @@ class GameManager {
         this.factionSystem.processEndMonth(); 
         await this.independenceSystem.checkIndependence(); // ★ await を追加して待ちます！
         
+        // ★ここを追加！：毎月末に、外交システムに「時間を進めて！」とお願いします
+        if (this.diplomacyManager) {
+            this.diplomacyManager.processEndMonth();
+        }
+
         // ★修正：国人衆の処理が終わるまで「待つ」ようにします！
         await this.kunishuSystem.processEndMonth();
         
