@@ -1734,11 +1734,10 @@ class UIManager {
             faceHtml = `<img src="data/images/faceicons/${busho.faceIcon}" style="width: 100px; height: 100px; object-fit: cover; border: 2px solid #333; border-radius: 4px; background: #eee;" onerror="this.src='data/images/faceicons/unknown_face.webp'">`;
         }
 
-        // ★【変更点】「所属」を調べる新しい魔法です
-        let affiliationName = "なし"; // 最初は「なし」にしておきます
+        let affiliationName = "なし";
+        let isFamily = false; // ★一門かどうかを判定する箱
         
         if (busho.belongKunishuId > 0) {
-            // もし国人衆のIDを持っていたら、国人衆の図鑑から名前を探します
             let kunishu = null;
             if (this.game.kunishuSystem && typeof this.game.kunishuSystem.getKunishu === 'function') {
                 kunishu = this.game.kunishuSystem.getKunishu(busho.belongKunishuId);
@@ -1748,24 +1747,47 @@ class UIManager {
             
             if (kunishu) {
                 affiliationName = kunishu.getName(this.game);
+                
+                // ★頭領を探して、一門かどうかチェック！
+                const leader = this.game.getBusho(kunishu.leaderId);
+                // 自分が頭領ではなく、頭領が存在する場合
+                if (leader && busho.id !== leader.id) {
+                    if (busho.familyIds && leader.familyIds) {
+                        // お互いの家族リストに共通のIDがあるか確認します
+                        isFamily = busho.familyIds.some(id => leader.familyIds.includes(id));
+                    }
+                }
             } else {
-                affiliationName = "国人衆"; // もし見つからなかった時の予備
+                affiliationName = "国人衆";
             }
             
         } else if (busho.clan > 0) {
-            // 国人衆ではなく、大名家に所属している場合
             const clan = this.game.clans.find(c => c.id === busho.clan);
             if (clan) {
                 affiliationName = clan.name;
+                
+                // ★大名を探して、一門かどうかチェック！
+                const daimyo = this.game.getBusho(clan.leaderId); 
+                // 自分が大名ではなく、大名が存在する場合
+                if (daimyo && busho.id !== daimyo.id && !busho.isDaimyo) {
+                    if (busho.familyIds && daimyo.familyIds) {
+                        isFamily = busho.familyIds.some(id => daimyo.familyIds.includes(id));
+                    }
+                }
             }
         }
-        
+
+        let familyBadge = "";
+        if (isFamily) {
+            // ★角の丸い四角い背景に黒い枠線に白地に赤文字で一門
+            familyBadge = `<span style="font-size: 0.8rem; background: #fff; color: red; border: 1px solid black; padding: 2px 6px; border-radius: 4px; margin-left: 10px;">一門</span>`;
+        }
+
         const castle = this.game.getCastle(busho.castleId);
         const castleName = castle ? castle.name : "不明";
 
         const age = this.game.year - busho.birthYear;
 
-        // ★官位を調べる魔法（前回直した完成版です！）
         let rankName = "";
         try {
             if (busho.courtRankIds && this.game.courtRankSystem) {
@@ -1799,7 +1821,8 @@ class UIManager {
                     if (highestRank) {
                         let displayName = highestRank.rankName2 || highestRank.rankName1 || "";
                         if (displayName) {
-                            rankName = `<span style="font-size: 0.9rem; background: #d4af37; color: #fff; padding: 2px 6px; border-radius: 4px; margin-left: 10px; vertical-align: middle;">${displayName}</span>`;
+                            // ★親要素で上下を揃えるので、vertical-alignは外してスッキリさせました
+                            rankName = `<span style="font-size: 0.9rem; background: #d4af37; color: #fff; padding: 2px 6px; border-radius: 4px; margin-left: 10px;">${displayName}</span>`;
                         }
                     }
                 }
@@ -1819,19 +1842,26 @@ class UIManager {
 
         const getStat = (stat) => GameSystem.getDisplayStatHTML(busho, stat, gunshi, acc, this.game.playerClanId, myDaimyo);
 
-        // ★【変更点】HTMLの中身。「所属大名」という文字を「所属」に、中身を「affiliationName」に変えました！
         this.bushoDetailBody.innerHTML = `
             <div style="display: flex; gap: 20px; align-items: flex-start; margin-bottom: 20px;">
                 <div style="flex-shrink: 0;">${faceHtml}</div>
                 <div style="flex: 1;">
-                    <div style="font-size: 1.3rem; font-weight: bold; margin-bottom: 10px; border-bottom: 2px solid #ccc; padding-bottom: 5px;">
-                        ${busho.name}${rankName}
+                    <div style="display: flex; align-items: center; font-size: 1.3rem; font-weight: bold; margin-bottom: 10px; border-bottom: 2px solid #ccc; padding-bottom: 5px;">
+                        <span>${busho.name}</span>${rankName}
                     </div>
+                    
                     <div style="display: grid; grid-template-columns: 80px 1fr; gap: 5px; font-size: 0.95rem;">
-                        <div style="color: #666;">所属</div><div style="font-weight: bold;">${affiliationName}</div>
-                        <div style="color: #666;">所在城</div><div style="font-weight: bold;">${castleName}</div>
-                        <div style="color: #666;">身分</div><div style="font-weight: bold;">${busho.getRankName()}</div>
-                        <div style="color: #666;">年齢</div><div style="font-weight: bold;">${age}歳</div>
+                        <div style="color: #666; display: flex; align-items: center;">所属</div>
+                        <div style="font-weight: bold; display: flex; align-items: center;">${affiliationName}${familyBadge}</div>
+                        
+                        <div style="color: #666; display: flex; align-items: center;">所在城</div>
+                        <div style="font-weight: bold; display: flex; align-items: center;">${castleName}</div>
+                        
+                        <div style="color: #666; display: flex; align-items: center;">身分</div>
+                        <div style="font-weight: bold; display: flex; align-items: center;">${busho.getRankName()}</div>
+                        
+                        <div style="color: #666; display: flex; align-items: center;">年齢</div>
+                        <div style="font-weight: bold; display: flex; align-items: center;">${age}歳</div>
                     </div>
                 </div>
             </div>
