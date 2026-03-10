@@ -3043,5 +3043,98 @@ Object.assign(UIManager.prototype, {
         }
         
         modal.classList.remove('hidden');
+    },
+
+    // ---------------------------------------------------------
+    // 魔法②：諸勢力専用のリスト（元の見た目を復元した完全版！）
+    // ---------------------------------------------------------
+    showKunishuSelector(kunishus, onSelect, onCancel, isViewOnly = false) {
+        const modal = document.getElementById('selector-modal');
+        const list = document.getElementById('selector-list');
+        const contextInfo = document.getElementById('selector-context-info');
+        const confirmBtn = document.getElementById('selector-confirm-btn');
+        
+        if (!modal || !list || !contextInfo) return;
+        
+        const title = document.getElementById('selector-title');
+        if (title) title.textContent = isViewOnly ? "諸勢力一覧" : "対象とする諸勢力を選択";
+
+        contextInfo.innerHTML = isViewOnly ? "<div>この城に存在する諸勢力です</div>" : "<div>対象とする諸勢力を選択してください</div>";
+        
+        // ★修正: デフォルトのヘッダーを隠して、諸勢力専用のヘッダーを使います
+        const listHeader = modal.querySelector('.list-header');
+        if (listHeader) listHeader.style.display = 'none';
+
+        list.innerHTML = `
+            <div class="kunishu-list-header ${isViewOnly ? 'view-mode' : ''}">
+                ${isViewOnly ? '' : '<span></span>'}<span>勢力名</span><span>兵数</span><span>防御</span><span>友好度</span>
+            </div>
+        `;
+        
+        if (isViewOnly) list.classList.add('view-mode');
+        else list.classList.remove('view-mode');
+        
+        let selectedKunishuId = null;
+        
+        kunishus.forEach(kunishu => {
+            const item = document.createElement('div');
+            item.className = 'kunishu-list-item';
+            
+            const kunishuName = kunishu.getName(this.game);
+            const relVal = kunishu.getRelation(this.game.playerClanId);
+            const relPercent = Math.min(100, Math.max(0, Number(relVal) || 0));
+            const friendBarHtml = `<div class="bar-bg bar-bg-friend"><div class="bar-fill bar-fill-friend" style="width:${relPercent}%;"></div></div>`;
+            
+            if (isViewOnly) {
+                item.innerHTML = `<strong class="col-kunishu-name">${kunishuName}</strong><span>${kunishu.soldiers}</span><span>${kunishu.defense}</span><span>${friendBarHtml}</span>`;
+                item.style.cursor = 'default';
+            } else {
+                item.innerHTML = `<span></span><strong class="col-kunishu-name">${kunishuName}</strong><span>${kunishu.soldiers}</span><span>${kunishu.defense}</span><span>${friendBarHtml}</span>`;
+                item.style.cursor = 'pointer';
+                item.onclick = () => {
+                    if (window.AudioManager) window.AudioManager.playSE('choice.ogg');
+                    Array.from(list.querySelectorAll('.kunishu-list-item')).forEach(c => c.classList.remove('selected'));
+                    item.classList.add('selected');
+                    selectedKunishuId = kunishu.id;
+                    
+                    if (confirmBtn) {
+                        confirmBtn.disabled = false;
+                        confirmBtn.style.opacity = 1.0;
+                    }
+                };
+            }
+            list.appendChild(item);
+        });
+        
+        if (confirmBtn) {
+            if (isViewOnly) {
+                confirmBtn.classList.add('hidden');
+            } else {
+                confirmBtn.classList.remove('hidden');
+                confirmBtn.disabled = true;
+                confirmBtn.style.opacity = 0.5;
+                
+                confirmBtn.onclick = () => {
+                    if (!selectedKunishuId) {
+                        this.showDialog("諸勢力を選択してください", false);
+                        return;
+                    }
+                    if (listHeader) listHeader.style.display = ''; // 隠していたヘッダーを元に戻す
+                    modal.classList.add('hidden');
+                    if (onSelect) onSelect(selectedKunishuId);
+                };
+            }
+        }
+        
+        const cancelBtn = document.getElementById('selector-cancel-btn');
+        if (cancelBtn) {
+            cancelBtn.onclick = () => {
+                if (listHeader) listHeader.style.display = ''; // 隠していたヘッダーを元に戻す
+                modal.classList.add('hidden');
+                if (onCancel) onCancel();
+            };
+        }
+        
+        modal.classList.remove('hidden');
     }
 });
