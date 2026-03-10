@@ -1779,8 +1779,8 @@ class UIManager {
 
         let familyBadge = "";
         if (isFamily) {
-            // ★角の丸い四角い背景に黒い枠線に白地に赤文字で一門
-            familyBadge = `<span style="font-size: 0.8rem; background: #fff; color: red; border: 1px solid black; padding: 2px 6px; border-radius: 4px; margin-left: 10px;">一門</span>`;
+            // ★深紅の背景に白文字、枠線なしでスッキリと馴染むデザインにしました
+            familyBadge = `<span style="font-size: 0.8rem; background: #8b0000; color: #ffffff; padding: 2px 6px; border-radius: 4px; margin-left: 10px; box-shadow: 1px 1px 2px rgba(0,0,0,0.3);">一門</span>`;
         }
 
         const castle = this.game.getCastle(busho.castleId);
