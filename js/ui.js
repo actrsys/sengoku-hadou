@@ -1734,14 +1734,38 @@ class UIManager {
             faceHtml = `<img src="data/images/faceicons/${busho.faceIcon}" style="width: 100px; height: 100px; object-fit: cover; border: 2px solid #333; border-radius: 4px; background: #eee;" onerror="this.src='data/images/faceicons/unknown_face.webp'">`;
         }
 
-        const clan = this.game.clans.find(c => c.id === busho.clan);
-        const clanName = clan ? clan.name : "浪人";
+        // ★【変更点】「所属」を調べる新しい魔法です
+        let affiliationName = "なし"; // 最初は「なし」にしておきます
+        
+        if (busho.belongKunishuId > 0) {
+            // もし国人衆のIDを持っていたら、国人衆の図鑑から名前を探します
+            let kunishu = null;
+            if (this.game.kunishuSystem && typeof this.game.kunishuSystem.getKunishu === 'function') {
+                kunishu = this.game.kunishuSystem.getKunishu(busho.belongKunishuId);
+            } else if (this.game.kunishus) {
+                kunishu = this.game.kunishus.find(k => k.id === busho.belongKunishuId);
+            }
+            
+            if (kunishu) {
+                affiliationName = kunishu.getName(this.game);
+            } else {
+                affiliationName = "国人衆"; // もし見つからなかった時の予備
+            }
+            
+        } else if (busho.clan > 0) {
+            // 国人衆ではなく、大名家に所属している場合
+            const clan = this.game.clans.find(c => c.id === busho.clan);
+            if (clan) {
+                affiliationName = clan.name;
+            }
+        }
         
         const castle = this.game.getCastle(busho.castleId);
         const castleName = castle ? castle.name : "不明";
 
         const age = this.game.year - busho.birthYear;
 
+        // ★官位を調べる魔法（前回直した完成版です！）
         let rankName = "";
         try {
             if (busho.courtRankIds && this.game.courtRankSystem) {
@@ -1758,7 +1782,6 @@ class UIManager {
                         if (typeof this.game.courtRankSystem.getRank === 'function') {
                             rank = this.game.courtRankSystem.getRank(id);
                         } else if (this.game.courtRankSystem.ranks) {
-                            // ★ここを修正！リストの順番ではなく、確実に「出席番号(id)」を探すようにしました
                             if (Array.isArray(this.game.courtRankSystem.ranks)) {
                                 rank = this.game.courtRankSystem.ranks.find(r => r.id === id);
                             } else {
@@ -1773,7 +1796,6 @@ class UIManager {
                         }
                     });
                     
-                    // ★ここが修正ポイント！ name ではなく rankName2（征夷大将軍など）を探します
                     if (highestRank) {
                         let displayName = highestRank.rankName2 || highestRank.rankName1 || "";
                         if (displayName) {
@@ -1797,6 +1819,7 @@ class UIManager {
 
         const getStat = (stat) => GameSystem.getDisplayStatHTML(busho, stat, gunshi, acc, this.game.playerClanId, myDaimyo);
 
+        // ★【変更点】HTMLの中身。「所属大名」という文字を「所属」に、中身を「affiliationName」に変えました！
         this.bushoDetailBody.innerHTML = `
             <div style="display: flex; gap: 20px; align-items: flex-start; margin-bottom: 20px;">
                 <div style="flex-shrink: 0;">${faceHtml}</div>
@@ -1805,7 +1828,7 @@ class UIManager {
                         ${busho.name}${rankName}
                     </div>
                     <div style="display: grid; grid-template-columns: 80px 1fr; gap: 5px; font-size: 0.95rem;">
-                        <div style="color: #666;">所属大名</div><div style="font-weight: bold;">${clanName}</div>
+                        <div style="color: #666;">所属</div><div style="font-weight: bold;">${affiliationName}</div>
                         <div style="color: #666;">所在城</div><div style="font-weight: bold;">${castleName}</div>
                         <div style="color: #666;">身分</div><div style="font-weight: bold;">${busho.getRankName()}</div>
                         <div style="color: #666;">年齢</div><div style="font-weight: bold;">${age}歳</div>
