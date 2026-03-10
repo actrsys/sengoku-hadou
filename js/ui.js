@@ -2977,7 +2977,6 @@ class UIManager {
     }
 }
 
-// ★ここから下を、ui.jsのファイルのいちばん下に貼り付けてください！
 Object.assign(UIManager.prototype, {
     showForceSelector(forces, onSelect, onCancel) {
         const modal = document.getElementById('selector-modal');
@@ -2988,40 +2987,61 @@ Object.assign(UIManager.prototype, {
         if (!modal || !list || !contextInfo) return;
         
         contextInfo.innerHTML = "<div>援軍を要請する勢力を選択してください</div>";
-        list.innerHTML = "";
+        
+        // ★修正: リストの見出し（ヘッダー）を追加して綺麗に並べます
+        list.innerHTML = `
+            <div class="list-header" style="display: grid; grid-template-columns: 1fr 1fr 1fr; font-weight: bold; padding-bottom: 5px; border-bottom: 1px solid #ccc; margin-bottom: 5px;">
+                <span>勢力名</span><span>代表者</span><span>兵数</span>
+            </div>
+        `;
         
         let selectedForce = null;
         
         forces.forEach(force => {
             const item = document.createElement('div');
-            item.className = 'list-item';
+            // ★修正: 'list-item' を 'select-item' に変更！これでクリック時に青く光るようになります
+            item.className = 'select-item';
+            item.style.display = 'grid';
+            item.style.gridTemplateColumns = '1fr 1fr 1fr';
+            item.style.alignItems = 'center';
+            item.style.cursor = 'pointer';
             
             item.innerHTML = `
-                <div class="busho-info">
-                    <div class="busho-name">${force.name}</div>
-                    <div class="busho-stat">代表: ${force.leaderName}</div>
-                    <div class="busho-stat">兵数: ${force.soldiers}</div>
-                </div>
+                <span style="font-weight: bold;">${force.name}</span>
+                <span>${force.leaderName}</span>
+                <span>${force.soldiers}</span>
             `;
             
             item.onclick = () => {
-                Array.from(list.children).forEach(c => c.classList.remove('selected'));
+                if (window.AudioManager) window.AudioManager.playSE('choice.ogg');
+                Array.from(list.querySelectorAll('.select-item')).forEach(c => c.classList.remove('selected'));
                 item.classList.add('selected');
                 selectedForce = force;
+                
+                // ★追加: 選んだら決定ボタンを押せるように（明るく）します
+                if (confirmBtn) {
+                    confirmBtn.disabled = false;
+                    confirmBtn.style.opacity = 1.0;
+                }
             };
             list.appendChild(item);
         });
         
-        confirmBtn.onclick = () => {
-            if (!selectedForce) {
-                this.showDialog("勢力を選択してください", false);
-                return;
-            }
-            modal.classList.add('hidden');
-            onSelect(selectedForce);
-        };
+        // ★追加: 画面を開いた時は決定ボタンを無効（半透明）にしておきます
+        if (confirmBtn) {
+            confirmBtn.disabled = true;
+            confirmBtn.style.opacity = 0.5;
+            
+            confirmBtn.onclick = () => {
+                if (!selectedForce) {
+                    this.showDialog("勢力を選択してください", false);
+                    return;
+                }
+                modal.classList.add('hidden');
+                onSelect(selectedForce);
+            };
+        }
         
-        // ★修正: 存在しない関数を呼んでエラーになっていた部分を正しいキャンセル処理に直しました
         const cancelBtn = document.getElementById('selector-cancel-btn');
         if (cancelBtn) {
             cancelBtn.onclick = () => {
