@@ -31,6 +31,8 @@ class AffiliationSystem {
         // 4. 新しい大名家の所属にして、状態を「活動中(active)」にします
         busho.clan = newClanId;
         busho.status = 'active';
+        busho.isCastellan = false;
+        busho.isDaimyo = false;
 
         // 5. 新しい殿様との相性を計算して、最初の忠誠度を決めます！
         this.updateLoyaltyForNewLord(busho, newClanId);
