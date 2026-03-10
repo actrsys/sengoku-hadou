@@ -731,9 +731,15 @@ Object.assign(UIManager.prototype, {
     renderDaimyoLabels() {
         const labelsData = [];
 
+        // ★追加：国衆コマンド（親善、討伐、引抜）の時は大名の名前シールを出さないようにします！
+        const isKunishuMode = ['kunishu_goodwill', 'kunishu_subjugate', 'kunishu_headhunt'].includes(this.game.selectionMode);
+        if (isKunishuMode) return;
+
         // 1. 居城を持っている大名を探して、大体の大きさを計算します
         this.game.clans.forEach(clan => {
-            if (clan.id === 0) return;
+            // ★追加：自分の大名家（playerClanId）の時も、シールを作らないようにスキップします！
+            if (clan.id === 0 || clan.id === this.game.playerClanId) return;
+            
             const leader = this.game.getBusho(clan.leaderId);
             if (leader && leader.castleId) {
                 const castle = this.game.getCastle(leader.castleId);
