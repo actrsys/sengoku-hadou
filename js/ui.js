@@ -1320,9 +1320,86 @@ class UIManager {
     }
     
     // ★ マップ選択中専用の、スッキリしたメニューを描く魔法
-        } else {
-    
-    
+    renderSelectionModeMenu() {
+        const capturedMode = this.game.selectionMode;
+        const capturedData = this.game.tempReinfData;
+
+        // ★最強の魔法：メニューが作られた時、援軍の気配が少しでもあれば、UI自身に「絶対に消えないフラグ」を立てます！
+        const modeStrForCheck = String(capturedMode || "");
+        if (modeStrForCheck.includes('reinf') || modeStrForCheck.includes('ally') || modeStrForCheck.includes('self') || capturedData) {
+            this._activeReinforcementFlag = true;
+        }
+
+        const mobileArea = document.getElementById('command-area');
+        const pcArea = document.getElementById('pc-command-area');
+        const areas = [mobileArea, pcArea];
+        
+        areas.forEach(area => {
+            if(!area) return;
+            area.innerHTML = '';
+            
+            const btn = document.createElement('button');
+            btn.className = 'cmd-btn back';
+            btn.textContent = "戻る";
+            btn.onclick = () => {
+                if(this.game.isProcessingAI) return;
+
+                const currentMode = String(this.game.selectionMode || "");
+                const currentData = this.game.tempReinfData || capturedData;
+
+                let isReinfAction = false;
+                if (currentMode.includes('reinf') || modeStrForCheck.includes('reinf') || 
+                    currentMode.includes('ally') || modeStrForCheck.includes('ally') || 
+                    currentMode.includes('self') || modeStrForCheck.includes('self') || 
+                    currentData) {
+                    isReinfAction = true;
+                }
+                
+                // ★裏側のデータが消え去っていても、フラグが立っていれば問答無用で援軍扱いします！
+                if (this._activeReinforcementFlag) {
+                    isReinfAction = true;
+                }
+
+                if (isReinfAction) {
+                    let confirmMessage = "援軍を要請するのをやめますか？"; // 基本はこれ
+                    
+                    // 自軍のデータが入っているかどうかの確認
+                    const isSelfMode = currentMode.includes('self') || modeStrForCheck.includes('self');
+                    let isSelfData = false;
+                    if (currentData && currentData.candidates && currentData.candidates.length > 0) {
+                        if (currentData.candidates[0] && currentData.candidates[0].ownerClan === this.game.playerClanId) {
+                            isSelfData = true;
+                        }
+                    }
+
+                    if (isSelfMode || isSelfData) {
+                        confirmMessage = "援軍を出すのをやめますか？";
+                    }
+
+                    this.showDialog(confirmMessage, true, 
+                        () => {
+                            // ★「やめる」時はフラグを折って、記憶を復元してから安全にキャンセル処理へ向かいます
+                            this._activeReinforcementFlag = false;
+                            this.game.selectionMode = capturedMode || this.game.selectionMode;
+                            this.game.tempReinfData = currentData;
+                            
+                            this.cancelMapSelection(false); 
+                            this.scrollToActiveCastle();
+                        },
+                        () => {
+                            // 「いいえ（やめない）」を選んだ時は何もしません
+                        }
+                    );
+                } else {
+                    // 援軍以外の普通の行動なら、小窓を出さずにすぐキャンセル
+                    this.cancelMapSelection(false); 
+                    this.scrollToActiveCastle();
+                }
+            };
+            area.appendChild(btn);
+        });
+    }
+
     renderEnemyViewMenu() {
         const mobileArea = document.getElementById('command-area');
         const pcArea = document.getElementById('pc-command-area');
