@@ -1934,7 +1934,6 @@ class CommandSystem {
             this.game.tempReinfData = null; // 使い終わったら消す
             this.game.ui.cancelMapSelection(true); 
 
-            // ★ 追加：「城を選ぶマップ」に復帰するための魔法のチケットを作ります
             const backToMap = () => {
                 if (mode === 'atk_self_reinforcement') {
                     this.game.ui.showSelfReinforcementSelector(temp.candidates, temp.atkCastle, temp.targetCastle, temp.onComplete);
@@ -1947,17 +1946,70 @@ class CommandSystem {
                 }
             };
 
-            // 各画面に「戻るチケット(backToMap)」を渡して開きます
+            // ★追加: 他大名か国衆かを選ぶ処理（自軍援軍の時はスルーします）
+            if (mode === 'atk_ally_reinforcement' || mode === 'def_ally_reinforcement') {
+                const forces = [];
+                const myClanId = (mode === 'atk_ally_reinforcement') ? temp.atkCastle.ownerClan : temp.defCastle.ownerClan;
+                const enemyClanId = (mode === 'atk_ally_reinforcement') ? temp.targetCastle.ownerClan : this.game.warManager.state.attacker.ownerClan;
+
+                // 1. 大名家が援軍を出せるかチェック
+                if (targetCastle.ownerClan !== 0 && targetCastle.ownerClan !== myClanId && targetCastle.ownerClan !== enemyClanId) {
+                    const rel = this.game.getRelation(myClanId, targetCastle.ownerClan);
+                    const enemyRel = this.game.getRelation(targetCastle.ownerClan, enemyClanId);
+                    if (rel && ['友好', '同盟', '支配', '従属'].includes(rel.status) && rel.sentiment >= 50) {
+                        if (!enemyRel || !this.game.diplomacyManager.isNonAggression(enemyRel.status)) {
+                            const normalBushos = this.game.getCastleBushos(targetCastle.id).filter(b => !b.isDaimyo && !b.isCastellan && b.status !== 'ronin' && b.belongKunishuId === 0);
+                            const minRice = (mode === 'def_ally_reinforcement') ? 500 : 0;
+                            if (targetCastle.soldiers >= 1000 && targetCastle.rice >= minRice && normalBushos.length > 0) {
+                                const clan = this.game.clans.find(c => c.id === targetCastle.ownerClan);
+                                const castellan = this.game.getBusho(targetCastle.castellanId) || {name: "城主"};
+                                forces.push({ isKunishu: false, id: targetCastle.ownerClan, name: clan ? clan.name : "大名家", leaderName: castellan.name, soldiers: targetCastle.soldiers });
+                            }
+                        }
+                    }
+                }
+
+                // 2. 国人衆が援軍を出せるかチェック
+                const kunishus = this.game.kunishuSystem.getKunishusInCastle(targetCastle.id);
+                kunishus.forEach(k => {
+                    if (k.getRelation(myClanId) >= 70 && k.soldiers >= 1000) {
+                        const members = this.game.kunishuSystem.getKunishuMembers(k.id);
+                        if (members.length > 0) {
+                            const leader = this.game.getBusho(k.leaderId) || members[0];
+                            forces.push({ isKunishu: true, id: k.id, name: k.getName(this.game), leaderName: leader.name, soldiers: k.soldiers });
+                        }
+                    }
+                });
+
+                if (forces.length === 0) {
+                    this.game.ui.showDialog("この城には援軍を出せる勢力がいません。", false, backToMap);
+                    return;
+                }
+
+                const proceedWithForce = (force) => {
+                    targetCastle.selectedForce = force; // 目印のシールを貼ります！
+                    if (mode === 'atk_ally_reinforcement') {
+                        this.game.ui.showReinforcementGoldSelector(targetCastle, temp.atkCastle, temp.targetCastle, temp.atkBushos, temp.sVal, temp.rVal, temp.hVal, temp.gVal, temp.selfReinfData, backToMap);
+                    } else {
+                        this.game.ui.showDefReinforcementGoldSelector(targetCastle, temp.defCastle, temp.onComplete, backToMap);
+                    }
+                };
+
+                if (forces.length === 1) {
+                    proceedWithForce(forces[0]);
+                } else {
+                    this.game.ui.showForceSelector(forces, proceedWithForce, backToMap);
+                }
+                return;
+            }
+
+            // 自軍援軍の時はそのまま進む
             if (mode === 'atk_self_reinforcement') {
                 this._promptPlayerAtkSelfReinforcement(targetCastle, temp.atkCastle, temp.targetCastle, temp.onComplete, backToMap);
-            } else if (mode === 'atk_ally_reinforcement') {
-                this.game.ui.showReinforcementGoldSelector(targetCastle, temp.atkCastle, temp.targetCastle, temp.atkBushos, temp.sVal, temp.rVal, temp.hVal, temp.gVal, temp.selfReinfData, backToMap);
             } else if (mode === 'def_self_reinforcement') {
                 if (this.game.warManager && this.game.warManager._promptPlayerDefSelfReinforcement) {
                     this.game.warManager._promptPlayerDefSelfReinforcement(targetCastle, temp.defCastle, temp.onComplete, backToMap);
                 }
-            } else if (mode === 'def_ally_reinforcement') {
-                this.game.ui.showDefReinforcementGoldSelector(targetCastle, temp.defCastle, temp.onComplete, backToMap);
             }
             return;
         }
@@ -2132,42 +2184,65 @@ class CommandSystem {
         });
 
         const proceedToAlly = (selfReinfData) => {
-            let allyCandidates = [];
+            let allyForceCandidates = [];
             this.game.castles.forEach(c => {
-                if (c.ownerClan === 0 || c.ownerClan === myClanId || c.ownerClan === targetCastle.ownerClan) return;
+                // 1. 大名家
+                if (c.ownerClan !== 0 && c.ownerClan !== myClanId && c.ownerClan !== targetCastle.ownerClan) {
+                    const rel = this.game.getRelation(myClanId, c.ownerClan);
+                    const enemyRel = this.game.getRelation(c.ownerClan, targetCastle.ownerClan);
+                    if (rel && ['友好', '同盟', '支配', '従属'].includes(rel.status) && rel.sentiment >= 50) {
+                        if (!enemyRel || !this.game.diplomacyManager.isNonAggression(enemyRel.status)) {
+                            const isNextToMyAnyCastle = this.game.castles.some(myC => myC.ownerClan === myClanId && GameSystem.isAdjacent(c, myC));
+                            const isNextToEnemy = GameSystem.isAdjacent(c, targetCastle);
+                            if (isNextToMyAnyCastle || isNextToEnemy) {
+                                const normalBushos = this.game.getCastleBushos(c.id).filter(b => !b.isDaimyo && !b.isCastellan && b.status !== 'ronin' && b.belongKunishuId === 0);
+                                if (c.soldiers >= 1000 && normalBushos.length > 0) {
+                                    allyForceCandidates.push({ castle: c, force: { isKunishu: false, id: c.ownerClan, name: this.game.clans.find(clan=>clan.id===c.ownerClan)?.name || "大名", soldiers: c.soldiers } });
+                                }
+                            }
+                        }
+                    }
+                }
                 
-                const rel = this.game.getRelation(myClanId, c.ownerClan);
-                // ★バリア追加：rel が空っぽの時に落ちないように「!rel ||」を追加しました！
-                if (!rel || !['友好', '同盟', '支配', '従属'].includes(rel.status) || rel.sentiment < 50) return;
-                const enemyRel = this.game.getRelation(c.ownerClan, targetCastle.ownerClan);
-                // ★修正：外交専用の魔法を使います！
-                if (enemyRel && this.game.diplomacyManager.isNonAggression(enemyRel.status)) return;
-                const isNextToMyAnyCastle = this.game.castles.some(myC => myC.ownerClan === myClanId && GameSystem.isAdjacent(c, myC));
-                const isNextToEnemy = GameSystem.isAdjacent(c, targetCastle);
-                if (!isNextToMyAnyCastle && !isNextToEnemy) return;
-                if (c.soldiers < 1000) return;
-                const normalBushos = this.game.getCastleBushos(c.id).filter(b => !b.isDaimyo && !b.isCastellan && b.status !== 'ronin' && b.belongKunishuId === 0);
-                if (normalBushos.length === 0) return;
-                allyCandidates.push(c);
+                // 2. 国人衆
+                const kunishus = this.game.kunishuSystem.getKunishusInCastle(c.id);
+                kunishus.forEach(k => {
+                    if (k.getRelation(myClanId) >= 70 && k.soldiers >= 1000) {
+                        const isNextToMyAnyCastle = this.game.castles.some(myC => myC.ownerClan === myClanId && GameSystem.isAdjacent(c, myC));
+                        const isNextToEnemy = GameSystem.isAdjacent(c, targetCastle);
+                        if (isNextToMyAnyCastle || isNextToEnemy) {
+                            const members = this.game.kunishuSystem.getKunishuMembers(k.id);
+                            if (members.length > 0) {
+                                allyForceCandidates.push({ castle: c, force: { isKunishu: true, id: k.id, name: k.getName(this.game), soldiers: k.soldiers } });
+                            }
+                        }
+                    }
+                });
             });
 
-            if (allyCandidates.length === 0) {
+            if (allyForceCandidates.length === 0) {
                 this.game.warManager.startWar(atkCastle, targetCastle, atkBushos, sVal, rVal, hVal, gVal, null, selfReinfData);
                 return;
             }
 
+            // マップで光らせるための「城のリスト（重複なし）」を作る
+            const allyCastles = [...new Set(allyForceCandidates.map(fc => fc.castle))];
+
             if (myClanId === pid && !atkCastle.isDelegated) {
-                this.game.ui.showDialog("他大名家に援軍を要請しますか？", true, 
+                this.game.ui.showDialog("他勢力（他大名・国衆）に援軍を要請しますか？", true, 
                     () => {
-                        this.game.ui.showReinforcementSelector(allyCandidates, atkCastle, targetCastle, atkBushos, sVal, rVal, hVal, gVal, selfReinfData);
+                        this.game.ui.showReinforcementSelector(allyCastles, atkCastle, targetCastle, atkBushos, sVal, rVal, hVal, gVal, selfReinfData);
                     },
                     () => {
                         this.game.warManager.startWar(atkCastle, targetCastle, atkBushos, sVal, rVal, hVal, gVal, null, selfReinfData);
                     }
                 );
             } else {
-                allyCandidates.sort((a,b) => b.soldiers - a.soldiers);
-                this.executeReinforcementRequest(0, allyCandidates[0], atkCastle, targetCastle, atkBushos, sVal, rVal, hVal, gVal, selfReinfData);
+                // AIの場合：一番兵士数が多い勢力に頼みます
+                allyForceCandidates.sort((a,b) => b.force.soldiers - a.force.soldiers);
+                const best = allyForceCandidates[0];
+                best.castle.selectedForce = best.force; // シールを貼る
+                this.executeReinforcementRequest(0, best.castle, atkCastle, targetCastle, atkBushos, sVal, rVal, hVal, gVal, selfReinfData);
             }
         };
 
@@ -2316,7 +2391,76 @@ class CommandSystem {
     executeReinforcementRequest(gold, helperCastle, atkCastle, targetCastle, atkBushos, sVal, rVal, hVal, gVal, selfReinfData) {
         if (gold > 0) atkCastle.gold -= gold;
 
+        const force = helperCastle.selectedForce;
         const myClanId = atkCastle.ownerClan;
+        
+        // ★ 追加：国人衆が選ばれていた場合の特別な処理です！
+        if (force && force.isKunishu) {
+            const kunishu = this.game.kunishuSystem.getKunishu(force.id);
+            const currentRel = kunishu.getRelation(myClanId);
+            
+            let prob = currentRel - 50; 
+            prob += Math.floor((gold / 1500) * 15);
+            prob += 50; 
+            
+            let isSuccess = (Math.random() * 100 < prob);
+            
+            if (!isSuccess) {
+                if (myClanId === this.game.playerClanId) {
+                    const leader = this.game.getBusho(kunishu.leaderId);
+                    const leaderName = leader ? leader.name : "頭領";
+                    this.game.ui.showDialog(`${kunishu.getName(this.game)}の${leaderName}は援軍を拒否しました……`, false, () => this.game.warManager.startWar(atkCastle, targetCastle, atkBushos, sVal, rVal, hVal, gVal, null, selfReinfData));
+                } else {
+                    this.game.warManager.startWar(atkCastle, targetCastle, atkBushos, sVal, rVal, hVal, gVal, null, selfReinfData);
+                }
+                return;
+            }
+            
+            // 借りを作ったので友好度が少し下がります
+            kunishu.setRelation(myClanId, currentRel - 10);
+            
+            const rate = currentRel / 200; 
+            let reinfSoldiers = Math.floor(kunishu.soldiers * rate);
+            reinfSoldiers = Math.max(500, Math.min(reinfSoldiers, kunishu.soldiers));
+            
+            const availableBushos = this.game.kunishuSystem.getKunishuMembers(kunishu.id).sort((a,b) => b.strength - a.strength);
+            let bushoCount = reinfSoldiers >= 2500 ? 3 : (reinfSoldiers >= 1500 ? 2 : 1);
+            bushoCount = Math.min(bushoCount, availableBushos.length);
+            const reinfBushos = availableBushos.slice(0, bushoCount);
+            
+            const reinfRice = reinfSoldiers; 
+            const reinfHorses = 0; 
+            const reinfGuns = 0;
+            
+            kunishu.soldiers = Math.max(0, kunishu.soldiers - reinfSoldiers);
+            reinfBushos.forEach(b => b.isActionDone = true);
+            
+            const reinforcementData = {
+                castle: helperCastle, kunishuId: kunishu.id, bushos: reinfBushos, soldiers: reinfSoldiers,
+                rice: reinfRice, horses: reinfHorses, guns: reinfGuns, isAttacker: true, isSelf: false, isKunishuForce: true
+            };
+            
+            if (myClanId === this.game.playerClanId) {
+                const leader = this.game.getBusho(kunishu.leaderId);
+                const leaderName = leader ? leader.name : "頭領";
+                this.game.ui.showDialog(`${kunishu.getName(this.game)}の${leaderName}が援軍要請を承諾しました！`, false, () => {
+                    this.game.warManager.startWar(atkCastle, targetCastle, atkBushos, sVal, rVal, hVal, gVal, reinforcementData, selfReinfData);
+                });
+            } else {
+                const leaderName = reinfBushos.length > 0 ? reinfBushos[0].name : "頭領";
+                if (targetCastle.ownerClan === this.game.playerClanId) {
+                    this.game.ui.showDialog(`${kunishu.getName(this.game)}の${leaderName}が敵の援軍として向かっています！`, false, () => {
+                        this.game.warManager.startWar(atkCastle, targetCastle, atkBushos, sVal, rVal, hVal, gVal, reinforcementData, selfReinfData);
+                    });
+                } else {
+                    this.game.ui.log(`【同盟援軍】${atkCastle.name}軍の要請により、${kunishu.getName(this.game)}が攻撃の援軍として参戦しました。`);
+                    this.game.warManager.startWar(atkCastle, targetCastle, atkBushos, sVal, rVal, hVal, gVal, reinforcementData, selfReinfData);
+                }
+            }
+            return;
+        }
+
+        // 以降は今まで通りの大名家の処理です
         const helperClanId = helperCastle.ownerClan;
         const enemyClanId = targetCastle.ownerClan;
         const myToHelperRel = this.game.getRelation(myClanId, helperClanId);

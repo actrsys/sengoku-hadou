@@ -2975,5 +2975,57 @@ class UIManager {
 
         modal.classList.remove('hidden');
     }
-    // ★ 追加ここまで！
 }
+
+// ★ここから下を、ui.jsのファイルのいちばん下に貼り付けてください！
+Object.assign(UIManager.prototype, {
+    showForceSelector(forces, onSelect, onCancel) {
+        const modal = document.getElementById('selector-modal');
+        const list = document.getElementById('selector-list');
+        const contextInfo = document.getElementById('selector-context-info');
+        const confirmBtn = document.getElementById('selector-confirm-btn');
+        
+        if (!modal || !list || !contextInfo) return;
+        
+        contextInfo.innerHTML = "<div>援軍を要請する勢力（大名・国衆）を選択してください</div>";
+        list.innerHTML = "";
+        
+        let selectedForce = null;
+        
+        forces.forEach(force => {
+            const item = document.createElement('div');
+            item.className = 'list-item';
+            
+            item.innerHTML = `
+                <div class="busho-info">
+                    <div class="busho-name">${force.name}</div>
+                    <div class="busho-stat">代表: ${force.leaderName}</div>
+                    <div class="busho-stat">兵数: ${force.soldiers}</div>
+                </div>
+            `;
+            
+            item.onclick = () => {
+                Array.from(list.children).forEach(c => c.classList.remove('selected'));
+                item.classList.add('selected');
+                selectedForce = force;
+            };
+            list.appendChild(item);
+        });
+        
+        confirmBtn.onclick = () => {
+            if (!selectedForce) {
+                this.showDialog("勢力を選択してください", false);
+                return;
+            }
+            modal.classList.add('hidden');
+            onSelect(selectedForce);
+        };
+        
+        this.overrideSelectorCancel(() => {
+            modal.classList.add('hidden');
+            if (onCancel) onCancel();
+        });
+        
+        modal.classList.remove('hidden');
+    }
+});
