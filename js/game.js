@@ -432,13 +432,17 @@ class GameSystem {
             if (!gunshi) return null; // 軍師がいなければ見えません
 
             // ① まずは軍師の「好み」や「忠誠」による【えこひいき（バイアス）】を計算します！
-            const dist = this.calcValueDistance(gunshi, target);
-            let biasFactor = 1.0 + ((50 - dist) / 250); 
-            if (daimyo) {
-                const gunshiLoyalty = (gunshi.loyalty + gunshi.duty) / 2;
-                const gunshiDaimyoDist = this.calcValueDistance(gunshi, daimyo);
-                const fairness = (gunshiLoyalty * 0.005) + ((100 - gunshiDaimyoDist) * 0.005);
-                biasFactor = 1.0 + (biasFactor - 1.0) * (1.0 - fairness); // 真面目な軍師ほど公平になります
+            // 自分の大名家の時だけえこひいきして、他大名家の場合はバイアスなし（1.0）にします！
+            let biasFactor = 1.0;
+            if (target.clan === playerClanId) {
+                const dist = this.calcValueDistance(gunshi, target);
+                biasFactor = 1.0 + ((50 - dist) / 250); 
+                if (daimyo) {
+                    const gunshiLoyalty = (gunshi.loyalty + gunshi.duty) / 2;
+                    const gunshiDaimyoDist = this.calcValueDistance(gunshi, daimyo);
+                    const fairness = (gunshiLoyalty * 0.005) + ((100 - gunshiDaimyoDist) * 0.005);
+                    biasFactor = 1.0 + (biasFactor - 1.0) * (1.0 - fairness); // 真面目な軍師ほど公平になります
+                }
             }
             
             // ② 次に、軍師の「智謀」による【見抜く精度（パーセント）】を計算します！
