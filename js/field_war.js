@@ -227,14 +227,22 @@ class FieldWarManager {
                 let isReinf = false;
                 let unitIsPlayer = isAtkPlayer;
                 let isSelfReinf = false; // ★追加：自勢力の援軍かどうかのメモ
+                let unitKunishuId = null; // ★追加：国衆IDのメモ
                 
                 // 1. 同盟国からの援軍チェック
                 if (warState.reinforcement && warState.reinforcement.bushos.some(b => b.id === assign.busho.id)) {
                     isReinf = true;
-                    unitIsPlayer = (Number(warState.reinforcement.castle.ownerClan) === pid);
-                    isSelfReinf = (Number(warState.reinforcement.castle.ownerClan) === Number(warState.attacker.ownerClan));
+                    // ★修正：国人衆の援軍なら、絶対に「AI操作」で「他勢力の色」にします！
+                    if (warState.reinforcement.isKunishuForce) {
+                        unitIsPlayer = false;
+                        isSelfReinf = false;
+                        unitKunishuId = warState.reinforcement.kunishuId;
+                    } else {
+                        unitIsPlayer = (Number(warState.reinforcement.castle.ownerClan) === pid);
+                        isSelfReinf = (Number(warState.reinforcement.castle.ownerClan) === Number(warState.attacker.ownerClan));
+                    }
                 }
-                // 2. 自勢力の別城からの援軍チェック（ここで漏れていたのが原因です！）
+                // 2. 自勢力の別城からの援軍チェック
                 else if (warState.selfReinforcement && warState.selfReinforcement.bushos.some(b => b.id === assign.busho.id)) {
                     isReinf = true;
                     unitIsPlayer = (Number(warState.selfReinforcement.castle.ownerClan) === pid);
@@ -256,11 +264,12 @@ class FieldWarManager {
                 this.units.push({
                     id: `atk_${index}`,
                     bushoId: assign.busho.id,
+                    kunishuId: unitKunishuId, // ★追加
                     name: assign.busho.name,
                     isAttacker: true,
                     isPlayer: unitIsPlayer,
                     isReinforcement: isReinf,
-                    isSelfReinforcement: isSelfReinf, // ★追加：メモを部隊に持たせます
+                    isSelfReinforcement: isSelfReinf, 
                     isGeneral: index === 0,
                     x: deployPos.x,
                     y: deployPos.y,
@@ -286,15 +295,23 @@ class FieldWarManager {
                 // ★追加: 守備側の援軍チェック！
                 let isReinf = false;
                 let unitIsPlayer = isDefPlayer;
-                let isSelfReinf = false; // ★追加：自勢力の援軍かどうかのメモ
+                let isSelfReinf = false; 
+                let unitKunishuId = null; // ★追加：国衆IDのメモ
                 
                 // 1. 同盟国からの援軍チェック
                 if (warState.defReinforcement && warState.defReinforcement.bushos.some(b => b.id === assign.busho.id)) {
                     isReinf = true;
-                    unitIsPlayer = (Number(warState.defReinforcement.castle.ownerClan) === pid);
-                    isSelfReinf = (Number(warState.defReinforcement.castle.ownerClan) === Number(warState.defender.ownerClan));
+                    // ★修正：国人衆の援軍なら、絶対に「AI操作」で「他勢力の色」にします！
+                    if (warState.defReinforcement.isKunishuForce) {
+                        unitIsPlayer = false;
+                        isSelfReinf = false;
+                        unitKunishuId = warState.defReinforcement.kunishuId;
+                    } else {
+                        unitIsPlayer = (Number(warState.defReinforcement.castle.ownerClan) === pid);
+                        isSelfReinf = (Number(warState.defReinforcement.castle.ownerClan) === Number(warState.defender.ownerClan));
+                    }
                 }
-                // 2. 自勢力の別城からの援軍チェック（ここで漏れていたのが原因です！）
+                // 2. 自勢力の別城からの援軍チェック
                 else if (warState.defSelfReinforcement && warState.defSelfReinforcement.bushos.some(b => b.id === assign.busho.id)) {
                     isReinf = true;
                     unitIsPlayer = (Number(warState.defSelfReinforcement.castle.ownerClan) === pid);
@@ -316,11 +333,12 @@ class FieldWarManager {
                 this.units.push({
                     id: `def_${index}`,
                     bushoId: assign.busho.id,
+                    kunishuId: unitKunishuId, // ★追加
                     name: assign.busho.name,
                     isAttacker: false,
                     isPlayer: unitIsPlayer,
                     isReinforcement: isReinf,
-                    isSelfReinforcement: isSelfReinf, // ★追加：メモを部隊に持たせます
+                    isSelfReinforcement: isSelfReinf, 
                     isGeneral: index === 0,
                     x: deployPos.x,
                     y: deployPos.y,
