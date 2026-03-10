@@ -86,18 +86,22 @@ class CourtRankSystem {
         return bonus;
     }
 
-    // 武将が持っている官位の中で、一番偉い（rankNoが小さい）官位の名前を返します
-    getHighestRankName(busho) {
-        if (!busho || !busho.courtRankIds || busho.courtRankIds.length === 0) return "なし";
-        
-        // 持っている官位データを集めて、偉い順（rankNoが小さい順）に並べ替えます
-        const validRanks = busho.courtRankIds.map(id => this.getRankData(id)).filter(r => r);
-        if (validRanks.length === 0) return "なし";
-        
-        validRanks.sort((a, b) => a.rankNo - b.rankNo);
-        return validRanks[0].rankName2; // （例：征夷大将軍、など）
+// 朝廷から武将に官位を与える魔法です（これから使います！）
+    grantRank(busho, rankId) {
+        const index = this.availableRanks.indexOf(rankId);
+        // 朝廷がその官位を持っていれば
+        if (index !== -1) {
+            // 朝廷の在庫から消して…
+            this.availableRanks.splice(index, 1);
+            // 武将の持ち物リストに入れます！
+            if (!busho.courtRankIds.includes(rankId)) {
+                busho.courtRankIds.push(rankId);
+            }
+            return true; // 成功！
+        }
+        return false; // 朝廷が持っていなかったら失敗…
     }
-
+    
     // ==========================================
     // ★ここから追加：朝廷への貢献度システム
     // ==========================================
@@ -118,5 +122,70 @@ class CourtRankSystem {
         clan.courtContribution = Math.min(99999, (clan.courtContribution || 0) + goldAmount);
         
         return true;
+    }
+    
+    // ==========================================
+    // ★ここから追加：月初めの官位授与チェック
+    // ==========================================
+    processMonthlyPromotions() {
+        let messages = [];
+
+        if (!this.game || !this.game.clans) return messages;
+
+        this.game.clans.forEach(clan => {
+            if (clan.id === 0) return; // 空き家（中立）はチェックしません
+
+            const leader = this.game.getBusho(clan.leaderId);
+            if (!leader || leader.status === 'dead' || leader.status === 'unborn') return;
+
+            // 当主の現在の最高ランクを調べます
+            let targetRankNo = 19; // 何も持っていなければ、最下位の19を目指します
+            
+            if (leader.courtRankIds && leader.courtRankIds.length > 0) {
+                const validRanks = leader.courtRankIds.map(id => this.getRankData(id)).filter(r => r);
+                if (validRanks.length > 0) {
+                    // rankNo は小さいほど偉いので、昇順に並べ替えて一番小さいものを取ります
+                    validRanks.sort((a, b) => a.rankNo - b.rankNo);
+                    targetRankNo = validRanks[0].rankNo - 1; // 今持っている最高ランクの「1つ上」を目指します
+                }
+            }
+
+            // 献金で上がれるのは rankNo: 3 までです（イベント用に取っておきます）
+            if (targetRankNo < 3) return;
+
+            // 朝廷の「空いている官位」の中から、ターゲットランクのものを探します
+            let candidates = this.ranks.filter(r => r.rankNo === targetRankNo && this.availableRanks.includes(r.id));
+            if (candidates.length === 0) return; // 空きが一つもなければ今回は見送りです
+
+            // 威信と貢献度の条件を満たしているかチェックします
+            const basePrestige = clan.basePrestige || 0;
+            const contribution = clan.courtContribution || 0;
+
+            candidates = candidates.filter(r => {
+                // 素の威信が necessaryPrestige 以上、かつ
+                // 貢献度が necessaryPrestige の 4.5倍 以上
+                return basePrestige >= r.necessaryPrestige && contribution >= (r.necessaryPrestige * 4.5);
+            });
+
+            if (candidates.length === 0) return; // 条件を満たす官位がない場合は見送りです
+
+            // 同じランクの候補が複数ある場合は、ランダムに1つ選びます
+            const index = Math.floor(Math.random() * candidates.length);
+            const selectedRank = candidates[index];
+
+            // いよいよ官位を授与します！
+            if (this.grantRank(leader, selectedRank.id)) {
+                // 武将の名前から「|」を取り除いて綺麗にします
+                const leaderName = leader.name.replace('|', '');
+                const msg = `朝廷より、${leaderName} が ${selectedRank.rankName1} ${selectedRank.rankName2} に叙されました。`;
+                messages.push(msg);
+                
+                // 履歴ログにもこっそり残しておきます
+                this.game.ui.log(`【叙任】${leaderName} が ${selectedRank.rankName1} ${selectedRank.rankName2} に叙されました。`);
+            }
+        });
+
+        // 授与されたメッセージのリストを返します
+        return messages;
     }
 }

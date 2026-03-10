@@ -1007,8 +1007,21 @@ class GameManager {
         allCastles.sort(() => Math.random() - 0.5); 
         this.turnQueue = [...allCastles];
 
-        // ★毎月の初めに、最新の戦力を計算し直します！
+        // ★毎月の初めに、最新の威信を計算し直します！
         this.updateAllClanPrestige();
+
+        // ==========================================
+        // ★追加：ここで官位の授与チェックを行います！
+        const promotionMsgs = this.courtRankSystem.processMonthlyPromotions();
+        if (promotionMsgs && promotionMsgs.length > 0) {
+            // 複数の大名が同時に受かった場合は、改行で繋げてダイアログを出します
+            const combinedMsg = "【官位叙任のお知らせ】\n" + promotionMsgs.join('\n');
+            await this.ui.showDialogAsync(combinedMsg, false, 0);
+            
+            // 官位をもらったことで威信が増えるので、念のためもう一度最新の威信を計算し直しておきます！
+            this.updateAllClanPrestige();
+        }
+        // ==========================================
 
         this.currentIndex = 0; 
         this.processTurn();
