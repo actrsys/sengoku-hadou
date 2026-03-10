@@ -169,30 +169,23 @@ const COMMAND_SPECS = {
         msg: "武将を追放します" 
     },
 
-    // --- 調略 (STRATEGY) ---
-    'investigate': { 
-        label: "調査", category: 'STRATEGY', 
-        costGold: 0, costRice: 0, 
-        isMulti: true, hasAdvice: true, 
-        startMode: 'map_select', targetType: 'enemy_all',
-        sortKey: 'intelligence' 
-    },
+    // --- 対外：調略 (FOREIGN_STRATEGY) ---
     'incite': { 
-        label: "扇動", category: 'STRATEGY', 
+        label: "扇動", category: 'FOREIGN_STRATEGY', 
         costGold: 0, costRice: 0, 
         isMulti: false, hasAdvice: true, 
         startMode: 'map_select', targetType: 'enemy_all',
         sortKey: 'intelligence' 
     },
     'rumor': { 
-        label: "流言", category: 'STRATEGY', 
+        label: "流言", category: 'FOREIGN_STRATEGY', 
         costGold: 0, costRice: 0, 
         isMulti: false, hasAdvice: true, 
         startMode: 'map_select', targetType: 'enemy_all',
         sortKey: 'intelligence' 
     },
     'headhunt': { 
-        label: "引抜", category: 'STRATEGY', 
+        label: "引抜", category: 'FOREIGN_STRATEGY', 
         costGold: 0, costRice: 0,
         isMulti: false, hasAdvice: true, 
         startMode: 'map_select', targetType: 'enemy_all',
@@ -200,6 +193,13 @@ const COMMAND_SPECS = {
     },
 
     // --- 情報 (INFO) ---
+    'investigate': { 
+        label: "調査", category: 'INFO', 
+        costGold: 0, costRice: 0, 
+        isMulti: true, hasAdvice: true, 
+        startMode: 'map_select', targetType: 'enemy_all',
+        sortKey: 'intelligence' 
+    },
     'busho_list': {
         label: "武将", category: 'INFO',
         isSystem: true, action: 'busho_list'
@@ -213,40 +213,41 @@ const COMMAND_SPECS = {
         isSystem: true, action: 'daimyo_list'
     },
 
-    // --- 外交 (DIPLOMACY) ---
+    // --- 対外：大名家 (FOREIGN_DAIMYO) ---
     'goodwill': {
-        label: "親善", category: 'DIPLOMACY',
+        label: "親善", category: 'FOREIGN_DAIMYO',
         costGold: 0, costRice: 0,
         isMulti: false, hasAdvice: true,
         startMode: 'map_select', targetType: 'other_clan_all'
     },
     'alliance': {
-        label: "同盟", category: 'DIPLOMACY',
+        label: "同盟", category: 'FOREIGN_DAIMYO',
         costGold: 0, costRice: 0,
         isMulti: false, hasAdvice: true,
         startMode: 'map_select', targetType: 'other_clan_all'
     },
     'dominate': {
-        label: "支配", category: 'DIPLOMACY',
+        label: "支配", category: 'FOREIGN_DAIMYO',
         costGold: 0, costRice: 0,
         isMulti: false, hasAdvice: true,
         startMode: 'map_select', targetType: 'other_clan_all'
     },
     'subordinate': {
-        label: "従属", category: 'DIPLOMACY',
+        label: "従属", category: 'FOREIGN_DAIMYO',
         costGold: 0, costRice: 0,
         isMulti: false, hasAdvice: true,
         startMode: 'map_select', targetType: 'other_clan_all'
     },
     'break_alliance': {
-        label: "破棄", category: 'DIPLOMACY',
+        label: "破棄", category: 'FOREIGN_DAIMYO',
         costGold: 0, costRice: 0,
         isMulti: false, hasAdvice: false,
         startMode: 'map_select', targetType: 'breakable_clan'
     },
-    // ★追加: 国人衆と仲良くするための外交コマンド
+
+    // --- 対外：国衆 (FOREIGN_KUNISHU) ---
     'kunishu_goodwill': {
-        label: "国衆親善", category: 'DIPLOMACY',
+        label: "国衆親善", category: 'FOREIGN_KUNISHU',
         costGold: 0, costRice: 0,
         isMulti: false, hasAdvice: true,
         startMode: 'map_select', targetType: 'kunishu_valid'

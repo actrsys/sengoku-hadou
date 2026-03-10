@@ -1392,7 +1392,7 @@ class UIManager {
         
         const CATEGORY_MAP = {
             'DEVELOP': "内政", 'MILITARY': "軍事", 
-            'DIPLOMACY': "外交", 'STRATEGY': "調略", 
+            'FOREIGN': "対外", 
             'PERSONNEL': "人事", 'INFO': "情報"
         };
         
@@ -1458,13 +1458,19 @@ class UIManager {
             if (this.menuState === 'MILITARY') {
                 createBtn("取引", "category", () => menu('MIL_TRADE'));
             }
-            // ★追加：外交メニューの時に「朝廷」へのボタンを出します
-            if (this.menuState === 'DIPLOMACY') {
+            // ★追加：対外メニューの時に「大名家」「調略」「国衆」「朝廷」へのボタンを出します
+            if (this.menuState === 'FOREIGN') {
+                createBtn("大名家", "category", () => menu('FOREIGN_DAIMYO'));
+                createBtn("調略", "category", () => menu('FOREIGN_STRATEGY'));
+                createBtn("国衆", "category", () => menu('FOREIGN_KUNISHU'));
                 createBtn("朝廷", "category", () => menu('DIPLOMACY_COURT'));
             }
             
             // 空きマスの計算も少しだけ変えます
-            const extraBtnCount = (this.menuState === 'MILITARY' ? 1 : 0) + (this.menuState === 'DIPLOMACY' ? 1 : 0);
+            let extraBtnCount = 0;
+            if (this.menuState === 'MILITARY') extraBtnCount = 1;
+            if (this.menuState === 'FOREIGN') extraBtnCount = 4;
+            
             const emptyCount = 3 - ((relevantCommands.length + extraBtnCount) % 3);
             if (emptyCount < 3) {
                 for(let i=0; i<emptyCount; i++) {
@@ -1475,9 +1481,9 @@ class UIManager {
 
             if (this.menuState === 'MIL_TRADE') {
                 createBtn("戻る", "back", () => menu('MILITARY'));
-            } else if (this.menuState === 'DIPLOMACY_COURT') {
-                // ★追加：朝廷メニューにいる時は、戻るボタンで「外交」に戻ります
-                createBtn("戻る", "back", () => menu('DIPLOMACY'));
+            } else if (['FOREIGN_DAIMYO', 'FOREIGN_STRATEGY', 'FOREIGN_KUNISHU', 'DIPLOMACY_COURT'].includes(this.menuState)) {
+                // ★追加：大名家や調略などのメニューにいる時は、戻るボタンで「対外」に戻ります
+                createBtn("戻る", "back", () => menu('FOREIGN'));
             } else {
                 createBtn("戻る", "back", () => menu('MAIN'));
             }
