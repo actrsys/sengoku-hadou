@@ -17,14 +17,7 @@ class Clan {
         // 大名の戦力（威信）を覚えておく箱です
         this.daimyoPrestige = Number(data.daimyoPrestige || 0);
         
-        // CSVから「3000|征夷大将軍」のような官位のデータを読み込みます
-        // （何も書かれていない場合は、プラス0の「なし」にします）
-        this.courtRank = data.courtRank || "0|なし"; 
-        
-        // 「|」で真っ二つに割って、左側を数字に、右側を文字にします
-        const rankParts = this.courtRank.split('|');
-        this.courtRankBonus = Number(rankParts[0]) || 0; // 足し算するボーナス値（デフォルトは0）
-        this.courtRankName = rankParts[1] || "なし";      // 役職の名前
+        // 大名自身が持っていた官位の仕組みは、武将の機能にお引っ越ししたため削除しました！
         
         // CSVの initDiplomacy を翻訳して、外交の箱に入れます
         if (typeof data.initDiplomacy === 'string' && data.initDiplomacy.trim() !== "") {
@@ -150,6 +143,14 @@ class Busho {
         this.aptAshigaru = data.aptAshigaru || 'E'; // 足軽適性
         this.aptKiba = data.aptKiba || 'E';         // 騎馬適性
         this.aptTeppo = data.aptTeppo || 'E';       // 鉄砲適性
+
+        // ★【ここから書き足し：官位】
+        // 「1|2」のように書かれたIDを「|」で区切って、数字のリストに変身させます
+        if (typeof data.courtRank === 'string' && data.courtRank.trim() !== "") {
+            this.courtRankIds = data.courtRank.split('|').map(id => Number(id.trim()));
+        } else {
+            this.courtRankIds = []; // 何も持っていなければ空っぽのリストにします
+        }
 
         // ★【ここから書き足し：生没年・登場年】
         // 数字として扱うために Number() で囲みます
@@ -325,5 +326,17 @@ class Kunishu {
             if (!this.daimyoRelations[targetId]) this.daimyoRelations[targetId] = { status: '普通', sentiment: 50 };
             this.daimyoRelations[targetId].sentiment = newVal;
         }
+    }
+    
+}
+
+// 官位クラス
+class CourtRank {
+    constructor(data) {
+        Object.assign(this, data);
+        this.id = Number(this.id);
+        this.rankNo = Number(this.rankNo);
+        this.necessaryPrestige = Number(this.necessaryPrestige);
+        this.gainPrestige = Number(this.gainPrestige);
     }
 }

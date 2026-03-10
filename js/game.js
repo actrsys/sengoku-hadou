@@ -58,16 +58,18 @@ class DataManager {
                     this.parseGenericNames(namesText);
                 } catch (e) { console.warn("汎用武将名ファイルなし"); }
             }
-            const [clansText, castlesText, bushosText, kunishusText] = await Promise.all([                
+            const [clansText, castlesText, bushosText, kunishusText, courtRanksText] = await Promise.all([                
                 this.fetchText(path + "clans.csv"),                
                 this.fetchText(path + "castles.csv"),                
                 this.fetchText(path + "warriors.csv"),
-                this.fetchText(path + "kunishuClan.csv").catch(() => "")
+                this.fetchText(path + "kunishuClan.csv").catch(() => ""),
+                this.fetchText("./data/imperialCourtRank.csv").catch(() => "")
             ]);
             const clans = this.parseCSV(clansText, Clan);
             const castles = this.parseCSV(castlesText, Castle);
             const bushos = this.parseCSV(bushosText, Busho);
             const kunishus = kunishusText ? this.parseCSV(kunishusText, Kunishu) : [];
+            const courtRanks = courtRanksText ? this.parseCSV(courtRanksText, CourtRank) : [];
             
             this.joinData(clans, castles, bushos);
             if (bushos.length < 50) this.generateGenericBushos(bushos, castles, clans);
@@ -79,8 +81,8 @@ class DataManager {
             } catch (e) {
                 console.log("マップ画像の解析をスキップしました");
             }
-            // ★ここを差し替え！：画像の大きさも一緒に渡すようにします！
-            return { clans, castles, bushos, kunishus, mapWidth: this.mapImageWidth, mapHeight: this.mapImageHeight };
+            // ★ここを差し替え！：画像の大きさと官位データも一緒に渡すようにします！
+            return { clans, castles, bushos, kunishus, courtRanks, mapWidth: this.mapImageWidth, mapHeight: this.mapImageHeight };
         } catch (error) {
             console.error(error);
             alert(`データの読み込みに失敗しました。\nフォルダ構成を確認してください。`);
@@ -693,7 +695,8 @@ class GameManager {
         this.independenceSystem = new IndependenceSystem(this);
         this.factionSystem = new FactionSystem(this); 
         this.diplomacyManager = new DiplomacyManager(this);
-        
+        // ★ 官位を管理するシステムを呼び出します
+        this.courtRankSystem = new CourtRankSystem(this);
         // ★ 寿命と登場を管理するシステムを呼び出します
         this.lifeSystem = new LifeSystem(this);
         // ★ 軍師のシステムを呼び出します
@@ -730,6 +733,7 @@ class GameManager {
             this.clans = data.clans; this.castles = data.castles; this.bushos = data.bushos; 
             
             this.kunishuSystem.setKunishuData(data.kunishus || []);
+            this.courtRankSystem.setRankData(data.courtRanks || []);
             
             // ★ここを書き足し！：画像の大きさをゲーム全体で覚えるようにします！
             this.mapWidth = data.mapWidth || 1200;
@@ -835,8 +839,18 @@ class GameManager {
             // まずは今まで通り、兵士やお金から「基本の威信」を計算します
             const basePrestige = Math.floor(pop / 2000) + Math.floor(sol / 20) + Math.floor(koku / 20) + Math.floor(gold / 50) + Math.floor(rice / 100);
             
-            // そして最後に、官位の「ボーナス値」を足し算して、大名の箱にしまいます！
-            clan.daimyoPrestige = basePrestige + (clan.courtRankBonus || 0);
+            // ★追加：後で官位を得る計算などに使えるよう、ベースの素の威信を記憶しておきます
+            clan.basePrestige = basePrestige;
+
+            // ★追加：大名の武将データから官位ボーナスを取得します
+            let rankBonus = 0;
+            const leader = this.getBusho(clan.leaderId);
+            if (leader) {
+                rankBonus = this.courtRankSystem.getBushoRankBonus(leader);
+            }
+            
+            // ベース威信と官位ボーナスを足し算して、最終的な威信にします
+            clan.daimyoPrestige = basePrestige + rankBonus;
             
         });
     }
@@ -1235,8 +1249,13 @@ class GameManager {
                     const data = await DataManager.loadAll(scenario.folder);
                     this.clans = data.clans;
                 }
+                
+                // ★追加：セーブデータ読み込み時にも官位マスタデータをセットします
+                const courtRanksText = await DataManager.fetchText("./data/imperialCourtRank.csv").catch(() => "");
+                const courtRanks = courtRanksText ? DataManager.parseCSV(courtRanksText, CourtRank) : [];
+                this.courtRankSystem.setRankData(courtRanks);
 
-                document.getElementById('title-screen').classList.add('hidden'); 
+                document.getElementById('title-screen').classList.add('hidden');
                 document.getElementById('app').classList.remove('hidden'); 
                 
                 this.phase = 'game';
