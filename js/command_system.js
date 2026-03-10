@@ -2461,7 +2461,7 @@ class CommandSystem {
         doer.achievementTotal += 5 + Math.floor(gold / 500);
         this.game.factionSystem.updateRecognition(doer, 10);
         
-        this.game.ui.showResultModal(`${doer.name}を使者として、朝廷に 金${gold} を献上しました！\n（現在の朝廷貢献度: ${currentContribution} / 朝廷からの信用: ${currentTrust}）`);
+        this.game.ui.showResultModal(`${doer.name}を使者として、朝廷に 金${gold} を献上しました！`);
         
         this.game.ui.updatePanelHeader();
         this.game.ui.renderCommandMenu();
@@ -2484,7 +2484,7 @@ class CommandSystem {
         // 金と信用の最終確認（念のためもう一度チェックします）
         const currentTrust = this.game.courtRankSystem.getTrust(this.game.playerClanId);
         if (castle.gold < costGold || currentTrust < 500) {
-            this.game.ui.showDialog("金や信用が足りないため、実行できませんでした。", false);
+            this.game.ui.showDialog("、実行できませんでした。", false);
             return;
         }
 
