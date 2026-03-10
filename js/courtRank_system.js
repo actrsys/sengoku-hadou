@@ -148,7 +148,7 @@ class CourtRankSystem {
             }
 
             // 献金で上がれるのは rankNo: 4 までです（イベント用に取っておきます）
-            if (targetRankNo < 3) return;
+            if (targetRankNo < 4) return;
 
             // 朝廷の「空いている官位」の中から、ターゲットランクのものを探します
             let candidates = this.ranks.filter(r => r.rankNo === targetRankNo && this.availableRanks.includes(r.id));
