@@ -2254,8 +2254,15 @@ class CommandSystem {
         
         // ★修正：攻撃軍はプレイヤー・敵に関係なく「ピンク(log-color-atk)」にします
         let colorClass = "log-color-atk";
-        this.game.ui.log(`【自軍援軍】<span class="${colorClass}">${helperCastle.name}</span> から攻撃の援軍が参戦しました。`);
-        onComplete(selfReinfData);
+        const leaderName = reinfBushos.length > 0 ? reinfBushos[0].name : "総大将";
+        if (targetCastle.ownerClan === this.game.playerClanId) {
+            this.game.ui.showDialog(`${helperCastle.name}の${leaderName}が敵の援軍として向かっています！`, false, () => {
+                 onComplete(selfReinfData);
+            });
+        } else {
+            this.game.ui.log(`【自軍援軍】<span class="${colorClass}">${helperCastle.name}</span> から攻撃の援軍が参戦しました。`);
+            onComplete(selfReinfData);
+        }
     }
 
     // ★ 引数の最後に「backToMap」を追加
@@ -2344,7 +2351,9 @@ class CommandSystem {
 
         if (!isSuccess) {
             if (myClanId === this.game.playerClanId) {
-                this.game.ui.showDialog(`${helperCastle.name}への援軍要請は断られました……`, false, () => this.game.warManager.startWar(atkCastle, targetCastle, atkBushos, sVal, rVal, hVal, gVal, null, selfReinfData));
+                const castellan = this.game.getBusho(helperCastle.castellanId);
+                const castellanName = castellan ? castellan.name : "城主";
+                this.game.ui.showDialog(`${helperCastle.name}の${castellanName}は援軍を拒否しました……`, false, () => this.game.warManager.startWar(atkCastle, targetCastle, atkBushos, sVal, rVal, hVal, gVal, null, selfReinfData));
             } else {
                 this.game.warManager.startWar(atkCastle, targetCastle, atkBushos, sVal, rVal, hVal, gVal, null, selfReinfData);
             }
@@ -2383,12 +2392,21 @@ class CommandSystem {
         this.game.warManager.applyWarHostility(helperCastle.ownerClan, false, targetCastle.ownerClan, targetCastle.isKunishu, true);
         
         if (myClanId === this.game.playerClanId) {
-            this.game.ui.showDialog(`${helperClanName} (${helperCastle.name}) が共に ${targetCastle.name} へ出陣します！`, false, () => {
+            const castellan = this.game.getBusho(helperCastle.castellanId);
+            const castellanName = castellan ? castellan.name : "城主";
+            this.game.ui.showDialog(`${helperCastle.name}の${castellanName}が援軍要請を承諾しました！`, false, () => {
                 this.game.warManager.startWar(atkCastle, targetCastle, atkBushos, sVal, rVal, hVal, gVal, reinforcementData, selfReinfData);
             });
         } else {
-            this.game.ui.log(`【同盟援軍】${atkCastle.name}軍の要請により、${helperClanName}が攻撃の援軍として参戦しました。`);
-            this.game.warManager.startWar(atkCastle, targetCastle, atkBushos, sVal, rVal, hVal, gVal, reinforcementData, selfReinfData);
+            const leaderName = reinfBushos.length > 0 ? reinfBushos[0].name : "総大将";
+            if (targetCastle.ownerClan === this.game.playerClanId) {
+                this.game.ui.showDialog(`${helperClanName}の${leaderName}が敵の援軍として向かっています！`, false, () => {
+                    this.game.warManager.startWar(atkCastle, targetCastle, atkBushos, sVal, rVal, hVal, gVal, reinforcementData, selfReinfData);
+                });
+            } else {
+                this.game.ui.log(`【同盟援軍】${atkCastle.name}軍の要請により、${helperClanName}が攻撃の援軍として参戦しました。`);
+                this.game.warManager.startWar(atkCastle, targetCastle, atkBushos, sVal, rVal, hVal, gVal, reinforcementData, selfReinfData);
+            }
         }
     }
 
