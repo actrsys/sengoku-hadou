@@ -1758,7 +1758,12 @@ class UIManager {
                         if (typeof this.game.courtRankSystem.getRank === 'function') {
                             rank = this.game.courtRankSystem.getRank(id);
                         } else if (this.game.courtRankSystem.ranks) {
-                            rank = this.game.courtRankSystem.ranks[id] || this.game.courtRankSystem.ranks.find(r => r.id === id);
+                            // ★ここを修正！リストの順番ではなく、確実に「出席番号(id)」を探すようにしました
+                            if (Array.isArray(this.game.courtRankSystem.ranks)) {
+                                rank = this.game.courtRankSystem.ranks.find(r => r.id === id);
+                            } else {
+                                rank = this.game.courtRankSystem.ranks[id];
+                            }
                         }
 
                         if (rank) {
