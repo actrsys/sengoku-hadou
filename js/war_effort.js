@@ -14,6 +14,11 @@ Object.assign(WarManager.prototype, {
         // 両者の関係を「敵対」にします
         if (this.game.diplomacyManager) {
             this.game.diplomacyManager.changeStatus(atkId, defId, '敵対');
+            
+            // ★追加：主役同士（援軍じゃない場合）は、友好度を「０」まで減らします！（-100すれば必ず0になります）
+            if (!isReinforcement) {
+                this.game.diplomacyManager.updateSentiment(atkId, defId, -100);
+            }
         }
     },
     
@@ -228,6 +233,8 @@ Object.assign(WarManager.prototype, {
             // ★攻撃側と守備側を「敵対」にする処理（直接書き込みます！）
             if (this.game.diplomacyManager && !atkCastle.isKunishu && !defCastle.isKunishu && atkClan !== 0 && defClan !== 0) {
                 this.game.diplomacyManager.changeStatus(atkClan, defClan, '敵対');
+                // ★追加：攻撃側と守備側の友好度を０にします！
+                this.game.diplomacyManager.updateSentiment(atkClan, defClan, -100);
             }
             if (reinforcementData && this.game.diplomacyManager && !reinforcementData.castle.isKunishu && !defCastle.isKunishu) {
                 const helperClan = reinforcementData.castle.ownerClan;
@@ -773,6 +780,30 @@ Object.assign(WarManager.prototype, {
             returnReinforcement(s.reinforcement, true);
             returnReinforcement(s.defSelfReinforcement, false);
             returnReinforcement(s.defReinforcement, false);
+            
+            // ★敵の援軍に参加した大名との友好度を「５」下げる魔法！
+            if (this.game.diplomacyManager) {
+                // 攻撃陣営（大名と援軍）を調べます
+                const atkClan = (!s.attacker.isKunishu && s.attacker.ownerClan !== 0) ? s.attacker.ownerClan : null;
+                const atkAlly = (s.reinforcement && !s.reinforcement.castle.isKunishu && s.reinforcement.castle.ownerClan !== 0 && !s.reinforcement.isSelf) ? s.reinforcement.castle.ownerClan : null;
+                
+                // 守備陣営（大名と援軍）を調べます
+                const defClan = (!s.defender.isKunishu && s.oldDefClanId !== 0) ? s.oldDefClanId : null;
+                const defAlly = (s.defReinforcement && !s.defReinforcement.castle.isKunishu && s.defReinforcement.castle.ownerClan !== 0 && !s.defReinforcement.isSelf) ? s.defReinforcement.castle.ownerClan : null;
+
+                // 攻撃側大名 と 守備側援軍大名 の友好度ダウン
+                if (atkClan && defAlly) {
+                    this.game.diplomacyManager.updateSentiment(atkClan, defAlly, -5);
+                }
+                // 守備側大名 と 攻撃側援軍大名 の友好度ダウン
+                if (defClan && atkAlly) {
+                    this.game.diplomacyManager.updateSentiment(defClan, atkAlly, -5);
+                }
+                // 攻撃側の援軍大名 と 守備側の援軍大名 の友好度ダウン
+                if (atkAlly && defAlly) {
+                    this.game.diplomacyManager.updateSentiment(atkAlly, defAlly, -5);
+                }
+            }
             
             // プレイヤーが国人衆を制圧（討伐）した時の処理
             if (s.isKunishuSubjugation) {
