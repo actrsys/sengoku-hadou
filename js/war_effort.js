@@ -510,7 +510,7 @@ Object.assign(WarManager.prototype, {
             } else {
                 showInterceptDialog((choice, defAssignments, defRice, atkAssignments, interceptHorses = 0, interceptGuns = 0) => {
                     
-                    // ★追加: 野戦か籠城かが決まったこのタイミングで、守備側の援軍を城（防衛軍）に正式合流させる！
+                    // ★追加: 野戦か籠城かが決まったこのタイミングで、守備側の援軍を城（守備軍）に正式合流させる！
                     const applyDefReinf = (reinf) => {
                         if (!reinf) return;
                         defCastle.soldiers += reinf.soldiers; defCastle.rice += reinf.rice;
@@ -710,7 +710,7 @@ Object.assign(WarManager.prototype, {
             // s.attacker.horses = Math.floor((s.attacker.horses || 0) * atkSurviveRate);
             // s.attacker.guns = Math.floor((s.attacker.guns || 0) * atkSurviveRate);            
 
-            // 防衛側（城）の馬と鉄砲も、兵士の損耗に合わせて壊れるようにする
+            // 守備側（城）の馬と鉄砲も、兵士の損耗に合わせて壊れるようにする
             if (!s.defender.isKunishu) {
                 const originalDefSoldiers = s.defender.soldiers + s.deadSoldiers.defender;
                 const defSurviveRate = originalDefSoldiers > 0 ? (Math.max(0, s.defender.soldiers) / originalDefSoldiers) : 0;
@@ -1542,9 +1542,9 @@ Object.assign(WarManager.prototype, {
             rice: reinfRice, horses: reinfHorses, guns: reinfGuns, isSelf: true
         };
         
-        // ★修正：防衛軍はプレイヤー・敵に関係なく「水色(log-color-def)」にします
+        // ★修正：守備軍はプレイヤー・敵に関係なく「水色(log-color-def)」にします
         let colorClass = "log-color-def";
-        this.game.ui.log(`【自軍援軍】<span class="${colorClass}">${helperCastle.name}</span> から防衛の援軍が参戦しました。`);
+        this.game.ui.log(`【自軍援軍】<span class="${colorClass}">${helperCastle.name}</span> から守備側の援軍が参戦しました。`);
         onComplete(selfReinfData);
     },
 
@@ -1586,7 +1586,7 @@ Object.assign(WarManager.prototype, {
                 
                 // ★修正：こちらも同じく「水色(log-color-def)」にします
                 let colorClass = "log-color-def";
-                this.game.ui.log(`【自軍援軍】<span class="${colorClass}">${helperCastle.name}</span> が防衛の援軍に出発しました！`);
+                this.game.ui.log(`【自軍援軍】<span class="${colorClass}">${helperCastle.name}</span> が守備側の援軍に出発しました！`);
                 onComplete(selfReinfData);
             },
             onCancel: promptBusho
@@ -1608,9 +1608,9 @@ Object.assign(WarManager.prototype, {
             const isBoss = (myToHelperRel.status === '従属');
             const startSelection = () => this._promptPlayerDefReinforcement(helperCastle, defCastle, myToHelperRel, onComplete, isBoss);
 
-            if (isBoss) this.game.ui.showDialog(`主家である ${myClanName} から防衛の援軍要請が届きました。\n当家は従属しているため直ちに出陣します！`, false, startSelection);
+            if (isBoss) this.game.ui.showDialog(`主家である ${myClanName} から守備側の援軍要請が届きました。\n当家は従属しているため直ちに出陣します！`, false, startSelection);
             else {
-                this.game.ui.showDialog(`${myClanName} から防衛の援軍要請が届きました。(持参金: ${gold})\n派遣しますか？`, true, startSelection, () => {
+                this.game.ui.showDialog(`${myClanName} から守備側の援軍要請が届きました。(持参金: ${gold})\n派遣しますか？`, true, startSelection, () => {
                     this.game.diplomacyManager.updateSentiment(myClanId, helperClanId, -5);
                     this.game.ui.showDialog(`援軍要請を断りました。`, false, onComplete);
                 });
@@ -1630,7 +1630,7 @@ Object.assign(WarManager.prototype, {
         }
 
         if (!isSuccess) {
-            if (myClanId === this.game.playerClanId) this.game.ui.showDialog(`${helperCastle.name}への防衛援軍要請は断られました……\n自軍のみで防衛します。`, false, onComplete);
+            if (myClanId === this.game.playerClanId) this.game.ui.showDialog(`${helperCastle.name}への援軍要請は断られました……`, false, onComplete);
             else onComplete();
             return;
         }
@@ -1683,9 +1683,9 @@ Object.assign(WarManager.prototype, {
         const helperClanName = this.game.clans.find(c => c.id === helperClanId)?.name || "援軍";
 
         if (myClanId === this.game.playerClanId || helperClanId === this.game.playerClanId) {
-            this.game.ui.showDialog(`${helperClanName} (${helperCastle.name}) が防衛の援軍に駆けつけました！`, false, onComplete);
+            this.game.ui.showDialog(`${helperClanName} (${helperCastle.name}) が守備側の援軍に駆けつけました！`, false, onComplete);
         } else {
-            this.game.ui.log(`【同盟援軍】${defCastle.name}の要請により、${helperClanName}が防衛の援軍として駆けつけました。`);
+            this.game.ui.log(`【同盟援軍】${defCastle.name}の要請により、${helperClanName}が守備側の援軍として駆けつけました。`);
             onComplete();
         }
     },
@@ -1739,7 +1739,7 @@ Object.assign(WarManager.prototype, {
         
         this.state.isPlayerInvolved = true;
         const helperClanName = this.game.clans.find(c => c.id === helperClanId)?.name || "援軍";
-        this.game.ui.showDialog(`${helperClanName} (${helperCastle.name}) が防衛の同盟援軍に出発しました！`, false, onComplete);
+        this.game.ui.showDialog(`${helperClanName} (${helperCastle.name}) が守備側の援軍に出発しました！`, false, onComplete);
     }, // ←★ここにカンマ（,）を付けるのがとっても大事です！
     
     // ★追加: 城の所有者が変わった時、その城にいる国人衆の友好度をチェックして低下させる魔法

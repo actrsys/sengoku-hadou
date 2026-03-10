@@ -2149,9 +2149,9 @@ class UIManager {
         } else if (type === 'def_reinf_supplies' || type === 'atk_reinf_supplies' || type === 'def_self_reinf_supplies' || type === 'atk_self_reinf_supplies') { 
             const helperCastle = (data && data.length > 0) ? data[0] : c;
             let titleText = "";
-            if (type === 'def_reinf_supplies') titleText = "防衛援軍の部隊編成";
+            if (type === 'def_reinf_supplies') titleText = "守備援軍の部隊編成";
             else if (type === 'atk_reinf_supplies') titleText = "攻撃援軍の部隊編成";
-            else if (type === 'def_self_reinf_supplies') titleText = "防衛自軍援軍の部隊編成";
+            else if (type === 'def_self_reinf_supplies') titleText = "守備自軍援軍の部隊編成";
             else if (type === 'atk_self_reinf_supplies') titleText = "攻撃自軍援軍の部隊編成";
             document.getElementById('quantity-title').textContent = titleText;
             inputs.soldiers = createSlider("出陣兵士数", "soldiers", helperCastle.soldiers, helperCastle.soldiers, 500);
