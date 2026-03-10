@@ -1341,7 +1341,14 @@ class UIManager {
             const btn = document.createElement('button');
             btn.className = 'cmd-btn back';
             btn.textContent = "戻る";
-            btn.onclick = () => {
+            
+            // ★超重要修正！：e（イベント）を受け取って、クリックが裏のマップに貫通するのを防ぎます！
+            btn.onclick = (e) => {
+                if (e) {
+                    e.stopPropagation(); // 裏側の要素（マップの城など）にクリックを伝えないバリア！
+                    e.preventDefault();
+                }
+                
                 if(this.game.isProcessingAI) return;
 
                 const currentMode = String(this.game.selectionMode || "");
@@ -1355,7 +1362,7 @@ class UIManager {
                     isReinfAction = true;
                 }
                 
-                // ★裏側のデータが消え去っていても、フラグが立っていれば問答無用で援軍扱いします！
+                // 裏側のデータが消え去っていても、フラグが立っていれば問答無用で援軍扱いします
                 if (this._activeReinforcementFlag) {
                     isReinfAction = true;
                 }
@@ -1378,7 +1385,7 @@ class UIManager {
 
                     this.showDialog(confirmMessage, true, 
                         () => {
-                            // ★「やめる」時はフラグを折って、記憶を復元してから安全にキャンセル処理へ向かいます
+                            // 「やめる」時はフラグを折って、記憶を復元してから安全にキャンセル処理へ向かいます
                             this._activeReinforcementFlag = false;
                             this.game.selectionMode = capturedMode || this.game.selectionMode;
                             this.game.tempReinfData = currentData;
