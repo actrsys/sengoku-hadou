@@ -1333,10 +1333,20 @@ class UIManager {
             btn.onclick = () => {
                 if(this.game.isProcessingAI) return;
                 
-                // ★ 援軍を呼ぶモードの時に「戻る」を押したら、やめるかどうかを聞く魔法です！
-                const reinfModes = ['atk_self_reinforcement', 'atk_ally_reinforcement', 'def_self_reinforcement', 'def_ally_reinforcement'];
-                if (reinfModes.includes(this.game.selectionMode)) {
-                    this.showDialog("援軍を出すのをやめますか？", true, 
+                // ★ 自軍か他大名家かで、聞く言葉を変える魔法です！
+                const selfReinfModes = ['atk_self_reinforcement', 'def_self_reinforcement'];
+                const allyReinfModes = ['atk_ally_reinforcement', 'def_ally_reinforcement'];
+                
+                let confirmMessage = "";
+                if (selfReinfModes.includes(this.game.selectionMode)) {
+                    confirmMessage = "援軍を出すのをやめますか？";
+                } else if (allyReinfModes.includes(this.game.selectionMode)) {
+                    confirmMessage = "援軍を要請するのをやめますか？";
+                }
+
+                // ★ メッセージがセットされていたら、確認の小窓を出します
+                if (confirmMessage !== "") {
+                    this.showDialog(confirmMessage, true, 
                         () => {
                             // 「はい（やめる）」を選んだ時は、そのままキャンセルして次に進みます
                             this.cancelMapSelection(false); 
