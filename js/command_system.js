@@ -403,11 +403,11 @@ class CommandSystem {
         }
         else if (actionType === 'atk_reinf_deploy') {
             bushos = this.game.getCastleBushos(targetId).filter(b => b.status !== 'ronin' && b.status !== 'dead' && b.status !== 'unborn' && b.belongKunishuId === 0);
-            infoHtml = "<div>攻撃の同盟援軍に派遣する武将を選択してください（最大5名まで）</div>";
+            infoHtml = "<div>援軍に派遣する武将を選択してください（最大5名まで）</div>";
         }
         else if (actionType === 'def_self_reinf_deploy' || actionType === 'atk_self_reinf_deploy') {
             bushos = this.game.getCastleBushos(targetId).filter(b => b.status !== 'ronin' && b.status !== 'dead' && b.status !== 'unborn' && b.belongKunishuId === 0);
-            infoHtml = "<div>自軍援軍として出陣する武将を選択してください（最大5名まで）</div>";
+            infoHtml = "<div>援軍として出陣する武将を選択してください（最大5名まで）</div>";
         }
         
         else if (actionType === 'reward') {
@@ -2198,7 +2198,7 @@ class CommandSystem {
             askConfirmAndProceedToAlly(null);
         } else {
             if (myClanId === pid && !atkCastle.isDelegated) {
-                this.game.ui.showDialog("他の城から自軍の援軍を呼びますか？", true, 
+                this.game.ui.showDialog("他の城から援軍を出しますか？", true, 
                     () => {
                         this.game.ui.showSelfReinforcementSelector(selfCandidates, atkCastle, targetCastle, askConfirmAndProceedToAlly);
                     },
@@ -2317,7 +2317,7 @@ class CommandSystem {
             if (isBoss) {
                 this.game.ui.showDialog(`主家である ${myClanName} が侵攻します。\n当家は従属しているため直ちに出陣します！`, false, startSelection);
             } else {
-                this.game.ui.showDialog(`${myClanName} から攻撃の援軍要請が届きました。(持参金: ${gold})\n派遣しますか？`, true, startSelection, () => {
+                this.game.ui.showDialog(`${myClanName} から攻撃の援軍要請が届きました。(持参金: ${gold})\n援軍を派遣しますか？`, true, startSelection, () => {
                     this.game.diplomacyManager.updateSentiment(myClanId, helperClanId, -10);
                     this.game.ui.showDialog(`援軍要請を断りました。`, false, () => this.game.warManager.startWar(atkCastle, targetCastle, atkBushos, sVal, rVal, hVal, gVal, null, selfReinfData));
                 });
