@@ -177,7 +177,22 @@ class Busho {
         this.endYear = Number(data.endYear || 1650);     // 没年（空なら1650）
         this.startYear = Number(data.startYear || 1500); // 登場年（空なら1500）
         this.nameChange = data.nameChange || ""; // 年:姓:名|年:姓:名... の形式の改名データ
+        
         // ★【ここから書き足し：一門設定】
+        // familyId が「1|2|3」のように届くので、使いやすいようにバラバラのリスト（配列）にします
+        if (typeof data.familyId === 'string' && data.familyId.trim() !== "") {
+            this.familyIds = data.familyId.split('|').map(id => Number(id.trim()));
+        } else if (Number(data.familyId) > 0) {
+            // もし数字が一つだけ入っていたら、それをリストに入れます
+            this.familyIds = [Number(data.familyId)];
+        } else {
+            // 何もなければ（0番なら）、勘違いしないように「空っぽ」のリストにします
+            this.familyIds = [];
+        }
+        // ★追加：自分のIDも一門リストに入れておくことで、すれ違いを防ぎます！
+        if (!this.familyIds.includes(this.id)) {
+            this.familyIds.push(this.id);
+        }
         
         // --- 忠誠・義理など（ここから下は既存の続き） ---
         this.loyalty = Number(this.loyalty || 0);
