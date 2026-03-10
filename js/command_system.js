@@ -476,8 +476,16 @@ class CommandSystem {
             case 'other_clan_all': 
                 return this.game.castles.filter(target => {
                     if (target.ownerClan === 0 || Number(target.ownerClan) === playerClanId) return false;
+
+                    // ★追加：すでにその関係になっている場合は、選べないように（暗く）する魔法！
+                    const rel = this.game.getRelation(playerClanId, target.ownerClan);
+                    if (rel) {
+                        if (type === 'alliance' && rel.status === '同盟') return false;
+                        if (type === 'dominate' && rel.status === '支配') return false;
+                        if (type === 'subordinate' && rel.status === '従属') return false;
+                    }
                     
-                    // ★ここを追加：その大名家の「大名（当主）」を探して、その人がいる城だけをOK（選択可能）にします！
+                    // その大名家の「大名（当主）」を探して、その人がいる城だけをOK（選択可能）にします！
                     const daimyo = this.game.bushos.find(b => b.clan === target.ownerClan && b.isDaimyo);
                     return daimyo && Number(daimyo.castleId) === Number(target.id);
                 }).map(t => t.id);
