@@ -1935,6 +1935,9 @@ class CommandSystem {
             this.game.ui.cancelMapSelection(true); 
 
             const backToMap = () => {
+                // ★追加：もう一度マップに戻る時は、消してしまったデータを戻してあげます
+                this.game.tempReinfData = temp;
+                
                 if (mode === 'atk_self_reinforcement') {
                     this.game.ui.showSelfReinforcementSelector(temp.candidates, temp.atkCastle, temp.targetCastle, temp.onComplete);
                 } else if (mode === 'atk_ally_reinforcement') {

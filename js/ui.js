@@ -2794,7 +2794,7 @@ class UIManager {
         this.game.selectionMode = 'atk_ally_reinforcement';
         this.game.validTargets = candidateCastles.map(c => c.id);
         this.renderMap();
-        this.log("同盟援軍を要請する城を選択してください。");
+        this.log("援軍を要請する勢力の城を選択してください。");
         this.renderSelectionModeMenu(); // ★これを追加してメニューを「戻る」だけにします！
     }
 
@@ -2870,7 +2870,7 @@ class UIManager {
         this.game.selectionMode = 'def_ally_reinforcement';
         this.game.validTargets = candidateCastles.map(c => c.id);
         this.renderMap();
-        this.log("援軍を要請する同盟国の城を選択してください。");
+        this.log("援軍を要請する勢力の城を選択してください。");
         this.renderSelectionModeMenu(); // ★これを追加してメニューを「戻る」だけにします！
     }
 
@@ -2987,7 +2987,7 @@ Object.assign(UIManager.prototype, {
         
         if (!modal || !list || !contextInfo) return;
         
-        contextInfo.innerHTML = "<div>援軍を要請する勢力（大名・国衆）を選択してください</div>";
+        contextInfo.innerHTML = "<div>援軍を要請する勢力を選択してください</div>";
         list.innerHTML = "";
         
         let selectedForce = null;
@@ -3021,10 +3021,14 @@ Object.assign(UIManager.prototype, {
             onSelect(selectedForce);
         };
         
-        this.overrideSelectorCancel(() => {
-            modal.classList.add('hidden');
-            if (onCancel) onCancel();
-        });
+        // ★修正: 存在しない関数を呼んでエラーになっていた部分を正しいキャンセル処理に直しました
+        const cancelBtn = document.getElementById('selector-cancel-btn');
+        if (cancelBtn) {
+            cancelBtn.onclick = () => {
+                modal.classList.add('hidden');
+                if (onCancel) onCancel();
+            };
+        }
         
         modal.classList.remove('hidden');
     }
