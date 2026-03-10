@@ -737,8 +737,9 @@ Object.assign(UIManager.prototype, {
 
         // 1. 居城を持っている大名を探して、大体の大きさを計算します
         this.game.clans.forEach(clan => {
-            // ★追加：自分の大名家（playerClanId）の時も、シールを作らないようにスキップします！
-            if (clan.id === 0 || clan.id === this.game.playerClanId) return;
+            // ★修正：大名を選ぶ画面の時はみんなの名前を出し、ゲームが始まってからは自分の家の名前を隠すようにします！
+            if (clan.id === 0) return;
+            if (this.game.phase !== 'daimyo_select' && clan.id === this.game.playerClanId) return;
             
             const leader = this.game.getBusho(clan.leaderId);
             if (leader && leader.castleId) {
