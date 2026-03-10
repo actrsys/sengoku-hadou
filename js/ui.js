@@ -2307,7 +2307,9 @@ class UIManager {
             document.getElementById('quantity-title').textContent = "持参金 (任意)"; inputs.gold = createSlider("金", "gold", c.gold, 0);
         } else if (type === 'tribute_gold') {
             // ★追加：献上金のスライダーです
-            document.getElementById('quantity-title').textContent = "献上金"; inputs.gold = createSlider("金", "gold", c.gold, 0);
+            document.getElementById('quantity-title').textContent = "献上金 (最大1500)"; 
+            const maxTributeGold = Math.min(1500, c.gold); // 最大1500までの制限をかけます
+            inputs.gold = createSlider("金", "gold", maxTributeGold, 0);
         } else if (type === 'war_supplies') {
             document.getElementById('quantity-title').textContent = "出陣兵数・兵糧・兵器指定"; 
             inputs.soldiers = createSlider("兵士数", "soldiers", c.soldiers, c.soldiers);

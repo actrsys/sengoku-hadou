@@ -120,6 +120,23 @@ class CourtRankSystem {
         
         return true;
     }
+
+    // ★追加：指定した大名家の「朝廷からの信用」を調べる魔法です
+    getTrust(clanId) {
+        const clan = this.game.clans.find(c => c.id === clanId);
+        return clan ? (clan.courtTrust || 0) : 0;
+    }
+
+    // ★追加：朝廷からの信用を上げる魔法です
+    addTrust(clanId, trustAmount) {
+        const clan = this.game.clans.find(c => c.id === clanId);
+        if (!clan) return false;
+
+        // 上限の1000を超えないように見張る魔法（Math.min）をかけておきます！
+        clan.courtTrust = Math.min(1000, (clan.courtTrust || 0) + trustAmount);
+        
+        return true;
+    }
     
     // ==========================================
     // ★ここから追加：月初めの官位授与チェック

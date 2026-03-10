@@ -2591,15 +2591,18 @@ class CommandSystem {
         // お城の貯金箱からお金を減らします
         castle.gold -= gold;
         
-        // 前回作った魔法で、大名家の「朝廷への貢献度」をアップさせます！
+        // 魔法で大名家の「朝廷への貢献度」をアップさせます！
         this.game.courtRankSystem.addContribution(this.game.playerClanId, gold);
         
-        // 確認のために、今の貢献度がいくつになったか取得しておきます
-        const currentContribution = this.game.courtRankSystem.getContribution(this.game.playerClanId);
+        // ★追加：信用の上昇値を計算します（金1500・外交100で225程度、最低1）
+        const trustIncrease = Math.max(1, Math.floor(gold * (doer.diplomacy / 100) * 0.15));
         
-        // ★ここに「貢献度が一定を超えたら官位をもらえる」ような魔法を将来追加します！
-        // （今はまだガワだけなので、コメントのまま残しておきます）
-        // this.game.courtRankSystem.checkRankPromotion(this.game.playerClanId);
+        // 新しく作った魔法で、大名家の「朝廷からの信用」をアップさせます！
+        this.game.courtRankSystem.addTrust(this.game.playerClanId, trustIncrease);
+        
+        // 確認のために、今の貢献度と信用がいくつになったか取得しておきます
+        const currentContribution = this.game.courtRankSystem.getContribution(this.game.playerClanId);
+        const currentTrust = this.game.courtRankSystem.getTrust(this.game.playerClanId);
         
         // 使者は行動済みにします
         doer.isActionDone = true;
@@ -2607,7 +2610,7 @@ class CommandSystem {
         doer.achievementTotal += 5 + Math.floor(gold / 500);
         this.game.factionSystem.updateRecognition(doer, 10);
         
-        this.game.ui.showResultModal(`${doer.name}を使者として、朝廷に 金${gold} を献上しました！\n（現在の朝廷貢献度: ${currentContribution}）`);
+        this.game.ui.showResultModal(`${doer.name}を使者として、朝廷に 金${gold} を献上しました！\n（朝廷への累計貢献額: ${currentContribution}）`);
         
         this.game.ui.updatePanelHeader();
         this.game.ui.renderCommandMenu();
