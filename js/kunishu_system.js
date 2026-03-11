@@ -35,17 +35,40 @@ class KunishuSystem {
 
     // イデオロギーによる相性計算の補正
     calcIdeologyAffinity(kunishu, targetBusho) {
-        if (!targetBusho) return 25; // 基準となる25にします
+        if (!targetBusho) return 25;
         let baseAffinity = GameSystem.calcAffinityDiff(this.game.getBusho(kunishu.leaderId).affinity, targetBusho.affinity);
         
-        if (kunishu.ideology === '傭兵') {
-            return 25; // 傭兵は変動しないように真ん中の25にします
+        if (kunishu.ideology === '宗教') {
+            // 宗教：相手の革新が30以上で反発開始。50差（革新80）の時に最大の+25になります
+            if (targetBusho.innovation >= 30) {
+                let diff = targetBusho.innovation - 30;
+                let mod = (diff / 50) * 25;
+                baseAffinity += Math.min(25, mod); // 最大で+25まで
+            }
         } else if (kunishu.ideology === '地縁') {
-            if (targetBusho.innovation > 70) baseAffinity += 15; // 革新が高いと反発（相性差が広がるのでプラスにします）
-        } else if (kunishu.ideology === '宗教') {
-            if (targetBusho.innovation > 60) baseAffinity += 30; // 革新が高いと猛烈に反発（さらにプラスにします）
+            // 地縁：頭領と相手の革新の差を見ます
+            const leader = this.game.getBusho(kunishu.leaderId);
+            const L = leader ? leader.innovation : 50; // 頭領の革新
+            const T = targetBusho.innovation;          // 相手の革新
+            
+            if (L === 50 && T === 50) {
+                // お互い50ちょうどの時は -10
+                baseAffinity -= 10;
+            } else if ((L >= 50 && T >= 50) || (L <= 50 && T <= 50)) {
+                // お互い50を基準に同じ側（同サイド）にいる場合
+                let diff = Math.abs(L - T);
+                let mod = (diff * 0.5) - 25; // 0差で-25、50差で0になります
+                baseAffinity += mod;
+            } else {
+                // 50を基準に上下反対側にいる場合
+                let diff = Math.abs(L - T);
+                let mod = ((diff - 2) / 98) * 25; // 2差で0、100差で+25になります
+                baseAffinity += mod;
+            }
         }
-        return Math.max(0, Math.min(50, baseAffinity)); // 結果を0〜50の間に閉じ込めるおまじないです
+        // 傭兵は革新による補正を行わず、基本の相性をそのまま使います
+        
+        return Math.max(0, Math.min(50, baseAffinity)); // 結果を0〜50の間に閉じ込めます
     }
 
     // 月末処理

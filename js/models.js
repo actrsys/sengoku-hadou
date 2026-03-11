@@ -344,8 +344,18 @@ class Kunishu {
         }
     }
 
-    // ★修正: 仲良し度を書き込む機能
+    // ★修正: 仲良し度を書き込む機能（傭兵ボーナス追加）
     setRelation(targetId, value, isKunishu = false) {
+        // 今の友好度を調べて、どれくらい増減するのか計算します
+        let currentVal = this.getRelation(targetId, isKunishu);
+        let diff = value - currentVal;
+        
+        // 傭兵で、かつ友好度が増える時だけ、増える量を1.2倍にします！
+        if (this.ideology === '傭兵' && diff > 0) {
+            diff = diff * 1.2;
+            value = currentVal + diff;
+        }
+        
         let newVal = Math.max(0, Math.min(100, value));
         if (isKunishu) {
             // まだデータがない相手なら、新しくセットを作ります
