@@ -1068,7 +1068,11 @@ class GameManager {
 
         if (this.warManager.state.active) return;
 
+        // ★ここを修正！ 全ての城が終わって翌月（endMonth）に行く前にも、メッセージが消えるのをじっと待ちます！
         if (this.currentIndex >= this.turnQueue.length) { 
+            if (this.ui && this.ui.waitForDialogs) {
+                await this.ui.waitForDialogs();
+            }
             this.endMonth(); 
             return; 
         }
