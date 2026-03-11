@@ -193,7 +193,7 @@ Object.assign(WarManager.prototype, {
             atkBushos.forEach(b => b.isActionDone = true);
 
             // 3. 城のお留守番の数が確定したら、合戦で戦う「全体の数」として援軍を合流（足し算）させます！
-            const processReinforcement = (reinfData, isSelf) => {
+            const processReinforcement = (reinfData) => {
                 if (reinfData) {
                     const hC = reinfData.castle;
                     atkSoldierCount += reinfData.soldiers; 
@@ -203,17 +203,12 @@ Object.assign(WarManager.prototype, {
                     atkBushos = atkBushos.concat(reinfData.bushos);
                     // ★修正：諸勢力の援軍だった場合は、プレイヤーを強制的に巻き込まないようにします！
                     if (hC.ownerClan === pid && !hC.isDelegated && !reinfData.isKunishuForce) isPlayerInvolved = true;
-                    
-                    // ★追加：攻撃側の援軍ログをここで出します！
-                    let prefix = isSelf ? "自軍援軍" : "同盟援軍";
-                    let colorClass = isSelf ? "log-color-def" : "";
-                    this.game.ui.log(`【${prefix}】<span class="${colorClass}">${hC.name}</span> から攻撃側の援軍が参戦しました。`);
                 }
             };
-            processReinforcement(selfReinforcementData, true);
-            processReinforcement(reinforcementData, false);
+            processReinforcement(selfReinforcementData);
+            processReinforcement(reinforcementData);
 
-            const atkClanData = this.game.clans.find(c => c.id === atkClan);
+            const atkClanData = this.game.clans.find(c => c.id === atkClan); 
             const atkArmyName = atkCastle.isKunishu ? atkCastle.name : (atkClanData ? atkClanData.getArmyName() : "敵軍");
             const atkDaimyoName = atkClanData ? atkClanData.name : (atkCastle.isKunishu ? atkCastle.name : "中立");
             const defClanData = this.game.clans.find(c => c.id === defClan);
@@ -1513,59 +1508,15 @@ Object.assign(WarManager.prototype, {
         if (defClanId === pid && !defCastle.isDelegated) {
             // プレイヤーなら画面を出して選ばせる
             this.game.ui.showDefSelfReinforcementSelector(candidateCastles, defCastle, (reinfData) => {
-                if (reinfData) {
-                    this.game.ui.log(`【自軍援軍】<span class="log-color-def">${reinfData.castle.name}</span> から守備側の援軍が参戦しました。`);
-                }
                 onComplete(reinfData);
             });
         } else {
-            // AI（またはプレイヤー委任城）なら自動で一番兵士が多い城から送る
+            // AIなら自動で一番兵士が多い城から送る
             candidateCastles.sort((a,b) => b.soldiers - a.soldiers);
             const bestCastle = candidateCastles[0];
-            
-            // ★追加：委任城がプレイヤー直轄城に援軍要請をしてきた場合
-            if (defClanId === pid && !bestCastle.isDelegated) {
-                const atkForce = this.state.attacker;
-                const atkName = atkForce.isKunishu ? atkForce.name : (this.game.clans.find(c => c.id === atkForce.ownerClan)?.name || "敵軍");
-                const atkBushoName = this.state.atkBushos[0] ? this.state.atkBushos[0].name : "総大将";
-                const defLord = this.game.getBusho(defCastle.castellanId);
-                const defLordName = defLord ? defLord.name : "城主";
-
-                // msg1を削除し、すでに「攻め込みました」が画面に出ているので援軍要請だけ出します
-                const msg2 = `${defLordName}殿が${bestCastle.name}に参戦を求めています。\n援軍を送りますか？`;
-
-                this.game.ui.showDialog(msg2, true, 
-                        () => {
-                            // はい の場合
-                            const promptBusho = () => {
-                                this.game.ui.openBushoSelector('def_reinf_deploy', bestCastle.id, {
-                                    hideCancel: false,
-                                    onConfirm: (selectedIds) => this.handleBushoSelectionForDefSelfReinf(bestCastle.id, selectedIds, (rData) => {
-                                        if (rData) {
-                                            // ★出陣が決まった瞬間にログを出すことで、順番を後回しに！
-                                            this.game.ui.log(`【自軍援軍】<span class="log-color-def">${bestCastle.name}</span> から守備側の援軍が参戦しました。`);
-                                        }
-                                        onComplete(rData);
-                                    }, promptBusho),
-                                    onCancel: () => onComplete(null)
-                                });
-                            };
-                            promptBusho();
-                        },
-                        () => {
-                            // いいえ の場合
-                            onComplete(null);
-                        }
-                    );
-                });
-            } else {
-                this.executeDefSelfReinforcementAuto(bestCastle, defCastle, (reinfData) => {
-                    if (reinfData) {
-                        this.game.ui.log(`【自軍援軍】<span class="log-color-def">${bestCastle.name}</span> から守備側の援軍が参戦しました。`);
-                    }
-                    onComplete(reinfData);
-                });
-            }
+            this.executeDefSelfReinforcementAuto(bestCastle, defCastle, (reinfData) => {
+                onComplete(reinfData);
+            });
         }
     },
     

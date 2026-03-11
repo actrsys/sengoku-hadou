@@ -527,9 +527,9 @@ class AIEngine {
             // 最大値の適用
             prob = Math.min(prob, maxProb);
 
-            // ★最終調整用。すべての引き算が終わった最後に×５０％の魔法をかけます！
+            // ★最終調整用。すべての引き算が終わった最後に×５％の魔法をかけます！
             if (prob > 0) {
-                prob = prob * 0.5;
+                prob = prob * 0.05;
             }
 
             // 最小値の適用（マイナスになっていたらゼロにします）
@@ -613,108 +613,9 @@ class AIEngine {
             .map(eb => eb.busho); // 魔法の箱から武将データだけを取り出す
         // ★書き換えはここまで！
 
+        // 援軍を探す処理へバトンタッチします
         const sendHorses = source.horses || 0;
         const sendGuns = source.guns || 0;
-        const targetCastle = this.game.getCastle(target.id);
-        
-        const isSourcePlayer = source.ownerClan === this.game.playerClanId;
-        
-        // ★追加：AI城主（委任城）が攻撃する時の援軍要請とメッセージ
-            if (isSourcePlayer) {
-                let candidateCastles = [];
-                this.game.castles.forEach(c => {
-                    if (c.ownerClan !== source.ownerClan || c.id === source.id || c.id === target.id) return;
-                    if (!GameSystem.isReachable(this.game, source, c, source.ownerClan)) return;
-                    if (c.soldiers < 1000 || c.rice < 500) return;
-                    const normalBushos = this.game.getCastleBushos(c.id).filter(b => !b.isDaimyo && !b.isCastellan && b.status !== 'ronin' && b.belongKunishuId === 0);
-                    if (normalBushos.length === 0) return;
-                    candidateCastles.push(c);
-                });
-
-                let bestCastle = null;
-                if (candidateCastles.length > 0) {
-                    candidateCastles.sort((a,b) => b.soldiers - a.soldiers);
-                    bestCastle = candidateCastles[0];
-                }
-
-                if (bestCastle && !bestCastle.isDelegated) {
-                    // msg1をなくし、msg2に状況をまとめます
-                    const msg2 = `${source.name}の${general.name}殿が${targetCastle.name}へ出陣します。\n${bestCastle.name}に援軍を求めています。援軍を送りますか？`;
-                    this.game.ui.showDialog(msg2, true, 
-                        () => {
-                            // はい の場合
-                            const promptBusho = () => {
-                                this.game.ui.openBushoSelector('atk_reinf_deploy', bestCastle.id, {
-                                    hideCancel: false,
-                                    onConfirm: (selectedIds) => {
-                                        const reinfBushos = selectedIds.map(id => this.game.getBusho(id));
-                                        this.game.ui.openQuantitySelector('atk_self_reinf_supplies', [bestCastle], null, {
-                                            onConfirm: (inputs) => {
-                                                const i = inputs[bestCastle.id] || inputs;
-                                                const rS = i.soldiers ? parseInt(i.soldiers.num.value) : 500;
-                                                const rR = i.rice ? parseInt(i.rice.num.value) : 500;
-                                                const rH = i.horses ? parseInt(i.horses.num.value) : 0;
-                                                const rG = i.guns ? parseInt(i.guns.num.value) : 0;
-
-                                                bestCastle.soldiers = Math.max(0, bestCastle.soldiers - rS);
-                                                bestCastle.rice = Math.max(0, bestCastle.rice - rR);
-                                                bestCastle.horses = Math.max(0, (bestCastle.horses || 0) - rH);
-                                                bestCastle.guns = Math.max(0, (bestCastle.guns || 0) - rG);
-                                                reinfBushos.forEach(b => b.isActionDone = true);
-
-                                                const selfReinfData = {
-                                                    castle: bestCastle, bushos: reinfBushos, soldiers: rS,
-                                                    rice: rR, horses: rH, guns: rG, isSelf: true
-                                                };
-                                                
-                                                this.game.warManager.startWar(source, targetCastle, sorted, sendSoldiers, sendRice, sendHorses, sendGuns, null, selfReinfData);
-                                            },
-                                            onCancel: promptBusho
-                                        });
-                                    },
-                                    onCancel: () => {
-                                        this.game.warManager.startWar(source, targetCastle, sorted, sendSoldiers, sendRice, sendHorses, sendGuns);
-                                    }
-                                });
-                            };
-                            promptBusho();
-                        },
-                        () => {
-                            // いいえ の場合
-                            this.game.warManager.startWar(source, targetCastle, sorted, sendSoldiers, sendRice, sendHorses, sendGuns);
-                        }
-                    );
-                } else {
-                    // 直轄じゃない（AIの城）、または援軍を出せる城がない場合
-                    let aiReinfData = null;
-                    if (bestCastle) {
-                        let rS = Math.max(500, Math.floor(bestCastle.soldiers * 0.5));
-                        if (rS > bestCastle.soldiers) rS = bestCastle.soldiers;
-                        const availableBushos = this.game.getCastleBushos(bestCastle.id).filter(b => !b.isDaimyo && !b.isCastellan && b.status !== 'ronin' && b.belongKunishuId === 0).sort((a,b) => b.strength - a.strength);
-                        let bushoCount = rS >= 2500 ? 3 : (rS >= 1500 ? 2 : 1);
-                        const reinfBushos = availableBushos.slice(0, Math.min(bushoCount, availableBushos.length));
-                        let rR = Math.min(bestCastle.rice, Math.max(500, rS)); 
-                        const rH = Math.min(bestCastle.horses || 0, Math.floor(rS * 0.5)); 
-                        const rG = Math.min(bestCastle.guns || 0, Math.floor(rS * 0.5));
-
-                        bestCastle.soldiers = Math.max(0, bestCastle.soldiers - rS);
-                        bestCastle.rice = Math.max(0, bestCastle.rice - rR);
-                        bestCastle.horses = Math.max(0, (bestCastle.horses || 0) - rH);
-                        bestCastle.guns = Math.max(0, (bestCastle.guns || 0) - rG);
-                        reinfBushos.forEach(b => b.isActionDone = true);
-
-                        aiReinfData = {
-                            castle: bestCastle, bushos: reinfBushos, soldiers: rS,
-                            rice: rR, horses: rH, guns: rG, isSelf: true
-                        };
-                    }
-                    this.game.warManager.startWar(source, targetCastle, sorted, sendSoldiers, sendRice, sendHorses, sendGuns, null, aiReinfData);
-                }
-                return;
-            }
-
-        // ★AI同士の戦いや敵からの攻撃など、プレイヤーが攻撃側でない場合は
-        // 無理にメッセージを追加せず、元々のゲームの仕組み（チェック処理やログ）にお任せします！
         this.game.commandSystem.checkReinforcementAndStartWar(source, target.id, sorted, sendSoldiers, sendRice, sendHorses, sendGuns);
         
         // （「待つ魔法」は消しました！あとはwar.jsが最後までやってくれます）
