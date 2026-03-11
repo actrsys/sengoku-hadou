@@ -316,8 +316,11 @@ class UIManager {
         if (this.guardHiddenCount > 0) {
             this.guardHiddenCount--;
             if (this.guardHiddenCount === 0 && this.game && this.game.isProcessingAI) {
-                const aiGuard = document.getElementById('ai-guard');
-                if (aiGuard) aiGuard.classList.remove('hidden');
+                // ★追加：マップで援軍の城を選んでいる最中は、絶対に膜を復活させない魔法！
+                if (!this.game.selectionMode) {
+                    const aiGuard = document.getElementById('ai-guard');
+                    if (aiGuard) aiGuard.classList.remove('hidden');
+                }
             }
         }
     }
@@ -1293,12 +1296,16 @@ class UIManager {
     showControlPanel(castle) { 
         this.currentCastle = castle; 
         
+        // ★修正：敵のターン中（AIターン）に援軍のために自城をクリックした時、
+        // AIフラグが勝手に消し飛んでしまわないように守ります！
         if (Number(castle.ownerClan) === Number(this.game.playerClanId)) {
-            this.game.isProcessingAI = false;
+            if (!this.game.selectionMode && !this.game.isProcessingAI) {
+                this.game.isProcessingAI = false;
+            }
         }
 
         if(this.panelEl) this.panelEl.classList.remove('hidden');
-        this.updatePanelHeader(); 
+        this.updatePanelHeader();
         
         // ★ 変更：マップで何かを選んでいる最中は、専用の「戻る」メニューにします！
         if (this.game.selectionMode) {
