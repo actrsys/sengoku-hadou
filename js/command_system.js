@@ -1024,20 +1024,10 @@ class CommandSystem {
                 // ★頭領の名前ではなく、諸勢力の正式な名前を取得する魔法を使います
                 const kunishuName = kunishu.getName(this.game);
                 
-                // ★ここを書き換えます！
-                // 自分が操作している時だけ「討伐しますか？」のメッセージを出すようにします
-                const myClanId = castle.ownerClan;
-                const pid = this.game.playerClanId;
-                
-                if (myClanId === pid && !castle.isDelegated) {
-                    // プレイヤーの直轄城なら、ちゃんと確認メッセージを出します
-                    this.game.ui.showDialog(`${targetName}周辺に根付く ${kunishuName} を討伐しますか？\n今月の命令は終了となります`, true, () => {
-                        this.executeKunishuSubjugate(castle, targetId, data, sVal, rVal, hVal, gVal, kunishu);
-                    });
-                } else {
-                    // AI（コンピュータ）や委任の時は、メッセージを出さずにすぐ討伐を始めます！
+                // ★メッセージの中身も、取得した「kunishuName」をそのまま表示するように直しました
+                this.game.ui.showDialog(`${targetName}周辺に根付く ${kunishuName} を討伐しますか？\n今月の命令は終了となります`, true, () => {
                     this.executeKunishuSubjugate(castle, targetId, data, sVal, rVal, hVal, gVal, kunishu);
-                }
+                });
             } else {
                 // ★修正：「攻め込みますか？」の確認は後回しにして、まずは自軍の援軍を探す魔法に直結させます！
                 const bushos = data.map(id => this.game.getBusho(id));
@@ -1568,13 +1558,6 @@ class CommandSystem {
     // ★追加: 諸勢力を攻めて壊滅させるための処理（必ず攻城戦になります）
     // ★修正: 騎馬（sendHorses）と鉄砲（sendGuns）も出陣時に持っていくようにしました
     executeKunishuSubjugate(atkCastle, targetCastleId, atkBushosIds, sendSoldiers, sendRice, sendHorses, sendGuns, kunishu) {
-        // ★ここを書き足します！
-        // 戦争が始まるので、裏で動いているAIの時間をピタッと止めます！
-        if (this.game.aiTimer) {
-            clearTimeout(this.game.aiTimer);
-            this.game.aiTimer = null;
-        }
-
         const atkBushos = atkBushosIds.map(id => this.game.getBusho(id));
         const targetCastle = this.game.getCastle(targetCastleId);
         
@@ -2110,13 +2093,10 @@ class CommandSystem {
                 kunishus.forEach(k => {
                     if (k.getRelation(myClanId) >= 70 && k.soldiers >= 1000) {
                         const members = this.game.kunishuSystem.getKunishuMembers(k.id);
-                        // ★武将がいない時は幻の頭領の名前を用意して、バリケードを突破します！
-                        let leaderName = `${k.getName(this.game)}頭領`; 
                         if (members.length > 0) {
                             const leader = this.game.getBusho(k.leaderId) || members[0];
-                            if (leader) leaderName = leader.name;
+                            forces.push({ isKunishu: true, id: k.id, name: k.getName(this.game), leaderName: leader.name, soldiers: k.soldiers });
                         }
-                        forces.push({ isKunishu: true, id: k.id, name: k.getName(this.game), leaderName: leaderName, soldiers: k.soldiers });
                     }
                 });
 
@@ -2364,8 +2344,10 @@ class CommandSystem {
                         const isNextToMyAnyCastle = this.game.castles.some(myC => myC.ownerClan === myClanId && GameSystem.isAdjacent(c, myC));
                         const isNextToEnemy = GameSystem.isAdjacent(c, targetCastle);
                         if (isNextToMyAnyCastle || isNextToEnemy) {
-                            // ★武将が0人でも幻の頭領にお願いできるので、ifのバリケードを消します！
-                            allyForceCandidates.push({ castle: c, force: { isKunishu: true, id: k.id, name: k.getName(this.game), soldiers: k.soldiers } });
+                            const members = this.game.kunishuSystem.getKunishuMembers(k.id);
+                            if (members.length > 0) {
+                                allyForceCandidates.push({ castle: c, force: { isKunishu: true, id: k.id, name: k.getName(this.game), soldiers: k.soldiers } });
+                            }
                         }
                     }
                 });
@@ -2575,21 +2557,9 @@ class CommandSystem {
             reinfSoldiers = Math.max(500, Math.min(reinfSoldiers, kunishu.soldiers));
             
             const availableBushos = this.game.kunishuSystem.getKunishuMembers(kunishu.id).sort((a,b) => b.strength - a.strength);
-            let reinfBushos = [];
-            
-            if (availableBushos.length > 0) {
-                let bushoCount = reinfSoldiers >= 2500 ? 3 : (reinfSoldiers >= 1500 ? 2 : 1);
-                bushoCount = Math.min(bushoCount, availableBushos.length);
-                reinfBushos = availableBushos.slice(0, bushoCount);
-            } else {
-                // ★武将が誰もいない時は、幻の頭領をポンッと出します！
-                reinfBushos.push({
-                    id: `dummy_${kunishu.id}`,
-                    name: `${kunishu.getName(this.game)}頭領`,
-                    leadership: 30, strength: 30, intelligence: 30, politics: 30, charm: 30,
-                    isDummy: true
-                });
-            }
+            let bushoCount = reinfSoldiers >= 2500 ? 3 : (reinfSoldiers >= 1500 ? 2 : 1);
+            bushoCount = Math.min(bushoCount, availableBushos.length);
+            const reinfBushos = availableBushos.slice(0, bushoCount);
             
             const reinfRice = reinfSoldiers; 
             const reinfHorses = 0; 

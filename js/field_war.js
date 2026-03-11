@@ -364,23 +364,12 @@ class FieldWarManager {
                     const prob = 0.2 + ((rel - 70) / 30) * 0.8;
                     if (Math.random() <= prob) {
                         const members = this.game.kunishuSystem.getKunishuMembers(k.id);
-                        let bestBusho = null;
-                        
                         if (members.length > 0) {
                             members.sort((a, b) => b.leadership - a.leadership);
-                            bestBusho = members[0];
-                        } else {
-                            // 武将が誰もいない場合は、幻の頭領をポンッと出します！
-                            bestBusho = {
-                                id: `dummy_${k.id}`,
-                                name: `${k.getName(this.game)}頭領`,
-                                leadership: 30, strength: 30, intelligence: 30, politics: 30, charm: 30,
-                                isDummy: true
-                            };
-                        }
-                        
-                        if (bestBusho && !this.units.some(u => u.name === bestBusho.name)) {
-                                const uSoldiers = Math.floor(k.soldiers * 0.5);
+                            const bestBusho = members[0];
+                            
+                            if (!this.units.some(u => u.name === bestBusho.name)) {
+                                const uSoldiers = Math.floor(k.soldiers * 0.5); 
                                 // ★修正: 馬と鉄砲は全部持ち込む
                                 const uHorses = k.horses || 0;
                                 const uGuns = k.guns || 0;
