@@ -446,40 +446,25 @@ Object.assign(WarManager.prototype, {
                             const handleDefDivide = (callback) => {
                                 let finalDefAssignments = [];
                                 
-                                // ★順番を上にして、矢印の魔法（アロー関数）に変えます！
                                 const finishDef = () => {
                                     const mainAssigns = this.autoDivideSoldiers(defBushos, defCastle.soldiers, defCastle.horses || 0, defCastle.guns || 0);
                                     callback(mainAssigns.concat(finalDefAssignments));
                                 };
 
                                 const processNextDef = () => {
-                                    // ★修正：諸勢力の援軍なら勝手にAI配分されるように、バリケードを追加します！
-                                    if (this.state.defReinforcement && this.state.defReinforcement.castle.ownerClan === pid && !this.state.defReinforcement.isKunishuForce) {
-                                        this.game.ui.showUnitDivideModal(this.state.defReinforcement.bushos, this.state.defReinforcement.soldiers, this.state.defReinforcement.horses, this.state.defReinforcement.guns, (rAssigns) => {
-                                            finalDefAssignments = finalDefAssignments.concat(rAssigns);
-                                            finishDef();
-                                        });
-                                    } else {
-                                        if (this.state.defReinforcement) finalDefAssignments = finalDefAssignments.concat(this.autoDivideSoldiers(this.state.defReinforcement.bushos, this.state.defReinforcement.soldiers, this.state.defReinforcement.horses, this.state.defReinforcement.guns));
-                                        finishDef();
-                                    }
+                                    // ★修正：操作しない戦争（メイン守備がAI）の時は、同盟援軍もウインドウを出さず自動配分にします！
+                                    if (this.state.defReinforcement) finalDefAssignments = finalDefAssignments.concat(this.autoDivideSoldiers(this.state.defReinforcement.bushos, this.state.defReinforcement.soldiers, this.state.defReinforcement.horses, this.state.defReinforcement.guns));
+                                    finishDef();
                                 };
 
-                                if (this.state.defSelfReinforcement && this.state.defSelfReinforcement.castle.ownerClan === pid) {
-                                    this.game.ui.showUnitDivideModal(this.state.defSelfReinforcement.bushos, this.state.defSelfReinforcement.soldiers, this.state.defSelfReinforcement.horses, this.state.defSelfReinforcement.guns, (srAssigns) => {
-                                        finalDefAssignments = finalDefAssignments.concat(srAssigns);
-                                        processNextDef();
-                                    });
-                                } else {
-                                    if (this.state.defSelfReinforcement) finalDefAssignments = finalDefAssignments.concat(this.autoDivideSoldiers(this.state.defSelfReinforcement.bushos, this.state.defSelfReinforcement.soldiers, this.state.defSelfReinforcement.horses, this.state.defSelfReinforcement.guns));
-                                        processNextDef();
-                                }
+                                // ★修正：操作しない戦争（メイン守備がAI）の時は、自家援軍もウインドウを出さず自動配分にします！
+                                if (this.state.defSelfReinforcement) finalDefAssignments = finalDefAssignments.concat(this.autoDivideSoldiers(this.state.defSelfReinforcement.bushos, this.state.defSelfReinforcement.soldiers, this.state.defSelfReinforcement.horses, this.state.defSelfReinforcement.guns));
+                                processNextDef();
                             };
 
                             const handleAtkDivide = (defAssigns, callback) => {
                                 let finalAtkAssignments = [];
                                 
-                                // ★修正：順番を上にして、矢印の魔法（アロー関数）に変えます！
                                 const finishAtk = () => {
                                     if (atkClan === pid && !atkCastle.isDelegated && !attackerForce.isKunishu) {
                                         let myAtkS = atkSoldierCount - (this.state.reinforcement ? this.state.reinforcement.soldiers : 0) - (this.state.selfReinforcement ? this.state.selfReinforcement.soldiers : 0);
@@ -500,8 +485,8 @@ Object.assign(WarManager.prototype, {
                                 };
 
                                 const processNextAtk = () => {
-                                    // ★修正：こちらも同じように諸勢力のバリケードを追加します！
-                                    if (this.state.reinforcement && this.state.reinforcement.castle.ownerClan === pid && !this.state.reinforcement.isKunishuForce) {
+                                    // ★修正：攻撃側が「プレイヤー操作（直轄）」の場合のみ、援軍の部隊配分ウインドウを出します！
+                                    if (atkClan === pid && !atkCastle.isDelegated && this.state.reinforcement && this.state.reinforcement.castle.ownerClan === pid && !this.state.reinforcement.isKunishuForce) {
                                         this.game.ui.showUnitDivideModal(this.state.reinforcement.bushos, this.state.reinforcement.soldiers, this.state.reinforcement.horses, this.state.reinforcement.guns, (rAssigns) => {
                                             finalAtkAssignments = finalAtkAssignments.concat(rAssigns);
                                             finishAtk();
@@ -512,7 +497,8 @@ Object.assign(WarManager.prototype, {
                                     }
                                 };
 
-                                if (this.state.selfReinforcement && this.state.selfReinforcement.castle.ownerClan === pid) {
+                                // ★修正：自家援軍も同じく、攻撃側が「プレイヤー操作（直轄）」の場合のみウインドウを出します！
+                                if (atkClan === pid && !atkCastle.isDelegated && this.state.selfReinforcement && this.state.selfReinforcement.castle.ownerClan === pid) {
                                     this.game.ui.showUnitDivideModal(this.state.selfReinforcement.bushos, this.state.selfReinforcement.soldiers, this.state.selfReinforcement.horses, this.state.selfReinforcement.guns, (srAssigns) => {
                                         finalAtkAssignments = finalAtkAssignments.concat(srAssigns);
                                         processNextAtk();
