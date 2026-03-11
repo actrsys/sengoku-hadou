@@ -200,76 +200,105 @@ class KunishuSystem {
         const kunishuName = kunishu.getName(this.game);
         const clanName = clanData.name;
         
-        // ★ここから追加：この城が「プレイヤー（自分）の城」かどうかを調べる魔法です
+        // この城が「プレイヤー（自分）の城」かどうかを調べる魔法です
         const isPlayerCastle = (clanId === this.game.playerClanId);
+
+        // 頭領と城主の相性差を計算します
+        const affinityDiff = this.calcIdeologyAffinity(kunishu, castellan);
+        
+        // プレイヤーに有利な倍率（贈り物用）の魔法
+        // 相性差0で2倍、25で1倍、50で0.5倍になるように滑らかに変化させます
+        let goodMult = 1.0;
+        if (affinityDiff <= 25) {
+            goodMult = 2.0 - (affinityDiff / 25);
+        } else {
+            goodMult = 1.0 - ((affinityDiff - 25) / 50);
+        }
+        
+        // プレイヤーに不利な倍率（略奪・蜂起用）の魔法
+        // 相性差0で0.5倍、25で1倍、50で2倍になるように滑らかに変化させます
+        let badMult = 1.0;
+        if (affinityDiff <= 25) {
+            badMult = 0.5 + (affinityDiff / 25) * 0.5;
+        } else {
+            badMult = 1.0 + ((affinityDiff - 25) / 25);
+        }
 
         // 友好 (70以上)
         if (currentRel >= 70) {
-            // 献上 (無から湧く、最大現在兵力÷3、魅力で増加)
-            let baseAmount = Math.floor(kunishu.soldiers / 3);
-            let bonus = 1.0 + (castellan.charm / 100); // 魅力ボーナス
-            let amount = Math.floor(baseAmount * bonus * Math.random());
-            if (amount < 10) return;
+            // 贈り物の基本確率は20%（0.20）。友好度100で+15%（0.15）アップします
+            let giftChance = (0.20 + ((currentRel - 70) / 30) * 0.15) * goodMult;
+            
+            if (Math.random() < giftChance) {
+                // 献上 (無から湧く、最大現在兵力÷3、魅力で増加)
+                let baseAmount = Math.floor(kunishu.soldiers / 3);
+                let bonus = 1.0 + (castellan.charm / 100); // 魅力ボーナス
+                let amount = Math.floor(baseAmount * bonus * Math.random());
+                if (amount < 10) return;
 
-            if (Math.random() > 0.5) {
-                let maxAdd = 99999 - castle.gold;
-                let actualAmount = Math.min(amount, maxAdd);
-                if (actualAmount > 0) {
-                    castle.gold += actualAmount;
-                    
-                    // 文章を作って、まずはいつものようにログに書き込みます
-                    const msg = `【諸勢力支援】\n${kunishuName}が、${clanName}の${castle.name}に金${actualAmount}を献上しました。`;
-                    this.game.ui.log(msg.replace('\n', '')); // ログ用には改行を消してスッキリさせます
-                    
-                    // ★ここを追加：自分の城なら、画面にメッセージを出して「閉じる」まで待ちます！
-                    if (isPlayerCastle) await this.game.ui.showDialogAsync(msg);
-                }
-            } else {
-                let maxAdd = 99999 - castle.rice;
-                let actualAmount = Math.min(amount, maxAdd);
-                if (actualAmount > 0) {
-                    castle.rice += actualAmount;
-                    
-                    const msg = `【諸勢力支援】\n${kunishuName}が、${clanName}の${castle.name}に兵糧${actualAmount}を献上しました。`;
-                    this.game.ui.log(msg.replace('\n', ''));
-                    
-                    if (isPlayerCastle) await this.game.ui.showDialogAsync(msg);
+                if (Math.random() > 0.5) {
+                    let maxAdd = 99999 - castle.gold;
+                    let actualAmount = Math.min(amount, maxAdd);
+                    if (actualAmount > 0) {
+                        castle.gold += actualAmount;
+                        const msg = `【諸勢力支援】\n${kunishuName}が、${clanName}の${castle.name}に金${actualAmount}を献上しました。`;
+                        this.game.ui.log(msg.replace('\n', ''));
+                        if (isPlayerCastle) await this.game.ui.showDialogAsync(msg);
+                    }
+                } else {
+                    let maxAdd = 99999 - castle.rice;
+                    let actualAmount = Math.min(amount, maxAdd);
+                    if (actualAmount > 0) {
+                        castle.rice += actualAmount;
+                        const msg = `【諸勢力支援】\n${kunishuName}が、${clanName}の${castle.name}に兵糧${actualAmount}を献上しました。`;
+                        this.game.ui.log(msg.replace('\n', ''));
+                        if (isPlayerCastle) await this.game.ui.showDialogAsync(msg);
+                    }
                 }
             }
         } 
         // 敵対 (30以下)
         else if (currentRel <= 30) {
-            // 妨害か蜂起
-            if (Math.random() > 0.3) {
-                // 妨害（略奪）: 城から奪う、武力で軽減
-                let baseAmount = Math.floor(kunishu.soldiers / 3);
-                let reduction = 1.0 - (castellan.strength / 200); // 武力で最大50%軽減
-                let amount = Math.floor(baseAmount * reduction * (0.5 + Math.random() * 0.5));
-                if (amount < 10) return;
-
-                if (Math.random() > 0.5 && castle.gold > amount) {
-                    castle.gold -= amount;
-                    
-                    const msg = `【諸勢力妨害】\n${kunishuName}が、${clanName}の${castle.name}で略奪を働き、金${amount}を奪いました！`;
-                    this.game.ui.log(msg.replace('\n', ''));
-                    
-                    if (isPlayerCastle) await this.game.ui.showDialogAsync(msg);
-                } else if (castle.rice > amount) {
-                    castle.rice -= amount;
-                    
-                    const msg = `【諸勢力妨害】\n${kunishuName}が、${clanName}の${castle.name}で略奪を働き、兵糧${amount}を奪いました！`;
-                    this.game.ui.log(msg.replace('\n', ''));
-                    
-                    if (isPlayerCastle) await this.game.ui.showDialogAsync(msg);
-                }
-            } else {
-                // 蜂起（戦争）
-                let uprisingChance = 0.5;
-                if (leader.personality === 'aggressive') uprisingChance += 0.2;
-                if (leader.personality === 'cautious') uprisingChance -= 0.2;
-
+            let actionDone = false;
+            
+            // 友好度0の時は「蜂起」の判定を行います
+            if (currentRel === 0) {
+                let uprisingBase = 0;
+                if (kunishu.ideology === '傭兵') uprisingBase = 0.15;
+                else if (kunishu.ideology === '地縁') uprisingBase = 0.30;
+                else if (kunishu.ideology === '宗教') uprisingBase = 0.50;
+                
+                let uprisingChance = uprisingBase * badMult;
+                
                 if (Math.random() < uprisingChance && kunishu.soldiers > 500) {
                     await this.executeUprising(kunishu, castle);
+                    actionDone = true; // 蜂起したら略奪はしません
+                }
+            }
+            
+            // 蜂起しなかった場合、または友好度が1〜30の場合は「略奪」の判定を行います
+            if (!actionDone) {
+                // 略奪の基本確率は20%（0.20）。友好度0で+15%（0.15）アップします
+                let robChance = (0.20 + ((30 - currentRel) / 30) * 0.15) * badMult;
+                
+                if (Math.random() < robChance) {
+                    // 妨害（略奪）: 城から奪う、武力で軽減
+                    let baseAmount = Math.floor(kunishu.soldiers / 3);
+                    let reduction = 1.0 - (castellan.strength / 200); // 武力で最大50%軽減
+                    let amount = Math.floor(baseAmount * reduction * (0.5 + Math.random() * 0.5));
+                    if (amount < 10) return;
+
+                    if (Math.random() > 0.5 && castle.gold > amount) {
+                        castle.gold -= amount;
+                        const msg = `【諸勢力妨害】\n${kunishuName}が、${clanName}の${castle.name}で略奪を働き、金${amount}を奪いました！`;
+                        this.game.ui.log(msg.replace('\n', ''));
+                        if (isPlayerCastle) await this.game.ui.showDialogAsync(msg);
+                    } else if (castle.rice > amount) {
+                        castle.rice -= amount;
+                        const msg = `【諸勢力妨害】\n${kunishuName}が、${clanName}の${castle.name}で略奪を働き、兵糧${amount}を奪いました！`;
+                        this.game.ui.log(msg.replace('\n', ''));
+                        if (isPlayerCastle) await this.game.ui.showDialogAsync(msg);
+                    }
                 }
             }
         }
