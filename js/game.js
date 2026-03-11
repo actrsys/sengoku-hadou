@@ -1066,7 +1066,9 @@ class GameManager {
             this.aiTimer = null;
         }
 
-        if (this.warManager.state.active) return;
+        // ★最強ストッパー１：合戦中やマップ選択中にフライングで呼ばれたら絶対に弾く！
+        if (this.warManager && this.warManager.state && this.warManager.state.active) return;
+        if (this.selectionMode != null) return;
 
         // ★ここを修正！ 全ての城が終わって翌月（endMonth）に行く前にも、メッセージが消えるのをじっと待ちます！
         if (this.currentIndex >= this.turnQueue.length) { 
@@ -1186,11 +1188,9 @@ class GameManager {
     }
     
     finishTurn() { 
-        // ★最強ストッパー１：プレイヤーが関与していなくても、合戦の処理中なら絶対にターンを勝手に進めない！
-        if(this.warManager.state.active) return; 
-        
-        // ★最強ストッパー２：マップで城を選んでいる最中なども、絶対にターンを勝手に終わらせない！
-        if(this.selectionMode != null) return;
+        // ★最強ストッパー２：合戦中やマップ選択中なら、絶対にターンを勝手に終わらせない！
+        if (this.warManager && this.warManager.state && this.warManager.state.active) return; 
+        if (this.selectionMode != null) return;
         
         if (this.aiTimer) { clearTimeout(this.aiTimer); this.aiTimer = null; }
 
