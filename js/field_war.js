@@ -624,7 +624,11 @@ class FieldWarManager {
                 ${clanNameText}${unit.name} <span style="font-size:0.8rem; color:#555;">(${typeName})</span>
             </div>
             <div style="font-size:0.9rem; font-weight:bold;">兵士: ${unit.soldiers}</div>
-            <div style="font-size:0.8rem; color:#333;">統:${unit.stats.ldr} 武:${unit.stats.str} 智:${unit.stats.int}</div>
+            <div style="font-size:0.8rem; color:#333; display:flex; gap:5px; align-items:center; margin-top:2px;">
+                統:${GameSystem.toGradeHTML(unit.stats.ldr)} 
+                武:${GameSystem.toGradeHTML(unit.stats.str)} 
+                智:${GameSystem.toGradeHTML(unit.stats.int)}
+            </div>
         `;
         infoEl.classList.remove('hidden');
     }

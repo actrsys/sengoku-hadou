@@ -2080,6 +2080,9 @@ class UIManager {
             }
         };
 
+        const gunshi = this.game.getClanGunshi(this.game.playerClanId);
+        const myDaimyo = this.game.bushos.find(b => b.clan === this.game.playerClanId && b.isDaimyo);
+
         bushos.forEach((b, index) => {
             const div = document.createElement('div');
             div.style.marginBottom = "15px";
@@ -2088,8 +2091,15 @@ class UIManager {
             div.style.borderRadius = "4px";
             div.style.background = "#fff";
             
+            const getStat = (stat) => GameSystem.getDisplayStatHTML(b, stat, gunshi, null, this.game.playerClanId, myDaimyo);
+            
             div.innerHTML = `
-                <div style="font-weight:bold; margin-bottom:5px;">${b.name} <small>(統:${b.leadership} 武:${b.strength} 智:${b.intelligence})</small></div>
+                <div style="font-weight:bold; margin-bottom:5px; display:flex; align-items:center;">
+                    ${b.name} 
+                    <span style="font-size:0.8rem; margin-left:10px; display:flex; gap:5px; font-weight:normal;">
+                        (統:${getStat('leadership')} 武:${getStat('strength')} 智:${getStat('intelligence')})
+                    </span>
+                </div>
                 <div style="margin-bottom:5px;">
                     <select id="div-type-${b.id}" style="padding:4px; font-size:0.9rem;">
                         <option value="ashigaru">足軽</option>
@@ -2744,6 +2754,10 @@ class UIManager {
         this.prisonerModal.classList.remove('hidden');
         if (this.prisonerList) {
             this.prisonerList.innerHTML = '';
+            
+            const gunshi = this.game.getClanGunshi(this.game.playerClanId);
+            const myDaimyo = this.game.bushos.find(b => b.clan === this.game.playerClanId && b.isDaimyo);
+
             captives.forEach((p, index) => {
                 const div = document.createElement('div');
                 div.className = 'select-item';
@@ -2758,10 +2772,14 @@ class UIManager {
                     hireBtnHtml = `<button class="btn-primary" onclick="window.GameApp.warManager.handlePrisonerAction(${index}, 'hire')">登用</button>`;
                 }
                 
+                const getStat = (stat) => GameSystem.getDisplayStatHTML(p, stat, gunshi, null, this.game.playerClanId, myDaimyo);
+
                 div.innerHTML = `
                     <div style="flex:1;">
                         <strong>${p.name}</strong> (${p.getRankName()})<br>
-                        統:${p.leadership} 武:${p.strength} 智:${p.intelligence}
+                        <div style="display:flex; gap:5px; align-items:center; margin-top:2px;">
+                            統:${getStat('leadership')} 武:${getStat('strength')} 智:${getStat('intelligence')}
+                        </div>
                     </div>
                     <div style="display:flex; gap:5px;">
                         ${hireBtnHtml}
@@ -2806,10 +2824,22 @@ class UIManager {
         this.successionModal.classList.remove('hidden');
         if (this.successionList) {
             this.successionList.innerHTML = '';
+
+            const gunshi = this.game.getClanGunshi(this.game.playerClanId);
+            const myDaimyo = this.game.bushos.find(b => b.clan === this.game.playerClanId && b.isDaimyo);
+
             candidates.forEach(c => {
                 const div = document.createElement('div');
                 div.className = 'select-item';
-                div.innerHTML = `<span>${c.name}</span> <span>統:${c.leadership} 政:${c.politics}</span>`;
+                div.style.display = 'flex';
+                div.style.alignItems = 'center';
+                
+                const getStat = (stat) => GameSystem.getDisplayStatHTML(c, stat, gunshi, null, this.game.playerClanId, myDaimyo);
+
+                div.innerHTML = `
+                    <span style="flex:1; font-weight:bold;">${c.name}</span> 
+                    <span style="display:flex; gap:5px; align-items:center;">統:${getStat('leadership')} 政:${getStat('politics')}</span>
+                `;
                 div.onclick = () => {
                     this.successionModal.classList.add('hidden');
                     onSelect(c.id);
