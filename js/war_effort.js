@@ -1694,13 +1694,13 @@ Object.assign(WarManager.prototype, {
             const reinfBushos = availableBushos.slice(0, Math.min(bushoCount, availableBushos.length));
 
             let reinfRice = reinfSoldiers; 
-            // ★修正: 馬と鉄砲も割合で持っていく
-            const reinfHorses = Math.floor((kunishu.horses || 0) * rate); 
-            const reinfGuns = Math.floor((kunishu.guns || 0) * rate);
+            // ★修正: 馬と鉄砲は全部持っていく
+            const reinfHorses = kunishu.horses || 0; 
+            const reinfGuns = kunishu.guns || 0;
 
             kunishu.soldiers = Math.max(0, kunishu.soldiers - reinfSoldiers);
-            kunishu.horses = Math.max(0, (kunishu.horses || 0) - reinfHorses);
-            kunishu.guns = Math.max(0, (kunishu.guns || 0) - reinfGuns);
+            kunishu.horses = 0; // 全部持っていくのでお留守番はゼロになります
+            kunishu.guns = 0;   // 全部持っていくのでお留守番はゼロになります
             reinfBushos.forEach(b => b.isActionDone = true);
 
             this.state.defReinforcement = {

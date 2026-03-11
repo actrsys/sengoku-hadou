@@ -256,11 +256,11 @@ class KunishuSystem {
         if (atkSoldiers <= 0) return;
         kunishu.soldiers -= atkSoldiers;
 
-        // ★追加: 馬と鉄砲も5割持っていく
-        const atkHorses = Math.floor((kunishu.horses || 0) * 0.5);
-        kunishu.horses -= atkHorses;
-        const atkGuns = Math.floor((kunishu.guns || 0) * 0.5);
-        kunishu.guns -= atkGuns;
+        // ★修正: 馬と鉄砲は全部持っていく
+        const atkHorses = kunishu.horses || 0;
+        kunishu.horses = 0;
+        const atkGuns = kunishu.guns || 0;
+        kunishu.guns = 0;
 
         // 兵糧は無から兵数の1.5倍湧く
         const atkRice = Math.floor(atkSoldiers * 1.5);

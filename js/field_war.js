@@ -370,9 +370,10 @@ class FieldWarManager {
                             
                             if (!this.units.some(u => u.name === bestBusho.name)) {
                                 const uSoldiers = Math.floor(k.soldiers * 0.5); 
-                                // ★追加: 馬と鉄砲も半分持ち込む
-                                const uHorses = Math.floor((k.horses || 0) * 0.5);
-                                const uGuns = Math.floor((k.guns || 0) * 0.5);
+                                // ★修正: 馬と鉄砲は全部持ち込む
+                                const uHorses = k.horses || 0;
+                                const uGuns = k.guns || 0;
+                                // ※サプライズ援軍はすぐに帰る（消費しない）ので、お留守番の数をゼロにする処理は不要です
                                 
                                 if (uSoldiers > 0) {
                                     // ★追加: 兵科の決定（AIのautoDivideSoldiersの簡易版）
