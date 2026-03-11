@@ -35,17 +35,17 @@ class KunishuSystem {
 
     // イデオロギーによる相性計算の補正
     calcIdeologyAffinity(kunishu, targetBusho) {
-        if (!targetBusho) return 50;
+        if (!targetBusho) return 25; // 基準となる25にします
         let baseAffinity = GameSystem.calcAffinityDiff(this.game.getBusho(kunishu.leaderId).affinity, targetBusho.affinity);
         
         if (kunishu.ideology === '傭兵') {
-            return 50; // 傭兵は誰に対しても一定
+            return 25; // 傭兵は変動しないように真ん中の25にします
         } else if (kunishu.ideology === '地縁') {
-            if (targetBusho.innovation > 70) baseAffinity -= 15; // 革新が高いと反発
+            if (targetBusho.innovation > 70) baseAffinity += 15; // 革新が高いと反発（相性差が広がるのでプラスにします）
         } else if (kunishu.ideology === '宗教') {
-            if (targetBusho.innovation > 60) baseAffinity -= 30; // 革新が高いと猛烈に反発
+            if (targetBusho.innovation > 60) baseAffinity += 30; // 革新が高いと猛烈に反発（さらにプラスにします）
         }
-        return Math.max(0, Math.min(100, baseAffinity));
+        return Math.max(0, Math.min(50, baseAffinity)); // 結果を0〜50の間に閉じ込めるおまじないです
     }
 
     // 月末処理
@@ -99,18 +99,21 @@ class KunishuSystem {
             const castle = this.game.getCastle(kunishu.castleId);
             if (!castle || castle.ownerClan === 0) continue; // ★変更：return を continue にします
 
-            // 毎月末、最大20%の確率で発動
-            if (Math.random() < 0.20) {
+            // 毎月末、最大10%の確率で発動
+            if (Math.random() < 0.10) {
                 await this.executeActionToLord(kunishu, castle); // ★追加：await を付けます
             }
             
-            // 毎ターン、相性による友好度の自然変動 (最大±3)
+            // 毎ターン、相性による友好度の自然変動
             const castellan = this.game.getBusho(castle.castellanId);
             if (castellan) {
-                const affinity = this.calcIdeologyAffinity(kunishu, castellan);
-                let change = 0;
-                if (affinity > 60) change = Math.floor(Math.random() * 3) + 1;
-                else if (affinity < 40) change = -(Math.floor(Math.random() * 3) + 1);
+                const affinityDiff = this.calcIdeologyAffinity(kunishu, castellan);
+                
+                // 25を基準にして、0なら+3、50なら-3になる魔法の計算式です
+                let change = (25 - affinityDiff) * (3 / 25);
+                
+                // 小数点以下1桁まで残すためのおまじないです（例：1.2）
+                change = Math.round(change * 10) / 10;
                 
                 const currentRel = kunishu.getRelation(castle.ownerClan);
                 kunishu.setRelation(castle.ownerClan, currentRel + change);
