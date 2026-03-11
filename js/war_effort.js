@@ -1509,9 +1509,7 @@ Object.assign(WarManager.prototype, {
             // プレイヤーなら画面を出して選ばせる
             this.game.ui.showDefSelfReinforcementSelector(candidateCastles, defCastle, (reinfData) => {
                 if (reinfData) {
-                    setTimeout(() => {
-                        this.game.ui.log(`【自軍援軍】<span class="log-color-def">${reinfData.castle.name}</span> から守備側の援軍が参戦しました。`);
-                    }, 1500);
+                    this.game.ui.log(`【自軍援軍】<span class="log-color-def">${reinfData.castle.name}</span> から守備側の援軍が参戦しました。`);
                 }
                 onComplete(reinfData);
             });
@@ -1522,43 +1520,45 @@ Object.assign(WarManager.prototype, {
             
             // ★追加：委任城がプレイヤー直轄城に援軍要請をしてきた場合
             if (defClanId === pid && !bestCastle.isDelegated) {
+                const atkForce = this.state.attacker;
+                const atkName = atkForce.isKunishu ? atkForce.name : (this.game.clans.find(c => c.id === atkForce.ownerClan)?.name || "敵軍");
+                const atkBushoName = this.state.atkBushos[0] ? this.state.atkBushos[0].name : "総大将";
                 const defLord = this.game.getBusho(defCastle.castellanId);
                 const defLordName = defLord ? defLord.name : "城主";
 
-                // 既存のメッセージと重複しないよう、援軍要請だけ出します
+                // ★攻め込まれたメッセージ（msg1）を復活させて、順番通りに出す魔法！
+                const msg1 = `${atkName}の${atkBushoName}が\n${defCastle.name}へ攻めてきました！`;
                 const msg2 = `${defLordName}殿が${bestCastle.name}に参戦を求めています。\n援軍を送りますか？`;
 
-                this.game.ui.showDialog(msg2, true, 
-                    () => {
-                        // はい の場合
-                        const promptBusho = () => {
-                            this.game.ui.openBushoSelector('def_reinf_deploy', bestCastle.id, {
-                                hideCancel: false,
-                                onConfirm: (selectedIds) => this.handleBushoSelectionForDefSelfReinf(bestCastle.id, selectedIds, (rData) => {
-                                    if (rData) {
-                                        // ★参戦しました！の表示を後回しにする魔法
-                                        setTimeout(() => {
+                this.game.ui.showDialog(msg1, false, () => {
+                    this.game.ui.showDialog(msg2, true, 
+                        () => {
+                            // はい の場合
+                            const promptBusho = () => {
+                                this.game.ui.openBushoSelector('def_reinf_deploy', bestCastle.id, {
+                                    hideCancel: false,
+                                    onConfirm: (selectedIds) => this.handleBushoSelectionForDefSelfReinf(bestCastle.id, selectedIds, (rData) => {
+                                        if (rData) {
+                                            // ★出陣が決まった瞬間にログを出すことで、順番を後回しに！
                                             this.game.ui.log(`【自軍援軍】<span class="log-color-def">${bestCastle.name}</span> から守備側の援軍が参戦しました。`);
-                                        }, 1500);
-                                    }
-                                    onComplete(rData);
-                                }, promptBusho),
-                                onCancel: () => onComplete(null)
-                            });
-                        };
-                        promptBusho();
-                    },
-                    () => {
-                        // いいえ の場合
-                        onComplete(null);
-                    }
-                );
+                                        }
+                                        onComplete(rData);
+                                    }, promptBusho),
+                                    onCancel: () => onComplete(null)
+                                });
+                            };
+                            promptBusho();
+                        },
+                        () => {
+                            // いいえ の場合
+                            onComplete(null);
+                        }
+                    );
+                });
             } else {
                 this.executeDefSelfReinforcementAuto(bestCastle, defCastle, (reinfData) => {
                     if (reinfData) {
-                        setTimeout(() => {
-                            this.game.ui.log(`【自軍援軍】<span class="log-color-def">${bestCastle.name}</span> から守備側の援軍が参戦しました。`);
-                        }, 1500);
+                        this.game.ui.log(`【自軍援軍】<span class="log-color-def">${bestCastle.name}</span> から守備側の援軍が参戦しました。`);
                     }
                     onComplete(reinfData);
                 });
