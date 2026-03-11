@@ -185,6 +185,47 @@ Object.assign(WarManager.prototype, {
                 atkGuns = atkCastle.guns || 0;
             }
 
+            // ★変更：合流や減算をする前に、メッセージ表示用の準備をします！
+            const atkClanData = this.game.clans.find(c => c.id === atkClan); 
+            const atkArmyName = atkCastle.isKunishu ? atkCastle.name : (atkClanData ? atkClanData.getArmyName() : "敵軍");
+            const atkDaimyoName = atkClanData ? atkClanData.name : (atkCastle.isKunishu ? atkCastle.name : "中立");
+            const defClanData = this.game.clans.find(c => c.id === defClan);
+            const defDaimyoName = defClanData ? defClanData.name : (defCastle.isKunishu ? defCastle.name : "中立");
+            
+            const startMsg = `${atkDaimyoName}の${atkBushos[0].name}が\n${defDaimyoName}の${defCastle.name}に攻め込みました！`;
+            
+            // ★変更：「攻め込みました！」のメッセージをここで一番最初に出します！
+            this.game.ui.log(startMsg.replace('\n', ''));
+            if (!isPlayerInvolved) {
+                await this.game.ui.showTapMessage(startMsg);
+            } else {
+                await this.game.ui.showCutin(`${atkArmyName}の${atkBushos[0].name}が\n${defCastle.name}に攻め込みました！`);
+            }
+
+            // ★新規追加：攻撃側（委任城主）が直轄城に援軍を求めてきた場合、送るかどうか選べるようにします！
+            if (selfReinforcementData && selfReinforcementData.castle.ownerClan === pid && !selfReinforcementData.castle.isDelegated) {
+                const requesterName = atkBushos[0].name;
+                const reinfCastleName = selfReinforcementData.castle.name;
+                
+                const isConfirmed = await new Promise((resolve) => {
+                    this.game.ui.showDialog(`${requesterName}殿が${reinfCastleName}に参戦を求めています。\n援軍を送りますか？`, true, 
+                        () => resolve(true), 
+                        () => resolve(false)
+                    );
+                });
+                
+                if (!isConfirmed) {
+                    // キャンセルした場合は兵士や物資を城にお返しします
+                    const hc = selfReinforcementData.castle;
+                    hc.soldiers = Math.min(99999, hc.soldiers + selfReinforcementData.soldiers);
+                    hc.rice = Math.min(99999, hc.rice + selfReinforcementData.rice);
+                    hc.horses = Math.min(99999, (hc.horses || 0) + (selfReinforcementData.horses || 0));
+                    hc.guns = Math.min(99999, (hc.guns || 0) + (selfReinforcementData.guns || 0));
+                    selfReinforcementData.bushos.forEach(b => b.isActionDone = false);
+                    selfReinforcementData = null; // 援軍をナシにします
+                }
+            }
+
             // 2. 援軍を合流させる「前」に、出陣元の城から本隊の兵士や兵糧を減らしておきます！
             atkCastle.soldiers = Math.max(0, atkCastle.soldiers - atkSoldierCount);
             atkCastle.rice = Math.max(0, atkCastle.rice - atkRice);
@@ -193,7 +234,7 @@ Object.assign(WarManager.prototype, {
             atkBushos.forEach(b => b.isActionDone = true);
 
             // 3. 城のお留守番の数が確定したら、合戦で戦う「全体の数」として援軍を合流（足し算）させます！
-            const processReinforcement = (reinfData) => {
+            const processReinforcement = (reinfData, isSelf) => {
                 if (reinfData) {
                     const hC = reinfData.castle;
                     atkSoldierCount += reinfData.soldiers; 
@@ -203,19 +244,16 @@ Object.assign(WarManager.prototype, {
                     atkBushos = atkBushos.concat(reinfData.bushos);
                     // ★修正：諸勢力の援軍だった場合は、プレイヤーを強制的に巻き込まないようにします！
                     if (hC.ownerClan === pid && !hC.isDelegated && !reinfData.isKunishuForce) isPlayerInvolved = true;
+                    
+                    // ★追加：ここで「攻め込みました」の後に参戦のログを出します！
+                    if (isPlayerInvolved) {
+                        let reinfType = isSelf ? "自軍援軍" : "同盟援軍";
+                        this.game.ui.log(`【${reinfType}】${hC.name} が攻撃側の援軍として参戦しました。`);
+                    }
                 }
             };
-            processReinforcement(selfReinforcementData);
-            processReinforcement(reinforcementData);
-
-            const atkClanData = this.game.clans.find(c => c.id === atkClan); 
-            const atkArmyName = atkCastle.isKunishu ? atkCastle.name : (atkClanData ? atkClanData.getArmyName() : "敵軍");
-            const atkDaimyoName = atkClanData ? atkClanData.name : (atkCastle.isKunishu ? atkCastle.name : "中立");
-            const defClanData = this.game.clans.find(c => c.id === defClan);
-            const defDaimyoName = defClanData ? defClanData.name : (defCastle.isKunishu ? defCastle.name : "中立");
-            
-            const startMsg = `${atkDaimyoName}の${atkBushos[0].name}が\n${defDaimyoName}の${defCastle.name}に攻め込みました！`;
-            this.game.ui.log(startMsg.replace('\n', ''));
+            processReinforcement(selfReinforcementData, true);
+            processReinforcement(reinforcementData, false);
             
             let defBusho = null;
             if (defCastle.isKunishu) {
@@ -250,11 +288,9 @@ Object.assign(WarManager.prototype, {
                 turn: 'attacker', isPlayerInvolved: isPlayerInvolved, deadSoldiers: { attacker: 0, defender: 0 }, defenderGuarding: false,
                 reinforcement: reinforcementData, selfReinforcement: selfReinforcementData
             };
-            
-            if (!isPlayerInvolved) await this.game.ui.showTapMessage(startMsg);
 
             const showInterceptDialog = async (onResult) => {
-                if (isPlayerInvolved) await this.game.ui.showCutin(`${atkArmyName}の${atkBushos[0].name}が\n${defCastle.name}に攻め込みました！`);
+                // ★削除：ここで出していた showCutin は一番上に移動したので消しました！
 
                 // ★追加：同盟軍のチェックを一時的に「箱（startAllyReinforcement）」にしまいます
                 const startAllyReinforcement = () => {
@@ -1514,9 +1550,36 @@ Object.assign(WarManager.prototype, {
             // AIなら自動で一番兵士が多い城から送る
             candidateCastles.sort((a,b) => b.soldiers - a.soldiers);
             const bestCastle = candidateCastles[0];
-            this.executeDefSelfReinforcementAuto(bestCastle, defCastle, (reinfData) => {
-                onComplete(reinfData);
-            });
+            
+            // ★追加：委任城主が攻められた時、援軍候補が「直轄城」ならプレイヤーに尋ねる！
+            if (defClanId === pid && !bestCastle.isDelegated) {
+                const castellan = this.game.getBusho(defCastle.castellanId);
+                const requesterName = castellan ? castellan.name : "城主";
+                
+                this.game.ui.showDialog(`${requesterName}殿が${bestCastle.name}に参戦を求めています。\n援軍を送りますか？`, true, () => {
+                    // 「はい」の場合、武将選択画面を開いて自分で選べるようにします
+                    const promptBusho = () => {
+                        this.game.ui.openBushoSelector('def_self_reinf_deploy', bestCastle.id, {
+                            hideCancel: false, 
+                            onConfirm: (selectedBushoIds) => {
+                                this.handleBushoSelectionForDefSelfReinf(bestCastle.id, selectedBushoIds, onComplete, promptBusho);
+                            },
+                            onCancel: () => {
+                                this.game.ui.showDialog("援軍の派遣を取りやめました。", false, () => onComplete(null));
+                            }
+                        });
+                    };
+                    promptBusho();
+                }, () => {
+                    // 「いいえ」の場合
+                    onComplete(null);
+                });
+            } else {
+                // 自動で援軍を送る
+                this.executeDefSelfReinforcementAuto(bestCastle, defCastle, (reinfData) => {
+                    onComplete(reinfData);
+                });
+            }
         }
     },
     
