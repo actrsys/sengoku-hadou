@@ -266,7 +266,14 @@ class Kunishu {
         this.maxDefense = Number(this.maxDefense || 500);
         this.defense = Number(this.defense !== undefined ? this.defense : this.maxDefense);
         
-        this.ideology = this.ideology || '地縁'; 
+        // ★追加: 馬と鉄砲のステータス
+        this.maxHorses = Number(this.maxHorses || 300);
+        this.horses = Number(this.horses !== undefined ? this.horses : this.maxHorses);
+        
+        this.maxGuns = Number(this.maxGuns || 100);
+        this.guns = Number(this.guns !== undefined ? this.guns : this.maxGuns);
+        
+        this.ideology = this.ideology || '地縁';
         
         // ★修正: 友好度管理の箱を「大名用」と「諸勢力用」に分けました
         this.daimyoRelations = {};

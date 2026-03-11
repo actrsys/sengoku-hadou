@@ -370,8 +370,21 @@ class FieldWarManager {
                             
                             if (!this.units.some(u => u.name === bestBusho.name)) {
                                 const uSoldiers = Math.floor(k.soldiers * 0.5); 
+                                // ★追加: 馬と鉄砲も半分持ち込む
+                                const uHorses = Math.floor((k.horses || 0) * 0.5);
+                                const uGuns = Math.floor((k.guns || 0) * 0.5);
                                 
                                 if (uSoldiers > 0) {
+                                    // ★追加: 兵科の決定（AIのautoDivideSoldiersの簡易版）
+                                    let type = 'ashigaru';
+                                    let mobility = 4;
+                                    if (uHorses >= uSoldiers * 0.5) {
+                                        type = 'kiba';
+                                        mobility = 6;
+                                    } else if (uGuns >= uSoldiers * 0.5) {
+                                        type = 'teppo';
+                                    }
+
                                     let deployPos = defAllySlots[defAllyCount % defAllySlots.length];
                                     this.units.push({
                                         id: 'k_' + bestBusho.id,
@@ -384,10 +397,10 @@ class FieldWarManager {
                                         x: deployPos.x, 
                                         y: deployPos.y, 
                                         direction: (defX1 === leftX1) ? 1 : 4,
-                                        mobility: 4, 
-                                        ap: 4,
+                                        mobility: mobility, // ★修正
+                                        ap: mobility,       // ★修正
                                         soldiers: uSoldiers,
-                                        troopType: 'ashigaru', 
+                                        troopType: type,    // ★修正
                                         stats: WarSystem.calcUnitStats([bestBusho]),
                                         hasActionDone: false,
                                         hasMoved: false

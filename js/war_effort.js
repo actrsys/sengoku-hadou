@@ -736,11 +736,19 @@ Object.assign(WarManager.prototype, {
                         
                         const returnSoldiers = Math.floor(reinf.soldiers * surviveRate);
                         
+                        // ★追加: 馬と鉄砲の帰還数
+                        const returnHorses = Math.floor((reinf.horses || 0) * surviveRate);
+                        const returnGuns = Math.floor((reinf.guns || 0) * surviveRate);
+                        
                         if (isAttackerData) {
                             s.attacker.soldiers = Math.max(0, s.attacker.soldiers - returnSoldiers);
+                            s.attacker.horses = Math.max(0, (s.attacker.horses || 0) - returnHorses); // ★追加
+                            s.attacker.guns = Math.max(0, (s.attacker.guns || 0) - returnGuns);       // ★追加
                             reinf.bushos.forEach(rb => { s.atkBushos = s.atkBushos.filter(b => b.id !== rb.id); });
                         } else {
                             s.defender.soldiers = Math.max(0, s.defender.soldiers - returnSoldiers);
+                            s.defender.horses = Math.max(0, (s.defender.horses || 0) - returnHorses); // ★追加
+                            s.defender.guns = Math.max(0, (s.defender.guns || 0) - returnGuns);       // ★追加
                             reinf.bushos.forEach(rb => {
                                 const idx = s.defender.samuraiIds.indexOf(rb.id);
                                 if (idx !== -1) s.defender.samuraiIds.splice(idx, 1);
@@ -748,6 +756,8 @@ Object.assign(WarManager.prototype, {
                         }
                         
                         kunishu.soldiers = Math.min(99999, kunishu.soldiers + returnSoldiers);
+                        kunishu.horses = Math.min(99999, (kunishu.horses || 0) + returnHorses); // ★追加
+                        kunishu.guns = Math.min(99999, (kunishu.guns || 0) + returnGuns);       // ★追加
                         reinf.bushos.forEach(b => {
                             b.castleId = kunishu.castleId; 
                             b.isCastellan = false;
@@ -1684,10 +1694,13 @@ Object.assign(WarManager.prototype, {
             const reinfBushos = availableBushos.slice(0, Math.min(bushoCount, availableBushos.length));
 
             let reinfRice = reinfSoldiers; 
-            const reinfHorses = 0; 
-            const reinfGuns = 0;
+            // ★修正: 馬と鉄砲も割合で持っていく
+            const reinfHorses = Math.floor((kunishu.horses || 0) * rate); 
+            const reinfGuns = Math.floor((kunishu.guns || 0) * rate);
 
             kunishu.soldiers = Math.max(0, kunishu.soldiers - reinfSoldiers);
+            kunishu.horses = Math.max(0, (kunishu.horses || 0) - reinfHorses);
+            kunishu.guns = Math.max(0, (kunishu.guns || 0) - reinfGuns);
             reinfBushos.forEach(b => b.isActionDone = true);
 
             this.state.defReinforcement = {

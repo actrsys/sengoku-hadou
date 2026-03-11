@@ -60,6 +60,13 @@ class KunishuSystem {
             if (kunishu.defense < kunishu.maxDefense) {
                 kunishu.defense = Math.min(kunishu.maxDefense, kunishu.defense + Math.floor(kunishu.maxDefense * 0.05));
             }
+            // ★追加: 馬と鉄砲の自動回復（兵士と同じく最大値の５％）
+            if (kunishu.horses < kunishu.maxHorses) {
+                kunishu.horses = Math.min(kunishu.maxHorses, kunishu.horses + Math.floor(kunishu.maxHorses * 0.05));
+            }
+            if (kunishu.guns < kunishu.maxGuns) {
+                kunishu.guns = Math.min(kunishu.maxGuns, kunishu.guns + Math.floor(kunishu.maxGuns * 0.05));
+            }
 
             // 組織の壊滅チェック
             this.checkDestroyed(kunishu);
@@ -249,6 +256,12 @@ class KunishuSystem {
         if (atkSoldiers <= 0) return;
         kunishu.soldiers -= atkSoldiers;
 
+        // ★追加: 馬と鉄砲も5割持っていく
+        const atkHorses = Math.floor((kunishu.horses || 0) * 0.5);
+        kunishu.horses -= atkHorses;
+        const atkGuns = Math.floor((kunishu.guns || 0) * 0.5);
+        kunishu.guns -= atkGuns;
+
         // 兵糧は無から兵数の1.5倍湧く
         const atkRice = Math.floor(atkSoldiers * 1.5);
 
@@ -270,6 +283,8 @@ class KunishuSystem {
             name: kunishuName, 
             ownerClan: -1, // 特殊ID
             soldiers: atkSoldiers,
+            horses: atkHorses, // ★追加
+            guns: atkGuns,     // ★追加
             training: 50,
             morale: 80,
             rice: atkRice,
@@ -279,7 +294,7 @@ class KunishuSystem {
         };
 
         // WarManagerの開始フローに合流
-        this.game.warManager.startWar(dummyAttacker, castle, atkBushos, atkSoldiers, atkRice);
+        this.game.warManager.startWar(dummyAttacker, castle, atkBushos, atkSoldiers, atkRice, atkHorses, atkGuns); // ★修正
         
         // ★ここから追加：戦争画面が終わるまで、次の処理に進まずにじっと待つ魔法！
         while (this.game.warManager.state.active) {
