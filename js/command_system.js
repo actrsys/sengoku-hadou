@@ -1024,10 +1024,20 @@ class CommandSystem {
                 // ★頭領の名前ではなく、諸勢力の正式な名前を取得する魔法を使います
                 const kunishuName = kunishu.getName(this.game);
                 
-                // ★メッセージの中身も、取得した「kunishuName」をそのまま表示するように直しました
-                this.game.ui.showDialog(`${targetName}周辺に根付く ${kunishuName} を討伐しますか？\n今月の命令は終了となります`, true, () => {
+                // ★ここを書き換えます！
+                // 自分が操作している時だけ「討伐しますか？」のメッセージを出すようにします
+                const myClanId = castle.ownerClan;
+                const pid = this.game.playerClanId;
+                
+                if (myClanId === pid && !castle.isDelegated) {
+                    // プレイヤーの直轄城なら、ちゃんと確認メッセージを出します
+                    this.game.ui.showDialog(`${targetName}周辺に根付く ${kunishuName} を討伐しますか？\n今月の命令は終了となります`, true, () => {
+                        this.executeKunishuSubjugate(castle, targetId, data, sVal, rVal, hVal, gVal, kunishu);
+                    });
+                } else {
+                    // AI（コンピュータ）や委任の時は、メッセージを出さずにすぐ討伐を始めます！
                     this.executeKunishuSubjugate(castle, targetId, data, sVal, rVal, hVal, gVal, kunishu);
-                });
+                }
             } else {
                 // ★修正：「攻め込みますか？」の確認は後回しにして、まずは自軍の援軍を探す魔法に直結させます！
                 const bushos = data.map(id => this.game.getBusho(id));
@@ -1558,6 +1568,13 @@ class CommandSystem {
     // ★追加: 諸勢力を攻めて壊滅させるための処理（必ず攻城戦になります）
     // ★修正: 騎馬（sendHorses）と鉄砲（sendGuns）も出陣時に持っていくようにしました
     executeKunishuSubjugate(atkCastle, targetCastleId, atkBushosIds, sendSoldiers, sendRice, sendHorses, sendGuns, kunishu) {
+        // ★ここを書き足します！
+        // 戦争が始まるので、裏で動いているAIの時間をピタッと止めます！
+        if (this.game.aiTimer) {
+            clearTimeout(this.game.aiTimer);
+            this.game.aiTimer = null;
+        }
+
         const atkBushos = atkBushosIds.map(id => this.game.getBusho(id));
         const targetCastle = this.game.getCastle(targetCastleId);
         
