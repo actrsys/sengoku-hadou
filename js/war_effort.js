@@ -1775,7 +1775,13 @@ Object.assign(WarManager.prototype, {
             if (myClanId === this.game.playerClanId) {
                 const leader = this.game.getBusho(kunishu.leaderId);
                 const leaderName = leader ? leader.name : "頭領";
-                this.game.ui.showDialog(`${kunishu.getName(this.game)}の${leaderName}が援軍要請を承諾しました！`, false, onComplete);
+                
+                // ★追加：委任城主（AI）が攻められた時ならメッセージを「参戦しました！」に変えます！
+                if (defCastle.isDelegated) {
+                    this.game.ui.showDialog(`${kunishu.getName(this.game)}の${leaderName}が援軍として参戦しました！`, false, onComplete);
+                } else {
+                    this.game.ui.showDialog(`${kunishu.getName(this.game)}の${leaderName}が援軍要請を承諾しました！`, false, onComplete);
+                }
             } else {
                 const leaderName = reinfBushos.length > 0 ? reinfBushos[0].name : "頭領";
                 const atkForce = this.state.attacker;
@@ -1884,7 +1890,13 @@ Object.assign(WarManager.prototype, {
         if (myClanId === this.game.playerClanId) {
             const castellan = this.game.getBusho(helperCastle.castellanId);
             const castellanName = castellan ? castellan.name : "城主";
-            this.game.ui.showDialog(`${helperCastle.name}の${castellanName}が援軍要請を承諾しました！`, false, onComplete);
+            
+            // ★追加：こちらも委任城主（AI）が攻められた時ならメッセージを「参戦しました！」に変えます！
+            if (defCastle.isDelegated) {
+                this.game.ui.showDialog(`${helperCastle.name}の${castellanName}が同盟軍として参戦しました！`, false, onComplete);
+            } else {
+                this.game.ui.showDialog(`${helperCastle.name}の${castellanName}が援軍要請を承諾しました！`, false, onComplete);
+            }
         } else if (helperClanId === this.game.playerClanId) {
             this.game.ui.showDialog(`${helperClanName} (${helperCastle.name}) が守備側の援軍に駆けつけました！`, false, onComplete);
         } else {
