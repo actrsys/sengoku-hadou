@@ -311,9 +311,14 @@ Object.assign(WarManager.prototype, {
                                 modal.classList.remove('hidden');
                                 document.getElementById('intercept-msg').innerText = `${atkArmyName}の${atkBushos[0].name}が攻めてきました！\n敵軍: ${atkSoldierCount} 対 自軍: ${totalDefSoldiers}\n迎撃（野戦）しますか？籠城しますか？`;
                                 
-                                document.getElementById('btn-intercept').onclick = () => { 
+                                // ★修正：メッセージを待つために async にします！
+                                document.getElementById('btn-intercept').onclick = async () => { 
                                     modal.classList.add('hidden'); 
                                     this.game.ui.restoreAIGuard(); // ★追加：画面を閉じたらガードを戻す
+                                    
+                                    // ★追加：部隊配分（武将選択）の前にメッセージを出します！
+                                    await this.game.ui.showCutin(`迎撃のため、\n${defCastle.name}から打って出ます！`);
+                                    
                                     this.game.ui.openBushoSelector('def_intercept_deploy', defCastle.id, {
                                         onConfirm: (selectedBushoIds) => {
                                             const defBushos = selectedBushoIds.map(id => this.game.getBusho(id));
@@ -510,11 +515,26 @@ Object.assign(WarManager.prototype, {
                             };
 
                             // ★順番に実行して、最後に野戦をスタートさせます！
-                            handleDefDivide((finalDefAssignments) => {
-                                handleAtkDivide(finalDefAssignments, (defAssigns, finalAtkAssignments) => {
-                                    onResult('field', defAssigns, defCastle.rice, finalAtkAssignments, defCastle.horses || 0, defCastle.guns || 0);
+                            // ★追加：ここで「打って出ました！」のメッセージを出してから部隊配分に進みます！
+                            const runFieldWarProcess = async () => {
+                                const defLeaderName = defBushos.length > 0 ? defBushos[0].name : "守備隊長";
+                                const interceptMsg = `${defDaimyoName}の${defLeaderName}は、\n${defCastle.name}から打って出ました！`;
+                                
+                                this.game.ui.log(interceptMsg.replace('\n', ''));
+                                if (!isPlayerInvolved) {
+                                    await this.game.ui.showTapMessage(interceptMsg);
+                                } else {
+                                    await this.game.ui.showCutin(interceptMsg);
+                                }
+
+                                handleDefDivide((finalDefAssignments) => {
+                                    handleAtkDivide(finalDefAssignments, (defAssigns, finalAtkAssignments) => {
+                                        onResult('field', defAssigns, defCastle.rice, finalAtkAssignments, defCastle.horses || 0, defCastle.guns || 0);
+                                    });
                                 });
-                            });
+                            };
+                            
+                            runFieldWarProcess();
                         } else onResult('siege');
                     }
                 }); 
@@ -534,8 +554,7 @@ Object.assign(WarManager.prototype, {
             } else if (typeof window.FieldWarManager === 'undefined') {
                 this.startSiegeWarPhase();
             } else {
-                // ★修正：メッセージを待つために、矢印の魔法を非同期（async）にします！
-                showInterceptDialog(async (choice, defAssignments, defRice, atkAssignments, interceptHorses = 0, interceptGuns = 0) => {
+                showInterceptDialog((choice, defAssignments, defRice, atkAssignments, interceptHorses = 0, interceptGuns = 0) => {
                     
                     // ★追加: 野戦か籠城かが決まったこのタイミングで、守備側の援軍を城（守備軍）に正式合流させる！
                     const applyDefReinf = (reinf) => {
@@ -548,18 +567,7 @@ Object.assign(WarManager.prototype, {
                     applyDefReinf(this.state.defReinforcement);
 
                     if (choice === 'field') {
-                        // ★新規追加：「打って出ました！」のメッセージを表示します！
-                        const defLeaderName = (defAssignments && defAssignments.length > 0) ? defAssignments[0].busho.name : defBusho.name;
-                        const interceptMsg = `${defDaimyoName}の${defLeaderName}は、\n${defCastle.name}から打って出ました！`;
-                        
-                        // ログに記録しつつ、プレイヤーが関わっていればカットイン、AI同士ならタップ待ちメッセージを出します
-                        this.game.ui.log(interceptMsg.replace('\n', ''));
-                        if (!isPlayerInvolved) {
-                            await this.game.ui.showTapMessage(interceptMsg);
-                        } else {
-                            await this.game.ui.showCutin(interceptMsg);
-                        }
-
+                    
                         this.state.atkAssignments = atkAssignments; this.state.defAssignments = defAssignments; 
                         
                         let totalDefSoldiers = 0; if(defAssignments) defAssignments.forEach(a => totalDefSoldiers += a.soldiers);
