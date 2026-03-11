@@ -165,8 +165,8 @@ class Busho {
 
         // ★【ここから書き足し：官位】
         // 「1|2」のように書かれたIDを「|」で区切って、数字のリストに変身させます
-        if (typeof data.courtRank === 'string' && data.courtRank.trim() !== "") {
-            this.courtRankIds = data.courtRank.split('|').map(id => Number(id.trim()));
+        if (data.courtRank !== undefined && data.courtRank !== null && String(data.courtRank).trim() !== "") {
+            this.courtRankIds = String(data.courtRank).split('|').map(id => Number(id.trim()));
         } else {
             this.courtRankIds = []; // 何も持っていなければ空っぽのリストにします
         }
