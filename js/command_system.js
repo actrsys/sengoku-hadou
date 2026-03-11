@@ -2110,10 +2110,13 @@ class CommandSystem {
                 kunishus.forEach(k => {
                     if (k.getRelation(myClanId) >= 70 && k.soldiers >= 1000) {
                         const members = this.game.kunishuSystem.getKunishuMembers(k.id);
+                        // ★武将がいない時は幻の頭領の名前を用意して、バリケードを突破します！
+                        let leaderName = `${k.getName(this.game)}頭領`; 
                         if (members.length > 0) {
                             const leader = this.game.getBusho(k.leaderId) || members[0];
-                            forces.push({ isKunishu: true, id: k.id, name: k.getName(this.game), leaderName: leader.name, soldiers: k.soldiers });
+                            if (leader) leaderName = leader.name;
                         }
+                        forces.push({ isKunishu: true, id: k.id, name: k.getName(this.game), leaderName: leaderName, soldiers: k.soldiers });
                     }
                 });
 
@@ -2361,10 +2364,8 @@ class CommandSystem {
                         const isNextToMyAnyCastle = this.game.castles.some(myC => myC.ownerClan === myClanId && GameSystem.isAdjacent(c, myC));
                         const isNextToEnemy = GameSystem.isAdjacent(c, targetCastle);
                         if (isNextToMyAnyCastle || isNextToEnemy) {
-                            const members = this.game.kunishuSystem.getKunishuMembers(k.id);
-                            if (members.length > 0) {
-                                allyForceCandidates.push({ castle: c, force: { isKunishu: true, id: k.id, name: k.getName(this.game), soldiers: k.soldiers } });
-                            }
+                            // ★武将が0人でも幻の頭領にお願いできるので、ifのバリケードを消します！
+                            allyForceCandidates.push({ castle: c, force: { isKunishu: true, id: k.id, name: k.getName(this.game), soldiers: k.soldiers } });
                         }
                     }
                 });
@@ -2574,9 +2575,21 @@ class CommandSystem {
             reinfSoldiers = Math.max(500, Math.min(reinfSoldiers, kunishu.soldiers));
             
             const availableBushos = this.game.kunishuSystem.getKunishuMembers(kunishu.id).sort((a,b) => b.strength - a.strength);
-            let bushoCount = reinfSoldiers >= 2500 ? 3 : (reinfSoldiers >= 1500 ? 2 : 1);
-            bushoCount = Math.min(bushoCount, availableBushos.length);
-            const reinfBushos = availableBushos.slice(0, bushoCount);
+            let reinfBushos = [];
+            
+            if (availableBushos.length > 0) {
+                let bushoCount = reinfSoldiers >= 2500 ? 3 : (reinfSoldiers >= 1500 ? 2 : 1);
+                bushoCount = Math.min(bushoCount, availableBushos.length);
+                reinfBushos = availableBushos.slice(0, bushoCount);
+            } else {
+                // ★武将が誰もいない時は、幻の頭領をポンッと出します！
+                reinfBushos.push({
+                    id: `dummy_${kunishu.id}`,
+                    name: `${kunishu.getName(this.game)}頭領`,
+                    leadership: 30, strength: 30, intelligence: 30, politics: 30, charm: 30,
+                    isDummy: true
+                });
+            }
             
             const reinfRice = reinfSoldiers; 
             const reinfHorses = 0; 
