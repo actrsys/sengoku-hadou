@@ -1575,9 +1575,8 @@ Object.assign(WarManager.prototype, {
                     const isNextToMyAnyCastle = this.game.castles.some(myC => myC.ownerClan === defClanId && GameSystem.isAdjacent(c, myC));
                     if (isNextToMyAnyCastle) {
                         const members = this.game.kunishuSystem.getKunishuMembers(k.id);
-                        if (members.length > 0) {
-                            allyForceCandidates.push({ castle: c, force: { isKunishu: true, id: k.id, name: k.getName(this.game), soldiers: k.soldiers } });
-                        }
+                    // ★武将が0人でも幻の頭領にお願いできるので、ifのバリケードを消します！
+                    allyForceCandidates.push({ castle: c, force: { isKunishu: true, id: k.id, name: k.getName(this.game), soldiers: k.soldiers } });
                     }
                 }
             });
