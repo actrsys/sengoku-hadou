@@ -302,6 +302,12 @@ Object.assign(WarManager.prototype, {
                 // ★追加：同盟軍のチェックを一時的に「箱（startAllyReinforcement）」にしまいます
                 const startAllyReinforcement = () => {
                     this.checkDefenderReinforcement(defCastle, atkClan, () => {
+                    
+                    // ★追加：援軍の確認ダイアログがすべて終わったこのタイミングでも、念のためガードを吹き飛ばします！
+                    if (defClan === pid && !defCastle.isDelegated) {
+                        this.game.ui.hideAIGuardTemporarily();
+                    }
+                    
                     const totalDefSoldiers = defCastle.soldiers + (this.state.defReinforcement ? this.state.defReinforcement.soldiers : 0) + (this.state.defSelfReinforcement ? this.state.defSelfReinforcement.soldiers : 0);
                     isPlayerInvolved = this.state.isPlayerInvolved;
 
@@ -1573,6 +1579,8 @@ Object.assign(WarManager.prototype, {
                     });
                 },
                 () => {
+                    // ★追加：ダイアログが閉じた時にガードが戻ってしまうので、ここでもう一度外します！
+                    this.game.ui.hideAIGuardTemporarily();
                     onComplete(null); // 「いいえ」なら呼ばずに次へ進む
                 }
             );
@@ -1675,6 +1683,8 @@ Object.assign(WarManager.prototype, {
                     this.game.ui.showDefReinforcementSelector(allyCastles, defCastle, onComplete);
                 },
                 () => {
+                    // ★追加：ここも同じく、ダイアログが閉じた直後にガードを外します！
+                    this.game.ui.hideAIGuardTemporarily();
                     onComplete(); // 「いいえ」なら呼ばずに次へ進む
                 }
             );
