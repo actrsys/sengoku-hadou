@@ -606,12 +606,41 @@ Object.assign(UIManager.prototype, {
             if (isDaimyoSelect) {
                 el.innerHTML = '';
             } else {
+                // ★追加：城の中にいる諸勢力を調べて、左下に並べる魔法！
+                let kunishuHtml = '';
+                // この城にいる諸勢力のリストをもらいます
+                const kunishus = this.game.kunishuSystem ? this.game.kunishuSystem.getKunishusInCastle(c.id) : [];
+                
+                // もし諸勢力がいたら、アイコンの箱を作ります
+                if (kunishus && kunishus.length > 0) {
+                    kunishuHtml = `<div class="kunishu-icons-container">`;
+                    kunishus.forEach(k => {
+                        const kLeader = this.game.getBusho(k.leaderId);
+                        const kLeaderName = kLeader ? kLeader.name : "頭領";
+                        const kName = k.getName(this.game);
+                        
+                        // 諸勢力の数だけ、アイコンと吹き出しを追加します！
+                        kunishuHtml += `
+                            <div class="kunishu-icon-wrap">
+                                <img src="data/images/map/various_forces.webp" class="kunishu-icon-img" onerror="this.style.display='none'">
+                                <div class="hover-info kunishu-hover-info">
+                                    <div class="info-line">${kName}</div>
+                                    <div class="info-line">${kLeaderName}</div>
+                                </div>
+                            </div>
+                        `;
+                    });
+                    kunishuHtml += `</div>`;
+                }
+
+                // 城の吹き出しと、諸勢力のアイコンを一緒にセットします！
                 el.innerHTML = `
                     <div class="hover-info">
                         <div class="info-line name">${c.name}</div>
                         <div class="info-line">${clanData ? clanData.name : "中立"}</div>
                         <div class="info-line">${castellanName}</div>
                     </div>
+                    ${kunishuHtml}
                 `;
             }
             
