@@ -406,13 +406,25 @@ class IndependenceSystem {
                     alertMsgs.push(`解放：${p.name} は解放されました。`);
                 }
             } else if (newClanId === this.game.playerClanId) {
-                this.game.ui.showPrisonerModal(captives);
+                // ★プレイヤーの城に寝返った場合、戦争画面ではないので捕虜画面を出さず、逃がしてあげる魔法にします！
+                if (returnCastles.length > 0) {
+                    const target = returnCastles[Math.floor(Math.random() * returnCastles.length)];
+                    p.clan = oldClanId; p.castleId = target.id; target.samuraiIds.push(p.id);
+                    this.game.updateCastleLord(target);
+                } else {
+                    // ★逃げる城がなければ浪人にします
+                    this.game.affiliationSystem.becomeRonin(p);
+                }
+                alertMsgs.push(`${p.name} は元の主君のもとへ逃げ去りました。`);
             } else {
                 if (Math.random() < 0.3) { p.status = 'dead'; p.clan = 0; }
                 else if (returnCastles.length > 0) {
                     const target = returnCastles[Math.floor(Math.random() * returnCastles.length)];
                     p.clan = oldClanId; p.castleId = target.id; target.samuraiIds.push(p.id);
                     this.game.updateCastleLord(target);
+                } else {
+                    // ★AIの場合も、逃げる城がなければ浪人になるように安全対策を入れます！
+                    this.game.affiliationSystem.becomeRonin(p);
                 }
             }
         });
