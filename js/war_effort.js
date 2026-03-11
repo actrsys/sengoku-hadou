@@ -212,8 +212,9 @@ Object.assign(WarManager.prototype, {
                 const requesterName = atkBushos[0].name;
                 const reinfCastleName = selfReinforcementData.castle.name;
                 
-                // ★追加：AIターンなので透明なガードを一旦外します！
-                this.game.ui.hideAIGuardTemporarily();
+                // ★最強の魔法：システムに「今はプレイヤーの操作中！」と信じ込ませ、ガードを完全に破壊します！
+                this.game.isProcessingAI = false;
+                if (this.game.ui.aiGuard) this.game.ui.aiGuard.classList.add('hidden');
                 
                 const isConfirmed = await new Promise((resolve) => {
                     this.game.ui.showDialog(`${requesterName}殿が${reinfCastleName}に参戦を求めています。\n援軍を送りますか？`, true, 
@@ -221,9 +222,6 @@ Object.assign(WarManager.prototype, {
                         () => resolve(false)
                     );
                 });
-                
-                // ★追加：選び終わったらガードを戻します！
-                this.game.ui.restoreAIGuard();
                 
                 if (!isConfirmed) {
                     // キャンセルした場合は兵士や物資を城にお返しします
@@ -304,16 +302,17 @@ Object.assign(WarManager.prototype, {
                 // ★削除：ここで出していた showCutin は一番上に移動したので消しました！
 
                 // ★追加：同盟軍のチェックを一時的に「箱（startAllyReinforcement）」にしまいます
-                const startAllyReinforcement = () => {
-                    this.checkDefenderReinforcement(defCastle, atkClan, () => {
-                    
-                    // ★追加：援軍の確認ダイアログがすべて終わったこのタイミングでも、念のためガードを吹き飛ばします！
-                    if (defClan === pid && !defCastle.isDelegated) {
-                        this.game.ui.hideAIGuardTemporarily();
-                    }
-                    
-                    const totalDefSoldiers = defCastle.soldiers + (this.state.defReinforcement ? this.state.defReinforcement.soldiers : 0) + (this.state.defSelfReinforcement ? this.state.defSelfReinforcement.soldiers : 0);
-                    isPlayerInvolved = this.state.isPlayerInvolved;
+                const startAllyReinforcement = () => {
+                    this.checkDefenderReinforcement(defCastle, atkClan, () => {
+                    
+                    // ★最強の魔法：迎撃確認ウインドウの前でも、AIフラグを確実に折っておきます！
+                    if (defClan === pid && !defCastle.isDelegated) {
+                        this.game.isProcessingAI = false;
+                        if (this.game.ui.aiGuard) this.game.ui.aiGuard.classList.add('hidden');
+                    }
+                    
+                    const totalDefSoldiers = defCastle.soldiers + (this.state.defReinforcement ? this.state.defReinforcement.soldiers : 0) + (this.state.defSelfReinforcement ? this.state.defSelfReinforcement.soldiers : 0);
+                    isPlayerInvolved = this.state.isPlayerInvolved;
 
                     if (defClan === pid && !defCastle.isDelegated) {
     	                if (totalDefSoldiers <= 0) {
@@ -558,9 +557,10 @@ Object.assign(WarManager.prototype, {
                 }; // ★ここで同盟軍チェックの「箱」を閉じます
 
                 // ★追加：ここからが本番！まずは自軍の援軍をチェックして、そのあとに同盟軍チェック（箱）を呼び出します！
-                // ★追加：プレイヤーの領地が攻められた時は、ここで透明なガードを外してクリックできるようにします！
+                // ★最強の魔法：プレイヤーの領地が攻められたら、完全にAI思考フラグを解除してガードを破壊します！
                 if (defClan === pid) {
-                    this.game.ui.hideAIGuardTemporarily();
+                    this.game.isProcessingAI = false;
+                    if (this.game.ui.aiGuard) this.game.ui.aiGuard.classList.add('hidden');
                 }
                 
                 this.checkDefenderSelfReinforcement(defCastle, (selfReinfData) => {
@@ -1573,22 +1573,25 @@ Object.assign(WarManager.prototype, {
         }
 
         if (defClanId === pid && !defCastle.isDelegated) {
-            // ★修正：いきなり城を選ばせるのではなく、「他の城から援軍を出陣させますか？」と確認します！
-            this.game.ui.hideAIGuardTemporarily(); // ★念のためガードを外す
+            // ★最強の魔法：プレイヤーが操作する間はマップ再描画で膜が復活するのを防ぎます！
+            this.game.isProcessingAI = false;
+            if (this.game.ui.aiGuard) this.game.ui.aiGuard.classList.add('hidden');
+            
             this.game.ui.showDialog("他の城から援軍を出陣させますか？", true, 
                 () => {
-                    this.game.ui.hideAIGuardTemporarily(); // ★マップ選択前にもう一度ガードを外す
-                    this.game.ui.showDefSelfReinforcementSelector(candidateCastles, defCastle, (reinfData) => {
-                        onComplete(reinfData);
-                    });
-                },
-                () => {
-                    // ★追加：ダイアログが閉じた時にガードが戻ってしまうのを防ぐため、ここでもう一度外します！
-                    this.game.ui.hideAIGuardTemporarily();
-                    onComplete(null); // 「いいえ」なら呼ばずに次へ進む
-                }
-            );
-        } else {
+                    this.game.isProcessingAI = false;
+                    if (this.game.ui.aiGuard) this.game.ui.aiGuard.classList.add('hidden');
+                    this.game.ui.showDefSelfReinforcementSelector(candidateCastles, defCastle, (reinfData) => {
+                        onComplete(reinfData);
+                    });
+                },
+                () => {
+                    this.game.isProcessingAI = false;
+                    if (this.game.ui.aiGuard) this.game.ui.aiGuard.classList.add('hidden');
+                    onComplete(null); 
+                }
+            );
+        } else {
             // AIなら自動で一番兵士が多い城から送る
             candidateCastles.sort((a,b) => b.soldiers - a.soldiers);
             const bestCastle = candidateCastles[0];
@@ -1679,20 +1682,23 @@ Object.assign(WarManager.prototype, {
         const allyCastles = [...new Set(allyForceCandidates.map(fc => fc.castle))];
 
         if (defClanId === pid && !defCastle.isDelegated) {
-            // ★修正：こちらもいきなりマップ選択にせず、「他勢力に援軍を要請しますか？」と確認します！
-            this.game.ui.hideAIGuardTemporarily(); // ★念のためガードを外す
+            // ★最強の魔法：ここでもマップ再描画で膜が復活しないようにします！
+            this.game.isProcessingAI = false;
+            if (this.game.ui.aiGuard) this.game.ui.aiGuard.classList.add('hidden');
+            
             this.game.ui.showDialog("他勢力に援軍を要請しますか？", true, 
                 () => {
-                    this.game.ui.hideAIGuardTemporarily(); // ★マップ選択前にもう一度ガードを外す
-                    this.game.ui.showDefReinforcementSelector(allyCastles, defCastle, onComplete);
-                },
-                () => {
-                    // ★追加：ここも同じく、ダイアログが閉じた直後にガードを外します！
-                    this.game.ui.hideAIGuardTemporarily();
-                    onComplete(); // 「いいえ」なら呼ばずに次へ進む
-                }
-            );
-        } else {
+                    this.game.isProcessingAI = false;
+                    if (this.game.ui.aiGuard) this.game.ui.aiGuard.classList.add('hidden');
+                    this.game.ui.showDefReinforcementSelector(allyCastles, defCastle, onComplete);
+                },
+                () => {
+                    this.game.isProcessingAI = false;
+                    if (this.game.ui.aiGuard) this.game.ui.aiGuard.classList.add('hidden');
+                    onComplete(); 
+                }
+            );
+        } else {
             allyForceCandidates.sort((a,b) => b.force.soldiers - a.force.soldiers);
             const best = allyForceCandidates[0];
             best.castle.selectedForce = best.force; // シールを貼る
