@@ -164,8 +164,12 @@ Object.assign(WarManager.prototype, {
     },
     
     async startWar(atkCastle, defCastle, atkBushos, atkSoldierCount, atkRice, atkHorses = 0, atkGuns = 0, reinforcementData = null, selfReinforcementData = null) {
-        try {
-            let atkLeaderIdx = atkBushos.findIndex(b => b.isDaimyo);
+        // ★追加：何よりも先に「合戦中」のロックをかけて、裏で他のAIがフライングして動き出さないようにします！
+        this.state = this.state || {};
+        this.state.active = true;
+
+        try {
+            let atkLeaderIdx = atkBushos.findIndex(b => b.isDaimyo);
             if (atkLeaderIdx === -1) atkLeaderIdx = atkBushos.findIndex(b => b.isCastellan);
             if (atkLeaderIdx > 0) {
                 const leader = atkBushos.splice(atkLeaderIdx, 1)[0];
@@ -300,19 +304,19 @@ Object.assign(WarManager.prototype, {
                 // ★削除：ここで出していた showCutin は一番上に移動したので消しました！
 
                 // ★追加：同盟軍のチェックを一時的に「箱（startAllyReinforcement）」にしまいます
-                const startAllyReinforcement = () => {
-                    this.checkDefenderReinforcement(defCastle, atkClan, () => {
-                    
-                    // ★追加：援軍の確認ダイアログがすべて終わったこのタイミングでも、念のためガードを吹き飛ばします！
-                    if (defClan === pid && !defCastle.isDelegated) {
-                        this.game.ui.hideAIGuardTemporarily();
-                    }
-                    
-                    const totalDefSoldiers = defCastle.soldiers + (this.state.defReinforcement ? this.state.defReinforcement.soldiers : 0) + (this.state.defSelfReinforcement ? this.state.defSelfReinforcement.soldiers : 0);
-                    isPlayerInvolved = this.state.isPlayerInvolved;
+                const startAllyReinforcement = () => {
+                    this.checkDefenderReinforcement(defCastle, atkClan, () => {
+                    
+                    // ★追加：援軍の確認ダイアログがすべて終わったこのタイミングでも、念のためガードを吹き飛ばします！
+                    if (defClan === pid && !defCastle.isDelegated) {
+                        this.game.ui.hideAIGuardTemporarily();
+                    }
+                    
+                    const totalDefSoldiers = defCastle.soldiers + (this.state.defReinforcement ? this.state.defReinforcement.soldiers : 0) + (this.state.defSelfReinforcement ? this.state.defSelfReinforcement.soldiers : 0);
+                    isPlayerInvolved = this.state.isPlayerInvolved;
 
-                    if (defClan === pid && !defCastle.isDelegated) {
-    	                if (totalDefSoldiers <= 0) {
+                    if (defClan === pid && !defCastle.isDelegated) {
+    	                if (totalDefSoldiers <= 0) {
     	                    if (isPlayerInvolved) this.game.ui.log("城に兵士がいないため、迎撃（野戦）に出られません！");
     	                    onResult('siege');
     	                } else {
@@ -1573,18 +1577,18 @@ Object.assign(WarManager.prototype, {
             this.game.ui.hideAIGuardTemporarily(); // ★念のためガードを外す
             this.game.ui.showDialog("他の城から援軍を出陣させますか？", true, 
                 () => {
-                    this.game.ui.hideAIGuardTemporarily(); // ★マップ選択前にもう一度ガードを外す
-                    this.game.ui.showDefSelfReinforcementSelector(candidateCastles, defCastle, (reinfData) => {
-                        onComplete(reinfData);
-                    });
-                },
-                () => {
-                    // ★追加：ダイアログが閉じた時にガードが戻ってしまうので、ここでもう一度外します！
-                    this.game.ui.hideAIGuardTemporarily();
-                    onComplete(null); // 「いいえ」なら呼ばずに次へ進む
-                }
-            );
-        } else {
+                    this.game.ui.hideAIGuardTemporarily(); // ★マップ選択前にもう一度ガードを外す
+                    this.game.ui.showDefSelfReinforcementSelector(candidateCastles, defCastle, (reinfData) => {
+                        onComplete(reinfData);
+                    });
+                },
+                () => {
+                    // ★追加：ダイアログが閉じた時にガードが戻ってしまうのを防ぐため、ここでもう一度外します！
+                    this.game.ui.hideAIGuardTemporarily();
+                    onComplete(null); // 「いいえ」なら呼ばずに次へ進む
+                }
+            );
+        } else {
             // AIなら自動で一番兵士が多い城から送る
             candidateCastles.sort((a,b) => b.soldiers - a.soldiers);
             const bestCastle = candidateCastles[0];
@@ -1679,16 +1683,16 @@ Object.assign(WarManager.prototype, {
             this.game.ui.hideAIGuardTemporarily(); // ★念のためガードを外す
             this.game.ui.showDialog("他勢力に援軍を要請しますか？", true, 
                 () => {
-                    this.game.ui.hideAIGuardTemporarily(); // ★マップ選択前にもう一度ガードを外す
-                    this.game.ui.showDefReinforcementSelector(allyCastles, defCastle, onComplete);
-                },
-                () => {
-                    // ★追加：ここも同じく、ダイアログが閉じた直後にガードを外します！
-                    this.game.ui.hideAIGuardTemporarily();
-                    onComplete(); // 「いいえ」なら呼ばずに次へ進む
-                }
-            );
-        } else {
+                    this.game.ui.hideAIGuardTemporarily(); // ★マップ選択前にもう一度ガードを外す
+                    this.game.ui.showDefReinforcementSelector(allyCastles, defCastle, onComplete);
+                },
+                () => {
+                    // ★追加：ここも同じく、ダイアログが閉じた直後にガードを外します！
+                    this.game.ui.hideAIGuardTemporarily();
+                    onComplete(); // 「いいえ」なら呼ばずに次へ進む
+                }
+            );
+        } else {
             allyForceCandidates.sort((a,b) => b.force.soldiers - a.force.soldiers);
             const best = allyForceCandidates[0];
             best.castle.selectedForce = best.force; // シールを貼る
