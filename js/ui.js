@@ -302,7 +302,10 @@ class UIManager {
             isVisible('result-modal') ||
             isVisible('intercept-confirm-modal') ||
             isVisible('unit-divide-modal') ||
-            isVisible('prisoner-modal')
+            isVisible('prisoner-modal') ||
+            isVisible('selector-modal') || // ★追加：武将や諸勢力の一覧画面
+            isVisible('quantity-modal') || // ★追加：兵士数などを決めるスライダー画面
+            this.game.selectionMode != null // ★追加：マップ上で城を選んでいる最中
         ) {
             didWait = true; 
             await new Promise(resolve => setTimeout(resolve, 200));

@@ -1186,7 +1186,11 @@ class GameManager {
     }
     
     finishTurn() { 
-        if(this.warManager.state.active && this.warManager.state.isPlayerInvolved) return; 
+        // ★最強ストッパー１：プレイヤーが関与していなくても、合戦の処理中なら絶対にターンを勝手に進めない！
+        if(this.warManager.state.active) return; 
+        
+        // ★最強ストッパー２：マップで城を選んでいる最中なども、絶対にターンを勝手に終わらせない！
+        if(this.selectionMode != null) return;
         
         if (this.aiTimer) { clearTimeout(this.aiTimer); this.aiTimer = null; }
 
