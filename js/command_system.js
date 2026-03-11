@@ -319,9 +319,9 @@ class CommandSystem {
 
         // --- 条件分岐（誰をリストに出すか） ---
         if (actionType === 'employ_target') { 
-            bushos = this.game.getCastleBushos(c.id).filter(b => b.status === 'ronin'); 
+            bushos = this.game.getCastleBushos(c.id).filter(b => b.status === 'ronin' && b.belongKunishuId === 0); 
             infoHtml = "<div>登用する在野武将を選択してください</div>"; 
-        } 
+        }
         else if (actionType === 'employ_doer') { 
             bushos = this.game.getCastleBushos(c.id).filter(b => b.status !== 'ronin'); 
             infoHtml = "<div>登用を行う担当官を選択してください</div>"; 
