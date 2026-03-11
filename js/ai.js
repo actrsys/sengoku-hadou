@@ -618,31 +618,28 @@ class AIEngine {
         const targetCastle = this.game.getCastle(target.id);
         
         const isSourcePlayer = source.ownerClan === this.game.playerClanId;
-
+        
         // ★追加：AI城主（委任城）が攻撃する時の援軍要請とメッセージ
-        if (isSourcePlayer) {
-            let candidateCastles = [];
-            this.game.castles.forEach(c => {
-                if (c.ownerClan !== source.ownerClan || c.id === source.id || c.id === target.id) return;
-                if (!GameSystem.isReachable(this.game, source, c, source.ownerClan)) return;
-                if (c.soldiers < 1000 || c.rice < 500) return;
-                const normalBushos = this.game.getCastleBushos(c.id).filter(b => !b.isDaimyo && !b.isCastellan && b.status !== 'ronin' && b.belongKunishuId === 0);
-                if (normalBushos.length === 0) return;
-                candidateCastles.push(c);
-            });
+            if (isSourcePlayer) {
+                let candidateCastles = [];
+                this.game.castles.forEach(c => {
+                    if (c.ownerClan !== source.ownerClan || c.id === source.id || c.id === target.id) return;
+                    if (!GameSystem.isReachable(this.game, source, c, source.ownerClan)) return;
+                    if (c.soldiers < 1000 || c.rice < 500) return;
+                    const normalBushos = this.game.getCastleBushos(c.id).filter(b => !b.isDaimyo && !b.isCastellan && b.status !== 'ronin' && b.belongKunishuId === 0);
+                    if (normalBushos.length === 0) return;
+                    candidateCastles.push(c);
+                });
 
-            let bestCastle = null;
-            if (candidateCastles.length > 0) {
-                candidateCastles.sort((a,b) => b.soldiers - a.soldiers);
-                bestCastle = candidateCastles[0];
-            }
+                let bestCastle = null;
+                if (candidateCastles.length > 0) {
+                    candidateCastles.sort((a,b) => b.soldiers - a.soldiers);
+                    bestCastle = candidateCastles[0];
+                }
 
-            // ★攻め込んだメッセージ（msg1）を復活させて、順番通りに出す魔法！
-            const msg1 = `${source.name}の${general.name}殿が\n${targetCastle.name}へ攻め込みました！`;
-            
-            this.game.ui.showDialog(msg1, false, () => {
                 if (bestCastle && !bestCastle.isDelegated) {
-                    const msg2 = `${general.name}殿が${bestCastle.name}に参戦を求めています。\n援軍を送りますか？`;
+                    // msg1をなくし、msg2に状況をまとめます
+                    const msg2 = `${source.name}の${general.name}殿が${targetCastle.name}へ出陣します。\n${bestCastle.name}に援軍を求めています。援軍を送りますか？`;
                     this.game.ui.showDialog(msg2, true, 
                         () => {
                             // はい の場合
@@ -670,8 +667,6 @@ class AIEngine {
                                                     rice: rR, horses: rH, guns: rG, isSelf: true
                                                 };
                                                 
-                                                // ★出陣が決まった瞬間にログを出すことで、順番を後回しに！
-                                                this.game.ui.log(`【自軍援軍】<span class="log-color-def">${bestCastle.name}</span> から攻撃側の援軍が参戦しました。`);
                                                 this.game.warManager.startWar(source, targetCastle, sorted, sendSoldiers, sendRice, sendHorses, sendGuns, null, selfReinfData);
                                             },
                                             onCancel: promptBusho
@@ -712,14 +707,11 @@ class AIEngine {
                             castle: bestCastle, bushos: reinfBushos, soldiers: rS,
                             rice: rR, horses: rH, guns: rG, isSelf: true
                         };
-                        
-                        this.game.ui.log(`【自軍援軍】<span class="log-color-def">${bestCastle.name}</span> から攻撃側の援軍が参戦しました。`);
                     }
                     this.game.warManager.startWar(source, targetCastle, sorted, sendSoldiers, sendRice, sendHorses, sendGuns, null, aiReinfData);
                 }
-            });
-            return;
-        }
+                return;
+            }
 
         // ★AI同士の戦いや敵からの攻撃など、プレイヤーが攻撃側でない場合は
         // 無理にメッセージを追加せず、元々のゲームの仕組み（チェック処理やログ）にお任せします！

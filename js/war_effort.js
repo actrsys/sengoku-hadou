@@ -193,7 +193,7 @@ Object.assign(WarManager.prototype, {
             atkBushos.forEach(b => b.isActionDone = true);
 
             // 3. 城のお留守番の数が確定したら、合戦で戦う「全体の数」として援軍を合流（足し算）させます！
-            const processReinforcement = (reinfData) => {
+            const processReinforcement = (reinfData, isSelf) => {
                 if (reinfData) {
                     const hC = reinfData.castle;
                     atkSoldierCount += reinfData.soldiers; 
@@ -203,12 +203,17 @@ Object.assign(WarManager.prototype, {
                     atkBushos = atkBushos.concat(reinfData.bushos);
                     // ★修正：諸勢力の援軍だった場合は、プレイヤーを強制的に巻き込まないようにします！
                     if (hC.ownerClan === pid && !hC.isDelegated && !reinfData.isKunishuForce) isPlayerInvolved = true;
+                    
+                    // ★追加：攻撃側の援軍ログをここで出します！
+                    let prefix = isSelf ? "自軍援軍" : "同盟援軍";
+                    let colorClass = isSelf ? "log-color-def" : "";
+                    this.game.ui.log(`【${prefix}】<span class="${colorClass}">${hC.name}</span> から攻撃側の援軍が参戦しました。`);
                 }
             };
-            processReinforcement(selfReinforcementData);
-            processReinforcement(reinforcementData);
+            processReinforcement(selfReinforcementData, true);
+            processReinforcement(reinforcementData, false);
 
-            const atkClanData = this.game.clans.find(c => c.id === atkClan); 
+            const atkClanData = this.game.clans.find(c => c.id === atkClan);
             const atkArmyName = atkCastle.isKunishu ? atkCastle.name : (atkClanData ? atkClanData.getArmyName() : "敵軍");
             const atkDaimyoName = atkClanData ? atkClanData.name : (atkCastle.isKunishu ? atkCastle.name : "中立");
             const defClanData = this.game.clans.find(c => c.id === defClan);
@@ -1526,12 +1531,10 @@ Object.assign(WarManager.prototype, {
                 const defLord = this.game.getBusho(defCastle.castellanId);
                 const defLordName = defLord ? defLord.name : "城主";
 
-                // ★攻め込まれたメッセージ（msg1）を復活させて、順番通りに出す魔法！
-                const msg1 = `${atkName}の${atkBushoName}が\n${defCastle.name}へ攻めてきました！`;
+                // msg1を削除し、すでに「攻め込みました」が画面に出ているので援軍要請だけ出します
                 const msg2 = `${defLordName}殿が${bestCastle.name}に参戦を求めています。\n援軍を送りますか？`;
 
-                this.game.ui.showDialog(msg1, false, () => {
-                    this.game.ui.showDialog(msg2, true, 
+                this.game.ui.showDialog(msg2, true, 
                         () => {
                             // はい の場合
                             const promptBusho = () => {
