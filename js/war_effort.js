@@ -208,12 +208,18 @@ Object.assign(WarManager.prototype, {
                 const requesterName = atkBushos[0].name;
                 const reinfCastleName = selfReinforcementData.castle.name;
                 
+                // ★追加：AIターンなので透明なガードを一旦外します！
+                this.game.ui.hideAIGuardTemporarily();
+                
                 const isConfirmed = await new Promise((resolve) => {
                     this.game.ui.showDialog(`${requesterName}殿が${reinfCastleName}に参戦を求めています。\n援軍を送りますか？`, true, 
                         () => resolve(true), 
                         () => resolve(false)
                     );
                 });
+                
+                // ★追加：選び終わったらガードを戻します！
+                this.game.ui.restoreAIGuard();
                 
                 if (!isConfirmed) {
                     // キャンセルした場合は兵士や物資を城にお返しします
@@ -314,7 +320,7 @@ Object.assign(WarManager.prototype, {
                                 // ★修正：メッセージを待つために async にします！
                                 document.getElementById('btn-intercept').onclick = async () => { 
                                     modal.classList.add('hidden'); 
-                                    this.game.ui.restoreAIGuard(); // ★追加：画面を閉じたらガードを戻す
+                                    // ★注意：ここでガードを戻すと武将選択がクリックできなくなるので消します！
                                     
                                     // ★追加：部隊配分（武将選択）の前にメッセージを出します！
                                     await this.game.ui.showCutin(`迎撃のため、\n${defCastle.name}から打って出ます！`);
@@ -542,6 +548,11 @@ Object.assign(WarManager.prototype, {
                 }; // ★ここで同盟軍チェックの「箱」を閉じます
 
                 // ★追加：ここからが本番！まずは自軍の援軍をチェックして、そのあとに同盟軍チェック（箱）を呼び出します！
+                // ★追加：プレイヤーの領地が攻められた時は、ここで透明なガードを外してクリックできるようにします！
+                if (defClan === pid) {
+                    this.game.ui.hideAIGuardTemporarily();
+                }
+                
                 this.checkDefenderSelfReinforcement(defCastle, (selfReinfData) => {
                     if (selfReinfData) this.state.defSelfReinforcement = selfReinfData;
                     startAllyReinforcement();
@@ -555,6 +566,9 @@ Object.assign(WarManager.prototype, {
                 this.startSiegeWarPhase();
             } else {
                 showInterceptDialog((choice, defAssignments, defRice, atkAssignments, interceptHorses = 0, interceptGuns = 0) => {
+                    
+                    // ★追加：ここで確実にガードを戻して、これ以降の合戦がフリーズしないようにします！
+                    this.game.ui.restoreAIGuard();
                     
                     // ★追加: 野戦か籠城かが決まったこのタイミングで、守備側の援軍を城（守備軍）に正式合流させる！
                     const applyDefReinf = (reinf) => {
