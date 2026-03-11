@@ -1812,44 +1812,6 @@ class UIManager {
         let isFamily = false; // ★一門かどうかを判定する箱
         
         if (busho.belongKunishuId > 0) {
-            let kunishu = null;
-            if (this.game.kunishuSystem && typeof this.game.kunishuSystem.getKunishu === 'function') {
-                kunishu = this.game.kunishuSystem.getKunishu(busho.belongKunishuId);
-            } else if (this.game.kunishus) {
-                kunishu = this.game.kunishus.find(k => k.id === busho.belongKunishuId);
-            }
-            
-            if (kunishu) {
-                affiliationName = kunishu.getName(this.game);
-                
-                // ★頭領を探して、一門かどうかチェック！
-                const leader = this.game.getBusho(kunishu.leaderId);
-                // 自分が頭領ではなく、頭領が存在する場合
-                if (leader && busho.id !== leader.id) {
-                    if (busho.familyIds && leader.familyIds) {
-                        // お互いの家族リストに共通のIDがあるか確認します
-                        isFamily = busho.familyIds.some(id => leader.familyIds.includes(id));
-                    }
-                }
-            } else {
-                affiliationName = "諸勢力";
-            }
-            
-        } else if (busho.clan > 0) {
-            const clan = this.game.clans.find(c => c.id === busho.clan);
-            if (clan) {
-                affiliationName = clan.name;
-                
-                // ★大名を探して、一門かどうかチェック！
-                const daimyo = this.game.getBusho(clan.leaderId); 
-                // 自分が大名ではなく、大名が存在する場合
-                if (daimyo && busho.id !== daimyo.id && !busho.isDaimyo) {
-                    if (busho.familyIds && daimyo.familyIds) {
-                        isFamily = busho.familyIds.some(id => daimyo.familyIds.includes(id));
-                    }
-                }
-            }
-        }
 
         let familyBadge = "";
         if (isFamily) {
