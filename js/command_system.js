@@ -252,6 +252,12 @@ const COMMAND_SPECS = {
         isMulti: false, hasAdvice: true,
         startMode: 'map_select', targetType: 'kunishu_valid'
     },
+    'kunishu_incorporate': {
+        label: "諸勢力取込", category: 'FOREIGN_KUNISHU',
+        costGold: 0, costRice: 0,
+        isMulti: false, hasAdvice: true,
+        startMode: 'map_select', targetType: 'kunishu_incorporate_valid'
+    },
 
     // --- 朝廷 (DIPLOMACY_COURT) ---
     'tribute': {
@@ -349,6 +355,10 @@ class CommandSystem {
         else if (actionType === 'kunishu_headhunt_target') { 
             bushos = this.game.getCastleBushos(targetId).filter(b => b.status !== 'ronin' && b.belongKunishuId === extraData.kunishuId); 
             infoHtml = "<div>引抜の対象とする諸勢力武将を選択してください </div>"; 
+        }
+        else if (actionType === 'kunishu_incorporate_doer') {
+            bushos = this.game.getCastleBushos(c.id).filter(b => b.status !== 'ronin'); 
+            infoHtml = "<div>取込の交渉を行う担当官を選択してください</div>"; 
         }
         else if (actionType === 'headhunt_doer') {
             bushos = this.game.getCastleBushos(c.id).filter(b => b.status !== 'ronin'); 
@@ -552,6 +562,27 @@ class CommandSystem {
                 if (type === 'kunishu_goodwill') {
                     validKunishus = activeKunishus.filter(k => k.getRelation(playerClanId) < 100);
                 }
+                return [...new Set(validKunishus.map(k => k.castleId))];
+            }
+
+            case 'kunishu_incorporate_valid': {
+                const activeKunishus = this.game.kunishuSystem.getAliveKunishus();
+                const myClanId = playerClanId;
+                const myClan = this.game.clans.find(c => c.id === myClanId);
+                const myPrestige = myClan ? myClan.daimyoPrestige : 0;
+
+                const validKunishus = activeKunishus.filter(k => {
+                    const castle = this.game.getCastle(k.castleId);
+                    // 自分の城にいること
+                    if (!castle || Number(castle.ownerClan) !== myClanId) return false;
+                    // 宗教ではないこと
+                    if (k.ideology === '宗教') return false;
+                    // 友好度95以上
+                    if (k.getRelation(myClanId) < 95) return false;
+                    // 兵士数が自軍威信の半分以下
+                    if (k.soldiers > myPrestige / 2) return false;
+                    return true;
+                });
                 return [...new Set(validKunishus.map(k => k.castleId))];
             }
 
@@ -767,6 +798,31 @@ class CommandSystem {
         }
         if (actionType === 'kunishu_headhunt_doer') {
             this.game.ui.openQuantitySelector('headhunt_gold', selectedIds, extraData.targetId, { isKunishu: true, kunishuId: extraData.kunishuId });
+            return;
+        }
+        if (actionType === 'kunishu_incorporate_doer') {
+            const doer = this.game.getBusho(firstId);
+            const kunishu = this.game.kunishuSystem.getKunishu(extraData.kunishuId);
+            
+            const myClan = this.game.clans.find(c => c.id === this.game.playerClanId);
+            const myPrestige = myClan ? myClan.daimyoPrestige : 0;
+            const myDaimyo = this.game.bushos.find(b => b.clan === this.game.playerClanId && b.isDaimyo);
+            const leader = this.game.getBusho(kunishu.leaderId);
+
+            let baseProb = 0;
+            const targetSoldiers = kunishu.soldiers || 1;
+            const ratio = myPrestige / (targetSoldiers * 12);
+            baseProb = 70 * ratio; 
+            
+            const affinityDiff = (myDaimyo && leader) ? GameSystem.calcAffinityDiff(myDaimyo.affinity, leader.affinity) : 25;
+            const affinityMod = (25 - affinityDiff) / 25 * 10;
+            
+            const diplomacyMod = (doer.diplomacy - 50) / 50 * 10;
+            
+            let totalProb = baseProb + affinityMod + diplomacyMod;
+            totalProb = Math.max(0, Math.min(100, totalProb)) / 100; 
+
+            this.showAdviceAndExecute('kunishu_incorporate', () => this.executeKunishuIncorporate(firstId, targetId, extraData.kunishuId), { trueProb: totalProb });
             return;
         }
         if (actionType === 'kunishu_subjugate_deploy') {
@@ -1440,6 +1496,64 @@ class CommandSystem {
         doer.isActionDone = true; this.game.ui.updatePanelHeader(); this.game.ui.renderCommandMenu();
     }
     
+    // ★追加: 諸勢力を自軍に取り込む処理です
+    executeKunishuIncorporate(doerId, castleId, kunishuId) {
+        const doer = this.game.getBusho(doerId);
+        const kunishu = this.game.kunishuSystem.getKunishu(kunishuId);
+        const castle = this.game.getCastle(castleId);
+        
+        if (!kunishu) return;
+
+        const myClan = this.game.clans.find(c => c.id === this.game.playerClanId);
+        const myPrestige = myClan ? myClan.daimyoPrestige : 0;
+        const myDaimyo = this.game.bushos.find(b => b.clan === this.game.playerClanId && b.isDaimyo);
+        const leader = this.game.getBusho(kunishu.leaderId);
+
+        let baseProb = 0;
+        const targetSoldiers = kunishu.soldiers || 1;
+        const ratio = myPrestige / (targetSoldiers * 12);
+        baseProb = 70 * ratio;
+        
+        const affinityDiff = (myDaimyo && leader) ? GameSystem.calcAffinityDiff(myDaimyo.affinity, leader.affinity) : 25;
+        const affinityMod = (25 - affinityDiff) / 25 * 10;
+        
+        const diplomacyMod = (doer.diplomacy - 50) / 50 * 10;
+        
+        let totalProb = baseProb + affinityMod + diplomacyMod;
+        
+        const isSuccess = (Math.random() * 100) < totalProb;
+        
+        if (isSuccess) {
+            castle.soldiers = Math.min(99999, castle.soldiers + kunishu.soldiers);
+            castle.horses = Math.min(99999, (castle.horses || 0) + (kunishu.horses || 0));
+            castle.guns = Math.min(99999, (castle.guns || 0) + (kunishu.guns || 0));
+            
+            const members = this.game.kunishuSystem.getKunishuMembers(kunishuId);
+            members.forEach(b => {
+                b.belongKunishuId = 0;
+                this.game.affiliationSystem.joinClan(b, this.game.playerClanId, castle.id);
+            });
+            
+            kunishu.isDestroyed = true;
+            kunishu.soldiers = 0;
+
+            const kunishuName = kunishu.getName(this.game);
+            this.game.ui.showResultModal(`${doer.name}の熱意ある説得により、${kunishuName} が我が軍に合流しました！\n所属武将と兵士、騎馬、鉄砲が自軍に加わりました！`);
+            
+            doer.achievementTotal += Math.floor(doer.diplomacy * 0.3) + 30;
+            this.game.factionSystem.updateRecognition(doer, 30);
+        } else {
+            const kunishuName = kunishu.getName(this.game);
+            this.game.ui.showResultModal(`${doer.name}は ${kunishuName} に合流を提案しましたが、\n丁重に断られてしまいました……`);
+            doer.achievementTotal += 5;
+            this.game.factionSystem.updateRecognition(doer, 10);
+        }
+
+        doer.isActionDone = true;
+        this.game.ui.updatePanelHeader();
+        this.game.ui.renderCommandMenu();
+    }
+
     // ★追加: 諸勢力を攻めて壊滅させるための処理（必ず攻城戦になります）
     // ★修正: 騎馬（sendHorses）と鉄砲（sendGuns）も出陣時に持っていくようにしました
     executeKunishuSubjugate(atkCastle, targetCastleId, atkBushosIds, sendSoldiers, sendRice, sendHorses, sendGuns, kunishu) {
@@ -1910,6 +2024,7 @@ class CommandSystem {
             case 'kunishu_headhunt': return "引抜対象の諸勢力がいる城を選択してください";
             case 'goodwill': case 'alliance': return "外交相手を選択してください";
             case 'kunishu_goodwill': return "親善を行う諸勢力がいる城を選択してください";
+            case 'kunishu_incorporate': return "取込を行う諸勢力がいる城を選択してください";
             case 'break_alliance': return "同盟破棄する相手を選択してください";
             case 'court_truce': return "和睦を行う相手を選択してください"; // ★これを追加！
             // ★ここから下を追加！
@@ -2027,8 +2142,23 @@ class CommandSystem {
         };
 
         // ★変更: 諸勢力のコマンドなら、どの諸勢力を対象にするかを選びます
-        if (['kunishu_subjugate', 'kunishu_headhunt', 'kunishu_goodwill'].includes(mode)) {
-            const kunishus = this.game.kunishuSystem.getKunishusInCastle(targetCastle.id);
+        if (['kunishu_subjugate', 'kunishu_headhunt', 'kunishu_goodwill', 'kunishu_incorporate'].includes(mode)) {
+            let kunishus = this.game.kunishuSystem.getKunishusInCastle(targetCastle.id);
+
+            // ★追加：取込の場合はさらに条件で絞り込みます
+            if (mode === 'kunishu_incorporate') {
+                const myClanId = this.game.playerClanId;
+                const myClan = this.game.clans.find(c => c.id === myClanId);
+                const myPrestige = myClan ? myClan.daimyoPrestige : 0;
+                
+                kunishus = kunishus.filter(k => {
+                    if (k.ideology === '宗教') return false;
+                    if (k.getRelation(myClanId) < 95) return false;
+                    if (k.soldiers > myPrestige / 2) return false;
+                    return true;
+                });
+            }
+
             if (kunishus.length === 0) {
                 this.game.ui.showDialog("この城には行動可能な諸勢力がいません。", false);
                 return;
@@ -2042,6 +2172,8 @@ class CommandSystem {
                     this.game.ui.openBushoSelector('kunishu_headhunt_target', targetCastle.id, { kunishuId: selectedKunishuId }, onBackToMap);
                 } else if (mode === 'kunishu_subjugate') {
                     this.game.ui.openBushoSelector('kunishu_subjugate_deploy', targetCastle.id, { kunishuId: selectedKunishuId }, onBackToMap);
+                } else if (mode === 'kunishu_incorporate') {
+                    this.game.ui.openBushoSelector('kunishu_incorporate_doer', targetCastle.id, { kunishuId: selectedKunishuId }, onBackToMap);
                 }
             };
             
