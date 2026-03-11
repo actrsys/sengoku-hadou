@@ -203,7 +203,8 @@ Object.assign(WarManager.prototype, {
             }
 
             // ★新規追加：攻撃側（委任城主）が直轄城に援軍を求めてきた場合、送るかどうか選べるようにします！
-            if (selfReinforcementData && selfReinforcementData.castle.ownerClan === pid && !selfReinforcementData.castle.isDelegated) {
+            // ★プレイヤー自身が直轄城から出陣させた時は聞かず、委任城主（AI）からの要請の時だけ出します！
+            if (selfReinforcementData && selfReinforcementData.castle.ownerClan === pid && !selfReinforcementData.castle.isDelegated && atkCastle.isDelegated) {
                 const requesterName = atkBushos[0].name;
                 const reinfCastleName = selfReinforcementData.castle.name;
                 
