@@ -132,8 +132,14 @@ class KunishuSystem {
             if (castellan) {
                 const affinityDiff = this.calcIdeologyAffinity(kunishu, castellan);
                 
-                // 25を基準にして、0なら+3、50なら-3になる魔法の計算式です
-                let change = (25 - affinityDiff) * (3 / 25);
+                // 25を基準にして、どれくらい離れているか（差分）を計算します
+                let diff = 25 - affinityDiff;
+                
+                // どんなに差が大きくても、上も下も「最大25（最小-25）」でストップをかけます！
+                diff = Math.max(-25, Math.min(25, diff));
+                
+                // 最大で ±3 になるように計算する魔法です
+                let change = diff * (3 / 25);
                 
                 // 小数点以下1桁まで残すためのおまじないです（例：1.2）
                 change = Math.round(change * 10) / 10;
@@ -261,44 +267,45 @@ class KunishuSystem {
         else if (currentRel <= 30) {
             let actionDone = false;
             
-            // 友好度0の時は「蜂起」の判定を行います
-            if (currentRel === 0) {
-                let uprisingBase = 0;
-                if (kunishu.ideology === '傭兵') uprisingBase = 0.15;
-                else if (kunishu.ideology === '地縁') uprisingBase = 0.30;
-                else if (kunishu.ideology === '宗教') uprisingBase = 0.50;
-                
-                let uprisingChance = uprisingBase * badMult;
-                
-                if (Math.random() < uprisingChance && kunishu.soldiers > 500) {
-                    await this.executeUprising(kunishu, castle);
-                    actionDone = true; // 蜂起したら略奪はしません
-                }
-            }
+            // まずは「略奪」の判定から行います！
+            // 略奪の基本確率は20%（0.20）。友好度0で+15%（0.15）アップします
+            let robChance = (0.20 + ((30 - currentRel) / 30) * 0.15) * badMult;
             
-            // 蜂起しなかった場合、または友好度が1〜30の場合は「略奪」の判定を行います
-            if (!actionDone) {
-                // 略奪の基本確率は20%（0.20）。友好度0で+15%（0.15）アップします
-                let robChance = (0.20 + ((30 - currentRel) / 30) * 0.15) * badMult;
+            if (Math.random() < robChance) {
+                // 妨害（略奪）: 城から奪う、武力で軽減
+                let baseAmount = Math.floor(kunishu.soldiers / 3);
+                let reduction = 1.0 - (castellan.strength / 200); // 武力で最大50%軽減
+                let amount = Math.floor(baseAmount * reduction * (0.5 + Math.random() * 0.5));
                 
-                if (Math.random() < robChance) {
-                    // 妨害（略奪）: 城から奪う、武力で軽減
-                    let baseAmount = Math.floor(kunishu.soldiers / 3);
-                    let reduction = 1.0 - (castellan.strength / 200); // 武力で最大50%軽減
-                    let amount = Math.floor(baseAmount * reduction * (0.5 + Math.random() * 0.5));
-                    if (amount < 10) return;
-
+                // 奪う量が10以上なら略奪を実行します
+                if (amount >= 10) {
                     if (Math.random() > 0.5 && castle.gold > amount) {
                         castle.gold -= amount;
                         const msg = `【諸勢力妨害】\n${kunishuName}が、${clanName}の${castle.name}で略奪を働き、金${amount}を奪いました！`;
                         this.game.ui.log(msg.replace('\n', ''));
                         if (isPlayerCastle) await this.game.ui.showDialogAsync(msg);
+                        actionDone = true; // 略奪をしたので、目印をつけます
                     } else if (castle.rice > amount) {
                         castle.rice -= amount;
                         const msg = `【諸勢力妨害】\n${kunishuName}が、${clanName}の${castle.name}で略奪を働き、兵糧${amount}を奪いました！`;
                         this.game.ui.log(msg.replace('\n', ''));
                         if (isPlayerCastle) await this.game.ui.showDialogAsync(msg);
+                        actionDone = true; // 略奪をしたので、目印をつけます
                     }
+                }
+            }
+            
+            // 略奪が起きなかった場合で、さらに友好度0の時だけ「蜂起」の判定を行います
+            if (!actionDone && currentRel === 0) {
+                let uprisingBase = 0;
+                if (kunishu.ideology === '傭兵') uprisingBase = 0.30;
+                else if (kunishu.ideology === '地縁') uprisingBase = 0.60;
+                else if (kunishu.ideology === '宗教') uprisingBase = 1.00;
+                
+                let uprisingChance = uprisingBase * badMult;
+                
+                if (Math.random() < uprisingChance && kunishu.soldiers > 500) {
+                    await this.executeUprising(kunishu, castle);
                 }
             }
         }
