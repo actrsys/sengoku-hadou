@@ -2562,13 +2562,21 @@ class CommandSystem {
                 rice: reinfRice, horses: reinfHorses, guns: reinfGuns, isAttacker: true, isSelf: false, isKunishuForce: true
             };
             
-            // ★プレイヤーがお願いした時だけ「承諾しました！」のお返事を復活させます！（AIのフライング報告は消したままです）
+            // ★修正：プレイヤーがお願いした時だけ「承諾しました！」のお返事を復活させます！（AIのフライング報告は消したままです）
             if (myClanId === this.game.playerClanId) {
                 const leader = this.game.getBusho(kunishu.leaderId);
                 const leaderName = leader ? leader.name : "頭領";
-                this.game.ui.showDialog(`${kunishu.getName(this.game)}の${leaderName}が援軍要請を承諾しました！`, false, () => {
-                    this.game.warManager.startWar(atkCastle, targetCastle, atkBushos, sVal, rVal, hVal, gVal, reinforcementData, selfReinfData);
-                });
+                
+                // ★追加：出陣元の城が「委任」されている（AI城主）かどうかでメッセージを変えます！
+                if (atkCastle.isDelegated) {
+                    this.game.ui.showDialog(`${kunishu.getName(this.game)}の${leaderName}が援軍として参戦しました！`, false, () => {
+                        this.game.warManager.startWar(atkCastle, targetCastle, atkBushos, sVal, rVal, hVal, gVal, reinforcementData, selfReinfData);
+                    });
+                } else {
+                    this.game.ui.showDialog(`${kunishu.getName(this.game)}の${leaderName}が援軍要請を承諾しました！`, false, () => {
+                        this.game.warManager.startWar(atkCastle, targetCastle, atkBushos, sVal, rVal, hVal, gVal, reinforcementData, selfReinfData);
+                    });
+                }
             } else {
                 this.game.warManager.startWar(atkCastle, targetCastle, atkBushos, sVal, rVal, hVal, gVal, reinforcementData, selfReinfData);
             }
@@ -2653,9 +2661,17 @@ class CommandSystem {
         if (myClanId === this.game.playerClanId) {
             const castellan = this.game.getBusho(helperCastle.castellanId);
             const castellanName = castellan ? castellan.name : "城主";
-            this.game.ui.showDialog(`${helperCastle.name}の${castellanName}が援軍要請を承諾しました！`, false, () => {
-                this.game.warManager.startWar(atkCastle, targetCastle, atkBushos, sVal, rVal, hVal, gVal, reinforcementData, selfReinfData);
-            });
+            
+            // ★追加：こちらも委任城主（AI）ならメッセージを「参戦しました！」に変えます！
+            if (atkCastle.isDelegated) {
+                this.game.ui.showDialog(`${helperCastle.name}の${castellanName}が同盟軍として参戦しました！`, false, () => {
+                    this.game.warManager.startWar(atkCastle, targetCastle, atkBushos, sVal, rVal, hVal, gVal, reinforcementData, selfReinfData);
+                });
+            } else {
+                this.game.ui.showDialog(`${helperCastle.name}の${castellanName}が援軍要請を承諾しました！`, false, () => {
+                    this.game.warManager.startWar(atkCastle, targetCastle, atkBushos, sVal, rVal, hVal, gVal, reinforcementData, selfReinfData);
+                });
+            }
         } else {
             this.game.warManager.startWar(atkCastle, targetCastle, atkBushos, sVal, rVal, hVal, gVal, reinforcementData, selfReinfData);
         }
