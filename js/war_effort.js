@@ -534,7 +534,8 @@ Object.assign(WarManager.prototype, {
             } else if (typeof window.FieldWarManager === 'undefined') {
                 this.startSiegeWarPhase();
             } else {
-                showInterceptDialog((choice, defAssignments, defRice, atkAssignments, interceptHorses = 0, interceptGuns = 0) => {
+                // ★修正：メッセージを待つために、矢印の魔法を非同期（async）にします！
+                showInterceptDialog(async (choice, defAssignments, defRice, atkAssignments, interceptHorses = 0, interceptGuns = 0) => {
                     
                     // ★追加: 野戦か籠城かが決まったこのタイミングで、守備側の援軍を城（守備軍）に正式合流させる！
                     const applyDefReinf = (reinf) => {
@@ -547,7 +548,18 @@ Object.assign(WarManager.prototype, {
                     applyDefReinf(this.state.defReinforcement);
 
                     if (choice === 'field') {
-                    
+                        // ★新規追加：「打って出ました！」のメッセージを表示します！
+                        const defLeaderName = (defAssignments && defAssignments.length > 0) ? defAssignments[0].busho.name : defBusho.name;
+                        const interceptMsg = `${defDaimyoName}の${defLeaderName}は、\n${defCastle.name}から打って出ました！`;
+                        
+                        // ログに記録しつつ、プレイヤーが関わっていればカットイン、AI同士ならタップ待ちメッセージを出します
+                        this.game.ui.log(interceptMsg.replace('\n', ''));
+                        if (!isPlayerInvolved) {
+                            await this.game.ui.showTapMessage(interceptMsg);
+                        } else {
+                            await this.game.ui.showCutin(interceptMsg);
+                        }
+
                         this.state.atkAssignments = atkAssignments; this.state.defAssignments = defAssignments; 
                         
                         let totalDefSoldiers = 0; if(defAssignments) defAssignments.forEach(a => totalDefSoldiers += a.soldiers);
