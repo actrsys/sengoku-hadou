@@ -221,8 +221,19 @@ Object.assign(WarManager.prototype, {
             if (defCastle.isKunishu) {
                 const kunishu = this.game.kunishuSystem.getKunishu(defCastle.kunishuId);
                 defBusho = kunishu ? this.game.getBusho(kunishu.leaderId) : null;
+                // もし武将が誰もいなかったら、名前を「〇〇頭領」にした幻の武将を作ります
+                if (!defBusho && kunishu) {
+                    defBusho = {
+                        id: `dummy_def_${kunishu.id}`,
+                        name: `${kunishu.getName(this.game)}頭領`, 
+                        strength:30, leadership:30, intelligence:30, politics:30, charm:30, 
+                        faceIcon: "unknown_face.webp", isDummy: true
+                    };
+                }
             } else defBusho = this.game.getBusho(defCastle.castellanId);
-            if (!defBusho) defBusho = {name:"守備隊長", strength:30, leadership:30, intelligence:30, charm:30, faceIcon: "unknown_face.webp"};
+            
+            // それでもいない場合（空き城など）はただの守備隊長（これも幻の目印をつけておきます）
+            if (!defBusho) defBusho = {name:"守備隊長", strength:30, leadership:30, intelligence:30, charm:30, faceIcon: "unknown_face.webp", isDummy: true};
             
             const attackerForce = {
                 name: atkCastle.isKunishu ? atkCastle.name : atkCastle.name + "遠征軍", 
@@ -576,7 +587,7 @@ Object.assign(WarManager.prototype, {
                 
                 const capturedBushos = [];
                 this.game.getCastleBushos(defCastle.id).forEach(b => { 
-                    if (b.status === 'ronin') return;
+                    if (b.status === 'ronin' || b.isDummy) return; // ★幻の武将は捕まらないように弾く
 
                     let chance = 0.5 - (b.strength * (window.WarParams.War.CaptureStrFactor || 0.002)) + (Math.random() * 0.3);
                     if (defCastle.soldiers > 1000) chance -= 0.2;
@@ -972,11 +983,17 @@ Object.assign(WarManager.prototype, {
                 return;
             }
 
-            s.atkBushos.forEach(b => { this.game.factionSystem.recordBattle(b, s.defender.id); this.game.factionSystem.updateRecognition(b, 25); });
+            s.atkBushos.forEach(b => { 
+                if (b.isDummy) return; // ★幻の武将は記録から外す
+                this.game.factionSystem.recordBattle(b, s.defender.id); this.game.factionSystem.updateRecognition(b, 25); 
+            });
             // ★大名の戦いなら諸勢力を弾き、諸勢力の戦いなら大名を弾く魔法！
             const defBushos = this.game.getCastleBushos(s.defender.id).filter(b => b.status !== 'ronin' && (s.defender.isKunishu ? b.belongKunishuId === s.defender.kunishuId : b.belongKunishuId === 0)).concat(this.pendingPrisoners);
             if (s.defBusho && s.defBusho.id && !defBushos.find(b => b.id === s.defBusho.id)) defBushos.push(s.defBusho);
-            defBushos.forEach(b => { this.game.factionSystem.recordBattle(b, s.defender.id); this.game.factionSystem.updateRecognition(b, 25); });
+            defBushos.forEach(b => { 
+                if (b.isDummy) return; // ★幻の武将は記録から外す
+                this.game.factionSystem.recordBattle(b, s.defender.id); this.game.factionSystem.updateRecognition(b, 25); 
+            });
 
             if (s.isPlayerInvolved) { this.game.ui.setWarModalVisible(false); }
             
@@ -1169,7 +1186,7 @@ Object.assign(WarManager.prototype, {
 
         losers.forEach(b => { 
             // ★ 修正: 未登場の武将を巻き込んで捕虜や浪人にしないように守ります！
-            if (b.status === 'ronin' || b.status === 'unborn' || b.status === 'dead') return;
+            if (b.status === 'ronin' || b.status === 'unborn' || b.status === 'dead' || b.isDummy) return; // ★幻の武将は弾く
             // ★ 追加: 普通の大名の城が落ちた時に、同居している諸勢力が巻き添えで捕虜にならないように守ります！
             if (!defeatedCastle.isKunishu && b.belongKunishuId > 0) return;
 
@@ -1690,8 +1707,20 @@ Object.assign(WarManager.prototype, {
             reinfSoldiers = Math.max(500, Math.min(reinfSoldiers, kunishu.soldiers));
             
             const availableBushos = this.game.kunishuSystem.getKunishuMembers(kunishu.id).sort((a,b) => b.strength - a.strength);
-            let bushoCount = reinfSoldiers >= 2500 ? 3 : (reinfSoldiers >= 1500 ? 2 : 1);
-            const reinfBushos = availableBushos.slice(0, Math.min(bushoCount, availableBushos.length));
+            let reinfBushos = [];
+            
+            if (availableBushos.length > 0) {
+                let bushoCount = reinfSoldiers >= 2500 ? 3 : (reinfSoldiers >= 1500 ? 2 : 1);
+                reinfBushos = availableBushos.slice(0, Math.min(bushoCount, availableBushos.length));
+            } else {
+                // 誰もいない時は幻の頭領にお願いします
+                reinfBushos.push({
+                    id: `dummy_${kunishu.id}`,
+                    name: `${kunishu.getName(this.game)}頭領`,
+                    leadership: 30, strength: 30, intelligence: 30, politics: 30, charm: 30,
+                    isDummy: true
+                });
+            }
 
             let reinfRice = reinfSoldiers; 
             // ★修正: 馬と鉄砲は全部持っていく

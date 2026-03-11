@@ -267,13 +267,24 @@ class KunishuSystem {
 
         // 連れてくる武将は最大5人
         const members = this.getKunishuMembers(kunishu.id).sort((a,b) => b.leadership - a.leadership);
-        // リーダーを必ず含める
         let atkBushos = [];
-        const leaderIdx = members.findIndex(b => b.id === kunishu.leaderId);
-        if (leaderIdx !== -1) {
-            atkBushos.push(members.splice(leaderIdx, 1)[0]);
+        
+        if (members.length > 0) {
+            // 武将がいる場合は今まで通り
+            const leaderIdx = members.findIndex(b => b.id === kunishu.leaderId);
+            if (leaderIdx !== -1) {
+                atkBushos.push(members.splice(leaderIdx, 1)[0]);
+            }
+            atkBushos = atkBushos.concat(members.slice(0, 4));
+        } else {
+            // 武将が誰もいない場合は、幻の頭領をポンッと出します！
+            atkBushos.push({
+                id: `dummy_${kunishu.id}`,
+                name: `${kunishu.getName(this.game)}頭領`,
+                leadership: 30, strength: 30, intelligence: 30, politics: 30, charm: 30,
+                isDummy: true // ★これは幻だという目印です
+            });
         }
-        atkBushos = atkBushos.concat(members.slice(0, 4));
 
         const kunishuName = kunishu.getName(this.game);
         this.game.ui.log(`【諸勢力蜂起】${castle.name}にて、${kunishuName}が反乱を起こしました！`);
@@ -315,8 +326,8 @@ class KunishuSystem {
         const members = this.getKunishuMembers(kunishu.id);
         const leaderAlive = members.some(b => b.id === kunishu.leaderId);
 
-        // 兵力が0、または所属武将が全滅したら壊滅
-        if (kunishu.soldiers <= 0 || members.length === 0) {
+        // 兵力が0になったら壊滅（所属武将が0人でも兵力があれば壊滅しません）
+        if (kunishu.soldiers <= 0) {
             kunishu.isDestroyed = true;
             kunishu.soldiers = 0;
             
@@ -336,6 +347,8 @@ class KunishuSystem {
             members.sort((a, b) => (b.leadership + b.intelligence) - (a.leadership + a.intelligence));
             kunishu.leaderId = members[0].id;
             this.game.ui.log(`【諸勢力継承】${members[0].name}が新たな諸勢力の頭領となりました。`);
+        } else if (!leaderAlive && members.length === 0) {
+            kunishu.leaderId = 0; // 誰もいないので頭領は空席にします
         }
     }
 }
