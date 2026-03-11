@@ -1812,6 +1812,57 @@ class UIManager {
         let isFamily = false; // ★一門かどうかを判定する箱
         
         if (busho.belongKunishuId > 0) {
+            let kunishu = null;
+            if (this.game.kunishuSystem && typeof this.game.kunishuSystem.getKunishu === 'function') {
+                kunishu = this.game.kunishuSystem.getKunishu(busho.belongKunishuId);
+            } else if (this.game.kunishus) {
+                kunishu = this.game.kunishus.find(k => k.id === busho.belongKunishuId);
+            }
+            
+            if (kunishu) {
+                affiliationName = kunishu.getName(this.game);
+                
+                // ★頭領を探して、一門かどうかチェック！
+                const leader = this.game.getBusho(kunishu.leaderId);
+                if (leader && busho.id !== leader.id) {
+                    // 空っぽの時にエラーにならないよう、確実にリストにします
+                    const bFamily = Array.isArray(busho.familyIds) ? busho.familyIds : [];
+                    const lFamily = Array.isArray(leader.familyIds) ? leader.familyIds : [];
+                    
+                    // 「0」以外の共通IDがあるか、または直接相手のIDを持っているかをチェックします！
+                    const hasCommon = bFamily.some(id => id > 0 && lFamily.includes(id));
+                    const hasDirect = bFamily.includes(leader.id) || lFamily.includes(busho.id);
+                    
+                    if (hasCommon || hasDirect) {
+                        isFamily = true;
+                    }
+                }
+            } else {
+                affiliationName = "諸勢力";
+            }
+            
+        } else if (busho.clan > 0) {
+            const clan = this.game.clans.find(c => c.id === busho.clan);
+            if (clan) {
+                affiliationName = clan.name;
+                
+                // ★大名を探して、一門かどうかチェック！
+                const daimyo = this.game.getBusho(clan.leaderId); 
+                if (daimyo && busho.id !== daimyo.id && !busho.isDaimyo) {
+                    // 空っぽの時にエラーにならないよう、確実にリストにします
+                    const bFamily = Array.isArray(busho.familyIds) ? busho.familyIds : [];
+                    const dFamily = Array.isArray(daimyo.familyIds) ? daimyo.familyIds : [];
+                    
+                    // 「0」以外の共通IDがあるか、または直接相手のIDを持っているかをチェックします！
+                    const hasCommon = bFamily.some(id => id > 0 && dFamily.includes(id));
+                    const hasDirect = bFamily.includes(daimyo.id) || dFamily.includes(busho.id);
+                    
+                    if (hasCommon || hasDirect) {
+                        isFamily = true;
+                    }
+                }
+            }
+        }
 
         let familyBadge = "";
         if (isFamily) {
