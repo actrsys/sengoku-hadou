@@ -1563,10 +1563,19 @@ Object.assign(WarManager.prototype, {
         }
 
         if (defClanId === pid && !defCastle.isDelegated) {
-            // プレイヤーなら画面を出して選ばせる
-            this.game.ui.showDefSelfReinforcementSelector(candidateCastles, defCastle, (reinfData) => {
-                onComplete(reinfData);
-            });
+            // ★修正：いきなり城を選ばせるのではなく、「他の城から援軍を出陣させますか？」と確認します！
+            this.game.ui.hideAIGuardTemporarily(); // ★念のためガードを外す
+            this.game.ui.showDialog("他の城から援軍を出陣させますか？", true, 
+                () => {
+                    this.game.ui.hideAIGuardTemporarily(); // ★マップ選択前にもう一度ガードを外す
+                    this.game.ui.showDefSelfReinforcementSelector(candidateCastles, defCastle, (reinfData) => {
+                        onComplete(reinfData);
+                    });
+                },
+                () => {
+                    onComplete(null); // 「いいえ」なら呼ばずに次へ進む
+                }
+            );
         } else {
             // AIなら自動で一番兵士が多い城から送る
             candidateCastles.sort((a,b) => b.soldiers - a.soldiers);
@@ -1658,7 +1667,17 @@ Object.assign(WarManager.prototype, {
         const allyCastles = [...new Set(allyForceCandidates.map(fc => fc.castle))];
 
         if (defClanId === pid && !defCastle.isDelegated) {
-            this.game.ui.showDefReinforcementSelector(allyCastles, defCastle, onComplete);
+            // ★修正：こちらもいきなりマップ選択にせず、「他勢力に援軍を要請しますか？」と確認します！
+            this.game.ui.hideAIGuardTemporarily(); // ★念のためガードを外す
+            this.game.ui.showDialog("他勢力に援軍を要請しますか？", true, 
+                () => {
+                    this.game.ui.hideAIGuardTemporarily(); // ★マップ選択前にもう一度ガードを外す
+                    this.game.ui.showDefReinforcementSelector(allyCastles, defCastle, onComplete);
+                },
+                () => {
+                    onComplete(); // 「いいえ」なら呼ばずに次へ進む
+                }
+            );
         } else {
             allyForceCandidates.sort((a,b) => b.force.soldiers - a.force.soldiers);
             const best = allyForceCandidates[0];
