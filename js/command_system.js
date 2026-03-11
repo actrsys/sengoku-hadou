@@ -1538,7 +1538,7 @@ class CommandSystem {
             kunishu.soldiers = 0;
 
             const kunishuName = kunishu.getName(this.game);
-            this.game.ui.showResultModal(`${doer.name}の熱意ある説得により、${kunishuName} が我が軍に合流しました！\n所属武将と兵士、騎馬、鉄砲が自軍に加わりました！`);
+            this.game.ui.showResultModal(`${doer.name}の説得により、${kunishuName} が我が傘下に加わりました！`);
             
             doer.achievementTotal += Math.floor(doer.diplomacy * 0.3) + 30;
             this.game.factionSystem.updateRecognition(doer, 30);
