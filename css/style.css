@@ -2082,9 +2082,13 @@ body.is-pc #daimyo-confirm-modal .btn-secondary {
     left: 50%;
     right: auto;
     /* 真ん中に寄せる魔法 */
-    transform: translate(-50%, 0) scale(0.5);
+    transform: translate(-50%, 0) scale(0.5) !important;
     transform-origin: bottom center;
     z-index: 110;
+
+    /* ★ここを追加！：アイコンに直接乗るまでは絶対に見せない！という強い魔法です */
+    opacity: 0 !important;
+    visibility: hidden !important;
 }
 
 /* 諸勢力アイコンにマウスが乗った時に吹き出しを表示 */
