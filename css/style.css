@@ -1578,13 +1578,42 @@ body.is-pc .faction-list-container { scroll-padding-top: 38px; }
 .bar-fill-friend {
     background: linear-gradient(to bottom, #42a5f5, #1565c0); /* キレイな青のグラデーション */
 }
+
 /* =========================================================
-   ★ 野戦マップの地形カラー
+   ★ 野戦マップの地形カラーと模様（パターン）
    ========================================================= */
-.hex-plain { background-color: #81c784 !important; } /* 平地：明るい緑 */
-.hex-forest { background-color: #2e7d32 !important; } /* 森：深い緑 */
-.hex-river { background-color: #4fc3f7 !important; } /* 川：水色 */
-.hex-mountain { background-color: #795548 !important; } /* 山：茶色 */
+.hex-plain { 
+    background-color: #81c784 !important; 
+    background-image: linear-gradient(0deg, rgba(255, 255, 255, 0.15) 50%, transparent 50%) !important;
+    background-size: 10px 10px !important;
+}
+
+.hex-forest { 
+    background-color: #2e7d32 !important; 
+    background-image: linear-gradient(45deg, rgba(0, 0, 0, 0.15) 25%, transparent 25%), linear-gradient(315deg, rgba(0, 0, 0, 0.15) 25%, transparent 25%) !important;
+    background-position: 5px 0, 10px 0 !important;
+    background-size: 10px 10px !important;
+}
+
+.hex-river { 
+    background-color: #4fc3f7 !important; 
+    background-image: 
+        linear-gradient(30deg, rgba(255,255,255,0.2) 12%, transparent 12.5%, transparent 87%, rgba(255,255,255,0.2) 87.5%, rgba(255,255,255,0.2)), 
+        linear-gradient(150deg, rgba(255,255,255,0.2) 12%, transparent 12.5%, transparent 87%, rgba(255,255,255,0.2) 87.5%, rgba(255,255,255,0.2)), 
+        linear-gradient(30deg, rgba(255,255,255,0.2) 12%, transparent 12.5%, transparent 87%, rgba(255,255,255,0.2) 87.5%, rgba(255,255,255,0.2)), 
+        linear-gradient(150deg, rgba(255,255,255,0.2) 12%, transparent 12.5%, transparent 87%, rgba(255,255,255,0.2) 87.5%, rgba(255,255,255,0.2)), 
+        linear-gradient(60deg, rgba(255,255,255,0.1) 25%, transparent 25.5%, transparent 75%, rgba(255,255,255,0.1) 75%, rgba(255,255,255,0.1)), 
+        linear-gradient(60deg, rgba(255,255,255,0.1) 25%, transparent 25.5%, transparent 75%, rgba(255,255,255,0.1) 75%, rgba(255,255,255,0.1)) !important;
+    background-size: 20px 35px !important;
+    background-position: 0 0, 0 0, 10px 17.5px, 10px 17.5px, 0 0, 10px 17.5px !important;
+}
+
+.hex-mountain { 
+    background-color: #795548 !important; 
+    background-image: linear-gradient(45deg, rgba(0, 0, 0, 0.15) 50%, transparent 50%) !important;
+    background-size: 10px 10px !important;
+}
+
 /* ★追加: 野戦マップの裏地（グリッド線の色）だけを暗い色にします！ */
 #fw-map {
     background-color: #37474f; 
