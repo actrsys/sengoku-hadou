@@ -1429,7 +1429,10 @@ class CommandSystem {
             doer.achievementTotal += 5;
             this.game.factionSystem.updateRecognition(doer, 10);
         }
-        doer.isActionDone = true; this.game.ui.updatePanelHeader(); this.game.ui.renderCommandMenu();
+        doer.isActionDone = true; 
+        this.game.ui.updatePanelHeader(); 
+        this.game.ui.renderCommandMenu();
+        this.game.ui.renderMap(); // ★これを追加！地図を最新の状態に描き直す魔法です
     }
     
     // ★追加: 諸勢力との親善処理です
