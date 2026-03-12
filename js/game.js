@@ -739,11 +739,24 @@ class GameManager {
     
     startNewGame() {
         if(this.ui) this.ui.forceResetModals();
+        
+        // ★ここから追加：前回のゲームの記憶やフラグを綺麗にお掃除します！
+        this.isProcessingAI = false; // AI思考中フラグを解除！
+        if (this.aiTimer) {
+            clearTimeout(this.aiTimer);
+            this.aiTimer = null;
+        }
+        this.turnQueue = [];
+        this.currentIndex = 0;
+        this.selectionMode = null;
+        this.validTargets = [];
+        this.lastMenuState = null;
+        if (this.warManager && this.warManager.state) {
+            this.warManager.state.active = false;
+        }
+        // ★お掃除ここまで！
+
         this.boot();
-    }
-    
-    async boot() { 
-        if (this.ui) this.ui.showScenarioSelection(SCENARIOS, (folder) => this.loadScenario(folder)); 
     }
     
     async loadScenario(folder) {
@@ -1230,9 +1243,15 @@ class GameManager {
         const playerAlive = clans.has(this.playerClanId); 
         
         if (clans.size === 1 && playerAlive) {
-            this.ui.showDialog("天下統一！", false);
+            // ★書き換え：メッセージを閉じたらタイトルに戻ります！
+            this.ui.showDialog("天下統一！", false, () => {
+                this.ui.returnToTitle(); 
+            });
         } else if (!playerAlive) {
-            this.ui.showDialog("我が大名家は滅亡しました……", false);
+            // ★書き換え：メッセージを閉じたらタイトルに戻ります！
+            this.ui.showDialog("我が大名家は滅亡しました……", false, () => {
+                this.ui.returnToTitle(); 
+            });
         } else {
             this.startMonth(); 
         }
