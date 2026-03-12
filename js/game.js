@@ -1307,8 +1307,22 @@ class GameManager {
         const reader = new FileReader(); 
         reader.onload = async (evt) => { 
             try { 
+                // ★ここから追加：前のゲームの記憶やフラグを綺麗にお掃除します！
+                this.isProcessingAI = false; // AI思考中フラグを解除！
+                if (this.aiTimer) {
+                    clearTimeout(this.aiTimer);
+                    this.aiTimer = null;
+                }
+                this.selectionMode = null;
+                this.validTargets = [];
+                this.lastMenuState = null;
+                if (this.warManager && this.warManager.state) {
+                    this.warManager.state.active = false;
+                }
+                // ★お掃除ここまで！
+
                 const d = JSON.parse(evt.target.result); 
-                this.year = d.year; 
+                this.year = d.year;
                 this.month = d.month; 
                 this.playerClanId = d.playerClanId || 1; 
                 this.marketRate = d.marketRate !== undefined ? d.marketRate : 1.0; 
