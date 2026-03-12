@@ -659,7 +659,7 @@ class FieldWarManager {
 
         if (attacker.troopType === 'teppo') {
             if (attacker.hasMoved) return false; // 鉄砲は移動後攻撃不可
-            if (dist < 2 || dist > 3) return false; // 射程は2〜3マス
+            if (dist > 3) return false; // ★変更：射程は1〜3マスになりました！
             if (!this.isFrontDirection(attacker.direction, targetDir)) return false; // 前方3方向のみ
             return true;
         } else {
@@ -1522,7 +1522,13 @@ class FieldWarManager {
             if (atkToDefDiff === 0) atkMult = 1.2; // 正面
             else if (atkToDefDiff === 1) atkMult = 1.1; // 前斜め
         } else if (attacker.troopType === 'teppo') {
-            atkMult = 1.2; // 鉄砲は常に1.2倍
+            // ★変更: 敵との距離を測って、隣なら0.3倍、遠くなら1.2倍にします！
+            let dist = this.getDistance(attacker.x, attacker.y, defender.x, defender.y);
+            if (dist === 1) {
+                atkMult = 0.3; // 隣接時は0.3倍
+            } else {
+                atkMult = 1.2; // 遠距離なら1.2倍
+            }
         } else {
             // 足軽などは向きのみで背後・側面ボーナス
             if (defToAtkDiff === 3) atkMult = 1.5; // 背後（3に変更）
@@ -1801,11 +1807,8 @@ class FieldWarManager {
                         else if (dToEnemy === 3) score += 80;
                         else if (dToEnemy === 1) score -= 100;
                         else score -= dToEnemy * 10;
-                        score -= (1.0 - mySoldierRatio) * (10 - dToEnemy) * 2;
                     } else {
                         score -= dToEnemy * 20; 
-                        score -= (1.0 - mySoldierRatio) * (20 - dToEnemy) * 4; 
-                        
                         const friendlyTeppos = allies.filter(a => a.troopType === 'teppo');
                         friendlyTeppos.forEach(teppo => {
                             let dToTeppo = this.getDistance(nx, ny, teppo.x, teppo.y);
@@ -1888,7 +1891,14 @@ class FieldWarManager {
         let finalBestScore = -Infinity;
         
         enemies.forEach(e => {
-            if (this.canAttackTarget(unit, e.x, e.y)) {
+            // ★修正: 「もし敵の方を振り向いたとしたら」という仮の姿を作って、攻撃できるかチェックします！
+            let targetDir = this.getDirection(unit.x, unit.y, e.x, e.y);
+            let turnCost = this.getTurnCost(unit.direction, targetDir);
+            let tempUnit = Object.assign({}, unit);
+            tempUnit.direction = targetDir; // 仮に敵の方を向かせる
+
+            // 振り向く体力（turnCost）を引いても攻撃できるかチェック！
+            if (unit.ap >= turnCost && this.canAttackTarget(tempUnit, e.x, e.y)) {
                 let score = 0;
                 let d = this.getDistance(unit.x, unit.y, e.x, e.y);
                 score += (50 - d * 2); 
