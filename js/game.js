@@ -953,8 +953,33 @@ class GameManager {
             }
         }
         
+        // ★新しく追加：お殿様（大名）を探して、新しいもの好きか（革新性）を調べます！
+        const daimyo = this.bushos.find(b => b.clan === castle.ownerClan && b.isDaimyo);
+        const innovation = daimyo ? daimyo.innovation : 50; // お殿様が見つからなければ普通の「50」にします
+
+        // ★新しく追加：お殿様の性格に合わせて、能力と功績の「重視する割合（係数）」を計算します！
+        const abilityFactor = innovation / 100;
+        const meritFactor = (100 - innovation) / 100;
+
         bushos.forEach(b => {
-            b._lordScore = (b.leadership * 5) + (b.politics * 4) + (b.charm * 1);
+            // ① 能力の点数（スコア）を細かく計算します！
+            const leadScore = Math.min(b.leadership, 80) * 0.8 + Math.max(b.leadership - 80, 0) * 0.8 * 0.3;
+            const strScore = Math.min(b.strength, 50) * 0.5 + Math.max(b.strength - 50, 0) * 0.5 * 0.3;
+            const polScore = Math.min(b.politics, 80) * 0.8 + Math.max(b.politics - 80, 0) * 0.8 * 0.3;
+            const dipScore = Math.min(b.diplomacy, 60) * 0.6 + Math.max(b.diplomacy - 60, 0) * 0.6 * 0.3;
+            const intScore = Math.min(b.intelligence, 60) * 0.6 + Math.max(b.intelligence - 60, 0) * 0.6 * 0.3;
+            const charmScore = Math.min(b.charm, 70) * 0.8 + Math.max(b.charm - 70, 0) * 0.8 * 0.3;
+            
+            // 全部足して「能力スコア」にします
+            const abilityScore = leadScore + strScore + polScore + dipScore + intScore + charmScore;
+            
+            // ② これまでの頑張り（功績）の点数を計算します！
+            // Math.sqrt というのは、数字の「ルート（平方根）」を計算する魔法です
+            const meritScore = Math.sqrt((b.achievementTotal || 0) * 64);
+            
+            // ③ お殿様の好みに合わせて、最終的な城主の点数（_lordScore）を決めます！
+            b._lordScore = (abilityScore * abilityFactor) + (meritScore * meritFactor);
+
             if (b.isFactionLeader) {
                 b._lordScore += 10000; 
             }
