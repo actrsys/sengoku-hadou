@@ -135,6 +135,55 @@ class AIEngine {
                 }
             }
             
+            // ★大名の軍師任命の魔法！
+            // 自分がお殿様（大名）で、プレイヤーの大名家ではない時だけ発動します
+            if (castellan.isDaimyo && Number(castle.ownerClan) !== Number(this.game.playerClanId)) {
+                // お家に軍師がいるかチェックします
+                const currentGunshi = this.game.getClanGunshi(castle.ownerClan);
+                if (!currentGunshi) {
+                    // 大名と同じ派閥の人を探すための準備です
+                    const daimyoFactionId = castellan.factionId;
+                    
+                    // 同じ大名家で、活動中の武将を全員集めます
+                    const myClanBushos = this.game.bushos.filter(b => b.clan === castle.ownerClan && b.status === 'active');
+                    
+                    // 候補者を絞り込みます（大名じゃない、城主じゃない、大名と同じ派閥）
+                    let candidates = myClanBushos.filter(b => 
+                        !b.isDaimyo && 
+                        !b.isCastellan && 
+                        b.factionId === daimyoFactionId
+                    );
+
+                    if (candidates.length > 0) {
+                        // 候補者たちを、あや瀨さんの条件に合わせて順番に並べ替えます！
+                        candidates.sort((a, b) => {
+                            // 1. 智謀が高い順
+                            if (b.intelligence !== a.intelligence) {
+                                return b.intelligence - a.intelligence; // 智謀の引き算で比べます
+                            }
+                            // 2. 相性の差が小さい順
+                            const aDiff = GameSystem.calcAffinityDiff(a.affinity, castellan.affinity);
+                            const bDiff = GameSystem.calcAffinityDiff(b.affinity, castellan.affinity);
+                            if (aDiff !== bDiff) {
+                                return aDiff - bDiff; // 相性差の引き算で比べます
+                            }
+                            // 3. 貢献度が高い順
+                            const aAchieve = a.achievementTotal || 0;
+                            const bAchieve = b.achievementTotal || 0;
+                            if (bAchieve !== aAchieve) {
+                                return bAchieve - aAchieve; // 貢献度の引き算で比べます
+                            }
+                            // 4. どれも同じならランダム！
+                            return Math.random() - 0.5;
+                        });
+
+                        // 厳しい審査を勝ち抜いた一番上の人を、新しい軍師に任命します！
+                        const newGunshi = candidates[0];
+                        newGunshi.isGunshi = true;
+                    }
+                }
+            }
+
             const mods = this.getDifficultyMods();
             const smartness = this.getAISmartness(castellan.intelligence);
 
