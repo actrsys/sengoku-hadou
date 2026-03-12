@@ -2502,11 +2502,6 @@ class CommandSystem {
                     rice: reinfRice, horses: reinfHorses, guns: reinfGuns, isAttacker: true, isSelf: true
                 };
                 
-                const selfReinfData = {
-                    castle: helperCastle, bushos: reinfBushos, soldiers: reinfSoldiers,
-                    rice: reinfRice, horses: reinfHorses, guns: reinfGuns, isAttacker: true, isSelf: true
-                };
-                
                 // ★修正：出発のメッセージは攻め込んだ後に war_effort.js で出すので、ここは静かに次へ進みます！
                 onComplete(selfReinfData);
             },
