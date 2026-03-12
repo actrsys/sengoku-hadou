@@ -756,7 +756,10 @@ class GameManager {
         }
         // ★お掃除ここまで！
 
-        this.boot();
+        // ★ここを修正：存在しない謎の魔法を消して、正しいシナリオ選択の魔法に戻します！
+        this.ui.showScenarioSelection(SCENARIOS, (folder) => {
+            this.loadScenario(folder);
+        });
     }
     
     async loadScenario(folder) {
