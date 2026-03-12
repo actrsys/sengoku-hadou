@@ -2128,9 +2128,8 @@ class CommandSystem {
             if (mode === 'atk_self_reinforcement') {
                 this._promptPlayerAtkSelfReinforcement(targetCastle, temp.atkCastle, temp.targetCastle, temp.onComplete, backToMap);
             } else if (mode === 'def_self_reinforcement') {
-                if (this.game.warManager && this.game.warManager._promptPlayerDefSelfReinforcement) {
-                    this.game.warManager._promptPlayerDefSelfReinforcement(targetCastle, temp.defCastle, temp.onComplete, backToMap);
-                }
+                // ★修正：warManagerではなく、command_system内の魔法を直接呼び出します！
+                this._promptPlayerDefSelfReinforcement(targetCastle, temp.defCastle, temp.onComplete, backToMap);
             }
             return;
         }
@@ -2503,12 +2502,64 @@ class CommandSystem {
                     rice: reinfRice, horses: reinfHorses, guns: reinfGuns, isAttacker: true, isSelf: true
                 };
                 
+                const selfReinfData = {
+                    castle: helperCastle, bushos: reinfBushos, soldiers: reinfSoldiers,
+                    rice: reinfRice, horses: reinfHorses, guns: reinfGuns, isAttacker: true, isSelf: true
+                };
+                
                 // ★修正：出発のメッセージは攻め込んだ後に war_effort.js で出すので、ここは静かに次へ進みます！
                 onComplete(selfReinfData);
             },
             onCancel: promptBusho
         });
     }
+
+    // ==========================================
+    // ★ここから追加：守備側の自軍援軍を選ぶための魔法！
+    _promptPlayerDefSelfReinforcement(helperCastle, defCastle, onComplete, backToMap) {
+        const promptBusho = () => {
+            this.game.ui.openBushoSelector('def_self_reinf_deploy', helperCastle.id, {
+                onConfirm: (selectedIds) => {
+                    this.handleBushoSelectionForDefSelfReinf(helperCastle.id, selectedIds, onComplete, promptBusho);
+                },
+                onCancel: () => {
+                    if (backToMap) backToMap();
+                    else onComplete(null);
+                }
+            });
+        };
+        promptBusho();
+    }
+
+    handleBushoSelectionForDefSelfReinf(helperCastleId, selectedIds, onComplete, promptBusho) {
+        const helperCastle = this.game.getCastle(helperCastleId);
+        const reinfBushos = selectedIds.map(id => this.game.getBusho(id));
+        this.game.ui.openQuantitySelector('def_self_reinf_supplies', [helperCastle], null, {
+            onConfirm: (inputs) => {
+                const inputData = inputs[helperCastle.id] || inputs;
+                const reinfSoldiers = inputData.soldiers ? parseInt(inputData.soldiers.num.value) : 500;
+                const reinfRice = inputData.rice ? parseInt(inputData.rice.num.value) : 500;
+                const reinfHorses = inputData.horses ? parseInt(inputData.horses.num.value) : 0;
+                const reinfGuns = inputData.guns ? parseInt(inputData.guns.num.value) : 0;
+
+                helperCastle.soldiers = Math.max(0, helperCastle.soldiers - reinfSoldiers);
+                helperCastle.rice = Math.max(0, helperCastle.rice - reinfRice);
+                helperCastle.horses = Math.max(0, (helperCastle.horses || 0) - reinfHorses);
+                helperCastle.guns = Math.max(0, (helperCastle.guns || 0) - reinfGuns);
+                reinfBushos.forEach(b => b.isActionDone = true);
+
+                const selfReinfData = {
+                    castle: helperCastle, bushos: reinfBushos, soldiers: reinfSoldiers,
+                    rice: reinfRice, horses: reinfHorses, guns: reinfGuns, isAttacker: false, isSelf: true
+                };
+                
+                onComplete(selfReinfData);
+            },
+            onCancel: promptBusho
+        });
+    }
+    // ★追加ここまで
+    // ==========================================
 
     executeReinforcementRequest(gold, helperCastle, atkCastle, targetCastle, atkBushos, sVal, rVal, hVal, gVal, selfReinfData) {
         if (gold > 0) atkCastle.gold -= gold;
