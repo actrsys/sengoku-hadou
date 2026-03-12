@@ -1598,14 +1598,15 @@ body.is-pc .faction-list-container { scroll-padding-top: 38px; }
 .hex-river { 
     background-color: #4fc3f7 !important; 
     background-image: 
-        linear-gradient(30deg, rgba(255,255,255,0.2) 12%, transparent 12.5%, transparent 87%, rgba(255,255,255,0.2) 87.5%, rgba(255,255,255,0.2)), 
-        linear-gradient(150deg, rgba(255,255,255,0.2) 12%, transparent 12.5%, transparent 87%, rgba(255,255,255,0.2) 87.5%, rgba(255,255,255,0.2)), 
-        linear-gradient(30deg, rgba(255,255,255,0.2) 12%, transparent 12.5%, transparent 87%, rgba(255,255,255,0.2) 87.5%, rgba(255,255,255,0.2)), 
-        linear-gradient(150deg, rgba(255,255,255,0.2) 12%, transparent 12.5%, transparent 87%, rgba(255,255,255,0.2) 87.5%, rgba(255,255,255,0.2)), 
-        linear-gradient(60deg, rgba(255,255,255,0.1) 25%, transparent 25.5%, transparent 75%, rgba(255,255,255,0.1) 75%, rgba(255,255,255,0.1)), 
-        linear-gradient(60deg, rgba(255,255,255,0.1) 25%, transparent 25.5%, transparent 75%, rgba(255,255,255,0.1) 75%, rgba(255,255,255,0.1)) !important;
-    background-size: 20px 35px !important;
-    background-position: 0 0, 0 0, 10px 17.5px, 10px 17.5px, 0 0, 10px 17.5px !important;
+        radial-gradient(ellipse 8px 4px at 4px 4px, rgba(255, 255, 255, 0.4) 30%, transparent 50%),
+        radial-gradient(ellipse 8px 4px at 12px 12px, rgba(255, 255, 255, 0.2) 30%, transparent 50%) !important;
+    background-size: 16px 16px !important;
+    animation: river-ripple 1s infinite !important;
+}
+
+@keyframes river-ripple {
+    0%, 49.9% { background-position: 0px 0px, 0px 0px; }
+    50%, 100% { background-position: 8px 2px, -8px -2px; }
 }
 
 .hex-mountain { 
