@@ -1359,7 +1359,8 @@ class UIManager {
                     e.preventDefault();
                 }
                 
-                if(this.game.isProcessingAI) return;
+                // ★修正：敵のターン中（守備の援軍選択中）でも戻れるように、AI処理中のブロックを消し去ります！
+                // （ここにあった if(this.game.isProcessingAI) return; を削除しました）
 
                 const currentMode = String(this.game.selectionMode || "");
                 const currentData = this.game.tempReinfData || capturedData;

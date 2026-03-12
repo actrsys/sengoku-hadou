@@ -359,17 +359,37 @@ Object.assign(WarManager.prototype, {
                                                             const rAssign = this.autoDivideSoldiers(r.bushos, r.soldiers, r.horses, r.guns);
                                                             finalDefAssignments = finalDefAssignments.concat(rAssign);
                                                         }
+                                                        // ★修正：守備側の「自軍援軍」もここで合流させます！
+                                                        if (this.state.defSelfReinforcement) {
+                                                            const sr = this.state.defSelfReinforcement;
+                                                            const srAssign = this.autoDivideSoldiers(sr.bushos, sr.soldiers, sr.horses, sr.guns);
+                                                            finalDefAssignments = finalDefAssignments.concat(srAssign);
+                                                        }
 
                                                         // ★攻撃軍（AI本隊＋援軍）の自動編成と合流
                                                         let finalAtkAssignments = [];
+                                                        
+                                                        // ★修正：攻撃側の「同盟援軍」と「自軍援軍」の両方を考慮して兵数を計算します！
+                                                        const rSoldiers = (this.state.reinforcement ? this.state.reinforcement.soldiers : 0) + (this.state.selfReinforcement ? this.state.selfReinforcement.soldiers : 0);
+                                                        const rHorses = (this.state.reinforcement ? this.state.reinforcement.horses : 0) + (this.state.selfReinforcement ? this.state.selfReinforcement.horses : 0);
+                                                        const rGuns = (this.state.reinforcement ? this.state.reinforcement.guns : 0) + (this.state.selfReinforcement ? this.state.selfReinforcement.guns : 0);
+                                                        
+                                                        const mainBushos = atkBushos.filter(b => 
+                                                            (!this.state.reinforcement || !this.state.reinforcement.bushos.some(rb => rb.id === b.id)) &&
+                                                            (!this.state.selfReinforcement || !this.state.selfReinforcement.bushos.some(sb => sb.id === b.id))
+                                                        );
+                                                        const mainAssign = this.autoDivideSoldiers(mainBushos, Math.max(0, atkSoldierCount - rSoldiers), Math.max(0, atkHorses - rHorses), Math.max(0, atkGuns - rGuns));
+                                                        finalAtkAssignments = finalAtkAssignments.concat(mainAssign);
+
                                                         if (this.state.reinforcement) {
                                                             const r = this.state.reinforcement;
-                                                            const mainBushos = atkBushos.filter(b => !r.bushos.some(rb => rb.id === b.id));
-                                                            const mainAssign = this.autoDivideSoldiers(mainBushos, Math.max(0, atkSoldierCount - r.soldiers), Math.max(0, atkHorses - r.horses), Math.max(0, atkGuns - r.guns));
                                                             const rAssign = this.autoDivideSoldiers(r.bushos, r.soldiers, r.horses, r.guns);
-                                                            finalAtkAssignments = mainAssign.concat(rAssign);
-                                                        } else {
-                                                            finalAtkAssignments = this.autoDivideSoldiers(atkBushos, atkSoldierCount, atkHorses, atkGuns);
+                                                            finalAtkAssignments = finalAtkAssignments.concat(rAssign);
+                                                        }
+                                                        if (this.state.selfReinforcement) {
+                                                            const sr = this.state.selfReinforcement;
+                                                            const srAssign = this.autoDivideSoldiers(sr.bushos, sr.soldiers, sr.horses, sr.guns);
+                                                            finalAtkAssignments = finalAtkAssignments.concat(srAssign);
                                                         }
 
                                                         onResult('field', finalDefAssignments, interceptRice, finalAtkAssignments, interceptHorses, interceptGuns);
