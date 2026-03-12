@@ -980,6 +980,11 @@ class GameManager {
             // ③ お殿様の好みに合わせて、最終的な城主の点数（_lordScore）を決めます！
             b._lordScore = (abilityScore * abilityFactor) + (meritScore * meritFactor);
 
+            // ★ここをさらに追加！：元々城主だった人には「80〜120点」のボーナスをあげます！
+            if (b.isCastellan) {
+                b._lordScore += Math.floor(Math.random() * 41) + 80;
+            }
+
             if (b.isFactionLeader) {
                 b._lordScore += 10000; 
             }
