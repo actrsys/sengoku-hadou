@@ -617,7 +617,7 @@ body.is-pc {
 }
 
 .fw-hex.movable { cursor: pointer; filter: brightness(1.1); }
-.fw-hex.movable::after { background-color: rgba(244, 143, 177, 0.65); }
+.fw-hex.movable::after { background-color: rgba(244, 143, 177, 0.62); }
 
 .fw-hex.current-pos { cursor: pointer; filter: brightness(1.1); }
 .fw-hex.current-pos::after { background-color: rgba(255, 255, 255, 0.65); } /* åªç›ínÇÕîíÇ¡Ç€Ç≠åıÇÈ */
@@ -1601,12 +1601,12 @@ body.is-pc .faction-list-container { scroll-padding-top: 38px; }
         radial-gradient(ellipse 8px 4px at 4px 4px, rgba(255, 255, 255, 0.4) 30%, transparent 50%),
         radial-gradient(ellipse 8px 4px at 12px 12px, rgba(255, 255, 255, 0.2) 30%, transparent 50%) !important;
     background-size: 16px 16px !important;
-    animation: river-ripple 1s infinite !important;
+    animation: river-ripple 1.5s infinite !important;
 }
 
 @keyframes river-ripple {
     0%, 49.9% { background-position: 0px 0px, 0px 0px; }
-    50%, 100% { background-position: 8px 2px, -8px -2px; }
+    50%, 100% { background-position: 4px 1px, -4px -1px; }
 }
 
 .hex-mountain { 
