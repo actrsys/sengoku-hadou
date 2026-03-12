@@ -1776,7 +1776,7 @@ class FieldWarManager {
                 let terrain_t = (this.grid && this.grid[row_t] && this.grid[row_t][nx]) ? this.grid[row_t][nx].terrain : 'plain';
                 
                 if (terrain_t === 'river') {
-                    score -= 50; // 川の上で止まると被ダメージが増えるので極力避ける！
+                    score -= 20; // 川の上で止まると被ダメージが増えるので極力避ける！
                 } else if (terrain_t === 'mountain') {
                     score += 15; // 山は防御力が上がるので、陣取るには良い場所！
                 } else if (terrain_t === 'forest') {
