@@ -1274,7 +1274,9 @@ class GameManager {
             bushos: this.bushos, 
             clans: this.clans,
             playerClanId: this.playerClanId,
-            kunishus: this.kunishuSystem.kunishus
+            kunishus: this.kunishuSystem.kunishus,
+            mapWidth: this.mapWidth,
+            mapHeight: this.mapHeight
         }; 
         const blob = new Blob([JSON.stringify(data, null, 2)], {type: 'application/json'}); 
         const url = URL.createObjectURL(blob); 
@@ -1291,8 +1293,31 @@ class GameManager {
                 this.month = d.month; 
                 this.playerClanId = d.playerClanId || 1; 
                 this.marketRate = d.marketRate !== undefined ? d.marketRate : 1.0; 
+                
+                // ★追加：マップの大きさをセーブデータから復元します
+                this.mapWidth = d.mapWidth;
+                this.mapHeight = d.mapHeight;
+
+                // ★追加：もし古いセーブデータで大きさが記録されていなかったら、画像を調べて測り直します
+                if (!this.mapWidth || !this.mapHeight) {
+                    await new Promise((resolve) => {
+                        const img = new Image();
+                        img.onload = () => {
+                            this.mapWidth = img.width;
+                            this.mapHeight = img.height;
+                            resolve();
+                        };
+                        img.onerror = () => {
+                            this.mapWidth = 1200;
+                            this.mapHeight = 800;
+                            resolve();
+                        };
+                        img.src = './data/images/map/japan_colorcode_map.png';
+                    });
+                }
+
                 this.castles = d.castles.map(c => new Castle(c)); 
-                this.bushos = d.bushos.map(b => new Busho(b)); 
+                this.bushos = d.bushos.map(b => new Busho(b));
                 
                 if (d.kunishus) {
                     this.kunishuSystem.setKunishuData(d.kunishus.map(k => new Kunishu(k)));
