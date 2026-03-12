@@ -470,7 +470,6 @@ class FactionSystem {
     }
 
     /**
-     * ★ここから追加した部分です（game.jsからのお引っ越し）
      * 3ヶ月ごとの城主最適化処理（大名による自動任命）
      */
     optimizeCastellans() { 
@@ -480,7 +479,9 @@ class FactionSystem {
             const myBushos = this.game.bushos.filter(b => b.clan === clanId && b.status !== 'unborn'); 
             if(myBushos.length===0) return; 
             
-            let daimyoInt = Math.max(...myBushos.map(b => b.intelligence));
+            const daimyo = myBushos.find(b => b.isDaimyo);
+            let daimyoInt = daimyo ? daimyo.intelligence : 50;
+
             if (Math.random() * 100 < daimyoInt) { 
                 const clanCastles = this.game.castles.filter(c => c.ownerClan === clanId); 
                 clanCastles.forEach(castle => { 
