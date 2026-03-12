@@ -850,7 +850,7 @@ Object.assign(WarManager.prototype, {
                         });
                         
                         const myClanId = isAttackerData ? s.sourceCastle.ownerClan : s.defender.ownerClan;
-                        let isWin = isAttackerData ? (attackerWon && !isRetreat) : (!attackerWon && !isRetreat);
+                        let isWin = isAttackerData ? attackerWon : !attackerWon;
                         const kRel = kunishu.getRelation(myClanId);
                         if (isWin) {
                             kunishu.setRelation(myClanId, kRel + 5);
@@ -905,7 +905,7 @@ Object.assign(WarManager.prototype, {
                     if (!reinf.isSelf) {
                         const myClanId = isAttackerData ? s.sourceCastle.ownerClan : s.defender.ownerClan;
                         const helperClanId = helperCastle.ownerClan;
-                        let isWin = isAttackerData ? (attackerWon && !isRetreat) : (!attackerWon && !isRetreat);
+                        let isWin = isAttackerData ? attackerWon : !attackerWon;
                         if (isWin) {
                             this.game.diplomacyManager.updateSentiment(myClanId, helperClanId, 5);
                             if (s.isPlayerInvolved) this.game.ui.log(`(援軍が勝利に貢献し、${this.game.clans.find(c=>c.id===helperClanId)?.name}との友好度が上がりました)`);
