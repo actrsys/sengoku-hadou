@@ -486,7 +486,14 @@ Object.assign(UIManager.prototype, {
                 this.mapGuide.classList.add('hidden'); 
             }
         }
-        if (this.aiGuard) { if (this.game.isProcessingAI) this.aiGuard.classList.remove('hidden'); else this.aiGuard.classList.add('hidden'); }
+        if (this.aiGuard) { 
+            // ★修正：マップで何かを選んでいる最中や、一時的に隠している時は、思考中の膜を復活させない魔法！
+            if (this.game.isProcessingAI && !isSelectionMode && (this.guardHiddenCount || 0) === 0) {
+                this.aiGuard.classList.remove('hidden'); 
+            } else {
+                this.aiGuard.classList.add('hidden'); 
+            }
+        }
 
         // 変更後
         const activeCastle = this.currentCastle || this.game.getCurrentTurnCastle(); // ★今ターンが来ている城を覚えておきます
