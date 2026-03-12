@@ -213,7 +213,7 @@ const COMMAND_SPECS = {
         isSystem: true, action: 'daimyo_list'
     },
 
-    // --- 対外：大名家 (FOREIGN_DAIMYO) ---
+    // --- 対外：外交 (FOREIGN_DAIMYO) ---
     'goodwill': {
         label: "親善", category: 'FOREIGN_DAIMYO',
         costGold: 0, costRice: 0,
