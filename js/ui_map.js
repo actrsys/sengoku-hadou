@@ -667,9 +667,10 @@ Object.assign(UIManager.prototype, {
                      this.game.handleDaimyoSelect(c);
                  };
             }
-            else if (!this.game.isProcessingAI) {
+            // ★修正：AIのターン中であっても、援軍などで「城を選んでいる最中(isSelectionMode)」なら操作できるようにバリアを解除します！
+            else if (!this.game.isProcessingAI || isSelectionMode) {
                 if (isSelectionMode) { 
-                    if (this.game.validTargets.includes(c.id)) { 
+                    if (this.game.validTargets.includes(c.id)) {
                         el.classList.add('selectable-target'); 
                         el.onclick = (e) => { 
                             e.stopPropagation(); 
