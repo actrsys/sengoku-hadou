@@ -1056,6 +1056,10 @@ class CommandSystem {
             if (type === 'appoint') { 
                 const old = this.game.getBusho(castle.castellanId); if(old) old.isCastellan = false; 
                 castle.castellanId = bushos.id; bushos.isCastellan = true; 
+                // ★追加：もし城主になった人が軍師だったら、軍師のお仕事を外します！
+                if (bushos.isGunshi) {
+                    bushos.isGunshi = false;
+                }
                 this.game.ui.showResultModal(`${bushos.name}を城主に任命しました`); 
             }
             if (type === 'appoint_gunshi') { 
