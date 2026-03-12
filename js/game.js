@@ -1076,8 +1076,8 @@ class GameManager {
             
             bushos.forEach(b => {
                 b.isActionDone = false;
-                if (b.isCastellan) {
-                    // 毎月城主の功績が５増えます。
+                if (b.isCastellan || b.isGunshi) {
+                    // 毎月城主と軍師の功績が５増えます
                     b.achievementTotal += 5;
                 }
             });
