@@ -1077,7 +1077,8 @@ class GameManager {
             bushos.forEach(b => {
                 b.isActionDone = false;
                 if (b.isCastellan) {
-                    b.achievementTotal += 10;
+                    // 毎月城主の功績が５増えます。
+                    b.achievementTotal += 5;
                 }
             });
         });
