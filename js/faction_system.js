@@ -233,8 +233,10 @@ class FactionSystem {
                 
                 const charmBonus = Math.floor((50 - (Number(leader.charm) || 0)) * 0.1);
                 
-                // 功績ボーナスを「20につき1点」にしました
-                const achievementBonus = Math.max(0, Math.floor(((Number(leader.achievementTotal) || 0) - 500) / 20));
+                // 功績ボーナスに「桁数を見るlog（常用対数）」を使って、500を超えた分だけで計算します！
+                const merit = Math.max(0, (Number(leader.achievementTotal) || 0) - 500);
+                // Math.log10 というのが、桁数を見る魔法です。最後にかける「8」の数字を変えると、もらえる点数を調整できますよ！
+                const achievementBonus = Math.floor(Math.log10(merit + 1) * 8);
 
                 let personalityBonus = 0;
                 if (voter.personality && leader.personality && voter.personality === leader.personality) {
