@@ -246,34 +246,149 @@ class WarManager {
     startSiegeWarPhase() {
         const s = this.state; const W = window.WarParams.War;
         
+        // ★ここから追加：本隊に混ざってしまった援軍の数字を分離します！
+        if (!s.isSeparatedForSiege) {
+            // 攻撃側の分離
+            if (s.selfReinforcement) {
+                s.attacker.soldiers = Math.max(0, s.attacker.soldiers - s.selfReinforcement.soldiers);
+                s.attacker.rice = Math.max(0, s.attacker.rice - s.selfReinforcement.rice);
+                s.atkBushos = s.atkBushos.filter(b => !s.selfReinforcement.bushos.some(rb => rb.id === b.id));
+            }
+            if (s.reinforcement) {
+                s.attacker.soldiers = Math.max(0, s.attacker.soldiers - s.reinforcement.soldiers);
+                s.attacker.rice = Math.max(0, s.attacker.rice - s.reinforcement.rice);
+                s.atkBushos = s.atkBushos.filter(b => !s.reinforcement.bushos.some(rb => rb.id === b.id));
+            }
+            // 守備側の分離
+            if (s.defSelfReinforcement) {
+                s.defender.soldiers = Math.max(0, s.defender.soldiers - s.defSelfReinforcement.soldiers);
+                s.defender.rice = Math.max(0, s.defender.rice - s.defSelfReinforcement.rice);
+            }
+            if (s.defReinforcement) {
+                s.defender.soldiers = Math.max(0, s.defender.soldiers - s.defReinforcement.soldiers);
+                s.defender.rice = Math.max(0, s.defender.rice - s.defReinforcement.rice);
+            }
+            s.isSeparatedForSiege = true;
+
+            // ★戦争が終わる時（endWar）に、エラーが起きないよう再び合体させる罠を仕掛けます
+            const originalEndWar = this.endWar.bind(this);
+            this.endWar = (attackerWon, isRetreat = false, capturedInRetreat = [], retreatTargetId = null) => {
+                if (this.state.isSeparatedForSiege) {
+                    if (this.state.selfReinforcement) {
+                        this.state.attacker.soldiers += this.state.selfReinforcement.soldiers;
+                        this.state.attacker.rice += this.state.selfReinforcement.rice;
+                        this.state.atkBushos = this.state.atkBushos.concat(this.state.selfReinforcement.bushos);
+                    }
+                    if (this.state.reinforcement) {
+                        this.state.attacker.soldiers += this.state.reinforcement.soldiers;
+                        this.state.attacker.rice += this.state.reinforcement.rice;
+                        this.state.atkBushos = this.state.atkBushos.concat(this.state.reinforcement.bushos);
+                    }
+                    if (this.state.defSelfReinforcement) {
+                        this.state.defender.soldiers += this.state.defSelfReinforcement.soldiers;
+                        this.state.defender.rice += this.state.defSelfReinforcement.rice;
+                    }
+                    if (this.state.defReinforcement) {
+                        this.state.defender.soldiers += this.state.defReinforcement.soldiers;
+                        this.state.defender.rice += this.state.defReinforcement.rice;
+                    }
+                    this.state.isSeparatedForSiege = false;
+                }
+                originalEndWar(attackerWon, isRetreat, capturedInRetreat, retreatTargetId);
+            };
+        }
+        // ★追加ここまで
+
         // 諸勢力の制圧戦（ダミー城）の場合は民忠・人口の低下をスキップ
         if (!s.isKunishuSubjugation) {
-            // ★変更：民忠を現在の2割減らす
             const dropLoyalty = Math.floor(s.defender.peoplesLoyalty * 0.2);
             s.defender.peoplesLoyalty = Math.max(0, s.defender.peoplesLoyalty - dropLoyalty); 
             
-            // ★変更：人口を攻撃側の兵士数の2割減らす
-            const dropPopulation = Math.floor(s.attacker.soldiers * 0.2);
+            // ★修正：分離したことで攻撃側の兵士数が減ったため、少し計算を調整します
+            let totalAtkForPop = s.attacker.soldiers + (s.selfReinforcement ? s.selfReinforcement.soldiers : 0) + (s.reinforcement ? s.reinforcement.soldiers : 0);
+            const dropPopulation = Math.floor(totalAtkForPop * 0.2);
             s.defender.population = Math.max(0, s.defender.population - dropPopulation);
         }
         
         if (s.isPlayerInvolved) { 
             this.game.ui.setWarModalVisible(true); this.game.ui.clearWarLog();
-            
-            // ★ここから追加：攻城戦スタート時にBGMを切り替える！
             if (window.AudioManager) {
                 window.AudioManager.memorizeCurrentBgm(); 
-                window.AudioManager.playBGM('07_Underworld dance.ogg'); // ←★ここを、先ほどカタログに登録した攻城戦用の曲名に変えます！
+                window.AudioManager.playBGM('07_Underworld dance.ogg'); 
             }
-            // ★追加ここまで
-            
             setTimeout(() => {
                 this.game.ui.log(`★ ${s.sourceCastle.name}軍が${s.defender.name}への攻城戦を開始！`);
                 this.game.ui.updateWarUI(); this.processWarRound(); 
             }, 500); 
         } else { setTimeout(() => { this.resolveAutoWar(); }, 100); }
     }
+    
+    distributeDamage(isTargetDefSide, totalDamage) {
+        const s = this.state;
+        let targetArmies = [];
+        // 生きている部隊だけをリストアップします
+        if (isTargetDefSide) {
+            if (s.defender.soldiers > 0) targetArmies.push(s.defender);
+            if (s.defSelfReinforcement && s.defSelfReinforcement.soldiers > 0) targetArmies.push(s.defSelfReinforcement);
+            if (s.defReinforcement && s.defReinforcement.soldiers > 0) targetArmies.push(s.defReinforcement);
+        } else {
+            if (s.attacker.soldiers > 0) targetArmies.push(s.attacker);
+            if (s.selfReinforcement && s.selfReinforcement.soldiers > 0) targetArmies.push(s.selfReinforcement);
+            if (s.reinforcement && s.reinforcement.soldiers > 0) targetArmies.push(s.reinforcement);
+        }
 
+        let actualTotalDmg = 0;
+        if (targetArmies.length > 0) {
+            // ダメージを部隊の数で割ります（割り勘）
+            let dmgPerArmy = Math.floor(totalDamage / targetArmies.length);
+            let unassignedDmg = 0; // はみ出したダメージ
+            
+            targetArmies.forEach(army => {
+                if (army.soldiers >= dmgPerArmy) {
+                    army.soldiers -= dmgPerArmy;
+                    actualTotalDmg += dmgPerArmy;
+                } else {
+                    let took = army.soldiers; // 兵士が少なくて受けきれなかった場合
+                    unassignedDmg += (dmgPerArmy - took);
+                    army.soldiers = 0;
+                    actualTotalDmg += took;
+                }
+            });
+            
+            // 割り切れなかった余りのダメージも足します
+            unassignedDmg += (totalDamage % targetArmies.length);
+            let aliveArmies = targetArmies.filter(a => a.soldiers > 0);
+            
+            // はみ出したダメージを、まだ生きている部隊に順番に配ります
+            while (unassignedDmg > 0 && aliveArmies.length > 0) {
+                let dmgSlice = Math.ceil(unassignedDmg / aliveArmies.length);
+                let newlyDead = false;
+                aliveArmies.forEach(army => {
+                    if (unassignedDmg <= 0) return;
+                    let applyDmg = Math.min(dmgSlice, unassignedDmg);
+                    if (army.soldiers >= applyDmg) {
+                        army.soldiers -= applyDmg;
+                        actualTotalDmg += applyDmg;
+                        unassignedDmg -= applyDmg;
+                    } else {
+                        let took = army.soldiers;
+                        army.soldiers = 0;
+                        actualTotalDmg += took;
+                        unassignedDmg -= took;
+                        newlyDead = true;
+                    }
+                });
+                if (newlyDead) aliveArmies = targetArmies.filter(a => a.soldiers > 0);
+            }
+        }
+        
+        // 最後に、負傷兵の箱にダメージ分を入れます
+        if (isTargetDefSide) s.deadSoldiers.defender += actualTotalDmg;
+        else s.deadSoldiers.attacker += actualTotalDmg;
+
+        return actualTotalDmg;
+    }
+    
     resolveAutoWar() { 
         try { 
             const s = this.state;
@@ -425,8 +540,6 @@ class WarManager {
         if(type === 'retreat') { if(s.turn === 'attacker') { this.endWar(false, true); } else if (s.turn === 'defender') { this.executeRetreatLogic(s.defender); } return; }
         
         const isAtkTurnGroup = s.turn.startsWith('attacker'); 
-        // ターゲットは常に敵の「本隊」にします！
-        const target = isAtkTurnGroup ? s.defender : s.attacker;
         
         // 今動いている部隊の情報を取り出します
         let activeBushos, activeSoldiers, activeMorale, activeTraining, activeArmyName;
@@ -437,7 +550,7 @@ class WarManager {
         else if (s.turn === 'defender_self_reinf') { activeBushos = s.defSelfReinforcement.bushos; activeSoldiers = s.defSelfReinforcement.soldiers; activeMorale = s.defender.morale; activeTraining = s.defender.training; activeArmyName = "守備側自家援軍"; }
         else if (s.turn === 'defender_ally_reinf') { activeBushos = s.defReinforcement.bushos; activeSoldiers = s.defReinforcement.soldiers; activeMorale = s.defender.morale; activeTraining = s.defender.training; activeArmyName = "守備側同盟軍"; }
 
-        // 相手（本隊）の情報
+        // 相手（本隊）の情報を計算用に取り出します
         let targetBushos, targetSoldiers, targetMorale, targetTraining;
         if (isAtkTurnGroup) { targetBushos = [s.defBusho]; targetSoldiers = s.defender.soldiers; targetMorale = s.defender.morale; targetTraining = s.defender.training; }
         else { targetBushos = s.atkBushos; targetSoldiers = s.attacker.soldiers; targetMorale = s.attacker.morale; targetTraining = s.attacker.training; }
@@ -471,9 +584,10 @@ class WarManager {
             const result = WarSystem.calcScheme(activeBushos[0], targetBushos[0], isAtkTurnGroup ? s.defender.peoplesLoyalty : (window.MainParams?.Economy?.MaxLoyalty || 100));
             if (!result.success) { if (s.isPlayerInvolved) this.game.ui.addWarDetailLog(`R${s.round} [${activeArmyName}] 謀略失敗！`); }
             else {
-                let actualDamage = s.isPlayerInvolved ? result.damage : Math.floor(result.damage * 0.195);
-                target.soldiers = Math.max(0, target.soldiers - actualDamage);
-                if (s.isPlayerInvolved) this.game.ui.addWarDetailLog(`R${s.round} [${activeArmyName}] 謀略成功！ 敵本隊兵士に${actualDamage}の被害`);
+                let calcDamage = s.isPlayerInvolved ? result.damage : Math.floor(result.damage * 0.195);
+                // ★修正：ダメージを敵全体に分散させます！
+                let actualDamage = this.distributeDamage(isAtkTurnGroup, calcDamage);
+                if (s.isPlayerInvolved) this.game.ui.addWarDetailLog(`R${s.round} [${activeArmyName}] 謀略成功！ 敵軍に計${actualDamage}の被害`);
             }
             this.advanceWarTurn(); return;
         }
@@ -482,11 +596,16 @@ class WarManager {
             const result = WarSystem.calcFire(activeBushos[0], targetBushos[0]);
             if (!result.success) { if (s.isPlayerInvolved) this.game.ui.addWarDetailLog(`R${s.round} [${activeArmyName}] 火攻失敗！`); }
             else {
-                let actualDamage = s.isPlayerInvolved ? result.damage : Math.floor(result.damage * 0.195);
-                let actualDefSoldierDamage = s.isPlayerInvolved ? 50 : 16;
-                if(isAtkTurnGroup) s.defender.defense = Math.max(0, s.defender.defense - actualDamage);
-                else target.soldiers = Math.max(0, target.soldiers - actualDefSoldierDamage);
-                if (s.isPlayerInvolved) this.game.ui.addWarDetailLog(`R${s.round} [${activeArmyName}] 火攻成功！ 敵${isAtkTurnGroup?'防御':'本隊兵士'}に${isAtkTurnGroup ? actualDamage : actualDefSoldierDamage}の被害`);
+                let calcDamage = s.isPlayerInvolved ? result.damage : Math.floor(result.damage * 0.195);
+                let calcDefSoldierDamage = s.isPlayerInvolved ? 50 : 16;
+                if(isAtkTurnGroup) {
+                    s.defender.defense = Math.max(0, s.defender.defense - calcDamage);
+                    if (s.isPlayerInvolved) this.game.ui.addWarDetailLog(`R${s.round} [${activeArmyName}] 火攻成功！ 敵防御に${calcDamage}の被害`);
+                } else {
+                    // ★修正：こちらも敵全体に分散させます！
+                    let actualDamage = this.distributeDamage(isAtkTurnGroup, calcDefSoldierDamage);
+                    if (s.isPlayerInvolved) this.game.ui.addWarDetailLog(`R${s.round} [${activeArmyName}] 火攻成功！ 敵軍に計${actualDamage}の被害`);
+                }
             }
             this.advanceWarTurn(); return;
         }
@@ -505,8 +624,6 @@ class WarManager {
             calculatedSoldierDmg = Math.floor(calculatedSoldierDmg * 0.195); calculatedWallDmg = Math.floor(calculatedWallDmg * 0.195); calculatedCounterDmg = Math.floor(calculatedCounterDmg * 0.195);
         }
 
-        // ★籠城の防御力アップのチェック
-        // 攻撃側が攻撃する時、守備本隊が「籠城」を予定メモに書いているか確認します
         if (isAtkTurnGroup) {
             const defPlan = s.plannedActions['defender'];
             if (defPlan && defPlan.type === 'def_attack') {
@@ -516,13 +633,14 @@ class WarManager {
             }
         }
 
-        let actualSoldierDmg = Math.min(target.soldiers, calculatedSoldierDmg);
-        target.soldiers -= actualSoldierDmg;
-        if(isAtkTurnGroup) { s.deadSoldiers.defender += actualSoldierDmg; s.defender.defense = Math.max(0, s.defender.defense - calculatedWallDmg); } 
-        else s.deadSoldiers.attacker += actualSoldierDmg;
+        // ★修正：敵軍全体にダメージを割り勘（分散）させる魔法を使います！
+        let actualSoldierDmg = this.distributeDamage(isAtkTurnGroup, calculatedSoldierDmg);
+        
+        if(isAtkTurnGroup) { s.defender.defense = Math.max(0, s.defender.defense - calculatedWallDmg); } 
         
         if(calculatedCounterDmg > 0) { 
             const actualCounterDmg = Math.min(activeSoldiers, calculatedCounterDmg);
+            // 反撃ダメージは、攻撃した部隊だけが受けます！
             if (s.turn === 'attacker') s.attacker.soldiers -= actualCounterDmg;
             else if (s.turn === 'attacker_self_reinf') s.selfReinforcement.soldiers -= actualCounterDmg;
             else if (s.turn === 'attacker_ally_reinf') s.reinforcement.soldiers -= actualCounterDmg;
@@ -537,7 +655,7 @@ class WarManager {
         if (s.isPlayerInvolved) { 
             let actionName = type.includes('bow') ? "弓攻撃" : type.includes('siege') ? "城攻め" : "力攻め"; 
             if (type.includes('def_')) actionName = type === 'def_bow' ? "斉射" : type === 'def_charge' ? "突撃" : "反撃"; 
-            let msg = (calculatedWallDmg > 0) ? `${actionName} (敵本隊兵-${actualSoldierDmg} 防-${calculatedWallDmg})` : `${actionName} (敵本隊兵-${actualSoldierDmg})`; 
+            let msg = (calculatedWallDmg > 0) ? `${actionName} (敵軍兵-${actualSoldierDmg} 防-${calculatedWallDmg})` : `${actionName} (敵軍兵-${actualSoldierDmg})`; 
             this.game.ui.addWarDetailLog(`R${s.round} [${activeArmyName}] ${msg}`); 
         }
         this.advanceWarTurn();
