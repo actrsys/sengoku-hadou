@@ -2803,6 +2803,92 @@ class UIManager {
         setTxt('war-def-training', s.defender.training);
         setTxt('war-def-rice', s.defender.rice); 
         updateFace('war-def-face', s.defBusho);
+
+        // ★ここから追加：援軍の表示処理
+        const createReinfCard = (reinfData, title, colorHex) => {
+            if (!reinfData) return null;
+            const card = document.createElement('div');
+            card.className = 'war-reinf-card';
+            card.style.background = `linear-gradient(to bottom, #ffffff, #f0f0f0)`;
+            card.style.border = `2px solid ${colorHex}`;
+            card.style.borderRadius = '6px';
+            card.style.padding = '5px';
+            card.style.width = '75px';
+            card.style.display = 'flex';
+            card.style.flexDirection = 'column';
+            card.style.alignItems = 'center';
+            card.style.justifyContent = 'flex-start';
+            card.style.boxShadow = `0 2px 4px rgba(0,0,0,0.2)`;
+            card.style.color = '#333';
+            card.style.fontSize = '0.75rem';
+            card.style.flexShrink = '0';
+
+            const leader = reinfData.bushos && reinfData.bushos.length > 0 ? reinfData.bushos[0] : null;
+            const leaderName = leader ? leader.name.split('|').join('') : "不明";
+            const faceHtml = leader && leader.faceIcon ? `<img src="data/images/faceicons/${leader.faceIcon}" style="width:40px; height:40px; border-radius:3px; object-fit:cover; border:1px solid #777; margin: 3px 0;" onerror="this.src='data/images/faceicons/unknown_face.webp'">` : `<img src="data/images/faceicons/unknown_face.webp" style="width:40px; height:40px; border-radius:3px; object-fit:cover; border:1px solid #777; margin: 3px 0;">`;
+            
+            let orgName = "";
+            if (reinfData.isKunishuForce) {
+                orgName = this.game.kunishuSystem.getKunishu(reinfData.kunishuId)?.getName(this.game) || "諸勢力";
+            } else {
+                orgName = reinfData.castle ? reinfData.castle.name : "援軍";
+            }
+
+            card.innerHTML = `
+                <div style="font-weight:bold; color:${colorHex}; font-size:0.65rem; border-bottom:1px solid ${colorHex}; width:100%; text-align:center; padding-bottom:2px;">${title}</div>
+                ${faceHtml}
+                <div style="font-weight:bold; font-size:0.7rem; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; width:100%; text-align:center;">${orgName}</div>
+                <div style="white-space:nowrap; overflow:hidden; text-overflow:ellipsis; width:100%; text-align:center; margin-bottom: 2px;">${leaderName}</div>
+                <div style="color:#d32f2f; font-weight:bold; font-size:0.8rem;">兵 ${reinfData.soldiers}</div>
+            `;
+            return card;
+        };
+
+        const wrapSide = (baseBox) => {
+            if (!baseBox) return null;
+            let wrapper = baseBox.parentElement;
+            if (!wrapper.classList.contains('war-side-wrapper')) {
+                wrapper = document.createElement('div');
+                wrapper.className = 'war-side-wrapper';
+                wrapper.style.display = 'flex';
+                wrapper.style.flexDirection = 'row';
+                wrapper.style.alignItems = 'stretch';
+                wrapper.style.gap = '8px';
+                
+                baseBox.parentNode.insertBefore(wrapper, baseBox);
+                wrapper.appendChild(baseBox);
+            }
+            
+            const existingCards = wrapper.querySelectorAll('.war-reinf-card');
+            existingCards.forEach(c => c.remove());
+            
+            return wrapper;
+        };
+
+        const atkBaseBox = atkTitleEl ? atkTitleEl.parentElement : null;
+        const defBaseBox = defTitleEl ? defTitleEl.parentElement : null;
+
+        if (atkBaseBox) {
+            const atkWrapper = wrapSide(atkBaseBox);
+            if (atkWrapper) {
+                // ピンク：#e83e8c (自軍援軍)、赤：#dc3545 (同盟援軍)
+                const atkAllyCard = createReinfCard(s.reinforcement, "同盟援軍", "#dc3545");
+                const atkSelfCard = createReinfCard(s.selfReinforcement, "自軍援軍", "#e83e8c");
+                if (atkSelfCard) atkWrapper.insertBefore(atkSelfCard, atkBaseBox);
+                if (atkAllyCard) atkWrapper.insertBefore(atkAllyCard, atkWrapper.firstChild);
+            }
+        }
+
+        if (defBaseBox) {
+            const defWrapper = wrapSide(defBaseBox);
+            if (defWrapper) {
+                // 水色：#03a9f4 (自軍援軍)、緑青：#20c997 (同盟援軍)
+                const defSelfCard = createReinfCard(s.defSelfReinforcement, "自軍援軍", "#03a9f4");
+                const defAllyCard = createReinfCard(s.defReinforcement, "同盟援軍", "#20c997");
+                if (defSelfCard) defWrapper.appendChild(defSelfCard);
+                if (defAllyCard) defWrapper.appendChild(defAllyCard);
+            }
+        }
     }
 
     renderWarControls(isAtkTurn) {
