@@ -2871,8 +2871,8 @@ class UIManager {
         if (atkBaseBox) {
             const atkWrapper = wrapSide(atkBaseBox);
             if (atkWrapper) {
-                // ピンク：#e83e8c (自軍援軍)、赤：#dc3545 (同盟援軍)
-                const atkAllyCard = createReinfCard(s.reinforcement, "同盟援軍", "#dc3545");
+                // ピンク：#e83e8c (自軍援軍)、オレンジ：#ff8c00 (同盟援軍)
+                const atkAllyCard = createReinfCard(s.reinforcement, "同盟援軍", "#ff8c00");
                 const atkSelfCard = createReinfCard(s.selfReinforcement, "自軍援軍", "#e83e8c");
                 if (atkSelfCard) atkWrapper.insertBefore(atkSelfCard, atkBaseBox);
                 if (atkAllyCard) atkWrapper.insertBefore(atkAllyCard, atkWrapper.firstChild);
