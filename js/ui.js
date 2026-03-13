@@ -2801,31 +2801,84 @@ class UIManager {
         setTxt('war-def-training', s.defender.training);
         setTxt('war-def-rice', s.defender.rice); 
         updateFace('war-def-face', s.defBusho);
-
-        // ★援軍のミニパネルを作る処理
+        
+        // ★援軍のミニパネルを作る処理（メイン部隊のデザインに合わせました）
         const createReinfCard = (reinfData, title, bgColor, fallbackClanId) => {
             const card = document.createElement('div');
-            card.className = 'war-side-info war-reinf-card';
+            card.className = 'war-side-info war-reinf-card responsive-army-box'; // ★メイン部隊と同じクラスを付与
             card.style.padding = '5px';
             card.style.margin = '0'; 
             card.style.display = 'flex';
             card.style.flexDirection = 'column';
             card.style.alignItems = 'center';
-            card.style.justifyContent = 'space-evenly'; 
+            card.style.justifyContent = 'flex-start'; 
             card.style.boxSizing = 'border-box';
             card.style.width = '100%'; 
             card.style.flex = '1';     
 
+            card.style.backgroundColor = bgColor; 
+            card.style.color = '#fff'; // ★メインに合わせて白文字に
+            card.style.textShadow = '1px 1px 2px rgba(0,0,0,0.6)'; // ★パステル背景でも読めるように影をつけます
+
             if (!reinfData) {
                 card.style.backgroundColor = '#d3d3d3'; 
+                card.style.textShadow = 'none'; // グレー背景は影なし
                 card.innerHTML = `
-                    <div style="font-weight:bold; font-size:0.7rem; border-bottom:1px solid rgba(0,0,0,0.1); width:100%; text-align:center; padding-bottom:2px; color:#555;">${title} ---</div>
-                    <div style="width:40px; height:40px; margin: 2px 0; display:flex; align-items:center; justify-content:center; color:#888; font-size:0.6rem;">なし</div>
-                    <div style="font-weight:bold; font-size:0.75rem; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; width:100%; text-align:center; margin-top:2px; margin-bottom: 2px; color:#888;">---</div>
-                    <div style="font-weight:bold; font-size:0.8rem; color:#888;">---</div>
+                    <div class="responsive-army-title" style="font-size: 0.95rem; text-align: center; margin-bottom: 5px; color: #555; border-bottom-color: rgba(0,0,0,0.2); text-shadow: none;">${title} ---</div>
+                    <div style="width: 100%; display: flex; flex-direction: column; align-items: center; gap: 5px; color: #888;">
+                        <div style="width:50px; height:50px; border:2px solid #999; display:flex; align-items:center; justify-content:center; font-size:0.7rem; background:#eee; box-shadow: 2px 2px 5px rgba(0,0,0,0.3);">なし</div>
+                        <div class="responsive-army-stats" style="width: 100%; margin-top: 0; font-size: 0.85rem; gap: 2px; text-shadow: none;">
+                            <div class="stat-busho" style="font-size: 0.9rem; margin-bottom: 2px; width: 100%; text-align: center; background: rgba(0,0,0,0.1); color: #888;">---</div>
+                            <div class="stat-row" style="padding-bottom: 1px; width: 100%; border-bottom-color: rgba(0,0,0,0.1);"><span>兵数</span><span>---</span></div>
+                            <div class="stat-row" style="padding-bottom: 1px; width: 100%; border-bottom-color: rgba(0,0,0,0.1);"><span>士気</span><span>---</span></div>
+                            <div class="stat-row" style="padding-bottom: 1px; width: 100%; border-bottom-color: rgba(0,0,0,0.1);"><span>訓練</span><span>---</span></div>
+                            <div class="stat-row" style="padding-bottom: 1px; width: 100%; border-bottom-color: rgba(0,0,0,0.1);"><span>兵糧</span><span>---</span></div>
+                        </div>
+                    </div>
                 `;
                 return card;
             }
+
+            const leader = reinfData.bushos && reinfData.bushos.length > 0 ? reinfData.bushos[0] : null;
+            const leaderName = leader ? leader.name.split('|').join('') : "不明";
+            // ★顔画像もメインと同じクラスとスタイルで整えます
+            const faceHtml = leader && leader.faceIcon 
+                ? `<img src="data/images/faceicons/${leader.faceIcon}" class="responsive-war-face" style="width:50px; height:50px; border-width:2px; margin:0;" onerror="this.src='data/images/faceicons/unknown_face.webp'">` 
+                : `<img src="data/images/faceicons/unknown_face.webp" class="responsive-war-face" style="width:50px; height:50px; border-width:2px; margin:0;">`;
+            
+            let orgName = "";
+            if (reinfData.isKunishuForce) {
+                orgName = this.game.kunishuSystem.getKunishu(reinfData.kunishuId)?.getName(this.game) || "諸勢力";
+            } else {
+                let targetClanId = fallbackClanId;
+                if (reinfData.ownerClan !== undefined) {
+                    targetClanId = reinfData.ownerClan;
+                } else if (leader && leader.ownerClan !== undefined) {
+                    targetClanId = leader.ownerClan;
+                } else if (reinfData.castle && reinfData.castle.ownerClan !== undefined) {
+                    targetClanId = reinfData.castle.ownerClan;
+                }
+                
+                const clan = this.game.clans.find(c => c.id === targetClanId);
+                orgName = clan ? clan.name : "野武士";
+            }
+
+            // ★メイン部隊と同じように、士気や訓練などのパラメータを表示させます
+            card.innerHTML = `
+                <div class="responsive-army-title" style="font-size: 0.95rem; text-align: center; margin-bottom: 5px;">${title} ${orgName}</div>
+                <div style="display: flex; flex-direction: column; align-items: center; width: 100%; gap: 5px;">
+                    ${faceHtml}
+                    <div class="responsive-army-stats" style="width: 100%; margin-top: 0; font-size: 0.85rem; gap: 2px;">
+                        <div class="stat-busho" style="font-size: 0.9rem; margin-bottom: 2px; width: 100%; text-shadow: none;">${leaderName}</div>
+                        <div class="stat-row" style="padding-bottom: 1px; width: 100%;"><span>兵数</span><span class="stat-val-large" style="font-size: 1rem;">${reinfData.soldiers || 0}</span></div>
+                        <div class="stat-row" style="padding-bottom: 1px; width: 100%;"><span>士気</span><span>${reinfData.morale || 0}</span></div>
+                        <div class="stat-row" style="padding-bottom: 1px; width: 100%;"><span>訓練</span><span>${reinfData.training || 0}</span></div>
+                        <div class="stat-row" style="padding-bottom: 1px; width: 100%;"><span>兵糧</span><span>${reinfData.rice || 0}</span></div>
+                    </div>
+                </div>
+            `;
+            return card;
+        };
 
             card.style.backgroundColor = bgColor; 
             const leader = reinfData.bushos && reinfData.bushos.length > 0 ? reinfData.bushos[0] : null;
