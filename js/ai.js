@@ -1015,12 +1015,23 @@ class AIEngine {
                 actions.push({ type: 'employ', stat: 'charm', score: 5, cost: 0, targetRonin: ronins[0] });
             }
 
-            // ★追加: 領内の諸勢力への親善（友好度30以下の場合）
-            const myKunishus = this.game.kunishuSystem.getKunishusInCastle(castle.id).filter(k => k.getRelation(castle.ownerClan) <= 30);
+            // ★追加: 領内の諸勢力への親善（友好度90未満の場合に検討）
+            const myKunishus = this.game.kunishuSystem.getKunishusInCastle(castle.id).filter(k => k.getRelation(castle.ownerClan) < 90);
             myKunishus.forEach(k => {
-                // 友好度が低いほどスコアが高くなる（攻撃優先度よりは低いが、内政の中では優先されやすいように調整）
-                let score = (30 - k.getRelation(castle.ownerClan)) * 10 + 50; 
-                actions.push({ type: 'kunishu_goodwill', stat: 'charm', score: score, cost: 300, targetKunishu: k });
+                const relation = k.getRelation(castle.ownerClan);
+                
+                // ★修正: 友好度0で最大40点、90で0点になるように計算します
+                let score = Math.floor(40 * (90 - relation) / 90);
+                
+                // ★追加：お城の資金が「1000」未満で余裕がない時は、自分の生活を優先して親善の優先度を大幅に下げます！
+                if (castle.gold < 1000) {
+                    score = Math.floor(score / 4); // スコアを4分の1にします
+                }
+                
+                // スコアが1点以上ある時だけ、行動の候補に入れます
+                if (score > 0) {
+                    actions.push({ type: 'kunishu_goodwill', stat: 'charm', score: score, cost: 300, targetKunishu: k });
+                }
             });
 
             // ★追加 12. 褒美（承認欲求がたまっている、または忠誠度が低い武将がいる場合）
