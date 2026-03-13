@@ -1144,6 +1144,23 @@ class AIEngine {
                 const doer = bestBushos[0];
 
                 // 実行処理
+                if (action.type === 'kunishu_goodwill' && castle.gold >= action.cost) {
+                    castle.gold -= action.cost;
+                    const kunishu = action.targetKunishu;
+                    const increase = this.game.commandSystem.calcGoodwillIncrease(action.cost, doer);
+                    const currentRel = kunishu.getRelation(castle.ownerClan);
+                    kunishu.setRelation(castle.ownerClan, currentRel + increase);
+                    
+                    doer.achievementTotal = (doer.achievementTotal || 0) + Math.floor(doer.diplomacy * 0.2) + 10;
+                    if (this.game.factionSystem && this.game.factionSystem.updateRecognition) {
+                        this.game.factionSystem.updateRecognition(doer, 15);
+                    }
+                    
+                    doer.isActionDone = true; 
+                    actionDoneInThisStep = true; 
+                    break;
+                }
+                if (action.type === 'employ') {
                     const targetRonin = action.targetRonin;
                     const myPower = this.game.getClanTotalSoldiers(castle.ownerClan) || 1;
                     const success = GameSystem.calcEmploymentSuccess(doer, targetRonin, myPower, 0);
