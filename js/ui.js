@@ -2766,9 +2766,10 @@ class UIManager {
             setTxt('war-title-name', `${s.defender.name} 攻防戦`);
         }
 
+        // ★重複していた「攻撃軍」「軍」のテキスト出力をやめて、純粋な名前のみ出力します
         const atkClan = this.game.clans.find(c => c.id === s.attacker.ownerClan);
         const atkName = s.attacker.isKunishu ? s.attacker.name : (atkClan ? atkClan.name : "野武士");
-        setTxt('war-atk-name', `攻撃軍 ${atkName}`);
+        setTxt('war-atk-name', atkName);
         
         const atkTitleEl = document.getElementById('war-atk-name').parentElement;
         if (atkName.length >= 5) {
@@ -2777,7 +2778,7 @@ class UIManager {
             atkTitleEl.classList.remove('title-long-text');
         }
         
-        setTxt('war-atk-busho', `${s.atkBushos[0].name.split('|').join('')} 軍`);
+        setTxt('war-atk-busho', s.atkBushos[0].name.split('|').join(''));
         setTxt('war-atk-soldier', s.attacker.soldiers);
         setTxt('war-atk-morale', s.attacker.morale);
         setTxt('war-atk-training', s.attacker.training);
@@ -2786,7 +2787,7 @@ class UIManager {
         
         const defClan = this.game.clans.find(c => c.id === s.defender.ownerClan);
         const defNameText = s.defender.isKunishu ? s.defender.name : (defClan ? defClan.name : "野武士");
-        setTxt('war-def-name', `守備軍 ${defNameText}`);
+        setTxt('war-def-name', defNameText);
         
         const defTitleEl = document.getElementById('war-def-name').parentElement;
         if (defNameText.length >= 5) {
@@ -2795,15 +2796,15 @@ class UIManager {
             defTitleEl.classList.remove('title-long-text');
         }
 
-        setTxt('war-def-busho', `${s.defBusho.name.split('|').join('')} 軍`);
+        setTxt('war-def-busho', s.defBusho.name.split('|').join(''));
         setTxt('war-def-soldier', s.defender.soldiers);
         setTxt('war-def-morale', s.defender.morale);
         setTxt('war-def-training', s.defender.training);
         setTxt('war-def-rice', s.defender.rice); 
         updateFace('war-def-face', s.defBusho);
 
-        // ★援軍のミニパネルを作る処理
-        const createReinfCard = (reinfData, title, bgColor) => {
+        // ★援軍のミニパネルを作る処理（大名のIDのフォールバックを追加）
+        const createReinfCard = (reinfData, title, bgColor, fallbackClanId) => {
             const card = document.createElement('div');
             card.className = 'war-side-info war-reinf-card';
             card.style.padding = '5px';
@@ -2811,18 +2812,17 @@ class UIManager {
             card.style.display = 'flex';
             card.style.flexDirection = 'column';
             card.style.alignItems = 'center';
-            // ★変更：縦横の余白をめいっぱい使って広がるように設定
             card.style.justifyContent = 'space-evenly'; 
             card.style.boxSizing = 'border-box';
-            card.style.width = '85px'; // 横幅をしっかり確保
-            card.style.flex = '1';     // 縦の空きスペースを埋め尽くす魔法
+            card.style.width = '100%'; // ★横幅いっぱいに広がるように修正
+            card.style.flex = '1';     
 
             if (!reinfData) {
                 card.style.backgroundColor = '#d3d3d3'; 
                 card.innerHTML = `
                     <div style="font-weight:bold; font-size:0.7rem; border-bottom:1px solid rgba(0,0,0,0.1); width:100%; text-align:center; padding-bottom:2px; color:#555;">${title} ---</div>
                     <div style="width:40px; height:40px; margin: 2px 0; display:flex; align-items:center; justify-content:center; color:#888; font-size:0.6rem;">なし</div>
-                    <div style="font-weight:bold; font-size:0.75rem; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; width:100%; text-align:center; margin-top:2px; margin-bottom: 2px; color:#888;">--- 軍</div>
+                    <div style="font-weight:bold; font-size:0.75rem; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; width:100%; text-align:center; margin-top:2px; margin-bottom: 2px; color:#888;">---</div>
                     <div style="font-weight:bold; font-size:0.8rem; color:#888;">---</div>
                 `;
                 return card;
@@ -2837,14 +2837,17 @@ class UIManager {
             if (reinfData.isKunishuForce) {
                 orgName = this.game.kunishuSystem.getKunishu(reinfData.kunishuId)?.getName(this.game) || "諸勢力";
             } else {
-                const clan = this.game.clans.find(c => c.id === reinfData.ownerClan);
+                // ★自軍援軍の時にデータがない場合、メイン部隊のID（fallbackClanId）を使って家名を取得します
+                let targetClanId = reinfData.ownerClan !== undefined ? reinfData.ownerClan : fallbackClanId;
+                const clan = this.game.clans.find(c => c.id === targetClanId);
                 orgName = clan ? clan.name : "野武士";
             }
 
+            // こちらの重複文字も削除しました
             card.innerHTML = `
                 <div style="font-weight:bold; font-size:0.7rem; border-bottom:1px solid rgba(0,0,0,0.1); width:100%; text-align:center; padding-bottom:2px;">${title} ${orgName}</div>
                 ${faceHtml}
-                <div style="font-weight:bold; font-size:0.75rem; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; width:100%; text-align:center; margin-top:2px; margin-bottom: 2px;">${leaderName} 軍</div>
+                <div style="font-weight:bold; font-size:0.75rem; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; width:100%; text-align:center; margin-top:2px; margin-bottom: 2px;">${leaderName}</div>
                 <div style="color:#d32f2f; font-weight:bold; font-size:0.8rem;">兵 ${reinfData.soldiers}</div>
             `;
             return card;
@@ -2860,9 +2863,9 @@ class UIManager {
                 wrapper.className = 'war-side-wrapper';
                 wrapper.style.display = 'flex';
                 wrapper.style.flexDirection = 'row'; 
-                // ★変更：中央にちんまりまとまらないように、親の高さに合わせてストレッチ（引き伸ばし）させます
                 wrapper.style.alignItems = 'stretch'; 
-                wrapper.style.height = '100%'; // 親の余白を全部使う
+                wrapper.style.width = '100%'; // ★親要素の横幅を100%限界まで使います
+                wrapper.style.height = '100%'; 
                 wrapper.style.gap = '8px'; 
                 
                 baseBox.parentNode.insertBefore(wrapper, baseBox);
@@ -2871,7 +2874,9 @@ class UIManager {
                 reinfCol.className = 'war-reinf-col';
                 reinfCol.style.display = 'flex';
                 reinfCol.style.flexDirection = 'column'; 
-                reinfCol.style.gap = '8px'; // 上下のパネルの隙間も少し広めに
+                reinfCol.style.gap = '8px'; 
+                reinfCol.style.flex = '1'; // ★メイン部隊と半分のスペースを分け合って最大まで広げます
+                reinfCol.style.minWidth = '0';
                 
                 if (isAttacker) {
                     wrapper.appendChild(reinfCol); 
@@ -2881,7 +2886,8 @@ class UIManager {
                     wrapper.appendChild(reinfCol); 
                 }
                 baseBox.style.margin = '0';
-                baseBox.style.flex = '1'; // メインパネルも余白を埋める
+                baseBox.style.flex = '1'; // ★メイン部隊も余白を埋め尽くします
+                baseBox.style.minWidth = '0';
             } else {
                 reinfCol = wrapper.querySelector('.war-reinf-col');
                 reinfCol.innerHTML = ''; 
@@ -2893,11 +2899,12 @@ class UIManager {
         const atkBaseBox = atkTitleEl ? atkTitleEl.parentElement : null;
         const defBaseBox = defTitleEl ? defTitleEl.parentElement : null;
 
+        // ★援軍の表示名をすべて「攻撃軍」「守備軍」に統一し、フォールバック用のIDを渡しています
         if (atkBaseBox) {
             const atkReinfCol = wrapSide(atkBaseBox, true);
             if (atkReinfCol) {
-                const atkSelfCard = createReinfCard(s.selfReinforcement, "援軍", "#ffcdd2"); 
-                const atkAllyCard = createReinfCard(s.reinforcement, "同盟軍", "#ffe0b2"); 
+                const atkSelfCard = createReinfCard(s.selfReinforcement, "攻撃軍", "#ffcdd2", s.attacker.ownerClan); 
+                const atkAllyCard = createReinfCard(s.reinforcement, "攻撃軍", "#ffe0b2", s.attacker.ownerClan); 
                 
                 atkReinfCol.appendChild(atkSelfCard); 
                 atkReinfCol.appendChild(atkAllyCard); 
@@ -2907,8 +2914,8 @@ class UIManager {
         if (defBaseBox) {
             const defReinfCol = wrapSide(defBaseBox, false);
             if (defReinfCol) {
-                const defSelfCard = createReinfCard(s.defSelfReinforcement, "援軍", "#b3e5fc"); 
-                const defAllyCard = createReinfCard(s.defReinforcement, "同盟軍", "#b2dfdb"); 
+                const defSelfCard = createReinfCard(s.defSelfReinforcement, "守備軍", "#b3e5fc", s.defender.ownerClan); 
+                const defAllyCard = createReinfCard(s.defReinforcement, "守備軍", "#b2dfdb", s.defender.ownerClan); 
                 
                 defReinfCol.appendChild(defSelfCard); 
                 defReinfCol.appendChild(defAllyCard); 
