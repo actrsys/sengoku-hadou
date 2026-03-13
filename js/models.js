@@ -230,6 +230,9 @@ class Busho {
         this.isGunshi = this.isGunshi === true;
         this.status = this.status || 'active';
         this.isActionDone = this.isActionDone === true;
+
+        // ★ここを書き足し！：自動生成された頭領かどうかの「秘密のシール」を貼る専用の枠です！
+        this.isAutoLeader = data.isAutoLeader === true;
     }
 
     // UI表示用メソッド

@@ -61,7 +61,8 @@ class KunishuSystem {
                     birthYear: currentYear - 30, // 今30歳になるように計算します
                     endYear: currentYear + 60,   // 今から60年後（90歳）まで生きるように計算します
                     startYear: currentYear - 30, // すでに大人になっている年にします
-                    status: 'active' // バリバリ活動中！
+                    status: 'active', // バリバリ活動中！（★最後に「,」を付けます）
+                    isAutoLeader: true // ★追加：自動で作られた頭領だという「秘密のシール」を貼っておきます！
                 });
 
                 // 新しく作った頭領を、ゲーム全体の武将リストに登録します！
@@ -496,8 +497,8 @@ class KunishuSystem {
             members.forEach(b => {
                 b.belongKunishuId = 0; // 諸勢力から外れます
 
-                // ★ここから書き足し！：自動で作った「頭領」かどうか調べます
-                if (b.givenName === "頭領") {
+                // ★ここを書き換え！：名前ではなく「秘密のシール」が貼ってあるか調べます
+                if (b.isAutoLeader) {
                     // 自動で作られた頭領なら「死亡（消滅）」の印をつけます
                     b.status = 'dead';
                     
