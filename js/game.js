@@ -1255,21 +1255,49 @@ class GameManager {
         this.processTurn(); 
     }
 
-    async endMonth() { // ★ async を追加します！
-        this.factionSystem.processEndMonth(); 
-        await this.independenceSystem.checkIndependence(); // ★ await を追加して待ちます！
+    async endMonth() {
+        // ==========================================
+        // ★ 新しい一元管理の魔法：「画面にメッセージが出ている間は絶対に待つ」という最強の関所を作ります！
+        const waitIfBusy = async () => {
+            if (this.ui && typeof this.ui.waitForDialogs === 'function') {
+                await this.ui.waitForDialogs();
+            }
+            // 少しだけ隙間を待つ（メッセージが連続で出るときの安全対策です）
+            await new Promise(resolve => setTimeout(resolve, 300));
+        };
+        // ==========================================
+
+        // 1つ目の係員：派閥
+        if (this.factionSystem && typeof this.factionSystem.processEndMonth === 'function') {
+            await this.factionSystem.processEndMonth(); 
+        }
+        await waitIfBusy(); // 終わったら、画面が空っぽになるまで絶対に待つ！
+
+        // 2つ目の係員：独立（反乱して空白地になる処理など）
+        if (this.independenceSystem && typeof this.independenceSystem.checkIndependence === 'function') {
+            await this.independenceSystem.checkIndependence();
+        }
+        await waitIfBusy(); // 終わったら、画面が空っぽになるまで絶対に待つ！
         
-        // ★ここを追加！：毎月末に、外交システムに「時間を進めて！」とお願いします
-        if (this.diplomacyManager) {
+        // 3つ目の係員：外交
+        if (this.diplomacyManager && typeof this.diplomacyManager.processEndMonth === 'function') {
             this.diplomacyManager.processEndMonth();
         }
+        await waitIfBusy(); // 終わったら、画面が空っぽになるまで絶対に待つ！
 
-        // ★修正：諸勢力の処理が終わるまで「待つ」ようにします！
-        await this.kunishuSystem.processEndMonth();
+        // 4つ目の係員：諸勢力（反乱など）
+        if (this.kunishuSystem && typeof this.kunishuSystem.processEndMonth === 'function') {
+            await this.kunishuSystem.processEndMonth();
+        }
+        await waitIfBusy(); // 終わったら、画面が空っぽになるまで絶対に待つ！
         
-        // ★ 追加：月の終わりに、寿命を迎えた武将がいないかチェックします！
-        await this.lifeSystem.processEndMonth(); // ★ await を追加して待ちます！
+        // 5つ目の係員：寿命
+        if (this.lifeSystem && typeof this.lifeSystem.processEndMonth === 'function') {
+            await this.lifeSystem.processEndMonth(); 
+        }
+        await waitIfBusy(); // 終わったら、画面が空っぽになるまで絶対に待つ！
 
+        // すべての月末イベントとメッセージが完全に終わってから、ようやく時間を進めます！
         this.month++; 
         if(this.month > 12) { this.month = 1; this.year++; }
         
@@ -1277,12 +1305,10 @@ class GameManager {
         const playerAlive = clans.has(this.playerClanId); 
         
         if (clans.size === 1 && playerAlive) {
-            // ★書き換え：メッセージを閉じたらタイトルに戻ります！
             this.ui.showDialog("天下統一！", false, () => {
                 this.ui.returnToTitle(); 
             });
         } else if (!playerAlive) {
-            // ★書き換え：メッセージを閉じたらタイトルに戻ります！
             this.ui.showDialog("我が大名家は滅亡しました……", false, () => {
                 this.ui.returnToTitle(); 
             });
