@@ -961,7 +961,9 @@ Object.assign(WarManager.prototype, {
                         kunishu.soldiers = 0;
                         const members = this.game.kunishuSystem.getKunishuMembers(kunishu.id);
                         members.forEach(b => {
-                            b.belongKunishuId = 0; b.clan = 0; b.status = 'ronin'; b.isCastellan = false;
+                            b.belongKunishuId = 0; // 諸勢力の所属を外します
+                            // ★ここを書き換え！関所を通らずに勝手に浪人になる古い魔法を消して、お引越しセンターにお願いします！
+                            this.game.affiliationSystem.becomeRonin(b);
                         });
                     }
                 } else {
