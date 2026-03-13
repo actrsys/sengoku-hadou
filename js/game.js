@@ -754,6 +754,10 @@ class GameManager {
         if (this.warManager && this.warManager.state) {
             this.warManager.state.active = false;
         }
+        if (this.ui) {
+            this.ui.logHistory = [];
+            this.ui.clearWarLog();
+        }
         // ★お掃除ここまで！
 
         // ★ここを修正：存在しない謎の魔法を消して、正しいシナリオ選択の魔法に戻します！
@@ -1381,6 +1385,10 @@ class GameManager {
                 this.lastMenuState = null;
                 if (this.warManager && this.warManager.state) {
                     this.warManager.state.active = false;
+                }
+                if (this.ui) {
+                    this.ui.logHistory = [];
+                    this.ui.clearWarLog();
                 }
                 // ★お掃除ここまで！
 
