@@ -1047,21 +1047,6 @@ class AIEngine {
                     // ★修正: 友好度0で最大40点、90で0点になるように計算します
                     let score = Math.floor(40 * (90 - relation) / 90);
                     
-                    // ★ここから追加：城主と諸勢力の頭領の「相性」を比べて、仲が悪いほど親善をやりにくくする魔法！
-                    // 1. 諸勢力の頭領（リーダー）を探します
-                    const leader = this.game.getBusho(k.leaderId);
-                    if (leader) {
-                        // 2. 城主と頭領の「相性の差」を計算します（0がピッタリ、50が真逆）
-                        const affinityDiff = GameSystem.calcAffinityDiff(castellan.affinity, leader.affinity);
-                        
-                        // 3. 差が50の時に「25点」下がるように計算します（相性の差を半分にします）
-                        const penalty = Math.floor(affinityDiff / 2);
-                        
-                        // 4. スコアから引きます（マイナスにならないように、最低でも0にします）
-                        score = Math.max(0, score - penalty);
-                    }
-                    // ★追加ここまで
-                    
                     // ★追加：お城の資金が「1000」未満で余裕がない時は、自分の生活を優先して親善の優先度を大幅に下げます！
                     if (castle.gold < 1000) {
                         score = Math.floor(score / 4); // スコアを4分の1にします
