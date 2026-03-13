@@ -492,11 +492,25 @@ class KunishuSystem {
             kunishu.isDestroyed = true;
             kunishu.soldiers = 0;
             
-            // 残った武将は在野へ
+            // 残った武将の行き先を決めます
             members.forEach(b => {
-                b.belongKunishuId = 0;
-                // ★新しいお引越しセンターの魔法を使います！
-                this.game.affiliationSystem.becomeRonin(b);
+                b.belongKunishuId = 0; // 諸勢力から外れます
+
+                // ★ここから書き足し！：自動で作った「頭領」かどうか調べます
+                if (b.givenName === "頭領") {
+                    // 自動で作られた頭領なら「死亡（消滅）」の印をつけます
+                    b.status = 'dead';
+                    
+                    // お城の名簿からも、この頭領の名前を消しゴムで消しておきます
+                    const castle = this.game.getCastle(b.castleId);
+                    if (castle) {
+                        castle.samuraiIds = castle.samuraiIds.filter(id => id !== b.id);
+                    }
+                } else {
+                    // 頭領以外の普通の武将は、今まで通り浪人になります
+                    // ★新しいお引越しセンターの魔法を使います！
+                    this.game.affiliationSystem.becomeRonin(b);
+                }
             });
             this.game.ui.log(`【諸勢力壊滅】${this.game.getCastle(kunishu.castleId).name}の諸勢力は壊滅しました。`);
             return;
