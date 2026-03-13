@@ -663,6 +663,8 @@ Object.assign(WarManager.prototype, {
                 const capturedBushos = [];
                 this.game.getCastleBushos(defCastle.id).forEach(b => { 
                     if (b.status === 'ronin') return;
+                    // ★ 追加: 諸勢力の武将は撤退戦に巻き込まれて捕虜にならないようにします！
+                    if (b.belongKunishuId > 0) return;
 
                     let chance = 0.5 - (b.strength * (window.WarParams.War.CaptureStrFactor || 0.002)) + (Math.random() * 0.3);
                     if (defCastle.soldiers > 1000) chance -= 0.2;
@@ -1256,8 +1258,8 @@ Object.assign(WarManager.prototype, {
         losers.forEach(b => { 
             // ★ 修正: 未登場の武将を巻き込んで捕虜や浪人にしないように守ります！
             if (b.status === 'ronin' || b.status === 'unborn' || b.status === 'dead') return;
-            // ★ 追加: 普通の大名の城が落ちた時に、同居している諸勢力が巻き添えで捕虜にならないように守ります！
-            if (!defeatedCastle.isKunishu && b.belongKunishuId > 0) return;
+            // ★ 修正: 諸勢力に所属している武将は、どんな城の戦いでも絶対に巻き添えで捕虜にならないように守ります！
+            if (b.belongKunishuId > 0) return;
 
             let chance = isLastStand ? 1.0 : ((window.WarParams.War.CaptureChanceBase || 0.7) - (b.strength * (window.WarParams.War.CaptureStrFactor || 0.002)) + (Math.random() * 0.3));
             if (!isLastStand && defeatedCastle.soldiers > 1000) chance -= 0.2; 
