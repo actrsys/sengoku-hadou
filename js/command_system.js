@@ -444,6 +444,7 @@ class CommandSystem {
             else if (['repair'].includes(actionType)) { infoHtml = `<div>金: ${c.gold} (1回300)</div>`; }
             else if (['draft'].includes(actionType)) { infoHtml = `<div>民忠: ${c.peoplesLoyalty}</div>`; }
             else if (['training','soldier_charity'].includes(actionType)) { infoHtml = `<div>状態: 訓練${c.training}/士気${c.morale}</div>`; }
+            else if (actionType === 'war_deploy' || actionType === 'kunishu_subjugate_deploy') { infoHtml = `<div>出陣する武将を選択してください（最大5名まで）</div>`; }
         }
 
         // --- 並び替え（ソート） ---
