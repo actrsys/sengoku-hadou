@@ -522,9 +522,23 @@ class WarManager {
         else if (s.turn === 'defender_self_reinf') { activeBushos = s.defSelfReinforcement.bushos; activeSoldiers = s.defSelfReinforcement.soldiers; activeMorale = s.defender.morale; activeTraining = s.defender.training; activeArmyName = "守備側自家援軍"; }
         else if (s.turn === 'defender_ally_reinf') { activeBushos = s.defReinforcement.bushos; activeSoldiers = s.defReinforcement.soldiers; activeMorale = s.defender.morale; activeTraining = s.defender.training; activeArmyName = "守備側同盟軍"; }
 
-        let targetBushos, targetSoldiers, targetMorale, targetTraining;
-        if (isAtkTurnGroup) { targetBushos = [s.defBusho]; targetSoldiers = s.defender.soldiers; targetMorale = s.defender.morale; targetTraining = s.defender.training; }
-        else { targetBushos = s.atkBushos; targetSoldiers = s.attacker.soldiers; targetMorale = s.attacker.morale; targetTraining = s.attacker.training; }
+        let targetBushos, targetSoldiers = 0, targetMorale, targetTraining;
+        
+        if (isAtkTurnGroup) { 
+            targetBushos = [s.defBusho]; 
+            targetMorale = s.defender.morale; 
+            targetTraining = s.defender.training;
+            if (s.defender.soldiers > 0) targetSoldiers += s.defender.soldiers;
+            if (s.defSelfReinforcement && s.defSelfReinforcement.soldiers > 0) targetSoldiers += s.defSelfReinforcement.soldiers;
+            if (s.defReinforcement && s.defReinforcement.soldiers > 0) targetSoldiers += s.defReinforcement.soldiers;
+        } else { 
+            targetBushos = s.atkBushos; 
+            targetMorale = s.attacker.morale; 
+            targetTraining = s.attacker.training;
+            if (s.attacker.soldiers > 0) targetSoldiers += s.attacker.soldiers;
+            if (s.selfReinforcement && s.selfReinforcement.soldiers > 0) targetSoldiers += s.selfReinforcement.soldiers;
+            if (s.reinforcement && s.reinforcement.soldiers > 0) targetSoldiers += s.reinforcement.soldiers;
+        }
 
         let actStats = WarSystem.calcUnitStats(activeBushos); 
         let tgtStats = WarSystem.calcUnitStats(targetBushos);
