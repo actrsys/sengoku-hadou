@@ -280,59 +280,78 @@ class WarManager {
     distributeDamage(isTargetDefSide, totalDamage) {
         const s = this.state;
         let targetArmies = [];
-        // 生きている部隊だけをリストアップします
+        const W = window.WarParams.War;
+        
+        // 生きている部隊だけをリストアップし、「役割（role）」の名前も一緒に覚えます！
         if (isTargetDefSide) {
-            if (s.defender.soldiers > 0) targetArmies.push(s.defender);
-            if (s.defSelfReinforcement && s.defSelfReinforcement.soldiers > 0) targetArmies.push(s.defSelfReinforcement);
-            if (s.defReinforcement && s.defReinforcement.soldiers > 0) targetArmies.push(s.defReinforcement);
+            if (s.defender.soldiers > 0) targetArmies.push({ army: s.defender, role: 'defender' });
+            if (s.defSelfReinforcement && s.defSelfReinforcement.soldiers > 0) targetArmies.push({ army: s.defSelfReinforcement, role: 'defender_self_reinf' });
+            if (s.defReinforcement && s.defReinforcement.soldiers > 0) targetArmies.push({ army: s.defReinforcement, role: 'defender_ally_reinf' });
         } else {
-            if (s.attacker.soldiers > 0) targetArmies.push(s.attacker);
-            if (s.selfReinforcement && s.selfReinforcement.soldiers > 0) targetArmies.push(s.selfReinforcement);
-            if (s.reinforcement && s.reinforcement.soldiers > 0) targetArmies.push(s.reinforcement);
+            if (s.attacker.soldiers > 0) targetArmies.push({ army: s.attacker, role: 'attacker' });
+            if (s.selfReinforcement && s.selfReinforcement.soldiers > 0) targetArmies.push({ army: s.selfReinforcement, role: 'attacker_self_reinf' });
+            if (s.reinforcement && s.reinforcement.soldiers > 0) targetArmies.push({ army: s.reinforcement, role: 'attacker_ally_reinf' });
         }
 
         let actualTotalDmg = 0;
         if (targetArmies.length > 0) {
-            // ダメージを部隊の数で割ります（割り勘）
+            // 割り勘の基本ダメージ
             let dmgPerArmy = Math.floor(totalDamage / targetArmies.length);
-            let unassignedDmg = 0; // はみ出したダメージ
+            let unassignedDmg = 0; 
             
-            targetArmies.forEach(army => {
-                if (army.soldiers >= dmgPerArmy) {
-                    army.soldiers -= dmgPerArmy;
-                    actualTotalDmg += dmgPerArmy;
+            targetArmies.forEach(target => {
+                let army = target.army;
+                let role = target.role;
+                
+                // ★ 個別の籠城判定！ 籠城のメモがある部隊だけ、受けるダメージを軽減します
+                let isRojo = (isTargetDefSide && s.plannedActions[role] && s.plannedActions[role].type === 'def_attack');
+                let finalDmg = isRojo ? Math.floor(dmgPerArmy * W.RojoDamageReduction) : dmgPerArmy;
+
+                if (army.soldiers >= finalDmg) {
+                    army.soldiers -= finalDmg;
+                    actualTotalDmg += finalDmg;
                 } else {
-                    let took = army.soldiers; // 兵士が少なくて受けきれなかった場合
-                    unassignedDmg += (dmgPerArmy - took);
+                    let took = army.soldiers;
                     army.soldiers = 0;
                     actualTotalDmg += took;
+                    // 受けきれずにあふれたダメージを未割当に追加（計算用に元の分配量から引きます）
+                    unassignedDmg += (dmgPerArmy - took); 
                 }
             });
             
             // 割り切れなかった余りのダメージも足します
             unassignedDmg += (totalDamage % targetArmies.length);
-            let aliveArmies = targetArmies.filter(a => a.soldiers > 0);
+            let aliveArmies = targetArmies.filter(a => a.army.soldiers > 0);
             
             // はみ出したダメージを、まだ生きている部隊に順番に配ります
             while (unassignedDmg > 0 && aliveArmies.length > 0) {
                 let dmgSlice = Math.ceil(unassignedDmg / aliveArmies.length);
                 let newlyDead = false;
-                aliveArmies.forEach(army => {
+                
+                aliveArmies.forEach(target => {
                     if (unassignedDmg <= 0) return;
-                    let applyDmg = Math.min(dmgSlice, unassignedDmg);
-                    if (army.soldiers >= applyDmg) {
-                        army.soldiers -= applyDmg;
-                        actualTotalDmg += applyDmg;
-                        unassignedDmg -= applyDmg;
+                    let army = target.army;
+                    let role = target.role;
+                    
+                    let sliceToApply = Math.min(dmgSlice, unassignedDmg);
+                    // 余りのダメージを配る時も、籠城している部隊はしっかりガードします
+                    let isRojo = (isTargetDefSide && s.plannedActions[role] && s.plannedActions[role].type === 'def_attack');
+                    let finalSlice = isRojo ? Math.floor(sliceToApply * W.RojoDamageReduction) : sliceToApply;
+                    
+                    if (army.soldiers >= finalSlice) {
+                        army.soldiers -= finalSlice;
+                        actualTotalDmg += finalSlice;
+                        unassignedDmg -= sliceToApply; // 軽減前のもとの値を引いて消費したことにする
                     } else {
                         let took = army.soldiers;
                         army.soldiers = 0;
                         actualTotalDmg += took;
-                        unassignedDmg -= took;
+                        unassignedDmg -= sliceToApply; // 軽減前のもとの値を引いて消費したことにする
                         newlyDead = true;
                     }
                 });
-                if (newlyDead) aliveArmies = targetArmies.filter(a => a.soldiers > 0);
+                
+                if (newlyDead) aliveArmies = targetArmies.filter(a => a.army.soldiers > 0);
             }
         }
         
@@ -495,7 +514,6 @@ class WarManager {
         
         const isAtkTurnGroup = s.turn.startsWith('attacker'); 
         
-        // 今動いている部隊の情報を取り出します
         let activeBushos, activeSoldiers, activeMorale, activeTraining, activeArmyName;
         if (s.turn === 'attacker') { activeBushos = s.atkBushos; activeSoldiers = s.attacker.soldiers; activeMorale = s.attacker.morale; activeTraining = s.attacker.training; activeArmyName = "攻撃本隊"; }
         else if (s.turn === 'attacker_self_reinf') { activeBushos = s.selfReinforcement.bushos; activeSoldiers = s.selfReinforcement.soldiers; activeMorale = s.attacker.morale; activeTraining = s.attacker.training; activeArmyName = "攻撃側自家援軍"; }
@@ -504,7 +522,6 @@ class WarManager {
         else if (s.turn === 'defender_self_reinf') { activeBushos = s.defSelfReinforcement.bushos; activeSoldiers = s.defSelfReinforcement.soldiers; activeMorale = s.defender.morale; activeTraining = s.defender.training; activeArmyName = "守備側自家援軍"; }
         else if (s.turn === 'defender_ally_reinf') { activeBushos = s.defReinforcement.bushos; activeSoldiers = s.defReinforcement.soldiers; activeMorale = s.defender.morale; activeTraining = s.defender.training; activeArmyName = "守備側同盟軍"; }
 
-        // 相手（本隊）の情報を計算用に取り出します
         let targetBushos, targetSoldiers, targetMorale, targetTraining;
         if (isAtkTurnGroup) { targetBushos = [s.defBusho]; targetSoldiers = s.defender.soldiers; targetMorale = s.defender.morale; targetTraining = s.defender.training; }
         else { targetBushos = s.atkBushos; targetSoldiers = s.attacker.soldiers; targetMorale = s.attacker.morale; targetTraining = s.attacker.training; }
@@ -539,7 +556,6 @@ class WarManager {
             if (!result.success) { if (s.isPlayerInvolved) this.game.ui.addWarDetailLog(`R${s.round} [${activeArmyName}] 謀略失敗！`); }
             else {
                 let calcDamage = s.isPlayerInvolved ? result.damage : Math.floor(result.damage * 0.195);
-                // ★修正：ダメージを敵全体に分散させます！
                 let actualDamage = this.distributeDamage(isAtkTurnGroup, calcDamage);
                 if (s.isPlayerInvolved) this.game.ui.addWarDetailLog(`R${s.round} [${activeArmyName}] 謀略成功！ 敵軍に計${actualDamage}の被害`);
             }
@@ -556,7 +572,6 @@ class WarManager {
                     s.defender.defense = Math.max(0, s.defender.defense - calcDamage);
                     if (s.isPlayerInvolved) this.game.ui.addWarDetailLog(`R${s.round} [${activeArmyName}] 火攻成功！ 敵防御に${calcDamage}の被害`);
                 } else {
-                    // ★修正：こちらも敵全体に分散させます！
                     let actualDamage = this.distributeDamage(isAtkTurnGroup, calcDefSoldierDamage);
                     if (s.isPlayerInvolved) this.game.ui.addWarDetailLog(`R${s.round} [${activeArmyName}] 火攻成功！ 敵軍に計${actualDamage}の被害`);
                 }
@@ -579,22 +594,26 @@ class WarManager {
         }
 
         if (isAtkTurnGroup) {
-            const defPlan = s.plannedActions['defender'];
-            if (defPlan && defPlan.type === 'def_attack') {
-                 calculatedSoldierDmg = Math.floor(calculatedSoldierDmg * window.WarParams.War.RojoDamageReduction); 
+            // ★修正：誰か1人でも籠城を選んでいれば、城壁ダメージを軽減します。
+            // 複数人が選んでいても、ここの処理は1回しか通らないので重複して硬くなることはありません！
+            const hasRojo = ['defender', 'defender_self_reinf', 'defender_ally_reinf'].some(role => {
+                const plan = s.plannedActions[role];
+                return plan && plan.type === 'def_attack';
+            });
+            
+            if (hasRojo) {
                  calculatedWallDmg = Math.floor(calculatedWallDmg * window.WarParams.War.RojoDamageReduction);
-                 if (s.isPlayerInvolved) this.game.ui.addWarDetailLog(`(守備軍の籠城により被害軽減)`);
+                 if (s.isPlayerInvolved) this.game.ui.addWarDetailLog(`(守備軍の籠城により城壁の被害軽減)`);
             }
         }
 
-        // ★修正：敵軍全体にダメージを割り勘（分散）させる魔法を使います！
+        // ★修正：兵士へのダメージは distributeDamage の魔法の中で、籠城した部隊だけが個別に軽減されます！
         let actualSoldierDmg = this.distributeDamage(isAtkTurnGroup, calculatedSoldierDmg);
         
         if(isAtkTurnGroup) { s.defender.defense = Math.max(0, s.defender.defense - calculatedWallDmg); } 
         
         if(calculatedCounterDmg > 0) { 
             const actualCounterDmg = Math.min(activeSoldiers, calculatedCounterDmg);
-            // 反撃ダメージは、攻撃した部隊だけが受けます！
             if (s.turn === 'attacker') s.attacker.soldiers -= actualCounterDmg;
             else if (s.turn === 'attacker_self_reinf') s.selfReinforcement.soldiers -= actualCounterDmg;
             else if (s.turn === 'attacker_ally_reinf') s.reinforcement.soldiers -= actualCounterDmg;
@@ -646,13 +665,28 @@ class WarManager {
                 // 全員が作戦を決め終わったら、【実行（アクション）フェーズ】へ！
                 s.phase = 'action';
                 s.actionQueue = [];
-                // ここでご指定の【行動する順番】に並べ替えます！
-                if (s.plannedActions['attacker']) s.actionQueue.push('attacker');
-                if (s.plannedActions['defender']) s.actionQueue.push('defender');
-                if (s.plannedActions['attacker_self_reinf']) s.actionQueue.push('attacker_self_reinf');
-                if (s.plannedActions['defender_self_reinf']) s.actionQueue.push('defender_self_reinf');
-                if (s.plannedActions['attacker_ally_reinf']) s.actionQueue.push('attacker_ally_reinf');
-                if (s.plannedActions['defender_ally_reinf']) s.actionQueue.push('defender_ally_reinf');
+                
+                // ★追加：籠城を選んだ守備軍を、一番最初に行動（準備）するように特別扱いします！
+                // 順番はご指定の通り「守備側 → 守備側援軍 → 守備側同盟軍」です。
+                const defRoles = ['defender', 'defender_self_reinf', 'defender_ally_reinf'];
+                defRoles.forEach(role => {
+                    if (s.plannedActions[role] && s.plannedActions[role].type === 'def_attack') {
+                        s.actionQueue.push(role);
+                    }
+                });
+
+                // ★追加：残りの部隊を、いつもの「攻撃→守備→援軍…」の順番で並べます！
+                const normalOrder = [
+                    'attacker', 'defender', 
+                    'attacker_self_reinf', 'defender_self_reinf', 
+                    'attacker_ally_reinf', 'defender_ally_reinf'
+                ];
+                normalOrder.forEach(role => {
+                    // まだリストに入っていない（籠城以外を選んだ）部隊だけを追加します
+                    if (s.plannedActions[role] && !s.actionQueue.includes(role)) {
+                        s.actionQueue.push(role);
+                    }
+                });
                 
                 this.advanceWarTurn();
             }
