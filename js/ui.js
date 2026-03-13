@@ -2766,7 +2766,6 @@ class UIManager {
             setTxt('war-title-name', `${s.defender.name} 攻防戦`);
         }
 
-        // ★重複していた「攻撃軍」「軍」のテキスト出力をやめて、純粋な名前のみ出力します
         const atkClan = this.game.clans.find(c => c.id === s.attacker.ownerClan);
         const atkName = s.attacker.isKunishu ? s.attacker.name : (atkClan ? atkClan.name : "野武士");
         setTxt('war-atk-name', atkName);
@@ -2803,7 +2802,7 @@ class UIManager {
         setTxt('war-def-rice', s.defender.rice); 
         updateFace('war-def-face', s.defBusho);
 
-        // ★援軍のミニパネルを作る処理（大名のIDのフォールバックを追加）
+        // ★援軍のミニパネルを作る処理
         const createReinfCard = (reinfData, title, bgColor, fallbackClanId) => {
             const card = document.createElement('div');
             card.className = 'war-side-info war-reinf-card';
@@ -2814,7 +2813,7 @@ class UIManager {
             card.style.alignItems = 'center';
             card.style.justifyContent = 'space-evenly'; 
             card.style.boxSizing = 'border-box';
-            card.style.width = '100%'; // ★横幅いっぱいに広がるように修正
+            card.style.width = '100%'; 
             card.style.flex = '1';     
 
             if (!reinfData) {
@@ -2837,13 +2836,20 @@ class UIManager {
             if (reinfData.isKunishuForce) {
                 orgName = this.game.kunishuSystem.getKunishu(reinfData.kunishuId)?.getName(this.game) || "諸勢力";
             } else {
-                // ★自軍援軍の時にデータがない場合、メイン部隊のID（fallbackClanId）を使って家名を取得します
-                let targetClanId = reinfData.ownerClan !== undefined ? reinfData.ownerClan : fallbackClanId;
+                // ★大名家の情報を、「援軍のデータ」「大将のデータ」「お城のデータ」の順に隅々まで探します！
+                let targetClanId = fallbackClanId;
+                if (reinfData.ownerClan !== undefined) {
+                    targetClanId = reinfData.ownerClan;
+                } else if (leader && leader.ownerClan !== undefined) {
+                    targetClanId = leader.ownerClan;
+                } else if (reinfData.castle && reinfData.castle.ownerClan !== undefined) {
+                    targetClanId = reinfData.castle.ownerClan;
+                }
+                
                 const clan = this.game.clans.find(c => c.id === targetClanId);
                 orgName = clan ? clan.name : "野武士";
             }
 
-            // こちらの重複文字も削除しました
             card.innerHTML = `
                 <div style="font-weight:bold; font-size:0.7rem; border-bottom:1px solid rgba(0,0,0,0.1); width:100%; text-align:center; padding-bottom:2px;">${title} ${orgName}</div>
                 ${faceHtml}
@@ -2864,7 +2870,7 @@ class UIManager {
                 wrapper.style.display = 'flex';
                 wrapper.style.flexDirection = 'row'; 
                 wrapper.style.alignItems = 'stretch'; 
-                wrapper.style.width = '100%'; // ★親要素の横幅を100%限界まで使います
+                wrapper.style.width = '100%'; 
                 wrapper.style.height = '100%'; 
                 wrapper.style.gap = '8px'; 
                 
@@ -2875,7 +2881,7 @@ class UIManager {
                 reinfCol.style.display = 'flex';
                 reinfCol.style.flexDirection = 'column'; 
                 reinfCol.style.gap = '8px'; 
-                reinfCol.style.flex = '1'; // ★メイン部隊と半分のスペースを分け合って最大まで広げます
+                reinfCol.style.flex = '1'; 
                 reinfCol.style.minWidth = '0';
                 
                 if (isAttacker) {
@@ -2886,7 +2892,7 @@ class UIManager {
                     wrapper.appendChild(reinfCol); 
                 }
                 baseBox.style.margin = '0';
-                baseBox.style.flex = '1'; // ★メイン部隊も余白を埋め尽くします
+                baseBox.style.flex = '1'; 
                 baseBox.style.minWidth = '0';
             } else {
                 reinfCol = wrapper.querySelector('.war-reinf-col');
@@ -2899,7 +2905,6 @@ class UIManager {
         const atkBaseBox = atkTitleEl ? atkTitleEl.parentElement : null;
         const defBaseBox = defTitleEl ? defTitleEl.parentElement : null;
 
-        // ★援軍の表示名をすべて「攻撃軍」「守備軍」に統一し、フォールバック用のIDを渡しています
         if (atkBaseBox) {
             const atkReinfCol = wrapSide(atkBaseBox, true);
             if (atkReinfCol) {
