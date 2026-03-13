@@ -169,46 +169,52 @@ class WarManager {
         const atkStats = WarSystem.calcUnitStats(s.atkBushos); const defStats = WarSystem.calcUnitStats([s.defBusho]);
         const consumeRate = (window.WarParams.War.RiceConsumptionAtk || 0.1) * 0.5;
 
-        while (turn <= 20 && s.attacker.soldiers > 0 && s.defender.fieldSoldiers > 0 && safetyLimit > 0) {
-            let resAtk = WarSystem.calcWarDamage(atkStats, defStats, s.attacker.soldiers, s.defender.fieldSoldiers, 0, s.attacker.morale, s.defender.training, 'charge');
-            // ★0.5を0.195に変更しました！
+        // ★修正: 野戦は全員で一斉にぶつかるため、合算した兵士数を使います！
+        let totalAtkSoldiers = s.atkAssignments ? s.atkAssignments.reduce((sum, a) => sum + a.soldiers, 0) : s.attacker.soldiers;
+        let totalAtkRice = s.attacker.rice + (s.reinforcement ? s.reinforcement.rice : 0) + (s.selfReinforcement ? s.selfReinforcement.rice : 0);
+
+        while (turn <= 20 && totalAtkSoldiers > 0 && s.defender.fieldSoldiers > 0 && safetyLimit > 0) {
+            let resAtk = WarSystem.calcWarDamage(atkStats, defStats, totalAtkSoldiers, s.defender.fieldSoldiers, 0, s.attacker.morale, s.defender.training, 'charge');
             if (!s.isPlayerInvolved) { resAtk.soldierDmg = Math.floor(resAtk.soldierDmg * 0.195); resAtk.counterDmg = Math.floor(resAtk.counterDmg * 0.195); }
             
-            // ★修正: 減った兵士の数を計算して、負傷兵の箱（deadSoldiers）に入れます！
             let actDefDmg1 = Math.min(s.defender.fieldSoldiers, resAtk.soldierDmg);
-            let actAtkDmg1 = Math.min(s.attacker.soldiers, resAtk.counterDmg);
+            let actAtkDmg1 = Math.min(totalAtkSoldiers, resAtk.counterDmg);
             s.defender.fieldSoldiers -= actDefDmg1; 
-            s.attacker.soldiers -= actAtkDmg1;
+            totalAtkSoldiers -= actAtkDmg1;
             s.deadSoldiers.defender += actDefDmg1;
             s.deadSoldiers.attacker += actAtkDmg1;
 
-            if (s.defender.fieldSoldiers <= 0 || s.attacker.soldiers <= 0) break;
+            if (s.defender.fieldSoldiers <= 0 || totalAtkSoldiers <= 0) break;
             
-            let resDef = WarSystem.calcWarDamage(defStats, atkStats, s.defender.fieldSoldiers, s.attacker.soldiers, 0, s.defender.morale, s.attacker.training, 'charge');
-            // ★0.5を0.195に変更しました！
+            let resDef = WarSystem.calcWarDamage(defStats, atkStats, s.defender.fieldSoldiers, totalAtkSoldiers, 0, s.defender.morale, s.attacker.training, 'charge');
             if (!s.isPlayerInvolved) { resDef.soldierDmg = Math.floor(resDef.soldierDmg * 0.195); resDef.counterDmg = Math.floor(resDef.counterDmg * 0.195); }
             
-            // ★修正: こちらも同じように減った兵士を負傷兵の箱に入れます！
-            let actAtkDmg2 = Math.min(s.attacker.soldiers, resDef.soldierDmg);
+            let actAtkDmg2 = Math.min(totalAtkSoldiers, resDef.soldierDmg);
             let actDefDmg2 = Math.min(s.defender.fieldSoldiers, resDef.counterDmg);
-            s.attacker.soldiers -= actAtkDmg2; 
+            totalAtkSoldiers -= actAtkDmg2; 
             s.defender.fieldSoldiers -= actDefDmg2;
             s.deadSoldiers.attacker += actAtkDmg2;
             s.deadSoldiers.defender += actDefDmg2;
             
-            s.attacker.rice = Math.max(0, s.attacker.rice - Math.floor(s.attacker.soldiers * consumeRate));
+            totalAtkRice = Math.max(0, totalAtkRice - Math.floor(totalAtkSoldiers * consumeRate));
             s.defFieldRice = Math.max(0, s.defFieldRice - Math.floor(s.defender.fieldSoldiers * consumeRate)); 
-            if (s.attacker.rice <= 0 || s.defFieldRice <= 0 || s.attacker.soldiers < s.defender.fieldSoldiers * 0.2 || s.defender.fieldSoldiers < s.attacker.soldiers * 0.2) break;
+            if (totalAtkRice <= 0 || s.defFieldRice <= 0 || totalAtkSoldiers < s.defender.fieldSoldiers * 0.2 || s.defender.fieldSoldiers < totalAtkSoldiers * 0.2) break;
 
             turn++; safetyLimit--;
         }
 
-        const atkLost = s.attacker.soldiers <= 0 || s.attacker.rice <= 0 || (s.attacker.soldiers < s.defender.fieldSoldiers * 0.2);
-        const defLost = s.defender.fieldSoldiers <= 0 || s.defFieldRice <= 0 || (s.defender.fieldSoldiers < s.attacker.soldiers * 0.2);
+        const atkLost = totalAtkSoldiers <= 0 || totalAtkRice <= 0 || (totalAtkSoldiers < s.defender.fieldSoldiers * 0.2);
+        const defLost = s.defender.fieldSoldiers <= 0 || s.defFieldRice <= 0 || (s.defender.fieldSoldiers < totalAtkSoldiers * 0.2);
         
+        // ★修正: 生き残った割合を計算して、本隊・援軍それぞれの兵士数を減らします！
+        const originalAtkSoldiers = s.atkAssignments ? s.atkAssignments.reduce((sum, a) => sum + a.soldiers, 0) : Math.max(1, s.attacker.soldiers);
+        const atkSurviveRate = originalAtkSoldiers > 0 ? Math.max(0, totalAtkSoldiers) / originalAtkSoldiers : 0;
+        
+        s.attacker.soldiers = Math.floor(s.attacker.soldiers * atkSurviveRate);
+        if (s.reinforcement) s.reinforcement.soldiers = Math.floor(s.reinforcement.soldiers * atkSurviveRate);
+        if (s.selfReinforcement) s.selfReinforcement.soldiers = Math.floor(s.selfReinforcement.soldiers * atkSurviveRate);
+
         if (s.atkAssignments) {
-            const originalAtkSoldiers = s.atkAssignments.reduce((sum, a) => sum + a.soldiers, 0);
-            const atkSurviveRate = originalAtkSoldiers > 0 ? Math.max(0, s.attacker.soldiers) / originalAtkSoldiers : 0;
             let atkHorses = 0, atkGuns = 0;
             s.atkAssignments.forEach(a => {
                 a.soldiers = Math.floor(a.soldiers * atkSurviveRate);
@@ -246,65 +252,11 @@ class WarManager {
     startSiegeWarPhase() {
         const s = this.state; const W = window.WarParams.War;
         
-        // ★ここから追加：本隊に混ざってしまった援軍の数字を分離します！
-        if (!s.isSeparatedForSiege) {
-            // 攻撃側の分離
-            if (s.selfReinforcement) {
-                s.attacker.soldiers = Math.max(0, s.attacker.soldiers - s.selfReinforcement.soldiers);
-                s.attacker.rice = Math.max(0, s.attacker.rice - s.selfReinforcement.rice);
-                s.atkBushos = s.atkBushos.filter(b => !s.selfReinforcement.bushos.some(rb => rb.id === b.id));
-            }
-            if (s.reinforcement) {
-                s.attacker.soldiers = Math.max(0, s.attacker.soldiers - s.reinforcement.soldiers);
-                s.attacker.rice = Math.max(0, s.attacker.rice - s.reinforcement.rice);
-                s.atkBushos = s.atkBushos.filter(b => !s.reinforcement.bushos.some(rb => rb.id === b.id));
-            }
-            // 守備側の分離
-            if (s.defSelfReinforcement) {
-                s.defender.soldiers = Math.max(0, s.defender.soldiers - s.defSelfReinforcement.soldiers);
-                s.defender.rice = Math.max(0, s.defender.rice - s.defSelfReinforcement.rice);
-            }
-            if (s.defReinforcement) {
-                s.defender.soldiers = Math.max(0, s.defender.soldiers - s.defReinforcement.soldiers);
-                s.defender.rice = Math.max(0, s.defender.rice - s.defReinforcement.rice);
-            }
-            s.isSeparatedForSiege = true;
-
-            // ★戦争が終わる時（endWar）に、エラーが起きないよう再び合体させる罠を仕掛けます
-            const originalEndWar = this.endWar.bind(this);
-            this.endWar = (attackerWon, isRetreat = false, capturedInRetreat = [], retreatTargetId = null) => {
-                if (this.state.isSeparatedForSiege) {
-                    if (this.state.selfReinforcement) {
-                        this.state.attacker.soldiers += this.state.selfReinforcement.soldiers;
-                        this.state.attacker.rice += this.state.selfReinforcement.rice;
-                        this.state.atkBushos = this.state.atkBushos.concat(this.state.selfReinforcement.bushos);
-                    }
-                    if (this.state.reinforcement) {
-                        this.state.attacker.soldiers += this.state.reinforcement.soldiers;
-                        this.state.attacker.rice += this.state.reinforcement.rice;
-                        this.state.atkBushos = this.state.atkBushos.concat(this.state.reinforcement.bushos);
-                    }
-                    if (this.state.defSelfReinforcement) {
-                        this.state.defender.soldiers += this.state.defSelfReinforcement.soldiers;
-                        this.state.defender.rice += this.state.defSelfReinforcement.rice;
-                    }
-                    if (this.state.defReinforcement) {
-                        this.state.defender.soldiers += this.state.defReinforcement.soldiers;
-                        this.state.defender.rice += this.state.defReinforcement.rice;
-                    }
-                    this.state.isSeparatedForSiege = false;
-                }
-                originalEndWar(attackerWon, isRetreat, capturedInRetreat, retreatTargetId);
-            };
-        }
-        // ★追加ここまで
-
-        // 諸勢力の制圧戦（ダミー城）の場合は民忠・人口の低下をスキップ
         if (!s.isKunishuSubjugation) {
             const dropLoyalty = Math.floor(s.defender.peoplesLoyalty * 0.2);
             s.defender.peoplesLoyalty = Math.max(0, s.defender.peoplesLoyalty - dropLoyalty); 
             
-            // ★修正：分離したことで攻撃側の兵士数が減ったため、少し計算を調整します
+            // ★変更: ここで全軍の合計数を計算してペナルティを出します！
             let totalAtkForPop = s.attacker.soldiers + (s.selfReinforcement ? s.selfReinforcement.soldiers : 0) + (s.reinforcement ? s.reinforcement.soldiers : 0);
             const dropPopulation = Math.floor(totalAtkForPop * 0.2);
             s.defender.population = Math.max(0, s.defender.population - dropPopulation);
@@ -312,10 +264,12 @@ class WarManager {
         
         if (s.isPlayerInvolved) { 
             this.game.ui.setWarModalVisible(true); this.game.ui.clearWarLog();
+            
             if (window.AudioManager) {
                 window.AudioManager.memorizeCurrentBgm(); 
                 window.AudioManager.playBGM('07_Underworld dance.ogg'); 
             }
+            
             setTimeout(() => {
                 this.game.ui.log(`★ ${s.sourceCastle.name}軍が${s.defender.name}への攻城戦を開始！`);
                 this.game.ui.updateWarUI(); this.processWarRound(); 
