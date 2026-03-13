@@ -1393,8 +1393,11 @@ class UIManager {
                     
                     // 自軍のデータが入っているかどうかの確認
                     const isSelfMode = currentMode.includes('self') || modeStrForCheck.includes('self');
+                    const isAllyMode = currentMode.includes('ally') || modeStrForCheck.includes('ally'); // ★追加
+                    
                     let isSelfData = false;
-                    if (currentData && currentData.candidates && currentData.candidates.length > 0) {
+                    // ★修正：諸勢力（自分の城にいる）へのお願いの時に「出す」と勘違いしないようにガードします！
+                    if (!isAllyMode && currentData && currentData.candidates && currentData.candidates.length > 0) {
                         if (currentData.candidates[0] && currentData.candidates[0].ownerClan === this.game.playerClanId) {
                             isSelfData = true;
                         }
@@ -1404,7 +1407,7 @@ class UIManager {
                         confirmMessage = "援軍を出すのをやめますか？";
                     }
 
-                    this.showDialog(confirmMessage, true, 
+                    this.showDialog(confirmMessage, true,
                         () => {
                             // 「やめる」時はフラグを折って、記憶を復元してから安全にキャンセル処理へ向かいます
                             this._activeReinforcementFlag = false;
