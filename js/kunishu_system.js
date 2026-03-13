@@ -15,6 +15,71 @@ class KunishuSystem {
         this.kunishus = kunishus;
     }
 
+    // ★ここから追加：頭領がいない諸勢力に、自動で頭領を配置する魔法です！
+    generateMissingLeaders() {
+        // 今いる武将の中で、一番大きいID（出席番号）を探します
+        let maxId = 0;
+        this.game.bushos.forEach(b => {
+            if (b.id > maxId) maxId = b.id;
+        });
+
+        const currentYear = this.game.year; // 今の年（開始年）
+
+        this.kunishus.forEach(kunishu => {
+            // この諸勢力に所属している武将を探します
+            const members = this.getKunishuMembers(kunishu.id);
+            // リーダーがちゃんと生きているか確認します
+            const leaderAlive = members.some(b => b.id === kunishu.leaderId);
+
+            // もしリーダーがいないなら、新しい頭領を作ります！
+            if (!leaderAlive) {
+                maxId++; // 新しい出席番号を１つ進めます
+                const newId = maxId;
+
+                // 諸勢力の名前を取ってきます
+                const kunishuName = kunishu.getName(this.game);
+                
+                // 新しい武将（頭領）のデータを作ります
+                // 「|」で区切ることで、名字が「〇〇」、名前が「頭領」という扱いになります
+                const newLeader = new Busho({
+                    id: newId,
+                    name: `${kunishuName}|頭領`,
+                    leadership: 30,
+                    strength: 30,
+                    politics: 30,
+                    diplomacy: 30,
+                    intelligence: 30,
+                    charm: 30,
+                    innovation: 0,
+                    cooperation: 50,
+                    ambition: 50,
+                    duty: 50,
+                    affinity: 50,
+                    clan: 0, // 大名には所属していません
+                    belongKunishuId: kunishu.id,
+                    castleId: kunishu.castleId,
+                    birthYear: currentYear - 30, // 今30歳になるように計算します
+                    endYear: currentYear + 60,   // 今から60年後（90歳）まで生きるように計算します
+                    startYear: currentYear - 30, // すでに大人になっている年にします
+                    status: 'active' // バリバリ活動中！
+                });
+
+                // 新しく作った頭領を、ゲーム全体の武将リストに登録します！
+                this.game.bushos.push(newLeader);
+                
+                // 諸勢力のリーダーを、この新しい頭領に設定します
+                kunishu.leaderId = newId;
+
+                // 頭領が住むお城のデータにも、「この人がお城に入ったよ」とメモしておきます
+                const castle = this.game.getCastle(kunishu.castleId);
+                if (castle) {
+                    castle.samuraiIds.push(newId);
+                }
+            }
+        });
+    }
+    // ★追加ここまで！
+
     getKunishu(id) {
         return this.kunishus.find(k => k.id === id);
     }

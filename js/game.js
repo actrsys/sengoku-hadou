@@ -779,6 +779,9 @@ class GameManager {
             this.kunishuSystem.setKunishuData(data.kunishus || []);
             this.courtRankSystem.setRankData(data.courtRanks || []);
             
+            // ★ここを書き足し！：諸勢力の頭領がいないかチェックして、いなければ自動で作ってもらいます！
+            this.kunishuSystem.generateMissingLeaders();
+            
             // ★ここを書き足し！：画像の大きさをゲーム全体で覚えるようにします！
             this.mapWidth = data.mapWidth || 1200;
             this.mapHeight = data.mapHeight || 800;
