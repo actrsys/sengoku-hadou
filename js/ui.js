@@ -2766,9 +2766,10 @@ class UIManager {
             setTxt('war-title-name', `${s.defender.name} 攻防戦`);
         }
 
+        // ★メイン攻撃軍のテキストフォーマット変更
         const atkClan = this.game.clans.find(c => c.id === s.attacker.ownerClan);
         const atkName = s.attacker.isKunishu ? s.attacker.name : (atkClan ? atkClan.name : "野武士");
-        setTxt('war-atk-name', atkName);
+        setTxt('war-atk-name', `攻撃軍 ${atkName}`);
         
         const atkTitleEl = document.getElementById('war-atk-name').parentElement;
         if (atkName.length >= 5) {
@@ -2777,16 +2778,17 @@ class UIManager {
             atkTitleEl.classList.remove('title-long-text');
         }
         
-        setTxt('war-atk-busho', s.atkBushos[0].name);
+        setTxt('war-atk-busho', `${s.atkBushos[0].name.split('|').join('')} 軍`);
         setTxt('war-atk-soldier', s.attacker.soldiers);
         setTxt('war-atk-morale', s.attacker.morale);
         setTxt('war-atk-training', s.attacker.training);
         setTxt('war-atk-rice', s.attacker.rice); 
         updateFace('war-atk-face', s.atkBushos[0]);
         
+        // ★メイン守備軍のテキストフォーマット変更
         const defClan = this.game.clans.find(c => c.id === s.defender.ownerClan);
         const defNameText = s.defender.isKunishu ? s.defender.name : (defClan ? defClan.name : "野武士");
-        setTxt('war-def-name', defNameText);
+        setTxt('war-def-name', `守備軍 ${defNameText}`);
         
         const defTitleEl = document.getElementById('war-def-name').parentElement;
         if (defNameText.length >= 5) {
@@ -2795,14 +2797,14 @@ class UIManager {
             defTitleEl.classList.remove('title-long-text');
         }
 
-        setTxt('war-def-busho', s.defBusho.name);
+        setTxt('war-def-busho', `${s.defBusho.name.split('|').join('')} 軍`);
         setTxt('war-def-soldier', s.defender.soldiers);
         setTxt('war-def-morale', s.defender.morale);
         setTxt('war-def-training', s.defender.training);
         setTxt('war-def-rice', s.defender.rice); 
         updateFace('war-def-face', s.defBusho);
 
-        // ★援軍のミニパネルを作る処理
+        // ★援軍のミニパネルを作る処理（テキストフォーマット統一）
         const createReinfCard = (reinfData, title, bgColor) => {
             const card = document.createElement('div');
             card.className = 'war-side-info war-reinf-card';
@@ -2813,20 +2815,17 @@ class UIManager {
             card.style.alignItems = 'center';
             card.style.boxSizing = 'border-box';
 
-            // ★変更：もし援軍のデータが無い時は、同じ大きさの「灰色の空枠」を作ってお返しします
             if (!reinfData) {
                 card.style.backgroundColor = '#d3d3d3'; // 灰色
                 card.innerHTML = `
-                    <div style="font-weight:bold; font-size:0.7rem; border-bottom:1px solid rgba(0,0,0,0.1); width:100%; text-align:center; padding-bottom:2px; color:#555;">${title}</div>
+                    <div style="font-weight:bold; font-size:0.7rem; border-bottom:1px solid rgba(0,0,0,0.1); width:100%; text-align:center; padding-bottom:2px; color:#555;">${title} ---</div>
                     <div style="width:40px; height:40px; margin: 2px 0; display:flex; align-items:center; justify-content:center; color:#888; font-size:0.6rem;">なし</div>
-                    <div style="font-weight:bold; font-size:0.75rem; margin-top:2px; color:#888;">---</div>
-                    <div style="font-size:0.7rem; margin-bottom: 2px; color:#888;">---</div>
+                    <div style="font-weight:bold; font-size:0.75rem; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; width:100%; text-align:center; margin-top:2px; margin-bottom: 2px; color:#888;">--- 軍</div>
                     <div style="font-weight:bold; font-size:0.8rem; color:#888;">---</div>
                 `;
                 return card;
             }
 
-            // 援軍データがある時は、指定された色を塗って中身を作ります
             card.style.backgroundColor = bgColor; 
             const leader = reinfData.bushos && reinfData.bushos.length > 0 ? reinfData.bushos[0] : null;
             const leaderName = leader ? leader.name.split('|').join('') : "不明";
@@ -2836,20 +2835,19 @@ class UIManager {
             if (reinfData.isKunishuForce) {
                 orgName = this.game.kunishuSystem.getKunishu(reinfData.kunishuId)?.getName(this.game) || "諸勢力";
             } else {
-                orgName = reinfData.castle ? reinfData.castle.name : "援軍";
+                const clan = this.game.clans.find(c => c.id === reinfData.ownerClan);
+                orgName = clan ? clan.name : "野武士";
             }
 
             card.innerHTML = `
-                <div style="font-weight:bold; font-size:0.7rem; border-bottom:1px solid rgba(0,0,0,0.1); width:100%; text-align:center; padding-bottom:2px;">${title}</div>
+                <div style="font-weight:bold; font-size:0.7rem; border-bottom:1px solid rgba(0,0,0,0.1); width:100%; text-align:center; padding-bottom:2px;">${title} ${orgName}</div>
                 ${faceHtml}
-                <div style="font-weight:bold; font-size:0.75rem; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; width:100%; text-align:center; margin-top:2px;">${orgName}</div>
-                <div style="white-space:nowrap; font-size:0.7rem; overflow:hidden; text-overflow:ellipsis; width:100%; text-align:center; margin-bottom: 2px;">${leaderName}</div>
+                <div style="font-weight:bold; font-size:0.75rem; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; width:100%; text-align:center; margin-top:2px; margin-bottom: 2px;">${leaderName} 軍</div>
                 <div style="color:#d32f2f; font-weight:bold; font-size:0.8rem;">兵 ${reinfData.soldiers}</div>
             `;
             return card;
         };
 
-        // ★メイン部隊の隣に「援軍を縦に並べるための専用の箱」を作る処理
         const wrapSide = (baseBox, isAttacker) => {
             if (!baseBox) return null;
             let wrapper = baseBox.parentElement;
@@ -2890,12 +2888,11 @@ class UIManager {
         const atkBaseBox = atkTitleEl ? atkTitleEl.parentElement : null;
         const defBaseBox = defTitleEl ? defTitleEl.parentElement : null;
 
-        // ★変更：援軍がいてもいなくても、常に箱を作って配置するようにしました
         if (atkBaseBox) {
             const atkReinfCol = wrapSide(atkBaseBox, true);
             if (atkReinfCol) {
-                const atkSelfCard = createReinfCard(s.selfReinforcement, "自軍援軍", "#ffcdd2"); 
-                const atkAllyCard = createReinfCard(s.reinforcement, "同盟援軍", "#ffe0b2"); 
+                const atkSelfCard = createReinfCard(s.selfReinforcement, "援軍", "#ffcdd2"); 
+                const atkAllyCard = createReinfCard(s.reinforcement, "同盟軍", "#ffe0b2"); 
                 
                 atkReinfCol.appendChild(atkSelfCard); 
                 atkReinfCol.appendChild(atkAllyCard); 
@@ -2905,8 +2902,8 @@ class UIManager {
         if (defBaseBox) {
             const defReinfCol = wrapSide(defBaseBox, false);
             if (defReinfCol) {
-                const defSelfCard = createReinfCard(s.defSelfReinforcement, "自軍援軍", "#b3e5fc"); 
-                const defAllyCard = createReinfCard(s.defReinforcement, "同盟援軍", "#b2dfdb"); 
+                const defSelfCard = createReinfCard(s.defSelfReinforcement, "援軍", "#b3e5fc"); 
+                const defAllyCard = createReinfCard(s.defReinforcement, "同盟軍", "#b2dfdb"); 
                 
                 defReinfCol.appendChild(defSelfCard); 
                 defReinfCol.appendChild(defAllyCard); 
