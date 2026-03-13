@@ -769,6 +769,9 @@ class GameManager {
             const data = await DataManager.loadAll(folder); 
             this.clans = data.clans; this.castles = data.castles; this.bushos = data.bushos; 
             
+            this.year = window.MainParams.StartYear;
+            this.month = window.MainParams.StartMonth;
+            
             this.kunishuSystem.setKunishuData(data.kunishus || []);
             this.courtRankSystem.setRankData(data.courtRanks || []);
             
