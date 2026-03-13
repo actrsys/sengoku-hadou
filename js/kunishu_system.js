@@ -355,45 +355,56 @@ class KunishuSystem {
             kunishuId: kunishu.id
         };
 
-        // WarManagerの開始フローに合流
-        this.game.warManager.startWar(dummyAttacker, castle, atkBushos, atkSoldiers, atkRice, atkHorses, atkGuns); // ★修正
-        
         // ==========================================
-        // ★ここから修正！：戦争画面とメッセージが終わるまで、絶対に次の処理に進まない強固な魔法！
+        // ★ここから修正！：戦争が「完全に」終わるまで見届ける監視カメラの魔法！
         // ==========================================
+        let isWarReallyFinished = false;
+        const originalCloseWar = this.game.warManager.closeWar;
         
-        // 1. 戦争の準備ができるまで一瞬待ちます
-        await new Promise(resolve => setTimeout(resolve, 200));
+        // closeWar（合戦画面を閉じる最後の処理）が呼ばれたら、監視カメラに「終わったよ！」と報告させます
+        this.game.warManager.closeWar = function() {
+            if (originalCloseWar) originalCloseWar.call(this); // 元の終了処理をちゃんと実行します
+            isWarReallyFinished = true;  // 報告！
+        };
 
-        let isWarProcessing = true;
-        while (isWarProcessing) {
-            // 2. 戦争中（activeがtrue）ならじっと待つ
-            if (this.game.warManager.state && this.game.warManager.state.active) {
-                await new Promise(resolve => setTimeout(resolve, 500));
-                continue; // まだ戦争中なのでループの先頭に戻ります
-            }
+        // WarManagerの開始フローに合流（いざ、戦争スタート！）
+        this.game.warManager.startWar(dummyAttacker, castle, atkBushos, atkSoldiers, atkRice, atkHorses, atkGuns); 
+        
+        // 戦争とメッセージ表示が完全に終わるまでじっと待ちます
+        let failSafeCounter = 0; 
+        
+        while (!isWarReallyFinished) {
+            await new Promise(resolve => setTimeout(resolve, 500));
             
-            // 3. ダイアログが出ているなら待つ
-            if (this.game.ui && this.game.ui.waitForDialogs) {
-                await this.game.ui.waitForDialogs();
-            }
-
-            // 4. 画面が切り替わる隙間（裏側の待ち時間）を越えるため、少し長めに待つ
-            await new Promise(resolve => setTimeout(resolve, 600));
-
-            // 5. それでも戦争が終わっていて、何もダイアログが出ていなければ、本当に終わったと判断します！
-            let anyModalOpen = false;
-            if (this.game.ui && typeof this.game.ui.waitForDialogs === 'function') {
-                const isVisible = (id) => { const el = document.getElementById(id); return el && !el.classList.contains('hidden'); };
-                if (isVisible('result-modal') || isVisible('dialog-modal') || isVisible('war-modal')) {
-                    anyModalOpen = true;
+            // 安全装置：裏でエラーが起きて closeWar が一生呼ばれない場合のためのタイマー
+            if (this.game.warManager.state && !this.game.warManager.state.active) {
+                let anyModalOpen = false;
+                if (this.game.ui) {
+                    const isVisible = (id) => { const el = document.getElementById(id); return el && !el.classList.contains('hidden'); };
+                    if (isVisible('result-modal') || isVisible('dialog-modal') || isVisible('war-modal')) {
+                        anyModalOpen = true;
+                    }
+                    // タップメッセージ等、名前がわからない画面が出ている場合も検知します
+                    const overlay = document.querySelector('[class*="tap"], [id*="tap"]');
+                    if (overlay && !overlay.classList.contains('hidden') && overlay.style.display !== 'none') {
+                        anyModalOpen = true;
+                    }
+                }
+                
+                if (!anyModalOpen) {
+                    failSafeCounter++;
+                    // 何の画面も出ていないのに3秒（6回）止まっていたら、エラーとみなして強制的に次へ進めます
+                    if (failSafeCounter > 6) {
+                        break;
+                    }
+                } else {
+                    failSafeCounter = 0; // 画面が出ている間は大人しく待ちます
                 }
             }
-            
-            if (!(this.game.warManager.state && this.game.warManager.state.active) && !anyModalOpen) {
-                isWarProcessing = false; // ループを抜けます！
-            }
         }
+        
+        // 監視カメラを片付けて、元の状態に綺麗に戻します！
+        delete this.game.warManager.closeWar;
         // ==========================================
         // ★修正ここまで
     }
