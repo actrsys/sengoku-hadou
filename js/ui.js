@@ -2766,7 +2766,6 @@ class UIManager {
             setTxt('war-title-name', `${s.defender.name} 攻防戦`);
         }
 
-        // ★メイン攻撃軍のテキストフォーマット変更
         const atkClan = this.game.clans.find(c => c.id === s.attacker.ownerClan);
         const atkName = s.attacker.isKunishu ? s.attacker.name : (atkClan ? atkClan.name : "野武士");
         setTxt('war-atk-name', `攻撃軍 ${atkName}`);
@@ -2785,7 +2784,6 @@ class UIManager {
         setTxt('war-atk-rice', s.attacker.rice); 
         updateFace('war-atk-face', s.atkBushos[0]);
         
-        // ★メイン守備軍のテキストフォーマット変更
         const defClan = this.game.clans.find(c => c.id === s.defender.ownerClan);
         const defNameText = s.defender.isKunishu ? s.defender.name : (defClan ? defClan.name : "野武士");
         setTxt('war-def-name', `守備軍 ${defNameText}`);
@@ -2804,7 +2802,7 @@ class UIManager {
         setTxt('war-def-rice', s.defender.rice); 
         updateFace('war-def-face', s.defBusho);
 
-        // ★援軍のミニパネルを作る処理（テキストフォーマット統一）
+        // ★援軍のミニパネルを作る処理
         const createReinfCard = (reinfData, title, bgColor) => {
             const card = document.createElement('div');
             card.className = 'war-side-info war-reinf-card';
@@ -2813,10 +2811,14 @@ class UIManager {
             card.style.display = 'flex';
             card.style.flexDirection = 'column';
             card.style.alignItems = 'center';
+            // ★変更：縦横の余白をめいっぱい使って広がるように設定
+            card.style.justifyContent = 'space-evenly'; 
             card.style.boxSizing = 'border-box';
+            card.style.width = '85px'; // 横幅をしっかり確保
+            card.style.flex = '1';     // 縦の空きスペースを埋め尽くす魔法
 
             if (!reinfData) {
-                card.style.backgroundColor = '#d3d3d3'; // 灰色
+                card.style.backgroundColor = '#d3d3d3'; 
                 card.innerHTML = `
                     <div style="font-weight:bold; font-size:0.7rem; border-bottom:1px solid rgba(0,0,0,0.1); width:100%; text-align:center; padding-bottom:2px; color:#555;">${title} ---</div>
                     <div style="width:40px; height:40px; margin: 2px 0; display:flex; align-items:center; justify-content:center; color:#888; font-size:0.6rem;">なし</div>
@@ -2858,7 +2860,9 @@ class UIManager {
                 wrapper.className = 'war-side-wrapper';
                 wrapper.style.display = 'flex';
                 wrapper.style.flexDirection = 'row'; 
-                wrapper.style.alignItems = 'center';
+                // ★変更：中央にちんまりまとまらないように、親の高さに合わせてストレッチ（引き伸ばし）させます
+                wrapper.style.alignItems = 'stretch'; 
+                wrapper.style.height = '100%'; // 親の余白を全部使う
                 wrapper.style.gap = '8px'; 
                 
                 baseBox.parentNode.insertBefore(wrapper, baseBox);
@@ -2867,7 +2871,7 @@ class UIManager {
                 reinfCol.className = 'war-reinf-col';
                 reinfCol.style.display = 'flex';
                 reinfCol.style.flexDirection = 'column'; 
-                reinfCol.style.gap = '4px'; 
+                reinfCol.style.gap = '8px'; // 上下のパネルの隙間も少し広めに
                 
                 if (isAttacker) {
                     wrapper.appendChild(reinfCol); 
@@ -2877,6 +2881,7 @@ class UIManager {
                     wrapper.appendChild(reinfCol); 
                 }
                 baseBox.style.margin = '0';
+                baseBox.style.flex = '1'; // メインパネルも余白を埋める
             } else {
                 reinfCol = wrapper.querySelector('.war-reinf-col');
                 reinfCol.innerHTML = ''; 
