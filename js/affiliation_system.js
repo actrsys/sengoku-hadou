@@ -46,6 +46,18 @@ class AffiliationSystem {
      * @param {object} busho - 浪人になる武将
      */
     becomeRonin(busho) {
+        // ★ここから追加：最強の関所！自動で作られた頭領は浪人になれず、ここで消滅します！
+        if (busho.isAutoLeader) {
+            busho.clan = 0;
+            busho.status = 'dead'; // 浪人ではなく、死亡（消滅）扱いにします
+            busho.isCastellan = false;
+            busho.isDaimyo = false;
+            busho.belongKunishuId = 0; // 諸勢力からも外します
+            this.leaveCastle(busho); // お城から綺麗にいなくなります
+            return; // これ以上下の「浪人になる処理」には進ませません！
+        }
+        // ★追加ここまで！
+
         const oldClanId = busho.clan;
 
         // 1. 大名家を抜けるので、功績を半分にします！
