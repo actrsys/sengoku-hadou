@@ -296,20 +296,30 @@ class UIManager {
 
         let didWait = false; 
 
-        while (
-            (this.dialogQueue && this.dialogQueue.length > 0) ||
+        // ★書き換え：チェックする条件をひとまとめにします
+        const checkActive = () => {
+            return (this.dialogQueue && this.dialogQueue.length > 0) ||
             isVisible('dialog-modal') ||
             isVisible('result-modal') ||
             isVisible('intercept-confirm-modal') ||
             isVisible('unit-divide-modal') ||
             isVisible('prisoner-modal') ||
-            isVisible('selector-modal') || // ★追加：武将や諸勢力の一覧画面
-            isVisible('quantity-modal') || // ★追加：兵士数などを決めるスライダー画面
-            this.game.selectionMode != null // ★追加：マップ上で城を選んでいる最中
-        ) {
+            isVisible('selector-modal') || 
+            isVisible('quantity-modal') || 
+            isVisible('war-modal') ||      // ★ここを追加！！！戦争画面が開いている間も待ちます！
+            this.game.selectionMode != null;
+        };
+
+        while (checkActive()) {
             didWait = true; 
             await new Promise(resolve => setTimeout(resolve, 200));
+            
+            // ★追加：ダイアログが消えたと思っても、次のダイアログが出るまでの隙間（プログラムの準備時間）を考慮して、念のため少し待ってからもう一度確認します！
+            if (!checkActive()) {
+                await new Promise(resolve => setTimeout(resolve, 500)); 
+            }
         }
+        
         if (didWait) {
             await new Promise(resolve => setTimeout(resolve, 100));
         }

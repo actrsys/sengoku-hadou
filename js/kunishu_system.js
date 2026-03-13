@@ -358,16 +358,44 @@ class KunishuSystem {
         // WarManagerの開始フローに合流
         this.game.warManager.startWar(dummyAttacker, castle, atkBushos, atkSoldiers, atkRice, atkHorses, atkGuns); // ★修正
         
-        // ★ここから追加：戦争画面が終わるまで、次の処理に進まずにじっと待つ魔法！
-        while (this.game.warManager.state.active) {
-            await new Promise(resolve => setTimeout(resolve, 500));
-        }
+        // ==========================================
+        // ★ここから修正！：戦争画面とメッセージが終わるまで、絶対に次の処理に進まない強固な魔法！
+        // ==========================================
         
-        // ★さらに追加：戦争後の「鎮圧しました」などのメッセージを読み終わるまで待ちます！
-        if (this.game.ui && this.game.ui.waitForDialogs) {
-            await this.game.ui.waitForDialogs();
+        // 1. 戦争の準備ができるまで一瞬待ちます
+        await new Promise(resolve => setTimeout(resolve, 200));
+
+        let isWarProcessing = true;
+        while (isWarProcessing) {
+            // 2. 戦争中（activeがtrue）ならじっと待つ
+            if (this.game.warManager.state && this.game.warManager.state.active) {
+                await new Promise(resolve => setTimeout(resolve, 500));
+                continue; // まだ戦争中なのでループの先頭に戻ります
+            }
+            
+            // 3. ダイアログが出ているなら待つ
+            if (this.game.ui && this.game.ui.waitForDialogs) {
+                await this.game.ui.waitForDialogs();
+            }
+
+            // 4. 画面が切り替わる隙間（裏側の待ち時間）を越えるため、少し長めに待つ
+            await new Promise(resolve => setTimeout(resolve, 600));
+
+            // 5. それでも戦争が終わっていて、何もダイアログが出ていなければ、本当に終わったと判断します！
+            let anyModalOpen = false;
+            if (this.game.ui && typeof this.game.ui.waitForDialogs === 'function') {
+                const isVisible = (id) => { const el = document.getElementById(id); return el && !el.classList.contains('hidden'); };
+                if (isVisible('result-modal') || isVisible('dialog-modal') || isVisible('war-modal')) {
+                    anyModalOpen = true;
+                }
+            }
+            
+            if (!(this.game.warManager.state && this.game.warManager.state.active) && !anyModalOpen) {
+                isWarProcessing = false; // ループを抜けます！
+            }
         }
-        // ★追加ここまで
+        // ==========================================
+        // ★修正ここまで
     }
 
     // 壊滅と継承のチェック
