@@ -2744,10 +2744,8 @@ class UIManager {
             if (busho && busho.faceIcon) {
                 el.src = `data/images/faceicons/${busho.faceIcon}`;
                 el.classList.remove('hidden');
-                // ★書き換え：もし画像が見つからなかったら、のっぺらぼうを表示します
                 el.onerror = () => { el.src = 'data/images/faceicons/unknown_face.webp'; }; 
             } else {
-                // ★書き換え：武将がいない時や画像が設定されていない時は、のっぺらぼうを表示します
                 el.src = 'data/images/faceicons/unknown_face.webp';
                 el.classList.remove('hidden');
             }
@@ -2804,15 +2802,14 @@ class UIManager {
         setTxt('war-def-rice', s.defender.rice); 
         updateFace('war-def-face', s.defBusho);
 
-        // ★ここから追加：援軍の表示処理
+        // ★援軍のミニパネルを作る処理
         const createReinfCard = (reinfData, title, bgColor) => {
             if (!reinfData) return null;
             const card = document.createElement('div');
-            // メインの部隊（war-side-info）のデザインと揃えます
             card.className = 'war-side-info war-reinf-card';
-            card.style.backgroundColor = bgColor; // 枠線ではなく背景色（パネルの色）を変えます
+            card.style.backgroundColor = bgColor; 
             card.style.padding = '5px';
-            card.style.margin = '0'; // くっつけるためにマージンをリセット
+            card.style.margin = '0'; 
             card.style.display = 'flex';
             card.style.flexDirection = 'column';
             card.style.alignItems = 'center';
@@ -2839,65 +2836,79 @@ class UIManager {
             return card;
         };
 
-        const wrapSide = (baseBox) => {
+        // ★メイン部隊の隣に「援軍を縦に並べるための専用の箱」を作る処理
+        const wrapSide = (baseBox, isAttacker) => {
             if (!baseBox) return null;
             let wrapper = baseBox.parentElement;
+            let reinfCol;
+            
+            // まだ包まれていなければ、横並びの大きな箱（wrapper）を作ります
             if (!wrapper.classList.contains('war-side-wrapper')) {
                 wrapper = document.createElement('div');
                 wrapper.className = 'war-side-wrapper';
                 wrapper.style.display = 'flex';
-                // メイン部隊にくっつくように縦(column)に並べます
-                wrapper.style.flexDirection = 'column'; 
+                wrapper.style.flexDirection = 'row'; // 横並びにする魔法
                 wrapper.style.alignItems = 'center';
-                wrapper.style.justifyContent = 'center';
-                wrapper.style.gap = '4px'; // メイン部隊とくっつくような狭い隙間
+                wrapper.style.gap = '8px'; // メインと援軍の隙間
                 
                 baseBox.parentNode.insertBefore(wrapper, baseBox);
-                wrapper.appendChild(baseBox);
                 
-                // メイン部隊もくっつけるためにマージンをリセット
+                // 援軍を入れるための縦長の箱（reinfCol）を作ります
+                reinfCol = document.createElement('div');
+                reinfCol.className = 'war-reinf-col';
+                reinfCol.style.display = 'flex';
+                reinfCol.style.flexDirection = 'column'; // 縦並びにする魔法
+                reinfCol.style.gap = '4px'; // 上下（自援軍と同盟軍）の隙間
+                
+                // 攻撃側なら左側、守備側なら右側に援軍の箱を置きます
+                if (isAttacker) {
+                    wrapper.appendChild(reinfCol); // 左側：援軍の箱
+                    wrapper.appendChild(baseBox);  // 右側：メインの部隊
+                } else {
+                    wrapper.appendChild(baseBox);  // 左側：メインの部隊
+                    wrapper.appendChild(reinfCol); // 右側：援軍の箱
+                }
                 baseBox.style.margin = '0';
+            } else {
+                // すでに包まれている場合は、中身を一度空っぽにして準備します
+                reinfCol = wrapper.querySelector('.war-reinf-col');
+                reinfCol.innerHTML = ''; 
             }
             
-            const existingCards = wrapper.querySelectorAll('.war-reinf-card');
-            existingCards.forEach(c => c.remove());
-            
-            return wrapper;
+            return reinfCol; // 援軍の箱をお返しします
         };
 
         const atkBaseBox = atkTitleEl ? atkTitleEl.parentElement : null;
         const defBaseBox = defTitleEl ? defTitleEl.parentElement : null;
 
+        // 攻撃側の配置処理
         if (atkBaseBox) {
-            // 自援軍か同盟軍がいる場合のみスペースを作る
             if (s.selfReinforcement || s.reinforcement) {
-                const atkWrapper = wrapSide(atkBaseBox);
-                if (atkWrapper) {
-                    // ピンク：#ffcdd2 (自軍援軍)、オレンジ：#ffe0b2 (同盟援軍)
-                    const atkSelfCard = createReinfCard(s.selfReinforcement, "自軍援軍", "#ffcdd2");
-                    const atkAllyCard = createReinfCard(s.reinforcement, "同盟援軍", "#ffe0b2");
+                // 攻撃側のメイン部隊の「左」に援軍用の箱を用意します
+                const atkReinfCol = wrapSide(atkBaseBox, true);
+                if (atkReinfCol) {
+                    const atkSelfCard = createReinfCard(s.selfReinforcement, "自軍援軍", "#ffcdd2"); // ピンク
+                    const atkAllyCard = createReinfCard(s.reinforcement, "同盟援軍", "#ffe0b2"); // オレンジ
                     
-                    // 自援軍はメインの上
-                    if (atkSelfCard) atkWrapper.insertBefore(atkSelfCard, atkBaseBox);
-                    // 同盟援軍はメインの下
-                    if (atkAllyCard) atkWrapper.appendChild(atkAllyCard);
+                    // 箱の中に上から順番に入れます
+                    if (atkSelfCard) atkReinfCol.appendChild(atkSelfCard); // 上（C）
+                    if (atkAllyCard) atkReinfCol.appendChild(atkAllyCard); // 下（D）
                 }
             }
         }
 
+        // 守備側の配置処理
         if (defBaseBox) {
-            // 自援軍か同盟軍がいる場合のみスペースを作る
             if (s.defSelfReinforcement || s.defReinforcement) {
-                const defWrapper = wrapSide(defBaseBox);
-                if (defWrapper) {
-                    // 水色：#b3e5fc (自軍援軍)、緑青：#b2dfdb (同盟援軍)
-                    const defSelfCard = createReinfCard(s.defSelfReinforcement, "自軍援軍", "#b3e5fc");
-                    const defAllyCard = createReinfCard(s.defReinforcement, "同盟援軍", "#b2dfdb");
+                // 守備側のメイン部隊の「右」に援軍用の箱を用意します
+                const defReinfCol = wrapSide(defBaseBox, false);
+                if (defReinfCol) {
+                    const defSelfCard = createReinfCard(s.defSelfReinforcement, "自軍援軍", "#b3e5fc"); // 水色
+                    const defAllyCard = createReinfCard(s.defReinforcement, "同盟援軍", "#b2dfdb"); // 緑青
                     
-                    // 自援軍はメインの上
-                    if (defSelfCard) defWrapper.insertBefore(defSelfCard, defBaseBox);
-                    // 同盟援軍はメインの下
-                    if (defAllyCard) defWrapper.appendChild(defAllyCard);
+                    // 箱の中に上から順番に入れます
+                    if (defSelfCard) defReinfCol.appendChild(defSelfCard); // 上（E）
+                    if (defAllyCard) defReinfCol.appendChild(defAllyCard); // 下（F）
                 }
             }
         }
