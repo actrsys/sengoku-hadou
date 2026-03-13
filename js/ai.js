@@ -390,6 +390,67 @@ class AIEngine {
         let highestProb = -1;
 
         enemies.forEach(target => {
+            if (target.isKunishuTarget) {
+                // ★諸勢力に対する攻撃確率の計算
+                const kunishu = target.kunishu;
+                // ★修正：諸勢力は兵力が少ないため、計算上は「2倍」にして大名家の城と同じ難易度として評価します！
+                const enemyForce = (kunishu.soldiers + kunishu.defense) * 2; 
+                
+                let myReinfPower = 0;
+                // 自軍からの援軍を見積もる
+                this.game.castles.forEach(c => {
+                    if (c.ownerClan === myCastle.ownerClan && c.id !== myCastle.id && c.soldiers >= 1000) {
+                        const errorRange = Math.min(0.3, Math.max(0, (100 - myGeneral.intelligence) / 100 * 0.3));
+                        const errorRate = 1.0 + (Math.random() - 0.5) * 2 * errorRange;
+                        myReinfPower += (c.soldiers * 0.5) * errorRate;
+                    }
+                });
+
+                const myForce = myCastle.soldiers + myReinfPower;
+                const forceRatio = myForce / Math.max(1, enemyForce);
+                
+                let prob = 0;
+                if (forceRatio < 1.0) { // ★見かけの兵力を2倍にした上で、互角以上でないと攻めません
+                    prob = -999;
+                } else if (forceRatio >= 3.0) {
+                    prob = 40 + (forceRatio - 3.0) * 5;
+                } else if (forceRatio >= 2.0) {
+                    prob = 30 + (forceRatio - 2.0) * 10; 
+                } else {
+                    prob = 10 + (forceRatio - 1.0) * 20;
+                }
+
+                // 友好度による補正 (友好度が低いほど攻撃したくなる)
+                const relVal = kunishu.getRelation(myCastle.ownerClan);
+                prob += (30 - relVal); // 最大+30
+
+                // 性格補正
+                const getPersonalityBonus = (p) => {
+                    if (p === 'aggressive') return 5;
+                    if (p === 'conservative') return -5;
+                    return 0;
+                };
+                prob += getPersonalityBonus(myDaimyo.personality);
+                prob += getPersonalityBonus(myGeneral.personality);
+
+                // 難易度補正
+                const diff = window.AIParams.AI.Difficulty || 'normal';
+                const diffMulti = diff === 'hard' ? 1.2 : diff === 'easy' ? 0.7 : 1.0;
+                prob *= diffMulti;
+
+                // 最大値の適用 (諸勢力相手は敵対大名と同じく最大40)
+                prob = Math.min(prob, 40);
+
+                if (prob > 0) prob = prob * 0.07;
+                prob = Math.max(0, prob);
+
+                if (prob > highestProb) {
+                    highestProb = prob;
+                    bestTarget = target;
+                }
+                return; // ここでこのループのイテレーションを終了
+            }
+
             // ★追加：空き城の時は外交データがないので、仮の「敵対」データを作ってあげます！
             let rel = { status: '敵対', sentiment: 0 };
             if (target.ownerClan !== 0) {
@@ -670,6 +731,55 @@ class AIEngine {
         // （「待つ魔法」は消しました！あとはwar.jsが最後までやってくれます）
     }
 
+    executeKunishuSubjugateAI(sourceCastle, kunishu, general, sendSoldiers, sendRice) {
+        if (sendSoldiers <= 0 || sendRice <= 0) {
+            this.game.finishTurn();
+            return;
+        }
+        
+        const bushos = this.game.getCastleBushos(sourceCastle.id).filter(b => b.status !== 'ronin');
+        
+        let evaluatorInt = general.intelligence;
+        let maxError = 0;
+        if (evaluatorInt <= 50) {
+            maxError = 0.2;
+        } else if (evaluatorInt >= 95) {
+            maxError = 0;
+        } else {
+            maxError = 0.2 * (95 - evaluatorInt) / 45;
+        }
+
+        const evaluatedBushos = bushos.map(b => {
+            const truePower = (b.leadership + b.strength + b.intelligence) / 2;
+            let perceivedPower = truePower;
+            if (b.id !== general.id) {
+                const errorRate = 1.0 + (Math.random() - 0.5) * 2 * maxError;
+                perceivedPower = truePower * errorRate;
+            }
+            return { busho: b, perceivedPower: perceivedPower };
+        });
+
+        let maxPower = 0;
+        evaluatedBushos.forEach(eb => {
+            if (eb.perceivedPower > maxPower) {
+                maxPower = eb.perceivedPower;
+            }
+        });
+
+        const threshold = maxPower * 0.7;
+        const sorted = evaluatedBushos
+            .filter(eb => eb.perceivedPower > threshold)
+            .sort((a, b) => b.perceivedPower - a.perceivedPower)
+            .slice(0, 5)
+            .map(eb => eb.busho);
+
+        const sendHorses = sourceCastle.horses || 0;
+        const sendGuns = sourceCastle.guns || 0;
+        
+        // ★ commandSystem の executeKunishuSubjugate を呼び出す
+        this.game.commandSystem.executeKunishuSubjugate(sourceCastle, sourceCastle.id, sorted.map(b => b.id), sendSoldiers, sendRice, sendHorses, sendGuns, kunishu);
+    }
+
     execInternalAffairs(castle, castellan, mods, smartness) {
         // ① 大名を取得します（行動回数の計算に使います）
         const daimyo = this.game.bushos.find(b => b.clan === castle.ownerClan && b.isDaimyo) || castellan;
@@ -905,6 +1015,14 @@ class AIEngine {
                 actions.push({ type: 'employ', stat: 'charm', score: 5, cost: 0, targetRonin: ronins[0] });
             }
 
+            // ★追加: 領内の諸勢力への親善（友好度30以下の場合）
+            const myKunishus = this.game.kunishuSystem.getKunishusInCastle(castle.id).filter(k => k.getRelation(castle.ownerClan) <= 30);
+            myKunishus.forEach(k => {
+                // 友好度が低いほどスコアが高くなる（攻撃優先度よりは低いが、内政の中では優先されやすいように調整）
+                let score = (30 - k.getRelation(castle.ownerClan)) * 10 + 50; 
+                actions.push({ type: 'kunishu_goodwill', stat: 'charm', score: score, cost: 300, targetKunishu: k });
+            });
+
             // ★追加 12. 褒美（承認欲求がたまっている、または忠誠度が低い武将がいる場合）
             let rewardTargets = [];
             // ★追加：選ばれた人の中で「一番低い忠誠度」を覚えておく箱です！
@@ -1026,7 +1144,6 @@ class AIEngine {
                 const doer = bestBushos[0];
 
                 // 実行処理
-                if (action.type === 'employ') {
                     const targetRonin = action.targetRonin;
                     const myPower = this.game.getClanTotalSoldiers(castle.ownerClan) || 1;
                     const success = GameSystem.calcEmploymentSuccess(doer, targetRonin, myPower, 0);
