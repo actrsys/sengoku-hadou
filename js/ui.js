@@ -2880,38 +2880,6 @@ class UIManager {
             return card;
         };
 
-            card.style.backgroundColor = bgColor; 
-            const leader = reinfData.bushos && reinfData.bushos.length > 0 ? reinfData.bushos[0] : null;
-            const leaderName = leader ? leader.name.split('|').join('') : "不明";
-            const faceHtml = leader && leader.faceIcon ? `<img src="data/images/faceicons/${leader.faceIcon}" style="width:40px; height:40px; border-radius:3px; object-fit:cover; border:1px solid #777; margin: 2px 0;" onerror="this.src='data/images/faceicons/unknown_face.webp'">` : `<img src="data/images/faceicons/unknown_face.webp" style="width:40px; height:40px; border-radius:3px; object-fit:cover; border:1px solid #777; margin: 2px 0;">`;
-            
-            let orgName = "";
-            if (reinfData.isKunishuForce) {
-                orgName = this.game.kunishuSystem.getKunishu(reinfData.kunishuId)?.getName(this.game) || "諸勢力";
-            } else {
-                // ★大名家の情報を、「援軍のデータ」「大将のデータ」「お城のデータ」の順に隅々まで探します！
-                let targetClanId = fallbackClanId;
-                if (reinfData.ownerClan !== undefined) {
-                    targetClanId = reinfData.ownerClan;
-                } else if (leader && leader.ownerClan !== undefined) {
-                    targetClanId = leader.ownerClan;
-                } else if (reinfData.castle && reinfData.castle.ownerClan !== undefined) {
-                    targetClanId = reinfData.castle.ownerClan;
-                }
-                
-                const clan = this.game.clans.find(c => c.id === targetClanId);
-                orgName = clan ? clan.name : "野武士";
-            }
-
-            card.innerHTML = `
-                <div style="font-weight:bold; font-size:0.7rem; border-bottom:1px solid rgba(0,0,0,0.1); width:100%; text-align:center; padding-bottom:2px;">${title} ${orgName}</div>
-                ${faceHtml}
-                <div style="font-weight:bold; font-size:0.75rem; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; width:100%; text-align:center; margin-top:2px; margin-bottom: 2px;">${leaderName}</div>
-                <div style="color:#d32f2f; font-weight:bold; font-size:0.8rem;">兵 ${reinfData.soldiers}</div>
-            `;
-            return card;
-        };
-
         const wrapSide = (baseBox, isAttacker) => {
             if (!baseBox) return null;
             let wrapper = baseBox.parentElement;
