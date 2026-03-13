@@ -134,18 +134,26 @@ class WarManager {
         const s = this.state;
         if (!s.isPlayerInvolved) return [];
         
-        // ★変更：委任城の場合はコマンドを選べないようにします
+        // 自分が操作できる部隊かどうかをチェックします
         let isMyTurn = false;
-        if (isAtkTurn && Number(s.attacker.ownerClan) === Number(this.game.playerClanId) && !s.sourceCastle.isDelegated) isMyTurn = true;
-        if (!isAtkTurn && Number(s.defender.ownerClan) === Number(this.game.playerClanId) && !s.defender.isDelegated) isMyTurn = true;
-        
+        const pid = Number(this.game.playerClanId);
+        if (s.turn === 'attacker' && Number(s.attacker.ownerClan) === pid && !s.sourceCastle.isDelegated) isMyTurn = true;
+        if (s.turn === 'attacker_self_reinf' && Number(s.selfReinforcement.castle.ownerClan) === pid && !s.selfReinforcement.castle.isDelegated) isMyTurn = true;
+        if (s.turn === 'attacker_ally_reinf' && Number(s.reinforcement.castle.ownerClan) === pid && !s.reinforcement.castle.isDelegated) isMyTurn = true;
+        if (s.turn === 'defender' && Number(s.defender.ownerClan) === pid && !s.defender.isDelegated) isMyTurn = true;
+        if (s.turn === 'defender_self_reinf' && Number(s.defSelfReinforcement.castle.ownerClan) === pid && !s.defSelfReinforcement.castle.isDelegated) isMyTurn = true;
+        if (s.turn === 'defender_ally_reinf' && Number(s.defReinforcement.castle.ownerClan) === pid && !s.defReinforcement.castle.isDelegated) isMyTurn = true;
+
+        // 操作できない（同盟軍や委任の）場合は空っぽにします
         if (!isMyTurn) return []; 
+        
         const commands = [];
-        if (isAtkTurn) {
-            commands.push({ label: "突撃", type: "charge" }, { label: "斉射", type: "bow" }, { label: "城攻め", type: "siege" }, { label: "火計", type: "fire" }, { label: "謀略", type: "scheme" }, { label: "撤退", type: "retreat" });
+        if (s.turn.startsWith('attacker')) {
+            commands.push({ label: "突撃", type: "charge" }, { label: "斉射", type: "bow" }, { label: "城攻め", type: "siege" }, { label: "火計", type: "fire" }, { label: "謀略", type: "scheme" });
+            if (s.turn === 'attacker') commands.push({ label: "撤退", type: "retreat" }); // 撤退は本隊だけ！
         } else {
             commands.push({ label: "突撃", type: "def_charge" }, { label: "斉射", type: "def_bow" }, { label: "籠城", type: "def_attack" }, { label: "謀略", type: "scheme" }, { label: "補修", type: "repair_setup" }); 
-            if (this.game.castles.some(c => c.ownerClan === s.defender.ownerClan && c.id !== s.defender.id && GameSystem.isReachable(this.game, s.defender, c, s.defender.ownerClan))) commands.push({ label: "撤退", type: "retreat" });
+            if (s.turn === 'defender' && this.game.castles.some(c => c.ownerClan === s.defender.ownerClan && c.id !== s.defender.id && GameSystem.isReachable(this.game, s.defender, c, s.defender.ownerClan))) commands.push({ label: "撤退", type: "retreat" }); // 撤退は本隊だけ！
         }
         return commands;
     }
@@ -290,166 +298,247 @@ class WarManager {
     processWarRound() { 
         if (!this.state.active) return; 
         const s = this.state; 
-        if (s.turn === 'attacker' && s.round > 1) {
-             s.attacker.rice = Math.max(0, s.attacker.rice - Math.floor(s.attacker.soldiers * window.WarParams.War.RiceConsumptionAtk));
-             s.defender.rice = Math.max(0, s.defender.rice - Math.floor(s.defender.soldiers * window.WarParams.War.RiceConsumptionDef));
+
+        // s.phase がない、または 'init'（ラウンドの最初）の時の準備
+        if (!s.phase || s.phase === 'init') {
+            if (s.round > 1) {
+                s.attacker.rice = Math.max(0, s.attacker.rice - Math.floor(s.attacker.soldiers * window.WarParams.War.RiceConsumptionAtk));
+                if (s.selfReinforcement) s.selfReinforcement.rice = Math.max(0, s.selfReinforcement.rice - Math.floor(s.selfReinforcement.soldiers * window.WarParams.War.RiceConsumptionAtk));
+                if (s.reinforcement) s.reinforcement.rice = Math.max(0, s.reinforcement.rice - Math.floor(s.reinforcement.soldiers * window.WarParams.War.RiceConsumptionAtk));
+
+                s.defender.rice = Math.max(0, s.defender.rice - Math.floor(s.defender.soldiers * window.WarParams.War.RiceConsumptionDef));
+                if (s.defSelfReinforcement) s.defSelfReinforcement.rice = Math.max(0, s.defSelfReinforcement.rice - Math.floor(s.defSelfReinforcement.soldiers * window.WarParams.War.RiceConsumptionDef));
+                if (s.defReinforcement) s.defReinforcement.rice = Math.max(0, s.defReinforcement.rice - Math.floor(s.defReinforcement.soldiers * window.WarParams.War.RiceConsumptionDef));
+            }
+
+            if (s.defender.soldiers <= 0 || s.defender.defense <= 0) { this.endWar(true); return; } 
+            if (s.attacker.soldiers <= 0) { this.endWar(false); return; } 
+            
+            if (s.attacker.rice <= 0) { if(s.isPlayerInvolved) this.game.ui.log("攻撃軍の兵糧が尽きました！"); this.endWar(false); return; }
+            if (s.defender.rice <= 0) { if(s.isPlayerInvolved) this.game.ui.log("守備軍の兵糧が尽きました！"); this.endWar(true); return; }
+
+            // みんなが作戦（コマンド）を決める順番のリストを作ります
+            s.commandQueue = ['attacker'];
+            if (s.selfReinforcement) s.commandQueue.push('attacker_self_reinf');
+            if (s.reinforcement) s.commandQueue.push('attacker_ally_reinf');
+            s.commandQueue.push('defender');
+            if (s.defSelfReinforcement) s.commandQueue.push('defender_self_reinf');
+            if (s.defReinforcement) s.commandQueue.push('defender_ally_reinf');
+
+            s.plannedActions = {}; // 選んだ作戦をメモしておくノートです
+            s.phase = 'command'; // ゲームの状態を「作戦を決めるフェーズ」にします
         }
 
-        if (s.defender.soldiers <= 0 || s.defender.defense <= 0) { this.endWar(true); return; } 
-        if (s.attacker.soldiers <= 0) { this.endWar(false); return; } 
-        if (s.attacker.rice <= 0) { if(s.isPlayerInvolved) this.game.ui.log("攻撃軍、兵糧尽きる！"); this.endWar(false); return; }
-        if (s.defender.rice <= 0) { if(s.isPlayerInvolved) this.game.ui.log("守備軍、兵糧尽きる！"); this.endWar(true); return; }
-        
-        this.game.ui.updateWarUI(); this.game.ui.renderWarControls(s.turn === 'attacker'); 
-        const isMyTurn = (s.turn === 'attacker' && Number(s.attacker.ownerClan) === Number(this.game.playerClanId)) || (s.turn !== 'attacker' && Number(s.defender.ownerClan) === Number(this.game.playerClanId));
-        if (!isMyTurn) setTimeout(() => this.execWarAI(), 800); 
+        this.advanceWarTurn(); 
     }
 
     execWarCmd(type, extraVal = null) { 
         if (!this.state.active) return;
-        if (type === 'repair_setup') { window.GameApp.ui.openQuantitySelector('war_repair', [this.state.defender], null); return; }
-        if(type==='scheme'||type==='fire') this.resolveWarAction(type); 
-        else { const ctrl = document.getElementById('war-controls'); if(ctrl) ctrl.classList.add('disabled-area'); this.resolveWarAction(type, extraVal); } 
+        if (this.state.phase !== 'command') return; // 作戦を決めるフェーズだけ動きます
+
+        if (type === 'repair_setup') { 
+            window.GameApp.ui.openQuantitySelector('war_repair', [this.state.defender], null); 
+            return; 
+        }
+        
+        const ctrl = document.getElementById('war-controls'); 
+        if(ctrl) ctrl.classList.add('disabled-area'); 
+
+        // すぐに実行せずに、予定メモに書き込んでおきます！
+        this.state.plannedActions[this.state.turn] = { type: type, extraVal: extraVal };
+        
+        // 次の部隊の作戦決めへ進みます
+        this.advanceWarTurn(); 
     }
 
     execWarAI() { 
         if (!this.state.active) return; 
-        const s = this.state; const isDefender = (s.turn === 'defender');
-        
-        // ★変更: 委任されている城はAIが操作するようにします！
-        let isPlayerControlled = false;
-        if (isDefender && Number(s.defender.ownerClan) === Number(this.game.playerClanId) && !s.defender.isDelegated) isPlayerControlled = true;
-        if (!isDefender && Number(s.attacker.ownerClan) === Number(this.game.playerClanId) && !s.sourceCastle.isDelegated) isPlayerControlled = true;
-        
-        if (isPlayerControlled) return;
+        if (this.state.phase !== 'command') return;
+        const s = this.state; 
+        const isDefenderTurn = s.turn.startsWith('defender');
 
-        const actor = isDefender ? s.defBusho : s.atkBushos[0];
+        let actor;
+        let mySoldiers = 0;
+        
+        if (s.turn === 'attacker') { actor = s.atkBushos[0]; mySoldiers = s.attacker.soldiers; }
+        else if (s.turn === 'attacker_self_reinf') { actor = s.selfReinforcement.bushos[0]; mySoldiers = s.selfReinforcement.soldiers; }
+        else if (s.turn === 'attacker_ally_reinf') { actor = s.reinforcement.bushos[0]; mySoldiers = s.reinforcement.soldiers; }
+        else if (s.turn === 'defender') { actor = s.defBusho; mySoldiers = s.defender.soldiers; }
+        else if (s.turn === 'defender_self_reinf') { actor = s.defSelfReinforcement.bushos[0]; mySoldiers = s.defSelfReinforcement.soldiers; }
+        else if (s.turn === 'defender_ally_reinf') { actor = s.defReinforcement.bushos[0]; mySoldiers = s.defReinforcement.soldiers; }
+
+        let totalAtkSoldiers = s.attacker.soldiers + (s.selfReinforcement ? s.selfReinforcement.soldiers : 0) + (s.reinforcement ? s.reinforcement.soldiers : 0);
+        let totalDefSoldiers = s.defender.soldiers + (s.defSelfReinforcement ? s.defSelfReinforcement.soldiers : 0) + (s.defReinforcement ? s.defReinforcement.soldiers : 0);
+
         let smartness = actor.intelligence / 100.0;
         if (window.AIParams.AI.Difficulty === 'hard') smartness = Math.min(1.0, smartness + 0.2);
         if (window.AIParams.AI.Difficulty === 'easy') smartness = Math.max(0.1, smartness - 0.2);
 
-        if (isDefender) {
-            if (s.defender.soldiers / (s.attacker.soldiers + 1) < (0.2 + smartness * 0.2) && s.defender.defense < 200) { this.resolveWarAction('retreat'); return; }
-            if (s.defender.defense / (s.defender.maxDefense || 1000) < 0.2 && s.defender.soldiers > 1000 && Math.random() < smartness) { this.resolveWarAction('repair', Math.min(s.defender.soldiers, 100)); return; }
+        let bestCmd = 'charge';
+        let extraVal = null;
+
+        if (isDefenderTurn) {
+            if (s.turn === 'defender' && totalDefSoldiers / (totalAtkSoldiers + 1) < (0.2 + smartness * 0.2) && s.defender.defense < 200) { bestCmd = 'retreat'; }
+            else if (s.defender.defense / (s.defender.maxDefense || 1000) < 0.2 && mySoldiers > 1000 && Math.random() < smartness) { bestCmd = 'repair'; extraVal = Math.min(mySoldiers, 100); }
         } else {
-            if (s.attacker.rice < s.attacker.soldiers * 0.2 && s.attacker.soldiers < s.defender.soldiers * 0.5) { this.resolveWarAction('retreat'); return; }
-            if (s.attacker.soldiers < s.defender.soldiers * 0.3 && smartness > 0.5) { this.resolveWarAction('retreat'); return; }
+            if (s.turn === 'attacker') {
+                if (s.attacker.rice < s.attacker.soldiers * 0.2 && totalAtkSoldiers < totalDefSoldiers * 0.5) { bestCmd = 'retreat'; }
+                else if (totalAtkSoldiers < totalDefSoldiers * 0.3 && smartness > 0.5) { bestCmd = 'retreat'; }
+            }
         }
 
-        const options = isDefender ? ['def_charge', 'def_bow', 'def_attack'] : ['charge', 'bow', 'siege'];
-        if (actor.intelligence > 30) options.push('scheme');
-        if (actor.intelligence > 50 && !isDefender) options.push('fire');
+        if (bestCmd === 'charge') { 
+            const options = isDefenderTurn ? ['def_charge', 'def_bow', 'def_attack'] : ['charge', 'bow', 'siege'];
+            if (actor.intelligence > 30) options.push('scheme');
+            if (actor.intelligence > 50 && !isDefenderTurn) options.push('fire');
 
-        let bestCmd = options[0]; let bestScore = -Infinity; const W = window.WarParams.War;
+            bestCmd = options[0]; let bestScore = -Infinity; const W = window.WarParams.War;
 
-        options.forEach(cmd => {
-            let score = 0; let multiplier = 1.0; let risk = 1.0;
-            if (cmd === 'charge') { multiplier = W.ChargeMultiplier; risk = W.ChargeRisk; }
-            else if (cmd === 'bow') { multiplier = W.BowMultiplier; risk = W.BowRisk; }
-            else if (cmd === 'siege') { multiplier = W.SiegeMultiplier; risk = W.SiegeRisk; }
-            else if (cmd === 'def_charge') { multiplier = W.DefChargeMultiplier; risk = W.DefChargeRisk; }
-            else if (cmd === 'def_bow') { multiplier = W.DefBowMultiplier; risk = 0.5; }
-            else if (cmd === 'def_attack') { multiplier = 0; risk = 0; } 
+            options.forEach(cmd => {
+                let score = 0; let multiplier = 1.0; let risk = 1.0;
+                if (cmd === 'charge') { multiplier = W.ChargeMultiplier; risk = W.ChargeRisk; }
+                else if (cmd === 'bow') { multiplier = W.BowMultiplier; risk = W.BowRisk; }
+                else if (cmd === 'siege') { multiplier = W.SiegeMultiplier; risk = W.SiegeRisk; }
+                else if (cmd === 'def_charge') { multiplier = W.DefChargeMultiplier; risk = W.DefChargeRisk; }
+                else if (cmd === 'def_bow') { multiplier = W.DefBowMultiplier; risk = 0.5; }
+                else if (cmd === 'def_attack') { multiplier = 0; risk = 0; } 
 
-            if (cmd === 'siege') score += (multiplier * 50) + (s.defender.defense > 0 ? 100 : 0);
-            else if (cmd === 'def_attack') score += (s.defender.soldiers < s.attacker.soldiers) ? 200 : -100;
-            else score += multiplier * 100;
+                if (cmd === 'siege') score += (multiplier * 50) + (s.defender.defense > 0 ? 100 : 0);
+                else if (cmd === 'def_attack') score += (totalDefSoldiers < totalAtkSoldiers) ? 200 : -100;
+                else score += multiplier * 100;
 
-            score -= (risk * 50 * smartness);
-            if (cmd === 'scheme' || cmd === 'fire') score = ((actor.intelligence / 100) * 150) - (50 * smartness); 
-            score += (Math.random() * 50) * (1.0 - smartness);
-            if (score > bestScore) { bestScore = score; bestCmd = cmd; }
-        });
-        this.resolveWarAction(bestCmd); 
+                score -= (risk * 50 * smartness);
+                if (cmd === 'scheme' || cmd === 'fire') score = ((actor.intelligence / 100) * 150) - (50 * smartness); 
+                score += (Math.random() * 50) * (1.0 - smartness);
+                if (score > bestScore) { bestScore = score; bestCmd = cmd; }
+            });
+        }
+
+        // AIの行動も予定メモに書き込みます
+        s.plannedActions[s.turn] = { type: bestCmd, extraVal: extraVal };
+        this.advanceWarTurn(); 
     }
 
     resolveWarAction(type, extraVal = null) {
         if (!this.state.active) return;
         const s = this.state;
-        if(type === 'retreat') { if(s.turn === 'attacker') { this.endWar(false, true); } else { this.executeRetreatLogic(s.defender); } return; }
+        if(type === 'retreat') { if(s.turn === 'attacker') { this.endWar(false, true); } else if (s.turn === 'defender') { this.executeRetreatLogic(s.defender); } return; }
         
-        const isAtkTurn = (s.turn === 'attacker'); const target = isAtkTurn ? s.defender : s.attacker;
-        let atkStats = WarSystem.calcUnitStats(s.atkBushos); let defStats = { str: s.defBusho.strength, int: s.defBusho.intelligence, ldr: s.defBusho.leadership };
+        const isAtkTurnGroup = s.turn.startsWith('attacker'); 
+        // ターゲットは常に敵の「本隊」にします！
+        const target = isAtkTurnGroup ? s.defender : s.attacker;
+        
+        // 今動いている部隊の情報を取り出します
+        let activeBushos, activeSoldiers, activeMorale, activeTraining, activeArmyName;
+        if (s.turn === 'attacker') { activeBushos = s.atkBushos; activeSoldiers = s.attacker.soldiers; activeMorale = s.attacker.morale; activeTraining = s.attacker.training; activeArmyName = "攻撃本隊"; }
+        else if (s.turn === 'attacker_self_reinf') { activeBushos = s.selfReinforcement.bushos; activeSoldiers = s.selfReinforcement.soldiers; activeMorale = s.attacker.morale; activeTraining = s.attacker.training; activeArmyName = "攻撃側自家援軍"; }
+        else if (s.turn === 'attacker_ally_reinf') { activeBushos = s.reinforcement.bushos; activeSoldiers = s.reinforcement.soldiers; activeMorale = s.attacker.morale; activeTraining = s.attacker.training; activeArmyName = "攻撃側同盟軍"; }
+        else if (s.turn === 'defender') { activeBushos = [s.defBusho]; activeSoldiers = s.defender.soldiers; activeMorale = s.defender.morale; activeTraining = s.defender.training; activeArmyName = "守備本隊"; }
+        else if (s.turn === 'defender_self_reinf') { activeBushos = s.defSelfReinforcement.bushos; activeSoldiers = s.defSelfReinforcement.soldiers; activeMorale = s.defender.morale; activeTraining = s.defender.training; activeArmyName = "守備側自家援軍"; }
+        else if (s.turn === 'defender_ally_reinf') { activeBushos = s.defReinforcement.bushos; activeSoldiers = s.defReinforcement.soldiers; activeMorale = s.defender.morale; activeTraining = s.defender.training; activeArmyName = "守備側同盟軍"; }
+
+        // 相手（本隊）の情報
+        let targetBushos, targetSoldiers, targetMorale, targetTraining;
+        if (isAtkTurnGroup) { targetBushos = [s.defBusho]; targetSoldiers = s.defender.soldiers; targetMorale = s.defender.morale; targetTraining = s.defender.training; }
+        else { targetBushos = s.atkBushos; targetSoldiers = s.attacker.soldiers; targetMorale = s.attacker.morale; targetTraining = s.attacker.training; }
+
+        let actStats = WarSystem.calcUnitStats(activeBushos); 
+        let tgtStats = WarSystem.calcUnitStats(targetBushos);
         
         if (type === 'def_attack') { 
-             s.defenderGuarding = true;
-             if(s.isPlayerInvolved) this.game.ui.addWarDetailLog(`R${s.round} [守] 籠城し、守りを固めている！`);
+             if(s.isPlayerInvolved) this.game.ui.addWarDetailLog(`R${s.round} [${activeArmyName}] 籠城し、守りを固めている！`);
              this.advanceWarTurn(); return;
         }
         if (type === 'repair') { 
              const soldierCost = extraVal || 50; 
-             if (s.defender.soldiers > soldierCost) {
-                 const W = window.WarParams.War; s.defender.soldiers -= soldierCost;
-                 const castleBushos = this.game.getCastleBushos(s.defender.id);
-                 const polList = castleBushos.map(b => b.politics).sort((a,b) => b - a);
+             if (activeSoldiers > soldierCost) {
+                 const W = window.WarParams.War; 
+                 if (s.turn === 'defender') s.defender.soldiers -= soldierCost;
+                 else if (s.turn === 'defender_self_reinf') s.defSelfReinforcement.soldiers -= soldierCost;
+                 else if (s.turn === 'defender_ally_reinf') s.defReinforcement.soldiers -= soldierCost;
+
+                 const polList = activeBushos.map(b => b.politics).sort((a,b) => b - a);
                  const maxPol = polList.length > 0 ? polList[0] : 0;
                  let subPolSum = 0; for(let i=1; i<polList.length; i++) subPolSum += polList[i];
                  let recover = Math.floor(((soldierCost * W.RepairSoldierFactor) + (maxPol * W.RepairMainPolFactor) + (subPolSum * W.RepairSubPolFactor)) * W.RepairGlobalMultiplier);
                  s.defender.defense += recover;
-                 if(s.isPlayerInvolved) this.game.ui.addWarDetailLog(`R${s.round} [守] 補修を実行！ (兵-${soldierCost} 防+${recover})`);
-             } else { if(s.isPlayerInvolved) this.game.ui.addWarDetailLog(`R${s.round} [守] 補修しようとしたが兵が足りない！`); }
+                 if(s.isPlayerInvolved) this.game.ui.addWarDetailLog(`R${s.round} [${activeArmyName}] 補修を実行！ (兵-${soldierCost} 防+${recover})`);
+             } else { if(s.isPlayerInvolved) this.game.ui.addWarDetailLog(`R${s.round} [${activeArmyName}] 補修しようとしたが兵が足りない！`); }
              this.advanceWarTurn(); return;
         }
 
         if (type === 'scheme') {
-            const result = WarSystem.calcScheme(isAtkTurn ? s.atkBushos[0] : s.defBusho, isAtkTurn ? s.defBusho : s.atkBushos[0], isAtkTurn ? s.defender.peoplesLoyalty : (window.MainParams?.Economy?.MaxLoyalty || 100));
-            if (!result.success) { if (s.isPlayerInvolved) this.game.ui.addWarDetailLog(`R${s.round} 謀略失敗！`); }
+            const result = WarSystem.calcScheme(activeBushos[0], targetBushos[0], isAtkTurnGroup ? s.defender.peoplesLoyalty : (window.MainParams?.Economy?.MaxLoyalty || 100));
+            if (!result.success) { if (s.isPlayerInvolved) this.game.ui.addWarDetailLog(`R${s.round} [${activeArmyName}] 謀略失敗！`); }
             else {
-                // ★0.5を0.195に変更しました！
                 let actualDamage = s.isPlayerInvolved ? result.damage : Math.floor(result.damage * 0.195);
                 target.soldiers = Math.max(0, target.soldiers - actualDamage);
-                if (s.isPlayerInvolved) this.game.ui.addWarDetailLog(`R${s.round} 謀略成功！ 兵士に${actualDamage}の被害`);
+                if (s.isPlayerInvolved) this.game.ui.addWarDetailLog(`R${s.round} [${activeArmyName}] 謀略成功！ 敵本隊兵士に${actualDamage}の被害`);
             }
             this.advanceWarTurn(); return;
         }
 
         if (type === 'fire') {
-            const result = WarSystem.calcFire(isAtkTurn ? s.atkBushos[0] : s.defBusho, isAtkTurn ? s.defBusho : s.atkBushos[0]);
-            if (!result.success) { if (s.isPlayerInvolved) this.game.ui.addWarDetailLog(`R${s.round} 火攻失敗！`); }
+            const result = WarSystem.calcFire(activeBushos[0], targetBushos[0]);
+            if (!result.success) { if (s.isPlayerInvolved) this.game.ui.addWarDetailLog(`R${s.round} [${activeArmyName}] 火攻失敗！`); }
             else {
-                // ★0.5を0.195に変更しました！
                 let actualDamage = s.isPlayerInvolved ? result.damage : Math.floor(result.damage * 0.195);
-                // ★25（半分のダメージ）を16（3分の1のダメージ）に変更しました！
                 let actualDefSoldierDamage = s.isPlayerInvolved ? 50 : 16;
-                if(isAtkTurn) s.defender.defense = Math.max(0, s.defender.defense - actualDamage);
+                if(isAtkTurnGroup) s.defender.defense = Math.max(0, s.defender.defense - actualDamage);
                 else target.soldiers = Math.max(0, target.soldiers - actualDefSoldierDamage);
-                if (s.isPlayerInvolved) this.game.ui.addWarDetailLog(`R${s.round} 火攻成功！ ${isAtkTurn?'防御':'兵士'}に${isAtkTurn ? actualDamage : actualDefSoldierDamage}の被害`);
+                if (s.isPlayerInvolved) this.game.ui.addWarDetailLog(`R${s.round} [${activeArmyName}] 火攻成功！ 敵${isAtkTurnGroup?'防御':'本隊兵士'}に${isAtkTurnGroup ? actualDamage : actualDefSoldierDamage}の被害`);
             }
             this.advanceWarTurn(); return;
         }
         
-        const result = WarSystem.calcWarDamage(atkStats, defStats, s.attacker.soldiers, s.defender.soldiers, s.defender.defense, s.attacker.morale, s.defender.training, type);
+        let atkStatsParam = isAtkTurnGroup ? actStats : tgtStats;
+        let defStatsParam = isAtkTurnGroup ? tgtStats : actStats;
+        let atkSoldiersParam = isAtkTurnGroup ? activeSoldiers : targetSoldiers;
+        let defSoldiersParam = isAtkTurnGroup ? targetSoldiers : activeSoldiers;
+        let atkMoraleParam = isAtkTurnGroup ? activeMorale : targetMorale;
+        let defTrainingParam = isAtkTurnGroup ? targetTraining : activeTraining;
+
+        const result = WarSystem.calcWarDamage(atkStatsParam, defStatsParam, atkSoldiersParam, defSoldiersParam, s.defender.defense, atkMoraleParam, defTrainingParam, type);
         let calculatedSoldierDmg = result.soldierDmg; let calculatedWallDmg = result.wallDmg; let calculatedCounterDmg = result.counterDmg;
 
         if (!s.isPlayerInvolved) {
-            // ★0.5を0.195に変更しました！
             calculatedSoldierDmg = Math.floor(calculatedSoldierDmg * 0.195); calculatedWallDmg = Math.floor(calculatedWallDmg * 0.195); calculatedCounterDmg = Math.floor(calculatedCounterDmg * 0.195);
         }
 
-        if (isAtkTurn && s.defenderGuarding) {
-             calculatedSoldierDmg = Math.floor(calculatedSoldierDmg * window.WarParams.War.RojoDamageReduction); 
-             calculatedWallDmg = Math.floor(calculatedWallDmg * window.WarParams.War.RojoDamageReduction);
-             s.defenderGuarding = false; if (s.isPlayerInvolved) this.game.ui.addWarDetailLog(`(籠城効果によりダメージ軽減)`);
+        // ★籠城の防御力アップのチェック
+        // 攻撃側が攻撃する時、守備本隊が「籠城」を予定メモに書いているか確認します
+        if (isAtkTurnGroup) {
+            const defPlan = s.plannedActions['defender'];
+            if (defPlan && defPlan.type === 'def_attack') {
+                 calculatedSoldierDmg = Math.floor(calculatedSoldierDmg * window.WarParams.War.RojoDamageReduction); 
+                 calculatedWallDmg = Math.floor(calculatedWallDmg * window.WarParams.War.RojoDamageReduction);
+                 if (s.isPlayerInvolved) this.game.ui.addWarDetailLog(`(守備軍の籠城により被害軽減)`);
+            }
         }
 
         let actualSoldierDmg = Math.min(target.soldiers, calculatedSoldierDmg);
         target.soldiers -= actualSoldierDmg;
-        if(isAtkTurn) { s.deadSoldiers.defender += actualSoldierDmg; s.defender.defense = Math.max(0, s.defender.defense - calculatedWallDmg); } 
+        if(isAtkTurnGroup) { s.deadSoldiers.defender += actualSoldierDmg; s.defender.defense = Math.max(0, s.defender.defense - calculatedWallDmg); } 
         else s.deadSoldiers.attacker += actualSoldierDmg;
         
         if(calculatedCounterDmg > 0) { 
-            const actorArmy = isAtkTurn ? s.attacker : s.defender; 
-            const actualCounterDmg = Math.min(actorArmy.soldiers, calculatedCounterDmg);
-            actorArmy.soldiers -= actualCounterDmg;
-            if(isAtkTurn) s.deadSoldiers.attacker += actualCounterDmg; else s.deadSoldiers.defender += actualCounterDmg;
-            if(s.isPlayerInvolved) this.game.ui.addWarDetailLog(`(反撃被害: ${actualCounterDmg})`); 
+            const actualCounterDmg = Math.min(activeSoldiers, calculatedCounterDmg);
+            if (s.turn === 'attacker') s.attacker.soldiers -= actualCounterDmg;
+            else if (s.turn === 'attacker_self_reinf') s.selfReinforcement.soldiers -= actualCounterDmg;
+            else if (s.turn === 'attacker_ally_reinf') s.reinforcement.soldiers -= actualCounterDmg;
+            else if (s.turn === 'defender') s.defender.soldiers -= actualCounterDmg;
+            else if (s.turn === 'defender_self_reinf') s.defSelfReinforcement.soldiers -= actualCounterDmg;
+            else if (s.turn === 'defender_ally_reinf') s.defReinforcement.soldiers -= actualCounterDmg;
+
+            if(isAtkTurnGroup) s.deadSoldiers.attacker += actualCounterDmg; else s.deadSoldiers.defender += actualCounterDmg;
+            if(s.isPlayerInvolved) this.game.ui.addWarDetailLog(`(${activeArmyName}への反撃被害: ${actualCounterDmg})`); 
         }
         
         if (s.isPlayerInvolved) { 
             let actionName = type.includes('bow') ? "弓攻撃" : type.includes('siege') ? "城攻め" : "力攻め"; 
             if (type.includes('def_')) actionName = type === 'def_bow' ? "斉射" : type === 'def_charge' ? "突撃" : "反撃"; 
-            let msg = (calculatedWallDmg > 0) ? `${actionName} (兵-${actualSoldierDmg} 防-${calculatedWallDmg})` : `${actionName} (兵-${actualSoldierDmg})`; 
-            this.game.ui.addWarDetailLog(`R${s.round} [${isAtkTurn?'攻':'守'}] ${msg}`); 
+            let msg = (calculatedWallDmg > 0) ? `${actionName} (敵本隊兵-${actualSoldierDmg} 防-${calculatedWallDmg})` : `${actionName} (敵本隊兵-${actualSoldierDmg})`; 
+            this.game.ui.addWarDetailLog(`R${s.round} [${activeArmyName}] ${msg}`); 
         }
         this.advanceWarTurn();
     }
@@ -457,12 +546,77 @@ class WarManager {
     advanceWarTurn() { 
         if (!this.state.active) return;
         const s = this.state; 
-        if (s.turn === 'attacker') s.turn = 'defender'; 
-        else { 
-            s.turn = 'attacker'; s.round++; 
-            if(s.round > window.WarParams.Military.WarMaxRounds) { this.endWar(false); return; } 
-        } 
-        if (s.isPlayerInvolved) this.processWarRound(); 
+
+        // 【１】作戦を決めるフェーズ
+        if (s.phase === 'command') {
+            if (s.commandQueue.length > 0) {
+                // 次に作戦を決める人を取り出します
+                s.turn = s.commandQueue.shift(); 
+                
+                this.game.ui.updateWarUI(); 
+                const isAtkSideTurn = s.turn.startsWith('attacker');
+                this.game.ui.renderWarControls(isAtkSideTurn); 
+
+                // プレイヤーが操作できる部隊かどうかチェック
+                let isMyTurn = false;
+                const pid = Number(this.game.playerClanId);
+                if (s.turn === 'attacker' && Number(s.attacker.ownerClan) === pid && !s.sourceCastle.isDelegated) isMyTurn = true;
+                if (s.turn === 'attacker_self_reinf' && Number(s.selfReinforcement.castle.ownerClan) === pid && !s.selfReinforcement.castle.isDelegated) isMyTurn = true;
+                if (s.turn === 'attacker_ally_reinf' && Number(s.reinforcement.castle.ownerClan) === pid && !s.reinforcement.castle.isDelegated) isMyTurn = true;
+                if (s.turn === 'defender' && Number(s.defender.ownerClan) === pid && !s.defender.isDelegated) isMyTurn = true;
+                if (s.turn === 'defender_self_reinf' && Number(s.defSelfReinforcement.castle.ownerClan) === pid && !s.defSelfReinforcement.castle.isDelegated) isMyTurn = true;
+                if (s.turn === 'defender_ally_reinf' && Number(s.defReinforcement.castle.ownerClan) === pid && !s.defReinforcement.castle.isDelegated) isMyTurn = true;
+
+                if (!isMyTurn) {
+                    setTimeout(() => this.execWarAI(), 800); 
+                }
+            } else {
+                // 全員が作戦を決め終わったら、【実行（アクション）フェーズ】へ！
+                s.phase = 'action';
+                s.actionQueue = [];
+                // ここでご指定の【行動する順番】に並べ替えます！
+                if (s.plannedActions['attacker']) s.actionQueue.push('attacker');
+                if (s.plannedActions['defender']) s.actionQueue.push('defender');
+                if (s.plannedActions['attacker_self_reinf']) s.actionQueue.push('attacker_self_reinf');
+                if (s.plannedActions['defender_self_reinf']) s.actionQueue.push('defender_self_reinf');
+                if (s.plannedActions['attacker_ally_reinf']) s.actionQueue.push('attacker_ally_reinf');
+                if (s.plannedActions['defender_ally_reinf']) s.actionQueue.push('defender_ally_reinf');
+                
+                this.advanceWarTurn();
+            }
+            
+        // 【２】実行（アクション）フェーズ
+        } else if (s.phase === 'action') {
+            if (s.actionQueue.length > 0) {
+                // 次に攻撃（実行）する人
+                s.turn = s.actionQueue.shift(); 
+                const action = s.plannedActions[s.turn];
+                
+                // もし実行する前にやられて（兵士ゼロに）しまっていたら、行動はスキップ！
+                let isDead = false;
+                if (s.turn === 'attacker' && s.attacker.soldiers <= 0) isDead = true;
+                else if (s.turn === 'attacker_self_reinf' && s.selfReinforcement.soldiers <= 0) isDead = true;
+                else if (s.turn === 'attacker_ally_reinf' && s.reinforcement.soldiers <= 0) isDead = true;
+                else if (s.turn === 'defender' && s.defender.soldiers <= 0) isDead = true;
+                else if (s.turn === 'defender_self_reinf' && s.defSelfReinforcement.soldiers <= 0) isDead = true;
+                else if (s.turn === 'defender_ally_reinf' && s.defReinforcement.soldiers <= 0) isDead = true;
+                
+                if (isDead || !action) {
+                    this.advanceWarTurn();
+                } else {
+                    // 少し間をあけて（演出を見やすくして）実行します
+                    setTimeout(() => {
+                        this.resolveWarAction(action.type, action.extraVal);
+                    }, 800);
+                }
+            } else {
+                // 全員の行動が終わったら、ラウンドを1つ進めます
+                s.phase = 'init';
+                s.round++;
+                if(s.round > window.WarParams.Military.WarMaxRounds) { this.endWar(false); return; } 
+                this.processWarRound();
+            }
+        }
     }
     
 }
