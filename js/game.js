@@ -1122,7 +1122,7 @@ class GameManager {
             if (this.ui && this.ui.waitForDialogs) {
                 await this.ui.waitForDialogs();
             }
-            this.endMonth(); 
+            await this.endMonth(); // ← ★「await」を書き足します！
             return; 
         }
 
