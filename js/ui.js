@@ -1671,7 +1671,7 @@ class UIManager {
             
             if (cost > 0) {
                  contextEl.innerHTML = `<div>消費予定 ${item}: ${cost} (所持: ${item==='金'?c.gold:c.rice})</div>`; 
-            } else if (actionType === 'war_deploy' || actionType === 'def_intercept_deploy' || actionType === 'def_reinf_deploy' || actionType === 'atk_reinf_deploy' || actionType === 'kunishu_subjugate_deploy') {
+            } else if (actionType === 'war_deploy' || actionType === 'def_intercept_deploy' || actionType === 'def_reinf_deploy' || actionType === 'atk_reinf_deploy' || actionType === 'def_self_reinf_deploy' || actionType === 'atk_self_reinf_deploy' || actionType === 'kunishu_subjugate_deploy') {
                  contextEl.innerHTML = `<div>出陣武将: ${checkedCount}名 / 最大5名</div>`;
             }
         };
@@ -1729,7 +1729,7 @@ class UIManager {
                             const siblings = this.selectorList.querySelectorAll('.select-item');
                             siblings.forEach(el => el.classList.remove('selected'));
                         } else {
-                             const maxSelect = (actionType === 'war_deploy' || actionType === 'def_intercept_deploy' || actionType === 'def_reinf_deploy' || actionType === 'atk_reinf_deploy' || actionType === 'kunishu_subjugate_deploy') ? 5 : 999;
+                             const maxSelect = (actionType === 'war_deploy' || actionType === 'def_intercept_deploy' || actionType === 'def_reinf_deploy' || actionType === 'atk_reinf_deploy' || actionType === 'def_self_reinf_deploy' || actionType === 'atk_self_reinf_deploy' || actionType === 'kunishu_subjugate_deploy') ? 5 : 999;
                              const currentChecked = this.selectorList.querySelectorAll('input[name="sel_busho"]:checked').length;
                              if(e.target.checked && currentChecked > maxSelect) {
                                  e.target.checked = false;
@@ -1764,7 +1764,7 @@ class UIManager {
                     const input = div.querySelector('input');
                     if(input) {
                         if (isMulti) { 
-                             const maxSelect = (actionType === 'war_deploy' || actionType === 'def_intercept_deploy' || actionType === 'def_reinf_deploy' || actionType === 'atk_reinf_deploy' || actionType === 'kunishu_subjugate_deploy') ? 5 : 999;
+                             const maxSelect = (actionType === 'war_deploy' || actionType === 'def_intercept_deploy' || actionType === 'def_reinf_deploy' || actionType === 'atk_reinf_deploy' || actionType === 'def_self_reinf_deploy' || actionType === 'atk_self_reinf_deploy' || actionType === 'kunishu_subjugate_deploy') ? 5 : 999;
                              const currentChecked = this.selectorList.querySelectorAll('input[name="sel_busho"]:checked').length;
                              if(!input.checked && currentChecked >= maxSelect) {
                                  this.showDialog(`出陣できる武将は最大${maxSelect}名までです。`, false);
