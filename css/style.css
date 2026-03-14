@@ -536,9 +536,9 @@ body.is-pc {
 .war-controls-buttons button { 
     writing-mode: vertical-rl; /* ★文字を縦書きにする魔法！ */
     text-orientation: upright; /* 文字を真っ直ぐ立てます */
-    padding: 5px 2px !important; 
+    padding: 5px 0 !important; 
     cursor: pointer; 
-    font-size: 1.05rem !important; 
+    font-size: 1.1rem !important; 
     background: #fff; 
     border: 2px solid #ccc !important; 
     border-radius: 4px !important; 
@@ -546,9 +546,11 @@ body.is-pc {
     color: #333;
     transition: all 0.2s;
     height: 100%;
-    display: flex;
-    align-items: center;
-    justify-content: center;
+    
+    /* ★邪魔をしていた魔法を消して、代わりに「テキストを真ん中にする」魔法に変えました！ */
+    display: block; 
+    text-align: center; 
+    
     letter-spacing: 2px; /* ★縦書きの文字同士の隙間を少し開けて読みやすくします */
 }
 .war-controls-buttons button:hover { 
