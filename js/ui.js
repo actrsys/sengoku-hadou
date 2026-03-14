@@ -2802,11 +2802,11 @@ class UIManager {
         setTxt('war-def-rice', s.defender.rice); 
         updateFace('war-def-face', s.defBusho);
         
-        // ★援軍のミニパネルを作る処理（士気と訓練を横並びに！）
+        // ★援軍のミニパネルを作る処理（士気と訓練を横並びにし、数字を右揃えに！）
         const createReinfCard = (reinfData, title, bgColor, fallbackClanId) => {
             const card = document.createElement('div');
             card.className = 'war-side-info war-reinf-card responsive-army-box'; 
-            card.style.padding = '3px'; // スマホの縦幅節約のために少し狭く
+            card.style.padding = '3px'; 
             card.style.margin = '0'; 
             card.style.display = 'flex';
             card.style.flexDirection = 'column';
@@ -2831,16 +2831,24 @@ class UIManager {
                         <div style="width:35px; height:35px; border:2px solid #999; display:flex; align-items:center; justify-content:center; font-size:0.6rem; background:#eee; box-shadow: 2px 2px 5px rgba(0,0,0,0.3);">なし</div>
                         <div class="responsive-army-stats" style="width: 100%; margin-top: 0; font-size: 0.8rem; gap: 1px; text-shadow: none;">
                             <div class="stat-busho" style="font-size: 0.8rem; margin-bottom: 1px; width: 100%; text-align: center; background: rgba(0,0,0,0.1); color: #888;">---</div>
-                            <div class="stat-row" style="padding-bottom: 1px; width: 100%;"><span class="label-pc">兵数</span><span class="label-sp" style="display:none;">兵</span><span>---</span></div>
+                            
+                            <div class="stat-row" style="padding-bottom: 1px; width: 100%;">
+                                <div><span class="label-pc">兵数</span><span class="label-sp" style="display:none;">兵</span></div>
+                                <span>---</span>
+                            </div>
                             
                             <div class="stat-row label-pc" style="padding-bottom: 1px; width: 100%;"><span>士気</span><span>---</span></div>
                             <div class="stat-row label-pc" style="padding-bottom: 1px; width: 100%;"><span>訓練</span><span>---</span></div>
                             
-                            <div class="stat-row label-sp-flex" style="display:none; padding-bottom: 1px; width: 100%; justify-content: space-between;">
-                                <span>士 ---</span><span>練 ---</span>
+                            <div class="stat-row label-sp-flex" style="display:none; padding-bottom: 1px; width: 100%;">
+                                <div><span>士</span><span>---</span></div>
+                                <div><span>練</span><span>---</span></div>
                             </div>
 
-                            <div class="stat-row" style="padding-bottom: 1px; width: 100%;"><span class="label-pc">兵糧</span><span class="label-sp" style="display:none;">糧</span><span>---</span></div>
+                            <div class="stat-row" style="padding-bottom: 1px; width: 100%;">
+                                <div><span class="label-pc">兵糧</span><span class="label-sp" style="display:none;">糧</span></div>
+                                <span>---</span>
+                            </div>
                         </div>
                     </div>
                 `;
@@ -2850,7 +2858,6 @@ class UIManager {
             const leader = reinfData.bushos && reinfData.bushos.length > 0 ? reinfData.bushos[0] : null;
             const leaderName = leader ? leader.name.split('|').join('') : "不明";
             
-            // スマホの縦幅節約のために顔画像を少し小さくします
             const faceHtml = leader && leader.faceIcon 
                 ? `<img src="data/images/faceicons/${leader.faceIcon}" class="responsive-war-face" style="width:35px; height:35px; border-width:2px; margin:0;" onerror="this.src='data/images/faceicons/unknown_face.webp'">` 
                 : `<img src="data/images/faceicons/unknown_face.webp" class="responsive-war-face" style="width:35px; height:35px; border-width:2px; margin:0;">`;
@@ -2880,17 +2887,24 @@ class UIManager {
                     ${faceHtml}
                     <div class="responsive-army-stats" style="width: 100%; margin-top: 0; font-size: 0.8rem; gap: 1px;">
                         <div class="stat-busho" style="font-size: 0.8rem; margin-bottom: 1px; width: 100%; text-shadow: none;">${leaderName}</div>
-                        <div class="stat-row" style="padding-bottom: 1px; width: 100%;"><span class="label-pc">兵数</span><span class="label-sp" style="display:none;">兵</span><span class="stat-val-large" style="font-size: 0.95rem;">${reinfData.soldiers || 0}</span></div>
+                        
+                        <div class="stat-row" style="padding-bottom: 1px; width: 100%;">
+                            <div><span class="label-pc">兵数</span><span class="label-sp" style="display:none;">兵</span></div>
+                            <span class="stat-val-large" style="font-size: 0.95rem;">${reinfData.soldiers || 0}</span>
+                        </div>
                         
                         <div class="stat-row label-pc" style="padding-bottom: 1px; width: 100%;"><span>士気</span><span>${reinfData.morale || 0}</span></div>
                         <div class="stat-row label-pc" style="padding-bottom: 1px; width: 100%;"><span>訓練</span><span>${reinfData.training || 0}</span></div>
                         
-                        <div class="stat-row label-sp-flex" style="display:none; padding-bottom: 1px; width: 100%; justify-content: space-between;">
-                            <span>士 ${reinfData.morale || 0}</span>
-                            <span>練 ${reinfData.training || 0}</span>
+                        <div class="stat-row label-sp-flex" style="display:none; padding-bottom: 1px; width: 100%;">
+                            <div><span>士</span><span>${reinfData.morale || 0}</span></div>
+                            <div><span>練</span><span>${reinfData.training || 0}</span></div>
                         </div>
 
-                        <div class="stat-row" style="padding-bottom: 1px; width: 100%;"><span class="label-pc">兵糧</span><span class="label-sp" style="display:none;">糧</span><span>${reinfData.rice || 0}</span></div>
+                        <div class="stat-row" style="padding-bottom: 1px; width: 100%;">
+                            <div><span class="label-pc">兵糧</span><span class="label-sp" style="display:none;">糧</span></div>
+                            <span>${reinfData.rice || 0}</span>
+                        </div>
                     </div>
                 </div>
             `;
