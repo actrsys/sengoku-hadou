@@ -2802,186 +2802,113 @@ class UIManager {
         setTxt('war-def-rice', s.defender.rice); 
         updateFace('war-def-face', s.defBusho);
         
-        // ★援軍のミニパネルを作る処理（士気と訓練を横並びにし、数字を右揃えに！）
-        const createReinfCard = (reinfData, title, bgColor, fallbackClanId) => {
-            const card = document.createElement('div');
-            card.className = 'war-side-info war-reinf-card responsive-army-box'; 
-            card.style.padding = '3px'; 
-            card.style.margin = '0'; 
-            card.style.display = 'flex';
-            card.style.flexDirection = 'column';
-            card.style.alignItems = 'center';
-            card.style.justifyContent = 'flex-start'; 
-            card.style.boxSizing = 'border-box';
-            card.style.width = '100%'; 
-            card.style.flex = '1';     
+        // ★HTMLに用意した枠へ、援軍の情報を流し込む魔法です！
+        const updateReinfCardUI = (prefix, reinfData, fallbackClanId) => {
+            const card = document.getElementById(`war-${prefix}-reinf-card`);
+            if (!card) return;
 
-            card.style.backgroundColor = bgColor; 
-            card.style.color = '#fff'; 
-            card.style.textShadow = '1px 1px 2px rgba(0,0,0,0.6)'; 
+            const orgEl = document.getElementById(`war-${prefix}-reinf-org`);
+            const faceContainer = document.getElementById(`war-${prefix}-reinf-face-container`);
+            const faceImg = document.getElementById(`war-${prefix}-reinf-face`);
+            const emptyIcon = document.getElementById(`war-${prefix}-reinf-empty-icon`);
+            const bushoEl = document.getElementById(`war-${prefix}-reinf-busho`);
+            const soldierEl = document.getElementById(`war-${prefix}-reinf-soldier`);
+            const riceEl = document.getElementById(`war-${prefix}-reinf-rice`);
+            const moraleEl = document.getElementById(`war-${prefix}-reinf-morale`);
+            const trainingEl = document.getElementById(`war-${prefix}-reinf-training`);
+            const moraleSpEl = document.getElementById(`war-${prefix}-reinf-morale-sp`);
+            const trainingSpEl = document.getElementById(`war-${prefix}-reinf-training-sp`);
+            
+            const titleEl = card.querySelector('.responsive-army-title');
+            const statsEl = card.querySelector('.responsive-army-stats');
 
             if (!reinfData) {
-                card.style.backgroundColor = '#d3d3d3'; 
-                card.style.textShadow = 'none'; 
-                card.innerHTML = `
-                    <div class="responsive-army-title" style="font-size: 0.85rem; text-align: center; margin-bottom: 2px; color: #555; border-bottom-color: rgba(0,0,0,0.2); text-shadow: none;">
-                        <span class="label-pc">${title} </span>---
-                    </div>
-                    <div style="width: 100%; display: flex; flex-direction: column; align-items: center; gap: 2px; color: #888;">
-                        <div style="width:35px; height:35px; border:2px solid #999; display:flex; align-items:center; justify-content:center; font-size:0.6rem; background:#eee; box-shadow: 2px 2px 5px rgba(0,0,0,0.3);">なし</div>
-                        <div class="responsive-army-stats" style="width: 100%; margin-top: 0; font-size: 0.8rem; gap: 1px; text-shadow: none;">
-                            <div class="stat-busho" style="font-size: 0.8rem; margin-bottom: 1px; width: 100%; text-align: center; background: rgba(0,0,0,0.1); color: #888;">---</div>
-                            
-                            <div class="stat-row" style="padding-bottom: 1px; width: 100%;">
-                                <div><span class="label-pc">兵数</span><span class="label-sp" style="display:none;">兵</span></div>
-                                <span>---</span>
-                            </div>
-                            
-                            <div class="stat-row" style="padding-bottom: 1px; width: 100%;">
-                                <div><span class="label-pc">兵糧</span><span class="label-sp" style="display:none;">糧</span></div>
-                                <span>---</span>
-                            </div>
-                            
-                            <div class="stat-row label-pc" style="padding-bottom: 1px; width: 100%;"><span>士気</span><span>---</span></div>
-                            <div class="stat-row label-pc" style="padding-bottom: 1px; width: 100%;"><span>訓練</span><span>---</span></div>
-                            
-                            <div class="stat-row label-sp-flex" style="display:none; padding-bottom: 1px; width: 100%;">
-                                <div><span>士</span><span>---</span></div>
-                                <div><span>練</span><span>---</span></div>
-                            </div>
-                        </div>
-                    </div>
-                `;
-                return card;
-            }
+                // 誰も来ていない（空っぽ）時は、グレーの寂しいデザインにします
+                card.style.backgroundColor = '#d3d3d3';
+                card.style.textShadow = 'none';
+                titleEl.style.color = '#555';
+                titleEl.style.borderBottomColor = 'rgba(0,0,0,0.2)';
+                titleEl.style.textShadow = 'none';
+                statsEl.style.color = '#888';
+                statsEl.style.textShadow = 'none';
+                bushoEl.style.background = 'rgba(0,0,0,0.1)';
+                bushoEl.style.color = '#888';
+                bushoEl.style.textShadow = 'none';
 
-            const leader = reinfData.bushos && reinfData.bushos.length > 0 ? reinfData.bushos[0] : null;
-            const leaderName = leader ? leader.name.split('|').join('') : "不明";
-            
-            const faceHtml = leader && leader.faceIcon 
-                ? `<img src="data/images/faceicons/${leader.faceIcon}" class="responsive-war-face" style="width:35px; height:35px; border-width:2px; margin:0;" onerror="this.src='data/images/faceicons/unknown_face.webp'">` 
-                : `<img src="data/images/faceicons/unknown_face.webp" class="responsive-war-face" style="width:35px; height:35px; border-width:2px; margin:0;">`;
-            
-            let orgName = "";
-            if (reinfData.isKunishuForce) {
-                orgName = this.game.kunishuSystem.getKunishu(reinfData.kunishuId)?.getName(this.game) || "諸勢力";
+                faceContainer.classList.add('hidden');
+                emptyIcon.classList.remove('hidden');
+
+                orgEl.textContent = '---';
+                bushoEl.textContent = '---';
+                soldierEl.textContent = '---';
+                riceEl.textContent = '---';
+                moraleEl.textContent = '---';
+                trainingEl.textContent = '---';
+                if(moraleSpEl) moraleSpEl.textContent = '---';
+                if(trainingSpEl) trainingSpEl.textContent = '---';
             } else {
-                let targetClanId = fallbackClanId;
-                if (reinfData.ownerClan !== undefined) {
-                    targetClanId = reinfData.ownerClan;
-                } else if (leader && leader.ownerClan !== undefined) {
-                    targetClanId = leader.ownerClan;
-                } else if (reinfData.castle && reinfData.castle.ownerClan !== undefined) {
-                    targetClanId = reinfData.castle.ownerClan;
-                }
+                // 援軍が来ている時は、所属に応じた鮮やかな色に戻します！
+                if (prefix === 'atk-self') card.style.backgroundColor = '#ef9a9a';
+                else if (prefix === 'atk-ally') card.style.backgroundColor = '#ffcc80';
+                else if (prefix === 'def-self') card.style.backgroundColor = '#81d4fa';
+                else if (prefix === 'def-ally') card.style.backgroundColor = '#80cbc4';
                 
-                const clan = this.game.clans.find(c => c.id === targetClanId);
-                orgName = clan ? clan.name : "野武士";
-            }
+                card.style.textShadow = '1px 1px 2px rgba(0,0,0,0.6)';
+                titleEl.style.color = '#fff';
+                titleEl.style.borderBottomColor = 'rgba(255,255,255,0.8)';
+                titleEl.style.textShadow = '';
+                statsEl.style.color = '#fff';
+                statsEl.style.textShadow = '';
+                bushoEl.style.background = 'rgba(0,0,0,0.5)';
+                bushoEl.style.color = '#fff';
+                bushoEl.style.textShadow = 'none';
 
-            card.innerHTML = `
-                <div class="responsive-army-title" style="font-size: 0.85rem; text-align: center; margin-bottom: 2px;">
-                    <span class="label-pc">${title} </span>${orgName}
-                </div>
-                <div style="display: flex; flex-direction: column; align-items: center; width: 100%; gap: 2px;">
-                    ${faceHtml}
-                    <div class="responsive-army-stats" style="width: 100%; margin-top: 0; font-size: 0.8rem; gap: 1px;">
-                        <div class="stat-busho" style="font-size: 0.8rem; margin-bottom: 1px; width: 100%; text-shadow: none;">${leaderName}</div>
-                        
-                        <div class="stat-row" style="padding-bottom: 1px; width: 100%;">
-                            <div><span class="label-pc">兵数</span><span class="label-sp" style="display:none;">兵</span></div>
-                            <span class="stat-val-large" style="font-size: 0.95rem;">${reinfData.soldiers || 0}</span>
-                        </div>
-                        
-                        <div class="stat-row" style="padding-bottom: 1px; width: 100%;">
-                            <div><span class="label-pc">兵糧</span><span class="label-sp" style="display:none;">糧</span></div>
-                            <span>${reinfData.rice || 0}</span>
-                        </div>
-                        
-                        <div class="stat-row label-pc" style="padding-bottom: 1px; width: 100%;"><span>士気</span><span>${reinfData.morale || 0}</span></div>
-                        <div class="stat-row label-pc" style="padding-bottom: 1px; width: 100%;"><span>訓練</span><span>${reinfData.training || 0}</span></div>
-                        
-                        <div class="stat-row label-sp-flex" style="display:none; padding-bottom: 1px; width: 100%;">
-                            <div><span>士</span><span>${reinfData.morale || 0}</span></div>
-                            <div><span>練</span><span>${reinfData.training || 0}</span></div>
-                        </div>
-                    </div>
-                </div>
-            `;
-            return card;
-        };
+                faceContainer.classList.remove('hidden');
+                emptyIcon.classList.add('hidden');
 
-        const wrapSide = (baseBox, isAttacker) => {
-            if (!baseBox) return null;
-            let wrapper = baseBox.parentElement;
-            let reinfCol;
-            
-            if (!wrapper.classList.contains('war-side-wrapper')) {
-                wrapper = document.createElement('div');
-                wrapper.className = 'war-side-wrapper';
-                wrapper.style.display = 'flex';
-                wrapper.style.flexDirection = 'row'; 
-                wrapper.style.alignItems = 'stretch'; 
-                wrapper.style.width = '100%'; 
-                wrapper.style.height = '100%'; 
-                wrapper.style.gap = '8px'; 
+                const leader = reinfData.bushos && reinfData.bushos.length > 0 ? reinfData.bushos[0] : null;
+                const leaderName = leader ? leader.name.split('|').join('') : "不明";
                 
-                baseBox.parentNode.insertBefore(wrapper, baseBox);
-                
-                reinfCol = document.createElement('div');
-                reinfCol.className = 'war-reinf-col';
-                reinfCol.style.display = 'flex';
-                reinfCol.style.flexDirection = 'column'; 
-                reinfCol.style.gap = '8px'; 
-                reinfCol.style.flex = '1'; 
-                reinfCol.style.minWidth = '0';
-                
-                if (isAttacker) {
-                    wrapper.appendChild(reinfCol); 
-                    wrapper.appendChild(baseBox);  
+                if (leader && leader.faceIcon) {
+                    faceImg.src = `data/images/faceicons/${leader.faceIcon}`;
+                    faceImg.onerror = () => { faceImg.src = 'data/images/faceicons/unknown_face.webp'; };
                 } else {
-                    wrapper.appendChild(baseBox);  
-                    wrapper.appendChild(reinfCol); 
+                    faceImg.src = 'data/images/faceicons/unknown_face.webp';
                 }
-                baseBox.style.margin = '0';
-                baseBox.style.flex = '1'; 
-                baseBox.style.minWidth = '0';
-            } else {
-                reinfCol = wrapper.querySelector('.war-reinf-col');
-                reinfCol.innerHTML = ''; 
+
+                let orgName = "";
+                if (reinfData.isKunishuForce) {
+                    orgName = this.game.kunishuSystem.getKunishu(reinfData.kunishuId)?.getName(this.game) || "諸勢力";
+                } else {
+                    let targetClanId = fallbackClanId;
+                    if (reinfData.ownerClan !== undefined) {
+                        targetClanId = reinfData.ownerClan;
+                    } else if (leader && leader.ownerClan !== undefined) {
+                        targetClanId = leader.ownerClan;
+                    } else if (reinfData.castle && reinfData.castle.ownerClan !== undefined) {
+                        targetClanId = reinfData.castle.ownerClan;
+                    }
+                    const clan = this.game.clans.find(c => c.id === targetClanId);
+                    orgName = clan ? clan.name : "野武士";
+                }
+
+                // ここでHTMLに値を流し込みます
+                orgEl.textContent = orgName;
+                bushoEl.textContent = leaderName;
+                soldierEl.textContent = reinfData.soldiers || 0;
+                riceEl.textContent = reinfData.rice || 0;
+                moraleEl.textContent = reinfData.morale || 0;
+                trainingEl.textContent = reinfData.training || 0;
+                if(moraleSpEl) moraleSpEl.textContent = reinfData.morale || 0;
+                if(trainingSpEl) trainingSpEl.textContent = reinfData.training || 0;
             }
-            
-            return reinfCol; 
         };
 
-        const atkBaseBox = atkTitleEl ? atkTitleEl.parentElement : null;
-        const defBaseBox = defTitleEl ? defTitleEl.parentElement : null;
-
-        if (atkBaseBox) {
-            const atkReinfCol = wrapSide(atkBaseBox, true);
-            if (atkReinfCol) {
-                // ★ピンク（#ef9a9a）
-                const atkSelfCard = createReinfCard(s.selfReinforcement, "攻撃軍", "#ef9a9a", s.attacker.ownerClan); 
-                // ★オレンジ（#ffcc80）
-                const atkAllyCard = createReinfCard(s.reinforcement, "攻撃軍", "#ffcc80", s.attacker.ownerClan); 
-                
-                atkReinfCol.appendChild(atkSelfCard); 
-                atkReinfCol.appendChild(atkAllyCard); 
-            }
-        }
-
-        if (defBaseBox) {
-            const defReinfCol = wrapSide(defBaseBox, false);
-            if (defReinfCol) {
-                // ★水色（#81d4fa）
-                const defSelfCard = createReinfCard(s.defSelfReinforcement, "守備軍", "#81d4fa", s.defender.ownerClan); 
-                // ★緑青（#80cbc4）
-                const defAllyCard = createReinfCard(s.defReinforcement, "守備軍", "#80cbc4", s.defender.ownerClan); 
-                
-                defReinfCol.appendChild(defSelfCard); 
-                defReinfCol.appendChild(defAllyCard); 
-            }
-        }
+        // メイン部隊と同じように、4つの援軍カードをまとめて更新します
+        updateReinfCardUI('atk-self', s.selfReinforcement, s.attacker.ownerClan);
+        updateReinfCardUI('atk-ally', s.reinforcement, s.attacker.ownerClan);
+        updateReinfCardUI('def-self', s.defSelfReinforcement, s.defender.ownerClan);
+        updateReinfCardUI('def-ally', s.defReinforcement, s.defender.ownerClan);
     }
 
     // ui.js の renderWarControls をまるごと以下に差し替え！
