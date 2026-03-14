@@ -2272,3 +2272,95 @@ body.is-pc .war-side-wrapper > .war-reinf-col {
 body.is-pc .war-side-wrapper > .war-reinf-col:first-child {
     flex-direction: column !important; /* 反転を解除して縦並びに戻す */
 }
+/* =========================================================
+   ★ 左右の中央の境目を常にド真ん中に固定する魔法
+   ========================================================= */
+.responsive-war-visual {
+    display: flex !important;
+    flex-direction: row !important;
+    width: 100% !important;
+}
+
+/* 攻撃側・守備側を絶対にピッタリ50%ずつに分割します！ */
+.war-side-wrapper {
+    flex: 1 1 50% !important;
+    width: 50% !important;
+    max-width: 50% !important;
+    box-sizing: border-box !important;
+}
+
+/* =========================================================
+   ★ スマホ版：メイン軍のレイアウトを整える魔法
+   ========================================================= */
+/* 消えてしまっていた項目を復活させるために、はみ出し禁止を解除！ */
+.responsive-army-box {
+    overflow-y: visible !important; 
+    overflow-x: visible !important;
+}
+
+/* メイン軍の箱（顔画像とステータスが入っている箱）の設定 */
+.responsive-army-content {
+    position: relative !important;
+    padding-left: 85px !important;   /* 顔画像(75px)＋隙間(10px)の場所を左に空けます */
+    padding-bottom: 30px !important; /* 武将名のための高さを下に空けます */
+    min-height: 110px !important;    /* 全体の最低限の高さを確保します */
+    display: block !important;       /* 横並び設定を解除して素直に表示させます */
+}
+
+/* メイン軍の顔画像だけを左上にピッタリ固定して、少し小さくします */
+.responsive-army-content .responsive-war-face {
+    position: absolute !important;
+    top: 0 !important;
+    left: 0 !important;
+    width: 75px !important;
+    height: 75px !important;
+    margin: 0 !important;
+}
+
+/* メイン軍の武将名を顔画像の下（左下）にピッタリ固定します */
+.responsive-army-content .stat-busho {
+    position: absolute !important;
+    top: 80px !important; /* 顔画像の下に配置 */
+    left: -5px !important;
+    width: 85px !important;
+    margin: 0 !important;
+    font-size: 0.85rem !important;
+    padding: 2px !important;
+    box-sizing: border-box !important;
+    text-align: center !important;
+    white-space: nowrap !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+}
+
+/* ステータス（兵数など）を右側に縦並びにする */
+.responsive-army-content .responsive-army-stats {
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 2px !important;
+    width: 100% !important;
+}
+
+/* ---------------------------------------------------------
+   ★ PC版（画面が広い時）は元のレイアウトに戻す魔法
+   --------------------------------------------------------- */
+body.is-pc .responsive-army-content {
+    position: static !important;
+    padding-left: 0 !important;
+    padding-bottom: 0 !important;
+    min-height: auto !important;
+    display: flex !important;
+}
+
+body.is-pc .responsive-army-content .responsive-war-face {
+    position: static !important;
+    width: 140px !important;
+    height: 140px !important;
+}
+
+body.is-pc .responsive-army-content .stat-busho {
+    position: static !important;
+    width: 75% !important;
+    font-size: 1.3rem !important;
+    margin-bottom: 10px !important;
+}
