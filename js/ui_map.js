@@ -771,12 +771,13 @@ Object.assign(UIManager.prototype, {
     renderDaimyoLabels() {
         const labelsData = [];
 
-        // ★追加：諸勢力コマンドや、出陣・援軍などで城を選ぶ時は大名の名前シールを出さないようにします！
+        // ★追加：諸勢力コマンドや、出陣・援軍、調査などで城を選ぶ時は大名の名前シールを出さないようにします！
         const hiddenModes = [
             'kunishu_goodwill', 'kunishu_subjugate', 'kunishu_headhunt',
             'war',
             'atk_self_reinforcement', 'atk_ally_reinforcement',
-            'def_self_reinforcement', 'def_ally_reinforcement'
+            'def_self_reinforcement', 'def_ally_reinforcement',
+            'investigate', 'info_investigate', 'investigation' // ★調査コマンド用に追加しました！
         ];
         if (hiddenModes.includes(this.game.selectionMode)) return;
 
