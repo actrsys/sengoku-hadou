@@ -340,11 +340,12 @@ body.hide-daimyo-labels .daimyo-name-label { display: none !important; }
 .responsive-army-title { margin: 0 0 5px 0; border-bottom: 2px solid rgba(255,255,255,0.8); width: 100%; text-align: left; font-size: 1.2rem; padding-bottom: 2px; color: #fff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex-shrink: 0; line-height: 1.4; }
 .title-long-text { font-size: 0.95rem !important; }
 
-.responsive-army-content { display: block !important; position: relative !important; padding-left: 65px !important; padding-bottom: 22px !important; min-height: 85px !important; width: 100% !important; box-sizing: border-box !important; }
-.responsive-war-face { position: absolute !important; top: 0 !important; left: 0 !important; width: 60px !important; height: 60px !important; margin: 0 !important; box-sizing: border-box !important; border: 2px solid #333; box-shadow: 2px 2px 5px rgba(0,0,0,0.5); background: #fff; object-fit: cover; }
+.responsive-army-content { width: 100% !important; box-sizing: border-box !important; }
+.responsive-war-face { box-sizing: border-box !important; border: 2px solid #333; box-shadow: 2px 2px 5px rgba(0,0,0,0.5); background: #fff; object-fit: cover; }
 .responsive-army-stats { display: flex !important; flex-direction: column !important; gap: 1px !important; width: 100% !important; box-sizing: border-box !important; font-size: 0.95rem; color: #fff; }
 
-.stat-busho { position: absolute !important; top: 62px !important; left: 0 !important; width: 60px !important; margin: 0 !important; font-size: 0 !important; padding: 2px 0 !important; text-align: center !important; white-space: nowrap !important; overflow: hidden !important; text-overflow: ellipsis !important; background: rgba(0,0,0,0.5) !important; color: #fff; font-weight: bold; }
+.stat-busho { white-space: nowrap !important; overflow: hidden !important; text-overflow: ellipsis !important; color: #fff; font-weight: bold; }
+.reinf-content-wrap { display: flex; width: 100%; }
 .stat-row { display: flex; justify-content: space-between; border-bottom: 1px solid rgba(255,255,255,0.3) !important; padding-bottom: 1px !important; font-weight: bold; font-size: 0.8rem !important; }
 .stat-val-large { font-size: 0.95rem !important; }
 .war-reinf-card .stat-row { display: flex !important; justify-content: space-between !important; width: 100% !important; box-sizing: border-box !important; }
@@ -452,8 +453,21 @@ body:not(.is-pc) .war-header-info, body:not(.is-pc) #war-date-info, body:not(.is
 body:not(.is-pc) .war-reinf-card .responsive-army-title { font-size: 0.75rem !important; margin-bottom: 2px !important; }
 body:not(.is-pc) .war-reinf-card .stat-row { font-size: 0.75rem !important; }
 body:not(.is-pc) .war-reinf-card .stat-val-large { font-size: 0.85rem !important; }
-body:not(.is-pc) .war-reinf-card .responsive-war-face { position: static !important; margin: 0 auto !important; }
-body:not(.is-pc) .war-reinf-card .stat-busho { position: static !important; width: auto !important; min-width: 80% !important; margin: 2px auto !important; font-size: 0.8rem !important; }
+
+/* スマホ版: 新レイアウト (メイン部隊は横並び、援軍は縦積み) */
+body:not(.is-pc) .responsive-army-box { align-items: stretch !important; }
+body:not(.is-pc) .responsive-army-title { text-align: left !important; }
+body:not(.is-pc) .main-busho-label { position: static !important; width: 100% !important; text-align: left !important; background: transparent !important; font-size: 0.95rem !important; color: #fff !important; padding: 0 0 2px 0 !important; margin: 0 0 5px 0 !important; }
+body:not(.is-pc) .responsive-army-content { display: flex !important; flex-direction: row !important; align-items: flex-start !important; padding: 0 !important; gap: 10px !important; min-height: auto !important; }
+body:not(.is-pc) .responsive-war-face { position: static !important; width: 60px !important; height: 60px !important; margin: 0 !important; }
+body:not(.is-pc) .responsive-army-stats { flex: 1 !important; }
+
+body:not(.is-pc) .war-reinf-card { align-items: center !important; }
+body:not(.is-pc) .war-reinf-card .responsive-army-title { text-align: center !important; }
+body:not(.is-pc) .war-reinf-card .reinf-busho-label { text-align: center !important; font-size: 0.8rem !important; background: rgba(0,0,0,0.5) !important; margin: 2px auto !important; min-width: 80% !important; position: static !important; }
+body:not(.is-pc) .war-reinf-card .reinf-content-wrap { flex-direction: column; align-items: center; gap: 2px; }
+body:not(.is-pc) .war-reinf-card .reinf-face-container { display: flex; justify-content: center; width: 100%; }
+
 body:not(.is-pc) .war-controls-area { height: 105px !important; gap: 3px !important; flex-shrink: 0 !important; margin-bottom: 5px !important; }
 body:not(.is-pc) .war-controls-desc { font-size: 0.7rem !important; padding: 3px !important; }
 body:not(.is-pc) .war-controls-buttons button { font-size: 0.95rem !important; letter-spacing: 0px !important; padding: 0 !important; }
@@ -524,16 +538,26 @@ body.is-pc {
     .war-controls-desc { flex: 1; font-size: 0.95rem; }
     .war-controls-buttons button { writing-mode: horizontal-tb; white-space: normal; letter-spacing: normal; padding: 12px 2px !important; font-size: 1.1rem !important; display: flex; align-items: center; justify-content: center; }
     
-    .responsive-army-content { flex-direction: column; align-items: center; height: 100%; justify-content: center; position: static !important; padding-left: 0 !important; padding-bottom: 0 !important; min-height: auto !important; display: flex !important; }
-    .responsive-war-face { width: 140px !important; height: 140px !important; border-width: 3px; position: static !important; }
-    .responsive-army-stats { width: 100%; font-size: 1.2rem; gap: 8px; margin-top: 15px; display: flex; flex-direction: column; align-items: center; }
-    .stat-busho { font-size: 1.3rem !important; text-align: center; margin-bottom: 10px !important; margin-top: 10px !important; width: 75% !important; background: rgba(0,0,0,0.4) !important; position: static !important; }
+    .responsive-army-box { align-items: stretch !important; }
+    .responsive-army-title { text-align: left !important; font-size: 1.4rem; margin-bottom: 5px; }
+    .main-busho-label { position: static !important; width: 100% !important; text-align: left !important; background: transparent !important; font-size: 1.2rem !important; margin: 0 0 10px 0 !important; padding: 0 !important; }
+    .responsive-army-content { display: flex !important; flex-direction: row !important; align-items: flex-start !important; justify-content: flex-start !important; padding: 0 !important; gap: 15px !important; }
+    .responsive-war-face { width: 100px !important; height: 100px !important; margin: 0 !important; position: static !important; border-width: 3px; }
+    .responsive-army-stats { width: 100%; font-size: 1.2rem; gap: 8px; display: flex; flex-direction: column; align-items: stretch; margin-top: 0 !important; flex: 1; }
+    .stat-busho { font-size: 1.3rem !important; }
     .stat-busho > * { font-size: 1.3rem !important; }
-    .stat-row { width: 65%; font-size: 1.2rem !important; border-bottom-width: 4px !important; padding-bottom: 2px !important; }
+    .stat-row { width: 100% !important; font-size: 1.2rem !important; border-bottom-width: 4px !important; padding-bottom: 2px !important; }
     .stat-val-large { font-size: 1.5rem !important; }
-    .responsive-army-title { font-size: 1.4rem; text-align: center; margin-bottom: 5px; }
     .title-long-text { font-size: 1.15rem !important; }
     
+    .war-reinf-card { align-items: stretch !important; padding: 10px !important; }
+    .war-reinf-card .responsive-army-title { text-align: left !important; font-size: 0.95rem !important; }
+    .war-reinf-card .reinf-busho-label { text-align: left !important; font-size: 0.95rem !important; background: transparent !important; padding: 0 !important; margin: 0 0 5px 0 !important; width: 100% !important; position: static !important; }
+    .war-reinf-card .reinf-content-wrap { flex-direction: row; gap: 8px; align-items: flex-start; }
+    .war-reinf-card .reinf-face-container { display: block; }
+    .war-reinf-card .responsive-war-face { width: 60px !important; height: 60px !important; border-width: 2px; }
+    .war-reinf-card .stat-row { width: 100% !important; font-size: 0.8rem !important; border-bottom-width: 1px !important; }
+
     .war-side-wrapper { flex-direction: row !important; flex: 1 1 50% !important; overflow: visible !important;}
     .war-side-wrapper > :not(.war-reinf-col) { order: unset !important; width: auto !important; }
     .war-side-wrapper > .war-reinf-col { order: unset !important; flex-direction: column !important; width: auto !important; }
