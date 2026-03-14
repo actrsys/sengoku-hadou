@@ -2738,41 +2738,43 @@ class UIManager {
         }
         this.warControls.classList.remove('disabled-area');
 
-        // ★修正１：ボタンを無理やり消す魔法をやめて、裏に残したままにします！
-        // 代わりに、コマンド欄に「上からぴったりと膜をかぶせる」ための準備をします。
-        this.warControls.style.position = 'relative'; 
+        // ★修正１：あや瀨さんのアイデア通り、コマンドと説明を画面から完全に消し去ります！
+        this.warControls.innerHTML = ''; 
+        this.warControls.style.position = ''; 
 
-        // もし前のメッセージ膜が残っていたら、念のためお掃除します
-        const oldMsg = document.getElementById('war-action-message-overlay');
-        if (oldMsg) oldMsg.remove();
-
+        // 部隊の光を消す魔法です
         const allCards = document.querySelectorAll('.army-box, .responsive-army-box');
         allCards.forEach(c => c.classList.remove('active-command-turn'));
         
+        // 新しいメッセージの箱を作ります
         const msgContainer = document.createElement('div');
-        msgContainer.id = 'war-action-message-overlay'; // 膜に名前をつけます
         msgContainer.className = 'war-action-message-container';
-        
-        // ★修正２：コマンド欄の真上に、絶対にクリックを通さない膜を張る魔法です！
-        msgContainer.style.position = 'absolute';
-        msgContainer.style.top = '0';
-        msgContainer.style.left = '0';
-        msgContainer.style.width = '100%';
-        msgContainer.style.height = '100%';
-        msgContainer.style.zIndex = '1000'; // コマンドより上に表示させます
         
         msgContainer.innerHTML = `<div class="war-action-message-text">${msg}</div><div class="war-action-message-prompt">▶ クリックして次へ</div>`;
         
+        // ★修正２：同じメッセージをうっかり2回連打してしまわないようにする鍵（カギ）です
+        let isClicked = false;
+        
         msgContainer.onclick = (e) => {
-            // ★修正３：クリックが下のコマンドボタンに貫通するのを防ぐ「最強の盾」です！
             e.stopPropagation();
             e.preventDefault();
             
+            // もしすでにクリックされていたら、それ以上何もしないで無視します
+            if (isClicked) return;
+            isClicked = true;
+            
             if (window.AudioManager) window.AudioManager.playSE('decision.ogg');
-            msgContainer.remove(); // クリックしたらメッセージの膜を消します
+            
+            // ★修正３：メッセージウィンドウ自体は消さずに、「▶ クリックして次へ」の文字だけを透明にして隠します。
+            // これで、次のメッセージが出るまでの間、画面が空っぽになるのを防いで隙間をなくします！
+            const prompt = msgContainer.querySelector('.war-action-message-prompt');
+            if (prompt) prompt.style.visibility = 'hidden';
+            
+            // 次の処理へ進みます
             onClick();
         };
         
+        // 最後に、空っぽになったコマンド欄にメッセージの箱を置きます
         this.warControls.appendChild(msgContainer);
     }
 
