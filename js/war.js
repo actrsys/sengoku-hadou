@@ -510,9 +510,38 @@ class WarManager {
     resolveWarAction(type, extraVal = null) {
         if (!this.state.active) return;
         const s = this.state;
-        if(type === 'retreat') { if(s.turn === 'attacker') { this.endWar(false, true); } else if (s.turn === 'defender') { this.executeRetreatLogic(s.defender); } return; }
+        if (type === 'retreat') { 
+            if (s.turn === 'attacker') { 
+                this.endWar(false, true); 
+            } else if (s.turn === 'defender') { 
+                this.executeRetreatLogic(s.defender); 
+            } else if (['attacker_self_reinf', 'attacker_ally_reinf', 'defender_self_reinf', 'defender_ally_reinf'].includes(s.turn)) {
+                // 援軍が撤退した場合の処理です
+                let reinfKey = '';
+                let activeArmyName = "";
+                
+                if (s.turn === 'attacker_self_reinf') { reinfKey = 'selfReinforcement'; activeArmyName = "攻撃側自家援軍"; }
+                else if (s.turn === 'attacker_ally_reinf') { reinfKey = 'reinforcement'; activeArmyName = "攻撃側同盟軍"; }
+                else if (s.turn === 'defender_self_reinf') { reinfKey = 'defSelfReinforcement'; activeArmyName = "守備側自家援軍"; }
+                else if (s.turn === 'defender_ally_reinf') { reinfKey = 'defReinforcement'; activeArmyName = "守備側同盟軍"; }
+                
+                // プレイヤーが見ている戦いなら、ログ（記録）に撤退したことを残します
+                if (s.isPlayerInvolved) {
+                    this.game.ui.addWarDetailLog(`R${s.round} [${activeArmyName}] は戦場から離脱し、撤退した！`);
+                }
+                
+                // war_effort.js にある「数値をメモして戦場から除外する魔法」を呼び出します
+                if (typeof this.retreatReinforcementForce === 'function') {
+                    this.retreatReinforcementForce(reinfKey);
+                }
+                
+                // 忘れずに、次の人に順番を回します！（これがないとフリーズします）
+                this.advanceWarTurn();
+            }
+            return; 
+        }
         
-        const isAtkTurnGroup = s.turn.startsWith('attacker'); 
+        const isAtkTurnGroup = s.turn.startsWith('attacker');
         
         let activeBushos, activeSoldiers, activeMorale, activeTraining, activeArmyName;
         if (s.turn === 'attacker') { activeBushos = s.atkBushos; activeSoldiers = s.attacker.soldiers; activeMorale = s.attacker.morale; activeTraining = s.attacker.training; activeArmyName = "攻撃本隊"; }
