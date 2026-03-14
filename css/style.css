@@ -496,9 +496,62 @@ body.is-pc {
 .army-box.attacker { background: #d32f2f; }
 .army-box.defender { background: #1976d2; }
 .highlight-val { font-size: 1.5rem; font-weight: bold; }
-.war-controls-area { display: grid; grid-template-columns: repeat(3, 1fr); gap: 5px; flex-shrink: 0;}
-.war-controls-area button { padding: 12px 2px; cursor: pointer; font-size: 0.9rem; background: #fff; border: 1px solid #999; border-radius: 4px; }
-.war-controls-area button:hover { background: #eee; }
+/* =========================================================
+   ★攻城戦のコマンド欄を左右に分ける魔法
+   ========================================================= */
+/* 元々あったグリッド設定を解除して、横並びのフレックスボックスに変えます */
+.war-controls-area { 
+    display: flex !important; 
+    width: 100%;
+    gap: 10px; 
+    flex-shrink: 0;
+}
+
+/* 左側：ボタンが並ぶ場所（全体の3分の2） */
+.war-controls-buttons {
+    flex: 2;
+    display: grid; 
+    grid-template-columns: repeat(3, 1fr); 
+    gap: 5px;
+}
+
+/* 右側：説明が出る場所（全体の3分の1） */
+.war-controls-desc {
+    flex: 1;
+    background: #f9f9f9;
+    border: 2px solid #ccc;
+    border-radius: 4px;
+    padding: 8px;
+    font-size: 0.95rem;
+    color: #333;
+    text-align: left;
+    overflow-y: auto; /* 文字が多くなってもスクロールできるようにします */
+}
+
+/* 各ボタンのデザイン */
+.war-controls-buttons button { 
+    padding: 12px 2px !important; 
+    cursor: pointer; 
+    font-size: 1.1rem !important; 
+    background: #fff; 
+    border: 2px solid #ccc !important; 
+    border-radius: 4px !important; 
+    font-weight: bold;
+    color: #333;
+    transition: all 0.2s;
+}
+.war-controls-buttons button:hover { 
+    background: #f0f0f0; 
+}
+
+/* ★1回押して「選択状態」になったボタンのデザイン */
+.war-controls-buttons button.active-cmd {
+    background: #ffe0b2 !important; /* 薄いオレンジ色に光らせます */
+    border-color: #ff9800 !important;
+    color: #e65100;
+    box-shadow: 0 0 8px rgba(255, 152, 0, 0.4);
+    transform: translateY(1px); /* 少し押し込まれた感じにします */
+}
 .disabled-area { pointer-events: none; opacity: 0.5; }
 
 #map-guide {
