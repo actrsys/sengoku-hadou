@@ -2464,7 +2464,8 @@ class CommandSystem {
 
         const selfReinfData = {
             castle: helperCastle, bushos: reinfBushos, soldiers: reinfSoldiers,
-            rice: reinfRice, horses: reinfHorses, guns: reinfGuns, isAttacker: true, isSelf: true
+            rice: reinfRice, horses: reinfHorses, guns: reinfGuns, isSelf: true,
+            morale: helperCastle.morale || 50, training: helperCastle.training || 50
         };
         
         // ★修正：「参戦しました」のメッセージは攻め込んだ後に war_effort.js で出すので、ここでは静かに次へ進みます！
@@ -2506,8 +2507,9 @@ class CommandSystem {
                 reinfBushos.forEach(b => b.isActionDone = true);
 
                 const selfReinfData = {
-                    castle: helperCastle, bushos: reinfBushos, soldiers: reinfSoldiers,
-                    rice: reinfRice, horses: reinfHorses, guns: reinfGuns, isAttacker: true, isSelf: true
+                    castle: helperCastle, bushos: reinfBushos, soldiers: rS,
+                    rice: rR, horses: rH, guns: rG, isSelf: true,
+                    morale: helperCastle.morale || 50, training: helperCastle.training || 50
                 };
                 
                 // ★修正：出発のメッセージは攻め込んだ後に war_effort.js で出すので、ここは静かに次へ進みます！
@@ -2613,7 +2615,8 @@ class CommandSystem {
             
             const reinforcementData = {
                 castle: helperCastle, kunishuId: kunishu.id, bushos: reinfBushos, soldiers: reinfSoldiers,
-                rice: reinfRice, horses: reinfHorses, guns: reinfGuns, isAttacker: true, isSelf: false, isKunishuForce: true
+                rice: reinfRice, horses: reinfHorses, guns: reinfGuns, isSelf: false, isKunishuForce: true,
+                morale: 50, training: 50
             };
             
             // ★修正：プレイヤーがお願いした時だけ「承諾しました！」のお返事を復活させます！（AIのフライング報告は消したままです）
@@ -2706,7 +2709,8 @@ class CommandSystem {
 
         const reinforcementData = {
             castle: helperCastle, bushos: reinfBushos, soldiers: reinfSoldiers,
-            rice: reinfRice, horses: reinfHorses, guns: reinfGuns, isAttacker: true, isSelf: false
+            rice: reinfRice, horses: reinfHorses, guns: reinfGuns, isSelf: false,
+            morale: helperCastle.morale || 50, training: helperCastle.training || 50
         };
 
         this.game.warManager.applyWarHostility(helperCastle.ownerClan, false, targetCastle.ownerClan, targetCastle.isKunishu, true);

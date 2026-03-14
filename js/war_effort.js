@@ -1651,7 +1651,8 @@ Object.assign(WarManager.prototype, {
 
         const selfReinfData = {
             castle: helperCastle, bushos: reinfBushos, soldiers: reinfSoldiers,
-            rice: reinfRice, horses: reinfHorses, guns: reinfGuns, isSelf: true
+            rice: reinfRice, horses: reinfHorses, guns: reinfGuns, isSelf: true,
+            morale: helperCastle.morale || 50, training: helperCastle.training || 50
         };
         
         // ★修正：守備軍はプレイヤー・敵に関係なく「水色(log-color-def)」にします
@@ -1689,7 +1690,8 @@ Object.assign(WarManager.prototype, {
 
                 const selfReinfData = {
                     castle: helperCastle, bushos: reinfBushos, soldiers: rS,
-                    rice: rR, horses: rH, guns: rG, isSelf: true
+                    rice: rR, horses: rH, guns: rG, isSelf: true,
+                    morale: helperCastle.morale || 50, training: helperCastle.training || 50
                 };
                 
                 // ★修正：こちらも同じく「水色(log-color-def)」にします
@@ -1751,7 +1753,8 @@ Object.assign(WarManager.prototype, {
 
             this.state.defReinforcement = {
                 castle: helperCastle, kunishuId: kunishu.id, bushos: reinfBushos, soldiers: reinfSoldiers,
-                rice: reinfRice, horses: reinfHorses, guns: reinfGuns, isSelf: false, isKunishuForce: true
+                rice: reinfRice, horses: reinfHorses, guns: reinfGuns, isSelf: false, isKunishuForce: true,
+                morale: 50, training: 50
             };
             
             if (myClanId === this.game.playerClanId) {
@@ -1853,7 +1856,8 @@ Object.assign(WarManager.prototype, {
 
         this.state.defReinforcement = {
             castle: helperCastle, bushos: reinfBushos, soldiers: reinfSoldiers,
-            rice: reinfRice, horses: reinfHorses, guns: reinfGuns, isSelf: false
+            rice: reinfRice, horses: reinfHorses, guns: reinfGuns, isSelf: false,
+            morale: helperCastle.morale || 50, training: helperCastle.training || 50
         };
         
         const atkForce = this.state.attacker;
@@ -1929,7 +1933,8 @@ Object.assign(WarManager.prototype, {
 
         this.state.defReinforcement = {
             castle: helperCastle, bushos: reinfBushos, soldiers: reinfSoldiers,
-            rice: reinfRice, horses: reinfHorses, guns: reinfGuns, isSelf: false
+            rice: reinfRice, horses: reinfHorses, guns: reinfGuns, isSelf: false,
+            morale: helperCastle.morale || 50, training: helperCastle.training || 50
         };
         
         const atkForce = this.state.attacker;
