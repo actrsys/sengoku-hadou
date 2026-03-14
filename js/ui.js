@@ -2816,98 +2816,137 @@ class UIManager {
     }
 
     playDamageAnimation(data) {
-        // ★修正：送られてきたお手紙（data）の中に音（se）の指定があればそれを、なければいつもの音を鳴らします！
-        if (window.AudioManager) {
-            let soundFile = data.se || 'damage001.ogg';
-            window.AudioManager.playSE(soundFile);
-        }
+        // ★修正：送られてきたお手紙（data）の中に音（se）の指定があればそれを、なければいつもの音を鳴らします！
+        if (window.AudioManager) {
+            let soundFile = data.se || 'damage001.ogg';
+            window.AudioManager.playSE(soundFile);
+        }
 
-        // 対象の「役割（role）」ごとに、どのカードを揺らすか探す魔法です！
-        const applyAnim = (role, dmgStr) => {
-            let targetCard = null;
-            // それぞれの役割にあわせて、画面上のカードを探します
-            if (role === 'attacker') {
-                const n = document.getElementById('war-atk-name');
-                if (n) targetCard = n.closest('.responsive-army-box, .army-box');
-            } else if (role === 'attacker_self_reinf') {
-                targetCard = document.getElementById('war-atk-self-reinf-card');
-            } else if (role === 'attacker_ally_reinf') {
-                targetCard = document.getElementById('war-atk-ally-reinf-card');
-            } else if (role === 'defender') {
-                const n = document.getElementById('war-def-name');
-                if (n) targetCard = n.closest('.responsive-army-box, .army-box');
-            } else if (role === 'defender_self_reinf') {
-                targetCard = document.getElementById('war-def-self-reinf-card');
-            } else if (role === 'defender_ally_reinf') {
-                targetCard = document.getElementById('war-def-ally-reinf-card');
-            }
+        // 対象の「役割（role）」ごとに、どのカードを揺らすか探す魔法です！
+        const applyAnim = (role, dmgStr) => {
+            let targetCard = null;
+            // それぞれの役割にあわせて、画面上のカードを探します
+            if (role === 'attacker') {
+                const n = document.getElementById('war-atk-name');
+                if (n) targetCard = n.closest('.responsive-army-box, .army-box');
+            } else if (role === 'attacker_self_reinf') {
+                targetCard = document.getElementById('war-atk-self-reinf-card');
+            } else if (role === 'attacker_ally_reinf') {
+                targetCard = document.getElementById('war-atk-ally-reinf-card');
+            } else if (role === 'defender') {
+                const n = document.getElementById('war-def-name');
+                if (n) targetCard = n.closest('.responsive-army-box, .army-box');
+            } else if (role === 'defender_self_reinf') {
+                targetCard = document.getElementById('war-def-self-reinf-card');
+            } else if (role === 'defender_ally_reinf') {
+                targetCard = document.getElementById('war-def-ally-reinf-card');
+            }
 
-            // カードが見つかれば、アニメーションさせます！
-            if (targetCard) {
-                targetCard.style.position = 'relative'; // ポップアップの基準位置にします
-                
-                targetCard.classList.remove('anim-damage-shake', 'anim-damage-flash');
-                void targetCard.offsetWidth; // アニメーションをリセットするおまじない
-                targetCard.classList.add('anim-damage-shake', 'anim-damage-flash');
-                
-                const pop = document.createElement('div');
-                pop.className = 'damage-popup anim-popup-text';
-                pop.innerHTML = dmgStr;
-                targetCard.appendChild(pop);
+            // カードが見つかれば、アニメーションさせます！
+            if (targetCard) {
+                targetCard.style.position = 'relative'; // ポップアップの基準位置にします
+                
+                targetCard.classList.remove('anim-damage-shake', 'anim-damage-flash');
+                void targetCard.offsetWidth; // アニメーションをリセットするおまじない
+                targetCard.classList.add('anim-damage-shake', 'anim-damage-flash');
+                
+                const pop = document.createElement('div');
+                pop.className = 'damage-popup anim-popup-text';
+                pop.innerHTML = dmgStr;
+                targetCard.appendChild(pop);
 
-                // アニメーションが終わったら消します
-                setTimeout(() => {
-                    targetCard.classList.remove('anim-damage-shake', 'anim-damage-flash');
-                    if (pop.parentNode) pop.parentNode.removeChild(pop);
-                }, 1000);
-            }
-        };
+                // アニメーションが終わったら消します
+                setTimeout(() => {
+                    targetCard.classList.remove('anim-damage-shake', 'anim-damage-flash');
+                    if (pop.parentNode) pop.parentNode.removeChild(pop);
+                }, 1000);
+            }
+        };
 
-        // 城の防御力の文字がある場所を揺らす専用の魔法です！
-        const applyWallAnim = (dmgStr) => {
-            const wallEl = document.getElementById('war-def-wall-info');
-            if (wallEl) {
-                wallEl.style.position = 'relative'; // ここを基準にして数字を浮かせます
-                
-                wallEl.classList.remove('anim-damage-shake', 'anim-damage-flash');
-                void wallEl.offsetWidth; // アニメーションをリセット！
-                wallEl.classList.add('anim-damage-shake', 'anim-damage-flash');
-                
-                const pop = document.createElement('div');
-                pop.className = 'damage-popup anim-popup-text';
-                pop.innerHTML = dmgStr;
-                wallEl.appendChild(pop);
+        // 城の防御力の文字がある場所を揺らす専用の魔法です！
+        const applyWallAnim = (dmgStr) => {
+            const wallEl = document.getElementById('war-def-wall-info');
+            if (wallEl) {
+                wallEl.style.position = 'relative'; // ここを基準にして数字を浮かせます
+                
+                wallEl.classList.remove('anim-damage-shake', 'anim-damage-flash');
+                void wallEl.offsetWidth; // アニメーションをリセット！
+                wallEl.classList.add('anim-damage-shake', 'anim-damage-flash');
+                
+                const pop = document.createElement('div');
+                pop.className = 'damage-popup anim-popup-text';
+                pop.innerHTML = dmgStr;
+                wallEl.appendChild(pop);
 
-                // アニメーションが終わったらお片付けします
-                setTimeout(() => {
-                    wallEl.classList.remove('anim-damage-shake', 'anim-damage-flash');
-                    if (pop.parentNode) pop.parentNode.removeChild(pop);
-                }, 1000);
-            }
-        };
+                // アニメーションが終わったらお片付けします
+                setTimeout(() => {
+                    wallEl.classList.remove('anim-damage-shake', 'anim-damage-flash');
+                    if (pop.parentNode) pop.parentNode.removeChild(pop);
+                }, 1000);
+            }
+        };
 
-        // 各部隊（援軍も含む）がそれぞれ受けた兵士ダメージをポップアップさせます
-        if (data.soldierDmgDetails) {
-            for (const [role, dmg] of Object.entries(data.soldierDmgDetails)) {
-                if (dmg > 0) {
-                    applyAnim(role, `-${dmg}`);
-                }
-            }
-        } else if (data.soldierDmg && data.soldierDmg > 0) {
-            // （保険）もし詳細なデータがない時は、代表して本隊に出します
-            applyAnim(data.target, `-${data.soldierDmg}`);
-        }
+        // 各部隊（援軍も含む）がそれぞれ受けた兵士ダメージをポップアップさせます
+        if (data.soldierDmgDetails) {
+            for (const [role, dmg] of Object.entries(data.soldierDmgDetails)) {
+                if (dmg > 0) {
+                    applyAnim(role, `-${dmg}`);
+                }
+            }
+        } else if (data.soldierDmg && data.soldierDmg > 0) {
+            // （保険）もし詳細なデータがない時は、代表して本隊に出します
+            applyAnim(data.target, `-${data.soldierDmg}`);
+        }
 
-        // 城壁へのダメージは右上の「城防御」のところに出します
-        if (data.wallDmg && data.wallDmg > 0) {
-            applyWallAnim(`-${data.wallDmg}`);
-        }
+        // 城壁へのダメージは右上の「城防御」のところに出します
+        if (data.wallDmg && data.wallDmg > 0) {
+            applyWallAnim(`-${data.wallDmg}`);
+        }
 
-        // 反撃ダメージは、攻撃を仕掛けた部隊だけに出します
-        if (data.counterDmg && data.counterDmg > 0 && data.counterTarget) {
-            applyAnim(data.counterTarget, `-${data.counterDmg}`);
-        }
-    }
+        // 反撃ダメージは、攻撃を仕掛けた部隊だけに出します
+        if (data.counterDmg && data.counterDmg > 0 && data.counterTarget) {
+            applyAnim(data.counterTarget, `-${data.counterDmg}`);
+        }
+
+        // ★追加：アニメーションが始まって少し経った時（0.4秒後）に、画面の数字を減らす魔法！
+        if (data.currentStats) {
+            setTimeout(() => {
+                const updateTxt = (id, val) => {
+                    const el = document.getElementById(id);
+                    if (el) {
+                        if (id === 'war-def-wall-info') {
+                            el.innerHTML = `城防御 <span style="color:#fdea60;">${val}</span>`;
+                        } else {
+                            el.textContent = val;
+                        }
+                    }
+                };
+
+                // それぞれの場所の数字を書き換えます
+                updateTxt('war-atk-soldier', data.currentStats.atkSoldiers);
+                updateTxt('war-atk-self-reinf-soldier', data.currentStats.atkSelfSoldiers);
+                updateTxt('war-atk-ally-reinf-soldier', data.currentStats.atkAllySoldiers);
+                updateTxt('war-def-soldier', data.currentStats.defSoldiers);
+                updateTxt('war-def-self-reinf-soldier', data.currentStats.defSelfSoldiers);
+                updateTxt('war-def-ally-reinf-soldier', data.currentStats.defAllySoldiers);
+                updateTxt('war-def-wall-info', data.currentStats.wallDefense);
+
+                // 数字が減ったことがわかりやすいように、一瞬だけ文字を黄色く光らせるおまじない
+                const ids = [
+                    'war-atk-soldier', 'war-atk-self-reinf-soldier', 'war-atk-ally-reinf-soldier',
+                    'war-def-soldier', 'war-def-self-reinf-soldier', 'war-def-ally-reinf-soldier'
+                ];
+                ids.forEach(id => {
+                    const el = document.getElementById(id);
+                    if (el) {
+                        el.style.transition = 'color 0.2s';
+                        el.style.color = '#fdea60';
+                        setTimeout(() => { el.style.color = ''; }, 300); // 0.3秒で元の色に戻します
+                    }
+                });
+            }, 400); // 0.4秒遅らせて実行します
+        }
+    }
 
     updateWarUI() {
         if (!this.game.warManager.state.active) return;
