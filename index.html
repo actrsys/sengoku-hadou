@@ -254,18 +254,20 @@
                             <div class="war-side-wrapper" style="display: flex; flex-direction: row; align-items: stretch; width: 50%; height: 100%; gap: 8px;">
                                 <div class="war-reinf-col" style="display: flex; flex-direction: column; gap: 8px; flex: 1; min-width: 0;">
                                     
-                                    <div id="war-atk-self-reinf-card" class="war-side-info war-reinf-card responsive-army-box" style="background-color: #ef9a9a; color: #fff; text-shadow: 1px 1px 2px rgba(0,0,0,0.6); padding: 3px; margin: 0; display: flex; flex-direction: column; align-items: center; justify-content: flex-start; box-sizing: border-box; width: 100%; flex: 1;">
-                                        <div class="responsive-army-title" style="font-size: 0.85rem; text-align: center; margin-bottom: 2px;">
+                                    <div id="war-atk-self-reinf-card" class="war-side-info war-reinf-card responsive-army-box" style="background-color: #ef9a9a; color: #fff; text-shadow: 1px 1px 2px rgba(0,0,0,0.6); padding: 5px; margin: 0; display: flex; flex-direction: column; box-sizing: border-box; width: 100%; flex: 1;">
+                                        <div class="responsive-army-title" style="font-size: 0.85rem; margin-bottom: 2px;">
                                             <span class="label-pc">攻撃軍 </span><span id="war-atk-self-reinf-org">---</span>
                                         </div>
-                                        <div style="display: flex; flex-direction: column; align-items: center; width: 100%; gap: 2px;">
-                                            <div id="war-atk-self-reinf-face-container">
-                                                <img id="war-atk-self-reinf-face" class="responsive-war-face" style="width:35px; height:35px; border-width:2px; margin:0;" src="data/images/faceicons/unknown_face.webp">
+                                        <div id="war-atk-self-reinf-busho" class="stat-busho reinf-busho-label">---</div>
+                                        <div class="reinf-content-wrap">
+                                            <div class="reinf-face-container" style="flex-shrink: 0;">
+                                                <div id="war-atk-self-reinf-face-container">
+                                                    <img id="war-atk-self-reinf-face" class="responsive-war-face" style="width:35px; height:35px; border-width:2px; margin:0;" src="data/images/faceicons/unknown_face.webp">
+                                                </div>
+                                                <div id="war-atk-self-reinf-empty-icon" class="hidden" style="width:35px; height:35px; border:2px solid #999; display:flex; align-items:center; justify-content:center; font-size:0.6rem; background:#eee; box-shadow: 2px 2px 5px rgba(0,0,0,0.3); color: #888; text-shadow: none;">なし</div>
                                             </div>
-                                            <div id="war-atk-self-reinf-empty-icon" class="hidden" style="width:35px; height:35px; border:2px solid #999; display:flex; align-items:center; justify-content:center; font-size:0.6rem; background:#eee; box-shadow: 2px 2px 5px rgba(0,0,0,0.3); color: #888; text-shadow: none;">なし</div>
                                             
                                             <div class="responsive-army-stats" style="width: 100%; margin-top: 0; font-size: 0.8rem; gap: 1px;">
-                                                <div id="war-atk-self-reinf-busho" class="stat-busho" style="font-size: 0.8rem; margin-bottom: 1px; width: 100%; text-shadow: none;">---</div>
                                                 <div class="stat-row" style="padding-bottom: 1px; width: 100%;"><div><span class="label-pc">兵数</span><span class="label-sp" style="display:none;">兵</span></div><span id="war-atk-self-reinf-soldier" class="stat-val-large" style="font-size: 0.95rem;">---</span></div>
                                                 <div class="stat-row" style="padding-bottom: 1px; width: 100%;"><div><span class="label-pc">兵糧</span><span class="label-sp" style="display:none;">糧</span></div><span id="war-atk-self-reinf-rice">---</span></div>
                                                 <div class="stat-row label-pc" style="padding-bottom: 1px; width: 100%;"><span>士気</span><span id="war-atk-self-reinf-morale">---</span></div>
@@ -275,18 +277,20 @@
                                         </div>
                                     </div>
 
-                                    <div id="war-atk-ally-reinf-card" class="war-side-info war-reinf-card responsive-army-box" style="background-color: #ffcc80; color: #fff; text-shadow: 1px 1px 2px rgba(0,0,0,0.6); padding: 3px; margin: 0; display: flex; flex-direction: column; align-items: center; justify-content: flex-start; box-sizing: border-box; width: 100%; flex: 1;">
-                                        <div class="responsive-army-title" style="font-size: 0.85rem; text-align: center; margin-bottom: 2px;">
+                                    <div id="war-atk-ally-reinf-card" class="war-side-info war-reinf-card responsive-army-box" style="background-color: #ffcc80; color: #fff; text-shadow: 1px 1px 2px rgba(0,0,0,0.6); padding: 5px; margin: 0; display: flex; flex-direction: column; box-sizing: border-box; width: 100%; flex: 1;">
+                                        <div class="responsive-army-title" style="font-size: 0.85rem; margin-bottom: 2px;">
                                             <span class="label-pc">攻撃軍 </span><span id="war-atk-ally-reinf-org">---</span>
                                         </div>
-                                        <div style="display: flex; flex-direction: column; align-items: center; width: 100%; gap: 2px;">
-                                            <div id="war-atk-ally-reinf-face-container">
-                                                <img id="war-atk-ally-reinf-face" class="responsive-war-face" style="width:35px; height:35px; border-width:2px; margin:0;" src="data/images/faceicons/unknown_face.webp">
+                                        <div id="war-atk-ally-reinf-busho" class="stat-busho reinf-busho-label">---</div>
+                                        <div class="reinf-content-wrap">
+                                            <div class="reinf-face-container" style="flex-shrink: 0;">
+                                                <div id="war-atk-ally-reinf-face-container">
+                                                    <img id="war-atk-ally-reinf-face" class="responsive-war-face" style="width:35px; height:35px; border-width:2px; margin:0;" src="data/images/faceicons/unknown_face.webp">
+                                                </div>
+                                                <div id="war-atk-ally-reinf-empty-icon" class="hidden" style="width:35px; height:35px; border:2px solid #999; display:flex; align-items:center; justify-content:center; font-size:0.6rem; background:#eee; box-shadow: 2px 2px 5px rgba(0,0,0,0.3); color: #888; text-shadow: none;">なし</div>
                                             </div>
-                                            <div id="war-atk-ally-reinf-empty-icon" class="hidden" style="width:35px; height:35px; border:2px solid #999; display:flex; align-items:center; justify-content:center; font-size:0.6rem; background:#eee; box-shadow: 2px 2px 5px rgba(0,0,0,0.3); color: #888; text-shadow: none;">なし</div>
                                             
                                             <div class="responsive-army-stats" style="width: 100%; margin-top: 0; font-size: 0.8rem; gap: 1px;">
-                                                <div id="war-atk-ally-reinf-busho" class="stat-busho" style="font-size: 0.8rem; margin-bottom: 1px; width: 100%; text-shadow: none;">---</div>
                                                 <div class="stat-row" style="padding-bottom: 1px; width: 100%;"><div><span class="label-pc">兵数</span><span class="label-sp" style="display:none;">兵</span></div><span id="war-atk-ally-reinf-soldier" class="stat-val-large" style="font-size: 0.95rem;">---</span></div>
                                                 <div class="stat-row" style="padding-bottom: 1px; width: 100%;"><div><span class="label-pc">兵糧</span><span class="label-sp" style="display:none;">糧</span></div><span id="war-atk-ally-reinf-rice">---</span></div>
                                                 <div class="stat-row label-pc" style="padding-bottom: 1px; width: 100%;"><span>士気</span><span id="war-atk-ally-reinf-morale">---</span></div>
@@ -300,10 +304,10 @@
                                 
                                 <div class="army-box attacker responsive-army-box" style="background:#ef5350; margin: 0; flex: 1; min-width: 0;">
                                     <h3 class="army-title responsive-army-title">攻撃軍 <span id="war-atk-name"></span></h3>
+                                    <div class="stat-busho main-busho-label"><span id="war-atk-busho"></span> 軍</div>
                                     <div class="responsive-army-content">
                                         <img id="war-atk-face" class="war-face hidden responsive-war-face" src="" alt="">
                                         <div class="responsive-army-stats">
-                                            <div class="stat-busho"><span id="war-atk-busho"></span> 軍</div>
                                             <div class="stat-row"><span>兵士</span> <span><span id="war-atk-soldier" class="stat-val-large"></span>人</span></div>
                                             <div class="stat-row"><span>兵糧</span> <span id="war-atk-rice"></span></div>
                                             <div class="stat-row"><span>士気</span> <span id="war-atk-morale"></span></div>
@@ -317,10 +321,10 @@
                                 
                                 <div class="army-box defender responsive-army-box" style="background:#42a5f5; margin: 0; flex: 1; min-width: 0;">
                                     <h3 class="army-title responsive-army-title">守備軍 <span id="war-def-name"></span></h3>
+                                    <div class="stat-busho main-busho-label"><span id="war-def-busho"></span> 軍</div>
                                     <div class="responsive-army-content">
                                         <img id="war-def-face" class="war-face hidden responsive-war-face" src="" alt="">
                                         <div class="responsive-army-stats">
-                                            <div class="stat-busho"><span id="war-def-busho"></span> 軍</div>
                                             <div class="stat-row"><span>兵士</span> <span><span id="war-def-soldier" class="stat-val-large"></span>人</span></div>
                                             <div class="stat-row"><span>兵糧</span> <span id="war-def-rice"></span></div>
                                             <div class="stat-row"><span>士気</span> <span id="war-def-morale"></span></div>
@@ -331,18 +335,20 @@
 
                                 <div class="war-reinf-col" style="display: flex; flex-direction: column; gap: 8px; flex: 1; min-width: 0;">
                                     
-                                    <div id="war-def-self-reinf-card" class="war-side-info war-reinf-card responsive-army-box" style="background-color: #81d4fa; color: #fff; text-shadow: 1px 1px 2px rgba(0,0,0,0.6); padding: 3px; margin: 0; display: flex; flex-direction: column; align-items: center; justify-content: flex-start; box-sizing: border-box; width: 100%; flex: 1;">
-                                        <div class="responsive-army-title" style="font-size: 0.85rem; text-align: center; margin-bottom: 2px;">
+                                    <div id="war-def-self-reinf-card" class="war-side-info war-reinf-card responsive-army-box" style="background-color: #81d4fa; color: #fff; text-shadow: 1px 1px 2px rgba(0,0,0,0.6); padding: 5px; margin: 0; display: flex; flex-direction: column; box-sizing: border-box; width: 100%; flex: 1;">
+                                        <div class="responsive-army-title" style="font-size: 0.85rem; margin-bottom: 2px;">
                                             <span class="label-pc">守備軍 </span><span id="war-def-self-reinf-org">---</span>
                                         </div>
-                                        <div style="display: flex; flex-direction: column; align-items: center; width: 100%; gap: 2px;">
-                                            <div id="war-def-self-reinf-face-container">
-                                                <img id="war-def-self-reinf-face" class="responsive-war-face" style="width:35px; height:35px; border-width:2px; margin:0;" src="data/images/faceicons/unknown_face.webp">
+                                        <div id="war-def-self-reinf-busho" class="stat-busho reinf-busho-label">---</div>
+                                        <div class="reinf-content-wrap">
+                                            <div class="reinf-face-container" style="flex-shrink: 0;">
+                                                <div id="war-def-self-reinf-face-container">
+                                                    <img id="war-def-self-reinf-face" class="responsive-war-face" style="width:35px; height:35px; border-width:2px; margin:0;" src="data/images/faceicons/unknown_face.webp">
+                                                </div>
+                                                <div id="war-def-self-reinf-empty-icon" class="hidden" style="width:35px; height:35px; border:2px solid #999; display:flex; align-items:center; justify-content:center; font-size:0.6rem; background:#eee; box-shadow: 2px 2px 5px rgba(0,0,0,0.3); color: #888; text-shadow: none;">なし</div>
                                             </div>
-                                            <div id="war-def-self-reinf-empty-icon" class="hidden" style="width:35px; height:35px; border:2px solid #999; display:flex; align-items:center; justify-content:center; font-size:0.6rem; background:#eee; box-shadow: 2px 2px 5px rgba(0,0,0,0.3); color: #888; text-shadow: none;">なし</div>
                                             
                                             <div class="responsive-army-stats" style="width: 100%; margin-top: 0; font-size: 0.8rem; gap: 1px;">
-                                                <div id="war-def-self-reinf-busho" class="stat-busho" style="font-size: 0.8rem; margin-bottom: 1px; width: 100%; text-shadow: none;">---</div>
                                                 <div class="stat-row" style="padding-bottom: 1px; width: 100%;"><div><span class="label-pc">兵数</span><span class="label-sp" style="display:none;">兵</span></div><span id="war-def-self-reinf-soldier" class="stat-val-large" style="font-size: 0.95rem;">---</span></div>
                                                 <div class="stat-row" style="padding-bottom: 1px; width: 100%;"><div><span class="label-pc">兵糧</span><span class="label-sp" style="display:none;">糧</span></div><span id="war-def-self-reinf-rice">---</span></div>
                                                 <div class="stat-row label-pc" style="padding-bottom: 1px; width: 100%;"><span>士気</span><span id="war-def-self-reinf-morale">---</span></div>
@@ -352,18 +358,20 @@
                                         </div>
                                     </div>
 
-                                    <div id="war-def-ally-reinf-card" class="war-side-info war-reinf-card responsive-army-box" style="background-color: #80cbc4; color: #fff; text-shadow: 1px 1px 2px rgba(0,0,0,0.6); padding: 3px; margin: 0; display: flex; flex-direction: column; align-items: center; justify-content: flex-start; box-sizing: border-box; width: 100%; flex: 1;">
-                                        <div class="responsive-army-title" style="font-size: 0.85rem; text-align: center; margin-bottom: 2px;">
+                                    <div id="war-def-ally-reinf-card" class="war-side-info war-reinf-card responsive-army-box" style="background-color: #80cbc4; color: #fff; text-shadow: 1px 1px 2px rgba(0,0,0,0.6); padding: 5px; margin: 0; display: flex; flex-direction: column; box-sizing: border-box; width: 100%; flex: 1;">
+                                        <div class="responsive-army-title" style="font-size: 0.85rem; margin-bottom: 2px;">
                                             <span class="label-pc">守備軍 </span><span id="war-def-ally-reinf-org">---</span>
                                         </div>
-                                        <div style="display: flex; flex-direction: column; align-items: center; width: 100%; gap: 2px;">
-                                            <div id="war-def-ally-reinf-face-container">
-                                                <img id="war-def-ally-reinf-face" class="responsive-war-face" style="width:35px; height:35px; border-width:2px; margin:0;" src="data/images/faceicons/unknown_face.webp">
+                                        <div id="war-def-ally-reinf-busho" class="stat-busho reinf-busho-label">---</div>
+                                        <div class="reinf-content-wrap">
+                                            <div class="reinf-face-container" style="flex-shrink: 0;">
+                                                <div id="war-def-ally-reinf-face-container">
+                                                    <img id="war-def-ally-reinf-face" class="responsive-war-face" style="width:35px; height:35px; border-width:2px; margin:0;" src="data/images/faceicons/unknown_face.webp">
+                                                </div>
+                                                <div id="war-def-ally-reinf-empty-icon" class="hidden" style="width:35px; height:35px; border:2px solid #999; display:flex; align-items:center; justify-content:center; font-size:0.6rem; background:#eee; box-shadow: 2px 2px 5px rgba(0,0,0,0.3); color: #888; text-shadow: none;">なし</div>
                                             </div>
-                                            <div id="war-def-ally-reinf-empty-icon" class="hidden" style="width:35px; height:35px; border:2px solid #999; display:flex; align-items:center; justify-content:center; font-size:0.6rem; background:#eee; box-shadow: 2px 2px 5px rgba(0,0,0,0.3); color: #888; text-shadow: none;">なし</div>
                                             
                                             <div class="responsive-army-stats" style="width: 100%; margin-top: 0; font-size: 0.8rem; gap: 1px;">
-                                                <div id="war-def-ally-reinf-busho" class="stat-busho" style="font-size: 0.8rem; margin-bottom: 1px; width: 100%; text-shadow: none;">---</div>
                                                 <div class="stat-row" style="padding-bottom: 1px; width: 100%;"><div><span class="label-pc">兵数</span><span class="label-sp" style="display:none;">兵</span></div><span id="war-def-ally-reinf-soldier" class="stat-val-large" style="font-size: 0.95rem;">---</span></div>
                                                 <div class="stat-row" style="padding-bottom: 1px; width: 100%;"><div><span class="label-pc">兵糧</span><span class="label-sp" style="display:none;">糧</span></div><span id="war-def-ally-reinf-rice">---</span></div>
                                                 <div class="stat-row label-pc" style="padding-bottom: 1px; width: 100%;"><span>士気</span><span id="war-def-ally-reinf-morale">---</span></div>
