@@ -2729,7 +2729,7 @@ class UIManager {
         }
     }
     
-    showWarActionMessage(msg, onClick) {
+    showWarActionMessage(messages, onClick) {
         if (!this.warControls) return;
 
         const warAiGuard = document.getElementById('war-ai-guard');
@@ -2738,44 +2738,119 @@ class UIManager {
         }
         this.warControls.classList.remove('disabled-area');
 
-        // ★修正１：あや瀨さんのアイデア通り、コマンドと説明を画面から完全に消し去ります！
         this.warControls.innerHTML = ''; 
         this.warControls.style.position = ''; 
 
-        // 部隊の光を消す魔法です
         const allCards = document.querySelectorAll('.army-box, .responsive-army-box');
         allCards.forEach(c => c.classList.remove('active-command-turn'));
         
-        // 新しいメッセージの箱を作ります
         const msgContainer = document.createElement('div');
         msgContainer.className = 'war-action-message-container';
         
-        msgContainer.innerHTML = `<div class="war-action-message-text">${msg}</div><div class="war-action-message-prompt">▶ クリックして次へ</div>`;
+        const textContainer = document.createElement('div');
+        textContainer.className = 'war-action-message-text';
         
-        // ★修正２：同じメッセージをうっかり2回連打してしまわないようにする鍵（カギ）です
+        const promptContainer = document.createElement('div');
+        promptContainer.className = 'war-action-message-prompt';
+        promptContainer.textContent = '▶ クリックして次へ';
+        promptContainer.style.visibility = 'hidden';
+
+        msgContainer.appendChild(textContainer);
+        msgContainer.appendChild(promptContainer);
+        this.warControls.appendChild(msgContainer);
+        
         let isClicked = false;
         
         msgContainer.onclick = (e) => {
             e.stopPropagation();
             e.preventDefault();
             
-            // もしすでにクリックされていたら、それ以上何もしないで無視します
+            // メッセージが全て出終わるまではクリックを無視します
+            if (promptContainer.style.visibility === 'hidden') return;
             if (isClicked) return;
             isClicked = true;
             
             if (window.AudioManager) window.AudioManager.playSE('decision.ogg');
-            
-            // ★修正３：メッセージウィンドウ自体は消さずに、「▶ クリックして次へ」の文字だけを透明にして隠します。
-            // これで、次のメッセージが出るまでの間、画面が空っぽになるのを防いで隙間をなくします！
-            const prompt = msgContainer.querySelector('.war-action-message-prompt');
-            if (prompt) prompt.style.visibility = 'hidden';
-            
-            // 次の処理へ進みます
+            promptContainer.style.visibility = 'hidden';
             onClick();
         };
-        
-        // 最後に、空っぽになったコマンド欄にメッセージの箱を置きます
-        this.warControls.appendChild(msgContainer);
+
+        // 配列じゃなかったら配列に変換します
+        if (!Array.isArray(messages)) {
+            messages = [messages];
+        }
+
+        let currentIndex = 0;
+
+        // 順番に処理していく魔法です
+        const processNext = () => {
+            if (currentIndex >= messages.length) {
+                // 全部終わったらクリック待ちの文字を出します
+                promptContainer.style.visibility = 'visible';
+                return;
+            }
+
+            const item = messages[currentIndex];
+            currentIndex++;
+
+            if (typeof item === 'string') {
+                textContainer.innerHTML += (textContainer.innerHTML ? '<br>' : '') + item;
+                setTimeout(processNext, 600); // メッセージを読ませるために少し待ちます
+            } else if (item.text) {
+                textContainer.innerHTML += (textContainer.innerHTML ? '<br>' : '') + item.text;
+                setTimeout(processNext, 600);
+            } else if (item.type === 'damage') {
+                this.playDamageAnimation(item);
+                setTimeout(processNext, 800); // アニメーションが完了するまで待ちます
+            } else {
+                processNext();
+            }
+        };
+
+        processNext();
+    }
+
+    playDamageAnimation(data) {
+        // 対象の部隊カードを探してダメージをポップアップさせます
+        const applyAnim = (targetType, dmgStr) => {
+            let targetCard = null;
+            if (targetType === 'defender') {
+                const n = document.getElementById('war-def-name');
+                if (n) targetCard = n.closest('.responsive-army-box, .army-box');
+            } else if (targetType === 'attacker') {
+                const n = document.getElementById('war-atk-name');
+                if (n) targetCard = n.closest('.responsive-army-box, .army-box');
+            }
+
+            if (targetCard) {
+                targetCard.style.position = 'relative'; // ポップアップの基準位置にします
+                
+                targetCard.classList.remove('anim-damage-shake', 'anim-damage-flash');
+                void targetCard.offsetWidth; // アニメーションをリセットするおまじない
+                targetCard.classList.add('anim-damage-shake', 'anim-damage-flash');
+                
+                const pop = document.createElement('div');
+                pop.className = 'damage-popup anim-popup-text';
+                pop.innerHTML = dmgStr;
+                targetCard.appendChild(pop);
+
+                // アニメーションが終わったら消します
+                setTimeout(() => {
+                    targetCard.classList.remove('anim-damage-shake', 'anim-damage-flash');
+                    if (pop.parentNode) pop.parentNode.removeChild(pop);
+                }, 1000);
+            }
+        };
+
+        if ((data.soldierDmg && data.soldierDmg > 0) || (data.wallDmg && data.wallDmg > 0)) {
+            let text = "";
+            if (data.soldierDmg > 0) text += `-${data.soldierDmg}`;
+            applyAnim(data.target, text);
+        }
+
+        if (data.counterDmg && data.counterDmg > 0 && data.counterTarget) {
+            applyAnim(data.counterTarget, `-${data.counterDmg}`);
+        }
     }
 
     updateWarUI() {

@@ -515,13 +515,14 @@ class WarManager {
         const pushMsg = (msg) => {
              if (s.isPlayerInvolved) {
                  actionMessages.push(msg);
-                 this.game.ui.addWarDetailLog(msg);
+                 if (typeof msg === 'string') this.game.ui.addWarDetailLog(msg);
+                 else if (msg.log) this.game.ui.addWarDetailLog(msg.log);
              }
         };
 
         const executeNext = () => {
              if (s.isPlayerInvolved && actionMessages.length > 0) {
-                 this.game.ui.showWarActionMessage(actionMessages.join('<br>'), () => {
+                 this.game.ui.showWarActionMessage(actionMessages, () => {
                      this.advanceWarTurn();
                  });
              } else {
@@ -601,7 +602,9 @@ class WarManager {
                  let subPolSum = 0; for(let i=1; i<polList.length; i++) subPolSum += polList[i];
                  let recover = Math.floor(((soldierCost * W.RepairSoldierFactor) + (maxPol * W.RepairMainPolFactor) + (subPolSum * W.RepairSubPolFactor)) * W.RepairGlobalMultiplier);
                  s.defender.defense += recover;
-                 pushMsg(`R${s.round} [${activeArmyName}] 補修を実行！ (兵-${soldierCost} 防+${recover})`);
+                 
+                 pushMsg(`R${s.round} [${activeArmyName}] の補修！`);
+                 pushMsg({ text: `城を修復した！ (兵-${soldierCost} 防+${recover})`, log: `R${s.round} [${activeArmyName}] 補修を実行！ (兵-${soldierCost} 防+${recover})`});
              } else { 
                  pushMsg(`R${s.round} [${activeArmyName}] 補修しようとしたが兵が足りない！`); 
              }
@@ -613,9 +616,11 @@ class WarManager {
             if (!result.success) { 
                  pushMsg(`R${s.round} [${activeArmyName}] 謀略失敗！`); 
             } else {
+                pushMsg(`R${s.round} [${activeArmyName}] の謀略！`);
                 let calcDamage = s.isPlayerInvolved ? result.damage : Math.floor(result.damage * 0.195);
                 let actualDamage = this.distributeDamage(isAtkTurnGroup, calcDamage);
-                pushMsg(`R${s.round} [${activeArmyName}] 謀略成功！ 敵軍に計${actualDamage}の被害`);
+                pushMsg({ type: 'damage', target: isAtkTurnGroup ? 'defender' : 'attacker', soldierDmg: actualDamage });
+                pushMsg({ text: `敵軍に計${actualDamage}の被害を与えた！`, log: `R${s.round} [${activeArmyName}] 謀略成功！ 敵軍に計${actualDamage}の被害`});
             }
             executeNext(); return;
         }
@@ -625,14 +630,17 @@ class WarManager {
             if (!result.success) { 
                  pushMsg(`R${s.round} [${activeArmyName}] 火攻失敗！`); 
             } else {
+                pushMsg(`R${s.round} [${activeArmyName}] の火攻め！`);
                 let calcDamage = s.isPlayerInvolved ? result.damage : Math.floor(result.damage * 0.195);
                 let calcDefSoldierDamage = s.isPlayerInvolved ? 50 : 16;
                 if(isAtkTurnGroup) {
                     s.defender.defense = Math.max(0, s.defender.defense - calcDamage);
-                    pushMsg(`R${s.round} [${activeArmyName}] 火攻成功！ 敵防御に${calcDamage}の被害`);
+                    pushMsg({ type: 'damage', target: 'defender', wallDmg: calcDamage });
+                    pushMsg({ text: `敵防御に${calcDamage}の被害を与えた！`, log: `R${s.round} [${activeArmyName}] 火攻成功！ 敵防御に${calcDamage}の被害`});
                 } else {
                     let actualDamage = this.distributeDamage(isAtkTurnGroup, calcDefSoldierDamage);
-                    pushMsg(`R${s.round} [${activeArmyName}] 火攻成功！ 敵軍に計${actualDamage}の被害`);
+                    pushMsg({ type: 'damage', target: 'attacker', soldierDmg: actualDamage });
+                    pushMsg({ text: `敵軍に計${actualDamage}の被害を与えた！`, log: `R${s.round} [${activeArmyName}] 火攻成功！ 敵軍に計${actualDamage}の被害`});
                 }
             }
             executeNext(); return;
@@ -668,8 +676,9 @@ class WarManager {
         
         if(isAtkTurnGroup) { s.defender.defense = Math.max(0, s.defender.defense - calculatedWallDmg); } 
         
+        let actualCounterDmg = 0;
         if(calculatedCounterDmg > 0) { 
-            const actualCounterDmg = Math.min(activeSoldiers, calculatedCounterDmg);
+            actualCounterDmg = Math.min(activeSoldiers, calculatedCounterDmg);
             if (s.turn === 'attacker') s.attacker.soldiers -= actualCounterDmg;
             else if (s.turn === 'attacker_self_reinf') s.selfReinforcement.soldiers -= actualCounterDmg;
             else if (s.turn === 'attacker_ally_reinf') s.reinforcement.soldiers -= actualCounterDmg;
@@ -678,13 +687,30 @@ class WarManager {
             else if (s.turn === 'defender_ally_reinf') s.defReinforcement.soldiers -= actualCounterDmg;
 
             if(isAtkTurnGroup) s.deadSoldiers.attacker += actualCounterDmg; else s.deadSoldiers.defender += actualCounterDmg;
-            pushMsg(`(${activeArmyName}への反撃被害: ${actualCounterDmg})`); 
         }
         
         let actionName = type.includes('bow') ? "弓攻撃" : type.includes('siege') ? "城攻め" : "力攻め"; 
         if (type.includes('def_')) actionName = type === 'def_bow' ? "斉射" : type === 'def_charge' ? "突撃" : "反撃"; 
-        let msg = (calculatedWallDmg > 0) ? `${actionName} (敵軍兵-${actualSoldierDmg} 防-${calculatedWallDmg})` : `${actionName} (敵軍兵-${actualSoldierDmg})`; 
-        pushMsg(`R${s.round} [${activeArmyName}] ${msg}`); 
+        
+        pushMsg(`R${s.round} [${activeArmyName}] の${actionName}！`);
+        
+        // ダメージアニメーションを挟むおまじない
+        pushMsg({
+            type: 'damage',
+            target: isAtkTurnGroup ? 'defender' : 'attacker',
+            soldierDmg: actualSoldierDmg,
+            wallDmg: calculatedWallDmg,
+            counterTarget: isAtkTurnGroup ? 'attacker' : 'defender',
+            counterDmg: actualCounterDmg
+        });
+        
+        // 結果のメッセージ
+        let resultMsg = `敵軍に 兵-${actualSoldierDmg}`;
+        if (calculatedWallDmg > 0) resultMsg += ` 防-${calculatedWallDmg}`;
+        resultMsg += ` の被害を与えた！`;
+        if (actualCounterDmg > 0) resultMsg += `<br>（反撃を受け 兵-${actualCounterDmg}）`;
+        
+        pushMsg({ text: resultMsg, log: `R${s.round} [${activeArmyName}] ${resultMsg.replace('<br>', ' ')}` });
 
         executeNext();
     }
