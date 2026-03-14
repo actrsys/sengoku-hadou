@@ -2797,6 +2797,11 @@ class UIManager {
                 textContainer.innerHTML += (textContainer.innerHTML ? '<br>' : '') + item;
                 setTimeout(processNext, 600); // メッセージを読ませるために少し待ちます
             } else if (item.text) {
+                // ★追加：テキストを表示する時にも、メモ（se）があれば音を鳴らせるようにします！
+                if (item.se && window.AudioManager) {
+                    window.AudioManager.playSE(item.se);
+                }
+                
                 textContainer.innerHTML += (textContainer.innerHTML ? '<br>' : '') + item.text;
                 setTimeout(processNext, 600);
             } else if (item.type === 'damage') {
