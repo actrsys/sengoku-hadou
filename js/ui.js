@@ -2811,6 +2811,10 @@ class UIManager {
     }
 
     playDamageAnimation(data) {
+        // ★追加：ダメージのアニメーションが出ると同時に、専用の音を鳴らします！
+        if (window.AudioManager) {
+            window.AudioManager.playSE('damage001.ogg');
+        }
         // ★修正：対象の「役割（role）」ごとに、どのカードを揺らすか探す魔法です！
         const applyAnim = (role, dmgStr) => {
             let targetCard = null;
