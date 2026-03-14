@@ -2811,7 +2811,7 @@ class UIManager {
     }
 
     playDamageAnimation(data) {
-        // ★修正：対象の「役割（role）」ごとに、どのカードを揺らすか探すようにしました！
+        // ★修正：対象の「役割（role）」ごとに、どのカードを揺らすか探す魔法です！
         const applyAnim = (role, dmgStr) => {
             let targetCard = null;
             // それぞれの役割にあわせて、画面上のカードを探します
@@ -2852,7 +2852,30 @@ class UIManager {
             }
         };
 
-        // ★追加：各部隊（援軍も含む）がそれぞれ受けたダメージを、全部同時にポップアップさせます！
+        // ★追加：城の防御力の文字がある場所を揺らす専用の魔法です！
+        const applyWallAnim = (dmgStr) => {
+            const wallEl = document.getElementById('war-def-wall-info');
+            if (wallEl) {
+                wallEl.style.position = 'relative'; // ここを基準にして数字を浮かせます
+                
+                wallEl.classList.remove('anim-damage-shake', 'anim-damage-flash');
+                void wallEl.offsetWidth; // アニメーションをリセット！
+                wallEl.classList.add('anim-damage-shake', 'anim-damage-flash');
+                
+                const pop = document.createElement('div');
+                pop.className = 'damage-popup anim-popup-text';
+                pop.innerHTML = dmgStr;
+                wallEl.appendChild(pop);
+
+                // アニメーションが終わったらお片付けします
+                setTimeout(() => {
+                    wallEl.classList.remove('anim-damage-shake', 'anim-damage-flash');
+                    if (pop.parentNode) pop.parentNode.removeChild(pop);
+                }, 1000);
+            }
+        };
+
+        // 各部隊（援軍も含む）がそれぞれ受けた兵士ダメージをポップアップさせます
         if (data.soldierDmgDetails) {
             for (const [role, dmg] of Object.entries(data.soldierDmgDetails)) {
                 if (dmg > 0) {
@@ -2864,9 +2887,9 @@ class UIManager {
             applyAnim(data.target, `-${data.soldierDmg}`);
         }
 
-        // 城壁ダメージは本隊（defender または attacker）に出します
+        // ★変更：城壁へのダメージは、部隊カードではなく右上の「城防御」のところに出します！
         if (data.wallDmg && data.wallDmg > 0) {
-            applyAnim(data.target === 'defender' ? 'defender' : 'attacker', `城防-${data.wallDmg}`);
+            applyWallAnim(`-${data.wallDmg}`);
         }
 
         // 反撃ダメージは、攻撃を仕掛けた部隊だけに出します
