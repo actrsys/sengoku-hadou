@@ -538,6 +538,19 @@ class WarManager {
              }
         };
 
+        // ★追加：今の各部隊の「最新の兵士数」と「城の防御力」を調べる魔法です
+        const getCurrentStats = () => {
+            return {
+                defSoldiers: s.defender.soldiers,
+                defSelfSoldiers: s.defSelfReinforcement ? s.defSelfReinforcement.soldiers : 0,
+                defAllySoldiers: s.defReinforcement ? s.defReinforcement.soldiers : 0,
+                atkSoldiers: s.attacker.soldiers,
+                atkSelfSoldiers: s.selfReinforcement ? s.selfReinforcement.soldiers : 0,
+                atkAllySoldiers: s.reinforcement ? s.reinforcement.soldiers : 0,
+                wallDefense: s.defender.defense
+            };
+        };
+
         if (type === 'retreat') { 
             if (s.turn === 'attacker') { 
                 this.endWar(false, true); 
@@ -622,7 +635,6 @@ class WarManager {
         if (type === 'scheme') {
             const result = WarSystem.calcScheme(activeBushos[0], targetBushos[0], isAtkTurnGroup ? s.defender.peoplesLoyalty : (window.MainParams?.Economy?.MaxLoyalty || 100));
             if (!result.success) { 
-                 // ★修正：失敗のメッセージを出す時に「miss.ogg」を鳴らすメモをつけます！
                  let failMsg = `R${s.round} [${activeArmyName}] 謀略失敗！`;
                  pushMsg({ text: failMsg, log: failMsg, se: 'miss.ogg' }); 
             } else {
@@ -632,7 +644,8 @@ class WarManager {
                 let dmgResult = this.distributeDamage(isAtkTurnGroup, calcDamage);
                 let actualDamage = dmgResult.total;
                 
-                pushMsg({ type: 'damage', target: isAtkTurnGroup ? 'defender' : 'attacker', soldierDmgDetails: dmgResult.details, se: 'slash.ogg' });
+                // ★修正：最新ステータス（currentStats）のメモを付け足します
+                pushMsg({ type: 'damage', target: isAtkTurnGroup ? 'defender' : 'attacker', soldierDmgDetails: dmgResult.details, se: 'slash.ogg', currentStats: getCurrentStats() });
                 pushMsg({ text: `敵軍に計${actualDamage}の被害を与えた！`, log: `R${s.round} [${activeArmyName}] 謀略成功！ 敵軍に計${actualDamage}の被害`});
             }
             executeNext(); return;
@@ -641,7 +654,6 @@ class WarManager {
         if (type === 'fire') {
             const result = WarSystem.calcFire(activeBushos[0], targetBushos[0]);
             if (!result.success) { 
-                 // ★修正：こちらも失敗のメッセージを出す時に「miss.ogg」を鳴らすメモをつけます！
                  let failMsg = `R${s.round} [${activeArmyName}] 火攻失敗！`;
                  pushMsg({ text: failMsg, log: failMsg, se: 'miss.ogg' }); 
             } else {
@@ -650,13 +662,15 @@ class WarManager {
                 let calcDefSoldierDamage = s.isPlayerInvolved ? 50 : 16;
                 if(isAtkTurnGroup) {
                     s.defender.defense = Math.max(0, s.defender.defense - calcDamage);
-                    pushMsg({ type: 'damage', target: 'defender', wallDmg: calcDamage, se: 'fire001.mp3' });
+                    // ★修正：最新ステータス（currentStats）のメモを付け足します
+                    pushMsg({ type: 'damage', target: 'defender', wallDmg: calcDamage, se: 'fire001.mp3', currentStats: getCurrentStats() });
                     pushMsg({ text: `敵防御に${calcDamage}の被害を与えた！`, log: `R${s.round} [${activeArmyName}] 火攻成功！ 敵防御に${calcDamage}の被害`});
                 } else {
                     let dmgResult = this.distributeDamage(isAtkTurnGroup, calcDefSoldierDamage);
                     let actualDamage = dmgResult.total;
                     
-                    pushMsg({ type: 'damage', target: 'attacker', soldierDmgDetails: dmgResult.details, se: 'fire001.mp3' });
+                    // ★修正：最新ステータス（currentStats）のメモを付け足します
+                    pushMsg({ type: 'damage', target: 'attacker', soldierDmgDetails: dmgResult.details, se: 'fire001.mp3', currentStats: getCurrentStats() });
                     pushMsg({ text: `敵軍に計${actualDamage}の被害を与えた！`, log: `R${s.round} [${activeArmyName}] 火攻成功！ 敵軍に計${actualDamage}の被害`});
                 }
             }
@@ -712,6 +726,7 @@ class WarManager {
         
         pushMsg(`R${s.round} [${activeArmyName}] の${actionName}！`);
         
+        // ★修正：最新ステータス（currentStats）のメモを付け足します
         pushMsg({
             type: 'damage',
             target: isAtkTurnGroup ? 'defender' : 'attacker',
@@ -719,7 +734,8 @@ class WarManager {
             wallDmg: calculatedWallDmg,
             counterTarget: s.turn,
             counterDmg: actualCounterDmg,
-            se: 'damage001.ogg'
+            se: 'damage001.ogg',
+            currentStats: getCurrentStats()
         });
         
         let resultMsg = `敵軍に 計${actualSoldierDmg}の被害`; 
