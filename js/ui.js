@@ -1273,7 +1273,7 @@ class UIManager {
             this.mobileTopLeft.innerHTML = content;
         }
 
-        if (this.statusContainer && window.innerWidth >= 769) {
+        if (this.statusContainer && document.body.classList.contains('is-pc')) {
             this.statusContainer.innerHTML = content;
         }
 
