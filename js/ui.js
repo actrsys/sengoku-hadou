@@ -2929,8 +2929,10 @@ class UIManager {
         if (atkBaseBox) {
             const atkReinfCol = wrapSide(atkBaseBox, true);
             if (atkReinfCol) {
-                const atkSelfCard = createReinfCard(s.selfReinforcement, "攻撃軍", "#ffcdd2", s.attacker.ownerClan); 
-                const atkAllyCard = createReinfCard(s.reinforcement, "攻撃軍", "#ffe0b2", s.attacker.ownerClan); 
+                // ★ピンク（#ef9a9a）
+                const atkSelfCard = createReinfCard(s.selfReinforcement, "攻撃軍", "#ef9a9a", s.attacker.ownerClan); 
+                // ★オレンジ（#ffcc80）
+                const atkAllyCard = createReinfCard(s.reinforcement, "攻撃軍", "#ffcc80", s.attacker.ownerClan); 
                 
                 atkReinfCol.appendChild(atkSelfCard); 
                 atkReinfCol.appendChild(atkAllyCard); 
@@ -2940,8 +2942,10 @@ class UIManager {
         if (defBaseBox) {
             const defReinfCol = wrapSide(defBaseBox, false);
             if (defReinfCol) {
-                const defSelfCard = createReinfCard(s.defSelfReinforcement, "守備軍", "#b3e5fc", s.defender.ownerClan); 
-                const defAllyCard = createReinfCard(s.defReinforcement, "守備軍", "#b2dfdb", s.defender.ownerClan); 
+                // ★水色（#81d4fa）
+                const defSelfCard = createReinfCard(s.defSelfReinforcement, "守備軍", "#81d4fa", s.defender.ownerClan); 
+                // ★緑青（#80cbc4）
+                const defAllyCard = createReinfCard(s.defReinforcement, "守備軍", "#80cbc4", s.defender.ownerClan); 
                 
                 defReinfCol.appendChild(defSelfCard); 
                 defReinfCol.appendChild(defAllyCard); 
