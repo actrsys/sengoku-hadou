@@ -452,10 +452,11 @@ body:not(.is-pc) .war-header-info, body:not(.is-pc) #war-date-info, body:not(.is
 body:not(.is-pc) .war-reinf-card .responsive-army-title { font-size: 0.75rem !important; margin-bottom: 2px !important; }
 body:not(.is-pc) .war-reinf-card .stat-row { font-size: 0.75rem !important; }
 body:not(.is-pc) .war-reinf-card .stat-val-large { font-size: 0.85rem !important; }
+body:not(.is-pc) .war-reinf-card .responsive-war-face { position: static !important; margin: 0 auto !important; }
+body:not(.is-pc) .war-reinf-card .stat-busho { position: static !important; width: auto !important; min-width: 80% !important; margin: 2px auto !important; font-size: 0.8rem !important; }
 body:not(.is-pc) .war-controls-area { height: 105px !important; gap: 3px !important; flex-shrink: 0 !important; margin-bottom: 5px !important; }
 body:not(.is-pc) .war-controls-desc { font-size: 0.7rem !important; padding: 3px !important; }
 body:not(.is-pc) .war-controls-buttons button { font-size: 0.95rem !important; letter-spacing: 0px !important; padding: 0 !important; }
-
 
 /* =========================================================
    PC専用のオーバーライド (body.is-pc)
