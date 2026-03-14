@@ -2979,7 +2979,7 @@ class UIManager {
             ];
         } else {
             options = [
-                { label: "突撃", type: "def_charge", desc: "突撃します。敵兵士を減らします。"" }, 
+                { label: "突撃", type: "def_charge", desc: "突撃します。敵兵士を減らします。" },
                 { label: "斉射", type: "def_bow", desc: "遠距離から弓や鉄砲で射撃を行います。反撃を受けにくい攻撃です。" }, 
                 { label: "籠城", type: "def_attack", desc: "守りを固めます。敵の攻撃による被害を抑えられます。" },
                 { label: "謀略", type: "scheme", desc: "敵の動揺を誘います。成功すると敵兵士を大きく減らします。" }, 
