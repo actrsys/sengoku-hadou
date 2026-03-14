@@ -2837,17 +2837,17 @@ class UIManager {
                                 <span>---</span>
                             </div>
                             
+                            <div class="stat-row" style="padding-bottom: 1px; width: 100%;">
+                                <div><span class="label-pc">兵糧</span><span class="label-sp" style="display:none;">糧</span></div>
+                                <span>---</span>
+                            </div>
+                            
                             <div class="stat-row label-pc" style="padding-bottom: 1px; width: 100%;"><span>士気</span><span>---</span></div>
                             <div class="stat-row label-pc" style="padding-bottom: 1px; width: 100%;"><span>訓練</span><span>---</span></div>
                             
                             <div class="stat-row label-sp-flex" style="display:none; padding-bottom: 1px; width: 100%;">
                                 <div><span>士</span><span>---</span></div>
                                 <div><span>練</span><span>---</span></div>
-                            </div>
-
-                            <div class="stat-row" style="padding-bottom: 1px; width: 100%;">
-                                <div><span class="label-pc">兵糧</span><span class="label-sp" style="display:none;">糧</span></div>
-                                <span>---</span>
                             </div>
                         </div>
                     </div>
@@ -2893,17 +2893,17 @@ class UIManager {
                             <span class="stat-val-large" style="font-size: 0.95rem;">${reinfData.soldiers || 0}</span>
                         </div>
                         
+                        <div class="stat-row" style="padding-bottom: 1px; width: 100%;">
+                            <div><span class="label-pc">兵糧</span><span class="label-sp" style="display:none;">糧</span></div>
+                            <span>${reinfData.rice || 0}</span>
+                        </div>
+                        
                         <div class="stat-row label-pc" style="padding-bottom: 1px; width: 100%;"><span>士気</span><span>${reinfData.morale || 0}</span></div>
                         <div class="stat-row label-pc" style="padding-bottom: 1px; width: 100%;"><span>訓練</span><span>${reinfData.training || 0}</span></div>
                         
                         <div class="stat-row label-sp-flex" style="display:none; padding-bottom: 1px; width: 100%;">
                             <div><span>士</span><span>${reinfData.morale || 0}</span></div>
                             <div><span>練</span><span>${reinfData.training || 0}</span></div>
-                        </div>
-
-                        <div class="stat-row" style="padding-bottom: 1px; width: 100%;">
-                            <div><span class="label-pc">兵糧</span><span class="label-sp" style="display:none;">糧</span></div>
-                            <span>${reinfData.rice || 0}</span>
                         </div>
                     </div>
                 </div>
