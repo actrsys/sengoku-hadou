@@ -622,7 +622,9 @@ class WarManager {
         if (type === 'scheme') {
             const result = WarSystem.calcScheme(activeBushos[0], targetBushos[0], isAtkTurnGroup ? s.defender.peoplesLoyalty : (window.MainParams?.Economy?.MaxLoyalty || 100));
             if (!result.success) { 
-                 pushMsg(`R${s.round} [${activeArmyName}] 謀略失敗！`); 
+                 // ★修正：失敗のメッセージを出す時に「miss.ogg」を鳴らすメモをつけます！
+                 let failMsg = `R${s.round} [${activeArmyName}] 謀略失敗！`;
+                 pushMsg({ text: failMsg, log: failMsg, se: 'miss.ogg' }); 
             } else {
                 pushMsg(`R${s.round} [${activeArmyName}] の謀略！`);
                 let calcDamage = s.isPlayerInvolved ? result.damage : Math.floor(result.damage * 0.195);
@@ -630,7 +632,6 @@ class WarManager {
                 let dmgResult = this.distributeDamage(isAtkTurnGroup, calcDamage);
                 let actualDamage = dmgResult.total;
                 
-                // ★追加：謀略のダメージの時は「slash.ogg」を鳴らすようにメモ（se）をつけます！
                 pushMsg({ type: 'damage', target: isAtkTurnGroup ? 'defender' : 'attacker', soldierDmgDetails: dmgResult.details, se: 'slash.ogg' });
                 pushMsg({ text: `敵軍に計${actualDamage}の被害を与えた！`, log: `R${s.round} [${activeArmyName}] 謀略成功！ 敵軍に計${actualDamage}の被害`});
             }
@@ -640,21 +641,21 @@ class WarManager {
         if (type === 'fire') {
             const result = WarSystem.calcFire(activeBushos[0], targetBushos[0]);
             if (!result.success) { 
-                 pushMsg(`R${s.round} [${activeArmyName}] 火攻失敗！`); 
+                 // ★修正：こちらも失敗のメッセージを出す時に「miss.ogg」を鳴らすメモをつけます！
+                 let failMsg = `R${s.round} [${activeArmyName}] 火攻失敗！`;
+                 pushMsg({ text: failMsg, log: failMsg, se: 'miss.ogg' }); 
             } else {
                 pushMsg(`R${s.round} [${activeArmyName}] の火攻め！`);
                 let calcDamage = s.isPlayerInvolved ? result.damage : Math.floor(result.damage * 0.195);
                 let calcDefSoldierDamage = s.isPlayerInvolved ? 50 : 16;
                 if(isAtkTurnGroup) {
                     s.defender.defense = Math.max(0, s.defender.defense - calcDamage);
-                    // ★追加：火攻めで城が燃える時は「fire001.mp3」を鳴らします！
                     pushMsg({ type: 'damage', target: 'defender', wallDmg: calcDamage, se: 'fire001.mp3' });
                     pushMsg({ text: `敵防御に${calcDamage}の被害を与えた！`, log: `R${s.round} [${activeArmyName}] 火攻成功！ 敵防御に${calcDamage}の被害`});
                 } else {
                     let dmgResult = this.distributeDamage(isAtkTurnGroup, calcDefSoldierDamage);
                     let actualDamage = dmgResult.total;
                     
-                    // ★追加：火攻めで兵士が燃える時も「fire001.mp3」を鳴らします！
                     pushMsg({ type: 'damage', target: 'attacker', soldierDmgDetails: dmgResult.details, se: 'fire001.mp3' });
                     pushMsg({ text: `敵軍に計${actualDamage}の被害を与えた！`, log: `R${s.round} [${activeArmyName}] 火攻成功！ 敵軍に計${actualDamage}の被害`});
                 }
@@ -711,7 +712,6 @@ class WarManager {
         
         pushMsg(`R${s.round} [${activeArmyName}] の${actionName}！`);
         
-        // ★追加：普通の攻撃の時は「damage001.ogg」を鳴らすようにメモ（se）をつけます！
         pushMsg({
             type: 'damage',
             target: isAtkTurnGroup ? 'defender' : 'attacker',
@@ -722,7 +722,6 @@ class WarManager {
             se: 'damage001.ogg'
         });
         
-        // 結果のメッセージ
         let resultMsg = `敵軍に 計${actualSoldierDmg}の被害`; 
         if (calculatedWallDmg > 0) resultMsg += ` (防-${calculatedWallDmg})`;
         resultMsg += ` を与えた！`;
