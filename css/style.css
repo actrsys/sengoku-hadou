@@ -174,6 +174,9 @@ body.showing-daimyo-labels .hover-info { display: none !important; }
 .daimyo-name-label { background: rgba(0, 0, 0, 0.8); border: 2px solid #d4af37; color: #fff; padding: 4px 10px; border-radius: 4px; font-size: 1.1rem; white-space: nowrap; font-weight: bold; box-shadow: 0 2px 4px rgba(0,0,0,0.5); z-index: 200; pointer-events: auto; cursor: pointer; transition: opacity 0.3s, transform 0.2s; }
 .daimyo-name-label:hover { background: rgba(50, 50, 50, 0.9) !important; border-color: #ffe066 !important; transform: translate(-50%, -100%) scale(1.05) !important; }
 
+/* ★追加：大名選択の確認画面が出ている時は名前シールを隠す魔法 */
+body.hide-daimyo-labels .daimyo-name-label { display: none !important; }
+
 /* =========================================================
    UIコンポーネント（リスト・スクロール・ボタン・バッジ）
    ========================================================= */
