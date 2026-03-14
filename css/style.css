@@ -2228,3 +2228,47 @@ body.is-pc #daimyo-confirm-modal .btn-secondary {
 .castle-card.tooltip-right .kunishu-icon-wrap:hover .kunishu-hover-info {
     transform: translate(0, 0) scale(1) !important;
 }
+/* =========================================================
+   ★ スマホ版のみ援軍ウィンドウの配置を変更する魔法
+   ========================================================= */
+/* 左右の「メイン＋援軍」を囲む箱を、スマホでは「縦並び」にします */
+.war-side-wrapper {
+    flex-direction: column !important;
+}
+
+/* メイン部隊（A, B）を上段（1番目）に配置して横幅いっぱいに広げます */
+.war-side-wrapper > :not(.war-reinf-col) {
+    order: 1 !important;
+    width: 100% !important;
+}
+
+/* 援軍を入れる箱（C,D,E,F）を下段（2番目）に配置し、横並びにします */
+.war-side-wrapper > .war-reinf-col {
+    order: 2 !important;
+    flex-direction: row !important;
+    width: 100% !important;
+}
+
+/* 攻撃側の援軍（左側）は表示を「D・C」にするため、左右を反転させます */
+.war-side-wrapper > .war-reinf-col:first-child {
+    flex-direction: row-reverse !important;
+}
+
+/* ---------------------------------------------------------
+   ★ PC版（画面が広い時）は元の配置に戻す魔法
+   --------------------------------------------------------- */
+body.is-pc .war-side-wrapper {
+    flex-direction: row !important; /* 横並びに戻す */
+}
+body.is-pc .war-side-wrapper > :not(.war-reinf-col) {
+    order: unset !important;
+    width: auto !important;
+}
+body.is-pc .war-side-wrapper > .war-reinf-col {
+    order: unset !important;
+    flex-direction: column !important; /* 援軍同士は縦並びに戻す */
+    width: auto !important;
+}
+body.is-pc .war-side-wrapper > .war-reinf-col:first-child {
+    flex-direction: column !important; /* 反転を解除して縦並びに戻す */
+}
