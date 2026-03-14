@@ -2731,21 +2731,21 @@ class UIManager {
     
     showWarActionMessage(msg, onClick) {
         if (!this.warControls) return;
+
+        // ★今回直した魔法です！
+        // 本当の攻城戦の「思考中の膜」を探し出して、しっかり消し去ります！
+        const warAiGuard = document.getElementById('war-ai-guard');
+        if (warAiGuard) {
+            warAiGuard.classList.add('hidden');
+        }
+        // コマンド欄を押せなくするバリアも解除します！
+        this.warControls.classList.remove('disabled-area');
+
         this.warControls.innerHTML = ''; 
         
-        // ★修正１：メッセージが出た時は、部隊の光（ハイライト）を強制的に全部消します
+        // 部隊の光（ハイライト）を強制的に全部消します
         const allCards = document.querySelectorAll('.army-box, .responsive-army-box');
         allCards.forEach(c => c.classList.remove('active-command-turn'));
-        
-        // ★修正２：メッセージが出た時は、思考中の透明な覆いを外してクリックできるようにします
-        if (typeof this.hideWarThinking === 'function') {
-            this.hideWarThinking();
-        }
-        const thinkingOverlay = document.getElementById('war-thinking-overlay');
-        if (thinkingOverlay) thinkingOverlay.style.display = 'none';
-
-        const actionBlocker = document.getElementById('war-action-blocker');
-        if (actionBlocker) actionBlocker.style.display = 'none';
         
         const msgContainer = document.createElement('div');
         msgContainer.className = 'war-action-message-container';
