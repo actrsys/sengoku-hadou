@@ -2273,13 +2273,14 @@ body.is-pc .war-side-wrapper > .war-reinf-col:first-child {
     flex-direction: column !important; /* 反転を解除して縦並びに戻す */
 }
 /* =========================================================
-   ★ 左右の中央の境目を常にド真ん中に固定する魔法
+   ★ 左右の中央の境目固定 ＆ 上下ズレ防止の魔法
    ========================================================= */
 .responsive-war-visual {
     display: flex !important;
     flex-direction: row !important;
     width: 100% !important;
     box-sizing: border-box !important;
+    align-items: flex-start !important; /* ★ここを追加！上端をピシッと揃えて上下のズレを無くします */
 }
 
 /* 攻撃・守備の箱を絶対に50%ずつに固定し、外へのはみ出しをカット！ */
@@ -2289,10 +2290,11 @@ body.is-pc .war-side-wrapper > .war-reinf-col:first-child {
     max-width: 50% !important;
     box-sizing: border-box !important;
     overflow: hidden !important; 
+    justify-content: flex-start !important; /* ★ここも追加！中身を上から詰めてズレを防ぎます */
 }
 
 /* =========================================================
-   ★ スマホ版：メイン軍のレイアウトを整える魔法（はみ出し解決版）
+   ★ スマホ版：メイン軍のレイアウト＆文字切り替えの魔法
    ========================================================= */
 /* 箱の余白を減らして、文字が収まるスペースを広く確保します */
 .responsive-army-box {
@@ -2303,15 +2305,15 @@ body.is-pc .war-side-wrapper > .war-reinf-col:first-child {
 /* メイン軍の中身を囲む箱 */
 .responsive-army-content {
     position: relative !important;
-    padding-left: 65px !important;   /* 顔画像(60px) + 隙間(5px) の分だけ左を空ける */
-    padding-bottom: 22px !important; /* 武将名の高さを下に空ける */
-    min-height: 85px !important;     /* 顔画像 + 武将名 の最低限の高さを確保 */
+    padding-left: 65px !important;   
+    padding-bottom: 22px !important; 
+    min-height: 85px !important;     
     display: block !important;       
     width: 100% !important;
     box-sizing: border-box !important;
 }
 
-/* 顔画像（左上にピッタリ固定し、少し小さくして幅を節約） */
+/* 顔画像 */
 .responsive-army-content .responsive-war-face {
     position: absolute !important;
     top: 0 !important;
@@ -2322,20 +2324,25 @@ body.is-pc .war-side-wrapper > .war-reinf-col:first-child {
     box-sizing: border-box !important;
 }
 
-/* 武将名（顔画像の下にピッタリ固定し、幅も合わせます） */
+/* 武将名 */
 .responsive-army-content .stat-busho {
     position: absolute !important;
     top: 62px !important; 
     left: 0 !important;
     width: 60px !important; 
     margin: 0 !important;
-    font-size: 0.75rem !important;
+    font-size: 0 !important; /* ★魔法！一旦すべての文字（直書きの「軍」など）を消し去ります！ */
     padding: 2px 0 !important;
     text-align: center !important;
     white-space: nowrap !important;
     overflow: hidden !important;
     text-overflow: ellipsis !important;
     background: rgba(0,0,0,0.5) !important;
+}
+
+/* ★消し去った中から、武将名の部分だけを元のサイズで復活させます！ */
+body:not(.is-pc) .responsive-army-content .stat-busho > * {
+    font-size: 0.75rem !important;
 }
 
 /* ステータス（右側に縦並び） */
@@ -2347,7 +2354,6 @@ body.is-pc .war-side-wrapper > .war-reinf-col:first-child {
     box-sizing: border-box !important;
 }
 
-/* ステータスの文字サイズと線の太さをスマホの幅に最適化 */
 .responsive-army-content .stat-row {
     font-size: 0.8rem !important;
     padding-bottom: 1px !important;
@@ -2356,6 +2362,12 @@ body.is-pc .war-side-wrapper > .war-reinf-col:first-child {
 .responsive-army-content .stat-val-large {
     font-size: 0.95rem !important;
 }
+
+/* ---------------------------------------------------------
+   ★ スマホ版のみ、文字を切り替える魔法（JSと連携）
+   --------------------------------------------------------- */
+body:not(.is-pc) .label-pc { display: none !important; }
+body:not(.is-pc) .label-sp { display: inline !important; }
 
 /* ---------------------------------------------------------
    ★ PC版（画面が広い時）は元のレイアウトに戻す魔法
@@ -2386,10 +2398,14 @@ body.is-pc .responsive-army-content .responsive-war-face {
 body.is-pc .responsive-army-content .stat-busho {
     position: static !important;
     width: 75% !important;
-    font-size: 1.3rem !important;
+    font-size: 1.3rem !important; /* PC版はフォントサイズを戻す */
     margin-bottom: 10px !important;
     margin-top: 10px !important;
     background: rgba(0,0,0,0.4) !important;
+}
+
+body.is-pc .responsive-army-content .stat-busho > * {
+    font-size: 1.3rem !important; /* PC版も連動して戻す */
 }
 
 body.is-pc .responsive-army-content .stat-row {
