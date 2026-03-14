@@ -2953,6 +2953,8 @@ class UIManager {
         }
     }
 
+    // ui.js の renderWarControls をまるごと以下に差し替え！
+
     renderWarControls(isAtkTurn) {
         if (!this.warControls) return;
         
@@ -2965,29 +2967,76 @@ class UIManager {
         const isMyTurn = (isAtkTurn && amIAttacker) || (!isAtkTurn && amIDefender);
         
         let options = [];
+        // ★ここに説明文（desc）を追加しました！
         if (amIAttacker || (isAtkTurn && !amIDefender)) {
             options = [
-                { label: "突撃", type: "charge" }, { label: "斉射", type: "bow" }, { label: "城攻め", type: "siege" },
-                { label: "火計", type: "fire" }, { label: "謀略", type: "scheme" }, { label: "撤退", type: "retreat" }
+                { label: "突撃", type: "charge", desc: "突撃します。敵兵士を減らし、城の防御度も僅かに削ります。" }, 
+                { label: "斉射", type: "bow", desc: "遠距離から弓や鉄砲で射撃を行います。反撃を受けにくい攻撃です。" }, 
+                { label: "破壊", type: "siege", desc: "城壁を破壊して、城の防御度を削ります。" },
+                { label: "火計", type: "fire", desc: "城に火を放ちます。成功すると城の防御度を大きく削ります。" }, 
+                { label: "謀略", type: "scheme", desc: "敵の動揺を誘います。成功すると敵兵士を大きく減らします。" }, 
+                { label: "撤退", type: "retreat", desc: "戦場から離脱し、退却します。" }
             ];
         } else {
             options = [
-                { label: "突撃", type: "def_charge" }, { label: "斉射", type: "def_bow" }, { label: "籠城", type: "def_attack" },
-                { label: "謀略", type: "scheme" }, { label: "補修", type: "repair_setup" }
+                { label: "突撃", type: "def_charge", desc: "突撃します。敵兵士を減らします。"" }, 
+                { label: "斉射", type: "def_bow", desc: "遠距離から弓や鉄砲で射撃を行います。反撃を受けにくい攻撃です。" }, 
+                { label: "籠城", type: "def_attack", desc: "守りを固めます。敵の攻撃による被害を抑えられます。" },
+                { label: "謀略", type: "scheme", desc: "敵の動揺を誘います。成功すると敵兵士を大きく減らします。" }, 
+                { label: "補修", type: "repair_setup", desc: "城を補修します。兵士を働かせて城の防御度を僅かに回復します。" }
             ];
             if (this.game.castles.some(c => c.ownerClan === s.defender.ownerClan && c.id !== s.defender.id && GameSystem.isReachable(this.game, s.defender, c, s.defender.ownerClan))) {
-                options.push({ label: "撤退", type: "retreat" });
+                options.push({ label: "撤退", type: "retreat", desc: "城を捨てて、安全な城へ退却します。" });
             }
         }
 
         this.warControls.innerHTML = '';
+
+        // ★左側のボタンを入れる箱（3分の2）
+        const btnContainer = document.createElement('div');
+        btnContainer.className = 'war-controls-buttons';
+
+        // ★右側の説明を入れる箱（3分の1）
+        const descContainer = document.createElement('div');
+        descContainer.className = 'war-controls-desc';
+        descContainer.innerHTML = '<div style="color:#666; text-align:center; margin-top:15px;">コマンドを選択してください</div>';
+
+        // 2つの箱を画面に追加します
+        this.warControls.appendChild(btnContainer);
+        this.warControls.appendChild(descContainer);
+
+        let selectedBtnInfo = null; // ★今どのボタンが「1回押された状態」かを覚えておく箱です
+
         options.forEach(cmd => {
             const btn = document.createElement('button');
             btn.textContent = cmd.label;
+            
             btn.onclick = () => {
-                if(isMyTurn) this.game.warManager.execWarCmd(cmd.type);
+                if(!isMyTurn) return;
+
+                // もし「既に選ばれているボタン」をもう一度押したら、ついに実行します！
+                if (selectedBtnInfo === cmd.type) {
+                    if (window.AudioManager) window.AudioManager.playSE('decision.ogg');
+                    this.game.warManager.execWarCmd(cmd.type);
+                } else {
+                    // 初めて押した時（または別のボタンから乗り換えた時）
+                    if (window.AudioManager) window.AudioManager.playSE('choice.ogg');
+                    
+                    selectedBtnInfo = cmd.type; // 選んだボタンを記憶
+                    
+                    // 右側の箱に説明を書き出します
+                    descContainer.innerHTML = `
+                        <div style="font-weight:bold; font-size:1.1rem; border-bottom:1px solid #ccc; padding-bottom:5px; margin-bottom:5px;">${cmd.label}</div>
+                        <div>${cmd.desc}</div>
+                        <div style="margin-top:8px; color:#d32f2f; font-weight:bold; font-size:0.85rem;">もう一度押すと実行します</div>
+                    `;
+
+                    // すべてのボタンの「選択中」の光を消して、今押したボタンだけを光らせます
+                    Array.from(btnContainer.children).forEach(b => b.classList.remove('active-cmd'));
+                    btn.classList.add('active-cmd');
+                }
             };
-            this.warControls.appendChild(btn);
+            btnContainer.appendChild(btn);
         });
 
         const guard = document.getElementById('war-ai-guard');
