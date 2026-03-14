@@ -164,13 +164,15 @@ class Busho {
         this.aptTeppo = data.aptTeppo || 'E';       // 鉄砲適性
 
         // ★【ここから書き足し：官位】
-        // 「1|2」のように書かれたIDを「|」で区切って、数字のリストに変身させます
-        if (data.courtRank !== undefined && data.courtRank !== null && String(data.courtRank).trim() !== "") {
+        if (data.courtRankIds && Array.isArray(data.courtRankIds)) {
+            // セーブデータから読み込んだ時は、すでにリストになっているのでそのまま使います！
+            this.courtRankIds = data.courtRankIds;
+        } else if (data.courtRank !== undefined && data.courtRank !== null && String(data.courtRank).trim() !== "") {
+            // CSVから読み込んだ時は、「1|2」のような文字を区切ってリストにします
             this.courtRankIds = String(data.courtRank).split('|').map(id => Number(id.trim()));
         } else {
             this.courtRankIds = []; // 何も持っていなければ空っぽのリストにします
         }
-
         // ★【ここから書き足し：生没年・登場年】
         // 数字として扱うために Number() で囲みます
         this.birthYear = Number(data.birthYear || 1500); // 生年（空なら1500）
@@ -179,8 +181,11 @@ class Busho {
         this.nameChange = data.nameChange || ""; // 年:姓:名|年:姓:名... の形式の改名データ
         
         // ★【ここから書き足し：一門設定】
-        // familyId が「1|2|3」のように届くので、使いやすいようにバラバラのリスト（配列）にします
-        if (typeof data.familyId === 'string' && data.familyId.trim() !== "") {
+        if (data.familyIds && Array.isArray(data.familyIds)) {
+            // セーブデータから読み込んだ時はそのまま使います！
+            this.familyIds = data.familyIds;
+        } else if (typeof data.familyId === 'string' && data.familyId.trim() !== "") {
+            // familyId が「1|2|3」のように届くので、使いやすいようにバラバラのリスト（配列）にします
             this.familyIds = data.familyId.split('|').map(id => Number(id.trim()));
         } else if (Number(data.familyId) > 0) {
             // もし数字が一つだけ入っていたら、それをリストに入れます
