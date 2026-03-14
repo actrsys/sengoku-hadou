@@ -2816,11 +2816,13 @@ class UIManager {
     }
 
     playDamageAnimation(data) {
-        // ★追加：ダメージのアニメーションが出ると同時に、専用の音を鳴らします！
+        // ★修正：送られてきたお手紙（data）の中に音（se）の指定があればそれを、なければいつもの音を鳴らします！
         if (window.AudioManager) {
-            window.AudioManager.playSE('damage001.ogg');
+            let soundFile = data.se || 'damage001.ogg';
+            window.AudioManager.playSE(soundFile);
         }
-        // ★修正：対象の「役割（role）」ごとに、どのカードを揺らすか探す魔法です！
+
+        // 対象の「役割（role）」ごとに、どのカードを揺らすか探す魔法です！
         const applyAnim = (role, dmgStr) => {
             let targetCard = null;
             // それぞれの役割にあわせて、画面上のカードを探します
@@ -2861,7 +2863,7 @@ class UIManager {
             }
         };
 
-        // ★追加：城の防御力の文字がある場所を揺らす専用の魔法です！
+        // 城の防御力の文字がある場所を揺らす専用の魔法です！
         const applyWallAnim = (dmgStr) => {
             const wallEl = document.getElementById('war-def-wall-info');
             if (wallEl) {
@@ -2896,7 +2898,7 @@ class UIManager {
             applyAnim(data.target, `-${data.soldierDmg}`);
         }
 
-        // ★変更：城壁へのダメージは、部隊カードではなく右上の「城防御」のところに出します！
+        // 城壁へのダメージは右上の「城防御」のところに出します
         if (data.wallDmg && data.wallDmg > 0) {
             applyWallAnim(`-${data.wallDmg}`);
         }
