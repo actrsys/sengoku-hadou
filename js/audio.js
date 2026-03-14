@@ -50,7 +50,7 @@ class AudioManager {
             'choice.ogg': { baseVolume: 0.05 },
             'window.ogg': { baseVolume: 0.05 },
             'damage001.ogg': { baseVolume: 0.05 },
-            'fire001.mp3g': { baseVolume: 0.05 },
+            'fire001.mp3g': { baseVolume: 0.1 },
             'slash.ogg': { baseVolume: 0.05 },
             'miss.ogg': { baseVolume: 0.05 },
             
