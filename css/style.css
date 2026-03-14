@@ -2279,71 +2279,96 @@ body.is-pc .war-side-wrapper > .war-reinf-col:first-child {
     display: flex !important;
     flex-direction: row !important;
     width: 100% !important;
-}
-
-/* 攻撃側・守備側を絶対にピッタリ50%ずつに分割します！ */
-.war-side-wrapper {
-    flex: 1 1 50% !important;
-    width: 50% !important;
-    max-width: 50% !important;
     box-sizing: border-box !important;
 }
 
-/* =========================================================
-   ★ スマホ版：メイン軍のレイアウトを整える魔法
-   ========================================================= */
-/* 消えてしまっていた項目を復活させるために、はみ出し禁止を解除！ */
-.responsive-army-box {
-    overflow-y: visible !important; 
-    overflow-x: visible !important;
+/* 攻撃・守備の箱を絶対に50%ずつに固定し、外へのはみ出しをカット！ */
+.war-side-wrapper {
+    flex: 0 0 50% !important; 
+    width: 50% !important;
+    max-width: 50% !important;
+    box-sizing: border-box !important;
+    overflow: hidden !important; 
 }
 
-/* メイン軍の箱（顔画像とステータスが入っている箱）の設定 */
+/* =========================================================
+   ★ スマホ版：メイン軍のレイアウトを整える魔法（はみ出し解決版）
+   ========================================================= */
+/* 箱の余白を減らして、文字が収まるスペースを広く確保します */
+.responsive-army-box {
+    padding: 4px 6px !important; 
+    box-sizing: border-box !important;
+}
+
+/* メイン軍の中身を囲む箱 */
 .responsive-army-content {
     position: relative !important;
-    padding-left: 85px !important;   /* 顔画像(75px)＋隙間(10px)の場所を左に空けます */
-    padding-bottom: 30px !important; /* 武将名のための高さを下に空けます */
-    min-height: 110px !important;    /* 全体の最低限の高さを確保します */
-    display: block !important;       /* 横並び設定を解除して素直に表示させます */
+    padding-left: 65px !important;   /* 顔画像(60px) + 隙間(5px) の分だけ左を空ける */
+    padding-bottom: 22px !important; /* 武将名の高さを下に空ける */
+    min-height: 85px !important;     /* 顔画像 + 武将名 の最低限の高さを確保 */
+    display: block !important;       
+    width: 100% !important;
+    box-sizing: border-box !important;
 }
 
-/* メイン軍の顔画像だけを左上にピッタリ固定して、少し小さくします */
+/* 顔画像（左上にピッタリ固定し、少し小さくして幅を節約） */
 .responsive-army-content .responsive-war-face {
     position: absolute !important;
     top: 0 !important;
     left: 0 !important;
-    width: 75px !important;
-    height: 75px !important;
+    width: 60px !important;
+    height: 60px !important;
     margin: 0 !important;
+    box-sizing: border-box !important;
 }
 
-/* メイン軍の武将名を顔画像の下（左下）にピッタリ固定します */
+/* 武将名（顔画像の下にピッタリ固定し、幅も合わせます） */
 .responsive-army-content .stat-busho {
     position: absolute !important;
-    top: 80px !important; /* 顔画像の下に配置 */
-    left: -5px !important;
-    width: 85px !important;
+    top: 62px !important; 
+    left: 0 !important;
+    width: 60px !important; 
     margin: 0 !important;
-    font-size: 0.85rem !important;
-    padding: 2px !important;
-    box-sizing: border-box !important;
+    font-size: 0.75rem !important;
+    padding: 2px 0 !important;
     text-align: center !important;
     white-space: nowrap !important;
     overflow: hidden !important;
     text-overflow: ellipsis !important;
+    background: rgba(0,0,0,0.5) !important;
 }
 
-/* ステータス（兵数など）を右側に縦並びにする */
+/* ステータス（右側に縦並び） */
 .responsive-army-content .responsive-army-stats {
     display: flex !important;
     flex-direction: column !important;
-    gap: 2px !important;
+    gap: 1px !important;
     width: 100% !important;
+    box-sizing: border-box !important;
+}
+
+/* ステータスの文字サイズと線の太さをスマホの幅に最適化 */
+.responsive-army-content .stat-row {
+    font-size: 0.8rem !important;
+    padding-bottom: 1px !important;
+    border-bottom-width: 1px !important;
+}
+.responsive-army-content .stat-val-large {
+    font-size: 0.95rem !important;
 }
 
 /* ---------------------------------------------------------
    ★ PC版（画面が広い時）は元のレイアウトに戻す魔法
    --------------------------------------------------------- */
+body.is-pc .war-side-wrapper {
+    flex: 1 1 50% !important;
+    overflow: visible !important;
+}
+
+body.is-pc .responsive-army-box {
+    padding: 10px !important;
+}
+
 body.is-pc .responsive-army-content {
     position: static !important;
     padding-left: 0 !important;
@@ -2363,4 +2388,16 @@ body.is-pc .responsive-army-content .stat-busho {
     width: 75% !important;
     font-size: 1.3rem !important;
     margin-bottom: 10px !important;
+    margin-top: 10px !important;
+    background: rgba(0,0,0,0.4) !important;
+}
+
+body.is-pc .responsive-army-content .stat-row {
+    font-size: 1.2rem !important;
+    border-bottom-width: 4px !important;
+    padding-bottom: 2px !important;
+}
+
+body.is-pc .responsive-army-content .stat-val-large {
+    font-size: 1.5rem !important;
 }
