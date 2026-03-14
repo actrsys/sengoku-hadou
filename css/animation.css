@@ -1,0 +1,65 @@
+@charset "UTF-8";
+
+/* =========================================================
+   戦国覇道 アニメーション専用ファイル
+   ========================================================= */
+
+/* -----------------------------------------
+   1. 揺れるアニメーション（ダメージを受けた時）
+   ----------------------------------------- */
+/* この「anim-damage-shake」というシールを貼られた要素が揺れます */
+.anim-damage-shake {
+    /* 0.5秒かけて、shakeという動きを1回だけやります */
+    animation: shake 0.5s ease-in-out;
+}
+
+/* shake（揺れ）の具体的な動きの設計図です */
+@keyframes shake {
+    0%   { transform: translateX(0); }       /* 最初は元の位置 */
+    20%  { transform: translateX(-10px); }   /* 左に10ピクセルずれる */
+    40%  { transform: translateX(10px); }    /* 右に10ピクセルずれる */
+    60%  { transform: translateX(-10px); }   /* また左へ */
+    80%  { transform: translateX(10px); }    /* また右へ */
+    100% { transform: translateX(0); }       /* 元の位置に戻る */
+}
+
+/* -----------------------------------------
+   2. 攻撃する動き（前にドン！と出る）
+   ----------------------------------------- */
+.anim-attack {
+    /* 0.3秒かけて、attack-pushという動きをやります */
+    animation: attack-push 0.3s ease-in-out;
+}
+
+@keyframes attack-push {
+    0%   { transform: translateY(0); }
+    50%  { transform: translateY(-15px) scale(1.1); } /* 少し上に飛び出て、1.1倍に大きくなる */
+    100% { transform: translateY(0) scale(1); }       /* 元に戻る */
+}
+
+/* -----------------------------------------
+   3. ポップアップして消える文字（「-100」など）
+   ----------------------------------------- */
+.anim-popup-text {
+    /* forwards は「アニメーションが終わった後の状態（透明）をそのままキープする」というおまじないです */
+    animation: popup 1s ease-out forwards;
+}
+
+@keyframes popup {
+    0%   { transform: translateY(0); opacity: 1; }     /* 最初ははっきり見える */
+    50%  { transform: translateY(-20px); opacity: 1; } /* 上に上がりながら見えるまま */
+    100% { transform: translateY(-40px); opacity: 0; } /* さらに上に上がりつつ、透明になって消える */
+}
+
+/* -----------------------------------------
+   4. 画面が赤く光る（大ダメージを受けた時など）
+   ----------------------------------------- */
+.anim-damage-flash {
+    animation: flash-red 0.3s ease-out;
+}
+
+@keyframes flash-red {
+    0%   { background-color: transparent; }
+    50%  { background-color: rgba(255, 0, 0, 0.5); } /* 半透明の赤になる */
+    100% { background-color: transparent; }          /* 元に戻る */
+}
