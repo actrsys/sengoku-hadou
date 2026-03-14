@@ -516,237 +516,261 @@ class WarManager {
     }
     
     resolveWarAction(type, extraVal = null) {
-        if (!this.state.active) return;
-        const s = this.state;
+        if (!this.state.active) return;
+        const s = this.state;
 
-        let actionMessages = [];
-        const pushMsg = (msg) => {
-             if (s.isPlayerInvolved) {
-                 actionMessages.push(msg);
-                 if (typeof msg === 'string') this.game.ui.addWarDetailLog(msg);
-                 else if (msg.log) this.game.ui.addWarDetailLog(msg.log);
-             }
-        };
+        let actionMessages = [];
+        const pushMsg = (msg) => {
+             if (s.isPlayerInvolved) {
+                 actionMessages.push(msg);
+                 if (typeof msg === 'string') this.game.ui.addWarDetailLog(msg);
+                 else if (msg.log) this.game.ui.addWarDetailLog(msg.log);
+             }
+        };
 
-        const executeNext = () => {
-             if (s.isPlayerInvolved && actionMessages.length > 0) {
-                 this.game.ui.showWarActionMessage(actionMessages, () => {
-                     this.advanceWarTurn();
-                 });
-             } else {
-                 this.advanceWarTurn();
-             }
-        };
+        const executeNext = () => {
+             // ★修正：メッセージを読み終わった後、防御が0になっていたら「残りの予定を全て消し飛ばして」すぐに勝敗をつける魔法です
+             const doNext = () => {
+                 if (s.defender.defense <= 0) {
+                     this.endWar(true);
+                 } else if (s.defender.soldiers <= 0) {
+                     this.endWar(true);
+                 } else if (s.attacker.soldiers <= 0) {
+                     this.endWar(false);
+                 } else {
+                     this.advanceWarTurn(); // まだ生きていれば次の部隊の行動へ進みます
+                 }
+             };
 
-        // ★追加：今の各部隊の「最新の兵士数」と「城の防御力」を調べる魔法です
-        const getCurrentStats = () => {
-            return {
-                defSoldiers: s.defender.soldiers,
-                defSelfSoldiers: s.defSelfReinforcement ? s.defSelfReinforcement.soldiers : 0,
-                defAllySoldiers: s.defReinforcement ? s.defReinforcement.soldiers : 0,
-                atkSoldiers: s.attacker.soldiers,
-                atkSelfSoldiers: s.selfReinforcement ? s.selfReinforcement.soldiers : 0,
-                atkAllySoldiers: s.reinforcement ? s.reinforcement.soldiers : 0,
-                wallDefense: s.defender.defense
-            };
-        };
+             if (s.isPlayerInvolved && actionMessages.length > 0) {
+                 this.game.ui.showWarActionMessage(actionMessages, () => {
+                     doNext();
+                 });
+             } else {
+                 doNext();
+             }
+        };
 
-        if (type === 'retreat') { 
-            if (s.turn === 'attacker') { 
-                this.endWar(false, true); 
-            } else if (s.turn === 'defender') { 
-                this.executeRetreatLogic(s.defender); 
-            } else if (['attacker_self_reinf', 'attacker_ally_reinf', 'defender_self_reinf', 'defender_ally_reinf'].includes(s.turn)) {
-                let reinfKey = '';
-                let activeArmyName = "";
-                
-                if (s.turn === 'attacker_self_reinf') { reinfKey = 'selfReinforcement'; activeArmyName = "攻撃側自家援軍"; }
-                else if (s.turn === 'attacker_ally_reinf') { reinfKey = 'reinforcement'; activeArmyName = "攻撃側同盟軍"; }
-                else if (s.turn === 'defender_self_reinf') { reinfKey = 'defSelfReinforcement'; activeArmyName = "守備側自家援軍"; }
-                else if (s.turn === 'defender_ally_reinf') { reinfKey = 'defReinforcement'; activeArmyName = "守備側同盟軍"; }
-                
-                pushMsg(`R${s.round} [${activeArmyName}] は戦場から離脱し、撤退した！`);
-                
-                if (typeof this.retreatReinforcementForce === 'function') {
-                    this.retreatReinforcementForce(reinfKey);
-                }
-                executeNext();
-            }
-            return; 
-        }
-        
-        const isAtkTurnGroup = s.turn.startsWith('attacker');
-        
-        let activeBushos, activeSoldiers, activeMorale, activeTraining, activeArmyName;
-        if (s.turn === 'attacker') { activeBushos = s.atkBushos; activeSoldiers = s.attacker.soldiers; activeMorale = s.attacker.morale; activeTraining = s.attacker.training; activeArmyName = "攻撃本隊"; }
-        else if (s.turn === 'attacker_self_reinf') { activeBushos = s.selfReinforcement.bushos; activeSoldiers = s.selfReinforcement.soldiers; activeMorale = s.attacker.morale; activeTraining = s.attacker.training; activeArmyName = "攻撃側自家援軍"; }
-        else if (s.turn === 'attacker_ally_reinf') { activeBushos = s.reinforcement.bushos; activeSoldiers = s.reinforcement.soldiers; activeMorale = s.attacker.morale; activeTraining = s.attacker.training; activeArmyName = "攻撃側同盟軍"; }
-        else if (s.turn === 'defender') { activeBushos = [s.defBusho]; activeSoldiers = s.defender.soldiers; activeMorale = s.defender.morale; activeTraining = s.defender.training; activeArmyName = "守備本隊"; }
-        else if (s.turn === 'defender_self_reinf') { activeBushos = s.defSelfReinforcement.bushos; activeSoldiers = s.defSelfReinforcement.soldiers; activeMorale = s.defender.morale; activeTraining = s.defender.training; activeArmyName = "守備側自家援軍"; }
-        else if (s.turn === 'defender_ally_reinf') { activeBushos = s.defReinforcement.bushos; activeSoldiers = s.defReinforcement.soldiers; activeMorale = s.defender.morale; activeTraining = s.defender.training; activeArmyName = "守備側同盟軍"; }
+        // 今の各部隊の「最新の兵士数」と「城の防御力」を調べる魔法です
+        const getCurrentStats = () => {
+            return {
+                defSoldiers: s.defender.soldiers,
+                defSelfSoldiers: s.defSelfReinforcement ? s.defSelfReinforcement.soldiers : 0,
+                defAllySoldiers: s.defReinforcement ? s.defReinforcement.soldiers : 0,
+                atkSoldiers: s.attacker.soldiers,
+                atkSelfSoldiers: s.selfReinforcement ? s.selfReinforcement.soldiers : 0,
+                atkAllySoldiers: s.reinforcement ? s.reinforcement.soldiers : 0,
+                wallDefense: s.defender.defense
+            };
+        };
 
-        let targetBushos, targetSoldiers = 0, targetMorale, targetTraining;
-        
-        if (isAtkTurnGroup) { 
-            targetBushos = [s.defBusho]; 
-            targetMorale = s.defender.morale; 
-            targetTraining = s.defender.training;
-            if (s.defender.soldiers > 0) targetSoldiers += s.defender.soldiers;
-            if (s.defSelfReinforcement && s.defSelfReinforcement.soldiers > 0) targetSoldiers += s.defSelfReinforcement.soldiers;
-            if (s.defReinforcement && s.defReinforcement.soldiers > 0) targetSoldiers += s.defReinforcement.soldiers;
-        } else { 
-            targetBushos = s.atkBushos; 
-            targetMorale = s.attacker.morale; 
-            targetTraining = s.attacker.training;
-            if (s.attacker.soldiers > 0) targetSoldiers += s.attacker.soldiers;
-            if (s.selfReinforcement && s.selfReinforcement.soldiers > 0) targetSoldiers += s.selfReinforcement.soldiers;
-            if (s.reinforcement && s.reinforcement.soldiers > 0) targetSoldiers += s.reinforcement.soldiers;
-        }
+        // ★追加：どちらかが負けた時に、わかりやすい専用のメッセージを差し込む魔法です
+        const checkDefeatAndPushMsg = () => {
+            if (s.defender.defense <= 0) {
+                pushMsg({ text: `<span style="color:#d32f2f; font-size:1.2rem; font-weight:bold;">城の防御が０になった！<br>城は陥落した！</span>`, log: `城防御が0になり、陥落した！` });
+            } else if (s.defender.soldiers <= 0) {
+                pushMsg({ text: `<span style="color:#d32f2f; font-size:1.2rem; font-weight:bold;">守備本隊が全滅した！<br>城は陥落した！</span>`, log: `守備本隊が全滅し、陥落した！` });
+            } else if (s.attacker.soldiers <= 0) {
+                pushMsg({ text: `<span style="color:#1976d2; font-size:1.2rem; font-weight:bold;">攻撃本隊が全滅した！<br>守備軍が防ぎ切った！</span>`, log: `攻撃本隊が全滅し、退却した！` });
+            }
+        };
 
-        let actStats = WarSystem.calcUnitStats(activeBushos); 
-        let tgtStats = WarSystem.calcUnitStats(targetBushos);
-        
-        if (type === 'def_attack') { 
-             pushMsg(`R${s.round} [${activeArmyName}] 籠城し、守りを固めている！`);
-             executeNext(); return;
-        }
-        if (type === 'repair') { 
-             const soldierCost = extraVal || 50; 
-             if (activeSoldiers > soldierCost) {
-                 const W = window.WarParams.War; 
-                 if (s.turn === 'defender') s.defender.soldiers -= soldierCost;
-                 else if (s.turn === 'defender_self_reinf') s.defSelfReinforcement.soldiers -= soldierCost;
-                 else if (s.turn === 'defender_ally_reinf') s.defReinforcement.soldiers -= soldierCost;
+        if (type === 'retreat') { 
+            if (s.turn === 'attacker') { 
+                this.endWar(false, true); 
+            } else if (s.turn === 'defender') { 
+                this.executeRetreatLogic(s.defender); 
+            } else if (['attacker_self_reinf', 'attacker_ally_reinf', 'defender_self_reinf', 'defender_ally_reinf'].includes(s.turn)) {
+                let reinfKey = '';
+                let activeArmyName = "";
+                
+                if (s.turn === 'attacker_self_reinf') { reinfKey = 'selfReinforcement'; activeArmyName = "攻撃側自家援軍"; }
+                else if (s.turn === 'attacker_ally_reinf') { reinfKey = 'reinforcement'; activeArmyName = "攻撃側同盟軍"; }
+                else if (s.turn === 'defender_self_reinf') { reinfKey = 'defSelfReinforcement'; activeArmyName = "守備側自家援軍"; }
+                else if (s.turn === 'defender_ally_reinf') { reinfKey = 'defReinforcement'; activeArmyName = "守備側同盟軍"; }
+                
+                pushMsg(`R${s.round} [${activeArmyName}] は戦場から離脱し、撤退した！`);
+                
+                if (typeof this.retreatReinforcementForce === 'function') {
+                    this.retreatReinforcementForce(reinfKey);
+                }
+                executeNext();
+            }
+            return; 
+        }
+        
+        const isAtkTurnGroup = s.turn.startsWith('attacker');
+        
+        let activeBushos, activeSoldiers, activeMorale, activeTraining, activeArmyName;
+        if (s.turn === 'attacker') { activeBushos = s.atkBushos; activeSoldiers = s.attacker.soldiers; activeMorale = s.attacker.morale; activeTraining = s.attacker.training; activeArmyName = "攻撃本隊"; }
+        else if (s.turn === 'attacker_self_reinf') { activeBushos = s.selfReinforcement.bushos; activeSoldiers = s.selfReinforcement.soldiers; activeMorale = s.attacker.morale; activeTraining = s.attacker.training; activeArmyName = "攻撃側自家援軍"; }
+        else if (s.turn === 'attacker_ally_reinf') { activeBushos = s.reinforcement.bushos; activeSoldiers = s.reinforcement.soldiers; activeMorale = s.attacker.morale; activeTraining = s.attacker.training; activeArmyName = "攻撃側同盟軍"; }
+        else if (s.turn === 'defender') { activeBushos = [s.defBusho]; activeSoldiers = s.defender.soldiers; activeMorale = s.defender.morale; activeTraining = s.defender.training; activeArmyName = "守備本隊"; }
+        else if (s.turn === 'defender_self_reinf') { activeBushos = s.defSelfReinforcement.bushos; activeSoldiers = s.defSelfReinforcement.soldiers; activeMorale = s.defender.morale; activeTraining = s.defender.training; activeArmyName = "守備側自家援軍"; }
+        else if (s.turn === 'defender_ally_reinf') { activeBushos = s.defReinforcement.bushos; activeSoldiers = s.defReinforcement.soldiers; activeMorale = s.defender.morale; activeTraining = s.defender.training; activeArmyName = "守備側同盟軍"; }
 
-                 const polList = activeBushos.map(b => b.politics).sort((a,b) => b - a);
-                 const maxPol = polList.length > 0 ? polList[0] : 0;
-                 let subPolSum = 0; for(let i=1; i<polList.length; i++) subPolSum += polList[i];
-                 let recover = Math.floor(((soldierCost * W.RepairSoldierFactor) + (maxPol * W.RepairMainPolFactor) + (subPolSum * W.RepairSubPolFactor)) * W.RepairGlobalMultiplier);
-                 s.defender.defense += recover;
-                 
-                 pushMsg(`R${s.round} [${activeArmyName}] の補修！`);
-                 pushMsg({ text: `城を修復した！ (兵-${soldierCost} 防+${recover})`, log: `R${s.round} [${activeArmyName}] 補修を実行！ (兵-${soldierCost} 防+${recover})`});
-             } else { 
-                 pushMsg(`R${s.round} [${activeArmyName}] 補修しようとしたが兵が足りない！`); 
-             }
-             executeNext(); return;
-        }
+        let targetBushos, targetSoldiers = 0, targetMorale, targetTraining;
+        
+        if (isAtkTurnGroup) { 
+            targetBushos = [s.defBusho]; 
+            targetMorale = s.defender.morale; 
+            targetTraining = s.defender.training;
+            if (s.defender.soldiers > 0) targetSoldiers += s.defender.soldiers;
+            if (s.defSelfReinforcement && s.defSelfReinforcement.soldiers > 0) targetSoldiers += s.defSelfReinforcement.soldiers;
+            if (s.defReinforcement && s.defReinforcement.soldiers > 0) targetSoldiers += s.defReinforcement.soldiers;
+        } else { 
+            targetBushos = s.atkBushos; 
+            targetMorale = s.attacker.morale; 
+            targetTraining = s.attacker.training;
+            if (s.attacker.soldiers > 0) targetSoldiers += s.attacker.soldiers;
+            if (s.selfReinforcement && s.selfReinforcement.soldiers > 0) targetSoldiers += s.selfReinforcement.soldiers;
+            if (s.reinforcement && s.reinforcement.soldiers > 0) targetSoldiers += s.reinforcement.soldiers;
+        }
 
-        if (type === 'scheme') {
-            const result = WarSystem.calcScheme(activeBushos[0], targetBushos[0], isAtkTurnGroup ? s.defender.peoplesLoyalty : (window.MainParams?.Economy?.MaxLoyalty || 100));
-            if (!result.success) { 
-                 let failMsg = `R${s.round} [${activeArmyName}] 謀略失敗！`;
-                 pushMsg({ text: failMsg, log: failMsg, se: 'miss.ogg' }); 
-            } else {
-                pushMsg(`R${s.round} [${activeArmyName}] の謀略！`);
-                let calcDamage = s.isPlayerInvolved ? result.damage : Math.floor(result.damage * 0.195);
-                
-                let dmgResult = this.distributeDamage(isAtkTurnGroup, calcDamage);
-                let actualDamage = dmgResult.total;
-                
-                // ★修正：最新ステータス（currentStats）のメモを付け足します
-                pushMsg({ type: 'damage', target: isAtkTurnGroup ? 'defender' : 'attacker', soldierDmgDetails: dmgResult.details, se: 'slash.ogg', currentStats: getCurrentStats() });
-                pushMsg({ text: `敵軍に計${actualDamage}の被害を与えた！`, log: `R${s.round} [${activeArmyName}] 謀略成功！ 敵軍に計${actualDamage}の被害`});
-            }
-            executeNext(); return;
-        }
+        let actStats = WarSystem.calcUnitStats(activeBushos); 
+        let tgtStats = WarSystem.calcUnitStats(targetBushos);
+        
+        if (type === 'def_attack') { 
+             pushMsg(`R${s.round} [${activeArmyName}] 籠城し、守りを固めている！`);
+             executeNext(); return;
+        }
+        if (type === 'repair') { 
+             const soldierCost = extraVal || 50; 
+             if (activeSoldiers > soldierCost) {
+                 const W = window.WarParams.War; 
+                 if (s.turn === 'defender') s.defender.soldiers -= soldierCost;
+                 else if (s.turn === 'defender_self_reinf') s.defSelfReinforcement.soldiers -= soldierCost;
+                 else if (s.turn === 'defender_ally_reinf') s.defReinforcement.soldiers -= soldierCost;
 
-        if (type === 'fire') {
-            const result = WarSystem.calcFire(activeBushos[0], targetBushos[0]);
-            if (!result.success) { 
-                 let failMsg = `R${s.round} [${activeArmyName}] 火攻失敗！`;
-                 pushMsg({ text: failMsg, log: failMsg, se: 'miss.ogg' }); 
-            } else {
-                pushMsg(`R${s.round} [${activeArmyName}] の火攻め！`);
-                let calcDamage = s.isPlayerInvolved ? result.damage : Math.floor(result.damage * 0.195);
-                let calcDefSoldierDamage = s.isPlayerInvolved ? 50 : 16;
-                if(isAtkTurnGroup) {
-                    s.defender.defense = Math.max(0, s.defender.defense - calcDamage);
-                    // ★修正：最新ステータス（currentStats）のメモを付け足します
-                    pushMsg({ type: 'damage', target: 'defender', wallDmg: calcDamage, se: 'fire001.mp3', currentStats: getCurrentStats() });
-                    pushMsg({ text: `敵防御に${calcDamage}の被害を与えた！`, log: `R${s.round} [${activeArmyName}] 火攻成功！ 敵防御に${calcDamage}の被害`});
-                } else {
-                    let dmgResult = this.distributeDamage(isAtkTurnGroup, calcDefSoldierDamage);
-                    let actualDamage = dmgResult.total;
-                    
-                    // ★修正：最新ステータス（currentStats）のメモを付け足します
-                    pushMsg({ type: 'damage', target: 'attacker', soldierDmgDetails: dmgResult.details, se: 'fire001.mp3', currentStats: getCurrentStats() });
-                    pushMsg({ text: `敵軍に計${actualDamage}の被害を与えた！`, log: `R${s.round} [${activeArmyName}] 火攻成功！ 敵軍に計${actualDamage}の被害`});
-                }
-            }
-            executeNext(); return;
-        }
-        
-        let atkStatsParam = isAtkTurnGroup ? actStats : tgtStats;
-        let defStatsParam = isAtkTurnGroup ? tgtStats : actStats;
-        let atkSoldiersParam = isAtkTurnGroup ? activeSoldiers : targetSoldiers;
-        let defSoldiersParam = isAtkTurnGroup ? targetSoldiers : activeSoldiers;
-        let atkMoraleParam = isAtkTurnGroup ? activeMorale : targetMorale;
-        let defTrainingParam = isAtkTurnGroup ? targetTraining : activeTraining;
+                 const polList = activeBushos.map(b => b.politics).sort((a,b) => b - a);
+                 const maxPol = polList.length > 0 ? polList[0] : 0;
+                 let subPolSum = 0; for(let i=1; i<polList.length; i++) subPolSum += polList[i];
+                 let recover = Math.floor(((soldierCost * W.RepairSoldierFactor) + (maxPol * W.RepairMainPolFactor) + (subPolSum * W.RepairSubPolFactor)) * W.RepairGlobalMultiplier);
+                 s.defender.defense += recover;
+                 
+                 pushMsg(`R${s.round} [${activeArmyName}] の補修！`);
+                 pushMsg({ text: `城を修復した！ (兵-${soldierCost} 防+${recover})`, log: `R${s.round} [${activeArmyName}] 補修を実行！ (兵-${soldierCost} 防+${recover})`});
+             } else { 
+                 pushMsg(`R${s.round} [${activeArmyName}] 補修しようとしたが兵が足りない！`); 
+             }
+             executeNext(); return;
+        }
 
-        const result = WarSystem.calcWarDamage(atkStatsParam, defStatsParam, atkSoldiersParam, defSoldiersParam, s.defender.defense, atkMoraleParam, defTrainingParam, type);
-        let calculatedSoldierDmg = result.soldierDmg; let calculatedWallDmg = result.wallDmg; let calculatedCounterDmg = result.counterDmg;
+        if (type === 'scheme') {
+            const result = WarSystem.calcScheme(activeBushos[0], targetBushos[0], isAtkTurnGroup ? s.defender.peoplesLoyalty : (window.MainParams?.Economy?.MaxLoyalty || 100));
+            if (!result.success) { 
+                 let failMsg = `R${s.round} [${activeArmyName}] 謀略失敗！`;
+                 pushMsg({ text: failMsg, log: failMsg, se: 'miss.ogg' }); 
+            } else {
+                pushMsg(`R${s.round} [${activeArmyName}] の謀略！`);
+                let calcDamage = s.isPlayerInvolved ? result.damage : Math.floor(result.damage * 0.195);
+                
+                let dmgResult = this.distributeDamage(isAtkTurnGroup, calcDamage);
+                let actualDamage = dmgResult.total;
+                
+                pushMsg({ type: 'damage', target: isAtkTurnGroup ? 'defender' : 'attacker', soldierDmgDetails: dmgResult.details, se: 'slash.ogg', currentStats: getCurrentStats() });
+                pushMsg({ text: `敵軍に計${actualDamage}の被害を与えた！`, log: `R${s.round} [${activeArmyName}] 謀略成功！ 敵軍に計${actualDamage}の被害`});
+                checkDefeatAndPushMsg(); // ★負けたかチェック
+            }
+            executeNext(); return;
+        }
 
-        if (!s.isPlayerInvolved) {
-            calculatedSoldierDmg = Math.floor(calculatedSoldierDmg * 0.195); calculatedWallDmg = Math.floor(calculatedWallDmg * 0.195); calculatedCounterDmg = Math.floor(calculatedCounterDmg * 0.195);
-        }
+        if (type === 'fire') {
+            const result = WarSystem.calcFire(activeBushos[0], targetBushos[0]);
+            if (!result.success) { 
+                 let failMsg = `R${s.round} [${activeArmyName}] 火攻失敗！`;
+                 pushMsg({ text: failMsg, log: failMsg, se: 'miss.ogg' }); 
+            } else {
+                pushMsg(`R${s.round} [${activeArmyName}] の火攻め！`);
+                let calcDamage = s.isPlayerInvolved ? result.damage : Math.floor(result.damage * 0.195);
+                let calcDefSoldierDamage = s.isPlayerInvolved ? 50 : 16;
+                if(isAtkTurnGroup) {
+                    s.defender.defense = Math.max(0, s.defender.defense - calcDamage);
+                    pushMsg({ type: 'damage', target: 'defender', wallDmg: calcDamage, se: 'fire001.mp3', currentStats: getCurrentStats() });
+                    pushMsg({ text: `敵防御に${calcDamage}の被害を与えた！`, log: `R${s.round} [${activeArmyName}] 火攻成功！ 敵防御に${calcDamage}の被害`});
+                    checkDefeatAndPushMsg(); // ★負けたかチェック
+                } else {
+                    let dmgResult = this.distributeDamage(isAtkTurnGroup, calcDefSoldierDamage);
+                    let actualDamage = dmgResult.total;
+                    
+                    pushMsg({ type: 'damage', target: 'attacker', soldierDmgDetails: dmgResult.details, se: 'fire001.mp3', currentStats: getCurrentStats() });
+                    pushMsg({ text: `敵軍に計${actualDamage}の被害を与えた！`, log: `R${s.round} [${activeArmyName}] 火攻成功！ 敵軍に計${actualDamage}の被害`});
+                    checkDefeatAndPushMsg(); // ★負けたかチェック
+                }
+            }
+            executeNext(); return;
+        }
+        
+        let atkStatsParam = isAtkTurnGroup ? actStats : tgtStats;
+        let defStatsParam = isAtkTurnGroup ? tgtStats : actStats;
+        let atkSoldiersParam = isAtkTurnGroup ? activeSoldiers : targetSoldiers;
+        let defSoldiersParam = isAtkTurnGroup ? targetSoldiers : activeSoldiers;
+        let atkMoraleParam = isAtkTurnGroup ? activeMorale : targetMorale;
+        let defTrainingParam = isAtkTurnGroup ? targetTraining : activeTraining;
 
-        if (isAtkTurnGroup) {
-            const hasRojo = ['defender', 'defender_self_reinf', 'defender_ally_reinf'].some(role => {
-                const plan = s.plannedActions[role];
-                return plan && plan.type === 'def_attack';
-            });
-            
-            if (hasRojo) {
-                 calculatedWallDmg = Math.floor(calculatedWallDmg * window.WarParams.War.RojoDamageReduction);
-                 pushMsg(`(守備軍の籠城により城壁の被害軽減)`);
-            }
-        }
+        const result = WarSystem.calcWarDamage(atkStatsParam, defStatsParam, atkSoldiersParam, defSoldiersParam, s.defender.defense, atkMoraleParam, defTrainingParam, type);
+        let calculatedSoldierDmg = result.soldierDmg; let calculatedWallDmg = result.wallDmg; let calculatedCounterDmg = result.counterDmg;
 
-        let dmgResult = this.distributeDamage(isAtkTurnGroup, calculatedSoldierDmg);
-        let actualSoldierDmg = dmgResult.total;
-        
-        if(isAtkTurnGroup) { s.defender.defense = Math.max(0, s.defender.defense - calculatedWallDmg); } 
-        
-        let actualCounterDmg = 0;
-        if(calculatedCounterDmg > 0) { 
-            actualCounterDmg = Math.min(activeSoldiers, calculatedCounterDmg);
-            if (s.turn === 'attacker') s.attacker.soldiers -= actualCounterDmg;
-            else if (s.turn === 'attacker_self_reinf') s.selfReinforcement.soldiers -= actualCounterDmg;
-            else if (s.turn === 'attacker_ally_reinf') s.reinforcement.soldiers -= actualCounterDmg;
-            else if (s.turn === 'defender') s.defender.soldiers -= actualCounterDmg;
-            else if (s.turn === 'defender_self_reinf') s.defSelfReinforcement.soldiers -= actualCounterDmg;
-            else if (s.turn === 'defender_ally_reinf') s.defReinforcement.soldiers -= actualCounterDmg;
+        if (!s.isPlayerInvolved) {
+            calculatedSoldierDmg = Math.floor(calculatedSoldierDmg * 0.195); calculatedWallDmg = Math.floor(calculatedWallDmg * 0.195); calculatedCounterDmg = Math.floor(calculatedCounterDmg * 0.195);
+        }
 
-            if(isAtkTurnGroup) s.deadSoldiers.attacker += actualCounterDmg; else s.deadSoldiers.defender += actualCounterDmg;
-        }
-        
-        let actionName = type.includes('bow') ? "弓攻撃" : type.includes('siege') ? "城攻め" : "力攻め"; 
-        if (type.includes('def_')) actionName = type === 'def_bow' ? "斉射" : type === 'def_charge' ? "突撃" : "反撃"; 
-        
-        pushMsg(`R${s.round} [${activeArmyName}] の${actionName}！`);
-        
-        // ★修正：最新ステータス（currentStats）のメモを付け足します
-        pushMsg({
-            type: 'damage',
-            target: isAtkTurnGroup ? 'defender' : 'attacker',
-            soldierDmgDetails: dmgResult.details,
-            wallDmg: calculatedWallDmg,
-            counterTarget: s.turn,
-            counterDmg: actualCounterDmg,
-            se: 'damage001.ogg',
-            currentStats: getCurrentStats()
-        });
-        
-        let resultMsg = `敵軍に 計${actualSoldierDmg}の被害`; 
-        if (calculatedWallDmg > 0) resultMsg += ` (防-${calculatedWallDmg})`;
-        resultMsg += ` を与えた！`;
-        if (actualCounterDmg > 0) resultMsg += `<br>（反撃を受け 兵-${actualCounterDmg}）`;
-        
-        pushMsg({ text: resultMsg, log: `R${s.round} [${activeArmyName}] ${resultMsg.replace('<br>', ' ')}` });
+        if (isAtkTurnGroup) {
+            const hasRojo = ['defender', 'defender_self_reinf', 'defender_ally_reinf'].some(role => {
+                const plan = s.plannedActions[role];
+                return plan && plan.type === 'def_attack';
+            });
+            
+            if (hasRojo) {
+                 calculatedWallDmg = Math.floor(calculatedWallDmg * window.WarParams.War.RojoDamageReduction);
+                 pushMsg(`(守備軍の籠城により城壁の被害軽減)`);
+            }
+        }
 
-        executeNext();
-    }
+        let dmgResult = this.distributeDamage(isAtkTurnGroup, calculatedSoldierDmg);
+        let actualSoldierDmg = dmgResult.total;
+        
+        if(isAtkTurnGroup) { s.defender.defense = Math.max(0, s.defender.defense - calculatedWallDmg); } 
+        
+        let actualCounterDmg = 0;
+        if(calculatedCounterDmg > 0) { 
+            actualCounterDmg = Math.min(activeSoldiers, calculatedCounterDmg);
+            if (s.turn === 'attacker') s.attacker.soldiers -= actualCounterDmg;
+            else if (s.turn === 'attacker_self_reinf') s.selfReinforcement.soldiers -= actualCounterDmg;
+            else if (s.turn === 'attacker_ally_reinf') s.reinforcement.soldiers -= actualCounterDmg;
+            else if (s.turn === 'defender') s.defender.soldiers -= actualCounterDmg;
+            else if (s.turn === 'defender_self_reinf') s.defSelfReinforcement.soldiers -= actualCounterDmg;
+            else if (s.turn === 'defender_ally_reinf') s.defReinforcement.soldiers -= actualCounterDmg;
+
+            if(isAtkTurnGroup) s.deadSoldiers.attacker += actualCounterDmg; else s.deadSoldiers.defender += actualCounterDmg;
+        }
+        
+        let actionName = type.includes('bow') ? "弓攻撃" : type.includes('siege') ? "城攻め" : "力攻め"; 
+        if (type.includes('def_')) actionName = type === 'def_bow' ? "斉射" : type === 'def_charge' ? "突撃" : "反撃"; 
+        
+        pushMsg(`R${s.round} [${activeArmyName}] の${actionName}！`);
+        
+        pushMsg({
+            type: 'damage',
+            target: isAtkTurnGroup ? 'defender' : 'attacker',
+            soldierDmgDetails: dmgResult.details,
+            wallDmg: calculatedWallDmg,
+            counterTarget: s.turn,
+            counterDmg: actualCounterDmg,
+            se: 'damage001.ogg',
+            currentStats: getCurrentStats()
+        });
+        
+        let resultMsg = `敵軍に 計${actualSoldierDmg}の被害`; 
+        if (calculatedWallDmg > 0) resultMsg += ` (防-${calculatedWallDmg})`;
+        resultMsg += ` を与えた！`;
+        if (actualCounterDmg > 0) resultMsg += `<br>（反撃を受け 兵-${actualCounterDmg}）`;
+        
+        pushMsg({ text: resultMsg, log: `R${s.round} [${activeArmyName}] ${resultMsg.replace('<br>', ' ')}` });
+
+        checkDefeatAndPushMsg(); // ★負けたかチェック
+        executeNext();
+    }
 
     advanceWarTurn() { 
         if (!this.state.active) return;
