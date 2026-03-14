@@ -2715,7 +2715,7 @@ class UIManager {
         if (visible) this.warModal.classList.remove('hidden');
         else this.warModal.classList.add('hidden');
     }
-
+    
     clearWarLog() {
         if (this.warLog) this.warLog.innerHTML = '';
     }
@@ -2727,6 +2727,22 @@ class UIManager {
              this.warLog.appendChild(div);
              this.warLog.scrollTop = this.warLog.scrollHeight;
         }
+    }
+
+    showWarActionMessage(msg, onClick) {
+        if (!this.warControls) return;
+        this.warControls.innerHTML = ''; 
+        
+        const msgContainer = document.createElement('div');
+        msgContainer.className = 'war-action-message-container';
+        msgContainer.innerHTML = `<div class="war-action-message-text">${msg}</div><div class="war-action-message-prompt">▶ クリックして次へ</div>`;
+        
+        msgContainer.onclick = () => {
+            if (window.AudioManager) window.AudioManager.playSE('decision.ogg');
+            onClick();
+        };
+        
+        this.warControls.appendChild(msgContainer);
     }
 
     updateWarUI() {
@@ -2903,12 +2919,38 @@ class UIManager {
                 if(trainingSpEl) trainingSpEl.textContent = reinfData.training || 0;
             }
         };
-
+        
         // メイン部隊と同じように、4つの援軍カードをまとめて更新します
         updateReinfCardUI('atk-self', s.selfReinforcement, s.attacker.ownerClan);
         updateReinfCardUI('atk-ally', s.reinforcement, s.attacker.ownerClan);
         updateReinfCardUI('def-self', s.defSelfReinforcement, s.defender.ownerClan);
         updateReinfCardUI('def-ally', s.defReinforcement, s.defender.ownerClan);
+        
+        // ★ ハイライトの更新
+        const allCards = document.querySelectorAll('.army-box, .responsive-army-box');
+        allCards.forEach(c => c.classList.remove('active-command-turn'));
+
+        if (s.phase === 'command') {
+            let targetCard = null;
+            if (s.turn === 'attacker') {
+                const n = document.getElementById('war-atk-name');
+                if (n) targetCard = n.closest('.responsive-army-box, .army-box');
+            } else if (s.turn === 'defender') {
+                const n = document.getElementById('war-def-name');
+                if (n) targetCard = n.closest('.responsive-army-box, .army-box');
+            } else if (s.turn === 'attacker_self_reinf') {
+                targetCard = document.getElementById('war-atk-self-reinf-card');
+            } else if (s.turn === 'attacker_ally_reinf') {
+                targetCard = document.getElementById('war-atk-ally-reinf-card');
+            } else if (s.turn === 'defender_self_reinf') {
+                targetCard = document.getElementById('war-def-self-reinf-card');
+            } else if (s.turn === 'defender_ally_reinf') {
+                targetCard = document.getElementById('war-def-ally-reinf-card');
+            }
+            if (targetCard) {
+                targetCard.classList.add('active-command-turn');
+            }
+        }
     }
 
     // ui.js の renderWarControls をまるごと以下に差し替え！
