@@ -503,9 +503,9 @@ body.is-pc {
 .war-controls-area { 
     display: flex !important; 
     width: 100%;
-    gap: 5px; /* スマホは少し隙間を狭くします */
+    gap: 5px; 
     flex-shrink: 0;
-    height: 140px; /* ★高さを固定して、文字が変わってもガタガタ動かないようにします！ */
+    height: 150px; /* ★高さを少しだけ広げて、文字が確実に入るように固定します！ */
 }
 
 /* 左側：ボタンが並ぶ場所（スマホは全体の5分の2） */
@@ -514,7 +514,7 @@ body.is-pc {
     display: grid; 
     grid-template-columns: repeat(3, 1fr); 
     gap: 3px;
-    height: 100%; /* 親の高さ（140px）にピッタリ合わせます */
+    height: 100%; 
 }
 
 /* 右側：説明が出る場所（スマホは全体の5分の3） */
@@ -524,21 +524,21 @@ body.is-pc {
     border: 2px solid #ccc;
     border-radius: 4px;
     padding: 8px;
-    font-size: 0.85rem; /* スマホ用に少し小さめ */
+    font-size: 0.85rem; 
     color: #333;
     text-align: left;
-    overflow-y: auto; /* 説明が長くなっても中でスクロールできます */
+    overflow-y: auto; 
     height: 100%;
     box-sizing: border-box;
 }
 
 /* 各ボタンのデザイン（スマホ版：縦書き） */
 .war-controls-buttons button { 
-    writing-mode: vertical-rl; /* ★文字を縦書きにする魔法！ */
-    text-orientation: upright; /* 文字を真っ直ぐ立てます */
-    padding: 5px 0 !important; 
+    writing-mode: vertical-rl; 
+    text-orientation: upright; 
+    padding: 2px 0 !important; /* ★上下の余白を削って文字の場所を確保します */
     cursor: pointer; 
-    font-size: 1.1rem !important; 
+    font-size: 1rem !important; /* ★文字が縦に収まるように少しだけ小さくします */
     background: #fff; 
     border: 2px solid #ccc !important; 
     border-radius: 4px !important; 
@@ -547,11 +547,13 @@ body.is-pc {
     transition: all 0.2s;
     height: 100%;
     
-    /* ★邪魔をしていた魔法を消して、代わりに「テキストを真ん中にする」魔法に変えました！ */
-    display: block; 
-    text-align: center; 
+    /* ★文字をど真ん中に配置する魔法です */
+    display: flex;
+    align-items: center; 
+    justify-content: center; 
     
-    letter-spacing: 2px; /* ★縦書きの文字同士の隙間を少し開けて読みやすくします */
+    letter-spacing: 1px; /* ★隙間を少し詰めて収まりやすくしました */
+    white-space: nowrap; /* ★文字が入りきらなくても、絶対に左の列に逃げさせない最強のバリアです！ */
 }
 .war-controls-buttons button:hover { 
     background: #f0f0f0; 
@@ -570,7 +572,7 @@ body.is-pc {
    ★ PC版（画面が広い時）のコマンド欄 上書きルール
    --------------------------------------------------------- */
 body.is-pc .war-controls-area {
-    height: 150px; /* PCは少し高めに */
+    height: 150px; /* PCも高さを揃えます */
     gap: 10px;
 }
 body.is-pc .war-controls-buttons {
@@ -583,9 +585,14 @@ body.is-pc .war-controls-desc {
 }
 body.is-pc .war-controls-buttons button {
     writing-mode: horizontal-tb; /* ★PCは横書きに戻す魔法！ */
+    white-space: normal;         /* ★PCはバリアを解除して通常通りにします */
     letter-spacing: normal;
     padding: 12px 2px !important;
     font-size: 1.1rem !important;
+    
+    display: flex;
+    align-items: center;
+    justify-content: center;
 }
 
 
