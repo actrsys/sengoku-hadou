@@ -294,6 +294,8 @@ class WarManager {
         }
 
         let actualTotalDmg = 0;
+        let damageDetails = {}; // ★追加：誰がどれくらいダメージを受けたかを細かく記録する箱です！
+        
         if (targetArmies.length > 0) {
             // 割り勘の基本ダメージ
             let dmgPerArmy = Math.floor(totalDamage / targetArmies.length);
@@ -302,6 +304,7 @@ class WarManager {
             targetArmies.forEach(target => {
                 let army = target.army;
                 let role = target.role;
+                damageDetails[role] = 0; // まずは0で初期化します
                 
                 // ★ 個別の籠城判定！ 籠城のメモがある部隊だけ、受けるダメージを軽減します
                 let isRojo = (isTargetDefSide && s.plannedActions[role] && s.plannedActions[role].type === 'def_attack');
@@ -310,10 +313,12 @@ class WarManager {
                 if (army.soldiers >= finalDmg) {
                     army.soldiers -= finalDmg;
                     actualTotalDmg += finalDmg;
+                    damageDetails[role] += finalDmg; // 記録します
                 } else {
                     let took = army.soldiers;
                     army.soldiers = 0;
                     actualTotalDmg += took;
+                    damageDetails[role] += took; // 記録します
                     // 受けきれずにあふれたダメージを未割当に追加（計算用に元の分配量から引きます）
                     unassignedDmg += (dmgPerArmy - took); 
                 }
@@ -341,11 +346,13 @@ class WarManager {
                     if (army.soldiers >= finalSlice) {
                         army.soldiers -= finalSlice;
                         actualTotalDmg += finalSlice;
+                        damageDetails[role] += finalSlice; // 記録します
                         unassignedDmg -= sliceToApply; // 軽減前のもとの値を引いて消費したことにする
                     } else {
                         let took = army.soldiers;
                         army.soldiers = 0;
                         actualTotalDmg += took;
+                        damageDetails[role] += took; // 記録します
                         unassignedDmg -= sliceToApply; // 軽減前のもとの値を引いて消費したことにする
                         newlyDead = true;
                     }
@@ -359,7 +366,8 @@ class WarManager {
         if (isTargetDefSide) s.deadSoldiers.defender += actualTotalDmg;
         else s.deadSoldiers.attacker += actualTotalDmg;
 
-        return actualTotalDmg;
+        // ★変更：合計ダメージと、それぞれの部隊の内訳をセットで返します！
+        return { total: actualTotalDmg, details: damageDetails };
     }
     
     resolveAutoWar() { 
@@ -618,9 +626,13 @@ class WarManager {
             } else {
                 pushMsg(`R${s.round} [${activeArmyName}] の謀略！`);
                 let calcDamage = s.isPlayerInvolved ? result.damage : Math.floor(result.damage * 0.195);
-                let actualDamage = this.distributeDamage(isAtkTurnGroup, calcDamage);
-                pushMsg({ type: 'damage', target: isAtkTurnGroup ? 'defender' : 'attacker', soldierDmg: actualDamage });
-                pushMsg({ text: `敵軍に計${actualDamage}の被害を与えた！`, log: `R${s.round} [${activeArmyName}] 謀略成功！ 敵軍に計${actualDamage}の被害`});
+                
+                // ★修正：ダメージの内訳を受け取ってアニメーションに渡します！
+                let dmgResult = this.distributeDamage(isAtkTurnGroup, calcDamage);
+                let actualDamage = dmgResult.total;
+                
+                pushMsg({ type: 'damage', target: isAtkTurnGroup ? 'defender' : 'attacker', soldierDmgDetails: dmgResult.details });
+                pushMsg({ text: `敵軍に計${actualDamage}の損害を与えた！！`, log: `R${s.round} [${activeArmyName}] 謀略成功！ 敵軍に計${actualDamage}の被害`});
             }
             executeNext(); return;
         }
@@ -636,11 +648,14 @@ class WarManager {
                 if(isAtkTurnGroup) {
                     s.defender.defense = Math.max(0, s.defender.defense - calcDamage);
                     pushMsg({ type: 'damage', target: 'defender', wallDmg: calcDamage });
-                    pushMsg({ text: `敵防御に${calcDamage}の被害を与えた！`, log: `R${s.round} [${activeArmyName}] 火攻成功！ 敵防御に${calcDamage}の被害`});
+                    pushMsg({ text: `敵防御に${calcDamage}の損害を与えた！！`, log: `R${s.round} [${activeArmyName}] 火攻成功！ 敵防御に${calcDamage}の被害`});
                 } else {
-                    let actualDamage = this.distributeDamage(isAtkTurnGroup, calcDefSoldierDamage);
-                    pushMsg({ type: 'damage', target: 'attacker', soldierDmg: actualDamage });
-                    pushMsg({ text: `敵軍に計${actualDamage}の被害を与えた！`, log: `R${s.round} [${activeArmyName}] 火攻成功！ 敵軍に計${actualDamage}の被害`});
+                    // ★修正：こちらも内訳を受け取ってアニメーションに渡します！
+                    let dmgResult = this.distributeDamage(isAtkTurnGroup, calcDefSoldierDamage);
+                    let actualDamage = dmgResult.total;
+                    
+                    pushMsg({ type: 'damage', target: 'attacker', soldierDmgDetails: dmgResult.details });
+                    pushMsg({ text: `敵軍に計${actualDamage}の損害を与えた！！`, log: `R${s.round} [${activeArmyName}] 火攻成功！ 敵軍に計${actualDamage}の被害`});
                 }
             }
             executeNext(); return;
@@ -672,7 +687,9 @@ class WarManager {
             }
         }
 
-        let actualSoldierDmg = this.distributeDamage(isAtkTurnGroup, calculatedSoldierDmg);
+        // ★修正：通常攻撃も内訳を受け取ります！
+        let dmgResult = this.distributeDamage(isAtkTurnGroup, calculatedSoldierDmg);
+        let actualSoldierDmg = dmgResult.total;
         
         if(isAtkTurnGroup) { s.defender.defense = Math.max(0, s.defender.defense - calculatedWallDmg); } 
         
@@ -694,20 +711,20 @@ class WarManager {
         
         pushMsg(`R${s.round} [${activeArmyName}] の${actionName}！`);
         
-        // ダメージアニメーションを挟むおまじない
+        // ★修正：ダメージアニメーションのおまじないに、内訳と行動部隊のデータを渡します
         pushMsg({
             type: 'damage',
             target: isAtkTurnGroup ? 'defender' : 'attacker',
-            soldierDmg: actualSoldierDmg,
+            soldierDmgDetails: dmgResult.details, // 内訳
             wallDmg: calculatedWallDmg,
-            counterTarget: isAtkTurnGroup ? 'attacker' : 'defender',
+            counterTarget: s.turn, // 反撃エフェクトは、今攻撃した部隊（s.turn）だけに出します！
             counterDmg: actualCounterDmg
         });
         
         // 結果のメッセージ
-        let resultMsg = `敵軍に 兵-${actualSoldierDmg}`;
-        if (calculatedWallDmg > 0) resultMsg += ` 防-${calculatedWallDmg}`;
-        resultMsg += ` の被害を与えた！`;
+        let resultMsg = `敵軍に 計${actualSoldierDmg}の被害`; // 割り勘の合計ダメージに変更
+        if (calculatedWallDmg > 0) resultMsg += ` (防-${calculatedWallDmg})`;
+        resultMsg += ` を与えた！`;
         if (actualCounterDmg > 0) resultMsg += `<br>（反撃を受け 兵-${actualCounterDmg}）`;
         
         pushMsg({ text: resultMsg, log: `R${s.round} [${activeArmyName}] ${resultMsg.replace('<br>', ' ')}` });

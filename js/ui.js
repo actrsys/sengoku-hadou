@@ -2811,17 +2811,27 @@ class UIManager {
     }
 
     playDamageAnimation(data) {
-        // 対象の部隊カードを探してダメージをポップアップさせます
-        const applyAnim = (targetType, dmgStr) => {
+        // ★修正：対象の「役割（role）」ごとに、どのカードを揺らすか探すようにしました！
+        const applyAnim = (role, dmgStr) => {
             let targetCard = null;
-            if (targetType === 'defender') {
-                const n = document.getElementById('war-def-name');
-                if (n) targetCard = n.closest('.responsive-army-box, .army-box');
-            } else if (targetType === 'attacker') {
+            // それぞれの役割にあわせて、画面上のカードを探します
+            if (role === 'attacker') {
                 const n = document.getElementById('war-atk-name');
                 if (n) targetCard = n.closest('.responsive-army-box, .army-box');
+            } else if (role === 'attacker_self_reinf') {
+                targetCard = document.getElementById('war-atk-self-reinf-card');
+            } else if (role === 'attacker_ally_reinf') {
+                targetCard = document.getElementById('war-atk-ally-reinf-card');
+            } else if (role === 'defender') {
+                const n = document.getElementById('war-def-name');
+                if (n) targetCard = n.closest('.responsive-army-box, .army-box');
+            } else if (role === 'defender_self_reinf') {
+                targetCard = document.getElementById('war-def-self-reinf-card');
+            } else if (role === 'defender_ally_reinf') {
+                targetCard = document.getElementById('war-def-ally-reinf-card');
             }
 
+            // カードが見つかれば、アニメーションさせます！
             if (targetCard) {
                 targetCard.style.position = 'relative'; // ポップアップの基準位置にします
                 
@@ -2842,12 +2852,24 @@ class UIManager {
             }
         };
 
-        if ((data.soldierDmg && data.soldierDmg > 0) || (data.wallDmg && data.wallDmg > 0)) {
-            let text = "";
-            if (data.soldierDmg > 0) text += `-${data.soldierDmg}`;
-            applyAnim(data.target, text);
+        // ★追加：各部隊（援軍も含む）がそれぞれ受けたダメージを、全部同時にポップアップさせます！
+        if (data.soldierDmgDetails) {
+            for (const [role, dmg] of Object.entries(data.soldierDmgDetails)) {
+                if (dmg > 0) {
+                    applyAnim(role, `-${dmg}`);
+                }
+            }
+        } else if (data.soldierDmg && data.soldierDmg > 0) {
+            // （保険）もし詳細なデータがない時は、代表して本隊に出します
+            applyAnim(data.target, `-${data.soldierDmg}`);
         }
 
+        // 城壁ダメージは本隊（defender または attacker）に出します
+        if (data.wallDmg && data.wallDmg > 0) {
+            applyAnim(data.target === 'defender' ? 'defender' : 'attacker', `城防-${data.wallDmg}`);
+        }
+
+        // 反撃ダメージは、攻撃を仕掛けた部隊だけに出します
         if (data.counterDmg && data.counterDmg > 0 && data.counterTarget) {
             applyAnim(data.counterTarget, `-${data.counterDmg}`);
         }
