@@ -649,6 +649,17 @@ class WarManager {
                  s.defender.defense += recover;
                  
                  pushMsg(`R${s.round} [${activeArmyName}] の補修！`);
+                 
+                 // ★修正：回復アニメーションを流して、最新のステータスを渡すお手紙です！
+                 pushMsg({ 
+                     type: 'recover', 
+                     targetRole: s.turn, 
+                     soldierCost: soldierCost, 
+                     wallRecover: recover, 
+                     se: 'decision.ogg', // 補修の時も音を鳴らします
+                     currentStats: getCurrentStats() 
+                 });
+
                  pushMsg({ text: `城を修復した！ (兵-${soldierCost} 防+${recover})`, log: `R${s.round} [${activeArmyName}] 補修を実行！ (兵-${soldierCost} 防+${recover})`});
              } else { 
                  pushMsg(`R${s.round} [${activeArmyName}] 補修しようとしたが兵が足りない！`); 

@@ -2797,14 +2797,14 @@ class UIManager {
                 textContainer.innerHTML += (textContainer.innerHTML ? '<br>' : '') + item;
                 setTimeout(processNext, 600); // メッセージを読ませるために少し待ちます
             } else if (item.text) {
-                // ★追加：テキストを表示する時にも、メモ（se）があれば音を鳴らせるようにします！
                 if (item.se && window.AudioManager) {
                     window.AudioManager.playSE(item.se);
                 }
                 
                 textContainer.innerHTML += (textContainer.innerHTML ? '<br>' : '') + item.text;
                 setTimeout(processNext, 600);
-            } else if (item.type === 'damage') {
+            // ★修正：「damage」の時だけでなく「recover（回復）」の時もアニメーションを呼ぶようにしました！
+            } else if (item.type === 'damage' || item.type === 'recover') {
                 this.playDamageAnimation(item);
                 setTimeout(processNext, 800); // アニメーションが完了するまで待ちます
             } else {
@@ -2816,16 +2816,16 @@ class UIManager {
     }
 
     playDamageAnimation(data) {
-        // 送られてきたお手紙（data）の中に音（se）の指定があればそれを、なければいつもの音を鳴らします！
+        // 送られてきたお手紙（data）の中に音（se）の指定があればそれを鳴らします
         if (window.AudioManager) {
             let soundFile = data.se || 'damage001.ogg';
             window.AudioManager.playSE(soundFile);
         }
 
         // 対象の「役割（role）」ごとに、どのカードを揺らすか探す魔法です！
-        const applyAnim = (role, dmgStr) => {
+        // ★修正：回復の時は揺らさずに出すように、isRecover という合図を追加しました
+        const applyAnim = (role, dmgStr, isRecover = false) => {
             let targetCard = null;
-            // それぞれの役割にあわせて、画面上のカードを探します
             if (role === 'attacker') {
                 const n = document.getElementById('war-atk-name');
                 if (n) targetCard = n.closest('.responsive-army-box, .army-box');
@@ -2842,20 +2842,23 @@ class UIManager {
                 targetCard = document.getElementById('war-def-ally-reinf-card');
             }
 
-            // カードが見つかれば、アニメーションさせます！
             if (targetCard) {
-                targetCard.style.position = 'relative'; // ポップアップの基準位置にします
+                targetCard.style.position = 'relative'; 
                 
                 targetCard.classList.remove('anim-damage-shake', 'anim-damage-flash');
-                void targetCard.offsetWidth; // アニメーションをリセットするおまじない
-                targetCard.classList.add('anim-damage-shake', 'anim-damage-flash');
+                void targetCard.offsetWidth; 
+                
+                // ★追加：回復じゃない時（ダメージの時）だけ揺らします
+                if (!isRecover) {
+                    targetCard.classList.add('anim-damage-shake', 'anim-damage-flash');
+                }
                 
                 const pop = document.createElement('div');
-                pop.className = 'damage-popup anim-popup-text';
+                // ★追加：回復の時は緑色のデザイン（recover-popup）を使います！
+                pop.className = isRecover ? 'recover-popup anim-popup-text' : 'damage-popup anim-popup-text';
                 pop.innerHTML = dmgStr;
                 targetCard.appendChild(pop);
 
-                // アニメーションが終わったら消します
                 setTimeout(() => {
                     targetCard.classList.remove('anim-damage-shake', 'anim-damage-flash');
                     if (pop.parentNode) pop.parentNode.removeChild(pop);
@@ -2864,21 +2867,25 @@ class UIManager {
         };
 
         // 城の防御力の文字がある場所を揺らす専用の魔法です！
-        const applyWallAnim = (dmgStr) => {
+        const applyWallAnim = (dmgStr, isRecover = false) => {
             const wallEl = document.getElementById('war-def-wall-info');
             if (wallEl) {
-                wallEl.style.position = 'relative'; // ここを基準にして数字を浮かせます
+                wallEl.style.position = 'relative'; 
                 
                 wallEl.classList.remove('anim-damage-shake', 'anim-damage-flash');
-                void wallEl.offsetWidth; // アニメーションをリセット！
-                wallEl.classList.add('anim-damage-shake', 'anim-damage-flash');
+                void wallEl.offsetWidth; 
+                
+                // ★追加：回復じゃない時（ダメージの時）だけ揺らします
+                if (!isRecover) {
+                    wallEl.classList.add('anim-damage-shake', 'anim-damage-flash');
+                }
                 
                 const pop = document.createElement('div');
-                pop.className = 'damage-popup anim-popup-text';
+                // ★追加：回復の時は緑色のデザインを使います！
+                pop.className = isRecover ? 'recover-popup anim-popup-text' : 'damage-popup anim-popup-text';
                 pop.innerHTML = dmgStr;
                 wallEl.appendChild(pop);
 
-                // アニメーションが終わったらお片付けします
                 setTimeout(() => {
                     wallEl.classList.remove('anim-damage-shake', 'anim-damage-flash');
                     if (pop.parentNode) pop.parentNode.removeChild(pop);
@@ -2886,35 +2893,34 @@ class UIManager {
             }
         };
 
-        // 各部隊（援軍も含む）がそれぞれ受けた兵士ダメージをポップアップさせます
-        if (data.soldierDmgDetails) {
-            for (const [role, dmg] of Object.entries(data.soldierDmgDetails)) {
-                if (dmg > 0) {
-                    applyAnim(role, `-${dmg}`);
-                }
+        // ★追加：回復（recover）の時と、ダメージの時で動きを分けます！
+        if (data.type === 'recover') {
+            if (data.soldierCost > 0) {
+                applyAnim(data.targetRole, `-${data.soldierCost}`, false); // 兵士は減るので赤で揺らします
             }
-        } else if (data.soldierDmg && data.soldierDmg > 0) {
-            // （保険）もし詳細なデータがない時は、代表して本隊に出します
-            applyAnim(data.target, `-${data.soldierDmg}`);
+            if (data.wallRecover > 0) {
+                applyWallAnim(`+${data.wallRecover}`, true); // 城壁は回復なので緑で揺らしません
+            }
+        } else {
+            // 今までのダメージ処理
+            if (data.soldierDmgDetails) {
+                for (const [role, dmg] of Object.entries(data.soldierDmgDetails)) {
+                    if (dmg > 0) applyAnim(role, `-${dmg}`);
+                }
+            } else if (data.soldierDmg && data.soldierDmg > 0) {
+                applyAnim(data.target, `-${data.soldierDmg}`);
+            }
+
+            if (data.wallDmg && data.wallDmg > 0) applyWallAnim(`-${data.wallDmg}`);
+            if (data.counterDmg && data.counterDmg > 0 && data.counterTarget) applyAnim(data.counterTarget, `-${data.counterDmg}`);
         }
 
-        // 城壁へのダメージは右上の「城防御」のところに出します
-        if (data.wallDmg && data.wallDmg > 0) {
-            applyWallAnim(`-${data.wallDmg}`);
-        }
-
-        // 反撃ダメージは、攻撃を仕掛けた部隊だけに出します
-        if (data.counterDmg && data.counterDmg > 0 && data.counterTarget) {
-            applyAnim(data.counterTarget, `-${data.counterDmg}`);
-        }
-
-        // ★追加：アニメーションが始まって少し経った時（0.4秒後）に、画面の数字を減らす魔法！
+        // アニメーションが始まって少し経った時（0.4秒後）に、画面の数字を更新する魔法
         if (data.currentStats) {
             setTimeout(() => {
                 const updateTxt = (id, val) => {
                     const el = document.getElementById(id);
                     if (el) {
-                        // ★修正：もし「---」になっている（＝部隊がいない）なら、更新をスキップします！
                         if (el.textContent === '---') return;
 
                         if (id === 'war-def-wall-info') {
@@ -2925,7 +2931,6 @@ class UIManager {
                     }
                 };
 
-                // それぞれの場所の数字を書き換えます
                 updateTxt('war-atk-soldier', data.currentStats.atkSoldiers);
                 updateTxt('war-atk-self-reinf-soldier', data.currentStats.atkSelfSoldiers);
                 updateTxt('war-atk-ally-reinf-soldier', data.currentStats.atkAllySoldiers);
@@ -2934,46 +2939,66 @@ class UIManager {
                 updateTxt('war-def-ally-reinf-soldier', data.currentStats.defAllySoldiers);
                 updateTxt('war-def-wall-info', data.currentStats.wallDefense);
 
-                // ★修正：本当にダメージを受けた（数字が減った）場所だけを光らせるように、対象を集めます！
                 let highlightIds = [];
                 
-                const addHighlight = (role) => {
-                    if (role === 'attacker') highlightIds.push('war-atk-soldier');
-                    if (role === 'attacker_self_reinf') highlightIds.push('war-atk-self-reinf-soldier');
-                    if (role === 'attacker_ally_reinf') highlightIds.push('war-atk-ally-reinf-soldier');
-                    if (role === 'defender') highlightIds.push('war-def-soldier');
-                    if (role === 'defender_self_reinf') highlightIds.push('war-def-self-reinf-soldier');
-                    if (role === 'defender_ally_reinf') highlightIds.push('war-def-ally-reinf-soldier');
-                };
-
-                // ダメージの内訳を見て、ダメージを受けた役割（role）だけをリストに入れます
-                if (data.soldierDmgDetails) {
-                    for (const [role, dmg] of Object.entries(data.soldierDmgDetails)) {
-                        if (dmg > 0) addHighlight(role);
+                // ★追加：回復の時は、特別な光らせ方をします！
+                if (data.type === 'recover') {
+                    // 兵士が減った部隊は黄色く光らせます
+                    if (data.targetRole === 'defender') highlightIds.push('war-def-soldier');
+                    if (data.targetRole === 'defender_self_reinf') highlightIds.push('war-def-self-reinf-soldier');
+                    if (data.targetRole === 'defender_ally_reinf') highlightIds.push('war-def-ally-reinf-soldier');
+                    
+                    // 城壁は「緑色」に光らせます！
+                    const wallEl = document.getElementById('war-def-wall-info');
+                    if (wallEl) {
+                        wallEl.style.transition = 'color 0.2s';
+                        wallEl.style.color = '#388e3c'; // 緑色！
+                        setTimeout(() => { wallEl.style.color = ''; }, 300);
                     }
-                } else if (data.soldierDmg && data.soldierDmg > 0) {
-                    addHighlight(data.target);
+                } else {
+                    const addHighlight = (role) => {
+                        if (role === 'attacker') highlightIds.push('war-atk-soldier');
+                        if (role === 'attacker_self_reinf') highlightIds.push('war-atk-self-reinf-soldier');
+                        if (role === 'attacker_ally_reinf') highlightIds.push('war-atk-ally-reinf-soldier');
+                        if (role === 'defender') highlightIds.push('war-def-soldier');
+                        if (role === 'defender_self_reinf') highlightIds.push('war-def-self-reinf-soldier');
+                        if (role === 'defender_ally_reinf') highlightIds.push('war-def-ally-reinf-soldier');
+                    };
+
+                    if (data.soldierDmgDetails) {
+                        for (const [role, dmg] of Object.entries(data.soldierDmgDetails)) {
+                            if (dmg > 0) addHighlight(role);
+                        }
+                    } else if (data.soldierDmg && data.soldierDmg > 0) {
+                        addHighlight(data.target);
+                    }
+
+                    if (data.counterDmg && data.counterDmg > 0 && data.counterTarget) {
+                        addHighlight(data.counterTarget);
+                    }
+                    
+                    // 城壁がダメージを受けた時は黄色く光らせます
+                    if (data.wallDmg && data.wallDmg > 0) {
+                        const wallEl = document.getElementById('war-def-wall-info');
+                        if (wallEl) {
+                            wallEl.style.transition = 'color 0.2s';
+                            wallEl.style.color = '#fdea60'; // 黄色！
+                            setTimeout(() => { wallEl.style.color = ''; }, 300);
+                        }
+                    }
                 }
 
-                // 反撃を受けた部隊もリストに入れます
-                if (data.counterDmg && data.counterDmg > 0 && data.counterTarget) {
-                    addHighlight(data.counterTarget);
-                }
-
-                // ダブっているIDを綺麗に整頓します
                 highlightIds = [...new Set(highlightIds)];
 
-                // ダメージを受けたところだけを一瞬黄色く光らせます
                 highlightIds.forEach(id => {
                     const el = document.getElementById(id);
-                    // ★修正：いない部隊は絶対に光らせないガード！
                     if (el && el.textContent !== '---') { 
                         el.style.transition = 'color 0.2s';
-                        el.style.color = '#fdea60';
-                        setTimeout(() => { el.style.color = ''; }, 300); // 0.3秒で元の色に戻します
+                        el.style.color = '#fdea60'; // 兵士が減った時は黄色
+                        setTimeout(() => { el.style.color = ''; }, 300); 
                     }
                 });
-            }, 400); // 0.4秒遅らせて実行します
+            }, 400); 
         }
     }
 
