@@ -1105,13 +1105,12 @@ body.is-pc {
     }
 }
 /* =========================================================
-   PC版でログを右側に配置する魔法
+   ★攻城戦のログを消して、画面を左右いっぱいに広げる魔法
    ========================================================= */
-
-/* ① スマホ時の基本ルール（今まで通り、ログは下） */
 .responsive-war-layout {
     display: flex;
     flex-direction: column;
+    width: 100%;
 }
 
 .responsive-war-left {
@@ -1119,33 +1118,12 @@ body.is-pc {
     flex-direction: column;
     flex: 1;
     overflow: hidden;
+    border-right: none !important; /* 右側にあった区切りの線を消します */
 }
 
-.responsive-war-log {
-    border-top: 2px solid #333;
-}
-
-/* PC版（横幅768px以上）の特別ルール（ログは右） */
-body.is-pc {
-    .responsive-war-layout {
-        flex-direction: row; 
-    }
-    
-    .responsive-war-left {
-        flex: 1; /* ★魔法変更：左側は「ログが取った以外の残りのスペース全部」を使います！ */
-        border-right: 2px solid #333; 
-    }
-    
-    /* 以前の#war-logの設定を上書きして、右側に縦長く配置します */
-    #war-log.responsive-war-log {
-        flex: 0 0 220px !important; /* ★魔法変更：右側のログは「絶対に220pxの幅」から変わらないようにします！ */
-        width: 220px !important; /* ★念押しの幅指定 */
-        height: 100% !important; 
-        min-height: 0 !important;
-        border-top: none !important; 
-        margin-bottom: 0 !important;
-        padding: 10px !important; 
-    }
+/* 攻城戦のログ画面を完全に隠します */
+#war-log {
+    display: none !important;
 }
 /* =========================================================
    ★ PC版で画面を「固定サイズ」にしてズームする準備
