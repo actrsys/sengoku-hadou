@@ -143,6 +143,9 @@ img { pointer-events: none; -webkit-user-drag: none; user-drag: none; }
 .hover-info .info-line { font-size: 2.2em; line-height: 1.4; text-shadow: 1px 1px 2px #000; }
 .hover-info .name { font-size: 2.8em; font-weight: 900; color: #ffd700; margin-bottom: 5px; }
 
+/* ★追加：大名家名シールが出ている時は、城情報や諸勢力の吹き出しを一切出さない魔法 */
+body.showing-daimyo-labels .hover-info { display: none !important; }
+
 /* ツールチップ位置ズラし */
 .castle-card.tooltip-left .hover-info { left: 0; right: auto; margin: 0; transform: scale(0.5); transform-origin: bottom left; }
 .castle-card.tooltip-left:hover .hover-info { transform: scale(1); }
