@@ -359,6 +359,53 @@ body.hide-daimyo-labels .daimyo-name-label { display: none !important; }
 #war-controls button { font-weight: bold; background: #fff; color: #333; transition: background 0.2s; }
 #war-controls button:hover { background: #f0f0f0; }
 
+/* 攻城戦アクションメッセージ */
+.war-action-message-container {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    background: rgba(0, 0, 0, 0.85);
+    border: 2px solid #ff9800;
+    border-radius: 6px;
+    padding: 15px;
+    box-sizing: border-box;
+    cursor: pointer;
+    transition: background 0.2s;
+    box-shadow: inset 0 0 10px rgba(0,0,0,0.8);
+}
+.war-action-message-container:hover {
+    background: rgba(30, 30, 30, 0.95);
+}
+.war-action-message-text {
+    font-size: 1.15rem;
+    color: #fff;
+    text-align: center;
+    line-height: 1.6;
+    margin-bottom: 12px;
+    text-shadow: 1px 1px 2px #000;
+}
+.war-action-message-prompt {
+    font-size: 0.95rem;
+    color: #ffeb3b;
+    animation: fw-blink 1.5s infinite;
+    font-weight: bold;
+}
+/* アクティブ部隊ハイライト */
+@keyframes active-army-glow {
+    0% { box-shadow: 0 0 5px rgba(255, 235, 59, 0.4); border-color: rgba(255, 235, 59, 0.4); }
+    50% { box-shadow: 0 0 15px rgba(255, 235, 59, 0.9); border-color: rgba(255, 235, 59, 0.9); }
+    100% { box-shadow: 0 0 5px rgba(255, 235, 59, 0.4); border-color: rgba(255, 235, 59, 0.4); }
+}
+.active-command-turn {
+    animation: active-army-glow 1.5s infinite;
+    border: 3px solid #ffeb3b !important;
+    z-index: 10;
+    position: relative;
+}
+
 /* =========================================================
    野戦 (HEX・部隊)
    ========================================================= */
