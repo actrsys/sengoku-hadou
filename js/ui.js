@@ -2732,27 +2732,44 @@ class UIManager {
     showWarActionMessage(msg, onClick) {
         if (!this.warControls) return;
 
-        // ★今回直した魔法です！
-        // 本当の攻城戦の「思考中の膜」を探し出して、しっかり消し去ります！
         const warAiGuard = document.getElementById('war-ai-guard');
         if (warAiGuard) {
             warAiGuard.classList.add('hidden');
         }
-        // コマンド欄を押せなくするバリアも解除します！
         this.warControls.classList.remove('disabled-area');
 
-        this.warControls.innerHTML = ''; 
-        
-        // 部隊の光（ハイライト）を強制的に全部消します
+        // ★修正１：ボタンを無理やり消す魔法をやめて、裏に残したままにします！
+        // 代わりに、コマンド欄に「上からぴったりと膜をかぶせる」ための準備をします。
+        this.warControls.style.position = 'relative'; 
+
+        // もし前のメッセージ膜が残っていたら、念のためお掃除します
+        const oldMsg = document.getElementById('war-action-message-overlay');
+        if (oldMsg) oldMsg.remove();
+
         const allCards = document.querySelectorAll('.army-box, .responsive-army-box');
         allCards.forEach(c => c.classList.remove('active-command-turn'));
         
         const msgContainer = document.createElement('div');
+        msgContainer.id = 'war-action-message-overlay'; // 膜に名前をつけます
         msgContainer.className = 'war-action-message-container';
+        
+        // ★修正２：コマンド欄の真上に、絶対にクリックを通さない膜を張る魔法です！
+        msgContainer.style.position = 'absolute';
+        msgContainer.style.top = '0';
+        msgContainer.style.left = '0';
+        msgContainer.style.width = '100%';
+        msgContainer.style.height = '100%';
+        msgContainer.style.zIndex = '1000'; // コマンドより上に表示させます
+        
         msgContainer.innerHTML = `<div class="war-action-message-text">${msg}</div><div class="war-action-message-prompt">▶ クリックして次へ</div>`;
         
-        msgContainer.onclick = () => {
+        msgContainer.onclick = (e) => {
+            // ★修正３：クリックが下のコマンドボタンに貫通するのを防ぐ「最強の盾」です！
+            e.stopPropagation();
+            e.preventDefault();
+            
             if (window.AudioManager) window.AudioManager.playSE('decision.ogg');
+            msgContainer.remove(); // クリックしたらメッセージの膜を消します
             onClick();
         };
         
