@@ -2919,21 +2919,26 @@ class UIManager {
         const s = this.game.warManager.state;
         const pid = Number(this.game.playerClanId);
         
-        const amIAttacker = (Number(s.attacker.ownerClan) === pid);
-        const amIDefender = (Number(s.defender.ownerClan) === pid);
-        
-        const isMyTurn = (isAtkTurn && amIAttacker) || (!isAtkTurn && amIDefender);
+        // ★修正: 自分が操作できる部隊かどうかを、それぞれの役割ごとに厳密にチェックします！
+        // これにより、自分がメイン軍の時に同盟軍を操作したり、自分が援軍の時にメイン軍を操作してしまうのを防ぎます。
+        let isMyTurn = false;
+        if (s.turn === 'attacker' && Number(s.attacker.ownerClan) === pid && !s.sourceCastle.isDelegated) isMyTurn = true;
+        if (s.turn === 'attacker_self_reinf' && Number(s.selfReinforcement.castle.ownerClan) === pid && !s.selfReinforcement.castle.isDelegated) isMyTurn = true;
+        if (s.turn === 'attacker_ally_reinf' && Number(s.reinforcement.castle.ownerClan) === pid && !s.reinforcement.castle.isDelegated) isMyTurn = true;
+        if (s.turn === 'defender' && Number(s.defender.ownerClan) === pid && !s.defender.isDelegated) isMyTurn = true;
+        if (s.turn === 'defender_self_reinf' && Number(s.defSelfReinforcement.castle.ownerClan) === pid && !s.defSelfReinforcement.castle.isDelegated) isMyTurn = true;
+        if (s.turn === 'defender_ally_reinf' && Number(s.defReinforcement.castle.ownerClan) === pid && !s.defReinforcement.castle.isDelegated) isMyTurn = true;
         
         let options = [];
-        // ★ここに説明文（desc）を追加しました！
-        if (amIAttacker || (isAtkTurn && !amIDefender)) {
+        
+        // ★修正: 順番が回ってきたのが「攻撃陣営」か「守備陣営」かで、出すコマンドを切り替えます
+        if (isAtkTurn) {
             options = [
                 { label: "突撃", type: "charge", desc: "突撃します。敵兵士を減らし、城の防御度も僅かに削ります。" }, 
                 { label: "斉射", type: "bow", desc: "遠距離から弓や鉄砲で射撃を行います。反撃を受けにくい攻撃です。" }, 
                 { label: "破壊", type: "siege", desc: "城壁を破壊して、城の防御度を削ります。" },
                 { label: "火計", type: "fire", desc: "城に火を放ちます。成功すると城の防御度を大きく削ります。" }, 
-                { label: "謀略", type: "scheme", desc: "敵の動揺を誘います。成功すると敵兵士を大きく減らします。" }, 
-                { label: "撤退", type: "retreat", desc: "戦場から離脱し、退却します。" }
+                { label: "謀略", type: "scheme", desc: "敵の動揺を誘います。成功すると敵兵士を大きく減らします。" }
             ];
         } else {
             options = [
@@ -2943,9 +2948,18 @@ class UIManager {
                 { label: "謀略", type: "scheme", desc: "敵の動揺を誘います。成功すると敵兵士を大きく減らします。" }, 
                 { label: "補修", type: "repair_setup", desc: "城を補修します。兵士を働かせて城の防御度を僅かに回復します。" }
             ];
+        }
+
+        // ★撤退コマンドの追加（本隊と援軍で処理を分けます）
+        if (s.turn === 'attacker') {
+            options.push({ label: "撤退", type: "retreat", desc: "戦場から離脱し、退却します。" });
+        } else if (s.turn === 'defender') {
             if (this.game.castles.some(c => c.ownerClan === s.defender.ownerClan && c.id !== s.defender.id && GameSystem.isReachable(this.game, s.defender, c, s.defender.ownerClan))) {
                 options.push({ label: "撤退", type: "retreat", desc: "城を捨てて、安全な城へ退却します。" });
             }
+        } else {
+            // 援軍の場合は攻撃・守備に関わらず撤退可能
+            options.push({ label: "撤退", type: "retreat", desc: "戦場から離脱し、退却します。" });
         }
 
         this.warControls.innerHTML = '';
