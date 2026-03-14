@@ -627,12 +627,12 @@ class WarManager {
                 pushMsg(`R${s.round} [${activeArmyName}] の謀略！`);
                 let calcDamage = s.isPlayerInvolved ? result.damage : Math.floor(result.damage * 0.195);
                 
-                // ★修正：ダメージの内訳を受け取ってアニメーションに渡します！
                 let dmgResult = this.distributeDamage(isAtkTurnGroup, calcDamage);
                 let actualDamage = dmgResult.total;
                 
-                pushMsg({ type: 'damage', target: isAtkTurnGroup ? 'defender' : 'attacker', soldierDmgDetails: dmgResult.details });
-                pushMsg({ text: `敵軍に計${actualDamage}の損害を与えた！！`, log: `R${s.round} [${activeArmyName}] 謀略成功！ 敵軍に計${actualDamage}の被害`});
+                // ★追加：謀略のダメージの時は「slash.ogg」を鳴らすようにメモ（se）をつけます！
+                pushMsg({ type: 'damage', target: isAtkTurnGroup ? 'defender' : 'attacker', soldierDmgDetails: dmgResult.details, se: 'slash.ogg' });
+                pushMsg({ text: `敵軍に計${actualDamage}の被害を与えた！`, log: `R${s.round} [${activeArmyName}] 謀略成功！ 敵軍に計${actualDamage}の被害`});
             }
             executeNext(); return;
         }
@@ -647,15 +647,16 @@ class WarManager {
                 let calcDefSoldierDamage = s.isPlayerInvolved ? 50 : 16;
                 if(isAtkTurnGroup) {
                     s.defender.defense = Math.max(0, s.defender.defense - calcDamage);
-                    pushMsg({ type: 'damage', target: 'defender', wallDmg: calcDamage });
-                    pushMsg({ text: `敵防御に${calcDamage}の損害を与えた！！`, log: `R${s.round} [${activeArmyName}] 火攻成功！ 敵防御に${calcDamage}の被害`});
+                    // ★追加：火攻めで城が燃える時は「fire001.mp3」を鳴らします！
+                    pushMsg({ type: 'damage', target: 'defender', wallDmg: calcDamage, se: 'fire001.mp3' });
+                    pushMsg({ text: `敵防御に${calcDamage}の被害を与えた！`, log: `R${s.round} [${activeArmyName}] 火攻成功！ 敵防御に${calcDamage}の被害`});
                 } else {
-                    // ★修正：こちらも内訳を受け取ってアニメーションに渡します！
                     let dmgResult = this.distributeDamage(isAtkTurnGroup, calcDefSoldierDamage);
                     let actualDamage = dmgResult.total;
                     
-                    pushMsg({ type: 'damage', target: 'attacker', soldierDmgDetails: dmgResult.details });
-                    pushMsg({ text: `敵軍に計${actualDamage}の損害を与えた！！`, log: `R${s.round} [${activeArmyName}] 火攻成功！ 敵軍に計${actualDamage}の被害`});
+                    // ★追加：火攻めで兵士が燃える時も「fire001.mp3」を鳴らします！
+                    pushMsg({ type: 'damage', target: 'attacker', soldierDmgDetails: dmgResult.details, se: 'fire001.mp3' });
+                    pushMsg({ text: `敵軍に計${actualDamage}の被害を与えた！`, log: `R${s.round} [${activeArmyName}] 火攻成功！ 敵軍に計${actualDamage}の被害`});
                 }
             }
             executeNext(); return;
@@ -687,7 +688,6 @@ class WarManager {
             }
         }
 
-        // ★修正：通常攻撃も内訳を受け取ります！
         let dmgResult = this.distributeDamage(isAtkTurnGroup, calculatedSoldierDmg);
         let actualSoldierDmg = dmgResult.total;
         
@@ -711,18 +711,19 @@ class WarManager {
         
         pushMsg(`R${s.round} [${activeArmyName}] の${actionName}！`);
         
-        // ★修正：ダメージアニメーションのおまじないに、内訳と行動部隊のデータを渡します
+        // ★追加：普通の攻撃の時は「damage001.ogg」を鳴らすようにメモ（se）をつけます！
         pushMsg({
             type: 'damage',
             target: isAtkTurnGroup ? 'defender' : 'attacker',
-            soldierDmgDetails: dmgResult.details, // 内訳
+            soldierDmgDetails: dmgResult.details,
             wallDmg: calculatedWallDmg,
-            counterTarget: s.turn, // 反撃エフェクトは、今攻撃した部隊（s.turn）だけに出します！
-            counterDmg: actualCounterDmg
+            counterTarget: s.turn,
+            counterDmg: actualCounterDmg,
+            se: 'damage001.ogg'
         });
         
         // 結果のメッセージ
-        let resultMsg = `敵軍に 計${actualSoldierDmg}の被害`; // 割り勘の合計ダメージに変更
+        let resultMsg = `敵軍に 計${actualSoldierDmg}の被害`; 
         if (calculatedWallDmg > 0) resultMsg += ` (防-${calculatedWallDmg})`;
         resultMsg += ` を与えた！`;
         if (actualCounterDmg > 0) resultMsg += `<br>（反撃を受け 兵-${actualCounterDmg}）`;
