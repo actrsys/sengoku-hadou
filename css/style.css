@@ -2417,3 +2417,63 @@ body.is-pc .responsive-army-content .stat-row {
 body.is-pc .responsive-army-content .stat-val-large {
     font-size: 1.5rem !important;
 }
+/* =========================================================
+   ★ スマホ版：攻城戦の高さ圧縮 ＆ メイン部隊保護の魔法
+   ========================================================= */
+/* UI.jsで作った「士・練」の横並びをスマホ版でのみ有効化する魔法 */
+body:not(.is-pc) .label-sp-flex {
+    display: flex !important;
+}
+
+/* ★上部の白い範囲（ヘッダー領域）の高さを圧縮 */
+body:not(.is-pc) .war-visual {
+    padding: 5px !important; 
+    margin-bottom: 0 !important;
+}
+body:not(.is-pc) #war-title-name {
+    font-size: 1.1rem !important; /* 少し小さく */
+    margin: 2px 0 !important;
+}
+body:not(.is-pc) .war-header-info,
+body:not(.is-pc) #war-date-info,
+body:not(.is-pc) #war-turn-info {
+    font-size: 0.85rem !important; 
+    margin-bottom: 2px !important;
+}
+
+/* ★最強のバリア：メイン部隊（A・B）は画面が狭くても絶対に潰させない！ */
+body:not(.is-pc) .war-side-wrapper > :not(.war-reinf-col) {
+    flex-shrink: 0 !important; 
+}
+
+/* 反対に、援軍部隊（C・D・E・F）は画面が狭ければ縮ませる！ */
+body:not(.is-pc) .war-side-wrapper > .war-reinf-col {
+    flex-shrink: 1 !important;
+    min-height: 0 !important;
+}
+
+/* スマホ版の援軍カード内の文字サイズを少しだけ小さく調整 */
+body:not(.is-pc) .war-reinf-card .responsive-army-title {
+    font-size: 0.75rem !important;
+    margin-bottom: 2px !important;
+}
+body:not(.is-pc) .war-reinf-card .stat-row {
+    font-size: 0.75rem !important;
+}
+body:not(.is-pc) .war-reinf-card .stat-val-large {
+    font-size: 0.85rem !important;
+}
+
+/* ★コマンド欄全体の縦幅を低くする（150px → 120px に圧縮） */
+body:not(.is-pc) .war-controls-area {
+    height: 120px !important;
+    gap: 3px !important;
+}
+body:not(.is-pc) .war-controls-desc {
+    font-size: 0.75rem !important;
+    padding: 4px !important;
+}
+body:not(.is-pc) .war-controls-buttons button {
+    font-size: 0.95rem !important;
+    letter-spacing: 0px !important; /* 縦が狭いので縦書きの文字間隔を少し詰める */
+}
