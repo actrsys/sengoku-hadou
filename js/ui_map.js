@@ -451,6 +451,9 @@ Object.assign(UIManager.prototype, {
         if (!this.mapEl) return;
         this.mapEl.innerHTML = ''; 
         
+        // ★追加：一旦、大名家名シールが出ている合図をリセットします
+        document.body.classList.remove('showing-daimyo-labels');
+        
         if (!this.hasInitializedMap && this.game.castles.length > 0) {
             this.fitMapToScreen();
             this.hasInitializedMap = true;
@@ -776,6 +779,22 @@ Object.assign(UIManager.prototype, {
             'def_self_reinforcement', 'def_ally_reinforcement'
         ];
         if (hiddenModes.includes(this.game.selectionMode)) return;
+
+        // ★ここから追加：外交や調略以外の「自国の城しか選ばないコマンド（輸送など）」の時は名前シールを出さない魔法！
+        if (this.game.selectionMode) {
+            // 選べる城の中に、自分の勢力以外の城があるかチェックします
+            const hasOtherClanTarget = this.game.validTargets.some(castleId => {
+                const c = this.game.getCastle(castleId);
+                return c && c.ownerClan !== 0 && c.ownerClan !== this.game.playerClanId;
+            });
+            // もし自国の城しか選べないなら、名前シールは出しません
+            if (!hasOtherClanTarget) {
+                return;
+            }
+        }
+        
+        // ★追加：ここまで来たら名前シールを出すので、bodyに目印をつけます！
+        document.body.classList.add('showing-daimyo-labels');
 
         // 1. 居城を持っている大名を探して、大体の大きさを計算します
         this.game.clans.forEach(clan => {
