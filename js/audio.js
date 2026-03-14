@@ -48,8 +48,12 @@ class AudioManager {
             'decision.ogg': { baseVolume: 0.04 },
             'cancel.ogg': { baseVolume: 0.02 },
             'choice.ogg': { baseVolume: 0.05 },
-            'damage001.ogg': { baseVolume: 0.05 },
             'window.ogg': { baseVolume: 0.05 },
+            'damage001.ogg': { baseVolume: 0.05 },
+            'fire001.mp3g': { baseVolume: 0.05 },
+            'slash.ogg': { baseVolume: 0.05 },
+            'miss.ogg': { baseVolume: 0.05 },
+            
             // 特定の音が大きすぎる場合は、ここで小さくできます
             // 'loud_explosion.ogg': { baseVolume: 0.005 },
         };
