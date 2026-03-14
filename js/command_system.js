@@ -2507,8 +2507,8 @@ class CommandSystem {
                 reinfBushos.forEach(b => b.isActionDone = true);
 
                 const selfReinfData = {
-                    castle: helperCastle, bushos: reinfBushos, soldiers: rS,
-                    rice: rR, horses: rH, guns: rG, isSelf: true,
+                    castle: helperCastle, bushos: reinfBushos, soldiers: reinfSoldiers,
+                    rice: reinfRice, horses: reinfHorses, guns: reinfGuns, isSelf: true,
                     morale: helperCastle.morale || 50, training: helperCastle.training || 50
                 };
                 
@@ -2768,7 +2768,8 @@ class CommandSystem {
 
         const reinforcementData = {
             castle: helperCastle, bushos: reinfBushos, soldiers: reinfSoldiers,
-            rice: reinfRice, horses: reinfHorses, guns: reinfGuns, isAttacker: true, isSelf: false
+            rice: reinfRice, horses: reinfHorses, guns: reinfGuns, isAttacker: true, isSelf: false,
+            morale: helperCastle.morale || 50, training: helperCastle.training || 50
         };
 
         this.game.warManager.applyWarHostility(helperCastle.ownerClan, false, targetCastle.ownerClan, targetCastle.isKunishu, true);
