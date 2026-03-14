@@ -548,6 +548,31 @@ Object.assign(WarManager.prototype, {
         } catch(e) { console.error("StartWar Error:", e); this.state.active = false; this.game.finishTurn(); }
     },
     
+    // ★ここから追加：援軍が途中で「もう無理～！」と撤退する時の魔法！
+    retreatReinforcementForce(reinfKey) {
+        const s = this.state;
+        
+        // もしデータがないか、既に帰っていたら何もしません
+        if (!s || !s[reinfKey]) return;
+
+        const reinf = s[reinfKey];
+        
+        // 撤退した人たちを忘れないように、専用の「帰宅待ちリスト」を作ります
+        if (!s.retreatedReinforcements) {
+            s.retreatedReinforcements = [];
+        }
+        
+        // その時の兵士数などの「今の状態」をそのままリストにメモします
+        s.retreatedReinforcements.push({
+            data: reinf,
+            isAttackerData: (reinfKey === 'reinforcement' || reinfKey === 'selfReinforcement')
+        });
+        
+        // メモし終わったら、戦場のリストからは消してあげます（これで戦闘から除外されます！）
+        s[reinfKey] = null;
+    },
+    // ★追加ここまで
+    
     executeRetreatLogic(defCastle) {
         const candidates = this.game.castles.filter(c => c.ownerClan === defCastle.ownerClan && c.id !== defCastle.id && GameSystem.isReachable(this.game, defCastle, c, defCastle.ownerClan));
         if (candidates.length === 0) { this.endWar(true); return; }
@@ -829,6 +854,66 @@ Object.assign(WarManager.prototype, {
             returnReinforcement(s.reinforcement, true);
             returnReinforcement(s.defSelfReinforcement, false);
             returnReinforcement(s.defReinforcement, false);
+            
+            // ★ここから追加：途中で撤退した援軍たちを、無事にお城へ帰してあげる魔法
+            if (s.retreatedReinforcements) {
+                s.retreatedReinforcements.forEach(ret => {
+                    const reinf = ret.data;
+                    const isAttackerData = ret.isAttackerData;
+                    
+                    if (reinf.isKunishuForce) {
+                        // 諸勢力の場合のお帰り処理
+                        const kunishu = this.game.kunishuSystem.getKunishu(reinf.kunishuId);
+                        if (kunishu && !kunishu.isDestroyed) {
+                            kunishu.soldiers = Math.min(99999, kunishu.soldiers + reinf.soldiers);
+                            kunishu.horses = Math.min(99999, (kunishu.horses || 0) + (reinf.horses || 0)); 
+                            kunishu.guns = Math.min(99999, (kunishu.guns || 0) + (reinf.guns || 0));       
+                            reinf.bushos.forEach(b => {
+                                b.castleId = kunishu.castleId; 
+                                b.isCastellan = false;
+                            });
+                            // 途中で逃げ帰ったので、少しだけ友好度が下がります
+                            const myClanId = isAttackerData ? s.sourceCastle.ownerClan : s.defender.ownerClan;
+                            const kRel = kunishu.getRelation(myClanId);
+                            kunishu.setRelation(myClanId, kRel - 5);
+                            if (s.isPlayerInvolved) this.game.ui.log(`(援軍が撤退し、${kunishu.getName(this.game)}との友好度が下がりました)`);
+                        }
+                    } else {
+                        // 大名家の場合のお帰り処理
+                        const helperCastle = this.game.getCastle(reinf.castle.id); 
+                        if (helperCastle) {
+                            helperCastle.soldiers = Math.min(99999, helperCastle.soldiers + reinf.soldiers);
+                            helperCastle.rice = Math.min(99999, helperCastle.rice + reinf.rice);
+                            helperCastle.horses = Math.min(99999, (helperCastle.horses || 0) + (reinf.horses || 0));
+                            helperCastle.guns = Math.min(99999, (helperCastle.guns || 0) + (reinf.guns || 0));
+                            reinf.bushos.forEach(b => {
+                                b.castleId = helperCastle.id; 
+                                b.isCastellan = false;
+                                if (!helperCastle.samuraiIds.includes(b.id)) helperCastle.samuraiIds.push(b.id);
+                            });
+                            this.game.updateCastleLord(helperCastle);
+
+                            if (!reinf.isSelf) {
+                                const myClanId = isAttackerData ? s.sourceCastle.ownerClan : s.defender.ownerClan;
+                                const helperClanId = helperCastle.ownerClan;
+                                this.game.diplomacyManager.updateSentiment(myClanId, helperClanId, -5);
+                                if (s.isPlayerInvolved) this.game.ui.log(`(援軍が撤退し、${this.game.clans.find(c=>c.id===helperClanId)?.name}との友好度が下がりました)`);
+                            }
+                        }
+                    }
+                    
+                    // 戦場の武将リストからも、帰ってしまった人を消しておきます
+                    if (isAttackerData) {
+                        reinf.bushos.forEach(rb => { s.atkBushos = s.atkBushos.filter(b => b.id !== rb.id); });
+                    } else {
+                        reinf.bushos.forEach(rb => {
+                            const idx = s.defender.samuraiIds.indexOf(rb.id);
+                            if (idx !== -1) s.defender.samuraiIds.splice(idx, 1);
+                        });
+                    }
+                });
+            }
+            // ★追加ここまで
             
             // ★敵の援軍に参加した大名との友好度を「５」下げる魔法！
             if (this.game.diplomacyManager) {
