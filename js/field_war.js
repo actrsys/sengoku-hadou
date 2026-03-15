@@ -448,21 +448,18 @@ class FieldWarManager {
             scrollArea.addEventListener('mouseleave', () => {
                 isDown = false;
                 scrollArea.style.cursor = 'auto';
-                // ★修正: ドラッグ判定をリセット（クリックイベントが発火した直後に消すため少し遅らせます）
-                setTimeout(() => { this.isDragging = false; }, 100);
+                setTimeout(() => { this.isDragging = false; }, 50);
             });
             scrollArea.addEventListener('mouseup', () => {
                 isDown = false;
                 scrollArea.style.cursor = 'auto';
-                // ★修正: ドラッグ判定をリセット（クリックイベントが発火した直後に消すため少し遅らせます）
-                setTimeout(() => { this.isDragging = false; }, 100);
+                setTimeout(() => { this.isDragging = false; }, 50);
             });
             scrollArea.addEventListener('mousemove', (e) => {
                 if (!isDown) return;
                 const x = e.pageX - scrollArea.offsetLeft;
                 const y = e.pageY - scrollArea.offsetTop;
                 
-                // ★修正: クリック時の手ぶれで誤判定しないよう、遊び（ゆとり）を少し大きくします
                 if (Math.abs(x - startX) > 10 || Math.abs(y - startY) > 10) {
                     this.isDragging = true;
                     scrollArea.scrollLeft = scrollLeft - (x - startX);
@@ -470,11 +467,10 @@ class FieldWarManager {
                 }
             });
 
-            // ★追加: スマホのスワイプ（フリック）中も誤クリックを防ぐための魔法
             scrollArea.addEventListener('touchstart', () => { this.isDragging = false; }, {passive: true});
             scrollArea.addEventListener('touchmove', () => { this.isDragging = true; }, {passive: true});
             scrollArea.addEventListener('touchend', () => {
-                setTimeout(() => { this.isDragging = false; }, 100);
+                setTimeout(() => { this.isDragging = false; }, 50);
             }, {passive: true});
         }
         
@@ -1456,6 +1452,16 @@ class FieldWarManager {
     }
 
     onHexClick(x, y) {
+        if (!this.active) return;
+        
+        // ★修正: 画面をドラッグ中ならクリックを無視した上で、念のためドラッグ状態を強制リセットします
+        if (this.isDragging) {
+            this.isDragging = false;
+            return;
+        }
+
+        // ★修正: クリックしたマスにいる部隊を探す処理を復活させました
+        const clickedUnit = this.units.find(u => u.x === x && u.y === y);
         const currentUnit = this.turnQueue[0];
 
         if (clickedUnit) {
@@ -1476,18 +1482,18 @@ class FieldWarManager {
             }
 
             let key = `${x},${y}`;
-			if (this.reachable && this.reachable[key]) {
-			    let path = this.reachable[key].path;
-			    let previewDir = unit.direction; 
-			    if (path && path.length > 0) {
-			        let fromX = (path.length > 1) ? path[path.length - 2].x : unit.x;
-			        let fromY = (path.length > 1) ? path[path.length - 2].y : unit.y;
-			        previewDir = this.getDirection(fromX, fromY, x, y);
-			    }
-			    this.previewTarget = {x: x, y: y, path: path, cost: this.reachable[key].cost, direction: previewDir};
-			    this.state = 'MOVE_PREVIEW';
-			    this.updateMap();
-			} else {
+            if (this.reachable && this.reachable[key]) {
+                let path = this.reachable[key].path;
+                let previewDir = unit.direction; 
+                if (path && path.length > 0) {
+                    let fromX = (path.length > 1) ? path[path.length - 2].x : unit.x;
+                    let fromY = (path.length > 1) ? path[path.length - 2].y : unit.y;
+                    previewDir = this.getDirection(fromX, fromY, x, y);
+                }
+                this.previewTarget = {x: x, y: y, path: path, cost: this.reachable[key].cost, direction: previewDir};
+                this.state = 'MOVE_PREVIEW';
+                this.updateMap();
+            } else {
                 this.cancelAction();
                 if(clickedUnit) this.showUnitInfo(clickedUnit);
             }
@@ -1498,38 +1504,38 @@ class FieldWarManager {
                 return;
             }
 
-			if (this.previewTarget && x === this.previewTarget.x && y === this.previewTarget.y) {
-			    let path = this.previewTarget.path;
-			    if (path && path.length > 0) {
-			        let fromX = unit.x;
-			        let fromY = unit.y;
-			        if (path.length > 1) {
-			            let prevStep = path[path.length - 2];
-			            fromX = prevStep.x;
-			            fromY = prevStep.y;
-			        }
-			        unit.direction = this.getDirection(fromX, fromY, x, y);
-			    }
+            if (this.previewTarget && x === this.previewTarget.x && y === this.previewTarget.y) {
+                let path = this.previewTarget.path;
+                if (path && path.length > 0) {
+                    let fromX = unit.x;
+                    let fromY = unit.y;
+                    if (path.length > 1) {
+                        let prevStep = path[path.length - 2];
+                        fromX = prevStep.x;
+                        fromY = prevStep.y;
+                    }
+                    unit.direction = this.getDirection(fromX, fromY, x, y);
+                }
 
-			    unit.ap -= this.previewTarget.cost;
-			    unit.x = x;
-			    unit.y = y;
+                unit.ap -= this.previewTarget.cost;
+                unit.x = x;
+                unit.y = y;
                 unit.hasMoved = true; // ★ 移動したことを記録
-			    this.log(`${unit.name}隊が移動（向きも変更）。`);
-			    this.nextPhase();
-			} else {
+                this.log(`${unit.name}隊が移動（向きも変更）。`);
+                this.nextPhase();
+            } else {
                 let key = `${x},${y}`;
-				if (this.reachable && this.reachable[key]) {
-				    let path = this.reachable[key].path;
-				    let previewDir = unit.direction;
-				    if (path && path.length > 0) {
-				        let fromX = (path.length > 1) ? path[path.length - 2].x : unit.x;
-				        let fromY = (path.length > 1) ? path[path.length - 2].y : unit.y;
-				        previewDir = this.getDirection(fromX, fromY, x, y);
-				    }
-				    this.previewTarget = {x: x, y: y, path: path, cost: this.reachable[key].cost, direction: previewDir};
-				    this.updateMap();
-				} else {
+                if (this.reachable && this.reachable[key]) {
+                    let path = this.reachable[key].path;
+                    let previewDir = unit.direction;
+                    if (path && path.length > 0) {
+                        let fromX = (path.length > 1) ? path[path.length - 2].x : unit.x;
+                        let fromY = (path.length > 1) ? path[path.length - 2].y : unit.y;
+                        previewDir = this.getDirection(fromX, fromY, x, y);
+                    }
+                    this.previewTarget = {x: x, y: y, path: path, cost: this.reachable[key].cost, direction: previewDir};
+                    this.updateMap();
+                } else {
                     this.cancelAction();
                     if(clickedUnit) this.showUnitInfo(clickedUnit);
                 }
