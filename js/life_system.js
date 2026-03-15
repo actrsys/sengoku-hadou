@@ -33,25 +33,34 @@ class LifeSystem {
             // 今の年齢を計算します
             const age = currentYear - b.birthYear;
             
-            let penalty = 0;
+            let penaltyYoung = 0;       // 若い時のマイナス
+            let penaltyOldGeneral = 0;  // おじいちゃんになった時のマイナス（智謀以外）
+            let penaltyOldInt = 0;      // おじいちゃんになった時のマイナス（智謀だけ）
             
             // 30歳未満の場合（2歳若くなるごとにマイナス1）
             if (age < 30) {
-                // 30歳との差を計算して、2で割って切り上げます（例：29歳なら差1→0.5→切り上げて1）
-                penalty = Math.ceil((30 - age) / 2);
+                penaltyYoung = Math.ceil((30 - age) / 2);
             } 
-            // 46歳以上の場合（2年歳をとるごとにマイナス1）
-            else if (age > 45) {
-                // 45歳との差を計算して、2で割って切り上げます（例：46歳なら差1→0.5→切り上げて1）
-                penalty = Math.ceil((age - 45) / 2);
+            
+            // 46歳以上の場合（3年歳をとるごとにマイナス1）
+            if (age >= 46) {
+                penaltyOldGeneral = Math.ceil((age - 45) / 3);
+            }
+
+            // 智謀（intelligence）は56歳以上の場合（3年歳をとるごとにマイナス1）
+            if (age >= 56) {
+                penaltyOldInt = Math.ceil((age - 55) / 3);
             }
             
             // 基礎値からペナルティを引いて、0以下にならないように（最低1）セットします
-            b.leadership = Math.max(1, b.baseLeadership - penalty);
-            b.strength = Math.max(1, b.baseStrength - penalty);
-            b.politics = Math.max(1, b.basePolitics - penalty);
-            b.diplomacy = Math.max(1, b.baseDiplomacy - penalty);
-            b.intelligence = Math.max(1, b.baseIntelligence - penalty);
+            // 統率・武勇・政治・外交は、若い時のマイナスと、46歳からのマイナスを引きます
+            b.leadership = Math.max(1, b.baseLeadership - penaltyYoung - penaltyOldGeneral);
+            b.strength = Math.max(1, b.baseStrength - penaltyYoung - penaltyOldGeneral);
+            b.politics = Math.max(1, b.basePolitics - penaltyYoung - penaltyOldGeneral);
+            b.diplomacy = Math.max(1, b.baseDiplomacy - penaltyYoung - penaltyOldGeneral);
+            
+            // 智謀だけは、若い時のマイナスと、56歳からのマイナスを引きます
+            b.intelligence = Math.max(1, b.baseIntelligence - penaltyYoung - penaltyOldInt);
         }
     }
 
