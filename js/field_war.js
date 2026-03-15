@@ -399,6 +399,8 @@ class FieldWarManager {
         this.defTraining = warState.defender.training;
 
         this.turnQueue = [];
+        this.isInfoMode = false;
+        this.isCmdMode = false;
         this.initUI();
         
         // ★追加：援軍も含めて、プレイヤーが操作する部隊が1つでもあるか調べます！
@@ -507,10 +509,29 @@ class FieldWarManager {
 
         const btnWait = document.getElementById('fw-btn-wait');
         const btnRetreat = document.getElementById('fw-btn-retreat');
+        const btnCmd = document.getElementById('fw-btn-cmd');
+        const btnInfo = document.getElementById('fw-btn-info');
+        const btnCmdBack = document.getElementById('fw-btn-cmd-back');
+        const btnInfoBack = document.getElementById('fw-btn-info-back');
+
+        if (btnCmd) btnCmd.onclick = () => { if(!this.isPlayerTurn()) return; this.isCmdMode = true; this.updateMenu(); };
+        if (btnCmdBack) btnCmdBack.onclick = () => { if(!this.isPlayerTurn()) return; this.isCmdMode = false; this.updateMenu(); };
         
+        if (btnInfo) btnInfo.onclick = () => {
+            this.isInfoMode = true; 
+            this.updateMenu(); 
+            this.updateMap(); 
+        };
+        if (btnInfoBack) btnInfoBack.onclick = () => {
+            this.isInfoMode = false; 
+            this.hideUnitInfo(); 
+            this.updateMenu(); 
+            this.updateMap(); 
+        };
+
         if (btnWait) {
             btnWait.onclick = () => {
-                if (!this.isPlayerTurn()) return;
+                if (!this.isPlayerTurn() || this.isInfoMode) return;
                 const unit = this.turnQueue[0];
                 this.log(`${unit.name}隊は待機した。`);
                 unit.hasActionDone = true;
@@ -521,7 +542,7 @@ class FieldWarManager {
         
         if (btnRetreat) {
             btnRetreat.onclick = () => {
-                if (!this.isPlayerTurn()) return;
+                if (!this.isPlayerTurn() || this.isInfoMode) return;
                 const unit = this.turnQueue[0];
                 this.game.ui.showDialog("全軍を撤退させますか？", true, () => {
                     if (unit.isAttacker) this.log(`撤退を開始します……`);
@@ -640,6 +661,34 @@ class FieldWarManager {
         }
     }
     
+    updateMenu() {
+        if (!this.active) return;
+        
+        const mainGroup = document.getElementById('fw-menu-main');
+        const cmdGroup = document.getElementById('fw-menu-cmd');
+        const infoGroup = document.getElementById('fw-menu-info');
+        const statusBar = document.getElementById('fw-status-bar');
+
+        if (mainGroup) mainGroup.classList.add('hidden');
+        if (cmdGroup) cmdGroup.classList.add('hidden');
+        if (infoGroup) infoGroup.classList.add('hidden');
+
+        if (this.isInfoMode) {
+            if (statusBar) statusBar.classList.remove('hidden');
+            if (infoGroup) infoGroup.classList.remove('hidden');
+        } else {
+            if (statusBar) statusBar.classList.add('hidden');
+            
+            if (this.isPlayerTurn()) {
+                if (this.isCmdMode) {
+                    if (cmdGroup) cmdGroup.classList.remove('hidden');
+                } else {
+                    if (mainGroup) mainGroup.classList.remove('hidden');
+                }
+            }
+        }
+    }
+    
     showUnitInfo(unit) {
         const infoEl = document.getElementById('fw-unit-info');
         if (!infoEl) return;
@@ -755,7 +804,7 @@ class FieldWarManager {
                 hex.style.left = `${x * (this.hexW * 0.75)}px`;
                 hex.style.top = `${y * (this.hexH / 2)}px`;
                 
-                if (isPlayerTurn && unit) {
+                if (isPlayerTurn && unit && !this.isInfoMode) {
                     if (this.state === 'PHASE_MOVE' || this.state === 'MOVE_PREVIEW') {
                         if (x === unit.x && y === unit.y) {
                             hex.classList.add('current-pos');
@@ -843,7 +892,7 @@ class FieldWarManager {
             }
         }
         
-        if (this.state === 'MOVE_PREVIEW' && this.previewTarget && unit) {
+        if (this.state === 'MOVE_PREVIEW' && this.previewTarget && unit && !this.isInfoMode) {
             this.drawPath(this.previewTarget.path, unit.x, unit.y);
             
             let iconSize = 16 + Math.min(Math.floor(unit.soldiers / 1000), 5) * 3;
@@ -900,15 +949,7 @@ class FieldWarManager {
             this.mapEl.appendChild(uEl);
         });
 
-        const btnWait = document.getElementById('fw-btn-wait');
-        const btnRetreat = document.getElementById('fw-btn-retreat');
-        if (isPlayerTurn) {
-            if(btnWait) btnWait.classList.remove('hidden');
-            if(btnRetreat) btnRetreat.classList.remove('hidden');
-        } else {
-            if(btnWait) btnWait.classList.add('hidden');
-            if(btnRetreat) btnRetreat.classList.add('hidden');
-        }
+        this.updateMenu();
     }
 
     drawPath(pathArr, startX, startY) {
@@ -1196,7 +1237,11 @@ class FieldWarManager {
 
         const isPlayerInvolved = this.units.some(u => u.isPlayer);
 
-        this.showUnitInfo(unit);
+        this.isInfoMode = false;
+        this.isCmdMode = false;
+        this.hideUnitInfo();
+        this.updateMenu();
+        
         if (isPlayerInvolved) {
             setTimeout(() => this.scrollToUnit(unit), 100);
         }
@@ -1494,14 +1539,17 @@ class FieldWarManager {
         if (!this.active) return;
         
         const clickedUnit = this.units.find(u => u.x === x && u.y === y);
-        const currentUnit = this.turnQueue[0];
 
-        if (clickedUnit) {
-            this.showUnitInfo(clickedUnit);
-        } else {
-            if (currentUnit) this.showUnitInfo(currentUnit);
-            else this.hideUnitInfo();
+        if (this.isInfoMode) {
+            if (clickedUnit) {
+                this.showUnitInfo(clickedUnit);
+            } else {
+                this.hideUnitInfo();
+            }
+            return;
         }
+
+        this.hideUnitInfo();
 
         if (!this.isPlayerTurn()) return;
         
