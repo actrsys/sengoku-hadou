@@ -1630,7 +1630,7 @@ class CommandSystem {
 
         // ★追加：AIの時は、まず誰がどこに攻め込んだかの「開始メッセージ」を出して一旦ストップさせます！
         if (!isPlayer) {
-            const startMsg = `【諸勢力鎮圧】\n${atkDaimyoName}の${leaderName}が、\n${kunishuName}の鎮圧に向かいました！`;
+            const startMsg = `【諸勢力鎮圧】\n${atkDaimyoName}の${leaderName}が、\n${kunishuName}の鎮圧に乗り出しました！`;
             this.game.ui.log(startMsg.replace('\n', ''));
             await this.game.ui.showTapMessage(startMsg);
         }
