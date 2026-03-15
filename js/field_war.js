@@ -421,8 +421,12 @@ class FieldWarManager {
         // 野戦の画面が表示されたあとに、大きさをピッタリに合わせる魔法を使います
         setTimeout(() => {
             this.adjustMapScale();
+            // サイズ調整が終わった後に、確実に操作部隊へカメラを向ける
+            if (this.turnQueue && this.turnQueue.length > 0) {
+                setTimeout(() => this.scrollToUnit(this.turnQueue[0]), 50);
+            }
         }, 100); // 画面ができるまで一瞬（0.1秒）だけ待ってから魔法をかけます
-    } // ← この「}」が startFieldWar の終わりのカッコです
+    }
 
     initUI() {
         this.modal = document.getElementById('field-war-modal');
@@ -527,6 +531,9 @@ class FieldWarManager {
             this.hideUnitInfo(); 
             this.updateMenu(); 
             this.updateMap(); 
+            if (this.turnQueue && this.turnQueue.length > 0) {
+                setTimeout(() => this.scrollToUnit(this.turnQueue[0]), 100);
+            }
         };
 
         if (btnWait) {
@@ -906,7 +913,7 @@ class FieldWarManager {
             pEl.style.setProperty('--fw-dir', `${this.previewTarget.direction * 60}deg`);
             pEl.style.pointerEvents = 'none'; 
             
-            pEl.innerHTML = '';
+            pEl.innerHTML = `<div class="fw-unit-soldiers">${unit.soldiers}</div>`;
             if (unit.isGeneral) {
                 pEl.classList.add('general');
             }
@@ -944,7 +951,7 @@ class FieldWarManager {
             uEl.style.top = `${u.y * (this.hexH / 2) + (this.hexH - iconSize) / 2}px`;     
             uEl.style.setProperty('--fw-dir', `${u.direction * 60}deg`);
             uEl.style.pointerEvents = 'none'; 
-            uEl.innerHTML = '';
+            uEl.innerHTML = `<div class="fw-unit-soldiers">${u.soldiers}</div>`;
             
             this.mapEl.appendChild(uEl);
         });
