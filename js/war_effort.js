@@ -1068,8 +1068,17 @@ Object.assign(WarManager.prototype, {
                     }
                     
                 } else {
-                    resultMsg = `【諸勢力蜂起】\n諸勢力の反乱を鎮圧しました。`;
-                    this.game.ui.log(`【諸勢力蜂起】諸勢力の反乱を鎮圧しました。`);
+                    // ★変更：お城にちゃんとした武将がいるか（「守備隊長」じゃないか）を調べます！
+                    if (s.defBusho && s.defBusho.name !== "守備隊長") {
+                        // 武将がいる時は、その人の名前を出してかっこよく褒めます！
+                        const defLeaderName = s.defBusho.name;
+                        resultMsg = `【諸勢力蜂起】\n反乱は${defLeaderName}の手によって鎮圧されました！`;
+                        this.game.ui.log(`【諸勢力蜂起】反乱は${defLeaderName}の手によって鎮圧されました！`);
+                    } else {
+                        // 誰もいない時（または守備隊長の時）は、名前を出さずにシンプルに伝えます！
+                        resultMsg = `【諸勢力蜂起】\n反乱は鎮圧されました！`;
+                        this.game.ui.log(`【諸勢力蜂起】反乱は鎮圧されました！`);
+                    }
                 }
                 
                 if (s.isPlayerInvolved) {
