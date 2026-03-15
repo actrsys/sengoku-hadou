@@ -1297,6 +1297,12 @@ class FieldWarManager {
         let atkHorses = 0, atkGuns = 0;
         let defHorses = 0, defGuns = 0;
 
+        // ★追加：援軍の兵士や馬たちを入れる、別々の箱を用意します！
+        let atkAllyReinfSoldiers = 0, atkAllyReinfHorses = 0, atkAllyReinfGuns = 0;
+        let atkSelfReinfSoldiers = 0, atkSelfReinfHorses = 0, atkSelfReinfGuns = 0;
+        let defAllyReinfSoldiers = 0, defAllyReinfHorses = 0, defAllyReinfGuns = 0;
+        let defSelfReinfSoldiers = 0, defSelfReinfHorses = 0, defSelfReinfGuns = 0;
+
         if (this.warState.atkAssignments) {
             this.warState.atkAssignments.forEach(a => a.soldiers = 0);
         }
@@ -1306,9 +1312,22 @@ class FieldWarManager {
 
         this.units.forEach(u => {
             if (u.isAttacker) {
-                atkSoldiers += u.soldiers;
-                if (u.troopType === 'kiba') atkHorses += u.soldiers;
-                if (u.troopType === 'teppo') atkGuns += u.soldiers;
+                // ★修正：メインの部隊か、援軍かを見分けて、別々の箱にしまいます！
+                if (u.isReinforcement) {
+                    if (u.isSelfReinforcement) {
+                        atkSelfReinfSoldiers += u.soldiers;
+                        if (u.troopType === 'kiba') atkSelfReinfHorses += u.soldiers;
+                        if (u.troopType === 'teppo') atkSelfReinfGuns += u.soldiers;
+                    } else {
+                        atkAllyReinfSoldiers += u.soldiers;
+                        if (u.troopType === 'kiba') atkAllyReinfHorses += u.soldiers;
+                        if (u.troopType === 'teppo') atkAllyReinfGuns += u.soldiers;
+                    }
+                } else {
+                    atkSoldiers += u.soldiers;
+                    if (u.troopType === 'kiba') atkHorses += u.soldiers;
+                    if (u.troopType === 'teppo') atkGuns += u.soldiers;
+                }
                 
                 if (this.warState.atkAssignments) {
                     const assign = this.warState.atkAssignments.find(a => a.busho.id === u.bushoId);
@@ -1316,9 +1335,22 @@ class FieldWarManager {
                 }
             } else {
                 if (typeof u.id === 'string' && !u.id.startsWith('k_')) {
-                    defSoldiers += u.soldiers;
-                    if (u.troopType === 'kiba') defHorses += u.soldiers;
-                    if (u.troopType === 'teppo') defGuns += u.soldiers;
+                    // ★修正：守備側も同じように、メインと援軍を見分けて別の箱にしまいます！
+                    if (u.isReinforcement) {
+                        if (u.isSelfReinforcement) {
+                            defSelfReinfSoldiers += u.soldiers;
+                            if (u.troopType === 'kiba') defSelfReinfHorses += u.soldiers;
+                            if (u.troopType === 'teppo') defSelfReinfGuns += u.soldiers;
+                        } else {
+                            defAllyReinfSoldiers += u.soldiers;
+                            if (u.troopType === 'kiba') defAllyReinfHorses += u.soldiers;
+                            if (u.troopType === 'teppo') defAllyReinfGuns += u.soldiers;
+                        }
+                    } else {
+                        defSoldiers += u.soldiers;
+                        if (u.troopType === 'kiba') defHorses += u.soldiers;
+                        if (u.troopType === 'teppo') defGuns += u.soldiers;
+                    }
                     
                     if (this.warState.defAssignments) {
                         const assign = this.warState.defAssignments.find(a => a.busho.id === u.bushoId);
@@ -1328,19 +1360,47 @@ class FieldWarManager {
             }
         });
         
+        // メインの攻撃軍のデータを更新
         this.warState.attacker.soldiers = atkSoldiers;
         this.warState.attacker.rice = this.atkRice;
         this.warState.attacker.horses = atkHorses;
         this.warState.attacker.guns = atkGuns;
-        // ★追加: 変化した攻撃側の士気を、元のゲームデータにしっかり保存（引き継ぎ）します
         this.warState.attacker.morale = this.atkMorale; 
 
+        // ★追加：攻撃側の「同盟国からの援軍」のデータを更新
+        if (this.warState.reinforcement) {
+            this.warState.reinforcement.soldiers = atkAllyReinfSoldiers;
+            this.warState.reinforcement.horses = atkAllyReinfHorses;
+            this.warState.reinforcement.guns = atkAllyReinfGuns;
+        }
+
+        // ★追加：攻撃側の「自分の別の城からの援軍」のデータを更新
+        if (this.warState.selfReinforcement) {
+            this.warState.selfReinforcement.soldiers = atkSelfReinfSoldiers;
+            this.warState.selfReinforcement.horses = atkSelfReinfHorses;
+            this.warState.selfReinforcement.guns = atkSelfReinfGuns;
+        }
+
+        // メインの守備軍のデータを更新
         this.warState.defender.fieldSoldiers = defSoldiers;
         this.warState.defFieldRice = this.defRice;
         this.warState.defender.fieldHorses = defHorses;
         this.warState.defender.fieldGuns = defGuns;
-        // ★追加: 守備側の士気も同じように保存します
         this.warState.defender.morale = this.defMorale; 
+
+        // ★追加：守備側の「同盟国からの援軍」のデータを更新
+        if (this.warState.defReinforcement) {
+            this.warState.defReinforcement.soldiers = defAllyReinfSoldiers;
+            this.warState.defReinforcement.horses = defAllyReinfHorses;
+            this.warState.defReinforcement.guns = defAllyReinfGuns;
+        }
+
+        // ★追加：守備側の「自分の別の城からの援軍」のデータを更新
+        if (this.warState.defSelfReinforcement) {
+            this.warState.defSelfReinforcement.soldiers = defSelfReinfSoldiers;
+            this.warState.defSelfReinforcement.horses = defSelfReinfHorses;
+            this.warState.defSelfReinforcement.guns = defSelfReinfGuns;
+        }
 
         const isPlayerInvolved = this.units.some(u => u.isPlayer);
         
