@@ -409,102 +409,37 @@ body.hide-daimyo-labels .daimyo-name-label { display: none !important; }
 /* =========================================================
    野戦 (HEX・部隊)
    ========================================================= */
+/* 新しい全画面・フローティングレイアウト */
 #field-war-modal { padding: 0 !important; }
-#field-war-modal .modal-content.fw-modal-content { 
-    width: 100% !important; 
-    height: 100% !important; 
-    max-width: none !important; 
-    max-height: none !important; 
-    margin: 0 !important; 
-    border-radius: 0 !important; 
-    border: none !important; 
-    padding: 0 !important; 
-    display: flex; 
-    flex-direction: column; 
-    background-color: #263238;
-}
+#field-war-modal .modal-content.fw-fullscreen-content { width: 100% !important; height: 100% !important; max-width: none !important; max-height: none !important; margin: 0 !important; border-radius: 0 !important; border: none !important; padding: 0 !important; background: #222; display: flex; flex-direction: column; }
 
-#fw-map-area {
-    flex: 1;
-    position: relative;
-    overflow: hidden;
-    background: #81c784;
-}
+.fw-top-bar { height: 30px; background: #000; color: #fff; display: flex; align-items: center; padding: 0 10px; font-size: 0.9rem; font-weight: bold; gap: 20px; flex-shrink: 0; }
+.fw-main-area { flex: 1; position: relative; overflow: hidden; background: #81c784; }
+.fw-map-scroll { width: 100%; height: 100%; overflow: auto; display: block; }
 
-#fw-map-scroll {
-    width: 100%;
-    height: 100%;
-    overflow: auto;
-    position: relative;
-    -ms-overflow-style: none;
-    scrollbar-width: none;
-}
-#fw-map-scroll::-webkit-scrollbar { display: none; }
+.fw-floating-status { position: absolute; top: 10px; left: 10px; right: 10px; display: flex; justify-content: space-between; pointer-events: none; z-index: 100; gap: 10px; }
+.fw-floating-status .army-box { flex: 1; max-width: 300px; margin: 0; padding: 5px 10px; font-size: 0.85rem; background: rgba(0, 0, 0, 0.7) !important; color: #fff; border: 2px solid; pointer-events: auto; }
+.fw-floating-status .attacker { border-color: #ef5350; }
+.fw-floating-status .defender { border-color: #42a5f5; }
 
-#fw-map { 
-    position: absolute; 
-    transform-origin: top left;
-}
+.fw-floating-unit { position: absolute; top: 80px; left: 50%; transform: translateX(-50%); background: rgba(255, 255, 255, 0.9); border: 2px solid #333; padding: 5px 15px; font-size: 0.85rem; border-radius: 6px; z-index: 100; pointer-events: none; display: flex; gap: 15px; align-items: center; box-shadow: 0 2px 5px rgba(0,0,0,0.5); white-space: nowrap; }
 
-.fw-log-overlay {
-    position: absolute;
-    bottom: 10px;
-    left: 50%;
-    transform: translateX(-50%);
-    width: 90%;
-    max-width: 600px;
-    height: 25%;
-    background: rgba(0, 0, 0, 0.6);
-    color: #fff;
-    border-radius: 8px;
-    border: 1px solid rgba(255, 255, 255, 0.3);
-    padding: 10px;
-    font-size: 0.95rem;
-    overflow-y: auto;
-    z-index: 100;
-    pointer-events: none;
-}
-.fw-log-overlay div {
-    text-shadow: 1px 1px 2px #000;
-}
+.fw-floating-log { position: absolute; bottom: 10px; left: 50%; transform: translateX(-50%); width: 90%; max-width: 600px; height: 100px; overflow-y: auto; background: rgba(0, 0, 0, 0.6); color: #fff; border: 1px solid rgba(255,255,255,0.3); border-radius: 4px; padding: 5px 10px; font-size: 0.85rem; z-index: 100; pointer-events: auto; text-shadow: 1px 1px 1px #000; }
 
-.fw-controls-area {
-    height: 10vh;
-    min-height: 60px;
-    background: #fff;
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    gap: 15px;
-    flex-shrink: 0;
-    border-top: 2px solid #333;
-}
-.fw-controls-area button {
-    height: 70%;
-    min-width: 120px;
-    font-size: 1.2rem;
-    border-radius: 6px;
-}
+.fw-controls { height: 10vh; min-height: 50px; background: #333; display: flex; justify-content: center; align-items: center; gap: 20px; flex-shrink: 0; border-top: 2px solid #111; }
+.fw-controls button { height: 60%; min-width: 100px; font-size: 1.1rem; border-radius: 8px; font-weight: bold; }
+#fw-map { background-color: transparent; }
 
-.fw-hex { background-color: #aed581; clip-path: polygon(25% 0%, 75% 0%, 100% 50%, 75% 100%, 25% 100%, 0% 50%); position: absolute; box-sizing: border-box; display: flex; justify-content: center; align-items: center; color: rgba(0,0,0,0.3); font-size: 8px; font-weight: bold; transition: background-color 0.2s, filter 0.2s; user-select: none; transform: scale(0.96); }
-.fw-hex:hover { filter: brightness(1.15); }
+.fw-hex { width: 30px; height: 26px; background-color: #aed581; clip-path: polygon(25% 0%, 75% 0%, 100% 50%, 75% 100%, 25% 100%, 0% 50%); position: absolute; box-sizing: border-box; display: flex; justify-content: center; align-items: center; color: rgba(0,0,0,0.3); font-size: 8px; font-weight: bold; transition: background-color 0.2s, filter 0.2s; user-select: none; transform: scale(0.94); }
+.fw-hex:hover { filter: brightness(1.1); }
 .fw-hex::after { content: ""; position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; }
-
-/* ★追加：移動範囲や攻撃範囲などのホバー反応を分かりやすく強化 */
 .fw-hex.movable { cursor: pointer; filter: brightness(1.1); }
-.fw-hex.movable:hover { filter: brightness(1.3); } /* ←さらに明るく */
 .fw-hex.movable::after { background-color: rgba(244, 143, 177, 0.58); }
-
 .fw-hex.current-pos { cursor: pointer; filter: brightness(1.1); }
-.fw-hex.current-pos:hover { filter: brightness(1.3); }
 .fw-hex.current-pos::after { background-color: rgba(255, 255, 255, 0.65); } 
-
 .fw-hex.attackable { cursor: pointer; filter: brightness(1.1); }
-.fw-hex.attackable:hover { filter: brightness(1.3); }
 .fw-hex.attackable::after { background-color: rgba(239, 83, 80, 0.58); box-shadow: inset 0 0 15px red; } 
-
 .fw-hex.fw-dir-highlight { cursor: pointer; filter: brightness(1.2); }
-.fw-hex.fw-dir-highlight:hover { filter: brightness(1.4); }
 .fw-hex.fw-dir-highlight::after { background-color: rgba(255, 235, 59, 0.5); box-shadow: inset 0 0 10px #fbc02d; }
 
 .hex-plain { background-color: #81c784 !important; background-image: linear-gradient(0deg, rgba(255, 255, 255, 0.15) 50%, transparent 50%) !important; background-size: 10px 10px !important; }
