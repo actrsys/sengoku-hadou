@@ -1003,7 +1003,7 @@ Object.assign(WarManager.prototype, {
                     this.game.ui.setWarModalVisible(false);
                     this.game.ui.showResultModal(resultMsg, () => { this.closeWar(); });
                 } else {
-                    // ★追加：AIが討伐した時も、専用のメッセージを出してタップを待ちます！
+                    // ★修正：戦闘画面は飛ばしますが、結果のメッセージは表示してタップを待ちます！
                     await this.game.ui.showTapMessage(resultMsg);
                     this.closeWar();
                 }
