@@ -22,8 +22,8 @@ class HexMapGenerator {
     // マップを作るメインの魔法
     generate() {
         // 1. マップの広さをランダムに決める（横10〜20、縦8〜14）
-        const cols = this.rand(10, 20);
-        const rows = this.rand(8, 14);
+        const cols = this.rand(16, 22);
+        const rows = this.rand(12, 18);
         const totalHexes = cols * rows;
 
         // 2. 地形の割合（ノルマ）を決める
