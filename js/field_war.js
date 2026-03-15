@@ -442,6 +442,48 @@ class FieldWarManager {
             };
         }
 
+        // ★追加：マウスのドラッグでマップをぐりぐりスクロールする魔法
+        const scrollEl = document.getElementById('fw-map-scroll');
+        if (scrollEl) {
+            let isDragging = false;
+            let startX, startY, scrollLeft, scrollTop;
+
+            scrollEl.onmousedown = (e) => {
+                // 左クリック以外（右クリックなど）は無視します
+                if (e.button !== 0) return;
+                // 部隊やマス目をクリックした時は、そっちの操作を優先させるためドラッグをキャンセルします
+                if (e.target.closest('.fw-hex') || e.target.closest('.fw-unit')) return;
+                
+                isDragging = true;
+                scrollEl.classList.add('grabbing');
+                startX = e.pageX - scrollEl.offsetLeft;
+                startY = e.pageY - scrollEl.offsetTop;
+                scrollLeft = scrollEl.scrollLeft;
+                scrollTop = scrollEl.scrollTop;
+            };
+
+            scrollEl.onmouseleave = () => {
+                isDragging = false;
+                scrollEl.classList.remove('grabbing');
+            };
+
+            scrollEl.onmouseup = () => {
+                isDragging = false;
+                scrollEl.classList.remove('grabbing');
+            };
+
+            scrollEl.onmousemove = (e) => {
+                if (!isDragging) return;
+                e.preventDefault();
+                const x = e.pageX - scrollEl.offsetLeft;
+                const y = e.pageY - scrollEl.offsetTop;
+                const walkX = (x - startX) * 1.5; // 動かすスピード（1.5倍）
+                const walkY = (y - startY) * 1.5;
+                scrollEl.scrollLeft = scrollLeft - walkX;
+                scrollEl.scrollTop = scrollTop - walkY;
+            };
+        }
+
         const btnWait = document.getElementById('fw-btn-wait');
         const btnRetreat = document.getElementById('fw-btn-retreat');
         
