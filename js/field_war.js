@@ -226,7 +226,7 @@ class FieldWarManager {
                 
                 let deployPos;
                 let deployDir;
-                if (isReinf) {
+                if (isReinf && !isSelfReinf) {
                     deployPos = atkAllySlots[atkAllyCount % atkAllySlots.length];
                     deployDir = (atkX1 === leftX1) ? 1 : 4;
                     atkAllyCount++;
@@ -295,7 +295,7 @@ class FieldWarManager {
                 
                 let deployPos;
                 let deployDir;
-                if (isReinf) {
+                if (isReinf && !isSelfReinf) {
                     deployPos = defAllySlots[defAllyCount % defAllySlots.length];
                     deployDir = (defX1 === leftX1) ? 1 : 4;
                     defAllyCount++;
