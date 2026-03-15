@@ -5,6 +5,46 @@
  */
 
 /* ==========================================================================
+   ★ メニューの階層構造（ボタンの並び順の設計図）
+   ========================================================================== */
+const COMMAND_MENU_STRUCTURE = [
+    {
+        label: "内政",
+        commands: ['farm', 'commerce', 'repair', 'charity']
+    },
+    {
+        label: "軍事",
+        commands: ['war', 'draft', 'training', 'soldier_charity', 'transport', 'kunishu_subjugate']
+    },
+    {
+        label: "取引",
+        commands: ['buy_rice', 'sell_rice', 'buy_horses', 'buy_guns']
+    },
+    {
+        label: "人事",
+        commands: ['appoint_gunshi', 'appoint', 'delegate', 'reward', 'interview', 'employ', 'move', 'banish']
+    },
+    {
+        label: "対外",
+        // ★ここが「入れ子（サブメニュー）」になる部分です！
+        subMenus: [
+            { label: "外交", commands: ['goodwill', 'alliance', 'dominate', 'subordinate', 'break_alliance'] },
+            { label: "調略", commands: ['incite', 'rumor', 'headhunt'] },
+            { label: "諸勢力", commands: ['kunishu_goodwill', 'kunishu_incorporate'] },
+            { label: "朝廷", commands: ['tribute', 'court_truce'] }
+        ]
+    },
+    {
+        label: "情報",
+        commands: ['investigate', 'busho_list', 'faction_list', 'daimyo_list']
+    },
+    {
+        label: "システム",
+        commands: ['history', 'settings', 'save', 'load', 'title']
+    }
+];
+
+/* ==========================================================================
    ★ コマンド定義 (COMMAND_SPECS)
    ========================================================================== */
 const COMMAND_SPECS = {

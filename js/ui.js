@@ -1488,12 +1488,6 @@ class UIManager {
         const pcArea = document.getElementById('pc-command-area');
         const areas = [mobileArea, pcArea];
         
-        const CATEGORY_MAP = {
-            'DEVELOP': "内政", 'MILITARY': "軍事", 
-            'FOREIGN': "対外", 
-            'PERSONNEL': "人事", 'INFO': "情報"
-        };
-        
         areas.forEach(area => {
             if(!area) return;
             area.innerHTML = '';
@@ -1512,23 +1506,13 @@ class UIManager {
             
             const cmd = (type) => this.game.commandSystem.startCommand(type);
             const menu = (targetMenu) => { this.menuState = targetMenu; this.renderCommandMenu(); };
+            const specs = this.game.commandSystem.getSpecs();
             
             if (this.menuState === 'MAIN') {
-                Object.keys(CATEGORY_MAP).forEach(key => {
-                    createBtn(CATEGORY_MAP[key], "category", () => menu(key));
+                // トップメニューの描画
+                COMMAND_MENU_STRUCTURE.forEach(item => {
+                    createBtn(item.label, "category", () => menu(item.label));
                 });
-                
-                const sysBtn = document.createElement('button');
-                sysBtn.className = `cmd-btn category`;
-                sysBtn.textContent = "機能";
-                sysBtn.style.gridColumn = "span 1";
-                sysBtn.style.marginTop = "2px"; 
-                sysBtn.onclick = () => {
-                    if (this.game.isProcessingAI) return;
-                    this.cancelMapSelection(true);
-                    menu('SYSTEM');
-                };
-                area.appendChild(sysBtn);
 
                 const finishBtn = document.createElement('button');
                 finishBtn.className = `cmd-btn finish`;
@@ -1542,34 +1526,58 @@ class UIManager {
                     });
                 };
                 area.appendChild(finishBtn);
-                
                 return;
             }
 
-            const specs = this.game.commandSystem.getSpecs();
-            const relevantCommands = Object.entries(specs).filter(([, s]) => s.category === this.menuState);
+            // 選ばれたメニューの中身を探す
+            let currentMenuInfo = null;
+            let parentMenuName = 'MAIN';
 
-            relevantCommands.forEach(([key, spec]) => {
-                createBtn(spec.label, "", () => cmd(key));
-            });
+            for (const topItem of COMMAND_MENU_STRUCTURE) {
+                if (topItem.label === this.menuState) {
+                    currentMenuInfo = topItem;
+                    break;
+                }
+                if (topItem.subMenus) {
+                    for (const sub of topItem.subMenus) {
+                        if (sub.label === this.menuState) {
+                            currentMenuInfo = sub;
+                            parentMenuName = topItem.label;
+                            break;
+                        }
+                    }
+                }
+            }
 
-            if (this.menuState === 'MILITARY') {
-                createBtn("取引", "category", () => menu('MIL_TRADE'));
+            if (!currentMenuInfo) {
+                // もし見つからなかったらメインに戻す安全装置
+                menu('MAIN');
+                return;
             }
-            // ★追加：対外メニューの時に「大名家」「調略」「諸勢力」「朝廷」へのボタンを出します
-            if (this.menuState === 'FOREIGN') {
-                createBtn("外交", "category", () => menu('FOREIGN_DAIMYO'));
-                createBtn("調略", "category", () => menu('FOREIGN_STRATEGY'));
-                createBtn("諸勢力", "category", () => menu('FOREIGN_KUNISHU'));
-                createBtn("朝廷", "category", () => menu('DIPLOMACY_COURT'));
+
+            let btnCount = 0;
+
+            // ① コマンドがあればボタンを作る
+            if (currentMenuInfo.commands) {
+                currentMenuInfo.commands.forEach(key => {
+                    const spec = specs[key];
+                    if (spec) {
+                        createBtn(spec.label, "", () => cmd(key));
+                        btnCount++;
+                    }
+                });
             }
-            
-            // 空きマスの計算も少しだけ変えます
-            let extraBtnCount = 0;
-            if (this.menuState === 'MILITARY') extraBtnCount = 1;
-            if (this.menuState === 'FOREIGN') extraBtnCount = 4;
-            
-            const emptyCount = 3 - ((relevantCommands.length + extraBtnCount) % 3);
+
+            // ② サブメニューがあればそれもボタンを作る
+            if (currentMenuInfo.subMenus) {
+                currentMenuInfo.subMenus.forEach(sub => {
+                    createBtn(sub.label, "category", () => menu(sub.label));
+                    btnCount++;
+                });
+            }
+
+            // ③ グリッドの形を整えるための空白（ダミー）を入れる
+            const emptyCount = 3 - (btnCount % 3);
             if (emptyCount < 3) {
                 for(let i=0; i<emptyCount; i++) {
                     const d = document.createElement('div');
@@ -1577,14 +1585,8 @@ class UIManager {
                 }
             }
 
-            if (this.menuState === 'MIL_TRADE') {
-                createBtn("戻る", "back", () => menu('MILITARY'));
-            } else if (['FOREIGN_DAIMYO', 'FOREIGN_STRATEGY', 'FOREIGN_KUNISHU', 'DIPLOMACY_COURT'].includes(this.menuState)) {
-                // ★追加：大名家や調略などのメニューにいる時は、戻るボタンで「対外」に戻ります
-                createBtn("戻る", "back", () => menu('FOREIGN'));
-            } else {
-                createBtn("戻る", "back", () => menu('MAIN'));
-            }
+            // ④ 戻るボタン
+            createBtn("戻る", "back", () => menu(parentMenuName));
         });
     }
     
