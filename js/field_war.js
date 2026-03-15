@@ -913,7 +913,7 @@ class FieldWarManager {
             pEl.style.setProperty('--fw-dir', `${this.previewTarget.direction * 60}deg`);
             pEl.style.pointerEvents = 'none'; 
             
-            pEl.innerHTML = `<div class="fw-unit-soldiers">${unit.soldiers}</div>`;
+            pEl.innerHTML = `<div class="fw-unit-icon"></div><div class="fw-unit-soldiers">${unit.soldiers}</div>`;
             if (unit.isGeneral) {
                 pEl.classList.add('general');
             }
@@ -951,7 +951,7 @@ class FieldWarManager {
             uEl.style.top = `${u.y * (this.hexH / 2) + (this.hexH - iconSize) / 2}px`;     
             uEl.style.setProperty('--fw-dir', `${u.direction * 60}deg`);
             uEl.style.pointerEvents = 'none'; 
-            uEl.innerHTML = `<div class="fw-unit-soldiers">${u.soldiers}</div>`;
+            uEl.innerHTML = `<div class="fw-unit-icon"></div><div class="fw-unit-soldiers">${u.soldiers}</div>`;
             
             this.mapEl.appendChild(uEl);
         });
