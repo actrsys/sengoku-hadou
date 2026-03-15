@@ -1612,18 +1612,25 @@ class CommandSystem {
         else nextRel = 0;
         kunishu.setRelation(this.game.playerClanId, nextRel);
 
+        // ★修正：プレイヤーの城であっても、「委任」されている時はAI操作なので画面をスキップさせます！
+        const isPlayer = (Number(atkCastle.ownerClan) === Number(this.game.playerClanId) && !atkCastle.isDelegated);
+
         // 戦争マネージャーにデータを渡してスタート
         this.game.warManager.state = { 
             active: true, round: 1, attacker: attackerForce, sourceCastle: atkCastle, 
             defender: dummyDefender, atkBushos: atkBushos, defBusho: leader || {name:"諸勢力", strength:50, intelligence:50, leadership:50}, 
-            turn: 'attacker', isPlayerInvolved: true, deadSoldiers: { attacker: 0, defender: 0 }, defenderGuarding: false,
+            turn: 'attacker', isPlayerInvolved: isPlayer, deadSoldiers: { attacker: 0, defender: 0 }, defenderGuarding: false,
             isKunishuSubjugation: true // 制圧戦であることをマーク
         };
 
         // 野戦を飛ばして、いきなり攻城戦からスタート
         this.game.warManager.startSiegeWarPhase();
-        this.game.ui.updatePanelHeader();
-        this.game.ui.renderCommandMenu();
+        
+        // ★修正：プレイヤーが自分で操作した時だけ、画面を更新するようにします！（AIの裏での行動で画面がバグるのを防ぎます）
+        if (isPlayer) {
+            this.game.ui.updatePanelHeader();
+            this.game.ui.renderCommandMenu();
+        }
     }
 
     executeReward(bushoIds) {
