@@ -1113,6 +1113,12 @@ class UIManager {
         this.forceResetModals();
         const ts = document.getElementById('title-screen');
         if(ts) ts.classList.remove('hidden'); 
+        
+        // ★ここから下を書き足します！
+        if (window.AudioManager) {
+            window.AudioManager.playBGM('SC_ex_Town1_Castle.ogg');
+        }
+        // ★書き足すのはここまで！
     }
     
     // ★ ここをごっそり差し替え！：大名選択の確認画面を、ギュッと小さくコンパクトにする魔法です！
