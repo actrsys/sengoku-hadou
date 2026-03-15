@@ -1565,7 +1565,7 @@ class CommandSystem {
 
     // ★追加: 諸勢力を攻めて壊滅させるための処理（必ず攻城戦になります）
     // ★修正: 騎馬（sendHorses）と鉄砲（sendGuns）も出陣時に持っていくようにしました
-    executeKunishuSubjugate(atkCastle, targetCastleId, atkBushosIds, sendSoldiers, sendRice, sendHorses, sendGuns, kunishu) {
+    async executeKunishuSubjugate(atkCastle, targetCastleId, atkBushosIds, sendSoldiers, sendRice, sendHorses, sendGuns, kunishu) {
         const atkBushos = atkBushosIds.map(id => this.game.getBusho(id));
         const targetCastle = this.game.getCastle(targetCastleId);
         
@@ -1622,6 +1622,18 @@ class CommandSystem {
             turn: 'attacker', isPlayerInvolved: isPlayer, deadSoldiers: { attacker: 0, defender: 0 }, defenderGuarding: false,
             isKunishuSubjugation: true // 制圧戦であることをマーク
         };
+
+        // ★追加：出陣する大名家の情報を調べます
+        const atkClanData = this.game.clans.find(c => c.id === Number(atkCastle.ownerClan));
+        const atkDaimyoName = atkClanData ? atkClanData.name : "大名家";
+        const leaderName = atkBushos[0].name;
+
+        // ★追加：AIの時は、まず誰がどこに攻め込んだかの「開始メッセージ」を出して一旦ストップさせます！
+        if (!isPlayer) {
+            const startMsg = `【諸勢力鎮圧】\n${atkDaimyoName}の${leaderName}が、\n${kunishuName}の鎮圧に向かいました！`;
+            this.game.ui.log(startMsg.replace('\n', ''));
+            await this.game.ui.showTapMessage(startMsg);
+        }
 
         // 野戦を飛ばして、いきなり攻城戦からスタート
         this.game.warManager.startSiegeWarPhase();

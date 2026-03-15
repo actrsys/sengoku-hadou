@@ -964,14 +964,19 @@ Object.assign(WarManager.prototype, {
                 }
             }
             
-            // プレイヤーが諸勢力を制圧（討伐）した時の処理
+            // 諸勢力を制圧（討伐）した時の処理
             if (s.isKunishuSubjugation) {
                 const kunishu = this.game.kunishuSystem.getKunishu(s.defender.kunishuId);
                 let resultMsg = ""; 
                 
+                // ★追加：誰が討伐したのか分かるように、攻撃側の情報を取得します
+                const atkClanData = this.game.clans.find(c => c.id === s.attacker.ownerClan);
+                const atkDaimyoName = atkClanData ? atkClanData.name : "大名家";
+                const leaderName = s.atkBushos[0].name;
+                
                 if (attackerWon) {
-                    resultMsg = `【諸勢力制圧】\n${s.defender.name}の討伐に成功しました！`;
-                    this.game.ui.log(`【諸勢力制圧】${s.defender.name}の討伐に成功しました！`);
+                    resultMsg = `【諸勢力制圧】\n${atkDaimyoName}の${leaderName}が、\n${s.defender.name}の討伐に成功しました！`;
+                    this.game.ui.log(`【諸勢力制圧】${atkDaimyoName}の${leaderName}が、${s.defender.name}の討伐に成功しました！`);
                     if (kunishu) {
                         kunishu.isDestroyed = true;
                         kunishu.soldiers = 0;
@@ -983,8 +988,8 @@ Object.assign(WarManager.prototype, {
                         });
                     }
                 } else {
-                    resultMsg = `【討伐失敗】\n${s.defender.name}の討伐に失敗しました……`;
-                    this.game.ui.log(`【諸勢力制圧】${s.defender.name}の討伐に失敗しました……`);
+                    resultMsg = `【討伐失敗】\n${atkDaimyoName}の${leaderName}は、\n${s.defender.name}の討伐に失敗しました……`;
+                    this.game.ui.log(`【諸勢力制圧】${atkDaimyoName}の${leaderName}は、${s.defender.name}の討伐に失敗しました……`);
                     
                     if (kunishu) {
                         kunishu.soldiers = s.defender.soldiers;
