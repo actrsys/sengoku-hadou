@@ -1408,6 +1408,14 @@ class FieldWarManager {
             this.warState.defSelfReinforcement.guns = defSelfReinfGuns;
         }
 
+        // ★追加：ここで「兵士が0人」になってしまった援軍部隊を、攻城戦に参加させずに「撤退」扱いにします！
+        if (this.game.warManager && typeof this.game.warManager.retreatReinforcementForce === 'function') {
+            if (this.warState.reinforcement && this.warState.reinforcement.soldiers <= 0) this.game.warManager.retreatReinforcementForce('reinforcement');
+            if (this.warState.selfReinforcement && this.warState.selfReinforcement.soldiers <= 0) this.game.warManager.retreatReinforcementForce('selfReinforcement');
+            if (this.warState.defReinforcement && this.warState.defReinforcement.soldiers <= 0) this.game.warManager.retreatReinforcementForce('defReinforcement');
+            if (this.warState.defSelfReinforcement && this.warState.defSelfReinforcement.soldiers <= 0) this.game.warManager.retreatReinforcementForce('defSelfReinforcement');
+        }
+
         const isPlayerInvolved = this.units.some(u => u.isPlayer);
         
         if (isPlayerInvolved) {

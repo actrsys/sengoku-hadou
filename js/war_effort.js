@@ -894,11 +894,21 @@ Object.assign(WarManager.prototype, {
                     const reinf = ret.data;
                     const isAttackerData = ret.isAttackerData;
                     
+                    // ★追加：野戦で減った数（メモ用紙）から、回復する負傷兵を計算します！
+                    const fieldLoss = reinf.fieldLoss || 0;
+                    const recovered = Math.floor(fieldLoss * (isAttackerData ? baseRecoveryRate : defRecoveryRate));
+                    const finalReturnSoldiers = reinf.soldiers + recovered;
+                    
+                    // 吸い込み防止のメモ用紙にも、この負傷兵を記録しておきます
+                    if (isAttackerData) atkReinfTotalLoss += fieldLoss;
+                    else defReinfTotalLoss += fieldLoss;
+                    
                     if (reinf.isKunishuForce) {
                         // 諸勢力の場合のお帰り処理
                         const kunishu = this.game.kunishuSystem.getKunishu(reinf.kunishuId);
                         if (kunishu && !kunishu.isDestroyed) {
-                            kunishu.soldiers = Math.min(99999, kunishu.soldiers + reinf.soldiers);
+                            // ★修正：回復した兵士を足してあげます
+                            kunishu.soldiers = Math.min(99999, kunishu.soldiers + finalReturnSoldiers);
                             kunishu.horses = Math.min(99999, (kunishu.horses || 0) + (reinf.horses || 0)); 
                             kunishu.guns = Math.min(99999, (kunishu.guns || 0) + (reinf.guns || 0));       
                             reinf.bushos.forEach(b => {
@@ -915,7 +925,8 @@ Object.assign(WarManager.prototype, {
                         // 大名家の場合のお帰り処理
                         const helperCastle = this.game.getCastle(reinf.castle.id); 
                         if (helperCastle) {
-                            helperCastle.soldiers = Math.min(99999, helperCastle.soldiers + reinf.soldiers);
+                            // ★修正：回復した兵士を足してあげます
+                            helperCastle.soldiers = Math.min(99999, helperCastle.soldiers + finalReturnSoldiers);
                             helperCastle.rice = Math.min(99999, helperCastle.rice + reinf.rice);
                             helperCastle.horses = Math.min(99999, (helperCastle.horses || 0) + (reinf.horses || 0));
                             helperCastle.guns = Math.min(99999, (helperCastle.guns || 0) + (reinf.guns || 0));
