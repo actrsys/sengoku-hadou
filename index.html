@@ -413,17 +413,40 @@
         </div>
 
         <div id="field-war-modal" class="modal hidden">
-            <div class="modal-content fw-modal-content">
-                <div id="fw-map-area">
-                    <div id="fw-map-scroll">
-                        <div id="fw-map"></div>
-                    </div>
-                    <div id="fw-log" class="fw-log-overlay"></div>
+            <div class="modal-content fw-modal-content" style="width: 100%; height: 100%; max-width: none; max-height: none; margin: 0; padding: 0; border-radius: 0; display: flex; flex-direction: column; background: #263238;">
+                
+                <div id="fw-top-bar" style="background: #000; color: #fff; padding: 5px 15px; display: flex; align-items: center; font-size: 1.1rem; font-weight: bold; flex-shrink: 0; gap: 20px; z-index: 10;">
+                    <span id="fw-date-info">----年--月</span>
+                    <span id="fw-turn-info">残りターン -/-</span>
                 </div>
 
-                <div id="fw-controls" class="fw-controls-area">
-                    <button id="fw-btn-wait" class="btn-secondary hidden">待機</button>
-                    <button id="fw-btn-retreat" class="btn-danger hidden">撤退</button>
+                <div id="fw-map-area" style="flex: 1; position: relative; overflow: hidden; background: #81c784;">
+                    <div id="fw-map-scroll" style="width: 100%; height: 100%; overflow: auto; position: relative; -ms-overflow-style: none; scrollbar-width: none;">
+                        <div id="fw-map" style="position: absolute; transform-origin: top left;"></div>
+                    </div>
+                    <div id="fw-log" style="position: absolute; bottom: 10px; left: 50%; transform: translateX(-50%); width: 90%; max-width: 600px; height: 25%; background: rgba(0, 0, 0, 0.6); color: #fff; border-radius: 8px; border: 1px solid rgba(255, 255, 255, 0.3); padding: 10px; font-size: 0.95rem; overflow-y: auto; z-index: 100; pointer-events: none; text-shadow: 1px 1px 2px #000;"></div>
+                </div>
+
+                <div id="fw-controls-area" style="height: 10vh; min-height: 60px; background: #fff; display: flex; justify-content: center; align-items: center; flex-shrink: 0; border-top: 2px solid #333;">
+                    
+                    <div id="fw-main-menu" style="display: flex; gap: 15px; align-items: center; height: 100%;">
+                        <button id="fw-btn-order" class="btn-primary" style="height: 70%; min-width: 100px; font-size: 1.2rem;">命令</button>
+                        <button id="fw-btn-info" class="btn-primary" style="height: 70%; min-width: 100px; font-size: 1.2rem;">情報</button>
+                        <button id="fw-btn-system" class="btn-primary" style="height: 70%; min-width: 100px; font-size: 1.2rem;">システム</button>
+                    </div>
+                    
+                    <div id="fw-order-menu" class="hidden" style="display: flex; gap: 15px; align-items: center; height: 100%;">
+                        <button id="fw-btn-wait" class="btn-secondary" style="height: 70%; min-width: 100px; font-size: 1.2rem;">待機</button>
+                        <button id="fw-btn-retreat" class="btn-danger" style="height: 70%; min-width: 100px; font-size: 1.2rem;">撤退</button>
+                        <button id="fw-btn-order-back" class="btn-secondary" style="height: 70%; min-width: 100px; font-size: 1.2rem;">戻る</button>
+                    </div>
+                    
+                    <div id="fw-system-menu" class="hidden" style="display: flex; gap: 15px; align-items: center; height: 100%;">
+                        <button id="fw-btn-settings" class="btn-secondary" style="height: 70%; min-width: 100px; font-size: 1.2rem;">設定</button>
+                        <button id="fw-btn-title" class="btn-danger" style="height: 70%; min-width: 100px; font-size: 1.2rem;">タイトル</button>
+                        <button id="fw-btn-system-back" class="btn-secondary" style="height: 70%; min-width: 100px; font-size: 1.2rem;">戻る</button>
+                    </div>
+
                 </div>
             </div>
         </div>
