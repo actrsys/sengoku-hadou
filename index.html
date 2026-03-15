@@ -424,7 +424,7 @@
                         <div id="fw-map" style="position: relative; transition: transform 0.3s; margin: 0;"></div>
                     </div>
                     
-                    <div id="fw-status-bar" class="fw-floating-status">
+                    <div id="fw-status-bar" class="fw-floating-status hidden">
                         <div id="fw-atk-status" class="army-box attacker"></div>
                         <div id="fw-def-status" class="army-box defender"></div>
                     </div>
@@ -435,8 +435,18 @@
                 </div>
 
                 <div id="fw-controls" class="fw-controls">
-                    <button id="fw-btn-wait" class="btn-secondary hidden">待機</button>
-                    <button id="fw-btn-retreat" class="btn-danger hidden">撤退</button>
+                    <div id="fw-menu-main" class="fw-menu-group hidden">
+                        <button id="fw-btn-cmd" class="btn-primary">命令</button>
+                        <button id="fw-btn-wait" class="btn-secondary">待機</button>
+                        <button id="fw-btn-info" class="btn-secondary">情報</button>
+                    </div>
+                    <div id="fw-menu-cmd" class="fw-menu-group hidden">
+                        <button id="fw-btn-retreat" class="btn-danger">撤退</button>
+                        <button id="fw-btn-cmd-back" class="btn-secondary">戻る</button>
+                    </div>
+                    <div id="fw-menu-info" class="fw-menu-group hidden">
+                        <button id="fw-btn-info-back" class="btn-secondary">戻る</button>
+                    </div>
                 </div>
             </div>
         </div>
