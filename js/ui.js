@@ -1558,7 +1558,7 @@ class UIManager {
             }
             // ★追加：対外メニューの時に「大名家」「調略」「諸勢力」「朝廷」へのボタンを出します
             if (this.menuState === 'FOREIGN') {
-                createBtn("大名家", "category", () => menu('FOREIGN_DAIMYO'));
+                createBtn("外交", "category", () => menu('FOREIGN_DAIMYO'));
                 createBtn("調略", "category", () => menu('FOREIGN_STRATEGY'));
                 createBtn("諸勢力", "category", () => menu('FOREIGN_KUNISHU'));
                 createBtn("朝廷", "category", () => menu('DIPLOMACY_COURT'));
