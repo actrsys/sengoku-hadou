@@ -11,11 +11,10 @@ class FieldWarManager {
         this.game = game;
         this.active = false;
         
-        // HEXサイズとマップのグリッド設定
+        // HEXサイズとマップのグリッド設定（初期値、後で動的に再計算）
         this.hexW = 30;
         this.hexH = 26;
-        // 横20マス × 縦12マスのフィールド空間に変更
-        this.cols = 20;
+        this.cols = 10;
         this.rows = 12;
 
         // state: 'IDLE', 'PHASE_MOVE', 'MOVE_PREVIEW', 'PHASE_DIR', 'PHASE_ATTACK'
@@ -25,7 +24,8 @@ class FieldWarManager {
         this.turnBackup = null; 
         window.addEventListener('resize', () => {
             if (this.active) {
-                this.adjustMapScale();
+                this.calculateHexSize();
+                this.updateMap();
             }
         });
     }
@@ -99,63 +99,34 @@ class FieldWarManager {
 
         // 綺麗に並べ終わったものを、総大将の後ろにくっつけます
         orderedSlots = orderedSlots.concat(regionSlots);
-
+        
         return orderedSlots; // 出来上がった配置リストを返します
     }
     
     /**
-     * マップを緑の画面に合わせてギリギリまで大きくする魔法（完全版）
+     * ウインドウ幅に合わせて横10マスがピッタリ収まるようにHEXサイズを再計算する魔法
      */
-    adjustMapScale() {
-        const mapArea = document.getElementById('fw-map');
-        const scrollArea = document.getElementById('fw-map-scroll');
+    calculateHexSize() {
+        const mapArea = document.getElementById('fw-map-area');
+        this.mapEl = document.getElementById('fw-map');
+        if (!mapArea || !this.mapEl) return;
 
-        if (!mapArea || !scrollArea) return;
-
-        // スマホ画面なら、魔法を解除して普通の配置に戻します
-        if (window.innerWidth < 768) {
-            mapArea.style.transform = 'scale(1)';
-            mapArea.style.transformOrigin = 'top left';
-            mapArea.style.margin = '0';
-            scrollArea.style.display = 'block';
-            return;
-        }
-
-        // マップの本来の広さを測ります（万が一取れない時のために予備も用意）
-        const mapWidth = parseFloat(mapArea.style.width) || mapArea.offsetWidth;
-        const mapHeight = parseFloat(mapArea.style.height) || mapArea.offsetHeight;
+        const containerW = mapArea.clientWidth;
         
-        // スクロール枠の広さを測ります（端がぶつからないように20引きます）
-        const availableWidth = scrollArea.clientWidth - 20;
-        const availableHeight = scrollArea.clientHeight - 20;
+        // ★修正: 実際のマップの広さに関わらず、「画面の幅に10マス」が収まるようにHEXの大きさを決めます
+        const displayCols = 10;
+        const scaleFactor = 1 + (displayCols - 1) * 0.75;
+        this.hexW = containerW / scaleFactor;
+        
+        // 元の縦横比 (26 / 30 = 0.866) を維持
+        this.hexH = this.hexW * (26 / 30);
 
-        if (!mapWidth || !mapHeight) return;
-
-        // 縦と横、どちらかはみ出さない「小さい方」の倍率を選びます
-        let scale = Math.min(availableWidth / mapWidth, availableHeight / mapHeight);
-
-        if (scale <= 1.0) {
-            // 【ウインドウが小さい時】
-            // 最低保証の1倍にして、スクロールできるように左上にピッタリ寄せます
-            mapArea.style.transformOrigin = 'top left';
-            mapArea.style.transform = 'scale(1)';
-            mapArea.style.margin = '0';
-            
-            // 緑の枠を普通のスクロール状態に戻します
-            scrollArea.style.display = 'block';
-        } else {
-            // 【ウインドウが大きい時】
-            // ギリギリまで拡大します
-            mapArea.style.transformOrigin = 'center center';
-            mapArea.style.transform = `scale(${scale})`;
-            mapArea.style.margin = '0';
-            
-            // 緑の枠に「Flexbox（フレックスボックス）」という仕組みを使って、
-            // 拡大したマップを画面のド真ん中にガッチリ固定します
-            scrollArea.style.display = 'flex';
-            scrollArea.style.justifyContent = 'center';
-            scrollArea.style.alignItems = 'center';
-        }
+        // マップ全体のサイズは、実際のマップの広さ（this.cols, this.rows）を使って広げます
+        const totalW = (this.cols - 1) * (this.hexW * 0.75) + this.hexW;
+        const totalH = (this.rows * 2 - 1) * (this.hexH / 2) + this.hexH;
+        
+        this.mapEl.style.width = `${totalW}px`;
+        this.mapEl.style.height = `${totalH}px`;
     }
     
     startFieldWar(warState, onComplete) {
@@ -422,9 +393,10 @@ class FieldWarManager {
         this.defMorale = warState.defender.morale;
         this.atkTraining = warState.attacker.training;
         this.defTraining = warState.defender.training;
-
+        
         this.turnQueue = [];
         this.initUI();
+        this.calculateHexSize(); // ★ UI初期化後にサイズ計算
         
         // ★追加：援軍も含めて、プレイヤーが操作する部隊が1つでもあるか調べます！
         const isPlayerInvolved = this.units.some(u => u.isPlayer);
@@ -441,32 +413,60 @@ class FieldWarManager {
         }
         
         this.startTurn();
-        // 野戦の画面が表示されたあとに、大きさをピッタリに合わせる魔法を使います
-        setTimeout(() => {
-            this.adjustMapScale();
-        }, 100); // 画面ができるまで一瞬（0.1秒）だけ待ってから魔法をかけます
     } // ← この「}」が startFieldWar の終わりのカッコです
-
+    
     initUI() {
         this.modal = document.getElementById('field-war-modal');
         this.mapEl = document.getElementById('fw-map');
         this.logEl = document.getElementById('fw-log');
+        const scrollArea = document.getElementById('fw-map-scroll');
         
         if (this.modal) this.modal.classList.remove('hidden');
         if (this.logEl) this.logEl.innerHTML = '';
         
-        const totalW = (this.cols - 1) * (this.hexW * 0.75) + this.hexW;
-        const totalH = (this.rows * 2 - 1) * (this.hexH / 2) + this.hexH;
-        
         if (this.mapEl) {
-            this.mapEl.style.width = `${totalW}px`;
-            this.mapEl.style.height = `${totalH}px`;
             this.mapEl.oncontextmenu = (e) => {
                 e.preventDefault();
                 this.cancelAction();
             };
         }
+        
+        // ★追加: マウスのドラッグでスクロールできるようにする魔法
+        if (scrollArea) {
+            let isDown = false;
+            let startX, startY, scrollLeft, scrollTop;
 
+            scrollArea.addEventListener('mousedown', (e) => {
+                isDown = true;
+                this.isDragging = false; // ドラッグ中かどうかのメモをリセット
+                scrollArea.style.cursor = 'grabbing';
+                startX = e.pageX - scrollArea.offsetLeft;
+                startY = e.pageY - scrollArea.offsetTop;
+                scrollLeft = scrollArea.scrollLeft;
+                scrollTop = scrollArea.scrollTop;
+            });
+            scrollArea.addEventListener('mouseleave', () => {
+                isDown = false;
+                scrollArea.style.cursor = 'auto';
+            });
+            scrollArea.addEventListener('mouseup', () => {
+                isDown = false;
+                scrollArea.style.cursor = 'auto';
+            });
+            scrollArea.addEventListener('mousemove', (e) => {
+                if (!isDown) return;
+                const x = e.pageX - scrollArea.offsetLeft;
+                const y = e.pageY - scrollArea.offsetTop;
+                
+                // 少しでも動いたら「ドラッグしている」と判定します
+                if (Math.abs(x - startX) > 5 || Math.abs(y - startY) > 5) {
+                    this.isDragging = true;
+                    scrollArea.scrollLeft = scrollLeft - (x - startX);
+                    scrollArea.scrollTop = scrollTop - (y - startY);
+                }
+            });
+        }
+        
         const btnWait = document.getElementById('fw-btn-wait');
         const btnRetreat = document.getElementById('fw-btn-retreat');
         
@@ -699,6 +699,9 @@ class FieldWarManager {
                     hex.classList.add(`hex-${this.grid[row][x].terrain}`);
                 }
                 
+                // ★追加: 動的に計算したサイズを直接指定
+                hex.style.width = `${this.hexW}px`;
+                hex.style.height = `${this.hexH}px`;
                 hex.style.left = `${x * (this.hexW * 0.75)}px`;
                 hex.style.top = `${y * (this.hexH / 2)}px`;
                 
@@ -793,7 +796,9 @@ class FieldWarManager {
         if (this.state === 'MOVE_PREVIEW' && this.previewTarget && unit) {
             this.drawPath(this.previewTarget.path, unit.x, unit.y);
             
-            let iconSize = 16 + Math.min(Math.floor(unit.soldiers / 1000), 5) * 3;
+            // ★追加: アイコンサイズもHEX幅に比例して拡大・縮小するように調整
+            let baseIconSize = this.hexW * 0.6; 
+            let iconSize = baseIconSize + Math.min(Math.floor(unit.soldiers / 1000), 5) * (this.hexW * 0.05);
 
             const pEl = document.createElement('div');
             pEl.className = `fw-unit ${unit.isAttacker ? 'attacker' : 'defender'} preview`;
@@ -815,7 +820,9 @@ class FieldWarManager {
         const isDefPlayer = (Number(this.warState.defender.ownerClan) === Number(this.game.playerClanId));
         
         this.units.forEach((u) => {
-            let iconSize = 16 + Math.min(Math.floor(u.soldiers / 1000), 5) * 3;
+            // ★追加: アイコンサイズもHEX幅に比例して拡大・縮小するように調整
+            let baseIconSize = this.hexW * 0.6; 
+            let iconSize = baseIconSize + Math.min(Math.floor(u.soldiers / 1000), 5) * (this.hexW * 0.05);
 
             const uEl = document.createElement('div');
             const isActive = (unit && u.id === unit.id);
@@ -1438,9 +1445,6 @@ class FieldWarManager {
     }
 
     onHexClick(x, y) {
-        if (!this.active) return;
-        
-        const clickedUnit = this.units.find(u => u.x === x && u.y === y);
         const currentUnit = this.turnQueue[0];
 
         if (clickedUnit) {
