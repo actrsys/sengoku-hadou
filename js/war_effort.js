@@ -722,21 +722,33 @@ Object.assign(WarManager.prototype, {
                 }
             };
             
-            // 兵士の減った割合を計算して、馬と鉄砲も減らす（壊れる）処理
-            // 野戦があった場合、ここでの horses と guns は既に野戦生き残り数に更新されており、
-            // originalAtkSoldiers も攻城戦開始時の兵数（野戦生き残り数）となるため、攻城戦での損耗だけが反映される。
-            const originalAtkSoldiers = Math.max(1, s.attacker.soldiers + s.deadSoldiers.attacker);
-            const atkSurviveRate = Math.max(0, s.attacker.soldiers) / originalAtkSoldiers;
+            // ★修正：本当の「攻城戦での死者数」だけを計算して、援軍の生存率を出します！
+            // （野戦で総大将が倒れて終わった場合、攻城戦の死者は0になるので、援軍はそのまま帰れます）
+            let siegeDeadAtk = s.deadSoldiers.attacker;
+            let siegeDeadDef = s.deadSoldiers.defender;
             
-            // ★修正：攻城戦では攻撃側の馬と鉄砲が減らないように、以下の2行の先頭に「//」をつけてお休みにします！
-            // s.attacker.horses = Math.floor((s.attacker.horses || 0) * atkSurviveRate);
-            // s.attacker.guns = Math.floor((s.attacker.guns || 0) * atkSurviveRate);            
+            // 野戦のメモ用紙（fieldDeadSoldiers）があれば、全体の死者から野戦の死者を引きます
+            if (s.fieldDeadSoldiers) {
+                siegeDeadAtk = Math.max(0, s.deadSoldiers.attacker - s.fieldDeadSoldiers.attacker);
+                siegeDeadDef = Math.max(0, s.deadSoldiers.defender - s.fieldDeadSoldiers.defender);
+            }
 
-            // 守備側（城）の馬と鉄砲も、兵士の損耗に合わせて壊れるようにする
+            // 攻城戦での生存率を計算します
+            let atkSurviveRate = 1.0;
+            if (siegeDeadAtk > 0) {
+                const siegeStartAtk = s.attacker.soldiers + siegeDeadAtk;
+                atkSurviveRate = Math.max(0, s.attacker.soldiers) / siegeStartAtk;
+            }
+            
+            let defSurviveRate = 1.0;
+            if (siegeDeadDef > 0) {
+                const siegeStartDef = s.defender.soldiers + siegeDeadDef;
+                defSurviveRate = Math.max(0, s.defender.soldiers) / siegeStartDef;
+            }
+
+            // 守備側の生存率もこの defSurviveRate を使うように統一します
             if (!s.defender.isKunishu) {
-                const originalDefSoldiers = s.defender.soldiers + s.deadSoldiers.defender;
-                const defSurviveRate = originalDefSoldiers > 0 ? (Math.max(0, s.defender.soldiers) / originalDefSoldiers) : 0;
-                // ★修正：守備側の馬と鉄砲も減らないように、以下の2行の先頭に「//」をつけてお休みにします！
+                // 馬と鉄砲は減らない設定なのでお休み中です
                 // s.defender.horses = Math.floor((s.defender.horses || 0) * defSurviveRate);
                 // s.defender.guns = Math.floor((s.defender.guns || 0) * defSurviveRate);
             }
@@ -760,9 +772,8 @@ Object.assign(WarManager.prototype, {
                 if (reinf.isKunishuForce) {
                     const kunishu = this.game.kunishuSystem.getKunishu(reinf.kunishuId);
                     if (kunishu && !kunishu.isDestroyed) {
-                        let surviveRate = 0;
-                        if (isAttackerData) surviveRate = atkSurviveRate;
-                        else surviveRate = (s.defender.soldiers + s.deadSoldiers.defender) > 0 ? (Math.max(0, s.defender.soldiers) / (s.defender.soldiers + s.deadSoldiers.defender)) : 0;
+                        // ★修正：新しく計算した生存率をそのまま使います！
+                        let surviveRate = isAttackerData ? atkSurviveRate : defSurviveRate;
                         
                         // 攻城戦を生き残った数
                         const surviveSoldiers = Math.floor(reinf.soldiers * surviveRate);
@@ -822,9 +833,8 @@ Object.assign(WarManager.prototype, {
 
                 const helperCastle = this.game.getCastle(reinf.castle.id); 
                 if (helperCastle) {
-                    let surviveRate = 0;
-                    if (isAttackerData) surviveRate = atkSurviveRate;
-                    else surviveRate = (s.defender.soldiers + s.deadSoldiers.defender) > 0 ? (Math.max(0, s.defender.soldiers) / (s.defender.soldiers + s.deadSoldiers.defender)) : 0;
+                    // ★修正：新しく計算した生存率をそのまま使います！
+                    let surviveRate = isAttackerData ? atkSurviveRate : defSurviveRate;
 
                     const surviveSoldiers = Math.floor(reinf.soldiers * surviveRate);
                     const siegeLoss = reinf.soldiers - surviveSoldiers;
@@ -841,8 +851,13 @@ Object.assign(WarManager.prototype, {
                     let returnRice = 0;
 
                     if (isAttackerData) {
-                        const ratio = s.attacker.soldiers > 0 ? (finalReturnSoldiers / s.attacker.soldiers) : 0;
-                        returnRice = Math.floor(s.attacker.rice * Math.min(1.0, ratio));
+                        // ★修正：メイン部隊が全滅している時は、兵士の数だけ兵糧を持ち帰ります
+                        if (s.attacker.soldiers > 0) {
+                            const ratio = finalReturnSoldiers / s.attacker.soldiers;
+                            returnRice = Math.floor(s.attacker.rice * Math.min(1.0, ratio));
+                        } else {
+                            returnRice = Math.min(s.attacker.rice, finalReturnSoldiers);
+                        }
                         s.attacker.rice = Math.max(0, s.attacker.rice - returnRice);
                         s.attacker.soldiers = Math.max(0, s.attacker.soldiers - finalReturnSoldiers);
                         s.attacker.horses = Math.max(0, (s.attacker.horses || 0) - returnHorses);

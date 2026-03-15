@@ -1367,6 +1367,14 @@ class FieldWarManager {
         this.warState.attacker.guns = atkGuns;
         this.warState.attacker.morale = this.atkMorale; 
 
+        // ★追加：野戦終了時の死者数をしっかりメモ用紙（fieldDeadSoldiers）に書き留めます！
+        // これがないと、お片付けの時に「攻城戦の死者」と「野戦の死者」が混ざって回復できなくなります
+        if (!this.warState.fieldDeadSoldiers) {
+            this.warState.fieldDeadSoldiers = { attacker: 0, defender: 0 };
+        }
+        this.warState.fieldDeadSoldiers.attacker = this.warState.deadSoldiers.attacker;
+        this.warState.fieldDeadSoldiers.defender = this.warState.deadSoldiers.defender;
+
         // ★追加：攻撃側の「同盟国からの援軍」のデータを更新
         if (this.warState.reinforcement) {
             // ★追加：出陣時と比べてどれだけ野戦で減ったかを計算してメモします！
