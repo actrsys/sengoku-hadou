@@ -276,10 +276,11 @@ const COMMAND_SPECS = {
     },
 
     // --- システム (SYSTEM) - UI生成用プレースホルダ ---
+    'history': { label: "履歴", category: 'SYSTEM', isSystem: true, action: 'history' },
+    'settings': { label: "設定", category: 'SYSTEM', isSystem: true, action: 'settings' },
     'save': { label: "ファイル保存", category: 'SYSTEM', isSystem: true, action: 'save' },
     'load': { label: "ファイル読込", category: 'SYSTEM', isSystem: true, action: 'load' },
-    'settings': { label: "設定", category: 'SYSTEM', isSystem: true, action: 'settings' },
-    'history': { label: "履歴", category: 'SYSTEM', isSystem: true, action: 'history' }
+    'title': { label: "タイトルに戻る", category: 'SYSTEM', isSystem: true, action: 'title' } // ★この１行を書き足します！
 };
 
 class CommandSystem {
@@ -695,6 +696,16 @@ class CommandSystem {
             case 'delegate_list': this.game.ui.showDelegateListModal(); break;
             // ★ここを書き足し！：「settings」と呼ばれたら小窓を開きます
             case 'settings': this.game.ui.showSettingsModal(); break;
+            // ★ここから下を書き足します！
+            case 'title':
+                this.game.ui.showDialog("タイトル画面に戻りますか？\n保存していないデータは失われます。", true, () => {
+                    // 「はい」を押した時だけ、タイトル画面を呼び出してゲーム画面を隠します
+                    this.game.ui.returnToTitle();
+                    const appScreen = document.getElementById('app');
+                    if (appScreen) appScreen.classList.add('hidden');
+                });
+                break;
+            // ★書き足すのはここまで！
         }
     }
 
