@@ -1369,6 +1369,8 @@ class FieldWarManager {
 
         // ★追加：攻撃側の「同盟国からの援軍」のデータを更新
         if (this.warState.reinforcement) {
+            // ★追加：出陣時と比べてどれだけ野戦で減ったかを計算してメモします！
+            this.warState.reinforcement.fieldLoss = Math.max(0, this.warState.reinforcement.soldiers - atkAllyReinfSoldiers);
             this.warState.reinforcement.soldiers = atkAllyReinfSoldiers;
             this.warState.reinforcement.horses = atkAllyReinfHorses;
             this.warState.reinforcement.guns = atkAllyReinfGuns;
@@ -1376,6 +1378,7 @@ class FieldWarManager {
 
         // ★追加：攻撃側の「自分の別の城からの援軍」のデータを更新
         if (this.warState.selfReinforcement) {
+            this.warState.selfReinforcement.fieldLoss = Math.max(0, this.warState.selfReinforcement.soldiers - atkSelfReinfSoldiers);
             this.warState.selfReinforcement.soldiers = atkSelfReinfSoldiers;
             this.warState.selfReinforcement.horses = atkSelfReinfHorses;
             this.warState.selfReinforcement.guns = atkSelfReinfGuns;
@@ -1386,10 +1389,12 @@ class FieldWarManager {
         this.warState.defFieldRice = this.defRice;
         this.warState.defender.fieldHorses = defHorses;
         this.warState.defender.fieldGuns = defGuns;
+        // ★追加: 守備側の士気も同じように保存します
         this.warState.defender.morale = this.defMorale; 
 
         // ★追加：守備側の「同盟国からの援軍」のデータを更新
         if (this.warState.defReinforcement) {
+            this.warState.defReinforcement.fieldLoss = Math.max(0, this.warState.defReinforcement.soldiers - defAllyReinfSoldiers);
             this.warState.defReinforcement.soldiers = defAllyReinfSoldiers;
             this.warState.defReinforcement.horses = defAllyReinfHorses;
             this.warState.defReinforcement.guns = defAllyReinfGuns;
@@ -1397,6 +1402,7 @@ class FieldWarManager {
 
         // ★追加：守備側の「自分の別の城からの援軍」のデータを更新
         if (this.warState.defSelfReinforcement) {
+            this.warState.defSelfReinforcement.fieldLoss = Math.max(0, this.warState.defSelfReinforcement.soldiers - defSelfReinfSoldiers);
             this.warState.defSelfReinforcement.soldiers = defSelfReinfSoldiers;
             this.warState.defSelfReinforcement.horses = defSelfReinfHorses;
             this.warState.defSelfReinforcement.guns = defSelfReinfGuns;

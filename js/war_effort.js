@@ -741,9 +741,20 @@ Object.assign(WarManager.prototype, {
                 // s.defender.guns = Math.floor((s.defender.guns || 0) * defSurviveRate);
             }
             
+            // ★ここから追加：メイン部隊が援軍の負傷兵を吸い込まないように、メモしておく箱を用意します！
+            let atkReinfTotalLoss = 0;
+            let defReinfTotalLoss = 0;
+            const isShortWarForRecovery = s.round < window.WarParams.War.ShortWarTurnLimit;
+            const baseRecoveryRate = window.WarParams.War.BaseRecoveryRate || 0.2;
+            const retreatRecoveryRate = window.WarParams.War.RetreatRecoveryRate || 0.2;
+            const defRecoveryRate = (isRetreat && isShortWarForRecovery) ? retreatRecoveryRate : baseRecoveryRate;
+
             // 援軍部隊を元の城に帰還させる処理をまとめた関数
             const returnReinforcement = (reinf, isAttackerData) => {
                 if (!reinf) return;
+                
+                // ★追加：野戦で減った数（メモ用紙から読み取ります）
+                const fieldLoss = reinf.fieldLoss || 0;
                 
                 // ★ 追加：諸勢力の援軍だった場合の帰還処理です！
                 if (reinf.isKunishuForce) {
@@ -753,30 +764,43 @@ Object.assign(WarManager.prototype, {
                         if (isAttackerData) surviveRate = atkSurviveRate;
                         else surviveRate = (s.defender.soldiers + s.deadSoldiers.defender) > 0 ? (Math.max(0, s.defender.soldiers) / (s.defender.soldiers + s.deadSoldiers.defender)) : 0;
                         
-                        const returnSoldiers = Math.floor(reinf.soldiers * surviveRate);
+                        // 攻城戦を生き残った数
+                        const surviveSoldiers = Math.floor(reinf.soldiers * surviveRate);
+                        // 攻城戦で減った数
+                        const siegeLoss = reinf.soldiers - surviveSoldiers;
+                        // トータルの負傷兵
+                        const totalLoss = fieldLoss + siegeLoss;
+                        
+                        // メイン部隊が吸い込まないようにメモしておきます
+                        if (isAttackerData) atkReinfTotalLoss += totalLoss;
+                        else defReinfTotalLoss += totalLoss;
+                        
+                        // 負傷兵の一部が回復して、一緒に帰ります！
+                        const recovered = Math.floor(totalLoss * (isAttackerData ? baseRecoveryRate : defRecoveryRate));
+                        const finalReturnSoldiers = surviveSoldiers + recovered;
                         
                         // ★追加: 馬と鉄砲の帰還数
                         const returnHorses = Math.floor((reinf.horses || 0) * surviveRate);
                         const returnGuns = Math.floor((reinf.guns || 0) * surviveRate);
                         
                         if (isAttackerData) {
-                            s.attacker.soldiers = Math.max(0, s.attacker.soldiers - returnSoldiers);
-                            s.attacker.horses = Math.max(0, (s.attacker.horses || 0) - returnHorses); // ★追加
-                            s.attacker.guns = Math.max(0, (s.attacker.guns || 0) - returnGuns);       // ★追加
+                            s.attacker.soldiers = Math.max(0, s.attacker.soldiers - finalReturnSoldiers);
+                            s.attacker.horses = Math.max(0, (s.attacker.horses || 0) - returnHorses); 
+                            s.attacker.guns = Math.max(0, (s.attacker.guns || 0) - returnGuns);       
                             reinf.bushos.forEach(rb => { s.atkBushos = s.atkBushos.filter(b => b.id !== rb.id); });
                         } else {
-                            s.defender.soldiers = Math.max(0, s.defender.soldiers - returnSoldiers);
-                            s.defender.horses = Math.max(0, (s.defender.horses || 0) - returnHorses); // ★追加
-                            s.defender.guns = Math.max(0, (s.defender.guns || 0) - returnGuns);       // ★追加
+                            s.defender.soldiers = Math.max(0, s.defender.soldiers - finalReturnSoldiers);
+                            s.defender.horses = Math.max(0, (s.defender.horses || 0) - returnHorses); 
+                            s.defender.guns = Math.max(0, (s.defender.guns || 0) - returnGuns);       
                             reinf.bushos.forEach(rb => {
                                 const idx = s.defender.samuraiIds.indexOf(rb.id);
                                 if (idx !== -1) s.defender.samuraiIds.splice(idx, 1);
                             });
                         }
                         
-                        kunishu.soldiers = Math.min(99999, kunishu.soldiers + returnSoldiers);
-                        kunishu.horses = Math.min(99999, (kunishu.horses || 0) + returnHorses); // ★追加
-                        kunishu.guns = Math.min(99999, (kunishu.guns || 0) + returnGuns);       // ★追加
+                        kunishu.soldiers = Math.min(99999, kunishu.soldiers + finalReturnSoldiers);
+                        kunishu.horses = Math.min(99999, (kunishu.horses || 0) + returnHorses); 
+                        kunishu.guns = Math.min(99999, (kunishu.guns || 0) + returnGuns);       
                         reinf.bushos.forEach(b => {
                             b.castleId = kunishu.castleId; 
                             b.isCastellan = false;
@@ -802,21 +826,30 @@ Object.assign(WarManager.prototype, {
                     if (isAttackerData) surviveRate = atkSurviveRate;
                     else surviveRate = (s.defender.soldiers + s.deadSoldiers.defender) > 0 ? (Math.max(0, s.defender.soldiers) / (s.defender.soldiers + s.deadSoldiers.defender)) : 0;
 
-                    const returnSoldiers = Math.floor(reinf.soldiers * surviveRate);
+                    const surviveSoldiers = Math.floor(reinf.soldiers * surviveRate);
+                    const siegeLoss = reinf.soldiers - surviveSoldiers;
+                    const totalLoss = fieldLoss + siegeLoss;
+                    
+                    if (isAttackerData) atkReinfTotalLoss += totalLoss;
+                    else defReinfTotalLoss += totalLoss;
+                    
+                    const recovered = Math.floor(totalLoss * (isAttackerData ? baseRecoveryRate : defRecoveryRate));
+                    const finalReturnSoldiers = surviveSoldiers + recovered;
+
                     const returnHorses = Math.floor(reinf.horses * surviveRate);
                     const returnGuns = Math.floor(reinf.guns * surviveRate);
                     let returnRice = 0;
 
                     if (isAttackerData) {
-                        const ratio = s.attacker.soldiers > 0 ? (returnSoldiers / s.attacker.soldiers) : 0;
+                        const ratio = s.attacker.soldiers > 0 ? (finalReturnSoldiers / s.attacker.soldiers) : 0;
                         returnRice = Math.floor(s.attacker.rice * Math.min(1.0, ratio));
                         s.attacker.rice = Math.max(0, s.attacker.rice - returnRice);
-                        s.attacker.soldiers = Math.max(0, s.attacker.soldiers - returnSoldiers);
+                        s.attacker.soldiers = Math.max(0, s.attacker.soldiers - finalReturnSoldiers);
                         s.attacker.horses = Math.max(0, (s.attacker.horses || 0) - returnHorses);
                         s.attacker.guns = Math.max(0, (s.attacker.guns || 0) - returnGuns);
                         reinf.bushos.forEach(rb => { s.atkBushos = s.atkBushos.filter(b => b.id !== rb.id); });
                     } else {
-                        s.defender.soldiers = Math.max(0, s.defender.soldiers - returnSoldiers);
+                        s.defender.soldiers = Math.max(0, s.defender.soldiers - finalReturnSoldiers);
                         s.defender.horses = Math.max(0, (s.defender.horses || 0) - returnHorses);
                         s.defender.guns = Math.max(0, (s.defender.guns || 0) - returnGuns);
                         reinf.bushos.forEach(rb => {
@@ -825,7 +858,7 @@ Object.assign(WarManager.prototype, {
                         });
                     }
 
-                    helperCastle.soldiers = Math.min(99999, helperCastle.soldiers + returnSoldiers);
+                    helperCastle.soldiers = Math.min(99999, helperCastle.soldiers + finalReturnSoldiers);
                     helperCastle.rice = Math.min(99999, helperCastle.rice + returnRice);
                     helperCastle.horses = Math.min(99999, (helperCastle.horses || 0) + returnHorses);
                     helperCastle.guns = Math.min(99999, (helperCastle.guns || 0) + returnGuns);
@@ -1061,8 +1094,11 @@ Object.assign(WarManager.prototype, {
 
             if (s.isPlayerInvolved) { this.game.ui.setWarModalVisible(false); }
             
-            const isShortWar = s.round < window.WarParams.War.ShortWarTurnLimit;
-            const attackerRecovered = Math.floor(s.deadSoldiers.attacker * window.WarParams.War.BaseRecoveryRate);
+            // ★修正：メイン部隊の本当の負傷兵（全体の負傷兵から、援軍の分を引いたもの）を計算します！
+            const realAtkDead = Math.max(0, s.deadSoldiers.attacker - atkReinfTotalLoss);
+            const realDefDead = Math.max(0, s.deadSoldiers.defender - defReinfTotalLoss);
+            
+            const attackerRecovered = Math.floor(realAtkDead * baseRecoveryRate);
             const totalAtkSurvivors = s.attacker.soldiers + attackerRecovered;
 
             if (s.attacker.rice > 0) {
@@ -1079,14 +1115,14 @@ Object.assign(WarManager.prototype, {
             if (isRetreat && retreatTargetId) {
                 const targetC = this.game.getCastle(retreatTargetId);
                 if (targetC) {
-                    const recovered = Math.floor(s.deadSoldiers.defender * (isShortWar ? window.WarParams.War.RetreatRecoveryRate : window.WarParams.War.BaseRecoveryRate));
+                    const recovered = Math.floor(realDefDead * defRecoveryRate);
                     // ★追加：撤退先での兵士合流にストッパー！
                     targetC.soldiers = Math.min(99999, targetC.soldiers + s.defender.soldiers + recovered);
                     if (s.isPlayerInvolved && recovered > 0) this.game.ui.log(`(撤退先にて負傷兵 ${recovered}名 が復帰)`);
                 }
             } else if (!isRetreat && attackerWon) {
                 const survivors = Math.max(0, s.defender.soldiers);
-                const recovered = Math.floor(s.deadSoldiers.defender * 0.2);
+                const recovered = Math.floor(realDefDead * baseRecoveryRate);
                 const totalAbsorbed = survivors + recovered;
 
                 // ★追加：攻め込んだ元気な兵士と、城に残っていた兵士の士気と訓練をまぜまぜします！
@@ -1116,7 +1152,8 @@ Object.assign(WarManager.prototype, {
                 srcC.soldiers = Math.min(99999, newTotalSoldiers);
                 srcC.horses = Math.min(99999, (srcC.horses || 0) + (s.attacker.horses || 0));
                 srcC.guns = Math.min(99999, (srcC.guns || 0) + (s.attacker.guns || 0));
-                const recovered = Math.floor(s.deadSoldiers.defender * window.WarParams.War.BaseRecoveryRate);
+                
+                const recovered = Math.floor(realDefDead * baseRecoveryRate);
                 s.defender.soldiers = Math.min(99999, s.defender.soldiers + recovered);
                 if (s.isPlayerInvolved && attackerRecovered > 0) this.game.ui.log(`(遠征軍 負傷兵 ${attackerRecovered}名 が帰還)`);
             }
