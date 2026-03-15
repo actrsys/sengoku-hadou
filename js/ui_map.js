@@ -777,7 +777,8 @@ Object.assign(UIManager.prototype, {
             'war',
             'atk_self_reinforcement', 'atk_ally_reinforcement',
             'def_self_reinforcement', 'def_ally_reinforcement',
-            'investigate', 'info_investigate', 'investigation' // ★調査コマンド用に追加しました！
+            'investigate', 'info_investigate', 'investigation', // ★調査コマンド用に追加しました！
+            'incite', 'rumor', 'headhunt', 'headhunt_select_castle' // ★調略コマンド用に追加しました！
         ];
         if (hiddenModes.includes(this.game.selectionMode)) return;
 
