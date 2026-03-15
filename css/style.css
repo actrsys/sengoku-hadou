@@ -487,15 +487,24 @@ body.hide-daimyo-labels .daimyo-name-label { display: none !important; }
 }
 
 .fw-hex { background-color: #aed581; clip-path: polygon(25% 0%, 75% 0%, 100% 50%, 75% 100%, 25% 100%, 0% 50%); position: absolute; box-sizing: border-box; display: flex; justify-content: center; align-items: center; color: rgba(0,0,0,0.3); font-size: 8px; font-weight: bold; transition: background-color 0.2s, filter 0.2s; user-select: none; transform: scale(0.96); }
-.fw-hex:hover { filter: brightness(1.1); }
+.fw-hex:hover { filter: brightness(1.15); }
 .fw-hex::after { content: ""; position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; }
+
+/* ★追加：移動範囲や攻撃範囲などのホバー反応を分かりやすく強化 */
 .fw-hex.movable { cursor: pointer; filter: brightness(1.1); }
+.fw-hex.movable:hover { filter: brightness(1.3); } /* ←さらに明るく */
 .fw-hex.movable::after { background-color: rgba(244, 143, 177, 0.58); }
+
 .fw-hex.current-pos { cursor: pointer; filter: brightness(1.1); }
+.fw-hex.current-pos:hover { filter: brightness(1.3); }
 .fw-hex.current-pos::after { background-color: rgba(255, 255, 255, 0.65); } 
+
 .fw-hex.attackable { cursor: pointer; filter: brightness(1.1); }
+.fw-hex.attackable:hover { filter: brightness(1.3); }
 .fw-hex.attackable::after { background-color: rgba(239, 83, 80, 0.58); box-shadow: inset 0 0 15px red; } 
+
 .fw-hex.fw-dir-highlight { cursor: pointer; filter: brightness(1.2); }
+.fw-hex.fw-dir-highlight:hover { filter: brightness(1.4); }
 .fw-hex.fw-dir-highlight::after { background-color: rgba(255, 235, 59, 0.5); box-shadow: inset 0 0 10px #fbc02d; }
 
 .hex-plain { background-color: #81c784 !important; background-image: linear-gradient(0deg, rgba(255, 255, 255, 0.15) 50%, transparent 50%) !important; background-size: 10px 10px !important; }
