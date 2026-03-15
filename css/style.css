@@ -415,7 +415,11 @@ body.hide-daimyo-labels .daimyo-name-label { display: none !important; }
 
 .fw-top-bar { height: 30px; background: #000; color: #fff; display: flex; align-items: center; padding: 0 10px; font-size: 0.9rem; font-weight: bold; gap: 20px; flex-shrink: 0; }
 .fw-main-area { flex: 1; position: relative; overflow: hidden; background: #81c784; }
-.fw-map-scroll { width: 100%; height: 100%; overflow: auto; display: block; }
+
+/* ★追加：スクロールバーを消して、ドラッグの手のマークにする魔法 */
+.fw-map-scroll { width: 100%; height: 100%; overflow: auto; display: block; scrollbar-width: none; -ms-overflow-style: none; cursor: grab; }
+.fw-map-scroll::-webkit-scrollbar { display: none; }
+.fw-map-scroll.grabbing { cursor: grabbing; }
 
 .fw-floating-status { position: absolute; top: 10px; left: 10px; right: 10px; display: flex; justify-content: space-between; pointer-events: none; z-index: 100; gap: 10px; }
 .fw-floating-status .army-box { flex: 1; max-width: 300px; margin: 0; padding: 5px 10px; font-size: 0.85rem; background: rgba(0, 0, 0, 0.7) !important; color: #fff; border: 2px solid; pointer-events: auto; }
