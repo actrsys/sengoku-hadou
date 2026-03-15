@@ -446,15 +446,17 @@ class FieldWarManager {
         const scrollEl = document.getElementById('fw-map-scroll');
         if (scrollEl) {
             let isDragging = false;
+            let isMoved = false; // ★ドラッグで動かしたかどうかのメモ
             let startX, startY, scrollLeft, scrollTop;
 
             scrollEl.onmousedown = (e) => {
                 // 左クリック以外（右クリックなど）は無視します
                 if (e.button !== 0) return;
-                // 部隊やマス目をクリックした時は、そっちの操作を優先させるためドラッグをキャンセルします
-                if (e.target.closest('.fw-hex') || e.target.closest('.fw-unit')) return;
+                
+                // ★マス目の上でもドラッグできるように、邪魔なストッパーを消しました！
                 
                 isDragging = true;
+                isMoved = false; // クリックするたびにメモを白紙に戻す
                 scrollEl.classList.add('grabbing');
                 startX = e.pageX - scrollEl.offsetLeft;
                 startY = e.pageY - scrollEl.offsetTop;
@@ -470,6 +472,9 @@ class FieldWarManager {
             scrollEl.onmouseup = () => {
                 isDragging = false;
                 scrollEl.classList.remove('grabbing');
+                
+                // 指を離した直後にクリック判定が暴発しないように、少しだけ待ってからメモを白紙にする魔法です
+                setTimeout(() => { isMoved = false; }, 50);
             };
 
             scrollEl.onmousemove = (e) => {
@@ -477,11 +482,27 @@ class FieldWarManager {
                 e.preventDefault();
                 const x = e.pageX - scrollEl.offsetLeft;
                 const y = e.pageY - scrollEl.offsetTop;
-                const walkX = (x - startX) * 1.5; // 動かすスピード（1.5倍）
-                const walkY = (y - startY) * 1.5;
-                scrollEl.scrollLeft = scrollLeft - walkX;
-                scrollEl.scrollTop = scrollTop - walkY;
+                
+                // ★手が震えただけの「クリック」と見分けるため、少し多めに動いた時だけ「ドラッグした」とメモします
+                if (Math.abs(x - startX) > 5 || Math.abs(y - startY) > 5) {
+                    isMoved = true;
+                }
+
+                if (isMoved) {
+                    const walkX = (x - startX) * 1.5; 
+                    const walkY = (y - startY) * 1.5;
+                    scrollEl.scrollLeft = scrollLeft - walkX;
+                    scrollEl.scrollTop = scrollTop - walkY;
+                }
             };
+
+            // ★マップ全体の操作を見張って、「ドラッグした直後のクリック」ならマス目への指示をキャンセルするガードマンです
+            scrollEl.addEventListener('click', (e) => {
+                if (isMoved) {
+                    e.stopPropagation(); // ここでストップをかけます！
+                    e.preventDefault();
+                }
+            }, true); // true にすることで、誰よりも早く見張ることができます
         }
 
         const btnWait = document.getElementById('fw-btn-wait');
