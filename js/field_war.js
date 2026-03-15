@@ -11,10 +11,11 @@ class FieldWarManager {
         this.game = game;
         this.active = false;
         
-        // HEXサイズとマップのグリッド設定（初期値、後で動的に再計算）
+        // HEXサイズとマップのグリッド設定
         this.hexW = 30;
         this.hexH = 26;
-        this.cols = 10;
+        // 横20マス × 縦12マスのフィールド空間に変更
+        this.cols = 20;
         this.rows = 12;
 
         // state: 'IDLE', 'PHASE_MOVE', 'MOVE_PREVIEW', 'PHASE_DIR', 'PHASE_ATTACK'
@@ -24,8 +25,7 @@ class FieldWarManager {
         this.turnBackup = null; 
         window.addEventListener('resize', () => {
             if (this.active) {
-                this.calculateHexSize();
-                this.updateMap();
+                this.adjustMapScale();
             }
         });
     }
@@ -99,36 +99,38 @@ class FieldWarManager {
 
         // 綺麗に並べ終わったものを、総大将の後ろにくっつけます
         orderedSlots = orderedSlots.concat(regionSlots);
-        
+
         return orderedSlots; // 出来上がった配置リストを返します
     }
     
     /**
-     * ウインドウ幅に合わせて横10マスがピッタリ収まるようにHEXサイズを再計算する魔法
+     * マップを緑の画面に合わせてギリギリまで大きくする魔法（完全版）
      */
-    calculateHexSize() {
-        const mapArea = document.getElementById('fw-map-area');
-        this.mapEl = document.getElementById('fw-map');
-        if (!mapArea || !this.mapEl) return;
+    adjustMapScale() {
+        const mapArea = document.getElementById('fw-map');
+        const scrollArea = document.getElementById('fw-map-scroll');
 
-        const containerW = mapArea.clientWidth;
-        
-        // ★修正: スマホ判定を行い、PCなら16マス、スマホなら10マスにします
-        const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
-        const displayCols = isMobile ? 10 : 16;
-        
-        const scaleFactor = 1 + (displayCols - 1) * 0.75;
-        this.hexW = containerW / scaleFactor;
-        
-        // 元の縦横比 (26 / 30 = 0.866) を維持
-        this.hexH = this.hexW * (26 / 30);
+        if (!mapArea || !scrollArea) return;
 
-        // マップ全体のサイズは、実際のマップの広さ（this.cols, this.rows）を使って広げます
-        const totalW = (this.cols - 1) * (this.hexW * 0.75) + this.hexW;
-        const totalH = (this.rows * 2 - 1) * (this.hexH / 2) + this.hexH;
+        // スマホかPCかによって、画面横幅に表示するマス数を固定します
+        const isPC = document.body.classList.contains('is-pc') || window.innerWidth >= 768;
+        const targetCols = isPC ? 16 : 10;
+
+        // 目標とするマス数分の「本来の横幅(ピクセル)」を計算します
+        const targetWidthPx = (targetCols - 1) * (this.hexW * 0.75) + this.hexW;
         
-        this.mapEl.style.width = `${totalW}px`;
-        this.mapEl.style.height = `${totalH}px`;
+        // 実際の画面の横幅を測ります
+        const availableWidth = scrollArea.clientWidth;
+
+        // 画面の幅にピッタリ合わせるための拡大/縮小率（スケール）を割り出します
+        let scale = availableWidth / targetWidthPx;
+
+        // 割り出したスケールをマップに適用します
+        mapArea.style.transformOrigin = 'top left';
+        mapArea.style.transform = `scale(${scale})`;
+        mapArea.style.margin = '0';
+        
+        scrollArea.style.display = 'block';
     }
     
     startFieldWar(warState, onComplete) {
@@ -395,10 +397,9 @@ class FieldWarManager {
         this.defMorale = warState.defender.morale;
         this.atkTraining = warState.attacker.training;
         this.defTraining = warState.defender.training;
-        
+
         this.turnQueue = [];
         this.initUI();
-        this.calculateHexSize(); // ★ UI初期化後にサイズ計算
         
         // ★追加：援軍も含めて、プレイヤーが操作する部隊が1つでもあるか調べます！
         const isPlayerInvolved = this.units.some(u => u.isPlayer);
@@ -415,121 +416,35 @@ class FieldWarManager {
         }
         
         this.startTurn();
+        // 野戦の画面が表示されたあとに、大きさをピッタリに合わせる魔法を使います
+        setTimeout(() => {
+            this.adjustMapScale();
+        }, 100); // 画面ができるまで一瞬（0.1秒）だけ待ってから魔法をかけます
     } // ← この「}」が startFieldWar の終わりのカッコです
-    
+
     initUI() {
         this.modal = document.getElementById('field-war-modal');
         this.mapEl = document.getElementById('fw-map');
         this.logEl = document.getElementById('fw-log');
-        const scrollArea = document.getElementById('fw-map-scroll');
         
         if (this.modal) this.modal.classList.remove('hidden');
         if (this.logEl) this.logEl.innerHTML = '';
         
+        const totalW = (this.cols - 1) * (this.hexW * 0.75) + this.hexW;
+        const totalH = (this.rows * 2 - 1) * (this.hexH / 2) + this.hexH;
+        
         if (this.mapEl) {
+            this.mapEl.style.width = `${totalW}px`;
+            this.mapEl.style.height = `${totalH}px`;
             this.mapEl.oncontextmenu = (e) => {
                 e.preventDefault();
                 this.cancelAction();
             };
         }
-        
-        // ★追加: マウスのドラッグでスクロールできるようにする魔法
-        if (scrollArea) {
-            let isDown = false;
-            let startX, startY, scrollLeft, scrollTop;
 
-            scrollArea.addEventListener('mousedown', (e) => {
-                isDown = true;
-                this.isDragging = false; // ドラッグ中かどうかのメモをリセット
-                scrollArea.style.cursor = 'grabbing';
-                startX = e.pageX - scrollArea.offsetLeft;
-                startY = e.pageY - scrollArea.offsetTop;
-                scrollLeft = scrollArea.scrollLeft;
-                scrollTop = scrollArea.scrollTop;
-            });
-            scrollArea.addEventListener('mouseleave', () => {
-                isDown = false;
-                scrollArea.style.cursor = 'auto';
-                setTimeout(() => { this.isDragging = false; }, 50);
-            });
-            scrollArea.addEventListener('mouseup', () => {
-                isDown = false;
-                scrollArea.style.cursor = 'auto';
-                setTimeout(() => { this.isDragging = false; }, 50);
-            });
-            scrollArea.addEventListener('mousemove', (e) => {
-                if (!isDown) return;
-                const x = e.pageX - scrollArea.offsetLeft;
-                const y = e.pageY - scrollArea.offsetTop;
-                
-                if (Math.abs(x - startX) > 10 || Math.abs(y - startY) > 10) {
-                    this.isDragging = true;
-                    scrollArea.scrollLeft = scrollLeft - (x - startX);
-                    scrollArea.scrollTop = scrollTop - (y - startY);
-                }
-            });
-
-            scrollArea.addEventListener('touchstart', () => { this.isDragging = false; }, {passive: true});
-            scrollArea.addEventListener('touchmove', () => { this.isDragging = true; }, {passive: true});
-            scrollArea.addEventListener('touchend', () => {
-                setTimeout(() => { this.isDragging = false; }, 50);
-            }, {passive: true});
-        }
-        
         const btnWait = document.getElementById('fw-btn-wait');
         const btnRetreat = document.getElementById('fw-btn-retreat');
         
-        // ★追加: 階層メニューの制御
-        const mainMenu = document.getElementById('fw-main-menu');
-        const orderMenu = document.getElementById('fw-order-menu');
-        const systemMenu = document.getElementById('fw-system-menu');
-        
-        const btnOrder = document.getElementById('fw-btn-order');
-        const btnInfo = document.getElementById('fw-btn-info');
-        const btnSystem = document.getElementById('fw-btn-system');
-        const btnOrderBack = document.getElementById('fw-btn-order-back');
-        const btnSystemBack = document.getElementById('fw-btn-system-back');
-
-        const btnSettings = document.getElementById('fw-btn-settings');
-        const btnTitle = document.getElementById('fw-btn-title');
-
-        this.resetMenu = () => {
-            if (mainMenu) mainMenu.classList.remove('hidden');
-            if (orderMenu) orderMenu.classList.add('hidden');
-            if (systemMenu) systemMenu.classList.add('hidden');
-        };
-
-        if (btnOrder) btnOrder.onclick = () => {
-            if (!this.isPlayerTurn()) return; // 敵ターン中は押せない
-            mainMenu.classList.add('hidden');
-            orderMenu.classList.remove('hidden');
-        };
-        if (btnSystem) btnSystem.onclick = () => {
-            mainMenu.classList.add('hidden');
-            systemMenu.classList.remove('hidden');
-        };
-        if (btnInfo) btnInfo.onclick = () => {
-            this.log("情報メニューは準備中です。");
-        };
-        if (btnOrderBack) btnOrderBack.onclick = this.resetMenu;
-        if (btnSystemBack) btnSystemBack.onclick = this.resetMenu;
-
-        if (btnSettings) btnSettings.onclick = () => {
-            const settingsModal = document.getElementById('settings-modal');
-            if (settingsModal) settingsModal.classList.remove('hidden');
-        };
-        if (btnTitle) btnTitle.onclick = () => {
-            if (this.game && this.game.ui) {
-                this.game.ui.showDialog("タイトルに戻りますか？\nセーブしていないデータは失われます。", true, () => {
-                    location.reload();
-                });
-            } else {
-                if (confirm("タイトルに戻りますか？\nセーブしていないデータは失われます。")) {
-                    location.reload();
-                }
-            }
-        };
-
         if (btnWait) {
             btnWait.onclick = () => {
                 if (!this.isPlayerTurn()) return;
@@ -537,7 +452,6 @@ class FieldWarManager {
                 this.log(`${unit.name}隊は待機した。`);
                 unit.hasActionDone = true;
                 this.state = 'IDLE';
-                this.resetMenu(); // ★メインメニューに戻す
                 this.nextPhaseTurn();
             };
         }
@@ -549,7 +463,6 @@ class FieldWarManager {
                 this.game.ui.showDialog("全軍を撤退させますか？", true, () => {
                     if (unit.isAttacker) this.log(`撤退を開始します……`);
                     else this.log(`城内へ撤退を開始します……`);
-                    this.resetMenu(); // ★メインメニューに戻す
                     this.endFieldWar(unit.isAttacker ? 'attacker_retreat' : 'defender_retreat');
                 });
             };
@@ -593,10 +506,20 @@ class FieldWarManager {
 
     scrollToUnit(unit) {
         const scrollEl = document.getElementById('fw-map-scroll');
-        if (!scrollEl) return;
+        const mapEl = document.getElementById('fw-map');
+        if (!scrollEl || !mapEl) return;
         
-        const px = unit.x * (this.hexW * 0.75) + this.hexW / 2;
-        const py = unit.y * (this.hexH / 2) + this.hexH / 2;
+        // 現在のマップのスケール（拡大率）を読み取ります
+        const transform = mapEl.style.transform;
+        let scale = 1;
+        if (transform && transform.includes('scale')) {
+            const match = transform.match(/scale\(([^)]+)\)/);
+            if (match && match[1]) scale = parseFloat(match[1]);
+        }
+        
+        // 拡大率を掛け算して、本当のピクセル位置を計算します
+        const px = (unit.x * (this.hexW * 0.75) + this.hexW / 2) * scale;
+        const py = (unit.y * (this.hexH / 2) + this.hexH / 2) * scale;
 
         const containerW = scrollEl.clientWidth;
         const containerH = scrollEl.clientHeight;
@@ -624,22 +547,9 @@ class FieldWarManager {
             else defSoldiers += u.soldiers;
         });
 
-        // ★追加: 上部バーの年月と残りターンを更新
-        const dateEl = document.getElementById('fw-date-info');
-        const turnEl = document.getElementById('fw-turn-info');
-        
-        if (dateEl && this.game) {
-            dateEl.innerText = `${this.game.year}年${this.game.month}月`;
-        }
-        if (turnEl) {
-            let remainTurns = this.maxTurns - this.turnCount + 1;
-            turnEl.innerText = `残りターン ${remainTurns}/${this.maxTurns}`;
-        }
-
         const atkEl = document.getElementById('fw-atk-status');
         const defEl = document.getElementById('fw-def-status');
 
-        // ★変更: 士気(Morale)も画面に表示して、変動がリアルタイムで見えるようにしました！
         if (atkEl) atkEl.innerHTML = `<strong>[攻] ${this.warState.attacker.name}</strong><br>兵: ${atkSoldiers} / 糧: ${this.atkRice} / 士気: ${this.atkMorale}`;
         if (defEl) defEl.innerHTML = `<strong>[守] ${this.warState.defender.name}</strong><br>兵: ${defSoldiers} / 糧: ${this.defRice} / 士気: ${this.defMorale}`;
         
@@ -657,8 +567,14 @@ class FieldWarManager {
             if (defEl) defEl.style.order = 2;
         }
 
+        // 黒帯のターン表示と年月を更新します
         const turnEl = document.getElementById('fw-turn-info');
-        if (turnEl) turnEl.innerText = `Turn: ${this.turnCount}/${this.maxTurns}`;
+        if (turnEl) turnEl.innerText = `残りターン ◯/△`.replace('◯', this.turnCount).replace('△', this.maxTurns);
+
+        const dateEl = document.getElementById('fw-date-info');
+        if (dateEl && this.game) {
+            dateEl.innerText = `${this.game.year}年 ${this.game.month}月`;
+        }
     }
     
     showUnitInfo(unit) {
@@ -773,9 +689,6 @@ class FieldWarManager {
                     hex.classList.add(`hex-${this.grid[row][x].terrain}`);
                 }
                 
-                // ★追加: 動的に計算したサイズを直接指定
-                hex.style.width = `${this.hexW}px`;
-                hex.style.height = `${this.hexH}px`;
                 hex.style.left = `${x * (this.hexW * 0.75)}px`;
                 hex.style.top = `${y * (this.hexH / 2)}px`;
                 
@@ -870,9 +783,7 @@ class FieldWarManager {
         if (this.state === 'MOVE_PREVIEW' && this.previewTarget && unit) {
             this.drawPath(this.previewTarget.path, unit.x, unit.y);
             
-            // ★追加: アイコンサイズもHEX幅に比例して拡大・縮小するように調整
-            let baseIconSize = this.hexW * 0.6; 
-            let iconSize = baseIconSize + Math.min(Math.floor(unit.soldiers / 1000), 5) * (this.hexW * 0.05);
+            let iconSize = 16 + Math.min(Math.floor(unit.soldiers / 1000), 5) * 3;
 
             const pEl = document.createElement('div');
             pEl.className = `fw-unit ${unit.isAttacker ? 'attacker' : 'defender'} preview`;
@@ -894,9 +805,7 @@ class FieldWarManager {
         const isDefPlayer = (Number(this.warState.defender.ownerClan) === Number(this.game.playerClanId));
         
         this.units.forEach((u) => {
-            // ★追加: アイコンサイズもHEX幅に比例して拡大・縮小するように調整
-            let baseIconSize = this.hexW * 0.6; 
-            let iconSize = baseIconSize + Math.min(Math.floor(u.soldiers / 1000), 5) * (this.hexW * 0.05);
+            let iconSize = 16 + Math.min(Math.floor(u.soldiers / 1000), 5) * 3;
 
             const uEl = document.createElement('div');
             const isActive = (unit && u.id === unit.id);
@@ -928,18 +837,14 @@ class FieldWarManager {
             this.mapEl.appendChild(uEl);
         });
 
-        const btnOrder = document.getElementById('fw-btn-order');
+        const btnWait = document.getElementById('fw-btn-wait');
+        const btnRetreat = document.getElementById('fw-btn-retreat');
         if (isPlayerTurn) {
-            if (btnOrder) {
-                btnOrder.style.opacity = '1';
-                btnOrder.style.pointerEvents = 'auto';
-            }
+            if(btnWait) btnWait.classList.remove('hidden');
+            if(btnRetreat) btnRetreat.classList.remove('hidden');
         } else {
-            if (btnOrder) {
-                btnOrder.style.opacity = '0.5';
-                btnOrder.style.pointerEvents = 'none';
-            }
-            if (this.resetMenu) this.resetMenu(); // 敵ターン中はメインメニューに強制戻し
+            if(btnWait) btnWait.classList.add('hidden');
+            if(btnRetreat) btnRetreat.classList.add('hidden');
         }
     }
 
@@ -1525,13 +1430,6 @@ class FieldWarManager {
     onHexClick(x, y) {
         if (!this.active) return;
         
-        // ★修正: 画面をドラッグ中ならクリックを無視した上で、念のためドラッグ状態を強制リセットします
-        if (this.isDragging) {
-            this.isDragging = false;
-            return;
-        }
-
-        // ★修正: クリックしたマスにいる部隊を探す処理を復活させました
         const clickedUnit = this.units.find(u => u.x === x && u.y === y);
         const currentUnit = this.turnQueue[0];
 
@@ -1553,18 +1451,18 @@ class FieldWarManager {
             }
 
             let key = `${x},${y}`;
-            if (this.reachable && this.reachable[key]) {
-                let path = this.reachable[key].path;
-                let previewDir = unit.direction; 
-                if (path && path.length > 0) {
-                    let fromX = (path.length > 1) ? path[path.length - 2].x : unit.x;
-                    let fromY = (path.length > 1) ? path[path.length - 2].y : unit.y;
-                    previewDir = this.getDirection(fromX, fromY, x, y);
-                }
-                this.previewTarget = {x: x, y: y, path: path, cost: this.reachable[key].cost, direction: previewDir};
-                this.state = 'MOVE_PREVIEW';
-                this.updateMap();
-            } else {
+			if (this.reachable && this.reachable[key]) {
+			    let path = this.reachable[key].path;
+			    let previewDir = unit.direction; 
+			    if (path && path.length > 0) {
+			        let fromX = (path.length > 1) ? path[path.length - 2].x : unit.x;
+			        let fromY = (path.length > 1) ? path[path.length - 2].y : unit.y;
+			        previewDir = this.getDirection(fromX, fromY, x, y);
+			    }
+			    this.previewTarget = {x: x, y: y, path: path, cost: this.reachable[key].cost, direction: previewDir};
+			    this.state = 'MOVE_PREVIEW';
+			    this.updateMap();
+			} else {
                 this.cancelAction();
                 if(clickedUnit) this.showUnitInfo(clickedUnit);
             }
@@ -1575,38 +1473,38 @@ class FieldWarManager {
                 return;
             }
 
-            if (this.previewTarget && x === this.previewTarget.x && y === this.previewTarget.y) {
-                let path = this.previewTarget.path;
-                if (path && path.length > 0) {
-                    let fromX = unit.x;
-                    let fromY = unit.y;
-                    if (path.length > 1) {
-                        let prevStep = path[path.length - 2];
-                        fromX = prevStep.x;
-                        fromY = prevStep.y;
-                    }
-                    unit.direction = this.getDirection(fromX, fromY, x, y);
-                }
+			if (this.previewTarget && x === this.previewTarget.x && y === this.previewTarget.y) {
+			    let path = this.previewTarget.path;
+			    if (path && path.length > 0) {
+			        let fromX = unit.x;
+			        let fromY = unit.y;
+			        if (path.length > 1) {
+			            let prevStep = path[path.length - 2];
+			            fromX = prevStep.x;
+			            fromY = prevStep.y;
+			        }
+			        unit.direction = this.getDirection(fromX, fromY, x, y);
+			    }
 
-                unit.ap -= this.previewTarget.cost;
-                unit.x = x;
-                unit.y = y;
+			    unit.ap -= this.previewTarget.cost;
+			    unit.x = x;
+			    unit.y = y;
                 unit.hasMoved = true; // ★ 移動したことを記録
-                this.log(`${unit.name}隊が移動（向きも変更）。`);
-                this.nextPhase();
-            } else {
+			    this.log(`${unit.name}隊が移動（向きも変更）。`);
+			    this.nextPhase();
+			} else {
                 let key = `${x},${y}`;
-                if (this.reachable && this.reachable[key]) {
-                    let path = this.reachable[key].path;
-                    let previewDir = unit.direction;
-                    if (path && path.length > 0) {
-                        let fromX = (path.length > 1) ? path[path.length - 2].x : unit.x;
-                        let fromY = (path.length > 1) ? path[path.length - 2].y : unit.y;
-                        previewDir = this.getDirection(fromX, fromY, x, y);
-                    }
-                    this.previewTarget = {x: x, y: y, path: path, cost: this.reachable[key].cost, direction: previewDir};
-                    this.updateMap();
-                } else {
+				if (this.reachable && this.reachable[key]) {
+				    let path = this.reachable[key].path;
+				    let previewDir = unit.direction;
+				    if (path && path.length > 0) {
+				        let fromX = (path.length > 1) ? path[path.length - 2].x : unit.x;
+				        let fromY = (path.length > 1) ? path[path.length - 2].y : unit.y;
+				        previewDir = this.getDirection(fromX, fromY, x, y);
+				    }
+				    this.previewTarget = {x: x, y: y, path: path, cost: this.reachable[key].cost, direction: previewDir};
+				    this.updateMap();
+				} else {
                     this.cancelAction();
                     if(clickedUnit) this.showUnitInfo(clickedUnit);
                 }
