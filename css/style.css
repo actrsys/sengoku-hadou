@@ -410,13 +410,83 @@ body.hide-daimyo-labels .daimyo-name-label { display: none !important; }
    ñÏêÌ (HEXÅEïîë‡)
    ========================================================= */
 #field-war-modal { padding: 0 !important; }
-#field-war-modal .modal-content { width: 100% !important; height: 100% !important; max-width: none !important; max-height: none !important; margin: 0 !important; border-radius: 0 !important; border: none !important; padding: 0 !important; }
-#fw-log { height: 45px !important; min-height: 45px !important; margin-bottom: 5px !important; }
-#field-war-modal h2, #fw-status-bar, #fw-controls { padding-left: 10px !important; padding-right: 10px !important; margin-top: 5px !important; }
-#fw-map-scroll { border-left: none !important; border-right: none !important; }
-#fw-map { background-color: #37474f; }
+#field-war-modal .modal-content.fw-modal-content { 
+    width: 100% !important; 
+    height: 100% !important; 
+    max-width: none !important; 
+    max-height: none !important; 
+    margin: 0 !important; 
+    border-radius: 0 !important; 
+    border: none !important; 
+    padding: 0 !important; 
+    display: flex; 
+    flex-direction: column; 
+    background-color: #263238;
+}
 
-.fw-hex { width: 30px; height: 26px; background-color: #aed581; clip-path: polygon(25% 0%, 75% 0%, 100% 50%, 75% 100%, 25% 100%, 0% 50%); position: absolute; box-sizing: border-box; display: flex; justify-content: center; align-items: center; color: rgba(0,0,0,0.3); font-size: 8px; font-weight: bold; transition: background-color 0.2s, filter 0.2s; user-select: none; transform: scale(0.94); }
+#fw-map-area {
+    flex: 1;
+    position: relative;
+    overflow: hidden;
+    background: #81c784;
+}
+
+#fw-map-scroll {
+    width: 100%;
+    height: 100%;
+    overflow: auto;
+    position: relative;
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+}
+#fw-map-scroll::-webkit-scrollbar { display: none; }
+
+#fw-map { 
+    position: absolute; 
+    transform-origin: top left;
+}
+
+.fw-log-overlay {
+    position: absolute;
+    bottom: 10px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 90%;
+    max-width: 600px;
+    height: 25%;
+    background: rgba(0, 0, 0, 0.6);
+    color: #fff;
+    border-radius: 8px;
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    padding: 10px;
+    font-size: 0.95rem;
+    overflow-y: auto;
+    z-index: 100;
+    pointer-events: none;
+}
+.fw-log-overlay div {
+    text-shadow: 1px 1px 2px #000;
+}
+
+.fw-controls-area {
+    height: 10vh;
+    min-height: 60px;
+    background: #fff;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 15px;
+    flex-shrink: 0;
+    border-top: 2px solid #333;
+}
+.fw-controls-area button {
+    height: 70%;
+    min-width: 120px;
+    font-size: 1.2rem;
+    border-radius: 6px;
+}
+
+.fw-hex { background-color: #aed581; clip-path: polygon(25% 0%, 75% 0%, 100% 50%, 75% 100%, 25% 100%, 0% 50%); position: absolute; box-sizing: border-box; display: flex; justify-content: center; align-items: center; color: rgba(0,0,0,0.3); font-size: 8px; font-weight: bold; transition: background-color 0.2s, filter 0.2s; user-select: none; transform: scale(0.96); }
 .fw-hex:hover { filter: brightness(1.1); }
 .fw-hex::after { content: ""; position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; }
 .fw-hex.movable { cursor: pointer; filter: brightness(1.1); }
