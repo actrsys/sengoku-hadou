@@ -157,6 +157,14 @@ class Busho {
         this.intelligence = Number(this.intelligence || 0);
         this.charm = Number(this.charm || 0);
 
+        // ★【ここから書き足し：能力の基礎値】
+        // 年齢によって能力が下がっても、元の「全盛期の能力」を忘れないように箱に入れておきます！
+        this.baseLeadership = Number(data.baseLeadership !== undefined ? data.baseLeadership : this.leadership);
+        this.baseStrength = Number(data.baseStrength !== undefined ? data.baseStrength : this.strength);
+        this.basePolitics = Number(data.basePolitics !== undefined ? data.basePolitics : this.politics);
+        this.baseDiplomacy = Number(data.baseDiplomacy !== undefined ? data.baseDiplomacy : this.diplomacy);
+        this.baseIntelligence = Number(data.baseIntelligence !== undefined ? data.baseIntelligence : this.intelligence);
+
         // ★【ここから書き足し：兵科適性】
         // 何も入っていない（空っぽ）なら、最低ランクの 'E' を入れる設定です
         this.aptAshigaru = data.aptAshigaru || 'E'; // 足軽適性

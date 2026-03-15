@@ -782,6 +782,9 @@ class GameManager {
             // ★ここを書き足し！：諸勢力の頭領がいないかチェックして、いなければ自動で作ってもらいます！
             this.kunishuSystem.generateMissingLeaders();
             
+            // ★ここを書き足し！：ゲーム開始の瞬間に、全員の年齢による能力値変動を計算します！
+            this.lifeSystem.updateAllBushosAge();
+            
             // ★ここを書き足し！：画像の大きさをゲーム全体で覚えるようにします！
             this.mapWidth = data.mapWidth || 1200;
             this.mapHeight = data.mapHeight || 800;
@@ -1455,6 +1458,9 @@ class GameManager {
                 this.currentIndex = 0; 
 
                 this.updateAllCastlesLords();
+
+                // ★ここを書き足し！：ロードした時も、念のため年齢による能力変動を再計算しておきます
+                this.lifeSystem.updateAllBushosAge();
 
                 this.ui.showCutin(`ロード完了: ${this.year}年 ${this.month}月`);
                 this.ui.hasInitializedMap = false; 

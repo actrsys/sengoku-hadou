@@ -11,6 +11,7 @@ class LifeSystem {
     // 毎月の初め（1月）に「新しく登場する武将がいないか」をチェックします
     async processStartMonth() {
         if (this.game.month === 1) {
+            this.updateAllBushosAge(); // ★追加：毎年1月に、全員の年齢と能力を計算し直します！
             await this.checkBirth();
             await this.checkNameChange(); // ★この行を書き足しました！
         }
@@ -19,6 +20,39 @@ class LifeSystem {
     // 毎月の終わりに「寿命を迎えて亡くなる武将がいないか」をチェックします
     async processEndMonth() {
         await this.checkDeath();
+    }
+
+    // ★ 全員の年齢から能力値を計算し直す魔法です！
+    updateAllBushosAge() {
+        const currentYear = this.game.year;
+        
+        for (const b of this.game.bushos) {
+            // まだ生まれていない武将は計算しません
+            if (b.status === 'unborn') continue;
+
+            // 今の年齢を計算します
+            const age = currentYear - b.birthYear;
+            
+            let penalty = 0;
+            
+            // 30歳未満の場合（2歳若くなるごとにマイナス1）
+            if (age < 30) {
+                // 30歳との差を計算して、2で割って切り上げます（例：29歳なら差1→0.5→切り上げて1）
+                penalty = Math.ceil((30 - age) / 2);
+            } 
+            // 46歳以上の場合（2年歳をとるごとにマイナス1）
+            else if (age > 45) {
+                // 45歳との差を計算して、2で割って切り上げます（例：46歳なら差1→0.5→切り上げて1）
+                penalty = Math.ceil((age - 45) / 2);
+            }
+            
+            // 基礎値からペナルティを引いて、0以下にならないように（最低1）セットします
+            b.leadership = Math.max(1, b.baseLeadership - penalty);
+            b.strength = Math.max(1, b.baseStrength - penalty);
+            b.politics = Math.max(1, b.basePolitics - penalty);
+            b.diplomacy = Math.max(1, b.baseDiplomacy - penalty);
+            b.intelligence = Math.max(1, b.baseIntelligence - penalty);
+        }
     }
 
     // ==========================================
