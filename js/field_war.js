@@ -113,8 +113,8 @@ class FieldWarManager {
 
         const containerW = mapArea.clientWidth;
         
-        // ★修正: 実際のマップの広さに関わらず、「画面の幅に10マス」が収まるようにHEXの大きさを決めます
-        const displayCols = 10;
+        // ★修正: 実際のマップの広さに関わらず、「画面の幅に16マス」が収まるようにHEXの大きさを決めます
+        const displayCols = 16;
         const scaleFactor = 1 + (displayCols - 1) * 0.75;
         this.hexW = containerW / scaleFactor;
         
@@ -448,23 +448,34 @@ class FieldWarManager {
             scrollArea.addEventListener('mouseleave', () => {
                 isDown = false;
                 scrollArea.style.cursor = 'auto';
+                // ★修正: ドラッグ判定をリセット（クリックイベントが発火した直後に消すため少し遅らせます）
+                setTimeout(() => { this.isDragging = false; }, 100);
             });
             scrollArea.addEventListener('mouseup', () => {
                 isDown = false;
                 scrollArea.style.cursor = 'auto';
+                // ★修正: ドラッグ判定をリセット（クリックイベントが発火した直後に消すため少し遅らせます）
+                setTimeout(() => { this.isDragging = false; }, 100);
             });
             scrollArea.addEventListener('mousemove', (e) => {
                 if (!isDown) return;
                 const x = e.pageX - scrollArea.offsetLeft;
                 const y = e.pageY - scrollArea.offsetTop;
                 
-                // 少しでも動いたら「ドラッグしている」と判定します
-                if (Math.abs(x - startX) > 5 || Math.abs(y - startY) > 5) {
+                // ★修正: クリック時の手ぶれで誤判定しないよう、遊び（ゆとり）を少し大きくします
+                if (Math.abs(x - startX) > 10 || Math.abs(y - startY) > 10) {
                     this.isDragging = true;
                     scrollArea.scrollLeft = scrollLeft - (x - startX);
                     scrollArea.scrollTop = scrollTop - (y - startY);
                 }
             });
+
+            // ★追加: スマホのスワイプ（フリック）中も誤クリックを防ぐための魔法
+            scrollArea.addEventListener('touchstart', () => { this.isDragging = false; }, {passive: true});
+            scrollArea.addEventListener('touchmove', () => { this.isDragging = true; }, {passive: true});
+            scrollArea.addEventListener('touchend', () => {
+                setTimeout(() => { this.isDragging = false; }, 100);
+            }, {passive: true});
         }
         
         const btnWait = document.getElementById('fw-btn-wait');
