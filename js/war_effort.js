@@ -722,38 +722,41 @@ Object.assign(WarManager.prototype, {
                 }
             };
             
-            // ★修正：本当の「攻城戦での死者数」だけを計算して、援軍の生存率を出します！
-            // （野戦で総大将が倒れて終わった場合、攻城戦の死者は0になるので、援軍はそのまま帰れます）
+            // ★ここから「生存率の計算」と「援軍の帰還処理」を丸ごと新しくします！
+            
+            // 1. 攻城戦の本当の死者を出す（全体の死者から、野戦の死者を引きます）
             let siegeDeadAtk = s.deadSoldiers.attacker;
             let siegeDeadDef = s.deadSoldiers.defender;
             
-            // 野戦のメモ用紙（fieldDeadSoldiers）があれば、全体の死者から野戦の死者を引きます
             if (s.fieldDeadSoldiers) {
                 siegeDeadAtk = Math.max(0, s.deadSoldiers.attacker - s.fieldDeadSoldiers.attacker);
                 siegeDeadDef = Math.max(0, s.deadSoldiers.defender - s.fieldDeadSoldiers.defender);
             }
 
-            // 攻城戦での生存率を計算します
+            // 2. 攻城戦の開始時の全兵力を計算する（メイン部隊と援軍をすべて足します）
+            const currentAtkMain = Math.max(0, s.attacker.soldiers);
+            const currentAtkAlly = s.reinforcement ? Math.max(0, s.reinforcement.soldiers) : 0;
+            const currentAtkSelfAlly = s.selfReinforcement ? Math.max(0, s.selfReinforcement.soldiers) : 0;
+            const totalCurrentAtk = currentAtkMain + currentAtkAlly + currentAtkSelfAlly;
+            
             let atkSurviveRate = 1.0;
             if (siegeDeadAtk > 0) {
-                const siegeStartAtk = s.attacker.soldiers + siegeDeadAtk;
-                atkSurviveRate = Math.max(0, s.attacker.soldiers) / siegeStartAtk;
-            }
-            
-            let defSurviveRate = 1.0;
-            if (siegeDeadDef > 0) {
-                const siegeStartDef = s.defender.soldiers + siegeDeadDef;
-                defSurviveRate = Math.max(0, s.defender.soldiers) / siegeStartDef;
+                const siegeStartAtk = totalCurrentAtk + siegeDeadAtk;
+                atkSurviveRate = Math.max(0, totalCurrentAtk) / Math.max(1, siegeStartAtk);
             }
 
-            // 守備側の生存率もこの defSurviveRate を使うように統一します
-            if (!s.defender.isKunishu) {
-                // 馬と鉄砲は減らない設定なのでお休み中です
-                // s.defender.horses = Math.floor((s.defender.horses || 0) * defSurviveRate);
-                // s.defender.guns = Math.floor((s.defender.guns || 0) * defSurviveRate);
+            const currentDefMain = Math.max(0, s.defender.soldiers);
+            const currentDefAlly = s.defReinforcement ? Math.max(0, s.defReinforcement.soldiers) : 0;
+            const currentDefSelfAlly = s.defSelfReinforcement ? Math.max(0, s.defSelfReinforcement.soldiers) : 0;
+            const totalCurrentDef = currentDefMain + currentDefAlly + currentDefSelfAlly;
+
+            let defSurviveRate = 1.0;
+            if (siegeDeadDef > 0) {
+                const siegeStartDef = totalCurrentDef + siegeDeadDef;
+                defSurviveRate = Math.max(0, totalCurrentDef) / Math.max(1, siegeStartDef);
             }
-            
-            // ★ここから追加：メイン部隊が援軍の負傷兵を吸い込まないように、メモしておく箱を用意します！
+
+            // 3. 吸い込み防止の箱と、回復率の設定
             let atkReinfTotalLoss = 0;
             let defReinfTotalLoss = 0;
             const isShortWarForRecovery = s.round < window.WarParams.War.ShortWarTurnLimit;
@@ -761,140 +764,107 @@ Object.assign(WarManager.prototype, {
             const retreatRecoveryRate = window.WarParams.War.RetreatRecoveryRate || 0.2;
             const defRecoveryRate = (isRetreat && isShortWarForRecovery) ? retreatRecoveryRate : baseRecoveryRate;
 
-            // 援軍部隊を元の城に帰還させる処理をまとめた関数
+            // 4. 援軍部隊を元の城に帰還させるお帰り魔法
             const returnReinforcement = (reinf, isAttackerData) => {
                 if (!reinf) return;
                 
-                // ★追加：野戦で減った数（メモ用紙から読み取ります）
+                // 野戦で減った数（メモ用紙から読み取ります）
                 const fieldLoss = reinf.fieldLoss || 0;
                 
-                // ★ 追加：諸勢力の援軍だった場合の帰還処理です！
+                // 新しく計算した生存率を使います！
+                let surviveRate = isAttackerData ? atkSurviveRate : defSurviveRate;
+                
+                // 攻城戦を生き残った数
+                const surviveSoldiers = Math.floor(reinf.soldiers * surviveRate);
+                // 攻城戦で減った数
+                const siegeLoss = reinf.soldiers - surviveSoldiers;
+                // トータルの負傷兵
+                const totalLoss = fieldLoss + siegeLoss;
+                
+                // メイン部隊が吸い込まないようにメモしておきます
+                if (isAttackerData) atkReinfTotalLoss += totalLoss;
+                else defReinfTotalLoss += totalLoss;
+                
+                // 負傷兵の一部が回復して、一緒に帰ります！
+                const recovered = Math.floor(totalLoss * (isAttackerData ? baseRecoveryRate : defRecoveryRate));
+                const finalReturnSoldiers = surviveSoldiers + recovered;
+                
+                // 馬と鉄砲の帰還数
+                const returnHorses = Math.floor((reinf.horses || 0) * surviveRate);
+                const returnGuns = Math.floor((reinf.guns || 0) * surviveRate);
+
+                // 諸勢力の場合
                 if (reinf.isKunishuForce) {
                     const kunishu = this.game.kunishuSystem.getKunishu(reinf.kunishuId);
                     if (kunishu && !kunishu.isDestroyed) {
-                        // ★修正：新しく計算した生存率をそのまま使います！
-                        let surviveRate = isAttackerData ? atkSurviveRate : defSurviveRate;
-                        
-                        // 攻城戦を生き残った数
-                        const surviveSoldiers = Math.floor(reinf.soldiers * surviveRate);
-                        // 攻城戦で減った数
-                        const siegeLoss = reinf.soldiers - surviveSoldiers;
-                        // トータルの負傷兵
-                        const totalLoss = fieldLoss + siegeLoss;
-                        
-                        // メイン部隊が吸い込まないようにメモしておきます
-                        if (isAttackerData) atkReinfTotalLoss += totalLoss;
-                        else defReinfTotalLoss += totalLoss;
-                        
-                        // 負傷兵の一部が回復して、一緒に帰ります！
-                        const recovered = Math.floor(totalLoss * (isAttackerData ? baseRecoveryRate : defRecoveryRate));
-                        const finalReturnSoldiers = surviveSoldiers + recovered;
-                        
-                        // ★追加: 馬と鉄砲の帰還数
-                        const returnHorses = Math.floor((reinf.horses || 0) * surviveRate);
-                        const returnGuns = Math.floor((reinf.guns || 0) * surviveRate);
-                        
-                        if (isAttackerData) {
-                            s.attacker.soldiers = Math.max(0, s.attacker.soldiers - finalReturnSoldiers);
-                            s.attacker.horses = Math.max(0, (s.attacker.horses || 0) - returnHorses); 
-                            s.attacker.guns = Math.max(0, (s.attacker.guns || 0) - returnGuns);       
-                            reinf.bushos.forEach(rb => { s.atkBushos = s.atkBushos.filter(b => b.id !== rb.id); });
-                        } else {
-                            s.defender.soldiers = Math.max(0, s.defender.soldiers - finalReturnSoldiers);
-                            s.defender.horses = Math.max(0, (s.defender.horses || 0) - returnHorses); 
-                            s.defender.guns = Math.max(0, (s.defender.guns || 0) - returnGuns);       
-                            reinf.bushos.forEach(rb => {
-                                const idx = s.defender.samuraiIds.indexOf(rb.id);
-                                if (idx !== -1) s.defender.samuraiIds.splice(idx, 1);
-                            });
-                        }
-                        
                         kunishu.soldiers = Math.min(99999, kunishu.soldiers + finalReturnSoldiers);
                         kunishu.horses = Math.min(99999, (kunishu.horses || 0) + returnHorses); 
                         kunishu.guns = Math.min(99999, (kunishu.guns || 0) + returnGuns);       
                         reinf.bushos.forEach(b => {
-                            b.castleId = kunishu.castleId; 
-                            b.isCastellan = false;
+                            b.castleId = kunishu.castleId; b.isCastellan = false;
                         });
-                        
                         const myClanId = isAttackerData ? s.sourceCastle.ownerClan : s.defender.ownerClan;
                         let isWin = isAttackerData ? attackerWon : !attackerWon;
-                        const kRel = kunishu.getRelation(myClanId);
                         if (isWin) {
-                            kunishu.setRelation(myClanId, kRel + 5);
+                            kunishu.setRelation(myClanId, kunishu.getRelation(myClanId) + 5);
                             if (s.isPlayerInvolved) this.game.ui.log(`(援軍が勝利に貢献し、${kunishu.getName(this.game)}との友好度が上がりました)`);
                         } else {
-                            kunishu.setRelation(myClanId, kRel - 5);
+                            kunishu.setRelation(myClanId, kunishu.getRelation(myClanId) - 5);
                             if (s.isPlayerInvolved) this.game.ui.log(`(敗北/撤退により、${kunishu.getName(this.game)}との友好度が下がりました)`);
                         }
                     }
-                    return;
-                }
-
-                const helperCastle = this.game.getCastle(reinf.castle.id); 
-                if (helperCastle) {
-                    // ★修正：新しく計算した生存率をそのまま使います！
-                    let surviveRate = isAttackerData ? atkSurviveRate : defSurviveRate;
-
-                    const surviveSoldiers = Math.floor(reinf.soldiers * surviveRate);
-                    const siegeLoss = reinf.soldiers - surviveSoldiers;
-                    const totalLoss = fieldLoss + siegeLoss;
-                    
-                    if (isAttackerData) atkReinfTotalLoss += totalLoss;
-                    else defReinfTotalLoss += totalLoss;
-                    
-                    const recovered = Math.floor(totalLoss * (isAttackerData ? baseRecoveryRate : defRecoveryRate));
-                    const finalReturnSoldiers = surviveSoldiers + recovered;
-
-                    const returnHorses = Math.floor(reinf.horses * surviveRate);
-                    const returnGuns = Math.floor(reinf.guns * surviveRate);
-                    let returnRice = 0;
-
-                    if (isAttackerData) {
-                        // ★修正：メイン部隊が全滅している時は、兵士の数だけ兵糧を持ち帰ります
-                        if (s.attacker.soldiers > 0) {
-                            const ratio = finalReturnSoldiers / s.attacker.soldiers;
-                            returnRice = Math.floor(s.attacker.rice * Math.min(1.0, ratio));
-                        } else {
-                            returnRice = Math.min(s.attacker.rice, finalReturnSoldiers);
+                } else {
+                    // 大名家の場合
+                    const helperCastle = this.game.getCastle(reinf.castle.id); 
+                    if (helperCastle) {
+                        let returnRice = 0;
+                        // メイン部隊から兵糧を分けてもらう
+                        if (isAttackerData) {
+                            // メイン部隊が全滅している時は、兵士の数だけ兵糧を持ち帰ります
+                            if (totalCurrentAtk > 0) {
+                                const ratio = finalReturnSoldiers / totalCurrentAtk;
+                                returnRice = Math.floor(s.attacker.rice * Math.min(1.0, ratio));
+                            } else {
+                                returnRice = Math.min(s.attacker.rice, finalReturnSoldiers);
+                            }
+                            s.attacker.rice = Math.max(0, s.attacker.rice - returnRice);
                         }
-                        s.attacker.rice = Math.max(0, s.attacker.rice - returnRice);
-                        s.attacker.soldiers = Math.max(0, s.attacker.soldiers - finalReturnSoldiers);
-                        s.attacker.horses = Math.max(0, (s.attacker.horses || 0) - returnHorses);
-                        s.attacker.guns = Math.max(0, (s.attacker.guns || 0) - returnGuns);
-                        reinf.bushos.forEach(rb => { s.atkBushos = s.atkBushos.filter(b => b.id !== rb.id); });
-                    } else {
-                        s.defender.soldiers = Math.max(0, s.defender.soldiers - finalReturnSoldiers);
-                        s.defender.horses = Math.max(0, (s.defender.horses || 0) - returnHorses);
-                        s.defender.guns = Math.max(0, (s.defender.guns || 0) - returnGuns);
-                        reinf.bushos.forEach(rb => {
-                            const idx = s.defender.samuraiIds.indexOf(rb.id);
-                            if (idx !== -1) s.defender.samuraiIds.splice(idx, 1);
+
+                        helperCastle.soldiers = Math.min(99999, helperCastle.soldiers + finalReturnSoldiers);
+                        helperCastle.rice = Math.min(99999, helperCastle.rice + returnRice);
+                        helperCastle.horses = Math.min(99999, (helperCastle.horses || 0) + returnHorses);
+                        helperCastle.guns = Math.min(99999, (helperCastle.guns || 0) + returnGuns);
+                        
+                        reinf.bushos.forEach(b => {
+                            b.castleId = helperCastle.id; 
+                            b.isCastellan = false;
+                            if (!helperCastle.samuraiIds.includes(b.id)) helperCastle.samuraiIds.push(b.id);
                         });
-                    }
+                        this.game.updateCastleLord(helperCastle);
 
-                    helperCastle.soldiers = Math.min(99999, helperCastle.soldiers + finalReturnSoldiers);
-                    helperCastle.rice = Math.min(99999, helperCastle.rice + returnRice);
-                    helperCastle.horses = Math.min(99999, (helperCastle.horses || 0) + returnHorses);
-                    helperCastle.guns = Math.min(99999, (helperCastle.guns || 0) + returnGuns);
-                    reinf.bushos.forEach(b => {
-                        b.castleId = helperCastle.id; b.isCastellan = false;
-                        if (!helperCastle.samuraiIds.includes(b.id)) helperCastle.samuraiIds.push(b.id);
-                    });
-                    this.game.updateCastleLord(helperCastle);
-
-                    if (!reinf.isSelf) {
-                        const myClanId = isAttackerData ? s.sourceCastle.ownerClan : s.defender.ownerClan;
-                        const helperClanId = helperCastle.ownerClan;
-                        let isWin = isAttackerData ? attackerWon : !attackerWon;
-                        if (isWin) {
-                            this.game.diplomacyManager.updateSentiment(myClanId, helperClanId, 5);
-                            if (s.isPlayerInvolved) this.game.ui.log(`(援軍が勝利に貢献し、${this.game.clans.find(c=>c.id===helperClanId)?.name}との友好度が上がりました)`);
-                        } else {
-                            this.game.diplomacyManager.updateSentiment(myClanId, helperClanId, -5);
-                            if (s.isPlayerInvolved) this.game.ui.log(`(敗北/撤退により、${this.game.clans.find(c=>c.id===helperClanId)?.name}との友好度が下がりました)`);
+                        if (!reinf.isSelf) {
+                            const myClanId = isAttackerData ? s.sourceCastle.ownerClan : s.defender.ownerClan;
+                            const helperClanId = helperCastle.ownerClan;
+                            let isWin = isAttackerData ? attackerWon : !attackerWon;
+                            if (isWin) {
+                                this.game.diplomacyManager.updateSentiment(myClanId, helperClanId, 5);
+                                if (s.isPlayerInvolved) this.game.ui.log(`(援軍が勝利に貢献し、${this.game.clans.find(c=>c.id===helperClanId)?.name}との友好度が上がりました)`);
+                            } else {
+                                this.game.diplomacyManager.updateSentiment(myClanId, helperClanId, -5);
+                                if (s.isPlayerInvolved) this.game.ui.log(`(敗北/撤退により、${this.game.clans.find(c=>c.id===helperClanId)?.name}との友好度が下がりました)`);
+                            }
                         }
                     }
+                }
+                
+                // 武将を戦場リストから消す
+                if (isAttackerData) {
+                    reinf.bushos.forEach(rb => { s.atkBushos = s.atkBushos.filter(b => b.id !== rb.id); });
+                } else {
+                    reinf.bushos.forEach(rb => {
+                        const idx = s.defender.samuraiIds.indexOf(rb.id);
+                        if (idx !== -1) s.defender.samuraiIds.splice(idx, 1);
+                    });
                 }
             };
 
@@ -903,13 +873,13 @@ Object.assign(WarManager.prototype, {
             returnReinforcement(s.defSelfReinforcement, false);
             returnReinforcement(s.defReinforcement, false);
             
-            // ★ここから追加：途中で撤退した援軍たちを、無事にお城へ帰してあげる魔法
+            // 5. 途中で撤退した援軍たちを、無事にお城へ帰してあげる魔法
             if (s.retreatedReinforcements) {
                 s.retreatedReinforcements.forEach(ret => {
                     const reinf = ret.data;
                     const isAttackerData = ret.isAttackerData;
                     
-                    // ★追加：野戦で減った数（メモ用紙）から、回復する負傷兵を計算します！
+                    // 野戦で減った数（メモ用紙）から、回復する負傷兵を計算します！
                     const fieldLoss = reinf.fieldLoss || 0;
                     const recovered = Math.floor(fieldLoss * (isAttackerData ? baseRecoveryRate : defRecoveryRate));
                     const finalReturnSoldiers = reinf.soldiers + recovered;
@@ -919,10 +889,8 @@ Object.assign(WarManager.prototype, {
                     else defReinfTotalLoss += fieldLoss;
                     
                     if (reinf.isKunishuForce) {
-                        // 諸勢力の場合のお帰り処理
                         const kunishu = this.game.kunishuSystem.getKunishu(reinf.kunishuId);
                         if (kunishu && !kunishu.isDestroyed) {
-                            // ★修正：回復した兵士を足してあげます
                             kunishu.soldiers = Math.min(99999, kunishu.soldiers + finalReturnSoldiers);
                             kunishu.horses = Math.min(99999, (kunishu.horses || 0) + (reinf.horses || 0)); 
                             kunishu.guns = Math.min(99999, (kunishu.guns || 0) + (reinf.guns || 0));       
@@ -930,17 +898,14 @@ Object.assign(WarManager.prototype, {
                                 b.castleId = kunishu.castleId; 
                                 b.isCastellan = false;
                             });
-                            // 途中で逃げ帰ったので、少しだけ友好度が下がります
                             const myClanId = isAttackerData ? s.sourceCastle.ownerClan : s.defender.ownerClan;
                             const kRel = kunishu.getRelation(myClanId);
                             kunishu.setRelation(myClanId, kRel - 5);
                             if (s.isPlayerInvolved) this.game.ui.log(`(援軍が撤退し、${kunishu.getName(this.game)}との友好度が下がりました)`);
                         }
                     } else {
-                        // 大名家の場合のお帰り処理
                         const helperCastle = this.game.getCastle(reinf.castle.id); 
                         if (helperCastle) {
-                            // ★修正：回復した兵士を足してあげます
                             helperCastle.soldiers = Math.min(99999, helperCastle.soldiers + finalReturnSoldiers);
                             helperCastle.rice = Math.min(99999, helperCastle.rice + reinf.rice);
                             helperCastle.horses = Math.min(99999, (helperCastle.horses || 0) + (reinf.horses || 0));
@@ -961,7 +926,6 @@ Object.assign(WarManager.prototype, {
                         }
                     }
                     
-                    // 戦場の武将リストからも、帰ってしまった人を消しておきます
                     if (isAttackerData) {
                         reinf.bushos.forEach(rb => { s.atkBushos = s.atkBushos.filter(b => b.id !== rb.id); });
                     } else {
