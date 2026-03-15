@@ -180,7 +180,8 @@ Object.assign(WarManager.prototype, {
             const defClan = Number(defCastle.ownerClan);
             let isPlayerInvolved = false;
             if (atkClan === pid && !atkCastle.isDelegated) isPlayerInvolved = true;
-            if (defClan === pid && !defCastle.isDelegated) isPlayerInvolved = true;
+            // ★修正：諸勢力がお相手の時は、プレイヤーが防衛操作をすることはないので無視します！
+            if (!defCastle.isKunishu && defClan === pid && !defCastle.isDelegated) isPlayerInvolved = true;
             
             if (atkClan !== pid && !atkCastle.isKunishu) {
                 atkHorses = atkCastle.horses || 0; 
@@ -197,6 +198,7 @@ Object.assign(WarManager.prototype, {
             
             this.game.ui.log(startMsg.replace('\n', ''));
             if (!isPlayerInvolved) {
+                // ★修正：諸勢力に対する鎮圧や反乱の時も、開始メッセージをしっかり出して結果を知らせます！
                 await this.game.ui.showTapMessage(startMsg);
             } else {
                 await this.game.ui.showCutin(`${atkArmyName}の${atkBushos[0].name}が\n${defCastle.name}に攻め込みました！`);

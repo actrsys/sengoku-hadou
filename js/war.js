@@ -374,7 +374,8 @@ class WarManager {
         try { 
             const s = this.state;
             // ★変更: 委任城なら強制的に手動戦闘になるのを防ぎます！
-            if (s.isPlayerInvolved || (Number(s.defender.ownerClan) === Number(this.game.playerClanId) && !s.defender.isDelegated)) {
+            // ★修正：守備側が「諸勢力」の時は、プレイヤーの城であっても強制的に画面をスキップさせます！
+            if (s.isPlayerInvolved || (!s.defender.isKunishu && Number(s.defender.ownerClan) === Number(this.game.playerClanId) && !s.defender.isDelegated)) {
                 s.isPlayerInvolved = true; this.game.ui.setWarModalVisible(true); this.game.ui.updateWarUI(); this.processWarRound(); return;
             }
 
