@@ -113,8 +113,10 @@ class FieldWarManager {
 
         const containerW = mapArea.clientWidth;
         
-        // ★修正: 実際のマップの広さに関わらず、「画面の幅に16マス」が収まるようにHEXの大きさを決めます
-        const displayCols = 16;
+        // ★修正: スマホ判定を行い、PCなら16マス、スマホなら10マスにします
+        const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+        const displayCols = isMobile ? 10 : 16;
+        
         const scaleFactor = 1 + (displayCols - 1) * 0.75;
         this.hexW = containerW / scaleFactor;
         
@@ -477,6 +479,57 @@ class FieldWarManager {
         const btnWait = document.getElementById('fw-btn-wait');
         const btnRetreat = document.getElementById('fw-btn-retreat');
         
+        // ★追加: 階層メニューの制御
+        const mainMenu = document.getElementById('fw-main-menu');
+        const orderMenu = document.getElementById('fw-order-menu');
+        const systemMenu = document.getElementById('fw-system-menu');
+        
+        const btnOrder = document.getElementById('fw-btn-order');
+        const btnInfo = document.getElementById('fw-btn-info');
+        const btnSystem = document.getElementById('fw-btn-system');
+        const btnOrderBack = document.getElementById('fw-btn-order-back');
+        const btnSystemBack = document.getElementById('fw-btn-system-back');
+
+        const btnSettings = document.getElementById('fw-btn-settings');
+        const btnTitle = document.getElementById('fw-btn-title');
+
+        this.resetMenu = () => {
+            if (mainMenu) mainMenu.classList.remove('hidden');
+            if (orderMenu) orderMenu.classList.add('hidden');
+            if (systemMenu) systemMenu.classList.add('hidden');
+        };
+
+        if (btnOrder) btnOrder.onclick = () => {
+            if (!this.isPlayerTurn()) return; // 敵ターン中は押せない
+            mainMenu.classList.add('hidden');
+            orderMenu.classList.remove('hidden');
+        };
+        if (btnSystem) btnSystem.onclick = () => {
+            mainMenu.classList.add('hidden');
+            systemMenu.classList.remove('hidden');
+        };
+        if (btnInfo) btnInfo.onclick = () => {
+            this.log("情報メニューは準備中です。");
+        };
+        if (btnOrderBack) btnOrderBack.onclick = this.resetMenu;
+        if (btnSystemBack) btnSystemBack.onclick = this.resetMenu;
+
+        if (btnSettings) btnSettings.onclick = () => {
+            const settingsModal = document.getElementById('settings-modal');
+            if (settingsModal) settingsModal.classList.remove('hidden');
+        };
+        if (btnTitle) btnTitle.onclick = () => {
+            if (this.game && this.game.ui) {
+                this.game.ui.showDialog("タイトルに戻りますか？\nセーブしていないデータは失われます。", true, () => {
+                    location.reload();
+                });
+            } else {
+                if (confirm("タイトルに戻りますか？\nセーブしていないデータは失われます。")) {
+                    location.reload();
+                }
+            }
+        };
+
         if (btnWait) {
             btnWait.onclick = () => {
                 if (!this.isPlayerTurn()) return;
@@ -484,6 +537,7 @@ class FieldWarManager {
                 this.log(`${unit.name}隊は待機した。`);
                 unit.hasActionDone = true;
                 this.state = 'IDLE';
+                this.resetMenu(); // ★メインメニューに戻す
                 this.nextPhaseTurn();
             };
         }
@@ -495,6 +549,7 @@ class FieldWarManager {
                 this.game.ui.showDialog("全軍を撤退させますか？", true, () => {
                     if (unit.isAttacker) this.log(`撤退を開始します……`);
                     else this.log(`城内へ撤退を開始します……`);
+                    this.resetMenu(); // ★メインメニューに戻す
                     this.endFieldWar(unit.isAttacker ? 'attacker_retreat' : 'defender_retreat');
                 });
             };
@@ -568,6 +623,18 @@ class FieldWarManager {
             if (u.isAttacker) atkSoldiers += u.soldiers;
             else defSoldiers += u.soldiers;
         });
+
+        // ★追加: 上部バーの年月と残りターンを更新
+        const dateEl = document.getElementById('fw-date-info');
+        const turnEl = document.getElementById('fw-turn-info');
+        
+        if (dateEl && this.game) {
+            dateEl.innerText = `${this.game.year}年${this.game.month}月`;
+        }
+        if (turnEl) {
+            let remainTurns = this.maxTurns - this.turnCount + 1;
+            turnEl.innerText = `残りターン ${remainTurns}/${this.maxTurns}`;
+        }
 
         const atkEl = document.getElementById('fw-atk-status');
         const defEl = document.getElementById('fw-def-status');
@@ -861,14 +928,18 @@ class FieldWarManager {
             this.mapEl.appendChild(uEl);
         });
 
-        const btnWait = document.getElementById('fw-btn-wait');
-        const btnRetreat = document.getElementById('fw-btn-retreat');
+        const btnOrder = document.getElementById('fw-btn-order');
         if (isPlayerTurn) {
-            if(btnWait) btnWait.classList.remove('hidden');
-            if(btnRetreat) btnRetreat.classList.remove('hidden');
+            if (btnOrder) {
+                btnOrder.style.opacity = '1';
+                btnOrder.style.pointerEvents = 'auto';
+            }
         } else {
-            if(btnWait) btnWait.classList.add('hidden');
-            if(btnRetreat) btnRetreat.classList.add('hidden');
+            if (btnOrder) {
+                btnOrder.style.opacity = '0.5';
+                btnOrder.style.pointerEvents = 'none';
+            }
+            if (this.resetMenu) this.resetMenu(); // 敵ターン中はメインメニューに強制戻し
         }
     }
 
