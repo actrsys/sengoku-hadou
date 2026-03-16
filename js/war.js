@@ -469,7 +469,8 @@ class WarManager {
         }
         
         const ctrl = document.getElementById('war-controls'); 
-        if(ctrl) ctrl.classList.add('disabled-area'); 
+        // ★修正：ボタンを押した瞬間に、ボタンの中身を空っぽにして完全に消し去ります！
+        if(ctrl) ctrl.innerHTML = ''; 
 
         // すぐに実行せずに、予定メモに書き込んでおきます！
         this.state.plannedActions[this.state.turn] = { type: type, extraVal: extraVal };
@@ -831,13 +832,17 @@ class WarManager {
                 
                 this.game.ui.updateWarUI(); 
                 const isAtkSideTurn = s.turn.startsWith('attacker');
-                this.game.ui.renderWarControls(isAtkSideTurn); 
 
                 // プレイヤーが操作できる部隊かどうかチェック
                 // ★変更：ここでも先ほど作った「おまとめ魔法」を使うようにしました！
                 let isMyTurn = this.checkIsMyTurn(s);
 
-                if (!isMyTurn) {
+                // ★修正：プレイヤーのターンの時だけボタンを描画し、AIのターンならボタンを空っぽのままにします！
+                if (isMyTurn) {
+                    this.game.ui.renderWarControls(isAtkSideTurn); 
+                } else {
+                    const ctrl = document.getElementById('war-controls');
+                    if (ctrl) ctrl.innerHTML = ''; // AIのターンは絶対にボタンを出さないようにします
                     setTimeout(() => this.execWarAI(), 800); 
                 }
             } else {
