@@ -130,22 +130,28 @@ class WarSystem {
 class WarManager {
     constructor(game) { this.game = game; this.state = { active: false }; this.pendingPrisoners = []; }
 
+    // ★追加：自分が操作できる部隊かどうかを判定する、便利なおまとめ魔法です！
+    // 諸勢力（isKunishu, isKunishuForce）の場合は、プレイヤーの城から出てもAIにお任せするようにガードを追加しました。
+    checkIsMyTurn(s) {
+        const pid = Number(this.game.playerClanId);
+        if (s.turn === 'attacker' && s.attacker && Number(s.attacker.ownerClan) === pid && s.sourceCastle && !s.sourceCastle.isDelegated && !s.attacker.isKunishu) return true;
+        if (s.turn === 'attacker_self_reinf' && s.selfReinforcement && s.selfReinforcement.castle && Number(s.selfReinforcement.castle.ownerClan) === pid && !s.selfReinforcement.castle.isDelegated && !s.selfReinforcement.isKunishuForce) return true;
+        if (s.turn === 'attacker_ally_reinf' && s.reinforcement && s.reinforcement.castle && Number(s.reinforcement.castle.ownerClan) === pid && !s.reinforcement.castle.isDelegated && !s.reinforcement.isKunishuForce) return true;
+        if (s.turn === 'defender' && s.defender && Number(s.defender.ownerClan) === pid && !s.defender.isDelegated && !s.defender.isKunishu) return true;
+        if (s.turn === 'defender_self_reinf' && s.defSelfReinforcement && s.defSelfReinforcement.castle && Number(s.defSelfReinforcement.castle.ownerClan) === pid && !s.defSelfReinforcement.castle.isDelegated && !s.defSelfReinforcement.isKunishuForce) return true;
+        if (s.turn === 'defender_ally_reinf' && s.defReinforcement && s.defReinforcement.castle && Number(s.defReinforcement.castle.ownerClan) === pid && !s.defReinforcement.castle.isDelegated && !s.defReinforcement.isKunishuForce) return true;
+        return false;
+    }
+
     getAvailableCommands(isAtkTurn) {
         const s = this.state;
         if (!s.isPlayerInvolved) return [];
         
-        // 自分が操作できる部隊かどうかをチェックします
-        let isMyTurn = false;
-        const pid = Number(this.game.playerClanId);
-        if (s.turn === 'attacker' && Number(s.attacker.ownerClan) === pid && !s.sourceCastle.isDelegated) isMyTurn = true;
-        if (s.turn === 'attacker_self_reinf' && Number(s.selfReinforcement.castle.ownerClan) === pid && !s.selfReinforcement.castle.isDelegated) isMyTurn = true;
-        if (s.turn === 'attacker_ally_reinf' && Number(s.reinforcement.castle.ownerClan) === pid && !s.reinforcement.castle.isDelegated) isMyTurn = true;
-        if (s.turn === 'defender' && Number(s.defender.ownerClan) === pid && !s.defender.isDelegated) isMyTurn = true;
-        if (s.turn === 'defender_self_reinf' && Number(s.defSelfReinforcement.castle.ownerClan) === pid && !s.defSelfReinforcement.castle.isDelegated) isMyTurn = true;
-        if (s.turn === 'defender_ally_reinf' && Number(s.defReinforcement.castle.ownerClan) === pid && !s.defReinforcement.castle.isDelegated) isMyTurn = true;
+        // ★変更：おまとめ魔法を使ってチェックするようにしました！
+        let isMyTurn = this.checkIsMyTurn(s);
 
         // 操作できない（同盟軍や委任の）場合は空っぽにします
-        if (!isMyTurn) return []; 
+        if (!isMyTurn) return [];
         
         const commands = [];
         if (s.turn.startsWith('attacker')) {
@@ -823,14 +829,8 @@ class WarManager {
                 this.game.ui.renderWarControls(isAtkSideTurn); 
 
                 // プレイヤーが操作できる部隊かどうかチェック
-                let isMyTurn = false;
-                const pid = Number(this.game.playerClanId);
-                if (s.turn === 'attacker' && Number(s.attacker.ownerClan) === pid && !s.sourceCastle.isDelegated) isMyTurn = true;
-                if (s.turn === 'attacker_self_reinf' && Number(s.selfReinforcement.castle.ownerClan) === pid && !s.selfReinforcement.castle.isDelegated) isMyTurn = true;
-                if (s.turn === 'attacker_ally_reinf' && Number(s.reinforcement.castle.ownerClan) === pid && !s.reinforcement.castle.isDelegated) isMyTurn = true;
-                if (s.turn === 'defender' && Number(s.defender.ownerClan) === pid && !s.defender.isDelegated) isMyTurn = true;
-                if (s.turn === 'defender_self_reinf' && Number(s.defSelfReinforcement.castle.ownerClan) === pid && !s.defSelfReinforcement.castle.isDelegated) isMyTurn = true;
-                if (s.turn === 'defender_ally_reinf' && Number(s.defReinforcement.castle.ownerClan) === pid && !s.defReinforcement.castle.isDelegated) isMyTurn = true;
+                // ★変更：ここでも先ほど作った「おまとめ魔法」を使うようにしました！
+                let isMyTurn = this.checkIsMyTurn(s);
 
                 if (!isMyTurn) {
                     setTimeout(() => this.execWarAI(), 800); 
