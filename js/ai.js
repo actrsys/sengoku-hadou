@@ -72,11 +72,27 @@ class AIEngine {
             // ★大名のお引越し（特殊な移動処理）の魔法！
             // 自分がお殿様（大名）で、性格が「好戦的（aggressive）」ではない場合だけ発動します
             if (castellan.isDaimyo && castellan.personality !== 'aggressive') {
-                // 道が繋がっている自分の城をぜんぶ探します
-                const myClanCastles = this.game.castles.filter(c => 
-                    c.ownerClan === castle.ownerClan && 
-                    GameSystem.isReachable(this.game, castle, c, castle.ownerClan)
-                );
+                // ★追加：自領のみを通って辿り着ける城を探します！
+                const myClanCastles = [];
+                const visited = new Set();
+                const queue = [castle];
+                visited.add(castle.id);
+
+                while (queue.length > 0) {
+                    const current = queue.shift();
+                    myClanCastles.push(current);
+
+                    const neighbors = this.game.castles.filter(c => 
+                        c.ownerClan === castle.ownerClan && 
+                        GameSystem.isAdjacent(current, c) &&
+                        !visited.has(c.id)
+                    );
+
+                    for (const n of neighbors) {
+                        visited.add(n.id);
+                        queue.push(n);
+                    }
+                }
                 
                 // もし城が2つ以上あるなら、引っ越しを考えます
                 if (myClanCastles.length > 1) {
@@ -983,14 +999,34 @@ class AIEngine {
                 actions.push({ type: 'buy_rice', stat: 'politics', score: 800, cost: 0 }); 
             }
 
+            // ★追加：自領のみを通って辿り着ける城のリストを作る魔法！
+            const reachableMyCastles = [];
+            const visitedCastles = new Set();
+            const searchQueue = [castle];
+            visitedCastles.add(castle.id);
+
+            while (searchQueue.length > 0) {
+                const current = searchQueue.shift();
+                if (current.id !== castle.id) {
+                    reachableMyCastles.push(current);
+                }
+
+                const adjMyCastles = this.game.castles.filter(c => 
+                    c.ownerClan === castle.ownerClan && 
+                    GameSystem.isAdjacent(current, c) &&
+                    !visitedCastles.has(c.id)
+                );
+
+                for (const n of adjMyCastles) {
+                    visitedCastles.add(n.id);
+                    searchQueue.push(n);
+                }
+            }
+
             // 9. 輸送（大名のいない城のみ）
             if (!daimyo || daimyo.castleId !== castle.id) {
-                // ★修正：プレイヤーと同じように「道が繋がっているか（自領、同盟、支配を通れるか）」を判定します！
-                const allyCastles = this.game.castles.filter(c => 
-                    c.ownerClan === castle.ownerClan && 
-                    c.id !== castle.id &&
-                    GameSystem.isReachable(this.game, castle, c, castle.ownerClan)
-                );
+                // ★修正：自領のみを通れるようにしました！
+                const allyCastles = reachableMyCastles;
                 
                 for (const target of allyCastles) {
                     if ((target.soldiers <= 500 || target.gold <= 500) && castle.soldiers >= 2000 && castle.gold >= 2000) {
@@ -1005,11 +1041,8 @@ class AIEngine {
             }
 
             // 10. 武将の移動
-            const myClanCastles = this.game.castles.filter(c => 
-                c.ownerClan === castle.ownerClan && 
-                c.id !== castle.id && 
-                GameSystem.isReachable(this.game, castle, c, castle.ownerClan)
-            );
+            // ★修正：自領のみを通れるようにしました！
+            const myClanCastles = reachableMyCastles;
             
             // ① 従来の空き城への移動
             const emptyCastles = myClanCastles.filter(c => c.samuraiIds.length <= 1);

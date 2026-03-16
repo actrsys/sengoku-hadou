@@ -553,10 +553,31 @@ class CommandSystem {
                 ).map(t => t.id);
 
             case 'ally_other': 
-                return this.game.castles.filter(target => 
-                    Number(target.ownerClan) === playerClanId && target.id !== c.id &&
-                    GameSystem.isReachable(this.game, c, target, playerClanId) // ★道が繋がっているか調べます！
-                ).map(t => t.id);
+                return this.game.castles.filter(target => {
+                    if (Number(target.ownerClan) !== playerClanId || target.id === c.id) return false;
+                    
+                    // ★追加：自領のみを通って辿り着けるか調べる魔法！
+                    const visited = new Set();
+                    const queue = [c];
+                    visited.add(c.id);
+
+                    while (queue.length > 0) {
+                        const current = queue.shift();
+                        if (current.id === target.id) return true;
+
+                        const neighbors = this.game.castles.filter(adj => 
+                            adj.ownerClan === playerClanId && 
+                            GameSystem.isAdjacent(current, adj) &&
+                            !visited.has(adj.id)
+                        );
+
+                        for (const n of neighbors) {
+                            visited.add(n.id);
+                            queue.push(n);
+                        }
+                    }
+                    return false;
+                }).map(t => t.id);
             
             case 'other_clan_all': 
                 return this.game.castles.filter(target => {
