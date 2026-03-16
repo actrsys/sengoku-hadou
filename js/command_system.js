@@ -1687,13 +1687,13 @@ class CommandSystem {
             horses: sendHorses, guns: sendGuns
         };
 
-        // ★修正: 諸勢力への攻撃をしたので、友好度を低下させます
-        let currentRel = kunishu.getRelation(this.game.playerClanId);
+        // ★修正: 諸勢力への攻撃をしたので、攻撃した大名家との友好度を低下させます！
+        let currentRel = kunishu.getRelation(atkCastle.ownerClan);
         let nextRel = currentRel;
         if (currentRel >= 60) nextRel = 30;
         else if (currentRel >= 31) nextRel -= 30;
         else nextRel = 0;
-        kunishu.setRelation(this.game.playerClanId, nextRel);
+        kunishu.setRelation(atkCastle.ownerClan, nextRel);
 
         // ★修正：プレイヤーの城であっても、「委任」されている時はAI操作なので画面をスキップさせます！
         const isPlayer = (Number(atkCastle.ownerClan) === Number(this.game.playerClanId) && !atkCastle.isDelegated);
