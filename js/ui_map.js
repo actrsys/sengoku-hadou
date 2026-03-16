@@ -3,8 +3,25 @@
  * 画面の見た目（ui.js）のうち、マップを動かす魔法だけを担当する別館です。
  */
 
+// ★ シナリオ別・デバイス別で最初に映すお城のIDを管理する箱
+const INITIAL_MAP_CENTER_CONFIG = {
+    "1560_okehazama": { // 1560年 桶狭間の戦いシナリオ
+        PC: 7,     // PC版で最初に中心にする城のID
+        MOBILE: 7  // スマホ版で最初に中心にする城のID
+    },
+    "1562_kiyosudoumei": { // 1562年 清洲同盟シナリオ
+        PC: 7,     // 例：PC版で最初に中心にする城のID
+        MOBILE: 7  // 例：スマホ版で最初に中心にする城のID
+    },
+    "DEFAULT": {      // 上記以外のシナリオの場合のお守り
+        PC: 7,
+        MOBILE: 7
+    }
+};
+
 // ★ マップのズーム設定を1箇所で管理する箱
 const MAP_ZOOM_CONFIG = {
+    PC: {
     PC: {
         minMargin: 1.05, // PCの最小サイズの時の余白（1.0でピッタリ）
         mid: 1.1,        // PCの中間サイズ
@@ -461,8 +478,16 @@ Object.assign(UIManager.prototype, {
             const sc = document.getElementById('map-scroll-container');
             if (sc) {
                 setTimeout(() => {
-                    // ★ここを差し替え！：ID29番のお城を探して、そこにカメラを合わせる魔法です！
-                    const centerCastle = this.game.getCastle(29);
+                    // ★ここを差し替え！：シナリオのフォルダ名とデバイスに合わせて、最初に中心にするお城を決める魔法です！
+                    const isPC = document.body.classList.contains('is-pc'); // 今がPC版かどうか調べます
+                    const folderName = this.game.scenarioFolder; // さっき覚えさせたシナリオのフォルダ名を取り出します
+                    
+                    // 設定箱の中から、今のシナリオ用の設定を探します（無ければDEFAULTを使います）
+                    const config = INITIAL_MAP_CENTER_CONFIG[folderName] || INITIAL_MAP_CENTER_CONFIG.DEFAULT;
+                    // PCかスマホかで、使うIDを選びます
+                    const centerCastleId = isPC ? config.PC : config.MOBILE;
+                    
+                    const centerCastle = this.game.getCastle(centerCastleId);
                     if (centerCastle) {
                         // お城が見つかったら、そこを真ん中にして映します
                         this.scrollToActiveCastle(centerCastle);

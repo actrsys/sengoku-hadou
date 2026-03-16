@@ -776,6 +776,9 @@ class GameManager {
             this.year = window.MainParams.StartYear;
             this.month = window.MainParams.StartMonth;
             
+            // ★追加：今のシナリオのフォルダ名をゲーム全体で覚えておく魔法です！
+            this.scenarioFolder = folder;
+            
             this.kunishuSystem.setKunishuData(data.kunishus || []);
             this.courtRankSystem.setRankData(data.courtRanks || []);
             
