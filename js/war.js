@@ -854,7 +854,14 @@ class WarManager {
                         let factionName = "不明";
                         if (army) {
                             if (army.isKunishu || army.isKunishuForce) {
-                                factionName = army.name; // 諸勢力はそのままの名前（例：伊賀忍者）
+                                // ★修正：背番号（kunishuId）を使って、システムから正しい名前を呼び出します！
+                                if (army.kunishuId) {
+                                    const kunishu = this.game.kunishuSystem.getKunishu(army.kunishuId);
+                                    if (kunishu) factionName = kunishu.getName(this.game);
+                                    else factionName = "諸勢力";
+                                } else {
+                                    factionName = army.name || "諸勢力";
+                                }
                             } else {
                                 const clan = this.game.clans.find(c => c.id === Number(army.ownerClan));
                                 if (clan) factionName = clan.name + "家"; // 大名の場合は「〇〇家」
