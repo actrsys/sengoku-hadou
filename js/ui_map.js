@@ -7,11 +7,11 @@
 const INITIAL_MAP_CENTER_CONFIG = {
     "1560_okehazama": { // 1560年 桶狭間の戦いシナリオ
         PC: 7,     // PC版で最初に中心にする城のID
-        MOBILE: 7  // スマホ版で最初に中心にする城のID
+        MOBILE: 35  // スマホ版で最初に中心にする城のID
     },
     "1562_kiyosudoumei": { // 1562年 清洲同盟シナリオ
         PC: 7,     // 例：PC版で最初に中心にする城のID
-        MOBILE: 7  // 例：スマホ版で最初に中心にする城のID
+        MOBILE: 36  // 例：スマホ版で最初に中心にする城のID
     },
     "DEFAULT": {      // 上記以外のシナリオの場合のお守り
         PC: 7,
