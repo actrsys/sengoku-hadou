@@ -8,7 +8,7 @@ const MAP_ZOOM_CONFIG = {
     PC: {
         minMargin: 1.05, // PCの最小サイズの時の余白（1.0でピッタリ）
         mid: 1.1,        // PCの中間サイズ
-        max: 3         // PCの最大サイズ
+        max: 2.5         // PCの最大サイズ
     },
     MOBILE: {
         minMargin: 1, // スマホの最小サイズの時の余白
@@ -461,8 +461,8 @@ Object.assign(UIManager.prototype, {
             const sc = document.getElementById('map-scroll-container');
             if (sc) {
                 setTimeout(() => {
-                    // ★ここを差し替え！：ID35番のお城を探して、そこにカメラを合わせる魔法です！
-                    const centerCastle = this.game.getCastle(35);
+                    // ★ここを差し替え！：ID29番のお城を探して、そこにカメラを合わせる魔法です！
+                    const centerCastle = this.game.getCastle(29);
                     if (centerCastle) {
                         // お城が見つかったら、そこを真ん中にして映します
                         this.scrollToActiveCastle(centerCastle);
