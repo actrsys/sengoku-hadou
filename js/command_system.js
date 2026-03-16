@@ -1476,11 +1476,27 @@ class CommandSystem {
                 target.loyalty = 100; // 寝返ったので忠誠はMAX！
                 target.isActionDone = true;
                 target.status = 'active';
+                target.isGunshi = false; // ★ここを書き足します！念のため軍師を外しておきます
                 
                 // ■ 同じ城にいる部下たちの処理（independence_systemの機能を使います）
                 // これにより、部下がついてくるか、逃げるか、捕まるかが自動で決まります
                 const indSys = this.game.independenceSystem;
                 const captiveMsgs = indSys.resolveSubordinates(oldCastle, target, targetLord, newClanId, oldClanId);
+                
+                // ★ここから追加：念のための安全ネット！
+                // このお城に残っている人（一緒に寝返った部下や、浪人になった人）から「軍師バッジ」を没収します！
+                // （間違えて本物の軍師のバッジを外さないように、自軍の本当の軍師は守ります）
+                const myGunshi = this.game.bushos.find(b => b.clan === newClanId && b.isGunshi);
+                this.game.getCastleBushos(oldCastle.id).forEach(b => {
+                    // 本物の軍師「以外」の武将を調べます
+                    if (!myGunshi || b.id !== myGunshi.id) {
+                        // 新しく自軍になったか、浪人になった場合のみバッジを外します
+                        if (b.clan === newClanId || b.clan === 0) {
+                            b.isGunshi = false;
+                        }
+                    }
+                });
+                // ★追加ここまで
                 
                 // 城の城主データを更新
                 this.game.updateCastleLord(oldCastle);
