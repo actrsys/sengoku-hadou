@@ -394,7 +394,14 @@ class WarManager {
                 if (s.attacker.rice <= 0 || s.defender.rice <= 0) break;
                 safetyLimit--;
             } 
-            this.endWar(s.defender.soldiers <= 0 || s.defender.defense <= 0 || s.defender.rice <= 0); 
+            
+            // ★追加：オートバトルでも、城壁が壊れて落ちた場合は防御力を少し修復します！
+            if (s.defender.defense <= 0) {
+                s.defender.defense += 150;
+                this.endWar(true);
+            } else {
+                this.endWar(s.defender.soldiers <= 0 || s.defender.rice <= 0); 
+            }
         } catch(e) { console.error(e); this.endWar(false); } 
     }
 
@@ -414,7 +421,13 @@ class WarManager {
                 if (s.defReinforcement) s.defReinforcement.rice = Math.max(0, s.defReinforcement.rice - Math.floor(s.defReinforcement.soldiers * window.WarParams.War.RiceConsumptionDef));
             }
 
-            if (s.defender.soldiers <= 0 || s.defender.defense <= 0) { this.endWar(true); return; } 
+            if (s.defender.defense <= 0) { 
+                // ★追加：城壁が壊れて落ちた場合、少しだけ城壁（防御力）を修復してあげます！
+                s.defender.defense += 150; 
+                this.endWar(true); 
+                return; 
+            } 
+            if (s.defender.soldiers <= 0) { this.endWar(true); return; }
             if (s.attacker.soldiers <= 0) { this.endWar(false); return; } 
             
             if (s.attacker.rice <= 0) { if(s.isPlayerInvolved) this.game.ui.log("攻撃軍の兵糧が尽きました！"); this.endWar(false); return; }
@@ -542,6 +555,8 @@ class WarManager {
              // ★修正：メッセージを読み終わった後、防御が0になっていたら「残りの予定を全て消し飛ばして」すぐに勝敗をつける魔法です
              const doNext = () => {
                  if (s.defender.defense <= 0) {
+                     // ★追加：城壁が壊れて落ちた場合、少しだけ城壁（防御力）を修復してあげます！
+                     s.defender.defense += 150;
                      this.endWar(true);
                  } else if (s.defender.soldiers <= 0) {
                      this.endWar(true);
