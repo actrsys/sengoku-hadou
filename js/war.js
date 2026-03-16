@@ -868,7 +868,8 @@ class WarManager {
                                     clanId = leader.clan;
                                 }
                                 const clan = this.game.clans.find(c => c.id === Number(clanId));
-                                if (clan) factionName = clan.name + "家"; // 大名の場合は「〇〇家」
+                                // ★修正：最初から「家」の文字が入っているので、そのまま使うように直しました！
+                                if (clan) factionName = clan.name;
                             }
                         }
                         const bushoName = leader ? leader.name : "不明";
