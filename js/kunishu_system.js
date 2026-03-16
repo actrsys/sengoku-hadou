@@ -36,14 +36,11 @@ class KunishuSystem {
                 maxId++; // 新しい出席番号を１つ進めます
                 const newId = maxId;
 
-                // 諸勢力の名前を取ってきます
-                const kunishuName = kunishu.getName(this.game);
-                
                 // 新しい武将（頭領）のデータを作ります
-                // 「|」で区切ることで、名字が「〇〇」、名前が「頭領」という扱いになります
+                // 「|」の左側（名字）を空っぽにして、名前を「頭領」だけにします！
                 const newLeader = new Busho({
                     id: newId,
-                    name: `${kunishuName}|頭領`,
+                    name: `|頭領`,
                     leadership: 30,
                     strength: 30,
                     politics: 30,
