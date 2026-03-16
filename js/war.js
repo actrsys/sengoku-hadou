@@ -440,12 +440,13 @@ class WarManager {
             if (s.defender.rice <= 0) { if(s.isPlayerInvolved) this.game.ui.log("守備軍の兵糧が尽きました！"); this.endWar(true); return; }
 
             // みんなが作戦（コマンド）を決める順番のリストを作ります
+            // ★修正：野戦などで兵士が0になって全滅した援軍には、作戦を聞かないようにガードを追加しました！
             s.commandQueue = ['attacker'];
-            if (s.selfReinforcement) s.commandQueue.push('attacker_self_reinf');
-            if (s.reinforcement) s.commandQueue.push('attacker_ally_reinf');
+            if (s.selfReinforcement && s.selfReinforcement.soldiers > 0) s.commandQueue.push('attacker_self_reinf');
+            if (s.reinforcement && s.reinforcement.soldiers > 0) s.commandQueue.push('attacker_ally_reinf');
             s.commandQueue.push('defender');
-            if (s.defSelfReinforcement) s.commandQueue.push('defender_self_reinf');
-            if (s.defReinforcement) s.commandQueue.push('defender_ally_reinf');
+            if (s.defSelfReinforcement && s.defSelfReinforcement.soldiers > 0) s.commandQueue.push('defender_self_reinf');
+            if (s.defReinforcement && s.defReinforcement.soldiers > 0) s.commandQueue.push('defender_ally_reinf');
 
             s.plannedActions = {}; // 選んだ作戦をメモしておくノートです
             s.phase = 'command'; // ゲームの状態を「作戦を決めるフェーズ」にします
@@ -457,6 +458,10 @@ class WarManager {
     execWarCmd(type, extraVal = null) { 
         if (!this.state.active) return;
         if (this.state.phase !== 'command') return; // 作戦を決めるフェーズだけ動きます
+
+        // ★追加：自分の操作ターンでない場合は、ボタンを押しても完全に無視する鉄壁のガードです！
+        // 野戦直後など、AIが考えている最中に画面のボタンが残っていて押せてしまう不具合を防ぎます。
+        if (!this.checkIsMyTurn(this.state)) return;
 
         if (type === 'repair_setup') { 
             window.GameApp.ui.openQuantitySelector('war_repair', [this.state.defender], null); 
