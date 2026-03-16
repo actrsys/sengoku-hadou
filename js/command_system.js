@@ -533,8 +533,19 @@ class CommandSystem {
         const playerClanId = Number(this.game.playerClanId);
         
         switch (spec.targetType) {
-            case 'enemy_valid': 
-                return this.game.warManager.getValidWarTargets(c);
+            case 'enemy_valid': {
+                // warManagerからの基本リストを取得
+                const baseTargets = this.game.warManager.getValidWarTargets(c);
+                // ★追加：自領と直接隣接している（同盟国などを通らない）城だけに出陣可能にします
+                return baseTargets.filter(targetId => {
+                    const targetCastle = this.game.getCastle(targetId);
+                    if (!targetCastle || !targetCastle.adjacentCastleIds) return false;
+                    return targetCastle.adjacentCastleIds.some(adjId => {
+                        const adjCastle = this.game.getCastle(adjId);
+                        return adjCastle && Number(adjCastle.ownerClan) === playerClanId;
+                    });
+                });
+            }
             
             case 'enemy_all': 
                 return this.game.castles.filter(target => 

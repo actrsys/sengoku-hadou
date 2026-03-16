@@ -231,6 +231,16 @@ class AIEngine {
                 );
                 
                 const validEnemies = neighbors.filter(target => {
+                    // ★追加：自領と直接隣接していない（同盟国などを通る）場合は攻撃不可にする！
+                    let isDirectlyAdjacent = false;
+                    if (target.adjacentCastleIds) {
+                        isDirectlyAdjacent = target.adjacentCastleIds.some(adjId => {
+                            const adjCastle = this.game.getCastle(adjId);
+                            return adjCastle && adjCastle.ownerClan === myClanId;
+                        });
+                    }
+                    if (!isDirectlyAdjacent) return false;
+
                     // ★追加：空き城（0）の時は、同盟などの関係がないのでそのまま攻撃対象にします！
                     if (target.ownerClan === 0) {
                         if ((target.immunityUntil || 0) >= this.game.getCurrentTurnId()) return false;
