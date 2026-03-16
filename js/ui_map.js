@@ -7,8 +7,8 @@
 const MAP_ZOOM_CONFIG = {
     PC: {
         minMargin: 1.05, // PCの最小サイズの時の余白（1.0でピッタリ）
-        mid: 1.5,        // PCの中間サイズ
-        max: 2         // PCの最大サイズ
+        mid: 1.1,        // PCの中間サイズ
+        max: 3         // PCの最大サイズ
     },
     MOBILE: {
         minMargin: 1, // スマホの最小サイズの時の余白
