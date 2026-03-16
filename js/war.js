@@ -854,7 +854,6 @@ class WarManager {
                         let factionName = "不明";
                         if (army) {
                             if (army.isKunishu || army.isKunishuForce) {
-                                // ★修正：背番号（kunishuId）を使って、システムから正しい名前を呼び出します！
                                 if (army.kunishuId) {
                                     const kunishu = this.game.kunishuSystem.getKunishu(army.kunishuId);
                                     if (kunishu) factionName = kunishu.getName(this.game);
@@ -863,7 +862,12 @@ class WarManager {
                                     factionName = army.name || "諸勢力";
                                 }
                             } else {
-                                const clan = this.game.clans.find(c => c.id === Number(army.ownerClan));
+                                // ★修正：お城ではなく、部隊を率いている大将自身の所属大名家（clan）から名前を拾います！
+                                let clanId = army.ownerClan;
+                                if (clanId === undefined && leader) {
+                                    clanId = leader.clan;
+                                }
+                                const clan = this.game.clans.find(c => c.id === Number(clanId));
                                 if (clan) factionName = clan.name + "家"; // 大名の場合は「〇〇家」
                             }
                         }
