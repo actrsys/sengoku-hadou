@@ -849,6 +849,10 @@ class WarManager {
                 // 全員が作戦を決め終わったら、【実行（アクション）フェーズ】へ！
                 s.phase = 'action';
                 s.actionQueue = [];
+
+                // ★追加：実行（アクション）フェーズに入った瞬間に、思考中の文字をきれいに消し去ります！
+                const ctrl = document.getElementById('war-controls');
+                if (ctrl) ctrl.innerHTML = '';
                 
                 // ★追加：籠城を選んだ守備軍を、一番最初に行動（準備）するように特別扱いします！
                 // 順番はご指定の通り「守備側 → 守備側援軍 → 守備側同盟軍」です。
