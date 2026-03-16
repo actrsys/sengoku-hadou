@@ -175,7 +175,7 @@ class WarManager {
 
         while (turn <= 20 && totalAtkSoldiers > 0 && s.defender.fieldSoldiers > 0 && safetyLimit > 0) {
             let resAtk = WarSystem.calcWarDamage(atkStats, defStats, totalAtkSoldiers, s.defender.fieldSoldiers, 0, s.attacker.morale, s.defender.training, 'charge');
-            if (!s.isPlayerInvolved) { resAtk.soldierDmg = Math.floor(resAtk.soldierDmg * 0.195); resAtk.counterDmg = Math.floor(resAtk.counterDmg * 0.195); }
+            if (!s.isPlayerInvolved) { resAtk.soldierDmg = Math.floor(resAtk.soldierDmg * 0.333); resAtk.counterDmg = Math.floor(resAtk.counterDmg * 0.333); }
             
             let actDefDmg1 = Math.min(s.defender.fieldSoldiers, resAtk.soldierDmg);
             let actAtkDmg1 = Math.min(totalAtkSoldiers, resAtk.counterDmg);
@@ -187,7 +187,7 @@ class WarManager {
             if (s.defender.fieldSoldiers <= 0 || totalAtkSoldiers <= 0) break;
             
             let resDef = WarSystem.calcWarDamage(defStats, atkStats, s.defender.fieldSoldiers, totalAtkSoldiers, 0, s.defender.morale, s.attacker.training, 'charge');
-            if (!s.isPlayerInvolved) { resDef.soldierDmg = Math.floor(resDef.soldierDmg * 0.195); resDef.counterDmg = Math.floor(resDef.counterDmg * 0.195); }
+            if (!s.isPlayerInvolved) { resDef.soldierDmg = Math.floor(resDef.soldierDmg * 0.333); resDef.counterDmg = Math.floor(resDef.counterDmg * 0.333); }
             
             let actAtkDmg2 = Math.min(totalAtkSoldiers, resDef.soldierDmg);
             let actDefDmg2 = Math.min(s.defender.fieldSoldiers, resDef.counterDmg);
@@ -684,7 +684,7 @@ class WarManager {
                  pushMsg({ text: failMsg, log: failMsg, se: 'miss.ogg' }); 
             } else {
                 pushMsg(`R${s.round} [${activeArmyName}] の謀略！`);
-                let calcDamage = s.isPlayerInvolved ? result.damage : Math.floor(result.damage * 0.195);
+                let calcDamage = s.isPlayerInvolved ? result.damage : Math.floor(result.damage * 0.333);
                 
                 let dmgResult = this.distributeDamage(isAtkTurnGroup, calcDamage);
                 let actualDamage = dmgResult.total;
@@ -703,7 +703,7 @@ class WarManager {
                  pushMsg({ text: failMsg, log: failMsg, se: 'miss.ogg' }); 
             } else {
                 pushMsg(`R${s.round} [${activeArmyName}] の火攻め！`);
-                let calcDamage = s.isPlayerInvolved ? result.damage : Math.floor(result.damage * 0.195);
+                let calcDamage = s.isPlayerInvolved ? result.damage : Math.floor(result.damage * 0.333);
                 let calcDefSoldierDamage = s.isPlayerInvolved ? 50 : 16;
                 if(isAtkTurnGroup) {
                     s.defender.defense = Math.max(0, s.defender.defense - calcDamage);
@@ -733,7 +733,7 @@ class WarManager {
         let calculatedSoldierDmg = result.soldierDmg; let calculatedWallDmg = result.wallDmg; let calculatedCounterDmg = result.counterDmg;
 
         if (!s.isPlayerInvolved) {
-            calculatedSoldierDmg = Math.floor(calculatedSoldierDmg * 0.195); calculatedWallDmg = Math.floor(calculatedWallDmg * 0.195); calculatedCounterDmg = Math.floor(calculatedCounterDmg * 0.195);
+            calculatedSoldierDmg = Math.floor(calculatedSoldierDmg * 0.333); calculatedWallDmg = Math.floor(calculatedWallDmg * 0.333); calculatedCounterDmg = Math.floor(calculatedCounterDmg * 0.333);
         }
 
         if (isAtkTurnGroup) {
