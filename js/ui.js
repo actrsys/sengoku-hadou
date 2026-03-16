@@ -227,6 +227,9 @@ class UIManager {
             const btn = e.target.closest('button');
             if (!btn) return; 
 
+            // ★追加：合戦のコマンドボタンは個別に音を鳴らすので、共通の音をキャンセルします！
+            if (btn.closest('#war-controls')) return;
+
             const text = btn.textContent.trim();
             
             // ★ここを書き足し！：個別に音を鳴らす設定をしたボタンは、共通の「decision.ogg」をキャンセルします
