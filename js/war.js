@@ -834,15 +834,37 @@ class WarManager {
                 const isAtkSideTurn = s.turn.startsWith('attacker');
 
                 // プレイヤーが操作できる部隊かどうかチェック
-                // ★変更：ここでも先ほど作った「おまとめ魔法」を使うようにしました！
                 let isMyTurn = this.checkIsMyTurn(s);
 
-                // ★修正：プレイヤーのターンの時だけボタンを描画し、AIのターンならボタンを空っぽのままにします！
+                // ★修正：プレイヤーの時はボタンを出し、AIの時は「思考中……」のメッセージを出します！
                 if (isMyTurn) {
                     this.game.ui.renderWarControls(isAtkSideTurn); 
                 } else {
                     const ctrl = document.getElementById('war-controls');
-                    if (ctrl) ctrl.innerHTML = ''; // AIのターンは絶対にボタンを出さないようにします
+                    if (ctrl) {
+                        // 今、誰が作戦を考えているのかを調べます
+                        let army = null; let leader = null;
+                        if (s.turn === 'attacker') { army = s.attacker; leader = s.atkBushos[0]; }
+                        else if (s.turn === 'attacker_self_reinf') { army = s.selfReinforcement; leader = s.selfReinforcement.bushos[0]; }
+                        else if (s.turn === 'attacker_ally_reinf') { army = s.reinforcement; leader = s.reinforcement.bushos[0]; }
+                        else if (s.turn === 'defender') { army = s.defender; leader = s.defBusho; }
+                        else if (s.turn === 'defender_self_reinf') { army = s.defSelfReinforcement; leader = s.defSelfReinforcement.bushos[0]; }
+                        else if (s.turn === 'defender_ally_reinf') { army = s.defReinforcement; leader = s.defReinforcement.bushos[0]; }
+
+                        let factionName = "不明";
+                        if (army) {
+                            if (army.isKunishu || army.isKunishuForce) {
+                                factionName = army.name; // 諸勢力はそのままの名前（例：伊賀忍者）
+                            } else {
+                                const clan = this.game.clans.find(c => c.id === Number(army.ownerClan));
+                                if (clan) factionName = clan.name + "家"; // 大名の場合は「〇〇家」
+                            }
+                        }
+                        const bushoName = leader ? leader.name : "不明";
+
+                        // 思考中のメッセージを表示します（１行でシンプルに！）
+                        ctrl.innerHTML = `<div style="text-align: center; padding: 10px; font-weight: bold; color: #555;">${factionName} ${bushoName} 思考中……</div>`;
+                    }
                     setTimeout(() => this.execWarAI(), 800); 
                 }
             } else {
