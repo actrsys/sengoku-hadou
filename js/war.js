@@ -282,6 +282,9 @@ class WarManager {
         let targetArmies = [];
         const W = window.WarParams.War;
         
+        // ★ここを追加！：作戦メモの準備（安全装置）
+        s.plannedActions = s.plannedActions || {};
+        
         // 生きている部隊だけをリストアップし、「役割（role）」の名前も一緒に覚えます！
         if (isTargetDefSide) {
             if (s.defender.soldiers > 0) targetArmies.push({ army: s.defender, role: 'defender' });
@@ -379,7 +382,10 @@ class WarManager {
                 s.isPlayerInvolved = true; this.game.ui.setWarModalVisible(true); this.game.ui.updateWarUI(); this.processWarRound(); return;
             }
 
-            let safetyLimit = 100; 
+            // ★ここを追加！：AI自動戦闘の時も、エラーにならないように空の作戦メモを用意しておきます！
+            s.plannedActions = s.plannedActions || {};
+
+            let safetyLimit = 100;
             while(s.round <= window.WarParams.Military.WarMaxRounds && s.attacker.soldiers > 0 && s.defender.soldiers > 0 && s.defender.defense > 0 && safetyLimit > 0) { 
                 this.resolveWarAction('charge'); 
                 if (s.attacker.soldiers <= 0 || s.defender.soldiers <= 0) break; 
@@ -519,6 +525,9 @@ class WarManager {
     resolveWarAction(type, extraVal = null) {
         if (!this.state.active) return;
         const s = this.state;
+
+        // ★ここを追加！：万が一の時にもエラーで止まらないように安全装置をつけます
+        s.plannedActions = s.plannedActions || {};
 
         let actionMessages = [];
         const pushMsg = (msg) => {
