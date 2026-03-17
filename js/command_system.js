@@ -1456,101 +1456,9 @@ class CommandSystem {
         return this.game.diplomacyManager.calcGoodwillIncrease(gold, doer.diplomacy);
     }
 
+    // ★修正：外交の複雑な処理は、すべて外交の専門部署（diplomacy.js）にお任せするようにしました！
     executeDiplomacy(doerId, targetCastleId, type, gold = 0) {
-        const doer = this.game.getBusho(doerId);
-        const targetCastle = this.game.getCastle(targetCastleId);
-        if (!targetCastle) return;
-        
-        const targetClanId = targetCastle.ownerClan;
-        let msg = "";
-        const isPlayerInvolved = (doer.clan === this.game.playerClanId || targetClanId === this.game.playerClanId);
-
-        const myPower = this.game.getClanTotalSoldiers(doer.clan) || 1;
-        const targetPower = this.game.getClanTotalSoldiers(targetClanId) || 1;
-
-        if (type === 'goodwill') {
-            let isSuccess = true;
-            if (targetClanId !== this.game.playerClanId) {
-                isSuccess = this.game.diplomacyManager.checkDiplomacySuccess(doer.clan, targetClanId, type, doer.diplomacy, myPower, targetPower);
-            }
-
-            if (isSuccess) {
-                const increase = this.calcGoodwillIncrease(gold, doer);
-                this.game.diplomacyManager.updateSentiment(doer.clan, targetClanId, increase);
-                
-                const castle = this.game.getCastle(doer.castleId); 
-                if(castle) castle.gold -= gold;
-                
-                msg = `${doer.name}が親善を行いました\n友好度が上昇しました`;
-                doer.achievementTotal += Math.floor(doer.diplomacy * 0.2) + 10;
-                this.game.factionSystem.updateRecognition(doer, 15);
-            } else {
-                msg = `${this.game.clans.find(c => c.id === targetClanId).name} に親善の品を突き返されました……\n友好度は変わりませんでした`;
-                doer.achievementTotal += 5;
-                this.game.factionSystem.updateRecognition(doer, 5);
-            }
-
-        } else if (type === 'alliance') {
-            let isSuccess = this.game.diplomacyManager.checkDiplomacySuccess(doer.clan, targetClanId, type, doer.diplomacy, myPower, targetPower);
-
-            if (isSuccess) {
-                this.game.diplomacyManager.changeStatus(doer.clan, targetClanId, '同盟');
-                msg = `同盟の締結に成功しました！`;
-                doer.achievementTotal += Math.floor(doer.diplomacy * 0.2) + 10;
-                this.game.factionSystem.updateRecognition(doer, 30);
-            } else {
-                this.game.diplomacyManager.updateSentiment(doer.clan, targetClanId, -10);
-                msg = `同盟の締結に失敗しました……`;
-                doer.achievementTotal += 5;
-                this.game.factionSystem.updateRecognition(doer, 10);
-            }
-
-        } else if (type === 'break_alliance') {
-            const result = this.game.diplomacyManager.applyBreakAlliancePenalty(doer.clan, targetClanId);
-
-            msg = `${result.oldStatus}関係を破棄しました`;
-            if (result.isBetrayal) {
-                msg += `\n諸大名からの心証が悪化しました……`;
-            }
-            doer.achievementTotal += 5;
-            this.game.factionSystem.updateRecognition(doer, 10);
-
-        } else if (type === 'subordinate') {
-            this.clearDominationRelations(doer.clan);
-            this.game.diplomacyManager.changeStatus(doer.clan, targetClanId, '従属');
-            msg = `${this.game.clans.find(c => c.id === targetClanId).name} に従属しました！`;
-            doer.achievementTotal += Math.floor(doer.diplomacy * 0.2) + 10;
-            this.game.factionSystem.updateRecognition(doer, 30);
-
-        } else if (type === 'dominate') {
-            let isSuccess = this.game.diplomacyManager.checkDiplomacySuccess(doer.clan, targetClanId, type, doer.diplomacy, myPower, targetPower);
-            
-            if (myPower / targetPower < 5) {
-                msg = `要求を跳ね除けられました……`;
-                doer.achievementTotal += 5;
-                this.game.factionSystem.updateRecognition(doer, 10);
-            } else if (isSuccess) {
-                this.clearDominationRelations(targetClanId);
-                this.game.diplomacyManager.changeStatus(doer.clan, targetClanId, '支配');
-                msg = `${this.game.clans.find(c => c.id === targetClanId).name} を支配下に置くことに成功しました！`;
-                doer.achievementTotal += Math.floor(doer.diplomacy * 0.2) + 20;
-                this.game.factionSystem.updateRecognition(doer, 40);
-            } else {
-                this.game.diplomacyManager.updateSentiment(doer.clan, targetClanId, -20);
-                msg = `支配の要求は拒否されました……`;
-                doer.achievementTotal += 5;
-                this.game.factionSystem.updateRecognition(doer, 10);
-            }
-        }
-        
-        doer.isActionDone = true;
-        if (isPlayerInvolved) {
-            this.game.ui.showResultModal(msg);
-            if (doer.clan === this.game.playerClanId) {
-                this.game.ui.updatePanelHeader();
-                this.game.ui.renderCommandMenu();
-            }
-        }
+        this.game.diplomacyManager.executeDiplomacy(doerId, targetCastleId, type, gold);
     }
 
     executeSubjugation(winnerClanId, loserClanId) {
@@ -2122,15 +2030,9 @@ class CommandSystem {
         }
     }
     
+    // ★修正：この処理も専門部署にお任せします！
     clearDominationRelations(clanId) {
-        this.game.clans.forEach(c => {
-            if (c.id !== clanId) {
-                const rel = this.game.getRelation(clanId, c.id);
-                if (rel && (rel.status === '支配' || rel.status === '従属')) {
-                    this.game.diplomacyManager.changeStatus(clanId, c.id, '普通');
-                }
-            }
-        });
+        this.game.diplomacyManager.clearDominationRelations(clanId);
     }
     
     // ★追加: AIからプレイヤーへの外交提案を受ける処理
