@@ -664,10 +664,10 @@ class UIManager {
         if (leader) {
             if (leader.innovation >= 67) {
                 ideology = "革新";
-                ideologyColor = "color:#e91e63;";
+                ideologyColor = "#e91e63"; // color: を外して色だけ指定します
             } else if (leader.innovation <= 33) {
                 ideology = "保守";
-                ideologyColor = "color:#1976d2;";
+                ideologyColor = "#1976d2";
             }
         }
 
@@ -677,43 +677,25 @@ class UIManager {
             faceSrc = `data/images/faceicons/${leader.faceIcon}`;
         }
 
-        // CSSのお片付け箱（クラス）を使って、きれいに並べます
-        let contentHtml = `
-            <div class="daimyo-detail-container">
-                <div class="daimyo-detail-header">
-                    <div class="daimyo-detail-name">${clan.name}</div>
-                    <div class="daimyo-detail-ideology" style="${ideologyColor}">${ideology}</div>
-                </div>
-                <div class="daimyo-detail-body">
-                    <div class="daimyo-detail-left">
-                        <img src="${faceSrc}" class="daimyo-detail-face" onerror="this.src='data/images/faceicons/unknown_face.webp'">
-                        <div class="daimyo-detail-leader-name">${leaderName}</div>
-                        <div class="daimyo-detail-leader-rank">${highestRankName}</div>
-                    </div>
-                    
-                    <div class="daimyo-detail-info">
-                        <div class="daimyo-detail-stat-box">
-                            <span class="daimyo-detail-label">本拠地</span>
-                            <span class="daimyo-detail-value">${baseCastleName}</span>
-                        </div>
-                        <div class="daimyo-detail-stat-box">
-                            <span class="daimyo-detail-label">城数</span>
-                            <span class="daimyo-detail-value">${castlesCount}</span>
-                        </div>
-                        <div class="daimyo-detail-stat-box">
-                            <span class="daimyo-detail-label">武将数</span>
-                            <span class="daimyo-detail-value">${bushosCount}</span>
-                        </div>
-                        <div class="daimyo-detail-stat-box">
-                            <span class="daimyo-detail-label">姫数</span>
-                            <span class="daimyo-detail-value">${princessCount}</span>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        `;
+        // ★変更：index.html に置いたテンプレート（設計図）の中身を、実際のデータに書き換えます！
+        document.getElementById('detail-clan-name').textContent = clan.name;
+        document.getElementById('detail-clan-ideology').textContent = ideology;
+        document.getElementById('detail-clan-ideology').style.color = ideologyColor;
+        
+        document.getElementById('detail-leader-face').src = faceSrc;
+        document.getElementById('detail-leader-name').textContent = leaderName;
+        document.getElementById('detail-leader-rank').textContent = highestRankName;
+        
+        document.getElementById('detail-base-castle').textContent = baseCastleName;
+        document.getElementById('detail-castle-count').textContent = castlesCount;
+        document.getElementById('detail-busho-count').textContent = bushosCount;
+        document.getElementById('detail-princess-count').textContent = princessCount;
+
+        // 書き換えたHTMLをごっそりコピーして、表示用の中身にします
+        const contentHtml = document.getElementById('daimyo-detail-template').innerHTML;
 
         // 画面の下（フッター）に置くボタンたちです
+        // ※ボタンは押した時の行き先が毎回変わるので、ここだけはJSで作ります
         const customFooter = `
             <div style="display: flex; justify-content: space-between; width: 100%;">
                 <button class="btn-secondary" onclick="window.GameApp.ui.showDaimyoList()">戻る</button>
@@ -723,6 +705,11 @@ class UIManager {
 
         // 小窓を表示する魔法を呼び出します
         this.showResultModal(contentHtml, null, customFooter);
+
+        // ★追加：スクロールしないように、はみ出した部分を隠してピタッと固定します
+        if (this.resultBody) {
+            this.resultBody.style.overflowY = 'hidden';
+        }
     }
 
     // ==========================================
