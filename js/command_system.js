@@ -1033,7 +1033,7 @@ class CommandSystem {
             let totalProb = baseProb + affinityMod + diplomacyMod;
             totalProb = Math.max(0, Math.min(100, totalProb)) / 100; 
 
-            this.showAdviceAndExecute('kunishu_incorporate', () => this.executeKunishuIncorporate(firstId, targetId, extraData.kunishuId), { trueProb: totalProb });
+            this.showAdviceAndExecute('kunishu_incorporate', () => this.game.kunishuSystem.executeKunishuIncorporate(firstId, targetId, extraData.kunishuId), { trueProb: totalProb });
             return;
         }
         if (actionType === 'kunishu_subjugate_deploy') {
@@ -1159,7 +1159,7 @@ class CommandSystem {
             
             // ★追加: 諸勢力への親善なら
             if (extraData && extraData.isKunishu) {
-                this.showAdviceAndExecute('kunishu_goodwill', () => this.executeKunishuGoodwill(data[0], extraData.kunishuId, val), { trueProb: 1.0 });
+                this.showAdviceAndExecute('kunishu_goodwill', () => this.game.kunishuSystem.executeKunishuGoodwill(data[0], extraData.kunishuId, val), { trueProb: 1.0 });
             } else {
                 this.showAdviceAndExecute('goodwill', () => this.executeDiplomacy(data[0], targetId, 'goodwill', val), { trueProb: 1.0 });
             }
@@ -1237,7 +1237,7 @@ class CommandSystem {
                 
                 // ★メッセージの中身も、取得した「kunishuName」をそのまま表示するように直しました
                 this.game.ui.showDialog(`${targetName}周辺に根付く ${kunishuName} を制圧しますか？\n今月の命令は終了となります`, true, () => {
-                    this.executeKunishuSubjugate(castle, targetId, data, sVal, rVal, hVal, gVal, kunishu);
+                    this.game.kunishuSystem.executeKunishuSubjugate(castle, targetId, data, sVal, rVal, hVal, gVal, kunishu);
                 });
             } else {
                 // ★修正：「攻め込みますか？」の確認は後回しにして、まずは自軍の援軍を探す魔法に直結させます！
@@ -1562,174 +1562,6 @@ class CommandSystem {
         }
     }
     
-    // ★追加: 諸勢力との親善処理です
-    executeKunishuGoodwill(doerId, kunishuId, gold) {
-        const doer = this.game.getBusho(doerId);
-        const kunishu = this.game.kunishuSystem.getKunishu(kunishuId);
-        if (!kunishu) return;
-        
-        const castle = this.game.getCurrentTurnCastle();
-        if (castle.gold < gold) { this.game.ui.showDialog("資金が足りません", false); return; }
-        castle.gold -= gold;
-
-        const increase = this.calcGoodwillIncrease(gold, doer);
-        
-        const currentRel = kunishu.getRelation(this.game.playerClanId);
-        kunishu.setRelation(this.game.playerClanId, currentRel + increase);
-        const newRel = kunishu.getRelation(this.game.playerClanId);
-
-        const kunishuName = kunishu.getName(this.game);
-        
-        doer.isActionDone = true;
-        doer.achievementTotal += Math.floor(doer.diplomacy * 0.2) + 10;
-        this.game.factionSystem.updateRecognition(doer, 15);
-
-        this.game.ui.showResultModal(`${doer.name}が ${kunishuName} と親善を行いました\n友好度が上昇しました`);
-        this.game.ui.updatePanelHeader();
-        this.game.ui.renderCommandMenu();
-    }
-    
-    // ★追加: 諸勢力を自軍に取り込む処理です
-    executeKunishuIncorporate(doerId, castleId, kunishuId) {
-        const doer = this.game.getBusho(doerId);
-        const kunishu = this.game.kunishuSystem.getKunishu(kunishuId);
-        const castle = this.game.getCastle(castleId);
-        
-        if (!kunishu) return;
-
-        const myClan = this.game.clans.find(c => c.id === this.game.playerClanId);
-        const myPrestige = myClan ? myClan.daimyoPrestige : 0;
-        const myDaimyo = this.game.bushos.find(b => b.clan === this.game.playerClanId && b.isDaimyo);
-        const leader = this.game.getBusho(kunishu.leaderId);
-
-        let baseProb = 0;
-        const targetSoldiers = kunishu.soldiers || 1;
-        const ratio = myPrestige / (targetSoldiers * 12);
-        baseProb = 70 * ratio;
-        
-        const affinityDiff = (myDaimyo && leader) ? GameSystem.calcAffinityDiff(myDaimyo.affinity, leader.affinity) : 25;
-        const affinityMod = (25 - affinityDiff) / 25 * 10;
-        
-        const diplomacyMod = (doer.diplomacy - 50) / 50 * 10;
-        
-        let totalProb = baseProb + affinityMod + diplomacyMod;
-        
-        const isSuccess = (Math.random() * 100) < totalProb;
-        
-        if (isSuccess) {
-            castle.soldiers = Math.min(99999, castle.soldiers + kunishu.soldiers);
-            castle.horses = Math.min(99999, (castle.horses || 0) + (kunishu.horses || 0));
-            castle.guns = Math.min(99999, (castle.guns || 0) + (kunishu.guns || 0));
-            
-            const members = this.game.kunishuSystem.getKunishuMembers(kunishuId);
-            members.forEach(b => {
-                b.belongKunishuId = 0;
-                this.game.affiliationSystem.joinClan(b, this.game.playerClanId, castle.id);
-            });
-            
-            kunishu.isDestroyed = true;
-            kunishu.soldiers = 0;
-
-            const kunishuName = kunishu.getName(this.game);
-            this.game.ui.showResultModal(`${doer.name}の説得により、${kunishuName} が我が傘下に加わりました！`);
-            
-            doer.achievementTotal += Math.floor(doer.diplomacy * 0.3) + 30;
-            this.game.factionSystem.updateRecognition(doer, 30);
-        } else {
-            const kunishuName = kunishu.getName(this.game);
-            this.game.ui.showResultModal(`${doer.name}は ${kunishuName} に合流を提案しましたが、\n丁重に断られてしまいました……`);
-            doer.achievementTotal += 5;
-            this.game.factionSystem.updateRecognition(doer, 10);
-        }
-
-        doer.isActionDone = true;
-        this.game.ui.updatePanelHeader();
-        this.game.ui.renderCommandMenu();
-        this.game.ui.renderMap(); // ★これを追加！：地図を最新の状態に描き直す魔法です
-    }
-
-    // ★追加: 諸勢力を攻めて壊滅させるための処理（必ず攻城戦になります）
-    // ★修正: 騎馬（sendHorses）と鉄砲（sendGuns）も出陣時に持っていくようにしました
-    async executeKunishuSubjugate(atkCastle, targetCastleId, atkBushosIds, sendSoldiers, sendRice, sendHorses, sendGuns, kunishu) {
-        const atkBushos = atkBushosIds.map(id => this.game.getBusho(id));
-        const targetCastle = this.game.getCastle(targetCastleId);
-        
-        // 攻撃する側（プレイヤー）の城から、出陣する数だけ兵士や兵糧、騎馬、鉄砲を減らします
-        atkCastle.soldiers = Math.max(0, atkCastle.soldiers - sendSoldiers);
-        atkCastle.rice = Math.max(0, atkCastle.rice - sendRice);
-        atkCastle.horses = Math.max(0, (atkCastle.horses || 0) - sendHorses);
-        atkCastle.guns = Math.max(0, (atkCastle.guns || 0) - sendGuns);
-        atkBushos.forEach(b => b.isActionDone = true);
-
-        // 諸勢力側の準備（一時的なダミーの城と軍団を作ります）
-        const kunishuName = kunishu.getName(this.game);
-        const leader = this.game.getBusho(kunishu.leaderId);
-        // この戦い限定の「守備側データ」を作成
-        const dummyDefender = {
-            id: targetCastleId,
-            name: kunishuName, // ←★城の名前をくっつけず、諸勢力の名前（伊賀衆など）だけにします！
-            ownerClan: -1,
-            soldiers: kunishu.soldiers,
-            defense: kunishu.defense,
-            maxDefense: kunishu.maxDefense,
-            training: 50,
-            morale: 80,
-            rice: Math.floor(kunishu.soldiers * 1.5), 
-            isKunishu: true,
-            kunishuId: kunishu.id,
-            peoplesLoyalty: 100, // 下がっても諸勢力には影響なし
-            population: 1000,
-            samuraiIds: [] 
-        };
-
-        // ★修正: 出陣する遠征軍の荷物に「horses（騎馬）」と「guns（鉄砲）」を追加しました！
-        const attackerForce = { 
-            name: atkCastle.name + "遠征軍", ownerClan: atkCastle.ownerClan, soldiers: sendSoldiers, 
-            bushos: atkBushos, training: atkCastle.training, morale: atkCastle.morale, rice: sendRice, maxRice: sendRice,
-            horses: sendHorses, guns: sendGuns
-        };
-
-        // ★修正: 諸勢力への攻撃をしたので、攻撃した大名家との友好度を低下させます！
-        let currentRel = kunishu.getRelation(atkCastle.ownerClan);
-        let nextRel = currentRel;
-        if (currentRel >= 60) nextRel = 30;
-        else if (currentRel >= 31) nextRel -= 30;
-        else nextRel = 0;
-        kunishu.setRelation(atkCastle.ownerClan, nextRel);
-
-        // ★修正：プレイヤーの城であっても、「委任」されている時はAI操作なので画面をスキップさせます！
-        const isPlayer = (Number(atkCastle.ownerClan) === Number(this.game.playerClanId) && !atkCastle.isDelegated);
-
-        // 戦争マネージャーにデータを渡してスタート
-        this.game.warManager.state = { 
-            active: true, round: 1, attacker: attackerForce, sourceCastle: atkCastle, 
-            defender: dummyDefender, atkBushos: atkBushos, defBusho: leader || {name:"諸勢力", strength:50, intelligence:50, leadership:50}, 
-            turn: 'attacker', isPlayerInvolved: isPlayer, deadSoldiers: { attacker: 0, defender: 0 }, defenderGuarding: false,
-            isKunishuSubjugation: true // 制圧戦であることをマーク
-        };
-
-        // ★追加：出陣する大名家の情報を調べます
-        const atkClanData = this.game.clans.find(c => c.id === Number(atkCastle.ownerClan));
-        const atkDaimyoName = atkClanData ? atkClanData.name : "大名家";
-        const leaderName = atkBushos[0].name;
-
-        // ★追加：AIの時は、まず誰がどこに攻め込んだかの「開始メッセージ」を出して一旦ストップさせます！
-        if (!isPlayer) {
-            const startMsg = `【諸勢力鎮圧】\n${atkDaimyoName}の${leaderName}が、\n${kunishuName}の鎮圧に乗り出しました！`;
-            this.game.ui.log(startMsg.replace('\n', ''));
-            await this.game.ui.showTapMessage(startMsg);
-        }
-
-        // 野戦を飛ばして、いきなり攻城戦からスタート
-        this.game.warManager.startSiegeWarPhase();
-        
-        // ★修正：プレイヤーが自分で操作した時だけ、画面を更新するようにします！（AIの裏での行動で画面がバグるのを防ぎます）
-        if (isPlayer) {
-            this.game.ui.updatePanelHeader();
-            this.game.ui.renderCommandMenu();
-        }
-    }
-
     executeReward(bushoIds) {
         const castle = this.game.getCurrentTurnCastle();
         const daimyo = this.game.bushos.find(b => b.id === this.game.clans.find(c => c.id === this.game.playerClanId).leaderId);
