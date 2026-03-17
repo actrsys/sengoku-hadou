@@ -1,3 +1,3 @@
-id,name,fatherId,birthYear,startYear,endYear,faceIcon,originalClanId,status
-1,胡蝶,1005022,1535,1549,1612,,6,unmarried
-2,市,1006050,1547,1561,1583,,1,unmarried
+id,name,fatherId,birthYear,startYear,endYear,faceIcon,originalClanId,currentClanId,husbandId,status
+1,胡蝶,1005022,1535,1549,1612,,6,1,1006001,married
+2,市,1006050,1547,1561,1583,,1,,,unmarried
