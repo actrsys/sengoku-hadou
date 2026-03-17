@@ -659,7 +659,7 @@ class UIInfoManager {
             this.selectedPrincessId = null;
             customFooter = `
                 <div style="display: flex; gap: 10px; margin-left: auto;">
-                    <button class="btn-primary" onclick="window.GameApp.ui.info.confirmPrincessSelection(${targetCastleId}, ${doerId})">決定</button>
+                    <button id="princess-confirm-btn" class="btn-primary" disabled style="opacity: 0.5; cursor: not-allowed;" onclick="window.GameApp.ui.info.confirmPrincessSelection(${targetCastleId}, ${doerId})">決定</button>
                     <button class="btn-secondary" onclick="window.GameApp.ui.openBushoSelector('diplomacy_doer', ${targetCastleId}, { subAction: 'marriage' }); window.GameApp.ui.closeResultModal();">戻る</button>
                 </div>
             `;
@@ -704,6 +704,14 @@ class UIInfoManager {
 
         // 誰を選んだか覚えておきます
         this.selectedPrincessId = princessId;
+
+        // ★追加：決定ボタンの封印を解いて、明るく（押せるように）します！
+        const confirmBtn = document.getElementById('princess-confirm-btn');
+        if (confirmBtn) {
+            confirmBtn.disabled = false;
+            confirmBtn.style.opacity = '1';
+            confirmBtn.style.cursor = 'pointer';
+        }
     }
 
     // 「決定」ボタンを押した時の処理
