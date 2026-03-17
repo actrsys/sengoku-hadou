@@ -218,8 +218,6 @@ body.hide-daimyo-labels .daimyo-name-label { display: none !important; }
 .kunishu-list-header, .kunishu-list-item { display: grid; grid-template-columns: 20px 3fr 1.5fr 1.5fr 1.5fr; font-size: clamp(0.7rem, 2.8vw, 0.9rem); padding: 0; min-height: 30px; gap: 0; }
 .view-mode .kunishu-list-header, .view-mode .kunishu-list-item { grid-template-columns: 3fr 1.5fr 1.5fr 1.5fr; }
 .faction-list-header, .faction-list-item { display: grid; grid-template-columns: 2.5fr 1fr 1.5fr 1.5fr; font-size: clamp(0.7rem, 2.8vw, 0.95rem); padding: 0; min-height: 30px; gap: 0; }
-/* 姫一覧専用の列幅（スマホ用） */
-.daimyo-list-header.is-princess, .daimyo-list-item.is-princess { grid-template-columns: 1.5fr 1fr 1fr 1.5fr 1.5fr !important; }
 
 .kunishu-item { padding: 12px 15px; border: 1px solid #d0b080; margin-bottom: 8px; cursor: pointer; display: flex; align-items: center; background: rgba(250, 240, 230, 0.95); border-radius: 6px; transition: all 0.2s ease; font-family: 'Sawarabi Mincho', serif; box-shadow: 1px 1px 3px rgba(0,0,0,0.1); }
 .kunishu-item:hover { background: #fff5e0; transform: translateX(3px); box-shadow: 2px 2px 5px rgba(0,0,0,0.15); border-color: #c0a070; }
@@ -704,8 +702,6 @@ body.is-pc {
     .view-mode .kunishu-list-header, .view-mode .kunishu-list-item { grid-template-columns: 140px 80px 80px 80px; }
     .faction-list-header, .faction-list-item { grid-template-columns: 140px 80px 100px 100px; font-size: 0.95rem; min-height: 36px; }
     .list-container, .daimyo-list-container, .result-body, .faction-list-container { scroll-padding-top: 38px; }
-    /* PC版 姫一覧専用の列幅 */
-    .daimyo-list-header.is-princess, .daimyo-list-item.is-princess { grid-template-columns: 1.5fr 1fr 1fr 1.5fr 1.5fr !important; }
     
     /* モーダル拡張（輸送・兵力分配）のタイル化 */
     #quantity-modal .modal-content, #unit-divide-modal .modal-content { max-width: 900px !important; max-height: 90% !important; }
@@ -759,4 +755,40 @@ body.is-pc {
     .war-side-wrapper > .war-reinf-col { order: unset !important; flex-direction: column !important; width: auto !important; }
     .war-side-wrapper > .war-reinf-col:first-child { flex-direction: column !important; }
     .responsive-army-box { padding: 10px !important; }
+}
+
+/* =========================================================
+   ★ 姫一覧専用の絶対崩れない魔法（最終版）
+   ========================================================= */
+.daimyo-list-header.is-princess, 
+.daimyo-list-item.is-princess {
+    display: grid !important;
+    grid-template-columns: 1.5fr 1fr 1fr 1.5fr 1.5fr !important;
+    align-items: center !important;
+    height: 40px !important;
+    min-height: 40px !important;
+    gap: 0 !important;
+    padding: 0 !important;
+}
+
+.daimyo-list-header.is-princess > span, 
+.daimyo-list-item.is-princess > span {
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    height: 100% !important;
+    padding: 0 5px !important;
+    box-sizing: border-box !important;
+    white-space: nowrap !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+}
+
+.daimyo-list-item.is-princess .col-daimyo-name {
+    justify-content: flex-start !important;
+}
+
+body.is-pc .daimyo-list-header.is-princess, 
+body.is-pc .daimyo-list-item.is-princess {
+    grid-template-columns: 120px 60px 60px 100px 100px !important;
 }
