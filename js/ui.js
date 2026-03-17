@@ -659,17 +659,16 @@ class UIManager {
         const bushosCount = this.game.bushos.filter(b => b.clan === clanId && b.status === 'active').length;
         const princessCount = clan.princessIds ? clan.princessIds.length : 0;
         
-        // ★変更：派閥一覧の色を参考にして、文字色ではなく「背景色」を指定します！
-        // 「中道」は派閥一覧にはありませんが、バランスの取れた色として緑系（#388e3c）にしました
+        // ★変更：CSSに新しく作った「ダークグラデーションのバッジ」のクラスを割り当てます
         let ideology = "中道";
-        let ideologyBg = "#388e3c"; 
+        let ideologyClass = "ideology-chudo"; 
         if (leader) {
             if (leader.innovation >= 67) {
                 ideology = "革新";
-                ideologyBg = "#e91e63"; // 派閥の「革新的」と同じピンク系
+                ideologyClass = "ideology-kakushin";
             } else if (leader.innovation <= 33) {
                 ideology = "保守";
-                ideologyBg = "#1976d2"; // 派閥の「保守的」と同じ青系
+                ideologyClass = "ideology-hoshu";
             }
         }
 
@@ -686,12 +685,12 @@ class UIManager {
 
         if (!modal || !body) return;
 
-        // 情報をHTMLにして流し込みます（CSSのお片付け箱はそのまま活きます！）
+        // 情報をHTMLにして流し込みます
         body.innerHTML = `
             <div class="daimyo-detail-container">
                 <div class="daimyo-detail-header">
                     <div class="daimyo-detail-name">${clan.name}</div>
-                    <div class="daimyo-detail-ideology" style="background-color:${ideologyBg};">${ideology}</div>
+                    <div class="daimyo-detail-ideology ${ideologyClass}">${ideology}</div>
                 </div>
                 <div class="daimyo-detail-body">
                     <div class="daimyo-detail-left">
