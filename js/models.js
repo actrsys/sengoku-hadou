@@ -23,7 +23,8 @@ class Clan {
         // ★今回追加：朝廷からの信用を覚えておく箱です（上限は1000にします）
         this.courtTrust = Number(data.courtTrust || 0);
         
-        // 大名自身が持っていた官位の仕組みは、武将の機能にお引っ越ししたため削除しました！
+        // ★今回追加：姫の数を覚えておく箱です（空欄なら0になります）
+        this.princess = Number(data.princess || 0);
         
         // CSVの initDiplomacy を翻訳して、外交の箱に入れます
         if (typeof data.initDiplomacy === 'string' && data.initDiplomacy.trim() !== "") {
