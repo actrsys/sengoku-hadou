@@ -467,7 +467,7 @@ Object.assign(UIManager.prototype, {
         if (!this.mapEl) return;
         this.mapEl.innerHTML = ''; 
         
-        // ★追加：一旦、大名家名シールが出ている合図をリセットします
+        // ★追加：一旦、勢力名シールが出ている合図をリセットします
         document.body.classList.remove('showing-daimyo-labels');
         
         if (!this.hasInitializedMap && this.game.castles.length > 0) {
@@ -508,7 +508,7 @@ Object.assign(UIManager.prototype, {
                 this.mapGuide.textContent = this.game.commandSystem.getSelectionGuideMessage();
             } else if (isDaimyoSelect) {
                 this.mapGuide.classList.remove('hidden'); 
-                this.mapGuide.textContent = "操作する大名家を選択してください";
+                this.mapGuide.textContent = "操作する勢力を選択してください";
             } else {
                 this.mapGuide.classList.add('hidden'); 
             }
@@ -776,7 +776,7 @@ Object.assign(UIManager.prototype, {
                 if (this.daimyoConfirmBody) {
                     this.daimyoConfirmBody.innerHTML = `
                         <div style="text-align:center; padding: 20px 0; color: #555; font-size: 1.05rem; font-weight: bold;">
-                            操作する大名家を選択してください。
+                            操作する勢力を選択してください。
                         </div>
                     `;
                 }
@@ -791,7 +791,7 @@ Object.assign(UIManager.prototype, {
         // ==========================================
     },
     
-    // ★新魔法：大名家の名前を賢く並べる魔法です
+    // ★新魔法：勢力の名前を賢く並べる魔法です
     renderDaimyoLabels() {
         const labelsData = [];
 
