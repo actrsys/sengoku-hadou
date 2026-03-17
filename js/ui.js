@@ -637,6 +637,33 @@ class UIManager {
         const leader = this.game.getBusho(clan.leaderId);
         const leaderName = leader ? leader.name : "不明";
         
+        // 本拠地（大名がいる城）を探します
+        let baseCastleName = "不明";
+        if (leader && leader.location) {
+            const baseCastle = this.game.castles.find(c => c.id === leader.location);
+            if (baseCastle) {
+                baseCastleName = baseCastle.name;
+            }
+        }
+
+        // 官位（一番 rankNo が小さいもの）を探します
+        let highestRankName = "なし";
+        // もし武将が titles という箱を持っていて、そこに官位のIDが入っていると仮定しています
+        if (leader && leader.titles && leader.titles.length > 0) {
+            let bestRank = null;
+            for (const titleId of leader.titles) {
+                const title = this.game.titles.find(t => t.id === titleId);
+                if (title) {
+                    if (!bestRank || title.rankNo < bestRank.rankNo) {
+                        bestRank = title;
+                    }
+                }
+            }
+            if (bestRank) {
+                highestRankName = bestRank.name;
+            }
+        }
+
         // 城・武将・姫の数を数えます
         const castlesCount = this.game.castles.filter(c => c.ownerClan === clanId).length;
         const bushosCount = this.game.bushos.filter(b => b.clan === clanId && b.status === 'active').length;
@@ -648,33 +675,35 @@ class UIManager {
         if (leader) {
             if (leader.innovation >= 67) {
                 ideology = "革新";
-                ideologyColor = "color:#e91e63;"; // 革新はピンクっぽくします
+                ideologyColor = "color:#e91e63;";
             } else if (leader.innovation <= 33) {
                 ideology = "保守";
-                ideologyColor = "color:#1976d2;"; // 保守は青っぽくします
+                ideologyColor = "color:#1976d2;";
             }
         }
 
-        // 大名の顔画像を表示する準備
-        let faceHtml = "";
+        // 顔画像の準備
+        let faceSrc = "data/images/faceicons/unknown_face.webp";
         if (leader && leader.faceIcon) {
-            faceHtml = `<img src="data/images/faceicons/${leader.faceIcon}" style="width: 100px; height: 100px; object-fit: cover; border: 2px solid #333; border-radius: 4px; background: #eee;" onerror="this.src='data/images/faceicons/unknown_face.webp'">`;
+            faceSrc = `data/images/faceicons/${leader.faceIcon}`;
         }
 
-        // 画面に表示する中身の設計図です！
+        // CSSのお片付け箱（クラス）を使って、きれいに並べます
         let contentHtml = `
-            <div style="display: flex; gap: 20px; align-items: flex-start; margin-bottom: 20px; text-align: left;">
-                <div style="flex-shrink: 0;">${faceHtml}</div>
-                <div style="flex: 1;">
-                    <div style="font-size: 1.3rem; font-weight: bold; margin-bottom: 10px; border-bottom: 2px solid #ccc; padding-bottom: 5px;">
-                        ${clan.name}
-                    </div>
-                    <div style="display: grid; grid-template-columns: 100px 1fr; gap: 8px; font-size: 1rem;">
-                        <div style="color: #666;">当主</div><div style="font-weight: bold;">${leaderName}</div>
-                        <div style="color: #666;">方針</div><div style="font-weight: bold; ${ideologyColor}">${ideology}</div>
-                        <div style="color: #666;">城数</div><div style="font-weight: bold;">${castlesCount}</div>
-                        <div style="color: #666;">武将数</div><div style="font-weight: bold;">${bushosCount}</div>
-                        <div style="color: #666;">姫数</div><div style="font-weight: bold;">${princessCount}</div>
+            <div class="daimyo-detail-container">
+                <div class="daimyo-detail-header">
+                    <div class="daimyo-detail-name">${clan.name}</div>
+                    <div class="daimyo-detail-ideology" style="${ideologyColor}">${ideology}</div>
+                </div>
+                <div class="daimyo-detail-body">
+                    <img src="${faceSrc}" class="daimyo-detail-face" onerror="this.src='data/images/faceicons/unknown_face.webp'">
+                    <div class="daimyo-detail-info">
+                        <div class="daimyo-detail-label">当主</div><div class="daimyo-detail-value">${leaderName}</div>
+                        <div class="daimyo-detail-label">官位</div><div class="daimyo-detail-value">${highestRankName}</div>
+                        <div class="daimyo-detail-label">本拠地</div><div class="daimyo-detail-value">${baseCastleName}</div>
+                        <div class="daimyo-detail-label">城数</div><div class="daimyo-detail-value">${castlesCount}</div>
+                        <div class="daimyo-detail-label">武将数</div><div class="daimyo-detail-value">${bushosCount}</div>
+                        <div class="daimyo-detail-label">姫数</div><div class="daimyo-detail-value">${princessCount}</div>
                     </div>
                 </div>
             </div>
@@ -688,8 +717,8 @@ class UIManager {
             </div>
         `;
 
-        // 小窓を表示する魔法を呼び出します
-        this.showResultModal(`<h3 style="margin-top:0; border-bottom: 2px solid #ddd; padding-bottom: 10px; flex-shrink:0;">大名家詳細</h3>${contentHtml}`, null, customFooter);
+        // 小窓を表示する魔法を呼び出します（タイトル部分は新しいデザインに含めたのでスッキリさせました）
+        this.showResultModal(contentHtml, null, customFooter);
     }
 
     // ==========================================
