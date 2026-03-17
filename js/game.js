@@ -1061,14 +1061,15 @@ class GameManager {
             if (c.ownerClan === 0) return;
             c.isDone = false;
 
-            const baseGold = (c.population * 0.001) + (c.peoplesLoyalty / 3) + (c.commerce / 10);
+            const baseGold = (c.population * 0.001) + (c.peoplesLoyalty / 2) + (c.commerce / 8);
             let income = Math.floor(baseGold * window.MainParams.Economy.IncomeGoldRate);
             income = GameSystem.applyVariance(income, window.MainParams.Economy.IncomeFluctuation);
-            if (this.month === 3) income += income * 5;
+            if (this.month === 3) income += income * 3;
             c.gold = Math.min(99999, c.gold + income);
-
+            
+            // ９月の兵糧収入計算式
             if (this.month === 9) {
-                const baseRice = c.kokudaka + c.peoplesLoyalty;
+                const baseRice = (c.kokudaka / 2) + c.peoplesLoyalty;
                 let riceIncome = Math.floor(baseRice * window.MainParams.Economy.IncomeRiceRate);
                 riceIncome = GameSystem.applyVariance(riceIncome, window.MainParams.Economy.IncomeFluctuation);
                 c.rice = Math.min(99999, c.rice + riceIncome);
