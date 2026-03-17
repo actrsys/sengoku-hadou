@@ -17,14 +17,6 @@ const COMMAND_MENU_STRUCTURE = [
         commands: ['war', 'draft', 'training', 'soldier_charity', 'transport', 'kunishu_subjugate']
     },
     {
-        label: "取引",
-        commands: ['buy_rice', 'sell_rice', 'buy_horses', 'buy_guns']
-    },
-    {
-        label: "人事",
-        commands: ['appoint_gunshi', 'appoint', 'delegate', 'reward', 'interview', 'employ', 'move', 'banish']
-    },
-    {
         label: "対外",
         // ★ここが「入れ子（サブメニュー）」になる部分です！
         subMenus: [
@@ -33,6 +25,14 @@ const COMMAND_MENU_STRUCTURE = [
             { label: "諸勢力", commands: ['kunishu_goodwill', 'kunishu_incorporate'] },
             { label: "朝廷", commands: ['tribute', 'court_truce'] }
         ]
+    },
+    {
+        label: "取引",
+        commands: ['buy_rice', 'sell_rice', 'buy_horses', 'buy_guns']
+    },
+    {
+        label: "人事",
+        commands: ['appoint_gunshi', 'appoint', 'delegate', 'reward', 'interview', 'employ', 'move', 'banish']
     },
     {
         label: "情報",
