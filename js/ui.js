@@ -3648,4 +3648,121 @@ class UIManager {
 
         modal.classList.remove('hidden');
     }
+    
+    // ==========================================
+    // ★ここから追加：婚姻コマンド専用のUI魔法です！
+    // ==========================================
+    showMarriageSelector(doerId, targetCastleId) {
+        const myClan = this.game.clans.find(c => c.id === this.game.playerClanId);
+        // 嫁がせることができる、自分の家の「未婚の姫」を探します
+        const myPrincesses = myClan.princessIds
+            .map(id => this.game.princesses.find(p => p.id === id))
+            .filter(p => p && p.status === 'unmarried');
+
+        let listHtml = `<div class="list-container" style="max-height: 400px; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; padding: 10px;">`;
+        
+        myPrincesses.forEach(p => {
+            const age = this.game.year - p.birthYear;
+            listHtml += `
+                <div class="select-item" style="display:flex; align-items:center; gap:15px; padding: 10px; border: 1px solid #ccc; border-radius: 8px; cursor: pointer; background: #fff;"
+                     onclick="if(window.AudioManager) window.AudioManager.playSE('choice.ogg'); window.GameApp.ui.showMarriageKinsmanSelector(${doerId}, ${targetCastleId}, ${p.id})">
+                    <img src="data/images/faceicons/${p.faceIcon}" style="width: 60px; height: 60px; object-fit: cover; border-radius: 4px; border: 1px solid #999;" onerror="this.src='data/images/faceicons/unknown_face.webp'">
+                    <div>
+                        <div style="font-weight:bold; font-size: 1.2rem; margin-bottom: 5px;">${p.name}</div>
+                        <div style="font-size: 0.95rem; color: #555;">年齢: ${age}歳</div>
+                    </div>
+                </div>
+            `;
+        });
+        listHtml += `</div>`;
+
+        const customFooter = `<button class="btn-secondary" onclick="window.GameApp.ui.closeResultModal()">戻る</button>`;
+        
+        this.showResultModal(
+            `<h3 style="margin-top:0; border-bottom: 2px solid #ddd; padding-bottom: 10px;">嫁がせる姫を選択してください</h3>${listHtml}`, 
+            null, 
+            customFooter
+        );
+    }
+
+    showMarriageKinsmanSelector(doerId, targetCastleId, princessId) {
+        const targetClanId = this.game.getCastle(targetCastleId).ownerClan;
+        const targetLeaderId = this.game.clans.find(c => c.id === targetClanId)?.leaderId;
+        const targetLeader = this.game.getBusho(targetLeaderId);
+        
+        // 相手の家の一門武将（大名と同じ血縁IDを持っている、活動中の人）を探します
+        const kinsmen = this.game.bushos.filter(b => 
+            b.clan === targetClanId && 
+            b.status === 'active' && 
+            b.familyIds.some(id => targetLeader.familyIds.includes(id))
+        );
+
+        const princess = this.game.princesses.find(p => p.id === princessId);
+        const gunshi = this.game.getClanGunshi(this.game.playerClanId);
+        const myDaimyo = this.game.bushos.find(b => b.clan === this.game.playerClanId && b.isDaimyo);
+
+        let listHtml = `<div class="list-container" style="max-height: 400px; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; padding: 10px;">`;
+        
+        kinsmen.forEach(b => {
+            const getStat = (stat) => GameSystem.getDisplayStatHTML(b, stat, gunshi, null, this.game.playerClanId, myDaimyo);
+            
+            listHtml += `
+                <div class="select-item" style="display:flex; align-items:center; gap:15px; padding: 10px; border: 1px solid #ccc; border-radius: 8px; cursor: pointer; background: #fff;"
+                     onclick="if(window.AudioManager) window.AudioManager.playSE('choice.ogg'); window.GameApp.ui.confirmMarriage(${doerId}, ${targetCastleId}, ${princess.id}, ${b.id})">
+                    <img src="data/images/faceicons/${b.faceIcon}" style="width: 60px; height: 60px; object-fit: cover; border-radius: 4px; border: 1px solid #999;" onerror="this.src='data/images/faceicons/unknown_face.webp'">
+                    <div>
+                        <div style="font-weight:bold; font-size: 1.2rem; margin-bottom: 5px;">${b.name} <span style="font-size:0.9rem; color:#1976d2;">(${b.getRankName()})</span></div>
+                        <div style="font-size: 0.9rem; color: #555;">統:${getStat('leadership')} 武:${getStat('strength')} 政:${getStat('politics')} 智:${getStat('intelligence')} 魅:${getStat('charm')}</div>
+                    </div>
+                </div>
+            `;
+        });
+        listHtml += `</div>`;
+
+        const customFooter = `<button class="btn-secondary" onclick="window.GameApp.ui.showMarriageSelector(${doerId}, ${targetCastleId})">戻る</button>`;
+
+        this.showResultModal(
+            `<h3 style="margin-top:0; border-bottom: 2px solid #ddd; padding-bottom: 10px;">${princess.name} を嫁がせる相手を選択してください</h3>${listHtml}`, 
+            null, 
+            customFooter
+        );
+    }
+
+    confirmMarriage(doerId, targetCastleId, princessId, targetBushoId) {
+        // 念のため、現在開いている小窓を一度閉じます
+        this.closeResultModal();
+
+        const targetClanId = this.game.getCastle(targetCastleId).ownerClan;
+        const targetClan = this.game.clans.find(c => c.id === targetClanId);
+        const targetBusho = this.game.getBusho(targetBushoId);
+        const princess = this.game.princesses.find(p => p.id === princessId);
+        const doer = this.game.getBusho(doerId);
+
+        const msg = `${targetClan.name} の ${targetBusho.name} に、当家の ${princess.name} を嫁がせます。\nよろしいですか？`;
+
+        this.showDialog(msg, true, 
+            () => {
+                // 【はい】を選んだ時の処理（実行）
+                this.game.commandSystem.applyMarriageData(princessId, targetBushoId, targetClanId);
+
+                // 使者のお仕事完了処理（行動済みにし、功績も与えます）
+                doer.isActionDone = true;
+                doer.achievementTotal += Math.floor(doer.diplomacy * 0.2) + 20;
+                this.game.factionSystem.updateRecognition(doer, 30);
+
+                // 成功メッセージを出して画面を更新
+                this.showResultModal(`${targetClan.name} と婚姻同盟を結びました！\n${princess.name} は ${targetBusho.name} の正室として迎えられました。`, () => {
+                    this.updatePanelHeader();
+                    this.renderCommandMenu();
+                    this.renderMap();
+                });
+            }, 
+            () => {
+                // 【いいえ】を選んだ時は、もう一度「相手を選ぶ画面」に戻してあげます
+                this.showMarriageKinsmanSelector(doerId, targetCastleId, princessId);
+            }
+        );
+    }
+    // ★追加ここまで！
+    
 }
