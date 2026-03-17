@@ -58,20 +58,25 @@ class DataManager {
                     this.parseGenericNames(namesText);
                 } catch (e) { console.warn("汎用武将名ファイルなし"); }
             }
-            const [clansText, castlesText, bushosText, kunishusText, courtRanksText] = await Promise.all([                
+            // ★今回追加：princess.csv も一緒に読み込むようにリストに加えます！
+            const [clansText, castlesText, bushosText, kunishusText, courtRanksText, princessesText] = await Promise.all([                
                 this.fetchText(path + "clans.csv"),                
                 this.fetchText(path + "castles.csv"),                
                 this.fetchText(path + "warriors.csv"),
                 this.fetchText(path + "kunishuClan.csv").catch(() => ""),
-                this.fetchText("./data/imperialCourtRank.csv").catch(() => "")
+                this.fetchText("./data/imperialCourtRank.csv").catch(() => ""),
+                this.fetchText(path + "princess.csv").catch(() => "") // 姫データがないシナリオでもエラーにならないように守ります
             ]);
             const clans = this.parseCSV(clansText, Clan);
             const castles = this.parseCSV(castlesText, Castle);
             const bushos = this.parseCSV(bushosText, Busho);
             const kunishus = kunishusText ? this.parseCSV(kunishusText, Kunishu) : [];
             const courtRanks = courtRanksText ? this.parseCSV(courtRanksText, CourtRank) : [];
+            // ★今回追加：読み込んだ文字を、新しく作った姫クラス（器）に流し込みます
+            const princesses = princessesText ? this.parseCSV(princessesText, Princess) : [];
             
-            this.joinData(clans, castles, bushos);
+            // ★今回追加：ゲーム開始時の準備係（joinData）に、姫の名簿も一緒に渡してあげます
+            this.joinData(clans, castles, bushos, princesses);
             if (bushos.length < 50) this.generateGenericBushos(bushos, castles, clans);
             
             // ★ここを書き足し！：お城のデータが揃った後で、色を探す魔法を発動させます！
@@ -81,8 +86,8 @@ class DataManager {
             } catch (e) {
                 console.log("マップ画像の解析をスキップしました");
             }
-            // ★ここを差し替え！：画像の大きさと官位データも一緒に渡すようにします！
-            return { clans, castles, bushos, kunishus, courtRanks, mapWidth: this.mapImageWidth, mapHeight: this.mapImageHeight };
+            // ★今回追加：完成した姫の名簿をゲーム本体に返します！
+            return { clans, castles, bushos, kunishus, courtRanks, princesses, mapWidth: this.mapImageWidth, mapHeight: this.mapImageHeight };
         } catch (error) {
             console.error(error);
             alert(`データの読み込みに失敗しました。\nフォルダ構成を確認してください。`);
@@ -146,8 +151,8 @@ class DataManager {
         return text;
     }
     
-    // ★ゲーム開始時の状態を作る魔法です！
-    static joinData(clans, castles, bushos) {
+    // ★ゲーム開始時の状態を作る魔法です！（今回から姫の名簿も受け取ります）
+    static joinData(clans, castles, bushos, princesses = []) {
         const startYear = window.MainParams.StartYear; // 今のシナリオの開始年（例：1560年）
         
         castles.forEach(c => c.samuraiIds = []);
@@ -217,6 +222,9 @@ class DataManager {
                 const c = castles.find(castle => Number(castle.id) === Number(b.castleId));
                 if(c) c.samuraiIds.push(b.id);
             }
+
+            // ★今回追加：ゲーム開始の瞬間に、姫の名簿を使って「武将の一門関係（血の繋がり）」を繋ぎます！
+            b.updateFamilyIds(princesses);
         });
     }
     
@@ -774,6 +782,8 @@ class GameManager {
 
             const data = await DataManager.loadAll(folder); 
             this.clans = data.clans; this.castles = data.castles; this.bushos = data.bushos; 
+            // ★今回追加：ゲーム本体（GameApp）に、姫の名簿を持たせます！
+            this.princesses = data.princesses || []; 
             
             this.year = window.MainParams.StartYear;
             this.month = window.MainParams.StartMonth;
@@ -1371,6 +1381,7 @@ class GameManager {
             castles: this.castles, 
             bushos: this.bushos, 
             clans: this.clans,
+            princesses: this.princesses, // ★今回追加：姫の名簿もセーブデータに書き込みます
             playerClanId: this.playerClanId,
             kunishus: this.kunishuSystem.kunishus,
             mapWidth: this.mapWidth,
@@ -1434,6 +1445,8 @@ class GameManager {
 
                 this.castles = d.castles.map(c => new Castle(c)); 
                 this.bushos = d.bushos.map(b => new Busho(b));
+                // ★今回追加：セーブデータから姫の名簿を元通りに復元します
+                this.princesses = (d.princesses || []).map(p => new Princess(p));
                 
                 if (d.kunishus) {
                     this.kunishuSystem.setKunishuData(d.kunishus.map(k => new Kunishu(k)));
