@@ -428,12 +428,44 @@ class CommandSystem {
             bushos = this.game.getCastleBushos(targetId); 
             infoHtml = "<div>武将一覧 (精度により情報は隠蔽されます)</div>"; 
         }
-        else if (actionType === 'all_busho_list') { 
-            bushos = this.game.bushos.filter(b => b.clan === this.game.playerClanId && b.status !== 'dead' && b.status !== 'ronin' && b.status !== 'unborn');
-            infoHtml = "<div>我が軍の武将一覧です</div>"; 
-            isMulti = false;
-        }
-        else if (actionType === 'war_general' || actionType === 'kunishu_war_general') {
+        else if (actionType === 'all_busho_list') { 
+            bushos = this.game.bushos.filter(b => b.clan === this.game.playerClanId && b.status !== 'dead' && b.status !== 'ronin' && b.status !== 'unborn');
+            infoHtml = "<div>我が軍の武将一覧です</div>"; 
+            isMulti = false;
+        }
+        // ★ここから追加：姫を「ダミーの武将」に変装させてリストに出します！
+        else if (actionType === 'marriage_princess') {
+            const myClan = this.game.clans.find(c => c.id === this.game.playerClanId);
+            const myPrincesses = myClan.princessIds
+                .map(id => this.game.princesses.find(p => p.id === id))
+                .filter(p => p && p.status === 'unmarried');
+            
+            bushos = myPrincesses.map(p => ({
+                id: p.id,
+                name: p.name,
+                isActionDone: false,
+                getRankName: () => `姫 (${this.game.year - p.birthYear}歳)`,
+                leadership: 0, strength: 0, politics: 0, diplomacy: 0, intelligence: 0, charm: 0,
+                isPrincess: true // 並び替えで一番上にするための目印
+            }));
+            infoHtml = "<div>嫁がせる姫を選択してください</div>";
+            isMulti = false;
+        }
+        // ★ここから追加：相手の一門武将をリストに出します！
+        else if (actionType === 'marriage_kinsman') {
+            const targetClanId = this.game.getCastle(targetId).ownerClan;
+            const targetLeaderId = this.game.clans.find(c => c.id === targetClanId)?.leaderId;
+            const targetLeader = this.game.getBusho(targetLeaderId);
+            
+            bushos = this.game.bushos.filter(b => 
+                b.clan === targetClanId && 
+                b.status === 'active' && 
+                b.familyIds.some(id => targetLeader.familyIds.includes(id))
+            );
+            infoHtml = "<div>姫を嫁がせる相手（一門武将）を選択してください</div>";
+            isMulti = false;
+        }
+        else if (actionType === 'war_general' || actionType === 'kunishu_war_general') {
             if (extraData && extraData.candidates) {
                 bushos = extraData.candidates.map(id => this.game.getBusho(id));
             }
@@ -496,10 +528,11 @@ class CommandSystem {
         }
 
         // --- 並び替え（ソート） ---
-        bushos.sort((a,b) => {
-            const getRankScore = (target) => {
-                if (target.isDaimyo || target.isCastellan) return 10; 
-                if (target.isGunshi) return 20; 
+        bushos.sort((a,b) => {
+            const getRankScore = (target) => {
+                if (target.isPrincess) return 5; // ★追加：姫を一番上にします！
+                if (target.isDaimyo || target.isCastellan) return 10; 
+                if (target.isGunshi) return 20;
                 if (target.belongKunishuId && target.belongKunishuId > 0) {
                     const kunishu = this.game.kunishuSystem.getKunishu(target.belongKunishuId);
                     const isBoss = kunishu && (Number(kunishu.leaderId) === Number(target.id));
@@ -855,11 +888,56 @@ class CommandSystem {
         }
 
         if (actionType === 'rumor_target_busho') {
-            this.game.ui.openBushoSelector('rumor_doer', targetId, { targetBushoId: firstId });
-            return;
-        }
-        if (actionType === 'rumor_doer') {
-            const doer = this.game.getBusho(firstId);
+            this.game.ui.openBushoSelector('rumor_doer', targetId, { targetBushoId: firstId });
+            return;
+        }
+
+        // ★ここから追加：婚姻のリストで決定ボタンを押した時の動き！
+        if (actionType === 'marriage_princess') {
+            // 使者と姫のIDを覚えて、相手武将のリストを開きます
+            this.game.ui.openBushoSelector('marriage_kinsman', targetId, { 
+                doerId: extraData.doerId, 
+                princessId: firstId 
+            });
+            return;
+        }
+        if (actionType === 'marriage_kinsman') {
+            const doerId = extraData.doerId;
+            const princessId = extraData.princessId;
+            const targetBushoId = firstId;
+            
+            const targetClanId = this.game.getCastle(targetId).ownerClan;
+            const targetClan = this.game.clans.find(c => c.id === targetClanId);
+            const targetBusho = this.game.getBusho(targetBushoId);
+            const princess = this.game.princesses.find(p => p.id === princessId);
+            const doer = this.game.getBusho(doerId);
+
+            const msg = `${targetClan.name} の ${targetBusho.name} に、当家の ${princess.name} を嫁がせます。\nよろしいですか？`;
+
+            this.game.ui.showDialog(msg, true, 
+                () => {
+                    // はい：結婚成立！
+                    this.applyMarriageData(princessId, targetBushoId, targetClanId);
+                    doer.isActionDone = true;
+                    doer.achievementTotal += Math.floor(doer.diplomacy * 0.2) + 20;
+                    this.game.factionSystem.updateRecognition(doer, 30);
+
+                    this.game.ui.showResultModal(`${targetClan.name} と婚姻同盟を結びました！\n${princess.name} は ${targetBusho.name} の正室として迎えられました。`, () => {
+                        this.game.ui.updatePanelHeader();
+                        this.game.ui.renderCommandMenu();
+                        this.game.ui.renderMap();
+                    });
+                }, 
+                () => {
+                    // いいえ：もう一度相手武将選びに戻る
+                    this.game.ui.openBushoSelector('marriage_kinsman', targetId, extraData);
+                }
+            );
+            return;
+        }
+
+        if (actionType === 'rumor_doer') {
+            const doer = this.game.getBusho(firstId);
             const targetBusho = this.game.getBusho(extraData.targetBushoId);
             const trueProb = GameSystem.getRumorProb(doer, targetBusho);
             this.showAdviceAndExecute('rumor', () => this.executeRumor(firstId, targetId, extraData.targetBushoId), { trueProb: trueProb });
@@ -908,10 +986,8 @@ class CommandSystem {
                 // ★追加：朝廷和睦は条件を満たしていれば確実に成功します！
                 this.showAdviceAndExecute('diplomacy', () => this.executeCourtTruce(firstId, targetId), { trueProb: 1.0 });
             } else if (extraData.subAction === 'marriage') {
-                // ★今回追加：使者が決まったら、次は「誰を嫁がせるか」「誰に嫁がせるか」を選ぶ画面を呼び出します！
-                if (this.game.ui.showMarriageSelector) {
-                    this.game.ui.showMarriageSelector(firstId, targetId);
-                }
+                // ★変更：いつもの「武将リスト」を使って、姫を選ぶ画面を開きます！
+                this.game.ui.openBushoSelector('marriage_princess', targetId, { doerId: firstId });
             }
             return;
         }
