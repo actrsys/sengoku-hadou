@@ -10,36 +10,16 @@
     <link rel="stylesheet" href="css/animation.css">
 </head>
 <body>
-    <div id="daimyo-detail-template" style="display: none;">
-        <div class="daimyo-detail-container">
-            <div class="daimyo-detail-header">
-                <div id="detail-clan-name" class="daimyo-detail-name"></div>
-                <div id="detail-clan-ideology" class="daimyo-detail-ideology"></div>
+    <div id="daimyo-detail-modal" class="modal hidden">
+        <div class="modal-content" style="max-width: 500px;">
+            <div class="modal-header" style="border-bottom: 2px solid #ddd; padding-bottom: 10px; margin-bottom: 15px;">
+                <h3 style="margin:0;">大名家詳細</h3>
             </div>
-            <div class="daimyo-detail-body">
-                <div class="daimyo-detail-left">
-                    <img id="detail-leader-face" class="daimyo-detail-face" src="" onerror="this.src='data/images/faceicons/unknown_face.webp'">
-                    <div id="detail-leader-name" class="daimyo-detail-leader-name"></div>
-                    <div id="detail-leader-rank" class="daimyo-detail-leader-rank"></div>
+            <div id="daimyo-detail-body" class="modal-body" style="text-align: left; overflow-y: auto; padding-bottom: 10px;">
                 </div>
-                <div class="daimyo-detail-info">
-                    <div class="daimyo-detail-stat-box">
-                        <span class="daimyo-detail-label">本拠地</span>
-                        <span id="detail-base-castle" class="daimyo-detail-value"></span>
-                    </div>
-                    <div class="daimyo-detail-stat-box">
-                        <span class="daimyo-detail-label">城数</span>
-                        <span id="detail-castle-count" class="daimyo-detail-value"></span>
-                    </div>
-                    <div class="daimyo-detail-stat-box">
-                        <span class="daimyo-detail-label">武将数</span>
-                        <span id="detail-busho-count" class="daimyo-detail-value"></span>
-                    </div>
-                    <div class="daimyo-detail-stat-box">
-                        <span class="daimyo-detail-label">姫数</span>
-                        <span id="detail-princess-count" class="daimyo-detail-value"></span>
-                    </div>
-                </div>
+            <div class="modal-footer" style="justify-content: space-between; width: 100%; margin-top: 15px; border-top: none;">
+                <button class="btn-secondary" id="daimyo-detail-back-btn">戻る</button>
+                <button class="btn-primary" id="daimyo-detail-diplo-btn">外交関係</button>
             </div>
         </div>
     </div>
