@@ -580,7 +580,108 @@ class UIInfoManager {
         seSlider.onchange = () => {
              if (window.AudioManager) window.AudioManager.playSE('choice.ogg');
         };
-
+        
         modal.classList.remove('hidden');
     }
+
+    // ==========================================
+    // ★ここから追加：姫一覧＆姫選択の魔法です！
+    // ==========================================
+
+    // 「情報」から見る時用
+    showPrincessList() {
+        this.renderPrincessModal(false, null, null);
+    }
+
+    // 「婚姻」で選ぶ時用
+    showPrincessSelector(targetCastleId, doerId) {
+        this.renderPrincessModal(true, targetCastleId, doerId);
+    }
+
+    // 姫の画面を描くお仕事をする場所です
+    renderPrincessModal(isSelectMode, targetCastleId, doerId) {
+        const myClanId = this.game.playerClanId;
+        const myClan = this.game.clans.find(c => c.id === myClanId);
+        
+        let princesses = [];
+        if (myClan && myClan.princessIds) {
+            princesses = myClan.princessIds
+                .map(id => this.game.princesses.find(p => p.id === id))
+                .filter(p => p !== undefined); // データがない姫は弾きます
+        }
+
+        // 選ぶ時は「未婚」の姫だけに絞ります
+        if (isSelectMode) {
+            princesses = princesses.filter(p => p.status === 'unmarried');
+        }
+
+        // 見出しを作ります（列の幅を5つに分けます）
+        let listHtml = '<div class="daimyo-list-container"><div class="daimyo-list-header" style="grid-template-columns: 1fr 1fr 1fr 1.5fr 1.5fr;"><span>名前</span><span>身分</span><span>年齢</span><span>父親</span><span>配偶者</span></div>';
+
+        // 姫を一人ずつリストに並べていきます
+        princesses.forEach(p => {
+            const age = this.game.year - p.birthYear;
+            const father = this.game.getBusho(p.fatherId);
+            const fatherName = father ? father.name : "不明";
+            const husband = this.game.getBusho(p.husbandId);
+            const husbandName = husband ? husband.name : "なし";
+
+            let onClickStr = "";
+            let cursorStr = "";
+
+            // 選ぶ時だけ、押した時の魔法（onClick）と指マーク（cursor）をつけます
+            if (isSelectMode) {
+                cursorStr = "cursor:pointer;";
+                // 選んだら、裏側でコッソリ「選んだよ！」とゲーム本体に伝えて画面を閉じます
+                onClickStr = `onclick="if(window.AudioManager) window.AudioManager.playSE('choice.ogg'); window.GameApp.commandSystem.handleBushoSelection('marriage_princess', [${p.id}], ${targetCastleId}, { doerId: ${doerId} }); window.GameApp.ui.closeResultModal();"`;
+            }
+
+            // 1人分の行を作ります
+            listHtml += `<div class="daimyo-list-item" style="grid-template-columns: 1fr 1fr 1fr 1.5fr 1.5fr; ${cursorStr}" ${onClickStr}>
+                <span class="col-daimyo-name" style="font-weight:bold;">${p.name}</span>
+                <span>姫</span>
+                <span>${age}歳</span>
+                <span>${fatherName}</span>
+                <span>${husbandName}</span>
+            </div>`;
+        });
+        
+        // もし一人もいなかったら
+        if (princesses.length === 0) {
+            listHtml += `<div style="padding: 15px; text-align: center;">該当する姫はおりませぬ。</div>`;
+        }
+
+        listHtml += '</div>';
+
+        const title = isSelectMode ? "嫁がせる姫を選択してください" : "姫一覧";
+        let customFooter = "";
+        
+        // 戻るボタンの動きを作ります
+        if (!isSelectMode) {
+            // 見るだけの時は普通に閉じるだけ
+            customFooter = `<button class="btn-primary" onclick="window.GameApp.ui.closeResultModal()">閉じる</button>`;
+        } else {
+            // 婚姻で選んでいる時は、前の「使者選び」に戻してあげます
+            customFooter = `<button class="btn-secondary" onclick="window.GameApp.ui.openBushoSelector('diplomacy_doer', ${targetCastleId}, { subAction: 'marriage' }); window.GameApp.ui.closeResultModal();">戻る</button>`;
+        }
+
+        // 出来上がった画面を、いつもの小窓（モーダル）に表示してもらいます
+        this.ui.showResultModal(`<h3 style="margin-top:0; border-bottom: 2px solid #ddd; padding-bottom: 10px; flex-shrink:0;">${title}</h3>${listHtml}`, () => {
+            if (this.ui.resultBody) {
+                this.ui.resultBody.style.overflowY = '';
+                this.ui.resultBody.style.display = '';
+                this.ui.resultBody.style.flexDirection = '';
+            }
+        }, customFooter);
+
+        // スクロールできるように整えます
+        if (this.ui.resultBody) {
+            this.ui.resultBody.style.overflowY = 'hidden';
+            this.ui.resultBody.style.display = 'flex';
+            this.ui.resultBody.style.flexDirection = 'column';
+        }
+    }
+    // ==========================================
+    // ★姫一覧＆姫選択の魔法ここまで！
+    // ==========================================
 }

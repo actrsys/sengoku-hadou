@@ -36,7 +36,7 @@ const COMMAND_MENU_STRUCTURE = [
     },
     {
         label: "情報",
-        commands: ['investigate', 'busho_list', 'faction_list', 'daimyo_list']
+        commands: ['investigate', 'busho_list', 'princess_list', 'faction_list', 'daimyo_list']
     },
     {
         label: "システム",
@@ -244,6 +244,10 @@ const COMMAND_SPECS = {
         label: "武将", category: 'INFO',
         isSystem: true, action: 'busho_list'
     },
+    'princess_list': {
+        label: "姫", category: 'INFO',
+        isSystem: true, action: 'princess_list'
+    },
     'faction_list': {
         label: "派閥", category: 'INFO',
         isSystem: true, action: 'faction_list'
@@ -428,30 +432,12 @@ class CommandSystem {
             bushos = this.game.getCastleBushos(targetId); 
             infoHtml = "<div>武将一覧 (精度により情報は隠蔽されます)</div>"; 
         }
-        else if (actionType === 'all_busho_list') { 
+        // 【差し替え後】（間の部分が消えます！）
+        else if (actionType === 'all_busho_list') { 
             bushos = this.game.bushos.filter(b => b.clan === this.game.playerClanId && b.status !== 'dead' && b.status !== 'ronin' && b.status !== 'unborn');
             infoHtml = "<div>我が軍の武将一覧です</div>"; 
             isMulti = false;
         }
-        // ★ここから追加：姫を「ダミーの武将」に変装させてリストに出します！
-        else if (actionType === 'marriage_princess') {
-            const myClan = this.game.clans.find(c => c.id === this.game.playerClanId);
-            const myPrincesses = myClan.princessIds
-                .map(id => this.game.princesses.find(p => p.id === id))
-                .filter(p => p && p.status === 'unmarried');
-            
-            bushos = myPrincesses.map(p => ({
-                id: p.id,
-                name: p.name,
-                isActionDone: false,
-                getRankName: () => `姫 (${this.game.year - p.birthYear}歳)`,
-                leadership: 0, strength: 0, politics: 0, diplomacy: 0, intelligence: 0, charm: 0,
-                isPrincess: true // 並び替えで一番上にするための目印
-            }));
-            infoHtml = "<div>嫁がせる姫を選択してください</div>";
-            isMulti = false;
-        }
-        // ★ここから追加：相手の一門武将をリストに出します！
         else if (actionType === 'marriage_kinsman') {
             const targetClanId = this.game.getCastle(targetId).ownerClan;
             const targetLeaderId = this.game.clans.find(c => c.id === targetClanId)?.leaderId;
@@ -844,6 +830,7 @@ class CommandSystem {
             case 'daimyo_list': this.game.ui.showDaimyoList(); break;
             case 'faction_list': this.game.ui.showFactionList(this.game.playerClanId, true); break;
             case 'busho_list': this.game.ui.openBushoSelector('all_busho_list', null, null, null); break;
+            case 'princess_list': this.game.ui.showPrincessList(); break;
             case 'delegate_list': this.game.ui.showDelegateListModal(); break;
             // ★ここを書き足し！：「settings」と呼ばれたら小窓を開きます
             case 'settings': this.game.ui.showSettingsModal(); break;
@@ -986,8 +973,8 @@ class CommandSystem {
                 // ★追加：朝廷和睦は条件を満たしていれば確実に成功します！
                 this.showAdviceAndExecute('diplomacy', () => this.game.courtRankSystem.executeCourtTruce(firstId, targetId), { trueProb: 1.0 });
             } else if (extraData.subAction === 'marriage') {
-                // ★変更：いつもの「武将リスト」を使って、姫を選ぶ画面を開きます！
-                this.game.ui.openBushoSelector('marriage_princess', targetId, { doerId: firstId });
+                // ★変更：新しく作った「姫専用の画面」を開きます！
+                this.game.ui.showPrincessSelector(targetId, firstId);
             }
             return;
         }
