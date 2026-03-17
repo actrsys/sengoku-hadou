@@ -359,11 +359,18 @@ class DiplomacyManager {
         let targetDrop = -60; 
         let globalDrop = 0; 
         let isBetrayal = false;
+        let isBreakDomination = false; // ★追加：支配関係を破棄したかどうかのシールです
 
         if (oldStatus === '同盟' && oldSentiment >= 70) {
             targetDrop = -70; globalDrop = -10; isBetrayal = true;
         } else if (oldStatus === '従属' && oldSentiment >= 70) {
             targetDrop = -100; globalDrop = -10; isBetrayal = true;
+        } else if (oldStatus === '支配') {
+            // ★追加：自分が支配している相手を切り捨てた時の重いペナルティです！
+            targetDrop = -100; // 対象の大名家との友好度を0にするため、-100します
+            globalDrop = -15;  // 他の全ての大名家との友好度が15下がります
+            isBetrayal = true; // 周りからの心証が悪くなるシールを貼ります
+            isBreakDomination = true; // 忠誠度を下げるための専用シールも貼ります
         }
 
         this.updateSentiment(doerClanId, targetClanId, targetDrop);
@@ -381,7 +388,19 @@ class DiplomacyManager {
                 }
             });
         }
-        return { oldStatus, isBetrayal };
+
+        // ★追加：もし「支配」を破棄していたら、自分の家の武将たちの忠誠度を5下げます
+        if (isBreakDomination) {
+            this.game.bushos.forEach(busho => {
+                // 同じ家（clan）にいて、活動中（active）で、大名本人ではない武将を探します
+                if (busho.clan === doerClanId && busho.status === 'active' && !busho.isDaimyo) {
+                    busho.loyalty = Math.max(0, busho.loyalty - 5); // 0未満にはならないように下げます
+                }
+            });
+        }
+
+        // 最後に、結果をお知らせする魔法にシール（isBreakDomination）も一緒に渡してあげます
+        return { oldStatus, isBetrayal, isBreakDomination };
     }
     
     /**
@@ -449,6 +468,10 @@ class DiplomacyManager {
             msg = `${result.oldStatus}関係を破棄しました`;
             if (result.isBetrayal) {
                 msg += `\n諸大名からの心証が悪化しました……`;
+            }
+            // ★追加：もし支配関係を破棄して忠誠度が下がっていたら、メッセージを書き足します
+            if (result.isBreakDomination) {
+                msg += `\n家臣団の間にも動揺が広がっているようです……`;
             }
             doer.achievementTotal += 5;
             this.game.factionSystem.updateRecognition(doer, 10);
