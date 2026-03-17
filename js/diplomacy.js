@@ -290,6 +290,38 @@ class DiplomacyManager {
             if (chance <= threshold) return 0;
             return Math.max(0, Math.min(100, acceptProb));
         }
+        // ★ここから追加：婚姻の成功確率（同盟より少し成功しやすく緩和します！）
+        else if (type === 'marriage') {
+            let threshold = commonEnemy ? 90 : 120; 
+            let acceptProb = commonEnemy ? 90 : 70; 
+
+            if (allyCount >= 2) {
+                acceptProb -= (allyCount - 1) * 20; 
+                threshold += (allyCount - 1) * 10;  
+            }
+
+            // ★緩和その１：兵力差による確率の低下を「3分の2」に緩和します！
+            if (targetPower > myPower) {
+                // 本来ならどれくらい確率を引かれるか（ペナルティの量）を計算します
+                const penalty = 1.0 - (myPower / targetPower);
+                // ペナルティの量を「3分の2」にオマケしてあげます
+                const mitigatedPenalty = penalty * (2 / 3);
+                // オマケしたあとのペナルティを使って、最終的な確率を計算します
+                acceptProb *= (1.0 - mitigatedPenalty);
+            }
+
+            // ★緩和その２：友好度が低いことによるマイナス影響を「2分の1」に緩和します！
+            // 満点(100)からどれくらい友好度が下がっているかを計算します
+            const sentimentDrop = 100 - relation.sentiment;
+            // 下がってしまった分を「半分（2分の1）だけ大目に見る」という魔法をかけます
+            const effectiveSentiment = relation.sentiment + (sentimentDrop / 2);
+
+            // オマケしてもらった友好度を使って、成功のハードルを超えられるかチェックします
+            const chance = effectiveSentiment + doerDiplomacy;
+            if (chance <= threshold) return 0;
+            
+            return Math.max(0, Math.min(100, acceptProb));
+        }
         else if (type === 'dominate') {
             const powerRatio = myPower / Math.max(1, targetPower);
             if (powerRatio < 5) return 0;
