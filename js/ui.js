@@ -607,7 +607,8 @@ class UIManager {
                 friendBarHtml = `<div class="bar-bg bar-bg-friend"><div class="bar-fill bar-fill-friend" style="width:${friendPercent}%;"></div></div>`;
             }
 
-            listHtml += `<div class="daimyo-list-item" style="cursor:pointer;" onclick="if(window.AudioManager) window.AudioManager.playSE('choice.ogg'); window.GameApp.ui.showDiplomacyList(${d.id}, '${d.name}')"><span class="col-daimyo-name" style="font-weight:bold;">${d.name}</span><span class="col-leader-name">${d.leaderName}</span><span>${d.castlesCount}</span><span>${powerBarHtml}</span><span>${friendBarHtml}</span><span style="${statusColor}">${friendStatus}</span></div>`;
+            // ★変更：一覧をクリックした時に、外交リストではなく「大名家詳細」を開くようにしました！
+            listHtml += `<div class="daimyo-list-item" style="cursor:pointer;" onclick="if(window.AudioManager) window.AudioManager.playSE('choice.ogg'); window.GameApp.ui.showDaimyoDetail(${d.id})"><span class="col-daimyo-name" style="font-weight:bold;">${d.name}</span><span class="col-leader-name">${d.leaderName}</span><span>${d.castlesCount}</span><span>${powerBarHtml}</span><span>${friendBarHtml}</span><span style="${statusColor}">${friendStatus}</span></div>`;
         });
         listHtml += '</div>';
         
@@ -626,6 +627,71 @@ class UIManager {
         }
     }
     
+    // ==========================================
+    // ★ここから追加：大名家詳細画面を表示する魔法
+    // ==========================================
+    showDaimyoDetail(clanId) {
+        const clan = this.game.clans.find(c => c.id === clanId);
+        if (!clan) return;
+        
+        const leader = this.game.getBusho(clan.leaderId);
+        const leaderName = leader ? leader.name : "不明";
+        
+        // 城・武将・姫の数を数えます
+        const castlesCount = this.game.castles.filter(c => c.ownerClan === clanId).length;
+        const bushosCount = this.game.bushos.filter(b => b.clan === clanId && b.status === 'active').length;
+        const princessCount = clan.princessIds ? clan.princessIds.length : 0;
+        
+        // 革新性の計算（0-33:保守, 34-66:中道, 67-100:革新）
+        let ideology = "中道";
+        let ideologyColor = "";
+        if (leader) {
+            if (leader.innovation >= 67) {
+                ideology = "革新";
+                ideologyColor = "color:#e91e63;"; // 革新はピンクっぽくします
+            } else if (leader.innovation <= 33) {
+                ideology = "保守";
+                ideologyColor = "color:#1976d2;"; // 保守は青っぽくします
+            }
+        }
+
+        // 大名の顔画像を表示する準備
+        let faceHtml = "";
+        if (leader && leader.faceIcon) {
+            faceHtml = `<img src="data/images/faceicons/${leader.faceIcon}" style="width: 100px; height: 100px; object-fit: cover; border: 2px solid #333; border-radius: 4px; background: #eee;" onerror="this.src='data/images/faceicons/unknown_face.webp'">`;
+        }
+
+        // 画面に表示する中身の設計図です！
+        let contentHtml = `
+            <div style="display: flex; gap: 20px; align-items: flex-start; margin-bottom: 20px; text-align: left;">
+                <div style="flex-shrink: 0;">${faceHtml}</div>
+                <div style="flex: 1;">
+                    <div style="font-size: 1.3rem; font-weight: bold; margin-bottom: 10px; border-bottom: 2px solid #ccc; padding-bottom: 5px;">
+                        ${clan.name}
+                    </div>
+                    <div style="display: grid; grid-template-columns: 100px 1fr; gap: 8px; font-size: 1rem;">
+                        <div style="color: #666;">当主</div><div style="font-weight: bold;">${leaderName}</div>
+                        <div style="color: #666;">方針</div><div style="font-weight: bold; ${ideologyColor}">${ideology}</div>
+                        <div style="color: #666;">城数</div><div style="font-weight: bold;">${castlesCount}</div>
+                        <div style="color: #666;">武将数</div><div style="font-weight: bold;">${bushosCount}</div>
+                        <div style="color: #666;">姫数</div><div style="font-weight: bold;">${princessCount}</div>
+                    </div>
+                </div>
+            </div>
+        `;
+
+        // 画面の下（フッター）に置くボタンたちです
+        const customFooter = `
+            <div style="display: flex; justify-content: space-between; width: 100%;">
+                <button class="btn-secondary" onclick="window.GameApp.ui.showDaimyoList()">戻る</button>
+                <button class="btn-primary" onclick="window.GameApp.ui.showDiplomacyList(${clan.id}, '${clan.name}')">外交関係</button>
+            </div>
+        `;
+
+        // 小窓を表示する魔法を呼び出します
+        this.showResultModal(`<h3 style="margin-top:0; border-bottom: 2px solid #ddd; padding-bottom: 10px; flex-shrink:0;">大名家詳細</h3>${contentHtml}`, null, customFooter);
+    }
+
     // ==========================================
     // ★ここから追加：委任する城の一覧を出す魔法
     // ==========================================
@@ -856,7 +922,8 @@ class UIManager {
         });
         listHtml += '</div>';
         
-        const customFooter = `<button class="btn-secondary" onclick="window.GameApp.ui.showDaimyoList()">戻る</button>`;
+        // ★変更：戻るボタンを押した時に、「大名一覧」ではなく「大名家詳細」へ戻るようにしました！
+        const customFooter = `<button class="btn-secondary" onclick="window.GameApp.ui.showDaimyoDetail(${clanId})">戻る</button>`;
         
         this.showResultModal(`<h3 style="margin-top:0; border-bottom: 2px solid #ddd; padding-bottom: 10px; flex-shrink:0;">${clanName} 外交関係</h3>${listHtml}`, () => {
             if (this.resultBody) {
@@ -1708,6 +1775,7 @@ class UIManager {
             
             let isSelectable = !b.isActionDone; 
             if (extraData && extraData.allowDone) isSelectable = true; 
+            // ★変更：.includes の括弧の中に 'marriage_princess', 'marriage_kinsman' を追加しました！
             if (['appoint','employ_target','appoint_gunshi','rumor_target_busho','headhunt_target','interview','interview_target','reward','view_only','war_general', 'kunishu_war_general', 'all_busho_list', 'marriage_princess', 'marriage_kinsman'].includes(actionType)) isSelectable = true;
             if (actionType === 'def_intercept_deploy' || actionType === 'def_reinf_deploy' || actionType === 'atk_reinf_deploy') isSelectable = true;
             
@@ -3649,83 +3717,4 @@ class UIManager {
         modal.classList.remove('hidden');
     }
     
-    // ==========================================
-    // ★ここから追加：婚姻コマンド専用のUI魔法です！
-    // ==========================================
-    showMarriageSelector(doerId, targetCastleId) {
-        const myClan = this.game.clans.find(c => c.id === this.game.playerClanId);
-        // 嫁がせることができる、自分の家の「未婚の姫」を探します
-        const myPrincesses = myClan.princessIds
-            .map(id => this.game.princesses.find(p => p.id === id))
-            .filter(p => p && p.status === 'unmarried');
-
-        let listHtml = `<div class="list-container" style="max-height: 400px; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; padding: 10px;">`;
-        
-        myPrincesses.forEach(p => {
-            const age = this.game.year - p.birthYear;
-            // ★修正：タグが壊れないように、<div ...> の中は改行せずに1行で繋げました！
-            listHtml += `
-                <div class="select-item" style="display:flex; align-items:center; gap:15px; padding: 10px; border: 1px solid #ccc; border-radius: 8px; cursor: pointer; background: #fff;" onclick="if(window.AudioManager) window.AudioManager.playSE('choice.ogg'); window.GameApp.ui.showMarriageKinsmanSelector(${doerId}, ${targetCastleId}, ${p.id})">
-                    <img src="data/images/faceicons/${p.faceIcon}" style="width: 60px; height: 60px; object-fit: cover; border-radius: 4px; border: 1px solid #999;" onerror="this.src='data/images/faceicons/unknown_face.webp'">
-                    <div>
-                        <div style="font-weight:bold; font-size: 1.2rem; margin-bottom: 5px;">${p.name}</div>
-                        <div style="font-size: 0.95rem; color: #555;">年齢: ${age}歳</div>
-                    </div>
-                </div>
-            `;
-        });
-        listHtml += `</div>`;
-
-        const customFooter = `<button class="btn-secondary" onclick="window.GameApp.ui.closeResultModal()">戻る</button>`;
-        
-        this.showResultModal(
-            `<h3 style="margin-top:0; border-bottom: 2px solid #ddd; padding-bottom: 10px;">嫁がせる姫を選択してください</h3>${listHtml}`, 
-            null, 
-            customFooter
-        );
-    }
-
-    showMarriageKinsmanSelector(doerId, targetCastleId, princessId) {
-        const targetClanId = this.game.getCastle(targetCastleId).ownerClan;
-        const targetLeaderId = this.game.clans.find(c => c.id === targetClanId)?.leaderId;
-        const targetLeader = this.game.getBusho(targetLeaderId);
-        
-        // 相手の家の一門武将（大名と同じ血縁IDを持っている、活動中の人）を探します
-        const kinsmen = this.game.bushos.filter(b => 
-            b.clan === targetClanId && 
-            b.status === 'active' && 
-            b.familyIds.some(id => targetLeader.familyIds.includes(id))
-        );
-
-        const princess = this.game.princesses.find(p => p.id === princessId);
-        const gunshi = this.game.getClanGunshi(this.game.playerClanId);
-        const myDaimyo = this.game.bushos.find(b => b.clan === this.game.playerClanId && b.isDaimyo);
-
-        let listHtml = `<div class="list-container" style="max-height: 400px; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; padding: 10px;">`;
-        
-        kinsmen.forEach(b => {
-            const getStat = (stat) => GameSystem.getDisplayStatHTML(b, stat, gunshi, null, this.game.playerClanId, myDaimyo);
-            
-            // ★修正：こちらもタグが壊れないように1行に繋げました！
-            listHtml += `
-                <div class="select-item" style="display:flex; align-items:center; gap:15px; padding: 10px; border: 1px solid #ccc; border-radius: 8px; cursor: pointer; background: #fff;" onclick="if(window.AudioManager) window.AudioManager.playSE('choice.ogg'); window.GameApp.ui.confirmMarriage(${doerId}, ${targetCastleId}, ${princess.id}, ${b.id})">
-                    <img src="data/images/faceicons/${b.faceIcon}" style="width: 60px; height: 60px; object-fit: cover; border-radius: 4px; border: 1px solid #999;" onerror="this.src='data/images/faceicons/unknown_face.webp'">
-                    <div>
-                        <div style="font-weight:bold; font-size: 1.2rem; margin-bottom: 5px;">${b.name} <span style="font-size:0.9rem; color:#1976d2;">(${b.getRankName()})</span></div>
-                        <div style="font-size: 0.9rem; color: #555;">統:${getStat('leadership')} 武:${getStat('strength')} 政:${getStat('politics')} 智:${getStat('intelligence')} 魅:${getStat('charm')}</div>
-                    </div>
-                </div>
-            `;
-        });
-        listHtml += `</div>`;
-
-        const customFooter = `<button class="btn-secondary" onclick="window.GameApp.ui.showMarriageSelector(${doerId}, ${targetCastleId})">戻る</button>`;
-
-        this.showResultModal(
-            `<h3 style="margin-top:0; border-bottom: 2px solid #ddd; padding-bottom: 10px;">${princess.name} を嫁がせる相手を選択してください</h3>${listHtml}`, 
-            null, 
-            customFooter
-        );
-    }
-    // ★追加ここまで！
 }
