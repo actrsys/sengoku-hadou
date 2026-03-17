@@ -635,10 +635,9 @@ class UIManager {
         if (!clan) return;
         
         const leader = this.game.getBusho(clan.leaderId);
-        // 名前から「|」を取り除いて綺麗にします
         const leaderName = leader ? leader.name.replace('|', '') : "不明";
         
-        // 本拠地（大名がいる城）を探します
+        // 本拠地と官位を探します
         let baseCastleName = "不明";
         if (leader && leader.castleId) {
             const baseCastle = this.game.castles.find(c => c.id === leader.castleId);
@@ -647,72 +646,94 @@ class UIManager {
             }
         }
 
-        // 官位（一番 rankNo が小さいもの）を専用の魔法で探します
         let highestRankName = "なし";
         if (leader && this.game.courtRankSystem) {
             highestRankName = this.game.courtRankSystem.getHighestRankName(leader);
         }
 
-        // 城・武将・姫の数を数えます
+        // 数を数え、革新性を計算します
         const castlesCount = this.game.castles.filter(c => c.ownerClan === clanId).length;
         const bushosCount = this.game.bushos.filter(b => b.clan === clanId && b.status === 'active').length;
         const princessCount = clan.princessIds ? clan.princessIds.length : 0;
         
-        // 革新性の計算（0-33:保守, 34-66:中道, 67-100:革新）
         let ideology = "中道";
         let ideologyColor = "";
         if (leader) {
             if (leader.innovation >= 67) {
                 ideology = "革新";
-                ideologyColor = "#e91e63"; // color: を外して色だけ指定します
+                ideologyColor = "#e91e63";
             } else if (leader.innovation <= 33) {
                 ideology = "保守";
                 ideologyColor = "#1976d2";
             }
         }
 
-        // 顔画像の準備
         let faceSrc = "data/images/faceicons/unknown_face.webp";
         if (leader && leader.faceIcon) {
             faceSrc = `data/images/faceicons/${leader.faceIcon}`;
         }
 
-        // ★変更：index.html に置いたテンプレート（設計図）の中身を、実際のデータに書き換えます！
-        document.getElementById('detail-clan-name').textContent = clan.name;
-        document.getElementById('detail-clan-ideology').textContent = ideology;
-        document.getElementById('detail-clan-ideology').style.color = ideologyColor;
-        
-        document.getElementById('detail-leader-face').src = faceSrc;
-        document.getElementById('detail-leader-name').textContent = leaderName;
-        document.getElementById('detail-leader-rank').textContent = highestRankName;
-        
-        document.getElementById('detail-base-castle').textContent = baseCastleName;
-        document.getElementById('detail-castle-count').textContent = castlesCount;
-        document.getElementById('detail-busho-count').textContent = bushosCount;
-        document.getElementById('detail-princess-count').textContent = princessCount;
+        // ★根本解決：大名家詳細専用の小窓（モーダル）を探して使います！
+        const modal = document.getElementById('daimyo-detail-modal');
+        const body = document.getElementById('daimyo-detail-body');
+        const backBtn = document.getElementById('daimyo-detail-back-btn');
+        const diploBtn = document.getElementById('daimyo-detail-diplo-btn');
 
-        // 書き換えたHTMLをごっそりコピーして、表示用の中身にします
-        const contentHtml = document.getElementById('daimyo-detail-template').innerHTML;
+        if (!modal || !body) return;
 
-        // 画面の下（フッター）に置くボタンたちです
-        // ※ボタンは押した時の行き先が毎回変わるので、ここだけはJSで作ります
-        const customFooter = `
-            <div style="display: flex; justify-content: space-between; width: 100%;">
-                <button class="btn-secondary" onclick="window.GameApp.ui.showDaimyoList()">戻る</button>
-                <button class="btn-primary" onclick="window.GameApp.ui.showDiplomacyList(${clan.id}, '${clan.name}')">外交関係</button>
+        // 情報をHTMLにして流し込みます（CSSのお片付け箱はそのまま活きます！）
+        body.innerHTML = `
+            <div class="daimyo-detail-container">
+                <div class="daimyo-detail-header">
+                    <div class="daimyo-detail-name">${clan.name}</div>
+                    <div class="daimyo-detail-ideology" style="color:${ideologyColor}; font-weight:bold;">${ideology}</div>
+                </div>
+                <div class="daimyo-detail-body">
+                    <div class="daimyo-detail-left">
+                        <img src="${faceSrc}" class="daimyo-detail-face" onerror="this.src='data/images/faceicons/unknown_face.webp'">
+                        <div class="daimyo-detail-leader-name">${leaderName}</div>
+                        <div class="daimyo-detail-leader-rank">${highestRankName}</div>
+                    </div>
+                    <div class="daimyo-detail-info">
+                        <div class="daimyo-detail-stat-box">
+                            <span class="daimyo-detail-label">本拠地</span><span class="daimyo-detail-value">${baseCastleName}</span>
+                        </div>
+                        <div class="daimyo-detail-stat-box">
+                            <span class="daimyo-detail-label">城数</span><span class="daimyo-detail-value">${castlesCount}</span>
+                        </div>
+                        <div class="daimyo-detail-stat-box">
+                            <span class="daimyo-detail-label">武将数</span><span class="daimyo-detail-value">${bushosCount}</span>
+                        </div>
+                        <div class="daimyo-detail-stat-box">
+                            <span class="daimyo-detail-label">姫数</span><span class="daimyo-detail-value">${princessCount}</span>
+                        </div>
+                    </div>
+                </div>
             </div>
         `;
 
-        // 小窓を表示する魔法を呼び出します
-        this.showResultModal(contentHtml, null, customFooter);
+        // ボタンを押した時の行き先をセットします
+        backBtn.onclick = () => {
+            modal.classList.add('hidden');
+            this.showDaimyoList(); // 一覧に戻る
+        };
 
-        // ★追加：スクロールを絶対にさせないように、強力な魔法でピタッと固定します
-        if (this.resultBody) {
-            // important をつけて、他のルールを無理やり上書きします
-            this.resultBody.style.setProperty('overflow-y', 'hidden', 'important');
-            // 念のため、小窓の余計なすき間も消しておきます
-            this.resultBody.style.paddingBottom = '0'; 
-        }
+        diploBtn.onclick = () => {
+            modal.classList.add('hidden');
+            this.showDiplomacyList(clan.id, clan.name); // 外交へ飛ぶ
+        };
+
+        // 武将詳細と同じように、黒い背景を押した時にも閉じて一覧に戻るようにします
+        modal.onclick = (e) => {
+            if (e.target === modal) {
+                if (window.AudioManager) window.AudioManager.playSE('cancel.ogg');
+                modal.classList.add('hidden');
+                this.showDaimyoList();
+            }
+        };
+
+        // 全ての準備が整ったら、専用の小窓を表示します！
+        modal.classList.remove('hidden');
     }
 
     // ==========================================
