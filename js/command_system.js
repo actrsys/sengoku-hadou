@@ -2035,78 +2035,9 @@ class CommandSystem {
         this.game.diplomacyManager.clearDominationRelations(clanId);
     }
     
-    // ★追加: AIからプレイヤーへの外交提案を受ける処理
+    // ★修正：AIからの外交提案の処理も、専門部署（diplomacy.js）にお任せします！
     proposeDiplomacyToPlayer(doer, targetClanId, type, gold, onComplete) {
-        // ★ aiGuard を消す魔法を削除しました
-        const doerClan = this.game.clans.find(c => c.id === doer.clan);
-
-        // ★追加：使者を出したAIの城からお金を減らす処理
-        if (type === 'goodwill') {
-            const doerCastle = this.game.getCastle(doer.castleId);
-            if (doerCastle) doerCastle.gold = Math.max(0, doerCastle.gold - gold);
-        }
-
-        let title = "使者の来訪";
-        let msg = "";
-        
-        if (type === 'goodwill') {
-            msg = `${doerClan.name} の ${doer.name} が使者として訪れました。\n親善の証として 金${gold} を持参しています。\n受け取りますか？`;
-        } else if (type === 'alliance') {
-            msg = `${doerClan.name} の ${doer.name} が使者として訪れました。\n当家との「同盟」を提案しています。\n受諾しますか？`;
-        } else if (type === 'dominate') {
-            msg = `${doerClan.name} の ${doer.name} が使者として訪れました。\n当家に「従属」するよう要求しています。\n受諾しますか？`;
-        }
-
-        // はい／いいえ を選べるダイアログを出します
-        this.game.ui.showDialog(msg, true, 
-            () => {
-                // 【受諾（OK）を選んだ時】
-                if (type === 'goodwill') {
-                    const myCastle = this.game.castles.find(c => c.ownerClan === targetClanId);
-                    if (myCastle) myCastle.gold = Math.min(99999, myCastle.gold + gold);
-                    const increase = this.calcGoodwillIncrease(gold, doer);
-                    this.game.diplomacyManager.updateSentiment(doer.clan, targetClanId, increase);
-                    this.game.ui.showResultModal(`${doerClan.name} からの親善を受け入れました！\n友好度が上昇しました`, () => {
-                        // ★修正: 画面がフリーズしないように、0.1秒だけ待ってから次に進むようにしました
-                        if (onComplete) setTimeout(onComplete, 100);
-                    });
-                } else if (type === 'alliance') {
-                    this.game.diplomacyManager.changeStatus(doer.clan, targetClanId, '同盟');
-                    this.game.ui.showResultModal(`${doerClan.name} と同盟を結びました！`, () => {
-                        // ★修正: 画面がフリーズしないように、0.1秒だけ待ってから次に進むようにしました
-                        if (onComplete) setTimeout(onComplete, 100);
-                    });
-                } else if (type === 'dominate') {
-                    this.clearDominationRelations(targetClanId);
-                    this.game.diplomacyManager.changeStatus(doer.clan, targetClanId, '支配');
-                    this.game.ui.showResultModal(`${doerClan.name} に従属しました……`, () => {
-                        // ★修正: 画面がフリーズしないように、0.1秒だけ待ってから次に進むようにしました
-                        if (onComplete) setTimeout(onComplete, 100);
-                    });
-                }
-            },
-            () => {
-                // 【拒否（キャンセル）を選んだ時】
-                if (type === 'goodwill') {
-                    // おまけ：もし親善を拒否されたら、AIの城にお金を返してあげる処理を追加しました
-                    const doerCastle = this.game.getCastle(doer.castleId);
-                    if (doerCastle) doerCastle.gold = Math.min(99999, doerCastle.gold + gold);
-                    this.game.ui.showResultModal(`親善の品を突き返しました。`, () => {
-                        if (onComplete) setTimeout(onComplete, 100);
-                    });
-                } else if (type === 'alliance') {
-                    this.game.diplomacyManager.updateSentiment(doer.clan, targetClanId, -10);
-                    this.game.ui.showResultModal(`同盟の提案を拒否しました。`, () => {
-                        if (onComplete) setTimeout(onComplete, 100);
-                    });
-                } else if (type === 'dominate') {
-                    this.game.diplomacyManager.updateSentiment(doer.clan, targetClanId, -20);
-                    this.game.ui.showResultModal(`従属の要求を断固として拒否しました！`, () => {
-                        if (onComplete) setTimeout(onComplete, 100);
-                    });
-                }
-            }
-        );
+        this.game.diplomacyManager.proposeDiplomacyToPlayer(doer, targetClanId, type, gold, onComplete);
     }
     
     // ★ここから下全部、援軍を探してお願いする新しい機能です！
@@ -2589,42 +2520,8 @@ class CommandSystem {
         });
     }
     
-    // ★新しく追加：婚姻が成立した時の、データ書き換え一斉処理です！
+    // ★修正：婚姻のデータ書き換え処理も、専門部署（diplomacy.js）にお任せします！
     applyMarriageData(princessId, targetBushoId, targetClanId) {
-        const myClan = this.game.clans.find(c => c.id === this.game.playerClanId);
-        const princess = this.game.princesses.find(p => p.id === princessId);
-        const targetBusho = this.game.getBusho(targetBushoId);
-        
-        if (!princess || !targetBusho || !myClan) return;
-
-        // ① 姫のデータを「結婚済み」にして、相手の家と武将の元へ移します
-        princess.currentClanId = targetClanId;
-        princess.husbandId = targetBushoId;
-        princess.status = 'married';
-
-        // ② 自分の大名家の「保有している姫リスト」から、嫁がせた姫のIDを消しゴムで消します
-        myClan.princessIds = myClan.princessIds.filter(id => id !== princessId);
-
-        // ③ 相手の武将の「奥さんリスト」に姫を追加し、一門関係（血縁）を繋ぎ直します
-        if (!targetBusho.wifeIds.includes(princessId)) {
-            targetBusho.wifeIds.push(princessId);
-        }
-        targetBusho.updateFamilyIds(this.game.princesses);
-
-        // ④ 両家を「同盟」状態にして、特別な「結婚シール（isMarriage）」を貼ります！
-        this.game.diplomacyManager.changeStatus(this.game.playerClanId, targetClanId, '同盟');
-        
-        // 念のため、お互いの仲の良さ（感情値）も少し上げておきます
-        const relation = this.game.diplomacyManager.getDiplomacyData(this.game.playerClanId, targetClanId);
-        if (relation) {
-            relation.isMarriage = true;
-            relation.sentiment = Math.max(relation.sentiment, 70); 
-        }
-        const oppRelation = this.game.diplomacyManager.getDiplomacyData(targetClanId, this.game.playerClanId);
-        if (oppRelation) {
-            oppRelation.isMarriage = true;
-            oppRelation.sentiment = Math.max(oppRelation.sentiment, 70);
-        }
+        this.game.diplomacyManager.applyMarriageData(princessId, targetBushoId, targetClanId);
     }
-    
 }

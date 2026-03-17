@@ -470,4 +470,107 @@ class DiplomacyManager {
             }
         });
     }
+    
+    /**
+     * AIからプレイヤーへの外交提案を受ける処理です
+     */
+    proposeDiplomacyToPlayer(doer, targetClanId, type, gold, onComplete) {
+        const doerClan = this.game.clans.find(c => c.id === doer.clan);
+
+        if (type === 'goodwill') {
+            const doerCastle = this.game.getCastle(doer.castleId);
+            if (doerCastle) doerCastle.gold = Math.max(0, doerCastle.gold - gold);
+        }
+
+        let title = "使者の来訪";
+        let msg = "";
+        
+        if (type === 'goodwill') {
+            msg = `${doerClan.name} の ${doer.name} が使者として訪れました。\n親善の証として 金${gold} を持参しています。\n受け取りますか？`;
+        } else if (type === 'alliance') {
+            msg = `${doerClan.name} の ${doer.name} が使者として訪れました。\n当家との「同盟」を提案しています。\n受諾しますか？`;
+        } else if (type === 'dominate') {
+            msg = `${doerClan.name} の ${doer.name} が使者として訪れました。\n当家に「従属」するよう要求しています。\n受諾しますか？`;
+        }
+
+        this.game.ui.showDialog(msg, true, 
+            () => {
+                if (type === 'goodwill') {
+                    const myCastle = this.game.castles.find(c => c.ownerClan === targetClanId);
+                    if (myCastle) myCastle.gold = Math.min(99999, myCastle.gold + gold);
+                    // ★窓口の時とは違い、専門部署用に少しだけ計算の仕方を整えています
+                    const increase = this.calcGoodwillIncrease(gold, doer.diplomacy);
+                    this.updateSentiment(doer.clan, targetClanId, increase);
+                    this.game.ui.showResultModal(`${doerClan.name} からの親善を受け入れました！\n友好度が上昇しました`, () => {
+                        if (onComplete) setTimeout(onComplete, 100);
+                    });
+                } else if (type === 'alliance') {
+                    this.changeStatus(doer.clan, targetClanId, '同盟');
+                    this.game.ui.showResultModal(`${doerClan.name} と同盟を結びました！`, () => {
+                        if (onComplete) setTimeout(onComplete, 100);
+                    });
+                } else if (type === 'dominate') {
+                    this.clearDominationRelations(targetClanId);
+                    this.changeStatus(doer.clan, targetClanId, '支配');
+                    this.game.ui.showResultModal(`${doerClan.name} に従属しました……`, () => {
+                        if (onComplete) setTimeout(onComplete, 100);
+                    });
+                }
+            },
+            () => {
+                if (type === 'goodwill') {
+                    const doerCastle = this.game.getCastle(doer.castleId);
+                    if (doerCastle) doerCastle.gold = Math.min(99999, doerCastle.gold + gold);
+                    this.game.ui.showResultModal(`親善の品を突き返しました。`, () => {
+                        if (onComplete) setTimeout(onComplete, 100);
+                    });
+                } else if (type === 'alliance') {
+                    this.updateSentiment(doer.clan, targetClanId, -10);
+                    this.game.ui.showResultModal(`同盟の提案を拒否しました。`, () => {
+                        if (onComplete) setTimeout(onComplete, 100);
+                    });
+                } else if (type === 'dominate') {
+                    this.updateSentiment(doer.clan, targetClanId, -20);
+                    this.game.ui.showResultModal(`従属の要求を断固として拒否しました！`, () => {
+                        if (onComplete) setTimeout(onComplete, 100);
+                    });
+                }
+            }
+        );
+    }
+
+    /**
+     * 婚姻が成立した時の、データ書き換え一斉処理です
+     */
+    applyMarriageData(princessId, targetBushoId, targetClanId) {
+        const myClan = this.game.clans.find(c => c.id === this.game.playerClanId);
+        const princess = this.game.princesses.find(p => p.id === princessId);
+        const targetBusho = this.game.getBusho(targetBushoId);
+        
+        if (!princess || !targetBusho || !myClan) return;
+
+        princess.currentClanId = targetClanId;
+        princess.husbandId = targetBushoId;
+        princess.status = 'married';
+
+        myClan.princessIds = myClan.princessIds.filter(id => id !== princessId);
+
+        if (!targetBusho.wifeIds.includes(princessId)) {
+            targetBusho.wifeIds.push(princessId);
+        }
+        targetBusho.updateFamilyIds(this.game.princesses);
+
+        this.changeStatus(this.game.playerClanId, targetClanId, '同盟');
+        
+        const relation = this.getDiplomacyData(this.game.playerClanId, targetClanId);
+        if (relation) {
+            relation.isMarriage = true;
+            relation.sentiment = Math.max(relation.sentiment, 70); 
+        }
+        const oppRelation = this.getDiplomacyData(targetClanId, this.game.playerClanId);
+        if (oppRelation) {
+            oppRelation.isMarriage = true;
+            oppRelation.sentiment = Math.max(oppRelation.sentiment, 70);
+        }
+    }
 }
