@@ -218,6 +218,9 @@ body.hide-daimyo-labels .daimyo-name-label { display: none !important; }
 .kunishu-list-header, .kunishu-list-item { display: grid; grid-template-columns: 20px 3fr 1.5fr 1.5fr 1.5fr; font-size: clamp(0.7rem, 2.8vw, 0.9rem); padding: 0; min-height: 30px; gap: 0; }
 .view-mode .kunishu-list-header, .view-mode .kunishu-list-item { grid-template-columns: 3fr 1.5fr 1.5fr 1.5fr; }
 .faction-list-header, .faction-list-item { display: grid; grid-template-columns: 2.5fr 1fr 1.5fr 1.5fr; font-size: clamp(0.7rem, 2.8vw, 0.95rem); padding: 0; min-height: 30px; gap: 0; }
+/* 姫一覧専用の列幅（スマホ用） */
+.daimyo-list-header.is-princess, .daimyo-list-item.is-princess { grid-template-columns: 1.5fr 1fr 1fr 1.5fr 1.5fr; }
+
 
 .kunishu-item { padding: 12px 15px; border: 1px solid #d0b080; margin-bottom: 8px; cursor: pointer; display: flex; align-items: center; background: rgba(250, 240, 230, 0.95); border-radius: 6px; transition: all 0.2s ease; font-family: 'Sawarabi Mincho', serif; box-shadow: 1px 1px 3px rgba(0,0,0,0.1); }
 .kunishu-item:hover { background: #fff5e0; transform: translateX(3px); box-shadow: 2px 2px 5px rgba(0,0,0,0.15); border-color: #c0a070; }
@@ -702,7 +705,9 @@ body.is-pc {
     .view-mode .kunishu-list-header, .view-mode .kunishu-list-item { grid-template-columns: 140px 80px 80px 80px; }
     .faction-list-header, .faction-list-item { grid-template-columns: 140px 80px 100px 100px; font-size: 0.95rem; min-height: 36px; }
     .list-container, .daimyo-list-container, .result-body, .faction-list-container { scroll-padding-top: 38px; }
-
+    /* PC版 姫一覧専用の列幅 */
+    .daimyo-list-header.is-princess, .daimyo-list-item.is-princess { grid-template-columns: 120px 60px 60px 100px 100px; }
+    
     /* モーダル拡張（輸送・兵力分配）のタイル化 */
     #quantity-modal .modal-content, #unit-divide-modal .modal-content { max-width: 900px !important; max-height: 90% !important; }
     #quantity-container, #divide-list { display: grid !important; grid-auto-flow: column; grid-template-rows: repeat(3, min-content); grid-auto-columns: 1fr; gap: 15px; align-items: start; }
