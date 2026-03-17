@@ -685,14 +685,29 @@ class UIManager {
                     <div class="daimyo-detail-ideology" style="${ideologyColor}">${ideology}</div>
                 </div>
                 <div class="daimyo-detail-body">
-                    <img src="${faceSrc}" class="daimyo-detail-face" onerror="this.src='data/images/faceicons/unknown_face.webp'">
+                    <div class="daimyo-detail-left">
+                        <img src="${faceSrc}" class="daimyo-detail-face" onerror="this.src='data/images/faceicons/unknown_face.webp'">
+                        <div class="daimyo-detail-leader-name">${leaderName}</div>
+                        <div class="daimyo-detail-leader-rank">${highestRankName}</div>
+                    </div>
+                    
                     <div class="daimyo-detail-info">
-                        <div class="daimyo-detail-label">当主</div><div class="daimyo-detail-value">${leaderName}</div>
-                        <div class="daimyo-detail-label">官位</div><div class="daimyo-detail-value">${highestRankName}</div>
-                        <div class="daimyo-detail-label">本拠地</div><div class="daimyo-detail-value">${baseCastleName}</div>
-                        <div class="daimyo-detail-label">城数</div><div class="daimyo-detail-value">${castlesCount}</div>
-                        <div class="daimyo-detail-label">武将数</div><div class="daimyo-detail-value">${bushosCount}</div>
-                        <div class="daimyo-detail-label">姫数</div><div class="daimyo-detail-value">${princessCount}</div>
+                        <div class="daimyo-detail-stat-box">
+                            <span class="daimyo-detail-label">本拠地</span>
+                            <span class="daimyo-detail-value">${baseCastleName}</span>
+                        </div>
+                        <div class="daimyo-detail-stat-box">
+                            <span class="daimyo-detail-label">城数</span>
+                            <span class="daimyo-detail-value">${castlesCount}</span>
+                        </div>
+                        <div class="daimyo-detail-stat-box">
+                            <span class="daimyo-detail-label">武将数</span>
+                            <span class="daimyo-detail-value">${bushosCount}</span>
+                        </div>
+                        <div class="daimyo-detail-stat-box">
+                            <span class="daimyo-detail-label">姫数</span>
+                            <span class="daimyo-detail-value">${princessCount}</span>
+                        </div>
                     </div>
                 </div>
             </div>
