@@ -758,37 +758,48 @@ body.is-pc {
 }
 
 /* =========================================================
-   ★ 姫一覧専用の絶対崩れない魔法（最終版）
+   ★ 姫一覧専用の魔法（派閥一覧を参考にした完全独立版）
    ========================================================= */
-.daimyo-list-header.is-princess, 
-.daimyo-list-item.is-princess {
-    display: grid !important;
-    grid-template-columns: 1.5fr 1fr 1fr 1.5fr 1.5fr !important;
-    align-items: center !important;
-    height: 40px !important;
-    min-height: 40px !important;
-    gap: 0 !important;
-    padding: 0 !important;
+.princess-list-container {
+    flex: 1; overflow-y: auto; min-height: 150px; scroll-snap-type: y mandatory; border: 1px solid #ddd; scroll-padding-top: 32px; border-radius: 4px;
+}
+.princess-list-container::-webkit-scrollbar { width: 14px; height: 14px; }
+.princess-list-container::-webkit-scrollbar-track { background: #e0e0e0; border-left: 1px solid #ccc; }
+.princess-list-container::-webkit-scrollbar-thumb { background: #78909c; border: 2px solid #e0e0e0; }
+.princess-list-container::-webkit-scrollbar-thumb:hover { background: #546e7a; }
+
+.princess-list-header, .princess-list-item {
+    display: grid;
+    grid-template-columns: 2fr 1fr 1fr 1.5fr 1.5fr;
+    font-size: clamp(0.7rem, 2.8vw, 0.95rem);
+    padding: 0; min-height: 30px; gap: 0;
 }
 
-.daimyo-list-header.is-princess > span, 
-.daimyo-list-item.is-princess > span {
-    display: flex !important;
-    align-items: center !important;
-    justify-content: center !important;
-    height: 100% !important;
-    padding: 0 5px !important;
-    box-sizing: border-box !important;
-    white-space: nowrap !important;
-    overflow: hidden !important;
-    text-overflow: ellipsis !important;
+.princess-list-header > span, .princess-list-item > span, .princess-list-item > strong {
+    border-right: 1px solid #ddd; padding: 0 2px;
+    display: flex; align-items: center; justify-content: center;
+    box-sizing: border-box; overflow: hidden; white-space: nowrap; text-overflow: ellipsis;
+}
+.princess-list-header > span { border-right: 1px solid #546e7a; }
+.princess-list-header > span:last-child, .princess-list-item > span:last-child { border-right: none; }
+
+.princess-list-header {
+    background: #37474f; color: #fff; font-weight: bold; position: sticky; top: 0; z-index: 10;
 }
 
-.daimyo-list-item.is-princess .col-daimyo-name {
-    justify-content: flex-start !important;
+.princess-list-item {
+    border-bottom: 2px solid #e0e0e0; scroll-snap-align: start; cursor: pointer; color: var(--text-color);
+}
+.princess-list-item:nth-child(even) { background-color: #f0f4f8; }
+.princess-list-item:hover { background-color: #e3f2fd !important; }
+
+/* 名前だけ左寄せにする魔法 */
+.princess-list-item .col-princess-name {
+    justify-content: flex-start !important; padding-left: 5px;
 }
 
-body.is-pc .daimyo-list-header.is-princess, 
-body.is-pc .daimyo-list-item.is-princess {
-    grid-template-columns: 120px 60px 60px 100px 100px !important;
+/* パソコンで見た時の幅設定 */
+body.is-pc .princess-list-header, body.is-pc .princess-list-item {
+    grid-template-columns: 140px 80px 80px 100px 100px;
+    font-size: 0.95rem; min-height: 36px;
 }
