@@ -354,14 +354,14 @@ body.hide-daimyo-labels .daimyo-name-label { display: none !important; }
 .daimyo-detail-left {
     display: flex;
     flex-direction: column;
-    gap: 2px; /* ★5pxから2pxにして、顔画像・名前・官位のすき間を狭くしました */
-    width: 100px; 
+    gap: 2px;
+    width: 80px; /* ★100pxから80pxにして、少しコンパクトにしました */
     flex-shrink: 0;
 }
 
 .daimyo-detail-face {
-    width: 100px;
-    height: 100px;
+    width: 80px; /* ★こちらも80pxに合わせます */
+    height: 80px;
     object-fit: cover;
     border: 2px solid #333;
     border-radius: 4px;
@@ -370,27 +370,27 @@ body.hide-daimyo-labels .daimyo-name-label { display: none !important; }
 
 .daimyo-detail-leader-name {
     font-weight: bold;
-    font-size: 1.1rem;
+    font-size: 1.0rem; /* ★画像に合わせて少しだけ文字を小さく */
     text-align: left;
 }
 
 .daimyo-detail-leader-rank {
-    font-size: 0.9rem;
+    font-size: 0.85rem;
     color: #444;
     text-align: left;
 }
 
 .daimyo-detail-info {
-    display: flex;
-    flex-direction: column; 
-    gap: 2px; /* ★8pxから2pxにして、項目同士の縦のすき間をごく狭くしました */
+    display: grid; /* ★縦並び(flex)から、マス目(grid)に変更します！ */
+    grid-template-columns: 1fr 1fr; /* ★2列に分ける魔法です */
+    gap: 6px 8px; /* 縦と横のすき間です */
     flex: 1;
-    max-width: 200px; 
+    /* max-widthは消して、右側の空きスペースを広々と使えるようにしました */
 }
 
 .daimyo-detail-stat-box {
     background-color: #e0e0e0; 
-    padding: 2px 10px; /* ★5pxから2pxにして、箱の内側の上下のすき間も狭くしました */
+    padding: 4px 8px; /* 文字が読みやすいように内側のすき間を少し戻しました */
     border-radius: 4px; 
     display: flex;
     justify-content: space-between; 
