@@ -659,15 +659,17 @@ class UIManager {
         const bushosCount = this.game.bushos.filter(b => b.clan === clanId && b.status === 'active').length;
         const princessCount = clan.princessIds ? clan.princessIds.length : 0;
         
+        // ★変更：派閥一覧の色を参考にして、文字色ではなく「背景色」を指定します！
+        // 「中道」は派閥一覧にはありませんが、バランスの取れた色として緑系（#388e3c）にしました
         let ideology = "中道";
-        let ideologyColor = "";
+        let ideologyBg = "#388e3c"; 
         if (leader) {
             if (leader.innovation >= 67) {
                 ideology = "革新";
-                ideologyColor = "#e91e63";
+                ideologyBg = "#e91e63"; // 派閥の「革新的」と同じピンク系
             } else if (leader.innovation <= 33) {
                 ideology = "保守";
-                ideologyColor = "#1976d2";
+                ideologyBg = "#1976d2"; // 派閥の「保守的」と同じ青系
             }
         }
 
@@ -689,7 +691,7 @@ class UIManager {
             <div class="daimyo-detail-container">
                 <div class="daimyo-detail-header">
                     <div class="daimyo-detail-name">${clan.name}</div>
-                    <div class="daimyo-detail-ideology" style="color:${ideologyColor}; font-weight:bold;">${ideology}</div>
+                    <div class="daimyo-detail-ideology" style="background-color:${ideologyBg};">${ideology}</div>
                 </div>
                 <div class="daimyo-detail-body">
                     <div class="daimyo-detail-left">
