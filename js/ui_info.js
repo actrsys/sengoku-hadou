@@ -615,8 +615,8 @@ class UIInfoManager {
             princesses = princesses.filter(p => p.status === 'unmarried');
         }
 
-        // 見出しを作ります
-        let listHtml = '<div class="daimyo-list-container"><div class="daimyo-list-header is-princess"><span>名前</span><span>身分</span><span>年齢</span><span>父親</span><span>配偶者</span></div>';
+        // 見出しを作ります（新しく作った princess-list 用の枠組みを使います！）
+        let listHtml = '<div class="princess-list-container"><div class="princess-list-header"><span>名前</span><span>身分</span><span>年齢</span><span>父親</span><span>配偶者</span></div>';
 
         // 姫を一人ずつリストに並べていきます
         princesses.forEach(p => {
@@ -636,19 +636,13 @@ class UIInfoManager {
                 onClickStr = `onclick="if(window.AudioManager) window.AudioManager.playSE('choice.ogg'); window.GameApp.commandSystem.handleBushoSelection('marriage_princess', [${p.id}], ${targetCastleId}, { doerId: ${doerId} }); window.GameApp.ui.closeResultModal();"`;
             }
 
-            // 1人分の行を作ります
-            listHtml += `<div class="daimyo-list-item is-princess" ${cursorStr} ${onClickStr}>
-                <span class="col-daimyo-name" style="font-weight:bold;">${p.name}</span>
-                <span>姫</span>
-                <span>${age}歳</span>
-                <span>${fatherName}</span>
-                <span>${husbandName}</span>
-            </div>`;
+            // 1人分の行を作ります（他のリストと同じように、空白や改行をなくして1行にまとめます！）
+            listHtml += `<div class="princess-list-item" ${cursorStr} ${onClickStr}><strong class="col-princess-name">${p.name}</strong><span>姫</span><span>${age}歳</span><span>${fatherName}</span><span>${husbandName}</span></div>`;
         });
         
         // もし一人もいなかったら
         if (princesses.length === 0) {
-            listHtml += `<div style="padding: 15px; text-align: center;">該当する姫はおりませぬ。</div>`;
+            listHtml += `<div style="padding: 15px; text-align: center;">姫はいません。</div>`;
         }
 
         listHtml += '</div>';
