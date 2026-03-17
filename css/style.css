@@ -318,6 +318,69 @@ body.hide-daimyo-labels .daimyo-name-label { display: none !important; }
 .daimyo-confirm-info { display: flex; flex-direction: column; justify-content: center; text-align: left; }
 
 /* =========================================================
+   大名家詳細モーダルのデザイン
+   ========================================================= */
+.daimyo-detail-container {
+    display: flex;
+    flex-direction: column;
+    text-align: left;
+}
+
+.daimyo-detail-header {
+    display: flex;
+    align-items: baseline;
+    gap: 15px; /* 名前と革新性の間のすき間 */
+    border-bottom: 2px solid var(--border-color, #ccc); /* 下に線を引きます */
+    margin-bottom: 15px;
+    padding-bottom: 5px;
+}
+
+.daimyo-detail-name {
+    font-size: 1.4rem;
+    font-weight: bold;
+}
+
+.daimyo-detail-ideology {
+    font-size: 1rem;
+    font-weight: bold;
+}
+
+.daimyo-detail-body {
+    display: flex;
+    gap: 20px; /* 顔画像と情報の間のすき間 */
+    align-items: flex-start;
+}
+
+.daimyo-detail-face {
+    width: 100px;
+    height: 100px;
+    object-fit: cover;
+    border: 2px solid #333;
+    border-radius: 4px;
+    background: #eee;
+    flex-shrink: 0;
+}
+
+.daimyo-detail-info {
+    display: grid;
+    grid-template-columns: auto 1fr; /* 左は文字の長さに合わせ、右は残りの幅 */
+    gap: 8px 20px; /* 縦と横のすき間 */
+    font-size: 1rem;
+    flex: 1;
+    max-width: 250px; /* ★右端に寄りすぎないように、幅の限界を決めます */
+}
+
+.daimyo-detail-label {
+    color: #666;
+    text-align: left; /* 項目名は左揃え */
+}
+
+.daimyo-detail-value {
+    font-weight: bold;
+    text-align: right; /* 数値は右揃え */
+}
+
+/* =========================================================
    攻城戦 (#war-modal 関連)
    ========================================================= */
 #war-modal { padding: 0 !important; }
