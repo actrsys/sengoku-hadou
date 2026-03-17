@@ -471,7 +471,7 @@ class DiplomacyManager {
             }
             // ★追加：もし支配関係を破棄して忠誠度が下がっていたら、メッセージを書き足します
             if (result.isBreakDomination) {
-                msg += `\n家臣団の間にも動揺が広がっているようです……`;
+                msg += `\n家臣団の中でも動揺が広がっているようです……`;
             }
             doer.achievementTotal += 5;
             this.game.factionSystem.updateRecognition(doer, 10);
