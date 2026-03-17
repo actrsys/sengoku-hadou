@@ -726,6 +726,8 @@ class GameManager {
         this.diplomacyManager = new DiplomacyManager(this);
         // ★ 官位を管理するシステムを呼び出します
         this.courtRankSystem = new CourtRankSystem(this);
+        // ★ 調略を管理するシステムを呼び出します
+        this.strategySystem = new StrategySystem(this);
         // ★ 寿命と登場を管理するシステムを呼び出します
         this.lifeSystem = new LifeSystem(this);
         // ★ 軍師のシステムを呼び出します
