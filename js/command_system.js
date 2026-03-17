@@ -244,13 +244,13 @@ const COMMAND_SPECS = {
         label: "武将", category: 'INFO',
         isSystem: true, action: 'busho_list'
     },
-    'princess_list': {
-        label: "姫", category: 'INFO',
-        isSystem: true, action: 'princess_list'
-    },
     'faction_list': {
         label: "派閥", category: 'INFO',
         isSystem: true, action: 'faction_list'
+    },
+    'princess_list': {
+        label: "姫", category: 'INFO',
+        isSystem: true, action: 'princess_list'
     },
     'daimyo_list': {
         label: "勢力", category: 'INFO',
