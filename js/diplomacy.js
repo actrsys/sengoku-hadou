@@ -30,14 +30,16 @@ class DiplomacyManager {
                 clan.diplomacyValue[targetId] = {
                     status: oppData.status,
                     sentiment: oppData.sentiment,
-                    trucePeriod: oppData.trucePeriod || 0 // ★和睦の期間もコピーします
+                    trucePeriod: oppData.trucePeriod || 0, // ★和睦の期間もコピーします
+                    isMarriage: oppData.isMarriage || false // ★今回追加：相手がシールを持っていたらコピーします
                 };
             } else {
                 // どちらも持っていなければ、初期値の50になります
                 clan.diplomacyValue[targetId] = {
                     status: '普通', // 状態: '普通', '友好', '敵対', '同盟', '支配', '従属', '和睦'
                     sentiment: 50,  // 感情値: 0 - 100
-                    trucePeriod: 0  // ★初期値は0にします
+                    trucePeriod: 0, // ★初期値は0にします
+                    isMarriage: false // ★今回追加：最初は結婚のシールは貼っていません
                 };
             }
         }

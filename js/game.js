@@ -733,6 +733,8 @@ class GameManager {
         if (rel) {
             rel.alliance = (rel.status === '同盟');
             rel.friendship = rel.sentiment;
+            // ★追加：画面の見た目だけを変えるための「表示用の名前」を用意します！
+            rel.displayStatus = (rel.status === '同盟' && rel.isMarriage) ? '婚姻' : rel.status;
         }
         return rel;
     }

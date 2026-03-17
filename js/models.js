@@ -71,7 +71,8 @@ class Clan {
                         this.diplomacyValue[targetId] = {
                             status: statusStr,
                             sentiment: sentimentVal,
-                            trucePeriod: trucePeriod // ★取り出した期間も一緒にメモしておきます
+                            trucePeriod: trucePeriod, // ★取り出した期間も一緒にメモしておきます
+                            isMarriage: false // ★今回追加：結婚で結ばれた同盟かどうかのシールです（最初は貼ってない状態）
                         };
                     }
                 }
