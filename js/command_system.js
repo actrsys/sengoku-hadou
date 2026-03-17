@@ -984,7 +984,7 @@ class CommandSystem {
                 this.showAdviceAndExecute('diplomacy', () => this.executeDiplomacy(firstId, targetId, 'dominate'), { trueProb: trueProb });
             } else if (extraData.subAction === 'court_truce') {
                 // ★追加：朝廷和睦は条件を満たしていれば確実に成功します！
-                this.showAdviceAndExecute('diplomacy', () => this.executeCourtTruce(firstId, targetId), { trueProb: 1.0 });
+                this.showAdviceAndExecute('diplomacy', () => this.game.courtRankSystem.executeCourtTruce(firstId, targetId), { trueProb: 1.0 });
             } else if (extraData.subAction === 'marriage') {
                 // ★変更：いつもの「武将リスト」を使って、姫を選ぶ画面を開きます！
                 this.game.ui.openBushoSelector('marriage_princess', targetId, { doerId: firstId });
@@ -1168,7 +1168,7 @@ class CommandSystem {
             // ★追加：貢物の金額が決まったら、実行の魔法を呼び出します
             const val = parseInt(inputs.gold.num.value);
             if (val <= 0) return;
-            this.showAdviceAndExecute('tribute', () => this.executeTribute(data[0], val), { trueProb: 1.0 });
+            this.showAdviceAndExecute('tribute', () => this.game.courtRankSystem.executeTribute(data[0], val), { trueProb: 1.0 });
         }
         else if (type === 'headhunt_gold') {
             const val = parseInt(inputs.gold.num.value);
@@ -3039,88 +3039,6 @@ class CommandSystem {
         this.game.ui.showDialog(`自軍の同盟援軍が出発しました！\n共に ${targetCastle.name} へ侵攻します！`, false, () => {
             this.game.warManager.startWar(atkCastle, targetCastle, atkBushos, sVal, rVal, hVal, gVal, reinforcementData, selfReinfData);
         });
-    }
-    
-    // ==========================================
-    // ★追加：朝廷に貢物を贈る魔法！
-    // ==========================================
-    executeTribute(doerId, gold) {
-        const doer = this.game.getBusho(doerId);
-        const castle = this.game.getCurrentTurnCastle();
-        
-        if (castle.gold < gold) {
-            this.game.ui.showDialog("資金が足りません", false);
-            return;
-        }
-        
-        // お城の貯金箱からお金を減らします
-        castle.gold -= gold;
-        
-        // 魔法で大名家の「朝廷への貢献度」をアップさせます！
-        this.game.courtRankSystem.addContribution(this.game.playerClanId, gold);
-        
-        // ★追加：信用の上昇値を計算します（金1500・外交100で225程度、最低1）
-        const trustIncrease = Math.max(1, Math.floor(gold * (doer.diplomacy / 100) * 0.15));
-        
-        // 新しく作った魔法で、大名家の「朝廷からの信用」をアップさせます！
-        this.game.courtRankSystem.addTrust(this.game.playerClanId, trustIncrease);
-        
-        // 確認のために、今の貢献度と信用がいくつになったか取得しておきます
-        const currentContribution = this.game.courtRankSystem.getContribution(this.game.playerClanId);
-        const currentTrust = this.game.courtRankSystem.getTrust(this.game.playerClanId);
-        
-        // 使者は行動済みにします
-        doer.isActionDone = true;
-        // 頑張って貢物を運んだので、少しだけ実績を与えます（金額が多いほど少しボーナス）
-        doer.achievementTotal += 5 + Math.floor(gold / 500);
-        this.game.factionSystem.updateRecognition(doer, 10);
-        
-        this.game.ui.showResultModal(`${doer.name}を使者として、朝廷に 金${gold} を献上しました！`);
-        
-        this.game.ui.updatePanelHeader();
-        this.game.ui.renderCommandMenu();
-    }
-    
-    // ==========================================
-    // ★追加：朝廷の信用を消費して強制的に和睦する魔法！
-    // ==========================================
-    executeCourtTruce(doerId, targetCastleId) {
-        const doer = this.game.getBusho(doerId);
-        const targetCastle = this.game.getCastle(targetCastleId);
-        if (!targetCastle) return;
-
-        const targetClanId = targetCastle.ownerClan;
-        const targetClanName = this.game.clans.find(c => c.id === targetClanId).name;
-        
-        const castle = this.game.getCurrentTurnCastle();
-        const costGold = 2000;
-
-        // 金と信用の最終確認（念のためもう一度チェックします）
-        const currentTrust = this.game.courtRankSystem.getTrust(this.game.playerClanId);
-        if (castle.gold < costGold || currentTrust < 500) {
-            this.game.ui.showDialog("、実行できませんでした。", false);
-            return;
-        }
-
-        // お城の貯金箱からお金を減らします
-        castle.gold -= costGold;
-        
-        // 信用を「500」消費（マイナス）します！
-        this.game.courtRankSystem.addTrust(this.game.playerClanId, -500);
-
-        // ★あや瀨さんが作ってくれた魔法を使って、外交状態を強制的に「和睦」にし、期間を「6」にセットします！
-        this.game.diplomacyManager.changeStatus(this.game.playerClanId, targetClanId, '和睦', 6);
-
-        // 使者は行動済みにします
-        doer.isActionDone = true;
-        doer.achievementTotal += Math.floor(doer.diplomacy * 0.2) + 10;
-        this.game.factionSystem.updateRecognition(doer, 20);
-
-        // 信用がどれくらい減ったかは見せないようにします
-        this.game.ui.showResultModal(`朝廷の威光により、${targetClanName} との間に和睦が結ばれました！\n（和睦期間：６ヶ月）`);
-        
-        this.game.ui.updatePanelHeader();
-        this.game.ui.renderCommandMenu();
     }
     
     // ★新しく追加：婚姻が成立した時の、データ書き換え一斉処理です！
