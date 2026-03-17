@@ -566,6 +566,17 @@ class UIManager {
     }
 
     // ==========================================
+    // ★姫一覧と姫選択画面の案内板
+    // ==========================================
+    showPrincessList() {
+        this.info.showPrincessList();
+    }
+
+    showPrincessSelector(targetCastleId, doerId) {
+        this.info.showPrincessSelector(targetCastleId, doerId);
+    }
+
+    // ==========================================
     // ★ここから追加：委任する城の一覧を出す魔法
     // ==========================================
     showDelegateListModal() {
