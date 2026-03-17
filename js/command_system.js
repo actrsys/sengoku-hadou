@@ -916,17 +916,36 @@ class CommandSystem {
 
             this.game.ui.showDialog(msg, true, 
                 () => {
-                    // はい：結婚成立！
-                    this.applyMarriageData(princessId, targetBushoId, targetClanId);
-                    doer.isActionDone = true;
-                    doer.achievementTotal += Math.floor(doer.diplomacy * 0.2) + 20;
-                    this.game.factionSystem.updateRecognition(doer, 30);
+                    // ★追加：diplomacy.js の専門部署に「marriage（婚姻）」の確率計算をお願いします！
+                    const myPower = this.game.getClanTotalSoldiers(doer.clan) || 1;
+                    const targetPower = this.game.getClanTotalSoldiers(targetClanId) || 1;
+                    const isSuccess = this.game.diplomacyManager.checkDiplomacySuccess(doer.clan, targetClanId, 'marriage', doer.diplomacy, myPower, targetPower);
 
-                    this.game.ui.showResultModal(`${targetClan.name} と婚姻同盟を結びました！\n${princess.name} は ${targetBusho.name} の正室として迎えられました。`, () => {
-                        this.game.ui.updatePanelHeader();
-                        this.game.ui.renderCommandMenu();
-                        this.game.ui.renderMap();
-                    });
+                    if (isSuccess) {
+                        // 成功した時の処理
+                        this.applyMarriageData(princessId, targetBushoId, targetClanId);
+                        doer.isActionDone = true;
+                        doer.achievementTotal += Math.floor(doer.diplomacy * 0.2) + 20;
+                        this.game.factionSystem.updateRecognition(doer, 30);
+
+                        this.game.ui.showResultModal(`${targetClan.name} と婚姻同盟を結びました！\n${princess.name} は ${targetBusho.name} の正室として迎えられました。`, () => {
+                            this.game.ui.updatePanelHeader();
+                            this.game.ui.renderCommandMenu();
+                            this.game.ui.renderMap();
+                        });
+                    } else {
+                        // 失敗した時の処理
+                        this.game.diplomacyManager.updateSentiment(doer.clan, targetClanId, -10); // 断られたので少し仲が悪くなります
+                        doer.isActionDone = true;
+                        doer.achievementTotal += 5;
+                        this.game.factionSystem.updateRecognition(doer, 10);
+
+                        this.game.ui.showResultModal(`${targetClan.name} に婚姻を断られました……\n使者は失意のまま帰還しました。`, () => {
+                            this.game.ui.updatePanelHeader();
+                            this.game.ui.renderCommandMenu();
+                            this.game.ui.renderMap();
+                        });
+                    }
                 }, 
                 () => {
                     // いいえ：もう一度相手武将選びに戻る
