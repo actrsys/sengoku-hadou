@@ -653,6 +653,12 @@ class UIManager {
         if (leader && this.game.courtRankSystem) {
             highestRankName = this.game.courtRankSystem.getHighestRankName(leader);
         }
+        
+        // ★追加：官位がない場合は「なし」という文字を消して、透明な文字（&nbsp;）を入れます。
+        // これにより、文字は見えなくなりますが、行の高さはそのままキープされます！
+        if (!highestRankName || highestRankName === "なし") {
+            highestRankName = "&nbsp;";
+        }
 
         // 数を数え、革新性を計算します
         const castlesCount = this.game.castles.filter(c => c.ownerClan === clanId).length;
