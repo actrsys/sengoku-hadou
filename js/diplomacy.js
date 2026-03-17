@@ -247,11 +247,11 @@ class DiplomacyManager {
         let totalFloat = (baseIncrease + dipBonus) * (0.9 + Math.random() * 0.2);
         return Math.max(1, Math.round(totalFloat));
     }
-
+    
     /**
-     * 外交の成功判定を行います（AI相手の場合）
+     * 外交の成功確率（％）を計算して返す魔法です（0〜100の数値になります）
      */
-    checkDiplomacySuccess(doerClanId, targetClanId, type, doerDiplomacy, myPower, targetPower) {
+    getDiplomacyProb(doerClanId, targetClanId, type, doerDiplomacy, myPower, targetPower) {
         const relation = this.getRelation(doerClanId, targetClanId);
         
         // 共通の敵がいるか
@@ -272,7 +272,7 @@ class DiplomacyManager {
             if (allyCount >= 2) acceptProb -= (allyCount - 1) * 20;
             if (targetPower > myPower) acceptProb *= (myPower / targetPower);
             
-            return (Math.random() * 100) <= acceptProb;
+            return Math.max(0, Math.min(100, acceptProb));
         } 
         else if (type === 'alliance') {
             let threshold = commonEnemy ? 90 : 120; 
@@ -287,11 +287,12 @@ class DiplomacyManager {
             }
 
             const chance = relation.sentiment + doerDiplomacy;
-            return (chance > threshold) && ((Math.random() * 100) < acceptProb);
+            if (chance <= threshold) return 0;
+            return Math.max(0, Math.min(100, acceptProb));
         }
         else if (type === 'dominate') {
             const powerRatio = myPower / Math.max(1, targetPower);
-            if (powerRatio < 5) return false;
+            if (powerRatio < 5) return 0;
 
             let prob = 20;
             if (powerRatio >= 15) prob = 70;
@@ -309,9 +310,18 @@ class DiplomacyManager {
             
             if (isAlreadySubordinate) prob *= 0.2;
             
-            return (Math.random() * 100) < prob;
+            return Math.max(0, Math.min(100, prob));
         }
-        return false;
+        return 0;
+    }
+
+    /**
+     * 外交の成功判定を行います（AI相手の場合）
+     */
+    checkDiplomacySuccess(doerClanId, targetClanId, type, doerDiplomacy, myPower, targetPower) {
+        // ★修正：確率計算は新しい専門部署にお任せして、ここでサイコロを振るだけにします！
+        const prob = this.getDiplomacyProb(doerClanId, targetClanId, type, doerDiplomacy, myPower, targetPower);
+        return (Math.random() * 100) < prob;
     }
     
     /**

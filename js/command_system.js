@@ -945,43 +945,24 @@ class CommandSystem {
         }
 
         if (actionType === 'diplomacy_doer') {
+            const doer = this.game.getBusho(firstId);
+            const targetCastle = this.game.getCastle(targetId);
+            const targetClanId = targetCastle.ownerClan;
+            const myPower = this.game.getClanTotalSoldiers(doer.clan);
+            const targetPower = this.game.getClanTotalSoldiers(targetClanId) || 1;
+
             if (extraData.subAction === 'goodwill') {
                 this.game.ui.openQuantitySelector('goodwill', selectedIds, targetId);
             } else if (extraData.subAction === 'alliance') {
-                const doer = this.game.getBusho(firstId);
-                const targetCastle = this.game.getCastle(targetId);
-                const relation = this.game.getRelation(doer.clan, targetCastle.ownerClan);
-                const chance = relation.sentiment + doer.diplomacy;
-                const trueProb = chance > 120 ? 0.7 : 0.0;
-                this.showAdviceAndExecute('diplomacy', () => this.executeDiplomacy(firstId, targetId, 'alliance'), { trueProb: trueProb });
+                const prob = this.game.diplomacyManager.getDiplomacyProb(doer.clan, targetClanId, 'alliance', doer.diplomacy, myPower, targetPower);
+                this.showAdviceAndExecute('diplomacy', () => this.executeDiplomacy(firstId, targetId, 'alliance'), { trueProb: prob / 100 });
             } else if (extraData.subAction === 'break_alliance') {
                 this.executeDiplomacy(firstId, targetId, 'break_alliance');
             } else if (extraData.subAction === 'subordinate') {
                 this.showAdviceAndExecute('diplomacy', () => this.executeDiplomacy(firstId, targetId, 'subordinate'), { trueProb: 1.0 });
             } else if (extraData.subAction === 'dominate') {
-                const doer = this.game.getBusho(firstId);
-                const targetCastle = this.game.getCastle(targetId);
-                const targetClanId = targetCastle.ownerClan;
-                const myPower = this.game.getClanTotalSoldiers(doer.clan);
-                const targetPower = this.game.getClanTotalSoldiers(targetClanId) || 1;
-                const powerRatio = myPower / targetPower;
-                let trueProb = 0;
-                if (powerRatio >= 5) {
-                    let prob = 20;
-                    if (powerRatio >= 15) prob = 70;
-                    else prob = 20 + (powerRatio - 5) * (50 / 10);
-                    if (doer.diplomacy >= 50) prob += Math.min(10, (doer.diplomacy - 50) * 0.2);
-                    let isAlreadySubordinate = false;
-                    this.game.clans.forEach(c => {
-                        if (c.id !== targetClanId && c.id !== doer.clan) {
-                            const rel = this.game.getRelation(targetClanId, c.id);
-                            if (rel && rel.status === '従属') isAlreadySubordinate = true;
-                        }
-                    });
-                    if (isAlreadySubordinate) prob *= 0.2;
-                    trueProb = prob / 100;
-                }
-                this.showAdviceAndExecute('diplomacy', () => this.executeDiplomacy(firstId, targetId, 'dominate'), { trueProb: trueProb });
+                const prob = this.game.diplomacyManager.getDiplomacyProb(doer.clan, targetClanId, 'dominate', doer.diplomacy, myPower, targetPower);
+                this.showAdviceAndExecute('diplomacy', () => this.executeDiplomacy(firstId, targetId, 'dominate'), { trueProb: prob / 100 });
             } else if (extraData.subAction === 'court_truce') {
                 // ★追加：朝廷和睦は条件を満たしていれば確実に成功します！
                 this.showAdviceAndExecute('diplomacy', () => this.game.courtRankSystem.executeCourtTruce(firstId, targetId), { trueProb: 1.0 });
