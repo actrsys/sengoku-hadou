@@ -316,6 +316,30 @@ class DiplomacyManager {
     }
 
     /**
+     * 他の大名家が援軍要請を承諾する確率（％）を計算する魔法です
+     */
+    getReinforcementAcceptProb(myClanId, helperClanId, enemyClanId, gold) {
+        const myToHelperRel = this.getRelation(myClanId, helperClanId);
+        const helperToEnemyRel = this.getRelation(helperClanId, enemyClanId);
+
+        if (myToHelperRel.status === '支配') return 100; // 支配下なら絶対来てくれる！
+
+        let prob = (myToHelperRel.sentiment >= 50) ? (myToHelperRel.sentiment - 49) : 0;
+        prob += Math.floor((gold / 1500) * 15); // 持参金ボーナス
+        
+        if (myToHelperRel.status === '同盟' || myToHelperRel.status === '従属') {
+            prob += 30; // 同盟や従属関係ならボーナス
+        }
+        
+        if (helperToEnemyRel) {
+            // 相手が敵と仲良しなら、来てくれにくくなる
+            prob -= Math.floor((helperToEnemyRel.sentiment - 50) * (20 / 50)); 
+        }
+
+        return Math.max(0, Math.min(100, prob));
+    }
+
+    /**
      * 外交の成功判定を行います（AI相手の場合）
      */
     checkDiplomacySuccess(doerClanId, targetClanId, type, doerDiplomacy, myPower, targetPower) {

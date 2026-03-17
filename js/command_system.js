@@ -2365,7 +2365,7 @@ class CommandSystem {
         const helperClanId = helperCastle.ownerClan;
         const enemyClanId = targetCastle.ownerClan;
         const myToHelperRel = this.game.getRelation(myClanId, helperClanId);
-        const helperToEnemyRel = this.game.getRelation(helperClanId, enemyClanId);
+        // helperToEnemyRel は外交専門部署で使うので、ここでは消しておきます
 
         if (helperClanId === this.game.playerClanId) {
             const myClanName = this.game.clans.find(c => c.id === myClanId)?.name || "不明";
@@ -2384,15 +2384,9 @@ class CommandSystem {
             return;
         }
 
-        let isSuccess = false;
-        if (myToHelperRel.status === '支配') isSuccess = true;
-        else {
-            let prob = (myToHelperRel.sentiment >= 50) ? (myToHelperRel.sentiment - 49) : 0;
-            prob += Math.floor((gold / 1500) * 15);
-            if (myToHelperRel.status === '同盟' || myToHelperRel.status === '従属') prob += 30;
-            if (helperToEnemyRel) prob -= Math.floor((helperToEnemyRel.sentiment - 50) * (20 / 50)); 
-            if (Math.random() * 100 < prob) isSuccess = true;
-        }
+        // ★修正：確率計算とサイコロは、外交の専門部署にお任せします！
+        const prob = this.game.diplomacyManager.getReinforcementAcceptProb(myClanId, helperClanId, enemyClanId, gold);
+        const isSuccess = (Math.random() * 100 < prob);
 
         if (!isSuccess) {
             if (myClanId === this.game.playerClanId) {
