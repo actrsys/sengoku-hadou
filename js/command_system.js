@@ -28,7 +28,7 @@ const COMMAND_MENU_STRUCTURE = [
         label: "対外",
         // ★ここが「入れ子（サブメニュー）」になる部分です！
         subMenus: [
-            { label: "外交", commands: ['goodwill', 'alliance', 'dominate', 'subordinate', 'break_alliance'] },
+            { label: "外交", commands: ['goodwill', 'alliance', 'marriage', 'dominate', 'subordinate', 'break_alliance'] }, // ★ 'marriage' を追加！
             { label: "調略", commands: ['incite', 'rumor', 'headhunt'] },
             { label: "諸勢力", commands: ['kunishu_goodwill', 'kunishu_incorporate'] },
             { label: "朝廷", commands: ['tribute', 'court_truce'] }
@@ -265,6 +265,13 @@ const COMMAND_SPECS = {
         costGold: 0, costRice: 0,
         isMulti: false, hasAdvice: true,
         startMode: 'map_select', targetType: 'other_clan_all'
+    },
+    // ★今回追加：婚姻の設計図です！
+    'marriage': {
+        label: "婚姻", category: 'FOREIGN_DAIMYO',
+        costGold: 0, costRice: 0,
+        isMulti: false, hasAdvice: true,
+        startMode: 'map_select', targetType: 'marriage_valid' // 婚姻専用の相手を選ぶ合言葉にします
     },
     'dominate': {
         label: "支配", category: 'FOREIGN_DAIMYO',
