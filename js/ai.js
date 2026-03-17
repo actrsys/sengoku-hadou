@@ -1534,12 +1534,6 @@ class AIEngine {
 
         // ★修正：diplomacy.js のお引越しセンターを使って数えます！
         const allyCount = this.game.diplomacyManager.getAllyCount(myClanId);
-        
-        // ★追加：仲良しが2つ以上なら、外交する確率を下げる魔法（1つ増えるごとに20%ダウン）
-        let sendProbModifier = 1.0;
-        if (allyCount >= 2) {
-            sendProbModifier = Math.max(0.1, 1.0 - (allyCount - 1) * 0.2); 
-        }
 
         // ★追加：ここで改めて周辺の敵を判断します！（智謀による見誤りがあるためAIに残します）
         let evaluatorInt = 50;
@@ -1580,117 +1574,56 @@ class AIEngine {
             const threatData = enemyThreats.find(t => t.clanId === targetClanId);
             const perceivedTargetTotal = threatData ? threatData.power : targetClanTotal;
 
-            const rel = this.game.getRelation(myClanId, targetClanId);
-            const dutyInhibition = (myDaimyo.duty * 0.01) * (1.0 - (smartness * 0.5)); 
-            
             const targetCastle = neighbors.find(c => c.ownerClan === targetClanId);
             if (!targetCastle) continue; 
             const targetCastleId = targetCastle.id;
             
-            if (rel.status === '従属') {
-                const ratio = targetClanTotal / myPower;
-                if (ratio <= 2.0) {
-                    const breakProb = 0.01 + (2.0 - Math.max(1.0, ratio)) * 0.89;
-                    if (Math.random() < breakProb && Math.random() > dutyInhibition) {
-                        this.game.commandSystem.executeDiplomacy(castellan.id, targetCastleId, 'break_alliance'); 
-                        castellan.isActionDone = true;
-                    }
-                }
+            // ★修正：外交の判断（何をどれくらいするか）は、外交の専門部署にお任せします！
+            const decision = this.game.diplomacyManager.determineAIDiplomacyAction(
+                myClanId, targetClanId, myPower, targetClanTotal, perceivedTargetTotal, 
+                myDaimyo.duty, smartness, targetData.isStrategicPartner, allyCount, neighbors
+            );
+
+            if (decision.action === 'break_alliance') {
+                this.game.commandSystem.executeDiplomacy(castellan.id, targetCastleId, 'break_alliance'); 
+                castellan.isActionDone = true;
                 continue;
-            }
-
-            if (rel.status === '同盟' || rel.status === '支配') {
-                 const enemies = neighbors.filter(c => !['同盟', '支配', '従属'].includes(this.game.getRelation(myClanId, c.ownerClan).status));
-                 if (enemies.length === 0 && myPower > targetClanTotal * 2.5 && Math.random() > dutyInhibition) {
-                      this.game.commandSystem.executeDiplomacy(castellan.id, targetCastleId, 'break_alliance'); 
-                      castellan.isActionDone = true;
-                 }
-                 continue;
-            }
-
-            if (targetClanTotal * 8 <= myPower) {
-                if (Math.random() < 0.05) { 
+            } else if (decision.action === 'dominate') {
+                if (targetClanId === this.game.playerClanId) {
+                    this.game.commandSystem.proposeDiplomacyToPlayer(castellan, targetClanId, 'dominate', 0, () => {
+                        castellan.isActionDone = true;
+                        this.game.finishTurn(); 
+                    });
+                    return 'waiting';
+                } else {
+                    this.game.commandSystem.executeDiplomacy(castellan.id, targetCastleId, 'dominate'); 
+                    castellan.isActionDone = true;
+                    continue;
+                }
+            } else if (decision.action === 'goodwill') {
+                if (castle.gold >= decision.gold) {
                     if (targetClanId === this.game.playerClanId) {
-                        this.game.commandSystem.proposeDiplomacyToPlayer(castellan, targetClanId, 'dominate', 0, () => {
+                        this.game.commandSystem.proposeDiplomacyToPlayer(castellan, targetClanId, 'goodwill', decision.gold, () => {
                             castellan.isActionDone = true;
-                            this.game.finishTurn(); 
+                            this.game.finishTurn();
                         });
                         return 'waiting';
                     } else {
-                        this.game.commandSystem.executeDiplomacy(castellan.id, targetCastleId, 'dominate'); 
+                        this.game.commandSystem.executeDiplomacy(castellan.id, targetCastleId, 'goodwill', decision.gold);
                         castellan.isActionDone = true;
-                        continue;
                     }
                 }
-            }
-
-            // 通常の親善・同盟のロジック
-            // ★修正：diplomacy.js で計算済みの結果をそのまま使います！
-            let isStrategicPartner = targetData.isStrategicPartner;
-
-            // 「自分より相手が強い」か「戦略的パートナー（isStrategicPartner）」なら外交を考えます！
-            if (myPower < perceivedTargetTotal * 0.8 || isStrategicPartner) {
-                if (Math.random() < smartness * sendProbModifier) {
-                    const allianceThreshold = isStrategicPartner ? (window.AIParams.AI.AllianceThreshold || 70) - 15 : (window.AIParams.AI.AllianceThreshold || 70);
-                    const goodwillThreshold = isStrategicPartner ? (window.AIParams.AI.GoodwillThreshold || 40) + 20 : (window.AIParams.AI.GoodwillThreshold || 40);
-
-                    if (rel.sentiment < goodwillThreshold) {
-                         const ratio = perceivedTargetTotal / Math.max(1, myPower); 
-                         
-                         let willGoodwill = true;
-                         if (rel.sentiment <= 50) {
-                             let skipProb = (50 - rel.sentiment) * 2; 
-                             if (isStrategicPartner) { 
-                                 skipProb -= 30; 
-                             }
-                             // ★直接敵対している大名には、親善の確率をガクッと落とします！
-                             if (rel.status === '敵対' && !isStrategicPartner) { 
-                                 skipProb += 60; 
-                             }
-
-                             if (Math.random() * 100 < skipProb) {
-                                 willGoodwill = false;
-                             }
-                         }
-
-                         // ★戦略的パートナーなら、威信に関わらず親善を諦めないようにします
-                         if (!willGoodwill || (rel.sentiment <= 30 && ratio < 3.0 && !isStrategicPartner)) {
-                             // 何もしないで諦める
-                         } else {
-                             let goodwillGold = 300; 
-                             if (ratio >= 3.0) {
-                                 goodwillGold = 1000; 
-                             } else if (ratio > 1.5) {
-                                 goodwillGold = 300 + ((ratio - 1.5) / 1.5) * 700;
-                             }
-                             goodwillGold = Math.floor(goodwillGold / 100) * 100; 
-
-                             if (castle.gold >= goodwillGold) {
-                                 if (targetClanId === this.game.playerClanId) {
-                                     this.game.commandSystem.proposeDiplomacyToPlayer(castellan, targetClanId, 'goodwill', goodwillGold, () => {
-                                         castellan.isActionDone = true;
-                                         this.game.finishTurn();
-                                     });
-                                     return 'waiting';
-                                 } else {
-                                     this.game.commandSystem.executeDiplomacy(castellan.id, targetCastleId, 'goodwill', goodwillGold);
-                                     castellan.isActionDone = true;
-                                 }
-                             }
-                         }
-                    } else if (rel.sentiment > allianceThreshold) {
-                         if (targetClanId === this.game.playerClanId) {
-                             this.game.commandSystem.proposeDiplomacyToPlayer(castellan, targetClanId, 'alliance', 0, () => {
-                                 castellan.isActionDone = true;
-                                 this.game.finishTurn();
-                             });
-                             return 'waiting';
-                         } else {
-                             this.game.commandSystem.executeDiplomacy(castellan.id, targetCastleId, 'alliance');
-                             castellan.isActionDone = true;
-                         }
-                    }
-                }
+            } else if (decision.action === 'alliance') {
+                 if (targetClanId === this.game.playerClanId) {
+                     this.game.commandSystem.proposeDiplomacyToPlayer(castellan, targetClanId, 'alliance', 0, () => {
+                         castellan.isActionDone = true;
+                         this.game.finishTurn();
+                     });
+                     return 'waiting';
+                 } else {
+                     this.game.commandSystem.executeDiplomacy(castellan.id, targetCastleId, 'alliance');
+                     castellan.isActionDone = true;
+                 }
             }
         }
     }

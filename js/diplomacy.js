@@ -472,6 +472,41 @@ class DiplomacyManager {
     }
     
     /**
+     * 婚姻が成立した時の、データ書き換え一斉処理です
+     */
+    applyMarriageData(princessId, targetBushoId, targetClanId) {
+        const myClan = this.game.clans.find(c => c.id === this.game.playerClanId);
+        const princess = this.game.princesses.find(p => p.id === princessId);
+        const targetBusho = this.game.getBusho(targetBushoId);
+        
+        if (!princess || !targetBusho || !myClan) return;
+
+        princess.currentClanId = targetClanId;
+        princess.husbandId = targetBushoId;
+        princess.status = 'married';
+
+        myClan.princessIds = myClan.princessIds.filter(id => id !== princessId);
+
+        if (!targetBusho.wifeIds.includes(princessId)) {
+            targetBusho.wifeIds.push(princessId);
+        }
+        targetBusho.updateFamilyIds(this.game.princesses);
+
+        this.changeStatus(this.game.playerClanId, targetClanId, '同盟');
+        
+        const relation = this.getDiplomacyData(this.game.playerClanId, targetClanId);
+        if (relation) {
+            relation.isMarriage = true;
+            relation.sentiment = Math.max(relation.sentiment, 70); 
+        }
+        const oppRelation = this.getDiplomacyData(targetClanId, this.game.playerClanId);
+        if (oppRelation) {
+            oppRelation.isMarriage = true;
+            oppRelation.sentiment = Math.max(oppRelation.sentiment, 70);
+        }
+    }
+    
+    /**
      * AIからプレイヤーへの外交提案を受ける処理です
      */
     proposeDiplomacyToPlayer(doer, targetClanId, type, gold, onComplete) {
@@ -538,39 +573,91 @@ class DiplomacyManager {
             }
         );
     }
-
+    
     /**
-     * 婚姻が成立した時の、データ書き換え一斉処理です
+     * AIが特定の相手に対して、どの外交コマンドを実行するか判定して返す魔法です
      */
-    applyMarriageData(princessId, targetBushoId, targetClanId) {
-        const myClan = this.game.clans.find(c => c.id === this.game.playerClanId);
-        const princess = this.game.princesses.find(p => p.id === princessId);
-        const targetBusho = this.game.getBusho(targetBushoId);
+    determineAIDiplomacyAction(myClanId, targetClanId, myPower, targetClanTotal, perceivedTargetTotal, myDaimyoDuty, smartness, isStrategicPartner, allyCount, neighbors) {
+        const rel = this.getRelation(myClanId, targetClanId);
+        const dutyInhibition = (myDaimyoDuty * 0.01) * (1.0 - (smartness * 0.5)); 
         
-        if (!princess || !targetBusho || !myClan) return;
-
-        princess.currentClanId = targetClanId;
-        princess.husbandId = targetBushoId;
-        princess.status = 'married';
-
-        myClan.princessIds = myClan.princessIds.filter(id => id !== princessId);
-
-        if (!targetBusho.wifeIds.includes(princessId)) {
-            targetBusho.wifeIds.push(princessId);
+        // 仲良しが2つ以上なら、外交する確率を下げる魔法（1つ増えるごとに20%ダウン）
+        let sendProbModifier = 1.0;
+        if (allyCount >= 2) {
+            sendProbModifier = Math.max(0.1, 1.0 - (allyCount - 1) * 0.2); 
         }
-        targetBusho.updateFamilyIds(this.game.princesses);
 
-        this.changeStatus(this.game.playerClanId, targetClanId, '同盟');
-        
-        const relation = this.getDiplomacyData(this.game.playerClanId, targetClanId);
-        if (relation) {
-            relation.isMarriage = true;
-            relation.sentiment = Math.max(relation.sentiment, 70); 
+        // ① 従属関係の破棄判定
+        if (rel.status === '従属') {
+            const ratio = targetClanTotal / myPower;
+            if (ratio <= 2.0) {
+                const breakProb = 0.01 + (2.0 - Math.max(1.0, ratio)) * 0.89;
+                if (Math.random() < breakProb && Math.random() > dutyInhibition) {
+                    return { action: 'break_alliance', gold: 0 };
+                }
+            }
+            return { action: 'none', gold: 0 };
         }
-        const oppRelation = this.getDiplomacyData(targetClanId, this.game.playerClanId);
-        if (oppRelation) {
-            oppRelation.isMarriage = true;
-            oppRelation.sentiment = Math.max(oppRelation.sentiment, 70);
+
+        // ② 同盟・支配関係の破棄判定
+        if (rel.status === '同盟' || rel.status === '支配') {
+             const enemies = neighbors.filter(c => !['同盟', '支配', '従属'].includes(this.getRelation(myClanId, c.ownerClan).status));
+             if (enemies.length === 0 && myPower > targetClanTotal * 2.5 && Math.random() > dutyInhibition) {
+                  return { action: 'break_alliance', gold: 0 };
+             }
+             return { action: 'none', gold: 0 };
         }
+
+        // ③ 支配要求の判定
+        if (targetClanTotal * 8 <= myPower) {
+            if (Math.random() < 0.05) { 
+                return { action: 'dominate', gold: 0 };
+            }
+        }
+
+        // ④ 親善・同盟の判定
+        if (myPower < perceivedTargetTotal * 0.8 || isStrategicPartner) {
+            if (Math.random() < smartness * sendProbModifier) {
+                const allianceThreshold = isStrategicPartner ? (window.AIParams.AI.AllianceThreshold || 70) - 15 : (window.AIParams.AI.AllianceThreshold || 70);
+                const goodwillThreshold = isStrategicPartner ? (window.AIParams.AI.GoodwillThreshold || 40) + 20 : (window.AIParams.AI.GoodwillThreshold || 40);
+
+                if (rel.sentiment < goodwillThreshold) {
+                     const ratio = perceivedTargetTotal / Math.max(1, myPower); 
+                     
+                     let willGoodwill = true;
+                     if (rel.sentiment <= 50) {
+                         let skipProb = (50 - rel.sentiment) * 2; 
+                         if (isStrategicPartner) { 
+                             skipProb -= 30; 
+                         }
+                         if (rel.status === '敵対' && !isStrategicPartner) { 
+                             skipProb += 60; 
+                         }
+
+                         if (Math.random() * 100 < skipProb) {
+                             willGoodwill = false;
+                         }
+                     }
+
+                     if (!willGoodwill || (rel.sentiment <= 30 && ratio < 3.0 && !isStrategicPartner)) {
+                         return { action: 'none', gold: 0 };
+                     } else {
+                         let goodwillGold = 300; 
+                         if (ratio >= 3.0) {
+                             goodwillGold = 1000; 
+                         } else if (ratio > 1.5) {
+                             goodwillGold = 300 + ((ratio - 1.5) / 1.5) * 700;
+                         }
+                         goodwillGold = Math.floor(goodwillGold / 100) * 100; 
+                         return { action: 'goodwill', gold: goodwillGold };
+                     }
+                } else if (rel.sentiment > allianceThreshold) {
+                     return { action: 'alliance', gold: 0 };
+                }
+            }
+        }
+
+        return { action: 'none', gold: 0 };
     }
+    
 }
