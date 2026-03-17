@@ -638,7 +638,7 @@ class UIInfoManager {
 
             // 1人分の行を作ります
             listHtml += `<div class="daimyo-list-item is-princess" ${cursorStr} ${onClickStr}>
-                <span class="col-daimyo-name" style="font-weight:bold;">${p.name}</span>
+                <span style="font-weight:bold; justify-content: flex-start; padding-left: 5px;">${p.name}</span>
                 <span>姫</span>
                 <span>${age}歳</span>
                 <span>${fatherName}</span>
