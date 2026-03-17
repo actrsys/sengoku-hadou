@@ -3011,73 +3011,14 @@ class UIManager {
     }
 
     showPrisonerModal(captives) {
-        if (!this.prisonerModal) return;
-        this.prisonerModal.classList.remove('hidden');
-        if (this.prisonerList) {
-            this.prisonerList.innerHTML = '';
-            
-            const gunshi = this.game.getClanGunshi(this.game.playerClanId);
-            const myDaimyo = this.game.bushos.find(b => b.clan === this.game.playerClanId && b.isDaimyo);
-
-            captives.forEach((p, index) => {
-                const div = document.createElement('div');
-                div.className = 'select-item';
-                div.style.display = 'flex';
-                div.style.justifyContent = 'space-between';
-                div.style.alignItems = 'center';
-                
-                let hireBtnHtml = '';
-                if (p.hasRefusedHire) {
-                    hireBtnHtml = `<button class="btn-primary" disabled style="opacity:0.5; background-color: #666;">拒否</button>`;
-                } else {
-                    hireBtnHtml = `<button class="btn-primary" onclick="window.GameApp.warManager.handlePrisonerAction(${index}, 'hire')">登用</button>`;
-                }
-                
-                const getStat = (stat) => GameSystem.getDisplayStatHTML(p, stat, gunshi, null, this.game.playerClanId, myDaimyo);
-
-                div.innerHTML = `
-                    <div style="flex:1;">
-                        <strong>${p.name}</strong> (${p.getRankName()})<br>
-                        <div style="display:flex; gap:5px; align-items:center; margin-top:2px;">
-                            統:${getStat('leadership')} 武:${getStat('strength')} 智:${getStat('intelligence')}
-                        </div>
-                    </div>
-                    <div style="display:flex; gap:5px;">
-                        ${hireBtnHtml}
-                        <button class="btn-secondary" onclick="window.GameApp.warManager.handlePrisonerAction(${index}, 'release')">解放</button>
-                        <button class="btn-danger" onclick="window.GameApp.warManager.handlePrisonerAction(${index}, 'kill')">処断</button>
-                    </div>
-                `;
-                this.prisonerList.appendChild(div);
-            });
-        }
+        this.info.showPrisonerModal(captives);
     }
     closePrisonerModal() {
-        if(this.prisonerModal) this.prisonerModal.classList.add('hidden');
+        this.info.closePrisonerModal();
     }
     
     showDaimyoPrisonerModal(prisoner) {
-        this.hideAIGuardTemporarily();
-        
-        let hireBtnHtml = '';
-        if (prisoner.hasRefusedHire) {
-            hireBtnHtml = `<button class="btn-primary" disabled style="opacity:0.5; background-color: #666;">拒否</button>`;
-        } else {
-            hireBtnHtml = `<button class="btn-primary" onclick="window.GameApp.warManager.handleDaimyoPrisonerAction('hire')">登用</button>`;
-        }
-
-        const content = `
-            <div style="text-align:center; padding: 10px;">
-                <h3 style="margin-top:0;">敵大名 捕縛！</h3>
-                <p style="font-size:1.1rem;">敵大名・<strong>${prisoner.name}</strong>を捕縛しました。<br>処遇を決めてください。</p>
-                <div style="margin-top:20px; display:flex; justify-content:center; gap:10px;">
-                    ${hireBtnHtml}
-                    <button class="btn-secondary" onclick="window.GameApp.warManager.handleDaimyoPrisonerAction('release')">解放</button>
-                    <button class="btn-danger" onclick="window.GameApp.warManager.handleDaimyoPrisonerAction('kill')">処断</button>
-                </div>
-            </div>
-        `;
-        this.showResultModal(content, null, ""); 
+        this.info.showDaimyoPrisonerModal(prisoner);
     }
     
     showSuccessionModal(candidates, onSelect) {
@@ -3256,50 +3197,7 @@ class UIManager {
         this.renderSelectionModeMenu(); // ★これを追加してメニューを「戻る」だけにします！
     }
     
-    // ★ ここからまるごと追加！：設定画面を開いて、スライダーを動かせるようにする魔法です！
     showSettingsModal() {
-        const modal = document.getElementById('settings-modal');
-        const bgmSlider = document.getElementById('setting-bgm-volume');
-        const bgmText = document.getElementById('setting-bgm-text');
-        const seSlider = document.getElementById('setting-se-volume');
-        const seText = document.getElementById('setting-se-text');
-
-        if (!modal || !bgmSlider || !seSlider) return;
-
-        // 今の音量（1.0なら100%）をスライダーにセットします
-        if (window.AudioManager) {
-            bgmSlider.value = Math.round(window.AudioManager.userBgmVolume * 100);
-            bgmText.textContent = bgmSlider.value + '%';
-            
-            seSlider.value = Math.round(window.AudioManager.userSeVolume * 100);
-            seText.textContent = seSlider.value + '%';
-        }
-
-        // BGMのスライダーを動かしたときの処理
-        bgmSlider.oninput = (e) => {
-            const val = e.target.value;
-            bgmText.textContent = val + '%';
-            if (window.AudioManager) {
-                // 100を1.0に直して渡します
-                window.AudioManager.setBgmVolume(val / 100); 
-            }
-        };
-
-        // SEのスライダーを動かしたときの処理
-        seSlider.oninput = (e) => {
-            const val = e.target.value;
-            seText.textContent = val + '%';
-            if (window.AudioManager) {
-                window.AudioManager.setSeVolume(val / 100);
-            }
-        };
-        
-        // つまみを離したときに「ピロッ」と鳴らして音量を確認できるようにします
-        seSlider.onchange = () => {
-             if (window.AudioManager) window.AudioManager.playSE('choice.ogg');
-        };
-
-        modal.classList.remove('hidden');
+        this.info.showSettingsModal();
     }
-    
 }
