@@ -632,8 +632,8 @@ class UIInfoManager {
             // 選ぶ時だけ、押した時の魔法（onClick）と指マーク（cursor）をつけます
             if (isSelectMode) {
                 cursorStr = "style='cursor:pointer;'";
-                // 選んだら、裏側でコッソリ「選んだよ！」とゲーム本体に伝えて画面を閉じます
-                onClickStr = `onclick="if(window.AudioManager) window.AudioManager.playSE('choice.ogg'); window.GameApp.commandSystem.handleBushoSelection('marriage_princess', [${p.id}], ${targetCastleId}, { doerId: ${doerId} }); window.GameApp.ui.closeResultModal();"`;
+                // ★変更：クリックしたら「選択状態（オレンジ色）」にするだけの魔法に変えます！
+                onClickStr = `onclick="window.GameApp.ui.info.selectPrincess(${p.id}, this)"`;
             }
 
             // 1人分の行を作ります（他のリストと同じように、空白や改行をなくして1行にまとめます！）
@@ -650,13 +650,17 @@ class UIInfoManager {
         const title = isSelectMode ? "嫁がせる姫を選択してください" : "姫一覧";
         let customFooter = "";
         
-        // 戻るボタンの動きを作ります
+        // 戻るボタンや決定ボタンの動きを作ります
         if (!isSelectMode) {
             // 見るだけの時は普通に閉じるだけ
             customFooter = `<button class="btn-primary" onclick="window.GameApp.ui.closeResultModal()">閉じる</button>`;
         } else {
-            // 婚姻で選んでいる時は、前の「使者選び」に戻してあげます
-            customFooter = `<button class="btn-secondary" onclick="window.GameApp.ui.openBushoSelector('diplomacy_doer', ${targetCastleId}, { subAction: 'marriage' }); window.GameApp.ui.closeResultModal();">戻る</button>`;
+            // ★変更：「選んだ姫」の記憶をリセットして、決定ボタンと戻るボタンを並べます！
+            this.selectedPrincessId = null;
+            customFooter = `
+                <button class="btn-primary" onclick="window.GameApp.ui.info.confirmPrincessSelection(${targetCastleId}, ${doerId})">決定</button>
+                <button class="btn-secondary" onclick="window.GameApp.ui.openBushoSelector('diplomacy_doer', ${targetCastleId}, { subAction: 'marriage' }); window.GameApp.ui.closeResultModal();">戻る</button>
+            `;
         }
 
         // 出来上がった画面を、いつもの小窓（モーダル）に表示してもらいます
@@ -675,7 +679,49 @@ class UIInfoManager {
             this.ui.resultBody.style.flexDirection = 'column';
         }
     }
+
+    // ==========================================
+    // ★ここから追加：選んで決定する魔法！
+    // ==========================================
+    
+    // 姫をクリックした時の処理（オレンジ色にして、誰を選んだか覚えておく）
+    selectPrincess(princessId, element) {
+        // カチッという音を鳴らします
+        if (window.AudioManager) window.AudioManager.playSE('click.ogg');
+        
+        // まず、全ての姫の行の色を元に戻します（お掃除）
+        const items = document.querySelectorAll('.princess-list-item');
+        items.forEach(item => {
+            item.style.backgroundColor = '';
+            item.style.borderLeft = '';
+        });
+
+        // クリックされた行だけ、武将選択と同じオレンジ色にして目立たせます！
+        element.style.backgroundColor = '#ffe0b2';
+        element.style.borderLeft = '5px solid #ff9800';
+
+        // 誰を選んだか覚えておきます
+        this.selectedPrincessId = princessId;
+    }
+
+    // 「決定」ボタンを押した時の処理
+    confirmPrincessSelection(targetCastleId, doerId) {
+        // 誰も選んでいない時は何もしません
+        if (!this.selectedPrincessId) {
+            return;
+        }
+
+        // 決定の音を鳴らして、ゲーム本体に「この姫を選んだよ！」と伝えて画面を閉じます
+        if (window.AudioManager) window.AudioManager.playSE('choice.ogg');
+        window.GameApp.commandSystem.handleBushoSelection('marriage_princess', [this.selectedPrincessId], targetCastleId, { doerId: doerId });
+        
+        // 記憶をリセットしておきます
+        this.selectedPrincessId = null; 
+        window.GameApp.ui.closeResultModal();
+    }
+
     // ==========================================
     // ★姫一覧＆姫選択の魔法ここまで！
     // ==========================================
+}
 }
