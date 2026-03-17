@@ -249,7 +249,7 @@ const COMMAND_SPECS = {
         isSystem: true, action: 'faction_list'
     },
     'daimyo_list': {
-        label: "大名", category: 'INFO',
+        label: "勢力", category: 'INFO',
         isSystem: true, action: 'daimyo_list'
     },
 
