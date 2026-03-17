@@ -347,8 +347,17 @@ body.hide-daimyo-labels .daimyo-name-label { display: none !important; }
 
 .daimyo-detail-body {
     display: flex;
-    gap: 20px; /* 顔画像と情報の間のすき間 */
+    gap: 20px; /* 左側（顔）と右側（情報）のすき間 */
     align-items: flex-start;
+}
+
+/* ★新しく追加：左側の顔画像と名前を入れる縦長の箱 */
+.daimyo-detail-left {
+    display: flex;
+    flex-direction: column;
+    gap: 5px; /* 画像と名前、官位のすき間 */
+    width: 100px; /* 顔画像の幅に合わせます */
+    flex-shrink: 0;
 }
 
 .daimyo-detail-face {
@@ -358,26 +367,48 @@ body.hide-daimyo-labels .daimyo-name-label { display: none !important; }
     border: 2px solid #333;
     border-radius: 4px;
     background: #eee;
-    flex-shrink: 0;
 }
 
+/* ★新しく追加：顔の下の名前や官位の文字デザイン */
+.daimyo-detail-leader-name {
+    font-weight: bold;
+    font-size: 1.1rem;
+    text-align: left;
+}
+
+.daimyo-detail-leader-rank {
+    font-size: 0.9rem;
+    color: #444;
+    text-align: left;
+}
+
+/* ★変更：右側の情報箱を並べるデザイン */
 .daimyo-detail-info {
-    display: grid;
-    grid-template-columns: auto 1fr; /* 左は文字の長さに合わせ、右は残りの幅 */
-    gap: 8px 20px; /* 縦と横のすき間 */
-    font-size: 1rem;
+    display: flex;
+    flex-direction: column; /* 縦に並べます */
+    gap: 8px; /* 箱と箱の縦のすき間 */
     flex: 1;
-    max-width: 250px; /* ★右端に寄りすぎないように、幅の限界を決めます */
+    max-width: 200px; /* 右端に寄りすぎないように調整 */
+}
+
+/* ★新しく追加：項目ごとにつける背景色のついた箱 */
+.daimyo-detail-stat-box {
+    background-color: #e0e0e0; /* 背景の色です */
+    padding: 5px 10px; /* 箱の内側のすき間 */
+    border-radius: 4px; /* 角を少し丸くします */
+    display: flex;
+    justify-content: space-between; /* 項目名を左端、数値を右端に離します */
+    align-items: center;
 }
 
 .daimyo-detail-label {
-    color: #666;
-    text-align: left; /* 項目名は左揃え */
+    color: #555;
+    font-size: 0.95rem;
 }
 
 .daimyo-detail-value {
     font-weight: bold;
-    text-align: right; /* 数値は右揃え */
+    font-size: 1rem;
 }
 
 /* =========================================================
