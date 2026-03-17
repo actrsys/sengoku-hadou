@@ -320,6 +320,11 @@ body.hide-daimyo-labels .daimyo-name-label { display: none !important; }
 /* =========================================================
    大名家詳細モーダルのデザイン（完全版）
    ========================================================= */
+/* ★新しく追加：大名一覧の小窓よりも、さらに手前に表示する魔法です！ */
+#daimyo-detail-modal {
+    z-index: 1010 !important; 
+}
+
 .daimyo-detail-container {
     display: flex;
     flex-direction: column;
