@@ -886,6 +886,16 @@ class CommandSystem {
                 }
                 this.showAdviceAndExecute('diplomacy', () => this.executeDiplomacy(firstId, targetId, 'dominate'), { trueProb: trueProb });
             } else if (extraData.subAction === 'court_truce') {
+                // ★追加：朝廷和睦は条件を満たしていれば確実に成功します！
+                this.showAdviceAndExecute('diplomacy', () => this.executeCourtTruce(firstId, targetId), { trueProb: 1.0 });
+            } else if (extraData.subAction === 'marriage') {
+                // ★今回追加：使者が決まったら、次は「誰を嫁がせるか」「誰に嫁がせるか」を選ぶ画面を呼び出します！
+                if (this.game.ui.showMarriageSelector) {
+                    this.game.ui.showMarriageSelector(firstId, targetId);
+                }
+            }
+            return;
+        }
 
         // ★追加: 貢物の使者を選んだら、いくら払うか（金額指定）の画面を開きます！
         if (actionType === 'tribute_doer') {
