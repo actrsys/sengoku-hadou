@@ -635,33 +635,22 @@ class UIManager {
         if (!clan) return;
         
         const leader = this.game.getBusho(clan.leaderId);
-        const leaderName = leader ? leader.name : "不明";
+        // 名前から「|」を取り除いて綺麗にします
+        const leaderName = leader ? leader.name.replace('|', '') : "不明";
         
         // 本拠地（大名がいる城）を探します
         let baseCastleName = "不明";
-        if (leader && leader.location) {
-            const baseCastle = this.game.castles.find(c => c.id === leader.location);
+        if (leader && leader.castleId) {
+            const baseCastle = this.game.castles.find(c => c.id === leader.castleId);
             if (baseCastle) {
                 baseCastleName = baseCastle.name;
             }
         }
 
-        // 官位（一番 rankNo が小さいもの）を探します
+        // 官位（一番 rankNo が小さいもの）を専用の魔法で探します
         let highestRankName = "なし";
-        // もし武将が titles という箱を持っていて、そこに官位のIDが入っていると仮定しています
-        if (leader && leader.titles && leader.titles.length > 0) {
-            let bestRank = null;
-            for (const titleId of leader.titles) {
-                const title = this.game.titles.find(t => t.id === titleId);
-                if (title) {
-                    if (!bestRank || title.rankNo < bestRank.rankNo) {
-                        bestRank = title;
-                    }
-                }
-            }
-            if (bestRank) {
-                highestRankName = bestRank.name;
-            }
+        if (leader && this.game.courtRankSystem) {
+            highestRankName = this.game.courtRankSystem.getHighestRankName(leader);
         }
 
         // 城・武将・姫の数を数えます
@@ -717,7 +706,7 @@ class UIManager {
             </div>
         `;
 
-        // 小窓を表示する魔法を呼び出します（タイトル部分は新しいデザインに含めたのでスッキリさせました）
+        // 小窓を表示する魔法を呼び出します
         this.showResultModal(contentHtml, null, customFooter);
     }
 
