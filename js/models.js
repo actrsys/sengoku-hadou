@@ -23,25 +23,17 @@ class Clan {
         // ★今回追加：朝廷からの信用を覚えておく箱です（上限は1000にします）
         this.courtTrust = Number(data.courtTrust || 0);
         
-        // ★今回変更：姫のIDと名前をリスト（配列）で覚えておく箱です
-        this.princesses = [];
-        if (data.princesses && Array.isArray(data.princesses)) {
-            // セーブデータから読み込んだ時は、すでにリストになっているのでそのまま使います
-            this.princesses = data.princesses;
+        // ★今回変更：姫のID（出席番号）だけをリスト（配列）で覚えておく箱です
+        this.princessIds = [];
+        if (data.princessIds && Array.isArray(data.princessIds)) {
+            // セーブデータから読み込んだ場合
+            this.princessIds = data.princessIds;
         } else if (typeof data.princess === 'string' && data.princess.trim() !== "") {
-            // CSVから「1:帰蝶|2:お市」のように届いた文字をバラバラにして箱に入れます
-            const parts = data.princess.split('|');
-            parts.forEach(part => {
-                const items = part.split(':');
-                if (items.length >= 2) {
-                    const pId = Number(items[0].trim());
-                    const pName = items[1].trim();
-                    if (!isNaN(pId)) {
-                        // IDと名前をセットにして、リストに追加します！
-                        this.princesses.push({ id: pId, name: pName });
-                    }
-                }
-            });
+            // CSVから「1|2|5」のように届いた文字を、数字のリストにします
+            this.princessIds = String(data.princess).split('|').map(id => Number(id.trim()));
+        } else if (Number(data.princess) > 0) {
+            // 数字が1つだけ入っていた場合
+            this.princessIds = [Number(data.princess)];
         }
         
         // 大名自身が持っていた官位の仕組みは、武将の機能にお引っ越ししたため削除しました！
@@ -211,53 +203,36 @@ class Busho {
         this.nameChange = data.nameChange || ""; // 年:姓:名|年:姓:名... の形式の改名データ
         
         // ★【ここから書き足し：奥さん（姫）の設定】
-        this.wives = [];
-        if (data.wives && Array.isArray(data.wives)) {
-            // セーブデータから読み込んだ場合はそのまま使います
-            this.wives = data.wives;
+        // 姫の「ID（出席番号）」だけを覚えておきます
+        this.wifeIds = [];
+        if (data.wifeIds && Array.isArray(data.wifeIds)) {
+            this.wifeIds = data.wifeIds;
         } else if (typeof data.wife === 'string' && data.wife.trim() !== "") {
-            // CSVから「大名家ID:姫ID:姫の名前:大名武将ID|...」で届いた文字をバラバラにして箱に入れます
-            const parts = data.wife.split('|');
-            parts.forEach(part => {
-                const items = part.split(':');
-                if (items.length >= 4) {
-                    const cId = Number(items[0].trim());
-                    const pId = Number(items[1].trim());
-                    const pName = items[2].trim();
-                    const dId = Number(items[3].trim());
-                    if (!isNaN(cId) && !isNaN(pId) && !isNaN(dId)) {
-                        // IDや名前をセットにして、奥さんリストに追加します！
-                        this.wives.push({ clanId: cId, princessId: pId, name: pName, daimyoId: dId });
-                    }
-                }
-            });
+            // CSVから「1|2」で届いた文字を数字のリストにします
+            this.wifeIds = String(data.wife).split('|').map(id => Number(id.trim()));
+        } else if (Number(data.wife) > 0) {
+            this.wifeIds = [Number(data.wife)];
         }
 
         // ★【ここから書き足し：一門設定（修正版）】
-        // 婚姻で増えた分と区別するために、元々の「血の繋がった一門（baseFamilyIds）」を安全な金庫に保管します
         if (data.baseFamilyIds && Array.isArray(data.baseFamilyIds)) {
-            // 新しいセーブデータから読み込んだ場合
             this.baseFamilyIds = data.baseFamilyIds;
         } else if (data.familyIds && Array.isArray(data.familyIds)) {
-            // 古いセーブデータからの移行用
             this.baseFamilyIds = data.familyIds;
         } else if (typeof data.familyId === 'string' && data.familyId.trim() !== "") {
-            // CSVから読み込んだ場合
-            this.baseFamilyIds = data.familyId.split('|').map(id => Number(id.trim()));
+            this.baseFamilyIds = String(data.familyId).split('|').map(id => Number(id.trim()));
         } else if (Number(data.familyId) > 0) {
             this.baseFamilyIds = [Number(data.familyId)];
         } else {
             this.baseFamilyIds = [];
         }
         
-        // 自分のIDも元の一門リストに入れておくことで、すれ違いを防ぎます！
         if (!this.baseFamilyIds.includes(this.id)) {
             this.baseFamilyIds.push(this.id);
         }
 
-        // 血縁リストと奥さんリストを合体させて、普段使う用の一門リスト（familyIds）を準備します
-        this.familyIds = [];
-        this.updateFamilyIds();
+        // 血縁リストと奥さんリストを合体させる機能は、後で姫の名簿を読み込んでから呼び出します！
+        this.familyIds = [...this.baseFamilyIds];
         
         // --- 忠誠・義理など（ここから下は既存の続き） ---
         this.loyalty = Number(this.loyalty || 0);
@@ -320,17 +295,45 @@ class Busho {
     }
 
     // ★新しく書き足す魔法の機能：奥さんが増えたり減ったりした時に、一門リストを作り直す機能です
-    updateFamilyIds() {
+    // 今回から「姫全員の名簿（princesses）」を渡してもらうようにしました
+    updateFamilyIds(princesses = []) {
         // まずは普段使う用のリストに、金庫（baseFamilyIds）の中身を丸写しします
         this.familyIds = [...this.baseFamilyIds];
         
-        // 次に、今いる奥さんたちの「元の大名武将ID」を順番に見ていきます
-        this.wives.forEach(wife => {
-            // もしリストにまだ入っていなければ、新しく追加します！
-            if (!this.familyIds.includes(wife.daimyoId)) {
-                this.familyIds.push(wife.daimyoId);
+        // 次に、自分の奥さんリスト（ID）を順番に見ていきます
+        this.wifeIds.forEach(wId => {
+            // 姫の名簿から、奥さんのデータを探します
+            const wifeData = princesses.find(p => p.id === wId);
+            // 奥さんのデータが見つかって、そのお父さんのIDがまだリストに入っていなければ追加します！
+            if (wifeData && !this.familyIds.includes(wifeData.fatherId)) {
+                this.familyIds.push(wifeData.fatherId);
             }
         });
+    }
+}
+
+// ★新しく追加：姫クラス
+class Princess {
+    constructor(data) {
+        Object.assign(this, data);
+        this.id = Number(this.id);
+        this.name = data.name || "姫";
+        this.birthYear = Number(this.birthYear || 1500);
+        
+        // ★今回追加：登場年、没年、顔画像
+        this.startYear = Number(this.startYear || 1500); // 登場年
+        this.endYear = Number(this.endYear || 1650);     // 没年
+        this.faceIcon = this.faceIcon || 'unknown_face.webp'; // 姫用の汎用画像があればその名前に変えてもOKです
+        
+        this.originalClanId = Number(this.originalClanId || 0); // 生まれた大名家のID
+        this.fatherId = Number(this.fatherId || 0);             // 父親（武将）のID
+        
+        // ★ゲーム中にコロコロ変わるデータ（最初は実家と同じにしておきます）
+        this.currentClanId = Number(data.currentClanId !== undefined ? data.currentClanId : this.originalClanId);
+        this.husbandId = Number(this.husbandId || 0); // 夫の武将ID
+        
+        // 状態（unmarried:未婚, married:既婚, unborn:登場前, dead:死亡 など）
+        this.status = data.status || 'unmarried';     
     }
 }
 
