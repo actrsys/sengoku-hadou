@@ -631,6 +631,9 @@ class UIManager {
     // ★ここから追加：大名家詳細画面を表示する魔法
     // ==========================================
     showDaimyoDetail(clanId) {
+        // ★修正：手前に被さっている「大名一覧」などの小窓を確実に閉じます！
+        this.closeResultModal();
+
         const clan = this.game.clans.find(c => c.id === clanId);
         if (!clan) return;
         
@@ -966,7 +969,7 @@ class UIManager {
         });
         listHtml += '</div>';
         
-        // ★変更：戻るボタンを押した時に、「大名一覧」ではなく「大名家詳細」へ戻るようにしました！
+        // ★変更：戻るボタンの行き先を「大名一覧」から「大名家詳細」に変更します！
         const customFooter = `<button class="btn-secondary" onclick="window.GameApp.ui.showDaimyoDetail(${clanId})">戻る</button>`;
         
         this.showResultModal(`<h3 style="margin-top:0; border-bottom: 2px solid #ddd; padding-bottom: 10px; flex-shrink:0;">${clanName} 外交関係</h3>${listHtml}`, () => {
