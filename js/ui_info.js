@@ -650,16 +650,18 @@ class UIInfoManager {
         const title = isSelectMode ? "嫁がせる姫を選択してください" : "姫一覧";
         let customFooter = "";
         
-        // 戻るボタンや決定ボタンの動きを作ります
+       // 戻るボタンや決定ボタンの動きを作ります
         if (!isSelectMode) {
             // 見るだけの時は普通に閉じるだけ
             customFooter = `<button class="btn-primary" onclick="window.GameApp.ui.closeResultModal()">閉じる</button>`;
         } else {
-            // ★変更：「選んだ姫」の記憶をリセットして、決定ボタンと戻るボタンを並べます！
+            // ★変更：「決定」→「戻る」の順番に戻して、右下にピシッと寄せます！
             this.selectedPrincessId = null;
             customFooter = `
-                <button class="btn-primary" onclick="window.GameApp.ui.info.confirmPrincessSelection(${targetCastleId}, ${doerId})">決定</button>
-                <button class="btn-secondary" onclick="window.GameApp.ui.openBushoSelector('diplomacy_doer', ${targetCastleId}, { subAction: 'marriage' }); window.GameApp.ui.closeResultModal();">戻る</button>
+                <div style="display: flex; gap: 10px; margin-left: auto;">
+                    <button class="btn-primary" onclick="window.GameApp.ui.info.confirmPrincessSelection(${targetCastleId}, ${doerId})">決定</button>
+                    <button class="btn-secondary" onclick="window.GameApp.ui.openBushoSelector('diplomacy_doer', ${targetCastleId}, { subAction: 'marriage' }); window.GameApp.ui.closeResultModal();">戻る</button>
+                </div>
             `;
         }
 
@@ -686,8 +688,8 @@ class UIInfoManager {
     
     // 姫をクリックした時の処理（オレンジ色にして、誰を選んだか覚えておく）
     selectPrincess(princessId, element) {
-        // カチッという音を鳴らします
-        if (window.AudioManager) window.AudioManager.playSE('click.ogg');
+        // 武将選択と同じ音を鳴らします
+        if (window.AudioManager) window.AudioManager.playSE('choice.ogg');
         
         // まず、全ての姫の行の色を元に戻します（お掃除）
         const items = document.querySelectorAll('.princess-list-item');
