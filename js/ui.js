@@ -714,21 +714,28 @@ class UIManager {
             </div>
         `;
 
-        backBtn.onclick = () => {
+        backBtn.onclick = (e) => {
+            e.stopPropagation(); // ★追加：クリックが裏側の画面に貫通するのを防ぎます
             modal.classList.add('hidden');
-            // ★変更：一覧を描き直すのをやめて、ただ小窓を閉じるだけにします！
         };
 
-        diploBtn.onclick = () => {
+        diploBtn.onclick = (e) => {
+            e.stopPropagation(); 
+            
+            // ★追加：大名一覧の「どこまでスクロールしていたか（位置）」をメモ帳に書き残します！
+            if (this.resultBody) {
+                this.savedDaimyoScroll = this.resultBody.scrollTop;
+            }
+
             modal.classList.add('hidden');
             this.showDiplomacyList(clan.id, clan.name);
         };
 
         modal.onclick = (e) => {
+            e.stopPropagation(); // ★追加：黒い背景をクリックした時も、裏側の画面に貫通するのを防ぎます
             if (e.target === modal) {
                 if (window.AudioManager) window.AudioManager.playSE('cancel.ogg');
                 modal.classList.add('hidden');
-                // ★変更：ここも、ただ小窓を閉じるだけにします！
             }
         };
 
@@ -965,8 +972,8 @@ class UIManager {
         });
         listHtml += '</div>';
         
-        // ★変更：外交から戻る時は、裏に「大名一覧」をこっそり準備してから「詳細画面」を開くようにします！
-        const customFooter = `<button class="btn-secondary" onclick="window.GameApp.ui.showDaimyoList(); setTimeout(() => { window.GameApp.ui.showDaimyoDetail(${clanId}); }, 10);">戻る</button>`;
+        // ★変更：裏に「大名一覧」を準備したあと、メモしておいたスクロール位置に一瞬で自動スクロールさせます！
+        const customFooter = `<button class="btn-secondary" onclick="window.GameApp.ui.showDaimyoList(); setTimeout(() => { if(window.GameApp.ui.resultBody) window.GameApp.ui.resultBody.scrollTop = window.GameApp.ui.savedDaimyoScroll || 0; window.GameApp.ui.showDaimyoDetail(${clanId}); }, 10);">戻る</button>`;
         
         this.showResultModal(`<h3 style="margin-top:0; border-bottom: 2px solid #ddd; padding-bottom: 10px; flex-shrink:0;">${clanName} 外交関係</h3>${listHtml}`, () => {
             if (this.resultBody) {
