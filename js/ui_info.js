@@ -615,8 +615,8 @@ class UIInfoManager {
             princesses = princesses.filter(p => p.status === 'unmarried');
         }
 
-        // 見出しを作ります（列の幅を5つに分けます）
-        let listHtml = '<div class="daimyo-list-container"><div class="daimyo-list-header" style="grid-template-columns: 1fr 1fr 1fr 1.5fr 1.5fr;"><span>名前</span><span>身分</span><span>年齢</span><span>父親</span><span>配偶者</span></div>';
+        // 見出しを作ります
+        let listHtml = '<div class="daimyo-list-container"><div class="daimyo-list-header is-princess"><span>名前</span><span>身分</span><span>年齢</span><span>父親</span><span>配偶者</span></div>';
 
         // 姫を一人ずつリストに並べていきます
         princesses.forEach(p => {
@@ -631,13 +631,13 @@ class UIInfoManager {
 
             // 選ぶ時だけ、押した時の魔法（onClick）と指マーク（cursor）をつけます
             if (isSelectMode) {
-                cursorStr = "cursor:pointer;";
+                cursorStr = "style='cursor:pointer;'";
                 // 選んだら、裏側でコッソリ「選んだよ！」とゲーム本体に伝えて画面を閉じます
                 onClickStr = `onclick="if(window.AudioManager) window.AudioManager.playSE('choice.ogg'); window.GameApp.commandSystem.handleBushoSelection('marriage_princess', [${p.id}], ${targetCastleId}, { doerId: ${doerId} }); window.GameApp.ui.closeResultModal();"`;
             }
 
             // 1人分の行を作ります
-            listHtml += `<div class="daimyo-list-item" style="grid-template-columns: 1fr 1fr 1fr 1.5fr 1.5fr; ${cursorStr}" ${onClickStr}>
+            listHtml += `<div class="daimyo-list-item is-princess" ${cursorStr} ${onClickStr}>
                 <span class="col-daimyo-name" style="font-weight:bold;">${p.name}</span>
                 <span>姫</span>
                 <span>${age}歳</span>
