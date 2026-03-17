@@ -687,29 +687,25 @@ class CommandSystem {
                 });
             }
             
-            case 'marriage_valid':
+            case 'marriage_valid': {
                 // 1. まず、自分の大名家に嫁がせられる姫がいるかチェックします
-                const myClan = this.game.clans.find(c => c.id === this.game.playerClanId);
+                const myClan = this.game.clans.find(c => c.id === playerClanId);
                 if (!myClan || !myClan.princessIds || myClan.princessIds.length === 0) return [];
 
-                // 2. 相手の大名家に「一門武将」がいるかチェックします
-                this.game.castles.forEach(c => {
-                    // 相手の大名家の城の時だけ調べます
-                    if (c.ownerClan !== 0 && c.ownerClan !== this.game.playerClanId) {
-                        const targetLeaderId = this.game.clans.find(clan => clan.id === c.ownerClan)?.leaderId;
-                        const targetLeader = this.game.getBusho(targetLeaderId);
-                        if (targetLeader) {
-                            // 相手の家の一門武将（大名と同じ血縁IDを持っている、活動中の人）を探します
-                            const kinsmen = this.game.bushos.filter(b => b.clan === c.ownerClan && b.status === 'active' && b.familyIds.some(id => targetLeader.familyIds.includes(id)));
-                            
-                            // 一門武将が1人でもいれば、そのお城は「選べる城」としてリストに入れます！
-                            if (kinsmen.length > 0) {
-                                validCastles.push(c);
-                            }
-                        }
+                // 2. 他の大名家の城を「フィルター（ふるい）」にかけて、条件に合うものだけを残します
+                return this.game.castles.filter(target => {
+                    if (target.ownerClan === 0 || Number(target.ownerClan) === playerClanId) return false;
+                    
+                    const targetLeaderId = this.game.clans.find(clan => clan.id === target.ownerClan)?.leaderId;
+                    const targetLeader = this.game.getBusho(targetLeaderId);
+                    if (targetLeader) {
+                        // 相手の家の一門武将を探します
+                        const kinsmen = this.game.bushos.filter(b => b.clan === target.ownerClan && b.status === 'active' && b.familyIds.some(id => targetLeader.familyIds.includes(id)));
+                        if (kinsmen.length > 0) return true; // 一門武将がいればOK（光らせる）！
                     }
-                });
-                break;
+                    return false;
+                }).map(t => t.id); // 最後にIDだけのリストにして返します
+            }
                 
             default:
                 return [];
@@ -890,11 +886,6 @@ class CommandSystem {
                 }
                 this.showAdviceAndExecute('diplomacy', () => this.executeDiplomacy(firstId, targetId, 'dominate'), { trueProb: trueProb });
             } else if (extraData.subAction === 'court_truce') {
-                // ★追加：朝廷和睦は条件を満たしていれば確実に成功します！
-                this.showAdviceAndExecute('diplomacy', () => this.executeCourtTruce(firstId, targetId), { trueProb: 1.0 });
-            }
-            return;
-        }
 
         // ★追加: 貢物の使者を選んだら、いくら払うか（金額指定）の画面を開きます！
         if (actionType === 'tribute_doer') {
@@ -2369,6 +2360,9 @@ class CommandSystem {
         } else if (mode === 'court_truce') {
             // ★追加：朝廷和睦の使者選びへ繋げます
             this.game.ui.openBushoSelector('diplomacy_doer', targetCastle.id, { subAction: 'court_truce' }, onBackToMap);
+        } else if (mode === 'marriage') {
+            // ★今回追加：婚姻の使者選びへ繋げます
+            this.game.ui.openBushoSelector('diplomacy_doer', targetCastle.id, { subAction: 'marriage' }, onBackToMap);
         }
     }
     
