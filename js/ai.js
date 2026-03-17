@@ -540,8 +540,10 @@ class AIEngine {
                 const myRel = this.game.getRelation(myCastle.ownerClan, c.id);
                 const cToTargetRel = this.game.getRelation(c.id, target.ownerClan);
                 if (myRel && this.game.diplomacyManager.isNonAggression(myRel.status) && myRel.sentiment >= 50) {
-                    // ★修正：魔法を使います！
-                    if (!cToTargetRel || !this.game.diplomacyManager.isNonAggression(cToTargetRel.status)) {
+                    // ★修正：敵対大名と「同盟・支配・従属」関係にあるか、友好度が100の場合は呼べないようにします
+                    const isEnemyAlly = cToTargetRel && ['同盟', '支配', '従属'].includes(cToTargetRel.status);
+                    const isEnemyMaxGoodwill = cToTargetRel && cToTargetRel.sentiment >= 100;
+                    if (!isEnemyAlly && !isEnemyMaxGoodwill && (!cToTargetRel || !this.game.diplomacyManager.isNonAggression(cToTargetRel.status))) {
                         myReinfPower += expectedReinf;
                     }
                 }
@@ -550,8 +552,10 @@ class AIEngine {
                 const targetRel = this.game.getRelation(target.ownerClan, c.id);
                 const cToMyRel = this.game.getRelation(c.id, myCastle.ownerClan);
                 if (targetRel && this.game.diplomacyManager.isNonAggression(targetRel.status) && targetRel.sentiment >= 50) {
-                    // ★修正：魔法を使います！
-                    if (!cToMyRel || !this.game.diplomacyManager.isNonAggression(cToMyRel.status)) {
+                    // ★修正：こちらも同じく、自分と「同盟・支配・従属」または友好度100の場合は相手に味方しないようにします
+                    const isMyAlly = cToMyRel && ['同盟', '支配', '従属'].includes(cToMyRel.status);
+                    const isMyMaxGoodwill = cToMyRel && cToMyRel.sentiment >= 100;
+                    if (!isMyAlly && !isMyMaxGoodwill && (!cToMyRel || !this.game.diplomacyManager.isNonAggression(cToMyRel.status))) {
                         enemyReinfPower += expectedReinf;
                     }
                 }

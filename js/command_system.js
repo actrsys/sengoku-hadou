@@ -2332,7 +2332,10 @@ class CommandSystem {
                     const rel = this.game.getRelation(myClanId, targetCastle.ownerClan);
                     const enemyRel = this.game.getRelation(targetCastle.ownerClan, enemyClanId);
                     if (rel && ['友好', '同盟', '支配', '従属'].includes(rel.status) && rel.sentiment >= 50) {
-                        if (!enemyRel || !this.game.diplomacyManager.isNonAggression(enemyRel.status)) {
+                        // ★修正：敵対大名と「同盟・支配・従属」関係にあるか、友好度が100の場合はダメ！という魔法です
+                        const isEnemyAlly = enemyRel && ['同盟', '支配', '従属'].includes(enemyRel.status);
+                        const isEnemyMaxGoodwill = enemyRel && enemyRel.sentiment >= 100;
+                        if (!isEnemyAlly && !isEnemyMaxGoodwill && (!enemyRel || !this.game.diplomacyManager.isNonAggression(enemyRel.status))) {
                             const normalBushos = this.game.getCastleBushos(targetCastle.id).filter(b => !b.isDaimyo && !b.isCastellan && b.status !== 'ronin' && b.belongKunishuId === 0);
                             const minRice = (mode === 'def_ally_reinforcement') ? 500 : 0;
                             if (targetCastle.soldiers >= 1000 && targetCastle.rice >= minRice && normalBushos.length > 0) {
@@ -2347,7 +2350,9 @@ class CommandSystem {
                 // 2. 諸勢力が援軍を出せるかチェック
                 const kunishus = this.game.kunishuSystem.getKunishusInCastle(targetCastle.id);
                 kunishus.forEach(k => {
-                    if (k.getRelation(myClanId) >= 70 && k.soldiers >= 1000) {
+                    // ★修正：敵対大名との友好度が100の時はダメ！という魔法です
+                    const enemyKunishuRel = k.getRelation(enemyClanId);
+                    if (k.getRelation(myClanId) >= 70 && k.soldiers >= 1000 && enemyKunishuRel < 100) {
                         const members = this.game.kunishuSystem.getKunishuMembers(k.id);
                         if (members.length > 0) {
                             const leader = this.game.getBusho(k.leaderId) || members[0];
@@ -2582,7 +2587,10 @@ class CommandSystem {
                     const rel = this.game.getRelation(myClanId, c.ownerClan);
                     const enemyRel = this.game.getRelation(c.ownerClan, targetCastle.ownerClan);
                     if (rel && ['友好', '同盟', '支配', '従属'].includes(rel.status) && rel.sentiment >= 50) {
-                        if (!enemyRel || !this.game.diplomacyManager.isNonAggression(enemyRel.status)) {
+                        // ★修正：敵対大名と「同盟・支配・従属」関係にあるか、友好度が100の場合はダメ！という魔法です
+                        const isEnemyAlly = enemyRel && ['同盟', '支配', '従属'].includes(enemyRel.status);
+                        const isEnemyMaxGoodwill = enemyRel && enemyRel.sentiment >= 100;
+                        if (!isEnemyAlly && !isEnemyMaxGoodwill && (!enemyRel || !this.game.diplomacyManager.isNonAggression(enemyRel.status))) {
                             const isNextToMyAnyCastle = this.game.castles.some(myC => myC.ownerClan === myClanId && GameSystem.isAdjacent(c, myC));
                             const isNextToEnemy = GameSystem.isAdjacent(c, targetCastle);
                             if (isNextToMyAnyCastle || isNextToEnemy) {
@@ -2598,7 +2606,9 @@ class CommandSystem {
                 // 2. 諸勢力
                 const kunishus = this.game.kunishuSystem.getKunishusInCastle(c.id);
                 kunishus.forEach(k => {
-                    if (k.getRelation(myClanId) >= 70 && k.soldiers >= 1000) {
+                    // ★修正：敵対大名との友好度が100の時はダメ！という魔法です
+                    const enemyKunishuRel = k.getRelation(targetCastle.ownerClan);
+                    if (k.getRelation(myClanId) >= 70 && k.soldiers >= 1000 && enemyKunishuRel < 100) {
                         const isNextToMyAnyCastle = this.game.castles.some(myC => myC.ownerClan === myClanId && GameSystem.isAdjacent(c, myC));
                         const isNextToEnemy = GameSystem.isAdjacent(c, targetCastle);
                         if (isNextToMyAnyCastle || isNextToEnemy) {
