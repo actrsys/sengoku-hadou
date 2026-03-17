@@ -631,16 +631,14 @@ class UIManager {
     // ★ここから追加：大名家詳細画面を表示する魔法
     // ==========================================
     showDaimyoDetail(clanId) {
-        // ★修正：手前に被さっている「大名一覧」などの小窓を確実に閉じます！
-        this.closeResultModal();
-
+        // ★削除：「大名一覧」を消す魔法を取り除き、裏にそのまま残しておきます！
+        
         const clan = this.game.clans.find(c => c.id === clanId);
         if (!clan) return;
         
         const leader = this.game.getBusho(clan.leaderId);
         const leaderName = leader ? leader.name.replace('|', '') : "不明";
         
-        // 本拠地と官位を探します
         let baseCastleName = "不明";
         if (leader && leader.castleId) {
             const baseCastle = this.game.castles.find(c => c.id === leader.castleId);
@@ -654,18 +652,14 @@ class UIManager {
             highestRankName = this.game.courtRankSystem.getHighestRankName(leader);
         }
         
-        // ★追加：官位がない場合は「なし」という文字を消して、透明な文字（&nbsp;）を入れます。
-        // これにより、文字は見えなくなりますが、行の高さはそのままキープされます！
         if (!highestRankName || highestRankName === "なし") {
             highestRankName = "&nbsp;";
         }
 
-        // 数を数え、革新性を計算します
         const castlesCount = this.game.castles.filter(c => c.ownerClan === clanId).length;
         const bushosCount = this.game.bushos.filter(b => b.clan === clanId && b.status === 'active').length;
         const princessCount = clan.princessIds ? clan.princessIds.length : 0;
         
-        // ★変更：CSSに新しく作った「ダークグラデーションのバッジ」のクラスを割り当てます
         let ideology = "中道";
         let ideologyClass = "ideology-chudo"; 
         if (leader) {
@@ -683,7 +677,6 @@ class UIManager {
             faceSrc = `data/images/faceicons/${leader.faceIcon}`;
         }
 
-        // ★根本解決：大名家詳細専用の小窓（モーダル）を探して使います！
         const modal = document.getElementById('daimyo-detail-modal');
         const body = document.getElementById('daimyo-detail-body');
         const backBtn = document.getElementById('daimyo-detail-back-btn');
@@ -691,7 +684,6 @@ class UIManager {
 
         if (!modal || !body) return;
 
-        // 情報をHTMLにして流し込みます
         body.innerHTML = `
             <div class="daimyo-detail-container">
                 <div class="daimyo-detail-header">
@@ -722,27 +714,24 @@ class UIManager {
             </div>
         `;
 
-        // ボタンを押した時の行き先をセットします
         backBtn.onclick = () => {
             modal.classList.add('hidden');
-            this.showDaimyoList(); // 一覧に戻る
+            // ★変更：一覧を描き直すのをやめて、ただ小窓を閉じるだけにします！
         };
 
         diploBtn.onclick = () => {
             modal.classList.add('hidden');
-            this.showDiplomacyList(clan.id, clan.name); // 外交へ飛ぶ
+            this.showDiplomacyList(clan.id, clan.name);
         };
 
-        // 武将詳細と同じように、黒い背景を押した時にも閉じて一覧に戻るようにします
         modal.onclick = (e) => {
             if (e.target === modal) {
                 if (window.AudioManager) window.AudioManager.playSE('cancel.ogg');
                 modal.classList.add('hidden');
-                this.showDaimyoList();
+                // ★変更：ここも、ただ小窓を閉じるだけにします！
             }
         };
 
-        // 全ての準備が整ったら、専用の小窓を表示します！
         modal.classList.remove('hidden');
     }
 
@@ -976,8 +965,8 @@ class UIManager {
         });
         listHtml += '</div>';
         
-        // ★変更：戻るボタンの行き先を「大名一覧」から「大名家詳細」に変更します！
-        const customFooter = `<button class="btn-secondary" onclick="window.GameApp.ui.showDaimyoDetail(${clanId})">戻る</button>`;
+        // ★変更：外交から戻る時は、裏に「大名一覧」をこっそり準備してから「詳細画面」を開くようにします！
+        const customFooter = `<button class="btn-secondary" onclick="window.GameApp.ui.showDaimyoList(); setTimeout(() => { window.GameApp.ui.showDaimyoDetail(${clanId}); }, 10);">戻る</button>`;
         
         this.showResultModal(`<h3 style="margin-top:0; border-bottom: 2px solid #ddd; padding-bottom: 10px; flex-shrink:0;">${clanName} 外交関係</h3>${listHtml}`, () => {
             if (this.resultBody) {
