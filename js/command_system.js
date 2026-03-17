@@ -688,9 +688,14 @@ class CommandSystem {
             }
             
             case 'marriage_valid': {
-                // 1. まず、自分の大名家に嫁がせられる姫がいるかチェックします
+                // 1. まず、自分の大名家に嫁がせられる姫（未婚の姫）がいるかチェックします
                 const myClan = this.game.clans.find(c => c.id === playerClanId);
-                if (!myClan || !myClan.princessIds || myClan.princessIds.length === 0) return [];
+                const hasUnmarriedPrincess = myClan && myClan.princessIds && myClan.princessIds.some(pId => {
+                    const p = this.game.princesses.find(princess => princess.id === pId);
+                    return p && p.status === 'unmarried';
+                });
+                // 未婚の姫が一人もいなければ、選べる城は「ゼロ」にしておきます
+                if (!hasUnmarriedPrincess) return [];
 
                 // 2. 他の大名家の城を「フィルター（ふるい）」にかけて、条件に合うものだけを残します
                 return this.game.castles.filter(target => {
@@ -751,6 +756,20 @@ class CommandSystem {
             if (currentTrust < 500) {
                 this.game.ui.showDialog("朝廷に働きかけるための信用が足りないようです……", false);
                 return;
+            }
+        }
+
+        // ★追加：婚姻コマンドの時、我が家に嫁がせる姫がいるかチェックします！
+        if (type === 'marriage') {
+            const myClan = this.game.clans.find(c => c.id === this.game.playerClanId);
+            const hasUnmarriedPrincess = myClan && myClan.princessIds && myClan.princessIds.some(pId => {
+                const p = this.game.princesses.find(princess => princess.id === pId);
+                return p && p.status === 'unmarried';
+            });
+            
+            if (!hasUnmarriedPrincess) {
+                this.game.ui.showDialog("我が家には、他国へ嫁がせることができる未婚の姫がおりませぬ。", false);
+                return; // ここで「お帰りください」と処理を終わらせます
             }
         }
 
