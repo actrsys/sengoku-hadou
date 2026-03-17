@@ -706,9 +706,12 @@ class UIManager {
         // 小窓を表示する魔法を呼び出します
         this.showResultModal(contentHtml, null, customFooter);
 
-        // ★追加：スクロールしないように、はみ出した部分を隠してピタッと固定します
+        // ★追加：スクロールを絶対にさせないように、強力な魔法でピタッと固定します
         if (this.resultBody) {
-            this.resultBody.style.overflowY = 'hidden';
+            // important をつけて、他のルールを無理やり上書きします
+            this.resultBody.style.setProperty('overflow-y', 'hidden', 'important');
+            // 念のため、小窓の余計なすき間も消しておきます
+            this.resultBody.style.paddingBottom = '0'; 
         }
     }
 
