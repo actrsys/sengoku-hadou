@@ -686,7 +686,31 @@ class CommandSystem {
                     return isMyCastle || isNeighbor;
                 });
             }
+            
+            case 'marriage_valid':
+                // 1. まず、自分の大名家に嫁がせられる姫がいるかチェックします
+                const myClan = this.game.clans.find(c => c.id === this.game.playerClanId);
+                if (!myClan || !myClan.princessIds || myClan.princessIds.length === 0) return [];
 
+                // 2. 相手の大名家に「一門武将」がいるかチェックします
+                this.game.castles.forEach(c => {
+                    // 相手の大名家の城の時だけ調べます
+                    if (c.ownerClan !== 0 && c.ownerClan !== this.game.playerClanId) {
+                        const targetLeaderId = this.game.clans.find(clan => clan.id === c.ownerClan)?.leaderId;
+                        const targetLeader = this.game.getBusho(targetLeaderId);
+                        if (targetLeader) {
+                            // 相手の家の一門武将（大名と同じ血縁IDを持っている、活動中の人）を探します
+                            const kinsmen = this.game.bushos.filter(b => b.clan === c.ownerClan && b.status === 'active' && b.familyIds.some(id => targetLeader.familyIds.includes(id)));
+                            
+                            // 一門武将が1人でもいれば、そのお城は「選べる城」としてリストに入れます！
+                            if (kinsmen.length > 0) {
+                                validCastles.push(c);
+                            }
+                        }
+                    }
+                });
+                break;
+                
             default:
                 return [];
         }
@@ -2989,4 +3013,43 @@ class CommandSystem {
         this.game.ui.updatePanelHeader();
         this.game.ui.renderCommandMenu();
     }
+    
+    // ★新しく追加：婚姻が成立した時の、データ書き換え一斉処理です！
+    applyMarriageData(princessId, targetBushoId, targetClanId) {
+        const myClan = this.game.clans.find(c => c.id === this.game.playerClanId);
+        const princess = this.game.princesses.find(p => p.id === princessId);
+        const targetBusho = this.game.getBusho(targetBushoId);
+        
+        if (!princess || !targetBusho || !myClan) return;
+
+        // ① 姫のデータを「結婚済み」にして、相手の家と武将の元へ移します
+        princess.currentClanId = targetClanId;
+        princess.husbandId = targetBushoId;
+        princess.status = 'married';
+
+        // ② 自分の大名家の「保有している姫リスト」から、嫁がせた姫のIDを消しゴムで消します
+        myClan.princessIds = myClan.princessIds.filter(id => id !== princessId);
+
+        // ③ 相手の武将の「奥さんリスト」に姫を追加し、一門関係（血縁）を繋ぎ直します
+        if (!targetBusho.wifeIds.includes(princessId)) {
+            targetBusho.wifeIds.push(princessId);
+        }
+        targetBusho.updateFamilyIds(this.game.princesses);
+
+        // ④ 両家を「同盟」状態にして、特別な「結婚シール（isMarriage）」を貼ります！
+        this.game.diplomacyManager.changeStatus(this.game.playerClanId, targetClanId, '同盟');
+        
+        // 念のため、お互いの仲の良さ（感情値）も少し上げておきます
+        const relation = this.game.diplomacyManager.getDiplomacyData(this.game.playerClanId, targetClanId);
+        if (relation) {
+            relation.isMarriage = true;
+            relation.sentiment = Math.max(relation.sentiment, 70); 
+        }
+        const oppRelation = this.game.diplomacyManager.getDiplomacyData(targetClanId, this.game.playerClanId);
+        if (oppRelation) {
+            oppRelation.isMarriage = true;
+            oppRelation.sentiment = Math.max(oppRelation.sentiment, 70);
+        }
+    }
+    
 }
