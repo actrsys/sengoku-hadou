@@ -23,8 +23,28 @@ class Clan {
         // ★今回追加：朝廷からの信用を覚えておく箱です（上限は1000にします）
         this.courtTrust = Number(data.courtTrust || 0);
         
-        // ★今回追加：姫の数を覚えておく箱です（空欄なら0になります）
-        this.princess = Number(data.princess || 0);
+        // ★今回変更：姫のIDと名前をリスト（配列）で覚えておく箱です
+        this.princesses = [];
+        if (data.princesses && Array.isArray(data.princesses)) {
+            // セーブデータから読み込んだ時は、すでにリストになっているのでそのまま使います
+            this.princesses = data.princesses;
+        } else if (typeof data.princess === 'string' && data.princess.trim() !== "") {
+            // CSVから「1:帰蝶|2:お市」のように届いた文字をバラバラにして箱に入れます
+            const parts = data.princess.split('|');
+            parts.forEach(part => {
+                const items = part.split(':');
+                if (items.length >= 2) {
+                    const pId = Number(items[0].trim());
+                    const pName = items[1].trim();
+                    if (!isNaN(pId)) {
+                        // IDと名前をセットにして、リストに追加します！
+                        this.princesses.push({ id: pId, name: pName });
+                    }
+                }
+            });
+        }
+        
+        // 大名自身が持っていた官位の仕組みは、武将の機能にお引っ越ししたため削除しました！
         
         // CSVの initDiplomacy を翻訳して、外交の箱に入れます
         if (typeof data.initDiplomacy === 'string' && data.initDiplomacy.trim() !== "") {
@@ -189,24 +209,54 @@ class Busho {
         this.startYear = Number(data.startYear || 1500); // 登場年（空なら1500）
         this.nameChange = data.nameChange || ""; // 年:姓:名|年:姓:名... の形式の改名データ
         
-        // ★【ここから書き足し：一門設定】
-        if (data.familyIds && Array.isArray(data.familyIds)) {
-            // セーブデータから読み込んだ時はそのまま使います！
-            this.familyIds = data.familyIds;
+        // ★【ここから書き足し：奥さん（姫）の設定】
+        this.wives = [];
+        if (data.wives && Array.isArray(data.wives)) {
+            // セーブデータから読み込んだ場合はそのまま使います
+            this.wives = data.wives;
+        } else if (typeof data.wife === 'string' && data.wife.trim() !== "") {
+            // CSVから「大名家ID:姫ID:姫の名前:大名武将ID|...」で届いた文字をバラバラにして箱に入れます
+            const parts = data.wife.split('|');
+            parts.forEach(part => {
+                const items = part.split(':');
+                if (items.length >= 4) {
+                    const cId = Number(items[0].trim());
+                    const pId = Number(items[1].trim());
+                    const pName = items[2].trim();
+                    const dId = Number(items[3].trim());
+                    if (!isNaN(cId) && !isNaN(pId) && !isNaN(dId)) {
+                        // IDや名前をセットにして、奥さんリストに追加します！
+                        this.wives.push({ clanId: cId, princessId: pId, name: pName, daimyoId: dId });
+                    }
+                }
+            });
+        }
+
+        // ★【ここから書き足し：一門設定（修正版）】
+        // 婚姻で増えた分と区別するために、元々の「血の繋がった一門（baseFamilyIds）」を安全な金庫に保管します
+        if (data.baseFamilyIds && Array.isArray(data.baseFamilyIds)) {
+            // 新しいセーブデータから読み込んだ場合
+            this.baseFamilyIds = data.baseFamilyIds;
+        } else if (data.familyIds && Array.isArray(data.familyIds)) {
+            // 古いセーブデータからの移行用
+            this.baseFamilyIds = data.familyIds;
         } else if (typeof data.familyId === 'string' && data.familyId.trim() !== "") {
-            // familyId が「1|2|3」のように届くので、使いやすいようにバラバラのリスト（配列）にします
-            this.familyIds = data.familyId.split('|').map(id => Number(id.trim()));
+            // CSVから読み込んだ場合
+            this.baseFamilyIds = data.familyId.split('|').map(id => Number(id.trim()));
         } else if (Number(data.familyId) > 0) {
-            // もし数字が一つだけ入っていたら、それをリストに入れます
-            this.familyIds = [Number(data.familyId)];
+            this.baseFamilyIds = [Number(data.familyId)];
         } else {
-            // 何もなければ（0番なら）、勘違いしないように「空っぽ」のリストにします
-            this.familyIds = [];
+            this.baseFamilyIds = [];
         }
-        // ★追加：自分のIDも一門リストに入れておくことで、すれ違いを防ぎます！
-        if (!this.familyIds.includes(this.id)) {
-            this.familyIds.push(this.id);
+        
+        // 自分のIDも元の一門リストに入れておくことで、すれ違いを防ぎます！
+        if (!this.baseFamilyIds.includes(this.id)) {
+            this.baseFamilyIds.push(this.id);
         }
+
+        // 血縁リストと奥さんリストを合体させて、普段使う用の一門リスト（familyIds）を準備します
+        this.familyIds = [];
+        this.updateFamilyIds();
         
         // --- 忠誠・義理など（ここから下は既存の続き） ---
         this.loyalty = Number(this.loyalty || 0);
@@ -266,6 +316,20 @@ class Busho {
     getFactionName() {
         if (this.factionId === 0) return "中立";
         return "派閥" + this.factionId;
+    }
+
+    // ★新しく書き足す魔法の機能：奥さんが増えたり減ったりした時に、一門リストを作り直す機能です
+    updateFamilyIds() {
+        // まずは普段使う用のリストに、金庫（baseFamilyIds）の中身を丸写しします
+        this.familyIds = [...this.baseFamilyIds];
+        
+        // 次に、今いる奥さんたちの「元の大名武将ID」を順番に見ていきます
+        this.wives.forEach(wife => {
+            // もしリストにまだ入っていなければ、新しく追加します！
+            if (!this.familyIds.includes(wife.daimyoId)) {
+                this.familyIds.push(wife.daimyoId);
+            }
+        });
     }
 }
 
