@@ -328,10 +328,12 @@ body.hide-daimyo-labels .daimyo-name-label { display: none !important; }
 
 .daimyo-detail-header {
     display: flex;
-    align-items: center; /* ★baselineからcenterに変更し、大名家名と縦の中央で揃えました */
+    align-items: center; 
     gap: 15px; 
-    /* ★ここにあった border-bottom と padding を消して、二重線を解消しました */
     margin-bottom: 15px; 
+    /* ★追加：古い「border-bottom」がどこかに残っていても、強制的に線を消し去る魔法です！ */
+    border-bottom: none !important;
+    padding-bottom: 0 !important;
 }
 
 .daimyo-detail-name {
@@ -342,10 +344,32 @@ body.hide-daimyo-labels .daimyo-name-label { display: none !important; }
 .daimyo-detail-ideology {
     font-size: 0.95rem;
     font-weight: bold;
-    color: #ffffff; /* ★文字色を白にします */
-    padding: 3px 10px; /* ★内側にすき間を作って、四角いバッジの形にします */
-    border-radius: 4px; /* ★角を少し丸くします */
-    box-shadow: 1px 1px 3px rgba(0,0,0,0.3); /* ★少し影をつけて立体感を出します */
+    color: #ffffff; 
+    padding: 4px 12px; 
+    border-radius: 4px; 
+    box-shadow: 2px 2px 4px rgba(0,0,0,0.4); /* 影を少し濃くして立体感アップ */
+    text-shadow: 1px 1px 2px #000000; /* 白文字が映えるように黒いフチドリをつけます */
+    letter-spacing: 1px; /* 文字の間隔を少し開けて重厚感を演出 */
+}
+
+/* ★ここから追加：それぞれの革新性専用の「ダークグラデーション」デザイン */
+.ideology-kakushin {
+    /* 中央がダークグレー、外側が深いピンクのグラデーション */
+    background: radial-gradient(ellipse at center, #444444 0%, #880e4f 100%);
+    border: 1px solid #4a0024; /* さらに濃い色の枠線 */
+}
+
+.ideology-hoshu {
+    /* 中央がダークグレー、外側が深い青のグラデーション */
+    background: radial-gradient(ellipse at center, #444444 0%, #0d47a1 100%);
+    border: 1px solid #002171;
+}
+
+.ideology-chudo {
+    /* 中央がダークグレー、外側が深い緑のグラデーション */
+    background: radial-gradient(ellipse at center, #444444 0%, #1b5e20 100%);
+    border: 1px solid #003300;
+}
 }
 
 .daimyo-detail-body {
