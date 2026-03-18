@@ -1005,11 +1005,11 @@ class UIManager {
         const backBtn = document.getElementById('daimyo-confirm-back-btn');
         if (backBtn) {
             backBtn.style.display = '';
-            backBtn.textContent = "やめる";
+            backBtn.textContent = "戻る";
             backBtn.onclick = () => {
                 this.selectedDaimyoId = null; 
                 this.updateCastleGlows();     
-                // ★追加：「やめる」を押したら隠す合図を解除して、名前シールを復活させます
+                // ★追加：「戻る」を押したら隠す合図を解除して、名前シールを復活させます
                 document.body.classList.remove('hide-daimyo-labels'); 
                 this.renderMap(); 
             };
@@ -1248,7 +1248,7 @@ class UIManager {
 
                     this.showDialog(confirmMessage, true,
                         () => {
-                            // 「やめる」時はフラグを折って、記憶を復元してから安全にキャンセル処理へ向かいます
+                            // 「戻る」時はフラグを折って、記憶を復元してから安全にキャンセル処理へ向かいます
                             this._activeReinforcementFlag = false;
                             this.game.selectionMode = capturedMode || this.game.selectionMode;
                             this.game.tempReinfData = currentData;
