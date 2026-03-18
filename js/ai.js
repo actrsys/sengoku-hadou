@@ -134,7 +134,36 @@ class AIEngine {
                         castle.morale = avgMorale;
                         bestCastle.morale = avgMorale;
 
-                        // 荷物を運んだら、最後にお殿様（大名）自身が引っ越します！
+                        // ★大名のお引越しに合わせて、お供の武将たちも一緒に移動させます！
+                        const castleBushos = this.game.getCastleBushos(castle.id).filter(b => b.status !== 'ronin' && b.id !== castellan.id);
+                        
+                        // 元の城に残す人数の目安（最低3人、または全体の約4割）
+                        const keepCount = Math.max(3, Math.ceil(castleBushos.length * 0.4));
+                        
+                        // 武将を「元の城に残るべき順（留守番適性）」で並べ替えます
+                        castleBushos.sort((a, b) => {
+                            // 大名と同じ派閥の人は、一緒について行きたいので留守番適性を大幅に下げます
+                            const aFactionScore = (a.factionId === castellan.factionId && a.factionId !== 0) ? -200 : 0;
+                            const bFactionScore = (b.factionId === castellan.factionId && b.factionId !== 0) ? -200 : 0;
+                            
+                            // 留守を任せるので、統率と武力（防衛力）が高い人を高く評価します
+                            const aScore = a.leadership + a.strength + aFactionScore;
+                            const bScore = b.leadership + b.strength + bFactionScore;
+                            
+                            return bScore - aScore; // 点数が高い（留守番向き）順
+                        });
+
+                        // 留守番リストから外れた（引越し組の）武将たちを移動させます
+                        const movers = castleBushos.slice(keepCount);
+                        movers.forEach(mover => {
+                            if (this.game.factionSystem && this.game.factionSystem.handleMove) {
+                                this.game.factionSystem.handleMove(mover, castle.id, bestCastle.id);
+                            }
+                            this.game.affiliationSystem.moveCastle(mover, bestCastle.id);
+                            mover.isActionDone = true; // ついでに行動済にしておきます
+                        });
+
+                        // 荷物と武将を運んだら、最後にお殿様（大名）自身が引っ越します！
                         if (this.game.factionSystem && this.game.factionSystem.handleMove) {
                             this.game.factionSystem.handleMove(castellan, castle.id, bestCastle.id);
                         }
