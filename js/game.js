@@ -935,111 +935,17 @@ class GameManager {
     }
     // ==========================================
 
+    // ★城主を決める仕事は、すべて人事部（affiliationSystem）に転送します！
     updateCastleLord(castle) {
-        if (!castle || castle.ownerClan === 0) {
-            if (castle) castle.castellanId = 0;
-            return;
-        }
-
-        const bushos = this.getCastleBushos(castle.id).filter(b => b.status !== 'ronin' && b.status !== 'dead' && b.status !== 'unborn');
-        if (bushos.length === 0) {
-            castle.castellanId = 0;
-            return;
-        }
-
-        const daimyo = bushos.find(b => b.isDaimyo);
-        if (daimyo) {
-            bushos.forEach(b => { 
-                b.isCastellan = false; 
-            });
-            daimyo.isCastellan = true; 
-            castle.castellanId = daimyo.id;
-            
-            // ★ここに移動しました！：大名が城主になった（＝この城にいる）なら、問答無用で直轄に戻します！
-            castle.isDelegated = false;
-            
-            return;
-        }
-
-        let currentLord = bushos.find(b => b.id === castle.castellanId && b.isCastellan);
-        
-        if (!currentLord) {
-            this.electCastellan(castle, bushos);
-        }
+        this.affiliationSystem.updateCastleLord(castle);
     }
     
     electCastellan(castle, bushos) {
-        // ==========================================
-        // ★委任城の城主を勝手に変えない魔法です！
-        // もし自分の大名家のお城で、委任されているなら…
-        if (castle.ownerClan === this.playerClanId && castle.isDelegated) {
-            // 前回の城主がまだこのお城にいるか探します
-            const currentLord = bushos.find(b => b.id === castle.castellanId);
-            if (currentLord) {
-                // まだいるなら、他の人の城主マークを外して、元の城主にマークを付け直します！
-                bushos.forEach(b => b.isCastellan = false);
-                currentLord.isCastellan = true;
-                return; // ここで処理を終わらせて、新しい城主を選ばないようにします！
-            }
-        }
-        
-        // ★新しく追加：お殿様（大名）を探して、新しいもの好きか（革新性）を調べます！
-        const daimyo = this.bushos.find(b => b.clan === castle.ownerClan && b.isDaimyo);
-        const innovation = daimyo ? daimyo.innovation : 50; // お殿様が見つからなければ普通の「50」にします
-
-        // ★新しく追加：お殿様の性格に合わせて、能力と功績の「重視する割合（係数）」を計算します！
-        const abilityFactor = innovation / 100;
-        const meritFactor = (100 - innovation) / 100;
-
-        bushos.forEach(b => {
-            // ① 能力の点数（スコア）を細かく計算します！
-            const leadScore = Math.min(b.leadership, 80) * 0.8 + Math.max(b.leadership - 80, 0) * 0.8 * 0.3;
-            const strScore = Math.min(b.strength, 50) * 0.5 + Math.max(b.strength - 50, 0) * 0.5 * 0.3;
-            const polScore = Math.min(b.politics, 80) * 0.8 + Math.max(b.politics - 80, 0) * 0.8 * 0.3;
-            const dipScore = Math.min(b.diplomacy, 60) * 0.6 + Math.max(b.diplomacy - 60, 0) * 0.6 * 0.3;
-            const intScore = Math.min(b.intelligence, 60) * 0.6 + Math.max(b.intelligence - 60, 0) * 0.6 * 0.3;
-            const charmScore = Math.min(b.charm, 70) * 0.8 + Math.max(b.charm - 70, 0) * 0.8 * 0.3;
-            
-            // 全部足して「能力スコア」にします
-            const abilityScore = leadScore + strScore + polScore + dipScore + intScore + charmScore;
-            
-            // ② これまでの頑張り（功績）の点数を計算します！
-            // Math.sqrt というのは、数字の「ルート（平方根）」を計算する魔法です
-            const meritScore = Math.sqrt((b.achievementTotal || 0) * 64);
-            
-            // ③ お殿様の好みに合わせて、最終的な城主の点数（_lordScore）を決めます！
-            b._lordScore = (abilityScore * abilityFactor) + (meritScore * meritFactor);
-
-            // ★ここをさらに追加！：元々城主だった人には「80〜120点」のボーナスをあげます！
-            if (b.isCastellan) {
-                b._lordScore += Math.floor(Math.random() * 41) + 80;
-            }
-
-            if (b.isFactionLeader) {
-                b._lordScore += 10000; 
-            }
-            // ★ここを追加：軍師の点数をものすごく下げて一番後回しにします！
-            if (b.isGunshi) {
-                b._lordScore -= 100000; 
-            }
-        });
-
-        bushos.sort((a, b) => b._lordScore - a._lordScore);
-        const best = bushos[0];
-
-        bushos.forEach(b => b.isCastellan = false);
-        best.isCastellan = true;
-        
-        // ★ここを追加：もし他に誰もいなくて、仕方なく軍師が城主になったら、軍師はクビ（解任）にします
-        if (best.isGunshi) {
-            best.isGunshi = false;
-        }
-        
-        castle.castellanId = best.id;
+        this.affiliationSystem.electCastellan(castle, bushos);
     }
 
     updateAllCastlesLords() {
-        this.castles.forEach(c => this.updateCastleLord(c));
+        this.affiliationSystem.updateAllCastlesLords();
     }
 
     async startMonth() { 
