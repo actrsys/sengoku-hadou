@@ -154,6 +154,23 @@ class KunishuSystem {
                 kunishu.guns = Math.min(kunishu.maxGuns, kunishu.guns + Math.floor(kunishu.maxGuns * 0.05));
             }
 
+            // ★今回追加: 訓練度と士気の自然変動（毎月1ずつデフォルト値に近づく）
+            if (kunishu.training < kunishu.defaultTraining) {
+                kunishu.training += 1;
+            } else if (kunishu.training > kunishu.defaultTraining) {
+                kunishu.training -= 1;
+            }
+
+            if (kunishu.morale < kunishu.defaultMorale) {
+                kunishu.morale += 1;
+            } else if (kunishu.morale > kunishu.defaultMorale) {
+                kunishu.morale -= 1;
+            }
+            
+            // 安全のため、0未満や100を超えないようにガードします
+            kunishu.training = Math.max(0, Math.min(100, kunishu.training));
+            kunishu.morale = Math.max(0, Math.min(100, kunishu.morale));
+
             // 組織の壊滅チェック
             this.checkDestroyed(kunishu);
         });
@@ -416,8 +433,8 @@ class KunishuSystem {
             soldiers: atkSoldiers,
             horses: atkHorses, // ★追加
             guns: atkGuns,     // ★追加
-            training: 50,
-            morale: 80,
+            training: kunishu.training, // ★修正：諸勢力の訓練度を使う
+            morale: kunishu.morale,     // ★修正：諸勢力の士気を使う
             rice: atkRice,
             maxRice: atkRice,
             isKunishu: true,
@@ -636,8 +653,8 @@ class KunishuSystem {
             soldiers: kunishu.soldiers,
             defense: kunishu.defense,
             maxDefense: kunishu.maxDefense,
-            training: 50,
-            morale: 80,
+            training: kunishu.training, // ★修正：諸勢力の訓練度を使う
+            morale: kunishu.morale,     // ★修正：諸勢力の士気を使う
             rice: Math.floor(kunishu.soldiers * 1.5), 
             isKunishu: true,
             kunishuId: kunishu.id,

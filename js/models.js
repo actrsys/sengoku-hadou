@@ -357,6 +357,13 @@ class Kunishu {
         
         this.maxGuns = Number(this.maxGuns || 100);
         this.guns = Number(this.guns !== undefined ? this.guns : this.maxGuns);
+
+        // ★今回追加：訓練度（training）と士気（morale）のステータス
+        this.defaultTraining = Number(data.defaultTraining !== undefined ? data.defaultTraining : (data.training !== undefined ? data.training : 50));
+        this.training = Number(this.training !== undefined ? this.training : this.defaultTraining);
+
+        this.defaultMorale = Number(data.defaultMorale !== undefined ? data.defaultMorale : (data.morale !== undefined ? data.morale : 50));
+        this.morale = Number(this.morale !== undefined ? this.morale : this.defaultMorale);
         
         this.ideology = this.ideology || '地縁';
         
