@@ -806,7 +806,8 @@ class UIManager {
             if (customFooterHtml !== null) {
                 footer.innerHTML = customFooterHtml;
             } else {
-                footer.innerHTML = `<button class="btn-primary" onclick="window.GameApp.ui.closeResultModal()">閉じる</button>`;
+                // ★変更：青色（btn-primary）からグレー（btn-secondary）に変更します！
+                footer.innerHTML = `<button class="btn-secondary" onclick="window.GameApp.ui.closeResultModal()">閉じる</button>`;
             }
         }
         if (this.resultModal) this.resultModal.classList.remove('hidden'); 
@@ -821,7 +822,8 @@ class UIManager {
         // 小窓を閉じる時に、必ず「いつもの閉じるボタン」に戻しておきます！
         const footer = document.getElementById('result-footer');
         if (footer) {
-            footer.innerHTML = `<button class="btn-primary" onclick="window.GameApp.ui.closeResultModal()">閉じる</button>`;
+            // ★変更：青色（btn-primary）からグレー（btn-secondary）に変更します！
+            footer.innerHTML = `<button class="btn-secondary" onclick="window.GameApp.ui.closeResultModal()">閉じる</button>`;
         }
         // ★書き足すのはここまで！
         
@@ -1444,12 +1446,25 @@ class UIManager {
         if (this.selectorModal) this.selectorModal.classList.remove('hidden'); 
         if (document.getElementById('selector-title')) document.getElementById('selector-title').textContent = "武将を選択"; 
         
+        const isViewMode = (actionType === 'view_only' || actionType === 'all_busho_list');
+
         const backBtn = document.querySelector('#selector-modal .btn-secondary');
         if(backBtn) {
+            const footer = backBtn.parentElement; // ★追加：ボタンが入っているフッターの箱を取得します
             if (extraData && extraData.hideCancel) {
                 backBtn.style.display = 'none';
             } else {
                 backBtn.style.display = ''; 
+                
+                // ★追加：見るだけの時は「閉じる」にして真ん中に、選ぶ時は「戻る」にして右下に寄せます
+                if (isViewMode) {
+                    backBtn.textContent = '閉じる';
+                    if (footer) footer.style.justifyContent = 'center';
+                } else {
+                    backBtn.textContent = '戻る';
+                    if (footer) footer.style.justifyContent = 'flex-end';
+                }
+
                 backBtn.onclick = () => {
                     this.closeSelector();
                     if (onBack) {
@@ -1461,7 +1476,6 @@ class UIManager {
             }
         }
 
-        const isViewMode = (actionType === 'view_only' || actionType === 'all_busho_list');
         if (this.selectorList) {
             this.selectorList.innerHTML = `
                 <div class="list-header">
