@@ -213,7 +213,7 @@ class UIInfoManager {
         });
         listHtml += '</div>';
         
-        const customFooter = `<button class="btn-secondary" onclick="window.GameApp.ui.showDaimyoList(); setTimeout(() => { if(window.GameApp.ui.resultBody) window.GameApp.ui.resultBody.scrollTop = window.GameApp.ui.savedDaimyoScroll || 0; window.GameApp.ui.showDaimyoDetail(${clanId}); }, 10);">戻る</button>`;
+        const customFooter = `<button class="btn-secondary" onclick="window.GameApp.ui.showDaimyoList(); setTimeout(() => { if(window.GameApp.ui.resultBody) window.GameApp.ui.resultBody.scrollTop = window.GameApp.ui.savedDaimyoScroll || 0; window.GameApp.ui.showDaimyoDetail(${clanId}); }, 10);">閉じる</button>`;
         
         this.ui.showResultModal(`<h3 style="margin-top:0; border-bottom: 2px solid #ddd; padding-bottom: 10px; flex-shrink:0;">${clanName} 外交関係</h3>${listHtml}`, () => {
             if (this.ui.resultBody) {
@@ -301,9 +301,9 @@ class UIInfoManager {
 
         let customFooter = "";
         if (isDirect) {
-            customFooter = `<button class="btn-primary" onclick="window.GameApp.ui.closeResultModal()">閉じる</button>`;
+            customFooter = `<button class="btn-secondary" onclick="window.GameApp.ui.closeResultModal()">閉じる</button>`;
         } else {
-            customFooter = `<button class="btn-secondary" onclick="window.GameApp.ui.showDaimyoList()">戻る</button>`;
+            customFooter = `<button class="btn-secondary" onclick="window.GameApp.ui.showDaimyoList()">閉じる</button>`;
         }
         
         this.ui.showResultModal(`<h3 style="margin-top:0; border-bottom: 2px solid #ddd; padding-bottom: 10px; flex-shrink:0;">${clan.name} 派閥一覧</h3>${listHtml}`, () => {
@@ -653,12 +653,12 @@ class UIInfoManager {
        // 戻るボタンや決定ボタンの動きを作ります
         if (!isSelectMode) {
             // 見るだけの時は普通に閉じるだけ
-            customFooter = `<button class="btn-primary" onclick="window.GameApp.ui.closeResultModal()">閉じる</button>`;
+            customFooter = `<button class="btn-secondary" onclick="window.GameApp.ui.closeResultModal()">閉じる</button>`;
         } else {
             // ★変更：「決定」→「戻る」の順番に戻して、右下にピシッと寄せます！
             this.selectedPrincessId = null;
             customFooter = `
-                <div style="display: flex; gap: 10px; margin-left: auto;">
+                <div style="display: flex; gap: 10px; justify-content: flex-end; width: 100%;">
                     <button id="princess-confirm-btn" class="btn-primary" disabled style="opacity: 0.5; cursor: not-allowed;" onclick="window.GameApp.ui.info.confirmPrincessSelection(${targetCastleId}, ${doerId})">決定</button>
                     <button class="btn-secondary" onclick="window.GameApp.ui.openBushoSelector('diplomacy_doer', ${targetCastleId}, { subAction: 'marriage' }); window.GameApp.ui.closeResultModal();">戻る</button>
                 </div>
