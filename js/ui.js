@@ -454,11 +454,21 @@ class UIManager {
 
         okBtn.onclick = () => { okBtn.onclick = null; cleanupAndNext(dialog.onOk); };
 
+        const footer = okBtn.parentElement; // ★追加：ボタンが入っているフッターの箱を取得します
+
         if (dialog.isConfirm) {
             cancelBtn.classList.remove('hidden'); 
             cancelBtn.onclick = () => { cancelBtn.onclick = null; cleanupAndNext(dialog.onCancel); };
+            // ★追加：ボタンが２個の時の設定（右下に寄せる）
+            okBtn.textContent = '了承';
+            okBtn.className = 'btn-primary';
+            footer.style.justifyContent = 'flex-end';
         } else {
             cancelBtn.classList.add('hidden'); 
+            // ★追加：ボタンが１個の時の設定（真ん中に寄せて、色形を「戻る」に揃える）
+            okBtn.textContent = '閉じる';
+            okBtn.className = 'btn-secondary';
+            footer.style.justifyContent = 'center';
         }
 
         modal.classList.remove('hidden');
