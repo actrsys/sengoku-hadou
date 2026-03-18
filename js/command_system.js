@@ -439,18 +439,20 @@ class CommandSystem {
             isMulti = false;
         }
         else if (actionType === 'marriage_kinsman') {
-            const targetClanId = this.game.getCastle(targetId).ownerClan;
-            const targetLeaderId = this.game.clans.find(c => c.id === targetClanId)?.leaderId;
-            const targetLeader = this.game.getBusho(targetLeaderId);
-            
-            bushos = this.game.bushos.filter(b => 
-                b.clan === targetClanId && 
-                b.status === 'active' && 
-                b.familyIds.some(id => targetLeader.familyIds.includes(id))
-            );
-            infoHtml = "<div>姫を嫁がせる相手（一門武将）を選択してください</div>";
-            isMulti = false;
-        }
+            const targetClanId = this.game.getCastle(targetId).ownerClan;
+            const targetLeaderId = this.game.clans.find(c => c.id === targetClanId)?.leaderId;
+            const targetLeader = this.game.getBusho(targetLeaderId);
+            
+            bushos = this.game.bushos.filter(b => {
+                if (b.clan !== targetClanId || b.status !== 'active') return false;
+                // 大名本人か、直接の血縁（お互いのリストに直接IDが含まれている）かをチェックします
+                const bFamily = Array.isArray(b.familyIds) ? b.familyIds : [];
+                const lFamily = Array.isArray(targetLeader.familyIds) ? targetLeader.familyIds : [];
+                return b.id === targetLeader.id || bFamily.includes(targetLeader.id) || lFamily.includes(b.id);
+            });
+            infoHtml = "<div>姫を嫁がせる相手（一門武将）を選択してください</div>";
+            isMulti = false;
+        }
         else if (actionType === 'war_general' || actionType === 'kunishu_war_general') {
             if (extraData && extraData.candidates) {
                 bushos = extraData.candidates.map(id => this.game.getBusho(id));
@@ -728,7 +730,12 @@ class CommandSystem {
                     const targetLeader = this.game.getBusho(targetLeaderId);
                     if (targetLeader) {
                         // 相手の家の一門武将を探します
-                        const kinsmen = this.game.bushos.filter(b => b.clan === target.ownerClan && b.status === 'active' && b.familyIds.some(id => targetLeader.familyIds.includes(id)));
+                        const kinsmen = this.game.bushos.filter(b => {
+                            if (b.clan !== target.ownerClan || b.status !== 'active') return false;
+                            const bFamily = Array.isArray(b.familyIds) ? b.familyIds : [];
+                            const lFamily = Array.isArray(targetLeader.familyIds) ? targetLeader.familyIds : [];
+                            return b.id === targetLeader.id || bFamily.includes(targetLeader.id) || lFamily.includes(b.id);
+                        });
                         if (kinsmen.length > 0) return true; // 一門武将がいればOK（光らせる）！
                     }
                     return false;
