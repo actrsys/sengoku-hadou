@@ -720,6 +720,10 @@ class CommandSystem {
                 return this.game.castles.filter(target => {
                     if (target.ownerClan === 0 || Number(target.ownerClan) === playerClanId) return false;
                     
+                    // ★追加：その大名家の「大名（当主）」を探して、その人がいる城（居城）だけをOKにします！
+                    const daimyo = this.game.bushos.find(b => b.clan === target.ownerClan && b.isDaimyo);
+                    if (!daimyo || Number(daimyo.castleId) !== Number(target.id)) return false;
+
                     const targetLeaderId = this.game.clans.find(clan => clan.id === target.ownerClan)?.leaderId;
                     const targetLeader = this.game.getBusho(targetLeaderId);
                     if (targetLeader) {
@@ -1824,13 +1828,12 @@ class CommandSystem {
             case 'kunishu_goodwill': return "親善を行う諸勢力がいる城を選択してください";
             case 'kunishu_incorporate': return "取込を行う諸勢力がいる城を選択してください";
             case 'break_alliance': return "同盟破棄する相手を選択してください";
-            case 'court_truce': return "和睦を行う相手を選択してください"; // ★これを追加！
-            // ★ここから下を追加！
+            case 'court_truce': return "和睦を行う相手を選択してください";
+            case 'marriage': return "婚姻同盟を行う相手を選択してください";
             case 'atk_self_reinforcement': return "援軍を出陣させる城を選択してください";
             case 'atk_ally_reinforcement': return "援軍を要請する城を選択してください";
             case 'def_self_reinforcement': return "援軍を出陣させる城を選択してください";
             case 'def_ally_reinforcement': return "援軍を要請する城を選択してください";
-            // ★追加ここまで
             default: return "対象を選択してください";
         }
     }
