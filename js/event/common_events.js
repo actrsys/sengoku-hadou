@@ -14,16 +14,14 @@ window.GameEvents.push({
     checkCondition: function(game) {
         const dice = Math.random();
         if (game.month === 8 && dice < 0.10) return true;
-        if (game.month === 9 && dice < 0.30) return true;
+        if (game.month === 9 && dice < 1.00) return true;
         if (game.month === 10 && dice < 0.03) return true;
         if (game.month === 11 && dice < 0.01) return true;
         return false;
     },
     
     execute: async function(game) {
-        // 【デバッグ用】F12キーを押すと見える「秘密のメモ」を残します！
         console.log("=== 台風イベント開始 ===");
-        console.log("読み込んでいる地方（provinces）の数:", game.provinces.length);
 
         // 【1】「台風が接近しています」メッセージを表示
         await game.ui.showDialogAsync("【台風接近】\n台風が接近しています……。", false, 0);
@@ -38,29 +36,17 @@ window.GameEvents.push({
         const baseScale = Math.floor(Math.random() * 5) + Math.floor(Math.random() * 6) + 1;
 
         game.provinces.forEach(province => {
-            // 【デバッグ用】それぞれの地方の確率が正しく読み込めているかチェック！
-            console.log(`チェック：${province.province} の台風確率 =`, province.typhoon);
-            
             if (!province.typhoon) return; 
 
             if (Math.random() < province.typhoon) {
                 const shift = Math.floor(Math.random() * 3) - 1;
                 let finalScale = Math.max(1, Math.min(10, baseScale + shift));
                 damagedProvinceMap.set(province.id, finalScale);
-                
-                // 【デバッグ用】直撃した地方をメモします
                 console.log(`💥 ${province.province} に規模 ${finalScale} の台風が直撃！`);
             }
         });
 
-        console.log("青く光る予定の地方IDリスト:", Array.from(damagedProvinceMap.keys()));
-
         game.castles.forEach(castle => {
-            // 【デバッグ用】プレイヤーの城の provinceId が正しく読み込めているかチェック！
-            if (castle.ownerClan === game.playerClanId) {
-                console.log(`チェック：お城「${castle.name}」の provinceId =`, castle.provinceId);
-            }
-
             if (damagedProvinceMap.has(castle.provinceId)) {
                 const finalScale = damagedProvinceMap.get(castle.provinceId);
                 const dropPercent = finalScale * 0.03;
@@ -120,67 +106,75 @@ window.GameEvents.push({
             }
         });
 
-        // 【5】被害を受けた地方を青く塗る魔法のキャンバスを重ねます
-        if (damagedProvinceMap.size > 0 && window.DataManager && DataManager.provinceImageData) {
-            const canvas = document.createElement('canvas');
-            canvas.width = DataManager.mapImageWidth || whiteMapImg.naturalWidth;
-            canvas.height = DataManager.mapImageHeight || whiteMapImg.naturalHeight;
-            canvas.style.position = 'absolute';
-            canvas.style.top = '0';
-            canvas.style.left = '0';
-            canvas.style.width = '100%';
-            canvas.style.height = '100%';
-            canvas.style.pointerEvents = 'none';
+        // 【5】被害が出ているかチェック（ここでメッセージと地図の処理を完全に分けました！）
+        if (damagedProvinceMap.size > 0) {
             
-            canvas.style.animation = 'blink 1s infinite';
+            // ★地図を青く光らせる魔法（データがある時だけ動きます）
+            if (typeof DataManager !== 'undefined' && DataManager.provinceImageData) {
+                const canvas = document.createElement('canvas');
+                canvas.width = DataManager.mapImageWidth || whiteMapImg.naturalWidth;
+                canvas.height = DataManager.mapImageHeight || whiteMapImg.naturalHeight;
+                canvas.style.position = 'absolute';
+                canvas.style.top = '0';
+                canvas.style.left = '0';
+                canvas.style.width = '100%';
+                canvas.style.height = '100%';
+                canvas.style.pointerEvents = 'none';
+                
+                canvas.style.animation = 'blink 1s infinite';
 
-            const ctx = canvas.getContext('2d');
-            const targetColors = [];
-            
-            damagedProvinceMap.forEach((scale, pId) => {
-                const pData = game.provinces.find(p => p.id === pId);
-                if (pData && pData.color_code) {
-                    const rgb = DataManager.hexToRgb(pData.color_code);
-                    if (rgb) targetColors.push(rgb);
-                }
-            });
+                const ctx = canvas.getContext('2d');
+                const targetColors = [];
+                
+                damagedProvinceMap.forEach((scale, pId) => {
+                    const pData = game.provinces.find(p => p.id === pId);
+                    if (pData && pData.color_code) {
+                        const rgb = DataManager.hexToRgb(pData.color_code);
+                        if (rgb) targetColors.push(rgb);
+                    }
+                });
 
-            if (targetColors.length > 0) {
-                const srcData = DataManager.provinceImageData.data;
-                const newImgData = ctx.createImageData(canvas.width, canvas.height);
-                const dstData = newImgData.data;
+                if (targetColors.length > 0) {
+                    const srcData = DataManager.provinceImageData.data;
+                    const newImgData = ctx.createImageData(canvas.width, canvas.height);
+                    const dstData = newImgData.data;
 
-                for (let i = 0; i < srcData.length; i += 4) {
-                    const r = srcData[i], g = srcData[i+1], b = srcData[i+2], a = srcData[i+3];
-                    if (a > 0) {
-                        let isTarget = false;
-                        for (let c of targetColors) {
-                            if (Math.abs(r - c.r) < 5 && Math.abs(g - c.g) < 5 && Math.abs(b - c.b) < 5) {
-                                isTarget = true;
-                                break;
+                    for (let i = 0; i < srcData.length; i += 4) {
+                        const r = srcData[i], g = srcData[i+1], b = srcData[i+2], a = srcData[i+3];
+                        if (a > 0) {
+                            let isTarget = false;
+                            for (let c of targetColors) {
+                                if (Math.abs(r - c.r) < 5 && Math.abs(g - c.g) < 5 && Math.abs(b - c.b) < 5) {
+                                    isTarget = true;
+                                    break;
+                                }
+                            }
+                            if (isTarget) {
+                                dstData[i] = 0;
+                                dstData[i+1] = 0;
+                                dstData[i+2] = 255;
+                                dstData[i+3] = 180;
                             }
                         }
-                        if (isTarget) {
-                            dstData[i] = 0;
-                            dstData[i+1] = 0;
-                            dstData[i+2] = 255;
-                            dstData[i+3] = 180;
-                        }
                     }
+                    ctx.putImageData(newImgData, 0, 0);
                 }
-                ctx.putImageData(newImgData, 0, 0);
+                mapContainer.appendChild(canvas);
+
+                await new Promise(resolve => setTimeout(resolve, 2000));
+
+                canvas.style.animation = 'none';
+                canvas.style.opacity = '0.8';
+            } else {
+                // 地図の色データが見つからなかった時は、フリーズしないようにこっそりメモを残します
+                console.warn("地方マップの画像データがないため、青く光る演出をスキップしました。");
             }
-            mapContainer.appendChild(canvas);
 
-            await new Promise(resolve => setTimeout(resolve, 2000));
-
-            canvas.style.animation = 'none';
-            canvas.style.opacity = '0.8';
-
-            // 【6】ここでメッセージを表示します
+            // 【6】ここで被害発生メッセージを表示します
             await game.ui.showDialogAsync("【台風発生】\n各地で被害が発生しているようです……。", false, 0);
 
         } else {
+            // 被害が0件だった時のメッセージです
             await game.ui.showDialogAsync("【台風通過】\n幸い、今回は大きな被害はなかったようです。", false, 0);
         }
 
