@@ -86,6 +86,7 @@ class Castle {
         this.castellanId = Number(this.castellanId);
         this.x = Number(this.x);
         this.y = Number(this.y);
+        this.provinceId = Number(this.provinceId || 0); // ★ここを追加！地方の出席番号を覚えるスペースです
         if (data.adjacentCastleIds && Array.isArray(data.adjacentCastleIds)) {
             // セーブデータから読み込んだ時はそのまま使います
             this.adjacentCastleIds = data.adjacentCastleIds;
@@ -469,5 +470,15 @@ class CourtRank {
         this.rankNo = Number(this.rankNo);
         this.necessaryPrestige = Number(this.necessaryPrestige);
         this.gainPrestige = Number(this.gainPrestige);
+    }
+}
+
+// ★新しく追加：地方（Province）クラス
+class Province {
+    constructor(data) {
+        Object.assign(this, data);
+        this.id = Number(this.id);
+        // region（地方名）、province（国名）、color_code（色）は、
+        // そのまま文字として自動で箱に入ります！
     }
 }

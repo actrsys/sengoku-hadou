@@ -59,13 +59,14 @@ class DataManager {
                 } catch (e) { console.warn("汎用武将名ファイルなし"); }
             }
             // ★今回追加：princess.csv も一緒に読み込むようにリストに加えます！
-            const [clansText, castlesText, bushosText, kunishusText, courtRanksText, princessesText] = await Promise.all([                
+            const [clansText, castlesText, bushosText, kunishusText, courtRanksText, princessesText, provincesText] = await Promise.all([                
                 this.fetchText(path + "clans.csv"),                
                 this.fetchText(path + "castles.csv"),                
                 this.fetchText(path + "warriors.csv"),
                 this.fetchText(path + "kunishuClan.csv").catch(() => ""),
                 this.fetchText("./data/imperialCourtRank.csv").catch(() => ""),
-                this.fetchText(path + "princess.csv").catch(() => "") // 姫データがないシナリオでもエラーにならないように守ります
+                this.fetchText(path + "princess.csv").catch(() => ""), // 姫データがないシナリオでもエラーにならないように守ります
+                this.fetchText("./data/provinces_map.csv").catch(() => "") // ★今回追加：地方のデータを読み込みます
             ]);
             const clans = this.parseCSV(clansText, Clan);
             const castles = this.parseCSV(castlesText, Castle);
@@ -74,6 +75,8 @@ class DataManager {
             const courtRanks = courtRanksText ? this.parseCSV(courtRanksText, CourtRank) : [];
             // ★今回追加：読み込んだ文字を、新しく作った姫クラス（器）に流し込みます
             const princesses = princessesText ? this.parseCSV(princessesText, Princess) : [];
+            // ★今回追加：読み込んだ地方の文字を、さっき作った地方クラス（箱）に流し込みます
+            const provinces = provincesText ? this.parseCSV(provincesText, Province) : [];
             
             // ★今回追加：ゲーム開始時の準備係（joinData）に、姫の名簿も一緒に渡してあげます
             this.joinData(clans, castles, bushos, princesses);
@@ -87,7 +90,7 @@ class DataManager {
                 console.log("マップ画像の解析をスキップしました");
             }
             // ★今回追加：完成した姫の名簿をゲーム本体に返します！
-            return { clans, castles, bushos, kunishus, courtRanks, princesses, mapWidth: this.mapImageWidth, mapHeight: this.mapImageHeight };
+            return { clans, castles, bushos, kunishus, courtRanks, princesses, provinces, mapWidth: this.mapImageWidth, mapHeight: this.mapImageHeight };
         } catch (error) {
             console.error(error);
             alert(`データの読み込みに失敗しました。\nフォルダ構成を確認してください。`);
@@ -788,6 +791,8 @@ class GameManager {
             this.clans = data.clans; this.castles = data.castles; this.bushos = data.bushos; 
             // ★今回追加：ゲーム本体（GameApp）に、姫の名簿を持たせます！
             this.princesses = data.princesses || []; 
+            // ★今回追加：ゲーム本体に、地方の名簿も持たせます！
+            this.provinces = data.provinces || [];
             
             this.year = window.MainParams.StartYear;
             this.month = window.MainParams.StartMonth;
@@ -1314,6 +1319,7 @@ class GameManager {
             bushos: this.bushos, 
             clans: this.clans,
             princesses: this.princesses, // ★今回追加：姫の名簿もセーブデータに書き込みます
+            provinces: this.provinces, // ★今回追加：地方の名簿もセーブデータに書き込みます
             playerClanId: this.playerClanId,
             kunishus: this.kunishuSystem.kunishus,
             mapWidth: this.mapWidth,
@@ -1379,6 +1385,8 @@ class GameManager {
                 this.bushos = d.bushos.map(b => new Busho(b));
                 // ★今回追加：セーブデータから姫の名簿を元通りに復元します
                 this.princesses = (d.princesses || []).map(p => new Princess(p));
+                // ★今回追加：セーブデータから地方の名簿を元通りに復元します
+                this.provinces = (d.provinces || []).map(p => new Province(p));
                 
                 if (d.kunishus) {
                     this.kunishuSystem.setKunishuData(d.kunishus.map(k => new Kunishu(k)));
