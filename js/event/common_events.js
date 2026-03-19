@@ -14,35 +14,45 @@ window.GameEvents.push({
     checkCondition: function(game) {
         const dice = Math.random();
         if (game.month === 8 && dice < 0.10) return true;
-        if (game.month === 9 && dice < 1.00) return true;
+        if (game.month === 9 && dice < 0.30) return true;
         if (game.month === 10 && dice < 0.03) return true;
         if (game.month === 11 && dice < 0.01) return true;
         return false;
     },
     
     execute: async function(game) {
-        // 【1】「台風が接近しています」メッセージを表示（ここで時間は自動的に止まります）
+        // 【1】「台風が接近しています」メッセージを表示
         await game.ui.showDialogAsync("【台風接近】\n台風が接近しています……。", false, 0);
 
         // 【2】地図を最小表示にする
         const resetZoomBtn = document.getElementById('map-reset-zoom');
         if (resetZoomBtn) resetZoomBtn.click();
 
-        // 【3】被害の計算（表には見えない裏側の処理です）
-        const damagedProvinceIds = new Set();
-        const damagedPlayerCastles = [];
+        // 【3】被害の計算（順番を変えました！）
+        const damagedProvinceMap = new Map(); // 「地方のID」と「台風の規模」をセットで覚えるメモ帳です
+        const damagedPlayerCastles = [];      
         
         const baseScale = Math.floor(Math.random() * 5) + Math.floor(Math.random() * 6) + 1;
 
-        game.castles.forEach(castle => {
-            const provinceData = game.provinces.find(p => p.id === castle.provinceId);
-            if (!provinceData || !provinceData.typhoon) return;
+        // ① まずは「すべての地方（国）」を順番に見て、台風が来るかサイコロを振ります
+        game.provinces.forEach(province => {
+            if (!province.typhoon) return; // 台風確率がない地方は無視します
 
-            if (Math.random() < provinceData.typhoon) {
-                damagedProvinceIds.add(castle.provinceId);
-                
+            if (Math.random() < province.typhoon) {
+                // 台風が直撃した地方は、-1〜+1のズレを計算して規模を決めます
                 const shift = Math.floor(Math.random() * 3) - 1;
                 let finalScale = Math.max(1, Math.min(10, baseScale + shift));
+                
+                // 「この地方には、この規模の台風が来ましたよ」とメモ帳に書きます
+                damagedProvinceMap.set(province.id, finalScale);
+            }
+        });
+
+        // ② 次に「すべてのお城」を順番に見て、メモ帳に載っている地方のお城だけ被害を受けます
+        game.castles.forEach(castle => {
+            if (damagedProvinceMap.has(castle.provinceId)) {
+                // メモ帳から、その地方の台風の規模を読み取ります
+                const finalScale = damagedProvinceMap.get(castle.provinceId);
                 const dropPercent = finalScale * 0.03;
                 
                 castle.kokudaka = Math.floor(castle.kokudaka * (1.0 - dropPercent));
@@ -67,7 +77,6 @@ window.GameEvents.push({
         mapOverlay.style.width = '100%';
         mapOverlay.style.height = '100%';
         mapOverlay.style.backgroundColor = 'rgba(0,0,0,0.85)';
-        // ★修正：メッセージの窓（8000）の裏に回るように、7500に変更しました！
         mapOverlay.style.zIndex = '7500'; 
         mapOverlay.style.display = 'flex';
         mapOverlay.style.justifyContent = 'center';
@@ -91,19 +100,18 @@ window.GameEvents.push({
         mapOverlay.appendChild(mapContainer);
         document.body.appendChild(mapOverlay);
 
-        // ★修正：画像読み込みで絶対にフリーズしない「お守り（1秒で強制突破）」をつけました
         await new Promise(resolve => {
             if (whiteMapImg.complete) {
                 resolve();
             } else {
                 whiteMapImg.onload = resolve;
                 whiteMapImg.onerror = resolve;
-                setTimeout(resolve, 1000); // もし読み込めなくても1秒経ったら次へ
+                setTimeout(resolve, 1000); 
             }
         });
 
         // 【5】被害を受けた地方を青く塗る魔法のキャンバスを重ねます
-        if (damagedProvinceIds.size > 0 && window.DataManager && DataManager.provinceImageData) {
+        if (damagedProvinceMap.size > 0 && window.DataManager && DataManager.provinceImageData) {
             const canvas = document.createElement('canvas');
             canvas.width = DataManager.mapImageWidth || whiteMapImg.naturalWidth;
             canvas.height = DataManager.mapImageHeight || whiteMapImg.naturalHeight;
@@ -119,7 +127,8 @@ window.GameEvents.push({
             const ctx = canvas.getContext('2d');
             const targetColors = [];
             
-            damagedProvinceIds.forEach(pId => {
+            // メモ帳に書かれている地方（国）の色をリストアップします
+            damagedProvinceMap.forEach((scale, pId) => {
                 const pData = game.provinces.find(p => p.id === pId);
                 if (pData && pData.color_code) {
                     const rgb = DataManager.hexToRgb(pData.color_code);
@@ -159,7 +168,7 @@ window.GameEvents.push({
             canvas.style.animation = 'none';
             canvas.style.opacity = '0.8';
 
-            // 【6】ここでメッセージを表示します（今度は地図の手前に出ます！）
+            // 【6】ここでメッセージを表示します
             await game.ui.showDialogAsync("【台風発生】\n各地で被害が発生しているようです……。", false, 0);
 
         } else {
