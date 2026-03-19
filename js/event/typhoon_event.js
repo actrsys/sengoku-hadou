@@ -12,17 +12,17 @@ window.GameEvents.push({
     
     checkCondition: function(game) {
         const dice = Math.random();
-        if (game.month === 8 && dice < 0.10) return true;
-        if (game.month === 9 && dice < 1.00) return true;
-        if (game.month === 10 && dice < 0.03) return true;
-        if (game.month === 11 && dice < 0.01) return true;
+        if (game.month === 7 && dice < 0.05) return true;
+        if (game.month === 8 && dice < 0.1) return true;
+        if (game.month === 9 && dice < 0.3) return true;
+        if (game.month === 10 && dice < 0.1) return true;
+        if (game.month === 11 && dice < 0.05) return true;
         return false;
     },
     
     execute: async function(game) {
         console.log("=== 台風イベント開始 ===");
 
-        // ★★★ 進路を表示するかどうかのスイッチ ★★★
         const SHOW_TYPHOON_PATH = true;
 
         await game.ui.showDialogAsync("【台風接近】\n台風が接近しています……。", false, 0);
@@ -33,7 +33,6 @@ window.GameEvents.push({
         const damagedProvinceMap = new Map();
         const damagedPlayerCastles = [];      
         
-        // ガチャの魔法（規模と確率の決定）
         let baseScale = 1;
         const scaleDice = Math.random() * 100; 
 
@@ -129,7 +128,6 @@ window.GameEvents.push({
             }
         }
 
-        // ====== ★ ここから新しい台風の進路計算です ★ ======
         const pathData = [];
 
         if (window.ProvinceImageDataCache) {
@@ -148,7 +146,7 @@ window.GameEvents.push({
 
             let r = Math.pow(Math.random(), 3); 
             let typhoonX = -500 + (r * (width * 0.7 + 500)); 
-            let typhoonY = height + 500;
+            let typhoonY = height + 600;
             
             let initialScale = Math.min(10, Math.max(1, baseScale));
             let typhoonRadius = 100 + (initialScale * 15); 
@@ -161,7 +159,6 @@ window.GameEvents.push({
 
             while (typhoonX < width + typhoonRadius && typhoonY > -typhoonRadius && typhoonY < height + 1000 && typhoonRadius > 30) {
                 
-                // ★ ここで「場所」と一緒に「大きさ（radius）」もメモ帳に書き込みます！
                 pathData.push({ x: typhoonX, y: typhoonY, radius: typhoonRadius });
 
                 let moveX = Math.random() * 20 + 5;
@@ -220,7 +217,6 @@ window.GameEvents.push({
                 wasOnLand = onLand;
             }
             
-            // 最後の場所の大きさもメモ
             pathData.push({ x: typhoonX, y: typhoonY, radius: typhoonRadius });
 
             if (game.provinces && game.provinces.length > 0) {
@@ -234,7 +230,6 @@ window.GameEvents.push({
                 }
             }
         }
-        // ====== ★ 台風の進路計算おわり ★ ======
 
         game.castles.forEach(castle => {
             if (damagedProvinceMap.has(castle.provinceId)) {
@@ -274,7 +269,6 @@ window.GameEvents.push({
 
                 const ctx = canvas.getContext('2d');
                 
-                // --- ① 青く光らせる処理 ---
                 if (damagedProvinceMap.size > 0) {
                     const targetColors = [];
                     const hexToRgb = (hex) => {
@@ -300,7 +294,8 @@ window.GameEvents.push({
                             if (a > 0) {
                                 let isTarget = false;
                                 for (let c of targetColors) {
-                                    if (Math.abs(r - c.r) < 5 && Math.abs(g - c.g) < 5 && Math.abs(b - c.b) < 5) {
+                                    // ★ ここが修正ポイントです！完全に一致する色だけを正解にします
+                                    if (r === c.r && g === c.g && b === c.b) {
                                         isTarget = true;
                                         break;
                                     }
@@ -317,29 +312,23 @@ window.GameEvents.push({
                     }
                 }
 
-                // --- ② 鎖状の円と、黄色い点線の進路を描く処理 ---
                 if (SHOW_TYPHOON_PATH && pathData.length > 0) {
-                    
-                    // ★ 新しい魔法：台風の大きさ（暴風域）を薄い点線の円で描きます！
                     ctx.lineWidth = 3; 
-                    ctx.strokeStyle = 'rgba(255, 255, 0, 0.4)'; // 少し薄めの黄色
-                    ctx.setLineDash([8, 8]); // 円用の細かい点線
+                    ctx.strokeStyle = 'rgba(255, 255, 0, 0.4)'; 
+                    ctx.setLineDash([8, 8]); 
 
-                    // 全部描くと真っ黄色に塗りつぶされてしまうので、2歩に1回だけ円を描きます
                     for (let i = 0; i < pathData.length; i++) {
                         if (i % 2 === 0 || i === pathData.length - 1) {
                             ctx.beginPath();
-                            // コンパスのように「中心X、中心Y、半径」を指定して円（arc）を描きます
                             ctx.arc(pathData[i].x, pathData[i].y, Math.max(0, pathData[i].radius), 0, Math.PI * 2);
                             ctx.stroke();
                         }
                     }
 
-                    // その後、真ん中の太い黄色い点線（元の進路）を描きます
                     ctx.beginPath();
-                    ctx.setLineDash([20, 20]); // 進路用の大きな点線
-                    ctx.strokeStyle = 'rgba(255, 255, 0, 0.8)'; // 濃い黄色
-                    ctx.lineWidth = 12; // 太い線
+                    ctx.setLineDash([20, 20]); 
+                    ctx.strokeStyle = 'rgba(255, 255, 0, 0.8)'; 
+                    ctx.lineWidth = 12; 
                     ctx.lineCap = 'round'; 
                     ctx.lineJoin = 'round'; 
 
@@ -348,7 +337,7 @@ window.GameEvents.push({
                         ctx.lineTo(pathData[i].x, pathData[i].y);
                     }
                     ctx.stroke(); 
-                    ctx.setLineDash([]); // 点線の設定をリセット
+                    ctx.setLineDash([]); 
                 }
 
                 mapContainer.appendChild(canvas);
