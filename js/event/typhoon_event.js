@@ -125,40 +125,44 @@ window.GameEvents.push({
                 return "#" + ((1 << 24) + (data[idx] << 16) + (data[idx+1] << 8) + data[idx+2]).toString(16).slice(1);
             };
 
-            // 発生場所（九州の西の海〜関東の南の海までランダム）
-            let typhoonX = (Math.random() * (width * 0.6)) - 100;
-            let typhoonY = height + 200;
+            // ① 発生場所をさらに遠くへ！（左へ500、下へ500の広い海）
+            let typhoonX = (Math.random() * (width * 0.5)) - 500;
+            let typhoonY = height + 500;
             
             let typhoonRadius = 180;
             const damagedColorCodes = new Set(); 
-
-            // この台風の「右へ流されやすさ（個性）」
             const windStrength = Math.random() * 30 + 10; 
+            
+            // ★新しい魔法：さっき陸地を踏んだか？を覚えておくメモ帳
+            let wasOnLand = false; 
 
-            // 大きさが30より小さくなったら「温帯低気圧に変わった（消滅）」とみなして終わります
             while (typhoonX < width + typhoonRadius && typhoonY > -typhoonRadius && typhoonRadius > 30) {
-                // 基本の歩幅（上に上がる力と、右に進む力）
                 let moveX = Math.random() * 20 + 5;
                 let moveY = Math.random() * 25 + 15;
 
-                // ★アイデア①：北に行くほど「上に行く力」を奪い、「右に流す」！
-                // 画像の真ん中より上（北）に行くと、少しずつ上に行きにくくなります
+                // ② 陸地にあたった時の「角度（進行方向）」の減衰！
+                // 山にぶつかると北に進めなくなり、東へ倒れ込むように曲がります
+                if (wasOnLand) {
+                    moveY *= 0.3; // 上に進む力を激減させる！（角度が急に右に曲がる）
+                    moveX *= 0.9; // スピード全体も少し落ちる
+                }
+
+                // 偏西風（北に行くほど右に曲がる）
                 if (typhoonY < height * 0.6) {
                     moveX += windStrength; 
-                    moveY *= 0.6; // 上に行く力を半分近くに減らす！
+                    moveY *= 0.6; 
                 }
-                // 画像の上から5分の1（東北のあたり）に行くと、もう上に上がれず真横に流されます
                 if (typhoonY < height * 0.2) {
-                    moveX += windStrength * 1.5; // さらに強く右に流される
-                    moveY *= 0.2; // 上に行く力をほとんどゼロにする！
+                    moveX += windStrength * 1.5; 
+                    moveY *= 0.2; 
                 }
 
                 typhoonX += moveX;
                 typhoonY -= moveY;
 
-                // ★アイデア②：陸地を踏んだら急激に小さくなる（弱まる）準備
                 let onLand = false;
 
+                // 画面の中に入ったら色をチェック
                 if (typhoonX > -typhoonRadius && typhoonX < width + typhoonRadius &&
                     typhoonY > -typhoonRadius && typhoonY < height + typhoonRadius) {
 
@@ -174,17 +178,20 @@ window.GameEvents.push({
                         const hex = getPixelHex(pt.x, pt.y);
                         if (hex) {
                             damagedColorCodes.add(hex.toLowerCase());
-                            onLand = true; // 「あっ、海じゃなくて国の色（陸地）を踏んだ！」とメモする
+                            onLand = true; // 「陸地を踏んだ！」とメモ
                         }
                     }
                 }
 
-                // ここで実際に台風の大きさを削ります！
+                // 威力の減衰
                 if (onLand) {
-                    typhoonRadius -= 4.0; // 陸上はエネルギーがもらえず、山にぶつかって一気に弱る！
+                    typhoonRadius -= 4.0; // 陸上だとゴリゴリ削れる
                 } else {
-                    typhoonRadius -= 0.8; // 海上はゆっくり弱る
+                    typhoonRadius -= 0.8; // 海上はゆっくり削れる
                 }
+
+                // 次の歩幅を計算するために、「今、陸地にいたか」を記憶しておく
+                wasOnLand = onLand;
             }
 
             if (game.provinces && game.provinces.length > 0) {
