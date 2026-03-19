@@ -25,13 +25,12 @@ window.GameEvents.push({
         await game.ui.showDialogAsync("【台風接近】\n台風が接近しています……。", false, 0);
 
         // 【2】地図を最小表示にする
-        // もし画面に「ズームをリセットするボタン」があれば、こっそり押して一番引いた状態にします
         const resetZoomBtn = document.getElementById('map-reset-zoom');
         if (resetZoomBtn) resetZoomBtn.click();
 
         // 【3】被害の計算（表には見えない裏側の処理です）
-        const damagedProvinceIds = new Set(); // 被害を受けた「地方」の出席番号リスト
-        const damagedPlayerCastles = [];      // 被害を受けた「自軍の城」のリスト
+        const damagedProvinceIds = new Set();
+        const damagedPlayerCastles = [];
         
         const baseScale = Math.floor(Math.random() * 5) + Math.floor(Math.random() * 6) + 1;
 
@@ -39,9 +38,7 @@ window.GameEvents.push({
             const provinceData = game.provinces.find(p => p.id === castle.provinceId);
             if (!provinceData || !provinceData.typhoon) return;
 
-            // 国（地方）ごとの確率で台風が直撃するかチェック！
             if (Math.random() < provinceData.typhoon) {
-                // 直撃した地方の番号をメモしておきます
                 damagedProvinceIds.add(castle.provinceId);
                 
                 const shift = Math.floor(Math.random() * 3) - 1;
@@ -56,14 +53,13 @@ window.GameEvents.push({
                     castle.population = Math.floor(castle.population * (1.0 - ((finalScale - 5) * 0.02)));
                 }
 
-                // もし自分の城だったら、後で報告するためにメモしておきます
                 if (castle.ownerClan === game.playerClanId) {
                     damagedPlayerCastles.push({ castle: castle, scale: finalScale });
                 }
             }
         });
 
-        // 【4】白地図のウインドウを画面の一番手前に作ります！
+        // 【4】白地図のウインドウを作ります
         const mapOverlay = document.createElement('div');
         mapOverlay.style.position = 'fixed';
         mapOverlay.style.top = '0';
@@ -71,7 +67,8 @@ window.GameEvents.push({
         mapOverlay.style.width = '100%';
         mapOverlay.style.height = '100%';
         mapOverlay.style.backgroundColor = 'rgba(0,0,0,0.85)';
-        mapOverlay.style.zIndex = '99999'; // 絶対に一番手前に来るようにします
+        // ★修正：メッセージの窓（8000）の裏に回るように、7500に変更しました！
+        mapOverlay.style.zIndex = '7500'; 
         mapOverlay.style.display = 'flex';
         mapOverlay.style.justifyContent = 'center';
         mapOverlay.style.alignItems = 'center';
@@ -82,7 +79,7 @@ window.GameEvents.push({
         mapContainer.style.maxWidth = '800px';
         mapContainer.style.border = '4px solid #fff';
         mapContainer.style.borderRadius = '8px';
-        mapContainer.style.backgroundColor = '#81c784'; // 海の背景色
+        mapContainer.style.backgroundColor = '#81c784';
         mapContainer.style.overflow = 'hidden';
 
         const whiteMapImg = new Image();
@@ -94,10 +91,15 @@ window.GameEvents.push({
         mapOverlay.appendChild(mapContainer);
         document.body.appendChild(mapOverlay);
 
-        // 白地図の画像がしっかり読み込まれるまで、一瞬だけ待ちます
+        // ★修正：画像読み込みで絶対にフリーズしない「お守り（1秒で強制突破）」をつけました
         await new Promise(resolve => {
-            whiteMapImg.onload = resolve;
-            whiteMapImg.onerror = resolve; // 万が一画像が無くても止まらないようにします
+            if (whiteMapImg.complete) {
+                resolve();
+            } else {
+                whiteMapImg.onload = resolve;
+                whiteMapImg.onerror = resolve;
+                setTimeout(resolve, 1000); // もし読み込めなくても1秒経ったら次へ
+            }
         });
 
         // 【5】被害を受けた地方を青く塗る魔法のキャンバスを重ねます
@@ -112,13 +114,11 @@ window.GameEvents.push({
             canvas.style.height = '100%';
             canvas.style.pointerEvents = 'none';
             
-            // CSSにある魔法「blink」を使って、青色をチカチカ点滅させます！
             canvas.style.animation = 'blink 1s infinite';
 
             const ctx = canvas.getContext('2d');
             const targetColors = [];
             
-            // 被害を受けた地方の「マップの色」をリストアップします
             damagedProvinceIds.forEach(pId => {
                 const pData = game.provinces.find(p => p.id === pId);
                 if (pData && pData.color_code) {
@@ -132,7 +132,6 @@ window.GameEvents.push({
                 const newImgData = ctx.createImageData(canvas.width, canvas.height);
                 const dstData = newImgData.data;
 
-                // 1ピクセルずつ調べて、被害を受けた地方の色なら「青色（半透明）」に塗り替えます
                 for (let i = 0; i < srcData.length; i += 4) {
                     const r = srcData[i], g = srcData[i+1], b = srcData[i+2], a = srcData[i+3];
                     if (a > 0) {
@@ -144,10 +143,10 @@ window.GameEvents.push({
                             }
                         }
                         if (isTarget) {
-                            dstData[i] = 0;     // 赤
-                            dstData[i+1] = 0;   // 緑
-                            dstData[i+2] = 255; // 青をMAX！
-                            dstData[i+3] = 180; // 少し透けさせる
+                            dstData[i] = 0;
+                            dstData[i+1] = 0;
+                            dstData[i+2] = 255;
+                            dstData[i+3] = 180;
                         }
                     }
                 }
@@ -155,18 +154,15 @@ window.GameEvents.push({
             }
             mapContainer.appendChild(canvas);
 
-            // プレイヤーに青い点滅を2秒間見てもらいます
             await new Promise(resolve => setTimeout(resolve, 2000));
 
-            // 点滅を止めて、青色に光りっぱなしの状態にします！
             canvas.style.animation = 'none';
             canvas.style.opacity = '0.8';
 
-            // 【6】ここでメッセージを表示します
+            // 【6】ここでメッセージを表示します（今度は地図の手前に出ます！）
             await game.ui.showDialogAsync("【台風発生】\n各地で被害が発生しているようです……。", false, 0);
 
         } else {
-            // どこにも被害がなかった時のメッセージです
             await game.ui.showDialogAsync("【台風通過】\n幸い、今回は大きな被害はなかったようです。", false, 0);
         }
 
@@ -180,8 +176,6 @@ window.GameEvents.push({
         for (const data of damagedPlayerCastles) {
             await game.ui.showDialogAsync(`【被害報告】\n我が家の ${data.castle.name} が台風の被害を受けました……。\n（局地規模：${data.scale}）`, false, 0);
         }
-
-        // この行が終わると、自動的に時間が再び動き出します！
     }
 });
 
