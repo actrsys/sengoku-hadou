@@ -1,4 +1,4 @@
-id,province,regionid,region,color_code
+id,province,regionId,region,color_code
 1,陸奥国,1,東北,#ff0000
 2,出羽国,1,東北,#ff0400
 3,越後国,2,北陸,#ff2a00
