@@ -800,12 +800,23 @@ class FieldWarManager {
                 }
             }
         }
+        
+        // ★追加：専用の箱から、この部隊が所属するグループの士気と訓練度を取り出します！
+        let unitMorale = 50;
+        let unitTraining = 50;
+        if (this.groupStats && this.groupStats[unit.groupId]) {
+            unitMorale = this.groupStats[unit.groupId].morale;
+            unitTraining = this.groupStats[unit.groupId].training;
+        }
 
         infoEl.innerHTML = `
             <div style="font-weight:bold; color: ${color};">
                 ${clanNameText}${unit.name} <span style="font-size:0.8rem; color:#555;">(${typeName})</span>
             </div>
-            <div style="font-size:0.9rem; font-weight:bold;">兵士: ${unit.soldiers}</div>
+            <div style="font-size:0.9rem; font-weight:bold; display:flex; align-items:baseline; gap:10px;">
+                <span>兵士: ${unit.soldiers}</span>
+                <span style="font-size:0.75rem; color:#333; font-weight:normal;">士気:${unitMorale} 訓練:${unitTraining}</span>
+            </div>
             <div style="font-size:0.8rem; color:#333; display:flex; gap:5px; align-items:center; margin-top:2px;">
                 統:${GameSystem.toGradeHTML(unit.stats.ldr)} 
                 武:${GameSystem.toGradeHTML(unit.stats.str)} 
