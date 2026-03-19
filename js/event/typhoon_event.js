@@ -23,45 +23,38 @@ window.GameEvents.push({
         console.log("=== 台風イベント開始 ===");
 
         // ★★★ 進路を表示するかどうかのスイッチ ★★★
-        // true  にすると、黄色い点線で進路を描画します。
-        // false にすると、進路は描画されません（本番用）。
         const SHOW_TYPHOON_PATH = true;
 
-        // 【1】「台風が接近しています」メッセージを表示
         await game.ui.showDialogAsync("【台風接近】\n台風が接近しています……。", false, 0);
 
-        // 【2】地図を最小表示にする
         const resetZoomBtn = document.getElementById('map-reset-zoom');
         if (resetZoomBtn) resetZoomBtn.click();
 
-        // 【3】被害の計算結果を入れる箱を準備
         const damagedProvinceMap = new Map();
         const damagedPlayerCastles = [];      
         
-        // ★ 新しい魔法：台風の規模（1〜10）をガチャの確率のように決めます！
+        // ガチャの魔法（規模と確率の決定）
         let baseScale = 1;
-        const scaleDice = Math.random() * 100; // 0〜100が出るルーレットを回します
+        const scaleDice = Math.random() * 100; 
 
         if (scaleDice < 10) {
-            baseScale = 1; // 10%の確率で 規模1
+            baseScale = 1; 
         } else if (scaleDice < 35) {
-            baseScale = 2; // 25%の確率で 規模2
+            baseScale = 2; 
         } else if (scaleDice < 65) {
-            baseScale = 3; // 30%の確率で 規模3（ここが一番出やすい！）
+            baseScale = 3; 
         } else if (scaleDice < 85) {
-            baseScale = 4; // 20%の確率で 規模4
+            baseScale = 4; 
         } else if (scaleDice < 93) {
-            baseScale = 5; // 8%の確率で 規模5
+            baseScale = 5; 
         } else if (scaleDice < 97) {
-            baseScale = 6; // 4%の確率で 規模6
+            baseScale = 6; 
         } else if (scaleDice < 99) {
-            baseScale = 7; // 2%の確率で 規模7
+            baseScale = 7; 
         } else {
-            // ルーレットで「99〜100」のわずか1%を引いた時だけ、規模8〜10の超巨大台風（激レア）！
             baseScale = Math.floor(Math.random() * 3) + 8; 
         }
 
-        // 【4】白地図のウインドウを作ります
         const mapOverlay = document.createElement('div');
         mapOverlay.style.position = 'fixed';
         mapOverlay.style.top = '0';
@@ -109,7 +102,6 @@ window.GameEvents.push({
             }
         });
 
-        // 【5】色分け地図（japan_provinces.png）を裏側で読み込みます
         if (!window.ProvinceImageDataCache) {
             const provMapImg = new Image();
             provMapImg.src = './data/images/map/japan_provinces.png';
@@ -138,7 +130,6 @@ window.GameEvents.push({
         }
 
         // ====== ★ ここから新しい台風の進路計算です ★ ======
-        // ★新しいメモ帳：台風が通った道を記録しておくための箱です
         const pathData = [];
 
         if (window.ProvinceImageDataCache) {
@@ -157,38 +148,29 @@ window.GameEvents.push({
 
             let r = Math.pow(Math.random(), 3); 
             let typhoonX = -500 + (r * (width * 0.7 + 500)); 
-            let typhoonY = height + 500;
+            let typhoonY = height + 1000;
             
-            // ★ 新しい魔法①：規模（強さ）と初期の大きさを連動させます！
-            // プログラムの上で決まった規模（だいたい1〜10）をエンジンの強さにします
             let initialScale = Math.min(10, Math.max(1, baseScale));
-            
-            // 規模が大きいほど、最初の円も大きくなります（最小115 〜 最大250）
             let typhoonRadius = 100 + (initialScale * 15); 
             
             const damagedColorCodes = new Set(); 
-            
-            // ★ 新しい魔法②：規模が小さいほど風に流されやすく、大きいと耐えます
-            // 小さい台風（scale1）は強さ37〜42で右に流され、大きい（scale10）と10〜15しか流されません
             const windStrength = 40 - (initialScale * 3) + (Math.random() * 5); 
             
             let wasOnLand = false; 
             let landCount = 0; 
 
             while (typhoonX < width + typhoonRadius && typhoonY > -typhoonRadius && typhoonY < height + 1000 && typhoonRadius > 30) {
-                pathData.push({ x: typhoonX, y: typhoonY });
+                
+                // ★ ここで「場所」と一緒に「大きさ（radius）」もメモ帳に書き込みます！
+                pathData.push({ x: typhoonX, y: typhoonY, radius: typhoonRadius });
 
                 let moveX = Math.random() * 20 + 5;
-                
-                // ★ 新しい魔法③：規模が大きいほど、上に突き進む力が強くなります
                 let moveY = Math.random() * 25 + 10 + (initialScale * 1.5); 
 
                 let progress = Math.max(0, (height + 500 - typhoonY) / height); 
                 
                 moveX += windStrength * progress * 1.5; 
                 
-                // ★ 新しい魔法④：規模が小さいほど、放物線を描いて下に落ちやすくなります
-                // 大きい台風はここが引かれにくいので、放物線にならず真っ直ぐ上に突き抜けます！
                 let fallPower = 50 - (initialScale * 3); 
                 moveY -= fallPower * Math.pow(progress, 1.5); 
 
@@ -238,7 +220,8 @@ window.GameEvents.push({
                 wasOnLand = onLand;
             }
             
-            pathData.push({ x: typhoonX, y: typhoonY });
+            // 最後の場所の大きさもメモ
+            pathData.push({ x: typhoonX, y: typhoonY, radius: typhoonRadius });
 
             if (game.provinces && game.provinces.length > 0) {
                 for (let prov of game.provinces) {
@@ -253,7 +236,6 @@ window.GameEvents.push({
         }
         // ====== ★ 台風の進路計算おわり ★ ======
 
-        // 【6】お米や兵士を減らす処理
         game.castles.forEach(castle => {
             if (damagedProvinceMap.has(castle.provinceId)) {
                 const finalScale = damagedProvinceMap.get(castle.provinceId);
@@ -273,7 +255,6 @@ window.GameEvents.push({
             }
         });
 
-        // 【7】被害の青い光 ＋ 黄色い点線の描画
         if (damagedProvinceMap.size > 0 || SHOW_TYPHOON_PATH) {
             
             if (window.ProvinceImageDataCache) {
@@ -287,7 +268,6 @@ window.GameEvents.push({
                 canvas.style.height = '100%';
                 canvas.style.pointerEvents = 'none';
                 
-                // 被害がある時だけピコンピコンと点滅させます
                 if (damagedProvinceMap.size > 0) {
                     canvas.style.animation = 'blink 1s 2';
                 }
@@ -337,23 +317,38 @@ window.GameEvents.push({
                     }
                 }
 
-                // --- ② 黄色い点線の進路を描く処理 ---
+                // --- ② 鎖状の円と、黄色い点線の進路を描く処理 ---
                 if (SHOW_TYPHOON_PATH && pathData.length > 0) {
-                    ctx.beginPath();
-                    ctx.setLineDash([20, 20]); // 20ピクセル描いて、20ピクセル隙間をあける（点線）
-                    ctx.strokeStyle = 'rgba(255, 255, 0, 0.8)'; // 半透明の黄色
-                    ctx.lineWidth = 12; // 線の太さ
-                    ctx.lineCap = 'round'; // 線の端っこを丸くする
-                    ctx.lineJoin = 'round'; // 折れ曲がる部分を丸くする
+                    
+                    // ★ 新しい魔法：台風の大きさ（暴風域）を薄い点線の円で描きます！
+                    ctx.lineWidth = 3; 
+                    ctx.strokeStyle = 'rgba(255, 255, 0, 0.4)'; // 少し薄めの黄色
+                    ctx.setLineDash([8, 8]); // 円用の細かい点線
 
-                    // メモ帳の最初の場所に筆を置く
+                    // 全部描くと真っ黄色に塗りつぶされてしまうので、2歩に1回だけ円を描きます
+                    for (let i = 0; i < pathData.length; i++) {
+                        if (i % 2 === 0 || i === pathData.length - 1) {
+                            ctx.beginPath();
+                            // コンパスのように「中心X、中心Y、半径」を指定して円（arc）を描きます
+                            ctx.arc(pathData[i].x, pathData[i].y, Math.max(0, pathData[i].radius), 0, Math.PI * 2);
+                            ctx.stroke();
+                        }
+                    }
+
+                    // その後、真ん中の太い黄色い点線（元の進路）を描きます
+                    ctx.beginPath();
+                    ctx.setLineDash([20, 20]); // 進路用の大きな点線
+                    ctx.strokeStyle = 'rgba(255, 255, 0, 0.8)'; // 濃い黄色
+                    ctx.lineWidth = 12; // 太い線
+                    ctx.lineCap = 'round'; 
+                    ctx.lineJoin = 'round'; 
+
                     ctx.moveTo(pathData[0].x, pathData[0].y);
-                    // メモ帳の場所を順番に線で結んでいく
                     for (let i = 1; i < pathData.length; i++) {
                         ctx.lineTo(pathData[i].x, pathData[i].y);
                     }
-                    ctx.stroke(); // 実際に線を引く
-                    ctx.setLineDash([]); // 点線の設定をリセットしておく
+                    ctx.stroke(); 
+                    ctx.setLineDash([]); // 点線の設定をリセット
                 }
 
                 mapContainer.appendChild(canvas);
@@ -371,15 +366,12 @@ window.GameEvents.push({
             }
 
         } else {
-            // 被害もなく、線も表示しない設定の時
             await game.ui.showDialogAsync("【台風通過】\n幸い、今回は大きな被害はなかったようです。", false, 0);
         }
 
-        // 【8】プレイヤーがメッセージを閉じたら、白地図ウインドウを消します
         document.body.removeChild(mapOverlay);
         await new Promise(resolve => setTimeout(resolve, 3000));
 
-        // 【9】自軍の城の被害報告
         for (const data of damagedPlayerCastles) {
             await game.ui.showDialogAsync(`【被害報告】\n我が家の ${data.castle.name} が台風の被害を受けました……。\n（局地規模：${data.scale}）`, false, 0);
         }
