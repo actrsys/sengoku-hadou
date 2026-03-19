@@ -832,11 +832,18 @@ Object.assign(WarManager.prototype, {
                             }
                             s.attacker.rice = Math.max(0, s.attacker.rice - returnRice);
                         }
-
+                        
+                        const oldSoldiers = helperCastle.soldiers;
                         helperCastle.soldiers = Math.min(99999, helperCastle.soldiers + finalReturnSoldiers);
                         helperCastle.rice = Math.min(99999, helperCastle.rice + returnRice);
                         helperCastle.horses = Math.min(99999, (helperCastle.horses || 0) + returnHorses);
                         helperCastle.guns = Math.min(99999, (helperCastle.guns || 0) + returnGuns);
+                        
+                        // ★追加：帰ってきた兵士たちの士気と訓練度を、お城の兵士たちと混ぜ合わせます！
+                        if (helperCastle.soldiers > 0 && finalReturnSoldiers > 0) {
+                            helperCastle.training = Math.floor(((helperCastle.training || 50) * oldSoldiers + (reinf.training || 50) * finalReturnSoldiers) / helperCastle.soldiers);
+                            helperCastle.morale = Math.floor(((helperCastle.morale || 50) * oldSoldiers + (reinf.morale || 50) * finalReturnSoldiers) / helperCastle.soldiers);
+                        }
                         
                         reinf.bushos.forEach(b => {
                             b.castleId = helperCastle.id; 

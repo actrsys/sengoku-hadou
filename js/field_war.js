@@ -226,19 +226,31 @@ class FieldWarManager {
                 
                 let deployPos;
                 let deployDir;
-                if (isReinf && !isSelfReinf) {
-                    deployPos = atkAllySlots[atkAllyCount % atkAllySlots.length];
-                    deployDir = (atkX1 === leftX1) ? 1 : 4;
-                    atkAllyCount++;
+                let unitGroupId = 'atk_main';
+                if (isReinf) {
+                    if (isSelfReinf) {
+                        deployPos = atkMainSlots[atkMainCount % atkMainSlots.length]; // 自軍援軍はメインと同じ配置
+                        deployDir = (atkX1 === leftX1) ? 2 : 5;
+                        atkMainCount++;
+                        unitGroupId = 'atk_self';
+                    } else {
+                        deployPos = atkAllySlots[atkAllyCount % atkAllySlots.length];
+                        deployDir = (atkX1 === leftX1) ? 1 : 4;
+                        atkAllyCount++;
+                        unitGroupId = 'atk_ally';
+                    }
                 } else {
                     deployPos = atkMainSlots[atkMainCount % atkMainSlots.length];
                     deployDir = (atkX1 === leftX1) ? 2 : 5;
                     atkMainCount++;
+                    unitGroupId = 'atk_main';
                 }
 
                 this.units.push({
                     id: `atk_${index}`,
+                    groupId: unitGroupId,
                     bushoId: assign.busho.id,
+                
                     kunishuId: unitKunishuId, // ★追加
                     name: assign.busho.name,
                     isAttacker: true,
@@ -295,18 +307,29 @@ class FieldWarManager {
                 
                 let deployPos;
                 let deployDir;
-                if (isReinf && !isSelfReinf) {
-                    deployPos = defAllySlots[defAllyCount % defAllySlots.length];
-                    deployDir = (defX1 === leftX1) ? 1 : 4;
-                    defAllyCount++;
+                let unitGroupId = 'def_main';
+                if (isReinf) {
+                    if (isSelfReinf) {
+                        deployPos = defMainSlots[defMainCount % defMainSlots.length];
+                        deployDir = (defX1 === leftX1) ? 2 : 5;
+                        defMainCount++;
+                        unitGroupId = 'def_self';
+                    } else {
+                        deployPos = defAllySlots[defAllyCount % defAllySlots.length];
+                        deployDir = (defX1 === leftX1) ? 1 : 4;
+                        defAllyCount++;
+                        unitGroupId = 'def_ally';
+                    }
                 } else {
                     deployPos = defMainSlots[defMainCount % defMainSlots.length];
                     deployDir = (defX1 === leftX1) ? 2 : 5;
                     defMainCount++;
+                    unitGroupId = 'def_main';
                 }
 
                 this.units.push({
                     id: `def_${index}`,
+                    groupId: unitGroupId,
                     bushoId: assign.busho.id,
                     kunishuId: unitKunishuId, // ★追加
                     name: assign.busho.name,
@@ -360,10 +383,12 @@ class FieldWarManager {
                                     } else if (uGuns >= uSoldiers * 0.5) {
                                         type = 'teppo';
                                     }
-
+                                    
                                     let deployPos = defAllySlots[defAllyCount % defAllySlots.length];
+                                    let unitGroupId = 'def_kunishu_' + k.id;
                                     this.units.push({
                                         id: 'k_' + bestBusho.id,
+                                        groupId: unitGroupId,
                                         bushoId: bestBusho.id,
                                         kunishuId: k.id,
                                         name: bestBusho.name,
@@ -390,15 +415,28 @@ class FieldWarManager {
                 }
             });
         }
+        
+        // それぞれの部隊ごとに兵糧、士気、訓練度を分けて管理する「専用の箱」を作ります！
+        this.groupStats = {
+            atk_main: { rice: warState.attacker.rice || 0, morale: warState.attacker.morale || 50, training: warState.attacker.training || 50 },
+            atk_ally: warState.reinforcement ? { rice: warState.reinforcement.rice || 0, morale: warState.reinforcement.morale || 50, training: warState.reinforcement.training || 50 } : null,
+            atk_self: warState.selfReinforcement ? { rice: warState.selfReinforcement.rice || 0, morale: warState.selfReinforcement.morale || 50, training: warState.selfReinforcement.training || 50 } : null,
+            def_main: { rice: warState.defFieldRice || 0, morale: warState.defender.morale || 50, training: warState.defender.training || 50 },
+            def_ally: warState.defReinforcement ? { rice: warState.defReinforcement.rice || 0, morale: warState.defReinforcement.morale || 50, training: warState.defReinforcement.training || 50 } : null,
+            def_self: warState.defSelfReinforcement ? { rice: warState.defSelfReinforcement.rice || 0, morale: warState.defSelfReinforcement.morale || 50, training: warState.defSelfReinforcement.training || 50 } : null,
+        };
 
-        this.atkRice = warState.attacker.rice;
-        this.defRice = warState.defFieldRice || 0;
-        this.atkMorale = warState.attacker.morale;
-        this.defMorale = warState.defender.morale;
-        this.atkTraining = warState.attacker.training;
-        this.defTraining = warState.defender.training;
+        // 諸勢力のサプライズ援軍用の箱も作ります（兵糧は使いません）
+        this.units.forEach(u => {
+            if (u.groupId && u.groupId.startsWith('def_kunishu_')) {
+                if (!this.groupStats[u.groupId]) {
+                    this.groupStats[u.groupId] = { rice: 0, morale: 50, training: 50 };
+                }
+            }
+        });
 
         this.turnQueue = [];
+        
         this.isInfoMode = false;
         this.isCmdMode = false;
         this.initUI();
@@ -637,12 +675,33 @@ class FieldWarManager {
             if (u.isAttacker) atkSoldiers += u.soldiers;
             else defSoldiers += u.soldiers;
         });
-
+        
         const atkEl = document.getElementById('fw-atk-status');
         const defEl = document.getElementById('fw-def-status');
 
-        if (atkEl) atkEl.innerHTML = `<strong>[攻] ${this.warState.attacker.name}</strong><br>兵: ${atkSoldiers} / 糧: ${this.atkRice} / 士気: ${this.atkMorale}`;
-        if (defEl) defEl.innerHTML = `<strong>[守] ${this.warState.defender.name}</strong><br>兵: ${defSoldiers} / 糧: ${this.defRice} / 士気: ${this.defMorale}`;
+        // 各グループの兵糧と士気を集めて、合計と平均を出します
+        let atkTotalRice = 0, defTotalRice = 0;
+        let atkMoraleSum = 0, atkMoraleCount = 0;
+        let defMoraleSum = 0, defMoraleCount = 0;
+        
+        for (let key in this.groupStats) {
+            if (!this.groupStats[key]) continue;
+            if (key.startsWith('atk_')) {
+                atkTotalRice += this.groupStats[key].rice;
+                atkMoraleSum += this.groupStats[key].morale;
+                atkMoraleCount++;
+            } else if (key.startsWith('def_')) {
+                defTotalRice += this.groupStats[key].rice;
+                defMoraleSum += this.groupStats[key].morale;
+                defMoraleCount++;
+            }
+        }
+        
+        let displayAtkMorale = atkMoraleCount > 0 ? Math.floor(atkMoraleSum / atkMoraleCount) : 50;
+        let displayDefMorale = defMoraleCount > 0 ? Math.floor(defMoraleSum / defMoraleCount) : 50;
+
+        if (atkEl) atkEl.innerHTML = `<strong>[攻] ${this.warState.attacker.name}</strong><br>兵: ${atkSoldiers} / 糧: ${atkTotalRice} / 士気: ${displayAtkMorale}`;
+        if (defEl) defEl.innerHTML = `<strong>[守] ${this.warState.defender.name}</strong><br>兵: ${defSoldiers} / 糧: ${defTotalRice} / 士気: ${displayDefMorale}`;
         
         const isAtkPlayer = (Number(this.warState.attacker.ownerClan) === Number(this.game.playerClanId));
         const isDefPlayer = (Number(this.warState.defender.ownerClan) === Number(this.game.playerClanId));
@@ -1322,23 +1381,25 @@ class FieldWarManager {
         this.turnQueue.shift();
         this.processQueue();
     }
-
+    
     consumeRice() {
-        let atkSoldiers = 0, defSoldiers = 0;
+        // グループごとに兵士数を数えて、兵糧を減らします
+        let groupSoldiers = {};
         this.units.forEach(u => {
-            if (u.isAttacker) atkSoldiers += u.soldiers;
-            else defSoldiers += u.soldiers;
+            if (!groupSoldiers[u.groupId]) groupSoldiers[u.groupId] = 0;
+            groupSoldiers[u.groupId] += u.soldiers;
         });
 
         const consumeRate = (window.WarParams.War.RiceConsumptionAtk || 0.1) * 0.5;
         
-        const atkCons = Math.floor(atkSoldiers * consumeRate);
-        const defCons = Math.floor(defSoldiers * consumeRate);
-        
-        this.atkRice = Math.max(0, this.atkRice - atkCons);
-        this.defRice = Math.max(0, this.defRice - defCons);
+        for (let key in groupSoldiers) {
+            if (this.groupStats[key]) {
+                let cons = Math.floor(groupSoldiers[key] * consumeRate);
+                this.groupStats[key].rice = Math.max(0, this.groupStats[key].rice - cons);
+            }
+        }
     }
-
+    
     checkEndCondition() {
         let atkAlive = false, defAlive = false;
         let atkGeneralAlive = false, defGeneralAlive = false;
@@ -1371,20 +1432,29 @@ class FieldWarManager {
             this.endFieldWar('attacker_win');
             return true;
         }
-        if (this.atkRice <= 0) {
+        
+        let atkTotalRice = 0, defTotalRice = 0;
+        for (let key in this.groupStats) {
+            if (!this.groupStats[key]) continue;
+            if (key.startsWith('atk_')) atkTotalRice += this.groupStats[key].rice;
+            else if (key.startsWith('def_')) defTotalRice += this.groupStats[key].rice;
+        }
+
+        if (atkTotalRice <= 0) {
             if (isAtkPlayer) this.log(`兵糧が尽き、これ以上の行軍は不可能です……`);
             else if (isDefPlayer) this.log(`${enemyName}は兵糧が尽き、撤退していきました！`);
             else this.log(`兵糧が尽き、攻撃軍は撤退を余儀なくされた！`);
             this.endFieldWar('attacker_lose');
             return true;
         }
-        if (this.defRice <= 0) {
+        if (defTotalRice <= 0) {
             if (isAtkPlayer) this.log(`${enemyName}の兵糧が尽き、城へ敗走していきました！`);
             else if (isDefPlayer) this.log(`兵糧が底を突き、戦線を維持できません……`);
             else this.log(`兵糧が尽き、守備軍は城へ敗走した！`);
             this.endFieldWar('attacker_win');
             return true;
         }
+        
         if (this.turnCount > this.maxTurns) {
             if (isAtkPlayer) this.log(`これ以上の野戦は不利と判断し撤退します……`);
             else if (isDefPlayer) this.log(`${enemyName}は攻めきれずに撤退していきました！`);
@@ -1467,13 +1537,14 @@ class FieldWarManager {
         
         // メインの攻撃軍のデータを更新
         this.warState.attacker.soldiers = atkSoldiers;
-        this.warState.attacker.rice = this.atkRice;
         this.warState.attacker.horses = atkHorses;
         this.warState.attacker.guns = atkGuns;
-        this.warState.attacker.morale = this.atkMorale; 
+        if (this.groupStats['atk_main']) {
+            this.warState.attacker.rice = this.groupStats['atk_main'].rice;
+            this.warState.attacker.morale = this.groupStats['atk_main'].morale; 
+        }
 
         // ★追加：野戦終了時の死者数をしっかりメモ用紙（fieldDeadSoldiers）に書き留めます！
-        // これがないと、お片付けの時に「攻城戦の死者」と「野戦の死者」が混ざって回復できなくなります
         if (!this.warState.fieldDeadSoldiers) {
             this.warState.fieldDeadSoldiers = { attacker: 0, defender: 0 };
         }
@@ -1482,11 +1553,14 @@ class FieldWarManager {
 
         // ★追加：攻撃側の「同盟国からの援軍」のデータを更新
         if (this.warState.reinforcement) {
-            // ★追加：出陣時と比べてどれだけ野戦で減ったかを計算してメモします！
             this.warState.reinforcement.fieldLoss = Math.max(0, this.warState.reinforcement.soldiers - atkAllyReinfSoldiers);
             this.warState.reinforcement.soldiers = atkAllyReinfSoldiers;
             this.warState.reinforcement.horses = atkAllyReinfHorses;
             this.warState.reinforcement.guns = atkAllyReinfGuns;
+            if (this.groupStats['atk_ally']) {
+                this.warState.reinforcement.rice = this.groupStats['atk_ally'].rice;
+                this.warState.reinforcement.morale = this.groupStats['atk_ally'].morale;
+            }
         }
 
         // ★追加：攻撃側の「自分の別の城からの援軍」のデータを更新
@@ -1495,15 +1569,20 @@ class FieldWarManager {
             this.warState.selfReinforcement.soldiers = atkSelfReinfSoldiers;
             this.warState.selfReinforcement.horses = atkSelfReinfHorses;
             this.warState.selfReinforcement.guns = atkSelfReinfGuns;
+            if (this.groupStats['atk_self']) {
+                this.warState.selfReinforcement.rice = this.groupStats['atk_self'].rice;
+                this.warState.selfReinforcement.morale = this.groupStats['atk_self'].morale;
+            }
         }
 
         // メインの守備軍のデータを更新
         this.warState.defender.fieldSoldiers = defSoldiers;
-        this.warState.defFieldRice = this.defRice;
         this.warState.defender.fieldHorses = defHorses;
         this.warState.defender.fieldGuns = defGuns;
-        // ★追加: 守備側の士気も同じように保存します
-        this.warState.defender.morale = this.defMorale; 
+        if (this.groupStats['def_main']) {
+            this.warState.defFieldRice = this.groupStats['def_main'].rice;
+            this.warState.defender.morale = this.groupStats['def_main'].morale; 
+        }
 
         // ★追加：守備側の「同盟国からの援軍」のデータを更新
         if (this.warState.defReinforcement) {
@@ -1511,6 +1590,10 @@ class FieldWarManager {
             this.warState.defReinforcement.soldiers = defAllyReinfSoldiers;
             this.warState.defReinforcement.horses = defAllyReinfHorses;
             this.warState.defReinforcement.guns = defAllyReinfGuns;
+            if (this.groupStats['def_ally']) {
+                this.warState.defReinforcement.rice = this.groupStats['def_ally'].rice;
+                this.warState.defReinforcement.morale = this.groupStats['def_ally'].morale;
+            }
         }
 
         // ★追加：守備側の「自分の別の城からの援軍」のデータを更新
@@ -1519,8 +1602,12 @@ class FieldWarManager {
             this.warState.defSelfReinforcement.soldiers = defSelfReinfSoldiers;
             this.warState.defSelfReinforcement.horses = defSelfReinfHorses;
             this.warState.defSelfReinforcement.guns = defSelfReinfGuns;
+            if (this.groupStats['def_self']) {
+                this.warState.defSelfReinforcement.rice = this.groupStats['def_self'].rice;
+                this.warState.defSelfReinforcement.morale = this.groupStats['def_self'].morale;
+            }
         }
-
+        
         // ★追加：ここで「兵士が0人」になってしまった援軍部隊を、攻城戦に参加させずに「撤退」扱いにします！
         if (this.game.warManager && typeof this.game.warManager.retreatReinforcementForce === 'function') {
             if (this.warState.reinforcement && this.warState.reinforcement.soldiers <= 0) this.game.warManager.retreatReinforcementForce('reinforcement');
@@ -1742,14 +1829,18 @@ class FieldWarManager {
 
         return { attack: atkMult, defense: defMult, defToAtkDiff: defToAtkDiff };
     }
-
+    
     executeAttack(attacker, defender) {
+        // それぞれの部隊の専用の箱から、士気と訓練度を取り出します
+        let atkMorale = this.groupStats[attacker.groupId] ? this.groupStats[attacker.groupId].morale : 50;
+        let defTraining = this.groupStats[defender.groupId] ? this.groupStats[defender.groupId].training : 50;
+
         // 基本ダメージ計算
         const result = WarSystem.calcWarDamage(
             attacker.stats, defender.stats,
             attacker.soldiers, defender.soldiers,
             0, 
-            this.atkMorale, this.defTraining,
+            atkMorale, defTraining,
             'charge'
         );
 
@@ -1795,36 +1886,23 @@ class FieldWarManager {
         let counterMsg = (dmgToAtk > 0) ? ` 反撃で${dmgToAtk}の被害！` : ``;
 
         this.log(`${attacker.name}隊の${atkWeapon}！${dirMsg} 敵に${dmgToDef}の損害！${counterMsg}`);
-
+        
         if (defender.soldiers <= 0) {
             this.log(`${defender.name}隊が壊滅した！`);
             this.units = this.units.filter(u => u.id !== defender.id);
             
-            // ★追加: 壊滅した側の士気を下げ、倒した側の士気を上げる魔法
-            if (defender.isAttacker) {
-                this.atkMorale = Math.max(0, this.atkMorale - 3);
-                this.defMorale = Math.min(120, this.defMorale + 3);
-                this.log(`部隊の壊滅により、攻撃軍の士気が下がり、守備軍の士気が上がった！`);
-            } else {
-                this.defMorale = Math.max(0, this.defMorale - 3);
-                this.atkMorale = Math.min(120, this.atkMorale + 3);
-                this.log(`部隊の壊滅により、守備軍の士気が下がり、攻撃軍の士気が上がった！`);
-            }
+            // 壊滅した部隊のグループの士気を下げ、倒した側の士気を上げます
+            if (this.groupStats[defender.groupId]) this.groupStats[defender.groupId].morale = Math.max(0, this.groupStats[defender.groupId].morale - 3);
+            if (this.groupStats[attacker.groupId]) this.groupStats[attacker.groupId].morale = Math.min(120, this.groupStats[attacker.groupId].morale + 3);
+            this.log(`部隊の壊滅により、${defender.name}隊が所属する軍の士気が下がり、${attacker.name}隊が所属する軍の士気が上がった！`);
         }
         if (attacker.soldiers <= 0) {
             this.log(`${attacker.name}隊が壊滅した！`);
             this.units = this.units.filter(u => u.id !== attacker.id);
             
-            // ★追加: 反撃などで攻撃側が壊滅した場合も同じように処理します
-            if (attacker.isAttacker) {
-                this.atkMorale = Math.max(0, this.atkMorale - 3);
-                this.defMorale = Math.min(120, this.defMorale + 3);
-                this.log(`部隊の壊滅により、攻撃軍の士気が下がり、守備軍の士気が上がった！`);
-            } else {
-                this.defMorale = Math.max(0, this.defMorale - 3);
-                this.atkMorale = Math.min(120, this.atkMorale + 3);
-                this.log(`部隊の壊滅により、守備軍の士気が下がり、攻撃軍の士気が上がった！`);
-            }
+            if (this.groupStats[attacker.groupId]) this.groupStats[attacker.groupId].morale = Math.max(0, this.groupStats[attacker.groupId].morale - 3);
+            if (this.groupStats[defender.groupId]) this.groupStats[defender.groupId].morale = Math.min(120, this.groupStats[defender.groupId].morale + 3);
+            this.log(`部隊の壊滅により、${attacker.name}隊が所属する軍の士気が下がり、${defender.name}隊が所属する軍の士気が上がった！`);
         }
         
         attacker.hasActionDone = true;
