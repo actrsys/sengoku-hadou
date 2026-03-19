@@ -109,32 +109,65 @@ window.GameEvents.push({
         // 【5】被害が出ているかチェック
         if (damagedProvinceMap.size > 0) {
             
-            if (typeof DataManager !== 'undefined' && DataManager.provinceImageData) {
+            // 初回のみ画像を読み込み、パソコンのメモリに記憶（キャッシュ）させます
+            if (!window.ProvinceImageDataCache) {
+                const provMapImg = new Image();
+                provMapImg.src = './data/images/map/japan_provinces.png';
+                
+                await new Promise(resolve => {
+                    if (provMapImg.complete) resolve();
+                    else {
+                        provMapImg.onload = resolve;
+                        provMapImg.onerror = resolve;
+                        setTimeout(resolve, 1000); 
+                    }
+                });
+
+                if (provMapImg.naturalWidth > 0) {
+                    const tempCanvas = document.createElement('canvas');
+                    tempCanvas.width = provMapImg.naturalWidth;
+                    tempCanvas.height = provMapImg.naturalHeight;
+                    const tempCtx = tempCanvas.getContext('2d');
+                    tempCtx.drawImage(provMapImg, 0, 0);
+                    try {
+                        window.ProvinceImageDataCache = tempCtx.getImageData(0, 0, tempCanvas.width, tempCanvas.height);
+                    } catch (e) {
+                        console.error("画像読み取りエラー:", e);
+                    }
+                }
+            }
+
+            // 記憶した画像データを使って地図を塗ります
+            if (window.ProvinceImageDataCache) {
                 const canvas = document.createElement('canvas');
-                canvas.width = DataManager.mapImageWidth || whiteMapImg.naturalWidth;
-                canvas.height = DataManager.mapImageHeight || whiteMapImg.naturalHeight;
+                canvas.width = window.ProvinceImageDataCache.width;
+                canvas.height = window.ProvinceImageDataCache.height;
                 canvas.style.position = 'absolute';
                 canvas.style.top = '0';
                 canvas.style.left = '0';
                 canvas.style.width = '100%';
                 canvas.style.height = '100%';
                 canvas.style.pointerEvents = 'none';
-                
                 canvas.style.animation = 'blink 1s infinite';
 
                 const ctx = canvas.getContext('2d');
                 const targetColors = [];
                 
+                const hexToRgb = (hex) => {
+                    const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+                    return result ? { r: parseInt(result[1], 16), g: parseInt(result[2], 16), b: parseInt(result[3], 16) } : null;
+                };
+                
                 damagedProvinceMap.forEach((scale, pId) => {
                     const pData = game.provinces.find(p => p.id === pId);
                     if (pData && pData.color_code) {
-                        const rgb = DataManager.hexToRgb(pData.color_code);
+                        const rgb = hexToRgb(pData.color_code);
                         if (rgb) targetColors.push(rgb);
                     }
                 });
 
                 if (targetColors.length > 0) {
-                    const srcData = DataManager.provinceImageData.data;
+                    const srcData = window.ProvinceImageDataCache.data;
                     const newImgData = ctx.createImageData(canvas.width, canvas.height);
                     const dstData = newImgData.data;
 
