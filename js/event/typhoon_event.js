@@ -37,7 +37,29 @@ window.GameEvents.push({
         // 【3】被害の計算結果を入れる箱を準備
         const damagedProvinceMap = new Map();
         const damagedPlayerCastles = [];      
-        const baseScale = Math.floor(Math.random() * 5) + Math.floor(Math.random() * 6) + 1;
+        
+        // ★ 新しい魔法：台風の規模（1〜10）をガチャの確率のように決めます！
+        let baseScale = 1;
+        const scaleDice = Math.random() * 100; // 0〜100が出るルーレットを回します
+
+        if (scaleDice < 10) {
+            baseScale = 1; // 10%の確率で 規模1
+        } else if (scaleDice < 35) {
+            baseScale = 2; // 25%の確率で 規模2
+        } else if (scaleDice < 65) {
+            baseScale = 3; // 30%の確率で 規模3（ここが一番出やすい！）
+        } else if (scaleDice < 85) {
+            baseScale = 4; // 20%の確率で 規模4
+        } else if (scaleDice < 93) {
+            baseScale = 5; // 8%の確率で 規模5
+        } else if (scaleDice < 97) {
+            baseScale = 6; // 4%の確率で 規模6
+        } else if (scaleDice < 99) {
+            baseScale = 7; // 2%の確率で 規模7
+        } else {
+            // ルーレットで「99〜100」のわずか1%を引いた時だけ、規模8〜10の超巨大台風（激レア）！
+            baseScale = Math.floor(Math.random() * 3) + 8; 
+        }
 
         // 【4】白地図のウインドウを作ります
         const mapOverlay = document.createElement('div');
