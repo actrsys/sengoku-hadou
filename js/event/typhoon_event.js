@@ -29,204 +29,120 @@ window.GameEvents.push({
         const resetZoomBtn = document.getElementById('map-reset-zoom');
         if (resetZoomBtn) resetZoomBtn.click();
 
-        // 【3】被害の計算
-        const damagedProvinceMap = new Map();
-        const damagedPlayerCastles = [];      
-        const baseScale = Math.floor(Math.random() * 5) + Math.floor(Math.random() * 6) + 1;
-
-        game.provinces.forEach(province => {
-            if (!province.typhoon) return; 
-
-            if (Math.random() < province.typhoon) {
-                const shift = Math.floor(Math.random() * 3) - 1;
-                let finalScale = Math.max(1, Math.min(10, baseScale + shift));
-                damagedProvinceMap.set(province.id, finalScale);
-                console.log(`💥 ${province.province} に規模 ${finalScale} の台風が直撃！`);
-            }
-        });
-
-        game.castles.forEach(castle => {
-            if (damagedProvinceMap.has(castle.provinceId)) {
-                const finalScale = damagedProvinceMap.get(castle.provinceId);
-                const dropPercent = finalScale * 0.03;
-                
-                castle.kokudaka = Math.floor(castle.kokudaka * (1.0 - dropPercent));
-                castle.defense = Math.floor(castle.defense * (1.0 - dropPercent));
-                
-                if (finalScale >= 6) {
-                    castle.soldiers = Math.floor(castle.soldiers * (1.0 - ((finalScale - 5) * 0.04)));
-                    castle.population = Math.floor(castle.population * (1.0 - ((finalScale - 5) * 0.02)));
-                }
-
-                if (castle.ownerClan === game.playerClanId) {
-                    damagedPlayerCastles.push({ castle: castle, scale: finalScale });
-                }
-            }
-        });
-
-        // 【4】白地図のウインドウを作ります
-        const mapOverlay = document.createElement('div');
-        mapOverlay.style.position = 'fixed';
-        mapOverlay.style.top = '0';
-        mapOverlay.style.left = '0';
-        mapOverlay.style.width = '100%';
-        mapOverlay.style.height = '100%';
-        mapOverlay.style.backgroundColor = 'rgba(0,0,0,0.85)';
-        mapOverlay.style.zIndex = '7500'; 
-        mapOverlay.style.display = 'flex';
-        mapOverlay.style.justifyContent = 'center';
-        mapOverlay.style.alignItems = 'flex-start'; // ★ 画面の上側に配置します
-        mapOverlay.style.paddingTop = '5vh'; // ★ 上から少しだけ隙間を開けます
-
-        const mapContainer = document.createElement('div');
-        mapContainer.style.position = 'relative';
-        
-        // ★ PCとスマホで地図のサイズを変えます
-        if (window.innerWidth > 768) {
-            mapContainer.style.width = '66%'; // PC版は3分の2くらいに縮小
-            mapContainer.style.maxWidth = '800px'; 
-        } else {
-            mapContainer.style.width = '95%'; // スマホ版は横幅いっぱいに
-            mapContainer.style.maxWidth = 'none';
+        // 【3】地図画像の取得（裏側で見えない画用紙を作る準備です）
+        const mapImg = document.querySelector('#map-container img') || document.getElementById('map-image');
+        if (!mapImg) {
+            console.error("地図画像が見つからないため、台風の進路計算ができませんでした。");
+            await game.ui.showDialogAsync("【台風通過】\n幸い、今回は大きな被害はなかったようです。", false, 0);
+            return;
         }
 
-        mapContainer.style.border = '4px solid #fff';
-        mapContainer.style.borderRadius = '8px';
-        mapContainer.style.backgroundColor = '#81c784';
-        mapContainer.style.overflow = 'hidden';
+        // 見えない画用紙（キャンバス）を作って、地図をそっくり写し書きします
+        const canvas = document.createElement('canvas');
+        const ctx = canvas.getContext('2d', { willReadFrequently: true });
+        const width = mapImg.naturalWidth || 3140;
+        const height = mapImg.naturalHeight || 2440;
+        canvas.width = width;
+        canvas.height = height;
+        ctx.drawImage(mapImg, 0, 0, width, height);
 
-        const whiteMapImg = new Image();
-        whiteMapImg.src = './data/images/map/japan_white_map.png';
-        whiteMapImg.style.width = '100%';
-        whiteMapImg.style.display = 'block';
+        // 【4】台風のスタート地点と設定
+        let typhoonX = -200;         // 左側の画面外からスタート
+        let typhoonY = height + 200; // 下側の画面外からスタート
+        const typhoonRadius = 150;   // 台風の大きさ（被害が出る範囲）
+        
+        // 被害を受けた国の色コードをメモする箱（Setを使うと、同じ色が何度も入るのを防いでくれます）
+        const damagedColorCodes = new Set(); 
+        const pathData = []; // 進路を記録する箱（あとでアニメーションに使うためのものです）
 
-        mapContainer.appendChild(whiteMapImg);
-        mapOverlay.appendChild(mapContainer);
-        document.body.appendChild(mapOverlay);
+        // 【5】台風を動かして進路を計算します（右上に向かって進みます）
+        while (typhoonX < width + typhoonRadius && typhoonY > -typhoonRadius) {
+            // 今の場所を記録します
+            pathData.push({ x: typhoonX, y: typhoonY });
 
-        await new Promise(resolve => {
-            if (whiteMapImg.complete) {
-                resolve();
+            // 1歩進めます（サイコロを振ってランダムな歩幅にします）
+            let moveX = Math.random() * 30 + 10; // 右へ10〜40進む
+            let moveY = Math.random() * 30 + 10; // 上へ10〜40進む
+
+            // 太平洋側（右下）に向かわせるための「重み」の処理です
+            // y座標が大きい（地図の下の方にいる）時は、右へ行きやすくします
+            if (typhoonY > height / 2) {
+                moveX += 15;
             } else {
-                whiteMapImg.onload = resolve;
-                whiteMapImg.onerror = resolve;
-                setTimeout(resolve, 1000); 
-            }
-        });
-
-        // 【5】被害が出ているかチェック
-        if (damagedProvinceMap.size > 0) {
-            
-            // 初回のみ画像を読み込み、パソコンのメモリに記憶（キャッシュ）させます
-            if (!window.ProvinceImageDataCache) {
-                const provMapImg = new Image();
-                provMapImg.src = './data/images/map/japan_provinces.png';
-                
-                await new Promise(resolve => {
-                    if (provMapImg.complete) resolve();
-                    else {
-                        provMapImg.onload = resolve;
-                        provMapImg.onerror = resolve;
-                        setTimeout(resolve, 1000); 
-                    }
-                });
-
-                if (provMapImg.naturalWidth > 0) {
-                    const tempCanvas = document.createElement('canvas');
-                    tempCanvas.width = provMapImg.naturalWidth;
-                    tempCanvas.height = provMapImg.naturalHeight;
-                    const tempCtx = tempCanvas.getContext('2d');
-                    tempCtx.drawImage(provMapImg, 0, 0);
-                    try {
-                        window.ProvinceImageDataCache = tempCtx.getImageData(0, 0, tempCanvas.width, tempCanvas.height);
-                    } catch (e) {
-                        console.error("画像読み取りエラー:", e);
-                    }
-                }
+                moveY += 15;
             }
 
-            // 記憶した画像データを使って地図を塗ります
-            if (window.ProvinceImageDataCache) {
-                const canvas = document.createElement('canvas');
-                canvas.width = window.ProvinceImageDataCache.width;
-                canvas.height = window.ProvinceImageDataCache.height;
-                canvas.style.position = 'absolute';
-                canvas.style.top = '0';
-                canvas.style.left = '0';
-                canvas.style.width = '100%';
-                canvas.style.height = '100%';
-                canvas.style.pointerEvents = 'none';
-                
-                // ★ 点滅アニメーションを「1秒間の光りを2回だけ繰り返す」に設定します
-                canvas.style.animation = 'blink 1s 2';
+            typhoonX += moveX;
+            typhoonY -= moveY;
 
-                const ctx = canvas.getContext('2d');
-                const targetColors = [];
-                
-                const hexToRgb = (hex) => {
-                    const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
-                    return result ? { r: parseInt(result[1], 16), g: parseInt(result[2], 16), b: parseInt(result[3], 16) } : null;
-                };
-                
-                damagedProvinceMap.forEach((scale, pId) => {
-                    const pData = game.provinces.find(p => p.id === pId);
-                    if (pData && pData.color_code) {
-                        const rgb = hexToRgb(pData.color_code);
-                        if (rgb) targetColors.push(rgb);
-                    }
-                });
+            // 今の場所が地図の中に入っているかチェックします
+            if (typhoonX > -typhoonRadius && typhoonX < width + typhoonRadius &&
+                typhoonY > -typhoonRadius && typhoonY < height + typhoonRadius) {
 
-                if (targetColors.length > 0) {
-                    const srcData = window.ProvinceImageDataCache.data;
-                    const newImgData = ctx.createImageData(canvas.width, canvas.height);
-                    const dstData = newImgData.data;
+                // 【6】色コード検知（台風の中心と、上下左右の少し離れた場所の色を調べます）
+                const checkPoints = [
+                    { x: typhoonX, y: typhoonY }, // 中心
+                    { x: typhoonX - typhoonRadius/2, y: typhoonY }, // 左
+                    { x: typhoonX + typhoonRadius/2, y: typhoonY }, // 右
+                    { x: typhoonX, y: typhoonY - typhoonRadius/2 }, // 上
+                    { x: typhoonX, y: typhoonY + typhoonRadius/2 }  // 下
+                ];
 
-                    for (let i = 0; i < srcData.length; i += 4) {
-                        const r = srcData[i], g = srcData[i+1], b = srcData[i+2], a = srcData[i+3];
-                        if (a > 0) {
-                            let isTarget = false;
-                            for (let c of targetColors) {
-                                if (Math.abs(r - c.r) < 5 && Math.abs(g - c.g) < 5 && Math.abs(b - c.b) < 5) {
-                                    isTarget = true;
-                                    break;
-                                }
-                            }
-                            if (isTarget) {
-                                dstData[i] = 0;
-                                dstData[i+1] = 0;
-                                dstData[i+2] = 255;
-                                dstData[i+3] = 180;
-                            }
+                for (let pt of checkPoints) {
+                    if (pt.x >= 0 && pt.x < width && pt.y >= 0 && pt.y < height) {
+                        // 虫眼鏡でその場所のピクセルの色データを取得します
+                        const pixel = ctx.getImageData(Math.floor(pt.x), Math.floor(pt.y), 1, 1).data;
+                        const r = pixel[0]; // 赤
+                        const g = pixel[1]; // 緑
+                        const b = pixel[2]; // 青
+                        const a = pixel[3]; // 透明度
+
+                        // 透明じゃなくて、真っ黒（海）でもない場合のみ反応します
+                        if (a > 0 && !(r === 0 && g === 0 && b === 0)) {
+                            // RGBの数字を「#ff0000」のようなカラーコードに変換します
+                            const hexColor = "#" + ((1 << 24) + (r << 16) + (g << 8) + b).toString(16).slice(1);
+                            damagedColorCodes.add(hexColor); // メモ帳に色を書き込みます
                         }
                     }
-                    ctx.putImageData(newImgData, 0, 0);
                 }
-                mapContainer.appendChild(canvas);
-
-                // ★ アニメーションが終わるまで2秒待ちます
-                await new Promise(resolve => setTimeout(resolve, 2000));
-
-                // ★ アニメーションを解除して、一番濃い状態で固定します
-                canvas.style.animation = 'none';
-                canvas.style.opacity = '1.0';
             }
+        }
 
-            // 【6】アニメーション停止後、地図が出たままの状態でメッセージを表示します
-            await game.ui.showDialogAsync("【台風発生】\n各地で被害が発生しているようです……。", false, 0);
+        console.log("=== 台風の進路メモ ===", pathData);
+        console.log("=== 読み取った色コード ===", damagedColorCodes);
+
+        // 【7】色コードから国を特定します
+        const damagedProvinces = []; // 被害を受けた国の名前を入れる箱
+        const damagedProvinceIds = []; // 被害を受けた国のIDを入れる箱
+
+        // ゲームの国データと、メモした色を見比べます
+        if (game.provinces && game.provinces.length > 0) {
+            for (let prov of game.provinces) {
+                // prov.color_code または prov.colorCode がメモの中にあるか確認します
+                const provColor = prov.color_code || prov.colorCode;
+                if (damagedColorCodes.has(provColor)) {
+                    damagedProvinces.push(prov.province || prov.name);
+                    damagedProvinceIds.push(prov.id);
+                }
+            }
+        }
+
+        console.log("=== 被害を受けた国 ===", damagedProvinces);
+
+        // 【8】結果の表示と被害処理
+        if (damagedProvinces.length > 0) {
+            // 国名が多すぎるとメッセージが長くなるので、最初の3つくらいだけ表示するようにしています
+            const displayNames = damagedProvinces.slice(0, 3).join("、") + (damagedProvinces.length > 3 ? " など" : "");
+            await game.ui.showDialogAsync(`【台風通過】\n${displayNames} で被害が発生したようです……。`, false, 0);
+
+            // ------------------------------------------------------------------------
+            // ★ ここに、以前のコードで行っていた「お米が減る」などの処理を繋げます ★
+            // （今は判定の仕組みを作ったので、ここで damagedProvinceIds に入っている
+            //   国のIDを使って、城の被害を計算することができます）
+            // ------------------------------------------------------------------------
 
         } else {
             await game.ui.showDialogAsync("【台風通過】\n幸い、今回は大きな被害はなかったようです。", false, 0);
-        }
-
-        // 【7】プレイヤーがメッセージを閉じたら、白地図ウインドウを消します
-        document.body.removeChild(mapOverlay);
-
-        // 【8】ウインドウが消えてから、嵐の後の静けさ……「3秒間」じっと待ちます
-        await new Promise(resolve => setTimeout(resolve, 3000));
-
-        // 【9】自軍の城の被害を、1つずつ個別に報告します
-        for (const data of damagedPlayerCastles) {
-            await game.ui.showDialogAsync(`【被害報告】\n我が家の ${data.castle.name} が台風の被害を受けました……。\n（局地規模：${data.scale}）`, false, 0);
         }
     }
 });
