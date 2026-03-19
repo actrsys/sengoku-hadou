@@ -76,12 +76,21 @@ window.GameEvents.push({
         mapOverlay.style.zIndex = '7500'; 
         mapOverlay.style.display = 'flex';
         mapOverlay.style.justifyContent = 'center';
-        mapOverlay.style.alignItems = 'center';
+        mapOverlay.style.alignItems = 'flex-start'; // ★ 画面の上側に配置します
+        mapOverlay.style.paddingTop = '5vh'; // ★ 上から少しだけ隙間を開けます
 
         const mapContainer = document.createElement('div');
         mapContainer.style.position = 'relative';
-        mapContainer.style.width = '90%';
-        mapContainer.style.maxWidth = '800px';
+        
+        // ★ PCとスマホで地図のサイズを変えます
+        if (window.innerWidth > 768) {
+            mapContainer.style.width = '66%'; // PC版は3分の2くらいに縮小
+            mapContainer.style.maxWidth = '800px'; 
+        } else {
+            mapContainer.style.width = '95%'; // スマホ版は横幅いっぱいに
+            mapContainer.style.maxWidth = 'none';
+        }
+
         mapContainer.style.border = '4px solid #fff';
         mapContainer.style.borderRadius = '8px';
         mapContainer.style.backgroundColor = '#81c784';
@@ -97,8 +106,9 @@ window.GameEvents.push({
         document.body.appendChild(mapOverlay);
 
         await new Promise(resolve => {
-            if (whiteMapImg.complete) resolve();
-            else {
+            if (whiteMapImg.complete) {
+                resolve();
+            } else {
                 whiteMapImg.onload = resolve;
                 whiteMapImg.onerror = resolve;
                 setTimeout(resolve, 1000); 
@@ -147,7 +157,9 @@ window.GameEvents.push({
                 canvas.style.width = '100%';
                 canvas.style.height = '100%';
                 canvas.style.pointerEvents = 'none';
-                canvas.style.animation = 'blink 1s infinite';
+                
+                // ★ 点滅アニメーションを「1秒間の光りを2回だけ繰り返す」に設定します
+                canvas.style.animation = 'blink 1s 2';
 
                 const ctx = canvas.getContext('2d');
                 const targetColors = [];
@@ -192,17 +204,19 @@ window.GameEvents.push({
                 }
                 mapContainer.appendChild(canvas);
 
+                // ★ アニメーションが終わるまで2秒待ちます
                 await new Promise(resolve => setTimeout(resolve, 2000));
 
+                // ★ アニメーションを解除して、一番濃い状態で固定します
                 canvas.style.animation = 'none';
-                canvas.style.opacity = '0.8';
+                canvas.style.opacity = '1.0';
             }
 
-            // 【6】ここで被害発生メッセージを表示します
+            // 【6】アニメーション停止後、地図が出たままの状態でメッセージを表示します
+            // （地図を上側に寄せたため、下部に出るメッセージとは被りません）
             await game.ui.showDialogAsync("【台風発生】\n各地で被害が発生しているようです……。", false, 0);
 
         } else {
-            // 被害が0件だった時のメッセージです
             await game.ui.showDialogAsync("【台風通過】\n幸い、今回は大きな被害はなかったようです。", false, 0);
         }
 
