@@ -1902,18 +1902,47 @@ class FieldWarManager {
             this.log(`${defender.name}隊が壊滅した！`);
             this.units = this.units.filter(u => u.id !== defender.id);
             
-            // 壊滅した部隊のグループの士気を下げ、倒した側の士気を上げます
-            if (this.groupStats[defender.groupId]) this.groupStats[defender.groupId].morale = Math.max(0, this.groupStats[defender.groupId].morale - 3);
-            if (this.groupStats[attacker.groupId]) this.groupStats[attacker.groupId].morale = Math.min(120, this.groupStats[attacker.groupId].morale + 3);
-            this.log(`部隊の壊滅により、${defender.name}隊が所属する軍の士気が下がり、${attacker.name}隊が所属する軍の士気が上がった！`);
+            // 壊滅した陣営の士気ダウン（本人は-3、友軍は-1）
+            const losePrefix = defender.isAttacker ? 'atk_' : 'def_';
+            for (let key in this.groupStats) {
+                if (key.startsWith(losePrefix) && this.groupStats[key]) {
+                    let drop = (key === defender.groupId) ? 3 : 1;
+                    this.groupStats[key].morale = Math.max(0, this.groupStats[key].morale - drop);
+                }
+            }
+            // 倒した陣営の士気アップ（本人は+3、友軍は+1）
+            const winPrefix = attacker.isAttacker ? 'atk_' : 'def_';
+            for (let key in this.groupStats) {
+                if (key.startsWith(winPrefix) && this.groupStats[key]) {
+                    let rise = (key === attacker.groupId) ? 3 : 1;
+                    this.groupStats[key].morale = Math.min(120, this.groupStats[key].morale + rise);
+                }
+            }
+            this.log(`部隊の壊滅により、${defender.name}隊が所属する軍の士気が大きく下がり、友軍の士気も下がった！`);
+            this.log(`${attacker.name}隊が所属する軍の士気が大きく上がり、友軍の士気も上がった！`);
         }
         if (attacker.soldiers <= 0) {
             this.log(`${attacker.name}隊が壊滅した！`);
             this.units = this.units.filter(u => u.id !== attacker.id);
             
-            if (this.groupStats[attacker.groupId]) this.groupStats[attacker.groupId].morale = Math.max(0, this.groupStats[attacker.groupId].morale - 3);
-            if (this.groupStats[defender.groupId]) this.groupStats[defender.groupId].morale = Math.min(120, this.groupStats[defender.groupId].morale + 3);
-            this.log(`部隊の壊滅により、${attacker.name}隊が所属する軍の士気が下がり、${defender.name}隊が所属する軍の士気が上がった！`);
+            // 壊滅した陣営の士気ダウン（本人は-3、友軍は-1）
+            const losePrefix = attacker.isAttacker ? 'atk_' : 'def_';
+            for (let key in this.groupStats) {
+                if (key.startsWith(losePrefix) && this.groupStats[key]) {
+                    let drop = (key === attacker.groupId) ? 3 : 1;
+                    this.groupStats[key].morale = Math.max(0, this.groupStats[key].morale - drop);
+                }
+            }
+            // 倒した陣営の士気アップ（本人は+3、友軍は+1）
+            const winPrefix = defender.isAttacker ? 'atk_' : 'def_';
+            for (let key in this.groupStats) {
+                if (key.startsWith(winPrefix) && this.groupStats[key]) {
+                    let rise = (key === defender.groupId) ? 3 : 1;
+                    this.groupStats[key].morale = Math.min(120, this.groupStats[key].morale + rise);
+                }
+            }
+            this.log(`部隊の壊滅により、${attacker.name}隊が所属する軍の士気が大きく下がり、友軍の士気も下がった！`);
+            this.log(`${defender.name}隊が所属する軍の士気が大きく上がり、友軍の士気も上がった！`);
         }
         
         attacker.hasActionDone = true;
