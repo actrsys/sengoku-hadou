@@ -966,9 +966,9 @@ class GameManager {
         
         this.ui.log(`=== ${this.year}年 ${this.month}月 ===`);
         
-        // ★ここを書き足し！：月初イベントをチェックして実行します
+        // ★ここを書き換え！：月初イベント【前】をチェックして実行します
         if (this.eventManager) {
-            await this.eventManager.processStartMonthEvents();
+            await this.eventManager.processEvents('startMonth_before');
         }
         
         // ★修正：await を書き足して、元服の処理が終わるまでしっかり待ちます！
@@ -1046,6 +1046,11 @@ class GameManager {
             this.updateAllClanPrestige();
         }
         // ==========================================
+
+        // ★ここを書き足し！：月初イベント【後】（収入などの処理が終わった後）を実行します
+        if (this.eventManager) {
+            await this.eventManager.processEvents('startMonth_after');
+        }
 
         this.currentIndex = 0; 
         this.processTurn();
@@ -1211,6 +1216,12 @@ class GameManager {
         };
         // ==========================================
 
+        // ★ここを書き足し！：月末イベント【前】（寿命などの処理が始まる前）を実行します
+        if (this.eventManager) {
+            await this.eventManager.processEvents('endMonth_before');
+        }
+        await waitIfBusy(); // 終わったら、画面が空っぽになるまで絶対に待つ！
+
         // 1つ目の係員：派閥
         if (this.factionSystem && typeof this.factionSystem.processEndMonth === 'function') {
             await this.factionSystem.processEndMonth(); 
@@ -1242,8 +1253,8 @@ class GameManager {
         await waitIfBusy(); // 終わったら、画面が空っぽになるまで絶対に待つ！
 
         // 6つ目の係員：月末の特別イベント（災害など）
-        if (this.eventManager && typeof this.eventManager.processEndMonthEvents === 'function') {
-            await this.eventManager.processEndMonthEvents();
+        if (this.eventManager) {
+            await this.eventManager.processEvents('endMonth_after');
         }
         await waitIfBusy(); // 終わったら、画面が空っぽになるまで絶対に待つ！
 
