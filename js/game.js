@@ -734,6 +734,8 @@ class GameManager {
         this.gunshiSystem = new GunshiSystem(this);
         // ★ お引越しセンターを開店します！
         this.affiliationSystem = new AffiliationSystem(this);
+        // ★ 月初・月末のイベントを管理するシステムを呼び出します！
+        this.eventManager = new EventManager(this);
         
         this.phase = 'title';
     }
@@ -963,6 +965,11 @@ class GameManager {
         await this.ui.showCutin(`${this.year}年 ${this.month}月`);
         
         this.ui.log(`=== ${this.year}年 ${this.month}月 ===`);
+        
+        // ★ここを書き足し！：月初イベントをチェックして実行します
+        if (this.eventManager) {
+            await this.eventManager.processStartMonthEvents();
+        }
         
         // ★修正：await を書き足して、元服の処理が終わるまでしっかり待ちます！
         await this.lifeSystem.processStartMonth();
@@ -1234,8 +1241,14 @@ class GameManager {
         }
         await waitIfBusy(); // 終わったら、画面が空っぽになるまで絶対に待つ！
 
+        // 6つ目の係員：月末の特別イベント（災害など）
+        if (this.eventManager && typeof this.eventManager.processEndMonthEvents === 'function') {
+            await this.eventManager.processEndMonthEvents();
+        }
+        await waitIfBusy(); // 終わったら、画面が空っぽになるまで絶対に待つ！
+
         // すべての月末イベントとメッセージが完全に終わってから、ようやく時間を進めます！
-        this.month++; 
+        this.month++;
         if(this.month > 12) { this.month = 1; this.year++; }
         
         const clans = new Set(this.castles.filter(c => c.ownerClan !== 0).map(c => c.ownerClan)); 
