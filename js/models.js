@@ -477,8 +477,13 @@ class CourtRank {
 class Province {
     constructor(data) {
         Object.assign(this, data);
-        this.id = Number(this.id);
-        // region（地方名）、province（国名）、color_code（色）は、
-        // そのまま文字として自動で箱に入ります！
+        
+        // ★CSVから読み込んだデータを、確実な形にして箱にしまいます
+        this.id = Number(this.id || 0);             // 国の出席番号（例：23）
+        this.province = data.province || "";        // 国の名前（例：尾張国）
+        this.regionId = Number(this.regionId || 0); // 地方の出席番号（例：5）
+        this.region = data.region || "";            // 地方の名前（例：東海）
+        this.color_code = data.color_code || "";    // マップ用の色（例：#ff5d00）
+        this.typhoon = Number(this.typhoon || 0);   // 台風の発生確率（例：0.15）
     }
 }
