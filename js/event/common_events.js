@@ -14,7 +14,7 @@ window.GameEvents.push({
     checkCondition: function(game) {
         const dice = Math.random();
         if (game.month === 8 && dice < 0.10) return true;
-        if (game.month === 9 && dice < 0.30) return true;
+        if (game.month === 9 && dice < 1.00) return true;
         if (game.month === 10 && dice < 0.03) return true;
         if (game.month === 11 && dice < 0.01) return true;
         return false;
