@@ -529,11 +529,26 @@ Object.assign(UIManager.prototype, {
         // ★追加：ポップアップの目印シールを貼るために、絶対に「今のターンの城」を取得する魔法です
         const turnCastle = this.game.getCurrentTurnCastle();
 
+        const mapW = this.game.mapWidth || 1200;
+        const mapH = this.game.mapHeight || 800;
+
+        // ★ここから追加！：地方を光らせるための「透明な画用紙（キャンバス）」を敷いておきます！
+        const overlay = document.createElement('canvas');
+        overlay.id = 'province-overlay';
+        overlay.width = mapW;
+        overlay.height = mapH;
+        overlay.style.position = 'absolute';
+        overlay.style.left = '0px';
+        overlay.style.top = '0px';
+        overlay.style.pointerEvents = 'none'; // クリックの邪魔をしないようにする魔法です
+        overlay.style.zIndex = '3'; // お城の線より下、マップ画像より上に敷きます
+        overlay.classList.add('anim-map-glow'); // ぼわーっと光るアニメーションの準備
+        this.mapEl.appendChild(overlay);
+        // ★追加ここまで！
+
         const svgNS = "http://www.w3.org/2000/svg";
         const svg = document.createElementNS(svgNS, "svg");
         
-        const mapW = this.game.mapWidth || 1200;
-        const mapH = this.game.mapHeight || 800;
         svg.setAttribute("width", mapW);
         svg.setAttribute("height", mapH);
         
@@ -980,5 +995,75 @@ Object.assign(UIManager.prototype, {
                 }
             }
         });
+    },
+
+    // ==========================================
+    // ★ここから追加！：特定の地方（または国）を光らせる魔法です！
+    // ==========================================
+    highlightRegion(regionId) {
+        const overlay = document.getElementById('province-overlay');
+        if (!overlay) return;
+        const ctx = overlay.getContext('2d');
+        const width = overlay.width;
+        const height = overlay.height;
+        
+        // まずは前に塗った色を全部消して、画用紙を綺麗にします
+        ctx.clearRect(0, 0, width, height);
+
+        // DataManagerにこっそりしまっておいた画像データ（裏側の秘密マップ）をもらいます
+        const sourceData = DataManager.provinceImageData;
+        if (!sourceData) return;
+
+        // 指定された地方（regionId）に含まれる国の「色コード」を全部集めます
+        const targetColors = this.game.provinces
+            .filter(p => p.regionId === regionId)
+            .map(p => DataManager.hexToRgb(p.color_code));
+
+        if (targetColors.length === 0) return;
+
+        // 新しく色を塗るための透明な絵の具セットを作ります
+        const outputData = ctx.createImageData(width, height);
+
+        // 画像の「点（ピクセル）」を1個ずつ調べていきます！
+        for (let i = 0; i < sourceData.data.length; i += 4) {
+            const r = sourceData.data[i];
+            const g = sourceData.data[i+1];
+            const b = sourceData.data[i+2];
+            const a = sourceData.data[i+3];
+
+            if (a === 0) continue; // 透明な場所は無視して次へ
+
+            // 集めた色コードと一致するかチェックします
+            let match = false;
+            for (let c of targetColors) {
+                // ちょっとだけ色がズレていても大丈夫なようにおまけします（誤差5まで）
+                if (Math.abs(r - c.r) < 5 && Math.abs(g - c.g) < 5 && Math.abs(b - c.b) < 5) {
+                    match = true;
+                    break;
+                }
+            }
+
+            if (match) {
+                // 一致したら、赤色で半透明に塗ります！（色はR, G, Bの数字で自由に変えられます）
+                outputData.data[i] = 255;   // R（赤：マックス）
+                outputData.data[i+1] = 50;  // G（緑：少し）
+                outputData.data[i+2] = 50;  // B（青：少し）
+                outputData.data[i+3] = 128; // A（透明度。255が真っ暗、0が透明、128は半透明）
+            }
+        }
+
+        // 完成した絵の具を、画用紙にドーンと乗せます！
+        ctx.putImageData(outputData, 0, 0);
+    },
+
+    // 光を消す魔法です
+    clearHighlight() {
+        const overlay = document.getElementById('province-overlay');
+        if (!overlay) return;
+        const ctx = overlay.getContext('2d');
+        // 画用紙を綺麗にするだけ！
+        ctx.clearRect(0, 0, overlay.width, overlay.height);
     }
+    // ==========================================
+    // ★追加ここまで！
 }); // 合体魔法はここで終わり

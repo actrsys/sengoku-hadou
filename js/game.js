@@ -89,6 +89,15 @@ class DataManager {
             } catch (e) {
                 console.log("マップ画像の解析をスキップしました");
             }
+
+            // ★ここから追加！：地方のマップ画像もこっそり読み込んでおく魔法です！
+            try {
+                await this.loadProvinceMap('./data/images/map/japan_provinces.png');
+            } catch (e) {
+                console.log("地方マップ画像の解析をスキップしました");
+            }
+            // ★追加ここまで！
+
             // ★今回追加：完成した姫の名簿をゲーム本体に返します！
             return { clans, castles, bushos, kunishus, courtRanks, princesses, provinces, mapWidth: this.mapImageWidth, mapHeight: this.mapImageHeight };
         } catch (error) {
@@ -367,6 +376,30 @@ class DataManager {
             b: parseInt(result[3], 16)
         } : { r: 0, g: 0, b: 0 };
     }
+
+    // ★ここから追加！：地方マップの画像を読み込んで「透明な下敷き」として保存する魔法です！
+    static async loadProvinceMap(url) {
+        return new Promise((resolve, reject) => {
+            const img = new Image();
+            img.onload = () => {
+                const canvas = document.createElement('canvas');
+                canvas.width = img.width;
+                canvas.height = img.height;
+                const ctx = canvas.getContext('2d');
+                ctx.drawImage(img, 0, 0);
+                // 画像の点（ピクセル）のデータを、ゲーム中いつでも使えるように大事にしまっておきます
+                this.provinceImageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+                resolve();
+            };
+            img.onerror = () => {
+                console.warn("地方マップ画像の読み込みに失敗しました！");
+                resolve(); // 失敗してもゲームが止まらないようにします
+            };
+            img.src = url;
+        });
+    }
+    // ★追加ここまで！
+
     // ============================================
     // ★画像から色を探す魔法ここまで！
     // ============================================
