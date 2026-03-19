@@ -255,7 +255,7 @@ Object.assign(WarManager.prototype, {
                 const kunishu = this.game.kunishuSystem.getKunishu(defCastle.kunishuId);
                 defBusho = kunishu ? this.game.getBusho(kunishu.leaderId) : null;
             } else defBusho = this.game.getBusho(defCastle.castellanId);
-            if (!defBusho) defBusho = {name:"守備隊長", strength:30, leadership:30, intelligence:30, charm:30, faceIcon: "unknown_face.webp"};
+            if (!defBusho) defBusho = {name:"守備隊長", strength:30, leadership:30, politics:30, intelligence:30, charm:30, faceIcon: "unknown_face.webp"};
             
             // ★変更: 攻撃軍の情報は「メイン軍」のものだけになります！
             const attackerForce = {
@@ -576,7 +576,8 @@ Object.assign(WarManager.prototype, {
     // ★追加ここまで
     
     executeRetreatLogic(defCastle) {
-        const candidates = this.game.castles.filter(c => c.ownerClan === defCastle.ownerClan && c.id !== defCastle.id && GameSystem.isReachable(this.game, defCastle, c, defCastle.ownerClan));
+        // ★修正：大名家が「0（中立の空き城）」の時は、他の空き城を仲間の城だと勘違いしないように空っぽ（[]）にします！
+        const candidates = defCastle.ownerClan === 0 ? [] : this.game.castles.filter(c => c.ownerClan === defCastle.ownerClan && c.id !== defCastle.id && GameSystem.isReachable(this.game, defCastle, c, defCastle.ownerClan));
         if (candidates.length === 0) { this.endWar(true); return; }
         const s = this.state;
         

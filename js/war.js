@@ -679,7 +679,7 @@ class WarManager {
                  else if (s.turn === 'defender_self_reinf') s.defSelfReinforcement.soldiers -= soldierCost;
                  else if (s.turn === 'defender_ally_reinf') s.defReinforcement.soldiers -= soldierCost;
 
-                 const polList = activeBushos.map(b => b.politics).sort((a,b) => b - a);
+                 const polList = activeBushos.map(b => b.politics || 0).sort((a,b) => b - a);
                  const maxPol = polList.length > 0 ? polList[0] : 0;
                  let subPolSum = 0; for(let i=1; i<polList.length; i++) subPolSum += polList[i];
                  let recover = Math.floor(((soldierCost * W.RepairSoldierFactor) + (maxPol * W.RepairMainPolFactor) + (subPolSum * W.RepairSubPolFactor)) * W.RepairGlobalMultiplier);
