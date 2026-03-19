@@ -133,9 +133,10 @@ window.GameEvents.push({
                 return "#" + ((1 << 24) + (data[idx] << 16) + (data[idx+1] << 8) + data[idx+2]).toString(16).slice(1);
             };
 
+            // ① 左端に集中させる魔法
             let r = Math.pow(Math.random(), 3); 
             let typhoonX = -500 + (r * (width * 0.7 + 500)); 
-            let typhoonY = height + 1500;
+            let typhoonY = height + 1000;
             
             let typhoonRadius = 180;
             const damagedColorCodes = new Set(); 
@@ -144,26 +145,29 @@ window.GameEvents.push({
             let wasOnLand = false; 
             let landCount = 0; 
 
-            while (typhoonX < width + typhoonRadius && typhoonY > -typhoonRadius && typhoonRadius > 30) {
+            // ★ 放物線を描いて画面の下(南)へ落ちていく可能性があるので、
+            // 「下にはみ出しすぎた時 (typhoonY < height + 1000)」も終了条件に追加しました
+            while (typhoonX < width + typhoonRadius && typhoonY > -typhoonRadius && typhoonY < height + 1000 && typhoonRadius > 30) {
                 // 歩くたびに、今の場所をメモ帳に書き込みます
                 pathData.push({ x: typhoonX, y: typhoonY });
 
+                // 基本の歩幅
                 let moveX = Math.random() * 20 + 5;
                 let moveY = Math.random() * 25 + 15;
 
-                if (wasOnLand) {
-                    let yMultiplier = Math.max(0.1, 0.5 - (landCount * 0.05));
-                    moveY *= yMultiplier; 
-                    moveX *= 0.8; 
-                }
+                // ② 放物線を描く魔法！（北に行くほど、右へ、そして下へ倒れ込む）
+                // スタート地点からどれくらい進んだか（0.0 〜 1.0以上）を計算します
+                let progress = Math.max(0, (height + 500 - typhoonY) / height); 
+                
+                // 東（右）へはどんどん加速！
+                moveX += windStrength * progress * 1.5; 
+                // 北（上）へ行く力は奪われ、最終的にマイナス（南へ落下）になります！
+                // これが美しい放物線（カーブ）を作ります。
+                moveY -= 40 * Math.pow(progress, 1.5); 
 
-                if (typhoonY < height * 0.6) {
-                    moveX += windStrength; 
-                    moveY *= 0.6; 
-                }
-                if (typhoonY < height * 0.2) {
-                    moveX += windStrength * 1.5; 
-                    moveY *= 0.2; 
+                // 陸地にあたるとさらに角度が落ちる（急激に右下へ倒れる）
+                if (wasOnLand) {
+                    moveY -= 15; 
                 }
 
                 typhoonX += moveX;
@@ -191,23 +195,31 @@ window.GameEvents.push({
                     }
                 }
 
-                let baseDecay = 0.8; 
-                let northFactor = Math.max(0, (height - typhoonY) / height); 
-                let northDecay = 3.0 * northFactor; 
+                // ③ 威力の減衰を弱め、たまに成長する魔法！
+                // サイコロで「-1.0(成長する)」〜「+2.0(縮小する)」の値を決定します。
+                // 全体としては少しずつ縮小することが多いですが、たまに大きくなります！
+                let baseDecay = (Math.random() * 3.0) - 1.0; 
+                
+                // 北に行くことによる減衰も優しくしました
+                let northDecay = 1.0 * progress; 
 
                 if (onLand) {
                     landCount++;
-                    let landDecay = 3.0 + (landCount * 0.3); 
+                    // 陸地での削られ方も、以前よりかなりマイルドにしました
+                    let landDecay = 1.0 + (landCount * 0.2); 
                     typhoonRadius -= (baseDecay + northDecay + landDecay);
                 } else {
                     landCount = 0; 
                     typhoonRadius -= (baseDecay + northDecay);
                 }
 
+                // 成長しすぎて画面を覆い尽くさないよう、大きさの上限（250）を設定
+                if (typhoonRadius > 250) typhoonRadius = 250;
+
                 wasOnLand = onLand;
             }
             
-            // 最後に消えた場所もメモしておきます
+            // 最後に消えた場所もメモ
             pathData.push({ x: typhoonX, y: typhoonY });
 
             if (game.provinces && game.provinces.length > 0) {
