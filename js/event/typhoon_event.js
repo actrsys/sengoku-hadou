@@ -22,6 +22,11 @@ window.GameEvents.push({
     execute: async function(game) {
         console.log("=== 台風イベント開始 ===");
 
+        // ★★★ 進路を表示するかどうかのスイッチ ★★★
+        // true  にすると、黄色い点線で進路を描画します。
+        // false にすると、進路は描画されません（本番用）。
+        const SHOW_TYPHOON_PATH = true;
+
         // 【1】「台風が接近しています」メッセージを表示
         await game.ui.showDialogAsync("【台風接近】\n台風が接近しています……。", false, 0);
 
@@ -111,6 +116,9 @@ window.GameEvents.push({
         }
 
         // ====== ★ ここから新しい台風の進路計算です ★ ======
+        // ★新しいメモ帳：台風が通った道を記録しておくための箱です
+        const pathData = [];
+
         if (window.ProvinceImageDataCache) {
             const width = window.ProvinceImageDataCache.width;
             const height = window.ProvinceImageDataCache.height;
@@ -125,29 +133,30 @@ window.GameEvents.push({
                 return "#" + ((1 << 24) + (data[idx] << 16) + (data[idx+1] << 8) + data[idx+2]).toString(16).slice(1);
             };
 
-            // ① 発生場所をさらに遠くへ！（左へ500、下へ500の広い海）
-            let typhoonX = (Math.random() * (width * 0.5)) - 500;
+            let r = Math.pow(Math.random(), 3); 
+            let typhoonX = -500 + (r * (width * 0.7 + 500)); 
             let typhoonY = height + 500;
             
             let typhoonRadius = 180;
             const damagedColorCodes = new Set(); 
             const windStrength = Math.random() * 30 + 10; 
             
-            // ★新しい魔法：さっき陸地を踏んだか？を覚えておくメモ帳
             let wasOnLand = false; 
+            let landCount = 0; 
 
             while (typhoonX < width + typhoonRadius && typhoonY > -typhoonRadius && typhoonRadius > 30) {
+                // 歩くたびに、今の場所をメモ帳に書き込みます
+                pathData.push({ x: typhoonX, y: typhoonY });
+
                 let moveX = Math.random() * 20 + 5;
                 let moveY = Math.random() * 25 + 15;
 
-                // ② 陸地にあたった時の「角度（進行方向）」の減衰！
-                // 山にぶつかると北に進めなくなり、東へ倒れ込むように曲がります
                 if (wasOnLand) {
-                    moveY *= 0.3; // 上に進む力を激減させる！（角度が急に右に曲がる）
-                    moveX *= 0.9; // スピード全体も少し落ちる
+                    let yMultiplier = Math.max(0.1, 0.5 - (landCount * 0.05));
+                    moveY *= yMultiplier; 
+                    moveX *= 0.8; 
                 }
 
-                // 偏西風（北に行くほど右に曲がる）
                 if (typhoonY < height * 0.6) {
                     moveX += windStrength; 
                     moveY *= 0.6; 
@@ -162,7 +171,6 @@ window.GameEvents.push({
 
                 let onLand = false;
 
-                // 画面の中に入ったら色をチェック
                 if (typhoonX > -typhoonRadius && typhoonX < width + typhoonRadius &&
                     typhoonY > -typhoonRadius && typhoonY < height + typhoonRadius) {
 
@@ -178,21 +186,29 @@ window.GameEvents.push({
                         const hex = getPixelHex(pt.x, pt.y);
                         if (hex) {
                             damagedColorCodes.add(hex.toLowerCase());
-                            onLand = true; // 「陸地を踏んだ！」とメモ
+                            onLand = true; 
                         }
                     }
                 }
 
-                // 威力の減衰
+                let baseDecay = 0.8; 
+                let northFactor = Math.max(0, (height - typhoonY) / height); 
+                let northDecay = 3.0 * northFactor; 
+
                 if (onLand) {
-                    typhoonRadius -= 4.0; // 陸上だとゴリゴリ削れる
+                    landCount++;
+                    let landDecay = 3.0 + (landCount * 0.3); 
+                    typhoonRadius -= (baseDecay + northDecay + landDecay);
                 } else {
-                    typhoonRadius -= 0.8; // 海上はゆっくり削れる
+                    landCount = 0; 
+                    typhoonRadius -= (baseDecay + northDecay);
                 }
 
-                // 次の歩幅を計算するために、「今、陸地にいたか」を記憶しておく
                 wasOnLand = onLand;
             }
+            
+            // 最後に消えた場所もメモしておきます
+            pathData.push({ x: typhoonX, y: typhoonY });
 
             if (game.provinces && game.provinces.length > 0) {
                 for (let prov of game.provinces) {
@@ -227,8 +243,8 @@ window.GameEvents.push({
             }
         });
 
-        // 【7】被害が出ているかチェックして青く光らせる
-        if (damagedProvinceMap.size > 0) {
+        // 【7】被害の青い光 ＋ 黄色い点線の描画
+        if (damagedProvinceMap.size > 0 || SHOW_TYPHOON_PATH) {
             
             if (window.ProvinceImageDataCache) {
                 const canvas = document.createElement('canvas');
@@ -241,49 +257,75 @@ window.GameEvents.push({
                 canvas.style.height = '100%';
                 canvas.style.pointerEvents = 'none';
                 
-                canvas.style.animation = 'blink 1s 2';
+                // 被害がある時だけピコンピコンと点滅させます
+                if (damagedProvinceMap.size > 0) {
+                    canvas.style.animation = 'blink 1s 2';
+                }
 
                 const ctx = canvas.getContext('2d');
-                const targetColors = [];
                 
-                const hexToRgb = (hex) => {
-                    const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
-                    return result ? { r: parseInt(result[1], 16), g: parseInt(result[2], 16), b: parseInt(result[3], 16) } : null;
-                };
-                
-                damagedProvinceMap.forEach((scale, pId) => {
-                    const pData = game.provinces.find(p => p.id === pId);
-                    if (pData && pData.color_code) {
-                        const rgb = hexToRgb(pData.color_code);
-                        if (rgb) targetColors.push(rgb);
-                    }
-                });
+                // --- ① 青く光らせる処理 ---
+                if (damagedProvinceMap.size > 0) {
+                    const targetColors = [];
+                    const hexToRgb = (hex) => {
+                        const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+                        return result ? { r: parseInt(result[1], 16), g: parseInt(result[2], 16), b: parseInt(result[3], 16) } : null;
+                    };
+                    
+                    damagedProvinceMap.forEach((scale, pId) => {
+                        const pData = game.provinces.find(p => p.id === pId);
+                        if (pData && pData.color_code) {
+                            const rgb = hexToRgb(pData.color_code);
+                            if (rgb) targetColors.push(rgb);
+                        }
+                    });
 
-                if (targetColors.length > 0) {
-                    const srcData = window.ProvinceImageDataCache.data;
-                    const newImgData = ctx.createImageData(canvas.width, canvas.height);
-                    const dstData = newImgData.data;
+                    if (targetColors.length > 0) {
+                        const srcData = window.ProvinceImageDataCache.data;
+                        const newImgData = ctx.createImageData(canvas.width, canvas.height);
+                        const dstData = newImgData.data;
 
-                    for (let i = 0; i < srcData.length; i += 4) {
-                        const r = srcData[i], g = srcData[i+1], b = srcData[i+2], a = srcData[i+3];
-                        if (a > 0) {
-                            let isTarget = false;
-                            for (let c of targetColors) {
-                                if (Math.abs(r - c.r) < 5 && Math.abs(g - c.g) < 5 && Math.abs(b - c.b) < 5) {
-                                    isTarget = true;
-                                    break;
+                        for (let i = 0; i < srcData.length; i += 4) {
+                            const r = srcData[i], g = srcData[i+1], b = srcData[i+2], a = srcData[i+3];
+                            if (a > 0) {
+                                let isTarget = false;
+                                for (let c of targetColors) {
+                                    if (Math.abs(r - c.r) < 5 && Math.abs(g - c.g) < 5 && Math.abs(b - c.b) < 5) {
+                                        isTarget = true;
+                                        break;
+                                    }
+                                }
+                                if (isTarget) {
+                                    dstData[i] = 0;
+                                    dstData[i+1] = 0;
+                                    dstData[i+2] = 255;
+                                    dstData[i+3] = 180;
                                 }
                             }
-                            if (isTarget) {
-                                dstData[i] = 0;
-                                dstData[i+1] = 0;
-                                dstData[i+2] = 255;
-                                dstData[i+3] = 180;
-                            }
                         }
+                        ctx.putImageData(newImgData, 0, 0);
                     }
-                    ctx.putImageData(newImgData, 0, 0);
                 }
+
+                // --- ② 黄色い点線の進路を描く処理 ---
+                if (SHOW_TYPHOON_PATH && pathData.length > 0) {
+                    ctx.beginPath();
+                    ctx.setLineDash([20, 20]); // 20ピクセル描いて、20ピクセル隙間をあける（点線）
+                    ctx.strokeStyle = 'rgba(255, 255, 0, 0.8)'; // 半透明の黄色
+                    ctx.lineWidth = 12; // 線の太さ
+                    ctx.lineCap = 'round'; // 線の端っこを丸くする
+                    ctx.lineJoin = 'round'; // 折れ曲がる部分を丸くする
+
+                    // メモ帳の最初の場所に筆を置く
+                    ctx.moveTo(pathData[0].x, pathData[0].y);
+                    // メモ帳の場所を順番に線で結んでいく
+                    for (let i = 1; i < pathData.length; i++) {
+                        ctx.lineTo(pathData[i].x, pathData[i].y);
+                    }
+                    ctx.stroke(); // 実際に線を引く
+                    ctx.setLineDash([]); // 点線の設定をリセットしておく
+                }
+
                 mapContainer.appendChild(canvas);
 
                 await new Promise(resolve => setTimeout(resolve, 2000));
@@ -292,9 +334,14 @@ window.GameEvents.push({
                 canvas.style.opacity = '1.0';
             }
 
-            await game.ui.showDialogAsync("【台風発生】\n各地で被害が発生しているようです……。", false, 0);
+            if (damagedProvinceMap.size > 0) {
+                await game.ui.showDialogAsync("【台風発生】\n各地で被害が発生しているようです……。", false, 0);
+            } else {
+                await game.ui.showDialogAsync("【台風通過】\n幸い、今回は大きな被害はなかったようです。", false, 0);
+            }
 
         } else {
+            // 被害もなく、線も表示しない設定の時
             await game.ui.showDialogAsync("【台風通過】\n幸い、今回は大きな被害はなかったようです。", false, 0);
         }
 
