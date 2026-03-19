@@ -14,13 +14,17 @@ window.GameEvents.push({
     checkCondition: function(game) {
         const dice = Math.random();
         if (game.month === 8 && dice < 0.10) return true;
-        if (game.month === 9 && dice < 1.00) return true;
+        if (game.month === 9 && dice < 0.30) return true;
         if (game.month === 10 && dice < 0.03) return true;
         if (game.month === 11 && dice < 0.01) return true;
         return false;
     },
     
     execute: async function(game) {
+        // 【デバッグ用】F12キーを押すと見える「秘密のメモ」を残します！
+        console.log("=== 台風イベント開始 ===");
+        console.log("読み込んでいる地方（provinces）の数:", game.provinces.length);
+
         // 【1】「台風が接近しています」メッセージを表示
         await game.ui.showDialogAsync("【台風接近】\n台風が接近しています……。", false, 0);
 
@@ -28,30 +32,36 @@ window.GameEvents.push({
         const resetZoomBtn = document.getElementById('map-reset-zoom');
         if (resetZoomBtn) resetZoomBtn.click();
 
-        // 【3】被害の計算（順番を変えました！）
-        const damagedProvinceMap = new Map(); // 「地方のID」と「台風の規模」をセットで覚えるメモ帳です
+        // 【3】被害の計算
+        const damagedProvinceMap = new Map();
         const damagedPlayerCastles = [];      
-        
         const baseScale = Math.floor(Math.random() * 5) + Math.floor(Math.random() * 6) + 1;
 
-        // ① まずは「すべての地方（国）」を順番に見て、台風が来るかサイコロを振ります
         game.provinces.forEach(province => {
-            if (!province.typhoon) return; // 台風確率がない地方は無視します
+            // 【デバッグ用】それぞれの地方の確率が正しく読み込めているかチェック！
+            console.log(`チェック：${province.province} の台風確率 =`, province.typhoon);
+            
+            if (!province.typhoon) return; 
 
             if (Math.random() < province.typhoon) {
-                // 台風が直撃した地方は、-1〜+1のズレを計算して規模を決めます
                 const shift = Math.floor(Math.random() * 3) - 1;
                 let finalScale = Math.max(1, Math.min(10, baseScale + shift));
-                
-                // 「この地方には、この規模の台風が来ましたよ」とメモ帳に書きます
                 damagedProvinceMap.set(province.id, finalScale);
+                
+                // 【デバッグ用】直撃した地方をメモします
+                console.log(`💥 ${province.province} に規模 ${finalScale} の台風が直撃！`);
             }
         });
 
-        // ② 次に「すべてのお城」を順番に見て、メモ帳に載っている地方のお城だけ被害を受けます
+        console.log("青く光る予定の地方IDリスト:", Array.from(damagedProvinceMap.keys()));
+
         game.castles.forEach(castle => {
+            // 【デバッグ用】プレイヤーの城の provinceId が正しく読み込めているかチェック！
+            if (castle.ownerClan === game.playerClanId) {
+                console.log(`チェック：お城「${castle.name}」の provinceId =`, castle.provinceId);
+            }
+
             if (damagedProvinceMap.has(castle.provinceId)) {
-                // メモ帳から、その地方の台風の規模を読み取ります
                 const finalScale = damagedProvinceMap.get(castle.provinceId);
                 const dropPercent = finalScale * 0.03;
                 
@@ -127,7 +137,6 @@ window.GameEvents.push({
             const ctx = canvas.getContext('2d');
             const targetColors = [];
             
-            // メモ帳に書かれている地方（国）の色をリストアップします
             damagedProvinceMap.forEach((scale, pId) => {
                 const pData = game.provinces.find(p => p.id === pId);
                 if (pData && pData.color_code) {
