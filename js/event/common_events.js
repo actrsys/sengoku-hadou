@@ -106,10 +106,9 @@ window.GameEvents.push({
             }
         });
 
-        // 【5】被害が出ているかチェック（ここでメッセージと地図の処理を完全に分けました！）
+        // 【5】被害が出ているかチェック
         if (damagedProvinceMap.size > 0) {
             
-            // ★地図を青く光らせる魔法（データがある時だけ動きます）
             if (typeof DataManager !== 'undefined' && DataManager.provinceImageData) {
                 const canvas = document.createElement('canvas');
                 canvas.width = DataManager.mapImageWidth || whiteMapImg.naturalWidth;
@@ -165,9 +164,6 @@ window.GameEvents.push({
 
                 canvas.style.animation = 'none';
                 canvas.style.opacity = '0.8';
-            } else {
-                // 地図の色データが見つからなかった時は、フリーズしないようにこっそりメモを残します
-                console.warn("地方マップの画像データがないため、青く光る演出をスキップしました。");
             }
 
             // 【6】ここで被害発生メッセージを表示します
