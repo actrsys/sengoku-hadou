@@ -65,7 +65,7 @@ window.GameEvents.push({
             }
         });
 
-        // 【4】白地図のウインドウを作ります
+        // 【4】白地図のウインドウを作ります（レイアウト修正版）
         const mapOverlay = document.createElement('div');
         mapOverlay.style.position = 'fixed';
         mapOverlay.style.top = '0';
@@ -76,16 +76,29 @@ window.GameEvents.push({
         mapOverlay.style.zIndex = '7500'; 
         mapOverlay.style.display = 'flex';
         mapOverlay.style.justifyContent = 'center';
-        mapOverlay.style.alignItems = 'center';
+        // 地図を画面上側に配置
+        mapOverlay.style.alignItems = 'flex-start'; 
+        mapOverlay.style.paddingTop = '20px'; // 少し余裕を持たせる
 
         const mapContainer = document.createElement('div');
         mapContainer.style.position = 'relative';
-        mapContainer.style.width = '90%';
-        mapContainer.style.maxWidth = '800px';
+        
+        // レスポンシブ対応：PC版は3分の2くらいに縮小
+        if (window.innerWidth > 768) {
+            // PC版
+            mapContainer.style.width = '60%'; // ほぼ3分の2
+            mapContainer.style.maxWidth = '600px'; 
+        } else {
+            // スマホ版
+            mapContainer.style.width = '95%'; // スマホは画面いっぱいに近く
+            mapContainer.style.maxWidth = 'none';
+        }
+
         mapContainer.style.border = '4px solid #fff';
         mapContainer.style.borderRadius = '8px';
         mapContainer.style.backgroundColor = '#81c784';
         mapContainer.style.overflow = 'hidden';
+        mapContainer.style.transition = 'opacity 0.5s ease-out'; // 消える時のアニメーション
 
         const whiteMapImg = new Image();
         whiteMapImg.src = './data/images/map/japan_white_map.png';
@@ -97,19 +110,18 @@ window.GameEvents.push({
         document.body.appendChild(mapOverlay);
 
         await new Promise(resolve => {
-            if (whiteMapImg.complete) {
-                resolve();
-            } else {
+            if (whiteMapImg.complete) resolve();
+            else {
                 whiteMapImg.onload = resolve;
                 whiteMapImg.onerror = resolve;
                 setTimeout(resolve, 1000); 
             }
         });
 
-        // 【5】被害が出ているかチェック
+        // 【5】被害が出ているかチェック（点滅とメッセージ表示タイミング修正）
         if (damagedProvinceMap.size > 0) {
             
-            // 初回のみ画像を読み込み、パソコンのメモリに記憶（キャッシュ）させます
+            // キャッシュ処理（変更なし）
             if (!window.ProvinceImageDataCache) {
                 const provMapImg = new Image();
                 provMapImg.src = './data/images/map/japan_provinces.png';
@@ -148,7 +160,11 @@ window.GameEvents.push({
                 canvas.style.width = '100%';
                 canvas.style.height = '100%';
                 canvas.style.pointerEvents = 'none';
-                canvas.style.animation = 'blink 1s infinite';
+                
+                // チカチカアニメーション
+                canvas.style.animation = 'blink 1s forwards'; // forwardsで終わった状態を維持
+                // infiniteを削除し、iteration-countで回数を指定（2s = 1s * 2回）
+                canvas.style.animationIterationCount = '2'; 
 
                 const ctx = canvas.getContext('2d');
                 const targetColors = [];
@@ -193,11 +209,29 @@ window.GameEvents.push({
                 }
                 mapContainer.appendChild(canvas);
 
+                // アニメーションが終わるまで（2秒間）待つ
                 await new Promise(resolve => setTimeout(resolve, 2000));
 
+                // 一番濃い状態で固定
                 canvas.style.animation = 'none';
-                canvas.style.opacity = '0.8';
+                canvas.style.opacity = '1.0';
             }
+
+            // 【6】アニメーションが止まった後、下の方にメッセージを表示
+            // showDialogAsyncの引数で表示位置を「下」に指定（もし実装があれば）
+            // ここでは実装があると仮定して（位置指定はgame.ui側で調整）呼び出す
+            await game.ui.showDialogAsync("【台風発生】\n各地で被害が発生しているようです……。", false, 0);
+
+        } else {
+            await game.ui.showDialogAsync("【台風通過】\n幸い、今回は大きな被害はなかったようです。", false, 0);
+        }
+
+        // 【7】プレイヤーがメッセージを閉じたら、地図をフェードアウトさせてから消す
+        mapContainer.style.opacity = '0';
+        await new Promise(resolve => setTimeout(resolve, 500)); // フェードアウト時間待つ
+        if (mapOverlay.parentNode) {
+            document.body.removeChild(mapOverlay);
+        }
 
             // 【6】ここで被害発生メッセージを表示します
             await game.ui.showDialogAsync("【台風発生】\n各地で被害が発生しているようです……。", false, 0);
