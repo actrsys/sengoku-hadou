@@ -12,11 +12,11 @@ window.GameEvents.push({
     
     checkCondition: function(game) {
         const dice = Math.random();
-        if (game.month === 7 && dice < 0.05) return true;
-        if (game.month === 8 && dice < 0.1) return true;
-        if (game.month === 9 && dice < 0.3) return true;
-        if (game.month === 10 && dice < 0.1) return true;
-        if (game.month === 11 && dice < 0.05) return true;
+        if (game.month === 7 && dice < 0.1) return true;
+        if (game.month === 8 && dice < 0.15) return true;
+        if (game.month === 9 && dice < 0.4) return true;
+        if (game.month === 10 && dice < 0.15) return true;
+        if (game.month === 11 && dice < 0.1) return true;
         return false;
     },
     
@@ -25,7 +25,7 @@ window.GameEvents.push({
 
         const SHOW_TYPHOON_PATH = true;
 
-        await game.ui.showDialogAsync("【台風接近】\n台風が接近しています……。", false, 0);
+        await game.ui.showDialogAsync("【台風接近】\n台風が接近しています……", false, 0);
 
         const resetZoomBtn = document.getElementById('map-reset-zoom');
         if (resetZoomBtn) resetZoomBtn.click();
@@ -349,7 +349,7 @@ window.GameEvents.push({
             }
 
             if (damagedProvinceMap.size > 0) {
-                await game.ui.showDialogAsync("【台風発生】\n各地で被害が発生しているようです……。", false, 0);
+                await game.ui.showDialogAsync("【台風発生】\n各地で被害が発生しているようです……", false, 0);
             } else {
                 await game.ui.showDialogAsync("【台風通過】\n幸い、今回は大きな被害はなかったようです。", false, 0);
             }
@@ -362,7 +362,7 @@ window.GameEvents.push({
         await new Promise(resolve => setTimeout(resolve, 3000));
 
         for (const data of damagedPlayerCastles) {
-            await game.ui.showDialogAsync(`【被害報告】\n我が家の ${data.castle.name} が台風の被害を受けました……。\n（局地規模：${data.scale}）`, false, 0);
+            await game.ui.showDialogAsync(`【被害報告】\n我が家の ${data.castle.name} が台風の被害を受けました……\n（局地規模：${data.scale}）`, false, 0);
         }
     }
 });
