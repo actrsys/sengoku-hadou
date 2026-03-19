@@ -34,7 +34,7 @@ window.GameEvents.push({
         const damagedPlayerCastles = [];      
         const baseScale = Math.floor(Math.random() * 5) + Math.floor(Math.random() * 6) + 1;
 
-        // 【4】あや瀨さんのオリジナル！白地図のウインドウを作ります
+        // 【4】白地図のウインドウを作ります
         const mapOverlay = document.createElement('div');
         mapOverlay.style.position = 'fixed';
         mapOverlay.style.top = '0';
@@ -65,7 +65,7 @@ window.GameEvents.push({
         mapContainer.style.overflow = 'hidden';
 
         const whiteMapImg = new Image();
-        whiteMapImg.src = './data/images/map/japan_white_map.png'; // あや瀨さんの白地図！
+        whiteMapImg.src = './data/images/map/japan_white_map.png'; 
         whiteMapImg.style.width = '100%';
         whiteMapImg.style.display = 'block';
 
@@ -116,31 +116,40 @@ window.GameEvents.push({
             const height = window.ProvinceImageDataCache.height;
             const data = window.ProvinceImageDataCache.data;
 
-            // 虫眼鏡で色を調べる便利な魔法
             const getPixelHex = (x, y) => {
                 x = Math.floor(x); y = Math.floor(y);
                 if (x < 0 || x >= width || y < 0 || y >= height) return null;
                 const idx = (y * width + x) * 4;
-                if (data[idx+3] === 0) return null; // 透明なら無視
-                if (data[idx] === 0 && data[idx+1] === 0 && data[idx+2] === 0) return null; // 真っ黒(海)なら無視
+                if (data[idx+3] === 0) return null; 
+                if (data[idx] === 0 && data[idx+1] === 0 && data[idx+2] === 0) return null; 
                 return "#" + ((1 << 24) + (data[idx] << 16) + (data[idx+1] << 8) + data[idx+2]).toString(16).slice(1);
             };
 
-            let typhoonX = -200;
+            // ① スタート地点の工夫：画面の左下から真ん中下にかけてのどこかから発生します
+            let typhoonX = (Math.random() * (width / 3)) - 100;
             let typhoonY = height + 200;
-            const typhoonRadius = 150;
-            const damagedColorCodes = new Set(); // 踏んだ色をメモする箱
+            
+            // ② 大きさの工夫：最初はかなり大きい（180）状態でスタートします
+            let typhoonRadius = 180;
+            const damagedColorCodes = new Set(); 
 
-            // 台風を歩かせます
-            while (typhoonX < width + typhoonRadius && typhoonY > -typhoonRadius) {
-                let moveX = Math.random() * 30 + 10;
-                let moveY = Math.random() * 30 + 10;
-                if (typhoonY > height / 2) moveX += 15; else moveY += 15;
+            // 台風を歩かせます（小さくなりすぎたら、その時点で消滅します）
+            while (typhoonX < width + typhoonRadius && typhoonY > -typhoonRadius && typhoonRadius > 30) {
+                // 基本の歩幅
+                let moveX = Math.random() * 20 + 5;
+                let moveY = Math.random() * 25 + 15;
+
+                // ③ 偏西風の魔法：地図の真ん中より上（北）に来ると、右（東）にグイッと大きく曲がります
+                if (typhoonY < height * 0.7) {
+                    moveX += 25; 
+                }
 
                 typhoonX += moveX;
                 typhoonY -= moveY;
 
-                // 画面の中に入ったら色を調べます
+                // ④ パワーダウンの魔法：一歩進むごとに、台風が少しずつ小さくなります
+                typhoonRadius -= 1.2;
+
                 if (typhoonX > -typhoonRadius && typhoonX < width + typhoonRadius &&
                     typhoonY > -typhoonRadius && typhoonY < height + typhoonRadius) {
 
@@ -166,14 +175,14 @@ window.GameEvents.push({
                     if (provColor && damagedColorCodes.has(provColor.toLowerCase())) {
                         const shift = Math.floor(Math.random() * 3) - 1;
                         let finalScale = Math.max(1, Math.min(10, baseScale + shift));
-                        damagedProvinceMap.set(prov.id, finalScale); // 被害リストに登録！
+                        damagedProvinceMap.set(prov.id, finalScale); 
                     }
                 }
             }
         }
         // ====== ★ 台風の進路計算おわり ★ ======
 
-        // 【6】あや瀨さんのオリジナル！ お米や兵士を減らす処理
+        // 【6】お米や兵士を減らす処理
         game.castles.forEach(castle => {
             if (damagedProvinceMap.has(castle.provinceId)) {
                 const finalScale = damagedProvinceMap.get(castle.provinceId);
@@ -193,7 +202,7 @@ window.GameEvents.push({
             }
         });
 
-        // 【7】あや瀨さんのオリジナル！ 被害が出ているかチェックして青く光らせる
+        // 【7】被害が出ているかチェックして青く光らせる
         if (damagedProvinceMap.size > 0) {
             
             if (window.ProvinceImageDataCache) {
@@ -270,7 +279,7 @@ window.GameEvents.push({
 
         // 【9】自軍の城の被害報告
         for (const data of damagedPlayerCastles) {
-            await game.ui.showDialogAsync(`【被害報告】\n${data.castle.name} が台風の被害を受けました……。\n（局地規模：${data.scale}）`, false, 0);
+            await game.ui.showDialogAsync(`【被害報告】\n我が家の ${data.castle.name} が台風の被害を受けました……。\n（局地規模：${data.scale}）`, false, 0);
         }
     }
 });
