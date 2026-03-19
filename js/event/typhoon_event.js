@@ -133,39 +133,43 @@ window.GameEvents.push({
                 return "#" + ((1 << 24) + (data[idx] << 16) + (data[idx+1] << 8) + data[idx+2]).toString(16).slice(1);
             };
 
-            // ① 左端に集中させる魔法
             let r = Math.pow(Math.random(), 3); 
             let typhoonX = -500 + (r * (width * 0.7 + 500)); 
             let typhoonY = height + 500;
             
-            let typhoonRadius = 180;
+            // ★ 新しい魔法①：規模（強さ）と初期の大きさを連動させます！
+            // プログラムの上で決まった規模（だいたい1〜10）をエンジンの強さにします
+            let initialScale = Math.min(10, Math.max(1, baseScale));
+            
+            // 規模が大きいほど、最初の円も大きくなります（最小115 〜 最大250）
+            let typhoonRadius = 100 + (initialScale * 15); 
+            
             const damagedColorCodes = new Set(); 
-            const windStrength = Math.random() * 30 + 10; 
+            
+            // ★ 新しい魔法②：規模が小さいほど風に流されやすく、大きいと耐えます
+            // 小さい台風（scale1）は強さ37〜42で右に流され、大きい（scale10）と10〜15しか流されません
+            const windStrength = 40 - (initialScale * 3) + (Math.random() * 5); 
             
             let wasOnLand = false; 
             let landCount = 0; 
 
-            // ★ 放物線を描いて画面の下(南)へ落ちていく可能性があるので、
-            // 「下にはみ出しすぎた時 (typhoonY < height + 1000)」も終了条件に追加しました
             while (typhoonX < width + typhoonRadius && typhoonY > -typhoonRadius && typhoonY < height + 1000 && typhoonRadius > 30) {
-                // 歩くたびに、今の場所をメモ帳に書き込みます
                 pathData.push({ x: typhoonX, y: typhoonY });
 
-                // 基本の歩幅
                 let moveX = Math.random() * 20 + 5;
-                let moveY = Math.random() * 25 + 15;
+                
+                // ★ 新しい魔法③：規模が大きいほど、上に突き進む力が強くなります
+                let moveY = Math.random() * 25 + 10 + (initialScale * 1.5); 
 
-                // ② 放物線を描く魔法！（北に行くほど、右へ、そして下へ倒れ込む）
-                // スタート地点からどれくらい進んだか（0.0 〜 1.0以上）を計算します
                 let progress = Math.max(0, (height + 500 - typhoonY) / height); 
                 
-                // 東（右）へはどんどん加速！
                 moveX += windStrength * progress * 1.5; 
-                // 北（上）へ行く力は奪われ、最終的にマイナス（南へ落下）になります！
-                // これが美しい放物線（カーブ）を作ります。
-                moveY -= 40 * Math.pow(progress, 1.5); 
+                
+                // ★ 新しい魔法④：規模が小さいほど、放物線を描いて下に落ちやすくなります
+                // 大きい台風はここが引かれにくいので、放物線にならず真っ直ぐ上に突き抜けます！
+                let fallPower = 50 - (initialScale * 3); 
+                moveY -= fallPower * Math.pow(progress, 1.5); 
 
-                // 陸地にあたるとさらに角度が落ちる（急激に右下へ倒れる）
                 if (wasOnLand) {
                     moveY -= 15; 
                 }
@@ -195,17 +199,11 @@ window.GameEvents.push({
                     }
                 }
 
-                // ③ 威力の減衰を弱め、たまに成長する魔法！
-                // サイコロで「-1.0(成長する)」〜「+2.0(縮小する)」の値を決定します。
-                // 全体としては少しずつ縮小することが多いですが、たまに大きくなります！
                 let baseDecay = (Math.random() * 3.0) - 1.0; 
-                
-                // 北に行くことによる減衰も優しくしました
                 let northDecay = 1.0 * progress; 
 
                 if (onLand) {
                     landCount++;
-                    // 陸地での削られ方も、以前よりかなりマイルドにしました
                     let landDecay = 1.0 + (landCount * 0.2); 
                     typhoonRadius -= (baseDecay + northDecay + landDecay);
                 } else {
@@ -213,13 +211,11 @@ window.GameEvents.push({
                     typhoonRadius -= (baseDecay + northDecay);
                 }
 
-                // 成長しすぎて画面を覆い尽くさないよう、大きさの上限（250）を設定
                 if (typhoonRadius > 250) typhoonRadius = 250;
 
                 wasOnLand = onLand;
             }
             
-            // 最後に消えた場所もメモ
             pathData.push({ x: typhoonX, y: typhoonY });
 
             if (game.provinces && game.provinces.length > 0) {
