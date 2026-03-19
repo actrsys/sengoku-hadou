@@ -148,7 +148,7 @@ window.GameEvents.push({
 
             let r = Math.pow(Math.random(), 3); 
             let typhoonX = -500 + (r * (width * 0.7 + 500)); 
-            let typhoonY = height + 1000;
+            let typhoonY = height + 500;
             
             let initialScale = Math.min(10, Math.max(1, baseScale));
             let typhoonRadius = 100 + (initialScale * 15); 
