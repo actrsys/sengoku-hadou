@@ -125,29 +125,29 @@ window.GameEvents.push({
                 return "#" + ((1 << 24) + (data[idx] << 16) + (data[idx+1] << 8) + data[idx+2]).toString(16).slice(1);
             };
 
-            // ① スタート地点の工夫：画面の左下から真ん中下にかけてのどこかから発生します
-            let typhoonX = (Math.random() * (width / 3)) - 100;
+            // ① 発生場所を広くしました（九州の左の方から、関東のはるか南の海まで）
+            let typhoonX = (Math.random() * (width * 0.6)) - 100;
             let typhoonY = height + 200;
             
-            // ② 大きさの工夫：最初はかなり大きい（180）状態でスタートします
             let typhoonRadius = 180;
             const damagedColorCodes = new Set(); 
 
-            // 台風を歩かせます（小さくなりすぎたら、その時点で消滅します）
+            // ★ 新しい魔法：この台風専用の「偏西風の強さ（曲がりやすさ）」を決めます
+            // 5（全然曲がらない直進型）〜 35（すぐ右に流れるカーブ型）まで個性が出ます
+            const windStrength = Math.random() * 30 + 5; 
+
             while (typhoonX < width + typhoonRadius && typhoonY > -typhoonRadius && typhoonRadius > 30) {
-                // 基本の歩幅
                 let moveX = Math.random() * 20 + 5;
                 let moveY = Math.random() * 25 + 15;
 
-                // ③ 偏西風の魔法：地図の真ん中より上（北）に来ると、右（東）にグイッと大きく曲がります
+                // 地図の真ん中より北に行くと、さっき決めた「その台風の個性」の分だけ右に流されます
                 if (typhoonY < height * 0.7) {
-                    moveX += 25; 
+                    moveX += windStrength; 
                 }
 
                 typhoonX += moveX;
                 typhoonY -= moveY;
 
-                // ④ パワーダウンの魔法：一歩進むごとに、台風が少しずつ小さくなります
                 typhoonRadius -= 1.2;
 
                 if (typhoonX > -typhoonRadius && typhoonX < width + typhoonRadius &&
@@ -168,7 +168,6 @@ window.GameEvents.push({
                 }
             }
 
-            // メモした色と国のデータを照らし合わせて、被害規模を決めます
             if (game.provinces && game.provinces.length > 0) {
                 for (let prov of game.provinces) {
                     const provColor = prov.color_code || prov.colorCode;
