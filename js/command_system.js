@@ -2276,7 +2276,8 @@ class CommandSystem {
         const promptBusho = () => {
             this.game.ui.openBushoSelector('atk_self_reinf_deploy', helperCastle.id, {
                 onConfirm: (selectedIds) => {
-                    this.handleBushoSelectionForSelfReinf(helperCastle.id, selectedIds, onComplete, promptBusho, backToMap);
+                    // ★追加：大雪の判定に使うために「targetCastle」を渡してあげます
+                    this.handleBushoSelectionForSelfReinf(helperCastle.id, selectedIds, targetCastle, onComplete, promptBusho, backToMap);
                 },
                 onCancel: () => {
                     // ★ 変更：キャンセルした時は、完全にやめるのではなく城選択マップに戻ります！
@@ -2288,9 +2289,9 @@ class CommandSystem {
         promptBusho();
     }
 
-    handleBushoSelectionForSelfReinf(helperCastleId, selectedIds, onComplete, promptBusho) {
+    handleBushoSelectionForSelfReinf(helperCastleId, selectedIds, targetCastle, onComplete, promptBusho) {
         const helperCastle = this.game.getCastle(helperCastleId);
-        const reinfBushos = selectedIds.map(id => this.game.getBusho(id));
+        const reinfBushosData = selectedIds;
         this.game.ui.openQuantitySelector('atk_self_reinf_supplies', [helperCastle], null, {
             onConfirm: (inputs) => {
                 const inputData = inputs[helperCastle.id] || inputs;
@@ -2299,20 +2300,76 @@ class CommandSystem {
                 const reinfHorses = inputData.horses ? parseInt(inputData.horses.num.value) : 0;
                 const reinfGuns = inputData.guns ? parseInt(inputData.guns.num.value) : 0;
 
-                helperCastle.soldiers = Math.max(0, helperCastle.soldiers - reinfSoldiers);
-                helperCastle.rice = Math.max(0, helperCastle.rice - reinfRice);
-                helperCastle.horses = Math.max(0, (helperCastle.horses || 0) - reinfHorses);
-                helperCastle.guns = Math.max(0, (helperCastle.guns || 0) - reinfGuns);
-                reinfBushos.forEach(b => b.isActionDone = true);
+                // ★ここから追加：自軍の援軍にも大雪の影響があるか調べる魔法！
+                const srcProv = this.game.provinces.find(p => p.id === helperCastle.provinceId);
+                const tgtProv = this.game.provinces.find(p => p.id === targetCastle.provinceId);
+                const isHeavySnow = (srcProv && srcProv.statusEffects && srcProv.statusEffects.includes('heavySnow')) || 
+                                    (tgtProv && tgtProv.statusEffects && tgtProv.statusEffects.includes('heavySnow'));
 
-                const selfReinfData = {
-                    castle: helperCastle, bushos: reinfBushos, soldiers: reinfSoldiers,
-                    rice: reinfRice, horses: reinfHorses, guns: reinfGuns, isSelf: true,
-                    morale: helperCastle.morale || 50, training: helperCastle.training || 50
+                const proceedWar = async () => {
+                    let finalSVal = reinfSoldiers;
+                    let finalBushosData = [...reinfBushosData];
+                    let finalBushos = finalBushosData.map(id => this.game.getBusho(id));
+
+                    if (isHeavySnow) {
+                        const lossRate = 0.20 + Math.random() * 0.30;
+                        const lostSoldiers = Math.floor(finalSVal * lossRate);
+                        finalSVal -= lostSoldiers;
+
+                        if (lostSoldiers > 0) {
+                            await this.game.ui.showDialogAsync(`【強行軍】\n我が軍の兵士${lostSoldiers}人が遭難しました……`, false, 0);
+                        }
+
+                        const survivingBushos = [];
+                        for (let b of finalBushos) {
+                            if (Math.random() < 0.10) {
+                                await this.game.ui.showDialogAsync(`【強行軍】\n我が軍の${b.name}が凍死しました……`, false, 0);
+                                await this.game.lifeSystem.executeDeath(b);
+                            } else {
+                                survivingBushos.push(b);
+                            }
+                        }
+                        finalBushos = survivingBushos;
+
+                        // 誰もいなくなってしまったら、物資ごと消滅してキャンセル扱いになります
+                        if (finalBushos.length === 0) {
+                            await this.game.ui.showDialogAsync("【強行軍】\n我が軍は行方不明になりました……", false, 0);
+                            helperCastle.soldiers = Math.max(0, helperCastle.soldiers - reinfSoldiers);
+                            helperCastle.rice = Math.max(0, helperCastle.rice - reinfRice);
+                            helperCastle.horses = Math.max(0, (helperCastle.horses || 0) - reinfHorses);
+                            helperCastle.guns = Math.max(0, (helperCastle.guns || 0) - reinfGuns);
+                            
+                            this.game.ui.updatePanelHeader();
+                            this.game.ui.renderCommandMenu();
+                            onComplete(null); 
+                            return;
+                        }
+                    }
+
+                    helperCastle.soldiers = Math.max(0, helperCastle.soldiers - finalSVal);
+                    helperCastle.rice = Math.max(0, helperCastle.rice - reinfRice);
+                    helperCastle.horses = Math.max(0, (helperCastle.horses || 0) - reinfHorses);
+                    helperCastle.guns = Math.max(0, (helperCastle.guns || 0) - reinfGuns);
+                    finalBushos.forEach(b => b.isActionDone = true);
+
+                    const selfReinfData = {
+                        castle: helperCastle, bushos: finalBushos, soldiers: finalSVal,
+                        rice: reinfRice, horses: reinfHorses, guns: reinfGuns, isSelf: true,
+                        morale: helperCastle.morale || 50, training: helperCastle.training || 50
+                    };
+                    
+                    // ★修正：出発のメッセージは攻め込んだ後に war_effort.js で出すので、ここは静かに次へ進みます！
+                    onComplete(selfReinfData);
                 };
-                
-                // ★修正：出発のメッセージは攻め込んだ後に war_effort.js で出すので、ここは静かに次へ進みます！
-                onComplete(selfReinfData);
+
+                // ★大雪なら自軍の援軍にも確認のダイアログを出します！
+                if (isHeavySnow) {
+                    this.game.ui.showDialog("大雪の影響により、被害が出る場合があります。\nそれでも出陣しますか？", true, () => {
+                        proceedWar(); 
+                    });
+                } else {
+                    proceedWar();
+                }
             },
             onCancel: promptBusho
         });
@@ -2324,7 +2381,8 @@ class CommandSystem {
         const promptBusho = () => {
             this.game.ui.openBushoSelector('def_self_reinf_deploy', helperCastle.id, {
                 onConfirm: (selectedIds) => {
-                    this.handleBushoSelectionForDefSelfReinf(helperCastle.id, selectedIds, onComplete, promptBusho);
+                    // ★追加：大雪の判定に使うために「defCastle」を渡してあげます
+                    this.handleBushoSelectionForDefSelfReinf(helperCastle.id, selectedIds, defCastle, onComplete, promptBusho);
                 },
                 onCancel: () => {
                     if (backToMap) backToMap();
@@ -2335,9 +2393,9 @@ class CommandSystem {
         promptBusho();
     }
 
-    handleBushoSelectionForDefSelfReinf(helperCastleId, selectedIds, onComplete, promptBusho) {
+    handleBushoSelectionForDefSelfReinf(helperCastleId, selectedIds, defCastle, onComplete, promptBusho) {
         const helperCastle = this.game.getCastle(helperCastleId);
-        const reinfBushos = selectedIds.map(id => this.game.getBusho(id));
+        const reinfBushosData = selectedIds;
         this.game.ui.openQuantitySelector('def_self_reinf_supplies', [helperCastle], null, {
             onConfirm: (inputs) => {
                 const inputData = inputs[helperCastle.id] || inputs;
@@ -2346,18 +2404,72 @@ class CommandSystem {
                 const reinfHorses = inputData.horses ? parseInt(inputData.horses.num.value) : 0;
                 const reinfGuns = inputData.guns ? parseInt(inputData.guns.num.value) : 0;
 
-                helperCastle.soldiers = Math.max(0, helperCastle.soldiers - reinfSoldiers);
-                helperCastle.rice = Math.max(0, helperCastle.rice - reinfRice);
-                helperCastle.horses = Math.max(0, (helperCastle.horses || 0) - reinfHorses);
-                helperCastle.guns = Math.max(0, (helperCastle.guns || 0) - reinfGuns);
-                reinfBushos.forEach(b => b.isActionDone = true);
+                // ★ここから追加：守備側の自軍援軍にも大雪の影響があるか調べる魔法！
+                const srcProv = this.game.provinces.find(p => p.id === helperCastle.provinceId);
+                const tgtProv = this.game.provinces.find(p => p.id === defCastle.provinceId);
+                const isHeavySnow = (srcProv && srcProv.statusEffects && srcProv.statusEffects.includes('heavySnow')) || 
+                                    (tgtProv && tgtProv.statusEffects && tgtProv.statusEffects.includes('heavySnow'));
 
-                const selfReinfData = {
-                    castle: helperCastle, bushos: reinfBushos, soldiers: reinfSoldiers,
-                    rice: reinfRice, horses: reinfHorses, guns: reinfGuns, isAttacker: false, isSelf: true
+                const proceedWar = async () => {
+                    let finalSVal = reinfSoldiers;
+                    let finalBushosData = [...reinfBushosData];
+                    let finalBushos = finalBushosData.map(id => this.game.getBusho(id));
+
+                    if (isHeavySnow) {
+                        const lossRate = 0.20 + Math.random() * 0.30;
+                        const lostSoldiers = Math.floor(finalSVal * lossRate);
+                        finalSVal -= lostSoldiers;
+
+                        if (lostSoldiers > 0) {
+                            await this.game.ui.showDialogAsync(`【強行軍】\n我が軍の兵士${lostSoldiers}人が遭難しました……`, false, 0);
+                        }
+
+                        const survivingBushos = [];
+                        for (let b of finalBushos) {
+                            if (Math.random() < 0.10) {
+                                await this.game.ui.showDialogAsync(`【強行軍】\n我が軍の${b.name}が凍死しました……`, false, 0);
+                                await this.game.lifeSystem.executeDeath(b);
+                            } else {
+                                survivingBushos.push(b);
+                            }
+                        }
+                        finalBushos = survivingBushos;
+
+                        if (finalBushos.length === 0) {
+                            await this.game.ui.showDialogAsync("【強行軍】\n我が軍は行方不明になりました……", false, 0);
+                            helperCastle.soldiers = Math.max(0, helperCastle.soldiers - reinfSoldiers);
+                            helperCastle.rice = Math.max(0, helperCastle.rice - reinfRice);
+                            helperCastle.horses = Math.max(0, (helperCastle.horses || 0) - reinfHorses);
+                            helperCastle.guns = Math.max(0, (helperCastle.guns || 0) - reinfGuns);
+                            
+                            this.game.ui.updatePanelHeader();
+                            this.game.ui.renderCommandMenu();
+                            onComplete(null);
+                            return;
+                        }
+                    }
+
+                    helperCastle.soldiers = Math.max(0, helperCastle.soldiers - finalSVal);
+                    helperCastle.rice = Math.max(0, helperCastle.rice - reinfRice);
+                    helperCastle.horses = Math.max(0, (helperCastle.horses || 0) - reinfHorses);
+                    helperCastle.guns = Math.max(0, (helperCastle.guns || 0) - reinfGuns);
+                    finalBushos.forEach(b => b.isActionDone = true);
+
+                    const selfReinfData = {
+                        castle: helperCastle, bushos: finalBushos, soldiers: finalSVal,
+                        rice: reinfRice, horses: reinfHorses, guns: reinfGuns, isAttacker: false, isSelf: true
+                    };
+                    
+                    onComplete(selfReinfData);
                 };
-                
-                onComplete(selfReinfData);
+
+                if (isHeavySnow) {
+                    this.game.ui.showDialog("大雪の影響により、被害が出る場合があります。\nそれでも出陣しますか？", true, () => {
+                        proceedWar(); 
+                    });
+                } else {
+                    proceedWar();
+                }
             },
             onCancel: promptBusho
         });
@@ -2371,22 +2483,35 @@ class CommandSystem {
         const force = helperCastle.selectedForce;
         const myClanId = atkCastle.ownerClan;
         
+        // ★ここから追加：大雪の判定です
+        const srcProv1 = this.game.provinces.find(p => p.id === helperCastle.provinceId);
+        const srcProv2 = this.game.provinces.find(p => p.id === atkCastle.provinceId);
+        const tgtProv = this.game.provinces.find(p => p.id === targetCastle.provinceId);
+        const isHeavySnow = (srcProv1 && srcProv1.statusEffects && srcProv1.statusEffects.includes('heavySnow')) ||
+                            (srcProv2 && srcProv2.statusEffects && srcProv2.statusEffects.includes('heavySnow')) ||
+                            (tgtProv && tgtProv.statusEffects && tgtProv.statusEffects.includes('heavySnow'));
+        
         // ★ 追加：諸勢力が選ばれていた場合の特別な処理です！
         if (force && force.isKunishu) {
             const kunishu = this.game.kunishuSystem.getKunishu(force.id);
             const currentRel = kunishu.getRelation(myClanId);
             
-            let prob = currentRel - 50; 
-            prob += Math.floor((gold / 1500) * 15);
-            prob += 50; 
-            
-            let isSuccess = (Math.random() * 100 < prob);
+            // ★追加：大雪ならAI（諸勢力）は絶対に断ります！
+            let isSuccess = false;
+            if (!isHeavySnow) {
+                let prob = currentRel - 50; 
+                prob += Math.floor((gold / 1500) * 15);
+                prob += 50; 
+                isSuccess = (Math.random() * 100 < prob);
+            }
             
             if (!isSuccess) {
                 if (myClanId === this.game.playerClanId) {
                     const leader = this.game.getBusho(kunishu.leaderId);
                     const leaderName = leader ? leader.name : "頭領";
-                    this.game.ui.showDialog(`${kunishu.getName(this.game)}の${leaderName}は援軍を拒否しました……`, false, () => this.game.warManager.startWar(atkCastle, targetCastle, atkBushos, sVal, rVal, hVal, gVal, null, selfReinfData));
+                    // ★大雪の時はメッセージを変えます！
+                    const reasonMsg = isHeavySnow ? "大雪のため、" : "";
+                    this.game.ui.showDialog(`${reasonMsg}${kunishu.getName(this.game)}の${leaderName}は援軍を拒否しました……`, false, () => this.game.warManager.startWar(atkCastle, targetCastle, atkBushos, sVal, rVal, hVal, gVal, null, selfReinfData));
                 } else {
                     this.game.warManager.startWar(atkCastle, targetCastle, atkBushos, sVal, rVal, hVal, gVal, null, selfReinfData);
                 }
@@ -2462,15 +2587,20 @@ class CommandSystem {
             return;
         }
 
-        // ★修正：確率計算とサイコロは、外交の専門部署にお任せします！
-        const prob = this.game.diplomacyManager.getReinforcementAcceptProb(myClanId, helperClanId, enemyClanId, gold);
-        const isSuccess = (Math.random() * 100 < prob);
+        // ★追加：大雪ならAIは絶対に断ります！
+        let isSuccess = false;
+        if (!isHeavySnow) {
+            // ★修正：確率計算とサイコロは、外交の専門部署にお任せします！
+            const prob = this.game.diplomacyManager.getReinforcementAcceptProb(myClanId, helperClanId, enemyClanId, gold);
+            isSuccess = (Math.random() * 100 < prob);
+        }
 
         if (!isSuccess) {
             if (myClanId === this.game.playerClanId) {
                 const castellan = this.game.getBusho(helperCastle.castellanId);
                 const castellanName = castellan ? castellan.name : "城主";
-                this.game.ui.showDialog(`${helperCastle.name}の${castellanName}は援軍を拒否しました……`, false, () => this.game.warManager.startWar(atkCastle, targetCastle, atkBushos, sVal, rVal, hVal, gVal, null, selfReinfData));
+                const reasonMsg = isHeavySnow ? "大雪のため、" : "";
+                this.game.ui.showDialog(`${reasonMsg}${helperCastle.name}の${castellanName}は援軍を拒否しました……`, false, () => this.game.warManager.startWar(atkCastle, targetCastle, atkBushos, sVal, rVal, hVal, gVal, null, selfReinfData));
             } else {
                 this.game.warManager.startWar(atkCastle, targetCastle, atkBushos, sVal, rVal, hVal, gVal, null, selfReinfData);
             }

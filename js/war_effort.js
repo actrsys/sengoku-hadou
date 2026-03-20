@@ -1845,22 +1845,32 @@ Object.assign(WarManager.prototype, {
         const force = helperCastle.selectedForce;
         const myClanId = defCastle.ownerClan;
 
+        // ★ここから追加：大雪の判定です
+        const srcProv = this.game.provinces.find(p => p.id === helperCastle.provinceId);
+        const tgtProv = this.game.provinces.find(p => p.id === defCastle.provinceId);
+        const isHeavySnow = (srcProv && srcProv.statusEffects && srcProv.statusEffects.includes('heavySnow')) ||
+                            (tgtProv && tgtProv.statusEffects && tgtProv.statusEffects.includes('heavySnow'));
+
         // ★ 追加：諸勢力が選ばれていた場合の特別な処理です！
         if (force && force.isKunishu) {
             const kunishu = this.game.kunishuSystem.getKunishu(force.id);
             const currentRel = kunishu.getRelation(myClanId);
             
-            let prob = currentRel - 50; 
-            prob += Math.floor((gold / 1500) * 15);
-            prob += 50; 
-            
-            let isSuccess = (Math.random() * 100 < prob);
+            // ★追加：大雪ならAI（諸勢力）は絶対に断ります！
+            let isSuccess = false;
+            if (!isHeavySnow) {
+                let prob = currentRel - 50; 
+                prob += Math.floor((gold / 1500) * 15);
+                prob += 50; 
+                isSuccess = (Math.random() * 100 < prob);
+            }
             
             if (!isSuccess) {
                 if (myClanId === this.game.playerClanId) {
                     const leader = this.game.getBusho(kunishu.leaderId);
                     const leaderName = leader ? leader.name : "頭領";
-                    this.game.ui.showDialog(`${kunishu.getName(this.game)}の${leaderName}は援軍を拒否しました……`, false, onComplete);
+                    const reasonMsg = isHeavySnow ? "大雪のため、" : "";
+                    this.game.ui.showDialog(`${reasonMsg}${kunishu.getName(this.game)}の${leaderName}は援軍を拒否しました……`, false, onComplete);
                 } else {
                     onComplete();
                 }
@@ -1939,9 +1949,10 @@ Object.assign(WarManager.prototype, {
             return;
         }
 
+        // ★追加：大雪ならAIは絶対に断ります！
         let isSuccess = false;
-        if (myToHelperRel.status === '支配') isSuccess = true;
-        else {
+        if (myToHelperRel.status === '支配' && !isHeavySnow) isSuccess = true;
+        else if (!isHeavySnow) {
             let prob = (myToHelperRel.sentiment >= 50) ? (myToHelperRel.sentiment - 49) : 0;
             prob += Math.floor((gold / 1500) * 15);
             if (myToHelperRel.status === '同盟' || myToHelperRel.status === '従属') prob += 30;
@@ -1954,7 +1965,8 @@ Object.assign(WarManager.prototype, {
             if (myClanId === this.game.playerClanId) {
                 const castellan = this.game.getBusho(helperCastle.castellanId);
                 const castellanName = castellan ? castellan.name : "城主";
-                this.game.ui.showDialog(`${helperCastle.name}の${castellanName}は援軍を拒否しました……`, false, onComplete);
+                const reasonMsg = isHeavySnow ? "大雪のため、" : "";
+                this.game.ui.showDialog(`${reasonMsg}${helperCastle.name}の${castellanName}は援軍を拒否しました……`, false, onComplete);
             } else {
                 onComplete();
             }

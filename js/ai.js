@@ -316,7 +316,28 @@ class AIEngine {
         let bestTarget = null;
         let highestProb = -1;
 
+        // ★ここから追加：自分がいる国が大雪かどうか調べます！
+        const srcProv = this.game.provinces.find(p => p.id === myCastle.provinceId);
+        const isSrcHeavySnow = srcProv && srcProv.statusEffects && srcProv.statusEffects.includes('heavySnow');
+
         enemies.forEach(target => {
+            // ★ここから追加：目的地が大雪か調べます！
+            let isTgtHeavySnow = false;
+            if (target.isKunishuTarget) {
+                isTgtHeavySnow = isSrcHeavySnow; // 諸勢力は自分の城の周辺なので同じ天気です
+            } else {
+                const tgtProv = this.game.provinces.find(p => p.id === target.provinceId);
+                if (tgtProv && tgtProv.statusEffects && tgtProv.statusEffects.includes('heavySnow')) {
+                    isTgtHeavySnow = true;
+                }
+            }
+
+            // ★大雪の時は、絶対にこの目標を攻めません（次の目標の計算へスキップします）
+            if (isSrcHeavySnow || isTgtHeavySnow) {
+                return;
+            }
+            // ★追加ここまで
+
             if (target.isKunishuTarget) {
                 // ★諸勢力に対する攻撃確率の計算
                 const kunishu = target.kunishu;
