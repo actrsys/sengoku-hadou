@@ -374,7 +374,7 @@ window.GameEvents.push({
         await new Promise(resolve => setTimeout(resolve, 1000));
 
         for (const data of damagedPlayerCastles) {
-            await game.ui.showDialogAsync(`【被害報告】\n我が家の ${data.castle.name} が台風の被害を受けました……\n（局地規模：${data.scale}）`, false, 0);
+            await game.ui.showDialogAsync(`【被害報告】\n ${data.castle.name} が台風の被害を受けました……`, false, 0);
         }
     }
 });
