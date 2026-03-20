@@ -607,35 +607,34 @@ window.GameEvents.push({
     },
     
     execute: async function(game) {
-        const regionsToSnow = new Set();
-        
-        // 地方ごとに発生確率を判定します
-        if (Math.random() < 0.98) regionsToSnow.add(1); // 東北（98%）
-        if (Math.random() < 0.95) regionsToSnow.add(2); // 北陸（95%）
-        if (Math.random() < 0.40) regionsToSnow.add(3); // 甲信（40%）
-        if (Math.random() < 0.03) regionsToSnow.add(4); // 関東（3%）
-        
-        // どこも大雪の判定が成功しなかったら、何もせずにおしまいです
-        if (regionsToSnow.size === 0) return;
-
         let isNewSnowAdded = false; // 新しく雪が降る国が増えたかどうかのメモです
         const allSnowProvIds = new Set(); // 今月雪が降っているすべての国を入れる箱です
 
-        // 国ごとにチェックしていきます
+        // 日本中すべての「国」を順番にチェックしていきます！
         game.provinces.forEach(p => {
             const hasSnow = p.statusEffects && p.statusEffects.includes('heavySnow');
             
             if (hasSnow) {
                 // ① すでに雪のシールが貼られている国は、そのまま箱に入れます
                 allSnowProvIds.add(p.id);
-            } else if (regionsToSnow.has(p.regionId)) {
-                // ② まだ雪のシールがなくて、今回大雪の判定が成功した地方の国の場合
-                allSnowProvIds.add(p.id);
-                isNewSnowAdded = true; // 新しく雪が降る国が増えました！
+            } else {
+                // ② まだ雪のシールが貼られていない国は、国ごとに雪が降るかサイコロを振ります！
+                let willSnow = false;
                 
-                // 新しく雪のシールを貼ります
-                if (!p.statusEffects) p.statusEffects = [];
-                p.statusEffects.push('heavySnow');
+                if (p.regionId === 1 && Math.random() < 0.99) willSnow = true;      // 東北（99%）
+                else if (p.regionId === 2 && Math.random() < 0.99) willSnow = true; // 北陸（99%）
+                else if (p.regionId === 3 && Math.random() < 0.60) willSnow = true; // 甲信（60%）
+                else if (p.regionId === 4 && Math.random() < 0.02) willSnow = true; // 関東（2%）
+
+                // もし大雪の判定に成功したら…
+                if (willSnow) {
+                    allSnowProvIds.add(p.id);
+                    isNewSnowAdded = true; // 新しく雪が降る国が増えました！
+                    
+                    // 新しく雪のシールを貼ります
+                    if (!p.statusEffects) p.statusEffects = [];
+                    p.statusEffects.push('heavySnow');
+                }
             }
         });
 
@@ -646,7 +645,7 @@ window.GameEvents.push({
                 '大雪', 
                 "【大雪】\n厳しい冬が訪れ、各地が大雪に見舞われています……", 
                 allSnowProvIds, 
-                125, 199, 255
+                220, 240, 255
             );
         }
     }
