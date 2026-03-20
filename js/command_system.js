@@ -1224,23 +1224,85 @@ class CommandSystem {
             const gVal = inputs.guns ? parseInt(inputs.guns.num.value) : 0;
             if (sVal <= 0) { this.game.ui.showDialog("兵士0では出陣できません", false); return; }
             
-            const targetName = this.game.getCastle(targetId).name;
+            const targetCastle = this.game.getCastle(targetId);
+            const targetName = targetCastle.name;
             
-            // ★諸勢力の制圧なら
-            if (extraData && extraData.isKunishu) {
-                const kunishu = this.game.kunishuSystem.getKunishu(extraData.kunishuId);
-                
-                // ★頭領の名前ではなく、諸勢力の正式な名前を取得する魔法を使います
-                const kunishuName = kunishu.getName(this.game);
-                
-                // ★メッセージの中身も、取得した「kunishuName」をそのまま表示するように直しました
-                this.game.ui.showDialog(`${targetName}周辺に根付く ${kunishuName} を制圧しますか？\n今月の命令は終了となります`, true, () => {
-                    this.game.kunishuSystem.executeKunishuSubjugate(castle, targetId, data, sVal, rVal, hVal, gVal, kunishu);
+            // ★ここから追加：大雪の影響があるか調べる魔法！
+            // 出発する国か、目的地の国どちらかに大雪シールが貼られているかチェックします
+            const srcProv = this.game.provinces.find(p => p.id === castle.provinceId);
+            const tgtProv = this.game.provinces.find(p => p.id === targetCastle.provinceId);
+            const isHeavySnow = (srcProv && srcProv.statusEffects && srcProv.statusEffects.includes('heavySnow')) || 
+                                (tgtProv && tgtProv.statusEffects && tgtProv.statusEffects.includes('heavySnow'));
+
+            // 出陣を決定した時に動く「出陣の本当の魔法」です
+            const proceedWar = async () => {
+                let finalSVal = sVal;
+                let finalBushosData = [...data];
+                let finalBushos = finalBushosData.map(id => this.game.getBusho(id));
+
+                if (isHeavySnow) {
+                    // ★兵士の遭難処理（20%〜50%減る）
+                    const lossRate = 0.20 + Math.random() * 0.30;
+                    const lostSoldiers = Math.floor(finalSVal * lossRate);
+                    finalSVal -= lostSoldiers;
+
+                    if (lostSoldiers > 0) {
+                        await this.game.ui.showDialogAsync(`【強行軍】\n我が軍の兵士${lostSoldiers}人が遭難しました……`, false, 0);
+                    }
+
+                    // ★武将の凍死処理（10%の確率で死亡）
+                    const survivingBushos = [];
+                    for (let b of finalBushos) {
+                        if (Math.random() < 0.10) {
+                            await this.game.ui.showDialogAsync(`【強行軍】\n我が軍の${b.name}が凍死しました……`, false, 0);
+                            await this.game.lifeSystem.executeDeath(b); // 死神の魔法でお迎えが来ます
+                        } else {
+                            survivingBushos.push(b);
+                        }
+                    }
+                    finalBushos = survivingBushos;
+                    finalBushosData = finalBushos.map(b => b.id);
+
+                    // ★誰もいなくなってしまった時の処理
+                    if (finalBushos.length === 0) {
+                        await this.game.ui.showDialogAsync("【強行軍】\n我が軍は行方不明になりました……", false, 0);
+                        // 城から持ち出した物資がそのまま消え去ります
+                        castle.soldiers = Math.max(0, castle.soldiers - sVal);
+                        castle.rice = Math.max(0, castle.rice - rVal);
+                        castle.horses = Math.max(0, (castle.horses || 0) - hVal);
+                        castle.guns = Math.max(0, (castle.guns || 0) - gVal);
+                        
+                        this.game.ui.updatePanelHeader();
+                        this.game.ui.renderCommandMenu();
+                        return; // ここで悲しい終了です
+                    }
+                }
+
+                // ★ここから先は今までと同じ出陣の処理です！
+                // ★諸勢力の制圧なら
+                if (extraData && extraData.isKunishu) {
+                    const kunishu = this.game.kunishuSystem.getKunishu(extraData.kunishuId);
+                    
+                    // ★頭領の名前ではなく、諸勢力の正式な名前を取得する魔法を使います
+                    const kunishuName = kunishu.getName(this.game);
+                    
+                    // ★メッセージの中身も、取得した「kunishuName」をそのまま表示するように直しました
+                    this.game.ui.showDialog(`${targetName}周辺に根付く ${kunishuName} を制圧しますか？\n今月の命令は終了となります`, true, () => {
+                        this.game.kunishuSystem.executeKunishuSubjugate(castle, targetId, finalBushosData, finalSVal, rVal, hVal, gVal, kunishu);
+                    });
+                } else {
+                    // ★修正：「攻め込みますか？」の確認は後回しにして、まずは自軍の援軍を探す魔法に直結させます！
+                    this.checkReinforcementAndStartWar(castle, targetId, finalBushos, finalSVal, rVal, hVal, gVal);
+                }
+            };
+
+            // ★大雪なら確認のダイアログを出します！
+            if (isHeavySnow) {
+                this.game.ui.showDialog("大雪の影響により、被害が出る場合があります。\nそれでも出陣しますか？", true, () => {
+                    proceedWar(); // 「はい」なら地獄の強行軍へ…
                 });
             } else {
-                // ★修正：「攻め込みますか？」の確認は後回しにして、まずは自軍の援軍を探す魔法に直結させます！
-                const bushos = data.map(id => this.game.getBusho(id));
-                this.checkReinforcementAndStartWar(castle, targetId, bushos, sVal, rVal, hVal, gVal);
+                proceedWar(); // 大雪じゃなければそのまま元気に出発！
             }
         }
         else if (type === 'war_repair') {
