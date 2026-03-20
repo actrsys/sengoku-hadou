@@ -143,6 +143,9 @@ class Castle {
         // ★今回書き足し！：委任中の細かい許可設定（デフォルトは false ＝ 不可）
         this.allowAttack = data.allowAttack === true;
         this.allowMove = data.allowMove === true;
+
+        // ★今回新しく追加！：一揆や豪雪などの「状態異常」のシールを複数貼っておくための箱です
+        this.statusEffects = Array.isArray(data.statusEffects) ? data.statusEffects : [];
     }
 }
 
@@ -485,5 +488,8 @@ class Province {
         this.region = data.region || "";            // 地方の名前（例：東海）
         this.color_code = data.color_code || "";    // マップ用の色（例：#ff5d00）
         this.typhoon = Number(this.typhoon || 0);   // 台風の発生確率（例：0.15）
+
+        // ★今回新しく追加！：長雨などの「状態異常」のシールを複数貼っておくための箱です
+        this.statusEffects = Array.isArray(data.statusEffects) ? data.statusEffects : [];
     }
 }
