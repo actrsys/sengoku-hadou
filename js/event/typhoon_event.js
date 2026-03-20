@@ -348,6 +348,17 @@ window.GameEvents.push({
                 canvas.style.opacity = '1.0';
             }
 
+            // ★文字は出さずに、プレイヤーが画面を触る（クリックやタップする）までストップして待ちます！
+            await new Promise(resolve => {
+                const onTouch = () => {
+                    mapOverlay.removeEventListener('click', onTouch);
+                    mapOverlay.removeEventListener('touchstart', onTouch);
+                    resolve(); // 触ってくれたらストッパーを解除して先に進みます！
+                };
+                mapOverlay.addEventListener('click', onTouch);
+                mapOverlay.addEventListener('touchstart', onTouch, { passive: true });
+            });
+
             if (damagedProvinceMap.size > 0) {
                 await game.ui.showDialogAsync("【台風発生】\n各地で被害が発生しているようです……", false, 0);
             } else {
@@ -359,7 +370,8 @@ window.GameEvents.push({
         }
 
         document.body.removeChild(mapOverlay);
-        await new Promise(resolve => setTimeout(resolve, 3000));
+        // ★マップを閉じた後の硬直時間を3秒（3000）から1秒（1000）に減らしました！
+        await new Promise(resolve => setTimeout(resolve, 1000));
 
         for (const data of damagedPlayerCastles) {
             await game.ui.showDialogAsync(`【被害報告】\n我が家の ${data.castle.name} が台風の被害を受けました……\n（局地規模：${data.scale}）`, false, 0);
