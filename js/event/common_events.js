@@ -610,9 +610,9 @@ window.GameEvents.push({
         const regionsToSnow = new Set();
         
         // 地方ごとに発生確率を判定します
-        if (Math.random() < 0.90) regionsToSnow.add(1); // 東北（90%）
-        if (Math.random() < 0.80) regionsToSnow.add(2); // 北陸（80%）
-        if (Math.random() < 0.20) regionsToSnow.add(3); // 甲信（20%）
+        if (Math.random() < 0.98) regionsToSnow.add(1); // 東北（98%）
+        if (Math.random() < 0.95) regionsToSnow.add(2); // 北陸（95%）
+        if (Math.random() < 0.40) regionsToSnow.add(3); // 甲信（40%）
         if (Math.random() < 0.03) regionsToSnow.add(4); // 関東（3%）
         
         // どこも大雪の判定が成功しなかったら、何もせずにおしまいです
@@ -646,7 +646,7 @@ window.GameEvents.push({
                 '大雪', 
                 "【大雪】\n厳しい冬が訪れ、各地が大雪に見舞われています……", 
                 allSnowProvIds, 
-                220, 240, 255
+                125, 199, 255
             );
         }
     }
