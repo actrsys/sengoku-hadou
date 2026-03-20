@@ -1240,6 +1240,13 @@ class GameManager {
 
         this.selectionMode = null; 
         
+        // ★ここから追加：自分のターンが終わった瞬間に、いったん膜を張って操作をブロックします！
+        this.isProcessingAI = true;
+        if (this.ui && this.ui.aiGuard) {
+            this.ui.aiGuard.classList.remove('hidden');
+        }
+        // ★追加ここまで
+        
         // ★追加：月末のイベント処理中（独立や反乱など）は、ここでストップします！
         if (this.currentIndex >= this.turnQueue.length) {
             return;
