@@ -1065,7 +1065,8 @@ class GameManager {
             });
         });
 
-        const allCastles = this.castles.filter(c => c.ownerClan !== 0);
+        // ★ここを書き換え！：空っぽの城（中立）も仲間はずれにせず、一緒に混ぜて順番リストに入れます！
+        const allCastles = [...this.castles];
         allCastles.sort(() => Math.random() - 0.5); 
         this.turnQueue = [...allCastles];
 
@@ -1356,8 +1357,12 @@ class GameManager {
             playerClanId: this.playerClanId,
             kunishus: this.kunishuSystem.kunishus,
             mapWidth: this.mapWidth,
-            mapHeight: this.mapHeight
-        }; 
+            mapHeight: this.mapHeight,
+            // ★ここから追加：今どの城の順番か、どんな順番で回っているかのメモを残します！
+            turnQueueIds: this.turnQueue.map(c => c.id),
+            currentIndex: this.currentIndex
+            // ★追加ここまで
+        };
         const blob = new Blob([JSON.stringify(data, null, 2)], {type: 'application/json'}); 
         const url = URL.createObjectURL(blob); 
         const a = document.createElement('a'); a.href = url; a.download = `sengoku_save_${this.year}_${this.month}.json`; a.click(); URL.revokeObjectURL(url); 
@@ -1450,8 +1455,17 @@ class GameManager {
                 
                 this.phase = 'game';
                 
-                this.turnQueue = this.castles.filter(c => c.ownerClan !== 0).sort(() => Math.random() - 0.5);
-                this.currentIndex = 0; 
+                // ★ここをごっそり差し替え！：セーブデータのメモから順番を復元します！
+                if (d.turnQueueIds && d.turnQueueIds.length > 0) {
+                    // メモ書きがある場合は、そのIDの順番通りに城を並べ直して、続きから始めます
+                    this.turnQueue = d.turnQueueIds.map(id => this.castles.find(c => c.id === id)).filter(c => c !== undefined);
+                    this.currentIndex = d.currentIndex || 0;
+                } else {
+                    // 古いセーブデータなどでメモ書きがない場合は、全ての城を混ぜて最初からにします（空城も含めます）
+                    this.turnQueue = [...this.castles].sort(() => Math.random() - 0.5);
+                    this.currentIndex = 0;
+                }
+                // ★差し替えここまで！
 
                 this.updateAllCastlesLords();
 
