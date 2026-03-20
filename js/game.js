@@ -1481,7 +1481,9 @@ class GameManager {
                 // ★ここを書き足し！：ロードした時も、念のため年齢による能力変動を再計算しておきます
                 this.lifeSystem.updateAllBushosAge();
 
-                this.ui.showCutin(`ロード完了: ${this.year}年 ${this.month}月`);
+                // ★ここを修正！：カットインが完全に消えるまで「await」でしっかり待ちます！
+                await this.ui.showCutin(`ロード完了: ${this.year}年 ${this.month}月`);
+                
                 this.ui.hasInitializedMap = false; 
                 this.ui.renderMap();
 

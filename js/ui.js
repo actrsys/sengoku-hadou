@@ -314,6 +314,7 @@ class UIManager {
             isVisible('selector-modal') || 
             isVisible('quantity-modal') || 
             isVisible('war-modal') ||      // ★ここを追加！！！戦争画面が開いている間も待ちます！
+            isVisible('cutin-overlay') ||  // ★ここを書き足し！！！月替わりのカットイン表示中も絶対に待ちます！
             this.game.selectionMode != null;
         };
 
