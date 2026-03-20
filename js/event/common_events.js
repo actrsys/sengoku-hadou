@@ -337,8 +337,8 @@ window.GameEvents.push({
             }
         });
 
-        // ② 15%の確率で「新しい豊作」が発生するか判定します
-        if (Math.random() < 0.15) {
+        // ② 20%の確率で「新しい豊作」が発生するか判定します
+        if (Math.random() < 0.2) {
             // 新規発生の候補（東北・甲信ではなく、どちらのシールも貼られていない国）を探します
             const validGoodProvinceIds = [...new Set(game.castles.filter(c => c.provinceId > 0).map(c => c.provinceId))].filter(pid => {
                 const p = getProv(pid);
@@ -412,9 +412,9 @@ window.GameEvents.push({
             riceIncome = GameSystem.applyVariance(riceIncome, window.MainParams.Economy.IncomeFluctuation);
             
             if (hasStatus(c.provinceId, 'badHarvest')) {
-                riceIncome = Math.floor(riceIncome * 0.5); 
+                riceIncome = Math.floor(riceIncome * 0.8); //凶作の場合は収入80％ 
             } else if (hasStatus(c.provinceId, 'goodHarvest')) {
-                riceIncome = Math.floor(riceIncome * 1.5); 
+                riceIncome = Math.floor(riceIncome * 1.3);  //豊作の場合は収入130％
             }
             
             c.rice = Math.min(99999, c.rice + riceIncome);
