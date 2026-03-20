@@ -171,6 +171,8 @@ window.playProvinceMapEffect = async function(game, eventType, initialMsg, affec
         if (eventType === '豊作') msg = `【豊作の報せ】\n${pName}は豊作です！`;
         else if (eventType === '凶作') msg = `【凶作の報せ】\n${pName}は凶作に見舞われています……`;
         else if (eventType === '飢饉') msg = `【飢饉の報せ】\n${pName}で飢饉が発生し、甚大な被害が出ています……`;
+        else if (eventType === '疫病') msg = `【疫病の報せ】\n${pName}で恐ろしい疫病が猛威を振るっています……`;
+        else if (eventType === '地震') msg = `【地震の報せ】\n${pName}で大地震による甚大な被害が出ています……`;
         
         await game.ui.showDialogAsync(msg, false, 0);
     }
@@ -477,6 +479,114 @@ window.GameEvents.push({
             if (p.statusEffects) {
                 // 'famine' という文字以外のシールだけを残します
                 p.statusEffects = p.statusEffects.filter(s => s !== 'famine');
+            }
+        });
+    }
+});
+
+// ==========================================
+// ★ 不定期イベント：疫病（月末処理後）
+// ==========================================
+window.GameEvents.push({
+    id: "epidemic_event_random",
+    timing: "endMonth_after", // 月末の処理が終わった後に判定します
+    isOneTime: false,
+    
+    checkCondition: function(game) {
+        // 0.2%（1000回に2回）の確率で、疫病のスイッチが入ります
+        return Math.random() < 0.002;
+    },
+    
+    execute: async function(game) {
+        // 日本中にあるすべての国の「出席番号」を集めます
+        const allProvIds = [...new Set(game.castles.filter(c => c.provinceId > 0).map(c => c.provinceId))];
+        if (allProvIds.length === 0) return;
+        
+        // その中から、くじ引きで「ランダムな１つの国」を選びます
+        const targetProvId = allProvIds[Math.floor(Math.random() * allProvIds.length)];
+        const affectedProvIds = new Set([targetProvId]);
+
+        // ★共通の魔法を呼び出します！（疫病の色は、毒々しい紫色です）
+        await window.playProvinceMapEffect(
+            game, 
+            '疫病', 
+            "【疫病流行】\n各地で恐ろしい疫病が流行の兆しを見せています……", 
+            affectedProvIds, 
+            128, 0, 128
+        );
+
+        // 選ばれた国のお城に被害を与えます
+        game.castles.forEach(c => {
+            if (c.ownerClan === 0) return; 
+            
+            if (affectedProvIds.has(c.provinceId)) {
+                // 兵士数が 10% ～ 30% ランダムで減ります
+                const solDropRate = 0.10 + (Math.random() * 0.20);
+                c.soldiers = Math.max(0, Math.floor(c.soldiers * (1.0 - solDropRate)));
+                
+                // 人口が 10% ～ 20% ランダムで減ります
+                const popDropRate = 0.10 + (Math.random() * 0.10);
+                c.population = Math.max(0, Math.floor(c.population * (1.0 - popDropRate)));
+                
+                // 兵士と人口の減少割合（％）を足し算して、民忠をガクッと下げます
+                const loyaltyDrop = Math.floor(solDropRate * 100) + Math.floor(popDropRate * 100);
+                c.peoplesLoyalty = Math.max(0, c.peoplesLoyalty - loyaltyDrop);
+            }
+        });
+    }
+});
+
+// ==========================================
+// ★ 不定期イベント：地震（月末処理後）
+// ==========================================
+window.GameEvents.push({
+    id: "earthquake_event_random",
+    timing: "endMonth_after", // これも月末の処理が終わった後に判定します
+    isOneTime: false,
+    
+    checkCondition: function(game) {
+        // 0.2%（1000回に2回）の確率で、地震のスイッチが入ります
+        return Math.random() < 0.002;
+    },
+    
+    execute: async function(game) {
+        // 日本中にあるすべての国の「出席番号」を集めます
+        const allProvIds = [...new Set(game.castles.filter(c => c.provinceId > 0).map(c => c.provinceId))];
+        if (allProvIds.length === 0) return;
+        
+        // その中から、くじ引きで「ランダムな１つの国」を選びます
+        const targetProvId = allProvIds[Math.floor(Math.random() * allProvIds.length)];
+        const affectedProvIds = new Set([targetProvId]);
+
+        // ★共通の魔法を呼び出します！（地震の色は、大地を思わせる茶色です）
+        await window.playProvinceMapEffect(
+            game, 
+            '地震', 
+            "【大地震】\n大きな地鳴りとともに、大地が激しく揺れました！", 
+            affectedProvIds, 
+            139, 69, 19
+        );
+
+        // 選ばれた国のお城に被害を与えます
+        game.castles.forEach(c => {
+            if (c.ownerClan === 0) return; 
+            
+            if (affectedProvIds.has(c.provinceId)) {
+                // 兵士数が 5% ～ 15% ランダムで減ります
+                const solDropRate = 0.05 + (Math.random() * 0.10);
+                c.soldiers = Math.max(0, Math.floor(c.soldiers * (1.0 - solDropRate)));
+                
+                // 人口が 0.1% ～ 5% ランダムで減ります
+                const popDropRate = 0.001 + (Math.random() * 0.049);
+                c.population = Math.max(0, Math.floor(c.population * (1.0 - popDropRate)));
+                
+                // 石高が 5% ～ 30% ランダムで減ります（田んぼが崩れてしまいます）
+                const kokuDropRate = 0.05 + (Math.random() * 0.25);
+                c.kokudaka = Math.max(0, Math.floor(c.kokudaka * (1.0 - kokuDropRate)));
+                
+                // 城防御が 20% ～ 50% も大きく減ります（城壁や門が壊れてしまいます）
+                const defDropRate = 0.20 + (Math.random() * 0.30);
+                c.defense = Math.max(0, Math.floor(c.defense * (1.0 - defDropRate)));
             }
         });
     }
