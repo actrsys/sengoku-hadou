@@ -173,6 +173,7 @@ window.playProvinceMapEffect = async function(game, eventType, initialMsg, affec
         else if (eventType === '飢饉') msg = `【飢饉の報せ】\n${pName}で飢饉が発生し、甚大な被害が出ています……`;
         else if (eventType === '疫病') msg = `【疫病の報せ】\n${pName}で恐ろしい疫病が猛威を振るっています……`;
         else if (eventType === '地震') msg = `【地震の報せ】\n${pName}で大地震による甚大な被害が出ています……`;
+        else if (eventType === '大雪') msg = `【大雪の報せ】\n${pName}は深い雪に閉ざされています……`; // ★これを書き足しました！
         
         await game.ui.showDialogAsync(msg, false, 0);
     }
@@ -587,6 +588,122 @@ window.GameEvents.push({
                 // 城防御が 20% ～ 50% も大きく減ります（城壁や門が壊れてしまいます）
                 const defDropRate = 0.20 + (Math.random() * 0.30);
                 c.defense = Math.max(0, Math.floor(c.defense * (1.0 - defDropRate)));
+            }
+        });
+    }
+});
+
+// ==========================================
+// ★ 季節イベント：大雪の発生（11〜2月の月末処理後）
+// ==========================================
+window.GameEvents.push({
+    id: "heavy_snow_trigger",
+    timing: "endMonth_after", // 11〜2月の月末の処理が終わった後に判定します
+    isOneTime: false,
+    
+    checkCondition: function(game) {
+        // 11月、12月、1月、2月の時だけ実行します
+        return [11, 12, 1, 2].includes(game.month);
+    },
+    
+    execute: async function(game) {
+        const regionsToSnow = new Set();
+        
+        // 地方ごとに発生確率を判定します
+        if (Math.random() < 0.90) regionsToSnow.add(1); // 東北（90%）
+        if (Math.random() < 0.80) regionsToSnow.add(2); // 北陸（80%）
+        if (Math.random() < 0.20) regionsToSnow.add(3); // 甲信（20%）
+        if (Math.random() < 0.03) regionsToSnow.add(4); // 関東（3%）
+        
+        // どこも大雪にならなかったら、何もせずにおしまいです
+        if (regionsToSnow.size === 0) return;
+
+        const affectedProvIds = new Set();
+
+        // 判定が成功した地方の国々に「heavySnow」のシールを貼ります
+        game.provinces.forEach(p => {
+            if (regionsToSnow.has(p.regionId)) {
+                affectedProvIds.add(p.id);
+                if (!p.statusEffects) p.statusEffects = [];
+                if (!p.statusEffects.includes('heavySnow')) p.statusEffects.push('heavySnow');
+            }
+        });
+
+        // ★共通の魔法を呼び出します！（雪の色は、うっすら青みがかった白です）
+        await window.playProvinceMapEffect(
+            game, 
+            '大雪', 
+            "【大雪】\n厳しい冬が訪れ、各地が大雪に見舞われています……", 
+            affectedProvIds, 
+            220, 240, 255
+        );
+    }
+});
+
+// ==========================================
+// ★ 季節イベント：大雪の被害 ＆ ３月の雪解け（各処理の開始前）
+// ==========================================
+window.GameEvents.push({
+    id: "heavy_snow_damage_and_clear",
+    timing: "startMonth_before", // ★毎月の各処理が始まる「前」に実行します
+    isOneTime: false,
+    
+    checkCondition: function(game) {
+        // 毎月必ずチェックします
+        return true;
+    },
+    
+    execute: async function(game) {
+        // ① もし３月だったら、ダメージは与えずに雪のシールを全部剥がします（雪解け）
+        if (game.month === 3) {
+            game.provinces.forEach(p => {
+                if (p.statusEffects) {
+                    p.statusEffects = p.statusEffects.filter(s => s !== 'heavySnow');
+                }
+            });
+            return; // ここで処理はおしまいです
+        }
+
+        // ② ３月以外の場合、大雪シールが貼られている国を探します
+        const snowProvIds = new Set();
+        game.provinces.forEach(p => {
+            if (p.statusEffects && p.statusEffects.includes('heavySnow')) {
+                snowProvIds.add(p.id);
+            }
+        });
+
+        // 雪が降っている国がなければ、何もしないでおしまいです
+        if (snowProvIds.size === 0) return;
+
+        // ③ 雪が降っている国のお城に、毎月のジワジワとした被害を与えます
+        game.castles.forEach(c => {
+            if (c.ownerClan === 0) return; 
+            
+            if (snowProvIds.has(c.provinceId)) {
+                // 石高が 1% ～ 5% ランダムで減ります
+                const kokuDropRate = 0.01 + (Math.random() * 0.04);
+                c.kokudaka = Math.max(0, Math.floor(c.kokudaka * (1.0 - kokuDropRate)));
+                
+                // 城防御が 1% ～ 5% ランダムで減ります
+                const defDropRate = 0.01 + (Math.random() * 0.04);
+                c.defense = Math.max(0, Math.floor(c.defense * (1.0 - defDropRate)));
+
+                // 兵士数が 1% ～ 5% ランダムで減ります（凍傷や逃亡）
+                const solDropRate = 0.01 + (Math.random() * 0.04);
+                c.soldiers = Math.max(0, Math.floor(c.soldiers * (1.0 - solDropRate)));
+                
+                // 人口が 0.01% ～ 0.05% ランダムで減ります
+                // （0.01% は小数にすると 0.0001 になります）
+                const popDropRate = 0.0001 + (Math.random() * 0.0004);
+                c.population = Math.max(0, Math.floor(c.population * (1.0 - popDropRate)));
+                
+                // 民忠が 1 ～ 5 ランダムで下がります
+                const loyaltyDrop = Math.floor(Math.random() * 5) + 1;
+                c.peoplesLoyalty = Math.max(0, c.peoplesLoyalty - loyaltyDrop);
+
+                // 士気が 3 ～ 5 ランダムで下がります
+                const moraleDrop = Math.floor(Math.random() * 3) + 3;
+                c.morale = Math.max(0, c.morale - moraleDrop);
             }
         });
     }
