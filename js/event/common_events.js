@@ -452,7 +452,7 @@ window.GameEvents.push({
             120, 0, 0 // 暗くて濃い赤色の数字です
         );
 
-        // ③ 飢饉の国にあるお城ごとに、兵士と人口を減らします！
+        // ③ 飢饉の国にあるお城ごとに、兵士と人口、そして民忠を減らします！
         game.castles.forEach(c => {
             if (c.ownerClan === 0) return; 
             
@@ -465,6 +465,10 @@ window.GameEvents.push({
                 // 人口が 1% ～ 10% ランダムで減ります！
                 const popDropRate = 0.01 + (Math.random() * 0.09);
                 c.population = Math.max(0, Math.floor(c.population * (1.0 - popDropRate)));
+                
+                // ★追加：兵士と人口の減少割合（％）を足し算して、民忠のダウン量を決めます！
+                const loyaltyDrop = Math.floor(solDropRate * 100) + Math.floor(popDropRate * 100);
+                c.peoplesLoyalty = Math.max(0, c.peoplesLoyalty - loyaltyDrop);
             }
         });
 
