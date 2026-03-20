@@ -615,28 +615,40 @@ window.GameEvents.push({
         if (Math.random() < 0.20) regionsToSnow.add(3); // 甲信（20%）
         if (Math.random() < 0.03) regionsToSnow.add(4); // 関東（3%）
         
-        // どこも大雪にならなかったら、何もせずにおしまいです
+        // どこも大雪の判定が成功しなかったら、何もせずにおしまいです
         if (regionsToSnow.size === 0) return;
 
-        const affectedProvIds = new Set();
+        let isNewSnowAdded = false; // 新しく雪が降る国が増えたかどうかのメモです
+        const allSnowProvIds = new Set(); // 今月雪が降っているすべての国を入れる箱です
 
-        // 判定が成功した地方の国々に「heavySnow」のシールを貼ります
+        // 国ごとにチェックしていきます
         game.provinces.forEach(p => {
-            if (regionsToSnow.has(p.regionId)) {
-                affectedProvIds.add(p.id);
+            const hasSnow = p.statusEffects && p.statusEffects.includes('heavySnow');
+            
+            if (hasSnow) {
+                // ① すでに雪のシールが貼られている国は、そのまま箱に入れます
+                allSnowProvIds.add(p.id);
+            } else if (regionsToSnow.has(p.regionId)) {
+                // ② まだ雪のシールがなくて、今回大雪の判定が成功した地方の国の場合
+                allSnowProvIds.add(p.id);
+                isNewSnowAdded = true; // 新しく雪が降る国が増えました！
+                
+                // 新しく雪のシールを貼ります
                 if (!p.statusEffects) p.statusEffects = [];
-                if (!p.statusEffects.includes('heavySnow')) p.statusEffects.push('heavySnow');
+                p.statusEffects.push('heavySnow');
             }
         });
 
-        // ★共通の魔法を呼び出します！（雪の色は、うっすら青みがかった白です）
-        await window.playProvinceMapEffect(
-            game, 
-            '大雪', 
-            "【大雪】\n厳しい冬が訪れ、各地が大雪に見舞われています……", 
-            affectedProvIds, 
-            220, 240, 255
-        );
+        // ★新しく雪が降る国が増えた時だけ、すべての雪国をまとめて地図で光らせます！
+        if (isNewSnowAdded && allSnowProvIds.size > 0) {
+            await window.playProvinceMapEffect(
+                game, 
+                '大雪', 
+                "【大雪】\n厳しい冬が訪れ、各地が大雪に見舞われています……", 
+                allSnowProvIds, 
+                220, 240, 255
+            );
+        }
     }
 });
 
