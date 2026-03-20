@@ -231,6 +231,20 @@ window.GameEvents.push({
             }
         }
 
+        // ★ここから追加！：７月か８月の台風なら、被害を受けた国に「凶作」のシールを貼ります！
+        if (game.month === 7 || game.month === 8) {
+            damagedProvinceMap.forEach((scale, pId) => {
+                const p = game.provinces.find(prov => prov.id === pId);
+                if (p) {
+                    if (!p.statusEffects) p.statusEffects = [];
+                    if (!p.statusEffects.includes('badHarvest')) {
+                        p.statusEffects.push('badHarvest');
+                    }
+                }
+            });
+        }
+        // ★追加ここまで！
+
         game.castles.forEach(castle => {
             if (damagedProvinceMap.has(castle.provinceId)) {
                 const finalScale = damagedProvinceMap.get(castle.provinceId);
