@@ -1365,8 +1365,12 @@ class GameManager {
     
     loadGameFromFile(e) { 
         const file = e.target.files[0]; if (!file) return; 
+        
+        // ★ここを書き足し！：同じファイルを選んでも反応するように、選択状態をリセットします
+        e.target.value = '';
+        
         const reader = new FileReader(); 
-        reader.onload = async (evt) => { 
+        reader.onload = async (evt) => {
             try { 
                 // ★ここから追加：前のゲームの記憶やフラグを綺麗にお掃除します！
                 this.isProcessingAI = false; // AI思考中フラグを解除！
