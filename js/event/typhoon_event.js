@@ -12,11 +12,11 @@ window.GameEvents.push({
     
     checkCondition: function(game) {
         const dice = Math.random();
-        if (game.month === 7 && dice < 0.1) return true;
+        if (game.month === 7 && dice < 0.05) return true;
         if (game.month === 8 && dice < 0.15) return true;
         if (game.month === 9 && dice < 0.6) return true;
         if (game.month === 10 && dice < 0.15) return true;
-        if (game.month === 11 && dice < 0.1) return true;
+        if (game.month === 11 && dice < 0.05) return true;
         return false;
     },
     
