@@ -645,7 +645,7 @@ window.GameEvents.push({
                 '大雪', 
                 "【大雪】\n厳しい冬が訪れ、各地が大雪に見舞われています……", 
                 allSnowProvIds, 
-                220, 240, 255
+                99, 188, 255
             );
         }
     }
@@ -667,11 +667,22 @@ window.GameEvents.push({
     execute: async function(game) {
         // ① もし３月だったら、ダメージは与えずに雪のシールを全部剥がします（雪解け）
         if (game.month === 3) {
+            let hadSnow = false; // 日本のどこかに雪が積もっていたかをメモする箱です
+
             game.provinces.forEach(p => {
-                if (p.statusEffects) {
+                // その国に雪のシールが貼られているかチェックします
+                if (p.statusEffects && p.statusEffects.includes('heavySnow')) {
+                    hadSnow = true; // 雪が積もっている国を見つけました！
+                    // 雪のシールを綺麗に剥がします
                     p.statusEffects = p.statusEffects.filter(s => s !== 'heavySnow');
                 }
             });
+
+            // どこかに雪が積もっていたなら、春の訪れをメッセージだけでお知らせします
+            if (hadSnow && game.ui) {
+                await game.ui.showDialogAsync("【雪解け】\n雪解けの季節です", false, 0);
+            }
+            
             return; // ここで処理はおしまいです
         }
 
