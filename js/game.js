@@ -1033,12 +1033,7 @@ class GameManager {
             c.gold = Math.min(99999, c.gold + income);
             
             // ９月の兵糧収入計算式
-            if (this.month === 9) {
-                const baseRice = (c.kokudaka / 2) + c.peoplesLoyalty;
-                let riceIncome = Math.floor(baseRice * window.MainParams.Economy.IncomeRiceRate);
-                riceIncome = GameSystem.applyVariance(riceIncome, window.MainParams.Economy.IncomeFluctuation);
-                c.rice = Math.min(99999, c.rice + riceIncome);
-            }
+            // ★ここは common_events.js の「豊作・凶作イベント」にお引っ越ししました！
             
             if (isPopGrowth) { 
                 let growth = 0;
