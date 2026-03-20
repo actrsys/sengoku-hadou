@@ -42,8 +42,8 @@ window.GameEvents.push({
     },
     
     execute: async function(game) {
-        // ① イベント発生の判定（100%で発生、さらに50%で豊作か凶作）
-        const isEventYear = Math.random() < 1.0;
+        // ① イベント発生の判定（30%で発生、さらに50%で豊作か凶作）
+        const isEventYear = Math.random() < 0.3;
         let eventType = null; 
         
         if (isEventYear) {
@@ -54,15 +54,38 @@ window.GameEvents.push({
 
         // ② イベントが起きた時の国の伝染計算
         if (eventType) {
-            const allProvinceIds = [...new Set(game.castles.filter(c => c.provinceId > 0).map(c => c.provinceId))];
+            // ★変更点：まずは有効な国の出席番号を集めます
+            let validProvinceIds = [];
             
-            const provinceRands = allProvinceIds.map(pid => {
+            if (eventType === '豊作') {
+                // 豊作の場合、regionIdが1（東北）と3（甲信）の国は最初から除外します！
+                validProvinceIds = [...new Set(game.castles.filter(c => c.provinceId > 0).map(c => c.provinceId))].filter(pid => {
+                    const p = game.provinces.find(prov => prov.id === pid);
+                    return p && p.regionId !== 1 && p.regionId !== 3;
+                });
+            } else {
+                // 凶作の場合は日本のすべての国が対象です
+                validProvinceIds = [...new Set(game.castles.filter(c => c.provinceId > 0).map(c => c.provinceId))];
+            }
+            
+            const provinceRands = validProvinceIds.map(pid => {
                 return { id: pid, rand: Math.floor(Math.random() * 1000) };
             });
             provinceRands.sort((a, b) => b.rand - a.rand);
             
-            const candidates = provinceRands.slice(0, 3);
-            let successCandidates = candidates.filter(c => Math.random() < 0.3);
+            // ★変更点：候補の国を「３つ」から「５つ」に増やしました！
+            const candidates = provinceRands.slice(0, 5);
+            
+            // ★変更点：凶作の時、東北と甲信は発生率が60%になります！
+            let successCandidates = candidates.filter(c => {
+                if (eventType === '凶作') {
+                    const p = game.provinces.find(prov => prov.id === c.id);
+                    if (p && (p.regionId === 1 || p.regionId === 3)) {
+                        return Math.random() < 0.6; // 東北・甲信なら60%
+                    }
+                }
+                return Math.random() < 0.3; // それ以外は30%
+            });
             
             if (successCandidates.length === 0 && candidates.length > 0) {
                 const maxRand = candidates[0].rand;
@@ -94,7 +117,18 @@ window.GameEvents.push({
                 for (let neighbor of neighbors) {
                     if (!visitedCastles.has(neighbor.id)) {
                         visitedCastles.add(neighbor.id); 
-                        if (Math.random() < 0.2) {
+                        
+                        // ★変更点：豊作の時、隣の城が東北（1）か甲信（3）なら伝染をブロックします！
+                        let canSpread = true;
+                        if (eventType === '豊作') {
+                            const p = game.provinces.find(prov => prov.id === neighbor.provinceId);
+                            if (p && (p.regionId === 1 || p.regionId === 3)) {
+                                canSpread = false;
+                            }
+                        }
+                        
+                        // ★変更点：伝染の確率を 20% から 35% に上げました！
+                        if (canSpread && Math.random() < 0.35) {
                             affectedProvinces.add(neighbor.provinceId);
                             queue.push({ castle: neighbor, distance: dist + 1 });
                         }
@@ -102,16 +136,17 @@ window.GameEvents.push({
                 }
             }
             
-            // ③ ★ここから追加！マップをピカピカさせる魔法です！
+            // ③ マップをピカピカさせる魔法です
             if (affectedProvinces.size > 0 && game.ui) {
-                // まずは導入のダイアログを出します
-                await game.ui.showDialogAsync("【秋の訪れ】\n今年の収穫の様子はどうでしょうか……", false, 0);
+                // ★変更点：最初の導入メッセージをあや瀨さんの指定通りに変更しました！
+                const initialMsg = eventType === '豊作' 
+                    ? "【秋の訪れ】\n今年は各地で豊作の秋を迎えています！"
+                    : "【秋の訪れ】\n今年は各地で凶作に見舞われています……";
+                await game.ui.showDialogAsync(initialMsg, false, 0);
 
-                // ズームをリセットします
                 const resetZoomBtn = document.getElementById('map-reset-zoom');
                 if (resetZoomBtn) resetZoomBtn.click();
 
-                // マップの背景（黒いフィルター）を作ります
                 const mapOverlay = document.createElement('div');
                 mapOverlay.style.position = 'fixed';
                 mapOverlay.style.top = '0';
@@ -157,7 +192,6 @@ window.GameEvents.push({
                     }
                 });
 
-                // 地方の色分けデータを読み込みます（台風と同じです）
                 if (!window.ProvinceImageDataCache) {
                     const provMapImg = new Image();
                     provMapImg.src = './data/images/map/japan_provinces.png';
@@ -181,7 +215,6 @@ window.GameEvents.push({
                     }
                 }
 
-                // 色を塗るための透明なキャンバスを作ります
                 if (window.ProvinceImageDataCache) {
                     const canvas = document.createElement('canvas');
                     canvas.width = window.ProvinceImageDataCache.width;
@@ -192,7 +225,7 @@ window.GameEvents.push({
                     canvas.style.width = '100%';
                     canvas.style.height = '100%';
                     canvas.style.pointerEvents = 'none';
-                    canvas.style.animation = 'blink 1s 2'; // ピカピカさせます
+                    canvas.style.animation = 'blink 1s 2'; 
 
                     const ctx = canvas.getContext('2d');
                     const targetColors = [];
@@ -201,7 +234,6 @@ window.GameEvents.push({
                         return result ? { r: parseInt(result[1], 16), g: parseInt(result[2], 16), b: parseInt(result[3], 16) } : null;
                     };
                     
-                    // 被害に遭った国の色を調べます
                     affectedProvinces.forEach(pId => {
                         const pData = game.provinces.find(p => p.id === pId);
                         if (pData && pData.color_code) {
@@ -210,13 +242,11 @@ window.GameEvents.push({
                         }
                     });
 
-                    // キャンバスに色を塗ります！
                     if (targetColors.length > 0) {
                         const srcData = window.ProvinceImageDataCache.data;
                         const newImgData = ctx.createImageData(canvas.width, canvas.height);
                         const dstData = newImgData.data;
 
-                        // 豊作なら「黄金色」、凶作なら「赤紫色」にします
                         const drawR = eventType === '豊作' ? 255 : 180;
                         const drawG = eventType === '豊作' ? 215 : 0;
                         const drawB = eventType === '豊作' ? 0 : 180;
@@ -235,7 +265,7 @@ window.GameEvents.push({
                                     dstData[i] = drawR;
                                     dstData[i+1] = drawG;
                                     dstData[i+2] = drawB;
-                                    dstData[i+3] = 180; // 半透明
+                                    dstData[i+3] = 180; 
                                 }
                             }
                         }
@@ -243,13 +273,11 @@ window.GameEvents.push({
                     }
                     mapContainer.appendChild(canvas);
                     
-                    // ピカピカのアニメーションが終わるまで少し待ちます
                     await new Promise(resolve => setTimeout(resolve, 2000));
                     canvas.style.animation = 'none';
                     canvas.style.opacity = '1.0';
                 }
 
-                // プレイヤーが画面を触るまでストップして待ちます！
                 await new Promise(resolve => {
                     const onTouch = () => {
                         mapOverlay.removeEventListener('click', onTouch);
@@ -260,18 +288,28 @@ window.GameEvents.push({
                     mapOverlay.addEventListener('touchstart', onTouch, { passive: true });
                 });
 
-                // マップを片付けます
                 document.body.removeChild(mapOverlay);
                 await new Promise(resolve => setTimeout(resolve, 1000));
 
-                // どこの国で発生したかのお知らせダイアログを出します
-                const pNames = Array.from(affectedProvinces).map(pid => {
-                    const p = game.provinces.find(prov => prov.id === pid);
-                    return p ? p.province : "どこかの国";
+                // ★変更点：プレイヤーが持っているお城が対象になっていたら、個別の報告を出します！
+                const playerAffectedProvinces = new Set();
+                game.castles.forEach(c => {
+                    if (c.ownerClan === game.playerClanId && affectedProvinces.has(c.provinceId)) {
+                        playerAffectedProvinces.add(c.provinceId);
+                    }
                 });
-                const uniquePNames = [...new Set(pNames)];
-                const msg = `【${eventType}】\n${uniquePNames.join('、')} を中心とした地域で\n${eventType}となりました！`;
-                await game.ui.showDialogAsync(msg, false, 0);
+                
+                // 影響を受けた国ごとに順番にお知らせします
+                for (let pid of playerAffectedProvinces) {
+                    const p = game.provinces.find(prov => prov.id === pid);
+                    const pName = p ? p.province : "どこかの国";
+                    
+                    const msg = eventType === '豊作'
+                        ? `【豊作の報せ】\n${pName}は豊作です！`
+                        : `【凶作の報せ】\n${pName}は凶作に見舞われています……`;
+                    
+                    await game.ui.showDialogAsync(msg, false, 0);
+                }
             }
         }
 
