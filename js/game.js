@@ -1110,6 +1110,11 @@ class GameManager {
             if (this.ui && this.ui.waitForDialogs) {
                 await this.ui.waitForDialogs();
             }
+            // ★ここから追加：全部終わって翌月に行く前に、安心感のために数字を「MAX/MAX」にしておきます！
+            if (this.isProcessingAI && this.ui && this.turnQueue.length > 0) {
+                this.ui.updateAIProgress(this.turnQueue.length, this.turnQueue.length);
+            }
+            // ★追加ここまで
             await this.endMonth(); // ← ★「await」を書き足します！
             return; 
         }
@@ -1117,12 +1122,16 @@ class GameManager {
         const castle = this.turnQueue[this.currentIndex]; 
         
         if (castle.isDone) {
+            // ★ここを書き足し：行動済みの城をスキップする時も、一瞬だけ数字を進めます！
+            if (this.isProcessingAI && this.ui) this.ui.updateAIProgress(this.currentIndex + 1, this.turnQueue.length);
             this.finishTurn();
             return;
         }
 
         if(!castle || castle.ownerClan === 0 || !this.clans.find(c => Number(c.id) === Number(castle.ownerClan))) { 
             console.warn(`Skipping invalid castle or owner.`);
+            // ★ここを書き足し：空城をスキップする時も、一瞬だけ数字を進めます！
+            if (this.isProcessingAI && this.ui) this.ui.updateAIProgress(this.currentIndex + 1, this.turnQueue.length);
             this.currentIndex++; 
             this.processTurn(); 
             return; 
