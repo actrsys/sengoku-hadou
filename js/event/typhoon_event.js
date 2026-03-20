@@ -59,13 +59,12 @@ window.GameEvents.push({
         mapOverlay.style.top = '0';
         mapOverlay.style.left = '0';
         mapOverlay.style.width = '100%';
-        mapOverlay.style.height = '100%';
+        mapOverlay.style.height = '66vh';
         mapOverlay.style.backgroundColor = 'rgba(0,0,0,0.85)';
         mapOverlay.style.zIndex = '7500'; 
         mapOverlay.style.display = 'flex';
         mapOverlay.style.justifyContent = 'center';
-        mapOverlay.style.alignItems = 'flex-start';
-        mapOverlay.style.paddingTop = '5vh'; 
+        mapOverlay.style.alignItems = 'center';
 
         const mapContainer = document.createElement('div');
         mapContainer.style.position = 'relative';
@@ -348,6 +347,16 @@ window.GameEvents.push({
                 canvas.style.opacity = '1.0';
             }
 
+            await new Promise(resolve => {
+                const waitTouch = () => {
+                    document.removeEventListener('mousedown', waitTouch);
+                    document.removeEventListener('touchstart', waitTouch);
+                    resolve();
+                };
+                document.addEventListener('mousedown', waitTouch);
+                document.addEventListener('touchstart', waitTouch);
+            });
+
             if (damagedProvinceMap.size > 0) {
                 await game.ui.showDialogAsync("【台風発生】\n各地で被害が発生しているようです……", false, 0);
             } else {
@@ -359,7 +368,7 @@ window.GameEvents.push({
         }
 
         document.body.removeChild(mapOverlay);
-        await new Promise(resolve => setTimeout(resolve, 3000));
+        await new Promise(resolve => setTimeout(resolve, 1000));
 
         for (const data of damagedPlayerCastles) {
             await game.ui.showDialogAsync(`【被害報告】\n我が家の ${data.castle.name} が台風の被害を受けました……\n（局地規模：${data.scale}）`, false, 0);
