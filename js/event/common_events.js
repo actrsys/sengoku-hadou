@@ -30,7 +30,7 @@ window.GameEvents.push({
 });
 
 // ==========================================
-// ★ ９月の豊作・凶作イベント ＆ 兵糧収入処理（マップ演出付き・独立発生版）
+// ★ ９月の豊作・凶作イベント ＆ 兵糧収入処理（マップ演出付き・事前ステータス連動版）
 // ==========================================
 window.GameEvents.push({
     id: "harvest_event_september",
@@ -45,11 +45,8 @@ window.GameEvents.push({
         // =========================================================
         // 【準備】便利な道具（関数）を用意します
         // =========================================================
-        
-        // ① 指定した国を探す道具
         const getProv = (pId) => game.provinces.find(p => p.id === pId);
         
-        // ② 国に「状態異常のシール（badHarvest など）」を貼る道具
         const addStatus = (pId, status) => {
             const p = getProv(pId);
             if (p) {
@@ -58,13 +55,11 @@ window.GameEvents.push({
             }
         };
         
-        // ③ 国にそのシールが貼られているか確認する道具
         const hasStatus = (pId, status) => {
             const p = getProv(pId);
             return p && p.statusEffects && p.statusEffects.includes(status);
         };
 
-        // ④ 地図をピカピカさせる魔法（長くなるので、ひとまとめにしました！）
         const playMapEffect = async (eventType, affectedProvIds) => {
             if (affectedProvIds.size === 0 || !game.ui) return;
             
@@ -238,73 +233,121 @@ window.GameEvents.push({
         };
 
         // =========================================================
-        // 【実行１】まずは「凶作」の判定をします（15%）
+        // 【実行１】まずは「凶作」の処理を行います
         // =========================================================
-        if (Math.random() < 0.15) {
-            let affected = new Set();
-            const allProvinceIds = [...new Set(game.castles.filter(c => c.provinceId > 0).map(c => c.provinceId))];
-            
-            const provinceRands = allProvinceIds.map(pid => ({ id: pid, rand: Math.floor(Math.random() * 1000) }));
-            provinceRands.sort((a, b) => b.rand - a.rand);
-            
-            const candidates = provinceRands.slice(0, 5);
-            let successCandidates = candidates.filter(c => {
-                const p = getProv(c.id);
-                if (p && (p.regionId === 1 || p.regionId === 3)) return Math.random() < 0.6; // 東北・甲信は60%
-                return Math.random() < 0.3; // それ以外は30%
-            });
-            
-            if (successCandidates.length === 0 && candidates.length > 0) {
-                successCandidates = candidates.filter(c => c.rand === candidates[0].rand);
+        let badAffected = new Set();
+        let badQueue = [];
+
+        // ① すでに「凶作シール」や「豊作シール」が貼られている国を確認します
+        game.provinces.forEach(p => {
+            if (hasStatus(p.id, 'badHarvest')) {
+                badAffected.add(p.id); // すでに凶作なら被害リストに入れます
             }
+        });
 
-            const startProvinceIds = successCandidates.map(c => c.id);
-            startProvinceIds.forEach(pid => affected.add(pid));
+        // 最初から凶作の国にある城を、伝染のスタート地点（距離0）として準備します
+        game.castles.forEach(c => {
+            if (badAffected.has(c.provinceId)) {
+                badQueue.push({ castle: c, distance: 0 });
+            }
+        });
 
-            let queue = [];
-            game.castles.forEach(c => {
-                if (startProvinceIds.includes(c.provinceId)) queue.push({ castle: c, distance: 0 });
+        // ② 15%の確率で「新しい凶作」が発生するか判定します
+        if (Math.random() < 0.15) {
+            // 新規発生の候補（まだどちらのシールも貼られていない国）を探します
+            const validBadProvinceIds = [...new Set(game.castles.filter(c => c.provinceId > 0).map(c => c.provinceId))].filter(pid => {
+                return !hasStatus(pid, 'badHarvest') && !hasStatus(pid, 'goodHarvest');
             });
+            
+            if (validBadProvinceIds.length > 0) {
+                const provinceRands = validBadProvinceIds.map(pid => ({ id: pid, rand: Math.floor(Math.random() * 1000) }));
+                provinceRands.sort((a, b) => b.rand - a.rand);
+                
+                const candidates = provinceRands.slice(0, 5);
+                let successCandidates = candidates.filter(c => {
+                    const p = getProv(c.id);
+                    if (p && (p.regionId === 1 || p.regionId === 3)) return Math.random() < 0.6; // 東北・甲信は60%
+                    return Math.random() < 0.3; // それ以外は30%
+                });
+                
+                if (successCandidates.length === 0 && candidates.length > 0) {
+                    successCandidates = candidates.filter(c => c.rand === candidates[0].rand);
+                }
 
-            let visitedCastles = new Set();
-            queue.forEach(q => visitedCastles.add(q.castle.id));
+                // 新しく凶作になった国をリストに追加し、スタート地点として準備します
+                const startProvinceIds = successCandidates.map(c => c.id);
+                startProvinceIds.forEach(pid => {
+                    badAffected.add(pid);
+                    game.castles.forEach(c => {
+                        if (c.provinceId === pid) badQueue.push({ castle: c, distance: 0 });
+                    });
+                });
+            }
+        }
 
-            while (queue.length > 0) {
-                const current = queue.shift();
-                if (current.distance >= 5) continue; 
+        // ③ 凶作を隣の城へ伝染させます
+        let visitedBadCastles = new Set();
+        badQueue.forEach(q => visitedBadCastles.add(q.castle.id));
 
-                const neighbors = game.castles.filter(c => GameSystem.isAdjacent(current.castle, c));
-                for (let neighbor of neighbors) {
-                    if (!visitedCastles.has(neighbor.id)) {
-                        visitedCastles.add(neighbor.id); 
-                        if (Math.random() < 0.35) {
-                            affected.add(neighbor.provinceId);
-                            queue.push({ castle: neighbor, distance: current.distance + 1 });
-                        }
+        while (badQueue.length > 0) {
+            const current = badQueue.shift();
+            if (current.distance >= 5) continue; 
+
+            const neighbors = game.castles.filter(c => GameSystem.isAdjacent(current.castle, c));
+            for (let neighbor of neighbors) {
+                if (!visitedBadCastles.has(neighbor.id)) {
+                    visitedBadCastles.add(neighbor.id); 
+                    
+                    // 伝染先としてOKか確認（まだどちらのシールも貼られていないこと）
+                    let canSpread = !hasStatus(neighbor.provinceId, 'badHarvest') && 
+                                    !hasStatus(neighbor.provinceId, 'goodHarvest') && 
+                                    !badAffected.has(neighbor.provinceId);
+                    
+                    if (canSpread && Math.random() < 0.35) {
+                        badAffected.add(neighbor.provinceId);
+                        badQueue.push({ castle: neighbor, distance: current.distance + 1 });
                     }
                 }
             }
-            
-            // 対象になった国に「凶作のシール」を貼って、マップ演出を出します
-            affected.forEach(pId => addStatus(pId, 'badHarvest'));
-            await playMapEffect('凶作', affected);
+        }
+        
+        // ④ 被害が出た国があれば、すべてにシールを貼ってマップ演出を出します
+        if (badAffected.size > 0) {
+            badAffected.forEach(pId => addStatus(pId, 'badHarvest'));
+            await playMapEffect('凶作', badAffected);
         }
 
         // =========================================================
-        // 【実行２】次に「豊作」の判定をします（15%）
+        // 【実行２】次に「豊作」の処理を行います
         // =========================================================
+        let goodAffected = new Set();
+        let goodQueue = [];
+
+        // ① すでに「豊作シール」が貼られている国を確認します
+        game.provinces.forEach(p => {
+            if (hasStatus(p.id, 'goodHarvest')) {
+                goodAffected.add(p.id); 
+            }
+        });
+
+        // 最初から豊作の国にある城を、伝染のスタート地点として準備します
+        game.castles.forEach(c => {
+            if (goodAffected.has(c.provinceId)) {
+                goodQueue.push({ castle: c, distance: 0 });
+            }
+        });
+
+        // ② 15%の確率で「新しい豊作」が発生するか判定します
         if (Math.random() < 0.15) {
-            let affected = new Set();
-            
-            // 豊作の候補を探します（東北・甲信と、さっき凶作シールが貼られた国は除外します！）
-            const validProvinceIds = [...new Set(game.castles.filter(c => c.provinceId > 0).map(c => c.provinceId))].filter(pid => {
+            // 新規発生の候補（東北・甲信ではなく、どちらのシールも貼られていない国）を探します
+            const validGoodProvinceIds = [...new Set(game.castles.filter(c => c.provinceId > 0).map(c => c.provinceId))].filter(pid => {
                 const p = getProv(pid);
-                return p && p.regionId !== 1 && p.regionId !== 3 && !hasStatus(pid, 'badHarvest');
+                return p && p.regionId !== 1 && p.regionId !== 3 && 
+                       !hasStatus(pid, 'badHarvest') && !hasStatus(pid, 'goodHarvest');
             });
             
-            // 候補となる国が残っている時だけ進みます
-            if (validProvinceIds.length > 0) {
-                const provinceRands = validProvinceIds.map(pid => ({ id: pid, rand: Math.floor(Math.random() * 1000) }));
+            if (validGoodProvinceIds.length > 0) {
+                const provinceRands = validGoodProvinceIds.map(pid => ({ id: pid, rand: Math.floor(Math.random() * 1000) }));
                 provinceRands.sort((a, b) => b.rand - a.rand);
                 
                 const candidates = provinceRands.slice(0, 5);
@@ -315,41 +358,47 @@ window.GameEvents.push({
                 }
 
                 const startProvinceIds = successCandidates.map(c => c.id);
-                startProvinceIds.forEach(pid => affected.add(pid));
-
-                let queue = [];
-                game.castles.forEach(c => {
-                    if (startProvinceIds.includes(c.provinceId)) queue.push({ castle: c, distance: 0 });
+                startProvinceIds.forEach(pid => {
+                    goodAffected.add(pid);
+                    game.castles.forEach(c => {
+                        if (c.provinceId === pid) goodQueue.push({ castle: c, distance: 0 });
+                    });
                 });
+            }
+        }
 
-                let visitedCastles = new Set();
-                queue.forEach(q => visitedCastles.add(q.castle.id));
+        // ③ 豊作を隣の城へ伝染させます
+        let visitedGoodCastles = new Set();
+        goodQueue.forEach(q => visitedGoodCastles.add(q.castle.id));
 
-                while (queue.length > 0) {
-                    const current = queue.shift();
-                    if (current.distance >= 5) continue; 
+        while (goodQueue.length > 0) {
+            const current = goodQueue.shift();
+            if (current.distance >= 5) continue; 
 
-                    const neighbors = game.castles.filter(c => GameSystem.isAdjacent(current.castle, c));
-                    for (let neighbor of neighbors) {
-                        if (!visitedCastles.has(neighbor.id)) {
-                            visitedCastles.add(neighbor.id); 
-                            
-                            // 伝染先もチェック：東北・甲信ではなく、凶作シールも貼られていないこと
-                            const p = getProv(neighbor.provinceId);
-                            let canSpread = p && p.regionId !== 1 && p.regionId !== 3 && !hasStatus(neighbor.provinceId, 'badHarvest');
-                            
-                            if (canSpread && Math.random() < 0.35) {
-                                affected.add(neighbor.provinceId);
-                                queue.push({ castle: neighbor, distance: current.distance + 1 });
-                            }
-                        }
+            const neighbors = game.castles.filter(c => GameSystem.isAdjacent(current.castle, c));
+            for (let neighbor of neighbors) {
+                if (!visitedGoodCastles.has(neighbor.id)) {
+                    visitedGoodCastles.add(neighbor.id); 
+                    
+                    // 伝染先としてOKか確認（東北・甲信ではなく、どちらのシールも貼られていないこと）
+                    const p = getProv(neighbor.provinceId);
+                    let canSpread = p && p.regionId !== 1 && p.regionId !== 3 && 
+                                    !hasStatus(neighbor.provinceId, 'badHarvest') && 
+                                    !hasStatus(neighbor.provinceId, 'goodHarvest') && 
+                                    !goodAffected.has(neighbor.provinceId);
+                    
+                    if (canSpread && Math.random() < 0.35) {
+                        goodAffected.add(neighbor.provinceId);
+                        goodQueue.push({ castle: neighbor, distance: current.distance + 1 });
                     }
                 }
-                
-                // 対象になった国に「豊作のシール」を貼って、マップ演出を出します
-                affected.forEach(pId => addStatus(pId, 'goodHarvest'));
-                await playMapEffect('豊作', affected);
             }
+        }
+        
+        // ④ 豊作の国があれば、すべてにシールを貼ってマップ演出を出します
+        if (goodAffected.size > 0) {
+            goodAffected.forEach(pId => addStatus(pId, 'goodHarvest'));
+            await playMapEffect('豊作', goodAffected);
         }
 
         // =========================================================
@@ -362,11 +411,10 @@ window.GameEvents.push({
             let riceIncome = Math.floor(baseRice * window.MainParams.Economy.IncomeRiceRate);
             riceIncome = GameSystem.applyVariance(riceIncome, window.MainParams.Economy.IncomeFluctuation);
             
-            // 国に貼られているシールを見て、お米の量を調整します
             if (hasStatus(c.provinceId, 'badHarvest')) {
-                riceIncome = Math.floor(riceIncome * 0.5); // 凶作なら半分
+                riceIncome = Math.floor(riceIncome * 0.5); 
             } else if (hasStatus(c.provinceId, 'goodHarvest')) {
-                riceIncome = Math.floor(riceIncome * 1.5); // 豊作なら1.5倍
+                riceIncome = Math.floor(riceIncome * 1.5); 
             }
             
             c.rice = Math.min(99999, c.rice + riceIncome);
@@ -377,7 +425,6 @@ window.GameEvents.push({
         // =========================================================
         game.provinces.forEach(p => {
             if (p.statusEffects) {
-                // 'badHarvest' と 'goodHarvest' 以外のシールだけを残す（＝この２つは消える）魔法です
                 p.statusEffects = p.statusEffects.filter(s => s !== 'badHarvest' && s !== 'goodHarvest');
             }
         });
