@@ -1081,7 +1081,7 @@ class GameManager {
         // ★修正：ここも await を書き足して、武将の下野（出奔）が終わるまで待ちます！
         await this.factionSystem.processStartMonth(); 
         
-        this.factionSystem.processRoninMovements();
+        this.affiliationSystem.processRoninMovements();
         
         this.updateAllCastlesLords();
         

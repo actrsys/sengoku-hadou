@@ -386,4 +386,29 @@ class AffiliationSystem {
         this.game.castles.forEach(c => this.updateCastleLord(c));
     }
     
+    /**
+     * 月初の浪人移動処理
+     */
+     processRoninMovements() {
+        // 全武将から「浪人」かつ「諸勢力に所属していない（IDが0または未定義）」武将を抽出
+        const ronins = this.game.bushos.filter(b => b.status === 'ronin' && !b.belongKunishuId);
+        
+        ronins.forEach(r => {
+            const currentC = this.game.getCastle(r.castleId); 
+            if(!currentC) return; 
+            
+            // 隣接する城のリストを作る
+            const neighbors = this.game.castles.filter(c => GameSystem.isAdjacent(currentC, c)); 
+            
+            // 隣に城があって、かつ20%の確率(サイコロ)に当たったらお引越しする
+            if (neighbors.length > 0 && Math.random() < 0.2) {
+                // クジ引きで移動先の城を「1つだけ」決める
+                const targetCastle = neighbors[Math.floor(Math.random() * neighbors.length)];
+                
+                // お引越しセンター自身の魔法を使います！
+                this.moveCastle(r, targetCastle.id);
+            }
+        }); 
+    }
+
 }

@@ -1,7 +1,7 @@
 /**
  * faction_system.js
  * 派閥・承認欲求・下野システム
- * 修正: 浪人移動(processRoninMovements)と城主最適化(optimizeCastellans)をgame.jsからお引っ越し
+ * 修正: 城主最適化(optimizeCastellans)をgame.jsからお引っ越し
  */
 
 class FactionSystem {
@@ -447,30 +447,6 @@ class FactionSystem {
             const achievementGain = Math.floor(busho.leadership * achieveLdr) + achieveBase;
             busho.achievementTotal += achievementGain;
         }
-    }
-    /**
-     * 月初の浪人移動処理
-     */
-     processRoninMovements() {
-        // 全武将から「浪人」かつ「諸勢力に所属していない（IDが0または未定義）」武将を抽出
-        const ronins = this.game.bushos.filter(b => b.status === 'ronin' && !b.belongKunishuId);
-        
-        ronins.forEach(r => {
-            const currentC = this.game.getCastle(r.castleId); 
-            if(!currentC) return; 
-            
-            // 隣接する城のリストを作る
-            const neighbors = this.game.castles.filter(c => GameSystem.isAdjacent(currentC, c)); 
-            
-            // 隣に城があって、かつ20%の確率(サイコロ)に当たったらお引越しする
-            if (neighbors.length > 0 && Math.random() < 0.2) {
-                // クジ引きで移動先の城を「1つだけ」決める
-                const targetCastle = neighbors[Math.floor(Math.random() * neighbors.length)];
-                
-                // ★新しいお引越しセンターの魔法を使います！
-                this.game.affiliationSystem.moveCastle(r, targetCastle.id);
-            }
-        }); 
     }
 
     /**
