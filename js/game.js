@@ -996,8 +996,11 @@ class GameManager {
         const fluc = window.MainParams.Economy.TradeFluctuation; // 動く幅（0.3）
         const change = (Math.random() * (fluc * 2)) - fluc; // -0.3 から +0.3 の間でランダムな数字を作ります
         
-        // 今の相場に、さっき作った数字を足し引きします
-        this.marketRate = Math.max(window.MainParams.Economy.TradeRateMin, Math.min(window.MainParams.Economy.TradeRateMax, this.marketRate + change));
+        // ★新しく追加した魔法：「1.0（普通）」に戻ろうとするゴムのような力です！
+        const rubberForce = (1.0 - this.marketRate) * 0.2; 
+        
+        // 今の相場に、サイコロの数字と、ゴムの力を足し合わせます
+        this.marketRate = Math.max(window.MainParams.Economy.TradeRateMin, Math.min(window.MainParams.Economy.TradeRateMax, this.marketRate + change + rubberForce));
         // ★差し替えここまで！
         
         await this.ui.showCutin(`${this.year}年 ${this.month}月`);
