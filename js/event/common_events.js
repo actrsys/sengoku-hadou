@@ -395,9 +395,9 @@ window.GameEvents.push({
             // ★ここから追加：日本中の米相場を動かします！
             game.provinces.forEach(prov => {
                 if (prov && prov.marketRate !== undefined) {
-                    // もしこの国が「豊作（goodAffected）」に入っていたら 0.5 ダウン！
+                    // もしこの国が「豊作（goodAffected）」に入っていたら 0.8 ダウン！
                     if (goodAffected.has(prov.id)) {
-                        prov.marketRate = Math.max(window.MainParams.Economy.TradeRateMin, prov.marketRate - 0.5);
+                        prov.marketRate = Math.max(window.MainParams.Economy.TradeRateMin, prov.marketRate - 0.8);
                     } else {
                         // 豊作じゃない他の国も、影響を受けて 0.2 ダウン！
                         prov.marketRate = Math.max(window.MainParams.Economy.TradeRateMin, prov.marketRate - 0.2);
