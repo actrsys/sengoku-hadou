@@ -1779,31 +1779,81 @@ Object.assign(WarManager.prototype, {
         const reinfHorses = Math.min(helperCastle.horses || 0, Math.floor(reinfSoldiers * 0.5)); 
         const reinfGuns = Math.min(helperCastle.guns || 0, Math.floor(reinfSoldiers * 0.5));
 
-        helperCastle.soldiers = Math.max(0, helperCastle.soldiers - reinfSoldiers);
-        helperCastle.rice = Math.max(0, helperCastle.rice - reinfRice);
-        helperCastle.horses = Math.max(0, (helperCastle.horses || 0) - reinfHorses);
-        helperCastle.guns = Math.max(0, (helperCastle.guns || 0) - reinfGuns);
-        reinfBushos.forEach(b => b.isActionDone = true);
+        // ★追加：AIからの守備援軍も大雪の被害をチェックします！
+        const srcProv = this.game.provinces.find(p => p.id === helperCastle.provinceId);
+        const tgtProv = this.game.provinces.find(p => p.id === defCastle.provinceId);
+        const isHeavySnow = (srcProv && srcProv.statusEffects && srcProv.statusEffects.includes('heavySnow')) || 
+                            (tgtProv && tgtProv.statusEffects && tgtProv.statusEffects.includes('heavySnow'));
 
-        const selfReinfData = {
-            castle: helperCastle, bushos: reinfBushos, soldiers: reinfSoldiers,
-            rice: reinfRice, horses: reinfHorses, guns: reinfGuns, isSelf: true,
-            morale: helperCastle.morale || 50, training: helperCastle.training || 50
-        };
-        
-        // ★修正：守備軍はプレイヤー・敵に関係なく「水色(log-color-def)」にします
-        let colorClass = "log-color-def";
-        const atkForce = this.state.attacker;
-        const atkClanId = atkForce.isKunishu ? 0 : atkForce.ownerClan;
-        const leaderName = reinfBushos.length > 0 ? reinfBushos[0].name : "総大将";
-        
-        if (atkClanId === this.game.playerClanId) {
-            this.game.ui.showDialog(`${helperCastle.name}の${leaderName}が敵の援軍として参戦しました！`, false, () => {
+        const proceed = async () => {
+            let finalSVal = reinfSoldiers;
+            let finalBushos = [...reinfBushos];
+
+            if (isHeavySnow) {
+                const survivingBushos = [];
+                for (let b of finalBushos) {
+                    if (Math.random() < 0.10) {
+                        await this.game.ui.showDialogAsync(`【強行軍】\n我が軍の${b.name}が凍死しました……`, false, 0);
+                        await this.game.lifeSystem.executeDeath(b);
+                    } else {
+                        survivingBushos.push(b);
+                    }
+                }
+                finalBushos = survivingBushos;
+
+                const lossRate = 0.20 + Math.random() * 0.30;
+                const lostSoldiers = Math.floor(finalSVal * lossRate);
+                finalSVal -= lostSoldiers;
+
+                if (lostSoldiers > 0) {
+                    await this.game.ui.showDialogAsync(`【強行軍】\n我が軍の兵士${lostSoldiers}人が遭難しました……`, false, 0);
+                }
+
+                if (finalBushos.length === 0) {
+                    await this.game.ui.showDialogAsync("【強行軍】\n我が軍は行方不明になりました……", false, 0);
+                    this.game.ui.updatePanelHeader();
+                    this.game.ui.renderCommandMenu();
+                    onComplete(null);
+                    return;
+                }
+            }
+
+            helperCastle.soldiers = Math.max(0, helperCastle.soldiers - finalSVal);
+            helperCastle.rice = Math.max(0, helperCastle.rice - reinfRice);
+            helperCastle.horses = Math.max(0, (helperCastle.horses || 0) - reinfHorses);
+            helperCastle.guns = Math.max(0, (helperCastle.guns || 0) - reinfGuns);
+            finalBushos.forEach(b => b.isActionDone = true);
+
+            const selfReinfData = {
+                castle: helperCastle, bushos: finalBushos, soldiers: finalSVal,
+                rice: reinfRice, horses: reinfHorses, guns: reinfGuns, isSelf: true,
+                morale: helperCastle.morale || 50, training: helperCastle.training || 50
+            };
+            
+            let colorClass = "log-color-def";
+            const atkForce = this.state.attacker;
+            const atkClanId = atkForce ? (atkForce.isKunishu ? 0 : atkForce.ownerClan) : 0;
+            const leaderName = finalBushos.length > 0 ? finalBushos[0].name : "総大将";
+            
+            if (atkClanId === this.game.playerClanId) {
+                this.game.ui.showDialog(`${helperCastle.name}の${leaderName}が敵の援軍として参戦しました！`, false, () => {
+                    onComplete(selfReinfData);
+                });
+            } else {
+                this.game.ui.log(`【自軍援軍】<span class="${colorClass}">${helperCastle.name}</span> から守備側の援軍が参戦しました。`);
                 onComplete(selfReinfData);
+            }
+        };
+
+        // ★追加：自分のAI城なら「被害が出ますが送りますか？」と確認してくれます！
+        if (isHeavySnow && myClanId === this.game.playerClanId) {
+            this.game.ui.showDialog(`大雪の影響により、援軍部隊(${helperCastle.name})に被害が出る場合があります。\nそれでも出陣させますか？`, true, () => {
+                proceed();
+            }, () => {
+                onComplete(null);
             });
         } else {
-            this.game.ui.log(`【自軍援軍】<span class="${colorClass}">${helperCastle.name}</span> から守備側の援軍が参戦しました。`);
-            onComplete(selfReinfData);
+            proceed();
         }
     },
 
