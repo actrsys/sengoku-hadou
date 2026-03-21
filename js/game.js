@@ -996,11 +996,21 @@ class GameManager {
         const fluc = window.MainParams.Economy.TradeFluctuation; // 動く幅（0.3）
         const change = (Math.random() * (fluc * 2)) - fluc; // -0.3 から +0.3 の間でランダムな数字を作ります
         
-        // ★新しく追加した魔法：「1.0（普通）」に戻ろうとするゴムのような力です！
-        const rubberForce = (1.0 - this.marketRate) * 0.2; 
+        // ★今回追加した魔法：「季節の風」です！
+        let seasonForce = 0;
+        if (this.month === 9) {
+            // 9月は収穫の秋！お米が市場に溢れるので、相場が一気に下がります（安くなる）
+            seasonForce = -0.5;
+        } else {
+            // それ以外の月は、だんだんお米が減っていくので、毎月少しずつ相場が上がります（高くなる）
+            seasonForce = 0.05;
+        }
         
-        // 今の相場に、サイコロの数字と、ゴムの力を足し合わせます
-        this.marketRate = Math.max(window.MainParams.Economy.TradeRateMin, Math.min(window.MainParams.Economy.TradeRateMax, this.marketRate + change + rubberForce));
+        // 「1.0（普通）」に戻ろうとするゴムのような力（季節の動きを邪魔しすぎないように、少し弱めにします）
+        const rubberForce = (1.0 - this.marketRate) * 0.1; 
+        
+        // 今の相場に、「サイコロの数字」「ゴムの力」「季節の風」を全部足し合わせます
+        this.marketRate = Math.max(window.MainParams.Economy.TradeRateMin, Math.min(window.MainParams.Economy.TradeRateMax, this.marketRate + change + rubberForce + seasonForce));
         // ★差し替えここまで！
         
         await this.ui.showCutin(`${this.year}年 ${this.month}月`);
