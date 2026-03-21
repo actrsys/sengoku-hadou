@@ -594,16 +594,16 @@ window.GameEvents.push({
 });
 
 // ==========================================
-// ★ 季節イベント：大雪の発生（11〜2月の月末処理後）
+// ★ 季節イベント：大雪の発生（12〜2月の月初の処理前）
 // ==========================================
 window.GameEvents.push({
     id: "heavy_snow_trigger",
-    timing: "endMonth_after", // 11〜2月の月末の処理が終わった後に判定します
+    timing: "startMonth_before",
     isOneTime: false,
     
     checkCondition: function(game) {
-        // 11月、12月、1月、2月の時だけ実行します
-        return [11, 12, 1, 2].includes(game.month);
+    // 12月、1月、2月の時だけ実行します
+        return [12, 1, 2].includes(game.month);
     },
     
     execute: async function(game) {
