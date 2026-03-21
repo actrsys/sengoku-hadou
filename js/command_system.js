@@ -956,7 +956,8 @@ class CommandSystem {
         if (actionType === 'rumor_doer') {
             const doer = this.game.getBusho(firstId);
             const targetBusho = this.game.getBusho(extraData.targetBushoId);
-            const trueProb = GameSystem.getRumorProb(doer, targetBusho);
+            // ★専門部署である StrategySystem の計算魔法を呼びます！
+            const trueProb = StrategySystem.getRumorProb(doer, targetBusho);
             this.showAdviceAndExecute('rumor', () => this.game.strategySystem.executeRumor(firstId, targetId, extraData.targetBushoId), { trueProb: trueProb });
             return;
         }
@@ -1104,7 +1105,8 @@ class CommandSystem {
         
         if (actionType === 'incite_doer') {
              const doer = this.game.getBusho(firstId);
-             const trueProb = GameSystem.getInciteProb(doer);
+             // ★専門部署である StrategySystem の計算魔法を呼びます！
+             const trueProb = StrategySystem.getInciteProb(doer);
              this.showAdviceAndExecute('incite', () => this.game.strategySystem.executeIncite(firstId, targetId), { trueProb: trueProb });
              return;
         }
@@ -1177,14 +1179,16 @@ class CommandSystem {
                 const kunishu = this.game.kunishuSystem.getKunishu(extraData.kunishuId);
                 const targetLord = this.game.getBusho(kunishu.leaderId) || { affinity: 50 }; 
                 const newLord = this.game.bushos.find(b => b.clan === this.game.playerClanId && b.isDaimyo) || { affinity: 50 };
-                const trueProb = GameSystem.getHeadhuntProb(doer, target, val, targetLord, newLord);
+                // ★専門部署である StrategySystem の計算魔法を呼びます！
+                const trueProb = StrategySystem.getHeadhuntProb(doer, target, val, targetLord, newLord);
                 this.showAdviceAndExecute('kunishu_headhunt', () => this.game.strategySystem.executeKunishuHeadhunt(data[0], targetId, val, extraData.kunishuId), { trueProb: trueProb });
             } else {
                 const doer = this.game.getBusho(data[0]);
                 const target = this.game.getBusho(targetId);
                 const targetLord = this.game.bushos.find(b => b.clan === target.clan && b.isDaimyo) || { affinity: 50 }; 
                 const newLord = this.game.bushos.find(b => b.clan === this.game.playerClanId && b.isDaimyo) || { affinity: 50 }; 
-                const trueProb = GameSystem.getHeadhuntProb(doer, target, val, targetLord, newLord);
+                // ★専門部署である StrategySystem の計算魔法を呼びます！
+                const trueProb = StrategySystem.getHeadhuntProb(doer, target, val, targetLord, newLord);
                 this.showAdviceAndExecute('headhunt', () => this.game.strategySystem.executeHeadhunt(data[0], targetId, val), { trueProb: trueProb });
             }
         }

@@ -632,37 +632,6 @@ class GameSystem {
         return (totalStr - 30) / window.MainParams.Strategy.InvestigateDifficulty;
     }
 
-    static getInciteProb(busho) {
-        const score = (busho.intelligence * 0.7) + (busho.strength * 0.3); 
-        return Math.min(1.0, score / window.MainParams.Strategy.InciteFactor);
-    }
-
-    static getRumorProb(busho, targetBusho) {
-        const score = (busho.intelligence * 0.7) + (busho.strength * 0.3); 
-        const defScore = (targetBusho.intelligence * 0.5) + (targetBusho.loyalty * 0.5); 
-        let prob = Math.min(1.0, score / (defScore + window.MainParams.Strategy.RumorFactor));
-        if (targetBusho.isCastellan) prob *= 0.67;
-        return prob;
-    }
-
-    static getHeadhuntProb(doer, target, gold, targetLord, newLord) {
-        const S = window.MainParams.Strategy;
-        const goldEffect = Math.min(S.HeadhuntGoldMaxEffect, gold * S.HeadhuntGoldEffect);
-        const offense = (doer.intelligence * S.HeadhuntIntWeight) + goldEffect;
-        const defense = (target.loyalty * S.HeadhuntLoyaltyWeight) + (target.duty * S.HeadhuntDutyWeight) + S.HeadhuntBaseDiff;
-        const affLord = this.calcAffinityDiff(target.affinity, targetLord.affinity); 
-        const lordBonus = (50 - affLord) * S.AffinityLordWeight; 
-        const affNew = this.calcAffinityDiff(target.affinity, newLord.affinity);
-        const newBonus = (50 - affNew) * S.AffinityNewLordWeight; 
-        const affDoer = this.calcAffinityDiff(target.affinity, doer.affinity);
-        const doerBonus = (50 - affDoer) * S.AffinityDoerWeight; 
-        const totalOffense = offense + newBonus + doerBonus;
-        const totalDefense = defense + lordBonus;
-        let successRate = (totalOffense / totalDefense) * 0.5; 
-        if (target.isCastellan) successRate *= 0.67;
-        return Math.min(1.0, successRate);
-    }
-
     static getEmployProb(recruiter, target, recruiterClanPower, targetClanPower) {
         if (target.clan !== 0 && target.ambition > 70 && recruiterClanPower < targetClanPower * 0.7) return 0; 
         const affDiff = this.calcAffinityDiff(recruiter.affinity, target.affinity); 
@@ -674,20 +643,6 @@ class GameSystem {
         if (threshold >= 1.0) return 0;
         if (threshold <= 0.0) return 1.0;
         return 1.0 - threshold;
-    }
-    
-    static calcIncite(busho) { 
-        const score = (busho.intelligence * 0.7) + (busho.strength * 0.3); 
-        const success = Math.random() < (score / window.MainParams.Strategy.InciteFactor); 
-        if(!success) return { success: false, val: 0 }; 
-        return { success: true, val: Math.max(1, Math.floor((score * 2) / 15)) }; 
-    }
-    static calcRumor(busho, targetBusho) { 
-        const score = (busho.intelligence * 0.7) + (busho.strength * 0.3); 
-        const defScore = (targetBusho.intelligence * 0.5) + (targetBusho.loyalty * 0.5); 
-        const success = Math.random() < (score / (defScore + window.MainParams.Strategy.RumorFactor)); 
-        if(!success) return { success: false, val: 0 }; 
-        return { success: true, val: Math.floor((20 + Math.random()*20) / 4) }; 
     }
 
     static calcAffinityDiff(a, b) { const diff = Math.abs(a - b); return Math.min(diff, 100 - diff); }
@@ -707,24 +662,8 @@ class GameSystem {
         if (actualIncrease < 0) actualIncrease = 0;
         return Math.floor(actualIncrease);
     }
-    static calcHeadhunt(doer, target, gold, targetLord, newLord) {
-        const S = window.MainParams.Strategy;
-        const goldEffect = Math.min(S.HeadhuntGoldMaxEffect, gold * S.HeadhuntGoldEffect);
-        const offense = (doer.intelligence * S.HeadhuntIntWeight) + goldEffect;
-        const defense = (target.loyalty * S.HeadhuntLoyaltyWeight) + (target.duty * S.HeadhuntDutyWeight) + S.HeadhuntBaseDiff;
-        const affLord = this.calcAffinityDiff(target.affinity, targetLord.affinity); 
-        const lordBonus = (50 - affLord) * S.AffinityLordWeight; 
-        const affNew = this.calcAffinityDiff(target.affinity, newLord.affinity);
-        const newBonus = (50 - affNew) * S.AffinityNewLordWeight; 
-        const affDoer = this.calcAffinityDiff(target.affinity, doer.affinity);
-        const doerBonus = (50 - affDoer) * S.AffinityDoerWeight; 
-        const totalOffense = offense + newBonus + doerBonus;
-        const totalDefense = defense + lordBonus;
-        const successRate = (totalOffense / totalDefense) * 0.5; 
-        return Math.random() < successRate;
-    }
     
-    static calcEmploymentSuccess(recruiter, target, recruiterClanPower, targetClanPower) { 
+    static calcEmploymentSuccess(recruiter, target, recruiterClanPower, targetClanPower) {
         if (target.clan !== 0 && target.ambition > 70 && recruiterClanPower < targetClanPower * 0.7) return false; 
         const affDiff = this.calcAffinityDiff(recruiter.affinity, target.affinity); 
         let affBonus = (affDiff < 10) ? 30 : (affDiff < 25) ? 15 : (affDiff > 40) ? -10 : 0; 
