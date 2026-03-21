@@ -598,11 +598,11 @@ window.GameEvents.push({
 // ==========================================
 window.GameEvents.push({
     id: "heavy_snow_trigger",
-    timing: "startMonth_before",
+    timing: "startMonth_before", 
     isOneTime: false,
     
     checkCondition: function(game) {
-    // 12月、1月、2月の時だけ実行します
+        // 12月、1月、2月の時だけ実行します
         return [12, 1, 2].includes(game.month);
     },
     
@@ -610,37 +610,58 @@ window.GameEvents.push({
         let isNewSnowAdded = false; // 新しく雪が降る国が増えたかどうかのメモです
         const allSnowProvIds = new Set(); // 今月雪が降っているすべての国を入れる箱です
 
-        // 日本中すべての「国」を順番にチェックしていきます！
         game.provinces.forEach(p => {
             const hasSnow = p.statusEffects && p.statusEffects.includes('heavySnow');
             
             if (hasSnow) {
-                // ① すでに雪のシールが貼られている国は、そのまま箱に入れます
                 allSnowProvIds.add(p.id);
             } else {
-                // ② まだ雪のシールが貼られていない国は、国ごとに雪が降るかサイコロを振ります！
                 let willSnow = false;
                 
-                if (p.regionId === 1 && Math.random() < 0.99) willSnow = true;      // 東北（99%）
-                else if (p.regionId === 2 && Math.random() < 0.99) willSnow = true; // 北陸（99%）
-                else if (p.regionId === 3 && Math.random() < 0.60) willSnow = true; // 甲信（60%）
-                else if (p.regionId === 4 && Math.random() < 0.02) willSnow = true; // 関東（2%）
+                // ★ 新しい魔法：国ごとの「雪が降る確率」のリストです
+                // 100%は「1.0」、1%は「0.01」という書き方をします
+                const snowProbabilities = {
+                    1: 0.99,  // 陸奥国 (99%)
+                    2: 0.99,  // 出羽国 (99%)
+                    3: 0.97,  // 越後国 (97%)
+                    4: 0.95,  // 越中国 (95%)
+                    5: 0.93,  // 越前国 (93%)
+                    6: 0.95,  // 加賀国 (95%)
+                    7: 0.95,  // 能登国 (95%)
+                    8: 0.70,  // 若狭国 (70%)
+                    9: 0.20,  // 甲斐国 (20%)
+                    10: 0.60, // 信濃国 (60%)
+                    11: 0.60, // 上野国 (60%)
+                    12: 0.60, // 下野国 (60%)
+                    13: 0.02, // 上総国 (2%)
+                    14: 0.01, // 下総国 (1%)
+                    15: 0.15, // 常陸国 (15%)
+                    17: 0.15, // 武蔵国 (15%)
+                    27: 0.02, // 美濃国 (2%)
+                    28: 0.30, // 飛騨国 (30%)
+                    29: 0.01, // 近江国 (1%)
+                    38: 0.10  // 丹後国 (10%)
+                };
 
-                // もし大雪の判定に成功したら…
+                // リストに書かれている国ならその数字を、書かれていなければ 0（降らない）にします
+                const prob = snowProbabilities[p.id] || 0;
+
+                // もし確率が0より大きくて、サイコロが確率の中に収まったら雪を降らせます！
+                if (prob > 0 && Math.random() < prob) {
+                    willSnow = true;
+                }
+
                 if (willSnow) {
                     allSnowProvIds.add(p.id);
-                    isNewSnowAdded = true; // 新しく雪が降る国が増えました！
+                    isNewSnowAdded = true; 
                     
-                    // 新しく雪のシールを貼ります
                     if (!p.statusEffects) p.statusEffects = [];
                     p.statusEffects.push('heavySnow');
                 }
             }
         });
 
-        // ★新しく雪が降る国が増えた時だけ、すべての雪国をまとめて地図で光らせます！
         if (isNewSnowAdded && allSnowProvIds.size > 0) {
-            // ★大雪のイベントと同時に、マップの水玉模様をすぐに更新します！
             if (game.ui && game.ui.updateSnowOverlay) game.ui.updateSnowOverlay();
 
             await window.playProvinceMapEffect(
