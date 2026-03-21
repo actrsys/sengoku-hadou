@@ -1474,7 +1474,17 @@ class AIEngine {
             const threatData = enemyThreats.find(t => t.clanId === targetClanId);
             const perceivedTargetTotal = threatData ? threatData.power : targetClanTotal;
 
-            const targetCastle = neighbors.find(c => c.ownerClan === targetClanId);
+            // 相手の大名（殿様）を探して、その人がいるお城をターゲットにします
+            const targetDaimyo = this.game.bushos.find(b => b.clan === targetClanId && b.isDaimyo);
+            let targetCastle = null;
+            if (targetDaimyo) {
+                targetCastle = this.game.castles.find(c => c.id === targetDaimyo.castleId);
+            }
+            // 万が一お殿様が見つからなかった時は、とりあえず見つかった相手の城にします
+            if (!targetCastle) {
+                targetCastle = neighbors.find(c => c.ownerClan === targetClanId);
+            }
+            
             if (!targetCastle) continue; 
             const targetCastleId = targetCastle.id;
             
