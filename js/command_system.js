@@ -1725,11 +1725,17 @@ class CommandSystem {
     }
 
     executeTrade(type, amount) {
-        const castle = this.game.getCurrentTurnCastle(); 
-        const rate = this.game.marketRate;
-        
-        if(type === 'buy_rice') { 
-            const cost = Math.floor(amount * rate); 
+        const castle = this.game.getCurrentTurnCastle(); 
+        // ★ごっそり書き換え！：日本共通の相場ではなく、今いる国の相場を見に行きます！
+        let rate = 1.0;
+        if (castle && this.game.provinces) {
+            const province = this.game.provinces.find(p => p.id === castle.provinceId);
+            if (province && province.marketRate !== undefined) rate = province.marketRate;
+        }
+        // ★書き換えここまで！
+        
+        if(type === 'buy_rice') { 
+            const cost = Math.floor(amount * rate);
             if(castle.gold < cost) { this.game.ui.showDialog("資金不足", false); return; } 
             // ★追加: 買うと上限を超えるならストップ
             if(castle.rice + amount > 99999) { this.game.ui.showDialog("これ以上兵糧は買えません", false); return; }
