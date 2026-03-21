@@ -488,8 +488,7 @@ class Province {
         this.region = data.region || "";            // 地方の名前（例：東海）
         this.color_code = data.color_code || "";    // マップ用の色（例：#ff5d00）
         this.typhoon = Number(this.typhoon || 0);   // 台風の発生確率（例：0.15）
-
-        // ★今回新しく追加！：長雨などの「状態異常」のシールを複数貼っておくための箱です
-        this.statusEffects = Array.isArray(data.statusEffects) ? data.statusEffects : [];
+        this.marketRate = data.marketRate !== undefined ? Number(data.marketRate) : 1.0; // 国ごとの米相場（例：1.0）
+        this.statusEffects = Array.isArray(data.statusEffects) ? data.statusEffects : []; // ★豊作・凶作などの「状態異常」
     }
 }

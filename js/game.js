@@ -989,14 +989,13 @@ class GameManager {
     }
 
     async startMonth() { 
-        // ★ここを書き足し！ 月が替わったら軍師の報告印を消します
+        // ★月が替わったら軍師の報告印を消します
         if (this.gunshiSystem) this.gunshiSystem.onStartMonth();
         
-        // ★ここを差し替え！ 相場を「足し算・引き算」で動くようにします
+        // ★相場の変動を「国（province）ごと」に計算するようにします！
         const fluc = window.MainParams.Economy.TradeFluctuation; // 動く幅（0.3）
-        const change = (Math.random() * (fluc * 2)) - fluc; // -0.3 から +0.3 の間でランダムな数字を作ります
         
-        // ★今回追加した魔法：「季節の風」です！
+        // 季節の風（季節の動きは日本全国共通です！）
         let seasonForce = 0;
         if (this.month === 9) {
             // 9月は収穫の秋！お米が市場に溢れるので、相場が一気に下がります（安くなる）
@@ -1005,13 +1004,18 @@ class GameManager {
             // それ以外の月は、だんだんお米が減っていくので、毎月少しずつ相場が上がります（高くなる）
             seasonForce = 0.05;
         }
-        
-        // 「1.0（普通）」に戻ろうとするゴムのような力（季節の動きを邪魔しすぎないように、少し弱めにします）
-        const rubberForce = (1.0 - this.marketRate) * 0.1; 
-        
-        // 今の相場に、「サイコロの数字」「ゴムの力」「季節の風」を全部足し合わせます
-        this.marketRate = Math.max(window.MainParams.Economy.TradeRateMin, Math.min(window.MainParams.Economy.TradeRateMax, this.marketRate + change + rubberForce + seasonForce));
-        // ★差し替えここまで！
+
+        // 地方の名簿（provinces）を上から順番に見て、それぞれの国の相場を更新します
+        this.provinces.forEach(p => {
+            // 国ごとにサイコロを振って、独自の変動を作ります！
+            const change = (Math.random() * (fluc * 2)) - fluc;
+            
+            // 「1.0（普通）」に戻ろうとする力も、国ごとの今の相場を基準に計算します
+            const rubberForce = (1.0 - p.marketRate) * 0.1;
+            
+            // 全て足し合わせて、国ごとの新しい相場を上書きします！
+            p.marketRate = Math.max(window.MainParams.Economy.TradeRateMin, Math.min(window.MainParams.Economy.TradeRateMax, p.marketRate + change + rubberForce + seasonForce));
+        });
         
         await this.ui.showCutin(`${this.year}年 ${this.month}月`);
         
