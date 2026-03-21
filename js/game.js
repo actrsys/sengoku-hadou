@@ -992,7 +992,7 @@ class GameManager {
         // ★月が替わったら軍師の報告印を消します
         if (this.gunshiSystem) this.gunshiSystem.onStartMonth();
         
-        // ★相場の変動を「国（province）ごと」に計算するようにします！
+        // ★ごっそり差し替え！：相場の変動を「国（province）ごと」に計算するようにします！
         const fluc = window.MainParams.Economy.TradeFluctuation; // 動く幅（0.3）
         
         // 季節の風（季節の動きは日本全国共通です！）
@@ -1005,17 +1005,66 @@ class GameManager {
             seasonForce = 0.05;
         }
 
-        // 地方の名簿（provinces）を上から順番に見て、それぞれの国の相場を更新します
+        // ==========================================
+        // ★ここから追加：隣の国と相場を引っ張り合う魔法！
+        // まず、「どの国とどの国が隣り合っているか」のリスト（つながりマップ）を作ります
+        const adjProvinces = {};
+        this.provinces.forEach(p => adjProvinces[p.id] = new Set());
+
+        // 日本中のお城を調べて、道が繋がっているお城同士の「国」をメモします
+        this.castles.forEach(c => {
+            if (c.provinceId > 0 && c.adjacentCastleIds) {
+                c.adjacentCastleIds.forEach(adjId => {
+                    const adjCastle = this.getCastle(adjId);
+                    // 違う国にあるお城と道が繋がっていたら、お互いの国を「お隣さん」としてメモ！
+                    if (adjCastle && adjCastle.provinceId > 0 && adjCastle.provinceId !== c.provinceId) {
+                        adjProvinces[c.provinceId].add(adjCastle.provinceId);
+                        adjProvinces[adjCastle.provinceId].add(c.provinceId);
+                    }
+                });
+            }
+        });
+
+        // 上から順番に相場を書き換えると不公平になるので、
+        // まずは「来月の新しい相場」を別のメモ帳（nextRates）に下書きします
+        const nextRates = new Map();
+
         this.provinces.forEach(p => {
-            // 国ごとにサイコロを振って、独自の変動を作ります！
+            // 国ごとのサイコロと、ゴムの力
             const change = (Math.random() * (fluc * 2)) - fluc;
-            
-            // 「1.0（普通）」に戻ろうとする力も、国ごとの今の相場を基準に計算します
             const rubberForce = (1.0 - p.marketRate) * 0.1;
             
-            // 全て足し合わせて、国ごとの新しい相場を上書きします！
-            p.marketRate = Math.max(window.MainParams.Economy.TradeRateMin, Math.min(window.MainParams.Economy.TradeRateMax, p.marketRate + change + rubberForce + seasonForce));
+            // ★お隣さんから引っ張られる力！
+            let neighborForce = 0;
+            const neighborIds = adjProvinces[p.id];
+            
+            if (neighborIds && neighborIds.size > 0) {
+                let neighborTotalRate = 0;
+                // お隣さんの相場を全部足し算します
+                neighborIds.forEach(nId => {
+                    const nProv = this.provinces.find(prov => prov.id === nId);
+                    if (nProv) neighborTotalRate += nProv.marketRate;
+                });
+                // 足した相場を、お隣さんの数で割り算して「平均値」を出します
+                const neighborAverage = neighborTotalRate / neighborIds.size;
+                
+                // お隣さんたちの平均値との「差」の、ほんの少し（5%）だけそっちに引っ張られます！
+                neighborForce = (neighborAverage - p.marketRate) * 0.05; 
+            }
+
+            // 全て足し合わせて、下書き用のメモ帳に書き込みます
+            let newRate = p.marketRate + change + rubberForce + seasonForce + neighborForce;
+            newRate = Math.max(window.MainParams.Economy.TradeRateMin, Math.min(window.MainParams.Economy.TradeRateMax, newRate));
+            nextRates.set(p.id, newRate);
         });
+
+        // 最後に、メモ帳を見ながら全ての国の相場を一斉に書き換えます！
+        this.provinces.forEach(p => {
+            if (nextRates.has(p.id)) {
+                p.marketRate = nextRates.get(p.id);
+            }
+        });
+        // ★差し替えここまで！
         
         await this.ui.showCutin(`${this.year}年 ${this.month}月`);
         
