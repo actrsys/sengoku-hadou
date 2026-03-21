@@ -519,6 +519,7 @@ class DiplomacyManager {
             let isSuccess = this.checkDiplomacySuccess(doer.clan, targetClanId, type, doer.diplomacy, myPower, targetPower);
             
             if (myPower / targetPower < 5) {
+                this.updateSentiment(doer.clan, targetClanId, -5);
                 msg = `要求を跳ね除けられました……`;
                 doer.achievementTotal += 5;
                 this.game.factionSystem.updateRecognition(doer, 10);
@@ -529,7 +530,7 @@ class DiplomacyManager {
                 doer.achievementTotal += Math.floor(doer.diplomacy * 0.2) + 20;
                 this.game.factionSystem.updateRecognition(doer, 40);
             } else {
-                this.updateSentiment(doer.clan, targetClanId, -20);
+                this.updateSentiment(doer.clan, targetClanId, -5);
                 msg = `支配の要求は拒否されました……`;
                 doer.achievementTotal += 5;
                 this.game.factionSystem.updateRecognition(doer, 10);
@@ -654,7 +655,7 @@ class DiplomacyManager {
                         if (onComplete) setTimeout(onComplete, 100);
                     });
                 } else if (type === 'dominate') {
-                    this.updateSentiment(doer.clan, targetClanId, -20);
+                    this.updateSentiment(doer.clan, targetClanId, -5);
                     this.game.ui.showResultModal(`従属の要求を断固として拒否しました！`, () => {
                         if (onComplete) setTimeout(onComplete, 100);
                     });
@@ -703,7 +704,24 @@ class DiplomacyManager {
 
         // ③ 支配要求の判定
         if (targetClanTotal * 8 <= myPower) {
-            if (Math.random() < 0.05) { 
+            // 自分の領地と相手の領地が直接くっついているか調べます
+            let isDirectlyAdjacent = false;
+            const myCastles = this.game.castles.filter(c => c.ownerClan === myClanId);
+            const targetCastles = this.game.castles.filter(c => c.ownerClan === targetClanId);
+            
+            for (let mc of myCastles) {
+                for (let tc of targetCastles) {
+                    // お城同士の道が繋がっているか確認します
+                    if (GameSystem.isAdjacent(mc, tc)) {
+                        isDirectlyAdjacent = true;
+                        break;
+                    }
+                }
+                if (isDirectlyAdjacent) break;
+            }
+
+            // 直接くっついている時だけ、支配のお願いをします
+            if (isDirectlyAdjacent && Math.random() < 0.05) { 
                 return { action: 'dominate', gold: 0 };
             }
         }
