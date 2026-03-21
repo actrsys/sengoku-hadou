@@ -1421,24 +1421,35 @@ class GameManager {
                 this.mapWidth = d.mapWidth;
                 this.mapHeight = d.mapHeight;
 
-                // ★ 地図画像を裏側で読み込み、完了するまで「必ず」待機するようにします
-                const mapImagePath = './data/images/map/japan_map.png'; // 背景地図のパス
-                await new Promise((resolve) => {
+                // ★ ここをごっそり差し替え！：地図だけでなく、お城や地方の画像も全部揃うまで「必ず」待機するようにします
+                const imageUrls = [
+                    './data/images/map/japan_map.png',
+                    './data/images/map/shiro_icon001.png',
+                    './data/images/map/japan_colorcode_map.png',
+                    './data/images/map/japan_white_map.png',
+                    './data/images/map/japan_provinces.png'
+                ];
+
+                await Promise.all(imageUrls.map(url => new Promise(resolve => {
                     const img = new Image();
                     img.onload = () => {
-                        // 画像が読み込めたら、そのサイズをゲームに教えます
-                        this.mapWidth = img.width;
-                        this.mapHeight = img.height;
+                        // もし読み込んだのがメインの地図だったら、その大きさをゲームに教えます
+                        if (url.includes('japan_map.png')) {
+                            this.mapWidth = img.width;
+                            this.mapHeight = img.height;
+                        }
                         resolve();
                     };
                     img.onerror = () => {
-                        // もし読み込めなくても、止まらないように予備のサイズをセットして進みます
-                        this.mapWidth = 1200;
-                        this.mapHeight = 800;
+                        // 失敗してもゲームが止まらないようにします
+                        if (url.includes('japan_map.png')) {
+                            this.mapWidth = 1200;
+                            this.mapHeight = 800;
+                        }
                         resolve();
                     };
-                    img.src = mapImagePath;
-                });
+                    img.src = url;
+                })));
 
                 this.castles = d.castles.map(c => new Castle(c)); 
                 this.bushos = d.bushos.map(b => new Busho(b));
@@ -1489,9 +1500,7 @@ class GameManager {
                 // ★ここを書き足し！：ロードした時も、念のため年齢による能力変動を再計算しておきます
                 this.lifeSystem.updateAllBushosAge();
 
-                // ★ここを修正！：カットインが完全に消えるまで「await」でしっかり待ちます！
-                await this.ui.showCutin(`ロード完了: ${this.year}年 ${this.month}月`);
-                
+                // ★ここを修正！：カットインを出す「前」に、先にマップを描いておく魔法です！
                 this.ui.hasInitializedMap = false; 
                 this.ui.renderMap();
 
@@ -1501,6 +1510,9 @@ class GameManager {
                 }
                 // ★ ここまで追加
 
+                // ★マップが描かれた綺麗な画面の上で、カットインをゆっくり出します
+                await this.ui.showCutin(`ロード完了: ${this.year}年 ${this.month}月`);
+                
                 this.processTurn();
             } catch(err) { console.error(err); alert("セーブデータの読み込みに失敗しました"); } 
 // ------------------------------
