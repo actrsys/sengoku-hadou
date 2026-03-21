@@ -804,32 +804,32 @@ class GameManager {
     // ★ここから追加！：ゲームの裏側で、武将の顔画像を少しずつ読み込んでおく魔法です！
     // ==========================================
     preloadFaceIcons() {
-        // 同じ顔画像を何度も読み込まないように、必要なファイル名だけをリストアップします
         const faceFiles = new Set();
         this.bushos.forEach(b => {
-            // unknown_face.webp（のっぺらぼう）以外の、ちゃんと設定されている顔画像を集めます
             if (b.faceIcon && b.faceIcon !== 'unknown_face.webp') {
                 faceFiles.add(b.faceIcon);
             }
         });
 
-        // 画像があるフォルダの道順をくっつけます
         const urls = Array.from(faceFiles).map(filename => `./data/images/faceicons/${filename}`);
-
-        // 一気に何百枚も読み込むとブラウザがパンクするので、1枚ずつ順番に読み込みます
-        let i = 0;
-        const loadNext = () => {
-            if (i >= urls.length) return; // 全部終わったらお仕事終了です！
+        
+        // ブラウザが一度に処理しやすい「10枚ずつ」の束にして、一斉に読み込みます
+        const batchSize = 10;
+        const loadBatch = async (startIndex) => {
+            if (startIndex >= urls.length) return;
             
-            const img = new Image();
-            // 成功しても失敗しても、立ち止まらずに次の画像を読み込みに行きます
-            img.onload = () => { i++; loadNext(); };
-            img.onerror = () => { i++; loadNext(); };
-            img.src = urls[i];
+            const batch = urls.slice(startIndex, startIndex + batchSize);
+            await Promise.all(batch.map(url => new Promise(res => {
+                const img = new Image();
+                img.onload = img.onerror = res;
+                img.src = url;
+            })));
+            
+            // 次の束へ進みます
+            loadBatch(startIndex + batchSize);
         };
 
-        // 魔法スタート！
-        loadNext();
+        loadBatch(0);
     }
     // ==========================================
     // ★顔画像の裏側読み込み魔法ここまで！
@@ -1421,23 +1421,24 @@ class GameManager {
                 this.mapWidth = d.mapWidth;
                 this.mapHeight = d.mapHeight;
 
-                // ★追加：もし古いセーブデータで大きさが記録されていなかったら、画像を調べて測り直します
-                if (!this.mapWidth || !this.mapHeight) {
-                    await new Promise((resolve) => {
-                        const img = new Image();
-                        img.onload = () => {
-                            this.mapWidth = img.width;
-                            this.mapHeight = img.height;
-                            resolve();
-                        };
-                        img.onerror = () => {
-                            this.mapWidth = 1200;
-                            this.mapHeight = 800;
-                            resolve();
-                        };
-                        img.src = './data/images/map/japan_colorcode_map.png';
-                    });
-                }
+                // ★ 地図画像を裏側で読み込み、完了するまで「必ず」待機するようにします
+                const mapImagePath = './data/images/map/japan_map.png'; // 背景地図のパス
+                await new Promise((resolve) => {
+                    const img = new Image();
+                    img.onload = () => {
+                        // 画像が読み込めたら、そのサイズをゲームに教えます
+                        this.mapWidth = img.width;
+                        this.mapHeight = img.height;
+                        resolve();
+                    };
+                    img.onerror = () => {
+                        // もし読み込めなくても、止まらないように予備のサイズをセットして進みます
+                        this.mapWidth = 1200;
+                        this.mapHeight = 800;
+                        resolve();
+                    };
+                    img.src = mapImagePath;
+                });
 
                 this.castles = d.castles.map(c => new Castle(c)); 
                 this.bushos = d.bushos.map(b => new Busho(b));

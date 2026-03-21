@@ -123,7 +123,7 @@ class UIManager {
                     window.AudioManager.playBGM('SC_ex_Town1_Castle.ogg');
                 }
 
-                // ★ ここによく使う重い画像の道順（URL）を書きます！
+                // ★ 画像と音声を並列（一斉）に読み込むためのリストを作ります
                 const imageUrls = [
                     './data/images/map/japan_map.png',
                     './data/images/map/shiro_icon001.png',
@@ -131,18 +131,6 @@ class UIManager {
                     './data/images/map/japan_white_map.png',
                     './data/images/map/japan_provinces.png'
                 ];
-
-                // 画像を裏側でこっそり読み込む魔法
-                const loadImages = imageUrls.map(url => {
-                    return new Promise((resolve) => {
-                        const img = new Image();
-                        img.onload = () => resolve();
-                        img.onerror = () => resolve();
-                        img.src = url;
-                    });
-                });
-
-                // ★ ここに事前によく使う音楽の道順（URL）を書きます！
                 const audioUrls = [
                     'data/music/bgm/SC_ex_Town1_Castle.ogg',
                     'data/music/bgm/SC_ex_Town2_Fortress.ogg',
@@ -151,19 +139,23 @@ class UIManager {
                     'data/music/se/cancel.ogg'
                 ];
 
-                // 音楽を裏側でこっそり読み込む魔法
-                const loadAudios = audioUrls.map(url => {
-                    return new Promise((resolve) => {
+                // すべてのファイルを「一斉に」読み込み開始します
+                const promises = [
+                    ...imageUrls.map(url => new Promise(res => {
+                        const img = new Image();
+                        img.onload = img.onerror = res;
+                        img.src = url;
+                    })),
+                    ...audioUrls.map(url => new Promise(res => {
                         const audio = new Audio();
-                        audio.oncanplaythrough = () => resolve();
-                        audio.onerror = () => resolve();
+                        audio.oncanplaythrough = audio.onerror = res;
                         audio.src = url;
                         audio.load();
-                    });
-                });
+                    }))
+                ];
 
-                // 画像と音楽が全部読み終わるまで、ここでじっと待ちます
-                await Promise.all([...loadImages, ...loadAudios]);
+                // 全員の準備が整うのを待ちます
+                await Promise.all(promises);
 
                 // 準備が終わったら、メッセージを隠してメニューボタンを出します！
                 tapMessage.classList.add('hidden');
