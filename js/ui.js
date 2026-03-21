@@ -124,25 +124,46 @@ class UIManager {
                 }
 
                 // ★ ここによく使う重い画像の道順（URL）を書きます！
-                // 他にも最初からサクッと出したい画像があれば、ここに「,」で区切って足してくださいね
                 const imageUrls = [
                     './data/images/map/japan_map.png',
                     './data/images/map/shiro_icon001.png',
-                    './data/images/field_war_images/butai_icon.png'
+                    './data/images/map/japan_colorcode_map.png',
+                    './data/images/map/japan_white_map.png',
+                    './data/images/map/japan_provinces.png'
                 ];
 
                 // 画像を裏側でこっそり読み込む魔法
                 const loadImages = imageUrls.map(url => {
                     return new Promise((resolve) => {
                         const img = new Image();
-                        img.onload = () => resolve();  // 成功したらOK！
-                        img.onerror = () => resolve(); // 失敗しても、ゲームを止めないためにOK扱いにします
+                        img.onload = () => resolve();
+                        img.onerror = () => resolve();
                         img.src = url;
                     });
                 });
 
-                // 画像が全部読み終わるまで、ここでじっと待ちます
-                await Promise.all(loadImages);
+                // ★ ここに事前によく使う音楽の道順（URL）を書きます！
+                const audioUrls = [
+                    'data/music/bgm/SC_ex_Town1_Castle.ogg',
+                    'data/music/bgm/SC_ex_Town2_Fortress.ogg',
+                    'data/music/se/decision.ogg',
+                    'data/music/se/choice.ogg',
+                    'data/music/se/cancel.ogg'
+                ];
+
+                // 音楽を裏側でこっそり読み込む魔法
+                const loadAudios = audioUrls.map(url => {
+                    return new Promise((resolve) => {
+                        const audio = new Audio();
+                        audio.oncanplaythrough = () => resolve();
+                        audio.onerror = () => resolve();
+                        audio.src = url;
+                        audio.load();
+                    });
+                });
+
+                // 画像と音楽が全部読み終わるまで、ここでじっと待ちます
+                await Promise.all([...loadImages, ...loadAudios]);
 
                 // 準備が終わったら、メッセージを隠してメニューボタンを出します！
                 tapMessage.classList.add('hidden');
