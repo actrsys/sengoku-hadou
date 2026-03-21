@@ -1048,11 +1048,11 @@ Object.assign(UIManager.prototype, {
 
             if (a === 0) continue; // 透明な場所は無視して次へ
 
-            // 集めた色コードと一致するかチェックします
+            // 集めた色コードと完全に一致するかチェックします
             let match = false;
             for (let c of targetColors) {
-                // ちょっとだけ色がズレていても大丈夫なようにおまけします（誤差5まで）
-                if (Math.abs(r - c.r) < 5 && Math.abs(g - c.g) < 5 && Math.abs(b - c.b) < 5) {
+                // 別の国を巻き込まないように、ピッタリ同じ色だけを塗ります
+                if (r === c.r && g === c.g && b === c.b) {
                     match = true;
                     break;
                 }
@@ -1119,7 +1119,8 @@ Object.assign(UIManager.prototype, {
             // 大雪の国かどうかチェックします
             let match = false;
             for (let c of targetColors) {
-                if (Math.abs(r - c.r) < 5 && Math.abs(g - c.g) < 5 && Math.abs(b - c.b) < 5) {
+                // 別の国を巻き込まないように、ピッタリ同じ色だけを塗ります
+                if (r === c.r && g === c.g && b === c.b) {
                     match = true;
                     break;
                 }
