@@ -690,10 +690,14 @@ class DiplomacyManager {
 
         // ② 同盟・支配関係の破棄判定
         if (rel.status === '同盟' || rel.status === '支配') {
-             const enemies = neighbors.filter(c => !['同盟', '支配', '従属'].includes(this.getRelation(myClanId, c.ownerClan).status));
-             if (enemies.length === 0 && myPower > targetClanTotal * 2.5 && Math.random() > dutyInhibition) {
-                  return { action: 'break_alliance', gold: 0 };
+             // ★修正：同盟の時だけ、裏切るかどうかの計算をします！
+             if (rel.status === '同盟') {
+                 const enemies = neighbors.filter(c => !['同盟', '支配', '従属'].includes(this.getRelation(myClanId, c.ownerClan).status));
+                 if (enemies.length === 0 && myPower > targetClanTotal * 2.5 && Math.random() > dutyInhibition) {
+                      return { action: 'break_alliance', gold: 0 };
+                 }
              }
+             // ★支配している相手の時は、上の計算をスキップして、おとなしくここで終わります
              return { action: 'none', gold: 0 };
         }
 
