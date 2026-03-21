@@ -1139,7 +1139,7 @@ Object.assign(UIManager.prototype, {
                     outputData.data[i] = 255;     // R（白）
                     outputData.data[i+1] = 255;   // G（白）
                     outputData.data[i+2] = 255;   // B（白）
-                    outputData.data[i+3] = 180;   // A（少し透ける白）
+                    outputData.data[i+3] = 210;   // A（少し透ける白）
                 }
             }
         }
