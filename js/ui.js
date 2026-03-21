@@ -1132,12 +1132,21 @@ class UIManager {
             roninCount = this.game.bushos.filter(b => b.castleId === castle.id && Number(b.clan) === 0 && Number(b.belongKunishuId) === 0 && b.status !== 'dead' && b.status !== 'unborn').length;
         }
 
-        if (this.mobileFloatingMarket) {
-            this.mobileFloatingMarket.innerHTML = `
-                <div class="floating-market">浪人 ${roninCount}人</div>
-                <div class="floating-market">米相場 ${this.game.marketRate.toFixed(1)}</div>
-            `;
-        }
+        // ★今の城がある「国（地方）」の米相場を調べます！
+        let currentRate = 1.0;
+        if (castle && this.game.provinces) {
+            const province = this.game.provinces.find(p => p.id === castle.provinceId);
+            if (province && province.marketRate !== undefined) {
+                currentRate = province.marketRate;
+            }
+        }
+
+        if (this.mobileFloatingMarket) {
+            this.mobileFloatingMarket.innerHTML = `
+                <div class="floating-market">浪人 ${roninCount}人</div>
+                <div class="floating-market">米相場 ${currentRate.toFixed(1)}</div>
+            `;
+        }
 
         const cmdGrid = document.getElementById('command-area');
         if(cmdGrid) {
@@ -2157,14 +2166,25 @@ class UIManager {
             inputs.soldiers = createSlider("兵士", "soldiers", c.soldiers, 0);
             inputs.horses = createSlider("騎馬", "horses", c.horses || 0, 0);
             inputs.guns = createSlider("鉄砲", "guns", c.guns || 0, 0);
-        } else if (type === 'buy_rice') {
-            document.getElementById('quantity-title').textContent = "兵糧購入"; const rate = this.game.marketRate; const maxBuy = Math.floor(c.gold / rate);
-            this.tradeTypeInfo.classList.remove('hidden'); this.tradeTypeInfo.textContent = `相場: ${rate.toFixed(2)} (金1 -> 米${(1/rate).toFixed(2)})`;
-            inputs.amount = createSlider("購入量(米)", "amount", maxBuy, 0);
-        } else if (type === 'sell_rice') {
-            document.getElementById('quantity-title').textContent = "兵糧売却"; const rate = this.game.marketRate;
-            this.tradeTypeInfo.classList.remove('hidden'); this.tradeTypeInfo.textContent = `相場: ${rate.toFixed(2)} (米1 -> 金${rate.toFixed(2)})`;
-            inputs.amount = createSlider("売却量(米)", "amount", c.rice, 0);
+        } else if (type === 'buy_rice') {
+            document.getElementById('quantity-title').textContent = "兵糧購入"; 
+            let rate = 1.0;
+            if (c && this.game.provinces) {
+                const province = this.game.provinces.find(p => p.id === c.provinceId);
+                if (province && province.marketRate !== undefined) rate = province.marketRate;
+            }
+            const maxBuy = Math.floor(c.gold / rate);
+            this.tradeTypeInfo.classList.remove('hidden'); this.tradeTypeInfo.textContent = `相場: ${rate.toFixed(2)} (金1 -> 米${(1/rate).toFixed(2)})`;
+            inputs.amount = createSlider("購入量(米)", "amount", maxBuy, 0);
+        } else if (type === 'sell_rice') {
+            document.getElementById('quantity-title').textContent = "兵糧売却"; 
+            let rate = 1.0;
+            if (c && this.game.provinces) {
+                const province = this.game.provinces.find(p => p.id === c.provinceId);
+                if (province && province.marketRate !== undefined) rate = province.marketRate;
+            }
+            this.tradeTypeInfo.classList.remove('hidden'); this.tradeTypeInfo.textContent = `相場: ${rate.toFixed(2)} (米1 -> 金${rate.toFixed(2)})`;
+            inputs.amount = createSlider("売却量(米)", "amount", c.rice, 0);
         } else if (type === 'buy_ammo') {
             document.getElementById('quantity-title').textContent = "矢弾購入"; 
             const price = parseInt(window.MainParams.Economy.PriceAmmo, 10) || 1;
