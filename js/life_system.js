@@ -406,11 +406,19 @@ class LifeSystem {
             // 2. 差額を計算します（プラスなら優秀、マイナスなら不安）
             const diff = newTotal - oldTotal;
             
-            // 3. 最大±15になるように計算します（差額100で15変動なので、0.15を掛けます）
-            let changeVal = Math.floor(diff * 0.15);
+            // 3. 差が「51以上」離れているかチェックします
+            let changeVal = 0;
+            // 差額の絶対値（プラスマイナスをなくした純粋な差）が51以上なら計算を始めます
+            if (Math.abs(diff) >= 51) {
+                // 差がプラスなら50を引き、マイナスなら50を足して、「50をはみ出した分」だけを取り出します
+                const overDiff = diff > 0 ? diff - 50 : diff + 50;
+                
+                // はみ出した分に0.25を掛け算します
+                changeVal = Math.floor(overDiff * 0.25);
+            }
             
-            // 上限15、下限-15でストッパーをかけます
-            changeVal = Math.max(-15, Math.min(15, changeVal));
+            // 上限30、下限-30でストッパーをかけます
+            changeVal = Math.max(-30, Math.min(30, changeVal));
 
             // もし能力に差があって、変動する数値が0じゃないなら魔法発動！
             if (changeVal !== 0) {
