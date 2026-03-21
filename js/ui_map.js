@@ -546,6 +546,20 @@ Object.assign(UIManager.prototype, {
         this.mapEl.appendChild(overlay);
         // ★追加ここまで！
 
+        // ==========================================
+        // ★今回追加：大雪を表現するための水玉キャンバスを敷きます！
+        // ==========================================
+        const snowOverlay = document.createElement('canvas');
+        snowOverlay.id = 'snow-overlay';
+        snowOverlay.width = mapW;
+        snowOverlay.height = mapH;
+        snowOverlay.style.position = 'absolute';
+        snowOverlay.style.left = '0px';
+        snowOverlay.style.top = '0px';
+        snowOverlay.style.pointerEvents = 'none'; 
+        snowOverlay.style.zIndex = '4'; // province-overlay(3)より上、SVG(5)やお城(10)より下
+        this.mapEl.appendChild(snowOverlay);
+
         const svgNS = "http://www.w3.org/2000/svg";
         const svg = document.createElementNS(svgNS, "svg");
         
@@ -778,6 +792,7 @@ Object.assign(UIManager.prototype, {
         }
         
         this.updateCastleGlows();
+        this.updateSnowOverlay(); // ★大雪の表示を更新します！
 
         // ==========================================
         // ★スマホで大名を選ぶ時専用の「ボトムバー」を出す魔法です！
@@ -1063,6 +1078,73 @@ Object.assign(UIManager.prototype, {
         const ctx = overlay.getContext('2d');
         // 画用紙を綺麗にするだけ！
         ctx.clearRect(0, 0, overlay.width, overlay.height);
+    },
+
+    // ==========================================
+    // ★大雪の国のマップ上に、白い水玉模様を描く魔法です！
+    // ==========================================
+    updateSnowOverlay() {
+        const overlay = document.getElementById('snow-overlay');
+        if (!overlay) return;
+        const ctx = overlay.getContext('2d');
+        const width = overlay.width;
+        const height = overlay.height;
+        
+        // まずは前の雪を全部消して綺麗にします
+        ctx.clearRect(0, 0, width, height);
+
+        // DataManagerにこっそりしまっておいた画像データ（裏側の秘密マップ）をもらいます
+        const sourceData = DataManager.provinceImageData;
+        if (!sourceData) return;
+
+        // 「heavySnow（大雪）」のシールが貼られている国の色コードを全部集めます
+        const targetColors = this.game.provinces
+            .filter(p => p.statusEffects && p.statusEffects.includes('heavySnow'))
+            .map(p => DataManager.hexToRgb(p.color_code));
+
+        if (targetColors.length === 0) return;
+
+        // 新しく雪を降らせるための透明な絵の具セットを作ります
+        const outputData = ctx.createImageData(width, height);
+
+        // 画像の「点（ピクセル）」を1個ずつ調べていきます！
+        for (let i = 0; i < sourceData.data.length; i += 4) {
+            const r = sourceData.data[i];
+            const g = sourceData.data[i+1];
+            const b = sourceData.data[i+2];
+            const a = sourceData.data[i+3];
+
+            if (a === 0) continue; // 透明な場所は無視して次へ
+
+            // 大雪の国かどうかチェックします
+            let match = false;
+            for (let c of targetColors) {
+                if (Math.abs(r - c.r) < 5 && Math.abs(g - c.g) < 5 && Math.abs(b - c.b) < 5) {
+                    match = true;
+                    break;
+                }
+            }
+
+            if (match) {
+                // 水玉模様を描くために、今のピクセルが「どこ」にあるか計算します
+                const pixelIndex = i / 4;
+                const x = pixelIndex % width;
+                const y = Math.floor(pixelIndex / width);
+
+                // 8ピクセルごとに2x2の四角い白い雪（水玉）を描きます！
+                const modX = x % 8;
+                const modY = y % 8;
+                if ((modX < 2 && modY < 2) || (modX >= 4 && modX < 6 && modY >= 4 && modY < 6)) {
+                    outputData.data[i] = 255;     // R（白）
+                    outputData.data[i+1] = 255;   // G（白）
+                    outputData.data[i+2] = 255;   // B（白）
+                    outputData.data[i+3] = 180;   // A（少し透ける白）
+                }
+            }
+        }
+
+        // 完成した雪の絵の具を、画用紙にドーンと乗せます！
+        ctx.putImageData(outputData, 0, 0);
     }
     // ==========================================
     // ★追加ここまで！
