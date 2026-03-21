@@ -21,46 +21,42 @@ class AudioManager {
             'SC_ex_Town2_Fortress.ogg': { 
                 start: 36603 / 44100, 
                 end: (36603 + 5733088) / 44100,
-                baseVolume: 0.02 
+                baseVolume: 0.04 
             },
             'SC_ex_Town1_Castle.ogg': { 
-                baseVolume: 0.02 
+                baseVolume: 0.04 
             },
             // ★野戦のBGM
             '08_Legend of bear slaying.ogg': {
                 start: 671034 / 44100, 
                 end: (671034 + 5327048) / 44100,
-                baseVolume: 0.03
+                baseVolume: 0.06
             },
             // ★ここを書き足し！：攻城戦のBGM
             '07_Underworld dance.ogg': {
                 start: 4943179 / 44100, 
                 end: (4943179 + 3587798) / 44100,
-                baseVolume: 0.025
+                baseVolume: 0.05
             },
-            // '新しい曲.ogg': { baseVolume: 0.05 }, // ループがない曲はこれだけでもOK！
         };
 
         // ==========================================
         // ★ SEのカタログ（個別の音量調整つき！）
         // ==========================================
         this.seList = {
-            'decision.ogg': { baseVolume: 0.04 },
-            'cancel.ogg': { baseVolume: 0.02 },
-            'choice.ogg': { baseVolume: 0.05 },
-            'window.ogg': { baseVolume: 0.05 },
-            'damage001.ogg': { baseVolume: 0.05 },
-            'fire001.mp3g': { baseVolume: 0.8 },
-            'slash.ogg': { baseVolume: 0.05 },
-            'miss.ogg': { baseVolume: 0.05 },
-            
-            // 特定の音が大きすぎる場合は、ここで小さくできます
-            // 'loud_explosion.ogg': { baseVolume: 0.005 },
+            'decision.ogg': { baseVolume: 0.08 },
+            'cancel.ogg': { baseVolume: 0.04 },
+            'choice.ogg': { baseVolume: 0.1 },
+            'window.ogg': { baseVolume: 0.1 },
+            'damage001.ogg': { baseVolume: 0.1 },
+            'fire001.mp3g': { baseVolume: 1.6 },
+            'slash.ogg': { baseVolume: 0.1 },
+            'miss.ogg': { baseVolume: 0.1 },
         };
         
         // もしカタログに書いていない音が呼ばれたときの「とりあえずの音量」
-        this.fallbackBgmVolume = 0.02;
-        this.fallbackSeVolume = 0.02;
+        this.fallbackBgmVolume = 0.05;
+        this.fallbackSeVolume = 0.1;
     }
 
     // BGMを鳴らす魔法
