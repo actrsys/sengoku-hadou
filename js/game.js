@@ -1509,16 +1509,11 @@ class GameManager {
 }
 
 window.addEventListener('DOMContentLoaded', () => {
+    // 右クリックメニューが出ないようにする設定です
     document.addEventListener('contextmenu', (e) => {
         e.preventDefault();
     }, { passive: false });
 
+    // ゲームの本体（心臓）を新しく作って、動き出せるようにします
     window.GameApp = new GameManager();
-
-    // ★ここから書き足し！：タイトル画面の裏で、重いマップ画像をこっそりダウンロードしておく魔法です！
-    const preloadImg = new Image();
-    // もし画像の場所や名前が違う場合は、ここをあや瀨さんのファイルに合わせて書き換えてくださいね
-    preloadImg.src = './data/images/map/japan_colorcode_map.png'; 
-    // ★書き足しここまで！
-
 });
