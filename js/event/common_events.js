@@ -301,10 +301,24 @@ window.GameEvents.push({
         }
         
         if (badAffected.size > 0) {
-            badAffected.forEach(pId => addStatus(pId, 'badHarvest'));
-            // ★共通の魔法を呼び出します！（凶作の色は赤紫色）
-            await window.playProvinceMapEffect(game, '凶作', "【秋の訪れ】\n今年は各地で凶作に見舞われています……", badAffected, 180, 0, 180);
-        }
+            badAffected.forEach(pId => addStatus(pId, 'badHarvest'));
+
+            // ★ここから追加：日本中の米相場を動かします！
+            game.provinces.forEach(prov => {
+                if (prov && prov.marketRate !== undefined) {
+                    // もしこの国が「凶作（badAffected）」に入っていたら 1.0 アップ！
+                    if (badAffected.has(prov.id)) {
+                        prov.marketRate = Math.min(window.MainParams.Economy.TradeRateMax, prov.marketRate + 1.0);
+                    } else {
+                        // 凶作じゃない他の国も、影響を受けて 0.5 アップ！
+                        prov.marketRate = Math.min(window.MainParams.Economy.TradeRateMax, prov.marketRate + 0.5);
+                    }
+                }
+            });
+
+            // ★共通の魔法を呼び出します！（凶作の色は赤紫色）
+            await window.playProvinceMapEffect(game, '凶作', "【秋の訪れ】\n今年は各地で凶作に見舞われています……", badAffected, 180, 0, 180);
+        }
 
         // =========================================================
         // 【実行２】「豊作」の処理を行います
@@ -376,10 +390,24 @@ window.GameEvents.push({
         }
         
         if (goodAffected.size > 0) {
-            goodAffected.forEach(pId => addStatus(pId, 'goodHarvest'));
-            // ★共通の魔法を呼び出します！（豊作の色は黄金色）
-            await window.playProvinceMapEffect(game, '豊作', "【秋の訪れ】\n今年は各地で豊作の秋を迎えています！", goodAffected, 255, 215, 0);
-        }
+            goodAffected.forEach(pId => addStatus(pId, 'goodHarvest'));
+
+            // ★ここから追加：日本中の米相場を動かします！
+            game.provinces.forEach(prov => {
+                if (prov && prov.marketRate !== undefined) {
+                    // もしこの国が「豊作（goodAffected）」に入っていたら 0.5 ダウン！
+                    if (goodAffected.has(prov.id)) {
+                        prov.marketRate = Math.max(window.MainParams.Economy.TradeRateMin, prov.marketRate - 0.5);
+                    } else {
+                        // 豊作じゃない他の国も、影響を受けて 0.2 ダウン！
+                        prov.marketRate = Math.max(window.MainParams.Economy.TradeRateMin, prov.marketRate - 0.2);
+                    }
+                }
+            });
+
+            // ★共通の魔法を呼び出します！（豊作の色は黄金色）
+            await window.playProvinceMapEffect(game, '豊作', "【秋の訪れ】\n今年は各地で豊作の秋を迎えています！", goodAffected, 255, 215, 0);
+        }
 
         // =========================================================
         // 【実行３】日本中の城で「９月の兵糧収入」を計算します！
@@ -722,10 +750,18 @@ window.GameEvents.push({
         });
 
         // 雪が降っている国がなければ、何もしないでおしまいです
-        if (snowProvIds.size === 0) return;
+        if (snowProvIds.size === 0) return;
 
-        // ③ 雪が降っている国のお城に、毎月のジワジワとした被害を与えます
-        game.castles.forEach(c => {
+        // ③-1 まずは雪が降っている国の米相場をジワジワと上げます！
+        snowProvIds.forEach(pId => {
+            const prov = game.provinces.find(p => p.id === pId);
+            if (prov && prov.marketRate !== undefined) {
+                prov.marketRate = Math.min(window.MainParams.Economy.TradeRateMax, prov.marketRate + 0.1);
+            }
+        });
+
+        // ③-2 雪が降っている国のお城に、毎月のジワジワとした被害を与えます
+        game.castles.forEach(c => {
             if (c.ownerClan === 0) return; 
             
             if (snowProvIds.has(c.provinceId)) {

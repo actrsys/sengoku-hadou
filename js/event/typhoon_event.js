@@ -231,7 +231,7 @@ window.GameEvents.push({
             }
         }
 
-        // ★ここから追加！：７月か８月の台風なら、被害を受けた国に「凶作」のシールを貼ります！
+        // ７月か８月の台風なら、被害を受けた国に「凶作」のシールを貼ります！
         if (game.month === 7 || game.month === 8) {
             damagedProvinceMap.forEach((scale, pId) => {
                 const p = game.provinces.find(prov => prov.id === pId);
@@ -243,8 +243,23 @@ window.GameEvents.push({
                 }
             });
         }
-        // ★追加ここまで！
-
+        
+        // 台風の被害を受けた国だけでなく、他の国にも影響を出します！
+        if (damagedProvinceMap.size > 0) {
+            game.provinces.forEach(prov => {
+                if (prov && prov.marketRate !== undefined) {
+                    // 台風の被害を受けた国かどうか調べます
+                    if (damagedProvinceMap.has(prov.id)) {
+                        // 被害を受けた国は 0.3 アップします！
+                        prov.marketRate = Math.min(window.MainParams.Economy.TradeRateMax, prov.marketRate + 0.3);
+                    } else {
+                        // 被害を受けていない他の国も、影響で 0.1 アップします！
+                        prov.marketRate = Math.min(window.MainParams.Economy.TradeRateMax, prov.marketRate + 0.1);
+                    }
+                }
+            });
+        }
+        
         game.castles.forEach(castle => {
             if (damagedProvinceMap.has(castle.provinceId)) {
                 const finalScale = damagedProvinceMap.get(castle.provinceId);
