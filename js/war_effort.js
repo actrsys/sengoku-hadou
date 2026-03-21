@@ -204,6 +204,19 @@ Object.assign(WarManager.prototype, {
                 await this.game.ui.showCutin(`${atkArmyName}の${atkBushos[0].name}が\n${defCastle.name}に攻め込みました！`);
             }
 
+            // ★追加：出陣したことで、攻撃側と守備側の国の米相場が上がります！
+            const maxTradeRate = window.MainParams.Economy.TradeRateMax || 2.5;
+            const atkProv = this.game.provinces.find(p => p.id === atkCastle.provinceId);
+            const defProv = this.game.provinces.find(p => p.id === defCastle.provinceId);
+            
+            if (atkProv) {
+                atkProv.marketRate = Math.min(maxTradeRate, atkProv.marketRate + 0.3);
+            }
+            // 同じ国の中での戦いなら、2重に上がらないようにチェックします
+            if (defProv && (!atkProv || atkProv.id !== defProv.id)) {
+                defProv.marketRate = Math.min(maxTradeRate, defProv.marketRate + 0.3);
+            }
+
             if (selfReinforcementData && selfReinforcementData.castle.ownerClan === pid && !selfReinforcementData.castle.isDelegated && atkCastle.isDelegated) {
                 const requesterName = atkBushos[0].name;
                 const reinfCastleName = selfReinforcementData.castle.name;
