@@ -640,9 +640,12 @@ window.GameEvents.push({
 
         // ★新しく雪が降る国が増えた時だけ、すべての雪国をまとめて地図で光らせます！
         if (isNewSnowAdded && allSnowProvIds.size > 0) {
+            // ★大雪のイベントと同時に、マップの水玉模様をすぐに更新します！
+            if (game.ui && game.ui.updateSnowOverlay) game.ui.updateSnowOverlay();
+
             await window.playProvinceMapEffect(
                 game, 
-                '大雪', 
+                '大雪',
                 "【大雪】\n厳しい冬が訪れ、各地が大雪に見舞われています……", 
                 allSnowProvIds, 
                 99, 188, 255
@@ -680,6 +683,9 @@ window.GameEvents.push({
 
             // どこかに雪が積もっていたなら、春の訪れをメッセージだけでお知らせします
             if (hadSnow && game.ui) {
+                // ★春の訪れとともに、マップの水玉模様を消します！
+                if (game.ui.updateSnowOverlay) game.ui.updateSnowOverlay();
+
                 await game.ui.showDialogAsync("【雪解け】\n雪解けの季節です", false, 0);
             }
             
