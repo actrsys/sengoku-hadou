@@ -2455,7 +2455,7 @@ class CommandSystem {
                         }
                     }
 
-                    helperCastle.soldiers = Math.max(0, helperCastle.soldiers - finalSVal);
+                    helperCastle.soldiers = Math.max(0, helperCastle.soldiers - reinfSoldiers);
                     helperCastle.rice = Math.max(0, helperCastle.rice - reinfRice);
                     helperCastle.horses = Math.max(0, (helperCastle.horses || 0) - reinfHorses);
                     helperCastle.guns = Math.max(0, (helperCastle.guns || 0) - reinfGuns);
