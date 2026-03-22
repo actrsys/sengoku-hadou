@@ -38,8 +38,11 @@ class Clan {
         
         // 大名自身が持っていた官位の仕組みは、武将の機能にお引っ越ししたため削除しました！
         
-        // CSVの initDiplomacy を翻訳して、外交の箱に入れます
-        if (typeof data.initDiplomacy === 'string' && data.initDiplomacy.trim() !== "") {
+        // ★ここから書き足し：セーブデータから読み込んだ時は、すでに外交の箱に中身が入っているので、上書きしないようにガードします！
+        const hasSavedDiplomacy = data.diplomacyValue && Object.keys(data.diplomacyValue).length > 0;
+
+        // CSVの initDiplomacy を翻訳して、外交の箱に入れます（新規ゲームの時だけ！）
+        if (!hasSavedDiplomacy && typeof data.initDiplomacy === 'string' && data.initDiplomacy.trim() !== "") {
             const parts = data.initDiplomacy.split('|');
             parts.forEach(part => {
                 const items = part.split(':');
