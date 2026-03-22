@@ -1688,6 +1688,10 @@ Object.assign(WarManager.prototype, {
             if (c.soldiers < 1000) return;
             if (c.rice < 500) return;
 
+            // ★追加：そのお城がある国が「大雪」だったら、援軍候補から外します！
+            const prov = this.game.provinces.find(p => p.id === c.provinceId);
+            if (prov && prov.statusEffects && prov.statusEffects.includes('heavySnow')) return;
+
             // 大名・城主以外の、動かせる一般武将がいるか
             const normalBushos = this.game.getCastleBushos(c.id).filter(b => 
                 !b.isDaimyo && !b.isCastellan && b.status !== 'ronin' && b.belongKunishuId === 0
@@ -1768,6 +1772,10 @@ Object.assign(WarManager.prototype, {
         let allyForceCandidates = [];
 
         this.game.castles.forEach(c => {
+            // ★追加：そのお城がある国が「大雪」だったら、援軍候補から外します！
+            const prov = this.game.provinces.find(p => p.id === c.provinceId);
+            if (prov && prov.statusEffects && prov.statusEffects.includes('heavySnow')) return;
+
             // 1. 大名家
             if (c.ownerClan !== 0 && c.ownerClan !== defClanId && c.ownerClan !== atkClanId) {
                 const rel = this.game.getRelation(defClanId, c.ownerClan);

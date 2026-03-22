@@ -2078,6 +2078,11 @@ class CommandSystem {
         let selfCandidates = [];
         this.game.castles.forEach(c => {
             if (c.ownerClan !== myClanId || c.id === atkCastle.id) return;
+
+            // ★追加：そのお城がある国が「大雪」だったら、援軍候補から外します！
+            const prov = this.game.provinces.find(p => p.id === c.provinceId);
+            if (prov && prov.statusEffects && prov.statusEffects.includes('heavySnow')) return;
+
             const isNextToMyAnyCastle = this.game.castles.some(myC => myC.ownerClan === myClanId && GameSystem.isAdjacent(c, myC));
             const isNextToEnemy = GameSystem.isAdjacent(c, targetCastle);
             if (!isNextToMyAnyCastle && !isNextToEnemy) return;
@@ -2091,6 +2096,10 @@ class CommandSystem {
         const proceedToAlly = (selfReinfData, currentAtkBushos = atkBushos, currentSVal = sVal) => {
             let allyForceCandidates = [];
             this.game.castles.forEach(c => {
+                // ★追加：そのお城がある国が「大雪」だったら、援軍候補から外します！
+                const prov = this.game.provinces.find(p => p.id === c.provinceId);
+                if (prov && prov.statusEffects && prov.statusEffects.includes('heavySnow')) return;
+
                 if (c.ownerClan !== 0 && c.ownerClan !== myClanId && c.ownerClan !== targetCastle.ownerClan) {
                     const rel = this.game.getRelation(myClanId, c.ownerClan);
                     const enemyRel = this.game.getRelation(c.ownerClan, targetCastle.ownerClan);
