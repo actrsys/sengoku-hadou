@@ -144,6 +144,15 @@ class AIEngine {
                 // 基本の確率にボーナスを足し算します
                 diplomacyChance += dipBonus;
                 
+                // ★追加：お城がピンチ（兵士が少ない等）の時は、内政（徴兵など）を優先したくて外交確率を下げます！
+                if (castle.soldiers <= 1000) {
+                    diplomacyChance = 0; // 兵士1000以下の超ピンチなら、外交してる場合じゃない！
+                } else if (castle.soldiers <= 3000) {
+                    // 1000〜3000の間なら、兵士が少ないほど外交確率が下がっていく魔法です！
+                    const penaltyRatio = (castle.soldiers - 1000) / 2000; // 0(少ない) 〜 1(多い) になります
+                    diplomacyChance = diplomacyChance * penaltyRatio; 
+                }
+                
                 // 確率がマイナス（0%より下）にならないように、最低でも0にしておきます
                 diplomacyChance = Math.max(0, diplomacyChance);
 
@@ -1592,6 +1601,11 @@ class AIEngine {
                     continue;
                 }
             } else if (decision.action === 'goodwill') {
+                // ★ここを書き足します：使うお金が、お城の貯金箱の5分の1（20%）より多い時は、高すぎるのでキャンセルします！
+                if (decision.gold > castle.gold / 5) {
+                    continue; // この相手との外交は諦めて、次の候補を探します
+                }
+
                 if (castle.gold >= decision.gold) {
                     if (targetClanId === this.game.playerClanId) {
                         this.game.commandSystem.proposeDiplomacyToPlayer(castellan, targetClanId, 'goodwill', decision.gold, () => {
