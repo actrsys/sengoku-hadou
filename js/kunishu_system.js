@@ -178,25 +178,7 @@ class KunishuSystem {
         // 壊滅していないものを再度取得
         const survivingKunishus = this.getAliveKunishus();
 
-        // 2. 諸勢力同士の抗争 (同一城内のチェック)
-        const checkedPairs = new Set();
-        survivingKunishus.forEach(k1 => {
-            survivingKunishus.forEach(k2 => {
-                if (k1.id === k2.id || k1.castleId !== k2.castleId) return;
-                const pairId = k1.id < k2.id ? `${k1.id}-${k2.id}` : `${k2.id}-${k1.id}`;
-                if (checkedPairs.has(pairId)) return;
-                checkedPairs.add(pairId);
-
-                // ★修正: 諸勢力同士の関係を調べるので「true」を付けます
-                const rel1 = k1.getRelation(k2.id, true);
-                const rel2 = k2.getRelation(k1.id, true);
-                if (rel1 <= 30 || rel2 <= 30) {
-                    this.executeConflict(k1, k2);
-                }
-            });
-        });
-
-        // 3. 城の所有者（大名）に対するアクション
+        // 2. 城の所有者（大名）に対するアクション
         // ★変更：forEach をやめて、順番待ちができる for...of に変えます
         for (const kunishu of survivingKunishus) {
             const castle = this.game.getCastle(kunishu.castleId);
@@ -234,47 +216,6 @@ class KunishuSystem {
                 kunishu.setRelation(castle.ownerClan, currentRel + change);
             }
         }
-    }
-
-    // 諸勢力同士の抗争処理
-    executeConflict(k1, k2) {
-        // k1が攻撃側、k2が防御側とする（ランダムで決定）
-        let attacker = k1;
-        let defender = k2;
-        if (Math.random() > 0.5) {
-            attacker = k2;
-            defender = k1;
-        }
-
-        const atkSoldiers = Math.floor(attacker.soldiers * 0.5); // 攻撃側は5割の兵力
-        const defSoldiers = defender.soldiers; // 防御側は全兵力
-
-        if (atkSoldiers <= 0 || defSoldiers <= 0) return;
-
-        // 簡易的なダメージ計算（武将能力はリーダーを参照）
-        const atkLeader = this.game.getBusho(attacker.leaderId);
-        const defLeader = this.game.getBusho(defender.leaderId);
-        
-        const atkPower = (atkLeader ? atkLeader.leadership : 30) * 1.0 + atkSoldiers * 0.05;
-        // 防御側有利
-        const defPower = (defLeader ? defLeader.leadership : 30) * 1.2 + defSoldiers * 0.05;
-
-        const ratio = atkPower / (atkPower + defPower);
-        const baseDmg = Math.max(10, atkPower * ratio * 1.0);
-
-        const soldierDmg = Math.floor(baseDmg);
-        const counterDmg = Math.floor(defPower * 0.1);
-
-        defender.soldiers = Math.max(0, defender.soldiers - soldierDmg);
-        attacker.soldiers = Math.max(0, attacker.soldiers - counterDmg);
-
-        const atkName = attacker.getName(this.game);
-        const defName = defender.getName(this.game);
-        const msg = `【諸勢力抗争】${this.game.getCastle(attacker.castleId).name}にて、${atkName}と${defName}が抗争を起こしました！`;
-        this.game.ui.log(msg);
-
-        this.checkDestroyed(attacker);
-        this.checkDestroyed(defender);
     }
 
     // 城主（大名）へのアクション
