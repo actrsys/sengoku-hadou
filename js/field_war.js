@@ -23,6 +23,7 @@ class FieldWarManager {
         this.reachable = null;
         this.previewTarget = null;
         this.turnBackup = null; 
+        this.retreatedUnits = []; // ★追加：撤退した部隊をメモする箱
         window.addEventListener('resize', () => {
             if (this.active) {
                 this.adjustMapScale();
@@ -185,6 +186,7 @@ class FieldWarManager {
         const defAllySlots = !atkIsLeft ? leftAllySlots : rightAllySlots;
 
         this.units = [];
+        this.retreatedUnits = []; // ★追加：撤退した部隊をメモする箱を空っぽにしておきます
         
         let atkMainCount = 0;
         let atkAllyCount = 0;
@@ -589,11 +591,18 @@ class FieldWarManager {
             btnRetreat.onclick = () => {
                 if (!this.isPlayerTurn() || this.isInfoMode) return;
                 const unit = this.turnQueue[0];
-                this.game.ui.showDialog("全軍を撤退させますか？", true, () => {
-                    if (unit.isAttacker) this.log(`撤退を開始します……`);
-                    else this.log(`城内へ撤退を開始します……`);
-                    this.endFieldWar(unit.isAttacker ? 'attacker_retreat' : 'defender_retreat');
-                });
+                if (unit.isGeneral) {
+                    this.game.ui.showDialog("全軍を撤退させますか？（総大将が撤退すると野戦は終了します）", true, () => {
+                        if (unit.isAttacker) this.log(`全軍、撤退を開始します……`);
+                        else this.log(`全軍、城内へ撤退を開始します……`);
+                        this.endFieldWar(unit.isAttacker ? 'attacker_retreat' : 'defender_retreat');
+                    });
+                } else {
+                    this.game.ui.showDialog(`${unit.name}隊を戦場から離脱（撤退）させますか？`, true, () => {
+                        this.log(`${unit.name}隊は戦場から撤退しました。`);
+                        this.retreatUnit(unit);
+                    });
+                }
             };
         }
     }
@@ -1410,6 +1419,26 @@ class FieldWarManager {
             }
         }
     }
+
+    // ★追加: 個別部隊の撤退処理
+    retreatUnit(unit) {
+        // 撤退済みリストに追加（終了時に兵士数を回収するため）
+        if (!this.retreatedUnits) this.retreatedUnits = [];
+        this.retreatedUnits.push(unit);
+        
+        // 戦場から部隊を消す
+        this.units = this.units.filter(u => u.id !== unit.id);
+        
+        // マップとステータスを更新し、行動済み扱いにして次の部隊へ
+        unit.hasActionDone = true;
+        this.state = 'IDLE';
+        this.updateMap();
+        this.updateStatus();
+        
+        setTimeout(() => {
+            this.nextPhaseTurn();
+        }, 500);
+    }
     
     checkEndCondition() {
         let atkAlive = false, defAlive = false;
@@ -1496,7 +1525,13 @@ class FieldWarManager {
             this.warState.defAssignments.forEach(a => a.soldiers = 0);
         }
 
-        this.units.forEach(u => {
+        // ★追加：戦場に残っている部隊と、すでに撤退した部隊を合わせて計算します！
+        let allUnits = [...this.units];
+        if (this.retreatedUnits) {
+            allUnits = allUnits.concat(this.retreatedUnits);
+        }
+
+        allUnits.forEach(u => {
             if (u.isAttacker) {
                 // ★修正：メインの部隊か、援軍かを見分けて、別々の箱にしまいます！
                 if (u.isReinforcement) {
@@ -1985,12 +2020,18 @@ class FieldWarManager {
         allies.forEach(a => allySoldiers += a.soldiers);
         enemies.forEach(e => enemySoldiers += e.soldiers);
         
-        if (allySoldiers < enemySoldiers * 0.2) {
+        // ★修正: 総大将なら全軍撤退、一般部隊なら個別撤退の判断をします
+        if (unit.isGeneral && (allySoldiers < enemySoldiers * 0.2)) {
             if (isPlayerInvolved) {
                 if (unit.isAttacker) this.log(`${unit.name}軍は攻略を諦め、引き揚げていきました！`);
                 else this.log(`${unit.name}軍は不利を悟り、戦場から離脱しました！`);
             }
             this.endFieldWar(unit.isAttacker ? 'attacker_retreat' : 'defender_retreat');
+            return;
+        } else if (!unit.isGeneral && (unit.soldiers <= 200 || unit.soldiers < enemySoldiers * 0.05)) {
+            // 一般部隊は、自分の兵士が少なすぎるか、敵全体に対して少なすぎたら逃げる
+            if (isPlayerInvolved) this.log(`${unit.name}隊は被害が大きく、戦場から撤退しました！`);
+            this.retreatUnit(unit);
             return;
         }
 
@@ -2033,8 +2074,14 @@ class FieldWarManager {
         // --- 2. 逃走・移動判定 ---
         if (unit.troopType === 'teppo') {
             if (allies.length === 0 && distToTarget === 1) {
-                if (isPlayerInvolved) this.log(`${unit.name}は不利を悟り、戦場から離脱しました！`);
-                this.endFieldWar(unit.isAttacker ? 'attacker_retreat' : 'defender_retreat');
+                // ★修正: 総大将なら全軍撤退、一般部隊なら個別撤退
+                if (unit.isGeneral) {
+                    if (isPlayerInvolved) this.log(`${unit.name}軍は不利を悟り、戦場から離脱しました！`);
+                    this.endFieldWar(unit.isAttacker ? 'attacker_retreat' : 'defender_retreat');
+                } else {
+                    if (isPlayerInvolved) this.log(`${unit.name}隊は不利を悟り、戦場から撤退しました！`);
+                    this.retreatUnit(unit);
+                }
                 return;
             }
         }
