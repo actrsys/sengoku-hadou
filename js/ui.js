@@ -547,6 +547,16 @@ class UIManager {
         if(this.warModal) this.warModal.classList.add('hidden');
         if(this.unitDivideModal) this.unitDivideModal.classList.add('hidden');
         if(this.aiGuard) this.aiGuard.classList.add('hidden'); 
+        
+        // ★ここから書き足し：前に遊んでいた時の画面の枠をしっかり隠します！
+        if(this.panelEl) this.panelEl.classList.add('hidden'); // PC版のサイドバーを隠します
+        if(this.mobileTopLeft) this.mobileTopLeft.innerHTML = ''; // スマホ版の上の情報を消します
+        if(this.mobileFloatingInfo) this.mobileFloatingInfo.innerHTML = ''; // スマホ版の時計を消します
+        if(this.mobileFloatingMarket) this.mobileFloatingMarket.innerHTML = ''; // スマホ版の相場を消します
+        const cmdGrid = document.getElementById('command-area');
+        if(cmdGrid) cmdGrid.style.display = 'none'; // スマホ版のボタン置き場を隠します
+        // ★書き足すのはここまで！
+
         this.hideContextMenu();
     }
 
