@@ -403,11 +403,6 @@ class CommandSystem {
             bushos = this.game.getCastleBushos(targetId).filter(b => b.status !== 'ronin' && !b.isDaimyo && b.belongKunishuId === 0); 
             infoHtml = "<div>引抜の対象とする武将を選択してください </div>"; 
         }
-        // ★追加: 諸勢力を引き抜く時に、自分の城の武将が表示されてしまうバグを直す魔法のブロックです！
-        else if (actionType === 'kunishu_headhunt_target') { 
-            bushos = this.game.getCastleBushos(targetId).filter(b => b.status !== 'ronin' && b.belongKunishuId === extraData.kunishuId); 
-            infoHtml = "<div>引抜の対象とする諸勢力武将を選択してください </div>"; 
-        }
         else if (actionType === 'kunishu_incorporate_doer') {
             bushos = this.game.getCastleBushos(c.id).filter(b => b.status !== 'ronin'); 
             infoHtml = "<div>取込の交渉を行う担当官を選択してください</div>"; 
@@ -1002,14 +997,6 @@ class CommandSystem {
             this.game.ui.openQuantitySelector('goodwill', selectedIds, targetId, { isKunishu: true, kunishuId: extraData.kunishuId });
             return;
         }
-        if (actionType === 'kunishu_headhunt_target') {
-            this.game.ui.openBushoSelector('kunishu_headhunt_doer', null, { targetId: firstId, kunishuId: extraData.kunishuId });
-            return;
-        }
-        if (actionType === 'kunishu_headhunt_doer') {
-            this.game.ui.openQuantitySelector('headhunt_gold', selectedIds, extraData.targetId, { isKunishu: true, kunishuId: extraData.kunishuId });
-            return;
-        }
         if (actionType === 'kunishu_incorporate_doer') {
             const doer = this.game.getBusho(firstId);
             const kunishu = this.game.kunishuSystem.getKunishu(extraData.kunishuId);
@@ -1172,25 +1159,13 @@ class CommandSystem {
         }
         else if (type === 'headhunt_gold') {
             const val = parseInt(inputs.gold.num.value);
-            // ★追加: 諸勢力からの引き抜きなら
-            if (extraData && extraData.isKunishu) {
-                const doer = this.game.getBusho(data[0]);
-                const target = this.game.getBusho(targetId);
-                const kunishu = this.game.kunishuSystem.getKunishu(extraData.kunishuId);
-                const targetLord = this.game.getBusho(kunishu.leaderId) || { affinity: 50 }; 
-                const newLord = this.game.bushos.find(b => b.clan === this.game.playerClanId && b.isDaimyo) || { affinity: 50 };
-                // ★専門部署である StrategySystem の計算魔法を呼びます！
-                const trueProb = StrategySystem.getHeadhuntProb(doer, target, val, targetLord, newLord);
-                this.showAdviceAndExecute('kunishu_headhunt', () => this.game.strategySystem.executeKunishuHeadhunt(data[0], targetId, val, extraData.kunishuId), { trueProb: trueProb });
-            } else {
-                const doer = this.game.getBusho(data[0]);
-                const target = this.game.getBusho(targetId);
-                const targetLord = this.game.bushos.find(b => b.clan === target.clan && b.isDaimyo) || { affinity: 50 }; 
-                const newLord = this.game.bushos.find(b => b.clan === this.game.playerClanId && b.isDaimyo) || { affinity: 50 }; 
-                // ★専門部署である StrategySystem の計算魔法を呼びます！
-                const trueProb = StrategySystem.getHeadhuntProb(doer, target, val, targetLord, newLord);
-                this.showAdviceAndExecute('headhunt', () => this.game.strategySystem.executeHeadhunt(data[0], targetId, val), { trueProb: trueProb });
-            }
+            const doer = this.game.getBusho(data[0]);
+            const target = this.game.getBusho(targetId);
+            const targetLord = this.game.bushos.find(b => b.clan === target.clan && b.isDaimyo) || { affinity: 50 }; 
+            const newLord = this.game.bushos.find(b => b.clan === this.game.playerClanId && b.isDaimyo) || { affinity: 50 }; 
+            // ★専門部署である StrategySystem の計算魔法を呼びます！
+            const trueProb = StrategySystem.getHeadhuntProb(doer, target, val, targetLord, newLord);
+            this.showAdviceAndExecute('headhunt', () => this.game.strategySystem.executeHeadhunt(data[0], targetId, val), { trueProb: trueProb });
         }
         else if (type === 'transport') {
             const vals = {
@@ -1887,14 +1862,13 @@ class CommandSystem {
             case 'incite': return "扇動対象の城を選択してください";
             case 'rumor': return "流言対象の城を選択してください";
             case 'headhunt': case 'headhunt_select_castle': return "引抜対象の居城を選択してください";
-            case 'kunishu_headhunt': return "引抜対象の諸勢力がいる城を選択してください";
             case 'goodwill': return "親善を行う相手を選択してください";
             case 'alliance': return "同盟を行う相手を選択してください";
             case 'dominate': return "支配下に置く相手を選択してください";
             case 'subordinate': return "従属する相手を選択してください";
             case 'kunishu_goodwill': return "親善を行う諸勢力がいる城を選択してください";
             case 'kunishu_incorporate': return "取込を行う諸勢力がいる城を選択してください";
-            case 'break_alliance': return "同盟破棄する相手を選択してください";
+            case 'break_alliance': return "関係を破棄する相手を選択してください";
             case 'court_truce': return "和睦を行う相手を選択してください";
             case 'marriage': return "婚姻同盟を行う相手を選択してください";
             case 'atk_self_reinforcement': return "援軍を出陣させる城を選択してください";
@@ -2014,7 +1988,7 @@ class CommandSystem {
         };
 
         // ★変更: 諸勢力のコマンドなら、どの諸勢力を対象にするかを選びます
-        if (['kunishu_subjugate', 'kunishu_headhunt', 'kunishu_goodwill', 'kunishu_incorporate'].includes(mode)) {
+        if (['kunishu_subjugate', 'kunishu_goodwill', 'kunishu_incorporate'].includes(mode)) {
             let kunishus = this.game.kunishuSystem.getKunishusInCastle(targetCastle.id);
 
             // ★追加：取込の場合はさらに条件で絞り込みます
@@ -2040,8 +2014,6 @@ class CommandSystem {
             const proceedKunishuCommand = (selectedKunishuId) => {
                 if (mode === 'kunishu_goodwill') {
                     this.game.ui.openBushoSelector('kunishu_goodwill_doer', targetCastle.id, { kunishuId: selectedKunishuId }, onBackToMap);
-                } else if (mode === 'kunishu_headhunt') {
-                    this.game.ui.openBushoSelector('kunishu_headhunt_target', targetCastle.id, { kunishuId: selectedKunishuId }, onBackToMap);
                 } else if (mode === 'kunishu_subjugate') {
                     this.game.ui.openBushoSelector('kunishu_subjugate_deploy', targetCastle.id, { kunishuId: selectedKunishuId }, onBackToMap);
                 } else if (mode === 'kunishu_incorporate') {

@@ -165,50 +165,8 @@ class StrategySystem {
         this.game.ui.renderMap();
     }
 
-    // 諸勢力の武将を味方に引き抜く魔法
-    executeKunishuHeadhunt(doerId, targetBushoId, gold, kunishuId) {
-        const doer = this.game.getBusho(doerId);
-        const target = this.game.getBusho(targetBushoId);
-        const kunishu = this.game.kunishuSystem.getKunishu(kunishuId);
-        
-        const castle = this.game.getCurrentTurnCastle();
-        if (castle.gold < gold) { this.game.ui.showDialog("資金が足りません", false); return; }
-        
-        if (kunishu && target.id === kunishu.leaderId) {
-            this.game.ui.showDialog("諸勢力の頭領は引き抜けません！", false);
-            return;
-        }
-
-        castle.gold -= gold;
-        
-        const targetLord = this.game.getBusho(kunishu.leaderId) || { affinity: 50 }; 
-        const newLord = this.game.bushos.find(b => b.clan === this.game.playerClanId && b.isDaimyo) || { affinity: 50 }; 
-        
-        // ★専門部署である StrategySystem の計算魔法を呼びます！
-        let isSuccess = StrategySystem.calcHeadhunt(doer, target, gold, targetLord, newLord);
-
-        if (isSuccess) {
-            target.belongKunishuId = 0; // 諸勢力を抜ける
-            target.isActionDone = true; 
-            
-            // 新しいお引越しセンターの魔法を使います！
-            this.game.affiliationSystem.joinClan(target, this.game.playerClanId, castle.id);
-            
-            this.game.ui.showResultModal(`${doer.name}の引抜工作が成功！\n${target.name}が諸勢力を離れ、我が軍に加わりました！`);
-            const maxStat = Math.max(target.strength, target.intelligence, target.leadership, target.charm, target.diplomacy);
-            doer.achievementTotal += Math.floor(maxStat * 0.3);
-            this.game.factionSystem.updateRecognition(doer, 25);
-        } else {
-            this.game.ui.showResultModal(`${doer.name}の引抜工作は失敗しました……\n${target.name}は応じませんでした`);
-            doer.achievementTotal += 5;
-            this.game.factionSystem.updateRecognition(doer, 10);
-        }
-        doer.isActionDone = true; 
-        this.game.ui.updatePanelHeader(); 
-        this.game.ui.renderCommandMenu();
-    }
-
     // 扇動を実行する魔法
+    executeIncite(doerId, targetId) {
     executeIncite(doerId, targetId) { 
         const doer = this.game.getBusho(doerId); 
         const target = this.game.getCastle(targetId); 
