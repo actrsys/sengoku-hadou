@@ -1412,8 +1412,9 @@ class FieldWarManager {
         
         for (let key in groupSoldiers) {
             if (this.groupStats[key]) {
-                // 野戦専用の計算式を使って消費する兵糧を出します
-                let cons = WarSystem.calcFieldWarRiceConsumption(groupSoldiers[key]);
+                // 野戦での兵糧消費を直接計算するようにします
+                let rate = key.startsWith('atk_') ? (window.WarParams.War.RiceConsumptionAtk || 0.05) : (window.WarParams.War.RiceConsumptionDef || 0.025);
+                let cons = Math.floor(groupSoldiers[key] * rate);
                 this.groupStats[key].rice = Math.max(0, this.groupStats[key].rice - cons);
             }
         }
