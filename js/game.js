@@ -932,7 +932,7 @@ class GameManager {
         this.isProcessingAI = true;
         if (this.ui && this.ui.aiGuard) {
             this.ui.aiGuard.classList.remove('hidden');
-            this.ui.aiGuard.innerHTML = '<div class="loading-spinner"></div>月初の準備中...';
+            this.ui.aiGuard.innerHTML = '';
         }
 
         // ★月が替わったら軍師の報告印を消します
