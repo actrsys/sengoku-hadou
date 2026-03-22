@@ -166,9 +166,8 @@ class StrategySystem {
     }
 
     // 扇動を実行する魔法
-    executeIncite(doerId, targetId) {
     executeIncite(doerId, targetId) { 
-        const doer = this.game.getBusho(doerId); 
+        const doer = this.game.getBusho(doerId);
         const target = this.game.getCastle(targetId); 
         // ★専門部署である StrategySystem の計算魔法を呼びます！
         const result = StrategySystem.calcIncite(doer); 
