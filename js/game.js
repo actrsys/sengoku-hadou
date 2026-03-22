@@ -1063,8 +1063,15 @@ class GameManager {
             const bushos = this.getCastleBushos(c.id);
             const consumeGold = bushos.length * window.MainParams.Economy.ConsumeGoldPerBusho;
             const isGoldShort = (c.gold - consumeGold < 0);
-
-            c.rice = Math.max(0, c.rice - Math.floor(c.soldiers * window.MainParams.Economy.ConsumeRicePerSoldier));
+            
+            const consumeRice = Math.floor(c.soldiers * window.MainParams.Economy.ConsumeRicePerSoldier);
+            if (c.rice - consumeRice < 0) {
+                c.rice = 0;
+                c.soldiers = Math.floor(c.soldiers * 0.95);
+            } else {
+                c.rice -= consumeRice;
+            }
+            
             c.gold = Math.max(0, c.gold - consumeGold);
             
             bushos.forEach(b => {
