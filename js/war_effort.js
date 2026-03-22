@@ -2059,7 +2059,8 @@ Object.assign(WarManager.prototype, {
 
         if (helperClanId === this.game.playerClanId) {
             const myClanName = this.game.clans.find(c => c.id === myClanId)?.name || "不明";
-            const isBoss = (myToHelperRel.status === '従属');
+            // ★相手（AI）から見て、自分が「支配」されている時は、要請を断れない
+            const isBoss = (myToHelperRel.status === '支配');
             const startSelection = () => this._promptPlayerDefReinforcement(helperCastle, defCastle, myToHelperRel, onComplete, isBoss);
 
             if (isBoss) this.game.ui.showDialog(`主家である ${myClanName} から守備側の援軍要請が届きました。\n当家は従属しているため直ちに出陣します！`, false, startSelection);
