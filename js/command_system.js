@@ -1,7 +1,7 @@
 /**
  * command_system.js
  * ゲーム内のコマンド実行ロジックおよびフロー制御を管理するクラス
- * 修正: 出陣時・諸勢力制圧時に、指定した「騎馬」と「鉄砲」を持参する処理を追加しました
+ * 修正: 出陣時・諸勢力鎮圧時に、指定した「騎馬」と「鉄砲」を持参する処理を追加しました
  */
 
 /* ==========================================================================
@@ -144,9 +144,9 @@ const COMMAND_SPECS = {
         startMode: 'map_select', targetType: 'ally_other',
         sortKey: 'strength' 
     },
-    // ★追加: 諸勢力を攻める（制圧する）ための軍事コマンド
+    // ★追加: 諸勢力を攻める（鎮圧する）ための軍事コマンド
     'kunishu_subjugate': { 
-        label: "制圧", category: 'MILITARY', 
+        label: "鎮圧", category: 'MILITARY', 
         costGold: 0, costRice: 0, 
         isMulti: true, hasAdvice: true, 
         startMode: 'map_select', targetType: 'kunishu_subjugate_valid', // ← 専用の合言葉にしました！
@@ -683,7 +683,7 @@ class CommandSystem {
                 return [...new Set(validKunishus.map(k => k.castleId))];
             }
 
-            // ★追加: 制圧コマンド専用！自分の城か、隣の城だけを選べるようにします
+            // ★追加: 鎮圧コマンド専用！自分の城か、隣の城だけを選べるようにします
             case 'kunishu_subjugate_valid': {
                 const activeKunishus = this.game.kunishuSystem.getAliveKunishus();
                 // まず諸勢力がいる城を全部集めます
@@ -1216,7 +1216,7 @@ class CommandSystem {
                     const kunishu = this.game.kunishuSystem.getKunishu(extraData.kunishuId);
                     const kunishuName = kunishu.getName(this.game);
                     
-                    this.game.ui.showDialog(`${targetName}周辺に根付く ${kunishuName} を制圧しますか？\n今月の命令は終了となります`, true, async () => {
+                    this.game.ui.showDialog(`${targetName}周辺に根付く ${kunishuName} を鎮圧しますか？\n今月の命令は終了となります`, true, async () => {
                         let finalSVal = sVal;
                         let finalBushosData = [...data];
                         let finalBushos = finalBushosData.map(id => this.game.getBusho(id));
@@ -1854,8 +1854,8 @@ class CommandSystem {
 
     getSelectionGuideMessage() {
         switch(this.game.selectionMode) {
-            case 'war': return "攻撃目標を選択してください(攻略直後の城は選択不可)";
-            case 'kunishu_subjugate': return "制圧する諸勢力がいる城を選択してください";
+            case 'war': return "攻撃目標を選択してください";
+            case 'kunishu_subjugate': return "攻撃目標となる諸勢力がいる城を選択してください";
             case 'move': return "移動先を選択してください";
             case 'transport': return "輸送先を選択してください";
             case 'investigate': return "調査対象の城を選択してください";
