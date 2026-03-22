@@ -1396,22 +1396,47 @@ Object.assign(WarManager.prototype, {
             }
 
             const myBushos = this.game.bushos.filter(b=>b.clan===this.game.playerClanId && b.status !== 'unborn'); const recruiter = myBushos.find(b => b.isDaimyo) || myBushos[0];
-            const score = (recruiter.charm * 2.0) / (prisoner.loyalty * 1.5); 
             
             // ★変更：大名で、かつ城が残っているなら絶対に拒否し、stayStepで画面に戻します
             if (prisoner.isDaimyo && !isExtinct) {
                 prisoner.hasRefusedHire = true; // ★追加：拒否したという印をつけます
                 this.game.ui.showDialog(`${prisoner.name}「敵の軍門には下らぬ！」`, false, stayStep); 
             } else {
-                // ★追加：滅亡時の大名は登用確率が1/3になります
-                let hireProb = score;
-                if (prisoner.isDaimyo && isExtinct) {
-                    hireProb = score / 3.0;
+                // 新しい計算式：基本確率を出します
+                let baseProb = ((recruiter.charm || 50) * 1.5) / ((prisoner.loyalty || 50) * 3) - 0.4;
+                
+                // ＋0.1 から －0.1 のランダムな運の要素を作ります
+                let randomBonus = (Math.random() * 0.2) - 0.1;
+                
+                // 相性の差を計算して補正します
+                const recruiterAffinity = recruiter.affinity || 0;
+                const prisonerAffinity = prisoner.affinity || 0;
+                const affinityDiff = Math.abs(recruiterAffinity - prisonerAffinity);
+                
+                let affinityBonus = 0;
+                if (affinityDiff <= 10) {
+                    affinityBonus = 0.1;
+                } else if (affinityDiff >= 50) {
+                    affinityBonus = -0.3;
+                } else {
+                    affinityBonus = 0.1 - (affinityDiff - 10) * 0.01;
+                }
+                
+                // 基本確率、ランダムな運、相性補正をすべて足します（途中はマイナスでもOKです）
+                let hireProb = baseProb + randomBonus + affinityBonus;
+                
+                // 全部足した結果を、0%から99%の間に収めます
+                hireProb = Math.max(0, Math.min(0.99, hireProb));
+                
+                // 捕まった武将が大名なら確率を半分にします
+                if (prisoner.isDaimyo && hireProb > 0) {
+                    hireProb *= 0.5;
                 } else if (!prisoner.isDaimyo && this.daimyoHiredBonus) {
                     hireProb += this.daimyoHiredBonus;
+                    hireProb = Math.max(0, Math.min(0.99, hireProb));
                 }
 
-                if (hireProb > Math.random()) { 
+                if (hireProb > Math.random()) {
                     // ★ここから変更：大名だったかどうかを最初に記憶しておきます！
                     const wasDaimyo = prisoner.isDaimyo;
                     
@@ -1484,7 +1509,8 @@ Object.assign(WarManager.prototype, {
     
     async autoResolvePrisoners(captives, winnerClanId) { // ★ async を追加
         const aiBushos = this.game.bushos.filter(b => b.clan === winnerClanId && b.status !== 'unborn'); 
-        const leaderInt = aiBushos.length > 0 ? Math.max(...aiBushos.map(b => b.intelligence)) : 50;
+        // AIもプレイヤーと同じように大名（または代表者）の魅力や相性を使うようにします
+        const recruiter = aiBushos.find(b => b.isDaimyo) || aiBushos[0] || { charm: 50, affinity: 0 };
 
         // ★大名から先に処理するように並べ替えます
         captives.sort((a, b) => (b.isDaimyo ? 1 : 0) - (a.isDaimyo ? 1 : 0));
@@ -1503,15 +1529,41 @@ Object.assign(WarManager.prototype, {
             
             const isKunishuBoss = (p.belongKunishuId > 0 && p.id === this.game.kunishuSystem.getKunishu(p.belongKunishuId)?.leaderId);
 
-            // ★滅亡時の大名は登用確率が1/3になります。大名を登用できたら他も50%アップ
-            let hireProb = (leaderInt / 100);
-            if (p.isDaimyo && isExtinct) {
-                hireProb = hireProb / 3.0;
+            // 新しい計算式：基本確率を出します
+            let baseProb = ((recruiter.charm || 50) * 1.5) / ((p.loyalty || 50) * 3) - 0.4;
+            
+            // ＋0.1 から －0.1 のランダムな運の要素を作ります
+            let randomBonus = (Math.random() * 0.2) - 0.1;
+            
+            // 相性の差を計算して補正します
+            const recruiterAffinity = recruiter.affinity || 0;
+            const prisonerAffinity = p.affinity || 0;
+            const affinityDiff = Math.abs(recruiterAffinity - prisonerAffinity);
+            
+            let affinityBonus = 0;
+            if (affinityDiff <= 10) {
+                affinityBonus = 0.1;
+            } else if (affinityDiff >= 50) {
+                affinityBonus = -0.3;
+            } else {
+                affinityBonus = 0.1 - (affinityDiff - 10) * 0.01;
+            }
+            
+            // 基本確率、ランダムな運、相性補正をすべて足します（途中はマイナスでもOKです）
+            let hireProb = baseProb + randomBonus + affinityBonus;
+            
+            // 全部足した結果を、0%から99%の間に収めます
+            hireProb = Math.max(0, Math.min(0.99, hireProb));
+            
+            // 捕まった武将が大名なら確率を半分にします
+            if (p.isDaimyo && hireProb > 0) {
+                hireProb *= 0.5;
             } else if (!p.isDaimyo && daimyoHiredBonus > 0) {
                 hireProb += daimyoHiredBonus;
+                hireProb = Math.max(0, Math.min(0.99, hireProb));
             }
 
-            if (!isKunishuBoss && hireProb > Math.random()) { 
+            if (!isKunishuBoss && hireProb > Math.random()) {
                 // ★大名が登用に応じた場合は、看板を下ろさせてご褒美をセット！
                 if (p.isDaimyo) {
                     p.isDaimyo = false;
