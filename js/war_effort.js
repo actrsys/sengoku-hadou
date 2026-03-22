@@ -598,7 +598,7 @@ Object.assign(WarManager.prototype, {
             if (!targetId) { this.endWar(true); return; } 
             const target = this.game.castles.find(c => c.id === targetId);
             if(target) {
-                let lossRate = Math.min(0.9, Math.max(0.05, 0.2 + (s.attacker.soldiers / (defCastle.soldiers + 1)) * 0.1)); 
+                let lossRate = Math.min(0.9, Math.max(0.05, window.WarParams.War.RetreatResourceLossFactor + (s.attacker.soldiers / (defCastle.soldiers + 1)) * 0.1)); 
                 const carryGold = Math.floor(defCastle.gold * (1.0 - lossRate)); const carryRice = Math.floor(defCastle.rice * (1.0 - lossRate));
                 // ★追加：逃げ込んだ先の城がパンクしないように上限をかけます
                 target.gold = Math.min(99999, target.gold + carryGold); 
@@ -613,10 +613,10 @@ Object.assign(WarManager.prototype, {
                     // ★ 追加: 諸勢力の武将は撤退戦に巻き込まれて捕虜にならないようにします！
                     if (b.belongKunishuId > 0) return;
 
-                    let chance = 0.5 - (b.strength * 0.002) + (Math.random() * 0.3);
+                    let chance = 0.5 - (b.strength * (window.WarParams.War.CaptureStrFactor || 0.002)) + (Math.random() * 0.3);
                     if (defCastle.soldiers > 1000) chance -= 0.2;
-                    if (b.isDaimyo) chance -= 0.3;
-                    if (chance > 0.5) {
+                    if (b.isDaimyo) chance -= window.WarParams.War.DaimyoCaptureReduction;
+                    if (chance > 0.5) { 
                         capturedBushos.push(b); 
                         // ★城から出て捕虜になります
                         this.game.affiliationSystem.leaveCastle(b);
@@ -775,9 +775,9 @@ Object.assign(WarManager.prototype, {
             // 3. 吸い込み防止の箱と、回復率の設定
             let atkReinfTotalLoss = 0;
             let defReinfTotalLoss = 0;
-            const isShortWarForRecovery = s.round < 5;
-            const baseRecoveryRate = 0.2;
-            const retreatRecoveryRate = 0.3;
+            const isShortWarForRecovery = s.round < window.WarParams.War.ShortWarTurnLimit;
+            const baseRecoveryRate = window.WarParams.War.BaseRecoveryRate || 0.2;
+            const retreatRecoveryRate = window.WarParams.War.RetreatRecoveryRate || 0.2;
             const defRecoveryRate = (isRetreat && isShortWarForRecovery) ? retreatRecoveryRate : baseRecoveryRate;
 
             // 4. 援軍部隊を元の城に帰還させるお帰り魔法
@@ -1246,13 +1246,13 @@ Object.assign(WarManager.prototype, {
                 }
                 // ★書き足しここまで
 
-                s.attacker.training = Math.min(120, s.attacker.training + 5); s.attacker.morale = Math.min(120, s.attacker.morale + 5); 
+                s.attacker.training = Math.min(120, s.attacker.training + (window.WarParams.War.WinStatIncrease || 5)); s.attacker.morale = Math.min(120, s.attacker.morale + (window.WarParams.War.WinStatIncrease || 5)); 
                 
                 const maxCharm = Math.max(...s.atkBushos.map(b => b.charm));
                 const subCharm = s.atkBushos.reduce((acc, b) => acc + b.charm, 0) - maxCharm;
                 const daimyo = this.game.bushos.find(b => b.clan === s.attacker.ownerClan && b.isDaimyo) || {charm: 50};
-                const charmScore = maxCharm + (subCharm * 0.1) + (daimyo.charm * 0.1);
-                let lossRate = Math.max(0, 0.3 - (charmScore * 0.002)); 
+                const charmScore = maxCharm + (subCharm * 0.1) + (daimyo.charm * window.WarParams.War.DaimyoCharmWeight);
+                let lossRate = Math.max(0, window.WarParams.War.LootingBaseRate - (charmScore * window.WarParams.War.LootingCharmFactor)); 
                 if (lossRate > 0) {
                     const lostGold = Math.floor(s.defender.gold * lossRate); const lostRice = Math.floor(s.defender.rice * lossRate);
                     s.defender.gold -= lostGold; s.defender.rice -= lostRice;
@@ -1318,11 +1318,11 @@ Object.assign(WarManager.prototype, {
             // ★ 修正: 諸勢力に所属している武将は、どんな城の戦いでも絶対に巻き添えで捕虜にならないように守ります！
             if (b.belongKunishuId > 0) return;
 
-            let chance = isLastStand ? 1.0 : (0.4 - (b.strength * 0.002) + (Math.random() * 0.3));
+            let chance = isLastStand ? 1.0 : ((window.WarParams.War.CaptureChanceBase || 0.7) - (b.strength * (window.WarParams.War.CaptureStrFactor || 0.002)) + (Math.random() * 0.3));
             if (!isLastStand && defeatedCastle.soldiers > 1000) chance -= 0.2; 
-            if (!isLastStand && b.isDaimyo) chance -= 0.3;
+            if (!isLastStand && b.isDaimyo) chance -= window.WarParams.War.DaimyoCaptureReduction;
             
-            if (chance > 0.5) {
+            if (chance > 0.5) { 
                 captives.push(b); 
                 // ★城から出て捕虜になります
                 this.game.affiliationSystem.leaveCastle(b);
