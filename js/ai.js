@@ -144,15 +144,6 @@ class AIEngine {
                 // 基本の確率にボーナスを足し算します
                 diplomacyChance += dipBonus;
                 
-                // ★追加：お城がピンチ（兵士が少ない等）の時は、内政（徴兵など）を優先したくて外交確率を下げます！
-                if (castle.soldiers <= 1000) {
-                    diplomacyChance = 0; // 兵士1000以下の超ピンチなら、外交してる場合じゃない！
-                } else if (castle.soldiers <= 3000) {
-                    // 1000〜3000の間なら、兵士が少ないほど外交確率が下がっていく魔法です！
-                    const penaltyRatio = (castle.soldiers - 1000) / 2000; // 0(少ない) 〜 1(多い) になります
-                    diplomacyChance = diplomacyChance * penaltyRatio; 
-                }
-                
                 // 確率がマイナス（0%より下）にならないように、最低でも0にしておきます
                 diplomacyChance = Math.max(0, diplomacyChance);
 
@@ -896,11 +887,6 @@ class AIEngine {
                 let score = 0;
                 if (castle.defense <= castle.maxDefense / 4) score = 80; // ★修正：緊急事態でも80点に抑えます
                 else score = 20;
-                
-                // ★追加：最大防御力が1000の時を「1倍」として、低いほど点数が上がり、高いほど点数が下がる魔法！
-                const defRatio = 1000 / Math.max(1, castle.maxDefense);
-                score = Math.floor(score * defRatio);
-                
                 actions.push({ type: 'repair', stat: 'politics', score: score, cost: 200 });
             }
 
@@ -922,29 +908,17 @@ class AIEngine {
             if (castle.population > 1000 && castle.soldiers < castle.rice / 2) {
                 let scoreDraft = 0;
                 let mySoldiers = Math.max(1, castle.soldiers);
+                let enemyMaxSoldiers = 0;
+                neighbors.forEach(n => {
+                    if (n.soldiers > enemyMaxSoldiers) enemyMaxSoldiers = n.soldiers;
+                });
                 
-                // ★ここをごっそり書き換えます！兵士が3000人以下なら、少ないほど焦る魔法！
-                if (mySoldiers <= 3000) {
-                    if (mySoldiers <= 1000) {
-                        // 1000人以下なら、城壁修復(80点)や民忠回復(60点)よりも優先する「100点」！
-                        scoreDraft = 100; 
-                    } else {
-                        // 1000〜3000の間で、100点からゆっくりと20点くらいまで下がるなめらかな計算です
-                        scoreDraft = 100 - ((mySoldiers - 1000) / 2000) * 80;
-                    }
-                } else {
-                    // 兵士が十分（3000より多い）な時は、今まで通り周りの敵と比べます
-                    let enemyMaxSoldiers = 0;
-                    neighbors.forEach(n => {
-                        if (n.soldiers > enemyMaxSoldiers) enemyMaxSoldiers = n.soldiers;
-                    });
-                    const keepSoldiers = (castellan.leadership + daimyo.leadership) * 50;
-                    
-                    if (enemyMaxSoldiers > mySoldiers) {
-                        scoreDraft = ((enemyMaxSoldiers * 1.5 / mySoldiers) * 20); 
-                    } else if (castle.soldiers < keepSoldiers) {
-                        scoreDraft = 30; 
-                    }
+                const keepSoldiers = (castellan.leadership + daimyo.leadership) * 50;
+
+                if (enemyMaxSoldiers > mySoldiers) {
+                    scoreDraft = ((enemyMaxSoldiers * 1.5 / mySoldiers) * 20); 
+                } else if (castle.soldiers < keepSoldiers) {
+                    scoreDraft = 30; 
                 }
 
                 if (scoreDraft > 0) {
@@ -1618,11 +1592,6 @@ class AIEngine {
                     continue;
                 }
             } else if (decision.action === 'goodwill') {
-                // ★ここを書き足します：使うお金が、お城の貯金箱の5分の1（20%）より多い時は、高すぎるのでキャンセルします！
-                if (decision.gold > castle.gold / 5) {
-                    continue; // この相手との外交は諦めて、次の候補を探します
-                }
-
                 if (castle.gold >= decision.gold) {
                     if (targetClanId === this.game.playerClanId) {
                         this.game.commandSystem.proposeDiplomacyToPlayer(castellan, targetClanId, 'goodwill', decision.gold, () => {
