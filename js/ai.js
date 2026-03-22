@@ -917,17 +917,29 @@ class AIEngine {
             if (castle.population > 1000 && castle.soldiers < castle.rice / 2) {
                 let scoreDraft = 0;
                 let mySoldiers = Math.max(1, castle.soldiers);
-                let enemyMaxSoldiers = 0;
-                neighbors.forEach(n => {
-                    if (n.soldiers > enemyMaxSoldiers) enemyMaxSoldiers = n.soldiers;
-                });
                 
-                const keepSoldiers = (castellan.leadership + daimyo.leadership) * 50;
-
-                if (enemyMaxSoldiers > mySoldiers) {
-                    scoreDraft = ((enemyMaxSoldiers * 1.5 / mySoldiers) * 20); 
-                } else if (castle.soldiers < keepSoldiers) {
-                    scoreDraft = 30; 
+                // ★ここをごっそり書き換えます！兵士が3000人以下なら、少ないほど焦る魔法！
+                if (mySoldiers <= 3000) {
+                    if (mySoldiers <= 1000) {
+                        // 1000人以下なら、城壁修復(80点)や民忠回復(60点)よりも優先する「100点」！
+                        scoreDraft = 100; 
+                    } else {
+                        // 1000〜3000の間で、100点からゆっくりと20点くらいまで下がるなめらかな計算です
+                        scoreDraft = 100 - ((mySoldiers - 1000) / 2000) * 80;
+                    }
+                } else {
+                    // 兵士が十分（3000より多い）な時は、今まで通り周りの敵と比べます
+                    let enemyMaxSoldiers = 0;
+                    neighbors.forEach(n => {
+                        if (n.soldiers > enemyMaxSoldiers) enemyMaxSoldiers = n.soldiers;
+                    });
+                    const keepSoldiers = (castellan.leadership + daimyo.leadership) * 50;
+                    
+                    if (enemyMaxSoldiers > mySoldiers) {
+                        scoreDraft = ((enemyMaxSoldiers * 1.5 / mySoldiers) * 20); 
+                    } else if (castle.soldiers < keepSoldiers) {
+                        scoreDraft = 30; 
+                    }
                 }
 
                 if (scoreDraft > 0) {
