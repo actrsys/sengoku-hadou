@@ -81,6 +81,11 @@ class AffiliationSystem {
         // 4. お城から出ます
         // （浪人としてその城の周辺には居座りますが、お城の中からは追い出されます）
         this.leaveCastle(busho);
+        
+        // ★修正：名簿から完全に消えてしまうと迷子になるので、城の周辺にいる浪人として名簿に書き直します！
+        if (busho.castleId) {
+            this.enterCastle(busho, busho.castleId);
+        }
     }
 
     /**
@@ -400,8 +405,8 @@ class AffiliationSystem {
             // 隣接する城のリストを作る
             const neighbors = this.game.castles.filter(c => GameSystem.isAdjacent(currentC, c)); 
             
-            // 隣に城があって、かつ20%の確率(サイコロ)に当たったらお引越しする
-            if (neighbors.length > 0 && Math.random() < 0.2) {
+            // 隣に城があって、かつ5%の確率(サイコロ)に当たったらお引越しする
+            if (neighbors.length > 0 && Math.random() < 0.05) {
                 // クジ引きで移動先の城を「1つだけ」決める
                 const targetCastle = neighbors[Math.floor(Math.random() * neighbors.length)];
                 
