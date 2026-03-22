@@ -896,6 +896,11 @@ class AIEngine {
                 let score = 0;
                 if (castle.defense <= castle.maxDefense / 4) score = 80; // ★修正：緊急事態でも80点に抑えます
                 else score = 20;
+                
+                // ★追加：最大防御力が1000の時を「1倍」として、低いほど点数が上がり、高いほど点数が下がる魔法！
+                const defRatio = 1000 / Math.max(1, castle.maxDefense);
+                score = Math.floor(score * defRatio);
+                
                 actions.push({ type: 'repair', stat: 'politics', score: score, cost: 200 });
             }
 
