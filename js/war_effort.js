@@ -833,18 +833,8 @@ Object.assign(WarManager.prototype, {
                     // 大名家の場合
                     const helperCastle = this.game.getCastle(reinf.castle.id); 
                     if (helperCastle) {
-                        let returnRice = 0;
-                        // メイン部隊から兵糧を分けてもらう
-                        if (isAttackerData) {
-                            // メイン部隊が全滅している時は、兵士の数だけ兵糧を持ち帰ります
-                            if (totalCurrentAtk > 0) {
-                                const ratio = finalReturnSoldiers / totalCurrentAtk;
-                                returnRice = Math.floor(s.attacker.rice * Math.min(1.0, ratio));
-                            } else {
-                                returnRice = Math.min(s.attacker.rice, finalReturnSoldiers);
-                            }
-                            s.attacker.rice = Math.max(0, s.attacker.rice - returnRice);
-                        }
+                        // 援軍部隊が持っている残りの兵糧をそのまま持ち帰ります
+                        let returnRice = reinf.rice || 0;
                         
                         const oldSoldiers = helperCastle.soldiers;
                         helperCastle.soldiers = Math.min(99999, helperCastle.soldiers + finalReturnSoldiers);
