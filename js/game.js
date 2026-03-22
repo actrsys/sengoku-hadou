@@ -928,6 +928,13 @@ class GameManager {
     }
 
     async startMonth() { 
+        // ★追加：月初の処理が始まったら、ユーザーが勝手に操作できないように膜（ガード）を張ります！
+        this.isProcessingAI = true;
+        if (this.ui && this.ui.aiGuard) {
+            this.ui.aiGuard.classList.remove('hidden');
+            this.ui.aiGuard.innerHTML = '<div class="loading-spinner"></div>月初の準備中...';
+        }
+
         // ★月が替わったら軍師の報告印を消します
         if (this.gunshiSystem) this.gunshiSystem.onStartMonth();
         
