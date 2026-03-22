@@ -466,29 +466,21 @@ class AIEngine {
             const pEnemySoldiers = target.soldiers * errorRate;
             const pEnemyDefense = target.defense * errorRate;
 
-            // ★修正：敵の強さに、予想される「敵の援軍」を足します
-            const enemyForce = pEnemySoldiers + pEnemyDefense + enemyReinfPower;
+            // ★修正：敵の強さに、予想される「敵の援軍」を足します（影響力を3分の1に減らします）
+            const enemyForce = pEnemySoldiers + pEnemyDefense + (enemyReinfPower / 3);
 
-            // ★修正：自分の強さに、予想される「味方の援軍」を足して比べます
-            const myForce = myCastle.soldiers + myReinfPower;
+            // ★修正：自分の強さに、予想される「味方の援軍」を足して比べます（影響力を3分の1に減らします）
+            const myForce = myCastle.soldiers + (myReinfPower / 3);
             const forceRatio = myForce / Math.max(1, enemyForce);
             
             let prob = 0;
             if (forceRatio < 0.8) {
-                // ★足切り魔法：自分の総兵力が相手の0.8倍未満なら、絶対に攻撃しない！
-                prob = -999;
-            } else if (forceRatio >= 3.0) {
-                // 相手の3倍以上の総兵力がある時
-                prob = 40 + (forceRatio - 3.0) * 5;
-            } else if (forceRatio >= 2.0) {
-                // 相手の2倍から3倍までの時
-                prob = 30 + (forceRatio - 2.0) * 10; 
-            } else if (forceRatio >= 1.0) {
-                // 相手と互角から2倍までの時
-                prob = 10 + (forceRatio - 1.0) * 20;
+                // 足切りを緩和：0.8倍未満でも -999 ではなく -50 にして、性格などの要因でワンチャン攻めるようにします
+                prob = -50;
             } else {
-                // 相手の0.8倍から互角までの時
-                prob = (forceRatio - 0.8) * 50;
+                // 0.8倍以上のときは、まっすぐな一つの計算式（線形）でポイントを出します
+                // 相手と同じ(1.0)のときは「10」、相手の2倍(2.0)のときは「30」になり、今までの計算とぴったり合います
+                prob = (forceRatio - 0.5) * 20;
             }
             
             // 守備側武将の能力による攻撃確率低下 (最大10%)
