@@ -1409,12 +1409,12 @@ class FieldWarManager {
             if (!groupSoldiers[u.groupId]) groupSoldiers[u.groupId] = 0;
             groupSoldiers[u.groupId] += u.soldiers;
         });
+
+        const consumeRate = (window.WarParams.War.RiceConsumptionAtk || 0.1) * 0.5;
         
         for (let key in groupSoldiers) {
             if (this.groupStats[key]) {
-                // ★修正: 野戦専用の兵糧消費の仕組み（パラメーター）を使うようにしました！
-                let rate = key.startsWith('atk_') ? (window.WarParams.War.FieldRiceConsumptionAtk || 0.05) : (window.WarParams.War.FieldRiceConsumptionDef || 0.025);
-                let cons = Math.floor(groupSoldiers[key] * rate);
+                let cons = Math.floor(groupSoldiers[key] * consumeRate);
                 this.groupStats[key].rice = Math.max(0, this.groupStats[key].rice - cons);
             }
         }
@@ -1881,11 +1881,13 @@ class FieldWarManager {
         let atkMorale = this.groupStats[attacker.groupId] ? this.groupStats[attacker.groupId].morale : 50;
         let defTraining = this.groupStats[defender.groupId] ? this.groupStats[defender.groupId].training : 50;
 
-        // ★修正: 野戦専用のダメージ計算式を使うように変更します！
-        const result = WarSystem.calcFieldWarDamage(
+        // 基本ダメージ計算
+        const result = WarSystem.calcWarDamage(
             attacker.stats, defender.stats,
             attacker.soldiers, defender.soldiers,
-            atkMorale, defTraining
+            0, 
+            atkMorale, defTraining,
+            'charge'
         );
 
         // ★ 兵科による倍率を計算

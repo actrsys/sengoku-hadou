@@ -82,18 +82,9 @@ class AIEngine {
             const mods = this.getDifficultyMods();
             const smartness = this.getAISmartness(castellan.intelligence);
 
-            // ★追加：お城がピンチの時は、内政を優先するかチェックします！
-            let isEmergency = false;
-            if (castle.defense <= castle.maxDefense / 4 || castle.peoplesLoyalty <= 70) {
-                // 85%の確率で「今回は戦争や外交をやめて内政に専念する！」と決意します
-                if (Math.random() < 0.85) {
-                    isEmergency = true;
-                }
-            }
-
             // 外交フェーズ (確率で実行)
-            // ★書き換え！：プレイヤーの城や、緊急事態(isEmergency)の時は勝手に外交させないようにします
-            if (!isEmergency && Number(castle.ownerClan) !== Number(this.game.playerClanId)) {
+            // ★書き換え！：プレイヤーの城（委任中）の場合は、勝手に外交させないようにします
+            if (Number(castle.ownerClan) !== Number(this.game.playerClanId)) {
                 const diplomacyChance = ((window.AIParams.AI.DiplomacyChance || 0.3) / 3) * (mods.aggression); 
                 if (Math.random() < diplomacyChance) {
                     const dipResult = this.execAIDiplomacy(castle, castellan, smartness); 
@@ -103,13 +94,10 @@ class AIEngine {
             }
             
             // 軍事フェーズ
-            // プレイヤーの城で「城攻 不可」の場合、または「緊急事態」の場合は攻撃をスキップします
+            // プレイヤーの城で「城攻 不可」の場合は、攻撃をスキップします
             let skipAttack = false;
             if (Number(castle.ownerClan) === Number(this.game.playerClanId) && castle.isDelegated && !castle.allowAttack) {
                 skipAttack = true; // ストップの目印をつけます
-            }
-            if (isEmergency) {
-                skipAttack = true; // 内政に専念するためストップの目印をつけます
             }
 
             // ★修正：「年」の差だけでなく、「月」の差も足し算して正確なターン数を数えます！
@@ -192,14 +180,47 @@ class AIEngine {
                     const decision = this.decideAttackTarget(castle, castellan, validEnemies);
                     if (decision) {
                         if (decision.action === 'attack') {
-                            // 予定通り攻撃に出発します！（気まぐれの武器購入は内政にお引っ越ししました）
-                            // ★復活：諸勢力への攻撃なら専用の魔法を使います！
-                            if (decision.target.isKunishuTarget) {
-                                this.executeKunishuSubjugateAI(castle, decision.target.kunishu, castellan, decision.sendSoldiers, decision.sendRice);
+                            // ★追加：40%の確率で「やっぱりや〜めた！」を発動する魔法
+                            if (Math.random() < 0.40) {
+                                // まず、自分の大名（殿様）を探します
+                                const daimyo = this.game.bushos.find(b => b.clan === castle.ownerClan && b.isDaimyo) || castellan;
+                                // 城主と大名の「innovation（新しいもの好き度）」を足します（0〜200になります）
+                                const totalInno = castellan.innovation + daimyo.innovation;
+                                // 少しだけ気分屋にするために、ランダムで -20 から +20 の揺らぎ（サイコロ）を足します
+                                const randomInno = totalInno + (Math.random() * 40 - 20);
+                                // お城の貯金箱から、きっちり半分の金額を取り出します（端数は切り捨て！）
+                                const useGold = Math.floor(castle.gold / 2);
+                                
+                                // 数字が100以上なら鉄砲、100未満なら騎馬を買うことにします！
+                                if (randomInno >= 100) {
+                                    const priceGun = parseInt(window.MainParams.Economy.PriceGun, 10) || 50;
+                                    const buyAmount = Math.floor(useGold / priceGun); 
+                                    const actualCost = buyAmount * priceGun; 
+                                    if (buyAmount > 0) {
+                                        castle.gold -= actualCost; 
+                                        castle.guns = Math.min(99999, (castle.guns || 0) + buyAmount); 
+                                        castellan.isActionDone = true; 
+                                    }
+                                } else {
+                                    const priceHorse = parseInt(window.MainParams.Economy.PriceHorse, 10) || 5;
+                                    const buyAmount = Math.floor(useGold / priceHorse); 
+                                    const actualCost = buyAmount * priceHorse; 
+                                    if (buyAmount > 0) {
+                                        castle.gold -= actualCost; 
+                                        castle.horses = Math.min(99999, (castle.horses || 0) + buyAmount); 
+                                        castellan.isActionDone = true; 
+                                    }
+                                }
                             } else {
-                                this.executeAttack(castle, decision.target, castellan, decision.sendSoldiers, decision.sendRice);
+                                // 残りの60%は、予定通り攻撃に出発します！
+                                // ★復活：諸勢力への攻撃なら専用の魔法を使います！
+                                if (decision.target.isKunishuTarget) {
+                                    this.executeKunishuSubjugateAI(castle, decision.target.kunishu, castellan, decision.sendSoldiers, decision.sendRice);
+                                } else {
+                                    this.executeAttack(castle, decision.target, castellan, decision.sendSoldiers, decision.sendRice);
+                                }
+                                return; 
                             }
-                            return; 
                         }
                     }
                 }
@@ -278,11 +299,11 @@ class AIEngine {
                 // 見積もった威信で倍率を計算します
                 const powerRatio = perceivedEnemyPower / myTotalPower;
                 let penalty = 0;
-                // 0.8倍から警戒しはじめ、2.5倍で警戒心マックスになります（ペナルティを半分にしました）
+                // 0.8倍から警戒しはじめ、2.5倍で警戒心マックスになります
                 if (powerRatio >= 1.0) {
                     let cautionLevel = (powerRatio - 0.5) / (2.5 - 0.8);
                     cautionLevel = Math.min(1.0, Math.max(0.0, cautionLevel));
-                    penalty = cautionLevel * 12; // 25だったものを約半分の12に減らしました！
+                    penalty = cautionLevel * 25; 
                 }
                 if (penalty > 0) {
                     // ★powerには「見誤った威信」を入れておき、後で一番脅威に感じた敵を選べるようにします
@@ -445,21 +466,29 @@ class AIEngine {
             const pEnemySoldiers = target.soldiers * errorRate;
             const pEnemyDefense = target.defense * errorRate;
 
-            // ★修正：敵の強さに、予想される「敵の援軍」を足します（影響力を3分の1に減らします）
-            const enemyForce = pEnemySoldiers + pEnemyDefense + (enemyReinfPower / 3);
+            // ★修正：敵の強さに、予想される「敵の援軍」を足します
+            const enemyForce = pEnemySoldiers + pEnemyDefense + enemyReinfPower;
 
-            // ★修正：自分の強さに、予想される「味方の援軍」を足して比べます（影響力を3分の1に減らします）
-            const myForce = myCastle.soldiers + (myReinfPower / 3);
+            // ★修正：自分の強さに、予想される「味方の援軍」を足して比べます
+            const myForce = myCastle.soldiers + myReinfPower;
             const forceRatio = myForce / Math.max(1, enemyForce);
             
             let prob = 0;
             if (forceRatio < 0.8) {
-                // 足切りを緩和：0.8倍未満でも -999 ではなく -50 にして、性格などの要因でワンチャン攻めるようにします
-                prob = -50;
+                // ★足切り魔法：自分の総兵力が相手の0.8倍未満なら、絶対に攻撃しない！
+                prob = -999;
+            } else if (forceRatio >= 3.0) {
+                // 相手の3倍以上の総兵力がある時
+                prob = 40 + (forceRatio - 3.0) * 5;
+            } else if (forceRatio >= 2.0) {
+                // 相手の2倍から3倍までの時
+                prob = 30 + (forceRatio - 2.0) * 10; 
+            } else if (forceRatio >= 1.0) {
+                // 相手と互角から2倍までの時
+                prob = 10 + (forceRatio - 1.0) * 20;
             } else {
-                // 0.8倍以上のときは、まっすぐな一つの計算式（線形）でポイントを出します
-                // 相手と同じ(1.0)のときは「10」、相手の2倍(2.0)のときは「30」になり、今までの計算とぴったり合います
-                prob = (forceRatio - 0.5) * 20;
+                // 相手の0.8倍から互角までの時
+                prob = (forceRatio - 0.8) * 50;
             }
             
             // 守備側武将の能力による攻撃確率低下 (最大10%)
@@ -560,9 +589,9 @@ class AIEngine {
             // 最大値の適用
             prob = Math.min(prob, maxProb);
 
-            // ★最終調整用。すべての引き算が終わった最後に×８％の魔法をかけます！
+            // ★最終調整用。すべての引き算が終わった最後に×６％の魔法をかけます！
             if (prob > 0) {
-                prob = prob * 0.08;
+                prob = prob * 0.06;
             }
 
             // 最小値の適用（マイナスになっていたらゼロにします）
@@ -792,19 +821,19 @@ class AIEngine {
             // --- 候補となる行動の点数（スコア）をつける表を作ります ---
             let actions = [];
 
-            // 1. 城壁修復
+            // 1. 城壁修復（最大値の1/4以下なら超優先！）
             if (castle.defense < castle.maxDefense) {
                 let score = 0;
-                if (castle.defense <= castle.maxDefense / 4) score = 120; // 1000点から120点に下げました
+                if (castle.defense <= castle.maxDefense / 4) score = 1000; // 緊急事態！
                 else score = 20;
                 actions.push({ type: 'repair', stat: 'politics', score: score, cost: 200 });
             }
 
-            // 2. 施し
+            // 2. 施し（民忠70以下なら優先！）
             if (castle.peoplesLoyalty < 100) {
                 let score = 0;
-                if (castle.peoplesLoyalty <= 70) score = 100; // 500点から100点に下げました
-                else score = (100 - castle.peoplesLoyalty) * 1.5; // 点数の上がり方を少しマイルドにしました
+                if (castle.peoplesLoyalty <= 70) score = 500; // 結構優先！
+                else score = (100 - castle.peoplesLoyalty) * 2;
                 actions.push({ type: 'charity', stat: 'charm', score: score, cost: 200 }); 
             }
 
@@ -1053,18 +1082,6 @@ class AIEngine {
                 actions.push({ type: 'reward', stat: 'none', score: rewardScore, cost: 100, targets: rewardTargets });
             }
 
-            // ★追加 13. 武器の購入（内政のお仕事としてお引っ越ししました）
-            // お金が500以上ある時に、低めの優先度（25点）で考えます
-            if (castle.gold >= 500) {
-                // 城主と大名の「新しいもの好き度」を足します
-                const totalInno = castellan.innovation + daimyo.innovation;
-                if (totalInno >= 100) {
-                    actions.push({ type: 'buy_gun', stat: 'politics', score: 25, cost: 500 });
-                } else {
-                    actions.push({ type: 'buy_horse', stat: 'politics', score: 25, cost: 500 });
-                }
-            }
-
             // 点数が高い順に並べ替えます
             actions.sort((a, b) => b.score - a.score);
 
@@ -1274,24 +1291,6 @@ class AIEngine {
                     const actualVal = castle.commerce - oldVal;
                     doer.achievementTotal = (doer.achievementTotal || 0) + Math.floor(actualVal * 0.5);
                     if (this.game.factionSystem && this.game.factionSystem.updateRecognition) this.game.factionSystem.updateRecognition(doer, 10);
-                    
-                    doer.isActionDone = true; actionDoneInThisStep = true; break;
-                }
-                
-                // ★追加：武器の購入の実行処理
-                if (action.type === 'buy_gun' && castle.gold >= action.cost) {
-                    castle.gold -= action.cost;
-                    const priceGun = parseInt(window.MainParams.Economy.PriceGun, 10) || 50;
-                    const buyAmount = Math.floor(action.cost / priceGun);
-                    castle.guns = Math.min(99999, (castle.guns || 0) + buyAmount);
-                    
-                    doer.isActionDone = true; actionDoneInThisStep = true; break;
-                }
-                if (action.type === 'buy_horse' && castle.gold >= action.cost) {
-                    castle.gold -= action.cost;
-                    const priceHorse = parseInt(window.MainParams.Economy.PriceHorse, 10) || 5;
-                    const buyAmount = Math.floor(action.cost / priceHorse);
-                    castle.horses = Math.min(99999, (castle.horses || 0) + buyAmount);
                     
                     doer.isActionDone = true; actionDoneInThisStep = true; break;
                 }

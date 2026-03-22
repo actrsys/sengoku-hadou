@@ -28,7 +28,6 @@ window.WarParams = {
         ShortWarTurnLimit: 5, BaseRecoveryRate: 0.2, RetreatRecoveryRate: 0.3, RetreatCaptureRate: 0.1, DaimyoCaptureReduction: 0.3,
         RetreatResourceLossFactor: 0.2, LootingBaseRate: 0.3, LootingCharmFactor: 0.002, DaimyoCharmWeight: 0.1,
         RiceConsumptionAtk: 0.05, RiceConsumptionDef: 0.025,
-        FieldRiceConsumptionAtk: 0.05, FieldRiceConsumptionDef: 0.025,
         BaseStat: 30, SubGeneralFactor: 0.2, MinDamage: 50,
         StatsLdrWeight: 1.2, StatsStrWeight: 0.3, StatsIntWeight: 0.5,
         MoraleBase: 50, SchemeBaseIntOffset: 20, LoyaltyDamageFactor: 500,
@@ -81,43 +80,33 @@ class WarSystem {
         }
         
         const ratio = atkPower / (atkPower + defPower);
-        let baseDmg = atkPower * ratio * multiplier * rand;
+        let baseDmg = Math.max(W.MinDamage || 50, atkPower * ratio * multiplier * rand);
         
-        let counterDmg = Math.floor(defPower * (W.CounterAtkPowerFactor !== undefined ? W.CounterAtkPowerFactor : 0.05) * counterRisk);
+        // ★ここがゾンビアタック対策の追加部分です★
+        // 攻撃側、守備側の兵士数がそれぞれ200人以下の時、ダメージを減らすための「弱体化パワー（ペナルティ）」を計算します。
+        // 人数が少ないほど、2乗のカーブで急激に弱くなります。
+        let atkPenalty = atkSoldiers <= 200 ? Math.pow(Math.max(0, atkSoldiers) / 200, 2) : 1.0;
+        let defPenalty = defSoldiers <= 200 ? Math.pow(Math.max(0, defSoldiers) / 200, 2) : 1.0;
+
+        // どっちが攻撃を仕掛けているかで、ペナルティを逆にします
+        const activePenalty = type.startsWith('def_') ? defPenalty : atkPenalty;
+        const passivePenalty = type.startsWith('def_') ? atkPenalty : defPenalty;
+        
+        let counterDmg = 0;
+        if (counterRisk > 0 && type !== 'def_attack') {
+            const opponentPower = type.startsWith('def_') ? atkPower : defPower;
+            // 反撃ダメージにも、反撃する側の兵士数が少ない場合のペナルティを掛けます
+            counterDmg = Math.floor(opponentPower * (W.CounterAtkPowerFactor !== undefined ? W.CounterAtkPowerFactor : 0.05) * counterRisk * passivePenalty);
+        }
         
         return { 
-            soldierDmg: Math.floor(baseDmg * soldierRate), 
+            soldierDmg: Math.floor(baseDmg * soldierRate * activePenalty), 
+            wallDmg: Math.floor(baseDmg * wallRate * 0.5 * activePenalty), 
             counterDmg: counterDmg 
         };
     }
 
-    static calcFieldWarDamage(atkStats, defStats, atkSoldiers, defSoldiers, atkMorale, defTraining) {
-        const M = window.WarParams.Military; const W = window.WarParams.War;
-        const fluctuation = M.DamageFluctuation || 0.2;
-        const rand = 1.0 - fluctuation + (Math.random() * fluctuation * 2);
-        
-        const moraleBonus = (atkMorale - (W.MoraleBase || 50)) / 100; 
-        const trainingBonus = (defTraining - (W.MoraleBase || 50)) / 100;
-        
-        const atkPower = ((atkStats.ldr * (W.StatsLdrWeight || 1.2)) + (atkStats.str * (W.StatsStrWeight || 0.3)) + (atkSoldiers * M.DamageSoldierPower)) * (1.0 + moraleBonus);
-        const defPower = ((defStats.ldr * 1.0) + (defStats.int * (W.StatsIntWeight || 0.5)) + (defSoldiers * M.DamageSoldierPower)) * (1.0 + trainingBonus);
-        
-        let multiplier = W.ChargeMultiplier; 
-        let soldierRate = W.ChargeSoldierDmgRate; 
-        let counterRisk = W.ChargeRisk;
-        
-        const ratio = atkPower / (atkPower + defPower);
-        let baseDmg = atkPower * ratio * multiplier * rand;
-        
-        let counterDmg = Math.floor(defPower * (W.CounterAtkPowerFactor !== undefined ? W.CounterAtkPowerFactor : 0.05) * counterRisk);
-        
-        return { 
-            soldierDmg: Math.floor(baseDmg * soldierRate), 
-            counterDmg: counterDmg 
-        };
-    }
-
-    static calcScheme(atkBusho, defBusho, defCastleLoyalty) {
+    static calcScheme(atkBusho, defBusho, defCastleLoyalty) { 
         const successRate = (atkBusho.intelligence / ((defBusho ? defBusho.intelligence : 30) + (window.WarParams.War.SchemeBaseIntOffset || 20))) * (window.MainParams?.Strategy?.SchemeSuccessRate || 0.25); 
         if (Math.random() > successRate) return { success: false, damage: 0 }; 
         const loyaltyBonus = ((window.MainParams?.Economy?.MaxLoyalty || 100) - defCastleLoyalty) / (window.WarParams.War.LoyaltyDamageFactor || 50); 
