@@ -1061,8 +1061,11 @@ class GameManager {
                 c.population = Math.min(999999, Math.max(0, c.population + growth));
             }
             const bushos = this.getCastleBushos(c.id);
+            const consumeGold = bushos.length * window.MainParams.Economy.ConsumeGoldPerBusho;
+            const isGoldShort = (c.gold - consumeGold < 0);
+
             c.rice = Math.max(0, c.rice - Math.floor(c.soldiers * window.MainParams.Economy.ConsumeRicePerSoldier));
-            c.gold = Math.max(0, c.gold - (bushos.length * window.MainParams.Economy.ConsumeGoldPerBusho));
+            c.gold = Math.max(0, c.gold - consumeGold);
             
             bushos.forEach(b => {
                 b.isActionDone = false;
@@ -1070,9 +1073,12 @@ class GameManager {
                     // 毎月城主と軍師の功績が５増えます
                     b.achievementTotal += 5;
                 }
+                
+                // 金が足りなかったら城にいる家臣の忠誠度が１下がる
+                if (!b.isDaimyo && isGoldShort) {
+                    b.loyalty = Math.max(0, b.loyalty - 1);
+                }
             });
-        });
-
         // ★ここを書き換え！：空っぽの城（中立）も仲間はずれにせず、一緒に混ぜて順番リストに入れます！
         const allCastles = [...this.castles];
         allCastles.sort(() => Math.random() - 0.5); 
