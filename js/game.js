@@ -1086,6 +1086,8 @@ class GameManager {
                     b.loyalty = Math.max(0, b.loyalty - 1);
                 }
             });
+        });
+
         // ★ここを書き換え！：空っぽの城（中立）も仲間はずれにせず、一緒に混ぜて順番リストに入れます！
         const allCastles = [...this.castles];
         allCastles.sort(() => Math.random() - 0.5); 
