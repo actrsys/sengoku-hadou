@@ -945,7 +945,8 @@ class GameManager {
         let seasonForce = 0;
         if (this.month === 9) {
             // 9月は収穫の秋！お米が市場に溢れるので、相場が一気に下がります（安くなる）
-            seasonForce = -0.5;
+            let randomDown = (Math.floor(Math.random() * 51) / 100) + 0.5;
+            seasonForce = -randomDown;
         } else {
             // それ以外の月は、だんだんお米が減っていくので、毎月少しずつ相場が上がります（高くなる）
             seasonForce = 0.05;
