@@ -1817,7 +1817,6 @@ Object.assign(WarManager.prototype, {
         const allyCastles = [...new Set(allyForceCandidates.map(fc => fc.castle))];
 
         if (defClanId === pid && !defCastle.isDelegated) {
-            // ★修正：こちらも元に戻します
             this.game.ui.hideAIGuardTemporarily(); 
             
             this.game.ui.showDialog("他勢力に援軍を要請しますか？", true, 
@@ -1834,7 +1833,26 @@ Object.assign(WarManager.prototype, {
             allyForceCandidates.sort((a,b) => b.force.soldiers - a.force.soldiers);
             const best = allyForceCandidates[0];
             best.castle.selectedForce = best.force; // シールを貼る
-            this.executeDefReinforcement(0, best.castle, defCastle, onComplete);
+
+            // ★追加：親善と同じロジックで持参金を計算します
+            const myPower = this.game.getClanTotalSoldiers(defClanId) || 1;
+            const helperPower = best.force.isKunishu ? best.force.soldiers : (this.game.getClanTotalSoldiers(best.force.id) || 1);
+            const ratio = helperPower / Math.max(1, myPower);
+            
+            let reinfGold = 300;
+            if (ratio >= 3.0) {
+                reinfGold = 1000;
+            } else if (ratio > 1.5) {
+                reinfGold = 300 + ((ratio - 1.5) / 1.5) * 700;
+            }
+            reinfGold = Math.floor(reinfGold / 100) * 100;
+            
+            // 足りなければお城の全額にします
+            if (reinfGold > defCastle.gold) {
+                reinfGold = defCastle.gold;
+            }
+
+            this.executeDefReinforcement(reinfGold, best.castle, defCastle, onComplete);
         }
     },
 
