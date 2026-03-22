@@ -299,11 +299,11 @@ class AIEngine {
                 // 見積もった威信で倍率を計算します
                 const powerRatio = perceivedEnemyPower / myTotalPower;
                 let penalty = 0;
-                // 0.8倍から警戒しはじめ、2.5倍で警戒心マックスになります
+                // 0.8倍から警戒しはじめ、2.5倍で警戒心マックスになります（ペナルティを半分にしました）
                 if (powerRatio >= 1.0) {
                     let cautionLevel = (powerRatio - 0.5) / (2.5 - 0.8);
                     cautionLevel = Math.min(1.0, Math.max(0.0, cautionLevel));
-                    penalty = cautionLevel * 25; 
+                    penalty = cautionLevel * 12; // 25だったものを約半分の12に減らしました！
                 }
                 if (penalty > 0) {
                     // ★powerには「見誤った威信」を入れておき、後で一番脅威に感じた敵を選べるようにします
