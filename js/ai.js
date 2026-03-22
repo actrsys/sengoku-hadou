@@ -82,10 +82,72 @@ class AIEngine {
             const mods = this.getDifficultyMods();
             const smartness = this.getAISmartness(castellan.intelligence);
 
+            // ★追加：外交や戦争を考えるよりも先に、城防御上げや民忠上げを優先します！
+            let emergencyActionDone = false;
+            if (castle.defense <= castle.maxDefense / 4 && castle.gold >= 200) {
+                // 城壁修復
+                castle.gold -= 200;
+                const val = GameSystem.calcRepair(castellan);
+                const oldVal = castle.defense;
+                castle.defense = Math.min(castle.maxDefense, castle.defense + val);
+                
+                const actualVal = castle.defense - oldVal;
+                castellan.achievementTotal = (castellan.achievementTotal || 0) + Math.floor(actualVal * 0.5);
+                if (this.game.factionSystem && this.game.factionSystem.updateRecognition) this.game.factionSystem.updateRecognition(castellan, 10);
+                
+                castellan.isActionDone = true;
+                emergencyActionDone = true;
+            } else if (castle.peoplesLoyalty <= 70 && castle.rice >= 200) {
+                // 施し
+                castle.rice -= 200;
+                let val = GameSystem.calcCharity(castellan, 'rice');
+                val = Math.floor(val / 6);
+                if (val < 1) val = 1;
+                
+                castle.peoplesLoyalty = Math.min(100, castle.peoplesLoyalty + val);
+                
+                castellan.achievementTotal = (castellan.achievementTotal || 0) + Math.floor(val * 0.5);
+                if (this.game.factionSystem && this.game.factionSystem.updateRecognition) this.game.factionSystem.updateRecognition(castellan, 15);
+                
+                castellan.isActionDone = true;
+                emergencyActionDone = true;
+            }
+
+            // ★追加：緊急の修復や施しを行ったら、戦争などは行わずに残りの内政のみ行います
+            if (emergencyActionDone) {
+                this.execInternalAffairs(castle, castellan, mods, smartness);
+                this.game.finishTurn();
+                return;
+            }
+
             // 外交フェーズ (確率で実行)
             // ★書き換え！：プレイヤーの城（委任中）の場合は、勝手に外交させないようにします
             if (Number(castle.ownerClan) !== Number(this.game.playerClanId)) {
-                const diplomacyChance = ((window.AIParams.AI.DiplomacyChance || 0.3) / 3) * (mods.aggression); 
+                // まずは自分のお殿様（大名）を探します。いない時は城主を大名の代わりにします
+                const daimyo = this.game.bushos.find(b => b.clan === castle.ownerClan && b.isDaimyo) || castellan;
+                
+                // 今までの基本の確率（約10%）を計算します
+                let diplomacyChance = ((window.AIParams.AI.DiplomacyChance || 0.3) / 3) * (mods.aggression); 
+                
+                // 大名の外交ステータスから基準の50を引いて、差を計算します（-50から+50になります）
+                const dipDiff = daimyo.diplomacy - 50;
+                
+                // 差が50の時に10%（0.1）になるように、少しずつ増減する数字（ボーナス）を作ります
+                let dipBonus = dipDiff * 0.002;
+                
+                // お殿様の性格が好戦的（aggressive）で、かつボーナスがプラス（外交が50より高い）の時
+                if (daimyo.personality === 'aggressive' && dipBonus > 0) {
+                    // アップする分だけを半分にします（最大で5%アップになります）
+                    dipBonus = dipBonus / 2;
+                }
+                
+                // 基本の確率にボーナスを足し算します
+                diplomacyChance += dipBonus;
+                
+                // 確率がマイナス（0%より下）にならないように、最低でも0にしておきます
+                diplomacyChance = Math.max(0, diplomacyChance);
+
+                // 出来上がった確率でサイコロを振ります！
                 if (Math.random() < diplomacyChance) {
                     const dipResult = this.execAIDiplomacy(castle, castellan, smartness); 
                     if (dipResult === 'waiting') return; // ★ プレイヤーのお返事待ちならここで一旦ストップ！
@@ -303,7 +365,7 @@ class AIEngine {
                 if (powerRatio >= 1.0) {
                     let cautionLevel = (powerRatio - 0.5) / (2.5 - 0.8);
                     cautionLevel = Math.min(1.0, Math.max(0.0, cautionLevel));
-                    penalty = cautionLevel * 25; 
+                    penalty = cautionLevel * 12.5; // ★周辺の敵に対する警戒ペナルティを半分に抑制します
                 }
                 if (penalty > 0) {
                     // ★powerには「見誤った威信」を入れておき、後で一番脅威に感じた敵を選べるようにします
@@ -466,17 +528,16 @@ class AIEngine {
             const pEnemySoldiers = target.soldiers * errorRate;
             const pEnemyDefense = target.defense * errorRate;
 
-            // ★修正：敵の強さに、予想される「敵の援軍」を足します
-            const enemyForce = pEnemySoldiers + pEnemyDefense + enemyReinfPower;
+            // ★修正：予想される援軍の影響を3分の1に抑制して計算します
+            const enemyForce = pEnemySoldiers + pEnemyDefense + (enemyReinfPower / 3);
 
-            // ★修正：自分の強さに、予想される「味方の援軍」を足して比べます
-            const myForce = myCastle.soldiers + myReinfPower;
+            const myForce = myCastle.soldiers + (myReinfPower / 3);
             const forceRatio = myForce / Math.max(1, enemyForce);
             
             let prob = 0;
-            if (forceRatio < 0.8) {
-                // ★足切り魔法：自分の総兵力が相手の0.8倍未満なら、絶対に攻撃しない！
-                prob = -999;
+            if (forceRatio < 0.5) {
+                // ★足切り魔法：自分の総兵力が相手の0.5倍未満なら、攻撃確率を大きく下げる！
+                prob = -50;
             } else if (forceRatio >= 3.0) {
                 // 相手の3倍以上の総兵力がある時
                 prob = 40 + (forceRatio - 3.0) * 5;
@@ -487,8 +548,8 @@ class AIEngine {
                 // 相手と互角から2倍までの時
                 prob = 10 + (forceRatio - 1.0) * 20;
             } else {
-                // 相手の0.8倍から互角までの時
-                prob = (forceRatio - 0.8) * 50;
+                // 相手の0.5倍から互角までの時（-50から10までなめらかに繋げます）
+                prob = -50 + (forceRatio - 0.5) * 120;
             }
             
             // 守備側武将の能力による攻撃確率低下 (最大10%)
@@ -589,9 +650,9 @@ class AIEngine {
             // 最大値の適用
             prob = Math.min(prob, maxProb);
 
-            // ★最終調整用。すべての引き算が終わった最後に×６％の魔法をかけます！
+            // ★最終調整用。すべての引き算が終わった最後に×１０％の魔法をかけます！
             if (prob > 0) {
-                prob = prob * 0.06;
+                prob = prob * 0.1;
             }
 
             // 最小値の適用（マイナスになっていたらゼロにします）
@@ -824,7 +885,7 @@ class AIEngine {
             // 1. 城壁修復（最大値の1/4以下なら超優先！）
             if (castle.defense < castle.maxDefense) {
                 let score = 0;
-                if (castle.defense <= castle.maxDefense / 4) score = 1000; // 緊急事態！
+                if (castle.defense <= castle.maxDefense / 4) score = 80; // ★修正：緊急事態でも80点に抑えます
                 else score = 20;
                 actions.push({ type: 'repair', stat: 'politics', score: score, cost: 200 });
             }
@@ -832,9 +893,15 @@ class AIEngine {
             // 2. 施し（民忠70以下なら優先！）
             if (castle.peoplesLoyalty < 100) {
                 let score = 0;
-                if (castle.peoplesLoyalty <= 70) score = 500; // 結構優先！
+                if (castle.peoplesLoyalty <= 70) score = 60; // ★修正：結構優先でも60点に抑えます
                 else score = (100 - castle.peoplesLoyalty) * 2;
                 actions.push({ type: 'charity', stat: 'charm', score: score, cost: 200 }); 
+            }
+
+            // ★追加：鉄砲と騎馬の購入（内政フェイズでの優先度は15点）
+            if (castle.gold >= 500) {
+                actions.push({ type: 'buy_gun', stat: 'politics', score: 15, cost: 500 });
+                actions.push({ type: 'buy_horse', stat: 'politics', score: 15, cost: 500 });
             }
 
             // 3. 徴兵（お隣の敵と比べて、自分が少ないほど焦る、または最低限の備え）
@@ -1296,6 +1363,20 @@ class AIEngine {
                 }
                 
                 // 特殊行動群
+                if (action.type === 'buy_gun') {
+                    const priceGun = parseInt(window.MainParams.Economy.PriceGun, 10) || 50;
+                    const amount = Math.floor(500 / priceGun);
+                    castle.gold -= (amount * priceGun);
+                    castle.guns = Math.min(99999, (castle.guns || 0) + amount);
+                    doer.isActionDone = true; actionDoneInThisStep = true; break;
+                }
+                if (action.type === 'buy_horse') {
+                    const priceHorse = parseInt(window.MainParams.Economy.PriceHorse, 10) || 5;
+                    const amount = Math.floor(500 / priceHorse);
+                    castle.gold -= (amount * priceHorse);
+                    castle.horses = Math.min(99999, (castle.horses || 0) + amount);
+                    doer.isActionDone = true; actionDoneInThisStep = true; break;
+                }
                 if (action.type === 'sell_rice') {
                     const sellAmount = castle.rice - Math.max(3000, Math.floor(castle.soldiers * 1.5));
                     if (sellAmount > 0) {
