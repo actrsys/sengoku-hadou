@@ -918,6 +918,18 @@ class AIEngine {
                 actions.push({ type: 'buy_horse', stat: 'politics', score: 15, cost: 500 });
             }
 
+            // ★追加：朝廷への貢物（金が5000以上で余裕がある時、たまに行います）
+            if (castle.gold >= 5000) {
+                let tributeGold = 500;
+                if (castle.gold >= 10000) {
+                    tributeGold = 1500;
+                } else if (castle.gold >= 7500) {
+                    tributeGold = 1000;
+                }
+                // たまに行うように、鉄砲の購入と同じ15点にしておきます。外交が得意な人を向かわせます。
+                actions.push({ type: 'tribute', stat: 'diplomacy', score: 15, cost: tributeGold });
+            }
+
             // 3. 徴兵（お隣の敵と比べて、自分が少ないほど焦る、または最低限の備え）
             if (castle.population > 1000 && castle.soldiers < castle.rice / 2) {
                 let scoreDraft = 0;
@@ -1235,6 +1247,26 @@ class AIEngine {
                 const doer = bestBushos[0];
 
                 // 実行処理
+                if (action.type === 'tribute' && castle.gold >= action.cost) {
+                    castle.gold -= action.cost;
+                    
+                    // 朝廷への貢献度をアップさせます
+                    this.game.courtRankSystem.addContribution(castle.ownerClan, action.cost);
+                    
+                    // ★差し替え：信用の上昇値を「専門部署（courtRankSystem）」に計算してもらいます！
+                    const trustIncrease = this.game.courtRankSystem.calcTributeTrustIncrease(action.cost, doer);
+                    this.game.courtRankSystem.addTrust(castle.ownerClan, trustIncrease);
+                    
+                    // ★差し替え：使者の功績も「専門部署」に計算してもらいます！
+                    doer.achievementTotal = (doer.achievementTotal || 0) + this.game.courtRankSystem.calcTributeAchievement(action.cost);
+                    if (this.game.factionSystem && this.game.factionSystem.updateRecognition) {
+                        this.game.factionSystem.updateRecognition(doer, 10);
+                    }
+                    
+                    doer.isActionDone = true; 
+                    actionDoneInThisStep = true; 
+                    break;
+                }
                 if (action.type === 'kunishu_goodwill' && castle.gold >= action.cost) {
                     castle.gold -= action.cost;
                     const kunishu = action.targetKunishu;

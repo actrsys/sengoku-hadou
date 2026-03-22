@@ -216,6 +216,16 @@ class CourtRankSystem {
     // ★ここから追加：朝廷コマンドの実行処理（command_system.jsからのお引っ越し）
     // ==========================================
     
+    // ★追加：貢物による「信用」の上がり幅を計算する専用の魔法です！
+    calcTributeTrustIncrease(gold, doer) {
+        return Math.max(1, Math.floor(gold * (doer.diplomacy / 100) * 0.15));
+    }
+
+    // ★追加：貢物をした使者の「功績」の上がり幅を計算する専用の魔法です！
+    calcTributeAchievement(gold) {
+        return 5 + Math.floor(gold / 500);
+    }
+
     // 朝廷に貢物を贈る魔法！
     executeTribute(doerId, gold) {
         const doer = this.game.getBusho(doerId);
@@ -232,16 +242,16 @@ class CourtRankSystem {
         // 魔法で大名家の「朝廷への貢献度」をアップさせます！
         this.addContribution(this.game.playerClanId, gold);
         
-        // ★追加：信用の上昇値を計算します（金1500・外交100で225程度、最低1）
-        const trustIncrease = Math.max(1, Math.floor(gold * (doer.diplomacy / 100) * 0.15));
+        // ★差し替え：信用の上昇値を専門部署（自分自身）の魔法で出します！
+        const trustIncrease = this.calcTributeTrustIncrease(gold, doer);
         
         // 新しく作った魔法で、大名家の「朝廷からの信用」をアップさせます！
         this.addTrust(this.game.playerClanId, trustIncrease);
         
         // 使者は行動済みにします
         doer.isActionDone = true;
-        // 頑張って貢物を運んだので、少しだけ実績を与えます（金額が多いほど少しボーナス）
-        doer.achievementTotal += 5 + Math.floor(gold / 500);
+        // ★差し替え：実績のボーナスも専門部署の魔法で出します！
+        doer.achievementTotal += this.calcTributeAchievement(gold);
         this.game.factionSystem.updateRecognition(doer, 10);
         
         this.game.ui.showResultModal(`${doer.name}を使者として、朝廷に 金${gold} を献上しました！`);
