@@ -38,7 +38,7 @@ window.WarParams = {
 
 class WarSystem {
     static calcUnitStats(bushos) { 
-        const W = window.WarParams.War; const M = window.WarParams.Military; const baseStat = W.BaseStat || 30;
+        const baseStat = 30;
         if (!bushos || bushos.length === 0) return { ldr:baseStat, str:baseStat, int:baseStat, charm:baseStat }; 
         const leader = bushos[0]; const subs = bushos.slice(1); 
         let totalLdr = leader.leadership; let totalStr = leader.strength; let totalInt = leader.intelligence; 
@@ -46,43 +46,42 @@ class WarSystem {
         if (subs.length > 0) {
             const leaderFaction = leader.getFactionName ? leader.getFactionName() : "中立";
             let sameFactionCount = 0; let oppFactionCount = 0; 
-            const subFactor = W.SubGeneralFactor || 0.2;
+            const subFactor = 0.05;
             subs.forEach(b => { 
                 totalLdr += b.leadership * subFactor; totalStr += b.strength * subFactor; totalInt += b.intelligence * subFactor; 
                 const f = b.getFactionName ? b.getFactionName() : "中立";
                 if (f === leaderFaction) sameFactionCount++;
                 else if ((leaderFaction === "革新派" && f === "保守派") || (leaderFaction === "保守派" && f === "革新派")) oppFactionCount++;
             });
-            if (oppFactionCount > 0) factionBonusMultiplier = M.FactionPenalty;
-            else if (sameFactionCount === subs.length) factionBonusMultiplier = M.FactionBonus;
+            if (oppFactionCount > 0) factionBonusMultiplier = 0.8;
+            else if (sameFactionCount === subs.length) factionBonusMultiplier = 1.1;
         }
         return { ldr: Math.floor(totalLdr * factionBonusMultiplier), str: Math.floor(totalStr * factionBonusMultiplier), int: Math.floor(totalInt * factionBonusMultiplier), charm: leader.charm }; 
     }
 
     static calcWarDamage(atkStats, defStats, atkSoldiers, defSoldiers, defWall, atkMorale, defTraining, type) {
-        const M = window.WarParams.Military; const W = window.WarParams.War;
-        const fluctuation = M.DamageFluctuation || 0.2;
+        const fluctuation = 0.1;
         const rand = 1.0 - fluctuation + (Math.random() * fluctuation * 2);
-        const moraleBonus = (atkMorale - (W.MoraleBase || 50)) / 100; 
-        const trainingBonus = (defTraining - (W.MoraleBase || 50)) / 100;
+        const moraleBonus = (atkMorale - 50) / 100; 
+        const trainingBonus = (defTraining - 50) / 100;
         
-        const atkPower = ((atkStats.ldr * (W.StatsLdrWeight || 1.2)) + (atkStats.str * (W.StatsStrWeight || 0.3)) + (atkSoldiers * M.DamageSoldierPower)) * (1.0 + moraleBonus);
-        const defPower = ((defStats.ldr * 1.0) + (defStats.int * (W.StatsIntWeight || 0.5)) + (defWall * M.WallDefenseEffect) + (defSoldiers * M.DamageSoldierPower)) * (1.0 + trainingBonus);
+        const atkPower = ((atkStats.ldr * 1.5) + (atkStats.str * 0.3) + (atkSoldiers * 0.08)) * (1.0 + moraleBonus);
+        const defPower = ((defStats.ldr * 1.0) + (defStats.int * 0.3) + (defWall * 0.5) + (defSoldiers * 0.08)) * (1.0 + trainingBonus);
         
         let multiplier = 1.0, soldierRate = 1.0, wallRate = 0.0, counterRisk = 1.0;
         switch(type) {
-            case 'bow': multiplier = W.BowMultiplier; wallRate = 0.0; counterRisk = W.BowRisk; break;
-            case 'siege': multiplier = W.SiegeMultiplier; soldierRate = 0.05; wallRate = W.SiegeWallRate; counterRisk = W.SiegeRisk; break;
-            case 'charge': multiplier = W.ChargeMultiplier; soldierRate = W.ChargeSoldierDmgRate; wallRate = W.ChargeWallDmgRate; counterRisk = W.ChargeRisk; break;
-            case 'def_bow': multiplier = W.DefBowMultiplier; wallRate = 0.0; break;
+            case 'bow': multiplier = 0.7; wallRate = 0.0; counterRisk = 0.2; break;
+            case 'siege': multiplier = 1.0; soldierRate = 0.05; wallRate = 0.4; counterRisk = 10.0; break;
+            case 'charge': multiplier = 1.1; soldierRate = 1.0; wallRate = 0.1; counterRisk = 1.5; break;
+            case 'def_bow': multiplier = 0.7; wallRate = 0.0; break;
             case 'def_attack': multiplier = 0.0; wallRate = 0.0; break; 
-            case 'def_charge': multiplier = W.DefChargeMultiplier; wallRate = 0.0; counterRisk = W.DefChargeRisk; break; 
+            case 'def_charge': multiplier = 1.1; wallRate = 0.0; counterRisk = 1.5; break; 
         }
         
         const ratio = atkPower / (atkPower + defPower);
         let baseDmg = atkPower * ratio * multiplier * rand;
         
-        let counterDmg = Math.floor(defPower * (W.CounterAtkPowerFactor !== undefined ? W.CounterAtkPowerFactor : 0.05) * counterRisk);
+        let counterDmg = Math.floor(defPower * 0.05 * counterRisk);
         
         return { 
             soldierDmg: Math.floor(baseDmg * soldierRate), 
@@ -91,15 +90,15 @@ class WarSystem {
     }
 
     static calcScheme(atkBusho, defBusho, defCastleLoyalty) { 
-        const successRate = (atkBusho.intelligence / ((defBusho ? defBusho.intelligence : 30) + (window.WarParams.War.SchemeBaseIntOffset || 20))) * (window.MainParams?.Strategy?.SchemeSuccessRate || 0.25); 
+        const successRate = (atkBusho.intelligence / ((defBusho ? defBusho.intelligence : 30) + 20)) * (window.MainParams?.Strategy?.SchemeSuccessRate || 0.25); 
         if (Math.random() > successRate) return { success: false, damage: 0 }; 
-        const loyaltyBonus = ((window.MainParams?.Economy?.MaxLoyalty || 100) - defCastleLoyalty) / (window.WarParams.War.LoyaltyDamageFactor || 50); 
-        return { success: true, damage: Math.floor(atkBusho.intelligence * window.WarParams.War.SchemeDamageFactor * (1.0 + loyaltyBonus)) }; 
+        const loyaltyBonus = ((window.MainParams?.Economy?.MaxLoyalty || 100) - defCastleLoyalty) / 500; 
+        return { success: true, damage: Math.floor(atkBusho.intelligence * 4 * (1.0 + loyaltyBonus)) }; 
     }
 
     static calcFire(atkBusho, defBusho) { 
-        if (Math.random() > (atkBusho.intelligence / ((defBusho ? defBusho.intelligence : 30) + 10)) * window.WarParams.War.FireSuccessBase) return { success: false, damage: 0 }; 
-        return { success: true, damage: Math.floor(atkBusho.intelligence * window.WarParams.War.FireDamageFactor * (Math.random() + 0.5)) }; 
+        if (Math.random() > (atkBusho.intelligence / ((defBusho ? defBusho.intelligence : 30) + 10)) * 0.25) return { success: false, damage: 0 }; 
+        return { success: true, damage: Math.floor(atkBusho.intelligence * 0.8 * (Math.random() + 0.5)) }; 
     }
 
     static calcRetreatScore(castle) { return castle.soldiers + (castle.defense * 0.5) + (castle.gold * 0.1) + (castle.rice * 0.1) + (castle.samuraiIds.length * 100); }
@@ -157,7 +156,7 @@ class WarManager {
     resolveAutoFieldWar() {
         const s = this.state; let safetyLimit = 20; let turn = 1;
         const atkStats = WarSystem.calcUnitStats(s.atkBushos); const defStats = WarSystem.calcUnitStats([s.defBusho]);
-        const consumeRate = (window.WarParams.War.RiceConsumptionAtk || 0.1) * 0.5;
+        const consumeRate = 0.05 * 0.5;
 
         // ★修正: 野戦は全員で一斉にぶつかるため、合算した兵士数を使います！
         let totalAtkSoldiers = s.atkAssignments ? s.atkAssignments.reduce((sum, a) => sum + a.soldiers, 0) : s.attacker.soldiers;
@@ -301,7 +300,7 @@ class WarManager {
                 
                 // ★ 個別の籠城判定！ 籠城のメモがある部隊だけ、受けるダメージを軽減します
                 let isRojo = (isTargetDefSide && s.plannedActions[role] && s.plannedActions[role].type === 'def_attack');
-                let finalDmg = isRojo ? Math.floor(dmgPerArmy * W.RojoDamageReduction) : dmgPerArmy;
+                let finalDmg = isRojo ? Math.floor(dmgPerArmy * 0.5) : dmgPerArmy;
 
                 if (army.soldiers >= finalDmg) {
                     army.soldiers -= finalDmg;
@@ -334,7 +333,7 @@ class WarManager {
                     let sliceToApply = Math.min(dmgSlice, unassignedDmg);
                     // 余りのダメージを配る時も、籠城している部隊はしっかりガードします
                     let isRojo = (isTargetDefSide && s.plannedActions[role] && s.plannedActions[role].type === 'def_attack');
-                    let finalSlice = isRojo ? Math.floor(sliceToApply * W.RojoDamageReduction) : sliceToApply;
+                    let finalSlice = isRojo ? Math.floor(sliceToApply * 0.5) : sliceToApply;
                     
                     if (army.soldiers >= finalSlice) {
                         army.soldiers -= finalSlice;
@@ -376,14 +375,14 @@ class WarManager {
             s.plannedActions = s.plannedActions || {};
 
             let safetyLimit = 100;
-            while(s.round <= window.WarParams.Military.WarMaxRounds && s.attacker.soldiers > 0 && s.defender.soldiers > 0 && s.defender.defense > 0 && safetyLimit > 0) { 
+            while(s.round <= 10 && s.attacker.soldiers > 0 && s.defender.soldiers > 0 && s.defender.defense > 0 && safetyLimit > 0) { 
                 this.resolveWarAction('charge'); 
                 if (s.attacker.soldiers <= 0 || s.defender.soldiers <= 0) break; 
-                s.attacker.rice = Math.max(0, s.attacker.rice - Math.floor(s.attacker.soldiers * window.WarParams.War.RiceConsumptionAtk));
-                s.defender.rice = Math.max(0, s.defender.rice - Math.floor(s.defender.soldiers * window.WarParams.War.RiceConsumptionDef));
+                s.attacker.rice = Math.max(0, s.attacker.rice - Math.floor(s.attacker.soldiers * 0.05));
+                s.defender.rice = Math.max(0, s.defender.rice - Math.floor(s.defender.soldiers * 0.025));
                 if (s.attacker.rice <= 0 || s.defender.rice <= 0) break;
                 safetyLimit--;
-            } 
+            }
             
             // ★追加：オートバトルでも、城壁が壊れて落ちた場合は防御力を少し修復します！
             if (s.defender.defense <= 0) {
@@ -402,13 +401,13 @@ class WarManager {
         // s.phase がない、または 'init'（ラウンドの最初）の時の準備
         if (!s.phase || s.phase === 'init') {
             if (s.round > 1) {
-                s.attacker.rice = Math.max(0, s.attacker.rice - Math.floor(s.attacker.soldiers * window.WarParams.War.RiceConsumptionAtk));
-                if (s.selfReinforcement) s.selfReinforcement.rice = Math.max(0, s.selfReinforcement.rice - Math.floor(s.selfReinforcement.soldiers * window.WarParams.War.RiceConsumptionAtk));
-                if (s.reinforcement) s.reinforcement.rice = Math.max(0, s.reinforcement.rice - Math.floor(s.reinforcement.soldiers * window.WarParams.War.RiceConsumptionAtk));
+                s.attacker.rice = Math.max(0, s.attacker.rice - Math.floor(s.attacker.soldiers * 0.05));
+                if (s.selfReinforcement) s.selfReinforcement.rice = Math.max(0, s.selfReinforcement.rice - Math.floor(s.selfReinforcement.soldiers * 0.05));
+                if (s.reinforcement) s.reinforcement.rice = Math.max(0, s.reinforcement.rice - Math.floor(s.reinforcement.soldiers * 0.05));
 
-                s.defender.rice = Math.max(0, s.defender.rice - Math.floor(s.defender.soldiers * window.WarParams.War.RiceConsumptionDef));
-                if (s.defSelfReinforcement) s.defSelfReinforcement.rice = Math.max(0, s.defSelfReinforcement.rice - Math.floor(s.defSelfReinforcement.soldiers * window.WarParams.War.RiceConsumptionDef));
-                if (s.defReinforcement) s.defReinforcement.rice = Math.max(0, s.defReinforcement.rice - Math.floor(s.defReinforcement.soldiers * window.WarParams.War.RiceConsumptionDef));
+                s.defender.rice = Math.max(0, s.defender.rice - Math.floor(s.defender.soldiers * 0.025));
+                if (s.defSelfReinforcement) s.defSelfReinforcement.rice = Math.max(0, s.defSelfReinforcement.rice - Math.floor(s.defSelfReinforcement.soldiers * 0.025));
+                if (s.defReinforcement) s.defReinforcement.rice = Math.max(0, s.defReinforcement.rice - Math.floor(s.defReinforcement.soldiers * 0.025));
             }
 
             if (s.defender.defense <= 0) { 
@@ -504,16 +503,16 @@ class WarManager {
             if (actor.intelligence > 30) options.push('scheme');
             if (actor.intelligence > 50 && !isDefenderTurn) options.push('fire');
 
-            bestCmd = options[0]; let bestScore = -Infinity; const W = window.WarParams.War;
+            bestCmd = options[0]; let bestScore = -Infinity;
 
             options.forEach(cmd => {
                 let score = 0; let multiplier = 1.0; let risk = 1.0;
-                if (cmd === 'charge') { multiplier = W.ChargeMultiplier; risk = W.ChargeRisk; }
-                else if (cmd === 'bow') { multiplier = W.BowMultiplier; risk = W.BowRisk; }
-                else if (cmd === 'siege') { multiplier = W.SiegeMultiplier; risk = W.SiegeRisk; }
-                else if (cmd === 'def_charge') { multiplier = W.DefChargeMultiplier; risk = W.DefChargeRisk; }
-                else if (cmd === 'def_bow') { multiplier = W.DefBowMultiplier; risk = 0.5; }
-                else if (cmd === 'def_attack') { multiplier = 0; risk = 0; } 
+                if (cmd === 'charge') { multiplier = 1.1; risk = 1.5; }
+                else if (cmd === 'bow') { multiplier = 0.7; risk = 0.2; }
+                else if (cmd === 'siege') { multiplier = 1.0; risk = 10.0; }
+                else if (cmd === 'def_charge') { multiplier = 1.1; risk = 1.5; }
+                else if (cmd === 'def_bow') { multiplier = 0.7; risk = 0.5; }
+                else if (cmd === 'def_attack') { multiplier = 0; risk = 0; }
 
                 if (cmd === 'siege') score += (multiplier * 50) + (s.defender.defense > 0 ? 100 : 0);
                 else if (cmd === 'def_attack') score += (totalDefSoldiers < totalAtkSoldiers) ? 200 : -100;
@@ -658,7 +657,6 @@ class WarManager {
         if (type === 'repair') { 
              const soldierCost = extraVal || 50; 
              if (activeSoldiers > soldierCost) {
-                 const W = window.WarParams.War; 
                  if (s.turn === 'defender') s.defender.soldiers -= soldierCost;
                  else if (s.turn === 'defender_self_reinf') s.defSelfReinforcement.soldiers -= soldierCost;
                  else if (s.turn === 'defender_ally_reinf') s.defReinforcement.soldiers -= soldierCost;
@@ -666,7 +664,7 @@ class WarManager {
                  const polList = activeBushos.map(b => b.politics || 0).sort((a,b) => b - a);
                  const maxPol = polList.length > 0 ? polList[0] : 0;
                  let subPolSum = 0; for(let i=1; i<polList.length; i++) subPolSum += polList[i];
-                 let recover = Math.floor(((soldierCost * W.RepairSoldierFactor) + (maxPol * W.RepairMainPolFactor) + (subPolSum * W.RepairSubPolFactor)) * W.RepairGlobalMultiplier);
+                 let recover = Math.floor(((soldierCost * 0.05) + (maxPol * 0.25) + (subPolSum * 0.05)) * 0.4);
                  s.defender.defense += recover;
                  
                  pushMsg(`R${s.round} [${activeArmyName}] の補修！`);
@@ -754,7 +752,7 @@ class WarManager {
             });
             
             if (hasRojo) {
-                 calculatedWallDmg = Math.floor(calculatedWallDmg * window.WarParams.War.RojoDamageReduction);
+                 calculatedWallDmg = Math.floor(calculatedWallDmg * 0.5);
                  pushMsg(`(守備軍の籠城により城壁の被害軽減)`);
             }
         }
@@ -925,7 +923,7 @@ class WarManager {
                 // 全員の行動が終わったら、ラウンドを1つ進めます
                 s.phase = 'init';
                 s.round++;
-                if(s.round > window.WarParams.Military.WarMaxRounds) { this.endWar(false); return; } 
+                if(s.round > 10) { this.endWar(false); return; } 
                 this.processWarRound();
             }
         }
