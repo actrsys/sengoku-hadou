@@ -1402,8 +1402,8 @@ Object.assign(WarManager.prototype, {
                 prisoner.hasRefusedHire = true; // ★追加：拒否したという印をつけます
                 this.game.ui.showDialog(`${prisoner.name}「敵の軍門には下らぬ！」`, false, stayStep); 
             } else {
-                // 新しい計算式：基本確率を出します
-                let baseProb = ((recruiter.charm || 50) * 1.5) / ((prisoner.loyalty || 50) * 3) - 0.4;
+                // 新しい計算式：基本確率を出します（帰る城がない＝滅亡確定ならペナルティをなくします）
+                let baseProb = ((recruiter.charm || 50) * 1.5) / ((prisoner.loyalty || 50) * 3) - (isExtinct ? 0 : 0.4);
                 
                 // ＋0.1 から －0.1 のランダムな運の要素を作ります
                 let randomBonus = (Math.random() * 0.2) - 0.1;
@@ -1529,8 +1529,8 @@ Object.assign(WarManager.prototype, {
             
             const isKunishuBoss = (p.belongKunishuId > 0 && p.id === this.game.kunishuSystem.getKunishu(p.belongKunishuId)?.leaderId);
 
-            // 新しい計算式：基本確率を出します
-            let baseProb = ((recruiter.charm || 50) * 1.5) / ((p.loyalty || 50) * 3) - 0.4;
+            // 新しい計算式：基本確率を出します（帰る城がない＝滅亡確定ならペナルティをなくします）
+            let baseProb = ((recruiter.charm || 50) * 1.5) / ((p.loyalty || 50) * 3) - (isExtinct ? 0 : 0.4);
             
             // ＋0.1 から －0.1 のランダムな運の要素を作ります
             let randomBonus = (Math.random() * 0.2) - 0.1;
