@@ -1412,8 +1412,8 @@ class FieldWarManager {
         
         for (let key in groupSoldiers) {
             if (this.groupStats[key]) {
-                // 攻撃側と守備側で分ける魔法
-                let rate = key.startsWith('atk_') ? (window.WarParams.War.RiceConsumptionAtk || 0.05) : (window.WarParams.War.RiceConsumptionDef || 0.025);
+                // ★修正: 野戦専用の兵糧消費の仕組み（パラメーター）を使うようにしました！
+                let rate = key.startsWith('atk_') ? (window.WarParams.War.FieldRiceConsumptionAtk || 0.05) : (window.WarParams.War.FieldRiceConsumptionDef || 0.025);
                 let cons = Math.floor(groupSoldiers[key] * rate);
                 this.groupStats[key].rice = Math.max(0, this.groupStats[key].rice - cons);
             }
@@ -1881,11 +1881,11 @@ class FieldWarManager {
         let atkMorale = this.groupStats[attacker.groupId] ? this.groupStats[attacker.groupId].morale : 50;
         let defTraining = this.groupStats[defender.groupId] ? this.groupStats[defender.groupId].training : 50;
 
-        // 野戦専用の計算式がないため、通常の計算式を「城壁ゼロ・突撃」として代用します
-        const result = WarSystem.calcWarDamage(
+        // ★修正: 野戦専用のダメージ計算式を使うように変更します！
+        const result = WarSystem.calcFieldWarDamage(
             attacker.stats, defender.stats,
             attacker.soldiers, defender.soldiers,
-            0, atkMorale, defTraining, 'charge'
+            atkMorale, defTraining
         );
 
         // ★ 兵科による倍率を計算
