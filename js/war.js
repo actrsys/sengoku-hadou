@@ -106,7 +106,43 @@ class WarSystem {
         };
     }
 
-    static calcScheme(atkBusho, defBusho, defCastleLoyalty) { 
+    // 野戦専用のダメージ計算式です！（内容は攻城戦の流用からスタート）
+    static calcFieldWarDamage(atkStats, defStats, atkSoldiers, defSoldiers, atkMorale, defTraining) {
+        const M = window.WarParams.Military; const W = window.WarParams.War;
+        const fluctuation = M.DamageFluctuation || 0.2;
+        const rand = 1.0 - fluctuation + (Math.random() * fluctuation * 2);
+        const moraleBonus = (atkMorale - (W.MoraleBase || 50)) / 100; 
+        const trainingBonus = (defTraining - (W.MoraleBase || 50)) / 100;
+        
+        const atkPower = ((atkStats.ldr * (W.StatsLdrWeight || 1.2)) + (atkStats.str * (W.StatsStrWeight || 0.3)) + (atkSoldiers * M.DamageSoldierPower)) * (1.0 + moraleBonus);
+        const defPower = ((defStats.ldr * 1.0) + (defStats.int * (W.StatsIntWeight || 0.5)) + (defSoldiers * M.DamageSoldierPower)) * (1.0 + trainingBonus);
+        
+        let multiplier = W.ChargeMultiplier; 
+        let soldierRate = W.ChargeSoldierDmgRate; 
+        let counterRisk = W.ChargeRisk;
+        
+        const ratio = atkPower / (atkPower + defPower);
+        let baseDmg = Math.max(W.MinDamage || 50, atkPower * ratio * multiplier * rand);
+        
+        let atkPenalty = atkSoldiers <= 200 ? Math.pow(Math.max(0, atkSoldiers) / 200, 2) : 1.0;
+        let defPenalty = defSoldiers <= 200 ? Math.pow(Math.max(0, defSoldiers) / 200, 2) : 1.0;
+
+        let counterDmg = Math.floor(defPower * (W.CounterAtkPowerFactor !== undefined ? W.CounterAtkPowerFactor : 0.05) * counterRisk * defPenalty);
+        
+        return { 
+            soldierDmg: Math.floor(baseDmg * soldierRate * atkPenalty), 
+            counterDmg: counterDmg 
+        };
+    }
+
+    // 野戦専用の兵糧消費の計算式です！
+    static calcFieldWarRiceConsumption(soldiers) {
+        // 今までの攻城戦の計算式（0.5倍）をそのまま持ってきています
+        const consumeRate = (window.WarParams.War.RiceConsumptionAtk || 0.1) * 0.5;
+        return Math.floor(soldiers * consumeRate);
+    }
+
+    static calcScheme(atkBusho, defBusho, defCastleLoyalty) {
         const successRate = (atkBusho.intelligence / ((defBusho ? defBusho.intelligence : 30) + (window.WarParams.War.SchemeBaseIntOffset || 20))) * (window.MainParams?.Strategy?.SchemeSuccessRate || 0.25); 
         if (Math.random() > successRate) return { success: false, damage: 0 }; 
         const loyaltyBonus = ((window.MainParams?.Economy?.MaxLoyalty || 100) - defCastleLoyalty) / (window.WarParams.War.LoyaltyDamageFactor || 50); 
@@ -173,14 +209,13 @@ class WarManager {
     resolveAutoFieldWar() {
         const s = this.state; let safetyLimit = 20; let turn = 1;
         const atkStats = WarSystem.calcUnitStats(s.atkBushos); const defStats = WarSystem.calcUnitStats([s.defBusho]);
-        const consumeRate = (window.WarParams.War.RiceConsumptionAtk || 0.1) * 0.5;
 
         // ★修正: 野戦は全員で一斉にぶつかるため、合算した兵士数を使います！
         let totalAtkSoldiers = s.atkAssignments ? s.atkAssignments.reduce((sum, a) => sum + a.soldiers, 0) : s.attacker.soldiers;
         let totalAtkRice = s.attacker.rice + (s.reinforcement ? s.reinforcement.rice : 0) + (s.selfReinforcement ? s.selfReinforcement.rice : 0);
 
         while (turn <= 20 && totalAtkSoldiers > 0 && s.defender.fieldSoldiers > 0 && safetyLimit > 0) {
-            let resAtk = WarSystem.calcWarDamage(atkStats, defStats, totalAtkSoldiers, s.defender.fieldSoldiers, 0, s.attacker.morale, s.defender.training, 'charge');
+            let resAtk = WarSystem.calcFieldWarDamage(atkStats, defStats, totalAtkSoldiers, s.defender.fieldSoldiers, s.attacker.morale, s.defender.training);
             if (!s.isPlayerInvolved) { resAtk.soldierDmg = Math.floor(resAtk.soldierDmg * 0.333); resAtk.counterDmg = Math.floor(resAtk.counterDmg * 0.333); }
             
             let actDefDmg1 = Math.min(s.defender.fieldSoldiers, resAtk.soldierDmg);
@@ -192,7 +227,7 @@ class WarManager {
 
             if (s.defender.fieldSoldiers <= 0 || totalAtkSoldiers <= 0) break;
             
-            let resDef = WarSystem.calcWarDamage(defStats, atkStats, s.defender.fieldSoldiers, totalAtkSoldiers, 0, s.defender.morale, s.attacker.training, 'charge');
+            let resDef = WarSystem.calcFieldWarDamage(defStats, atkStats, s.defender.fieldSoldiers, totalAtkSoldiers, s.defender.morale, s.attacker.training);
             if (!s.isPlayerInvolved) { resDef.soldierDmg = Math.floor(resDef.soldierDmg * 0.333); resDef.counterDmg = Math.floor(resDef.counterDmg * 0.333); }
             
             let actAtkDmg2 = Math.min(totalAtkSoldiers, resDef.soldierDmg);
@@ -202,8 +237,8 @@ class WarManager {
             s.deadSoldiers.attacker += actAtkDmg2;
             s.deadSoldiers.defender += actDefDmg2;
             
-            totalAtkRice = Math.max(0, totalAtkRice - Math.floor(totalAtkSoldiers * consumeRate));
-            s.defFieldRice = Math.max(0, s.defFieldRice - Math.floor(s.defender.fieldSoldiers * consumeRate)); 
+            totalAtkRice = Math.max(0, totalAtkRice - WarSystem.calcFieldWarRiceConsumption(totalAtkSoldiers));
+            s.defFieldRice = Math.max(0, s.defFieldRice - WarSystem.calcFieldWarRiceConsumption(s.defender.fieldSoldiers)); 
             if (totalAtkRice <= 0 || s.defFieldRice <= 0 || totalAtkSoldiers < s.defender.fieldSoldiers * 0.2 || s.defender.fieldSoldiers < totalAtkSoldiers * 0.2) break;
 
             turn++; safetyLimit--;
