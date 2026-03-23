@@ -967,7 +967,7 @@ class UIManager {
             
             let selectedScenario = null; // 今選ばれているシナリオを覚えておく箱です
 
-            scenarios.forEach(s => {
+            scenarios.forEach((s, index) => {
                 const div = document.createElement('div'); 
                 div.className = 'clan-btn';
                 // 名前だけを真ん中に表示するようにします
@@ -998,6 +998,16 @@ class UIManager {
                     }
                 };
                 this.scenarioList.appendChild(div);
+
+                // 一番最初のシナリオ（indexが0）なら、最初から選んだ状態にします
+                if (index === 0) {
+                    div.classList.add('selected');
+                    selectedScenario = s;
+                    if (descBox) {
+                        descBox.innerHTML = `<strong style="font-size:1.1rem;">${s.name}</strong><br><br>${s.desc}`;
+                        descBox.style.display = 'block';
+                    }
+                }
             });
         }
     }
@@ -3110,8 +3120,8 @@ class UIManager {
         
         candidates.forEach(c => {
             const div = document.createElement('div'); 
-            // 横並びのボタンデザイン（clan-btn）をそのまま再利用します
-            div.className = 'clan-btn'; 
+            // 撤退専用のデザイン（retreat-btn）を使います
+            div.className = 'retreat-btn'; 
             div.innerHTML = `<div style="text-align:center;"><strong>${c.name}</strong><br><small>兵数:${c.soldiers} 防御:${c.defense}</small></div>`;
             
             div.onclick = () => { 
