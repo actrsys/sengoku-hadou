@@ -313,13 +313,26 @@ body.hide-daimyo-labels .daimyo-name-label { display: none !important; }
 .cutin-overlay.fade-in .cutin-text { transform: scale(1); }
 
 /* 大名選択ダイアログ共通 */
-#daimyo-confirm-modal { background: transparent !important; pointer-events: none; }
-#daimyo-confirm-modal .modal-content { pointer-events: auto; margin: 0; box-shadow: 0 -2px 10px rgba(0,0,0,0.3); background: rgba(255, 255, 255, 0.95); border: 2px solid #333; }
+body.daimyo-select-mode #pc-sidebar,
+body.daimyo-select-mode #bottom-command-bar,
+body.daimyo-select-mode #mobile-bottom-info { display: none !important; }
+body:not(.is-pc).daimyo-select-mode #map-wrapper { margin-bottom: 0 !important; height: 100% !important; flex: 1 !important; }
+
+#daimyo-confirm-modal { position: absolute !important; top: 0; left: 0; right: 0; bottom: 0; width: 100%; height: 100%; background: transparent !important; pointer-events: none; z-index: 4000; display: block; }
+#daimyo-confirm-modal.hidden { display: none !important; }
+#daimyo-confirm-modal .modal-content { position: absolute; margin: 0; width: auto; max-width: 90%; height: auto; max-height: 80%; background: rgba(255, 255, 255, 0.95); border: 2px solid #333; box-shadow: 0 10px 25px rgba(0,0,0,0.5); pointer-events: auto; overflow-y: auto; padding: 20px; border-radius: 8px; }
 #daimyo-confirm-modal .modal-content h3 { margin: 10px 0 20px 0; font-size: 1.5rem; color: #333; }
 #daimyo-confirm-modal p { font-size: 1.1rem; margin: 10px 0; }
 .daimyo-confirm-compact { display: flex; align-items: center; gap: 15px; width: 100%; }
-.daimyo-confirm-compact .daimyo-confirm-face { width: 60px !important; height: 60px !important; margin: 0 !important; border-radius: 5px; border: 2px solid #555; object-fit: cover; flex-shrink: 0; }
+.daimyo-confirm-compact .daimyo-confirm-face { width: 60px; height: 60px; margin: 0; border-radius: 5px; border: 2px solid #555; object-fit: cover; flex-shrink: 0; }
 .daimyo-confirm-info { display: flex; flex-direction: column; justify-content: center; text-align: left; }
+
+/* 独立ボタン・シナリオに戻るボタン共通 */
+.floating-back-btn { position: absolute; bottom: 30px; left: 50%; transform: translateX(-50%); z-index: 4000; padding: 12px 24px; background-color: #37474f; color: #fff; border: 2px solid #cfd8dc; border-radius: 8px; font-size: 1.2rem; font-weight: bold; cursor: pointer; box-shadow: 0 4px 6px rgba(0,0,0,0.5); transition: all 0.2s; pointer-events: auto; white-space: nowrap; }
+.floating-back-btn:hover { background-color: #546e7a; transform: translateX(-50%) scale(1.05); }
+.floating-back-btn.hidden, .daimyo-confirm-buttons.hidden { display: none !important; }
+.daimyo-confirm-buttons { position: absolute; bottom: 30px; left: 50%; transform: translateX(-50%); display: flex; gap: 20px; pointer-events: auto; z-index: 4001; }
+.daimyo-confirm-buttons button { padding: 12px 30px; font-size: 1.2rem; border-radius: 8px; font-weight: bold; cursor: pointer; border: none; }
 
 /* =========================================================
    大名家詳細モーダルのデザイン（完全版）
@@ -624,15 +637,9 @@ body:not(.is-pc) .label-pc { display: none !important; }
 body:not(.is-pc) .label-sp { display: inline !important; }
 
 /* スマホ版: 大名選択 */
-body:not(.is-pc) #daimyo-confirm-modal { align-items: flex-end; padding: 0; }
-body:not(.is-pc) #daimyo-confirm-modal .modal-content { width: 100%; max-width: 100%; border-bottom-left-radius: 0; border-bottom-right-radius: 0; padding-bottom: calc(env(safe-area-inset-bottom) + 20px); }
-body:not(.is-pc).daimyo-select-mode #map-wrapper { height: auto !important; flex: 1 !important; margin-bottom: calc(150px + env(safe-area-inset-bottom)) !important; }
-body:not(.is-pc).daimyo-select-mode #map-scroll-container { padding-bottom: 0 !important; }
-body:not(.is-pc).daimyo-select-mode #bottom-command-bar { display: none !important; }
-body:not(.is-pc).daimyo-select-mode #daimyo-confirm-modal { position: fixed !important; top: auto !important; bottom: 0 !important; left: 0 !important; width: 100% !important; height: auto !important; min-height: 140px !important; background: #fdfdfd !important; border-top: 3px solid #333; pointer-events: auto !important; display: flex !important; flex-direction: column !important; z-index: 1000 !important; align-items: center !important; padding: 0 !important; }
-body:not(.is-pc).daimyo-select-mode #daimyo-confirm-modal .modal-content { background: transparent !important; box-shadow: none !important; border: none !important; padding: 15px 15px calc(15px + env(safe-area-inset-bottom)) !important; height: auto !important; width: 100% !important; display: flex !important; flex-direction: column !important; justify-content: space-between !important; box-sizing: border-box !important; gap: 10px !important; }
-body:not(.is-pc).daimyo-select-mode #daimyo-confirm-modal .modal-footer { margin-top: auto !important; padding-top: 5px !important; border-top: none !important; display: flex !important; justify-content: flex-end !important; gap: 15px !important; width: 100%; }
-body:not(.is-pc).daimyo-select-mode #daimyo-confirm-modal .btn-primary, body:not(.is-pc).daimyo-select-mode #daimyo-confirm-modal .btn-secondary { padding: 10px 25px !important; font-size: 1.05rem !important; border-radius: 20px !important; }
+body:not(.is-pc) #daimyo-confirm-modal .modal-content { top: max(20px, env(safe-area-inset-top)); bottom: auto; left: 50%; transform: translateX(-50%); width: 90%; max-width: 400px; padding: 15px; }
+body:not(.is-pc) .daimyo-confirm-buttons { flex-direction: column; gap: 12px; width: 90%; bottom: max(20px, env(safe-area-inset-bottom)); }
+body:not(.is-pc) .daimyo-confirm-buttons button { width: 100%; box-sizing: border-box; border-radius: 20px; }
 
 /* スマホ版: 攻城戦メイン軍・援軍レイアウト圧縮 */
 body:not(.is-pc) .war-side-wrapper { flex-direction: column !important; }
@@ -718,14 +725,12 @@ body.is-pc {
     .grade-plus { font-size: 0.8rem !important; }
 
     /* PC版: 大名選択 */
-    #daimyo-confirm-modal { justify-content: flex-end; align-items: stretch; padding: 0; right: 0; left: auto; width: 380px; }
-    #daimyo-confirm-modal .modal-content { width: 100%; height: 100%; max-height: 100%; border-radius: 0; display: flex; flex-direction: column; justify-content: center; }
-    .daimyo-confirm-compact { flex-direction: column !important; gap: 20px !important; }
-    .daimyo-confirm-compact .daimyo-confirm-face { width: 160px !important; height: 160px !important; border-width: 3px !important; }
-    .daimyo-confirm-info { align-items: center !important; text-align: center !important; }
-    .daimyo-confirm-info h3 { font-size: 1.8rem !important; margin-bottom: 15px !important; }
-    .daimyo-confirm-info div { font-size: 1.3rem !important; margin-bottom: 8px !important; }
-    #daimyo-confirm-modal .btn-primary, #daimyo-confirm-modal .btn-secondary { padding: 12px 30px !important; font-size: 1.2rem !important; }
+    #daimyo-confirm-modal .modal-content { top: 20px; left: 20px; bottom: auto; right: auto; width: auto; max-width: 400px; }
+    .daimyo-confirm-compact { flex-direction: row; gap: 20px; align-items: flex-start; }
+    .daimyo-confirm-compact .daimyo-confirm-face { width: 120px; height: 120px; border-width: 3px; }
+    .daimyo-confirm-info { align-items: flex-start; text-align: left; }
+    .daimyo-confirm-info h3 { font-size: 1.6rem; margin-bottom: 10px; }
+    .daimyo-confirm-info div { font-size: 1.1rem; margin-bottom: 5px; }
 
     /* PC版: 攻城戦 */
     .war-controls-area { height: 150px; gap: 10px; }
@@ -832,122 +837,4 @@ body.is-pc .princess-list-header, body.is-pc .princess-list-item {
 .retreat-btn:hover { 
     transform: scale(1.02); 
     background: #f0f8ff; 
-}
-/* =========================================================
-   大名選択フロートウィンドウ・戻るボタン
-   ========================================================= */
-/* シナリオ選択に戻るボタン (常に中央下部に配置) */
-.floating-back-btn {
-    position: absolute; /* ★ fixed から absolute に変更（枠から飛び出さないように） */
-    bottom: 30px;
-    left: 50%;
-    transform: translateX(-50%);
-    z-index: 4000;
-    padding: 12px 24px;
-    background-color: #37474f;
-    color: #fff;
-    border: 2px solid #cfd8dc;
-    border-radius: 8px;
-    font-size: 1.2rem;
-    font-weight: bold;
-    cursor: pointer;
-    box-shadow: 0 4px 6px rgba(0,0,0,0.5);
-    transition: all 0.2s;
-    pointer-events: auto;
-    white-space: nowrap;
-}
-.floating-back-btn:hover {
-    background-color: #546e7a;
-    transform: translateX(-50%) scale(1.05);
-}
-
-/* 隠すクラス */
-.floating-back-btn.hidden, .daimyo-confirm-buttons.hidden {
-    display: none !important;
-}
-
-/* ★サイドバーとボトムバーを完全に消し去る魔法 */
-body.daimyo-select-mode #pc-sidebar,
-body.daimyo-select-mode #bottom-command-bar,
-body.daimyo-select-mode #mobile-bottom-info { 
-    display: none !important; /* ★スマホ専用のボトムバーも確実に隠すように追加！ */
-}
-body:not(.is-pc).daimyo-select-mode #map-wrapper { margin-bottom: 0 !important; height: 100% !important; flex: 1 !important; }
-
-/* フロート型の大名情報ウィンドウの大枠 */
-body.daimyo-select-mode #daimyo-confirm-modal {
-    position: absolute !important; 
-    top: 0 !important; left: 0 !important; right: 0 !important; bottom: 0 !important;
-    width: 100% !important; height: 100% !important;
-    background: transparent !important;
-    pointer-events: none !important; /* 背景はクリックをスルーさせます */
-    z-index: 4000 !important;
-    display: block !important;
-}
-
-body.daimyo-select-mode #daimyo-confirm-modal.hidden {
-    display: none !important;
-}
-
-/* 大名情報の白いパネル本体 (PCは左上、スマホは中央) */
-body.daimyo-select-mode #daimyo-confirm-modal .modal-content {
-    position: absolute !important;
-    width: auto !important; max-width: 90% !important;
-    height: auto !important; max-height: 80% !important;
-    padding: 20px !important; border-radius: 8px !important;
-    background: rgba(255, 255, 255, 0.95) !important;
-    border: 2px solid #333 !important;
-    box-shadow: 0 10px 25px rgba(0,0,0,0.5) !important;
-    pointer-events: auto !important;
-    overflow-y: auto !important;
-    margin: 0 !important;
-}
-
-/* スマホ版：白いパネルを上部に浮かせるように変更！ */
-body:not(.is-pc).daimyo-select-mode #daimyo-confirm-modal .modal-content {
-    top: max(20px, env(safe-area-inset-top)) !important;
-    bottom: auto !important; /* ★確実に追加：下側のボトムバー位置にくっつくのを防ぎます */
-    left: 50% !important; 
-    transform: translateX(-50%) !important;
-}
-
-/* PC版：白いパネルを左上に配置する */
-body.is-pc.daimyo-select-mode #daimyo-confirm-modal .modal-content {
-    top: 20px !important; left: 20px !important;
-    bottom: auto !important; right: auto !important;
-}
-
-/* 独立させる「開始」「戻る」ボタンたち (シナリオに戻るボタンと同じ中央下部に配置) */
-body.daimyo-select-mode .daimyo-confirm-buttons {
-    position: absolute !important; /* ★ fixed から absolute に変更 */
-    bottom: 30px !important;
-    left: 50% !important;
-    transform: translateX(-50%) !important;
-    display: flex !important;
-    gap: 20px !important;
-    pointer-events: auto !important;
-    z-index: 4001 !important;
-}
-
-/* ★追加：スマホ版の「開始」「戻る」ボタンを縦に並べて、横幅いっぱいにする魔法 */
-body:not(.is-pc).daimyo-select-mode .daimyo-confirm-buttons {
-    flex-direction: column !important; /* 縦並びの合図 */
-    gap: 12px !important;
-    width: 90% !important; /* 横幅を広げます */
-    bottom: max(20px, env(safe-area-inset-bottom)) !important; /* 画面の下からの距離を調整 */
-}
-body:not(.is-pc).daimyo-select-mode .daimyo-confirm-buttons button {
-    width: 100% !important; /* ボタンの中身を限界まで横に広げます */
-    box-sizing: border-box !important;
-}
-
-/* PC版の見た目調整 */
-body.is-pc.daimyo-select-mode .daimyo-confirm-compact {
-    flex-direction: row !important; gap: 20px !important; text-align: left !important; align-items: flex-start !important;
-}
-body.is-pc.daimyo-select-mode .daimyo-confirm-compact .daimyo-confirm-face {
-    width: 120px !important; height: 120px !important; margin-bottom: 0 !important;
-}
-body.is-pc.daimyo-select-mode .daimyo-confirm-info {
-    align-items: flex-start !important; text-align: left !important; justify-content: flex-start !important;
 }
