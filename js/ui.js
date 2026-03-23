@@ -3101,32 +3101,26 @@ class UIManager {
     }
 
     showRetreatSelector(castle, candidates, onSelect) {
-        if (!this.scenarioScreen) return; 
-        this.scenarioScreen.classList.remove('hidden'); 
-        const title = this.scenarioScreen.querySelector('h2');
-        if(title) title.textContent = "撤退先選択";
+        const modal = document.getElementById('retreat-modal');
+        const list = document.getElementById('retreat-list');
+        if (!modal || !list) return; 
         
-        if (this.scenarioList) {
-            // 撤退画面の時は、元のグリッド（横並び）の魔法に戻します
-            this.scenarioList.className = 'clan-grid';
+        modal.classList.remove('hidden'); 
+        list.innerHTML = '';
+        
+        candidates.forEach(c => {
+            const div = document.createElement('div'); 
+            // 横並びのボタンデザイン（clan-btn）をそのまま再利用します
+            div.className = 'clan-btn'; 
+            div.innerHTML = `<div style="text-align:center;"><strong>${c.name}</strong><br><small>兵数:${c.soldiers} 防御:${c.defense}</small></div>`;
             
-            // シナリオ説明の窓は使わないので隠しておきます
-            const descBox = document.getElementById('scenario-desc-box');
-            if (descBox) descBox.style.display = 'none';
-
-            this.scenarioList.innerHTML = '';
-            candidates.forEach(c => {
-                const div = document.createElement('div'); div.className = 'scenario-item';
-                div.innerHTML = `<div class="scenario-title">${c.name}</div><div class="scenario-desc">兵数:${c.soldiers} 防御:${c.defense}</div>`;
-                div.onclick = () => { 
-                    if (window.AudioManager) window.AudioManager.playSE('choice.ogg');
-                    
-                    this.scenarioScreen.classList.add('hidden'); 
-                    onSelect(c.id); 
-                };
-                this.scenarioList.appendChild(div);
-            });
-        }
+            div.onclick = () => { 
+                if (window.AudioManager) window.AudioManager.playSE('choice.ogg');
+                modal.classList.add('hidden'); 
+                onSelect(c.id); 
+            };
+            list.appendChild(div);
+        });
     }
 
     showPrisonerModal(captives) {
