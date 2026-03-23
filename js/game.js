@@ -1115,6 +1115,12 @@ class GameManager {
             await this.eventManager.processEvents('startMonth_after');
         }
 
+        // ★ここから追加：毎月の初めに、各大名家に「作戦会議（カウントダウンの進行や新しい目標決め）」をさせます！
+        if (this.aiOperationManager) {
+            this.aiOperationManager.processMonthlyOperations();
+        }
+        // ★追加ここまで
+
         this.currentIndex = 0; 
         this.processTurn();
     }

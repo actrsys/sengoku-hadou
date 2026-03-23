@@ -165,137 +165,36 @@ class AIEngine {
             }
             
             // 軍事フェーズ
-            // プレイヤーの城で「城攻 不可」の場合は、攻撃をスキップします
-            let skipAttack = false;
-            if (Number(castle.ownerClan) === Number(this.game.playerClanId) && castle.isDelegated && !castle.allowAttack) {
-                skipAttack = true; // ストップの目印をつけます
-            }
-
-            // ★修正：「年」の差だけでなく、「月」の差も足し算して正確なターン数を数えます！
-            const startMonth = window.MainParams.StartMonth || 1; // 開始月（わからなければ1月とします）
-            const elapsedTurns = ((this.game.year - window.MainParams.StartYear) * 12) + (this.game.month - startMonth);
+            // ★ここをごっそり差し替え！：軍事フェーズ（新しい作戦システム版）
+            const myOperation = this.game.aiOperationManager.operations[castle.ownerClan];
             
-            // ★ここも書き換え！ ストップの目印（skipAttack）がついていない時だけ攻撃します
-            if (elapsedTurns >= 3 && !skipAttack) {
-                // ★追加：自分が従属している「親大名」を探します
-                const myClanId = castle.ownerClan;
-                let myBossId = 0;
-                for (const c of this.game.clans) {
-                    if (c.id !== myClanId) {
-                        const r = this.game.getRelation(myClanId, c.id);
-                        if (r && r.status === '従属') {
-                            myBossId = c.id;
-                            break;
+            // 自分の大名家に「作戦」があり、それが「攻撃」で、かつ「実行中」の場合
+            if (myOperation && myOperation.type === '攻撃' && myOperation.status === '実行中') {
+                // そして、自分のお城がその「出撃元（stagingBase）」に選ばれている場合だけ出陣します！
+                if (myOperation.stagingBase === castle.id) {
+                    
+                    // メモしておいたIDから、お城や諸勢力のデータを復元して出発の魔法を呼びます
+                    if (myOperation.isKunishuTarget) {
+                        const targetKunishu = this.game.kunishuSystem.getKunishu(myOperation.targetId);
+                        if (targetKunishu) {
+                            this.executeKunishuSubjugateAI(castle, targetKunishu, castellan, myOperation.requiredForce, myOperation.requiredRice);
                         }
-                    }
-                }
-
-                const neighbors = this.game.castles.filter(c => 
-                    // ★ c.ownerClan !== 0 && （空き城も対象にしました！）
-                    c.ownerClan !== myClanId && 
-                    GameSystem.isReachable(this.game, castle, c, myClanId)
-                );
-                
-                const validEnemies = neighbors.filter(target => {
-                    // ★追加：自領と直接隣接していない（同盟国などを通る）場合は攻撃不可にする！
-                    let isDirectlyAdjacent = false;
-                    if (target.adjacentCastleIds) {
-                        isDirectlyAdjacent = target.adjacentCastleIds.some(adjId => {
-                            const adjCastle = this.game.getCastle(adjId);
-                            return adjCastle && adjCastle.ownerClan === myClanId;
-                        });
-                    }
-                    if (!isDirectlyAdjacent) return false;
-
-                    // ★追加：空き城（0）の時は、同盟などの関係がないのでそのまま攻撃対象にします！
-                    if (target.ownerClan === 0) {
-                        if ((target.immunityUntil || 0) >= this.game.getCurrentTurnId()) return false;
-                        return true;
+                    } else {
+                        const targetCastle = this.game.getCastle(myOperation.targetId);
+                        if (targetCastle) {
+                            this.executeAttack(castle, targetCastle, castellan, myOperation.requiredForce, myOperation.requiredRice);
+                        }
                     }
                     
-                    const rel = this.game.getRelation(myClanId, target.ownerClan);
-                    // ★修正：外交専用の魔法を使います！
-                    const isProtected = rel && this.game.diplomacyManager.isNonAggression(rel.status);
-                    if (isProtected || (target.immunityUntil || 0) >= this.game.getCurrentTurnId()) return false;
-
-                    // ★追加：親大名がいる場合、親の「同盟国」や「他の従属国（親が支配している国）」は攻撃できない
-                    if (myBossId !== 0) {
-                        const bossRel = this.game.getRelation(myBossId, target.ownerClan);
-                        // ★修正：親大名の方も魔法を使います！
-                        if (bossRel && this.game.diplomacyManager.isNonAggression(bossRel.status)) {
-                            return false;
-                        }
-                    }
-
-                    return true;
-                });
-
-                // ★復活：自領内の諸勢力を制圧対象としてリストアップ
-                // ★さらに追加：城が「委任」されていない（直轄）時だけ、諸勢力への制圧を考えます！
-                if (!castle.isDelegated) {
-                    const kunishusInCastle = this.game.kunishuSystem.getKunishusInCastle(castle.id).filter(k => k.getRelation(myClanId) <= 30);
-                    kunishusInCastle.forEach(k => {
-                        validEnemies.push({
-                            isKunishuTarget: true,
-                            kunishu: k,
-                            id: castle.id,
-                            ownerClan: -1,
-                            soldiers: k.soldiers,
-                            defense: k.defense,
-                            name: k.getName(this.game)
-                        });
-                    });
-                }
-
-                if (validEnemies.length > 0) {
-                    const decision = this.decideAttackTarget(castle, castellan, validEnemies);
-                    if (decision) {
-                        if (decision.action === 'attack') {
-                            // ★追加：40%の確率で「やっぱりや〜めた！」を発動する魔法
-                            if (Math.random() < 0.40) {
-                                // まず、自分の大名（殿様）を探します
-                                const daimyo = this.game.bushos.find(b => b.clan === castle.ownerClan && b.isDaimyo) || castellan;
-                                // 城主と大名の「innovation（新しいもの好き度）」を足します（0〜200になります）
-                                const totalInno = castellan.innovation + daimyo.innovation;
-                                // 少しだけ気分屋にするために、ランダムで -20 から +20 の揺らぎ（サイコロ）を足します
-                                const randomInno = totalInno + (Math.random() * 40 - 20);
-                                // お城の貯金箱から、きっちり半分の金額を取り出します（端数は切り捨て！）
-                                const useGold = Math.floor(castle.gold / 2);
-                                
-                                // 数字が100以上なら鉄砲、100未満なら騎馬を買うことにします！
-                                if (randomInno >= 100) {
-                                    const priceGun = parseInt(window.MainParams.Economy.PriceGun, 10) || 50;
-                                    const buyAmount = Math.floor(useGold / priceGun); 
-                                    const actualCost = buyAmount * priceGun; 
-                                    if (buyAmount > 0) {
-                                        castle.gold -= actualCost; 
-                                        castle.guns = Math.min(99999, (castle.guns || 0) + buyAmount); 
-                                        castellan.isActionDone = true; 
-                                    }
-                                } else {
-                                    const priceHorse = parseInt(window.MainParams.Economy.PriceHorse, 10) || 5;
-                                    const buyAmount = Math.floor(useGold / priceHorse); 
-                                    const actualCost = buyAmount * priceHorse; 
-                                    if (buyAmount > 0) {
-                                        castle.gold -= actualCost; 
-                                        castle.horses = Math.min(99999, (castle.horses || 0) + buyAmount); 
-                                        castellan.isActionDone = true; 
-                                    }
-                                }
-                            } else {
-                                // 残りの60%は、予定通り攻撃に出発します！
-                                // ★復活：諸勢力への攻撃なら専用の魔法を使います！
-                                if (decision.target.isKunishuTarget) {
-                                    this.executeKunishuSubjugateAI(castle, decision.target.kunishu, castellan, decision.sendSoldiers, decision.sendRice);
-                                } else {
-                                    this.executeAttack(castle, decision.target, castellan, decision.sendSoldiers, decision.sendRice);
-                                }
-                                return; 
-                            }
-                        }
-                    }
+                    // ★出撃が終わったら、この作戦のメモは「完了」にして消しておきます
+                    myOperation.status = '完了';
+                    delete this.game.aiOperationManager.operations[castle.ownerClan];
+                    
+                    // 出陣したので、このお城のターンはおしまいです！
+                    return; 
                 }
             }
+            // ★差し替えここまで
             
             // 内政フェーズ (軍事行動をしなかった場合)
             this.execInternalAffairs(castle, castellan, mods, smartness);
@@ -678,8 +577,9 @@ class AIEngine {
             }
         });
 
-        if (bestTarget && Math.random() * 100 < highestProb) {
-            return { action: 'attack', target: bestTarget, sendSoldiers, sendRice: requiredRice };
+        // ★ここを書き換え！：確率のサイコロは後で振るので、ここでは「一番良かった目標」と「その点数(score)」を報告します！
+        if (bestTarget) {
+            return { action: 'attack', target: bestTarget, sendSoldiers: sendSoldiers, sendRice: requiredRice, score: highestProb };
         }
         
         // 攻撃する相手がいなかったら、おとなしく諦めます
