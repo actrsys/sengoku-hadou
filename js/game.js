@@ -577,16 +577,10 @@ class GameSystem {
                 if (!visited.has(next.id)) {
                     let canPass = false;
                     
+                    // 自分のお城（自領）だけを通り抜けられるようにします！
                     if (Number(next.ownerClan) === Number(movingClanId)) {
                         canPass = true;
                     } 
-                    // ★変更：ここも「0」より大きい（正規の大名家）時だけ調べるようにガードを強化しました！
-                    else if (Number(next.ownerClan) > 0) {
-                        const rel = game.getRelation(movingClanId, next.ownerClan);
-                        if (rel && (rel.status === '同盟' || rel.status === '支配')) {
-                            canPass = true;
-                        }
-                    }
                     
                     if (canPass) {
                         visited.add(next.id);
