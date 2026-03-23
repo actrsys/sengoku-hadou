@@ -1667,6 +1667,13 @@ Object.assign(WarManager.prototype, {
             return;
         }
 
+        // ★追加：守備側（目的地）のお城がある国が大雪だったら、誰も助けに来られないので諦めます！
+        const defProv = this.game.provinces.find(p => p.id === defCastle.provinceId);
+        if (defProv && defProv.statusEffects && defProv.statusEffects.includes('heavySnow')) {
+            onComplete(null);
+            return;
+        }
+
         let candidateCastles = [];
 
         this.game.castles.forEach(c => {
@@ -1755,6 +1762,13 @@ Object.assign(WarManager.prototype, {
         const pid = this.game.playerClanId;
         
         if (defClanId === 0 || defCastle.isKunishu || this.state.isKunishuSubjugation || this.state.attacker.isKunishu) {
+            onComplete();
+            return;
+        }
+
+        // ★追加：守備側（目的地）のお城がある国が大雪だったら、誰も助けに来られないので諦めます！
+        const defProv = this.game.provinces.find(p => p.id === defCastle.provinceId);
+        if (defProv && defProv.statusEffects && defProv.statusEffects.includes('heavySnow')) {
             onComplete();
             return;
         }

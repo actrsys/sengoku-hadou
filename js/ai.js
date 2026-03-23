@@ -179,28 +179,49 @@ class AIEngine {
                 // そして、自分のお城がその「出撃元（stagingBase）」に選ばれている場合だけ出陣します！
                 if (myOperation.stagingBase === castle.id) {
                     
-                    // メモしておいたIDから、お城や諸勢力のデータを復元して出発の魔法を呼びます
-                    if (myOperation.isKunishuTarget) {
-                        const targetKunishu = this.game.kunishuSystem.getKunishu(myOperation.targetId);
-                        if (targetKunishu) {
-                            this.executeKunishuSubjugateAI(castle, targetKunishu, castellan, myOperation.requiredForce, myOperation.requiredRice);
+                    // ★追加：出陣する前に、自分のお城か目的地が大雪になっていないか最終チェックをします！
+                    let isHeavySnow = false;
+                    const srcProv = this.game.provinces.find(p => p.id === castle.provinceId);
+                    if (srcProv && srcProv.statusEffects && srcProv.statusEffects.includes('heavySnow')) {
+                        isHeavySnow = true;
+                    }
+                    if (!isHeavySnow) {
+                        let targetProvId = castle.provinceId; // 諸勢力なら同じ国
+                        if (!myOperation.isKunishuTarget) {
+                            const targetCastle = this.game.getCastle(myOperation.targetId);
+                            if (targetCastle) targetProvId = targetCastle.provinceId;
                         }
-                    } else {
-                        const targetCastle = this.game.getCastle(myOperation.targetId);
-                        if (targetCastle) {
-                            this.executeAttack(castle, targetCastle, castellan, myOperation.requiredForce, myOperation.requiredRice);
+                        const tgtProv = this.game.provinces.find(p => p.id === targetProvId);
+                        if (tgtProv && tgtProv.statusEffects && tgtProv.statusEffects.includes('heavySnow')) {
+                            isHeavySnow = true;
                         }
                     }
-                    
-                    // ★出撃が終わったら、この作戦のメモは「完了」にして消しておきます
-                    myOperation.status = '完了';
-                    delete this.game.aiOperationManager.operations[castle.ownerClan];
-                    
-                    // 出陣したので、このお城のターンはおしまいです！
-                    return; 
+
+                    // 大雪じゃなければ、予定通り出陣します！
+                    if (!isHeavySnow) {
+                        // メモしておいたIDから、お城や諸勢力のデータを復元して出発の魔法を呼びます
+                        if (myOperation.isKunishuTarget) {
+                            const targetKunishu = this.game.kunishuSystem.getKunishu(myOperation.targetId);
+                            if (targetKunishu) {
+                                this.executeKunishuSubjugateAI(castle, targetKunishu, castellan, myOperation.requiredForce, myOperation.requiredRice);
+                            }
+                        } else {
+                            const targetCastle = this.game.getCastle(myOperation.targetId);
+                            if (targetCastle) {
+                                this.executeAttack(castle, targetCastle, castellan, myOperation.requiredForce, myOperation.requiredRice);
+                            }
+                        }
+                        
+                        // ★出撃が終わったら、この作戦のメモは「完了」にして消しておきます
+                        myOperation.status = '完了';
+                        delete this.game.aiOperationManager.operations[castle.ownerClan];
+                        
+                        // 出陣したので、このお城のターンはおしまいです！
+                        return; 
+                    }
+                    // 大雪の時は出陣を我慢して、何もしない（内政フェーズに進む）ようにします
                 }
             }
-            // ★差し替えここまで
             
             // 内政フェーズ (軍事行動をしなかった場合)
             this.execInternalAffairs(castle, castellan, mods, smartness);
