@@ -838,7 +838,7 @@ body.is-pc .princess-list-header, body.is-pc .princess-list-item {
    ========================================================= */
 /* シナリオ選択に戻るボタン (常に中央下部に配置) */
 .floating-back-btn {
-    position: fixed;
+    position: absolute; /* ★ fixed から absolute に変更（枠から飛び出さないように） */
     bottom: 30px;
     left: 50%;
     transform: translateX(-50%);
@@ -873,7 +873,7 @@ body:not(.is-pc).daimyo-select-mode #map-wrapper { margin-bottom: 0 !important; 
 
 /* フロート型の大名情報ウィンドウの大枠 */
 body.daimyo-select-mode #daimyo-confirm-modal {
-    position: fixed !important;
+    position: absolute !important; /* ★ fixed から absolute に変更 */
     top: 0 !important; left: 0 !important; right: 0 !important; bottom: 0 !important;
     width: 100% !important; height: 100% !important;
     background: transparent !important;
@@ -913,7 +913,7 @@ body.is-pc.daimyo-select-mode #daimyo-confirm-modal .modal-content {
 
 /* 独立させる「開始」「戻る」ボタンたち (シナリオに戻るボタンと同じ中央下部に配置) */
 body.daimyo-select-mode .daimyo-confirm-buttons {
-    position: fixed !important;
+    position: absolute !important; /* ★ fixed から absolute に変更 */
     bottom: 30px !important;
     left: 50% !important;
     transform: translateX(-50%) !important;
