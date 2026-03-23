@@ -124,6 +124,32 @@ class AIOperationManager {
                 // 点数が今までで一番高かったら、ベストな作戦としてメモを書き換えます
                 if (decision && decision.score > highestScore) {
                     highestScore = decision.score;
+                    
+                    // ★ここから追加：雪国かどうかを判定して「越冬」の準備をします
+                    let prepTurns = 2; // 基本の準備期間は2ヶ月
+                    
+                    // 大雪がよく降る国（降雪確率30%以上）の出席番号リストです
+                    const snowProvs = [1, 2, 3, 4, 5, 6, 7, 8, 10, 11, 12, 28];
+                    // 諸勢力が目標の時は、自分の城と同じ国として扱います
+                    const targetProvId = decision.target.isKunishuTarget ? myCastle.provinceId : decision.target.provinceId;
+                    
+                    // 出発する城か、目的地のお城のどちらかが雪国リストに入っていたら「越冬モード」を考えます
+                    const isSnowArea = snowProvs.includes(myCastle.provinceId) || snowProvs.includes(targetProvId);
+                    
+                    if (isSnowArea) {
+                        // 実行する予定の月を計算します（12を超えたら1に戻るようにします）
+                        let execMonth = this.game.month + prepTurns;
+                        if (execMonth > 12) execMonth -= 12;
+                        
+                        // もし実行予定の月が冬（12月、1月、2月）だったら、3月になるまで準備期間を毎月1ずつ延ばします
+                        while (execMonth === 12 || execMonth === 1 || execMonth === 2) {
+                            prepTurns++;
+                            execMonth = this.game.month + prepTurns;
+                            if (execMonth > 12) execMonth -= 12;
+                        }
+                    }
+                    // ★追加ここまで
+
                     bestOperation = {
                         type: '攻撃',
                         // セーブできるように、お城も諸勢力も「出席番号（ID）」だけで覚えます！
@@ -133,8 +159,8 @@ class AIOperationManager {
                         requiredForce: decision.sendSoldiers, // 必要な兵士
                         requiredRice: decision.sendRice,      // 必要な兵糧
                         assignedUnits: [], 
-                        turnsRemaining: 2, // ★準備期間は2ターン（2ヶ月）にします
-                        maxTurns: 5,       // 5ヶ月経っても実行できなかったら諦めます
+                        turnsRemaining: prepTurns, // ★計算した準備ターン（越冬なら長くなります）
+                        maxTurns: prepTurns + 3,   // ★待機中に期限切れで諦めないように、少し余裕を持たせます
                         status: '準備中'
                     };
                 }
