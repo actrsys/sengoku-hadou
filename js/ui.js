@@ -1036,6 +1036,11 @@ class UIManager {
 
         this.daimyoConfirmModal.classList.remove('hidden');
         
+        // ★ここから追加：独立させたボタンを表示する魔法です
+        const confirmButtons = document.querySelector('.daimyo-confirm-buttons');
+        if (confirmButtons) confirmButtons.classList.remove('hidden');
+        // ★追加ここまで
+        
         let faceHtml = "";
         if (leader && leader.faceIcon) {
             faceHtml = `<img src="data/images/faceicons/${leader.faceIcon}" class="daimyo-confirm-face" onerror="this.style.display='none'">`;
@@ -1056,29 +1061,25 @@ class UIManager {
         
         const startBtn = document.getElementById('daimyo-confirm-start-btn');
         if (startBtn) {
-            startBtn.style.display = '';
-            startBtn.textContent = "この大名で開始"; 
             startBtn.onclick = () => {
                 if (window.AudioManager) {
                     window.AudioManager.playBGM('SC_ex_Town2_Fortress.ogg');
                 }
 
                 this.daimyoConfirmModal.classList.add('hidden');
+                if (confirmButtons) confirmButtons.classList.add('hidden'); // 分離したボタンも隠す
+                
                 this.selectedDaimyoId = null; 
                 document.body.classList.remove('daimyo-select-mode'); 
-                // ★追加：ゲームが始まったら隠す合図を解除します
                 document.body.classList.remove('hide-daimyo-labels'); 
                 onStart();
             };
         }
         const backBtn = document.getElementById('daimyo-confirm-back-btn');
         if (backBtn) {
-            backBtn.style.display = '';
-            backBtn.textContent = "戻る";
             backBtn.onclick = () => {
                 this.selectedDaimyoId = null; 
                 this.updateCastleGlows();     
-                // ★追加：「戻る」を押したら隠す合図を解除して、名前シールを復活させます
                 document.body.classList.remove('hide-daimyo-labels'); 
                 this.renderMap(); 
             };

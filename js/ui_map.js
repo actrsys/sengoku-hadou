@@ -795,35 +795,40 @@ Object.assign(UIManager.prototype, {
         this.updateSnowOverlay(); // ★大雪の表示を更新します！
 
         // ==========================================
-        // ★大名選択時のフローティングUIを制御する魔法です！
+        // ★大名選択モードの見た目とボタンを切り替える魔法です！
         // ==========================================
         const backToScenarioBtn = document.getElementById('btn-back-to-scenario');
+        const confirmButtons = document.querySelector('.daimyo-confirm-buttons');
 
         if (isDaimyoSelect) {
-            document.body.classList.add('daimyo-select-mode'); // 大名選択中モードに切り替え
+            document.body.classList.add('daimyo-select-mode'); // 「今は大名選択中だよ！」という目印をつけます
             
+            // まだ大名を選んでいない時
             if (!this.selectedDaimyoId) {
-                // 【城を選んでいない時】大名情報を隠して、シナリオに戻るボタンを出す
+                // 大名情報の箱と、独立した「開始・戻る」ボタンを隠す
                 if (this.daimyoConfirmModal) this.daimyoConfirmModal.classList.add('hidden');
+                if (confirmButtons) confirmButtons.classList.add('hidden');
                 
+                // シナリオ選択に戻るボタンを出す
                 if (backToScenarioBtn) {
                     backToScenarioBtn.classList.remove('hidden');
                     backToScenarioBtn.onclick = () => {
                         if (window.AudioManager) window.AudioManager.playSE('cancel.ogg');
                         document.body.classList.remove('daimyo-select-mode');
                         backToScenarioBtn.classList.add('hidden');
-                        this.returnToTitle();
+                        this.returnToTitle(); 
                         if (window.GameApp) window.GameApp.startNewGame();
                     };
                 }
             } else {
-                // 【城を選んでいる時】シナリオに戻るボタンを隠す（大名情報の表示はui.jsが担当します）
+                // 大名を選んでいる時は「シナリオ選択に戻る」を隠す
+                // （大名情報や開始・戻るボタンの表示は ui.js が担当してくれます）
                 if (backToScenarioBtn) backToScenarioBtn.classList.add('hidden');
             }
         } else {
-            // 大名選択以外の時はすべて解除して隠す
-            document.body.classList.remove('daimyo-select-mode');
+            document.body.classList.remove('daimyo-select-mode'); // 終わったら目印を外します
             if (backToScenarioBtn) backToScenarioBtn.classList.add('hidden');
+            if (confirmButtons) confirmButtons.classList.add('hidden');
         }
         // ==========================================
     },
