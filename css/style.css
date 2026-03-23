@@ -900,9 +900,9 @@ body.daimyo-select-mode #daimyo-confirm-modal .modal-content {
     margin: 0 !important;
 }
 
-/* スマホ版：白いパネルを真ん中らへんに浮かせる */
+/* スマホ版：白いパネルを上部に浮かせるように変更！ */
 body:not(.is-pc).daimyo-select-mode #daimyo-confirm-modal .modal-content {
-    top: 40%; left: 50%; transform: translate(-50%, -50%);
+    top: max(20px, env(safe-area-inset-top)); left: 50%; transform: translateX(-50%);
 }
 
 /* PC版：白いパネルを左上に配置する */
@@ -921,6 +921,18 @@ body.daimyo-select-mode .daimyo-confirm-buttons {
     gap: 20px !important;
     pointer-events: auto !important;
     z-index: 4001 !important;
+}
+
+/* ★追加：スマホ版の「開始」「戻る」ボタンを縦に並べて、横幅いっぱいにする魔法 */
+body:not(.is-pc).daimyo-select-mode .daimyo-confirm-buttons {
+    flex-direction: column !important; /* 縦並びの合図 */
+    gap: 12px !important;
+    width: 90% !important; /* 横幅を広げます */
+    bottom: max(20px, env(safe-area-inset-bottom)) !important; /* 画面の下からの距離を調整 */
+}
+body:not(.is-pc).daimyo-select-mode .daimyo-confirm-buttons button {
+    width: 100% !important; /* ボタンの中身を限界まで横に広げます */
+    box-sizing: border-box !important;
 }
 
 /* PC版の見た目調整 */
