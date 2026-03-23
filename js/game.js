@@ -696,6 +696,7 @@ class GameManager {
         this.commandSystem = new CommandSystem(this);
         this.warManager = new WarManager(this);
         this.aiEngine = new AIEngine(this);
+        this.aiStaffing = new AIStaffing(this);
         this.aiOperationManager = new AIOperationManager(this);
         this.independenceSystem = new IndependenceSystem(this);
         this.factionSystem = new FactionSystem(this); 
