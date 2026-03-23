@@ -847,7 +847,7 @@ body.is-pc .princess-list-header, body.is-pc .princess-list-item {
    ★ 専用ロード画面の魔法
    ========================================================= */
 #global-loading-screen {
-    position: fixed;
+    position: absolute; /* ★差し替え：親要素（ゲーム画面）を基準にします */
     top: 0; 
     left: 0; 
     width: 100%; 
