@@ -112,49 +112,30 @@ img { pointer-events: none; -webkit-user-drag: none; user-drag: none; }
 #zoom-controls { display: none !important; }
 
 /* =========================================================
-   年月・浪人・米相場のフローティング表示（絶対に崩れない魔法）
+   年月・浪人・米相場のフローティング表示
    ========================================================= */
-/* 年月の箱（左下にガッチリ固定） */
 #mobile-floating-info { 
-    position: absolute !important; 
-    bottom: 20px !important; 
-    left: 10px !important; 
-    display: flex !important; 
-    flex-direction: column !important; 
-    gap: 6px !important; 
-    z-index: 500 !important; 
-    pointer-events: none !important; 
+    position: absolute; bottom: 20px; left: 10px; 
+    display: flex; flex-direction: column; gap: 6px; 
+    z-index: 500; pointer-events: none; 
 }
 
-/* 浪人と米相場の箱（右上にガッチリ固定し、横伸びを防止） */
 #mobile-floating-market { 
-    position: absolute !important; 
-    top: 10px !important; 
-    right: 10px !important; 
-    left: auto !important;  /* ★見えないゴムをここで断ち切ります！ */
-    width: auto !important; /* ★箱の幅を文字ぴったりに縮めます！ */
-    z-index: 500 !important; 
-    pointer-events: none !important; 
-    display: flex !important; 
-    flex-direction: row !important; /* 横並びを強制 */
-    justify-content: flex-end !important; 
-    gap: 10px !important; 
+    position: absolute; top: 10px; right: 10px; 
+    z-index: 500; pointer-events: none; 
+    display: flex; gap: 10px; 
+    justify-content: flex-end; 
+    align-items: flex-start; /* ★根本原因：要素が縦に引き伸ばされるのを防ぐ指定です */
 }
 
-/* 中身の文字と背景のデザイン（絶対に改行させない・背景を伸ばさない） */
 .floating-time, .floating-market { 
-    background: rgba(0, 0, 0, 0.75) !important; 
-    color: #fff !important; 
-    padding: 4px 12px !important; 
-    border-radius: 12px !important; 
-    font-size: 0.9rem !important; 
-    font-weight: bold !important; 
-    box-shadow: 0 2px 5px rgba(0,0,0,0.3) !important; 
-    border: 1px solid rgba(255,255,255,0.2) !important; 
-    width: max-content !important; /* ★背景が２行分に伸びるのを完全に防ぎます */
-    text-shadow: 1px 1px 2px rgba(0,0,0,0.8) !important; 
-    white-space: nowrap !important; /* ★文字を絶対に１行にします */
-    margin: 0 !important;
+    background: rgba(0, 0, 0, 0.75); color: #fff; 
+    padding: 4px 12px; border-radius: 12px; 
+    font-size: 0.9rem; font-weight: bold; 
+    box-shadow: 0 2px 5px rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.2); 
+    text-shadow: 1px 1px 2px rgba(0,0,0,0.8); 
+    white-space: nowrap; /* ★根本原因：文字が画面幅で自動改行されるのを防ぐ指定です */
+    line-height: 1.2; /* 行間による間延びをリセットします */
 }
 
 #map-guide { position: absolute; top: 10px; left: 50%; transform: translateX(-50%); background: rgba(0,0,0,0.8); color: #fff; padding: 8px 20px; border-radius: 20px; pointer-events: none; z-index: 600; font-weight: bold; box-shadow: 0 2px 5px rgba(0,0,0,0.3); }
