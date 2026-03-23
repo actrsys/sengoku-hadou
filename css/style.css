@@ -281,8 +281,8 @@ body.hide-daimyo-labels .daimyo-name-label { display: none !important; }
 
 .start-content { max-width: 600px; text-align: center; }
 .clan-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 10px; margin-top: 20px; overflow-y: auto; }
-/* シナリオ選択用の新しいリストデザイン（縦並び＆スクロール禁止） */
-.scenario-list-vertical { display: flex; flex-direction: column; gap: 10px; margin-top: 20px; overflow: hidden; }
+/* シナリオ選択用の新しいリストデザイン（縦並び＆端が切れないように余白を追加） */
+.scenario-list-vertical { display: flex; flex-direction: column; gap: 10px; margin-top: 20px; padding: 5px; overflow: visible; }
 .clan-btn { padding: 15px; border: 2px solid #ccc; border-radius: 8px; font-weight: bold; cursor: pointer; background: #fff; transition: transform 0.1s, background-color 0.2s, border-color 0.2s; display: flex; justify-content: center; align-items: center; }
 .clan-btn:hover { transform: scale(1.02); background: #f0f8ff; }
 .clan-btn.selected { background: #e3f2fd; border-color: #1976d2; color: #1976d2; box-shadow: 0 0 8px rgba(25, 118, 210, 0.4); transform: scale(1.02); }
@@ -806,4 +806,30 @@ body.is-pc {
 body.is-pc .princess-list-header, body.is-pc .princess-list-item {
     grid-template-columns: 140px 80px 80px 100px 100px;
     font-size: 0.95rem; min-height: 36px;
+}
+/* =========================================================
+   ★ 撤退先選択専用の魔法（完全独立版）
+   ========================================================= */
+.retreat-grid {
+    display: grid; 
+    grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); 
+    gap: 10px; 
+    margin-top: 20px; 
+    overflow-y: auto;
+}
+.retreat-btn { 
+    padding: 15px; 
+    border: 2px solid #ccc; 
+    border-radius: 8px; 
+    font-weight: bold; 
+    cursor: pointer; 
+    background: #fff; 
+    transition: transform 0.1s, background-color 0.2s, border-color 0.2s; 
+    display: flex; 
+    justify-content: center; 
+    align-items: center; 
+}
+.retreat-btn:hover { 
+    transform: scale(1.02); 
+    background: #f0f8ff; 
 }
