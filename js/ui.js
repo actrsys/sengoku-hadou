@@ -1039,6 +1039,10 @@ class UIManager {
         // ★ここから追加：独立させたボタンを表示する魔法です
         const confirmButtons = document.querySelector('.daimyo-confirm-buttons');
         if (confirmButtons) confirmButtons.classList.remove('hidden');
+        
+        // ★修正：大名情報が出た時に「シナリオ選択に戻る」ボタンを確実に隠す魔法です！
+        const backToScenarioBtn = document.getElementById('btn-back-to-scenario');
+        if (backToScenarioBtn) backToScenarioBtn.classList.add('hidden');
         // ★追加ここまで
         
         let faceHtml = "";
