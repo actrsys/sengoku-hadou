@@ -551,6 +551,7 @@ class UIManager {
         
         // ★ここから書き足し：前に遊んでいた時の画面の枠をしっかり隠します！
         if(this.panelEl) this.panelEl.classList.add('hidden'); // PC版のサイドバーを隠します
+        if(this.statusContainer) this.statusContainer.innerHTML = ''; // PC版の上の情報も消します
         if(this.mobileTopLeft) this.mobileTopLeft.innerHTML = ''; // スマホ版の上の情報を消します
         if(this.mobileFloatingInfo) this.mobileFloatingInfo.innerHTML = ''; // スマホ版の時計を消します
         if(this.mobileFloatingMarket) this.mobileFloatingMarket.innerHTML = ''; // スマホ版の相場を消します

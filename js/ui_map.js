@@ -435,7 +435,7 @@ Object.assign(UIManager.prototype, {
         }
     },
     
-    scrollToActiveCastle(castle = null) {
+    scrollToActiveCastle(castle = null, immediate = false) {
         const targetCastle = castle || this.currentCastle || this.game.getCurrentTurnCastle();
         const sc = document.getElementById('map-scroll-container');
         if (!sc || !targetCastle) return;
@@ -452,7 +452,7 @@ Object.assign(UIManager.prototype, {
         sc.scrollTo({
             left: scaledX - sc.clientWidth / 2,
             top: scaledY - sc.clientHeight / 2,
-            behavior: 'smooth'
+            behavior: immediate ? 'auto' : 'smooth'
         });
     },
     
@@ -481,19 +481,25 @@ Object.assign(UIManager.prototype, {
                     const isPC = document.body.classList.contains('is-pc'); // 今がPC版かどうか調べます
                     const folderName = this.game.scenarioFolder; // さっき覚えさせたシナリオのフォルダ名を取り出します
                     
+                    // ゲームの続きから（ロード時など）の場合は、今ターンの城を優先します
+                    const currentTarget = this.currentCastle || this.game.getCurrentTurnCastle();
+                    
                     // 設定箱の中から、今のシナリオ用の設定を探します（無ければDEFAULTを使います）
                     const config = INITIAL_MAP_CENTER_CONFIG[folderName] || INITIAL_MAP_CENTER_CONFIG.DEFAULT;
                     // PCかスマホかで、使うIDを選びます
                     const centerCastleId = isPC ? config.PC : config.MOBILE;
                     
-                    const centerCastle = this.game.getCastle(centerCastleId);
+                    const centerCastle = currentTarget || this.game.getCastle(centerCastleId);
                     if (centerCastle) {
-                        // お城が見つかったら、そこを真ん中にして映します
-                        this.scrollToActiveCastle(centerCastle);
+                        // お城が見つかったら、そこを真ん中にして映します。最初は一瞬で移動させます！
+                        this.scrollToActiveCastle(centerCastle, true);
                     } else {
                         // もしお城が見つからなかった時のためのお守りです（今まで通り全体の真ん中を映します）
-                        sc.scrollTop = (sc.scrollHeight - sc.clientHeight) / 2;
-                        sc.scrollLeft = (sc.scrollWidth - sc.clientWidth) / 2;
+                        sc.scrollTo({
+                            left: (sc.scrollWidth - sc.clientWidth) / 2,
+                            top: (sc.scrollHeight - sc.clientHeight) / 2,
+                            behavior: 'auto'
+                        });
                     }
                 }, 0);
             }

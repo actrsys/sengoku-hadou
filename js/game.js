@@ -742,6 +742,9 @@ class GameManager {
         if (this.ui) {
             this.ui.logHistory = [];
             this.ui.clearWarLog();
+            this.ui.currentCastle = null; // 前の城の記憶を消します
+            this.ui.hasInitializedMap = false; // マップも最初から作り直すようにします
+            this.ui.selectedDaimyoId = null; // 選んでいた大名の記憶も消します
         }
         // ★お掃除ここまで！
 
@@ -787,7 +790,7 @@ class GameManager {
             
             this.phase = 'daimyo_select';
             this.ui.renderMap();
-            await this.ui.showCutin("開始する大名家の城を選択してください");
+            // カットイン表示を消しました！
             
         } catch (e) {
             console.error(e);
