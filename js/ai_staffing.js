@@ -48,9 +48,12 @@ class AIStaffing {
                 // 攻撃目標に届くお城のリストを作ります
                 const reachables = reachableMyCastles.filter(c => {
                     if (myOp.isKunishuTarget) {
-                        return c.id === myOp.stagingBase || GameSystem.isAdjacent(c, this.game.getCastle(myOp.stagingBase));
+                        // 諸勢力の場合は、その諸勢力がいるお城（stagingBase）まで「最大3マス」で届くか調べます
+                        const stagingCastle = this.game.getCastle(myOp.stagingBase);
+                        return c.id === myOp.stagingBase || (stagingCastle && GameSystem.isReachable(this.game, c, stagingCastle, clanId));
                     } else if (enemyCastle) {
-                        return GameSystem.isAdjacent(c, enemyCastle);
+                        // 敵のお城の場合は、そのお城まで「最大3マス」で届くか調べます
+                        return GameSystem.isReachable(this.game, c, enemyCastle, clanId);
                     }
                     return false;
                 });
