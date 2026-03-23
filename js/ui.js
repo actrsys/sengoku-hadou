@@ -114,10 +114,8 @@ class UIManager {
                 // 何度も押されないように、1回押されたらクリックの魔法を解除します
                 titleScreen.removeEventListener('click', onTitleClick);
 
-                // メッセージを「準備中」に変えて、点滅も止めます
-                tapMessage.textContent = "データを準備しています...";
-                tapMessage.style.animation = "none";
-                tapMessage.style.opacity = "1";
+                // ★追加：ここで専用のロード画面をパッと出します！
+                this.showLoadingScreen();
 
                 // 音を鳴らす準備（ブラウザのルールで、ユーザーが画面を触った瞬間に鳴らすのが一番安全です）
                 if (window.AudioManager) {
@@ -161,6 +159,9 @@ class UIManager {
                 // 準備が終わったら、メッセージを隠してメニューボタンを出します！
                 tapMessage.classList.add('hidden');
                 menuButtons.classList.remove('hidden');
+
+                // ★追加：裏側の準備がすべて終わったら、ロード画面をサッと隠します！
+                this.hideLoadingScreen();
             };
             titleScreen.addEventListener('click', onTitleClick);
         }
@@ -1028,7 +1029,11 @@ class UIManager {
             });
         }
     }
-    returnToTitle() { 
+    async returnToTitle() { 
+        // ★追加：お掃除を始める前に、画面をロード画面で隠します
+        this.showLoadingScreen();
+        await new Promise(resolve => setTimeout(resolve, 50));
+
         this.forceResetModals();
         const ts = document.getElementById('title-screen');
         if(ts) ts.classList.remove('hidden'); 
@@ -1038,6 +1043,10 @@ class UIManager {
             window.AudioManager.playBGM('SC_ex_Town1_Castle.ogg');
         }
         // ★書き足すのはここまで！
+
+        // ★追加：お掃除が終わってタイトル画面が出たら、少し待ってからロード画面を隠します
+        await new Promise(resolve => setTimeout(resolve, 100));
+        this.hideLoadingScreen();
     }
     
     // ★ ここをごっそり差し替え！：大名選択の確認画面を、ギュッと小さくコンパクトにする魔法です！
