@@ -843,3 +843,38 @@ body.is-pc .princess-list-header, body.is-pc .princess-list-item {
     transform: scale(1.02); 
     background: #f0f8ff; 
 }
+/* =========================================================
+   ★ 専用ロード画面の魔法
+   ========================================================= */
+#global-loading-screen {
+    position: fixed;
+    top: 0; 
+    left: 0; 
+    width: 100%; 
+    height: 100%;
+    background-color: #263238; /* タイトル画面のような暗い色 */
+    z-index: 9999; /* どんな画面よりも手前に出します */
+    display: flex;
+    justify-content: flex-end; /* 右に寄せます */
+    align-items: flex-end;     /* 下に寄せます */
+    padding: 40px;
+    box-sizing: border-box;
+}
+
+#global-loading-screen.hidden {
+    display: none; /* 隠す時は完全に無いものとします */
+}
+
+.loading-text {
+    color: #ffffff;
+    font-size: 1.5rem;
+    letter-spacing: 4px; /* 文字と文字の間を少し開けます */
+    animation: blink-loading 1.5s infinite; /* チカチカ動くアニメーションの名前です */
+}
+
+/* ロード中の文字がフワッ、と点滅する動きの指定です */
+@keyframes blink-loading {
+    0% { opacity: 0.3; }
+    50% { opacity: 1; }
+    100% { opacity: 0.3; }
+}
