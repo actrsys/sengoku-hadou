@@ -795,41 +795,35 @@ Object.assign(UIManager.prototype, {
         this.updateSnowOverlay(); // ★大雪の表示を更新します！
 
         // ==========================================
-        // ★スマホで大名を選ぶ時専用の「ボトムバー」を出す魔法です！
+        // ★大名選択時のフローティングUIを制御する魔法です！
         // ==========================================
+        const backToScenarioBtn = document.getElementById('btn-back-to-scenario');
+
         if (isDaimyoSelect) {
-            document.body.classList.add('daimyo-select-mode'); // 「今は大名選択中だよ！」という目印をつけます
+            document.body.classList.add('daimyo-select-mode'); // 大名選択中モードに切り替え
             
-            // まだ大名を選んでいない時は、案内メッセージを出しておきます
-            if (this.daimyoConfirmModal && !this.selectedDaimyoId) {
-                this.daimyoConfirmModal.classList.remove('hidden');
-                if (this.daimyoConfirmBody) {
-                    this.daimyoConfirmBody.innerHTML = `
-                        <div style="text-align:center; padding: 20px 0; color: #555; font-size: 1.05rem; font-weight: bold;">
-                            操作する勢力を選択してください。
-                        </div>
-                    `;
-                }
-                const startBtn = document.getElementById('daimyo-confirm-start-btn');
-                const backBtn = document.getElementById('daimyo-confirm-back-btn');
-                if(startBtn) startBtn.style.display = 'none'; // 開始ボタンは隠します
+            if (!this.selectedDaimyoId) {
+                // 【城を選んでいない時】大名情報を隠して、シナリオに戻るボタンを出す
+                if (this.daimyoConfirmModal) this.daimyoConfirmModal.classList.add('hidden');
                 
-                // 戻るボタンだけを表示して、シナリオ選択に戻る働きを持たせます
-                if(backBtn) {
-                    backBtn.style.display = ''; 
-                    backBtn.textContent = '戻る';
-                    backBtn.onclick = () => {
+                if (backToScenarioBtn) {
+                    backToScenarioBtn.classList.remove('hidden');
+                    backToScenarioBtn.onclick = () => {
                         if (window.AudioManager) window.AudioManager.playSE('cancel.ogg');
-                        // 大名選択の画面を閉じて、シナリオ選択に戻ります
-                        this.daimyoConfirmModal.classList.add('hidden');
                         document.body.classList.remove('daimyo-select-mode');
-                        this.returnToTitle(); 
+                        backToScenarioBtn.classList.add('hidden');
+                        this.returnToTitle();
                         if (window.GameApp) window.GameApp.startNewGame();
                     };
                 }
+            } else {
+                // 【城を選んでいる時】シナリオに戻るボタンを隠す（大名情報の表示はui.jsが担当します）
+                if (backToScenarioBtn) backToScenarioBtn.classList.add('hidden');
             }
         } else {
-            document.body.classList.remove('daimyo-select-mode'); // 終わったら目印を外します
+            // 大名選択以外の時はすべて解除して隠す
+            document.body.classList.remove('daimyo-select-mode');
+            if (backToScenarioBtn) backToScenarioBtn.classList.add('hidden');
         }
         // ==========================================
     },
