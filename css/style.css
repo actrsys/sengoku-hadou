@@ -111,11 +111,14 @@ img { pointer-events: none; -webkit-user-drag: none; user-drag: none; }
 #pc-map-overlay { display: none !important; }
 #zoom-controls { display: none !important; }
 
+/* 年月の箱です（絶対に左下になるように戻しました！） */
 #mobile-floating-info { position: absolute; bottom: 20px; left: 10px; display: flex; flex-direction: column; gap: 6px; z-index: 500; pointer-events: none; }
 
-#mobile-floating-market { position: absolute; top: 10px; right: 10px; z-index: 500; pointer-events: none; display: flex; justify-content: flex-end; gap: 10px; flex-wrap: nowrap; }
+/* 浪人と米相場の箱です（横並びのまま、右端に寄せます） */
+#mobile-floating-market { position: absolute; top: 10px; right: 10px; z-index: 500; pointer-events: none; display: flex; justify-content: flex-end; align-items: flex-start; gap: 10px; }
 
-.floating-time, .floating-market { background: rgba(0, 0, 0, 0.75); color: #fff; padding: 4px 12px; border-radius: 12px; font-size: 0.9rem; font-weight: bold; box-shadow: 0 2px 5px rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.2); width: fit-content; text-shadow: 1px 1px 2px rgba(0,0,0,0.8); white-space: nowrap; }
+/* 文字と背景の魔法です（スマホでも絶対に1行になり、背景が間延びしないように「max-content」を使います） */
+.floating-time, .floating-market { background: rgba(0, 0, 0, 0.75); color: #fff; padding: 4px 12px; border-radius: 12px; font-size: 0.9rem; font-weight: bold; box-shadow: 0 2px 5px rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.2); width: max-content; height: max-content; text-shadow: 1px 1px 2px rgba(0,0,0,0.8); white-space: nowrap; }
 
 #map-guide { position: absolute; top: 10px; left: 50%; transform: translateX(-50%); background: rgba(0,0,0,0.8); color: #fff; padding: 8px 20px; border-radius: 20px; pointer-events: none; z-index: 600; font-weight: bold; box-shadow: 0 2px 5px rgba(0,0,0,0.3); }
 
