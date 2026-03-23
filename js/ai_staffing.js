@@ -343,10 +343,19 @@ class AIStaffing {
         // 特別な理由がなくても、武将が1人しかいない（空き城に近い）城があれば、バランス調整のために移動します
         const emptyCastles = reachableMyCastles.filter(c => c.samuraiIds.length <= 1 && c.id !== castle.id);
         if (emptyCastles.length > 0 && castle.samuraiIds.length > 4) {
-            // お城から、城主以外の適当な人を1人選びます
-            const randomMover = availableBushos.find(b => b.id !== castle.castellanId);
-            if (randomMover) {
-                return { type: 'move', stat: 'leadership', score: 250, cost: 0, targetId: emptyCastles[0].id, movers: [randomMover] };
+            // お城から、城主以外の人を「能力の合計が低い順」に並べ替えます
+            const lowSkillMovers = availableBushos
+                .filter(b => b.id !== castle.castellanId)
+                .sort((a, b) => {
+                    const totalA = a.leadership + a.strength + a.politics + a.diplomacy + a.intelligence;
+                    const totalB = b.leadership + b.strength + b.politics + b.diplomacy + b.intelligence;
+                    return totalA - totalB; // 点数が低い人が一番前に来ます
+                });
+
+            // 並べ替えた列の、一番前にいる人（一番能力が低い人）をお留守番に選びます
+            if (lowSkillMovers.length > 0) {
+                const mover = lowSkillMovers[0];
+                return { type: 'move', stat: 'leadership', score: 250, cost: 0, targetId: emptyCastles[0].id, movers: [mover] };
             }
         }
 
