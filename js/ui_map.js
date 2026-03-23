@@ -818,7 +818,7 @@ Object.assign(UIManager.prototype, {
                 if (backToScenarioBtn) {
                     backToScenarioBtn.classList.remove('hidden');
                     backToScenarioBtn.onclick = () => {
-                        if (window.AudioManager) window.AudioManager.playSE('cancel.ogg');
+                        // ★修正：二重に鳴るのを防ぐため、ここでの音の魔法を消します
                         document.body.classList.remove('daimyo-select-mode');
                         backToScenarioBtn.classList.add('hidden');
                         this.returnToTitle(); 
