@@ -244,7 +244,7 @@ class AIStaffing {
 
         let movers = [];
         let bestTargetCastle = null;
-        let highestMoveScore = 0;
+        let highestScoreDiff = 0; // どれくらい「今の城より魅力的か（大差があるか）」を覚える箱
 
         // 今のお城にいる武将たちを順番に見ていきます
         for (let busho of availableBushos) {
@@ -254,80 +254,82 @@ class AIStaffing {
             if (!bTypeInfo) continue;
 
             const bType = bTypeInfo.mainType;
-            let wantsToMove = false;
-            let targetPreferences = [];
+            let currentCastleScore = 0;
+            let bestTargetScore = 0;
+            let targetForThisBusho = null;
 
-            // 今のお城の状況と、武将のタイプを見比べて「ここに居たくない理由」を探します
-            
-            // 1. 無能型は前線に居たくないので後方へ逃げたがります
-            if (bType === '無能型' && currentRoleData.role === '前線拠点') {
-                wantsToMove = true;
-                targetPreferences = ['後方拠点', '準前線拠点'];
-            }
-            
-            // 2. 万能型は、根拠地や前線など重要な場所に居たがります
-            if (bType === '万能型' && currentRoleData.role === '後方拠点' && !currentRoleData.isBase) {
-                wantsToMove = true;
-                targetPreferences = ['根拠地', '受け皿として強い準前線'];
-            }
+            // 自領のすべてのお城（今の城を含む）に、この武将にとっての「魅力点数」をつけていきます
+            for (let target of reachableMyCastles) {
+                const tRoleData = castleRoles.get(target.id);
+                if (!tRoleData) continue;
 
-            // 3. 前線拠点が弱すぎる（受け皿スコアが低い）場合、武将は強い準前線に下がって援軍の準備をしたくなります
-            if (currentRoleData.role === '前線拠点' && currentRoleData.receiverScore < 1000) {
-                // 最低限の防衛人数（城主含め3人）を残して、強い武将は後ろに下がります
-                const remainingCount = castle.samuraiIds.length - movers.length;
-                if (remainingCount > 3) {
-                    wantsToMove = true;
-                    targetPreferences = ['受け皿として強い準前線'];
+                let score = 0;
+
+                // 1. お城の基本ステータス（総合評価）が高いとプラス
+                score += tRoleData.totalScore / 5;
+
+                // 2. 空の城・手薄な城へのボーナス！
+                if (target.samuraiIds.length === 0) {
+                    score += 150; // 空っぽなら超優先！
+                } else if (target.samuraiIds.length === 1) {
+                    score += 80;  // 1人しかいない場合も優先
+                } else if (target.samuraiIds.length === 2) {
+                    score += 30;
+                }
+
+                // 3. 開発の余地ボーナス
+                const devRoom = (target.maxKokudaka - target.kokudaka) + (target.maxCommerce - target.commerce);
+                if (devRoom > 1000) {
+                    score += 50;
+                    if (bTypeInfo.isSpecialist && busho.politics >= 70) score += 100; // 内政得意な人ならさらにドン！
+                } else if (devRoom > 500) {
+                    score += 20;
+                    if (bTypeInfo.isSpecialist && busho.politics >= 70) score += 50;
+                }
+
+                // 4. 武将のタイプによる好み
+                if (bType === '無能型') {
+                    // 弱い人は前線を嫌がり、後方を喜びます（手薄な城のお留守番にも向いています）
+                    if (tRoleData.role === '前線拠点') score -= 100;
+                    if (tRoleData.role === '後方拠点') score += 50;
+                } else if (bType === '万能型') {
+                    // エースは重要な場所（根拠地や前線）に居たがります
+                    if (tRoleData.isBase) score += 80;
+                    if (tRoleData.role === '前線拠点' || tRoleData.role === '準前線拠点') score += 50;
+                }
+
+                // 5. 弱い前線からの退避と、強い受け皿への集結
+                if (tRoleData.role === '準前線拠点') {
+                    score += tRoleData.receiverScore / 20; // 受け皿として強いほど魅力アップ
+                }
+
+                // 6. 攻撃作戦の準備拠点ならプラス
+                const myOp = this.game.aiOperationManager.operations[clanId];
+                if (clanGoal === '攻撃準備' && myOp && myOp.stagingBase === target.id) {
+                    if (bType !== '無能型') score += 150;
+                }
+
+                // 計算した点数を、今の城と移動先で振り分けます
+                if (target.id === castle.id) {
+                    currentCastleScore = score; // 今の城の点数
+                } else {
+                    if (score > bestTargetScore) {
+                        bestTargetScore = score;
+                        targetForThisBusho = target;
+                    }
                 }
             }
 
-            // 4. 内政特化の武将は、開発の余地が大きい後方拠点に行きたがります
-            if (bTypeInfo.isSpecialist && busho.politics >= 70 && (castle.kokudaka >= castle.maxKokudaka && castle.commerce >= castle.maxCommerce)) {
-                wantsToMove = true;
-                targetPreferences = ['開発余地のある後方'];
-            }
-
-            // 5. 作戦システムで攻撃拠点に選ばれている城には、バランス型や万能型が集結したがります
-            const myOp = this.game.aiOperationManager.operations[clanId];
-            if (clanGoal === '攻撃準備' && myOp && myOp.stagingBase !== castle.id) {
-                if (bType !== '無能型') {
-                    wantsToMove = true;
-                    targetPreferences = ['攻撃拠点'];
-                }
-            }
-
-            // 移動したい理由があれば、行き先を探します
-            if (wantsToMove) {
-                for (let target of reachableMyCastles) {
-                    if (target.id === castle.id) continue;
-                    
-                    const tRoleData = castleRoles.get(target.id);
-                    if (!tRoleData) continue;
-
-                    let score = 0;
-
-                    if (targetPreferences.includes('後方拠点') && tRoleData.role === '後方拠点') score += 100;
-                    if (targetPreferences.includes('準前線拠点') && tRoleData.role === '準前線拠点') score += 50;
-                    if (targetPreferences.includes('根拠地') && tRoleData.isBase) score += 150;
-                    
-                    if (targetPreferences.includes('受け皿として強い準前線') && tRoleData.role === '準前線拠点') {
-                        score += tRoleData.receiverScore / 10; // 受け皿スコアが高いほど優先
-                    }
-
-                    if (targetPreferences.includes('開発余地のある後方') && tRoleData.role === '後方拠点') {
-                        const room = (target.maxKokudaka - target.kokudaka) + (target.maxCommerce - target.commerce);
-                        if (room > 500) score += 120;
-                    }
-
-                    if (targetPreferences.includes('攻撃拠点') && myOp && myOp.stagingBase === target.id) {
-                        score += 200; // 攻撃の出撃拠点には最優先で集まります
-                    }
-
-                    if (score > highestMoveScore) {
-                        highestMoveScore = score;
-                        bestTargetCastle = target;
-                        movers = [busho]; // 一番目的が合致した人を行かせます
-                    }
+            // ★ここで「今の城」と「一番良い移動先」を比べます！
+            // 「50点以上の大差」がないと、引っ越しの面倒くささが勝って居座ります！
+            const scoreDiff = bestTargetScore - currentCastleScore;
+            
+            if (targetForThisBusho && scoreDiff >= 50) {
+                // 大差があって、しかも今まで見た武将の中で一番「行きたい気持ち（点数差）」が強かったら
+                if (scoreDiff > highestScoreDiff) {
+                    highestScoreDiff = scoreDiff;
+                    bestTargetCastle = targetForThisBusho;
+                    movers = [busho];
                 }
             }
         }
@@ -335,30 +337,11 @@ class AIStaffing {
         // 今のお城に最低3人は残るように制限をかけます
         if (movers.length > 0 && bestTargetCastle) {
             if (castle.samuraiIds.length - movers.length >= 3) {
-                // スコアの基本値を300とし、そこに計算したスコアを足して優先度を決めます
-                return { type: 'move', stat: 'leadership', score: 300 + highestMoveScore, cost: 0, targetId: bestTargetCastle.id, movers: movers };
+                // 引っ越し決定！
+                return { type: 'move', stat: 'leadership', score: 300 + highestScoreDiff, cost: 0, targetId: bestTargetCastle.id, movers: movers };
             }
         }
 
-        // 特別な理由がなくても、武将が1人しかいない（空き城に近い）城があれば、バランス調整のために移動します
-        const emptyCastles = reachableMyCastles.filter(c => c.samuraiIds.length <= 1 && c.id !== castle.id);
-        if (emptyCastles.length > 0 && castle.samuraiIds.length > 4) {
-            // お城から、城主以外の人を「能力の合計が低い順」に並べ替えます
-            const lowSkillMovers = availableBushos
-                .filter(b => b.id !== castle.castellanId)
-                .sort((a, b) => {
-                    const totalA = a.leadership + a.strength + a.politics + a.diplomacy + a.intelligence;
-                    const totalB = b.leadership + b.strength + b.politics + b.diplomacy + b.intelligence;
-                    return totalA - totalB; // 点数が低い人が一番前に来ます
-                });
-
-            // 並べ替えた列の、一番前にいる人（一番能力が低い人）をお留守番に選びます
-            if (lowSkillMovers.length > 0) {
-                const mover = lowSkillMovers[0];
-                return { type: 'move', stat: 'leadership', score: 250, cost: 0, targetId: emptyCastles[0].id, movers: [mover] };
-            }
-        }
-
-        return null;
+        return null; // 大差がなければ誰も移動しません（居座る）
     }
 }
