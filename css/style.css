@@ -861,18 +861,18 @@ body.is-pc .princess-list-header, body.is-pc .princess-list-item {
     transform: translateX(-50%) scale(1.05);
 }
 
-/* 大名選択中のマップ全画面化とサイドバー隠しの魔法 */
+/* 隠すクラス */
+.floating-back-btn.hidden, .daimyo-confirm-buttons.hidden {
+    display: none !important;
+}
+
+/* ★サイドバーとボトムバーを完全に消し去る魔法 */
 body.daimyo-select-mode #pc-sidebar { display: none !important; }
 body.daimyo-select-mode #bottom-command-bar { display: none !important; }
 body:not(.is-pc).daimyo-select-mode #map-wrapper { margin-bottom: 0 !important; height: 100% !important; flex: 1 !important; }
 
-/* ★バグ修正：隠す合図（hidden）が出ている時は、透明ボタンが残らないように完全に消し去ります！ */
-body.daimyo-select-mode #daimyo-confirm-modal.hidden {
-    display: none !important;
-}
-
 /* フロート型の大名情報ウィンドウの大枠 */
-body.daimyo-select-mode #daimyo-confirm-modal:not(.hidden) {
+body.daimyo-select-mode #daimyo-confirm-modal {
     position: fixed !important;
     top: 0 !important; left: 0 !important; right: 0 !important; bottom: 0 !important;
     width: 100% !important; height: 100% !important;
@@ -882,8 +882,12 @@ body.daimyo-select-mode #daimyo-confirm-modal:not(.hidden) {
     display: block !important;
 }
 
-/* 大名情報の白いパネル本体 */
-body.daimyo-select-mode #daimyo-confirm-body {
+body.daimyo-select-mode #daimyo-confirm-modal.hidden {
+    display: none !important;
+}
+
+/* 大名情報の白いパネル本体 (PCは左上、スマホは中央) */
+body.daimyo-select-mode #daimyo-confirm-modal .modal-content {
     position: absolute !important;
     width: auto !important; max-width: 90% !important;
     height: auto !important; max-height: 80% !important;
@@ -893,16 +897,18 @@ body.daimyo-select-mode #daimyo-confirm-body {
     box-shadow: 0 10px 25px rgba(0,0,0,0.5) !important;
     pointer-events: auto !important;
     overflow-y: auto !important;
+    margin: 0 !important;
 }
 
 /* スマホ版：白いパネルを真ん中らへんに浮かせる */
-body:not(.is-pc).daimyo-select-mode #daimyo-confirm-body {
+body:not(.is-pc).daimyo-select-mode #daimyo-confirm-modal .modal-content {
     top: 40%; left: 50%; transform: translate(-50%, -50%);
 }
 
 /* PC版：白いパネルを左上に配置する */
-body.is-pc.daimyo-select-mode #daimyo-confirm-body {
+body.is-pc.daimyo-select-mode #daimyo-confirm-modal .modal-content {
     top: 20px !important; left: 20px !important;
+    bottom: auto !important; right: auto !important;
 }
 
 /* 独立させる「開始」「戻る」ボタンたち (シナリオに戻るボタンと同じ中央下部に配置) */
@@ -913,17 +919,17 @@ body.daimyo-select-mode .daimyo-confirm-buttons {
     transform: translateX(-50%) !important;
     display: flex !important;
     gap: 20px !important;
-    pointer-events: auto !important; /* ボタンはしっかり押せるようにします */
+    pointer-events: auto !important;
     z-index: 4001 !important;
 }
 
-/* PC版の見た目調整（以前のものを引き継ぎ） */
+/* PC版の見た目調整 */
 body.is-pc.daimyo-select-mode .daimyo-confirm-compact {
-    flex-direction: row !important; gap: 20px !important;
+    flex-direction: row !important; gap: 20px !important; text-align: left !important; align-items: flex-start !important;
 }
 body.is-pc.daimyo-select-mode .daimyo-confirm-compact .daimyo-confirm-face {
-    width: 120px !important; height: 120px !important;
+    width: 120px !important; height: 120px !important; margin-bottom: 0 !important;
 }
 body.is-pc.daimyo-select-mode .daimyo-confirm-info {
-    align-items: flex-start !important; text-align: left !important;
+    align-items: flex-start !important; text-align: left !important; justify-content: flex-start !important;
 }
