@@ -953,16 +953,49 @@ class UIManager {
         this.forceResetModals();
         if (!this.scenarioScreen) return;
         this.scenarioScreen.classList.remove('hidden'); 
+        
+        const descBox = document.getElementById('scenario-desc-box');
+        if (descBox) {
+            descBox.style.display = 'none';
+            descBox.innerHTML = '';
+        }
+
         if (this.scenarioList) {
             this.scenarioList.innerHTML = '';
+            // 縦並びにしてスクロールを禁止する魔法のクラスに書き換えます
+            this.scenarioList.className = 'scenario-list-vertical';
+            
+            let selectedScenario = null; // 今選ばれているシナリオを覚えておく箱です
+
             scenarios.forEach(s => {
-                const div = document.createElement('div'); div.className = 'clan-btn';
-                div.innerHTML = `<div style="text-align:left;"><strong>${s.name}</strong><br><small>${s.desc}</small></div>`;
+                const div = document.createElement('div'); 
+                div.className = 'clan-btn';
+                // 名前だけを真ん中に表示するようにします
+                div.innerHTML = `<strong>${s.name}</strong>`;
+                
                 div.onclick = () => { 
-                    if (window.AudioManager) window.AudioManager.playSE('choice.ogg');
-                    
-                    this.scenarioScreen.classList.add('hidden'); 
-                    onSelect(s.folder); 
+                    // 1回目に押した時（選択した時）
+                    if (selectedScenario !== s) {
+                        if (window.AudioManager) window.AudioManager.playSE('choice.ogg');
+                        
+                        // 他のボタンの色を元に戻して、今押したボタンだけ色を変えます
+                        Array.from(this.scenarioList.children).forEach(child => child.classList.remove('selected'));
+                        div.classList.add('selected');
+                        selectedScenario = s;
+
+                        // 下の説明用の窓に文章を出して、見えるようにします
+                        if (descBox) {
+                            descBox.innerHTML = `<strong style="font-size:1.1rem;">${s.name}</strong><br><br>${s.desc}`;
+                            descBox.style.display = 'block';
+                        }
+                    } 
+                    // 2回目に押した時（決定した時）
+                    else {
+                        if (window.AudioManager) window.AudioManager.playSE('decision.ogg');
+                        
+                        this.scenarioScreen.classList.add('hidden'); 
+                        onSelect(s.folder); 
+                    }
                 };
                 this.scenarioList.appendChild(div);
             });
@@ -3074,6 +3107,13 @@ class UIManager {
         if(title) title.textContent = "撤退先選択";
         
         if (this.scenarioList) {
+            // 撤退画面の時は、元のグリッド（横並び）の魔法に戻します
+            this.scenarioList.className = 'clan-grid';
+            
+            // シナリオ説明の窓は使わないので隠しておきます
+            const descBox = document.getElementById('scenario-desc-box');
+            if (descBox) descBox.style.display = 'none';
+
             this.scenarioList.innerHTML = '';
             candidates.forEach(c => {
                 const div = document.createElement('div'); div.className = 'scenario-item';
