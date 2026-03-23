@@ -696,6 +696,7 @@ class GameManager {
         this.commandSystem = new CommandSystem(this);
         this.warManager = new WarManager(this);
         this.aiEngine = new AIEngine(this);
+        this.aiOperationManager = new AIOperationManager(this);
         this.independenceSystem = new IndependenceSystem(this);
         this.factionSystem = new FactionSystem(this); 
         this.diplomacyManager = new DiplomacyManager(this);
@@ -1391,16 +1392,15 @@ class GameManager {
             castles: this.castles, 
             bushos: this.bushos, 
             clans: this.clans,
-            princesses: this.princesses, // ★今回追加：姫の名簿もセーブデータに書き込みます
-            provinces: this.provinces, // ★今回追加：地方の名簿もセーブデータに書き込みます
+            princesses: this.princesses, // ★姫の名簿もセーブデータに書き込みます
+            provinces: this.provinces, // ★地方の名簿もセーブデータに書き込みます
             playerClanId: this.playerClanId,
             kunishus: this.kunishuSystem.kunishus,
             mapWidth: this.mapWidth,
             mapHeight: this.mapHeight,
-            // ★ここから追加：今どの城の順番か、どんな順番で回っているかのメモを残します！
+            aiOperations: this.aiOperationManager.save(),
             turnQueueIds: this.turnQueue.map(c => c.id),
             currentIndex: this.currentIndex
-            // ★追加ここまで
         };
         const blob = new Blob([JSON.stringify(data, null, 2)], {type: 'application/json'}); 
         const url = URL.createObjectURL(blob); 
@@ -1440,11 +1440,14 @@ class GameManager {
                 this.playerClanId = d.playerClanId || 1; 
                 this.marketRate = d.marketRate !== undefined ? d.marketRate : 1.0; 
                 
-                // ★追加：マップの大きさをセーブデータから復元します
+                // ★マップの大きさをセーブデータから復元します
                 this.mapWidth = d.mapWidth;
                 this.mapHeight = d.mapHeight;
+                
+                // ★追加：AIの作戦データを復元します
+                this.aiOperationManager.load(d.aiOperations);
 
-                // ★ ここをごっそり差し替え！：地図だけでなく、お城や地方の画像も全部揃うまで「必ず」待機するようにします
+                // ★ 地図だけでなく、お城や地方の画像も全部揃うまで「必ず」待機するようにします
                 const imageUrls = [
                     './data/images/map/japan_map.png',
                     './data/images/map/shiro_icon001.png',
