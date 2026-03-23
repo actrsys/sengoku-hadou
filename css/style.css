@@ -867,13 +867,16 @@ body.is-pc .princess-list-header, body.is-pc .princess-list-item {
 }
 
 /* ★サイドバーとボトムバーを完全に消し去る魔法 */
-body.daimyo-select-mode #pc-sidebar { display: none !important; }
-body.daimyo-select-mode #bottom-command-bar { display: none !important; }
+body.daimyo-select-mode #pc-sidebar,
+body.daimyo-select-mode #bottom-command-bar,
+body.daimyo-select-mode #mobile-bottom-info { 
+    display: none !important; /* ★スマホ専用のボトムバーも確実に隠すように追加！ */
+}
 body:not(.is-pc).daimyo-select-mode #map-wrapper { margin-bottom: 0 !important; height: 100% !important; flex: 1 !important; }
 
 /* フロート型の大名情報ウィンドウの大枠 */
 body.daimyo-select-mode #daimyo-confirm-modal {
-    position: absolute !important; /* ★ fixed から absolute に変更 */
+    position: absolute !important; 
     top: 0 !important; left: 0 !important; right: 0 !important; bottom: 0 !important;
     width: 100% !important; height: 100% !important;
     background: transparent !important;
@@ -902,7 +905,10 @@ body.daimyo-select-mode #daimyo-confirm-modal .modal-content {
 
 /* スマホ版：白いパネルを上部に浮かせるように変更！ */
 body:not(.is-pc).daimyo-select-mode #daimyo-confirm-modal .modal-content {
-    top: max(20px, env(safe-area-inset-top)); left: 50%; transform: translateX(-50%);
+    top: max(20px, env(safe-area-inset-top)) !important;
+    bottom: auto !important; /* ★確実に追加：下側のボトムバー位置にくっつくのを防ぎます */
+    left: 50% !important; 
+    transform: translateX(-50%) !important;
 }
 
 /* PC版：白いパネルを左上に配置する */
