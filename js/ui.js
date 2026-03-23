@@ -1033,6 +1033,10 @@ class UIManager {
 
         // ★追加：大名を選んだら、マップをスッキリさせるために名前シールを隠す合図を出します！
         document.body.classList.add('hide-daimyo-labels');
+        
+        // ★追加：「操作する勢力を選択してください」の案内板も隠します！
+        const mapGuide = document.getElementById('map-guide');
+        if (mapGuide) mapGuide.classList.add('hidden');
 
         this.daimyoConfirmModal.classList.remove('hidden');
         

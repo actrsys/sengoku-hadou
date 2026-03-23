@@ -507,8 +507,13 @@ Object.assign(UIManager.prototype, {
                 this.mapGuide.classList.remove('hidden'); 
                 this.mapGuide.textContent = this.game.commandSystem.getSelectionGuideMessage();
             } else if (isDaimyoSelect) {
-                this.mapGuide.classList.remove('hidden'); 
-                this.mapGuide.textContent = "操作する勢力を選択してください";
+                // ★修正：城を選んでいる時は案内板を非表示にします！
+                if (this.selectedDaimyoId) {
+                    this.mapGuide.classList.add('hidden');
+                } else {
+                    this.mapGuide.classList.remove('hidden'); 
+                    this.mapGuide.textContent = "操作する勢力を選択してください";
+                }
             } else {
                 this.mapGuide.classList.add('hidden'); 
             }
