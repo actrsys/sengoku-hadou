@@ -836,11 +836,12 @@ body.is-pc .princess-list-header, body.is-pc .princess-list-item {
 /* =========================================================
    大名選択フロートウィンドウ・戻るボタン
    ========================================================= */
-/* シナリオ選択に戻るボタンの見た目 */
+/* シナリオ選択に戻るボタン (常に中央下部に配置) */
 .floating-back-btn {
-    position: absolute;
-    top: 20px;
-    left: 20px;
+    position: fixed;
+    bottom: 30px;
+    left: 50%;
+    transform: translateX(-50%);
     z-index: 4000;
     padding: 12px 24px;
     background-color: #37474f;
@@ -853,22 +854,10 @@ body.is-pc .princess-list-header, body.is-pc .princess-list-item {
     box-shadow: 0 4px 6px rgba(0,0,0,0.5);
     transition: all 0.2s;
     pointer-events: auto;
+    white-space: nowrap;
 }
 .floating-back-btn:hover {
     background-color: #546e7a;
-    transform: scale(1.05);
-}
-
-/* スマホ版の場合、左上だと邪魔になるので上部の中央に配置します */
-body:not(.is-pc) .floating-back-btn {
-    top: max(20px, env(safe-area-inset-top));
-    left: 50%;
-    transform: translateX(-50%);
-    font-size: 1.1rem;
-    padding: 10px 20px;
-    white-space: nowrap;
-}
-body:not(.is-pc) .floating-back-btn:hover {
     transform: translateX(-50%) scale(1.05);
 }
 
@@ -877,27 +866,58 @@ body.daimyo-select-mode #pc-sidebar { display: none !important; }
 body.daimyo-select-mode #bottom-command-bar { display: none !important; }
 body:not(.is-pc).daimyo-select-mode #map-wrapper { margin-bottom: 0 !important; height: 100% !important; flex: 1 !important; }
 
-/* フロート型の大名情報ウィンドウ (PC/スマホ共通で画面中央付近に浮かせる) */
-body.daimyo-select-mode #daimyo-confirm-modal {
-    position: absolute !important;
+/* ★バグ修正：隠す合図（hidden）が出ている時は、透明ボタンが残らないように完全に消し去ります！ */
+body.daimyo-select-mode #daimyo-confirm-modal.hidden {
+    display: none !important;
+}
+
+/* フロート型の大名情報ウィンドウの大枠 */
+body.daimyo-select-mode #daimyo-confirm-modal:not(.hidden) {
+    position: fixed !important;
     top: 0 !important; left: 0 !important; right: 0 !important; bottom: 0 !important;
     width: 100% !important; height: 100% !important;
-    display: flex !important; justify-content: center !important; align-items: center !important;
-    background: transparent !important; pointer-events: none !important; z-index: 4000 !important;
+    background: transparent !important;
+    pointer-events: none !important; /* 背景はクリックをスルーさせます */
+    z-index: 4000 !important;
+    display: block !important;
 }
-body.daimyo-select-mode #daimyo-confirm-modal .modal-content {
-    position: relative !important;
-    width: auto !important; max-width: 90% !important; height: auto !important; max-height: 90% !important;
+
+/* 大名情報の白いパネル本体 */
+body.daimyo-select-mode #daimyo-confirm-body {
+    position: absolute !important;
+    width: auto !important; max-width: 90% !important;
+    height: auto !important; max-height: 80% !important;
     padding: 20px !important; border-radius: 8px !important;
     background: rgba(255, 255, 255, 0.95) !important;
     border: 2px solid #333 !important;
     box-shadow: 0 10px 25px rgba(0,0,0,0.5) !important;
     pointer-events: auto !important;
-    display: flex !important; flex-direction: column !important; gap: 15px !important;
+    overflow-y: auto !important;
 }
-body:not(.is-pc).daimyo-select-mode #daimyo-confirm-modal .modal-footer {
-    justify-content: center !important; margin-top: 10px !important;
+
+/* スマホ版：白いパネルを真ん中らへんに浮かせる */
+body:not(.is-pc).daimyo-select-mode #daimyo-confirm-body {
+    top: 40%; left: 50%; transform: translate(-50%, -50%);
 }
+
+/* PC版：白いパネルを左上に配置する */
+body.is-pc.daimyo-select-mode #daimyo-confirm-body {
+    top: 20px !important; left: 20px !important;
+}
+
+/* 独立させる「開始」「戻る」ボタンたち (シナリオに戻るボタンと同じ中央下部に配置) */
+body.daimyo-select-mode .daimyo-confirm-buttons {
+    position: fixed !important;
+    bottom: 30px !important;
+    left: 50% !important;
+    transform: translateX(-50%) !important;
+    display: flex !important;
+    gap: 20px !important;
+    pointer-events: auto !important; /* ボタンはしっかり押せるようにします */
+    z-index: 4001 !important;
+}
+
+/* PC版の見た目調整（以前のものを引き継ぎ） */
 body.is-pc.daimyo-select-mode .daimyo-confirm-compact {
     flex-direction: row !important; gap: 20px !important;
 }
