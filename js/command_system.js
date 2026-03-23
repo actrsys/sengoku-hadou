@@ -2153,10 +2153,37 @@ class CommandSystem {
                 );
             } else {
                 allyForceCandidates.sort((a,b) => b.force.soldiers - a.force.soldiers);
-                const best = allyForceCandidates[0];
-                best.castle.selectedForce = best.force; 
-                this.executeReinforcementRequest(0, best.castle, atkCastle, targetCastle, currentAtkBushos, currentSVal, rVal, hVal, gVal, selfReinfData);
-            }
+                const best = allyForceCandidates[0];
+                best.castle.selectedForce = best.force; 
+
+                // ★親善と同じように、兵力差で持参金を計算する魔法です！
+                const myPower = this.game.getClanTotalSoldiers(myClanId) || 1;
+                const helperPower = best.force.isKunishu ? best.force.soldiers : (this.game.getClanTotalSoldiers(best.force.id) || 1);
+                const ratio = helperPower / Math.max(1, myPower);
+                
+                let reinfGold = 300;
+                if (ratio >= 3.0) {
+                    reinfGold = 1000;
+                } else if (ratio > 1.5) {
+                    reinfGold = 300 + ((ratio - 1.5) / 1.5) * 700;
+                }
+                reinfGold = Math.floor(reinfGold / 100) * 100;
+                
+                // 足りなければお城の全額にします
+                if (reinfGold > atkCastle.gold) {
+                    reinfGold = atkCastle.gold;
+                }
+
+                // ★ただし、自分が相手を「支配」しているなら強制参加なので、持参金は０にします！
+                if (!best.force.isKunishu) {
+                    const rel = this.game.getRelation(myClanId, best.force.id);
+                    if (rel && rel.status === '支配') {
+                        reinfGold = 0;
+                    }
+                }
+
+                this.executeReinforcementRequest(reinfGold, best.castle, atkCastle, targetCastle, currentAtkBushos, currentSVal, rVal, hVal, gVal, selfReinfData);
+            }
         };
 
         const askConfirmAndProceedToAlly = (selfReinfData) => {
@@ -2569,35 +2596,39 @@ class CommandSystem {
         }
 
         // 以降は今まで通りの大名家の処理です
-        const helperClanId = helperCastle.ownerClan;
-        const enemyClanId = targetCastle.ownerClan;
-        const myToHelperRel = this.game.getRelation(myClanId, helperClanId);
-        // helperToEnemyRel は外交専門部署で使うので、ここでは消しておきます
+        const helperClanId = helperCastle.ownerClan;
+        const enemyClanId = targetCastle.ownerClan;
+        const myToHelperRel = this.game.getRelation(myClanId, helperClanId);
+        // helperToEnemyRel は外交専門部署で使うので、ここでは消しておきます
 
-        if (helperClanId === this.game.playerClanId) {
-            const myClanName = this.game.clans.find(c => c.id === myClanId)?.name || "不明";
-            const targetClanName = this.game.clans.find(c => c.id === enemyClanId)?.name || "敵軍";
-            const isBoss = (myToHelperRel.status === '従属');
-            const startSelection = () => this._promptPlayerAtkReinforcement(helperCastle, atkCastle, targetCastle, atkBushos, sVal, rVal, hVal, gVal, isBoss, selfReinfData);
-            
-            if (isBoss) {
-                this.game.ui.showDialog(`主家である ${myClanName} が侵攻します。\n当家は従属しているため直ちに出陣します！`, false, startSelection);
-            } else {
-                this.game.ui.showDialog(`${myClanName} から攻撃の援軍要請が届きました。(持参金: ${gold})\n援軍を派遣しますか？`, true, startSelection, () => {
-                    this.game.diplomacyManager.updateSentiment(myClanId, helperClanId, -10);
-                    this.game.ui.showDialog(`援軍要請を断りました。`, false, () => this.game.warManager.startWar(atkCastle, targetCastle, atkBushos, sVal, rVal, hVal, gVal, null, selfReinfData));
-                });
-            }
-            return;
-        }
+        if (helperClanId === this.game.playerClanId) {
+            const myClanName = this.game.clans.find(c => c.id === myClanId)?.name || "不明";
+            const targetClanName = this.game.clans.find(c => c.id === enemyClanId)?.name || "敵軍";
+            // ★修正：AI（要請側）から見てプレイヤー（受諾側）が「支配」されている相手かどうかを確認します！
+            const isBoss = (myToHelperRel && myToHelperRel.status === '支配');
+            const startSelection = () => this._promptPlayerAtkReinforcement(helperCastle, atkCastle, targetCastle, atkBushos, sVal, rVal, hVal, gVal, isBoss, selfReinfData);
+            
+            if (isBoss) {
+                this.game.ui.showDialog(`主家である ${myClanName} が侵攻します。\n当家は従属しているため直ちに出陣します！`, false, startSelection);
+            } else {
+                this.game.ui.showDialog(`${myClanName} から攻撃の援軍要請が届きました。(持参金: ${gold})\n援軍を派遣しますか？`, true, startSelection, () => {
+                    this.game.diplomacyManager.updateSentiment(myClanId, helperClanId, -10);
+                    this.game.ui.showDialog(`援軍要請を断りました。`, false, () => this.game.warManager.startWar(atkCastle, targetCastle, atkBushos, sVal, rVal, hVal, gVal, null, selfReinfData));
+                });
+            }
+            return;
+        }
 
-        // ★追加：大雪ならAIは絶対に断ります！
-        let isSuccess = false;
-        if (!isHeavySnow) {
-            // ★修正：確率計算とサイコロは、外交の専門部署にお任せします！
-            const prob = this.game.diplomacyManager.getReinforcementAcceptProb(myClanId, helperClanId, enemyClanId, gold);
-            isSuccess = (Math.random() * 100 < prob);
-        }
+        // ★追加：大雪ならAIは絶対に断ります！
+        let isSuccess = false;
+        // ★修正：要請側が相手を「支配」しているなら、大雪でも何でも絶対に強制参加させます！
+        if (myToHelperRel && myToHelperRel.status === '支配') {
+            isSuccess = true;
+        } else if (!isHeavySnow) {
+            // ★修正：確率計算とサイコロは、外交の専門部署にお任せします！
+            const prob = this.game.diplomacyManager.getReinforcementAcceptProb(myClanId, helperClanId, enemyClanId, gold);
+            isSuccess = (Math.random() * 100 < prob);
+        }
 
         if (!isSuccess) {
             if (myClanId === this.game.playerClanId) {

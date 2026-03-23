@@ -1838,11 +1838,19 @@ Object.assign(WarManager.prototype, {
             reinfGold = Math.floor(reinfGold / 100) * 100;
             
             // 足りなければお城の全額にします
-            if (reinfGold > defCastle.gold) {
-                reinfGold = defCastle.gold;
-            }
+            if (reinfGold > defCastle.gold) {
+                reinfGold = defCastle.gold;
+            }
 
-            this.executeDefReinforcement(reinfGold, best.castle, defCastle, onComplete);
+            // ★追加：自分が相手を「支配」しているなら強制参加なので、持参金は０にします！
+            if (!best.force.isKunishu) {
+                const rel = this.game.getRelation(defClanId, best.force.id);
+                if (rel && rel.status === '支配') {
+                    reinfGold = 0;
+                }
+            }
+
+            this.executeDefReinforcement(reinfGold, best.castle, defCastle, onComplete);
         }
     },
 
