@@ -839,7 +839,7 @@ body.is-pc .princess-list-header, body.is-pc .princess-list-item {
     justify-content: center; 
     align-items: center; 
 }
-.retreat-btn:hover { 
+body.is-pc .retreat-btn:hover { 
     transform: scale(1.02); 
     background: #f0f8ff; 
 }
