@@ -316,7 +316,8 @@ body.hide-daimyo-labels .daimyo-name-label { display: none !important; }
 body.is-pc.daimyo-select-mode #pc-sidebar,   /* ★力（詳細度）を上げて確実にPCサイドバーを消します */
 body.daimyo-select-mode #pc-sidebar,
 body.daimyo-select-mode #bottom-command-bar,
-body.daimyo-select-mode #mobile-bottom-info { display: none !important; }
+body.daimyo-select-mode #mobile-bottom-info,
+body.daimyo-select-mode #mobile-top-left { display: none !important; } /* ★スマホの上の白い帯も一緒に隠します */
 body:not(.is-pc).daimyo-select-mode #map-wrapper { margin-bottom: 0 !important; height: 100% !important; flex: 1 !important; }
 
 /* ★ padding: 0 !important; と box-sizing を追加して、ボタンが押し出されないように枠をカッチリ固定します */
