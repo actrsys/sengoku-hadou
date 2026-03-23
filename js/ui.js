@@ -96,6 +96,14 @@ class UIManager {
                 event.preventDefault(); 
             }
             lastTouchEnd = now;
+
+            // ★ここから書き足し：タッチが終わった瞬間に、ボタンなどから「カーソルが乗っている状態」を強制的に引き剥がす魔法です！
+            if (event.target && typeof event.target.blur === 'function') {
+                setTimeout(() => {
+                    event.target.blur();
+                }, 50); // クリックの邪魔にならないよう、ほんの少しだけ待ってから引き剥がします
+            }
+            // ★書き足すのはここまで！
         }, false);
         
         document.addEventListener('touchmove', (e) => {

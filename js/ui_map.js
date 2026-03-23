@@ -768,6 +768,9 @@ Object.assign(UIManager.prototype, {
             }
             
             el.onmouseenter = () => {
+                // ★ここを書き足し：スマホ版の時は、カーソルを乗せた時の魔法（吹き出しなど）を使わないようにします！
+                if (!document.body.classList.contains('is-pc')) return;
+
                 const rect = el.getBoundingClientRect();
                 const containerRect = document.getElementById('map-scroll-container').getBoundingClientRect();
                 
@@ -788,6 +791,9 @@ Object.assign(UIManager.prototype, {
             };
 
             el.onmouseleave = () => {
+                // ★ここを書き足し：スマホ版の時は何もしません
+                if (!document.body.classList.contains('is-pc')) return;
+
                 el.classList.remove('tooltip-bottom', 'tooltip-left', 'tooltip-right');
             };
             
