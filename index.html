@@ -59,7 +59,7 @@
         <div id="retreat-modal" class="modal hidden">
             <div class="modal-content start-content">
                 <h2>撤退先選択</h2>
-                <div id="retreat-list" class="clan-grid"></div>
+                <div id="retreat-list" class="retreat-grid"></div>
                 <div class="modal-footer" style="justify-content: center;">
                     <button class="btn-secondary" onclick="document.getElementById('retreat-modal').classList.add('hidden')">閉じる</button>
                 </div>
@@ -67,6 +67,8 @@
         </div>
 
         <div id="start-screen" class="modal hidden"></div>
+        
+        <button id="btn-back-to-scenario" class="floating-back-btn hidden">シナリオ選択に戻る</button>
         
         <div id="daimyo-confirm-modal" class="modal hidden">
             <div class="modal-content" style="max-width: 400px; text-align: center;">
