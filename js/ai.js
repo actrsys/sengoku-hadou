@@ -387,13 +387,23 @@ class AIEngine {
 
             // ★ここから追加：① 自分と相手の「別の城からの援軍（自家援軍）」を見積もります！
             this.game.castles.forEach(c => {
-                // 自分が呼べそうな自家援軍（出撃元の城以外で、兵力1000以上の城）
-                if (c.ownerClan === myCastle.ownerClan && c.id !== myCastle.id && c.soldiers >= 1000) {
-                    myReinfPower += (c.soldiers * 0.5) * errorRate; // 兵力の半分くらい来てくれると予想
+                // ★追加：援軍元の城（c）がある国が大雪かどうか調べます！
+                let isReinfHeavySnow = false;
+                const reinfProv = this.game.provinces.find(p => p.id === c.provinceId);
+                if (reinfProv && reinfProv.statusEffects && reinfProv.statusEffects.includes('heavySnow')) {
+                    isReinfHeavySnow = true;
                 }
-                // 相手が呼べそうな自家援軍（守る城以外で、兵力1000以上の城）
-                if (c.ownerClan === target.ownerClan && c.id !== target.id && c.soldiers >= 1000) {
-                    enemyReinfPower += (c.soldiers * 0.5) * errorRate; // 相手の別のお城からの援軍も警戒！
+
+                // ★大雪の城からは援軍が来ないので、計算に入れません！
+                if (!isReinfHeavySnow) {
+                    // 自分が呼べそうな自家援軍（出撃元の城以外で、兵力1000以上の城）
+                    if (c.ownerClan === myCastle.ownerClan && c.id !== myCastle.id && c.soldiers >= 1000) {
+                        myReinfPower += (c.soldiers * 0.5) * errorRate; // 兵力の半分くらい来てくれると予想
+                    }
+                    // 相手が呼べそうな自家援軍（守る城以外で、兵力1000以上の城）
+                    if (c.ownerClan === target.ownerClan && c.id !== target.id && c.soldiers >= 1000) {
+                        enemyReinfPower += (c.soldiers * 0.5) * errorRate; // 相手の別のお城からの援軍も警戒！
+                    }
                 }
             });
             // ★追加ここまで
