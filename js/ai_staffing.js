@@ -3,7 +3,143 @@
  * 責務: 大名家全体の戦略、拠点の重要度、武将の能力タイプに基づいた移動先の決定
  */
 
-class AIStaffing {
+class AIStaffing {    
+    // 大名のお引越し先を考えます（お金や兵士の分配、お供の随伴機能付き！）
+    relocateDaimyo(castle, castellan) {
+        const clanId = castle.ownerClan;
+        const daimyo = castellan; // castellanは大名自身です
+        
+        // このお城に大名がいないなら、お引越しの判定はしません
+        if (!daimyo || !daimyo.isDaimyo || daimyo.castleId !== castle.id) return false;
+
+        // 自分が移動できるお城（自領で繋がっている城）のリストを作ります
+        const reachableMyCastles = [];
+        const visitedCastles = new Set();
+        const searchQueue = [castle];
+        visitedCastles.add(castle.id);
+
+        while (searchQueue.length > 0) {
+            const current = searchQueue.shift();
+            reachableMyCastles.push(current);
+
+            const adjMyCastles = this.game.castles.filter(c => 
+                c.ownerClan === clanId && 
+                GameSystem.isAdjacent(current, c) &&
+                !visitedCastles.has(c.id)
+            );
+
+            for (const n of adjMyCastles) {
+                visitedCastles.add(n.id);
+                searchQueue.push(n);
+            }
+        }
+
+        if (reachableMyCastles.length <= 1) return false;
+
+        let bestCastle = null;
+
+        // 好戦的な大名の特別な移動先探し
+        if (daimyo.personality === 'aggressive') {
+            const myOp = this.game.aiOperationManager.operations[clanId];
+            if (myOp && myOp.type === '攻撃') {
+                const targetEnemyId = myOp.targetId;
+                const enemyCastle = this.game.getCastle(targetEnemyId);
+
+                // 攻撃目標に届くお城のリストを作ります
+                const reachables = reachableMyCastles.filter(c => {
+                    if (myOp.isKunishuTarget) {
+                        return c.id === myOp.stagingBase || GameSystem.isAdjacent(c, this.game.getCastle(myOp.stagingBase));
+                    } else if (enemyCastle) {
+                        return GameSystem.isAdjacent(c, enemyCastle);
+                    }
+                    return false;
+                });
+
+                // 届くお城があるなら、その中で一番最大防御が高いお城を選びます
+                if (reachables.length > 0) {
+                    reachables.sort((a, b) => b.maxDefense - a.maxDefense);
+                    bestCastle = reachables[0];
+                }
+            }
+        }
+
+        // 好戦的でない場合や、攻撃目標に届くお城がなかった場合は、単純に一番最大防御が高いお城を選びます
+        if (!bestCastle) {
+            const allCandidates = [...reachableMyCastles];
+            allCandidates.sort((a, b) => b.maxDefense - a.maxDefense);
+            bestCastle = allCandidates[0];
+        }
+
+        // 一番良いお城が「今の城」でなければ、お引越しを実行！
+        if (bestCastle && bestCastle.id !== castle.id) {
+            // ==========================================
+            // 資源（お金、お米、兵士など）を分け合います
+            // ==========================================
+            const totalGold = castle.gold + bestCastle.gold;
+            const totalRice = castle.rice + bestCastle.rice;
+            const totalSoldiers = castle.soldiers + bestCastle.soldiers;
+            const totalHorses = (castle.horses || 0) + (bestCastle.horses || 0);
+            const totalGuns = (castle.guns || 0) + (bestCastle.guns || 0);
+
+            const avgTraining = Math.floor(((castle.training * castle.soldiers) + (bestCastle.training * bestCastle.soldiers)) / Math.max(1, totalSoldiers));
+            const avgMorale = Math.floor(((castle.morale * castle.soldiers) + (bestCastle.morale * bestCastle.soldiers)) / Math.max(1, totalSoldiers));
+
+            bestCastle.gold = Math.min(99999, Math.ceil(totalGold * 0.6));
+            castle.gold = totalGold - bestCastle.gold;
+            
+            bestCastle.rice = Math.min(99999, Math.ceil(totalRice * 0.6));
+            castle.rice = totalRice - bestCastle.rice;
+            
+            bestCastle.soldiers = Math.min(99999, Math.ceil(totalSoldiers * 0.6));
+            castle.soldiers = totalSoldiers - bestCastle.soldiers;
+            
+            bestCastle.horses = Math.min(99999, Math.ceil(totalHorses * 0.6));
+            castle.horses = totalHorses - bestCastle.horses;
+            
+            bestCastle.guns = Math.min(99999, Math.ceil(totalGuns * 0.6));
+            castle.guns = totalGuns - bestCastle.guns;
+
+            castle.training = avgTraining;
+            bestCastle.training = avgTraining;
+            castle.morale = avgMorale;
+            bestCastle.morale = avgMorale;
+
+            // ==========================================
+            // 仲良しのお供（武将）を連れて行きます
+            // ==========================================
+            const castleBushos = this.game.getCastleBushos(castle.id).filter(b => b.status !== 'ronin' && b.id !== castellan.id);
+            const keepCount = Math.max(3, Math.ceil(castleBushos.length * 0.4));
+            
+            castleBushos.sort((a, b) => {
+                const aFactionScore = (a.factionId === castellan.factionId && a.factionId !== 0) ? -200 : 0;
+                const bFactionScore = (b.factionId === castellan.factionId && b.factionId !== 0) ? -200 : 0;
+                const aScore = a.leadership + a.strength + aFactionScore;
+                const bScore = b.leadership + b.strength + bFactionScore;
+                return bScore - aScore; 
+            });
+
+            const movers = castleBushos.slice(keepCount);
+            movers.forEach(mover => {
+                if (this.game.factionSystem && this.game.factionSystem.handleMove) {
+                    this.game.factionSystem.handleMove(mover, castle.id, bestCastle.id);
+                }
+                this.game.affiliationSystem.moveCastle(mover, bestCastle.id);
+                mover.isActionDone = true; 
+            });
+
+            // 大名自身も移動します
+            if (this.game.factionSystem && this.game.factionSystem.handleMove) {
+                this.game.factionSystem.handleMove(castellan, castle.id, bestCastle.id);
+            }
+            this.game.affiliationSystem.moveCastle(castellan, bestCastle.id);
+            castellan.isActionDone = true;
+            
+            return true; // 引越し完了の合図
+        }
+
+        return false; // 引越ししなかった合図
+    }
+    
     constructor(game) {
         this.game = game;
         this.evaluationCache = {};
@@ -242,9 +378,8 @@ class AIStaffing {
         const currentRoleData = castleRoles.get(castle.id);
         if (!currentRoleData) return null;
 
-        let movers = [];
-        let bestTargetCastle = null;
-        let highestScoreDiff = 0; // どれくらい「今の城より魅力的か（大差があるか）」を覚える箱
+        // お引越しの候補者を入れる箱を用意します
+        let candidates = [];
 
         // 今のお城にいる武将たちを順番に見ていきます
         for (let busho of availableBushos) {
@@ -270,9 +405,9 @@ class AIStaffing {
 
                 // 2. 空の城・手薄な城へのボーナス！
                 if (target.samuraiIds.length === 0) {
-                    score += 150; // 空っぽなら超優先！
+                    score += 150; 
                 } else if (target.samuraiIds.length === 1) {
-                    score += 80;  // 1人しかいない場合も優先
+                    score += 80;  
                 } else if (target.samuraiIds.length === 2) {
                     score += 30;
                 }
@@ -281,7 +416,7 @@ class AIStaffing {
                 const devRoom = (target.maxKokudaka - target.kokudaka) + (target.maxCommerce - target.commerce);
                 if (devRoom > 1000) {
                     score += 50;
-                    if (bTypeInfo.isSpecialist && busho.politics >= 70) score += 100; // 内政得意な人ならさらにドン！
+                    if (bTypeInfo.isSpecialist && busho.politics >= 70) score += 100;
                 } else if (devRoom > 500) {
                     score += 20;
                     if (bTypeInfo.isSpecialist && busho.politics >= 70) score += 50;
@@ -289,18 +424,16 @@ class AIStaffing {
 
                 // 4. 武将のタイプによる好み
                 if (bType === '無能型') {
-                    // 弱い人は前線を嫌がり、後方を喜びます（手薄な城のお留守番にも向いています）
                     if (tRoleData.role === '前線拠点') score -= 100;
                     if (tRoleData.role === '後方拠点') score += 50;
                 } else if (bType === '万能型') {
-                    // エースは重要な場所（根拠地や前線）に居たがります
                     if (tRoleData.isBase) score += 80;
                     if (tRoleData.role === '前線拠点' || tRoleData.role === '準前線拠点') score += 50;
                 }
 
                 // 5. 弱い前線からの退避と、強い受け皿への集結
                 if (tRoleData.role === '準前線拠点') {
-                    score += tRoleData.receiverScore / 20; // 受け皿として強いほど魅力アップ
+                    score += tRoleData.receiverScore / 20;
                 }
 
                 // 6. 攻撃作戦の準備拠点ならプラス
@@ -311,7 +444,7 @@ class AIStaffing {
 
                 // 計算した点数を、今の城と移動先で振り分けます
                 if (target.id === castle.id) {
-                    currentCastleScore = score; // 今の城の点数
+                    currentCastleScore = score; 
                 } else {
                     if (score > bestTargetScore) {
                         bestTargetScore = score;
@@ -321,27 +454,89 @@ class AIStaffing {
             }
 
             // ★ここで「今の城」と「一番良い移動先」を比べます！
-            // 「50点以上の大差」がないと、引っ越しの面倒くささが勝って居座ります！
             const scoreDiff = bestTargetScore - currentCastleScore;
             
+            // 50点以上の大差があれば、お引越し候補のリストに入れます
             if (targetForThisBusho && scoreDiff >= 50) {
-                // 大差があって、しかも今まで見た武将の中で一番「行きたい気持ち（点数差）」が強かったら
-                if (scoreDiff > highestScoreDiff) {
-                    highestScoreDiff = scoreDiff;
-                    bestTargetCastle = targetForThisBusho;
-                    movers = [busho];
+                candidates.push({
+                    busho: busho,
+                    scoreDiff: scoreDiff,
+                    target: targetForThisBusho
+                });
+            }
+        }
+
+        // 候補のリストを、行きたい気持ち（点数差）が強い順に並べ替えます
+        candidates.sort((a, b) => b.scoreDiff - a.scoreDiff);
+
+        // 目的地ごとにグループ分けをします（同じお城に行く人はまとめます）
+        const targetGroups = new Map();
+        for (let cand of candidates) {
+            if (!targetGroups.has(cand.target.id)) {
+                targetGroups.set(cand.target.id, { target: cand.target, movers: [], maxScoreDiff: 0 });
+            }
+            const group = targetGroups.get(cand.target.id);
+            group.movers.push(cand.busho);
+            // グループの中で一番強い行きたい気持ちを、そのグループの代表点数にします
+            if (cand.scoreDiff > group.maxScoreDiff) {
+                group.maxScoreDiff = cand.scoreDiff;
+            }
+        }
+
+        // お城に残る人数のカウンターです（最初は今いる全員の数）
+        let remainingCount = castle.samuraiIds.length;
+        const moveActions = []; // まとめた行動を入れる箱です
+
+        // 目的地ごとに、まとめて移動の行動を作ります
+        targetGroups.forEach(group => {
+            let actualMovers = [];
+            // 今のお城に3人以上残るように、上から順番にメンバーを確定させます
+            for (let busho of group.movers) {
+                if (remainingCount > 3) {
+                    actualMovers.push(busho);
+                    remainingCount--;
+                }
+            }
+            // もし1人でも引っ越せるなら、行動のリストに追加します
+            if (actualMovers.length > 0) {
+                moveActions.push({
+                    type: 'move',
+                    stat: 'leadership',
+                    score: 300 + group.maxScoreDiff,
+                    cost: 0,
+                    targetId: group.target.id,
+                    movers: actualMovers
+                });
+            }
+        });
+
+        // もし行きたい人が誰もいなくて、空き城があった時のお留守番機能です
+        if (moveActions.length === 0) {
+            const emptyCastles = reachableMyCastles.filter(c => c.samuraiIds.length <= 1 && c.id !== castle.id);
+            if (emptyCastles.length > 0 && castle.samuraiIds.length > 4) {
+                const lowSkillMovers = availableBushos
+                    .filter(b => b.id !== castle.castellanId)
+                    .sort((a, b) => {
+                        const totalA = a.leadership + a.strength + a.politics + a.diplomacy + a.intelligence;
+                        const totalB = b.leadership + b.strength + b.politics + b.diplomacy + b.intelligence;
+                        return totalA - totalB; 
+                    });
+
+                if (lowSkillMovers.length > 0) {
+                    const mover = lowSkillMovers[0];
+                    moveActions.push({
+                        type: 'move',
+                        stat: 'leadership',
+                        score: 250,
+                        cost: 0,
+                        targetId: emptyCastles[0].id,
+                        movers: [mover]
+                    });
                 }
             }
         }
 
-        // 今のお城に最低3人は残るように制限をかけます
-        if (movers.length > 0 && bestTargetCastle) {
-            if (castle.samuraiIds.length - movers.length >= 3) {
-                // 引っ越し決定！
-                return { type: 'move', stat: 'leadership', score: 300 + highestScoreDiff, cost: 0, targetId: bestTargetCastle.id, movers: movers };
-            }
-        }
-
-        return null; // 大差がなければ誰も移動しません（居座る）
+        // 完成した複数の移動リストを、そのまま返します！
+        return moveActions;
     }
 }

@@ -70,7 +70,13 @@ class AIEngine {
             }
             
             // ★大名のお引越しと、軍師任命の処理を「人事部」に任せます！
-            const isRelocated = this.game.affiliationSystem.relocateDaimyoAI(castle, castellan);
+            let isRelocated = false;
+            if (this.game.aiStaffing) {
+                isRelocated = this.game.aiStaffing.relocateDaimyo(castle, castellan);
+            } else {
+                isRelocated = this.game.affiliationSystem.relocateDaimyoAI(castle, castellan);
+            }
+            
             if (isRelocated) {
                 // お引越しをしたなら、このお城のターンはおしまいです！
                 this.game.finishTurn();
@@ -962,9 +968,10 @@ class AIEngine {
             // 10. 武将の移動
             // 新しい人事部（AIStaffing）の戦略的な指示に従います！
             if (this.game.aiStaffing) {
-                const moveAction = this.game.aiStaffing.planMoveAction(castle, availableBushos, reachableMyCastles);
-                if (moveAction) {
-                    actions.push(moveAction);
+                const moveActions = this.game.aiStaffing.planMoveAction(castle, availableBushos, reachableMyCastles);
+                if (moveActions && moveActions.length > 0) {
+                    // 何人もの移動リストを、そのまま全部行動の候補に追加します！
+                    actions.push(...moveActions);
                 }
             }
             
