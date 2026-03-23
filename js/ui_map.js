@@ -812,8 +812,21 @@ Object.assign(UIManager.prototype, {
                 }
                 const startBtn = document.getElementById('daimyo-confirm-start-btn');
                 const backBtn = document.getElementById('daimyo-confirm-back-btn');
-                if(startBtn) startBtn.style.display = 'none'; // ボタンは隠します
-                if(backBtn) backBtn.style.display = 'none';
+                if(startBtn) startBtn.style.display = 'none'; // 開始ボタンは隠します
+                
+                // 戻るボタンだけを表示して、シナリオ選択に戻る働きを持たせます
+                if(backBtn) {
+                    backBtn.style.display = ''; 
+                    backBtn.textContent = '戻る';
+                    backBtn.onclick = () => {
+                        if (window.AudioManager) window.AudioManager.playSE('cancel.ogg');
+                        // 大名選択の画面を閉じて、シナリオ選択に戻ります
+                        this.daimyoConfirmModal.classList.add('hidden');
+                        document.body.classList.remove('daimyo-select-mode');
+                        this.returnToTitle(); 
+                        if (window.GameApp) window.GameApp.startNewGame();
+                    };
+                }
             }
         } else {
             document.body.classList.remove('daimyo-select-mode'); // 終わったら目印を外します
