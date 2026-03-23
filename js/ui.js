@@ -26,6 +26,7 @@ class UIManager {
         this.selectorConfirmBtn = document.getElementById('selector-confirm-btn');
         this.cutinOverlay = document.getElementById('cutin-overlay');
         this.cutinMessage = document.getElementById('cutin-message'); 
+        this.globalLoadingScreen = document.getElementById('global-loading-screen'); // ★追加：新しいロード画面を操作する準備
         this.quantityModal = document.getElementById('quantity-modal');
         this.quantityContainer = document.getElementById('quantity-container'); 
         this.quantityConfirmBtn = document.getElementById('quantity-confirm-btn');
@@ -536,6 +537,20 @@ class UIManager {
     hideContextMenu() {
         // エラーが出ないように、念のため「メニューを隠す」お約束だけ残しておきます
         if (this.contextMenu) this.contextMenu.classList.add('hidden');
+    }
+
+    // ★追加：ロード画面をパッと出す魔法
+    showLoadingScreen() {
+        if (this.globalLoadingScreen) {
+            this.globalLoadingScreen.classList.remove('hidden');
+        }
+    }
+
+    // ★追加：ロード画面をサッと隠す魔法
+    hideLoadingScreen() {
+        if (this.globalLoadingScreen) {
+            this.globalLoadingScreen.classList.add('hidden');
+        }
     }
 
     forceResetModals() {

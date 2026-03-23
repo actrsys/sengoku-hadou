@@ -755,6 +755,11 @@ class GameManager {
     }
     
     async loadScenario(folder) {
+        // ★追加：シナリオの準備を始める前に、画面をロード画面で隠します
+        if (this.ui) this.ui.showLoadingScreen();
+        // ★追加：ロード画面がしっかり表示されるまで、ほんの一瞬（0.05秒）だけ待ちます
+        await new Promise(resolve => setTimeout(resolve, 50));
+
         try {
             document.getElementById('title-screen').classList.add('hidden'); 
 
@@ -791,8 +796,13 @@ class GameManager {
             this.phase = 'daimyo_select';
             this.ui.renderMap();
             // カットイン表示を消しました！
+
+            // ★追加：マップの準備がすべて終わったら、少しだけ待ってからロード画面を隠します
+            await new Promise(resolve => setTimeout(resolve, 100));
+            if (this.ui) this.ui.hideLoadingScreen();
             
         } catch (e) {
+            if (this.ui) this.ui.hideLoadingScreen();
             console.error(e);
             alert("シナリオデータの読み込みに失敗しました。");
             this.ui.returnToTitle();
