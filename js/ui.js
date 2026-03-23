@@ -1251,11 +1251,9 @@ class UIManager {
         }
 
         if (this.mobileFloatingMarket) {
-            this.mobileFloatingMarket.innerHTML = `
-                <div class="floating-market">浪人 ${roninCount}人</div>
-                <div class="floating-market">米相場 ${currentRate.toFixed(1)}</div>
-            `;
-        }
+            // ★根本解決：見えない空白ブロックが生まれないように、絶対に改行せずに1行で繋げて出力します！
+            this.mobileFloatingMarket.innerHTML = `<div class="floating-market">浪人 ${roninCount}人</div><div class="floating-market">米相場 ${currentRate.toFixed(1)}</div>`;
+        }
 
         const cmdGrid = document.getElementById('command-area');
         if(cmdGrid) {
