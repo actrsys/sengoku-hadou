@@ -2236,7 +2236,7 @@ class UIManager {
                     const soldiers = parseInt(document.getElementById('num-soldiers')?.value) || 0;
                     const busho = this.game.getBusho(data[0]);
                     const cost = GameSystem.calcDraftCost(soldiers, busho, c.peoplesLoyalty);
-                    displayEl.innerText = `必要資金: ${cost} 金`;
+                    displayEl.innerText = `必要資金: ${cost}`;
                 } else if (type === 'buy_rice') {
                     const amount = parseInt(document.getElementById('num-amount')?.value) || 0;
                     let rate = 1.0;
@@ -2245,7 +2245,7 @@ class UIManager {
                         if (province && province.marketRate !== undefined) rate = province.marketRate;
                     }
                     const cost = Math.ceil(amount * rate); // 1金未満の端数が出た時に足りなくならないよう切り上げます
-                    displayEl.innerText = `必要資金: ${cost} 金`;
+                    displayEl.innerText = `必要資金: ${cost}`;
                 }
             }
         };
