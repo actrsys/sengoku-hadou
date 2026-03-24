@@ -165,11 +165,8 @@ class UIInfoManager {
 
         diploBtn.onclick = (e) => {
             e.stopPropagation(); 
-            if (this.ui.resultBody) {
-                this.ui.savedDaimyoScroll = this.ui.resultBody.scrollTop;
-            }
-            modal.classList.add('hidden');
-            this.ui.showDiplomacyList(clan.id, clan.name);
+            if (window.AudioManager) window.AudioManager.playSE('decision.ogg');
+            this.showDiplomacyList(clan.id, clan.name);
         };
 
         modal.onclick = (e) => {
@@ -213,21 +210,16 @@ class UIInfoManager {
         });
         listHtml += '</div>';
         
-        const customFooter = `<button class="btn-secondary" onclick="window.GameApp.ui.showDaimyoList(); setTimeout(() => { if(window.GameApp.ui.resultBody) window.GameApp.ui.resultBody.scrollTop = window.GameApp.ui.savedDaimyoScroll || 0; window.GameApp.ui.showDaimyoDetail(${clanId}); }, 10);">閉じる</button>`;
+        const diploModal = document.getElementById('diplo-list-modal');
+        const diploTitle = document.getElementById('diplo-list-title');
+        const diploBody = document.getElementById('diplo-list-body');
         
-        this.ui.showResultModal(`<h3 style="margin-top:0; border-bottom: 2px solid #ddd; padding-bottom: 10px; flex-shrink:0;">${clanName} 外交関係</h3>${listHtml}`, () => {
-            if (this.ui.resultBody) {
-                this.ui.resultBody.style.overflowY = '';
-                this.ui.resultBody.style.display = '';
-                this.ui.resultBody.style.flexDirection = '';
-            }
-        }, customFooter);
-
-        if (this.ui.resultBody) {
-            this.ui.resultBody.style.overflowY = 'hidden';
-            this.ui.resultBody.style.display = 'flex';
-            this.ui.resultBody.style.flexDirection = 'column';
-        }
+        if (!diploModal || !diploTitle || !diploBody) return;
+        
+        diploTitle.textContent = `${clanName} 外交関係`;
+        diploBody.innerHTML = listHtml;
+        
+        diploModal.classList.remove('hidden');
     }
 
     showFactionList(clanId, isDirect = false) {
