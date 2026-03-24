@@ -138,6 +138,18 @@ img { pointer-events: none; -webkit-user-drag: none; user-drag: none; }
     line-height: 1.2; /* 行間による間延びをリセットします */
 }
 
+/* ★追加：スマホ版・PC版共通で、数字が変わっても箱の大きさが揺れないようにする設定 */
+.floating-time {
+    min-width: 100px;
+    text-align: center;
+    font-variant-numeric: tabular-nums;
+}
+.floating-market {
+    min-width: 90px;
+    text-align: center;
+    font-variant-numeric: tabular-nums;
+}
+
 #map-guide { position: absolute; top: 10px; left: 50%; transform: translateX(-50%); background: rgba(0,0,0,0.8); color: #fff; padding: 8px 20px; border-radius: 20px; pointer-events: none; z-index: 600; font-weight: bold; box-shadow: 0 2px 5px rgba(0,0,0,0.3); }
 
 /* --- 城カード --- */
@@ -735,7 +747,7 @@ body.is-pc {
         top: 20px; 
         bottom: auto; 
         left: auto; 
-        right: 230px; /* 浪人と米相場の左隣に置くための距離です */
+        right: 250px; /* 箱の幅を広げたので、ぶつからないように少し左へずらします */
         flex-direction: row; 
     }
     #mobile-floating-market { 
@@ -744,6 +756,18 @@ body.is-pc {
         left: auto;
         right: 30px; 
         flex-direction: row; 
+    }
+
+    /* 数字が変わっても箱の大きさが揺れないようにする設定 */
+    .floating-time {
+        min-width: 100px; /* 4桁の年と2桁の月が十分に入るだけの幅を確保します */
+        text-align: center; /* 箱の中で文字を真ん中に揃えます */
+        font-variant-numeric: tabular-nums; /* どの数字も同じ横幅になるようにします */
+    }
+    .floating-market {
+        min-width: 90px; /* 浪人や米相場の文字と数字が十分に入るだけの幅を確保します */
+        text-align: center; /* 箱の中で文字を真ん中に揃えます */
+        font-variant-numeric: tabular-nums; /* どの数字も同じ横幅になるようにします */
     }
 
     /* ダンボール箱に閉じ込める魔法 */
