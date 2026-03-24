@@ -1091,6 +1091,39 @@ class GameManager {
                 }
                 c.population = Math.min(999999, Math.max(0, c.population + growth));
             }
+        });
+
+        // ★ここを書き換え！：空っぽの城（中立）も仲間はずれにせず、一緒に混ぜて順番リストに入れます！
+        const allCastles = [...this.castles];
+        allCastles.sort(() => Math.random() - 0.5); 
+        this.turnQueue = [...allCastles];
+
+        // ★毎月の初めに、最新の威信を計算し直します！
+        this.updateAllClanPrestige();
+
+        // ==========================================
+        // ★追加：ここで官位の授与チェックを行います！
+        const promotionMsgs = this.courtRankSystem.processMonthlyPromotions();
+        if (promotionMsgs && promotionMsgs.length > 0) {
+            // 複数の大名が同時に受かった場合は、改行で繋げてダイアログを出します
+            const combinedMsg = "【官位叙任のお知らせ】\n" + promotionMsgs.join('\n');
+            await this.ui.showDialogAsync(combinedMsg, false, 0);
+            
+            // 官位をもらったことで威信が増えるので、念のためもう一度最新の威信を計算し直しておきます！
+            this.updateAllClanPrestige();
+        }
+        // ==========================================
+
+        // ★ここを書き足し！：月初イベント【後】（収入などの処理が終わった後）を実行します
+        // ここで9月の兵糧収穫イベントなどが実行されます！
+        if (this.eventManager) {
+            await this.eventManager.processEvents('startMonth_after');
+        }
+
+        // ★ここから新しく書き足し！：収入やイベントが全部終わった「後」に、金や兵糧を消費します！
+        this.castles.forEach(c => {
+            if (c.ownerClan === 0) return;
+
             const bushos = this.getCastleBushos(c.id);
             const consumeGold = bushos.length * window.MainParams.Economy.ConsumeGoldPerBusho;
             const isGoldShort = (c.gold - consumeGold < 0);
@@ -1118,39 +1151,13 @@ class GameManager {
                 }
             });
 
-            // ここに追加します！もし兵糧不足などで兵士が0以下になったら、訓練と士気も0にします
+            // もし兵糧不足などで兵士が0以下になったら、訓練と士気も0にします
             if (c.soldiers <= 0) {
                 c.soldiers = 0;
                 c.training = 0;
                 c.morale = 0;
             }
         });
-
-        // ★ここを書き換え！：空っぽの城（中立）も仲間はずれにせず、一緒に混ぜて順番リストに入れます！
-        const allCastles = [...this.castles];
-        allCastles.sort(() => Math.random() - 0.5); 
-        this.turnQueue = [...allCastles];
-
-        // ★毎月の初めに、最新の威信を計算し直します！
-        this.updateAllClanPrestige();
-
-        // ==========================================
-        // ★追加：ここで官位の授与チェックを行います！
-        const promotionMsgs = this.courtRankSystem.processMonthlyPromotions();
-        if (promotionMsgs && promotionMsgs.length > 0) {
-            // 複数の大名が同時に受かった場合は、改行で繋げてダイアログを出します
-            const combinedMsg = "【官位叙任のお知らせ】\n" + promotionMsgs.join('\n');
-            await this.ui.showDialogAsync(combinedMsg, false, 0);
-            
-            // 官位をもらったことで威信が増えるので、念のためもう一度最新の威信を計算し直しておきます！
-            this.updateAllClanPrestige();
-        }
-        // ==========================================
-
-        // ★ここを書き足し！：月初イベント【後】（収入などの処理が終わった後）を実行します
-        if (this.eventManager) {
-            await this.eventManager.processEvents('startMonth_after');
-        }
 
         // ★ここから追加：毎月の初めに、各大名家に「作戦会議（カウントダウンの進行や新しい目標決め）」をさせます！
         if (this.aiOperationManager) {
