@@ -41,6 +41,12 @@ class AffiliationSystem {
 
         // 6. 新しいお城に入ります
         this.enterCastle(busho, newCastleId);
+
+        // ★ここから追加：画面の絵をすぐに描き直す魔法！
+        if (this.game && this.game.ui) {
+            this.game.ui.renderMap();
+            this.game.ui.updatePanelHeader();
+        }
     }
 
     /**
@@ -86,6 +92,12 @@ class AffiliationSystem {
         if (busho.castleId) {
             this.enterCastle(busho, busho.castleId);
         }
+
+        // ★ここから追加：画面の絵をすぐに描き直す魔法！
+        if (this.game && this.game.ui) {
+            this.game.ui.renderMap();
+            this.game.ui.updatePanelHeader();
+        }
     }
 
     /**
@@ -102,6 +114,31 @@ class AffiliationSystem {
         
         // 3. 移動するといったん城主ではなくなります（必要なら後で再任命します）
         busho.isCastellan = false; 
+
+        // ★ここから追加：画面の絵をすぐに描き直す魔法！
+        if (this.game && this.game.ui) {
+            this.game.ui.renderMap();
+            this.game.ui.updatePanelHeader();
+        }
+    }
+
+    /**
+     * ④ お城の「所属（持ち主の大名家）」が変わる時の魔法
+     * 引き抜きや独立、戦争での落城などで使います！
+     * @param {object} castle - 所属が変わるお城
+     * @param {number} newClanId - 新しい大名家のID
+     */
+    changeCastleOwner(castle, newClanId) {
+        if (!castle) return;
+        
+        // お城の持ち主のデータを書き換えます
+        castle.ownerClan = newClanId;
+
+        // 画面の絵をすぐに描き直す魔法！
+        if (this.game && this.game.ui) {
+            this.game.ui.renderMap();
+            this.game.ui.updatePanelHeader();
+        }
     }
 
     /**
