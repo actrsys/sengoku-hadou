@@ -446,6 +446,28 @@ class LifeSystem {
                 }
             }
             
+            // ★ここから追加：当主交代に合わせて大名家の名前を変更し、マップを更新します！
+            const clan = this.game.clans.find(c => c.id === daimyo.clan);
+            if (clan) {
+                const oldClanName = clan.name;
+                
+                // 万が一「姓」のデータが空っぽだった場合に備えて、フルネームを代用する安全策を入れます
+                const safeFamilyName = successor.familyName || successor.name;
+                const newClanName = `${safeFamilyName}家`;
+                
+                // 家の名前が本当に変わる場合のみ変更します
+                if (oldClanName !== newClanName) {
+                    clan.name = newClanName;
+                    extraMsg += `\n当主の交代により、${oldClanName}は今後「${newClanName}」となります。`;
+                    
+                    // マップ上の名前もすぐに書き換わるように、画面の更新の合図を出します
+                    if (this.game.ui && typeof this.game.ui.renderMap === 'function') {
+                        this.game.ui.renderMap();
+                    }
+                }
+            }
+            // ★追加ここまで
+            
             const msg = `【当主交代】\n${daimyo.name.replace('|','')}が死亡し、${successor.name.replace('|','')}が家督を継ぎました。${extraMsg}`;
             this.game.ui.log(`【当主交代】${daimyo.name.replace('|','')}が死亡し、${successor.name.replace('|','')}が家督を継ぎました。`);
             

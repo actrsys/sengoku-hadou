@@ -161,11 +161,14 @@ class Busho {
         
         // --- 名前（既存の処理） ---
         if (this.name && this.name.includes('|')) {
+            // CSVなどから「織田|信長」の形式で読み込んだ時の処理です
             let names = this.name.split('|');
             this.familyName = names[0];
             this.givenName = names[1];
             this.name = names[0] + names[1]; 
-        } else {
+        } else if (!this.familyName) {
+            // セーブデータから読み込んだ時はすでに「familyName（姓）」を持っているので、
+            // 空っぽの時だけフルネームを入れるようにして上書きを防ぎます
             this.familyName = this.name;
             this.givenName = "";
         }
