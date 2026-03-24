@@ -793,7 +793,7 @@ class UIInfoManager {
                     ${faceHtml}
                     <div class="daimyo-confirm-info">
                         <h3 style="margin:0 0 5px 0; font-size:1.2rem; border:none; padding:0;">${clanName}</h3>
-                        <div style="font-size:0.95rem; margin-bottom: 3px;">当主：${leader ? leader.name : "不明"}</div>
+                        <div style="font-size:0.95rem; margin-bottom: 3px;">大名　${leader ? leader.name : "不明"}</div>
                     </div>
                 </div>
                 <div class="daimyo-confirm-stats">
