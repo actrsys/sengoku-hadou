@@ -489,13 +489,11 @@ class UIManager {
         if (dialog.isConfirm) {
             cancelBtn.classList.remove('hidden'); 
             cancelBtn.onclick = () => { cancelBtn.onclick = null; cleanupAndNext(dialog.onCancel); };
-            // ★追加：ボタンが２個の時の設定（右下に寄せる）
             okBtn.textContent = '了承';
             okBtn.className = 'btn-primary';
-            footer.style.justifyContent = 'flex-end';
+            footer.style.justifyContent = 'center';
         } else {
             cancelBtn.classList.add('hidden'); 
-            // ★追加：ボタンが１個の時の設定（真ん中に寄せて、色形を「戻る」に揃える）
             okBtn.textContent = '閉じる';
             okBtn.className = 'btn-secondary';
             footer.style.justifyContent = 'center';
@@ -1704,14 +1702,12 @@ class UIManager {
             } else {
                 backBtn.style.display = ''; 
                 
-                // ★追加：見るだけの時は「閉じる」にして真ん中に、選ぶ時は「戻る」にして右下に寄せます
                 if (isViewMode) {
                     backBtn.textContent = '閉じる';
-                    if (footer) footer.style.justifyContent = 'center';
                 } else {
                     backBtn.textContent = '戻る';
-                    if (footer) footer.style.justifyContent = 'flex-end';
                 }
+                if (footer) footer.style.justifyContent = 'center';
 
                 backBtn.onclick = () => {
                     this.closeSelector();
@@ -1936,6 +1932,8 @@ class UIManager {
         const modal = document.getElementById('unit-divide-modal');
         const listEl = document.getElementById('divide-list');
         const confirmBtn = document.getElementById('divide-confirm-btn');
+        const footer = confirmBtn.parentElement;
+        if (footer) footer.style.justifyContent = 'center';
         const remainEl = document.getElementById('divide-remain-soldiers');
         const totalEl = document.getElementById('divide-total-soldiers');
         
