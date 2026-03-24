@@ -782,6 +782,11 @@ class UIInfoManager {
             totalRice += (c.rice || 0);
         });
 
+        // 武将の数と姫の数も数えます
+        const bushosCount = this.game.bushos.filter(b => b.clan === clanId && b.status !== 'dead' && b.status !== 'unborn').length;
+        const clanData = this.game.clans.find(c => c.id === clanId);
+        const princessCount = clanData && clanData.princessIds ? clanData.princessIds.length : 0;
+
         if (this.ui.daimyoConfirmBody) {
             this.ui.daimyoConfirmBody.innerHTML = `
                 <div class="daimyo-confirm-compact">
@@ -792,12 +797,14 @@ class UIInfoManager {
                     </div>
                 </div>
                 <div class="daimyo-confirm-stats">
-                    <div class="stat-box"><span>城数</span><span class="stat-val">${castlesCount}</span></div>
-                    <div class="stat-box"><span>総人口</span><span class="stat-val">${totalPopulation}</span></div>
-                    <div class="stat-box"><span>総石高</span><span class="stat-val">${totalKokudaka}</span></div>
-                    <div class="stat-box"><span>総兵数</span><span class="stat-val">${soldiers}</span></div>
+                    <div class="stat-box"><span>城</span><span class="stat-val">${castlesCount}</span></div>
+                    <div class="stat-box"><span>人口</span><span class="stat-val">${totalPopulation}</span></div>
+                    <div class="stat-box"><span>兵士</span><span class="stat-val">${soldiers}</span></div>
+                    <div class="stat-box"><span>石高</span><span class="stat-val">${totalKokudaka}</span></div>
                     <div class="stat-box"><span>金</span><span class="stat-val">${totalGold}</span></div>
                     <div class="stat-box"><span>兵糧</span><span class="stat-val">${totalRice}</span></div>
+                    <div class="stat-box"><span>武将</span><span class="stat-val">${bushosCount}</span></div>
+                    <div class="stat-box"><span>姫</span><span class="stat-val">${princessCount}</span></div>
                 </div>
             `;
         }
