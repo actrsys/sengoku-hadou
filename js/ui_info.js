@@ -25,8 +25,15 @@ class UIInfoManager {
             };
         });
         
-        clanDataList.sort((a,b) => b.power - a.power);
-        const maxPower = clanDataList.length > 0 ? clanDataList[0].power : 1;
+        // 先に、全員の中で一番高い威信の数値を調べて覚えておきます
+        const maxPower = clanDataList.length > 0 ? Math.max(...clanDataList.map(c => c.power)) : 1;
+
+        // プレイヤーの勢力なら一番上に、それ以外は威信が高い順番になるように並べ替えます
+        clanDataList.sort((a, b) => {
+            if (a.id === this.game.playerClanId) return -1;
+            if (b.id === this.game.playerClanId) return 1;
+            return b.power - a.power;
+        });
 
         clanDataList.forEach(d => {
             let friendScore = 50;
