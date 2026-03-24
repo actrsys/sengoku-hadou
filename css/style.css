@@ -878,9 +878,9 @@ body.is-pc .retreat-btn:hover {
     background-color: #263238; /* タイトル画面のような暗い色 */
     z-index: 9999; /* どんな画面よりも手前に出します */
     display: flex;
-    justify-content: flex-end; /* 右に寄せます */
-    align-items: flex-end;     /* 下に寄せます */
-    padding: 40px;
+    justify-content: center; /* ★中央に寄せます（左右） */
+    align-items: center;     /* ★中央に寄せます（上下） */
+    padding: 0;              /* 余計な隙間をなくします */
     box-sizing: border-box;
 }
 
