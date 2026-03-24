@@ -331,7 +331,7 @@ const COMMAND_SPECS = {
     'settings': { label: "設定", category: 'SYSTEM', isSystem: true, action: 'settings' },
     'save': { label: "ファイル保存", category: 'SYSTEM', isSystem: true, action: 'save' },
     'load': { label: "ファイル読込", category: 'SYSTEM', isSystem: true, action: 'load' },
-    'title': { label: "タイトルに戻る", category: 'SYSTEM', isSystem: true, action: 'title' } // ★この１行を書き足します！
+    'title': { label: "タイトルへ", category: 'SYSTEM', isSystem: true, action: 'title' } // ★この１行を書き足します！
 };
 
 class CommandSystem {
