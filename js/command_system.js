@@ -766,6 +766,12 @@ class CommandSystem {
         if (type === 'training' && castle.training >= maxTraining) { this.game.ui.showDialog("これ以上訓練は上げられません", false); return; }
         if (type === 'soldier_charity' && castle.morale >= maxMorale) { this.game.ui.showDialog("これ以上士気は上げられません", false); return; }
 
+        // ここにストッパーを追加します。兵士が0以下の時は実行できなくします
+        if ((type === 'training' || type === 'soldier_charity') && castle.soldiers <= 0) {
+            this.game.ui.showDialog("兵士がいません", false);
+            return;
+        }
+
         if (spec.costGold > 0 && castle.gold < spec.costGold) {
             this.game.ui.showDialog(`金が足りません (必要: ${spec.costGold})`, false);
             return;
@@ -1366,7 +1372,8 @@ class CommandSystem {
                     castle.gold -= spec.costGold;  
                     castle.rice -= spec.costRice;  
 
-                    const val = GameSystem.calcTraining(busho); 
+                    // 「その城の兵士数 (castle.soldiers)」を渡して計算してもらいます
+                    const val = GameSystem.calcTraining(busho, castle.soldiers); 
                     const maxTraining = window.WarParams.Military.MaxTraining || 100;
                     const oldVal = castle.training;
                     castle.training = Math.min(maxTraining, castle.training + val); 
@@ -1381,7 +1388,8 @@ class CommandSystem {
                     castle.gold -= spec.costGold;  
                     castle.rice -= spec.costRice;  
 
-                    const val = GameSystem.calcSoldierCharity(busho); 
+                    // こちらも「その城の兵士数」を渡します
+                    const val = GameSystem.calcSoldierCharity(busho, castle.soldiers); 
                     const maxMorale = window.WarParams.Military.MaxMorale || 100;
                     const oldVal = castle.morale;
                     castle.morale = Math.min(maxMorale, castle.morale + val); 
@@ -1676,6 +1684,13 @@ class CommandSystem {
         c.guns = Math.max(0, (c.guns || 0) - vals.guns);
         t.horses = (t.horses || 0) + vals.horses;
         t.guns = (t.guns || 0) + vals.guns;
+        
+        // ここに追加します！もし輸送元（c）の兵士が0以下になったら、訓練と士気も0にします
+        if (c.soldiers <= 0) {
+            c.soldiers = 0;
+            c.training = 0;
+            c.morale = 0;
+        }
         
         bushoIds.forEach(id => {
             const b = this.game.getBusho(id);
