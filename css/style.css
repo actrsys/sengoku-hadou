@@ -747,7 +747,7 @@ body.is-pc {
         top: 20px; 
         bottom: auto; 
         left: auto; 
-        right: 250px; /* ” ‚Ì•‚ğL‚°‚½‚Ì‚ÅA‚Ô‚Â‚©‚ç‚È‚¢‚æ‚¤‚É­‚µ¶‚Ö‚¸‚ç‚µ‚Ü‚· */
+        right: 300px; /* š‚±‚±‚Ì”š‚ğ 250 ‚©‚ç 300 ‚É‘‚â‚µ‚ÄA‚à‚Á‚Æ¶‚É‚¸‚ç‚µ‚Ü‚µ‚½ */
         flex-direction: row; 
     }
     #mobile-floating-market { 
