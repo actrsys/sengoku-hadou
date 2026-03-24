@@ -250,7 +250,7 @@ body.hide-daimyo-labels .daimyo-name-label { display: none !important; }
 .daimyo-list-header, .daimyo-list-item { display: grid; grid-template-columns: 2fr 2fr 1fr 1.5fr 1.5fr 1fr; font-size: clamp(0.65rem, 2.5vw, 0.9rem); padding: 0; min-height: 30px; gap: 0; }
 .kunishu-list-header, .kunishu-list-item { display: grid; grid-template-columns: 20px 3fr 1.5fr 1.5fr 1.5fr; font-size: clamp(0.7rem, 2.8vw, 0.9rem); padding: 0; min-height: 30px; gap: 0; }
 .view-mode .kunishu-list-header, .view-mode .kunishu-list-item { grid-template-columns: 3fr 1.5fr 1.5fr 1.5fr; }
-.faction-list-header, .faction-list-item { display: grid; grid-template-columns: 2.5fr 1fr 1.5fr 1.5fr; font-size: clamp(0.7rem, 2.8vw, 0.95rem); padding: 0; min-height: 30px; gap: 0; }
+.faction-list-header, .faction-list-item { display: grid; grid-template-columns: 2.5fr 1fr 1.5fr 1.5fr 3fr; font-size: clamp(0.7rem, 2.8vw, 0.95rem); padding: 0; min-height: 30px; gap: 0; }
 
 .kunishu-item { padding: 12px 15px; border: 1px solid #d0b080; margin-bottom: 8px; cursor: pointer; display: flex; align-items: center; background: rgba(250, 240, 230, 0.95); border-radius: 6px; transition: all 0.2s ease; font-family: 'Sawarabi Mincho', serif; box-shadow: 1px 1px 3px rgba(0,0,0,0.1); }
 .kunishu-item:hover { background: #fff5e0; transform: translateX(3px); box-shadow: 2px 2px 5px rgba(0,0,0,0.15); border-color: #c0a070; }
@@ -797,7 +797,7 @@ body.is-pc {
     .daimyo-list-header, .daimyo-list-item { grid-template-columns: 80px 110px 50px 80px 80px 60px; font-size: 0.9rem; min-height: 36px; }
     .kunishu-list-header, .kunishu-list-item { grid-template-columns: 25px 130px 80px 80px 80px; font-size: 0.9rem; min-height: 36px; }
     .view-mode .kunishu-list-header, .view-mode .kunishu-list-item { grid-template-columns: 140px 80px 80px 80px; }
-    .faction-list-header, .faction-list-item { grid-template-columns: 140px 80px 100px 100px; font-size: 0.95rem; min-height: 36px; }
+    .faction-list-header, .faction-list-item { grid-template-columns: 140px 80px 100px 100px 1fr; font-size: 0.95rem; min-height: 36px; }
     .list-container, .daimyo-list-container, .result-body, .faction-list-container { scroll-padding-top: 38px; }
     
     /* モーダル拡張（輸送・兵力分配）のタイル化 */
@@ -868,7 +868,7 @@ body.is-pc {
 
 .princess-list-header, .princess-list-item {
     display: grid;
-    grid-template-columns: 2fr 1fr 1fr 1.5fr 1.5fr;
+    grid-template-columns: 2fr 1fr 1fr 1.5fr 1.5fr 3fr;
     font-size: clamp(0.7rem, 2.8vw, 0.95rem);
     padding: 0; min-height: 30px; gap: 0;
 }
@@ -898,7 +898,7 @@ body.is-pc {
 
 /* パソコンで見た時の幅設定 */
 body.is-pc .princess-list-header, body.is-pc .princess-list-item {
-    grid-template-columns: 140px 80px 80px 100px 100px;
+    grid-template-columns: 140px 80px 80px 100px 100px 1fr;
     font-size: 0.95rem; min-height: 36px;
 }
 /* =========================================================
