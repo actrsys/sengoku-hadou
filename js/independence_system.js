@@ -174,7 +174,7 @@ class IndependenceSystem {
             }
             castellan.clan = newClanId;
             castellan.loyalty = 100;
-            castle.ownerClan = newClanId;
+            this.game.affiliationSystem.changeCastleOwner(castle, newClanId);
             
         } else {
             newClanId = Math.max(...this.game.clans.map(c => c.id)) + 1;
@@ -196,7 +196,7 @@ class IndependenceSystem {
             }
             castellan.clan = newClanId;
             castellan.loyalty = 100;
-            castle.ownerClan = newClanId;
+            this.game.affiliationSystem.changeCastleOwner(castle, newClanId);
 
             const oldClan = this.game.clans.find(c => c.id === oldClanId);
             if (oldClan) oldClan.diplomacyValue[newClanId] = { status: '敵対', sentiment: 0 };
@@ -212,7 +212,7 @@ class IndependenceSystem {
             }
             if (rebellionLeader.isCastellan && leaderCastle) {
                 // 派閥主がどこかの城主なら、その城も新勢力になる
-                leaderCastle.ownerClan = newClanId;
+                this.game.affiliationSystem.changeCastleOwner(leaderCastle, newClanId);
                 rebellionLeader.clan = newClanId;
                 rebellionLeader.loyalty = 100;
             } else {
@@ -345,7 +345,7 @@ class IndependenceSystem {
                 if (joinScore > stayScore) {
                     this.game.ui.log(`  -> 呼応！${castle.name}城主の${busho.name}が${leader.name}に与しました！`);
                     const oldLoy = busho.loyalty;
-                    castle.ownerClan = newClanId;
+                    this.game.affiliationSystem.changeCastleOwner(castle, newClanId);
                     // ★大名家が変わるので功績半分！
                     if (busho.clan !== 0 && busho.clan !== newClanId) {
                         busho.achievementTotal = Math.floor((busho.achievementTotal || 0) / 2);
