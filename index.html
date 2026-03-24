@@ -26,6 +26,17 @@
             </div>
         </div>
     </div>
+
+    <div id="diplo-list-modal" class="modal hidden" style="z-index: 100000;">
+        <div class="modal-content result-content" style="max-width: 500px;">
+            <h3 id="diplo-list-title" style="margin-top:0; border-bottom: 2px solid #ddd; padding-bottom: 10px; flex-shrink:0;">外交関係</h3>
+            <div id="diplo-list-body" style="display: flex; flex-direction: column; flex: 1; overflow-y: hidden; min-height: 200px;"></div>
+            <div class="modal-footer" style="justify-content: center;">
+                <button class="btn-secondary" onclick="document.getElementById('diplo-list-modal').classList.add('hidden')">閉じる</button>
+            </div>
+        </div>
+    </div>
+
     <div id="game-screen">
         <div id="global-loading-screen" class="hidden">
             <div class="loading-text">Now Loading...</div>
