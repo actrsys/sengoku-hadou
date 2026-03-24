@@ -550,8 +550,18 @@ class GameSystem {
     static calcDevelopment(busho) { return Math.max(1, Math.round(((busho.politics * 1.5) + (Math.sqrt(busho.loyalty) * 2)) / 20)); }
     static calcRepair(busho) { return Math.max(1, Math.round(((busho.politics * 1.5) + (Math.sqrt(busho.loyalty) * 2)) / 15)); }
     static calcCharity(busho) { return Math.max(1, Math.round(((busho.politics * 1.5) + busho.charm + (Math.sqrt(busho.loyalty) * 2)) / 30)); }
-    static calcTraining(busho) { return Math.max(1, Math.round(((busho.leadership * 1.5) + busho.strength + (Math.sqrt(busho.loyalty) * 2)) / 35)); }
-    static calcSoldierCharity(busho) { return Math.max(1, Math.round(((busho.politics * 1.5) + busho.charm + (Math.sqrt(busho.loyalty) * 2)) / 30)); }
+    
+    // 新しい計算式です。兵士数(soldiers)を引数として受け取ります
+    static calcTraining(busho, soldiers) { 
+        const safeSoldiers = Math.max(1, soldiers); // 兵士0の時は計算エラーを防ぐため1として扱います
+        const val = ((busho.leadership * 1.5) + busho.strength + (Math.sqrt(busho.loyalty) * 2)) / (Math.sqrt(safeSoldiers) * 1.0);
+        return Math.max(1, Math.round(val)); 
+    }
+    static calcSoldierCharity(busho, soldiers) { 
+        const safeSoldiers = Math.max(1, soldiers); // こちらも同じく兵士0の時は1として扱います
+        const val = ((busho.politics * 1.5) + busho.charm + (Math.sqrt(busho.loyalty) * 2)) / (Math.sqrt(safeSoldiers) * 1.0);
+        return Math.max(1, Math.round(val)); 
+    }
     
     // AI用：お金を指定して、集まる兵士数を計算します
     static calcDraftFromGold(gold, busho, peoplesLoyalty) { 
@@ -1107,6 +1117,13 @@ class GameManager {
                     b.loyalty = Math.max(0, b.loyalty - 1);
                 }
             });
+
+            // ここに追加します！もし兵糧不足などで兵士が0以下になったら、訓練と士気も0にします
+            if (c.soldiers <= 0) {
+                c.soldiers = 0;
+                c.training = 0;
+                c.morale = 0;
+            }
         });
 
         // ★ここを書き換え！：空っぽの城（中立）も仲間はずれにせず、一緒に混ぜて順番リストに入れます！
