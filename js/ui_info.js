@@ -733,4 +733,99 @@ class UIInfoManager {
     // ==========================================
     // ★姫一覧＆姫選択の魔法ここまで！
     // ==========================================
+
+    // ==========================================
+    // ★ここから追加：大名選択の確認画面の魔法！
+    // ==========================================
+    showDaimyoConfirmModal(clanId, clanName, soldiers, leader, onStart) {
+        if (!this.ui.daimyoConfirmModal) return;
+
+        // ★選択中の大名を記憶して、光を更新します
+        this.ui.selectedDaimyoId = clanId;
+        this.ui.updateCastleGlows();
+
+        // ★追加：大名を選んだら、マップをスッキリさせるために名前シールを隠す合図を出します！
+        document.body.classList.add('hide-daimyo-labels');
+        
+        // ★追加：「操作する勢力を選択してください」の案内板も隠します！
+        const mapGuide = document.getElementById('map-guide');
+        if (mapGuide) mapGuide.classList.add('hidden');
+
+        this.ui.daimyoConfirmModal.classList.remove('hidden');
+        
+        // ★ここから追加：独立させたボタンを表示する魔法です
+        const confirmButtons = document.querySelector('.daimyo-confirm-buttons');
+        if (confirmButtons) confirmButtons.classList.remove('hidden');
+        
+        // ★修正：大名情報が出た時に「シナリオ選択に戻る」ボタンを確実に隠す魔法です！
+        const backToScenarioBtn = document.getElementById('btn-back-to-scenario');
+        if (backToScenarioBtn) backToScenarioBtn.classList.add('hidden');
+        
+        let faceHtml = "";
+        if (leader && leader.faceIcon) {
+            faceHtml = `<img src="data/images/faceicons/${leader.faceIcon}" class="daimyo-confirm-face" onerror="this.style.display='none'">`;
+        }
+
+        // 大名の情報を集めて合算します
+        const clanCastles = this.game.castles.filter(c => c.ownerClan === clanId);
+        const castlesCount = clanCastles.length;
+        
+        let totalPopulation = 0;
+        let totalKokudaka = 0;
+        let totalGold = 0;
+        let totalRice = 0;
+        
+        clanCastles.forEach(c => {
+            totalPopulation += (c.population || 0);
+            totalKokudaka += (c.kokudaka || 0);
+            totalGold += (c.gold || 0);
+            totalRice += (c.rice || 0);
+        });
+
+        if (this.ui.daimyoConfirmBody) {
+            this.ui.daimyoConfirmBody.innerHTML = `
+                <div class="daimyo-confirm-compact">
+                    ${faceHtml}
+                    <div class="daimyo-confirm-info">
+                        <h3 style="margin:0 0 5px 0; font-size:1.2rem; border:none; padding:0;">${clanName}</h3>
+                        <div style="font-size:0.95rem; margin-bottom: 3px;">当主：${leader ? leader.name : "不明"}</div>
+                    </div>
+                </div>
+                <div class="daimyo-confirm-stats">
+                    <div class="stat-box"><span>城数</span><span class="stat-val">${castlesCount}</span></div>
+                    <div class="stat-box"><span>総人口</span><span class="stat-val">${totalPopulation}</span></div>
+                    <div class="stat-box"><span>総石高</span><span class="stat-val">${totalKokudaka}</span></div>
+                    <div class="stat-box"><span>総兵数</span><span class="stat-val">${soldiers}</span></div>
+                    <div class="stat-box"><span>金</span><span class="stat-val">${totalGold}</span></div>
+                    <div class="stat-box"><span>兵糧</span><span class="stat-val">${totalRice}</span></div>
+                </div>
+            `;
+        }
+        
+        const startBtn = document.getElementById('daimyo-confirm-start-btn');
+        if (startBtn) {
+            startBtn.onclick = () => {
+                if (window.AudioManager) {
+                    window.AudioManager.playBGM('SC_ex_Town2_Fortress.ogg');
+                }
+
+                this.ui.daimyoConfirmModal.classList.add('hidden');
+                if (confirmButtons) confirmButtons.classList.add('hidden'); // 分離したボタンも隠す
+                
+                this.ui.selectedDaimyoId = null; 
+                document.body.classList.remove('daimyo-select-mode'); 
+                document.body.classList.remove('hide-daimyo-labels'); 
+                onStart();
+            };
+        }
+        const backBtn = document.getElementById('daimyo-confirm-back-btn');
+        if (backBtn) {
+            backBtn.onclick = () => {
+                this.ui.selectedDaimyoId = null; 
+                this.ui.updateCastleGlows();     
+                document.body.classList.remove('hide-daimyo-labels'); 
+                this.ui.renderMap(); 
+            };
+        }
+    }
 }
