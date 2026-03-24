@@ -615,7 +615,7 @@ class UIInfoManager {
         }
 
         // 見出しを作ります（新しく作った princess-list 用の枠組みを使います！）
-        let listHtml = '<div class="princess-list-container"><div class="princess-list-header"><span>名前</span><span>身分</span><span>年齢</span><span>父親</span><span>配偶者</span><span></span></div>';
+        let listHtml = '<div class="princess-list-container"><div class="princess-list-header"><span>名前</span><span>年齢</span><span>父親</span><span>配偶者</span><span></span></div>';
 
         // 姫を一人ずつリストに並べていきます
         princesses.forEach(p => {
@@ -636,7 +636,7 @@ class UIInfoManager {
             }
 
             // 1人分の行を作ります（他のリストと同じように、空白や改行をなくして1行にまとめます！）
-            listHtml += `<div class="princess-list-item" ${cursorStr} ${onClickStr}><strong class="col-princess-name">${p.name}</strong><span>姫</span><span>${age}歳</span><span>${fatherName}</span><span>${husbandName}</span><span></span></div>`;
+            listHtml += `<div class="princess-list-item" ${cursorStr} ${onClickStr}><strong class="col-princess-name">${p.name}</strong><span>${age}歳</span><span>${fatherName}</span><span>${husbandName}</span><span></span></div>`;
         });
         
         // もし一人もいなかったら
