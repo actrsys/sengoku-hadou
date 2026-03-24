@@ -727,27 +727,26 @@ body.is-pc {
     #game-screen { overflow: hidden; background-color: var(--bg-color); position: relative; }
     
     #app { flex-direction: row; }
-        #top-info-bar, #bottom-command-bar, #pc-map-overlay { display: none !important; }
-        #map-reset-zoom { bottom: 20px; right: 20px; }
-        
-        /* PC版：年月、浪人、米相場を城情報ウインドウの右側に左揃えで縦に並べる */
-        #mobile-floating-info { 
-            top: 10px; 
-            bottom: auto; 
-            left: 350px; 
-            right: auto; 
-        }
-        #mobile-floating-market { 
-            top: 42px; 
-            bottom: auto; 
-            left: 350px; 
-            right: auto; 
-            flex-direction: column; 
-            align-items: flex-start; 
-            gap: 6px; 
-        }
+    #top-info-bar, #bottom-command-bar, #pc-map-overlay { display: none !important; }
+    #map-reset-zoom { bottom: 20px; right: 20px; }
+    
+    /* PC版：年月、浪人、米相場を右上に横並びで配置 */
+    #mobile-floating-info { 
+        top: 20px; 
+        bottom: auto; 
+        left: auto; 
+        right: 230px; /* 浪人と米相場の左隣に置くための距離です */
+        flex-direction: row; 
+    }
+    #mobile-floating-market { 
+        top: 20px; 
+        bottom: auto;
+        left: auto;
+        right: 30px; 
+        flex-direction: row; 
+    }
 
-        /* ダンボール箱に閉じ込める魔法 */
+    /* ダンボール箱に閉じ込める魔法 */
     #title-screen, .modal, .cutin-overlay, #ai-guard { position: absolute !important; }
 
     /* PCサイドバー（新しいUIに移行したため完全に非表示にします） */
