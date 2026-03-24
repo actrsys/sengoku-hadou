@@ -739,6 +739,9 @@ body.is-pc {
     #top-info-bar, #bottom-command-bar, #pc-map-overlay { display: none !important; }
     #map-reset-zoom { bottom: 20px; right: 20px; }
     
+    /* PC版：マップの周りの余白をタイトル画面と同じ色に塗りつぶす魔法 */
+    #map-wrapper { background: linear-gradient(135deg, #263238 0%, #37474f 100%); }
+    
     /* PC版：年月、浪人、米相場を右上に横並びで配置 */
     #mobile-floating-info { 
         top: 20px; 
