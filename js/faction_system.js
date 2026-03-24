@@ -15,7 +15,7 @@ class FactionSystem {
      * @param {number} baseAmount 基本変動量 (プラスは不満蓄積、マイナスは恩義/解消)
      */
     updateRecognition(busho, baseAmount) {
-        if (!busho || busho.status === 'ronin' || busho.status === 'dead') return;
+        if (!busho || busho.status === 'ronin' || busho.status === 'dead' || busho.isDaimyo) return;
         
         // パラメータ取得
         const F = window.WarParams.Faction || {};
