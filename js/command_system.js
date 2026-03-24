@@ -1777,11 +1777,12 @@ class CommandSystem {
         }
         
         castle.gold -= costGold;
-        
-        const newMorale = Math.max(0, castle.morale - 10); 
-        const newTraining = Math.max(0, castle.training - 10); 
-        
-        if (castle.soldiers + soldiers > 0) {
+        
+        // 新しく入ってきた兵士たちは、まだ訓練も受けていないので基本の低い数字になります
+        const newMorale = 30; 
+        const newTraining = 30; 
+        
+        if (castle.soldiers + soldiers > 0) {
             castle.training = Math.floor(((castle.training * castle.soldiers) + (newTraining * soldiers)) / (castle.soldiers + soldiers));
             castle.morale = Math.floor(((castle.morale * castle.soldiers) + (newMorale * soldiers)) / (castle.soldiers + soldiers));
         }
