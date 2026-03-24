@@ -2228,6 +2228,26 @@ class UIManager {
                 this.quantityConfirmBtn.disabled = true;
                 this.quantityConfirmBtn.style.opacity = 0.5;
             }
+
+            // ★追加：スライダーを動かすたびに呼ばれるこの場所で、必要資金を計算してパタパタ表示します！
+            const displayEl = document.getElementById('dynamic-cost-display');
+            if (displayEl) {
+                if (type === 'draft') {
+                    const soldiers = parseInt(document.getElementById('num-soldiers')?.value) || 0;
+                    const busho = this.game.getBusho(data[0]);
+                    const cost = GameSystem.calcDraftCost(soldiers, busho, c.peoplesLoyalty);
+                    displayEl.innerText = `必要資金: ${cost} 金`;
+                } else if (type === 'buy_rice') {
+                    const amount = parseInt(document.getElementById('num-amount')?.value) || 0;
+                    let rate = 1.0;
+                    if (c && this.game.provinces) {
+                        const province = this.game.provinces.find(p => p.id === c.provinceId);
+                        if (province && province.marketRate !== undefined) rate = province.marketRate;
+                    }
+                    const cost = Math.ceil(amount * rate); // 1金未満の端数が出た時に足りなくならないよう切り上げます
+                    displayEl.innerText = `必要資金: ${cost} 金`;
+                }
+            }
         };
 
         const createSlider = (label, id, max, currentVal, minVal = 0) => { 
@@ -2293,7 +2313,22 @@ class UIManager {
         let inputs = {};
         
         if (type === 'draft') {
-            document.getElementById('quantity-title').textContent = "徴兵資金"; inputs.gold = createSlider("金", "gold", c.gold, 0);
+            document.getElementById('quantity-title').textContent = "徴兵"; 
+            
+            const busho = this.game.getBusho(data[0]);
+            // 持っているお金で雇える最大人数を計算します
+            const maxAffordable = GameSystem.calcDraftFromGold(c.gold, busho, c.peoplesLoyalty);
+            // 人口の限界などと比べて、本当に雇える最大数を決めます
+            const maxSoldiers = Math.min(c.population, 99999 - c.soldiers, maxAffordable);
+            
+            inputs.soldiers = createSlider("兵士数", "soldiers", maxSoldiers, 0);
+
+            // ★追加：スライダーの下に、必要な資金を表示する枠を作ります
+            const costDiv = document.createElement('div');
+            costDiv.id = 'dynamic-cost-display';
+            costDiv.style.cssText = "text-align:center; font-weight:bold; color:#1976d2; margin-top:10px; font-size:1.1rem;";
+            this.quantityContainer.appendChild(costDiv);
+            
         } else if (type === 'charity') {
             document.getElementById('quantity-title').textContent = "施し"; this.charityTypeSelector.classList.remove('hidden'); const count = data.length; this.quantityContainer.innerHTML = `<p>選択武将数: ${count}名</p>`;
         } else if (type === 'goodwill') {
@@ -2307,17 +2342,17 @@ class UIManager {
             inputs.gold = createSlider("金", "gold", maxTributeGold, 0);
         } else if (type === 'war_supplies') {
             document.getElementById('quantity-title').textContent = "出陣兵数・兵糧・兵器指定"; 
-            inputs.soldiers = createSlider("兵士数", "soldiers", c.soldiers, c.soldiers);
-            inputs.rice = createSlider("持参兵糧", "rice", c.rice, c.rice);
-            inputs.horses = createSlider("持参騎馬", "horses", c.horses, 0);
-            inputs.guns = createSlider("持参鉄砲", "guns", c.guns, 0);
+            inputs.soldiers = createSlider("兵士", "soldiers", c.soldiers, c.soldiers);
+            inputs.rice = createSlider("兵糧", "rice", c.rice, c.rice);
+            inputs.horses = createSlider("騎馬", "horses", c.horses, 0);
+            inputs.guns = createSlider("鉄砲", "guns", c.guns, 0);
         } else if (type === 'def_intercept') { 
             const interceptCastle = (data && data.length > 0) ? data[0] : c;
             document.getElementById('quantity-title').textContent = "迎撃部隊編成"; 
             inputs.soldiers = createSlider("出陣兵士数", "soldiers", interceptCastle.soldiers, interceptCastle.soldiers);
-            inputs.rice = createSlider("持参兵糧", "rice", interceptCastle.rice, interceptCastle.rice);
-            inputs.horses = createSlider("持参騎馬", "horses", interceptCastle.horses || 0, 0);
-            inputs.guns = createSlider("持参鉄砲", "guns", interceptCastle.guns || 0, 0);
+            inputs.rice = createSlider("兵糧", "rice", interceptCastle.rice, interceptCastle.rice);
+            inputs.horses = createSlider("騎馬", "horses", interceptCastle.horses || 0, 0);
+            inputs.guns = createSlider("鉄砲", "guns", interceptCastle.guns || 0, 0);
         } else if (type === 'def_reinf_supplies' || type === 'atk_reinf_supplies' || type === 'def_self_reinf_supplies' || type === 'atk_self_reinf_supplies') { 
             const helperCastle = (data && data.length > 0) ? data[0] : c;
             let titleText = "";
@@ -2326,10 +2361,10 @@ class UIManager {
             else if (type === 'def_self_reinf_supplies') titleText = "守備自軍援軍の部隊編成";
             else if (type === 'atk_self_reinf_supplies') titleText = "攻撃自軍援軍の部隊編成";
             document.getElementById('quantity-title').textContent = titleText;
-            inputs.soldiers = createSlider("出陣兵士数", "soldiers", helperCastle.soldiers, helperCastle.soldiers, 500);
-            inputs.rice = createSlider("持参兵糧", "rice", helperCastle.rice, helperCastle.rice, 500);
-            inputs.horses = createSlider("持参騎馬", "horses", helperCastle.horses || 0, 0, 0);
-            inputs.guns = createSlider("持参鉄砲", "guns", helperCastle.guns || 0, 0, 0);
+            inputs.soldiers = createSlider("兵士", "soldiers", helperCastle.soldiers, helperCastle.soldiers, 500);
+            inputs.rice = createSlider("兵糧", "rice", helperCastle.rice, helperCastle.rice, 500);
+            inputs.horses = createSlider("騎馬", "horses", helperCastle.horses || 0, 0, 0);
+            inputs.guns = createSlider("鉄砲", "guns", helperCastle.guns || 0, 0, 0);
         } else if (type === 'transport') {
             document.getElementById('quantity-title').textContent = "輸送物資指定"; 
             inputs.gold = createSlider("金", "gold", c.gold, 0); 
@@ -2338,16 +2373,23 @@ class UIManager {
             inputs.horses = createSlider("騎馬", "horses", c.horses || 0, 0);
             inputs.guns = createSlider("鉄砲", "guns", c.guns || 0, 0);
         } else if (type === 'buy_rice') {
-            document.getElementById('quantity-title').textContent = "兵糧購入"; 
-            let rate = 1.0;
-            if (c && this.game.provinces) {
-                const province = this.game.provinces.find(p => p.id === c.provinceId);
-                if (province && province.marketRate !== undefined) rate = province.marketRate;
-            }
-            const maxBuy = Math.floor(c.gold / rate);
-            this.tradeTypeInfo.classList.remove('hidden'); this.tradeTypeInfo.textContent = `相場: ${rate.toFixed(2)} (金1 -> 米${(1/rate).toFixed(2)})`;
-            inputs.amount = createSlider("購入量(米)", "amount", maxBuy, 0);
-        } else if (type === 'sell_rice') {
+            document.getElementById('quantity-title').textContent = "兵糧購入"; 
+            let rate = 1.0;
+            if (c && this.game.provinces) {
+                const province = this.game.provinces.find(p => p.id === c.provinceId);
+                if (province && province.marketRate !== undefined) rate = province.marketRate;
+            }
+            const maxBuy = Math.floor(c.gold / rate);
+            this.tradeTypeInfo.classList.remove('hidden'); this.tradeTypeInfo.textContent = `相場: ${rate.toFixed(2)} (金1 -> 米${(1/rate).toFixed(2)})`;
+            inputs.amount = createSlider("購入量(米)", "amount", maxBuy, 0);
+            
+            // ★追加：スライダーの下に、必要な資金を表示する枠を作ります
+            const costDiv = document.createElement('div');
+            costDiv.id = 'dynamic-cost-display';
+            costDiv.style.cssText = "text-align:center; font-weight:bold; color:#1976d2; margin-top:10px; font-size:1.1rem;";
+            this.quantityContainer.appendChild(costDiv);
+            
+        } else if (type === 'sell_rice') {
             document.getElementById('quantity-title').textContent = "兵糧売却"; 
             let rate = 1.0;
             if (c && this.game.provinces) {
