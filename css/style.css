@@ -139,13 +139,10 @@ img { pointer-events: none; -webkit-user-drag: none; user-drag: none; }
 }
 
 /* ★追加：スマホ版・PC版共通で、数字が変わっても箱の大きさが揺れないようにする設定 */
-.floating-time {
-    min-width: 100px;
-    text-align: center;
-    font-variant-numeric: tabular-nums;
-}
-.floating-market {
-    min-width: 90px;
+/* ３つの箱の横幅をすべて同じサイズに統一して、カッチリ固定します */
+.floating-time, .floating-market {
+    width: 110px;
+    box-sizing: border-box;
     text-align: center;
     font-variant-numeric: tabular-nums;
 }
@@ -747,7 +744,7 @@ body.is-pc {
         top: 20px; 
         bottom: auto; 
         left: auto; 
-        right: 300px; /* ★ここの数字を 250 から 300 に増やして、もっと左にずらしました */
+        right: 280px; /* 計算して割り出した、ピッタリの位置です */
         flex-direction: row; 
     }
     #mobile-floating-market { 
@@ -756,6 +753,7 @@ body.is-pc {
         left: auto;
         right: 30px; 
         flex-direction: row; 
+        gap: 15px; /* 浪人と米相場の間の隙間を15pxに固定します */
     }
 
     /* ダンボール箱に閉じ込める魔法 */
