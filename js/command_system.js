@@ -1811,9 +1811,7 @@ class CommandSystem {
             const busho = this.game.getBusho(bid);
             if (!busho) return;
 
-            let val = GameSystem.calcCharity(busho); 
-            val = Math.floor(val / 6); 
-            if (val < 1) val = 1;
+            const val = GameSystem.calcCharity(busho); 
 
             totalVal += val;
             count++;
