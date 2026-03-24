@@ -22,7 +22,7 @@ const INITIAL_MAP_CENTER_CONFIG = {
 // ★ マップのズーム設定を1箇所で管理する箱
 const MAP_ZOOM_CONFIG = {
     PC: {
-        minMargin: 1.05, // PCの最小サイズの時の余白（1.0でピッタリ）
+        minMargin: 1.0, // PCの最小サイズの時の余白（1.0で縦の高さにピッタリ合わせます！）
         mid: 1.1,        // PCの中間サイズ
         max: 2.5         // PCの最大サイズ
     },
