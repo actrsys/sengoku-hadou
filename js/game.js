@@ -218,6 +218,7 @@ class DataManager {
                 const clan = clans.find(cl => Number(cl.leaderId) === Number(b.id));
                 if (clan) {
                     b.isDaimyo = true;
+                    b.loyalty = 100; // ★大名は自分の家なので、忠誠度は絶対に100にします！
                     // ★\大名の名前が変わっていたら、大名家の名前も自動で「〇〇家」に合わせます！
                     clan.name = b.familyName + "家";
                 }
@@ -226,6 +227,7 @@ class DataManager {
                 
                 if (b.clan === 0) {
                     b.status = 'ronin';
+                    b.loyalty = 50; // ★浪人の場合も、ゲーム開始時に忠誠度を50にしておきます！
                 } else {
                     b.status = 'active'; // 明確に「活動中」にします
                 }
@@ -1393,6 +1395,7 @@ class GameManager {
         const newLeader = this.getBusho(newLeaderId); 
         if(newLeader) { 
             newLeader.isDaimyo = true; 
+            newLeader.loyalty = 100; // ★新しく大名になったら、忠誠度を100にします！
             this.clans.find(c => c.id === clanId).leaderId = newLeaderId; 
         } 
         this.updateAllCastlesLords(); 

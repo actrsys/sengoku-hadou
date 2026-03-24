@@ -165,6 +165,7 @@ class LifeSystem {
             if (b.clan === 0) {
                 // 登場前:浪人 の場合
                 b.status = 'ronin';
+                b.loyalty = 50; // ★浪人として登場したので、忠誠度を50にします！
                 const targetCastle = this.game.getCastle(b.castleId);
                 if (targetCastle) {
                     targetCastle.samuraiIds.push(b.id);
@@ -199,6 +200,7 @@ class LifeSystem {
                             // 城が空き城なら、仕方なく浪人になります
                             b.status = 'ronin';
                             b.clan = 0;
+                            b.loyalty = 50; // ★浪人になったので忠誠度を50にします！
                         } else {
                             b.clan = ownerClanId;
                         }
@@ -219,6 +221,7 @@ class LifeSystem {
                     // 万が一城が見つからなかった時の安全策
                     b.status = 'ronin';
                     b.clan = 0;
+                    b.loyalty = 50; // ★浪人になったので忠誠度を50にします！
                 }
             }
         });

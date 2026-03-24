@@ -80,6 +80,7 @@ class AffiliationSystem {
         // 3. 浪人になるので、肩書きを外します
         busho.clan = 0;
         busho.status = 'ronin';
+        busho.loyalty = 50; // ★浪人になったので、忠誠度を50にします！
         busho.isCastellan = false;
         busho.isDaimyo = false;
         busho.isGunshi = false; // ★ここを書き足します！軍師のバッジを外します
