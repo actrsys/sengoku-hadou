@@ -111,7 +111,7 @@ class StrategySystem {
             
             if (target.isCastellan && oldCastle) {
                 // ■ 城主を引き抜いた場合（城ごと寝返る！）
-                oldCastle.ownerClan = newClanId;
+                this.game.affiliationSystem.changeCastleOwner(oldCastle, newClanId);
                 target.clan = newClanId;
                 target.loyalty = 100; // 寝返ったので忠誠はMAX！
                 target.isActionDone = true;
