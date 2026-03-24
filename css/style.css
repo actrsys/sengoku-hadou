@@ -417,8 +417,6 @@ body:not(.is-pc).daimyo-select-mode #map-wrapper { margin-bottom: 0 !important; 
     font-size: 1.3rem;
     font-weight: bold;
     white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
 }
 
 .daimyo-detail-ideology {
@@ -479,8 +477,6 @@ body:not(.is-pc).daimyo-select-mode #map-wrapper { margin-bottom: 0 !important; 
     font-size: 0.95rem; 
     text-align: left;
     white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
 }
 
 .daimyo-detail-leader-rank {
@@ -488,8 +484,6 @@ body:not(.is-pc).daimyo-select-mode #map-wrapper { margin-bottom: 0 !important; 
     color: #444;
     text-align: left;
     white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
 }
 
 .daimyo-detail-info {
@@ -497,7 +491,6 @@ body:not(.is-pc).daimyo-select-mode #map-wrapper { margin-bottom: 0 !important; 
     grid-template-columns: 1fr 1fr; 
     gap: 4px 6px; 
     flex: 1;
-    min-width: 0;
 }
 
 .daimyo-detail-stat-box {
@@ -508,7 +501,6 @@ body:not(.is-pc).daimyo-select-mode #map-wrapper { margin-bottom: 0 !important; 
     justify-content: space-between; 
     align-items: center;
     white-space: nowrap;
-    overflow: hidden;
 }
 
 .daimyo-detail-label {
@@ -523,9 +515,6 @@ body:not(.is-pc).daimyo-select-mode #map-wrapper { margin-bottom: 0 !important; 
     font-size: 0.95rem;
     text-align: right;
     white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    min-width: 0;
 }
 
 /* =========================================================
