@@ -734,10 +734,9 @@ body.is-pc {
     /* ダンボール箱に閉じ込める魔法 */
     #title-screen, .modal, .cutin-overlay, #ai-guard { position: absolute !important; }
 
-    /* PCサイドバー */
-    #pc-sidebar { display: flex !important; flex-direction: column; width: 380px; background: #f5f5f5; border-left: 1px solid #ccc; box-shadow: -2px 0 5px rgba(0,0,0,0.1); z-index: 200; overflow-y: auto; height: 100%; position: relative; }
-    #sidebar-resizer { display: block; position: absolute; top: 0; left: 0; bottom: 0; width: 8px; cursor: col-resize; z-index: 210; background-color: transparent; transition: background-color 0.2s; }
-    #sidebar-resizer:hover, #sidebar-resizer:active { background-color: rgba(33, 150, 243, 0.3); }
+    /* PCサイドバー（新しいUIに移行したため完全に非表示にします） */
+    #pc-sidebar { display: none !important; }
+    #sidebar-resizer { display: none !important; }
 
     #pc-status-panel { flex: none; padding: 0; background: #fff; border-bottom: 2px solid #ccc; }
     #pc-status-panel .sp-params-grid { row-gap: 8px; padding: 10px 0; }
