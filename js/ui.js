@@ -1287,8 +1287,15 @@ class UIManager {
             }
         }
         
-        if(this.panelEl) this.panelEl.classList.remove('hidden');
-        if(this.pcNewUiContainer) this.pcNewUiContainer.classList.remove('hidden');
+        // パソコンの画面のときは、古いサイドバーを隠して新しい箱を出します
+        if (document.body.classList.contains('is-pc')) {
+            if(this.panelEl) this.panelEl.classList.add('hidden');
+            if(this.pcNewUiContainer) this.pcNewUiContainer.classList.remove('hidden');
+        } else {
+            // スマホの画面のときは、今まで通りの箱を出します
+            if(this.panelEl) this.panelEl.classList.remove('hidden');
+            if(this.pcNewUiContainer) this.pcNewUiContainer.classList.add('hidden');
+        }
         this.updatePanelHeader();
         
         // ★ 変更：マップで何かを選んでいる最中は、専用の「戻る」メニューにします！
