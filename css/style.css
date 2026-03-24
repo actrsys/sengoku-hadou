@@ -377,6 +377,10 @@ body:not(.is-pc).daimyo-select-mode #map-wrapper { margin-bottom: 0 !important; 
 .daimyo-confirm-compact { display: flex; align-items: center; gap: 15px; width: 100%; }
 .daimyo-confirm-compact .daimyo-confirm-face { width: 60px; height: 60px; margin: 0; border-radius: 5px; border: 2px solid #555; object-fit: cover; flex-shrink: 0; }
 .daimyo-confirm-info { display: flex; flex-direction: column; justify-content: center; text-align: left; }
+.daimyo-confirm-stats { display: grid; grid-template-columns: repeat(2, 1fr); gap: 5px; margin-top: 15px; text-align: left; }
+.daimyo-confirm-stats .stat-box { background-color: #f0f0f0; padding: 4px 8px; border-radius: 4px; display: flex; justify-content: space-between; align-items: center; font-size: 0.95rem; }
+.daimyo-confirm-stats .stat-box span:first-child { color: #555; }
+.daimyo-confirm-stats .stat-box span:last-child { font-weight: bold; }
 
 /* 独立ボタン・シナリオに戻るボタン共通 */
 /* ★ 画面下部からの距離(bottom)を少し上げて、見切れないように調整しました */
@@ -802,6 +806,8 @@ body.is-pc {
     .daimyo-confirm-info { align-items: flex-start; text-align: left; }
     .daimyo-confirm-info h3 { font-size: 1.6rem; margin-bottom: 10px; }
     .daimyo-confirm-info div { font-size: 1.1rem; margin-bottom: 5px; }
+    .daimyo-confirm-stats { gap: 8px; margin-top: 20px; }
+    .daimyo-confirm-stats .stat-box { font-size: 1.1rem; padding: 6px 10px; }
 
     /* PC版: 攻城戦 */
     .war-controls-area { height: 150px; gap: 10px; }
