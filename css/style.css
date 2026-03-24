@@ -800,7 +800,7 @@ body.is-pc {
     .grade-plus { font-size: 0.8rem !important; }
 
     /* PC”Å: ‘å–¼‘I‘ð */
-    #daimyo-confirm-modal .modal-content { top: 20px; left: 20px; bottom: auto; right: auto; width: auto; max-width: 400px; }
+    #daimyo-confirm-modal .modal-content { top: 20px; left: 20px; bottom: auto; right: auto; width: auto; max-width: 600px; }
     .daimyo-confirm-compact { flex-direction: row; gap: 20px; align-items: flex-start; }
     .daimyo-confirm-compact .daimyo-confirm-face { width: 120px; height: 120px; border-width: 3px; }
     .daimyo-confirm-info { align-items: flex-start; text-align: left; }
