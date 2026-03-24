@@ -188,7 +188,7 @@ class UIInfoManager {
     }
 
     showDiplomacyList(clanId, clanName) {
-        let listHtml = '<div class="daimyo-list-container"><div class="daimyo-list-header" style="grid-template-columns: 2fr 1.5fr 1fr;"><span>勢力名</span><span>友好度</span><span>関係</span></div>';
+        let listHtml = '<div class="daimyo-list-container"><div class="daimyo-list-header" style="grid-template-columns: 2fr 1.5fr 1fr 3fr;"><span>勢力名</span><span>友好度</span><span>関係</span><span></span></div>';
         
         const activeClans = this.game.clans.filter(c => c.id !== 0 && c.id !== clanId && this.game.castles.some(cs => cs.ownerClan === c.id));
         
@@ -213,7 +213,7 @@ class UIInfoManager {
             const friendPercent = Math.min(100, Math.max(0, r.sentiment));
             const friendBarHtml = `<div class="bar-bg bar-bg-friend"><div class="bar-fill bar-fill-friend" style="width:${friendPercent}%;"></div></div>`;
 
-            listHtml += `<div class="daimyo-list-item" style="grid-template-columns: 2fr 1.5fr 1fr;"><span class="col-daimyo-name" style="font-weight:bold;">${r.name}</span><span>${friendBarHtml}</span><span style="${statusColor}">${r.status}</span></div>`;
+            listHtml += `<div class="daimyo-list-item" style="grid-template-columns: 2fr 1.5fr 1fr 3fr;"><span class="col-daimyo-name" style="font-weight:bold;">${r.name}</span><span>${friendBarHtml}</span><span style="${statusColor}">${r.status}</span><span></span></div>`;
         });
         listHtml += '</div>';
         
@@ -257,7 +257,7 @@ class UIInfoManager {
             return factions[b].count - factions[a].count; 
         });
         
-        let listHtml = `<div class="faction-list-container"><div class="faction-list-header"><span>派閥主</span><span>武将数</span><span>方針</span><span>思想</span></div>`;
+        let listHtml = `<div class="faction-list-container"><div class="faction-list-header"><span>派閥主</span><span>武将数</span><span>方針</span><span>思想</span><span></span></div>`;
         
         if (fIds.length === 0) {
             listHtml += `<div style="padding:10px;">派閥はありません。</div>`;
@@ -288,12 +288,12 @@ class UIInfoManager {
                     nameStyle = "color: darkorange;";
                 }
 
-                listHtml += `<div class="faction-list-item"><strong class="col-faction-name" style="${nameStyle}">${leaderName}</strong><span>${count}</span><span style="${seikakuColor}">${seikaku}</span><span style="${hoshinColor}">${hoshin}</span></div>`;
+                listHtml += `<div class="faction-list-item"><strong class="col-faction-name" style="${nameStyle}">${leaderName}</strong><span>${count}</span><span style="${seikakuColor}">${seikaku}</span><span style="${hoshinColor}">${hoshin}</span><span></span></div>`;
             });
         }
         
         if (nonFactionCount > 0) {
-            listHtml += `<div class="faction-list-item"><strong class="col-faction-name">無派閥</strong><span>${nonFactionCount}</span><span>-</span><span>-</span></div>`;
+            listHtml += `<div class="faction-list-item"><strong class="col-faction-name">無派閥</strong><span>${nonFactionCount}</span><span>-</span><span>-</span><span></span></div>`;
         }
         
         listHtml += `</div>`;
@@ -615,7 +615,7 @@ class UIInfoManager {
         }
 
         // 見出しを作ります（新しく作った princess-list 用の枠組みを使います！）
-        let listHtml = '<div class="princess-list-container"><div class="princess-list-header"><span>名前</span><span>身分</span><span>年齢</span><span>父親</span><span>配偶者</span></div>';
+        let listHtml = '<div class="princess-list-container"><div class="princess-list-header"><span>名前</span><span>身分</span><span>年齢</span><span>父親</span><span>配偶者</span><span></span></div>';
 
         // 姫を一人ずつリストに並べていきます
         princesses.forEach(p => {
@@ -636,7 +636,7 @@ class UIInfoManager {
             }
 
             // 1人分の行を作ります（他のリストと同じように、空白や改行をなくして1行にまとめます！）
-            listHtml += `<div class="princess-list-item" ${cursorStr} ${onClickStr}><strong class="col-princess-name">${p.name}</strong><span>姫</span><span>${age}歳</span><span>${fatherName}</span><span>${husbandName}</span></div>`;
+            listHtml += `<div class="princess-list-item" ${cursorStr} ${onClickStr}><strong class="col-princess-name">${p.name}</strong><span>姫</span><span>${age}歳</span><span>${fatherName}</span><span>${husbandName}</span><span></span></div>`;
         });
         
         // もし一人もいなかったら
