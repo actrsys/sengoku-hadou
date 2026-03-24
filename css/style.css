@@ -316,7 +316,7 @@ body.hide-daimyo-labels .daimyo-name-label { display: none !important; }
 .modal-content { background: #fff; padding: 20px; border-radius: 8px; width: 90%; max-width: 800px; max-height: 75%; display: flex; flex-direction: column; box-shadow: 0 10px 25px rgba(0,0,0,0.5); position: relative; overflow: hidden !important; }
 .modal-content h3 { margin-top: 0; border-bottom: 2px solid #ddd; padding-bottom: 10px; }
 .context-info { margin-bottom: 10px; padding: 10px; background: #e8eaf6; border-radius: 4px; font-size: 0.9rem; }
-.modal-footer { margin-top: 15px; display: flex; justify-content: flex-end; gap: 10px; padding-top: 10px; border-top: 1px solid #eee; flex-shrink: 0; background: #fff; padding-bottom: env(safe-area-inset-bottom); }
+.modal-footer { margin-top: 15px; display: flex; justify-content: center; gap: 10px; padding-top: 10px; border-top: 1px solid #eee; flex-shrink: 0; background: #fff; padding-bottom: env(safe-area-inset-bottom); }
 
 .start-content { max-width: 600px; text-align: center; }
 .clan-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 10px; margin-top: 20px; overflow-y: auto; }
@@ -727,11 +727,27 @@ body.is-pc {
     #game-screen { overflow: hidden; background-color: var(--bg-color); position: relative; }
     
     #app { flex-direction: row; }
-    #top-info-bar, #bottom-command-bar, #pc-map-overlay { display: none !important; }
-    #map-reset-zoom { bottom: 20px; right: 20px; }
-    #mobile-floating-market { right: 30px; top: 20px; }
+        #top-info-bar, #bottom-command-bar, #pc-map-overlay { display: none !important; }
+        #map-reset-zoom { bottom: 20px; right: 20px; }
+        
+        /* PC版：年月、浪人、米相場を城情報ウインドウの右側に左揃えで縦に並べる */
+        #mobile-floating-info { 
+            top: 10px; 
+            bottom: auto; 
+            left: 350px; 
+            right: auto; 
+        }
+        #mobile-floating-market { 
+            top: 42px; 
+            bottom: auto; 
+            left: 350px; 
+            right: auto; 
+            flex-direction: column; 
+            align-items: flex-start; 
+            gap: 6px; 
+        }
 
-    /* ダンボール箱に閉じ込める魔法 */
+        /* ダンボール箱に閉じ込める魔法 */
     #title-screen, .modal, .cutin-overlay, #ai-guard { position: absolute !important; }
 
     /* PCサイドバー（新しいUIに移行したため完全に非表示にします） */
