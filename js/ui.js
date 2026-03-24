@@ -51,6 +51,11 @@ class UIManager {
         this.historyModal = document.getElementById('history-modal');
         this.historyList = document.getElementById('history-list');
         
+        this.pcNewUiContainer = document.getElementById('pc-new-ui-container');
+        this.pcNewStatusPanel = document.getElementById('pc-new-status-panel');
+        this.pcNewCommandArea = document.getElementById('pc-new-command-area');
+        this.pcMenuPath = [];
+        
         // ★ここを書き足します！
         // 情報表示の専門家（さっき作った新しい箱）を準備しておきます
         this.info = new UIInfoManager(this, this.game);
@@ -576,6 +581,9 @@ class UIManager {
         // ★ここから書き足し：前に遊んでいた時の画面の枠をしっかり隠します！
         if(this.panelEl) this.panelEl.classList.add('hidden'); // PC版のサイドバーを隠します
         if(this.statusContainer) this.statusContainer.innerHTML = ''; // PC版の上の情報も消します
+        if(this.pcNewUiContainer) this.pcNewUiContainer.classList.add('hidden');
+        if(this.pcNewStatusPanel) this.pcNewStatusPanel.innerHTML = '';
+        if(this.pcNewCommandArea) this.pcNewCommandArea.innerHTML = '';
         if(this.mobileTopLeft) this.mobileTopLeft.innerHTML = ''; // スマホ版の上の情報を消します
         if(this.mobileFloatingInfo) this.mobileFloatingInfo.innerHTML = ''; // スマホ版の時計を消します
         if(this.mobileFloatingMarket) this.mobileFloatingMarket.innerHTML = ''; // スマホ版の相場を消します
@@ -1223,9 +1231,13 @@ class UIManager {
         if (this.mobileTopLeft) {
             this.mobileTopLeft.innerHTML = content;
         }
-
+        
         if (this.statusContainer && document.body.classList.contains('is-pc')) {
             this.statusContainer.innerHTML = content;
+        }
+        
+        if (this.pcNewStatusPanel && document.body.classList.contains('is-pc')) {
+            this.pcNewStatusPanel.innerHTML = content;
         }
 
         if (this.mobileFloatingInfo) {
@@ -1274,8 +1286,9 @@ class UIManager {
                 this.game.isProcessingAI = false;
             }
         }
-
+        
         if(this.panelEl) this.panelEl.classList.remove('hidden');
+        if(this.pcNewUiContainer) this.pcNewUiContainer.classList.remove('hidden');
         this.updatePanelHeader();
         
         // ★ 変更：マップで何かを選んでいる最中は、専用の「戻る」メニューにします！
@@ -1307,14 +1320,22 @@ class UIManager {
         if (modeStrForCheck.includes('reinf') || modeStrForCheck.includes('ally') || modeStrForCheck.includes('self') || capturedData) {
             this._activeReinforcementFlag = true;
         }
-
+        
         const mobileArea = document.getElementById('command-area');
-        const pcArea = document.getElementById('pc-command-area');
+        const pcArea = document.getElementById('pc-new-command-area');
         const areas = [mobileArea, pcArea];
         
         areas.forEach(area => {
             if(!area) return;
             area.innerHTML = '';
+            
+            let targetNode = area;
+            if (area.id === 'pc-new-command-area') {
+                const col = document.createElement('div');
+                col.className = 'pc-cmd-col';
+                area.appendChild(col);
+                targetNode = col;
+            }
             
             const btn = document.createElement('button');
             btn.className = 'cmd-btn back';
@@ -1385,17 +1406,25 @@ class UIManager {
                     this.scrollToActiveCastle();
                 }
             };
-            area.appendChild(btn);
+            targetNode.appendChild(btn);
         });
     }
-
+    
     renderEnemyViewMenu() {
         const mobileArea = document.getElementById('command-area');
-        const pcArea = document.getElementById('pc-command-area');
+        const pcArea = document.getElementById('pc-new-command-area');
         const areas = [mobileArea, pcArea];
         areas.forEach(area => {
             if(!area) return;
             area.innerHTML = '';
+            
+            let targetNode = area;
+            if (area.id === 'pc-new-command-area') {
+                const col = document.createElement('div');
+                col.className = 'pc-cmd-col';
+                area.appendChild(col);
+                targetNode = col;
+            }
             
             const btn = document.createElement('button');
             btn.className = 'cmd-btn back';
@@ -1406,7 +1435,7 @@ class UIManager {
                 this.showControlPanel(myCastle);
                 this.scrollToActiveCastle(myCastle);
             };
-            area.appendChild(btn);
+            targetNode.appendChild(btn);
         });
     }
 
@@ -1430,19 +1459,17 @@ class UIManager {
                 this.game.lastMenuState = null;
             } else {
                 this.menuState = 'MAIN';
+                this.pcMenuPath = [];
             }
             this.renderCommandMenu();
         }
     }
-
+    
     renderCommandMenu() {
         const mobileArea = document.getElementById('command-area');
-        const pcArea = document.getElementById('pc-command-area');
-        const areas = [mobileArea, pcArea];
         
-        areas.forEach(area => {
-            if(!area) return;
-            area.innerHTML = '';
+        if (mobileArea) {
+            mobileArea.innerHTML = '';
             
             const createBtn = (label, cls, onClick) => { 
                 const btn = document.createElement('button'); 
@@ -1453,7 +1480,7 @@ class UIManager {
                     this.cancelMapSelection(true);
                     onClick();
                 }; 
-                area.appendChild(btn); 
+                mobileArea.appendChild(btn); 
             };
             
             const cmd = (type) => this.game.commandSystem.startCommand(type);
@@ -1461,7 +1488,6 @@ class UIManager {
             const specs = this.game.commandSystem.getSpecs();
             
             if (this.menuState === 'MAIN') {
-                // トップメニューの描画
                 COMMAND_MENU_STRUCTURE.forEach(item => {
                     createBtn(item.label, "category", () => menu(item.label));
                 });
@@ -1477,69 +1503,153 @@ class UIManager {
                         this.game.finishTurn();
                     });
                 };
-                area.appendChild(finishBtn);
-                return;
-            }
+                mobileArea.appendChild(finishBtn);
+            } else {
+                let currentMenuInfo = null;
+                let parentMenuName = 'MAIN';
 
-            // 選ばれたメニューの中身を探す
-            let currentMenuInfo = null;
-            let parentMenuName = 'MAIN';
-
-            for (const topItem of COMMAND_MENU_STRUCTURE) {
-                if (topItem.label === this.menuState) {
-                    currentMenuInfo = topItem;
-                    break;
-                }
-                if (topItem.subMenus) {
-                    for (const sub of topItem.subMenus) {
-                        if (sub.label === this.menuState) {
-                            currentMenuInfo = sub;
-                            parentMenuName = topItem.label;
-                            break;
+                for (const topItem of COMMAND_MENU_STRUCTURE) {
+                    if (topItem.label === this.menuState) {
+                        currentMenuInfo = topItem;
+                        break;
+                    }
+                    if (topItem.subMenus) {
+                        for (const sub of topItem.subMenus) {
+                            if (sub.label === this.menuState) {
+                                currentMenuInfo = sub;
+                                parentMenuName = topItem.label;
+                                break;
+                            }
                         }
                     }
                 }
+
+                if (!currentMenuInfo) {
+                    menu('MAIN');
+                } else {
+                    let btnCount = 0;
+                    if (currentMenuInfo.commands) {
+                        currentMenuInfo.commands.forEach(key => {
+                            const spec = specs[key];
+                            if (spec) {
+                                createBtn(spec.label, "", () => cmd(key));
+                                btnCount++;
+                            }
+                        });
+                    }
+
+                    if (currentMenuInfo.subMenus) {
+                        currentMenuInfo.subMenus.forEach(sub => {
+                            createBtn(sub.label, "category", () => menu(sub.label));
+                            btnCount++;
+                        });
+                    }
+
+                    const emptyCount = 3 - (btnCount % 3);
+                    if (emptyCount < 3) {
+                        for(let i=0; i<emptyCount; i++) {
+                            const d = document.createElement('div');
+                            mobileArea.appendChild(d);
+                        }
+                    }
+                    createBtn("戻る", "back", () => menu(parentMenuName));
+                }
             }
+        }
+        
+        if (document.body.classList.contains('is-pc')) {
+            this.renderPcCommandMenu();
+        }
+    }
 
-            if (!currentMenuInfo) {
-                // もし見つからなかったらメインに戻す安全装置
-                menu('MAIN');
-                return;
-            }
+    renderPcCommandMenu() {
+        const pcArea = document.getElementById('pc-new-command-area');
+        if (!pcArea) return;
+        pcArea.innerHTML = '';
 
-            let btnCount = 0;
+        const specs = this.game.commandSystem.getSpecs();
+        const cmd = (type) => this.game.commandSystem.startCommand(type);
+        
+        if (!this.pcMenuPath) this.pcMenuPath = [];
 
-            // ① コマンドがあればボタンを作る
-            if (currentMenuInfo.commands) {
-                currentMenuInfo.commands.forEach(key => {
+        const createCol = () => {
+            const col = document.createElement('div');
+            col.className = 'pc-cmd-col';
+            pcArea.appendChild(col);
+            return col;
+        };
+
+        const createBtn = (area, label, cls, onClick) => { 
+            const btn = document.createElement('button'); 
+            btn.className = `cmd-btn ${cls || ''}`; 
+            btn.textContent = label; 
+            btn.onclick = () => {
+                if (this.game.isProcessingAI) return;
+                this.cancelMapSelection(true);
+                onClick();
+            }; 
+            area.appendChild(btn); 
+        };
+
+        const col1 = createCol();
+        
+        COMMAND_MENU_STRUCTURE.forEach(item => {
+            const isActive = this.pcMenuPath[0] === item.label;
+            createBtn(col1, item.label, isActive ? "category active" : "category", () => {
+                if (isActive) {
+                    this.pcMenuPath = [];
+                } else {
+                    this.pcMenuPath = [item.label];
+                }
+                this.renderPcCommandMenu();
+            });
+        });
+        
+        createBtn(col1, "命令終了", "finish", () => {
+            if (this.game.isProcessingAI) return;
+            this.cancelMapSelection(true);
+            this.showDialog("今月の命令を終了しますか？", true, () => {
+                this.game.finishTurn();
+            });
+        });
+
+        const renderSubMenu = (menuList, pathIndex, parentCol) => {
+            if (this.pcMenuPath.length <= pathIndex) return;
+            const activeLabel = this.pcMenuPath[pathIndex];
+            const activeItem = menuList.find(m => m.label === activeLabel);
+            
+            if (!activeItem) return;
+
+            const col = createCol();
+            
+            if (activeItem.commands) {
+                activeItem.commands.forEach(key => {
                     const spec = specs[key];
                     if (spec) {
-                        createBtn(spec.label, "", () => cmd(key));
-                        btnCount++;
+                        createBtn(col, spec.label, "", () => cmd(key));
                     }
                 });
             }
 
-            // ② サブメニューがあればそれもボタンを作る
-            if (currentMenuInfo.subMenus) {
-                currentMenuInfo.subMenus.forEach(sub => {
-                    createBtn(sub.label, "category", () => menu(sub.label));
-                    btnCount++;
+            if (activeItem.subMenus) {
+                activeItem.subMenus.forEach(sub => {
+                    const isActive = this.pcMenuPath[pathIndex + 1] === sub.label;
+                    createBtn(col, sub.label, isActive ? "category active" : "category", () => {
+                        this.pcMenuPath = this.pcMenuPath.slice(0, pathIndex + 1);
+                        if (!isActive) this.pcMenuPath.push(sub.label);
+                        this.renderPcCommandMenu();
+                    });
                 });
+                renderSubMenu(activeItem.subMenus, pathIndex + 1, col);
             }
 
-            // ③ グリッドの形を整えるための空白（ダミー）を入れる
-            const emptyCount = 3 - (btnCount % 3);
-            if (emptyCount < 3) {
-                for(let i=0; i<emptyCount; i++) {
-                    const d = document.createElement('div');
-                    area.appendChild(d);
-                }
-            }
+            createBtn(col, "戻る", "back", () => {
+                this.pcMenuPath = this.pcMenuPath.slice(0, pathIndex);
+                this.renderPcCommandMenu();
+            });
+        };
 
-            // ④ 戻るボタン
-            createBtn("戻る", "back", () => menu(parentMenuName));
-        });
+        renderSubMenu(COMMAND_MENU_STRUCTURE, 0, col1);
     }
     
     openGunshiModal(gunshi, msg, onConfirm) {
