@@ -1094,14 +1094,44 @@ class UIManager {
             faceHtml = `<img src="data/images/faceicons/${leader.faceIcon}" class="daimyo-confirm-face" onerror="this.style.display='none'">`;
         }
 
+        // 大名の情報を集めて合算します
+        const clanCastles = this.game.castles.filter(c => c.ownerClan === clanId);
+        const castlesCount = clanCastles.length;
+        
+        let totalPopulation = 0;
+        let totalKokudaka = 0;
+        let totalGold = 0;
+        let totalRice = 0;
+        
+        clanCastles.forEach(c => {
+            totalPopulation += (c.population || 0);
+            totalKokudaka += (c.kokudaka || 0);
+            totalGold += (c.gold || 0);
+            totalRice += (c.rice || 0);
+        });
+
+        const clanData = this.game.clans.find(c => c.id === clanId);
+        const prestige = clanData ? (clanData.daimyoPrestige || 0) : 0;
+
         if (this.daimyoConfirmBody) {
+            // 総兵数は重要なので、横いっぱいに広げて少し目立たせます！
             this.daimyoConfirmBody.innerHTML = `
                 <div class="daimyo-confirm-compact">
                     ${faceHtml}
                     <div class="daimyo-confirm-info">
                         <h3 style="margin:0 0 5px 0; font-size:1.2rem; border:none; padding:0;">${clanName}</h3>
                         <div style="font-size:0.95rem; margin-bottom: 3px;">当主：${leader ? leader.name : "不明"}</div>
-                        <div style="font-size:0.95rem; font-weight:bold; color:#d32f2f;">総兵数：${soldiers}</div>
+                    </div>
+                </div>
+                <div class="daimyo-confirm-stats">
+                    <div class="stat-box"><span>威信</span><span>${prestige}</span></div>
+                    <div class="stat-box"><span>城数</span><span>${castlesCount}</span></div>
+                    <div class="stat-box"><span>総人口</span><span>${totalPopulation}</span></div>
+                    <div class="stat-box"><span>総石高</span><span>${totalKokudaka}</span></div>
+                    <div class="stat-box"><span>金</span><span>${totalGold}</span></div>
+                    <div class="stat-box"><span>兵糧</span><span>${totalRice}</span></div>
+                    <div class="stat-box" style="grid-column: 1 / -1; justify-content: center; background-color: #ffebee;">
+                        <span style="color:#d32f2f; margin-right: 15px;">総兵数</span><span style="color:#d32f2f; font-size: 1.1rem;">${soldiers}</span>
                     </div>
                 </div>
             `;
