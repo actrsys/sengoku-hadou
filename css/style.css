@@ -800,15 +800,15 @@ body.is-pc {
     .grade-plus { font-size: 0.8rem !important; }
 
     /* PCî≈: ëÂñºëIë */
-    #daimyo-confirm-modal .modal-content { top: 20px; left: 20px; bottom: auto; right: auto; width: auto; max-width: 600px; }
+    #daimyo-confirm-modal .modal-content { top: 20px; left: 20px; bottom: auto; right: auto; width: 480px; max-width: 90vw; }
     .daimyo-confirm-compact { flex-direction: row; gap: 20px; align-items: flex-start; }
     .daimyo-confirm-compact .daimyo-confirm-face { width: 120px; height: 120px; border-width: 3px; }
-    .daimyo-confirm-info { align-items: flex-start; text-align: left; }
+    .daimyo-confirm-info { align-items: flex-start; text-align: left; width: 100%; }
     .daimyo-confirm-info h3 { font-size: 1.6rem; margin-bottom: 10px; }
     .daimyo-confirm-info div { font-size: 1.1rem; margin-bottom: 5px; }
-    .daimyo-confirm-stats { gap: 8px; margin-top: 20px; }
+    .daimyo-confirm-stats { gap: 8px; margin-top: 20px; width: 100%; box-sizing: border-box; }
     .daimyo-confirm-stats .stat-box { font-size: 1.1rem; padding: 6px 10px; }
-    .daimyo-confirm-stats .stat-box span.stat-val { min-width: 80px; }
+    .daimyo-confirm-stats .stat-box span.stat-val { min-width: 70px; }
 
     /* PCî≈: çUèÈêÌ */
     .war-controls-area { height: 150px; gap: 10px; }
