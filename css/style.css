@@ -758,18 +758,6 @@ body.is-pc {
         flex-direction: row; 
     }
 
-    /* 数字が変わっても箱の大きさが揺れないようにする設定 */
-    .floating-time {
-        min-width: 100px; /* 4桁の年と2桁の月が十分に入るだけの幅を確保します */
-        text-align: center; /* 箱の中で文字を真ん中に揃えます */
-        font-variant-numeric: tabular-nums; /* どの数字も同じ横幅になるようにします */
-    }
-    .floating-market {
-        min-width: 90px; /* 浪人や米相場の文字と数字が十分に入るだけの幅を確保します */
-        text-align: center; /* 箱の中で文字を真ん中に揃えます */
-        font-variant-numeric: tabular-nums; /* どの数字も同じ横幅になるようにします */
-    }
-
     /* ダンボール箱に閉じ込める魔法 */
     #title-screen, .modal, .cutin-overlay, #ai-guard { position: absolute !important; }
 
