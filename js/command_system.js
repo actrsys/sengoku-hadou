@@ -1099,7 +1099,7 @@ class CommandSystem {
         }
 
         if (actionType === 'charity') {
-            this.showAdviceAndExecute('charity', () => this.executeCharity(selectedIds, 'rice'), { trueProb: 1.0 });
+            this.showAdviceAndExecute('charity', () => this.executeCharity(selectedIds), { trueProb: 1.0 });
             return;
         }
 
@@ -1791,23 +1791,17 @@ class CommandSystem {
         this.game.ui.updatePanelHeader(); this.game.ui.renderCommandMenu();
     }
     
-    executeCharity(bushoIds, type) { 
+    executeCharity(bushoIds) { 
         const castle = this.game.getCurrentTurnCastle(); 
         const spec = COMMAND_SPECS['charity']; 
         
-        let singleCostGold = 0, singleCostRice = 0; 
-        if (type === 'gold' || type === 'both') singleCostGold = spec.costGold; 
-        if (type === 'rice' || type === 'both') singleCostRice = spec.costRice; 
-
-        const totalCostGold = singleCostGold * bushoIds.length;
-        const totalCostRice = singleCostRice * bushoIds.length;
+        const totalCostRice = spec.costRice * bushoIds.length;
         
-        if (castle.gold < totalCostGold || castle.rice < totalCostRice) { 
+        if (castle.rice < totalCostRice) { 
             this.game.ui.showDialog("物資不足", false); 
             return; 
         } 
         
-        castle.gold -= totalCostGold; 
         castle.rice -= totalCostRice; 
        
         let totalVal = 0;
@@ -1817,7 +1811,7 @@ class CommandSystem {
             const busho = this.game.getBusho(bid);
             if (!busho) return;
 
-            let val = GameSystem.calcCharity(busho, type); 
+            let val = GameSystem.calcCharity(busho); 
             val = Math.floor(val / 6); 
             if (val < 1) val = 1;
 

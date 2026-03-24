@@ -547,9 +547,9 @@ class GameSystem {
         return this.toGradeHTML(val);
     }
 
-    static calcDevelopment(busho) { const base = window.MainParams.Economy.BaseDevelopment + (busho.politics * window.MainParams.Economy.PoliticsEffect); const val = this.applyVariance(base, window.MainParams.Economy.DevelopFluctuation); return Math.max(1, Math.floor(val / 5)); }
-    static calcRepair(busho) { const base = window.MainParams.Economy.BaseRepair + (busho.politics * window.MainParams.Economy.RepairEffect); const val = this.applyVariance(base, window.MainParams.Economy.RepairFluctuation); return Math.max(1, Math.floor(val / 3)); }
-    static calcCharity(busho, type) { let val = window.MainParams.Economy.BaseCharity + (busho.charm * window.MainParams.Economy.CharmEffect); if (type === 'both') val = val * 1.5; return this.applyVariance(val, window.MainParams.Economy.CharityFluctuation); }
+    static calcDevelopment(busho) { return Math.max(1, Math.round(((busho.politics * 1.5) + (Math.sqrt(busho.loyalty) * 2)) / 20)); }
+    static calcRepair(busho) { return Math.max(1, Math.round(((busho.politics * 1.5) + (Math.sqrt(busho.loyalty) * 2)) / 15)); }
+    static calcCharity(busho) { return Math.max(1, Math.round(((busho.politics * 1.5) + busho.charm + (Math.sqrt(busho.loyalty) * 2)) / 30)); }
     static calcTraining(busho) { const base = window.WarParams.Military.BaseTraining + (busho.leadership * window.WarParams.Military.TrainingLdrEffect + busho.strength * window.WarParams.Military.TrainingStrEffect); return this.applyVariance(base, window.WarParams.Military.TrainingFluctuation); }
     static calcSoldierCharity(busho) { const base = window.WarParams.Military.BaseMorale + (busho.leadership * window.WarParams.Military.MoraleLdrEffect) + (busho.charm * window.WarParams.Military.MoraleCharmEffect); return this.applyVariance(base, window.WarParams.Military.MoraleFluctuation); }
     static calcDraftFromGold(gold, busho, castlePopulation) { const bonus = 1.0 + ((busho.leadership + busho.strength + busho.charm) / 300) * (window.WarParams.Military.DraftStatBonus - 1.0); const popBonus = 1.0 + (castlePopulation * window.WarParams.Military.DraftPopBonusFactor); return Math.floor(gold * 1.0 * bonus * popBonus); }

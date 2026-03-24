@@ -106,7 +106,7 @@ class AIEngine {
             } else if (castle.peoplesLoyalty <= 70 && castle.rice >= 200) {
                 // 施し
                 castle.rice -= 200;
-                let val = GameSystem.calcCharity(castellan, 'rice');
+                let val = GameSystem.calcCharity(castellan);
                 val = Math.floor(val / 6);
                 if (val < 1) val = 1;
                 
@@ -1237,7 +1237,7 @@ class AIEngine {
                     castle.rice -= 200;
                     
                     // ★ずるっこ禁止！プレイヤーと同じく「6で割る」厳しい計算式に直しました！
-                    let val = GameSystem.calcCharity(doer, 'rice');
+                    let val = GameSystem.calcCharity(doer);
                     val = Math.floor(val / 6);
                     if (val < 1) val = 1;
                     
