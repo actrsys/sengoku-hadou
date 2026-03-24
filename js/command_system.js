@@ -121,7 +121,7 @@ const COMMAND_SPECS = {
         costGold: 0, costRice: 0, 
         isMulti: false, hasAdvice: false, 
         startMode: 'busho_select', sortKey: 'leadership',
-        msg: "資金に応じて徴兵します" 
+        msg: "徴兵する兵士数を指定します" 
     },
     'training': { 
         label: "訓練", category: 'MILITARY', 
@@ -1136,7 +1136,9 @@ class CommandSystem {
         const castle = this.game.getCurrentTurnCastle();
         
         if (type === 'draft') {
-            const val = parseInt(inputs.gold.num.value);
+            // ui.jsの方でスライダーが「兵士数（soldiers）」などに直されることを想定して、臨機応変に受け取ります
+            const inputField = inputs.soldiers || inputs.amount || inputs.gold;
+            const val = parseInt(inputField.num.value);
             if (val <= 0) return;
             this.showAdviceAndExecute('draft', () => this.executeDraft(data, val), { val: val, trueProb: 1.0 });
         }
@@ -1760,20 +1762,21 @@ class CommandSystem {
         this.game.ui.renderCommandMenu();
     }
 
-    executeDraft(bushoIds, gold) { 
+    executeDraft(bushoIds, soldiers) { 
         const castle = this.game.getCurrentTurnCastle(); 
-        if(castle.gold < gold) { this.game.ui.showDialog("資金不足", false); return; } 
-        
         const busho = this.game.getBusho(bushoIds[0]); 
-        let soldiers = GameSystem.calcDraftFromGold(gold, busho, castle.population); 
-        soldiers = Math.floor(soldiers / 10);
+        
+        // 選ばれた兵士数を集めるために必要な「お金」を計算します
+        const costGold = GameSystem.calcDraftCost(soldiers, busho, castle.peoplesLoyalty);
+        
+        if(castle.gold < costGold) { this.game.ui.showDialog(`資金不足です。(必要: ${costGold}金)`, false); return; } 
         
         if (castle.soldiers + soldiers > 99999) {
             this.game.ui.showDialog(`兵数が上限(99,999)を超えるため、これ以上徴兵できません。\n(現在の兵数: ${castle.soldiers})`, false);
             return;
         }
         
-        castle.gold -= gold;
+        castle.gold -= costGold;
         
         const newMorale = Math.max(0, castle.morale - 10); 
         const newTraining = Math.max(0, castle.training - 10); 

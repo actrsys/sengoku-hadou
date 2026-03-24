@@ -1254,8 +1254,7 @@ class AIEngine {
                     }
                     
                     // ★修正：決めた金額（draftCost）で兵士を集めます！
-                    let soldiers = GameSystem.calcDraftFromGold(draftCost, doer, castle.population);
-                    soldiers = Math.floor(soldiers / 10);
+                    let soldiers = GameSystem.calcDraftFromGold(draftCost, doer, castle.peoplesLoyalty);
                     
                     if (castle.soldiers + soldiers > 99999) {
                         soldiers = 99999 - castle.soldiers;
