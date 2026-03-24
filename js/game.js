@@ -550,9 +550,19 @@ class GameSystem {
     static calcDevelopment(busho) { return Math.max(1, Math.round(((busho.politics * 1.5) + (Math.sqrt(busho.loyalty) * 2)) / 20)); }
     static calcRepair(busho) { return Math.max(1, Math.round(((busho.politics * 1.5) + (Math.sqrt(busho.loyalty) * 2)) / 15)); }
     static calcCharity(busho) { return Math.max(1, Math.round(((busho.politics * 1.5) + busho.charm + (Math.sqrt(busho.loyalty) * 2)) / 30)); }
-    static calcTraining(busho) { const base = window.WarParams.Military.BaseTraining + (busho.leadership * window.WarParams.Military.TrainingLdrEffect + busho.strength * window.WarParams.Military.TrainingStrEffect); return this.applyVariance(base, window.WarParams.Military.TrainingFluctuation); }
-    static calcSoldierCharity(busho) { const base = window.WarParams.Military.BaseMorale + (busho.leadership * window.WarParams.Military.MoraleLdrEffect) + (busho.charm * window.WarParams.Military.MoraleCharmEffect); return this.applyVariance(base, window.WarParams.Military.MoraleFluctuation); }
-    static calcDraftFromGold(gold, busho, castlePopulation) { const bonus = 1.0 + ((busho.leadership + busho.strength + busho.charm) / 300) * (window.WarParams.Military.DraftStatBonus - 1.0); const popBonus = 1.0 + (castlePopulation * window.WarParams.Military.DraftPopBonusFactor); return Math.floor(gold * 1.0 * bonus * popBonus); }
+    static calcTraining(busho) { return Math.max(1, Math.round(((busho.leadership * 1.5) + busho.strength + (Math.sqrt(busho.loyalty) * 2)) / 35)); }
+    static calcSoldierCharity(busho) { return Math.max(1, Math.round(((busho.politics * 1.5) + busho.charm + (Math.sqrt(busho.loyalty) * 2)) / 30)); }
+    
+    // AI用：お金を指定して、集まる兵士数を計算します
+    static calcDraftFromGold(gold, busho, peoplesLoyalty) { 
+        const efficiency = ((busho.leadership * 1.5) + (busho.charm * 1.5) + (Math.sqrt(busho.loyalty) * 2) + (Math.sqrt(peoplesLoyalty) * 2)) / 1000;
+        return Math.floor(gold * efficiency); 
+    }
+    // プレイヤー用：集めたい兵士数を指定して、必要なお金を計算します
+    static calcDraftCost(soldiers, busho, peoplesLoyalty) { 
+        const efficiency = ((busho.leadership * 1.5) + (busho.charm * 1.5) + (Math.sqrt(busho.loyalty) * 2) + (Math.sqrt(peoplesLoyalty) * 2)) / 1000;
+        return Math.ceil(soldiers / efficiency); 
+    }
 
     static isReachable(game, startCastle, targetCastle, movingClanId) {
         // ★追加：もし城のデータが空っぽだったら、エラーになる前にすぐストップします！
