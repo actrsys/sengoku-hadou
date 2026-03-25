@@ -1015,16 +1015,23 @@ class WarManager {
         let dmgResult = this.distributeDamage(isAtkTurnGroup, calculatedSoldierDmg);
         let actualSoldierDmg = dmgResult.total;
         
-        // 士気の低下（受けたダメージによって減らします）
+        // ★今回変更：士気の上がり下がりを一時的にメモしておく箱を作ります
+        let moraleDiffs = {
+            attacker: 0, attacker_self_reinf: 0, attacker_ally_reinf: 0,
+            defender: 0, defender_self_reinf: 0, defender_ally_reinf: 0
+        };
+        
+        // 受けたダメージによる士気低下のメモ
         for (let role in dmgResult.details) {
             let dmgTaken = dmgResult.details[role];
             if (dmgTaken > 0) {
-                let moraleDrop = Math.round(Math.sqrt(dmgTaken) / 2);
-                let armyObj = getArmyObj(role);
-                if (armyObj) {
-                    armyObj.morale = Math.max(0, (armyObj.morale || 50) - moraleDrop);
-                }
+                moraleDiffs[role] -= Math.round(Math.sqrt(dmgTaken) / 2);
             }
+        }
+
+        // 敵の兵士を減らしたことによる士気上昇のメモ
+        if (actualSoldierDmg > 0) {
+            moraleDiffs[s.turn] += Math.round(Math.sqrt(actualSoldierDmg) / 2);
         }
         
         if (isAtkTurnGroup) { s.defender.defense = Math.max(0, s.defender.defense - calculatedWallDmg); } 
@@ -1035,11 +1042,24 @@ class WarManager {
             let activeArmyObj = getArmyObj(s.turn);
             if (activeArmyObj) {
                 activeArmyObj.soldiers -= actualCounterDmg;
-                // 反撃を受けた時の士気低下
-                let counterMoraleDrop = Math.round(Math.sqrt(actualCounterDmg) / 2);
-                activeArmyObj.morale = Math.max(0, (activeArmyObj.morale || 50) - counterMoraleDrop);
+                // 反撃を受けた時の士気低下のメモ
+                moraleDiffs[s.turn] -= Math.round(Math.sqrt(actualCounterDmg) / 2);
             }
             if(isAtkTurnGroup) s.deadSoldiers.attacker += actualCounterDmg; else s.deadSoldiers.defender += actualCounterDmg;
+
+            // 反撃で敵の兵士を減らした側の士気上昇のメモ（ターゲット側の本隊）
+            let counterRole = isAtkTurnGroup ? 'defender' : 'attacker';
+            moraleDiffs[counterRole] += Math.round(Math.sqrt(actualCounterDmg) / 2);
+        }
+
+        // ★今回追加：ここでメモした士気の上がり下がりを相殺して、一気に反映させます！
+        for (let role in moraleDiffs) {
+            if (moraleDiffs[role] !== 0) {
+                let armyObj = getArmyObj(role);
+                if (armyObj) {
+                    armyObj.morale = Math.max(0, Math.min(100, (armyObj.morale || 50) + moraleDiffs[role]));
+                }
+            }
         }
         
         let actionName = "攻撃";
@@ -1218,8 +1238,17 @@ class WarManager {
             } else {
                 // 全員の行動が終わったら、兵糧を消費します
                 s.attacker.rice = Math.max(0, s.attacker.rice - Math.floor(s.attacker.soldiers * 0.05));
-                if (s.selfReinforcement) s.selfReinforcement.rice = Math.max(0, s.selfReinforcement.rice - Math.floor(s.selfReinforcement.soldiers * 0.05));
-                if (s.reinforcement) s.reinforcement.rice = Math.max(0, s.reinforcement.rice - Math.floor(s.reinforcement.soldiers * 0.05));
+                // ★今回追加：毎ターンの終了時（ラウンドの終わり）に、攻撃側の士気を１下げます
+                s.attacker.morale = Math.max(0, (s.attacker.morale || 50) - 1);
+
+                if (s.selfReinforcement) {
+                    s.selfReinforcement.rice = Math.max(0, s.selfReinforcement.rice - Math.floor(s.selfReinforcement.soldiers * 0.05));
+                    s.selfReinforcement.morale = Math.max(0, (s.selfReinforcement.morale || 50) - 1);
+                }
+                if (s.reinforcement) {
+                    s.reinforcement.rice = Math.max(0, s.reinforcement.rice - Math.floor(s.reinforcement.soldiers * 0.05));
+                    s.reinforcement.morale = Math.max(0, (s.reinforcement.morale || 50) - 1);
+                }
 
                 s.defender.rice = Math.max(0, s.defender.rice - Math.floor(s.defender.soldiers * 0.05));
                 if (s.defSelfReinforcement) s.defSelfReinforcement.rice = Math.max(0, s.defSelfReinforcement.rice - Math.floor(s.defSelfReinforcement.soldiers * 0.05));
