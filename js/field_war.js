@@ -785,11 +785,11 @@ class FieldWarManager {
         // タブに表示する名前の準備
         let atkDisplayName = `<strong>${atkClanName} ${atkGeneralName} 軍</strong>`;
         if (this.activeAtkTab === 'self') atkDisplayName = `<strong>${atkClanName} 応援軍</strong>`;
-        if (this.activeAtkTab === 'ally') atkDisplayName = `<strong>攻撃 同盟軍</strong>`;
+        if (this.activeAtkTab === 'ally') atkDisplayName = `<strong>攻撃側 同盟軍</strong>`;
 
         let defDisplayName = `<strong>${defClanName} ${defGeneralName} 軍</strong>`;
         if (this.activeDefTab === 'self') defDisplayName = `<strong>${defClanName} 応援軍</strong>`;
-        if (this.activeDefTab === 'ally') defDisplayName = `<strong>守備 同盟軍</strong>`;
+        if (this.activeDefTab === 'ally') defDisplayName = `<strong>守備側 同盟軍</strong>`;
 
         // 値を２行に分けて表示します
         const atkHTML = `${atkDisplayName}<br><div style="margin-top:2px;">兵: ${curAtk.soldiers} / 糧: ${curAtk.rice}<br>士気: ${curAtk.morale} / 訓練: ${curAtk.training}</div>`;
