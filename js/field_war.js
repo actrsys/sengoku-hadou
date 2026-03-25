@@ -4,6 +4,7 @@
  * 修正: 撤退ボタンの確認アラートをカスタムダイアログ（showDialog）に置き換えました
  * ★追加: 城が攻められた時に、仲の良い諸勢力が「AIの援軍」として参戦する機能を追加しました
  * ★追加: 「足軽」「騎馬」「鉄砲」の兵科概念を導入し、移動力や攻撃範囲、ダメージ倍率を反映しました
+ * ★追加: 計算式を攻城戦とは分離し、野戦独自の計算式を導入しました
  */
 
 class FieldWarManager {
@@ -267,7 +268,12 @@ class FieldWarManager {
                     ap: mobility,
                     soldiers: assign.soldiers,
                     troopType: type,
-                    stats: WarSystem.calcUnitStats([assign.busho]),
+                    stats: {
+                        ldr: assign.busho.leadership,
+                        str: assign.busho.strength,
+                        int: assign.busho.intelligence,
+                        charm: assign.busho.charm
+                    },
                     hasActionDone: false,
                     hasMoved: false
                 });
@@ -347,7 +353,12 @@ class FieldWarManager {
                     ap: mobility,
                     soldiers: assign.soldiers,
                     troopType: type,
-                    stats: WarSystem.calcUnitStats([assign.busho]),
+                    stats: {
+                        ldr: assign.busho.leadership,
+                        str: assign.busho.strength,
+                        int: assign.busho.intelligence,
+                        charm: assign.busho.charm
+                    },
                     hasActionDone: false,
                     hasMoved: false
                 });
@@ -404,7 +415,12 @@ class FieldWarManager {
                                         ap: mobility,       // ★修正
                                         soldiers: uSoldiers,
                                         troopType: type,    // ★修正
-                                        stats: WarSystem.calcUnitStats([bestBusho]),
+                                        stats: {
+                                            ldr: bestBusho.leadership,
+                                            str: bestBusho.strength,
+                                            int: bestBusho.intelligence,
+                                            charm: bestBusho.charm
+                                        },
                                         hasActionDone: false,
                                         hasMoved: false
                                     });
@@ -1818,112 +1834,118 @@ class FieldWarManager {
         }
     }
 
-    // ★修正: 兵科や攻撃方向によるダメージ倍率を計算
-    getDamageMultipliers(attacker, defender) {
-        let atkDirIndex = this.getDirection(attacker.x, attacker.y, defender.x, defender.y);
-        let defDirIndex = defender.direction;
-        
-        // 防御側から見た攻撃の飛んできた方向とのズレ（正面を0、背後を3になるように修正）
-        let oppositeAtkDir = (atkDirIndex + 3) % 6;
-        let defToAtkDiff = Math.abs(defDirIndex - oppositeAtkDir);
-        defToAtkDiff = Math.min(defToAtkDiff, 6 - defToAtkDiff); 
-        
-        // 鉄砲隊の攻撃は相手の向きに関係なく常に「正面扱い（0）」にする
-        if (attacker.troopType === 'teppo') {
-            defToAtkDiff = 0;
-        }
-
-        // 攻撃側から見たターゲットの方向と自身の向きとのズレ
-        let atkToDefDiff = Math.abs(attacker.direction - atkDirIndex);
-        atkToDefDiff = Math.min(atkToDefDiff, 6 - atkToDefDiff);
-
-        let atkMult = 1.0;
-        let defMult = 1.0; // 防御側の被ダメ補正
-
-        // 攻撃側の兵科による与ダメ補正
-        if (attacker.troopType === 'kiba') {
-            if (atkToDefDiff === 0) atkMult = 1.2; // 正面
-            else if (atkToDefDiff === 1) atkMult = 1.1; // 前斜め
-        } else if (attacker.troopType === 'teppo') {
-            // ★変更: 敵との距離を測って、隣なら0.3倍、遠くなら1.2倍にします！
-            let dist = this.getDistance(attacker.x, attacker.y, defender.x, defender.y);
-            if (dist === 1) {
-                atkMult = 0.3; // 隣接時は0.3倍
-            } else {
-                atkMult = 1.2; // 遠距離なら1.2倍
-            }
-        } else {
-            // 足軽などは向きのみで背後・側面ボーナス
-            if (defToAtkDiff === 3) atkMult = 1.5; // 背後（3に変更）
-            else if (defToAtkDiff === 2) atkMult = 1.2; // 側面（2に変更）
-        }
-
-        // ★修正: 「=」ではなく「*=」にすることで、この後の地形効果と掛け合わせられるようにします！
-        if (defender.troopType === 'kiba') {
-            if (defToAtkDiff === 2 || defToAtkDiff === 3) defMult *= 1.1; 
-        } else if (defender.troopType === 'teppo') {
-            defMult *= 1.3; 
-        }
-
-        // ★追加: 地形による被ダメージ補正！
-        let row = Math.floor(defender.y / 2);
-        let terrain = (this.grid && this.grid[row] && this.grid[row][defender.x]) ? this.grid[row][defender.x].terrain : 'plain';
-        
-        if (terrain === 'forest') defMult *= 0.9;      // 森はダメージ10%減少
-        else if (terrain === 'mountain') defMult *= 0.8; // 山はダメージ20%減少
-        else if (terrain === 'river') defMult *= 1.2;    // 川はダメージ20%増加（危険！）
-
-        return { attack: atkMult, defense: defMult, defToAtkDiff: defToAtkDiff };
-    }
-    
     executeAttack(attacker, defender) {
         // それぞれの部隊の専用の箱から、士気と訓練度を取り出します
         let atkMorale = this.groupStats[attacker.groupId] ? this.groupStats[attacker.groupId].morale : 50;
+        let atkTraining = this.groupStats[attacker.groupId] ? this.groupStats[attacker.groupId].training : 50;
+        let defMorale = this.groupStats[defender.groupId] ? this.groupStats[defender.groupId].morale : 50;
         let defTraining = this.groupStats[defender.groupId] ? this.groupStats[defender.groupId].training : 50;
 
-        // 基本ダメージ計算
-        const result = WarSystem.calcWarDamage(
-            attacker.stats, defender.stats,
-            attacker.soldiers, defender.soldiers,
-            0, 
-            atkMorale, defTraining,
-            'charge'
-        );
+        // 【野戦独自のダメージ計算】
+        let atkS = Math.max(0, attacker.soldiers);
+        let defS = Math.max(0, defender.soldiers);
 
-        // ★ 兵科による倍率を計算
-        const mults = this.getDamageMultipliers(attacker, defender);
+        // 1. 基礎攻撃力・基礎防御力の計算
+        let atkBaseAtk = Math.sqrt(atkS) + (attacker.stats.ldr * 1.5 + attacker.stats.str) * (atkS / (atkS + 150));
+        let atkBaseDef = Math.sqrt(atkS) + (attacker.stats.ldr * 1.5 + attacker.stats.int) * (atkS / (atkS + 150));
         
-        let dmgToDef = Math.floor(result.soldierDmg * mults.attack * mults.defense);
-        // 兵数以上のダメージは受けない
-        dmgToDef = Math.min(defender.soldiers, dmgToDef);
+        let defBaseAtk = Math.sqrt(defS) + (defender.stats.ldr * 1.5 + defender.stats.str) * (defS / (defS + 150));
+        let defBaseDef = Math.sqrt(defS) + (defender.stats.ldr * 1.5 + defender.stats.int) * (defS / (defS + 150));
 
-        let dmgToAtk = 0;
-        // 反撃は距離1のときのみ発生
-        const dist = this.getDistance(attacker.x, attacker.y, defender.x, defender.y);
-        if (dist === 1) {
-            // 反撃側（defender）の与ダメ補正を計算（立場を逆転）
-            const counterMults = this.getDamageMultipliers(defender, attacker);
-            dmgToAtk = Math.floor(result.counterDmg * counterMults.attack * counterMults.defense);
-            dmgToAtk = Math.min(attacker.soldiers, dmgToAtk);
+        // 2. 最終攻撃力・最終防御力の計算（士気・訓練による補正）
+        let atkFinalAtk = atkBaseAtk * (1 + (atkMorale * 1.5 + atkTraining) / 1000);
+        let atkFinalDef = atkBaseDef * (1 + (atkMorale * 1.5 + atkTraining) / 1000);
+
+        let defFinalAtk = defBaseAtk * (1 + (defMorale * 1.5 + defTraining) / 1000);
+        let defFinalDef = defBaseDef * (1 + (defMorale * 1.5 + defTraining) / 1000);
+
+        // 3. 向きによる補正の判定
+        let atkDirIndex = this.getDirection(attacker.x, attacker.y, defender.x, defender.y);
+        let defDirIndex = defender.direction;
+        let oppositeAtkDir = (atkDirIndex + 3) % 6;
+        let defToAtkDiff = Math.abs(defDirIndex - oppositeAtkDir);
+        defToAtkDiff = Math.min(defToAtkDiff, 6 - defToAtkDiff); 
+
+        if (attacker.troopType === 'teppo') {
+            defToAtkDiff = 0; // 鉄砲は常に正面扱い
         }
+
+        let dirMult = 1.0;
+        if (defToAtkDiff === 3) dirMult = 0.5; // 背後
+        else if (defToAtkDiff === 2) dirMult = 0.8; // 側面
+
+        // 防御側のステータスに向き補正を適用
+        defFinalDef = defFinalDef * dirMult;
+        defFinalAtk = defFinalAtk * (dirMult * 0.5);
+
+        // 4. 兵科による攻撃力のボーナス計算
+        let atkToDefDiff = Math.abs(attacker.direction - atkDirIndex);
+        atkToDefDiff = Math.min(atkToDefDiff, 6 - atkToDefDiff);
+
+        let atkWeaponMult = 1.0;
+        if (attacker.troopType === 'kiba') {
+            if (atkToDefDiff === 0) atkWeaponMult = 1.2; // 正面から突撃
+            else if (atkToDefDiff === 1) atkWeaponMult = 1.1; // 前斜めから突撃
+        } else if (attacker.troopType === 'teppo') {
+            let dist = this.getDistance(attacker.x, attacker.y, defender.x, defender.y);
+            if (dist === 1) {
+                atkWeaponMult = 0.3; // 隣接時は威力が落ちる
+            } else {
+                atkWeaponMult = 1.2; // 遠距離なら威力が上がる
+            }
+        }
+        atkFinalAtk = atkFinalAtk * atkWeaponMult;
+
+        // 5. 兵科による防御力のペナルティ計算（打たれ弱さ）
+        let defWeaponMult = 1.0;
+        if (defender.troopType === 'kiba') {
+            if (defToAtkDiff === 2 || defToAtkDiff === 3) defWeaponMult = 0.9; // 側面や背後から攻撃されると防御力ダウン
+        } else if (defender.troopType === 'teppo') {
+            defWeaponMult = 0.8; // 鉄砲は常に防御力ダウン
+        }
+        defFinalDef = defFinalDef * defWeaponMult;
+
+        // 6. 地形による防御力の補正
+        let row = Math.floor(defender.y / 2);
+        let terrain = (this.grid && this.grid[row] && this.grid[row][defender.x]) ? this.grid[row][defender.x].terrain : 'plain';
+        
+        let terrainMult = 1.0;
+        if (terrain === 'forest') terrainMult = 1.1;      // 森は防御力アップ
+        else if (terrain === 'mountain') terrainMult = 1.2; // 山はさらに防御力アップ
+        else if (terrain === 'river') terrainMult = 0.8;    // 川は防御力ダウン
+        defFinalDef = defFinalDef * terrainMult;
+
+        // 7. 与ダメージ計算
+        let dmgRatio = (atkFinalAtk + defFinalDef) > 0 ? (atkFinalAtk / (atkFinalAtk + defFinalDef)) : 0;
+        let dmgToDef = Math.floor(atkFinalAtk * dmgRatio);
+
+        // 8. 反撃ダメージ計算
+        let dmgToAtk = 0;
+        const dist = this.getDistance(attacker.x, attacker.y, defender.x, defender.y);
+        if (dist === 1) { // 反撃は距離1のときのみ
+            let counterRatio = (atkFinalAtk + defFinalDef) > 0 ? (defFinalDef / (atkFinalAtk + defFinalDef)) : 0;
+            dmgToAtk = Math.floor(defFinalAtk * 0.5 * counterRatio);
+        }
+
+        // ダメージ適用（兵数以上のダメージは受けないようにガード）
+        dmgToDef = Math.min(defender.soldiers, dmgToDef);
+        dmgToAtk = Math.min(attacker.soldiers, dmgToAtk);
 
         defender.soldiers -= dmgToDef;
         attacker.soldiers -= dmgToAtk;
 
-        // ★書き足し: 野戦での被害を負傷兵の箱（deadSoldiers）に記録します！
+        // 野戦での被害を負傷兵の箱（deadSoldiers）に記録します
         if (attacker.isAttacker) {
-            // 攻撃軍から仕掛けた場合
             this.warState.deadSoldiers.defender += dmgToDef;
             this.warState.deadSoldiers.attacker += dmgToAtk;
         } else {
-            // 守備軍から仕掛けた場合
             this.warState.deadSoldiers.attacker += dmgToDef;
             this.warState.deadSoldiers.defender += dmgToAtk;
         }
         
         let dirMsg = "";
-        if (mults.defToAtkDiff === 3) dirMsg = "（背後からの強襲！）";
-        else if (mults.defToAtkDiff === 2) dirMsg = "（側面からの攻撃！）";
+        if (defToAtkDiff === 3) dirMsg = "（背後からの強襲！）";
+        else if (defToAtkDiff === 2) dirMsg = "（側面からの攻撃！）";
         
         let atkWeapon = "攻撃";
         if (attacker.troopType === 'teppo') atkWeapon = "射撃";
