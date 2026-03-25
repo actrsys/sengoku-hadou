@@ -307,9 +307,8 @@ class WarManager {
                 let role = target.role;
                 damageDetails[role] = 0; // まずは0で初期化します
                 
-                // ★ 個別の籠城判定！ 籠城のメモがある部隊だけ、受けるダメージを軽減します
-                let isRojo = (isTargetDefSide && s.plannedActions[role] && s.plannedActions[role].type === 'def_attack');
-                let finalDmg = isRojo ? Math.floor(dmgPerArmy * W.RojoDamageReduction) : dmgPerArmy;
+                // 新しい計算式ですでに籠城の半減は終わっているので、ここではそのままダメージを受けます！
+                let finalDmg = dmgPerArmy;
 
                 if (army.soldiers >= finalDmg) {
                     army.soldiers -= finalDmg;
@@ -340,9 +339,8 @@ class WarManager {
                     let role = target.role;
                     
                     let sliceToApply = Math.min(dmgSlice, unassignedDmg);
-                    // 余りのダメージを配る時も、籠城している部隊はしっかりガードします
-                    let isRojo = (isTargetDefSide && s.plannedActions[role] && s.plannedActions[role].type === 'def_attack');
-                    let finalSlice = isRojo ? Math.floor(sliceToApply * W.RojoDamageReduction) : sliceToApply;
+                    // 余りのダメージも、計算済みなのでそのまま受けます！
+                    let finalSlice = sliceToApply;
                     
                     if (army.soldiers >= finalSlice) {
                         army.soldiers -= finalSlice;
