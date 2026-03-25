@@ -256,10 +256,11 @@ class AIEngine {
                     // 大雪の時は出陣を我慢して、何もしない（内政フェーズに進む）ようにします
                 }
             }
+        }
             
-            // 内政フェーズ (軍事行動をしなかった場合)
-            this.execInternalAffairs(castle, castellan, mods, smartness);
-            this.game.finishTurn();
+        // 内政フェーズ (軍事行動をしなかった場合)
+        this.execInternalAffairs(castle, castellan, mods, smartness);
+        this.game.finishTurn();
 
         } catch(e) {
             console.error("AI Logic Error:", e);
