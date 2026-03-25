@@ -144,6 +144,11 @@ class FieldWarManager {
         this.maxTurns = 30; // 30ターンに固定
         this.active = true;
         this.state = 'IDLE';
+        
+        // ★追加：野戦が始まるたびに、タブの選択を一番左（メイン）にリセットします
+        this.activeAtkTab = 'main';
+        this.activeDefTab = 'main';
+        
         this.hideUnitInfo();
 
         // ★追加: 新しく作ったマップ工場でランダムなマップを作る
