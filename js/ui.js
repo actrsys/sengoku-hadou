@@ -78,6 +78,13 @@ class UIManager {
         if (this.resultModal) {
             this.resultModal.addEventListener('click', (e) => { 
                 if (e.target === this.resultModal) { 
+                    // ★ここから追加：選択が必須の画面（いつもの「閉じる」ボタンがない時）は、閉じられないように守ります！
+                    const footer = document.getElementById('result-footer');
+                    if (footer && !footer.innerHTML.includes('closeResultModal')) {
+                        return; // 閉じずに何もしないで、そのまま待ちます
+                    }
+                    // ★追加ここまで
+
                     if (window.AudioManager) window.AudioManager.playSE('cancel.ogg'); 
                     this.closeResultModal(); 
                 } 
