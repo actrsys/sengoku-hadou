@@ -595,9 +595,9 @@ class WarManager {
             scores['retreat'] = retreatRatioBonus + retreatDefBonus + (timidDegree * 300);
             
             // 籠城: 防御が低いほど、兵力が少ないほど、なめらかにスコアが大きくなる
-            let defAttackDefBonus = Math.max(0, 800 - def) * 0.6;
-            let defAttackRatioBonus = Math.max(0, 0.5 - ratio) * 1000;
-            scores['def_attack'] = defAttackDefBonus + defAttackRatioBonus + (timidDegree * 300);
+            let defAttackDefBonus = Math.max(0, 500 - def) * 0.8; // 防御500以下から意識しはじめる
+            let defAttackRatioBonus = Math.max(0, 0.25 - ratio) * 1200; // 兵力比0.25(1/4)以下から意識しはじめる
+            scores['def_attack'] = defAttackDefBonus + defAttackRatioBonus + (timidDegree * 200);
             
             // 鼓舞: 目標となる士気に足りない分だけなめらかにスコアが大きくなる
             let targetMoraleDef = Math.max(30, enemyMoraleAvg * 0.8);
