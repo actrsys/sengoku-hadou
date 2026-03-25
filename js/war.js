@@ -571,7 +571,7 @@ class WarManager {
             
             // 撤退: 兵力が少ないほど、防御が低いほど、なめらかにスコアが大きくなる
             let retreatRatioBonus = Math.max(0, 0.2 - ratio) * 3000; // 兵力比0.2(1/5)以下から意識しはじめる
-            let retreatDefBonus = Math.max(0, 500 - def) * 1.5; // 防御500以下から意識しはじめる
+            let retreatDefBonus = Math.max(0, 400 - def) * 1.5; // 防御400以下から意識しはじめる
             scores['retreat'] = retreatRatioBonus + retreatDefBonus + (timidDegree * 300);
             
             // 籠城: 防御が低いほど、兵力が少ないほど、なめらかにスコアが大きくなる
@@ -585,7 +585,7 @@ class WarManager {
             
             // ★今回追加：相手の火計が成功している場合、防ぐために鼓舞のスコアを爆発的に上げます！
             if (s.fireSufferedCount && s.fireSufferedCount > 0) {
-                let fireBonus = s.fireSufferedCount * 300;
+                let fireBonus = s.fireSufferedCount * 180;
                 // ★追加：ただし、士気が70以上ある時は火計の焦り（ボーナス）の影響も線形で薄まるようにします
                 if (myMorale >= 70) {
                     fireBonus *= (100 - myMorale) / 30; // 70で1.0倍、100で0倍になるようにします
