@@ -1281,7 +1281,7 @@ class AIEngine {
                     }
                 }
                 if (action.type === 'training') {
-                    const val = GameSystem.calcTraining(doer);
+                    const val = GameSystem.calcTraining(doer, castle.soldiers);
                     const oldVal = castle.training;
                     castle.training = Math.min(100, castle.training + val);
                     
@@ -1293,7 +1293,7 @@ class AIEngine {
                 }
                 if (action.type === 'soldier_charity' && castle.rice >= 200) {
                     castle.rice -= 200;
-                    const val = GameSystem.calcSoldierCharity(doer);
+                    const val = GameSystem.calcSoldierCharity(doer, castle.soldiers);
                     const oldVal = castle.morale;
                     castle.morale = Math.min(100, castle.morale + val);
                     
@@ -1346,7 +1346,12 @@ class AIEngine {
                 if (action.type === 'sell_rice') {
                     const sellAmount = castle.rice - Math.max(3000, Math.floor(castle.soldiers * 1.5));
                     if (sellAmount > 0) {
-                        const gain = Math.floor(sellAmount * this.game.marketRate);
+                        let rate = 1.0;
+                        if (this.game.provinces) {
+                            const province = this.game.provinces.find(p => p.id === castle.provinceId);
+                            if (province && province.marketRate !== undefined) rate = province.marketRate;
+                        }
+                        const gain = Math.floor(sellAmount * rate);
                         // ★プレイヤーと同じ！上限(99,999)を超えないかチェックします
                         if (castle.gold + gain <= 99999) {
                             castle.rice -= sellAmount;
@@ -1357,9 +1362,15 @@ class AIEngine {
                         }
                     }
                 }
+                // 差し替え後
                 if (action.type === 'buy_rice') {
                     const buyAmount = Math.floor(castle.soldiers * 1.5) - castle.rice;
-                    const cost = Math.floor(buyAmount * this.game.marketRate);
+                    let rate = 1.0;
+                    if (this.game.provinces) {
+                        const province = this.game.provinces.find(p => p.id === castle.provinceId);
+                        if (province && province.marketRate !== undefined) rate = province.marketRate;
+                    }
+                    const cost = Math.floor(buyAmount * rate);
                     if (buyAmount > 0 && castle.gold >= cost + 500) {
                         // ★プレイヤーと同じ！上限(99,999)を超えないかチェックします
                         if (castle.rice + buyAmount <= 99999) {
