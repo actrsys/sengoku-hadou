@@ -585,7 +585,7 @@ class WarManager {
             
             // ★今回追加：相手の火計が成功している場合、防ぐために鼓舞のスコアを爆発的に上げます！
             if (s.fireSufferedCount && s.fireSufferedCount > 0) {
-                let fireBonus = s.fireSufferedCount * 180;
+                let fireBonus = s.fireSufferedCount * 120;
                 // ★追加：ただし、士気が70以上ある時は火計の焦り（ボーナス）の影響も線形で薄まるようにします
                 if (myMorale >= 70) {
                     fireBonus *= (100 - myMorale) / 30; // 70で1.0倍、100で0倍になるようにします
