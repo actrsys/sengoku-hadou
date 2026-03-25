@@ -953,7 +953,7 @@ class UIManager {
                         ${msg.replace(/\n/g, '<br>')}
                     </div>
                     <div class="modal-footer" style="justify-content: center; border-top: none; padding-bottom: 0;">
-                        <button class="btn-primary" id="tap-msg-close-btn">閉じる</button>
+                        <button class="btn-secondary" id="tap-msg-close-btn">閉じる</button>
                     </div>
                 </div>
             `;
