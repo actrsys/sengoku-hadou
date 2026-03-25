@@ -197,14 +197,17 @@ class AIEngine {
                             // 道が繋がっているか、魔法を使って再確認します！
                             canReach = GameSystem.isReachable(this.game, castle, targetCastle, castle.ownerClan);
                             
-                            // ★追加：お城の持ち主が変わって、味方や同盟国になっていないかチェックします！
-                            if (targetCastle.ownerClan !== castle.ownerClan) {
-                                if (targetCastle.ownerClan === 0) {
-                                    isStillEnemy = true; // 空き城なら攻撃OKです
-                                } else {
-                                    const rel = this.game.getRelation(castle.ownerClan, targetCastle.ownerClan);
-                                    if (!rel || !this.game.diplomacyManager.isNonAggression(rel.status)) {
-                                        isStillEnemy = true; // 同盟などで守られていなければ敵です！
+                            // ★追加：お休み期間（immunityUntil）ではないか、味方や同盟国になっていないかチェックします！
+                            // 今の月（TurnId）よりもお休み期間の方が未来なら、攻撃は我慢します
+                            if ((targetCastle.immunityUntil || 0) < this.game.getCurrentTurnId()) {
+                                if (targetCastle.ownerClan !== castle.ownerClan) {
+                                    if (targetCastle.ownerClan === 0) {
+                                        isStillEnemy = true; // 空き城なら攻撃OKです
+                                    } else {
+                                        const rel = this.game.getRelation(castle.ownerClan, targetCastle.ownerClan);
+                                        if (!rel || !this.game.diplomacyManager.isNonAggression(rel.status)) {
+                                            isStillEnemy = true; // 同盟などで守られていなければ敵です！
+                                        }
                                     }
                                 }
                             }
