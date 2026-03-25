@@ -132,7 +132,8 @@ class WarManager {
             if (s.turn === 'attacker') commands.push({ label: "撤退", type: "retreat" });
         } else {
             commands.push({ label: "突撃", type: "def_charge" }, { label: "斉射", type: "def_bow" }, { label: "籠城", type: "def_attack" }, { label: "挑発", type: "provoke" }, { label: "鼓舞", type: "def_inspire" }); 
-            if (s.turn === 'defender' && this.game.castles.some(c => c.ownerClan === s.defender.ownerClan && c.id !== s.defender.id && GameSystem.isReachable(this.game, s.defender, c, s.defender.ownerClan))) commands.push({ label: "撤退", type: "retreat" });
+            // ★修正：中立の空き城（ownerClanが0）の守備軍は、撤退コマンドを選べないようにします！
+            if (s.turn === 'defender' && s.defender.ownerClan !== 0 && this.game.castles.some(c => c.ownerClan === s.defender.ownerClan && c.id !== s.defender.id && GameSystem.isReachable(this.game, s.defender, c, s.defender.ownerClan))) commands.push({ label: "撤退", type: "retreat" });
         }
         return commands;
     }
@@ -508,7 +509,8 @@ class WarManager {
         const options = isDefenderTurn ? ['def_charge', 'def_bow', 'def_attack', 'provoke', 'def_inspire'] : ['charge', 'bow', 'siege', 'fire', 'inspire'];
         
         // 撤退の選択肢を追加
-        if (isDefenderTurn && s.turn === 'defender' && this.game.castles.some(c => c.ownerClan === s.defender.ownerClan && c.id !== s.defender.id && GameSystem.isReachable(this.game, s.defender, c, s.defender.ownerClan))) {
+        // ★修正：中立の空き城（ownerClanが0）の守備軍は、AIも撤退を選ばないようにします！
+        if (isDefenderTurn && s.turn === 'defender' && s.defender.ownerClan !== 0 && this.game.castles.some(c => c.ownerClan === s.defender.ownerClan && c.id !== s.defender.id && GameSystem.isReachable(this.game, s.defender, c, s.defender.ownerClan))) {
             options.push('retreat');
         } else if (!isDefenderTurn && s.turn === 'attacker') {
             options.push('retreat');
@@ -791,7 +793,8 @@ class WarManager {
             }
 
             pushMsg(`${activeArmyName} の鼓舞！`);
-            pushMsg({ text: `士気が${moraleUp}上昇した！`, log: `${activeArmyName} 鼓舞！ 士気+${moraleUp}` });
+            // ★追加：メッセージと一緒に「最新の数字（currentStats）」を送ることで、すぐに画面を更新させます！
+            pushMsg({ text: `士気が${moraleUp}上昇した！`, log: `${activeArmyName} 鼓舞！ 士気+${moraleUp}`, currentStats: getCurrentStats() });
             executeNext(); return;
         }
 

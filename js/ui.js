@@ -2759,6 +2759,14 @@ class UIManager {
                 }
                 
                 textContainer.innerHTML += (textContainer.innerHTML ? '<br>' : '') + item.text;
+
+                // ★追加：メッセージと一緒に新しい数字（currentStats）が届いていたら、画面の数字をすぐ更新します！
+                if (item.currentStats) {
+                    setTimeout(() => {
+                        this.updateWarUI();
+                    }, 200);
+                }
+                
                 setTimeout(processNext, 600);
             // ★修正：「damage」の時だけでなく「recover（回復）」の時もアニメーションを呼ぶようにしました！
             } else if (item.type === 'damage' || item.type === 'recover') {
@@ -3225,7 +3233,8 @@ class UIManager {
         if (s.turn === 'attacker') {
             options.push({ label: "撤退", type: "retreat", desc: "戦場から離脱し、退却します。" });
         } else if (s.turn === 'defender') {
-            if (this.game.castles.some(c => c.ownerClan === s.defender.ownerClan && c.id !== s.defender.id && GameSystem.isReachable(this.game, s.defender, c, s.defender.ownerClan))) {
+            // ★修正：中立の空き城（ownerClanが0）の守備軍は、撤退できないようにガードを追加します！
+            if (s.defender.ownerClan !== 0 && this.game.castles.some(c => c.ownerClan === s.defender.ownerClan && c.id !== s.defender.id && GameSystem.isReachable(this.game, s.defender, c, s.defender.ownerClan))) {
                 options.push({ label: "撤退", type: "retreat", desc: "城を捨てて、安全な城へ退却します。" });
             }
         } else {
