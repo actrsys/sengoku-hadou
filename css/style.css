@@ -72,6 +72,7 @@ img { pointer-events: none; -webkit-user-drag: none; user-drag: none; }
 .sp-info-header { display: flex; align-items: center; background: #333; color: #fff; padding: 2px 8px; font-weight: bold; }
 .sp-clan { margin-right: 10px; color: #ffeb3b; }
 .sp-castle { flex: 1; font-size: 1rem; }
+.sp-senran-mark { background-color: #d32f2f; color: #ffffff; font-size: 0.75rem; padding: 1px 4px; border-radius: 3px; margin-left: 5px; vertical-align: middle; font-weight: bold; box-shadow: 1px 1px 2px rgba(0,0,0,0.5); text-shadow: none; }
 .sp-lord-label { font-size: 0.75rem; color: #aaa; margin-right: 5px; }
 .sp-lord-name { font-size: 0.9rem; text-align: left; }
 .sp-info-body { display: flex; padding: 3px 5px; background: #fff; border-bottom: 1px solid #ccc; }
