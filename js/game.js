@@ -1413,7 +1413,7 @@ class GameManager {
 
         if (this.isProcessingAI) return;
 
-        const bushos = this.getCastleBushos(c.id).filter(b => b.status !== 'ronin');
+        const bushos = this.getCastleBushos(c.id).filter(b => b.status !== 'ronin' && b.belongKunishuId === 0);
         
         if(bushos.length > 0 && bushos.every(b => b.isActionDone)) {
              setTimeout(() => {

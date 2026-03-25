@@ -375,28 +375,28 @@ class CommandSystem {
             infoHtml = "<div>登用する在野武将を選択してください</div>"; 
         }
         else if (actionType === 'employ_doer') { 
-            bushos = this.game.getCastleBushos(c.id).filter(b => b.status !== 'ronin'); 
+            bushos = this.game.getCastleBushos(c.id).filter(b => b.status !== 'ronin' && b.belongKunishuId === 0); 
             infoHtml = "<div>登用を行う担当官を選択してください</div>"; 
         } 
         else if (actionType === 'diplomacy_doer') { 
-            bushos = this.game.getCastleBushos(c.id).filter(b => b.status !== 'ronin'); 
+            bushos = this.game.getCastleBushos(c.id).filter(b => b.status !== 'ronin' && b.belongKunishuId === 0); 
             infoHtml = "<div>外交の担当官を選択してください</div>"; 
         }
         // ★追加：貢物を持っていく使者を選ぶリスト
         else if (actionType === 'tribute_doer') { 
-            bushos = this.game.getCastleBushos(c.id).filter(b => b.status !== 'ronin'); 
+            bushos = this.game.getCastleBushos(c.id).filter(b => b.status !== 'ronin' && b.belongKunishuId === 0); 
             infoHtml = "<div>朝廷への使者を選択してください</div>"; 
         }
         else if (actionType === 'rumor_target_busho') { 
-            bushos = this.game.getCastleBushos(targetId).filter(b => b.status !== 'ronin' && !b.isDaimyo); 
+            bushos = this.game.getCastleBushos(targetId).filter(b => b.status !== 'ronin' && !b.isDaimyo && b.belongKunishuId === 0); 
             infoHtml = "<div>流言の対象とする武将を選択してください</div>"; 
         }
         else if (actionType === 'rumor_doer') { 
-            bushos = this.game.getCastleBushos(c.id).filter(b => b.status !== 'ronin'); 
+            bushos = this.game.getCastleBushos(c.id).filter(b => b.status !== 'ronin' && b.belongKunishuId === 0); 
             infoHtml = "<div>流言を実行する担当官を選択してください</div>"; 
         }
         else if (actionType === 'incite_doer') { 
-            bushos = this.game.getCastleBushos(c.id).filter(b => b.status !== 'ronin'); 
+            bushos = this.game.getCastleBushos(c.id).filter(b => b.status !== 'ronin' && b.belongKunishuId === 0); 
             infoHtml = "<div>扇動を実行する担当官を選択してください</div>"; 
         }
         else if (actionType === 'headhunt_target') { 
@@ -404,23 +404,23 @@ class CommandSystem {
             infoHtml = "<div>引抜の対象とする武将を選択してください </div>"; 
         }
         else if (actionType === 'kunishu_incorporate_doer') {
-            bushos = this.game.getCastleBushos(c.id).filter(b => b.status !== 'ronin'); 
+            bushos = this.game.getCastleBushos(c.id).filter(b => b.status !== 'ronin' && b.belongKunishuId === 0); 
             infoHtml = "<div>取込の交渉を行う担当官を選択してください</div>"; 
         }
         else if (actionType === 'headhunt_doer') {
-            bushos = this.game.getCastleBushos(c.id).filter(b => b.status !== 'ronin'); 
+            bushos = this.game.getCastleBushos(c.id).filter(b => b.status !== 'ronin' && b.belongKunishuId === 0); 
             infoHtml = "<div>引抜を実行する担当官を選択してください</div>"; 
         }
         else if (actionType === 'interview') { 
-            bushos = this.game.getCastleBushos(c.id).filter(b => b.status !== 'ronin' && !b.isDaimyo); 
+            bushos = this.game.getCastleBushos(c.id).filter(b => b.status !== 'ronin' && !b.isDaimyo && b.belongKunishuId === 0); 
             infoHtml = "<div>面談する武将を選択してください</div>"; 
         }
         else if (actionType === 'interview_target') { 
-            bushos = this.game.bushos.filter(b => b.clan === this.game.playerClanId && b.status !== 'dead' && b.status !== 'ronin' && b.status !== 'unborn' && b.id !== extraData.interviewer.id && !b.isDaimyo);
+            bushos = this.game.bushos.filter(b => b.clan === this.game.playerClanId && b.status !== 'dead' && b.status !== 'ronin' && b.status !== 'unborn' && b.id !== extraData.interviewer.id && !b.isDaimyo && b.belongKunishuId === 0);
             infoHtml = `<div>誰についての印象を聞きますか？</div>`; 
         }
         else if (actionType === 'investigate_deploy') { 
-            bushos = this.game.getCastleBushos(c.id).filter(b => b.status !== 'ronin'); 
+            bushos = this.game.getCastleBushos(c.id).filter(b => b.status !== 'ronin' && b.belongKunishuId === 0); 
             infoHtml = "<div>調査を行う武将を選択してください(複数可)</div>"; 
         }
         else if (actionType === 'view_only') { 
@@ -429,7 +429,7 @@ class CommandSystem {
         }
         // 【差し替え後】（間の部分が消えます！）
         else if (actionType === 'all_busho_list') { 
-            bushos = this.game.bushos.filter(b => b.clan === this.game.playerClanId && b.status !== 'dead' && b.status !== 'ronin' && b.status !== 'unborn');
+            bushos = this.game.bushos.filter(b => b.clan === this.game.playerClanId && b.status !== 'dead' && b.status !== 'ronin' && b.status !== 'unborn' && b.belongKunishuId === 0);
             infoHtml = "<div>我が軍の武将一覧です</div>"; 
             isMulti = false;
         }
