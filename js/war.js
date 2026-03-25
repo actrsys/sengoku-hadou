@@ -561,64 +561,58 @@ class WarManager {
             // 攻撃側
             let ratio = totalAtkSoldiers / Math.max(1, totalDefSoldiers);
             
-            // 撤退: 自部隊兵力が相手の総兵士数の半分以下で考え始める。弱気度に応じてスコアアップ
-            scores['retreat'] = (totalDefSoldiers * 0.5 - totalAtkSoldiers) / Math.max(1, totalDefSoldiers) * 200;
-            if (totalAtkSoldiers <= totalDefSoldiers * 0.5) scores['retreat'] += 500;
-            scores['retreat'] += timidDegree * 300;
+            // 撤退: 相手の半分の兵力(0.5)を下回るほど、なめらかにスコアが大きくなる
+            scores['retreat'] = Math.max(0, 0.5 - ratio) * 1500 + (timidDegree * 300);
             
-            // 鼓舞: 士気が敵平均の0.8倍以下、または30未満
-            scores['inspire'] = Math.max(0, 30 - myMorale) * 5 + Math.max(0, enemyMoraleAvg * 0.8 - myMorale) * 5;
-            if (myMorale <= enemyMoraleAvg * 0.8 || myMorale < 30) scores['inspire'] += 500;
-            else scores['inspire'] += 20; // 低確率で鼓舞
+            // 鼓舞: 目標となる士気（敵の平均の0.8倍、または30）に足りない分だけなめらかにスコアが大きくなる
+            let targetMorale = Math.max(30, enemyMoraleAvg * 0.8);
+            scores['inspire'] = Math.max(0, targetMorale - myMorale) * 20 + 20;
             
-            // 破壊: 敵防御が低以下(<=500)で、自部隊兵力が大以上(>=2.5)
-            scores['siege'] = Math.max(0, 500 - def) * 0.5 + Math.max(0, ratio - 2.5) * 100;
-            if (def <= 500 && ratio >= 2.5) scores['siege'] += 500;
-            scores['siege'] -= timidDegree * 200; // 弱気なら控える
+            // 破壊: 防御が低いほど、兵力が多いほど、なめらかにスコアが大きくなる
+            let siegeDefBonus = Math.max(0, 800 - def) * 0.6; // 防御800以下から意識しはじめる
+            let siegeRatioBonus = Math.max(0, ratio - 1.5) * 150; // 兵力比1.5倍以上から意識しはじめる
+            scores['siege'] = siegeDefBonus + siegeRatioBonus - (timidDegree * 200);
             
-            // 火計: 敵防御が高以上(>=1000)で、自部隊兵力が大未満(<2.5)
-            scores['fire'] = Math.max(0, def - 1000) * 0.2 + Math.max(0, 2.5 - ratio) * 100 + intBonus;
-            if (def >= 1000 && ratio < 2.5) scores['fire'] += 500;
-            scores['fire'] -= timidDegree * 100;
+            // 火計: 防御が高いほど、兵力が少ないほど、なめらかにスコアが大きくなる
+            let fireDefBonus = Math.max(0, def - 500) * 0.4; // 防御500以上から意識しはじめる
+            let fireRatioBonus = Math.max(0, 2.5 - ratio) * 200; // 兵力比2.5倍未満から意識しはじめる
+            scores['fire'] = fireDefBonus + fireRatioBonus + intBonus - (timidDegree * 100);
             
-            // 斉射: 敵防御が高以上(>=1000)で上記を満たさない
-            scores['bow'] = Math.max(0, def - 1000) * 0.2;
-            if (def >= 1000 && ratio >= 2.5) scores['bow'] += 300;
+            // 斉射: 防御が高いほど、なめらかにスコアが大きくなる（火計に選ばれない時に選ばれやすく）
+            let bowDefBonus = Math.max(0, def - 600) * 0.3;
+            scores['bow'] = 50 + bowDefBonus + (ratio * 50);
             
-            // 突撃: デフォルト
-            scores['charge'] = 100 - (timidDegree * 200); // 弱気なら控える
+            // 突撃: 基本の攻撃。弱気なときは控える
+            scores['charge'] = 150 - (timidDegree * 200);
 
         } else {
             // 守備側
             let ratio = totalDefSoldiers / Math.max(1, totalAtkSoldiers);
             
-            // 撤退: 兵力が1/16以下 かつ 城防御が超低(<=200)以下。弱気度に応じてスコアアップ
-            scores['retreat'] = ((1/16) - ratio) * 2000 + Math.max(0, 200 - def) * 2;
-            if (ratio <= 0.0625 && def <= 200) scores['retreat'] += 500;
-            scores['retreat'] += timidDegree * 300;
+            // 撤退: 兵力が少ないほど、防御が低いほど、なめらかにスコアが大きくなる
+            let retreatRatioBonus = Math.max(0, 0.2 - ratio) * 3000; // 兵力比0.2(1/5)以下から意識しはじめる
+            let retreatDefBonus = Math.max(0, 500 - def) * 1.5; // 防御500以下から意識しはじめる
+            scores['retreat'] = retreatRatioBonus + retreatDefBonus + (timidDegree * 300);
             
-            // 籠城: 城防御が低以下(<=500)で、兵力が小以下(<=0.25)。弱気度に応じてスコアアップ
-            scores['def_attack'] = Math.max(0, 500 - def) * 0.5 + Math.max(0, 0.25 - ratio) * 500;
-            if (def <= 500 && ratio <= 0.25) scores['def_attack'] += 500;
-            scores['def_attack'] += timidDegree * 300;
+            // 籠城: 防御が低いほど、兵力が少ないほど、なめらかにスコアが大きくなる
+            let defAttackDefBonus = Math.max(0, 800 - def) * 0.6;
+            let defAttackRatioBonus = Math.max(0, 0.5 - ratio) * 1000;
+            scores['def_attack'] = defAttackDefBonus + defAttackRatioBonus + (timidDegree * 300);
             
-            // 鼓舞: 士気が敵平均の0.8倍以下、または30未満
-            scores['def_inspire'] = Math.max(0, 30 - myMorale) * 5 + Math.max(0, enemyMoraleAvg * 0.8 - myMorale) * 5;
-            if (myMorale <= enemyMoraleAvg * 0.8 || myMorale < 30) scores['def_inspire'] += 500;
-            else scores['def_inspire'] += 20; // 低確率で鼓舞
+            // 鼓舞: 目標となる士気に足りない分だけなめらかにスコアが大きくなる
+            let targetMoraleDef = Math.max(30, enemyMoraleAvg * 0.8);
+            scores['def_inspire'] = Math.max(0, targetMoraleDef - myMorale) * 20 + 20;
             
-            // 挑発: 城防御が高以上(>=1000)で、兵力が中以上(>=0.25)
-            scores['provoke'] = Math.max(0, def - 1000) * 0.2 + Math.max(0, ratio - 0.25) * 200 + intBonus;
-            if (def >= 1000 && ratio >= 0.25) scores['provoke'] += 500;
-            scores['provoke'] -= timidDegree * 100; // 弱気なら控える
+            // 挑発: 防御が高いほど、兵力が多いほど、なめらかにスコアが大きくなる
+            let provokeDefBonus = Math.max(0, def - 600) * 0.4;
+            let provokeRatioBonus = Math.max(0, ratio - 0.1) * 300;
+            scores['provoke'] = provokeDefBonus + provokeRatioBonus + intBonus - (timidDegree * 100);
             
-            // 突撃: 兵力が大以上(>=1.0)
-            scores['def_charge'] = Math.max(0, ratio - 1.0) * 200;
-            if (ratio >= 1.0) scores['def_charge'] += 200;
-            scores['def_charge'] -= timidDegree * 200; // 弱気なら控える
+            // 突撃: 兵力が多いほど、なめらかにスコアが大きくなる
+            scores['def_charge'] = 50 + Math.max(0, ratio - 0.5) * 300 - (timidDegree * 200); 
             
-            // 斉射: デフォルト
-            scores['def_bow'] = 100;
+            // 斉射: 基本の攻撃
+            scores['def_bow'] = 120;
         }
 
         options.forEach(cmd => {
