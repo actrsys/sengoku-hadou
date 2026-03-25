@@ -378,33 +378,14 @@ class WarManager {
                 s.isPlayerInvolved = true; this.game.ui.setWarModalVisible(true); this.game.ui.updateWarUI(); this.processWarRound(); return;
             }
 
-            // ★ここを追加！：AI自動戦闘の時も、エラーにならないように空の作戦メモを用意しておきます！
+            // ★ここを大改造！：AI同士のオートバトルでも、プレイヤー用と同じように頭を使った攻城戦をやらせます！
+            s.isPlayerInvolved = false; // 裏側でやるという印です
             s.plannedActions = s.plannedActions || {};
 
-            let safetyLimit = 100;
-            while(s.round <= window.WarParams.Military.WarMaxRounds && s.attacker.soldiers > 0 && s.defender.soldiers > 0 && s.defender.defense > 0 && safetyLimit > 0) { 
-                this.resolveWarAction('charge'); 
-                if (s.attacker.soldiers <= 0 || s.defender.soldiers <= 0) break; 
-                
-                s.attacker.rice = Math.max(0, s.attacker.rice - Math.floor(s.attacker.soldiers * 0.05));
-                if (s.selfReinforcement) s.selfReinforcement.rice = Math.max(0, s.selfReinforcement.rice - Math.floor(s.selfReinforcement.soldiers * 0.05));
-                if (s.reinforcement) s.reinforcement.rice = Math.max(0, s.reinforcement.rice - Math.floor(s.reinforcement.soldiers * 0.05));
+            // 手動戦と同じ「ラウンドの進行」をスタートさせます！
+            // 裏側で一瞬のうちに全部終わるようになります。
+            this.processWarRound();
 
-                s.defender.rice = Math.max(0, s.defender.rice - Math.floor(s.defender.soldiers * 0.01));
-                if (s.defSelfReinforcement) s.defSelfReinforcement.rice = Math.max(0, s.defSelfReinforcement.rice - Math.floor(s.defSelfReinforcement.soldiers * 0.01));
-                if (s.defReinforcement) s.defReinforcement.rice = Math.max(0, s.defReinforcement.rice - Math.floor(s.defReinforcement.soldiers * 0.01));
-
-                if (s.attacker.rice <= 0 || s.defender.rice <= 0) break;
-                safetyLimit--;
-            }
-            
-            // ★追加：オートバトルでも、城壁が壊れて落ちた場合は防御力を少し修復します！
-            if (s.defender.defense <= 0) {
-                s.defender.defense += 150;
-                this.endWar(true);
-            } else {
-                this.endWar(s.defender.soldiers <= 0 || s.defender.rice <= 0); 
-            }
         } catch(e) { console.error(e); this.endWar(false); } 
     }
 
@@ -1085,7 +1066,13 @@ class WarManager {
                         // 思考中のメッセージを表示します（１行でシンプルに！）
                         ctrl.innerHTML = `<div style="text-align: center; padding: 10px; font-weight: bold; color: #555;">${factionName} ${bushoName} 思考中……</div>`;
                     }
-                    setTimeout(() => this.execWarAI(), 800); 
+                    
+                    // ★追加：裏で高速計算する時は待たずにすぐ実行、画面に出す時だけ待ちます！
+                    if (!s.isPlayerInvolved) {
+                        this.execWarAI();
+                    } else {
+                        setTimeout(() => this.execWarAI(), 800); 
+                    }
                 }
             } else {
                 // 全員が作戦を決め終わったら、【実行（アクション）フェーズ】へ！
@@ -1147,10 +1134,15 @@ class WarManager {
                 if (isDead || !action) {
                     this.advanceWarTurn();
                 } else {
-                    // 少し間をあけて（演出を見やすくして）実行します
-                    setTimeout(() => {
+                    // ★追加：裏で高速計算する時は待たずにすぐ実行、画面に出す時だけ待ちます！
+                    if (!s.isPlayerInvolved) {
                         this.resolveWarAction(action.type, action.extraVal);
-                    }, 800);
+                    } else {
+                        // 少し間をあけて（演出を見やすくして）実行します
+                        setTimeout(() => {
+                            this.resolveWarAction(action.type, action.extraVal);
+                        }, 800);
+                    }
                 }
             } else {
                 // 全員の行動が終わったら、兵糧を消費します
