@@ -42,21 +42,13 @@ class WarSystem {
         if (!bushos || bushos.length === 0) return { ldr:baseStat, str:baseStat, int:baseStat, charm:baseStat }; 
         const leader = bushos[0]; const subs = bushos.slice(1); 
         let totalLdr = leader.leadership; let totalStr = leader.strength; let totalInt = leader.intelligence; 
-        let factionBonusMultiplier = 1.0;
         if (subs.length > 0) {
-            const leaderFaction = leader.getFactionName ? leader.getFactionName() : "中立";
-            let sameFactionCount = 0; let oppFactionCount = 0; 
             const subFactor = W.SubGeneralFactor || 0.2;
             subs.forEach(b => { 
                 totalLdr += b.leadership * subFactor; totalStr += b.strength * subFactor; totalInt += b.intelligence * subFactor; 
-                const f = b.getFactionName ? b.getFactionName() : "中立";
-                if (f === leaderFaction) sameFactionCount++;
-                else if ((leaderFaction === "革新派" && f === "保守派") || (leaderFaction === "保守派" && f === "革新派")) oppFactionCount++;
             });
-            if (oppFactionCount > 0) factionBonusMultiplier = M.FactionPenalty;
-            else if (sameFactionCount === subs.length) factionBonusMultiplier = M.FactionBonus;
         }
-        return { ldr: Math.floor(totalLdr * factionBonusMultiplier), str: Math.floor(totalStr * factionBonusMultiplier), int: Math.floor(totalInt * factionBonusMultiplier), charm: leader.charm }; 
+        return { ldr: Math.floor(totalLdr), str: Math.floor(totalStr), int: Math.floor(totalInt), charm: leader.charm }; 
     }
 
     static calcWarDamage(atkStats, defStats, atkSoldiers, defSoldiers, defWall, atkMorale, defTraining, type) {
@@ -395,11 +387,18 @@ class WarManager {
             while(s.round <= window.WarParams.Military.WarMaxRounds && s.attacker.soldiers > 0 && s.defender.soldiers > 0 && s.defender.defense > 0 && safetyLimit > 0) { 
                 this.resolveWarAction('charge'); 
                 if (s.attacker.soldiers <= 0 || s.defender.soldiers <= 0) break; 
-                s.attacker.rice = Math.max(0, s.attacker.rice - Math.floor(s.attacker.soldiers * window.WarParams.War.RiceConsumptionAtk));
-                s.defender.rice = Math.max(0, s.defender.rice - Math.floor(s.defender.soldiers * window.WarParams.War.RiceConsumptionDef));
+                
+                s.attacker.rice = Math.max(0, s.attacker.rice - Math.floor(s.attacker.soldiers * 0.05));
+                if (s.selfReinforcement) s.selfReinforcement.rice = Math.max(0, s.selfReinforcement.rice - Math.floor(s.selfReinforcement.soldiers * 0.05));
+                if (s.reinforcement) s.reinforcement.rice = Math.max(0, s.reinforcement.rice - Math.floor(s.reinforcement.soldiers * 0.05));
+
+                s.defender.rice = Math.max(0, s.defender.rice - Math.floor(s.defender.soldiers * 0.01));
+                if (s.defSelfReinforcement) s.defSelfReinforcement.rice = Math.max(0, s.defSelfReinforcement.rice - Math.floor(s.defSelfReinforcement.soldiers * 0.01));
+                if (s.defReinforcement) s.defReinforcement.rice = Math.max(0, s.defReinforcement.rice - Math.floor(s.defReinforcement.soldiers * 0.01));
+
                 if (s.attacker.rice <= 0 || s.defender.rice <= 0) break;
                 safetyLimit--;
-            } 
+            }
             
             // ★追加：オートバトルでも、城壁が壊れて落ちた場合は防御力を少し修復します！
             if (s.defender.defense <= 0) {
@@ -417,17 +416,7 @@ class WarManager {
 
         // s.phase がない、または 'init'（ラウンドの最初）の時の準備
         if (!s.phase || s.phase === 'init') {
-            if (s.round > 1) {
-                s.attacker.rice = Math.max(0, s.attacker.rice - Math.floor(s.attacker.soldiers * window.WarParams.War.RiceConsumptionAtk));
-                if (s.selfReinforcement) s.selfReinforcement.rice = Math.max(0, s.selfReinforcement.rice - Math.floor(s.selfReinforcement.soldiers * window.WarParams.War.RiceConsumptionAtk));
-                if (s.reinforcement) s.reinforcement.rice = Math.max(0, s.reinforcement.rice - Math.floor(s.reinforcement.soldiers * window.WarParams.War.RiceConsumptionAtk));
-
-                s.defender.rice = Math.max(0, s.defender.rice - Math.floor(s.defender.soldiers * window.WarParams.War.RiceConsumptionDef));
-                if (s.defSelfReinforcement) s.defSelfReinforcement.rice = Math.max(0, s.defSelfReinforcement.rice - Math.floor(s.defSelfReinforcement.soldiers * window.WarParams.War.RiceConsumptionDef));
-                if (s.defReinforcement) s.defReinforcement.rice = Math.max(0, s.defReinforcement.rice - Math.floor(s.defReinforcement.soldiers * window.WarParams.War.RiceConsumptionDef));
-            }
-
-            if (s.defender.defense <= 0) { 
+            if (s.defender.defense <= 0) {
                 // ★追加：城壁が壊れて落ちた場合、少しだけ城壁（防御力）を修復してあげます！
                 s.defender.defense += 150; 
                 this.endWar(true); 
@@ -938,7 +927,16 @@ class WarManager {
                     }, 800);
                 }
             } else {
-                // 全員の行動が終わったら、ラウンドを1つ進めます
+                // 全員の行動が終わったら、兵糧を消費します
+                s.attacker.rice = Math.max(0, s.attacker.rice - Math.floor(s.attacker.soldiers * 0.05));
+                if (s.selfReinforcement) s.selfReinforcement.rice = Math.max(0, s.selfReinforcement.rice - Math.floor(s.selfReinforcement.soldiers * 0.05));
+                if (s.reinforcement) s.reinforcement.rice = Math.max(0, s.reinforcement.rice - Math.floor(s.reinforcement.soldiers * 0.05));
+
+                s.defender.rice = Math.max(0, s.defender.rice - Math.floor(s.defender.soldiers * 0.01));
+                if (s.defSelfReinforcement) s.defSelfReinforcement.rice = Math.max(0, s.defSelfReinforcement.rice - Math.floor(s.defSelfReinforcement.soldiers * 0.01));
+                if (s.defReinforcement) s.defReinforcement.rice = Math.max(0, s.defReinforcement.rice - Math.floor(s.defReinforcement.soldiers * 0.01));
+
+                // ラウンドを1つ進めます
                 s.phase = 'init';
                 s.round++;
                 if(s.round > window.WarParams.Military.WarMaxRounds) { this.endWar(false); return; } 
