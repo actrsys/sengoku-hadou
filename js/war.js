@@ -890,6 +890,12 @@ class WarManager {
         let activePowerObj = calcArmyPower(activeBushos, activeSoldiers, activeMorale, activeTraining, (!isAtkTurnGroup && s.turn === 'defender'));
         let activeAtkPower = activePowerObj.atkPower;
 
+        // 守備側のターンなら、自分のお城の防御力を攻撃パワーにも乗せます
+        if (!isAtkTurnGroup) {
+            let activeCastleMod = 1.5 + (s.defender.defense / 1000);
+            activeAtkPower = activeAtkPower * activeCastleMod;
+        }
+
         let targetList = [];
         if (isAtkTurnGroup) {
             if (s.defender.soldiers > 0) targetList.push({ bushos: [s.defBusho], soldiers: s.defender.soldiers, morale: s.defender.morale, training: s.defender.training, role: 'defender', isDefendingCastle: true });
