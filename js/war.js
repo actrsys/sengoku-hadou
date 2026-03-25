@@ -866,8 +866,8 @@ class WarManager {
             
             if (Math.random() < successRate) {
                 let dmgRatio = (atkInt * 1.5) / ((atkInt * 1.5) + (defInt * 1.5));
-                //火計の最終ダメージ 実行智謀 * ダメージ倍率 * 0.7
-                let baseDamage = atkInt * dmgRatio * 0.7;
+                //火計の最終ダメージ 実行智謀 * ダメージ倍率 * 0.5
+                let baseDamage = atkInt * dmgRatio * 0.5;
                 let calcDamage = Math.floor(s.isPlayerInvolved ? baseDamage : baseDamage * 0.333);
                 
                 s.defender.defense = Math.max(0, s.defender.defense - calcDamage);
@@ -966,7 +966,7 @@ class WarManager {
             multiplier = 0.5;
             defMultiplier = 1.0;
             counterRisk = 2.0;
-            if (isAtkTurnGroup) wallDmgRate = 0.60;
+            if (isAtkTurnGroup) wallDmgRate = 0.80;
         }
 
         if (s.plannedActions[s.turn] && s.plannedActions[s.turn].isProvoked) {
