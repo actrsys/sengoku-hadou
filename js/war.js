@@ -1060,11 +1060,20 @@ class WarManager {
             currentStats: getCurrentStats()
         });
         
-        let resultMsg = `敵軍に 計${actualSoldierDmg}の被害`; 
-        if (calculatedWallDmg > 0) resultMsg += ` (防-${calculatedWallDmg})`;
-        resultMsg += ` を与えた！`;
-        if (actualCounterDmg > 0) resultMsg += `<br>（反撃を受け 兵-${actualCounterDmg}）`;
+        let resultMsg = `敵軍に 計${actualSoldierDmg}の損害`; 
         
+        if (actualCounterDmg > 0) {
+            resultMsg += `を負わせ、反撃により ${actualCounterDmg} の被害を受けた！`;
+        } else {
+            resultMsg += `を負わせた！`;
+        }
+
+        if (calculatedWallDmg > 0) {
+            // お城へのダメージがある場合は、改行（<br>）して付け足します
+            resultMsg += `<br>城に ${calculatedWallDmg} の損害を負わせた！`;
+        }
+        
+        // ★ <br> を使って画面に表示しつつ、横長の記録（ログ）には改行をスペースに変えて書き込みます
         pushMsg({ text: resultMsg, log: `${activeArmyName} ${resultMsg.replace('<br>', ' ')}` });
 
         checkDefeatAndPushMsg(); // ★負けたかチェック
