@@ -25,6 +25,8 @@ class FieldWarManager {
         this.previewTarget = null;
         this.turnBackup = null; 
         this.retreatedUnits = []; // ★追加：撤退した部隊をメモする箱
+        this.activeAtkTab = 'main'; // 野戦用タブ（攻撃）
+        this.activeDefTab = 'main'; // 野戦用タブ（守備）
         window.addEventListener('resize', () => {
             if (this.active) {
                 this.adjustMapScale();
@@ -695,35 +697,66 @@ class FieldWarManager {
     }
 
     updateStatus() {
-        let atkSoldiers = 0, defSoldiers = 0;
-        this.units.forEach(u => {
-            if (u.isAttacker) atkSoldiers += u.soldiers;
-            else defSoldiers += u.soldiers;
-        });
-        
-        const atkEl = document.getElementById('fw-atk-status');
-        const defEl = document.getElementById('fw-def-status');
+        // メイン、応援軍、同盟軍のそれぞれの数値を保管する箱を用意します
+        let stats = {
+            atk: {
+                main: { soldiers: 0, rice: 0, morale: 0, training: 0, exists: false },
+                self: { soldiers: 0, rice: 0, morale: 0, training: 0, exists: false },
+                ally: { soldiers: 0, rice: 0, morale: 0, training: 0, exists: false }
+            },
+            def: {
+                main: { soldiers: 0, rice: 0, morale: 0, training: 0, exists: false },
+                self: { soldiers: 0, rice: 0, morale: 0, training: 0, exists: false },
+                ally: { soldiers: 0, rice: 0, morale: 0, training: 0, exists: false }
+            }
+        };
 
-        // 各グループの兵糧と士気を集めて、合計と平均を出します
-        let atkTotalRice = 0, defTotalRice = 0;
-        let atkMoraleSum = 0, atkMoraleCount = 0;
-        let defMoraleSum = 0, defMoraleCount = 0;
-        
+        // マップ上の部隊から兵士数を数えます
+        this.units.forEach(u => {
+            let side = u.isAttacker ? 'atk' : 'def';
+            let tab = 'main';
+            if (u.groupId === `${side}_self`) tab = 'self';
+            else if (u.groupId === `${side}_ally` || (u.groupId && u.groupId.startsWith(`${side}_kunishu`))) tab = 'ally';
+            
+            stats[side][tab].soldiers += u.soldiers;
+            stats[side][tab].exists = true;
+        });
+
+        let groupCounters = {
+            atk: { main: {rice:0, mSum:0, mCount:0, tSum:0, tCount:0}, self: {rice:0, mSum:0, mCount:0, tSum:0, tCount:0}, ally: {rice:0, mSum:0, mCount:0, tSum:0, tCount:0} },
+            def: { main: {rice:0, mSum:0, mCount:0, tSum:0, tCount:0}, self: {rice:0, mSum:0, mCount:0, tSum:0, tCount:0}, ally: {rice:0, mSum:0, mCount:0, tSum:0, tCount:0} }
+        };
+
+        // 専用の箱から兵糧・士気・訓練を取り出します
         for (let key in this.groupStats) {
             if (!this.groupStats[key]) continue;
-            if (key.startsWith('atk_')) {
-                atkTotalRice += this.groupStats[key].rice;
-                atkMoraleSum += this.groupStats[key].morale;
-                atkMoraleCount++;
-            } else if (key.startsWith('def_')) {
-                defTotalRice += this.groupStats[key].rice;
-                defMoraleSum += this.groupStats[key].morale;
-                defMoraleCount++;
-            }
+            let side = key.startsWith('atk_') ? 'atk' : 'def';
+            let tab = 'main';
+            if (key.includes('_self')) tab = 'self';
+            else if (key.includes('_ally') || key.includes('_kunishu')) tab = 'ally';
+            
+            groupCounters[side][tab].rice += this.groupStats[key].rice;
+            groupCounters[side][tab].mSum += this.groupStats[key].morale;
+            groupCounters[side][tab].mCount++;
+            groupCounters[side][tab].tSum += this.groupStats[key].training;
+            groupCounters[side][tab].tCount++;
+            stats[side][tab].exists = true;
         }
-        
-        let displayAtkMorale = atkMoraleCount > 0 ? Math.floor(atkMoraleSum / atkMoraleCount) : 50;
-        let displayDefMorale = defMoraleCount > 0 ? Math.floor(defMoraleSum / defMoraleCount) : 50;
+
+        ['atk', 'def'].forEach(side => {
+            ['main', 'self', 'ally'].forEach(tab => {
+                stats[side][tab].rice = groupCounters[side][tab].rice;
+                stats[side][tab].morale = groupCounters[side][tab].mCount > 0 ? Math.floor(groupCounters[side][tab].mSum / groupCounters[side][tab].mCount) : 0;
+                stats[side][tab].training = groupCounters[side][tab].tCount > 0 ? Math.floor(groupCounters[side][tab].tSum / groupCounters[side][tab].tCount) : 0;
+            });
+        });
+
+        // 応援軍などが居ないのにタブが選ばれていたら、強制的にメインに戻します
+        if (!stats.atk[this.activeAtkTab].exists) this.activeAtkTab = 'main';
+        if (!stats.def[this.activeDefTab].exists) this.activeDefTab = 'main';
+
+        const curAtk = stats.atk[this.activeAtkTab];
+        const curDef = stats.def[this.activeDefTab];
 
         // 攻撃側の勢力名と総大将名を探す
         let atkClanName = "独立勢力";
@@ -749,22 +782,85 @@ class FieldWarManager {
         const defGeneral = this.units.find(u => !u.isAttacker && u.isGeneral);
         if (defGeneral) defGeneralName = defGeneral.name;
 
-        // 画面に新しい形式で表示する
-        if (atkEl) atkEl.innerHTML = `<strong>[攻] ${atkClanName}<br>${atkGeneralName}軍</strong><br>兵: ${atkSoldiers} / 糧: ${atkTotalRice} / 士気: ${displayAtkMorale}`;
-        if (defEl) defEl.innerHTML = `<strong>[守] ${defClanName}<br>${defGeneralName}軍</strong><br>兵: ${defSoldiers} / 糧: ${defTotalRice} / 士気: ${displayDefMorale}`;
-        
+        // タブに表示する名前の準備
+        let atkDisplayName = `<strong>${atkClanName}<br>${atkGeneralName} 軍</strong>`;
+        if (this.activeAtkTab === 'self') atkDisplayName = `<strong>${atkClanName}<br>応援軍</strong>`;
+        if (this.activeAtkTab === 'ally') atkDisplayName = `<strong>攻撃側<br>同盟軍</strong>`;
+
+        let defDisplayName = `<strong>${defClanName}<br>${defGeneralName} 軍</strong>`;
+        if (this.activeDefTab === 'self') defDisplayName = `<strong>${defClanName}<br>応援軍</strong>`;
+        if (this.activeDefTab === 'ally') defDisplayName = `<strong>守備側<br>同盟軍</strong>`;
+
+        // 値を２行に分けて表示します
+        const atkHTML = `${atkDisplayName}<br><div style="margin-top:2px;">兵: ${curAtk.soldiers} / 糧: ${curAtk.rice}<br>士気: ${curAtk.morale} / 訓練: ${curAtk.training}</div>`;
+        const defHTML = `${defDisplayName}<br><div style="margin-top:2px;">兵: ${curDef.soldiers} / 糧: ${curDef.rice}<br>士気: ${curDef.morale} / 訓練: ${curDef.training}</div>`;
+
+        const atkEl = document.getElementById('fw-atk-status');
+        const defEl = document.getElementById('fw-def-status');
+        const atkTabsEl = document.getElementById('fw-atk-tabs');
+        const defTabsEl = document.getElementById('fw-def-tabs');
+        const atkWrapper = document.getElementById('fw-atk-wrapper');
+        const defWrapper = document.getElementById('fw-def-wrapper');
+
+        if (atkEl) atkEl.innerHTML = atkHTML;
+        if (defEl) defEl.innerHTML = defHTML;
+
+        // 攻撃側のタブの描画（左から並べます）
+        if (atkTabsEl) {
+            atkTabsEl.innerHTML = '';
+            let tabs = [];
+            if (stats.atk.main.exists) tabs.push({ id: 'main', label: '攻撃側' });
+            if (stats.atk.self.exists) tabs.push({ id: 'self', label: '応援軍' });
+            if (stats.atk.ally.exists) tabs.push({ id: 'ally', label: '同盟軍' });
+            
+            if (tabs.length > 1) {
+                tabs.forEach(t => {
+                    const btn = document.createElement('div');
+                    btn.className = `fw-tab attacker ${this.activeAtkTab === t.id ? 'active' : ''}`;
+                    btn.innerText = t.label;
+                    btn.onclick = () => { this.activeAtkTab = t.id; this.updateStatus(); };
+                    atkTabsEl.appendChild(btn);
+                });
+            }
+        }
+
+        // 守備側のタブの描画（右から並べます）
+        if (defTabsEl) {
+            defTabsEl.innerHTML = '';
+            let tabs = [];
+            if (stats.def.main.exists) tabs.push({ id: 'main', label: '守備側' });
+            if (stats.def.self.exists) tabs.push({ id: 'self', label: '応援軍' });
+            if (stats.def.ally.exists) tabs.push({ id: 'ally', label: '同盟軍' });
+            
+            // 右端から「守備・応援・同盟」となるように順番をひっくり返します
+            tabs.reverse();
+            
+            if (tabs.length > 1) {
+                tabs.forEach(t => {
+                    const btn = document.createElement('div');
+                    btn.className = `fw-tab defender ${this.activeDefTab === t.id ? 'active' : ''}`;
+                    btn.innerText = t.label;
+                    btn.onclick = () => { this.activeDefTab = t.id; this.updateStatus(); };
+                    defTabsEl.appendChild(btn);
+                });
+            }
+        }
+
+        // プレイヤーの枠を手前に表示します
         const isAtkPlayer = (Number(this.warState.attacker.ownerClan) === Number(this.game.playerClanId));
         const isDefPlayer = (Number(this.warState.defender.ownerClan) === Number(this.game.playerClanId));
 
-        if (isAtkPlayer) {
-            if (atkEl) atkEl.style.order = 1;
-            if (defEl) defEl.style.order = 2;
-        } else if (isDefPlayer) {
-            if (atkEl) atkEl.style.order = 2;
-            if (defEl) defEl.style.order = 1;
-        } else {
-            if (atkEl) atkEl.style.order = 1;
-            if (defEl) defEl.style.order = 2;
+        if (atkWrapper && defWrapper) {
+            if (isAtkPlayer) {
+                atkWrapper.style.order = 1;
+                defWrapper.style.order = 2;
+            } else if (isDefPlayer) {
+                atkWrapper.style.order = 2;
+                defWrapper.style.order = 1;
+            } else {
+                atkWrapper.style.order = 1;
+                defWrapper.style.order = 2;
+            }
         }
 
         // 黒帯のターン表示と年月を更新します
