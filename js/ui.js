@@ -3166,19 +3166,19 @@ class UIManager {
         // ★修正: 順番が回ってきたのが「攻撃陣営」か「守備陣営」かで、出すコマンドを切り替えます
         if (isAtkTurn) {
             options = [
-                { label: "突撃", type: "charge", desc: "突撃します。敵兵士を減らし、城の防御度も僅かに削ります。" }, 
-                { label: "斉射", type: "bow", desc: "遠距離から弓や鉄砲で射撃を行います。反撃を受けにくい攻撃です。" }, 
-                { label: "破壊", type: "siege", desc: "城壁を破壊して、城の防御度を削ります。" },
-                { label: "火計", type: "fire", desc: "城に火を放ちます。成功すると城の防御度を大きく削ります。" }, 
-                { label: "謀略", type: "scheme", desc: "敵の動揺を誘います。成功すると敵兵士を大きく減らします。" }
+                { label: "突撃", type: "charge", desc: "突撃します。敵兵士を減らし、城壁にも少し被害を与えます。" }, 
+                { label: "斉射", type: "bow", desc: "遠距離から射撃を行います。反撃を受けにくい攻撃です。" }, 
+                { label: "破壊", type: "siege", desc: "城壁を破壊します。反撃のリスクは高いですが、城壁に大きな被害を与えます。" },
+                { label: "火計", type: "fire", desc: "知略を用いて城に火を放ちます。成功すると敵の防御力を無視して城壁を削ります。" }, 
+                { label: "鼓舞", type: "inspire", desc: "味方を鼓舞して、部隊の士気を高めます。" }
             ];
         } else {
             options = [
                 { label: "突撃", type: "def_charge", desc: "突撃します。敵兵士を減らします。" },
-                { label: "斉射", type: "def_bow", desc: "遠距離から弓や鉄砲で射撃を行います。反撃を受けにくい攻撃です。" }, 
-                { label: "籠城", type: "def_attack", desc: "守りを固めます。敵の攻撃による被害を抑えられます。" },
-                { label: "謀略", type: "scheme", desc: "敵の動揺を誘います。成功すると敵兵士を大きく減らします。" }, 
-                { label: "補修", type: "repair_setup", desc: "城を補修します。兵士を働かせて城の防御度を僅かに回復します。" }
+                { label: "斉射", type: "def_bow", desc: "遠距離から射撃を行います。反撃を受けにくい攻撃です。" }, 
+                { label: "籠城", type: "def_attack", desc: "守りを固めます。このターン、敵から受けるダメージを半分にします。" },
+                { label: "挑発", type: "provoke", desc: "敵を挑発します。成功すると敵の「突撃」を誘い、反撃で与える被害が増えます。" }, 
+                { label: "鼓舞", type: "def_inspire", desc: "味方を鼓舞して、部隊の士気を高めます。" }
             ];
         }
 
