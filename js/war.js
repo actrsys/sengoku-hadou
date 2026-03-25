@@ -583,7 +583,7 @@ class WarManager {
             let targetMoraleDef = Math.max(30, enemyMoraleAvg * 0.8);
             scores['def_inspire'] = Math.max(0, targetMoraleDef - myMorale) * 20 + 20;
             
-            // ★今回追加：相手の火計が成功している場合、防ぐために鼓舞のスコアを爆発的に上げます！
+            // ★今回追加：相手の火計が成功している場合、防ぐために鼓舞のスコアを上げます！
             if (s.fireSufferedCount && s.fireSufferedCount > 0) {
                 let fireBonus = s.fireSufferedCount * 120;
                 // ★追加：ただし、士気が70以上ある時は火計の焦り（ボーナス）の影響も線形で薄まるようにします
