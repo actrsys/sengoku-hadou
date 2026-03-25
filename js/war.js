@@ -529,6 +529,9 @@ class WarManager {
             // 攻撃側
             let ratio = totalAtkSoldiers / Math.max(1, totalDefSoldiers);
             
+            // ★今回追加：行動部隊「単体」の兵士数と、相手の「総」兵士数の比率です
+            let unitRatio = mySoldiers / Math.max(1, totalDefSoldiers);
+            
             // 撤退: 相手の半分の兵力(0.5)を下回るほど、なめらかにスコアが大きくなる
             scores['retreat'] = Math.max(0, 0.5 - ratio) * 1500 + (timidDegree * 300);
             
@@ -539,7 +542,13 @@ class WarManager {
             // 破壊: 防御が低いほど、兵力が多いほど、なめらかにスコアが大きくなる
             let siegeDefBonus = Math.max(0, 800 - def) * 0.6; // 防御800以下から意識しはじめる
             let siegeRatioBonus = Math.max(0, ratio - 1.5) * 150; // 兵力比1.5倍以上から意識しはじめる
-            scores['siege'] = siegeDefBonus + siegeRatioBonus - (timidDegree * 200);
+            
+            // ★今回追加：単体の兵士数が相手の総兵士数の1.5倍以下ならペナルティ！1.0以下で激減します
+            let siegeUnitPenalty = 0;
+            if (unitRatio <= 1.5) {
+                siegeUnitPenalty = (1.5 - unitRatio) * 1000;
+            }
+            scores['siege'] = siegeDefBonus + siegeRatioBonus - (timidDegree * 200) - siegeUnitPenalty;
             
             // 火計: 防御が高いほど、兵力が少ないほど、なめらかにスコアが大きくなる
             let fireDefBonus = Math.max(0, def - 500) * 0.4; // 防御500以上から意識しはじめる
@@ -551,7 +560,12 @@ class WarManager {
             scores['bow'] = 50 + bowDefBonus + (ratio * 50);
             
             // 突撃: 基本の攻撃。弱気なときは控える
-            scores['charge'] = 150 - (timidDegree * 200);
+            // ★今回追加：単体の兵士数が相手の総兵士数の1.0倍以下ならペナルティ！0.5以下で激減します
+            let chargeUnitPenalty = 0;
+            if (unitRatio <= 1.0) {
+                chargeUnitPenalty = (1.0 - unitRatio) * 1000;
+            }
+            scores['charge'] = 150 - (timidDegree * 200) - chargeUnitPenalty;
 
         } else {
             // 守備側
@@ -570,6 +584,11 @@ class WarManager {
             // 鼓舞: 目標となる士気に足りない分だけなめらかにスコアが大きくなる
             let targetMoraleDef = Math.max(30, enemyMoraleAvg * 0.8);
             scores['def_inspire'] = Math.max(0, targetMoraleDef - myMorale) * 20 + 20;
+            
+            // ★今回追加：相手の火計が成功している場合、防ぐために鼓舞のスコアを爆発的に上げます！
+            if (s.fireSufferedCount && s.fireSufferedCount > 0) {
+                scores['def_inspire'] += s.fireSufferedCount * 800;
+            }
             
             // 挑発: 防御が高いほど、兵力が多いほど、なめらかにスコアが大きくなる
             let provokeDefBonus = Math.max(0, def - 600) * 0.4;
@@ -737,6 +756,11 @@ class WarManager {
                 activeArmyObj.morale = Math.min(100, (activeArmyObj.morale || 50) + moraleUp);
             }
 
+            // ★今回追加：守備側が鼓舞を行った時、火計をくらった記憶（警戒フラグ）をリセットします！
+            if (type === 'def_inspire') {
+                s.fireSufferedCount = 0;
+            }
+
             pushMsg(`R${s.round} [${activeArmyName}] の鼓舞！`);
             pushMsg({ text: `士気が${moraleUp}上昇した！`, log: `R${s.round} [${activeArmyName}] 鼓舞！ 士気+${moraleUp}` });
             executeNext(); return;
@@ -817,6 +841,10 @@ class WarManager {
                 let calcDamage = Math.floor(s.isPlayerInvolved ? baseDamage : baseDamage * 0.333);
                 
                 s.defender.defense = Math.max(0, s.defender.defense - calcDamage);
+                
+                // ★今回追加：火計が成功したという記憶（警戒フラグ）を守備側に刻み込みます！
+                s.fireSufferedCount = (s.fireSufferedCount || 0) + 1;
+                
                 pushMsg({ type: 'damage', target: 'defender', wallDmg: calcDamage, se: 'fire001.mp3', currentStats: getCurrentStats() });
                 pushMsg({ text: `敵城壁に${calcDamage}の被害を与えた！`, log: `R${s.round} [${activeArmyName}] 火計成功！ 敵城壁に${calcDamage}の被害`});
                 checkDefeatAndPushMsg();
