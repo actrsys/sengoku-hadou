@@ -773,7 +773,7 @@ class WarManager {
                         let atkInt = tbushos[0].intelligence;
                         let atkMorale = targetArmy.morale || 50;
                         let atkTraining = targetArmy.training || 50;
-                        let atkMoraleTrainBonus = Math.max(0.01, ((atkMorale / 100) + (atkTraining / 100)) / 2);
+                        let atkMoraleTrainBonus = Math.max(0.01, (atkMorale / 100) + (atkTraining / 100));
                         
                         let successRate = ((Math.sqrt(10 + defBestInt) * (Math.sqrt(defInt) * 2)) / ((Math.sqrt(50 + atkBestInt) * (Math.sqrt(atkInt) * 2)) * atkMoraleTrainBonus) * 0.75) - 0.2;
                         successRate = Math.max(0, Math.min(0.99, successRate));
@@ -802,9 +802,24 @@ class WarManager {
             
             let defBestInt = targetBushos.reduce((max, b) => Math.max(max, b.intelligence), 0);
             let defInt = targetBushos[0].intelligence;
-            let defMorale = targetMorale || 50;
-            let defTraining = targetTraining || 50;
-            let defMoraleTrainBonus = Math.max(0.01, ((defMorale / 100) + (defTraining / 100)) / 2);
+            
+            let defRoles = ['defender', 'defender_self_reinf', 'defender_ally_reinf'];
+            let totalMorale = 0;
+            let totalTraining = 0;
+            let validArmyCount = 0;
+            
+            defRoles.forEach(role => {
+                let army = getArmyObj(role);
+                if (army && army.soldiers > 0) {
+                    totalMorale += (army.morale || 50);
+                    totalTraining += (army.training || 50);
+                    validArmyCount++;
+                }
+            });
+            
+            let defMoraleAvg = validArmyCount > 0 ? totalMorale / validArmyCount : 50;
+            let defTrainingAvg = validArmyCount > 0 ? totalTraining / validArmyCount : 50;
+            let defMoraleTrainBonus = Math.max(0.01, (defMoraleAvg / 100) + (defTrainingAvg / 100));
             
             let successRate = ((Math.sqrt(10 + atkBestInt) * (Math.sqrt(atkInt) * 2)) / ((Math.sqrt(50 + defBestInt) * (Math.sqrt(defInt) * 2)) * defMoraleTrainBonus) * 0.75) - 0.2;
             successRate = Math.max(0, Math.min(0.99, successRate));
