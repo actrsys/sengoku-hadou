@@ -177,24 +177,42 @@ class AIEngine {
                 // そして、自分のお城がその「出撃元（stagingBase）」に選ばれている場合だけ出陣します！
                 if (myOperation.stagingBase === castle.id) {
                     
-                    // ★追加：出陣する前に、目的地までの道がまだ繋がっているか最終チェックをします！
+                    // ★追加：出陣する前に、道が繋がっているか、まだ「敵」かどうかの最終チェックをします！
                     let canReach = false;
+                    let isStillEnemy = false; // ★追加：まだ敵のままかどうかの印です
                     let targetProvId = castle.provinceId; // 諸勢力なら同じ国
                     
                     if (myOperation.isKunishuTarget) {
                         // 諸勢力は自分のお城のすぐそばなので、道はいつでも繋がっています！
                         canReach = true;
+                        // 諸勢力がまだ生きているか、仲良しになっていないか（友好度30以下）をチェックします
+                        const targetKunishu = this.game.kunishuSystem.getKunishu(myOperation.targetId);
+                        if (targetKunishu && !targetKunishu.isDestroyed && targetKunishu.getRelation(castle.ownerClan) <= 30) {
+                            isStillEnemy = true;
+                        }
                     } else {
                         const targetCastle = this.game.getCastle(myOperation.targetId);
                         if (targetCastle) {
                             targetProvId = targetCastle.provinceId;
                             // 道が繋がっているか、魔法を使って再確認します！
                             canReach = GameSystem.isReachable(this.game, castle, targetCastle, castle.ownerClan);
+                            
+                            // ★追加：お城の持ち主が変わって、味方や同盟国になっていないかチェックします！
+                            if (targetCastle.ownerClan !== castle.ownerClan) {
+                                if (targetCastle.ownerClan === 0) {
+                                    isStillEnemy = true; // 空き城なら攻撃OKです
+                                } else {
+                                    const rel = this.game.getRelation(castle.ownerClan, targetCastle.ownerClan);
+                                    if (!rel || !this.game.diplomacyManager.isNonAggression(rel.status)) {
+                                        isStillEnemy = true; // 同盟などで守られていなければ敵です！
+                                    }
+                                }
+                            }
                         }
                     }
 
-                    // もし道が途切れていたら、作戦のメモを消して中止します！
-                    if (!canReach) {
+                    // もし道が途切れていたり、すでに敵じゃなくなっていたら、作戦のメモを消して中止します！
+                    if (!canReach || !isStillEnemy) {
                         delete this.game.aiOperationManager.operations[castle.ownerClan];
                     } else {
                         // ★追加：自分のお城か目的地が大雪になっていないかチェックをします！
