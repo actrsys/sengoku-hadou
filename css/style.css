@@ -623,9 +623,16 @@ body:not(.is-pc).daimyo-select-mode #map-wrapper { margin-bottom: 0 !important; 
 .fw-map-scroll.grabbing { cursor: grabbing; }
 
 .fw-floating-status { position: absolute; top: 10px; left: 10px; right: 10px; display: flex; justify-content: space-between; pointer-events: none; z-index: 100; gap: 10px; }
-.fw-floating-status .army-box { flex: 1; max-width: 300px; margin: 0; padding: 5px 10px; font-size: 0.85rem; background: rgba(0, 0, 0, 0.7) !important; color: #fff; border: 2px solid; pointer-events: auto; }
+.fw-status-wrapper { display: flex; flex-direction: column; gap: 5px; flex: 1; max-width: 300px; pointer-events: auto; }
+.fw-floating-status .army-box { margin: 0; padding: 5px 10px; font-size: 0.85rem; background: rgba(0, 0, 0, 0.7) !important; color: #fff; border: 2px solid; }
 .fw-floating-status .attacker { border-color: #ef5350; }
 .fw-floating-status .defender { border-color: #42a5f5; }
+.fw-tabs { display: flex; gap: 2px; flex-wrap: wrap; }
+.fw-tabs.right-align { justify-content: flex-end; }
+.fw-tab { background: rgba(0, 0, 0, 0.5); color: #ccc; border: 1px solid rgba(255,255,255,0.3); padding: 2px 8px; font-size: 0.75rem; border-radius: 4px; cursor: pointer; transition: all 0.2s; white-space: nowrap; }
+.fw-tab.active { color: #fff; border-color: #fff; font-weight: bold; }
+.fw-tab.attacker.active { background: rgba(239, 83, 80, 0.6); }
+.fw-tab.defender.active { background: rgba(66, 165, 245, 0.6); }
 
 .fw-floating-unit { position: absolute; top: 80px; left: 50%; transform: translateX(-50%); background: rgba(255, 255, 255, 0.9); border: 2px solid #333; padding: 5px 15px; font-size: 0.85rem; border-radius: 6px; z-index: 100; pointer-events: none; display: flex; gap: 15px; align-items: center; box-shadow: 0 2px 5px rgba(0,0,0,0.5); white-space: nowrap; }
 
