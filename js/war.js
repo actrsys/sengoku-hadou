@@ -1181,29 +1181,41 @@ class WarManager {
                 const ctrl = document.getElementById('war-controls');
                 if (ctrl) ctrl.innerHTML = '';
                 
+                const allRoles = ['attacker', 'defender', 'attacker_self_reinf', 'defender_self_reinf', 'attacker_ally_reinf', 'defender_ally_reinf'];
                 const defRoles = ['defender', 'defender_self_reinf', 'defender_ally_reinf'];
                 
-                // 1. 籠城を一番最初に行動させます
+                // ★今回変更：行動の優先順位を「撤退」→「鼓舞」→「籠城」→「挑発」→「その他」に変更しました！
+                
+                // 1. 撤退を最優先（一番最初）に行動させます
+                allRoles.forEach(role => {
+                    if (s.plannedActions[role] && s.plannedActions[role].type === 'retreat') {
+                        s.actionQueue.push(role);
+                    }
+                });
+
+                // 2. その次に、鼓舞を行動させます
+                allRoles.forEach(role => {
+                    if (s.plannedActions[role] && (s.plannedActions[role].type === 'inspire' || s.plannedActions[role].type === 'def_inspire')) {
+                        s.actionQueue.push(role);
+                    }
+                });
+
+                // 3. その次に、籠城を行動させます
                 defRoles.forEach(role => {
                     if (s.plannedActions[role] && s.plannedActions[role].type === 'def_attack') {
                         s.actionQueue.push(role);
                     }
                 });
                 
-                // 2. その次に、挑発を行動させます
+                // 4. その次に、挑発を行動させます
                 defRoles.forEach(role => {
                     if (s.plannedActions[role] && s.plannedActions[role].type === 'provoke') {
                         s.actionQueue.push(role);
                     }
                 });
 
-                // 3. 残りの部隊を、いつもの順番で並べます！
-                const normalOrder = [
-                    'attacker', 'defender', 
-                    'attacker_self_reinf', 'defender_self_reinf', 
-                    'attacker_ally_reinf', 'defender_ally_reinf'
-                ];
-                normalOrder.forEach(role => {
+                // 5. 残りの部隊（突撃、斉射、火計、破壊など）を、いつもの順番で並べます！
+                allRoles.forEach(role => {
                     // まだリストに入っていない部隊だけを追加します
                     if (s.plannedActions[role] && !s.actionQueue.includes(role)) {
                         s.actionQueue.push(role);
