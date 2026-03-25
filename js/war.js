@@ -474,13 +474,14 @@ class WarManager {
 
         let actor;
         let mySoldiers = 0;
+        let myMorale = 50;
         
-        if (s.turn === 'attacker') { actor = s.atkBushos[0]; mySoldiers = s.attacker.soldiers; }
-        else if (s.turn === 'attacker_self_reinf') { actor = s.selfReinforcement.bushos[0]; mySoldiers = s.selfReinforcement.soldiers; }
-        else if (s.turn === 'attacker_ally_reinf') { actor = s.reinforcement.bushos[0]; mySoldiers = s.reinforcement.soldiers; }
-        else if (s.turn === 'defender') { actor = s.defBusho; mySoldiers = s.defender.soldiers; }
-        else if (s.turn === 'defender_self_reinf') { actor = s.defSelfReinforcement.bushos[0]; mySoldiers = s.defSelfReinforcement.soldiers; }
-        else if (s.turn === 'defender_ally_reinf') { actor = s.defReinforcement.bushos[0]; mySoldiers = s.defReinforcement.soldiers; }
+        if (s.turn === 'attacker') { actor = s.atkBushos[0]; mySoldiers = s.attacker.soldiers; myMorale = s.attacker.morale || 50; }
+        else if (s.turn === 'attacker_self_reinf') { actor = s.selfReinforcement.bushos[0]; mySoldiers = s.selfReinforcement.soldiers; myMorale = s.selfReinforcement.morale || 50; }
+        else if (s.turn === 'attacker_ally_reinf') { actor = s.reinforcement.bushos[0]; mySoldiers = s.reinforcement.soldiers; myMorale = s.reinforcement.morale || 50; }
+        else if (s.turn === 'defender') { actor = s.defBusho; mySoldiers = s.defender.soldiers; myMorale = s.defender.morale || 50; }
+        else if (s.turn === 'defender_self_reinf') { actor = s.defSelfReinforcement.bushos[0]; mySoldiers = s.defSelfReinforcement.soldiers; myMorale = s.defSelfReinforcement.morale || 50; }
+        else if (s.turn === 'defender_ally_reinf') { actor = s.defReinforcement.bushos[0]; mySoldiers = s.defReinforcement.soldiers; myMorale = s.defReinforcement.morale || 50; }
 
         let totalAtkSoldiers = s.attacker.soldiers + (s.selfReinforcement ? s.selfReinforcement.soldiers : 0) + (s.reinforcement ? s.reinforcement.soldiers : 0);
         let totalDefSoldiers = s.defender.soldiers + (s.defSelfReinforcement ? s.defSelfReinforcement.soldiers : 0) + (s.defReinforcement ? s.defReinforcement.soldiers : 0);
@@ -489,37 +490,116 @@ class WarManager {
         if (window.AIParams.AI.Difficulty === 'hard') smartness = Math.min(1.0, smartness + 0.2);
         if (window.AIParams.AI.Difficulty === 'easy') smartness = Math.max(0.1, smartness - 0.2);
 
+        // 敵の士気の平均を計算
+        let enemyMorales = [];
+        if (isDefenderTurn) {
+            if (s.attacker.soldiers > 0) enemyMorales.push(s.attacker.morale || 50);
+            if (s.selfReinforcement && s.selfReinforcement.soldiers > 0) enemyMorales.push(s.selfReinforcement.morale || 50);
+            if (s.reinforcement && s.reinforcement.soldiers > 0) enemyMorales.push(s.reinforcement.morale || 50);
+        } else {
+            if (s.defender.soldiers > 0) enemyMorales.push(s.defender.morale || 50);
+            if (s.defSelfReinforcement && s.defSelfReinforcement.soldiers > 0) enemyMorales.push(s.defSelfReinforcement.morale || 50);
+            if (s.defReinforcement && s.defReinforcement.soldiers > 0) enemyMorales.push(s.defReinforcement.morale || 50);
+        }
+        let enemyMoraleAvg = enemyMorales.length > 0 ? enemyMorales.reduce((a, b) => a + b, 0) / enemyMorales.length : 50;
+
+        // 防御力
+        let def = s.defender.defense || 0;
+
+        // 智謀の比較対象
+        let myInt = actor.intelligence;
+        let enemyBestInt = 30;
+        if (isDefenderTurn) {
+            enemyBestInt = s.atkBushos.reduce((max, b) => Math.max(max, b.intelligence), 0);
+        } else {
+            let defBushos = [s.defBusho];
+            if (s.defSelfReinforcement) defBushos = defBushos.concat(s.defSelfReinforcement.bushos);
+            if (s.defReinforcement) defBushos = defBushos.concat(s.defReinforcement.bushos);
+            enemyBestInt = defBushos.reduce((max, b) => Math.max(max, b.intelligence), 0);
+        }
+
+        // 智謀スコア計算（50基準、相手との差で変動）
+        let intBonus = (myInt - 50) * 1.5 + (myInt - enemyBestInt) * 2.0 - 20;
+        if (myInt <= 50) intBonus -= 30; // 智謀が中以下の場合はマイナス補正を強くする
+
         let bestCmd = 'charge';
         let extraVal = null;
+        let bestScore = -Infinity;
+        let scores = {};
 
-        if (isDefenderTurn) {
-            if (s.turn === 'defender' && totalDefSoldiers / (totalAtkSoldiers + 1) < (0.2 + smartness * 0.2) && s.defender.defense < 200) { bestCmd = 'retreat'; }
-            else if (s.defender.defense / (s.defender.maxDefense || 1000) < 0.2 && mySoldiers > 1000 && Math.random() < smartness) { bestCmd = 'repair'; extraVal = Math.min(mySoldiers, 100); }
+        const options = isDefenderTurn ? ['def_charge', 'def_bow', 'def_attack', 'provoke', 'def_inspire'] : ['charge', 'bow', 'siege', 'fire', 'inspire'];
+        
+        // 撤退の選択肢を追加
+        if (isDefenderTurn && s.turn === 'defender' && this.game.castles.some(c => c.ownerClan === s.defender.ownerClan && c.id !== s.defender.id && GameSystem.isReachable(this.game, s.defender, c, s.defender.ownerClan))) {
+            options.push('retreat');
+        } else if (!isDefenderTurn && s.turn === 'attacker') {
+            options.push('retreat');
+        }
+
+        if (!isDefenderTurn) {
+            // 攻撃側
+            let ratio = totalAtkSoldiers / Math.max(1, totalDefSoldiers);
+            
+            // 撤退: 自部隊兵力が相手の総兵士数の半分以下で考え始める
+            scores['retreat'] = (totalDefSoldiers * 0.5 - totalAtkSoldiers) / Math.max(1, totalDefSoldiers) * 200;
+            if (totalAtkSoldiers <= totalDefSoldiers * 0.5) scores['retreat'] += 500;
+            
+            // 鼓舞: 士気が敵平均の0.8倍以下、または30未満
+            scores['inspire'] = Math.max(0, 30 - myMorale) * 5 + Math.max(0, enemyMoraleAvg * 0.8 - myMorale) * 5;
+            if (myMorale <= enemyMoraleAvg * 0.8 || myMorale < 30) scores['inspire'] += 500;
+            else scores['inspire'] += 20; // 低確率で鼓舞
+            
+            // 破壊: 敵防御が低以下(<=500)で、自部隊兵力が大以上(>=2.5)
+            scores['siege'] = Math.max(0, 500 - def) * 0.5 + Math.max(0, ratio - 2.5) * 100;
+            if (def <= 500 && ratio >= 2.5) scores['siege'] += 500;
+            
+            // 火計: 敵防御が高以上(>=1000)で、自部隊兵力が大未満(<2.5)
+            scores['fire'] = Math.max(0, def - 1000) * 0.2 + Math.max(0, 2.5 - ratio) * 100 + intBonus;
+            if (def >= 1000 && ratio < 2.5) scores['fire'] += 500;
+            
+            // 斉射: 敵防御が高以上(>=1000)で上記を満たさない
+            scores['bow'] = Math.max(0, def - 1000) * 0.2;
+            if (def >= 1000 && ratio >= 2.5) scores['bow'] += 300;
+            
+            // 突撃: デフォルト
+            scores['charge'] = 100;
+
         } else {
-            if (s.turn === 'attacker') {
-                if (s.attacker.rice < s.attacker.soldiers * 0.2 && totalAtkSoldiers < totalDefSoldiers * 0.5) { bestCmd = 'retreat'; }
-                else if (totalAtkSoldiers < totalDefSoldiers * 0.3 && smartness > 0.5) { bestCmd = 'retreat'; }
+            // 守備側
+            let ratio = totalDefSoldiers / Math.max(1, totalAtkSoldiers);
+            
+            // 撤退: 兵力が1/16以下 かつ 城防御が超低(<=200)以下
+            scores['retreat'] = ((1/16) - ratio) * 2000 + Math.max(0, 200 - def) * 2;
+            if (ratio <= 0.0625 && def <= 200) scores['retreat'] += 500;
+            
+            // 籠城: 城防御が低以下(<=500)で、兵力が小以下(<=0.25)
+            scores['def_attack'] = Math.max(0, 500 - def) * 0.5 + Math.max(0, 0.25 - ratio) * 500;
+            if (def <= 500 && ratio <= 0.25) scores['def_attack'] += 500;
+            
+            // 鼓舞: 士気が敵平均の0.8倍以下、または30未満
+            scores['def_inspire'] = Math.max(0, 30 - myMorale) * 5 + Math.max(0, enemyMoraleAvg * 0.8 - myMorale) * 5;
+            if (myMorale <= enemyMoraleAvg * 0.8 || myMorale < 30) scores['def_inspire'] += 500;
+            else scores['def_inspire'] += 20; // 低確率で鼓舞
+            
+            // 挑発: 城防御が高以上(>=1000)で、兵力が中以上(>=0.25)
+            scores['provoke'] = Math.max(0, def - 1000) * 0.2 + Math.max(0, ratio - 0.25) * 200 + intBonus;
+            if (def >= 1000 && ratio >= 0.25) scores['provoke'] += 500;
+            
+            // 突撃: 兵力が中以上(>=0.25)
+            scores['def_charge'] = Math.max(0, ratio - 0.25) * 200;
+            if (ratio >= 0.25) scores['def_charge'] += 200;
+            
+            // 斉射: デフォルト
+            scores['def_bow'] = 100;
+        }
+
+        options.forEach(cmd => {
+            let score = (scores[cmd] || 0) + (Math.random() * 50 * smartness);
+            if (score > bestScore) {
+                bestScore = score;
+                bestCmd = cmd;
             }
-        }
-
-        if (bestCmd === 'charge') { 
-            const options = isDefenderTurn ? ['def_charge', 'def_bow', 'def_attack', 'provoke', 'def_inspire'] : ['charge', 'bow', 'siege', 'fire', 'inspire'];
-
-            bestCmd = options[0]; let bestScore = -Infinity;
-
-            options.forEach(cmd => {
-                let score = 0; 
-                if (cmd === 'siege') score += 100 + (s.defender.defense > 0 ? 50 : 0);
-                else if (cmd === 'def_attack') score += (totalDefSoldiers < totalAtkSoldiers) ? 200 : -100;
-                else if (cmd === 'charge' || cmd === 'def_charge') score += 120;
-                else if (cmd === 'bow' || cmd === 'def_bow') score += 80;
-                else if (cmd === 'provoke' || cmd === 'fire') score += (actor.intelligence / 100) * 150;
-                else if (cmd === 'inspire' || cmd === 'def_inspire') score += (mySoldiers < 1000) ? 50 : 100;
-                
-                score += (Math.random() * 50);
-                if (score > bestScore) { bestScore = score; bestCmd = cmd; }
-            });
-        }
+        });
 
         // AIの行動も予定メモに書き込みます
         s.plannedActions[s.turn] = { type: bestCmd, extraVal: extraVal };
