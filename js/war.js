@@ -665,7 +665,14 @@ class WarManager {
                 atkSoldiers: s.attacker.soldiers,
                 atkSelfSoldiers: s.selfReinforcement ? s.selfReinforcement.soldiers : 0,
                 atkAllySoldiers: s.reinforcement ? s.reinforcement.soldiers : 0,
-                wallDefense: s.defender.defense
+                wallDefense: s.defender.defense,
+                // ★今回追加：兵士数と一緒に「士気」の最新データも画面（UI）に送ります！
+                defMorale: s.defender.morale,
+                defSelfMorale: s.defSelfReinforcement ? s.defSelfReinforcement.morale : 0,
+                defAllyMorale: s.defReinforcement ? s.defReinforcement.morale : 0,
+                atkMorale: s.attacker.morale,
+                atkSelfMorale: s.selfReinforcement ? s.selfReinforcement.morale : 0,
+                atkAllyMorale: s.reinforcement ? s.reinforcement.morale : 0
             };
         };
 
