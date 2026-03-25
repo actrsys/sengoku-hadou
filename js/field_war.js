@@ -725,8 +725,33 @@ class FieldWarManager {
         let displayAtkMorale = atkMoraleCount > 0 ? Math.floor(atkMoraleSum / atkMoraleCount) : 50;
         let displayDefMorale = defMoraleCount > 0 ? Math.floor(defMoraleSum / defMoraleCount) : 50;
 
-        if (atkEl) atkEl.innerHTML = `<strong>[攻] ${this.warState.attacker.name}</strong><br>兵: ${atkSoldiers} / 糧: ${atkTotalRice} / 士気: ${displayAtkMorale}`;
-        if (defEl) defEl.innerHTML = `<strong>[守] ${this.warState.defender.name}</strong><br>兵: ${defSoldiers} / 糧: ${defTotalRice} / 士気: ${displayDefMorale}`;
+        // 攻撃側の勢力名と総大将名を探す
+        let atkClanName = "独立勢力";
+        const atkClan = this.game.clans.find(c => c.id === Number(this.warState.attacker.ownerClan));
+        if (atkClan) atkClanName = atkClan.name;
+
+        let atkGeneralName = "総大将";
+        const atkGeneral = this.units.find(u => u.isAttacker && u.isGeneral);
+        if (atkGeneral) atkGeneralName = atkGeneral.name;
+
+        // 守備側の勢力名と総大将名を探す
+        let defClanName = "独立勢力";
+        if (this.warState.isKunishuSubjugation) {
+            const k = this.game.kunishuSystem.getKunishu(this.warState.defender.id);
+            if (k) defClanName = k.getName(this.game);
+        } else {
+            const defClan = this.game.clans.find(c => c.id === Number(this.warState.defender.ownerClan));
+            if (defClan) defClanName = defClan.name;
+            else if (this.warState.defender.ownerClan === 0) defClanName = "中立勢力";
+        }
+
+        let defGeneralName = "総大将";
+        const defGeneral = this.units.find(u => !u.isAttacker && u.isGeneral);
+        if (defGeneral) defGeneralName = defGeneral.name;
+
+        // 画面に新しい形式で表示する
+        if (atkEl) atkEl.innerHTML = `<strong>[攻] ${atkClanName}<br>${atkGeneralName}軍</strong><br>兵: ${atkSoldiers} / 糧: ${atkTotalRice} / 士気: ${displayAtkMorale}`;
+        if (defEl) defEl.innerHTML = `<strong>[守] ${defClanName}<br>${defGeneralName}軍</strong><br>兵: ${defSoldiers} / 糧: ${defTotalRice} / 士気: ${displayDefMorale}`;
         
         const isAtkPlayer = (Number(this.warState.attacker.ownerClan) === Number(this.game.playerClanId));
         const isDefPlayer = (Number(this.warState.defender.ownerClan) === Number(this.game.playerClanId));
