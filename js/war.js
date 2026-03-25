@@ -522,6 +522,27 @@ class WarManager {
         let intBonus = (myInt - 50) * 1.5 + (myInt - enemyBestInt) * 2.0 - 20;
         if (myInt <= 50) intBonus -= 30; // 智謀が中以下の場合はマイナス補正を強くする
 
+        // ★追加：自部隊の陣営内での割合と、それに伴う「弱気度」の計算
+        let myTotalSoldiers = isDefenderTurn ? totalDefSoldiers : totalAtkSoldiers;
+        let myRatio = mySoldiers / Math.max(1, myTotalSoldiers);
+        
+        // 割合が25%未満なら、足りない分だけ弱気(最大1.0)になります
+        let timidDegree = myRatio >= 0.25 ? 0 : (0.25 - myRatio) / 0.25;
+        
+        // ただし、自陣営の合計が相手よりずっと多ければ弱気を克服します
+        let forceAdvantage = isDefenderTurn ? (totalDefSoldiers / Math.max(1, totalAtkSoldiers)) : (totalAtkSoldiers / Math.max(1, totalDefSoldiers));
+        let timidReduction = 1.0;
+        
+        if (isDefenderTurn) {
+            // 守備側は相手の2倍で弱気を完全に克服します
+            timidReduction = Math.max(0, 1.0 - Math.max(0, forceAdvantage - 1.0) / 1.0);
+        } else {
+            // 攻撃側は相手の5倍で弱気を完全に克服します
+            timidReduction = Math.max(0, 1.0 - Math.max(0, forceAdvantage - 1.0) / 4.0);
+        }
+        
+        timidDegree *= timidReduction;
+
         let bestCmd = 'charge';
         let extraVal = null;
         let bestScore = -Infinity;
@@ -540,9 +561,10 @@ class WarManager {
             // 攻撃側
             let ratio = totalAtkSoldiers / Math.max(1, totalDefSoldiers);
             
-            // 撤退: 自部隊兵力が相手の総兵士数の半分以下で考え始める
+            // 撤退: 自部隊兵力が相手の総兵士数の半分以下で考え始める。弱気度に応じてスコアアップ
             scores['retreat'] = (totalDefSoldiers * 0.5 - totalAtkSoldiers) / Math.max(1, totalDefSoldiers) * 200;
             if (totalAtkSoldiers <= totalDefSoldiers * 0.5) scores['retreat'] += 500;
+            scores['retreat'] += timidDegree * 300;
             
             // 鼓舞: 士気が敵平均の0.8倍以下、または30未満
             scores['inspire'] = Math.max(0, 30 - myMorale) * 5 + Math.max(0, enemyMoraleAvg * 0.8 - myMorale) * 5;
@@ -552,29 +574,33 @@ class WarManager {
             // 破壊: 敵防御が低以下(<=500)で、自部隊兵力が大以上(>=2.5)
             scores['siege'] = Math.max(0, 500 - def) * 0.5 + Math.max(0, ratio - 2.5) * 100;
             if (def <= 500 && ratio >= 2.5) scores['siege'] += 500;
+            scores['siege'] -= timidDegree * 200; // 弱気なら控える
             
             // 火計: 敵防御が高以上(>=1000)で、自部隊兵力が大未満(<2.5)
             scores['fire'] = Math.max(0, def - 1000) * 0.2 + Math.max(0, 2.5 - ratio) * 100 + intBonus;
             if (def >= 1000 && ratio < 2.5) scores['fire'] += 500;
+            scores['fire'] -= timidDegree * 100;
             
             // 斉射: 敵防御が高以上(>=1000)で上記を満たさない
             scores['bow'] = Math.max(0, def - 1000) * 0.2;
             if (def >= 1000 && ratio >= 2.5) scores['bow'] += 300;
             
             // 突撃: デフォルト
-            scores['charge'] = 100;
+            scores['charge'] = 100 - (timidDegree * 200); // 弱気なら控える
 
         } else {
             // 守備側
             let ratio = totalDefSoldiers / Math.max(1, totalAtkSoldiers);
             
-            // 撤退: 兵力が1/16以下 かつ 城防御が超低(<=200)以下
+            // 撤退: 兵力が1/16以下 かつ 城防御が超低(<=200)以下。弱気度に応じてスコアアップ
             scores['retreat'] = ((1/16) - ratio) * 2000 + Math.max(0, 200 - def) * 2;
             if (ratio <= 0.0625 && def <= 200) scores['retreat'] += 500;
+            scores['retreat'] += timidDegree * 300;
             
-            // 籠城: 城防御が低以下(<=500)で、兵力が小以下(<=0.25)
+            // 籠城: 城防御が低以下(<=500)で、兵力が小以下(<=0.25)。弱気度に応じてスコアアップ
             scores['def_attack'] = Math.max(0, 500 - def) * 0.5 + Math.max(0, 0.25 - ratio) * 500;
             if (def <= 500 && ratio <= 0.25) scores['def_attack'] += 500;
+            scores['def_attack'] += timidDegree * 300;
             
             // 鼓舞: 士気が敵平均の0.8倍以下、または30未満
             scores['def_inspire'] = Math.max(0, 30 - myMorale) * 5 + Math.max(0, enemyMoraleAvg * 0.8 - myMorale) * 5;
@@ -584,10 +610,12 @@ class WarManager {
             // 挑発: 城防御が高以上(>=1000)で、兵力が中以上(>=0.25)
             scores['provoke'] = Math.max(0, def - 1000) * 0.2 + Math.max(0, ratio - 0.25) * 200 + intBonus;
             if (def >= 1000 && ratio >= 0.25) scores['provoke'] += 500;
+            scores['provoke'] -= timidDegree * 100; // 弱気なら控える
             
             // 突撃: 兵力が中以上(>=0.25)
             scores['def_charge'] = Math.max(0, ratio - 0.25) * 200;
             if (ratio >= 0.25) scores['def_charge'] += 200;
+            scores['def_charge'] -= timidDegree * 200; // 弱気なら控える
             
             // 斉射: デフォルト
             scores['def_bow'] = 100;
