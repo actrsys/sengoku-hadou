@@ -1552,8 +1552,8 @@ class FieldWarManager {
             groupSoldiers[u.groupId] += u.soldiers;
         });
 
-        // 野戦独自の兵糧消費量（兵士数 × 0.033）
-        const consumeRate = 0.033;
+        // 野戦独自の兵糧消費量（兵士数 × 0.005）
+        const consumeRate = 0.005;
         
         for (let key in groupSoldiers) {
             if (this.groupStats[key]) {
