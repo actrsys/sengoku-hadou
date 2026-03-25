@@ -738,19 +738,122 @@ class WarManager {
             executeNext(); return;
         }
         
-        let atkStatsParam = isAtkTurnGroup ? actStats : tgtStats;
-        let defStatsParam = isAtkTurnGroup ? tgtStats : actStats;
-        let atkSoldiersParam = isAtkTurnGroup ? activeSoldiers : targetSoldiers;
-        let defSoldiersParam = isAtkTurnGroup ? targetSoldiers : activeSoldiers;
-        let atkMoraleParam = isAtkTurnGroup ? activeMorale : targetMorale;
-        let defTrainingParam = isAtkTurnGroup ? targetTraining : activeTraining;
+        // ==========================================
+        // ★ここから差し替え！：新しい基礎計算式
+        // ==========================================
+        const calcArmyPower = (bushos, soldiers, morale, training, isDefendingCastle) => {
+            if (!bushos || bushos.length === 0 || soldiers <= 0) return { atkPower: 0, defPower: 0 };
+            
+            let leader = bushos[0];
+            let subs = bushos.slice(1);
 
-        const result = WarSystem.calcWarDamage(atkStatsParam, defStatsParam, atkSoldiersParam, defSoldiersParam, s.defender.defense, atkMoraleParam, defTrainingParam, type);
-        let calculatedSoldierDmg = result.soldierDmg; let calculatedWallDmg = result.wallDmg; let calculatedCounterDmg = result.counterDmg;
+            // 守備側の城本隊なら、お城の中で一番強い武将（統率＋武力＋智謀の合計）を総大将にします！
+            if (isDefendingCastle && this.game && s.defender) {
+                const castleBushos = this.game.getCastleBushos(s.defender.id).filter(b => b.status !== 'ronin' && b.belongKunishuId === 0 && b.clan === s.defender.ownerClan);
+                if (castleBushos.length > 0) {
+                    let bestBusho = castleBushos.reduce((best, current) => {
+                        let bestScore = best.leadership + best.strength + best.intelligence;
+                        let currentScore = current.leadership + current.strength + current.intelligence;
+                        return currentScore > bestScore ? current : best;
+                    });
+                    leader = bestBusho;
+                    subs = castleBushos.filter(b => b.id !== leader.id);
+                }
+            }
 
-        if (!s.isPlayerInvolved) {
-            calculatedSoldierDmg = Math.floor(calculatedSoldierDmg * 0.333); calculatedWallDmg = Math.floor(calculatedWallDmg * 0.333); calculatedCounterDmg = Math.floor(calculatedCounterDmg * 0.333);
+            let subLdrSum = 0; let subStrSum = 0; let subIntSum = 0;
+            subs.forEach(b => {
+                subLdrSum += b.leadership;
+                subStrSum += b.strength;
+                subIntSum += b.intelligence;
+            });
+
+            const soldierFactor = soldiers / (soldiers + 150);
+            const sqrtSol = Math.sqrt(soldiers);
+
+            // 基礎攻撃力の計算
+            const baseAtk = sqrtSol + ((leader.leadership + subLdrSum * 0.05) * 1.5 + (leader.strength + subStrSum * 0.05)) * soldierFactor;
+            // 基礎防御力の計算
+            const baseDef = sqrtSol + ((leader.leadership + subLdrSum * 0.05) * 1.5 + (leader.intelligence + subIntSum * 0.05)) * soldierFactor;
+
+            // 最終攻撃力の計算
+            const finalAtk = baseAtk * (1.0 + (morale * 1.5 + training) / 1000);
+            // 最終防御力の計算
+            const finalDef = baseDef * (1.0 + (morale + training * 1.5) / 1000);
+
+            return { atkPower: finalAtk, defPower: finalDef };
+        };
+
+        // 行動する部隊（アクティブ）のパワー計算
+        let activePowerObj = calcArmyPower(activeBushos, activeSoldiers, activeMorale, activeTraining, (!isAtkTurnGroup && s.turn === 'defender'));
+        let activeAtkPower = activePowerObj.atkPower;
+
+        // ターゲットになる部隊（全員）のリストアップ
+        let targetList = [];
+        if (isAtkTurnGroup) {
+            if (s.defender.soldiers > 0) targetList.push({ bushos: [s.defBusho], soldiers: s.defender.soldiers, morale: s.defender.morale, training: s.defender.training, role: 'defender', isDefendingCastle: true });
+            if (s.defSelfReinforcement && s.defSelfReinforcement.soldiers > 0) targetList.push({ bushos: s.defSelfReinforcement.bushos, soldiers: s.defSelfReinforcement.soldiers, morale: s.defender.morale, training: s.defender.training, role: 'defender_self_reinf', isDefendingCastle: false });
+            if (s.defReinforcement && s.defReinforcement.soldiers > 0) targetList.push({ bushos: s.defReinforcement.bushos, soldiers: s.defReinforcement.soldiers, morale: s.defender.morale, training: s.defender.training, role: 'defender_ally_reinf', isDefendingCastle: false });
+        } else {
+            if (s.attacker.soldiers > 0) targetList.push({ bushos: s.atkBushos, soldiers: s.attacker.soldiers, morale: s.attacker.morale, training: s.attacker.training, role: 'attacker', isDefendingCastle: false });
+            if (s.selfReinforcement && s.selfReinforcement.soldiers > 0) targetList.push({ bushos: s.selfReinforcement.bushos, soldiers: s.selfReinforcement.soldiers, morale: s.attacker.morale, training: s.attacker.training, role: 'attacker_self_reinf', isDefendingCastle: false });
+            if (s.reinforcement && s.reinforcement.soldiers > 0) targetList.push({ bushos: s.reinforcement.bushos, soldiers: s.reinforcement.soldiers, morale: s.attacker.morale, training: s.attacker.training, role: 'attacker_ally_reinf', isDefendingCastle: false });
         }
+
+        // ターゲットの防御力も一つずつ計算します
+        targetList.forEach(t => {
+            let pObj = calcArmyPower(t.bushos, t.soldiers, t.morale, t.training, t.isDefendingCastle);
+            t.defPower = pObj.defPower;
+            t.atkPower = pObj.atkPower; 
+        });
+
+        // コマンド別の倍率（城壁ダメージなどはここでコントロールします）
+        const W = window.WarParams.War;
+        let multiplier = 1.0, soldierRate = 1.0, wallRate = 0.0, counterRisk = 1.0;
+        switch(type) {
+            case 'bow': multiplier = W.BowMultiplier; wallRate = 0.0; counterRisk = W.BowRisk; break;
+            case 'siege': multiplier = W.SiegeMultiplier; soldierRate = 0.05; wallRate = W.SiegeWallRate; counterRisk = W.SiegeRisk; break;
+            case 'charge': multiplier = W.ChargeMultiplier; soldierRate = W.ChargeSoldierDmgRate; wallRate = W.ChargeWallDmgRate; counterRisk = W.ChargeRisk; break;
+            case 'def_bow': multiplier = W.DefBowMultiplier; wallRate = 0.0; break;
+            case 'def_attack': multiplier = 0.0; wallRate = 0.0; break; 
+            case 'def_charge': multiplier = W.DefChargeMultiplier; wallRate = 0.0; counterRisk = W.DefChargeRisk; break; 
+        }
+
+        let totalSoldierDmg = 0;
+        let totalCounterDmg = 0;
+
+        // 分配攻撃力（ターゲットの数で割り勘にします）
+        let distAtkPower = (activeAtkPower * multiplier) / Math.max(1, targetList.length);
+        
+        targetList.forEach(t => {
+            // 城補正（守備側だけにかかります）
+            let castleMod = isAtkTurnGroup ? (1.5 + (s.defender.defense / 1000)) : 1.0;
+            
+            // ダメージ倍率 ＝ 分配攻撃力 / (分配攻撃力 + 防御力 * 城補正)
+            let dmgRatio = distAtkPower / (distAtkPower + t.defPower * castleMod);
+            let dmg = distAtkPower * dmgRatio * soldierRate;
+
+            // 反撃ダメージ ＝ 防御側の攻撃力 × 0.5 × ((防御力 × 城補正) / (分配攻撃力 + 防御力 × 城補正))
+            let counterRatio = (t.defPower * castleMod) / (distAtkPower + t.defPower * castleMod);
+            let counter = t.atkPower * 0.5 * counterRisk * counterRatio;
+
+            totalSoldierDmg += dmg;
+            totalCounterDmg += counter;
+        });
+
+        let calculatedSoldierDmg = Math.floor(totalSoldierDmg);
+        let calculatedCounterDmg = Math.floor(totalCounterDmg);
+        let calculatedWallDmg = Math.floor(activeAtkPower * multiplier * wallRate * 0.5);
+
+        // AI同士の戦いは少しダメージを減らします
+        if (!s.isPlayerInvolved) {
+            calculatedSoldierDmg = Math.floor(calculatedSoldierDmg * 0.333);
+            calculatedWallDmg = Math.floor(calculatedWallDmg * 0.333);
+            calculatedCounterDmg = Math.floor(calculatedCounterDmg * 0.333);
+        }
+        // ==========================================
+        // ★差し替えここまで！
+        // ==========================================
 
         if (isAtkTurnGroup) {
             const hasRojo = ['defender', 'defender_self_reinf', 'defender_ally_reinf'].some(role => {
