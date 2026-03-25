@@ -680,6 +680,50 @@ class WarManager {
             }
         };
 
+        const getArmyObj = (role) => {
+            if (role === 'attacker') return s.attacker;
+            if (role === 'attacker_self_reinf') return s.selfReinforcement;
+            if (role === 'attacker_ally_reinf') return s.reinforcement;
+            if (role === 'defender') return s.defender;
+            if (role === 'defender_self_reinf') return s.defSelfReinforcement;
+            if (role === 'defender_ally_reinf') return s.defReinforcement;
+            return null;
+        };
+
+        // ★新規追加: 勢力名と武将名を組み合わせたカッコいい軍の名前を作る魔法
+        const getArmyDisplayName = (role) => {
+            let army = getArmyObj(role);
+            let leader = null;
+            if (role === 'attacker') leader = s.atkBushos ? s.atkBushos[0] : null;
+            else if (role === 'attacker_self_reinf') leader = s.selfReinforcement ? s.selfReinforcement.bushos[0] : null;
+            else if (role === 'attacker_ally_reinf') leader = s.reinforcement ? s.reinforcement.bushos[0] : null;
+            else if (role === 'defender') leader = s.defBusho;
+            else if (role === 'defender_self_reinf') leader = s.defSelfReinforcement ? s.defSelfReinforcement.bushos[0] : null;
+            else if (role === 'defender_ally_reinf') leader = s.defReinforcement ? s.defReinforcement.bushos[0] : null;
+
+            let factionName = "不明";
+            if (army) {
+                if (army.isKunishu || army.isKunishuForce) {
+                    if (army.kunishuId) {
+                        const kunishu = this.game.kunishuSystem.getKunishu(army.kunishuId);
+                        if (kunishu) factionName = kunishu.getName(this.game);
+                        else factionName = "諸勢力";
+                    } else {
+                        factionName = army.name || "諸勢力";
+                    }
+                } else {
+                    let clanId = army.ownerClan;
+                    if (clanId === undefined && leader) clanId = leader.clan;
+                    const clan = this.game.clans.find(c => c.id === Number(clanId));
+                    if (clan) factionName = clan.name;
+                }
+            }
+            const bushoName = leader ? leader.name : "不明";
+            return `${factionName} ${bushoName} 軍`;
+        };
+
+        let activeArmyName = getArmyDisplayName(s.turn);
+
         if (type === 'retreat') { 
             if (s.turn === 'attacker') { 
                 this.endWar(false, true); 
@@ -687,14 +731,13 @@ class WarManager {
                 this.executeRetreatLogic(s.defender); 
             } else if (['attacker_self_reinf', 'attacker_ally_reinf', 'defender_self_reinf', 'defender_ally_reinf'].includes(s.turn)) {
                 let reinfKey = '';
-                let activeArmyName = "";
                 
-                if (s.turn === 'attacker_self_reinf') { reinfKey = 'selfReinforcement'; activeArmyName = "攻撃側自家援軍"; }
-                else if (s.turn === 'attacker_ally_reinf') { reinfKey = 'reinforcement'; activeArmyName = "攻撃側同盟軍"; }
-                else if (s.turn === 'defender_self_reinf') { reinfKey = 'defSelfReinforcement'; activeArmyName = "守備側自家援軍"; }
-                else if (s.turn === 'defender_ally_reinf') { reinfKey = 'defReinforcement'; activeArmyName = "守備側同盟軍"; }
+                if (s.turn === 'attacker_self_reinf') reinfKey = 'selfReinforcement';
+                else if (s.turn === 'attacker_ally_reinf') reinfKey = 'reinforcement';
+                else if (s.turn === 'defender_self_reinf') reinfKey = 'defSelfReinforcement';
+                else if (s.turn === 'defender_ally_reinf') reinfKey = 'defReinforcement';
                 
-                pushMsg(`R${s.round} [${activeArmyName}] は戦場から離脱し、撤退した！`);
+                pushMsg(`${activeArmyName} は戦場から離脱し、撤退した！`);
                 
                 if (typeof this.retreatReinforcementForce === 'function') {
                     this.retreatReinforcementForce(reinfKey);
@@ -706,13 +749,13 @@ class WarManager {
         
         const isAtkTurnGroup = s.turn.startsWith('attacker');
         
-        let activeBushos, activeSoldiers, activeMorale, activeTraining, activeArmyName;
-        if (s.turn === 'attacker') { activeBushos = s.atkBushos; activeSoldiers = s.attacker.soldiers; activeMorale = s.attacker.morale || 50; activeTraining = s.attacker.training || 50; activeArmyName = "攻撃本隊"; }
-        else if (s.turn === 'attacker_self_reinf') { activeBushos = s.selfReinforcement.bushos; activeSoldiers = s.selfReinforcement.soldiers; activeMorale = s.selfReinforcement.morale || 50; activeTraining = s.selfReinforcement.training || 50; activeArmyName = "攻撃側自家援軍"; }
-        else if (s.turn === 'attacker_ally_reinf') { activeBushos = s.reinforcement.bushos; activeSoldiers = s.reinforcement.soldiers; activeMorale = s.reinforcement.morale || 50; activeTraining = s.reinforcement.training || 50; activeArmyName = "攻撃側同盟軍"; }
-        else if (s.turn === 'defender') { activeBushos = [s.defBusho]; activeSoldiers = s.defender.soldiers; activeMorale = s.defender.morale || 50; activeTraining = s.defender.training || 50; activeArmyName = "守備本隊"; }
-        else if (s.turn === 'defender_self_reinf') { activeBushos = s.defSelfReinforcement.bushos; activeSoldiers = s.defSelfReinforcement.soldiers; activeMorale = s.defSelfReinforcement.morale || 50; activeTraining = s.defSelfReinforcement.training || 50; activeArmyName = "守備側自家援軍"; }
-        else if (s.turn === 'defender_ally_reinf') { activeBushos = s.defReinforcement.bushos; activeSoldiers = s.defReinforcement.soldiers; activeMorale = s.defReinforcement.morale || 50; activeTraining = s.defReinforcement.training || 50; activeArmyName = "守備側同盟軍"; }
+        let activeBushos, activeSoldiers, activeMorale, activeTraining;
+        if (s.turn === 'attacker') { activeBushos = s.atkBushos; activeSoldiers = s.attacker.soldiers; activeMorale = s.attacker.morale || 50; activeTraining = s.attacker.training || 50; }
+        else if (s.turn === 'attacker_self_reinf') { activeBushos = s.selfReinforcement.bushos; activeSoldiers = s.selfReinforcement.soldiers; activeMorale = s.selfReinforcement.morale || 50; activeTraining = s.selfReinforcement.training || 50; }
+        else if (s.turn === 'attacker_ally_reinf') { activeBushos = s.reinforcement.bushos; activeSoldiers = s.reinforcement.soldiers; activeMorale = s.reinforcement.morale || 50; activeTraining = s.reinforcement.training || 50; }
+        else if (s.turn === 'defender') { activeBushos = [s.defBusho]; activeSoldiers = s.defender.soldiers; activeMorale = s.defender.morale || 50; activeTraining = s.defender.training || 50; }
+        else if (s.turn === 'defender_self_reinf') { activeBushos = s.defSelfReinforcement.bushos; activeSoldiers = s.defSelfReinforcement.soldiers; activeMorale = s.defSelfReinforcement.morale || 50; activeTraining = s.defSelfReinforcement.training || 50; }
+        else if (s.turn === 'defender_ally_reinf') { activeBushos = s.defReinforcement.bushos; activeSoldiers = s.defReinforcement.soldiers; activeMorale = s.defReinforcement.morale || 50; activeTraining = s.defReinforcement.training || 50; }
 
         let targetBushos, targetSoldiers = 0, targetMorale, targetTraining;
         
@@ -732,18 +775,8 @@ class WarManager {
             if (s.reinforcement && s.reinforcement.soldiers > 0) targetSoldiers += s.reinforcement.soldiers;
         }
 
-        const getArmyObj = (role) => {
-            if (role === 'attacker') return s.attacker;
-            if (role === 'attacker_self_reinf') return s.selfReinforcement;
-            if (role === 'attacker_ally_reinf') return s.reinforcement;
-            if (role === 'defender') return s.defender;
-            if (role === 'defender_self_reinf') return s.defSelfReinforcement;
-            if (role === 'defender_ally_reinf') return s.defReinforcement;
-            return null;
-        };
-
         if (type === 'def_attack') { 
-             pushMsg(`R${s.round} [${activeArmyName}] 籠城し、守りを固めている！`);
+             pushMsg(`${activeArmyName} は籠城し、守りを固めている！`);
              executeNext(); return;
         }
 
@@ -761,13 +794,13 @@ class WarManager {
                 s.fireSufferedCount = 0;
             }
 
-            pushMsg(`R${s.round} [${activeArmyName}] の鼓舞！`);
-            pushMsg({ text: `士気が${moraleUp}上昇した！`, log: `R${s.round} [${activeArmyName}] 鼓舞！ 士気+${moraleUp}` });
+            pushMsg(`${activeArmyName} の鼓舞！`);
+            pushMsg({ text: `士気が${moraleUp}上昇した！`, log: `${activeArmyName} 鼓舞！ 士気+${moraleUp}` });
             executeNext(); return;
         }
 
         if (type === 'provoke') {
-            pushMsg(`R${s.round} [${activeArmyName}] 敵を挑発している！`);
+            pushMsg(`${activeArmyName} は敵を挑発している！`);
             let defBestInt = activeBushos.reduce((max, b) => Math.max(max, b.intelligence), 0);
             let defInt = activeBushos[0].intelligence;
             
@@ -799,15 +832,15 @@ class WarManager {
             });
             
             if (provokedCount > 0) {
-                pushMsg({ text: `敵部隊の挑発に成功した！`, log: `R${s.round} [${activeArmyName}] 挑発成功！` });
+                pushMsg({ text: `敵部隊の挑発に成功した！`, log: `${activeArmyName} 挑発成功！` });
             } else {
-                pushMsg({ text: `挑発は失敗に終わった……`, log: `R${s.round} [${activeArmyName}] 挑発失敗……`, se: 'miss.ogg' });
+                pushMsg({ text: `挑発は失敗に終わった……`, log: `${activeArmyName} 挑発失敗……`, se: 'miss.ogg' });
             }
             executeNext(); return;
         }
 
         if (type === 'fire') {
-            pushMsg(`R${s.round} [${activeArmyName}] の火計！`);
+            pushMsg(`${activeArmyName} の火計！`);
             let atkBestInt = activeBushos.reduce((max, b) => Math.max(max, b.intelligence), 0);
             let atkInt = activeBushos[0].intelligence;
             
@@ -846,10 +879,10 @@ class WarManager {
                 s.fireSufferedCount = (s.fireSufferedCount || 0) + 1;
                 
                 pushMsg({ type: 'damage', target: 'defender', wallDmg: calcDamage, se: 'fire001.mp3', currentStats: getCurrentStats() });
-                pushMsg({ text: `敵城壁に${calcDamage}の被害を与えた！`, log: `R${s.round} [${activeArmyName}] 火計成功！ 敵城壁に${calcDamage}の被害`});
+                pushMsg({ text: `敵城壁に${calcDamage}の被害を与えた！`, log: `${activeArmyName} 火計成功！ 敵城壁に${calcDamage}の被害`});
                 checkDefeatAndPushMsg();
             } else {
-                pushMsg({ text: `火計は失敗に終わった……`, log: `R${s.round} [${activeArmyName}] 火計失敗……`, se: 'miss.ogg' });
+                pushMsg({ text: `火計は失敗に終わった……`, log: `${activeArmyName} 火計失敗……`, se: 'miss.ogg' });
             }
             executeNext(); return;
         }
@@ -1014,7 +1047,7 @@ class WarManager {
         else if (type === 'siege') actionName = "破壊";
         else if (type === 'charge' || type === 'def_charge') actionName = "突撃";
         
-        pushMsg(`R${s.round} [${activeArmyName}] の${actionName}！`);
+        pushMsg(`${activeArmyName} の${actionName}！`);
         
         pushMsg({
             type: 'damage',
@@ -1032,7 +1065,7 @@ class WarManager {
         resultMsg += ` を与えた！`;
         if (actualCounterDmg > 0) resultMsg += `<br>（反撃を受け 兵-${actualCounterDmg}）`;
         
-        pushMsg({ text: resultMsg, log: `R${s.round} [${activeArmyName}] ${resultMsg.replace('<br>', ' ')}` });
+        pushMsg({ text: resultMsg, log: `${activeArmyName} ${resultMsg.replace('<br>', ' ')}` });
 
         checkDefeatAndPushMsg(); // ★負けたかチェック
         executeNext();
