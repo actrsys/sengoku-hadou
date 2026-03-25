@@ -2583,7 +2583,7 @@ class CommandSystem {
             const reinforcementData = {
                 castle: helperCastle, kunishuId: kunishu.id, bushos: reinfBushos, soldiers: reinfSoldiers,
                 rice: reinfRice, horses: reinfHorses, guns: reinfGuns, isSelf: false, isKunishuForce: true,
-                morale: 50, training: 50
+                morale: kunishu.morale || 50, training: kunishu.training || 50
             };
             
             // ★修正：プレイヤーがお願いした時だけ「承諾しました！」のお返事を復活させます！（AIのフライング報告は消したままです）
