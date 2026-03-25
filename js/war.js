@@ -530,6 +530,13 @@ class WarManager {
             let targetMorale = Math.max(30, enemyMoraleAvg * 0.8);
             scores['inspire'] = Math.max(0, targetMorale - myMorale) * 20 + 20;
             
+            // ★追加：士気が70以上なら、線形でマイナスを入れます！100以上なら絶対に選びません
+            if (myMorale >= 100) {
+                scores['inspire'] = -9999;
+            } else if (myMorale >= 70) {
+                scores['inspire'] -= (myMorale - 70) * 20;
+            }
+            
             // 破壊: 防御が低いほど、兵力が多いほど、なめらかにスコアが大きくなる
             let siegeDefBonus = Math.max(0, 800 - def) * 0.6; // 防御800以下から意識しはじめる
             let siegeRatioBonus = Math.max(0, ratio - 1.5) * 150; // 兵力比1.5倍以上から意識しはじめる
@@ -578,7 +585,19 @@ class WarManager {
             
             // ★今回追加：相手の火計が成功している場合、防ぐために鼓舞のスコアを爆発的に上げます！
             if (s.fireSufferedCount && s.fireSufferedCount > 0) {
-                scores['def_inspire'] += s.fireSufferedCount * 800;
+                let fireBonus = s.fireSufferedCount * 300;
+                // ★追加：ただし、士気が70以上ある時は火計の焦り（ボーナス）の影響も線形で薄まるようにします
+                if (myMorale >= 70) {
+                    fireBonus *= (100 - myMorale) / 30; // 70で1.0倍、100で0倍になるようにします
+                }
+                scores['def_inspire'] += fireBonus;
+            }
+            
+            // ★追加：士気が70以上なら、線形でマイナスを入れます！100以上なら絶対に選びません
+            if (myMorale >= 100) {
+                scores['def_inspire'] = -9999;
+            } else if (myMorale >= 70) {
+                scores['def_inspire'] -= (myMorale - 70) * 20;
             }
             
             // 挑発: 防御が高いほど、兵力が多いほど、なめらかにスコアが大きくなる
