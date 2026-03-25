@@ -612,9 +612,9 @@ class WarManager {
             if (def >= 1000 && ratio >= 0.25) scores['provoke'] += 500;
             scores['provoke'] -= timidDegree * 100; // 弱気なら控える
             
-            // 突撃: 兵力が中以上(>=0.25)
-            scores['def_charge'] = Math.max(0, ratio - 0.25) * 200;
-            if (ratio >= 0.25) scores['def_charge'] += 200;
+            // 突撃: 兵力が大以上(>=1.0)
+            scores['def_charge'] = Math.max(0, ratio - 1.0) * 200;
+            if (ratio >= 1.0) scores['def_charge'] += 200;
             scores['def_charge'] -= timidDegree * 200; // 弱気なら控える
             
             // 斉射: デフォルト
