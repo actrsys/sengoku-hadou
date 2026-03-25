@@ -139,7 +139,7 @@ class FieldWarManager {
         this.warState = warState;
         this.onComplete = onComplete;
         this.turnCount = 1;
-        this.maxTurns = 20; 
+        this.maxTurns = 30; // 30ターンに固定
         this.active = true;
         this.state = 'IDLE';
         this.hideUnitInfo();
@@ -1426,7 +1426,8 @@ class FieldWarManager {
             groupSoldiers[u.groupId] += u.soldiers;
         });
 
-        const consumeRate = (window.WarParams.War.RiceConsumptionAtk || 0.1) * 0.5;
+        // 野戦独自の兵糧消費量（兵士数 × 0.033）
+        const consumeRate = 0.033;
         
         for (let key in groupSoldiers) {
             if (this.groupStats[key]) {
