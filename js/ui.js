@@ -1129,10 +1129,27 @@ class UIManager {
             faceHtml = `<img src="data/images/faceicons/${castellan.faceIcon}" onerror="this.style.display='none'">`;
         }
 
+        // ★ここから追加：城が「保護期間（戦乱）」かどうかをチェックする魔法です！
+        let isProtected = false;
+        // ゲーム内の「immunityUntil」という数字で管理されている保護期間をチェックします！
+        if (castle.immunityUntil && castle.immunityUntil >= this.game.getCurrentTurnId()) {
+            isProtected = true;
+        } 
+        // もし statusEffects という「状態異常のシール」で管理されていた場合
+        else if (castle.statusEffects && castle.statusEffects.includes('戦乱')) {
+            isProtected = true;
+        }
+
+        // 戦乱中なら、赤いマークの部品を作ります
+        let senranMark = "";
+        if (isProtected) {
+            senranMark = `<span class="sp-senran-mark">戦乱</span>`;
+        }
+
         let content = `
             <div class="sp-info-header">
                 <span class="sp-clan">${clanName}</span>
-                <span class="sp-castle">${castle.name}</span>
+                <span class="sp-castle">${castle.name}${senranMark}</span>
                 <span class="sp-lord-label">城主</span>
                 <span class="sp-lord-name">${castellanName}</span>
             </div>
