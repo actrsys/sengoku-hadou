@@ -701,12 +701,12 @@ class WarManager {
         const isAtkTurnGroup = s.turn.startsWith('attacker');
         
         let activeBushos, activeSoldiers, activeMorale, activeTraining, activeArmyName;
-        if (s.turn === 'attacker') { activeBushos = s.atkBushos; activeSoldiers = s.attacker.soldiers; activeMorale = s.attacker.morale; activeTraining = s.attacker.training; activeArmyName = "攻撃本隊"; }
-        else if (s.turn === 'attacker_self_reinf') { activeBushos = s.selfReinforcement.bushos; activeSoldiers = s.selfReinforcement.soldiers; activeMorale = s.selfReinforcement.morale; activeTraining = s.selfReinforcement.training; activeArmyName = "攻撃側自家援軍"; }
-        else if (s.turn === 'attacker_ally_reinf') { activeBushos = s.reinforcement.bushos; activeSoldiers = s.reinforcement.soldiers; activeMorale = s.reinforcement.morale; activeTraining = s.reinforcement.training; activeArmyName = "攻撃側同盟軍"; }
-        else if (s.turn === 'defender') { activeBushos = [s.defBusho]; activeSoldiers = s.defender.soldiers; activeMorale = s.defender.morale; activeTraining = s.defender.training; activeArmyName = "守備本隊"; }
-        else if (s.turn === 'defender_self_reinf') { activeBushos = s.defSelfReinforcement.bushos; activeSoldiers = s.defSelfReinforcement.soldiers; activeMorale = s.defSelfReinforcement.morale; activeTraining = s.defSelfReinforcement.training; activeArmyName = "守備側自家援軍"; }
-        else if (s.turn === 'defender_ally_reinf') { activeBushos = s.defReinforcement.bushos; activeSoldiers = s.defReinforcement.soldiers; activeMorale = s.defReinforcement.morale; activeTraining = s.defReinforcement.training; activeArmyName = "守備側同盟軍"; }
+        if (s.turn === 'attacker') { activeBushos = s.atkBushos; activeSoldiers = s.attacker.soldiers; activeMorale = s.attacker.morale || 50; activeTraining = s.attacker.training || 50; activeArmyName = "攻撃本隊"; }
+        else if (s.turn === 'attacker_self_reinf') { activeBushos = s.selfReinforcement.bushos; activeSoldiers = s.selfReinforcement.soldiers; activeMorale = s.selfReinforcement.morale || 50; activeTraining = s.selfReinforcement.training || 50; activeArmyName = "攻撃側自家援軍"; }
+        else if (s.turn === 'attacker_ally_reinf') { activeBushos = s.reinforcement.bushos; activeSoldiers = s.reinforcement.soldiers; activeMorale = s.reinforcement.morale || 50; activeTraining = s.reinforcement.training || 50; activeArmyName = "攻撃側同盟軍"; }
+        else if (s.turn === 'defender') { activeBushos = [s.defBusho]; activeSoldiers = s.defender.soldiers; activeMorale = s.defender.morale || 50; activeTraining = s.defender.training || 50; activeArmyName = "守備本隊"; }
+        else if (s.turn === 'defender_self_reinf') { activeBushos = s.defSelfReinforcement.bushos; activeSoldiers = s.defSelfReinforcement.soldiers; activeMorale = s.defSelfReinforcement.morale || 50; activeTraining = s.defSelfReinforcement.training || 50; activeArmyName = "守備側自家援軍"; }
+        else if (s.turn === 'defender_ally_reinf') { activeBushos = s.defReinforcement.bushos; activeSoldiers = s.defReinforcement.soldiers; activeMorale = s.defReinforcement.morale || 50; activeTraining = s.defReinforcement.training || 50; activeArmyName = "守備側同盟軍"; }
 
         let targetBushos, targetSoldiers = 0, targetMorale, targetTraining;
         
@@ -873,13 +873,13 @@ class WarManager {
 
         let targetList = [];
         if (isAtkTurnGroup) {
-            if (s.defender.soldiers > 0) targetList.push({ bushos: [s.defBusho], soldiers: s.defender.soldiers, morale: s.defender.morale, training: s.defender.training, role: 'defender', isDefendingCastle: true });
-            if (s.defSelfReinforcement && s.defSelfReinforcement.soldiers > 0) targetList.push({ bushos: s.defSelfReinforcement.bushos, soldiers: s.defSelfReinforcement.soldiers, morale: s.defSelfReinforcement.morale, training: s.defSelfReinforcement.training, role: 'defender_self_reinf', isDefendingCastle: false });
-            if (s.defReinforcement && s.defReinforcement.soldiers > 0) targetList.push({ bushos: s.defReinforcement.bushos, soldiers: s.defReinforcement.soldiers, morale: s.defReinforcement.morale, training: s.defReinforcement.training, role: 'defender_ally_reinf', isDefendingCastle: false });
+            if (s.defender.soldiers > 0) targetList.push({ bushos: [s.defBusho], soldiers: s.defender.soldiers, morale: s.defender.morale || 50, training: s.defender.training || 50, role: 'defender', isDefendingCastle: true });
+            if (s.defSelfReinforcement && s.defSelfReinforcement.soldiers > 0) targetList.push({ bushos: s.defSelfReinforcement.bushos, soldiers: s.defSelfReinforcement.soldiers, morale: s.defSelfReinforcement.morale || 50, training: s.defSelfReinforcement.training || 50, role: 'defender_self_reinf', isDefendingCastle: false });
+            if (s.defReinforcement && s.defReinforcement.soldiers > 0) targetList.push({ bushos: s.defReinforcement.bushos, soldiers: s.defReinforcement.soldiers, morale: s.defReinforcement.morale || 50, training: s.defReinforcement.training || 50, role: 'defender_ally_reinf', isDefendingCastle: false });
         } else {
-            if (s.attacker.soldiers > 0) targetList.push({ bushos: s.atkBushos, soldiers: s.attacker.soldiers, morale: s.attacker.morale, training: s.attacker.training, role: 'attacker', isDefendingCastle: false });
-            if (s.selfReinforcement && s.selfReinforcement.soldiers > 0) targetList.push({ bushos: s.selfReinforcement.bushos, soldiers: s.selfReinforcement.soldiers, morale: s.selfReinforcement.morale, training: s.selfReinforcement.training, role: 'attacker_self_reinf', isDefendingCastle: false });
-            if (s.reinforcement && s.reinforcement.soldiers > 0) targetList.push({ bushos: s.reinforcement.bushos, soldiers: s.reinforcement.soldiers, morale: s.reinforcement.morale, training: s.reinforcement.training, role: 'attacker_ally_reinf', isDefendingCastle: false });
+            if (s.attacker.soldiers > 0) targetList.push({ bushos: s.atkBushos, soldiers: s.attacker.soldiers, morale: s.attacker.morale || 50, training: s.attacker.training || 50, role: 'attacker', isDefendingCastle: false });
+            if (s.selfReinforcement && s.selfReinforcement.soldiers > 0) targetList.push({ bushos: s.selfReinforcement.bushos, soldiers: s.selfReinforcement.soldiers, morale: s.selfReinforcement.morale || 50, training: s.selfReinforcement.training || 50, role: 'attacker_self_reinf', isDefendingCastle: false });
+            if (s.reinforcement && s.reinforcement.soldiers > 0) targetList.push({ bushos: s.reinforcement.bushos, soldiers: s.reinforcement.soldiers, morale: s.reinforcement.morale || 50, training: s.reinforcement.training || 50, role: 'attacker_ally_reinf', isDefendingCastle: false });
         }
         targetList.forEach(t => {
             let pObj = calcArmyPower(t.bushos, t.soldiers, t.morale, t.training, t.isDefendingCastle);

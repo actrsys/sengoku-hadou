@@ -2501,7 +2501,8 @@ class CommandSystem {
 
                     const selfReinfData = {
                         castle: helperCastle, bushos: finalBushos, soldiers: finalSVal,
-                        rice: reinfRice, horses: reinfHorses, guns: reinfGuns, isAttacker: false, isSelf: true
+                        rice: reinfRice, horses: reinfHorses, guns: reinfGuns, isAttacker: false, isSelf: true,
+                        morale: helperCastle.morale || 50, training: helperCastle.training || 50
                     };
                     
                     onComplete(selfReinfData);
