@@ -2872,6 +2872,21 @@ class UIManager {
                 updateTxt('war-def-ally-reinf-soldier', data.currentStats.defAllySoldiers);
                 updateTxt('war-def-wall-info', data.currentStats.wallDefense);
 
+                // ★今回追加：war.jsから送られてきた「士気」の最新データも、兵士数と同時に画面に書き込みます！
+                updateTxt('war-atk-morale', data.currentStats.atkMorale);
+                updateTxt('war-def-morale', data.currentStats.defMorale);
+                
+                updateTxt('war-atk-self-reinf-morale', data.currentStats.atkSelfMorale);
+                updateTxt('war-atk-ally-reinf-morale', data.currentStats.atkAllyMorale);
+                updateTxt('war-def-self-reinf-morale', data.currentStats.defSelfMorale);
+                updateTxt('war-def-ally-reinf-morale', data.currentStats.defAllyMorale);
+                
+                // スマホ用の縦並びレイアウト時の士気も念のため同時に更新します
+                updateTxt('war-atk-self-reinf-morale-sp', data.currentStats.atkSelfMorale);
+                updateTxt('war-atk-ally-reinf-morale-sp', data.currentStats.atkAllyMorale);
+                updateTxt('war-def-self-reinf-morale-sp', data.currentStats.defSelfMorale);
+                updateTxt('war-def-ally-reinf-morale-sp', data.currentStats.defAllyMorale);
+
                 let highlightIds = [];
                 
                 // ★追加：回復の時は、特別な光らせ方をします！
