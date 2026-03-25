@@ -177,27 +177,42 @@ class AIEngine {
                 // そして、自分のお城がその「出撃元（stagingBase）」に選ばれている場合だけ出陣します！
                 if (myOperation.stagingBase === castle.id) {
                     
-                    // ★追加：出陣する前に、自分のお城か目的地が大雪になっていないか最終チェックをします！
-                    let isHeavySnow = false;
-                    const srcProv = this.game.provinces.find(p => p.id === castle.provinceId);
-                    if (srcProv && srcProv.statusEffects && srcProv.statusEffects.includes('heavySnow')) {
-                        isHeavySnow = true;
-                    }
-                    if (!isHeavySnow) {
-                        let targetProvId = castle.provinceId; // 諸勢力なら同じ国
-                        if (!myOperation.isKunishuTarget) {
-                            const targetCastle = this.game.getCastle(myOperation.targetId);
-                            if (targetCastle) targetProvId = targetCastle.provinceId;
-                        }
-                        const tgtProv = this.game.provinces.find(p => p.id === targetProvId);
-                        if (tgtProv && tgtProv.statusEffects && tgtProv.statusEffects.includes('heavySnow')) {
-                            isHeavySnow = true;
+                    // ★追加：出陣する前に、目的地までの道がまだ繋がっているか最終チェックをします！
+                    let canReach = false;
+                    let targetProvId = castle.provinceId; // 諸勢力なら同じ国
+                    
+                    if (myOperation.isKunishuTarget) {
+                        // 諸勢力は自分のお城のすぐそばなので、道はいつでも繋がっています！
+                        canReach = true;
+                    } else {
+                        const targetCastle = this.game.getCastle(myOperation.targetId);
+                        if (targetCastle) {
+                            targetProvId = targetCastle.provinceId;
+                            // 道が繋がっているか、魔法を使って再確認します！
+                            canReach = GameSystem.isReachable(this.game, castle, targetCastle, castle.ownerClan);
                         }
                     }
 
-                    // 大雪じゃなければ、予定通り出陣します！
-                    if (!isHeavySnow) {
-                        // メモしておいたIDから、お城や諸勢力のデータを復元して出発の魔法を呼びます
+                    // もし道が途切れていたら、作戦のメモを消して中止します！
+                    if (!canReach) {
+                        delete this.game.aiOperationManager.operations[castle.ownerClan];
+                    } else {
+                        // ★追加：自分のお城か目的地が大雪になっていないかチェックをします！
+                        let isHeavySnow = false;
+                        const srcProv = this.game.provinces.find(p => p.id === castle.provinceId);
+                        if (srcProv && srcProv.statusEffects && srcProv.statusEffects.includes('heavySnow')) {
+                            isHeavySnow = true;
+                        }
+                        if (!isHeavySnow) {
+                            const tgtProv = this.game.provinces.find(p => p.id === targetProvId);
+                            if (tgtProv && tgtProv.statusEffects && tgtProv.statusEffects.includes('heavySnow')) {
+                                isHeavySnow = true;
+                            }
+                        }
+
+                        // 大雪じゃなければ、予定通り出陣します！
+                        if (!isHeavySnow) {
+                            // メモしておいたIDから、お城や諸勢力のデータを復元して出発の魔法を呼びます
                         if (myOperation.isKunishuTarget) {
                             const targetKunishu = this.game.kunishuSystem.getKunishu(myOperation.targetId);
                             if (targetKunishu) {
