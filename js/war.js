@@ -23,14 +23,13 @@ window.WarParams = {
         SiegeMultiplier: 1.0, SiegeWallRate: 0.5, SiegeRisk: 10.0,
         DefChargeMultiplier: 1.2, DefChargeRisk: 2.0, DefBowMultiplier: 0.5, RojoDamageReduction: 0.7,
         CounterAtkPowerFactor: 0.05,
-        RepairMaxSoldiers: 500, RepairSoldierFactor: 0.05, RepairMainPolFactor: 0.25, RepairSubPolFactor: 0.05, RepairGlobalMultiplier: 0.4,
-        SchemeDamageFactor: 4, FireSuccessBase: 0.25, FireDamageFactor: 0.8,
+        FireSuccessBase: 0.25, FireDamageFactor: 0.8,
         ShortWarTurnLimit: 5, BaseRecoveryRate: 0.2, RetreatRecoveryRate: 0.3, RetreatCaptureRate: 0.1, DaimyoCaptureReduction: 0.3,
         RetreatResourceLossFactor: 0.2, LootingBaseRate: 0.3, LootingCharmFactor: 0.002, DaimyoCharmWeight: 0.1,
         RiceConsumptionAtk: 0.05, RiceConsumptionDef: 0.025,
         BaseStat: 30, SubGeneralFactor: 0.2, MinDamage: 50,
         StatsLdrWeight: 1.2, StatsStrWeight: 0.3, StatsIntWeight: 0.5,
-        MoraleBase: 50, SchemeBaseIntOffset: 20, LoyaltyDamageFactor: 500,
+        MoraleBase: 50, LoyaltyDamageFactor: 500,
         AttackLoyaltyDecay: 50, AttackPopDecay: 500, WinStatIncrease: 5,
         CaptureChanceBase: 0.7, CaptureStrFactor: 0.002, PrisonerRecruitThreshold: 60
     }
@@ -98,14 +97,7 @@ class WarSystem {
         };
     }
 
-    static calcScheme(atkBusho, defBusho, defCastleLoyalty) { 
-        const successRate = (atkBusho.intelligence / ((defBusho ? defBusho.intelligence : 30) + (window.WarParams.War.SchemeBaseIntOffset || 20))) * (window.MainParams?.Strategy?.SchemeSuccessRate || 0.25); 
-        if (Math.random() > successRate) return { success: false, damage: 0 }; 
-        const loyaltyBonus = ((window.MainParams?.Economy?.MaxLoyalty || 100) - defCastleLoyalty) / (window.WarParams.War.LoyaltyDamageFactor || 50); 
-        return { success: true, damage: Math.floor(atkBusho.intelligence * window.WarParams.War.SchemeDamageFactor * (1.0 + loyaltyBonus)) }; 
-    }
-
-    static calcFire(atkBusho, defBusho) { 
+    static calcFire(atkBusho, defBusho) {
         if (Math.random() > (atkBusho.intelligence / ((defBusho ? defBusho.intelligence : 30) + 10)) * window.WarParams.War.FireSuccessBase) return { success: false, damage: 0 }; 
         return { success: true, damage: Math.floor(atkBusho.intelligence * window.WarParams.War.FireDamageFactor * (Math.random() + 0.5)) }; 
     }
@@ -431,14 +423,9 @@ class WarManager {
         // 野戦直後など、AIが考えている最中に画面のボタンが残っていて押せてしまう不具合を防ぎます。
         if (!this.checkIsMyTurn(this.state)) return;
 
-        if (type === 'repair_setup') { 
-            window.GameApp.ui.openQuantitySelector('war_repair', [this.state.defender], null); 
-            return; 
-        }
-        
         const ctrl = document.getElementById('war-controls'); 
         // ★修正：ボタンを押した瞬間に、ボタンの中身を空っぽにして完全に消し去ります！
-        if(ctrl) ctrl.innerHTML = ''; 
+        if(ctrl) ctrl.innerHTML = '';
 
         // すぐに実行せずに、予定メモに書き込んでおきます！
         this.state.plannedActions[this.state.turn] = { type: type, extraVal: extraVal };
