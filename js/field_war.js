@@ -1854,10 +1854,10 @@ class FieldWarManager {
 
         // 2. 最終攻撃力・最終防御力の計算（士気・訓練による補正）
         let atkFinalAtk = atkBaseAtk * (1 + (atkMorale * 1.5 + atkTraining) / 1000);
-        let atkFinalDef = atkBaseDef * (1 + (atkMorale * 1.5 + atkTraining) / 1000);
+        let atkFinalDef = atkBaseDef * (1 + (atkMorale + atkTraining * 1.5) / 1000);
 
         let defFinalAtk = defBaseAtk * (1 + (defMorale * 1.5 + defTraining) / 1000);
-        let defFinalDef = defBaseDef * (1 + (defMorale * 1.5 + defTraining) / 1000);
+        let defFinalDef = defBaseDef * (1 + (defMorale + defTraining * 1.5) / 1000);
 
         // 3. 向きによる補正の判定
         let atkDirIndex = this.getDirection(attacker.x, attacker.y, defender.x, defender.y);
