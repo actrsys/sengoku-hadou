@@ -599,6 +599,11 @@ class UIManager {
         if(this.unitDivideModal) this.unitDivideModal.classList.add('hidden');
         if(this.aiGuard) this.aiGuard.classList.add('hidden'); 
         
+        // ★ここから追加：さっき作った、コマンドを初期化して隠す魔法をここでも使います！
+        if (typeof this.clearCommandMenu === 'function') {
+            this.clearCommandMenu();
+        }
+        
         // ★ここから書き足し：前に遊んでいた時の画面の枠をしっかり隠します！
         if(this.panelEl) this.panelEl.classList.add('hidden'); // PC版のサイドバーを隠します
         if(this.statusContainer) this.statusContainer.innerHTML = ''; // PC版の上の情報も消します

@@ -1493,6 +1493,10 @@ class GameManager {
                 if (this.ui) {
                     this.ui.logHistory = [];
                     this.ui.clearWarLog();
+                    // ★ここから追加：さっき作った、コマンドを初期化して隠す魔法をロードの時にも使います！
+                    if (typeof this.ui.clearCommandMenu === 'function') {
+                        this.ui.clearCommandMenu();
+                    }
                 }
                 // ★お掃除ここまで！
 
