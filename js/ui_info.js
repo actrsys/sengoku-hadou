@@ -45,11 +45,13 @@ class UIInfoManager {
                 const relation = this.game.getRelation(this.game.playerClanId, d.id);
                 if (relation) {
                     friendScore = relation.sentiment;
-                    friendStatus = relation.status;
+                    // ★変更：内部の status ではなく、見た目用の displayStatus を使います！
+                    friendStatus = relation.displayStatus || relation.status; 
                     hasRelation = true;
                     if (friendStatus === '敵対') statusColor = 'color:#d32f2f;';
                     else if (friendStatus === '友好') statusColor = 'color:#388e3c;';
-                    else if (['同盟', '支配', '従属'].includes(friendStatus)) statusColor = 'color:#1976d2;';
+                    // ★変更：青色にする条件のリストに '婚姻' も仲間入りさせます！
+                    else if (['同盟', '支配', '従属', '婚姻'].includes(friendStatus)) statusColor = 'color:#1976d2;';
                 }
             }
 
@@ -198,7 +200,8 @@ class UIInfoManager {
                 id: c.id,
                 name: c.name,
                 sentiment: rel ? rel.sentiment : 50,
-                status: rel ? rel.status : "普通"
+                // ★変更：ここでも見た目用の displayStatus を使います！
+                status: rel ? (rel.displayStatus || rel.status) : "普通"
             };
         });
 
@@ -208,7 +211,8 @@ class UIInfoManager {
             let statusColor = "";
             if (r.status === '敵対') statusColor = 'color:#d32f2f;';
             else if (r.status === '友好') statusColor = 'color:#388e3c;';
-            else if (['同盟', '支配', '従属'].includes(r.status)) statusColor = 'color:#1976d2;';
+            // ★変更：こちらでも青色にする条件に '婚姻' を仲間入りさせます！
+            else if (['同盟', '支配', '従属', '婚姻'].includes(r.status)) statusColor = 'color:#1976d2;';
 
             const friendPercent = Math.min(100, Math.max(0, r.sentiment));
             const friendBarHtml = `<div class="bar-bg bar-bg-friend"><div class="bar-fill bar-fill-friend" style="width:${friendPercent}%;"></div></div>`;
