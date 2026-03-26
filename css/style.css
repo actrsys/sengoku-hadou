@@ -79,10 +79,10 @@ img { pointer-events: none; -webkit-user-drag: none; user-drag: none; }
 .sp-face-wrapper { width: 50px; height: 50px; margin-right: 8px; flex-shrink: 0; border: 1px solid #333; display: flex; align-items: center; justify-content: center; background: #eee; }
 .sp-face-wrapper img { width: 100%; height: 100%; object-fit: cover; }
 .sp-params-grid { display: grid; grid-template-columns: auto auto auto auto auto 50px; column-gap: 6px; row-gap: 1px; flex: 1; align-items: center; }
-.sp-label { text-align: left; color: #555; font-size: 0.8rem; }
-.sp-val { text-align: right; }
-.sp-val-right { text-align: right; font-weight: bold; padding-right: 2px; font-variant-numeric: tabular-nums; }
-.sp-val-left { text-align: left; font-weight: bold; padding-left: 2px; font-variant-numeric: tabular-nums; }
+.sp-label { display: flex; align-items: center; color: #555; font-size: 0.8rem; height: 100%; }
+.sp-val { display: flex; align-items: center; justify-content: flex-end; height: 100%; }
+.sp-val-right { display: flex; align-items: center; justify-content: flex-end; font-weight: bold; padding-right: 2px; font-variant-numeric: tabular-nums; height: 100%; }
+.sp-val-left { display: flex; align-items: center; justify-content: flex-start; font-weight: bold; padding-left: 2px; font-variant-numeric: tabular-nums; height: 100%; }
 .sp-empty {}
 .sp-info-footer { display: flex; justify-content: space-between; gap: 4px; padding: 4px 5px; font-weight: bold; font-size: 0.85rem; }
 .sp-footer-box { flex: 1; display: flex; justify-content: space-between; background: #e0e0e0; padding: 2px 6px; border-radius: 4px; border: 1px solid #ccc; }
