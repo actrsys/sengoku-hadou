@@ -310,8 +310,8 @@ window.GameEvents.push({
                     let isEnemy = false;
                     if (adjCastle.ownerClan !== 0 && adjCastle.ownerClan !== c.ownerClan) {
                         const rel = game.getRelation(c.ownerClan, adjCastle.ownerClan);
-                        // 同盟でも支配でもないなら、敵です！
-                        if (!rel || (rel.status !== '同盟' && rel.status !== '支配')) {
+                        // ★関係が明確に「敵対」の時だけ、包囲している敵としてカウントします！
+                        if (rel && rel.status === '敵対') {
                             isEnemy = true;
                         }
                     }
@@ -578,6 +578,10 @@ window.GameEvents.push({
             // ★追加：一揆状態の城は兵糧収入が４分の１になります！
             if (c.statusEffects && c.statusEffects.includes('一揆')) {
                 riceIncome = Math.floor(riceIncome / 4);
+            }
+            // ★追加：兵糧攻め状態の城は兵糧収入が８分の１になります！
+            if (c.statusEffects && c.statusEffects.includes('糧攻')) {
+                riceIncome = Math.floor(riceIncome / 8);
             }
             
             c.rice = Math.min(99999, c.rice + riceIncome);
