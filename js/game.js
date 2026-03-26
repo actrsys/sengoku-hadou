@@ -1074,6 +1074,12 @@ class GameManager {
             let income = Math.floor(baseGold * window.MainParams.Economy.IncomeGoldRate);
             income = GameSystem.applyVariance(income, window.MainParams.Economy.IncomeFluctuation);
             if (this.month === 3) income += income * 3;
+            
+            // ★追加：一揆状態の城は金収入が０になります！
+            if (c.statusEffects && c.statusEffects.includes('一揆')) {
+                income = 0;
+            }
+            
             c.gold = Math.min(99999, c.gold + income);
             
             // ９月の兵糧収入計算式
