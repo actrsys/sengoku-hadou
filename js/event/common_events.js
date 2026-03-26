@@ -425,6 +425,11 @@ window.GameEvents.push({
                 riceIncome = Math.floor(riceIncome * 1.3);  //豊作なら130%の収入
             }
             
+            // ★追加：一揆状態の城は兵糧収入が４分の１になります！
+            if (c.statusEffects && c.statusEffects.includes('一揆')) {
+                riceIncome = Math.floor(riceIncome / 4);
+            }
+            
             c.rice = Math.min(99999, c.rice + riceIncome);
         });
 
