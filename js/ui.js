@@ -90,6 +90,27 @@ class UIManager {
                 } 
             });
         }
+
+        // ★ここから追加：単なるメッセージ表示のウインドウも、外側を押して閉じられるようにします！
+        const dialogModal = document.getElementById('dialog-modal');
+        if (dialogModal) {
+            dialogModal.addEventListener('click', (e) => {
+                // ウインドウの外側（黒い背景）を押したか確認します
+                if (e.target === dialogModal) {
+                    const cancelBtn = document.getElementById('dialog-btn-cancel');
+                    // キャンセルボタンが隠れている（＝選択肢がない単なるメッセージの）時だけ閉じます
+                    if (cancelBtn && cancelBtn.classList.contains('hidden')) {
+                        const okBtn = document.getElementById('dialog-btn-ok');
+                        if (okBtn) {
+                            // 背景を押して閉じたので、キャンセルの音を鳴らして「閉じる」ボタンを押したことにします
+                            if (window.AudioManager) window.AudioManager.playSE('cancel.ogg');
+                            okBtn.click();
+                        }
+                    }
+                }
+            });
+        }
+        // ★追加ここまで
         
         if (this.mapZoomInBtn) {
             this.mapZoomInBtn.onclick = (e) => { e.stopPropagation(); this.changeMapZoom(1); };
