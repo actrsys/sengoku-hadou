@@ -557,12 +557,7 @@ class UIManager {
             emptyBgClass = 'status-bar-empty-bg';
         }
 
-        return `
-            <div class="status-bar-container ${emptyBgClass}">
-                <div class="status-bar-fill ${fillClass}" style="width: ${percent}%;"></div>
-                <div class="status-bar-text">${displayText}</div>
-            </div>
-        `;
+        return `<div class="status-bar-container ${emptyBgClass}"><div class="status-bar-fill ${fillClass}" style="width: ${percent}%;"></div><div class="status-bar-text">${displayText}</div></div>`;
     }
 
     initContextMenu() {
