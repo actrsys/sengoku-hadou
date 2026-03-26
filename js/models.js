@@ -248,7 +248,6 @@ class Busho {
 
         // ★【ここから書き足し：一門設定（修正版）】
         if (data.baseFamilyIds && Array.isArray(data.baseFamilyIds)) {
-        if (data.baseFamilyIds && Array.isArray(data.baseFamilyIds)) {
             this.baseFamilyIds = data.baseFamilyIds;
         } else if (data.familyIds && Array.isArray(data.familyIds)) {
             this.baseFamilyIds = data.familyIds;
