@@ -731,6 +731,7 @@ class GameManager {
         this.eventManager = new EventManager(this);
         
         this.phase = 'title';
+        this.isSpectatorMode = false;
     }
     
     getRelation(id1, id2) { 
@@ -748,6 +749,7 @@ class GameManager {
         if(this.ui) this.ui.forceResetModals();
         
         // ★ここから追加：前回のゲームの記憶やフラグを綺麗にお掃除します！
+        this.isSpectatorMode = false; // 観戦モードも解除！
         this.isProcessingAI = false; // AI思考中フラグを解除！
         if (this.aiTimer) {
             clearTimeout(this.aiTimer);
@@ -819,6 +821,10 @@ class GameManager {
             this.ui.renderMap();
             // カットイン表示を消しました！
 
+            // ★追加：大名選択画面になったら「観戦」ボタンを出します！
+            const btnSpectate = document.getElementById('btn-spectate');
+            if (btnSpectate) btnSpectate.classList.remove('hidden');
+
             // ★追加：マップの準備がすべて終わったら、少しだけ待ってからロード画面を隠します
             await new Promise(resolve => setTimeout(resolve, 100));
             if (this.ui) this.ui.hideLoadingScreen();
@@ -866,6 +872,25 @@ class GameManager {
     // ★顔画像の裏側読み込み魔法ここまで！
     // ==========================================
     
+    // ★観戦モードを始める魔法！
+    startSpectatorMode() {
+        this.isSpectatorMode = true;
+        this.playerClanId = -1; // プレイヤーを「誰もいない」状態にします
+        this.phase = 'game';
+        
+        // ボタンを切り替えます
+        if (this.ui.btnSpectate) this.ui.btnSpectate.classList.add('hidden');
+        if (this.ui.btnStopSpectate) this.ui.btnStopSpectate.classList.remove('hidden');
+        
+        // 大名選択の特別な画面モードを解除します
+        if (document.body.classList.contains('daimyo-select-mode')) {
+            document.body.classList.remove('daimyo-select-mode');
+        }
+
+        this.ui.renderMap(); 
+        this.init(); // ゲームをスタート！
+    }
+
     handleDaimyoSelect(castle) {
         if (castle.ownerClan === 0) {
             this.ui.showDialog("その城は空き城（中立）のため選択できません。", false);
@@ -897,7 +922,10 @@ class GameManager {
     getClanTotalSoldiers(clanId) { return this.castles.filter(c => Number(c.ownerClan) === Number(clanId)).reduce((sum, c) => sum + c.soldiers, 0); }
     getClanGunshi(clanId) { return this.bushos.find(b => Number(b.clan) === Number(clanId) && b.isGunshi && b.status === 'active'); }
     isCastleVisible(castle) { 
-        if (Number(castle.ownerClan) === Number(this.playerClanId)) return true; 
+        // ★観戦モードの時は、日本中すべての城が丸見えになります！
+        if (this.isSpectatorMode) return true; 
+
+        if (Number(castle.ownerClan) === Number(this.playerClanId)) return true;
         if (castle.investigatedUntil >= this.getCurrentTurnId()) return true; 
         
         // ★追加：同盟か支配している相手の城なら見えるようにする魔法！
@@ -1078,6 +1106,10 @@ class GameManager {
             // ★追加：一揆状態の城は金収入が０になります！
             if (c.statusEffects && c.statusEffects.includes('一揆')) {
                 income = 0;
+            }
+            // ★追加：兵糧攻め状態の城は金収入が４分の１になります！
+            if (c.statusEffects && c.statusEffects.includes('糧攻')) {
+                income = Math.floor(income / 4);
             }
             
             c.gold = Math.min(99999, c.gold + income);
@@ -1405,12 +1437,16 @@ class GameManager {
         const clans = new Set(this.castles.filter(c => c.ownerClan !== 0).map(c => c.ownerClan)); 
         const playerAlive = clans.has(this.playerClanId); 
         
-        if (clans.size === 1 && playerAlive) {
+        if (clans.size === 1 && playerAlive && !this.isSpectatorMode) {
             this.ui.showDialog("天下統一！", false, () => {
                 this.ui.returnToTitle(); 
             });
-        } else if (!playerAlive) {
+        } else if (!playerAlive && !this.isSpectatorMode) {
             this.ui.showDialog("我が大名家は滅亡しました……", false, () => {
+                this.ui.returnToTitle(); 
+            });
+        } else if (clans.size === 1 && this.isSpectatorMode) {
+            this.ui.showDialog("天下統一が成し遂げられました！", false, () => {
                 this.ui.returnToTitle(); 
             });
         } else {
@@ -1479,6 +1515,7 @@ class GameManager {
         reader.onload = async (evt) => {
             try { 
                 // ★ここから追加：前のゲームの記憶やフラグを綺麗にお掃除します！
+                this.isSpectatorMode = false; // 観戦モードも解除！
                 this.isProcessingAI = false; // AI思考中フラグを解除！
                 if (this.aiTimer) {
                     clearTimeout(this.aiTimer);

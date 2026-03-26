@@ -50,6 +50,26 @@ class UIManager {
         this.mapZoomOutBtn = document.getElementById('map-zoom-out');
         this.historyModal = document.getElementById('history-modal');
         this.historyList = document.getElementById('history-list');
+
+        this.btnSpectate = document.getElementById('btn-spectate');
+        if (this.btnSpectate) {
+            this.btnSpectate.onclick = () => {
+                if (window.AudioManager) window.AudioManager.playSE('choice.ogg');
+                this.showDialog("観戦しますか？", true, () => {
+                    this.game.startSpectatorMode();
+                });
+            };
+        }
+
+        this.btnStopSpectate = document.getElementById('btn-stop-spectate');
+        if (this.btnStopSpectate) {
+            this.btnStopSpectate.onclick = () => {
+                if (window.AudioManager) window.AudioManager.playSE('choice.ogg');
+                this.showDialog("観戦を終了しますか？", true, () => {
+                    this.returnToTitle();
+                });
+            };
+        }
         
         this.pcNewUiContainer = document.getElementById('pc-new-ui-container');
         this.pcNewStatusPanel = document.getElementById('pc-new-status-panel');
@@ -598,6 +618,12 @@ class UIManager {
         if(this.warModal) this.warModal.classList.add('hidden');
         if(this.unitDivideModal) this.unitDivideModal.classList.add('hidden');
         if(this.aiGuard) this.aiGuard.classList.add('hidden'); 
+
+        // 観戦ボタンたちも隠しておきます
+        const btnSpectate = document.getElementById('btn-spectate');
+        if (btnSpectate) btnSpectate.classList.add('hidden');
+        const btnStopSpectate = document.getElementById('btn-stop-spectate');
+        if (btnStopSpectate) btnStopSpectate.classList.add('hidden');
         
         // ★ここから追加：さっき作った、コマンドを初期化して隠す魔法をここでも使います！
         if (typeof this.clearCommandMenu === 'function') {
