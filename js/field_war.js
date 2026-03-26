@@ -2078,6 +2078,13 @@ class FieldWarManager {
             dmgToAtk = Math.floor(defFinalAtk * 0.5 * counterRatio);
         }
 
+        // ★追加: プレイヤーがいないAI同士の戦いなら、ダメージを約3分の1（0.333）に減らします！
+        const isPlayerInvolved = this.units.some(u => u.isPlayer);
+        if (!isPlayerInvolved) {
+            dmgToDef = Math.floor(dmgToDef * 0.333);
+            dmgToAtk = Math.floor(dmgToAtk * 0.333);
+        }
+
         // ダメージ適用（兵数以上のダメージは受けないようにガード）
         dmgToDef = Math.min(defender.soldiers, dmgToDef);
         dmgToAtk = Math.min(attacker.soldiers, dmgToAtk);
