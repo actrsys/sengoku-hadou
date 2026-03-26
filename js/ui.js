@@ -1113,16 +1113,21 @@ class UIManager {
             isProtected = true;
         }
 
-        // 戦乱中なら、赤いマークの部品を作ります
-        let senranMark = "";
+        // 戦乱中や一揆中なら、マークの部品を作ります
+        let statusMarks = "";
         if (isProtected) {
-            senranMark = `<span class="sp-senran-mark">戦乱</span>`;
+            statusMarks += `<span class="sp-senran-mark">戦乱</span>`;
+        }
+        // ★追加：一揆状態なら、一揆マークを並べて追加します！
+        if (castle.statusEffects && castle.statusEffects.includes('一揆')) {
+            // 戦乱マークと同じデザイン（クラス）を使いつつ、横に並んだ時にくっつかないよう隙間をあけます
+            statusMarks += `<span class="sp-senran-mark" style="margin-left: 5px;">一揆</span>`;
         }
 
         let content = `
             <div class="sp-info-header">
                 <span class="sp-clan">${clanName}</span>
-                <span class="sp-castle">${castle.name}${senranMark}</span>
+                <span class="sp-castle">${castle.name}${statusMarks}</span>
                 <span class="sp-lord-label">城主</span>
                 <span class="sp-lord-name">${castellanName}</span>
             </div>
