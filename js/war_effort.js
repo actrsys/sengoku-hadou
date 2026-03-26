@@ -255,7 +255,7 @@ Object.assign(WarManager.prototype, {
                     const hC = reinfData.castle;
                     if (hC.ownerClan === pid && !hC.isDelegated && !reinfData.isKunishuForce) isPlayerInvolved = true;
                     
-                    let reinfType = isSelf ? "応援軍" : "同盟軍";
+                    let reinfType = isSelf ? "応援軍" : "友軍";
                     let leaderName = reinfData.bushos && reinfData.bushos.length > 0 ? reinfData.bushos[0].name : "総大将";
                     let msg = `【${reinfType}】\n${hC.name}の${leaderName}が攻撃側の援軍として参戦しました！`;
                     
@@ -2140,7 +2140,7 @@ Object.assign(WarManager.prototype, {
                 if (atkClanId === this.game.playerClanId) {
                     this.game.ui.showDialog(`${kunishu.getName(this.game)}の${leaderName}が敵の援軍として参戦しました！`, false, onComplete);
                 } else {
-                    this.game.ui.log(`【同盟軍】${defCastle.name}の要請により、${kunishu.getName(this.game)}が守備側の援軍として駆けつけました。`);
+                    this.game.ui.log(`【友軍】${defCastle.name}の要請により、${kunishu.getName(this.game)}が守備側の援軍として駆けつけました。`);
                     this.game.ui.showDialog(`${kunishu.getName(this.game)}の${leaderName}が守備側の援軍として参戦しました！`, false, onComplete);
                 }
             }
@@ -2248,7 +2248,7 @@ Object.assign(WarManager.prototype, {
             
             // ★追加：こちらも委任城主（AI）が攻められた時ならメッセージを「参戦しました！」に変えます！
             if (defCastle.isDelegated) {
-                this.game.ui.showDialog(`${helperCastle.name}の${castellanName}が同盟軍として参戦しました！`, false, onComplete);
+                this.game.ui.showDialog(`${helperCastle.name}の${castellanName}が友軍として参戦しました！`, false, onComplete);
             } else {
                 this.game.ui.showDialog(`${helperCastle.name}の${castellanName}が援軍要請を承諾しました！`, false, onComplete);
             }
@@ -2262,7 +2262,7 @@ Object.assign(WarManager.prototype, {
             if (atkClanId === this.game.playerClanId) {
                 this.game.ui.showDialog(`${helperClanName}の${leaderName}が敵の援軍として参戦しました！`, false, onComplete);
             } else {
-                this.game.ui.log(`【同盟軍】${defCastle.name}の要請により、${helperClanName}が守備側の援軍として駆けつけました。`);
+                this.game.ui.log(`【友軍】${defCastle.name}の要請により、${helperClanName}が守備側の援軍として駆けつけました。`);
                 this.game.ui.showDialog(`${helperClanName}の${leaderName}が守備側の援軍として参戦しました！`, false, onComplete);
             }
         }

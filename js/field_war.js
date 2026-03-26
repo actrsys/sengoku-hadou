@@ -707,7 +707,7 @@ class FieldWarManager {
     }
 
     updateStatus() {
-        // メイン、応援軍、同盟軍のそれぞれの数値を保管する箱を用意します
+        // メイン、応援軍、友軍のそれぞれの数値を保管する箱を用意します
         let stats = {
             atk: {
                 main: { soldiers: 0, rice: 0, morale: 0, training: 0, exists: false },
@@ -795,11 +795,11 @@ class FieldWarManager {
         // タブに表示する名前の準備
         let atkDisplayName = `<strong>${atkClanName} ${atkGeneralName} 軍</strong>`;
         if (this.activeAtkTab === 'self') atkDisplayName = `<strong>${atkClanName} 応援軍</strong>`;
-        if (this.activeAtkTab === 'ally') atkDisplayName = `<strong>攻撃側 同盟軍</strong>`;
+        if (this.activeAtkTab === 'ally') atkDisplayName = `<strong>攻撃側 友軍</strong>`;
 
         let defDisplayName = `<strong>${defClanName} ${defGeneralName} 軍</strong>`;
         if (this.activeDefTab === 'self') defDisplayName = `<strong>${defClanName} 応援軍</strong>`;
-        if (this.activeDefTab === 'ally') defDisplayName = `<strong>守備側 同盟軍</strong>`;
+        if (this.activeDefTab === 'ally') defDisplayName = `<strong>守備側 友軍</strong>`;
 
         // 値を２行に分けて表示します
         const atkHTML = `${atkDisplayName}<br><div style="margin-top:2px;">兵: ${curAtk.soldiers} / 糧: ${curAtk.rice}<br>士気: ${curAtk.morale} / 訓練: ${curAtk.training}</div>`;
@@ -821,7 +821,7 @@ class FieldWarManager {
             let tabs = [];
             if (stats.atk.main.exists) tabs.push({ id: 'main', label: '攻撃軍' });
             if (stats.atk.self.exists) tabs.push({ id: 'self', label: '応援軍' });
-            if (stats.atk.ally.exists) tabs.push({ id: 'ally', label: '同盟軍' });
+            if (stats.atk.ally.exists) tabs.push({ id: 'ally', label: '友軍' });
             
             if (tabs.length > 1) {
                 tabs.forEach(t => {
@@ -840,7 +840,7 @@ class FieldWarManager {
             let tabs = [];
             if (stats.def.main.exists) tabs.push({ id: 'main', label: '守備軍' });
             if (stats.def.self.exists) tabs.push({ id: 'self', label: '応援軍' });
-            if (stats.def.ally.exists) tabs.push({ id: 'ally', label: '同盟軍' });
+            if (stats.def.ally.exists) tabs.push({ id: 'ally', label: '友軍' });
             
             // 右端から「守備・応援・同盟」となるように順番をひっくり返します
             tabs.reverse();

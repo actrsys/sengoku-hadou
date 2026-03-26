@@ -2692,7 +2692,7 @@ class CommandSystem {
             
             // ★追加：こちらも委任城主（AI）ならメッセージを「参戦しました！」に変えます！
             if (atkCastle.isDelegated) {
-                this.game.ui.showDialog(`${helperCastle.name}の${castellanName}が同盟軍として参戦しました！`, false, () => {
+                this.game.ui.showDialog(`${helperCastle.name}の${castellanName}が友軍として参戦しました！`, false, () => {
                     this.game.warManager.startWar(atkCastle, targetCastle, atkBushos, sVal, rVal, hVal, gVal, reinforcementData, selfReinfData);
                 });
             } else {
@@ -2744,7 +2744,7 @@ class CommandSystem {
 
         this.game.warManager.applyWarHostility(helperCastle.ownerClan, false, targetCastle.ownerClan, targetCastle.isKunishu, true);
         
-        // ★修正：手動で同盟軍を出した時の「出発しました！」のお返事を復活させます！
+        // ★修正：手動で友軍を出した時の「出発しました！」のお返事を復活させます！
         this.game.ui.showDialog(`自軍の同盟援軍が出発しました！\n共に ${targetCastle.name} へ侵攻します！`, false, () => {
             this.game.warManager.startWar(atkCastle, targetCastle, atkBushos, sVal, rVal, hVal, gVal, reinforcementData, selfReinfData);
         });

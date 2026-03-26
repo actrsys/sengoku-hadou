@@ -3165,7 +3165,7 @@ class UIManager {
         const pid = Number(this.game.playerClanId);
         
         // ★修正: 自分が操作できる部隊かどうかを、それぞれの役割ごとに厳密にチェックします！
-        // これにより、自分がメイン軍の時に同盟軍を操作したり、自分が援軍の時にメイン軍を操作してしまうのを防ぎます。
+        // これにより、自分がメイン軍の時に友軍を操作したり、自分が援軍の時にメイン軍を操作してしまうのを防ぎます。
         let isMyTurn = false;
         if (s.turn === 'attacker' && Number(s.attacker.ownerClan) === pid && !s.sourceCastle.isDelegated) isMyTurn = true;
         if (s.turn === 'attacker_self_reinf' && Number(s.selfReinforcement.castle.ownerClan) === pid && !s.selfReinforcement.castle.isDelegated) isMyTurn = true;
