@@ -554,12 +554,33 @@ Object.assign(WarManager.prototype, {
                 });
             };
 
+            // ★追加：籠城戦に入った時のメッセージを出す魔法！
+            const showSiegeMessage = async () => {
+                const defLeaderName = defBusho ? defBusho.name : "守備隊長";
+                let siegeMsg = "";
+                // ★鎮圧戦や相手が諸勢力の場合は「自領」にします
+                if (this.state.isKunishuSubjugation || defCastle.isKunishu) {
+                    siegeMsg = `${defDaimyoName}の${defLeaderName}は、\n自領に立て籠もりました！`;
+                } else {
+                    siegeMsg = `${defDaimyoName}の${defLeaderName}は、\n${defCastle.name}に立て籠もりました！`;
+                }
+                
+                this.game.ui.log(siegeMsg.replace('\n', ''));
+                if (!isPlayerInvolved) {
+                    await this.game.ui.showDialogAsync(siegeMsg);
+                } else {
+                    await this.game.ui.showCutin(siegeMsg);
+                }
+            };
+
             if (this.state.isKunishuSubjugation) {
+                await showSiegeMessage();
                 this.startSiegeWarPhase();
             } else if (typeof window.FieldWarManager === 'undefined') {
+                await showSiegeMessage();
                 this.startSiegeWarPhase();
             } else {
-                showInterceptDialog((choice, defAssignments, defRice, atkAssignments, interceptHorses = 0, interceptGuns = 0) => {
+                showInterceptDialog(async (choice, defAssignments, defRice, atkAssignments, interceptHorses = 0, interceptGuns = 0) => {
                     this.game.ui.restoreAIGuard();
                     
                     // ★削除: 守備側の援軍を強制合流させる魔法（applyDefReinf）を完全に消しました！
@@ -581,16 +602,21 @@ Object.assign(WarManager.prototype, {
                         if (!isPlayerInvolved) this.resolveAutoFieldWar();
                         else {
                             if (!this.game.fieldWarManager) this.game.fieldWarManager = new window.FieldWarManager(this.game);
-                            this.game.fieldWarManager.startFieldWar(this.state, (resultType) => {
+                            this.game.fieldWarManager.startFieldWar(this.state, async (resultType) => {
                                 defCastle.soldiers += this.state.defender.fieldSoldiers;
                                 defCastle.rice += this.state.defFieldRice; 
                                 defCastle.horses = (defCastle.horses || 0) + (this.state.defender.fieldHorses || 0);
                                 defCastle.guns = (defCastle.guns || 0) + (this.state.defender.fieldGuns || 0);
-                                if (resultType === 'attacker_win' || resultType === 'defender_retreat' || resultType === 'draw_to_siege') this.startSiegeWarPhase();
-                                else this.endWar(false);
+                                if (resultType === 'attacker_win' || resultType === 'defender_retreat' || resultType === 'draw_to_siege') {
+                                    await showSiegeMessage();
+                                    this.startSiegeWarPhase();
+                                } else this.endWar(false);
                             });
                         }
-                    } else this.startSiegeWarPhase();
+                    } else {
+                        await showSiegeMessage();
+                        this.startSiegeWarPhase();
+                    }
                 });
             }
         } catch(e) { console.error("StartWar Error:", e); this.state.active = false; this.game.finishTurn(); }
