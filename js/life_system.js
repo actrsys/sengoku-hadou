@@ -231,22 +231,23 @@ class LifeSystem {
 
         unbornPrincesses.forEach(p => {
             let targetClanId = 0;
+            let fatherNameStr = ""; // ★お父さんの名前を書いておくメモ帳です
 
             if (p.fatherId > 0) {
                 // お父さんがいる場合は、お父さんのいる大名家を探します
                 const father = this.game.getBusho(p.fatherId);
                 if (father && father.status !== 'dead' && father.status !== 'unborn' && father.clan !== 0) {
                     targetClanId = father.clan;
+                    fatherNameStr = father.name.replace('|', ''); // ★お父さんの名前から「|」を消してメモします
                 }
-            } else if (p.originalClanId > 0) {
-                // お父さんがいなくて、実家の大名家が設定されている場合
+            }
+            
+            // ★お父さんが設定されていない、またはお父さんが死んだり浪人していて大名家が見つからなかった場合！
+            if (targetClanId === 0 && p.originalClanId > 0) {
                 const clanCastles = this.game.castles.filter(c => c.ownerClan === p.originalClanId);
                 // その大名家が滅亡していなければ（お城を持っていれば）
                 if (clanCastles.length > 0) {
                     targetClanId = p.originalClanId;
-                } else {
-                    // 実家が滅亡している場合は、登場せずに待ちます
-                    return;
                 }
             }
 
@@ -256,7 +257,30 @@ class LifeSystem {
                 
                 // プレイヤーの大名家に姫がやってきたらお知らせのメッセージを作ります
                 if (targetClanId === this.game.playerClanId) {
-                    messages.push(`${p.name}が成人し、当家に登場しました！`);
+                    if (fatherNameStr !== "") {
+                        // ★ここから変更：お父さんの身分によってメッセージを切り替えます！
+                        let isRoyal = false;
+                        const playerDaimyo = this.game.bushos.find(b => b.clan === this.game.playerClanId && b.isDaimyo);
+                        const fatherData = this.game.getBusho(p.fatherId); // お父さんのデータをもう一度呼び出します
+                        
+                        if (playerDaimyo && fatherData) {
+                            // お父さんが大名本人か、血の繋がった直接の一門（baseFamilyIdsが共通）かをチェックします
+                            const isDirectFamily = fatherData.baseFamilyIds.some(fId => playerDaimyo.baseFamilyIds.includes(fId));
+                            if (fatherData.id === playerDaimyo.id || isDirectFamily) {
+                                isRoyal = true;
+                            }
+                        }
+
+                        // 大名や直接の一門の場合は特別なお知らせ！
+                        if (isRoyal) {
+                            messages.push(`${fatherNameStr}様の姫君、${p.name}様がお生まれになりました！`);
+                        } else {
+                            // 間接的な一門や、普通の家臣の場合はこちらになります
+                            messages.push(`${fatherNameStr}のご息女、${p.name}が誕生しました！`);
+                        }
+                    } else {
+                        messages.push(`${p.name}が誕生しました！`);
+                    }
                 }
             }
         });
@@ -280,8 +304,6 @@ class LifeSystem {
             b.status !== 'unborn' && b.status !== 'dead' && currentYear >= (b.endYear - 1)
         );
 
-        let diedPlayerBushos = [];
-
         for (const b of targetBushos) {
             // プレイヤーの大名だけは絶対に死なない魔法をかけます！
             if (b.isDaimyo && b.clan === this.game.playerClanId) continue;
@@ -295,19 +317,14 @@ class LifeSystem {
             // サイコロを振って、確率に当たってしまったらお別れです…
             if (Math.random() < deathProb) {
                 await this.executeDeath(b);
-                // もしプレイヤーの家臣だったら、お知らせリストに入れます
+                // もしプレイヤーの家臣だったら、その場でお知らせを出します
                 if (b.clan === this.game.playerClanId) {
-                    diedPlayerBushos.push(b);
+                    const name = b.name.replace('|', '');
+                    this.game.ui.log(`${name}が病によりこの世を去りました…。`);
+                    // ★一人ずつ順番にダイアログを出して、押すまで待ちます！
+                    await this.game.ui.showDialogAsync(`${name}が病によりこの世を去りました…。`, false, 0);
                 }
             }
-        }
-
-        // お別れした家臣がいたら、悲しいお知らせを表示します
-        if (diedPlayerBushos.length > 0) {
-            const names = diedPlayerBushos.map(b => b.name.replace('|', '')).join('、');
-            this.game.ui.log(`${names}が病によりこの世を去りました…。`);
-            // ★大名の時と同じように、ダイアログを出して0秒（押すまで）待ちます！
-            await this.game.ui.showDialogAsync(`${names}が病によりこの世を去りました…。`, false, 0);
         }
 
         // ★ここから追加：姫の寿命チェックを書き足します！
