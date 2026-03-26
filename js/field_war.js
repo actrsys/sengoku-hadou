@@ -464,12 +464,12 @@ class FieldWarManager {
         
         this.isInfoMode = false;
         this.isCmdMode = false;
-        this.initUI();
         
         // ★追加：援軍も含めて、プレイヤーが操作する部隊が1つでもあるか調べます！
         const isPlayerInvolved = this.units.some(u => u.isPlayer);
 
         if (isPlayerInvolved) {
+            this.initUI();
             this.updateMap();
             this.updateStatus();
             this.log("両軍、布陣を完了。野戦を開始します！");
@@ -478,17 +478,22 @@ class FieldWarManager {
                 window.AudioManager.memorizeCurrentBgm(); // 今の曲をメモ
                 window.AudioManager.playBGM('08_Legend of bear slaying.ogg'); // 野戦BGM再生
             }
+            
+            // 野戦の画面が表示されたあとに、大きさをピッタリに合わせる魔法を使います
+            setTimeout(() => {
+                this.adjustMapScale();
+                // サイズ調整が終わった後に、確実に操作部隊へカメラを向ける
+                if (this.turnQueue && this.turnQueue.length > 0) {
+                    setTimeout(() => this.scrollToUnit(this.turnQueue[0]), 50);
+                }
+            }, 100); // 画面ができるまで一瞬（0.1秒）だけ待ってから魔法をかけます
+        } else {
+            // ★プレイヤーがいない場合、画面に野戦マップが出ないように隠します！
+            const modal = document.getElementById('field-war-modal');
+            if (modal) modal.classList.add('hidden');
         }
         
         this.startTurn();
-        // 野戦の画面が表示されたあとに、大きさをピッタリに合わせる魔法を使います
-        setTimeout(() => {
-            this.adjustMapScale();
-            // サイズ調整が終わった後に、確実に操作部隊へカメラを向ける
-            if (this.turnQueue && this.turnQueue.length > 0) {
-                setTimeout(() => this.scrollToUnit(this.turnQueue[0]), 50);
-            }
-        }, 100); // 画面ができるまで一瞬（0.1秒）だけ待ってから魔法をかけます
     }
 
     initUI() {
@@ -1431,7 +1436,13 @@ class FieldWarManager {
             return speedB - speedA;
         });
 
-        this.processQueue();
+        // ★追加：AI同士の高速戦闘でブラウザがフリーズしないように、ターンの最初に少しだけ息継ぎをします！
+        const isPlayerInvolved = this.units.some(u => u.isPlayer);
+        if (!isPlayerInvolved) {
+            setTimeout(() => this.processQueue(), 0);
+        } else {
+            this.processQueue();
+        }
     }
 
     processQueue() {
@@ -1486,8 +1497,10 @@ class FieldWarManager {
             if (isPlayerInvolved) {
                 this.updateMap();
                 this.updateStatus();
+                setTimeout(() => this.processAITurn(), 600);
+            } else {
+                this.processAITurn(); // ★プレイヤーがいなければウェイトなしで即実行！
             }
-            setTimeout(() => this.processAITurn(), 600);
         }
     }
 
@@ -1532,9 +1545,15 @@ class FieldWarManager {
         } else if (this.state === 'PHASE_ATTACK') {
             unit.hasActionDone = true;
             this.state = 'IDLE';
-            this.updateMap();
-            this.updateStatus();
-            setTimeout(() => this.nextPhaseTurn(), 300);
+
+            const isPlayerInvolved = this.units.some(u => u.isPlayer);
+            if (isPlayerInvolved) {
+                this.updateMap();
+                this.updateStatus();
+                setTimeout(() => this.nextPhaseTurn(), 300);
+            } else {
+                this.nextPhaseTurn();
+            }
         }
     }
 
@@ -1575,12 +1594,17 @@ class FieldWarManager {
         // マップとステータスを更新し、行動済み扱いにして次の部隊へ
         unit.hasActionDone = true;
         this.state = 'IDLE';
-        this.updateMap();
-        this.updateStatus();
-        
-        setTimeout(() => {
+
+        const isPlayerInvolved = this.units.some(u => u.isPlayer);
+        if (isPlayerInvolved) {
+            this.updateMap();
+            this.updateStatus();
+            setTimeout(() => {
+                this.nextPhaseTurn();
+            }, 500);
+        } else {
             this.nextPhaseTurn();
-        }, 500);
+        }
     }
     
     checkEndCondition() {
@@ -2131,12 +2155,17 @@ class FieldWarManager {
         
         attacker.hasActionDone = true;
         this.state = 'IDLE';
-        this.updateMap();
-        this.updateStatus();
         
-        setTimeout(() => {
+        const isPlayerInvolved = this.units.some(u => u.isPlayer);
+        if (isPlayerInvolved) {
+            this.updateMap();
+            this.updateStatus();
+            setTimeout(() => {
+                this.nextPhaseTurn();
+            }, 800);
+        } else {
             this.nextPhaseTurn();
-        }, 800);
+        }
     }
 
     // ★修正: AIの行動スコアに「智謀」「性格」に加えて「孤立ペナルティ（5マス以上離れない）」を追加！

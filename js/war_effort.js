@@ -599,20 +599,17 @@ Object.assign(WarManager.prototype, {
                         this.state.defender.fieldHorses = interceptHorses;
                         this.state.defender.fieldGuns = interceptGuns;
 
-                        if (!isPlayerInvolved) this.resolveAutoFieldWar();
-                        else {
-                            if (!this.game.fieldWarManager) this.game.fieldWarManager = new window.FieldWarManager(this.game);
-                            this.game.fieldWarManager.startFieldWar(this.state, async (resultType) => {
-                                defCastle.soldiers += this.state.defender.fieldSoldiers;
-                                defCastle.rice += this.state.defFieldRice; 
-                                defCastle.horses = (defCastle.horses || 0) + (this.state.defender.fieldHorses || 0);
-                                defCastle.guns = (defCastle.guns || 0) + (this.state.defender.fieldGuns || 0);
-                                if (resultType === 'attacker_win' || resultType === 'defender_retreat' || resultType === 'draw_to_siege') {
-                                    await showSiegeMessage();
-                                    this.startSiegeWarPhase();
-                                } else this.endWar(false);
-                            });
-                        }
+                        if (!this.game.fieldWarManager) this.game.fieldWarManager = new window.FieldWarManager(this.game);
+                        this.game.fieldWarManager.startFieldWar(this.state, async (resultType) => {
+                            defCastle.soldiers += this.state.defender.fieldSoldiers;
+                            defCastle.rice += this.state.defFieldRice; 
+                            defCastle.horses = (defCastle.horses || 0) + (this.state.defender.fieldHorses || 0);
+                            defCastle.guns = (defCastle.guns || 0) + (this.state.defender.fieldGuns || 0);
+                            if (resultType === 'attacker_win' || resultType === 'defender_retreat' || resultType === 'draw_to_siege') {
+                                await showSiegeMessage();
+                                this.startSiegeWarPhase();
+                            } else this.endWar(false);
+                        });
                     } else {
                         await showSiegeMessage();
                         this.startSiegeWarPhase();
