@@ -216,7 +216,7 @@ window.GameEvents.push({
     },
     
     execute: async function(game) {
-        let newIkkiCastles = []; // 新しく一揆が起きた城の名前をメモする箱です
+        let playerIkkiCastles = []; // ★変更：自分の大名家で一揆が起きた城だけをメモする箱にします
 
         game.castles.forEach(c => {
             // 城のシール帳がなければ用意します
@@ -262,7 +262,11 @@ window.GameEvents.push({
                     if (Math.random() < occurProb) {
                         // 一揆発生！シールを貼ります
                         c.statusEffects.push('一揆');
-                        newIkkiCastles.push(c.name || "どこかの城");
+                        
+                        // ★変更：自分のお城の時だけ、後でお知らせするためにメモします
+                        if (c.ownerClan === game.playerClanId) {
+                            playerIkkiCastles.push(c.name || "どこかの城");
+                        }
                         
                         // 発生した瞬間の大きな被害を受けます
                         c.kokudaka = Math.max(0, Math.floor(c.kokudaka * 0.90));     // 石高10%減少
@@ -273,10 +277,12 @@ window.GameEvents.push({
             }
         });
         
-        // 新しく一揆が起きた城があれば、画面でお知らせします
-        if (newIkkiCastles.length > 0 && game.ui) {
-            const msg = `【一揆勃発】\n領民の不満が爆発し、以下の城で一揆が発生しました！\n・` + newIkkiCastles.join('\n・');
-            await game.ui.showDialogAsync(msg, false, 0);
+        // ★変更：自分のお城で一揆が起きていたら、１つずつ順番に画面でお知らせします
+        if (playerIkkiCastles.length > 0 && game.ui) {
+            for (let cName of playerIkkiCastles) {
+                const msg = `【一揆勃発】\n領民の不満が爆発し、当家の「${cName}」で一揆が発生しました！`;
+                await game.ui.showDialogAsync(msg, false, 0);
+            }
         }
     }
 });
