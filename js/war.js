@@ -25,9 +25,7 @@ window.WarParams = {
         CounterAtkPowerFactor: 0.05,
         FireSuccessBase: 0.25, FireDamageFactor: 0.8,
         ShortWarTurnLimit: 5, BaseRecoveryRate: 0.2, RetreatRecoveryRate: 0.3, RetreatCaptureRate: 0.1, DaimyoCaptureReduction: 0.3,
-        RetreatResourceLossFactor: 0.2, LootingBaseRate: 0.3, LootingCharmFactor: 0.002, DaimyoCharmWeight: 0.1,
-        RiceConsumptionAtk: 0.05, RiceConsumptionDef: 0.025,
-        BaseStat: 30, SubGeneralFactor: 0.2, MinDamage: 50,
+        RetreatResourceLossFactor: 0.2, LootingBaseRate: 0.3, LootingCharmF
         StatsLdrWeight: 1.2, StatsStrWeight: 0.3, StatsIntWeight: 0.5,
         MoraleBase: 50, LoyaltyDamageFactor: 500,
         AttackLoyaltyDecay: 50, AttackPopDecay: 500, WinStatIncrease: 5,
