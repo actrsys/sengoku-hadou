@@ -219,10 +219,14 @@ window.GameEvents.push({
         let newIkkiCastles = []; // 新しく一揆が起きた城の名前をメモする箱です
 
         game.castles.forEach(c => {
-            if (c.ownerClan === 0) return; // 空き城は無視します
-            
             // 城のシール帳がなければ用意します
             if (!c.statusEffects) c.statusEffects = [];
+
+            if (c.ownerClan === 0) {
+                // 空き城になったら、一揆のシールを綺麗に剥がしておきます
+                c.statusEffects = c.statusEffects.filter(s => s !== '一揆');
+                return; // 空き城での一揆処理はおしまいです
+            }
 
             const isIkki = c.statusEffects.includes('一揆');
             
@@ -291,10 +295,14 @@ window.GameEvents.push({
     
     execute: async function(game) {
         game.castles.forEach(c => {
-            if (c.ownerClan === 0) return; // 空き城は無視します
-            
             // 城のシール帳がなければ用意します
             if (!c.statusEffects) c.statusEffects = [];
+
+            if (c.ownerClan === 0) {
+                // 空き城になったら、兵糧攻めのシールを綺麗に剥がしておきます
+                c.statusEffects = c.statusEffects.filter(s => s !== '糧攻');
+                return; // 空き城での兵糧攻め処理はおしまいです
+            }
 
             let isSurrounded = false;
             
