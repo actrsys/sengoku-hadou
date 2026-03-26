@@ -952,62 +952,7 @@ class UIManager {
         });
     }
     
-    // ==========================================
-    // ★ここから追加：メッセージの魔法！
-    // ==========================================
-    showTapMessage(msg) {
-        return new Promise((resolve) => {
-            let overlay = document.getElementById('tap-message-overlay');
-            
-            if (!overlay) {
-                overlay = document.createElement('div');
-                overlay.id = 'tap-message-overlay';
-                overlay.className = 'modal'; // 他の画面と同じ黒い下敷きを使います
-                overlay.style.zIndex = '99999';
-                document.body.appendChild(overlay);
-            }
-            
-            // 白いウィンドウの中に、メッセージと「閉じる」ボタンを置きます
-            overlay.innerHTML = `
-                <div class="modal-content" style="max-width: 450px; text-align: center;">
-                    <div style="font-size: 1.1rem; line-height: 1.5; font-weight: bold; color: #333; margin-bottom: 20px; padding-top: 10px;">
-                        ${msg.replace(/\n/g, '<br>')}
-                    </div>
-                    <div class="modal-footer" style="justify-content: center; border-top: none; padding-bottom: 0;">
-                        <button class="btn-secondary" id="tap-msg-close-btn">閉じる</button>
-                    </div>
-                </div>
-            `;
-            
-            overlay.classList.remove('hidden');
-
-            const onClick = (e) => {
-                // ウィンドウの「外側（黒い背景）」か、「閉じるボタン」を押したか調べます
-                const isBackground = (e.target === overlay);
-                const isCloseBtn = (e.target.id === 'tap-msg-close-btn');
-
-                // 外側かボタンを押した時だけ、画面を閉じる魔法を発動します！
-                if (isBackground || isCloseBtn) {
-                    e.stopPropagation();
-                    e.preventDefault();
-                    overlay.classList.add('hidden');
-                    overlay.removeEventListener('click', onClick);
-                    
-                    // 背景を押して閉じた時だけ、ここで「閉じる音（cancel.ogg）」を鳴らします
-                    // （ボタンを押した時は、ゲーム共通の魔法で自動で音が鳴ります）
-                    if (isBackground && window.AudioManager) {
-                        window.AudioManager.playSE('cancel.ogg');
-                    }
-                    
-                    resolve(); // 止めていた時間を動かします！
-                }
-            };
-            
-            // 下敷き全体にクリックの魔法をセット！
-            overlay.addEventListener('click', onClick);
-        });
-    }
-    // ==========================================
+    // 専用のメッセージ魔法はもう使わないので、お掃除しました！
     
     showScenarioSelection(scenarios, onSelect) {
         this.forceResetModals();

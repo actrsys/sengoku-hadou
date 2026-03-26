@@ -199,7 +199,7 @@ Object.assign(WarManager.prototype, {
             this.game.ui.log(startMsg.replace('\n', ''));
             if (!isPlayerInvolved) {
                 // ★修正：諸勢力に対する鎮圧や反乱の時も、開始メッセージをしっかり出して結果を知らせます！
-                await this.game.ui.showTapMessage(startMsg);
+                await this.game.ui.showDialogAsync(startMsg);
             } else {
                 await this.game.ui.showCutin(`${atkArmyName}の${atkBushos[0].name}が\n${defCastle.name}に攻め込みました！`);
             }
@@ -493,7 +493,7 @@ Object.assign(WarManager.prototype, {
                                 
                                 this.game.ui.log(interceptMsg.replace('\n', ''));
                                 if (!isPlayerInvolved) {
-                                    await this.game.ui.showTapMessage(interceptMsg);
+                                    await this.game.ui.showDialogAsync(interceptMsg);
                                 } else {
                                     await this.game.ui.showCutin(interceptMsg);
                                 }
@@ -679,7 +679,7 @@ Object.assign(WarManager.prototype, {
                 }
                 
                 // どこを触っても消せるメッセージを表示します！
-                await this.game.ui.showTapMessage(resultMsg);
+                await this.game.ui.showDialogAsync(resultMsg);
             }
             // ==========================================
             
@@ -1022,7 +1022,7 @@ Object.assign(WarManager.prototype, {
                     this.game.ui.showResultModal(resultMsg, () => { this.closeWar(); });
                 } else {
                     // ★修正：戦闘画面は飛ばしますが、結果のメッセージは表示してタップを待ちます！
-                    await this.game.ui.showTapMessage(resultMsg);
+                    await this.game.ui.showDialogAsync(resultMsg);
                     this.closeWar();
                 }
                 return;
@@ -1097,7 +1097,7 @@ Object.assign(WarManager.prototype, {
                     this.game.ui.showResultModal(resultMsg, () => { this.closeWar(); });
                 } else {
                     // ★追加：AIの城で反乱が起きた時も、専用のメッセージを出してタップを待ちます！
-                    await this.game.ui.showTapMessage(resultMsg);
+                    await this.game.ui.showDialogAsync(resultMsg);
                     this.closeWar();
                 }
                 return;
