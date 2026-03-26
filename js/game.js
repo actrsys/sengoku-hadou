@@ -732,6 +732,7 @@ class GameManager {
         
         this.phase = 'title';
         this.isSpectatorMode = false;
+        this.isSpectatorPaused = false; // ★一時停止のフラグを追加
     }
     
     getRelation(id1, id2) { 
@@ -750,6 +751,7 @@ class GameManager {
         
         // ★ここから追加：前回のゲームの記憶やフラグを綺麗にお掃除します！
         this.isSpectatorMode = false; // 観戦モードも解除！
+        this.isSpectatorPaused = false; // 一時停止も解除！
         this.isProcessingAI = false; // AI思考中フラグを解除！
         if (this.aiTimer) {
             clearTimeout(this.aiTimer);
@@ -875,12 +877,14 @@ class GameManager {
     // ★観戦モードを始める魔法！
     startSpectatorMode() {
         this.isSpectatorMode = true;
+        this.isSpectatorPaused = false;
         this.playerClanId = -1; // プレイヤーを「誰もいない」状態にします
         this.phase = 'game';
         
-        // ボタンを切り替えます
+        // ボタンや黒い膜の見た目を切り替えます
         if (this.ui.btnSpectate) this.ui.btnSpectate.classList.add('hidden');
-        if (this.ui.btnStopSpectate) this.ui.btnStopSpectate.classList.remove('hidden');
+        if (this.ui.spectateControls) this.ui.spectateControls.classList.remove('hidden');
+        if (this.ui.aiGuard) this.ui.aiGuard.classList.add('spectator-mode');
         
         // 大名選択の特別な画面モードを解除します
         if (document.body.classList.contains('daimyo-select-mode')) {
@@ -1217,8 +1221,11 @@ class GameManager {
         if (this.warManager && this.warManager.state && this.warManager.state.active) return;
         if (this.selectionMode != null) return;
 
+        // ★観戦モードで「停止」を押している間は、ここでじっと待ちます！
+        if (this.isSpectatorMode && this.isSpectatorPaused) return;
+
         // ★ここを修正！ 全ての城が終わって翌月（endMonth）に行く前にも、メッセージが消えるのをじっと待ちます！
-        if (this.currentIndex >= this.turnQueue.length) { 
+        if (this.currentIndex >= this.turnQueue.length) {
             if (this.ui && this.ui.waitForDialogs) {
                 await this.ui.waitForDialogs();
             }
@@ -1255,7 +1262,9 @@ class GameManager {
 
         const isVisible = this.isCastleVisible(castle);
         const isNeighbor = this.castles.some(c => Number(c.ownerClan) === playerId && GameSystem.isAdjacent(c, castle));
-        const isImportant = isVisible || isNeighbor;
+        
+        // ★観戦モードの時は、全城が見えるため常に「重要（ゆっくり進める）」と判定されてしまうのを防ぎ、サクサク進めます！
+        const isImportant = !this.isSpectatorMode && (isVisible || isNeighbor);
         
         // ==========================================
         // ★ここに追加：画面を動かしたり「ご命令ください」を出す前に、
@@ -1514,8 +1523,9 @@ class GameManager {
         const reader = new FileReader(); 
         reader.onload = async (evt) => {
             try { 
-                // ★ここから追加：前のゲームの記憶やフラグを綺麗にお掃除します！
+                // ★ここから追加：前回のゲームの記憶やフラグを綺麗にお掃除します！
                 this.isSpectatorMode = false; // 観戦モードも解除！
+                this.isSpectatorPaused = false; // 一時停止も解除！
                 this.isProcessingAI = false; // AI思考中フラグを解除！
                 if (this.aiTimer) {
                     clearTimeout(this.aiTimer);
