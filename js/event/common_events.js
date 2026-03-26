@@ -204,6 +204,80 @@ window.GameEvents.push({
 });
 
 // ==========================================
+// ★ 毎月の一揆イベント（発生・継続・解除）
+// ==========================================
+window.GameEvents.push({
+    id: "ikki_event_monthly",
+    timing: "startMonth_before", // 収入の前に実行します
+    isOneTime: false,
+    
+    checkCondition: function(game) {
+        return true; // 毎月必ずチェックします
+    },
+    
+    execute: async function(game) {
+        let newIkkiCastles = []; // 新しく一揆が起きた城の名前をメモする箱です
+
+        game.castles.forEach(c => {
+            if (c.ownerClan === 0) return; // 空き城は無視します
+            
+            // 城のシール帳がなければ用意します
+            if (!c.statusEffects) c.statusEffects = [];
+
+            const isIkki = c.statusEffects.includes('一揆');
+            
+            if (isIkki) {
+                // 【一揆中】まずは解除されるかチェックします！
+                if (c.peoplesLoyalty >= 50) {
+                    // 民忠50で25%、95以上で100%の確率で解除されます
+                    let clearProb = 0.25;
+                    if (c.peoplesLoyalty >= 95) {
+                        clearProb = 1.0;
+                    } else {
+                        clearProb = 0.25 + ((c.peoplesLoyalty - 50) / 45) * 0.75;
+                    }
+                    
+                    if (Math.random() < clearProb) {
+                        // 解除成功！シールを剥がして次の城へ行きます
+                        c.statusEffects = c.statusEffects.filter(s => s !== '一揆');
+                        return; // 解除されたら今月の継続ダメージは受けません
+                    }
+                }
+                
+                // 【一揆継続】解除されなかったら、今月の被害を受けます
+                c.kokudaka = Math.max(0, Math.floor(c.kokudaka * 0.95));     // 石高5%減少
+                c.defense = Math.max(0, Math.floor(c.defense * 0.95));       // 防御5%減少
+                c.population = Math.max(0, Math.floor(c.population * 0.98)); // 人口2%減少
+
+            } else {
+                // 【平常時】民忠が49以下なら、一揆が起きるかチェックします！
+                if (c.peoplesLoyalty <= 49) {
+                    // 民忠49で1%、0で100%の確率で発生します
+                    const occurProb = 0.01 + ((49 - c.peoplesLoyalty) / 49) * 0.99;
+                    
+                    if (Math.random() < occurProb) {
+                        // 一揆発生！シールを貼ります
+                        c.statusEffects.push('一揆');
+                        newIkkiCastles.push(c.name || "どこかの城");
+                        
+                        // 発生した瞬間の大きな被害を受けます
+                        c.kokudaka = Math.max(0, Math.floor(c.kokudaka * 0.90));     // 石高10%減少
+                        c.defense = Math.max(0, Math.floor(c.defense * 0.90));       // 防御10%減少
+                        c.population = Math.max(0, Math.floor(c.population * 0.95)); // 人口5%減少
+                    }
+                }
+            }
+        });
+        
+        // 新しく一揆が起きた城があれば、画面でお知らせします
+        if (newIkkiCastles.length > 0 && game.ui) {
+            const msg = `【一揆勃発】\n領民の不満が爆発し、以下の城で一揆が発生しました！\n・` + newIkkiCastles.join('\n・');
+            await game.ui.showDialogAsync(msg, false, 0);
+        }
+    }
+});
+
+// ==========================================
 // ★ ９月の豊作・凶作イベント ＆ 兵糧収入処理（スッキリ版）
 // ==========================================
 window.GameEvents.push({
