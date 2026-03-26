@@ -50,45 +50,6 @@ class UIManager {
         this.mapZoomOutBtn = document.getElementById('map-zoom-out');
         this.historyModal = document.getElementById('history-modal');
         this.historyList = document.getElementById('history-list');
-
-        this.btnSpectate = document.getElementById('btn-spectate');
-        if (this.btnSpectate) {
-            this.btnSpectate.onclick = () => {
-                if (window.AudioManager) window.AudioManager.playSE('choice.ogg');
-                this.showDialog("観戦しますか？", true, () => {
-                    this.game.startSpectatorMode();
-                });
-            };
-        }
-
-        this.spectateControls = document.getElementById('spectate-controls');
-        this.btnStopSpectate = document.getElementById('btn-stop-spectate');
-        if (this.btnStopSpectate) {
-            this.btnStopSpectate.onclick = () => {
-                if (window.AudioManager) window.AudioManager.playSE('choice.ogg');
-                this.showDialog("観戦を終了しますか？", true, () => {
-                    this.returnToTitle();
-                });
-            };
-        }
-
-        this.btnPauseSpectate = document.getElementById('btn-pause-spectate');
-        if (this.btnPauseSpectate) {
-            this.btnPauseSpectate.onclick = () => {
-                if (window.AudioManager) window.AudioManager.playSE('choice.ogg');
-                this.game.isSpectatorPaused = !this.game.isSpectatorPaused;
-                if (this.game.isSpectatorPaused) {
-                    this.btnPauseSpectate.textContent = '進行';
-                    this.btnPauseSpectate.style.backgroundColor = '#4caf50'; // 進行の時は緑色に
-                    this.btnPauseSpectate.style.borderColor = '#a5d6a7';
-                } else {
-                    this.btnPauseSpectate.textContent = '停止';
-                    this.btnPauseSpectate.style.backgroundColor = ''; // 元のオレンジ色に戻す
-                    this.btnPauseSpectate.style.borderColor = '';
-                    this.game.processTurn(); // 止まっていたAIのターンを再開します！
-                }
-            };
-        }
         
         this.pcNewUiContainer = document.getElementById('pc-new-ui-container');
         this.pcNewStatusPanel = document.getElementById('pc-new-status-panel');
@@ -637,19 +598,6 @@ class UIManager {
         if(this.warModal) this.warModal.classList.add('hidden');
         if(this.unitDivideModal) this.unitDivideModal.classList.add('hidden');
         if(this.aiGuard) this.aiGuard.classList.add('hidden'); 
-
-        // 観戦ボタンや黒い膜の魔法も元通りにリセットしておきます
-        const btnSpectate = document.getElementById('btn-spectate');
-        if (btnSpectate) btnSpectate.classList.add('hidden');
-        const spectateControls = document.getElementById('spectate-controls');
-        if (spectateControls) spectateControls.classList.add('hidden');
-        const btnPauseSpectate = document.getElementById('btn-pause-spectate');
-        if (btnPauseSpectate) {
-            btnPauseSpectate.textContent = '停止';
-            btnPauseSpectate.style.backgroundColor = '';
-            btnPauseSpectate.style.borderColor = '';
-        }
-        if (this.aiGuard) this.aiGuard.classList.remove('spectator-mode');
         
         // ★ここから追加：さっき作った、コマンドを初期化して隠す魔法をここでも使います！
         if (typeof this.clearCommandMenu === 'function') {
@@ -2687,7 +2635,6 @@ class UIManager {
     
     setWarModalVisible(visible) {
         if (!this.warModal) return;
-        if (this.game && this.game.isSpectatorMode) return; // ★観戦中は絶対に合戦画面を出さない！
         if (visible) this.warModal.classList.remove('hidden');
         else this.warModal.classList.add('hidden');
     }
@@ -2706,12 +2653,6 @@ class UIManager {
     }
     
     showWarActionMessage(messages, onClick) {
-        // ★観戦中はメッセージを出さずに、一瞬で次の処理に進めます！
-        if (this.game && this.game.isSpectatorMode) {
-            onClick();
-            return;
-        }
-
         if (!this.warControls) return;
 
         const warAiGuard = document.getElementById('war-ai-guard');
