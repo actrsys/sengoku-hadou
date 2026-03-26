@@ -84,7 +84,9 @@ img { pointer-events: none; -webkit-user-drag: none; user-drag: none; }
 .sp-val-right { text-align: right; font-weight: bold; padding-right: 2px; font-variant-numeric: tabular-nums; }
 .sp-val-left { text-align: left; font-weight: bold; padding-left: 2px; font-variant-numeric: tabular-nums; }
 .sp-empty {}
-.sp-info-footer { display: flex; justify-content: space-around; background: #e0e0e0; padding: 2px 0; font-weight: bold; border-bottom: 1px solid #ccc; font-size: 0.85rem; }
+.sp-info-footer { display: flex; justify-content: space-between; gap: 4px; padding: 4px 5px; font-weight: bold; font-size: 0.85rem; }
+.sp-footer-box { flex: 1; display: flex; justify-content: space-between; background: #e0e0e0; padding: 2px 6px; border-radius: 4px; border: 1px solid #ccc; }
+.sp-footer-box span:last-child { font-variant-numeric: tabular-nums; text-align: right; }
 
 #bottom-command-bar { flex: none; background: #fff; border-top: 1px solid var(--border-color); padding-bottom: max(5px, env(safe-area-inset-bottom)); padding-left: 5px; padding-right: 5px; z-index: 200; box-shadow: 0 -2px 5px rgba(0,0,0,0.1); height: auto; display: block; }
 #mobile-bottom-info { padding: 0; margin: 0; }
