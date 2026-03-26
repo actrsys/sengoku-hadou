@@ -1150,9 +1150,9 @@ class UIManager {
                 </div>
             </div>
             <div class="sp-info-footer">
-                <span>金　${mask(castle.gold)}</span>
-                <span>兵糧　${mask(castle.rice)}</span>
-                <span>兵数　${mask(castle.soldiers)}</span>
+                <div class="sp-footer-box"><span>金</span><span>${mask(castle.gold)}</span></div>
+                <div class="sp-footer-box"><span>兵糧</span><span>${mask(castle.rice)}</span></div>
+                <div class="sp-footer-box"><span>兵数</span><span>${mask(castle.soldiers)}</span></div>
             </div>
         `;
 
