@@ -1430,13 +1430,6 @@ class UIManager {
                     if (this.game.isProcessingAI) return;
                     this.cancelMapSelection(true);
                     this.showDialog("今月の命令を終了しますか？", true, () => {
-                        this.menuState = 'MAIN';
-                        this.pcMenuPath = [];
-                        
-                        if (mobileArea) mobileArea.innerHTML = '';
-                        const pcArea = document.getElementById('pc-new-command-area');
-                        if (pcArea) pcArea.innerHTML = '';
-                        
                         this.game.finishTurn();
                     });
                 };
@@ -1546,13 +1539,6 @@ class UIManager {
             if (this.game.isProcessingAI) return;
             this.cancelMapSelection(true);
             this.showDialog("今月の命令を終了しますか？", true, () => {
-                this.menuState = 'MAIN';
-                this.pcMenuPath = [];
-                
-                const mobileArea = document.getElementById('command-area');
-                if (mobileArea) mobileArea.innerHTML = '';
-                if (pcArea) pcArea.innerHTML = '';
-                
                 this.game.finishTurn();
             });
         });
@@ -1594,6 +1580,15 @@ class UIManager {
         };
 
         renderSubMenu(COMMAND_MENU_STRUCTURE, 0, col1);
+    }
+
+    clearCommandMenu() {
+        this.menuState = 'MAIN';
+        this.pcMenuPath = [];
+        const mobileArea = document.getElementById('command-area');
+        if (mobileArea) mobileArea.innerHTML = '';
+        const pcArea = document.getElementById('pc-new-command-area');
+        if (pcArea) pcArea.innerHTML = '';
     }
     
     openGunshiModal(gunshi, msg, onConfirm) {

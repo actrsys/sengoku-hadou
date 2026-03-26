@@ -1313,6 +1313,11 @@ class GameManager {
         if (this.aiTimer) { clearTimeout(this.aiTimer); this.aiTimer = null; }
 
         this.selectionMode = null; 
+
+        // ★ここから追加：ターン終了時、必ずコマンドの階層を初期化して非表示にします！
+        if (this.ui && typeof this.ui.clearCommandMenu === 'function') {
+            this.ui.clearCommandMenu();
+        }
         
         // ★ここから追加：自分のターンが終わった瞬間に、いったん膜を張って操作をブロックします！
         this.isProcessingAI = true;
