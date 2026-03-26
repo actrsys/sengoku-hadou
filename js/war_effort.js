@@ -384,28 +384,61 @@ Object.assign(WarManager.prototype, {
                             } else onResult('siege');
                         }
                     } else {
-                        // AI field war logic... (unchanged logic for busho evaluation)
-                        if (totalDefSoldiers >= totalAtkSoldiers * 0.8) {
-                            let availableDefBushos = this.game.getCastleBushos(defCastle.id).filter(b => b.status !== 'dead' && b.status !== 'ronin' && b.status !== 'unborn' && b.belongKunishuId === 0);
-                            let evaluator = availableDefBushos.find(b => b.isDaimyo);
-                            if (!evaluator) evaluator = availableDefBushos.find(b => b.isCastellan);
-                            
-                            let evaluatorInt = 50;
-                            let evaluatorId = 0;
-                            if (evaluator) {
-                                evaluatorInt = evaluator.intelligence;
-                                evaluatorId = evaluator.id;
-                            }
+                        let availableDefBushos = this.game.getCastleBushos(defCastle.id).filter(b => b.status !== 'dead' && b.status !== 'ronin' && b.status !== 'unborn' && b.belongKunishuId === 0);
+                        let evaluator = availableDefBushos.find(b => b.isDaimyo);
+                        if (!evaluator) evaluator = availableDefBushos.find(b => b.isCastellan);
+                        
+                        let evaluatorInt = 50;
+                        let evaluatorId = 0;
+                        let isAggressive = false;
+                        if (evaluator) {
+                            evaluatorInt = evaluator.intelligence;
+                            evaluatorId = evaluator.id;
+                            isAggressive = (evaluator.personality === 'aggressive');
+                        }
 
-                            let maxError = 0;
-                            if (evaluatorInt <= 50) {
-                                maxError = 0.2; 
-                            } else if (evaluatorInt >= 95) {
-                                maxError = 0;   
-                            } else {
-                                maxError = 0.2 * (95 - evaluatorInt) / 45;
-                            }
+                        // 智謀による見誤り率（最大エラー率）の計算
+                        let maxError = 0;
+                        if (evaluatorInt >= 95) {
+                            maxError = 0.01;
+                        } else if (evaluatorInt >= 50) {
+                            maxError = 0.15 - ((evaluatorInt - 50) * (0.14 / 45));
+                        } else if (evaluatorInt > 5) {
+                            maxError = 0.60 - ((evaluatorInt - 5) * 0.01);
+                        } else {
+                            maxError = 0.60;
+                        }
 
+                        // 乱数で見積もりをブレさせる関数
+                        const getPerceived = (val) => {
+                            const err = (Math.random() * 2 - 1.0) * maxError;
+                            return val * (1.0 + err);
+                        };
+
+                        // 各種数値の見積もり
+                        const perceivedTotalDefSoldiers = getPerceived(totalDefSoldiers);
+                        const perceivedTotalAtkSoldiers = getPerceived(totalAtkSoldiers);
+                        const perceivedDefSoldiers = getPerceived(defCastle.soldiers);
+                        const perceivedDefRice = getPerceived(defCastle.rice);
+                        const perceivedDefDefense = getPerceived(defCastle.defense);
+
+                        // 判定条件
+                        let shouldIntercept = false;
+                        if (isAggressive) {
+                            if (perceivedTotalDefSoldiers >= perceivedTotalAtkSoldiers * 1.2 ||
+                                perceivedDefRice < perceivedDefSoldiers * 1.5 ||
+                                perceivedDefDefense < 300) {
+                                shouldIntercept = true;
+                            }
+                        } else {
+                            if (perceivedTotalDefSoldiers >= perceivedTotalAtkSoldiers * 1.5 ||
+                                perceivedDefRice < perceivedDefSoldiers * 1.2 ||
+                                perceivedDefDefense < 400) {
+                                shouldIntercept = true;
+                            }
+                        }
+
+                        if (shouldIntercept) {
                             const evaluatedBushos = availableDefBushos.map(b => {
                                 const truePower = (b.leadership + b.strength + b.intelligence) / 2;
                                 let perceivedPower = truePower;
