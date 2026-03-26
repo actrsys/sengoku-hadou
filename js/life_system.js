@@ -344,48 +344,6 @@ class LifeSystem {
                     const husband = this.game.getBusho(p.husbandId);
                     if (husband) {
                         husband.wifeIds = husband.wifeIds.filter(id => id !== p.id);
-                        
-                        // ★ここから追加：婚姻同盟の解消チェック
-                        const clanA = p.originalClanId;
-                        const clanB = husband.clan;
-                        
-                        if (clanA > 0 && clanB > 0 && clanA !== clanB) {
-                            // 他にこの２つの家を結んでいる、生きているお姫様がいるか名簿を探します
-                            const hasOtherMarriage = this.game.princesses.some(otherP => {
-                                // 死んでいる、生まれていない、結婚していない姫は除外します
-                                if (otherP.status === 'dead' || otherP.status === 'unborn' || otherP.husbandId === 0) return false;
-                                
-                                const otherHusband = this.game.getBusho(otherP.husbandId);
-                                if (!otherHusband) return false;
-                                
-                                // 実家と嫁ぎ先が、今回と同じ組み合わせかチェックします（A家→B家、またはB家→A家）
-                                return (otherP.originalClanId === clanA && otherHusband.clan === clanB) || 
-                                       (otherP.originalClanId === clanB && otherHusband.clan === clanA);
-                            });
-                            
-                            // 他に誰もいなければ、婚姻のシール（isMarriage）を剥がします！
-                            if (!hasOtherMarriage) {
-                                const clanAData = this.game.clans.find(c => c.id === clanA);
-                                const clanBData = this.game.clans.find(c => c.id === clanB);
-                                
-                                if (clanAData && clanAData.diplomacyValue[clanB]) {
-                                    clanAData.diplomacyValue[clanB].isMarriage = false;
-                                }
-                                if (clanBData && clanBData.diplomacyValue[clanA]) {
-                                    clanBData.diplomacyValue[clanA].isMarriage = false;
-                                }
-                                
-                                // プレイヤーが関係している家なら、追加でお知らせを出します
-                                if (clanA === this.game.playerClanId || clanB === this.game.playerClanId) {
-                                    const targetClanName = (clanA === this.game.playerClanId) ? clanBData?.name : clanAData?.name;
-                                    if (targetClanName) {
-                                        const breakMsg = `${p.name}の死により、${targetClanName}との婚姻関係は解消され、通常の同盟となりました。`;
-                                        this.game.ui.log(breakMsg);
-                                        await this.game.ui.showDialogAsync(breakMsg, false, 0);
-                                    }
-                                }
-                            }
-                        }
                     }
                 }
 

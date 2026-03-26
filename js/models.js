@@ -231,21 +231,6 @@ class Busho {
             this.wifeIds = [Number(data.wife)];
         }
 
-        // ★【ここから書き足し：養父・養子の設定】
-        // 養父（お父さん）の出席番号を覚えておきます
-        this.adoptiveFatherId = Number(data.adoptiveFatherId || data.adoptiveFather || 0);
-
-        // 養子（子ども）の出席番号をリストで覚えておきます
-        this.adoptedSonIds = [];
-        if (data.adoptedSonIds && Array.isArray(data.adoptedSonIds)) {
-            this.adoptedSonIds = data.adoptedSonIds;
-        } else if (typeof data.adoptedSons === 'string' && data.adoptedSons.trim() !== "") {
-            // CSVから「1|2」のように届いた文字を数字のリストにします
-            this.adoptedSonIds = String(data.adoptedSons).split('|').map(id => Number(id.trim()));
-        } else if (Number(data.adoptedSons) > 0) {
-            this.adoptedSonIds = [Number(data.adoptedSons)];
-        }
-
         // ★【ここから書き足し：一門設定（修正版）】
         if (data.baseFamilyIds && Array.isArray(data.baseFamilyIds)) {
             this.baseFamilyIds = data.baseFamilyIds;
@@ -332,19 +317,6 @@ class Busho {
         // まずは普段使う用のリストに、金庫（baseFamilyIds）の中身を丸写しします
         this.familyIds = [...this.baseFamilyIds];
         
-        // ★追加：養父が設定されていて、まだリストに入っていなければ追加します！
-        if (this.adoptiveFatherId > 0 && !this.familyIds.includes(this.adoptiveFatherId)) {
-            this.familyIds.push(this.adoptiveFatherId);
-        }
-
-        // ★追加：養子たちが設定されていて、まだリストに入っていなければ追加します！
-        this.adoptedSonIds.forEach(sonId => {
-            // ★万が一「0」や空っぽのデータがリストに紛れ込んでも、無視するようにガード（sonId > 0）を追加しました！
-            if (sonId > 0 && !this.familyIds.includes(sonId)) {
-                this.familyIds.push(sonId);
-            }
-        });
-
         // 次に、自分の奥さんリスト（ID）を順番に見ていきます
         this.wifeIds.forEach(wId => {
             // 姫の名簿から、奥さんのデータを探します
