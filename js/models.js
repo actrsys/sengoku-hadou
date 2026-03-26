@@ -63,11 +63,18 @@ class Clan {
                             statusStr = '和睦';
                         }
                         
+                        // ★「婚姻」と書かれていたら、同盟状態にして結婚シールを貼ります
+                        let isMarriage = false;
+                        if (statusStr === '婚姻') {
+                            statusStr = '同盟';
+                            isMarriage = true;
+                        }
+
                         this.diplomacyValue[targetId] = {
                             status: statusStr,
                             sentiment: sentimentVal,
-                            trucePeriod: trucePeriod, // ★取り出した期間も一緒にメモしておきます
-                            isMarriage: false // ★今回追加：結婚で結ばれた同盟かどうかのシールです（最初は貼ってない状態）
+                            trucePeriod: trucePeriod,
+                            isMarriage: isMarriage 
                         };
                     }
                 }
