@@ -116,7 +116,7 @@ class LifeSystem {
                                 
                                 // ★ここで「await（待て）」の魔法を使います！
                                 // プレイヤーが画面をクリックしてメッセージを閉じるまで、次の処理には絶対に進みません。
-                                await this.game.ui.showTapMessage(msg); 
+                                await this.game.ui.showDialogAsync(msg); 
                                 // ==========================================
                                 
                                 // もし大名だったら、大名家の名前も新しくします
@@ -134,7 +134,7 @@ class LifeSystem {
                                             // ★大名家の名前が変わった時も、新しくメッセージを作って1回ずつ待ちます！
                                             const clanMsg = `当主の改名により、${oldClanName}は今後「${clan.name}」となります。`;
                                             this.game.ui.log(clanMsg);
-                                            await this.game.ui.showTapMessage(clanMsg);
+                                            await this.game.ui.showDialogAsync(clanMsg);
                                             // ==========================================
                                         }
                                     }

@@ -633,7 +633,7 @@ class KunishuSystem {
         if (!isPlayer) {
             const startMsg = `【諸勢力鎮圧】\n${atkDaimyoName}の${leaderName}が、\n${kunishuName}の鎮圧に乗り出しました！`;
             this.game.ui.log(startMsg.replace('\n', ''));
-            await this.game.ui.showTapMessage(startMsg);
+            await this.game.ui.showDialogAsync(startMsg);
         }
 
         this.game.warManager.startSiegeWarPhase();
