@@ -226,6 +226,42 @@ class LifeSystem {
             }
         });
 
+        // ★ここから追加：姫の登場チェックを書き足します！
+        const unbornPrincesses = this.game.princesses.filter(p => p.status === 'unborn' && p.startYear <= currentYear);
+
+        unbornPrincesses.forEach(p => {
+            let targetClanId = 0;
+
+            if (p.fatherId > 0) {
+                // お父さんがいる場合は、お父さんのいる大名家を探します
+                const father = this.game.getBusho(p.fatherId);
+                if (father && father.status !== 'dead' && father.status !== 'unborn' && father.clan !== 0) {
+                    targetClanId = father.clan;
+                }
+            } else if (p.originalClanId > 0) {
+                // お父さんがいなくて、実家の大名家が設定されている場合
+                const clanCastles = this.game.castles.filter(c => c.ownerClan === p.originalClanId);
+                // その大名家が滅亡していなければ（お城を持っていれば）
+                if (clanCastles.length > 0) {
+                    targetClanId = p.originalClanId;
+                } else {
+                    // 実家が滅亡している場合は、登場せずに待ちます
+                    return;
+                }
+            }
+
+            if (targetClanId > 0) {
+                p.status = 'unmarried'; // 登場して「未婚」になります
+                p.currentClanId = targetClanId;
+                
+                // プレイヤーの大名家に姫がやってきたらお知らせのメッセージを作ります
+                if (targetClanId === this.game.playerClanId) {
+                    messages.push(`${p.name}が成人し、当家に登場しました！`);
+                }
+            }
+        });
+        // ★追加ここまで！
+
         // お知らせがあれば、画面に表示します
         if (messages.length > 0) {
             const msgText = messages.join('\n');
@@ -273,6 +309,35 @@ class LifeSystem {
             // ★大名の時と同じように、ダイアログを出して0秒（押すまで）待ちます！
             await this.game.ui.showDialogAsync(`${names}が病によりこの世を去りました…。`, false, 0);
         }
+
+        // ★ここから追加：姫の寿命チェックを書き足します！
+        const targetPrincesses = this.game.princesses.filter(p => 
+            p.status !== 'unborn' && p.status !== 'dead' && currentYear >= (p.endYear - 1)
+        );
+
+        for (const p of targetPrincesses) {
+            const yearsPassed = currentYear - (p.endYear - 1);
+            const deathProb = 0.02 + (yearsPassed * 0.02);
+
+            if (Math.random() < deathProb) {
+                p.status = 'dead'; // 「死亡」の印をつけます
+                
+                // もし結婚していたら、旦那さんの奥さんリストから外します
+                if (p.husbandId > 0) {
+                    const husband = this.game.getBusho(p.husbandId);
+                    if (husband) {
+                        husband.wifeIds = husband.wifeIds.filter(id => id !== p.id);
+                    }
+                }
+
+                // プレイヤーの家にいる姫だったら、悲しいお知らせを表示します
+                if (p.currentClanId === this.game.playerClanId) {
+                    this.game.ui.log(`${p.name}が病によりこの世を去りました…。`);
+                    await this.game.ui.showDialogAsync(`${p.name}が病によりこの世を去りました…。`, false, 0);
+                }
+            }
+        }
+        // ★追加ここまで！
     }
 
     // お別れの処理をするところです
