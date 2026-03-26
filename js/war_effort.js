@@ -2052,7 +2052,7 @@ Object.assign(WarManager.prototype, {
                 // ★修正：こちらも同じく「水色(log-color-def)」にします
                 let colorClass = "log-color-def";
                 let leaderName = reinfBushos.length > 0 ? reinfBushos[0].name : "総大将";
-                this.game.ui.log(`【応援軍】<span class="${colorClass}">${helperCastle.name}の${leaderName}</span>が守備側の援軍に出発しました！`);
+                this.game.ui.log(`【応援軍】<span class="${colorClass}">${helperCastle.name}の${leaderName}</span>が守備側の援軍として出発しました！`);
                 onComplete(selfReinfData);
             },
             onCancel: promptBusho
@@ -2319,7 +2319,7 @@ Object.assign(WarManager.prototype, {
         this.state.isPlayerInvolved = true;
         const helperClanName = this.game.clans.find(c => c.id === helperClanId)?.name || "援軍";
         const leaderName = reinfBushos.length > 0 ? reinfBushos[0].name : "総大将";
-        this.game.ui.showDialog(`${helperClanName}の${leaderName} (${helperCastle.name}) が守備側の援軍に出発しました！`, false, onComplete);
+        this.game.ui.showDialog(`${helperClanName}の${leaderName} (${helperCastle.name}) が守備側の援軍として出発しました！`, false, onComplete);
     }, // ←★ここにカンマ（,）を付けるのがとっても大事です！
     
     // ★追加: 城の所有者が変わった時、その城にいる諸勢力の友好度をチェックして低下させる魔法
