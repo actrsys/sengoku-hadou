@@ -601,13 +601,19 @@ Object.assign(WarManager.prototype, {
                 }
             };
 
+            console.log("【チェック】諸勢力の鎮圧戦ですか？: " + (this.state.isKunishuSubjugation ? "はい" : "いいえ"));
+            console.log("【チェック】野戦システム(FieldWarManager)は読み込まれていますか？: " + (typeof window.FieldWarManager !== 'undefined' ? "はい" : "いいえ（未定義）"));
+
             if (this.state.isKunishuSubjugation) {
+                console.log("諸勢力の鎮圧戦なので、強制的に籠城戦になります！");
                 await showSiegeMessage();
                 this.startSiegeWarPhase();
             } else if (typeof window.FieldWarManager === 'undefined') {
+                console.log("野戦のシステムが見つからないため、強制的に籠城戦になります！");
                 await showSiegeMessage();
                 this.startSiegeWarPhase();
             } else {
+                console.log("野戦ができる状態なので、選択フェーズに入ります！");
                 showInterceptDialog(async (choice, defAssignments, defRice, atkAssignments, interceptHorses = 0, interceptGuns = 0) => {
                     this.game.ui.restoreAIGuard();
                     
