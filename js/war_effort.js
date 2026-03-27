@@ -1923,19 +1923,19 @@ Object.assign(WarManager.prototype, {
             reinfGold = Math.floor(reinfGold / 100) * 100;
             
             // 足りなければお城の全額にします
-            if (reinfGold > defCastle.gold) {
-                reinfGold = defCastle.gold;
-            }
+            if (reinfGold > defCastle.gold) {
+                reinfGold = defCastle.gold;
+            }
 
-            // ★追加：自分が相手を「支配」しているなら強制参加なので、持参金は０にします！
-            if (!best.force.isKunishu) {
-                const rel = this.game.getRelation(defClanId, best.force.id);
-                if (rel && rel.status === '支配') {
-                    reinfGold = 0;
-                }
-            }
+            // ★追加：自分が相手を「支配」しているなら強制参加なので、持参金は０にします！
+            if (!best.force.isKunishu) {
+                const rel = this.game.getRelation(defClanId, best.force.id);
+                if (rel && rel.status === '支配') {
+                    reinfGold = 0;
+                }
+            }
 
-            this.executeDefReinforcement(reinfGold, best.castle, defCastle, onComplete);
+            this.executeDefReinforcement(reinfGold, best.castle, defCastle, onComplete);
         }
     },
 
@@ -1967,7 +1967,11 @@ Object.assign(WarManager.prototype, {
                 const survivingBushos = [];
                 for (let b of finalBushos) {
                     if (Math.random() < 0.10) {
-                        await this.game.ui.showDialogAsync(`【強行軍】\n我が軍の${b.name}が凍死しました……`, false, 0);
+                        if (myClanId === this.game.playerClanId) {
+                            await this.game.ui.showDialogAsync(`【強行軍】\n我が軍の${b.name}が凍死しました……`, false, 0);
+                        } else if (this.state && this.state.isPlayerInvolved) {
+                            await this.game.ui.showDialogAsync(`【強行軍】\n${helperCastle.name}の${b.name}が凍死したようです。`, false, 0);
+                        }
                         await this.game.lifeSystem.executeDeath(b);
                     } else {
                         survivingBushos.push(b);
@@ -1980,13 +1984,21 @@ Object.assign(WarManager.prototype, {
                 finalSVal -= lostSoldiers;
 
                 if (lostSoldiers > 0) {
-                    await this.game.ui.showDialogAsync(`【強行軍】\n我が軍の兵士${lostSoldiers}人が遭難しました……`, false, 0);
+                    if (myClanId === this.game.playerClanId) {
+                        await this.game.ui.showDialogAsync(`【強行軍】\n我が軍の兵士${lostSoldiers}人が遭難しました……`, false, 0);
+                    } else if (this.state && this.state.isPlayerInvolved) {
+                        await this.game.ui.showDialogAsync(`【強行軍】\n${helperCastle.name}からの援軍が、兵士${lostSoldiers}人を雪で失ったようです。`, false, 0);
+                    }
                 }
 
                 if (finalBushos.length === 0) {
-                    await this.game.ui.showDialogAsync("【強行軍】\n我が軍は行方不明になりました……", false, 0);
-                    this.game.ui.updatePanelHeader();
-                    this.game.ui.renderCommandMenu();
+                    if (myClanId === this.game.playerClanId) {
+                        await this.game.ui.showDialogAsync("【強行軍】\n我が軍は行方不明になりました……", false, 0);
+                        this.game.ui.updatePanelHeader();
+                        this.game.ui.renderCommandMenu();
+                    } else if (this.state && this.state.isPlayerInvolved) {
+                        await this.game.ui.showDialogAsync(`【強行軍】\n${helperCastle.name}からの援軍は、行方不明になったようです……`, false, 0);
+                    }
                     onComplete(null);
                     return;
                 }
