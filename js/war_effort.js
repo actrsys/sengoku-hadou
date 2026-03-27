@@ -261,11 +261,7 @@ Object.assign(WarManager.prototype, {
                     
                     this.game.ui.log(`【${reinfType}】${hC.name}の${leaderName}が攻撃側の援軍として参戦しました。`);
                     
-                    if (isPlayerInvolved) {
-                        await this.game.ui.showCutin(msg);
-                    } else {
-                        await this.game.ui.showDialogAsync(msg);
-                    }
+                    await this.game.ui.showDialogAsync(msg);
                 }
             };
             await processReinforcement(selfReinforcementData, true);
