@@ -274,7 +274,7 @@ class KunishuSystem {
                     let actualAmount = Math.min(amount, maxAdd);
                     if (actualAmount > 0) {
                         castle.gold += actualAmount;
-                        const msg = `【諸勢力支援】\n${kunishuName}が、${clanName}の${castle.name}に金${actualAmount}を献上しました。`;
+                        const msg = `${kunishuName}が、${clanName}の${castle.name}に金${actualAmount}を献上しました。`;
                         this.game.ui.log(msg.replace('\n', ''));
                         if (isPlayerCastle) await this.game.ui.showDialogAsync(msg);
                     }
@@ -283,7 +283,7 @@ class KunishuSystem {
                     let actualAmount = Math.min(amount, maxAdd);
                     if (actualAmount > 0) {
                         castle.rice += actualAmount;
-                        const msg = `【諸勢力支援】\n${kunishuName}が、${clanName}の${castle.name}に兵糧${actualAmount}を献上しました。`;
+                        const msg = `${kunishuName}が、${clanName}の${castle.name}に兵糧${actualAmount}を献上しました。`;
                         this.game.ui.log(msg.replace('\n', ''));
                         if (isPlayerCastle) await this.game.ui.showDialogAsync(msg);
                     }
@@ -308,13 +308,13 @@ class KunishuSystem {
                 if (amount >= 10) {
                     if (Math.random() > 0.5 && castle.gold > amount) {
                         castle.gold -= amount;
-                        const msg = `【諸勢力妨害】\n${kunishuName}が、${clanName}の${castle.name}で略奪を働き、金${amount}を奪いました！`;
+                        const msg = `${kunishuName}が、${clanName}の${castle.name}で略奪を働き、金${amount}を奪いました！`;
                         this.game.ui.log(msg.replace('\n', ''));
                         if (isPlayerCastle) await this.game.ui.showDialogAsync(msg);
                         actionDone = true; // 略奪をしたので、目印をつけます
                     } else if (castle.rice > amount) {
                         castle.rice -= amount;
-                        const msg = `【諸勢力妨害】\n${kunishuName}が、${clanName}の${castle.name}で略奪を働き、兵糧${amount}を奪いました！`;
+                        const msg = `${kunishuName}が、${clanName}の${castle.name}で略奪を働き、兵糧${amount}を奪いました！`;
                         this.game.ui.log(msg.replace('\n', ''));
                         if (isPlayerCastle) await this.game.ui.showDialogAsync(msg);
                         actionDone = true; // 略奪をしたので、目印をつけます
@@ -631,7 +631,7 @@ class KunishuSystem {
         const leaderName = atkBushos[0].name;
 
         if (!isPlayer) {
-            const startMsg = `【諸勢力鎮圧】\n${atkDaimyoName}の${leaderName}が、\n${kunishuName}の鎮圧に乗り出しました！`;
+            const startMsg = `${atkDaimyoName}の${leaderName}が、\n${kunishuName}の鎮圧に乗り出しました！`;
             this.game.ui.log(startMsg.replace('\n', ''));
             await this.game.ui.showDialogAsync(startMsg);
         }

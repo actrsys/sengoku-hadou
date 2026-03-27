@@ -254,15 +254,15 @@ class IndependenceSystem {
         // ★メッセージの出し分け
         if (isProxyRebellion) {
             if (isDefection) {
-                msg = `【派閥寝返り】${oldClanName}の${castellan.name}が派閥主・${rebellionLeader.name}を擁立し、${castle.name}ごと敵対する${newClanName}へ寝返りました！`;
+                msg = `${oldClanName}の${castellan.name}が派閥主・${rebellionLeader.name}を擁立し、${castle.name}ごと敵対する${newClanName}へ寝返りました！`;
             } else {
-                msg = `【派閥独立】${oldClanName}の${castellan.name}が派閥主・${rebellionLeader.name}を大名として擁立し、${castle.name}にて独立を宣言しました！`;
+                msg = `${oldClanName}の${castellan.name}が派閥主・${rebellionLeader.name}を大名として擁立し、${castle.name}にて独立を宣言しました！`;
             }
         } else {
             if (isDefection) {
-                msg = `【寝返り】${oldClanName}の${castellan.name}が${castle.name}ごと、敵対する${newClanName}へ寝返りました！`;
+                msg = `${oldClanName}の${castle.name} ${castellan.name}が、敵対する${newClanName}へ寝返りました！`;
             } else {
-                msg = `【謀反】${oldClanName}の${castellan.name}が${castle.name}にて独立しました！`;
+                msg = `${oldClanName}の${castellan.name}が${castle.name}にて独立しました！`;
             }
         }
         
