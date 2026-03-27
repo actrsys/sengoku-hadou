@@ -430,21 +430,41 @@ Object.assign(WarManager.prototype, {
                         const perceivedDefRice = getPerceived(defCastle.rice);
                         const perceivedDefDefense = getPerceived(defCastle.defense);
 
+                        console.log("【AI防衛判断フェーズ開始】");
+                        console.log(`性格: ${isAggressive ? "好戦的" : "慎重"}, 自軍合計見積: ${perceivedTotalDefSoldiers}, 敵軍合計見積: ${perceivedTotalAtkSoldiers}, 兵糧見積: ${perceivedDefRice}, 必要兵糧: ${perceivedDefSoldiers * (isAggressive ? 1.5 : 1.2)}, 城防御見積: ${perceivedDefDefense}`);
+
                         // 判定条件
                         let shouldIntercept = false;
+                        let reason = "";
                         if (isAggressive) {
-                            if (perceivedTotalDefSoldiers >= perceivedTotalAtkSoldiers * 1.2 ||
-                                perceivedDefRice < perceivedDefSoldiers * 1.5 ||
-                                perceivedDefDefense < 300) {
+                            if (perceivedTotalDefSoldiers >= perceivedTotalAtkSoldiers * 1.2) {
                                 shouldIntercept = true;
+                                reason = "自軍の兵力が敵より十分に多いから（野戦）";
+                            } else if (perceivedDefRice < perceivedDefSoldiers * 1.5) {
+                                shouldIntercept = true;
+                                reason = "兵糧が足りないから（野戦）";
+                            } else if (perceivedDefDefense < 300) {
+                                shouldIntercept = true;
+                                reason = "城の防御が低いから（野戦）";
+                            } else {
+                                reason = "籠城できる条件が揃っているから（籠城）";
                             }
                         } else {
-                            if (perceivedTotalDefSoldiers >= perceivedTotalAtkSoldiers * 1.5 ||
-                                perceivedDefRice < perceivedDefSoldiers * 1.2 ||
-                                perceivedDefDefense < 400) {
+                            if (perceivedTotalDefSoldiers >= perceivedTotalAtkSoldiers * 1.5) {
                                 shouldIntercept = true;
+                                reason = "自軍の兵力が敵より圧倒的に多いから（野戦）";
+                            } else if (perceivedDefRice < perceivedDefSoldiers * 1.2) {
+                                shouldIntercept = true;
+                                reason = "兵糧が足りないから（野戦）";
+                            } else if (perceivedDefDefense < 400) {
+                                shouldIntercept = true;
+                                reason = "城の防御が低いから（野戦）";
+                            } else {
+                                reason = "籠城できる条件が揃っているから（籠城）";
                             }
                         }
+
+                        console.log(`AIの決断: ${shouldIntercept ? "野戦（迎撃）" : "籠城"}, 理由: ${reason}`);
 
                         if (shouldIntercept) {
                             const evaluatedBushos = availableDefBushos.map(b => {
@@ -1722,6 +1742,7 @@ Object.assign(WarManager.prototype, {
     
     // ★守備側が「自分の別の城」から援軍を呼べるかチェックする魔法
     checkDefenderSelfReinforcement(defCastle, onComplete) {
+        console.log("【守備側の自勢力援軍チェックフェーズ開始】");
         const defClanId = defCastle.ownerClan;
         const pid = this.game.playerClanId;
         
@@ -1763,6 +1784,7 @@ Object.assign(WarManager.prototype, {
         });
 
         if (candidateCastles.length === 0) {
+            console.log("条件に合う自勢力の援軍候補のお城がありませんでした。");
             onComplete(null);
             return;
         }
@@ -1787,6 +1809,7 @@ Object.assign(WarManager.prototype, {
             // AIなら自動で一番兵士が多い城から送る
             candidateCastles.sort((a,b) => b.soldiers - a.soldiers);
             const bestCastle = candidateCastles[0];
+            console.log(`自勢力の援軍を呼ぶお城を選びました: ${bestCastle.name}`);
             
             // ★追加：委任城主が攻められた時、援軍候補が「直轄城」ならプレイヤーに尋ねる！
             if (defClanId === pid && !bestCastle.isDelegated) {
@@ -1822,6 +1845,7 @@ Object.assign(WarManager.prototype, {
     
     // ★守備側が援軍を呼べるかチェックする機能
     checkDefenderReinforcement(defCastle, atkClanId, onComplete) {
+        console.log("【守備側の他勢力援軍チェックフェーズ開始】");
         const defClanId = defCastle.ownerClan;
         const pid = this.game.playerClanId;
         
@@ -1878,6 +1902,7 @@ Object.assign(WarManager.prototype, {
         });
 
         if (allyForceCandidates.length === 0) {
+            console.log("条件に合う他勢力の援軍候補がありませんでした。");
             onComplete();
             return;
         }
@@ -1901,6 +1926,7 @@ Object.assign(WarManager.prototype, {
             allyForceCandidates.sort((a,b) => b.force.soldiers - a.force.soldiers);
             const best = allyForceCandidates[0];
             best.castle.selectedForce = best.force; // シールを貼る
+            console.log(`他勢力の援軍を呼ぶ勢力（お城）を選びました: ${best.castle.name} の ${best.force.name}`);
 
             // ★追加：親善と同じロジックで持参金を計算します
             const myPower = this.game.getClanTotalSoldiers(defClanId) || 1;
@@ -1996,6 +2022,7 @@ Object.assign(WarManager.prototype, {
                 rice: reinfRice, horses: reinfHorses, guns: reinfGuns, isSelf: true,
                 morale: helperCastle.morale || 50, training: helperCastle.training || 50
             };
+            console.log(`自勢力の援軍が到着しました！兵士数: ${finalSVal}`);
             
             let colorClass = "log-color-def";
             const atkForce = this.state.attacker;
@@ -2122,6 +2149,7 @@ Object.assign(WarManager.prototype, {
                 rice: reinfRice, horses: reinfHorses, guns: reinfGuns, isSelf: false, isKunishuForce: true,
                 morale: 50, training: 50
             };
+            console.log(`他勢力（諸勢力）の援軍が到着しました！兵士数: ${reinfSoldiers}`);
             
             if (myClanId === this.game.playerClanId) {
                 const leader = this.game.getBusho(kunishu.leaderId);
@@ -2228,6 +2256,7 @@ Object.assign(WarManager.prototype, {
             rice: reinfRice, horses: reinfHorses, guns: reinfGuns, isSelf: false,
             morale: helperCastle.morale || 50, training: helperCastle.training || 50
         };
+        console.log(`他勢力（大名家）の援軍が到着しました！兵士数: ${reinfSoldiers}`);
         
         const atkForce = this.state.attacker;
         const atkIsKunishu = atkForce.isKunishu || false;
