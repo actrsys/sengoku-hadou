@@ -588,40 +588,47 @@ Object.assign(WarManager.prototype, {
                 await showSiegeMessage();
                 this.startSiegeWarPhase();
             } else {
-                showInterceptDialog(async (choice, defAssignments, defRice, atkAssignments, interceptHorses = 0, interceptGuns = 0) => {
-                    this.game.ui.restoreAIGuard();
-                    
-                    // ★削除: 守備側の援軍を強制合流させる魔法（applyDefReinf）を完全に消しました！
-
-                    if (choice === 'field') {
-                        this.state.atkAssignments = atkAssignments; this.state.defAssignments = defAssignments; 
+                await new Promise((resolve) => {
+                    showInterceptDialog(async (choice, defAssignments, defRice, atkAssignments, interceptHorses = 0, interceptGuns = 0) => {
+                        this.game.ui.restoreAIGuard();
                         
-                        let fieldTotalDefSoldiers = 0; if(defAssignments) defAssignments.forEach(a => fieldTotalDefSoldiers += a.soldiers);
-                        defCastle.soldiers = Math.max(0, defCastle.soldiers - fieldTotalDefSoldiers);
-                        defCastle.rice = Math.max(0, defCastle.rice - (defRice || 0));
-                        defCastle.horses = Math.max(0, (defCastle.horses || 0) - interceptHorses);
-                        defCastle.guns = Math.max(0, (defCastle.guns || 0) - interceptGuns);
-                        
-                        this.state.defender.fieldSoldiers = fieldTotalDefSoldiers;
-                        this.state.defFieldRice = defRice || 0; 
-                        this.state.defender.fieldHorses = interceptHorses;
-                        this.state.defender.fieldGuns = interceptGuns;
+                        // ★削除: 守備側の援軍を強制合流させる魔法（applyDefReinf）を完全に消しました！
 
-                        if (!this.game.fieldWarManager) this.game.fieldWarManager = new window.FieldWarManager(this.game);
-                        this.game.fieldWarManager.startFieldWar(this.state, async (resultType) => {
-                            defCastle.soldiers += this.state.defender.fieldSoldiers;
-                            defCastle.rice += this.state.defFieldRice; 
-                            defCastle.horses = (defCastle.horses || 0) + (this.state.defender.fieldHorses || 0);
-                            defCastle.guns = (defCastle.guns || 0) + (this.state.defender.fieldGuns || 0);
-                            if (resultType === 'attacker_win' || resultType === 'defender_retreat' || resultType === 'draw_to_siege') {
-                                await showSiegeMessage();
-                                this.startSiegeWarPhase();
-                            } else this.endWar(false);
-                        });
-                    } else {
-                        await showSiegeMessage();
-                        this.startSiegeWarPhase();
-                    }
+                        if (choice === 'field') {
+                            this.state.atkAssignments = atkAssignments; this.state.defAssignments = defAssignments; 
+                            
+                            let fieldTotalDefSoldiers = 0; if(defAssignments) defAssignments.forEach(a => fieldTotalDefSoldiers += a.soldiers);
+                            defCastle.soldiers = Math.max(0, defCastle.soldiers - fieldTotalDefSoldiers);
+                            defCastle.rice = Math.max(0, defCastle.rice - (defRice || 0));
+                            defCastle.horses = Math.max(0, (defCastle.horses || 0) - interceptHorses);
+                            defCastle.guns = Math.max(0, (defCastle.guns || 0) - interceptGuns);
+                            
+                            this.state.defender.fieldSoldiers = fieldTotalDefSoldiers;
+                            this.state.defFieldRice = defRice || 0; 
+                            this.state.defender.fieldHorses = interceptHorses;
+                            this.state.defender.fieldGuns = interceptGuns;
+
+                            if (!this.game.fieldWarManager) this.game.fieldWarManager = new window.FieldWarManager(this.game);
+                            this.game.fieldWarManager.startFieldWar(this.state, async (resultType) => {
+                                defCastle.soldiers += this.state.defender.fieldSoldiers;
+                                defCastle.rice += this.state.defFieldRice; 
+                                defCastle.horses = (defCastle.horses || 0) + (this.state.defender.fieldHorses || 0);
+                                defCastle.guns = (defCastle.guns || 0) + (this.state.defender.fieldGuns || 0);
+                                if (resultType === 'attacker_win' || resultType === 'defender_retreat' || resultType === 'draw_to_siege') {
+                                    await showSiegeMessage();
+                                    this.startSiegeWarPhase();
+                                    resolve();
+                                } else {
+                                    this.endWar(false);
+                                    resolve();
+                                }
+                            });
+                        } else {
+                            await showSiegeMessage();
+                            this.startSiegeWarPhase();
+                            resolve();
+                        }
+                    });
                 });
             }
         } catch(e) { console.error("StartWar Error:", e); this.state.active = false; this.game.finishTurn(); }
@@ -2008,12 +2015,16 @@ Object.assign(WarManager.prototype, {
                 });
             } else {
                 this.game.ui.log(`【応援軍】<span class="${colorClass}">${helperCastle.name}の${leaderName}</span>が守備側の援軍として参戦しました。`);
-                this.game.ui.showDialog(`${helperCastle.name}の${leaderName}が守備側の援軍として参戦しました！`, false, () => {
+                if (this.state && !this.state.isPlayerInvolved) {
+                    await this.game.ui.showDialogAsync(`${helperCastle.name}の${leaderName}が守備側の援軍として参戦しました！`);
                     onComplete(selfReinfData);
-                });
+                } else {
+                    this.game.ui.showDialog(`${helperCastle.name}の${leaderName}が守備側の援軍として参戦しました！`, false, () => {
+                        onComplete(selfReinfData);
+                    });
+                }
             }
         };
-
         // ★追加：自分のAI城なら「被害が出ますが送りますか？」と確認してくれます！
         if (isHeavySnow && myClanId === this.game.playerClanId) {
             this.game.ui.showDialog(`大雪の影響により、援軍部隊(${helperCastle.name})に被害が出る場合があります。\nそれでも出陣させますか？`, true, () => {
@@ -2141,7 +2152,11 @@ Object.assign(WarManager.prototype, {
                     this.game.ui.showDialog(`${kunishu.getName(this.game)}の${leaderName}が敵の援軍として参戦しました！`, false, onComplete);
                 } else {
                     this.game.ui.log(`【友軍】${defCastle.name}の要請により、${kunishu.getName(this.game)}が守備側の援軍として駆けつけました。`);
-                    this.game.ui.showDialog(`${kunishu.getName(this.game)}の${leaderName}が守備側の援軍として参戦しました！`, false, onComplete);
+                    if (this.state && !this.state.isPlayerInvolved) {
+                        this.game.ui.showDialogAsync(`${kunishu.getName(this.game)}の${leaderName}が守備側の援軍として参戦しました！`).then(onComplete);
+                    } else {
+                        this.game.ui.showDialog(`${kunishu.getName(this.game)}の${leaderName}が守備側の援軍として参戦しました！`, false, onComplete);
+                    }
                 }
             }
             return;
@@ -2263,7 +2278,11 @@ Object.assign(WarManager.prototype, {
                 this.game.ui.showDialog(`${helperClanName}の${leaderName}が敵の援軍として参戦しました！`, false, onComplete);
             } else {
                 this.game.ui.log(`【友軍】${defCastle.name}の要請により、${helperClanName}が守備側の援軍として駆けつけました。`);
-                this.game.ui.showDialog(`${helperClanName}の${leaderName}が守備側の援軍として参戦しました！`, false, onComplete);
+                if (this.state && !this.state.isPlayerInvolved) {
+                    this.game.ui.showDialogAsync(`${helperClanName}の${leaderName}が守備側の援軍として参戦しました！`).then(onComplete);
+                } else {
+                    this.game.ui.showDialog(`${helperClanName}の${leaderName}が守備側の援軍として参戦しました！`, false, onComplete);
+                }
             }
         }
     },
