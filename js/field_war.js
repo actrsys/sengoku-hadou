@@ -1,3 +1,5 @@
+console.log("【確認】field_war.js の読み込みを開始しました！");
+
 /**
  * field_war.js
  * HEX式 野戦システム
@@ -2517,3 +2519,4 @@ class FieldWarManager {
 }
 
 window.FieldWarManager = FieldWarManager;
+console.log("【確認】field_war.js の読み込みが完了しました！");
