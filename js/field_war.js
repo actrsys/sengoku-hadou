@@ -2165,7 +2165,6 @@ class FieldWarManager {
         attacker.hasActionDone = true;
         this.state = 'IDLE';
         
-        const isPlayerInvolved = this.units.some(u => u.isPlayer);
         if (isPlayerInvolved) {
             this.updateMap();
             this.updateStatus();
