@@ -711,6 +711,7 @@ class GameManager {
         this.kunishuSystem = new KunishuSystem(this);
         this.commandSystem = new CommandSystem(this);
         this.warManager = new WarManager(this);
+        this.fieldWarManager = new FieldWarManager(this);
         this.aiEngine = new AIEngine(this);
         this.aiStaffing = new AIStaffing(this);
         this.aiOperationManager = new AIOperationManager(this);
