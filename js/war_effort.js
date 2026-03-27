@@ -2041,7 +2041,7 @@ Object.assign(WarManager.prototype, {
                 });
             } else {
                 this.game.ui.log(`【応援軍】<span class="${colorClass}">${helperCastle.name}の${leaderName}</span>が守備側の援軍として参戦しました。`);
-                this.game.ui.showDialog(`【応援軍】${helperCastle.name}の${leaderName}が守備側の援軍として参戦しました！`, false, () => {
+                this.game.ui.showDialog(`${helperCastle.name}の${leaderName}が守備側の援軍として参戦しました！`, false, () => {
                     onComplete(selfReinfData);
                 });
             }
@@ -2175,7 +2175,7 @@ Object.assign(WarManager.prototype, {
                     this.game.ui.showDialog(`${kunishu.getName(this.game)}の${leaderName}が敵の援軍として参戦しました！`, false, onComplete);
                 } else {
                     this.game.ui.log(`【友軍】${defCastle.name}の要請により、${kunishu.getName(this.game)}が守備側の援軍として駆けつけました。`);
-                    this.game.ui.showDialog(`【友軍】${kunishu.getName(this.game)}の${leaderName}が守備側の援軍として参戦しました！`, false, onComplete);
+                    this.game.ui.showDialog(`${kunishu.getName(this.game)}の${leaderName}が守備側の援軍として参戦しました！`, false, onComplete);
                 }
             }
             return;
@@ -2298,7 +2298,7 @@ Object.assign(WarManager.prototype, {
                 this.game.ui.showDialog(`${helperClanName}の${leaderName}が敵の援軍として参戦しました！`, false, onComplete);
             } else {
                 this.game.ui.log(`【友軍】${defCastle.name}の要請により、${helperClanName}が守備側の援軍として駆けつけました。`);
-                this.game.ui.showDialog(`【友軍】${helperClanName}の${leaderName}が守備側の援軍として参戦しました！`, false, onComplete);
+                this.game.ui.showDialog(`${helperClanName}の${leaderName}が守備側の援軍として参戦しました！`, false, onComplete);
             }
         }
     },
