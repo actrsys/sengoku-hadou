@@ -595,7 +595,7 @@ class LifeSystem {
             }
             // ★追加ここまで
             
-            const msg = `【当主交代】\n${daimyo.name.replace('|','')}が死亡し、${successor.name.replace('|','')}が家督を継ぎました。${extraMsg}`;
+            const msg = `${daimyo.name.replace('|','')}が死亡し、${successor.name.replace('|','')}が家督を継ぎました。${extraMsg}`;
             this.game.ui.log(`【当主交代】${daimyo.name.replace('|','')}が死亡し、${successor.name.replace('|','')}が家督を継ぎました。`);
             
             await this.game.ui.showDialogAsync(msg, false, 0);
@@ -629,9 +629,9 @@ class LifeSystem {
             
             let extMsg = "";
             if (reason === 'no_heir') {
-                extMsg = `【大名家滅亡】\n当主が死亡し、後継ぎがいないため\n${displayClanName}は滅亡しました。`;
+                extMsg = `当主が死亡し、後継ぎがいないため\n${displayClanName}は滅亡しました。`;
             } else {
-                extMsg = `【大名家滅亡】\n拠点を全て失い、\n${displayClanName}は滅亡しました。`;
+                extMsg = `拠点を全て失い、\n${displayClanName}は滅亡しました。`;
             }
             
             // 履歴にメッセージを残します
