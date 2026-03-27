@@ -711,6 +711,14 @@ class GameManager {
         this.kunishuSystem = new KunishuSystem(this);
         this.commandSystem = new CommandSystem(this);
         this.warManager = new WarManager(this);
+        
+        // FieldWarManagerが存在するか確認してから準備する安全な書き方です
+        if (typeof FieldWarManager !== 'undefined') {
+            this.fieldWarManager = new FieldWarManager(this);
+        } else {
+            console.error("【エラー】FieldWarManagerが見つかりません。field_war.jsの読み込みに失敗しています。");
+        }
+        
         this.aiEngine = new AIEngine(this);
         this.aiStaffing = new AIStaffing(this);
         this.aiOperationManager = new AIOperationManager(this);
