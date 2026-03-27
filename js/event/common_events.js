@@ -168,12 +168,12 @@ window.playProvinceMapEffect = async function(game, eventType, initialMsg, affec
         const p = game.provinces.find(prov => prov.id === pid);
         const pName = p ? p.province : "どこかの国";
         let msg = "";
-        if (eventType === '豊作') msg = `【豊作の報せ】\n${pName}は豊作です！`;
-        else if (eventType === '凶作') msg = `【凶作の報せ】\n${pName}は凶作に見舞われています……`;
-        else if (eventType === '飢饉') msg = `【飢饉の報せ】\n${pName}で飢饉が発生し、甚大な被害が出ています……`;
-        else if (eventType === '疫病') msg = `【疫病の報せ】\n${pName}で恐ろしい疫病が猛威を振るっています……`;
-        else if (eventType === '地震') msg = `【地震の報せ】\n${pName}で大地震による甚大な被害が出ています……`;
-        else if (eventType === '大雪') msg = `【大雪の報せ】\n${pName}は深い雪に閉ざされています……`; // ★これを書き足しました！
+        if (eventType === '豊作') msg = `${pName}は豊作です！`;
+        else if (eventType === '凶作') msg = `${pName}は凶作に見舞われています……`;
+        else if (eventType === '飢饉') msg = `${pName}で飢饉が発生し、甚大な被害が出ています……`;
+        else if (eventType === '疫病') msg = `${pName}で恐ろしい疫病が猛威を振るっています……`;
+        else if (eventType === '地震') msg = `${pName}で大地震による甚大な被害が出ています……`;
+        else if (eventType === '大雪') msg = `${pName}は深い雪に閉ざされています……`; // ★これを書き足しました！
         
         await game.ui.showDialogAsync(msg, false, 0);
     }
@@ -280,7 +280,7 @@ window.GameEvents.push({
         // ★変更：自分のお城で一揆が起きていたら、１つずつ順番に画面でお知らせします
         if (playerIkkiCastles.length > 0 && game.ui) {
             for (let cName of playerIkkiCastles) {
-                const msg = `【一揆勃発】\n領民の不満が爆発し、当家の「${cName}」で一揆が発生しました！`;
+                const msg = `領民の不満が爆発し、当家の「${cName}」で一揆が発生しました！`;
                 await game.ui.showDialogAsync(msg, false, 0);
             }
         }
@@ -481,7 +481,7 @@ window.GameEvents.push({
             });
 
             // ★共通の魔法を呼び出します！（凶作の色は赤紫色）
-            await window.playProvinceMapEffect(game, '凶作', "【秋の訪れ】\n今年は各地で凶作に見舞われています……", badAffected, 180, 0, 180);
+            await window.playProvinceMapEffect(game, '凶作', "今年は各地で凶作に見舞われています……", badAffected, 180, 0, 180);
         }
 
         // =========================================================
@@ -570,7 +570,7 @@ window.GameEvents.push({
             });
 
             // ★共通の魔法を呼び出します！（豊作の色は黄金色）
-            await window.playProvinceMapEffect(game, '豊作', "【秋の訪れ】\n今年は各地で豊作の秋を迎えています！", goodAffected, 255, 215, 0);
+            await window.playProvinceMapEffect(game, '豊作', "今年は各地で豊作の秋を迎えています！", goodAffected, 255, 215, 0);
         }
 
         // =========================================================
@@ -651,7 +651,7 @@ window.GameEvents.push({
         await window.playProvinceMapEffect(
             game, 
             '飢饉', 
-            "【凶荒】\n各地で深刻な飢饉が発生しています……", 
+            "各地で深刻な飢饉が発生しています……", 
             famineProvIds, 
             120, 0, 0 // 暗くて濃い赤色の数字です
         );
@@ -764,7 +764,7 @@ window.GameEvents.push({
         await window.playProvinceMapEffect(
             game, 
             '地震', 
-            "【大地震】\n大きな地鳴りとともに、大地が激しく揺れました！", 
+            "大きな地鳴りとともに、大地が激しく揺れました！", 
             affectedProvIds, 
             139, 69, 19
         );
@@ -868,7 +868,7 @@ window.GameEvents.push({
             await window.playProvinceMapEffect(
                 game, 
                 '大雪',
-                "【大雪】\n厳しい冬が訪れ、各地が大雪に見舞われています……", 
+                "厳しい冬が訪れ、各地が大雪に見舞われています……", 
                 allSnowProvIds, 
                 99, 188, 255
             );
@@ -908,7 +908,7 @@ window.GameEvents.push({
                 // ★春の訪れとともに、マップの水玉模様を消します！
                 if (game.ui.updateSnowOverlay) game.ui.updateSnowOverlay();
 
-                await game.ui.showDialogAsync("【雪解け】\n雪解けの季節です", false, 0);
+                await game.ui.showDialogAsync("雪解けの季節です", false, 0);
             }
             
             return; // ここで処理はおしまいです

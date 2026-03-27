@@ -25,7 +25,7 @@ window.GameEvents.push({
 
         const SHOW_TYPHOON_PATH = true;
 
-        await game.ui.showDialogAsync("【台風接近】\n台風が接近しています……", false, 0);
+        await game.ui.showDialogAsync("台風が接近しています……", false, 0);
 
         const resetZoomBtn = document.getElementById('map-reset-zoom');
         if (resetZoomBtn) resetZoomBtn.click();
@@ -389,13 +389,13 @@ window.GameEvents.push({
             });
 
             if (damagedProvinceMap.size > 0) {
-                await game.ui.showDialogAsync("【台風発生】\n各地で被害が発生しているようです……", false, 0);
+                await game.ui.showDialogAsync("各地で被害が発生しているようです……", false, 0);
             } else {
-                await game.ui.showDialogAsync("【台風通過】\n幸い、今回は大きな被害はなかったようです。", false, 0);
+                await game.ui.showDialogAsync("今回は大きな被害はなかったようです。", false, 0);
             }
 
         } else {
-            await game.ui.showDialogAsync("【台風通過】\n幸い、今回は大きな被害はなかったようです。", false, 0);
+            await game.ui.showDialogAsync("今回は大きな被害はなかったようです。", false, 0);
         }
 
         document.body.removeChild(mapOverlay);
@@ -403,7 +403,7 @@ window.GameEvents.push({
         await new Promise(resolve => setTimeout(resolve, 1000));
 
         for (const data of damagedPlayerCastles) {
-            await game.ui.showDialogAsync(`【被害報告】\n ${data.castle.name} が台風の被害を受けました……`, false, 0);
+            await game.ui.showDialogAsync(` ${data.castle.name} が台風の被害を受けました……`, false, 0);
         }
     }
 });
