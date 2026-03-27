@@ -588,47 +588,40 @@ Object.assign(WarManager.prototype, {
                 await showSiegeMessage();
                 this.startSiegeWarPhase();
             } else {
-                await new Promise((resolve) => {
-                    showInterceptDialog(async (choice, defAssignments, defRice, atkAssignments, interceptHorses = 0, interceptGuns = 0) => {
-                        this.game.ui.restoreAIGuard();
+                showInterceptDialog(async (choice, defAssignments, defRice, atkAssignments, interceptHorses = 0, interceptGuns = 0) => {
+                    this.game.ui.restoreAIGuard();
+                    
+                    // ★削除: 守備側の援軍を強制合流させる魔法（applyDefReinf）を完全に消しました！
+
+                    if (choice === 'field') {
+                        this.state.atkAssignments = atkAssignments; this.state.defAssignments = defAssignments; 
                         
-                        // ★削除: 守備側の援軍を強制合流させる魔法（applyDefReinf）を完全に消しました！
+                        let fieldTotalDefSoldiers = 0; if(defAssignments) defAssignments.forEach(a => fieldTotalDefSoldiers += a.soldiers);
+                        defCastle.soldiers = Math.max(0, defCastle.soldiers - fieldTotalDefSoldiers);
+                        defCastle.rice = Math.max(0, defCastle.rice - (defRice || 0));
+                        defCastle.horses = Math.max(0, (defCastle.horses || 0) - interceptHorses);
+                        defCastle.guns = Math.max(0, (defCastle.guns || 0) - interceptGuns);
+                        
+                        this.state.defender.fieldSoldiers = fieldTotalDefSoldiers;
+                        this.state.defFieldRice = defRice || 0; 
+                        this.state.defender.fieldHorses = interceptHorses;
+                        this.state.defender.fieldGuns = interceptGuns;
 
-                        if (choice === 'field') {
-                            this.state.atkAssignments = atkAssignments; this.state.defAssignments = defAssignments; 
-                            
-                            let fieldTotalDefSoldiers = 0; if(defAssignments) defAssignments.forEach(a => fieldTotalDefSoldiers += a.soldiers);
-                            defCastle.soldiers = Math.max(0, defCastle.soldiers - fieldTotalDefSoldiers);
-                            defCastle.rice = Math.max(0, defCastle.rice - (defRice || 0));
-                            defCastle.horses = Math.max(0, (defCastle.horses || 0) - interceptHorses);
-                            defCastle.guns = Math.max(0, (defCastle.guns || 0) - interceptGuns);
-                            
-                            this.state.defender.fieldSoldiers = fieldTotalDefSoldiers;
-                            this.state.defFieldRice = defRice || 0; 
-                            this.state.defender.fieldHorses = interceptHorses;
-                            this.state.defender.fieldGuns = interceptGuns;
-
-                            if (!this.game.fieldWarManager) this.game.fieldWarManager = new window.FieldWarManager(this.game);
-                            this.game.fieldWarManager.startFieldWar(this.state, async (resultType) => {
-                                defCastle.soldiers += this.state.defender.fieldSoldiers;
-                                defCastle.rice += this.state.defFieldRice; 
-                                defCastle.horses = (defCastle.horses || 0) + (this.state.defender.fieldHorses || 0);
-                                defCastle.guns = (defCastle.guns || 0) + (this.state.defender.fieldGuns || 0);
-                                if (resultType === 'attacker_win' || resultType === 'defender_retreat' || resultType === 'draw_to_siege') {
-                                    await showSiegeMessage();
-                                    this.startSiegeWarPhase();
-                                    resolve();
-                                } else {
-                                    this.endWar(false);
-                                    resolve();
-                                }
-                            });
-                        } else {
-                            await showSiegeMessage();
-                            this.startSiegeWarPhase();
-                            resolve();
-                        }
-                    });
+                        if (!this.game.fieldWarManager) this.game.fieldWarManager = new window.FieldWarManager(this.game);
+                        this.game.fieldWarManager.startFieldWar(this.state, async (resultType) => {
+                            defCastle.soldiers += this.state.defender.fieldSoldiers;
+                            defCastle.rice += this.state.defFieldRice; 
+                            defCastle.horses = (defCastle.horses || 0) + (this.state.defender.fieldHorses || 0);
+                            defCastle.guns = (defCastle.guns || 0) + (this.state.defender.fieldGuns || 0);
+                            if (resultType === 'attacker_win' || resultType === 'defender_retreat' || resultType === 'draw_to_siege') {
+                                await showSiegeMessage();
+                                this.startSiegeWarPhase();
+                            } else this.endWar(false);
+                        });
+                    } else {
+                        await showSiegeMessage();
+                        this.startSiegeWarPhase();
+                    }
                 });
             }
         } catch(e) { console.error("StartWar Error:", e); this.state.active = false; this.game.finishTurn(); }
@@ -1923,19 +1916,19 @@ Object.assign(WarManager.prototype, {
             reinfGold = Math.floor(reinfGold / 100) * 100;
             
             // 足りなければお城の全額にします
-            if (reinfGold > defCastle.gold) {
-                reinfGold = defCastle.gold;
-            }
+            if (reinfGold > defCastle.gold) {
+                reinfGold = defCastle.gold;
+            }
 
-            // ★追加：自分が相手を「支配」しているなら強制参加なので、持参金は０にします！
-            if (!best.force.isKunishu) {
-                const rel = this.game.getRelation(defClanId, best.force.id);
-                if (rel && rel.status === '支配') {
-                    reinfGold = 0;
-                }
-            }
+            // ★追加：自分が相手を「支配」しているなら強制参加なので、持参金は０にします！
+            if (!best.force.isKunishu) {
+                const rel = this.game.getRelation(defClanId, best.force.id);
+                if (rel && rel.status === '支配') {
+                    reinfGold = 0;
+                }
+            }
 
-            this.executeDefReinforcement(reinfGold, best.castle, defCastle, onComplete);
+            this.executeDefReinforcement(reinfGold, best.castle, defCastle, onComplete);
         }
     },
 
@@ -1967,11 +1960,7 @@ Object.assign(WarManager.prototype, {
                 const survivingBushos = [];
                 for (let b of finalBushos) {
                     if (Math.random() < 0.10) {
-                        if (myClanId === this.game.playerClanId) {
-                            await this.game.ui.showDialogAsync(`【強行軍】\n我が軍の${b.name}が凍死しました……`, false, 0);
-                        } else if (this.state && this.state.isPlayerInvolved) {
-                            await this.game.ui.showDialogAsync(`【強行軍】\n${helperCastle.name}の${b.name}が凍死したようです。`, false, 0);
-                        }
+                        await this.game.ui.showDialogAsync(`【強行軍】\n我が軍の${b.name}が凍死しました……`, false, 0);
                         await this.game.lifeSystem.executeDeath(b);
                     } else {
                         survivingBushos.push(b);
@@ -1984,21 +1973,13 @@ Object.assign(WarManager.prototype, {
                 finalSVal -= lostSoldiers;
 
                 if (lostSoldiers > 0) {
-                    if (myClanId === this.game.playerClanId) {
-                        await this.game.ui.showDialogAsync(`【強行軍】\n我が軍の兵士${lostSoldiers}人が遭難しました……`, false, 0);
-                    } else if (this.state && this.state.isPlayerInvolved) {
-                        await this.game.ui.showDialogAsync(`【強行軍】\n${helperCastle.name}からの援軍が、兵士${lostSoldiers}人を雪で失ったようです。`, false, 0);
-                    }
+                    await this.game.ui.showDialogAsync(`【強行軍】\n我が軍の兵士${lostSoldiers}人が遭難しました……`, false, 0);
                 }
 
                 if (finalBushos.length === 0) {
-                    if (myClanId === this.game.playerClanId) {
-                        await this.game.ui.showDialogAsync("【強行軍】\n我が軍は行方不明になりました……", false, 0);
-                        this.game.ui.updatePanelHeader();
-                        this.game.ui.renderCommandMenu();
-                    } else if (this.state && this.state.isPlayerInvolved) {
-                        await this.game.ui.showDialogAsync(`【強行軍】\n${helperCastle.name}からの援軍は、行方不明になったようです……`, false, 0);
-                    }
+                    await this.game.ui.showDialogAsync("【強行軍】\n我が軍は行方不明になりました……", false, 0);
+                    this.game.ui.updatePanelHeader();
+                    this.game.ui.renderCommandMenu();
                     onComplete(null);
                     return;
                 }
@@ -2022,22 +2003,17 @@ Object.assign(WarManager.prototype, {
             const leaderName = finalBushos.length > 0 ? finalBushos[0].name : "総大将";
             
             if (atkClanId === this.game.playerClanId) {
-                this.game.ui.log(`【応援軍】<span class="${colorClass}">${helperCastle.name}の${leaderName}</span>が敵の援軍として参戦しました。`);
                 this.game.ui.showDialog(`${helperCastle.name}の${leaderName}が敵の援軍として参戦しました！`, false, () => {
                     onComplete(selfReinfData);
                 });
             } else {
                 this.game.ui.log(`【応援軍】<span class="${colorClass}">${helperCastle.name}の${leaderName}</span>が守備側の援軍として参戦しました。`);
-                if (this.state && !this.state.isPlayerInvolved) {
-                    await this.game.ui.showDialogAsync(`${helperCastle.name}の${leaderName}が守備側の援軍として参戦しました！`);
+                this.game.ui.showDialog(`${helperCastle.name}の${leaderName}が守備側の援軍として参戦しました！`, false, () => {
                     onComplete(selfReinfData);
-                } else {
-                    this.game.ui.showDialog(`${helperCastle.name}の${leaderName}が守備側の援軍として参戦しました！`, false, () => {
-                        onComplete(selfReinfData);
-                    });
-                }
+                });
             }
         };
+
         // ★追加：自分のAI城なら「被害が出ますが送りますか？」と確認してくれます！
         if (isHeavySnow && myClanId === this.game.playerClanId) {
             this.game.ui.showDialog(`大雪の影響により、援軍部隊(${helperCastle.name})に被害が出る場合があります。\nそれでも出陣させますか？`, true, () => {
@@ -2153,10 +2129,8 @@ Object.assign(WarManager.prototype, {
                 
                 // ★追加：委任城主（AI）が攻められた時ならメッセージを「参戦しました！」に変えます！
                 if (defCastle.isDelegated) {
-                    this.game.ui.log(`【友軍】${kunishu.getName(this.game)}の${leaderName}が援軍として参戦しました。`);
                     this.game.ui.showDialog(`${kunishu.getName(this.game)}の${leaderName}が援軍として参戦しました！`, false, onComplete);
                 } else {
-                    this.game.ui.log(`【友軍】${kunishu.getName(this.game)}の${leaderName}が援軍要請を承諾しました。`);
                     this.game.ui.showDialog(`${kunishu.getName(this.game)}の${leaderName}が援軍要請を承諾しました！`, false, onComplete);
                 }
             } else {
@@ -2164,15 +2138,10 @@ Object.assign(WarManager.prototype, {
                 const atkForce = this.state.attacker;
                 const atkClanId = atkForce.isKunishu ? 0 : atkForce.ownerClan;
                 if (atkClanId === this.game.playerClanId) {
-                    this.game.ui.log(`【友軍】${kunishu.getName(this.game)}の${leaderName}が敵の援軍として参戦しました。`);
                     this.game.ui.showDialog(`${kunishu.getName(this.game)}の${leaderName}が敵の援軍として参戦しました！`, false, onComplete);
                 } else {
                     this.game.ui.log(`【友軍】${defCastle.name}の要請により、${kunishu.getName(this.game)}が守備側の援軍として駆けつけました。`);
-                    if (this.state && !this.state.isPlayerInvolved) {
-                        this.game.ui.showDialogAsync(`${kunishu.getName(this.game)}の${leaderName}が守備側の援軍として参戦しました！`).then(onComplete);
-                    } else {
-                        this.game.ui.showDialog(`${kunishu.getName(this.game)}の${leaderName}が守備側の援軍として参戦しました！`, false, onComplete);
-                    }
+                    this.game.ui.showDialog(`${kunishu.getName(this.game)}の${leaderName}が守備側の援軍として参戦しました！`, false, onComplete);
                 }
             }
             return;
@@ -2279,30 +2248,22 @@ Object.assign(WarManager.prototype, {
             
             // ★追加：こちらも委任城主（AI）が攻められた時ならメッセージを「参戦しました！」に変えます！
             if (defCastle.isDelegated) {
-                this.game.ui.log(`【友軍】${helperCastle.name}の${castellanName}が友軍として参戦しました。`);
                 this.game.ui.showDialog(`${helperCastle.name}の${castellanName}が友軍として参戦しました！`, false, onComplete);
             } else {
-                this.game.ui.log(`【友軍】${helperCastle.name}の${castellanName}が援軍要請を承諾しました。`);
                 this.game.ui.showDialog(`${helperCastle.name}の${castellanName}が援軍要請を承諾しました！`, false, onComplete);
             }
         } else if (helperClanId === this.game.playerClanId) {
             const leaderName = reinfBushos.length > 0 ? reinfBushos[0].name : "総大将";
-            this.game.ui.log(`【友軍】${helperClanName}の${leaderName} (${helperCastle.name}) が守備側の援軍に駆けつけました。`);
             this.game.ui.showDialog(`${helperClanName}の${leaderName} (${helperCastle.name}) が守備側の援軍に駆けつけました！`, false, onComplete);
         } else {
             const atkForce = this.state.attacker;
             const atkClanId = atkForce.isKunishu ? 0 : atkForce.ownerClan;
             const leaderName = reinfBushos.length > 0 ? reinfBushos[0].name : "総大将";
             if (atkClanId === this.game.playerClanId) {
-                this.game.ui.log(`【友軍】${helperClanName}の${leaderName}が敵の援軍として参戦しました。`);
                 this.game.ui.showDialog(`${helperClanName}の${leaderName}が敵の援軍として参戦しました！`, false, onComplete);
             } else {
                 this.game.ui.log(`【友軍】${defCastle.name}の要請により、${helperClanName}が守備側の援軍として駆けつけました。`);
-                if (this.state && !this.state.isPlayerInvolved) {
-                    this.game.ui.showDialogAsync(`${helperClanName}の${leaderName}が守備側の援軍として参戦しました！`).then(onComplete);
-                } else {
-                    this.game.ui.showDialog(`${helperClanName}の${leaderName}が守備側の援軍として参戦しました！`, false, onComplete);
-                }
+                this.game.ui.showDialog(`${helperClanName}の${leaderName}が守備側の援軍として参戦しました！`, false, onComplete);
             }
         }
     },
@@ -2358,7 +2319,6 @@ Object.assign(WarManager.prototype, {
         this.state.isPlayerInvolved = true;
         const helperClanName = this.game.clans.find(c => c.id === helperClanId)?.name || "援軍";
         const leaderName = reinfBushos.length > 0 ? reinfBushos[0].name : "総大将";
-        this.game.ui.log(`【友軍】${helperClanName}の${leaderName} (${helperCastle.name}) が守備側の援軍として出発しました。`);
         this.game.ui.showDialog(`${helperClanName}の${leaderName} (${helperCastle.name}) が守備側の援軍として出発しました！`, false, onComplete);
     }, // ←★ここにカンマ（,）を付けるのがとっても大事です！
     
