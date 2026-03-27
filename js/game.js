@@ -1119,9 +1119,10 @@ class GameManager {
         // ★追加：ここで官位の授与チェックを行います！
         const promotionMsgs = this.courtRankSystem.processMonthlyPromotions();
         if (promotionMsgs && promotionMsgs.length > 0) {
-            // 複数の大名が同時に受かった場合は、改行で繋げてダイアログを出します
-            const combinedMsg = "【官位叙任のお知らせ】\n" + promotionMsgs.join('\n');
-            await this.ui.showDialogAsync(combinedMsg, false, 0);
+            // 複数の大名が受かった場合は、一人ずつ順番にお知らせを出します
+            for (const msg of promotionMsgs) {
+                await this.ui.showDialogAsync(msg, false, 0);
+            }
             
             // 官位をもらったことで威信が増えるので、念のためもう一度最新の威信を計算し直しておきます！
             this.updateAllClanPrestige();
