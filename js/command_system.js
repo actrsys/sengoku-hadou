@@ -1233,7 +1233,7 @@ class CommandSystem {
                             const survivingBushos = [];
                             for (let b of finalBushos) {
                                 if (Math.random() < 0.10) {
-                                    await this.game.ui.showDialogAsync(`【強行軍】\n我が軍の${b.name}が凍死しました……`, false, 0);
+                                    await this.game.ui.showDialogAsync(`我が軍の${b.name}が凍死しました……`, false, 0);
                                     await this.game.lifeSystem.executeDeath(b);
                                 } else {
                                     survivingBushos.push(b);
@@ -1249,12 +1249,12 @@ class CommandSystem {
                                 finalSVal -= lostSoldiers;
 
                                 if (lostSoldiers > 0) {
-                                    await this.game.ui.showDialogAsync(`【強行軍】\n我が軍の兵士${lostSoldiers}人が遭難しました……`, false, 0);
+                                    await this.game.ui.showDialogAsync(`我が軍の兵士${lostSoldiers}人が遭難しました……`, false, 0);
                                 }
                             }
 
                             if (finalBushos.length === 0) {
-                                await this.game.ui.showDialogAsync("【強行軍】\n我が軍は行方不明になりました……", false, 0);
+                                await this.game.ui.showDialogAsync("我が軍は行方不明になりました……", false, 0);
                                 castle.soldiers = Math.max(0, castle.soldiers - sVal);
                                 castle.rice = Math.max(0, castle.rice - rVal);
                                 castle.horses = Math.max(0, (castle.horses || 0) - hVal);
@@ -2222,7 +2222,7 @@ class CommandSystem {
                             const survivingBushos = [];
                             for (let b of finalAtkBushos) {
                                 if (Math.random() < 0.10) {
-                                    await this.game.ui.showDialogAsync(`【強行軍】\n我が軍の${b.name}が凍死しました……`, false, 0);
+                                    await this.game.ui.showDialogAsync(`我が軍の${b.name}が凍死しました……`, false, 0);
                                     await this.game.lifeSystem.executeDeath(b);
                                 } else {
                                     survivingBushos.push(b);
@@ -2235,7 +2235,7 @@ class CommandSystem {
                             finalSVal -= lostSoldiers;
 
                             if (lostSoldiers > 0) {
-                                await this.game.ui.showDialogAsync(`【強行軍】\n我が軍の兵士${lostSoldiers}人が遭難しました……`, false, 0);
+                                await this.game.ui.showDialogAsync(`我が軍の兵士${lostSoldiers}人が遭難しました……`, false, 0);
                             }
                         }
 
@@ -2244,7 +2244,7 @@ class CommandSystem {
                             const survivingReinfBushos = [];
                             for (let b of selfReinfData.bushos) {
                                 if (Math.random() < 0.10) {
-                                    await this.game.ui.showDialogAsync(`【強行軍】\n援軍の${b.name}が凍死しました……`, false, 0);
+                                    await this.game.ui.showDialogAsync(`援軍の${b.name}が凍死しました……`, false, 0);
                                     await this.game.lifeSystem.executeDeath(b);
                                 } else {
                                     survivingReinfBushos.push(b);
@@ -2257,13 +2257,13 @@ class CommandSystem {
                             selfReinfData.soldiers -= lostSoldiers;
 
                             if (lostSoldiers > 0) {
-                                await this.game.ui.showDialogAsync(`【強行軍】\n援軍の兵士${lostSoldiers}人が遭難しました……`, false, 0);
+                                await this.game.ui.showDialogAsync(`援軍の兵士${lostSoldiers}人が遭難しました……`, false, 0);
                             }
                         }
 
                         // ★メイン軍が全滅してしまった時の特別ルール！
                         if (finalAtkBushos.length === 0) {
-                            await this.game.ui.showDialogAsync("【強行軍】\n我が軍は行方不明になりました……", false, 0);
+                            await this.game.ui.showDialogAsync("我が軍は行方不明になりました……", false, 0);
                             atkCastle.soldiers = Math.max(0, atkCastle.soldiers - sVal);
                             atkCastle.rice = Math.max(0, atkCastle.rice - rVal);
                             atkCastle.horses = Math.max(0, (atkCastle.horses || 0) - hVal);
@@ -2290,7 +2290,7 @@ class CommandSystem {
 
                         // ★援軍だけ全滅した場合
                         if (selfReinfData && selfReinfData.bushos.length === 0) {
-                            await this.game.ui.showDialogAsync("【強行軍】\n援軍は行方不明になりました……", false, 0);
+                            await this.game.ui.showDialogAsync("援軍は行方不明になりました……", false, 0);
                             selfReinfData = null; // 援軍はなかったことにします
                         }
 
@@ -2462,7 +2462,7 @@ class CommandSystem {
                         const survivingBushos = [];
                         for (let b of finalBushos) {
                             if (Math.random() < 0.10) {
-                                await this.game.ui.showDialogAsync(`【強行軍】\n我が軍の${b.name}が凍死しました……`, false, 0);
+                                await this.game.ui.showDialogAsync(`我が軍の${b.name}が凍死しました……`, false, 0);
                                 await this.game.lifeSystem.executeDeath(b);
                             } else {
                                 survivingBushos.push(b);
@@ -2476,11 +2476,11 @@ class CommandSystem {
                         finalSVal -= lostSoldiers;
 
                         if (lostSoldiers > 0) {
-                            await this.game.ui.showDialogAsync(`【強行軍】\n我が軍の兵士${lostSoldiers}人が遭難しました……`, false, 0);
+                            await this.game.ui.showDialogAsync(`我が軍の兵士${lostSoldiers}人が遭難しました……`, false, 0);
                         }
 
                         if (finalBushos.length === 0) {
-                            await this.game.ui.showDialogAsync("【強行軍】\n我が軍は行方不明になりました……", false, 0);
+                            await this.game.ui.showDialogAsync("我が軍は行方不明になりました……", false, 0);
                             helperCastle.soldiers = Math.max(0, helperCastle.soldiers - reinfSoldiers);
                             helperCastle.rice = Math.max(0, helperCastle.rice - reinfRice);
                             helperCastle.horses = Math.max(0, (helperCastle.horses || 0) - reinfHorses);
