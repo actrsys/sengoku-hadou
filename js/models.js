@@ -104,11 +104,15 @@ class Castle {
         
         if (data.adjacentCastleIds && Array.isArray(data.adjacentCastleIds)) {
             // セーブデータから読み込んだ時はそのまま使います
-            this.adjacentCastleIds = data.adjacentCastleIds;
+            this.adjacentCastleIds = [...data.adjacentCastleIds]; // ★リストのコピーをもらいます
             // セーブデータに海路の記憶があればそれも使います
-            this.seaRouteIds = Array.isArray(data.seaRouteIds) ? data.seaRouteIds : [];
-        } else if (typeof data.adjacentCastle === 'string' && data.adjacentCastle.trim() !== "") {
-            // CSVから「2|3s|4」のような文字で届いたら、１つずつ確認します
+            this.seaRouteIds = Array.isArray(data.seaRouteIds) ? [...data.seaRouteIds] : [];
+        }
+
+        // ★ここを「else if」ではなく「if」に変えました！
+        // すでに道順を覚えていても、CSVから届いた文字があれば、海路の「s」を見逃さないように必ずチェックします！
+        if (typeof data.adjacentCastle === 'string' && data.adjacentCastle.trim() !== "") {
+            // CSVから「2|94s|10」のような文字で届いたら、１つずつ確認します
             const parts = data.adjacentCastle.split('|');
             parts.forEach(part => {
                 const cleanPart = part.trim();
@@ -120,9 +124,13 @@ class Castle {
                 const id = parseInt(cleanPart, 10);
                 
                 if (!isNaN(id)) {
-                    this.adjacentCastleIds.push(id); // 普通の「繋がっているお城リスト」には必ず入れます
-                    if (isSea) {
-                        this.seaRouteIds.push(id); // 「s」がついていたら「海路リスト」にも入れます
+                    // もしまだ普通の「繋がっているお城リスト」に入っていなければ、追加します
+                    if (!this.adjacentCastleIds.includes(id)) {
+                        this.adjacentCastleIds.push(id);
+                    }
+                    // 「s」がついていて、まだ「海路リスト」に入っていなければ追加します
+                    if (isSea && !this.seaRouteIds.includes(id)) {
+                        this.seaRouteIds.push(id);
                     }
                 }
             });
