@@ -644,9 +644,11 @@ Object.assign(UIManager.prototype, {
                             path.setAttribute("d", `M ${pos1X} ${pos1Y} Q ${cpX} ${cpY} ${pos2X} ${pos2Y}`);
                         }
 
-                        // ★今回追加：この2つの城のどちらかが「海路リスト」に相手の番号を持っていたら海路とみなします！
-                        const isSeaRoute = (c1.seaRouteIds && c1.seaRouteIds.includes(adjId)) || 
-                                           (c2.seaRouteIds && c2.seaRouteIds.includes(c1.id));
+                        // ★超重要な修正：念のため、お互いの出席番号を絶対に「数字」として扱ってから確認します！
+                        const numAdjId = Number(adjId);
+                        const numC1Id = Number(c1.id);
+                        const isSeaRoute = (c1.seaRouteIds && c1.seaRouteIds.includes(numAdjId)) || 
+                                           (c2.seaRouteIds && c2.seaRouteIds.includes(numC1Id));
 
                         path.setAttribute("fill", "transparent");
                         

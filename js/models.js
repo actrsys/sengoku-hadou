@@ -103,14 +103,16 @@ class Castle {
         this.seaRouteIds = []; 
         
         if (data.adjacentCastleIds && Array.isArray(data.adjacentCastleIds)) {
-            // セーブデータから読み込んだ時はそのまま使います
-            this.adjacentCastleIds = [...data.adjacentCastleIds]; // ★リストのコピーをもらいます
-            // セーブデータに海路の記憶があればそれも使います
-            this.seaRouteIds = Array.isArray(data.seaRouteIds) ? [...data.seaRouteIds] : [];
+            // ★超重要な修正：昔のデータが「文字の"17"」だった場合、「数字の17」に直して箱に入れます！
+            // こうしないと、文字と数字が別物扱いされて線が引かれないバグが起きます
+            this.adjacentCastleIds = data.adjacentCastleIds.map(id => Number(id));
+            
+            if (Array.isArray(data.seaRouteIds)) {
+                this.seaRouteIds = data.seaRouteIds.map(id => Number(id));
+            }
         }
 
-        // ★ここを「else if」ではなく「if」に変えました！
-        // すでに道順を覚えていても、CSVから届いた文字があれば、海路の「s」を見逃さないように必ずチェックします！
+        // CSVから届いた文字があれば、海路の「s」を見逃さないように必ずチェックします！
         if (typeof data.adjacentCastle === 'string' && data.adjacentCastle.trim() !== "") {
             // CSVから「2|94s|10」のような文字で届いたら、１つずつ確認します
             const parts = data.adjacentCastle.split('|');
