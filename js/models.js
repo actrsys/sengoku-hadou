@@ -97,15 +97,35 @@ class Castle {
         this.x = Number(this.x);
         this.y = Number(this.y);
         this.provinceId = Number(this.provinceId || 0); // ★ここを追加！地方の出席番号を覚えるスペースです
+        
+        // ★今回追加：道だけでなく「海路」かどうかを覚える新しい箱を作ります
+        this.adjacentCastleIds = [];
+        this.seaRouteIds = []; 
+        
         if (data.adjacentCastleIds && Array.isArray(data.adjacentCastleIds)) {
             // セーブデータから読み込んだ時はそのまま使います
             this.adjacentCastleIds = data.adjacentCastleIds;
+            // セーブデータに海路の記憶があればそれも使います
+            this.seaRouteIds = Array.isArray(data.seaRouteIds) ? data.seaRouteIds : [];
         } else if (typeof data.adjacentCastle === 'string' && data.adjacentCastle.trim() !== "") {
-            // CSVから「2|3|10」のような文字で届いたら、「|」で区切って数字のリストに変身させます！
-            this.adjacentCastleIds = data.adjacentCastle.split('|').map(id => Number(id.trim()));
-        } else {
-            // 何も書かれていなかったら空っぽのリストにしておきます
-            this.adjacentCastleIds = [];
+            // CSVから「2|3s|4」のような文字で届いたら、１つずつ確認します
+            const parts = data.adjacentCastle.split('|');
+            parts.forEach(part => {
+                const cleanPart = part.trim();
+                if (cleanPart === "") return;
+                
+                // 「s」が含まれているかチェックします（大文字の「S」でも大丈夫なようにします）
+                const isSea = cleanPart.toLowerCase().includes('s');
+                // 「s」を取り除いて、純粋な数字だけにします
+                const id = parseInt(cleanPart, 10);
+                
+                if (!isNaN(id)) {
+                    this.adjacentCastleIds.push(id); // 普通の「繋がっているお城リスト」には必ず入れます
+                    if (isSea) {
+                        this.seaRouteIds.push(id); // 「s」がついていたら「海路リスト」にも入れます
+                    }
+                }
+            });
         }
         this.castlesColorCode = data.castlesColorCode || "";
         
