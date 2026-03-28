@@ -644,9 +644,24 @@ Object.assign(UIManager.prototype, {
                             path.setAttribute("d", `M ${pos1X} ${pos1Y} Q ${cpX} ${cpY} ${pos2X} ${pos2Y}`);
                         }
 
+                        // ★今回追加：この2つの城のどちらかが「海路リスト」に相手の番号を持っていたら海路とみなします！
+                        const isSeaRoute = (c1.seaRouteIds && c1.seaRouteIds.includes(adjId)) || 
+                                           (c2.seaRouteIds && c2.seaRouteIds.includes(c1.id));
+
                         path.setAttribute("fill", "transparent");
-                        path.setAttribute("stroke", "rgba(255, 250, 200, 0.9)"); 
-                        path.setAttribute("stroke-width", "1.5");
+                        
+                        if (isSeaRoute) {
+                            // 海路の時：少し青っぽくして、透明にして、海路っぽく点線にします！
+                            path.setAttribute("stroke", "rgba(100, 200, 255, 0.7)"); 
+                            path.setAttribute("stroke-width", "2.0");
+                            path.setAttribute("stroke-dasharray", "6, 4"); // 6ピクセル描いて4ピクセル休む「点線」の魔法です
+                        } else {
+                            // 普通の陸路の時：今まで通りです
+                            path.setAttribute("stroke", "rgba(255, 250, 200, 0.9)"); 
+                            path.setAttribute("stroke-width", "1.5");
+                            path.removeAttribute("stroke-dasharray"); // 念のため点線の魔法を消しておきます
+                        }
+                        
                         svg.appendChild(path);
                     }
                 });
