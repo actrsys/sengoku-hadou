@@ -1130,7 +1130,7 @@ class FieldWarManager {
         if (this.state === 'MOVE_PREVIEW' && this.previewTarget && unit && !this.isInfoMode) {
             this.drawPath(this.previewTarget.path, unit.x, unit.y);
             
-            let iconSize = 16 + Math.min(Math.floor(unit.soldiers / 1000), 5) * 3;
+            let iconSize = 16 + Math.min(Math.floor(Math.max(0, unit.soldiers - 1) / 1000), 5) * 3;
 
             const pEl = document.createElement('div');
             pEl.className = `fw-unit ${unit.isAttacker ? 'attacker' : 'defender'} preview`;
@@ -1152,7 +1152,7 @@ class FieldWarManager {
         const isDefPlayer = (Number(this.warState.defender.ownerClan) === Number(this.game.playerClanId));
         
         this.units.forEach((u) => {
-            let iconSize = 16 + Math.min(Math.floor(u.soldiers / 1000), 5) * 3;
+            let iconSize = 16 + Math.min(Math.floor(Math.max(0, u.soldiers - 1) / 1000), 5) * 3;
 
             const uEl = document.createElement('div');
             const isActive = (unit && u.id === unit.id);
