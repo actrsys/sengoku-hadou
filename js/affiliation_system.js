@@ -288,7 +288,7 @@ class AffiliationSystem {
     }
 
     electCastellan(castle, bushos) {
-        if (castle.ownerClan === this.game.playerClanId && castle.isDelegated) {
+        if (castle.ownerClan === this.game.playerClanId) {
             const currentLord = bushos.find(b => b.id === castle.castellanId);
             if (currentLord) {
                 bushos.forEach(b => b.isCastellan = false);
