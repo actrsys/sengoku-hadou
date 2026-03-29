@@ -986,6 +986,131 @@ class AIEngine {
                     if (['draft', 'training', 'soldier_charity', 'buy_gun', 'buy_horse'].includes(a.type)) {
                         a.score *= 2;
                     }
+
+                    // ★ここから追加：前線基地への「特別なお届け物（輸送）」の点数をつけます！
+                    // 元々ある「transport（輸送）」の行動を見つけて、作戦中なら点数を高くします。
+                    if (a.type === 'transport') {
+                        // 今いるお城が、出撃用でも援軍用でもない「後方のお城」の場合だけ運びます
+                        if (castle.id !== myOp.stagingBase && castle.id !== myOp.supportBase) {
+                            
+                            // 周りの敵（仲良しじゃない勢力）の強さを調べて、お留守番の人数を計算します
+                            let hasEnemy = false;
+                            let maxEnemyTotalSoldiers = 0;
+                            let maxEnemyMaxCastleSoldiers = 0;
+
+                            // 1. お隣のお城を順番に調べます
+                            if (castle.adjacentCastleIds) {
+                                for (const adjId of castle.adjacentCastleIds) {
+                                    const adj = this.game.getCastle(adjId);
+                                    if (!adj || adj.ownerClan === castle.ownerClan) continue; // 自分のお城ならセーフ
+
+                                    let isFriendly = false;
+                                    if (adj.ownerClan !== 0) {
+                                        const rel = this.game.getRelation(castle.ownerClan, adj.ownerClan);
+                                        // 同盟、和睦、支配、従属のどれかなら仲良しです
+                                        if (rel && ['同盟', '和睦', '支配', '従属'].includes(rel.status)) {
+                                            isFriendly = true;
+                                        }
+                                    }
+
+                                    // 仲良しじゃない場合（空き城も油断できないので含めます）
+                                    if (!isFriendly) {
+                                        hasEnemy = true;
+                                        if (adj.ownerClan !== 0) {
+                                            // その敵の大名家の、全部の兵士数と一番兵士が多いお城を調べます
+                                            const enemyCastles = this.game.castles.filter(c => c.ownerClan === adj.ownerClan);
+                                            const enemyTotal = enemyCastles.reduce((sum, c) => sum + c.soldiers, 0);
+                                            const enemyMax = enemyCastles.length > 0 ? Math.max(...enemyCastles.map(c => c.soldiers)) : 0;
+                                            
+                                            // 一番大きな勢力の情報をメモしておきます
+                                            if (enemyTotal > maxEnemyTotalSoldiers) {
+                                                maxEnemyTotalSoldiers = enemyTotal;
+                                                maxEnemyMaxCastleSoldiers = enemyMax;
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+
+                            // 2. お城にいる諸勢力（国衆）も調べます
+                            const kunishus = this.game.kunishuSystem.getKunishusInCastle(castle.id);
+                            for (const k of kunishus) {
+                                // 仲良し度が30以下なら敵対しているとみなします
+                                if (k.getRelation(castle.ownerClan) <= 30) {
+                                    hasEnemy = true;
+                                    if (k.soldiers > maxEnemyTotalSoldiers) {
+                                        maxEnemyTotalSoldiers = k.soldiers;
+                                        maxEnemyMaxCastleSoldiers = k.soldiers;
+                                    }
+                                }
+                            }
+
+                            // 基本のお留守番セット（すぐ攻められない安全な場合）
+                            let keepSoldiers = 500;
+                            let keepRice = 1000;
+
+                            // もし周りに敵がいたら、お留守番を増やします
+                            if (hasEnemy) {
+                                // 最大勢力の中で、一番兵士が多いお城の「半分」をお留守番の目標にします
+                                keepSoldiers = Math.floor(maxEnemyMaxCastleSoldiers * 0.5);
+
+                                // でも、自分の大名家全体の兵力が、敵の全体の半分以下なら…
+                                const myCastles = this.game.castles.filter(c => c.ownerClan === castle.ownerClan);
+                                const myTotalSoldiers = myCastles.reduce((sum, c) => sum + c.soldiers, 0);
+                                const enemyHalf = maxEnemyTotalSoldiers * 0.5;
+
+                                if (enemyHalf > 0 && myTotalSoldiers <= enemyHalf) {
+                                    // 戦力差に合わせて「お留守番は諦めて前線に送る！」と判断します
+                                    const ratio = myTotalSoldiers / enemyHalf;
+                                    keepSoldiers = Math.floor(keepSoldiers * ratio);
+                                }
+
+                                // 兵糧は、お留守番の兵士の1.2倍を残します
+                                keepRice = Math.floor(keepSoldiers * 1.2);
+                            }
+
+                            // お留守番を残した上で、今回運ぶ分の300人と500の余裕があるか確認します
+                            const canSendSoldiers = castle.soldiers >= (keepSoldiers + 300);
+                            const canSendRice = castle.rice >= (keepRice + 500);
+
+                            if (canSendSoldiers && canSendRice) {
+                                const stagingCastle = this.game.getCastle(myOp.stagingBase);
+                                const supportCastle = myOp.supportBase ? this.game.getCastle(myOp.supportBase) : null;
+
+                                // 目標値は、作戦で決めた「必要な兵士（requiredForce）」を使います
+                                // 兵糧も、兵士の1.5倍を目指します
+                                const stagingSoldierGoal = myOp.requiredForce * 1.5;
+                                const stagingRiceGoal = stagingSoldierGoal * 1.5;
+                                
+                                const supportSoldierGoal = myOp.requiredForce;
+                                const supportRiceGoal = supportSoldierGoal * 1.5;
+
+                                // 届け先が出撃用拠点で、まだ目標（兵士か兵糧）に届いていないなら、大急ぎで運びます！
+                                if (a.targetId === myOp.stagingBase && stagingCastle && 
+                                   (stagingCastle.soldiers < stagingSoldierGoal || stagingCastle.rice < stagingRiceGoal)) {
+                                    
+                                    a.score += 500; // 点数を特大にして最優先にします！
+                                    
+                                    // 運ぶ量を「兵士300、兵糧500」にセットします
+                                    // ※もし元々のシステムで運ぶ量を指定できる作りになっていれば、これで少しずつ運びます
+                                    a.sendSoldiers = 300;
+                                    a.sendRice = 500;
+                                    a.sendGold = 0; // お金は今回は運びません
+                                }
+                                // 出撃用がもう十分で、届け先が援軍用拠点で、まだ目標に届いていないなら運びます！
+                                else if (supportCastle && a.targetId === myOp.supportBase && stagingCastle && 
+                                        (stagingCastle.soldiers >= stagingSoldierGoal && stagingCastle.rice >= stagingRiceGoal) &&
+                                        (supportCastle.soldiers < supportSoldierGoal || supportCastle.rice < supportRiceGoal)) {
+                                    
+                                    a.score += 300; // 優先して運びます！
+                                    a.sendSoldiers = 300;
+                                    a.sendRice = 500;
+                                    a.sendGold = 0;
+                                }
+                            }
+                        }
+                    }
+                    // ★追加ここまで
                 }
 
                 a.score *= (0.9 + Math.random() * 0.2);
