@@ -959,6 +959,9 @@ class AIEngine {
             }
 
             // --- 性格による点数の調整 ---
+            const myOp = this.game.aiOperationManager.operations[castle.ownerClan];
+            const isPreparingAttack = (myOp && myOp.type === '攻撃');
+
             actions.forEach(a => {
                 if (isConservative && ['farm', 'commerce', 'repair', 'charity'].includes(a.type)) {
                     a.score *= 1.2; 
@@ -966,6 +969,25 @@ class AIEngine {
                 if (isAggressive && ['draft', 'training', 'soldier_charity'].includes(a.type)) {
                     a.score *= 1.2; 
                 }
+
+                // ★追加：攻撃準備期間中は、内政の優先度を切り替えて軍事に集中します！
+                if (isPreparingAttack) {
+                    // 石高、鉱山、城壁、施しの優先度を半分に（緊急時以外）
+                    if (['farm', 'commerce', 'repair', 'charity'].includes(a.type)) {
+                        let isEmergency = false;
+                        if (a.type === 'repair' && castle.defense <= castle.maxDefense / 4) isEmergency = true;
+                        if (a.type === 'charity' && castle.peoplesLoyalty <= 70) isEmergency = true;
+                        
+                        if (!isEmergency) {
+                            a.score /= 2;
+                        }
+                    }
+                    // 徴兵、訓練、士気、馬・鉄砲購入の優先度を倍に
+                    if (['draft', 'training', 'soldier_charity', 'buy_gun', 'buy_horse'].includes(a.type)) {
+                        a.score *= 2;
+                    }
+                }
+
                 a.score *= (0.9 + Math.random() * 0.2);
             });
 

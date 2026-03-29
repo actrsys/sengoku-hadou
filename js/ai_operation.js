@@ -170,13 +170,27 @@ class AIOperationManager {
                     }
                 }
 
-                // ★修正：援軍用の拠点が確保できなくても、作戦自体は諦めずにそのまま採用します！
-                // お城が1つしかないお殿様でも、しっかり攻撃できるようにします。
+                // 援軍用拠点もしっかり確保できたら、この作戦を採用します！
                 highestScore = cand.score;
                 
-                // ★雪国かどうかを判定して「越冬」の準備をします
-                let prepTurns = 2; // 基本の準備期間は2ヶ月
+                // ★追加：敵との戦力差（見込み）を計算して、準備期間を決めます！
+                const enemyForce = cand.target.isKunishuTarget ? 
+                    (cand.target.kunishu.soldiers + cand.target.kunishu.defense) : 
+                    (cand.target.soldiers + cand.target.defense);
+                const myForce = this.game.getCastle(cand.castleId).soldiers;
+                const ratio = enemyForce / Math.max(1, myForce); // 敵の戦力が自分の何倍か？
+
+                let prepTurns = 4;
+                if (ratio <= 0.25) {
+                    prepTurns = 2; // 敵が1/4以下なら2ヶ月
+                } else if (ratio >= 1.3) {
+                    prepTurns = 6; // 敵が1.3倍以上なら6ヶ月
+                } else {
+                    // その間なら、なめらかに2〜6ヶ月の間で計算します
+                    prepTurns = Math.round(2 + ((ratio - 0.25) / 1.05) * 4);
+                }
                 
+                // ★雪国かどうかを判定して「越冬」の準備をします
                 // 大雪がよく降る国（降雪確率30%以上）の出席番号リストです
                 const snowProvs = [1, 2, 3, 4, 5, 6, 7, 8, 10, 11, 12, 28];
                 const myCastle = this.game.getCastle(cand.castleId);
