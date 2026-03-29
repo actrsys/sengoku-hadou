@@ -524,6 +524,11 @@ class LifeSystem {
             
             this.game.changeLeader(daimyo.clan, successor.id);
             
+            // ★当主交代があったら、今まで進めていた作戦（攻撃準備など）を一旦キャンセルして白紙に戻します！
+            if (this.game.aiOperationManager && this.game.aiOperationManager.operations[daimyo.clan]) {
+                delete this.game.aiOperationManager.operations[daimyo.clan];
+            }
+            
             // ★新旧大名の能力比較と、忠誠・民忠への影響！
             
             // 1. 交代前の大名と、新しい大名の「6つの能力の合計」を計算します
