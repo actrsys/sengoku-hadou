@@ -225,7 +225,7 @@ class DataManager {
                 const castleAsCastellan = castles.find(cs => Number(cs.castellanId) === Number(b.id));
                 if (castleAsCastellan) b.isCastellan = true;
                 
-                if (b.clan === 0) {
+                if (b.clan === 0 && (b.belongKunishuId || 0) === 0) {
                     b.status = 'ronin';
                     b.loyalty = 50; // ★浪人の場合も、ゲーム開始時に忠誠度を50にしておきます！
                 } else {
@@ -649,8 +649,11 @@ class GameSystem {
     }
 
     static getEmployProb(recruiter, target, recruiterClanPower, targetClanPower) {
+        // ★追加：諸勢力に所属している武将（頭領など）は引き抜けないようにガードします！
+        if ((target.belongKunishuId || 0) > 0) return 0;
+        
         if (target.clan !== 0 && target.ambition > 70 && recruiterClanPower < targetClanPower * 0.7) return 0; 
-        const affDiff = this.calcAffinityDiff(recruiter.affinity, target.affinity); 
+        const affDiff = this.calcAffinityDiff(recruiter.affinity, target.affinity);
         let affBonus = (affDiff < 10) ? 30 : (affDiff < 25) ? 15 : (affDiff > 40) ? -10 : 0; 
         const resistance = target.clan === 0 ? target.ambition : target.loyalty * window.MainParams.Strategy.EmploymentDiff; 
         const base = recruiter.charm + affBonus;
@@ -680,8 +683,11 @@ class GameSystem {
     }
     
     static calcEmploymentSuccess(recruiter, target, recruiterClanPower, targetClanPower) {
+        // ★追加：諸勢力に所属している武将（頭領など）は引き抜けないようにガードします！
+        if ((target.belongKunishuId || 0) > 0) return false;
+
         if (target.clan !== 0 && target.ambition > 70 && recruiterClanPower < targetClanPower * 0.7) return false; 
-        const affDiff = this.calcAffinityDiff(recruiter.affinity, target.affinity); 
+        const affDiff = this.calcAffinityDiff(recruiter.affinity, target.affinity);
         let affBonus = (affDiff < 10) ? 30 : (affDiff < 25) ? 15 : (affDiff > 40) ? -10 : 0; 
         const resistance = target.clan === 0 ? target.ambition : target.loyalty * window.MainParams.Strategy.EmploymentDiff; 
         return ((recruiter.charm + affBonus) * (Math.random() + 0.5)) > resistance; 

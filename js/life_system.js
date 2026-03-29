@@ -161,11 +161,18 @@ class LifeSystem {
         let messages = [];
 
         unbornBushos.forEach(b => {
-            // ★変更：ゲーム開始時にclanが0なら浪人、0以外なら仕官として処理します
-            if (b.clan === 0) {
+            // ★変更：大名家に所属しておらず、諸勢力でもない場合は「浪人」になります
+            if (b.clan === 0 && (b.belongKunishuId || 0) === 0) {
                 // 登場前:浪人 の場合
                 b.status = 'ronin';
                 b.loyalty = 50; // ★浪人として登場したので、忠誠度を50にします！
+                const targetCastle = this.game.getCastle(b.castleId);
+                if (targetCastle) {
+                    targetCastle.samuraiIds.push(b.id);
+                }
+            } else if ((b.belongKunishuId || 0) > 0) {
+                // ★追加：登場前:諸勢力 の場合
+                b.status = 'active';
                 const targetCastle = this.game.getCastle(b.castleId);
                 if (targetCastle) {
                     targetCastle.samuraiIds.push(b.id);
