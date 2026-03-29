@@ -54,8 +54,8 @@ class AIOperationManager {
             }
         }
 
-        let bestOperation = null;
-        let highestScore = -1;
+        // 攻撃作戦の候補を全部記録しておく箱を用意します
+        let operationCandidates = [];
 
         // 大名家のすべてのお城を順番に見て、一番攻めやすい場所を探します！
         for (const myCastle of myClanCastles) {
@@ -121,49 +121,100 @@ class AIOperationManager {
             if (validEnemies.length > 0) {
                 const decision = this.game.aiEngine.decideAttackTarget(myCastle, myGeneral, validEnemies);
                 
-                // 点数が今までで一番高かったら、ベストな作戦としてメモを書き換えます
-                if (decision && decision.score > highestScore) {
-                    highestScore = decision.score;
-                    
-                    // ★ここから追加：雪国かどうかを判定して「越冬」の準備をします
-                    let prepTurns = 2; // 基本の準備期間は2ヶ月
-                    
-                    // 大雪がよく降る国（降雪確率30%以上）の出席番号リストです
-                    const snowProvs = [1, 2, 3, 4, 5, 6, 7, 8, 10, 11, 12, 28];
-                    // 諸勢力が目標の時は、自分の城と同じ国として扱います
-                    const targetProvId = decision.target.isKunishuTarget ? myCastle.provinceId : decision.target.provinceId;
-                    
-                    // 出発する城か、目的地のお城のどちらかが雪国リストに入っていたら「越冬モード」を考えます
-                    const isSnowArea = snowProvs.includes(myCastle.provinceId) || snowProvs.includes(targetProvId);
-                    
-                    if (isSnowArea) {
-                        // 実行する予定の月を計算します（12を超えたら1に戻るようにします）
-                        let execMonth = this.game.month + prepTurns;
-                        if (execMonth > 12) execMonth -= 12;
-                        
-                        // もし実行予定の月が冬（12月、1月、2月）だったら、3月になるまで準備期間を毎月1ずつ延ばします
-                        while (execMonth === 12 || execMonth === 1 || execMonth === 2) {
-                            prepTurns++;
-                            execMonth = this.game.month + prepTurns;
-                            if (execMonth > 12) execMonth -= 12;
+                // 点数がついたら、とりあえず候補の箱に入れておきます
+                if (decision && decision.score > 0) {
+                    operationCandidates.push({
+                        castleId: myCastle.id,
+                        target: decision.target,
+                        sendSoldiers: decision.sendSoldiers,
+                        sendRice: decision.sendRice,
+                        score: decision.score
+                    });
+                }
+            }
+        }
+
+        let bestOperation = null;
+        let highestScore = -1;
+
+        // 候補の箱の中から、一番点数が高い作戦を見つけます！
+        if (operationCandidates.length > 0) {
+            // 点数が高い順に並べ替えます
+            operationCandidates.sort((a, b) => b.score - a.score);
+            
+            // ★ここから追加：点数が高い作戦から順番に見て、サポートが用意できるか確認します！
+            for (const cand of operationCandidates) {
+                let supportBaseId = null;
+                const targetId = cand.target.isKunishuTarget ? cand.target.kunishu.id : cand.target.id;
+                const isKunishuTarget = cand.target.isKunishuTarget === true;
+
+                const sameTargetCands = operationCandidates.filter(c => {
+                    const cTargetId = c.target.isKunishuTarget ? c.target.kunishu.id : c.target.id;
+                    const cIsKunishu = c.target.isKunishuTarget === true;
+                    return cTargetId === targetId && cIsKunishu === isKunishuTarget && c.castleId !== cand.castleId;
+                });
+
+                if (sameTargetCands.length > 0) {
+                    supportBaseId = sameTargetCands[0].castleId; // 同じ目標への点数が2番目に高かった城
+                } else {
+                    // 同じ目標に届く他の城がなかった場合、出撃元のお隣の城（自領）を予備として選ぶ魔法
+                    const stagingCastle = this.game.getCastle(cand.castleId);
+                    if (stagingCastle && stagingCastle.adjacentCastleIds) {
+                        const adjMyCastles = stagingCastle.adjacentCastleIds
+                            .map(id => this.game.getCastle(id))
+                            .filter(c => c && c.ownerClan === clanId)
+                            .sort((a, b) => (b.soldiers + b.defense) - (a.soldiers + a.defense));
+                        if (adjMyCastles.length > 0) {
+                            supportBaseId = adjMyCastles[0].id;
                         }
                     }
-                    // ★追加ここまで
-
-                    bestOperation = {
-                        type: '攻撃',
-                        // セーブできるように、お城も諸勢力も「出席番号（ID）」だけで覚えます！
-                        targetId: decision.target.isKunishuTarget ? decision.target.kunishu.id : decision.target.id, 
-                        isKunishuTarget: decision.target.isKunishuTarget === true, // 諸勢力かどうかの目印
-                        stagingBase: myCastle.id,    // 出撃する自分のお城のID
-                        requiredForce: decision.sendSoldiers, // 必要な兵士
-                        requiredRice: decision.sendRice,      // 必要な兵糧
-                        assignedUnits: [], 
-                        turnsRemaining: prepTurns, // ★計算した準備ターン（越冬なら長くなります）
-                        maxTurns: prepTurns + 3,   // ★待機中に期限切れで諦めないように、少し余裕を持たせます
-                        status: '準備中'
-                    };
                 }
+
+                // ★修正：援軍用の拠点が確保できなくても、作戦自体は諦めずにそのまま採用します！
+                // お城が1つしかないお殿様でも、しっかり攻撃できるようにします。
+                highestScore = cand.score;
+                
+                // ★雪国かどうかを判定して「越冬」の準備をします
+                let prepTurns = 2; // 基本の準備期間は2ヶ月
+                
+                // 大雪がよく降る国（降雪確率30%以上）の出席番号リストです
+                const snowProvs = [1, 2, 3, 4, 5, 6, 7, 8, 10, 11, 12, 28];
+                const myCastle = this.game.getCastle(cand.castleId);
+                // 諸勢力が目標の時は、自分の城と同じ国として扱います
+                const targetProvId = cand.target.isKunishuTarget ? myCastle.provinceId : cand.target.provinceId;
+                
+                // 出発する城か、目的地のお城のどちらかが雪国リストに入っていたら「越冬モード」を考えます
+                const isSnowArea = snowProvs.includes(myCastle.provinceId) || snowProvs.includes(targetProvId);
+                
+                if (isSnowArea) {
+                    // 実行する予定の月を計算します（12を超えたら1に戻るようにします）
+                    let execMonth = this.game.month + prepTurns;
+                    if (execMonth > 12) execMonth -= 12;
+                    
+                    // もし実行予定の月が冬（12月、1月、2月）だったら、3月になるまで準備期間を毎月1ずつ延ばします
+                    while (execMonth === 12 || execMonth === 1 || execMonth === 2) {
+                        prepTurns++;
+                        execMonth = this.game.month + prepTurns;
+                        if (execMonth > 12) execMonth -= 12;
+                    }
+                }
+
+                bestOperation = {
+                    type: '攻撃',
+                    targetId: targetId, 
+                    isKunishuTarget: isKunishuTarget,
+                    stagingBase: cand.castleId,    // 出撃する自分のお城のID
+                    supportBase: supportBaseId,        // ★追加：予備の援軍用拠点のID
+                    requiredForce: cand.sendSoldiers, 
+                    requiredRice: cand.sendRice,      
+                    assignedUnits: [], 
+                    turnsRemaining: prepTurns, 
+                    maxTurns: prepTurns + 3,   
+                    status: '準備中'
+                };
+
+                // 最高の作戦が1つ決まったら、もう他の候補は見なくていいのでループを終わらせます
+                break;
             }
         }
 
@@ -172,7 +223,7 @@ class AIOperationManager {
             // ai.jsでやっていた確率のサイコロをここで振って、やるかどうか決めます
             if (Math.random() * 100 < highestScore) {
                 this.operations[clanId] = bestOperation;
-                console.log(`大名家[${clanId}]が【攻撃作戦】を立案しました！(準備: ${bestOperation.turnsRemaining}ヶ月)`);
+                console.log(`大名家[${clanId}]が【攻撃作戦】を立案しました！(出撃元: ${bestOperation.stagingBase}, 援軍用: ${bestOperation.supportBase || 'なし'}, 準備: ${bestOperation.turnsRemaining}ヶ月)`);
                 return;
             }
         }
