@@ -39,29 +39,23 @@ class AIStaffing {
         let bestCastle = castle; // まずは「今いるお城」を一番良いお城（基準）としておきます
         let bestScore = 0; // 今のお城の点数は基準なので「0点」です
 
-        // ★追加：好戦的なお殿様のために、攻撃目標に届くお城のリストを作ります
-        let attackReachables = [];
-        if (daimyo.personality === 'aggressive') {
-            const myOp = this.game.aiOperationManager.operations[clanId];
-            if (myOp && myOp.type === '攻撃') {
-                const targetEnemyId = myOp.targetId;
-                const enemyCastle = this.game.getCastle(targetEnemyId);
-
-                attackReachables = reachableMyCastles.filter(c => {
-                    if (myOp.isKunishuTarget) {
-                        const stagingCastle = this.game.getCastle(myOp.stagingBase);
-                        return c.id === myOp.stagingBase || (stagingCastle && GameSystem.isReachable(this.game, c, stagingCastle, clanId));
-                    } else if (enemyCastle) {
-                        return GameSystem.isReachable(this.game, c, enemyCastle, clanId);
-                    }
-                    return false;
-                });
+        // ★追加：攻撃作戦の出撃元（前線拠点）の出席番号と、性格によるボーナス点数を調べます
+        let stagingBaseId = null;
+        let operationBonus = 0;
+        
+        const myOp = this.game.aiOperationManager.operations[clanId];
+        if (myOp && myOp.type === '攻撃') {
+            stagingBaseId = myOp.stagingBase;
+            if (daimyo.personality === 'aggressive') {
+                operationBonus = 60;
+            } else if (daimyo.personality === 'balanced') {
+                operationBonus = 30;
             }
         }
 
-        // もし「今いるお城」も攻撃目標に届くなら、基準の点数に特大ボーナスを足しておきます！
-        if (attackReachables.some(c => c.id === castle.id)) {
-            bestScore += 500;
+        // ★追加：もし「今いるお城」が攻撃作戦の出撃元なら、基準の点数にボーナスを足しておきます！
+        if (stagingBaseId !== null && castle.id === stagingBaseId) {
+            bestScore += operationBonus;
         }
 
         // 自分が移動できるお城（自領で繋がっているお城）を順番に調べて、点数をつけていきます
@@ -71,9 +65,9 @@ class AIStaffing {
 
             let score = 0;
 
-            // もしこのお城が、攻撃目標に届くお城リストに入っていたら、特大ボーナスをあげます！
-            if (attackReachables.some(c => c.id === target.id)) {
-                score += 500;
+            // ★追加：もしこのお城が、攻撃作戦の出撃元なら、ボーナスをあげます！
+            if (stagingBaseId !== null && target.id === stagingBaseId) {
+                score += operationBonus;
             }
 
             // 1. 最大石高の点数計算（2倍で+30点、半分で-30点）
@@ -122,38 +116,6 @@ class AIStaffing {
 
         // 一番良いお城が「今の城」でなければ、お引越しを実行！
         if (bestCastle && bestCastle.id !== castle.id) {
-            // ==========================================
-            // 資源（お金、お米、兵士など）を分け合います
-            // ==========================================
-            const totalGold = castle.gold + bestCastle.gold;
-            const totalRice = castle.rice + bestCastle.rice;
-            const totalSoldiers = castle.soldiers + bestCastle.soldiers;
-            const totalHorses = (castle.horses || 0) + (bestCastle.horses || 0);
-            const totalGuns = (castle.guns || 0) + (bestCastle.guns || 0);
-
-            const avgTraining = Math.floor(((castle.training * castle.soldiers) + (bestCastle.training * bestCastle.soldiers)) / Math.max(1, totalSoldiers));
-            const avgMorale = Math.floor(((castle.morale * castle.soldiers) + (bestCastle.morale * bestCastle.soldiers)) / Math.max(1, totalSoldiers));
-
-            bestCastle.gold = Math.min(99999, Math.ceil(totalGold * 0.6));
-            castle.gold = totalGold - bestCastle.gold;
-            
-            bestCastle.rice = Math.min(99999, Math.ceil(totalRice * 0.6));
-            castle.rice = totalRice - bestCastle.rice;
-            
-            bestCastle.soldiers = Math.min(99999, Math.ceil(totalSoldiers * 0.6));
-            castle.soldiers = totalSoldiers - bestCastle.soldiers;
-            
-            bestCastle.horses = Math.min(99999, Math.ceil(totalHorses * 0.6));
-            castle.horses = totalHorses - bestCastle.horses;
-            
-            bestCastle.guns = Math.min(99999, Math.ceil(totalGuns * 0.6));
-            castle.guns = totalGuns - bestCastle.guns;
-
-            castle.training = avgTraining;
-            bestCastle.training = avgTraining;
-            castle.morale = avgMorale;
-            bestCastle.morale = avgMorale;
-
             // ==========================================
             // 仲良しのお供（武将）を連れて行きます
             // ==========================================
