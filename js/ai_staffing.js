@@ -36,41 +36,88 @@ class AIStaffing {
 
         if (reachableMyCastles.length <= 1) return false;
 
-        let bestCastle = null;
+        let bestCastle = castle; // まずは「今いるお城」を一番良いお城（基準）としておきます
+        let bestScore = 0; // 今のお城の点数は基準なので「0点」です
 
-        // 好戦的な大名の特別な移動先探し
+        // ★追加：好戦的なお殿様のために、攻撃目標に届くお城のリストを作ります
+        let attackReachables = [];
         if (daimyo.personality === 'aggressive') {
             const myOp = this.game.aiOperationManager.operations[clanId];
             if (myOp && myOp.type === '攻撃') {
                 const targetEnemyId = myOp.targetId;
                 const enemyCastle = this.game.getCastle(targetEnemyId);
 
-                // 攻撃目標に届くお城のリストを作ります
-                const reachables = reachableMyCastles.filter(c => {
+                attackReachables = reachableMyCastles.filter(c => {
                     if (myOp.isKunishuTarget) {
-                        // 諸勢力の場合は、その諸勢力がいるお城（stagingBase）まで「最大3マス」で届くか調べます
                         const stagingCastle = this.game.getCastle(myOp.stagingBase);
                         return c.id === myOp.stagingBase || (stagingCastle && GameSystem.isReachable(this.game, c, stagingCastle, clanId));
                     } else if (enemyCastle) {
-                        // 敵のお城の場合は、そのお城まで「最大3マス」で届くか調べます
                         return GameSystem.isReachable(this.game, c, enemyCastle, clanId);
                     }
                     return false;
                 });
-
-                // 届くお城があるなら、その中で一番最大防御が高いお城を選びます
-                if (reachables.length > 0) {
-                    reachables.sort((a, b) => b.maxDefense - a.maxDefense);
-                    bestCastle = reachables[0];
-                }
             }
         }
 
-        // 好戦的でない場合や、攻撃目標に届くお城がなかった場合は、単純に一番最大防御が高いお城を選びます
-        if (!bestCastle) {
-            const allCandidates = [...reachableMyCastles];
-            allCandidates.sort((a, b) => b.maxDefense - a.maxDefense);
-            bestCastle = allCandidates[0];
+        // もし「今いるお城」も攻撃目標に届くなら、基準の点数に特大ボーナスを足しておきます！
+        if (attackReachables.some(c => c.id === castle.id)) {
+            bestScore += 500;
+        }
+
+        // 自分が移動できるお城（自領で繋がっているお城）を順番に調べて、点数をつけていきます
+        for (const target of reachableMyCastles) {
+            // 今いるお城は調べる必要がないので飛ばします
+            if (target.id === castle.id) continue;
+
+            let score = 0;
+
+            // もしこのお城が、攻撃目標に届くお城リストに入っていたら、特大ボーナスをあげます！
+            if (attackReachables.some(c => c.id === target.id)) {
+                score += 500;
+            }
+
+            // 1. 最大石高の点数計算（2倍で+30点、半分で-30点）
+            // ※0で割り算するとエラーになってしまうので、最低でも1になるように守ってあげます
+            const baseMaxKoku = Math.max(1, castle.maxKokudaka);
+            const rateMaxKoku = target.maxKokudaka / baseMaxKoku; // 今のお城の何倍あるか？を計算します
+            if (rateMaxKoku >= 1.0) {
+                score += (rateMaxKoku - 1.0) * 30; // 1倍より大きければ、増えた分だけプラスします
+            } else {
+                score += (rateMaxKoku - 1.0) * 60; // 0.5倍（半分）の時にちょうど-30点になるように、60をかけます
+            }
+
+            // 2. 最大防御力の点数計算（2倍で+30点、半分で-30点）
+            const baseMaxDef = Math.max(1, castle.maxDefense);
+            const rateMaxDef = target.maxDefense / baseMaxDef;
+            if (rateMaxDef >= 1.0) {
+                score += (rateMaxDef - 1.0) * 30;
+            } else {
+                score += (rateMaxDef - 1.0) * 60;
+            }
+
+            // 3. 現在石高の点数計算（2倍で+50点、半分で-50点）
+            const baseKoku = Math.max(1, castle.kokudaka);
+            const rateKoku = target.kokudaka / baseKoku;
+            if (rateKoku >= 1.0) {
+                score += (rateKoku - 1.0) * 50;
+            } else {
+                score += (rateKoku - 1.0) * 100; // 0.5倍（半分）の時にちょうど-50点になるように、100をかけます
+            }
+
+            // 4. 現在防御力の点数計算（2倍で+50点、半分で-50点）
+            const baseDef = Math.max(1, castle.defense);
+            const rateDef = target.defense / baseDef;
+            if (rateDef >= 1.0) {
+                score += (rateDef - 1.0) * 50;
+            } else {
+                score += (rateDef - 1.0) * 100;
+            }
+
+            // 全部の点数を足して、今までの最高得点よりも高かったらメモを書き換えます！
+            if (score > bestScore) {
+                bestScore = score;
+                bestCastle = target;
+            }
         }
 
         // 一番良いお城が「今の城」でなければ、お引越しを実行！
