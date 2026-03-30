@@ -1875,7 +1875,7 @@ class CommandSystem {
             case 'headhunt': case 'headhunt_select_castle': return "引抜対象の居城を選択してください";
             case 'goodwill': return "親善を行う相手を選択してください";
             case 'alliance': return "同盟を行う相手を選択してください";
-            case 'dominate': return "支配下に置く相手を選択してください";
+            case 'dominate': return "支配勧告を行う相手を選択してください";
             case 'subordinate': return "従属する相手を選択してください";
             case 'kunishu_goodwill': return "親善を行う諸勢力がいる城を選択してください";
             case 'kunishu_incorporate': return "取込を行う諸勢力がいる城を選択してください";

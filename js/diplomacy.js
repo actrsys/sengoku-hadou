@@ -452,10 +452,14 @@ class DiplomacyManager {
         
         const targetClanId = targetCastle.ownerClan;
         let msg = "";
+        let aiMsg = ""; // AI同士の場合のメッセージ用
         const isPlayerInvolved = (doer.clan === this.game.playerClanId || targetClanId === this.game.playerClanId);
 
         const myPower = this.game.getClanTotalSoldiers(doer.clan) || 1;
         const targetPower = this.game.getClanTotalSoldiers(targetClanId) || 1;
+
+        const doerClanName = this.game.clans.find(c => c.id === doer.clan).name;
+        const targetClanName = this.game.clans.find(c => c.id === targetClanId).name;
 
         if (type === 'goodwill') {
             let isSuccess = true;
@@ -485,6 +489,7 @@ class DiplomacyManager {
             if (isSuccess) {
                 this.changeStatus(doer.clan, targetClanId, '同盟');
                 msg = `同盟の締結に成功しました！`;
+                if (!isPlayerInvolved) aiMsg = `${doerClanName} が ${targetClanName} と同盟を締結しました！`;
                 doer.achievementTotal += Math.floor(doer.diplomacy * 0.2) + 10;
                 this.game.factionSystem.updateRecognition(doer, 30);
             } else {
@@ -498,6 +503,15 @@ class DiplomacyManager {
             const result = this.applyBreakAlliancePenalty(doer.clan, targetClanId);
 
             msg = `${result.oldStatus}関係を破棄しました`;
+            if (!isPlayerInvolved) {
+                if (result.oldStatus === '同盟') {
+                    aiMsg = `${doerClanName} が ${targetClanName} との同盟を破棄しました！`;
+                } else if (result.oldStatus === '従属') {
+                    aiMsg = `${doerClanName} が ${targetClanName} の支配下からの独立を宣言しました！`;
+                } else if (result.oldStatus === '支配') {
+                    aiMsg = `${doerClanName} が ${targetClanName} への支配を放棄しました！`;
+                }
+            }
             if (result.isBetrayal) {
                 msg += `\n諸大名からの心証が悪化しました……`;
             }
@@ -512,6 +526,7 @@ class DiplomacyManager {
             this.clearDominationRelations(doer.clan);
             this.changeStatus(doer.clan, targetClanId, '従属');
             msg = `${this.game.clans.find(c => c.id === targetClanId).name} に従属しました！`;
+            if (!isPlayerInvolved) aiMsg = `${targetClanName} が ${doerClanName} を支配下に置きました！`;
             doer.achievementTotal += Math.floor(doer.diplomacy * 0.2) + 10;
             this.game.factionSystem.updateRecognition(doer, 30);
 
@@ -527,6 +542,7 @@ class DiplomacyManager {
                 this.clearDominationRelations(targetClanId);
                 this.changeStatus(doer.clan, targetClanId, '支配');
                 msg = `${this.game.clans.find(c => c.id === targetClanId).name} を支配下に置くことに成功しました！`;
+                if (!isPlayerInvolved) aiMsg = `${doerClanName} が ${targetClanName} を支配下に置きました！`;
                 doer.achievementTotal += Math.floor(doer.diplomacy * 0.2) + 20;
                 this.game.factionSystem.updateRecognition(doer, 40);
             } else {
@@ -544,6 +560,8 @@ class DiplomacyManager {
                 this.game.ui.updatePanelHeader();
                 this.game.ui.renderCommandMenu();
             }
+        } else if (aiMsg !== "") {
+            this.game.ui.showDialog(aiMsg, false);
         }
     }
 
