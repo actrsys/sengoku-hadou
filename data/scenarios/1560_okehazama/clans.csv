@@ -23,7 +23,7 @@ id,name,代表者確認用,color,leaderId,daimyoPrestige,imperialCourtCredibilit
 22,江馬家,江馬時盛,#ffffff,1022001,,,,3:友好:80|10:敵対:30
 23,内ヶ島家,内ヶ島氏理,#ffffff,1023001,,,,2:普通:40|10:普通:40
 24,北畠家,北畠具教,#660033,1024001,,,,17:友好:70
-25,毛利家,,#ffffff,,,,,
+25,毛利家,毛利元就,#ffffff,1025001,,,,43:敵対:0
 26,島津家,,#ffffff,,,,,
 27,里見家,里見義堯,#3366ff,1027001,,,,2:同盟:80|28:同盟:70|32:同盟:70|37:同盟:70
 28,宇都宮家,宇都宮広綱,#ffff66,1028001,,,,2:友好:70|4:敵対:30|27:同盟:70|29:敵対:30|32:同盟:80
@@ -41,7 +41,7 @@ id,name,代表者確認用,color,leaderId,daimyoPrestige,imperialCourtCredibilit
 40,赤松家,赤松義祐,#ffffff,1040001,,,,16:敵対:30|20:友好:70
 41,畠山家,畠山高政,#ffffff,1041001,,,,17:敵対:30|20:敵対:0
 42,長宗我部家,,#ffffff,,,,,
-43,尼子家,,#ffffff,,,,,
+43,尼子家,,#ffffff,,,,,25:敵対:0
 44,浦上家,,#ffffff,,,,,
 45,三村家,,#ffffff,,,,,
 46,三浦家,,#ffffff,,,,,
@@ -60,4 +60,4 @@ id,name,代表者確認用,color,leaderId,daimyoPrestige,imperialCourtCredibilit
 59,相良家,,#ffffff,,,,,
 60,伊東家,,#ffffff,,,,,
 61,肝付家,,#ffffff,,,,,
-62,宗家,,#ffffff,,,,,
+62,宗家,宗義調,#ffffff,1062001,,,,
