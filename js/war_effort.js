@@ -1290,6 +1290,12 @@ Object.assign(WarManager.prototype, {
                     // ★新しいお引越しセンターの魔法を使います！
                     this.game.affiliationSystem.moveCastle(b, s.defender.id);
                 });
+
+                // ★追加：部隊の総大将（リストの先頭の武将）を新城主に仮任命します！
+                if (s.atkBushos.length > 0) {
+                    s.atkBushos[0].isCastellan = true;
+                    s.defender.castellanId = s.atkBushos[0].id;
+                }
                 
                 // ★書き足し１：守備側が撤退した時の履歴ログ
                 const atkClanData1 = this.game.clans.find(c => c.id === s.attacker.ownerClan);
@@ -1349,6 +1355,12 @@ Object.assign(WarManager.prototype, {
                     // ★新しいお引越しセンターの魔法を使います！
                     this.game.affiliationSystem.moveCastle(b, s.defender.id);
                 });
+
+                // ★追加：部隊の総大将（リストの先頭の武将）を新城主に仮任命します！
+                if (s.atkBushos.length > 0) {
+                    s.atkBushos[0].isCastellan = true;
+                    s.defender.castellanId = s.atkBushos[0].id;
+                }
                 
                 if (isAtkPlayer) resultMsg = isRetreat ? `${enemyName}は城を捨てて敗走しました！ 城を占領します！` : `${s.defender.name}を制圧しました！`;
                 else if (isDefPlayer) resultMsg = isRetreat ? `${s.defender.name}を放棄し、後退します……` : `${s.defender.name}が陥落しました。敵軍がなだれ込んできます……`;
@@ -1373,6 +1385,15 @@ Object.assign(WarManager.prototype, {
                      this.game.ui.log(`【合戦結果】${defArmyName}が${s.defender.name}の防衛に成功しました。`);
                 }
             } 
+
+            // ★追加：合戦が終わったら、勝敗に関わらず両方のお城の城主を再確認します！
+            // 討ち死にや大名の移動などで、城主が不在になっている場合があるためです
+            if (s.sourceCastle) {
+                this.game.affiliationSystem.updateCastleLord(s.sourceCastle);
+            }
+            if (s.defender) {
+                this.game.affiliationSystem.updateCastleLord(s.defender);
+            }
 
             if (s.isPlayerInvolved) this.game.ui.showResultModal(resultMsg, finishWarProcess);
             else finishWarProcess();
