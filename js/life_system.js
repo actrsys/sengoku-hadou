@@ -468,11 +468,17 @@ class LifeSystem {
             const unbornFamily = this.game.bushos.filter(b => b.status === 'unborn' && daimyo.familyIds.some(fId => b.familyIds.includes(fId)));
             
             if (unbornFamily.length > 0) {
-                // 相性 -> 年齢順に並べ替え
+                // 相性 -> 元の殿様より年下か -> 年齢順に並べ替え
                 unbornFamily.sort((a,b) => {
                     const diffA = Math.abs((daimyo.affinity || 0) - (a.affinity || 0));
                     const diffB = Math.abs((daimyo.affinity || 0) - (b.affinity || 0));
                     if (diffA !== diffB) return diffA - diffB;
+                    
+                    const aIsYounger = a.birthYear > daimyo.birthYear;
+                    const bIsYounger = b.birthYear > daimyo.birthYear;
+                    if (aIsYounger && !bIsYounger) return -1;
+                    if (!aIsYounger && bIsYounger) return 1;
+                    
                     return a.birthYear - b.birthYear;
                 });
 
@@ -520,6 +526,12 @@ class LifeSystem {
                     if (!a._isRelative && b._isRelative) return 1;
                     if (a._isRelative && b._isRelative) {
                         if (a._affinityDiff !== b._affinityDiff) return a._affinityDiff - b._affinityDiff;
+                        
+                        const aIsYounger = a.birthYear > daimyo.birthYear;
+                        const bIsYounger = b.birthYear > daimyo.birthYear;
+                        if (aIsYounger && !bIsYounger) return -1;
+                        if (!aIsYounger && bIsYounger) return 1;
+                        
                         if (a.birthYear !== b.birthYear) return a.birthYear - b.birthYear;
                     }
                     return b._baseScore - a._baseScore;
