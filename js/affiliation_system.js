@@ -263,7 +263,7 @@ class AffiliationSystem {
             return;
         }
 
-        const bushos = this.game.getCastleBushos(castle.id).filter(b => b.status !== 'ronin' && b.status !== 'dead' && b.status !== 'unborn');
+        const bushos = this.game.getCastleBushos(castle.id).filter(b => b.status !== 'ronin' && b.status !== 'dead' && b.status !== 'unborn' && b.belongKunishuId === 0 && b.clan === castle.ownerClan);
         if (bushos.length === 0) {
             castle.castellanId = 0;
             return;
