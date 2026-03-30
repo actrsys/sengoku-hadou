@@ -552,7 +552,6 @@ class DiplomacyManager {
                 this.game.factionSystem.updateRecognition(doer, 10);
             }
         }
-        
         doer.isActionDone = true;
         if (isPlayerInvolved) {
             this.game.ui.showResultModal(msg);
@@ -562,6 +561,7 @@ class DiplomacyManager {
             }
         } else if (aiMsg !== "") {
             this.game.ui.showDialog(aiMsg, false);
+            this.game.ui.log(aiMsg);
         }
     }
 
