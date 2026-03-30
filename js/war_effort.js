@@ -1751,6 +1751,15 @@ Object.assign(WarManager.prototype, {
         if (window.AudioManager && this.state.isPlayerInvolved) {
             window.AudioManager.restoreMemorizedBgm();
         }
+
+        // ★追加：諸勢力との戦いで城主が討ち死にした場合などに備えて、念のため再確認します！
+        if (this.state.sourceCastle) {
+            this.game.affiliationSystem.updateCastleLord(this.state.sourceCastle);
+        }
+        if (this.state.defender) {
+            this.game.affiliationSystem.updateCastleLord(this.state.defender);
+        }
+
         this.game.ui.renderMap(); 
         if (this.state.isPlayerInvolved) { 
             this.game.ui.updatePanelHeader();
