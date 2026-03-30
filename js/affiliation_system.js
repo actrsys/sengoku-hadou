@@ -107,14 +107,18 @@ class AffiliationSystem {
      * @param {number} newCastleId - 移動先のお城のID
      */
     moveCastle(busho, newCastleId) {
+        if (busho.isCastellan && !busho.isDaimyo) {
+            return; 
+        }
+
         // 1. 今のお城から出ます
         this.leaveCastle(busho);
         
-        // 2. 新しいお城に入ります
-        this.enterCastle(busho, newCastleId);
-        
-        // 3. 移動するといったん城主ではなくなります（必要なら後で再任命します）
+        // 2. 新しいお城に入る前にバッジを外します
         busho.isCastellan = false; 
+        
+        // 3. 新しいお城に入ります
+        this.enterCastle(busho, newCastleId);
 
         // ★ここから追加：画面の絵をすぐに描き直す魔法！
         if (this.game && this.game.ui) {
@@ -284,6 +288,12 @@ class AffiliationSystem {
         
         if (!currentLord) {
             this.electCastellan(castle, bushos);
+        } else {
+            bushos.forEach(b => {
+                if (b.id !== currentLord.id) {
+                    b.isCastellan = false;
+                }
+            });
         }
     }
 
