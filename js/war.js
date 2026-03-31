@@ -731,8 +731,13 @@ class WarManager {
                 } else {
                     let clanId = army.ownerClan;
                     if (clanId === undefined && leader) clanId = leader.clan;
+                    
+                    if (Number(clanId) === 0) {
+                        return "土豪";
+                    }
+                    
                     const clan = this.game.clans.find(c => c.id === Number(clanId));
-                    if (clan) factionName = clan.name;
+                    if (clan && clan.name) factionName = clan.name;
                 }
             }
             const bushoName = leader ? leader.name : "不明";

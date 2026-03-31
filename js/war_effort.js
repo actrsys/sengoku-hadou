@@ -190,11 +190,16 @@ Object.assign(WarManager.prototype, {
 
             const atkClanData = this.game.clans.find(c => c.id === atkClan); 
             const atkArmyName = atkCastle.isKunishu ? atkCastle.name : (atkClanData ? atkClanData.getArmyName() : "敵軍");
-            const atkDaimyoName = atkClanData ? atkClanData.name : (atkCastle.isKunishu ? atkCastle.name : "中立");
+            const atkDaimyoName = (atkClanData && atkClanData.name) ? atkClanData.name : (atkCastle.isKunishu ? atkCastle.name : "中立");
             const defClanData = this.game.clans.find(c => c.id === defClan);
-            const defDaimyoName = defClanData ? defClanData.name : (defCastle.isKunishu ? defCastle.name : "中立");
+            const defDaimyoName = (defClanData && defClanData.name) ? defClanData.name : (defCastle.isKunishu ? defCastle.name : "中立");
             
-            const startMsg = `${atkDaimyoName}の${atkBushos[0].name}が\n${defDaimyoName}の${defCastle.name}に攻め込みました！`;
+            let startMsg = "";
+            if (Number(defClan) === 0) {
+                startMsg = `${atkDaimyoName}の${atkBushos[0].name}が\n土豪が守る${defCastle.name}に攻め込みました！`;
+            } else {
+                startMsg = `${atkDaimyoName}の${atkBushos[0].name}が\n${defDaimyoName}の${defCastle.name}に攻め込みました！`;
+            }
             
             this.game.ui.log(startMsg.replace('\n', ''));
             if (!isPlayerInvolved) {
@@ -274,7 +279,7 @@ Object.assign(WarManager.prototype, {
             } else defBusho = this.game.getBusho(defCastle.castellanId);
             
             if (!defBusho) {
-                const guardName = defCastle.ownerClan === 0 ? "土豪" : "守備隊長";
+                const guardName = defCastle.ownerClan === 0 ? "土豪" : "侍大将";
                 defBusho = {name: guardName, strength:30, leadership:30, politics:30, intelligence:30, charm:30, faceIcon: "unknown_face.webp"};
             }
             
@@ -549,7 +554,7 @@ Object.assign(WarManager.prototype, {
                             };
                             
                             const runFieldWarProcess = async () => {
-                                const guardName = defCastle.ownerClan === 0 ? "土豪" : "守備隊長";
+                                const guardName = defCastle.ownerClan === 0 ? "土豪" : "侍大将";
                                 const defLeaderName = defBushos.length > 0 ? defBushos[0].name : guardName;
                                 const interceptMsg = `${defDaimyoName}の${defLeaderName}は、\n${defCastle.name}から打って出ました！`;
                                 
@@ -585,14 +590,18 @@ Object.assign(WarManager.prototype, {
             
             // ★追加：籠城戦に入った時のメッセージを出す魔法！
             const showSiegeMessage = async () => {
-                const guardName = defCastle.ownerClan === 0 ? "土豪" : "守備隊長";
-                const defLeaderName = defBusho ? defBusho.name : guardName;
+                const guardName = defCastle.ownerClan === 0 ? "土豪" : "侍大将";
+                const defLeaderName = (defBusho && defBusho.name) ? defBusho.name : guardName;
                 let siegeMsg = "";
                 // ★鎮圧戦や相手が諸勢力の場合は「自領」にします
                 if (this.state.isKunishuSubjugation || defCastle.isKunishu) {
-                    siegeMsg = `${defDaimyoName}の${defLeaderName}は、\n自領に立て籠もりました！`;
+                    let dName = defDaimyoName || "不明";
+                    siegeMsg = `${dName}の${defLeaderName}は、\n自領に立て籠もりました！`;
+                } else if (Number(defCastle.ownerClan) === 0) {
+                    siegeMsg = `土豪は、\n${defCastle.name}に立て籠もりました！`;
                 } else {
-                    siegeMsg = `${defDaimyoName}の${defLeaderName}は、\n${defCastle.name}に立て籠もりました！`;
+                    let dName = defDaimyoName || "不明";
+                    siegeMsg = `${dName}の${defLeaderName}は、\n${defCastle.name}に立て籠もりました！`;
                 }
                 
                 this.game.ui.log(siegeMsg.replace('\n', ''));
@@ -1171,8 +1180,8 @@ Object.assign(WarManager.prototype, {
                     }
                     
                 } else {
-                    // ★変更：お城にちゃんとした武将がいるか（「守備隊長」や「土豪」じゃないか）を調べます！
-                    if (s.defBusho && s.defBusho.name !== "守備隊長" && s.defBusho.name !== "土豪") {
+                    // ★変更：お城にちゃんとした武将がいるか（「侍大将」や「土豪」じゃないか）を調べます！
+                    if (s.defBusho && s.defBusho.name !== "侍大将" && s.defBusho.name !== "土豪") {
                         // 武将がいる時は、その人の名前を出してかっこよく褒めます！
                         const defLeaderName = s.defBusho.name;
                         resultMsg = `反乱は${defLeaderName}の手によって鎮圧されました！`;
