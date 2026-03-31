@@ -176,8 +176,8 @@ Object.assign(WarManager.prototype, {
             }
             
             const pid = Number(this.game.playerClanId);
-            const atkClan = Number(atkCastle.ownerClan);
-            const defClan = Number(defCastle.ownerClan);
+        const isAtkPlayer = (Number(warState.attacker.ownerClan) === pid && !warState.attacker.isKunishu);
+        const isDefPlayer = (Number(warState.defender.ownerClan) === pid && !warState.defender.isKunishu);
             let isPlayerInvolved = false;
             if (atkClan === pid && !atkCastle.isDelegated) isPlayerInvolved = true;
             // ★修正：諸勢力がお相手の時は、プレイヤーが防衛操作をすることはないので無視します！
@@ -189,8 +189,8 @@ Object.assign(WarManager.prototype, {
             }
 
             const atkClanData = this.game.clans.find(c => c.id === atkClan); 
-            const atkArmyName = atkCastle.isKunishu ? atkCastle.name : (atkClanData ? atkClanData.getArmyName() : "敵軍");
-            const atkDaimyoName = (atkClanData && atkClanData.name) ? atkClanData.name : (atkCastle.isKunishu ? atkCastle.name : "中立");
+            const atkArmyName = atkCastle.isKunishu ? (atkCastle.getName ? atkCastle.getName(this.game) : atkCastle.name) : (atkClanData ? atkClanData.getArmyName() : "敵軍");
+            const atkDaimyoName = (atkClanData && atkClanData.name) ? atkClanData.name : (atkCastle.isKunishu ? (atkCastle.getName ? atkCastle.getName(this.game) : atkCastle.name) : "中立");
             const defClanData = this.game.clans.find(c => c.id === defClan);
             const defDaimyoName = (defClanData && defClanData.name) ? defClanData.name : (defCastle.isKunishu ? defCastle.name : "中立");
             
@@ -287,10 +287,10 @@ Object.assign(WarManager.prototype, {
             
             // ★変更: 攻撃軍の情報は「メイン軍」のものだけになります！
             const attackerForce = {
-                name: atkCastle.isKunishu ? atkCastle.name : atkCastle.name + "遠征軍", 
-                ownerClan: atkCastle.ownerClan, soldiers: atkSoldierCount, bushos: atkBushos, 
-                training: atkCastle.training, morale: atkCastle.morale, rice: atkRice, maxRice: atkRice,
-                horses: atkHorses, guns: atkGuns, isKunishu: atkCastle.isKunishu || false, kunishuId: atkCastle.kunishuId || 0
+                name: atkCastle.isKunishu ? (atkCastle.getName ? atkCastle.getName(this.game) : atkCastle.name) : atkCastle.name + "遠征軍", 
+                ownerClan: atkCastle.ownerClan || 0, soldiers: atkSoldierCount, bushos: atkBushos, 
+                training: atkCastle.training || 50, morale: atkCastle.morale || 50, rice: atkRice, maxRice: atkRice,
+                horses: atkHorses, guns: atkGuns, isKunishu: atkCastle.isKunishu || false, kunishuId: atkCastle.isKunishu ? atkCastle.id : (atkCastle.kunishuId || 0)
             };
 
             if (this.game.diplomacyManager && !atkCastle.isKunishu && !defCastle.isKunishu && atkClan !== 0 && defClan !== 0) {
@@ -315,7 +315,7 @@ Object.assign(WarManager.prototype, {
                 const startAllyReinforcement = () => {
                     this.checkDefenderReinforcement(defCastle, atkClan, () => {
                     
-                    if (defClan === pid && !defCastle.isDelegated) {
+                    if (defClan === pid && !defCastle.isDelegated && !defCastle.isKunishu) {
                         this.game.ui.hideAIGuardTemporarily();
                     }
                     
@@ -324,7 +324,7 @@ Object.assign(WarManager.prototype, {
                     const totalAtkSoldiers = atkSoldierCount + (this.state.reinforcement ? this.state.reinforcement.soldiers : 0) + (this.state.selfReinforcement ? this.state.selfReinforcement.soldiers : 0);
                     isPlayerInvolved = this.state.isPlayerInvolved;
 
-                    if (defClan === pid && !defCastle.isDelegated) {
+                    if (defClan === pid && !defCastle.isDelegated && !defCastle.isKunishu) {
                         if (totalDefSoldiers <= 0) {
                             if (isPlayerInvolved) this.game.ui.log("城に兵士がいないため、迎撃（野戦）に出られません！");
                             onResult('siege');
@@ -399,7 +399,7 @@ Object.assign(WarManager.prototype, {
                             } else onResult('siege');
                         }
                     } else {
-                        let availableDefBushos = this.game.getCastleBushos(defCastle.id).filter(b => b.status !== 'dead' && b.status !== 'ronin' && b.status !== 'unborn' && b.belongKunishuId === 0);
+                        let availableDefBushos = this.game.getCastleBushos(defCastle.id).filter(b => b.status !== 'dead' && b.status !== 'ronin' && b.status !== 'unborn' && (defCastle.isKunishu ? b.belongKunishuId === defCastle.kunishuId : b.belongKunishuId === 0));
                         let evaluator = availableDefBushos.find(b => b.isDaimyo);
                         if (!evaluator) evaluator = availableDefBushos.find(b => b.isCastellan);
                         
@@ -626,11 +626,7 @@ Object.assign(WarManager.prototype, {
             console.log("【チェック】諸勢力の鎮圧戦ですか？: " + (this.state.isKunishuSubjugation ? "はい" : "いいえ"));
             console.log("【チェック】野戦システム(FieldWarManager)は読み込まれていますか？: " + (typeof window.FieldWarManager !== 'undefined' ? "はい" : "いいえ（未定義）"));
 
-            if (this.state.isKunishuSubjugation) {
-                console.log("諸勢力の鎮圧戦なので、強制的に籠城戦になります！");
-                await showSiegeMessage();
-                this.startSiegeWarPhase();
-            } else if (typeof window.FieldWarManager === 'undefined') {
+            if (typeof window.FieldWarManager === 'undefined') {
                 console.log("野戦のシステムが見つからないため、強制的に籠城戦になります！");
                 await showSiegeMessage();
                 this.startSiegeWarPhase();
