@@ -434,12 +434,12 @@ class WarManager {
         let mySoldiers = 0;
         let myMorale = 50;
         
-        if (s.turn === 'attacker') { actor = s.atkBushos[0]; mySoldiers = s.attacker.soldiers; myMorale = s.attacker.morale || 50; }
-        else if (s.turn === 'attacker_self_reinf') { actor = s.selfReinforcement.bushos[0]; mySoldiers = s.selfReinforcement.soldiers; myMorale = s.selfReinforcement.morale || 50; }
-        else if (s.turn === 'attacker_ally_reinf') { actor = s.reinforcement.bushos[0]; mySoldiers = s.reinforcement.soldiers; myMorale = s.reinforcement.morale || 50; }
-        else if (s.turn === 'defender') { actor = s.defBusho; mySoldiers = s.defender.soldiers; myMorale = s.defender.morale || 50; }
-        else if (s.turn === 'defender_self_reinf') { actor = s.defSelfReinforcement.bushos[0]; mySoldiers = s.defSelfReinforcement.soldiers; myMorale = s.defSelfReinforcement.morale || 50; }
-        else if (s.turn === 'defender_ally_reinf') { actor = s.defReinforcement.bushos[0]; mySoldiers = s.defReinforcement.soldiers; myMorale = s.defReinforcement.morale || 50; }
+        if (s.turn === 'attacker') { actor = s.atkBushos[0]; mySoldiers = s.attacker.soldiers; myMorale = s.attacker.morale ?? 50; }
+        else if (s.turn === 'attacker_self_reinf') { actor = s.selfReinforcement.bushos[0]; mySoldiers = s.selfReinforcement.soldiers; myMorale = s.selfReinforcement.morale ?? 50; }
+        else if (s.turn === 'attacker_ally_reinf') { actor = s.reinforcement.bushos[0]; mySoldiers = s.reinforcement.soldiers; myMorale = s.reinforcement.morale ?? 50; }
+        else if (s.turn === 'defender') { actor = s.defBusho; mySoldiers = s.defender.soldiers; myMorale = s.defender.morale ?? 50; }
+        else if (s.turn === 'defender_self_reinf') { actor = s.defSelfReinforcement.bushos[0]; mySoldiers = s.defSelfReinforcement.soldiers; myMorale = s.defSelfReinforcement.morale ?? 50; }
+        else if (s.turn === 'defender_ally_reinf') { actor = s.defReinforcement.bushos[0]; mySoldiers = s.defReinforcement.soldiers; myMorale = s.defReinforcement.morale ?? 50; }
 
         let totalAtkSoldiers = s.attacker.soldiers + (s.selfReinforcement ? s.selfReinforcement.soldiers : 0) + (s.reinforcement ? s.reinforcement.soldiers : 0);
         let totalDefSoldiers = s.defender.soldiers + (s.defSelfReinforcement ? s.defSelfReinforcement.soldiers : 0) + (s.defReinforcement ? s.defReinforcement.soldiers : 0);
@@ -451,13 +451,13 @@ class WarManager {
         // 敵の士気の平均を計算
         let enemyMorales = [];
         if (isDefenderTurn) {
-            if (s.attacker.soldiers > 0) enemyMorales.push(s.attacker.morale || 50);
-            if (s.selfReinforcement && s.selfReinforcement.soldiers > 0) enemyMorales.push(s.selfReinforcement.morale || 50);
-            if (s.reinforcement && s.reinforcement.soldiers > 0) enemyMorales.push(s.reinforcement.morale || 50);
+            if (s.attacker.soldiers > 0) enemyMorales.push(s.attacker.morale ?? 50);
+            if (s.selfReinforcement && s.selfReinforcement.soldiers > 0) enemyMorales.push(s.selfReinforcement.morale ?? 50);
+            if (s.reinforcement && s.reinforcement.soldiers > 0) enemyMorales.push(s.reinforcement.morale ?? 50);
         } else {
-            if (s.defender.soldiers > 0) enemyMorales.push(s.defender.morale || 50);
-            if (s.defSelfReinforcement && s.defSelfReinforcement.soldiers > 0) enemyMorales.push(s.defSelfReinforcement.morale || 50);
-            if (s.defReinforcement && s.defReinforcement.soldiers > 0) enemyMorales.push(s.defReinforcement.morale || 50);
+            if (s.defender.soldiers > 0) enemyMorales.push(s.defender.morale ?? 50);
+            if (s.defSelfReinforcement && s.defSelfReinforcement.soldiers > 0) enemyMorales.push(s.defSelfReinforcement.morale ?? 50);
+            if (s.defReinforcement && s.defReinforcement.soldiers > 0) enemyMorales.push(s.defReinforcement.morale ?? 50);
         }
         let enemyMoraleAvg = enemyMorales.length > 0 ? enemyMorales.reduce((a, b) => a + b, 0) / enemyMorales.length : 50;
 
@@ -515,6 +515,9 @@ class WarManager {
         } else if (!isDefenderTurn && s.turn === 'attacker') {
             options.push('retreat');
         }
+        
+        // ★追加：鼓舞でどれくらい士気が上がるかを計算しておきます
+        let moraleUp = Math.round((Math.sqrt(actor.leadership * 1.5) + Math.sqrt(actor.charm)) / 4);
 
         if (!isDefenderTurn) {
             // 攻撃側
@@ -535,6 +538,11 @@ class WarManager {
                 scores['inspire'] = -9999;
             } else if (myMorale >= 70) {
                 scores['inspire'] -= (myMorale - 70) * 20;
+            }
+
+            // ★追加：上がる士気が0の場合は絶対に選びません！
+            if (moraleUp <= 0) {
+                scores['inspire'] = -9999;
             }
             
             // 破壊: 防御が低いほど、兵力が多いほど、なめらかにスコアが大きくなる
@@ -598,6 +606,11 @@ class WarManager {
                 scores['def_inspire'] = -9999;
             } else if (myMorale >= 70) {
                 scores['def_inspire'] -= (myMorale - 70) * 20;
+            }
+
+            // ★追加：上がる士気が0の場合は絶対に選びません！
+            if (moraleUp <= 0) {
+                scores['def_inspire'] = -9999;
             }
             
             // 挑発: 防御が高いほど、兵力が多いほど、なめらかにスコアが大きくなる
@@ -772,26 +785,26 @@ class WarManager {
         const isAtkTurnGroup = s.turn.startsWith('attacker');
         
         let activeBushos, activeSoldiers, activeMorale, activeTraining;
-        if (s.turn === 'attacker') { activeBushos = s.atkBushos; activeSoldiers = s.attacker.soldiers; activeMorale = s.attacker.morale || 50; activeTraining = s.attacker.training || 50; }
-        else if (s.turn === 'attacker_self_reinf') { activeBushos = s.selfReinforcement.bushos; activeSoldiers = s.selfReinforcement.soldiers; activeMorale = s.selfReinforcement.morale || 50; activeTraining = s.selfReinforcement.training || 50; }
-        else if (s.turn === 'attacker_ally_reinf') { activeBushos = s.reinforcement.bushos; activeSoldiers = s.reinforcement.soldiers; activeMorale = s.reinforcement.morale || 50; activeTraining = s.reinforcement.training || 50; }
-        else if (s.turn === 'defender') { activeBushos = [s.defBusho]; activeSoldiers = s.defender.soldiers; activeMorale = s.defender.morale || 50; activeTraining = s.defender.training || 50; }
-        else if (s.turn === 'defender_self_reinf') { activeBushos = s.defSelfReinforcement.bushos; activeSoldiers = s.defSelfReinforcement.soldiers; activeMorale = s.defSelfReinforcement.morale || 50; activeTraining = s.defSelfReinforcement.training || 50; }
-        else if (s.turn === 'defender_ally_reinf') { activeBushos = s.defReinforcement.bushos; activeSoldiers = s.defReinforcement.soldiers; activeMorale = s.defReinforcement.morale || 50; activeTraining = s.defReinforcement.training || 50; }
+        if (s.turn === 'attacker') { activeBushos = s.atkBushos; activeSoldiers = s.attacker.soldiers; activeMorale = s.attacker.morale ?? 50; activeTraining = s.attacker.training ?? 50; }
+        else if (s.turn === 'attacker_self_reinf') { activeBushos = s.selfReinforcement.bushos; activeSoldiers = s.selfReinforcement.soldiers; activeMorale = s.selfReinforcement.morale ?? 50; activeTraining = s.selfReinforcement.training ?? 50; }
+        else if (s.turn === 'attacker_ally_reinf') { activeBushos = s.reinforcement.bushos; activeSoldiers = s.reinforcement.soldiers; activeMorale = s.reinforcement.morale ?? 50; activeTraining = s.reinforcement.training ?? 50; }
+        else if (s.turn === 'defender') { activeBushos = [s.defBusho]; activeSoldiers = s.defender.soldiers; activeMorale = s.defender.morale ?? 50; activeTraining = s.defender.training ?? 50; }
+        else if (s.turn === 'defender_self_reinf') { activeBushos = s.defSelfReinforcement.bushos; activeSoldiers = s.defSelfReinforcement.soldiers; activeMorale = s.defSelfReinforcement.morale ?? 50; activeTraining = s.defSelfReinforcement.training ?? 50; }
+        else if (s.turn === 'defender_ally_reinf') { activeBushos = s.defReinforcement.bushos; activeSoldiers = s.defReinforcement.soldiers; activeMorale = s.defReinforcement.morale ?? 50; activeTraining = s.defReinforcement.training ?? 50; }
 
         let targetBushos, targetSoldiers = 0, targetMorale, targetTraining;
         
         if (isAtkTurnGroup) { 
             targetBushos = [s.defBusho]; 
-            targetMorale = s.defender.morale; 
-            targetTraining = s.defender.training;
+            targetMorale = s.defender.morale ?? 50; 
+            targetTraining = s.defender.training ?? 50;
             if (s.defender.soldiers > 0) targetSoldiers += s.defender.soldiers;
             if (s.defSelfReinforcement && s.defSelfReinforcement.soldiers > 0) targetSoldiers += s.defSelfReinforcement.soldiers;
             if (s.defReinforcement && s.defReinforcement.soldiers > 0) targetSoldiers += s.defReinforcement.soldiers;
         } else { 
             targetBushos = s.atkBushos; 
-            targetMorale = s.attacker.morale; 
-            targetTraining = s.attacker.training;
+            targetMorale = s.attacker.morale ?? 50; 
+            targetTraining = s.attacker.training ?? 50;
             if (s.attacker.soldiers > 0) targetSoldiers += s.attacker.soldiers;
             if (s.selfReinforcement && s.selfReinforcement.soldiers > 0) targetSoldiers += s.selfReinforcement.soldiers;
             if (s.reinforcement && s.reinforcement.soldiers > 0) targetSoldiers += s.reinforcement.soldiers;
@@ -801,14 +814,14 @@ class WarManager {
              pushMsg(`${activeArmyName} は籠城し、守りを固めている！`);
              executeNext(); return;
         }
-
+        
         if (type === 'inspire' || type === 'def_inspire') {
             let leader = activeBushos[0];
             let moraleUp = Math.round((Math.sqrt(leader.leadership * 1.5) + Math.sqrt(leader.charm)) / 4);
             
             let activeArmyObj = getArmyObj(s.turn);
             if (activeArmyObj) {
-                activeArmyObj.morale = Math.min(100, (activeArmyObj.morale || 50) + moraleUp);
+                activeArmyObj.morale = Math.min(100, (activeArmyObj.morale ?? 50) + moraleUp);
             }
 
             // ★今回追加：守備側が鼓舞を行った時、火計をくらった記憶（警戒フラグ）をリセットします！
@@ -878,8 +891,8 @@ class WarManager {
             defRoles.forEach(role => {
                 let army = getArmyObj(role);
                 if (army && army.soldiers > 0) {
-                    totalMorale += (army.morale || 50);
-                    totalTraining += (army.training || 50);
+                    totalMorale += (army.morale ?? 50);
+                    totalTraining += (army.training ?? 50);
                     validArmyCount++;
                 }
             });
@@ -957,16 +970,16 @@ class WarManager {
             let activeCastleMod = 1.5 + (s.defender.defense / 1000);
             activeAtkPower = activeAtkPower * activeCastleMod;
         }
-
+        
         let targetList = [];
         if (isAtkTurnGroup) {
-            if (s.defender.soldiers > 0) targetList.push({ bushos: [s.defBusho], soldiers: s.defender.soldiers, morale: s.defender.morale || 50, training: s.defender.training || 50, role: 'defender', isDefendingCastle: true });
-            if (s.defSelfReinforcement && s.defSelfReinforcement.soldiers > 0) targetList.push({ bushos: s.defSelfReinforcement.bushos, soldiers: s.defSelfReinforcement.soldiers, morale: s.defSelfReinforcement.morale || 50, training: s.defSelfReinforcement.training || 50, role: 'defender_self_reinf', isDefendingCastle: false });
-            if (s.defReinforcement && s.defReinforcement.soldiers > 0) targetList.push({ bushos: s.defReinforcement.bushos, soldiers: s.defReinforcement.soldiers, morale: s.defReinforcement.morale || 50, training: s.defReinforcement.training || 50, role: 'defender_ally_reinf', isDefendingCastle: false });
+            if (s.defender.soldiers > 0) targetList.push({ bushos: [s.defBusho], soldiers: s.defender.soldiers, morale: s.defender.morale ?? 50, training: s.defender.training ?? 50, role: 'defender', isDefendingCastle: true });
+            if (s.defSelfReinforcement && s.defSelfReinforcement.soldiers > 0) targetList.push({ bushos: s.defSelfReinforcement.bushos, soldiers: s.defSelfReinforcement.soldiers, morale: s.defSelfReinforcement.morale ?? 50, training: s.defSelfReinforcement.training ?? 50, role: 'defender_self_reinf', isDefendingCastle: false });
+            if (s.defReinforcement && s.defReinforcement.soldiers > 0) targetList.push({ bushos: s.defReinforcement.bushos, soldiers: s.defReinforcement.soldiers, morale: s.defReinforcement.morale ?? 50, training: s.defReinforcement.training ?? 50, role: 'defender_ally_reinf', isDefendingCastle: false });
         } else {
-            if (s.attacker.soldiers > 0) targetList.push({ bushos: s.atkBushos, soldiers: s.attacker.soldiers, morale: s.attacker.morale || 50, training: s.attacker.training || 50, role: 'attacker', isDefendingCastle: false });
-            if (s.selfReinforcement && s.selfReinforcement.soldiers > 0) targetList.push({ bushos: s.selfReinforcement.bushos, soldiers: s.selfReinforcement.soldiers, morale: s.selfReinforcement.morale || 50, training: s.selfReinforcement.training || 50, role: 'attacker_self_reinf', isDefendingCastle: false });
-            if (s.reinforcement && s.reinforcement.soldiers > 0) targetList.push({ bushos: s.reinforcement.bushos, soldiers: s.reinforcement.soldiers, morale: s.reinforcement.morale || 50, training: s.reinforcement.training || 50, role: 'attacker_ally_reinf', isDefendingCastle: false });
+            if (s.attacker.soldiers > 0) targetList.push({ bushos: s.atkBushos, soldiers: s.attacker.soldiers, morale: s.attacker.morale ?? 50, training: s.attacker.training ?? 50, role: 'attacker', isDefendingCastle: false });
+            if (s.selfReinforcement && s.selfReinforcement.soldiers > 0) targetList.push({ bushos: s.selfReinforcement.bushos, soldiers: s.selfReinforcement.soldiers, morale: s.selfReinforcement.morale ?? 50, training: s.selfReinforcement.training ?? 50, role: 'attacker_self_reinf', isDefendingCastle: false });
+            if (s.reinforcement && s.reinforcement.soldiers > 0) targetList.push({ bushos: s.reinforcement.bushos, soldiers: s.reinforcement.soldiers, morale: s.reinforcement.morale ?? 50, training: s.reinforcement.training ?? 50, role: 'attacker_ally_reinf', isDefendingCastle: false });
         }
         targetList.forEach(t => {
             let pObj = calcArmyPower(t.bushos, t.soldiers, t.morale, t.training, t.isDefendingCastle);
@@ -1075,13 +1088,13 @@ class WarManager {
             let counterRole = isAtkTurnGroup ? 'defender' : 'attacker';
             moraleDiffs[counterRole] += Math.round(Math.sqrt(actualCounterDmg) / 2);
         }
-
+        
         // ★今回追加：ここでメモした士気の上がり下がりを相殺して、一気に反映させます！
         for (let role in moraleDiffs) {
             if (moraleDiffs[role] !== 0) {
                 let armyObj = getArmyObj(role);
                 if (armyObj) {
-                    armyObj.morale = Math.max(0, Math.min(100, (armyObj.morale || 50) + moraleDiffs[role]));
+                    armyObj.morale = Math.max(0, Math.min(100, (armyObj.morale ?? 50) + moraleDiffs[role]));
                 }
             }
         }
@@ -1286,15 +1299,15 @@ class WarManager {
                 // 全員の行動が終わったら、兵糧を消費します
                 s.attacker.rice = Math.max(0, s.attacker.rice - Math.floor(s.attacker.soldiers * 0.05));
                 // ★今回追加：毎ターンの終了時（ラウンドの終わり）に、攻撃側の士気を１下げます
-                s.attacker.morale = Math.max(0, (s.attacker.morale || 50) - 1);
+                s.attacker.morale = Math.max(0, (s.attacker.morale ?? 50) - 1);
 
                 if (s.selfReinforcement) {
                     s.selfReinforcement.rice = Math.max(0, s.selfReinforcement.rice - Math.floor(s.selfReinforcement.soldiers * 0.05));
-                    s.selfReinforcement.morale = Math.max(0, (s.selfReinforcement.morale || 50) - 1);
+                    s.selfReinforcement.morale = Math.max(0, (s.selfReinforcement.morale ?? 50) - 1);
                 }
                 if (s.reinforcement) {
                     s.reinforcement.rice = Math.max(0, s.reinforcement.rice - Math.floor(s.reinforcement.soldiers * 0.05));
-                    s.reinforcement.morale = Math.max(0, (s.reinforcement.morale || 50) - 1);
+                    s.reinforcement.morale = Math.max(0, (s.reinforcement.morale ?? 50) - 1);
                 }
 
                 s.defender.rice = Math.max(0, s.defender.rice - Math.floor(s.defender.soldiers * 0.05));
