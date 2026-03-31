@@ -272,7 +272,11 @@ Object.assign(WarManager.prototype, {
                 const kunishu = this.game.kunishuSystem.getKunishu(defCastle.kunishuId);
                 defBusho = kunishu ? this.game.getBusho(kunishu.leaderId) : null;
             } else defBusho = this.game.getBusho(defCastle.castellanId);
-            if (!defBusho) defBusho = {name:"守備隊長", strength:30, leadership:30, politics:30, intelligence:30, charm:30, faceIcon: "unknown_face.webp"};
+            
+            if (!defBusho) {
+                const guardName = defCastle.ownerClan === 0 ? "土豪" : "守備隊長";
+                defBusho = {name: guardName, strength:30, leadership:30, politics:30, intelligence:30, charm:30, faceIcon: "unknown_face.webp"};
+            }
             
             // ★変更: 攻撃軍の情報は「メイン軍」のものだけになります！
             const attackerForce = {
@@ -543,9 +547,10 @@ Object.assign(WarManager.prototype, {
                                     processNextAtk();
                                 }
                             };
-
+                            
                             const runFieldWarProcess = async () => {
-                                const defLeaderName = defBushos.length > 0 ? defBushos[0].name : "守備隊長";
+                                const guardName = defCastle.ownerClan === 0 ? "土豪" : "守備隊長";
+                                const defLeaderName = defBushos.length > 0 ? defBushos[0].name : guardName;
                                 const interceptMsg = `${defDaimyoName}の${defLeaderName}は、\n${defCastle.name}から打って出ました！`;
                                 
                                 this.game.ui.log(interceptMsg.replace('\n', ''));
@@ -577,10 +582,11 @@ Object.assign(WarManager.prototype, {
                     startAllyReinforcement();
                 });
             };
-
+            
             // ★追加：籠城戦に入った時のメッセージを出す魔法！
             const showSiegeMessage = async () => {
-                const defLeaderName = defBusho ? defBusho.name : "守備隊長";
+                const guardName = defCastle.ownerClan === 0 ? "土豪" : "守備隊長";
+                const defLeaderName = defBusho ? defBusho.name : guardName;
                 let siegeMsg = "";
                 // ★鎮圧戦や相手が諸勢力の場合は「自領」にします
                 if (this.state.isKunishuSubjugation || defCastle.isKunishu) {
@@ -1165,14 +1171,14 @@ Object.assign(WarManager.prototype, {
                     }
                     
                 } else {
-                    // ★変更：お城にちゃんとした武将がいるか（「守備隊長」じゃないか）を調べます！
-                    if (s.defBusho && s.defBusho.name !== "守備隊長") {
+                    // ★変更：お城にちゃんとした武将がいるか（「守備隊長」や「土豪」じゃないか）を調べます！
+                    if (s.defBusho && s.defBusho.name !== "守備隊長" && s.defBusho.name !== "土豪") {
                         // 武将がいる時は、その人の名前を出してかっこよく褒めます！
                         const defLeaderName = s.defBusho.name;
                         resultMsg = `反乱は${defLeaderName}の手によって鎮圧されました！`;
                         this.game.ui.log(`【諸勢力蜂起】反乱は${defLeaderName}の手によって鎮圧されました！`);
                     } else {
-                        // 誰もいない時（または守備隊長の時）は、名前を出さずにシンプルに伝えます！
+                        // 誰もいない時は、名前を出さずにシンプルに伝えます！
                         resultMsg = `反乱は鎮圧されました！`;
                         this.game.ui.log(`【諸勢力蜂起】反乱は鎮圧されました！`);
                     }
