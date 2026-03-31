@@ -733,7 +733,7 @@ class WarManager {
                     if (clanId === undefined && leader) clanId = leader.clan;
                     
                     if (Number(clanId) === 0) {
-                        return "土豪";
+                        return "土豪軍";
                     }
                     
                     const clan = this.game.clans.find(c => c.id === Number(clanId));
@@ -1154,8 +1154,9 @@ class WarManager {
                         else if (s.turn === 'defender') { army = s.defender; leader = s.defBusho; }
                         else if (s.turn === 'defender_self_reinf') { army = s.defSelfReinforcement; leader = s.defSelfReinforcement.bushos[0]; }
                         else if (s.turn === 'defender_ally_reinf') { army = s.defReinforcement; leader = s.defReinforcement.bushos[0]; }
-
+                        
                         let factionName = "不明";
+                        let isDogou = false; // ★土豪かどうかの目印を追加します
                         if (army) {
                             if (army.isKunishu || army.isKunishuForce) {
                                 if (army.kunishuId) {
@@ -1171,15 +1172,25 @@ class WarManager {
                                 if (clanId === undefined && leader) {
                                     clanId = leader.clan;
                                 }
-                                const clan = this.game.clans.find(c => c.id === Number(clanId));
-                                // ★修正：最初から「家」の文字が入っているので、そのまま使うように直しました！
-                                if (clan) factionName = clan.name;
+                                
+                                // ★空き城の場合は目印をONにします
+                                if (Number(clanId) === 0) {
+                                    isDogou = true;
+                                } else {
+                                    const clan = this.game.clans.find(c => c.id === Number(clanId));
+                                    // ★修正：最初から「家」の文字が入っているので、そのまま使うように直しました！
+                                    if (clan) factionName = clan.name;
+                                }
                             }
                         }
                         const bushoName = leader ? leader.name : "不明";
 
                         // 思考中のメッセージを表示します（１行でシンプルに！）
-                        ctrl.innerHTML = `<div style="text-align: center; padding: 10px; font-weight: bold; color: #555;">${factionName} ${bushoName} 思考中……</div>`;
+                        if (isDogou) {
+                            ctrl.innerHTML = `<div style="text-align: center; padding: 10px; font-weight: bold; color: #555;">土豪軍 思考中……</div>`;
+                        } else {
+                            ctrl.innerHTML = `<div style="text-align: center; padding: 10px; font-weight: bold; color: #555;">${factionName} ${bushoName} 思考中……</div>`;
+                        }
                     }
                     
                     // ★追加：裏で高速計算する時は待たずにすぐ実行、画面に出す時だけ待ちます！
