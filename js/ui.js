@@ -2984,9 +2984,9 @@ class UIManager {
         } else {
             setTxt('war-title-name', `${s.defender.name} 攻防戦`);
         }
-
+        
         const atkClan = this.game.clans.find(c => c.id === s.attacker.ownerClan);
-        const atkName = s.attacker.isKunishu ? s.attacker.name : (atkClan ? atkClan.name : "野武士");
+        const atkName = s.attacker.isKunishu ? s.attacker.name : (atkClan ? atkClan.name : "土豪");
         setTxt('war-atk-name', atkName);
         
         const atkTitleEl = document.getElementById('war-atk-name').parentElement;
@@ -3004,7 +3004,7 @@ class UIManager {
         updateFace('war-atk-face', s.atkBushos[0]);
         
         const defClan = this.game.clans.find(c => c.id === s.defender.ownerClan);
-        const defNameText = s.defender.isKunishu ? s.defender.name : (defClan ? defClan.name : "野武士");
+        const defNameText = s.defender.isKunishu ? s.defender.name : (defClan ? defClan.name : "土豪");
         setTxt('war-def-name', defNameText);
         
         const defTitleEl = document.getElementById('war-def-name').parentElement;
@@ -3108,10 +3108,11 @@ class UIManager {
                         targetClanId = reinfData.castle.ownerClan;
                     }
                     const clan = this.game.clans.find(c => c.id === targetClanId);
-                    orgName = clan ? clan.name : "野武士";
+                    orgName = clan ? clan.name : "土豪";
                 }
 
                 // ここでHTMLに値を流し込みます
+                orgEl.textContent = orgName;
                 orgEl.textContent = orgName;
                 bushoEl.textContent = leaderName;
                 soldierEl.textContent = reinfData.soldiers || 0;
