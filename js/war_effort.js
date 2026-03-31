@@ -278,9 +278,11 @@ Object.assign(WarManager.prototype, {
                 defBusho = kunishu ? this.game.getBusho(kunishu.leaderId) : null;
             } else defBusho = this.game.getBusho(defCastle.castellanId);
             
-            if (!defBusho) {
-                const guardName = defCastle.ownerClan === 0 ? "土豪" : "侍大将";
-                defBusho = {name: guardName, strength:30, leadership:30, politics:30, intelligence:30, charm:30, faceIcon: "unknown_face.webp"};
+            // 空き城（持ち主が0）の場合は、武将データが空でも強制的に「土豪」にします
+            if (Number(defCastle.ownerClan) === 0) {
+                defBusho = {name: "土豪", strength:30, leadership:30, politics:30, intelligence:30, charm:30, faceIcon: "unknown_face.webp"};
+            } else if (!defBusho || defBusho.name === "") {
+                defBusho = {name: "守備隊長", strength:30, leadership:30, politics:30, intelligence:30, charm:30, faceIcon: "unknown_face.webp"};
             }
             
             // ★変更: 攻撃軍の情報は「メイン軍」のものだけになります！
