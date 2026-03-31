@@ -282,7 +282,7 @@ Object.assign(WarManager.prototype, {
             if (Number(defCastle.ownerClan) === 0) {
                 defBusho = {name: "土豪", strength:30, leadership:30, politics:30, intelligence:30, charm:30, faceIcon: "unknown_face.webp"};
             } else if (!defBusho || defBusho.name === "") {
-                defBusho = {name: "守備隊長", strength:30, leadership:30, politics:30, intelligence:30, charm:30, faceIcon: "unknown_face.webp"};
+                defBusho = {name: "侍大将", strength:30, leadership:30, politics:30, intelligence:30, charm:30, faceIcon: "unknown_face.webp"};
             }
             
             // ★変更: 攻撃軍の情報は「メイン軍」のものだけになります！
@@ -495,6 +495,15 @@ Object.assign(WarManager.prototype, {
                                 .sort((a, b) => b.perceivedPower - a.perceivedPower) 
                                 .slice(0, 5) 
                                 .map(eb => eb.busho);
+                                
+                            // ★追加：守る武将が誰もいない場合（空き城など）は、ダミーの土豪や侍大将を用意します！
+                            if (defBushos.length === 0) {
+                                if (Number(defCastle.ownerClan) === 0) {
+                                    defBushos.push({id: 'dummy_dogou', name: "土豪", strength:30, leadership:30, politics:30, intelligence:30, charm:30, faceIcon: "unknown_face.webp"});
+                                } else {
+                                    defBushos.push({id: 'dummy_guard', name: "侍大将", strength:30, leadership:30, politics:30, intelligence:30, charm:30, faceIcon: "unknown_face.webp"});
+                                }
+                            }
                                 
                             let defLeaderIdx = defBushos.findIndex(b => b.isDaimyo);
                             if (defLeaderIdx === -1) defLeaderIdx = defBushos.findIndex(b => b.isCastellan);
