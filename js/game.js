@@ -1084,7 +1084,7 @@ class GameManager {
             if (c.ownerClan === 0) return;
             c.isDone = false;
 
-            const baseGold = (c.population * 0.001) + (c.peoplesLoyalty / 2) + (c.commerce / 8);
+            const baseGold = (c.population * 0.01) + (c.peoplesLoyalty / 2) + (c.commerce / 8);
             let income = Math.floor(baseGold * window.MainParams.Economy.IncomeGoldRate);
             income = GameSystem.applyVariance(income, window.MainParams.Economy.IncomeFluctuation);
             if (this.month === 3) income += income * 3;
