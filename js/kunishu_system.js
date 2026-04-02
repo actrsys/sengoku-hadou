@@ -185,7 +185,7 @@ class KunishuSystem {
             if (!castle || castle.ownerClan === 0) continue; // ★変更：return を continue にします
 
             // 毎月末、最大10%の確率で発動
-            if (Math.random() < 0.10) {
+            if (Math.random() < 1.00) {
                 await this.executeActionToLord(kunishu, castle); // ★追加：await を付けます
             }
             
@@ -224,6 +224,10 @@ class KunishuSystem {
         const currentRel = kunishu.getRelation(clanId);
         const castellan = this.game.getBusho(castle.castellanId);
         if (!castellan) return;
+
+        // ※テスト用：本来の条件を無視して、必ず反乱を起こさせます
+        await this.executeUprising(kunishu, castle);
+        return;
 
         const leader = this.game.getBusho(kunishu.leaderId);
         const clanData = this.game.clans.find(c => c.id === clanId);
