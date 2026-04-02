@@ -369,6 +369,7 @@ class KunishuSystem {
 
         // 諸勢力を専用の一時的な大名(Clan)として扱うためのダミーデータ
         const dummyAttacker = {
+            id: kunishu.id, // ★追加：通常の城と同じように扱えるようにIDを持たせます
             name: kunishuName, 
             ownerClan: -1, // 特殊ID
             soldiers: atkSoldiers,

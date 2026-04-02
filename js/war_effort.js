@@ -176,11 +176,12 @@ Object.assign(WarManager.prototype, {
             }
             
             const pid = Number(this.game.playerClanId);
-        const isAtkPlayer = (Number(warState.attacker.ownerClan) === pid && !warState.attacker.isKunishu);
-        const isDefPlayer = (Number(warState.defender.ownerClan) === pid && !warState.defender.isKunishu);
+            const atkClan = Number(atkCastle.ownerClan !== undefined ? atkCastle.ownerClan : (atkCastle.isKunishu ? -1 : 0));
+            const defClan = Number(defCastle.ownerClan || 0);
+
             let isPlayerInvolved = false;
-            if (atkClan === pid && !atkCastle.isDelegated) isPlayerInvolved = true;
-            // ★修正：諸勢力がお相手の時は、プレイヤーが防衛操作をすることはないので無視します！
+            if (atkClan === pid && !atkCastle.isDelegated && !atkCastle.isKunishu) isPlayerInvolved = true;
+            // ★修正：諸勢力が反乱を起こした際も、自軍が防衛側であればプレイヤーが操作できるようにします
             if (!defCastle.isKunishu && defClan === pid && !defCastle.isDelegated) isPlayerInvolved = true;
             
             if (atkClan !== pid && !atkCastle.isKunishu) {
