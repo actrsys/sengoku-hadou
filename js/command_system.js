@@ -1786,11 +1786,25 @@ class CommandSystem {
         
         if(castle.gold < costGold) { this.game.ui.showDialog(`資金不足です。(必要: ${costGold}金)`, false); return; } 
         
+        // ★ 人口以上の徴兵ができないようにストップをかけます
+        if (castle.population < soldiers) { 
+            this.game.ui.showDialog(`人口が足りません。(現在の人口: ${castle.population}人)`, false); 
+            return; 
+        }
+
         if (castle.soldiers + soldiers > 99999) {
             this.game.ui.showDialog(`兵数が上限(99,999)を超えるため、これ以上徴兵できません。\n(現在の兵数: ${castle.soldiers})`, false);
             return;
         }
         
+        // ★ 徴兵の割合を計算して、民忠と人口を減らす処理を行います
+        const draftRatio = soldiers / castle.population;          // 徴兵した割合
+        const penaltyRatio = draftRatio * 2;                      // ペナルティはその2倍
+        const loyaltyPenalty = Math.floor(castle.peoplesLoyalty * penaltyRatio); // 今の民忠から減らす量
+        
+        castle.peoplesLoyalty = Math.max(0, castle.peoplesLoyalty - loyaltyPenalty); // 0未満にはならないようにします
+        castle.population -= soldiers;                            // 徴兵した分だけ人口を減らします
+
         castle.gold -= costGold;
         
         // 新しく入ってきた兵士たちは、まだ訓練も受けていないので基本の低い数字になります
@@ -1806,7 +1820,9 @@ class CommandSystem {
         
         busho.achievementTotal += 5;
         this.game.factionSystem.updateRecognition(busho, 10);
-        this.game.ui.showResultModal(`${busho.name}が徴兵を行いました\n兵士+${soldiers}`); 
+        
+        // ★ 結果のメッセージに、人口と民忠が減ったことも書き足しておきます
+        this.game.ui.showResultModal(`${busho.name}が徴兵を行いました\n兵士+${soldiers}\n(人口-${soldiers} / 民忠-${loyaltyPenalty})`); 
         this.game.ui.updatePanelHeader(); this.game.ui.renderCommandMenu();
     }
     
