@@ -1440,10 +1440,23 @@ class AIEngine {
                     // ★修正：決めた金額（draftCost）で兵士を集めます！
                     let soldiers = GameSystem.calcDraftFromGold(draftCost, doer, castle.peoplesLoyalty);
                     
+                    // ★追加：AIも人口以上の徴兵はできないように、限界でストップさせます！
+                    if (castle.population < soldiers) {
+                        soldiers = castle.population;
+                    }
+
                     if (castle.soldiers + soldiers > 99999) {
                         soldiers = 99999 - castle.soldiers;
                     }
                     if (soldiers > 0) {
+                        // ★追加：AIもプレイヤーと同じように、割合で民忠と人口を減らします！
+                        const draftRatio = soldiers / castle.population;
+                        const penaltyRatio = draftRatio * 2;
+                        const loyaltyPenalty = Math.floor(castle.peoplesLoyalty * penaltyRatio);
+                        
+                        castle.peoplesLoyalty = Math.max(0, castle.peoplesLoyalty - loyaltyPenalty);
+                        castle.population -= soldiers;
+
                         // ★修正：決めた金額（draftCost）だけ、お城の貯金箱から減らします！
                         castle.gold -= draftCost; 
                         
