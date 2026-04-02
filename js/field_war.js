@@ -212,7 +212,8 @@ class FieldWarManager {
 
                 // ★追加: この部隊が援軍かどうか、そして誰が操作するかをチェックします！
                 let isReinf = false;
-                let unitIsPlayer = isAtkPlayer;
+                // ★修正：自分の大名家でも、委任城ならAI操作（false）にします！
+                let unitIsPlayer = isAtkPlayer && !warState.sourceCastle.isDelegated;
                 let isSelfReinf = false; // ★追加：自勢力の援軍かどうかのメモ
                 let unitKunishuId = null; // ★追加：諸勢力IDのメモ
                 
@@ -225,14 +226,15 @@ class FieldWarManager {
                         isSelfReinf = false;
                         unitKunishuId = warState.reinforcement.kunishuId;
                     } else {
-                        unitIsPlayer = (Number(warState.reinforcement.castle.ownerClan) === pid);
+                        unitIsPlayer = (Number(warState.reinforcement.castle.ownerClan) === pid) && !warState.reinforcement.castle.isDelegated;
                         isSelfReinf = (Number(warState.reinforcement.castle.ownerClan) === Number(warState.attacker.ownerClan));
                     }
                 }
                 // 2. 自勢力の別城からの援軍チェック
                 else if (warState.selfReinforcement && warState.selfReinforcement.bushos.some(b => b.id === assign.busho.id)) {
                     isReinf = true;
-                    unitIsPlayer = (Number(warState.selfReinforcement.castle.ownerClan) === pid);
+                    // ★修正：自勢力の援軍でも、委任城から来たならAI操作にします！
+                    unitIsPlayer = (Number(warState.selfReinforcement.castle.ownerClan) === pid) && !warState.selfReinforcement.castle.isDelegated;
                     isSelfReinf = true;
                 }
                 
@@ -298,7 +300,8 @@ class FieldWarManager {
 
                 // ★追加: 守備側の援軍チェック！
                 let isReinf = false;
-                let unitIsPlayer = isDefPlayer;
+                // ★修正：自分の大名家でも、委任城ならAI操作（false）にします！
+                let unitIsPlayer = isDefPlayer && !warState.defender.isDelegated;
                 let isSelfReinf = false; 
                 let unitKunishuId = null; // ★追加：諸勢力IDのメモ
                 
@@ -311,14 +314,15 @@ class FieldWarManager {
                         isSelfReinf = false;
                         unitKunishuId = warState.defReinforcement.kunishuId;
                     } else {
-                        unitIsPlayer = (Number(warState.defReinforcement.castle.ownerClan) === pid);
+                        unitIsPlayer = (Number(warState.defReinforcement.castle.ownerClan) === pid) && !warState.defReinforcement.castle.isDelegated;
                         isSelfReinf = (Number(warState.defReinforcement.castle.ownerClan) === Number(warState.defender.ownerClan));
                     }
                 }
                 // 2. 自勢力の別城からの援軍チェック
                 else if (warState.defSelfReinforcement && warState.defSelfReinforcement.bushos.some(b => b.id === assign.busho.id)) {
                     isReinf = true;
-                    unitIsPlayer = (Number(warState.defSelfReinforcement.castle.ownerClan) === pid);
+                    // ★修正：自勢力の援軍でも、委任城から来たならAI操作にします！
+                    unitIsPlayer = (Number(warState.defSelfReinforcement.castle.ownerClan) === pid) && !warState.defSelfReinforcement.castle.isDelegated;
                     isSelfReinf = true;
                 }
                 
