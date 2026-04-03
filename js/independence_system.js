@@ -533,8 +533,11 @@ class IndependenceSystem {
 
             if (result === 'rebel_win') {
                 // 【反乱軍の勝利】
-                await this.game.ui.showDialogAsync(`【謀反】${oldDaimyo.name}は討死しました！\n${rebellionLeader.name}が新たな大名となります！`);
-                this.game.ui.log(`【謀反】反乱軍が勝利し、${oldDaimyo.name}は討死しました。`);
+                await this.game.ui.showDialogAsync(`【謀反】${oldDaimyo.name}は討ち死にしました！\n${rebellionLeader.name}が新たな大名となります！`);
+                this.game.ui.log(`【謀反】反乱軍が勝利し、${oldDaimyo.name}は討ち死にしました。`);
+
+                // 勝手に後継ぎが選ばれて大名が2人にならないように、先に大名の印を外しておきます
+                oldDaimyo.isDaimyo = false;
 
                 // 大名死亡処理（life_systemにお任せします）
                 await this.game.lifeSystem.executeDeath(oldDaimyo);
