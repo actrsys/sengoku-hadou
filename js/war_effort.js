@@ -189,18 +189,16 @@ Object.assign(WarManager.prototype, {
                 atkGuns = atkCastle.guns || 0;
             }
 
-            const atkClanData = this.game.clans.find(c => c.id === atkClan); 
+            const atkClanData = this.game.clans.find(c => c.id === atkClan);
+            const atkProvData = this.game.provinces.find(p => p.id === atkCastle.provinceId);
             const atkArmyName = atkCastle.isKunishu ? (atkCastle.getName ? atkCastle.getName(this.game) : atkCastle.name) : (atkClanData ? atkClanData.getArmyName() : "敵軍");
-            const atkDaimyoName = (atkClanData && atkClanData.name) ? atkClanData.name : (atkCastle.isKunishu ? (atkCastle.getName ? atkCastle.getName(this.game) : atkCastle.name) : "中立");
-            const defClanData = this.game.clans.find(c => c.id === defClan);
-            const defDaimyoName = (defClanData && defClanData.name) ? defClanData.name : (defCastle.isKunishu ? defCastle.name : "中立");
+            const atkDaimyoName = (atkClanData && atkClanData.name) ? atkClanData.name : (atkCastle.isKunishu ? (atkCastle.getName ? atkCastle.getName(this.game) : atkCastle.name) : (atkProvData ? atkProvData.province : "中立"));
             
-            let startMsg = "";
-            if (Number(defClan) === 0) {
-                startMsg = `${atkDaimyoName}の${atkBushos[0].name}が\n土豪が守る${defCastle.name}に攻め込みました！`;
-            } else {
-                startMsg = `${atkDaimyoName}の${atkBushos[0].name}が\n${defDaimyoName}の${defCastle.name}に攻め込みました！`;
-            }
+            const defClanData = this.game.clans.find(c => c.id === defClan);
+            const defProvData = this.game.provinces.find(p => p.id === defCastle.provinceId);
+            const defDaimyoName = (defClanData && defClanData.name) ? defClanData.name : (defCastle.isKunishu ? defCastle.name : (defProvData ? defProvData.province : "中立"));
+            
+            let startMsg = `${atkDaimyoName}の${atkBushos[0].name}が\n${defDaimyoName}の${defCastle.name}に攻め込みました！`;
             
             this.game.ui.log(startMsg.replace('\n', ''));
             if (!isPlayerInvolved) {
@@ -605,14 +603,11 @@ Object.assign(WarManager.prototype, {
                 const guardName = defCastle.ownerClan === 0 ? "土豪" : "侍大将";
                 const defLeaderName = (defBusho && defBusho.name) ? defBusho.name : guardName;
                 let siegeMsg = "";
+                let dName = defDaimyoName || "不明";
                 // ★鎮圧戦や相手が諸勢力の場合は「自領」にします
                 if (this.state.isKunishuSubjugation || defCastle.isKunishu) {
-                    let dName = defDaimyoName || "不明";
                     siegeMsg = `${dName}の${defLeaderName}は、\n自領に立て籠もりました！`;
-                } else if (Number(defCastle.ownerClan) === 0) {
-                    siegeMsg = `土豪は、\n${defCastle.name}に立て籠もりました！`;
                 } else {
-                    let dName = defDaimyoName || "不明";
                     siegeMsg = `${dName}の${defLeaderName}は、\n${defCastle.name}に立て籠もりました！`;
                 }
                 
@@ -769,14 +764,15 @@ Object.assign(WarManager.prototype, {
             s.oldDefClanId = s.defender.ownerClan; 
             s.extinctionNotified = false; // フラグの初期化
             
-            // ==========================================
             // ★ここから追加：AI同士の戦争の結果メッセージを出して時間を止めます！
             // ★修正：諸勢力の戦いの時は専用のメッセージがあるので、ここではお休みします！
             if (!s.isPlayerInvolved && !s.isKunishuSubjugation && !s.attacker.isKunishu) {
                 const atkClanData = this.game.clans.find(c => c.id === s.attacker.ownerClan);
+                const atkProvData = this.game.provinces.find(p => p.id === s.sourceCastle.provinceId);
                 const defClanData = this.game.clans.find(c => c.id === s.oldDefClanId);
-                const atkDaimyoName = atkClanData ? atkClanData.name : (s.attacker.isKunishu ? s.attacker.name : "中立");
-                const defDaimyoName = defClanData ? defClanData.name : (s.defender.isKunishu ? s.defender.name : "中立");
+                const defProvData = this.game.provinces.find(p => p.id === s.defender.provinceId);
+                const atkDaimyoName = atkClanData ? atkClanData.name : (s.attacker.isKunishu ? s.attacker.name : (atkProvData ? atkProvData.province : "中立"));
+                const defDaimyoName = defClanData ? defClanData.name : (s.defender.isKunishu ? s.defender.name : (defProvData ? defProvData.province : "中立"));
                 
                 let resultMsg = "";
                 if (attackerWon) {
