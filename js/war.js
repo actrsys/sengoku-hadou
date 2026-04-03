@@ -970,6 +970,28 @@ class WarManager {
             let activeCastleMod = 1.5 + (s.defender.defense / 1000);
             activeAtkPower = activeAtkPower * activeCastleMod;
         }
+
+        // 装備（鉄砲・騎馬）による攻撃力アップ計算
+        let activeArmyObjForEquip = getArmyObj(s.turn);
+        if (activeArmyObjForEquip && activeSoldiers > 0) {
+            let activeHorses = activeArmyObjForEquip.horses || 0;
+            let activeGuns = activeArmyObjForEquip.guns || 0;
+            
+            // 兵士数に対する割合を計算します（最大1.0＝100%）
+            let horseRatio = Math.min(1.0, activeHorses / activeSoldiers);
+            let gunRatio = Math.min(1.0, activeGuns / activeSoldiers);
+            
+            // 「基礎攻撃力(activePowerObj.atkPower)」の最大30%分のボーナス値を計算します
+            let equipBonusValue = 0;
+            if (type === 'charge' || type === 'def_charge') {
+                equipBonusValue = activePowerObj.atkPower * (horseRatio * 0.3);
+            } else if (type === 'bow' || type === 'def_bow') {
+                equipBonusValue = activePowerObj.atkPower * (gunRatio * 0.3);
+            }
+            
+            // 算出したボーナス値を、最後に足し算します
+            activeAtkPower = activeAtkPower + equipBonusValue;
+        }
         
         let targetList = [];
         if (isAtkTurnGroup) {
