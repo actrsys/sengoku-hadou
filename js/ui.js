@@ -2176,6 +2176,10 @@ class UIManager {
         this.hideAIGuardTemporarily(); 
         if (this.resultModal) this.resultModal.classList.remove('hidden');
         this.onResultModalClose = onProceed;
+
+        if (window.AudioManager) {
+            window.AudioManager.playSE('myturn.ogg');
+        }
     }
 
     openQuantitySelector(type, data, targetId, extraData = null) {
