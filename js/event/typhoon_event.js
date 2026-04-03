@@ -25,6 +25,9 @@ window.GameEvents.push({
 
         const SHOW_TYPHOON_PATH = true;
 
+        // ★ダイアログを出す前に、音を鳴らしてバリアを張る魔法を呼びます！
+        if (window.playEventSoundAndBlock) window.playEventSoundAndBlock();
+
         await game.ui.showDialogAsync("台風が接近しています……", false, 0);
 
         const resetZoomBtn = document.getElementById('map-reset-zoom');

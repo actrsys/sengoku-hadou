@@ -4,10 +4,35 @@
  */
 
 // ==========================================
+// ★ イベントの始まりに音を鳴らして、少しの間画面を守る魔法
+// ==========================================
+window.playEventSoundAndBlock = function() {
+    if (window.AudioManager) window.AudioManager.playSE('event001.ogg');
+    
+    // 画面全体に透明なバリアを張って触れなくします
+    const blockOverlay = document.createElement('div');
+    blockOverlay.style.position = 'fixed';
+    blockOverlay.style.top = '0';
+    blockOverlay.style.left = '0';
+    blockOverlay.style.width = '100%';
+    blockOverlay.style.height = '100%';
+    blockOverlay.style.zIndex = '9999'; // 一番手前に置きます
+    document.body.appendChild(blockOverlay);
+    
+    // 2秒（2000ミリ秒）経ったらバリアを消します
+    setTimeout(() => {
+        if (blockOverlay.parentNode) document.body.removeChild(blockOverlay);
+    }, 2000);
+};
+
+// ==========================================
 // ★ マップを光らせる共通の魔法（いろんなイベントで使い回せます！）
 // ==========================================
 window.playProvinceMapEffect = async function(game, eventType, initialMsg, affectedProvIds, drawR, drawG, drawB) {
     if (affectedProvIds.size === 0 || !game.ui) return;
+    
+    // ★ダイアログを出す前に、音を鳴らしてバリアを張る魔法を呼びます！
+    if (window.playEventSoundAndBlock) window.playEventSoundAndBlock();
     
     await game.ui.showDialogAsync(initialMsg, false, 0);
 
@@ -279,6 +304,9 @@ window.GameEvents.push({
         
         // ★変更：自分のお城で一揆が起きていたら、１つずつ順番に画面でお知らせします
         if (playerIkkiCastles.length > 0 && game.ui) {
+            // ★お知らせを出す前に、音を鳴らしてバリアを張ります！
+            if (window.playEventSoundAndBlock) window.playEventSoundAndBlock();
+            
             for (let cName of playerIkkiCastles) {
                 const msg = `領民の不満が爆発し、当家の「${cName}」で一揆が発生しました！`;
                 await game.ui.showDialogAsync(msg, false, 0);
