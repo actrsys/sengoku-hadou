@@ -1165,7 +1165,7 @@ Object.assign(WarManager.prototype, {
                                 if (resultFooter) {
                                     resultFooter.classList.remove('hidden');
                                 }
-                            }, 7000); 
+                            }, 6500); 
                         }
                     }
                     this.game.ui.showResultModal(resultMsg, () => { this.closeWar(); });
@@ -1479,7 +1479,7 @@ Object.assign(WarManager.prototype, {
                             if (resultFooter) {
                                 resultFooter.classList.remove('hidden');
                             }
-                        }, 7000); 
+                        }, 6500); 
                     }
                 }
                 this.game.ui.showResultModal(resultMsg, finishWarProcess);
