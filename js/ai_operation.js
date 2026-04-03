@@ -54,6 +54,54 @@ class AIOperationManager {
             }
         }
 
+        // ★追加：周りの敵対勢力の数を数えます！
+        const adjacentEnemyClans = new Set();
+        for (const myCastle of myClanCastles) {
+            if (myCastle.adjacentCastleIds) {
+                for (const adjId of myCastle.adjacentCastleIds) {
+                    const adjCastle = this.game.getCastle(adjId);
+                    // 空き城(0)ではなく、自分の家でもないお城を調べます
+                    if (adjCastle && adjCastle.ownerClan !== 0 && adjCastle.ownerClan !== clanId) {
+                        const rel = this.game.getRelation(clanId, adjCastle.ownerClan);
+                        if (rel && rel.status === '敵対') {
+                            adjacentEnemyClans.add(adjCastle.ownerClan);
+                        }
+                    }
+                }
+            }
+        }
+
+        const enemyCount = adjacentEnemyClans.size;
+        // 敵が2つ以上いたら「外交作戦」を考えます！
+        if (enemyCount >= 2) {
+            // 1年（12ヶ月）の間にどれくらいの確率で立案するかを決めます
+            let yearlyProb = 0;
+            if (enemyCount === 2) yearlyProb = 0.10;      // 2勢力：ごくまれ (10%)
+            else if (enemyCount === 3) yearlyProb = 0.20; 
+            else if (enemyCount === 4) yearlyProb = 0.35; 
+            else if (enemyCount === 5) yearlyProb = 0.50; // 5勢力：そこそこ (50%)
+            else if (enemyCount === 6) yearlyProb = 0.65; 
+            else if (enemyCount >= 7) yearlyProb = 0.80;  // 7勢力以上：かなりの高確率 (80%)
+
+            // 12ヶ月で上の確率になるように、1ヶ月あたりのサイコロの確率を計算する魔法です！
+            const monthlyProb = 1 - Math.pow(1 - yearlyProb, 1 / 12);
+
+            // サイコロを振ります！
+            if (Math.random() < monthlyProb) {
+                // 期間の計算：敵が2勢力なら3ヶ月。そこから敵が2つ増えるごとに1ヶ月プラスします
+                const duration = 3 + Math.floor((enemyCount - 2) / 2);
+                
+                this.operations[clanId] = {
+                    type: '外交',
+                    turnsRemaining: 0, // すぐに実行するので準備期間はゼロです
+                    maxTurns: duration,
+                    status: '実行中'
+                };
+                console.log(`大名家[${clanId}]が【外交作戦】を立案しました！(隣接敵対: ${enemyCount}勢力, 期間: ${duration}ヶ月)`);
+                return; // 外交作戦が決まったら、今回の作戦会議はこれでおしまいです
+            }
+        }
+
         // 攻撃作戦の候補を全部記録しておく箱を用意します
         let operationCandidates = [];
 

@@ -148,6 +148,12 @@ class AIEngine {
                 // 基本の確率にボーナスを足し算します
                 diplomacyChance += dipBonus;
                 
+                // ★追加：大名家の作戦が「外交」なら、外交確率を2倍にします！
+                const myOp = this.game.aiOperationManager.operations[castle.ownerClan];
+                if (myOp && myOp.type === '外交' && myOp.status === '実行中') {
+                    diplomacyChance *= 2;
+                }
+                
                 // ★追加：お城がピンチ（兵士が少ない等）の時は、内政（徴兵など）を優先したくて外交確率を下げます！
                 if (castle.soldiers <= 1000) {
                     diplomacyChance = 0; // 兵士1000以下の超ピンチなら、外交してる場合じゃない！
