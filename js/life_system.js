@@ -158,9 +158,8 @@ class LifeSystem {
         // まだ登場していない（statusが'unborn'）武将の中で、登場年を迎えた人を探します
         const unbornBushos = this.game.bushos.filter(b => b.status === 'unborn' && b.startYear <= currentYear);
         
-        let messages = [];
-
-        unbornBushos.forEach(b => {
+        // ★変更：メッセージをためる箱（配列）は使わず、一つずつ順番に出すために「for...of」という魔法の繰り返しを使います！
+        for (const b of unbornBushos) {
             // ★変更：大名家に所属しておらず、諸勢力でもない場合は「浪人」になります
             if (b.clan === 0 && (b.belongKunishuId || 0) === 0) {
                 // 登場前:浪人 の場合
@@ -218,11 +217,15 @@ class LifeSystem {
                     // プレイヤーの大名家にやってきた場合は、お知らせのメッセージを作ります
                     if (b.status === 'active' && b.clan === this.game.playerClanId) {
                         const nameStr = b.name.replace('|', '');
+                        let msg = "";
                         if (hasRelative) {
-                            messages.push(`${nameStr}が元服し、当家に加わりました！`);
+                            msg = `${nameStr}が元服し、当家に加わりました！`;
                         } else {
-                            messages.push(`${nameStr}が当家に仕官しました！`);
+                            msg = `${nameStr}が当家に仕官しました！`;
                         }
+                        // ★変更：リストに溜め込まず、ここで直接画面に出して「OK」を押すまで待ちます！
+                        this.game.ui.log(msg);
+                        await this.game.ui.showDialogAsync(msg, false, 0);
                     }
                 } else {
                     // 万が一城が見つからなかった時の安全策
@@ -231,12 +234,13 @@ class LifeSystem {
                     b.loyalty = 50; // ★浪人になったので忠誠度を50にします！
                 }
             }
-        });
+        }
 
         // ★ここから追加：姫の登場チェックを書き足します！
         const unbornPrincesses = this.game.princesses.filter(p => p.status === 'unborn' && p.startYear <= currentYear);
 
-        unbornPrincesses.forEach(p => {
+        // ★変更：ここも「for...of」の魔法の繰り返しに変えて、一つずつ待ちます！
+        for (const p of unbornPrincesses) {
             let targetClanId = 0;
             let fatherNameStr = ""; // ★お父さんの名前を書いておくメモ帳です
 
@@ -264,6 +268,7 @@ class LifeSystem {
                 
                 // プレイヤーの大名家に姫がやってきたらお知らせのメッセージを作ります
                 if (targetClanId === this.game.playerClanId) {
+                    let msg = "";
                     if (fatherNameStr !== "") {
                         // ★ここから変更：お父さんの身分によってメッセージを切り替えます！
                         let isRoyal = false;
@@ -280,26 +285,21 @@ class LifeSystem {
 
                         // 大名や直接の一門の場合は特別なお知らせ！
                         if (isRoyal) {
-                            messages.push(`${fatherNameStr}様の姫君、${p.name}様がお生まれになりました！`);
+                            msg = `${fatherNameStr}様の姫君、${p.name}様がお生まれになりました！`;
                         } else {
                             // 間接的な一門や、普通の家臣の場合はこちらになります
-                            messages.push(`${fatherNameStr}のご息女、${p.name}が誕生しました！`);
+                            msg = `${fatherNameStr}のご息女、${p.name}が誕生しました！`;
                         }
                     } else {
-                        messages.push(`${p.name}が誕生しました！`);
+                        msg = `${p.name}が誕生しました！`;
                     }
+                    // ★変更：リストに溜め込まず、ここで直接画面に出して「OK」を押すまで待ちます！
+                    this.game.ui.log(msg);
+                    await this.game.ui.showDialogAsync(msg, false, 0);
                 }
             }
-        });
-        // ★追加ここまで！
-
-        // お知らせがあれば、画面に表示します
-        if (messages.length > 0) {
-            const msgText = messages.join('\n');
-            this.game.ui.log(msgText);
-            // ★awaitを追加して、プレイヤーが「OK」を押すまで時間を完全に止めます！
-            await this.game.ui.showDialogAsync(msgText, false, 0); 
         }
+        // ★追加ここまで！
     }
 
     // ★ 寿命のチェック（毎月行います）
