@@ -1154,10 +1154,17 @@ Object.assign(WarManager.prototype, {
                             window.AudioManager.playSE('victory.ogg');
                         }
                         const resultModal = document.getElementById('result-modal');
+                        const resultFooter = document.getElementById('result-footer');
                         if (resultModal) {
                             resultModal.style.pointerEvents = 'none';
+                            if (resultFooter) {
+                                resultFooter.classList.add('hidden');
+                            }
                             setTimeout(() => {
                                 resultModal.style.pointerEvents = 'auto';
+                                if (resultFooter) {
+                                    resultFooter.classList.remove('hidden');
+                                }
                             }, 7000); 
                         }
                     }
@@ -1461,10 +1468,17 @@ Object.assign(WarManager.prototype, {
                         window.AudioManager.playSE('victory.ogg');
                     }
                     const resultModal = document.getElementById('result-modal');
+                    const resultFooter = document.getElementById('result-footer');
                     if (resultModal) {
                         resultModal.style.pointerEvents = 'none';
+                        if (resultFooter) {
+                            resultFooter.classList.add('hidden');
+                        }
                         setTimeout(() => {
                             resultModal.style.pointerEvents = 'auto';
+                            if (resultFooter) {
+                                resultFooter.classList.remove('hidden');
+                            }
                         }, 7000); 
                     }
                 }
