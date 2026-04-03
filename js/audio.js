@@ -44,15 +44,15 @@ class AudioManager {
         // ★ SEのカタログ（個別の音量調整つき！）
         // ==========================================
         this.seList = {
-            'decision.ogg': { baseVolume: 0.06 },
-            'cancel.ogg': { baseVolume: 0.05 },
-            'choice.ogg': { baseVolume: 0.08 },
+            'decision.ogg': { baseVolume: 0.04 },
+            'cancel.ogg': { baseVolume: 0.03 },
+            'choice.ogg': { baseVolume: 0.06 },
             'window.ogg': { baseVolume: 0.1 },
             'damage001.ogg': { baseVolume: 0.11 },
             'fire001.mp3': { baseVolume: 0.3 },
             'slash.ogg': { baseVolume: 0.1 },
             'miss.ogg': { baseVolume: 0.1 },
-            'myturn.ogg': { baseVolume: 0.09 },
+            'myturn.ogg': { baseVolume: 0.07 },
             'event001.ogg': { baseVolume: 0.15 },
             'victory.ogg': { baseVolume: 0.1 },
             'katana001.ogg': { baseVolume: 0.07 },
