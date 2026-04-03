@@ -770,8 +770,8 @@ class AIEngine {
         const sendHorses = sourceCastle.horses || 0;
         const sendGuns = sourceCastle.guns || 0;
         
-        // ★ commandSystem の executeKunishuSubjugate を呼び出す
-        this.game.commandSystem.executeKunishuSubjugate(sourceCastle, sourceCastle.id, sorted.map(b => b.id), sendSoldiers, sendRice, sendHorses, sendGuns, kunishu);
+        // ★ kunishuSystem（諸勢力の専門部署）の executeKunishuSubjugate を呼び出します！
+        this.game.kunishuSystem.executeKunishuSubjugate(sourceCastle, sourceCastle.id, sorted.map(b => b.id), sendSoldiers, sendRice, sendHorses, sendGuns, kunishu);
     }
 
     execInternalAffairs(castle, castellan, mods, smartness) {
