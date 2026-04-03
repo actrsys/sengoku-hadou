@@ -542,6 +542,13 @@ class IndependenceSystem {
                 // 大名死亡処理（life_systemにお任せします）
                 await this.game.lifeSystem.executeDeath(oldDaimyo);
 
+                // ★追加：主家側として戦って負けた武将たちを全員「浪人」にします！（亡くなった大名本人は除外します）
+                daimyoMembers.forEach(b => {
+                    if (b.id !== oldDaimyo.id) {
+                        this.game.affiliationSystem.becomeRonin(b);
+                    }
+                });
+
                 // 反乱リーダーを新たな大名に
                 rebellionLeader.isDaimyo = true;
                 
