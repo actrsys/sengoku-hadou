@@ -188,7 +188,10 @@ class AIEngine {
                         // 諸勢力がまだ生きているか、仲良しになっていないか（友好度30以下）をチェックします
                         const targetKunishu = this.game.kunishuSystem.getKunishu(myOperation.targetId);
                         if (targetKunishu && !targetKunishu.isDestroyed && targetKunishu.getRelation(castle.ownerClan) <= 30) {
-                            isStillEnemy = true;
+                            // ★追加：その諸勢力が、今もこのお城（出撃する自分の城）にいるか確認します！
+                            if (targetKunishu.castleId === castle.id) {
+                                isStillEnemy = true;
+                            }
                         }
                     } else {
                         const targetCastle = this.game.getCastle(myOperation.targetId);
