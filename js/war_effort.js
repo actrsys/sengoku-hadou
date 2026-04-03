@@ -1147,6 +1147,10 @@ Object.assign(WarManager.prototype, {
                     this.game.ui.setWarModalVisible(false);
                     if (attackerWon) {
                         if (window.AudioManager) {
+                            // ★追加：ジングルが鳴る直前に、BGMを1秒かけてフェードアウトさせる魔法です！
+                            if (typeof window.AudioManager.fadeOutBgm === 'function') {
+                                window.AudioManager.fadeOutBgm(1);
+                            }
                             window.AudioManager.playSE('victory.ogg');
                         }
                         const resultModal = document.getElementById('result-modal');
@@ -1154,7 +1158,7 @@ Object.assign(WarManager.prototype, {
                             resultModal.style.pointerEvents = 'none';
                             setTimeout(() => {
                                 resultModal.style.pointerEvents = 'auto';
-                            }, 2500); 
+                            }, 7000); 
                         }
                     }
                     this.game.ui.showResultModal(resultMsg, () => { this.closeWar(); });
@@ -1450,6 +1454,10 @@ Object.assign(WarManager.prototype, {
             if (s.isPlayerInvolved) {
                 if (attackerWon && !isRetreat && isAtkPlayer) {
                     if (window.AudioManager) {
+                        // ★追加：ジングルが鳴る直前に、BGMを1秒かけてフェードアウトさせる魔法です！
+                        if (typeof window.AudioManager.fadeOutBgm === 'function') {
+                            window.AudioManager.fadeOutBgm(1);
+                        }
                         window.AudioManager.playSE('victory.ogg');
                     }
                     const resultModal = document.getElementById('result-modal');
@@ -1457,7 +1465,7 @@ Object.assign(WarManager.prototype, {
                         resultModal.style.pointerEvents = 'none';
                         setTimeout(() => {
                             resultModal.style.pointerEvents = 'auto';
-                        }, 2500); 
+                        }, 7000); 
                     }
                 }
                 this.game.ui.showResultModal(resultMsg, finishWarProcess);
