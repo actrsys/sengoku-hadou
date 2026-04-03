@@ -386,8 +386,8 @@ class AIEngine {
             if (target.isKunishuTarget) {
                 // ★諸勢力に対する攻撃確率の計算
                 const kunishu = target.kunishu;
-                // ★修正：諸勢力は兵力が少ないため、計算上は「1.3倍」にして大名家の城と同じ難易度として評価します！
-                const enemyForce = (kunishu.soldiers + kunishu.defense) * 1.3; 
+                // ★修正：諸勢力は兵力が少ないため、計算上は「1.1倍」にして大名家の城と同じ難易度として評価します！
+                const enemyForce = (kunishu.soldiers + kunishu.defense) * 1.1; 
                 
                 let myReinfPower = 0;
                 // 自軍からの援軍を見積もる
