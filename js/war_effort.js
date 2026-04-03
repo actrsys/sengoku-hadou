@@ -1435,7 +1435,21 @@ Object.assign(WarManager.prototype, {
                 this.game.affiliationSystem.updateCastleLord(s.defender);
             }
 
-            if (s.isPlayerInvolved) this.game.ui.showResultModal(resultMsg, finishWarProcess);
+            if (s.isPlayerInvolved) {
+                if (attackerWon && !isRetreat && isAtkPlayer) {
+                    if (window.AudioManager) {
+                        window.AudioManager.playSE('victory.ogg');
+                    }
+                    const resultModal = document.getElementById('result-modal');
+                    if (resultModal) {
+                        resultModal.style.pointerEvents = 'none';
+                        setTimeout(() => {
+                            resultModal.style.pointerEvents = 'auto';
+                        }, 2500); 
+                    }
+                }
+                this.game.ui.showResultModal(resultMsg, finishWarProcess);
+            }
             else finishWarProcess();
         } catch (e) {
             console.error("EndWar Error: ", e);
