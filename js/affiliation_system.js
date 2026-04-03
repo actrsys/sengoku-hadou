@@ -154,10 +154,10 @@ class AffiliationSystem {
             const oldCastle = this.game.getCastle(busho.castleId);
             if (oldCastle) {
                 // お城のリストから自分を消します
-                oldCastle.samuraiIds = oldCastle.samuraiIds.filter(id => id !== busho.id);
+                oldCastle.samuraiIds = oldCastle.samuraiIds.filter(id => Number(id) !== Number(busho.id));
                 
                 // もし自分が城主だったら、城主を空っぽにします
-                if (oldCastle.castellanId === busho.id) {
+                if (Number(oldCastle.castellanId) === Number(busho.id)) {
                     oldCastle.castellanId = 0;
                     busho.isCastellan = false;
                 }
@@ -174,8 +174,8 @@ class AffiliationSystem {
         const newCastle = this.game.getCastle(newCastleId);
         if (newCastle) {
             // お城のリストに自分がいなければ、名前を書きます
-            if (!newCastle.samuraiIds.includes(busho.id)) {
-                newCastle.samuraiIds.push(busho.id);
+            if (!newCastle.samuraiIds.some(id => Number(id) === Number(busho.id))) {
+                newCastle.samuraiIds.push(Number(busho.id));
             }
             this.game.updateCastleLord(newCastle);
         }
