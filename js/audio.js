@@ -52,8 +52,10 @@ class AudioManager {
             'fire001.mp3g': { baseVolume: 1.6 },
             'slash.ogg': { baseVolume: 0.1 },
             'miss.ogg': { baseVolume: 0.1 },
-            'katana001': { baseVolume: 0.07 },
-            'katana002': { baseVolume: 0.07 },
+            'event001.ogg': { baseVolume: 0.1 },
+            'victory.ogg': { baseVolume: 0.1 },
+            'katana001.ogg': { baseVolume: 0.07 },
+            'katana002.ogg': { baseVolume: 0.07 },
         };
         
         // もしカタログに書いていない音が呼ばれたときの「とりあえずの音量」
