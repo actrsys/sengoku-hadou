@@ -1224,7 +1224,7 @@ class GameManager {
         }
 
         if(!castle || castle.ownerClan === 0 || !this.clans.find(c => Number(c.id) === Number(castle.ownerClan))) { 
-            console.warn(`Skipping invalid castle or owner.`);
+            console.log(`空き城またはデータのない城をスキップしました。`);
             // ★ここを書き足し：空城をスキップする時も、一瞬だけ数字を進めます！
             if (this.isProcessingAI && this.ui) this.ui.updateAIProgress(this.currentIndex + 1, this.turnQueue.length);
             this.currentIndex++; 
