@@ -616,6 +616,40 @@ class LifeSystem {
                 }
             }
             
+            // ★ここから追加：当主交代による外交関係の変動！
+            this.game.clans.forEach(otherClan => {
+                // 空き家（0）や自分自身は計算しません
+                if (otherClan.id === 0 || otherClan.id === daimyo.clan) return;
+
+                // 相手との外交データを取得します
+                const rel = this.game.diplomacyManager.getRelation(daimyo.clan, otherClan.id);
+                if (!rel) return;
+
+                let changeAmount = 0;
+
+                // 関係が「普通」か「友好」の場合
+                if (rel.status === '普通' || rel.status === '友好') {
+                    if (rel.sentiment >= 51 && rel.sentiment <= 54) {
+                        // 50にするための差分を計算します
+                        changeAmount = 50 - rel.sentiment; 
+                    } else if (rel.sentiment >= 55) {
+                        // 55以上の場合は5下げます
+                        changeAmount = -5;
+                    }
+                } 
+                // 関係が「同盟」「従属」「支配」の場合（婚姻はステータスが「同盟」になっています）
+                else if (rel.status === '同盟' || rel.status === '従属' || rel.status === '支配') {
+                    // 基本は10下げますが、新当主の能力による変動（changeVal）も一緒に計算します
+                    changeAmount = -10 + changeVal;
+                }
+
+                // 変化がある場合のみ、外交システムに更新をお願いします
+                if (changeAmount !== 0) {
+                    this.game.diplomacyManager.updateSentiment(daimyo.clan, otherClan.id, changeAmount);
+                }
+            });
+            // ★追加ここまで
+
             // ★ここから追加：当主交代に合わせて大名家の名前を変更し、マップを更新します！
             const clan = this.game.clans.find(c => c.id === daimyo.clan);
             if (clan) {
