@@ -529,8 +529,8 @@ class WarManager {
             // 撤退: 相手の半分の兵力(0.5)を下回るほど、なめらかにスコアが大きくなる
             scores['retreat'] = Math.max(0, 0.5 - ratio) * 1500 + (timidDegree * 300);
             
-            // 鼓舞: 目標となる士気（敵の平均の0.8倍、または30）に足りない分だけなめらかにスコアが大きくなる
-            let targetMorale = Math.max(30, enemyMoraleAvg * 0.8);
+            // 鼓舞: 目標となる士気（30）に足りない分だけなめらかにスコアが大きくなる
+            let targetMorale = 30;
             scores['inspire'] = Math.max(0, targetMorale - myMorale) * 20 + 20;
             
             // ★追加：士気が70以上なら、線形でマイナスを入れます！100以上なら絶対に選びません
@@ -587,8 +587,8 @@ class WarManager {
             let defAttackRatioBonus = Math.max(0, 0.25 - ratio) * 1200; // 兵力比0.25(1/4)以下から意識しはじめる
             scores['def_attack'] = defAttackDefBonus + defAttackRatioBonus + (timidDegree * 200);
             
-            // 鼓舞: 目標となる士気に足りない分だけなめらかにスコアが大きくなる
-            let targetMoraleDef = Math.max(30, enemyMoraleAvg * 0.8);
+            // 鼓舞: 目標となる士気（30）に足りない分だけなめらかにスコアが大きくなる
+            let targetMoraleDef = 30;
             scores['def_inspire'] = Math.max(0, targetMoraleDef - myMorale) * 20 + 20;
             
             // ★今回追加：相手の火計が成功している場合、防ぐために鼓舞のスコアを上げます！
