@@ -657,10 +657,93 @@ class IndependenceSystem {
                 // 大名死亡処理（life_systemにお任せします）
                 await this.game.lifeSystem.executeDeath(oldDaimyo);
 
-                // ★追加：主家側として戦って負けた武将たちを全員「浪人」にします！（亡くなった大名本人は除外します）
+                // ★ここから追加：逃亡先の城を探す魔法です
+                let escapeCastleId = castle.id; // 万が一見つからなかった時のために、今の城を覚えておきます
+                const oldClanData = this.game.clans.find(c => c.id === oldClanId);
+                
+                if (oldClanData) {
+                    let candidateClans = [];
+                    // 外交の箱（diplomacyValue）を調べて、敵対していない大名家をリストアップします
+                    for (const targetIdStr in oldClanData.diplomacyValue) {
+                        const targetId = Number(targetIdStr);
+                        if (targetId === oldClanId) continue;
+                        
+                        const rel = oldClanData.diplomacyValue[targetId];
+                        // 敵対していなければ、候補に入れます（仲の良さも一緒にメモします）
+                        if (rel && rel.status !== '敵対') {
+                            candidateClans.push({ id: targetId, sentiment: rel.sentiment });
+                        }
+                    }
+                    
+                    // 仲が良い順に並べ替えます
+                    candidateClans.sort((a, b) => b.sentiment - a.sentiment);
+                    
+                    let targetCastles = [];
+                    // 仲が良い大名家から順番に、城を持っているか調べます
+                    for (const cClan of candidateClans) {
+                        const cList = this.game.castles.filter(c => c.ownerClan === cClan.id);
+                        if (cList.length > 0) {
+                            targetCastles = cList; // 城が見つかったら、それをターゲットにします
+                            break; 
+                        }
+                    }
+                    
+                    // もし、仲の良い大名家が一つも城を持っていなかったら…敵以外の誰かの城を探します
+                    if (targetCastles.length === 0) {
+                        targetCastles = this.game.castles.filter(c => c.ownerClan !== oldClanId && c.ownerClan !== 0);
+                    }
+                    
+                    // ターゲットの城が見つかったら、今の城から「一番近い城」を選びます
+                    if (targetCastles.length > 0) {
+                        targetCastles.sort((a, b) => {
+                            const distA = Math.abs(castle.x - a.x) + Math.abs(castle.y - a.y);
+                            const distB = Math.abs(castle.x - b.x) + Math.abs(castle.y - b.y);
+                            return distA - distB;
+                        });
+                        escapeCastleId = targetCastles[0].id;
+                    }
+                }
+                // ★逃亡先探しここまで
+                
+                // ★変更：主家側として戦って負けた武将たちを全員「浪人」にして、逃亡先に移動させます！（亡くなった大名本人は除外）
+                const roninBushos = []; // 後で一門の子どもたちを探すためのメモ帳です
                 daimyoMembers.forEach(b => {
                     if (b.id !== oldDaimyo.id) {
                         this.game.affiliationSystem.becomeRonin(b);
+                        this.game.affiliationSystem.moveCastle(b, escapeCastleId);
+                        roninBushos.push(b);
+                    }
+                });
+
+                // ★追加：主家や逃げた武将の「一門」で、まだ登場していない子どもたちを処理します！
+                const currentYear = this.game.year;
+                const unbornFamily = this.game.bushos.filter(b => {
+                    if (b.status !== 'unborn') return false; // まだ登場していない人だけを探します
+                    
+                    // 亡くなった旧大名の一門かチェック
+                    const isFamilyOfOldDaimyo = b.familyIds.some(fId => oldDaimyo.familyIds.includes(fId));
+                    // 逃げた武将たちの一門かチェック
+                    const isFamilyOfRonin = roninBushos.some(ronin => b.familyIds.some(fId => ronin.familyIds.includes(fId)));
+                    
+                    return isFamilyOfOldDaimyo || isFamilyOfRonin;
+                });
+                
+                unbornFamily.forEach(b => {
+                    b.clan = 0; // ★まだ生まれていない武将も含め、大名家IDを0にして浪人として登場するようにします
+                    
+                    if (b.birthYear <= currentYear) {
+                        // すでに生まれているなら、今すぐ元服して一緒に逃げます
+                        b.status = 'ronin'; // 浪人にします
+                        b.loyalty = 50;
+                        b.isCastellan = false;
+                        b.isDaimyo = false;
+                        b.isGunshi = false;
+                        // お引越しセンターの魔法で、安全に逃亡先の城に入れます
+                        this.game.affiliationSystem.enterCastle(b, escapeCastleId);
+                        
+                        // フルネームから「|」を消して綺麗なお名前にします
+                        const cleanName = b.name.replace('|', '');
+                        this.game.ui.log(`【逃亡】${cleanName}は一門の危機に元服を早め、行動を共にしました。`);
                     }
                 });
 
