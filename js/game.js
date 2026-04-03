@@ -591,7 +591,13 @@ class GameSystem {
 
             if (currentDist >= 3) continue;
 
-            const neighbors = game.castles.filter(c => this.isAdjacent(current, c));
+            const neighbors = [];
+            if (current.adjacentCastleIds) {
+                current.adjacentCastleIds.forEach(adjId => {
+                    const c = game.getCastle(adjId);
+                    if (c) neighbors.push(c);
+                });
+            }
             
             for (const next of neighbors) {
                 if (next.id === targetCastle.id) return true;

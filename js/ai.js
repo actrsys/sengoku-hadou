@@ -315,11 +315,14 @@ class AIEngine {
         // 自領のどこかと隣接している大名家をリストアップします
         const adjacentClans = new Set();
         myClanCastles.forEach(myC => {
-            this.game.castles.forEach(c => {
-                if (c.ownerClan !== 0 && c.ownerClan !== myClanId && GameSystem.isAdjacent(myC, c)) {
-                    adjacentClans.add(c.ownerClan);
-                }
-            });
+            if (myC.adjacentCastleIds) {
+                myC.adjacentCastleIds.forEach(adjId => {
+                    const c = this.game.getCastle(adjId);
+                    if (c && c.ownerClan !== 0 && c.ownerClan !== myClanId) {
+                        adjacentClans.add(c.ownerClan);
+                    }
+                });
+            }
         });
         
         // 警戒すべき敵対大名を複数リストアップします！
@@ -813,11 +816,15 @@ class AIEngine {
                     }
                     
                     // お隣の城を探します（同じ大名家の城だけを通ります）
-                    const neighbors = this.game.castles.filter(c => 
-                        c.ownerClan === castle.ownerClan && 
-                        GameSystem.isAdjacent(currentCastle, c) &&
-                        !visited.has(c.id)
-                    );
+                    const neighbors = [];
+                    if (currentCastle.adjacentCastleIds) {
+                        currentCastle.adjacentCastleIds.forEach(adjId => {
+                            const c = this.game.getCastle(adjId);
+                            if (c && c.ownerClan === castle.ownerClan && !visited.has(c.id)) {
+                                neighbors.push(c);
+                            }
+                        });
+                    }
                     
                     for (const n of neighbors) {
                         visited.add(n.id);
@@ -859,9 +866,15 @@ class AIEngine {
         const isAggressive = castellan.personality === 'aggressive';
 
         // お隣の敵のお城を調べておきます（徴兵の判断用）
-        const neighbors = this.game.castles.filter(c => 
-            c.ownerClan !== 0 && c.ownerClan !== castle.ownerClan && GameSystem.isAdjacent(castle, c)
-        );
+        const neighbors = [];
+        if (castle.adjacentCastleIds) {
+            castle.adjacentCastleIds.forEach(adjId => {
+                const c = this.game.getCastle(adjId);
+                if (c && c.ownerClan !== 0 && c.ownerClan !== castle.ownerClan) {
+                    neighbors.push(c);
+                }
+            });
+        }
 
         // ③ 決められた回数だけ、行動を繰り返します！
         for (let step = 0; step < maxActions; step++) {
@@ -1149,11 +1162,15 @@ class AIEngine {
                     reachableMyCastles.push(current);
                 }
 
-                const adjMyCastles = this.game.castles.filter(c => 
-                    c.ownerClan === castle.ownerClan && 
-                    GameSystem.isAdjacent(current, c) &&
-                    !visitedCastles.has(c.id)
-                );
+                const adjMyCastles = [];
+                if (current.adjacentCastleIds) {
+                    current.adjacentCastleIds.forEach(adjId => {
+                        const c = this.game.getCastle(adjId);
+                        if (c && c.ownerClan === castle.ownerClan && !visitedCastles.has(c.id)) {
+                            adjMyCastles.push(c);
+                        }
+                    });
+                }
 
                 for (const n of adjMyCastles) {
                     visitedCastles.add(n.id);
