@@ -21,10 +21,10 @@ class AudioManager {
             'SC_ex_Town2_Fortress.ogg': { 
                 start: 36603 / 44100, 
                 end: (36603 + 5733088) / 44100,
-                baseVolume: 0.04 
+                baseVolume: 0.05 
             },
             'SC_ex_Town1_Castle.ogg': { 
-                baseVolume: 0.04 
+                baseVolume: 0.05 
             },
             // ★野戦のBGM
             '08_Legend of bear slaying.ogg': {
