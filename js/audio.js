@@ -108,6 +108,20 @@ class AudioManager {
             this.bgmPlayer = null;
         }
     }
+
+    // BGMをゆっくり消す魔法（指定した秒数かけてフェードアウトします）
+    fadeOutBgm(durationInSeconds = 1) {
+        if (this.bgmPlayer) {
+            const currentVol = this.bgmPlayer.volume();
+            // 秒数をミリ秒（1000倍）に直して、今の音量から 0（無音）へフェードアウト
+            this.bgmPlayer.fade(currentVol, 0, durationInSeconds * 1000);
+            
+            // フェードアウトが完全に終わったら、BGMをきっちり停止させます
+            this.bgmPlayer.once('fade', () => {
+                this.stopBGM();
+            });
+        }
+    }
     
     // BGMの音量を変える（設定画面から呼ばれる魔法です）
     setBgmVolume(ratio) {
