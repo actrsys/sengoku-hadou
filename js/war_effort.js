@@ -205,10 +205,10 @@ Object.assign(WarManager.prototype, {
                 // ★追加：メッセージが出ると同時に、最初の刀の音を鳴らします
                 if (window.AudioManager) {
                     window.AudioManager.playSE('katana001.ogg');
-                    // 0.2秒（200ミリ秒）待ってから、次の音を鳴らします
+                    // 0.4秒（400ミリ秒）待ってから、次の音を鳴らします
                     setTimeout(() => {
                         if (window.AudioManager) window.AudioManager.playSE('katana002.ogg');
-                    }, 200);
+                    }, 400);
                 }
 
                 // ★追加：音が鳴っている間、画面を触れないように透明なバリアを張ります
@@ -216,8 +216,8 @@ Object.assign(WarManager.prototype, {
                 if (dialogModal) {
                     dialogModal.style.pointerEvents = 'none'; // バリア展開！
                     setTimeout(() => {
-                        dialogModal.style.pointerEvents = 'auto'; // 0.5秒後にバリアを解除！
-                    }, 500); 
+                        dialogModal.style.pointerEvents = 'auto'; // 0.8秒後にバリアを解除！
+                    }, 800); 
                 }
 
                 // ★修正：諸勢力に対する鎮圧や反乱の時も、開始メッセージをしっかり出して結果を知らせます！
