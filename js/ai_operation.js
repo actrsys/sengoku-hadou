@@ -182,12 +182,12 @@ class AIOperationManager {
 
                 let prepTurns = 4;
                 if (ratio <= 0.25) {
-                    prepTurns = 2; // 敵が1/4以下なら2ヶ月
+                    prepTurns = 0; // 敵が1/4以下なら0ヶ月（すぐに実行）
                 } else if (ratio >= 1.3) {
                     prepTurns = 6; // 敵が1.3倍以上なら6ヶ月
                 } else {
-                    // その間なら、なめらかに2〜6ヶ月の間で計算します
-                    prepTurns = Math.round(2 + ((ratio - 0.25) / 1.05) * 4);
+                    // その間なら、なめらかに0〜6ヶ月の間で計算します
+                    prepTurns = Math.round(((ratio - 0.25) / 1.05) * 6);
                 }
                 
                 // ★雪国かどうかを判定して「越冬」の準備をします
@@ -224,7 +224,7 @@ class AIOperationManager {
                     assignedUnits: [], 
                     turnsRemaining: prepTurns, 
                     maxTurns: prepTurns + 3,   
-                    status: '準備中'
+                    status: prepTurns <= 0 ? '実行中' : '準備中'
                 };
 
                 // 最高の作戦が1つ決まったら、もう他の候補は見なくていいのでループを終わらせます
