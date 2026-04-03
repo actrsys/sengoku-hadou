@@ -188,6 +188,39 @@ class IndependenceSystem {
             const newClan = new Clan({
                 id: newClanId, name: newClanName, color: newColor, leaderId: rebellionLeader.id
             });
+
+            const oldClanForDip = this.game.clans.find(c => c.id === oldClanId);
+            if (oldClanForDip) {
+                this.game.clans.forEach(otherClan => {
+                    if (otherClan.id === 0 || otherClan.id === oldClanId) return;
+                    
+                    const oldRel = this.game.getRelation(oldClanId, otherClan.id);
+                    if (oldRel) {
+                        let newSentiment = 100 - oldRel.sentiment;
+                        newSentiment = Math.max(30, Math.min(70, newSentiment));
+                        
+                        let newStatus = '普通';
+                        if (newSentiment >= 70) newStatus = '友好';
+                        if (newSentiment <= 30) newStatus = '敵対';
+                        
+                        newClan.diplomacyValue[otherClan.id] = {
+                            status: newStatus,
+                            sentiment: newSentiment,
+                            trucePeriod: 0,
+                            isMarriage: false
+                        };
+                        
+                        if (!otherClan.diplomacyValue) otherClan.diplomacyValue = {};
+                        otherClan.diplomacyValue[newClanId] = {
+                            status: newStatus,
+                            sentiment: newSentiment,
+                            trucePeriod: 0,
+                            isMarriage: false
+                        };
+                    }
+                });
+            }
+
             this.game.clans.push(newClan);
 
             rebellionLeader.isDaimyo = true;
@@ -558,6 +591,33 @@ class IndependenceSystem {
                     const familyName = rebellionLeader.familyName || rebellionLeader.name.split('|')[0] || rebellionLeader.name;
                     clan.name = `${familyName}家`;
                     clan.leaderId = rebellionLeader.id;
+
+                    this.game.clans.forEach(otherClan => {
+                        if (otherClan.id === 0 || otherClan.id === clan.id) return;
+                        
+                        const currentRel = this.game.getRelation(clan.id, otherClan.id);
+                        if (currentRel) {
+                            let newSentiment = 100 - currentRel.sentiment;
+                            newSentiment = Math.max(30, Math.min(70, newSentiment));
+                            
+                            let newStatus = '普通';
+                            if (newSentiment >= 70) newStatus = '友好';
+                            if (newSentiment <= 30) newStatus = '敵対';
+                            
+                            currentRel.status = newStatus;
+                            currentRel.sentiment = newSentiment;
+                            currentRel.trucePeriod = 0;
+                            currentRel.isMarriage = false;
+                            
+                            const oppRel = this.game.getRelation(otherClan.id, clan.id);
+                            if (oppRel) {
+                                oppRel.status = newStatus;
+                                oppRel.sentiment = newSentiment;
+                                oppRel.trucePeriod = 0;
+                                oppRel.isMarriage = false;
+                            }
+                        }
+                    });
                 }
                 // 勢力情報が変わったので威信を更新
                 if (window.GameApp) window.GameApp.updateAllClanPrestige();
