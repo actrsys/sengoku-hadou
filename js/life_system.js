@@ -458,41 +458,60 @@ class LifeSystem {
         }
         // ==========================================
 
-        // 1. 生きている一門がいるかチェック
-        const activeFamily = this.game.bushos.filter(b => b.clan === daimyo.clan && b.id !== daimyo.id && b.status === 'active' && !b.isDaimyo && daimyo.familyIds.some(fId => b.familyIds.includes(fId)));
-        
         let extraMsg = ""; // 緊急で元服した時の追加メッセージ
 
-        // もし生きている一門が0人なら、未登場の一門を探して強制的に登場させる
-        if (activeFamily.length === 0) {
-            const unbornFamily = this.game.bushos.filter(b => b.status === 'unborn' && daimyo.familyIds.some(fId => b.familyIds.includes(fId)));
-            
-            if (unbornFamily.length > 0) {
-                // 相性 -> 元の殿様より年下か -> 年齢順に並べ替え
-                unbornFamily.sort((a,b) => {
-                    const diffA = Math.abs((daimyo.affinity || 0) - (a.affinity || 0));
-                    const diffB = Math.abs((daimyo.affinity || 0) - (b.affinity || 0));
-                    if (diffA !== diffB) return diffA - diffB;
+        // 今のゲームの年を時計で確認します
+        const currentYear = this.game.year;
+
+        // 1. 今活躍している家臣たちと、まだ登場していない一門を全員集めます！
+        // （ただし、まだ生まれていない人は絶対に除外します！）
+        const activeBushos = this.game.bushos.filter(b => b.clan === daimyo.clan && b.id !== daimyo.id && b.status === 'active' && !b.isDaimyo);
+        const unbornFamily = this.game.bushos.filter(b => b.status === 'unborn' && daimyo.familyIds.some(fId => b.familyIds.includes(fId)) && b.birthYear <= currentYear);
+        
+        const allCandidates = [...activeBushos, ...unbornFamily];
+
+        // 2. 全員を並べて、誰が一番後継ぎにふさわしいかテストします！
+        if (allCandidates.length > 0) {
+            allCandidates.forEach(b => {
+                b._isRelative = daimyo.familyIds.some(fId => b.familyIds.includes(fId));
+                b._affinityDiff = Math.abs((daimyo.affinity || 0) - (b.affinity || 0));
+                b._baseScore = b.leadership + b.intelligence;
+            });
+
+            allCandidates.sort((a, b) => {
+                // 一門（親戚）を優先します
+                if (a._isRelative && !b._isRelative) return -1;
+                if (!a._isRelative && b._isRelative) return 1;
+                
+                // どちらも一門（またはどちらも一門ではない）場合は、相性などを比べます
+                if (a._isRelative && b._isRelative) {
+                    if (a._affinityDiff !== b._affinityDiff) return a._affinityDiff - b._affinityDiff;
                     
                     const aIsYounger = a.birthYear > daimyo.birthYear;
                     const bIsYounger = b.birthYear > daimyo.birthYear;
                     if (aIsYounger && !bIsYounger) return -1;
                     if (!aIsYounger && bIsYounger) return 1;
                     
-                    return a.birthYear - b.birthYear;
-                });
+                    if (a.birthYear !== b.birthYear) return a.birthYear - b.birthYear;
+                }
+                // 血の繋がりに関係なく、最後は能力の高さで決めます
+                return b._baseScore - a._baseScore;
+            });
 
-                // 一番有力な候補を強制登場させる
-                const heir = unbornFamily[0];
+            // ランキング1位の人を見つけます！
+            const bestCandidate = allCandidates[0];
+
+            // 3. もし一番ふさわしい人が「まだ登場していない一門」だったら、急いで元服させます！
+            if (bestCandidate.status === 'unborn') {
                 const baseCastle = clanCastles.length > 0 ? clanCastles[0] : null;
 
                 if (baseCastle) {
-                    heir.status = 'active';
-                    heir.clan = daimyo.clan;
-                    heir.castleId = baseCastle.id;
-                    heir.loyalty = 100;
-                    if (!baseCastle.samuraiIds.includes(heir.id)) baseCastle.samuraiIds.push(heir.id);
-                    extraMsg = `\n ${heir.name.replace('|','')}が急遽元服しました。`;
+                    bestCandidate.status = 'active';
+                    bestCandidate.clan = daimyo.clan;
+                    bestCandidate.castleId = baseCastle.id;
+                    bestCandidate.loyalty = 100;
+                    if (!baseCastle.samuraiIds.includes(bestCandidate.id)) baseCastle.samuraiIds.push(bestCandidate.id);
+                    extraMsg = `\n ${bestCandidate.name.replace('|','')}が急遽元服しました。`;
                 }
             }
         }
