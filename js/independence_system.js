@@ -766,14 +766,19 @@ class IndependenceSystem {
         if (!daimyoTeamBushos.includes(oldDaimyo)) daimyoTeamBushos[0] = oldDaimyo;
         if (!rebelTeamBushos.includes(rebellionLeader)) rebelTeamBushos[0] = rebellionLeader;
 
-        // 2. 兵士数を武将数に応じて5000人を割って渡します
-        const daimyoPerUnit = Math.floor(5000 / daimyoTeamBushos.length);
-        const rebelPerUnit = Math.floor(5000 / rebelTeamBushos.length);
+        // 2. 兵士数を「派閥の人数比」に合わせて、合計10000人を分け合います！
+        const totalCount = daimyoMembers.length + rebelMembers.length;
+        const daimyoTotalPool = Math.floor(10000 * (daimyoMembers.length / totalCount));
+        const rebelTotalPool = 10000 - daimyoTotalPool;
+
+        // 実際に決戦場で戦う5人の部隊に、それぞれの取り分を均等に配ります
+        const daimyoPerUnit = Math.floor(daimyoTotalPool / daimyoTeamBushos.length);
+        const rebelPerUnit = Math.floor(rebelTotalPool / rebelTeamBushos.length);
 
         const daimyoAssignments = daimyoTeamBushos.map(b => ({
             busho: b,
             soldiers: daimyoPerUnit,
-            troopType: 'ashigaru' // 裏の戦闘なので足軽で統一
+            troopType: 'ashigaru'
         }));
 
         const rebelAssignments = rebelTeamBushos.map(b => ({
@@ -789,7 +794,7 @@ class IndependenceSystem {
             attacker: { 
                 ownerClan: -1, 
                 name: "反乱軍", 
-                soldiers: 5000,
+                soldiers: rebelTotalPool,
                 rice: 5000, 
                 morale: 100, 
                 training: 100,
@@ -799,7 +804,7 @@ class IndependenceSystem {
                 id: 0, 
                 ownerClan: -1, 
                 name: "主家軍", 
-                soldiers: 5000,
+                soldiers: daimyoTotalPool,
                 morale: 50, 
                 training: 50,
                 isDelegated: false,
