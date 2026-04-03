@@ -1145,6 +1145,18 @@ Object.assign(WarManager.prototype, {
                 
                 if (s.isPlayerInvolved) {
                     this.game.ui.setWarModalVisible(false);
+                    if (attackerWon) {
+                        if (window.AudioManager) {
+                            window.AudioManager.playSE('victory.ogg');
+                        }
+                        const resultModal = document.getElementById('result-modal');
+                        if (resultModal) {
+                            resultModal.style.pointerEvents = 'none';
+                            setTimeout(() => {
+                                resultModal.style.pointerEvents = 'auto';
+                            }, 2500); 
+                        }
+                    }
                     this.game.ui.showResultModal(resultMsg, () => { this.closeWar(); });
                 } else {
                     // ★修正：戦闘画面は飛ばしますが、結果のメッセージは表示してタップを待ちます！
