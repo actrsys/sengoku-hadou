@@ -1149,7 +1149,7 @@ Object.assign(WarManager.prototype, {
                         if (window.AudioManager) {
                             // ★追加：ジングルが鳴る直前に、BGMを1秒かけてフェードアウトさせる魔法です！
                             if (typeof window.AudioManager.fadeOutBgm === 'function') {
-                                window.AudioManager.fadeOutBgm(1);
+                                window.AudioManager.fadeOutBgm(0.5);
                             }
                             window.AudioManager.playSE('victory.ogg');
                         }
@@ -1456,7 +1456,7 @@ Object.assign(WarManager.prototype, {
                     if (window.AudioManager) {
                         // ★追加：ジングルが鳴る直前に、BGMを1秒かけてフェードアウトさせる魔法です！
                         if (typeof window.AudioManager.fadeOutBgm === 'function') {
-                            window.AudioManager.fadeOutBgm(1);
+                            window.AudioManager.fadeOutBgm(0.5);
                         }
                         window.AudioManager.playSE('victory.ogg');
                     }
