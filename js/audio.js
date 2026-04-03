@@ -51,7 +51,7 @@ class AudioManager {
             'damage001.ogg': { baseVolume: 0.11 },
             'fire001.mp3': { baseVolume: 0.08 },
             'slash.ogg': { baseVolume: 0.08 },
-            'miss.ogg': { baseVolume: 0.1 },
+            'miss.ogg': { baseVolume: 0.07 },
             'myturn.ogg': { baseVolume: 0.07 },
             'event001.ogg': { baseVolume: 0.15 },
             'victory.ogg': { baseVolume: 0.1 },
