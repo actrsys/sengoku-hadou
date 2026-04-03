@@ -266,6 +266,28 @@ class IndependenceSystem {
             }
         }
 
+        // ★先に独立・寝返りのメインメッセージを作り、ログに出力します
+        const oldClanName = this.game.clans.find(c => c.id === oldClanId)?.name || "不明";
+        let msg = "";
+        
+        // ★メッセージの出し分け
+        if (isProxyRebellion) {
+            if (isDefection) {
+                msg = `${oldClanName} ${castle.name}の${castellan.name}が派閥主・${rebellionLeader.name}を擁立し、敵対する${newClanName}へ寝返りました！`;
+            } else {
+                msg = `${oldClanName} ${castle.name}の${castellan.name}が派閥主・${rebellionLeader.name}を大名として擁立し、独立を宣言しました！`;
+            }
+        } else {
+            if (isDefection) {
+                msg = `${oldClanName} ${castle.name}の${castellan.name}が、敵対する${newClanName}へ寝返りました！`;
+            } else {
+                msg = `${oldClanName}の${castellan.name}が${castle.name}にて独立しました！`;
+            }
+        }
+        
+        // ここで一番最初にログに書き込みます！
+        this.game.ui.log(msg);
+
         // 部下たちの去就
         // ★主君の基準を rebellionLeader にする
         let captiveMsgs = this.resolveSubordinates(castle, rebellionLeader, oldDaimyo, newClanId, oldClanId);
@@ -286,28 +308,10 @@ class IndependenceSystem {
 
         this.game.updateCastleLord(castle);
 
-        const oldClanName = this.game.clans.find(c => c.id === oldClanId)?.name || "不明";
-        let msg = "";
-        
-        // ★メッセージの出し分け
-        if (isProxyRebellion) {
-            if (isDefection) {
-                msg = `${oldClanName} ${castle.name}の${castellan.name}が派閥主・${rebellionLeader.name}を擁立し、敵対する${newClanName}へ寝返りました！`;
-            } else {
-                msg = `${oldClanName} ${castle.name}の${castellan.name}が派閥主・${rebellionLeader.name}を大名として擁立し、独立を宣言しました！`;
-            }
-        } else {
-            if (isDefection) {
-                msg = `${oldClanName} ${castle.name}の${castellan.name}が、敵対する${newClanName}へ寝返りました！`;
-            } else {
-                msg = `${oldClanName}の${castellan.name}が${castle.name}にて独立しました！`;
-            }
-        }
-        
         // ★追加：独立や寝返りで勢力が大きく変わるので、威信を最新に更新しておきます！
         if (window.GameApp) window.GameApp.updateAllClanPrestige();
         
-        this.game.ui.log(msg);
+        // メッセージ画面を出す処理は一番最後に行います
         if (captiveMsgs && captiveMsgs.length > 0) msg += '\n\n' + captiveMsgs.join('\n');
         await this.game.ui.showDialogAsync(msg, false, 0);
     }
