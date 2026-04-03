@@ -1122,7 +1122,11 @@ class WarManager {
         }
         
         let actionName = "攻撃";
-        if (type === 'bow' || type === 'def_bow') actionName = "斉射";
+        let actionSe = 'damage001.ogg';
+        if (type === 'bow' || type === 'def_bow') {
+            actionName = "斉射";
+            actionSe = 'bow_double';
+        }
         else if (type === 'siege') actionName = "破壊";
         else if (type === 'charge' || type === 'def_charge') actionName = "突撃";
         
@@ -1135,7 +1139,7 @@ class WarManager {
             wallDmg: calculatedWallDmg,
             counterTarget: s.turn,
             counterDmg: actualCounterDmg,
-            se: 'damage001.ogg',
+            se: actionSe,
             currentStats: getCurrentStats()
         });
         

@@ -2754,7 +2754,14 @@ class UIManager {
         // 送られてきたお手紙（data）の中に音（se）の指定があればそれを鳴らします
         if (window.AudioManager) {
             let soundFile = data.se || 'damage001.ogg';
-            window.AudioManager.playSE(soundFile);
+            if (soundFile === 'bow_double') {
+                window.AudioManager.playSE('bow001.mp3');
+                setTimeout(() => {
+                    window.AudioManager.playSE('bow001.mp3');
+                }, 400);
+            } else {
+                window.AudioManager.playSE(soundFile);
+            }
         }
 
         // 対象の「役割（role）」ごとに、どのカードを揺らすか探す魔法です！

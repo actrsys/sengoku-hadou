@@ -49,6 +49,7 @@ class AudioManager {
             'choice.ogg': { baseVolume: 0.06 },
             'window.ogg': { baseVolume: 0.1 },
             'damage001.ogg': { baseVolume: 0.09 },
+            'bow001.mp3': { baseVolume: 0.1 },
             'fire001.mp3': { baseVolume: 0.08 },
             'slash.ogg': { baseVolume: 0.1 },
             'miss.ogg': { baseVolume: 0.07 },
