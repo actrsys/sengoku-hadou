@@ -2757,13 +2757,13 @@ class UIManager {
             if (soundFile === 'bow_double') {
                 // 発射音のタイマー
                 window.AudioManager.playSE('bow001.mp3');
-                setTimeout(() => { window.AudioManager.playSE('bow001.mp3'); }, 200);
-                setTimeout(() => { window.AudioManager.playSE('bow001.mp3'); }, 400);
+                setTimeout(() => { window.AudioManager.playSE('bow001.mp3'); }, 150);
+                setTimeout(() => { window.AudioManager.playSE('bow001.mp3'); }, 300);
 
                 // 命中音のタイマー
+                setTimeout(() => { window.AudioManager.playSE('bow_hit001.mp3'); }, 550);
                 setTimeout(() => { window.AudioManager.playSE('bow_hit001.mp3'); }, 700);
-                setTimeout(() => { window.AudioManager.playSE('bow_hit001.mp3'); }, 900);
-                setTimeout(() => { window.AudioManager.playSE('bow_hit001.mp3'); }, 1100);
+                setTimeout(() => { window.AudioManager.playSE('bow_hit001.mp3'); }, 950);
             } else {
                 window.AudioManager.playSE(soundFile);
             }
