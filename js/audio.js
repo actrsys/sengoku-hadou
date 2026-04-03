@@ -55,8 +55,8 @@ class AudioManager {
             'myturn.ogg': { baseVolume: 0.05 },
             'event001.ogg': { baseVolume: 0.15 },
             'victory.ogg': { baseVolume: 0.1 },
-            'katana001.ogg': { baseVolume: 0.07 },
-            'katana002.ogg': { baseVolume: 0.07 },
+            'katana001.ogg': { baseVolume: 0.04 },
+            'katana002.ogg': { baseVolume: 0.05 },
         };
         
         // もしカタログに書いていない音が呼ばれたときの「とりあえずの音量」
