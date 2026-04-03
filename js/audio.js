@@ -52,7 +52,7 @@ class AudioManager {
             'fire001.mp3': { baseVolume: 0.08 },
             'slash.ogg': { baseVolume: 0.08 },
             'miss.ogg': { baseVolume: 0.07 },
-            'myturn.ogg': { baseVolume: 0.07 },
+            'myturn.ogg': { baseVolume: 0.05 },
             'event001.ogg': { baseVolume: 0.15 },
             'victory.ogg': { baseVolume: 0.1 },
             'katana001.ogg': { baseVolume: 0.07 },
