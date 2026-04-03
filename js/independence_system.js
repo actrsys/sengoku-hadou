@@ -78,7 +78,8 @@ class IndependenceSystem {
         
         if (prob <= 0) return;
         if (Math.random() * 1000 < prob) {
-            await this.executeRebellion(castle, castellan, daimyo);
+            // ★変更：いきなり独立するのではなく、お家乗っ取りの作戦会議を開きます！
+            await this.planCoupDetatOrRebellion(castle, castellan, daimyo);
         }
     }
 
@@ -451,4 +452,217 @@ class IndependenceSystem {
         return Math.floor(castle.population / 2000) + Math.floor(castle.soldiers / 20) + Math.floor(castle.kokudaka / 20) + Math.floor(castle.gold / 50) + Math.floor(castle.rice / 100);
     }
     
+    // =========================================================================
+    // ★ここから追加：お家乗っ取りの作戦会議と、裏での決戦を行う魔法！
+    // =========================================================================
+
+    async planCoupDetatOrRebellion(castle, castellan, oldDaimyo) {
+        // 1. まずは反乱のリーダー（神輿）を探します。
+        let rebellionLeader = castellan;
+        const oldClanId = castle.ownerClan;
+        
+        if (castellan.factionId !== 0 && !castellan.isFactionLeader) {
+            const factionLeader = this.game.bushos.find(b => b.clan === oldClanId && b.factionId === castellan.factionId && b.isFactionLeader && !b.belongKunishuId);
+            if (factionLeader) {
+                const { joinScore, stayScore } = this.calculateLoyaltyScores(factionLeader, castellan, oldDaimyo);
+                if (joinScore > stayScore) {
+                    rebellionLeader = factionLeader;
+                }
+            }
+        }
+
+        // 2. 勢力内の全員（諸勢力以外）を呼び出して、どっちの味方か振り分けます。
+        const allMembers = this.game.bushos.filter(b => b.clan === oldClanId && b.status === 'active' && !b.belongKunishuId);
+        const totalMembers = allMembers.length;
+
+        let rebelMembers = [];
+        let daimyoMembers = [];
+
+        // 全員が必ずどちらかに属するように、スコアの条件を少しずつ甘くしていくループです
+        let thresholdOffset = 0;
+        let allAssigned = false;
+
+        while (!allAssigned && thresholdOffset < 100) {
+            rebelMembers = [];
+            daimyoMembers = [];
+
+            for (const b of allMembers) {
+                // 本人たちは確定で自分の陣営へ
+                if (b.id === rebellionLeader.id) {
+                    rebelMembers.push(b);
+                    continue;
+                }
+                if (b.id === oldDaimyo.id) {
+                    daimyoMembers.push(b);
+                    continue;
+                }
+
+                // すでに派閥に属している場合
+                if (b.factionId !== 0) {
+                    // リーダーと同じ派閥なら反乱軍、それ以外はすべて主家（大名）軍
+                    if (b.factionId === rebellionLeader.factionId) {
+                        rebelMembers.push(b);
+                    } else {
+                        daimyoMembers.push(b);
+                    }
+                } else {
+                    // 無所属の場合は、スコアで判定します（offset分だけ条件を緩和します）
+                    const { joinScore, stayScore } = this.calculateLoyaltyScores(b, rebellionLeader, oldDaimyo);
+                    if (joinScore + thresholdOffset > stayScore) {
+                        rebelMembers.push(b);
+                    } else {
+                        daimyoMembers.push(b);
+                    }
+                }
+            }
+
+            if (rebelMembers.length + daimyoMembers.length === totalMembers) {
+                allAssigned = true;
+            } else {
+                thresholdOffset += 5; // まだ迷っている人がいたら、条件を甘くして再計算
+            }
+        }
+
+        // 3. 反乱軍が全体の「3分の2」以上いるかチェック！
+        if (rebelMembers.length >= totalMembers * (2 / 3)) {
+            this.game.ui.log(`【お家乗っ取り】${rebellionLeader.name}派の勢力が拡大し、クーデターが発生しました！`);
+            await this.game.ui.showDialogAsync(`【お家乗っ取り】\n当家において${rebellionLeader.name}派が多数を占めました！\nこれより、主家と反乱軍による決戦を行います！`);
+
+            // 裏で野戦を行います！
+            const result = await this.executeSecretFieldWar(daimyoMembers, rebelMembers, oldDaimyo, rebellionLeader);
+
+            if (result === 'rebel_win') {
+                // 【反乱軍の勝利】
+                await this.game.ui.showDialogAsync(`【お家乗っ取り 成功】\n反乱軍が勝利しました！\n${oldDaimyo.name}は討ち死にし、${rebellionLeader.name}が新たな大名となります！`);
+                this.game.ui.log(`反乱軍が勝利し、${oldDaimyo.name}は討ち死にしました。`);
+
+                // 大名死亡処理（life_systemにお任せします）
+                await this.game.lifeSystem.executeDeath(oldDaimyo);
+
+                // 反乱リーダーを新たな大名に
+                rebellionLeader.isDaimyo = true;
+                
+                // 勢力名を変更
+                const clan = this.game.clans.find(c => c.id === oldClanId);
+                if (clan) {
+                    const familyName = rebellionLeader.familyName || rebellionLeader.name.split('|')[0] || rebellionLeader.name;
+                    clan.name = `${familyName}家`;
+                    clan.leaderId = rebellionLeader.id;
+                }
+                // 勢力情報が変わったので威信を更新
+                if (window.GameApp) window.GameApp.updateAllClanPrestige();
+
+            } else if (result === 'daimyo_win') {
+                // 【主家軍の勝利】
+                await this.game.ui.showDialogAsync(`【お家乗っ取り 失敗】\n主家軍が勝利し、反乱を鎮圧しました！\n主家軍の武将に功績が与えられます。`);
+                this.game.ui.log(`主家軍が勝利し、反乱は鎮圧されました。反乱分子は独立を強行します。`);
+
+                // 主家軍に功績+3000
+                daimyoMembers.forEach(b => {
+                    b.achievementTotal = (b.achievementTotal || 0) + 3000;
+                });
+                
+                // 功績が変わったので派閥を再計算
+                this.game.factionSystem.updateFactions();
+
+                // その後、敗れた反乱分子たちは通常の独立処理へ移行
+                await this.executeRebellion(castle, castellan, oldDaimyo);
+
+            } else {
+                // 【引き分け】
+                await this.game.ui.showDialogAsync(`【お家乗っ取り 失敗】\n決着がつかず、反乱軍は城を占拠して独立を宣言しました！`);
+                this.game.ui.log(`お家乗っ取りは引き分けに終わりました。反乱軍は全員追従して独立します。`);
+
+                // 全員を強制的に追従させるため、一時的に派閥IDを反乱リーダーと同じにします
+                const dummyFactionId = rebellionLeader.factionId || 999;
+                rebellionLeader.factionId = dummyFactionId;
+                rebellionLeader.isFactionLeader = true;
+                rebelMembers.forEach(b => {
+                    b.factionId = dummyFactionId;
+                });
+
+                // 通常の独立処理へ
+                await this.executeRebellion(castle, castellan, oldDaimyo);
+            }
+
+        } else {
+            // 3分の2未満なら、最初から普通の独立として処理します
+            await this.executeRebellion(castle, castellan, oldDaimyo);
+        }
+    }
+
+    async executeSecretFieldWar(daimyoMembers, rebelMembers, oldDaimyo, rebellionLeader) {
+        // それぞれ強い順（統率＋武勇）に5人選びます
+        const sortByStr = (a, b) => (b.leadership + b.strength) - (a.leadership + a.strength);
+        const daimyoTeamBushos = [...daimyoMembers].sort(sortByStr).slice(0, 5);
+        const rebelTeamBushos = [...rebelMembers].sort(sortByStr).slice(0, 5);
+
+        // 大名と反乱リーダーは確実に入れます
+        if (!daimyoTeamBushos.includes(oldDaimyo)) daimyoTeamBushos[0] = oldDaimyo;
+        if (!rebelTeamBushos.includes(rebellionLeader)) rebelTeamBushos[0] = rebellionLeader;
+
+        // 兵士を全体の人数比で分けます（合計10000人）
+        const totalBushos = daimyoMembers.length + rebelMembers.length;
+        const daimyoSoldiersTotal = Math.floor(10000 * (daimyoMembers.length / totalBushos));
+        const rebelSoldiersTotal = 10000 - daimyoSoldiersTotal;
+
+        // 簡易的な部隊データを作成する道具です
+        const createTeam = (bushos, totalSoldiers, morale, training) => {
+            const team = [];
+            const perUnit = Math.floor(totalSoldiers / bushos.length);
+            bushos.forEach(b => {
+                team.push({ busho: b, soldiers: perUnit, morale: morale, training: training });
+            });
+            return team;
+        };
+
+        const daimyoTeam = createTeam(daimyoTeamBushos, daimyoSoldiersTotal, 50, 50);
+        const rebelTeam = createTeam(rebelTeamBushos, rebelSoldiersTotal, 100, 100);
+
+        // 裏で30ターン殴り合います（兵糧はお互い15000あるという設定で、ここでは省略）
+        let turn = 0;
+        while (turn < 30) {
+            const aliveDaimyo = daimyoTeam.filter(u => u.soldiers > 0);
+            const aliveRebel = rebelTeam.filter(u => u.soldiers > 0);
+
+            // どちらかが全滅したら終了
+            if (aliveDaimyo.length === 0) return 'rebel_win';
+            if (aliveRebel.length === 0) return 'daimyo_win';
+
+            // ランダムに1対1で殴り合います
+            const atkUnit = aliveDaimyo[Math.floor(Math.random() * aliveDaimyo.length)];
+            const defUnit = aliveRebel[Math.floor(Math.random() * aliveRebel.length)];
+
+            // ダメージ計算（NPC戦と同じく0.333倍の補正をかけます）
+            const calcDamage = (atkU, defU) => {
+                let atkS = Math.max(0, atkU.soldiers);
+                let defS = Math.max(0, defU.soldiers);
+                let atkBase = Math.sqrt(atkS) + (atkU.busho.leadership * 1.5 + atkU.busho.strength) * (atkS / (atkS + 150));
+                let defBase = Math.sqrt(defS) + (defU.busho.leadership * 1.5 + defU.busho.intelligence) * (defS / (defS + 150));
+
+                let atkFinal = atkBase * (1 + (atkU.morale * 1.5 + atkU.training) / 1000);
+                let defFinal = defBase * (1 + (defU.morale + defU.training * 1.5) / 1000);
+
+                let dmgRatio = (atkFinal + defFinal) > 0 ? (atkFinal / (atkFinal + defFinal)) : 0;
+                return Math.floor(atkFinal * dmgRatio * 0.333); 
+            };
+
+            // 主家軍の攻撃
+            defUnit.soldiers -= calcDamage(atkUnit, defUnit);
+
+            // 反乱軍の反撃（生きていれば）
+            if (defUnit.soldiers > 0) {
+                atkUnit.soldiers -= calcDamage(defUnit, atkUnit);
+            }
+
+            turn++;
+        }
+
+        // 30ターンで決着がつかなければ引き分け
+        return 'draw';
+    }
+
+    // =========================================================================
+    // ★ここまで追加
+    // =========================================================================
 }
