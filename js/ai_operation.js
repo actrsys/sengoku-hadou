@@ -318,6 +318,7 @@ class AIOperationManager {
         if (op.maxTurns <= 0) {
             console.log(`大名家[${clanId}]の作戦【${op.type}】は期限切れで中止されました。`);
             delete this.operations[clanId];
+            this.generateOperation(clanId);
             return;
         }
 

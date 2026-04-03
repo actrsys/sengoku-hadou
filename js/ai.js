@@ -226,6 +226,7 @@ class AIEngine {
                     // もし道が途切れていたり、すでに敵じゃなくなっていたら、作戦のメモを消して中止します！
                     if (!canReach || !isStillEnemy) {
                         delete this.game.aiOperationManager.operations[castle.ownerClan];
+                        this.game.aiOperationManager.generateOperation(castle.ownerClan);
                     } else {
                         // ★追加：自分のお城か目的地が大雪になっていないかチェックをします！
                         let isHeavySnow = false;
