@@ -83,7 +83,7 @@ class IndependenceSystem {
         }
     }
 
-    async executeRebellion(castle, castellan, oldDaimyo) {
+    async executeRebellion(castle, castellan, oldDaimyo, intention = 'indep') {
         const oldClanId = castle.ownerClan;
         const I = window.WarParams.Independence || {};
 
@@ -110,51 +110,54 @@ class IndependenceSystem {
         let targetDaimyo = null;
         let bestScore = -1;
 
-        // ★変更：寝返り前の「今のままの大名家の戦力」を計算します
-        const oldClanPower = this.calcClanPower(oldClanId);
+        // ★追加：独立志向(indep)でなければ、寝返り先を探します
+        if (intention !== 'indep') {
+            // ★変更：寝返り前の「今のままの大名家の戦力」を計算します
+            const oldClanPower = this.calcClanPower(oldClanId);
 
-        // 相性の計算基準を rebellionLeader（神輿になる人物）に変更
-        const oldAffinityDiff = GameSystem.calcAffinityDiff(rebellionLeader.affinity, oldDaimyo.affinity);
+            // 相性の計算基準を rebellionLeader（神輿になる人物）に変更
+            const oldAffinityDiff = GameSystem.calcAffinityDiff(rebellionLeader.affinity, oldDaimyo.affinity);
 
-        for (const clan of this.game.clans) {
-            if (clan.id === 0 || clan.id === oldClanId) continue; 
-            const rel = this.game.getRelation(oldClanId, clan.id);
-            if (!rel || rel.status !== '敵対') continue;
-            
-            // その敵対大名が持っている城の中に、ここから「3マス以内」の城があるか探します
-            const enemyCastles = this.game.castles.filter(c => c.ownerClan === clan.id);
-            let isNear = false; // 最初は「近くない」としておきます
-            for (const ec of enemyCastles) {
-                // タテの距離とヨコの距離を足して、何マス離れているか計算します
-                const distance = Math.abs(castle.x - ec.x) + Math.abs(castle.y - ec.y);
-                if (distance <= 3) {
-                    isNear = true; // 3マス以内の城が見つかったら「近い！」とメモします
-                    break; // 1つでも見つかればOKなので、探すのをやめます
+            for (const clan of this.game.clans) {
+                if (clan.id === 0 || clan.id === oldClanId) continue; 
+                const rel = this.game.getRelation(oldClanId, clan.id);
+                if (!rel || rel.status !== '敵対') continue;
+                
+                // その敵対大名が持っている城の中に、ここから「3マス以内」の城があるか探します
+                const enemyCastles = this.game.castles.filter(c => c.ownerClan === clan.id);
+                let isNear = false; // 最初は「近くない」としておきます
+                for (const ec of enemyCastles) {
+                    // タテの距離とヨコの距離を足して、何マス離れているか計算します
+                    const distance = Math.abs(castle.x - ec.x) + Math.abs(castle.y - ec.y);
+                    if (distance <= 3) {
+                        isNear = true; // 3マス以内の城が見つかったら「近い！」とメモします
+                        break; // 1つでも見つかればOKなので、探すのをやめます
+                    }
                 }
-            }
-            // もし3マス以内に城が1つもなかったら、この大名家は遠すぎるので無視（スキップ）します
-            if (!isNear) continue; 
-            
-            const enemyDaimyo = this.game.bushos.find(b => b.clan === clan.id && b.isDaimyo);
-            if (!enemyDaimyo) continue;
+                // もし3マス以内に城が1つもなかったら、この大名家は遠すぎるので無視（スキップ）します
+                if (!isNear) continue; 
+                
+                const enemyDaimyo = this.game.bushos.find(b => b.clan === clan.id && b.isDaimyo);
+                if (!enemyDaimyo) continue;
 
-            // ★変更：寝返り前の「そのままの敵対大名の戦力」を計算します
-            let enemyCurrentPower = this.calcClanPower(clan.id);
-            
-            // 相性の計算基準を rebellionLeader に変更
-            const enemyAffinityDiff = GameSystem.calcAffinityDiff(rebellionLeader.affinity, enemyDaimyo.affinity);
-            let affinityBonus = 0;
-            if (enemyAffinityDiff < oldAffinityDiff) {
-                affinityBonus = oldAffinityDiff - enemyAffinityDiff; 
-            }
+                // ★変更：寝返り前の「そのままの敵対大名の戦力」を計算します
+                let enemyCurrentPower = this.calcClanPower(clan.id);
+                
+                // 相性の計算基準を rebellionLeader に変更
+                const enemyAffinityDiff = GameSystem.calcAffinityDiff(rebellionLeader.affinity, enemyDaimyo.affinity);
+                let affinityBonus = 0;
+                if (enemyAffinityDiff < oldAffinityDiff) {
+                    affinityBonus = oldAffinityDiff - enemyAffinityDiff; 
+                }
 
-            // ★変更：「今の敵対大名戦力」 ＞ 「今の元大名戦力」 になるなら候補に入れます
-            if ((enemyCurrentPower + affinityBonus) > oldClanPower) {
-                const score = enemyCurrentPower + affinityBonus;
-                if (score > bestScore) {
-                    bestScore = score;
-                    targetClanId = clan.id;
-                    targetDaimyo = enemyDaimyo;
+                // ★変更：「今の敵対大名戦力」 ＞ 「今の元大名戦力」 になるなら候補に入れます
+                if ((enemyCurrentPower + affinityBonus) > oldClanPower) {
+                    const score = enemyCurrentPower + affinityBonus;
+                    if (score > bestScore) {
+                        bestScore = score;
+                        targetClanId = clan.id;
+                        targetDaimyo = enemyDaimyo;
+                    }
                 }
             }
         }
@@ -556,8 +559,87 @@ class IndependenceSystem {
             }
         }
 
-        // 3. 反乱軍が全体の「3分の2」以上いるかチェック！
-        if (rebelMembers.length >= totalMembers * (2 / 3)) {
+        // 3. ★改修：謀反・独立・寝返りのスコア計算と性格による判定
+        const personality = rebellionLeader.personality || 'balanced';
+        
+        // 性格が隠遁者（hermit）の場合は野に下ります
+        if (personality === 'hermit') {
+            this.game.ui.log(`【下野】${rebellionLeader.name}は謀反せず野に下りました。`);
+            this.game.affiliationSystem.becomeRonin(rebellionLeader);
+            // もし神輿と城主が違う人物なら、城主も一緒に浪人にします
+            if (castellan.id !== rebellionLeader.id && castellan.status === 'active') {
+                this.game.affiliationSystem.becomeRonin(castellan);
+            }
+            return;
+        }
+
+        const rebelRatio = rebelMembers.length / totalMembers;
+        let canCoup = false;
+
+        // 性格によって、謀反を起こすために必要な味方の割合を変えます
+        if (personality === 'aggressive') {
+            if (rebelRatio >= 1 / 2) canCoup = true;
+        } else if (personality === 'c' || personality === 'cautious') {
+            if (rebelRatio >= 4 / 5) canCoup = true;
+        } else {
+            // balance, balanced など
+            if (rebelRatio >= 2 / 3) canCoup = true;
+        }
+
+        // 野心と義理の数字を準備します（40より下、100より上は切り捨てます）
+        const ambition = Math.max(40, Math.min(100, rebellionLeader.ambition || 70));
+        const duty = Math.max(40, Math.min(100, rebellionLeader.duty || 70));
+
+        let coupScore = 50;   // 謀反スコア
+        let indepScore = 50;  // 独立スコア
+        let defectScore = 50; // 寝返りスコア
+
+        // 【野心による志向の計算】
+        if (ambition >= 70) {
+            const diff = ambition - 70;
+            coupScore += diff;
+            indepScore += diff;
+            defectScore -= diff;
+        } else {
+            const diff = 70 - ambition;
+            defectScore += diff;
+            indepScore += Math.floor(diff / 2); // 独立志向も少しあります
+            coupScore -= diff;
+        }
+
+        // 【義理による志向の計算】
+        if (duty >= 70) {
+            const diff = duty - 70;
+            indepScore += diff;
+            coupScore -= diff;
+            defectScore -= diff;
+        } else {
+            const diff = 70 - duty;
+            coupScore += diff;
+            defectScore += diff;
+            indepScore -= diff;
+        }
+
+        // 味方が足りなくて謀反できない場合は、謀反スコアを無くします
+        if (!canCoup) {
+            coupScore = -9999;
+        }
+
+        // 一番点数が高い行動を選びます（同点の場合は 謀反 ＞ 寝返り ＞ 独立 の順で優先します）
+        let action = 'indep';
+        let maxScore = indepScore;
+
+        if (defectScore >= maxScore) {
+            action = 'defect';
+            maxScore = defectScore;
+        }
+        if (coupScore >= maxScore) {
+            action = 'coup';
+            maxScore = coupScore;
+        }
+
+        // 決定した行動を実行します
+        if (action === 'coup') {
             this.game.ui.log(`【謀反】${rebellionLeader.name}が主君である${oldDaimyo.name}に対し、謀反を起こしました。`);
             await this.game.ui.showDialogAsync(`【謀反】\n${rebellionLeader.name}が主君である${oldDaimyo.name}に対し、謀反を起こしました！`);
 
@@ -649,7 +731,7 @@ class IndependenceSystem {
                 oldDaimyo.isDaimyo = true; // 大名様に戻ってもらいます
 
                 // その後、敗れた反乱分子たちは通常の独立処理へ移行
-                await this.executeRebellion(castle, castellan, oldDaimyo);
+                await this.executeRebellion(castle, castellan, oldDaimyo, 'indep');
 
             } else {
                 // 【引き分け】
@@ -665,12 +747,12 @@ class IndependenceSystem {
                 });
 
                 // 通常の独立処理へ
-                await this.executeRebellion(castle, castellan, oldDaimyo);
+                await this.executeRebellion(castle, castellan, oldDaimyo, 'indep');
             }
 
         } else {
-            // 3分の2未満なら、最初から普通の独立として処理します
-            await this.executeRebellion(castle, castellan, oldDaimyo);
+            // スコア計算の結果、寝返りか独立に決まった場合の処理です
+            await this.executeRebellion(castle, castellan, oldDaimyo, action);
         }
     }
 
