@@ -575,9 +575,12 @@ Object.assign(WarManager.prototype, {
                                     await this.game.ui.showCutin(interceptMsg);
                                 }
 
+                                const defHorses = (defCastle.horses || 0) < defCastle.soldiers * 0.2 ? 0 : (defCastle.horses || 0);
+                                const defGuns = (defCastle.guns || 0) < defCastle.soldiers * 0.2 ? 0 : (defCastle.guns || 0);
+
                                 handleDefDivide((finalDefAssignments) => {
                                     handleAtkDivide(finalDefAssignments, (defAssigns, finalAtkAssignments) => {
-                                        onResult('field', defAssigns, defCastle.rice, finalAtkAssignments, defCastle.horses || 0, defCastle.guns || 0);
+                                        onResult('field', defAssigns, defCastle.rice, finalAtkAssignments, defHorses, defGuns);
                                     });
                                 });
                             };
@@ -2020,8 +2023,8 @@ Object.assign(WarManager.prototype, {
         const reinfBushos = availableBushos.slice(0, Math.min(bushoCount, availableBushos.length));
 
         let reinfRice = Math.min(helperCastle.rice, Math.max(500, reinfSoldiers)); 
-        const reinfHorses = Math.min(helperCastle.horses || 0, Math.floor(reinfSoldiers * 0.5)); 
-        const reinfGuns = Math.min(helperCastle.guns || 0, Math.floor(reinfSoldiers * 0.5));
+        const reinfHorses = (helperCastle.horses || 0) < reinfSoldiers * 0.2 ? 0 : Math.min(helperCastle.horses || 0, Math.floor(reinfSoldiers * 0.5)); 
+        const reinfGuns = (helperCastle.guns || 0) < reinfSoldiers * 0.2 ? 0 : Math.min(helperCastle.guns || 0, Math.floor(reinfSoldiers * 0.5));
 
         // ★追加：AIからの守備援軍も大雪の被害をチェックします！
         const srcProv = this.game.provinces.find(p => p.id === helperCastle.provinceId);
@@ -2186,9 +2189,9 @@ Object.assign(WarManager.prototype, {
             const reinfBushos = availableBushos.slice(0, Math.min(bushoCount, availableBushos.length));
 
             let reinfRice = reinfSoldiers; 
-            // ★修正: 馬と鉄砲は全部持っていく
-            const reinfHorses = kunishu.horses || 0; 
-            const reinfGuns = kunishu.guns || 0;
+            // ★修正: 馬と鉄砲は兵士の2割以上あれば全部持っていく
+            const reinfHorses = (kunishu.horses || 0) < reinfSoldiers * 0.2 ? 0 : (kunishu.horses || 0); 
+            const reinfGuns = (kunishu.guns || 0) < reinfSoldiers * 0.2 ? 0 : (kunishu.guns || 0);
 
             kunishu.soldiers = Math.max(0, kunishu.soldiers - reinfSoldiers);
             kunishu.horses = 0; // 全部持っていくのでお留守番はゼロになります
@@ -2258,6 +2261,13 @@ Object.assign(WarManager.prototype, {
             if (myToHelperRel.status === '同盟' || myToHelperRel.status === '従属') prob += 30;
             if (helperToEnemyRel) prob -= Math.floor((helperToEnemyRel.sentiment - 50) * (20 / 50)); 
             prob += 10; 
+            
+            // ★追加：お願いした先の大名家が、攻撃の作戦中だったら確率を半分にします！
+            const helperOp = this.game.aiOperationManager.operations[helperClanId];
+            if (helperOp && helperOp.type === '攻撃') {
+                prob = Math.floor(prob / 2);
+            }
+            
             if (Math.random() * 100 < prob) isSuccess = true;
         }
 
@@ -2293,8 +2303,8 @@ Object.assign(WarManager.prototype, {
         const reinfBushos = availableBushos.slice(0, Math.min(bushoCount, availableBushos.length));
 
         let reinfRice = Math.min(helperCastle.rice, Math.max(500, reinfSoldiers)); 
-        const reinfHorses = Math.min(helperCastle.horses || 0, Math.floor(reinfSoldiers * 0.5)); 
-        const reinfGuns = Math.min(helperCastle.guns || 0, Math.floor(reinfSoldiers * 0.5));
+        const reinfHorses = (helperCastle.horses || 0) < reinfSoldiers * 0.2 ? 0 : Math.min(helperCastle.horses || 0, Math.floor(reinfSoldiers * 0.5)); 
+        const reinfGuns = (helperCastle.guns || 0) < reinfSoldiers * 0.2 ? 0 : Math.min(helperCastle.guns || 0, Math.floor(reinfSoldiers * 0.5));
 
         helperCastle.soldiers = Math.max(0, helperCastle.soldiers - reinfSoldiers);
         helperCastle.rice = Math.max(0, helperCastle.rice - reinfRice);
