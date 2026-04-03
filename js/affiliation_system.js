@@ -107,10 +107,6 @@ class AffiliationSystem {
      * @param {number} newCastleId - 移動先のお城のID
      */
     moveCastle(busho, newCastleId) {
-        if (busho.isCastellan && !busho.isDaimyo) {
-            return; 
-        }
-
         // 1. 今のお城から出ます
         this.leaveCastle(busho);
         
@@ -284,16 +280,18 @@ class AffiliationSystem {
             return;
         }
 
-        let currentLord = bushos.find(b => b.id === castle.castellanId && b.isCastellan);
-        
-        if (!currentLord) {
-            this.electCastellan(castle, bushos);
+        // 城内にいる城主バッジを持っている武将のリストを作成します
+        const lords = bushos.filter(b => b.isCastellan);
+
+        if (lords.length >= 2) {
+            // 城主が２人以上いる場合は、その複数の中から新しい城主を決めます
+            this.electCastellan(castle, lords);
+        } else if (lords.length === 1) {
+            // 城主が１人だけなら、元々の城主をそのまま維持します
+            castle.castellanId = lords[0].id;
         } else {
-            bushos.forEach(b => {
-                if (b.id !== currentLord.id) {
-                    b.isCastellan = false;
-                }
-            });
+            // 城主が誰もいない場合は、城内の全武将から新しい城主を決めます
+            this.electCastellan(castle, bushos);
         }
     }
 
