@@ -2893,16 +2893,17 @@ class UIManager {
 
         // 城の防御力の文字がある場所を揺らす専用の魔法です！
         const applyWallAnim = (dmgStr, isRecover = false) => {
-            const wallEl = document.getElementById('war-def-wall-info');
+            // 数字そのものではなく、八角形の枠全体を揺らすように親を探します
+            let wallEl = document.getElementById('war-def-wall-info');
             if (wallEl) {
-                wallEl.style.position = 'relative'; 
+                let targetWrap = wallEl.closest('.war-wall-hexagon-wrap') || wallEl;
                 
-                wallEl.classList.remove('anim-damage-shake', 'anim-damage-flash');
-                void wallEl.offsetWidth; 
+                targetWrap.classList.remove('anim-damage-shake', 'anim-damage-flash');
+                void targetWrap.offsetWidth; 
                 
                 // ★追加：回復じゃない時（ダメージの時）だけ揺らします
                 if (!isRecover) {
-                    wallEl.classList.add('anim-damage-shake', 'anim-damage-flash');
+                    targetWrap.classList.add('anim-damage-shake', 'anim-damage-flash');
                 }
                 
                 const pop = document.createElement('div');
@@ -2918,13 +2919,10 @@ class UIManager {
                 pop.style.zIndex = '100';
                 pop.style.pointerEvents = 'none';
 
-                // ★追加：城壁の枠を基準（relative）にする目印です！
-                wallEl.style.position = 'relative';
-
-                wallEl.appendChild(pop);
+                targetWrap.appendChild(pop);
 
                 setTimeout(() => {
-                    wallEl.classList.remove('anim-damage-shake', 'anim-damage-flash');
+                    targetWrap.classList.remove('anim-damage-shake', 'anim-damage-flash');
                     if (pop.parentNode) pop.parentNode.removeChild(pop);
                 }, 1000);
             }
@@ -2961,7 +2959,7 @@ class UIManager {
                         if (el.textContent === '---') return;
 
                         if (id === 'war-def-wall-info') {
-                            el.innerHTML = `城防御 <span style="color:#fdea60;">${val}</span>`;
+                            el.innerHTML = `<span style="color:#fdea60;">${val}</span>`;
                         } else if (id.includes('soldier')) {
                             el.textContent = val + '人';
                         } else {
@@ -3101,10 +3099,10 @@ class UIManager {
         const maxRounds = window.WarParams?.Military?.WarMaxRounds || 10;
         
         const turnEl = document.getElementById('war-turn-info');
-        if (turnEl) turnEl.innerHTML = `残り <span style="color:#fdea60;">${Math.max(0, maxRounds - s.round + 1)}</span>ターン`;
+        if (turnEl) turnEl.innerHTML = `残り <span class="turn-number">${Math.max(0, maxRounds - s.round + 1)}</span>ターン`;
         
         const wallEl = document.getElementById('war-def-wall-info');
-        if (wallEl) wallEl.innerHTML = `城防御 <span style="color:#fdea60;">${s.defender.defense}</span>`;
+        if (wallEl) wallEl.innerHTML = `<span style="color:#fdea60;">${s.defender.defense}</span>`;
 
         if (s.defender.isKunishu) {
             setTxt('war-title-name', `${s.defender.name} 鎮圧戦`);
