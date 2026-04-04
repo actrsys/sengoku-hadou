@@ -3099,12 +3099,12 @@ class UIManager {
                 if(moraleSpEl) moraleSpEl.textContent = '';
                 if(trainingSpEl) trainingSpEl.textContent = '';
             } else {
-                // 援軍が来ている時は、グラデーションを消して所属に応じた鮮やかな色に戻します！
-                card.style.background = ''; 
-                if (prefix === 'atk-self') card.style.backgroundColor = '#ef9a9a';
-                else if (prefix === 'atk-ally') card.style.backgroundColor = '#ffcc80';
-                else if (prefix === 'def-self') card.style.backgroundColor = '#81d4fa';
-                else if (prefix === 'def-ally') card.style.backgroundColor = '#80cbc4';
+                // 援軍が来ている時は、所属に応じた鮮やかなグラデーションにします！
+                card.style.backgroundColor = ''; 
+                if (prefix === 'atk-self') card.style.background = 'linear-gradient(to top right, #ffcdd2, #d32f2f)';
+                else if (prefix === 'atk-ally') card.style.background = 'linear-gradient(to top right, #ffecb3, #f57c00)';
+                else if (prefix === 'def-self') card.style.background = 'linear-gradient(to top right, #b3e5fc, #0288d1)';
+                else if (prefix === 'def-ally') card.style.background = 'linear-gradient(to top right, #b2dfdb, #00897b)';
                 
                 card.style.textShadow = '1px 1px 2px rgba(0,0,0,0.6)';
                 
