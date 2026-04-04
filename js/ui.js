@@ -1100,7 +1100,9 @@ class UIManager {
         let provinceName = "";
         if (this.game.provinces) {
             const province = this.game.provinces.find(p => p.id === castle.provinceId);
-            if (province) provinceName = province.name;
+            if (province) {
+                provinceName = province.province;
+            }
         }
         
         let faceHtml = "";
