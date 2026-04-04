@@ -2140,6 +2140,9 @@ class CommandSystem {
                 
                 const kunishus = this.game.kunishuSystem.getKunishusInCastle(c.id);
                 kunishus.forEach(k => {
+                    // ★追加：自分がこれから攻撃する諸勢力を、援軍として呼べないようにするストッパー！
+                    if (targetCastle.isKunishu && targetCastle.kunishuId === k.id) return;
+
                     const enemyKunishuRel = k.getRelation(targetCastle.ownerClan);
                     if (k.getRelation(myClanId) >= 70 && k.soldiers >= 1000 && enemyKunishuRel < 100) {
                         const isNextToMyAnyCastle = this.game.castles.some(myC => myC.ownerClan === myClanId && GameSystem.isAdjacent(c, myC));
