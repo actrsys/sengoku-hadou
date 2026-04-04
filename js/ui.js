@@ -2705,35 +2705,35 @@ class UIManager {
         
         const msgContainer = document.createElement('div');
         msgContainer.className = 'war-action-message-container';
+        // ★ここから追加：左寄せのスタイル
+        msgContainer.style.textAlign = 'left';
+        msgContainer.style.position = 'relative';
         
         const textContainer = document.createElement('div');
         textContainer.className = 'war-action-message-text';
+        // ★ここから追加：はみ出た分が上に流れていくようにするスタイル
+        textContainer.style.textAlign = 'left';
+        textContainer.style.width = '100%';
+        textContainer.style.height = '100%';
+        textContainer.style.overflowY = 'hidden'; 
+        textContainer.style.boxSizing = 'border-box';
         
         const promptContainer = document.createElement('div');
         promptContainer.className = 'war-action-message-prompt';
-        promptContainer.textContent = '▶ クリックして次へ';
-        promptContainer.style.visibility = 'hidden';
+        promptContainer.textContent = '▶ クリックでスキップ';
+        // ★ここから追加：右下に配置
+        promptContainer.style.position = 'absolute';
+        promptContainer.style.bottom = '10px';
+        promptContainer.style.right = '10px';
+        promptContainer.style.visibility = 'visible';
 
         msgContainer.appendChild(textContainer);
         msgContainer.appendChild(promptContainer);
         this.warControls.appendChild(msgContainer);
         
-        let isClicked = false;
+        let isFinished = false;
+        let currentTimer = null;
         
-        msgContainer.onclick = (e) => {
-            e.stopPropagation();
-            e.preventDefault();
-            
-            // メッセージが全て出終わるまではクリックを無視します
-            if (promptContainer.style.visibility === 'hidden') return;
-            if (isClicked) return;
-            isClicked = true;
-            
-            if (window.AudioManager) window.AudioManager.playSE('decision.ogg');
-            promptContainer.style.visibility = 'hidden';
-            onClick();
-        };
-
         // 配列じゃなかったら配列に変換します
         if (!Array.isArray(messages)) {
             messages = [messages];
@@ -2741,20 +2741,68 @@ class UIManager {
 
         let currentIndex = 0;
 
+        // ★ここから追加：クリックで一気に表示して次へ進むスキップ魔法
+        const skipToEnd = () => {
+            if (isFinished) return;
+            isFinished = true;
+            if (currentTimer) clearTimeout(currentTimer);
+
+            // 残りのメッセージを一気に表示します
+            while (currentIndex < messages.length) {
+                const item = messages[currentIndex];
+                currentIndex++;
+                
+                if (typeof item === 'string') {
+                    textContainer.innerHTML += (textContainer.innerHTML ? '<br>' : '') + item;
+                } else if (item.text) {
+                    textContainer.innerHTML += (textContainer.innerHTML ? '<br>' : '') + item.text;
+                    if (item.currentStats) {
+                        this.updateWarUI();
+                    }
+                    if (item.type === 'damage' || item.type === 'recover') {
+                        this.playDamageAnimation(item);
+                    }
+                }
+            }
+            
+            // 一番下までスクロールします
+            textContainer.scrollTop = textContainer.scrollHeight;
+
+            if (window.AudioManager) window.AudioManager.playSE('decision.ogg');
+            onClick();
+        };
+
+        msgContainer.onclick = (e) => {
+            e.stopPropagation();
+            e.preventDefault();
+            if (!isFinished) {
+                skipToEnd();
+            }
+        };
+
         // 順番に処理していく魔法です
         const processNext = () => {
+            if (isFinished) return;
+
             if (currentIndex >= messages.length) {
-                // 全部終わったらクリック待ちの文字を出します
-                promptContainer.style.visibility = 'visible';
+                // 全部終わったら、勝手に次へ進むようにします（1秒待ちます）
+                promptContainer.style.visibility = 'hidden';
+                currentTimer = setTimeout(() => {
+                    if (!isFinished) {
+                        isFinished = true;
+                        onClick();
+                    }
+                }, 1000);
                 return;
             }
 
             const item = messages[currentIndex];
             currentIndex++;
 
+            let waitTime = 600;
+
             if (typeof item === 'string') {
                 textContainer.innerHTML += (textContainer.innerHTML ? '<br>' : '') + item;
-                setTimeout(processNext, 600); // メッセージを読ませるために少し待ちます
             } else if (item.text) {
                 if (item.se && window.AudioManager) {
                     window.AudioManager.playSE(item.se);
@@ -2762,21 +2810,23 @@ class UIManager {
                 
                 textContainer.innerHTML += (textContainer.innerHTML ? '<br>' : '') + item.text;
 
-                // ★追加：メッセージと一緒に新しい数字（currentStats）が届いていたら、画面の数字をすぐ更新します！
+                // メッセージと一緒に新しい数字（currentStats）が届いていたら、画面の数字をすぐ更新します！
                 if (item.currentStats) {
                     setTimeout(() => {
                         this.updateWarUI();
                     }, 200);
                 }
                 
-                setTimeout(processNext, 600);
-            // ★修正：「damage」の時だけでなく「recover（回復）」の時もアニメーションを呼ぶようにしました！
-            } else if (item.type === 'damage' || item.type === 'recover') {
-                this.playDamageAnimation(item);
-                setTimeout(processNext, 800); // アニメーションが完了するまで待ちます
-            } else {
-                processNext();
+                if (item.type === 'damage' || item.type === 'recover') {
+                    this.playDamageAnimation(item);
+                    waitTime = 800; // アニメーションが完了するまで待ちます
+                }
             }
+
+            // ★追加：文章が追加されたら、一番下までスクロールして古い行を上に押し出します！
+            textContainer.scrollTop = textContainer.scrollHeight;
+
+            currentTimer = setTimeout(processNext, waitTime);
         };
 
         processNext();
