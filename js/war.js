@@ -706,7 +706,9 @@ class WarManager {
             } else if (s.defender.soldiers <= 0) {
                 pushMsg({ text: `<span style="color:#d32f2f; font-size:1.2rem; font-weight:bold;">守備本隊が全滅した！<br>城は陥落した！</span>`, log: `守備本隊が全滅し、陥落した！` });
             } else if (s.attacker.soldiers <= 0) {
-                pushMsg({ text: `<span style="color:#1976d2; font-size:1.2rem; font-weight:bold;">攻撃本隊が全滅した！<br>守備軍が防ぎ切った！</span>`, log: `攻撃本隊が全滅し、退却した！` });
+                // ★修正：攻撃本隊が全滅した時のメッセージも赤色（#d32f2f）に統一！
+                // 赤色にすることで自動でページが進まなくなり、しっかり結果を確認できるようになります。
+                pushMsg({ text: `<span style="color:#d32f2f; font-size:1.2rem; font-weight:bold;">攻撃本隊が全滅した！<br>守備軍が防ぎ切った！</span>`, log: `攻撃本隊が全滅し、退却した！` });
             }
         };
 
@@ -1158,6 +1160,32 @@ class WarManager {
         
         // ★ <br> を使って画面に表示しつつ、横長の記録（ログ）には改行をスペースに変えて書き込みます
         pushMsg({ text: resultMsg, log: `${activeArmyName} ${resultMsg.replace('<br>', ' ')}` });
+
+        // ★追加：援軍の兵士数が0になって全滅した時に、撤退と同じくカードをからっぽにする処理
+        const checkReinfDestroyed = () => {
+            const reinfRoles = [
+                { role: 'attacker_self_reinf', key: 'selfReinforcement' },
+                { role: 'attacker_ally_reinf', key: 'reinforcement' },
+                { role: 'defender_self_reinf', key: 'defSelfReinforcement' },
+                { role: 'defender_ally_reinf', key: 'defReinforcement' }
+            ];
+            
+            reinfRoles.forEach(r => {
+                // 援軍が存在していて、かつ兵士数が0以下になった場合
+                if (s[r.key] && s[r.key].soldiers <= 0) {
+                    let destroyedArmyName = getArmyDisplayName(r.role);
+                    pushMsg(`${destroyedArmyName} は壊滅し、戦場から離脱した！`);
+                    
+                    // 裏側のデータでも「撤退した」ことにします
+                    if (typeof this.retreatReinforcementForce === 'function') {
+                        this.retreatReinforcementForce(r.key); 
+                    } else {
+                        s[r.key] = null; // 念のための安全装置
+                    }
+                }
+            });
+        };
+        checkReinfDestroyed();
 
         checkDefeatAndPushMsg(); // ★負けたかチェック
         executeNext();
