@@ -3064,7 +3064,7 @@ class UIManager {
         }
         
         setTxt('war-atk-busho', s.atkBushos[0].name.split('|').join('') + '軍');
-        setTxt('war-atk-soldier', s.attacker.soldiers);
+        setTxt('war-atk-soldier', s.attacker.soldiers + '人');
         setTxt('war-atk-morale', s.attacker.morale);
         setTxt('war-atk-training', s.attacker.training);
         setTxt('war-atk-rice', s.attacker.rice); 
@@ -3082,7 +3082,7 @@ class UIManager {
         }
 
         setTxt('war-def-busho', s.defBusho.name.split('|').join('') + '軍');
-        setTxt('war-def-soldier', s.defender.soldiers);
+        setTxt('war-def-soldier', s.defender.soldiers + '人');
         setTxt('war-def-morale', s.defender.morale);
         setTxt('war-def-training', s.defender.training);
         setTxt('war-def-rice', s.defender.rice); 
