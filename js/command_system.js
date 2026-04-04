@@ -804,6 +804,23 @@ class CommandSystem {
             }
         }
 
+        // ★追加：支配コマンドの時、自分がどこかに従属していないかチェックします！
+        if (type === 'dominate') {
+            let isSubordinate = false;
+            this.game.clans.forEach(c => {
+                if (c.id !== 0 && c.id !== Number(this.game.playerClanId)) {
+                    const rel = this.game.getRelation(this.game.playerClanId, c.id);
+                    if (rel && rel.status === '従属') {
+                        isSubordinate = true;
+                    }
+                }
+            });
+            if (isSubordinate) {
+                this.game.ui.showDialog("当家は他勢力に従属しているため、\n他勢力を支配下に置くことはできません！", false);
+                return;
+            }
+        }
+
         switch (spec.startMode) {
             case 'map_select':
                 this.enterMapSelection(type);
@@ -2368,8 +2385,8 @@ class CommandSystem {
 
         const reinfBushos = availableBushos.slice(0, bushoCount);
         const reinfRice = reinfSoldiers; 
-        const reinfHorses = Math.min(helperCastle.horses || 0, Math.floor(reinfSoldiers * 0.5)); 
-        const reinfGuns = Math.min(helperCastle.guns || 0, Math.floor(reinfSoldiers * 0.5));
+        const reinfHorses = (helperCastle.horses || 0) < reinfSoldiers * 0.2 ? 0 : Math.min(helperCastle.horses || 0, Math.floor(reinfSoldiers * 0.5)); 
+        const reinfGuns = (helperCastle.guns || 0) < reinfSoldiers * 0.2 ? 0 : Math.min(helperCastle.guns || 0, Math.floor(reinfSoldiers * 0.5));
 
         helperCastle.soldiers = Math.max(0, helperCastle.soldiers - reinfSoldiers);
         helperCastle.rice = Math.max(0, helperCastle.rice - reinfRice);

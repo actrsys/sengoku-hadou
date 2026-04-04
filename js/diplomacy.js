@@ -720,8 +720,19 @@ class DiplomacyManager {
              return { action: 'none', gold: 0 };
         }
 
+        // 自分がどこかに従属しているかチェックします
+        let amISubordinate = false;
+        this.game.clans.forEach(c => {
+            if (c.id !== 0 && c.id !== myClanId) {
+                const r = this.getRelation(myClanId, c.id);
+                if (r && r.status === '従属') {
+                    amISubordinate = true;
+                }
+            }
+        });
+
         // ③ 支配要求の判定
-        if (targetClanTotal * 8 <= myPower) {
+        if (!amISubordinate && targetClanTotal * 8 <= myPower) {
             // 自分の領地と相手の領地が直接くっついているか調べます
             let isDirectlyAdjacent = false;
             const myCastles = this.game.castles.filter(c => c.ownerClan === myClanId);
