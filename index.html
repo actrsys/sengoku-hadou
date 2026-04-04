@@ -289,7 +289,7 @@
         <div id="war-modal" class="modal hidden">
             <div class="modal-content" style="max-width: 900px; height: 90%; display: flex; flex-direction: column; background: #fff; border: 2px solid #333;">
                 
-                <div class="war-screen responsive-war-layout" style="flex:1; padding:0; background:#fff; border-radius:0; overflow:hidden;">
+                <div class="war-screen responsive-war-layout" style="flex:1; padding:0; background:radial-gradient(circle, #2a1f3d 0%, #110d1a 100%); border-radius:0; overflow:hidden;">
                     
                     <div class="responsive-war-left" style="display:flex; flex-direction:column; flex:1; overflow:hidden;">
                         <div id="war-top-bar" style="background:#000; color:#fff; display:flex; justify-content:space-between; padding:5px 10px; font-size:1.1rem; font-weight:bold; flex-shrink:0;">
@@ -297,10 +297,10 @@
                             <span id="war-turn-info"></span>
                             <span id="war-def-wall-info"></span>
                         </div>
-                        <h2 class="war-title" id="war-title-name" style="margin:0; padding:10px 0; text-align:center; border-bottom:2px solid #333; font-size:1.5rem; font-weight:normal; background:#fff; flex-shrink:0;"></h2>
-                        <div class="war-visual responsive-war-visual">
+                        <h2 class="war-title" id="war-title-name" style="margin:0; padding:10px 0; text-align:center; border-bottom:2px solid #555; font-size:1.5rem; font-weight:normal; background:transparent; color:#fff; flex-shrink:0;"></h2>
+                        <div class="war-visual responsive-war-visual" style="display: flex; justify-content: center; width: 100%; box-sizing: border-box; padding: 10px;">
                             
-                            <div class="war-side-wrapper" style="display: flex; flex-direction: row; align-items: stretch; width: 50%; height: 100%; gap: 8px;">
+                            <div class="war-side-wrapper" style="display: flex; flex-direction: row; align-items: stretch; flex: 1; max-width: calc(50% - 10px); justify-content: center; height: 100%; gap: 8px;">
                                 <div class="war-reinf-col" style="display: flex; flex-direction: column; gap: 8px; flex: 1; min-width: 0;">
                                     
                                     <div id="war-atk-self-reinf-card" class="war-side-info war-reinf-card responsive-army-box" style="background-color: #ef9a9a; color: #fff; text-shadow: 1px 1px 2px rgba(0,0,0,0.6); padding: 5px; margin: 0; display: flex; flex-direction: column; box-sizing: border-box; width: 100%; flex: 1;">
@@ -366,7 +366,7 @@
                                 </div>
                             </div>
 
-                            <div class="war-side-wrapper" style="display: flex; flex-direction: row; align-items: stretch; width: 50%; height: 100%; gap: 8px;">
+                            <div class="war-side-wrapper" style="display: flex; flex-direction: row; align-items: stretch; flex: 1; max-width: calc(50% - 10px); justify-content: center; height: 100%; gap: 8px;">
                                 
                                 <div class="army-box defender responsive-army-box" style="background:#42a5f5; margin: 0; flex: 1; min-width: 0;">
                                     <h3 class="army-title responsive-army-title"><span id="war-def-name"></span></h3>
