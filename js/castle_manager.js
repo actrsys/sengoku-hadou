@@ -17,7 +17,11 @@ class CastleManager {
         
         // ★追加：城を失った旧勢力の武将たちの忠誠度を下げます！
         if (oldOwnerId !== 0 && oldOwnerId !== newOwnerId) {
-            this.decreaseLoyaltyOnCastleLost(oldOwnerId);
+            // ★変更：失った後、まだお城が残っているか（滅亡していないか）を調べます！
+            const remainingCastles = this.game.castles.filter(c => c.ownerClan === oldOwnerId);
+            if (remainingCastles.length > 0) {
+                this.decreaseLoyaltyOnCastleLost(oldOwnerId);
+            }
         }
 
         // ★追加：新しく城を得た勢力の武将たちの忠誠度を上げます！
