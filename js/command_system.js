@@ -2179,8 +2179,13 @@ class CommandSystem {
                     // ★追加：自分がこれから攻撃する諸勢力を、援軍として呼べないようにするストッパー！
                     if (targetCastle.isKunishu && targetCastle.kunishuId === k.id) return;
 
-                    const enemyKunishuRel = k.getRelation(targetCastle.ownerClan);
-                    if (k.getRelation(myClanId) >= 70 && k.soldiers >= 1000 && enemyKunishuRel < 100) {
+                    // ★修正：ターゲットが諸勢力の場合、敵の大名は存在しないので「敵への友好度」のチェックを外します！
+                    const enemyKunishuRel = targetCastle.isKunishu ? 0 : k.getRelation(targetCastle.ownerClan);
+                    const canRequest = targetCastle.isKunishu ? 
+                        (k.getRelation(myClanId) >= 70 && k.soldiers >= 1000) : 
+                        (k.getRelation(myClanId) >= 70 && k.soldiers >= 1000 && enemyKunishuRel < 100);
+
+                    if (canRequest) {
                         const isConnected = connectedCastles.has(c.id) || this.game.castles.some(myC => connectedCastles.has(myC.id) && GameSystem.isAdjacent(c, myC));
                         const isNextToEnemy = (c.id === targetCastle.id) || GameSystem.isAdjacent(c, targetCastle);
                         if (isConnected || isNextToEnemy) {
