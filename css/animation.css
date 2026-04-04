@@ -119,3 +119,18 @@
     0%   { opacity: 0.4; } /* 最初は少し薄く */
     100% { opacity: 1.0; } /* 最後はくっきり見えるように */
 }
+
+/* 援軍が撤退・壊滅した時に、からっぽのカードをフェードインさせる魔法の幕 */
+.empty-cover-overlay {
+    position: absolute;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background: linear-gradient(to top right, #eeeeee, #777777);
+    z-index: 20;
+    opacity: 0;
+    transition: opacity 1s ease-in-out;
+    pointer-events: none;
+    border-radius: inherit;
+}
+.empty-cover-overlay.show-overlay {
+    opacity: 1;
+}

@@ -1040,18 +1040,3 @@ body.is-pc .pc-cmd-col .cmd-btn.category.active {
 
 /* 大名選択画面では非表示にします */
 body.is-pc.daimyo-select-mode #pc-new-ui-container { display: none !important; }
-
-/* 援軍が撤退・壊滅した時に、からっぽのカードをフェードインさせる魔法の幕 */
-.empty-cover-overlay {
-    position: absolute;
-    top: 0; left: 0; right: 0; bottom: 0;
-    background: linear-gradient(to top right, #eeeeee, #777777);
-    z-index: 20;
-    opacity: 0;
-    transition: opacity 1s ease-in-out;
-    pointer-events: none;
-    border-radius: inherit;
-}
-.empty-cover-overlay.show-overlay {
-    opacity: 1;
-}
