@@ -2094,6 +2094,24 @@ class CommandSystem {
 
         const pid = this.game.playerClanId;
         
+        // ★追加：出陣するお城から道が繋がっている「自勢力の領土ネットワーク」を調べます！
+        const connectedCastles = new Set();
+        const queue = [atkCastle];
+        connectedCastles.add(atkCastle.id);
+
+        while (queue.length > 0) {
+            const current = queue.shift();
+            const neighbors = this.game.castles.filter(adj => 
+                adj.ownerClan === myClanId && 
+                GameSystem.isAdjacent(current, adj) &&
+                !connectedCastles.has(adj.id)
+            );
+            for (const n of neighbors) {
+                connectedCastles.add(n.id);
+                queue.push(n);
+            }
+        }
+        
         let selfCandidates = [];
         this.game.castles.forEach(c => {
             if (c.ownerClan !== myClanId || c.id === atkCastle.id) return;
@@ -2102,9 +2120,9 @@ class CommandSystem {
             const prov = this.game.provinces.find(p => p.id === c.provinceId);
             if (prov && prov.statusEffects && prov.statusEffects.includes('heavySnow')) return;
 
-            const isNextToMyAnyCastle = this.game.castles.some(myC => myC.ownerClan === myClanId && GameSystem.isAdjacent(c, myC));
+            const isConnected = connectedCastles.has(c.id);
             const isNextToEnemy = GameSystem.isAdjacent(c, targetCastle);
-            if (!isNextToMyAnyCastle && !isNextToEnemy) return;
+            if (!isConnected && !isNextToEnemy) return;
             if (c.soldiers < 1000) return;
             const normalBushos = this.game.getCastleBushos(c.id).filter(b => !b.isDaimyo && !b.isCastellan && b.status !== 'ronin' && b.belongKunishuId === 0);
             if (normalBushos.length === 0) return;
@@ -2126,9 +2144,9 @@ class CommandSystem {
                         const isEnemyAlly = enemyRel && ['同盟', '支配', '従属'].includes(enemyRel.status);
                         const isEnemyMaxGoodwill = enemyRel && enemyRel.sentiment >= 100;
                         if (!isEnemyAlly && !isEnemyMaxGoodwill && (!enemyRel || !this.game.diplomacyManager.isNonAggression(enemyRel.status))) {
-                            const isNextToMyAnyCastle = this.game.castles.some(myC => myC.ownerClan === myClanId && GameSystem.isAdjacent(c, myC));
+                            const isConnected = this.game.castles.some(myC => connectedCastles.has(myC.id) && GameSystem.isAdjacent(c, myC));
                             const isNextToEnemy = GameSystem.isAdjacent(c, targetCastle);
-                            if (isNextToMyAnyCastle || isNextToEnemy) {
+                            if (isConnected || isNextToEnemy) {
                                 const normalBushos = this.game.getCastleBushos(c.id).filter(b => !b.isDaimyo && !b.isCastellan && b.status !== 'ronin' && b.belongKunishuId === 0);
                                 if (c.soldiers >= 1000 && normalBushos.length > 0) {
                                     allyForceCandidates.push({ castle: c, force: { isKunishu: false, id: c.ownerClan, name: this.game.clans.find(clan=>clan.id===c.ownerClan)?.name || "大名", soldiers: c.soldiers } });
@@ -2145,9 +2163,9 @@ class CommandSystem {
 
                     const enemyKunishuRel = k.getRelation(targetCastle.ownerClan);
                     if (k.getRelation(myClanId) >= 70 && k.soldiers >= 1000 && enemyKunishuRel < 100) {
-                        const isNextToMyAnyCastle = this.game.castles.some(myC => myC.ownerClan === myClanId && GameSystem.isAdjacent(c, myC));
+                        const isConnected = this.game.castles.some(myC => connectedCastles.has(myC.id) && GameSystem.isAdjacent(c, myC));
                         const isNextToEnemy = GameSystem.isAdjacent(c, targetCastle);
-                        if (isNextToMyAnyCastle || isNextToEnemy) {
+                        if (isConnected || isNextToEnemy) {
                             const members = this.game.kunishuSystem.getKunishuMembers(k.id);
                             if (members.length > 0) {
                                 allyForceCandidates.push({ castle: c, force: { isKunishu: true, id: k.id, name: k.getName(this.game), soldiers: k.soldiers } });

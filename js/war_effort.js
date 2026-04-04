@@ -1950,6 +1950,24 @@ Object.assign(WarManager.prototype, {
             return;
         }
 
+        // ★追加：防衛するお城から道が繋がっている「自勢力の領土ネットワーク」を調べます！
+        const connectedCastles = new Set();
+        const queue = [defCastle];
+        connectedCastles.add(defCastle.id);
+
+        while (queue.length > 0) {
+            const current = queue.shift();
+            const neighbors = this.game.castles.filter(adj => 
+                adj.ownerClan === defClanId && 
+                GameSystem.isAdjacent(current, adj) &&
+                !connectedCastles.has(adj.id)
+            );
+            for (const n of neighbors) {
+                connectedCastles.add(n.id);
+                queue.push(n);
+            }
+        }
+
         let allyForceCandidates = [];
 
         this.game.castles.forEach(c => {
@@ -1963,8 +1981,8 @@ Object.assign(WarManager.prototype, {
                 if (rel && ['友好', '同盟', '支配', '従属'].includes(rel.status) && rel.sentiment >= 50) {
                     const enemyRel = this.game.getRelation(c.ownerClan, atkClanId);
                     if (!enemyRel || !this.game.diplomacyManager.isNonAggression(enemyRel.status)) {
-                        const isNextToMyAnyCastle = this.game.castles.some(myC => myC.ownerClan === defClanId && GameSystem.isAdjacent(c, myC));
-                        if (isNextToMyAnyCastle) {
+                        const isConnected = this.game.castles.some(myC => connectedCastles.has(myC.id) && GameSystem.isAdjacent(c, myC));
+                        if (isConnected) {
                             const normalBushos = this.game.getCastleBushos(c.id).filter(b => !b.isDaimyo && !b.isCastellan && b.status !== 'ronin' && b.belongKunishuId === 0);
                             if (c.soldiers >= 1000 && c.rice >= 500 && normalBushos.length > 0) {
                                 allyForceCandidates.push({ castle: c, force: { isKunishu: false, id: c.ownerClan, name: this.game.clans.find(clan=>clan.id===c.ownerClan)?.name || "勢力", soldiers: c.soldiers } });
@@ -1979,8 +1997,8 @@ Object.assign(WarManager.prototype, {
             kunishus.forEach(k => {
                 const kRel = k.getRelation(defClanId);
                 if (kRel >= 70 && k.soldiers >= 1000) {
-                    const isNextToMyAnyCastle = this.game.castles.some(myC => myC.ownerClan === defClanId && GameSystem.isAdjacent(c, myC));
-                    if (isNextToMyAnyCastle) {
+                    const isConnected = this.game.castles.some(myC => connectedCastles.has(myC.id) && GameSystem.isAdjacent(c, myC));
+                    if (isConnected) {
                         const members = this.game.kunishuSystem.getKunishuMembers(k.id);
                         if (members.length > 0) {
                             allyForceCandidates.push({ castle: c, force: { isKunishu: true, id: k.id, name: k.getName(this.game), soldiers: k.soldiers } });
