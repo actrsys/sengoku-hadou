@@ -3063,7 +3063,7 @@ class UIManager {
             atkTitleEl.classList.remove('title-long-text');
         }
         
-        setTxt('war-atk-busho', s.atkBushos[0].name.split('|').join(''));
+        setTxt('war-atk-busho', s.atkBushos[0].name.split('|').join('') + '軍');
         setTxt('war-atk-soldier', s.attacker.soldiers);
         setTxt('war-atk-morale', s.attacker.morale);
         setTxt('war-atk-training', s.attacker.training);
@@ -3081,7 +3081,7 @@ class UIManager {
             defTitleEl.classList.remove('title-long-text');
         }
 
-        setTxt('war-def-busho', s.defBusho.name.split('|').join(''));
+        setTxt('war-def-busho', s.defBusho.name.split('|').join('') + '軍');
         setTxt('war-def-soldier', s.defender.soldiers);
         setTxt('war-def-morale', s.defender.morale);
         setTxt('war-def-training', s.defender.training);
@@ -3153,15 +3153,6 @@ class UIManager {
                 titleEl.style.visibility = '';
                 bushoEl.style.visibility = '';
                 card.querySelector('.reinf-content-wrap').style.visibility = '';
-
-                titleEl.style.color = '#fff';
-                titleEl.style.borderBottomColor = 'rgba(255,255,255,0.8)';
-                titleEl.style.textShadow = '';
-                statsEl.style.color = '#fff';
-                statsEl.style.textShadow = '';
-                bushoEl.style.background = 'rgba(0,0,0,0.5)';
-                bushoEl.style.color = '#fff';
-                bushoEl.style.textShadow = 'none';
 
                 faceContainer.classList.remove('hidden');
                 emptyIcon.classList.add('hidden');
