@@ -1097,6 +1097,12 @@ class UIManager {
         const clanName = clanData ? clanData.name : "中立";
         const castellanName = castellan ? castellan.name : "-";
         
+        let provinceName = "";
+        if (this.game.provinces) {
+            const province = this.game.provinces.find(p => p.id === castle.provinceId);
+            if (province) provinceName = province.name;
+        }
+        
         let faceHtml = "";
         if (castellan && castellan.faceIcon) {
             faceHtml = `<img src="data/images/faceicons/${castellan.faceIcon}" onerror="this.style.display='none'">`;
@@ -1124,9 +1130,15 @@ class UIManager {
             statusMarks += `<span class="sp-senran-mark" style="margin-left: 5px;">一揆</span>`;
         }
 
+        let clanHtml = "";
+        if (Number(castle.ownerClan) !== 0) {
+            clanHtml = `<span class="sp-clan">${clanName}</span>`;
+        }
+
         let content = `
             <div class="sp-info-header">
-                <span class="sp-clan">${clanName}</span>
+                ${clanHtml}
+                <span class="sp-province">${provinceName}</span>
                 <span class="sp-castle">${castle.name}${statusMarks}</span>
                 <span class="sp-lord-label">城主</span>
                 <span class="sp-lord-name">${castellanName}</span>
