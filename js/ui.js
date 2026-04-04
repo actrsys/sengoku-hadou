@@ -2709,9 +2709,9 @@ class UIManager {
         
         const promptContainer = document.createElement('div');
         promptContainer.className = 'war-action-message-prompt';
-        promptContainer.textContent = '▼'; // ★文字を消して▼のみにしました！
-        // ★▼だけなので、少し文字を大きくして右下の位置を調整しています
-        promptContainer.style.cssText = 'position: absolute; bottom: 5px; right: 15px; font-size: 1.2rem; color: #888; cursor: pointer;';
+        promptContainer.textContent = '▼'; 
+        // ★修正：位置を中央下（bottom: 5px; left: 50%; transform: translateX(-50%);）に変更し、色を明るい白（#eee）にしました。
+        promptContainer.style.cssText = 'position: absolute; bottom: 5px; left: 50%; transform: translateX(-50%); font-size: 1.2rem; color: #eee; cursor: pointer;';
 
         msgContainer.appendChild(textContainer);
         msgContainer.appendChild(promptContainer);
@@ -2743,7 +2743,6 @@ class UIManager {
                 }
                 
                 if (typeof item !== 'string' && item) {
-                    // ★修正: アニメーションを邪魔する原因だった this.updateWarUI() を消しました
                     if (item.type === 'damage' || item.type === 'recover') this.playDamageAnimation(item);
                 }
             }
@@ -2757,7 +2756,7 @@ class UIManager {
             
             if (isPaused) {
                 isPaused = false;
-                promptContainer.textContent = '▼'; // ★再開時も▼のみです
+                promptContainer.textContent = '▼'; 
                 if (window.AudioManager) window.AudioManager.playSE('decision.ogg');
                 processNext();
             } else {
@@ -2787,7 +2786,6 @@ class UIManager {
             } else if (item.text) {
                 if (item.se && window.AudioManager) window.AudioManager.playSE(item.se);
                 textContainer.innerHTML += (textContainer.innerHTML ? '<br>' : '') + item.text;
-                // ★修正: アニメーションを打ち消してしまう原因だった this.updateWarUI() をここからも消しました！
                 if (item.type === 'damage' || item.type === 'recover') {
                     this.playDamageAnimation(item);
                     waitTime = 900;
@@ -2801,7 +2799,7 @@ class UIManager {
 
             if (isSpecialMsg) {
                 isPaused = true;
-                promptContainer.textContent = '▼'; // ★大事なお知らせで止まっている時の合図も▼のみです
+                promptContainer.textContent = '▼'; 
                 promptContainer.style.visibility = 'visible';
                 return; 
             }
@@ -3674,9 +3672,14 @@ class UIManager {
         const textContainer = document.createElement('div');
         textContainer.className = 'war-action-message-text';
         textContainer.style.cssText = 'text-align: left; width: 100%; display: block;';
-        // 思考中であることを示すメッセージ
-        textContainer.innerHTML = `<span style="color: #666;">${armyName} が作戦を思案中……</span>`;
+        // ★修正：色を明るい白（#eee）にしました。
+        textContainer.innerHTML = `<span style="color: #eee;">${armyName} が作戦を思案中...</span>`;
         
+        msgContainer.onclick = (e) => {
+            e.stopPropagation();
+            e.preventDefault();
+        };
+
         msgContainer.appendChild(textContainer);
         this.warControls.appendChild(msgContainer);
     }
