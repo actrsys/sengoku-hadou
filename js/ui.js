@@ -2663,8 +2663,16 @@ class UIManager {
     
     setWarModalVisible(visible) {
         if (!this.warModal) return;
-        if (visible) this.warModal.classList.remove('hidden');
-        else this.warModal.classList.add('hidden');
+        if (visible) {
+            this.warModal.classList.remove('hidden');
+        } else {
+            this.warModal.classList.add('hidden');
+            // ★追加：戦争が終わって画面を閉じる時に、カードの「部隊がいたよシール」を全部ひっぺがします
+            const allCards = document.querySelectorAll('.responsive-army-box, .army-box');
+            allCards.forEach(card => {
+                card.dataset.hasUnit = 'false';
+            });
+        }
     }
     
     clearWarLog() {
