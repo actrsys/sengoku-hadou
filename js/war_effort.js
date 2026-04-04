@@ -296,7 +296,7 @@ Object.assign(WarManager.prototype, {
             } else defBusho = this.game.getBusho(defCastle.castellanId);
             
             // 空き城（持ち主が0）の場合は、武将データが空でも強制的に「土豪」にします
-            if (Number(defCastle.ownerClan) === 0) {
+            if (!defCastle.isKunishu && Number(defCastle.ownerClan) === 0) {
                 defBusho = {name: "土豪", strength:30, leadership:30, politics:30, intelligence:30, charm:30, faceIcon: "unknown_face.webp"};
             } else if (!defBusho || defBusho.name === "") {
                 defBusho = {name: "侍大将", strength:30, leadership:30, politics:30, intelligence:30, charm:30, faceIcon: "unknown_face.webp"};
@@ -515,7 +515,7 @@ Object.assign(WarManager.prototype, {
                                 
                             // ★追加：守る武将が誰もいない場合（空き城など）は、ダミーの土豪や侍大将を用意します！
                             if (defBushos.length === 0) {
-                                if (Number(defCastle.ownerClan) === 0) {
+                                if (!defCastle.isKunishu && Number(defCastle.ownerClan) === 0) {
                                     defBushos.push({id: 'dummy_dogou', name: "土豪", strength:30, leadership:30, politics:30, intelligence:30, charm:30, faceIcon: "unknown_face.webp"});
                                 } else {
                                     defBushos.push({id: 'dummy_guard', name: "侍大将", strength:30, leadership:30, politics:30, intelligence:30, charm:30, faceIcon: "unknown_face.webp"});
@@ -582,7 +582,7 @@ Object.assign(WarManager.prototype, {
                             };
                             
                             const runFieldWarProcess = async () => {
-                                const guardName = defCastle.ownerClan === 0 ? "土豪" : "侍大将";
+                                const guardName = (!defCastle.isKunishu && defCastle.ownerClan === 0) ? "土豪" : "侍大将";
                                 const defLeaderName = defBushos.length > 0 ? defBushos[0].name : guardName;
                                 let interceptMsg = `${defDaimyoName}の${defLeaderName}は、\n${defCastle.name}から打って出ました！`;
                                 if (defCastle.isKunishu) {
@@ -624,7 +624,7 @@ Object.assign(WarManager.prototype, {
             
             // ★追加：籠城戦に入った時のメッセージを出す魔法！
             const showSiegeMessage = async () => {
-                const guardName = defCastle.ownerClan === 0 ? "土豪" : "侍大将";
+                const guardName = (!defCastle.isKunishu && defCastle.ownerClan === 0) ? "土豪" : "侍大将";
                 const defLeaderName = (defBusho && defBusho.name) ? defBusho.name : guardName;
                 let siegeMsg = "";
                 let dName = defDaimyoName || "不明";
