@@ -486,6 +486,11 @@ class UIManager {
             
             this.restoreAIGuard();
 
+            // ★追加：ダイアログを閉じた時に、鳴っているSEを0.1秒でスッと消す魔法です！
+            if (window.AudioManager && typeof window.AudioManager.fadeOutSe === 'function') {
+                window.AudioManager.fadeOutSe(0.1);
+            }
+
             // ★ここを書き足します！：今のダイアログが閉じたので「表示中」の合図を消します！
             this.isDialogShowing = false;
 
@@ -902,6 +907,11 @@ class UIManager {
         if (this.resultModal) this.resultModal.classList.add('hidden'); 
         this.restoreAIGuard(); 
         
+        // ★追加：結果画面を閉じた時に、鳴っているSEを0.1秒でスッと消す魔法です！
+        if (window.AudioManager && typeof window.AudioManager.fadeOutSe === 'function') {
+            window.AudioManager.fadeOutSe(0.1);
+        }
+
         // ★ここから書き足します！
         // 小窓を閉じる時に、必ず「いつもの閉じるボタン」に戻しておきます！
         const footer = document.getElementById('result-footer');

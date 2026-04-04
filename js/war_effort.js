@@ -211,15 +211,6 @@ Object.assign(WarManager.prototype, {
                     }, 400);
                 }
 
-                // ★追加：音が鳴っている間、画面を触れないように透明なバリアを張ります
-                const dialogModal = document.getElementById('dialog-modal');
-                if (dialogModal) {
-                    dialogModal.style.pointerEvents = 'none'; // バリア展開！
-                    setTimeout(() => {
-                        dialogModal.style.pointerEvents = 'auto'; // 0.8秒後にバリアを解除！
-                    }, 800); 
-                }
-
                 // ★修正：諸勢力に対する鎮圧や反乱の時も、開始メッセージをしっかり出して結果を知らせます！
                 await this.game.ui.showDialogAsync(startMsg);
             } else {
@@ -1153,20 +1144,6 @@ Object.assign(WarManager.prototype, {
                             }
                             window.AudioManager.playSE('victory.ogg');
                         }
-                        const resultModal = document.getElementById('result-modal');
-                        const resultFooter = document.getElementById('result-footer');
-                        if (resultModal) {
-                            resultModal.style.pointerEvents = 'none';
-                            if (resultFooter) {
-                                resultFooter.classList.add('hidden');
-                            }
-                            setTimeout(() => {
-                                resultModal.style.pointerEvents = 'auto';
-                                if (resultFooter) {
-                                    resultFooter.classList.remove('hidden');
-                                }
-                            }, 6500); 
-                        }
                     }
                     this.game.ui.showResultModal(resultMsg, () => { this.closeWar(); });
                 } else {
@@ -1457,20 +1434,6 @@ Object.assign(WarManager.prototype, {
                             window.AudioManager.fadeOutBgm(0.5);
                         }
                         window.AudioManager.playSE('victory.ogg');
-                    }
-                    const resultModal = document.getElementById('result-modal');
-                    const resultFooter = document.getElementById('result-footer');
-                    if (resultModal) {
-                        resultModal.style.pointerEvents = 'none';
-                        if (resultFooter) {
-                            resultFooter.classList.add('hidden');
-                        }
-                        setTimeout(() => {
-                            resultModal.style.pointerEvents = 'auto';
-                            if (resultFooter) {
-                                resultFooter.classList.remove('hidden');
-                            }
-                        }, 6500); 
                     }
                 }
                 this.game.ui.showResultModal(resultMsg, finishWarProcess);
