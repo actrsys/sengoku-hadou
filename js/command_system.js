@@ -2074,7 +2074,7 @@ class CommandSystem {
             const tgtProv = this.game.provinces.find(p => p.id === targetCastle.provinceId);
             const provName = tgtProv ? tgtProv.province : "不明な国";
             targetCastle = Object.assign({}, targetCastle, {
-                name: `${provName}の${kunishu.getName(this.game)}`,
+                name: `${provName} ${kunishu.getName(this.game)}`,
                 isKunishu: true,
                 kunishuId: kunishu.id,
                 soldiers: kunishu.soldiers,
