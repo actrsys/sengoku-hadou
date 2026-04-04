@@ -689,17 +689,35 @@ class CommandSystem {
                 // まず諸勢力がいる城を全部集めます
                 const allKunishuCastleIds = [...new Set(activeKunishus.map(k => k.castleId))];
                 
+                // ★追加：出陣するお城から道が繋がっている「自勢力の領土ネットワーク」を調べます！
+                const connectedCastles = new Set();
+                const queue = [c];
+                connectedCastles.add(c.id);
+
+                while (queue.length > 0) {
+                    const current = queue.shift();
+                    const neighbors = this.game.castles.filter(adj => 
+                        adj.ownerClan === playerClanId && 
+                        GameSystem.isAdjacent(current, adj) &&
+                        !connectedCastles.has(adj.id)
+                    );
+                    for (const n of neighbors) {
+                        connectedCastles.add(n.id);
+                        queue.push(n);
+                    }
+                }
+                
                 // 集めた城を「フィルター（ふるい）」にかけて、条件に合うものだけを残します！
                 return allKunishuCastleIds.filter(targetCastleId => {
                     const targetCastle = this.game.getCastle(targetCastleId);
                     
-                    // 条件①：自分が持っている城かどうか？
-                    const isMyCastle = (Number(targetCastle.ownerClan) === playerClanId);
-                    // 条件②：今まさに命令を出そうとしている城（c）から道が繋がっているか？
-                    const isNeighbor = GameSystem.isReachable(this.game, c, targetCastle, playerClanId);
+                    // 条件①：道が繋がっている自分の領土かどうか？
+                    const isConnected = connectedCastles.has(targetCastleId);
+                    // 条件②：道が繋がっている領土の「すぐ隣の城」かどうか？
+                    const isNextToConnected = this.game.castles.some(myC => connectedCastles.has(myC.id) && GameSystem.isAdjacent(targetCastle, myC));
                     
                     // どちらか1つでも当てはまればOK（地図で光らせる）！
-                    return isMyCastle || isNeighbor;
+                    return isConnected || isNextToConnected;
                 });
             }
             
@@ -2144,8 +2162,8 @@ class CommandSystem {
                         const isEnemyAlly = enemyRel && ['同盟', '支配', '従属'].includes(enemyRel.status);
                         const isEnemyMaxGoodwill = enemyRel && enemyRel.sentiment >= 100;
                         if (!isEnemyAlly && !isEnemyMaxGoodwill && (!enemyRel || !this.game.diplomacyManager.isNonAggression(enemyRel.status))) {
-                            const isConnected = this.game.castles.some(myC => connectedCastles.has(myC.id) && GameSystem.isAdjacent(c, myC));
-                            const isNextToEnemy = GameSystem.isAdjacent(c, targetCastle);
+                            const isConnected = connectedCastles.has(c.id) || this.game.castles.some(myC => connectedCastles.has(myC.id) && GameSystem.isAdjacent(c, myC));
+                            const isNextToEnemy = (c.id === targetCastle.id) || GameSystem.isAdjacent(c, targetCastle);
                             if (isConnected || isNextToEnemy) {
                                 const normalBushos = this.game.getCastleBushos(c.id).filter(b => !b.isDaimyo && !b.isCastellan && b.status !== 'ronin' && b.belongKunishuId === 0);
                                 if (c.soldiers >= 1000 && normalBushos.length > 0) {
@@ -2163,8 +2181,8 @@ class CommandSystem {
 
                     const enemyKunishuRel = k.getRelation(targetCastle.ownerClan);
                     if (k.getRelation(myClanId) >= 70 && k.soldiers >= 1000 && enemyKunishuRel < 100) {
-                        const isConnected = this.game.castles.some(myC => connectedCastles.has(myC.id) && GameSystem.isAdjacent(c, myC));
-                        const isNextToEnemy = GameSystem.isAdjacent(c, targetCastle);
+                        const isConnected = connectedCastles.has(c.id) || this.game.castles.some(myC => connectedCastles.has(myC.id) && GameSystem.isAdjacent(c, myC));
+                        const isNextToEnemy = (c.id === targetCastle.id) || GameSystem.isAdjacent(c, targetCastle);
                         if (isConnected || isNextToEnemy) {
                             const members = this.game.kunishuSystem.getKunishuMembers(k.id);
                             if (members.length > 0) {

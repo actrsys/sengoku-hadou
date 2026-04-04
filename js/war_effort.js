@@ -1981,7 +1981,7 @@ Object.assign(WarManager.prototype, {
                 if (rel && ['友好', '同盟', '支配', '従属'].includes(rel.status) && rel.sentiment >= 50) {
                     const enemyRel = this.game.getRelation(c.ownerClan, atkClanId);
                     if (!enemyRel || !this.game.diplomacyManager.isNonAggression(enemyRel.status)) {
-                        const isConnected = this.game.castles.some(myC => connectedCastles.has(myC.id) && GameSystem.isAdjacent(c, myC));
+                        const isConnected = connectedCastles.has(c.id) || this.game.castles.some(myC => connectedCastles.has(myC.id) && GameSystem.isAdjacent(c, myC));
                         if (isConnected) {
                             const normalBushos = this.game.getCastleBushos(c.id).filter(b => !b.isDaimyo && !b.isCastellan && b.status !== 'ronin' && b.belongKunishuId === 0);
                             if (c.soldiers >= 1000 && c.rice >= 500 && normalBushos.length > 0) {
@@ -1997,7 +1997,7 @@ Object.assign(WarManager.prototype, {
             kunishus.forEach(k => {
                 const kRel = k.getRelation(defClanId);
                 if (kRel >= 70 && k.soldiers >= 1000) {
-                    const isConnected = this.game.castles.some(myC => connectedCastles.has(myC.id) && GameSystem.isAdjacent(c, myC));
+                    const isConnected = connectedCastles.has(c.id) || this.game.castles.some(myC => connectedCastles.has(myC.id) && GameSystem.isAdjacent(c, myC));
                     if (isConnected) {
                         const members = this.game.kunishuSystem.getKunishuMembers(k.id);
                         if (members.length > 0) {
