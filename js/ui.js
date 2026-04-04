@@ -3030,7 +3030,7 @@ class UIManager {
         setTxt('war-atk-name', atkName);
         
         const atkTitleEl = document.getElementById('war-atk-name').parentElement;
-        if (atkName.length >= 5) {
+        if (atkName.length >= 8) {
             atkTitleEl.classList.add('title-long-text');
         } else {
             atkTitleEl.classList.remove('title-long-text');
@@ -3048,7 +3048,7 @@ class UIManager {
         setTxt('war-def-name', defNameText);
         
         const defTitleEl = document.getElementById('war-def-name').parentElement;
-        if (defNameText.length >= 5) {
+        if (defNameText.length >= 8) {
             defTitleEl.classList.add('title-long-text');
         } else {
             defTitleEl.classList.remove('title-long-text');
