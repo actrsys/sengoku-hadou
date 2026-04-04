@@ -2845,6 +2845,9 @@ class UIManager {
                 pop.style.zIndex = '100'; // 他のものより一番手前に出します
                 pop.style.pointerEvents = 'none'; // 文字が邪魔でクリックできなくなるのを防ぎます
 
+                // ★追加：数字たちが迷子にならないように、このカードを基準（relative）にします！
+                targetCard.style.position = 'relative';
+
                 targetCard.appendChild(pop);
 
                 setTimeout(() => {
@@ -2880,6 +2883,9 @@ class UIManager {
                 pop.style.transform = 'translate(-50%, -50%)';
                 pop.style.zIndex = '100';
                 pop.style.pointerEvents = 'none';
+
+                // ★追加：城壁の枠を基準（relative）にする目印です！
+                wallEl.style.position = 'relative';
 
                 wallEl.appendChild(pop);
 
