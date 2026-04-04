@@ -628,9 +628,9 @@ Object.assign(WarManager.prototype, {
                 const defLeaderName = (defBusho && defBusho.name) ? defBusho.name : guardName;
                 let siegeMsg = "";
                 let dName = defDaimyoName || "不明";
-                // ★鎮圧戦や相手が諸勢力の場合は「自領」にします
-                if (this.state.isKunishuSubjugation || defCastle.isKunishu) {
-                    siegeMsg = `${dName}の${defLeaderName}は、\n拠点に立て籠もりました！`;
+                // ★諸勢力の場合のみ「防衛陣地」にします
+                if (defCastle.isKunishu) {
+                    siegeMsg = `${dName}の${defLeaderName}は、\n防衛陣地に立て籠もりました！`;
                 } else {
                     siegeMsg = `${dName}の${defLeaderName}は、\n${defCastle.name}に立て籠もりました！`;
                 }
