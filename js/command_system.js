@@ -816,7 +816,7 @@ class CommandSystem {
                 }
             });
             if (isSubordinate) {
-                this.game.ui.showDialog("当家は他勢力に従属しているため、\n他勢力を支配下に置くことはできません！", false);
+                this.game.ui.showDialog("当家は他勢力に従属しているため、\n他勢力を支配下に置くことはできませぬ。", false);
                 return;
             }
         }
