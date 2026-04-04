@@ -558,8 +558,9 @@ body:not(.is-pc).daimyo-select-mode #map-wrapper { margin-bottom: 0 !important; 
     display: flex;
     justify-content: center;
     align-items: center;
-    padding: 18px 10px 10px; /* 上パディングを増やして「城防御」の文字切れを解消 */
+    padding: 18px 10px 10px;
     background: #111;
+    color: #fff; /* ★追加：これでターン数などの文字が白くなります！ */
     flex-shrink: 0;
     border-bottom: 2px solid #555;
     gap: 10px;
@@ -576,6 +577,12 @@ body:not(.is-pc).daimyo-select-mode #map-wrapper { margin-bottom: 0 !important; 
 .war-wall-side.right {
     justify-content: flex-start;
     text-align: left;
+}
+.war-wall-center {
+    position: relative; /* ★追加：新しく作った中心の箱をラベルの基準にします */
+    display: flex;
+    justify-content: center;
+    align-items: center;
 }
 .war-wall-hexagon-wrap {
     position: relative;
