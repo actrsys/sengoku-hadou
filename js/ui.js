@@ -2727,6 +2727,7 @@ class UIManager {
         let isFinished = false;
         let isPaused = false; 
         let currentTimer = null;
+        let isClickLocked = false; // ★追加：クリックを無視するための鍵
         if (!Array.isArray(messages)) messages = [messages];
         let currentIndex = 0;
 
@@ -2759,6 +2760,8 @@ class UIManager {
 
         msgContainer.onclick = (e) => {
             e.stopPropagation(); e.preventDefault();
+            // ★追加：鍵がかかっている間（1秒間）はクリックしても何も起きません
+            if (isClickLocked) return;
             if (isFinished) return;
             
             if (isPaused) {
@@ -2806,8 +2809,20 @@ class UIManager {
 
             if (isSpecialMsg) {
                 isPaused = true;
-                promptContainer.textContent = '▼'; 
-                promptContainer.style.visibility = 'visible';
+                
+                // ★追加：赤文字の時は1秒間クリックできなくします
+                isClickLocked = true;
+                promptContainer.style.visibility = 'hidden'; // ロック中は進める合図（▼）も隠します
+                
+                setTimeout(() => {
+                    isClickLocked = false; // 1秒経ったら鍵を開けます
+                    // 鍵が開いたら、進める合図（▼）を出します
+                    if (!isFinished && isPaused) {
+                        promptContainer.textContent = '▼'; 
+                        promptContainer.style.visibility = 'visible';
+                    }
+                }, 1000);
+                
                 return; 
             }
 
