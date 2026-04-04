@@ -720,38 +720,74 @@ body:not(.is-pc) #daimyo-confirm-modal .modal-content { top: max(20px, env(safe-
 body:not(.is-pc) .daimyo-confirm-buttons { flex-direction: column; gap: 12px; width: 90%; bottom: max(40px, calc(env(safe-area-inset-bottom) + 20px)); }
 body:not(.is-pc) .daimyo-confirm-buttons button { width: 100%; box-sizing: border-box; border-radius: 20px; }
 
-/* ƒXƒ}ƒz”Å: UéíƒƒCƒ“ŒRE‰‡ŒRƒŒƒCƒAƒEƒgˆ³k */
-body:not(.is-pc) .war-side-wrapper { flex-direction: column !important; }
+/* =========================================================
+   ƒXƒ}ƒz”Å: UéíƒƒCƒ“ŒRE‰‡ŒRƒŒƒCƒAƒEƒgiš®—®“Ú”Åj
+   ========================================================= */
+/* Šî–{‚Ì”z’uƒ‹[ƒ‹ */
+body:not(.is-pc) .war-side-wrapper { flex-direction: column !important; gap: 2px !important; }
 body:not(.is-pc) .war-side-wrapper > :not(.war-reinf-col) { order: 1 !important; width: 100% !important; flex-shrink: 0 !important; }
-body:not(.is-pc) .war-side-wrapper > .war-reinf-col { order: 2 !important; flex-direction: row !important; width: 100% !important; flex-shrink: 1 !important; min-height: 0 !important; }
+body:not(.is-pc) .war-side-wrapper > .war-reinf-col { order: 2 !important; flex-direction: row !important; width: 100% !important; flex-shrink: 1 !important; min-height: 0 !important; gap: 2px !important; }
 body:not(.is-pc) .war-side-wrapper > .war-reinf-col:first-child { flex-direction: row-reverse !important; }
+
 body:not(.is-pc) .responsive-army-content .stat-busho > * { font-size: 0.75rem !important; }
 body:not(.is-pc) .label-sp-flex { display: flex !important; justify-content: space-between !important; gap: 8px !important; }
 body:not(.is-pc) .label-sp-flex > div { flex: 1 !important; display: flex !important; justify-content: space-between !important; }
 body:not(.is-pc) .war-visual { padding: 3px 5px !important; margin-bottom: 0 !important; flex-shrink: 1 !important; min-height: 0 !important; overflow-y: auto !important; }
+body:not(.is-pc) .responsive-war-visual { padding: 2px !important; gap: 2px !important; }
 body:not(.is-pc) #war-title-name { font-size: 1.05rem !important; margin: 1px 0 !important; }
 body:not(.is-pc) .war-header-info, body:not(.is-pc) #war-date-info, body:not(.is-pc) #war-turn-info { font-size: 0.8rem !important; margin-bottom: 1px !important; }
-body:not(.is-pc) .war-reinf-card .responsive-army-title { font-size: 0.85rem !important; margin-bottom: 2px !important; }
+
+/* ‡@ ƒƒCƒ“ŒRE‰‡ŒRy‹¤’Êz‚Ì–‚–@ */
+body:not(.is-pc) .responsive-army-box,
+body:not(.is-pc) .war-reinf-card { 
+    align-items: stretch !important; 
+}
+body:not(.is-pc) .responsive-army-title,
+body:not(.is-pc) .war-reinf-card .responsive-army-title { 
+    text-align: left !important; 
+    padding: 0 !important; 
+}
+body:not(.is-pc) .main-busho-label,
+body:not(.is-pc) .war-reinf-card .reinf-busho-label { 
+    display: flex !important; 
+    align-items: center !important; 
+    position: static !important; 
+    width: 100% !important; 
+    text-align: left !important; 
+    background: rgba(0,0,0,0.5) !important; 
+    color: #fff !important; 
+    padding: 2px 5px !important; 
+    margin: 0 0 5px 0 !important; 
+    box-sizing: border-box !important; 
+}
+
+/* ‡A yƒƒCƒ“ŒR‚¾‚¯z‚Ì–‚–@ */
+body:not(.is-pc) .main-busho-label { 
+    font-size: 0.95rem !important; 
+}
+body:not(.is-pc) .responsive-army-content { 
+    display: flex !important; flex-direction: row !important; align-items: flex-start !important; padding: 0 !important; gap: 10px !important; min-height: auto !important; 
+}
+body:not(.is-pc) .responsive-war-face { 
+    position: static !important; width: 60px !important; height: 60px !important; margin: 0 !important; 
+}
+body:not(.is-pc) .responsive-army-stats { 
+    flex: 1 !important; 
+}
+
+/* ‡B y‰‡ŒR‚¾‚¯z‚Ì–‚–@ */
+body:not(.is-pc) .war-reinf-card .responsive-army-title { 
+    font-size: 0.85rem !important; margin-bottom: 2px !important; height: 20px !important; 
+}
+body:not(.is-pc) .war-reinf-card .reinf-busho-label { 
+    font-size: 0.6rem !important; 
+}
 body:not(.is-pc) .war-reinf-card .stat-row { font-size: 0.75rem !important; }
 body:not(.is-pc) .war-reinf-card .stat-val-large { font-size: 0.85rem !important; }
-
-/* ƒXƒ}ƒz”Å: VƒŒƒCƒAƒEƒg (ƒƒCƒ“•”‘à‚Í‰¡•À‚ÑA‰‡ŒR‚ÍcÏ‚Ý) */
-body:not(.is-pc) .responsive-army-box { align-items: stretch !important; }
-body:not(.is-pc) .responsive-army-title { text-align: left !important; }
-body:not(.is-pc) .main-busho-label { display: flex !important; align-items: center !important; position: static !important; width: 100% !important; text-align: left !important; background: rgba(0,0,0,0.5) !important; font-size: 0.95rem !important; color: #fff !important; padding: 2px 5px !important; margin: 0 0 5px 0 !important; box-sizing: border-box !important; }
-body:not(.is-pc) .responsive-army-content { display: flex !important; flex-direction: row !important; align-items: flex-start !important; padding: 0 !important; gap: 10px !important; min-height: auto !important; }
-body:not(.is-pc) .responsive-war-face { position: static !important; width: 60px !important; height: 60px !important; margin: 0 !important; }
-body:not(.is-pc) .responsive-army-stats { flex: 1 !important; }
-
-body:not(.is-pc) .war-reinf-card { align-items: stretch !important; }
-body:not(.is-pc) .war-reinf-card .responsive-army-title { text-align: left !important; height: 20px !important; padding: 0 !important; }
-body:not(.is-pc) .war-reinf-card .reinf-busho-label { display: flex !important; align-items: center !important; text-align: left !important; font-size: 0.6rem !important; background: rgba(0,0,0,0.5) !important; margin: 0 0 5px 0 !important; width: 100% !important; box-sizing: border-box !important; padding: 2px 5px !important; position: static !important; }
-body:not(.is-pc) .responsive-war-visual { padding: 2px !important; gap: 2px !important; }
-body:not(.is-pc) .war-side-wrapper { gap: 2px !important; }
-body:not(.is-pc) .war-reinf-col { gap: 2px !important; }
 body:not(.is-pc) .war-reinf-card .reinf-content-wrap { flex-direction: column; align-items: center; gap: 2px; }
 body:not(.is-pc) .war-reinf-card .reinf-face-container { display: flex; justify-content: center; width: 100%; }
 
+/* ƒRƒ“ƒgƒ[ƒ‹ƒpƒlƒ‹Žü‚è */
 body:not(.is-pc) .war-controls-area { height: 120px !important; gap: 5px !important; flex-shrink: 0 !important; margin-bottom: 5px !important; padding-bottom: 5px !important; box-sizing: border-box !important; }
 body:not(.is-pc) .war-controls-desc { font-size: 0.75rem !important; padding: 5px !important; }
 body:not(.is-pc) .war-controls-buttons button { font-size: clamp(0.75rem, 4vw, 1.1rem) !important; letter-spacing: 0px !important; padding: 0 !important; }
@@ -835,15 +871,45 @@ body.is-pc {
     .daimyo-confirm-stats .stat-box { font-size: 1.1rem; padding: 6px 10px; }
     .daimyo-confirm-stats .stat-box span.stat-val { min-width: 70px; }
 
-    /* PC”Å: Uéí */
+    /* ---------------------------------------------------------
+       š ŠÇ—‚µ‚â‚·‚¢“ˆê”ÅIUéí‚Ì•”‘àƒJ[ƒhiPC”Åj
+       --------------------------------------------------------- */
+    /* ƒRƒ“ƒgƒ[ƒ‹ƒGƒŠƒA */
     .war-controls-area { height: 150px; gap: 10px; }
     .war-controls-buttons { flex: 2; gap: 5px; }
     .war-controls-desc { flex: 1; font-size: 0.95rem; }
     .war-controls-buttons button { writing-mode: horizontal-tb; white-space: nowrap; letter-spacing: normal; padding: 0 !important; font-size: 1.1rem !important; display: flex; align-items: center; justify-content: center; }
-    
-    .responsive-army-box { align-items: stretch !important; }
-    .responsive-army-title { text-align: left !important; font-size: 1.4rem; margin-bottom: 5px; height: 35px !important; padding: 0 !important; }
-    .main-busho-label { display: flex !important; align-items: center !important; position: static !important; width: 100% !important; text-align: left !important; background: rgba(0,0,0,0.5) !important; font-size: 1.2rem !important; margin: 0 0 10px 0 !important; padding: 2px 5px !important; box-sizing: border-box !important; }
+
+    /* ‘S‘Ì‚Ì”z’uƒ‹[ƒ‹ */
+    .war-side-wrapper { flex-direction: row !important; flex: 1 !important; overflow: visible !important;}
+    .war-side-wrapper > :not(.war-reinf-col) { order: unset !important; width: auto !important; }
+    .war-side-wrapper > .war-reinf-col { order: unset !important; flex-direction: column !important; width: auto !important; }
+    .war-side-wrapper > .war-reinf-col:first-child { flex-direction: column !important; }
+
+    /* ‡@ ƒƒCƒ“ŒRE‰‡ŒRy‹¤’Êz‚Ì–‚–@ */
+    .responsive-army-box, .war-reinf-card { 
+        align-items: stretch !important; 
+    }
+    .responsive-army-title, .war-reinf-card .responsive-army-title { 
+        text-align: left !important; 
+        padding: 0 !important; 
+    }
+    .main-busho-label, .war-reinf-card .reinf-busho-label { 
+        display: flex !important; 
+        align-items: center !important; 
+        position: static !important; 
+        width: 100% !important; 
+        text-align: left !important; 
+        background: rgba(0,0,0,0.5) !important; 
+        color: #fff !important; 
+        box-sizing: border-box !important; 
+        padding: 2px 5px !important; 
+    }
+
+    /* ‡A yƒƒCƒ“ŒR‚¾‚¯z‚Ì–‚–@ */
+    .responsive-army-box { padding: 10px !important; }
+    .responsive-army-title { font-size: 1.4rem; margin-bottom: 5px; height: 35px !important; }
+    .main-busho-label { font-size: 1.2rem !important; margin: 0 0 10px 0 !important; }
     .responsive-army-content { display: flex !important; flex-direction: row !important; align-items: flex-start !important; justify-content: flex-start !important; padding: 0 !important; gap: 15px !important; }
     .responsive-war-face { width: 100px !important; height: 100px !important; margin: 0 !important; position: static !important; border-width: 3px; }
     .responsive-army-stats { width: 100%; font-size: 1.2rem; gap: 8px; display: flex; flex-direction: column; align-items: stretch; margin-top: 0 !important; flex: 1; }
@@ -852,21 +918,16 @@ body.is-pc {
     .stat-row { width: 100% !important; font-size: 1.2rem !important; border-bottom-width: 4px !important; padding-bottom: 2px !important; align-items: center !important; }
     .stat-val-large { font-size: 1.5rem !important; }
     .title-long-text { font-size: 1.15rem !important; }
-    
-    .war-reinf-card { align-items: stretch !important; padding: 10px !important; }
-    .war-reinf-card .responsive-army-title { text-align: left !important; font-size: 1.05rem !important; height: 26px !important; }
-    .war-reinf-card .reinf-busho-label { display: flex !important; align-items: center !important; text-align: left !important; font-size: 0.7rem !important; background: rgba(0,0,0,0.5) !important; padding: 2px 5px !important; margin: 0 0 5px 0 !important; width: 100% !important; position: static !important; box-sizing: border-box !important; }
+
+    /* ‡B y‰‡ŒR‚¾‚¯z‚Ì–‚–@ */
+    .war-reinf-card { padding: 10px !important; }
+    .war-reinf-card .responsive-army-title { font-size: 1.05rem !important; height: 26px !important; }
+    .war-reinf-card .reinf-busho-label { font-size: 0.7rem !important; margin: 0 0 5px 0 !important; }
     .war-reinf-card .reinf-content-wrap { flex-direction: row; gap: 8px; align-items: flex-start; }
     .war-reinf-card .reinf-face-container { display: block; }
     .war-reinf-card .responsive-war-face { width: 60px !important; height: 60px !important; border-width: 2px; }
     .war-reinf-card .stat-row { width: 100% !important; font-size: 0.8rem !important; border-bottom-width: 1px !important; }
     .label-sp-flex { display: none !important; }
-
-    .war-side-wrapper { flex-direction: row !important; flex: 1 !important; overflow: visible !important;}
-    .war-side-wrapper > :not(.war-reinf-col) { order: unset !important; width: auto !important; }
-    .war-side-wrapper > .war-reinf-col { order: unset !important; flex-direction: column !important; width: auto !important; }
-    .war-side-wrapper > .war-reinf-col:first-child { flex-direction: column !important; }
-    .responsive-army-box { padding: 10px !important; }
 }
 
 /* =========================================================
