@@ -533,13 +533,13 @@ body:not(.is-pc).daimyo-select-mode #map-wrapper { margin-bottom: 0 !important; 
 /* 上部ステータスバー（1段目） */
 .war-top-bar {
     background: #000;
-    color: #fff;
+    color: #a0a0a0; /* 文字色を少し暗めの白にして控えめに */
     display: flex;
     justify-content: center;
     align-items: center;
     padding: 5px 15px;
-    font-size: 1.1rem;
-    font-weight: bold;
+    font-size: 1rem; /* 少し小さめに */
+    font-weight: normal; /* 太字をやめる */
     flex-shrink: 0;
 }
 .war-title {
@@ -551,6 +551,7 @@ body:not(.is-pc).daimyo-select-mode #map-wrapper { margin-bottom: 0 !important; 
     font-weight: normal;
     background: transparent;
     color: #fff;
+    line-height: 1; /* 縦のズレを防ぐため高さをピッタリにします */
 }
 
 /* 城防御表示（2段目） */
@@ -560,15 +561,17 @@ body:not(.is-pc).daimyo-select-mode #map-wrapper { margin-bottom: 0 !important; 
     align-items: center;
     padding: 18px 10px 10px;
     background: #111;
-    color: #fff; /* ★追加：これでターン数などの文字が白くなります！ */
+    color: #fff;
     flex-shrink: 0;
     border-bottom: 2px solid #555;
-    gap: 10px;
+    gap: 15px; /* 左右の余白を少し広げます */
 }
 .war-wall-side {
     flex: 1;
     display: flex;
     align-items: center;
+    font-size: 1.1rem; /* 左右の文字の大きさを揃えます */
+    line-height: 1; /* 縦のズレを防ぎます */
 }
 .war-wall-side.left {
     justify-content: flex-end;
@@ -577,6 +580,15 @@ body:not(.is-pc).daimyo-select-mode #map-wrapper { margin-bottom: 0 !important; 
 .war-wall-side.right {
     justify-content: flex-start;
     text-align: left;
+}
+
+/* ターン数の数字だけ特別扱いする設定 */
+.turn-number {
+    font-size: 1.6rem; /* 数字だけ大きく */
+    color: #fdea60 !important; /* 絶対に黄色にするおまじないです！ */
+    font-weight: bold;
+    margin: 0 5px; /* 数字の左右に少し隙間を作ります */
+    line-height: 1;
 }
 .war-wall-center {
     position: relative; /* ★追加：新しく作った中心の箱をラベルの基準にします */
