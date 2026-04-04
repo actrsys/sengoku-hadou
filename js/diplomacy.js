@@ -524,6 +524,21 @@ class DiplomacyManager {
 
         } else if (type === 'subordinate') {
             this.changeStatus(doer.clan, targetClanId, '従属');
+            
+            // ★追加：従属した時に、関係値を調整します！
+            const relation = this.getRelation(doer.clan, targetClanId);
+            if (relation) {
+                // 40以下なら50にし、41以上なら10足します（100を超えないようにします）
+                if (relation.sentiment <= 40) {
+                    relation.sentiment = 50;
+                } else {
+                    relation.sentiment = Math.min(100, relation.sentiment + 10);
+                }
+                // 相手から見た関係値も同じ数字に揃えておきます
+                const oppRelation = this.getRelation(targetClanId, doer.clan);
+                if (oppRelation) oppRelation.sentiment = relation.sentiment;
+            }
+
             msg = `${this.game.clans.find(c => c.id === targetClanId).name} に従属しました！`;
             if (!isPlayerInvolved) aiMsg = `${targetClanName} が ${doerClanName} を支配下に置きました！`;
             doer.achievementTotal += Math.floor(doer.diplomacy * 0.2) + 10;
@@ -539,6 +554,19 @@ class DiplomacyManager {
                 this.game.factionSystem.updateRecognition(doer, 10);
             } else if (isSuccess) {
                 this.changeStatus(doer.clan, targetClanId, '支配');
+                
+                // ★追加：支配した時に、関係値を調整します！
+                const relation = this.getRelation(doer.clan, targetClanId);
+                if (relation) {
+                    if (relation.sentiment <= 40) {
+                        relation.sentiment = 50;
+                    } else {
+                        relation.sentiment = Math.min(100, relation.sentiment + 10);
+                    }
+                    const oppRelation = this.getRelation(targetClanId, doer.clan);
+                    if (oppRelation) oppRelation.sentiment = relation.sentiment;
+                }
+
                 msg = `${this.game.clans.find(c => c.id === targetClanId).name} を支配下に置くことに成功しました！`;
                 if (!isPlayerInvolved) aiMsg = `${doerClanName} が ${targetClanName} を支配下に置きました！`;
                 doer.achievementTotal += Math.floor(doer.diplomacy * 0.2) + 20;
@@ -652,6 +680,19 @@ class DiplomacyManager {
                     });
                 } else if (type === 'dominate') {
                     this.changeStatus(doer.clan, targetClanId, '支配');
+                    
+                    // ★追加：従属した時に、関係値を調整します！
+                    const relation = this.getRelation(doer.clan, targetClanId);
+                    if (relation) {
+                        if (relation.sentiment <= 40) {
+                            relation.sentiment = 50;
+                        } else {
+                            relation.sentiment = Math.min(100, relation.sentiment + 10);
+                        }
+                        const oppRelation = this.getRelation(targetClanId, doer.clan);
+                        if (oppRelation) oppRelation.sentiment = relation.sentiment;
+                    }
+
                     this.game.ui.showResultModal(`${doerClan.name} に従属しました……`, () => {
                         if (onComplete) setTimeout(onComplete, 100);
                     });
