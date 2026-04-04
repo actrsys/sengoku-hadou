@@ -2984,6 +2984,25 @@ class UIManager {
                         setTimeout(() => { el.style.color = ''; }, 300); 
                     }
                 });
+
+                // ★追加：ダメージを受けた結果、援軍が壊滅（消滅）していたら即座にフェードインで消します！
+                const s = this.game.warManager.state;
+                const checkAndFadeOut = (prefix, reinfData) => {
+                    if (!reinfData) {
+                        const card = document.getElementById(`war-${prefix}-reinf-card`);
+                        if (card) {
+                            const titleEl = card.querySelector('.responsive-army-title');
+                            if (titleEl && titleEl.style.visibility !== 'hidden') {
+                                this.applyEmptyCardAnimation(card);
+                            }
+                        }
+                    }
+                };
+                checkAndFadeOut('atk-self', s.selfReinforcement);
+                checkAndFadeOut('atk-ally', s.reinforcement);
+                checkAndFadeOut('def-self', s.defSelfReinforcement);
+                checkAndFadeOut('def-ally', s.defReinforcement);
+
             }, 400); 
         }
     }
@@ -3082,22 +3101,29 @@ class UIManager {
             const statsEl = card.querySelector('.responsive-army-stats');
 
             if (!reinfData) {
-                // 誰も来ていない（空っぽ）時は、左下から右上へ濃くなるグラデーションにします
-                card.style.background = 'linear-gradient(to top right, #eeeeee, #777777)';
-                
-                // 中身の要素をすべて透明にして、レイアウト（大きさ）だけを維持します
-                titleEl.style.visibility = 'hidden';
-                bushoEl.style.visibility = 'hidden';
-                card.querySelector('.reinf-content-wrap').style.visibility = 'hidden';
+                // 誰も来ていない（空っぽ）時
+                // ★追加：もしさっきまで中身が見えていたなら、フェードインの魔法を呼び出します！
+                const isVisible = titleEl.style.visibility !== 'hidden';
+                if (isVisible) {
+                    this.applyEmptyCardAnimation(card);
+                } else {
+                    // 初めから空っぽ、またはアニメーション完了済みの時はそのまま空にする
+                    card.style.background = 'linear-gradient(to top right, #eeeeee, #777777)';
+                    
+                    // 中身の要素をすべて透明にして、レイアウト（大きさ）だけを維持します
+                    titleEl.style.visibility = 'hidden';
+                    bushoEl.style.visibility = 'hidden';
+                    card.querySelector('.reinf-content-wrap').style.visibility = 'hidden';
 
-                orgEl.textContent = '';
-                bushoEl.textContent = '';
-                soldierEl.textContent = '';
-                riceEl.textContent = '';
-                moraleEl.textContent = '';
-                trainingEl.textContent = '';
-                if(moraleSpEl) moraleSpEl.textContent = '';
-                if(trainingSpEl) trainingSpEl.textContent = '';
+                    orgEl.textContent = '';
+                    bushoEl.textContent = '';
+                    soldierEl.textContent = '';
+                    riceEl.textContent = '';
+                    moraleEl.textContent = '';
+                    trainingEl.textContent = '';
+                    if(moraleSpEl) moraleSpEl.textContent = '';
+                    if(trainingSpEl) trainingSpEl.textContent = '';
+                }
             } else {
                 // 援軍が来ている時は、所属に応じた鮮やかなグラデーションにします！
                 card.style.backgroundColor = ''; 
@@ -3524,5 +3550,54 @@ class UIManager {
     
     showSettingsModal() {
         this.info.showSettingsModal();
+    }
+
+    // ==========================================
+    // ★追加：部隊が消滅した時に、上からからっぽのカードをフェードインさせる魔法
+    // ==========================================
+    applyEmptyCardAnimation(card) {
+        if (!card) return;
+        // 既にアニメーション中なら何もしない
+        if (card.querySelector('.empty-cover-overlay')) return;
+
+        // 魔法の幕（グラデーションのカバー）を作ってカードに被せます
+        const overlay = document.createElement('div');
+        overlay.className = 'empty-cover-overlay';
+        card.appendChild(overlay);
+
+        // ほんの少し待ってから、フワッと表示（フェードイン）させます
+        requestAnimationFrame(() => {
+            requestAnimationFrame(() => {
+                overlay.classList.add('show-overlay');
+            });
+        });
+
+        // 1秒後（フェードインが完全に終わった後）に、中身を透明にして幕を取り外します
+        setTimeout(() => {
+            card.style.background = 'linear-gradient(to top right, #eeeeee, #777777)';
+            
+            const titleEl = card.querySelector('.responsive-army-title');
+            const bushoEl = card.querySelector('.reinf-busho-label');
+            const wrapEl = card.querySelector('.reinf-content-wrap');
+            
+            if (titleEl) titleEl.style.visibility = 'hidden';
+            if (bushoEl) bushoEl.style.visibility = 'hidden';
+            if (wrapEl) wrapEl.style.visibility = 'hidden';
+
+            const orgEl = card.querySelector('[id$="-org"]');
+            const soldierEl = card.querySelector('[id$="-soldier"]');
+            const riceEl = card.querySelector('[id$="-rice"]');
+            const moraleEl = card.querySelector('[id$="-morale"]');
+            const trainingEl = card.querySelector('[id$="-training"]');
+            if (orgEl) orgEl.textContent = '';
+            if (bushoEl) bushoEl.textContent = '';
+            if (soldierEl) soldierEl.textContent = '';
+            if (riceEl) riceEl.textContent = '';
+            if (moraleEl) moraleEl.textContent = '';
+            if (trainingEl) trainingEl.textContent = '';
+            
+            // 幕はもう不要なので消します
+            if (overlay.parentNode) overlay.parentNode.removeChild(overlay);
+        }, 1000);
     }
 }
