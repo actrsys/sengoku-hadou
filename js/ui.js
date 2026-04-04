@@ -3167,7 +3167,7 @@ class UIManager {
                 emptyIcon.classList.add('hidden');
 
                 const leader = reinfData.bushos && reinfData.bushos.length > 0 ? reinfData.bushos[0] : null;
-                const leaderName = leader ? leader.name.split('|').join('') : "不明";
+                const leaderName = leader ? leader.name.split('|').join('') + "軍" : "不明";
                 
                 if (leader && leader.faceIcon) {
                     faceImg.src = `data/images/faceicons/${leader.faceIcon}`;
