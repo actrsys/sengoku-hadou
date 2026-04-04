@@ -2709,15 +2709,16 @@ class UIManager {
         
         const promptContainer = document.createElement('div');
         promptContainer.className = 'war-action-message-prompt';
-        promptContainer.textContent = '▶ クリックでスキップ';
-        promptContainer.style.cssText = 'position: absolute; bottom: 8px; right: 12px; font-size: 0.8rem; color: #888; cursor: pointer;';
+        promptContainer.textContent = '▼'; // ★文字を消して▼のみにしました！
+        // ★▼だけなので、少し文字を大きくして右下の位置を調整しています
+        promptContainer.style.cssText = 'position: absolute; bottom: 5px; right: 15px; font-size: 1.2rem; color: #888; cursor: pointer;';
 
         msgContainer.appendChild(textContainer);
         msgContainer.appendChild(promptContainer);
         this.warControls.appendChild(msgContainer);
         
         let isFinished = false;
-        let isPaused = false; // ★追加：一時停止用の目印です
+        let isPaused = false; 
         let currentTimer = null;
         if (!Array.isArray(messages)) messages = [messages];
         let currentIndex = 0;
@@ -2731,11 +2732,10 @@ class UIManager {
                 const item = messages[currentIndex++];
                 let msgText = typeof item === 'string' ? item : (item.text || '');
                 
-                // ★追加：大事な赤文字（色指定）が含まれているかチェックします
                 let isSpecialMsg = /color\s*:\s*(#d32f2f|red)/i.test(msgText); 
 
                 if (isSpecialMsg) {
-                    textContainer.innerHTML = ''; // ★追加：赤文字なら画面をリセットして綺麗にします
+                    textContainer.innerHTML = ''; 
                 }
                 
                 if (msgText) {
@@ -2743,7 +2743,7 @@ class UIManager {
                 }
                 
                 if (typeof item !== 'string' && item) {
-                    if (item.currentStats) this.updateWarUI();
+                    // ★修正: アニメーションを邪魔する原因だった this.updateWarUI() を消しました
                     if (item.type === 'damage' || item.type === 'recover') this.playDamageAnimation(item);
                 }
             }
@@ -2755,10 +2755,9 @@ class UIManager {
             e.stopPropagation(); e.preventDefault();
             if (isFinished) return;
             
-            // ★追加：一時停止中（赤文字で止まっている時）なら、スキップではなく「再開」にします
             if (isPaused) {
                 isPaused = false;
-                promptContainer.textContent = '▶ クリックでスキップ';
+                promptContainer.textContent = '▼'; // ★再開時も▼のみです
                 if (window.AudioManager) window.AudioManager.playSE('decision.ogg');
                 processNext();
             } else {
@@ -2777,12 +2776,10 @@ class UIManager {
             let waitTime = 700;
             
             let msgText = typeof item === 'string' ? item : (item.text || '');
-            
-            // ★追加：大事な赤文字（色指定）が含まれているかチェックします
             let isSpecialMsg = /color\s*:\s*(#d32f2f|red)/i.test(msgText); 
 
             if (isSpecialMsg) {
-                textContainer.innerHTML = ''; // ★追加：赤文字なら今までのお話を一度消して綺麗にします
+                textContainer.innerHTML = ''; 
             }
 
             if (typeof item === 'string') {
@@ -2790,7 +2787,7 @@ class UIManager {
             } else if (item.text) {
                 if (item.se && window.AudioManager) window.AudioManager.playSE(item.se);
                 textContainer.innerHTML += (textContainer.innerHTML ? '<br>' : '') + item.text;
-                if (item.currentStats) setTimeout(() => this.updateWarUI(), 200);
+                // ★修正: アニメーションを打ち消してしまう原因だった this.updateWarUI() をここからも消しました！
                 if (item.type === 'damage' || item.type === 'recover') {
                     this.playDamageAnimation(item);
                     waitTime = 900;
@@ -2802,12 +2799,11 @@ class UIManager {
 
             textContainer.scrollTop = textContainer.scrollHeight;
 
-            // ★追加：赤文字の時はここでタイマーを止め、一時停止します
             if (isSpecialMsg) {
                 isPaused = true;
-                promptContainer.textContent = '▶ クリックして次へ';
+                promptContainer.textContent = '▼'; // ★大事なお知らせで止まっている時の合図も▼のみです
                 promptContainer.style.visibility = 'visible';
-                return; // タイマーをセットせずにここで待ちます
+                return; 
             }
 
             currentTimer = setTimeout(processNext, waitTime);
@@ -3679,7 +3675,7 @@ class UIManager {
         textContainer.className = 'war-action-message-text';
         textContainer.style.cssText = 'text-align: left; width: 100%; display: block;';
         // 思考中であることを示すメッセージ
-        textContainer.innerHTML = `<span style="color: #666;">${armyName} が作戦を思案中...</span>`;
+        textContainer.innerHTML = `<span style="color: #666;">${armyName} が作戦を思案中……</span>`;
         
         msgContainer.appendChild(textContainer);
         this.warControls.appendChild(msgContainer);
