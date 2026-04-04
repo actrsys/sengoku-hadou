@@ -1150,17 +1150,20 @@ Object.assign(WarManager.prototype, {
                 }
                 
                 if (s.isPlayerInvolved) {
-                    this.game.ui.setWarModalVisible(false);
                     if (attackerWon) {
                         if (window.AudioManager) {
-                            // ★追加：ジングルが鳴る直前に、BGMを1秒かけてフェードアウトさせる魔法です！
-                            if (typeof window.AudioManager.fadeOutBgm === 'function') {
-                                window.AudioManager.fadeOutBgm(0.5);
+                            // ★修正：フェードアウトさせると音量が0になって戻らなくなるので、ピタッと止める魔法にします！
+                            if (typeof window.AudioManager.stopBgm === 'function') {
+                                window.AudioManager.stopBgm();
                             }
                             window.AudioManager.playSE('victory.ogg');
                         }
                     }
-                    this.game.ui.showResultModal(resultMsg, () => { this.closeWar(); });
+                    this.game.ui.showResultModal(resultMsg, () => { 
+                        // ★修正：合戦画面を閉じる（BGMが戻る）タイミングを、メッセージを読んだ「後」にします！
+                        this.game.ui.setWarModalVisible(false);
+                        this.closeWar(); 
+                    });
                 } else {
                     // ★修正：戦闘画面は飛ばしますが、結果のメッセージは表示してタップを待ちます！
                     await this.game.ui.showDialogAsync(resultMsg);
@@ -1235,8 +1238,11 @@ Object.assign(WarManager.prototype, {
                 }
                 
                 if (s.isPlayerInvolved) {
-                    this.game.ui.setWarModalVisible(false);
-                    this.game.ui.showResultModal(resultMsg, () => { this.closeWar(); });
+                    this.game.ui.showResultModal(resultMsg, () => { 
+                        // ★ここも同じく、メッセージを閉じた後に画面を消すようにします！
+                        this.game.ui.setWarModalVisible(false);
+                        this.closeWar(); 
+                    });
                 } else {
                     // ★追加：AIの城で反乱が起きた時も、専用のメッセージを出してタップを待ちます！
                     await this.game.ui.showDialogAsync(resultMsg);
@@ -1251,7 +1257,7 @@ Object.assign(WarManager.prototype, {
             if (s.defBusho && s.defBusho.id && !defBushos.find(b => b.id === s.defBusho.id)) defBushos.push(s.defBusho);
             defBushos.forEach(b => { this.game.factionSystem.recordBattle(b, s.defender.id); this.game.factionSystem.updateRecognition(b, 25); });
 
-            if (s.isPlayerInvolved) { this.game.ui.setWarModalVisible(false); }
+            // ★修正：ここにあった画面を閉じる魔法は、メッセージの後に引っ越すので削除します！
             
             // ★修正：メイン部隊の本当の負傷兵（全体の負傷兵から、援軍の分を引いたもの）を計算します！
             const realAtkDead = Math.max(0, s.deadSoldiers.attacker - atkReinfTotalLoss);
@@ -1353,7 +1359,10 @@ Object.assign(WarManager.prototype, {
                 this.game.ui.log(`【合戦結果】守備軍の撤退により、${atkArmyName1}が${s.defender.name}を占領しました。`);
                 
                 if (s.isPlayerInvolved) {
-                    this.game.ui.showResultModal(`撤退しました。\n${retreatTargetId ? '部隊は移動しました。' : '部隊は解散しました。'}`, finishWarProcess);
+                    this.game.ui.showResultModal(`撤退しました。\n${retreatTargetId ? '部隊は移動しました。' : '部隊は解散しました。'}`, () => {
+                        this.game.ui.setWarModalVisible(false); // ★ここにお引っ越し！
+                        finishWarProcess();
+                    });
                 } else {
                     finishWarProcess();
                 }
@@ -1444,14 +1453,17 @@ Object.assign(WarManager.prototype, {
             if (s.isPlayerInvolved) {
                 if (attackerWon && !isRetreat && isAtkPlayer) {
                     if (window.AudioManager) {
-                        // ★追加：ジングルが鳴る直前に、BGMを1秒かけてフェードアウトさせる魔法です！
-                        if (typeof window.AudioManager.fadeOutBgm === 'function') {
-                            window.AudioManager.fadeOutBgm(0.5);
+                        // ★修正：フェードアウトさせると音量が0になって戻らなくなるので、ピタッと止める魔法にします！
+                        if (typeof window.AudioManager.stopBgm === 'function') {
+                            window.AudioManager.stopBgm();
                         }
                         window.AudioManager.playSE('victory.ogg');
                     }
                 }
-                this.game.ui.showResultModal(resultMsg, finishWarProcess);
+                this.game.ui.showResultModal(resultMsg, () => {
+                    this.game.ui.setWarModalVisible(false); // ★ここにお引っ越し！
+                    finishWarProcess();
+                });
             }
             else finishWarProcess();
         } catch (e) {

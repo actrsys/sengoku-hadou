@@ -2672,6 +2672,17 @@ class UIManager {
             allCards.forEach(card => {
                 card.dataset.hasUnit = 'false';
             });
+            
+            // ★追加：合戦画面が閉じる時に、絶対に元のBGMに戻す魔法です！
+            if (window.AudioManager) {
+                // 記憶していたBGMに戻す機能があればそれを使います
+                if (typeof window.AudioManager.restoreBgm === 'function') {
+                    window.AudioManager.restoreBgm();
+                } else {
+                    // 戻す機能がなければ、いつものマップ曲を直接指定して鳴らします
+                    window.AudioManager.playBGM('SC_ex_Town1_Castle.ogg'); 
+                }
+            }
         }
     }
     
