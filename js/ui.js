@@ -2836,6 +2836,15 @@ class UIManager {
                 // ★追加：回復の時は緑色のデザイン（recover-popup）を使います！
                 pop.className = isRecover ? 'recover-popup anim-popup-text' : 'damage-popup anim-popup-text';
                 pop.innerHTML = dmgStr;
+                
+                // ★追加：どのカードでも絶対に「ど真ん中」から文字が出るように固定する魔法です！
+                pop.style.position = 'absolute';
+                pop.style.top = '50%';
+                pop.style.left = '50%';
+                pop.style.transform = 'translate(-50%, -50%)';
+                pop.style.zIndex = '100'; // 他のものより一番手前に出します
+                pop.style.pointerEvents = 'none'; // 文字が邪魔でクリックできなくなるのを防ぎます
+
                 targetCard.appendChild(pop);
 
                 setTimeout(() => {
@@ -2863,6 +2872,15 @@ class UIManager {
                 // ★追加：回復の時は緑色のデザインを使います！
                 pop.className = isRecover ? 'recover-popup anim-popup-text' : 'damage-popup anim-popup-text';
                 pop.innerHTML = dmgStr;
+                
+                // ★追加：城壁のダメージも絶対に「ど真ん中」から文字が出るように固定します！
+                pop.style.position = 'absolute';
+                pop.style.top = '50%';
+                pop.style.left = '50%';
+                pop.style.transform = 'translate(-50%, -50%)';
+                pop.style.zIndex = '100';
+                pop.style.pointerEvents = 'none';
+
                 wallEl.appendChild(pop);
 
                 setTimeout(() => {
