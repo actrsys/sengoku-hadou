@@ -2701,23 +2701,23 @@ class UIManager {
         
         const msgContainer = document.createElement('div');
         msgContainer.className = 'war-action-message-container';
-        // 左上固定のためのスタイル調整
         msgContainer.style.cssText = 'text-align: left; position: relative; display: block; padding: 15px; box-sizing: border-box; height: 100%;';
         
         const textContainer = document.createElement('div');
         textContainer.className = 'war-action-message-text';
-        textContainer.style.cssText = 'text-align: left; width: 100%; vertical-align: top; display: block;';
+        textContainer.style.cssText = 'text-align: left; width: 100%; display: block;';
         
         const promptContainer = document.createElement('div');
         promptContainer.className = 'war-action-message-prompt';
-        promptContainer.textContent = '▶ SKIP';
-        promptContainer.style.cssText = 'position: absolute; bottom: 8px; right: 12px; font-size: 0.8rem; color: #888;';
+        promptContainer.textContent = '▶ クリックでスキップ';
+        promptContainer.style.cssText = 'position: absolute; bottom: 8px; right: 12px; font-size: 0.8rem; color: #888; cursor: pointer;';
 
         msgContainer.appendChild(textContainer);
         msgContainer.appendChild(promptContainer);
         this.warControls.appendChild(msgContainer);
         
         let isFinished = false;
+        let isPaused = false; // ★追加：一時停止用の目印です
         let currentTimer = null;
         if (!Array.isArray(messages)) messages = [messages];
         let currentIndex = 0;
@@ -2729,33 +2729,62 @@ class UIManager {
 
             while (currentIndex < messages.length) {
                 const item = messages[currentIndex++];
-                if (typeof item === 'string') {
-                    textContainer.innerHTML += (textContainer.innerHTML ? '<br>' : '') + item;
-                } else if (item.text) {
-                    textContainer.innerHTML += (textContainer.innerHTML ? '<br>' : '') + item.text;
+                let msgText = typeof item === 'string' ? item : (item.text || '');
+                
+                // ★追加：大事な赤文字（色指定）が含まれているかチェックします
+                let isSpecialMsg = /color\s*:\s*(#d32f2f|red)/i.test(msgText); 
+
+                if (isSpecialMsg) {
+                    textContainer.innerHTML = ''; // ★追加：赤文字なら画面をリセットして綺麗にします
+                }
+                
+                if (msgText) {
+                    textContainer.innerHTML += (textContainer.innerHTML ? '<br>' : '') + msgText;
+                }
+                
+                if (typeof item !== 'string' && item) {
                     if (item.currentStats) this.updateWarUI();
                     if (item.type === 'damage' || item.type === 'recover') this.playDamageAnimation(item);
-                } else if (item.type === 'damage' || item.type === 'recover') {
-                    this.playDamageAnimation(item);
                 }
             }
             if (window.AudioManager) window.AudioManager.playSE('decision.ogg');
-            setTimeout(onClick, 300); // 演出完了のため一瞬だけ待つ
+            setTimeout(onClick, 300); 
         };
 
         msgContainer.onclick = (e) => {
             e.stopPropagation(); e.preventDefault();
-            if (!isFinished) skipToEnd();
+            if (isFinished) return;
+            
+            // ★追加：一時停止中（赤文字で止まっている時）なら、スキップではなく「再開」にします
+            if (isPaused) {
+                isPaused = false;
+                promptContainer.textContent = '▶ クリックでスキップ';
+                if (window.AudioManager) window.AudioManager.playSE('decision.ogg');
+                processNext();
+            } else {
+                skipToEnd();
+            }
         };
 
         const processNext = () => {
             if (isFinished) return;
             if (currentIndex >= messages.length) {
+                promptContainer.style.visibility = 'hidden';
                 currentTimer = setTimeout(() => { if (!isFinished) { isFinished = true; onClick(); } }, 1200);
                 return;
             }
             const item = messages[currentIndex++];
             let waitTime = 700;
+            
+            let msgText = typeof item === 'string' ? item : (item.text || '');
+            
+            // ★追加：大事な赤文字（色指定）が含まれているかチェックします
+            let isSpecialMsg = /color\s*:\s*(#d32f2f|red)/i.test(msgText); 
+
+            if (isSpecialMsg) {
+                textContainer.innerHTML = ''; // ★追加：赤文字なら今までのお話を一度消して綺麗にします
+            }
+
             if (typeof item === 'string') {
                 textContainer.innerHTML += (textContainer.innerHTML ? '<br>' : '') + item;
             } else if (item.text) {
@@ -2770,6 +2799,17 @@ class UIManager {
                 this.playDamageAnimation(item);
                 waitTime = 900;
             } else { waitTime = 0; }
+
+            textContainer.scrollTop = textContainer.scrollHeight;
+
+            // ★追加：赤文字の時はここでタイマーを止め、一時停止します
+            if (isSpecialMsg) {
+                isPaused = true;
+                promptContainer.textContent = '▶ クリックして次へ';
+                promptContainer.style.visibility = 'visible';
+                return; // タイマーをセットせずにここで待ちます
+            }
+
             currentTimer = setTimeout(processNext, waitTime);
         };
         processNext();
