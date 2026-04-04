@@ -630,7 +630,7 @@ Object.assign(WarManager.prototype, {
                 let dName = defDaimyoName || "不明";
                 // ★鎮圧戦や相手が諸勢力の場合は「自領」にします
                 if (this.state.isKunishuSubjugation || defCastle.isKunishu) {
-                    siegeMsg = `${dName}の${defLeaderName}は、\n自領に立て籠もりました！`;
+                    siegeMsg = `${dName}の${defLeaderName}は、\n拠点に立て籠もりました！`;
                 } else {
                     siegeMsg = `${dName}の${defLeaderName}は、\n${defCastle.name}に立て籠もりました！`;
                 }
