@@ -523,7 +523,6 @@ class DiplomacyManager {
             this.game.factionSystem.updateRecognition(doer, 10);
 
         } else if (type === 'subordinate') {
-            this.clearDominationRelations(doer.clan);
             this.changeStatus(doer.clan, targetClanId, '従属');
             msg = `${this.game.clans.find(c => c.id === targetClanId).name} に従属しました！`;
             if (!isPlayerInvolved) aiMsg = `${targetClanName} が ${doerClanName} を支配下に置きました！`;
@@ -539,7 +538,6 @@ class DiplomacyManager {
                 doer.achievementTotal += 5;
                 this.game.factionSystem.updateRecognition(doer, 10);
             } else if (isSuccess) {
-                this.clearDominationRelations(targetClanId);
                 this.changeStatus(doer.clan, targetClanId, '支配');
                 msg = `${this.game.clans.find(c => c.id === targetClanId).name} を支配下に置くことに成功しました！`;
                 if (!isPlayerInvolved) aiMsg = `${doerClanName} が ${targetClanName} を支配下に置きました！`;
@@ -653,7 +651,6 @@ class DiplomacyManager {
                         if (onComplete) setTimeout(onComplete, 100);
                     });
                 } else if (type === 'dominate') {
-                    this.clearDominationRelations(targetClanId);
                     this.changeStatus(doer.clan, targetClanId, '支配');
                     this.game.ui.showResultModal(`${doerClan.name} に従属しました……`, () => {
                         if (onComplete) setTimeout(onComplete, 100);
