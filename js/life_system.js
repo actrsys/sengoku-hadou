@@ -728,7 +728,7 @@ class LifeSystem {
 
             // 城主や大名がまだ城に残っている判定になっていれば、お城を空っぽにします
             clanCastles.forEach(c => {
-                c.ownerClan = 0;
+                this.game.castleManager.changeOwner(c, 0);
                 c.castellanId = 0;
                 this.game.getCastleBushos(c.id).forEach(l => {
                     if (l.status === 'unborn' || l.status === 'dead') return;
