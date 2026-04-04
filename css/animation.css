@@ -45,7 +45,7 @@
     animation: popup 1s ease-out forwards;
 }
 
-/* ★追加：ダメージポップアップ用の専用デザイン */
+/* ★修正：ダメージポップアップ用の専用デザイン（重複を削除しました） */
 .damage-popup {
     position: absolute;
     top: 30%;
@@ -68,31 +68,19 @@
 /* -----------------------------------------
    4. 画面が赤く光る（大ダメージを受けた時など）
    ----------------------------------------- */
+/* ★修正：背景色ではなく、枠に赤い影をつけるようにして目立たせます！ */
 .anim-damage-flash {
-    animation: flash-red 0.3s ease-out;
+    animation: flash-red 0.5s ease-out;
 }
 
 @keyframes flash-red {
-    0%   { background-color: transparent; }
-    50%  { background-color: rgba(255, 0, 0, 0.5); } /* 半透明の赤になる */
-    100% { background-color: transparent; }          /* 元に戻る */
+    0%   { box-shadow: inset 0 0 0px transparent; }
+    30%  { box-shadow: inset 0 0 30px rgba(255, 0, 0, 0.8); } /* 内側に赤い影を出す */
+    100% { box-shadow: inset 0 0 0px transparent; }
 }
 
-/* ★追加：ダメージポップアップ用の専用デザイン */
-.damage-popup {
-    position: absolute;
-    top: 30%;
-    left: 50%;
-    transform: translate(-50%, -50%);
-    color: #ff3333;
-    font-size: 2.2rem;
-    font-weight: bold;
-    text-shadow: 2px 2px 0 #fff, -2px -2px 0 #fff, 2px -2px 0 #fff, -2px 2px 0 #fff;
-    pointer-events: none;
-    z-index: 100;
-}
 
-/* ★追加：ここから！ 回復ポップアップ用の緑色の専用デザイン */
+/* ★追加：回復ポップアップ用の緑色の専用デザイン */
 .recover-popup {
     position: absolute;
     top: 30%;
@@ -105,10 +93,9 @@
     pointer-events: none;
     z-index: 100;
 }
-/* ★ここまで！ */
 
 /* =========================================
-   ★ここから追加！：マップの地方をぼわーっと光らせるアニメーション
+   マップの地方をぼわーっと光らせるアニメーション
    ========================================= */
 .anim-map-glow {
     /* 1.5秒かけて、glow-pulseという動きを永遠に繰り返します */
