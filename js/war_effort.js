@@ -630,7 +630,7 @@ Object.assign(WarManager.prototype, {
                 let dName = defDaimyoName || "不明";
                 // ★諸勢力の場合のみ「防衛陣地」にします
                 if (defCastle.isKunishu) {
-                    siegeMsg = `${dName}の${defLeaderName}は、\n防衛陣地に立て籠もりました！`;
+                    siegeMsg = `${defCastle.name}の${defLeaderName}は、\n防衛陣地に立て籠もりました！`;
                 } else {
                     siegeMsg = `${dName}の${defLeaderName}は、\n${defCastle.name}に立て籠もりました！`;
                 }
