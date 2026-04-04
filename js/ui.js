@@ -2896,8 +2896,9 @@ class UIManager {
             // 数字そのものではなく、八角形の枠全体を揺らすように親を探します
             let wallEl = document.getElementById('war-def-wall-info');
             if (wallEl) {
-                let targetWrap = wallEl.closest('.war-wall-hexagon-wrap');
-                if (!targetWrap) targetWrap = wallEl;
+                // ★修正：「城防御」のラベルも一緒に揺れるように親の親を探します
+                let targetWrap = wallEl.closest('.war-wall-center');
+                if (!targetWrap) targetWrap = wallEl.closest('.war-wall-hexagon-wrap') || wallEl;
                 
                 targetWrap.classList.remove('anim-damage-shake', 'anim-damage-flash');
                 void targetWrap.offsetWidth;
