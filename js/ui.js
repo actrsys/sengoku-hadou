@@ -2895,21 +2895,19 @@ class UIManager {
         const applyWallAnim = (dmgStr, isRecover = false) => {
             let wallEl = document.getElementById('war-def-wall-info');
             if (wallEl) {
-                // ★修正：揺らす対象（文字ごと）と、赤く光らせる対象（八角形の枠だけ）を分けます！
-                let centerWrap = wallEl.closest('.war-wall-center');
+                // ★修正：揺らす対象を「数字だけ」に、赤く光らせる対象を「八角形の枠」にします！
                 let hexWrap = wallEl.closest('.war-wall-hexagon-wrap');
                 
-                if (!centerWrap) centerWrap = hexWrap || wallEl;
                 if (!hexWrap) hexWrap = wallEl;
                 
-                centerWrap.classList.remove('anim-damage-shake');
-                hexWrap.classList.remove('anim-damage-flash');
-                void centerWrap.offsetWidth; 
+                wallEl.classList.remove('anim-damage-shake'); // 数字の揺れをリセット
+                hexWrap.classList.remove('anim-damage-flash'); // 枠の赤い光をリセット
+                void wallEl.offsetWidth; 
                 void hexWrap.offsetWidth; 
                 
                 // ★追加：回復じゃない時（ダメージの時）だけ効果を出します
                 if (!isRecover) {
-                    centerWrap.classList.add('anim-damage-shake'); // 文字ごと揺らします
+                    wallEl.classList.add('anim-damage-shake'); // ★数字だけを揺らします
                     hexWrap.classList.add('anim-damage-flash');    // 枠の中だけ赤く光らせます
                 }
                 
@@ -2926,13 +2924,13 @@ class UIManager {
                 pop.style.zIndex = '100';
                 pop.style.pointerEvents = 'none';
 
-                // ★追加：城壁の枠を基準（relative）にする目印です！
-                wallEl.style.position = 'relative';
-
-                centerWrap.appendChild(pop);
+                // ★追加：ダメージの文字（-50など）の基準を八角形の枠にします！
+                hexWrap.style.position = 'relative';
+                // 数字そのものではなく、動かない枠の方にダメージ文字をくっつけます
+                hexWrap.appendChild(pop);
 
                 setTimeout(() => {
-                    centerWrap.classList.remove('anim-damage-shake');
+                    wallEl.classList.remove('anim-damage-shake');
                     hexWrap.classList.remove('anim-damage-flash');
                     if (pop.parentNode) pop.parentNode.removeChild(pop);
                 }, 1000);
