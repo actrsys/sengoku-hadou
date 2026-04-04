@@ -530,6 +530,82 @@ body:not(.is-pc).daimyo-select-mode #map-wrapper { margin-bottom: 0 !important; 
 .war-screen { flex: 1; display: flex; flex-direction: column; background: #e0e0e0; padding: 5px; border-radius: 4px; overflow: hidden;}
 #war-log { height: 45px !important; min-height: 45px !important; margin-bottom: 5px !important; display: none !important; }
 
+/* 上部ステータスバー（1段目） */
+.war-top-bar {
+    background: #000;
+    color: #fff;
+    display: flex;
+    justify-content: flex-start;
+    align-items: center;
+    padding: 8px 15px;
+    font-size: 1.1rem;
+    font-weight: bold;
+    flex-shrink: 0;
+    gap: 30px;
+}
+.war-title {
+    margin: 0;
+    padding: 0;
+    text-align: left;
+    border-bottom: none;
+    font-size: 1.3rem;
+    font-weight: normal;
+    background: transparent;
+    color: #fff;
+    flex-shrink: 0;
+}
+.turn-number {
+    font-size: 1.5rem;
+    color: #fdea60;
+}
+
+/* 城防御表示（2段目） */
+.war-wall-container {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    padding: 10px 0;
+    background: #111;
+    flex-shrink: 0;
+    border-bottom: 2px solid #555;
+}
+.war-wall-hexagon-wrap {
+    position: relative;
+    padding: 2px;
+    background: #d4af37;
+    clip-path: polygon(15px 0, calc(100% - 15px) 0, 100% 15px, 100% calc(100% - 15px), calc(100% - 15px) 100%, 15px 100%, 0 calc(100% - 15px), 0 15px);
+    margin-top: 10px;
+}
+.war-wall-hexagon-inner {
+    background: #1a1a1a;
+    padding: 10px 30px;
+    clip-path: polygon(14px 0, calc(100% - 14px) 0, 100% 14px, 100% calc(100% - 14px), calc(100% - 14px) 100%, 14px 100%, 0 calc(100% - 14px), 0 14px);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-width: 60px;
+}
+.war-wall-label {
+    position: absolute;
+    top: -8px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: #111;
+    color: #d4af37;
+    font-size: 0.8rem;
+    padding: 0 10px;
+    border: 1px solid #d4af37;
+    border-radius: 3px;
+    z-index: 2;
+    white-space: nowrap;
+}
+#war-def-wall-info {
+    font-size: 1.8rem;
+    font-weight: bold;
+    color: #fff;
+    letter-spacing: 2px;
+}
+
 .responsive-war-layout { display: flex; flex-direction: column; width: 100%; }
 .responsive-war-left { display: flex; flex-direction: column; flex: 1; overflow: hidden; border-right: none !important; }
 
@@ -736,6 +812,10 @@ body:not(.is-pc) .war-visual { padding: 3px 5px !important; margin-bottom: 0 !im
 body:not(.is-pc) .responsive-war-visual { padding: 2px !important; gap: 2px !important; }
 body:not(.is-pc) #war-title-name { font-size: 1.05rem !important; margin: 1px 0 !important; }
 body:not(.is-pc) .war-header-info, body:not(.is-pc) #war-date-info, body:not(.is-pc) #war-turn-info { font-size: 0.8rem !important; margin-bottom: 1px !important; }
+body:not(.is-pc) .war-top-bar { gap: 10px !important; padding: 4px 8px !important; font-size: 0.9rem !important; }
+body:not(.is-pc) .war-wall-container { padding: 5px 0 !important; }
+body:not(.is-pc) .turn-number { font-size: 1.1rem !important; }
+body:not(.is-pc) #war-def-wall-info { font-size: 1.4rem !important; }
 
 /* ① メイン軍・援軍【共通】の魔法 */
 body:not(.is-pc) .responsive-army-box,
