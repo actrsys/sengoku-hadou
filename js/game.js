@@ -749,6 +749,8 @@ class GameManager {
         this.affiliationSystem = new AffiliationSystem(this);
         // ★ 月初・月末のイベントを管理するシステムを呼び出します！
         this.eventManager = new EventManager(this);
+        // ★ 城の管理を専門に行うシステムを呼び出します！
+        this.castleManager = new CastleManager(this);
         
         this.phase = 'title';
     }

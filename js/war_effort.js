@@ -1184,7 +1184,8 @@ Object.assign(WarManager.prototype, {
                 if (attackerWon) {
                     const targetC = this.game.getCastle(s.defender.id);
                     const oldOwner = targetC.ownerClan;
-                    targetC.ownerClan = 0; 
+                    // ★城の管理システムにお任せします！
+                    this.game.castleManager.changeOwner(targetC, 0); 
                     targetC.castellanId = 0;
                     
                     const kunishuMembers = this.game.kunishuSystem.getKunishuMembers(s.attacker.kunishuId).map(b => b.id);
@@ -1329,19 +1330,13 @@ Object.assign(WarManager.prototype, {
             }
             
             if (isRetreat && attackerWon) {
-                const oldOwner = s.defender.ownerClan; // ★追加：前の持ち主を記憶しておきます
-                s.defender.ownerClan = s.attacker.ownerClan; 
-                s.defender.investigatedUntil = 0; 
+                // ★城の管理システムにお任せします！
+                this.game.castleManager.changeOwner(s.defender, s.attacker.ownerClan);
                 s.defender.soldiers = totalAtkSurvivors;
 
                 // ★追加：敵が逃げて空っぽになった城に入るので、自分たちの士気と訓練をそのまま使います！
                 s.defender.training = s.attacker.training || 0;
                 s.defender.morale = s.attacker.morale || 0;
-                
-                // ★追加：城の持ち主が変わった時の諸勢力の反発チェック魔法を使います！
-                if (oldOwner !== s.defender.ownerClan) {
-                    this.applyKunishuRelationDropOnCapture(s.defender, s.defender.ownerClan);
-                }
                 
                 // ★追加: 敵が撤退して空になった城を占領した時、持ってきた馬と鉄砲を城に格納する
                 s.defender.horses = (s.attacker.horses || 0);
@@ -1404,13 +1399,9 @@ Object.assign(WarManager.prototype, {
                     if (s.isPlayerInvolved) this.game.ui.log(`(敵兵の持ち逃げにより 金${lostGold}, 米${lostRice} が失われた)`);
                 }
                 
-                const oldOwner = s.defender.ownerClan; // ★追加：前の持ち主を記憶しておきます
-                s.defender.ownerClan = s.attacker.ownerClan; s.defender.investigatedUntil = 0; s.defender.immunityUntil = this.game.getCurrentTurnId() + 1;
-                
-                // ★追加：城の持ち主が変わった時の諸勢力の反発チェック魔法を使います！
-                if (oldOwner !== s.defender.ownerClan) {
-                    this.applyKunishuRelationDropOnCapture(s.defender, s.defender.ownerClan);
-                }
+                // ★城の管理システムにお任せします！
+                this.game.castleManager.changeOwner(s.defender, s.attacker.ownerClan);
+                s.defender.immunityUntil = this.game.getCurrentTurnId() + 1;
                 
                 const srcC = this.game.getCastle(s.sourceCastle.id);
                 s.atkBushos.forEach((b) => { 
@@ -2476,29 +2467,6 @@ Object.assign(WarManager.prototype, {
         const helperClanName = this.game.clans.find(c => c.id === helperClanId)?.name || "援軍";
         const leaderName = reinfBushos.length > 0 ? reinfBushos[0].name : "総大将";
         this.game.ui.showDialog(`${helperClanName}の${leaderName} (${helperCastle.name}) が守備側の援軍として出発しました！`, false, onComplete);
-    }, // ←★ここにカンマ（,）を付けるのがとっても大事です！
-    
-    // ★追加: 城の所有者が変わった時、その城にいる諸勢力の友好度をチェックして低下させる魔法
-    applyKunishuRelationDropOnCapture(castle, newOwnerClan) {
-        if (newOwnerClan === 0) return; // 空き城になった時は何もしません
-        
-        // この城にいる諸勢力を探します
-        const kunishusInCastle = this.game.kunishuSystem.getKunishusInCastle(castle.id);
-        
-        kunishusInCastle.forEach(kunishu => {
-            // 新しい殿様との友好度をチェック！
-            const currentRel = kunishu.getRelation(newOwnerClan);
-            if (currentRel <= 69) {
-                // 友好度が69以下なら、20下げます（0より下にはならないようにします）
-                const newRel = Math.max(0, currentRel - 20);
-                kunishu.setRelation(newOwnerClan, newRel);
-                
-                // もしプレイヤーが関わっていたら、メッセージを出します！
-                if (newOwnerClan === this.game.playerClanId) {
-                    this.game.ui.log(`(城の主が変わったため、${kunishu.getName(this.game)}との友好度が低下しました)`);
-                }
-            }
-        });
     }
     
 });
