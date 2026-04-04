@@ -198,7 +198,12 @@ Object.assign(WarManager.prototype, {
             const defProvData = this.game.provinces.find(p => p.id === defCastle.provinceId);
             const defDaimyoName = (defClanData && defClanData.name) ? defClanData.name : (defCastle.isKunishu ? defCastle.name : (defProvData ? defProvData.province : "中立"));
             
-            let startMsg = `${atkDaimyoName}の${atkBushos[0].name}が\n${defDaimyoName}の${defCastle.name}に攻め込みました！`;
+            let startMsg = "";
+            if (defCastle.isKunishu) {
+                startMsg = `${atkDaimyoName}の${atkBushos[0].name}が\n${defCastle.name}の鎮圧に乗り出しました！`;
+            } else {
+                startMsg = `${atkDaimyoName}の${atkBushos[0].name}が\n${defDaimyoName}の${defCastle.name}に攻め込みました！`;
+            }
             
             this.game.ui.log(startMsg.replace('\n', ''));
             if (!isPlayerInvolved) {
@@ -214,7 +219,11 @@ Object.assign(WarManager.prototype, {
                 // ★修正：諸勢力に対する鎮圧や反乱の時も、開始メッセージをしっかり出して結果を知らせます！
                 await this.game.ui.showDialogAsync(startMsg);
             } else {
-                await this.game.ui.showCutin(`${atkArmyName}の${atkBushos[0].name}が\n${defCastle.name}に攻め込みました！`);
+                if (defCastle.isKunishu) {
+                    await this.game.ui.showCutin(`${atkArmyName}の${atkBushos[0].name}が\n${defCastle.name}の鎮圧に乗り出しました！`);
+                } else {
+                    await this.game.ui.showCutin(`${atkArmyName}の${atkBushos[0].name}が\n${defCastle.name}に攻め込みました！`);
+                }
             }
 
             // ★追加：出陣したことで、攻撃側と守備側の国の米相場が上がります！
@@ -575,7 +584,10 @@ Object.assign(WarManager.prototype, {
                             const runFieldWarProcess = async () => {
                                 const guardName = defCastle.ownerClan === 0 ? "土豪" : "侍大将";
                                 const defLeaderName = defBushos.length > 0 ? defBushos[0].name : guardName;
-                                const interceptMsg = `${defDaimyoName}の${defLeaderName}は、\n${defCastle.name}から打って出ました！`;
+                                let interceptMsg = `${defDaimyoName}の${defLeaderName}は、\n${defCastle.name}から打って出ました！`;
+                                if (defCastle.isKunishu) {
+                                    interceptMsg = `${defCastle.name}の${defLeaderName}は、\n迎撃のため打って出ました！`;
+                                }
                                 
                                 this.game.ui.log(interceptMsg.replace('\n', ''));
                                 if (!isPlayerInvolved) {
@@ -706,7 +718,8 @@ Object.assign(WarManager.prototype, {
     
     executeRetreatLogic(defCastle) {
         // ★修正：大名家が「0（中立の空き城）」の時は、他の空き城を仲間の城だと勘違いしないように空っぽ（[]）にします！
-        const candidates = defCastle.ownerClan === 0 ? [] : this.game.castles.filter(c => c.ownerClan === defCastle.ownerClan && c.id !== defCastle.id && GameSystem.isReachable(this.game, defCastle, c, defCastle.ownerClan));
+        let candidates = defCastle.ownerClan === 0 ? [] : this.game.castles.filter(c => c.ownerClan === defCastle.ownerClan && c.id !== defCastle.id && GameSystem.isReachable(this.game, defCastle, c, defCastle.ownerClan));
+        if (defCastle.isKunishu) candidates = []; // ★諸勢力は撤退先がない
         if (candidates.length === 0) { this.endWar(true); return; }
         const s = this.state;
         
@@ -1122,6 +1135,8 @@ Object.assign(WarManager.prototype, {
                     if (kunishu) {
                         kunishu.soldiers = s.defender.soldiers;
                         kunishu.defense = s.defender.defense;
+                        kunishu.horses = s.defender.horses || 0;
+                        kunishu.guns = s.defender.guns || 0;
                     }
                 }
                 
