@@ -1039,6 +1039,7 @@ class WarManager {
 
         let totalSoldierDmg = 0;
         let totalCounterDmg = 0;
+        let counterDmgDetails = {}; // ★追加：各部隊がどれくらい反撃したかをメモする箱
 
         let distAtkPower = (activeAtkPower * multiplier) / Math.max(1, targetList.length);
         
@@ -1057,6 +1058,7 @@ class WarManager {
 
             totalSoldierDmg += dmg;
             totalCounterDmg += counter;
+            counterDmgDetails[t.role] = counter; // ★追加：この部隊の反撃パワーをメモします！
         });
 
         let calculatedSoldierDmg = Math.floor(totalSoldierDmg);
@@ -1108,9 +1110,16 @@ class WarManager {
             }
             if(isAtkTurnGroup) s.deadSoldiers.attacker += actualCounterDmg; else s.deadSoldiers.defender += actualCounterDmg;
 
-            // 反撃で敵の兵士を減らした側の士気上昇のメモ（ターゲット側の本隊）
-            let counterRole = isAtkTurnGroup ? 'defender' : 'attacker';
-            moraleDiffs[counterRole] += Math.round(Math.sqrt(actualCounterDmg) / 2);
+            // ★修正：反撃で敵を減らした士気アップを、がんばった割合に応じて各部隊に配ります！
+            if (totalCounterDmg > 0) {
+                for (let role in counterDmgDetails) {
+                    let shareRatio = counterDmgDetails[role] / totalCounterDmg;
+                    let sharedCounterDmg = actualCounterDmg * shareRatio;
+                    if (sharedCounterDmg > 0) {
+                        moraleDiffs[role] += Math.round(Math.sqrt(sharedCounterDmg) / 2);
+                    }
+                }
+            }
         }
         
         // ★今回追加：ここでメモした士気の上がり下がりを相殺して、一気に反映させます！
