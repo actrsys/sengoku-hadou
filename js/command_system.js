@@ -1229,7 +1229,6 @@ class CommandSystem {
             if (sVal <= 0) { this.game.ui.showDialog("兵士0では出陣できません", false); return; }
             
             const targetCastle = this.game.getCastle(targetId);
-            const targetName = targetCastle.name;
             
             const srcProv = this.game.provinces.find(p => p.id === castle.provinceId);
             const tgtProv = this.game.provinces.find(p => p.id === targetCastle.provinceId);
@@ -1237,56 +1236,7 @@ class CommandSystem {
                                 (tgtProv && tgtProv.statusEffects && tgtProv.statusEffects.includes('heavySnow'));
 
             const proceedWar = () => {
-                if (extraData && extraData.isKunishu) {
-                    const kunishu = this.game.kunishuSystem.getKunishu(extraData.kunishuId);
-                    const kunishuName = kunishu.getName(this.game);
-                    
-                    this.game.ui.showDialog(`${targetName}周辺に根付く ${kunishuName} を鎮圧しますか？\n今月の命令は終了となります`, true, async () => {
-                        let finalSVal = sVal;
-                        let finalBushosData = [...data];
-                        let finalBushos = finalBushosData.map(id => this.game.getBusho(id));
-
-                        if (isHeavySnow) {
-                            const survivingBushos = [];
-                            for (let b of finalBushos) {
-                                if (Math.random() < 0.10) {
-                                    await this.game.ui.showDialogAsync(`我が軍の${b.name}が凍死しました……`, false, 0);
-                                    await this.game.lifeSystem.executeDeath(b);
-                                } else {
-                                    survivingBushos.push(b);
-                                }
-                            }
-                            finalBushos = survivingBushos;
-                            finalBushosData = finalBushos.map(b => b.id);
-
-                            // ★武将が全滅したら兵士の遭難処理は飛ばします！
-                            if (finalBushos.length > 0) {
-                                const lossRate = 0.20 + Math.random() * 0.30;
-                                const lostSoldiers = Math.floor(finalSVal * lossRate);
-                                finalSVal -= lostSoldiers;
-
-                                if (lostSoldiers > 0) {
-                                    await this.game.ui.showDialogAsync(`我が軍の兵士${lostSoldiers}人が遭難しました……`, false, 0);
-                                }
-                            }
-
-                            if (finalBushos.length === 0) {
-                                await this.game.ui.showDialogAsync("我が軍は行方不明になりました……", false, 0);
-                                castle.soldiers = Math.max(0, castle.soldiers - sVal);
-                                castle.rice = Math.max(0, castle.rice - rVal);
-                                castle.horses = Math.max(0, (castle.horses || 0) - hVal);
-                                castle.guns = Math.max(0, (castle.guns || 0) - gVal);
-                                this.game.ui.updatePanelHeader();
-                                this.game.ui.renderCommandMenu();
-                                return;
-                            }
-                        }
-                        this.game.kunishuSystem.executeKunishuSubjugate(castle, targetId, finalBushosData, finalSVal, rVal, hVal, gVal, kunishu);
-                    });
-                } else {
-                    // ★大名への攻撃なら被害判定は「後回し」にして、援軍の準備へ進みます！
-                    this.checkReinforcementAndStartWar(castle, targetId, data.map(id => this.game.getBusho(id)), sVal, rVal, hVal, gVal);
-                }
+                this.checkReinforcementAndStartWar(castle, targetId, data.map(id => this.game.getBusho(id)), sVal, rVal, hVal, gVal, extraData);
             };
 
             if (isHeavySnow) {
@@ -2114,9 +2064,34 @@ class CommandSystem {
     }
     
     // ★ここから下全部、援軍を探してお願いする新しい機能です！
-    checkReinforcementAndStartWar(atkCastle, targetCastleId, atkBushos, sVal, rVal, hVal, gVal) {
+    checkReinforcementAndStartWar(atkCastle, targetCastleId, atkBushos, sVal, rVal, hVal, gVal, extraData = null) {
         const myClanId = atkCastle.ownerClan;
-        const targetCastle = this.game.getCastle(targetCastleId);
+        let targetCastle = this.game.getCastle(targetCastleId);
+        
+        // ★追加：諸勢力の場合はダミーのターゲットオブジェクトを作る
+        if (extraData && extraData.isKunishu) {
+            const kunishu = this.game.kunishuSystem.getKunishu(extraData.kunishuId);
+            const tgtProv = this.game.provinces.find(p => p.id === targetCastle.provinceId);
+            const provName = tgtProv ? tgtProv.province : "不明な国";
+            targetCastle = Object.assign({}, targetCastle, {
+                name: `${provName}の${kunishu.getName(this.game)}`,
+                isKunishu: true,
+                kunishuId: kunishu.id,
+                soldiers: kunishu.soldiers,
+                rice: kunishu.soldiers * 2, // 無から湧く兵糧
+                horses: kunishu.horses || 0,
+                guns: kunishu.guns || 0,
+                defense: kunishu.defense,
+                training: kunishu.training,
+                morale: kunishu.morale
+            });
+            this.game.warManager.state = this.game.warManager.state || {};
+            this.game.warManager.state.isKunishuSubjugation = true; 
+        } else {
+            this.game.warManager.state = this.game.warManager.state || {};
+            this.game.warManager.state.isKunishuSubjugation = false;
+        }
+
         const pid = this.game.playerClanId;
         
         let selfCandidates = [];
@@ -2232,7 +2207,8 @@ class CommandSystem {
 
         const askConfirmAndProceedToAlly = (selfReinfData) => {
             if (myClanId === pid && !atkCastle.isDelegated) {
-                this.game.ui.showDialog(`${targetCastle.name}に攻め込みますか？\n今月の命令は終了となります`, true, 
+                const confirmMsg = targetCastle.isKunishu ? `${targetCastle.name} を鎮圧しますか？\n今月の命令は終了となります` : `${targetCastle.name}に攻め込みますか？\n今月の命令は終了となります`;
+                this.game.ui.showDialog(confirmMsg, true, 
                     async () => {
                         // ★「はい」を押した直後に、メイン軍と援軍の雪の被害をまとめて計算します！
                         let finalAtkBushos = [...atkBushos];
