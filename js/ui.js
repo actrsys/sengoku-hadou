@@ -3345,7 +3345,7 @@ class UIManager {
         // ★右側の説明を入れる箱（3分の1）
         const descContainer = document.createElement('div');
         descContainer.className = 'war-controls-desc';
-        descContainer.innerHTML = '<div style="color:#666; text-align:center; margin-top:15px;">コマンドを選択してください</div>';
+        descContainer.innerHTML = '<div style="color:#666; text-align:center; margin-top:15px;">命令を選択してください</div>';
 
         // 2つの箱を画面に追加します
         this.warControls.appendChild(btnContainer);
