@@ -3082,37 +3082,37 @@ class UIManager {
             const statsEl = card.querySelector('.responsive-army-stats');
 
             if (!reinfData) {
-                // 誰も来ていない（空っぽ）時は、グレーの寂しいデザインにします
-                card.style.backgroundColor = '#d3d3d3';
-                card.style.textShadow = 'none';
-                titleEl.style.color = '#555';
-                titleEl.style.borderBottomColor = 'rgba(0,0,0,0.2)';
-                titleEl.style.textShadow = 'none';
-                statsEl.style.color = '#888';
-                statsEl.style.textShadow = 'none';
-                bushoEl.style.background = 'rgba(0,0,0,0.1)';
-                bushoEl.style.color = '#888';
-                bushoEl.style.textShadow = 'none';
+                // 誰も来ていない（空っぽ）時は、左下から右上へ濃くなるグラデーションにします
+                card.style.background = 'linear-gradient(to top right, #eeeeee, #777777)';
+                
+                // 中身の要素をすべて透明にして、レイアウト（大きさ）だけを維持します
+                titleEl.style.visibility = 'hidden';
+                bushoEl.style.visibility = 'hidden';
+                card.querySelector('.reinf-content-wrap').style.visibility = 'hidden';
 
-                faceContainer.classList.add('hidden');
-                emptyIcon.classList.remove('hidden');
-
-                orgEl.textContent = '---';
-                bushoEl.textContent = '---';
-                soldierEl.textContent = '---';
-                riceEl.textContent = '---';
-                moraleEl.textContent = '---';
-                trainingEl.textContent = '---';
-                if(moraleSpEl) moraleSpEl.textContent = '---';
-                if(trainingSpEl) trainingSpEl.textContent = '---';
+                orgEl.textContent = '';
+                bushoEl.textContent = '';
+                soldierEl.textContent = '';
+                riceEl.textContent = '';
+                moraleEl.textContent = '';
+                trainingEl.textContent = '';
+                if(moraleSpEl) moraleSpEl.textContent = '';
+                if(trainingSpEl) trainingSpEl.textContent = '';
             } else {
-                // 援軍が来ている時は、所属に応じた鮮やかな色に戻します！
+                // 援軍が来ている時は、グラデーションを消して所属に応じた鮮やかな色に戻します！
+                card.style.background = ''; 
                 if (prefix === 'atk-self') card.style.backgroundColor = '#ef9a9a';
                 else if (prefix === 'atk-ally') card.style.backgroundColor = '#ffcc80';
                 else if (prefix === 'def-self') card.style.backgroundColor = '#81d4fa';
                 else if (prefix === 'def-ally') card.style.backgroundColor = '#80cbc4';
                 
                 card.style.textShadow = '1px 1px 2px rgba(0,0,0,0.6)';
+                
+                // 透明化を解除して見えるようにします
+                titleEl.style.visibility = '';
+                bushoEl.style.visibility = '';
+                card.querySelector('.reinf-content-wrap').style.visibility = '';
+
                 titleEl.style.color = '#fff';
                 titleEl.style.borderBottomColor = 'rgba(255,255,255,0.8)';
                 titleEl.style.textShadow = '';
