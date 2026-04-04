@@ -2904,6 +2904,8 @@ class UIManager {
 
                         if (id === 'war-def-wall-info') {
                             el.innerHTML = `城防御 <span style="color:#fdea60;">${val}</span>`;
+                        } else if (id.includes('soldier')) {
+                            el.textContent = val + '人';
                         } else {
                             el.textContent = val;
                         }
@@ -3187,7 +3189,7 @@ class UIManager {
                 orgEl.textContent = orgName;
                 orgEl.textContent = orgName;
                 bushoEl.textContent = leaderName;
-                soldierEl.textContent = reinfData.soldiers || 0;
+                soldierEl.textContent = (reinfData.soldiers || 0) + '人';
                 riceEl.textContent = reinfData.rice || 0;
                 moraleEl.textContent = reinfData.morale || 0;
                 trainingEl.textContent = reinfData.training || 0;
