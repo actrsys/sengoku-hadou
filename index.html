@@ -292,12 +292,19 @@
                 <div class="war-screen responsive-war-layout" style="flex:1; padding:0; background:radial-gradient(circle, #2a1f3d 0%, #110d1a 100%); border-radius:0; overflow:hidden;">
                     
                     <div class="responsive-war-left" style="display:flex; flex-direction:column; flex:1; overflow:hidden;">
-                        <div id="war-top-bar" style="background:#000; color:#fff; display:flex; justify-content:space-between; padding:5px 10px; font-size:1.1rem; font-weight:bold; flex-shrink:0;">
+                        <div id="war-top-bar" class="war-top-bar">
                             <span id="war-date-info"></span>
+                            <h2 class="war-title" id="war-title-name"></h2>
                             <span id="war-turn-info"></span>
-                            <span id="war-def-wall-info"></span>
                         </div>
-                        <h2 class="war-title" id="war-title-name" style="margin:0; padding:10px 0; text-align:center; border-bottom:2px solid #555; font-size:1.5rem; font-weight:normal; background:transparent; color:#fff; flex-shrink:0;"></h2>
+                        <div class="war-wall-container">
+                            <div class="war-wall-hexagon-wrap">
+                                <span class="war-wall-label">城防御</span>
+                                <div class="war-wall-hexagon-inner">
+                                    <span id="war-def-wall-info"></span>
+                                </div>
+                            </div>
+                        </div>
                         <div class="war-visual responsive-war-visual" style="display: flex; justify-content: center; width: 100%; box-sizing: border-box; padding: 10px;">
                             
                             <div class="war-side-wrapper" style="display: flex; flex-direction: row; align-items: stretch; flex: 1; max-width: calc(50% - 10px); justify-content: center; height: 100%; gap: 8px;">
