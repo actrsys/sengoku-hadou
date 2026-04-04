@@ -3110,12 +3110,15 @@ class UIManager {
 
             if (!reinfData) {
                 // 誰も来ていない（空っぽ）時
-                // ★追加：もしさっきまで中身が見えていたなら、フェードインの魔法を呼び出します！
-                const isVisible = titleEl.style.visibility !== 'hidden';
-                if (isVisible) {
+                // ★修正：カードに「直前まで部隊がいたよシール」が貼られているか確認します
+                const wasHere = card.dataset.hasUnit === 'true';
+                
+                if (wasHere) {
+                    // さっきまで部隊がいたなら、アニメーションで消します
                     this.applyEmptyCardAnimation(card);
+                    card.dataset.hasUnit = 'false'; // シールを「いない」に貼り替えます
                 } else {
-                    // 初めから空っぽ、またはアニメーション完了済みの時はそのまま空にする
+                    // 最初から空っぽ、またはアニメーション完了済みの時はそのまま空にする
                     card.style.background = 'linear-gradient(to top right, #eeeeee, #777777)';
                     
                     // 中身の要素をすべて透明にして、レイアウト（大きさ）だけを維持します
@@ -3131,9 +3134,13 @@ class UIManager {
                     trainingEl.textContent = '';
                     if(moraleSpEl) moraleSpEl.textContent = '';
                     if(trainingSpEl) trainingSpEl.textContent = '';
+                    
+                    card.dataset.hasUnit = 'false'; // 念のためシールを「いない」にしておきます
                 }
             } else {
                 // 援軍が来ている時は、所属に応じた鮮やかなグラデーションにします！
+                card.dataset.hasUnit = 'true'; // ★追加：部隊が「いる」というシールを貼ります！
+                
                 card.style.backgroundColor = ''; 
                 if (prefix === 'atk-self') card.style.background = 'linear-gradient(to top right, #ffcdd2, #d32f2f)';
                 else if (prefix === 'atk-ally') card.style.background = 'linear-gradient(to top right, #ffecb3, #f57c00)';
