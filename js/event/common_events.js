@@ -8,21 +8,6 @@
 // ==========================================
 window.playEventSoundAndBlock = function() {
     if (window.AudioManager) window.AudioManager.playSE('event001.ogg');
-    
-    // 画面全体に透明なバリアを張って触れなくします
-    const blockOverlay = document.createElement('div');
-    blockOverlay.style.position = 'fixed';
-    blockOverlay.style.top = '0';
-    blockOverlay.style.left = '0';
-    blockOverlay.style.width = '100%';
-    blockOverlay.style.height = '100%';
-    blockOverlay.style.zIndex = '9999'; // 一番手前に置きます
-    document.body.appendChild(blockOverlay);
-    
-    // 2秒（2000ミリ秒）経ったらバリアを消します
-    setTimeout(() => {
-        if (blockOverlay.parentNode) document.body.removeChild(blockOverlay);
-    }, 2000);
 };
 
 // ==========================================
