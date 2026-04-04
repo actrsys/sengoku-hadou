@@ -551,7 +551,11 @@ body:not(.is-pc).daimyo-select-mode #map-wrapper { margin-bottom: 0 !important; 
     font-weight: normal;
     background: transparent;
     color: #fff;
-    line-height: 1; /* 縦のズレを防ぐため高さをピッタリにします */
+    line-height: 1;
+    display: inline-flex;
+    align-items: center;
+    justify-content: flex-end;
+    flex-wrap: wrap;
 }
 
 /* 城防御表示（2段目） */
@@ -582,10 +586,10 @@ body:not(.is-pc).daimyo-select-mode #map-wrapper { margin-bottom: 0 !important; 
     text-align: left;
 }
 
-/* ターン数全体を、文字の下端（ベースライン）でピタッと揃える設定 */
+/* ターン数全体を、文字の縦の中心でピタッと揃える設定 */
 #war-turn-info {
     display: inline-flex;
-    align-items: baseline;
+    align-items: center;
 }
 
 /* ターン数の数字だけ特別扱いする設定 */
