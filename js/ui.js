@@ -2893,19 +2893,24 @@ class UIManager {
 
         // 城の防御力の文字がある場所を揺らす専用の魔法です！
         const applyWallAnim = (dmgStr, isRecover = false) => {
-            // 数字そのものではなく、八角形の枠全体を揺らすように親を探します
             let wallEl = document.getElementById('war-def-wall-info');
             if (wallEl) {
-                // ★修正：「城防御」のラベルも一緒に揺れるように親の親を探します
-                let targetWrap = wallEl.closest('.war-wall-center');
-                if (!targetWrap) targetWrap = wallEl.closest('.war-wall-hexagon-wrap') || wallEl;
+                // ★修正：揺らす対象（文字ごと）と、赤く光らせる対象（八角形の枠だけ）を分けます！
+                let centerWrap = wallEl.closest('.war-wall-center');
+                let hexWrap = wallEl.closest('.war-wall-hexagon-wrap');
                 
-                targetWrap.classList.remove('anim-damage-shake', 'anim-damage-flash');
-                void targetWrap.offsetWidth;
+                if (!centerWrap) centerWrap = hexWrap || wallEl;
+                if (!hexWrap) hexWrap = wallEl;
                 
-                // ★追加：回復じゃない時（ダメージの時）だけ揺らします
+                centerWrap.classList.remove('anim-damage-shake');
+                hexWrap.classList.remove('anim-damage-flash');
+                void centerWrap.offsetWidth; 
+                void hexWrap.offsetWidth; 
+                
+                // ★追加：回復じゃない時（ダメージの時）だけ効果を出します
                 if (!isRecover) {
-                    targetWrap.classList.add('anim-damage-shake', 'anim-damage-flash');
+                    centerWrap.classList.add('anim-damage-shake'); // 文字ごと揺らします
+                    hexWrap.classList.add('anim-damage-flash');    // 枠の中だけ赤く光らせます
                 }
                 
                 const pop = document.createElement('div');
@@ -2921,10 +2926,14 @@ class UIManager {
                 pop.style.zIndex = '100';
                 pop.style.pointerEvents = 'none';
 
-                targetWrap.appendChild(pop);
+                // ★追加：城壁の枠を基準（relative）にする目印です！
+                wallEl.style.position = 'relative';
+
+                centerWrap.appendChild(pop);
 
                 setTimeout(() => {
-                    targetWrap.classList.remove('anim-damage-shake', 'anim-damage-flash');
+                    centerWrap.classList.remove('anim-damage-shake');
+                    hexWrap.classList.remove('anim-damage-flash');
                     if (pop.parentNode) pop.parentNode.removeChild(pop);
                 }, 1000);
             }
@@ -3106,10 +3115,14 @@ class UIManager {
         const wallEl = document.getElementById('war-def-wall-info');
         if (wallEl) wallEl.innerHTML = `<span style="color:#fdea60;">${s.defender.defense}</span>`;
 
-        if (s.defender.isKunishu) {
-            setTxt('war-title-name', `${s.defender.name} 鎮圧戦`);
-        } else {
-            setTxt('war-title-name', `${s.defender.name} 攻防戦`);
+        const titleNameEl = document.getElementById('war-title-name');
+        if (titleNameEl) {
+            // ★修正：スマホで長くなった時に単語の途中で改行されないよう、名前と種類のブロックを分けます
+            if (s.defender.isKunishu) {
+                titleNameEl.innerHTML = `<span style="display:inline-block;">${s.defender.name}</span> <span style="display:inline-block;">鎮圧戦</span>`;
+            } else {
+                titleNameEl.innerHTML = `<span style="display:inline-block;">${s.defender.name}</span> <span style="display:inline-block;">攻防戦</span>`;
+            }
         }
         
         const atkClan = this.game.clans.find(c => c.id === s.attacker.ownerClan);
