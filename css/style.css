@@ -582,6 +582,12 @@ body:not(.is-pc).daimyo-select-mode #map-wrapper { margin-bottom: 0 !important; 
     text-align: left;
 }
 
+/* ターン数全体を、文字の下端（ベースライン）でピタッと揃える設定 */
+#war-turn-info {
+    display: inline-flex;
+    align-items: baseline;
+}
+
 /* ターン数の数字だけ特別扱いする設定 */
 .turn-number {
     font-size: 1.6rem; /* 数字だけ大きく */
