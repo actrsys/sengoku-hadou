@@ -1224,12 +1224,9 @@ class WarManager {
                         }
                         const bushoName = leader ? leader.name : "不明";
 
-                        // 思考中のメッセージを表示します（１行でシンプルに！）
-                        if (isDogou) {
-                            ctrl.innerHTML = `<div style="text-align: center; padding: 10px; font-weight: bold; color: #555;">土豪軍 思考中……</div>`;
-                        } else {
-                            ctrl.innerHTML = `<div style="text-align: center; padding: 10px; font-weight: bold; color: #555;">${factionName} ${bushoName} 思考中……</div>`;
-                        }
+                        // UIのメッセージ枠を使って思考中を表示します
+                        const armyDisplayName = isDogou ? "土豪軍" : `${factionName} ${bushoName}軍`;
+                        this.game.ui.showWarThinkingMessage(armyDisplayName);
                     }
                     
                     // ★追加：裏で高速計算する時は待たずにすぐ実行、画面に出す時だけ待ちます！

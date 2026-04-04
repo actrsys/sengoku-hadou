@@ -2692,37 +2692,26 @@ class UIManager {
         if (!this.warControls) return;
 
         const warAiGuard = document.getElementById('war-ai-guard');
-        if (warAiGuard) {
-            warAiGuard.classList.add('hidden');
-        }
+        if (warAiGuard) warAiGuard.classList.add('hidden');
         this.warControls.classList.remove('disabled-area');
 
         this.warControls.innerHTML = ''; 
-        this.warControls.style.position = ''; 
-
         const allCards = document.querySelectorAll('.army-box, .responsive-army-box');
         allCards.forEach(c => c.classList.remove('active-command-turn'));
         
         const msgContainer = document.createElement('div');
         msgContainer.className = 'war-action-message-container';
-        msgContainer.style.textAlign = 'left';
-        msgContainer.style.position = 'relative';
+        // 左上固定のためのスタイル調整
+        msgContainer.style.cssText = 'text-align: left; position: relative; display: block; padding: 15px; box-sizing: border-box; height: 100%;';
         
         const textContainer = document.createElement('div');
         textContainer.className = 'war-action-message-text';
-        textContainer.style.textAlign = 'left';
-        textContainer.style.width = '100%';
-        textContainer.style.height = '100%';
-        textContainer.style.overflowY = 'hidden'; 
-        textContainer.style.boxSizing = 'border-box';
+        textContainer.style.cssText = 'text-align: left; width: 100%; vertical-align: top; display: block;';
         
         const promptContainer = document.createElement('div');
         promptContainer.className = 'war-action-message-prompt';
-        promptContainer.textContent = '▶ クリックでスキップ';
-        promptContainer.style.position = 'absolute';
-        promptContainer.style.bottom = '10px';
-        promptContainer.style.right = '10px';
-        promptContainer.style.visibility = 'visible';
+        promptContainer.textContent = '▶ SKIP';
+        promptContainer.style.cssText = 'position: absolute; bottom: 8px; right: 12px; font-size: 0.8rem; color: #888;';
 
         msgContainer.appendChild(textContainer);
         msgContainer.appendChild(promptContainer);
@@ -2730,11 +2719,7 @@ class UIManager {
         
         let isFinished = false;
         let currentTimer = null;
-        
-        if (!Array.isArray(messages)) {
-            messages = [messages];
-        }
-
+        if (!Array.isArray(messages)) messages = [messages];
         let currentIndex = 0;
 
         const skipToEnd = () => {
@@ -2743,88 +2728,50 @@ class UIManager {
             if (currentTimer) clearTimeout(currentTimer);
 
             while (currentIndex < messages.length) {
-                const item = messages[currentIndex];
-                currentIndex++;
-                
+                const item = messages[currentIndex++];
                 if (typeof item === 'string') {
                     textContainer.innerHTML += (textContainer.innerHTML ? '<br>' : '') + item;
                 } else if (item.text) {
                     textContainer.innerHTML += (textContainer.innerHTML ? '<br>' : '') + item.text;
-                    if (item.currentStats) {
-                        this.updateWarUI();
-                    }
-                    if (item.type === 'damage' || item.type === 'recover') {
-                        this.playDamageAnimation(item);
-                    }
+                    if (item.currentStats) this.updateWarUI();
+                    if (item.type === 'damage' || item.type === 'recover') this.playDamageAnimation(item);
                 } else if (item.type === 'damage' || item.type === 'recover') {
                     this.playDamageAnimation(item);
                 }
             }
-            
-            textContainer.scrollTop = textContainer.scrollHeight;
-
             if (window.AudioManager) window.AudioManager.playSE('decision.ogg');
-            onClick();
+            setTimeout(onClick, 300); // 演出完了のため一瞬だけ待つ
         };
 
         msgContainer.onclick = (e) => {
-            e.stopPropagation();
-            e.preventDefault();
-            if (!isFinished) {
-                skipToEnd();
-            }
+            e.stopPropagation(); e.preventDefault();
+            if (!isFinished) skipToEnd();
         };
 
         const processNext = () => {
             if (isFinished) return;
-
             if (currentIndex >= messages.length) {
-                promptContainer.style.visibility = 'hidden';
-                currentTimer = setTimeout(() => {
-                    if (!isFinished) {
-                        isFinished = true;
-                        onClick();
-                    }
-                }, 1000);
+                currentTimer = setTimeout(() => { if (!isFinished) { isFinished = true; onClick(); } }, 1200);
                 return;
             }
-
-            const item = messages[currentIndex];
-            currentIndex++;
-
-            let waitTime = 600;
-
+            const item = messages[currentIndex++];
+            let waitTime = 700;
             if (typeof item === 'string') {
                 textContainer.innerHTML += (textContainer.innerHTML ? '<br>' : '') + item;
             } else if (item.text) {
-                if (item.se && window.AudioManager) {
-                    window.AudioManager.playSE(item.se);
-                }
-                
+                if (item.se && window.AudioManager) window.AudioManager.playSE(item.se);
                 textContainer.innerHTML += (textContainer.innerHTML ? '<br>' : '') + item.text;
-
-                if (item.currentStats) {
-                    setTimeout(() => {
-                        this.updateWarUI();
-                    }, 200);
-                }
-                
+                if (item.currentStats) setTimeout(() => this.updateWarUI(), 200);
                 if (item.type === 'damage' || item.type === 'recover') {
                     this.playDamageAnimation(item);
-                    waitTime = 800; 
+                    waitTime = 900;
                 }
             } else if (item.type === 'damage' || item.type === 'recover') {
                 this.playDamageAnimation(item);
-                waitTime = 800; 
-            } else {
-                waitTime = 0;
-            }
-
-            textContainer.scrollTop = textContainer.scrollHeight;
-
+                waitTime = 900;
+            } else { waitTime = 0; }
             currentTimer = setTimeout(processNext, waitTime);
         };
-
         processNext();
     }
 
@@ -3677,5 +3624,24 @@ class UIManager {
             // 幕はもう不要なので消します
             if (overlay.parentNode) overlay.parentNode.removeChild(overlay);
         }, 1000);
+    }
+    
+    // AIの思考中メッセージを戦闘用メッセージ枠に表示する
+    showWarThinkingMessage(armyName) {
+        if (!this.warControls) return;
+        this.warControls.innerHTML = '';
+        
+        const msgContainer = document.createElement('div');
+        msgContainer.className = 'war-action-message-container';
+        msgContainer.style.cssText = 'text-align: left; position: relative; display: block; padding: 15px; box-sizing: border-box; height: 100%;';
+        
+        const textContainer = document.createElement('div');
+        textContainer.className = 'war-action-message-text';
+        textContainer.style.cssText = 'text-align: left; width: 100%; display: block;';
+        // 思考中であることを示すメッセージ
+        textContainer.innerHTML = `<span style="color: #666;">${armyName} が作戦を思案中...</span>`;
+        
+        msgContainer.appendChild(textContainer);
+        this.warControls.appendChild(msgContainer);
     }
 }
