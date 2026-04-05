@@ -302,6 +302,19 @@ class AIEngine {
         const myClanId = myCastle.ownerClan;
         const myClanCastles = this.game.castles.filter(c => c.ownerClan === myClanId);
         const myTotalPower = this.getClanPrestige(myClanId);
+
+        // ★追加：過去に自領を攻撃してきた大名家や諸勢力をリストアップします！
+        const pastAttackerClans = new Set();
+        const pastAttackerKunishus = new Set();
+        myClanCastles.forEach(c => {
+            if (c.lastAttackerClanId > 0) {
+                if (c.lastAttackerIsKunishu) {
+                    pastAttackerKunishus.add(c.lastAttackerClanId);
+                } else {
+                    pastAttackerClans.add(c.lastAttackerClanId);
+                }
+            }
+        });
         
         // ★見積もりをする人（評価者）の智謀を決めます
         // プレイヤーの委任城なら「城主（myGeneral）」、敵AIなら「大名（myDaimyo）」の智謀を使います
@@ -430,6 +443,11 @@ class AIEngine {
                 const diff = window.AIParams.AI.Difficulty || 'normal';
                 const diffMulti = diff === 'hard' ? 1.2 : diff === 'easy' ? 0.7 : 1.0;
                 prob *= diffMulti;
+
+                // ★追加：過去に自領を攻撃してきた諸勢力への反撃！
+                if (pastAttackerKunishus.has(kunishu.id)) {
+                    prob += 10;
+                }
 
                 // 最大値の適用 (諸勢力相手は敵対大名と同じく最大40)
                 prob = Math.min(prob, 40);
@@ -636,6 +654,17 @@ class AIEngine {
             }
             // ★さらに追加ここまで！
             // =========================================================================
+
+            // ★追加：恨みを晴らすためのスコアアップ！
+            // 1. 過去に自領を攻撃してきた大名家への反撃
+            if (pastAttackerClans.has(target.ownerClan)) {
+                prob += 10; // 攻撃してきた相手には少し攻撃的になります！
+            }
+            // 2. 元々自分の城だった場所を取り返す
+            if (target.lastAttackedOwnerId === myClanId) {
+                prob += 15; // 奪われた城を取り返す時はさらに攻撃的になります！
+            }
+            // ★追加ここまで
             
             // 攻撃確率の最大値設定
             const maxProb = rel.status === '敵対' ? 40 : 20;
