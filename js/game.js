@@ -999,7 +999,7 @@ class GameManager {
             });
             
             // まずは今まで通り、兵士やお金から「基本の威信」を計算します
-            const basePrestige = Math.floor(pop / 2000) + Math.floor(sol / 20) + Math.floor(koku / 20) + Math.floor(gold / 50) + Math.floor(rice / 100);
+            const basePrestige = Math.floor(pop / 200) + Math.floor(sol / 20) + Math.floor(koku / 20) + Math.floor(gold / 50) + Math.floor(rice / 100);
             
             // ★追加：後で官位を得る計算などに使えるよう、ベースの素の威信を記憶しておきます
             clan.basePrestige = basePrestige;
