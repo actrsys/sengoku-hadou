@@ -2443,7 +2443,7 @@ class UIManager {
             this.tradeTypeInfo.classList.remove('hidden'); 
             // ★変更：相場の金額を小数点以下1桁で表示します！
             this.tradeTypeInfo.textContent = `相場: 兵糧 10 ＝ 金 ${(10 * rate).toFixed(1)}`;
-            inputs.amount = createSlider("購入量(米)", "amount", maxBuy, 0);
+            inputs.amount = createSlider("購入量", "amount", maxBuy, 0);
             
             const costDiv = document.createElement('div');
             costDiv.id = 'dynamic-cost-display';
@@ -2460,7 +2460,7 @@ class UIManager {
             this.tradeTypeInfo.classList.remove('hidden'); 
             // ★変更：相場の金額を小数点以下1桁で表示します！
             this.tradeTypeInfo.textContent = `相場: 兵糧 10 ＝ 金 ${(10 * rate).toFixed(1)}`;
-            inputs.amount = createSlider("売却量(米)", "amount", c.rice, 0);
+            inputs.amount = createSlider("売却量", "amount", c.rice, 0);
 
             const costDiv = document.createElement('div');
             costDiv.id = 'dynamic-cost-display';
