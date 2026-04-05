@@ -33,6 +33,24 @@ class CastleManager {
         if (oldOwnerId !== newOwnerId && newOwnerId !== 0) {
             this.applyKunishuRelationDropOnCapture(castle, newOwnerId);
         }
+
+        // ★追加：このお城を使おうとしていた大名家の作戦を中止させる魔法です！
+        if (this.game.aiOperationManager && this.game.aiOperationManager.operations) {
+            // 全ての大名家の作戦（メモ帳）を順番にめくって確認します
+            for (const clanId in this.game.aiOperationManager.operations) {
+                const op = this.game.aiOperationManager.operations[clanId];
+                
+                // 作戦の目標が「お城」で、それが今回持ち主が変わったお城だった場合
+                const isTarget = (op.type === '攻撃' && op.isKunishuTarget === false && op.targetId === castle.id);
+                // 出発するお城、またはお手伝い（援軍）をするお城が、今回持ち主が変わったお城だった場合
+                const isBase = (op.stagingBase === castle.id || op.supportBase === castle.id);
+
+                // どれかに当てはまったら、その作戦はもうできないので中止（メモを消去）します！
+                if (isTarget || isBase) {
+                    delete this.game.aiOperationManager.operations[clanId];
+                }
+            }
+        }
     }
 
     // ★追加：城を失った勢力の、大名以外の武将の忠誠度を全員３ダウンさせる魔法です
