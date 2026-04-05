@@ -1137,6 +1137,7 @@ class GameManager {
         this.updateAllCastlesLords();
         
         if (this.month % 3 === 0) this.factionSystem.optimizeCastellans(); 
+        if (this.month % 3 === 0) this.factionSystem.optimizeCastellans(); 
         
         this.castles.forEach(c => {
             if (c.ownerClan === 0) return;
@@ -1157,16 +1158,8 @@ class GameManager {
             // ９月の兵糧収入計算式
             // ★ここは common_events.js の「豊作・凶作イベント」にお引っ越ししました！
             
-            let growth = 0;
             let currentLoyalty = Math.max(0, Math.min(100, c.peoplesLoyalty));
-            if (currentLoyalty >= 51) {
-                const rate = 0.001 + ((currentLoyalty - 51) / 49) * 0.004;
-                growth = Math.floor(c.population * rate);
-            } else if (currentLoyalty <= 50) {
-                const rate = 0.001 + ((50 - currentLoyalty) / 50) * 0.004;
-                growth = -Math.floor(c.population * rate);
-            }
-            growth += Math.floor(currentLoyalty / 2);
+            let growth = Math.floor(((Math.sqrt(c.population) * 2) * ((currentLoyalty - 50) / 100)) + (currentLoyalty / 2));
             c.population = Math.min(999999, Math.max(0, c.population + growth));
         });
 
