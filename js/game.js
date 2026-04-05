@@ -582,16 +582,21 @@ class GameSystem {
         return totalEff;
     }
 
-    static calcBuyHorseCost(amount, daimyo, castellan) {
+    // ★追加：画面の相場表示に使う「小数点まで正確な1頭の単価」を出す魔法
+    static calcBuyHorseUnitPrice(daimyo, castellan) {
         const eff = this.calcBuyHorseEfficiency(daimyo, castellan);
-        //騎馬の基礎価格２
-        return Math.ceil(amount * 2 / (1 + eff / 10));
+        return 2 / (1 + eff / 10);
     }
 
-    static calcBuyGunCost(amount, daimyo, castellan) {
-        const eff = this.calcBuyGunEfficiency(daimyo, castellan);
-        鉄砲の基礎価格５
-        return Math.ceil(amount  * 5 / (1 + eff / 10));
+    static calcBuyHorseCost(amount, daimyo, castellan) {
+        const unitPrice = this.calcBuyHorseUnitPrice(daimyo, castellan);
+        return Math.ceil(amount * unitPrice);
+    }
+
+    // ★追加：お買い物スライダーのために「今のお金で最大いくつ買えるか」を逆算する魔法
+    static calcBuyHorseAmount(gold, daimyo, castellan) {
+        const unitPrice = this.calcBuyHorseUnitPrice(daimyo, castellan);
+        return Math.floor(gold / unitPrice);
     }
 
     static calcBuyGunEfficiency(daimyo, castellan) {
@@ -602,14 +607,22 @@ class GameSystem {
         return totalEff;
     }
 
-    static calcBuyGunCost(amount, daimyo, castellan) {
+    // ★追加：画面の相場表示に使う「小数点まで正確な1挺の単価」を出す魔法
+    static calcBuyGunUnitPrice(daimyo, castellan) {
         const eff = this.calcBuyGunEfficiency(daimyo, castellan);
-        return Math.ceil(amount / eff);
+        // 鉄砲の基礎価格5
+        return 5 / (1 + eff / 10);
     }
 
+    static calcBuyGunCost(amount, daimyo, castellan) {
+        const unitPrice = this.calcBuyGunUnitPrice(daimyo, castellan);
+        return Math.ceil(amount * unitPrice);
+    }
+
+    // ★修正：新しい計算に合わせて、お金から買える数を逆算するように直しました
     static calcBuyGunAmount(gold, daimyo, castellan) {
-        const eff = this.calcBuyGunEfficiency(daimyo, castellan);
-        return Math.floor(gold * eff);
+        const unitPrice = this.calcBuyGunUnitPrice(daimyo, castellan);
+        return Math.floor(gold / unitPrice);
     }
 
     static isReachable(game, startCastle, targetCastle, movingClanId) {

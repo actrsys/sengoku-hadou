@@ -2480,10 +2480,10 @@ class UIManager {
             const maxBuy = GameSystem.calcBuyHorseAmount(c.gold, daimyo, castellan);
             const realMaxBuy = Math.min(maxBuy, 99999 - (c.horses || 0));
 
-            const eff = GameSystem.calcBuyHorseEfficiency(daimyo, castellan);
+            // ★変更：さっき作った「正確な単価の魔法」を使って表示します
+            const unitPrice = GameSystem.calcBuyHorseUnitPrice(daimyo, castellan);
             this.tradeTypeInfo.classList.remove('hidden'); 
-            // ★変更：相場の金額を小数点以下1桁で表示します！
-            this.tradeTypeInfo.textContent = `相場: 騎馬 1頭 ＝ 金 ${(1 / eff).toFixed(1)}`;
+            this.tradeTypeInfo.textContent = `相場: 騎馬 1頭 ＝ 金 ${unitPrice.toFixed(1)}`;
             inputs.amount = createSlider("購入量", "amount", realMaxBuy, 0);
 
             const costDiv = document.createElement('div');
@@ -2496,10 +2496,10 @@ class UIManager {
             const maxBuy = GameSystem.calcBuyGunAmount(c.gold, daimyo, castellan);
             const realMaxBuy = Math.min(maxBuy, 99999 - (c.guns || 0));
 
-            const eff = GameSystem.calcBuyGunEfficiency(daimyo, castellan);
+            // ★変更：さっき作った「正確な単価の魔法」を使って表示します
+            const unitPrice = GameSystem.calcBuyGunUnitPrice(daimyo, castellan);
             this.tradeTypeInfo.classList.remove('hidden'); 
-            // ★変更：相場の金額を小数点以下1桁で表示します！
-            this.tradeTypeInfo.textContent = `相場: 鉄砲 1挺 ＝ 金 ${(1 / eff).toFixed(1)}`;
+            this.tradeTypeInfo.textContent = `相場: 鉄砲 1挺 ＝ 金 ${unitPrice.toFixed(1)}`;
             inputs.amount = createSlider("購入量", "amount", realMaxBuy, 0);
 
             const costDiv = document.createElement('div');
