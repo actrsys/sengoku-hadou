@@ -2254,18 +2254,14 @@ class UIManager {
                 const daimyo = this.game.bushos.find(b => b.clan === c.ownerClan && b.isDaimyo);
                 const castellan = this.game.getBusho(c.castellanId);
                 
-                // ★修正：縦のラインを綺麗に揃えるための表（グリッド）を作る魔法です！
-                // 全角スペースを使って、すべての項目の文字数を4文字に揃えています。
-                const makeGrid = (costLabel, costValue, itemName, afterItem, afterGold) => {
+                // ★修正：余計なお世話だった「必要資金」の行を消して、指定された通り「アイテム」と「金」の2行だけを綺麗に並べます！
+                const makeGrid = (itemName, afterItem, afterGold) => {
                     return `
                         <div style="display: inline-grid; grid-template-columns: max-content max-content minmax(3em, auto); column-gap: 1em; text-align: left;">
-                            <div>${costLabel}</div>
-                            <div>▶</div>
-                            <div style="text-align: right;">${Number(costValue).toFixed(1)}</div>
                             <div>${itemName}</div>
                             <div>▶</div>
                             <div style="text-align: right;">${Math.floor(afterItem)}</div>
-                            <div>　金　　</div>
+                            <div>　金</div>
                             <div>▶</div>
                             <div style="text-align: right;">${Math.floor(afterGold)}</div>
                         </div>
@@ -2275,10 +2271,8 @@ class UIManager {
                 if (type === 'draft') {
                     const amount = parseInt(document.getElementById('num-soldiers')?.value) || 0;
                     const busho = this.game.getBusho(data[0]);
-                    const efficiency = ((busho.leadership * 1.5) + (busho.charm * 1.5) + (Math.sqrt(busho.loyalty) * 2) + (Math.sqrt(c.peoplesLoyalty) * 2)) / 500;
-                    const rawCost = amount / efficiency;
                     const cost = GameSystem.calcDraftCost(amount, busho, c.peoplesLoyalty);
-                    displayEl.innerHTML = makeGrid("必要資金", rawCost, "兵士　　", c.soldiers + amount, c.gold - cost);
+                    displayEl.innerHTML = makeGrid("兵士", c.soldiers + amount, c.gold - cost);
                 } else if (type === 'buy_rice') {
                     const amount = parseInt(document.getElementById('num-amount')?.value) || 0;
                     let rate = 1.0;
@@ -2286,9 +2280,8 @@ class UIManager {
                         const province = this.game.provinces.find(p => p.id === c.provinceId);
                         if (province && province.marketRate !== undefined) rate = province.marketRate;
                     }
-                    const rawCost = amount * rate;
-                    const cost = Math.ceil(rawCost);
-                    displayEl.innerHTML = makeGrid("必要資金", rawCost, "兵糧　　", c.rice + amount, c.gold - cost);
+                    const cost = Math.ceil(amount * rate);
+                    displayEl.innerHTML = makeGrid("兵糧", c.rice + amount, c.gold - cost);
                 } else if (type === 'sell_rice') {
                     const amount = parseInt(document.getElementById('num-amount')?.value) || 0;
                     let rate = 1.0;
@@ -2296,21 +2289,16 @@ class UIManager {
                         const province = this.game.provinces.find(p => p.id === c.provinceId);
                         if (province && province.marketRate !== undefined) rate = province.marketRate;
                     }
-                    const rawProfit = amount * rate;
-                    const profit = Math.floor(rawProfit);
-                    displayEl.innerHTML = makeGrid("売却益　", rawProfit, "兵糧　　", c.rice - amount, c.gold + profit);
+                    const profit = Math.floor(amount * rate);
+                    displayEl.innerHTML = makeGrid("兵糧", c.rice - amount, c.gold + profit);
                 } else if (type === 'buy_horses') {
                     const amount = parseInt(document.getElementById('num-amount')?.value) || 0;
-                    const eff = GameSystem.calcBuyHorseEfficiency(daimyo, castellan);
-                    const rawCost = amount / eff;
                     const cost = GameSystem.calcBuyHorseCost(amount, daimyo, castellan);
-                    displayEl.innerHTML = makeGrid("必要資金", rawCost, "騎馬　　", (c.horses || 0) + amount, c.gold - cost);
+                    displayEl.innerHTML = makeGrid("騎馬", (c.horses || 0) + amount, c.gold - cost);
                 } else if (type === 'buy_guns') {
                     const amount = parseInt(document.getElementById('num-amount')?.value) || 0;
-                    const eff = GameSystem.calcBuyGunEfficiency(daimyo, castellan);
-                    const rawCost = amount / eff;
                     const cost = GameSystem.calcBuyGunCost(amount, daimyo, castellan);
-                    displayEl.innerHTML = makeGrid("必要資金", rawCost, "鉄砲　　", (c.guns || 0) + amount, c.gold - cost);
+                    displayEl.innerHTML = makeGrid("鉄砲", (c.guns || 0) + amount, c.gold - cost);
                 }
             }
         };
