@@ -1739,19 +1739,19 @@ class CommandSystem {
             castle.gold -= cost; castle.ammo = (castle.ammo || 0) + amount; 
             this.game.ui.showResultModal(`矢弾${amount}を購入しました\n(金-${cost})`); 
         } else if (type === 'buy_horses') {
-            // ★相場を消して、固定金額にします
-            const price = parseInt(window.MainParams.Economy.PriceHorse, 10) || 5;
-            const cost = price * amount;
-            if(castle.gold < cost) { this.game.ui.showDialog("資金不足", false); return; } 
+            const daimyo = this.game.bushos.find(b => b.clan === castle.ownerClan && b.isDaimyo);
+            const castellan = this.game.getBusho(castle.castellanId);
+            const cost = GameSystem.calcBuyHorseCost(amount, daimyo, castellan);
+            if(castle.gold < cost) { this.game.ui.showDialog(`資金不足です。(必要: ${cost}金)`, false); return; } 
             // ★追加: 騎馬のストッパー
             if((castle.horses || 0) + amount > 99999) { this.game.ui.showDialog("これ以上騎馬は買えません", false); return; }
             castle.gold -= cost; castle.horses = (castle.horses || 0) + amount; 
             this.game.ui.showResultModal(`騎馬${amount}を購入しました\n(金-${cost})`); 
         } else if (type === 'buy_guns') {
-            // ★相場を消して、固定金額にします
-            const price = parseInt(window.MainParams.Economy.PriceGun, 10) || 50;
-            const cost = price * amount;
-            if(castle.gold < cost) { this.game.ui.showDialog("資金不足", false); return; } 
+            const daimyo = this.game.bushos.find(b => b.clan === castle.ownerClan && b.isDaimyo);
+            const castellan = this.game.getBusho(castle.castellanId);
+            const cost = GameSystem.calcBuyGunCost(amount, daimyo, castellan);
+            if(castle.gold < cost) { this.game.ui.showDialog(`資金不足です。(必要: ${cost}金)`, false); return; } 
             // ★追加: 鉄砲のストッパー
             if((castle.guns || 0) + amount > 99999) { this.game.ui.showDialog("これ以上鉄砲は買えません", false); return; }
             castle.gold -= cost; castle.guns = (castle.guns || 0) + amount; 

@@ -574,6 +574,42 @@ class GameSystem {
         return Math.ceil(soldiers / efficiency); 
     }
 
+    static calcBuyHorseEfficiency(daimyo, castellan) {
+        const daimyoEff = daimyo ? ((daimyo.politics * 1.5) + (daimyo.charm * 1.5)) / 50 : 0;
+        const castellanEff = castellan ? ((castellan.politics * 1.5) + (castellan.charm * 1.5)) / 50 : 0;
+        let totalEff = daimyoEff + castellanEff;
+        if (totalEff <= 0) totalEff = 0.1;
+        return totalEff;
+    }
+
+    static calcBuyHorseCost(amount, daimyo, castellan) {
+        const eff = this.calcBuyHorseEfficiency(daimyo, castellan);
+        return Math.ceil(amount / eff);
+    }
+
+    static calcBuyHorseAmount(gold, daimyo, castellan) {
+        const eff = this.calcBuyHorseEfficiency(daimyo, castellan);
+        return Math.floor(gold * eff);
+    }
+
+    static calcBuyGunEfficiency(daimyo, castellan) {
+        const daimyoEff = daimyo ? ((daimyo.politics * 1.5) + (daimyo.charm * 1.5)) / 100 : 0;
+        const castellanEff = castellan ? ((castellan.politics * 1.5) + (castellan.charm * 1.5)) / 100 : 0;
+        let totalEff = daimyoEff + castellanEff;
+        if (totalEff <= 0) totalEff = 0.1;
+        return totalEff;
+    }
+
+    static calcBuyGunCost(amount, daimyo, castellan) {
+        const eff = this.calcBuyGunEfficiency(daimyo, castellan);
+        return Math.ceil(amount / eff);
+    }
+
+    static calcBuyGunAmount(gold, daimyo, castellan) {
+        const eff = this.calcBuyGunEfficiency(daimyo, castellan);
+        return Math.floor(gold * eff);
+    }
+
     static isReachable(game, startCastle, targetCastle, movingClanId) {
         // ★追加：もし城のデータが空っぽだったら、エラーになる前にすぐストップします！
         if (!startCastle || !targetCastle) return false;

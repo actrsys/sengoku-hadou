@@ -731,8 +731,8 @@ class AIEngine {
         // ★書き換えはここまで！
 
         // 援軍を探す処理へバトンタッチします
-        const sendHorses = source.horses || 0;
-        const sendGuns = source.guns || 0;
+        const sendHorses = (source.horses || 0) < sendSoldiers * 0.2 ? 0 : (source.horses || 0);
+        const sendGuns = (source.guns || 0) < sendSoldiers * 0.2 ? 0 : (source.guns || 0);
         this.game.commandSystem.checkReinforcementAndStartWar(source, target.id, sorted, sendSoldiers, sendRice, sendHorses, sendGuns);
         
         // （「待つ魔法」は消しました！あとはwar.jsが最後までやってくれます）
@@ -780,8 +780,8 @@ class AIEngine {
             .slice(0, 5)
             .map(eb => eb.busho);
 
-        const sendHorses = sourceCastle.horses || 0;
-        const sendGuns = sourceCastle.guns || 0;
+        const sendHorses = (sourceCastle.horses || 0) < sendSoldiers * 0.2 ? 0 : (sourceCastle.horses || 0);
+        const sendGuns = (sourceCastle.guns || 0) < sendSoldiers * 0.2 ? 0 : (sourceCastle.guns || 0);
         
         // ★ kunishuSystem（諸勢力の専門部署）の executeKunishuSubjugate を呼び出します！
         this.game.kunishuSystem.executeKunishuSubjugate(sourceCastle, sourceCastle.id, sorted.map(b => b.id), sendSoldiers, sendRice, sendHorses, sendGuns, kunishu);
@@ -1554,16 +1554,16 @@ class AIEngine {
                 
                 // 特殊行動群
                 if (action.type === 'buy_gun') {
-                    const priceGun = parseInt(window.MainParams.Economy.PriceGun, 10) || 50;
-                    const amount = Math.floor(500 / priceGun);
-                    castle.gold -= (amount * priceGun);
+                    const amount = GameSystem.calcBuyGunAmount(500, daimyo, castellan);
+                    const cost = GameSystem.calcBuyGunCost(amount, daimyo, castellan);
+                    castle.gold -= cost;
                     castle.guns = Math.min(99999, (castle.guns || 0) + amount);
                     doer.isActionDone = true; actionDoneInThisStep = true; break;
                 }
                 if (action.type === 'buy_horse') {
-                    const priceHorse = parseInt(window.MainParams.Economy.PriceHorse, 10) || 5;
-                    const amount = Math.floor(500 / priceHorse);
-                    castle.gold -= (amount * priceHorse);
+                    const amount = GameSystem.calcBuyHorseAmount(500, daimyo, castellan);
+                    const cost = GameSystem.calcBuyHorseCost(amount, daimyo, castellan);
+                    castle.gold -= cost;
                     castle.horses = Math.min(99999, (castle.horses || 0) + amount);
                     doer.isActionDone = true; actionDoneInThisStep = true; break;
                 }
