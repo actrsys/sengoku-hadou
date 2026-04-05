@@ -565,12 +565,12 @@ class GameSystem {
     
     // AI用：お金を指定して、集まる兵士数を計算します
     static calcDraftFromGold(gold, busho, peoplesLoyalty) { 
-        const efficiency = ((busho.leadership * 1.5) + (busho.charm * 1.5) + (Math.sqrt(busho.loyalty) * 2) + (Math.sqrt(peoplesLoyalty) * 2)) / 1000;
+        const efficiency = ((busho.leadership * 1.5) + (busho.charm * 1.5) + (Math.sqrt(busho.loyalty) * 2) + (Math.sqrt(peoplesLoyalty) * 2)) / 500;
         return Math.floor(gold * efficiency); 
     }
     // プレイヤー用：集めたい兵士数を指定して、必要なお金を計算します
     static calcDraftCost(soldiers, busho, peoplesLoyalty) { 
-        const efficiency = ((busho.leadership * 1.5) + (busho.charm * 1.5) + (Math.sqrt(busho.loyalty) * 2) + (Math.sqrt(peoplesLoyalty) * 2)) / 1000;
+        const efficiency = ((busho.leadership * 1.5) + (busho.charm * 1.5) + (Math.sqrt(busho.loyalty) * 2) + (Math.sqrt(peoplesLoyalty) * 2)) / 500;
         return Math.ceil(soldiers / efficiency); 
     }
 
