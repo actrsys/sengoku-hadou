@@ -1159,7 +1159,7 @@ class GameManager {
             // ★ここは common_events.js の「豊作・凶作イベント」にお引っ越ししました！
             
             let currentLoyalty = Math.max(0, Math.min(100, c.peoplesLoyalty));
-            let growth = Math.floor(((Math.sqrt(c.population) * 3) * ((currentLoyalty - 50) / 100)) + (currentLoyalty / 2));
+            let growth = Math.floor(((Math.sqrt(c.population) * 5) * ((currentLoyalty - 50) / 100)) + (currentLoyalty / 2));
             c.population = Math.min(999999, Math.max(0, c.population + growth));
         });
 
