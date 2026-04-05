@@ -2254,16 +2254,20 @@ class UIManager {
                 const daimyo = this.game.bushos.find(b => b.clan === c.ownerClan && b.isDaimyo);
                 const castellan = this.game.getBusho(c.castellanId);
                 
-                // ★追加：項目と数字を綺麗に縦に並べるための、専用の表（グリッド）を作る魔法です
-                const makeGrid = (itemName, afterItem, afterGold) => {
+                // ★修正：縦のラインを綺麗に揃えるための表（グリッド）を作る魔法です！
+                // 全角スペースを使って、すべての項目の文字数を4文字に揃えています。
+                const makeGrid = (costLabel, costValue, itemName, afterItem, afterGold) => {
                     return `
                         <div style="display: inline-grid; grid-template-columns: max-content max-content minmax(3em, auto); column-gap: 1em; text-align: left;">
+                            <div>${costLabel}</div>
+                            <div>▶</div>
+                            <div style="text-align: right;">${Number(costValue).toFixed(1)}</div>
                             <div>${itemName}</div>
                             <div>▶</div>
-                            <div style="text-align: right;">${afterItem}</div>
-                            <div>　金</div>
+                            <div style="text-align: right;">${Math.floor(afterItem)}</div>
+                            <div>　金　　</div>
                             <div>▶</div>
-                            <div style="text-align: right;">${afterGold}</div>
+                            <div style="text-align: right;">${Math.floor(afterGold)}</div>
                         </div>
                     `;
                 };
@@ -2271,8 +2275,10 @@ class UIManager {
                 if (type === 'draft') {
                     const amount = parseInt(document.getElementById('num-soldiers')?.value) || 0;
                     const busho = this.game.getBusho(data[0]);
+                    const efficiency = ((busho.leadership * 1.5) + (busho.charm * 1.5) + (Math.sqrt(busho.loyalty) * 2) + (Math.sqrt(c.peoplesLoyalty) * 2)) / 500;
+                    const rawCost = amount / efficiency;
                     const cost = GameSystem.calcDraftCost(amount, busho, c.peoplesLoyalty);
-                    displayEl.innerHTML = makeGrid("兵士", c.soldiers + amount, c.gold - cost);
+                    displayEl.innerHTML = makeGrid("必要資金", rawCost, "兵士　　", c.soldiers + amount, c.gold - cost);
                 } else if (type === 'buy_rice') {
                     const amount = parseInt(document.getElementById('num-amount')?.value) || 0;
                     let rate = 1.0;
@@ -2280,8 +2286,9 @@ class UIManager {
                         const province = this.game.provinces.find(p => p.id === c.provinceId);
                         if (province && province.marketRate !== undefined) rate = province.marketRate;
                     }
-                    const cost = Math.ceil(amount * rate); // 1金未満の端数が出た時に足りなくならないよう切り上げます
-                    displayEl.innerHTML = makeGrid("兵糧", c.rice + amount, c.gold - cost);
+                    const rawCost = amount * rate;
+                    const cost = Math.ceil(rawCost);
+                    displayEl.innerHTML = makeGrid("必要資金", rawCost, "兵糧　　", c.rice + amount, c.gold - cost);
                 } else if (type === 'sell_rice') {
                     const amount = parseInt(document.getElementById('num-amount')?.value) || 0;
                     let rate = 1.0;
@@ -2289,16 +2296,21 @@ class UIManager {
                         const province = this.game.provinces.find(p => p.id === c.provinceId);
                         if (province && province.marketRate !== undefined) rate = province.marketRate;
                     }
-                    const profit = Math.floor(amount * rate); // 売る時はおまけされないように切り捨てます
-                    displayEl.innerHTML = makeGrid("兵糧", c.rice - amount, c.gold + profit);
+                    const rawProfit = amount * rate;
+                    const profit = Math.floor(rawProfit);
+                    displayEl.innerHTML = makeGrid("売却益　", rawProfit, "兵糧　　", c.rice - amount, c.gold + profit);
                 } else if (type === 'buy_horses') {
                     const amount = parseInt(document.getElementById('num-amount')?.value) || 0;
+                    const eff = GameSystem.calcBuyHorseEfficiency(daimyo, castellan);
+                    const rawCost = amount / eff;
                     const cost = GameSystem.calcBuyHorseCost(amount, daimyo, castellan);
-                    displayEl.innerHTML = makeGrid("騎馬", (c.horses || 0) + amount, c.gold - cost);
+                    displayEl.innerHTML = makeGrid("必要資金", rawCost, "騎馬　　", (c.horses || 0) + amount, c.gold - cost);
                 } else if (type === 'buy_guns') {
                     const amount = parseInt(document.getElementById('num-amount')?.value) || 0;
+                    const eff = GameSystem.calcBuyGunEfficiency(daimyo, castellan);
+                    const rawCost = amount / eff;
                     const cost = GameSystem.calcBuyGunCost(amount, daimyo, castellan);
-                    displayEl.innerHTML = makeGrid("鉄砲", (c.guns || 0) + amount, c.gold - cost);
+                    displayEl.innerHTML = makeGrid("必要資金", rawCost, "鉄砲　　", (c.guns || 0) + amount, c.gold - cost);
                 }
             }
         };
@@ -2376,12 +2388,15 @@ class UIManager {
             const maxAffordable = GameSystem.calcDraftFromGold(c.gold, busho, c.peoplesLoyalty);
             const maxSoldiers = Math.min(c.population, 99999 - c.soldiers, maxAffordable);
             
+            // ★変更：相場の金額を小数点以下1桁で表示します！
+            const efficiency = ((busho.leadership * 1.5) + (busho.charm * 1.5) + (Math.sqrt(busho.loyalty) * 2) + (Math.sqrt(c.peoplesLoyalty) * 2)) / 500;
+            const singleCost = 1 / efficiency;
+            
             this.tradeTypeInfo.classList.remove('hidden'); 
-            this.tradeTypeInfo.textContent = `相場: 兵士 1人 ＝ 金 ${GameSystem.calcDraftCost(1, busho, c.peoplesLoyalty)}`;
+            this.tradeTypeInfo.textContent = `相場: 兵士 1人 ＝ 金 ${singleCost.toFixed(1)}`;
 
             inputs.soldiers = createSlider("兵士数", "soldiers", maxSoldiers, 0);
 
-            // ★変更：中身の表が綺麗に真ん中に寄るように、display: flex; justify-content: center; の魔法をかけます！
             const costDiv = document.createElement('div');
             costDiv.id = 'dynamic-cost-display';
             costDiv.style.cssText = "display: flex; justify-content: center; font-weight:bold; color:#1976d2; margin-top:10px; font-size:1.1rem;";
@@ -2438,7 +2453,8 @@ class UIManager {
             }
             const maxBuy = Math.floor(c.gold / rate);
             this.tradeTypeInfo.classList.remove('hidden'); 
-            this.tradeTypeInfo.textContent = `相場: 兵糧 10 ＝ 金 ${Math.ceil(10 * rate)}`;
+            // ★変更：相場の金額を小数点以下1桁で表示します！
+            this.tradeTypeInfo.textContent = `相場: 兵糧 10 ＝ 金 ${(10 * rate).toFixed(1)}`;
             inputs.amount = createSlider("購入量(米)", "amount", maxBuy, 0);
             
             const costDiv = document.createElement('div');
@@ -2454,12 +2470,13 @@ class UIManager {
                 if (province && province.marketRate !== undefined) rate = province.marketRate;
             }
             this.tradeTypeInfo.classList.remove('hidden'); 
-            this.tradeTypeInfo.textContent = `相場: 兵糧 10 ＝ 金 ${Math.floor(10 * rate)}`;
+            // ★変更：相場の金額を小数点以下1桁で表示します！
+            this.tradeTypeInfo.textContent = `相場: 兵糧 10 ＝ 金 ${(10 * rate).toFixed(1)}`;
             inputs.amount = createSlider("売却量(米)", "amount", c.rice, 0);
 
-            // ★変更：売却の時も、文字の色を青色（#1976d2）に統一します！
             const costDiv = document.createElement('div');
             costDiv.id = 'dynamic-cost-display';
+            // ★変更：売却の時の色も青色（#1976d2）に統一します！
             costDiv.style.cssText = "display: flex; justify-content: center; font-weight:bold; color:#1976d2; margin-top:10px; font-size:1.1rem;";
             this.quantityContainer.appendChild(costDiv);
 
@@ -2468,15 +2485,17 @@ class UIManager {
             const price = parseInt(window.MainParams.Economy.PriceAmmo, 10) || 1;
             const maxBuy = price > 0 ? Math.floor(c.gold / price) : 0;
             this.tradeTypeInfo.classList.remove('hidden'); 
-            this.tradeTypeInfo.textContent = `固定価格: 金${price} / 1個`;
+            this.tradeTypeInfo.textContent = `固定価格: 金${price.toFixed(1)} / 1個`; // 念のためこちらも揃えます
             inputs.amount = createSlider("購入量", "amount", maxBuy, 0);
         } else if (type === 'buy_horses') {
             document.getElementById('quantity-title').textContent = "騎馬購入"; 
             const maxBuy = GameSystem.calcBuyHorseAmount(c.gold, daimyo, castellan);
             const realMaxBuy = Math.min(maxBuy, 99999 - (c.horses || 0));
 
+            const eff = GameSystem.calcBuyHorseEfficiency(daimyo, castellan);
             this.tradeTypeInfo.classList.remove('hidden'); 
-            this.tradeTypeInfo.textContent = `相場: 馬 1頭 ＝ 金 ${GameSystem.calcBuyHorseCost(1, daimyo, castellan)}`;
+            // ★変更：相場の金額を小数点以下1桁で表示します！
+            this.tradeTypeInfo.textContent = `相場: 騎馬 1頭 ＝ 金 ${(1 / eff).toFixed(1)}`;
             inputs.amount = createSlider("購入量", "amount", realMaxBuy, 0);
 
             const costDiv = document.createElement('div');
@@ -2489,8 +2508,10 @@ class UIManager {
             const maxBuy = GameSystem.calcBuyGunAmount(c.gold, daimyo, castellan);
             const realMaxBuy = Math.min(maxBuy, 99999 - (c.guns || 0));
 
+            const eff = GameSystem.calcBuyGunEfficiency(daimyo, castellan);
             this.tradeTypeInfo.classList.remove('hidden'); 
-            this.tradeTypeInfo.textContent = `相場: 銃 1挺 ＝ 金 ${GameSystem.calcBuyGunCost(1, daimyo, castellan)}`;
+            // ★変更：相場の金額を小数点以下1桁で表示します！
+            this.tradeTypeInfo.textContent = `相場: 鉄砲 1挺 ＝ 金 ${(1 / eff).toFixed(1)}`;
             inputs.amount = createSlider("購入量", "amount", realMaxBuy, 0);
 
             const costDiv = document.createElement('div');
