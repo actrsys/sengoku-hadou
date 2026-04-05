@@ -177,15 +177,20 @@ class Castle {
         this.investigatedUntil = Number(this.investigatedUntil || 0);
         this.investigatedAccuracy = Number(this.investigatedAccuracy || 0);
         
-        // ★前回書き足し：委任されているかどうかを覚える箱（最初はfalse＝直轄）
+        // ★委任されているかどうかを覚える箱（最初はfalse＝直轄）
         this.isDelegated = data.isDelegated === true;
 
-        // ★今回書き足し！：委任中の細かい許可設定（デフォルトは false ＝ 不可）
+        // ★委任中の細かい許可設定（デフォルトは false ＝ 不可）
         this.allowAttack = data.allowAttack === true;
         this.allowMove = data.allowMove === true;
 
-        // ★今回新しく追加！：一揆や豪雪などの「状態異常」のシールを複数貼っておくための箱です
+        // ★一揆や豪雪などの「状態異常」のシールを複数貼っておくための箱です
         this.statusEffects = Array.isArray(data.statusEffects) ? data.statusEffects : [];
+        
+        // ★ここから追加：攻撃された時の記憶を残すための箱です
+        this.lastAttackedOwnerId = Number(data.lastAttackedOwnerId || 0); // 攻撃された時に誰の城だったか
+        this.lastAttackerClanId = Number(data.lastAttackerClanId || 0);   // 攻撃してきた勢力のID
+        this.lastAttackerIsKunishu = data.lastAttackerIsKunishu === true; // 攻撃してきたのが諸勢力かどうか
     }
 }
 

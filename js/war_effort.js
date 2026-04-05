@@ -198,6 +198,20 @@ Object.assign(WarManager.prototype, {
             const defProvData = this.game.provinces.find(p => p.id === defCastle.provinceId);
             const defDaimyoName = (defClanData && defClanData.name) ? defClanData.name : (defCastle.isKunishu ? defCastle.name : (defProvData ? defProvData.province : "中立"));
             
+            // ★ここから追加：お城に「攻撃された記憶」をメモ書きします！
+            defCastle.lastAttackedOwnerId = defClan; // 攻撃された時の持ち主（大名家ID）をメモ
+            
+            if (atkCastle.isKunishu) {
+                // 攻撃してきたのが諸勢力の場合
+                defCastle.lastAttackerClanId = atkCastle.kunishuId || atkCastle.id;
+                defCastle.lastAttackerIsKunishu = true;
+            } else {
+                // 攻撃してきたのが大名家の場合
+                defCastle.lastAttackerClanId = atkClan;
+                defCastle.lastAttackerIsKunishu = false;
+            }
+            // ★追加ここまで
+            
             let startMsg = "";
             if (defCastle.isKunishu) {
                 startMsg = `${atkDaimyoName}の${atkBushos[0].name}が\n${defCastle.name}の鎮圧に乗り出しました！`;
