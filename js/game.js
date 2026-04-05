@@ -575,8 +575,8 @@ class GameSystem {
     }
 
     static calcBuyHorseEfficiency(daimyo, castellan) {
-        const daimyoEff = daimyo ? ((daimyo.politics * 1.5) + (daimyo.charm * 1.5)) / 50 : 0;
-        const castellanEff = castellan ? ((castellan.politics * 1.5) + (castellan.charm * 1.5)) / 50 : 0;
+        const daimyoEff = daimyo ? ((daimyo.politics * 1.5) + (daimyo.charm * 1.5)) / 150 : 0;
+        const castellanEff = castellan ? ((castellan.politics * 1.5) + (castellan.charm * 1.5)) / 150 : 0;
         let totalEff = daimyoEff + castellanEff;
         if (totalEff <= 0) totalEff = 0.1;
         return totalEff;
@@ -593,8 +593,8 @@ class GameSystem {
     }
 
     static calcBuyGunEfficiency(daimyo, castellan) {
-        const daimyoEff = daimyo ? ((daimyo.politics * 1.5) + (daimyo.charm * 1.5)) / 100 : 0;
-        const castellanEff = castellan ? ((castellan.politics * 1.5) + (castellan.charm * 1.5)) / 100 : 0;
+        const daimyoEff = daimyo ? ((daimyo.politics * 1.5) + (daimyo.charm * 1.5)) / 300 : 0;
+        const castellanEff = castellan ? ((castellan.politics * 1.5) + (castellan.charm * 1.5)) / 300 : 0;
         let totalEff = daimyoEff + castellanEff;
         if (totalEff <= 0) totalEff = 0.1;
         return totalEff;
