@@ -1137,7 +1137,6 @@ class GameManager {
         this.updateAllCastlesLords();
         
         if (this.month % 3 === 0) this.factionSystem.optimizeCastellans(); 
-        const isPopGrowth = (this.month % 2 === 0);
         
         this.castles.forEach(c => {
             if (c.ownerClan === 0) return;
@@ -1158,18 +1157,17 @@ class GameManager {
             // ９月の兵糧収入計算式
             // ★ここは common_events.js の「豊作・凶作イベント」にお引っ越ししました！
             
-            if (isPopGrowth) { 
-                let growth = 0;
-                let currentLoyalty = Math.max(0, Math.min(100, c.peoplesLoyalty));
-                if (currentLoyalty >= 51) {
-                    const rate = 0.001 + ((currentLoyalty - 51) / 49) * 0.004;
-                    growth = Math.floor(c.population * rate);
-                } else if (currentLoyalty <= 50) {
-                    const rate = 0.001 + ((50 - currentLoyalty) / 50) * 0.004;
-                    growth = -Math.floor(c.population * rate);
-                }
-                c.population = Math.min(999999, Math.max(0, c.population + growth));
+            let growth = 0;
+            let currentLoyalty = Math.max(0, Math.min(100, c.peoplesLoyalty));
+            if (currentLoyalty >= 51) {
+                const rate = 0.001 + ((currentLoyalty - 51) / 49) * 0.004;
+                growth = Math.floor(c.population * rate);
+            } else if (currentLoyalty <= 50) {
+                const rate = 0.001 + ((50 - currentLoyalty) / 50) * 0.004;
+                growth = -Math.floor(c.population * rate);
             }
+            growth += Math.floor(currentLoyalty / 2);
+            c.population = Math.min(999999, Math.max(0, c.population + growth));
         });
 
         // ★ここを書き換え！：空っぽの城（中立）も仲間はずれにせず、一緒に混ぜて順番リストに入れます！
