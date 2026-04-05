@@ -2247,7 +2247,123 @@ class UIManager {
                 this.quantityConfirmBtn.style.opacity = 0.5;
             }
 
-            let inputs = {};
+            // ★追加：スライダーを動かすたびに呼ばれるこの場所で、必要資金を計算してパタパタ表示します！
+            const displayEl = document.getElementById('dynamic-cost-display');
+            if (displayEl) {
+                // 計算に使うために、大名と城主をここでも探しておきます
+                const daimyo = this.game.bushos.find(b => b.clan === c.ownerClan && b.isDaimyo);
+                const castellan = this.game.getBusho(c.castellanId);
+                
+                // ★追加：項目と数字を綺麗に縦に並べるための、専用の表（グリッド）を作る魔法です
+                const makeGrid = (itemName, afterItem, afterGold) => {
+                    return `
+                        <div style="display: inline-grid; grid-template-columns: max-content max-content minmax(3em, auto); column-gap: 1em; text-align: left;">
+                            <div>${itemName}</div>
+                            <div>▶</div>
+                            <div style="text-align: right;">${afterItem}</div>
+                            <div>　金</div>
+                            <div>▶</div>
+                            <div style="text-align: right;">${afterGold}</div>
+                        </div>
+                    `;
+                };
+                
+                if (type === 'draft') {
+                    const amount = parseInt(document.getElementById('num-soldiers')?.value) || 0;
+                    const busho = this.game.getBusho(data[0]);
+                    const cost = GameSystem.calcDraftCost(amount, busho, c.peoplesLoyalty);
+                    displayEl.innerHTML = makeGrid("兵士", c.soldiers + amount, c.gold - cost);
+                } else if (type === 'buy_rice') {
+                    const amount = parseInt(document.getElementById('num-amount')?.value) || 0;
+                    let rate = 1.0;
+                    if (c && this.game.provinces) {
+                        const province = this.game.provinces.find(p => p.id === c.provinceId);
+                        if (province && province.marketRate !== undefined) rate = province.marketRate;
+                    }
+                    const cost = Math.ceil(amount * rate); // 1金未満の端数が出た時に足りなくならないよう切り上げます
+                    displayEl.innerHTML = makeGrid("兵糧", c.rice + amount, c.gold - cost);
+                } else if (type === 'sell_rice') {
+                    const amount = parseInt(document.getElementById('num-amount')?.value) || 0;
+                    let rate = 1.0;
+                    if (c && this.game.provinces) {
+                        const province = this.game.provinces.find(p => p.id === c.provinceId);
+                        if (province && province.marketRate !== undefined) rate = province.marketRate;
+                    }
+                    const profit = Math.floor(amount * rate); // 売る時はおまけされないように切り捨てます
+                    displayEl.innerHTML = makeGrid("兵糧", c.rice - amount, c.gold + profit);
+                } else if (type === 'buy_horses') {
+                    const amount = parseInt(document.getElementById('num-amount')?.value) || 0;
+                    const cost = GameSystem.calcBuyHorseCost(amount, daimyo, castellan);
+                    displayEl.innerHTML = makeGrid("騎馬", (c.horses || 0) + amount, c.gold - cost);
+                } else if (type === 'buy_guns') {
+                    const amount = parseInt(document.getElementById('num-amount')?.value) || 0;
+                    const cost = GameSystem.calcBuyGunCost(amount, daimyo, castellan);
+                    displayEl.innerHTML = makeGrid("鉄砲", (c.guns || 0) + amount, c.gold - cost);
+                }
+            }
+        };
+
+        const createSlider = (label, id, max, currentVal, minVal = 0) => { 
+            const wrap = document.createElement('div'); 
+            wrap.className = 'qty-row'; 
+            wrap.innerHTML = `
+                <label>${label} (Max: <span id="max-label-${id}">${max}</span>)</label>
+                <div class="qty-control">
+                    <input type="range" id="range-${id}" min="${minVal}" max="${max}" value="${currentVal}">
+                    <input type="number" id="num-${id}" min="${minVal}" max="${max}" value="${currentVal}">
+                </div>
+                <div class="qty-shortcuts">
+                    <button class="qty-shortcut-btn" id="btn-min-${id}">最小</button>
+                    <button class="qty-shortcut-btn" id="btn-half-${id}">半分</button>
+                    <button class="qty-shortcut-btn" id="btn-max-${id}">最大</button>
+                </div>
+            `; 
+            
+            const range = wrap.querySelector(`#range-${id}`); 
+            const num = wrap.querySelector(`#num-${id}`); 
+
+            const setVal = (v) => {
+                let actualMax = parseInt(range.max);
+                if (v < minVal) v = minVal;
+                if (v > actualMax) v = actualMax;
+                range.value = v;
+                num.value = v;
+                checkValidQuantity(); 
+            };
+
+            wrap.querySelector(`#btn-min-${id}`).onclick = () => setVal(minVal);
+            wrap.querySelector(`#btn-half-${id}`).onclick = () => {
+                let actualMax = parseInt(range.max);
+                setVal(Math.floor((minVal + actualMax) / 2));
+            };
+            wrap.querySelector(`#btn-max-${id}`).onclick = () => setVal(parseInt(range.max));
+
+            range.oninput = () => { num.value = range.value; checkValidQuantity(); }; 
+
+            num.oninput = () => {
+                let actualMax = parseInt(range.max);
+                let v = parseInt(num.value);
+                if (isNaN(v)) return; 
+                if (v < minVal) v = minVal;
+                if (v > actualMax) v = actualMax;
+                if (num.value != v) num.value = v; 
+                range.value = v; 
+                checkValidQuantity(); 
+            };
+            
+            num.onblur = () => {
+                if (num.value === "" || isNaN(parseInt(num.value))) {
+                    num.value = minVal;
+                    range.value = minVal;
+                }
+                checkValidQuantity(); 
+            };
+
+            this.quantityContainer.appendChild(wrap); 
+            return { range, num }; 
+        };
+
+        let inputs = {};
         
         // ★追加：計算のために大名と城主をあらかじめ探しておきます
         const daimyo = this.game.bushos.find(b => b.clan === c.ownerClan && b.isDaimyo);
@@ -2380,215 +2496,6 @@ class UIManager {
             const costDiv = document.createElement('div');
             costDiv.id = 'dynamic-cost-display';
             costDiv.style.cssText = "display: flex; justify-content: center; font-weight:bold; color:#1976d2; margin-top:10px; font-size:1.1rem;";
-            this.quantityContainer.appendChild(costDiv);
-
-        } else if (type === 'war_repair') {
-            const s = this.game.warManager.state;
-            const defender = s.defender;
-            const maxSoldiers = Math.min(window.WarParams.War.RepairMaxSoldiers, defender.soldiers);
-            document.getElementById('quantity-title').textContent = "補修 (兵士選択)";
-            inputs.soldiers = createSlider("使用兵士数", "soldiers", maxSoldiers, Math.min(50, maxSoldiers));
-        }
-
-        const createSlider = (label, id, max, currentVal, minVal = 0) => { 
-            const wrap = document.createElement('div'); 
-            wrap.className = 'qty-row'; 
-            wrap.innerHTML = `
-                <label>${label} (Max: <span id="max-label-${id}">${max}</span>)</label>
-                <div class="qty-control">
-                    <input type="range" id="range-${id}" min="${minVal}" max="${max}" value="${currentVal}">
-                    <input type="number" id="num-${id}" min="${minVal}" max="${max}" value="${currentVal}">
-                </div>
-                <div class="qty-shortcuts">
-                    <button class="qty-shortcut-btn" id="btn-min-${id}">最小</button>
-                    <button class="qty-shortcut-btn" id="btn-half-${id}">半分</button>
-                    <button class="qty-shortcut-btn" id="btn-max-${id}">最大</button>
-                </div>
-            `; 
-            
-            const range = wrap.querySelector(`#range-${id}`); 
-            const num = wrap.querySelector(`#num-${id}`); 
-
-            const setVal = (v) => {
-                let actualMax = parseInt(range.max);
-                if (v < minVal) v = minVal;
-                if (v > actualMax) v = actualMax;
-                range.value = v;
-                num.value = v;
-                checkValidQuantity(); 
-            };
-
-            wrap.querySelector(`#btn-min-${id}`).onclick = () => setVal(minVal);
-            wrap.querySelector(`#btn-half-${id}`).onclick = () => {
-                let actualMax = parseInt(range.max);
-                setVal(Math.floor((minVal + actualMax) / 2));
-            };
-            wrap.querySelector(`#btn-max-${id}`).onclick = () => setVal(parseInt(range.max));
-
-            range.oninput = () => { num.value = range.value; checkValidQuantity(); }; 
-
-            num.oninput = () => {
-                let actualMax = parseInt(range.max);
-                let v = parseInt(num.value);
-                if (isNaN(v)) return; 
-                if (v < minVal) v = minVal;
-                if (v > actualMax) v = actualMax;
-                if (num.value != v) num.value = v; 
-                range.value = v; 
-                checkValidQuantity(); 
-            };
-            
-            num.onblur = () => {
-                if (num.value === "" || isNaN(parseInt(num.value))) {
-                    num.value = minVal;
-                    range.value = minVal;
-                }
-                checkValidQuantity(); 
-            };
-
-            this.quantityContainer.appendChild(wrap); 
-            return { range, num }; 
-        };
-
-        let inputs = {};
-        
-        // ★追加：計算のために大名と城主をあらかじめ探しておきます
-        const daimyo = this.game.bushos.find(b => b.clan === c.ownerClan && b.isDaimyo);
-        const castellan = this.game.getBusho(c.castellanId);
-        
-        if (type === 'draft') {
-            document.getElementById('quantity-title').textContent = "徴兵"; 
-            
-            const busho = this.game.getBusho(data[0]);
-            const maxAffordable = GameSystem.calcDraftFromGold(c.gold, busho, c.peoplesLoyalty);
-            const maxSoldiers = Math.min(c.population, 99999 - c.soldiers, maxAffordable);
-            
-            // ★変更：指定されたフォーマットで上の相場欄に出します！
-            this.tradeTypeInfo.classList.remove('hidden'); 
-            this.tradeTypeInfo.textContent = `相場: 兵士 1人 ＝ 金 ${GameSystem.calcDraftCost(1, busho, c.peoplesLoyalty)}`;
-
-            inputs.soldiers = createSlider("兵士数", "soldiers", maxSoldiers, 0);
-
-            const costDiv = document.createElement('div');
-            costDiv.id = 'dynamic-cost-display';
-            costDiv.style.cssText = "text-align:center; font-weight:bold; color:#1976d2; margin-top:10px; font-size:1.1rem;";
-            this.quantityContainer.appendChild(costDiv);
-            
-        } else if (type === 'charity') {
-            document.getElementById('quantity-title').textContent = "施し"; this.charityTypeSelector.classList.remove('hidden'); const count = data.length; this.quantityContainer.innerHTML = `<p>選択武将数: ${count}名</p>`;
-        } else if (type === 'goodwill') {
-            document.getElementById('quantity-title').textContent = "贈与金指定"; inputs.gold = createSlider("金", "gold", c.gold, 100);
-        } else if (type === 'headhunt_gold') {
-            document.getElementById('quantity-title').textContent = "持参金 (任意)"; inputs.gold = createSlider("金", "gold", c.gold, 0);
-        } else if (type === 'tribute_gold') {
-            document.getElementById('quantity-title').textContent = "献上金 (最大1500)"; 
-            const maxTributeGold = Math.min(1500, c.gold);
-            inputs.gold = createSlider("金", "gold", maxTributeGold, 0);
-        } else if (type === 'war_supplies') {
-            document.getElementById('quantity-title').textContent = "出陣兵数・兵糧・兵器指定"; 
-            inputs.soldiers = createSlider("兵士", "soldiers", c.soldiers, c.soldiers);
-            inputs.rice = createSlider("兵糧", "rice", c.rice, c.rice);
-            inputs.horses = createSlider("騎馬", "horses", c.horses, 0);
-            inputs.guns = createSlider("鉄砲", "guns", c.guns, 0);
-        } else if (type === 'def_intercept') { 
-            const interceptCastle = (data && data.length > 0) ? data[0] : c;
-            document.getElementById('quantity-title').textContent = "迎撃部隊編成"; 
-            inputs.soldiers = createSlider("出陣兵士数", "soldiers", interceptCastle.soldiers, interceptCastle.soldiers);
-            inputs.rice = createSlider("兵糧", "rice", interceptCastle.rice, interceptCastle.rice);
-            inputs.horses = createSlider("騎馬", "horses", interceptCastle.horses || 0, 0);
-            inputs.guns = createSlider("鉄砲", "guns", interceptCastle.guns || 0, 0);
-        } else if (type === 'def_reinf_supplies' || type === 'atk_reinf_supplies' || type === 'def_self_reinf_supplies' || type === 'atk_self_reinf_supplies') { 
-            const helperCastle = (data && data.length > 0) ? data[0] : c;
-            let titleText = "";
-            if (type === 'def_reinf_supplies') titleText = "守備援軍の部隊編成";
-            else if (type === 'atk_reinf_supplies') titleText = "攻撃援軍の部隊編成";
-            else if (type === 'def_self_reinf_supplies') titleText = "守備自軍援軍の部隊編成";
-            else if (type === 'atk_self_reinf_supplies') titleText = "攻撃自軍援軍の部隊編成";
-            document.getElementById('quantity-title').textContent = titleText;
-            inputs.soldiers = createSlider("兵士", "soldiers", helperCastle.soldiers, helperCastle.soldiers, 500);
-            inputs.rice = createSlider("兵糧", "rice", helperCastle.rice, helperCastle.rice, 500);
-            inputs.horses = createSlider("騎馬", "horses", helperCastle.horses || 0, 0, 0);
-            inputs.guns = createSlider("鉄砲", "guns", helperCastle.guns || 0, 0, 0);
-        } else if (type === 'transport') {
-            document.getElementById('quantity-title').textContent = "輸送物資指定"; 
-            inputs.gold = createSlider("金", "gold", c.gold, 0); 
-            inputs.rice = createSlider("兵糧", "rice", c.rice, 0); 
-            inputs.soldiers = createSlider("兵士", "soldiers", c.soldiers, 0);
-            inputs.horses = createSlider("騎馬", "horses", c.horses || 0, 0);
-            inputs.guns = createSlider("鉄砲", "guns", c.guns || 0, 0);
-        } else if (type === 'buy_rice') {
-            document.getElementById('quantity-title').textContent = "兵糧購入"; 
-            let rate = 1.0;
-            if (c && this.game.provinces) {
-                const province = this.game.provinces.find(p => p.id === c.provinceId);
-                if (province && province.marketRate !== undefined) rate = province.marketRate;
-            }
-            const maxBuy = Math.floor(c.gold / rate);
-            this.tradeTypeInfo.classList.remove('hidden'); 
-            // ★変更：兵糧の相場もフォーマットを揃えます！
-            this.tradeTypeInfo.textContent = `相場: 兵糧 10 ＝ 金 ${Math.ceil(10 * rate)}`;
-            inputs.amount = createSlider("購入量(米)", "amount", maxBuy, 0);
-            
-            const costDiv = document.createElement('div');
-            costDiv.id = 'dynamic-cost-display';
-            costDiv.style.cssText = "text-align:center; font-weight:bold; color:#1976d2; margin-top:10px; font-size:1.1rem;";
-            this.quantityContainer.appendChild(costDiv);
-            
-        } else if (type === 'sell_rice') {
-            document.getElementById('quantity-title').textContent = "兵糧売却"; 
-            let rate = 1.0;
-            if (c && this.game.provinces) {
-                const province = this.game.provinces.find(p => p.id === c.provinceId);
-                if (province && province.marketRate !== undefined) rate = province.marketRate;
-            }
-            this.tradeTypeInfo.classList.remove('hidden'); 
-            // ★変更：売却の時の表示も同じように揃えます！
-            this.tradeTypeInfo.textContent = `相場: 兵糧 10 ＝ 金 ${Math.floor(10 * rate)}`;
-            inputs.amount = createSlider("売却量(米)", "amount", c.rice, 0);
-
-            // ★追加：せっかくなので、売却の時もスライダーの下に「得られる資金」を表示するようにします！
-            const costDiv = document.createElement('div');
-            costDiv.id = 'dynamic-cost-display';
-            costDiv.style.cssText = "text-align:center; font-weight:bold; color:#d32f2f; margin-top:10px; font-size:1.1rem;";
-            this.quantityContainer.appendChild(costDiv);
-
-        } else if (type === 'buy_ammo') {
-            document.getElementById('quantity-title').textContent = "矢弾購入"; 
-            const price = parseInt(window.MainParams.Economy.PriceAmmo, 10) || 1;
-            const maxBuy = price > 0 ? Math.floor(c.gold / price) : 0;
-            this.tradeTypeInfo.classList.remove('hidden'); 
-            this.tradeTypeInfo.textContent = `固定価格: 金${price} / 1個`;
-            inputs.amount = createSlider("購入量", "amount", maxBuy, 0);
-        } else if (type === 'buy_horses') {
-            document.getElementById('quantity-title').textContent = "騎馬購入"; 
-            // ★変更：新しい計算の魔法を使います！
-            const maxBuy = GameSystem.calcBuyHorseAmount(c.gold, daimyo, castellan);
-            const realMaxBuy = Math.min(maxBuy, 99999 - (c.horses || 0));
-
-            this.tradeTypeInfo.classList.remove('hidden'); 
-            this.tradeTypeInfo.textContent = `相場: 馬 1頭 ＝ 金 ${GameSystem.calcBuyHorseCost(1, daimyo, castellan)}`;
-            inputs.amount = createSlider("購入量", "amount", realMaxBuy, 0);
-
-            // ★追加：スライダーの下に必要な資金を表示します！
-            const costDiv = document.createElement('div');
-            costDiv.id = 'dynamic-cost-display';
-            costDiv.style.cssText = "text-align:center; font-weight:bold; color:#1976d2; margin-top:10px; font-size:1.1rem;";
-            this.quantityContainer.appendChild(costDiv);
-
-        } else if (type === 'buy_guns') {
-            document.getElementById('quantity-title').textContent = "鉄砲購入"; 
-            // ★変更：新しい計算の魔法を使います！
-            const maxBuy = GameSystem.calcBuyGunAmount(c.gold, daimyo, castellan);
-            const realMaxBuy = Math.min(maxBuy, 99999 - (c.guns || 0));
-
-            this.tradeTypeInfo.classList.remove('hidden'); 
-            this.tradeTypeInfo.textContent = `相場: 銃 1挺 ＝ 金 ${GameSystem.calcBuyGunCost(1, daimyo, castellan)}`;
-            inputs.amount = createSlider("購入量", "amount", realMaxBuy, 0);
-
-            // ★追加：スライダーの下に必要な資金を表示します！
-            const costDiv = document.createElement('div');
-            costDiv.id = 'dynamic-cost-display';
-            costDiv.style.cssText = "text-align:center; font-weight:bold; color:#1976d2; margin-top:10px; font-size:1.1rem;";
             this.quantityContainer.appendChild(costDiv);
 
         } else if (type === 'war_repair') {
