@@ -27,7 +27,7 @@ window.MainParams = {
         BaseRepair: 20, RepairEffect: 0.6, RepairFluctuation: 0.15,
         BaseCharity: 10, CharmEffect: 0.4, CharityFluctuation: 0.15,
         TradeRateMin: 0.3, TradeRateMax: 2.5, TradeFluctuation: 0.3,
-        PriceAmmo: 1, PriceHorse: 5, PriceGun: 50
+        PriceAmmo: 1, PriceHorse: 2, PriceGun: 5
     },
     Strategy: {
         InvestigateDifficulty: 50, InciteFactor: 150, RumorFactor: 50, SchemeSuccessRate: 0.25, EmploymentDiff: 1.5,
@@ -584,12 +584,14 @@ class GameSystem {
 
     static calcBuyHorseCost(amount, daimyo, castellan) {
         const eff = this.calcBuyHorseEfficiency(daimyo, castellan);
-        return Math.ceil(amount / eff);
+        //騎馬の基礎価格２
+        return Math.ceil(amount * 2 / (1 + eff / 10));
     }
 
-    static calcBuyHorseAmount(gold, daimyo, castellan) {
-        const eff = this.calcBuyHorseEfficiency(daimyo, castellan);
-        return Math.floor(gold * eff);
+    static calcBuyGunCost(amount, daimyo, castellan) {
+        const eff = this.calcBuyGunEfficiency(daimyo, castellan);
+        鉄砲の基礎価格５
+        return Math.ceil(amount  * 5 / (1 + eff / 10));
     }
 
     static calcBuyGunEfficiency(daimyo, castellan) {
