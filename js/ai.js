@@ -1198,13 +1198,34 @@ class AIEngine {
                                 const stagingCastle = this.game.getCastle(myOp.stagingBase);
                                 const supportCastle = myOp.supportBase ? this.game.getCastle(myOp.supportBase) : null;
 
-                                // 目標値は、作戦で決めた「必要な兵士（requiredForce）」を使います
-                                // 兵糧も、兵士の1.5倍を目指します
-                                const stagingSoldierGoal = myOp.requiredForce * 1.5;
-                                const stagingRiceGoal = stagingSoldierGoal * 1.5;
+                                // ★出撃するお城の城主の性格を調べて、出陣する割合を予測します
+                                let stagingSendRate = 0.6;
+                                if (stagingCastle) {
+                                    const stagingGeneral = this.game.getBusho(stagingCastle.castellanId);
+                                    if (stagingGeneral) {
+                                        if (stagingGeneral.personality === 'aggressive') stagingSendRate = 0.8;
+                                        if (stagingGeneral.personality === 'conservative') stagingSendRate = 0.4;
+                                    }
+                                }
                                 
-                                const supportSoldierGoal = myOp.requiredForce;
-                                const supportRiceGoal = supportSoldierGoal * 1.5;
+                                // ★援軍用のお城の城主の性格も調べます
+                                let supportSendRate = 0.6;
+                                if (supportCastle) {
+                                    const supportGeneral = this.game.getBusho(supportCastle.castellanId);
+                                    if (supportGeneral) {
+                                        if (supportGeneral.personality === 'aggressive') supportSendRate = 0.8;
+                                        if (supportGeneral.personality === 'conservative') supportSendRate = 0.4;
+                                    }
+                                }
+
+                                // 必要な兵士（requiredForce）を確実に出陣させるために、
+                                // 性格の割合から逆算して、お城に集めておくべき目標の人数を計算します
+                                const stagingSoldierGoal = Math.floor(myOp.requiredForce / stagingSendRate);
+                                // 兵糧は、出陣する人たちの1.5倍を目指します
+                                const stagingRiceGoal = Math.floor(myOp.requiredForce * 1.5);
+                                
+                                const supportSoldierGoal = Math.floor(myOp.requiredForce / supportSendRate);
+                                const supportRiceGoal = Math.floor(myOp.requiredForce * 1.5);
 
                                 // 届け先が出撃用拠点で、まだ目標（兵士か兵糧）に届いていないなら、大急ぎで運びます！
                                 if (a.targetId === myOp.stagingBase && stagingCastle && 
