@@ -488,6 +488,26 @@ class DiplomacyManager {
 
             if (isSuccess) {
                 this.changeStatus(doer.clan, targetClanId, '同盟');
+                
+                // ★追加：同盟が成功したら、この大名家の「今月の外交目標」を親善に書き換えます
+                const doerClan = this.game.clans.find(c => c.id === doer.clan);
+                if (doerClan && doerClan.currentDiplomacyTarget && doerClan.currentDiplomacyTarget.targetId === targetClanId) {
+                    doerClan.currentDiplomacyTarget.action = 'goodwill';
+                    
+                    // 相手との強さの差（何倍強いか）を計算します
+                    const ratio = targetPower / Math.max(1, myPower);
+                    let goodwillGold = 300; // 基本は300にします
+                    
+                    if (ratio >= 3.0) {
+                        goodwillGold = 1000; // 相手が3倍以上強ければ1000にします
+                    } else if (ratio > 1.5) {
+                        goodwillGold = 300 + ((ratio - 1.5) / 1.5) * 700; // 1.5倍から3倍の間なら、少しずつ増やします
+                    }
+                    
+                    // 100の単位で綺麗に揃えて、新しい親善の金額にセットします
+                    doerClan.currentDiplomacyTarget.gold = Math.floor(goodwillGold / 100) * 100;
+                }
+
                 msg = `同盟の締結に成功しました！`;
                 if (!isPlayerInvolved) aiMsg = `${doerClanName} が ${targetClanName} と同盟を締結しました！`;
                 doer.achievementTotal += Math.floor(doer.diplomacy * 0.2) + 10;
@@ -839,6 +859,11 @@ class DiplomacyManager {
         }
 
         // 親善・同盟の判定
+        // すでに関係（同盟・支配・従属）がある相手なら、新しく同盟や親善を計画しません
+        if (['同盟', '支配', '従属'].includes(rel.status)) {
+            return { action: 'none', gold: 0 };
+        }
+
         if (myPower < perceivedTargetTotal * 0.8 || isStrategicPartner) {
             if (Math.random() < smartness * sendProbModifier) {
                 const allianceThreshold = isStrategicPartner ? (window.AIParams.AI.AllianceThreshold || 70) - 15 : (window.AIParams.AI.AllianceThreshold || 70);
