@@ -126,7 +126,7 @@ class StrategySystem {
                 const myGunshi = this.game.bushos.find(b => b.clan === newClanId && b.isGunshi);
                 this.game.getCastleBushos(oldCastle.id).forEach(b => {
                     if (!myGunshi || b.id !== myGunshi.id) {
-                        if (b.clan === newClanId || b.clan === 0) {
+                        if (b.clan === newClanId && b.status === 'active') {
                             b.isGunshi = false;
                         }
                     }
