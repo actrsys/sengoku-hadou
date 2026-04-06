@@ -72,15 +72,8 @@ window.GameEvents.push({
 
         const mapContainer = document.createElement('div');
         mapContainer.style.position = 'relative';
-        
-        if (window.innerWidth > 768) {
-            mapContainer.style.width = '66%'; 
-            mapContainer.style.maxWidth = '800px'; 
-        } else {
-            mapContainer.style.width = '95%'; 
-            mapContainer.style.maxWidth = 'none';
-        }
-
+        mapContainer.style.width = '95%';
+        mapContainer.style.maxWidth = '800px';
         mapContainer.style.border = '4px solid #fff';
         mapContainer.style.borderRadius = '8px';
         mapContainer.style.backgroundColor = '#81c784';
