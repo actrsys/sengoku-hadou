@@ -33,6 +33,9 @@ class AIOperationManager {
         this.game.clans.forEach(clan => {
             if (clan.id === 0 || clan.id === this.game.playerClanId) return;
 
+            // ★追加：毎月、同盟や自分を支配している相手への不満を溜める魔法です！
+            this.decreaseSentimentForHighTension(clan.id);
+
             // ★追加：毎月、まずは大名家単位で「誰と外交するか」を考えます！
             this.thinkMonthlyDiplomacy(clan);
             
@@ -44,6 +47,64 @@ class AIOperationManager {
 
             // ★追加：作戦とは別に、毎月「徴兵用のお城」を考えて選びます！
             this.selectDraftBase(clan.id);
+        });
+    }
+
+    // ★追加：同盟や支配されている相手に攻撃したいけど友好度が高くて我慢している時に、友好度を1下げる魔法です
+    decreaseSentimentForHighTension(clanId) {
+        const myPower = this.game.aiEngine.getClanPrestige(clanId);
+        const myDaimyo = this.game.bushos.find(b => b.clan === clanId && b.isDaimyo) || { duty: 50 };
+
+        const myClanCastles = this.game.castles.filter(c => c.ownerClan === clanId);
+        const neighborCastles = [];
+        myClanCastles.forEach(myC => {
+            if (myC.adjacentCastleIds) {
+                myC.adjacentCastleIds.forEach(adjId => {
+                    const adjCastle = this.game.getCastle(adjId);
+                    if (adjCastle && adjCastle.ownerClan !== 0 && adjCastle.ownerClan !== clanId) {
+                        neighborCastles.push(adjCastle);
+                    }
+                });
+            }
+        });
+
+        const adjacentClans = [...new Set(neighborCastles.map(c => c.ownerClan))];
+
+        adjacentClans.forEach(targetClanId => {
+            const rel = this.game.getRelation(clanId, targetClanId);
+            // 相手が「同盟」か、自分を支配している（自分の視点で相手が「支配」）場合で、友好度が50以上
+            if (rel && (rel.status === '同盟' || rel.status === '支配') && rel.sentiment >= 50) {
+                const targetPower = this.game.aiEngine.getClanPrestige(targetClanId);
+                
+                let breakScore = 0; 
+                let minEnemyPower = -1; 
+                
+                adjacentClans.forEach(cId => {
+                    const r = this.game.getRelation(clanId, cId);
+                    if (r && !['同盟', '支配', '従属'].includes(r.status)) {
+                        const p = this.game.aiEngine.getClanPrestige(cId);
+                        if (minEnemyPower === -1 || p < minEnemyPower) {
+                            minEnemyPower = p;
+                        }
+                    }
+                });
+
+                let comparePower = minEnemyPower !== -1 ? minEnemyPower : myPower;
+                const powerRatio = targetPower / comparePower;
+                
+                // 相手が相対的に弱いほど攻撃したくなります
+                if (powerRatio < 1.0) {
+                    breakScore += (1.0 - powerRatio) * 2.5;
+                }
+                
+                // 自分の義理が低いほど攻撃したくなります
+                breakScore += (50 - myDaimyo.duty) * 0.05;
+
+                // 攻撃したいスコア（0より大きい）なら、我慢しているストレスで友好度を1下げます！
+                if (breakScore > 0) {
+                    this.game.diplomacyManager.updateSentiment(clanId, targetClanId, -1);
+                }
+            }
         });
     }
 
