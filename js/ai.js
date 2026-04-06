@@ -1118,7 +1118,7 @@ class AIEngine {
             if (castle.rice <= castle.soldiers * 1) {
                 actions.push({ type: 'buy_rice', stat: 'politics', score: 800, cost: 0 }); 
             }
-            if (castle.gold >= Math.max(1, castle.rice) * 10 && castle.gold >= 500) {
+            if (castle.gold >= Math.max(1, castle.rice) * 5 && castle.gold >= 500) {
                 actions.push({ type: 'buy_rice_rich', stat: 'politics', score: 800, cost: 0 }); 
             }
 
