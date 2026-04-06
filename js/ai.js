@@ -220,7 +220,13 @@ class AIEngine {
                                         isStillEnemy = true; // 空き城なら攻撃OKです
                                     } else {
                                         const rel = this.game.getRelation(castle.ownerClan, targetCastle.ownerClan);
-                                        if (!rel || !this.game.diplomacyManager.isNonAggression(rel.status)) {
+                                        
+                                        // ★今回変更：もし出陣のタイミングで相手が「同盟」や「従属」なら、この瞬間に破棄します！
+                                        if (rel && (rel.status === '同盟' || rel.status === '従属')) {
+                                            this.game.diplomacyManager.applyBreakAlliancePenalty(castle.ownerClan, targetCastle.ownerClan);
+                                            console.log(`${castle.ownerClan}が\n${targetCastle.ownerClan}との関係を破棄しました！`);
+                                            isStillEnemy = true; // 破棄して敵になったので出陣OK！
+                                        } else if (!rel || !this.game.diplomacyManager.isNonAggression(rel.status)) {
                                             isStillEnemy = true; // 同盟などで守られていなければ敵です！
                                         }
                                     }

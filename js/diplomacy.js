@@ -80,7 +80,7 @@ class DiplomacyManager {
         update(dataA);
         update(dataB);
     }
-
+    
     /**
      * 強制的に状態を変更し、相手側も同期する
      * ★追加：和睦の時に、期間（trucePeriod）も一緒に設定できるようにしました！
@@ -103,6 +103,17 @@ class DiplomacyManager {
             // 同盟・敵対・和睦などは共通
             dataB.status = newStatus;
             if (newStatus === '和睦') dataB.trucePeriod = trucePeriod;
+        }
+
+        // ★今回追加：関係が変化したので、両方の大名家の「今月の外交目標」をリセットします！
+        const clanA = this.game.clans.find(c => c.id === clanId);
+        if (clanA && clanA.currentDiplomacyTarget && clanA.currentDiplomacyTarget.targetId === targetId) {
+            clanA.currentDiplomacyTarget = null;
+        }
+        
+        const clanB = this.game.clans.find(c => c.id === targetId);
+        if (clanB && clanB.currentDiplomacyTarget && clanB.currentDiplomacyTarget.targetId === clanId) {
+            clanB.currentDiplomacyTarget = null;
         }
     }
 
