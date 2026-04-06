@@ -627,7 +627,7 @@ class AIEngine {
             }
             
             // 守備側武将の能力による攻撃確率低下 (最大10%)
-            const enemyBushos = this.game.getCastleBushos(target.id);
+            const enemyBushos = this.game.getCastleBushos(target.id).filter(b => b.clan === target.ownerClan && b.status === 'active');
             let maxLdr = 0, maxInt = 0;
             if (enemyBushos.length > 0) {
                 maxLdr = Math.max(...enemyBushos.map(b => b.leadership));
