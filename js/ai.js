@@ -1778,6 +1778,13 @@ class AIEngine {
                                 castle.soldiers -= 300;
                                 castle.rice -= 500;
                                 
+                                const sendHorses = Math.min(castle.horses || 0, 300, 99999 - (targetCastle.horses || 0));
+                                const sendGuns = Math.min(castle.guns || 0, 300, 99999 - (targetCastle.guns || 0));
+                                castle.horses = (castle.horses || 0) - sendHorses;
+                                targetCastle.horses = (targetCastle.horses || 0) + sendHorses;
+                                castle.guns = (castle.guns || 0) - sendGuns;
+                                targetCastle.guns = (targetCastle.guns || 0) + sendGuns;
+
                                 const totalS = targetCastle.soldiers + 300;
                                 targetCastle.training = Math.floor(((targetCastle.training * targetCastle.soldiers) + (castle.training * 300)) / totalS);
                                 targetCastle.morale = Math.floor(((targetCastle.morale * targetCastle.soldiers) + (castle.morale * 300)) / totalS);
@@ -1792,6 +1799,13 @@ class AIEngine {
                                 castle.gold -= 500; 
                                 castle.soldiers -= 500;
                                 
+                                const sendHorses = Math.min(castle.horses || 0, 500, 99999 - (targetCastle.horses || 0));
+                                const sendGuns = Math.min(castle.guns || 0, 500, 99999 - (targetCastle.guns || 0));
+                                castle.horses = (castle.horses || 0) - sendHorses;
+                                targetCastle.horses = (targetCastle.horses || 0) + sendHorses;
+                                castle.guns = (castle.guns || 0) - sendGuns;
+                                targetCastle.guns = (targetCastle.guns || 0) + sendGuns;
+
                                 const totalS = targetCastle.soldiers + 500;
                                 targetCastle.training = Math.floor(((targetCastle.training * targetCastle.soldiers) + (castle.training * 500)) / totalS);
                                 targetCastle.morale = Math.floor(((targetCastle.morale * targetCastle.soldiers) + (castle.morale * 500)) / totalS);
@@ -1799,7 +1813,7 @@ class AIEngine {
                                 targetCastle.gold += 500; 
                                 targetCastle.soldiers += 500;
                             }
-                        } 
+                        }
                         // ④ 普通の兵糧のお使い
                         else if (task.type === 'normal_rice') {
                             if (castle.rice >= 1000 && targetCastle.rice + 1000 <= 99999) {
