@@ -946,13 +946,17 @@ class AIEngine {
             !b.isActionDone && b.status !== 'ronin' && b.belongKunishuId === 0
         );
 
+        // まず、お城に動ける武将がいるか確認します。誰もいなければ何もできません
+        if (availableBushos.length === 0) return;
+
         // 武将の人数より多くは行動できません
         maxActions = Math.min(maxActions, availableBushos.length);
 
-        // ★追加：NPCが賢すぎるのを防ぐため、ランダムで「0回」「1回」「2回」のどれかだけ行動回数を減らします
-        const reduceActions = Math.floor(Math.random() * 3); // 0, 1, 2のどれかを作る魔法です
-        maxActions = Math.max(1, maxActions - reduceActions); // 減らしても、最低1回は必ず行動させます
+        // ランダムで行動回数を減らしますが、マイナス（0回未満）にならないようにします
+        const reduceActions = Math.floor(Math.random() * 3);
+        maxActions = Math.max(0, maxActions - reduceActions); 
 
+        // 減らした結果、やるべき回数が0回になったり、武将がいなかったらおしまいです
         if (maxActions <= 0) return;
 
         // 城主の性格による好みの計算（相対値で最大±20%のブレ）
