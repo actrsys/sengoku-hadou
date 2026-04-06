@@ -1118,6 +1118,9 @@ class AIEngine {
             if (castle.rice <= castle.soldiers * 1) {
                 actions.push({ type: 'buy_rice', stat: 'politics', score: 800, cost: 0 }); 
             }
+            if (castle.gold >= Math.max(1, castle.rice) * 10 && castle.gold >= 500) {
+                actions.push({ type: 'buy_rice_rich', stat: 'politics', score: 800, cost: 0 }); 
+            }
 
             // ★追加：自領のみを通って辿り着ける城のリストを作る魔法！
             const reachableMyCastles = [];
@@ -1727,6 +1730,30 @@ class AIEngine {
                             doer.isActionDone = true; actionDoneInThisStep = true; break;
                         } else {
                             continue; // 上限を超えるなら買うのをやめます
+                        }
+                    }
+                }
+                
+                if (action.type === 'buy_rice_rich') {
+                    const spendGold = Math.floor(castle.gold / 2);
+                    let rate = 1.0;
+                    if (this.game.provinces) {
+                        const province = this.game.provinces.find(p => p.id === castle.provinceId);
+                        if (province && province.marketRate !== undefined) rate = province.marketRate;
+                    }
+                    const buyAmount = Math.floor(spendGold / rate);
+                    
+                    if (buyAmount > 0) {
+                        if (castle.rice + buyAmount <= 99999) {
+                            castle.gold -= spendGold;
+                            castle.rice += buyAmount;
+                            doer.isActionDone = true; actionDoneInThisStep = true; break;
+                        } else {
+                            const maxBuy = 99999 - castle.rice;
+                            const maxSpend = Math.floor(maxBuy * rate);
+                            castle.gold -= maxSpend;
+                            castle.rice = 99999;
+                            doer.isActionDone = true; actionDoneInThisStep = true; break;
                         }
                     }
                 }
