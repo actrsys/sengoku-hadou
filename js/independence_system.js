@@ -877,6 +877,9 @@ class IndependenceSystem {
         // 3. 野戦システム(FieldWarManager)に渡すための「ダミーの戦場データ」を作ります
         // ポイント：ownerClan を -1（中立扱い）にすることで、プレイヤーが操作できない「完全なAI戦」になり、画面を隠したまま裏で超高速で戦ってくれます！
         // エラーが起きないように、出発元のお城などのダミーデータもしっかり持たせます！
+        const isPlayerDaimyo = (oldDaimyo.clan === this.game.playerClanId);
+        const defClanId = isPlayerDaimyo ? oldDaimyo.clan : -1;
+
         const fakeWarState = {
             attacker: { 
                 ownerClan: -1, 
@@ -889,7 +892,7 @@ class IndependenceSystem {
             },
             defender: { 
                 id: 0, 
-                ownerClan: -1, 
+                ownerClan: defClanId, 
                 name: "主家軍", 
                 soldiers: daimyoTotalPool,
                 morale: 50, 
@@ -917,7 +920,7 @@ class IndependenceSystem {
                 this.game.fieldWarManager = new window.FieldWarManager(this.game);
             }
             
-            // AI戦として実行されるため、野戦画面は出ずに一瞬で結果が出ます
+            // プレイヤー大名の場合は通常の野戦画面が表示され、AI大名の場合は一瞬で結果が出ます
             this.game.fieldWarManager.startFieldWar(fakeWarState, (resultType) => {
                 // 結果を翻訳して返します
                 // attacker = 反乱軍, defender = 主家軍
