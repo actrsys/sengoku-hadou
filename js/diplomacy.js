@@ -787,8 +787,90 @@ class DiplomacyManager {
                 if (isDirectlyAdjacent) break;
             }
 
-            // 直接くっついている時だけ、支配のお願いをします
-            if (isDirectlyAdjacent && Math.random() < 0.05) { 
+            // ★ここから追加：支配していい相手かどうかをチェックする魔法です！
+            let isSafeToDominate = true;
+
+            // チェック１：同じ「国（尾張など）」に城を持っているか調べます
+            // まずは自分が持っている国のリストを作ります
+            const myProvinces = new Set();
+            myCastles.forEach(c => myProvinces.add(c.provinceId));
+
+            // 相手の城が、自分の持っている国のリストに含まれているか確認します
+            for (let tc of targetCastles) {
+                if (myProvinces.has(tc.provinceId)) {
+                    isSafeToDominate = false; // 同じ国にいるなら、地方統一の邪魔になるのでダメ！
+                    break;
+                }
+            }
+
+            // チェック２：二条城（城ID:26）への道を塞いでしまわないか調べます
+            // 同じ国にいない場合だけ、さらにチェックします
+            if (isSafeToDominate) {
+                const nijoCastleId = 26;
+                const nijoCastle = this.game.castles.find(c => c.id === nijoCastleId);
+                
+                // 二条城が存在していて、まだ自分が持っていない場合のみ調べます
+                if (nijoCastle && nijoCastle.ownerClan !== myClanId) {
+                    // 探索の準備：自分の城をすべてスタート地点として順番待ちリストに入れます
+                    let queue = [];
+                    let visited = new Set();
+                    let parentMap = new Map(); // どこから来たかをメモする地図です
+                    
+                    for (let mc of myCastles) {
+                        queue.push(mc.id);
+                        visited.add(mc.id);
+                    }
+                    
+                    let foundNijo = false;
+                    
+                    // 最短ルートを探すループです
+                    while (queue.length > 0) {
+                        let currentId = queue.shift();
+                        
+                        if (currentId === nijoCastleId) {
+                            foundNijo = true;
+                            break; // 二条城が見つかったら探索終了！
+                        }
+                        
+                        let currentCastle = this.game.castles.find(c => c.id === currentId);
+                        if (currentCastle && currentCastle.adjacentCastleIds) {
+                            for (let adjId of currentCastle.adjacentCastleIds) {
+                                if (!visited.has(adjId)) {
+                                    let adjCastle = this.game.castles.find(c => c.id === adjId);
+                                    if (adjCastle) {
+                                        // 通っていいのは「自分の城」「空き城」「今回支配しようとしている相手の城」「二条城」だけです
+                                        if (adjCastle.ownerClan === myClanId || adjCastle.ownerClan === 0 || adjCastle.ownerClan === targetClanId || adjCastle.id === nijoCastleId) {
+                                            visited.add(adjId);
+                                            parentMap.set(adjId, currentId); // 「この城には、あの城から来ました」とメモします
+                                            queue.push(adjId);
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    
+                    // 二条城への一番早いルートが見つかった場合、その道に相手の城があるか確認します
+                    if (foundNijo) {
+                        let currId = nijoCastleId;
+                        while (parentMap.has(currId)) {
+                            let pId = parentMap.get(currId);
+                            let pCastle = this.game.castles.find(c => c.id === pId);
+                            
+                            if (pCastle && pCastle.ownerClan === targetClanId) {
+                                // ルート上に相手の城があった！支配すると道が塞がるのでダメ！
+                                isSafeToDominate = false;
+                                break;
+                            }
+                            currId = pId; // さらに前の城へ戻って確認を続けます
+                        }
+                    }
+                }
+            }
+            // ★追加ここまで
+
+            // 直接くっついていて、かつ「支配しても邪魔にならない」時だけ、支配のお願いをします
+            if (isDirectlyAdjacent && isSafeToDominate && Math.random() < 0.05) { 
                 return { action: 'dominate', gold: 0 };
             }
         }
