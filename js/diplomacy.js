@@ -598,6 +598,13 @@ class DiplomacyManager {
                     if (oppRelation) oppRelation.sentiment = relation.sentiment;
                 }
 
+                // ★追加：支配が成功したら、この大名家の「今月の外交目標」を親善に書き換えます
+                const doerClan = this.game.clans.find(c => c.id === doer.clan);
+                if (doerClan && doerClan.currentDiplomacyTarget && doerClan.currentDiplomacyTarget.targetId === targetClanId) {
+                    doerClan.currentDiplomacyTarget.action = 'goodwill';
+                    doerClan.currentDiplomacyTarget.gold = 300; // 支配下への親善は基本の300にします
+                }
+
                 msg = `${this.game.clans.find(c => c.id === targetClanId).name} を支配下に置くことに成功しました！`;
                 if (!isPlayerInvolved) aiMsg = `${doerClanName} が ${targetClanName} を支配下に置きました！`;
                 doer.achievementTotal += Math.floor(doer.diplomacy * 0.2) + 20;
@@ -724,6 +731,12 @@ class DiplomacyManager {
                         if (oppRelation) oppRelation.sentiment = relation.sentiment;
                     }
 
+                    // ★追加：支配が成功したら、この大名家の「今月の外交目標」を親善に書き換えます
+                    if (doerClan && doerClan.currentDiplomacyTarget && doerClan.currentDiplomacyTarget.targetId === targetClanId) {
+                        doerClan.currentDiplomacyTarget.action = 'goodwill';
+                        doerClan.currentDiplomacyTarget.gold = 300; // 支配下への親善は基本の300にします
+                    }
+
                     this.game.ui.showResultModal(`${doerClan.name} に従属しました……`, () => {
                         if (onComplete) setTimeout(onComplete, 100);
                     });
@@ -776,7 +789,8 @@ class DiplomacyManager {
         });
 
         // 支配要求の判定
-        if (!amISubordinate && targetClanTotal * 8 <= myPower) {
+        // ★すでに「支配」している相手には、もう支配要求を行わないようにチェックを書き足します！
+        if (!amISubordinate && rel.status !== '支配' && targetClanTotal * 8 <= myPower) {
             // 自分の領地と相手の領地が直接くっついているか調べます
             let isDirectlyAdjacent = false;
             const myCastles = this.game.castles.filter(c => c.ownerClan === myClanId);
