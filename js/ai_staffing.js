@@ -415,14 +415,22 @@ class AIStaffing {
                 // 1. お城の基本ステータス（総合評価）が高いとプラス
                 score += tRoleData.totalScore / 5;
 
-                // 2. 空の城・手薄な城へのボーナス！
+                // 2. 空の城・手薄な城へのボーナスと、人数によるスコアの調整！
+                let countScore = 0;
                 if (target.samuraiIds.length === 0) {
-                    score += 150; 
+                    countScore += 150; 
                 } else if (target.samuraiIds.length === 1) {
-                    score += 80;  
+                    countScore += 80;  
                 } else if (target.samuraiIds.length === 2) {
-                    score += 30;
+                    countScore += 30;
                 }
+
+                if (target.samuraiIds.length <= 5) {
+                    countScore += (5 - target.samuraiIds.length) * 5;
+                } else {
+                    countScore -= (target.samuraiIds.length - 5) * 5;
+                }
+                score += countScore;
 
                 // 3. 開発の余地ボーナス
                 const devRoom = (target.maxKokudaka - target.kokudaka) + (target.maxCommerce - target.commerce);
@@ -499,14 +507,41 @@ class AIStaffing {
         let remainingCount = castle.samuraiIds.length;
         const moveActions = []; // まとめた行動を入れる箱です
 
+        // 人数による点数を計算する魔法の道具です
+        const calcCountScore = (count) => {
+            let s = 0;
+            if (count === 0) s += 150;
+            else if (count === 1) s += 80;
+            else if (count === 2) s += 30;
+            
+            if (count <= 5) {
+                s += (5 - count) * 5;
+            } else {
+                s -= (count - 5) * 5;
+            }
+            return s;
+        };
+
         // 目的地ごとに、まとめて移動の行動を作ります
         targetGroups.forEach(group => {
             let actualMovers = [];
-            // 今のお城に3人以上残るように、上から順番にメンバーを確定させます
+            let targetCount = group.target.samuraiIds.length;
+            
             for (let busho of group.movers) {
-                if (remainingCount > 3) {
+                // 最低でも城主1人は残すため、1人になったら絶対にお引越しさせません
+                if (remainingCount <= 1) break;
+
+                const currentTotalScore = calcCountScore(remainingCount) + calcCountScore(targetCount);
+                const nextTotalScore = calcCountScore(remainingCount - 1) + calcCountScore(targetCount + 1);
+
+                // 移動した方が点数が高くなる（または同じ）なら、お引越し決定です！
+                if (nextTotalScore >= currentTotalScore) {
                     actualMovers.push(busho);
                     remainingCount--;
+                    targetCount++;
+                } else {
+                    // 点数が下がるなら、これ以上このお城には送りません
+                    break;
                 }
             }
             // もし1人でも引っ越せるなら、行動のリストに追加します
