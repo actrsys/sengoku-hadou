@@ -56,7 +56,33 @@ class AIOperationManager {
             }
         });
 
-        const uniqueNeighbors = [...new Set(neighborCastles.map(c => c.ownerClan))];
+        // まずは直接お隣さんのリストを作ります
+        const directNeighbors = [...new Set(neighborCastles.map(c => c.ownerClan))];
+        let diplomacyCandidates = [...directNeighbors];
+
+        // ★追加：お隣さんの中で「敵対」している相手がいれば、さらにその向こう隣の勢力もリストに入れます！
+        directNeighbors.forEach(neighborId => {
+            const rel = this.game.getRelation(myClanId, neighborId);
+            if (rel && rel.status === '敵対') {
+                const enemyCastles = this.game.castles.filter(c => c.ownerClan === neighborId);
+                enemyCastles.forEach(enemyCastle => {
+                    if (enemyCastle.adjacentCastleIds) {
+                        enemyCastle.adjacentCastleIds.forEach(adjId => {
+                            const adjCastle = this.game.getCastle(adjId);
+                            // 空き城(0)でもなく、自分でもなく、その敵対勢力自身でもないなら、リストに追加します！
+                            if (adjCastle && adjCastle.ownerClan !== 0 && adjCastle.ownerClan !== myClanId && adjCastle.ownerClan !== neighborId) {
+                                if (!diplomacyCandidates.includes(adjCastle.ownerClan)) {
+                                    diplomacyCandidates.push(adjCastle.ownerClan);
+                                }
+                            }
+                        });
+                    }
+                });
+            }
+        });
+
+        // 出来上がったリストを、いつもの名前の箱に入れ直します
+        const uniqueNeighbors = diplomacyCandidates;
         if (uniqueNeighbors.length === 0) return;
 
         const allyCount = this.game.diplomacyManager.getAllyCount(myClanId);
