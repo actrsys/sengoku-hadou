@@ -886,8 +886,8 @@ class IndependenceSystem {
                 name: "反乱軍", 
                 soldiers: rebelTotalPool,
                 rice: 5000, 
-                morale: 100, 
-                training: 100,
+                morale: 70, 
+                training: 50,
                 isKunishu: false
             },
             defender: { 
