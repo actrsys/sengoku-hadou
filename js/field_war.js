@@ -2210,15 +2210,18 @@ class FieldWarManager {
         allies.forEach(a => allySoldiers += a.soldiers);
         enemies.forEach(e => enemySoldiers += e.soldiers);
         
-        // ★修正: 総大将なら全軍撤退、一般部隊なら個別撤退の判断をします
-        if (unit.isGeneral && (allySoldiers < enemySoldiers * 0.2)) {
+        // ★追加：この部隊が諸勢力かどうかをチェックします（諸勢力は絶対に撤退しません！）
+        let isKunishuUnit = (unit.isAttacker && this.warState.attacker.isKunishu) || (!unit.isAttacker && this.warState.defender.isKunishu);
+        
+        // ★修正: 諸勢力でなければ、総大将なら全軍撤退、一般部隊なら個別撤退の判断をします
+        if (!isKunishuUnit && unit.isGeneral && (allySoldiers < enemySoldiers * 0.2)) {
             if (isPlayerInvolved) {
                 if (unit.isAttacker) this.log(`${unit.name}軍は攻略を諦め、引き揚げていきました！`);
                 else this.log(`${unit.name}軍は不利を悟り、戦場から離脱しました！`);
             }
             this.endFieldWar(unit.isAttacker ? 'attacker_retreat' : 'defender_retreat');
             return;
-        } else if (!unit.isGeneral && (unit.soldiers <= 200 || unit.soldiers < enemySoldiers * 0.05)) {
+        } else if (!isKunishuUnit && !unit.isGeneral && (unit.soldiers <= 200 || unit.soldiers < enemySoldiers * 0.05)) {
             // 一般部隊は、自分の兵士が少なすぎるか、敵全体に対して少なすぎたら逃げる
             if (isPlayerInvolved) this.log(`${unit.name}隊は被害が大きく、戦場から撤退しました！`);
             this.retreatUnit(unit);
@@ -2264,15 +2267,17 @@ class FieldWarManager {
         // --- 2. 逃走・移動判定 ---
         if (unit.troopType === 'teppo') {
             if (allies.length === 0 && distToTarget === 1) {
-                // ★修正: 総大将なら全軍撤退、一般部隊なら個別撤退
-                if (unit.isGeneral) {
-                    if (isPlayerInvolved) this.log(`${unit.name}軍は不利を悟り、戦場から離脱しました！`);
-                    this.endFieldWar(unit.isAttacker ? 'attacker_retreat' : 'defender_retreat');
-                } else {
-                    if (isPlayerInvolved) this.log(`${unit.name}隊は不利を悟り、戦場から撤退しました！`);
-                    this.retreatUnit(unit);
+                if (!isKunishuUnit) {
+                    // ★修正: 諸勢力でなければ、総大将なら全軍撤退、一般部隊なら個別撤退
+                    if (unit.isGeneral) {
+                        if (isPlayerInvolved) this.log(`${unit.name}軍は不利を悟り、戦場から離脱しました！`);
+                        this.endFieldWar(unit.isAttacker ? 'attacker_retreat' : 'defender_retreat');
+                    } else {
+                        if (isPlayerInvolved) this.log(`${unit.name}隊は不利を悟り、戦場から撤退しました！`);
+                        this.retreatUnit(unit);
+                    }
+                    return;
                 }
-                return;
             }
         }
         

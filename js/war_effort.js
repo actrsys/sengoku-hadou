@@ -1287,7 +1287,12 @@ Object.assign(WarManager.prototype, {
             if (s.attacker.rice > 0) {
                 // ★追加：戦争終了時の兵糧合流でも上限を超えないようにします
                 if (attackerWon) s.defender.rice = Math.min(99999, s.defender.rice + s.attacker.rice); 
-                else { const srcC = this.game.getCastle(s.sourceCastle.id); if (srcC) srcC.rice = Math.min(99999, srcC.rice + s.attacker.rice); }
+                else { 
+                    if (!s.attacker.isKunishu) {
+                        const srcC = this.game.getCastle(s.sourceCastle.id); 
+                        if (srcC) srcC.rice = Math.min(99999, srcC.rice + s.attacker.rice); 
+                    }
+                }
             }
 
             // ★修正：攻撃軍が城に入って「兵士数」が勘違いされる前に、捕縛の処理を行います！
@@ -1321,20 +1326,35 @@ Object.assign(WarManager.prototype, {
                 s.defender.guns = Math.min(99999, (s.defender.guns || 0) + (s.attacker.guns || 0));
                 if (s.isPlayerInvolved && totalAbsorbed > 0) this.game.ui.log(`(敵残存兵・負傷兵 計${totalAbsorbed}名 を吸収)`);
             } else if (!attackerWon) {
-                const srcC = this.game.getCastle(s.sourceCastle.id);
-
-                // ★追加：帰ってきた兵士と、お留守番していた兵士の士気と訓練をまぜまぜします！
-                const originalSoldiers = srcC.soldiers;
-                const newTotalSoldiers = originalSoldiers + totalAtkSurvivors;
-                if (newTotalSoldiers > 0) {
-                    srcC.training = Math.floor(((srcC.training || 0) * originalSoldiers + (s.attacker.training || 0) * totalAtkSurvivors) / newTotalSoldiers);
-                    srcC.morale = Math.floor(((srcC.morale || 0) * originalSoldiers + (s.attacker.morale || 0) * totalAtkSurvivors) / newTotalSoldiers);
+                if (s.attacker.isKunishu) {
+                    const kunishu = this.game.kunishuSystem.getKunishu(s.attacker.kunishuId);
+                    if (kunishu && !kunishu.isDestroyed) {
+                        const originalSoldiers = kunishu.soldiers;
+                        const newTotalSoldiers = originalSoldiers + totalAtkSurvivors;
+                        if (newTotalSoldiers > 0) {
+                            kunishu.training = Math.floor(((kunishu.training || 0) * originalSoldiers + (s.attacker.training || 0) * totalAtkSurvivors) / newTotalSoldiers);
+                            kunishu.morale = Math.floor(((kunishu.morale || 0) * originalSoldiers + (s.attacker.morale || 0) * totalAtkSurvivors) / newTotalSoldiers);
+                        }
+                        kunishu.soldiers = Math.min(99999, newTotalSoldiers);
+                        kunishu.horses = Math.min(99999, (kunishu.horses || 0) + (s.attacker.horses || 0));
+                        kunishu.guns = Math.min(99999, (kunishu.guns || 0) + (s.attacker.guns || 0));
+                    }
+                } else {
+                    const srcC = this.game.getCastle(s.sourceCastle.id);
+    
+                    // ★追加：帰ってきた兵士と、お留守番していた兵士の士気と訓練をまぜまぜします！
+                    const originalSoldiers = srcC.soldiers;
+                    const newTotalSoldiers = originalSoldiers + totalAtkSurvivors;
+                    if (newTotalSoldiers > 0) {
+                        srcC.training = Math.floor(((srcC.training || 0) * originalSoldiers + (s.attacker.training || 0) * totalAtkSurvivors) / newTotalSoldiers);
+                        srcC.morale = Math.floor(((srcC.morale || 0) * originalSoldiers + (s.attacker.morale || 0) * totalAtkSurvivors) / newTotalSoldiers);
+                    }
+    
+                    // ★追加：負けて帰ってきた遠征軍の兵士、馬、鉄砲の合流にストッパー！
+                    srcC.soldiers = Math.min(99999, newTotalSoldiers);
+                    srcC.horses = Math.min(99999, (srcC.horses || 0) + (s.attacker.horses || 0));
+                    srcC.guns = Math.min(99999, (srcC.guns || 0) + (s.attacker.guns || 0));
                 }
-
-                // ★追加：負けて帰ってきた遠征軍の兵士、馬、鉄砲の合流にストッパー！
-                srcC.soldiers = Math.min(99999, newTotalSoldiers);
-                srcC.horses = Math.min(99999, (srcC.horses || 0) + (s.attacker.horses || 0));
-                srcC.guns = Math.min(99999, (srcC.guns || 0) + (s.attacker.guns || 0));
                 
                 const recovered = Math.floor(realDefDead * baseRecoveryRate);
                 s.defender.soldiers = Math.min(99999, s.defender.soldiers + recovered);

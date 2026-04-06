@@ -509,10 +509,10 @@ class WarManager {
         const options = isDefenderTurn ? ['def_charge', 'def_bow', 'def_attack', 'provoke', 'def_inspire'] : ['charge', 'bow', 'siege', 'fire', 'inspire'];
         
         // 撤退の選択肢を追加
-        // ★修正：中立の空き城（ownerClanが0）の守備軍は、AIも撤退を選ばないようにします！
-        if (isDefenderTurn && s.turn === 'defender' && s.defender.ownerClan !== 0 && this.game.castles.some(c => c.ownerClan === s.defender.ownerClan && c.id !== s.defender.id && GameSystem.isReachable(this.game, s.defender, c, s.defender.ownerClan))) {
+        // ★修正：中立の空き城（ownerClanが0）や諸勢力（isKunishu）の部隊は、AIも絶対に撤退を選ばないようにします！
+        if (isDefenderTurn && s.turn === 'defender' && s.defender.ownerClan !== 0 && !s.defender.isKunishu && this.game.castles.some(c => c.ownerClan === s.defender.ownerClan && c.id !== s.defender.id && GameSystem.isReachable(this.game, s.defender, c, s.defender.ownerClan))) {
             options.push('retreat');
-        } else if (!isDefenderTurn && s.turn === 'attacker') {
+        } else if (!isDefenderTurn && s.turn === 'attacker' && !s.attacker.isKunishu) {
             options.push('retreat');
         }
         
