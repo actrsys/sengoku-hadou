@@ -1795,6 +1795,10 @@ class AIEngine {
                 castellan.isActionDone = true;
             }
         } else if (targetData.action === 'goodwill') {
+            // ★追加：直前に関係値が100になっていたら、お金の無駄になるのでキャンセルします！
+            const currentRel = this.game.getRelation(castle.ownerClan, targetClanId);
+            if (currentRel && currentRel.sentiment >= 100) return;
+
             // 使うお金が、お城の貯金箱の5分の1（20%）より多い時は、高すぎるのでキャンセルします！
             if (targetData.gold > castle.gold / 5) return;
 

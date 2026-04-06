@@ -884,16 +884,17 @@ class DiplomacyManager {
         }
 
         // 親善・同盟の判定
-        // すでに「同盟」を結んでいる相手や、自分が「支配」している相手には、新しく同盟や親善を計画しません
-        // （自分が「従属」している親分に対しては、親善や同盟の打診を考えます！）
-        if (['同盟', '支配'].includes(rel.status)) {
-            return { action: 'none', gold: 0 };
-        }
-
+        // ★修正：同盟や支配・従属状態の相手でも、条件を満たせば親善を行うようにしました！
+        
         if (myPower < perceivedTargetTotal * 0.8 || isStrategicPartner) {
             if (Math.random() < smartness * sendProbModifier) {
                 const allianceThreshold = isStrategicPartner ? (window.AIParams.AI.AllianceThreshold || 70) - 15 : (window.AIParams.AI.AllianceThreshold || 70);
-                const goodwillThreshold = isStrategicPartner ? (window.AIParams.AI.GoodwillThreshold || 40) + 20 : (window.AIParams.AI.GoodwillThreshold || 40);
+                let goodwillThreshold = isStrategicPartner ? (window.AIParams.AI.GoodwillThreshold || 40) + 20 : (window.AIParams.AI.GoodwillThreshold || 40);
+
+                // ★追加：同盟、支配、従属関係にある相手には、関係値が100になるまで親善の対象にします！
+                if (['同盟', '支配', '従属'].includes(rel.status)) {
+                    goodwillThreshold = 100;
+                }
 
                 if (rel.sentiment < goodwillThreshold) {
                      const ratio = perceivedTargetTotal / Math.max(1, myPower); 
@@ -916,6 +917,11 @@ class DiplomacyManager {
                      if (!willGoodwill || (rel.sentiment <= 30 && ratio < 3.0 && !isStrategicPartner)) {
                          return { action: 'none', gold: 0 };
                      } else {
+                         // ★追加：関係値が100以上の時は親善しません（念のためのストッパーです）
+                         if (rel.sentiment >= 100) {
+                             return { action: 'none', gold: 0 };
+                         }
+
                          let goodwillGold = 300; 
                          if (ratio >= 3.0) {
                              goodwillGold = 1000; 
@@ -926,7 +932,10 @@ class DiplomacyManager {
                          return { action: 'goodwill', gold: goodwillGold };
                      }
                 } else if (rel.sentiment > allianceThreshold) {
-                     return { action: 'alliance', gold: 0 };
+                     // ★追加：すでに同盟や支配をしている相手には、新しく「同盟」の提案はしません
+                     if (!['同盟', '支配', '従属'].includes(rel.status)) {
+                         return { action: 'alliance', gold: 0 };
+                     }
                 }
             }
         }
