@@ -175,7 +175,7 @@ class AIStaffing {
             return this.evaluationCache[clanId].bushoTypes;
         }
 
-        const myBushos = this.game.bushos.filter(b => b.clan === clanId && b.status !== 'dead' && b.status !== 'unborn');
+        const myBushos = this.game.bushos.filter(b => b.clan === clanId && b.status === 'active');
         
         let totalSum = 0;
         let highestTotal = 0;

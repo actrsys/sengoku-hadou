@@ -433,7 +433,7 @@ Object.assign(WarManager.prototype, {
                             } else onResult('siege');
                         }
                     } else {
-                        let availableDefBushos = this.game.getCastleBushos(defCastle.id).filter(b => b.status !== 'dead' && b.status !== 'ronin' && b.status !== 'unborn' && (defCastle.isKunishu ? b.belongKunishuId === defCastle.kunishuId : b.belongKunishuId === 0));
+                        let availableDefBushos = this.game.getCastleBushos(defCastle.id).filter(b => b.status === 'active' && (defCastle.isKunishu ? b.belongKunishuId === defCastle.kunishuId : b.clan === defCastle.ownerClan));
                         let evaluator = availableDefBushos.find(b => b.isDaimyo);
                         if (!evaluator) evaluator = availableDefBushos.find(b => b.isCastellan);
                         
@@ -1270,7 +1270,7 @@ Object.assign(WarManager.prototype, {
 
             s.atkBushos.forEach(b => { this.game.factionSystem.recordBattle(b, s.defender.id); this.game.factionSystem.updateRecognition(b, 25); });
             // ★大名の戦いなら諸勢力を弾き、諸勢力の戦いなら大名を弾く魔法！
-            const defBushos = this.game.getCastleBushos(s.defender.id).filter(b => b.status !== 'ronin' && (s.defender.isKunishu ? b.belongKunishuId === s.defender.kunishuId : b.belongKunishuId === 0)).concat(this.pendingPrisoners);
+            const defBushos = this.game.getCastleBushos(s.defender.id).filter(b => b.status === 'active' && (s.defender.isKunishu ? b.belongKunishuId === s.defender.kunishuId : b.clan === s.defender.ownerClan)).concat(this.pendingPrisoners);
             if (s.defBusho && s.defBusho.id && !defBushos.find(b => b.id === s.defBusho.id)) defBushos.push(s.defBusho);
             defBushos.forEach(b => { this.game.factionSystem.recordBattle(b, s.defender.id); this.game.factionSystem.updateRecognition(b, 25); });
 
@@ -1909,7 +1909,7 @@ Object.assign(WarManager.prototype, {
 
             // 大名・城主以外の、動かせる一般武将がいるか
             const normalBushos = this.game.getCastleBushos(c.id).filter(b => 
-                !b.isDaimyo && !b.isCastellan && b.status !== 'ronin' && b.belongKunishuId === 0
+                b.clan === c.ownerClan && b.status === 'active' && !b.isDaimyo && !b.isCastellan
             );
             if (normalBushos.length === 0) return;
 
@@ -2027,7 +2027,7 @@ Object.assign(WarManager.prototype, {
                     if (!enemyRel || !this.game.diplomacyManager.isNonAggression(enemyRel.status)) {
                         const isConnected = connectedCastles.has(c.id) || this.game.castles.some(myC => connectedCastles.has(myC.id) && GameSystem.isAdjacent(c, myC));
                         if (isConnected) {
-                            const normalBushos = this.game.getCastleBushos(c.id).filter(b => !b.isDaimyo && !b.isCastellan && b.status !== 'ronin' && b.belongKunishuId === 0);
+                            const normalBushos = this.game.getCastleBushos(c.id).filter(b => b.clan === c.ownerClan && b.status === 'active' && !b.isDaimyo && !b.isCastellan);
                             if (c.soldiers >= 1000 && c.rice >= 500 && normalBushos.length > 0) {
                                 allyForceCandidates.push({ castle: c, force: { isKunishu: false, id: c.ownerClan, name: this.game.clans.find(clan=>clan.id===c.ownerClan)?.name || "勢力", soldiers: c.soldiers } });
                             }
@@ -2115,7 +2115,7 @@ Object.assign(WarManager.prototype, {
         let reinfSoldiers = Math.max(500, Math.floor(helperCastle.soldiers * 0.5));
         if (reinfSoldiers > helperCastle.soldiers) reinfSoldiers = helperCastle.soldiers;
         
-        const availableBushos = this.game.getCastleBushos(helperCastle.id).filter(b => !b.isDaimyo && !b.isCastellan && b.status !== 'ronin' && b.belongKunishuId === 0).sort((a,b) => b.strength - a.strength);
+        const availableBushos = this.game.getCastleBushos(helperCastle.id).filter(b => b.clan === helperCastle.ownerClan && b.status === 'active' && !b.isDaimyo && !b.isCastellan).sort((a,b) => b.strength - a.strength);
         let bushoCount = reinfSoldiers >= 2500 ? 3 : (reinfSoldiers >= 1500 ? 2 : 1);
         const reinfBushos = availableBushos.slice(0, Math.min(bushoCount, availableBushos.length));
 
@@ -2395,7 +2395,7 @@ Object.assign(WarManager.prototype, {
         let reinfSoldiers = Math.floor(helperCastle.soldiers * rate);
         reinfSoldiers = Math.max(500, Math.min(reinfSoldiers, helperCastle.soldiers));
         
-        const availableBushos = this.game.getCastleBushos(helperCastle.id).filter(b => !b.isDaimyo && !b.isCastellan && b.status !== 'ronin' && b.belongKunishuId === 0).sort((a,b) => b.strength - a.strength);
+        const availableBushos = this.game.getCastleBushos(helperCastle.id).filter(b => b.clan === helperCastle.ownerClan && b.status === 'active' && !b.isDaimyo && !b.isCastellan).sort((a,b) => b.strength - a.strength);
         let bushoCount = reinfSoldiers >= 2500 ? 3 : (reinfSoldiers >= 1500 ? 2 : 1);
         const reinfBushos = availableBushos.slice(0, Math.min(bushoCount, availableBushos.length));
 

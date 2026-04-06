@@ -375,52 +375,54 @@ class CommandSystem {
             infoHtml = "<div>登用する在野武将を選択してください</div>"; 
         }
         else if (actionType === 'employ_doer') { 
-            bushos = this.game.getCastleBushos(c.id).filter(b => b.status !== 'ronin' && b.belongKunishuId === 0); 
+            bushos = this.game.getCastleBushos(c.id).filter(b => b.clan === c.ownerClan && b.status === 'active'); 
             infoHtml = "<div>登用を行う担当官を選択してください</div>"; 
         } 
         else if (actionType === 'diplomacy_doer') { 
-            bushos = this.game.getCastleBushos(c.id).filter(b => b.status !== 'ronin' && b.belongKunishuId === 0); 
+            bushos = this.game.getCastleBushos(c.id).filter(b => b.clan === c.ownerClan && b.status === 'active'); 
             infoHtml = "<div>外交の担当官を選択してください</div>"; 
         }
         // ★追加：貢物を持っていく使者を選ぶリスト
         else if (actionType === 'tribute_doer') { 
-            bushos = this.game.getCastleBushos(c.id).filter(b => b.status !== 'ronin' && b.belongKunishuId === 0); 
+            bushos = this.game.getCastleBushos(c.id).filter(b => b.clan === c.ownerClan && b.status === 'active'); 
             infoHtml = "<div>朝廷への使者を選択してください</div>"; 
         }
         else if (actionType === 'rumor_target_busho') { 
-            bushos = this.game.getCastleBushos(targetId).filter(b => b.status !== 'ronin' && !b.isDaimyo && b.belongKunishuId === 0); 
+            const targetCastle = this.game.getCastle(targetId);
+            bushos = this.game.getCastleBushos(targetId).filter(b => b.clan === targetCastle.ownerClan && b.status === 'active' && !b.isDaimyo); 
             infoHtml = "<div>流言の対象とする武将を選択してください</div>"; 
         }
         else if (actionType === 'rumor_doer') { 
-            bushos = this.game.getCastleBushos(c.id).filter(b => b.status !== 'ronin' && b.belongKunishuId === 0); 
+            bushos = this.game.getCastleBushos(c.id).filter(b => b.clan === c.ownerClan && b.status === 'active'); 
             infoHtml = "<div>流言を実行する担当官を選択してください</div>"; 
         }
         else if (actionType === 'incite_doer') { 
-            bushos = this.game.getCastleBushos(c.id).filter(b => b.status !== 'ronin' && b.belongKunishuId === 0); 
+            bushos = this.game.getCastleBushos(c.id).filter(b => b.clan === c.ownerClan && b.status === 'active'); 
             infoHtml = "<div>扇動を実行する担当官を選択してください</div>"; 
         }
         else if (actionType === 'headhunt_target') { 
-            bushos = this.game.getCastleBushos(targetId).filter(b => b.status !== 'ronin' && !b.isDaimyo && b.belongKunishuId === 0); 
+            const targetCastle = this.game.getCastle(targetId);
+            bushos = this.game.getCastleBushos(targetId).filter(b => b.clan === targetCastle.ownerClan && b.status === 'active' && !b.isDaimyo); 
             infoHtml = "<div>引抜の対象とする武将を選択してください </div>"; 
         }
         else if (actionType === 'kunishu_incorporate_doer') {
-            bushos = this.game.getCastleBushos(c.id).filter(b => b.status !== 'ronin' && b.belongKunishuId === 0); 
+            bushos = this.game.getCastleBushos(c.id).filter(b => b.clan === c.ownerClan && b.status === 'active'); 
             infoHtml = "<div>取込の交渉を行う担当官を選択してください</div>"; 
         }
         else if (actionType === 'headhunt_doer') {
-            bushos = this.game.getCastleBushos(c.id).filter(b => b.status !== 'ronin' && b.belongKunishuId === 0); 
+            bushos = this.game.getCastleBushos(c.id).filter(b => b.clan === c.ownerClan && b.status === 'active'); 
             infoHtml = "<div>引抜を実行する担当官を選択してください</div>"; 
         }
         else if (actionType === 'interview') { 
-            bushos = this.game.getCastleBushos(c.id).filter(b => b.status !== 'ronin' && !b.isDaimyo && b.belongKunishuId === 0); 
+            bushos = this.game.getCastleBushos(c.id).filter(b => b.clan === c.ownerClan && b.status === 'active' && !b.isDaimyo); 
             infoHtml = "<div>面談する武将を選択してください</div>"; 
         }
         else if (actionType === 'interview_target') { 
-            bushos = this.game.bushos.filter(b => b.clan === this.game.playerClanId && b.status !== 'dead' && b.status !== 'ronin' && b.status !== 'unborn' && b.id !== extraData.interviewer.id && !b.isDaimyo && b.belongKunishuId === 0);
+            bushos = this.game.bushos.filter(b => b.clan === this.game.playerClanId && b.status === 'active' && b.id !== extraData.interviewer.id && !b.isDaimyo);
             infoHtml = `<div>誰についての印象を聞きますか？</div>`; 
         }
         else if (actionType === 'investigate_deploy') { 
-            bushos = this.game.getCastleBushos(c.id).filter(b => b.status !== 'ronin' && b.belongKunishuId === 0); 
+            bushos = this.game.getCastleBushos(c.id).filter(b => b.clan === c.ownerClan && b.status === 'active'); 
             infoHtml = "<div>調査を行う武将を選択してください(複数可)</div>"; 
         }
         else if (actionType === 'view_only') { 
@@ -429,7 +431,7 @@ class CommandSystem {
         }
         // 【差し替え後】（間の部分が消えます！）
         else if (actionType === 'all_busho_list') { 
-            bushos = this.game.bushos.filter(b => b.clan === this.game.playerClanId && b.status !== 'dead' && b.status !== 'ronin' && b.status !== 'unborn' && b.belongKunishuId === 0);
+            bushos = this.game.bushos.filter(b => b.clan === this.game.playerClanId && b.status === 'active');
             infoHtml = "<div>我が軍の武将一覧です</div>"; 
             isMulti = false;
         }
@@ -458,44 +460,38 @@ class CommandSystem {
         else if (actionType === 'appoint_gunshi') {
             bushos = this.game.bushos.filter(b => 
                 b.clan === this.game.playerClanId && 
-                b.status !== 'dead' && 
-                b.status !== 'ronin' &&
-                b.status !== 'unborn' &&
+                b.status === 'active' && 
                 !b.isDaimyo && 
                 !b.isCastellan
             );
             infoHtml = "<div>軍師に任命する武将を選択してください</div>";
         }
         else if (actionType === 'def_intercept_deploy') {
-            bushos = this.game.getCastleBushos(targetId).filter(b => b.status !== 'ronin' && b.status !== 'dead' && b.status !== 'unborn' && b.belongKunishuId === 0);
+            const targetC = this.game.getCastle(targetId);
+            bushos = this.game.getCastleBushos(targetId).filter(b => b.clan === targetC.ownerClan && b.status === 'active');
             infoHtml = "<div>迎撃に出陣する武将を選択してください（最大5名まで）</div>";
         }
-        else if (actionType === 'def_reinf_deploy') {
-            bushos = this.game.getCastleBushos(targetId).filter(b => b.status !== 'ronin' && b.status !== 'dead' && b.status !== 'unborn' && b.belongKunishuId === 0);
-            infoHtml = "<div>援軍に派遣する武将を選択してください（最大5名まで）</div>";
-        }
-        else if (actionType === 'atk_reinf_deploy') {
-            bushos = this.game.getCastleBushos(targetId).filter(b => b.status !== 'ronin' && b.status !== 'dead' && b.status !== 'unborn' && b.belongKunishuId === 0);
+        else if (actionType === 'def_reinf_deploy' || actionType === 'atk_reinf_deploy') {
+            const targetC = this.game.getCastle(targetId);
+            bushos = this.game.getCastleBushos(targetId).filter(b => b.clan === targetC.ownerClan && b.status === 'active');
             infoHtml = "<div>援軍に派遣する武将を選択してください（最大5名まで）</div>";
         }
         else if (actionType === 'def_self_reinf_deploy' || actionType === 'atk_self_reinf_deploy') {
-            bushos = this.game.getCastleBushos(targetId).filter(b => b.status !== 'ronin' && b.status !== 'dead' && b.status !== 'unborn' && b.belongKunishuId === 0);
+            const targetC = this.game.getCastle(targetId);
+            bushos = this.game.getCastleBushos(targetId).filter(b => b.clan === targetC.ownerClan && b.status === 'active');
             infoHtml = "<div>援軍として出陣する武将を選択してください（最大5名まで）</div>";
         }
-        
         else if (actionType === 'reward') {
             bushos = this.game.bushos.filter(b => 
                 b.clan === this.game.playerClanId && 
-                b.status !== 'dead' &&               
-                b.status !== 'ronin' &&              
-                b.status !== 'unborn' &&             
+                b.status === 'active' && 
                 !b.isDaimyo                          
             );
             infoHtml = "<div>褒美を与える武将を選択してください</div>"; 
         }
         else {
             // ★追加: 内政などの通常の命令でも、未登場の武将や諸勢力が勝手にリストに出ないようにします
-            bushos = this.game.getCastleBushos(c.id).filter(b => b.status !== 'ronin' && b.status !== 'dead' && b.status !== 'unborn' && b.belongKunishuId === 0);
+            bushos = this.game.getCastleBushos(c.id).filter(b => b.clan === c.ownerClan && b.status === 'active');
             
             if (spec.msg) {
                 infoHtml = `<div>${spec.msg}</div>`;
@@ -1933,7 +1929,7 @@ class CommandSystem {
                         const isEnemyAlly = enemyRel && ['同盟', '支配', '従属'].includes(enemyRel.status);
                         const isEnemyMaxGoodwill = enemyRel && enemyRel.sentiment >= 100;
                         if (!isEnemyAlly && !isEnemyMaxGoodwill && (!enemyRel || !this.game.diplomacyManager.isNonAggression(enemyRel.status))) {
-                            const normalBushos = this.game.getCastleBushos(targetCastle.id).filter(b => !b.isDaimyo && !b.isCastellan && b.status !== 'ronin' && b.belongKunishuId === 0);
+                            const normalBushos = this.game.getCastleBushos(targetCastle.id).filter(b => b.clan === targetCastle.ownerClan && b.status === 'active' && !b.isDaimyo && !b.isCastellan);
                             const minRice = (mode === 'def_ally_reinforcement') ? 500 : 0;
                             if (targetCastle.soldiers >= 1000 && targetCastle.rice >= minRice && normalBushos.length > 0) {
                                 const clan = this.game.clans.find(c => c.id === targetCastle.ownerClan);
@@ -2142,7 +2138,7 @@ class CommandSystem {
             const isNextToEnemy = GameSystem.isAdjacent(c, targetCastle);
             if (!isConnected && !isNextToEnemy) return;
             if (c.soldiers < 1000) return;
-            const normalBushos = this.game.getCastleBushos(c.id).filter(b => !b.isDaimyo && !b.isCastellan && b.status !== 'ronin' && b.belongKunishuId === 0);
+            const normalBushos = this.game.getCastleBushos(c.id).filter(b => b.clan === c.ownerClan && b.status === 'active' && !b.isDaimyo && !b.isCastellan);
             if (normalBushos.length === 0) return;
             selfCandidates.push(c);
         });
@@ -2165,7 +2161,7 @@ class CommandSystem {
                             const isConnected = connectedCastles.has(c.id) || this.game.castles.some(myC => connectedCastles.has(myC.id) && GameSystem.isAdjacent(c, myC));
                             const isNextToEnemy = (c.id === targetCastle.id) || GameSystem.isAdjacent(c, targetCastle);
                             if (isConnected || isNextToEnemy) {
-                                const normalBushos = this.game.getCastleBushos(c.id).filter(b => !b.isDaimyo && !b.isCastellan && b.status !== 'ronin' && b.belongKunishuId === 0);
+                                const normalBushos = this.game.getCastleBushos(c.id).filter(b => b.clan === c.ownerClan && b.status === 'active' && !b.isDaimyo && !b.isCastellan);
                                 if (c.soldiers >= 1000 && normalBushos.length > 0) {
                                     allyForceCandidates.push({ castle: c, force: { isKunishu: false, id: c.ownerClan, name: this.game.clans.find(clan=>clan.id===c.ownerClan)?.name || "大名", soldiers: c.soldiers } });
                                 }
@@ -2395,7 +2391,7 @@ class CommandSystem {
         if (reinfSoldiers > helperCastle.soldiers) reinfSoldiers = helperCastle.soldiers;
         
         const availableBushos = this.game.getCastleBushos(helperCastle.id).filter(b =>
-            !b.isDaimyo && !b.isCastellan && b.status !== 'ronin' && b.belongKunishuId === 0
+            b.clan === helperCastle.ownerClan && b.status === 'active' && !b.isDaimyo && !b.isCastellan
         ).sort((a,b) => b.strength - a.strength);
 
         let bushoCount = 1;
