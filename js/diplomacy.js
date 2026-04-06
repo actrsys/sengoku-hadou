@@ -749,8 +749,45 @@ class DiplomacyManager {
         if (rel.status === '同盟' || rel.status === '支配') {
              // ★修正：同盟の時だけ、裏切るかどうかの計算をします！
              if (rel.status === '同盟') {
-                 const enemies = neighbors.filter(c => !['同盟', '支配', '従属'].includes(this.getRelation(myClanId, c.ownerClan).status));
-                 if (enemies.length === 0 && myPower > targetClanTotal * 2.5 && Math.random() > dutyInhibition) {
+                 let breakProb = 0; // 同盟を破棄する確率の点数をいれる箱です（0.00 〜 1.00）
+
+                 // ① 他と比べて攻撃しやすいか（威信の比較）による魔法
+                 let minEnemyPower = -1; // 周りの敵の中で一番弱い勢力の威信を覚える箱
+                 const uniqueClans = [...new Set(neighbors.map(c => c.ownerClan))];
+                 uniqueClans.forEach(clanId => {
+                     const r = this.getRelation(myClanId, clanId);
+                     // 同盟・支配・従属ではない相手を「他の敵」とします
+                     if (r && !['同盟', '支配', '従属'].includes(r.status)) {
+                         const clan = this.game.clans.find(c => c.id === clanId);
+                         const p = clan ? Math.max(1, clan.daimyoPrestige) : 1;
+                         if (minEnemyPower === -1 || p < minEnemyPower) {
+                             minEnemyPower = p;
+                         }
+                     }
+                 });
+
+                 // 他に敵がいない場合は、自分（myPower）を比較の基準にします
+                 let comparePower = minEnemyPower !== -1 ? minEnemyPower : myPower;
+                 
+                 // 同盟相手が、他の敵（または自分）と比べてどれくらい弱いか計算します
+                 // 相手の方が弱ければ（1.0未満なら）、弱いほど真っ直ぐ確率が上がります（最大+50%）
+                 const powerRatio = targetClanTotal / comparePower;
+                 if (powerRatio < 1.0) {
+                     breakProb += (1.0 - powerRatio) * 0.50; 
+                 }
+
+                 // ② 関係値（仲の良さ）による魔法（50以下なら、0に近づくほど確率が上がります）
+                 if (rel.sentiment <= 50) {
+                      // 仲の良さが50なら +0%、0なら +50%（0.50）を足します
+                      breakProb += (50 - rel.sentiment) * 0.01;
+                 }
+
+                 // ③ 義理（myDaimyoDuty）による魔法（50を基準に真っ直ぐ計算します）
+                 // 義理が50なら ±0%。義理が0なら +50%（0.50）を足し、義理が100なら -50%（-0.50）引きます
+                 breakProb += (50 - myDaimyoDuty) * 0.01;
+
+                 // 最終的な確率が0より大きく、かつサイコロがその確率に当たったら同盟を破棄します！
+                 if (breakProb > 0 && Math.random() < breakProb) {
                       return { action: 'break_alliance', gold: 0 };
                  }
              }
