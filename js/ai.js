@@ -449,10 +449,10 @@ class AIEngine {
                     prob += 10;
                 }
 
-                // 最大値の適用 (諸勢力相手は敵対大名と同じく最大40)
+                // 最大値の適用 (諸勢力相手は最大40)
                 prob = Math.min(prob, 40);
 
-                if (prob > 0) prob = prob * 0.07;
+                if (prob > 0) prob = prob * 0.6;
                 prob = Math.max(0, prob);
 
                 if (prob > highestProb) {
@@ -667,7 +667,7 @@ class AIEngine {
             // ★追加ここまで
             
             // 攻撃確率の最大値設定
-            const maxProb = rel.status === '敵対' ? 40 : 20;
+            const maxProb = rel.status === '敵対' ? 60 : 10;
             
             // 最大値の適用
             prob = Math.min(prob, maxProb);
