@@ -181,9 +181,9 @@ class LifeSystem {
                 b.status = 'active';
                 
                 // ★追加：「登場前:仕官」の武将に一門武将がいるかチェックします
-                // 条件：すでに登場して生きている（浪人ではない）、自分自身ではない、一門IDが共通している
+                // 条件：すでに登場して活動している、自分自身ではない、一門IDが共通している
                 const activeRelatives = this.game.bushos.filter(other => 
-                    other.status !== 'unborn' && other.status !== 'dead' && other.status !== 'ronin' &&
+                    other.status === 'active' &&
                     other.id !== b.id &&
                     b.familyIds.some(fId => other.familyIds.includes(fId))
                 );

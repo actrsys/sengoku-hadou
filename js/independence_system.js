@@ -336,7 +336,7 @@ class IndependenceSystem {
     }
 
     resolveSubordinates(castle, newDaimyo, oldDaimyo, newClanId, oldClanId) {
-        const subordinates = this.game.getCastleBushos(castle.id).filter(b => b.id !== newDaimyo.id && b.status !== 'ronin' && b.clan === oldClanId && !b.belongKunishuId);
+        const subordinates = this.game.getCastleBushos(castle.id).filter(b => b.clan === oldClanId && b.status === 'active' && b.id !== newDaimyo.id);
         const captives = [], joiners = [];
         const escapeCastles = this.game.castles.filter(c => c.ownerClan === oldClanId && c.id !== castle.id);
         
@@ -382,7 +382,7 @@ class IndependenceSystem {
         const otherCastles = this.game.castles.filter(c => c.ownerClan === oldClanId && c.castellanId !== 0 && c.castellanId !== leader.id);
         otherCastles.forEach(castle => {
             const busho = this.game.getBusho(castle.castellanId);
-            if (busho && busho.factionId !== 0 && busho.factionId === leader.factionId && !busho.belongKunishuId) {
+            if (busho && busho.clan === oldClanId && busho.status === 'active' && busho.factionId !== 0 && busho.factionId === leader.factionId) {
                 const { joinScore, stayScore } = this.calculateLoyaltyScores(busho, leader, oldDaimyo);
                 if (joinScore > stayScore) {
                     this.game.ui.log(`  -> 呼応！${castle.name}城主の${busho.name}が${leader.name}に与しました！`);
@@ -403,7 +403,7 @@ class IndependenceSystem {
 
     resolveDistantFactionMembers(newDaimyo, oldClanId, newClanId, oldDaimyo) {
         if (newDaimyo.factionId === 0) return; 
-        const potential = this.game.bushos.filter(b => b.clan === oldClanId && !b.isCastellan && b.status === 'active' && b.factionId === newDaimyo.factionId && !b.belongKunishuId);
+        const potential = this.game.bushos.filter(b => b.clan === oldClanId && b.status === 'active' && !b.isCastellan && b.factionId === newDaimyo.factionId);
         const mainCastle = this.game.castles.find(c => c.castellanId === newDaimyo.id);
         if (!mainCastle) return;
 
@@ -511,8 +511,8 @@ class IndependenceSystem {
             }
         }
 
-        // 2. 勢力内の全員（諸勢力以外）を呼び出して、どっちの味方か振り分けます。
-        const allMembers = this.game.bushos.filter(b => b.clan === oldClanId && b.status === 'active' && !b.belongKunishuId);
+        // 2. 勢力内の全員を呼び出して、どっちの味方か振り分けます。
+        const allMembers = this.game.bushos.filter(b => b.clan === oldClanId && b.status === 'active');
         const totalMembers = allMembers.length;
 
         let rebelMembers = [];

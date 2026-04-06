@@ -933,7 +933,7 @@ class WarManager {
             let subs = bushos.slice(1);
 
             if (isDefendingCastle && this.game && s.defender) {
-                const castleBushos = this.game.getCastleBushos(s.defender.id).filter(b => b.status !== 'ronin' && b.belongKunishuId === 0 && b.clan === s.defender.ownerClan);
+                const castleBushos = this.game.getCastleBushos(s.defender.id).filter(b => b.clan === s.defender.ownerClan && b.status === 'active');
                 if (castleBushos.length > 0) {
                     let bestBusho = castleBushos.reduce((best, current) => {
                         let bestScore = best.leadership + best.strength + best.intelligence;
