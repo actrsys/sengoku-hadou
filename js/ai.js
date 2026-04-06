@@ -767,8 +767,8 @@ class AIEngine {
             return;
         }
         
-        // 城にいる武将（浪人以外）を集めます
-        const bushos = this.game.getCastleBushos(source.id).filter(b => b.status !== 'ronin');
+        // 城にいる武将（浪人と諸勢力以外）を集めます
+        const bushos = this.game.getCastleBushos(source.id).filter(b => b.status !== 'ronin' && b.belongKunishuId === 0);
         
         // ★ここから追加・書き換え：戦闘力による足切りと、智謀による「見誤り」の魔法！
         // 1. 城主(general)の智謀によって、どれくらい戦闘力を見誤るか（誤差）を決めます
@@ -832,7 +832,7 @@ class AIEngine {
             return;
         }
         
-        const bushos = this.game.getCastleBushos(sourceCastle.id).filter(b => b.status !== 'ronin');
+        const bushos = this.game.getCastleBushos(sourceCastle.id).filter(b => b.status !== 'ronin' && b.belongKunishuId === 0);
         
         let evaluatorInt = general.intelligence;
         let maxError = 0;
