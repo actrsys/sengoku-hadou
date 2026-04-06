@@ -16,17 +16,91 @@ class AIOperationManager {
     load(data) {
         this.operations = data || {};
     }
-
+    
     processMonthlyOperations() {
         this.game.clans.forEach(clan => {
             if (clan.id === 0 || clan.id === this.game.playerClanId) return;
 
+            // ★追加：毎月、まずは大名家単位で「誰と外交するか」を考えます！
+            this.thinkMonthlyDiplomacy(clan);
+            
             if (!this.operations[clan.id]) {
                 this.generateOperation(clan.id);
             } else {
                 this.updateOperation(clan.id);
             }
         });
+    }
+
+    // ★今回追加：毎月1回だけ、大名家として外交の狙いを1つに絞って覚えておく魔法です！
+    thinkMonthlyDiplomacy(clan) {
+        // 一旦、今までの記憶を忘れます
+        clan.currentDiplomacyTarget = null;
+
+        const myClanId = clan.id;
+        const myPower = this.game.aiEngine.getClanPrestige(myClanId);
+        const myDaimyo = this.game.bushos.find(b => b.clan === myClanId && b.isDaimyo) || { duty: 50, intelligence: 50 };
+        const smartness = this.game.aiEngine.getAISmartness(myDaimyo.intelligence);
+
+        // 周りのお城を探します
+        const myCastles = this.game.castles.filter(c => c.ownerClan === myClanId);
+        const neighborCastles = [];
+        myCastles.forEach(myCastle => {
+            if (myCastle.adjacentCastleIds) {
+                myCastle.adjacentCastleIds.forEach(adjId => {
+                    const adjCastle = this.game.getCastle(adjId);
+                    if (adjCastle && adjCastle.ownerClan !== 0 && adjCastle.ownerClan !== myClanId) {
+                        neighborCastles.push(adjCastle);
+                    }
+                });
+            }
+        });
+
+        const uniqueNeighbors = [...new Set(neighborCastles.map(c => c.ownerClan))];
+        if (uniqueNeighbors.length === 0) return;
+
+        const allyCount = this.game.diplomacyManager.getAllyCount(myClanId);
+        const enemyThreats = [];
+        uniqueNeighbors.forEach(targetClanId => {
+            const rel = this.game.getRelation(myClanId, targetClanId);
+            const isProtected = rel && this.game.diplomacyManager.isNonAggression(rel.status);
+            if (!isProtected) {
+                const trueEnemyPower = this.game.aiEngine.getClanPrestige(targetClanId);
+                const errorRange = Math.min(0.3, Math.max(0, (100 - myDaimyo.intelligence) / 100 * 0.3));
+                const errorRate = 1.0 + (Math.random() - 0.5) * 2 * errorRange;
+                enemyThreats.push({ clanId: targetClanId, power: trueEnemyPower * errorRate });
+            }
+        });
+        
+        enemyThreats.sort((a, b) => b.power - a.power);
+        const mainThreatId = enemyThreats.length > 0 ? enemyThreats[0].clanId : 0; 
+
+        // 優先度が高い順に並べたリストをもらいます
+        const diplomacyTargets = this.game.diplomacyManager.getDiplomacyPriorityList(myClanId, uniqueNeighbors, mainThreatId);
+
+        // 順番に見て、最初に「これをやる！」と決めた相手1人を記憶します
+        for (let targetData of diplomacyTargets) {
+            const targetClanId = targetData.clanId;
+            const targetClanTotal = this.game.aiEngine.getClanPrestige(targetClanId);
+            const threatData = enemyThreats.find(t => t.clanId === targetClanId);
+            const perceivedTargetTotal = threatData ? threatData.power : targetClanTotal;
+
+            // 外交の専門部署に、この相手に何をするか相談します
+            const decision = this.game.diplomacyManager.determineAIDiplomacyAction(
+                myClanId, targetClanId, myPower, targetClanTotal, perceivedTargetTotal, 
+                myDaimyo.duty, smartness, targetData.isStrategicPartner, allyCount, neighborCastles
+            );
+
+            // もし「何もしない」以外なら、これを今月の目標に決定します！
+            if (decision.action !== 'none') {
+                clan.currentDiplomacyTarget = {
+                    targetId: targetClanId,
+                    action: decision.action,
+                    gold: decision.gold
+                };
+                break; // 1つ決めたら探すのをおしまいにします
+            }
+        }
     }
 
     generateOperation(clanId) {
@@ -138,7 +212,14 @@ class AIOperationManager {
                 
                 const rel = this.game.getRelation(clanId, target.ownerClan);
                 const isProtected = rel && this.game.diplomacyManager.isNonAggression(rel.status);
-                if (isProtected || (target.immunityUntil || 0) >= this.game.getCurrentTurnId()) return false;
+                
+                // ★書き換え：同盟国と従属先も、破棄して攻撃する候補として特別に入れます！
+                // ただし和睦期間中や、自分が支配している相手には攻め込みません
+                if (isProtected) {
+                    if (rel.status === '和睦' || rel.status === '支配') return false; 
+                } else if ((target.immunityUntil || 0) >= this.game.getCurrentTurnId()) {
+                    return false;
+                }
 
                 if (myBossId !== 0) {
                     const bossRel = this.game.getRelation(myBossId, target.ownerClan);
@@ -284,6 +365,19 @@ class AIOperationManager {
         if (bestOperation) {
             // ai.jsでやっていた確率のサイコロをここで振って、やるかどうか決めます
             if (Math.random() * 100 < highestScore) {
+                
+                // ★今回追加：もし選ばれた作戦の目標が同盟国や従属先だったら、この瞬間に同盟を破棄します！
+                if (!bestOperation.isKunishuTarget) {
+                    const targetCastle = this.game.getCastle(bestOperation.targetId);
+                    if (targetCastle) {
+                        const rel = this.game.getRelation(clanId, targetCastle.ownerClan);
+                        if (rel && (rel.status === '同盟' || rel.status === '従属')) {
+                            this.game.diplomacyManager.applyBreakAlliancePenalty(clanId, targetCastle.ownerClan);
+                            console.log(`大名家[${clanId}]が【攻撃作戦】のために、${targetCastle.ownerClan}との関係を破棄しました！`);
+                        }
+                    }
+                }
+
                 this.operations[clanId] = bestOperation;
                 console.log(`大名家[${clanId}]が【攻撃作戦】を立案しました！(出撃元: ${bestOperation.stagingBase}, 援軍用: ${bestOperation.supportBase || 'なし'}, 準備: ${bestOperation.turnsRemaining}ヶ月)`);
                 return;

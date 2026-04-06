@@ -723,81 +723,14 @@ class DiplomacyManager {
     /**
      * AIが特定の相手に対して、どの外交コマンドを実行するか判定して返す魔法です
      */
+    
     determineAIDiplomacyAction(myClanId, targetClanId, myPower, targetClanTotal, perceivedTargetTotal, myDaimyoDuty, smartness, isStrategicPartner, allyCount, neighbors) {
         const rel = this.getRelation(myClanId, targetClanId);
-        const dutyInhibition = (myDaimyoDuty * 0.01) * (1.0 - (smartness * 0.5)); 
         
         // 仲良しが2つ以上なら、外交する確率を下げる魔法（1つ増えるごとに20%ダウン）
         let sendProbModifier = 1.0;
         if (allyCount >= 2) {
             sendProbModifier = Math.max(0.1, 1.0 - (allyCount - 1) * 0.2); 
-        }
-
-        // ① 従属関係の破棄判定
-        if (rel.status === '従属') {
-            const ratio = targetClanTotal / myPower;
-            if (ratio <= 2.0) {
-                const breakProb = 0.01 + (2.0 - Math.max(1.0, ratio)) * 0.89;
-                if (Math.random() < breakProb && Math.random() > dutyInhibition) {
-                    return { action: 'break_alliance', gold: 0 };
-                }
-            }
-            return { action: 'none', gold: 0 };
-        }
-
-        // ② 同盟・支配関係の破棄判定
-        if (rel.status === '同盟' || rel.status === '支配') {
-             // ★修正：同盟の時だけ、裏切るかどうかの計算をします！
-             if (rel.status === '同盟') {
-                 // ★追加：仲良し度（関係値）が50以上なら、絶対に同盟を破棄しません！
-                 if (rel.sentiment >= 50) {
-                      return { action: 'none', gold: 0 };
-                 }
-
-                 let breakProb = 0; // 同盟を破棄する確率の点数をいれる箱です（0.00 〜 1.00）
-
-                 // ① 他と比べて攻撃しやすいか（威信の比較）による魔法
-                 let minEnemyPower = -1; // 周りの敵の中で一番弱い勢力の威信を覚える箱
-                 const uniqueClans = [...new Set(neighbors.map(c => c.ownerClan))];
-                 uniqueClans.forEach(clanId => {
-                     const r = this.getRelation(myClanId, clanId);
-                     // 同盟・支配・従属ではない相手を「他の敵」とします
-                     if (r && !['同盟', '支配', '従属'].includes(r.status)) {
-                         const clan = this.game.clans.find(c => c.id === clanId);
-                         const p = clan ? Math.max(1, clan.daimyoPrestige) : 1;
-                         if (minEnemyPower === -1 || p < minEnemyPower) {
-                             minEnemyPower = p;
-                         }
-                     }
-                 });
-
-                 // 他に敵がいない場合は、自分（myPower）を比較の基準にします
-                 let comparePower = minEnemyPower !== -1 ? minEnemyPower : myPower;
-                 
-                 // 同盟相手が、他の敵（または自分）と比べてどれくらい弱いか計算します
-                 // 相手の方が弱ければ（1.0未満なら）、弱いほど真っ直ぐ確率が上がります（最大+2.5%）
-                 const powerRatio = targetClanTotal / comparePower;
-                 if (powerRatio < 1.0) {
-                     breakProb += (1.0 - powerRatio) * 0.025; 
-                 }
-
-                 // ② 関係値（仲の良さ）による魔法（50未満なら、0に近づくほど確率が上がります）
-                 if (rel.sentiment < 50) {
-                      // 仲の良さが0なら +2.5%（0.025）を足します
-                      breakProb += (50 - rel.sentiment) * 0.0005;
-                 }
-
-                 // ③ 義理（myDaimyoDuty）による魔法（50を基準に真っ直ぐ計算します）
-                 // 義理が50なら ±0%。義理が0なら +2.5%（0.025）を足し、義理が100なら -2.5%（-0.025）引きます
-                 breakProb += (50 - myDaimyoDuty) * 0.0005;
-
-                 // 最終的な確率が0より大きく、かつサイコロがその確率に当たったら同盟を破棄します！
-                 if (breakProb > 0 && Math.random() < breakProb) {
-                      return { action: 'break_alliance', gold: 0 };
-                 }
-             }
-             // ★支配している相手の時は、上の計算をスキップして、おとなしくここで終わります
-             return { action: 'none', gold: 0 };
         }
 
         // 自分がどこかに従属しているかチェックします
@@ -811,7 +744,7 @@ class DiplomacyManager {
             }
         });
 
-        // ③ 支配要求の判定
+        // 支配要求の判定
         if (!amISubordinate && targetClanTotal * 8 <= myPower) {
             // 自分の領地と相手の領地が直接くっついているか調べます
             let isDirectlyAdjacent = false;
@@ -829,34 +762,28 @@ class DiplomacyManager {
                 if (isDirectlyAdjacent) break;
             }
 
-            // ★ここから追加：支配していい相手かどうかをチェックする魔法です！
             let isSafeToDominate = true;
 
             // チェック１：同じ「国（尾張など）」に城を持っているか調べます
-            // まずは自分が持っている国のリストを作ります
             const myProvinces = new Set();
             myCastles.forEach(c => myProvinces.add(c.provinceId));
 
-            // 相手の城が、自分の持っている国のリストに含まれているか確認します
             for (let tc of targetCastles) {
                 if (myProvinces.has(tc.provinceId)) {
-                    isSafeToDominate = false; // 同じ国にいるなら、地方統一の邪魔になるのでダメ！
+                    isSafeToDominate = false; 
                     break;
                 }
             }
 
             // チェック２：二条城（城ID:26）への道を塞いでしまわないか調べます
-            // 同じ国にいない場合だけ、さらにチェックします
             if (isSafeToDominate) {
                 const nijoCastleId = 26;
                 const nijoCastle = this.game.castles.find(c => c.id === nijoCastleId);
                 
-                // 二条城が存在していて、まだ自分が持っていない場合のみ調べます
                 if (nijoCastle && nijoCastle.ownerClan !== myClanId) {
-                    // 探索の準備：自分の城をすべてスタート地点として順番待ちリストに入れます
                     let queue = [];
                     let visited = new Set();
-                    let parentMap = new Map(); // どこから来たかをメモする地図です
+                    let parentMap = new Map(); 
                     
                     for (let mc of myCastles) {
                         queue.push(mc.id);
@@ -865,13 +792,12 @@ class DiplomacyManager {
                     
                     let foundNijo = false;
                     
-                    // 最短ルートを探すループです
                     while (queue.length > 0) {
                         let currentId = queue.shift();
                         
                         if (currentId === nijoCastleId) {
                             foundNijo = true;
-                            break; // 二条城が見つかったら探索終了！
+                            break; 
                         }
                         
                         let currentCastle = this.game.castles.find(c => c.id === currentId);
@@ -880,10 +806,9 @@ class DiplomacyManager {
                                 if (!visited.has(adjId)) {
                                     let adjCastle = this.game.castles.find(c => c.id === adjId);
                                     if (adjCastle) {
-                                        // 通っていいのは「自分の城」「空き城」「今回支配しようとしている相手の城」「二条城」だけです
                                         if (adjCastle.ownerClan === myClanId || adjCastle.ownerClan === 0 || adjCastle.ownerClan === targetClanId || adjCastle.id === nijoCastleId) {
                                             visited.add(adjId);
-                                            parentMap.set(adjId, currentId); // 「この城には、あの城から来ました」とメモします
+                                            parentMap.set(adjId, currentId); 
                                             queue.push(adjId);
                                         }
                                     }
@@ -892,7 +817,6 @@ class DiplomacyManager {
                         }
                     }
                     
-                    // 二条城への一番早いルートが見つかった場合、その道に相手の城があるか確認します
                     if (foundNijo) {
                         let currId = nijoCastleId;
                         while (parentMap.has(currId)) {
@@ -900,24 +824,21 @@ class DiplomacyManager {
                             let pCastle = this.game.castles.find(c => c.id === pId);
                             
                             if (pCastle && pCastle.ownerClan === targetClanId) {
-                                // ルート上に相手の城があった！支配すると道が塞がるのでダメ！
                                 isSafeToDominate = false;
                                 break;
                             }
-                            currId = pId; // さらに前の城へ戻って確認を続けます
+                            currId = pId; 
                         }
                     }
                 }
             }
-            // ★追加ここまで
 
-            // 直接くっついていて、かつ「支配しても邪魔にならない」時だけ、支配のお願いをします
             if (isDirectlyAdjacent && isSafeToDominate && Math.random() < 0.05) { 
                 return { action: 'dominate', gold: 0 };
             }
         }
 
-        // ④ 親善・同盟の判定
+        // 親善・同盟の判定
         if (myPower < perceivedTargetTotal * 0.8 || isStrategicPartner) {
             if (Math.random() < smartness * sendProbModifier) {
                 const allianceThreshold = isStrategicPartner ? (window.AIParams.AI.AllianceThreshold || 70) - 15 : (window.AIParams.AI.AllianceThreshold || 70);
@@ -962,4 +883,59 @@ class DiplomacyManager {
         return { action: 'none', gold: 0 };
     }
     
+    /**
+     * ★今回追加：同盟や従属を破棄して攻撃する時の、破棄スコア（やりたさ）を計算する魔法です！
+     * いままでの確率の計算式をそのまま使って、100点満点のスコアにしてお返しします。
+     */
+    calcBreakAllianceScore(myClanId, targetClanId, myPower, targetClanTotal, myDaimyoDuty, neighbors) {
+        const rel = this.getRelation(myClanId, targetClanId);
+        if (!rel) return -999;
+
+        // 相手が従属している時の計算です
+        if (rel.status === '従属') {
+            const ratio = targetClanTotal / myPower;
+            if (ratio <= 2.0) {
+                // 最大 90点 になります
+                return (0.01 + (2.0 - Math.max(1.0, ratio)) * 0.89) * 100;
+            }
+            return -999; // マイナスにして絶対に攻めないようにします
+        }
+
+        // 相手が同盟している時の計算です
+        if (rel.status === '同盟') {
+            if (rel.sentiment >= 50) return -999; // 仲良し度50以上なら絶対に裏切りません！
+
+            let breakScore = 0; 
+            let minEnemyPower = -1; 
+            
+            const uniqueClans = [...new Set(neighbors.map(c => c.ownerClan))];
+            uniqueClans.forEach(clanId => {
+                const r = this.getRelation(myClanId, clanId);
+                if (r && !['同盟', '支配', '従属'].includes(r.status)) {
+                    const clan = this.game.clans.find(c => c.id === clanId);
+                    const p = clan ? Math.max(1, clan.daimyoPrestige) : 1;
+                    if (minEnemyPower === -1 || p < minEnemyPower) {
+                        minEnemyPower = p;
+                    }
+                }
+            });
+
+            let comparePower = minEnemyPower !== -1 ? minEnemyPower : myPower;
+            const powerRatio = targetClanTotal / comparePower;
+            
+            if (powerRatio < 1.0) {
+                breakScore += (1.0 - powerRatio) * 2.5; // (0.025 * 100)
+            }
+
+            if (rel.sentiment < 50) {
+                breakScore += (50 - rel.sentiment) * 0.05; // (0.0005 * 100)
+            }
+
+            breakScore += (50 - myDaimyoDuty) * 0.05; // (0.0005 * 100)
+
+            return breakScore > 0 ? breakScore : -999;
+        }
+
+        return -999;
+    }
 }

@@ -34,7 +34,17 @@ class CastleManager {
             this.applyKunishuRelationDropOnCapture(castle, newOwnerId);
         }
 
-        // ★追加：このお城を使おうとしていた大名家の作戦を中止させる魔法です！
+        // ★今回追加：城の持ち主が変わったので、これを外交相手として覚えていた大名家の記憶をリセットします！
+        this.game.clans.forEach(clan => {
+            if (clan.currentDiplomacyTarget) {
+                // 失った大名か、新しく得た大名がターゲットだったら、記憶を忘れさせます
+                if (clan.currentDiplomacyTarget.targetId === oldOwnerId || clan.currentDiplomacyTarget.targetId === newOwnerId) {
+                    clan.currentDiplomacyTarget = null;
+                }
+            }
+        });
+
+        // ★このお城を使おうとしていた大名家の作戦を中止させる魔法です！
         if (this.game.aiOperationManager && this.game.aiOperationManager.operations) {
             // 全ての大名家の作戦（メモ帳）を順番にめくって確認します
             for (const clanId in this.game.aiOperationManager.operations) {

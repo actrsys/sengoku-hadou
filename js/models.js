@@ -17,13 +17,16 @@ class Clan {
         // 大名の戦力（威信）を覚えておく箱です
         this.daimyoPrestige = Number(data.daimyoPrestige || 0);
 
-        // ★今回追加：朝廷への貢献度を覚えておく箱です（上限は99999にします）
+        // ★朝廷への貢献度を覚えておく箱です（上限は99999にします）
         this.courtContribution = Number(data.courtContribution || 0);
         
-        // ★今回追加：朝廷からの信用を覚えておく箱です（上限は1000にします）
+        // ★朝廷からの信用を覚えておく箱です（上限は1000にします）
         this.courtTrust = Number(data.courtTrust || 0);
         
-        // ★今回変更：姫のID（出席番号）だけをリスト（配列）で覚えておく箱です
+        // ★今回追加：今月の外交相手（ターゲット）を覚えておくための箱です！
+        this.currentDiplomacyTarget = null;
+        
+        // ★姫のID（出席番号）だけをリスト（配列）で覚えておく箱です
         this.princessIds = [];
         if (data.princessIds && Array.isArray(data.princessIds)) {
             // セーブデータから読み込んだ場合
