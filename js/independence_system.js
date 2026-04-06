@@ -922,6 +922,11 @@ class IndependenceSystem {
             
             // プレイヤー大名の場合は通常の野戦画面が表示され、AI大名の場合は一瞬で結果が出ます
             this.game.fieldWarManager.startFieldWar(fakeWarState, (resultType) => {
+                // ★追加：謀反の野戦（プレイヤー担当）が終わった時だけ、曲を元に戻します！
+                if (window.AudioManager && isPlayerDaimyo) {
+                    window.AudioManager.restoreMemorizedBgm();
+                }
+
                 // 結果を翻訳して返します
                 // attacker = 反乱軍, defender = 主家軍
                 if (resultType === 'attacker_win' || resultType === 'defender_retreat') {
