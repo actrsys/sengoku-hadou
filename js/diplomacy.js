@@ -914,6 +914,16 @@ class DiplomacyManager {
                          }
                      }
 
+                     // ★追加：同盟・支配・従属相手への親善は、大名の義理が低いほどサボりやすくなります！
+                     if (willGoodwill && ['同盟', '支配', '従属'].includes(rel.status)) {
+                         // 義理100で1.0(100%実行)、義理0で0.5(50%の確率で実行)になる計算式です
+                         const executeProb = 0.5 + (myDaimyoDuty / 200);
+                         // サイコロを振って、確率より大きい数字が出たら親善をサボります
+                         if (Math.random() > executeProb) {
+                             willGoodwill = false;
+                         }
+                     }
+
                      if (!willGoodwill || (rel.sentiment <= 30 && ratio < 3.0 && !isStrategicPartner)) {
                          return { action: 'none', gold: 0 };
                      } else {
