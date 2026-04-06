@@ -1297,6 +1297,26 @@ class AIEngine {
                 }
             }
 
+            // ★ここから追加：攻撃作戦の間、徴兵用の城にお金をピストン輸送します！
+            if (isPreparingAttack && this.game.aiOperationManager.draftBases) {
+                const draftBaseId = this.game.aiOperationManager.draftBases[castle.ownerClan];
+                // 徴兵用の拠点が決まっていて、今いるのがそのお城ではなく、お金に余裕（1000以上）がある時
+                if (draftBaseId && draftBaseId !== castle.id && castle.gold >= 1000) {
+                    // その徴兵拠点まで道が繋がっているか（飛び地じゃないか）確認します
+                    const isConnected = reachableMyCastles.some(c => c.id === draftBaseId);
+                    if (isConnected) {
+                        actions.push({ 
+                            type: 'transport_draft_gold', 
+                            stat: 'politics', // お金のやりくりなので政治力の高い人に任せます
+                            score: 350, // 優先して送るように少し高めの点数をつけます
+                            cost: 0, 
+                            targetId: draftBaseId 
+                        });
+                    }
+                }
+            }
+            // ★追加ここまで
+
             // 9. 輸送（大名のいない城のみ）
             if (!daimyo || daimyo.castleId !== castle.id) {
                 // ★修正：自領のみを通れるようにしました！
@@ -1725,6 +1745,23 @@ class AIEngine {
                         }
                     }
                 }
+                
+                // ★ここから追加：徴兵用拠点へのお金の輸送を実行します！
+                if (action.type === 'transport_draft_gold') {
+                    const targetCastle = this.game.getCastle(action.targetId);
+                    // 相手のお城の貯金箱が溢れないかチェックします（上限99,999）
+                    if (targetCastle && targetCastle.gold + 500 <= 99999) {
+                        castle.gold -= 500;
+                        targetCastle.gold += 500;
+                        doer.isActionDone = true; 
+                        actionDoneInThisStep = true; 
+                        break;
+                    } else {
+                        continue;
+                    }
+                }
+                // ★追加ここまで
+
                 if (action.type === 'transport') {
                     const targetCastle = this.game.getCastle(action.targetId);
                     if (action.res === 'gold_soldier') {

@@ -7,14 +7,26 @@ class AIOperationManager {
     constructor(game) {
         this.game = game;
         this.operations = {};
+        // ★追加：徴兵用のお城を記憶しておく箱です
+        this.draftBases = {}; 
     }
 
     save() {
-        return this.operations;
+        return {
+            operations: this.operations,
+            draftBases: this.draftBases // ★追加：セーブデータに残します
+        };
     }
 
     load(data) {
-        this.operations = data || {};
+        // ★変更：古いセーブデータと、新しいセーブデータの両方に対応する魔法です！
+        if (data && data.operations) {
+            this.operations = data.operations;
+            this.draftBases = data.draftBases || {};
+        } else {
+            this.operations = data || {};
+            this.draftBases = {};
+        }
     }
     
     processMonthlyOperations() {
@@ -29,7 +41,76 @@ class AIOperationManager {
             } else {
                 this.updateOperation(clan.id);
             }
+
+            // ★追加：作戦とは別に、毎月「徴兵用のお城」を考えて選びます！
+            this.selectDraftBase(clan.id);
         });
+    }
+
+    // ★ここから追加：徴兵用の拠点を選ぶ魔法です
+    selectDraftBase(clanId) {
+        // まずは前の月の記憶を消しておきます
+        this.draftBases[clanId] = null;
+
+        const myClanCastles = this.game.castles.filter(c => c.ownerClan === clanId);
+        // お城が1つしかない時は、輸送できないので選びません！
+        if (myClanCastles.length <= 1) return; 
+
+        let startCastleId = null;
+        const op = this.operations[clanId];
+        
+        // 攻撃作戦中なら、出撃するお城をスタート地点にします
+        if (op && op.type === '攻撃' && op.stagingBase) {
+            startCastleId = op.stagingBase;
+        } else {
+            // そうでなければ、お殿様がいるお城をスタート地点にします
+            const daimyo = this.game.bushos.find(b => b.clan === clanId && b.isDaimyo);
+            if (daimyo && daimyo.castleId) {
+                startCastleId = daimyo.castleId;
+            } else {
+                startCastleId = myClanCastles[0].id;
+            }
+        }
+
+        const startCastle = this.game.getCastle(startCastleId);
+        if (!startCastle) return;
+
+        // スタート地点から、道が繋がっている自分のお城を探し出します（飛び地対策）
+        const reachableMyCastles = [];
+        const visitedCastles = new Set();
+        const searchQueue = [startCastle];
+        visitedCastles.add(startCastle.id);
+
+        while (searchQueue.length > 0) {
+            const current = searchQueue.shift();
+            reachableMyCastles.push(current);
+
+            if (current.adjacentCastleIds) {
+                current.adjacentCastleIds.forEach(adjId => {
+                    const c = this.game.getCastle(adjId);
+                    if (c && c.ownerClan === clanId && !visitedCastles.has(c.id)) {
+                        visitedCastles.add(c.id);
+                        searchQueue.push(c);
+                    }
+                });
+            }
+        }
+
+        // 繋がっているお城の中から、一番「人口」が多いお城を探します！
+        let bestCastle = null;
+        let maxPopulation = -1;
+
+        reachableMyCastles.forEach(c => {
+            if (c.population > maxPopulation) {
+                maxPopulation = c.population;
+                bestCastle = c;
+            }
+        });
+
+        // 決まったら、記憶の箱にしまいます
+        if (bestCastle) {
+            this.draftBases[clanId] = bestCastle.id;
+        }
     }
 
     // ★今回追加：毎月1回だけ、大名家として外交の狙いを1つに絞って覚えておく魔法です！
