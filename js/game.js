@@ -1492,7 +1492,7 @@ class GameManager {
 
         if (this.isProcessingAI) return;
 
-        const bushos = this.getCastleBushos(c.id).filter(b => b.status !== 'ronin' && b.belongKunishuId === 0);
+        const bushos = this.getCastleBushos(c.id).filter(b => b.clan === c.ownerClan && b.status === 'active');
         
         if(bushos.length > 0 && bushos.every(b => b.isActionDone)) {
              setTimeout(() => {

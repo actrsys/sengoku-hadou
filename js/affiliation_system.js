@@ -157,7 +157,7 @@ class AffiliationSystem {
                     oldCastle.castellanId = 0;
                     busho.isCastellan = false;
                 }
-                this.game.updateCastleLord(oldCastle);
+                this.updateCastleLord(oldCastle);
             }
         }
     }
@@ -173,7 +173,7 @@ class AffiliationSystem {
             if (!newCastle.samuraiIds.some(id => Number(id) === Number(busho.id))) {
                 newCastle.samuraiIds.push(Number(busho.id));
             }
-            this.game.updateCastleLord(newCastle);
+            this.updateCastleLord(newCastle);
         }
     }
 
@@ -263,7 +263,7 @@ class AffiliationSystem {
             return;
         }
 
-        const bushos = this.game.getCastleBushos(castle.id).filter(b => b.status !== 'ronin' && b.status !== 'dead' && b.status !== 'unborn' && b.belongKunishuId === 0 && b.clan === castle.ownerClan);
+        const bushos = this.game.getCastleBushos(castle.id).filter(b => b.clan === castle.ownerClan && b.status === 'active');
         if (bushos.length === 0) {
             castle.castellanId = 0;
             return;

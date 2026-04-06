@@ -1201,8 +1201,8 @@ class UIManager {
         // ★城にいる浪人の数を数える魔法！
         let roninCount = 0;
         if (this.game && this.game.bushos) {
-            // 「死んでいない（deadじゃない）」かつ「未登場（unbornじゃない）」かつ「諸勢力ではない（belongKunishuIdが0）」人を数えるように変更します！
-            roninCount = this.game.bushos.filter(b => b.castleId === castle.id && Number(b.clan) === 0 && Number(b.belongKunishuId) === 0 && b.status !== 'dead' && b.status !== 'unborn').length;
+            // 状態が「浪人（ronin）」になっている人を数えるように変更します！
+            roninCount = this.game.bushos.filter(b => b.castleId === castle.id && b.status === 'ronin').length;
         }
 
         // ★今の城がある「国（地方）」の米相場を調べます！

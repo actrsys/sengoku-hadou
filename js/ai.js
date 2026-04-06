@@ -935,9 +935,9 @@ class AIEngine {
         // 最低1回、40ごとに+1回
         let maxActions = 1 + Math.floor(baseAP / 40);
 
-        // お城にいる動ける武将（浪人や諸勢力ではない人）をリストアップします
+        // お城にいる動ける武将（自分の大名家で、活動中の人）をリストアップします
         let availableBushos = this.game.getCastleBushos(castle.id).filter(b => 
-            !b.isActionDone && b.status !== 'ronin' && b.belongKunishuId === 0
+            !b.isActionDone && b.clan === castle.ownerClan && b.status === 'active'
         );
 
         // まず、お城に動ける武将がいるか確認します。誰もいなければ何もできません
@@ -972,7 +972,7 @@ class AIEngine {
         for (let step = 0; step < maxActions; step++) {
             // まだ動ける武将を再確認します
             availableBushos = this.game.getCastleBushos(castle.id).filter(b => 
-                !b.isActionDone && b.status !== 'ronin' && b.belongKunishuId === 0
+                !b.isActionDone && b.clan === castle.ownerClan && b.status === 'active'
             );
 
             // --- 候補となる行動の点数（スコア）をつける表を作ります ---
@@ -1381,7 +1381,7 @@ class AIEngine {
             // ★追加：選ばれた人の中で「一番低い忠誠度」を覚えておく箱です！
             let minLoyaltyForReward = 100;
             
-            const castleBushos = this.game.getCastleBushos(castle.id).filter(b => b.status !== 'ronin' && b.belongKunishuId === 0);
+            const castleBushos = this.game.getCastleBushos(castle.id).filter(b => b.clan === castle.ownerClan && b.status === 'active');
             
             for (let b of castleBushos) {
                 if ((b.recognitionNeed || 0) < 0) {
