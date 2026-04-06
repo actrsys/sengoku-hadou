@@ -223,8 +223,27 @@ class AIEngine {
                                         
                                         // ★今回変更：もし出陣のタイミングで相手が「同盟」や「従属」なら、この瞬間に破棄します！
                                         if (rel && (rel.status === '同盟' || rel.status === '従属')) {
+                                            
+                                            // ★今回追加：大名家の名前を調べて、関係に合わせたメッセージを作ります！
+                                            const myClanData = this.game.clans.find(c => c.id === castle.ownerClan);
+                                            const targetClanData = this.game.clans.find(c => c.id === targetCastle.ownerClan);
+                                            const myClanName = myClanData ? myClanData.name : "不明な勢力";
+                                            const targetClanName = targetClanData ? targetClanData.name : "不明な勢力";
+                                            
+                                            let breakMsg = "";
+                                            if (rel.status === '同盟') {
+                                                breakMsg = `${myClanName}が${targetClanName}との同盟を破棄しました！`;
+                                            } else if (rel.status === '従属') {
+                                                breakMsg = `${myClanName}が${targetClanName}の従属下から独立しました！`;
+                                            }
+                                            
+                                            // 画面のログ（文字の履歴）にお知らせを出します
+                                            if (breakMsg !== "") {
+                                                this.game.ui.log(`【外交】${breakMsg}`);
+                                                console.log(breakMsg); // 裏側の記録にも残しておきます
+                                            }
+
                                             this.game.diplomacyManager.applyBreakAlliancePenalty(castle.ownerClan, targetCastle.ownerClan);
-                                            console.log(`${castle.ownerClan}が\n${targetCastle.ownerClan}との関係を破棄しました！`);
                                             isStillEnemy = true; // 破棄して敵になったので出陣OK！
                                         } else if (!rel || !this.game.diplomacyManager.isNonAggression(rel.status)) {
                                             isStillEnemy = true; // 同盟などで守られていなければ敵です！
