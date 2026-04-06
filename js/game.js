@@ -961,7 +961,10 @@ class GameManager {
     }
 
     init() { this.startMonth(); }
-    getBusho(id) { return this.bushos.find(b => Number(b.id) === Number(id)); }
+    getBusho(id) { 
+        if (!id || Number(id) === 0) return undefined;
+        return this.bushos.find(b => Number(b.id) === Number(id)); 
+    }
     getCastle(id) { return this.castles.find(c => Number(c.id) === Number(id)); }
     // ★ 修正：まだ生まれていない人（unborn）や亡くなった人（dead）は無視するようにします
     getCastleBushos(cid) { const c = this.castles.find(c => Number(c.id) === Number(cid)); return c ? c.samuraiIds.map(id => this.getBusho(id)).filter(b => b && b.status !== 'unborn' && b.status !== 'dead') : []; }
