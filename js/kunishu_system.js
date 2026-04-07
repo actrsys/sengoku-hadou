@@ -539,7 +539,7 @@ class KunishuSystem {
             }
 
             kunishu.leaderId = successor.id;
-            this.game.ui.log(`【諸勢力継承】${successor.name.replace('|','')}が新たな諸勢力の頭領となりました。${extraMsg}`);
+            this.game.ui.log(`【諸勢力】${successor.name.replace('|','')}が新たな頭領となりました。${extraMsg}`);
         }
     }
 
