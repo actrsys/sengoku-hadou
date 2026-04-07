@@ -119,7 +119,7 @@ class AIStaffing {
             // ==========================================
             // 仲良しのお供（武将）を連れて行きます
             // ==========================================
-            const castleBushos = this.game.getCastleBushos(castle.id).filter(b => b.status !== 'ronin' && b.id !== castellan.id);
+            const castleBushos = this.game.getCastleBushos(castle.id).filter(b => b.clan === castle.ownerClan && b.status === 'active' && b.id !== castellan.id);
             const keepCount = Math.max(3, Math.ceil(castleBushos.length * 0.4));
             
             castleBushos.sort((a, b) => {

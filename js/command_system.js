@@ -2711,7 +2711,7 @@ class CommandSystem {
         let reinfSoldiers = Math.floor(helperCastle.soldiers * rate);
         reinfSoldiers = Math.max(500, Math.min(reinfSoldiers, helperCastle.soldiers));
         
-        const availableBushos = this.game.getCastleBushos(helperCastle.id).filter(b => !b.isDaimyo && !b.isCastellan && b.status !== 'ronin' && b.belongKunishuId === 0).sort((a,b) => b.strength - a.strength);
+        const availableBushos = this.game.getCastleBushos(helperCastle.id).filter(b => b.clan === helperCastle.ownerClan && b.status === 'active' && !b.isDaimyo && !b.isCastellan).sort((a,b) => b.strength - a.strength);
         let bushoCount = reinfSoldiers >= 2500 ? 3 : (reinfSoldiers >= 1500 ? 2 : 1);
         bushoCount = Math.min(bushoCount, availableBushos.length);
 

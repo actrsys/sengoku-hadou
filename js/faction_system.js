@@ -468,7 +468,7 @@ class FactionSystem {
                     const currentCastellan = this.game.getBusho(castle.castellanId);
                     if (currentCastellan && currentCastellan.isDaimyo) return;
 
-                    const castleBushos = this.game.getCastleBushos(castle.id).filter(b => b.status !== 'ronin'); 
+                    const castleBushos = this.game.getCastleBushos(castle.id).filter(b => b.clan === castle.ownerClan && b.status === 'active');
                     if (castleBushos.length <= 1) return; 
                     
                     this.game.electCastellan(castle, castleBushos);
