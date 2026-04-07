@@ -2395,7 +2395,13 @@ class UIManager {
 
                 range.oninput = () => { 
                     let v = parseInt(range.value);
-                    if (v > 0 && v < actualMaxTransport) { v = Math.round(v / 100) * 100; }
+                    if (v > 0 && v < actualMaxTransport) { 
+                        if (actualMaxTransport <= 999) {
+                            v = Math.round(v / 10) * 10; 
+                        } else {
+                            v = Math.round(v / 100) * 100; 
+                        }
+                    }
                     
                     // 【追加】ここで上限・下限を超えないようにブロックします
                     if (v > actualMaxTransport) v = actualMaxTransport;
@@ -2483,7 +2489,13 @@ class UIManager {
 
                 range.oninput = () => { 
                     let v = parseInt(range.value);
-                    if (v > minVal && v < max) { v = Math.round(v / 100) * 100; }
+                    if (v > minVal && v < max) { 
+                        if (max <= 999) {
+                            v = Math.round(v / 10) * 10; 
+                        } else {
+                            v = Math.round(v / 100) * 100; 
+                        }
+                    }
                     
                     // 【追加】ここで上限・下限を超えないようにブロックします
                     if (v > max) v = max;
