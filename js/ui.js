@@ -2261,6 +2261,26 @@ class UIManager {
                 this.quantityConfirmBtn.style.opacity = 0.5;
             }
 
+            // ★追加：複数スライダーの時の、上部の「残数」表示をパタパタ更新します！
+            if (['war_supplies', 'def_intercept', 'def_reinf_supplies', 'atk_reinf_supplies', 'def_self_reinf_supplies', 'atk_self_reinf_supplies', 'transport'].includes(type)) {
+                let sCastle = c;
+                if (type === 'def_intercept') sCastle = (data && data.length > 0) ? data[0] : c;
+                if (type === 'def_reinf_supplies' || type === 'atk_reinf_supplies' || type === 'def_self_reinf_supplies' || type === 'atk_self_reinf_supplies') sCastle = (data && data.length > 0) ? data[0] : c;
+                
+                const updateStock = (id, baseVal) => {
+                    const el = document.getElementById(`multi-stock-${id}`);
+                    if (el) {
+                        const v = parseInt(document.getElementById(`num-${id}`)?.value) || 0;
+                        el.textContent = baseVal - v;
+                    }
+                };
+                updateStock('gold', sCastle.gold);
+                updateStock('rice', sCastle.rice);
+                updateStock('soldiers', sCastle.soldiers);
+                updateStock('horses', sCastle.horses || 0);
+                updateStock('guns', sCastle.guns || 0);
+            }
+
             // ★追加：スライダーを動かすたびに呼ばれるこの場所で、必要資金を計算してパタパタ表示します！
             const displayEl = document.getElementById('dynamic-cost-display');
             if (displayEl) {
@@ -2363,7 +2383,6 @@ class UIManager {
                 wrap.innerHTML = `
                     <div class="qty-control" style="display:flex; align-items:center; gap:5px;">
                         <span style="${labelStyle} order:0;">${label}</span>
-                        <input type="number" id="num-src-${id}" min="${max - actualMaxTransport}" max="${max}" value="${max}" style="order:0;">
                         <button class="qty-shortcut-btn" id="btn-min-${id}" style="order:1;">最小</button>
                         <button class="qty-shortcut-btn" id="btn-half-${id}" style="order:3;">半分</button>
                         <input type="range" id="range-${id}" min="0" max="${actualMaxTransport}" value="0" style="flex:1; order:2;">
@@ -2374,7 +2393,6 @@ class UIManager {
                 `;
                 
                 const range = wrap.querySelector(`#range-${id}`);
-                const numSrc = wrap.querySelector(`#num-src-${id}`);
                 const numTgt = wrap.querySelector(`#num-tgt-${id}`);
                 const numHidden = wrap.querySelector(`#num-${id}`);
                 
@@ -2383,7 +2401,6 @@ class UIManager {
                     if (v > actualMaxTransport) v = actualMaxTransport;
                     range.value = v;
                     numHidden.value = v;
-                    numSrc.value = max - v;
                     numTgt.value = targetCurrent + v;
                     updateButtons(v);
                     checkValidQuantity();
@@ -2409,23 +2426,9 @@ class UIManager {
                     
                     range.value = v;
                     numHidden.value = v;
-                    numSrc.value = max - v;
                     numTgt.value = targetCurrent + v;
                     updateButtons(v);
                     checkValidQuantity(); 
-                };
-                
-                numSrc.oninput = () => {
-                    let v = parseInt(numSrc.value);
-                    if (isNaN(v)) return;
-                    if (v > max) v = max;
-                    if (v < max - actualMaxTransport) v = max - actualMaxTransport;
-                    const transAmount = max - v;
-                    range.value = transAmount;
-                    numHidden.value = transAmount;
-                    numTgt.value = targetCurrent + transAmount;
-                    updateButtons(transAmount);
-                    checkValidQuantity();
                 };
 
                 numTgt.oninput = () => {
@@ -2436,7 +2439,6 @@ class UIManager {
                     const transAmount = v - targetCurrent;
                     range.value = transAmount;
                     numHidden.value = transAmount;
-                    numSrc.value = max - transAmount;
                     updateButtons(transAmount);
                     checkValidQuantity();
                 };
@@ -2527,6 +2529,37 @@ class UIManager {
         // ★追加：計算のために大名と城主をあらかじめ探しておきます
         const daimyo = this.game.bushos.find(b => b.clan === c.ownerClan && b.isDaimyo);
         const castellan = this.game.getBusho(c.castellanId);
+
+        // ★今回追加：複数スライダー画面のための「上部の物資・残数表示」
+        const isMultiSliderMode = ['war_supplies', 'def_intercept', 'def_reinf_supplies', 'atk_reinf_supplies', 'def_self_reinf_supplies', 'atk_self_reinf_supplies', 'transport'].includes(type);
+        let sourceCastleForMulti = c;
+        if (type === 'def_intercept') sourceCastleForMulti = (data && data.length > 0) ? data[0] : c;
+        if (type === 'def_reinf_supplies' || type === 'atk_reinf_supplies' || type === 'def_self_reinf_supplies' || type === 'atk_self_reinf_supplies') sourceCastleForMulti = (data && data.length > 0) ? data[0] : c;
+
+        if (isMultiSliderMode) {
+            const stockDiv = document.createElement('div');
+            stockDiv.style.cssText = "background: #f0f4f8; padding: 10px; border-radius: 6px; border: 1px solid #ccc; margin-bottom: 15px; font-size: 0.95rem; font-weight: bold;";
+            stockDiv.innerHTML = `
+                <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px 15px;">
+                    <div style="display: flex; justify-content: space-between;">
+                        <span style="color:#555;">金</span><span id="multi-stock-gold">${sourceCastleForMulti.gold}</span>
+                    </div>
+                    <div style="display: flex; justify-content: space-between;">
+                        <span style="color:#555;">兵糧</span><span id="multi-stock-rice">${sourceCastleForMulti.rice}</span>
+                    </div>
+                    <div style="display: flex; justify-content: space-between;">
+                        <span style="color:#555;">兵士</span><span id="multi-stock-soldiers">${sourceCastleForMulti.soldiers}</span>
+                    </div>
+                    <div style="display: flex; justify-content: space-between;">
+                        <span style="color:#555;">騎馬</span><span id="multi-stock-horses">${sourceCastleForMulti.horses || 0}</span>
+                    </div>
+                    <div style="display: flex; justify-content: space-between;">
+                        <span style="color:#555;">鉄砲</span><span id="multi-stock-guns">${sourceCastleForMulti.guns || 0}</span>
+                    </div>
+                </div>
+            `;
+            this.quantityContainer.appendChild(stockDiv);
+        }
         
         if (type === 'draft') {
             document.getElementById('quantity-title').textContent = "徴兵"; 
@@ -2596,7 +2629,6 @@ class UIManager {
             header.innerHTML = `
                 <div class="qty-control" style="display:flex; align-items:center; gap:5px;">
                     <div style="width: 4em; min-width: 4em; margin-right: 5px; order:0;"></div>
-                    <div style="width: 50px; text-align: center; font-weight: bold; order:0;">輸送元</div>
                     <button class="qty-shortcut-btn" style="visibility:hidden; pointer-events:none; order:1;">空</button>
                     <div style="flex:1; order:2;"></div>
                     <button class="qty-shortcut-btn" style="visibility:hidden; pointer-events:none; order:3;">空</button>
