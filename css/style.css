@@ -831,7 +831,10 @@ body:not(.is-pc) .label-pc { display: none !important; }
 body:not(.is-pc) .label-sp { display: inline !important; }
 
 /* スマホ版: 複数スライダー画面を全画面にする魔法 */
-body:not(.is-pc) #quantity-modal.multi-slider-mode { padding: 0 !important; }
+body:not(.is-pc) #quantity-modal.multi-slider-mode { 
+    padding: 0 !important; 
+    height: 100dvh !important; 
+}
 body:not(.is-pc) #quantity-modal.multi-slider-mode .modal-content { 
     width: 100% !important; 
     height: 100% !important; 
@@ -840,6 +843,11 @@ body:not(.is-pc) #quantity-modal.multi-slider-mode .modal-content {
     margin: 0 !important; 
     border-radius: 0 !important; 
     border: none !important; 
+    box-sizing: border-box !important;
+    padding-top: max(40px, env(safe-area-inset-top)) !important;
+    padding-bottom: max(40px, env(safe-area-inset-bottom)) !important;
+    padding-left: 20px !important;
+    padding-right: 20px !important;
 }
 
 /* スマホ版: 大名選択 */
