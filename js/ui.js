@@ -1686,7 +1686,21 @@ class UIManager {
         let isMulti = data.isMulti;
         let spec = data.spec;
 
-        const contextEl = document.getElementById('selector-context-info'); 
+        if (actionType === 'view_only' || actionType === 'all_busho_list') {
+            const getSortRank = (b) => {
+                if (b.isDaimyo) return 1;
+                if (b.isCastellan) return 2;
+                if (b.status === 'ronin') return 6;
+                if (b.belongKunishuId > 0) {
+                    const isLeader = b.id === (window.GameApp ? window.GameApp.kunishuSystem.getKunishu(b.belongKunishuId)?.leaderId : 0);
+                    return isLeader ? 4 : 5;
+                }
+                return 3;
+            };
+            bushos.sort((a, b) => getSortRank(a) - getSortRank(b));
+        }
+
+        const contextEl = document.getElementById('selector-context-info');
         if(contextEl) {
             contextEl.classList.remove('hidden');
             contextEl.innerHTML = infoHtml;
