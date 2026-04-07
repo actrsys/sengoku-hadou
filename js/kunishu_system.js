@@ -444,12 +444,28 @@ class KunishuSystem {
         const members = this.getKunishuMembers(kunishu.id);
         const leaderAlive = members.some(b => b.id === kunishu.leaderId);
 
-        // 兵力が0、または所属武将が全滅したら壊滅
-        if (kunishu.soldiers <= 0 || members.length === 0) {
+        let unbornFamily = [];
+        const leader = this.game.getBusho(kunishu.leaderId);
+
+        // 頭領がいない場合、まだ登場していない親戚の中で、すでに生まれている人を探します
+        if (!leaderAlive && leader) {
+            const currentYear = this.game.year;
+            unbornFamily = this.game.bushos.filter(b => 
+                b.status === 'unborn' && 
+                leader.familyIds.some(fId => b.familyIds.includes(fId)) && 
+                b.birthYear <= currentYear
+            );
+        }
+
+        // 今いるメンバーと、新しく見つけた親戚を合わせます
+        const allCandidates = [...members, ...unbornFamily];
+
+        // 兵力が0、または後継ぎ候補が誰もいなくなったら壊滅します
+        if (kunishu.soldiers <= 0 || allCandidates.length === 0) {
             kunishu.isDestroyed = true;
             kunishu.soldiers = 0;
             
-            // 残った武将の行き先を決めます
+            // 残った武将（今いるメンバーのみ）の行き先を決めます
             members.forEach(b => {
                 b.belongKunishuId = 0; // 諸勢力から外れます
 
@@ -474,11 +490,56 @@ class KunishuSystem {
         }
 
         // リーダーが死亡等で不在の場合、継承
-        if (!leaderAlive && members.length > 0) {
-            // 能力（統率＋知略）が一番高い者が継ぐ
-            members.sort((a, b) => (b.leadership + b.intelligence) - (a.leadership + a.intelligence));
-            kunishu.leaderId = members[0].id;
-            this.game.ui.log(`【諸勢力継承】${members[0].name}が新たな諸勢力の頭領となりました。`);
+        if (!leaderAlive) {
+            allCandidates.forEach(b => {
+                // 親戚かどうかを調べます
+                b._isRelative = leader ? leader.familyIds.some(fId => b.familyIds.includes(fId)) : false;
+                // 考え方の違い（相性）を計算します
+                b._affinityDiff = leader ? Math.abs((leader.affinity || 0) - (b.affinity || 0)) : 0;
+                // 能力の合計点を計算します
+                b._baseScore = b.leadership + b.intelligence;
+            });
+
+            allCandidates.sort((a, b) => {
+                // 親戚を優先します
+                if (a._isRelative && !b._isRelative) return -1;
+                if (!a._isRelative && b._isRelative) return 1;
+                
+                // どちらも親戚（またはどちらも親戚ではない）場合は、相性や年齢を比べます
+                if (a._isRelative && b._isRelative && leader) {
+                    if (a._affinityDiff !== b._affinityDiff) return a._affinityDiff - b._affinityDiff;
+                    
+                    const aIsYounger = a.birthYear > leader.birthYear;
+                    const bIsYounger = b.birthYear > leader.birthYear;
+                    if (aIsYounger && !bIsYounger) return -1;
+                    if (!aIsYounger && bIsYounger) return 1;
+                    
+                    if (a.birthYear !== b.birthYear) return a.birthYear - b.birthYear;
+                }
+                // 血の繋がりに関係なく、最後は能力の高さで決めます
+                return b._baseScore - a._baseScore;
+            });
+
+            const successor = allCandidates[0];
+            let extraMsg = "";
+
+            // もし一番ふさわしい人が「まだ登場していない親戚」だったら、急いで元服させます
+            if (successor.status === 'unborn') {
+                successor.status = 'active';
+                successor.belongKunishuId = kunishu.id;
+                successor.castleId = kunishu.castleId;
+                successor.clan = 0; // 諸勢力なので大名家には属しません
+                successor.loyalty = 100;
+                
+                const castle = this.game.getCastle(kunishu.castleId);
+                if (castle && !castle.samuraiIds.includes(successor.id)) {
+                    castle.samuraiIds.push(successor.id);
+                }
+                extraMsg = `（${successor.name.replace('|','')}が急遽元服しました）`;
+            }
+
+            kunishu.leaderId = successor.id;
+            this.game.ui.log(`【諸勢力継承】${successor.name.replace('|','')}が新たな諸勢力の頭領となりました。${extraMsg}`);
         }
     }
 
