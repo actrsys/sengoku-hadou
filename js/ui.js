@@ -2324,34 +2324,37 @@ class UIManager {
             const labelStyle = "width: 4em; min-width: 4em; text-align:center; font-weight:bold; background-color: #546e7a; color: #fff; border-radius: 3px; padding: 4px 0; margin-right: 5px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;";
             const isSingle = !(['war_supplies', 'def_intercept', 'def_reinf_supplies', 'atk_reinf_supplies', 'def_self_reinf_supplies', 'atk_self_reinf_supplies', 'transport'].includes(type));
             
-            // ボタンの有効・無効を更新する仕組み
+            // ボタンの位置と表示を自動で切り替える仕組み
             const updateButtons = (v) => {
                 const bMin = wrap.querySelector(`#btn-min-${id}`);
                 const bHalf = wrap.querySelector(`#btn-half-${id}`);
                 const bMax = wrap.querySelector(`#btn-max-${id}`);
                 const currentMax = isTransport ? Math.min(max, targetMaxLimit - targetCurrent) : max;
                 const currentMin = isTransport ? 0 : minVal;
-                const hVal = Math.floor((currentMin + currentMax) / 2);
 
-                // 最大値が最小値以下の場合は全部無効（0の時など）
+                // 変更できない状態（0の時など）
                 if (currentMax <= currentMin) {
-                    if (bMin) bMin.disabled = true;
-                    if (bHalf) bHalf.disabled = true;
-                    if (bMax) bMax.disabled = true;
+                    if (bMin) { bMin.style.display = 'block'; bMin.disabled = true; bMin.style.order = 1; }
+                    if (bHalf) { bHalf.style.display = 'block'; bHalf.disabled = true; bHalf.style.order = 3; }
+                    if (bMax) { bMax.style.display = 'none'; }
                     return;
                 }
 
-                // 最小・最大の基本ルール
-                if (bMin) bMin.disabled = (v <= currentMin);
-                if (bMax) bMax.disabled = (v >= currentMax);
-                
-                // 半分の特殊ルール：最小値のときと、現在値が半分のときは無効
-                if (bHalf) {
-                    if (v <= currentMin || v === hVal) {
-                        bHalf.disabled = true;
-                    } else {
-                        bHalf.disabled = false;
-                    }
+                if (v <= currentMin) {
+                    // 最小の時：「最小(無効)」ゲージ「半分(有効)」を表示
+                    if (bMin) { bMin.style.display = 'block'; bMin.disabled = true; bMin.style.order = 1; }
+                    if (bHalf) { bHalf.style.display = 'block'; bHalf.disabled = false; bHalf.style.order = 3; }
+                    if (bMax) { bMax.style.display = 'none'; }
+                } else if (v >= currentMax) {
+                    // 最大の時：「半分(有効)」ゲージ「最大(無効)」を表示
+                    if (bMin) { bMin.style.display = 'none'; }
+                    if (bHalf) { bHalf.style.display = 'block'; bHalf.disabled = false; bHalf.style.order = 1; }
+                    if (bMax) { bMax.style.display = 'block'; bMax.disabled = true; bMax.style.order = 3; }
+                } else {
+                    // 中間の時：「最小(有効)」ゲージ「最大(有効)」を表示
+                    if (bMin) { bMin.style.display = 'block'; bMin.disabled = false; bMin.style.order = 1; }
+                    if (bHalf) { bHalf.style.display = 'none'; }
+                    if (bMax) { bMax.style.display = 'block'; bMax.disabled = false; bMax.style.order = 3; }
                 }
             };
 
@@ -2359,13 +2362,13 @@ class UIManager {
                 const actualMaxTransport = Math.min(max, targetMaxLimit - targetCurrent);
                 wrap.innerHTML = `
                     <div class="qty-control" style="display:flex; align-items:center; gap:5px;">
-                        <span style="${labelStyle}">${label}</span>
-                        <input type="number" id="num-src-${id}" min="${max - actualMaxTransport}" max="${max}" value="${max}">
-                        <button class="qty-shortcut-btn" id="btn-min-${id}">最小</button>
-                        <input type="range" id="range-${id}" min="0" max="${actualMaxTransport}" value="0" style="flex:1;">
-                        <button class="qty-shortcut-btn" id="btn-half-${id}">半分</button>
-                        <button class="qty-shortcut-btn" id="btn-max-${id}">最大</button>
-                        <input type="number" id="num-tgt-${id}" min="${targetCurrent}" max="${targetCurrent + actualMaxTransport}" value="${targetCurrent}">
+                        <span style="${labelStyle} order:0;">${label}</span>
+                        <input type="number" id="num-src-${id}" min="${max - actualMaxTransport}" max="${max}" value="${max}" style="order:0;">
+                        <button class="qty-shortcut-btn" id="btn-min-${id}" style="order:1;">最小</button>
+                        <button class="qty-shortcut-btn" id="btn-half-${id}" style="order:3;">半分</button>
+                        <input type="range" id="range-${id}" min="0" max="${actualMaxTransport}" value="0" style="flex:1; order:2;">
+                        <button class="qty-shortcut-btn" id="btn-max-${id}" style="order:3;">最大</button>
+                        <input type="number" id="num-tgt-${id}" min="${targetCurrent}" max="${targetCurrent + actualMaxTransport}" value="${targetCurrent}" style="order:4;">
                         <input type="hidden" id="num-${id}" value="0">
                     </div>
                 `;
@@ -2436,22 +2439,22 @@ class UIManager {
                     wrap.innerHTML = `
                         <div style="font-weight:bold; margin-bottom:8px; text-align:left; color:#333; font-size:1.05rem;">${label}</div>
                         <div class="qty-control" style="display:flex; align-items:center; gap:5px;">
-                            <button class="qty-shortcut-btn" id="btn-min-${id}">最小</button>
-                            <input type="range" id="range-${id}" min="${minVal}" max="${max}" value="${currentVal}" style="flex:1;">
-                            <button class="qty-shortcut-btn" id="btn-half-${id}">半分</button>
-                            <button class="qty-shortcut-btn" id="btn-max-${id}">最大</button>
-                            <input type="number" id="num-${id}" min="${minVal}" max="${max}" value="${currentVal}">
+                            <button class="qty-shortcut-btn" id="btn-min-${id}" style="order:1;">最小</button>
+                            <button class="qty-shortcut-btn" id="btn-half-${id}" style="order:3;">半分</button>
+                            <input type="range" id="range-${id}" min="${minVal}" max="${max}" value="${currentVal}" style="flex:1; order:2;">
+                            <button class="qty-shortcut-btn" id="btn-max-${id}" style="order:3;">最大</button>
+                            <input type="number" id="num-${id}" min="${minVal}" max="${max}" value="${currentVal}" style="order:4;">
                         </div>
                     `;
                 } else {
                     wrap.innerHTML = `
                         <div class="qty-control" style="display:flex; align-items:center; gap:5px;">
-                            <span style="${labelStyle}">${label}</span>
-                            <button class="qty-shortcut-btn" id="btn-min-${id}">最小</button>
-                            <input type="range" id="range-${id}" min="${minVal}" max="${max}" value="${currentVal}" style="flex:1;">
-                            <button class="qty-shortcut-btn" id="btn-half-${id}">半分</button>
-                            <button class="qty-shortcut-btn" id="btn-max-${id}">最大</button>
-                            <input type="number" id="num-${id}" min="${minVal}" max="${max}" value="${currentVal}">
+                            <span style="${labelStyle} order:0;">${label}</span>
+                            <button class="qty-shortcut-btn" id="btn-min-${id}" style="order:1;">最小</button>
+                            <button class="qty-shortcut-btn" id="btn-half-${id}" style="order:3;">半分</button>
+                            <input type="range" id="range-${id}" min="${minVal}" max="${max}" value="${currentVal}" style="flex:1; order:2;">
+                            <button class="qty-shortcut-btn" id="btn-max-${id}" style="order:3;">最大</button>
+                            <input type="number" id="num-${id}" min="${minVal}" max="${max}" value="${currentVal}" style="order:4;">
                         </div>
                     `;
                 }
@@ -2570,13 +2573,12 @@ class UIManager {
             // スライダー行と全く同じ要素構成にして、ボタンなどは透明化して配置します
             header.innerHTML = `
                 <div class="qty-control" style="display:flex; align-items:center; gap:5px;">
-                    <div style="width: 4em; min-width: 4em; margin-right: 5px;"></div>
-                    <div style="width: 50px; text-align: center; font-weight: bold;">輸送元</div>
-                    <button class="qty-shortcut-btn" style="visibility:hidden; pointer-events:none;">最小</button>
-                    <div style="flex:1;"></div>
-                    <button class="qty-shortcut-btn" style="visibility:hidden; pointer-events:none;">半分</button>
-                    <button class="qty-shortcut-btn" style="visibility:hidden; pointer-events:none;">最大</button>
-                    <div style="width: 50px; text-align: center; font-weight: bold;">輸送先</div>
+                    <div style="width: 4em; min-width: 4em; margin-right: 5px; order:0;"></div>
+                    <div style="width: 50px; text-align: center; font-weight: bold; order:0;">輸送元</div>
+                    <button class="qty-shortcut-btn" style="visibility:hidden; pointer-events:none; order:1;">空</button>
+                    <div style="flex:1; order:2;"></div>
+                    <button class="qty-shortcut-btn" style="visibility:hidden; pointer-events:none; order:3;">空</button>
+                    <div style="width: 50px; text-align: center; font-weight: bold; order:4;">輸送先</div>
                 </div>
             `;
             this.quantityContainer.appendChild(header);
