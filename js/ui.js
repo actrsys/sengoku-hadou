@@ -2321,20 +2321,42 @@ class UIManager {
             const wrap = document.createElement('div');
             wrap.className = 'qty-row';
             
-            // 項目名のデザイン（固定幅、中央揃え、背景色付き）
             const labelStyle = "width: 4em; min-width: 4em; text-align:center; font-weight:bold; background-color: #546e7a; color: #fff; border-radius: 3px; padding: 4px 0; margin-right: 5px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;";
-            
-            // 今開いている画面が「項目が１つだけの画面」かどうかを自動で判定します
             const isSingle = !(['war_supplies', 'def_intercept', 'def_reinf_supplies', 'atk_reinf_supplies', 'def_self_reinf_supplies', 'atk_self_reinf_supplies', 'transport'].includes(type));
             
-            // 輸送の時とそれ以外で見た目を変えます
-            if (isTransport) {
-                // 総量（左の城＋右の城）
-                const totalAmount = max + targetCurrent;
-                // 輸送できる上限（右の城の上限にあふれないか、左の城の現在値のどちらか小さい方）
-                const actualMaxTransport = Math.min(max, targetMaxLimit - targetCurrent);
-                // スライダーは「輸送量」を表します。
+            // ボタンの有効・無効を更新する仕組み
+            const updateButtons = (v) => {
+                const bMin = wrap.querySelector(`#btn-min-${id}`);
+                const bHalf = wrap.querySelector(`#btn-half-${id}`);
+                const bMax = wrap.querySelector(`#btn-max-${id}`);
+                const currentMax = isTransport ? Math.min(max, targetMaxLimit - targetCurrent) : max;
+                const currentMin = isTransport ? 0 : minVal;
+                const hVal = Math.floor((currentMin + currentMax) / 2);
+
+                // 最大値が最小値以下の場合は全部無効（0の時など）
+                if (currentMax <= currentMin) {
+                    if (bMin) bMin.disabled = true;
+                    if (bHalf) bHalf.disabled = true;
+                    if (bMax) bMax.disabled = true;
+                    return;
+                }
+
+                // 最小・最大の基本ルール
+                if (bMin) bMin.disabled = (v <= currentMin);
+                if (bMax) bMax.disabled = (v >= currentMax);
                 
+                // 半分の特殊ルール：最小値のときと、現在値が半分のときは無効
+                if (bHalf) {
+                    if (v <= currentMin || v === hVal) {
+                        bHalf.disabled = true;
+                    } else {
+                        bHalf.disabled = false;
+                    }
+                }
+            };
+
+            if (isTransport) {
+                const actualMaxTransport = Math.min(max, targetMaxLimit - targetCurrent);
                 wrap.innerHTML = `
                     <div class="qty-control" style="display:flex; align-items:center; gap:5px;">
                         <span style="${labelStyle}">${label}</span>
@@ -2360,78 +2382,57 @@ class UIManager {
                     numHidden.value = v;
                     numSrc.value = max - v;
                     numTgt.value = targetCurrent + v;
+                    updateButtons(v);
                     checkValidQuantity();
                 };
 
                 wrap.querySelector(`#btn-min-${id}`).onclick = () => setVal(0);
-                wrap.querySelector(`#btn-half-${id}`).onclick = () => {
-                    setVal(Math.floor(actualMaxTransport / 2));
-                };
+                wrap.querySelector(`#btn-half-${id}`).onclick = () => setVal(Math.floor(actualMaxTransport / 2));
                 wrap.querySelector(`#btn-max-${id}`).onclick = () => setVal(actualMaxTransport);
 
                 range.oninput = () => { 
                     let v = parseInt(range.value);
-                    // 100単位でカクカクさせる（端っこ以外）
-                    if (v > 0 && v < actualMaxTransport) {
-                        v = Math.round(v / 100) * 100;
-                    }
-                    if (v < 0) v = 0;
-                    if (v > actualMaxTransport) v = actualMaxTransport;
-                    
+                    if (v > 0 && v < actualMaxTransport) { v = Math.round(v / 100) * 100; }
                     range.value = v;
                     numHidden.value = v;
                     numSrc.value = max - v;
                     numTgt.value = targetCurrent + v;
+                    updateButtons(v);
                     checkValidQuantity(); 
                 };
                 
-                // 輸送元の数値を直接いじった時
                 numSrc.oninput = () => {
                     let v = parseInt(numSrc.value);
                     if (isNaN(v)) return;
                     if (v > max) v = max;
                     if (v < max - actualMaxTransport) v = max - actualMaxTransport;
-                    numSrc.value = v;
-                    
                     const transAmount = max - v;
                     range.value = transAmount;
                     numHidden.value = transAmount;
                     numTgt.value = targetCurrent + transAmount;
+                    updateButtons(transAmount);
                     checkValidQuantity();
                 };
-                numSrc.onblur = () => {
-                    if (numSrc.value === "" || isNaN(parseInt(numSrc.value))) {
-                        setVal(0); // 空っぽにされたら輸送量0（元通り）にします
-                    }
-                };
 
-                // 輸送先の数値を直接いじった時
                 numTgt.oninput = () => {
                     let v = parseInt(numTgt.value);
                     if (isNaN(v)) return;
                     if (v < targetCurrent) v = targetCurrent;
                     if (v > targetCurrent + actualMaxTransport) v = targetCurrent + actualMaxTransport;
-                    numTgt.value = v;
-                    
                     const transAmount = v - targetCurrent;
                     range.value = transAmount;
                     numHidden.value = transAmount;
                     numSrc.value = max - transAmount;
+                    updateButtons(transAmount);
                     checkValidQuantity();
                 };
-                numTgt.onblur = () => {
-                    if (numTgt.value === "" || isNaN(parseInt(numTgt.value))) {
-                        setVal(0);
-                    }
-                };
-
+                
+                updateButtons(0);
                 this.quantityContainer.appendChild(wrap);
                 return { range, num: numHidden };
                 
             } else {
-                // いつも通りの画面
                 if (isSingle) {
-                    // 項目が1つだけの時は、項目名を上に左寄せで配置します
                     wrap.innerHTML = `
                         <div style="font-weight:bold; margin-bottom:8px; text-align:left; color:#333; font-size:1.05rem;">${label}</div>
                         <div class="qty-control" style="display:flex; align-items:center; gap:5px;">
@@ -2443,7 +2444,6 @@ class UIManager {
                         </div>
                     `;
                 } else {
-                    // 出陣などのように複数項目ある時は、今まで通り左に配置します
                     wrap.innerHTML = `
                         <div class="qty-control" style="display:flex; align-items:center; gap:5px;">
                             <span style="${labelStyle}">${label}</span>
@@ -2465,47 +2465,33 @@ class UIManager {
                     if (v > actualMax) v = actualMax;
                     range.value = v;
                     num.value = v;
+                    updateButtons(v);
                     checkValidQuantity();
                 };
 
                 wrap.querySelector(`#btn-min-${id}`).onclick = () => setVal(minVal);
-                wrap.querySelector(`#btn-half-${id}`).onclick = () => {
-                    let actualMax = parseInt(range.max);
-                    setVal(Math.floor((minVal + actualMax) / 2));
-                };
-                wrap.querySelector(`#btn-max-${id}`).onclick = () => setVal(parseInt(range.max));
+                wrap.querySelector(`#btn-half-${id}`).onclick = () => setVal(Math.floor((minVal + max) / 2));
+                wrap.querySelector(`#btn-max-${id}`).onclick = () => setVal(max);
 
                 range.oninput = () => { 
                     let v = parseInt(range.value);
-                    // 100単位でカクカクさせる（端っこ以外）
-                    if (v > minVal && v < max) {
-                        v = Math.round(v / 100) * 100;
-                    }
-                    if (v < minVal) v = minVal;
-                    if (v > max) v = max;
-
+                    if (v > minVal && v < max) { v = Math.round(v / 100) * 100; }
                     range.value = v;
                     num.value = v;
+                    updateButtons(v);
                     checkValidQuantity(); 
                 };
                 num.oninput = () => { 
-                    let actualMax = parseInt(range.max);
                     let v = parseInt(num.value);
                     if (isNaN(v)) return;
                     if (v < minVal) v = minVal;
-                    if (v > actualMax) v = actualMax;
-                    if (num.value != v) num.value = v;
+                    if (v > max) v = max;
                     range.value = v;
-                    checkValidQuantity();
-                };
-                num.onblur = () => {
-                    if (num.value === "" || isNaN(parseInt(num.value))) {
-                        num.value = minVal;
-                        range.value = minVal;
-                    }
+                    updateButtons(v);
                     checkValidQuantity();
                 };
 
+                updateButtons(currentVal);
                 this.quantityContainer.appendChild(wrap);
                 return { range, num };
             }
