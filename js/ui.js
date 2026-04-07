@@ -2335,6 +2335,7 @@ class UIManager {
                         <input type="number" id="num-src-${id}" min="${max - actualMaxTransport}" max="${max}" value="${max}" style="width:60px;">
                         <button class="qty-shortcut-btn" id="btn-min-${id}">最小</button>
                         <input type="range" id="range-${id}" min="0" max="${actualMaxTransport}" value="0" style="flex:1;">
+                        <button class="qty-shortcut-btn" id="btn-half-${id}">半分</button>
                         <button class="qty-shortcut-btn" id="btn-max-${id}">最大</button>
                         <input type="number" id="num-tgt-${id}" min="${targetCurrent}" max="${targetCurrent + actualMaxTransport}" value="${targetCurrent}" style="width:60px;">
                         <input type="hidden" id="num-${id}" value="0">
@@ -2357,10 +2358,21 @@ class UIManager {
                 };
 
                 wrap.querySelector(`#btn-min-${id}`).onclick = () => setVal(0);
+                wrap.querySelector(`#btn-half-${id}`).onclick = () => {
+                    setVal(Math.floor(actualMaxTransport / 2));
+                };
                 wrap.querySelector(`#btn-max-${id}`).onclick = () => setVal(actualMaxTransport);
 
                 range.oninput = () => { 
-                    const v = parseInt(range.value);
+                    let v = parseInt(range.value);
+                    // 100単位でカクカクさせる（端っこ以外）
+                    if (v > 0 && v < actualMaxTransport) {
+                        v = Math.round(v / 100) * 100;
+                    }
+                    if (v < 0) v = 0;
+                    if (v > actualMaxTransport) v = actualMaxTransport;
+                    
+                    range.value = v;
                     numHidden.value = v;
                     numSrc.value = max - v;
                     numTgt.value = targetCurrent + v;
@@ -2417,6 +2429,7 @@ class UIManager {
                         <span style="width: 3em; text-align:right; font-weight:bold; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${label}</span>
                         <button class="qty-shortcut-btn" id="btn-min-${id}">最小</button>
                         <input type="range" id="range-${id}" min="${minVal}" max="${max}" value="${currentVal}" style="flex:1;">
+                        <button class="qty-shortcut-btn" id="btn-half-${id}">半分</button>
                         <button class="qty-shortcut-btn" id="btn-max-${id}">最大</button>
                         <input type="number" id="num-${id}" min="${minVal}" max="${max}" value="${currentVal}" style="width:70px;">
                     </div>
@@ -2435,10 +2448,23 @@ class UIManager {
                 };
 
                 wrap.querySelector(`#btn-min-${id}`).onclick = () => setVal(minVal);
+                wrap.querySelector(`#btn-half-${id}`).onclick = () => {
+                    let actualMax = parseInt(range.max);
+                    setVal(Math.floor((minVal + actualMax) / 2));
+                };
                 wrap.querySelector(`#btn-max-${id}`).onclick = () => setVal(parseInt(range.max));
 
                 range.oninput = () => { 
-                    num.value = range.value; 
+                    let v = parseInt(range.value);
+                    // 100単位でカクカクさせる（端っこ以外）
+                    if (v > minVal && v < max) {
+                        v = Math.round(v / 100) * 100;
+                    }
+                    if (v < minVal) v = minVal;
+                    if (v > max) v = max;
+
+                    range.value = v;
+                    num.value = v;
                     checkValidQuantity(); 
                 };
                 num.oninput = () => { 
