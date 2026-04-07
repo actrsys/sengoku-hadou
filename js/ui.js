@@ -2330,23 +2330,14 @@ class UIManager {
                 // スライダーは「輸送量」を表します。
                 
                 wrap.innerHTML = `
-                    <label style="font-weight:bold; display:block; margin-bottom:5px;">${label} (輸送可能: <span id="max-label-${id}">${actualMaxTransport}</span>)</label>
-                    <div class="qty-control" style="display:flex; align-items:center; gap:10px;">
-                        <div style="display:flex; flex-direction:column; align-items:center; width:80px;">
-                            <span style="font-size:0.8rem; color:#666;">輸送元</span>
-                            <input type="number" id="num-src-${id}" min="${max - actualMaxTransport}" max="${max}" value="${max}" style="width:100%;">
-                        </div>
-                        <input type="range" id="range-${id}" min="0" max="${actualMaxTransport}" value="0" style="flex:1;">
-                        <div style="display:flex; flex-direction:column; align-items:center; width:80px;">
-                            <span style="font-size:0.8rem; color:#666;">輸送先</span>
-                            <input type="number" id="num-tgt-${id}" min="${targetCurrent}" max="${targetCurrent + actualMaxTransport}" value="${targetCurrent}" style="width:100%;">
-                        </div>
-                        <input type="hidden" id="num-${id}" value="0">
-                    </div>
-                    <div class="qty-shortcuts">
+                    <div class="qty-control" style="display:flex; align-items:center; gap:5px;">
+                        <span style="width: 3em; text-align:right; font-weight:bold; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${label}</span>
+                        <input type="number" id="num-src-${id}" min="${max - actualMaxTransport}" max="${max}" value="${max}" style="width:60px;">
                         <button class="qty-shortcut-btn" id="btn-min-${id}">最小</button>
-                        <button class="qty-shortcut-btn" id="btn-half-${id}">半分</button>
+                        <input type="range" id="range-${id}" min="0" max="${actualMaxTransport}" value="0" style="flex:1;">
                         <button class="qty-shortcut-btn" id="btn-max-${id}">最大</button>
+                        <input type="number" id="num-tgt-${id}" min="${targetCurrent}" max="${targetCurrent + actualMaxTransport}" value="${targetCurrent}" style="width:60px;">
+                        <input type="hidden" id="num-${id}" value="0">
                     </div>
                 `;
                 
@@ -2366,9 +2357,6 @@ class UIManager {
                 };
 
                 wrap.querySelector(`#btn-min-${id}`).onclick = () => setVal(0);
-                wrap.querySelector(`#btn-half-${id}`).onclick = () => {
-                    setVal(Math.floor(actualMaxTransport / 2));
-                };
                 wrap.querySelector(`#btn-max-${id}`).onclick = () => setVal(actualMaxTransport);
 
                 range.oninput = () => { 
@@ -2425,15 +2413,12 @@ class UIManager {
             } else {
                 // いつも通りの画面
                 wrap.innerHTML = `
-                    <label style="font-weight:bold; display:block; margin-bottom:5px;">${label} (最大: <span id="max-label-${id}">${max}</span>)</label>
-                    <div class="qty-control">
-                        <input type="range" id="range-${id}" min="${minVal}" max="${max}" value="${currentVal}">
-                        <input type="number" id="num-${id}" min="${minVal}" max="${max}" value="${currentVal}">
-                    </div>
-                    <div class="qty-shortcuts">
+                    <div class="qty-control" style="display:flex; align-items:center; gap:5px;">
+                        <span style="width: 3em; text-align:right; font-weight:bold; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${label}</span>
                         <button class="qty-shortcut-btn" id="btn-min-${id}">最小</button>
-                        <button class="qty-shortcut-btn" id="btn-half-${id}">半分</button>
+                        <input type="range" id="range-${id}" min="${minVal}" max="${max}" value="${currentVal}" style="flex:1;">
                         <button class="qty-shortcut-btn" id="btn-max-${id}">最大</button>
+                        <input type="number" id="num-${id}" min="${minVal}" max="${max}" value="${currentVal}" style="width:70px;">
                     </div>
                 `;
                 
@@ -2450,10 +2435,6 @@ class UIManager {
                 };
 
                 wrap.querySelector(`#btn-min-${id}`).onclick = () => setVal(minVal);
-                wrap.querySelector(`#btn-half-${id}`).onclick = () => {
-                    let actualMax = parseInt(range.max);
-                    setVal(Math.floor((minVal + actualMax) / 2));
-                };
                 wrap.querySelector(`#btn-max-${id}`).onclick = () => setVal(parseInt(range.max));
 
                 range.oninput = () => { 
@@ -2546,7 +2527,23 @@ class UIManager {
             inputs.horses = createSlider("騎馬", "horses", helperCastle.horses || 0, 0, 0);
             inputs.guns = createSlider("鉄砲", "guns", helperCastle.guns || 0, 0, 0);
         } else if (type === 'transport') {
-            document.getElementById('quantity-title').textContent = "輸送物資指定";
+            document.getElementById('quantity-title').textContent = "輸送";
+            
+            const header = document.createElement('div');
+            header.style.display = 'flex';
+            header.style.alignItems = 'center';
+            header.style.gap = '5px';
+            header.style.marginBottom = '5px';
+            header.style.fontSize = '0.8rem';
+            header.style.color = '#666';
+            header.innerHTML = `
+                <div style="width: 3em;"></div>
+                <div style="width: 60px; text-align: center;">輸送元</div>
+                <div style="flex: 1;"></div>
+                <div style="width: 60px; text-align: center;">輸送先</div>
+            `;
+            this.quantityContainer.appendChild(header);
+
             const tCastle = this.game.getCastle(targetId); // 輸送先の城のデータを取得します
             
             // 引数は (ラベル, ID, 自分の城の数, 最初は0, 最低は0, 輸送モードフラグ, 相手の城の数, 相手の城の上限) です
