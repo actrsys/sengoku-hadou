@@ -2317,64 +2317,170 @@ class UIManager {
             }
         };
 
-        const createSlider = (label, id, max, currentVal, minVal = 0) => { 
-            const wrap = document.createElement('div'); 
-            wrap.className = 'qty-row'; 
-            wrap.innerHTML = `
-                <label>${label} (Max: <span id="max-label-${id}">${max}</span>)</label>
-                <div class="qty-control">
-                    <input type="range" id="range-${id}" min="${minVal}" max="${max}" value="${currentVal}">
-                    <input type="number" id="num-${id}" min="${minVal}" max="${max}" value="${currentVal}">
-                </div>
-                <div class="qty-shortcuts">
-                    <button class="qty-shortcut-btn" id="btn-min-${id}">最小</button>
-                    <button class="qty-shortcut-btn" id="btn-half-${id}">半分</button>
-                    <button class="qty-shortcut-btn" id="btn-max-${id}">最大</button>
-                </div>
-            `; 
+        const createSlider = (label, id, max, currentVal, minVal = 0, isTransport = false, targetCurrent = 0, targetMaxLimit = 99999) => {
+            const wrap = document.createElement('div');
+            wrap.className = 'qty-row';
             
-            const range = wrap.querySelector(`#range-${id}`); 
-            const num = wrap.querySelector(`#num-${id}`); 
+            // 輸送の時とそれ以外で見た目を変えます
+            if (isTransport) {
+                // 総量（左の城＋右の城）
+                const totalAmount = max + targetCurrent;
+                // 輸送できる上限（右の城の上限にあふれないか、左の城の現在値のどちらか小さい方）
+                const actualMaxTransport = Math.min(max, targetMaxLimit - targetCurrent);
+                // スライダーは「輸送量」を表します。
+                
+                wrap.innerHTML = `
+                    <label style="font-weight:bold; display:block; margin-bottom:5px;">${label} (輸送可能: <span id="max-label-${id}">${actualMaxTransport}</span>)</label>
+                    <div class="qty-control" style="display:flex; align-items:center; gap:10px;">
+                        <div style="display:flex; flex-direction:column; align-items:center; width:80px;">
+                            <span style="font-size:0.8rem; color:#666;">輸送元</span>
+                            <input type="number" id="num-src-${id}" min="${max - actualMaxTransport}" max="${max}" value="${max}" style="width:100%;">
+                        </div>
+                        <input type="range" id="range-${id}" min="0" max="${actualMaxTransport}" value="0" style="flex:1;">
+                        <div style="display:flex; flex-direction:column; align-items:center; width:80px;">
+                            <span style="font-size:0.8rem; color:#666;">輸送先</span>
+                            <input type="number" id="num-tgt-${id}" min="${targetCurrent}" max="${targetCurrent + actualMaxTransport}" value="${targetCurrent}" style="width:100%;">
+                        </div>
+                        <input type="hidden" id="num-${id}" value="0">
+                    </div>
+                    <div class="qty-shortcuts">
+                        <button class="qty-shortcut-btn" id="btn-min-${id}">最小</button>
+                        <button class="qty-shortcut-btn" id="btn-half-${id}">半分</button>
+                        <button class="qty-shortcut-btn" id="btn-max-${id}">最大</button>
+                    </div>
+                `;
+                
+                const range = wrap.querySelector(`#range-${id}`);
+                const numSrc = wrap.querySelector(`#num-src-${id}`);
+                const numTgt = wrap.querySelector(`#num-tgt-${id}`);
+                const numHidden = wrap.querySelector(`#num-${id}`);
+                
+                const setVal = (v) => {
+                    if (v < 0) v = 0;
+                    if (v > actualMaxTransport) v = actualMaxTransport;
+                    range.value = v;
+                    numHidden.value = v;
+                    numSrc.value = max - v;
+                    numTgt.value = targetCurrent + v;
+                    checkValidQuantity();
+                };
 
-            const setVal = (v) => {
-                let actualMax = parseInt(range.max);
-                if (v < minVal) v = minVal;
-                if (v > actualMax) v = actualMax;
-                range.value = v;
-                num.value = v;
-                checkValidQuantity(); 
-            };
+                wrap.querySelector(`#btn-min-${id}`).onclick = () => setVal(0);
+                wrap.querySelector(`#btn-half-${id}`).onclick = () => {
+                    setVal(Math.floor(actualMaxTransport / 2));
+                };
+                wrap.querySelector(`#btn-max-${id}`).onclick = () => setVal(actualMaxTransport);
 
-            wrap.querySelector(`#btn-min-${id}`).onclick = () => setVal(minVal);
-            wrap.querySelector(`#btn-half-${id}`).onclick = () => {
-                let actualMax = parseInt(range.max);
-                setVal(Math.floor((minVal + actualMax) / 2));
-            };
-            wrap.querySelector(`#btn-max-${id}`).onclick = () => setVal(parseInt(range.max));
+                range.oninput = () => { 
+                    const v = parseInt(range.value);
+                    numHidden.value = v;
+                    numSrc.value = max - v;
+                    numTgt.value = targetCurrent + v;
+                    checkValidQuantity(); 
+                };
+                
+                // 輸送元の数値を直接いじった時
+                numSrc.oninput = () => {
+                    let v = parseInt(numSrc.value);
+                    if (isNaN(v)) return;
+                    if (v > max) v = max;
+                    if (v < max - actualMaxTransport) v = max - actualMaxTransport;
+                    numSrc.value = v;
+                    
+                    const transAmount = max - v;
+                    range.value = transAmount;
+                    numHidden.value = transAmount;
+                    numTgt.value = targetCurrent + transAmount;
+                    checkValidQuantity();
+                };
+                numSrc.onblur = () => {
+                    if (numSrc.value === "" || isNaN(parseInt(numSrc.value))) {
+                        setVal(0); // 空っぽにされたら輸送量0（元通り）にします
+                    }
+                };
 
-            range.oninput = () => { num.value = range.value; checkValidQuantity(); }; 
+                // 輸送先の数値を直接いじった時
+                numTgt.oninput = () => {
+                    let v = parseInt(numTgt.value);
+                    if (isNaN(v)) return;
+                    if (v < targetCurrent) v = targetCurrent;
+                    if (v > targetCurrent + actualMaxTransport) v = targetCurrent + actualMaxTransport;
+                    numTgt.value = v;
+                    
+                    const transAmount = v - targetCurrent;
+                    range.value = transAmount;
+                    numHidden.value = transAmount;
+                    numSrc.value = max - transAmount;
+                    checkValidQuantity();
+                };
+                numTgt.onblur = () => {
+                    if (numTgt.value === "" || isNaN(parseInt(numTgt.value))) {
+                        setVal(0);
+                    }
+                };
 
-            num.oninput = () => {
-                let actualMax = parseInt(range.max);
-                let v = parseInt(num.value);
-                if (isNaN(v)) return; 
-                if (v < minVal) v = minVal;
-                if (v > actualMax) v = actualMax;
-                if (num.value != v) num.value = v; 
-                range.value = v; 
-                checkValidQuantity(); 
-            };
-            
-            num.onblur = () => {
-                if (num.value === "" || isNaN(parseInt(num.value))) {
-                    num.value = minVal;
-                    range.value = minVal;
-                }
-                checkValidQuantity(); 
-            };
+                this.quantityContainer.appendChild(wrap);
+                return { range, num: numHidden };
+                
+            } else {
+                // いつも通りの画面
+                wrap.innerHTML = `
+                    <label style="font-weight:bold; display:block; margin-bottom:5px;">${label} (最大: <span id="max-label-${id}">${max}</span>)</label>
+                    <div class="qty-control">
+                        <input type="range" id="range-${id}" min="${minVal}" max="${max}" value="${currentVal}">
+                        <input type="number" id="num-${id}" min="${minVal}" max="${max}" value="${currentVal}">
+                    </div>
+                    <div class="qty-shortcuts">
+                        <button class="qty-shortcut-btn" id="btn-min-${id}">最小</button>
+                        <button class="qty-shortcut-btn" id="btn-half-${id}">半分</button>
+                        <button class="qty-shortcut-btn" id="btn-max-${id}">最大</button>
+                    </div>
+                `;
+                
+                const range = wrap.querySelector(`#range-${id}`);
+                const num = wrap.querySelector(`#num-${id}`);
+                
+                const setVal = (v) => {
+                    let actualMax = parseInt(range.max);
+                    if (v < minVal) v = minVal;
+                    if (v > actualMax) v = actualMax;
+                    range.value = v;
+                    num.value = v;
+                    checkValidQuantity();
+                };
 
-            this.quantityContainer.appendChild(wrap); 
-            return { range, num }; 
+                wrap.querySelector(`#btn-min-${id}`).onclick = () => setVal(minVal);
+                wrap.querySelector(`#btn-half-${id}`).onclick = () => {
+                    let actualMax = parseInt(range.max);
+                    setVal(Math.floor((minVal + actualMax) / 2));
+                };
+                wrap.querySelector(`#btn-max-${id}`).onclick = () => setVal(parseInt(range.max));
+
+                range.oninput = () => { 
+                    num.value = range.value; 
+                    checkValidQuantity(); 
+                };
+                num.oninput = () => { 
+                    let actualMax = parseInt(range.max);
+                    let v = parseInt(num.value);
+                    if (isNaN(v)) return;
+                    if (v < minVal) v = minVal;
+                    if (v > actualMax) v = actualMax;
+                    if (num.value != v) num.value = v;
+                    range.value = v;
+                    checkValidQuantity();
+                };
+                num.onblur = () => {
+                    if (num.value === "" || isNaN(parseInt(num.value))) {
+                        num.value = minVal;
+                        range.value = minVal;
+                    }
+                    checkValidQuantity();
+                };
+
+                this.quantityContainer.appendChild(wrap);
+                return { range, num };
+            }
         };
 
         let inputs = {};
@@ -2440,12 +2546,15 @@ class UIManager {
             inputs.horses = createSlider("騎馬", "horses", helperCastle.horses || 0, 0, 0);
             inputs.guns = createSlider("鉄砲", "guns", helperCastle.guns || 0, 0, 0);
         } else if (type === 'transport') {
-            document.getElementById('quantity-title').textContent = "輸送物資指定"; 
-            inputs.gold = createSlider("金", "gold", c.gold, 0); 
-            inputs.rice = createSlider("兵糧", "rice", c.rice, 0); 
-            inputs.soldiers = createSlider("兵士", "soldiers", c.soldiers, 0);
-            inputs.horses = createSlider("騎馬", "horses", c.horses || 0, 0);
-            inputs.guns = createSlider("鉄砲", "guns", c.guns || 0, 0);
+            document.getElementById('quantity-title').textContent = "輸送物資指定";
+            const tCastle = this.game.getCastle(targetId); // 輸送先の城のデータを取得します
+            
+            // 引数は (ラベル, ID, 自分の城の数, 最初は0, 最低は0, 輸送モードフラグ, 相手の城の数, 相手の城の上限) です
+            inputs.gold = createSlider("金", "gold", c.gold, 0, 0, true, tCastle.gold, 99999);
+            inputs.rice = createSlider("兵糧", "rice", c.rice, 0, 0, true, tCastle.rice, 99999);
+            inputs.soldiers = createSlider("兵士", "soldiers", c.soldiers, 0, 0, true, tCastle.soldiers, 99999);
+            inputs.horses = createSlider("騎馬", "horses", c.horses || 0, 0, 0, true, tCastle.horses || 0, 99999);
+            inputs.guns = createSlider("鉄砲", "guns", c.guns || 0, 0, 0, true, tCastle.guns || 0, 99999);
         } else if (type === 'buy_rice') {
             document.getElementById('quantity-title').textContent = "兵糧購入"; 
             let rate = 1.0;
