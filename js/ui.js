@@ -2324,6 +2324,9 @@ class UIManager {
             // 項目名のデザイン（固定幅、中央揃え、背景色付き）
             const labelStyle = "width: 4em; min-width: 4em; text-align:center; font-weight:bold; background-color: #546e7a; color: #fff; border-radius: 3px; padding: 4px 0; margin-right: 5px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;";
             
+            // 今開いている画面が「項目が１つだけの画面」かどうかを自動で判定します
+            const isSingle = !(['war_supplies', 'def_intercept', 'def_reinf_supplies', 'atk_reinf_supplies', 'def_self_reinf_supplies', 'atk_self_reinf_supplies', 'transport'].includes(type));
+            
             // 輸送の時とそれ以外で見た目を変えます
             if (isTransport) {
                 // 総量（左の城＋右の城）
@@ -2427,16 +2430,31 @@ class UIManager {
                 
             } else {
                 // いつも通りの画面
-                wrap.innerHTML = `
-                    <div class="qty-control" style="display:flex; align-items:center; gap:5px;">
-                        <span style="${labelStyle}">${label}</span>
-                        <button class="qty-shortcut-btn" id="btn-min-${id}">最小</button>
-                        <input type="range" id="range-${id}" min="${minVal}" max="${max}" value="${currentVal}" style="flex:1;">
-                        <button class="qty-shortcut-btn" id="btn-half-${id}">半分</button>
-                        <button class="qty-shortcut-btn" id="btn-max-${id}">最大</button>
-                        <input type="number" id="num-${id}" min="${minVal}" max="${max}" value="${currentVal}">
-                    </div>
-                `;
+                if (isSingle) {
+                    // 項目が1つだけの時は、項目名を上に左寄せで配置します
+                    wrap.innerHTML = `
+                        <div style="font-weight:bold; margin-bottom:8px; text-align:left; color:#333; font-size:1.05rem;">${label}</div>
+                        <div class="qty-control" style="display:flex; align-items:center; gap:5px;">
+                            <button class="qty-shortcut-btn" id="btn-min-${id}">最小</button>
+                            <input type="range" id="range-${id}" min="${minVal}" max="${max}" value="${currentVal}" style="flex:1;">
+                            <button class="qty-shortcut-btn" id="btn-half-${id}">半分</button>
+                            <button class="qty-shortcut-btn" id="btn-max-${id}">最大</button>
+                            <input type="number" id="num-${id}" min="${minVal}" max="${max}" value="${currentVal}">
+                        </div>
+                    `;
+                } else {
+                    // 出陣などのように複数項目ある時は、今まで通り左に配置します
+                    wrap.innerHTML = `
+                        <div class="qty-control" style="display:flex; align-items:center; gap:5px;">
+                            <span style="${labelStyle}">${label}</span>
+                            <button class="qty-shortcut-btn" id="btn-min-${id}">最小</button>
+                            <input type="range" id="range-${id}" min="${minVal}" max="${max}" value="${currentVal}" style="flex:1;">
+                            <button class="qty-shortcut-btn" id="btn-half-${id}">半分</button>
+                            <button class="qty-shortcut-btn" id="btn-max-${id}">最大</button>
+                            <input type="number" id="num-${id}" min="${minVal}" max="${max}" value="${currentVal}">
+                        </div>
+                    `;
+                }
                 
                 const range = wrap.querySelector(`#range-${id}`);
                 const num = wrap.querySelector(`#num-${id}`);
