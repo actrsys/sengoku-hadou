@@ -830,6 +830,18 @@ body:not(.is-pc).daimyo-select-mode #map-wrapper { margin-bottom: 0 !important; 
 body:not(.is-pc) .label-pc { display: none !important; }
 body:not(.is-pc) .label-sp { display: inline !important; }
 
+/* スマホ版: 複数スライダー画面を全画面にする魔法 */
+body:not(.is-pc) #quantity-modal.multi-slider-mode { padding: 0 !important; }
+body:not(.is-pc) #quantity-modal.multi-slider-mode .modal-content { 
+    width: 100% !important; 
+    height: 100% !important; 
+    max-width: none !important; 
+    max-height: none !important; 
+    margin: 0 !important; 
+    border-radius: 0 !important; 
+    border: none !important; 
+}
+
 /* スマホ版: 大名選択 */
 body:not(.is-pc) #daimyo-confirm-modal .modal-content { top: max(20px, env(safe-area-inset-top)); bottom: auto; left: 50%; transform: translateX(-50%); width: 90%; max-width: 400px; padding: 15px; }
 /* ★ スマホ版も見切れないように、下の余白を多めに確保しました */

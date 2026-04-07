@@ -2223,6 +2223,15 @@ class UIManager {
     openQuantitySelector(type, data, targetId, extraData = null) {
         if (!this.quantityModal) return;
         this.hideAIGuardTemporarily(); // ★これを追加します！
+        
+        // ★追加：複数スライダーの時だけ全画面にするための目印をつけます
+        const isMultiMode = ['war_supplies', 'def_intercept', 'def_reinf_supplies', 'atk_reinf_supplies', 'def_self_reinf_supplies', 'atk_self_reinf_supplies', 'transport'].includes(type);
+        if (isMultiMode) {
+            this.quantityModal.classList.add('multi-slider-mode');
+        } else {
+            this.quantityModal.classList.remove('multi-slider-mode');
+        }
+
         this.quantityModal.classList.remove('hidden'); 
         if (this.quantityContainer) this.quantityContainer.innerHTML = '';
         if (this.charityTypeSelector) this.charityTypeSelector.classList.add('hidden'); 
