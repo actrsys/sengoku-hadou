@@ -2419,7 +2419,7 @@ class UIManager {
                 wrap.querySelector(`#btn-half-${id}`).onclick = () => setVal(Math.floor(actualMaxTransport / 2));
                 wrap.querySelector(`#btn-max-${id}`).onclick = () => setVal(actualMaxTransport);
 
-                range.oninput = () => { 
+                const rangeHandler = () => { 
                     let v = parseInt(range.value);
                     if (v > 0 && v < actualMaxTransport) { 
                         if (actualMaxTransport <= 999) {
@@ -2439,8 +2439,10 @@ class UIManager {
                     updateButtons(v);
                     checkValidQuantity(); 
                 };
+                range.oninput = rangeHandler;
+                range.onchange = rangeHandler; // ★スマホで指を離した時の最終確認
 
-                numTgt.oninput = () => {
+                const numTgtHandler = () => {
                     let v = parseInt(numTgt.value);
                     if (isNaN(v)) return;
                     if (v < targetCurrent) v = targetCurrent;
@@ -2451,6 +2453,8 @@ class UIManager {
                     updateButtons(transAmount);
                     checkValidQuantity();
                 };
+                numTgt.oninput = numTgtHandler;
+                numTgt.onchange = numTgtHandler; // ★スマホで指を離した時の最終確認
                 
                 updateButtons(0);
                 this.quantityContainer.appendChild(wrap);
@@ -2498,7 +2502,7 @@ class UIManager {
                 wrap.querySelector(`#btn-half-${id}`).onclick = () => setVal(Math.floor((minVal + max) / 2));
                 wrap.querySelector(`#btn-max-${id}`).onclick = () => setVal(max);
 
-                range.oninput = () => { 
+                const rangeHandler = () => { 
                     let v = parseInt(range.value);
                     if (v > minVal && v < max) { 
                         if (max <= 999) {
@@ -2517,7 +2521,10 @@ class UIManager {
                     updateButtons(v);
                     checkValidQuantity(); 
                 };
-                num.oninput = () => { 
+                range.oninput = rangeHandler;
+                range.onchange = rangeHandler; // ★スマホで指を離した時の最終確認
+
+                const numHandler = () => { 
                     let v = parseInt(num.value);
                     if (isNaN(v)) return;
                     if (v < minVal) v = minVal;
@@ -2526,6 +2533,8 @@ class UIManager {
                     updateButtons(v);
                     checkValidQuantity();
                 };
+                num.oninput = numHandler;
+                num.onchange = numHandler; // ★スマホで指を離した時の最終確認
 
                 updateButtons(currentVal);
                 this.quantityContainer.appendChild(wrap);
