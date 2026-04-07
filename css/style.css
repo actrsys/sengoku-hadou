@@ -844,8 +844,8 @@ body:not(.is-pc) #quantity-modal.multi-slider-mode .modal-content {
     border-radius: 0 !important; 
     border: none !important; 
     box-sizing: border-box !important;
-    padding-top: max(40px, env(safe-area-inset-top)) !important;
-    padding-bottom: max(40px, env(safe-area-inset-bottom)) !important;
+    padding-top: max(10px, env(safe-area-inset-top)) !important;
+    padding-bottom: max(10px, env(safe-area-inset-bottom)) !important;
     padding-left: 20px !important;
     padding-right: 20px !important;
 }
