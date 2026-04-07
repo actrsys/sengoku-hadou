@@ -344,10 +344,12 @@ body.hide-daimyo-labels .daimyo-name-label { display: none !important; }
 
 /* 入力・スライダー UI */
 .qty-row { margin-bottom: 15px; }
-.qty-control { display: flex; align-items: center; gap: 10px; width: 100%; }
+.qty-control { display: flex; align-items: center; gap: 5px; width: 100%; }
 .qty-control input[type="range"] { flex: 1; -webkit-appearance: none; height: 16px; background: #e0e0e0; border: 1px solid #aaa; border-radius: 0; outline: none; overflow: hidden; }
 .qty-control input[type="range"]::-webkit-slider-thumb { -webkit-appearance: none; width: 16px; height: 24px; border-radius: 2px; background: #f0f0f0; border: 1px solid #777; box-shadow: inset 0 1px 3px rgba(255,255,255,0.8), 0 1px 2px rgba(0,0,0,0.3), -10016px 0 0 10000px #81c784; cursor: pointer; }
-.qty-control input[type="number"] { width: 70px; padding: 5px; text-align: right; border: 1px solid #ccc; border-radius:4px; }
+.qty-control input[type="number"] { width: 50px; padding: 5px 2px; text-align: center; border: 1px solid #ccc; border-radius:4px; font-size: 0.95rem; -moz-appearance: textfield; }
+.qty-control input[type="number"]::-webkit-outer-spin-button,
+.qty-control input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
 .qty-control .qty-shortcut-btn { flex: none; padding: 4px 8px; font-size: 0.85rem; font-weight: bold; background: #f0f0f0; border: 1px solid #ccc; border-radius: 4px; cursor: pointer; color: #444; }
 .qty-control .qty-shortcut-btn:hover { background: #e0e0e0; }
 .qty-control .qty-shortcut-btn:active { background: #d0d0d0; transform: translateY(1px); }
@@ -967,11 +969,11 @@ body.is-pc {
     .faction-list-header, .faction-list-item { grid-template-columns: 140px 80px 100px 100px 1fr; font-size: 0.95rem; min-height: 36px; }
     .list-container, .daimyo-list-container, .result-body, .faction-list-container { scroll-padding-top: 38px; }
     
-    /* モーダル拡張（輸送・兵力分配）のタイル化 */
-    #quantity-modal .modal-content, #unit-divide-modal .modal-content { max-width: 900px !important; max-height: 90% !important; }
-    #quantity-container, #divide-list { display: grid !important; grid-auto-flow: column; grid-template-rows: repeat(3, min-content); grid-auto-columns: 1fr; gap: 15px; align-items: start; }
+    /* モーダル拡張（輸送・兵力分配）のタイル化を解除して縦並びに統一 */
+    #quantity-modal .modal-content, #unit-divide-modal .modal-content { max-width: 700px !important; max-height: 90% !important; }
+    #quantity-container, #divide-list { display: flex !important; flex-direction: column; gap: 10px; align-items: stretch; }
     .qty-row, #divide-list > div { margin-bottom: 0 !important; }
-    .qty-row { background: #f9f9f9; padding: 10px; border: 1px solid #ddd; border-radius: 6px; }
+    .qty-row { background: transparent; padding: 0; border: none; border-radius: 0; }
 
     /* ランク表記 */
     .grade-main { font-size: 1.1rem !important; }

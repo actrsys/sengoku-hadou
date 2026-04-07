@@ -2321,6 +2321,9 @@ class UIManager {
             const wrap = document.createElement('div');
             wrap.className = 'qty-row';
             
+            // 項目名のデザイン（固定幅、中央揃え、背景色付き）
+            const labelStyle = "width: 4em; min-width: 4em; text-align:center; font-weight:bold; background-color: #546e7a; color: #fff; border-radius: 3px; padding: 4px 0; margin-right: 5px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;";
+            
             // 輸送の時とそれ以外で見た目を変えます
             if (isTransport) {
                 // 総量（左の城＋右の城）
@@ -2331,13 +2334,13 @@ class UIManager {
                 
                 wrap.innerHTML = `
                     <div class="qty-control" style="display:flex; align-items:center; gap:5px;">
-                        <span style="width: 3em; text-align:right; font-weight:bold; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${label}</span>
-                        <input type="number" id="num-src-${id}" min="${max - actualMaxTransport}" max="${max}" value="${max}" style="width:60px;">
+                        <span style="${labelStyle}">${label}</span>
+                        <input type="number" id="num-src-${id}" min="${max - actualMaxTransport}" max="${max}" value="${max}">
                         <button class="qty-shortcut-btn" id="btn-min-${id}">最小</button>
                         <input type="range" id="range-${id}" min="0" max="${actualMaxTransport}" value="0" style="flex:1;">
                         <button class="qty-shortcut-btn" id="btn-half-${id}">半分</button>
                         <button class="qty-shortcut-btn" id="btn-max-${id}">最大</button>
-                        <input type="number" id="num-tgt-${id}" min="${targetCurrent}" max="${targetCurrent + actualMaxTransport}" value="${targetCurrent}" style="width:60px;">
+                        <input type="number" id="num-tgt-${id}" min="${targetCurrent}" max="${targetCurrent + actualMaxTransport}" value="${targetCurrent}">
                         <input type="hidden" id="num-${id}" value="0">
                     </div>
                 `;
@@ -2426,12 +2429,12 @@ class UIManager {
                 // いつも通りの画面
                 wrap.innerHTML = `
                     <div class="qty-control" style="display:flex; align-items:center; gap:5px;">
-                        <span style="width: 3em; text-align:right; font-weight:bold; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${label}</span>
+                        <span style="${labelStyle}">${label}</span>
                         <button class="qty-shortcut-btn" id="btn-min-${id}">最小</button>
                         <input type="range" id="range-${id}" min="${minVal}" max="${max}" value="${currentVal}" style="flex:1;">
                         <button class="qty-shortcut-btn" id="btn-half-${id}">半分</button>
                         <button class="qty-shortcut-btn" id="btn-max-${id}">最大</button>
-                        <input type="number" id="num-${id}" min="${minVal}" max="${max}" value="${currentVal}" style="width:70px;">
+                        <input type="number" id="num-${id}" min="${minVal}" max="${max}" value="${currentVal}">
                     </div>
                 `;
                 
@@ -2556,17 +2559,21 @@ class UIManager {
             document.getElementById('quantity-title').textContent = "輸送";
             
             const header = document.createElement('div');
-            header.style.display = 'flex';
-            header.style.alignItems = 'center';
-            header.style.gap = '5px';
+            header.className = 'qty-row'; // 行のスタイルを合わせます
             header.style.marginBottom = '5px';
-            header.style.fontSize = '0.8rem';
-            header.style.color = '#666';
+            header.style.fontSize = '0.85rem';
+            header.style.color = '#333';
+            // スライダー行と全く同じ要素構成にして、ボタンなどは透明化して配置します
             header.innerHTML = `
-                <div style="width: 3em;"></div>
-                <div style="width: 60px; text-align: center;">輸送元</div>
-                <div style="flex: 1;"></div>
-                <div style="width: 60px; text-align: center;">輸送先</div>
+                <div class="qty-control" style="display:flex; align-items:center; gap:5px;">
+                    <div style="width: 4em; min-width: 4em; margin-right: 5px;"></div>
+                    <div style="width: 50px; text-align: center; font-weight: bold;">輸送元</div>
+                    <button class="qty-shortcut-btn" style="visibility:hidden; pointer-events:none;">最小</button>
+                    <div style="flex:1;"></div>
+                    <button class="qty-shortcut-btn" style="visibility:hidden; pointer-events:none;">半分</button>
+                    <button class="qty-shortcut-btn" style="visibility:hidden; pointer-events:none;">最大</button>
+                    <div style="width: 50px; text-align: center; font-weight: bold;">輸送先</div>
+                </div>
             `;
             this.quantityContainer.appendChild(header);
 
