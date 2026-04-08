@@ -1274,11 +1274,11 @@ body.is-pc.daimyo-select-mode #pc-new-ui-container { display: none !important; }
 
 /* 状態タブ選択時のリストレイアウト（スマホ） */
 .list-header.status-mode, .select-item.status-mode {
-    grid-template-columns: 2.5fr 2.5fr 2.5fr 1fr 1fr 1fr 1fr; 
+    grid-template-columns: 2.5fr 2.5fr 2.5fr 1fr 1fr 1fr 1fr 0fr; 
 }
 /* 状態タブ選択時のリストレイアウト（PC版） */
 body.is-pc .list-header.status-mode, body.is-pc .select-item.status-mode {
-    grid-template-columns: 140px 140px 140px 60px 50px 60px 50px; 
+    grid-template-columns: 140px 140px 140px 60px 50px 50px 60px 1fr; 
 }
 
 /* ★一門の◯印のスタイル（黒・太字） */
