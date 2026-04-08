@@ -1856,7 +1856,7 @@ class UIManager {
                         if (salary === 0) salary = "-";
                     }
 
-                    div.innerHTML = `<span class="col-name">${b.name}</span><span class="col-faction">${forceName}</span><span class="col-castle">${bCastleName}</span><span class="col-rank">${b.getRankName()}</span><span class="col-age">${age}</span><span class="col-salary">${salary}</span><span class="col-family" style="font-weight:bold; color:#d32f2f;">${familyMark}</span>`;
+                    div.innerHTML = `<span class="col-name">${b.name}</span><span class="col-faction">${forceName}</span><span class="col-castle">${bCastleName}</span><span class="col-rank">${b.getRankName()}</span><span class="col-age">${age}</span><span class="col-salary">${salary}</span><span class="col-family">${familyMark}</span>`;
                 }
                 
                 if (actionType === 'view_only' || actionType === 'all_busho_list') {
