@@ -1804,17 +1804,24 @@ class UIManager {
 
             // ★追加：身分で並べ替えるための標準ルールをここで準備します
             const getSortRankAll = (b) => {
+                // 軍師かどうかをチェックします
+                const isGunshi = b.isGunshi || (b.clan > 0 && this.game.clans.find(c => c.id === b.clan)?.gunshiId === b.id);
+
                 if (b.clan === this.game.playerClanId) {
-                    return b.isDaimyo ? 100 : (b.isCastellan ? 200 : 300);
+                    return b.isDaimyo ? 100 : (b.isCastellan ? 200 : (isGunshi ? 250 : 300));
                 }
-                if (b.clan > 0) return 1000 + b.clan * 10 + (b.isDaimyo ? 1 : (b.isCastellan ? 2 : 3));
+                if (b.clan > 0) return 1000 + b.clan * 10 + (b.isDaimyo ? 1 : (b.isCastellan ? 2 : (isGunshi ? 2.5 : 3)));
                 if (b.belongKunishuId > 0) return 5000 + b.belongKunishuId * 10 + (b.id === (window.GameApp ? window.GameApp.kunishuSystem.getKunishu(b.belongKunishuId)?.leaderId : 0) ? 1 : 2);
                 if (b.status === 'ronin') return 9000;
                 return 10000;
             };
             const getSortRankClan = (b) => {
+                // 軍師かどうかをチェックします
+                const isGunshi = b.isGunshi || (b.clan > 0 && this.game.clans.find(c => c.id === b.clan)?.gunshiId === b.id);
+
                 if (b.isDaimyo) return 1;
                 if (b.isCastellan) return 2;
+                if (isGunshi) return 2.5; // ★城主(2)と一般武将(3)の間に入れます
                 if (b.status === 'ronin') return 6;
                 if (b.belongKunishuId > 0) {
                     const isLeader = b.id === (window.GameApp ? window.GameApp.kunishuSystem.getKunishu(b.belongKunishuId)?.leaderId : 0);
