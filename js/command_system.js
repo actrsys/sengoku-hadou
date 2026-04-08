@@ -420,12 +420,12 @@ class CommandSystem {
         }
         else if (actionType === 'view_only') { 
             bushos = this.game.getCastleBushos(targetId); 
-            infoHtml = "<div>武将一覧 (精度により情報は隠蔽されます)</div>"; 
+            infoHtml = "<div>武将一覧です</div>"; 
         }
         // 【差し替え後】（間の部分が消えます！）
         else if (actionType === 'all_busho_list') { 
             bushos = this.game.bushos.filter(b => b.clan === this.game.playerClanId && b.status === 'active');
-            infoHtml = "<div>我が軍の武将一覧です</div>"; 
+            infoHtml = "<div>武将一覧です</div>"; 
             isMulti = false;
         }
         else if (actionType === 'marriage_kinsman') {
