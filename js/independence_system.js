@@ -185,11 +185,15 @@ class IndependenceSystem {
             newClanId = Math.max(...this.game.clans.map(c => c.id)) + 1;
             const newColor = '#' + Math.floor(Math.random()*16777215).toString(16).padStart(6, '0');
             // ★新大名家の名前は神輿の人物ベース
-            const familyName = rebellionLeader.familyName || rebellionLeader.name; 
+            const familyName = rebellionLeader.familyName || rebellionLeader.name.split('|')[0] || rebellionLeader.name; 
             newClanName = `${familyName}家`;
+            
+            // ★新大名家の読み仮名も神輿の人物から取ります！
+            const familyYomi = rebellionLeader.familyYomi || rebellionLeader.yomi.split('|')[0] || rebellionLeader.yomi;
+            const newClanYomi = familyYomi ? `${familyYomi}け` : "";
 
             const newClan = new Clan({
-                id: newClanId, name: newClanName, color: newColor, leaderId: rebellionLeader.id
+                id: newClanId, name: newClanName, yomi: newClanYomi, color: newColor, leaderId: rebellionLeader.id
             });
 
             const oldClanForDip = this.game.clans.find(c => c.id === oldClanId);
@@ -759,6 +763,11 @@ class IndependenceSystem {
                 if (clan) {
                     const familyName = rebellionLeader.familyName || rebellionLeader.name.split('|')[0] || rebellionLeader.name;
                     clan.name = `${familyName}家`;
+                    
+                    // ★読み仮名も一緒に変更します！
+                    const familyYomi = rebellionLeader.familyYomi || rebellionLeader.yomi.split('|')[0] || rebellionLeader.yomi;
+                    clan.yomi = familyYomi ? `${familyYomi}け` : "";
+                    
                     clan.leaderId = rebellionLeader.id;
 
                     this.game.clans.forEach(otherClan => {
