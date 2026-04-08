@@ -1885,18 +1885,61 @@ class UIManager {
                         valA = a.clan > 0 && !a.isDaimyo && a.status !== 'ronin' ? a.getSalary(daimyoA) : 0;
                         valB = b.clan > 0 && !b.isDaimyo && b.status !== 'ronin' ? b.getSalary(daimyoB) : 0;
                     } else {
-                        // ★変更：統率や武勇などの能力値（見えている情報のみでソート）
-                        const statStrA = GameSystem.getDisplayStatHTML(a, currentSortKey, gunshi, acc, this.game.playerClanId, myDaimyo);
-                        const statStrB = GameSystem.getDisplayStatHTML(b, currentSortKey, gunshi, acc, this.game.playerClanId, myDaimyo);
-                        const isMaskedA = String(statStrA).includes('？');
-                        const isMaskedB = String(statStrB).includes('？');
+                        // ★書き換え：各武将が今いるお城の調査が済んでいるか、個別に調べます
+                        const getAccForSort = (busho) => {
+                            const c = this.game.getCastle(busho.castleId);
+                            if (c && c.investigatedUntil >= this.game.getCurrentTurnId()) {
+                                return c.investigatedAccuracy;
+                            }
+                            return acc;
+                        };
+
+                        let perceivedA = GameSystem.getPerceivedStatValue(a, currentSortKey, gunshi, getAccForSort(a), this.game.playerClanId, myDaimyo);
+                        let perceivedB = GameSystem.getPerceivedStatValue(b, currentSortKey, gunshi, getAccForSort(b), this.game.playerClanId, myDaimyo);
+
+                        // 自分の大名の場合は正確な能力がわかります
+                        if (a.clan === this.game.playerClanId && a.isDaimyo) perceivedA = a[currentSortKey];
+                        if (b.clan === this.game.playerClanId && b.isDaimyo) perceivedB = b[currentSortKey];
+
+                        const isMaskedA = perceivedA === null;
+                        const isMaskedB = perceivedB === null;
                         
                         // ★「？」になっている能力は、昇順降順に関係なく常に一番下へ回します
                         if (isMaskedA && !isMaskedB) return 1;  
                         if (!isMaskedA && isMaskedB) return -1; 
                         
-                        valA = a[currentSortKey] || 0;
-                        valB = b[currentSortKey] || 0;
+                        // ★ランク（S+, Aなど）を、比べやすいように数字に変換する魔法です
+                        const getGradeValue = (val) => {
+                            if (val >= 96) return 12; // S+
+                            if (val >= 91) return 11; // S
+                            if (val >= 81) return 10; // A+
+                            if (val >= 76) return 9;  // A
+                            if (val >= 66) return 8;  // B+
+                            if (val >= 61) return 7;  // B
+                            if (val >= 51) return 6;  // C+
+                            if (val >= 46) return 5;  // C
+                            if (val >= 36) return 4;  // D+
+                            if (val >= 31) return 3;  // D
+                            if (val >= 21) return 2;  // E+
+                            return 1;                 // E
+                        };
+
+                        if (isMaskedA && isMaskedB) {
+                            valA = 0;
+                            valB = 0;
+                        } else {
+                            const gradeA = getGradeValue(perceivedA);
+                            const gradeB = getGradeValue(perceivedB);
+
+                            if (gradeA === gradeB) {
+                                // 見た目のランク（Sなど）が同じなら、優しさで内部的な実際の能力値を使います！
+                                valA = a[currentSortKey] || 0;
+                                valB = b[currentSortKey] || 0;
+                            } else {
+                                valA = gradeA;
+                                valB = gradeB;
+                            }
+                        }
                     }
                     
                     if (valA === valB) return a.id - b.id; 
@@ -1984,8 +2027,15 @@ class UIManager {
                 if (['appoint','employ_target','appoint_gunshi','rumor_target_busho','headhunt_target','interview','interview_target','reward','view_only','war_general', 'kunishu_war_general', 'all_busho_list', 'marriage_princess', 'marriage_kinsman'].includes(actionType)) isSelectable = true;
                 if (actionType === 'def_intercept_deploy' || actionType === 'def_reinf_deploy' || actionType === 'atk_reinf_deploy') isSelectable = true;
                 
-                let acc = null; if (isEnemyTarget && targetCastle) acc = targetCastle.investigatedAccuracy;
-                const getStat = (stat) => GameSystem.getDisplayStatHTML(b, stat, gunshi, acc, this.game.playerClanId, myDaimyo);
+                // ★書き換え：表示する時も、対象の武将がいるお城の調査状況を個別に確認するようにします
+                let currentAcc = null;
+                const bCastle = this.game.getCastle(b.castleId);
+                if (bCastle && bCastle.investigatedUntil >= this.game.getCurrentTurnId()) {
+                    currentAcc = bCastle.investigatedAccuracy;
+                } else if (isEnemyTarget && targetCastle) {
+                    currentAcc = targetCastle.investigatedAccuracy;
+                }
+                const getStat = (stat) => GameSystem.getDisplayStatHTML(b, stat, gunshi, currentAcc, this.game.playerClanId, myDaimyo);
 
                 const div = document.createElement('div'); 
                 div.className = `select-item ${!isSelectable ? 'disabled' : ''}`;
