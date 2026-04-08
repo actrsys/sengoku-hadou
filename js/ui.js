@@ -1942,6 +1942,12 @@ class UIManager {
                         }
                     }
                     
+                    // ★書き足し：一門の「◯」や「はい・いいえ」を、計算しやすい数字の 1 と 0 に変身させます！
+                    if (valA === true || valA === '◯') valA = 1;
+                    if (valA === false || valA === '-' || valA === '') valA = 0;
+                    if (valB === true || valB === '◯') valB = 1;
+                    if (valB === false || valB === '-' || valB === '') valB = 0;
+                    
                     if (valA === valB) return a.id - b.id; 
                     return isSortAsc ? (valA - valB) : (valB - valA);
                 });
