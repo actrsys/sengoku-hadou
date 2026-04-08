@@ -1447,4 +1447,572 @@ class UIInfoManager {
             }
         }
     }
+    
+    // ==========================================
+    // ★ここから追加：数量選択（スライダー）の魔法です！
+    // ==========================================
+    openQuantitySelector(type, data, targetId, extraData = null) {
+        if (!this.ui.quantityModal) return;
+        this.ui.hideAIGuardTemporarily(); // ★これを追加します！
+        
+        // ★追加：複数スライダーの時だけ全画面にするための目印をつけます
+        const isMultiMode = ['war_supplies', 'def_intercept', 'def_reinf_supplies', 'atk_reinf_supplies', 'def_self_reinf_supplies', 'atk_self_reinf_supplies', 'transport'].includes(type);
+        if (isMultiMode) {
+            this.ui.quantityModal.classList.add('multi-slider-mode');
+        } else {
+            this.ui.quantityModal.classList.remove('multi-slider-mode');
+        }
+
+        this.ui.quantityModal.classList.remove('hidden'); 
+        if (this.ui.quantityContainer) this.ui.quantityContainer.innerHTML = '';
+        if (this.ui.charityTypeSelector) this.ui.charityTypeSelector.classList.add('hidden'); 
+        if (this.ui.tradeTypeInfo) this.ui.tradeTypeInfo.classList.add('hidden'); 
+        const c = this.ui.currentCastle;
+
+        const checkValidQuantity = () => {
+            if (!this.ui.quantityConfirmBtn) return;
+            let isValid = true;
+
+            if (type === 'transport') {
+                const g = parseInt(document.getElementById('num-gold')?.value) || 0;
+                const r = parseInt(document.getElementById('num-rice')?.value) || 0;
+                const s = parseInt(document.getElementById('num-soldiers')?.value) || 0;
+                const h = parseInt(document.getElementById('num-horses')?.value) || 0;
+                const gun = parseInt(document.getElementById('num-guns')?.value) || 0;
+                if (g === 0 && r === 0 && s === 0 && h === 0 && gun === 0) isValid = false;
+            } else if (type === 'headhunt_gold' || type === 'charity') {
+                isValid = true; 
+            } else if (type === 'war_supplies' || type === 'def_intercept' || type === 'def_reinf_supplies' || type === 'atk_reinf_supplies') {
+                const s = parseInt(document.getElementById('num-soldiers')?.value) || 0;
+                if (s <= 0) isValid = false; 
+            } else {
+                const inputsEl = document.querySelectorAll('.qty-control input[type="number"]');
+                if (inputsEl.length > 0) {
+                    const val = parseInt(inputsEl[0].value) || 0;
+                    if (val <= 0) isValid = false;
+                }
+            }
+
+            if (isValid) {
+                this.ui.quantityConfirmBtn.disabled = false;
+                this.ui.quantityConfirmBtn.style.opacity = 1.0;
+            } else {
+                this.ui.quantityConfirmBtn.disabled = true;
+                this.ui.quantityConfirmBtn.style.opacity = 0.5;
+            }
+
+            // ★追加：複数スライダーの時の、上部の「残数」表示をパタパタ更新します！
+            if (['war_supplies', 'def_intercept', 'def_reinf_supplies', 'atk_reinf_supplies', 'def_self_reinf_supplies', 'atk_self_reinf_supplies', 'transport'].includes(type)) {
+                let sCastle = c;
+                if (type === 'def_intercept') sCastle = (data && data.length > 0) ? data[0] : c;
+                if (type === 'def_reinf_supplies' || type === 'atk_reinf_supplies' || type === 'def_self_reinf_supplies' || type === 'atk_self_reinf_supplies') sCastle = (data && data.length > 0) ? data[0] : c;
+                
+                const updateStock = (id, baseVal) => {
+                    const el = document.getElementById(`multi-stock-${id}`);
+                    if (el) {
+                        const v = parseInt(document.getElementById(`num-${id}`)?.value) || 0;
+                        el.textContent = baseVal - v;
+                    }
+                };
+                updateStock('gold', sCastle.gold);
+                updateStock('rice', sCastle.rice);
+                updateStock('soldiers', sCastle.soldiers);
+                updateStock('horses', sCastle.horses || 0);
+                updateStock('guns', sCastle.guns || 0);
+            }
+
+            // ★追加：スライダーを動かすたびに呼ばれるこの場所で、必要資金を計算してパタパタ表示します！
+            const displayEl = document.getElementById('dynamic-cost-display');
+            if (displayEl) {
+                // 計算に使うために、大名と城主をここでも探しておきます
+                const daimyo = this.game.bushos.find(b => b.clan === c.ownerClan && b.isDaimyo);
+                const castellan = this.game.getBusho(c.castellanId);
+                
+                // ★修正：「金」が上、「アイテム」が下になるように２行の順番を入れ替えました！
+                const makeGrid = (itemName, afterItem, afterGold) => {
+                    return `
+                        <div style="display: inline-grid; grid-template-columns: max-content max-content minmax(3em, auto); column-gap: 1em; text-align: left;">
+                            <div>　金</div>
+                            <div>▶</div>
+                            <div style="text-align: right;">${Math.floor(afterGold)}</div>
+                            <div>${itemName}</div>
+                            <div>▶</div>
+                            <div style="text-align: right;">${Math.floor(afterItem)}</div>
+                        </div>
+                    `;
+                };
+                
+                if (type === 'draft') {
+                    const amount = parseInt(document.getElementById('num-soldiers')?.value) || 0;
+                    const busho = this.game.getBusho(data[0]);
+                    const cost = GameSystem.calcDraftCost(amount, busho, c.peoplesLoyalty);
+                    displayEl.innerHTML = makeGrid("兵士", c.soldiers + amount, c.gold - cost);
+                } else if (type === 'buy_rice') {
+                    const amount = parseInt(document.getElementById('num-amount')?.value) || 0;
+                    let rate = 1.0;
+                    if (c && this.game.provinces) {
+                        const province = this.game.provinces.find(p => p.id === c.provinceId);
+                        if (province && province.marketRate !== undefined) rate = province.marketRate;
+                    }
+                    const cost = Math.ceil(amount * rate);
+                    displayEl.innerHTML = makeGrid("兵糧", c.rice + amount, c.gold - cost);
+                } else if (type === 'sell_rice') {
+                    const amount = parseInt(document.getElementById('num-amount')?.value) || 0;
+                    let rate = 1.0;
+                    if (c && this.game.provinces) {
+                        const province = this.game.provinces.find(p => p.id === c.provinceId);
+                        if (province && province.marketRate !== undefined) rate = province.marketRate;
+                    }
+                    const profit = Math.floor(amount * rate);
+                    displayEl.innerHTML = makeGrid("兵糧", c.rice - amount, c.gold + profit);
+                } else if (type === 'buy_horses') {
+                    const amount = parseInt(document.getElementById('num-amount')?.value) || 0;
+                    const cost = GameSystem.calcBuyHorseCost(amount, daimyo, castellan);
+                    displayEl.innerHTML = makeGrid("騎馬", (c.horses || 0) + amount, c.gold - cost);
+                } else if (type === 'buy_guns') {
+                    const amount = parseInt(document.getElementById('num-amount')?.value) || 0;
+                    const cost = GameSystem.calcBuyGunCost(amount, daimyo, castellan);
+                    displayEl.innerHTML = makeGrid("鉄砲", (c.guns || 0) + amount, c.gold - cost);
+                }
+            }
+        };
+
+        const createSlider = (label, id, max, currentVal, minVal = 0, isTransport = false, targetCurrent = 0, targetMaxLimit = 99999) => {
+            const wrap = document.createElement('div');
+            wrap.className = 'qty-row';
+            
+            const labelStyle = "width: 4em; min-width: 4em; text-align:center; font-weight:bold; background-color: #546e7a; color: #fff; border-radius: 3px; padding: 4px 0; margin-right: 5px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;";
+            const isSingle = !(['war_supplies', 'def_intercept', 'def_reinf_supplies', 'atk_reinf_supplies', 'def_self_reinf_supplies', 'atk_self_reinf_supplies', 'transport'].includes(type));
+            
+            // ボタンの位置と表示を自動で切り替える仕組み
+            const updateButtons = (v) => {
+                const bMin = wrap.querySelector(`#btn-min-${id}`);
+                const bHalf = wrap.querySelector(`#btn-half-${id}`);
+                const bMax = wrap.querySelector(`#btn-max-${id}`);
+                const currentMax = isTransport ? Math.min(max, targetMaxLimit - targetCurrent) : max;
+                const currentMin = isTransport ? 0 : minVal;
+
+                // 変更できない状態（0の時など）
+                if (currentMax <= currentMin) {
+                    if (bMin) { bMin.style.display = 'block'; bMin.disabled = true; bMin.style.order = 1; }
+                    if (bHalf) { bHalf.style.display = 'block'; bHalf.disabled = true; bHalf.style.order = 3; }
+                    if (bMax) { bMax.style.display = 'none'; }
+                    return;
+                }
+
+                if (v <= currentMin) {
+                    // 最小の時：「最小(無効)」ゲージ「半分(有効)」を表示
+                    if (bMin) { bMin.style.display = 'block'; bMin.disabled = true; bMin.style.order = 1; }
+                    if (bHalf) { bHalf.style.display = 'block'; bHalf.disabled = false; bHalf.style.order = 3; }
+                    if (bMax) { bMax.style.display = 'none'; }
+                } else if (v >= currentMax) {
+                    // 最大の時：「半分(有効)」ゲージ「最大(無効)」を表示
+                    if (bMin) { bMin.style.display = 'none'; }
+                    if (bHalf) { bHalf.style.display = 'block'; bHalf.disabled = false; bHalf.style.order = 1; }
+                    if (bMax) { bMax.style.display = 'block'; bMax.disabled = true; bMax.style.order = 3; }
+                } else {
+                    // 中間の時：「最小(有効)」ゲージ「最大(有効)」を表示
+                    if (bMin) { bMin.style.display = 'block'; bMin.disabled = false; bMin.style.order = 1; }
+                    if (bHalf) { bHalf.style.display = 'none'; }
+                    if (bMax) { bMax.style.display = 'block'; bMax.disabled = false; bMax.style.order = 3; }
+                }
+            };
+
+            if (isTransport) {
+                const actualMaxTransport = Math.min(max, targetMaxLimit - targetCurrent);
+                wrap.innerHTML = `
+                    <div class="qty-control" style="display:flex; align-items:center; gap:5px;">
+                        <span style="${labelStyle} order:0;">${label}</span>
+                        <button class="qty-shortcut-btn" id="btn-min-${id}" style="order:1;">最小</button>
+                        <button class="qty-shortcut-btn" id="btn-half-${id}" style="order:3;">半分</button>
+                        <input type="range" id="range-${id}" min="0" max="${actualMaxTransport}" value="0" style="flex:1; order:2;">
+                        <button class="qty-shortcut-btn" id="btn-max-${id}" style="order:3;">最大</button>
+                        <input type="number" id="num-tgt-${id}" min="${targetCurrent}" max="${targetCurrent + actualMaxTransport}" value="${targetCurrent}" style="order:4;">
+                        <input type="hidden" id="num-${id}" value="0">
+                    </div>
+                `;
+                
+                const range = wrap.querySelector(`#range-${id}`);
+                const numTgt = wrap.querySelector(`#num-tgt-${id}`);
+                const numHidden = wrap.querySelector(`#num-${id}`);
+                
+                const setVal = (v) => {
+                    if (v < 0) v = 0;
+                    if (v > actualMaxTransport) v = actualMaxTransport;
+                    range.value = v;
+                    numHidden.value = v;
+                    numTgt.value = targetCurrent + v;
+                    updateButtons(v);
+                    checkValidQuantity();
+                };
+
+                wrap.querySelector(`#btn-min-${id}`).onclick = () => setVal(0);
+                wrap.querySelector(`#btn-half-${id}`).onclick = () => setVal(Math.floor(actualMaxTransport / 2));
+                wrap.querySelector(`#btn-max-${id}`).onclick = () => setVal(actualMaxTransport);
+
+                const rangeHandler = () => { 
+                    let v = parseInt(range.value);
+                    if (v > 0 && v < actualMaxTransport) { 
+                        if (actualMaxTransport <= 999) {
+                            v = Math.round(v / 10) * 10; 
+                        } else {
+                            v = Math.round(v / 100) * 100; 
+                        }
+                    }
+                    
+                    // 【追加】ここで上限・下限を超えないようにブロックします
+                    if (v > actualMaxTransport) v = actualMaxTransport;
+                    if (v < 0) v = 0;
+                    
+                    range.value = v;
+                    numHidden.value = v;
+                    numTgt.value = targetCurrent + v;
+                    updateButtons(v);
+                    checkValidQuantity(); 
+                };
+                range.oninput = rangeHandler;
+                range.onchange = rangeHandler; // ★スマホで指を離した時の最終確認
+
+                const numTgtHandler = () => {
+                    let v = parseInt(numTgt.value);
+                    if (isNaN(v)) return;
+                    if (v < targetCurrent) v = targetCurrent;
+                    if (v > targetCurrent + actualMaxTransport) v = targetCurrent + actualMaxTransport;
+                    const transAmount = v - targetCurrent;
+                    range.value = transAmount;
+                    numHidden.value = transAmount;
+                    updateButtons(transAmount);
+                    checkValidQuantity();
+                };
+                numTgt.oninput = numTgtHandler;
+                numTgt.onchange = numTgtHandler; // ★スマホで指を離した時の最終確認
+                
+                updateButtons(0);
+                this.ui.quantityContainer.appendChild(wrap);
+                return { range, num: numHidden };
+                
+            } else {
+                if (isSingle) {
+                    wrap.innerHTML = `
+                        <div style="font-weight:bold; margin-bottom:8px; text-align:left; color:#333; font-size:1.05rem;">${label}</div>
+                        <div class="qty-control" style="display:flex; align-items:center; gap:5px;">
+                            <button class="qty-shortcut-btn" id="btn-min-${id}" style="order:1;">最小</button>
+                            <button class="qty-shortcut-btn" id="btn-half-${id}" style="order:3;">半分</button>
+                            <input type="range" id="range-${id}" min="${minVal}" max="${max}" value="${currentVal}" style="flex:1; order:2;">
+                            <button class="qty-shortcut-btn" id="btn-max-${id}" style="order:3;">最大</button>
+                            <input type="number" id="num-${id}" min="${minVal}" max="${max}" value="${currentVal}" style="order:4;">
+                        </div>
+                    `;
+                } else {
+                    wrap.innerHTML = `
+                        <div class="qty-control" style="display:flex; align-items:center; gap:5px;">
+                            <span style="${labelStyle} order:0;">${label}</span>
+                            <button class="qty-shortcut-btn" id="btn-min-${id}" style="order:1;">最小</button>
+                            <button class="qty-shortcut-btn" id="btn-half-${id}" style="order:3;">半分</button>
+                            <input type="range" id="range-${id}" min="${minVal}" max="${max}" value="${currentVal}" style="flex:1; order:2;">
+                            <button class="qty-shortcut-btn" id="btn-max-${id}" style="order:3;">最大</button>
+                            <input type="number" id="num-${id}" min="${minVal}" max="${max}" value="${currentVal}" style="order:4;">
+                        </div>
+                    `;
+                }
+                
+                const range = wrap.querySelector(`#range-${id}`);
+                const num = wrap.querySelector(`#num-${id}`);
+                
+                const setVal = (v) => {
+                    let actualMax = parseInt(range.max);
+                    if (v < minVal) v = minVal;
+                    if (v > actualMax) v = actualMax;
+                    range.value = v;
+                    num.value = v;
+                    updateButtons(v);
+                    checkValidQuantity();
+                };
+
+                wrap.querySelector(`#btn-min-${id}`).onclick = () => setVal(minVal);
+                wrap.querySelector(`#btn-half-${id}`).onclick = () => setVal(Math.floor((minVal + max) / 2));
+                wrap.querySelector(`#btn-max-${id}`).onclick = () => setVal(max);
+
+                const rangeHandler = () => { 
+                    let v = parseInt(range.value);
+                    if (v > minVal && v < max) { 
+                        if (max <= 999) {
+                            v = Math.round(v / 10) * 10; 
+                        } else {
+                            v = Math.round(v / 100) * 100; 
+                        }
+                    }
+                    
+                    // 【追加】ここで上限・下限を超えないようにブロックします
+                    if (v > max) v = max;
+                    if (v < minVal) v = minVal;
+                    
+                    range.value = v;
+                    num.value = v;
+                    updateButtons(v);
+                    checkValidQuantity(); 
+                };
+                range.oninput = rangeHandler;
+                range.onchange = rangeHandler; // ★スマホで指を離した時の最終確認
+
+                const numHandler = () => { 
+                    let v = parseInt(num.value);
+                    if (isNaN(v)) return;
+                    if (v < minVal) v = minVal;
+                    if (v > max) v = max;
+                    range.value = v;
+                    updateButtons(v);
+                    checkValidQuantity();
+                };
+                num.oninput = numHandler;
+                num.onchange = numHandler; // ★スマホで指を離した時の最終確認
+
+                updateButtons(currentVal);
+                this.ui.quantityContainer.appendChild(wrap);
+                return { range, num };
+            }
+        };
+
+        let inputs = {};
+        
+        // ★追加：計算のために大名と城主をあらかじめ探しておきます
+        const daimyo = this.game.bushos.find(b => b.clan === c.ownerClan && b.isDaimyo);
+        const castellan = this.game.getBusho(c.castellanId);
+
+        // ★今回追加：複数スライダー画面のための「上部の物資・残数表示」
+        const isMultiSliderMode = ['war_supplies', 'def_intercept', 'def_reinf_supplies', 'atk_reinf_supplies', 'def_self_reinf_supplies', 'atk_self_reinf_supplies', 'transport'].includes(type);
+        let sourceCastleForMulti = c;
+        if (type === 'def_intercept') sourceCastleForMulti = (data && data.length > 0) ? data[0] : c;
+        if (type === 'def_reinf_supplies' || type === 'atk_reinf_supplies' || type === 'def_self_reinf_supplies' || type === 'atk_self_reinf_supplies') sourceCastleForMulti = (data && data.length > 0) ? data[0] : c;
+
+        if (isMultiSliderMode) {
+            const stockDiv = document.createElement('div');
+            stockDiv.style.cssText = "background: #f0f4f8; padding: 10px; border-radius: 6px; border: 1px solid #ccc; margin-bottom: 15px; font-size: 0.95rem; font-weight: bold;";
+            stockDiv.innerHTML = `
+                <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px;">
+                    <div style="background: #ffffff; padding: 6px 8px; border-radius: 4px; border: 1px solid #ddd; display: flex; justify-content: space-between; align-items: center;">
+                        <span style="color:#555;">金</span><span id="multi-stock-gold">${sourceCastleForMulti.gold}</span>
+                    </div>
+                    <div style="background: #ffffff; padding: 6px 8px; border-radius: 4px; border: 1px solid #ddd; display: flex; justify-content: space-between; align-items: center;">
+                        <span style="color:#555;">兵糧</span><span id="multi-stock-rice">${sourceCastleForMulti.rice}</span>
+                    </div>
+                    <div style="background: #ffffff; padding: 6px 8px; border-radius: 4px; border: 1px solid #ddd; display: flex; justify-content: space-between; align-items: center;">
+                        <span style="color:#555;">兵士</span><span id="multi-stock-soldiers">${sourceCastleForMulti.soldiers}</span>
+                    </div>
+                    <div style="background: #ffffff; padding: 6px 8px; border-radius: 4px; border: 1px solid #ddd; display: flex; justify-content: space-between; align-items: center;">
+                        <span style="color:#555;">騎馬</span><span id="multi-stock-horses">${sourceCastleForMulti.horses || 0}</span>
+                    </div>
+                    <div style="background: #ffffff; padding: 6px 8px; border-radius: 4px; border: 1px solid #ddd; display: flex; justify-content: space-between; align-items: center;">
+                        <span style="color:#555;">鉄砲</span><span id="multi-stock-guns">${sourceCastleForMulti.guns || 0}</span>
+                    </div>
+                </div>
+            `;
+            this.ui.quantityContainer.appendChild(stockDiv);
+        }
+        
+        if (type === 'draft') {
+            document.getElementById('quantity-title').textContent = "徴兵"; 
+            
+            const busho = this.game.getBusho(data[0]);
+            const maxAffordable = GameSystem.calcDraftFromGold(c.gold, busho, c.peoplesLoyalty);
+            const maxSoldiers = Math.min(c.population, 99999 - c.soldiers, maxAffordable);
+            
+            // ★変更：相場の金額を小数点以下1桁で表示します！
+            const efficiency = ((busho.leadership * 1.5) + (busho.charm * 1.5) + (Math.sqrt(busho.loyalty) * 2) + (Math.sqrt(c.peoplesLoyalty) * 2)) / 500;
+            const singleCost = 1 / efficiency;
+            
+            this.ui.tradeTypeInfo.classList.remove('hidden'); 
+            this.ui.tradeTypeInfo.textContent = `兵士 1人 ＝ 金 ${singleCost.toFixed(1)}`;
+
+            // ★変更：スライダーより前に数字の箱を作って、スライダーの上に表示させます！
+            const costDiv = document.createElement('div');
+            costDiv.id = 'dynamic-cost-display';
+            costDiv.style.cssText = "display: flex; justify-content: center; font-weight:bold; color:#1976d2; margin-bottom:15px; font-size:1.1rem;";
+            this.ui.quantityContainer.appendChild(costDiv);
+
+            inputs.soldiers = createSlider("兵士数", "soldiers", maxSoldiers, 0);
+            
+        } else if (type === 'charity') {
+            document.getElementById('quantity-title').textContent = "施し"; this.ui.charityTypeSelector.classList.remove('hidden'); const count = data.length; this.ui.quantityContainer.innerHTML = `<p>選択武将数: ${count}名</p>`;
+        } else if (type === 'goodwill') {
+            document.getElementById('quantity-title').textContent = "贈与金指定"; inputs.gold = createSlider("金", "gold", c.gold, 100);
+        } else if (type === 'headhunt_gold') {
+            document.getElementById('quantity-title').textContent = "持参金 (任意)"; inputs.gold = createSlider("金", "gold", c.gold, 0);
+        } else if (type === 'tribute_gold') {
+            document.getElementById('quantity-title').textContent = "献上金 (最大1500)"; 
+            const maxTributeGold = Math.min(1500, c.gold);
+            inputs.gold = createSlider("金", "gold", maxTributeGold, 0);
+        } else if (type === 'war_supplies') {
+            document.getElementById('quantity-title').textContent = "出陣用意"; 
+            inputs.soldiers = createSlider("兵士", "soldiers", c.soldiers, c.soldiers);
+            inputs.rice = createSlider("兵糧", "rice", c.rice, c.rice);
+            inputs.horses = createSlider("騎馬", "horses", c.horses, 0);
+            inputs.guns = createSlider("鉄砲", "guns", c.guns, 0);
+        } else if (type === 'def_intercept') { 
+            const interceptCastle = (data && data.length > 0) ? data[0] : c;
+            document.getElementById('quantity-title').textContent = "迎撃部隊編成"; 
+            inputs.soldiers = createSlider("出陣兵士数", "soldiers", interceptCastle.soldiers, interceptCastle.soldiers);
+            inputs.rice = createSlider("兵糧", "rice", interceptCastle.rice, interceptCastle.rice);
+            inputs.horses = createSlider("騎馬", "horses", interceptCastle.horses || 0, 0);
+            inputs.guns = createSlider("鉄砲", "guns", interceptCastle.guns || 0, 0);
+        } else if (type === 'def_reinf_supplies' || type === 'atk_reinf_supplies' || type === 'def_self_reinf_supplies' || type === 'atk_self_reinf_supplies') { 
+            const helperCastle = (data && data.length > 0) ? data[0] : c;
+            let titleText = "";
+            if (type === 'def_reinf_supplies') titleText = "守備援軍の部隊編成";
+            else if (type === 'atk_reinf_supplies') titleText = "攻撃援軍の部隊編成";
+            else if (type === 'def_self_reinf_supplies') titleText = "守備自軍援軍の部隊編成";
+            else if (type === 'atk_self_reinf_supplies') titleText = "攻撃自軍援軍の部隊編成";
+            document.getElementById('quantity-title').textContent = titleText;
+            inputs.soldiers = createSlider("兵士", "soldiers", helperCastle.soldiers, helperCastle.soldiers, 500);
+            inputs.rice = createSlider("兵糧", "rice", helperCastle.rice, helperCastle.rice, 500);
+            inputs.horses = createSlider("騎馬", "horses", helperCastle.horses || 0, 0, 0);
+            inputs.guns = createSlider("鉄砲", "guns", helperCastle.guns || 0, 0, 0);
+        } else if (type === 'transport') {
+            document.getElementById('quantity-title').textContent = "輸送";
+            
+            const header = document.createElement('div');
+            header.className = 'qty-row'; // 行のスタイルを合わせます
+            header.style.marginBottom = '5px';
+            header.style.fontSize = '0.85rem';
+            header.style.color = '#333';
+            // スライダー行と全く同じ要素構成にして、ボタンなどは透明化して配置します
+            header.innerHTML = `
+                <div class="qty-control" style="display:flex; align-items:center; gap:5px;">
+                    <div style="width: 4em; min-width: 4em; margin-right: 5px; order:0;"></div>
+                    <button class="qty-shortcut-btn" style="visibility:hidden; pointer-events:none; order:1;">空</button>
+                    <div style="flex:1; order:2;"></div>
+                    <button class="qty-shortcut-btn" style="visibility:hidden; pointer-events:none; order:3;">空</button>
+                    <div style="width: 50px; text-align: center; font-weight: bold; order:4;">輸送先</div>
+                </div>
+            `;
+            this.ui.quantityContainer.appendChild(header);
+
+            const tCastle = this.game.getCastle(targetId); // 輸送先の城のデータを取得します
+            
+            // 引数は (ラベル, ID, 自分の城の数, 最初は0, 最低は0, 輸送モードフラグ, 相手の城の数, 相手の城の上限) です
+            inputs.gold = createSlider("金", "gold", c.gold, 0, 0, true, tCastle.gold, 99999);
+            inputs.rice = createSlider("兵糧", "rice", c.rice, 0, 0, true, tCastle.rice, 99999);
+            inputs.soldiers = createSlider("兵士", "soldiers", c.soldiers, 0, 0, true, tCastle.soldiers, 99999);
+            inputs.horses = createSlider("騎馬", "horses", c.horses || 0, 0, 0, true, tCastle.horses || 0, 99999);
+            inputs.guns = createSlider("鉄砲", "guns", c.guns || 0, 0, 0, true, tCastle.guns || 0, 99999);
+        } else if (type === 'buy_rice') {
+            document.getElementById('quantity-title').textContent = "兵糧購入"; 
+            let rate = 1.0;
+            if (c && this.game.provinces) {
+                const province = this.game.provinces.find(p => p.id === c.provinceId);
+                if (province && province.marketRate !== undefined) rate = province.marketRate;
+            }
+            const maxBuy = Math.floor(c.gold / rate);
+            this.ui.tradeTypeInfo.classList.remove('hidden'); 
+            // ★変更：相場の金額を小数点以下1桁で表示します！
+            this.ui.tradeTypeInfo.textContent = `兵糧 10 ＝ 金 ${(10 * rate).toFixed(1)}`;
+
+            // ★変更：スライダーより前に数字の箱を作って、スライダーの上に表示させます！
+            const costDiv = document.createElement('div');
+            costDiv.id = 'dynamic-cost-display';
+            costDiv.style.cssText = "display: flex; justify-content: center; font-weight:bold; color:#1976d2; margin-bottom:15px; font-size:1.1rem;";
+            this.ui.quantityContainer.appendChild(costDiv);
+
+            inputs.amount = createSlider("購入量", "amount", maxBuy, 0);
+            
+        } else if (type === 'sell_rice') {
+            document.getElementById('quantity-title').textContent = "兵糧売却"; 
+            let rate = 1.0;
+            if (c && this.game.provinces) {
+                const province = this.game.provinces.find(p => p.id === c.provinceId);
+                if (province && province.marketRate !== undefined) rate = province.marketRate;
+            }
+            this.ui.tradeTypeInfo.classList.remove('hidden'); 
+            // ★変更：相場の金額を小数点以下1桁で表示します！
+            this.ui.tradeTypeInfo.textContent = `兵糧 10 ＝ 金 ${(10 * rate).toFixed(1)}`;
+
+            // ★変更：スライダーより前に数字の箱を作って、スライダーの上に表示させます！
+            const costDiv = document.createElement('div');
+            costDiv.id = 'dynamic-cost-display';
+            costDiv.style.cssText = "display: flex; justify-content: center; font-weight:bold; color:#1976d2; margin-bottom:15px; font-size:1.1rem;";
+            this.ui.quantityContainer.appendChild(costDiv);
+
+            inputs.amount = createSlider("売却量", "amount", c.rice, 0);
+
+        } else if (type === 'buy_ammo') {
+            document.getElementById('quantity-title').textContent = "矢弾購入"; 
+            const price = parseInt(window.MainParams.Economy.PriceAmmo, 10) || 1;
+            const maxBuy = price > 0 ? Math.floor(c.gold / price) : 0;
+            this.ui.tradeTypeInfo.classList.remove('hidden'); 
+            this.ui.tradeTypeInfo.textContent = `固定価格: 金${price.toFixed(1)} / 1個`; // 念のためこちらも揃えます
+            inputs.amount = createSlider("購入量", "amount", maxBuy, 0);
+        } else if (type === 'buy_horses') {
+            document.getElementById('quantity-title').textContent = "騎馬購入"; 
+            const maxBuy = GameSystem.calcBuyHorseAmount(c.gold, daimyo, castellan);
+            const realMaxBuy = Math.min(maxBuy, 99999 - (c.horses || 0));
+
+            // ★変更：さっき作った「正確な単価の魔法」を使って表示します
+            const unitPrice = GameSystem.calcBuyHorseUnitPrice(daimyo, castellan);
+            this.ui.tradeTypeInfo.classList.remove('hidden'); 
+            this.ui.tradeTypeInfo.textContent = `騎馬 1頭 ＝ 金 ${unitPrice.toFixed(1)}`;
+
+            // ★変更：スライダーより前に数字の箱を作って、スライダーの上に表示させます！
+            const costDiv = document.createElement('div');
+            costDiv.id = 'dynamic-cost-display';
+            costDiv.style.cssText = "display: flex; justify-content: center; font-weight:bold; color:#1976d2; margin-bottom:15px; font-size:1.1rem;";
+            this.ui.quantityContainer.appendChild(costDiv);
+
+            inputs.amount = createSlider("購入量", "amount", realMaxBuy, 0);
+
+        } else if (type === 'buy_guns') {
+            document.getElementById('quantity-title').textContent = "鉄砲購入"; 
+            const maxBuy = GameSystem.calcBuyGunAmount(c.gold, daimyo, castellan);
+            const realMaxBuy = Math.min(maxBuy, 99999 - (c.guns || 0));
+
+            // ★変更：さっき作った「正確な単価の魔法」を使って表示します
+            const unitPrice = GameSystem.calcBuyGunUnitPrice(daimyo, castellan);
+            this.ui.tradeTypeInfo.classList.remove('hidden'); 
+            this.ui.tradeTypeInfo.textContent = `鉄砲 1挺 ＝ 金 ${unitPrice.toFixed(1)}`;
+
+            // ★変更：スライダーより前に数字の箱を作って、スライダーの上に表示させます！
+            const costDiv = document.createElement('div');
+            costDiv.id = 'dynamic-cost-display';
+            costDiv.style.cssText = "display: flex; justify-content: center; font-weight:bold; color:#1976d2; margin-bottom:15px; font-size:1.1rem;";
+            this.ui.quantityContainer.appendChild(costDiv);
+
+            inputs.amount = createSlider("購入量", "amount", realMaxBuy, 0);
+
+        } else if (type === 'war_repair') {
+            const s = this.game.warManager.state;
+            const defender = s.defender;
+            const maxSoldiers = Math.min(window.WarParams.War.RepairMaxSoldiers, defender.soldiers);
+            document.getElementById('quantity-title').textContent = "補修 (兵士選択)";
+            inputs.soldiers = createSlider("使用兵士数", "soldiers", maxSoldiers, Math.min(50, maxSoldiers));
+        }
+        
+        checkValidQuantity(); 
+
+        const closeQuantityModal = () => {
+            this.ui.quantityModal.classList.add('hidden');
+            this.ui.restoreAIGuard(); // ★これを追加します！
+            if (this.ui.quantityConfirmBtn) {
+                this.ui.quantityConfirmBtn.disabled = false;
+                this.ui.quantityConfirmBtn.style.opacity = 1.0;
+            }
+        };
+
+        this.ui.quantityConfirmBtn.onclick = () => {
+            closeQuantityModal(); 
+            if (extraData && extraData.onConfirm) {
+                extraData.onConfirm(inputs);
+            } else {
+                this.game.commandSystem.handleQuantitySelection(type, inputs, targetId, data, extraData);
+            }
+        };
+
+        const cancelBtn = this.ui.quantityModal.querySelector('.btn-secondary');
+        if (cancelBtn) {
+            cancelBtn.onclick = () => {
+                closeQuantityModal(); 
+                if (extraData && extraData.onCancel) {
+                    extraData.onCancel(); 
+                }
+            };
+        }
+    }    
 }
