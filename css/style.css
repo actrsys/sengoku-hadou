@@ -1241,3 +1241,42 @@ body.is-pc .pc-cmd-col .cmd-btn.category.active {
 
 /* 大名選択画面では非表示にします */
 body.is-pc.daimyo-select-mode #pc-new-ui-container { display: none !important; }
+
+/* =========================================================
+   ★ 武将一覧のタブ切り替えと「状態」タブのデザイン
+   ========================================================= */
+.busho-tabs {
+    display: flex;
+    gap: 5px;
+    margin-bottom: 5px;
+    padding-left: 5px;
+}
+.busho-tab-btn {
+    padding: 6px 15px;
+    font-size: 0.95rem;
+    font-weight: bold;
+    background: #e0e0e0;
+    border: 1px solid #aaa;
+    border-bottom: none;
+    border-radius: 6px 6px 0 0;
+    cursor: pointer;
+    color: #555;
+    transition: background-color 0.2s, color 0.2s;
+}
+.busho-tab-btn:hover {
+    background: #cfd8dc;
+}
+.busho-tab-btn.active {
+    background: #37474f;
+    color: #fff;
+    border-color: #37474f;
+}
+
+/* 状態タブ選択時のリストレイアウト（スマホ） */
+.list-header.status-mode, .select-item.status-mode {
+    grid-template-columns: 2.5fr 2.5fr 2.5fr 1fr 1fr 1fr 1fr; 
+}
+/* 状態タブ選択時のリストレイアウト（PC版） */
+body.is-pc .list-header.status-mode, body.is-pc .select-item.status-mode {
+    grid-template-columns: 140px 140px 140px 60px 50px 60px 50px; 
+}

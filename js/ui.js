@@ -1669,14 +1669,6 @@ class UIManager {
             }
         }
 
-        if (this.selectorList) {
-            this.selectorList.innerHTML = `
-                <div class="list-header">
-                    <span class="col-act">行動</span><span class="col-name">名前</span><span class="col-rank">身分</span><span class="col-stat">統率</span><span class="col-stat">武勇</span><span class="col-stat">政務</span><span class="col-stat">外交</span><span class="col-stat">智謀</span><span class="col-stat">魅力</span>
-                </div>
-            `;
-        }
-        
         const c = this.currentCastle; 
         
         // ★さっき作った新しい魔法で、武将のリストとメッセージをまとめて受け取ります！
@@ -1752,114 +1744,206 @@ class UIManager {
             }
         };
 
-        bushos.forEach(b => {
-            if (actionType === 'banish' && b.isCastellan) return; 
-            if (actionType === 'employ_target' && b.isDaimyo) return;
-            if (actionType === 'reward' && b.isDaimyo) return; 
-            
-            let isSelectable = !b.isActionDone; 
-            if (extraData && extraData.allowDone) isSelectable = true; 
-            // ★変更：.includes の括弧の中に 'marriage_princess', 'marriage_kinsman' を追加しました！
-            if (['appoint','employ_target','appoint_gunshi','rumor_target_busho','headhunt_target','interview','interview_target','reward','view_only','war_general', 'kunishu_war_general', 'all_busho_list', 'marriage_princess', 'marriage_kinsman'].includes(actionType)) isSelectable = true;
-            if (actionType === 'def_intercept_deploy' || actionType === 'def_reinf_deploy' || actionType === 'atk_reinf_deploy') isSelectable = true;
-            
-            let acc = null; if (isEnemyTarget && targetCastle) acc = targetCastle.investigatedAccuracy;
-            const getStat = (stat) => GameSystem.getDisplayStatHTML(b, stat, gunshi, acc, this.game.playerClanId, myDaimyo);
-
-            const div = document.createElement('div'); div.className = `select-item ${!isSelectable ? 'disabled' : ''}`;
-            const inputType = isMulti ? 'checkbox' : 'radio';
-            
-            let inputHtml = '';
-            if (!isViewMode) {
-                inputHtml = `<input type="${inputType}" name="sel_busho" value="${b.id}" ${!isSelectable ? 'disabled' : ''} style="display:none;">`;
-            }
-            
-            div.innerHTML = `<span class="col-act">${inputHtml}${b.isActionDone?'[済]':'[未]'}</span><span class="col-name">${b.name}</span><span class="col-rank">${b.getRankName()}</span><span class="col-stat">${getStat('leadership')}</span><span class="col-stat">${getStat('strength')}</span><span class="col-stat">${getStat('politics')}</span><span class="col-stat">${getStat('diplomacy')}</span><span class="col-stat">${getStat('intelligence')}</span><span class="col-stat">${getStat('charm')}</span>`;
-            
-            if (actionType === 'view_only' || actionType === 'all_busho_list') {
-                div.onclick = () => {
+        // ★追加：タブ要素の準備と切り替えの魔法
+        const tabsEl = document.getElementById('selector-tabs');
+        let currentTab = 'stats'; // 最初は能力(stats)タブにしておきます
+        
+        if (isViewMode && tabsEl) {
+            tabsEl.classList.remove('hidden');
+            tabsEl.innerHTML = `
+                <button class="busho-tab-btn active" data-tab="stats">能力</button>
+                <button class="busho-tab-btn" data-tab="status">状態</button>
+            `;
+            const tabBtns = tabsEl.querySelectorAll('.busho-tab-btn');
+            tabBtns.forEach(btn => {
+                btn.onclick = () => {
                     if (window.AudioManager) window.AudioManager.playSE('choice.ogg');
-                    this.showBushoDetailModal(b);
+                    tabBtns.forEach(b => b.classList.remove('active'));
+                    btn.classList.add('active');
+                    currentTab = btn.getAttribute('data-tab');
+                    renderList(); // タブが切り替わったらリストを描き直します！
                 };
-                div.style.cursor = 'pointer'; // カーソルを指の形にする魔法
-            } else if (isSelectable) { 
-                div.onclick = (e) => {
-                    if (window.AudioManager) window.AudioManager.playSE('choice.ogg');
+            });
+        } else if (tabsEl) {
+            // 見るだけじゃない時はタブを隠します
+            tabsEl.classList.add('hidden');
+        }
 
-                    // 【パターン1】チェックボックスの四角い部分を直接ポチッと押した時の動き
-                    if(e.target.tagName === 'INPUT') { 
-                        if(!isMulti) {
-                            const siblings = this.selectorList.querySelectorAll('.select-item');
-                            siblings.forEach(el => el.classList.remove('selected'));
-                        } else {
-                             const maxSelect = (actionType === 'war_deploy' || actionType === 'def_intercept_deploy' || actionType === 'def_reinf_deploy' || actionType === 'atk_reinf_deploy' || actionType === 'def_self_reinf_deploy' || actionType === 'atk_self_reinf_deploy' || actionType === 'kunishu_subjugate_deploy') ? 5 : 999;
-                             const currentChecked = this.selectorList.querySelectorAll('input[name="sel_busho"]:checked').length;
-                             if(e.target.checked && currentChecked > maxSelect) {
-                                 e.target.checked = false;
-                                 this.showDialog(`出陣できる武将は最大${maxSelect}名までです。`, false);
-                                 return;
-                             }
+        // ★リストを描画する部分を「関数」としてまとめました！
+        const renderList = () => {
+            if (!this.selectorList) return;
+            this.selectorList.innerHTML = '';
+            
+            // 選ばれているタブに合わせて、リストの一番上の見出しを変えます
+            if (currentTab === 'stats') {
+                this.selectorList.innerHTML = `
+                    <div class="list-header">
+                        <span class="col-act">行動</span><span class="col-name">名前</span><span class="col-rank">身分</span><span class="col-stat">統率</span><span class="col-stat">武勇</span><span class="col-stat">政務</span><span class="col-stat">外交</span><span class="col-stat">智謀</span><span class="col-stat">魅力</span>
+                    </div>
+                `;
+            } else {
+                this.selectorList.innerHTML = `
+                    <div class="list-header status-mode">
+                        <span class="col-name">名前</span><span class="col-faction">勢力</span><span class="col-castle">所属</span><span class="col-rank">身分</span><span class="col-age">年齢</span><span class="col-salary">俸禄</span><span class="col-family">一門</span>
+                    </div>
+                `;
+            }
 
-                             // ★ ここから追加：金や兵糧のオーバーチェック（チェックボックスを直接押した時）
-                             if (e.target.checked) {
-                                 // spec.costGold は1人あたりの必要な金、c.gold は城の今の貯金です
-                                 if (spec.costGold > 0 && currentChecked * spec.costGold > c.gold) {
-                                     e.target.checked = false; // 無理なのでチェックを外します
-                                     this.showDialog(`金が足りないため、これ以上選べません。`, false);
-                                     return;
-                                 }
-                                 if (spec.costRice > 0 && currentChecked * spec.costRice > c.rice) {
-                                     e.target.checked = false; // 無理なのでチェックを外します
-                                     this.showDialog(`兵糧が足りないため、これ以上選べません。`, false);
-                                     return;
-                                 }
-                             }
-                             // ★ 追加ここまで
-                        }
-                        if(e.target.checked) div.classList.add('selected');
-                        else div.classList.remove('selected');
-                        updateContextCost();
-                        updateBushoConfirmBtn(); 
-                        return;
-                    } 
+            bushos.forEach(b => {
+                if (actionType === 'banish' && b.isCastellan) return; 
+                if (actionType === 'employ_target' && b.isDaimyo) return;
+                if (actionType === 'reward' && b.isDaimyo) return; 
+                
+                let isSelectable = !b.isActionDone; 
+                if (extraData && extraData.allowDone) isSelectable = true; 
+                if (['appoint','employ_target','appoint_gunshi','rumor_target_busho','headhunt_target','interview','interview_target','reward','view_only','war_general', 'kunishu_war_general', 'all_busho_list', 'marriage_princess', 'marriage_kinsman'].includes(actionType)) isSelectable = true;
+                if (actionType === 'def_intercept_deploy' || actionType === 'def_reinf_deploy' || actionType === 'atk_reinf_deploy') isSelectable = true;
+                
+                let acc = null; if (isEnemyTarget && targetCastle) acc = targetCastle.investigatedAccuracy;
+                const getStat = (stat) => GameSystem.getDisplayStatHTML(b, stat, gunshi, acc, this.game.playerClanId, myDaimyo);
+
+                const div = document.createElement('div'); 
+                div.className = `select-item ${!isSelectable ? 'disabled' : ''}`;
+                
+                // 状態タブの時は、CSSで幅を変えるための目印（status-mode）を貼ります
+                if (currentTab === 'status') div.classList.add('status-mode');
+
+                const inputType = isMulti ? 'checkbox' : 'radio';
+                
+                let inputHtml = '';
+                if (!isViewMode) {
+                    inputHtml = `<input type="${inputType}" name="sel_busho" value="${b.id}" ${!isSelectable ? 'disabled' : ''} style="display:none;">`;
+                }
+                
+                // ここでタブによって中身のデータを切り替えます！
+                if (currentTab === 'stats') {
+                    // 能力タブ（今まで通り）
+                    div.innerHTML = `<span class="col-act">${inputHtml}${b.isActionDone?'[済]':'[未]'}</span><span class="col-name">${b.name}</span><span class="col-rank">${b.getRankName()}</span><span class="col-stat">${getStat('leadership')}</span><span class="col-stat">${getStat('strength')}</span><span class="col-stat">${getStat('politics')}</span><span class="col-stat">${getStat('diplomacy')}</span><span class="col-stat">${getStat('intelligence')}</span><span class="col-stat">${getStat('charm')}</span>`;
+                } else {
+                    // 状態タブ
+                    let forceName = "浪人";
+                    let familyMark = "";
                     
-                    // 【パターン2】武将の名前など、行のどこかを押した時の動き
-                    const input = div.querySelector('input');
-                    if(input) {
-                        if (isMulti) { 
-                             const maxSelect = (actionType === 'war_deploy' || actionType === 'def_intercept_deploy' || actionType === 'def_reinf_deploy' || actionType === 'atk_reinf_deploy' || actionType === 'def_self_reinf_deploy' || actionType === 'atk_self_reinf_deploy' || actionType === 'kunishu_subjugate_deploy') ? 5 : 999;
-                             const currentChecked = this.selectorList.querySelectorAll('input[name="sel_busho"]:checked').length;
-                             if(!input.checked && currentChecked >= maxSelect) {
-                                 this.showDialog(`出陣できる武将は最大${maxSelect}名までです。`, false);
-                                 return;
-                             }
-
-                             // ★ ここから追加：金や兵糧のオーバーチェック（武将の行を押した時）
-                             if (!input.checked) {
-                                 if (spec.costGold > 0 && (currentChecked + 1) * spec.costGold > c.gold) {
-                                     this.showDialog(`金が足りないため、これ以上選べません。`, false);
-                                     return;
-                                 }
-                                 if (spec.costRice > 0 && (currentChecked + 1) * spec.costRice > c.rice) {
-                                     this.showDialog(`兵糧が足りないため、これ以上選べません。`, false);
-                                     return;
-                                 }
-                             }
-                             // ★ 追加ここまで
-
-                             input.checked = !input.checked; 
-                        } else { 
-                             input.checked = true; const allItems = this.selectorList.querySelectorAll('.select-item'); allItems.forEach(item => item.classList.remove('selected')); 
+                    // 勢力名と一門判定
+                    if (b.belongKunishuId > 0) {
+                        const kunishu = this.game.kunishuSystem.getKunishu(b.belongKunishuId);
+                        forceName = kunishu ? kunishu.getName(this.game) : "諸勢力";
+                    } else if (b.clan > 0) {
+                        const clan = this.game.clans.find(c => c.id === b.clan);
+                        forceName = clan ? clan.name : "大名家";
+                        
+                        const daimyo = clan ? this.game.getBusho(clan.leaderId) : null;
+                        if (daimyo && (b.id === daimyo.id || b.isDaimyo)) {
+                            familyMark = "◯";
+                        } else if (daimyo) {
+                            const bFamily = Array.isArray(b.familyIds) ? b.familyIds : [];
+                            const dFamily = Array.isArray(daimyo.familyIds) ? daimyo.familyIds : [];
+                            if (bFamily.includes(daimyo.id) || dFamily.includes(b.id)) {
+                                familyMark = "◯";
+                            }
                         }
-                        if(input.checked) div.classList.add('selected'); else div.classList.remove('selected');
-                        updateContextCost(); 
-                        updateBushoConfirmBtn(); 
                     }
-                };
-            }
-            this.selectorList.appendChild(div);
-        });
-        if (bushos.length === 0 && this.selectorList) this.selectorList.innerHTML = "<div style='padding:10px;'>対象となる武将がいません</div>";
+                    
+                    const bCastle = this.game.getCastle(b.castleId);
+                    const bCastleName = bCastle ? bCastle.name : "-";
+                    const age = this.game.year - b.birthYear;
+                    
+                    let salary = "-";
+                    if (b.clan > 0 && !b.isDaimyo && b.status !== 'ronin') {
+                        const clan = this.game.clans.find(c => c.id === b.clan);
+                        const daimyo = clan ? this.game.getBusho(clan.leaderId) : null;
+                        salary = b.getSalary(daimyo);
+                        if (salary === 0) salary = "-";
+                    }
+
+                    div.innerHTML = `<span class="col-name">${b.name}</span><span class="col-faction">${forceName}</span><span class="col-castle">${bCastleName}</span><span class="col-rank">${b.getRankName()}</span><span class="col-age">${age}</span><span class="col-salary">${salary}</span><span class="col-family" style="font-weight:bold; color:#d32f2f;">${familyMark}</span>`;
+                }
+                
+                if (actionType === 'view_only' || actionType === 'all_busho_list') {
+                    div.onclick = () => {
+                        if (window.AudioManager) window.AudioManager.playSE('choice.ogg');
+                        this.showBushoDetailModal(b);
+                    };
+                    div.style.cursor = 'pointer'; // カーソルを指の形にする魔法
+                } else if (isSelectable) { 
+                    div.onclick = (e) => {
+                        if (window.AudioManager) window.AudioManager.playSE('choice.ogg');
+
+                        // 【パターン1】チェックボックスの四角い部分を直接ポチッと押した時の動き
+                        if(e.target.tagName === 'INPUT') { 
+                            if(!isMulti) {
+                                const siblings = this.selectorList.querySelectorAll('.select-item');
+                                siblings.forEach(el => el.classList.remove('selected'));
+                            } else {
+                                 const maxSelect = (actionType === 'war_deploy' || actionType === 'def_intercept_deploy' || actionType === 'def_reinf_deploy' || actionType === 'atk_reinf_deploy' || actionType === 'def_self_reinf_deploy' || actionType === 'atk_self_reinf_deploy' || actionType === 'kunishu_subjugate_deploy') ? 5 : 999;
+                                 const currentChecked = this.selectorList.querySelectorAll('input[name="sel_busho"]:checked').length;
+                                 if(e.target.checked && currentChecked > maxSelect) {
+                                     e.target.checked = false;
+                                     this.showDialog(`出陣できる武将は最大${maxSelect}名までです。`, false);
+                                     return;
+                                 }
+
+                                 // ★ ここから追加：金や兵糧のオーバーチェック（チェックボックスを直接押した時）
+                                 if (e.target.checked) {
+                                     if (spec.costGold > 0 && currentChecked * spec.costGold > c.gold) {
+                                         e.target.checked = false; 
+                                         this.showDialog(`金が足りないため、これ以上選べません。`, false);
+                                         return;
+                                     }
+                                     if (spec.costRice > 0 && currentChecked * spec.costRice > c.rice) {
+                                         e.target.checked = false; 
+                                         this.showDialog(`兵糧が足りないため、これ以上選べません。`, false);
+                                         return;
+                                     }
+                                 }
+                            }
+                            if(e.target.checked) div.classList.add('selected');
+                            else div.classList.remove('selected');
+                            updateContextCost();
+                            updateBushoConfirmBtn(); 
+                            return;
+                        } 
+                        
+                        // 【パターン2】武将の名前など、行のどこかを押した時の動き
+                        const input = div.querySelector('input');
+                        if(input) {
+                            if (isMulti) { 
+                                 const maxSelect = (actionType === 'war_deploy' || actionType === 'def_intercept_deploy' || actionType === 'def_reinf_deploy' || actionType === 'atk_reinf_deploy' || actionType === 'def_self_reinf_deploy' || actionType === 'atk_self_reinf_deploy' || actionType === 'kunishu_subjugate_deploy') ? 5 : 999;
+                                 const currentChecked = this.selectorList.querySelectorAll('input[name="sel_busho"]:checked').length;
+                                 if(!input.checked && currentChecked >= maxSelect) {
+                                     this.showDialog(`出陣できる武将は最大${maxSelect}名までです。`, false);
+                                     return;
+                                 }
+
+                                 // ★ ここから追加：金や兵糧のオーバーチェック（武将の行を押した時）
+                                 if (!input.checked) {
+                                     if (spec.costGold > 0 && (currentChecked + 1) * spec.costGold > c.gold) {
+                                         this.showDialog(`金が足りないため、これ以上選べません。`, false);
+                                         return;
+                                     }
+                                     if (spec.costRice > 0 && (currentChecked + 1) * spec.costRice > c.rice) {
+                                         this.showDialog(`兵糧が足りないため、これ以上選べません。`, false);
+                                         return;
+                                     }
+                                 }
+
+                                 input.checked = !input.checked; 
+                            } else { 
+                                 input.checked = true; const allItems = this.selectorList.querySelectorAll('.select-item'); allItems.forEach(item => item.classList.remove('selected')); 
+                            }
+                            if(input.checked) div.classList.add('selected'); else div.classList.remove('selected');
+                            updateContextCost(); 
+                            updateBushoConfirmBtn(); 
+                        }
+                    };
+                }
+                this.selectorList.appendChild(div);
+            });
+            if (bushos.length === 0 && this.selectorList) this.selectorList.innerHTML = "<div style='padding:10px;'>対象となる武将がいません</div>";
+        };
+
+        // 準備が整ったので、最初の1回目を描画します！
+        renderList();
         
         if (this.selectorList) {
             this.selectorList.scrollTop = 0;
