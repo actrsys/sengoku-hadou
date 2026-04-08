@@ -36,7 +36,7 @@ const COMMAND_MENU_STRUCTURE = [
     },
     {
         label: "情報",
-        commands: ['investigate', 'busho_list', 'princess_list', 'faction_list', 'daimyo_list']
+        commands: ['busho_list', 'princess_list', 'faction_list', 'daimyo_list']
     },
     {
         label: "システム",
@@ -233,13 +233,6 @@ const COMMAND_SPECS = {
     },
 
     // --- 情報 (INFO) ---
-    'investigate': { 
-        label: "調査", category: 'INFO', 
-        costGold: 0, costRice: 0, 
-        isMulti: true, hasAdvice: true, 
-        startMode: 'map_select', targetType: 'enemy_all',
-        sortKey: 'intelligence' 
-    },
     'busho_list': {
         label: "武将", category: 'INFO',
         isSystem: true, action: 'busho_list'

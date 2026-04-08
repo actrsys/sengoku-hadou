@@ -469,96 +469,11 @@ class GameSystem {
             </span>`;
     }
     static getPerceivedStatValue(target, statName, gunshi, castleAccuracy, playerClanId, daimyo = null) {
-        const realVal = target[statName];
-
-        // ==========================================
-        // ★さっき追加した「固定されたサイコロ」の処理（そのまま残します）
-        const statNum = statName.charCodeAt(0) + statName.length; 
-        const seed = gunshi ? (gunshi.gunshiSeed + target.id * 10 + statNum) : (target.id * 10 + statNum);
-        const fixedRandom = this.seededRandom(seed);
-        // ==========================================
-        
-        // ★ここから追加：相手が「同盟」か「支配」の相手か調べる魔法！
-        let isAllyOrDominated = false;
-        if (target.clan !== 0 && target.clan !== playerClanId && window.GameApp) {
-            const rel = window.GameApp.getRelation(playerClanId, target.clan);
-            if (rel && (rel.status === '同盟' || rel.status === '支配')) {
-                isAllyOrDominated = true;
-            }
-        }
-        // ★書き換え：自分の武将か、同盟・支配している相手なら軍師が評価します！
-        if (target.clan === playerClanId || isAllyOrDominated) {
-            if (target.clan === playerClanId && target.isDaimyo) return realVal; // 自分の大名のステータスは正確に見えます
-            if (!gunshi) return null; // 軍師がいなければ見えません
-
-            // ① まずは軍師の「好み」や「忠誠」による【えこひいき（バイアス）】を計算します！
-            // 自分の大名家の時だけえこひいきして、他大名家の場合はバイアスなし（1.0）にします！
-            let biasFactor = 1.0;
-            if (target.clan === playerClanId) {
-                const dist = this.calcValueDistance(gunshi, target);
-                biasFactor = 1.0 + ((50 - dist) / 250); 
-                if (daimyo) {
-                    const gunshiLoyalty = (gunshi.loyalty + gunshi.duty) / 2;
-                    const gunshiDaimyoDist = this.calcValueDistance(gunshi, daimyo);
-                    const fairness = (gunshiLoyalty * 0.005) + ((100 - gunshiDaimyoDist) * 0.005);
-                    biasFactor = 1.0 + (biasFactor - 1.0) * (1.0 - fairness); // 真面目な軍師ほど公平になります
-                }
-            }
-            
-            // ② 次に、軍師の「智謀」による【見抜く精度（パーセント）】を計算します！
-            let accuracy = 0;
-            if (gunshi.intelligence >= 95) {
-                accuracy = 0.99; // ★智謀95以上なら、精度99%！
-            } else if (gunshi.intelligence >= 50) {
-                // ★智謀50〜94の間は、精度70%〜98%のグラデーションになります
-                accuracy = 0.70 + ((gunshi.intelligence - 50) / 45) * 0.29;
-            } else {
-                // 智謀0〜49の間は、精度40%〜69%のグラデーションになります
-                accuracy = 0.40 + (gunshi.intelligence / 50) * 0.30;
-            }
-
-            // ③ 精度から「最大でどれくらい数値がズレるか」を出します（100点満点基準）
-            const maxError = 100 * (1.0 - accuracy); // 精度99%なら最大1、精度70%なら最大30のズレ幅になります
-
-            // ④ 「固定されたサイコロ」を使って、実際にズラします
-            // (fixedRandom - 0.5) * 2 をすると「マイナス1倍 〜 プラス1倍」の幅になります
-            const randomError = (fixedRandom - 0.5) * 2 * maxError;
-            
-            // ⑤ 最後に、実際のステータスに「ズレ」を足して、さらに「えこひいき」の倍率をかけます！
-            let perceived = (realVal + randomError) * biasFactor;
-            return Math.max(1, Math.min(120, Math.floor(perceived)));
-        }
-        // ▲▲▲ 差し替えるのはここまで！ ▲▲▲
-
-        if (castleAccuracy !== null && castleAccuracy > 0) {
-            const maxErr = 50 * (1.0 - (castleAccuracy / 100));
-            
-            // ★ここも書き換え！
-            const err = (fixedRandom - 0.5) * 2 * maxErr;
-            
-            return Math.max(1, Math.min(120, Math.floor(realVal + err)));
-        }
-        
-        if (target.clan !== 0 && target.clan !== playerClanId) {
-            return null;
-        }
-
-        if (gunshi) {
-            const noise = (130 - gunshi.intelligence);
-            
-            // ★ここも書き換え！
-            const err = (fixedRandom - 0.5) * noise * 2;
-            
-            return Math.max(1, Math.min(120, Math.floor(realVal + err)));
-        }
-        return null;
+        return target[statName];
     }
     
     static getDisplayStatHTML(target, statName, gunshi, castleAccuracy = null, playerClanId = 0, daimyo = null) {
-        if (target.clan === playerClanId && target.isDaimyo) return this.toGradeHTML(target[statName]);
-        const val = this.getPerceivedStatValue(target, statName, gunshi, castleAccuracy, playerClanId, daimyo);
-        if (val === null) return "？";
-        return this.toGradeHTML(val);
+        return this.toGradeHTML(target[statName]);
     }
 
     static calcDevelopment(busho) { return Math.max(1, Math.round(((busho.politics * 1.5) + (Math.sqrt(busho.loyalty) * 2)) / 20)); }
