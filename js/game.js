@@ -902,17 +902,7 @@ class GameManager {
     getClanTotalSoldiers(clanId) { return this.castles.filter(c => Number(c.ownerClan) === Number(clanId)).reduce((sum, c) => sum + c.soldiers, 0); }
     getClanGunshi(clanId) { return this.bushos.find(b => Number(b.clan) === Number(clanId) && b.isGunshi && b.status === 'active'); }
     isCastleVisible(castle) { 
-        if (Number(castle.ownerClan) === Number(this.playerClanId)) return true; 
-        if (castle.investigatedUntil >= this.getCurrentTurnId()) return true; 
-        
-        // ★追加：同盟か支配している相手の城なら見えるようにする魔法！
-        if (castle.ownerClan !== 0) {
-            const rel = this.getRelation(this.playerClanId, castle.ownerClan);
-            if (rel && (rel.status === '同盟' || rel.status === '支配')) {
-                return true;
-            }
-        }
-        return false; 
+        return true; 
     }
     
     // ==========================================
