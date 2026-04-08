@@ -1242,7 +1242,7 @@ class GameManager {
                 this.ui.updateAIProgress(this.currentIndex + 1, this.turnQueue.length);
                 if(this.ui.panelEl) this.ui.panelEl.classList.add('hidden');
                 
-                const delay = isImportant ? 400 : 10;
+                const delay = isImportant ? 10 : 10;
 
                 this.aiTimer = setTimeout(() => {
                     if (this.warManager.state.active) return;
@@ -1287,7 +1287,7 @@ class GameManager {
 
             if(this.ui.panelEl) this.ui.panelEl.classList.add('hidden');
             
-            const delay = isImportant ? 400 : 10;
+            const delay = isImportant ? 10 : 10;
 
             this.aiTimer = setTimeout(() => {
                 if (this.warManager.state.active) return;
