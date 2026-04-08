@@ -2297,16 +2297,16 @@ class UIManager {
                 const daimyo = this.game.bushos.find(b => b.clan === c.ownerClan && b.isDaimyo);
                 const castellan = this.game.getBusho(c.castellanId);
                 
-                // ★修正：余計なお世話だった「必要資金」の行を消して、指定された通り「アイテム」と「金」の2行だけを綺麗に並べます！
+                // ★修正：「金」が上、「アイテム」が下になるように２行の順番を入れ替えました！
                 const makeGrid = (itemName, afterItem, afterGold) => {
                     return `
                         <div style="display: inline-grid; grid-template-columns: max-content max-content minmax(3em, auto); column-gap: 1em; text-align: left;">
-                            <div>${itemName}</div>
-                            <div>▶</div>
-                            <div style="text-align: right;">${Math.floor(afterItem)}</div>
                             <div>　金</div>
                             <div>▶</div>
                             <div style="text-align: right;">${Math.floor(afterGold)}</div>
+                            <div>${itemName}</div>
+                            <div>▶</div>
+                            <div style="text-align: right;">${Math.floor(afterItem)}</div>
                         </div>
                     `;
                 };
@@ -2593,12 +2593,13 @@ class UIManager {
             this.tradeTypeInfo.classList.remove('hidden'); 
             this.tradeTypeInfo.textContent = `相場: 兵士 1人 ＝ 金 ${singleCost.toFixed(1)}`;
 
-            inputs.soldiers = createSlider("兵士数", "soldiers", maxSoldiers, 0);
-
+            // ★変更：スライダーより前に数字の箱を作って、スライダーの上に表示させます！
             const costDiv = document.createElement('div');
             costDiv.id = 'dynamic-cost-display';
-            costDiv.style.cssText = "display: flex; justify-content: center; font-weight:bold; color:#1976d2; margin-top:10px; font-size:1.1rem;";
+            costDiv.style.cssText = "display: flex; justify-content: center; font-weight:bold; color:#1976d2; margin-bottom:15px; font-size:1.1rem;";
             this.quantityContainer.appendChild(costDiv);
+
+            inputs.soldiers = createSlider("兵士数", "soldiers", maxSoldiers, 0);
             
         } else if (type === 'charity') {
             document.getElementById('quantity-title').textContent = "施し"; this.charityTypeSelector.classList.remove('hidden'); const count = data.length; this.quantityContainer.innerHTML = `<p>選択武将数: ${count}名</p>`;
@@ -2674,12 +2675,14 @@ class UIManager {
             this.tradeTypeInfo.classList.remove('hidden'); 
             // ★変更：相場の金額を小数点以下1桁で表示します！
             this.tradeTypeInfo.textContent = `相場: 兵糧 10 ＝ 金 ${(10 * rate).toFixed(1)}`;
-            inputs.amount = createSlider("購入量", "amount", maxBuy, 0);
-            
+
+            // ★変更：スライダーより前に数字の箱を作って、スライダーの上に表示させます！
             const costDiv = document.createElement('div');
             costDiv.id = 'dynamic-cost-display';
-            costDiv.style.cssText = "display: flex; justify-content: center; font-weight:bold; color:#1976d2; margin-top:10px; font-size:1.1rem;";
+            costDiv.style.cssText = "display: flex; justify-content: center; font-weight:bold; color:#1976d2; margin-bottom:15px; font-size:1.1rem;";
             this.quantityContainer.appendChild(costDiv);
+
+            inputs.amount = createSlider("購入量", "amount", maxBuy, 0);
             
         } else if (type === 'sell_rice') {
             document.getElementById('quantity-title').textContent = "兵糧売却"; 
@@ -2691,13 +2694,14 @@ class UIManager {
             this.tradeTypeInfo.classList.remove('hidden'); 
             // ★変更：相場の金額を小数点以下1桁で表示します！
             this.tradeTypeInfo.textContent = `相場: 兵糧 10 ＝ 金 ${(10 * rate).toFixed(1)}`;
-            inputs.amount = createSlider("売却量", "amount", c.rice, 0);
 
+            // ★変更：スライダーより前に数字の箱を作って、スライダーの上に表示させます！
             const costDiv = document.createElement('div');
             costDiv.id = 'dynamic-cost-display';
-            // ★変更：売却の時の色も青色（#1976d2）に統一します！
-            costDiv.style.cssText = "display: flex; justify-content: center; font-weight:bold; color:#1976d2; margin-top:10px; font-size:1.1rem;";
+            costDiv.style.cssText = "display: flex; justify-content: center; font-weight:bold; color:#1976d2; margin-bottom:15px; font-size:1.1rem;";
             this.quantityContainer.appendChild(costDiv);
+
+            inputs.amount = createSlider("売却量", "amount", c.rice, 0);
 
         } else if (type === 'buy_ammo') {
             document.getElementById('quantity-title').textContent = "矢弾購入"; 
@@ -2715,12 +2719,14 @@ class UIManager {
             const unitPrice = GameSystem.calcBuyHorseUnitPrice(daimyo, castellan);
             this.tradeTypeInfo.classList.remove('hidden'); 
             this.tradeTypeInfo.textContent = `相場: 騎馬 1頭 ＝ 金 ${unitPrice.toFixed(1)}`;
-            inputs.amount = createSlider("購入量", "amount", realMaxBuy, 0);
 
+            // ★変更：スライダーより前に数字の箱を作って、スライダーの上に表示させます！
             const costDiv = document.createElement('div');
             costDiv.id = 'dynamic-cost-display';
-            costDiv.style.cssText = "display: flex; justify-content: center; font-weight:bold; color:#1976d2; margin-top:10px; font-size:1.1rem;";
+            costDiv.style.cssText = "display: flex; justify-content: center; font-weight:bold; color:#1976d2; margin-bottom:15px; font-size:1.1rem;";
             this.quantityContainer.appendChild(costDiv);
+
+            inputs.amount = createSlider("購入量", "amount", realMaxBuy, 0);
 
         } else if (type === 'buy_guns') {
             document.getElementById('quantity-title').textContent = "鉄砲購入"; 
@@ -2731,12 +2737,14 @@ class UIManager {
             const unitPrice = GameSystem.calcBuyGunUnitPrice(daimyo, castellan);
             this.tradeTypeInfo.classList.remove('hidden'); 
             this.tradeTypeInfo.textContent = `相場: 鉄砲 1挺 ＝ 金 ${unitPrice.toFixed(1)}`;
-            inputs.amount = createSlider("購入量", "amount", realMaxBuy, 0);
 
+            // ★変更：スライダーより前に数字の箱を作って、スライダーの上に表示させます！
             const costDiv = document.createElement('div');
             costDiv.id = 'dynamic-cost-display';
-            costDiv.style.cssText = "display: flex; justify-content: center; font-weight:bold; color:#1976d2; margin-top:10px; font-size:1.1rem;";
+            costDiv.style.cssText = "display: flex; justify-content: center; font-weight:bold; color:#1976d2; margin-bottom:15px; font-size:1.1rem;";
             this.quantityContainer.appendChild(costDiv);
+
+            inputs.amount = createSlider("購入量", "amount", realMaxBuy, 0);
 
         } else if (type === 'war_repair') {
             const s = this.game.warManager.state;
