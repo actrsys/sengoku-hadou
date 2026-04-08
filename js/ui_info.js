@@ -1615,27 +1615,27 @@ class UIInfoManager {
 
                 // 変更できない状態（0の時など）
                 if (currentMax <= currentMin) {
-                    if (bMin) { bMin.style.display = 'block'; bMin.disabled = true; bMin.style.order = 1; }
-                    if (bHalf) { bHalf.style.display = 'block'; bHalf.disabled = true; bHalf.style.order = 3; }
+                    if (bMin) { bMin.style.display = ''; bMin.disabled = true; bMin.style.order = 1; }
+                    if (bHalf) { bHalf.style.display = ''; bHalf.disabled = true; bHalf.style.order = 3; }
                     if (bMax) { bMax.style.display = 'none'; }
                     return;
                 }
 
                 if (v <= currentMin) {
                     // 最小の時：「最小(無効)」ゲージ「半分(有効)」を表示
-                    if (bMin) { bMin.style.display = 'block'; bMin.disabled = true; bMin.style.order = 1; }
-                    if (bHalf) { bHalf.style.display = 'block'; bHalf.disabled = false; bHalf.style.order = 3; }
+                    if (bMin) { bMin.style.display = ''; bMin.disabled = true; bMin.style.order = 1; }
+                    if (bHalf) { bHalf.style.display = ''; bHalf.disabled = false; bHalf.style.order = 3; }
                     if (bMax) { bMax.style.display = 'none'; }
                 } else if (v >= currentMax) {
                     // 最大の時：「半分(有効)」ゲージ「最大(無効)」を表示
                     if (bMin) { bMin.style.display = 'none'; }
-                    if (bHalf) { bHalf.style.display = 'block'; bHalf.disabled = false; bHalf.style.order = 1; }
-                    if (bMax) { bMax.style.display = 'block'; bMax.disabled = true; bMax.style.order = 3; }
+                    if (bHalf) { bHalf.style.display = ''; bHalf.disabled = false; bHalf.style.order = 1; }
+                    if (bMax) { bMax.style.display = ''; bMax.disabled = true; bMax.style.order = 3; }
                 } else {
                     // 中間の時：「最小(有効)」ゲージ「最大(有効)」を表示
-                    if (bMin) { bMin.style.display = 'block'; bMin.disabled = false; bMin.style.order = 1; }
+                    if (bMin) { bMin.style.display = ''; bMin.disabled = false; bMin.style.order = 1; }
                     if (bHalf) { bHalf.style.display = 'none'; }
-                    if (bMax) { bMax.style.display = 'block'; bMax.disabled = false; bMax.style.order = 3; }
+                    if (bMax) { bMax.style.display = ''; bMax.disabled = false; bMax.style.order = 3; }
                 }
             };
 
