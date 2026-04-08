@@ -1942,11 +1942,15 @@ class UIManager {
                         }
                     }
                     
-                    // ★書き足し：一門の「◯」や「はい・いいえ」を、計算しやすい数字の 1 と 0 に変身させます！
-                    if (valA === true || valA === '◯') valA = 1;
-                    if (valA === false || valA === '-' || valA === '') valA = 0;
-                    if (valB === true || valB === '◯') valB = 1;
-                    if (valB === false || valB === '-' || valB === '') valB = 0;
+                    // ★書き換え：中身が空っぽなら「0」、何かが入っていれば「1」にします！能力などの数字はそのまま残します。
+                    const checkContent = (val) => {
+                        if (val === false || val === '-' || val === '' || val === null || val === undefined) return 0;
+                        if (typeof val === 'number') return val;
+                        return 1;
+                    };
+                    
+                    valA = checkContent(valA);
+                    valB = checkContent(valB);
                     
                     if (valA === valB) return a.id - b.id; 
                     return isSortAsc ? (valA - valB) : (valB - valA);
