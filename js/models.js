@@ -98,6 +98,7 @@ class Castle {
     constructor(data) {
         Object.assign(this, data);
         this.id = Number(this.id);
+        this.yomi = data.yomi || "";
         this.ownerClan = Number(this.ownerClan);
         this.castellanId = Number(this.castellanId);
         this.x = Number(this.x);
