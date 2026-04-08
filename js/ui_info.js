@@ -838,4 +838,613 @@ class UIInfoManager {
             };
         }
     }
+
+    openBushoSelector(actionType, targetId = null, extraData = null, onBack = null) {
+        if (actionType === 'appoint' && this.ui.currentCastle) { const isDaimyoHere = this.game.getCastleBushos(this.ui.currentCastle.id).some(b => b.isDaimyo); if (isDaimyoHere) { this.ui.showDialog("大名の居城は城主を変更できません", false); return; } }
+        
+        this.ui.hideAIGuardTemporarily(); 
+        if (this.ui.selectorModal) this.ui.selectorModal.classList.remove('hidden'); 
+        if (document.getElementById('selector-title')) document.getElementById('selector-title').textContent = "武将を選択"; 
+        
+        const isViewMode = (actionType === 'view_only' || actionType === 'all_busho_list');
+
+        const backBtn = document.querySelector('#selector-modal .btn-secondary');
+        if(backBtn) {
+            const footer = backBtn.parentElement; // ★追加：ボタンが入っているフッターの箱を取得します
+            if (extraData && extraData.hideCancel) {
+                backBtn.style.display = 'none';
+            } else {
+                backBtn.style.display = ''; 
+                
+                if (isViewMode) {
+                    backBtn.textContent = '閉じる';
+                } else {
+                    backBtn.textContent = '戻る';
+                }
+                if (footer) footer.style.justifyContent = 'center';
+
+                backBtn.onclick = () => {
+                    this.ui.closeSelector();
+                    if (onBack) {
+                        onBack(); 
+                    } else if (extraData && extraData.onCancel) {
+                        extraData.onCancel(); 
+                    }
+                };
+            }
+        }
+
+        const c = this.ui.currentCastle; 
+        
+        // ★さっき作った新しい魔法で、武将のリストとメッセージをまとめて受け取ります！
+        const data = this.game.commandSystem.getBushoSelectorData(actionType, targetId, extraData, c);
+        let bushos = data.bushos;
+        let infoHtml = data.infoHtml;
+        let isMulti = data.isMulti;
+        let spec = data.spec;
+
+        const contextEl = document.getElementById('selector-context-info');
+        if(contextEl) {
+            contextEl.classList.remove('hidden');
+            contextEl.innerHTML = infoHtml;
+        }
+
+        // 画面のタイトルを変えます
+        if (document.getElementById('selector-title')) {
+            if (actionType === 'view_only' || actionType === 'all_busho_list') {
+                document.getElementById('selector-title').textContent = "武将一覧";
+            } else {
+                document.getElementById('selector-title').textContent = isMulti ? "武将を選択（複数可）" : "武将を選択"; 
+            }
+        }
+
+        // 相手の城を調べるかどうかの準備（表示の時に使います）
+        let isEnemyTarget = false;
+        let targetCastle = null;
+        if (['rumor_target_busho','headhunt_target','view_only'].includes(actionType)) {
+             isEnemyTarget = true;
+             targetCastle = this.game.getCastle(targetId);
+        }
+        const gunshi = this.game.getClanGunshi(this.game.playerClanId);
+        const myDaimyo = this.game.bushos.find(b => b.clan === this.game.playerClanId && b.isDaimyo);
+        const updateContextCost = () => { 
+            if (!isMulti || !contextEl) return; 
+            const checkedCount = document.querySelectorAll('input[name="sel_busho"]:checked').length; 
+            let cost = 0, item = ""; 
+            if (spec.costGold > 0) { cost = checkedCount * spec.costGold; item = "金"; }
+            if (spec.costRice > 0) { cost = checkedCount * spec.costRice; item = "米"; }
+            
+            if (cost > 0) {
+                 contextEl.innerHTML = `<div>消費予定 ${item}: ${cost} (所持: ${item==='金'?c.gold:c.rice})</div>`; 
+            } else if (actionType === 'war_deploy' || actionType === 'def_intercept_deploy' || actionType === 'def_reinf_deploy' || actionType === 'atk_reinf_deploy' || actionType === 'def_self_reinf_deploy' || actionType === 'atk_self_reinf_deploy' || actionType === 'kunishu_subjugate_deploy') {
+                 contextEl.innerHTML = `<div>出陣武将: ${checkedCount}名 / 最大5名</div>`;
+            }
+        };
+
+        const updateBushoConfirmBtn = () => {
+            if (!this.ui.selectorConfirmBtn) return;
+            if (actionType === 'view_only' || actionType === 'all_busho_list') return; 
+
+            const checkedCount = this.ui.selectorList.querySelectorAll('input[name="sel_busho"]:checked').length;
+            if (checkedCount > 0) {
+                this.ui.selectorConfirmBtn.disabled = false;
+                this.ui.selectorConfirmBtn.style.opacity = 1.0;
+            } else {
+                this.ui.selectorConfirmBtn.disabled = true;
+                this.ui.selectorConfirmBtn.style.opacity = 0.5;
+            }
+        };
+
+        // ★追加：タブ要素の準備と切り替えの魔法
+        const tabsEl = document.getElementById('selector-tabs');
+        let currentTab = 'stats'; // 最初は能力(stats)タブにしておきます
+        let currentScope = 'clan'; // 最初は自家タブにしておきます
+        let currentSortKey = null; // ★追加：今並べ替えの基準にしている項目
+        let isSortAsc = false;     // ★追加：小さい順（昇順）なら true、大きい順（降順）なら false
+        
+        if (isViewMode && tabsEl) {
+            tabsEl.classList.remove('hidden');
+            // 全部左側に寄せる設定にします
+            tabsEl.style.justifyContent = 'flex-start';
+            
+            let scopeHtml = '';
+            if (actionType === 'all_busho_list') {
+                // margin-left: 15px; で少し隙間を空けます
+                scopeHtml = `
+                    <div style="display: flex; gap: 5px; margin-left: 15px;">
+                        <button class="busho-scope-btn active" data-scope="clan">自家</button>
+                        <button class="busho-scope-btn" data-scope="all">全国</button>
+                    </div>
+                `;
+            }
+
+            // 能力・状態を先に、自家・全国を後に並べます
+            tabsEl.innerHTML = `
+                <div style="display: flex; gap: 5px;">
+                    <button class="busho-tab-btn active" data-tab="stats">能力</button>
+                    <button class="busho-tab-btn" data-tab="status">状態</button>
+                </div>
+                ${scopeHtml}
+            `;
+            
+            const tabBtns = tabsEl.querySelectorAll('.busho-tab-btn');
+            tabBtns.forEach(btn => {
+                btn.onclick = () => {
+                    if (window.AudioManager) window.AudioManager.playSE('choice.ogg');
+                    tabBtns.forEach(b => b.classList.remove('active'));
+                    btn.classList.add('active');
+                    currentTab = btn.getAttribute('data-tab');
+                    renderList(); // タブが切り替わったらリストを描き直します！
+                };
+            });
+
+            const scopeBtns = tabsEl.querySelectorAll('.busho-scope-btn');
+            scopeBtns.forEach(btn => {
+                btn.onclick = () => {
+                    if (window.AudioManager) window.AudioManager.playSE('choice.ogg');
+                    scopeBtns.forEach(b => b.classList.remove('active'));
+                    btn.classList.add('active');
+                    currentScope = btn.getAttribute('data-scope');
+                    renderList();
+                };
+            });
+        } else if (tabsEl) {
+            // 見るだけじゃない時はタブを隠します
+            tabsEl.classList.add('hidden');
+        }
+
+        // ★リストを描画する部分を「関数」としてまとめました！
+        const renderList = () => {
+            if (!this.ui.selectorList) return;
+            this.ui.selectorList.innerHTML = '';
+            
+            let displayBushos = [...bushos]; // ★書き換え：元の順番を壊さないようにコピーを作ります
+            if (actionType === 'all_busho_list' && currentScope === 'all') {
+                displayBushos = this.game.bushos.filter(b => {
+                    if (b.status === 'unborn' || b.status === 'dead') return false;
+                    if (b.clan > 0 || b.belongKunishuId > 0 || b.status === 'ronin') return true;
+                    return false;
+                });
+            }
+
+            // ★追加：身分で並べ替えるための標準ルールをここで準備します
+            const getSortRankAll = (b) => {
+                // 軍師かどうかをチェックします
+                const isGunshi = b.isGunshi || (b.clan > 0 && this.game.clans.find(c => c.id === b.clan)?.gunshiId === b.id);
+
+                if (b.clan === this.game.playerClanId) {
+                    return b.isDaimyo ? 100 : (b.isCastellan ? 200 : (isGunshi ? 250 : 300));
+                }
+                if (b.clan > 0) return 1000 + b.clan * 10 + (b.isDaimyo ? 1 : (b.isCastellan ? 2 : (isGunshi ? 2.5 : 3)));
+                if (b.belongKunishuId > 0) return 5000 + b.belongKunishuId * 10 + (b.id === (window.GameApp ? window.GameApp.kunishuSystem.getKunishu(b.belongKunishuId)?.leaderId : 0) ? 1 : 2);
+                if (b.status === 'ronin') return 9000;
+                return 10000;
+            };
+            const getSortRankClan = (b) => {
+                // 軍師かどうかをチェックします
+                const isGunshi = b.isGunshi || (b.clan > 0 && this.game.clans.find(c => c.id === b.clan)?.gunshiId === b.id);
+
+                if (b.isDaimyo) return 1;
+                if (b.isCastellan) return 2;
+                if (isGunshi) return 2.5; // ★城主(2)と一般武将(3)の間に入れます
+                if (b.status === 'ronin') return 6;
+                if (b.belongKunishuId > 0) {
+                    const isLeader = b.id === (window.GameApp ? window.GameApp.kunishuSystem.getKunishu(b.belongKunishuId)?.leaderId : 0);
+                    return isLeader ? 4 : 5;
+                }
+                return 3;
+            };
+
+            // ★追加：能力が「？」になっているか判定するための準備
+            let acc = null;
+            if (isEnemyTarget && targetCastle) acc = targetCastle.investigatedAccuracy;
+
+            // ★並べ替えの魔法
+            if (currentSortKey) {
+                displayBushos.sort((a, b) => {
+                    let valA = 0;
+                    let valB = 0;
+                    
+                    if (currentSortKey === 'action') {
+                        valA = a.isActionDone ? 1 : 0;
+                        valB = b.isActionDone ? 1 : 0;
+                    } else if (currentSortKey === 'name') {
+                        const yomiA = a.yomi || a.name || "";
+                        const yomiB = b.yomi || b.name || "";
+                        return isSortAsc ? yomiA.localeCompare(yomiB, 'ja') : yomiB.localeCompare(yomiA, 'ja');
+                    } else if (currentSortKey === 'rank') {
+                        // ★変更：手動でソートした時は、全国表示でも自家を特別扱いせず、純粋な身分だけで比べます
+                        valA = getSortRankClan(a);
+                        valB = getSortRankClan(b);
+                    } else if (currentSortKey === 'faction') {
+                        const getFactionYomi = (busho) => {
+                            if (busho.belongKunishuId > 0) {
+                                const kunishu = this.game.kunishuSystem.getKunishu(busho.belongKunishuId);
+                                return kunishu ? (kunishu.yomi || kunishu.name || "") : "んんん";
+                            } else if (busho.clan > 0) {
+                                const clan = this.game.clans.find(c => c.id === busho.clan);
+                                return clan ? (clan.yomi || clan.name || "") : "んんん";
+                            }
+                            return "んんん";
+                        };
+                        const yomiA = getFactionYomi(a);
+                        const yomiB = getFactionYomi(b);
+                        return isSortAsc ? yomiA.localeCompare(yomiB, 'ja') : yomiB.localeCompare(yomiA, 'ja');
+                    } else if (currentSortKey === 'castle') {
+                        const getCastleYomi = (busho) => {
+                            const castle = this.game.getCastle(busho.castleId);
+                            return castle ? (castle.yomi || castle.name || "") : "んんん";
+                        };
+                        const yomiA = getCastleYomi(a);
+                        const yomiB = getCastleYomi(b);
+                        return isSortAsc ? yomiA.localeCompare(yomiB, 'ja') : yomiB.localeCompare(yomiA, 'ja');
+                    } else if (currentSortKey === 'age') {
+                        valA = this.game.year - a.birthYear;
+                        valB = this.game.year - b.birthYear;
+                    } else if (currentSortKey === 'family') {
+                        // ★書き換え：画面に「◯」を表示する時とまったく同じルールで一門かどうかを確認します！
+                        const checkFamily = (busho) => {
+                            if (busho.clan > 0) {
+                                const clan = this.game.clans.find(c => c.id === busho.clan);
+                                const daimyo = clan ? this.game.getBusho(clan.leaderId) : null;
+                                // 自分が大名なら一門です
+                                if (daimyo && (busho.id === daimyo.id || busho.isDaimyo)) return 1;
+                                // 大名と家族の繋がりがあれば一門です
+                                if (daimyo) {
+                                    const bFam = Array.isArray(busho.familyIds) ? busho.familyIds : [];
+                                    const dFam = Array.isArray(daimyo.familyIds) ? daimyo.familyIds : [];
+                                    if (bFam.includes(daimyo.id) || dFam.includes(busho.id)) return 1;
+                                }
+                            }
+                            return 0; // 一門じゃなければ0にします
+                        };
+                        valA = checkFamily(a);
+                        valB = checkFamily(b);
+                    } else if (currentSortKey === 'salary') {
+                        const daimyoA = a.clan > 0 ? this.game.getBusho(this.game.clans.find(c=>c.id===a.clan)?.leaderId) : null;
+                        const daimyoB = b.clan > 0 ? this.game.getBusho(this.game.clans.find(c=>c.id===b.clan)?.leaderId) : null;
+                        valA = a.clan > 0 && !a.isDaimyo && a.status !== 'ronin' ? a.getSalary(daimyoA) : 0;
+                        valB = b.clan > 0 && !b.isDaimyo && b.status !== 'ronin' ? b.getSalary(daimyoB) : 0;
+                    } else {
+                        // ★書き換え：各武将が今いるお城の調査が済んでいるか、個別に調べます
+                        const getAccForSort = (busho) => {
+                            const c = this.game.getCastle(busho.castleId);
+                            if (c && c.investigatedUntil >= this.game.getCurrentTurnId()) {
+                                return c.investigatedAccuracy;
+                            }
+                            return acc;
+                        };
+
+                        let perceivedA = GameSystem.getPerceivedStatValue(a, currentSortKey, gunshi, getAccForSort(a), this.game.playerClanId, myDaimyo);
+                        let perceivedB = GameSystem.getPerceivedStatValue(b, currentSortKey, gunshi, getAccForSort(b), this.game.playerClanId, myDaimyo);
+
+                        // 自分の大名の場合は正確な能力がわかります
+                        if (a.clan === this.game.playerClanId && a.isDaimyo) perceivedA = a[currentSortKey];
+                        if (b.clan === this.game.playerClanId && b.isDaimyo) perceivedB = b[currentSortKey];
+
+                        const isMaskedA = perceivedA === null;
+                        const isMaskedB = perceivedB === null;
+                        
+                        // ★「？」になっている能力は、昇順降順に関係なく常に一番下へ回します
+                        if (isMaskedA && !isMaskedB) return 1;  
+                        if (!isMaskedA && isMaskedB) return -1; 
+                        
+                        // ★ランク（S+, Aなど）を、比べやすいように数字に変換する魔法です
+                        const getGradeValue = (val) => {
+                            if (val >= 96) return 12; // S+
+                            if (val >= 91) return 11; // S
+                            if (val >= 81) return 10; // A+
+                            if (val >= 76) return 9;  // A
+                            if (val >= 66) return 8;  // B+
+                            if (val >= 61) return 7;  // B
+                            if (val >= 51) return 6;  // C+
+                            if (val >= 46) return 5;  // C
+                            if (val >= 36) return 4;  // D+
+                            if (val >= 31) return 3;  // D
+                            if (val >= 21) return 2;  // E+
+                            return 1;                 // E
+                        };
+
+                        if (isMaskedA && isMaskedB) {
+                            valA = 0;
+                            valB = 0;
+                        } else {
+                            const gradeA = getGradeValue(perceivedA);
+                            const gradeB = getGradeValue(perceivedB);
+
+                            if (gradeA === gradeB) {
+                                // 見た目のランク（Sなど）が同じなら、優しさで内部的な実際の能力値を使います！
+                                valA = a[currentSortKey] || 0;
+                                valB = b[currentSortKey] || 0;
+                            } else {
+                                valA = gradeA;
+                                valB = gradeB;
+                            }
+                        }
+                    }
+                    
+                    // ★書き換え：中身が空っぽなら「0」、何かが入っていれば「1」にします！能力などの数字はそのまま残します。
+                    const checkContent = (val) => {
+                        if (val === false || val === '-' || val === '' || val === null || val === undefined) return 0;
+                        if (typeof val === 'number') return val;
+                        return 1;
+                    };
+                    
+                    valA = checkContent(valA);
+                    valB = checkContent(valB);
+                    
+                    if (valA === valB) return a.id - b.id; 
+                    return isSortAsc ? (valA - valB) : (valB - valA);
+                });
+            } else {
+                // 並べ替えの基準がない時は、今までの標準の並び順にします
+                if (actionType === 'all_busho_list' && currentScope === 'all') {
+                    displayBushos.sort((a, b) => getSortRankAll(a) - getSortRankAll(b));
+                } else if (actionType === 'view_only' || actionType === 'all_busho_list') {
+                    displayBushos.sort((a, b) => getSortRankClan(a) - getSortRankClan(b));
+                }
+            }
+
+            // ★追加：並べ替えのマーク（▲や▼）をつける魔法
+            const getSortMark = (key) => {
+                if (currentSortKey !== key) return '';
+                return isSortAsc ? ' ▲' : ' ▼';
+            };
+            
+            // 選ばれているタブに合わせて、リストの一番上の見出しを変えます
+            // 見出しに「data-sort」という目印をつけて、タップできるようにします
+            if (currentTab === 'stats') {
+                if (isViewMode) {
+                    this.ui.selectorList.innerHTML = `
+                        <div class="list-header sortable-header view-mode">
+                            <span class="col-name" data-sort="name">名前${getSortMark('name')}</span><span class="col-rank" data-sort="rank">身分${getSortMark('rank')}</span><span class="col-stat" data-sort="leadership">統率${getSortMark('leadership')}</span><span class="col-stat" data-sort="strength">武勇${getSortMark('strength')}</span><span class="col-stat" data-sort="politics">政務${getSortMark('politics')}</span><span class="col-stat" data-sort="diplomacy">外交${getSortMark('diplomacy')}</span><span class="col-stat" data-sort="intelligence">智謀${getSortMark('intelligence')}</span><span class="col-stat" data-sort="charm">魅力${getSortMark('charm')}</span>
+                        </div>
+                    `;
+                } else {
+                    this.ui.selectorList.innerHTML = `
+                        <div class="list-header sortable-header">
+                            <span class="col-act" data-sort="action">行動${getSortMark('action')}</span><span class="col-name" data-sort="name">名前${getSortMark('name')}</span><span class="col-rank" data-sort="rank">身分${getSortMark('rank')}</span><span class="col-stat" data-sort="leadership">統率${getSortMark('leadership')}</span><span class="col-stat" data-sort="strength">武勇${getSortMark('strength')}</span><span class="col-stat" data-sort="politics">政務${getSortMark('politics')}</span><span class="col-stat" data-sort="diplomacy">外交${getSortMark('diplomacy')}</span><span class="col-stat" data-sort="intelligence">智謀${getSortMark('intelligence')}</span><span class="col-stat" data-sort="charm">魅力${getSortMark('charm')}</span>
+                        </div>
+                    `;
+                }
+            } else {
+                if (isViewMode) {
+                    this.ui.selectorList.innerHTML = `
+                        <div class="list-header status-mode sortable-header view-mode">
+                            <span class="col-name" data-sort="name">名前${getSortMark('name')}</span><span class="col-rank" data-sort="rank">身分${getSortMark('rank')}</span><span class="col-faction" data-sort="faction">勢力${getSortMark('faction')}</span><span class="col-castle" data-sort="castle">所在${getSortMark('castle')}</span><span class="col-act" data-sort="action">行動${getSortMark('action')}</span><span class="col-age" data-sort="age">年齢${getSortMark('age')}</span><span class="col-family" data-sort="family">一門${getSortMark('family')}</span><span class="col-salary" data-sort="salary">俸禄${getSortMark('salary')}</span><span></span>
+                        </div>
+                    `;
+                } else {
+                    this.ui.selectorList.innerHTML = `
+                        <div class="list-header status-mode sortable-header">
+                            <span class="col-name" data-sort="name">名前${getSortMark('name')}</span><span class="col-rank" data-sort="rank">身分${getSortMark('rank')}</span><span class="col-faction" data-sort="faction">勢力${getSortMark('faction')}</span><span class="col-castle" data-sort="castle">所在${getSortMark('castle')}</span><span class="col-age" data-sort="age">年齢${getSortMark('age')}</span><span class="col-family" data-sort="family">一門${getSortMark('family')}</span><span class="col-salary" data-sort="salary">俸禄${getSortMark('salary')}</span><span></span>
+                        </div>
+                    `;
+                }
+            }
+
+            // ★追加：見出しをクリックした時に並べ替えを実行する魔法
+            const headerSpans = this.ui.selectorList.querySelectorAll('.sortable-header span[data-sort]');
+            headerSpans.forEach(span => {
+                span.onclick = (e) => {
+                    const key = e.currentTarget.getAttribute('data-sort');
+                    if (!key) return;
+                    if (window.AudioManager) window.AudioManager.playSE('choice.ogg');
+                    
+                    if (currentSortKey === key) {
+                        // 同じ項目を押したなら、大きい順・小さい順を切り替えます
+                        isSortAsc = !isSortAsc;
+                    } else {
+                        // 違う項目を押したなら、その項目を基準にします
+                        currentSortKey = key;
+                        isSortAsc = false; // 基本は大きい順（降順）から始めます
+                        
+                        // 名前や身分の時は、小さい順（昇順）から始まる方が自然です
+                        if (['name', 'rank', 'faction', 'castle'].includes(key)) {
+                            isSortAsc = true;
+                        }
+                    }
+                    renderList(); // リストを描き直します！
+                };
+            });
+
+            displayBushos.forEach(b => {
+                if (actionType === 'banish' && b.isCastellan) return; 
+                if (actionType === 'employ_target' && b.isDaimyo) return;
+                if (actionType === 'reward' && b.isDaimyo) return; 
+                
+                let isSelectable = !b.isActionDone; 
+                if (extraData && extraData.allowDone) isSelectable = true; 
+                if (['appoint','employ_target','appoint_gunshi','rumor_target_busho','headhunt_target','interview','interview_target','reward','view_only','war_general', 'kunishu_war_general', 'all_busho_list', 'marriage_princess', 'marriage_kinsman'].includes(actionType)) isSelectable = true;
+                if (actionType === 'def_intercept_deploy' || actionType === 'def_reinf_deploy' || actionType === 'atk_reinf_deploy') isSelectable = true;
+                
+                // ★書き換え：表示する時も、対象の武将がいるお城の調査状況を個別に確認するようにします
+                let currentAcc = null;
+                const bCastle = this.game.getCastle(b.castleId);
+                if (bCastle && bCastle.investigatedUntil >= this.game.getCurrentTurnId()) {
+                    currentAcc = bCastle.investigatedAccuracy;
+                } else if (isEnemyTarget && targetCastle) {
+                    currentAcc = targetCastle.investigatedAccuracy;
+                }
+                const getStat = (stat) => GameSystem.getDisplayStatHTML(b, stat, gunshi, currentAcc, this.game.playerClanId, myDaimyo);
+
+                const div = document.createElement('div'); 
+                div.className = `select-item ${!isSelectable ? 'disabled' : ''}`;
+                
+                // 状態タブの時は、CSSで幅を変えるための目印（status-mode）を貼ります
+                if (currentTab === 'status') div.classList.add('status-mode');
+                // 見るだけの時は幅を変えるための目印（view-mode）を貼ります
+                if (isViewMode) div.classList.add('view-mode');
+
+                const inputType = isMulti ? 'checkbox' : 'radio';
+                
+                let inputHtml = '';
+                if (!isViewMode) {
+                    inputHtml = `<input type="${inputType}" name="sel_busho" value="${b.id}" ${!isSelectable ? 'disabled' : ''} style="display:none;">`;
+                }
+                
+                // ここでタブによって中身のデータを切り替えます！
+                if (currentTab === 'stats') {
+                    // 能力タブ
+                    if (isViewMode) {
+                        div.innerHTML = `<span class="col-name">${b.name}</span><span class="col-rank">${b.getRankName()}</span><span class="col-stat">${getStat('leadership')}</span><span class="col-stat">${getStat('strength')}</span><span class="col-stat">${getStat('politics')}</span><span class="col-stat">${getStat('diplomacy')}</span><span class="col-stat">${getStat('intelligence')}</span><span class="col-stat">${getStat('charm')}</span>`;
+                    } else {
+                        div.innerHTML = `<span class="col-act">${inputHtml}${b.isActionDone?'済':'未'}</span><span class="col-name">${b.name}</span><span class="col-rank">${b.getRankName()}</span><span class="col-stat">${getStat('leadership')}</span><span class="col-stat">${getStat('strength')}</span><span class="col-stat">${getStat('politics')}</span><span class="col-stat">${getStat('diplomacy')}</span><span class="col-stat">${getStat('intelligence')}</span><span class="col-stat">${getStat('charm')}</span>`;
+                    }
+                } else {
+                    // 状態タブ
+                    let forceName = "浪人";
+                    let familyMark = "";
+                    
+                    // 勢力名と一門判定
+                    if (b.belongKunishuId > 0) {
+                        const kunishu = this.game.kunishuSystem.getKunishu(b.belongKunishuId);
+                        forceName = kunishu ? kunishu.getName(this.game) : "諸勢力";
+                    } else if (b.clan > 0) {
+                        const clan = this.game.clans.find(c => c.id === b.clan);
+                        forceName = clan ? clan.name : "大名家";
+                        
+                        const daimyo = clan ? this.game.getBusho(clan.leaderId) : null;
+                        if (daimyo && (b.id === daimyo.id || b.isDaimyo)) {
+                            familyMark = "◯";
+                        } else if (daimyo) {
+                            const bFamily = Array.isArray(b.familyIds) ? b.familyIds : [];
+                            const dFamily = Array.isArray(daimyo.familyIds) ? daimyo.familyIds : [];
+                            if (bFamily.includes(daimyo.id) || dFamily.includes(b.id)) {
+                                familyMark = "◯";
+                            }
+                        }
+                    }
+                    
+                    const bCastle = this.game.getCastle(b.castleId);
+                    const bCastleName = bCastle ? bCastle.name : "-";
+                    const age = this.game.year - b.birthYear;
+                    
+                    let salary = "-";
+                    if (b.clan > 0 && !b.isDaimyo && b.status !== 'ronin') {
+                        const clan = this.game.clans.find(c => c.id === b.clan);
+                        const daimyo = clan ? this.game.getBusho(clan.leaderId) : null;
+                        salary = b.getSalary(daimyo);
+                        if (salary === 0) salary = "-";
+                    }
+
+                    if (isViewMode) {
+                        div.innerHTML = `<span class="col-name">${b.name}</span><span class="col-rank">${b.getRankName()}</span><span class="col-faction">${forceName}</span><span class="col-castle">${bCastleName}</span><span class="col-act">${b.isActionDone?'済':'未'}</span><span class="col-age">${age}</span><span class="col-family">${familyMark}</span><span class="col-salary">${salary}</span><span></span>`;
+                    } else {
+                        // 状態タブにも inputHtml を隠しておく（選択できるように）
+                        div.innerHTML = `<span class="col-name">${inputHtml}${b.name}</span><span class="col-rank">${b.getRankName()}</span><span class="col-faction">${forceName}</span><span class="col-castle">${bCastleName}</span><span class="col-age">${age}</span><span class="col-family">${familyMark}</span><span class="col-salary">${salary}</span><span></span>`;
+                    }
+                }
+                
+                if (actionType === 'view_only' || actionType === 'all_busho_list') {
+                    div.onclick = () => {
+                        if (window.AudioManager) window.AudioManager.playSE('choice.ogg');
+                        this.ui.showBushoDetailModal(b);
+                    };
+                    div.style.cursor = 'pointer'; // カーソルを指の形にする魔法
+                } else if (isSelectable) { 
+                    div.onclick = (e) => {
+                        if (window.AudioManager) window.AudioManager.playSE('choice.ogg');
+
+                        // 【パターン1】チェックボックスの四角い部分を直接ポチッと押した時の動き
+                        if(e.target.tagName === 'INPUT') { 
+                            if(!isMulti) {
+                                const siblings = this.ui.selectorList.querySelectorAll('.select-item');
+                                siblings.forEach(el => el.classList.remove('selected'));
+                            } else {
+                                 const maxSelect = (actionType === 'war_deploy' || actionType === 'def_intercept_deploy' || actionType === 'def_reinf_deploy' || actionType === 'atk_reinf_deploy' || actionType === 'def_self_reinf_deploy' || actionType === 'atk_self_reinf_deploy' || actionType === 'kunishu_subjugate_deploy') ? 5 : 999;
+                                 const currentChecked = this.ui.selectorList.querySelectorAll('input[name="sel_busho"]:checked').length;
+                                 if(e.target.checked && currentChecked > maxSelect) {
+                                     e.target.checked = false;
+                                     this.ui.showDialog(`出陣できる武将は最大${maxSelect}名までです。`, false);
+                                     return;
+                                 }
+
+                                 // ★ ここから追加：金や兵糧のオーバーチェック（チェックボックスを直接押した時）
+                                 if (e.target.checked) {
+                                     if (spec.costGold > 0 && currentChecked * spec.costGold > c.gold) {
+                                         e.target.checked = false; 
+                                         this.ui.showDialog(`金が足りないため、これ以上選べません。`, false);
+                                         return;
+                                     }
+                                     if (spec.costRice > 0 && currentChecked * spec.costRice > c.rice) {
+                                         e.target.checked = false; 
+                                         this.ui.showDialog(`兵糧が足りないため、これ以上選べません。`, false);
+                                         return;
+                                     }
+                                 }
+                            }
+                            if(e.target.checked) div.classList.add('selected');
+                            else div.classList.remove('selected');
+                            updateContextCost();
+                            updateBushoConfirmBtn(); 
+                            return;
+                        } 
+                        
+                        // 【パターン2】武将の名前など、行のどこかを押した時の動き
+                        const input = div.querySelector('input');
+                        if(input) {
+                            if (isMulti) { 
+                                 const maxSelect = (actionType === 'war_deploy' || actionType === 'def_intercept_deploy' || actionType === 'def_reinf_deploy' || actionType === 'atk_reinf_deploy' || actionType === 'def_self_reinf_deploy' || actionType === 'atk_self_reinf_deploy' || actionType === 'kunishu_subjugate_deploy') ? 5 : 999;
+                                 const currentChecked = this.ui.selectorList.querySelectorAll('input[name="sel_busho"]:checked').length;
+                                 if(!input.checked && currentChecked >= maxSelect) {
+                                     this.ui.showDialog(`出陣できる武将は最大${maxSelect}名までです。`, false);
+                                     return;
+                                 }
+
+                                 // ★ ここから追加：金や兵糧のオーバーチェック（武将の行を押した時）
+                                 if (!input.checked) {
+                                     if (spec.costGold > 0 && (currentChecked + 1) * spec.costGold > c.gold) {
+                                         this.ui.showDialog(`金が足りないため、これ以上選べません。`, false);
+                                         return;
+                                     }
+                                     if (spec.costRice > 0 && (currentChecked + 1) * spec.costRice > c.rice) {
+                                         this.ui.showDialog(`兵糧が足りないため、これ以上選べません。`, false);
+                                         return;
+                                     }
+                                 }
+
+                                 input.checked = !input.checked; 
+                            } else { 
+                                 input.checked = true; const allItems = this.ui.selectorList.querySelectorAll('.select-item'); allItems.forEach(item => item.classList.remove('selected')); 
+                            }
+                            if(input.checked) div.classList.add('selected'); else div.classList.remove('selected');
+                            updateContextCost(); 
+                            updateBushoConfirmBtn(); 
+                        }
+                    };
+                }
+                this.ui.selectorList.appendChild(div);
+            });
+            if (bushos.length === 0 && this.ui.selectorList) this.ui.selectorList.innerHTML = "<div style='padding:10px;'>対象となる武将がいません</div>";
+        };
+
+        // 準備が整ったので、最初の1回目を描画します！
+        renderList();
+        
+        if (this.ui.selectorList) {
+            this.ui.selectorList.scrollTop = 0;
+        }
+        
+        if (this.ui.selectorConfirmBtn) {
+            if (actionType === 'view_only' || actionType === 'all_busho_list') {
+                this.ui.selectorConfirmBtn.classList.add('hidden'); 
+            } else {
+                this.ui.selectorConfirmBtn.classList.remove('hidden');
+                
+                updateBushoConfirmBtn();
+
+                this.ui.selectorConfirmBtn.onclick = () => {
+                    const inputs = document.querySelectorAll('input[name="sel_busho"]:checked'); if (inputs.length === 0) return;
+                    const selectedIds = Array.from(inputs).map(i => parseInt(i.value)); 
+                    this.ui.closeSelector();
+                    if (extraData && extraData.onConfirm) {
+                        extraData.onConfirm(selectedIds);
+                    } else {
+                        this.game.commandSystem.handleBushoSelection(actionType, selectedIds, targetId, extraData);
+                    }
+                };
+            }
+        }
+    }
 }
