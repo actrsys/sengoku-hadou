@@ -1877,8 +1877,24 @@ class UIManager {
                         valA = this.game.year - a.birthYear;
                         valB = this.game.year - b.birthYear;
                     } else if (currentSortKey === 'family') {
-                        valA = (a.familyIds && a.familyIds.length > 0) || a.isDaimyo ? 1 : 0;
-                        valB = (b.familyIds && b.familyIds.length > 0) || b.isDaimyo ? 1 : 0;
+                        // ★書き換え：画面に「◯」を表示する時とまったく同じルールで一門かどうかを確認します！
+                        const checkFamily = (busho) => {
+                            if (busho.clan > 0) {
+                                const clan = this.game.clans.find(c => c.id === busho.clan);
+                                const daimyo = clan ? this.game.getBusho(clan.leaderId) : null;
+                                // 自分が大名なら一門です
+                                if (daimyo && (busho.id === daimyo.id || busho.isDaimyo)) return 1;
+                                // 大名と家族の繋がりがあれば一門です
+                                if (daimyo) {
+                                    const bFam = Array.isArray(busho.familyIds) ? busho.familyIds : [];
+                                    const dFam = Array.isArray(daimyo.familyIds) ? daimyo.familyIds : [];
+                                    if (bFam.includes(daimyo.id) || dFam.includes(busho.id)) return 1;
+                                }
+                            }
+                            return 0; // 一門じゃなければ0にします
+                        };
+                        valA = checkFamily(a);
+                        valB = checkFamily(b);
                     } else if (currentSortKey === 'salary') {
                         const daimyoA = a.clan > 0 ? this.game.getBusho(this.game.clans.find(c=>c.id===a.clan)?.leaderId) : null;
                         const daimyoB = b.clan > 0 ? this.game.getBusho(this.game.clans.find(c=>c.id===b.clan)?.leaderId) : null;
