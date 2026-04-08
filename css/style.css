@@ -1280,3 +1280,9 @@ body.is-pc.daimyo-select-mode #pc-new-ui-container { display: none !important; }
 body.is-pc .list-header.status-mode, body.is-pc .select-item.status-mode {
     grid-template-columns: 140px 140px 140px 60px 50px 60px 50px; 
 }
+
+/* ★一門の◯印のスタイル（黒・太字） */
+.select-item.status-mode .col-family {
+    font-weight: bold;
+    color: #000;
+}
