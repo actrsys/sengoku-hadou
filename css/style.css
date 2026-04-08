@@ -251,6 +251,7 @@ body.hide-daimyo-labels .daimyo-name-label { display: none !important; }
 
 /* 各種リストの基本グリッド（スマホ向けベース） */
 .list-header, .select-item { display: grid; grid-template-columns: 35px 2.5fr 1.5fr repeat(6, 1fr); font-size: clamp(0.6rem, 2.2vw, 0.85rem); padding: 0; min-height: 30px; gap: 0; }
+.list-header.view-mode, .select-item.view-mode { grid-template-columns: 2.5fr 1.5fr repeat(6, 1fr); }
 .daimyo-list-header, .daimyo-list-item { display: grid; grid-template-columns: 2fr 2fr 1fr 1.5fr 1.5fr 1fr; font-size: clamp(0.65rem, 2.5vw, 0.9rem); padding: 0; min-height: 30px; gap: 0; }
 .kunishu-list-header, .kunishu-list-item { display: grid; grid-template-columns: 20px 3fr 1.5fr 1.5fr 1.5fr; font-size: clamp(0.7rem, 2.8vw, 0.9rem); padding: 0; min-height: 30px; gap: 0; }
 .view-mode .kunishu-list-header, .view-mode .kunishu-list-item { grid-template-columns: 3fr 1.5fr 1.5fr 1.5fr; }
@@ -983,7 +984,8 @@ body.is-pc {
     .cmd-btn.finish, .cmd-btn.back { grid-column: span 2; }
 
     /* PCリストレイアウト */
-    .list-header, .select-item { grid-template-columns: 45px 100px 55px repeat(6, 1fr); font-size: 0.85rem; min-height: 36px; }
+    .list-header, .select-item { grid-template-columns: 45px 100px 60px repeat(6, 1fr); font-size: 0.85rem; min-height: 36px; }
+    .list-header.view-mode, .select-item.view-mode { grid-template-columns: 100px 60px repeat(6, 1fr); }
     .daimyo-list-header, .daimyo-list-item { grid-template-columns: 80px 110px 50px 80px 80px 60px; font-size: 0.9rem; min-height: 36px; }
     .kunishu-list-header, .kunishu-list-item { grid-template-columns: 25px 130px 80px 80px 80px; font-size: 0.9rem; min-height: 36px; }
     .view-mode .kunishu-list-header, .view-mode .kunishu-list-item { grid-template-columns: 140px 80px 80px 80px; }
@@ -1274,11 +1276,18 @@ body.is-pc.daimyo-select-mode #pc-new-ui-container { display: none !important; }
 
 /* 状態タブ選択時のリストレイアウト（スマホ） */
 .list-header.status-mode, .select-item.status-mode {
-    grid-template-columns: 2.5fr 2.5fr 2fr 1.5fr 1fr 1fr 1fr 0fr; 
+    grid-template-columns: 2.5fr 1.5fr 2fr 2fr 1fr 1fr 1fr 0fr; 
 }
+.list-header.status-mode.view-mode, .select-item.status-mode.view-mode {
+    grid-template-columns: 2.5fr 1.5fr 2fr 2fr 35px 1fr 1fr 1fr 0fr; 
+}
+
 /* 状態タブ選択時のリストレイアウト（PC版） */
 body.is-pc .list-header.status-mode, body.is-pc .select-item.status-mode {
-    grid-template-columns: 140px 140px 140px 60px 50px 50px 60px 1fr; 
+    grid-template-columns: 100px 60px 140px 140px 50px 50px 60px 1fr; 
+}
+body.is-pc .list-header.status-mode.view-mode, body.is-pc .select-item.status-mode.view-mode {
+    grid-template-columns: 100px 60px 140px 140px 45px 50px 50px 60px 1fr; 
 }
 
 /* ★一門の◯印のスタイル（黒・太字） */

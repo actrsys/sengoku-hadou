@@ -1920,17 +1920,33 @@ class UIManager {
             // 選ばれているタブに合わせて、リストの一番上の見出しを変えます
             // 見出しに「data-sort」という目印をつけて、タップできるようにします
             if (currentTab === 'stats') {
-                this.selectorList.innerHTML = `
-                    <div class="list-header sortable-header">
-                        <span class="col-act" data-sort="action">行動${getSortMark('action')}</span><span class="col-name" data-sort="name">名前${getSortMark('name')}</span><span class="col-rank" data-sort="rank">身分${getSortMark('rank')}</span><span class="col-stat" data-sort="leadership">統率${getSortMark('leadership')}</span><span class="col-stat" data-sort="strength">武勇${getSortMark('strength')}</span><span class="col-stat" data-sort="politics">政務${getSortMark('politics')}</span><span class="col-stat" data-sort="diplomacy">外交${getSortMark('diplomacy')}</span><span class="col-stat" data-sort="intelligence">智謀${getSortMark('intelligence')}</span><span class="col-stat" data-sort="charm">魅力${getSortMark('charm')}</span>
-                    </div>
-                `;
+                if (isViewMode) {
+                    this.selectorList.innerHTML = `
+                        <div class="list-header sortable-header view-mode">
+                            <span class="col-name" data-sort="name">名前${getSortMark('name')}</span><span class="col-rank" data-sort="rank">身分${getSortMark('rank')}</span><span class="col-stat" data-sort="leadership">統率${getSortMark('leadership')}</span><span class="col-stat" data-sort="strength">武勇${getSortMark('strength')}</span><span class="col-stat" data-sort="politics">政務${getSortMark('politics')}</span><span class="col-stat" data-sort="diplomacy">外交${getSortMark('diplomacy')}</span><span class="col-stat" data-sort="intelligence">智謀${getSortMark('intelligence')}</span><span class="col-stat" data-sort="charm">魅力${getSortMark('charm')}</span>
+                        </div>
+                    `;
+                } else {
+                    this.selectorList.innerHTML = `
+                        <div class="list-header sortable-header">
+                            <span class="col-act" data-sort="action">行動${getSortMark('action')}</span><span class="col-name" data-sort="name">名前${getSortMark('name')}</span><span class="col-rank" data-sort="rank">身分${getSortMark('rank')}</span><span class="col-stat" data-sort="leadership">統率${getSortMark('leadership')}</span><span class="col-stat" data-sort="strength">武勇${getSortMark('strength')}</span><span class="col-stat" data-sort="politics">政務${getSortMark('politics')}</span><span class="col-stat" data-sort="diplomacy">外交${getSortMark('diplomacy')}</span><span class="col-stat" data-sort="intelligence">智謀${getSortMark('intelligence')}</span><span class="col-stat" data-sort="charm">魅力${getSortMark('charm')}</span>
+                        </div>
+                    `;
+                }
             } else {
-                this.selectorList.innerHTML = `
-                    <div class="list-header status-mode sortable-header">
-                        <span class="col-name" data-sort="name">名前${getSortMark('name')}</span><span class="col-faction" data-sort="faction">勢力${getSortMark('faction')}</span><span class="col-castle" data-sort="castle">所在${getSortMark('castle')}</span><span class="col-rank" data-sort="rank">身分${getSortMark('rank')}</span><span class="col-age" data-sort="age">年齢${getSortMark('age')}</span><span class="col-family" data-sort="family">一門${getSortMark('family')}</span><span class="col-salary" data-sort="salary">俸禄${getSortMark('salary')}</span><span></span>
-                    </div>
-                `;
+                if (isViewMode) {
+                    this.selectorList.innerHTML = `
+                        <div class="list-header status-mode sortable-header view-mode">
+                            <span class="col-name" data-sort="name">名前${getSortMark('name')}</span><span class="col-rank" data-sort="rank">身分${getSortMark('rank')}</span><span class="col-faction" data-sort="faction">勢力${getSortMark('faction')}</span><span class="col-castle" data-sort="castle">所在${getSortMark('castle')}</span><span class="col-act" data-sort="action">行動${getSortMark('action')}</span><span class="col-age" data-sort="age">年齢${getSortMark('age')}</span><span class="col-family" data-sort="family">一門${getSortMark('family')}</span><span class="col-salary" data-sort="salary">俸禄${getSortMark('salary')}</span><span></span>
+                        </div>
+                    `;
+                } else {
+                    this.selectorList.innerHTML = `
+                        <div class="list-header status-mode sortable-header">
+                            <span class="col-name" data-sort="name">名前${getSortMark('name')}</span><span class="col-rank" data-sort="rank">身分${getSortMark('rank')}</span><span class="col-faction" data-sort="faction">勢力${getSortMark('faction')}</span><span class="col-castle" data-sort="castle">所在${getSortMark('castle')}</span><span class="col-age" data-sort="age">年齢${getSortMark('age')}</span><span class="col-family" data-sort="family">一門${getSortMark('family')}</span><span class="col-salary" data-sort="salary">俸禄${getSortMark('salary')}</span><span></span>
+                        </div>
+                    `;
+                }
             }
 
             // ★追加：見出しをクリックした時に並べ替えを実行する魔法
@@ -1976,6 +1992,8 @@ class UIManager {
                 
                 // 状態タブの時は、CSSで幅を変えるための目印（status-mode）を貼ります
                 if (currentTab === 'status') div.classList.add('status-mode');
+                // 見るだけの時は幅を変えるための目印（view-mode）を貼ります
+                if (isViewMode) div.classList.add('view-mode');
 
                 const inputType = isMulti ? 'checkbox' : 'radio';
                 
@@ -1986,8 +2004,12 @@ class UIManager {
                 
                 // ここでタブによって中身のデータを切り替えます！
                 if (currentTab === 'stats') {
-                    // 能力タブ（今まで通り）
-                    div.innerHTML = `<span class="col-act">${inputHtml}${b.isActionDone?'[済]':'[未]'}</span><span class="col-name">${b.name}</span><span class="col-rank">${b.getRankName()}</span><span class="col-stat">${getStat('leadership')}</span><span class="col-stat">${getStat('strength')}</span><span class="col-stat">${getStat('politics')}</span><span class="col-stat">${getStat('diplomacy')}</span><span class="col-stat">${getStat('intelligence')}</span><span class="col-stat">${getStat('charm')}</span>`;
+                    // 能力タブ
+                    if (isViewMode) {
+                        div.innerHTML = `<span class="col-name">${b.name}</span><span class="col-rank">${b.getRankName()}</span><span class="col-stat">${getStat('leadership')}</span><span class="col-stat">${getStat('strength')}</span><span class="col-stat">${getStat('politics')}</span><span class="col-stat">${getStat('diplomacy')}</span><span class="col-stat">${getStat('intelligence')}</span><span class="col-stat">${getStat('charm')}</span>`;
+                    } else {
+                        div.innerHTML = `<span class="col-act">${inputHtml}${b.isActionDone?'[済]':'[未]'}</span><span class="col-name">${b.name}</span><span class="col-rank">${b.getRankName()}</span><span class="col-stat">${getStat('leadership')}</span><span class="col-stat">${getStat('strength')}</span><span class="col-stat">${getStat('politics')}</span><span class="col-stat">${getStat('diplomacy')}</span><span class="col-stat">${getStat('intelligence')}</span><span class="col-stat">${getStat('charm')}</span>`;
+                    }
                 } else {
                     // 状態タブ
                     let forceName = "浪人";
@@ -2025,7 +2047,12 @@ class UIManager {
                         if (salary === 0) salary = "-";
                     }
 
-                    div.innerHTML = `<span class="col-name">${b.name}</span><span class="col-faction">${forceName}</span><span class="col-castle">${bCastleName}</span><span class="col-rank">${b.getRankName()}</span><span class="col-age">${age}</span><span class="col-family">${familyMark}</span><span class="col-salary">${salary}</span><span></span>`;
+                    if (isViewMode) {
+                        div.innerHTML = `<span class="col-name">${b.name}</span><span class="col-rank">${b.getRankName()}</span><span class="col-faction">${forceName}</span><span class="col-castle">${bCastleName}</span><span class="col-act">${b.isActionDone?'[済]':'[未]'}</span><span class="col-age">${age}</span><span class="col-family">${familyMark}</span><span class="col-salary">${salary}</span><span></span>`;
+                    } else {
+                        // 状態タブにも inputHtml を隠しておく（選択できるように）
+                        div.innerHTML = `<span class="col-name">${inputHtml}${b.name}</span><span class="col-rank">${b.getRankName()}</span><span class="col-faction">${forceName}</span><span class="col-castle">${bCastleName}</span><span class="col-age">${age}</span><span class="col-family">${familyMark}</span><span class="col-salary">${salary}</span><span></span>`;
+                    }
                 }
                 
                 if (actionType === 'view_only' || actionType === 'all_busho_list') {
