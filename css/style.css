@@ -1286,3 +1286,15 @@ body.is-pc .list-header.status-mode, body.is-pc .select-item.status-mode {
     font-weight: bold;
     color: #000;
 }
+
+/* =========================================================
+   ★ リスト見出しの並べ替え機能（ソート）の魔法
+   ========================================================= */
+.sortable-header span[data-sort] {
+    cursor: pointer;
+    transition: background-color 0.2s, color 0.2s;
+}
+.sortable-header span[data-sort]:hover {
+    background-color: #546e7a;
+    color: #ffcc80;
+}

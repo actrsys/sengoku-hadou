@@ -1734,6 +1734,8 @@ class UIManager {
         const tabsEl = document.getElementById('selector-tabs');
         let currentTab = 'stats'; // 最初は能力(stats)タブにしておきます
         let currentScope = 'clan'; // 最初は自家タブにしておきます
+        let currentSortKey = null; // ★追加：今並べ替えの基準にしている項目
+        let isSortAsc = false;     // ★追加：小さい順（昇順）なら true、大きい順（降順）なら false
         
         if (isViewMode && tabsEl) {
             tabsEl.classList.remove('hidden');
@@ -1791,52 +1793,133 @@ class UIManager {
             if (!this.selectorList) return;
             this.selectorList.innerHTML = '';
             
-            let displayBushos = bushos;
+            let displayBushos = [...bushos]; // ★書き換え：元の順番を壊さないようにコピーを作ります
             if (actionType === 'all_busho_list' && currentScope === 'all') {
                 displayBushos = this.game.bushos.filter(b => {
                     if (b.status === 'unborn' || b.status === 'dead') return false;
                     if (b.clan > 0 || b.belongKunishuId > 0 || b.status === 'ronin') return true;
                     return false;
                 });
-                
-                const getSortRankAll = (b) => {
-                    if (b.clan === this.game.playerClanId) {
-                        return b.isDaimyo ? 100 : (b.isCastellan ? 200 : 300);
-                    }
-                    if (b.clan > 0) return 1000 + b.clan * 10 + (b.isDaimyo ? 1 : (b.isCastellan ? 2 : 3));
-                    if (b.belongKunishuId > 0) return 5000 + b.belongKunishuId * 10 + (b.id === (window.GameApp ? window.GameApp.kunishuSystem.getKunishu(b.belongKunishuId)?.leaderId : 0) ? 1 : 2);
-                    if (b.status === 'ronin') return 9000;
-                    return 10000;
-                };
-                displayBushos.sort((a, b) => getSortRankAll(a) - getSortRankAll(b));
-            } else if (actionType === 'view_only' || actionType === 'all_busho_list') {
-                const getSortRankClan = (b) => {
-                    if (b.isDaimyo) return 1;
-                    if (b.isCastellan) return 2;
-                    if (b.status === 'ronin') return 6;
-                    if (b.belongKunishuId > 0) {
-                        const isLeader = b.id === (window.GameApp ? window.GameApp.kunishuSystem.getKunishu(b.belongKunishuId)?.leaderId : 0);
-                        return isLeader ? 4 : 5;
-                    }
-                    return 3;
-                };
-                displayBushos.sort((a, b) => getSortRankClan(a) - getSortRankClan(b));
             }
+
+            // ★並べ替えの魔法
+            if (currentSortKey) {
+                displayBushos.sort((a, b) => {
+                    let valA = 0;
+                    let valB = 0;
+                    
+                    if (currentSortKey === 'action') {
+                        valA = a.isActionDone ? 1 : 0;
+                        valB = b.isActionDone ? 1 : 0;
+                    } else if (currentSortKey === 'name') {
+                        // 名前はあいうえお順などで比較します
+                        return isSortAsc ? a.name.localeCompare(b.name, 'ja') : b.name.localeCompare(a.name, 'ja');
+                    } else if (currentSortKey === 'rank') {
+                        // 身分は内部の並び順の数字を使います
+                        valA = (a.isDaimyo ? 1 : (a.isCastellan ? 2 : (a.status === 'ronin' ? 6 : (a.belongKunishuId > 0 ? 5 : 3))));
+                        valB = (b.isDaimyo ? 1 : (b.isCastellan ? 2 : (b.status === 'ronin' ? 6 : (b.belongKunishuId > 0 ? 5 : 3))));
+                    } else if (currentSortKey === 'faction') {
+                        valA = a.clan || (a.belongKunishuId ? a.belongKunishuId + 1000 : 9999);
+                        valB = b.clan || (b.belongKunishuId ? b.belongKunishuId + 1000 : 9999);
+                    } else if (currentSortKey === 'castle') {
+                        valA = a.castleId;
+                        valB = b.castleId;
+                    } else if (currentSortKey === 'age') {
+                        valA = this.game.year - a.birthYear;
+                        valB = this.game.year - b.birthYear;
+                    } else if (currentSortKey === 'family') {
+                        // 一門かどうかの判定です
+                        valA = (a.familyIds && a.familyIds.length > 0) || a.isDaimyo ? 1 : 0;
+                        valB = (b.familyIds && b.familyIds.length > 0) || b.isDaimyo ? 1 : 0;
+                    } else if (currentSortKey === 'salary') {
+                        // 俸禄の比較です（大名などは0になります）
+                        const daimyoA = a.clan > 0 ? this.game.getBusho(this.game.clans.find(c=>c.id===a.clan)?.leaderId) : null;
+                        const daimyoB = b.clan > 0 ? this.game.getBusho(this.game.clans.find(c=>c.id===b.clan)?.leaderId) : null;
+                        valA = a.clan > 0 && !a.isDaimyo && a.status !== 'ronin' ? a.getSalary(daimyoA) : 0;
+                        valB = b.clan > 0 && !b.isDaimyo && b.status !== 'ronin' ? b.getSalary(daimyoB) : 0;
+                    } else {
+                        // 統率や武勇などの能力値
+                        valA = a[currentSortKey] || 0;
+                        valB = b[currentSortKey] || 0;
+                    }
+                    
+                    if (valA === valB) return a.id - b.id; // 同じ数字なら内部IDの順番で揃えます
+                    return isSortAsc ? (valA - valB) : (valB - valA);
+                });
+            } else {
+                // 並べ替えの基準がない時は、今までの標準の並び順にします
+                if (actionType === 'all_busho_list' && currentScope === 'all') {
+                    const getSortRankAll = (b) => {
+                        if (b.clan === this.game.playerClanId) {
+                            return b.isDaimyo ? 100 : (b.isCastellan ? 200 : 300);
+                        }
+                        if (b.clan > 0) return 1000 + b.clan * 10 + (b.isDaimyo ? 1 : (b.isCastellan ? 2 : 3));
+                        if (b.belongKunishuId > 0) return 5000 + b.belongKunishuId * 10 + (b.id === (window.GameApp ? window.GameApp.kunishuSystem.getKunishu(b.belongKunishuId)?.leaderId : 0) ? 1 : 2);
+                        if (b.status === 'ronin') return 9000;
+                        return 10000;
+                    };
+                    displayBushos.sort((a, b) => getSortRankAll(a) - getSortRankAll(b));
+                } else if (actionType === 'view_only' || actionType === 'all_busho_list') {
+                    const getSortRankClan = (b) => {
+                        if (b.isDaimyo) return 1;
+                        if (b.isCastellan) return 2;
+                        if (b.status === 'ronin') return 6;
+                        if (b.belongKunishuId > 0) {
+                            const isLeader = b.id === (window.GameApp ? window.GameApp.kunishuSystem.getKunishu(b.belongKunishuId)?.leaderId : 0);
+                            return isLeader ? 4 : 5;
+                        }
+                        return 3;
+                    };
+                    displayBushos.sort((a, b) => getSortRankClan(a) - getSortRankClan(b));
+                }
+            }
+
+            // ★追加：並べ替えのマーク（▲や▼）をつける魔法
+            const getSortMark = (key) => {
+                if (currentSortKey !== key) return '';
+                return isSortAsc ? ' ▲' : ' ▼';
+            };
             
             // 選ばれているタブに合わせて、リストの一番上の見出しを変えます
+            // 見出しに「data-sort」という目印をつけて、タップできるようにします
             if (currentTab === 'stats') {
                 this.selectorList.innerHTML = `
-                    <div class="list-header">
-                        <span class="col-act">行動</span><span class="col-name">名前</span><span class="col-rank">身分</span><span class="col-stat">統率</span><span class="col-stat">武勇</span><span class="col-stat">政務</span><span class="col-stat">外交</span><span class="col-stat">智謀</span><span class="col-stat">魅力</span>
+                    <div class="list-header sortable-header">
+                        <span class="col-act" data-sort="action">行動${getSortMark('action')}</span><span class="col-name" data-sort="name">名前${getSortMark('name')}</span><span class="col-rank" data-sort="rank">身分${getSortMark('rank')}</span><span class="col-stat" data-sort="leadership">統率${getSortMark('leadership')}</span><span class="col-stat" data-sort="strength">武勇${getSortMark('strength')}</span><span class="col-stat" data-sort="politics">政務${getSortMark('politics')}</span><span class="col-stat" data-sort="diplomacy">外交${getSortMark('diplomacy')}</span><span class="col-stat" data-sort="intelligence">智謀${getSortMark('intelligence')}</span><span class="col-stat" data-sort="charm">魅力${getSortMark('charm')}</span>
                     </div>
                 `;
             } else {
                 this.selectorList.innerHTML = `
-                    <div class="list-header status-mode">
-                        <span class="col-name">名前</span><span class="col-faction">勢力</span><span class="col-castle">所在</span><span class="col-rank">身分</span><span class="col-age">年齢</span><span class="col-family">一門</span><span class="col-salary">俸禄</span><span></span>
+                    <div class="list-header status-mode sortable-header">
+                        <span class="col-name" data-sort="name">名前${getSortMark('name')}</span><span class="col-faction" data-sort="faction">勢力${getSortMark('faction')}</span><span class="col-castle" data-sort="castle">所在${getSortMark('castle')}</span><span class="col-rank" data-sort="rank">身分${getSortMark('rank')}</span><span class="col-age" data-sort="age">年齢${getSortMark('age')}</span><span class="col-family" data-sort="family">一門${getSortMark('family')}</span><span class="col-salary" data-sort="salary">俸禄${getSortMark('salary')}</span><span></span>
                     </div>
                 `;
             }
+
+            // ★追加：見出しをクリックした時に並べ替えを実行する魔法
+            const headerSpans = this.selectorList.querySelectorAll('.sortable-header span[data-sort]');
+            headerSpans.forEach(span => {
+                span.onclick = (e) => {
+                    const key = e.currentTarget.getAttribute('data-sort');
+                    if (!key) return;
+                    if (window.AudioManager) window.AudioManager.playSE('choice.ogg');
+                    
+                    if (currentSortKey === key) {
+                        // 同じ項目を押したなら、大きい順・小さい順を切り替えます
+                        isSortAsc = !isSortAsc;
+                    } else {
+                        // 違う項目を押したなら、その項目を基準にします
+                        currentSortKey = key;
+                        isSortAsc = false; // 基本は大きい順（降順）から始めます
+                        
+                        // 名前や身分の時は、小さい順（昇順）から始まる方が自然です
+                        if (['name', 'rank', 'faction', 'castle'].includes(key)) {
+                            isSortAsc = true;
+                        }
+                    }
+                    renderList(); // リストを描き直します！
+                };
+            });
 
             displayBushos.forEach(b => {
                 if (actionType === 'banish' && b.isCastellan) return; 
