@@ -1199,7 +1199,13 @@ class GameManager {
             if (c.ownerClan === 0) return;
 
             const bushos = this.getCastleBushos(c.id);
-            const consumeGold = bushos.length * window.MainParams.Economy.ConsumeGoldPerBusho;
+            const daimyo = this.bushos.find(b => b.clan === c.ownerClan && b.isDaimyo);
+            
+            let consumeGold = 0;
+            bushos.forEach(b => {
+                consumeGold += b.getSalary(daimyo);
+            });
+            
             const isGoldShort = (c.gold - consumeGold < 0);
             
             const consumeRice = Math.floor(c.soldiers * window.MainParams.Economy.ConsumeRicePerSoldier);
