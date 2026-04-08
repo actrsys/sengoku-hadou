@@ -2591,7 +2591,7 @@ class UIManager {
             const singleCost = 1 / efficiency;
             
             this.tradeTypeInfo.classList.remove('hidden'); 
-            this.tradeTypeInfo.textContent = `相場: 兵士 1人 ＝ 金 ${singleCost.toFixed(1)}`;
+            this.tradeTypeInfo.textContent = `兵士 1人 ＝ 金 ${singleCost.toFixed(1)}`;
 
             // ★変更：スライダーより前に数字の箱を作って、スライダーの上に表示させます！
             const costDiv = document.createElement('div');
@@ -2674,7 +2674,7 @@ class UIManager {
             const maxBuy = Math.floor(c.gold / rate);
             this.tradeTypeInfo.classList.remove('hidden'); 
             // ★変更：相場の金額を小数点以下1桁で表示します！
-            this.tradeTypeInfo.textContent = `相場: 兵糧 10 ＝ 金 ${(10 * rate).toFixed(1)}`;
+            this.tradeTypeInfo.textContent = `兵糧 10 ＝ 金 ${(10 * rate).toFixed(1)}`;
 
             // ★変更：スライダーより前に数字の箱を作って、スライダーの上に表示させます！
             const costDiv = document.createElement('div');
@@ -2693,7 +2693,7 @@ class UIManager {
             }
             this.tradeTypeInfo.classList.remove('hidden'); 
             // ★変更：相場の金額を小数点以下1桁で表示します！
-            this.tradeTypeInfo.textContent = `相場: 兵糧 10 ＝ 金 ${(10 * rate).toFixed(1)}`;
+            this.tradeTypeInfo.textContent = `兵糧 10 ＝ 金 ${(10 * rate).toFixed(1)}`;
 
             // ★変更：スライダーより前に数字の箱を作って、スライダーの上に表示させます！
             const costDiv = document.createElement('div');
@@ -2718,7 +2718,7 @@ class UIManager {
             // ★変更：さっき作った「正確な単価の魔法」を使って表示します
             const unitPrice = GameSystem.calcBuyHorseUnitPrice(daimyo, castellan);
             this.tradeTypeInfo.classList.remove('hidden'); 
-            this.tradeTypeInfo.textContent = `相場: 騎馬 1頭 ＝ 金 ${unitPrice.toFixed(1)}`;
+            this.tradeTypeInfo.textContent = `騎馬 1頭 ＝ 金 ${unitPrice.toFixed(1)}`;
 
             // ★変更：スライダーより前に数字の箱を作って、スライダーの上に表示させます！
             const costDiv = document.createElement('div');
@@ -2736,7 +2736,7 @@ class UIManager {
             // ★変更：さっき作った「正確な単価の魔法」を使って表示します
             const unitPrice = GameSystem.calcBuyGunUnitPrice(daimyo, castellan);
             this.tradeTypeInfo.classList.remove('hidden'); 
-            this.tradeTypeInfo.textContent = `相場: 鉄砲 1挺 ＝ 金 ${unitPrice.toFixed(1)}`;
+            this.tradeTypeInfo.textContent = `鉄砲 1挺 ＝ 金 ${unitPrice.toFixed(1)}`;
 
             // ★変更：スライダーより前に数字の箱を作って、スライダーの上に表示させます！
             const costDiv = document.createElement('div');
