@@ -994,18 +994,29 @@ class UIInfoManager {
             tabsEl.classList.add('hidden');
         }
 
+        let savedBushos = null; // ★追加：前の並び順を記憶しておく箱
+        let lastScope = null;   // ★追加：前回のスコープ（自家/全国）の記憶
+
         // ★リストを描画する部分を「関数」としてまとめました！
         const renderList = () => {
             if (!this.ui.selectorList) return;
             this.ui.selectorList.innerHTML = '';
             
-            let displayBushos = [...bushos]; // ★書き換え：元の順番を壊さないようにコピーを作ります
-            if (actionType === 'all_busho_list' && currentScope === 'all') {
-                displayBushos = this.game.bushos.filter(b => {
-                    if (b.status === 'unborn' || b.status === 'dead') return false;
-                    if (b.clan > 0 || b.belongKunishuId > 0 || b.status === 'ronin') return true;
-                    return false;
-                });
+            let displayBushos;
+            // ★変更：自家/全国が切り替わった時か、最初の１回目だけリストを作り直します
+            if (!savedBushos || lastScope !== currentScope) {
+                displayBushos = [...bushos]; 
+                if (actionType === 'all_busho_list' && currentScope === 'all') {
+                    displayBushos = this.game.bushos.filter(b => {
+                        if (b.status === 'unborn' || b.status === 'dead') return false;
+                        if (b.clan > 0 || b.belongKunishuId > 0 || b.status === 'ronin') return true;
+                        return false;
+                    });
+                }
+                lastScope = currentScope;
+            } else {
+                // ★変更：それ以外は、前回の「並べ替え済みのリスト」をそのまま使います！
+                displayBushos = [...savedBushos];
             }
 
             // ★追加：身分で並べ替えるための標準ルールをここで準備します
@@ -1191,6 +1202,9 @@ class UIInfoManager {
                     displayBushos.sort((a, b) => getSortRankClan(a) - getSortRankClan(b));
                 }
             }
+
+            // ★追加：並べ替えが終わった後のリストを記憶しておきます！
+            savedBushos = [...displayBushos];
 
             // ★追加：並べ替えのマーク（▲や▼）をつける魔法
             const getSortMark = (key) => {
