@@ -1251,7 +1251,7 @@ body.is-pc.daimyo-select-mode #pc-new-ui-container { display: none !important; }
     margin-bottom: 5px;
     padding-left: 5px;
 }
-.busho-tab-btn {
+.busho-tab-btn, .busho-scope-btn {
     padding: 6px 15px;
     font-size: 0.95rem;
     font-weight: bold;
@@ -1263,10 +1263,10 @@ body.is-pc.daimyo-select-mode #pc-new-ui-container { display: none !important; }
     color: #555;
     transition: background-color 0.2s, color 0.2s;
 }
-.busho-tab-btn:hover {
+.busho-tab-btn:hover, .busho-scope-btn:hover {
     background: #cfd8dc;
 }
-.busho-tab-btn.active {
+.busho-tab-btn.active, .busho-scope-btn.active {
     background: #37474f;
     color: #fff;
     border-color: #37474f;

@@ -1678,20 +1678,6 @@ class UIManager {
         let isMulti = data.isMulti;
         let spec = data.spec;
 
-        if (actionType === 'view_only' || actionType === 'all_busho_list') {
-            const getSortRank = (b) => {
-                if (b.isDaimyo) return 1;
-                if (b.isCastellan) return 2;
-                if (b.status === 'ronin') return 6;
-                if (b.belongKunishuId > 0) {
-                    const isLeader = b.id === (window.GameApp ? window.GameApp.kunishuSystem.getKunishu(b.belongKunishuId)?.leaderId : 0);
-                    return isLeader ? 4 : 5;
-                }
-                return 3;
-            };
-            bushos.sort((a, b) => getSortRank(a) - getSortRank(b));
-        }
-
         const contextEl = document.getElementById('selector-context-info');
         if(contextEl) {
             contextEl.classList.remove('hidden');
@@ -1747,13 +1733,30 @@ class UIManager {
         // ★追加：タブ要素の準備と切り替えの魔法
         const tabsEl = document.getElementById('selector-tabs');
         let currentTab = 'stats'; // 最初は能力(stats)タブにしておきます
+        let currentScope = 'clan'; // 最初は自家タブにしておきます
         
         if (isViewMode && tabsEl) {
             tabsEl.classList.remove('hidden');
+            tabsEl.style.justifyContent = actionType === 'all_busho_list' ? 'space-between' : 'flex-end';
+            
+            let scopeHtml = '';
+            if (actionType === 'all_busho_list') {
+                scopeHtml = `
+                    <div style="display: flex; gap: 5px;">
+                        <button class="busho-scope-btn active" data-scope="clan">自家</button>
+                        <button class="busho-scope-btn" data-scope="all">全国</button>
+                    </div>
+                `;
+            }
+
             tabsEl.innerHTML = `
-                <button class="busho-tab-btn active" data-tab="stats">能力</button>
-                <button class="busho-tab-btn" data-tab="status">状態</button>
+                ${scopeHtml}
+                <div style="display: flex; gap: 5px; ${actionType === 'all_busho_list' ? '' : 'margin-right: auto;'}">
+                    <button class="busho-tab-btn active" data-tab="stats">能力</button>
+                    <button class="busho-tab-btn" data-tab="status">状態</button>
+                </div>
             `;
+            
             const tabBtns = tabsEl.querySelectorAll('.busho-tab-btn');
             tabBtns.forEach(btn => {
                 btn.onclick = () => {
@@ -1762,6 +1765,17 @@ class UIManager {
                     btn.classList.add('active');
                     currentTab = btn.getAttribute('data-tab');
                     renderList(); // タブが切り替わったらリストを描き直します！
+                };
+            });
+
+            const scopeBtns = tabsEl.querySelectorAll('.busho-scope-btn');
+            scopeBtns.forEach(btn => {
+                btn.onclick = () => {
+                    if (window.AudioManager) window.AudioManager.playSE('choice.ogg');
+                    scopeBtns.forEach(b => b.classList.remove('active'));
+                    btn.classList.add('active');
+                    currentScope = btn.getAttribute('data-scope');
+                    renderList();
                 };
             });
         } else if (tabsEl) {
@@ -1773,6 +1787,38 @@ class UIManager {
         const renderList = () => {
             if (!this.selectorList) return;
             this.selectorList.innerHTML = '';
+            
+            let displayBushos = bushos;
+            if (actionType === 'all_busho_list' && currentScope === 'all') {
+                displayBushos = this.game.bushos.filter(b => {
+                    if (b.status === 'unborn' || b.status === 'dead') return false;
+                    if (b.clan > 0 || b.belongKunishuId > 0 || b.status === 'ronin') return true;
+                    return false;
+                });
+                
+                const getSortRankAll = (b) => {
+                    if (b.clan === this.game.playerClanId) {
+                        return b.isDaimyo ? 100 : (b.isCastellan ? 200 : 300);
+                    }
+                    if (b.clan > 0) return 1000 + b.clan * 10 + (b.isDaimyo ? 1 : (b.isCastellan ? 2 : 3));
+                    if (b.belongKunishuId > 0) return 5000 + b.belongKunishuId * 10 + (b.id === (window.GameApp ? window.GameApp.kunishuSystem.getKunishu(b.belongKunishuId)?.leaderId : 0) ? 1 : 2);
+                    if (b.status === 'ronin') return 9000;
+                    return 10000;
+                };
+                displayBushos.sort((a, b) => getSortRankAll(a) - getSortRankAll(b));
+            } else if (actionType === 'view_only' || actionType === 'all_busho_list') {
+                const getSortRankClan = (b) => {
+                    if (b.isDaimyo) return 1;
+                    if (b.isCastellan) return 2;
+                    if (b.status === 'ronin') return 6;
+                    if (b.belongKunishuId > 0) {
+                        const isLeader = b.id === (window.GameApp ? window.GameApp.kunishuSystem.getKunishu(b.belongKunishuId)?.leaderId : 0);
+                        return isLeader ? 4 : 5;
+                    }
+                    return 3;
+                };
+                displayBushos.sort((a, b) => getSortRankClan(a) - getSortRankClan(b));
+            }
             
             // 選ばれているタブに合わせて、リストの一番上の見出しを変えます
             if (currentTab === 'stats') {
@@ -1789,7 +1835,7 @@ class UIManager {
                 `;
             }
 
-            bushos.forEach(b => {
+            displayBushos.forEach(b => {
                 if (actionType === 'banish' && b.isCastellan) return; 
                 if (actionType === 'employ_target' && b.isDaimyo) return;
                 if (actionType === 'reward' && b.isDaimyo) return; 
