@@ -391,10 +391,11 @@ class Busho {
             if (isDirectFamily) return 0;
         }
 
-        const baseSalary = 10;
+        const baseSalary = 5;
+        const ambitionBonus = Math.floor((this.ambition || 0) / 10);
         const bonus = Math.floor((this.achievementTotal || 0) / 30);
         
-        return baseSalary + bonus;
+        return baseSalary + ambitionBonus + bonus;
     }
 
     // ★奥さんが増えたり減ったりした時に、一門リストを作り直す機能
