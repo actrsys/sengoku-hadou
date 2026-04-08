@@ -1839,14 +1839,9 @@ class UIManager {
                     } else if (currentSortKey === 'name') {
                         return isSortAsc ? a.name.localeCompare(b.name, 'ja') : b.name.localeCompare(a.name, 'ja');
                     } else if (currentSortKey === 'rank') {
-                        // ★変更：デフォルトの身分ソート用のルールを使います
-                        if (actionType === 'all_busho_list' && currentScope === 'all') {
-                            valA = getSortRankAll(a);
-                            valB = getSortRankAll(b);
-                        } else {
-                            valA = getSortRankClan(a);
-                            valB = getSortRankClan(b);
-                        }
+                        // ★変更：手動でソートした時は、全国表示でも自家を特別扱いせず、純粋な身分だけで比べます
+                        valA = getSortRankClan(a);
+                        valB = getSortRankClan(b);
                     } else if (currentSortKey === 'faction') {
                         valA = a.clan || (a.belongKunishuId ? a.belongKunishuId + 1000 : 9999);
                         valB = b.clan || (b.belongKunishuId ? b.belongKunishuId + 1000 : 9999);
