@@ -1844,17 +1844,35 @@ class UIManager {
                         valA = a.isActionDone ? 1 : 0;
                         valB = b.isActionDone ? 1 : 0;
                     } else if (currentSortKey === 'name') {
-                        return isSortAsc ? a.name.localeCompare(b.name, 'ja') : b.name.localeCompare(a.name, 'ja');
+                        const yomiA = a.yomi || a.name || "";
+                        const yomiB = b.yomi || b.name || "";
+                        return isSortAsc ? yomiA.localeCompare(yomiB, 'ja') : yomiB.localeCompare(yomiA, 'ja');
                     } else if (currentSortKey === 'rank') {
                         // ★変更：手動でソートした時は、全国表示でも自家を特別扱いせず、純粋な身分だけで比べます
                         valA = getSortRankClan(a);
                         valB = getSortRankClan(b);
                     } else if (currentSortKey === 'faction') {
-                        valA = a.clan || (a.belongKunishuId ? a.belongKunishuId + 1000 : 9999);
-                        valB = b.clan || (b.belongKunishuId ? b.belongKunishuId + 1000 : 9999);
+                        const getFactionYomi = (busho) => {
+                            if (busho.belongKunishuId > 0) {
+                                const kunishu = this.game.kunishuSystem.getKunishu(busho.belongKunishuId);
+                                return kunishu ? (kunishu.yomi || kunishu.name || "") : "んんん";
+                            } else if (busho.clan > 0) {
+                                const clan = this.game.clans.find(c => c.id === busho.clan);
+                                return clan ? (clan.yomi || clan.name || "") : "んんん";
+                            }
+                            return "んんん";
+                        };
+                        const yomiA = getFactionYomi(a);
+                        const yomiB = getFactionYomi(b);
+                        return isSortAsc ? yomiA.localeCompare(yomiB, 'ja') : yomiB.localeCompare(yomiA, 'ja');
                     } else if (currentSortKey === 'castle') {
-                        valA = a.castleId;
-                        valB = b.castleId;
+                        const getCastleYomi = (busho) => {
+                            const castle = this.game.getCastle(busho.castleId);
+                            return castle ? (castle.yomi || castle.name || "") : "んんん";
+                        };
+                        const yomiA = getCastleYomi(a);
+                        const yomiB = getCastleYomi(b);
+                        return isSortAsc ? yomiA.localeCompare(yomiB, 'ja') : yomiB.localeCompare(yomiA, 'ja');
                     } else if (currentSortKey === 'age') {
                         valA = this.game.year - a.birthYear;
                         valB = this.game.year - b.birthYear;
