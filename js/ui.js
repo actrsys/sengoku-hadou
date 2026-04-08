@@ -1737,24 +1737,27 @@ class UIManager {
         
         if (isViewMode && tabsEl) {
             tabsEl.classList.remove('hidden');
-            tabsEl.style.justifyContent = actionType === 'all_busho_list' ? 'space-between' : 'flex-end';
+            // 全部左側に寄せる設定にします
+            tabsEl.style.justifyContent = 'flex-start';
             
             let scopeHtml = '';
             if (actionType === 'all_busho_list') {
+                // margin-left: 15px; で少し隙間を空けます
                 scopeHtml = `
-                    <div style="display: flex; gap: 5px;">
+                    <div style="display: flex; gap: 5px; margin-left: 15px;">
                         <button class="busho-scope-btn active" data-scope="clan">自家</button>
                         <button class="busho-scope-btn" data-scope="all">全国</button>
                     </div>
                 `;
             }
 
+            // 能力・状態を先に、自家・全国を後に並べます
             tabsEl.innerHTML = `
-                ${scopeHtml}
-                <div style="display: flex; gap: 5px; ${actionType === 'all_busho_list' ? '' : 'margin-right: auto;'}">
+                <div style="display: flex; gap: 5px;">
                     <button class="busho-tab-btn active" data-tab="stats">能力</button>
                     <button class="busho-tab-btn" data-tab="status">状態</button>
                 </div>
+                ${scopeHtml}
             `;
             
             const tabBtns = tabsEl.querySelectorAll('.busho-tab-btn');
