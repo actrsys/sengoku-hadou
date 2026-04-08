@@ -139,10 +139,12 @@ class LifeSystem {
                                     if (clan) {
                                         const oldClanName = clan.name;
                                         const newClanName = `${newFamilyName}家`;
+                                        const newClanYomi = newFamilyYomi ? `${newFamilyYomi}け` : ""; // ★読み仮名も作ります
                                         
                                         // ★大名家の名前が本当に変わる時だけ、お知らせを出します！
                                         if (oldClanName !== newClanName) {
                                             clan.name = newClanName;
+                                            clan.yomi = newClanYomi; // ★読み仮名も新しく書き換えます
                                             
                                             // ==========================================
                                             // ★大名家の名前が変わった時も、新しくメッセージを作って1回ずつ待ちます！
@@ -673,9 +675,14 @@ class LifeSystem {
                 const safeFamilyName = successor.familyName || successor.name;
                 const newClanName = `${safeFamilyName}家`;
                 
+                // ★読み仮名も新しい当主の「姓の読み」から作ります！
+                const safeFamilyYomi = successor.familyYomi || successor.yomi;
+                const newClanYomi = safeFamilyYomi ? `${safeFamilyYomi}け` : "";
+                
                 // 家の名前が本当に変わる場合のみ変更します
                 if (oldClanName !== newClanName) {
                     clan.name = newClanName;
+                    clan.yomi = newClanYomi; // ★読み仮名も新しく書き換えます
                     extraMsg += `\n当主の交代により、${oldClanName}は今後「${newClanName}」となります。`;
                     
                     // マップ上の名前もすぐに書き換わるように、画面の更新の合図を出します

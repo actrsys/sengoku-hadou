@@ -10,6 +10,9 @@ class Clan {
         this.id = Number(this.id);
         this.leaderId = Number(this.leaderId);
         // data.color, data.name 等はCSVから自動で割り当たります
+        
+        // ★大名家の読み仮名を覚える箱を用意します
+        this.yomi = data.yomi || "";
 
         // 外交データの初期化
         this.diplomacyValue = this.diplomacyValue || {};
