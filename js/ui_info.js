@@ -1179,7 +1179,8 @@ class UIInfoManager {
                     valA = checkContent(valA);
                     valB = checkContent(valB);
                     
-                    if (valA === valB) return a.id - b.id; 
+                    // ★変更：同じ値だった時は、出席番号（ID）順に並び直すのをやめて、前の並び順をそのまま残す「0」にします！
+                    if (valA === valB) return 0; 
                     return isSortAsc ? (valA - valB) : (valB - valA);
                 });
             } else {
