@@ -1025,26 +1025,26 @@ class UIInfoManager {
                 const isGunshi = b.isGunshi || (b.clan > 0 && this.game.clans.find(c => c.id === b.clan)?.gunshiId === b.id);
 
                 if (b.clan === this.game.playerClanId) {
-                    return b.isDaimyo ? 100 : (b.isCastellan ? 200 : (isGunshi ? 250 : 300));
+                    return b.isDaimyo ? 10000 : (b.isCastellan ? 9000 : (isGunshi ? 8500 : 8000));
                 }
-                if (b.clan > 0) return 1000 + b.clan * 10 + (b.isDaimyo ? 1 : (b.isCastellan ? 2 : (isGunshi ? 2.5 : 3)));
-                if (b.belongKunishuId > 0) return 5000 + b.belongKunishuId * 10 + (b.id === (window.GameApp ? window.GameApp.kunishuSystem.getKunishu(b.belongKunishuId)?.leaderId : 0) ? 1 : 2);
-                if (b.status === 'ronin') return 9000;
-                return 10000;
+                if (b.clan > 0) return 5000 - b.clan * 10 + (b.isDaimyo ? 3 : (b.isCastellan ? 2 : (isGunshi ? 1.5 : 1)));
+                if (b.belongKunishuId > 0) return 2000 - b.belongKunishuId * 10 + (b.id === (window.GameApp ? window.GameApp.kunishuSystem.getKunishu(b.belongKunishuId)?.leaderId : 0) ? 2 : 1);
+                if (b.status === 'ronin') return 1000;
+                return 0;
             };
             const getSortRankClan = (b) => {
                 // 軍師かどうかをチェックします
                 const isGunshi = b.isGunshi || (b.clan > 0 && this.game.clans.find(c => c.id === b.clan)?.gunshiId === b.id);
 
-                if (b.isDaimyo) return 1;
-                if (b.isCastellan) return 2;
-                if (isGunshi) return 2.5; // ★城主(2)と一般武将(3)の間に入れます
-                if (b.status === 'ronin') return 6;
+                if (b.isDaimyo) return 7;
+                if (b.isCastellan) return 6;
+                if (isGunshi) return 5; 
+                if (b.status === 'ronin') return 1;
                 if (b.belongKunishuId > 0) {
                     const isLeader = b.id === (window.GameApp ? window.GameApp.kunishuSystem.getKunishu(b.belongKunishuId)?.leaderId : 0);
-                    return isLeader ? 4 : 5;
+                    return isLeader ? 3 : 2;
                 }
-                return 3;
+                return 4; // 一般武将
             };
 
             // ★追加：能力が「？」になっているか判定するための準備
@@ -1197,9 +1197,9 @@ class UIInfoManager {
             } else {
                 // 並べ替えの基準がない時は、今までの標準の並び順にします
                 if (actionType === 'all_busho_list' && currentScope === 'all') {
-                    displayBushos.sort((a, b) => getSortRankAll(a) - getSortRankAll(b));
+                    displayBushos.sort((a, b) => getSortRankAll(b) - getSortRankAll(a));
                 } else if (actionType === 'view_only' || actionType === 'all_busho_list') {
-                    displayBushos.sort((a, b) => getSortRankClan(a) - getSortRankClan(b));
+                    displayBushos.sort((a, b) => getSortRankClan(b) - getSortRankClan(a));
                 }
             }
 
@@ -1260,8 +1260,8 @@ class UIInfoManager {
                         currentSortKey = key;
                         isSortAsc = false; // 基本は大きい順（降順）から始めます
                         
-                        // 名前や身分の時は、小さい順（昇順）から始まる方が自然です
-                        if (['name', 'rank', 'faction', 'castle'].includes(key)) {
+                        // 名前や所在の時は、小さい順（昇順）から始まる方が自然です
+                        if (['name', 'faction', 'castle'].includes(key)) {
                             isSortAsc = true;
                         }
                     }
