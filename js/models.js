@@ -364,18 +364,33 @@ class Busho {
         return "派閥" + this.factionId;
     }
 
-    // ★新しく書き足す魔法の機能：奥さんが増えたり減ったりした時に、一門リストを作り直す機能です
-    // 今回から「姫全員の名簿（princesses）」を渡してもらうようにしました
+    getSalary(daimyo) {
+        if (this.isCastellan) return 0;
+        if (this.isDaimyo) return 0;
+        
+        if (daimyo) {
+            const isDirectFamily = this.baseFamilyIds.some(fId => daimyo.baseFamilyIds.includes(fId));
+            if (isDirectFamily) return 0;
+        }
+
+        const baseSalary = 10;
+        const bonus = Math.floor((this.achievementTotal || 0) / 30);
+        
+        return baseSalary + bonus;
+    }
+
+    // ★奥さんが増えたり減ったりした時に、一門リストを作り直す機能
+    // 「姫全員の名簿（princesses）」を渡してもらうようにしました
     updateFamilyIds(princesses = []) {
         // まずは普段使う用のリストに、金庫（baseFamilyIds）の中身を丸写しします
         this.familyIds = [...this.baseFamilyIds];
         
-        // ★追加：養父が設定されていて、まだリストに入っていなければ追加します！
+        // ★養父が設定されていて、まだリストに入っていなければ追加します！
         if (this.adoptiveFatherId > 0 && !this.familyIds.includes(this.adoptiveFatherId)) {
             this.familyIds.push(this.adoptiveFatherId);
         }
 
-        // ★追加：養子たちが設定されていて、まだリストに入っていなければ追加します！
+        // ★養子たちが設定されていて、まだリストに入っていなければ追加します！
         this.adoptedSonIds.forEach(sonId => {
             // ★万が一「0」や空っぽのデータがリストに紛れ込んでも、無視するようにガード（sonId > 0）を追加しました！
             if (sonId > 0 && !this.familyIds.includes(sonId)) {
@@ -395,7 +410,7 @@ class Busho {
     }
 }
 
-// ★新しく追加：姫クラス
+// ★姫クラス
 class Princess {
     constructor(data) {
         Object.assign(this, data);
