@@ -2878,6 +2878,10 @@ class UIManager {
         const contextInfo = document.getElementById('selector-context-info');
         const confirmBtn = document.getElementById('selector-confirm-btn');
         
+        // ★ここを追加：武将専用のタブをしっかり隠します！
+        const tabsEl = document.getElementById('selector-tabs');
+        if (tabsEl) tabsEl.classList.add('hidden');
+        
         if (!modal || !list || !contextInfo) return;
         
         const titleEl = document.getElementById('selector-title');
@@ -2970,6 +2974,10 @@ class UIManager {
         const list = document.getElementById('selector-list');
         const contextInfo = document.getElementById('selector-context-info');
         const confirmBtn = document.getElementById('selector-confirm-btn');
+        
+        // ★ここを追加：武将専用のタブをしっかり隠します！
+        const tabsEl = document.getElementById('selector-tabs');
+        if (tabsEl) tabsEl.classList.add('hidden');
         
         if (!modal || !list || !contextInfo) return;
         
