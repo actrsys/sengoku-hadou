@@ -458,6 +458,10 @@ class Kunishu {
     constructor(data) {
         Object.assign(this, data);
         this.id = Number(this.id);
+        
+        // ★諸勢力の読み仮名を覚える箱を追加します
+        this.yomi = data.yomi || "";
+        
         this.castleId = Number(this.castleId);
         this.leaderId = Number(this.leaderId);
         
