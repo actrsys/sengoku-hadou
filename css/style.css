@@ -217,7 +217,7 @@ body.hide-daimyo-labels .daimyo-name-label { display: none !important; }
    UIコンポーネント（リスト・スクロール・ボタン・バッジ）
    ========================================================= */
 /* スクロールバー装飾 */
-.list-container::-webkit-scrollbar, .daimyo-list-container::-webkit-scrollbar, .result-body::-webkit-scrollbar, #divide-list::-webkit-scrollbar, .faction-list-container::-webkit-scrollbar { width: 14px; height: 14px; }
+.list-container::-webkit-scrollbar, .daimyo-list-container::-webkit-scrollbar, .result-body::-webkit-scrollbar, #divide-list::-webkit-scrollbar, .faction-list-container::-webkit-scrollbar { width: 14px; height: 14px; -webkit-appearance: none; }
 .list-container::-webkit-scrollbar-track, .daimyo-list-container::-webkit-scrollbar-track, .result-body::-webkit-scrollbar-track, #divide-list::-webkit-scrollbar-track, .faction-list-container::-webkit-scrollbar-track { background: #e0e0e0; border-left: 1px solid #ccc; }
 .list-container::-webkit-scrollbar-thumb, .daimyo-list-container::-webkit-scrollbar-thumb, .result-body::-webkit-scrollbar-thumb, #divide-list::-webkit-scrollbar-thumb, .faction-list-container::-webkit-scrollbar-thumb { background: #78909c; border: 2px solid #e0e0e0; }
 .list-container::-webkit-scrollbar-thumb:hover, .daimyo-list-container::-webkit-scrollbar-thumb:hover, .result-body::-webkit-scrollbar-thumb:hover, #divide-list::-webkit-scrollbar-thumb:hover, .faction-list-container::-webkit-scrollbar-thumb:hover { background: #546e7a; }
@@ -228,7 +228,7 @@ body.hide-daimyo-labels .daimyo-name-label { display: none !important; }
 .list-container::-webkit-scrollbar-button:hover, .daimyo-list-container::-webkit-scrollbar-button:hover, .result-body::-webkit-scrollbar-button:hover, #divide-list::-webkit-scrollbar-button:hover, .faction-list-container::-webkit-scrollbar-button:hover { background-color: #cfd8dc; }
 
 /* リストベース */
-.list-container, .daimyo-list-container, .result-body, .faction-list-container { flex: 1; overflow-y: auto; min-height: 200px; scroll-snap-type: y mandatory; border: 1px solid #ddd; scroll-padding-top: 32px; }
+.list-container, .daimyo-list-container, .result-body, .faction-list-container { flex: 1; overflow-y: scroll; min-height: 200px; scroll-snap-type: y mandatory; border: 1px solid #ddd; scroll-padding-top: 32px; -webkit-overflow-scrolling: auto; }
 .faction-list-container { min-height: 150px; border-radius: 4px; }
 .result-body { min-height: 0; margin-bottom: 0 !important; padding-bottom: 10px; }
 .select-item:last-child, .daimyo-list-item:last-child, .kunishu-list-item:last-child, .faction-list-item:last-child { margin-bottom: 25px; }
@@ -1074,9 +1074,9 @@ body.is-pc {
    ★ 姫一覧専用の魔法（派閥一覧を参考にした完全独立版）
    ========================================================= */
 .princess-list-container {
-    flex: 1; overflow-y: auto; min-height: 150px; scroll-snap-type: y mandatory; border: 1px solid #ddd; scroll-padding-top: 32px; border-radius: 4px;
+    flex: 1; overflow-y: scroll; min-height: 150px; scroll-snap-type: y mandatory; border: 1px solid #ddd; scroll-padding-top: 32px; border-radius: 4px; -webkit-overflow-scrolling: auto;
 }
-.princess-list-container::-webkit-scrollbar { width: 14px; height: 14px; }
+.princess-list-container::-webkit-scrollbar { width: 14px; height: 14px; -webkit-appearance: none; }
 .princess-list-container::-webkit-scrollbar-track { background: #e0e0e0; border-left: 1px solid #ccc; }
 .princess-list-container::-webkit-scrollbar-thumb { background: #78909c; border: 2px solid #e0e0e0; }
 .princess-list-container::-webkit-scrollbar-thumb:hover { background: #546e7a; }
