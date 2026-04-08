@@ -1802,6 +1802,31 @@ class UIManager {
                 });
             }
 
+            // ★追加：身分で並べ替えるための標準ルールをここで準備します
+            const getSortRankAll = (b) => {
+                if (b.clan === this.game.playerClanId) {
+                    return b.isDaimyo ? 100 : (b.isCastellan ? 200 : 300);
+                }
+                if (b.clan > 0) return 1000 + b.clan * 10 + (b.isDaimyo ? 1 : (b.isCastellan ? 2 : 3));
+                if (b.belongKunishuId > 0) return 5000 + b.belongKunishuId * 10 + (b.id === (window.GameApp ? window.GameApp.kunishuSystem.getKunishu(b.belongKunishuId)?.leaderId : 0) ? 1 : 2);
+                if (b.status === 'ronin') return 9000;
+                return 10000;
+            };
+            const getSortRankClan = (b) => {
+                if (b.isDaimyo) return 1;
+                if (b.isCastellan) return 2;
+                if (b.status === 'ronin') return 6;
+                if (b.belongKunishuId > 0) {
+                    const isLeader = b.id === (window.GameApp ? window.GameApp.kunishuSystem.getKunishu(b.belongKunishuId)?.leaderId : 0);
+                    return isLeader ? 4 : 5;
+                }
+                return 3;
+            };
+
+            // ★追加：能力が「？」になっているか判定するための準備
+            let acc = null;
+            if (isEnemyTarget && targetCastle) acc = targetCastle.investigatedAccuracy;
+
             // ★並べ替えの魔法
             if (currentSortKey) {
                 displayBushos.sort((a, b) => {
@@ -1812,12 +1837,16 @@ class UIManager {
                         valA = a.isActionDone ? 1 : 0;
                         valB = b.isActionDone ? 1 : 0;
                     } else if (currentSortKey === 'name') {
-                        // 名前はあいうえお順などで比較します
                         return isSortAsc ? a.name.localeCompare(b.name, 'ja') : b.name.localeCompare(a.name, 'ja');
                     } else if (currentSortKey === 'rank') {
-                        // 身分は内部の並び順の数字を使います
-                        valA = (a.isDaimyo ? 1 : (a.isCastellan ? 2 : (a.status === 'ronin' ? 6 : (a.belongKunishuId > 0 ? 5 : 3))));
-                        valB = (b.isDaimyo ? 1 : (b.isCastellan ? 2 : (b.status === 'ronin' ? 6 : (b.belongKunishuId > 0 ? 5 : 3))));
+                        // ★変更：デフォルトの身分ソート用のルールを使います
+                        if (actionType === 'all_busho_list' && currentScope === 'all') {
+                            valA = getSortRankAll(a);
+                            valB = getSortRankAll(b);
+                        } else {
+                            valA = getSortRankClan(a);
+                            valB = getSortRankClan(b);
+                        }
                     } else if (currentSortKey === 'faction') {
                         valA = a.clan || (a.belongKunishuId ? a.belongKunishuId + 1000 : 9999);
                         valB = b.clan || (b.belongKunishuId ? b.belongKunishuId + 1000 : 9999);
@@ -1828,48 +1857,36 @@ class UIManager {
                         valA = this.game.year - a.birthYear;
                         valB = this.game.year - b.birthYear;
                     } else if (currentSortKey === 'family') {
-                        // 一門かどうかの判定です
                         valA = (a.familyIds && a.familyIds.length > 0) || a.isDaimyo ? 1 : 0;
                         valB = (b.familyIds && b.familyIds.length > 0) || b.isDaimyo ? 1 : 0;
                     } else if (currentSortKey === 'salary') {
-                        // 俸禄の比較です（大名などは0になります）
                         const daimyoA = a.clan > 0 ? this.game.getBusho(this.game.clans.find(c=>c.id===a.clan)?.leaderId) : null;
                         const daimyoB = b.clan > 0 ? this.game.getBusho(this.game.clans.find(c=>c.id===b.clan)?.leaderId) : null;
                         valA = a.clan > 0 && !a.isDaimyo && a.status !== 'ronin' ? a.getSalary(daimyoA) : 0;
                         valB = b.clan > 0 && !b.isDaimyo && b.status !== 'ronin' ? b.getSalary(daimyoB) : 0;
                     } else {
-                        // 統率や武勇などの能力値
+                        // ★変更：統率や武勇などの能力値（見えている情報のみでソート）
+                        const statStrA = GameSystem.getDisplayStatHTML(a, currentSortKey, gunshi, acc, this.game.playerClanId, myDaimyo);
+                        const statStrB = GameSystem.getDisplayStatHTML(b, currentSortKey, gunshi, acc, this.game.playerClanId, myDaimyo);
+                        const isMaskedA = String(statStrA).includes('？');
+                        const isMaskedB = String(statStrB).includes('？');
+                        
+                        // ★「？」になっている能力は、昇順降順に関係なく常に一番下へ回します
+                        if (isMaskedA && !isMaskedB) return 1;  
+                        if (!isMaskedA && isMaskedB) return -1; 
+                        
                         valA = a[currentSortKey] || 0;
                         valB = b[currentSortKey] || 0;
                     }
                     
-                    if (valA === valB) return a.id - b.id; // 同じ数字なら内部IDの順番で揃えます
+                    if (valA === valB) return a.id - b.id; 
                     return isSortAsc ? (valA - valB) : (valB - valA);
                 });
             } else {
                 // 並べ替えの基準がない時は、今までの標準の並び順にします
                 if (actionType === 'all_busho_list' && currentScope === 'all') {
-                    const getSortRankAll = (b) => {
-                        if (b.clan === this.game.playerClanId) {
-                            return b.isDaimyo ? 100 : (b.isCastellan ? 200 : 300);
-                        }
-                        if (b.clan > 0) return 1000 + b.clan * 10 + (b.isDaimyo ? 1 : (b.isCastellan ? 2 : 3));
-                        if (b.belongKunishuId > 0) return 5000 + b.belongKunishuId * 10 + (b.id === (window.GameApp ? window.GameApp.kunishuSystem.getKunishu(b.belongKunishuId)?.leaderId : 0) ? 1 : 2);
-                        if (b.status === 'ronin') return 9000;
-                        return 10000;
-                    };
                     displayBushos.sort((a, b) => getSortRankAll(a) - getSortRankAll(b));
                 } else if (actionType === 'view_only' || actionType === 'all_busho_list') {
-                    const getSortRankClan = (b) => {
-                        if (b.isDaimyo) return 1;
-                        if (b.isCastellan) return 2;
-                        if (b.status === 'ronin') return 6;
-                        if (b.belongKunishuId > 0) {
-                            const isLeader = b.id === (window.GameApp ? window.GameApp.kunishuSystem.getKunishu(b.belongKunishuId)?.leaderId : 0);
-                            return isLeader ? 4 : 5;
-                        }
-                        return 3;
-                    };
                     displayBushos.sort((a, b) => getSortRankClan(a) - getSortRankClan(b));
                 }
             }
