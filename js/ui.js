@@ -1784,7 +1784,7 @@ class UIManager {
             } else {
                 this.selectorList.innerHTML = `
                     <div class="list-header status-mode">
-                        <span class="col-name">名前</span><span class="col-faction">勢力</span><span class="col-castle">所属</span><span class="col-rank">身分</span><span class="col-age">年齢</span><span class="col-family">一門</span><span class="col-salary">俸禄</span><span></span>
+                        <span class="col-name">名前</span><span class="col-faction">勢力</span><span class="col-castle">所在</span><span class="col-rank">身分</span><span class="col-age">年齢</span><span class="col-family">一門</span><span class="col-salary">俸禄</span><span></span>
                     </div>
                 `;
             }
