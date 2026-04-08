@@ -384,7 +384,8 @@ class UIInfoManager {
         const castle = this.game.getCastle(busho.castleId);
         const castleName = castle ? castle.name : "不明";
 
-        const age = this.game.year - busho.birthYear;
+        const age = busho.isAutoLeader ? "-" : (this.game.year - busho.birthYear);
+        const ageStr = busho.isAutoLeader ? age : `${age}歳`;
 
         let rankName = "";
         try {
@@ -457,7 +458,7 @@ class UIInfoManager {
                         <div style="font-weight: bold; display: flex; align-items: center;">${busho.getRankName()}</div>
                         
                         <div style="color: #666; display: flex; align-items: center;">年齢</div>
-                        <div style="font-weight: bold; display: flex; align-items: center;">${age}歳</div>
+                        <div style="font-weight: bold; display: flex; align-items: center;">${ageStr}</div>
                     </div>
                 </div>
             </div>
@@ -1079,8 +1080,13 @@ class UIInfoManager {
                         const yomiB = getCastleYomi(b);
                         return isSortAsc ? yomiA.localeCompare(yomiB, 'ja') : yomiB.localeCompare(yomiA, 'ja');
                     } else if (currentSortKey === 'age') {
-                        valA = this.game.year - a.birthYear;
-                        valB = this.game.year - b.birthYear;
+                        const isNullA = a.isAutoLeader;
+                        const isNullB = b.isAutoLeader;
+                        if (isNullA && !isNullB) return 1;
+                        if (!isNullA && isNullB) return -1;
+
+                        valA = isNullA ? 0 : this.game.year - a.birthYear;
+                        valB = isNullB ? 0 : this.game.year - b.birthYear;
                     } else if (currentSortKey === 'family') {
                         // ★書き換え：画面に「◯」を表示する時とまったく同じルールで一門かどうかを確認します！
                         const checkFamily = (busho) => {
@@ -1318,7 +1324,7 @@ class UIInfoManager {
                     
                     const bCastle = this.game.getCastle(b.castleId);
                     const bCastleName = bCastle ? bCastle.name : "-";
-                    const age = this.game.year - b.birthYear;
+                    const age = b.isAutoLeader ? "-" : (this.game.year - b.birthYear);
                     
                     let salary = "-";
                     if (b.clan > 0 && !b.isDaimyo && b.status !== 'ronin') {

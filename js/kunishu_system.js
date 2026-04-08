@@ -56,7 +56,7 @@ class KunishuSystem {
                     belongKunishuId: kunishu.id,
                     castleId: kunishu.castleId,
                     birthYear: currentYear - 30, // 今30歳になるように計算します
-                    endYear: currentYear + 60,   // 今から60年後（90歳）まで生きるように計算します
+                    endYear: 9999, // 不老不死にします
                     startYear: currentYear - 30, // すでに大人になっている年にします
                     status: 'active', // バリバリ活動中！（★最後に「,」を付けます）
                     isAutoLeader: true // ★追加：自動で作られた頭領だという「秘密のシール」を貼っておきます！
