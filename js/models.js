@@ -387,7 +387,7 @@ class Busho {
         if (this.isDaimyo) return 0;
         
         if (daimyo) {
-            const isDirectFamily = this.baseFamilyIds.some(fId => daimyo.baseFamilyIds.includes(fId));
+            const isDirectFamily = this.familyIds.some(fId => daimyo.familyIds.includes(fId));
             if (isDirectFamily) return 0;
         }
 
