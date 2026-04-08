@@ -170,31 +170,45 @@ class DataManager {
         castles.forEach(c => c.samuraiIds = []);
         bushos.forEach(b => {
             // ==========================================
-            // ★ゲーム開始時点で「すでに改名しているはず」の武将の名前を変えておく魔法です！
+            // ★ゲーム開始時点で「すでに改名しているはず」の武将の名前と読み仮名を変えておく魔法です！
             if (b.nameChange) {
-                const changes = b.nameChange.split('|');
+                const changes = b.nameChange.split('/');
                 let latestYear = -1;
                 let latestFamilyName = "";
                 let latestGivenName = "";
+                let latestFamilyYomi = "";
+                let latestGivenYomi = "";
 
                 for (const change of changes) {
                     const parts = change.split(':');
                     if (parts.length === 3) {
                         const targetYear = Number(parts[0].trim());
-                        // ゲーム開始年「以前」に起きた改名イベントの中で、一番新しいものを探します
+                        // ゲーム開始年「以前」か「同じ年」に起きた改名イベントの中で、一番新しいものを探します
                         if (targetYear <= startYear && targetYear > latestYear) {
                             latestYear = targetYear;
-                            latestFamilyName = parts[1].trim();
-                            latestGivenName = parts[2].trim();
+                            
+                            // 新しい名前を「|」で姓と名に分けます
+                            const newNameParts = parts[1].trim().split('|');
+                            latestFamilyName = newNameParts[0] || ""; 
+                            latestGivenName = newNameParts[1] || "";  
+                            
+                            // 新しい読み仮名も「|」で姓と名に分けます
+                            const newYomiParts = parts[2].trim().split('|');
+                            latestFamilyYomi = newYomiParts[0] || ""; 
+                            latestGivenYomi = newYomiParts[1] || "";  
                         }
                     }
                 }
 
-                // もし改名データが見つかったら、最初からその名前にしておきます！
+                // もし改名データが見つかったら、最初からその名前と読み仮名にしておきます！
                 if (latestYear !== -1) {
                     b.familyName = latestFamilyName;
                     b.givenName = latestGivenName;
                     b.name = latestFamilyName + latestGivenName;
+                    
+                    b.familyYomi = latestFamilyYomi;
+                    b.givenYomi = latestGivenYomi;
+                    b.yomi = latestFamilyYomi + latestGivenYomi;
                 }
             }
             

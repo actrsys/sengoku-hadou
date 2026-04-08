@@ -84,8 +84,8 @@ class LifeSystem {
                 if (parts.length === 3) {
                     const targetYear = Number(parts[0].trim());
                     
-                    // 今の年が、改名する年と一致したら…
-                    if (targetYear === currentYear) {
+                    // 今の年と「同じ」、または「昔」のデータなら名前を更新します！
+                    if (targetYear <= currentYear) {
                         // 新しい名前を「|」で姓と名に分けます
                         const newNameParts = parts[1].trim().split('|');
                         const newFamilyName = newNameParts[0] || ""; // 新しい姓
@@ -109,8 +109,9 @@ class LifeSystem {
                         b.givenYomi = newGivenYomi;
                         b.yomi = newYomi;
 
+                        // ★お知らせを出すのは、改名する年が「ピッタリ今の年」の時だけにします！
                         // すでにゲームに登場して生きている武将（activeかronin）なら、お知らせを出します
-                        if (b.status === 'active' || b.status === 'ronin') {
+                        if (targetYear === currentYear && (b.status === 'active' || b.status === 'ronin')) {
                             // 前の名前と違う時だけメッセージを出します
                             if (oldName !== newName) {
                                 // 大名家に所属していたら「〇〇家の」と付けます
