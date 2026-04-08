@@ -76,25 +76,38 @@ class LifeSystem {
         for (const b of this.game.bushos) {
             if (!b.nameChange) continue;
 
-            // 「|」で区切られている複数の改名予定を一つずつ確認します
-            const changes = b.nameChange.split('|');
+            // 「/」で区切られている複数の改名予定を一つずつ確認します
+            const changes = b.nameChange.split('/');
             for (const change of changes) {
                 const parts = change.split(':');
+                // 年、名前（姓|名）、読み仮名（姓|名）の３つが揃っているか確認します
                 if (parts.length === 3) {
                     const targetYear = Number(parts[0].trim());
                     
                     // 今の年が、改名する年と一致したら…
                     if (targetYear === currentYear) {
-                        const newFamilyName = parts[1].trim(); // 新しい姓
-                        const newGivenName = parts[2].trim();  // 新しい名
+                        // 新しい名前を「|」で姓と名に分けます
+                        const newNameParts = parts[1].trim().split('|');
+                        const newFamilyName = newNameParts[0] || ""; // 新しい姓
+                        const newGivenName = newNameParts[1] || "";  // 新しい名
+                        
+                        // 新しい読み仮名も「|」で姓と名に分けます
+                        const newYomiParts = parts[2].trim().split('|');
+                        const newFamilyYomi = newYomiParts[0] || ""; // 新しい姓の読み
+                        const newGivenYomi = newYomiParts[1] || "";  // 新しい名の読み
                         
                         const oldName = b.name; // 今の名前をメモしておきます
                         const newName = newFamilyName + newGivenName; // 新しいフルネーム
+                        const newYomi = newFamilyYomi + newGivenYomi; // 新しいフルネームの読み
 
-                        // 名前データを書き換えます！
+                        // 名前と読み仮名のデータを書き換えます！
                         b.familyName = newFamilyName;
                         b.givenName = newGivenName;
                         b.name = newName;
+                        
+                        b.familyYomi = newFamilyYomi;
+                        b.givenYomi = newGivenYomi;
+                        b.yomi = newYomi;
 
                         // すでにゲームに登場して生きている武将（activeかronin）なら、お知らせを出します
                         if (b.status === 'active' || b.status === 'ronin') {

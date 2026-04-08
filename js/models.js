@@ -204,7 +204,7 @@ class Busho {
         this.clan = Number(this.clan);
         this.castleId = Number(this.castleId);
         
-        // --- 名前（既存の処理） ---
+        // --- 名前と読み仮名の処理 ---
         if (this.name && this.name.includes('|')) {
             // CSVなどから「織田|信長」の形式で読み込んだ時の処理です
             let names = this.name.split('|');
@@ -216,6 +216,20 @@ class Busho {
             // 空っぽの時だけフルネームを入れるようにして上書きを防ぎます
             this.familyName = this.name;
             this.givenName = "";
+        }
+
+        // 新しく読み仮名（yomi）も同じように処理する仕組みを足します！
+        if (this.yomi && this.yomi.includes('|')) {
+            // 「おだ|のぶなが」を姓と名に分けます
+            let yomis = this.yomi.split('|');
+            this.familyYomi = yomis[0];
+            this.givenYomi = yomis[1];
+            this.yomi = yomis[0] + yomis[1]; // 「おだのぶなが」のように繋げたものも覚えます
+        } else if (!this.familyYomi) {
+            // yomiが空っぽだったり、| が無い場合の安全策です
+            this.familyYomi = this.yomi || "";
+            this.givenYomi = "";
+            this.yomi = this.yomi || "";
         }
         
         // --- 能力値（既存の処理） ---
@@ -250,12 +264,12 @@ class Busho {
         } else {
             this.courtRankIds = []; // 何も持っていなければ空っぽのリストにします
         }
-        // ★【ここから書き足し：生没年・登場年】
+        // ★【生没年・登場年】
         // 数字として扱うために Number() で囲みます
         this.birthYear = Number(data.birthYear || 1500); // 生年（空なら1500）
         this.endYear = Number(data.endYear || 1650);     // 没年（空なら1650）
         this.startYear = Number(data.startYear || 1500); // 登場年（空なら1500）
-        this.nameChange = data.nameChange || ""; // 年:姓:名|年:姓:名... の形式の改名データ
+        this.nameChange = data.nameChange || ""; // 変わる年:新しい名前:新しい読み仮名/変わる年... の形式の改名データ
         
         // ★【ここから書き足し：奥さん（姫）の設定】
         // 姫の「ID（出席番号）」だけを覚えておきます
