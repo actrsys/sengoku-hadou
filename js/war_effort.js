@@ -971,9 +971,11 @@ Object.assign(WarManager.prototype, {
                 const recovered = Math.floor(totalLoss * (isAttackerData ? baseRecoveryRate : defRecoveryRate));
                 const finalReturnSoldiers = surviveSoldiers + recovered;
                 
-                // 馬と鉄砲の帰還数
-                const returnHorses = Math.floor((reinf.horses || 0) * surviveRate);
-                const returnGuns = Math.floor((reinf.guns || 0) * surviveRate);
+                // ★修正：馬と鉄砲の帰還数（死んだ兵士の割合から、装備していた分だけを減らします）
+                const horseEquipRate = Math.min(1.0, (reinf.horses || 0) / Math.max(1, reinf.soldiers));
+                const gunEquipRate = Math.min(1.0, (reinf.guns || 0) / Math.max(1, reinf.soldiers));
+                const returnHorses = Math.max(0, (reinf.horses || 0) - Math.floor(siegeLoss * horseEquipRate));
+                const returnGuns = Math.max(0, (reinf.guns || 0) - Math.floor(siegeLoss * gunEquipRate));
 
                 // 諸勢力の場合
                 if (reinf.isKunishuForce) {
