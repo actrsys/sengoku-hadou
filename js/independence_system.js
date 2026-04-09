@@ -226,6 +226,18 @@ class IndependenceSystem {
                         };
                     }
                 });
+
+                // ★ここから追加：諸勢力との関係値も反転させます！
+                if (this.game.kunishuSystem) {
+                    const aliveKunishus = this.game.kunishuSystem.getAliveKunishus();
+                    aliveKunishus.forEach(kunishu => {
+                        const oldRel = kunishu.getRelation(oldClanId);
+                        let newSentiment = 100 - oldRel;
+                        newSentiment = Math.max(30, Math.min(70, newSentiment));
+                        kunishu.setRelation(newClanId, newSentiment);
+                    });
+                }
+                // ★追加ここまで
             }
 
             this.game.clans.push(newClan);
@@ -314,6 +326,11 @@ class IndependenceSystem {
 
         // ★追加：独立や寝返りで勢力が大きく変わるので、威信を最新に更新しておきます！
         if (window.GameApp) window.GameApp.updateAllClanPrestige();
+        
+        // ★追加：独立や寝返りが起きたら、すぐにマップを新しい状態に描き直します！
+        if (this.game.ui && typeof this.game.ui.renderMap === 'function') {
+            this.game.ui.renderMap();
+        }
         
         // メッセージ画面を出す処理は一番最後に行います
         if (captiveMsgs && captiveMsgs.length > 0) msg += '\n\n' + captiveMsgs.join('\n');
@@ -796,9 +813,26 @@ class IndependenceSystem {
                             }
                         }
                     });
+
+                    // ★ここから追加：諸勢力との関係値も反転させます！
+                    if (this.game.kunishuSystem) {
+                        const aliveKunishus = this.game.kunishuSystem.getAliveKunishus();
+                        aliveKunishus.forEach(kunishu => {
+                            const currentRel = kunishu.getRelation(clan.id);
+                            let newSentiment = 100 - currentRel;
+                            newSentiment = Math.max(30, Math.min(70, newSentiment));
+                            kunishu.setRelation(clan.id, newSentiment);
+                        });
+                    }
+                    // ★追加ここまで
                 }
                 // 勢力情報が変わったので威信を更新
                 if (window.GameApp) window.GameApp.updateAllClanPrestige();
+
+                // ★追加：謀反が成功して大名が変わったので、すぐにマップを新しい状態に描き直します！
+                if (this.game.ui && typeof this.game.ui.renderMap === 'function') {
+                    this.game.ui.renderMap();
+                }
 
             } else if (result === 'daimyo_win') {
                 // 【主家軍の勝利】

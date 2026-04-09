@@ -723,14 +723,14 @@ class LifeSystem {
                     clan.name = newClanName;
                     clan.yomi = newClanYomi; // ★読み仮名も新しく書き換えます
                     extraMsg += `\n当主の交代により、${oldClanName}は今後「${newClanName}」となります。`;
-                    
-                    // マップ上の名前もすぐに書き換わるように、画面の更新の合図を出します
-                    if (this.game.ui && typeof this.game.ui.renderMap === 'function') {
-                        this.game.ui.renderMap();
-                    }
                 }
             }
             // ★追加ここまで
+            
+            // ★変更：大名家の名前が変わったかどうかにかかわらず、大名が交代したら必ずマップを描き直します！
+            if (this.game.ui && typeof this.game.ui.renderMap === 'function') {
+                this.game.ui.renderMap();
+            }
             
             const msg = `${daimyo.name.replace('|','')}が死亡し、${successor.name.replace('|','')}が家督を継ぎました。${extraMsg}`;
             this.game.ui.log(`【当主交代】${daimyo.name.replace('|','')}が死亡し、${successor.name.replace('|','')}が家督を継ぎました。`);
@@ -796,6 +796,11 @@ class LifeSystem {
                 });
                 this.game.updateCastleLord(c); // 城主情報をリセット
             });
+
+            // ★追加：大名家が滅亡してお城が空っぽになったので、マップをすぐに描き直します！
+            if (this.game.ui && typeof this.game.ui.renderMap === 'function') {
+                this.game.ui.renderMap();
+            }
 
             // もしプレイヤーの大名家が滅亡してしまったら…ゲームオーバーです！
             if (clanId === this.game.playerClanId) {
