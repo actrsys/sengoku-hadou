@@ -1088,19 +1088,24 @@ class GameManager {
             // まず、このお城の持ち主である大名様を探し出します
             const daimyoBusho = this.bushos.find(b => b.clan === c.ownerClan && b.isDaimyo);
             if (daimyoBusho) {
-                // 1. 大名補正: 能力値の平均を 0.0〜1.0 の割合にするために 600 で割ります
-                const daimyoBonus = (daimyoBusho.leadership + daimyoBusho.strength + daimyoBusho.politics + daimyoBusho.diplomacy + daimyoBusho.intelligence + daimyoBusho.charm) / 600;
+                // 1. 大名補正の計算
+                // まずは能力値の平均を出して、0.0〜1.0の割合にします（能力補正）
+                const statBonus = (daimyoBusho.leadership + daimyoBusho.strength + daimyoBusho.politics + daimyoBusho.diplomacy + daimyoBusho.intelligence + daimyoBusho.charm) / 600;
+                
+                // 次に、６つの能力の中で一番高い数字を見つけ出します
+                const highestStat = Math.max(daimyoBusho.leadership, daimyoBusho.strength, daimyoBusho.politics, daimyoBusho.diplomacy, daimyoBusho.intelligence, daimyoBusho.charm);
+                
+                // 一番高い数字を特化能力補正にします
+                const specialtyBonus = 0.5 + (highestStat * 0.005);
+                
+                // ２つを掛け算して、最終的な大名補正にします
+                const daimyoBonus = statBonus * specialtyBonus;
                 
                 // 2. 民忠補正: 民忠 * 0.01
                 const loyaltyBonus = c.peoplesLoyalty * 0.01;
                 
                 // 3. 増加量: √城の人口 * ((大名補正 + 民忠補正) / 2)
-                // 小数点が出ないように、Math.floorで切り捨てて綺麗な数字にします
                 const soldierGrowth = Math.floor(Math.sqrt(c.population) * ((daimyoBonus + loyaltyBonus) / 2));
-                
-                // 計算した増加量を兵士数に足します
-                // Math.min(99999, ...) で、増えた結果が99999を超えないように蓋をしています
-                c.soldiers = Math.min(99999, c.soldiers + Math.max(0, soldierGrowth));
             }
         });
 
