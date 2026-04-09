@@ -946,11 +946,7 @@ class AIEngine {
         // 武将の人数より多くは行動できません
         maxActions = Math.min(maxActions, availableBushos.length);
 
-        // ランダムで行動回数を減らしますが、マイナス（0回未満）にならないようにします
-        const reduceActions = Math.floor(Math.random() * 3);
-        maxActions = Math.max(0, maxActions - reduceActions); 
-
-        // 減らした結果、やるべき回数が0回になったり、武将がいなかったらおしまいです
+        // やるべき回数が0回になったり、武将がいなかったらおしまいです
         if (maxActions <= 0) return;
 
         // 城主の性格による好みの計算（相対値で最大±20%のブレ）
