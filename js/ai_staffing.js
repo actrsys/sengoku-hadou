@@ -449,13 +449,13 @@ class AIStaffing {
                     if (target.defense < target.maxDefense) {
                         let defScore = 0;
                         if (target.defense <= target.maxDefense / 4) {
-                            defScore = 50; // 1/4以下なら緊急事態なので点数を高くします
+                            defScore = 30; // 1/4以下なら緊急事態なので点数を高くします
                         } else {
                             defScore = 15; // 少し壊れているだけなら少し点数をあげます
                         }
                         
-                        // 最大防御力が低いお城（最大1000を基準にします）ほど、割合による重要度を上げます
-                        const defRatio = 1000 / Math.max(1, target.maxDefense);
+                        // 最大防御力が低いお城ほど重要度を上げますが、高くなりすぎないよう最大「2.5倍」までに制限します
+                        const defRatio = Math.min(2.5, 1000 / Math.max(1, target.maxDefense));
                         const polBonus = busho.politics / 100;
                         
                         score += Math.floor(defScore * defRatio * polBonus);
@@ -489,10 +489,16 @@ class AIStaffing {
                     score += tRoleData.receiverScore / 20;
                 }
 
-                // 6. 攻撃作戦の準備拠点ならプラス
+                // 6. 攻撃作戦の準備拠点・援軍拠点ならプラス
                 const myOp = this.game.aiOperationManager.operations[clanId];
-                if (clanGoal === '攻撃準備' && myOp && myOp.stagingBase === target.id) {
-                    if (bType !== '無能型') score += 150;
+                if (clanGoal === '攻撃準備' && myOp) {
+                    if (bType !== '無能型') {
+                        if (myOp.stagingBase === target.id) {
+                            score += 100; // 出撃拠点に集まる点数（一極集中を防ぐため少し下げます）
+                        } else if (myOp.supportBase === target.id) {
+                            score += 70;  // 忘れられていた「援軍用拠点」にもしっかり集まるようにします
+                        }
+                    }
                 }
 
                 // 計算した点数を、今の城と移動先で振り分けます
