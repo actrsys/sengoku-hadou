@@ -113,7 +113,6 @@ class StrategySystem {
                 // ■ 城主を引き抜いた場合（城ごと寝返る！）
                 this.game.castleManager.changeOwner(oldCastle, newClanId);
                 target.clan = newClanId;
-                target.loyalty = 100; // 寝返ったので忠誠はMAX！
                 target.isActionDone = true;
                 target.status = 'active';
                 target.isGunshi = false; // 念のため軍師を外しておきます
@@ -121,6 +120,13 @@ class StrategySystem {
                 // 部下たちの処理
                 const indSys = this.game.independenceSystem;
                 const captiveMsgs = indSys.resolveSubordinates(oldCastle, target, targetLord, newClanId, oldClanId);
+
+                // 新しく味方になった城主と、ついてきた部下たちの忠誠度を相性に合わせて計算し直します
+                this.game.getCastleBushos(oldCastle.id).forEach(b => {
+                    if (b.clan === newClanId && b.status === 'active') {
+                        this.game.affiliationSystem.updateLoyaltyForNewLord(b, newClanId);
+                    }
+                });
                 
                 // 本物の軍師「以外」の武将から軍師バッジを没収します！
                 const myGunshi = this.game.bushos.find(b => b.clan === newClanId && b.isGunshi);
