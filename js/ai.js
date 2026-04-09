@@ -1266,7 +1266,8 @@ class AIEngine {
             }
 
             // ===== 基本パラメータ =====
-            const targetRice = Math.floor(castle.soldiers * 1.5);
+            // 徴兵に必要な3.5倍に合わせて、お米を買う目標を引き上げます
+            const targetRice = Math.floor(castle.soldiers * 3.5);
             const minRice = Math.floor(castle.soldiers * 0.3);
             const shortage = Math.max(0, targetRice - castle.rice);
             // 目標が0の時はエラーにならないように0にします
