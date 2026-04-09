@@ -1088,8 +1088,8 @@ class GameManager {
             // まず、このお城の持ち主である大名様を探し出します
             const daimyoBusho = this.bushos.find(b => b.clan === c.ownerClan && b.isDaimyo);
             if (daimyoBusho) {
-                // 1. 大名補正: (統率 + 武力 + 政治 + 外交 + 知略 + 魅力) / 6
-                const daimyoBonus = (daimyoBusho.leadership + daimyoBusho.strength + daimyoBusho.politics + daimyoBusho.diplomacy + daimyoBusho.intelligence + daimyoBusho.charm) / 6;
+                // 1. 大名補正: 能力値の平均を 0.0〜1.0 の割合にするために 600 で割ります
+                const daimyoBonus = (daimyoBusho.leadership + daimyoBusho.strength + daimyoBusho.politics + daimyoBusho.diplomacy + daimyoBusho.intelligence + daimyoBusho.charm) / 600;
                 
                 // 2. 民忠補正: 民忠 * 0.01
                 const loyaltyBonus = c.peoplesLoyalty * 0.01;
