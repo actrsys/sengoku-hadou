@@ -534,18 +534,6 @@ class AIOperationManager {
             // ai.jsでやっていた確率のサイコロをここで振って、やるかどうか決めます
             if (Math.random() * 100 < (highestScore * 0.25)) {
                 
-                // ★今回追加：もし選ばれた作戦の目標が同盟国や従属先だったら、この瞬間に同盟を破棄します！
-                if (!bestOperation.isKunishuTarget) {
-                    const targetCastle = this.game.getCastle(bestOperation.targetId);
-                    if (targetCastle) {
-                        const rel = this.game.getRelation(clanId, targetCastle.ownerClan);
-                        if (rel && (rel.status === '同盟' || rel.status === '従属')) {
-                            this.game.diplomacyManager.applyBreakAlliancePenalty(clanId, targetCastle.ownerClan);
-                            console.log(`大名家[${clanId}]が【攻撃作戦】のために、${targetCastle.ownerClan}との関係を破棄しました！`);
-                        }
-                    }
-                }
-
                 this.operations[clanId] = bestOperation;
                 console.log(`大名家[${clanId}]が【攻撃作戦】を立案しました！(出撃元: ${bestOperation.stagingBase}, 援軍用: ${bestOperation.supportBase || 'なし'}, 準備: ${bestOperation.turnsRemaining}ヶ月)`);
                 return;
