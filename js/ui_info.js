@@ -1063,33 +1063,56 @@ class UIInfoManager {
                     } else if (currentSortKey === 'name') {
                         const yomiA = a.yomi || a.name || "";
                         const yomiB = b.yomi || b.name || "";
-                        return isSortAsc ? yomiA.localeCompare(yomiB, 'ja') : yomiB.localeCompare(yomiA, 'ja');
+                        let cmp = isSortAsc ? yomiA.localeCompare(yomiB, 'ja') : yomiB.localeCompare(yomiA, 'ja');
+                        if (cmp === 0) {
+                            const nameA = a.name || "";
+                            const nameB = b.name || "";
+                            cmp = isSortAsc ? nameA.localeCompare(nameB, 'ja') : nameB.localeCompare(nameA, 'ja');
+                        }
+                        return cmp;
                     } else if (currentSortKey === 'rank') {
                         // ★変更：手動でソートした時は、全国表示でも自家を特別扱いせず、純粋な身分だけで比べます
                         valA = getSortRankClan(a);
                         valB = getSortRankClan(b);
                     } else if (currentSortKey === 'faction') {
-                        const getFactionYomi = (busho) => {
+                        const getFactionInfo = (busho) => {
                             if (busho.belongKunishuId > 0) {
                                 const kunishu = this.game.kunishuSystem.getKunishu(busho.belongKunishuId);
-                                return kunishu ? (kunishu.yomi || kunishu.name || "") : "んんん";
+                                return {
+                                    yomi: kunishu ? (kunishu.yomi || kunishu.name || "") : "んんん",
+                                    name: kunishu ? (kunishu.name || "") : "んんん"
+                                };
                             } else if (busho.clan > 0) {
                                 const clan = this.game.clans.find(c => c.id === busho.clan);
-                                return clan ? (clan.yomi || clan.name || "") : "んんん";
+                                return {
+                                    yomi: clan ? (clan.yomi || clan.name || "") : "んんん",
+                                    name: clan ? (clan.name || "") : "んんん"
+                                };
                             }
-                            return "んんん";
+                            return { yomi: "んんん", name: "んんん" };
                         };
-                        const yomiA = getFactionYomi(a);
-                        const yomiB = getFactionYomi(b);
-                        return isSortAsc ? yomiA.localeCompare(yomiB, 'ja') : yomiB.localeCompare(yomiA, 'ja');
+                        const infoA = getFactionInfo(a);
+                        const infoB = getFactionInfo(b);
+                        let cmp = isSortAsc ? infoA.yomi.localeCompare(infoB.yomi, 'ja') : infoB.yomi.localeCompare(infoA.yomi, 'ja');
+                        if (cmp === 0) {
+                            cmp = isSortAsc ? infoA.name.localeCompare(infoB.name, 'ja') : infoB.name.localeCompare(infoA.name, 'ja');
+                        }
+                        return cmp;
                     } else if (currentSortKey === 'castle') {
-                        const getCastleYomi = (busho) => {
+                        const getCastleInfo = (busho) => {
                             const castle = this.game.getCastle(busho.castleId);
-                            return castle ? (castle.yomi || castle.name || "") : "んんん";
+                            return {
+                                yomi: castle ? (castle.yomi || castle.name || "") : "んんん",
+                                name: castle ? (castle.name || "") : "んんん"
+                            };
                         };
-                        const yomiA = getCastleYomi(a);
-                        const yomiB = getCastleYomi(b);
-                        return isSortAsc ? yomiA.localeCompare(yomiB, 'ja') : yomiB.localeCompare(yomiA, 'ja');
+                        const infoA = getCastleInfo(a);
+                        const infoB = getCastleInfo(b);
+                        let cmp = isSortAsc ? infoA.yomi.localeCompare(infoB.yomi, 'ja') : infoB.yomi.localeCompare(infoA.yomi, 'ja');
+                        if (cmp === 0) {
+                            cmp = isSortAsc ? infoA.name.localeCompare(infoB.name, 'ja') : infoB.name.localeCompare(infoA.name, 'ja');
+                        }
+                        return cmp;
                     } else if (currentSortKey === 'age') {
                         const isNullA = a.isAutoLeader;
                         const isNullB = b.isAutoLeader;
