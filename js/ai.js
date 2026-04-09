@@ -993,8 +993,8 @@ class AIEngine {
             // 2. 施し（民忠70以下なら優先！）
             if (castle.peoplesLoyalty < 100) {
                 let score = 0;
-                if (castle.peoplesLoyalty <= 70) score = 60; // ★修正：結構優先でも60点に抑えます
-                else score = (100 - castle.peoplesLoyalty) * 2;
+                if (castle.peoplesLoyalty <= 70) score = 120;
+                else score = (100 - castle.peoplesLoyalty) * 4;
                 actions.push({ type: 'charity', stat: 'charm', score: score, cost: 200 }); 
             }
 
