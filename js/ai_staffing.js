@@ -435,11 +435,11 @@ class AIStaffing {
                 // 3. 開発の余地ボーナス
                 const devRoom = (target.maxKokudaka - target.kokudaka) + (target.maxCommerce - target.commerce);
                 if (devRoom > 1000) {
-                    score += 50;
-                    if (bTypeInfo.isSpecialist && busho.politics >= 70) score += 100;
-                } else if (devRoom > 500) {
                     score += 20;
-                    if (bTypeInfo.isSpecialist && busho.politics >= 70) score += 50;
+                    if (bTypeInfo.isSpecialist && busho.politics >= 70) score += 40;
+                } else if (devRoom > 500) {
+                    score += 10;
+                    if (bTypeInfo.isSpecialist && busho.politics >= 70) score += 20;
                 }
 
                 // 3.5. 城壁の修復や民忠回復が必要な城への内政官派遣ボーナス
