@@ -998,10 +998,62 @@ class AIEngine {
                 actions.push({ type: 'charity', stat: 'charm', score: score, cost: 200 }); 
             }
 
-            // ★追加：鉄砲と騎馬の購入（内政フェイズでの優先度は15点、最大5回まで）
+            // ★鉄砲と騎馬の購入（大名の革新性、自家の装備比率、城の兵士数を元に点数を作ります）
             if (castle.gold >= 500 && tradeCount < 5) {
-                actions.push({ type: 'buy_gun', stat: 'politics', score: 15, cost: 500 });
-                actions.push({ type: 'buy_horse', stat: 'politics', score: 15, cost: 500 });
+                // ① 自家（自分の大名家）が持っている、すべての騎馬と鉄砲の数を数えます
+                let totalHorses = 0;
+                let totalGuns = 0;
+                this.game.castles.forEach(c => {
+                    if (c.ownerClan === castle.ownerClan) {
+                        totalHorses += (c.horses || 0);
+                        totalGuns += (c.guns || 0);
+                    }
+                });
+                
+                // 全体の数から、騎馬と鉄砲の「割合（0〜1）」を計算します
+                const totalEq = totalHorses + totalGuns;
+                // もし両方ともゼロだったら、公平に半分（0.5）ずつにします
+                const horseRatio = totalEq > 0 ? (totalHorses / totalEq) : 0.5;
+                const gunRatio = totalEq > 0 ? (totalGuns / totalEq) : 0.5;
+
+                // ② 大名の「革新性」が、基準の50からどれくらい離れているか計算します
+                const innoDiff = daimyo.innovation - 50;
+
+                // ③ 城の兵士数を「目標の数」として、今どれくらい持っているか（充足率）を調べます
+                // もし兵士が0人でも計算がおかしくならないように、最低でも「1」にします
+                const targetAmount = Math.max(1, castle.soldiers); 
+                const horseFillRate = (castle.horses || 0) / targetAmount;
+                const gunFillRate = (castle.guns || 0) / targetAmount;
+
+                // ④ いよいよ点数（スコア）の計算です！基本は控えめの「10点」からスタートします
+                // 充足率による点数：半分（0.5）持っていれば0点、少ないほどプラス、多いほどマイナスになります
+                let horseScore = 10 + ((0.5 - horseFillRate) * 10);
+                let gunScore = 10 + ((0.5 - gunFillRate) * 10);
+
+                // 革新性による点数：高いほど鉄砲が、低いほど騎馬がプラスになります（最大で±5点）
+                horseScore -= (innoDiff * 0.1);
+                gunScore += (innoDiff * 0.1);
+
+                // 比率による点数：大名家全体で多く持っている方を「うちの得意技だ！」と少しだけ優先します（最大+5点）
+                horseScore += (horseRatio * 5);
+                gunScore += (gunRatio * 5);
+
+                // 最後にサイコロを振って、少しだけ気まぐれな気持ち（0〜3点）を足し算します
+                horseScore += Math.random() * 3;
+                gunScore += Math.random() * 3;
+
+                // 目安（兵士数）の1倍以上持っていたら、もう十分なので点数をガクッと下げて買わないようにします
+                if (horseFillRate >= 1.0) horseScore -= 50;
+                if (gunFillRate >= 1.0) gunScore -= 50;
+
+                // 内政などよりは優先しないように、最大でも25点くらいに抑えられています
+                // 点数が5点以上残っていれば、お買い物リストに書きます！
+                if (gunScore >= 5) {
+                    actions.push({ type: 'buy_gun', stat: 'politics', score: gunScore, cost: 500 });
+                }
+                if (horseScore >= 5) {
+                    actions.push({ type: 'buy_horse', stat: 'politics', score: horseScore, cost: 500 });
+                }
             }
 
             // ★追加：朝廷への貢物（金が5000以上で余裕がある時、たまに行います）
