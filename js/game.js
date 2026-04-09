@@ -1083,6 +1083,25 @@ class GameManager {
             let currentLoyalty = Math.max(0, Math.min(100, c.peoplesLoyalty));
             let growth = Math.floor(((Math.sqrt(c.population) * 2) * ((currentLoyalty - 50) / 100)) + (currentLoyalty / 4));
             c.population = Math.min(999999, Math.max(0, c.population + growth));
+
+            // ★追加：毎月の兵士の自然増加計算
+            // まず、このお城の持ち主である大名様を探し出します
+            const daimyoBusho = this.bushos.find(b => b.clan === c.ownerClan && b.isDaimyo);
+            if (daimyoBusho) {
+                // 1. 大名補正: (統率 + 武力 + 政治 + 外交 + 知略 + 魅力) / 6
+                const daimyoBonus = (daimyoBusho.leadership + daimyoBusho.strength + daimyoBusho.politics + daimyoBusho.diplomacy + daimyoBusho.intelligence + daimyoBusho.charm) / 6;
+                
+                // 2. 民忠補正: 民忠 * 0.01
+                const loyaltyBonus = c.peoplesLoyalty * 0.01;
+                
+                // 3. 増加量: √城の人口 * ((大名補正 + 民忠補正) / 2)
+                // 小数点が出ないように、Math.floorで切り捨てて綺麗な数字にします
+                const soldierGrowth = Math.floor(Math.sqrt(c.population) * ((daimyoBonus + loyaltyBonus) / 2));
+                
+                // 計算した増加量を兵士数に足します
+                // Math.min(99999, ...) で、増えた結果が99999を超えないように蓋をしています
+                c.soldiers = Math.min(99999, c.soldiers + Math.max(0, soldierGrowth));
+            }
         });
 
         // ★ここを書き換え！：空っぽの城（中立）も仲間はずれにせず、一緒に混ぜて順番リストに入れます！
