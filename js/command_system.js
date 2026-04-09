@@ -830,7 +830,7 @@ class CommandSystem {
 
         if (type === 'goodwill' || type === 'kunishu_goodwill' || type === 'tribute') {
             if (castle.gold < 200) {
-                this.game.ui.showDialog("金が足りません！", false);
+                this.game.ui.showDialog("金が足りません。", false);
                 return;
             }
         }
