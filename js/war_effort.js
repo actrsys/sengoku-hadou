@@ -746,12 +746,14 @@ Object.assign(WarManager.prototype, {
             if(target) {
                 let lossRate = Math.min(0.9, Math.max(0.05, window.WarParams.War.RetreatResourceLossFactor + (s.attacker.soldiers / (defCastle.soldiers + 1)) * 0.1)); 
                 const carryGold = Math.floor(defCastle.gold * (1.0 - lossRate)); const carryRice = Math.floor(defCastle.rice * (1.0 - lossRate));
+                const carryHorses = Math.floor((defCastle.horses || 0) * (1.0 - lossRate));
+                const carryGuns = Math.floor((defCastle.guns || 0) * (1.0 - lossRate));
                 // ★追加：逃げ込んだ先の城がパンクしないように上限をかけます
                 target.gold = Math.min(99999, target.gold + carryGold); 
                 target.rice = Math.min(99999, target.rice + carryRice); 
                 target.soldiers = Math.min(99999, target.soldiers + defCastle.soldiers);
-                target.horses = Math.min(99999, (target.horses || 0) + (defCastle.horses || 0));
-                target.guns = Math.min(99999, (target.guns || 0) + (defCastle.guns || 0));
+                target.horses = Math.min(99999, (target.horses || 0) + carryHorses);
+                target.guns = Math.min(99999, (target.guns || 0) + carryGuns);
                 
                 const capturedBushos = [];
                 this.game.getCastleBushos(defCastle.id).forEach(b => { 
@@ -903,8 +905,9 @@ Object.assign(WarManager.prototype, {
             const totalCurrentAtk = currentAtkMain + currentAtkAlly + currentAtkSelfAlly;
             
             let atkSurviveRate = 1.0;
+            let siegeStartAtk = totalCurrentAtk;
             if (siegeDeadAtk > 0) {
-                const siegeStartAtk = totalCurrentAtk + siegeDeadAtk;
+                siegeStartAtk = totalCurrentAtk + siegeDeadAtk;
                 atkSurviveRate = Math.max(0, totalCurrentAtk) / Math.max(1, siegeStartAtk);
             }
 
@@ -914,10 +917,22 @@ Object.assign(WarManager.prototype, {
             const totalCurrentDef = currentDefMain + currentDefAlly + currentDefSelfAlly;
 
             let defSurviveRate = 1.0;
+            let siegeStartDef = totalCurrentDef;
             if (siegeDeadDef > 0) {
-                const siegeStartDef = totalCurrentDef + siegeDeadDef;
+                siegeStartDef = totalCurrentDef + siegeDeadDef;
                 defSurviveRate = Math.max(0, totalCurrentDef) / Math.max(1, siegeStartDef);
             }
+
+            // ★追加：攻城戦を生き残った馬と鉄砲の計算（死んだ兵士の割合から、装備していた分だけを減らす）
+            const atkHorseEquipRate = Math.min(1.0, (s.attacker.horses || 0) / Math.max(1, siegeStartAtk));
+            const atkGunEquipRate = Math.min(1.0, (s.attacker.guns || 0) / Math.max(1, siegeStartAtk));
+            const attackerSurvivedHorses = Math.max(0, (s.attacker.horses || 0) - Math.floor(siegeDeadAtk * atkHorseEquipRate));
+            const attackerSurvivedGuns = Math.max(0, (s.attacker.guns || 0) - Math.floor(siegeDeadAtk * atkGunEquipRate));
+
+            const defHorseEquipRate = Math.min(1.0, (s.defender.horses || 0) / Math.max(1, siegeStartDef));
+            const defGunEquipRate = Math.min(1.0, (s.defender.guns || 0) / Math.max(1, siegeStartDef));
+            const defenderSurvivedHorses = Math.max(0, (s.defender.horses || 0) - Math.floor(siegeDeadDef * defHorseEquipRate));
+            const defenderSurvivedGuns = Math.max(0, (s.defender.guns || 0) - Math.floor(siegeDeadDef * defGunEquipRate));
 
             // 3. 吸い込み防止の箱と、回復率の設定
             let atkReinfTotalLoss = 0;
@@ -1322,8 +1337,8 @@ Object.assign(WarManager.prototype, {
 
                 // ★追加：城を奪った時の兵士や馬、鉄砲の合流にストッパー！
                 s.defender.soldiers = Math.min(99999, newTotalSoldiers);
-                s.defender.horses = Math.min(99999, (s.defender.horses || 0) + (s.attacker.horses || 0));
-                s.defender.guns = Math.min(99999, (s.defender.guns || 0) + (s.attacker.guns || 0));
+                s.defender.horses = Math.min(99999, defenderSurvivedHorses + attackerSurvivedHorses);
+                s.defender.guns = Math.min(99999, defenderSurvivedGuns + attackerSurvivedGuns);
                 if (s.isPlayerInvolved && totalAbsorbed > 0) this.game.ui.log(`(敵残存兵・負傷兵 計${totalAbsorbed}名 を吸収)`);
             } else if (!attackerWon) {
                 if (s.attacker.isKunishu) {
@@ -1336,8 +1351,8 @@ Object.assign(WarManager.prototype, {
                             kunishu.morale = Math.floor(((kunishu.morale || 0) * originalSoldiers + (s.attacker.morale || 0) * totalAtkSurvivors) / newTotalSoldiers);
                         }
                         kunishu.soldiers = Math.min(99999, newTotalSoldiers);
-                        kunishu.horses = Math.min(99999, (kunishu.horses || 0) + (s.attacker.horses || 0));
-                        kunishu.guns = Math.min(99999, (kunishu.guns || 0) + (s.attacker.guns || 0));
+                        kunishu.horses = Math.min(99999, (kunishu.horses || 0) + attackerSurvivedHorses);
+                        kunishu.guns = Math.min(99999, (kunishu.guns || 0) + attackerSurvivedGuns);
                     }
                 } else {
                     const srcC = this.game.getCastle(s.sourceCastle.id);
@@ -1352,12 +1367,14 @@ Object.assign(WarManager.prototype, {
     
                     // ★追加：負けて帰ってきた遠征軍の兵士、馬、鉄砲の合流にストッパー！
                     srcC.soldiers = Math.min(99999, newTotalSoldiers);
-                    srcC.horses = Math.min(99999, (srcC.horses || 0) + (s.attacker.horses || 0));
-                    srcC.guns = Math.min(99999, (srcC.guns || 0) + (s.attacker.guns || 0));
+                    srcC.horses = Math.min(99999, (srcC.horses || 0) + attackerSurvivedHorses);
+                    srcC.guns = Math.min(99999, (srcC.guns || 0) + attackerSurvivedGuns);
                 }
                 
                 const recovered = Math.floor(realDefDead * baseRecoveryRate);
                 s.defender.soldiers = Math.min(99999, s.defender.soldiers + recovered);
+                s.defender.horses = defenderSurvivedHorses;
+                s.defender.guns = defenderSurvivedGuns;
                 if (s.isPlayerInvolved && attackerRecovered > 0) this.game.ui.log(`(遠征軍 負傷兵 ${attackerRecovered}名 が帰還)`);
             }
 
@@ -1375,8 +1392,8 @@ Object.assign(WarManager.prototype, {
                 s.defender.morale = s.attacker.morale || 0;
                 
                 // ★追加: 敵が撤退して空になった城を占領した時、持ってきた馬と鉄砲を城に格納する
-                s.defender.horses = (s.attacker.horses || 0);
-                s.defender.guns = (s.attacker.guns || 0);
+                s.defender.horses = attackerSurvivedHorses;
+                s.defender.guns = attackerSurvivedGuns;
 
                 const srcC = this.game.getCastle(s.sourceCastle.id);
                 s.atkBushos.forEach((b) => { 

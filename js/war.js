@@ -195,27 +195,29 @@ class WarManager {
         if (s.selfReinforcement) s.selfReinforcement.soldiers = Math.floor(s.selfReinforcement.soldiers * atkSurviveRate);
 
         if (s.atkAssignments) {
-            let atkHorses = 0, atkGuns = 0;
+            const atkDead = originalAtkSoldiers - Math.max(0, totalAtkSoldiers);
+            const horseEquipRate = Math.min(1.0, (s.attacker.horses || 0) / Math.max(1, originalAtkSoldiers));
+            const gunEquipRate = Math.min(1.0, (s.attacker.guns || 0) / Math.max(1, originalAtkSoldiers));
+
             s.atkAssignments.forEach(a => {
                 a.soldiers = Math.floor(a.soldiers * atkSurviveRate);
-                if (a.troopType === 'kiba') atkHorses += a.soldiers;
-                if (a.troopType === 'teppo') atkGuns += a.soldiers;
             });
-            s.attacker.horses = atkHorses;
-            s.attacker.guns = atkGuns;
+            s.attacker.horses = Math.max(0, (s.attacker.horses || 0) - Math.floor(atkDead * horseEquipRate));
+            s.attacker.guns = Math.max(0, (s.attacker.guns || 0) - Math.floor(atkDead * gunEquipRate));
         }
 
         if (s.defAssignments) {
             const originalDefSoldiers = s.defAssignments.reduce((sum, a) => sum + a.soldiers, 0);
             const defSurviveRate = originalDefSoldiers > 0 ? Math.max(0, s.defender.fieldSoldiers) / originalDefSoldiers : 0;
-            let defHorses = 0, defGuns = 0;
+            const defDead = originalDefSoldiers - Math.max(0, s.defender.fieldSoldiers);
+            const horseEquipRate = Math.min(1.0, (s.defender.fieldHorses || 0) / Math.max(1, originalDefSoldiers));
+            const gunEquipRate = Math.min(1.0, (s.defender.fieldGuns || 0) / Math.max(1, originalDefSoldiers));
+
             s.defAssignments.forEach(a => {
                 a.soldiers = Math.floor(a.soldiers * defSurviveRate);
-                if (a.troopType === 'kiba') defHorses += a.soldiers;
-                if (a.troopType === 'teppo') defGuns += a.soldiers;
             });
-            s.defender.fieldHorses = defHorses;
-            s.defender.fieldGuns = defGuns;
+            s.defender.fieldHorses = Math.max(0, (s.defender.fieldHorses || 0) - Math.floor(defDead * horseEquipRate));
+            s.defender.fieldGuns = Math.max(0, (s.defender.fieldGuns || 0) - Math.floor(defDead * gunEquipRate));
         }
 
         s.defender.soldiers += s.defender.fieldSoldiers;
