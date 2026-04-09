@@ -102,7 +102,7 @@ class AIOperationManager {
 
                 // 攻撃したいスコア（0より大きい）なら、我慢しているストレスで友好度を1下げます！
                 if (breakScore > 0) {
-                    this.game.diplomacyManager.updateSentiment(clanId, targetClanId, -1);
+                    this.game.diplomacyManager.updateSentiment(clanId, targetClanId, -0.5);
                 }
             }
         });
