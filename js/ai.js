@@ -1017,37 +1017,75 @@ class AIEngine {
                 actions.push({ type: 'tribute', stat: 'diplomacy', score: 15, cost: tributeGold });
             }
 
-            // 3. 徴兵（お隣の敵と比べて、自分が少ないほど焦る、または最低限の備え）
-            if (castle.population > 1000 && castle.soldiers < castle.rice / 2) {
-                let scoreDraft = 0;
-                let mySoldiers = Math.max(1, castle.soldiers);
+            // 3. 徴兵（お金と兵糧の余裕を見ながら、計画的に集めます！）
+            if (castle.population > 1000) {
+                // ===== 基本パラメータ =====
+                const targetRice = Math.floor(castle.soldiers * 3.5);
+                const safeRice = Math.floor(castle.soldiers * 2.0);
+                const targetGold = Math.floor(castle.soldiers * 3.0);
                 
-                // ★ここをごっそり書き換えます！兵士が3000人以下なら、少ないほど焦る魔法！
-                if (mySoldiers <= 3000) {
-                    if (mySoldiers <= 1000) {
-                        // 1000人以下なら、城壁修復(80点)や民忠回復(60点)よりも優先する「100点」！
-                        scoreDraft = 100; 
-                    } else {
-                        // 1000〜3000の間で、100点からゆっくりと20点くらいまで下がるなめらかな計算です
-                        scoreDraft = 100 - ((mySoldiers - 1000) / 2000) * 80;
-                    }
-                } else {
-                    // 兵士が十分（3000より多い）な時は、今まで通り周りの敵と比べます
-                    let enemyMaxSoldiers = 0;
-                    neighbors.forEach(n => {
-                        if (n.soldiers > enemyMaxSoldiers) enemyMaxSoldiers = n.soldiers;
-                    });
-                    const keepSoldiers = (castellan.leadership + daimyo.leadership) * 50;
-                    
-                    if (enemyMaxSoldiers > mySoldiers) {
-                        scoreDraft = ((enemyMaxSoldiers * 1.5 / mySoldiers) * 20); 
-                    } else if (castle.soldiers < keepSoldiers) {
-                        scoreDraft = 30; 
-                    }
+                // およそ1人集めるのにかかるお金（単価）を、城主の能力で仮計算します
+                const efficiency = ((castellan.leadership * 1.5) + (castellan.charm * 1.5) + (Math.sqrt(castellan.loyalty) * 2) + (Math.sqrt(castle.peoplesLoyalty) * 2)) / 500;
+                // 1人あたりのお金。もしゼロになりそうなら安全のために1にします
+                const unitPrice = Math.max(1, 1 / efficiency); 
+
+                // ===== 余力計算 =====
+                const surplusGold = Math.max(0, castle.gold - targetGold);
+                const surplusRice = Math.max(0, castle.rice - targetRice);
+
+                // ===== 雇用可能数 =====
+                const affordByGold = Math.floor(surplusGold / unitPrice);
+                const affordByRice = Math.floor(surplusRice / 3.5);
+                
+                // 実際の雇用上限（お金と兵糧、どちらか少ない方に合わせます）
+                let maxDraft = Math.max(0, Math.min(affordByGold, affordByRice));
+                
+                // 人口も超えられないようにします
+                maxDraft = Math.min(maxDraft, castle.population);
+
+                // ===== 目標兵力の計算 =====
+                let enemyMaxSoldiers = 0;
+                neighbors.forEach(n => {
+                    if (n.soldiers > enemyMaxSoldiers) enemyMaxSoldiers = n.soldiers;
+                });
+                // 周りに敵がいなければ、城主と大名の統率から「基本の備え」を目標にします
+                const keepSoldiers = (castellan.leadership + daimyo.leadership) * 50;
+                let targetSoldiers = Math.max(enemyMaxSoldiers * 1.2, keepSoldiers);
+                
+                // 兵士が1000人以下なら、最低でも3000人は急いで集めたい！という目標にします
+                if (castle.soldiers <= 1000) {
+                    targetSoldiers = Math.max(targetSoldiers, 3000);
                 }
 
-                if (scoreDraft > 0) {
-                    actions.push({ type: 'draft', stat: 'leadership', score: scoreDraft, cost: 500 }); 
+                // ===== 雇用スコア =====
+                const shortSoldiers = Math.max(0, targetSoldiers - castle.soldiers);
+                const shortRatio = shortSoldiers / (targetSoldiers + 1);
+                
+                let scoreDraft = 150 * shortRatio;
+
+                // ===== 安全制御 =====
+                if (castle.rice < safeRice) {
+                    scoreDraft = 0; // 兵糧が危ないならやめる
+                }
+                if (castle.gold < targetGold) {
+                    scoreDraft = 0; // お金が危ないならやめる
+                }
+                
+                // 兵士が極端に少ない(1000未満)時は、非常事態として少しスコアを底上げしてあげます
+                // （でもお金・兵糧がないとダメなのは同じです）
+                if (scoreDraft > 0 && castle.soldiers < 1000) {
+                    scoreDraft += 50;
+                }
+
+                // スコアが十分にあり、1人以上集められるなら候補に入れます
+                if (scoreDraft > 50 && maxDraft > 0) {
+                    // 一気に集めすぎないように、今の兵士の3割くらい、または最低でも500人くらいで調整します
+                    let plannedDraft = Math.min(maxDraft, Math.max(500, castle.soldiers * 0.3));
+                    
+                    // 使う予定のお金をメモしておきます
+                    let plannedCost = Math.ceil(plannedDraft * unitPrice);
+
+                    actions.push({ type: 'draft', stat: 'leadership', score: scoreDraft, cost: plannedCost, plannedDraft: plannedDraft }); 
                 }
             }
 
@@ -1636,28 +1674,40 @@ class AIEngine {
                     
                     doer.isActionDone = true; actionDoneInThisStep = true; break;
                 }
-                if (action.type === 'draft' && castle.gold >= 500 && castle.population > 1000) {
-                    // ★追加：お城の貯金箱を見て、使う金額を決める魔法！
-                    let draftCost = 500; // 最初は500
-                    if (castle.gold >= 5000) {
-                        draftCost = 2000; // 5000以上持っていたら2000使う！
-                    } else if (castle.gold >= 3000) {
-                        draftCost = 1000; // 3000以上持っていたら1000使う！
-                    }
+                if (action.type === 'draft' && castle.gold >= action.cost && castle.population > 1000) {
+                    // 準備段階で決めた「使う予定のお金（cost）」を使います
+                    let draftCost = action.cost;
                     
-                    // ★修正：決めた金額（draftCost）で兵士を集めます！
+                    // 実際に行く武将（doer）の能力で、集まる人数を正確に計算します
                     let soldiers = GameSystem.calcDraftFromGold(draftCost, doer, castle.peoplesLoyalty);
                     
-                    // ★追加：AIも人口以上の徴兵はできないように、限界でストップさせます！
+                    // 人口を超えないようにします
                     if (castle.population < soldiers) {
                         soldiers = castle.population;
+                        // 人数が減った分、使うお金も減らしてあげます
+                        draftCost = GameSystem.calcDraftCost(soldiers, doer, castle.peoplesLoyalty);
                     }
 
+                    // 兵士が上限（99999）を超えないようにします
                     if (castle.soldiers + soldiers > 99999) {
                         soldiers = 99999 - castle.soldiers;
+                        draftCost = GameSystem.calcDraftCost(soldiers, doer, castle.peoplesLoyalty);
                     }
-                    if (soldiers > 0) {
-                        // ★追加：AIもプレイヤーと同じように、割合で民忠と人口を減らします！
+
+                    // ===== 仮想チェック（重要） =====
+                    // 最後に、仮想の必要兵糧を計算して、本当に維持できるか最終チェックします！
+                    let virtualSoldiers = castle.soldiers + soldiers;
+                    let virtualRiceNeed = virtualSoldiers * 3.5;
+                    
+                    if (castle.rice < virtualRiceNeed) {
+                        // 維持できないなら、今の兵糧で維持できるギリギリの人数に減らします
+                        soldiers = Math.floor((castle.rice / 3.5) - castle.soldiers);
+                        soldiers = Math.max(0, soldiers);
+                        draftCost = GameSystem.calcDraftCost(soldiers, doer, castle.peoplesLoyalty);
+                    }
+
+                    if (soldiers > 0 && draftCost > 0) {
+                        // AIもプレイヤーと同じように、割合で民忠と人口を減らします
                         const draftRatio = soldiers / castle.population;
                         const penaltyRatio = draftRatio * 2;
                         const loyaltyPenalty = Math.floor(castle.peoplesLoyalty * penaltyRatio);
@@ -1665,7 +1715,7 @@ class AIEngine {
                         castle.peoplesLoyalty = Math.max(0, castle.peoplesLoyalty - loyaltyPenalty);
                         castle.population -= soldiers;
 
-                        // ★修正：決めた金額（draftCost）だけ、お城の貯金箱から減らします！
+                        // お城の貯金箱から使った分を減らします
                         castle.gold -= draftCost; 
                         
                         const newMorale = Math.max(0, castle.morale - 10);
@@ -1674,7 +1724,7 @@ class AIEngine {
                         castle.morale = Math.floor(((castle.morale * castle.soldiers) + (newMorale * soldiers)) / (castle.soldiers + soldiers));
                         castle.soldiers += soldiers;
                         
-                        // ★プレイヤーと同じ！徴兵でもご褒美をあげます
+                        // 頑張ったご褒美をあげます
                         doer.achievementTotal = (doer.achievementTotal || 0) + 5;
                         if (this.game.factionSystem && this.game.factionSystem.updateRecognition) this.game.factionSystem.updateRecognition(doer, 10);
                         
@@ -1682,7 +1732,7 @@ class AIEngine {
                         actionDoneInThisStep = true; 
                         break;
                     } else {
-                        continue; // 上限で増やせなかったら諦める
+                        continue; // 維持できなかったり増やせなかったら諦めて、別の行動を探します
                     }
                 }
                 if (action.type === 'training') {
