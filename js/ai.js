@@ -1099,8 +1099,8 @@ class AIEngine {
             // 3. 徴兵（お金と兵糧の余裕を見ながら、計画的に集めます！）
             if (castle.population > 1000) {
                 // ===== 基本パラメータ =====
-                const targetRice = Math.floor(castle.soldiers * 3.5);
-                const safeRice = Math.floor(castle.soldiers * 2.0);
+                const targetRice = Math.floor(castle.soldiers * 2.5);
+                const safeRice = Math.floor(castle.soldiers * 2.5);
                 const targetGold = Math.floor(castle.soldiers * 3.0);
                 
                 // およそ1人集めるのにかかるお金（単価）を、城主の能力で仮計算します
@@ -1264,9 +1264,8 @@ class AIEngine {
             if (sellScore > 30 && tradeCount < 5) {
                 actions.push({ type: 'sell_rice', stat: 'politics', score: sellScore, cost: 0 }); 
             }
-
+            
             // ===== 基本パラメータ =====
-            // 徴兵に必要な3.5倍に合わせて、お米を買う目標を引き上げます
             const targetRice = Math.floor(castle.soldiers * 3.5);
             const minRice = Math.floor(castle.soldiers * 0.3);
             const shortage = Math.max(0, targetRice - castle.rice);
@@ -1936,7 +1935,7 @@ class AIEngine {
                     }
                     
                     // 一気に余裕まで買います！
-                    const buyTarget = Math.floor(castle.soldiers * 1.8);
+                    const buyTarget = Math.floor(castle.soldiers * 3.5);
                     const extendedShortage = Math.max(0, buyTarget - castle.rice);
                     
                     // 欲しい分と、お金で買える分の、少ない方にします
