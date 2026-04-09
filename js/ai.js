@@ -1108,19 +1108,39 @@ class AIEngine {
                 a.score *= (0.9 + Math.random() * 0.2);
             });
 
-            // 8. 兵糧売買（特殊な判断）
-            if (castle.gold < 500 && castle.rice > 3000) {
-                const targetRice = Math.max(3000, Math.floor(castle.soldiers * 1.5));
-                if (castle.rice > targetRice) {
-                    actions.push({ type: 'sell_rice', stat: 'politics', score: 800, cost: 0 }); 
-                }
-            }
-
-            // 今の国の兵糧の単価（相場）を調べます
+            // 今の国の兵糧の単価（相場）を調べます（売るかどうかの判断にも使うので、先にお相場を調べます！）
             let riceRate = 1.0;
             if (this.game.provinces) {
                 const province = this.game.provinces.find(p => p.id === castle.provinceId);
                 if (province && province.marketRate !== undefined) riceRate = province.marketRate;
+            }
+
+            // 8. 兵糧売却の判断
+            const sellTargetRice = Math.floor(castle.soldiers * 3.5);
+            const sellSafeRice = Math.floor(castle.soldiers * 2.0);
+            const targetGold = Math.floor(castle.soldiers * 3.0);
+            
+            const shortageGold = Math.max(0, targetGold - castle.gold);
+            const surplusRice = Math.max(0, castle.rice - sellTargetRice);
+            
+            // 兵士が0人の時などにエラーにならないよう、分母に+1をしておきます
+            const surplusRate = surplusRice / (sellTargetRice + 1);
+            
+            let sellScore = 200 * Math.pow(surplusRate, 2) + 100 * surplusRate;
+            
+            const goldShortageRate = shortageGold / (targetGold + 1);
+            sellScore *= (1 + goldShortageRate);
+            
+            // お米が高く売れる時はスコアをアップ、安い時はダウンさせます！
+            sellScore *= riceRate;
+            
+            // 安全ラインを下回っていたら、絶対に売りません
+            if (castle.rice <= sellSafeRice) {
+                sellScore = 0;
+            }
+            
+            if (sellScore > 30) {
+                actions.push({ type: 'sell_rice', stat: 'politics', score: sellScore, cost: 0 }); 
             }
 
             // ===== 基本パラメータ =====
@@ -1729,21 +1749,46 @@ class AIEngine {
                     doer.isActionDone = true; actionDoneInThisStep = true; break;
                 }
                 if (action.type === 'sell_rice') {
-                    const sellAmount = castle.rice - Math.max(3000, Math.floor(castle.soldiers * 1.5));
+                    let rate = 1.0;
+                    if (this.game.provinces) {
+                        const province = this.game.provinces.find(p => p.id === castle.provinceId);
+                        if (province && province.marketRate !== undefined) rate = province.marketRate;
+                    }
+
+                    const sellGoalRice = Math.floor(castle.soldiers * 2.0);
+                    const canSellAmount = Math.max(0, castle.rice - sellGoalRice);
+                    
+                    const targetGold = Math.floor(castle.soldiers * 3.0);
+                    const shortageGold = Math.max(0, targetGold - castle.gold);
+                    
+                    // 足りないお金分のお米だけを売るように計算します
+                    const needSellAmount = Math.floor(shortageGold / rate);
+                    
+                    let sellAmount = Math.floor(Math.min(canSellAmount, needSellAmount));
+                    
+                    // 少しだけしか売らないなら、手間なのでやめます
+                    if (sellAmount < Math.floor(castle.soldiers * 0.2)) {
+                        sellAmount = 0;
+                    }
+                    
                     if (sellAmount > 0) {
-                        let rate = 1.0;
-                        if (this.game.provinces) {
-                            const province = this.game.provinces.find(p => p.id === castle.provinceId);
-                            if (province && province.marketRate !== undefined) rate = province.marketRate;
-                        }
                         const gain = Math.floor(sellAmount * rate);
-                        // ★プレイヤーと同じ！上限(99,999)を超えないかチェックします
+                        
                         if (castle.gold + gain <= 99999) {
                             castle.rice -= sellAmount;
                             castle.gold += gain;
                             doer.isActionDone = true; actionDoneInThisStep = true; break;
                         } else {
-                            continue; // 上限を超えるなら売るのをやめます
+                            // もし上限(99,999)を超えてしまう場合は、持てる分だけ売るように調整してあげます
+                            const maxGain = 99999 - castle.gold;
+                            sellAmount = Math.floor(maxGain / rate);
+                            if (sellAmount > 0) {
+                                castle.rice -= sellAmount;
+                                castle.gold += Math.floor(sellAmount * rate);
+                                doer.isActionDone = true; actionDoneInThisStep = true; break;
+                            } else {
+                                continue;
+                            }
                         }
                     }
                 }
