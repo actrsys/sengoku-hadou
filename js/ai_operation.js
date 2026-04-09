@@ -532,7 +532,7 @@ class AIOperationManager {
         // すべてのお城を見終わって、もし攻撃の作戦が見つかっていたらサイコロを振ります！
         if (bestOperation) {
             // ai.jsでやっていた確率のサイコロをここで振って、やるかどうか決めます
-            if (Math.random() * 100 < (highestScore * 0.25)) {
+            if (Math.random() * 100 < highestScore) {
                 
                 this.operations[clanId] = bestOperation;
                 console.log(`大名家[${clanId}]が【攻撃作戦】を立案しました！(出撃元: ${bestOperation.stagingBase}, 援軍用: ${bestOperation.supportBase || 'なし'}, 準備: ${bestOperation.turnsRemaining}ヶ月)`);
