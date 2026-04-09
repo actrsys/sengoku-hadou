@@ -994,7 +994,7 @@ class AIEngine {
             if (castle.peoplesLoyalty < 100) {
                 let score = 0;
                 if (castle.peoplesLoyalty <= 70) score = 120;
-                else score = (100 - castle.peoplesLoyalty) * 4;
+                else score = (100 - castle.peoplesLoyalty) * 2;
                 actions.push({ type: 'charity', stat: 'charm', score: score, cost: 200 }); 
             }
 
