@@ -415,31 +415,40 @@ class AIStaffing {
                 // 1. お城の基本ステータス（総合評価）が高いとプラス
                 score += tRoleData.totalScore / 5;
 
-                // 2. 空の城・手薄な城へのボーナスと、人数によるスコアの調整！
+                // 2. お城の大きさに合わせた、適正人数による点数調整！
+                const castleCapacity = Math.max(2, Math.min(8, Math.floor((target.maxKokudaka + target.maxCommerce) / 1000) + 2));
                 let countScore = 0;
+                
+                // お城が空っぽの場合は、どんなお城でも1人は必ず行ってほしいので特別に高い点数をあげます
                 if (target.samuraiIds.length === 0) {
-                    countScore += 300; 
-                } else if (target.samuraiIds.length === 1) {
-                    countScore += 80;  
-                } else if (target.samuraiIds.length === 2) {
-                    countScore += 30;
-                }
-
-                if (target.samuraiIds.length <= 5) {
-                    countScore += (5 - target.samuraiIds.length) * 5;
+                    countScore += 200; 
                 } else {
-                    countScore -= (target.samuraiIds.length - 5) * 5;
+                    // 適正人数に対して、今いる人数が少ないほど点数が高くなり、多いほど点数が下がります
+                    const diff = castleCapacity - target.samuraiIds.length;
+                    if (diff > 0) {
+                        countScore += diff * 20; // 人が足りない時はプラス
+                    } else {
+                        countScore += diff * 30; // 人が多すぎる時はマイナス（少し厳しめにします）
+                    }
                 }
                 score += countScore;
 
-                // 3. 開発の余地ボーナス
-                const devRoom = (target.maxKokudaka - target.kokudaka) + (target.maxCommerce - target.commerce);
-                if (devRoom > 1000) {
-                    score += 20;
-                    if (bTypeInfo.isSpecialist && busho.politics >= 70) score += 40;
-                } else if (devRoom > 500) {
-                    score += 10;
-                    if (bTypeInfo.isSpecialist && busho.politics >= 70) score += 20;
+                // 3. 開発の余地ボーナス（固定の数字ではなく、どれくらい開発できる割合が残っているかで見ます）
+                const maxDev = target.maxKokudaka + target.maxCommerce;
+                const currentDev = target.kokudaka + target.commerce;
+                const devRoom = maxDev - currentDev;
+                
+                // 最大値がとても小さいお城には、あまりボーナスをあげすぎないようにします
+                if (maxDev > 0 && devRoom > 0) {
+                    const devRatio = devRoom / maxDev; // 開発できる割合（0.0〜1.0）
+                    // たくさん開発する余地があって、なおかつ開発できる量（数値）もそこそこある場合に点数をあげます
+                    if (devRatio > 0.3 && devRoom > 300) {
+                        score += 20;
+                        if (bTypeInfo.isSpecialist && busho.politics >= 70) score += 40;
+                    } else if (devRatio > 0.1 && devRoom > 100) {
+                        score += 10;
+                        if (bTypeInfo.isSpecialist && busho.politics >= 70) score += 20;
+                    }
                 }
 
                 // 3.5. 城壁の修復や民忠回復が必要な城への内政官派遣ボーナス
@@ -546,17 +555,19 @@ class AIStaffing {
         let remainingCount = castle.samuraiIds.length;
         const moveActions = []; // まとめた行動を入れる箱です
 
-        // 人数による点数を計算する魔法の道具です
-        const calcCountScore = (count) => {
+        // 人数による点数を計算する魔法の道具です（お城の大きさも考慮します）
+        const calcCountScore = (count, castleData) => {
+            const capacity = Math.max(2, Math.min(8, Math.floor((castleData.maxKokudaka + castleData.maxCommerce) / 1000) + 2));
             let s = 0;
-            if (count === 0) s += 150;
-            else if (count === 1) s += 80;
-            else if (count === 2) s += 30;
-            
-            if (count <= 5) {
-                s += (5 - count) * 5;
+            if (count === 0) {
+                s += 200;
             } else {
-                s -= (count - 5) * 5;
+                const diff = capacity - count;
+                if (diff > 0) {
+                    s += diff * 20;
+                } else {
+                    s += diff * 30;
+                }
             }
             return s;
         };
@@ -570,8 +581,8 @@ class AIStaffing {
                 // 最低でも城主1人は残すため、1人になったら絶対にお引越しさせません
                 if (remainingCount <= 1) break;
 
-                const currentTotalScore = calcCountScore(remainingCount) + calcCountScore(targetCount);
-                const nextTotalScore = calcCountScore(remainingCount - 1) + calcCountScore(targetCount + 1);
+                const currentTotalScore = calcCountScore(remainingCount, castle) + calcCountScore(targetCount, group.target);
+                const nextTotalScore = calcCountScore(remainingCount - 1, castle) + calcCountScore(targetCount + 1, group.target);
 
                 // 移動した方が点数が高くなる（または同じ）なら、お引越し決定です！
                 if (nextTotalScore >= currentTotalScore) {
