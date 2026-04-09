@@ -811,7 +811,7 @@ class CommandSystem {
             }
         }
 
-        // ★追加：支配コマンドの時、自分がどこかに従属していないかチェックします！
+        // ★支配コマンドの時、自分がどこかに従属していないかチェックします！
         if (type === 'dominate') {
             let isSubordinate = false;
             this.game.clans.forEach(c => {
@@ -824,6 +824,13 @@ class CommandSystem {
             });
             if (isSubordinate) {
                 this.game.ui.showDialog("当家は他勢力に従属しているため、\n他勢力を支配下に置くことはできませぬ。", false);
+                return;
+            }
+        }
+
+        if (type === 'goodwill' || type === 'kunishu_goodwill' || type === 'tribute') {
+            if (castle.gold < 200) {
+                this.game.ui.showDialog("金が足りません！", false);
                 return;
             }
         }
