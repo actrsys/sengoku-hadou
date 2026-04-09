@@ -1835,7 +1835,12 @@ class UIInfoManager {
             document.getElementById('quantity-title').textContent = "徴兵"; 
             
             const busho = this.game.getBusho(data[0]);
-            const maxAffordable = GameSystem.calcDraftFromGold(c.gold, busho, c.peoplesLoyalty);
+            let maxAffordable = GameSystem.calcDraftFromGold(c.gold, busho, c.peoplesLoyalty);
+            // 金額の端数でお金が足りなくならないよう、確実な数まで減らします
+            while (maxAffordable > 0 && GameSystem.calcDraftCost(maxAffordable, busho, c.peoplesLoyalty) > c.gold) {
+                maxAffordable--;
+            }
+            // 城の兵士数の上限(99,999)を超えないようにします
             const maxSoldiers = Math.min(c.population, 99999 - c.soldiers, maxAffordable);
             
             // ★変更：相場の金額を小数点以下1桁で表示します！
@@ -1923,7 +1928,14 @@ class UIInfoManager {
                 const province = this.game.provinces.find(p => p.id === c.provinceId);
                 if (province && province.marketRate !== undefined) rate = province.marketRate;
             }
-            const maxBuy = Math.floor(c.gold / rate);
+            let maxBuy = Math.floor(c.gold / rate);
+            // 金額の端数でお金が足りなくならないよう、確実な数まで減らします
+            while (maxBuy > 0 && Math.ceil(maxBuy * rate) > c.gold) {
+                maxBuy--;
+            }
+            // 城の兵糧上限(99,999)を超えないようにします
+            const realMaxBuy = Math.min(maxBuy, 99999 - c.rice);
+
             this.ui.tradeTypeInfo.classList.remove('hidden'); 
             // ★変更：相場の金額を小数点以下1桁で表示します！
             this.ui.tradeTypeInfo.textContent = `兵糧 10 ＝ 金 ${(10 * rate).toFixed(1)}`;
@@ -1934,7 +1946,7 @@ class UIInfoManager {
             costDiv.style.cssText = "display: flex; justify-content: center; font-weight:bold; color:#1976d2; margin-bottom:15px; font-size:1.1rem;";
             this.ui.quantityContainer.appendChild(costDiv);
 
-            inputs.amount = createSlider("購入量", "amount", maxBuy, 0);
+            inputs.amount = createSlider("購入量", "amount", realMaxBuy, 0);
             
         } else if (type === 'sell_rice') {
             document.getElementById('quantity-title').textContent = "兵糧売却"; 
@@ -1943,6 +1955,10 @@ class UIInfoManager {
                 const province = this.game.provinces.find(p => p.id === c.provinceId);
                 if (province && province.marketRate !== undefined) rate = province.marketRate;
             }
+            // 売ったお金が所持金の上限(99,999)を超えないように、売れる最大量を逆算します
+            const maxSellByGold = Math.floor((99999 - c.gold) / rate);
+            const realMaxSell = Math.min(c.rice, maxSellByGold);
+
             this.ui.tradeTypeInfo.classList.remove('hidden'); 
             // ★変更：相場の金額を小数点以下1桁で表示します！
             this.ui.tradeTypeInfo.textContent = `兵糧 10 ＝ 金 ${(10 * rate).toFixed(1)}`;
@@ -1953,18 +1969,27 @@ class UIInfoManager {
             costDiv.style.cssText = "display: flex; justify-content: center; font-weight:bold; color:#1976d2; margin-bottom:15px; font-size:1.1rem;";
             this.ui.quantityContainer.appendChild(costDiv);
 
-            inputs.amount = createSlider("売却量", "amount", c.rice, 0);
+            inputs.amount = createSlider("売却量", "amount", realMaxSell, 0);
 
         } else if (type === 'buy_ammo') {
             document.getElementById('quantity-title').textContent = "矢弾購入"; 
             const price = parseInt(window.MainParams.Economy.PriceAmmo, 10) || 1;
             const maxBuy = price > 0 ? Math.floor(c.gold / price) : 0;
+            // 城の矢弾上限(99,999)を超えないようにします
+            const realMaxBuy = Math.min(maxBuy, 99999 - (c.ammo || 0));
+
             this.ui.tradeTypeInfo.classList.remove('hidden'); 
             this.ui.tradeTypeInfo.textContent = `固定価格: 金${price.toFixed(1)} / 1個`; // 念のためこちらも揃えます
-            inputs.amount = createSlider("購入量", "amount", maxBuy, 0);
+            inputs.amount = createSlider("購入量", "amount", realMaxBuy, 0);
+
         } else if (type === 'buy_horses') {
             document.getElementById('quantity-title').textContent = "騎馬購入"; 
-            const maxBuy = GameSystem.calcBuyHorseAmount(c.gold, daimyo, castellan);
+            let maxBuy = GameSystem.calcBuyHorseAmount(c.gold, daimyo, castellan);
+            // 金額の端数でお金が足りなくならないよう、確実な数まで減らします
+            while (maxBuy > 0 && GameSystem.calcBuyHorseCost(maxBuy, daimyo, castellan) > c.gold) {
+                maxBuy--;
+            }
+            // 城の騎馬上限(99,999)を超えないようにします
             const realMaxBuy = Math.min(maxBuy, 99999 - (c.horses || 0));
 
             // ★変更：さっき作った「正確な単価の魔法」を使って表示します
@@ -1982,7 +2007,12 @@ class UIInfoManager {
 
         } else if (type === 'buy_guns') {
             document.getElementById('quantity-title').textContent = "鉄砲購入"; 
-            const maxBuy = GameSystem.calcBuyGunAmount(c.gold, daimyo, castellan);
+            let maxBuy = GameSystem.calcBuyGunAmount(c.gold, daimyo, castellan);
+            // 金額の端数でお金が足りなくならないよう、確実な数まで減らします
+            while (maxBuy > 0 && GameSystem.calcBuyGunCost(maxBuy, daimyo, castellan) > c.gold) {
+                maxBuy--;
+            }
+            // 城の鉄砲上限(99,999)を超えないようにします
             const realMaxBuy = Math.min(maxBuy, 99999 - (c.guns || 0));
 
             // ★変更：さっき作った「正確な単価の魔法」を使って表示します
