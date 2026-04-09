@@ -2252,6 +2252,18 @@ class UIInfoManager {
                     v = maxAllowed;
                 } else if (mode === 'half') {
                     v = Math.floor((1 + maxAllowed) / 2);
+                } else if (mode === 'range') {
+                    // ★追加：スライダーを動かした時だけ、10単位・100単位で丸める魔法！
+                    if (v > 1 && v < maxAllowed) {
+                        // 全体の兵数が999以下なら10単位、1000以上なら100単位で丸めます
+                        if (totalSoldiers <= 999) {
+                            v = Math.round(v / 10) * 10;
+                        } else {
+                            v = Math.round(v / 100) * 100;
+                        }
+                    }
+                    if (v > maxAllowed) v = maxAllowed;
+                    if (v < 1) v = 1;
                 } else {
                     if (v > maxAllowed) v = maxAllowed;
                     if (v < 1) v = 1;
@@ -2262,7 +2274,8 @@ class UIInfoManager {
                 updateRemain(b.id, 'num_change');
             };
 
-            range.oninput = (e) => onInput(e.target.value);
+            range.oninput = (e) => onInput(e.target.value, 'range'); // ★変更：スライダーからの入力だと教えます
+            range.onchange = (e) => onInput(e.target.value, 'range'); // ★追加：スマホで指を離した時の最終確認
             num.oninput = (e) => onInput(e.target.value);
 
             const btnMin = div.querySelector(`#div-btn-min-${b.id}`);
