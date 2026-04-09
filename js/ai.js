@@ -1044,18 +1044,24 @@ class AIEngine {
                 maxDraft = Math.min(maxDraft, castle.population);
 
                 // ===== 目標兵力の計算 =====
+                // 自分の大名家全体の「総石高」を調べます！
+                const myCastles = this.game.castles.filter(c => c.ownerClan === castle.ownerClan);
+                const totalKokudaka = myCastles.reduce((sum, c) => sum + c.kokudaka, 0);
+
+                // 石高をベースにした新しい計算式で、目標にする兵士の数を決めます
+                const kokudakaBonus = 1 + (Math.sqrt(totalKokudaka) / 100) + (Math.sqrt(castle.kokudaka) / 10);
+                let targetSoldiers = Math.floor(2000 + (castle.kokudaka / 4) * kokudakaBonus);
+
+                // 周りの敵を調べて、もし敵の方がずっと強かったら目標を引き上げます
                 let enemyMaxSoldiers = 0;
                 neighbors.forEach(n => {
                     if (n.soldiers > enemyMaxSoldiers) enemyMaxSoldiers = n.soldiers;
                 });
-                // 周りに敵がいなければ、城主と大名の統率から「基本の備え」を目標にします
-                const keepSoldiers = (castellan.leadership + daimyo.leadership) * 50;
-                let targetSoldiers = Math.max(enemyMaxSoldiers * 1.2, keepSoldiers);
+                targetSoldiers = Math.max(targetSoldiers, Math.floor(enemyMaxSoldiers * 1.2));
                 
-                // 兵士が1000人以下なら、最低でも3000人は急いで集めたい！という目標にします
-                if (castle.soldiers <= 1000) {
-                    targetSoldiers = Math.max(targetSoldiers, 3000);
-                }
+                // 「最低でもこれだけは急いで集めたい！」という非常事態のラインを計算します
+                // 基本は目標の3分の1ですが、目標が高くなりすぎた時は焦る気持ちを緩やかに（3000人 ＋ 目標の1割程度に）抑えます
+                const minTarget = Math.min(Math.floor(targetSoldiers / 3), 3000 + Math.floor(targetSoldiers / 10));
 
                 // ===== 雇用スコア =====
                 const shortSoldiers = Math.max(0, targetSoldiers - castle.soldiers);
@@ -1071,9 +1077,8 @@ class AIEngine {
                     scoreDraft = 0; // お金が危ないならやめる
                 }
                 
-                // 兵士が極端に少ない(1000未満)時は、非常事態として少しスコアを底上げしてあげます
-                // （でもお金・兵糧がないとダメなのは同じです）
-                if (scoreDraft > 0 && castle.soldiers < 1000) {
+                // 兵士が最低ライン(目標の1/3)未満の時は、大ピンチなのでスコアを底上げしてあげます！
+                if (scoreDraft > 0 && castle.soldiers < minTarget) {
                     scoreDraft += 50;
                 }
 
