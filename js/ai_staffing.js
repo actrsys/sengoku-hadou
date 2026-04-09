@@ -418,7 +418,7 @@ class AIStaffing {
                 // 2. 空の城・手薄な城へのボーナスと、人数によるスコアの調整！
                 let countScore = 0;
                 if (target.samuraiIds.length === 0) {
-                    countScore += 150; 
+                    countScore += 300; 
                 } else if (target.samuraiIds.length === 1) {
                     countScore += 80;  
                 } else if (target.samuraiIds.length === 2) {
@@ -440,6 +440,39 @@ class AIStaffing {
                 } else if (devRoom > 500) {
                     score += 20;
                     if (bTypeInfo.isSpecialist && busho.politics >= 70) score += 50;
+                }
+
+                // 3.5. 城壁の修復や民忠回復が必要な城への内政官派遣ボーナス
+                // 政治や魅力が高い武将ほど、困っているお城を助けに行きたがるようにします
+                if (busho.politics >= 60 || busho.charm >= 60) {
+                    // 城の防御力が減っている時の評価（政治力が高い武将ほど評価アップ）
+                    if (target.defense < target.maxDefense) {
+                        let defScore = 0;
+                        if (target.defense <= target.maxDefense / 4) {
+                            defScore = 50; // 1/4以下なら緊急事態なので点数を高くします
+                        } else {
+                            defScore = 15; // 少し壊れているだけなら少し点数をあげます
+                        }
+                        
+                        // 最大防御力が低いお城（最大1000を基準にします）ほど、割合による重要度を上げます
+                        const defRatio = 1000 / Math.max(1, target.maxDefense);
+                        const polBonus = busho.politics / 100;
+                        
+                        score += Math.floor(defScore * defRatio * polBonus);
+                    }
+
+                    // 民忠が下がっている時の評価（魅力が高い武将ほど評価アップ）
+                    if (target.peoplesLoyalty < 100) {
+                        let loyaltyScore = 0;
+                        if (target.peoplesLoyalty <= 70) {
+                            loyaltyScore = 50; // 民忠が70以下なら不満が溜まっているので点数を高くします
+                        } else {
+                            loyaltyScore = (100 - target.peoplesLoyalty); // それ以外は下がっている分だけ点数にします
+                        }
+                        
+                        const charmBonus = busho.charm / 100;
+                        score += Math.floor(loyaltyScore * charmBonus);
+                    }
                 }
 
                 // 4. 武将のタイプによる好み
