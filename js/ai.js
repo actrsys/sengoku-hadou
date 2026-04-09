@@ -482,7 +482,7 @@ class AIEngine {
                 // 最大値の適用 (諸勢力相手は最大40)
                 prob = Math.min(prob, 40);
 
-                if (prob > 0) prob = prob * 0.6;
+                if (prob > 0) prob = prob * 1.1;
                 prob = Math.max(0, prob);
 
                 if (prob > highestProb) {
