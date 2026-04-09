@@ -483,12 +483,12 @@ class GameSystem {
     // 新しい計算式です。兵士数(soldiers)を引数として受け取ります
     static calcTraining(busho, soldiers) { 
         const safeSoldiers = Math.max(1, soldiers); // 兵士0の時は計算エラーを防ぐため1として扱います
-        const val = ((busho.leadership * 1.5) + busho.strength + (Math.sqrt(busho.loyalty) * 2)) / (Math.sqrt(safeSoldiers) * 1.0);
+        const val = ((busho.leadership * 1.5) + busho.strength + (Math.sqrt(busho.loyalty) * 2)) / (Math.sqrt(safeSoldiers) * 0.5);
         return Math.max(1, Math.round(val)); 
     }
     static calcSoldierCharity(busho, soldiers) { 
         const safeSoldiers = Math.max(1, soldiers); // こちらも同じく兵士0の時は1として扱います
-        const val = ((busho.politics * 1.5) + busho.charm + (Math.sqrt(busho.loyalty) * 2)) / (Math.sqrt(safeSoldiers) * 1.0);
+        const val = ((busho.politics * 1.5) + busho.charm + (Math.sqrt(busho.loyalty) * 2)) / (Math.sqrt(safeSoldiers) * 0.5);
         return Math.max(1, Math.round(val)); 
     }
     
