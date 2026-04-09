@@ -532,7 +532,7 @@ class AIOperationManager {
         // すべてのお城を見終わって、もし攻撃の作戦が見つかっていたらサイコロを振ります！
         if (bestOperation) {
             // ai.jsでやっていた確率のサイコロをここで振って、やるかどうか決めます
-            if (Math.random() * 100 < highestScore) {
+            if (Math.random() * 100 < (highestScore * 0.25)) {
                 
                 // ★今回追加：もし選ばれた作戦の目標が同盟国や従属先だったら、この瞬間に同盟を破棄します！
                 if (!bestOperation.isKunishuTarget) {
