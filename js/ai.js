@@ -968,6 +968,9 @@ class AIEngine {
             });
         }
 
+        // ★追加：取引の回数を数えるカウンター
+        let tradeCount = 0;
+
         // ③ 決められた回数だけ、行動を繰り返します！
         for (let step = 0; step < maxActions; step++) {
             // まだ動ける武将を再確認します
@@ -999,8 +1002,8 @@ class AIEngine {
                 actions.push({ type: 'charity', stat: 'charm', score: score, cost: 200 }); 
             }
 
-            // ★追加：鉄砲と騎馬の購入（内政フェイズでの優先度は15点）
-            if (castle.gold >= 500) {
+            // ★追加：鉄砲と騎馬の購入（内政フェイズでの優先度は15点、最大5回まで）
+            if (castle.gold >= 500 && tradeCount < 5) {
                 actions.push({ type: 'buy_gun', stat: 'politics', score: 15, cost: 500 });
                 actions.push({ type: 'buy_horse', stat: 'politics', score: 15, cost: 500 });
             }
@@ -1182,7 +1185,8 @@ class AIEngine {
                 sellScore = 0;
             }
             
-            if (sellScore > 30) {
+            // ★変更：最大5回までの制限を追加
+            if (sellScore > 30 && tradeCount < 5) {
                 actions.push({ type: 'sell_rice', stat: 'politics', score: sellScore, cost: 0 }); 
             }
 
@@ -1214,7 +1218,7 @@ class AIEngine {
             const finalRiceScore = riceScore * goldMod;
 
             // ===== 購入判断 =====
-            if (finalRiceScore > 30) {
+            if (finalRiceScore > 30 && tradeCount < 5) {
                 // ここでは点数をつけて「買いに行きたい！」と手を挙げるだけです
                 actions.push({ type: 'buy_rice', stat: 'politics', score: finalRiceScore, cost: 0 }); 
             }
@@ -1794,14 +1798,14 @@ class AIEngine {
                     const cost = GameSystem.calcBuyGunCost(amount, daimyo, castellan);
                     castle.gold -= cost;
                     castle.guns = Math.min(99999, (castle.guns || 0) + amount);
-                    doer.isActionDone = true; actionDoneInThisStep = true; break;
+                    tradeCount++; step--; actionDoneInThisStep = true; break;
                 }
                 if (action.type === 'buy_horse') {
                     const amount = GameSystem.calcBuyHorseAmount(500, daimyo, castellan);
                     const cost = GameSystem.calcBuyHorseCost(amount, daimyo, castellan);
                     castle.gold -= cost;
                     castle.horses = Math.min(99999, (castle.horses || 0) + amount);
-                    doer.isActionDone = true; actionDoneInThisStep = true; break;
+                    tradeCount++; step--; actionDoneInThisStep = true; break;
                 }
                 if (action.type === 'sell_rice') {
                     let rate = 1.0;
@@ -1832,7 +1836,7 @@ class AIEngine {
                         if (castle.gold + gain <= 99999) {
                             castle.rice -= sellAmount;
                             castle.gold += gain;
-                            doer.isActionDone = true; actionDoneInThisStep = true; break;
+                            tradeCount++; step--; actionDoneInThisStep = true; break;
                         } else {
                             // もし上限(99,999)を超えてしまう場合は、持てる分だけ売るように調整してあげます
                             const maxGain = 99999 - castle.gold;
@@ -1840,7 +1844,7 @@ class AIEngine {
                             if (sellAmount > 0) {
                                 castle.rice -= sellAmount;
                                 castle.gold += Math.floor(sellAmount * rate);
-                                doer.isActionDone = true; actionDoneInThisStep = true; break;
+                                tradeCount++; step--; actionDoneInThisStep = true; break;
                             } else {
                                 continue;
                             }
@@ -1880,7 +1884,7 @@ class AIEngine {
                         const cost = Math.floor(buyAmount * rate);
                         castle.gold -= cost;
                         castle.rice += buyAmount;
-                        doer.isActionDone = true; actionDoneInThisStep = true; break;
+                        tradeCount++; step--; actionDoneInThisStep = true; break;
                     } else {
                         // 買うのをやめたら、別の行動を探します
                         continue; 
