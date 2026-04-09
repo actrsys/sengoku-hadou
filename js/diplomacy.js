@@ -998,10 +998,10 @@ class DiplomacyManager {
             }
 
             if (rel.sentiment < 50) {
-                breakScore += (50 - rel.sentiment) * 0.05; // (0.0005 * 100)
+                breakScore += (50 - rel.sentiment) * 0.3; 
             }
 
-            breakScore += (50 - myDaimyoDuty) * 0.05; // (0.0005 * 100)
+            breakScore += (50 - myDaimyoDuty) * 0.3;
 
             return breakScore > 0 ? breakScore : -999;
         }

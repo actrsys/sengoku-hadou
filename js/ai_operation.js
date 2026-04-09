@@ -98,7 +98,7 @@ class AIOperationManager {
                 }
                 
                 // 自分の義理が低いほど攻撃したくなります
-                breakScore += (50 - myDaimyo.duty) * 0.05;
+                breakScore += (50 - myDaimyo.duty) * 0.3;
 
                 // 攻撃したいスコア（0より大きい）なら、我慢しているストレスで友好度を1下げます！
                 if (breakScore > 0) {
