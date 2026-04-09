@@ -879,47 +879,40 @@ class AIEngine {
         // ① 大名を取得します（行動回数の計算に使います）
         const daimyo = this.game.bushos.find(b => b.clan === castle.ownerClan && b.isDaimyo) || castellan;
 
-        // ★追加：大名の城と「自領で地続き」で繋がっているかを調べる魔法
+        // ★魔法の改善：最初にお城の繋がりを1回だけ全部調べて、リストを作ります！
+        const reachableMyCastles = [];
+        const visitedCastles = new Set();
+        const searchQueue = [castle];
+        visitedCastles.add(castle.id);
+
+        while (searchQueue.length > 0) {
+            const current = searchQueue.shift();
+            // 自分のお城もリストに入れておきます（後で便利です）
+            reachableMyCastles.push(current);
+
+            const adjMyCastles = [];
+            if (current.adjacentCastleIds) {
+                current.adjacentCastleIds.forEach(adjId => {
+                    const c = this.game.getCastle(adjId);
+                    if (c && c.ownerClan === castle.ownerClan && !visitedCastles.has(c.id)) {
+                        adjMyCastles.push(c);
+                    }
+                });
+            }
+
+            for (const n of adjMyCastles) {
+                visitedCastles.add(n.id);
+                searchQueue.push(n);
+            }
+        }
+
+        // ★大名の城と「自領で地続き」で繋がっているかをリストから一瞬で判断します！
         let isConnected = false;
-        
-        // もし大名がいない、またはこの城がまさに大名のいる城なら、繋がっている扱いにします
         if (!daimyo.castleId || daimyo.castleId === castle.id) {
             isConnected = true;
         } else {
-            // 大名のいるお城を探します
-            const daimyoCastle = this.game.castles.find(c => c.id === daimyo.castleId);
-            if (daimyoCastle) {
-                // 自領の城だけをたどって、大名の城から今の城まで行けるか調べます
-                const visited = new Set();
-                const queue = [daimyoCastle];
-                visited.add(daimyoCastle.id);
-
-                while (queue.length > 0) {
-                    const currentCastle = queue.shift();
-                    
-                    // ゴール（今の城）にたどり着いたら、繋がっている証拠！
-                    if (currentCastle.id === castle.id) {
-                        isConnected = true;
-                        break;
-                    }
-                    
-                    // お隣の城を探します（同じ大名家の城だけを通ります）
-                    const neighbors = [];
-                    if (currentCastle.adjacentCastleIds) {
-                        currentCastle.adjacentCastleIds.forEach(adjId => {
-                            const c = this.game.getCastle(adjId);
-                            if (c && c.ownerClan === castle.ownerClan && !visited.has(c.id)) {
-                                neighbors.push(c);
-                            }
-                        });
-                    }
-                    
-                    for (const n of neighbors) {
-                        visited.add(n.id);
-                        queue.push(n);
-                    }
-                }
-            }
+            // リストの中に大名のお城があるか探すだけですぐ分かります！
+            isConnected = reachableMyCastles.some(c => c.id === daimyo.castleId);
         }
 
         // ② 行動回数の計算
@@ -1014,29 +1007,15 @@ class AIEngine {
 
             if (canBuyEq && castle.gold >= 500 && tradeCount < 5) {
                 // ① 自領で「道が繋がっている範囲」のお城にある、騎馬・鉄砲・兵士の合計を数えます（飛び地対策）
+                // ★さっき作ったリストを使って、パパッと数えちゃいます！
                 let totalHorses = 0;
                 let totalGuns = 0;
                 let totalSoldiers = 0;
 
-                const visitedCastles = new Set();
-                const searchQueue = [castle];
-                visitedCastles.add(castle.id);
-
-                while (searchQueue.length > 0) {
-                    const current = searchQueue.shift();
+                for (const current of reachableMyCastles) {
                     totalHorses += (current.horses || 0);
                     totalGuns += (current.guns || 0);
                     totalSoldiers += (current.soldiers || 0);
-
-                    if (current.adjacentCastleIds) {
-                        current.adjacentCastleIds.forEach(adjId => {
-                            const c = this.game.getCastle(adjId);
-                            if (c && c.ownerClan === castle.ownerClan && !visitedCastles.has(c.id)) {
-                                visitedCastles.add(c.id);
-                                searchQueue.push(c);
-                            }
-                        });
-                    }
                 }
                 
                 // 全体の数から、騎馬と鉄砲の「割合（0〜1）」を計算します
@@ -1298,33 +1277,8 @@ class AIEngine {
                 actions.push({ type: 'buy_rice', stat: 'politics', score: finalRiceScore, cost: 0 }); 
             }
 
-            // ★追加：自領のみを通って辿り着ける城のリストを作る魔法！
-            const reachableMyCastles = [];
-            const visitedCastles = new Set();
-            const searchQueue = [castle];
-            visitedCastles.add(castle.id);
-
-            while (searchQueue.length > 0) {
-                const current = searchQueue.shift();
-                if (current.id !== castle.id) {
-                    reachableMyCastles.push(current);
-                }
-
-                const adjMyCastles = [];
-                if (current.adjacentCastleIds) {
-                    current.adjacentCastleIds.forEach(adjId => {
-                        const c = this.game.getCastle(adjId);
-                        if (c && c.ownerClan === castle.ownerClan && !visitedCastles.has(c.id)) {
-                            adjMyCastles.push(c);
-                        }
-                    });
-                }
-
-                for (const n of adjMyCastles) {
-                    visitedCastles.add(n.id);
-                    searchQueue.push(n);
-                }
-            }
+            // ★最初に作った「道が繋がっているお城リスト」から、自分のお城だけを抜いたリストを作ります！
+            const targetCastlesForTransport = reachableMyCastles.filter(c => c.id !== castle.id);
 
             // ★ここから変更：「お使いメモ（一括輸送）」を作って、まとめて1回で運ぶ魔法です！
             let transportTasks = [];
@@ -1334,7 +1288,7 @@ class AIEngine {
             if (isPreparingAttack && this.game.aiOperationManager.draftBases) {
                 const draftBaseId = this.game.aiOperationManager.draftBases[castle.ownerClan];
                 if (draftBaseId && draftBaseId !== castle.id && castle.gold >= 1000) {
-                    const isConnected = reachableMyCastles.some(c => c.id === draftBaseId);
+                    const isConnected = targetCastlesForTransport.some(c => c.id === draftBaseId);
                     if (isConnected) {
                         // メモに「お金を運ぶ」お使いを追加します
                         transportTasks.push({ type: 'draft_gold', targetId: draftBaseId });
@@ -1473,7 +1427,7 @@ class AIEngine {
 
             // ③ 通常の輸送（大名のいない城のみ）
             if (!daimyo || daimyo.castleId !== castle.id) {
-                const allyCastles = reachableMyCastles;
+                const allyCastles = targetCastlesForTransport;
                 for (const target of allyCastles) {
                     if ((target.soldiers <= 500 || target.gold <= 500) && castle.soldiers >= 2000 && castle.gold >= 2000) {
                         transportTasks.push({ type: 'normal_gold_soldier', targetId: target.id });
