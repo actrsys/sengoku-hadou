@@ -1062,9 +1062,8 @@ class AIEngine {
                 });
                 targetSoldiers = Math.max(targetSoldiers, Math.floor(enemyMaxSoldiers * 1.2));
                 
-                // 「最低でもこれだけは急いで集めたい！」という非常事態のラインを計算します
-                // 基本は目標の3分の1ですが、目標が高くなりすぎた時は焦る気持ちを緩やかに（3000人 ＋ 目標の1割程度に）抑えます
-                const minTarget = Math.min(Math.floor(targetSoldiers / 3), 3000 + Math.floor(targetSoldiers / 10));
+                // 「最低でもこれだけは急いで集めたい！」という非常事態のラインを、目標の3分の1にします
+                const minTarget = Math.floor(targetSoldiers / 3);
 
                 // ===== 雇用スコア =====
                 const shortSoldiers = Math.max(0, targetSoldiers - castle.soldiers);
