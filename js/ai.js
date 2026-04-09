@@ -1115,11 +1115,45 @@ class AIEngine {
                     actions.push({ type: 'sell_rice', stat: 'politics', score: 800, cost: 0 }); 
                 }
             }
-            if (castle.rice <= castle.soldiers * 1) {
-                actions.push({ type: 'buy_rice', stat: 'politics', score: 800, cost: 0 }); 
+
+            // 今の国の兵糧の単価（相場）を調べます
+            let riceRate = 1.0;
+            if (this.game.provinces) {
+                const province = this.game.provinces.find(p => p.id === castle.provinceId);
+                if (province && province.marketRate !== undefined) riceRate = province.marketRate;
             }
-            if (castle.gold >= Math.max(1, castle.rice) * 5 && castle.gold >= 500) {
-                actions.push({ type: 'buy_rice_rich', stat: 'politics', score: 800, cost: 0 }); 
+
+            // ===== 基本パラメータ =====
+            const targetRice = Math.floor(castle.soldiers * 1.5);
+            const minRice = Math.floor(castle.soldiers * 0.3);
+            const shortage = Math.max(0, targetRice - castle.rice);
+            // 目標が0の時はエラーにならないように0にします
+            const shortageRate = targetRice > 0 ? shortage / targetRice : 0;
+
+            // ===== 兵糧スコア =====
+            let riceScore = 200 * Math.pow(shortageRate, 2) + 100 * shortageRate;
+
+            // 飢餓ブースト
+            if (castle.rice < minRice) {
+                riceScore = 1000;
+            }
+
+            // ===== ヒステリシス代替 =====
+            if (castle.rice >= castle.soldiers * 1.3) {
+                riceScore *= 0.2; // 強制的に優先度を落とす
+            }
+
+            // ===== 所持金補正 =====
+            const buyableAmount = castle.gold / riceRate;
+            const fillRate = Math.min(1, buyableAmount / (shortage + 1));
+            const goldMod = 0.5 + 0.5 * fillRate;
+
+            const finalRiceScore = riceScore * goldMod;
+
+            // ===== 購入判断 =====
+            if (finalRiceScore > 30) {
+                // ここでは点数をつけて「買いに行きたい！」と手を挙げるだけです
+                actions.push({ type: 'buy_rice', stat: 'politics', score: finalRiceScore, cost: 0 }); 
             }
 
             // ★追加：自領のみを通って辿り着ける城のリストを作る魔法！
@@ -1715,46 +1749,41 @@ class AIEngine {
                 }
                 
                 if (action.type === 'buy_rice') {
-                    const buyAmount = Math.floor(castle.soldiers * 1.5) - castle.rice;
                     let rate = 1.0;
                     if (this.game.provinces) {
                         const province = this.game.provinces.find(p => p.id === castle.provinceId);
                         if (province && province.marketRate !== undefined) rate = province.marketRate;
                     }
-                    const cost = Math.floor(buyAmount * rate);
-                    if (buyAmount > 0 && castle.gold >= cost + 500) {
-                        // ★プレイヤーと同じ！上限(99,999)を超えないかチェックします
-                        if (castle.rice + buyAmount <= 99999) {
-                            castle.gold -= cost;
-                            castle.rice += buyAmount;
-                            doer.isActionDone = true; actionDoneInThisStep = true; break;
-                        } else {
-                            continue; // 上限を超えるなら買うのをやめます
-                        }
-                    }
-                }
-                
-                if (action.type === 'buy_rice_rich') {
-                    const spendGold = Math.floor(castle.gold / 2);
-                    let rate = 1.0;
-                    if (this.game.provinces) {
-                        const province = this.game.provinces.find(p => p.id === castle.provinceId);
-                        if (province && province.marketRate !== undefined) rate = province.marketRate;
-                    }
-                    const buyAmount = Math.floor(spendGold / rate);
                     
-                    if (buyAmount > 0) {
-                        if (castle.rice + buyAmount <= 99999) {
-                            castle.gold -= spendGold;
-                            castle.rice += buyAmount;
-                            doer.isActionDone = true; actionDoneInThisStep = true; break;
-                        } else {
-                            const maxBuy = 99999 - castle.rice;
-                            const maxSpend = Math.floor(maxBuy * rate);
-                            castle.gold -= maxSpend;
-                            castle.rice = 99999;
-                            doer.isActionDone = true; actionDoneInThisStep = true; break;
+                    // 一気に余裕まで買います！
+                    const buyTarget = Math.floor(castle.soldiers * 1.8);
+                    const extendedShortage = Math.max(0, buyTarget - castle.rice);
+                    
+                    // 欲しい分と、お金で買える分の、少ない方にします
+                    let buyAmount = Math.floor(Math.min(extendedShortage, castle.gold / rate));
+                    
+                    // ちょい買い防止
+                    const minRice = Math.floor(castle.soldiers * 0.3);
+                    if (buyAmount < castle.soldiers * 0.2) {
+                        if (castle.rice >= minRice) {
+                            buyAmount = 0; // 最低限持っているなら、少しだけ買うのはやめます
                         }
+                    }
+
+                    // 上限(99,999)を超えないように調整します
+                    if (castle.rice + buyAmount > 99999) {
+                        buyAmount = 99999 - castle.rice;
+                    }
+
+                    // 買う量が決まったら実行します
+                    if (buyAmount > 0) {
+                        const cost = Math.floor(buyAmount * rate);
+                        castle.gold -= cost;
+                        castle.rice += buyAmount;
+                        doer.isActionDone = true; actionDoneInThisStep = true; break;
+                    } else {
+                        // 買うのをやめたら、別の行動を探します
+                        continue; 
                     }
                 }
                 
