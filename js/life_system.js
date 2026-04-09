@@ -679,6 +679,32 @@ class LifeSystem {
             });
             // ★追加ここまで
 
+            // ★ここから追加：当主交代による諸勢力との友好度の変動！
+            if (this.game.kunishuSystem) {
+                const aliveKunishus = this.game.kunishuSystem.getAliveKunishus();
+                aliveKunishus.forEach(kunishu => {
+                    // 現在の諸勢力との仲良し度を調べます
+                    const currentRel = kunishu.getRelation(daimyo.clan);
+                    
+                    let changeAmount = 0;
+                    
+                    // 仲良し度が51〜54なら、50に戻します
+                    if (currentRel >= 51 && currentRel <= 54) {
+                        changeAmount = 50 - currentRel; 
+                    } 
+                    // 仲良し度が55以上なら、5下げます
+                    else if (currentRel >= 55) {
+                        changeAmount = -5;
+                    }
+                    
+                    // 変化がある場合のみ、新しい仲良し度を箱にしまいます
+                    if (changeAmount !== 0) {
+                        kunishu.setRelation(daimyo.clan, currentRel + changeAmount);
+                    }
+                });
+            }
+            // ★諸勢力の追加ここまで
+
             // ★ここから追加：当主交代に合わせて大名家の名前を変更し、マップを更新します！
             const clan = this.game.clans.find(c => c.id === daimyo.clan);
             if (clan) {
