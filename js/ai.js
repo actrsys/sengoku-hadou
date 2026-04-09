@@ -1094,13 +1094,13 @@ class AIEngine {
 
             // 4. 訓練
             if (castle.training < 100) {
-                let score = (100 - castle.training) * 0.5;
+                let score = 100 - castle.training;
                 actions.push({ type: 'training', stat: 'leadership', score: score, cost: 0 }); 
             }
 
             // 5. 兵施し（士気）
             if (castle.morale < 100) {
-                let score = (100 - castle.morale) * 0.5;
+                let score = 100 - castle.morale;
                 actions.push({ type: 'soldier_charity', stat: 'leadership', score: score, cost: 200 }); 
             }
 
