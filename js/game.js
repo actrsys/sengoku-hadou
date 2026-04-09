@@ -1105,7 +1105,7 @@ class GameManager {
                 const loyaltyBonus = c.peoplesLoyalty * 0.01;
                 
                 // 3. 増加量: √城の人口 * ((大名補正 + 民忠補正) / 2)
-                const soldierGrowth = Math.floor(Math.sqrt(c.population) * ((daimyoBonus + loyaltyBonus) / 2) * 0.5);
+                const soldierGrowth = Math.floor(Math.sqrt(c.population) * ((daimyoBonus + loyaltyBonus) / 2));
 
                 // 計算した増える人数を、今のお城の兵士の数に足し合わせます（最大99999人まで）
                 c.soldiers = Math.min(99999, c.soldiers + Math.max(0, soldierGrowth));
