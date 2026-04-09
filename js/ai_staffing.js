@@ -390,6 +390,18 @@ class AIStaffing {
         const currentRoleData = castleRoles.get(castle.id);
         if (!currentRoleData) return null;
 
+        // 繋がっているお城の中だけで、全体の人数や大きさを計算するようにします
+        let totalBushosInNetwork = 0;
+        let totalScale = 0;
+        
+        reachableMyCastles.forEach(c => {
+            totalBushosInNetwork += c.samuraiIds.length;
+            totalScale += (c.maxKokudaka + c.maxCommerce);
+        });
+
+        const avgBushos = Math.max(1, totalBushosInNetwork / Math.max(1, reachableMyCastles.length));
+        const avgScale = Math.max(1, totalScale / Math.max(1, reachableMyCastles.length));
+
         // お引越しの候補者を入れる箱を用意します
         let candidates = [];
 
@@ -415,20 +427,21 @@ class AIStaffing {
                 // 1. お城の基本ステータス（総合評価）が高いとプラス
                 score += tRoleData.totalScore / 5;
 
-                // 2. お城の大きさに合わせた、適正人数による点数調整！
-                const castleCapacity = Math.max(2, Math.min(8, Math.floor((target.maxKokudaka + target.maxCommerce) / 1000) + 2));
+                // 2. お城の大きさと全体の人数に合わせた、適正人数による点数調整！
+                const targetScale = target.maxKokudaka + target.maxCommerce;
+                const scaleRatio = targetScale / avgScale;
+                const castleCapacity = Math.max(2, Math.floor(avgBushos * scaleRatio));
+
                 let countScore = 0;
                 
-                // お城が空っぽの場合は、どんなお城でも1人は必ず行ってほしいので特別に高い点数をあげます
                 if (target.samuraiIds.length === 0) {
                     countScore += 200; 
                 } else {
-                    // 適正人数に対して、今いる人数が少ないほど点数が高くなり、多いほど点数が下がります
                     const diff = castleCapacity - target.samuraiIds.length;
                     if (diff > 0) {
-                        countScore += diff * 20; // 人が足りない時はプラス
+                        countScore += diff * 20;
                     } else {
-                        countScore += diff * 30; // 人が多すぎる時はマイナス（少し厳しめにします）
+                        countScore += diff * 30;
                     }
                 }
                 score += countScore;
@@ -555,9 +568,12 @@ class AIStaffing {
         let remainingCount = castle.samuraiIds.length;
         const moveActions = []; // まとめた行動を入れる箱です
 
-        // 人数による点数を計算する魔法の道具です（お城の大きさも考慮します）
+        // 人数による点数を計算する魔法の道具です（全体の状況とお城の大きさの両方を考慮します）
         const calcCountScore = (count, castleData) => {
-            const capacity = Math.max(2, Math.min(8, Math.floor((castleData.maxKokudaka + castleData.maxCommerce) / 1000) + 2));
+            const tScale = castleData.maxKokudaka + castleData.maxCommerce;
+            const sRatio = tScale / avgScale;
+            const capacity = Math.max(2, Math.floor(avgBushos * sRatio));
+            
             let s = 0;
             if (count === 0) {
                 s += 200;
