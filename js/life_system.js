@@ -620,14 +620,27 @@ class LifeSystem {
                 clanCastlesInfo.forEach(c => {
                     // 民忠も0～100の間で収まるようにします
                     c.peoplesLoyalty = Math.max(0, Math.min(100, (c.peoplesLoyalty || 50) + changeVal));
+
+                    // 能力が下がって、changeValがマイナスになっている時の処理
+                    if (changeVal < 0) {
+                        // マイナスの記号を取って、純粋な数字（パーセント）にします
+                        const decreasePercent = Math.abs(changeVal);
+                        
+                        // 兵士は decreasePercent ％減らします（残る割合を掛け算します）
+                        c.soldiers = Math.floor(c.soldiers * ((100 - decreasePercent) / 100));
+                        
+                        // 人口はその半分（decreasePercent / 2）％減らします
+                        c.population = Math.floor(c.population * ((100 - (decreasePercent / 2)) / 100));
+                    }
                 });
 
                 // ③ プレイヤーの大名家なら、メッセージに結果を書き足してお知らせします！
                 if (daimyo.clan === this.game.playerClanId) {
                     if (changeVal > 0) {
-                        extraMsg += `\n新当主への期待から、家臣の忠誠と領内の民忠が ${changeVal} 上昇しました！`;
+                        extraMsg += `\n新当主への期待から、家臣団の気勢が高まっています！`;
                     } else {
-                        extraMsg += `\n当主の交代による不安から、家臣の忠誠と領内の民忠が ${Math.abs(changeVal)} 低下しました……。`;
+                        const decreasePercent = Math.abs(changeVal);
+                        extraMsg += `\n当主交代による不安から、家臣団が動揺しています……`;
                     }
                 }
             }
