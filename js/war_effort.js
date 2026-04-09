@@ -923,16 +923,20 @@ Object.assign(WarManager.prototype, {
                 defSurviveRate = Math.max(0, totalCurrentDef) / Math.max(1, siegeStartDef);
             }
 
-            // ★追加：攻城戦を生き残った馬と鉄砲の計算（死んだ兵士の割合から、装備していた分だけを減らす）
-            const atkHorseEquipRate = Math.min(1.0, (s.attacker.horses || 0) / Math.max(1, siegeStartAtk));
-            const atkGunEquipRate = Math.min(1.0, (s.attacker.guns || 0) / Math.max(1, siegeStartAtk));
-            const attackerSurvivedHorses = Math.max(0, (s.attacker.horses || 0) - Math.floor(siegeDeadAtk * atkHorseEquipRate));
-            const attackerSurvivedGuns = Math.max(0, (s.attacker.guns || 0) - Math.floor(siegeDeadAtk * atkGunEquipRate));
+            // ★追加：メイン軍だけの「攻城戦での死者」を割り出します（全軍の生存率を当てはめます）
+            const siegeLossAtkMain = currentAtkMain - Math.floor(currentAtkMain * atkSurviveRate);
+            const siegeLossDefMain = currentDefMain - Math.floor(currentDefMain * defSurviveRate);
 
-            const defHorseEquipRate = Math.min(1.0, (s.defender.horses || 0) / Math.max(1, siegeStartDef));
-            const defGunEquipRate = Math.min(1.0, (s.defender.guns || 0) / Math.max(1, siegeStartDef));
-            const defenderSurvivedHorses = Math.max(0, (s.defender.horses || 0) - Math.floor(siegeDeadDef * defHorseEquipRate));
-            const defenderSurvivedGuns = Math.max(0, (s.defender.guns || 0) - Math.floor(siegeDeadDef * defGunEquipRate));
+            // ★追加：攻城戦を生き残った馬と鉄砲の計算（死んだ兵士の割合から、装備していた分だけを減らします）
+            const atkHorseEquipRate = Math.min(1.0, (s.attacker.horses || 0) / Math.max(1, currentAtkMain));
+            const atkGunEquipRate = Math.min(1.0, (s.attacker.guns || 0) / Math.max(1, currentAtkMain));
+            const attackerSurvivedHorses = Math.max(0, (s.attacker.horses || 0) - Math.floor(siegeLossAtkMain * atkHorseEquipRate));
+            const attackerSurvivedGuns = Math.max(0, (s.attacker.guns || 0) - Math.floor(siegeLossAtkMain * atkGunEquipRate));
+
+            const defHorseEquipRate = Math.min(1.0, (s.defender.horses || 0) / Math.max(1, currentDefMain));
+            const defGunEquipRate = Math.min(1.0, (s.defender.guns || 0) / Math.max(1, currentDefMain));
+            const defenderSurvivedHorses = Math.max(0, (s.defender.horses || 0) - Math.floor(siegeLossDefMain * defHorseEquipRate));
+            const defenderSurvivedGuns = Math.max(0, (s.defender.guns || 0) - Math.floor(siegeLossDefMain * defGunEquipRate));
 
             // 3. 吸い込み防止の箱と、回復率の設定
             let atkReinfTotalLoss = 0;

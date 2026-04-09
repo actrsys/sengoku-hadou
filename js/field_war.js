@@ -1680,12 +1680,69 @@ class FieldWarManager {
     
     endFieldWar(resultType) {
         this.active = false;
-        
+
+        // ★野戦開始時に「待機していた（部隊に配備しなかった）馬・鉄砲」を計算するための箱を用意します
+        let atkMainWaitHorses = this.warState.attacker.horses || 0;
+        let atkMainWaitGuns = this.warState.attacker.guns || 0;
+        let atkAllyWaitHorses = this.warState.reinforcement ? (this.warState.reinforcement.horses || 0) : 0;
+        let atkAllyWaitGuns = this.warState.reinforcement ? (this.warState.reinforcement.guns || 0) : 0;
+        let atkSelfWaitHorses = this.warState.selfReinforcement ? (this.warState.selfReinforcement.horses || 0) : 0;
+        let atkSelfWaitGuns = this.warState.selfReinforcement ? (this.warState.selfReinforcement.guns || 0) : 0;
+
+        let defMainWaitHorses = this.warState.defender.fieldHorses || 0;
+        let defMainWaitGuns = this.warState.defender.fieldGuns || 0;
+        let defAllyWaitHorses = this.warState.defReinforcement ? (this.warState.defReinforcement.horses || 0) : 0;
+        let defAllyWaitGuns = this.warState.defReinforcement ? (this.warState.defReinforcement.guns || 0) : 0;
+        let defSelfWaitHorses = this.warState.defSelfReinforcement ? (this.warState.defSelfReinforcement.horses || 0) : 0;
+        let defSelfWaitGuns = this.warState.defSelfReinforcement ? (this.warState.defSelfReinforcement.guns || 0) : 0;
+
+        // ★野戦開始時に、各軍が「部隊に配備した（戦場に出た）馬・鉄砲」の数を引いて、待機分を割り出します
+        if (this.warState.atkAssignments) {
+            this.warState.atkAssignments.forEach(a => {
+                let isSelfReinf = this.warState.selfReinforcement && this.warState.selfReinforcement.bushos.some(b => b.id === a.busho.id);
+                let isAllyReinf = this.warState.reinforcement && this.warState.reinforcement.bushos.some(b => b.id === a.busho.id);
+                
+                if (a.troopType === 'kiba') {
+                    if (isSelfReinf) atkSelfWaitHorses -= a.soldiers;
+                    else if (isAllyReinf) atkAllyWaitHorses -= a.soldiers;
+                    else atkMainWaitHorses -= a.soldiers;
+                } else if (a.troopType === 'teppo') {
+                    if (isSelfReinf) atkSelfWaitGuns -= a.soldiers;
+                    else if (isAllyReinf) atkAllyWaitGuns -= a.soldiers;
+                    else atkMainWaitGuns -= a.soldiers;
+                }
+            });
+        }
+        if (this.warState.defAssignments) {
+            this.warState.defAssignments.forEach(a => {
+                let isSelfReinf = this.warState.defSelfReinforcement && this.warState.defSelfReinforcement.bushos.some(b => b.id === a.busho.id);
+                let isAllyReinf = this.warState.defReinforcement && this.warState.defReinforcement.bushos.some(b => b.id === a.busho.id);
+                
+                if (a.troopType === 'kiba') {
+                    if (isSelfReinf) defSelfWaitHorses -= a.soldiers;
+                    else if (isAllyReinf) defAllyWaitHorses -= a.soldiers;
+                    else defMainWaitHorses -= a.soldiers;
+                } else if (a.troopType === 'teppo') {
+                    if (isSelfReinf) defSelfWaitGuns -= a.soldiers;
+                    else if (isAllyReinf) defAllyWaitGuns -= a.soldiers;
+                    else defMainWaitGuns -= a.soldiers;
+                }
+            });
+        }
+
+        // 計算結果がマイナスにならないようにゼロで止めます（安全装置）
+        atkMainWaitHorses = Math.max(0, atkMainWaitHorses); atkMainWaitGuns = Math.max(0, atkMainWaitGuns);
+        atkAllyWaitHorses = Math.max(0, atkAllyWaitHorses); atkAllyWaitGuns = Math.max(0, atkAllyWaitGuns);
+        atkSelfWaitHorses = Math.max(0, atkSelfWaitHorses); atkSelfWaitGuns = Math.max(0, atkSelfWaitGuns);
+        defMainWaitHorses = Math.max(0, defMainWaitHorses); defMainWaitGuns = Math.max(0, defMainWaitGuns);
+        defAllyWaitHorses = Math.max(0, defAllyWaitHorses); defAllyWaitGuns = Math.max(0, defAllyWaitGuns);
+        defSelfWaitHorses = Math.max(0, defSelfWaitHorses); defSelfWaitGuns = Math.max(0, defSelfWaitGuns);
+
         let atkSoldiers = 0, defSoldiers = 0;
+        
+        // ★残った部隊が持っている馬・鉄砲を入れる箱です（あとで待機分と合体させます）
         let atkHorses = 0, atkGuns = 0;
         let defHorses = 0, defGuns = 0;
-
-        // ★追加：援軍の兵士や馬たちを入れる、別々の箱を用意します！
         let atkAllyReinfSoldiers = 0, atkAllyReinfHorses = 0, atkAllyReinfGuns = 0;
         let atkSelfReinfSoldiers = 0, atkSelfReinfHorses = 0, atkSelfReinfGuns = 0;
         let defAllyReinfSoldiers = 0, defAllyReinfHorses = 0, defAllyReinfGuns = 0;
@@ -1698,7 +1755,7 @@ class FieldWarManager {
             this.warState.defAssignments.forEach(a => a.soldiers = 0);
         }
 
-        // ★追加：戦場に残っている部隊と、すでに撤退した部隊を合わせて計算します！
+        // 戦場に残っている部隊と、すでに撤退した部隊を合わせて計算します
         let allUnits = [...this.units];
         if (this.retreatedUnits) {
             allUnits = allUnits.concat(this.retreatedUnits);
@@ -1706,7 +1763,7 @@ class FieldWarManager {
 
         allUnits.forEach(u => {
             if (u.isAttacker) {
-                // ★修正：メインの部隊か、援軍かを見分けて、別々の箱にしまいます！
+                // メインの部隊か、援軍かを見分けて、別々の箱にしまいます
                 if (u.isReinforcement) {
                     if (u.isSelfReinforcement) {
                         atkSelfReinfSoldiers += u.soldiers;
@@ -1729,7 +1786,7 @@ class FieldWarManager {
                 }
             } else {
                 if (typeof u.id === 'string' && !u.id.startsWith('k_')) {
-                    // ★修正：守備側も同じように、メインと援軍を見分けて別の箱にしまいます！
+                    // 守備側も同じように、メインと援軍を見分けて別の箱にしまいます
                     if (u.isReinforcement) {
                         if (u.isSelfReinforcement) {
                             defSelfReinfSoldiers += u.soldiers;
@@ -1754,73 +1811,67 @@ class FieldWarManager {
             }
         });
         
-        // メインの攻撃軍のデータを更新
+        // ★ここで「生き残った部隊が持っている分」と「お留守番（待機）していた分」を合体させて保存します！
         this.warState.attacker.soldiers = atkSoldiers;
-        this.warState.attacker.horses = atkHorses;
-        this.warState.attacker.guns = atkGuns;
+        this.warState.attacker.horses = atkHorses + atkMainWaitHorses;
+        this.warState.attacker.guns = atkGuns + atkMainWaitGuns;
         if (this.groupStats['atk_main']) {
             this.warState.attacker.rice = this.groupStats['atk_main'].rice;
             this.warState.attacker.morale = this.groupStats['atk_main'].morale; 
         }
 
-        // ★追加：野戦終了時の死者数をしっかりメモ用紙（fieldDeadSoldiers）に書き留めます！
         if (!this.warState.fieldDeadSoldiers) {
             this.warState.fieldDeadSoldiers = { attacker: 0, defender: 0 };
         }
         this.warState.fieldDeadSoldiers.attacker = this.warState.deadSoldiers.attacker;
         this.warState.fieldDeadSoldiers.defender = this.warState.deadSoldiers.defender;
 
-        // ★追加：攻撃側の「同盟国からの援軍」のデータを更新
         if (this.warState.reinforcement) {
             this.warState.reinforcement.fieldLoss = Math.max(0, this.warState.reinforcement.soldiers - atkAllyReinfSoldiers);
             this.warState.reinforcement.soldiers = atkAllyReinfSoldiers;
-            this.warState.reinforcement.horses = atkAllyReinfHorses;
-            this.warState.reinforcement.guns = atkAllyReinfGuns;
+            this.warState.reinforcement.horses = atkAllyReinfHorses + atkAllyWaitHorses;
+            this.warState.reinforcement.guns = atkAllyReinfGuns + atkAllyWaitGuns;
             if (this.groupStats['atk_ally']) {
                 this.warState.reinforcement.rice = this.groupStats['atk_ally'].rice;
                 this.warState.reinforcement.morale = this.groupStats['atk_ally'].morale;
             }
         }
 
-        // ★追加：攻撃側の「自分の別の城からの援軍」のデータを更新
         if (this.warState.selfReinforcement) {
             this.warState.selfReinforcement.fieldLoss = Math.max(0, this.warState.selfReinforcement.soldiers - atkSelfReinfSoldiers);
             this.warState.selfReinforcement.soldiers = atkSelfReinfSoldiers;
-            this.warState.selfReinforcement.horses = atkSelfReinfHorses;
-            this.warState.selfReinforcement.guns = atkSelfReinfGuns;
+            this.warState.selfReinforcement.horses = atkSelfReinfHorses + atkSelfWaitHorses;
+            this.warState.selfReinforcement.guns = atkSelfReinfGuns + atkSelfWaitGuns;
             if (this.groupStats['atk_self']) {
                 this.warState.selfReinforcement.rice = this.groupStats['atk_self'].rice;
                 this.warState.selfReinforcement.morale = this.groupStats['atk_self'].morale;
             }
         }
 
-        // メインの守備軍のデータを更新
         this.warState.defender.fieldSoldiers = defSoldiers;
-        this.warState.defender.fieldHorses = defHorses;
-        this.warState.defender.fieldGuns = defGuns;
+        this.warState.defender.fieldHorses = defHorses + defMainWaitHorses;
+        this.warState.defender.fieldGuns = defGuns + defMainWaitGuns;
         if (this.groupStats['def_main']) {
             this.warState.defFieldRice = this.groupStats['def_main'].rice;
             this.warState.defender.morale = this.groupStats['def_main'].morale; 
         }
 
-        // ★追加：守備側の「同盟国からの援軍」のデータを更新
         if (this.warState.defReinforcement) {
             this.warState.defReinforcement.fieldLoss = Math.max(0, this.warState.defReinforcement.soldiers - defAllyReinfSoldiers);
             this.warState.defReinforcement.soldiers = defAllyReinfSoldiers;
-            this.warState.defReinforcement.horses = defAllyReinfHorses;
-            this.warState.defReinforcement.guns = defAllyReinfGuns;
+            this.warState.defReinforcement.horses = defAllyReinfHorses + defAllyWaitHorses;
+            this.warState.defReinforcement.guns = defAllyReinfGuns + defAllyWaitGuns;
             if (this.groupStats['def_ally']) {
                 this.warState.defReinforcement.rice = this.groupStats['def_ally'].rice;
                 this.warState.defReinforcement.morale = this.groupStats['def_ally'].morale;
             }
         }
 
-        // ★追加：守備側の「自分の別の城からの援軍」のデータを更新
         if (this.warState.defSelfReinforcement) {
             this.warState.defSelfReinforcement.fieldLoss = Math.max(0, this.warState.defSelfReinforcement.soldiers - defSelfReinfSoldiers);
             this.warState.defSelfReinforcement.soldiers = defSelfReinfSoldiers;
-            this.warState.defSelfReinforcement.horses = defSelfReinfHorses;
-            this.warState.defSelfReinforcement.guns = defSelfReinfGuns;
+            this.warState.defSelfReinforcement.horses = defSelfReinfHorses + defSelfWaitHorses;
+            this.warState.defSelfReinforcement.guns = defSelfReinfGuns + defSelfWaitGuns;
             if (this.groupStats['def_self']) {
                 this.warState.defSelfReinforcement.rice = this.groupStats['def_self'].rice;
                 this.warState.defSelfReinforcement.morale = this.groupStats['def_self'].morale;
