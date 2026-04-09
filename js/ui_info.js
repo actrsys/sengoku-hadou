@@ -1884,7 +1884,9 @@ class UIInfoManager {
         } else if (type === 'charity') {
             document.getElementById('quantity-title').textContent = "施し"; this.ui.charityTypeSelector.classList.remove('hidden'); const count = data.length; this.ui.quantityContainer.innerHTML = `<p>選択武将数: ${count}名</p>`;
         } else if (type === 'goodwill') {
-            document.getElementById('quantity-title').textContent = "贈与金指定"; inputs.gold = createSlider("金", "gold", c.gold, 100);
+            document.getElementById('quantity-title').textContent = "贈与金指定"; 
+            const maxGoodwillGold = Math.min(1500, c.gold);
+            inputs.gold = createSlider("金", "gold", maxGoodwillGold, 200, 200);
         } else if (type === 'headhunt_gold') {
             document.getElementById('quantity-title').textContent = "持参金 (任意)"; inputs.gold = createSlider("金", "gold", c.gold, 0);
         } else if (type === 'tribute_gold') {
