@@ -1885,14 +1885,14 @@ class UIInfoManager {
             document.getElementById('quantity-title').textContent = "施し"; this.ui.charityTypeSelector.classList.remove('hidden'); const count = data.length; this.ui.quantityContainer.innerHTML = `<p>選択武将数: ${count}名</p>`;
         } else if (type === 'goodwill') {
             document.getElementById('quantity-title').textContent = "贈与金指定"; 
-            const maxGoodwillGold = Math.min(1500, c.gold);
+            const maxGoodwillGold = Math.max(200, Math.min(1500, c.gold));
             inputs.gold = createSlider("金", "gold", maxGoodwillGold, 200, 200);
         } else if (type === 'headhunt_gold') {
             document.getElementById('quantity-title').textContent = "持参金 (任意)"; inputs.gold = createSlider("金", "gold", c.gold, 0);
         } else if (type === 'tribute_gold') {
             document.getElementById('quantity-title').textContent = "献上金 (最大1500)"; 
-            const maxTributeGold = Math.min(1500, c.gold);
-            inputs.gold = createSlider("金", "gold", maxTributeGold, 0);
+            const maxTributeGold = Math.max(200, Math.min(1500, c.gold));
+            inputs.gold = createSlider("金", "gold", maxTributeGold, 200, 200);
         } else if (type === 'war_supplies') {
             document.getElementById('quantity-title').textContent = "出陣用意"; 
             inputs.soldiers = createSlider("兵士", "soldiers", c.soldiers, c.soldiers);
