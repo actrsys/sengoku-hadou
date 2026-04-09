@@ -1648,8 +1648,7 @@ class UIManager {
         const confirmBtn = document.getElementById('divide-confirm-btn');
         const footer = confirmBtn.parentElement;
         if (footer) footer.style.justifyContent = 'center';
-        const remainEl = document.getElementById('divide-remain-soldiers');
-        const totalEl = document.getElementById('divide-total-soldiers');
+        const stockContainer = document.getElementById('divide-stock-container');
         
         if (!modal || !listEl) return;
         
@@ -1661,7 +1660,7 @@ class UIManager {
         }
 
         this.hideAIGuardTemporarily(); // ★これを追加します！
-
+        
         const cancelBtn = modal.querySelector('.btn-secondary');
         if (cancelBtn) {
             cancelBtn.onclick = () => {
@@ -1672,8 +1671,24 @@ class UIManager {
         }
 
         modal.classList.remove('hidden');
-        totalEl.textContent = totalSoldiers;
         listEl.innerHTML = '';
+
+        if (stockContainer) {
+            stockContainer.style.cssText = "background: #f0f4f8; padding: 10px; border-radius: 6px; border: 1px solid #ccc; margin-bottom: 15px; font-size: 0.95rem; font-weight: bold;";
+            stockContainer.innerHTML = `
+                <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px;">
+                    <div style="background: #ffffff; padding: 6px 8px; border-radius: 4px; border: 1px solid #ddd; display: flex; justify-content: space-between; align-items: center;">
+                        <span style="color:#555;">兵士</span><span id="divide-stock-soldiers">0</span>
+                    </div>
+                    <div style="background: #ffffff; padding: 6px 8px; border-radius: 4px; border: 1px solid #ddd; display: flex; justify-content: space-between; align-items: center;">
+                        <span style="color:#555;">騎馬</span><span id="divide-stock-horses">0</span>
+                    </div>
+                    <div style="background: #ffffff; padding: 6px 8px; border-radius: 4px; border: 1px solid #ddd; display: flex; justify-content: space-between; align-items: center;">
+                        <span style="color:#555;">鉄砲</span><span id="divide-stock-guns">0</span>
+                    </div>
+                </div>
+            `;
+        }
         
         let assignments = bushos.map(b => ({ id: b.id, count: 0, type: 'ashigaru' }));
         
@@ -1745,7 +1760,6 @@ class UIManager {
             usedGuns = currentData.filter(d => d.type === 'teppo').reduce((s, d) => s + d.count, 0);
             
             const rem = totalSoldiers - sum;
-
             currentData.forEach(d => {
                 const range = document.getElementById(`div-range-${d.id}`);
                 const num = document.getElementById(`div-num-${d.id}`);
@@ -1757,55 +1771,54 @@ class UIManager {
                 }
             });
             
-            remainEl.innerHTML = `${rem} <span style="font-size:0.8rem; color:#333; margin-left: 10px;">(騎馬残:${Math.max(0, totalHorses - usedHorses)} 鉄砲残:${Math.max(0, totalGuns - usedGuns)})</span>`;
+            const stockSoldiers = document.getElementById('divide-stock-soldiers');
+            const stockHorses = document.getElementById('divide-stock-horses');
+            const stockGuns = document.getElementById('divide-stock-guns');
+
+            if (stockSoldiers) stockSoldiers.textContent = rem;
+            if (stockHorses) stockHorses.textContent = Math.max(0, totalHorses - usedHorses);
+            if (stockGuns) stockGuns.textContent = Math.max(0, totalGuns - usedGuns);
             
             if (rem === 0) {
-                remainEl.style.color = "green";
+                if (stockSoldiers) stockSoldiers.style.color = "#388e3c"; // 緑色
                 confirmBtn.disabled = false;
                 confirmBtn.style.opacity = 1.0;
             } else {
-                remainEl.style.color = "red";
+                if (stockSoldiers) stockSoldiers.style.color = "#d32f2f"; // 赤色
                 confirmBtn.disabled = true;
                 confirmBtn.style.opacity = 0.5;
             }
         };
-
+        
         const gunshi = this.game.getClanGunshi(this.game.playerClanId);
         const myDaimyo = this.game.bushos.find(b => b.clan === this.game.playerClanId && b.isDaimyo);
 
         bushos.forEach((b, index) => {
             const div = document.createElement('div');
+            div.className = 'qty-row';
             div.style.marginBottom = "15px";
             div.style.padding = "10px";
             div.style.border = "1px solid #ccc";
             div.style.borderRadius = "4px";
             div.style.background = "#fff";
             
-            const getStat = (stat) => GameSystem.getDisplayStatHTML(b, stat, gunshi, null, this.game.playerClanId, myDaimyo);
-            
             div.innerHTML = `
-                <div style="font-weight:bold; margin-bottom:5px; display:flex; align-items:center;">
-                    ${b.name} 
-                    <span style="font-size:0.8rem; margin-left:10px; display:flex; gap:5px; font-weight:normal;">
-                        (統:${getStat('leadership')} 武:${getStat('strength')} 智:${getStat('intelligence')})
-                    </span>
+                <div style="font-weight:bold; margin-bottom:10px; display:flex; align-items:center; justify-content:space-between;">
+                    <span style="font-size:1.1rem; color:#333;">${b.name}</span>
+                    <div class="troop-type-selector" id="troop-type-group-${b.id}">
+                        <button class="troop-type-btn active" data-type="ashigaru">足軽</button>
+                        <button class="troop-type-btn" data-type="kiba">騎馬</button>
+                        <button class="troop-type-btn" data-type="teppo">鉄砲</button>
+                    </div>
                 </div>
-                <div style="margin-bottom:5px;">
-                    <select id="div-type-${b.id}" style="padding:4px; font-size:0.9rem;">
-                        <option value="ashigaru">足軽</option>
-                        <option value="kiba">騎馬</option>
-                        <option value="teppo">鉄砲</option>
-                    </select>
+                <div class="qty-control" style="display:flex; align-items:center; gap:5px;">
+                    <button class="qty-shortcut-btn" id="div-btn-min-${b.id}" style="order:1;">最小</button>
+                    <button class="qty-shortcut-btn" id="div-btn-half-${b.id}" style="order:3;">半分</button>
+                    <input type="range" id="div-range-${b.id}" min="1" max="${totalSoldiers}" value="${assignments[index].count}" style="flex:1; order:2;">
+                    <button class="qty-shortcut-btn" id="div-btn-max-${b.id}" style="order:3;">最大</button>
+                    <input type="number" id="div-num-${b.id}" min="1" max="${totalSoldiers}" value="${assignments[index].count}" style="order:4;">
                 </div>
-                <div class="qty-control">
-                    <input type="range" id="div-range-${b.id}" min="1" max="${totalSoldiers}" value="${assignments[index].count}">
-                    <input type="number" id="div-num-${b.id}" min="1" max="${totalSoldiers}" value="${assignments[index].count}">
-                </div>
-                <div class="qty-shortcuts">
-                    <button class="qty-shortcut-btn" id="div-btn-min-${b.id}">最小</button>
-                    <button class="qty-shortcut-btn" id="div-btn-half-${b.id}">半分</button>
-                    <button class="qty-shortcut-btn" id="div-btn-max-${b.id}">最大</button>
-                </div>
+                <input type="hidden" id="div-type-${b.id}" value="ashigaru">
             `;
             listEl.appendChild(div);
             
@@ -1858,17 +1871,25 @@ class UIManager {
             const btnHalf = div.querySelector(`#div-btn-half-${b.id}`);
             const btnMax = div.querySelector(`#div-btn-max-${b.id}`);
             
-            btnMin.onclick = () => onInput(1);
-            btnHalf.onclick = () => onInput(0, 'half');
-            btnMax.onclick = () => onInput(0, 'max');
+            btnMin.onclick = () => { if (window.AudioManager) window.AudioManager.playSE('choice.ogg'); onInput(1); };
+            btnHalf.onclick = () => { if (window.AudioManager) window.AudioManager.playSE('choice.ogg'); onInput(0, 'half'); };
+            btnMax.onclick = () => { if (window.AudioManager) window.AudioManager.playSE('choice.ogg'); onInput(0, 'max'); };
             num.onblur = (e) => {
                 if(e.target.value === "" || isNaN(parseInt(e.target.value))) {
                     onInput(1);
                 }
             };
-            typeSel.onchange = () => {
-                updateRemain(b.id, 'type_change');
-            };
+            
+            const typeBtns = div.querySelectorAll(`#troop-type-group-${b.id} .troop-type-btn`);
+            typeBtns.forEach(btn => {
+                btn.onclick = () => {
+                    if (window.AudioManager) window.AudioManager.playSE('choice.ogg');
+                    typeBtns.forEach(b => b.classList.remove('active'));
+                    btn.classList.add('active');
+                    typeSel.value = btn.getAttribute('data-type');
+                    updateRemain(b.id, 'type_change');
+                };
+            });
         });
 
         updateRemain();
