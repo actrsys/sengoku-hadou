@@ -241,21 +241,10 @@ class DiplomacyManager {
     /**
      * 親善による友好度の上昇量を計算します
      */
-    calcGoodwillIncrease(gold, doerDiplomacy) {
-        let baseIncrease = 0;
-        if (gold <= 1000) {
-            baseIncrease = gold / 100; 
-        } else {
-            baseIncrease = 10 + (Math.sqrt(gold - 1000) / Math.sqrt(2000)) * 3;
-        }
-
-        let dipBonus = (doerDiplomacy - 50) / 10;
-        dipBonus = Math.max(-5, Math.min(5, dipBonus)); 
-
-        let scale = Math.min(1.0, gold / 1000);
-        dipBonus *= scale;
-
-        let totalFloat = (baseIncrease + dipBonus) * (0.9 + Math.random() * 0.2);
+    calcGoodwillIncrease(gold, doer) {
+        const statBonus = ((doer.diplomacy * 1.5) + (Math.sqrt(doer.loyalty) * 2)) / 20;
+        const goldBonus = gold / 1000;
+        const totalFloat = statBonus * goldBonus;
         return Math.max(1, Math.round(totalFloat));
     }
     
@@ -479,7 +468,7 @@ class DiplomacyManager {
             }
 
             if (isSuccess) {
-                const increase = this.calcGoodwillIncrease(gold, doer.diplomacy);
+                const increase = this.calcGoodwillIncrease(gold, doer);
                 this.updateSentiment(doer.clan, targetClanId, increase);
                 
                 const castle = this.game.getCastle(doer.castleId); 
@@ -706,7 +695,7 @@ class DiplomacyManager {
                     const myCastle = this.game.castles.find(c => c.ownerClan === targetClanId);
                     if (myCastle) myCastle.gold = Math.min(99999, myCastle.gold + gold);
                     // ★窓口の時とは違い、専門部署用に少しだけ計算の仕方を整えています
-                    const increase = this.calcGoodwillIncrease(gold, doer.diplomacy);
+                    const increase = this.calcGoodwillIncrease(gold, doer);
                     this.updateSentiment(doer.clan, targetClanId, increase);
                     this.game.ui.showResultModal(`${doerClan.name} からの親善を受け入れました！\n友好度が上昇しました`, () => {
                         if (onComplete) setTimeout(onComplete, 100);

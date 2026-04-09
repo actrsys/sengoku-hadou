@@ -1174,7 +1174,8 @@ class CommandSystem {
         }
         else if (type === 'goodwill') {
             const val = parseInt(inputs.gold.num.value);
-            if (val < 100) { this.game.ui.showDialog("金が足りません(最低100)", false); return; }
+            if (val < 200) { this.game.ui.showDialog("金が足りません(最低200)", false); return; }
+            if (val > 1500) { this.game.ui.showDialog("贈れる金は最大1500までです", false); return; }
             
             // ★追加: 諸勢力への親善なら
             if (extraData && extraData.isKunishu) {
@@ -1464,7 +1465,7 @@ class CommandSystem {
     
     // ★修正：外交専用の魔法を呼び出すようにしました
     calcGoodwillIncrease(gold, doer) {
-        return this.game.diplomacyManager.calcGoodwillIncrease(gold, doer.diplomacy);
+        return this.game.diplomacyManager.calcGoodwillIncrease(gold, doer);
     }
 
     // ★修正：外交の複雑な処理は、すべて外交の専門部署（diplomacy.js）にお任せするようにしました！
