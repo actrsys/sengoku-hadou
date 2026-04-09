@@ -1174,7 +1174,7 @@ class CommandSystem {
         }
         else if (type === 'goodwill') {
             const val = parseInt(inputs.gold.num.value);
-            if (val < 200) { this.game.ui.showDialog("金が足りません(最低200)", false); return; }
+            if (val < 200) { this.game.ui.showDialog("金が足りません", false); return; }
             if (val > 1500) { this.game.ui.showDialog("贈れる金は最大1500までです", false); return; }
             
             // ★追加: 諸勢力への親善なら
@@ -1187,7 +1187,7 @@ class CommandSystem {
         else if (type === 'tribute_gold') {
             // ★追加：貢物の金額が決まったら、実行の魔法を呼び出します
             const val = parseInt(inputs.gold.num.value);
-            if (val <= 0) return;
+            if (val < 200) { this.game.ui.showDialog("金が足りません", false); return; }
             this.showAdviceAndExecute('tribute', () => this.game.courtRankSystem.executeTribute(data[0], val), { trueProb: 1.0 });
         }
         else if (type === 'headhunt_gold') {
