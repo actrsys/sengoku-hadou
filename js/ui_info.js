@@ -847,12 +847,24 @@ class UIInfoManager {
             } else if (this.currentKyotenTab === 'military') {
                 listHtml += `<div class="select-item" style="grid-template-columns: 2fr 1.5fr 1fr 1fr 1fr 1fr 1fr;"><span style="justify-content:flex-start; padding-left:5px;">${c.name}</span><span>${c.soldiers}</span><span>${c.defense}</span><span>${c.morale}</span><span>${c.training}</span><span>${c.horses}</span><span>${c.guns}</span></div>`;
             } else if (this.currentKyotenTab === 'economy') {
-                // ★ヘッダーの幅に合わせて、こちらも 1.5fr に広げています！
                 listHtml += `<div class="select-item" style="grid-template-columns: 1.5fr 1fr 1fr 1fr 1fr 1.5fr 1.5fr 1.5fr 1.5fr;"><span style="justify-content:flex-start; padding-left:5px;">${c.name}</span><span>${c.population}</span><span>${c.peoplesLoyalty}</span><span>${c.kokudaka}</span><span>${c.commerce}</span><span>${goldIncome}</span><span>${consumeGold}</span><span>${riceIncome}</span><span>${consumeRice}</span></div>`;
             }
         });
         
         listEl.innerHTML = listHtml;
+
+        // ★追加：リストを描き終わった後に、自作スクロールバーを呼び出して長さを合わせます！
+        if (window.CustomScrollbar) {
+            if (!this.kyotenScrollbar) {
+                this.kyotenScrollbar = new CustomScrollbar(listEl);
+            }
+            setTimeout(() => {
+                // スクロール位置を一番左上に戻してからバーを更新します
+                listEl.scrollTop = 0;
+                listEl.scrollLeft = 0;
+                this.kyotenScrollbar.update();
+            }, 10);
+        }
     }
     // ==========================================
 

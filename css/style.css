@@ -232,7 +232,8 @@ body.hide-daimyo-labels .daimyo-name-label { display: none !important; }
 .scroll-wrapper { 
     position: relative; flex: 1; display: flex; overflow: hidden; 
     border: 1px solid #ddd; border-radius: 4px; 
-    padding-right: 24px; /* バーが項目に重ならないよう、右側に道を作る */
+    padding-right: 24px; /* 縦バーが項目に重ならないよう、右側に道を作る */
+    padding-bottom: 24px; /* ★追加：横バーが項目に重ならないよう、下側に道を作る */
 }
 .hide-native-scroll::-webkit-scrollbar { display: none !important; }
 .hide-native-scroll { 
@@ -241,8 +242,9 @@ body.hide-daimyo-labels .daimyo-name-label { display: none !important; }
     overflow-x: auto;   /* 横にはみ出た時だけ左右スクロールを許可 */
 }
 
+/* 縦用スクロールバー */
 .custom-scrollbar-track {
-    position: absolute; top: 0; right: 0; width: 24px; height: 100%;
+    position: absolute; top: 0; right: 0; width: 24px; bottom: 24px; /* ★変更：横バーと重ならないように高さを調整！ */
     background-color: #f5f5f5; /* 常に場所を確保するので不透明で見やすく */
     border-left: 1px solid #ccc; z-index: 50; touch-action: none;
 }
@@ -253,6 +255,27 @@ body.hide-daimyo-labels .daimyo-name-label { display: none !important; }
 }
 .custom-scrollbar-thumb:active, .custom-scrollbar-thumb.dragging {
     background-color: #546e7a;
+}
+
+/* ★追加：横用スクロールバー */
+.custom-scrollbar-track-x {
+    position: absolute; bottom: 0; left: 0; right: 24px; height: 24px; /* 縦バーと重ならないように長さを調整！ */
+    background-color: #f5f5f5; border-top: 1px solid #ccc; z-index: 50; touch-action: none;
+}
+.custom-scrollbar-thumb-x {
+    position: absolute; left: 0; top: 2px; bottom: 2px; min-width: 40px;
+    background-color: #78909c; border: 2px solid #e0e0e0; border-radius: 12px;
+    cursor: pointer; touch-action: none; transition: background-color 0.2s;
+}
+.custom-scrollbar-thumb-x:active, .custom-scrollbar-thumb-x.dragging {
+    background-color: #546e7a;
+}
+
+/* ★追加：リスト右下角の空白を埋める四角（縦バーと横バーの交差点） */
+.scroll-wrapper::after {
+    content: ""; position: absolute; bottom: 0; right: 0; width: 24px; height: 24px;
+    background-color: #e0e0e0; border-left: 1px solid #ccc; border-top: 1px solid #ccc;
+    z-index: 49; box-sizing: border-box;
 }
 
 /* リストベース */
