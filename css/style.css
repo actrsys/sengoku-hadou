@@ -409,9 +409,9 @@ body:not(.is-pc).daimyo-select-mode #map-wrapper { margin-bottom: 0 !important; 
 /* =========================================================
    大名家詳細モーダルのデザイン（完全版）
    ========================================================= */
-/* ★変更：どんな画面よりも確実に一番手前に来るように、圧倒的に高い数字に変更しました！ */
+/* ★変更：他の画面（武将一覧など）が上に重なれるように、適切な数字に戻します！ */
 #daimyo-detail-modal {
-    z-index: 99999 !important; 
+    z-index: 8100 !important; 
 }
 
 .daimyo-detail-container {
