@@ -828,11 +828,8 @@ class UIInfoManager {
             const bushosCount = castleBushos.length;
             
             // 金と兵糧の収入・支出をゲームのルール通りに計算します
-            const baseRice = (c.kokudaka / 2) + c.peoplesLoyalty;
-            let riceIncome = Math.floor(baseRice * window.MainParams.Economy.IncomeRiceRate);
-            
-            const baseGold = (c.population * 0.01) + (c.peoplesLoyalty / 2) + (c.commerce / 4);
-            let goldIncome = Math.floor(baseGold * window.MainParams.Economy.IncomeGoldRate);
+            let riceIncome = GameSystem.calcBaseRiceIncome(c);
+            let goldIncome = GameSystem.calcBaseGoldIncome(c);
 
             let consumeRice = Math.floor(c.soldiers * window.MainParams.Economy.ConsumeRicePerSoldier);
             

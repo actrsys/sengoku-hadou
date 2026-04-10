@@ -491,6 +491,16 @@ class GameSystem {
         const val = ((busho.politics * 1.5) + busho.charm + (Math.sqrt(busho.loyalty) * 2)) / (Math.sqrt(safeSoldiers) * 0.5);
         return Math.max(1, Math.round(val)); 
     }
+
+    static calcBaseGoldIncome(castle) {
+        const baseGold = (castle.population * 0.01) + (castle.peoplesLoyalty / 2) + (castle.commerce / 4);
+        return Math.floor(baseGold * window.MainParams.Economy.IncomeGoldRate);
+    }
+    
+    static calcBaseRiceIncome(castle) {
+        const baseRice = (castle.kokudaka / 2) + castle.peoplesLoyalty;
+        return Math.floor(baseRice * window.MainParams.Economy.IncomeRiceRate);
+    }
     
     // AI用：お金を指定して、集まる兵士数を計算します
     static calcDraftFromGold(gold, busho, peoplesLoyalty) { 
@@ -1065,8 +1075,7 @@ class GameManager {
             if (c.ownerClan === 0) return;
             c.isDone = false;
 
-            const baseGold = (c.population * 0.01) + (c.peoplesLoyalty / 2) + (c.commerce / 4);
-            let income = Math.floor(baseGold * window.MainParams.Economy.IncomeGoldRate);
+            let income = GameSystem.calcBaseGoldIncome(c);
             income = GameSystem.applyVariance(income, window.MainParams.Economy.IncomeFluctuation);
             if (this.month === 3) income += income * 3;
             
