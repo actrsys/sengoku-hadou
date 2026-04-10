@@ -799,12 +799,12 @@ class UIInfoManager {
         
         // タブごとに見出し（一番上の行）を変えます
         if (this.currentKyotenTab === 'status') {
-            headerHtml = '<div class="list-header" style="grid-template-columns: 2fr 1.5fr 1.5fr 1fr 1fr 1fr 1fr;"><span>拠点名</span><span>所属勢力</span><span>城主</span><span>国名</span><span>武将数</span><span>金</span><span>兵糧</span></div>';
+            headerHtml = '<div class="list-header" style="grid-template-columns: 1.5fr 1.5fr 1.5fr 1fr 1fr 1fr 1fr;"><span style="padding-left:5px;">拠点名</span><span>所属勢力</span><span>城主</span><span>国名</span><span>武将数</span><span>金</span><span>兵糧</span></div>';
         } else if (this.currentKyotenTab === 'military') {
-            headerHtml = '<div class="list-header" style="grid-template-columns: 2fr 1.5fr 1fr 1fr 1fr 1fr 1fr;"><span>拠点名</span><span>兵士</span><span>城防御</span><span>士気</span><span>訓練</span><span>騎馬</span><span>鉄砲</span></div>';
+            headerHtml = '<div class="list-header" style="grid-template-columns: 1.5fr 1.5fr 1fr 1fr 1fr 1fr 1fr;"><span style="padding-left:5px;">拠点名</span><span>兵士</span><span>城防御</span><span>士気</span><span>訓練</span><span>騎馬</span><span>鉄砲</span></div>';
         } else if (this.currentKyotenTab === 'economy') {
             // ★項目名を変更し、文字がはみ出さないように 1.2fr を 1.5fr に少し広げました！
-            headerHtml = '<div class="list-header" style="grid-template-columns: 1.5fr 1fr 1fr 1fr 1fr 1.5fr 1.5fr 1.5fr 1.5fr;"><span style="padding-left:5px;">拠点名</span><span>人口</span><span>民忠</span><span>石高</span><span>鉱山</span><span>金収入/月</span><span>金支出/月</span><span>兵糧収入/年</span><span>兵糧支出/月</span></div>';
+            headerHtml = '<div class="list-header" style="grid-template-columns: 1.5fr 1fr 1fr 1fr 1fr 1.5fr 1.5fr 1.5fr 1.5fr;"><span style="padding-left:5px;">拠点名</span><span>人口</span><span>民忠</span><span>石高</span><span>鉱山</span><span>金収入/月</span><span>金支出/月</span><span>兵糧収入/年</span><span>兵糧支出/年</span></div>';
         }
         
         let listHtml = headerHtml;
@@ -833,6 +833,7 @@ class UIInfoManager {
             let goldIncome = GameSystem.calcBaseGoldIncome(c);
 
             let consumeRice = Math.floor(c.soldiers * window.MainParams.Economy.ConsumeRicePerSoldier);
+            let consumeRiceYear = consumeRice * 12; // 年間の消費量に計算し直します
             
             let consumeGold = 0;
             const daimyo = this.game.bushos.find(b => b.clan === c.ownerClan && b.isDaimyo);
@@ -843,11 +844,11 @@ class UIInfoManager {
             }
             
             if (this.currentKyotenTab === 'status') {
-                listHtml += `<div class="select-item" style="grid-template-columns: 2fr 1.5fr 1.5fr 1fr 1fr 1fr 1fr;"><span style="justify-content:flex-start; padding-left:5px;">${c.name}</span><span>${clanName}</span><span>${castellanName}</span><span>${provinceName}</span><span>${bushosCount}</span><span>${c.gold}</span><span>${c.rice}</span></div>`;
+                listHtml += `<div class="select-item" style="grid-template-columns: 1.5fr 1.5fr 1.5fr 1fr 1fr 1fr 1fr;"><span style="justify-content:flex-start; padding-left:5px;">${c.name}</span><span>${clanName}</span><span>${castellanName}</span><span>${provinceName}</span><span>${bushosCount}</span><span>${c.gold}</span><span>${c.rice}</span></div>`;
             } else if (this.currentKyotenTab === 'military') {
-                listHtml += `<div class="select-item" style="grid-template-columns: 2fr 1.5fr 1fr 1fr 1fr 1fr 1fr;"><span style="justify-content:flex-start; padding-left:5px;">${c.name}</span><span>${c.soldiers}</span><span>${c.defense}</span><span>${c.morale}</span><span>${c.training}</span><span>${c.horses}</span><span>${c.guns}</span></div>`;
+                listHtml += `<div class="select-item" style="grid-template-columns: 1.5fr 1.5fr 1fr 1fr 1fr 1fr 1fr;"><span style="justify-content:flex-start; padding-left:5px;">${c.name}</span><span>${c.soldiers}</span><span>${c.defense}</span><span>${c.morale}</span><span>${c.training}</span><span>${c.horses}</span><span>${c.guns}</span></div>`;
             } else if (this.currentKyotenTab === 'economy') {
-                listHtml += `<div class="select-item" style="grid-template-columns: 1.5fr 1fr 1fr 1fr 1fr 1.5fr 1.5fr 1.5fr 1.5fr;"><span style="justify-content:flex-start; padding-left:5px;">${c.name}</span><span>${c.population}</span><span>${c.peoplesLoyalty}</span><span>${c.kokudaka}</span><span>${c.commerce}</span><span>${goldIncome}</span><span>${consumeGold}</span><span>${riceIncome}</span><span>${consumeRice}</span></div>`;
+                listHtml += `<div class="select-item" style="grid-template-columns: 1.5fr 1fr 1fr 1fr 1fr 1.5fr 1.5fr 1.5fr 1.5fr;"><span style="justify-content:flex-start; padding-left:5px;">${c.name}</span><span>${c.population}</span><span>${c.peoplesLoyalty}</span><span>${c.kokudaka}</span><span>${c.commerce}</span><span>${goldIncome}</span><span>${consumeGold}</span><span>${riceIncome}</span><span>${consumeRiceYear}</span></div>`;
             }
         });
         
