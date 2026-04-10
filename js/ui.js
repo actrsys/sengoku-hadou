@@ -557,6 +557,10 @@ class UIManager {
             percent = (value / max) * 100;
             if (percent > 100) percent = 100;
             if (percent < 0) percent = 0;
+            
+            if (percent >= 100) {
+                fillClass = 'bar-fill-maxgreen';
+            }
         } else {
             percent = 0;
             emptyBgClass = 'status-bar-empty-bg';
