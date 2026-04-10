@@ -850,6 +850,9 @@ class UIInfoManager {
         const listEl = document.getElementById('kyoten-list');
         if (!listEl) return;
         
+        // ★追加：描き直す前の「左右のスクロール位置」をメモしておきます
+        const currentScrollLeft = listEl.scrollLeft;
+        
         // ★追加：表示用のお城リストを作り、並べ替えができるようにします
         let displayCastles = [...this.kyotenCastles];
 
@@ -1013,9 +1016,9 @@ class UIInfoManager {
                 this.kyotenScrollbar = new CustomScrollbar(listEl);
             }
             setTimeout(() => {
-                // スクロール位置を一番左上に戻してからバーを更新します
+                // 縦スクロールは一番上に戻しますが、横スクロールはメモしておいた位置に戻します
                 listEl.scrollTop = 0;
-                listEl.scrollLeft = 0;
+                listEl.scrollLeft = currentScrollLeft;
                 this.kyotenScrollbar.update();
             }, 10);
         }
