@@ -986,10 +986,8 @@ class CommandSystem {
         }
 
         if (actionType === 'rumor_doer') {
-            const doer = this.game.getBusho(firstId);
-            const targetBusho = this.game.getBusho(extraData.targetBushoId);
             // ★専門部署である StrategySystem の計算魔法を呼びます！
-            const trueProb = StrategySystem.getRumorProb(doer, targetBusho);
+            const trueProb = this.game.strategySystem.getRumorProb(firstId, extraData.targetBushoId);
             this.showAdviceAndExecute('rumor', () => this.game.strategySystem.executeRumor(firstId, targetId, extraData.targetBushoId), { trueProb: trueProb });
             return;
         }
@@ -1198,12 +1196,8 @@ class CommandSystem {
         }
         else if (type === 'headhunt_gold') {
             const val = parseInt(inputs.gold.num.value);
-            const doer = this.game.getBusho(data[0]);
-            const target = this.game.getBusho(targetId);
-            const targetLord = this.game.bushos.find(b => b.clan === target.clan && b.isDaimyo) || { affinity: 50 }; 
-            const newLord = this.game.bushos.find(b => b.clan === this.game.playerClanId && b.isDaimyo) || { affinity: 50 }; 
             // ★専門部署である StrategySystem の計算魔法を呼びます！
-            const trueProb = StrategySystem.getHeadhuntProb(doer, target, val, targetLord, newLord);
+            const trueProb = this.game.strategySystem.getHeadhuntProb(data[0], targetId, val);
             this.showAdviceAndExecute('headhunt', () => this.game.strategySystem.executeHeadhunt(data[0], targetId, val), { trueProb: trueProb });
         }
         else if (type === 'transport') {

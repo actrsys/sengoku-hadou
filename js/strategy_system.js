@@ -24,7 +24,9 @@ class StrategySystem {
         return Math.max(0.01, Math.min(0.99, prob));
     }
 
-    static getRumorProb(busho, targetBusho) {
+    getRumorProb(doerId, targetBushoId) {
+        const busho = this.game.getBusho(doerId);
+        const targetBusho = this.game.getBusho(targetBushoId);
         const score = (busho.intelligence * 0.7) + (busho.strength * 0.3); 
         const defScore = (targetBusho.intelligence * 0.5) + (targetBusho.loyalty * 0.5); 
         let prob = Math.min(1.0, score / (defScore + window.MainParams.Strategy.RumorFactor));
@@ -32,7 +34,12 @@ class StrategySystem {
         return prob;
     }
 
-    static getHeadhuntProb(doer, target, gold, targetLord, newLord) {
+    getHeadhuntProb(doerId, targetBushoId, gold) {
+        const doer = this.game.getBusho(doerId);
+        const target = this.game.getBusho(targetBushoId);
+        const targetLord = this.game.bushos.find(b => b.clan === target.clan && b.isDaimyo) || { affinity: 50 }; 
+        const newLord = this.game.bushos.find(b => b.clan === doer.clan && b.isDaimyo) || { affinity: 50 }; 
+
         const S = window.MainParams.Strategy;
         const goldEffect = Math.min(S.HeadhuntGoldMaxEffect, gold * S.HeadhuntGoldEffect);
         const offense = (doer.intelligence * S.HeadhuntIntWeight) + goldEffect;
@@ -68,7 +75,9 @@ class StrategySystem {
         return { success: true, val: damage }; 
     }
     
-    static calcRumor(busho, targetBusho) { 
+    calcRumor(doerId, targetBushoId) { 
+        const busho = this.game.getBusho(doerId);
+        const targetBusho = this.game.getBusho(targetBushoId);
         const score = (busho.intelligence * 0.7) + (busho.strength * 0.3); 
         const defScore = (targetBusho.intelligence * 0.5) + (targetBusho.loyalty * 0.5); 
         const success = Math.random() < (score / (defScore + window.MainParams.Strategy.RumorFactor)); 
@@ -76,7 +85,12 @@ class StrategySystem {
         return { success: true, val: Math.floor((20 + Math.random()*20) / 4) }; 
     }
 
-    static calcHeadhunt(doer, target, gold, targetLord, newLord) {
+    calcHeadhunt(doerId, targetBushoId, gold) {
+        const doer = this.game.getBusho(doerId);
+        const target = this.game.getBusho(targetBushoId);
+        const targetLord = this.game.bushos.find(b => b.clan === target.clan && b.isDaimyo) || { affinity: 50 }; 
+        const newLord = this.game.bushos.find(b => b.clan === doer.clan && b.isDaimyo) || { affinity: 50 }; 
+
         const S = window.MainParams.Strategy;
         const goldEffect = Math.min(S.HeadhuntGoldMaxEffect, gold * S.HeadhuntGoldEffect);
         const offense = (doer.intelligence * S.HeadhuntIntWeight) + goldEffect;
@@ -105,11 +119,9 @@ class StrategySystem {
         if (castle.gold < gold) { this.game.ui.showDialog("資金が足りません", false); return; }
         
         castle.gold -= gold;
-        const targetLord = this.game.bushos.find(b => b.clan === target.clan && b.isDaimyo) || { affinity: 50 }; 
-        const newLord = this.game.bushos.find(b => b.clan === this.game.playerClanId && b.isDaimyo) || { affinity: 50 }; 
         
         // ★専門部署である StrategySystem の計算魔法を呼びます！
-        let isSuccess = StrategySystem.calcHeadhunt(doer, target, gold, targetLord, newLord);
+        let isSuccess = this.calcHeadhunt(doerId, targetBushoId, gold);
         if (target.isCastellan && isSuccess) {
             if (Math.random() > 0.33) {
                 isSuccess = false;
@@ -119,7 +131,7 @@ class StrategySystem {
         if (isSuccess) {
             const oldCastle = this.game.getCastle(target.castleId);
             const oldClanId = target.clan;
-            const newClanId = this.game.playerClanId;
+            const newClanId = doer.clan;
             
             // ★他の大名家から移ってくるので、功績を半分にします！
             if (oldClanId !== 0 && oldClanId !== newClanId) {
@@ -217,7 +229,7 @@ class StrategySystem {
         const targetBusho = this.game.getBusho(targetBushoId); 
         
         // ★専門部署である StrategySystem の計算魔法を呼びます！
-        let result = StrategySystem.calcRumor(doer, targetBusho); 
+        let result = this.calcRumor(doerId, targetBushoId);
         if (targetBusho.isCastellan && result.success) {
             if (Math.random() > 0.33) {
                 result.success = false;
