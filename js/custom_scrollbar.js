@@ -1,6 +1,6 @@
 /**
  * custom_scrollbar.js
- * スマホでも確実につまめて動かせる、自作のスクロールバーです！
+ * 軸固定スクロール機能付き
  */
 class CustomScrollbar {
     constructor(listElement) {
@@ -17,8 +17,11 @@ class CustomScrollbar {
         this.wrapper.appendChild(this.track);
         
         this.isDragging = false;
+        this.lockAxis = null; // 'x' か 'y' を固定するための変数
         this.startY = 0;
+        this.startX = 0;
         this.startScrollTop = 0;
+        this.startScrollLeft = 0;
         
         this.initEvents();
     }
@@ -45,23 +48,51 @@ class CustomScrollbar {
     }
     
     initEvents() {
-        this.list.addEventListener('scroll', () => {
-            if (!this.isDragging) {
-                this.update();
+        // リスト本体のタッチ操作（軸固定用）
+        this.list.addEventListener('touchstart', (e) => {
+            this.lockAxis = null;
+            this.startY = e.touches[0].clientY;
+            this.startX = e.touches[0].clientX;
+            this.startScrollTop = this.list.scrollTop;
+            this.startScrollLeft = this.list.scrollLeft;
+        }, { passive: true });
+
+        this.list.addEventListener('touchmove', (e) => {
+            const currentY = e.touches[0].clientY;
+            const currentX = e.touches[0].clientX;
+            const diffY = Math.abs(currentY - this.startY);
+            const diffX = Math.abs(currentX - this.startX);
+
+            // 最初に動いた方向に軸を固定（閾値5px）
+            if (!this.lockAxis) {
+                if (diffX > 5 || diffY > 5) {
+                    this.lockAxis = diffX > diffY ? 'x' : 'y';
+                }
             }
+
+            // 固定された軸以外への移動を打ち消す
+            if (this.lockAxis === 'x') {
+                this.list.scrollTop = this.startScrollTop;
+            } else if (this.lockAxis === 'y') {
+                this.list.scrollLeft = this.startScrollLeft;
+            }
+        }, { passive: false });
+
+        this.list.addEventListener('scroll', () => {
+            if (!this.isDragging) this.update();
         });
         
+        // つまみのドラッグ操作
         const onStart = (e) => {
             this.isDragging = true;
             this.thumb.classList.add('dragging');
             this.startY = e.type.includes('touch') ? e.touches[0].clientY : e.clientY;
             this.startScrollTop = this.list.scrollTop;
-            e.preventDefault();
+            if (e.cancelable) e.preventDefault();
         };
         
         const onMove = (e) => {
             if (!this.isDragging) return;
-            
             const currentY = e.type.includes('touch') ? e.touches[0].clientY : e.clientY;
             const deltaY = currentY - this.startY;
             
@@ -76,6 +107,7 @@ class CustomScrollbar {
             this.list.scrollTop = this.startScrollTop + (scrollRatio * maxScrollTop);
             
             this.update();
+            if (e.cancelable) e.preventDefault();
         };
         
         const onEnd = () => {
@@ -85,13 +117,10 @@ class CustomScrollbar {
         
         this.thumb.addEventListener('touchstart', onStart, { passive: false });
         this.thumb.addEventListener('mousedown', onStart);
-        
         document.addEventListener('touchmove', onMove, { passive: false });
         document.addEventListener('mousemove', onMove);
-        
         document.addEventListener('touchend', onEnd);
         document.addEventListener('mouseup', onEnd);
-        
         window.addEventListener('resize', () => this.update());
     }
 }
