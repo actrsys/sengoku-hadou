@@ -753,6 +753,97 @@ class UIInfoManager {
     // ==========================================
 
     // ==========================================
+    // ★ここから追加：拠点一覧の魔法です！
+    // ==========================================
+    showKyotenList() {
+        const modal = document.getElementById('kyoten-list-modal');
+        const tabsEl = document.getElementById('kyoten-tabs');
+        if (!modal) return;
+        
+        // 自分の勢力のお城だけを集めます
+        this.kyotenCastles = this.game.castles.filter(c => c.ownerClan === this.game.playerClanId);
+        
+        // 最初は「状態」のタブを選んでいる状態にします
+        this.currentKyotenTab = 'status';
+        
+        if (tabsEl) {
+            const tabBtns = tabsEl.querySelectorAll('.busho-tab-btn');
+            tabBtns.forEach(btn => {
+                btn.classList.remove('active');
+                if (btn.getAttribute('data-tab') === 'status') btn.classList.add('active');
+                
+                btn.onclick = () => {
+                    // タブを押した時に音を鳴らします
+                    if (window.AudioManager) window.AudioManager.playSE('choice.ogg');
+                    
+                    // すべてのタブの色を元に戻して、押したタブだけ色を変えます
+                    tabBtns.forEach(b => b.classList.remove('active'));
+                    btn.classList.add('active');
+                    
+                    // 今選んでいるタブを覚えて、リストを描き直します
+                    this.currentKyotenTab = btn.getAttribute('data-tab');
+                    this.renderKyotenList();
+                };
+            });
+        }
+        
+        this.renderKyotenList();
+        modal.classList.remove('hidden');
+    }
+
+    renderKyotenList() {
+        const listEl = document.getElementById('kyoten-list');
+        if (!listEl) return;
+        
+        let headerHtml = '';
+        
+        // タブごとに見出し（一番上の行）を変えます
+        if (this.currentKyotenTab === 'status') {
+            headerHtml = '<div class="list-header" style="grid-template-columns: 2fr 1.5fr 1.5fr 1fr 1fr 1fr 1fr;"><span>拠点名</span><span>所属勢力</span><span>城主</span><span>国名</span><span>武将数</span><span>金</span><span>兵糧</span></div>';
+        } else if (this.currentKyotenTab === 'military') {
+            headerHtml = '<div class="list-header" style="grid-template-columns: 2fr 1.5fr 1fr 1fr 1fr 1fr 1fr;"><span>拠点名</span><span>兵士</span><span>城防御</span><span>士気</span><span>訓練</span><span>騎馬</span><span>鉄砲</span></div>';
+        } else if (this.currentKyotenTab === 'economy') {
+            headerHtml = '<div class="list-header" style="grid-template-columns: 2fr 1.5fr 1fr 1fr 1fr 1fr 1fr;"><span>拠点名</span><span>人口</span><span>民忠</span><span>石高</span><span>鉱山</span><span>金収入</span><span>兵糧収入</span></div>';
+        }
+        
+        let listHtml = headerHtml;
+        
+        // お城を一つずつ見て、リストの行を作っていきます
+        this.kyotenCastles.forEach(c => {
+            const clanData = this.game.clans.find(cd => cd.id === c.ownerClan);
+            const clanName = clanData ? clanData.name : "中立";
+            const castellan = this.game.getBusho(c.castellanId);
+            const castellanName = castellan ? castellan.name : "-";
+            
+            let provinceName = "";
+            if (this.game.provinces) {
+                const province = this.game.provinces.find(p => p.id === c.provinceId);
+                if (province) {
+                    provinceName = province.province;
+                }
+            }
+            
+            // お城にいる武将の数を数えます
+            const bushosCount = this.game.bushos.filter(b => b.castleId === c.id && b.status === 'active').length;
+            
+            // 金と兵糧の収入を計算します
+            let riceIncome = Math.floor(c.kokudaka * 2.5);
+            let goldIncome = Math.floor(c.commerce * 2.0);
+            
+            if (this.currentKyotenTab === 'status') {
+                listHtml += `<div class="select-item" style="grid-template-columns: 2fr 1.5fr 1.5fr 1fr 1fr 1fr 1fr;"><span style="justify-content:flex-start; padding-left:5px;">${c.name}</span><span>${clanName}</span><span>${castellanName}</span><span>${provinceName}</span><span>${bushosCount}</span><span>${c.gold}</span><span>${c.rice}</span></div>`;
+            } else if (this.currentKyotenTab === 'military') {
+                listHtml += `<div class="select-item" style="grid-template-columns: 2fr 1.5fr 1fr 1fr 1fr 1fr 1fr;"><span style="justify-content:flex-start; padding-left:5px;">${c.name}</span><span>${c.soldiers}</span><span>${c.defense}</span><span>${c.morale}</span><span>${c.training}</span><span>${c.horses}</span><span>${c.guns}</span></div>`;
+            } else if (this.currentKyotenTab === 'economy') {
+                listHtml += `<div class="select-item" style="grid-template-columns: 2fr 1.5fr 1fr 1fr 1fr 1fr 1fr;"><span style="justify-content:flex-start; padding-left:5px;">${c.name}</span><span>${c.population}</span><span>${c.peoplesLoyalty}</span><span>${c.kokudaka}</span><span>${c.commerce}</span><span>${goldIncome}</span><span>${riceIncome}</span></div>`;
+            }
+        });
+        
+        listEl.innerHTML = listHtml;
+    }
+    // ==========================================
+
+    // ==========================================
     // ★ここから追加：大名選択の確認画面の魔法！
     // ==========================================
     showDaimyoConfirmModal(clanId, clanName, soldiers, leader, onStart) {

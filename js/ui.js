@@ -679,6 +679,10 @@ class UIManager {
         this.info.showPrincessSelector(targetCastleId, doerId);
     }
 
+    showKyotenList() {
+        this.info.showKyotenList();
+    }
+
     // ==========================================
     // ★ここから追加：委任する城の一覧を出す魔法
     // ==========================================

@@ -36,7 +36,7 @@ const COMMAND_MENU_STRUCTURE = [
     },
     {
         label: "情報",
-        commands: ['busho_list', 'princess_list', 'faction_list', 'daimyo_list']
+        commands: ['busho_list', 'princess_list', 'kyoten_list', 'faction_list', 'daimyo_list']
     },
     {
         label: "システム",
@@ -244,6 +244,10 @@ const COMMAND_SPECS = {
     'princess_list': {
         label: "姫", category: 'INFO',
         isSystem: true, action: 'princess_list'
+    },
+    'kyoten_list': {
+        label: "拠点", category: 'INFO',
+        isSystem: true, action: 'kyoten_list'
     },
     'daimyo_list': {
         label: "勢力", category: 'INFO',
@@ -874,6 +878,7 @@ class CommandSystem {
             case 'faction_list': this.game.ui.showFactionList(this.game.playerClanId, true); break;
             case 'busho_list': this.game.ui.openBushoSelector('all_busho_list', null, null, null); break;
             case 'princess_list': this.game.ui.showPrincessList(); break;
+            case 'kyoten_list': this.game.ui.showKyotenList(); break;
             case 'delegate_list': this.game.ui.showDelegateListModal(); break;
             // ★ここを書き足し！：「settings」と呼ばれたら小窓を開きます
             case 'settings': this.game.ui.showSettingsModal(); break;
