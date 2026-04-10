@@ -24,6 +24,7 @@ body {
     background-color: var(--bg-color);
     color: var(--text-color);
     height: 100%; width: 100%;
+    position: fixed; top: 0; left: 0;
     overflow: hidden;
     display: flex; flex-direction: column;
     -webkit-user-select: none; -moz-user-select: none; -ms-user-select: none; user-select: none;

@@ -613,8 +613,8 @@
             // スマホなら
             document.body.classList.remove('is-pc'); // PC用の目印シールを剥がす
             
-            screen.style.width = '100%';
-            screen.style.height = '100%';
+            screen.style.width = window.innerWidth + 'px';
+            screen.style.height = window.innerHeight + 'px';
             screen.style.zoom = 1;
         }
     }
