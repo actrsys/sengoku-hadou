@@ -65,10 +65,8 @@ class CustomScrollbar {
             this.thumbY.style.height = '100%';
             this.thumbY.style.top = '0px';
             this.thumbY.style.pointerEvents = 'none';
-            this.thumbY.style.opacity = '0.5'; // スクロール不可なことを示すため少し薄くします
         } else {
             this.thumbY.style.pointerEvents = 'auto';
-            this.thumbY.style.opacity = '1';
             let thumbHeight = Math.max(40, (listHeight / scrollHeight) * listHeight);
             this.thumbY.style.height = `${thumbHeight}px`;
             
@@ -87,10 +85,8 @@ class CustomScrollbar {
             this.thumbX.style.width = '100%';
             this.thumbX.style.left = '0px';
             this.thumbX.style.pointerEvents = 'none';
-            this.thumbX.style.opacity = '0.5';
         } else {
             this.thumbX.style.pointerEvents = 'auto';
-            this.thumbX.style.opacity = '1';
             let thumbWidth = Math.max(40, (listWidth / scrollWidth) * listWidth);
             this.thumbX.style.width = `${thumbWidth}px`;
             
