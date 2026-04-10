@@ -16,7 +16,7 @@ class StrategySystem {
         const busho = this.game.getBusho(doerId);
         const targetCastle = this.game.getCastle(targetId);
 
-        const strBonus = ((busho.strength * 1.5) + (Math.sqrt(busho.loyalty) * 2)) / 1.5;
+        const strBonus = ((busho.strength * 1.5) + (Math.sqrt(busho.loyalty) * 2)) / 150;
         const intBonus = ((busho.intelligence * 1.5) + (Math.sqrt(busho.loyalty) * 2)) / 20;
         const loyaltyBonus = (targetCastle.peoplesLoyalty / 120) + 0.9;
         
@@ -62,7 +62,7 @@ class StrategySystem {
         const busho = this.game.getBusho(doerId);
         const targetCastle = this.game.getCastle(targetId);
 
-        const strBonus = ((busho.strength * 1.5) + (Math.sqrt(busho.loyalty) * 2)) / 1.5;
+        const strBonus = ((busho.strength * 1.5) + (Math.sqrt(busho.loyalty) * 2)) / 150;
         const intBonus = ((busho.intelligence * 1.5) + (Math.sqrt(busho.loyalty) * 2)) / 20;
         const loyaltyBonus = (targetCastle.peoplesLoyalty / 120) + 0.9;
         
