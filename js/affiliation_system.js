@@ -86,12 +86,64 @@ class AffiliationSystem {
         busho.isGunshi = false; // ★ここを書き足します！軍師のバッジを外します
 
         // 4. お城から出ます
-        // （浪人としてその城の周辺には居座りますが、お城の中からは追い出されます）
         this.leaveCastle(busho);
         
-        // ★修正：名簿から完全に消えてしまうと迷子になるので、城の周辺にいる浪人として名簿に書き直します！
+        // ★大名家が滅亡したかどうかのチェック（元いた大名家の城が0個なら滅亡と判断します）
+        const isClanDestroyed = (oldClanId !== 0) && (this.game.castles.filter(c => c.ownerClan === oldClanId).length === 0);
+        
+        // ★新しい処理：滅亡した場合はそのまま留まり、自ら出奔した場合は近いお城を探します
         if (busho.castleId) {
-            this.enterCastle(busho, busho.castleId);
+            const currentCastle = this.game.getCastle(busho.castleId);
+            let targetCastle = null;
+
+            // 滅亡ではなく、自ら出奔した場合のみ、お引越し先を探します
+            if (!isClanDestroyed && currentCastle) {
+                // 自分のもともといた大名家（oldClanId）ではなく、かつ誰かの持ち物であるお城だけを集めます
+                const otherCastles = this.game.castles.filter(c => c.ownerClan !== oldClanId && c.ownerClan !== 0);
+
+                if (otherCastles.length > 0) {
+                    // 集めたお城について、距離と城主との相性を計算して記録します
+                    const candidates = otherCastles.map(c => {
+                        // 今いるお城からの直線距離を計算します
+                        const dist = Math.sqrt(Math.pow(c.x - currentCastle.x, 2) + Math.pow(c.y - currentCastle.y, 2));
+                        
+                        // そのお城の城主を探します（城主がいなければ大名を探します）
+                        let lord = this.game.getBusho(c.castellanId);
+                        if (!lord) {
+                            lord = this.game.bushos.find(b => b.clan === c.ownerClan && b.isDaimyo);
+                        }
+
+                        // 相性のズレを計算します（0から50の間で、数字が小さいほど相性が良いです）
+                        let affDiff = 50; 
+                        if (lord) {
+                            const diff = Math.abs(busho.affinity - lord.affinity);
+                            affDiff = Math.min(diff, 100 - diff);
+                        }
+
+                        return { castle: c, dist: dist, affDiff: affDiff };
+                    });
+
+                    // 距離が近い順番に並べ替えます
+                    candidates.sort((a, b) => a.dist - b.dist);
+
+                    // 近くにあるお城の中から、上位10個だけを「近い範囲」として選び出します
+                    const nearCandidates = candidates.slice(0, 10);
+
+                    // 選ばれた近いお城の中で、一番相性が良い（ズレが小さい）順番に並べ替えます
+                    nearCandidates.sort((a, b) => a.affDiff - b.affDiff);
+
+                    // 一番相性が良いお城が複数ある場合に備えて、一番良い点数と同じお城だけを集めます
+                    const bestAffDiff = nearCandidates[0].affDiff;
+                    const bestGroup = nearCandidates.filter(c => c.affDiff === bestAffDiff);
+                    
+                    // その中からランダムで1つだけ選びます
+                    targetCastle = bestGroup[Math.floor(Math.random() * bestGroup.length)].castle;
+                }
+            }
+
+            // 新しい行き先が見つかっていればそこへ、見つからなければ（滅亡時など）元のお城の周辺にとどまります
+            const nextCastleId = targetCastle ? targetCastle.id : busho.castleId;
+            this.enterCastle(busho, nextCastleId);
         }
 
         // ★ここから追加：画面の絵をすぐに描き直す魔法！
