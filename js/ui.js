@@ -330,6 +330,32 @@ class UIManager {
                 }, 200); 
             }
         });
+
+        // ==========================================
+        // ★ここから追加：リストの変化をずっと見張る自動ロボット！
+        // ==========================================
+        const observer = new MutationObserver((mutations) => {
+            let needsUpdate = false;
+            mutations.forEach(mutation => {
+                // 中身が増えたり減ったりした時、または画面が表示された（classが変わった）時
+                if (mutation.type === 'childList' || (mutation.type === 'attributes' && mutation.attributeName === 'class')) {
+                    needsUpdate = true;
+                }
+            });
+            if (needsUpdate) {
+                // 変化があったら、スクロールバーを付ける魔法を呼びます
+                this.updateCustomScrollbars();
+            }
+        });
+        
+        // 画面全体の変化を見張るようにロボットにお願いします
+        observer.observe(document.body, {
+            childList: true,
+            subtree: true,
+            attributes: true,
+            attributeFilter: ['class']
+        });
+        // ==========================================
     } 
     
     hideAIGuardTemporarily() {
@@ -582,6 +608,41 @@ class UIManager {
         // エラーが出ないように、念のため「メニューを隠す」お約束だけ残しておきます
         if (this.contextMenu) this.contextMenu.classList.add('hidden');
     }
+
+    // ==========================================
+    // ★ここから追加：画面内のリストに自作スクロールバーをつける魔法
+    // ==========================================
+    updateCustomScrollbars() {
+        // スクロールバーをつけたいリストの目印（クラスやID）をここにまとめて書きます
+        const selectors = [
+            '.list-container', 
+            '.result-body', 
+            '#divide-list', 
+            '.daimyo-list-container', 
+            '.faction-list-container',
+            '.princess-list-container',
+            '#war-log',
+            '#history-list'
+        ];
+        
+        // 画面の中から、上の目印がついているリストを全部探してきます
+        const targets = document.querySelectorAll(selectors.join(', '));
+        
+        targets.forEach(listEl => {
+            if (listEl.customScrollbar) {
+                // すでにスクロールバーがついていたら、長さを計算し直すだけ
+                listEl.customScrollbar.update();
+            } else {
+                // まだついていなかったら、新しく取り付けます
+                if (typeof CustomScrollbar !== 'undefined') {
+                    listEl.customScrollbar = new CustomScrollbar(listEl);
+                    // 画面の準備が整うのをほんの少しだけ待ってから長さを合わせます
+                    setTimeout(() => listEl.customScrollbar.update(), 10);
+                }
+            }
+        });
+    }
+    // ==========================================
 
     // ★追加：ロード画面をパッと出す魔法
     showLoadingScreen() {

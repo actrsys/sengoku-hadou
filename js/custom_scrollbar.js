@@ -5,7 +5,28 @@
 class CustomScrollbar {
     constructor(listElement) {
         this.list = listElement;
-        this.wrapper = this.list.parentElement;
+        
+        // 親が 'scroll-wrapper' じゃなければ、自動で枠を作って囲んであげる魔法！
+        if (this.list.parentElement && this.list.parentElement.classList.contains('scroll-wrapper')) {
+            this.wrapper = this.list.parentElement;
+        } else {
+            this.wrapper = document.createElement('div');
+            this.wrapper.className = 'scroll-wrapper';
+            
+            // リストの大きさの情報を、外枠にも引き継いでおきます
+            this.wrapper.style.flex = this.list.style.flex || '1';
+            this.wrapper.style.maxHeight = this.list.style.maxHeight;
+            this.wrapper.style.minHeight = this.list.style.minHeight;
+            this.wrapper.style.height = this.list.style.height;
+            
+            if (this.list.parentNode) {
+                this.list.parentNode.insertBefore(this.wrapper, this.list);
+            }
+            this.wrapper.appendChild(this.list);
+        }
+        
+        // 元からあるスマホやパソコンのスクロールバーを隠す魔法をかけます
+        this.list.classList.add('hide-native-scroll');
         
         this.track = document.createElement('div');
         this.track.className = 'custom-scrollbar-track';
