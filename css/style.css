@@ -256,9 +256,9 @@ body.hide-daimyo-labels .daimyo-name-label { display: none !important; }
 }
 
 /* リストベース */
-.list-container, .daimyo-list-container, .result-body, .faction-list-container { flex: 1; overflow-y: scroll; min-height: 200px; scroll-snap-type: y mandatory; border: 1px solid #ddd; scroll-padding-top: 32px; -webkit-overflow-scrolling: auto; }
+.list-container, .daimyo-list-container, .faction-list-container { flex: 1; overflow-y: scroll; min-height: 200px; scroll-snap-type: y mandatory; border: 1px solid #ddd; scroll-padding-top: 32px; -webkit-overflow-scrolling: auto; }
 .faction-list-container { min-height: 150px; border-radius: 4px; }
-.result-body { min-height: 0; margin-bottom: 0 !important; padding-bottom: 10px; }
+.result-body { flex: 1; overflow-y: auto; min-height: 0; margin-bottom: 0 !important; padding-bottom: 10px; }
 .select-item:last-child, .daimyo-list-item:last-child, .kunishu-list-item:last-child, .faction-list-item:last-child { margin-bottom: 25px; }
 
 /* 縦の区切り線 */
