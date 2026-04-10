@@ -616,7 +616,6 @@ class UIManager {
         // スクロールバーをつけたいリストの目印（クラスやID）をここにまとめて書きます
         const selectors = [
             '.list-container', 
-            '.result-body', 
             '#divide-list', 
             '.daimyo-list-container', 
             '.faction-list-container',
