@@ -1152,13 +1152,7 @@ class UIManager {
         }
 
         let content = `
-            <div class="sp-info-header">
-                ${clanHtml}
-                <span class="sp-province">${provinceName}</span>
-                <span class="sp-castle">${castle.name}${statusMarks}</span>
-                <span class="sp-lord-label">城主</span>
-                <span class="sp-lord-name">${castellanName}</span>
-            </div>
+            <div class="sp-info-header">${clanHtml}<span class="sp-province">${provinceName}</span><span class="sp-castle">${castle.name}${statusMarks}</span><span class="sp-lord-label">城主</span><span class="sp-lord-name">${castellanName}</span></div>
             <div class="sp-info-body">
                 <div class="sp-face-wrapper">${faceHtml}</div>
                 <div class="sp-params-grid">
