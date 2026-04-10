@@ -60,14 +60,15 @@ class CustomScrollbar {
         const listHeight = this.list.clientHeight;
         const scrollHeight = this.list.scrollHeight;
         
-        this.trackY.style.display = 'block';
+        // 縦バーの表示状態を固定し、中身のサイズに応じてつまみを調整します
         if (scrollHeight <= listHeight) {
             this.thumbY.style.height = '100%';
             this.thumbY.style.top = '0px';
             this.thumbY.style.pointerEvents = 'none';
-            this.trackY.style.display = 'none'; // 必要ない時は軌道も隠します
+            this.thumbY.style.opacity = '0.5'; // スクロール不可なことを示すため少し薄くします
         } else {
             this.thumbY.style.pointerEvents = 'auto';
+            this.thumbY.style.opacity = '1';
             let thumbHeight = Math.max(40, (listHeight / scrollHeight) * listHeight);
             this.thumbY.style.height = `${thumbHeight}px`;
             
@@ -77,23 +78,23 @@ class CustomScrollbar {
             this.thumbY.style.top = `${scrollRatioY * maxThumbTop}px`;
         }
 
-        // --- ★横のバーの更新（新しく追加！） ---
+        // --- 横のバーの更新 ---
         const listWidth = this.list.clientWidth;
         const scrollWidth = this.list.scrollWidth;
 
-        this.trackX.style.display = 'block';
+        // 横バーも常に表示します
         if (scrollWidth <= listWidth) {
             this.thumbX.style.width = '100%';
             this.thumbX.style.left = '0px';
             this.thumbX.style.pointerEvents = 'none';
-            this.trackX.style.display = 'none'; // 必要ない時は軌道も隠します
+            this.thumbX.style.opacity = '0.5';
         } else {
             this.thumbX.style.pointerEvents = 'auto';
+            this.thumbX.style.opacity = '1';
             let thumbWidth = Math.max(40, (listWidth / scrollWidth) * listWidth);
             this.thumbX.style.width = `${thumbWidth}px`;
             
             const maxScrollLeft = scrollWidth - listWidth;
-            // 縦のバーを避けるため、実際の横軌道の長さを測ります
             const actualTrackWidth = this.trackX.clientWidth || listWidth;
             const maxThumbLeft = actualTrackWidth - thumbWidth;
             
