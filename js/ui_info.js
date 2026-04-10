@@ -134,6 +134,7 @@ class UIInfoManager {
         const body = document.getElementById('daimyo-detail-body');
         const backBtn = document.getElementById('daimyo-detail-back-btn');
         const diploBtn = document.getElementById('daimyo-detail-diplo-btn');
+        const bushoBtn = document.getElementById('daimyo-detail-busho-btn');
 
         if (!modal || !body) return;
 
@@ -177,6 +178,23 @@ class UIInfoManager {
             if (window.AudioManager) window.AudioManager.playSE('decision.ogg');
             this.showDiplomacyList(clan.id, clan.name);
         };
+
+        if (bushoBtn) {
+            bushoBtn.onclick = (e) => {
+                e.stopPropagation();
+                if (window.AudioManager) window.AudioManager.playSE('decision.ogg');
+                modal.classList.add('hidden');
+                
+                const targetBushos = this.game.bushos.filter(b => b.clan === clanId && b.status === 'active');
+                this.openBushoSelector('view_only', null, { 
+                    customBushos: targetBushos,
+                    customInfoHtml: `<div>${clan.name} 所属武将</div>`,
+                    onCancel: () => { 
+                        modal.classList.remove('hidden'); 
+                    }
+                });
+            };
+        }
 
         modal.onclick = (e) => {
             e.stopPropagation(); 
@@ -879,10 +897,10 @@ class UIInfoManager {
         
         // ★さっき作った新しい魔法で、武将のリストとメッセージをまとめて受け取ります！
         const data = this.game.commandSystem.getBushoSelectorData(actionType, targetId, extraData, c);
-        let bushos = data.bushos;
-        let infoHtml = data.infoHtml;
+        let bushos = extraData && extraData.customBushos ? extraData.customBushos : data.bushos;
+        let infoHtml = extraData && extraData.customInfoHtml ? extraData.customInfoHtml : data.infoHtml;
         let isMulti = data.isMulti;
-        let spec = data.spec;
+        let spec = data.spec || {};
 
         const contextEl = document.getElementById('selector-context-info');
         if(contextEl) {
