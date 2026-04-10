@@ -768,6 +768,10 @@ class UIInfoManager {
         this.currentKyotenTab = 'status';
         this.currentKyotenScope = 'clan';
         
+        // ★追加：最初は並べ替えをしていない状態にします
+        this.currentKyotenSortKey = null;
+        this.isKyotenSortAsc = false;
+        
         // 「自家/全国」タブの準備と切り替えの魔法
         if (scopeTabsEl) {
             // コマンドから呼ばれた時（勢力指定なし）だけ表示します
@@ -783,6 +787,11 @@ class UIInfoManager {
                         scopeBtns.forEach(b => b.classList.remove('active'));
                         btn.classList.add('active');
                         this.currentKyotenScope = btn.getAttribute('data-scope');
+                        
+                        // ★追加：タブを切り替えたら並び順をリセットします
+                        this.currentKyotenSortKey = null;
+                        this.isKyotenSortAsc = false;
+                        
                         this.updateKyotenCastles();
                         this.renderKyotenList();
                     };
@@ -812,6 +821,11 @@ class UIInfoManager {
                     
                     // 今選んでいるタブを覚えて、リストを描き直します
                     this.currentKyotenTab = btn.getAttribute('data-tab');
+                    
+                    // ★追加：タブを切り替えたら並び順をリセットします
+                    this.currentKyotenSortKey = null;
+                    this.isKyotenSortAsc = false;
+                    
                     this.renderKyotenList();
                 };
             });
@@ -836,22 +850,97 @@ class UIInfoManager {
         const listEl = document.getElementById('kyoten-list');
         if (!listEl) return;
         
+        // ★追加：表示用のお城リストを作り、並べ替えができるようにします
+        let displayCastles = [...this.kyotenCastles];
+
+        // ★追加：並べ替え（ソート）の魔法
+        if (this.currentKyotenSortKey) {
+            displayCastles.sort((a, b) => {
+                let valA = 0, valB = 0;
+
+                // 共通の計算処理（並べ替え用）
+                const getClanYomi = (c) => { const cd = this.game.clans.find(cd => cd.id === c.ownerClan); return cd ? (cd.yomi || cd.name) : "んんん"; };
+                const getClanName = (c) => { const cd = this.game.clans.find(cd => cd.id === c.ownerClan); return cd ? cd.name : "中立"; };
+                const getCastellanYomi = (c) => { const cb = this.game.getBusho(c.castellanId); return cb ? (cb.yomi || cb.name) : "んんん"; };
+                const getCastellanName = (c) => { const cb = this.game.getBusho(c.castellanId); return cb ? cb.name : "-"; };
+                const getProvinceYomi = (c) => { const p = this.game.provinces && this.game.provinces.find(p => p.id === c.provinceId); return p ? (p.yomi || p.province) : "んんん"; };
+                const getProvinceName = (c) => { const p = this.game.provinces && this.game.provinces.find(p => p.id === c.provinceId); return p ? p.province : ""; };
+                const getBushoCount = (c) => this.game.bushos.filter(b => b.castleId === c.id && b.status === 'active').length;
+
+                const getGoldIncome = (c) => GameSystem.calcBaseGoldIncome(c);
+                const getGoldConsume = (c) => {
+                    let consume = 0;
+                    const daimyo = this.game.bushos.find(b => b.clan === c.ownerClan && b.isDaimyo);
+                    if (daimyo) {
+                        this.game.bushos.filter(b => b.castleId === c.id && b.status === 'active').forEach(b => consume += b.getSalary(daimyo));
+                    }
+                    return consume;
+                };
+                const getRiceIncome = (c) => GameSystem.calcBaseRiceIncome(c);
+                const getRiceConsume = (c) => Math.floor(c.soldiers * window.MainParams.Economy.ConsumeRicePerSoldier) * 12;
+
+                switch (this.currentKyotenSortKey) {
+                    case 'name': valA = a.yomi || a.name; valB = b.yomi || b.name; break;
+                    case 'clan': valA = getClanYomi(a); valB = getClanYomi(b); break;
+                    case 'castellan': valA = getCastellanYomi(a); valB = getCastellanYomi(b); break;
+                    case 'province': valA = getProvinceYomi(a); valB = getProvinceYomi(b); break;
+                    case 'bushoCount': valA = getBushoCount(a); valB = getBushoCount(b); break;
+                    case 'gold': valA = a.gold || 0; valB = b.gold || 0; break;
+                    case 'rice': valA = a.rice || 0; valB = b.rice || 0; break;
+                    case 'soldiers': valA = a.soldiers || 0; valB = b.soldiers || 0; break;
+                    case 'defense': valA = a.defense || 0; valB = b.defense || 0; break;
+                    case 'morale': valA = a.morale || 0; valB = b.morale || 0; break;
+                    case 'training': valA = a.training || 0; valB = b.training || 0; break;
+                    case 'horses': valA = a.horses || 0; valB = b.horses || 0; break;
+                    case 'guns': valA = a.guns || 0; valB = b.guns || 0; break;
+                    case 'population': valA = a.population || 0; valB = b.population || 0; break;
+                    case 'loyalty': valA = a.peoplesLoyalty || 0; valB = b.peoplesLoyalty || 0; break;
+                    case 'kokudaka': valA = a.kokudaka || 0; valB = b.kokudaka || 0; break;
+                    case 'commerce': valA = a.commerce || 0; valB = b.commerce || 0; break;
+                    case 'goldIncome': valA = getGoldIncome(a); valB = getGoldIncome(b); break;
+                    case 'goldConsume': valA = getGoldConsume(a); valB = getGoldConsume(b); break;
+                    case 'riceIncome': valA = getRiceIncome(a); valB = getRiceIncome(b); break;
+                    case 'riceConsume': valA = getRiceConsume(a); valB = getRiceConsume(b); break;
+                }
+
+                // 文字列（名前など）の比較
+                if (typeof valA === 'string' && typeof valB === 'string') {
+                    let cmp = this.isKyotenSortAsc ? valA.localeCompare(valB, 'ja') : valB.localeCompare(valA, 'ja');
+                    if (cmp === 0) {
+                        // 読みが同じなら表示名で比較
+                        const nameA = this.currentKyotenSortKey === 'clan' ? getClanName(a) : (this.currentKyotenSortKey === 'castellan' ? getCastellanName(a) : (this.currentKyotenSortKey === 'province' ? getProvinceName(a) : a.name));
+                        const nameB = this.currentKyotenSortKey === 'clan' ? getClanName(b) : (this.currentKyotenSortKey === 'castellan' ? getCastellanName(b) : (this.currentKyotenSortKey === 'province' ? getProvinceName(b) : b.name));
+                        cmp = this.isKyotenSortAsc ? nameA.localeCompare(nameB, 'ja') : nameB.localeCompare(nameA, 'ja');
+                    }
+                    return cmp;
+                }
+                
+                // 数値の比較
+                if (valA === valB) return 0;
+                return this.isKyotenSortAsc ? (valA - valB) : (valB - valA);
+            });
+        }
+
+        const getSortMark = (key) => {
+            if (this.currentKyotenSortKey !== key) return '';
+            return this.isKyotenSortAsc ? ' ▲' : ' ▼';
+        };
+
         let headerHtml = '';
         
-        // タブごとに見出し（一番上の行）を変えます
+        // ★変更：見出しに sortable-header を追加し、data-sort属性と矢印マーク（▲▼）をつけます
         if (this.currentKyotenTab === 'status') {
-            headerHtml = '<div class="list-header" style="grid-template-columns: 1.5fr 1.5fr 1.5fr 1fr 1fr 1fr 1fr;"><span style="padding-left:5px;">拠点名</span><span>所属勢力</span><span>城主</span><span>国名</span><span>武将数</span><span>金</span><span>兵糧</span></div>';
+            headerHtml = `<div class="list-header sortable-header" style="grid-template-columns: 1.5fr 1.5fr 1.5fr 1fr 1fr 1fr 1fr;"><span data-sort="name" style="padding-left:5px; justify-content:flex-start;">拠点名${getSortMark('name')}</span><span data-sort="clan">所属勢力${getSortMark('clan')}</span><span data-sort="castellan">城主${getSortMark('castellan')}</span><span data-sort="province">国名${getSortMark('province')}</span><span data-sort="bushoCount">武将数${getSortMark('bushoCount')}</span><span data-sort="gold">金${getSortMark('gold')}</span><span data-sort="rice">兵糧${getSortMark('rice')}</span></div>`;
         } else if (this.currentKyotenTab === 'military') {
-            headerHtml = '<div class="list-header" style="grid-template-columns: 1.5fr 1.5fr 1fr 1fr 1fr 1fr 1fr;"><span style="padding-left:5px;">拠点名</span><span>兵士</span><span>城防御</span><span>士気</span><span>訓練</span><span>騎馬</span><span>鉄砲</span></div>';
+            headerHtml = `<div class="list-header sortable-header" style="grid-template-columns: 1.5fr 1.5fr 1fr 1fr 1fr 1fr 1fr;"><span data-sort="name" style="padding-left:5px; justify-content:flex-start;">拠点名${getSortMark('name')}</span><span data-sort="soldiers">兵士${getSortMark('soldiers')}</span><span data-sort="defense">城防御${getSortMark('defense')}</span><span data-sort="morale">士気${getSortMark('morale')}</span><span data-sort="training">訓練${getSortMark('training')}</span><span data-sort="horses">騎馬${getSortMark('horses')}</span><span data-sort="guns">鉄砲${getSortMark('guns')}</span></div>`;
         } else if (this.currentKyotenTab === 'economy') {
-            // ★項目名を変更し、文字がはみ出さないように 1.2fr を 1.5fr に少し広げました！
-            headerHtml = '<div class="list-header" style="grid-template-columns: 1.5fr 1fr 1fr 1fr 1fr 1.5fr 1.5fr 1.5fr 1.5fr;"><span style="padding-left:5px;">拠点名</span><span>人口</span><span>民忠</span><span>石高</span><span>鉱山</span><span>金収入/月</span><span>金支出/月</span><span>兵糧収入/年</span><span>兵糧支出/年</span></div>';
+            headerHtml = `<div class="list-header sortable-header" style="grid-template-columns: 1.5fr 1fr 1fr 1fr 1fr 1.5fr 1.5fr 1.5fr 1.5fr;"><span data-sort="name" style="padding-left:5px; justify-content:flex-start;">拠点名${getSortMark('name')}</span><span data-sort="population">人口${getSortMark('population')}</span><span data-sort="loyalty">民忠${getSortMark('loyalty')}</span><span data-sort="kokudaka">石高${getSortMark('kokudaka')}</span><span data-sort="commerce">鉱山${getSortMark('commerce')}</span><span data-sort="goldIncome">金収入/月${getSortMark('goldIncome')}</span><span data-sort="goldConsume">金支出/月${getSortMark('goldConsume')}</span><span data-sort="riceIncome">兵糧収入/年${getSortMark('riceIncome')}</span><span data-sort="riceConsume">兵糧支出/年${getSortMark('riceConsume')}</span></div>`;
         }
         
         let listHtml = headerHtml;
         
-        // お城を一つずつ見て、リストの行を作っていきます
-        this.kyotenCastles.forEach(c => {
+        // ★変更：並べ替えたあとの displayCastles を使ってリストを作ります
+        displayCastles.forEach(c => {
             const clanData = this.game.clans.find(cd => cd.id === c.ownerClan);
             const clanName = clanData ? clanData.name : "中立";
             const castellan = this.game.getBusho(c.castellanId);
@@ -895,7 +984,30 @@ class UIInfoManager {
         
         listEl.innerHTML = listHtml;
 
-        // ★追加：リストを描き終わった後に、自作スクロールバーを呼び出して長さを合わせます！
+        // ★追加：見出しをクリックした時に並べ替えを実行する魔法
+        const headerSpans = listEl.querySelectorAll('.sortable-header span[data-sort]');
+        headerSpans.forEach(span => {
+            span.onclick = (e) => {
+                const key = e.currentTarget.getAttribute('data-sort');
+                if (!key) return;
+                if (window.AudioManager) window.AudioManager.playSE('choice.ogg');
+                
+                if (this.currentKyotenSortKey === key) {
+                    this.isKyotenSortAsc = !this.isKyotenSortAsc;
+                } else {
+                    this.currentKyotenSortKey = key;
+                    this.isKyotenSortAsc = false; // 基本は大きい順（降順）から始めます
+                    
+                    // 名前系の項目は小さい順（昇順）から始まる方が自然です
+                    if (['name', 'clan', 'castellan', 'province'].includes(key)) {
+                        this.isKyotenSortAsc = true;
+                    }
+                }
+                this.renderKyotenList(); // リストを描き直します！
+            };
+        });
+
+        // リストを描き終わった後に、自作スクロールバーを呼び出して長さを合わせます
         if (window.CustomScrollbar) {
             if (!this.kyotenScrollbar) {
                 this.kyotenScrollbar = new CustomScrollbar(listEl);
