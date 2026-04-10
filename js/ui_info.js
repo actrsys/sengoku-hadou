@@ -755,16 +755,46 @@ class UIInfoManager {
     // ==========================================
     // ★ここから追加：拠点一覧の魔法です！
     // ==========================================
-    showKyotenList() {
+    showKyotenList(clanId = null) {
         const modal = document.getElementById('kyoten-list-modal');
         const tabsEl = document.getElementById('kyoten-tabs');
+        const scopeTabsEl = document.getElementById('kyoten-scope-tabs');
         if (!modal) return;
         
-        // 自分の勢力のお城だけを集めます
-        this.kyotenCastles = this.game.castles.filter(c => c.ownerClan === this.game.playerClanId);
+        // 引数で勢力が指定されていればその勢力、なければプレイヤーの勢力として記憶します
+        this.kyotenTargetClanId = clanId !== null ? clanId : this.game.playerClanId;
         
-        // 最初は「状態」のタブを選んでいる状態にします
+        // 最初は「状態」タブ、「自家」タブを選んでいる状態にします
         this.currentKyotenTab = 'status';
+        this.currentKyotenScope = 'clan';
+        
+        // 「自家/全国」タブの準備と切り替えの魔法
+        if (scopeTabsEl) {
+            // コマンドから呼ばれた時（勢力指定なし）だけ表示します
+            if (clanId === null) {
+                scopeTabsEl.classList.remove('hidden');
+                const scopeBtns = scopeTabsEl.querySelectorAll('.busho-scope-btn');
+                scopeBtns.forEach(btn => {
+                    btn.classList.remove('active');
+                    if (btn.getAttribute('data-scope') === 'clan') btn.classList.add('active');
+                    
+                    btn.onclick = () => {
+                        if (window.AudioManager) window.AudioManager.playSE('choice.ogg');
+                        scopeBtns.forEach(b => b.classList.remove('active'));
+                        btn.classList.add('active');
+                        this.currentKyotenScope = btn.getAttribute('data-scope');
+                        this.updateKyotenCastles();
+                        this.renderKyotenList();
+                    };
+                });
+            } else {
+                // 勢力詳細から呼ばれた時はタブを隠します
+                scopeTabsEl.classList.add('hidden');
+            }
+        }
+        
+        // 最初にお城のリストを用意します
+        this.updateKyotenCastles();
         
         if (tabsEl) {
             const tabBtns = tabsEl.querySelectorAll('.busho-tab-btn');
@@ -789,6 +819,17 @@ class UIInfoManager {
         
         this.renderKyotenList();
         modal.classList.remove('hidden');
+    }
+
+    // 表示するお城のリストを更新する魔法
+    updateKyotenCastles() {
+        if (this.currentKyotenScope === 'all') {
+            // 全国タブの時はすべてのお城を集めます
+            this.kyotenCastles = this.game.castles;
+        } else {
+            // 自家タブの時は、対象の勢力のお城だけを集めます
+            this.kyotenCastles = this.game.castles.filter(c => c.ownerClan === this.kyotenTargetClanId);
+        }
     }
 
     renderKyotenList() {
