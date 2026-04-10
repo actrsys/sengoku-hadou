@@ -803,7 +803,7 @@ class UIInfoManager {
         } else if (this.currentKyotenTab === 'military') {
             headerHtml = '<div class="list-header" style="grid-template-columns: 2fr 1.5fr 1fr 1fr 1fr 1fr 1fr;"><span>拠点名</span><span>兵士</span><span>城防御</span><span>士気</span><span>訓練</span><span>騎馬</span><span>鉄砲</span></div>';
         } else if (this.currentKyotenTab === 'economy') {
-            headerHtml = '<div class="list-header" style="grid-template-columns: 2fr 1.5fr 1fr 1fr 1fr 1fr 1fr;"><span>拠点名</span><span>人口</span><span>民忠</span><span>石高</span><span>鉱山</span><span>金収入</span><span>兵糧収入</span></div>';
+            headerHtml = '<div class="list-header" style="grid-template-columns: 1.5fr 1fr 1fr 1fr 1fr 1.2fr 1.2fr 1.2fr 1.2fr;"><span style="padding-left:5px;">拠点名</span><span>人口</span><span>民忠</span><span>石高</span><span>鉱山</span><span>金収入</span><span>金支出</span><span>兵糧収入</span><span>兵糧支出</span></div>';
         }
         
         let listHtml = headerHtml;
@@ -823,19 +823,33 @@ class UIInfoManager {
                 }
             }
             
-            // お城にいる武将の数を数えます
-            const bushosCount = this.game.bushos.filter(b => b.castleId === c.id && b.status === 'active').length;
+            // お城にいる武将をまとめます
+            const castleBushos = this.game.bushos.filter(b => b.castleId === c.id && b.status === 'active');
+            const bushosCount = castleBushos.length;
             
-            // 金と兵糧の収入を計算します
-            let riceIncome = Math.floor(c.kokudaka * 2.5);
-            let goldIncome = Math.floor(c.commerce * 2.0);
+            // 金と兵糧の収入・支出をゲームのルール通りに計算します
+            const baseRice = (c.kokudaka / 2) + c.peoplesLoyalty;
+            let riceIncome = Math.floor(baseRice * window.MainParams.Economy.IncomeRiceRate);
+            
+            const baseGold = (c.population * 0.01) + (c.peoplesLoyalty / 2) + (c.commerce / 4);
+            let goldIncome = Math.floor(baseGold * window.MainParams.Economy.IncomeGoldRate);
+
+            let consumeRice = Math.floor(c.soldiers * window.MainParams.Economy.ConsumeRicePerSoldier);
+            
+            let consumeGold = 0;
+            const daimyo = this.game.bushos.find(b => b.clan === c.ownerClan && b.isDaimyo);
+            if (daimyo) {
+                castleBushos.forEach(b => {
+                    consumeGold += b.getSalary(daimyo);
+                });
+            }
             
             if (this.currentKyotenTab === 'status') {
                 listHtml += `<div class="select-item" style="grid-template-columns: 2fr 1.5fr 1.5fr 1fr 1fr 1fr 1fr;"><span style="justify-content:flex-start; padding-left:5px;">${c.name}</span><span>${clanName}</span><span>${castellanName}</span><span>${provinceName}</span><span>${bushosCount}</span><span>${c.gold}</span><span>${c.rice}</span></div>`;
             } else if (this.currentKyotenTab === 'military') {
                 listHtml += `<div class="select-item" style="grid-template-columns: 2fr 1.5fr 1fr 1fr 1fr 1fr 1fr;"><span style="justify-content:flex-start; padding-left:5px;">${c.name}</span><span>${c.soldiers}</span><span>${c.defense}</span><span>${c.morale}</span><span>${c.training}</span><span>${c.horses}</span><span>${c.guns}</span></div>`;
             } else if (this.currentKyotenTab === 'economy') {
-                listHtml += `<div class="select-item" style="grid-template-columns: 2fr 1.5fr 1fr 1fr 1fr 1fr 1fr;"><span style="justify-content:flex-start; padding-left:5px;">${c.name}</span><span>${c.population}</span><span>${c.peoplesLoyalty}</span><span>${c.kokudaka}</span><span>${c.commerce}</span><span>${goldIncome}</span><span>${riceIncome}</span></div>`;
+                listHtml += `<div class="select-item" style="grid-template-columns: 1.5fr 1fr 1fr 1fr 1fr 1.2fr 1.2fr 1.2fr 1.2fr;"><span style="justify-content:flex-start; padding-left:5px;">${c.name}</span><span>${c.population}</span><span>${c.peoplesLoyalty}</span><span>${c.kokudaka}</span><span>${c.commerce}</span><span>${goldIncome}</span><span>${consumeGold}</span><span>${riceIncome}</span><span>${consumeRice}</span></div>`;
             }
         });
         
