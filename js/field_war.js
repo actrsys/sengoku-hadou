@@ -774,38 +774,56 @@ class FieldWarManager {
         const curAtk = stats.atk[this.activeAtkTab];
         const curDef = stats.def[this.activeDefTab];
 
-        // 攻撃側の勢力名と総大将名を探す
-        let atkClanName = "独立勢力";
-        const atkClan = this.game.clans.find(c => c.id === Number(this.warState.attacker.ownerClan));
-        if (atkClan) atkClanName = atkClan.name;
+        // 勢力と代表武将を調べて、タブに表示する名前を作る魔法
+        const getDisplayName = (isAttacker, tab) => {
+            // そのタブにいる部隊だけを集めます
+            let unitsInTab = this.units.filter(u => {
+                if (u.isAttacker !== isAttacker) return false;
+                if (tab === 'main' && u.groupId.includes('_main')) return true;
+                if (tab === 'self' && u.groupId.includes('_self')) return true;
+                if (tab === 'ally' && (u.groupId.includes('_ally') || u.groupId.includes('_kunishu'))) return true;
+                return false;
+            });
 
-        let atkGeneralName = "総大将";
-        const atkGeneral = this.units.find(u => u.isAttacker && u.isGeneral);
-        if (atkGeneral) atkGeneralName = atkGeneral.name;
+            if (unitsInTab.length === 0) return "<strong>不明な軍</strong>";
 
-        // 守備側の勢力名と総大将名を探す
-        let defClanName = "独立勢力";
-        if (this.warState.isKunishuSubjugation) {
-            const k = this.game.kunishuSystem.getKunishu(this.warState.defender.id);
-            if (k) defClanName = k.getName(this.game);
-        } else {
-            const defClan = this.game.clans.find(c => c.id === Number(this.warState.defender.ownerClan));
-            if (defClan) defClanName = defClan.name;
-            else if (this.warState.defender.ownerClan === 0) defClanName = "中立勢力";
-        }
+            // リーダーを決めます（総大将がいるなら優先、いなければ統率と武勇の合計が高い人）
+            let leader = unitsInTab.find(u => u.isGeneral);
+            if (!leader) {
+                let sorted = [...unitsInTab].sort((a, b) => {
+                    const speedA = a.stats.ldr + a.stats.str;
+                    const speedB = b.stats.ldr + b.stats.str;
+                    return speedB - speedA;
+                });
+                leader = sorted[0];
+            }
 
-        let defGeneralName = "総大将";
-        const defGeneral = this.units.find(u => !u.isAttacker && u.isGeneral);
-        if (defGeneral) defGeneralName = defGeneral.name;
+            // 勢力名を調べます
+            let clanNameText = "独立勢力";
+            if (leader.kunishuId) {
+                const kunishu = this.game.kunishuSystem.getKunishu(leader.kunishuId);
+                if (kunishu) clanNameText = kunishu.getName(this.game);
+            } else if (leader.bushoId) {
+                const busho = this.game.getBusho(leader.bushoId);
+                if (busho && busho.clan > 0) {
+                    const clanData = this.game.clans.find(c => c.id === busho.clan);
+                    if (clanData) clanNameText = clanData.name;
+                } else if (busho && busho.clan === 0) {
+                    clanNameText = "中立勢力";
+                }
+            }
 
-        // タブに表示する名前の準備
-        let atkDisplayName = `<strong>${atkClanName} ${atkGeneralName} 軍</strong>`;
-        if (this.activeAtkTab === 'self') atkDisplayName = `<strong>${atkClanName} 応援軍</strong>`;
-        if (this.activeAtkTab === 'ally') atkDisplayName = `<strong>攻撃側 友軍</strong>`;
+            // 守備側のメイン部隊で、鎮圧戦などの特別な場合は元の拠点の名前を優先します
+            if (!isAttacker && tab === 'main' && this.warState.isKunishuSubjugation) {
+                 const k = this.game.kunishuSystem.getKunishu(this.warState.defender.id);
+                 if (k) clanNameText = k.getName(this.game);
+            }
 
-        let defDisplayName = `<strong>${defClanName} ${defGeneralName} 軍</strong>`;
-        if (this.activeDefTab === 'self') defDisplayName = `<strong>${defClanName} 応援軍</strong>`;
-        if (this.activeDefTab === 'ally') defDisplayName = `<strong>守備側 友軍</strong>`;
+            return `<strong>${clanNameText} ${leader.name} 軍</strong>`;
+        };
+
+        let atkDisplayName = getDisplayName(true, this.activeAtkTab);
+        let defDisplayName = getDisplayName(false, this.activeDefTab);
 
         // 値を２行に分けて表示します
         const atkHTML = `${atkDisplayName}<br><div style="margin-top:2px;">兵: ${curAtk.soldiers} / 糧: ${curAtk.rice}<br>士気: ${curAtk.morale} / 訓練: ${curAtk.training}</div>`;
