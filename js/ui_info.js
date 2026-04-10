@@ -183,15 +183,11 @@ class UIInfoManager {
             bushoBtn.onclick = (e) => {
                 e.stopPropagation();
                 if (window.AudioManager) window.AudioManager.playSE('decision.ogg');
-                modal.classList.add('hidden');
                 
                 const targetBushos = this.game.bushos.filter(b => b.clan === clanId && b.status === 'active');
                 this.openBushoSelector('view_only', null, { 
                     customBushos: targetBushos,
-                    customInfoHtml: `<div>${clan.name} 所属武将</div>`,
-                    onCancel: () => { 
-                        modal.classList.remove('hidden'); 
-                    }
+                    customInfoHtml: `<div>${clan.name} 所属武将</div>`
                 });
             };
         }
