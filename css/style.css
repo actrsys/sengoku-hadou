@@ -70,12 +70,12 @@ img { pointer-events: none; -webkit-user-drag: none; user-drag: none; }
 #top-info-bar { flex: none; background: rgba(255,255,255,0.95); border-bottom: 1px solid var(--border-color); padding-top: max(20px, env(safe-area-inset-top)); padding-bottom: 10px; padding-left: 2px; padding-right: 2px; z-index: 100; box-shadow: 0 2px 5px rgba(0,0,0,0.1); font-size: 0.8rem; display: flex; justify-content: space-between; align-items: flex-start; }
 #mobile-top-left { display: flex; flex-direction: column; width: 100%; font-size: 0.85rem; }
 .sp-info-header { display: flex; align-items: center; background: #333; color: #fff; padding: 2px 8px; font-weight: bold; }
-.sp-clan { display: flex; align-items: center; margin-right: 10px; color: #ffeb3b; }
-.sp-province { display: flex; align-items: center; margin-right: 5px; color: #fff; font-size: inherit; }
-.sp-castle { flex: 1; font-size: 1rem; display: flex; align-items: center; }
+.sp-clan { display: flex; align-items: center; margin-right: 10px; color: #ffeb3b; line-height: 1; }
+.sp-province { display: flex; align-items: center; margin-right: 5px; color: #fff; font-size: inherit; line-height: 1; }
+.sp-castle { flex: 1; font-size: 1rem; display: flex; align-items: center; line-height: 1; }
 .sp-senran-mark { background-color: #d32f2f; color: #ffffff; font-size: 0.75rem; padding: 2px 4px; border-radius: 3px; margin-left: 5px; font-weight: bold; box-shadow: 1px 1px 2px rgba(0,0,0,0.5); text-shadow: none; line-height: 1; }
-.sp-lord-label { display: flex; align-items: center; font-size: 0.75rem; color: #aaa; margin-right: 5px; }
-.sp-lord-name { display: flex; align-items: center; font-size: 0.9rem; text-align: left; }
+.sp-lord-label { display: flex; align-items: center; font-size: 0.75rem; color: #aaa; margin-right: 5px; line-height: 1; }
+.sp-lord-name { display: flex; align-items: center; font-size: 0.9rem; text-align: left; line-height: 1; }
 .sp-info-body { display: flex; padding: 3px 5px; background: #fff; border-bottom: 1px solid #ccc; }
 .sp-face-wrapper { width: 50px; height: 50px; margin-right: 8px; flex-shrink: 0; border: 1px solid #333; display: flex; align-items: center; justify-content: center; background: #eee; }
 .sp-face-wrapper img { width: 100%; height: 100%; object-fit: cover; }
