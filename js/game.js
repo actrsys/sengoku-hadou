@@ -1069,7 +1069,6 @@ class GameManager {
         this.updateAllCastlesLords();
         
         if (this.month % 3 === 0) this.factionSystem.optimizeCastellans(); 
-        if (this.month % 3 === 0) this.factionSystem.optimizeCastellans(); 
         
         this.castles.forEach(c => {
             if (c.ownerClan === 0) return;
