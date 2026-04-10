@@ -149,10 +149,16 @@
             <div class="modal-content" style="max-width: 800px;">
                 <h3 style="margin-top:0; margin-bottom: 15px;">拠点一覧</h3>
                 
-                <div id="kyoten-tabs" style="display: flex; gap: 5px; margin-bottom: 10px;">
-                    <button class="busho-tab-btn active" data-tab="status">状態</button>
-                    <button class="busho-tab-btn" data-tab="military">軍事</button>
-                    <button class="busho-tab-btn" data-tab="economy">経済</button>
+                <div style="display: flex; gap: 15px; margin-bottom: 10px; align-items: center;">
+                    <div id="kyoten-tabs" style="display: flex; gap: 5px;">
+                        <button class="busho-tab-btn active" data-tab="status">状態</button>
+                        <button class="busho-tab-btn" data-tab="military">軍事</button>
+                        <button class="busho-tab-btn" data-tab="economy">経済</button>
+                    </div>
+                    <div id="kyoten-scope-tabs" style="display: flex; gap: 5px;" class="hidden">
+                        <button class="busho-scope-btn active" data-scope="clan">自家</button>
+                        <button class="busho-scope-btn" data-scope="all">全国</button>
+                    </div>
                 </div>
 
                 <div id="kyoten-list" class="list-container" style="max-height: 50vh; overflow-y: auto; overflow-x: auto;"></div>
