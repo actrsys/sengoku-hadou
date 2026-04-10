@@ -256,7 +256,7 @@ body.hide-daimyo-labels .daimyo-name-label { display: none !important; }
 }
 
 /* リストベース */
-.list-container, .daimyo-list-container, .faction-list-container { flex: 1; overflow-y: auto; min-height: 0; scroll-snap-type: y mandatory; border: 1px solid #ddd; scroll-padding-top: 32px; -webkit-overflow-scrolling: auto; }
+.list-container, .daimyo-list-container, .faction-list-container { flex: 1; overflow-y: scroll; min-height: 200px; scroll-snap-type: y mandatory; border: 1px solid #ddd; scroll-padding-top: 32px; -webkit-overflow-scrolling: auto; }
 .faction-list-container { min-height: 150px; border-radius: 4px; }
 .result-body { flex: 1; overflow-y: auto; min-height: 0; margin-bottom: 0 !important; padding-bottom: 10px; }
 .select-item:last-child, .daimyo-list-item:last-child, .kunishu-list-item:last-child, .faction-list-item:last-child { margin-bottom: 25px; }
@@ -368,11 +368,7 @@ body.hide-daimyo-labels .daimyo-name-label { display: none !important; }
 #diplo-list-modal { z-index: 8400; }
 #dialog-modal { z-index: 9500 !important; }
 
-.modal-content { background: #fff; padding: 20px; border-radius: 8px; width: 90%; max-width: 800px; max-height: 75%; display: flex; flex-direction: column; box-shadow: 0 10px 25px rgba(0,0,0,0.5); position: relative; overflow: hidden !important; }
-.modal-content > div:not(.modal-footer):not(.context-info):not(.war-screen) {
-    min-height: 0 !important;
-    overflow-y: auto;
-}
+.modal-content { background: #fff; padding: 20px; border-radius: 8px; width: 90%; max-width: 800px; height: 75vh; display: flex; flex-direction: column; box-shadow: 0 10px 25px rgba(0,0,0,0.5); position: relative; overflow: hidden !important; }
 .modal-content h3 { margin-top: 0; border-bottom: 2px solid #ddd; padding-bottom: 10px; }
 .context-info { margin-bottom: 10px; padding: 10px; background: #e8eaf6; border-radius: 4px; font-size: 0.9rem; }
 .modal-footer { margin-top: 15px; display: flex; justify-content: center; gap: 10px; padding-top: 10px; border-top: 1px solid #eee; flex-shrink: 0; background: #fff; padding-bottom: env(safe-area-inset-bottom); }
@@ -1121,7 +1117,7 @@ body.is-pc {
    ★ 姫一覧専用の魔法（派閥一覧を参考にした完全独立版）
    ========================================================= */
 .princess-list-container {
-    flex: 1; overflow-y: auto; min-height: 0; scroll-snap-type: y mandatory; border: 1px solid #ddd; scroll-padding-top: 32px; border-radius: 4px; -webkit-overflow-scrolling: auto;
+    flex: 1; overflow-y: scroll; min-height: 150px; scroll-snap-type: y mandatory; border: 1px solid #ddd; scroll-padding-top: 32px; border-radius: 4px; -webkit-overflow-scrolling: auto;
 }
 .princess-list-container::-webkit-scrollbar { width: 14px; height: 14px; -webkit-appearance: none; }
 .princess-list-container::-webkit-scrollbar-track { background: #e0e0e0; border-left: 1px solid #ccc; }
