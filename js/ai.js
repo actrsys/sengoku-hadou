@@ -405,20 +405,24 @@ class AIEngine {
         let bestTarget = null;
         let highestProb = -1;
 
-        // ★ここから追加：自分がいる国が大雪かどうか調べます！
-        const srcProv = this.game.provinces.find(p => p.id === myCastle.provinceId);
-        const isSrcHeavySnow = srcProv && srcProv.statusEffects && srcProv.statusEffects.includes('heavySnow');
+        // ★高速化：大雪が降っている国（provinceId）のリストを最初に作っておきます！
+        const heavySnowProvIds = new Set();
+        this.game.provinces.forEach(p => {
+            if (p.statusEffects && p.statusEffects.includes('heavySnow')) {
+                heavySnowProvIds.add(p.id);
+            }
+        });
+
+        // ★自分がいる国が大雪かどうか調べます！
+        const isSrcHeavySnow = heavySnowProvIds.has(myCastle.provinceId);
 
         enemies.forEach(target => {
-            // ★ここから追加：目的地が大雪か調べます！
+            // ★目的地が大雪か調べます！
             let isTgtHeavySnow = false;
             if (target.isKunishuTarget) {
                 isTgtHeavySnow = isSrcHeavySnow; // 諸勢力は自分の城の周辺なので同じ天気です
             } else {
-                const tgtProv = this.game.provinces.find(p => p.id === target.provinceId);
-                if (tgtProv && tgtProv.statusEffects && tgtProv.statusEffects.includes('heavySnow')) {
-                    isTgtHeavySnow = true;
-                }
+                isTgtHeavySnow = heavySnowProvIds.has(target.provinceId);
             }
 
             // ★大雪の時は、絶対にこの目標を攻めません（次の目標の計算へスキップします）
@@ -544,12 +548,8 @@ class AIEngine {
 
             // ★ここから追加：① 自分と相手の「別の城からの援軍（自家援軍）」を見積もります！
             this.game.castles.forEach(c => {
-                // ★追加：援軍元の城（c）がある国が大雪かどうか調べます！
-                let isReinfHeavySnow = false;
-                const reinfProv = this.game.provinces.find(p => p.id === c.provinceId);
-                if (reinfProv && reinfProv.statusEffects && reinfProv.statusEffects.includes('heavySnow')) {
-                    isReinfHeavySnow = true;
-                }
+                // ★高速化：事前に作ったリストを使って大雪かどうか調べます！
+                const isReinfHeavySnow = heavySnowProvIds.has(c.provinceId);
 
                 // ★大雪の城からは援軍が来ないので、計算に入れません！
                 if (!isReinfHeavySnow) {
@@ -960,6 +960,13 @@ class AIEngine {
         // ★追加：取引の回数を数えるカウンター
         let tradeCount = 0;
 
+        // ★高速化：今の国の兵糧の単価（相場）をループの「外」で１回だけ調べておきます！
+        let riceRate = 1.0;
+        if (this.game.provinces) {
+            const province = this.game.provinces.find(p => p.id === castle.provinceId);
+            if (province && province.marketRate !== undefined) riceRate = province.marketRate;
+        }
+
         // ③ 決められた回数だけ、行動を繰り返します！
         for (let step = 0; step < maxActions; step++) {
             // まだ動ける武将を再確認します
@@ -1207,13 +1214,6 @@ class AIEngine {
 
                 a.score *= (0.9 + Math.random() * 0.2);
             });
-
-            // 今の国の兵糧の単価（相場）を調べます（売るかどうかの判断にも使うので、先にお相場を調べます！）
-            let riceRate = 1.0;
-            if (this.game.provinces) {
-                const province = this.game.provinces.find(p => p.id === castle.provinceId);
-                if (province && province.marketRate !== undefined) riceRate = province.marketRate;
-            }
 
             // 8. 兵糧売却の判断
             const sellTargetRice = Math.floor(castle.soldiers * 3.5);
@@ -1837,11 +1837,7 @@ class AIEngine {
                     tradeCount++; step--; actionDoneInThisStep = true; break;
                 }
                 if (action.type === 'sell_rice') {
-                    let rate = 1.0;
-                    if (this.game.provinces) {
-                        const province = this.game.provinces.find(p => p.id === castle.provinceId);
-                        if (province && province.marketRate !== undefined) rate = province.marketRate;
-                    }
+                    let rate = riceRate; // ★高速化：ループの外で調べた相場をそのまま使います！
 
                     const sellGoalRice = Math.floor(castle.soldiers * 2.0);
                     const canSellAmount = Math.max(0, castle.rice - sellGoalRice);
@@ -1882,11 +1878,7 @@ class AIEngine {
                 }
                 
                 if (action.type === 'buy_rice') {
-                    let rate = 1.0;
-                    if (this.game.provinces) {
-                        const province = this.game.provinces.find(p => p.id === castle.provinceId);
-                        if (province && province.marketRate !== undefined) rate = province.marketRate;
-                    }
+                    let rate = riceRate; // ★高速化：ループの外で調べた相場をそのまま使います！
                     
                     // 一気に余裕まで買います！
                     const buyTarget = Math.floor(castle.soldiers * 3.5);
