@@ -368,6 +368,7 @@ body.hide-daimyo-labels .daimyo-name-label { display: none !important; }
 #diplo-list-modal { z-index: 8400; }
 #dialog-modal { z-index: 9500 !important; }
 
+.modal-content { background: #fff; padding: 20px; border-radius: 8px; width: 90%; max-width: 800px; max-height: 75%; display: flex; flex-direction: column; box-shadow: 0 10px 25px rgba(0,0,0,0.5); position: relative; overflow: hidden !important; }
 .modal-content > div:not(.modal-footer):not(.context-info):not(.war-screen) {
     min-height: 0 !important;
     overflow-y: auto;
