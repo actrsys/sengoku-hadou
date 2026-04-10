@@ -51,12 +51,16 @@ class CustomScrollbar {
         const listHeight = this.list.clientHeight;
         const scrollHeight = this.list.scrollHeight;
         
+        this.track.style.display = 'block';
+        
         if (scrollHeight <= listHeight) {
-            this.track.style.display = 'none';
+            this.thumb.style.height = '100%';
+            this.thumb.style.top = '0px';
+            this.thumb.style.pointerEvents = 'none';
             return;
         }
         
-        this.track.style.display = 'block';
+        this.thumb.style.pointerEvents = 'auto';
         
         let thumbHeight = Math.max(40, (listHeight / scrollHeight) * listHeight);
         this.thumb.style.height = `${thumbHeight}px`;
