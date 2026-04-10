@@ -1348,3 +1348,11 @@ body.is-pc .list-header.status-mode.view-mode, body.is-pc .select-item.status-mo
     background-color: #546e7a;
     color: #ffcc80;
 }
+
+/* =========================================================
+   ★ 拠点一覧の横スクロールのための魔法
+   ========================================================= */
+#kyoten-list .list-header, 
+#kyoten-list .select-item {
+    min-width: 650px; /* 画面が小さくてもこの幅を保って、横にスクロールできるようにします！ */
+}
