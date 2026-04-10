@@ -221,7 +221,9 @@
                 <h3 id="selector-title">選択</h3>
                 <div id="selector-context-info" class="context-info"></div>
                 <div id="selector-tabs" class="busho-tabs hidden"></div>
-                <div id="selector-list" class="list-container"></div>
+                <div class="scroll-wrapper" id="selector-list-wrapper">
+                    <div id="selector-list" class="list-container hide-native-scroll"></div>
+                </div>
                 <div class="modal-footer">
                     <button id="selector-confirm-btn" class="btn-primary">決定</button>
                     <button class="btn-secondary" onclick="window.GameApp.ui.closeSelector()">戻る</button>
@@ -600,6 +602,7 @@
     <script src="js/ui.js"></script>
     <script src="js/ui_map.js"></script>
     <script src="js/castle_manager.js"></script>
+    <script src="js/custom_scrollbar.js"></script>
     <script src="js/event_manager.js"></script>
     <script src="js/event/common_events.js"></script>
     <script src="js/event/typhoon_event.js"></script>

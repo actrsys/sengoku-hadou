@@ -1577,6 +1577,14 @@ class UIInfoManager {
                 this.ui.selectorList.appendChild(div);
             });
             if (bushos.length === 0 && this.ui.selectorList) this.ui.selectorList.innerHTML = "<div style='padding:10px;'>対象となる武将がいません</div>";
+            
+            // ★追加：リストを描き終わった後に、自作スクロールバーを呼び出して長さを合わせます！
+            if (window.CustomScrollbar) {
+                if (!this.ui.bushoScrollbar) {
+                    this.ui.bushoScrollbar = new CustomScrollbar(this.ui.selectorList);
+                }
+                setTimeout(() => this.ui.bushoScrollbar.update(), 10);
+            }
         };
 
         // 準備が整ったので、最初の1回目を描画します！
@@ -1584,6 +1592,7 @@ class UIInfoManager {
         
         if (this.ui.selectorList) {
             this.ui.selectorList.scrollTop = 0;
+            if (this.ui.bushoScrollbar) this.ui.bushoScrollbar.update();
         }
         
         if (this.ui.selectorConfirmBtn) {
