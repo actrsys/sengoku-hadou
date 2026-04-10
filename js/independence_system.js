@@ -897,14 +897,14 @@ class IndependenceSystem {
     }
 
     async executeSecretFieldWar(daimyoMembers, rebelMembers, oldDaimyo, rebellionLeader) {
-        // 1. それぞれ強い順（統率＋武勇）に5人選びます
+        // 1. 大名と反乱リーダーを必ず総大将（一番最初）に置いて、残りのメンバーから強い順に4人を選びます
         const sortByStr = (a, b) => (b.leadership + b.strength) - (a.leadership + a.strength);
-        const daimyoTeamBushos = [...daimyoMembers].sort(sortByStr).slice(0, 5);
-        const rebelTeamBushos = [...rebelMembers].sort(sortByStr).slice(0, 5);
+        
+        const otherDaimyoMembers = daimyoMembers.filter(b => b.id !== oldDaimyo.id).sort(sortByStr).slice(0, 4);
+        const daimyoTeamBushos = [oldDaimyo, ...otherDaimyoMembers];
 
-        // 大名と反乱リーダーは確実に入れます
-        if (!daimyoTeamBushos.includes(oldDaimyo)) daimyoTeamBushos[0] = oldDaimyo;
-        if (!rebelTeamBushos.includes(rebellionLeader)) rebelTeamBushos[0] = rebellionLeader;
+        const otherRebelMembers = rebelMembers.filter(b => b.id !== rebellionLeader.id).sort(sortByStr).slice(0, 4);
+        const rebelTeamBushos = [rebellionLeader, ...otherRebelMembers];
 
         // 2. 兵士数を「派閥の人数比」に合わせて、合計10000人を分け合います！
         const totalCount = daimyoMembers.length + rebelMembers.length;
@@ -933,10 +933,14 @@ class IndependenceSystem {
         const isPlayerDaimyo = (oldDaimyo.clan === this.game.playerClanId);
         const defClanId = isPlayerDaimyo ? oldDaimyo.clan : -1;
 
+        // この時点から、勢力名を「謀反武将の苗字＋家」にしてあげます
+        const familyName = rebellionLeader.familyName || rebellionLeader.name.split('|')[0] || rebellionLeader.name; 
+        const rebelClanName = `${familyName}家`;
+
         const fakeWarState = {
             attacker: { 
                 ownerClan: -1, 
-                name: "反乱軍", 
+                name: rebelClanName, 
                 soldiers: rebelTotalPool,
                 rice: 5000, 
                 morale: 70, 
