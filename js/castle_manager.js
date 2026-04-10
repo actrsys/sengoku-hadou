@@ -15,6 +15,9 @@ class CastleManager {
         // 調査状態などをリセットします
         castle.investigatedUntil = 0;
         
+        // ★追加：城の持ち主が変わった時は、おまかせ（委任）を必ず解除します！
+        castle.isDelegated = false;
+        
         // ★追加：城を失った旧勢力の武将たちの忠誠度を下げます！
         if (oldOwnerId !== 0 && oldOwnerId !== newOwnerId) {
             // ★変更：失った後、まだお城が残っているか（滅亡していないか）を調べます！

@@ -245,6 +245,12 @@ class IndependenceSystem {
 
             rebellionLeader.isDaimyo = true;
             
+            // ★追加：新しい大名が住んでいるお城のおまかせ（委任）を解除します
+            const daimyoCastle = this.game.castles.find(c => c.id === rebellionLeader.castleId);
+            if (daimyoCastle) {
+                daimyoCastle.isDelegated = false;
+            }
+
             // ★大名家が変わる（新設）ので功績半分！
             if (castellan.clan !== 0 && castellan.clan !== newClanId) {
                 castellan.achievementTotal = Math.floor((castellan.achievementTotal || 0) / 2);
@@ -785,6 +791,12 @@ class IndependenceSystem {
                 // 反乱リーダーを新たな大名に
                 rebellionLeader.isDaimyo = true;
                 
+                // ★追加：新しい大名が住んでいるお城のおまかせ（委任）を解除します
+                const daimyoCastle = this.game.castles.find(c => c.id === rebellionLeader.castleId);
+                if (daimyoCastle) {
+                    daimyoCastle.isDelegated = false;
+                }
+
                 // 勢力名を変更
                 const clan = this.game.clans.find(c => c.id === oldClanId);
                 if (clan) {

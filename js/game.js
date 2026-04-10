@@ -1462,6 +1462,12 @@ class GameManager {
             newLeader.isDaimyo = true; 
             newLeader.loyalty = 100; // ★新しく大名になったら、忠誠度を100にします！
             this.clans.find(c => c.id === clanId).leaderId = newLeaderId; 
+            
+            // ★追加：新しい大名が住んでいるお城のおまかせ（委任）を解除します
+            const daimyoCastle = this.getCastle(newLeader.castleId);
+            if (daimyoCastle) {
+                daimyoCastle.isDelegated = false;
+            }
         } 
         this.updateAllCastlesLords(); 
     }
