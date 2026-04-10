@@ -12,9 +12,16 @@ class StrategySystem {
     // ★調略コマンドの計算処理（game.jsからのお引っ越し）
     // ==========================================
     
-    static getInciteProb(busho) {
-        const score = (busho.intelligence * 0.7) + (busho.strength * 0.3); 
-        return Math.min(1.0, score / window.MainParams.Strategy.InciteFactor);
+    getInciteProb(doerId, targetId) {
+        const busho = this.game.getBusho(doerId);
+        const targetCastle = this.game.getCastle(targetId);
+
+        const strBonus = ((busho.strength * 1.5) + (Math.sqrt(busho.loyalty) * 2)) / 1.5;
+        const intBonus = ((busho.intelligence * 1.5) + (Math.sqrt(busho.loyalty) * 2)) / 20;
+        const loyaltyBonus = (targetCastle.peoplesLoyalty / 120) + 0.9;
+        
+        const prob = strBonus / loyaltyBonus;
+        return Math.max(0.01, Math.min(0.99, prob));
     }
 
     static getRumorProb(busho, targetBusho) {
@@ -44,11 +51,21 @@ class StrategySystem {
         return Math.min(1.0, successRate);
     }
 
-    static calcIncite(busho) { 
-        const score = (busho.intelligence * 0.7) + (busho.strength * 0.3); 
-        const success = Math.random() < (score / window.MainParams.Strategy.InciteFactor); 
+    calcIncite(doerId, targetId) { 
+        const busho = this.game.getBusho(doerId);
+        const targetCastle = this.game.getCastle(targetId);
+
+        const strBonus = ((busho.strength * 1.5) + (Math.sqrt(busho.loyalty) * 2)) / 1.5;
+        const intBonus = ((busho.intelligence * 1.5) + (Math.sqrt(busho.loyalty) * 2)) / 20;
+        const loyaltyBonus = (targetCastle.peoplesLoyalty / 120) + 0.9;
+        
+        const prob = Math.max(0.01, Math.min(0.99, strBonus / loyaltyBonus));
+        const success = Math.random() < prob; 
+        
         if(!success) return { success: false, val: 0 }; 
-        return { success: true, val: Math.max(1, Math.floor((score * 2) / 15)) }; 
+        
+        const damage = Math.max(1, Math.floor(intBonus / loyaltyBonus));
+        return { success: true, val: damage }; 
     }
     
     static calcRumor(busho, targetBusho) { 
@@ -176,8 +193,8 @@ class StrategySystem {
         const doer = this.game.getBusho(doerId);
         const target = this.game.getCastle(targetId); 
         // ★専門部署である StrategySystem の計算魔法を呼びます！
-        const result = StrategySystem.calcIncite(doer); 
-        if(result.success) { 
+        const result = this.calcIncite(doerId, targetId); 
+        if(result.success) {
             const oldVal = target.peoplesLoyalty;
             target.peoplesLoyalty = Math.max(0, target.peoplesLoyalty - result.val); 
             const actualDrop = oldVal - target.peoplesLoyalty;

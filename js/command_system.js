@@ -1128,9 +1128,8 @@ class CommandSystem {
         }
         
         if (actionType === 'incite_doer') {
-             const doer = this.game.getBusho(firstId);
              // ★専門部署である StrategySystem の計算魔法を呼びます！
-             const trueProb = StrategySystem.getInciteProb(doer);
+             const trueProb = this.game.strategySystem.getInciteProb(firstId, targetId);
              this.showAdviceAndExecute('incite', () => this.game.strategySystem.executeIncite(firstId, targetId), { trueProb: trueProb });
              return;
         }
