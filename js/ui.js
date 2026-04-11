@@ -1858,6 +1858,17 @@ class UIManager {
             list.appendChild(item);
         });
         
+        const itemCount = forces.length;
+        for (let i = itemCount; i < 8; i++) {
+            const dummy = document.createElement('div');
+            dummy.className = 'kunishu-list-item';
+            dummy.style.gridTemplateColumns = '1.5fr 1fr 1fr 1.5fr';
+            dummy.style.cursor = 'default';
+            dummy.style.pointerEvents = 'none';
+            dummy.innerHTML = '<span></span><span></span><span></span><span></span>';
+            list.appendChild(dummy);
+        }
+        
         if (confirmBtn) {
             confirmBtn.disabled = true;
             confirmBtn.style.opacity = 0.5;
@@ -1948,6 +1959,17 @@ class UIManager {
             }
             list.appendChild(item);
         });
+        
+        const itemCount = kunishus.length;
+        for (let i = itemCount; i < 8; i++) {
+            const dummy = document.createElement('div');
+            dummy.className = 'kunishu-list-item';
+            dummy.style.gridTemplateColumns = '1.5fr 1fr 1fr 1.5fr';
+            dummy.style.cursor = 'default';
+            dummy.style.pointerEvents = 'none';
+            dummy.innerHTML = '<span></span><span></span><span></span><span></span>';
+            list.appendChild(dummy);
+        }
         
         if (confirmBtn) {
             if (isViewOnly) {

@@ -68,6 +68,11 @@ class UIInfoManager {
 
             listHtml += `<div class="daimyo-list-item" style="cursor:pointer;" onclick="if(window.AudioManager) window.AudioManager.playSE('choice.ogg'); window.GameApp.ui.showDaimyoDetail(${d.id})"><span class="col-daimyo-name" style="font-weight:bold;">${d.name}</span><span class="col-leader-name">${d.leaderName}</span><span>${d.castlesCount}</span><span>${powerBarHtml}</span><span>${friendBarHtml}</span><span style="${statusColor}">${friendStatus}</span></div>`;
         });
+
+        const itemCount = clanDataList.length;
+        for (let i = itemCount; i < 8; i++) {
+            listHtml += `<div class="daimyo-list-item" style="cursor:default; pointer-events:none;"><span></span><span></span><span></span><span></span><span></span><span></span></div>`;
+        }
         listHtml += '</div>';
         
         this.ui.showResultModal(`<h3 style="margin-top:0; border-bottom: 2px solid #ddd; padding-bottom: 10px; flex-shrink:0;">勢力一覧</h3>${listHtml}`, () => {
@@ -233,6 +238,11 @@ class UIInfoManager {
 
             listHtml += `<div class="daimyo-list-item" style="grid-template-columns: 2fr 1.5fr 1fr 3fr;"><span class="col-daimyo-name" style="font-weight:bold;">${r.name}</span><span>${friendBarHtml}</span><span style="${statusColor}">${r.status}</span><span></span></div>`;
         });
+
+        const itemCount = relations.length;
+        for (let i = itemCount; i < 8; i++) {
+            listHtml += `<div class="daimyo-list-item" style="grid-template-columns: 2fr 1.5fr 1fr 3fr; cursor:default; pointer-events:none;"><span></span><span></span><span></span><span></span></div>`;
+        }
         listHtml += '</div>';
         
         const diploModal = document.getElementById('diplo-list-modal');
@@ -312,6 +322,14 @@ class UIInfoManager {
         
         if (nonFactionCount > 0) {
             listHtml += `<div class="faction-list-item"><strong class="col-faction-name">無派閥</strong><span>${nonFactionCount}</span><span>-</span><span>-</span><span></span></div>`;
+        }
+        
+        let itemCount = fIds.length + (nonFactionCount > 0 ? 1 : 0);
+        if (itemCount === 0) {
+            itemCount = 1; // 「派閥はありません。」のメッセージ分
+        }
+        for (let i = itemCount; i < 8; i++) {
+            listHtml += `<div class="faction-list-item" style="cursor:default; pointer-events:none;"><span></span><span></span><span></span><span></span><span></span></div>`;
         }
         
         listHtml += `</div>`;
@@ -659,8 +677,14 @@ class UIInfoManager {
         });
         
         // もし一人もいなかったら
-        if (princesses.length === 0) {
+        let itemCount = princesses.length;
+        if (itemCount === 0) {
             listHtml += `<div style="padding: 15px; text-align: center;">姫はいません。</div>`;
+            itemCount = 1;
+        }
+
+        for (let i = itemCount; i < 8; i++) {
+            listHtml += `<div class="princess-list-item" style="cursor:default; pointer-events:none;"><span></span><span></span><span></span><span></span><span></span></div>`;
         }
 
         listHtml += '</div>';
@@ -984,6 +1008,24 @@ class UIInfoManager {
                 listHtml += `<div class="select-item" style="grid-template-columns: 1.5fr 1fr 1fr 1fr 1fr 1.5fr 1.5fr 1.5fr 1.5fr;"><span style="justify-content:flex-start; padding-left:5px;">${c.name}</span><span>${c.population}</span><span>${c.peoplesLoyalty}</span><span>${c.kokudaka}</span><span>${c.commerce}</span><span>${goldIncome}</span><span>${consumeGold}</span><span>${riceIncome}</span><span>${consumeRiceYear}</span></div>`;
             }
         });
+        
+        const itemCount = displayCastles.length;
+        let dummyCols = "";
+        let dummyStyle = "";
+        if (this.currentKyotenTab === 'status') {
+            dummyCols = "<span></span><span></span><span></span><span></span><span></span><span></span><span></span>";
+            dummyStyle = "grid-template-columns: 1.5fr 1.5fr 1.5fr 1fr 1fr 1fr 1fr;";
+        } else if (this.currentKyotenTab === 'military') {
+            dummyCols = "<span></span><span></span><span></span><span></span><span></span><span></span><span></span>";
+            dummyStyle = "grid-template-columns: 1.5fr 1.5fr 1fr 1fr 1fr 1fr 1fr;";
+        } else if (this.currentKyotenTab === 'economy') {
+            dummyCols = "<span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span>";
+            dummyStyle = "grid-template-columns: 1.5fr 1fr 1fr 1fr 1fr 1.5fr 1.5fr 1.5fr 1.5fr;";
+        }
+
+        for (let i = itemCount; i < 8; i++) {
+            listHtml += `<div class="select-item" style="${dummyStyle} cursor:default; pointer-events:none;">${dummyCols}</div>`;
+        }
         
         listEl.innerHTML = listHtml;
 
@@ -1753,7 +1795,32 @@ class UIInfoManager {
                 }
                 this.ui.selectorList.appendChild(div);
             });
-            if (bushos.length === 0 && this.ui.selectorList) this.ui.selectorList.innerHTML = "<div style='padding:10px;'>対象となる武将がいません</div>";
+            
+            let itemCount = displayBushos.length;
+            if (itemCount === 0 && this.ui.selectorList) {
+                this.ui.selectorList.innerHTML = "<div style='padding:10px;'>対象となる武将がいません</div>";
+                itemCount = 1;
+            }
+            
+            for (let i = itemCount; i < 8; i++) {
+                const dummyDiv = document.createElement('div');
+                dummyDiv.className = 'select-item';
+                dummyDiv.style.cursor = 'default';
+                dummyDiv.style.pointerEvents = 'none';
+                if (currentTab === 'status') dummyDiv.classList.add('status-mode');
+                if (isViewMode) dummyDiv.classList.add('view-mode');
+                
+                let dummySpans = "";
+                if (currentTab === 'stats') {
+                    if (isViewMode) dummySpans = "<span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span>";
+                    else dummySpans = "<span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span>";
+                } else {
+                    if (isViewMode) dummySpans = "<span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span>";
+                    else dummySpans = "<span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span>";
+                }
+                dummyDiv.innerHTML = dummySpans;
+                this.ui.selectorList.appendChild(dummyDiv);
+            }
             
             // ★追加：リストを描き終わった後に、自作スクロールバーを呼び出して長さを合わせます！
             if (window.CustomScrollbar) {
