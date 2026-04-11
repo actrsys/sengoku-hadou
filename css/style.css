@@ -396,8 +396,8 @@ body.hide-daimyo-labels .daimyo-name-label { display: none !important; }
 #delegate-setting-modal { z-index: 6600; }
 #settings-modal { z-index: 7000; }
 #result-modal { z-index: 8000; }
-#daimyo-detail-modal { z-index: 8100; }
-#daimyo-list-modal { z-index: 8150; }
+#daimyo-list-modal { z-index: 8100; }
+#daimyo-detail-modal { z-index: 8150; }
 #faction-list-modal { z-index: 8160; }
 #princess-list-modal { z-index: 8170; }
 #selector-modal { z-index: 8200; }
