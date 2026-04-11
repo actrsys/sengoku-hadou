@@ -356,6 +356,19 @@ class UIManager {
             attributeFilter: ['class']
         });
         // ==========================================
+
+        // ★ここから追加：ウィンドウ付属のボタンを外に出す改修
+        const modals = document.querySelectorAll('.modal');
+        modals.forEach(modal => {
+            modal.style.flexDirection = 'column';
+            const content = modal.querySelector('.modal-content');
+            const footer = modal.querySelector('.modal-footer');
+            if (content && footer) {
+                // フッター（ボタン部分）をコンテンツの外に出す
+                modal.appendChild(footer);
+            }
+        });
+        // ★追加ここまで
     } 
     
     hideAIGuardTemporarily() {
