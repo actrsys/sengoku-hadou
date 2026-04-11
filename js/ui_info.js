@@ -75,16 +75,13 @@ class UIInfoManager {
         }
         listHtml += '</div>';
         
-        this.ui.showResultModal(listHtml, () => {
+        this.ui.showResultModal(`<h3 style="margin-top:-15px; border-bottom: 2px solid #ddd; padding-bottom: 10px; flex-shrink:0;">勢力一覧</h3>${listHtml}`, () => {
             if (this.ui.resultBody) {
                 this.ui.resultBody.style.overflowY = '';
                 this.ui.resultBody.style.display = '';
                 this.ui.resultBody.style.flexDirection = '';
             }
         });
-        
-        const titleEl = document.getElementById('result-title');
-        if (titleEl) titleEl.textContent = '勢力一覧';
 
         if (this.ui.resultBody) {
             this.ui.resultBody.style.overflowY = 'hidden';
@@ -344,16 +341,13 @@ class UIInfoManager {
             customFooter = `<button class="btn-secondary" onclick="window.GameApp.ui.showDaimyoList()">閉じる</button>`;
         }
         
-        this.ui.showResultModal(listHtml, () => {
+        this.ui.showResultModal(`<h3 style="margin-top:-15px; border-bottom: 2px solid #ddd; padding-bottom: 10px; flex-shrink:0;">${clan.name} 派閥一覧</h3>${listHtml}`, () => {
             if (this.ui.resultBody) {
                 this.ui.resultBody.style.overflowY = '';
                 this.ui.resultBody.style.display = '';
                 this.ui.resultBody.style.flexDirection = '';
             }
         }, customFooter);
-        
-        const titleEl = document.getElementById('result-title');
-        if (titleEl) titleEl.textContent = `${clan.name} 派閥一覧`;
 
         if (this.ui.resultBody) {
             this.ui.resultBody.style.overflowY = 'hidden';
@@ -714,16 +708,13 @@ class UIInfoManager {
         }
 
         // 出来上がった画面を、いつもの小窓（モーダル）に表示してもらいます
-        this.ui.showResultModal(listHtml, () => {
+        this.ui.showResultModal(`<h3 style="margin-top:-15px; border-bottom: 2px solid #ddd; padding-bottom: 10px; flex-shrink:0;">${title}</h3>${listHtml}`, () => {
             if (this.ui.resultBody) {
                 this.ui.resultBody.style.overflowY = '';
                 this.ui.resultBody.style.display = '';
                 this.ui.resultBody.style.flexDirection = '';
             }
         }, customFooter);
-        
-        const titleEl = document.getElementById('result-title');
-        if (titleEl) titleEl.textContent = title;
 
         // スクロールできるように整えます
         if (this.ui.resultBody) {
