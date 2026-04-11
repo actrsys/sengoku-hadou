@@ -499,7 +499,7 @@ class GameSystem {
     
     static calcBaseRiceIncome(castle) {
         const baseRice = (castle.kokudaka + castle.peoplesLoyalty) * (Math.sqrt(castle.peoplesLoyalty) + 2);
-        return Math.floor(baseRice * window.MainParams.Economy.IncomeRiceRate);
+        return Math.floor(baseRice);
     }
     
     // AI用：お金を指定して、集まる兵士数を計算します
