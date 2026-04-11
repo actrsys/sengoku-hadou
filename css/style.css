@@ -754,7 +754,7 @@ body:not(.is-pc).daimyo-select-mode #map-wrapper { margin-bottom: 0 !important; 
 .responsive-war-left { display: flex; flex-direction: column; flex: 1; overflow: hidden; border-right: none !important; }
 
 .war-visual { flex: 1; display: flex; flex-direction: column; justify-content: space-around; align-items: center; background: radial-gradient(circle, #2a1f3d 0%, #110d1a 100%); margin-bottom: 5px; padding: 10px; overflow-y: auto;}
-.responsive-war-visual { flex: 1; display: flex !important; flex-direction: row !important; width: 100% !important; background: radial-gradient(circle, #2a1f3d 0%, #110d1a 100%); overflow: hidden; align-items: flex-start !important; justify-content: center; padding: 8px !important; gap: 8px !important; margin: 0 !important; box-sizing: border-box !important; }
+.responsive-war-visual { flex: 1; display: flex !important; flex-direction: row !important; width: 100% !important; background: radial-gradient(circle, #2a1f3d 0%, #110d1a 100%); overflow: hidden; align-items: stretch !important; justify-content: center; padding: 8px !important; gap: 8px !important; margin: 0 !important; box-sizing: border-box !important; }
 .war-side-wrapper { flex: 1 !important; width: auto !important; max-width: none !important; box-sizing: border-box !important; overflow: hidden !important; justify-content: center !important; }
 
 .army-box { width: 90%; padding: 10px; border-radius: 8px; color: #fff; margin: 5px 0; display:flex; flex-direction:column; align-items:center; }
