@@ -230,14 +230,15 @@ body.hide-daimyo-labels .daimyo-name-label { display: none !important; }
 
 /* スマホ用自作スクロールバーのための設定（改良版） */
 .scroll-wrapper { 
-    position: relative; flex: 1; display: flex; overflow: hidden; 
+    position: relative; flex: none; width: 100%; display: flex; overflow: hidden; 
     border: 1px solid #ddd; border-radius: 4px; 
     padding-right: 24px; /* 縦バーが項目に重ならないよう、右側に道を作る */
     padding-bottom: 24px; /* ★追加：横バーが項目に重ならないよう、下側に道を作る */
+    box-sizing: border-box; /* ★追加：これを入れないと高さの計算が狂います！ */
 }
 .hide-native-scroll::-webkit-scrollbar { display: none !important; }
 .hide-native-scroll { 
-    -ms-overflow-style: none; scrollbar-width: none; border: none !important; flex: 1; 
+    -ms-overflow-style: none; scrollbar-width: none; border: none !important; flex: 1; min-width: 0; /* ★横幅が窮屈な時に縮む魔法を追加！ */
     overflow-y: scroll; /* 縦は常に許可 */
     overflow-x: auto;   /* 横にはみ出た時だけ左右スクロールを許可 */
 }
@@ -282,9 +283,10 @@ body.hide-daimyo-labels .daimyo-name-label { display: none !important; }
 }
 
 /* リストベース */
-.list-container, .daimyo-list-container, .faction-list-container { flex: none; height: calc(36px * 9 + 2px); overflow-y: scroll; scroll-snap-type: y mandatory; border: 1px solid #ddd; scroll-padding-top: 36px; box-sizing: border-box; -webkit-overflow-scrolling: auto; }
+/* ★変更：スクロールバーの太さ（24px）を足して、重ならないように領域を分離します！ */
+.list-container, .daimyo-list-container, .faction-list-container { flex: none; width: 100%; height: calc(36px * 9 + 26px); overflow-y: scroll; scroll-snap-type: y mandatory; border: 1px solid #ddd; scroll-padding-top: 36px; box-sizing: border-box; -webkit-overflow-scrolling: auto; }
 .faction-list-container { border-radius: 4px; }
-.result-body { flex: 1; overflow-y: auto; min-height: 0; margin-bottom: 0 !important; padding-bottom: 10px; }
+.result-body { flex: 1; width: 100%; overflow-y: auto; min-height: 0; margin-bottom: 0 !important; padding-bottom: 10px; box-sizing: border-box; }
 /* .select-item:last-child などの margin-bottom: 25px; を削除（固定高さに干渉するため） */
 .select-item:last-child, .daimyo-list-item:last-child, .kunishu-list-item:last-child, .faction-list-item:last-child { margin-bottom: 0; }
 
@@ -1088,7 +1090,8 @@ body.is-pc {
     .cmd-btn.finish, .cmd-btn.back { grid-column: span 2; }
 
     /* PCリストレイアウト */
-    .list-container, .daimyo-list-container, .faction-list-container, .princess-list-container { height: calc(40px * 9 + 2px); scroll-padding-top: 40px; }
+    /* ★変更：パソコン版もスクロールバーの太さを足します！ */
+    .list-container, .daimyo-list-container, .faction-list-container, .princess-list-container { height: calc(40px * 9 + 26px); scroll-padding-top: 40px; }
     .list-header, .select-item { grid-template-columns: 45px 100px 60px repeat(6, 1fr); font-size: 0.85rem; height: 40px; }
     .list-header.view-mode, .select-item.view-mode { grid-template-columns: 100px 60px repeat(6, 1fr); }
     .daimyo-list-header, .daimyo-list-item { grid-template-columns: 80px 110px 50px 80px 80px 60px; font-size: 0.9rem; height: 40px; }
@@ -1181,7 +1184,8 @@ body.is-pc {
    ★ 姫一覧専用の魔法（派閥一覧を参考にした完全独立版）
    ========================================================= */
 .princess-list-container {
-    flex: none; height: calc(36px * 9 + 2px); box-sizing: border-box; overflow-y: scroll; scroll-snap-type: y mandatory; border: 1px solid #ddd; scroll-padding-top: 36px; border-radius: 4px; -webkit-overflow-scrolling: auto;
+    /* ★変更：姫一覧も同様にスクロールバーの太さを足します！ */
+    flex: none; width: 100%; height: calc(36px * 9 + 26px); box-sizing: border-box; overflow-y: scroll; scroll-snap-type: y mandatory; border: 1px solid #ddd; scroll-padding-top: 36px; border-radius: 4px; -webkit-overflow-scrolling: auto;
 }
 .princess-list-container::-webkit-scrollbar { width: 14px; height: 14px; -webkit-appearance: none; }
 .princess-list-container::-webkit-scrollbar-track { background: #e0e0e0; border-left: 1px solid #ccc; }
