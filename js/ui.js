@@ -620,7 +620,6 @@ class UIManager {
             '.daimyo-list-container', 
             '.faction-list-container',
             '.princess-list-container',
-            '#war-log',
             '#history-list'
         ];
         
