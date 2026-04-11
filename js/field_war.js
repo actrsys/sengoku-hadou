@@ -2091,6 +2091,7 @@ class FieldWarManager {
             let bonusDef = 0;
             const tBusho = this.game.getBusho(targetUnit.bushoId);
             const factionId = tBusho ? tBusho.factionId : 0;
+            const clanId = tBusho ? tBusho.clan : 0; // 武将の所属勢力（家）のデータを取得します
             
             // 派閥に所属している場合のみ計算
             if (factionId !== 0) {
@@ -2099,7 +2100,8 @@ class FieldWarManager {
                     if (u.isAttacker !== targetUnit.isAttacker) return; // 敵軍は除外
                     
                     const uBusho = this.game.getBusho(u.bushoId);
-                    if (!uBusho || uBusho.factionId !== factionId) return; // 違う派閥なら除外
+                    // 違う派閥、または「違う勢力（同盟軍など）」なら除外するようにしました
+                    if (!uBusho || uBusho.factionId !== factionId || uBusho.clan !== clanId) return;
                     
                     const dist = this.getDistance(targetUnit.x, targetUnit.y, u.x, u.y);
                     const isLeader = uBusho.isFactionLeader;
