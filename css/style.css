@@ -342,6 +342,18 @@ body.hide-daimyo-labels .daimyo-name-label { display: none !important; }
 .btn-danger { background: #d32f2f; border-color: #ef9a9a; }
 .btn-danger:hover { background: #f44336; transform: scale(1.05); }
 
+/* ボタン無効時のスタイル（透けないグレーに変更・動かないように固定） */
+.btn-primary:disabled, .btn-secondary:disabled, .btn-danger:disabled,
+.btn-primary.disabled, .btn-secondary.disabled, .btn-danger.disabled {
+    background: #b0bec5 !important;
+    border-color: #cfd8dc !important;
+    color: #ffffff !important;
+    box-shadow: none !important;
+    cursor: not-allowed !important;
+    opacity: 1 !important;
+    transform: none !important;
+}
+
 .delegate-btn { padding: 15px 30px; font-size: 1.2rem; font-weight: bold; border: 2px solid #ccc; background-color: #f5f5f5; border-radius: 8px; cursor: pointer; color: #777; transition: all 0.2s; }
 .delegate-btn:hover { background-color: #e0e0e0; }
 .delegate-btn.active { border-color: #1976d2; background-color: #e3f2fd; color: #1976d2; box-shadow: 0 0 10px rgba(25, 118, 210, 0.3); }
@@ -400,7 +412,7 @@ body.hide-daimyo-labels .daimyo-name-label { display: none !important; }
 .modal-content { background: #fff; padding: 20px; border-radius: 8px; width: 90%; max-width: 800px; max-height: calc(95% - 60px); display: flex; flex-direction: column; box-shadow: 0 10px 25px rgba(0,0,0,0.5); position: relative; overflow-y: auto !important; overflow-x: hidden !important; }
 .modal-content h3 { margin-top: 0; border-bottom: 2px solid #ddd; padding-bottom: 10px; }
 .context-info { margin-bottom: 10px; padding: 10px; background: #e8eaf6; border-radius: 4px; font-size: 0.9rem; }
-.modal-footer { margin-top: 15px; display: flex; justify-content: center; gap: 10px; padding-top: 0; border-top: none; flex-shrink: 0; background: transparent; padding-bottom: env(safe-area-inset-bottom); }
+.modal-footer { margin-top: 15px; display: flex; justify-content: center; align-items: center; min-height: 60px; gap: 10px; padding-top: 0; border-top: none; flex-shrink: 0; background: transparent; padding-bottom: env(safe-area-inset-bottom); }
 
 .start-content { max-width: 600px; text-align: center; }
 .clan-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 10px; margin-top: 20px; overflow-y: auto; }
