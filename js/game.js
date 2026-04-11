@@ -476,20 +476,32 @@ class GameSystem {
         return this.toGradeHTML(target[statName]);
     }
 
-    static calcDevelopment(busho) { return Math.max(1, Math.round(((busho.politics * 1.5) + (Math.sqrt(busho.loyalty) * 2)) / 20)); }
-    static calcRepair(busho) { return Math.max(1, Math.round(((busho.politics * 1.5) + (Math.sqrt(busho.loyalty) * 2)) / 15)); }
-    static calcCharity(busho) { return Math.max(1, Math.round(((busho.politics * 1.5) + busho.charm + (Math.sqrt(busho.loyalty) * 2)) / 30)); }
+    static calcDevelopment(busho, bonusRate = 1.0) { return Math.max(1, Math.round((((busho.politics * 1.5) + (Math.sqrt(busho.loyalty) * 2)) / 20) * bonusRate)); }
+    static calcRepair(busho, bonusRate = 1.0) { return Math.max(1, Math.round((((busho.politics * 1.5) + (Math.sqrt(busho.loyalty) * 2)) / 15) * bonusRate)); }
+    static calcCharity(busho, bonusRate = 1.0) { return Math.max(1, Math.round((((busho.politics * 1.5) + busho.charm + (Math.sqrt(busho.loyalty) * 2)) / 30) * bonusRate)); }
     
     // 新しい計算式です。兵士数(soldiers)を引数として受け取ります
-    static calcTraining(busho, soldiers) { 
+    static calcTraining(busho, soldiers, bonusRate = 1.0) { 
         const safeSoldiers = Math.max(1, soldiers); // 兵士0の時は計算エラーを防ぐため1として扱います
-        const val = ((busho.leadership * 1.5) + busho.strength + (Math.sqrt(busho.loyalty) * 2)) / (Math.sqrt(safeSoldiers) * 0.5);
+        const val = (((busho.leadership * 1.5) + busho.strength + (Math.sqrt(busho.loyalty) * 2)) / (Math.sqrt(safeSoldiers) * 0.5)) * bonusRate;
         return Math.max(1, Math.round(val)); 
     }
-    static calcSoldierCharity(busho, soldiers) { 
+    static calcSoldierCharity(busho, soldiers, bonusRate = 1.0) { 
         const safeSoldiers = Math.max(1, soldiers); // こちらも同じく兵士0の時は1として扱います
-        const val = ((busho.politics * 1.5) + busho.charm + (Math.sqrt(busho.loyalty) * 2)) / (Math.sqrt(safeSoldiers) * 0.5);
+        const val = (((busho.politics * 1.5) + busho.charm + (Math.sqrt(busho.loyalty) * 2)) / (Math.sqrt(safeSoldiers) * 0.5)) * bonusRate;
         return Math.max(1, Math.round(val)); 
+    }
+
+    // ★追加：同じ派閥のみで実行した時のボーナス倍率を計算します
+    static calcFactionBonusRate(bushos) {
+        if (!bushos || bushos.length < 2) return 1.0;
+        const factionId = bushos[0].factionId;
+        if (factionId === 0) return 1.0; // 無所属は派閥として扱いません
+        const isSameFaction = bushos.every(b => b.factionId === factionId);
+        if (isSameFaction) {
+            return 1.0 + (bushos.length - 1) * 0.1;
+        }
+        return 1.0;
     }
 
     static calcBaseGoldIncome(castle) {

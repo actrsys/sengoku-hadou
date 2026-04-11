@@ -1276,6 +1276,10 @@ class CommandSystem {
         const castle = this.game.getCurrentTurnCastle(); 
         let totalVal = 0, cost = 0, count = 0, actionName = "";
         const spec = COMMAND_SPECS[type]; 
+
+        // ★追加：参加武将をリストアップして派閥ボーナスの倍率を出します
+        const execBushos = bushoIds.map(id => this.game.getBusho(id)).filter(b => b);
+        const bonusRate = GameSystem.calcFactionBonusRate(execBushos);
         
         if (type === 'appoint' || type === 'appoint_gunshi') {
             const bushos = this.game.getBusho(bushoIds[0]);
@@ -1316,7 +1320,7 @@ class CommandSystem {
             
             if (type === 'farm') { 
                 if (castle.gold >= spec.costGold) { 
-                    const val = GameSystem.calcDevelopment(busho); castle.gold -= spec.costGold; 
+                    const val = GameSystem.calcDevelopment(busho, bonusRate); castle.gold -= spec.costGold; 
                     const oldVal = castle.kokudaka;
                     castle.kokudaka = Math.min(castle.maxKokudaka, castle.kokudaka + val); 
                     const actualVal = castle.kokudaka - oldVal;
@@ -1327,7 +1331,7 @@ class CommandSystem {
             }
             else if (type === 'commerce') { 
                 if (castle.gold >= spec.costGold) { 
-                    const val = GameSystem.calcDevelopment(busho); castle.gold -= spec.costGold; 
+                    const val = GameSystem.calcDevelopment(busho, bonusRate); castle.gold -= spec.costGold; 
                     const oldVal = castle.commerce;
                     castle.commerce = Math.min(castle.maxCommerce, castle.commerce + val); 
                     const actualVal = castle.commerce - oldVal;
@@ -1338,7 +1342,7 @@ class CommandSystem {
             }
             else if (type === 'repair') { 
                 if (castle.gold >= spec.costGold) { 
-                    const val = GameSystem.calcRepair(busho); castle.gold -= spec.costGold; 
+                    const val = GameSystem.calcRepair(busho, bonusRate); castle.gold -= spec.costGold; 
                     const oldVal = castle.defense;
                     castle.defense = Math.min(castle.maxDefense, castle.defense + val); 
                     const actualVal = castle.defense - oldVal;
@@ -1353,7 +1357,7 @@ class CommandSystem {
                     castle.rice -= spec.costRice;  
 
                     // 「その城の兵士数 (castle.soldiers)」を渡して計算してもらいます
-                    const val = GameSystem.calcTraining(busho, castle.soldiers); 
+                    const val = GameSystem.calcTraining(busho, castle.soldiers, bonusRate); 
                     const maxTraining = window.WarParams.Military.MaxTraining || 100;
                     const oldVal = castle.training;
                     castle.training = Math.min(maxTraining, castle.training + val); 
@@ -1369,7 +1373,7 @@ class CommandSystem {
                     castle.rice -= spec.costRice;  
 
                     // こちらも「その城の兵士数」を渡します
-                    const val = GameSystem.calcSoldierCharity(busho, castle.soldiers); 
+                    const val = GameSystem.calcSoldierCharity(busho, castle.soldiers, bonusRate); 
                     const maxMorale = window.WarParams.Military.MaxMorale || 100;
                     const oldVal = castle.morale;
                     castle.morale = Math.min(maxMorale, castle.morale + val); 
@@ -1822,11 +1826,15 @@ class CommandSystem {
         let totalVal = 0;
         let count = 0;
 
+        // ★追加：参加武将をリストアップして派閥ボーナスの倍率を出します
+        const execBushos = bushoIds.map(id => this.game.getBusho(id)).filter(b => b);
+        const bonusRate = GameSystem.calcFactionBonusRate(execBushos);
+
         bushoIds.forEach(bid => {
             const busho = this.game.getBusho(bid);
             if (!busho) return;
 
-            const val = GameSystem.calcCharity(busho); 
+            const val = GameSystem.calcCharity(busho, bonusRate); 
 
             totalVal += val;
             count++;
