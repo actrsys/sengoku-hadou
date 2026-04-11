@@ -306,12 +306,12 @@ class UIInfoManager {
                     nameStyle = "color: darkorange;";
                 }
 
-                listHtml += `<div class="faction-list-item"><strong class="col-faction-name" style="${nameStyle}">${leaderName}</strong><span>${count}</span><span style="${seikakuColor}">${seikaku}</span><span style="${hoshinColor}">${hoshin}</span><span></span></div>`;
+                listHtml += `<div class="faction-list-item" onclick="if(window.AudioManager) window.AudioManager.playSE('choice.ogg'); window.GameApp.ui.info.showFactionBushoList(${clan.id}, ${fId}, '${leaderName}派')"><strong class="col-faction-name" style="${nameStyle}">${leaderName}</strong><span>${count}</span><span style="${seikakuColor}">${seikaku}</span><span style="${hoshinColor}">${hoshin}</span><span></span></div>`;
             });
         }
         
         if (nonFactionCount > 0) {
-            listHtml += `<div class="faction-list-item"><strong class="col-faction-name">無派閥</strong><span>${nonFactionCount}</span><span>-</span><span>-</span><span></span></div>`;
+            listHtml += `<div class="faction-list-item" onclick="if(window.AudioManager) window.AudioManager.playSE('choice.ogg'); window.GameApp.ui.info.showFactionBushoList(${clan.id}, 0, '無派閥')"><strong class="col-faction-name">無派閥</strong><span>${nonFactionCount}</span><span>-</span><span>-</span><span></span></div>`;
         }
         
         let itemCount = fIds.length + (nonFactionCount > 0 ? 1 : 0);
@@ -339,6 +339,19 @@ class UIInfoManager {
             
             modal.classList.remove('hidden');
         }
+    }
+
+    showFactionBushoList(clanId, factionId, factionName) {
+        const clan = this.game.clans.find(c => c.id === clanId);
+        if (!clan) return;
+
+        const targetBushos = this.game.bushos.filter(b => b.clan === clanId && b.status === 'active' && (b.factionId || 0) === factionId);
+
+        this.openBushoSelector('view_only', null, { 
+            customBushos: targetBushos,
+            customInfoHtml: `<div>${clan.name} ${factionName} 所属武将</div>`,
+            isFactionView: true
+        });
     }
 
     showBushoDetailModal(busho) {
@@ -1558,20 +1571,25 @@ class UIInfoManager {
                     valA = checkContent(valA);
                     valB = checkContent(valB);
                     
-                    // ★変更：同じ値だった時は、出席番号（ID）順に並び直すのをやめて、前の並び順をそのまま残す「0」にします！
                     if (valA === valB) return 0; 
                     return isSortAsc ? (valA - valB) : (valB - valA);
                 });
             } else {
-                // 並べ替えの基準がない時は、今までの標準の並び順にします
-                if (actionType === 'all_busho_list' && currentScope === 'all') {
+                if (extraData && extraData.isFactionView) {
+                    displayBushos.sort((a, b) => {
+                        if (a.isFactionLeader && !b.isFactionLeader) return -1;
+                        if (!a.isFactionLeader && b.isFactionLeader) return 1;
+                        if (a.isDaimyo && !b.isDaimyo) return -1;
+                        if (!a.isDaimyo && b.isDaimyo) return 1;
+                        return getSortRankClan(b) - getSortRankClan(a);
+                    });
+                } else if (actionType === 'all_busho_list' && currentScope === 'all') {
                     displayBushos.sort((a, b) => getSortRankAll(b) - getSortRankAll(a));
                 } else if (actionType === 'view_only' || actionType === 'all_busho_list') {
                     displayBushos.sort((a, b) => getSortRankClan(b) - getSortRankClan(a));
                 }
             }
 
-            // ★追加：並べ替えが終わった後のリストを記憶しておきます！
             savedBushos = [...displayBushos];
 
             // ★追加：並べ替えのマーク（▲や▼）をつける魔法
