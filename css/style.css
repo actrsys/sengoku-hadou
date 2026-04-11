@@ -397,7 +397,7 @@ body.hide-daimyo-labels .daimyo-name-label { display: none !important; }
 #diplo-list-modal { z-index: 8400; }
 #dialog-modal { z-index: 9500 !important; }
 
-.modal-content { background: #fff; padding: 20px; border-radius: 8px; width: 90%; max-width: 800px; max-height: 75%; display: flex; flex-direction: column; box-shadow: 0 10px 25px rgba(0,0,0,0.5); position: relative; overflow: hidden !important; }
+.modal-content { background: #fff; padding: 20px; border-radius: 8px; width: 90%; max-width: 800px; max-height: 95%; display: flex; flex-direction: column; box-shadow: 0 10px 25px rgba(0,0,0,0.5); position: relative; overflow-y: auto !important; overflow-x: hidden !important; }
 .modal-content h3 { margin-top: 0; border-bottom: 2px solid #ddd; padding-bottom: 10px; }
 .context-info { margin-bottom: 10px; padding: 10px; background: #e8eaf6; border-radius: 4px; font-size: 0.9rem; }
 .modal-footer { margin-top: 15px; display: flex; justify-content: center; gap: 10px; padding-top: 10px; border-top: 1px solid #eee; flex-shrink: 0; background: #fff; padding-bottom: env(safe-area-inset-bottom); }
