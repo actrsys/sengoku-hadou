@@ -6,7 +6,7 @@ class UIInfoManager {
     }
     
     showDaimyoList() {
-        let listHtml = '<div class="busho-tabs"><button class="busho-tab-btn active" style="cursor: default; pointer-events: none;">基本</button></div><div class="daimyo-list-container"><div class="daimyo-list-header"><span>勢力名</span><span>当主名</span><span>城数</span><span>威信</span><span>友好度</span><span>関係</span></div>';
+        let listHtml = '<div style="display: flex; gap: 15px; margin-bottom: 10px; align-items: center;"><div style="display: flex; gap: 5px;"><button class="busho-tab-btn active" style="cursor: default; pointer-events: none;">基本</button></div></div><div class="daimyo-list-container"><div class="daimyo-list-header"><span>勢力名</span><span>当主名</span><span>城数</span><span>威信</span><span>友好度</span><span>関係</span></div>';
         
         const activeClans = this.game.clans.filter(c => c.id !== 0 && this.game.castles.some(cs => cs.ownerClan === c.id));
         
@@ -285,7 +285,7 @@ class UIInfoManager {
             return factions[b].count - factions[a].count; 
         });
         
-        let listHtml = `<div class="busho-tabs"><button class="busho-tab-btn active" style="cursor: default; pointer-events: none;">基本</button></div><div class="faction-list-container"><div class="faction-list-header"><span>派閥主</span><span>武将数</span><span>方針</span><span>思想</span><span></span></div>`;
+        let listHtml = `<div style="display: flex; gap: 15px; margin-bottom: 10px; align-items: center;"><div style="display: flex; gap: 5px;"><button class="busho-tab-btn active" style="cursor: default; pointer-events: none;">基本</button></div></div><div class="faction-list-container"><div class="faction-list-header"><span>派閥主</span><span>武将数</span><span>方針</span><span>思想</span><span></span></div>`;
         
         if (fIds.length === 0) {
             listHtml += `<div style="padding:10px;">派閥はありません。</div>`;
@@ -652,7 +652,7 @@ class UIInfoManager {
         }
         
         // 見出しを作ります（新しく作った princess-list 用の枠組みを使います！）
-        let listHtml = '<div class="busho-tabs"><button class="busho-tab-btn active" style="cursor: default; pointer-events: none;">基本</button></div><div class="princess-list-container"><div class="princess-list-header"><span>名前</span><span>年齢</span><span>父親</span><span>配偶者</span><span></span></div>';
+        let listHtml = '<div style="display: flex; gap: 15px; margin-bottom: 10px; align-items: center;"><div style="display: flex; gap: 5px;"><button class="busho-tab-btn active" style="cursor: default; pointer-events: none;">基本</button></div></div><div class="princess-list-container"><div class="princess-list-header"><span>名前</span><span>年齢</span><span>父親</span><span>配偶者</span><span></span></div>';
 
         // 姫を一人ずつリストに並べていきます
         princesses.forEach(p => {
