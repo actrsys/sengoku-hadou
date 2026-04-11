@@ -960,8 +960,22 @@ class WarManager {
             const baseAtk = sqrtSol + ((leader.leadership + subLdrSum * 0.05) * 1.5 + (leader.strength + subStrSum * 0.05)) * soldierFactor;
             const baseDef = sqrtSol + ((leader.leadership + subLdrSum * 0.05) * 1.5 + (leader.intelligence + subIntSum * 0.05)) * soldierFactor;
 
-            const finalAtk = baseAtk * (1.0 + (morale * 1.5 + training) / 1000);
-            const finalDef = baseDef * (1.0 + (morale + training * 1.5) / 1000);
+            let factionBonus = 1.0;
+            const activeBushosList = [leader].concat(subs);
+            
+            if (activeBushosList.length >= 2) {
+                const firstFactionId = activeBushosList[0].factionId;
+                if (firstFactionId !== 0 && activeBushosList.every(b => b.factionId === firstFactionId)) {
+                    factionBonus = 1.0 + ((activeBushosList.length - 1) * 0.1);
+                }
+            }
+            
+            if (isDefendingCastle && factionBonus > 1.5) {
+                factionBonus = 1.5;
+            }
+
+            const finalAtk = baseAtk * (1.0 + (morale * 1.5 + training) / 1000) * factionBonus;
+            const finalDef = baseDef * (1.0 + (morale + training * 1.5) / 1000) * factionBonus;
 
             return { atkPower: finalAtk, defPower: finalDef };
         };
