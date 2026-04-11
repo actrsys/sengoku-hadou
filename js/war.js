@@ -999,12 +999,12 @@ class WarManager {
             let horseRatio = Math.min(1.0, activeHorses / activeSoldiers);
             let gunRatio = Math.min(1.0, activeGuns / activeSoldiers);
             
-            // 「基礎攻撃力(activePowerObj.atkPower)」の最大30%分のボーナス値を計算します
+            // 「基礎攻撃力(activePowerObj.atkPower)」の最大50%分のボーナス値を計算します
             let equipBonusValue = 0;
             if (type === 'charge' || type === 'def_charge') {
-                equipBonusValue = activePowerObj.atkPower * (horseRatio * 0.3);
+                equipBonusValue = activePowerObj.atkPower * (horseRatio * 0.5);
             } else if (type === 'bow' || type === 'def_bow') {
-                equipBonusValue = activePowerObj.atkPower * (gunRatio * 0.3);
+                equipBonusValue = activePowerObj.atkPower * (gunRatio * 0.5);
             }
             
             // 算出したボーナス値を、最後に足し算します
