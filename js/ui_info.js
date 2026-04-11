@@ -1585,13 +1585,13 @@ class UIInfoManager {
             if (currentTab === 'stats') {
                 if (isViewMode) {
                     this.ui.selectorList.innerHTML = `
-                        <div class="list-header sortable-header view-mode">
+                        <div class="list-header sortable-header view-mode" style="align-items: center;">
                             <span class="col-name" data-sort="name">名前${getSortMark('name')}</span><span class="col-rank" data-sort="rank">身分${getSortMark('rank')}</span><span class="col-stat" data-sort="leadership">統率${getSortMark('leadership')}</span><span class="col-stat" data-sort="strength">武勇${getSortMark('strength')}</span><span class="col-stat" data-sort="politics">政務${getSortMark('politics')}</span><span class="col-stat" data-sort="diplomacy">外交${getSortMark('diplomacy')}</span><span class="col-stat" data-sort="intelligence">智謀${getSortMark('intelligence')}</span><span class="col-stat" data-sort="charm">魅力${getSortMark('charm')}</span>
                         </div>
                     `;
                 } else {
                     this.ui.selectorList.innerHTML = `
-                        <div class="list-header sortable-header">
+                        <div class="list-header sortable-header" style="align-items: center;">
                             <span class="col-act" data-sort="action">行動${getSortMark('action')}</span><span class="col-name" data-sort="name">名前${getSortMark('name')}</span><span class="col-rank" data-sort="rank">身分${getSortMark('rank')}</span><span class="col-stat" data-sort="leadership">統率${getSortMark('leadership')}</span><span class="col-stat" data-sort="strength">武勇${getSortMark('strength')}</span><span class="col-stat" data-sort="politics">政務${getSortMark('politics')}</span><span class="col-stat" data-sort="diplomacy">外交${getSortMark('diplomacy')}</span><span class="col-stat" data-sort="intelligence">智謀${getSortMark('intelligence')}</span><span class="col-stat" data-sort="charm">魅力${getSortMark('charm')}</span>
                         </div>
                     `;
@@ -1599,13 +1599,13 @@ class UIInfoManager {
             } else {
                 if (isViewMode) {
                     this.ui.selectorList.innerHTML = `
-                        <div class="list-header status-mode sortable-header view-mode">
+                        <div class="list-header status-mode sortable-header view-mode" style="align-items: center;">
                             <span class="col-name" data-sort="name">名前${getSortMark('name')}</span><span class="col-rank" data-sort="rank">身分${getSortMark('rank')}</span><span class="col-faction" data-sort="faction">勢力${getSortMark('faction')}</span><span class="col-castle" data-sort="castle">所在${getSortMark('castle')}</span><span class="col-act" data-sort="action">行動${getSortMark('action')}</span><span class="col-age" data-sort="age">年齢${getSortMark('age')}</span><span class="col-family" data-sort="family">一門${getSortMark('family')}</span><span class="col-salary" data-sort="salary">俸禄${getSortMark('salary')}</span><span class="col-faction-leader" data-sort="faction_leader">派閥${getSortMark('faction_leader')}</span><span></span>
                         </div>
                     `;
                 } else {
                     this.ui.selectorList.innerHTML = `
-                        <div class="list-header status-mode sortable-header">
+                        <div class="list-header status-mode sortable-header" style="align-items: center;">
                             <span class="col-name" data-sort="name">名前${getSortMark('name')}</span><span class="col-rank" data-sort="rank">身分${getSortMark('rank')}</span><span class="col-faction" data-sort="faction">勢力${getSortMark('faction')}</span><span class="col-castle" data-sort="castle">所在${getSortMark('castle')}</span><span class="col-age" data-sort="age">年齢${getSortMark('age')}</span><span class="col-family" data-sort="family">一門${getSortMark('family')}</span><span class="col-salary" data-sort="salary">俸禄${getSortMark('salary')}</span><span class="col-faction-leader" data-sort="faction_leader">派閥${getSortMark('faction_leader')}</span><span></span>
                         </div>
                     `;
@@ -1659,6 +1659,7 @@ class UIInfoManager {
 
                 const div = document.createElement('div'); 
                 div.className = `select-item ${!isSelectable ? 'disabled' : ''}`;
+                div.style.alignItems = 'center';
                 
                 // 状態タブの時は、CSSで幅を変えるための目印（status-mode）を貼ります
                 if (currentTab === 'status') div.classList.add('status-mode');
@@ -1844,6 +1845,7 @@ class UIInfoManager {
                 dummyDiv.className = 'select-item';
                 dummyDiv.style.cursor = 'default';
                 dummyDiv.style.pointerEvents = 'none';
+                dummyDiv.style.alignItems = 'center';
                 if (currentTab === 'status') dummyDiv.classList.add('status-mode');
                 if (isViewMode) dummyDiv.classList.add('view-mode');
                 
