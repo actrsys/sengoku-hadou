@@ -2085,6 +2085,52 @@ class FieldWarManager {
         let defFinalAtk = defBaseAtk * (1 + (defMorale * 1.5 + defTraining) / 1000);
         let defFinalDef = defBaseDef * (1 + (defMorale + defTraining * 1.5) / 1000);
 
+        // ★追加: 派閥による連携バフの計算
+        const calcFactionBonus = (targetUnit) => {
+            let bonusAtk = 0;
+            let bonusDef = 0;
+            const tBusho = this.game.getBusho(targetUnit.bushoId);
+            const factionId = tBusho ? tBusho.factionId : 0;
+            
+            // 派閥に所属している場合のみ計算
+            if (factionId !== 0) {
+                this.units.forEach(u => {
+                    if (u.id === targetUnit.id) return; // 自分自身は除外
+                    if (u.isAttacker !== targetUnit.isAttacker) return; // 敵軍は除外
+                    
+                    const uBusho = this.game.getBusho(u.bushoId);
+                    if (!uBusho || uBusho.factionId !== factionId) return; // 違う派閥なら除外
+                    
+                    const dist = this.getDistance(targetUnit.x, targetUnit.y, u.x, u.y);
+                    const isLeader = uBusho.isFactionLeader;
+                    
+                    // リーダーは距離5で10%、それ以外は距離3で5%の恩恵
+                    if ((isLeader && dist <= 5) || (!isLeader && dist <= 3)) {
+                        const rate = isLeader ? 0.10 : 0.05;
+                        let uS = Math.max(0, u.soldiers);
+                        
+                        // 味方部隊の「元々の基礎値」を計算
+                        let uBaseAtk = Math.sqrt(uS) + (u.stats.ldr * 1.5 + u.stats.str) * (uS / (uS + 150));
+                        let uBaseDef = Math.sqrt(uS) + (u.stats.ldr * 1.5 + u.stats.int) * (uS / (uS + 150));
+                        
+                        bonusAtk += uBaseAtk * rate;
+                        bonusDef += uBaseDef * rate;
+                    }
+                });
+            }
+            return { atk: bonusAtk, def: bonusDef };
+        };
+
+        // 攻撃側の派閥バフを最終結果に加算
+        let atkFactionBonus = calcFactionBonus(attacker);
+        atkFinalAtk += atkFactionBonus.atk;
+        atkFinalDef += atkFactionBonus.def;
+
+        // 守備側の派閥バフを最終結果に加算
+        let defFactionBonus = calcFactionBonus(defender);
+        defFinalAtk += defFactionBonus.atk;
+        defFinalDef += defFactionBonus.def;
+
         // 3. 向きによる補正の判定
         let atkDirIndex = this.getDirection(attacker.x, attacker.y, defender.x, defender.y);
         let defDirIndex = defender.direction;
@@ -2110,14 +2156,14 @@ class FieldWarManager {
 
         let atkWeaponMult = 1.0;
         if (attacker.troopType === 'kiba') {
-            if (atkToDefDiff === 0) atkWeaponMult = 1.2; // 正面から突撃
-            else if (atkToDefDiff === 1) atkWeaponMult = 1.1; // 前斜めから突撃
+            if (atkToDefDiff === 0) atkWeaponMult = 1.3; // 正面から突撃
+            else if (atkToDefDiff === 1) atkWeaponMult = 1.2; // 前斜めから突撃
         } else if (attacker.troopType === 'teppo') {
             let dist = this.getDistance(attacker.x, attacker.y, defender.x, defender.y);
             if (dist === 1) {
                 atkWeaponMult = 0.3; // 隣接時は威力が落ちる
             } else {
-                atkWeaponMult = 1.2; // 遠距離なら威力が上がる
+                atkWeaponMult = 1.5; // 遠距離なら威力が上がる
             }
         }
         atkFinalAtk = atkFinalAtk * atkWeaponMult;
@@ -2136,9 +2182,9 @@ class FieldWarManager {
         let terrain = (this.grid && this.grid[row] && this.grid[row][defender.x]) ? this.grid[row][defender.x].terrain : 'plain';
         
         let terrainMult = 1.0;
-        if (terrain === 'forest') terrainMult = 1.1;      // 森は防御力アップ
-        else if (terrain === 'mountain') terrainMult = 1.2; // 山はさらに防御力アップ
-        else if (terrain === 'river') terrainMult = 0.8;    // 川は防御力ダウン
+        if (terrain === 'forest') terrainMult = 1.15;      // 森は防御力アップ
+        else if (terrain === 'mountain') terrainMult = 1.3; // 山はさらに防御力アップ
+        else if (terrain === 'river') terrainMult = 0.7;    // 川は防御力ダウン
         defFinalDef = defFinalDef * terrainMult;
 
         // 7. 与ダメージ計算
