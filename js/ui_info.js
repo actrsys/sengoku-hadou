@@ -1424,6 +1424,40 @@ class UIInfoManager {
                             cmp = isSortAsc ? infoA.name.localeCompare(infoB.name, 'ja') : infoB.name.localeCompare(infoA.name, 'ja');
                         }
                         return cmp;
+                    } else if (currentSortKey === 'faction_leader') {
+                        const getLeaderInfo = (busho) => {
+                            if (busho.factionId > 0 && busho.clan > 0) {
+                                const clanBushos = this.game.bushos.filter(b => b.clan === busho.clan && b.status === 'active');
+                                const factionLeaders = clanBushos.filter(b => b.isFactionLeader);
+                                const myLeader = factionLeaders.find(leader => leader.factionId === busho.factionId);
+                                
+                                if (myLeader) {
+                                    const sameFamilyLeaders = factionLeaders.filter(leader => leader.familyName && leader.familyName === myLeader.familyName && leader.id !== myLeader.id);
+                                    
+                                    let yomiStr = "";
+                                    let nameStr = "";
+                                    if (!myLeader.givenName) {
+                                        yomiStr = (myLeader.familyYomi || myLeader.yomi || "") + "は";
+                                        nameStr = myLeader.familyName + "派";
+                                    } else if (sameFamilyLeaders.length > 0) {
+                                        yomiStr = (myLeader.givenYomi || myLeader.yomi || "") + "は";
+                                        nameStr = myLeader.givenName + "派";
+                                    } else {
+                                        yomiStr = (myLeader.familyYomi || myLeader.yomi || "") + "は";
+                                        nameStr = myLeader.familyName + "派";
+                                    }
+                                    return { yomi: yomiStr, name: nameStr };
+                                }
+                            }
+                            return { yomi: "んんん", name: "んんん" };
+                        };
+                        const infoA = getLeaderInfo(a);
+                        const infoB = getLeaderInfo(b);
+                        let cmp = isSortAsc ? infoA.yomi.localeCompare(infoB.yomi, 'ja') : infoB.yomi.localeCompare(infoA.yomi, 'ja');
+                        if (cmp === 0) {
+                            cmp = isSortAsc ? infoA.name.localeCompare(infoB.name, 'ja') : infoB.name.localeCompare(infoA.name, 'ja');
+                        }
+                        return cmp;
                     } else if (currentSortKey === 'age') {
                         const isNullA = a.isAutoLeader;
                         const isNullB = b.isAutoLeader;
@@ -1566,13 +1600,13 @@ class UIInfoManager {
                 if (isViewMode) {
                     this.ui.selectorList.innerHTML = `
                         <div class="list-header status-mode sortable-header view-mode">
-                            <span class="col-name" data-sort="name">名前${getSortMark('name')}</span><span class="col-rank" data-sort="rank">身分${getSortMark('rank')}</span><span class="col-faction" data-sort="faction">勢力${getSortMark('faction')}</span><span class="col-castle" data-sort="castle">所在${getSortMark('castle')}</span><span class="col-act" data-sort="action">行動${getSortMark('action')}</span><span class="col-age" data-sort="age">年齢${getSortMark('age')}</span><span class="col-family" data-sort="family">一門${getSortMark('family')}</span><span class="col-salary" data-sort="salary">俸禄${getSortMark('salary')}</span><span></span>
+                            <span class="col-name" data-sort="name">名前${getSortMark('name')}</span><span class="col-rank" data-sort="rank">身分${getSortMark('rank')}</span><span class="col-faction" data-sort="faction">勢力${getSortMark('faction')}</span><span class="col-castle" data-sort="castle">所在${getSortMark('castle')}</span><span class="col-act" data-sort="action">行動${getSortMark('action')}</span><span class="col-age" data-sort="age">年齢${getSortMark('age')}</span><span class="col-family" data-sort="family">一門${getSortMark('family')}</span><span class="col-salary" data-sort="salary">俸禄${getSortMark('salary')}</span><span class="col-faction-leader" data-sort="faction_leader">派閥${getSortMark('faction_leader')}</span><span></span>
                         </div>
                     `;
                 } else {
                     this.ui.selectorList.innerHTML = `
                         <div class="list-header status-mode sortable-header">
-                            <span class="col-name" data-sort="name">名前${getSortMark('name')}</span><span class="col-rank" data-sort="rank">身分${getSortMark('rank')}</span><span class="col-faction" data-sort="faction">勢力${getSortMark('faction')}</span><span class="col-castle" data-sort="castle">所在${getSortMark('castle')}</span><span class="col-age" data-sort="age">年齢${getSortMark('age')}</span><span class="col-family" data-sort="family">一門${getSortMark('family')}</span><span class="col-salary" data-sort="salary">俸禄${getSortMark('salary')}</span><span></span>
+                            <span class="col-name" data-sort="name">名前${getSortMark('name')}</span><span class="col-rank" data-sort="rank">身分${getSortMark('rank')}</span><span class="col-faction" data-sort="faction">勢力${getSortMark('faction')}</span><span class="col-castle" data-sort="castle">所在${getSortMark('castle')}</span><span class="col-age" data-sort="age">年齢${getSortMark('age')}</span><span class="col-family" data-sort="family">一門${getSortMark('family')}</span><span class="col-salary" data-sort="salary">俸禄${getSortMark('salary')}</span><span class="col-faction-leader" data-sort="faction_leader">派閥${getSortMark('faction_leader')}</span><span></span>
                         </div>
                     `;
                 }
@@ -1595,7 +1629,7 @@ class UIInfoManager {
                         isSortAsc = false; // 基本は大きい順（降順）から始めます
                         
                         // 名前や所在の時は、小さい順（昇順）から始まる方が自然です
-                        if (['name', 'faction', 'castle'].includes(key)) {
+                        if (['name', 'faction', 'castle', 'faction_leader'].includes(key)) {
                             isSortAsc = true;
                         }
                     }
@@ -1683,11 +1717,38 @@ class UIInfoManager {
                         if (salary === 0) salary = "-";
                     }
 
+                    // その武将の派閥名を作る処理です
+                    let factionNameStr = "-";
+                    if (b.factionId > 0 && b.clan > 0) {
+                        // 同じ勢力の武将たちの中から、派閥のリーダーたちを見つけます
+                        const clanBushos = this.game.bushos.filter(busho => busho.clan === b.clan && busho.status === 'active');
+                        const factionLeaders = clanBushos.filter(busho => busho.isFactionLeader);
+                        
+                        // その武将が所属している派閥のリーダーを見つけます
+                        const myLeader = factionLeaders.find(leader => leader.factionId === b.factionId);
+                        
+                        if (myLeader) {
+                            // 同じ勢力の他の派閥リーダーの中に、同じ姓の人がいるか確認します
+                            const sameFamilyLeaders = factionLeaders.filter(leader => leader.familyName && leader.familyName === myLeader.familyName && leader.id !== myLeader.id);
+                            
+                            if (!myLeader.givenName) {
+                                // 苗字と名前の区切り（|）がない場合はフルネーム派にします
+                                factionNameStr = myLeader.familyName + "派";
+                            } else if (sameFamilyLeaders.length > 0) {
+                                // 同じ姓のリーダーが他にいる場合は名前派にします
+                                factionNameStr = myLeader.givenName + "派";
+                            } else {
+                                // それ以外は姓派にします
+                                factionNameStr = myLeader.familyName + "派";
+                            }
+                        }
+                    }
+
                     if (isViewMode) {
-                        div.innerHTML = `<span class="col-name">${b.name}</span><span class="col-rank">${b.getRankName()}</span><span class="col-faction">${forceName}</span><span class="col-castle">${bCastleName}</span><span class="col-act">${b.isActionDone?'済':'未'}</span><span class="col-age">${age}</span><span class="col-family">${familyMark}</span><span class="col-salary">${salary}</span><span></span>`;
+                        div.innerHTML = `<span class="col-name">${b.name}</span><span class="col-rank">${b.getRankName()}</span><span class="col-faction">${forceName}</span><span class="col-castle">${bCastleName}</span><span class="col-act">${b.isActionDone?'済':'未'}</span><span class="col-age">${age}</span><span class="col-family">${familyMark}</span><span class="col-salary">${salary}</span><span class="col-faction-leader">${factionNameStr}</span><span></span>`;
                     } else {
                         // 状態タブにも inputHtml を隠しておく（選択できるように）
-                        div.innerHTML = `<span class="col-name">${inputHtml}${b.name}</span><span class="col-rank">${b.getRankName()}</span><span class="col-faction">${forceName}</span><span class="col-castle">${bCastleName}</span><span class="col-age">${age}</span><span class="col-family">${familyMark}</span><span class="col-salary">${salary}</span><span></span>`;
+                        div.innerHTML = `<span class="col-name">${inputHtml}${b.name}</span><span class="col-rank">${b.getRankName()}</span><span class="col-faction">${forceName}</span><span class="col-castle">${bCastleName}</span><span class="col-age">${age}</span><span class="col-family">${familyMark}</span><span class="col-salary">${salary}</span><span class="col-faction-leader">${factionNameStr}</span><span></span>`;
                     }
                 }
                 
@@ -1791,8 +1852,8 @@ class UIInfoManager {
                     if (isViewMode) dummySpans = "<span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span>";
                     else dummySpans = "<span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span>";
                 } else {
-                    if (isViewMode) dummySpans = "<span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span>";
-                    else dummySpans = "<span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span>";
+                    if (isViewMode) dummySpans = "<span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span>";
+                    else dummySpans = "<span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span>";
                 }
                 dummyDiv.innerHTML = dummySpans;
                 this.ui.selectorList.appendChild(dummyDiv);
