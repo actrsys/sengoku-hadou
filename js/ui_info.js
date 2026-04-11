@@ -1659,7 +1659,6 @@ class UIInfoManager {
 
                 const div = document.createElement('div'); 
                 div.className = `select-item ${!isSelectable ? 'disabled' : ''}`;
-                div.style.alignItems = 'center';
                 
                 // 状態タブの時は、CSSで幅を変えるための目印（status-mode）を貼ります
                 if (currentTab === 'status') {
@@ -1854,7 +1853,6 @@ class UIInfoManager {
                 dummyDiv.className = 'select-item';
                 dummyDiv.style.cursor = 'default';
                 dummyDiv.style.pointerEvents = 'none';
-                dummyDiv.style.alignItems = 'center';
                 if (currentTab === 'status') {
                     dummyDiv.classList.add('status-mode');
                     if (isViewMode) {
