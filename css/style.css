@@ -297,35 +297,35 @@ body.hide-daimyo-labels .daimyo-name-label { display: none !important; }
 
 /* リストベース */
 /* ★変更：スクロールバーの太さ（24px）を足して、重ならないように領域を分離します！ */
-.list-container, .daimyo-list-container, .faction-list-container, .princess-list-container { flex: none; width: 100%; height: calc(36px * 9 + 26px); overflow-y: scroll; scroll-snap-type: y mandatory; border: 1px solid #ddd; scroll-padding-top: 36px; box-sizing: border-box; -webkit-overflow-scrolling: auto; overscroll-behavior: none; }
-.faction-list-container { border-radius: 4px; }
+.list-container, .daimyo-list-container, .faction-list-container, .princess-list-container { flex: none; width: 100%; height: calc(40px * 9 + 26px); overflow-y: scroll; scroll-snap-type: y mandatory; border: 1px solid #ddd; scroll-padding-top: 40px; box-sizing: border-box; -webkit-overflow-scrolling: auto; overscroll-behavior: none; border-radius: 4px; }
 .result-body { flex: 1; width: 100%; overflow-y: auto; min-height: 0; margin-bottom: 0 !important; padding-bottom: 10px; box-sizing: border-box; overscroll-behavior: none; }
 /* .select-item:last-child などの margin-bottom: 25px; を削除（固定高さに干渉するため） */
-.select-item:last-child, .daimyo-list-item:last-child, .kunishu-list-item:last-child, .faction-list-item:last-child { margin-bottom: 0; }
+.select-item:last-child, .daimyo-list-item:last-child, .kunishu-list-item:last-child, .faction-list-item:last-child, .princess-list-item:last-child { margin-bottom: 0; }
 
 /* 縦の区切り線 */
-.list-header > span, .select-item > span, .daimyo-list-header > span, .daimyo-list-item > span, .kunishu-list-header > span, .kunishu-list-item > span, .kunishu-list-header > strong, .kunishu-list-item > strong, .faction-list-header > span, .faction-list-item > span, .faction-list-item > strong { border-right: 1px solid #ddd; padding: 0 2px; display: flex; align-items: center; justify-content: center; box-sizing: border-box; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
-.list-header > span, .daimyo-list-header > span, .kunishu-list-header > span, .kunishu-list-header > strong, .faction-list-header > span { border-right: 1px solid #546e7a; }
-.list-header > span:last-child, .select-item > span:last-child, .daimyo-list-header > span:last-child, .daimyo-list-item > span:last-child, .kunishu-list-header > span:last-child, .kunishu-list-item > span:last-child, .faction-list-header > span:last-child, .faction-list-item > span:last-child { border-right: none; }
+.list-header > span, .select-item > span, .daimyo-list-header > span, .daimyo-list-item > span, .kunishu-list-header > span, .kunishu-list-item > span, .kunishu-list-header > strong, .kunishu-list-item > strong, .faction-list-header > span, .faction-list-item > span, .faction-list-item > strong, .princess-list-header > span, .princess-list-item > span, .princess-list-item > strong { border-right: 1px solid #ddd; padding: 0 2px; display: flex; align-items: center; justify-content: center; box-sizing: border-box; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; height: 100%; }
+.list-header > span, .daimyo-list-header > span, .kunishu-list-header > span, .kunishu-list-header > strong, .faction-list-header > span, .princess-list-header > span { border-right: 1px solid #546e7a; }
+.list-header > span:last-child, .select-item > span:last-child, .daimyo-list-header > span:last-child, .daimyo-list-item > span:last-child, .kunishu-list-header > span:last-child, .kunishu-list-item > span:last-child, .faction-list-header > span:last-child, .faction-list-item > span:last-child, .princess-list-header > span:last-child, .princess-list-item > span:last-child { border-right: none; }
 
 /* リストヘッダー・アイテム (ゼブラ柄) */
-.list-header, .daimyo-list-header, .kunishu-list-header, .faction-list-header { background: #37474f; color: #fff; font-weight: bold; position: sticky; top: 0; z-index: 10; }
-.select-item, .daimyo-list-item, .kunishu-list-item, .faction-list-item { border-bottom: 2px solid #e0e0e0; scroll-snap-align: start; cursor: pointer; }
-.select-item:nth-child(even), .daimyo-list-item:nth-child(even), .kunishu-list-item:nth-child(even), .faction-list-item:nth-child(even) { background-color: #f0f4f8; }
-.select-item:hover, .daimyo-list-item:hover, .kunishu-list-item:hover, .faction-list-item:hover { background-color: #e3f2fd !important; }
+.list-header, .daimyo-list-header, .kunishu-list-header, .faction-list-header, .princess-list-header { background: #37474f; color: #fff; font-weight: bold; position: sticky; top: 0; z-index: 10; }
+.select-item, .daimyo-list-item, .kunishu-list-item, .faction-list-item, .princess-list-item { border-bottom: 2px solid #e0e0e0; scroll-snap-align: start; cursor: pointer; color: var(--text-color); }
+.select-item:nth-child(even), .daimyo-list-item:nth-child(even), .kunishu-list-item:nth-child(even), .faction-list-item:nth-child(even), .princess-list-item:nth-child(even) { background-color: #f0f4f8; }
+.select-item:hover, .daimyo-list-item:hover, .kunishu-list-item:hover, .faction-list-item:hover, .princess-list-item:hover { background-color: #e3f2fd !important; }
 .select-item.disabled { color: #aaa; pointer-events: none; background: #f9f9f9; }
 .select-item.selected, .kunishu-list-item.selected { background-color: #ffe0b2 !important; border-left: 5px solid #ff9800; }
 .select-item.selected:hover, .kunishu-list-item.selected:hover { background-color: #ffcc80 !important; }
 .select-item input[type="checkbox"], .select-item input[type="radio"] { display: none; }
-.select-item .col-name, .daimyo-list-item .col-daimyo-name, .daimyo-list-item .col-leader-name, .kunishu-list-item .col-kunishu-name, .faction-list-item .col-faction-name { justify-content: flex-start !important; padding-left: 5px; }
+.select-item .col-name, .daimyo-list-item .col-daimyo-name, .daimyo-list-item .col-leader-name, .kunishu-list-item .col-kunishu-name, .faction-list-item .col-faction-name, .princess-list-item .col-princess-name { justify-content: flex-start !important; padding-left: 5px; }
 
 /* 各種リストの基本グリッド（スマホ向けベース） */
-.list-header, .select-item { display: grid; grid-template-columns: 35px 2.5fr 1.5fr repeat(6, 1fr); font-size: clamp(0.6rem, 2.2vw, 0.85rem); padding: 0; height: 36px; gap: 0; box-sizing: border-box; }
+.list-header, .select-item { display: grid; grid-template-columns: 35px 2.5fr 1.5fr repeat(6, 1fr); font-size: clamp(0.6rem, 2.2vw, 0.85rem); padding: 0; height: 40px; gap: 0; box-sizing: border-box; align-items: stretch; }
 .list-header.view-mode, .select-item.view-mode { grid-template-columns: 2.5fr 1.5fr repeat(6, 1fr); }
-.daimyo-list-header, .daimyo-list-item { display: grid; grid-template-columns: 2fr 2fr 1fr 1.5fr 1.5fr 1fr; font-size: clamp(0.65rem, 2.5vw, 0.9rem); padding: 0; height: 36px; gap: 0; box-sizing: border-box; }
-.kunishu-list-header, .kunishu-list-item { display: grid; grid-template-columns: 20px 3fr 1.5fr 1.5fr 1.5fr; font-size: clamp(0.7rem, 2.8vw, 0.9rem); padding: 0; height: 36px; gap: 0; box-sizing: border-box; }
+.daimyo-list-header, .daimyo-list-item { display: grid; grid-template-columns: 2fr 2fr 1fr 1.5fr 1.5fr 1fr; font-size: clamp(0.65rem, 2.5vw, 0.9rem); padding: 0; height: 40px; gap: 0; box-sizing: border-box; align-items: stretch; }
+.kunishu-list-header, .kunishu-list-item { display: grid; grid-template-columns: 20px 3fr 1.5fr 1.5fr 1.5fr; font-size: clamp(0.7rem, 2.8vw, 0.9rem); padding: 0; height: 40px; gap: 0; box-sizing: border-box; align-items: stretch; }
 .view-mode .kunishu-list-header, .view-mode .kunishu-list-item { grid-template-columns: 3fr 1.5fr 1.5fr 1.5fr; }
-.faction-list-header, .faction-list-item { display: grid; grid-template-columns: 2.5fr 1fr 1.5fr 1.5fr 3fr; font-size: clamp(0.7rem, 2.8vw, 0.95rem); padding: 0; height: 36px; gap: 0; box-sizing: border-box; }
+.faction-list-header, .faction-list-item { display: grid; grid-template-columns: 2.5fr 1fr 1.5fr 1.5fr 3fr; font-size: clamp(0.7rem, 2.8vw, 0.95rem); padding: 0; height: 40px; gap: 0; box-sizing: border-box; align-items: stretch; }
+.princess-list-header, .princess-list-item { display: grid; grid-template-columns: 1.3fr 1fr 1.5fr 1.5fr 3fr; font-size: clamp(0.7rem, 2.8vw, 0.95rem); padding: 0; height: 40px; gap: 0; box-sizing: border-box; align-items: stretch; }
 
 .kunishu-item { padding: 12px 15px; border: 1px solid #d0b080; margin-bottom: 8px; cursor: pointer; display: flex; align-items: center; background: rgba(250, 240, 230, 0.95); border-radius: 6px; transition: all 0.2s ease; font-family: 'Sawarabi Mincho', serif; box-shadow: 1px 1px 3px rgba(0,0,0,0.1); }
 .kunishu-item:hover { background: #fff5e0; transform: translateX(3px); box-shadow: 2px 2px 5px rgba(0,0,0,0.15); border-color: #c0a070; }
@@ -1123,14 +1123,15 @@ body.is-pc {
 
     /* PCリストレイアウト */
     /* ★変更：パソコン版もスクロールバーの太さを足します！ */
-    .list-container, .daimyo-list-container, .faction-list-container, .princess-list-container { height: calc(40px * 9 + 26px); scroll-padding-top: 40px; }
-    .list-header, .select-item { grid-template-columns: 45px 100px 60px repeat(6, 1fr); font-size: 0.85rem; height: 40px; }
+    .list-container, .daimyo-list-container, .faction-list-container, .princess-list-container { height: calc(44px * 9 + 26px); scroll-padding-top: 44px; }
+    .list-header, .select-item { grid-template-columns: 45px 100px 60px repeat(6, 1fr); font-size: 0.85rem; height: 44px; }
     .list-header.view-mode, .select-item.view-mode { grid-template-columns: 100px 60px repeat(6, 1fr); }
-    .daimyo-list-header, .daimyo-list-item { grid-template-columns: 80px 110px 50px 80px 80px 60px; font-size: 0.9rem; height: 40px; }
-    .kunishu-list-header, .kunishu-list-item { grid-template-columns: 25px 130px 80px 80px 80px; font-size: 0.9rem; height: 40px; }
+    .daimyo-list-header, .daimyo-list-item { grid-template-columns: 80px 110px 50px 80px 80px 60px; font-size: 0.9rem; height: 44px; }
+    .kunishu-list-header, .kunishu-list-item { grid-template-columns: 25px 130px 80px 80px 80px; font-size: 0.9rem; height: 44px; }
     .view-mode .kunishu-list-header, .view-mode .kunishu-list-item { grid-template-columns: 140px 80px 80px 80px; }
-    .faction-list-header, .faction-list-item { grid-template-columns: 140px 80px 100px 100px 1fr; font-size: 0.95rem; height: 40px; }
-    .list-container, .daimyo-list-container, .result-body, .faction-list-container, .princess-list-container { scroll-padding-top: 40px; }
+    .faction-list-header, .faction-list-item { grid-template-columns: 140px 80px 100px 100px 1fr; font-size: 0.95rem; height: 44px; }
+    .princess-list-header, .princess-list-item { grid-template-columns: 95px 80px 100px 100px 1fr; font-size: 0.95rem; height: 44px; }
+    .list-container, .daimyo-list-container, .result-body, .faction-list-container, .princess-list-container { scroll-padding-top: 44px; }
     
     /* モーダル拡張（輸送・兵力分配）のタイル化を解除して縦並びに統一 */
     #quantity-modal .modal-content, #unit-divide-modal .modal-content { max-width: 700px !important; max-height: 90% !important; }
@@ -1212,53 +1213,6 @@ body.is-pc {
     .label-sp-flex { display: none !important; }
 }
 
-/* =========================================================
-   ★ 姫一覧専用の魔法（派閥一覧を参考にした完全独立版）
-   ========================================================= */
-.princess-list-container {
-    /* ★変更：姫一覧も同様にスクロールバーの太さを足します！ */
-    flex: none; width: 100%; height: calc(36px * 9 + 26px); box-sizing: border-box; overflow-y: scroll; scroll-snap-type: y mandatory; border: 1px solid #ddd; scroll-padding-top: 36px; border-radius: 4px; -webkit-overflow-scrolling: auto; overscroll-behavior: none;
-}
-.princess-list-container::-webkit-scrollbar { width: 14px; height: 14px; -webkit-appearance: none; }
-.princess-list-container::-webkit-scrollbar-track { background: #e0e0e0; border-left: 1px solid #ccc; }
-.princess-list-container::-webkit-scrollbar-thumb { background: #78909c; border: 2px solid #e0e0e0; }
-.princess-list-container::-webkit-scrollbar-thumb:hover { background: #546e7a; }
-
-.princess-list-header, .princess-list-item {
-    display: grid;
-    grid-template-columns: 1.3fr 1fr 1.5fr 1.5fr 3fr;
-    font-size: clamp(0.7rem, 2.8vw, 0.95rem);
-    padding: 0; height: 36px; gap: 0; box-sizing: border-box;
-}
-
-.princess-list-header > span, .princess-list-item > span, .princess-list-item > strong {
-    border-right: 1px solid #ddd; padding: 0 2px;
-    display: flex; align-items: center; justify-content: center;
-    box-sizing: border-box; overflow: hidden; white-space: nowrap; text-overflow: ellipsis;
-}
-.princess-list-header > span { border-right: 1px solid #546e7a; }
-.princess-list-header > span:last-child, .princess-list-item > span:last-child { border-right: none; }
-
-.princess-list-header {
-    background: #37474f; color: #fff; font-weight: bold; position: sticky; top: 0; z-index: 10;
-}
-
-.princess-list-item {
-    border-bottom: 2px solid #e0e0e0; scroll-snap-align: start; cursor: pointer; color: var(--text-color);
-}
-.princess-list-item:nth-child(even) { background-color: #f0f4f8; }
-.princess-list-item:hover { background-color: #e3f2fd !important; }
-
-/* 名前だけ左寄せにする魔法 */
-.princess-list-item .col-princess-name {
-    justify-content: flex-start !important; padding-left: 5px;
-}
-
-/* パソコンで見た時の幅設定 */
-body.is-pc .princess-list-header, body.is-pc .princess-list-item {
-    grid-template-columns: 95px 80px 100px 100px 1fr;
-    font-size: 0.95rem; height: 40px;
-}
 /* =========================================================
    ★ 撤退先選択専用の魔法（完全独立版）
    ========================================================= */
