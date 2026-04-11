@@ -128,30 +128,43 @@ class CustomScrollbar {
             this.lockAxis = null;
             this.startY = e.touches[0].clientY;
             this.startX = e.touches[0].clientX;
-            this.startScrollTop = this.list.scrollTop;
-            this.startScrollLeft = this.list.scrollLeft;
+            // 一度スクロール制限を解除しておきます
+            this.list.style.overflowX = 'auto';
+            this.list.style.overflowY = 'scroll';
         }, { passive: true });
 
         this.list.addEventListener('touchmove', (e) => {
             if (e.touches.length > 1) return;
+            
+            // すでに動かす方向（軸）が決まっている場合は何もしません
+            if (this.lockAxis) return;
+
             const currentY = e.touches[0].clientY;
             const currentX = e.touches[0].clientX;
             const diffY = Math.abs(currentY - this.startY);
             const diffX = Math.abs(currentX - this.startX);
 
-            if (!this.lockAxis) {
-                if (diffX > 5 || diffY > 5) {
-                    this.lockAxis = diffX > diffY ? 'x' : 'y';
+            // 指が5ピクセル以上動いた時に、どっちに動かしたいのか判定します
+            if (diffX > 5 || diffY > 5) {
+                this.lockAxis = diffX > diffY ? 'x' : 'y';
+                
+                // 動かさない方向のスクロールを一時的に禁止する魔法です！
+                if (this.lockAxis === 'x') {
+                    this.list.style.overflowY = 'hidden';
+                } else if (this.lockAxis === 'y') {
+                    this.list.style.overflowX = 'hidden';
                 }
             }
+        }, { passive: true });
 
-            // 横に動かしている時は縦の動きを打ち消し、縦の時は横を打ち消します
-            if (this.lockAxis === 'x') {
-                this.list.scrollTop = this.startScrollTop;
-            } else if (this.lockAxis === 'y') {
-                this.list.scrollLeft = this.startScrollLeft;
-            }
-        }, { passive: false });
+        // 指を離した時や、画面外に出た時にスクロール制限を元に戻します
+        const onListTouchEnd = () => {
+            this.lockAxis = null;
+            this.list.style.overflowX = 'auto';
+            this.list.style.overflowY = 'scroll';
+        };
+        this.list.addEventListener('touchend', onListTouchEnd, { passive: true });
+        this.list.addEventListener('touchcancel', onListTouchEnd, { passive: true });
 
         this.list.addEventListener('scroll', () => {
             if (!this.isDraggingY && !this.isDraggingX) this.update();
