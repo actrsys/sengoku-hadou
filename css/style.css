@@ -241,6 +241,7 @@ body.hide-daimyo-labels .daimyo-name-label { display: none !important; }
     -ms-overflow-style: none; scrollbar-width: none; border: none !important; flex: 1; min-width: 0; /* ★横幅が窮屈な時に縮む魔法を追加！ */
     overflow-y: scroll; /* 縦は常に許可 */
     overflow-x: auto;   /* 横にはみ出た時だけ左右スクロールを許可 */
+    overscroll-behavior: none; /* ★バウンド（ゴムバンド効果）を消す魔法 */
 }
 
 /* ★新しく追加する縦スクロールボタンの魔法 */
@@ -296,9 +297,9 @@ body.hide-daimyo-labels .daimyo-name-label { display: none !important; }
 
 /* リストベース */
 /* ★変更：スクロールバーの太さ（24px）を足して、重ならないように領域を分離します！ */
-.list-container, .daimyo-list-container, .faction-list-container, .princess-list-container { flex: none; width: 100%; height: calc(36px * 9 + 26px); overflow-y: scroll; scroll-snap-type: y mandatory; border: 1px solid #ddd; scroll-padding-top: 36px; box-sizing: border-box; -webkit-overflow-scrolling: auto; }
+.list-container, .daimyo-list-container, .faction-list-container, .princess-list-container { flex: none; width: 100%; height: calc(36px * 9 + 26px); overflow-y: scroll; scroll-snap-type: y mandatory; border: 1px solid #ddd; scroll-padding-top: 36px; box-sizing: border-box; -webkit-overflow-scrolling: auto; overscroll-behavior: none; }
 .faction-list-container { border-radius: 4px; }
-.result-body { flex: 1; width: 100%; overflow-y: auto; min-height: 0; margin-bottom: 0 !important; padding-bottom: 10px; box-sizing: border-box; }
+.result-body { flex: 1; width: 100%; overflow-y: auto; min-height: 0; margin-bottom: 0 !important; padding-bottom: 10px; box-sizing: border-box; overscroll-behavior: none; }
 /* .select-item:last-child などの margin-bottom: 25px; を削除（固定高さに干渉するため） */
 .select-item:last-child, .daimyo-list-item:last-child, .kunishu-list-item:last-child, .faction-list-item:last-child { margin-bottom: 0; }
 
@@ -417,7 +418,7 @@ body.hide-daimyo-labels .daimyo-name-label { display: none !important; }
 #diplo-list-modal { z-index: 8400; }
 #dialog-modal { z-index: 9500 !important; }
 
-.modal-content { background: #fff; padding: 20px; border-radius: 8px; width: 90%; max-width: 800px; max-height: calc(95% - 60px); display: flex; flex-direction: column; box-shadow: 0 10px 25px rgba(0,0,0,0.5); position: relative; overflow-y: auto !important; overflow-x: hidden !important; }
+.modal-content { background: #fff; padding: 20px; border-radius: 8px; width: 90%; max-width: 800px; max-height: calc(95% - 60px); display: flex; flex-direction: column; box-shadow: 0 10px 25px rgba(0,0,0,0.5); position: relative; overflow-y: auto !important; overflow-x: hidden !important; overscroll-behavior: none; }
 .modal-content h3 { margin-top: 0; margin-bottom: 15px; border-bottom: 2px solid #ddd; padding-bottom: 10px; }
 .modal-content h3:empty { display: none !important; border: none !important; padding: 0 !important; margin: 0 !important; }
 .context-info { margin-bottom: 10px; padding: 10px; background: #e8eaf6; border-radius: 4px; font-size: 0.9rem; }
@@ -1216,7 +1217,7 @@ body.is-pc {
    ========================================================= */
 .princess-list-container {
     /* ★変更：姫一覧も同様にスクロールバーの太さを足します！ */
-    flex: none; width: 100%; height: calc(36px * 9 + 26px); box-sizing: border-box; overflow-y: scroll; scroll-snap-type: y mandatory; border: 1px solid #ddd; scroll-padding-top: 36px; border-radius: 4px; -webkit-overflow-scrolling: auto;
+    flex: none; width: 100%; height: calc(36px * 9 + 26px); box-sizing: border-box; overflow-y: scroll; scroll-snap-type: y mandatory; border: 1px solid #ddd; scroll-padding-top: 36px; border-radius: 4px; -webkit-overflow-scrolling: auto; overscroll-behavior: none;
 }
 .princess-list-container::-webkit-scrollbar { width: 14px; height: 14px; -webkit-appearance: none; }
 .princess-list-container::-webkit-scrollbar-track { background: #e0e0e0; border-left: 1px solid #ccc; }
