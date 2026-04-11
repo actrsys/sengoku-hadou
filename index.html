@@ -169,6 +169,60 @@
             </div>
         </div>
 
+        <div id="daimyo-list-modal" class="modal hidden">
+            <div class="modal-content" style="max-width: 800px; text-align: left;">
+                <h3 style="margin-top:0; margin-bottom: 15px;">勢力一覧</h3>
+                
+                <div style="display: flex; gap: 15px; margin-bottom: 10px; align-items: center;">
+                    <div style="display: flex; gap: 5px;">
+                        <button class="busho-tab-btn active" style="cursor: default; pointer-events: none;">基本</button>
+                    </div>
+                </div>
+
+                <div id="daimyo-list" class="daimyo-list-container" style="overflow-y: auto; overflow-x: auto;"></div>
+                
+                <div class="modal-footer" style="justify-content: center;">
+                    <button class="btn-secondary" onclick="document.getElementById('daimyo-list-modal').classList.add('hidden')">閉じる</button>
+                </div>
+            </div>
+        </div>
+
+        <div id="faction-list-modal" class="modal hidden">
+            <div class="modal-content" style="max-width: 800px; text-align: left;">
+                <h3 id="faction-list-title" style="margin-top:0; margin-bottom: 15px;">派閥一覧</h3>
+                
+                <div style="display: flex; gap: 15px; margin-bottom: 10px; align-items: center;">
+                    <div style="display: flex; gap: 5px;">
+                        <button class="busho-tab-btn active" style="cursor: default; pointer-events: none;">基本</button>
+                    </div>
+                </div>
+
+                <div id="faction-list" class="faction-list-container" style="overflow-y: auto; overflow-x: auto;"></div>
+                
+                <div class="modal-footer" id="faction-list-footer" style="justify-content: center;">
+                    <button class="btn-secondary" onclick="document.getElementById('faction-list-modal').classList.add('hidden')">閉じる</button>
+                </div>
+            </div>
+        </div>
+
+        <div id="princess-list-modal" class="modal hidden">
+            <div class="modal-content" style="max-width: 800px; text-align: left;">
+                <h3 id="princess-list-title" style="margin-top:0; margin-bottom: 15px;">姫一覧</h3>
+                
+                <div style="display: flex; gap: 15px; margin-bottom: 10px; align-items: center;">
+                    <div style="display: flex; gap: 5px;">
+                        <button class="busho-tab-btn active" style="cursor: default; pointer-events: none;">基本</button>
+                    </div>
+                </div>
+
+                <div id="princess-list" class="princess-list-container" style="overflow-y: auto; overflow-x: auto;"></div>
+                
+                <div class="modal-footer" id="princess-list-footer" style="justify-content: center;">
+                    <button class="btn-secondary" onclick="document.getElementById('princess-list-modal').classList.add('hidden')">閉じる</button>
+                </div>
+            </div>
+        </div>
+
         <div id="delegate-list-modal" class="modal hidden">
             <div class="modal-content" style="max-width: 600px;">
                 

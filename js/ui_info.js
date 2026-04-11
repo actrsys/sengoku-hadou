@@ -6,7 +6,7 @@ class UIInfoManager {
     }
     
     showDaimyoList() {
-        let listHtml = '<div style="display: flex; gap: 15px; margin-bottom: 10px; align-items: center;"><div style="display: flex; gap: 5px;"><button class="busho-tab-btn active" style="cursor: default; pointer-events: none;">基本</button></div></div><div class="daimyo-list-container"><div class="daimyo-list-header"><span>勢力名</span><span>当主名</span><span>城数</span><span>威信</span><span>友好度</span><span>関係</span></div>';
+        let listHtml = '<div class="daimyo-list-header"><span>勢力名</span><span>当主名</span><span>城数</span><span>威信</span><span>友好度</span><span>関係</span></div>';
         
         const activeClans = this.game.clans.filter(c => c.id !== 0 && this.game.castles.some(cs => cs.ownerClan === c.id));
         
@@ -45,12 +45,10 @@ class UIInfoManager {
                 const relation = this.game.getRelation(this.game.playerClanId, d.id);
                 if (relation) {
                     friendScore = relation.sentiment;
-                    // ★変更：内部の status ではなく、見た目用の displayStatus を使います！
                     friendStatus = relation.displayStatus || relation.status; 
                     hasRelation = true;
                     if (friendStatus === '敵対') statusColor = 'color:#d32f2f;';
                     else if (friendStatus === '友好') statusColor = 'color:#388e3c;';
-                    // ★変更：青色にする条件のリストに '婚姻' も仲間入りさせます！
                     else if (['同盟', '支配', '従属', '婚姻'].includes(friendStatus)) statusColor = 'color:#1976d2;';
                 }
             }
@@ -73,31 +71,12 @@ class UIInfoManager {
         for (let i = itemCount; i < 8; i++) {
             listHtml += `<div class="daimyo-list-item" style="cursor:default; pointer-events:none;"><span></span><span></span><span></span><span></span><span></span><span></span></div>`;
         }
-        listHtml += '</div>';
         
-        this.ui.showResultModal(listHtml, () => {
-            if (this.ui.resultBody) {
-                this.ui.resultBody.style.overflowY = '';
-                this.ui.resultBody.style.display = '';
-                this.ui.resultBody.style.flexDirection = '';
-            }
-        });
-
-        // 武将一覧や拠点一覧と同じ構造（リストの外側）にタイトルを配置して統一します
-        if (this.ui.resultBody && this.ui.resultBody.parentElement) {
-            let titleEl = this.ui.resultBody.parentElement.querySelector('h3');
-            if (!titleEl) {
-                titleEl = document.createElement('h3');
-                this.ui.resultBody.parentElement.insertBefore(titleEl, this.ui.resultBody);
-            }
-            titleEl.textContent = '勢力一覧';
-            titleEl.style.display = '';
-        }
-
-        if (this.ui.resultBody) {
-            this.ui.resultBody.style.overflowY = 'hidden';
-            this.ui.resultBody.style.display = 'flex';
-            this.ui.resultBody.style.flexDirection = 'column';
+        const modal = document.getElementById('daimyo-list-modal');
+        const listContainer = document.getElementById('daimyo-list');
+        if (modal && listContainer) {
+            listContainer.innerHTML = listHtml;
+            modal.classList.remove('hidden');
         }
     }
 
@@ -296,7 +275,7 @@ class UIInfoManager {
             return factions[b].count - factions[a].count; 
         });
         
-        let listHtml = `<div style="display: flex; gap: 15px; margin-bottom: 10px; align-items: center;"><div style="display: flex; gap: 5px;"><button class="busho-tab-btn active" style="cursor: default; pointer-events: none;">基本</button></div></div><div class="faction-list-container"><div class="faction-list-header"><span>派閥主</span><span>武将数</span><span>方針</span><span>思想</span><span></span></div>`;
+        let listHtml = `<div class="faction-list-header"><span>派閥主</span><span>武将数</span><span>方針</span><span>思想</span><span></span></div>`;
         
         if (fIds.length === 0) {
             listHtml += `<div style="padding:10px;">派閥はありません。</div>`;
@@ -337,43 +316,28 @@ class UIInfoManager {
         
         let itemCount = fIds.length + (nonFactionCount > 0 ? 1 : 0);
         if (itemCount === 0) {
-            itemCount = 1; // 「派閥はありません。」のメッセージ分
+            itemCount = 1; 
         }
         for (let i = itemCount; i < 8; i++) {
             listHtml += `<div class="faction-list-item" style="cursor:default; pointer-events:none;"><span></span><span></span><span></span><span></span><span></span></div>`;
         }
-        
-        listHtml += `</div>`;
 
-        let customFooter = "";
-        if (isDirect) {
-            customFooter = `<button class="btn-secondary" onclick="window.GameApp.ui.closeResultModal()">閉じる</button>`;
-        } else {
-            customFooter = `<button class="btn-secondary" onclick="window.GameApp.ui.showDaimyoList()">閉じる</button>`;
-        }
-        
-        this.ui.showResultModal(listHtml, () => {
-            if (this.ui.resultBody) {
-                this.ui.resultBody.style.overflowY = '';
-                this.ui.resultBody.style.display = '';
-                this.ui.resultBody.style.flexDirection = '';
+        const modal = document.getElementById('faction-list-modal');
+        const title = document.getElementById('faction-list-title');
+        const listContainer = document.getElementById('faction-list');
+        const footer = document.getElementById('faction-list-footer');
+
+        if (modal && title && listContainer && footer) {
+            title.textContent = `${clan.name} 派閥一覧`;
+            listContainer.innerHTML = listHtml;
+            
+            if (isDirect) {
+                footer.innerHTML = `<button class="btn-secondary" onclick="document.getElementById('faction-list-modal').classList.add('hidden')">閉じる</button>`;
+            } else {
+                footer.innerHTML = `<button class="btn-secondary" onclick="document.getElementById('faction-list-modal').classList.add('hidden'); window.GameApp.ui.showDaimyoList()">閉じる</button>`;
             }
-        }, customFooter);
-
-        if (this.ui.resultBody && this.ui.resultBody.parentElement) {
-            let titleEl = this.ui.resultBody.parentElement.querySelector('h3');
-            if (!titleEl) {
-                titleEl = document.createElement('h3');
-                this.ui.resultBody.parentElement.insertBefore(titleEl, this.ui.resultBody);
-            }
-            titleEl.textContent = `${clan.name} 派閥一覧`;
-            titleEl.style.display = '';
-        }
-
-        if (this.ui.resultBody) {
-            this.ui.resultBody.style.overflowY = 'hidden';
-            this.ui.resultBody.style.display = 'flex';
-            this.ui.resultBody.style.flexDirection = 'column';
+            
+            modal.classList.remove('hidden');
         }
     }
 
@@ -672,8 +636,7 @@ class UIInfoManager {
             princesses = princesses.filter(p => p.status === 'unmarried');
         }
         
-        // 見出しを作ります（新しく作った princess-list 用の枠組みを使います！）
-        let listHtml = '<div style="display: flex; gap: 15px; margin-bottom: 10px; align-items: center;"><div style="display: flex; gap: 5px;"><button class="busho-tab-btn active" style="cursor: default; pointer-events: none;">基本</button></div></div><div class="princess-list-container"><div class="princess-list-header"><span>名前</span><span>年齢</span><span>父親</span><span>配偶者</span><span></span></div>';
+        let listHtml = '<div class="princess-list-header"><span>名前</span><span>年齢</span><span>父親</span><span>配偶者</span><span></span></div>';
 
         // 姫を一人ずつリストに並べていきます
         princesses.forEach(p => {
@@ -689,15 +652,12 @@ class UIInfoManager {
             // 選ぶ時だけ、押した時の魔法（onClick）と指マーク（cursor）をつけます
             if (isSelectMode) {
                 cursorStr = "style='cursor:pointer;'";
-                // ★変更：クリックしたら「選択状態（オレンジ色）」にするだけの魔法に変えます！
                 onClickStr = `onclick="window.GameApp.ui.info.selectPrincess(${p.id}, this)"`;
             }
 
-            // 1人分の行を作ります（他のリストと同じように、空白や改行をなくして1行にまとめます！）
             listHtml += `<div class="princess-list-item" ${cursorStr} ${onClickStr}><strong class="col-princess-name">${p.name}</strong><span>${age}歳</span><span>${fatherName}</span><span>${husbandName}</span><span></span></div>`;
         });
         
-        // もし一人もいなかったら
         let itemCount = princesses.length;
         if (itemCount === 0) {
             listHtml += `<div style="padding: 15px; text-align: center;">姫はいません。</div>`;
@@ -708,50 +668,31 @@ class UIInfoManager {
             listHtml += `<div class="princess-list-item" style="cursor:default; pointer-events:none;"><span></span><span></span><span></span><span></span><span></span></div>`;
         }
 
-        listHtml += '</div>';
-
-        const title = isSelectMode ? "嫁がせる姫を選択してください" : "姫一覧";
-        let customFooter = "";
+        const titleStr = isSelectMode ? "嫁がせる姫を選択してください" : "姫一覧";
         
-       // 戻るボタンや決定ボタンの動きを作ります
-        if (!isSelectMode) {
-            // 見るだけの時は普通に閉じるだけ
-            customFooter = `<button class="btn-secondary" onclick="window.GameApp.ui.closeResultModal()">閉じる</button>`;
-        } else {
-            // ★変更：「決定」→「戻る」の順番に戻して、右下にピシッと寄せます！
-            this.selectedPrincessId = null;
-            customFooter = `
-                <div style="display: flex; gap: 10px; justify-content: flex-end; width: 100%;">
-                    <button id="princess-confirm-btn" class="btn-primary" disabled style="opacity: 0.5; cursor: not-allowed;" onclick="window.GameApp.ui.info.confirmPrincessSelection(${targetCastleId}, ${doerId})">決定</button>
-                    <button class="btn-secondary" onclick="window.GameApp.ui.openBushoSelector('diplomacy_doer', ${targetCastleId}, { subAction: 'marriage' }); window.GameApp.ui.closeResultModal();">戻る</button>
-                </div>
-            `;
-        }
+        const modal = document.getElementById('princess-list-modal');
+        const title = document.getElementById('princess-list-title');
+        const listContainer = document.getElementById('princess-list');
+        const footer = document.getElementById('princess-list-footer');
 
-        // 出来上がった画面を、いつもの小窓（モーダル）に表示してもらいます
-        this.ui.showResultModal(listHtml, () => {
-            if (this.ui.resultBody) {
-                this.ui.resultBody.style.overflowY = '';
-                this.ui.resultBody.style.display = '';
-                this.ui.resultBody.style.flexDirection = '';
+        if (modal && title && listContainer && footer) {
+            title.textContent = titleStr;
+            listContainer.innerHTML = listHtml;
+            
+            // 戻るボタンや決定ボタンの動きを作ります
+            if (!isSelectMode) {
+                footer.innerHTML = `<button class="btn-secondary" onclick="document.getElementById('princess-list-modal').classList.add('hidden')">閉じる</button>`;
+            } else {
+                this.selectedPrincessId = null;
+                footer.innerHTML = `
+                    <div style="display: flex; gap: 10px; justify-content: flex-end; width: 100%;">
+                        <button id="princess-confirm-btn" class="btn-primary" disabled style="opacity: 0.5; cursor: not-allowed;" onclick="window.GameApp.ui.info.confirmPrincessSelection(${targetCastleId}, ${doerId})">決定</button>
+                        <button class="btn-secondary" onclick="window.GameApp.ui.openBushoSelector('diplomacy_doer', ${targetCastleId}, { subAction: 'marriage' }); document.getElementById('princess-list-modal').classList.add('hidden');">戻る</button>
+                    </div>
+                `;
             }
-        }, customFooter);
 
-        if (this.ui.resultBody && this.ui.resultBody.parentElement) {
-            let titleEl = this.ui.resultBody.parentElement.querySelector('h3');
-            if (!titleEl) {
-                titleEl = document.createElement('h3');
-                this.ui.resultBody.parentElement.insertBefore(titleEl, this.ui.resultBody);
-            }
-            titleEl.textContent = title;
-            titleEl.style.display = '';
-        }
-
-        // スクロールできるように整えます
-        if (this.ui.resultBody) {
-            this.ui.resultBody.style.overflowY = 'hidden';
-            this.ui.resultBody.style.display = 'flex';
-            this.ui.resultBody.style.flexDirection = 'column';
+            modal.classList.remove('hidden');
         }
     }
 
@@ -800,7 +741,7 @@ class UIInfoManager {
         
         // 記憶をリセットしておきます
         this.selectedPrincessId = null; 
-        window.GameApp.ui.closeResultModal();
+        document.getElementById('princess-list-modal').classList.add('hidden');
     }
 
     // ==========================================
