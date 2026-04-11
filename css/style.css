@@ -243,16 +243,28 @@ body.hide-daimyo-labels .daimyo-name-label { display: none !important; }
     overflow-x: auto;   /* 横にはみ出た時だけ左右スクロールを許可 */
 }
 
+/* ★新しく追加する縦スクロールボタンの魔法 */
+.custom-scrollbar-btn {
+    position: absolute; right: 0; width: 24px; height: 24px;
+    background-color: #e0e0e0; border-left: 1px solid #ccc; z-index: 51;
+    display: flex; justify-content: center; align-items: center;
+    cursor: pointer; font-size: 10px; color: #555;
+    -webkit-user-select: none; user-select: none;
+}
+.custom-scrollbar-btn:active { background-color: #cfd8dc; }
+.custom-scrollbar-btn.up { top: 0; border-bottom: 1px solid #ccc; }
+.custom-scrollbar-btn.down { bottom: 24px; border-top: 1px solid #ccc; }
+
 /* 縦用スクロールバー */
 .custom-scrollbar-track {
-    position: absolute; top: 0; right: 0; width: 24px; bottom: 24px;
+    position: absolute; top: 24px; right: 0; width: 24px; bottom: 48px; /* ★上下にボタンを置くので隙間を空けます */
     background-color: #f5f5f5;
     border-left: 1px solid #ccc; z-index: 50; touch-action: none;
-    display: block !important; /* スクリプト側で消されないように強制表示します */
+    display: block !important;
 }
 .custom-scrollbar-thumb {
     position: absolute; top: 0; left: 2px; right: 2px; min-height: 40px;
-    background-color: #78909c; border: 2px solid #e0e0e0; border-radius: 12px;
+    background-color: #78909c; border: 2px solid #e0e0e0; border-radius: 0; /* ★丸みをなくして四角くします */
     cursor: pointer; touch-action: none; transition: background-color 0.2s;
 }
 .custom-scrollbar-thumb:active, .custom-scrollbar-thumb.dragging {
@@ -268,7 +280,7 @@ body.hide-daimyo-labels .daimyo-name-label { display: none !important; }
 }
 .custom-scrollbar-thumb-x {
     position: absolute; left: 0; top: 2px; bottom: 2px; min-width: 40px;
-    background-color: #78909c; border: 2px solid #e0e0e0; border-radius: 12px;
+    background-color: #78909c; border: 2px solid #e0e0e0; border-radius: 0; /* ★丸みをなくして四角くします */
     cursor: pointer; touch-action: none; transition: background-color 0.2s;
 }
 .custom-scrollbar-thumb-x:active, .custom-scrollbar-thumb-x.dragging {

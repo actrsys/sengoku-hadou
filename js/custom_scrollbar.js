@@ -35,6 +35,26 @@ class CustomScrollbar {
         this.thumbY.className = 'custom-scrollbar-thumb';
         this.trackY.appendChild(this.thumbY);
         this.wrapper.appendChild(this.trackY);
+
+        // ★縦用の上ボタン（▲）を作る魔法
+        this.btnUp = document.createElement('div');
+        this.btnUp.className = 'custom-scrollbar-btn up';
+        this.btnUp.innerHTML = '▲';
+        this.wrapper.appendChild(this.btnUp);
+
+        // ★縦用の下ボタン（▼）を作る魔法
+        this.btnDown = document.createElement('div');
+        this.btnDown.className = 'custom-scrollbar-btn down';
+        this.btnDown.innerHTML = '▼';
+        this.wrapper.appendChild(this.btnDown);
+
+        // ★ボタンを押した時に１行分（約36px）スクロールする魔法
+        this.btnUp.addEventListener('click', () => {
+            this.list.scrollBy({ top: -36, behavior: 'smooth' });
+        });
+        this.btnDown.addEventListener('click', () => {
+            this.list.scrollBy({ top: 36, behavior: 'smooth' });
+        });
         
         // ★横用のバー（新しく追加！）
         this.trackX = document.createElement('div');
@@ -59,6 +79,7 @@ class CustomScrollbar {
         // --- 縦のバーの更新 ---
         const listHeight = this.list.clientHeight;
         const scrollHeight = this.list.scrollHeight;
+        const trackHeight = this.trackY.clientHeight || listHeight; // ★トラックの実際の高さを測る魔法
         
         // 縦バーの表示状態を固定し、中身のサイズに応じてつまみを調整します
         if (scrollHeight <= listHeight) {
@@ -67,11 +88,12 @@ class CustomScrollbar {
             this.thumbY.style.pointerEvents = 'none';
         } else {
             this.thumbY.style.pointerEvents = 'auto';
-            let thumbHeight = Math.max(40, (listHeight / scrollHeight) * listHeight);
+            // ★つまみの高さや動く範囲も、トラックの高さに合わせて計算します
+            let thumbHeight = Math.max(40, (listHeight / scrollHeight) * trackHeight);
             this.thumbY.style.height = `${thumbHeight}px`;
             
             const maxScrollTop = scrollHeight - listHeight;
-            const maxThumbTop = listHeight - thumbHeight;
+            const maxThumbTop = trackHeight - thumbHeight;
             const scrollRatioY = this.list.scrollTop / maxScrollTop;
             this.thumbY.style.top = `${scrollRatioY * maxThumbTop}px`;
         }
@@ -150,10 +172,11 @@ class CustomScrollbar {
             
             const listHeight = this.list.clientHeight;
             const scrollHeight = this.list.scrollHeight;
+            const trackHeight = this.trackY.clientHeight || listHeight; // ★ここもトラックの高さにする魔法！
             const thumbHeight = parseFloat(this.thumbY.style.height);
             
             const maxScrollTop = scrollHeight - listHeight;
-            const maxThumbTop = listHeight - thumbHeight;
+            const maxThumbTop = trackHeight - thumbHeight; // ★トラックの高さを使います
             
             const scrollRatio = deltaY / maxThumbTop;
             this.list.scrollTop = this.startScrollTop + (scrollRatio * maxScrollTop);
