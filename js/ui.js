@@ -289,6 +289,9 @@ class UIManager {
 
             // ★追加：合戦のコマンドボタンは個別に音を鳴らすので、共通の音をキャンセルします！
             if (btn.closest('#war-controls')) return;
+            
+            // ★追加：タブ切り替えボタンも個別に音を鳴らすので、共通の音をキャンセルします！
+            if (btn.classList.contains('busho-tab-btn') || btn.classList.contains('busho-scope-btn')) return;
 
             const text = btn.textContent.trim();
             
