@@ -75,13 +75,24 @@ class UIInfoManager {
         }
         listHtml += '</div>';
         
-        this.ui.showResultModal(`<h3 style="margin-top:-15px; border-bottom: 2px solid #ddd; padding-bottom: 10px; flex-shrink:0;">勢力一覧</h3>${listHtml}`, () => {
+        this.ui.showResultModal(listHtml, () => {
             if (this.ui.resultBody) {
                 this.ui.resultBody.style.overflowY = '';
                 this.ui.resultBody.style.display = '';
                 this.ui.resultBody.style.flexDirection = '';
             }
         });
+
+        // 武将一覧や拠点一覧と同じ構造（リストの外側）にタイトルを配置して統一します
+        if (this.ui.resultBody && this.ui.resultBody.parentElement) {
+            let titleEl = this.ui.resultBody.parentElement.querySelector('h3');
+            if (!titleEl) {
+                titleEl = document.createElement('h3');
+                this.ui.resultBody.parentElement.insertBefore(titleEl, this.ui.resultBody);
+            }
+            titleEl.textContent = '勢力一覧';
+            titleEl.style.display = '';
+        }
 
         if (this.ui.resultBody) {
             this.ui.resultBody.style.overflowY = 'hidden';
@@ -341,13 +352,23 @@ class UIInfoManager {
             customFooter = `<button class="btn-secondary" onclick="window.GameApp.ui.showDaimyoList()">閉じる</button>`;
         }
         
-        this.ui.showResultModal(`<h3 style="margin-top:-15px; border-bottom: 2px solid #ddd; padding-bottom: 10px; flex-shrink:0;">${clan.name} 派閥一覧</h3>${listHtml}`, () => {
+        this.ui.showResultModal(listHtml, () => {
             if (this.ui.resultBody) {
                 this.ui.resultBody.style.overflowY = '';
                 this.ui.resultBody.style.display = '';
                 this.ui.resultBody.style.flexDirection = '';
             }
         }, customFooter);
+
+        if (this.ui.resultBody && this.ui.resultBody.parentElement) {
+            let titleEl = this.ui.resultBody.parentElement.querySelector('h3');
+            if (!titleEl) {
+                titleEl = document.createElement('h3');
+                this.ui.resultBody.parentElement.insertBefore(titleEl, this.ui.resultBody);
+            }
+            titleEl.textContent = `${clan.name} 派閥一覧`;
+            titleEl.style.display = '';
+        }
 
         if (this.ui.resultBody) {
             this.ui.resultBody.style.overflowY = 'hidden';
@@ -708,13 +729,23 @@ class UIInfoManager {
         }
 
         // 出来上がった画面を、いつもの小窓（モーダル）に表示してもらいます
-        this.ui.showResultModal(`<h3 style="margin-top:-15px; border-bottom: 2px solid #ddd; padding-bottom: 10px; flex-shrink:0;">${title}</h3>${listHtml}`, () => {
+        this.ui.showResultModal(listHtml, () => {
             if (this.ui.resultBody) {
                 this.ui.resultBody.style.overflowY = '';
                 this.ui.resultBody.style.display = '';
                 this.ui.resultBody.style.flexDirection = '';
             }
         }, customFooter);
+
+        if (this.ui.resultBody && this.ui.resultBody.parentElement) {
+            let titleEl = this.ui.resultBody.parentElement.querySelector('h3');
+            if (!titleEl) {
+                titleEl = document.createElement('h3');
+                this.ui.resultBody.parentElement.insertBefore(titleEl, this.ui.resultBody);
+            }
+            titleEl.textContent = title;
+            titleEl.style.display = '';
+        }
 
         // スクロールできるように整えます
         if (this.ui.resultBody) {
