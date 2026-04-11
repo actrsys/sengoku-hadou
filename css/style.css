@@ -282,10 +282,11 @@ body.hide-daimyo-labels .daimyo-name-label { display: none !important; }
 }
 
 /* リストベース */
-.list-container, .daimyo-list-container, .faction-list-container { flex: 1; overflow-y: scroll; min-height: 200px; scroll-snap-type: y mandatory; border: 1px solid #ddd; scroll-padding-top: 32px; -webkit-overflow-scrolling: auto; }
-.faction-list-container { min-height: 150px; border-radius: 4px; }
+.list-container, .daimyo-list-container, .faction-list-container { flex: none; height: calc(36px * 9 + 2px); overflow-y: scroll; scroll-snap-type: y mandatory; border: 1px solid #ddd; scroll-padding-top: 36px; box-sizing: border-box; -webkit-overflow-scrolling: auto; }
+.faction-list-container { border-radius: 4px; }
 .result-body { flex: 1; overflow-y: auto; min-height: 0; margin-bottom: 0 !important; padding-bottom: 10px; }
-.select-item:last-child, .daimyo-list-item:last-child, .kunishu-list-item:last-child, .faction-list-item:last-child { margin-bottom: 25px; }
+/* .select-item:last-child などの margin-bottom: 25px; を削除（固定高さに干渉するため） */
+.select-item:last-child, .daimyo-list-item:last-child, .kunishu-list-item:last-child, .faction-list-item:last-child { margin-bottom: 0; }
 
 /* 縦の区切り線 */
 .list-header > span, .select-item > span, .daimyo-list-header > span, .daimyo-list-item > span, .kunishu-list-header > span, .kunishu-list-item > span, .kunishu-list-header > strong, .kunishu-list-item > strong, .faction-list-header > span, .faction-list-item > span, .faction-list-item > strong { border-right: 1px solid #ddd; padding: 0 2px; display: flex; align-items: center; justify-content: center; box-sizing: border-box; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
@@ -304,12 +305,12 @@ body.hide-daimyo-labels .daimyo-name-label { display: none !important; }
 .select-item .col-name, .daimyo-list-item .col-daimyo-name, .daimyo-list-item .col-leader-name, .kunishu-list-item .col-kunishu-name, .faction-list-item .col-faction-name { justify-content: flex-start !important; padding-left: 5px; }
 
 /* 各種リストの基本グリッド（スマホ向けベース） */
-.list-header, .select-item { display: grid; grid-template-columns: 35px 2.5fr 1.5fr repeat(6, 1fr); font-size: clamp(0.6rem, 2.2vw, 0.85rem); padding: 0; min-height: 30px; gap: 0; }
+.list-header, .select-item { display: grid; grid-template-columns: 35px 2.5fr 1.5fr repeat(6, 1fr); font-size: clamp(0.6rem, 2.2vw, 0.85rem); padding: 0; height: 36px; gap: 0; box-sizing: border-box; }
 .list-header.view-mode, .select-item.view-mode { grid-template-columns: 2.5fr 1.5fr repeat(6, 1fr); }
-.daimyo-list-header, .daimyo-list-item { display: grid; grid-template-columns: 2fr 2fr 1fr 1.5fr 1.5fr 1fr; font-size: clamp(0.65rem, 2.5vw, 0.9rem); padding: 0; min-height: 30px; gap: 0; }
-.kunishu-list-header, .kunishu-list-item { display: grid; grid-template-columns: 20px 3fr 1.5fr 1.5fr 1.5fr; font-size: clamp(0.7rem, 2.8vw, 0.9rem); padding: 0; min-height: 30px; gap: 0; }
+.daimyo-list-header, .daimyo-list-item { display: grid; grid-template-columns: 2fr 2fr 1fr 1.5fr 1.5fr 1fr; font-size: clamp(0.65rem, 2.5vw, 0.9rem); padding: 0; height: 36px; gap: 0; box-sizing: border-box; }
+.kunishu-list-header, .kunishu-list-item { display: grid; grid-template-columns: 20px 3fr 1.5fr 1.5fr 1.5fr; font-size: clamp(0.7rem, 2.8vw, 0.9rem); padding: 0; height: 36px; gap: 0; box-sizing: border-box; }
 .view-mode .kunishu-list-header, .view-mode .kunishu-list-item { grid-template-columns: 3fr 1.5fr 1.5fr 1.5fr; }
-.faction-list-header, .faction-list-item { display: grid; grid-template-columns: 2.5fr 1fr 1.5fr 1.5fr 3fr; font-size: clamp(0.7rem, 2.8vw, 0.95rem); padding: 0; min-height: 30px; gap: 0; }
+.faction-list-header, .faction-list-item { display: grid; grid-template-columns: 2.5fr 1fr 1.5fr 1.5fr 3fr; font-size: clamp(0.7rem, 2.8vw, 0.95rem); padding: 0; height: 36px; gap: 0; box-sizing: border-box; }
 
 .kunishu-item { padding: 12px 15px; border: 1px solid #d0b080; margin-bottom: 8px; cursor: pointer; display: flex; align-items: center; background: rgba(250, 240, 230, 0.95); border-radius: 6px; transition: all 0.2s ease; font-family: 'Sawarabi Mincho', serif; box-shadow: 1px 1px 3px rgba(0,0,0,0.1); }
 .kunishu-item:hover { background: #fff5e0; transform: translateX(3px); box-shadow: 2px 2px 5px rgba(0,0,0,0.15); border-color: #c0a070; }
@@ -1087,13 +1088,14 @@ body.is-pc {
     .cmd-btn.finish, .cmd-btn.back { grid-column: span 2; }
 
     /* PCリストレイアウト */
-    .list-header, .select-item { grid-template-columns: 45px 100px 60px repeat(6, 1fr); font-size: 0.85rem; min-height: 36px; }
+    .list-container, .daimyo-list-container, .faction-list-container, .princess-list-container { height: calc(40px * 9 + 2px); scroll-padding-top: 40px; }
+    .list-header, .select-item { grid-template-columns: 45px 100px 60px repeat(6, 1fr); font-size: 0.85rem; height: 40px; }
     .list-header.view-mode, .select-item.view-mode { grid-template-columns: 100px 60px repeat(6, 1fr); }
-    .daimyo-list-header, .daimyo-list-item { grid-template-columns: 80px 110px 50px 80px 80px 60px; font-size: 0.9rem; min-height: 36px; }
-    .kunishu-list-header, .kunishu-list-item { grid-template-columns: 25px 130px 80px 80px 80px; font-size: 0.9rem; min-height: 36px; }
+    .daimyo-list-header, .daimyo-list-item { grid-template-columns: 80px 110px 50px 80px 80px 60px; font-size: 0.9rem; height: 40px; }
+    .kunishu-list-header, .kunishu-list-item { grid-template-columns: 25px 130px 80px 80px 80px; font-size: 0.9rem; height: 40px; }
     .view-mode .kunishu-list-header, .view-mode .kunishu-list-item { grid-template-columns: 140px 80px 80px 80px; }
-    .faction-list-header, .faction-list-item { grid-template-columns: 140px 80px 100px 100px 1fr; font-size: 0.95rem; min-height: 36px; }
-    .list-container, .daimyo-list-container, .result-body, .faction-list-container { scroll-padding-top: 38px; }
+    .faction-list-header, .faction-list-item { grid-template-columns: 140px 80px 100px 100px 1fr; font-size: 0.95rem; height: 40px; }
+    .list-container, .daimyo-list-container, .result-body, .faction-list-container { scroll-padding-top: 40px; }
     
     /* モーダル拡張（輸送・兵力分配）のタイル化を解除して縦並びに統一 */
     #quantity-modal .modal-content, #unit-divide-modal .modal-content { max-width: 700px !important; max-height: 90% !important; }
@@ -1179,7 +1181,7 @@ body.is-pc {
    ★ 姫一覧専用の魔法（派閥一覧を参考にした完全独立版）
    ========================================================= */
 .princess-list-container {
-    flex: 1; overflow-y: scroll; min-height: 150px; scroll-snap-type: y mandatory; border: 1px solid #ddd; scroll-padding-top: 32px; border-radius: 4px; -webkit-overflow-scrolling: auto;
+    flex: none; height: calc(36px * 9 + 2px); box-sizing: border-box; overflow-y: scroll; scroll-snap-type: y mandatory; border: 1px solid #ddd; scroll-padding-top: 36px; border-radius: 4px; -webkit-overflow-scrolling: auto;
 }
 .princess-list-container::-webkit-scrollbar { width: 14px; height: 14px; -webkit-appearance: none; }
 .princess-list-container::-webkit-scrollbar-track { background: #e0e0e0; border-left: 1px solid #ccc; }
@@ -1190,7 +1192,7 @@ body.is-pc {
     display: grid;
     grid-template-columns: 1.3fr 1fr 1.5fr 1.5fr 3fr;
     font-size: clamp(0.7rem, 2.8vw, 0.95rem);
-    padding: 0; min-height: 30px; gap: 0;
+    padding: 0; height: 36px; gap: 0; box-sizing: border-box;
 }
 
 .princess-list-header > span, .princess-list-item > span, .princess-list-item > strong {
@@ -1219,7 +1221,7 @@ body.is-pc {
 /* パソコンで見た時の幅設定 */
 body.is-pc .princess-list-header, body.is-pc .princess-list-item {
     grid-template-columns: 95px 80px 100px 100px 1fr;
-    font-size: 0.95rem; min-height: 36px;
+    font-size: 0.95rem; height: 40px;
 }
 /* =========================================================
    ★ 撤退先選択専用の魔法（完全独立版）
