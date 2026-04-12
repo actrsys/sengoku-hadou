@@ -1352,29 +1352,34 @@ body.is-pc.daimyo-select-mode #pc-new-ui-container { display: none !important; }
    ========================================================= */
 .busho-tabs {
     display: flex;
-    gap: 5px;
-    margin-bottom: 5px;
-    padding-left: 5px;
+    gap: 4px;
+    margin-bottom: -2px; /* リストの枠線に重ねてピッタリ繋げる魔法です */
+    padding-left: 10px;
+    position: relative;
+    z-index: 20;
 }
 .busho-tab-btn, .busho-scope-btn {
-    padding: 4px 11px;
-    font-size: 0.7rem;
+    padding: 6px 14px 4px 14px;
+    font-size: 0.8rem;
     font-weight: bold;
-    background: #e0e0e0;
-    border: 1px solid #aaa;
+    background: rgba(0, 0, 0, 0.6);
+    border: 2px solid rgba(212, 175, 55, 0.4);
     border-bottom: none;
-    border-radius: 6px 6px 0 0;
+    border-radius: 8px 8px 0 0;
     cursor: pointer;
-    color: #555;
-    transition: background-color 0.2s, color 0.2s;
+    color: #aaa;
+    transition: all 0.2s;
 }
 .busho-tab-btn:hover, .busho-scope-btn:hover {
-    background: #cfd8dc;
+    background: rgba(255, 255, 255, 0.1);
+    color: #fff;
 }
 .busho-tab-btn.active, .busho-scope-btn.active {
-    background: #37474f;
-    color: #fff;
-    border-color: #37474f;
+    background: linear-gradient(to bottom, #254a2e 0%, #1b3822 100%);
+    color: #ffd54f;
+    border: 2px solid #d4af37;
+    border-bottom: 2px solid #1b3822; /* リストの上の金線を隠して一体化させます */
+    text-shadow: 1px 1px 0 #000, -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000;
 }
 
 /* 状態タブ選択時のリストレイアウト（スマホ） */
