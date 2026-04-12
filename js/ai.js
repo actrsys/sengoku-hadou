@@ -998,7 +998,7 @@ class AIEngine {
                 actions.push({ type: 'charity', stat: 'charm', score: score, cost: 200 }); 
             }
 
-            // ★変更：鉄砲と騎馬の購入（大名の革新性、自家の装備比率、城の兵士数を元に点数を作ります）
+            // ★変更：鉄砲と軍馬の購入（大名の革新性、自家の装備比率、城の兵士数を元に点数を作ります）
             // ★追加：攻撃作戦中は出撃・援軍拠点のみ、それ以外は大名居城のみで購入します
             let canBuyEq = false;
             const myOpEq = this.game.aiOperationManager.operations[castle.ownerClan];
@@ -1013,7 +1013,7 @@ class AIEngine {
             }
 
             if (canBuyEq && castle.gold >= 500 && tradeCount < 5) {
-                // ① 自領で「道が繋がっている範囲」のお城にある、騎馬・鉄砲・兵士の合計を数えます（飛び地対策）
+                // ① 自領で「道が繋がっている範囲」のお城にある、軍馬・鉄砲・兵士の合計を数えます（飛び地対策）
                 // ★さっき作ったリストを使って、パパッと数えちゃいます！
                 let totalHorses = 0;
                 let totalGuns = 0;
@@ -1025,7 +1025,7 @@ class AIEngine {
                     totalSoldiers += (current.soldiers || 0);
                 }
                 
-                // 全体の数から、騎馬と鉄砲の「割合（0〜1）」を計算します
+                // 全体の数から、軍馬と鉄砲の「割合（0〜1）」を計算します
                 const totalEq = totalHorses + totalGuns;
                 const horseRatio = totalEq > 0 ? (totalHorses / totalEq) : 0.5;
                 const gunRatio = totalEq > 0 ? (totalGuns / totalEq) : 0.5;
@@ -1042,7 +1042,7 @@ class AIEngine {
                 let horseScore = 10 + ((0.5 - horseFillRate) * 10);
                 let gunScore = 10 + ((0.5 - gunFillRate) * 10);
 
-                // 革新性による点数：高いほど鉄砲が、低いほど騎馬がプラスになります（最大で±5点）
+                // 革新性による点数：高いほど鉄砲が、低いほど軍馬がプラスになります（最大で±5点）
                 horseScore -= (innoDiff * 0.1);
                 gunScore += (innoDiff * 0.1);
 

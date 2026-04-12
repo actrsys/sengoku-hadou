@@ -95,10 +95,10 @@ Object.assign(WarManager.prototype, {
         // ★追加: 順番待ちの列を「合計点（強さ）が高い順」に並び替えます！
         let sortedAssigns = [...assignments].sort((a, b) => b.score - a.score);
 
-        // 万が一、全員が馬か鉄砲になってしまった時に、「最後に変身した人」を覚えておく箱です
+        // 万が一、全員が騎馬か鉄砲になってしまった時に、「最後に変身した人」を覚えておく箱です
         let lastChangedAssign = null;
 
-        // 2. 強い人から順番に、馬や鉄砲を配っていきます
+        // 2. 強い人から順番に、軍馬や鉄砲を配っていきます
         for (let a of sortedAssigns) {
             let isGeneral = (a.index === 0);
             let req = a.req;
@@ -927,7 +927,7 @@ Object.assign(WarManager.prototype, {
             const siegeLossAtkMain = currentAtkMain - Math.floor(currentAtkMain * atkSurviveRate);
             const siegeLossDefMain = currentDefMain - Math.floor(currentDefMain * defSurviveRate);
 
-            // ★追加：攻城戦を生き残った馬と鉄砲の計算（死んだ兵士の割合から、装備していた分だけを減らします）
+            // ★追加：攻城戦を生き残った軍馬と鉄砲の計算（死んだ兵士の割合から、装備していた分だけを減らします）
             const atkHorseEquipRate = Math.min(1.0, (s.attacker.horses || 0) / Math.max(1, currentAtkMain));
             const atkGunEquipRate = Math.min(1.0, (s.attacker.guns || 0) / Math.max(1, currentAtkMain));
             const attackerSurvivedHorses = Math.max(0, (s.attacker.horses || 0) - Math.floor(siegeLossAtkMain * atkHorseEquipRate));
@@ -971,7 +971,7 @@ Object.assign(WarManager.prototype, {
                 const recovered = Math.floor(totalLoss * (isAttackerData ? baseRecoveryRate : defRecoveryRate));
                 const finalReturnSoldiers = surviveSoldiers + recovered;
                 
-                // ★修正：馬と鉄砲の帰還数（死んだ兵士の割合から、装備していた分だけを減らします）
+                // ★修正：軍馬と鉄砲の帰還数（死んだ兵士の割合から、装備していた分だけを減らします）
                 const horseEquipRate = Math.min(1.0, (reinf.horses || 0) / Math.max(1, reinf.soldiers));
                 const gunEquipRate = Math.min(1.0, (reinf.guns || 0) / Math.max(1, reinf.soldiers));
                 const returnHorses = Math.max(0, (reinf.horses || 0) - Math.floor(siegeLoss * horseEquipRate));
@@ -1341,7 +1341,7 @@ Object.assign(WarManager.prototype, {
                     s.defender.morale = Math.floor(((s.defender.morale || 0) * totalAbsorbed + (s.attacker.morale || 0) * totalAtkSurvivors) / newTotalSoldiers);
                 }
 
-                // ★追加：城を奪った時の兵士や馬、鉄砲の合流にストッパー！
+                // ★追加：城を奪った時の兵士や軍馬、鉄砲の合流にストッパー！
                 s.defender.soldiers = Math.min(99999, newTotalSoldiers);
                 s.defender.horses = Math.min(99999, defenderSurvivedHorses + attackerSurvivedHorses);
                 s.defender.guns = Math.min(99999, defenderSurvivedGuns + attackerSurvivedGuns);
@@ -1371,7 +1371,7 @@ Object.assign(WarManager.prototype, {
                         srcC.morale = Math.floor(((srcC.morale || 0) * originalSoldiers + (s.attacker.morale || 0) * totalAtkSurvivors) / newTotalSoldiers);
                     }
     
-                    // ★追加：負けて帰ってきた遠征軍の兵士、馬、鉄砲の合流にストッパー！
+                    // ★追加：負けて帰ってきた遠征軍の兵士、軍馬、鉄砲の合流にストッパー！
                     srcC.soldiers = Math.min(99999, newTotalSoldiers);
                     srcC.horses = Math.min(99999, (srcC.horses || 0) + attackerSurvivedHorses);
                     srcC.guns = Math.min(99999, (srcC.guns || 0) + attackerSurvivedGuns);
@@ -1397,7 +1397,7 @@ Object.assign(WarManager.prototype, {
                 s.defender.training = s.attacker.training || 0;
                 s.defender.morale = s.attacker.morale || 0;
                 
-                // ★追加: 敵が撤退して空になった城を占領した時、持ってきた馬と鉄砲を城に格納する
+                // ★追加: 敵が撤退して空になった城を占領した時、持ってきた軍馬と鉄砲を城に格納する
                 s.defender.horses = attackerSurvivedHorses;
                 s.defender.guns = attackerSurvivedGuns;
 
@@ -2309,7 +2309,7 @@ Object.assign(WarManager.prototype, {
             const reinfBushos = availableBushos.slice(0, Math.min(bushoCount, availableBushos.length));
 
             let reinfRice = reinfSoldiers; 
-            // ★修正: 馬と鉄砲は兵士の2割以上あれば全部持っていく
+            // ★軍馬と鉄砲は兵士の2割以上あれば全部持っていく
             const reinfHorses = (kunishu.horses || 0) < reinfSoldiers * 0.2 ? 0 : (kunishu.horses || 0); 
             const reinfGuns = (kunishu.guns || 0) < reinfSoldiers * 0.2 ? 0 : (kunishu.guns || 0);
 
