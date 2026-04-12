@@ -190,7 +190,7 @@ class UIInfoManager {
                         </div>
                         <div class="daimyo-detail-row daimyo-detail-2col">
                             <div class="daimyo-detail-stat-box"><span class="daimyo-detail-label">兵糧収入/年</span><span class="daimyo-detail-value">${totalRiceIncome}</span></div>
-                            <div style="flex:1; background: transparent; border: none; box-shadow: none;"></div>
+                            <div class="daimyo-detail-stat-box" style="visibility: hidden;"></div>
                         </div>
                     </div>
                 </div>
