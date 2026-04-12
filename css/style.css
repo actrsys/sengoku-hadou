@@ -601,7 +601,8 @@ body:not(.is-pc).daimyo-select-mode #map-wrapper { margin-bottom: 0 !important; 
 }
 
 .daimyo-detail-stat-box {
-    background-color: #e0e0e0; 
+    background: rgba(0,0,0,0.4); 
+    border: 1px solid rgba(212, 175, 55, 0.3);
     padding: 3px 6px; 
     border-radius: 4px; 
     display: flex;
@@ -611,10 +612,11 @@ body:not(.is-pc).daimyo-select-mode #map-wrapper { margin-bottom: 0 !important; 
 }
 
 .daimyo-detail-label {
-    color: #555;
+    color: #ffd54f;
     font-size: 0.85rem;
     margin-right: 5px;
     flex-shrink: 0;
+    text-shadow: 1px 1px 0 #000, -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000;
 }
 
 .daimyo-detail-value {
@@ -622,6 +624,8 @@ body:not(.is-pc).daimyo-select-mode #map-wrapper { margin-bottom: 0 !important; 
     font-size: 0.95rem;
     text-align: right;
     white-space: nowrap;
+    color: #fff;
+    text-shadow: 1px 1px 0 #000, -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000;
 }
 
 /* =========================================================
