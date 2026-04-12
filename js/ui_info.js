@@ -765,6 +765,16 @@ class UIInfoManager {
         const tabsEl = document.getElementById('kyoten-tabs');
         const scopeTabsEl = document.getElementById('kyoten-scope-tabs');
         if (!modal) return;
+
+        // ★追加：拠点一覧のタブが武将一覧と同じ位置・並びになるように、親の箱を整えます
+        if (tabsEl && tabsEl.parentElement) {
+            tabsEl.parentElement.style.display = 'flex';
+            tabsEl.parentElement.style.alignItems = 'flex-end';
+            tabsEl.parentElement.style.paddingLeft = '10px'; // 武将一覧と左の余白を揃える
+            if (scopeTabsEl) {
+                scopeTabsEl.style.marginLeft = '15px'; // 自家・全国タブとの間に隙間を作る
+            }
+        }
         
         // 引数で勢力が指定されていればその勢力、なければプレイヤーの勢力として記憶します
         this.kyotenTargetClanId = clanId !== null ? clanId : this.game.playerClanId;
@@ -1261,6 +1271,8 @@ class UIInfoManager {
             tabsEl.classList.remove('hidden');
             // 全部左側に寄せる設定にします
             tabsEl.style.justifyContent = 'flex-start';
+            tabsEl.style.paddingLeft = '10px'; // ★追加：左の余白を拠点一覧とピッタリ揃えます
+            tabsEl.style.alignItems = 'flex-end'; // ★追加：ボタンの高さを下揃えにします
             
             let scopeHtml = '';
             if (actionType === 'all_busho_list') {

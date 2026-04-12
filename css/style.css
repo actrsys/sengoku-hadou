@@ -1353,32 +1353,45 @@ body.is-pc.daimyo-select-mode #pc-new-ui-container { display: none !important; }
 .busho-tabs {
     display: flex;
     gap: 4px;
-    margin-bottom: -2px; /* リストの枠線に重ねてピッタリ繋げる魔法です */
     padding-left: 10px;
-    position: relative;
-    z-index: 20;
 }
+
+/* ★ 武将一覧・拠点一覧など、全てのタブグループで横並びになるようにします */
+#selector-tabs, #kyoten-tabs, #kyoten-scope-tabs {
+    display: flex;
+    gap: 4px;
+    align-items: flex-end;
+}
+
 .busho-tab-btn, .busho-scope-btn {
     padding: 6px 14px 4px 14px;
     font-size: 0.8rem;
     font-weight: bold;
     background: rgba(0, 0, 0, 0.6);
     border: 2px solid rgba(212, 175, 55, 0.4);
-    border-bottom: none;
+    border-bottom: 2px solid transparent; /* ★非アクティブ時も透明な線を確保し、高さを固定してズレを防ぎます */
     border-radius: 8px 8px 0 0;
     cursor: pointer;
     color: #aaa;
     transition: all 0.2s;
+    box-sizing: border-box; /* ★高さ計算を厳密にします */
+    
+    /* ★親コンテナに関係なく、ボタン自身を2px下にずらしてリストに被せます */
+    position: relative;
+    top: 2px;
+    z-index: 20;
 }
+
 .busho-tab-btn:hover, .busho-scope-btn:hover {
     background: rgba(255, 255, 255, 0.1);
     color: #fff;
 }
+
 .busho-tab-btn.active, .busho-scope-btn.active {
     background: linear-gradient(to bottom, #254a2e 0%, #1b3822 100%);
     color: #ffd54f;
     border: 2px solid #d4af37;
-    border-bottom: 2px solid #1b3822; /* リストの上の金線を隠して一体化させます */
+    border-bottom: 2px solid #1b3822; /* ★透明だった線を深緑に変えて、リストの上の金線を隠します */
     text-shadow: 1px 1px 0 #000, -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000;
 }
 
