@@ -430,10 +430,49 @@ body.hide-daimyo-labels .daimyo-name-label { display: none !important; }
 .clan-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 10px; margin-top: 20px; overflow-y: auto; }
 /* シナリオ選択用の新しいリストデザイン（縦並び＆端が切れないように余白を追加） */
 .scenario-list-vertical { display: flex; flex-direction: column; gap: 10px; margin-top: 20px; padding: 5px; overflow: visible; }
-.clan-btn { padding: 15px; border: 2px solid #ccc; border-radius: 8px; font-weight: bold; cursor: pointer; background: #fff; transition: transform 0.1s, background-color 0.2s, border-color 0.2s; display: flex; justify-content: center; align-items: center; }
-.clan-btn:hover { transform: scale(1.02); background: #f0f8ff; }
-.clan-btn.selected { background: #e3f2fd; border-color: #1976d2; color: #1976d2; box-shadow: 0 0 8px rgba(25, 118, 210, 0.4); transform: scale(1.02); }
-.scenario-desc-box { margin-top: 20px; padding: 15px; background: #f5f5f5; border: 1px solid #ddd; border-radius: 8px; text-align: left; font-size: 0.95rem; line-height: 1.5; display: none; }
+
+/* シナリオボタンのデザインを和風に統一 */
+.clan-btn { 
+    padding: 15px; 
+    border: 2px solid rgba(212, 175, 55, 0.4); 
+    border-radius: 8px; 
+    font-weight: bold; 
+    cursor: pointer; 
+    background: linear-gradient(to bottom, #254a2e 0%, #1b3822 100%); 
+    color: #fff;
+    text-shadow: 1px 1px 0 #000, -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000;
+    transition: transform 0.1s, background 0.2s, border-color 0.2s; 
+    display: flex; 
+    justify-content: center; 
+    align-items: center; 
+}
+.clan-btn:hover { 
+    transform: scale(1.02); 
+    background: linear-gradient(to bottom, #3a6b46 0%, #2a5a36 100%); 
+    border-color: #ffd54f;
+}
+.clan-btn.selected { 
+    background: rgba(255, 152, 0, 0.4); 
+    border-color: #ffd54f; 
+    color: #ffd54f; 
+    box-shadow: 0 0 10px rgba(255, 213, 79, 0.5); 
+    transform: scale(1.02); 
+}
+
+/* シナリオ説明文の箱を和風に統一 */
+.scenario-desc-box { 
+    margin-top: 20px; 
+    padding: 15px; 
+    background: rgba(0, 0, 0, 0.4); 
+    border: 1px solid rgba(212, 175, 55, 0.3); 
+    border-radius: 8px; 
+    text-align: left; 
+    font-size: 0.95rem; 
+    line-height: 1.5; 
+    display: none; 
+    color: #fff;
+    text-shadow: 1px 1px 1px #000;
+}
 .result-content { max-width: 550px !important; }
 /* リスト表示時はウィンドウ幅を統一 */
 #result-modal .modal-content:has(.daimyo-list-container, .faction-list-container, .princess-list-container) {
@@ -571,8 +610,23 @@ body:not(.is-pc).daimyo-select-mode #map-wrapper { margin-bottom: 0 !important; 
 
 /* 独立ボタン・シナリオに戻るボタン共通 */
 /* ★ 画面下部からの距離(bottom)を少し上げて、見切れないように調整しました */
-.floating-back-btn { position: absolute; bottom: 45px; left: 50%; transform: translateX(-50%); z-index: 4000; padding: 12px 24px; background-color: #37474f; color: #fff; border: 2px solid #cfd8dc; border-radius: 8px; font-size: 1.2rem; font-weight: bold; cursor: pointer; box-shadow: 0 4px 6px rgba(0,0,0,0.5); transition: all 0.2s; pointer-events: auto; white-space: nowrap; }
-.floating-back-btn:hover { background-color: #546e7a; transform: translateX(-50%) scale(1.05); }
+.floating-back-btn { 
+    position: absolute; bottom: 45px; left: 50%; transform: translateX(-50%); z-index: 4000; 
+    padding: 12px 24px; 
+    background: linear-gradient(to bottom, #254a2e 0%, #1b3822 100%); 
+    color: #fff; 
+    border: 2px solid #d4af37; 
+    border-radius: 8px; 
+    font-size: 1.2rem; font-weight: bold; cursor: pointer; 
+    box-shadow: 0 4px 10px rgba(0,0,0,0.6); 
+    text-shadow: 1px 1px 0 #000, -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000;
+    transition: all 0.2s; pointer-events: auto; white-space: nowrap; 
+}
+.floating-back-btn:hover { 
+    background: linear-gradient(to bottom, #3a6b46 0%, #2a5a36 100%); 
+    transform: translateX(-50%) scale(1.05); 
+    border-color: #ffd54f;
+}
 .floating-back-btn.hidden, .daimyo-confirm-buttons.hidden { display: none !important; }
 .daimyo-confirm-buttons { position: absolute; bottom: 45px; left: 50%; transform: translateX(-50%); display: flex; gap: 20px; pointer-events: auto; z-index: 4001; }
 .daimyo-confirm-buttons button { padding: 12px 30px; font-size: 1.2rem; border-radius: 8px; font-weight: bold; cursor: pointer; }
