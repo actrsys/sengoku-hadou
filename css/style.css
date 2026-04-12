@@ -381,43 +381,10 @@ body.hide-daimyo-labels .daimyo-name-label { display: none !important; }
 .delegate-sub-btn:disabled { opacity: 0.5; cursor: not-allowed; }
 
 /* ランクバッジ・ゲージ類 */
-.grade-container {
-    display: inline-flex;
-    position: relative;
-    align-items: center;
-    justify-content: center;
-    width: 24px;
-    height: 1.2em;
-    font-family: 'Arial Black', sans-serif;
-}
-
-.grade-main {
-    font-weight: normal;
-    font-size: 0.95rem !important;
-    text-shadow: 1.5px 1.5px 0 #000, -1.5px 1.5px 0 #000, 1.5px -1.5px 0 #000, -1.5px -1.5px 0 #000, 1.5px 0px 0 #000, -1.5px 0px 0 #000, 0px 1.5px 0 #000, 0px -1.5px 0 #000, 2px 2px 2px rgba(0,0,0,0.5);
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-}
-
-.grade-plus {
-    position: absolute !important;
-    font-size: 0.65rem !important;
-    top: 0 !important;
-    right: 0 !important;
-    left: auto !important;
-    bottom: auto !important;
-    font-weight: bold;
-    color: #ffffff;
-    text-shadow: 1px 1px 0 #000, -1px 1px 0 #000, 1px -1px 0 #000, -1px -1px 0 #000;
-    transform: translate(30%, -10%) !important;
-}
-
-.rank-s .grade-main { background: linear-gradient(to bottom, #ffd700 0%, #ffd700 35%, #ffffff 50%, #ffd700 65%, #ffd700 100%); }
-.rank-a .grade-main { background: linear-gradient(to bottom, #f47a4d 0%, #f47a4d 35%, #ffffff 50%, #f47a4d 65%, #f47a4d 100%); }
-.rank-b .grade-main { background: linear-gradient(to bottom, #f58f98 0%, #f58f98 35%, #ffffff 50%, #f58f98 65%, #f58f98 100%); }
-.rank-c .grade-main { background: linear-gradient(to bottom, #adff2f 0%, #adff2f 35%, #ffffff 50%, #adff2f 65%, #adff2f 100%); }
-.rank-d .grade-main { background: linear-gradient(to bottom, #65bbe9 0%, #65bbe9 35%, #ffffff 50%, #65bbe9 65%, #65bbe9 100%); }
-.rank-e .grade-main { background: linear-gradient(to bottom, #9b95c9 0%, #9b95c9 35%, #ffffff 50%, #9b95c9 65%, #9b95c9 100%); }
+.grade-container { display: inline-flex; position: relative; align-items: center; justify-content: center; width: 24px; height: 1.2em; font-family: 'Arial Black', sans-serif; }
+.grade-main { font-weight: normal; font-size: 0.95rem !important; text-shadow: 1.5px 1.5px 0 #000, -1.5px 1.5px 0 #000, 1.5px -1.5px 0 #000, -1.5px -1.5px 0 #000, 1.5px 0px 0 #000, -1.5px 0px 0 #000, 0px 1.5px 0 #000, 0px -1.5px 0 #000, 2px 2px 2px rgba(0,0,0,0.5); }
+.grade-plus { position: absolute !important; font-size: 0.65rem !important; top: 0 !important; right: 0 !important; left: auto !important; bottom: auto !important; font-weight: bold; color: #000000; text-shadow: none; transform: translate(30%, -10%) !important; }
+.rank-s .grade-main { color: #ffd700; } .rank-a .grade-main { color: #f47a4d; } .rank-b .grade-main { color: #f58f98; } .rank-c .grade-main { color: #adff2f; } .rank-d .grade-main { color: #65bbe9; } .rank-e .grade-main { color: #9b95c9; }
 
 .bar-bg { width: 90%; height: 12px; border-radius: 3px; overflow: hidden; display: inline-block; vertical-align: middle; border: 1px solid #a69363; box-shadow: 0 0 5px rgba(0,0,0,0.8), inset 0 1px 3px rgba(0,0,0,0.6); box-sizing: border-box; }
 .bar-fill { height: 100%; transition: width 0.3s ease; }
