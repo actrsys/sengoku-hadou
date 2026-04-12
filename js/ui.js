@@ -1253,7 +1253,7 @@ class UIManager {
             <div class="sp-info-footer">
                 <div class="sp-footer-box"><span>金</span><span>${mask(castle.gold)}</span></div>
                 <div class="sp-footer-box"><span>兵糧</span><span>${mask(castle.rice)}</span></div>
-                <div class="sp-footer-box"><span>兵数</span><span>${mask(castle.soldiers)}</span></div>
+                <div class="sp-footer-box"><span>兵士</span><span>${mask(castle.soldiers)}</span></div>
             </div>
         `;
 
@@ -1829,7 +1829,7 @@ class UIManager {
 
         list.innerHTML = `
             <div class="kunishu-list-header" style="grid-template-columns: 1.5fr 1fr 1fr 1.5fr;">
-                <span>勢力名</span><span>代表者</span><span>兵数</span><span>友好度</span>
+                <span>勢力名</span><span>代表者</span><span>兵士</span><span>友好度</span>
             </div>
         `;
         list.classList.remove('view-mode');
@@ -1937,7 +1937,7 @@ class UIManager {
 
         list.innerHTML = `
             <div class="kunishu-list-header" style="grid-template-columns: 1.5fr 1fr 1fr 1.5fr;">
-                <span>勢力名</span><span>兵数</span><span>防御</span><span>友好度</span>
+                <span>勢力名</span><span>兵士</span><span>防御</span><span>友好度</span>
             </div>
         `;
         
@@ -2800,7 +2800,7 @@ class UIManager {
             const div = document.createElement('div'); 
             // 撤退専用のデザイン（retreat-btn）を使います
             div.className = 'retreat-btn'; 
-            div.innerHTML = `<div style="text-align:center;"><strong>${c.name}</strong><br><small>兵数:${c.soldiers} 防御:${c.defense}</small></div>`;
+            div.innerHTML = `<div style="text-align:center;"><strong>${c.name}</strong><br><small>兵士:${c.soldiers} 防御:${c.defense}</small></div>`;
             
             div.onclick = () => { 
                 if (window.AudioManager) window.AudioManager.playSE('choice.ogg');
