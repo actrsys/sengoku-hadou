@@ -408,6 +408,16 @@ class FactionSystem {
             // ★追加ここまで
             
         });
+
+        // ★ここから追加：派閥が新しくなったので、もし派閥の画面が開いていたら描き直す魔法です！
+        if (this.game && this.game.ui && this.game.ui.info) {
+            const modal = document.getElementById('faction-list-modal');
+            const info = this.game.ui.info;
+            // 画面が隠れていなくて、どの勢力を見ているか覚えているなら描き直します
+            if (modal && !modal.classList.contains('hidden') && info.currentFactionClanId) {
+                info.showFactionList(info.currentFactionClanId, info.isFactionListDirect);
+            }
+        }
     }
 
     /**

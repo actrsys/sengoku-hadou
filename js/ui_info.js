@@ -248,6 +248,10 @@ class UIInfoManager {
     }
 
     showFactionList(clanId, isDirect = false) {
+        // 画面の更新ができるように、いま見ている勢力と開き方を覚えておきます！
+        this.currentFactionClanId = clanId;
+        this.isFactionListDirect = isDirect;
+
         const clan = this.game.clans.find(c => c.id === clanId);
         if (!clan) return;
 

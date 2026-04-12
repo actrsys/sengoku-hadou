@@ -151,6 +151,11 @@ class AffiliationSystem {
             this.enterCastle(busho, nextCastleId);
         }
 
+        // ★ここから追加：人が減ったので、派閥を新しく組み直す魔法を呼び出します！
+        if (this.game && this.game.factionSystem) {
+            this.game.factionSystem.updateFactions();
+        }
+
         // ★ここから追加：画面の絵をすぐに描き直す魔法！
         if (this.game && this.game.ui) {
             this.game.ui.renderMap();
