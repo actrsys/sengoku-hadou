@@ -448,24 +448,24 @@ class GameSystem {
     }
     
     static toGradeHTML(val) {
-        let base = "", plus = "", cls = "";
-        if (val >= 96) { base = "S"; plus = "+"; cls = "rank-s"; } 
-        else if (val >= 91) { base = "S"; plus = ""; cls = "rank-s"; }
-        else if (val >= 81) { base = "A"; plus = "+"; cls = "rank-a"; } 
-        else if (val >= 76) { base = "A"; plus = ""; cls = "rank-a"; }
-        else if (val >= 66) { base = "B"; plus = "+"; cls = "rank-b"; } 
-        else if (val >= 61) { base = "B"; plus = ""; cls = "rank-b"; }
-        else if (val >= 51) { base = "C"; plus = "+"; cls = "rank-c"; } 
-        else if (val >= 46) { base = "C"; plus = ""; cls = "rank-c"; }
-        else if (val >= 36) { base = "D"; plus = "+"; cls = "rank-d"; } 
-        else if (val >= 31) { base = "D"; plus = ""; cls = "rank-d"; }
-        else if (val >= 21) { base = "E"; plus = "+"; cls = "rank-e"; } 
-        else { base = "E"; plus = ""; cls = "rank-e"; }
+        let base = "", sub = "", cls = "";
+        if (val >= 96) { base = "S"; sub = "1"; cls = "rank-s"; } 
+        else if (val >= 91) { base = "S"; sub = "2"; cls = "rank-s"; }
+        else if (val >= 81) { base = "A"; sub = "1"; cls = "rank-a"; } 
+        else if (val >= 76) { base = "A"; sub = "2"; cls = "rank-a"; }
+        else if (val >= 66) { base = "B"; sub = "1"; cls = "rank-b"; } 
+        else if (val >= 61) { base = "B"; sub = "2"; cls = "rank-b"; }
+        else if (val >= 51) { base = "C"; sub = "1"; cls = "rank-c"; } 
+        else if (val >= 46) { base = "C"; sub = "2"; cls = "rank-c"; }
+        else if (val >= 36) { base = "D"; sub = "1"; cls = "rank-d"; } 
+        else if (val >= 31) { base = "D"; sub = "2"; cls = "rank-d"; }
+        else if (val >= 21) { base = "E"; sub = "1"; cls = "rank-e"; } 
+        else { base = "E"; sub = "2"; cls = "rank-e"; }
 
         return `
             <span class="grade-container ${cls}">
                 <span class="grade-main">${base}</span>
-                <span class="grade-plus">${plus}</span>
+                <span class="grade-sub">${sub}</span>
             </span>`;
     }
     static getPerceivedStatValue(target, statName, gunshi, castleAccuracy, playerClanId, daimyo = null) {
