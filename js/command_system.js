@@ -466,17 +466,17 @@ class CommandSystem {
         else if (actionType === 'def_intercept_deploy') {
             const targetC = this.game.getCastle(targetId);
             bushos = this.game.getCastleBushos(targetId).filter(b => b.clan === targetC.ownerClan && b.status === 'active');
-            infoHtml = "<div>迎撃に出陣する武将を選択してください（最大5名まで）</div>";
+            infoHtml = "<div>出陣武将を選択してください（最大5名まで）</div>";
         }
         else if (actionType === 'def_reinf_deploy' || actionType === 'atk_reinf_deploy') {
             const targetC = this.game.getCastle(targetId);
             bushos = this.game.getCastleBushos(targetId).filter(b => b.clan === targetC.ownerClan && b.status === 'active');
-            infoHtml = "<div>援軍に派遣する武将を選択してください（最大5名まで）</div>";
+            infoHtml = "<div>派遣する武将を選択してください（最大5名まで）</div>";
         }
         else if (actionType === 'def_self_reinf_deploy' || actionType === 'atk_self_reinf_deploy') {
             const targetC = this.game.getCastle(targetId);
             bushos = this.game.getCastleBushos(targetId).filter(b => b.clan === targetC.ownerClan && b.status === 'active');
-            infoHtml = "<div>援軍として出陣する武将を選択してください（最大5名まで）</div>";
+            infoHtml = "<div>出陣武将を選択してください（最大5名まで）</div>";
         }
         else if (actionType === 'reward') {
             bushos = this.game.bushos.filter(b => 
@@ -493,14 +493,14 @@ class CommandSystem {
             if (spec.msg) {
                 infoHtml = `<div>${spec.msg}</div>`;
                 if (actionType === 'war_deploy') {
-                    infoHtml = `<div>出陣する武将を選択してください（最大5名まで）</div>`;
+                    infoHtml = `<div>出陣武将を選択してください（最大5名まで）</div>`;
                 }
             } else if (['farm','commerce'].includes(actionType)) { infoHtml = `<div>金: ${c.gold} (1回500)</div>`; }
             else if (['charity'].includes(actionType)) { infoHtml = `<div>金: ${c.gold}, 米: ${c.rice} (1回300)</div>`; }
             else if (['repair'].includes(actionType)) { infoHtml = `<div>金: ${c.gold} (1回300)</div>`; }
             else if (['draft'].includes(actionType)) { infoHtml = `<div>民忠: ${c.peoplesLoyalty}</div>`; }
             else if (['training','soldier_charity'].includes(actionType)) { infoHtml = `<div>状態: 訓練${c.training}/士気${c.morale}</div>`; }
-            else if (actionType === 'war_deploy' || actionType === 'kunishu_subjugate_deploy') { infoHtml = `<div>出陣する武将を選択してください（最大5名まで）</div>`; }
+            else if (actionType === 'war_deploy' || actionType === 'kunishu_subjugate_deploy') { infoHtml = `<div>出陣武将を選択してください（最大5名まで）</div>`; }
         }
 
         // --- 並び替え（ソート） ---
