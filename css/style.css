@@ -686,15 +686,25 @@ body:not(.is-pc).daimyo-select-mode #map-wrapper { margin-bottom: 0 !important; 
     flex-direction: column;
     text-align: left;
     padding: 0 10px;
+    width: 100%;
+    box-sizing: border-box;
 }
+
+.pc-only { display: none !important; }
+.sp-only { display: flex !important; }
+body.is-pc .pc-only { display: flex !important; }
+body.is-pc .sp-only { display: none !important; }
 
 .daimyo-detail-header {
     display: flex;
     align-items: center; 
     gap: 10px; 
     margin-bottom: 10px; 
-    border-bottom: none !important; /* 二重線を確実に消し去る魔法 */
+    border-bottom: none !important; 
     padding-bottom: 0 !important;
+}
+.daimyo-detail-header.sp-only {
+    margin-bottom: 0;
 }
 
 .daimyo-detail-name {
@@ -707,41 +717,29 @@ body:not(.is-pc).daimyo-select-mode #map-wrapper { margin-bottom: 0 !important; 
     font-size: 0.95rem;
     font-weight: bold;
     color: #ffffff; 
-    padding: 1px 6px; /* ★ 上下左右のすき間を削って、文字のギリギリまで小さくしました！ */
-    border-radius: 3px; /* ★ 全体が小さくなったので、角の丸みも少し小さく整えました */
-    box-shadow: 1px 1px 3px rgba(0,0,0,0.4); /* ★ 影も少しコンパクトに調整しています */
+    padding: 1px 6px; 
+    border-radius: 3px; 
+    box-shadow: 1px 1px 3px rgba(0,0,0,0.4); 
     text-shadow: 1px 1px 2px #000000; 
     letter-spacing: 1px; 
     white-space: nowrap;
     flex-shrink: 0;
 }
 
-/* 革新性バッジのダークグラデーション装飾 */
-.ideology-kakushin {
-    background: radial-gradient(ellipse at center, #444444 0%, #880e4f 100%);
-    border: 1px solid #4a0024;
-}
+.ideology-kakushin { background: radial-gradient(ellipse at center, #444444 0%, #880e4f 100%); border: 1px solid #4a0024; }
+.ideology-hoshu { background: radial-gradient(ellipse at center, #444444 0%, #0d47a1 100%); border: 1px solid #002171; }
+.ideology-chudo { background: radial-gradient(ellipse at center, #444444 0%, #1b5e20 100%); border: 1px solid #003300; }
 
-.ideology-hoshu {
-    background: radial-gradient(ellipse at center, #444444 0%, #0d47a1 100%);
-    border: 1px solid #002171;
-}
-
-.ideology-chudo {
-    background: radial-gradient(ellipse at center, #444444 0%, #1b5e20 100%);
-    border: 1px solid #003300;
-}
-
-/* ここから下が消えていたため、レイアウトが崩れていました！ */
 .daimyo-detail-body {
     display: flex;
-    flex-direction: column; /* 基本はスマホ向けに縦に並べます */
-    align-items: flex-start; /* 左側に寄せます */
+    flex-direction: column; 
+    align-items: flex-start; 
     gap: 15px;
     padding: 10px 0;
+    width: 100%;
+    box-sizing: border-box;
 }
 
-/* パソコン版（is-pcがついている時）だけ横に並べます */
 body.is-pc .daimyo-detail-body {
     flex-direction: row;
     align-items: flex-start;
@@ -749,15 +747,18 @@ body.is-pc .daimyo-detail-body {
 
 .daimyo-detail-left {
     display: flex;
-    flex-direction: column;
-    gap: 2px;
-    width: 60px; /* スマホ版の顔サイズ */
+    flex-direction: row; /* スマホ版は横に並べて顔と名前を表示 */
+    align-items: center; /* 縦中央揃え */
+    gap: 15px;
+    width: 100%; 
     flex-shrink: 0;
 }
 
-/* パソコン版は顔を大きくします */
 body.is-pc .daimyo-detail-left {
+    flex-direction: column;
+    align-items: flex-start;
     width: 120px;
+    gap: 2px;
 }
 
 .daimyo-detail-face {
@@ -769,14 +770,15 @@ body.is-pc .daimyo-detail-left {
     border-radius: 6px;
     background: radial-gradient(circle, #1a2a3a 0%, #050a10 100%);
     margin-left: 2px;
+    flex-shrink: 0;
 }
 
-/* パソコン版の顔画像設定 */
 body.is-pc .daimyo-detail-face {
     width: 120px;
     height: 120px;
     border-width: 3px;
     border-radius: 8px;
+    margin-left: 0;
 }
 
 .daimyo-detail-right {
@@ -784,16 +786,21 @@ body.is-pc .daimyo-detail-face {
     flex-direction: column;
     gap: 6px;
     flex: 1;
+    width: 100%;
+    box-sizing: border-box;
 }
 
 .daimyo-detail-row {
     display: flex;
     gap: 6px;
+    width: 100%;
+    box-sizing: border-box;
 }
 
 .daimyo-detail-2col > div,
 .daimyo-detail-3col > div {
     flex: 1;
+    min-width: 0; /* 箱の中身に合わせて縮小可能にします */
 }
 
 .daimyo-detail-stat-box {
@@ -805,6 +812,8 @@ body.is-pc .daimyo-detail-face {
     justify-content: space-between; 
     align-items: center;
     white-space: nowrap;
+    min-width: 0; /* 箱自体を縮小可能にします */
+    box-sizing: border-box;
 }
 
 .daimyo-detail-label {
@@ -823,8 +832,27 @@ body.is-pc .daimyo-detail-face {
     font-size: 0.95rem;
     text-align: right;
     white-space: nowrap;
+    overflow: hidden; /* はみ出た文字を隠します */
+    text-overflow: ellipsis; /* はみ出たら「…」にします */
     color: #fff;
     text-shadow: 1px 1px 0 #000, -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000;
+}
+
+/* スマホ版特有の微調整（画面が狭い時の見切れ防止） */
+body:not(.is-pc) .daimyo-detail-stat-box {
+    padding: 3px 4px;
+}
+body:not(.is-pc) .daimyo-detail-row {
+    gap: 4px;
+}
+body:not(.is-pc) .daimyo-detail-label {
+    width: auto;
+    min-width: 30px; /* 固定幅を外して少し縮めるようにします */
+    font-size: 0.75rem;
+    margin-right: 3px;
+}
+body:not(.is-pc) .daimyo-detail-value {
+    font-size: 0.85rem;
 }
 
 /* =========================================================
