@@ -454,14 +454,19 @@ class LifeSystem {
         }
 
         // 軍師だったら役職を外します
-        if (busho.isGunshi) {
-            busho.isGunshi = false;
-        }
-        
-        busho.clan = 0;
-        busho.castleId = 0;
-        busho.belongKunishuId = 0;
-    }
+        if (busho.isGunshi) {
+            busho.isGunshi = false;
+        }
+        
+        busho.clan = 0;
+        busho.castleId = 0;
+        busho.belongKunishuId = 0;
+
+        // ★ここから追加：武将が亡くなって人が減ったので、派閥を組み直す魔法を呼び出します！
+        if (this.game.factionSystem) {
+            this.game.factionSystem.updateFactions();
+        }
+    }
 
     // 大名が亡くなった時の後継ぎ選びです
     async handleDaimyoDeath(daimyo) {
