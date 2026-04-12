@@ -104,10 +104,29 @@ class UIInfoManager {
             highestRankName = "&nbsp;";
         }
 
-        const castlesCount = this.game.castles.filter(c => c.ownerClan === clanId).length;
+        const clanCastles = this.game.castles.filter(c => c.ownerClan === clanId);
+        const castlesCount = clanCastles.length;
         const bushosCount = this.game.bushos.filter(b => b.clan === clanId && b.status === 'active').length;
         const princessCount = clan.princessIds ? clan.princessIds.length : 0;
         
+        let totalGold = 0;
+        let totalRice = 0;
+        let totalSoldiers = 0;
+        let totalHorses = 0;
+        let totalGuns = 0;
+        let totalGoldIncome = 0;
+        let totalRiceIncome = 0;
+        
+        clanCastles.forEach(c => {
+            totalGold += c.gold || 0;
+            totalRice += c.rice || 0;
+            totalSoldiers += c.soldiers || 0;
+            totalHorses += c.horses || 0;
+            totalGuns += c.guns || 0;
+            totalGoldIncome += GameSystem.calcBaseGoldIncome(c);
+            totalRiceIncome += GameSystem.calcBaseRiceIncome(c);
+        });
+
         let ideology = "中道";
         let ideologyClass = "ideology-chudo"; 
         if (leader) {
@@ -142,21 +161,32 @@ class UIInfoManager {
                 <div class="daimyo-detail-body">
                     <div class="daimyo-detail-left">
                         <img src="${faceSrc}" class="daimyo-detail-face" onerror="this.src='data/images/faceicons/unknown_face.webp'">
-                        <div class="daimyo-detail-leader-name">${leaderName}</div>
-                        <div class="daimyo-detail-leader-rank">${highestRankName}</div>
                     </div>
-                    <div class="daimyo-detail-info">
-                        <div class="daimyo-detail-stat-box">
-                            <span class="daimyo-detail-label">本拠地</span><span class="daimyo-detail-value">${baseCastleName}</span>
+                    <div class="daimyo-detail-right">
+                        <div class="daimyo-detail-row daimyo-detail-2col">
+                            <div class="daimyo-detail-stat-box"><span class="daimyo-detail-label">${leaderName}</span><span class="daimyo-detail-value">${highestRankName}</span></div>
+                            <div class="daimyo-detail-stat-box"><span class="daimyo-detail-label">本拠地</span><span class="daimyo-detail-value">${baseCastleName}</span></div>
                         </div>
-                        <div class="daimyo-detail-stat-box">
-                            <span class="daimyo-detail-label">城数</span><span class="daimyo-detail-value">${castlesCount}</span>
+                        <div class="daimyo-detail-row daimyo-detail-3col">
+                            <div class="daimyo-detail-stat-box"><span class="daimyo-detail-label">城</span><span class="daimyo-detail-value">${castlesCount}</span></div>
+                            <div class="daimyo-detail-stat-box"><span class="daimyo-detail-label">武将</span><span class="daimyo-detail-value">${bushosCount}</span></div>
+                            <div class="daimyo-detail-stat-box"><span class="daimyo-detail-label">姫</span><span class="daimyo-detail-value">${princessCount}</span></div>
                         </div>
-                        <div class="daimyo-detail-stat-box">
-                            <span class="daimyo-detail-label">武将数</span><span class="daimyo-detail-value">${bushosCount}</span>
+                        <div class="daimyo-detail-row daimyo-detail-2col">
+                            <div class="daimyo-detail-stat-box"><span class="daimyo-detail-label">金</span><span class="daimyo-detail-value">${totalGold}</span></div>
+                            <div class="daimyo-detail-stat-box"><span class="daimyo-detail-label">兵士</span><span class="daimyo-detail-value">${totalSoldiers}</span></div>
                         </div>
-                        <div class="daimyo-detail-stat-box">
-                            <span class="daimyo-detail-label">姫数</span><span class="daimyo-detail-value">${princessCount}</span>
+                        <div class="daimyo-detail-row daimyo-detail-2col">
+                            <div class="daimyo-detail-stat-box"><span class="daimyo-detail-label">金収入/月</span><span class="daimyo-detail-value">${totalGoldIncome}</span></div>
+                            <div class="daimyo-detail-stat-box"><span class="daimyo-detail-label">軍馬</span><span class="daimyo-detail-value">${totalHorses}</span></div>
+                        </div>
+                        <div class="daimyo-detail-row daimyo-detail-2col">
+                            <div class="daimyo-detail-stat-box"><span class="daimyo-detail-label">兵糧</span><span class="daimyo-detail-value">${totalRice}</span></div>
+                            <div class="daimyo-detail-stat-box"><span class="daimyo-detail-label">鉄砲</span><span class="daimyo-detail-value">${totalGuns}</span></div>
+                        </div>
+                        <div class="daimyo-detail-row daimyo-detail-2col">
+                            <div class="daimyo-detail-stat-box"><span class="daimyo-detail-label">兵糧収入/年</span><span class="daimyo-detail-value">${totalRiceIncome}</span></div>
+                            <div style="flex:1; background: transparent; border: none;"></div>
                         </div>
                     </div>
                 </div>

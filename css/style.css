@@ -742,38 +742,34 @@ body:not(.is-pc).daimyo-select-mode #map-wrapper { margin-bottom: 0 !important; 
     display: flex;
     flex-direction: column;
     gap: 2px;
-    width: 65px; 
+    width: 120px; 
     flex-shrink: 0;
 }
 
 .daimyo-detail-face {
-    width: 65px; 
-    height: 65px;
+    width: 120px; 
+    height: 120px;
     object-fit: cover;
-    border: 1.5px solid #fff;
+    border: 3px solid #fff;
     box-shadow: inset 0 0 0 1px rgba(0,0,0,0.7), 0 0 6px rgba(0,0,0,0.8);
-    border-radius: 6px;
+    border-radius: 8px;
     background: radial-gradient(circle, #1a2a3a 0%, #050a10 100%);
 }
 
-.daimyo-detail-leader-name {
-    font-weight: bold;
-    font-size: 0.95rem; 
-    text-align: left;
-    white-space: nowrap;
+.daimyo-detail-right {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    flex: 1;
 }
 
-.daimyo-detail-leader-rank {
-    font-size: 0.8rem;
-    color: #444;
-    text-align: left;
-    white-space: nowrap;
+.daimyo-detail-row {
+    display: flex;
+    gap: 6px;
 }
 
-.daimyo-detail-info {
-    display: grid; 
-    grid-template-columns: 1fr 1fr; 
-    gap: 4px 6px; 
+.daimyo-detail-2col > div,
+.daimyo-detail-3col > div {
     flex: 1;
 }
 
