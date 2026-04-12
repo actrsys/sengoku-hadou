@@ -441,73 +441,82 @@ body.hide-daimyo-labels .daimyo-name-label { display: none !important; }
     text-align: left !important;
 }
 
-/* 入力・スライダー UI */
-/* 1. スライダーごとの枠を消して、項目名を横に戻す（幅を狭めてフィットさせる） */
+/* =========================================================
+   スライダー画面（輸送・取引・出陣など）のレイアウト改修
+   ========================================================= */
+
+/* 1. スライダーの行と、項目名（武将名や[購入量]など）の設定 */
 .qty-row { 
-    margin-bottom: 12px !important; 
-    padding: 0 !important; 
-    background: transparent !important; 
-    border: none !important; 
-    border-radius: 0 !important;
-    color: #fff; 
+    margin-bottom: 12px; 
+    padding: 0; 
     display: flex;
     flex-direction: row; 
     align-items: center;
     gap: 4px; 
 }
-.qty-row > :first-child:not(.qty-control) { 
-    align-self: auto;
-    color: #ffd54f !important; 
+
+/* 単体スライダーのラベル、および複数スライダーの武将名（一元管理） */
+.qty-row > :first-child:not(.qty-control),
+.slider-row-label { 
+    color: #ffd54f; 
     font-size: 0.85rem; 
-    margin-bottom: 0 !important;
-    margin-right: 0 !important;
-    background: transparent !important;
-    border: none !important;
-    padding: 0 !important;
     text-shadow: 1px 1px 0 #000, -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000;
     font-weight: bold;
     white-space: nowrap;
-    min-width: 35px; 
+    min-width: 50px; 
     text-align: left;
     flex-shrink: 0;
 }
 
-/* 2. 全項目をまとめる「大きな枠」を作る（左右の余白を狭くする） */
+/* 2. 全項目をまとめる「大きな枠」 */
 #quantity-container, #divide-list {
-    background: rgba(0, 0, 0, 0.4) !important;
-    border: 1px solid rgba(212, 175, 55, 0.3) !important;
-    border-radius: 6px !important;
-    padding: 12px 5px 8px 5px !important; 
+    background: rgba(0, 0, 0, 0.4);
+    border: 1px solid rgba(212, 175, 55, 0.3);
+    border-radius: 6px;
+    padding: 12px 5px 8px 5px; 
+    margin-bottom: 15px;
 }
 
-/* 3. 「輸送先」などの説明エリアを大きな枠と合体させる */
+/* 3. 「輸送先」などの説明エリア */
 #trade-type-info {
-    background: rgba(0, 0, 0, 0.4) !important;
-    border: 1px solid rgba(212, 175, 55, 0.3) !important;
-    border-bottom: none !important; 
-    border-radius: 6px 6px 0 0 !important;
-    padding: 8px 10px 4px 10px !important;
-    color: #ffd54f !important;
+    background: rgba(0, 0, 0, 0.4);
+    border: 1px solid rgba(212, 175, 55, 0.3);
+    border-bottom: none; 
+    border-radius: 6px 6px 0 0;
+    padding: 8px 10px 4px 10px;
+    color: #ffd54f;
     font-weight: bold;
     text-shadow: 1px 1px 0 #000, -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000;
-    margin-bottom: 0 !important;
+    margin-bottom: 0;
 }
 #trade-type-info:not(:empty) + #quantity-container {
-    border-top: none !important;
-    border-radius: 0 0 6px 6px !important;
-    padding-top: 5px !important;
+    border-top: none;
+    border-radius: 0 0 6px 6px;
+    padding-top: 5px;
 }
 
-/* 4. 上部の現在数表示（JSで作られた部分）の枠を消して、区切り線にする */
-#quantity-container > div:first-child[style*="background"],
-#divide-list > div:first-child[style*="background"] {
-    background: transparent !important;
-    border: none !important;
-    padding: 0 5px 10px 5px !important;
-    margin-bottom: 12px !important;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.2) !important;
-    border-radius: 0 !important;
-    box-shadow: none !important;
+/* 4. 上部の現在数表示（JS側から色指定を排除し、ここで一元管理） */
+.slider-stock-info {
+    padding: 0 5px 10px 5px;
+    margin-bottom: 12px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+    font-size: 0.95rem;
+    font-weight: bold;
+    color: #fff;
+    text-shadow: 1px 1px 0 #000, -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000;
+}
+.stock-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 10px;
+}
+.stock-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+.stock-label {
+    color: #ffd54f;
 }
 .qty-control { display: flex; align-items: center; gap: 5px; width: 100%; }
 

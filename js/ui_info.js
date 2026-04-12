@@ -2281,24 +2281,14 @@ class UIInfoManager {
 
         if (isMultiSliderMode) {
             const stockDiv = document.createElement('div');
-            stockDiv.style.cssText = "background: rgba(0,0,0,0.4); padding: 10px; border-radius: 6px; border: 1px solid rgba(212, 175, 55, 0.3); margin-bottom: 15px; font-size: 0.95rem; font-weight: bold; color: #fff; text-shadow: 1px 1px 0 #000, -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000;";
+            stockDiv.className = 'slider-stock-info'; // ★CSSに任せる名札
             stockDiv.innerHTML = `
-                <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px;">
-                    <div style="display: flex; justify-content: space-between; align-items: center;">
-                        <span style="color:#ffd54f;">金</span><span id="multi-stock-gold">${sourceCastleForMulti.gold}</span>
-                    </div>
-                    <div style="display: flex; justify-content: space-between; align-items: center;">
-                        <span style="color:#ffd54f;">兵糧</span><span id="multi-stock-rice">${sourceCastleForMulti.rice}</span>
-                    </div>
-                    <div style="display: flex; justify-content: space-between; align-items: center;">
-                        <span style="color:#ffd54f;">兵士</span><span id="multi-stock-soldiers">${sourceCastleForMulti.soldiers}</span>
-                    </div>
-                    <div style="display: flex; justify-content: space-between; align-items: center;">
-                        <span style="color:#ffd54f;">騎馬</span><span id="multi-stock-horses">${sourceCastleForMulti.horses || 0}</span>
-                    </div>
-                    <div style="display: flex; justify-content: space-between; align-items: center;">
-                        <span style="color:#ffd54f;">鉄砲</span><span id="multi-stock-guns">${sourceCastleForMulti.guns || 0}</span>
-                    </div>
+                <div class="stock-grid">
+                    <div class="stock-item"><span class="stock-label">金</span><span id="multi-stock-gold">${sourceCastleForMulti.gold}</span></div>
+                    <div class="stock-item"><span class="stock-label">兵糧</span><span id="multi-stock-rice">${sourceCastleForMulti.rice}</span></div>
+                    <div class="stock-item"><span class="stock-label">兵士</span><span id="multi-stock-soldiers">${sourceCastleForMulti.soldiers}</span></div>
+                    <div class="stock-item"><span class="stock-label">騎馬</span><span id="multi-stock-horses">${sourceCastleForMulti.horses || 0}</span></div>
+                    <div class="stock-item"><span class="stock-label">鉄砲</span><span id="multi-stock-guns">${sourceCastleForMulti.guns || 0}</span></div>
                 </div>
             `;
             this.ui.quantityContainer.appendChild(stockDiv);
@@ -2577,18 +2567,12 @@ class UIInfoManager {
         listEl.innerHTML = '';
 
         if (stockContainer) {
-            stockContainer.style.cssText = "background: rgba(0,0,0,0.4); padding: 10px; border-radius: 6px; border: 1px solid rgba(212, 175, 55, 0.3); margin-bottom: 15px; font-size: 0.95rem; font-weight: bold; color: #fff; text-shadow: 1px 1px 0 #000, -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000;";
+            stockContainer.className = 'slider-stock-info'; // ★CSSに任せる名札
             stockContainer.innerHTML = `
-                <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px;">
-                    <div style="display: flex; justify-content: space-between; align-items: center;">
-                        <span style="color:#ffd54f;">兵士</span><span id="divide-stock-soldiers">0</span>
-                    </div>
-                    <div style="display: flex; justify-content: space-between; align-items: center;">
-                        <span style="color:#ffd54f;">騎馬</span><span id="divide-stock-horses">0</span>
-                    </div>
-                    <div style="display: flex; justify-content: space-between; align-items: center;">
-                        <span style="color:#ffd54f;">鉄砲</span><span id="divide-stock-guns">0</span>
-                    </div>
+                <div class="stock-grid">
+                    <div class="stock-item"><span class="stock-label">兵士</span><span id="divide-stock-soldiers">0</span></div>
+                    <div class="stock-item"><span class="stock-label">騎馬</span><span id="divide-stock-horses">0</span></div>
+                    <div class="stock-item"><span class="stock-label">鉄砲</span><span id="divide-stock-guns">0</span></div>
                 </div>
             `;
         }
@@ -2699,15 +2683,10 @@ class UIInfoManager {
         bushos.forEach((b, index) => {
             const div = document.createElement('div');
             div.className = 'qty-row';
-            div.style.marginBottom = "15px";
-            div.style.padding = "10px";
-            div.style.border = "1px solid #ccc";
-            div.style.borderRadius = "4px";
-            div.style.background = "#fff";
             
             div.innerHTML = `
                 <div style="font-weight:bold; margin-bottom:10px; display:flex; align-items:center; justify-content:space-between;">
-                    <span style="font-size:1.1rem; color:#333;">${b.name}</span>
+                    <span class="slider-row-label">${b.name}</span>
                     <div class="troop-type-selector" id="troop-type-group-${b.id}">
                         <button class="troop-type-btn active" data-type="ashigaru">足軽</button>
                         <button class="troop-type-btn" data-type="kiba">騎馬</button>
