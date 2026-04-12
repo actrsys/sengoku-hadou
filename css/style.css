@@ -860,11 +860,8 @@ body:not(.is-pc).daimyo-select-mode #map-wrapper { margin-bottom: 0 !important; 
 
 .busho-detail-affiliation-box {
     justify-content: flex-start;
-    gap: 15px;
-}
-.busho-detail-affiliation-item {
-    display: flex;
-    align-items: center;
+    gap: 10px;
+    margin-bottom: 8px;
 }
 
 .busho-detail-split-row {
@@ -881,6 +878,12 @@ body:not(.is-pc).daimyo-select-mode #map-wrapper { margin-bottom: 0 !important; 
     gap: 10px;
     margin-top: 2px;
 }
+.busho-detail-info-col {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    justify-content: center;
+}
 
 .busho-detail-face {
     width: 90px;
@@ -895,9 +898,9 @@ body:not(.is-pc).daimyo-select-mode #map-wrapper { margin-bottom: 0 !important; 
 
 .busho-detail-stats {
     display: grid;
-    grid-template-columns: 1fr 1fr;
+    grid-template-columns: 1fr 1fr 1fr;
     gap: 6px;
-    flex: 1;
+    margin-top: 2px;
 }
 .busho-detail-stat-box {
     justify-content: space-between;

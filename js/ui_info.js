@@ -480,38 +480,35 @@ class UIInfoManager {
                     </div>
                 </div>
                 
-                <div class="busho-detail-box busho-detail-affiliation-box">
-                    <div class="busho-detail-affiliation-item">
-                        <span class="busho-label">所属</span>
-                        <span class="busho-val">${affiliationName}${familyBadge}</span>
-                    </div>
-                    <div class="busho-detail-affiliation-item">
-                        <span class="busho-label">所在</span>
-                        <span class="busho-val">${castleName}</span>
-                    </div>
-                </div>
-                
-                <div class="busho-detail-split-row">
-                    <div class="busho-detail-box busho-detail-split-box">
-                        <span class="busho-label">身分</span>
-                        <span class="busho-val">${busho.getRankName()}</span>
-                    </div>
-                    <div class="busho-detail-box busho-detail-split-box">
-                        <span class="busho-label">年齢</span>
-                        <span class="busho-val">${ageStr}</span>
+                <div class="busho-detail-main">
+                    ${faceHtml}
+                    <div class="busho-detail-info-col">
+                        <div class="busho-detail-box busho-detail-affiliation-box">
+                            <span class="busho-label">所属</span>
+                            <span class="busho-val" style="margin-right: auto;">${affiliationName}${familyBadge}</span>
+                            <span class="busho-val">${castleName}</span>
+                        </div>
+                        
+                        <div class="busho-detail-split-row">
+                            <div class="busho-detail-box busho-detail-split-box">
+                                <span class="busho-label">身分</span>
+                                <span class="busho-val">${busho.getRankName()}</span>
+                            </div>
+                            <div class="busho-detail-box busho-detail-split-box">
+                                <span class="busho-label">年齢</span>
+                                <span class="busho-val">${ageStr}</span>
+                            </div>
+                        </div>
                     </div>
                 </div>
 
-                <div class="busho-detail-main">
-                    ${faceHtml}
-                    <div class="busho-detail-stats">
-                        <div class="busho-detail-box busho-detail-stat-box"><span class="busho-label">統率</span><span class="busho-val">${getStat('leadership')}</span></div>
-                        <div class="busho-detail-box busho-detail-stat-box"><span class="busho-label">外交</span><span class="busho-val">${getStat('diplomacy')}</span></div>
-                        <div class="busho-detail-box busho-detail-stat-box"><span class="busho-label">武勇</span><span class="busho-val">${getStat('strength')}</span></div>
-                        <div class="busho-detail-box busho-detail-stat-box"><span class="busho-label">智謀</span><span class="busho-val">${getStat('intelligence')}</span></div>
-                        <div class="busho-detail-box busho-detail-stat-box"><span class="busho-label">内政</span><span class="busho-val">${getStat('politics')}</span></div>
-                        <div class="busho-detail-box busho-detail-stat-box"><span class="busho-label">魅力</span><span class="busho-val">${getStat('charm')}</span></div>
-                    </div>
+                <div class="busho-detail-stats">
+                    <div class="busho-detail-box busho-detail-stat-box"><span class="busho-label">統率</span><span class="busho-val">${getStat('leadership')}</span></div>
+                    <div class="busho-detail-box busho-detail-stat-box"><span class="busho-label">武勇</span><span class="busho-val">${getStat('strength')}</span></div>
+                    <div class="busho-detail-box busho-detail-stat-box"><span class="busho-label">内政</span><span class="busho-val">${getStat('politics')}</span></div>
+                    <div class="busho-detail-box busho-detail-stat-box"><span class="busho-label">外交</span><span class="busho-val">${getStat('diplomacy')}</span></div>
+                    <div class="busho-detail-box busho-detail-stat-box"><span class="busho-label">智謀</span><span class="busho-val">${getStat('intelligence')}</span></div>
+                    <div class="busho-detail-box busho-detail-stat-box"><span class="busho-label">魅力</span><span class="busho-val">${getStat('charm')}</span></div>
                 </div>
             </div>
         `;
