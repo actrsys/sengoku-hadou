@@ -154,13 +154,17 @@ class UIInfoManager {
 
         body.innerHTML = `
             <div class="daimyo-detail-container">
-                <div class="daimyo-detail-header">
+                <div class="daimyo-detail-header pc-only">
                     <div class="daimyo-detail-name">${clan.name}</div>
                     <div class="daimyo-detail-ideology ${ideologyClass}">${ideology}</div>
                 </div>
                 <div class="daimyo-detail-body">
                     <div class="daimyo-detail-left">
                         <img src="${faceSrc}" class="daimyo-detail-face" onerror="this.src='data/images/faceicons/unknown_face.webp'">
+                        <div class="daimyo-detail-header sp-only">
+                            <div class="daimyo-detail-name">${clan.name}</div>
+                            <div class="daimyo-detail-ideology ${ideologyClass}">${ideology}</div>
+                        </div>
                     </div>
                     <div class="daimyo-detail-right">
                         <div class="daimyo-detail-row daimyo-detail-2col">
@@ -186,7 +190,7 @@ class UIInfoManager {
                         </div>
                         <div class="daimyo-detail-row daimyo-detail-2col">
                             <div class="daimyo-detail-stat-box"><span class="daimyo-detail-label">兵糧収入/年</span><span class="daimyo-detail-value">${totalRiceIncome}</span></div>
-                            <div style="flex:1; background: transparent; border: none;"></div>
+                            <div style="flex:1; background: transparent; border: none; box-shadow: none;"></div>
                         </div>
                     </div>
                 </div>
