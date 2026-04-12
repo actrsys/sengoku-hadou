@@ -164,7 +164,7 @@ class UIInfoManager {
                     </div>
                     <div class="daimyo-detail-right">
                         <div class="daimyo-detail-row daimyo-detail-2col">
-                            <div class="daimyo-detail-stat-box"><span class="daimyo-detail-label">${leaderName}</span><span class="daimyo-detail-value">${highestRankName}</span></div>
+                            <div class="daimyo-detail-stat-box"><span class="daimyo-detail-label">大名</span><span class="daimyo-detail-value">${leaderName} ${highestRankName}</span></div>
                             <div class="daimyo-detail-stat-box"><span class="daimyo-detail-label">本拠地</span><span class="daimyo-detail-value">${baseCastleName}</span></div>
                         </div>
                         <div class="daimyo-detail-row daimyo-detail-3col">
