@@ -1,7 +1,7 @@
 /**
  * command_system.js
  * ゲーム内のコマンド実行ロジックおよびフロー制御を管理するクラス
- * 修正: 出陣時・諸勢力鎮圧時に、指定した「騎馬」と「鉄砲」を持参する処理を追加しました
+ * 修正: 出陣時・諸勢力鎮圧時に、指定した「軍馬」と「鉄砲」を持参する処理を追加しました
  */
 
 /* ==========================================================================
@@ -94,11 +94,11 @@ const COMMAND_SPECS = {
         msg: "兵糧を売り金を得ます"
     },
     'buy_horses': {
-        label: "騎馬購入", category: 'MIL_TRADE',
+        label: "軍馬購入", category: 'MIL_TRADE',
         costGold: 0, costRice: 0,
         isMulti: false, hasAdvice: false,
         startMode: 'quantity_select',
-        msg: "金を払い騎馬を買います"
+        msg: "金を払い軍馬を買います"
     },
     'buy_guns': {
         label: "鉄砲購入", category: 'MIL_TRADE',
@@ -1233,7 +1233,7 @@ class CommandSystem {
             if (val <= 0) return;
             this.executeTrade(type, val);
         }
-        // ★修正: 出陣時に騎馬と鉄砲の数をスライダーから読み取って渡すようにしました
+        // ★修正: 出陣時に軍馬と鉄砲の数をスライダーから読み取って渡すようにしました
         else if (type === 'war_supplies') {
             const sVal = parseInt(inputs.soldiers.num.value);
             const rVal = parseInt(inputs.rice.num.value);
@@ -1682,7 +1682,7 @@ class CommandSystem {
         if (t.gold + vals.gold > 99999) { this.game.ui.showDialog("輸送先の「金」が上限(99,999)を超えてしまうため、輸送できません。", false); return; }
         if (t.rice + vals.rice > 99999) { this.game.ui.showDialog("輸送先の「兵糧」が上限(99,999)を超えてしまうため、輸送できません。", false); return; }
         if (t.soldiers + vals.soldiers > 99999) { this.game.ui.showDialog("輸送先の「兵数」が上限(99,999)を超えてしまうため、輸送できません。", false); return; }
-        if ((t.horses || 0) + vals.horses > 99999) { this.game.ui.showDialog("輸送先の「騎馬」が上限(99,999)を超えてしまうため、輸送できません。", false); return; }
+        if ((t.horses || 0) + vals.horses > 99999) { this.game.ui.showDialog("輸送先の「軍馬」が上限(99,999)を超えてしまうため、輸送できません。", false); return; }
         if ((t.guns || 0) + vals.guns > 99999) { this.game.ui.showDialog("輸送先の「鉄砲」が上限(99,999)を超えてしまうため、輸送できません。", false); return; }
 
         // ★修正: エラーの原因だった「訓練・士気の計算式」を直接計算するように直しました
@@ -1773,10 +1773,10 @@ class CommandSystem {
             const castellan = this.game.getBusho(castle.castellanId);
             const cost = GameSystem.calcBuyHorseCost(amount, daimyo, castellan);
             if(castle.gold < cost) { this.game.ui.showDialog(`資金不足です。(必要: ${cost}金)`, false); return; } 
-            // ★追加: 騎馬のストッパー
-            if((castle.horses || 0) + amount > 99999) { this.game.ui.showDialog("これ以上騎馬は買えません", false); return; }
+            // ★追加: 軍馬のストッパー
+            if((castle.horses || 0) + amount > 99999) { this.game.ui.showDialog("これ以上軍馬は買えません", false); return; }
             castle.gold -= cost; castle.horses = (castle.horses || 0) + amount; 
-            this.game.ui.showResultModal(`騎馬${amount}を購入しました\n(金-${cost})`); 
+            this.game.ui.showResultModal(`軍馬${amount}を購入しました\n(金-${cost})`); 
         } else if (type === 'buy_guns') {
             const daimyo = this.game.bushos.find(b => b.clan === castle.ownerClan && b.isDaimyo);
             const castellan = this.game.getBusho(castle.castellanId);

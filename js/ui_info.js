@@ -950,7 +950,7 @@ class UIInfoManager {
         if (this.currentKyotenTab === 'status') {
             headerHtml = `<div class="list-header sortable-header" style="grid-template-columns: 1.5fr 1.5fr 1.5fr 1fr 1fr 1fr 1fr;"><span data-sort="name" style="padding-left:5px; justify-content:flex-start;">拠点名${getSortMark('name')}</span><span data-sort="clan">勢力${getSortMark('clan')}</span><span data-sort="castellan">城主${getSortMark('castellan')}</span><span data-sort="province">国名${getSortMark('province')}</span><span data-sort="bushoCount">武将数${getSortMark('bushoCount')}</span><span data-sort="gold">金${getSortMark('gold')}</span><span data-sort="rice">兵糧${getSortMark('rice')}</span></div>`;
         } else if (this.currentKyotenTab === 'military') {
-            headerHtml = `<div class="list-header sortable-header" style="grid-template-columns: 1.5fr 1.5fr 1fr 1fr 1fr 1fr 1fr;"><span data-sort="name" style="padding-left:5px; justify-content:flex-start;">拠点名${getSortMark('name')}</span><span data-sort="soldiers">兵士${getSortMark('soldiers')}</span><span data-sort="defense">防御${getSortMark('defense')}</span><span data-sort="morale">士気${getSortMark('morale')}</span><span data-sort="training">訓練${getSortMark('training')}</span><span data-sort="horses">騎馬${getSortMark('horses')}</span><span data-sort="guns">鉄砲${getSortMark('guns')}</span></div>`;
+            headerHtml = `<div class="list-header sortable-header" style="grid-template-columns: 1.5fr 1.5fr 1fr 1fr 1fr 1fr 1fr;"><span data-sort="name" style="padding-left:5px; justify-content:flex-start;">拠点名${getSortMark('name')}</span><span data-sort="soldiers">兵士${getSortMark('soldiers')}</span><span data-sort="defense">防御${getSortMark('defense')}</span><span data-sort="morale">士気${getSortMark('morale')}</span><span data-sort="training">訓練${getSortMark('training')}</span><span data-sort="horses">軍馬${getSortMark('horses')}</span><span data-sort="guns">鉄砲${getSortMark('guns')}</span></div>`;
         } else if (this.currentKyotenTab === 'economy') {
             headerHtml = `<div class="list-header sortable-header" style="grid-template-columns: 1.5fr 1fr 1fr 1fr 1fr 1.5fr 1.5fr 1.5fr 1.5fr;"><span data-sort="name" style="padding-left:5px; justify-content:flex-start;">拠点名${getSortMark('name')}</span><span data-sort="population">人口${getSortMark('population')}</span><span data-sort="loyalty">民忠${getSortMark('loyalty')}</span><span data-sort="kokudaka">石高${getSortMark('kokudaka')}</span><span data-sort="commerce">鉱山${getSortMark('commerce')}</span><span data-sort="goldIncome">金収入/月${getSortMark('goldIncome')}</span><span data-sort="goldConsume">金支出/月${getSortMark('goldConsume')}</span><span data-sort="riceIncome">兵糧収入/年${getSortMark('riceIncome')}</span><span data-sort="riceConsume">兵糧支出/年${getSortMark('riceConsume')}</span></div>`;
         }
@@ -2062,7 +2062,7 @@ class UIInfoManager {
                 } else if (type === 'buy_horses') {
                     const amount = parseInt(document.getElementById('num-amount')?.value) || 0;
                     const cost = GameSystem.calcBuyHorseCost(amount, daimyo, castellan);
-                    displayEl.innerHTML = makeGrid("騎馬", (c.horses || 0) + amount, c.gold - cost);
+                    displayEl.innerHTML = makeGrid("軍馬", (c.horses || 0) + amount, c.gold - cost);
                 } else if (type === 'buy_guns') {
                     const amount = parseInt(document.getElementById('num-amount')?.value) || 0;
                     const cost = GameSystem.calcBuyGunCost(amount, daimyo, castellan);
@@ -2337,14 +2337,14 @@ class UIInfoManager {
             document.getElementById('quantity-title').textContent = "出陣用意"; 
             inputs.soldiers = createSlider("兵士", "soldiers", c.soldiers, c.soldiers);
             inputs.rice = createSlider("兵糧", "rice", c.rice, c.rice);
-            inputs.horses = createSlider("騎馬", "horses", c.horses, 0);
+            inputs.horses = createSlider("軍馬", "horses", c.horses, 0);
             inputs.guns = createSlider("鉄砲", "guns", c.guns, 0);
         } else if (type === 'def_intercept') { 
             const interceptCastle = (data && data.length > 0) ? data[0] : c;
             document.getElementById('quantity-title').textContent = "迎撃部隊編成"; 
             inputs.soldiers = createSlider("出陣兵士数", "soldiers", interceptCastle.soldiers, interceptCastle.soldiers);
             inputs.rice = createSlider("兵糧", "rice", interceptCastle.rice, interceptCastle.rice);
-            inputs.horses = createSlider("騎馬", "horses", interceptCastle.horses || 0, 0);
+            inputs.horses = createSlider("軍馬", "horses", interceptCastle.horses || 0, 0);
             inputs.guns = createSlider("鉄砲", "guns", interceptCastle.guns || 0, 0);
         } else if (type === 'def_reinf_supplies' || type === 'atk_reinf_supplies' || type === 'def_self_reinf_supplies' || type === 'atk_self_reinf_supplies') { 
             const helperCastle = (data && data.length > 0) ? data[0] : c;
@@ -2356,7 +2356,7 @@ class UIInfoManager {
             document.getElementById('quantity-title').textContent = titleText;
             inputs.soldiers = createSlider("兵士", "soldiers", helperCastle.soldiers, helperCastle.soldiers, 500);
             inputs.rice = createSlider("兵糧", "rice", helperCastle.rice, helperCastle.rice, 500);
-            inputs.horses = createSlider("騎馬", "horses", helperCastle.horses || 0, 0, 0);
+            inputs.horses = createSlider("軍馬", "horses", helperCastle.horses || 0, 0, 0);
             inputs.guns = createSlider("鉄砲", "guns", helperCastle.guns || 0, 0, 0);
         } else if (type === 'transport') {
             document.getElementById('quantity-title').textContent = "輸送";
@@ -2384,7 +2384,7 @@ class UIInfoManager {
             inputs.gold = createSlider("金", "gold", c.gold, 0, 0, true, tCastle.gold, 99999);
             inputs.rice = createSlider("兵糧", "rice", c.rice, 0, 0, true, tCastle.rice, 99999);
             inputs.soldiers = createSlider("兵士", "soldiers", c.soldiers, 0, 0, true, tCastle.soldiers, 99999);
-            inputs.horses = createSlider("騎馬", "horses", c.horses || 0, 0, 0, true, tCastle.horses || 0, 99999);
+            inputs.horses = createSlider("軍馬", "horses", c.horses || 0, 0, 0, true, tCastle.horses || 0, 99999);
             inputs.guns = createSlider("鉄砲", "guns", c.guns || 0, 0, 0, true, tCastle.guns || 0, 99999);
         } else if (type === 'buy_rice') {
             document.getElementById('quantity-title').textContent = "兵糧購入"; 
@@ -2448,19 +2448,19 @@ class UIInfoManager {
             inputs.amount = createSlider("購入量", "amount", realMaxBuy, 0);
 
         } else if (type === 'buy_horses') {
-            document.getElementById('quantity-title').textContent = "騎馬購入"; 
+            document.getElementById('quantity-title').textContent = "軍馬購入"; 
             let maxBuy = GameSystem.calcBuyHorseAmount(c.gold, daimyo, castellan);
             // 金額の端数でお金が足りなくならないよう、確実な数まで減らします
             while (maxBuy > 0 && GameSystem.calcBuyHorseCost(maxBuy, daimyo, castellan) > c.gold) {
                 maxBuy--;
             }
-            // 城の騎馬上限(99,999)を超えないようにします
+            // 城の軍馬上限(99,999)を超えないようにします
             const realMaxBuy = Math.min(maxBuy, 99999 - (c.horses || 0));
 
             // ★変更：さっき作った「正確な単価の魔法」を使って表示します
             const unitPrice = GameSystem.calcBuyHorseUnitPrice(daimyo, castellan);
             this.ui.tradeTypeInfo.classList.remove('hidden'); 
-            this.ui.tradeTypeInfo.textContent = `騎馬 1頭 ＝ 金 ${unitPrice.toFixed(1)}`;
+            this.ui.tradeTypeInfo.textContent = `軍馬 1頭 ＝ 金 ${unitPrice.toFixed(1)}`;
 
             // ★変更：スライダーより前に数字の箱を作って、スライダーの上に表示させます！
             const costDiv = document.createElement('div');
