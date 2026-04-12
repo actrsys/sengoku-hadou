@@ -1305,22 +1305,21 @@ class CommandSystem {
             const busho = this.game.getBusho(bushoIds[0]);
             this.game.ui.showDialog(`本当に ${busho.name} を追放しますか？`, true, () => {
                 
-                // ★追加：追放される武将が派閥に入っていたら、残されたメンバーにショックを与えます！
-                if (busho.factionId > 0) {
-                    // 同じ派閥のメンバーを集めます（大名と追放される本人を除きます）
-                    const factionMembers = this.game.bushos.filter(b => 
-                        b.clan === busho.clan && 
-                        b.factionId === busho.factionId && 
-                        b.id !== busho.id &&
-                        !b.isDaimyo &&
-                        b.status === 'active'
-                    );
+                // ★追加：追放される武将がいた場合、自勢力の他の武将全員にショックを与えます！
+                // 同じ大名家で、大名と追放される本人を除いた全員を集めます
+                const otherMembers = this.game.bushos.filter(b => 
+                    b.clan === busho.clan && 
+                    b.id !== busho.id &&
+                    !b.isDaimyo &&
+                    b.status === 'active'
+                );
 
-                    // 追放される人が「派閥のリーダー」だったかどうかを確認します
-                    const isLeader = busho.isFactionLeader;
+                const isLeader = busho.isFactionLeader;
 
-                    // 集めたメンバー全員に順番にショックを与えます
-                    factionMembers.forEach(member => {
+                // 集めたメンバー全員に順番にショックを与えます
+                otherMembers.forEach(member => {
+                    // 同じ派閥の場合（追放される武将が派閥に属している場合のみ）
+                    if (busho.factionId > 0 && member.factionId === busho.factionId) {
                         if (isLeader) {
                             // リーダーが追放された場合：承認欲求を50上げてから、忠誠度を10下げます
                             this.game.factionSystem.updateRecognition(member, 50);
@@ -1330,8 +1329,12 @@ class CommandSystem {
                             this.game.factionSystem.updateRecognition(member, 25);
                             member.loyalty = Math.max(0, member.loyalty - 3);
                         }
-                    });
-                }
+                    } else {
+                        // 違う派閥、または無派閥の場合：承認欲求を5上げてから、忠誠度を1下げます
+                        this.game.factionSystem.updateRecognition(member, 5);
+                        member.loyalty = Math.max(0, member.loyalty - 1);
+                    }
+                });
 
                 // ★新しいお引越しセンターの魔法を使います！
                 this.game.affiliationSystem.becomeRonin(busho);
