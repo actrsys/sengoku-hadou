@@ -685,6 +685,7 @@ body:not(.is-pc).daimyo-select-mode #map-wrapper { margin-bottom: 0 !important; 
     display: flex;
     flex-direction: column;
     text-align: left;
+    padding: 0 10px;
 }
 
 .daimyo-detail-header {
@@ -735,7 +736,7 @@ body:not(.is-pc).daimyo-select-mode #map-wrapper { margin-bottom: 0 !important; 
 .daimyo-detail-body {
     display: flex;
     flex-direction: column; /* 基本はスマホ向けに縦に並べます */
-    align-items: center;    /* 中央に寄せます */
+    align-items: flex-start; /* 左側に寄せます */
     gap: 15px;
     padding: 10px 0;
 }
@@ -767,6 +768,7 @@ body.is-pc .daimyo-detail-left {
     box-shadow: inset 0 0 0 1px rgba(0,0,0,0.7), 0 0 6px rgba(0,0,0,0.8);
     border-radius: 6px;
     background: radial-gradient(circle, #1a2a3a 0%, #050a10 100%);
+    margin-left: 2px;
 }
 
 /* パソコン版の顔画像設定 */
