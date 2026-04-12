@@ -441,7 +441,21 @@ body.hide-daimyo-labels .daimyo-name-label { display: none !important; }
 }
 
 /* 入力・スライダー UI */
-.qty-row { margin-bottom: 15px; color: #fff; text-shadow: 1px 1px 0 #000, -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000; }
+.qty-row { 
+    margin-bottom: 15px; 
+    padding: 8px 12px; 
+    background: rgba(0,0,0,0.4); 
+    border: 1px solid rgba(212, 175, 55, 0.3); 
+    border-radius: 6px; 
+    color: #fff; 
+    text-shadow: 1px 1px 0 #000, -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000; 
+}
+.qty-row > span:first-child { 
+    color: #ffd54f; 
+    font-weight: bold; 
+    display: inline-block;
+    margin-bottom: 5px;
+}
 .qty-control { display: flex; align-items: center; gap: 5px; width: 100%; }
 
 .troop-type-selector { display: flex; gap: 4px; }
@@ -451,7 +465,7 @@ body.hide-daimyo-labels .daimyo-name-label { display: none !important; }
 
 .qty-control input[type="range"] { flex: 1; -webkit-appearance: none; height: 16px; background: #e0e0e0; border: 1px solid #aaa; border-radius: 0; outline: none; overflow: hidden; }
 .qty-control input[type="range"]::-webkit-slider-thumb { -webkit-appearance: none; width: 16px; height: 24px; border-radius: 2px; background: #f0f0f0; border: 1px solid #777; box-shadow: inset 0 1px 3px rgba(255,255,255,0.8), 0 1px 2px rgba(0,0,0,0.3), -10016px 0 0 10000px #81c784; cursor: pointer; }
-.qty-control input[type="number"] { width: 50px; padding: 5px 2px; text-align: center; border: 1px solid #d4af37; background: rgba(0,0,0,0.5); color: #fff; border-radius:4px; font-size: 0.95rem; -moz-appearance: textfield; -webkit-appearance: none; appearance: none; }
+.qty-control input[type="number"] { width: 60px; padding: 5px 2px; text-align: center; border: 1.5px solid #d4af37; background: #000; color: #fff; border-radius: 4px; font-size: 1rem; font-weight: bold; box-shadow: inset 0 1px 3px rgba(255,255,255,0.1); }
 .qty-control input[type="number"]::-webkit-outer-spin-button,
 .qty-control input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
 .qty-control .qty-shortcut-btn { flex: none; padding: 4px 8px; font-size: 0.85rem; font-weight: bold; background: #ffffff; border: 1px solid #999; border-radius: 4px; cursor: pointer; color: #333; box-shadow: 0 1px 2px rgba(0,0,0,0.1); transition: all 0.2s; }
@@ -1143,7 +1157,7 @@ body.is-pc {
     #quantity-modal .modal-content, #unit-divide-modal .modal-content { max-width: 700px !important; max-height: 90% !important; }
     #quantity-container, #divide-list { display: flex !important; flex-direction: column; gap: 10px; align-items: stretch; }
     .qty-row, #divide-list > div { margin-bottom: 0 !important; }
-    .qty-row { background: transparent; padding: 0; border: none; border-radius: 0; }
+    .qty-row { background: rgba(0,0,0,0.4); padding: 10px 15px; border: 1px solid rgba(212, 175, 55, 0.3); border-radius: 6px; }
 
     /* ランク表記 */
     .grade-main { font-size: 1.1rem !important; }
