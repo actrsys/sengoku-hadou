@@ -668,10 +668,6 @@ class UIInfoManager {
         });
         
         let itemCount = princesses.length;
-        if (itemCount === 0) {
-            listHtml += `<div style="padding: 15px; text-align: center;">姫はいません。</div>`;
-            itemCount = 1;
-        }
 
         for (let i = itemCount; i < 8; i++) {
             listHtml += `<div class="princess-list-item" style="cursor:default; pointer-events:none;"><span></span><span></span><span></span><span></span><span></span></div>`;
