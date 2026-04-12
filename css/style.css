@@ -886,8 +886,8 @@ body:not(.is-pc).daimyo-select-mode #map-wrapper { margin-bottom: 0 !important; 
 }
 
 .busho-detail-face {
-    width: 90px;
-    height: 90px;
+    width: 60px;
+    height: 60px;
     object-fit: cover;
     border: 2px solid #fff;
     box-shadow: inset 0 0 0 1px rgba(0,0,0,0.7), 0 0 6px rgba(0,0,0,0.8);
