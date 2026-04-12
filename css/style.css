@@ -381,14 +381,15 @@ body.hide-daimyo-labels .daimyo-name-label { display: none !important; }
 .delegate-sub-btn:disabled { opacity: 0.5; cursor: not-allowed; }
 
 /* ランクバッジ・ゲージ類 */
-.grade-container { display: inline-flex; position: relative; align-items: center; justify-content: center; width: 24px; height: 1.2em; font-family: 'Arial Black', sans-serif; }
+.grade-container { display: inline-flex; position: relative; align-items: center; justify-content: center; width: 24px; height: 1.2em; font-family: 'Arial Black', sans-serif; filter: drop-shadow(2px 2px 2px rgba(0,0,0,0.5)); }
 .grade-main { 
     font-weight: normal; 
     font-size: 0.95rem !important; 
+    background-clip: text;
     -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
     color: transparent;
     -webkit-text-stroke: 1px #000;
-    filter: drop-shadow(2px 2px 2px rgba(0,0,0,0.5));
 }
 .grade-sub { 
     position: absolute !important; 
