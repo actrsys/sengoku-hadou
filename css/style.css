@@ -231,11 +231,17 @@ body.hide-daimyo-labels .daimyo-name-label { display: none !important; }
 
 /* スマホ用自作スクロールバーのための設定（改良版） */
 .scroll-wrapper { 
-    position: relative; flex: none; width: 100%; display: flex; overflow: hidden; 
-    border: 1px solid #ddd; border-radius: 4px; 
-    padding-right: 24px; /* 縦バーが項目に重ならないよう、右側に道を作る */
-    padding-bottom: 24px; /* ★追加：横バーが項目に重ならないよう、下側に道を作る */
-    box-sizing: border-box; /* ★追加：これを入れないと高さの計算が狂います！ */
+    position: relative; 
+    flex: 1; /* ★ ゴムのように画面に合わせて縮む魔法 */
+    min-height: 0; /* ★ 潰れることを許可する魔法 */
+    max-height: calc(40px * 9 + 28px);
+    width: 100%; display: flex; overflow: hidden; 
+    border: 2px solid #d4af37;
+    border-radius: 4px; 
+    box-shadow: 0 0 10px rgba(0,0,0,0.5);
+    padding-right: 24px; 
+    padding-bottom: 24px; 
+    box-sizing: border-box; 
 }
 .hide-native-scroll::-webkit-scrollbar { display: none !important; }
 .hide-native-scroll { 
@@ -297,8 +303,12 @@ body.hide-daimyo-labels .daimyo-name-label { display: none !important; }
 }
 
 /* リストベース */
-/* ★変更：画面が狭い時は自動で縮むように柔軟な設定（flex: 1 と max-height）に変更します */
-.list-container, .daimyo-list-container, .faction-list-container, .princess-list-container { flex: 1; min-height: 0; max-height: calc(40px * 9 + 26px); width: 100%; overflow-y: scroll; scroll-snap-type: y mandatory; border: 2px solid #d4af37; box-shadow: 0 0 10px rgba(0,0,0,0.5); scroll-padding-top: 40px; box-sizing: border-box; -webkit-overflow-scrolling: auto; overscroll-behavior: none; border-radius: 4px; }
+/* ★変更：外枠（.scroll-wrapper）の大きさにピッタリ追従するように設定します */
+.list-container, .daimyo-list-container, .faction-list-container, .princess-list-container { 
+    flex: 1; width: 100%; height: 100%; max-height: none; overflow-y: scroll; scroll-snap-type: y mandatory; 
+    border: none; box-shadow: none; border-radius: 0; /* ★ 外枠に任せるので全て消します */
+    scroll-padding-top: 40px; box-sizing: border-box; -webkit-overflow-scrolling: auto; overscroll-behavior: none; 
+}
 .result-body { flex: 1; width: 100%; overflow-y: auto; min-height: 0; margin-bottom: 0 !important; padding-bottom: 10px; box-sizing: border-box; overscroll-behavior: none; }
 /* .select-item:last-child などの margin-bottom: 25px; を削除（固定高さに干渉するため） */
 .select-item:last-child, .daimyo-list-item:last-child, .kunishu-list-item:last-child, .faction-list-item:last-child, .princess-list-item:last-child { margin-bottom: 0; }
@@ -1264,8 +1274,9 @@ body.is-pc {
     .cmd-btn.finish, .cmd-btn.back { grid-column: span 2; }
 
     /* PCリストレイアウト */
-    /* ★変更：パソコン版もスクロールバーの太さを足しつつ、柔軟に縮むように設定します */
-    .list-container, .daimyo-list-container, .faction-list-container, .princess-list-container { flex: 1; min-height: 0; max-height: calc(44px * 9 + 26px); height: auto; scroll-padding-top: 44px; }
+    /* ★変更：パソコン版用の高さに合わせて、外枠と中身をそれぞれ設定します */
+    .scroll-wrapper { max-height: calc(44px * 9 + 28px); }
+    .list-container, .daimyo-list-container, .faction-list-container, .princess-list-container { height: 100%; max-height: none; scroll-padding-top: 44px; }
     .list-header, .select-item { grid-template-columns: 45px 100px 60px repeat(6, 1fr); font-size: 0.85rem; height: 44px; }
     .list-header.view-mode, .select-item.view-mode { grid-template-columns: 100px 60px repeat(6, 1fr); }
     .daimyo-list-header, .daimyo-list-item { grid-template-columns: 80px 110px 50px 80px 80px 60px; font-size: 0.9rem; height: 44px; }
