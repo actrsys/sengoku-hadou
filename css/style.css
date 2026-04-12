@@ -734,7 +734,15 @@ body:not(.is-pc).daimyo-select-mode #map-wrapper { margin-bottom: 0 !important; 
 /* ここから下が消えていたため、レイアウトが崩れていました！ */
 .daimyo-detail-body {
     display: flex;
-    gap: 10px; 
+    flex-direction: column; /* 基本はスマホ向けに縦に並べます */
+    align-items: center;    /* 中央に寄せます */
+    gap: 15px;
+    padding: 10px 0;
+}
+
+/* パソコン版（is-pcがついている時）だけ横に並べます */
+body.is-pc .daimyo-detail-body {
+    flex-direction: row;
     align-items: flex-start;
 }
 
@@ -742,18 +750,31 @@ body:not(.is-pc).daimyo-select-mode #map-wrapper { margin-bottom: 0 !important; 
     display: flex;
     flex-direction: column;
     gap: 2px;
-    width: 120px; 
+    width: 60px; /* スマホ版の顔サイズ */
     flex-shrink: 0;
 }
 
+/* パソコン版は顔を大きくします */
+body.is-pc .daimyo-detail-left {
+    width: 120px;
+}
+
 .daimyo-detail-face {
-    width: 120px; 
-    height: 120px;
+    width: 60px; 
+    height: 60px;
     object-fit: cover;
-    border: 3px solid #fff;
+    border: 2px solid #fff;
     box-shadow: inset 0 0 0 1px rgba(0,0,0,0.7), 0 0 6px rgba(0,0,0,0.8);
-    border-radius: 8px;
+    border-radius: 6px;
     background: radial-gradient(circle, #1a2a3a 0%, #050a10 100%);
+}
+
+/* パソコン版の顔画像設定 */
+body.is-pc .daimyo-detail-face {
+    width: 120px;
+    height: 120px;
+    border-width: 3px;
+    border-radius: 8px;
 }
 
 .daimyo-detail-right {
