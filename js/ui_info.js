@@ -2287,7 +2287,7 @@ class UIInfoManager {
                     <div class="stock-item"><span class="stock-label">金</span><span id="multi-stock-gold">${sourceCastleForMulti.gold}</span></div>
                     <div class="stock-item"><span class="stock-label">兵糧</span><span id="multi-stock-rice">${sourceCastleForMulti.rice}</span></div>
                     <div class="stock-item"><span class="stock-label">兵士</span><span id="multi-stock-soldiers">${sourceCastleForMulti.soldiers}</span></div>
-                    <div class="stock-item"><span class="stock-label">騎馬</span><span id="multi-stock-horses">${sourceCastleForMulti.horses || 0}</span></div>
+                    <div class="stock-item"><span class="stock-label">軍馬</span><span id="multi-stock-horses">${sourceCastleForMulti.horses || 0}</span></div>
                     <div class="stock-item"><span class="stock-label">鉄砲</span><span id="multi-stock-guns">${sourceCastleForMulti.guns || 0}</span></div>
                 </div>
             `;
@@ -2571,7 +2571,7 @@ class UIInfoManager {
             stockContainer.innerHTML = `
                 <div class="stock-grid">
                     <div class="stock-item"><span class="stock-label">兵士</span><span id="divide-stock-soldiers">0</span></div>
-                    <div class="stock-item"><span class="stock-label">騎馬</span><span id="divide-stock-horses">0</span></div>
+                    <div class="stock-item"><span class="stock-label">軍馬</span><span id="divide-stock-horses">0</span></div>
                     <div class="stock-item"><span class="stock-label">鉄砲</span><span id="divide-stock-guns">0</span></div>
                 </div>
             `;
