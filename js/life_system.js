@@ -9,13 +9,18 @@ class LifeSystem {
     }
 
     // 毎月の初め（1月）に「新しく登場する武将がいないか」をチェックします
-    async processStartMonth() {
-        if (this.game.month === 1) {
-            this.updateAllBushosAge(); // ★追加：毎年1月に、全員の年齢と能力を計算し直します！
-            await this.checkBirth();
-            await this.checkNameChange(); // ★この行を書き足しました！
-        }
-    }
+    async processStartMonth() {
+        if (this.game.month === 1) {
+            this.updateAllBushosAge(); // 毎年1月に、全員の年齢と能力を計算し直します！
+            await this.checkBirth();
+            await this.checkNameChange();
+
+            // 新しく登場した武将たちのために、派閥を組み直す魔法を呼び出します！
+            if (this.game.factionSystem) {
+                this.game.factionSystem.updateFactions();
+            }
+        }
+    }
 
     // 毎月の終わりに「寿命を迎えて亡くなる武将がいないか」をチェックします
     async processEndMonth() {
