@@ -277,38 +277,34 @@ class UIInfoManager {
         
         let listHtml = `<div class="faction-list-header"><span>派閥主</span><span>武将数</span><span>方針</span><span>思想</span><span></span></div>`;
         
-        if (fIds.length === 0) {
-            listHtml += `<div style="padding:10px;">派閥はありません。</div>`;
-        } else {
-            fIds.forEach(fId => {
-                const fData = factions[fId];
-                const leader = fData.leader;
-                let leaderName = leader ? leader.name : "不明";
-                let count = fData.count;
-                let seikaku = "不明";
-                let hoshin = "不明";
-                
-                if (leader) {
-                    seikaku = leader.factionSeikaku || "中道";
-                    hoshin = leader.factionHoshin || "保守的";
-                }
-                
-                let seikakuColor = "";
-                if (seikaku === '武闘派') seikakuColor = 'color:#d32f2f;';
-                else if (seikaku === '穏健派') seikakuColor = 'color:#1976d2;';
+        fIds.forEach(fId => {
+            const fData = factions[fId];
+            const leader = fData.leader;
+            let leaderName = leader ? leader.name : "不明";
+            let count = fData.count;
+            let seikaku = "不明";
+            let hoshin = "不明";
+            
+            if (leader) {
+                seikaku = leader.factionSeikaku || "中道";
+                hoshin = leader.factionHoshin || "保守的";
+            }
+            
+            let seikakuColor = "";
+            if (seikaku === '武闘派') seikakuColor = 'color:#d32f2f;';
+            else if (seikaku === '穏健派') seikakuColor = 'color:#1976d2;';
 
-                let hoshinColor = "";
-                if (hoshin === '革新的') hoshinColor = 'color:#e91e63;';
-                else if (hoshin === '保守的') hoshinColor = 'color:#1976d2;';
+            let hoshinColor = "";
+            if (hoshin === '革新的') hoshinColor = 'color:#e91e63;';
+            else if (hoshin === '保守的') hoshinColor = 'color:#1976d2;';
 
-                let nameStyle = "";
-                if (fId === daimyoFactionId) {
-                    nameStyle = "color: darkorange;";
-                }
+            let nameStyle = "";
+            if (fId === daimyoFactionId) {
+                nameStyle = "color: darkorange;";
+            }
 
-                listHtml += `<div class="faction-list-item" onclick="if(window.AudioManager) window.AudioManager.playSE('choice.ogg'); window.GameApp.ui.info.showFactionBushoList(${clan.id}, ${fId}, '${leaderName}派')"><strong class="col-faction-name" style="${nameStyle}">${leaderName}</strong><span>${count}</span><span style="${seikakuColor}">${seikaku}</span><span style="${hoshinColor}">${hoshin}</span><span></span></div>`;
-            });
-        }
+            listHtml += `<div class="faction-list-item" onclick="if(window.AudioManager) window.AudioManager.playSE('choice.ogg'); window.GameApp.ui.info.showFactionBushoList(${clan.id}, ${fId}, '${leaderName}派')"><strong class="col-faction-name" style="${nameStyle}">${leaderName}</strong><span>${count}</span><span style="${seikakuColor}">${seikaku}</span><span style="${hoshinColor}">${hoshin}</span><span></span></div>`;
+        });
         
         if (nonFactionCount > 0) {
             listHtml += `<div class="faction-list-item" onclick="if(window.AudioManager) window.AudioManager.playSE('choice.ogg'); window.GameApp.ui.info.showFactionBushoList(${clan.id}, 0, '無派閥')"><strong class="col-faction-name">無派閥</strong><span>${nonFactionCount}</span><span>-</span><span>-</span><span></span></div>`;
