@@ -1203,6 +1203,12 @@ class UIManager {
             faceHtml = `<img src="data/images/faceicons/${castellan.faceIcon}" onerror="this.style.display='none'">`;
         }
 
+        // ★城にいるアクティブな自軍武将の数を数える魔法です！
+        let activeBushoCount = 0;
+        if (castle.ownerClan !== 0 && this.game && this.game.bushos) {
+            activeBushoCount = this.game.bushos.filter(b => b.castleId === castle.id && b.clan === castle.ownerClan && b.status === 'active').length;
+        }
+
         // ★ここから追加：城が「保護期間（戦乱）」かどうかをチェックする魔法です！
         let isProtected = false;
         // ゲーム内の「immunityUntil」という数字で管理されている保護期間をチェックします！
@@ -1247,7 +1253,8 @@ class UIManager {
                     <div class="sp-label">防御</div><div class="sp-val">${this.getStatusBarHTML(castle.defense, castle.maxDefense, 'lightblue', isVisible)}</div>
                     <div class="sp-empty"></div><div class="sp-empty"></div>
                     
-                    <div class="sp-label">人口</div><div class="sp-val-left" style="grid-column: 2 / span 5;">${maskPop(castle.population)}</div>
+                    <div class="sp-label">人口</div><div class="sp-val-left" style="grid-column: 2 / span 3;">${maskPop(castle.population)}</div>
+                    <div class="sp-label">武将</div><div class="sp-val-right">${maskPop(activeBushoCount)}</div>
                 </div>
             </div>
             <div class="sp-info-footer">
