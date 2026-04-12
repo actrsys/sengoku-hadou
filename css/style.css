@@ -404,12 +404,12 @@ body.hide-daimyo-labels .daimyo-name-label { display: none !important; }
     text-shadow: 1px 1px 0 #000, -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000;
     transform: translate(30%, -10%) !important; 
 }
-.rank-s .grade-main { background: linear-gradient(to bottom, #ffd700 0%, #ffd700 35%, #ffffff 50%, #ffd700 65%, #ffd700 100%); }
-.rank-a .grade-main { background: linear-gradient(to bottom, #f47a4d 0%, #f47a4d 35%, #ffffff 50%, #f47a4d 65%, #f47a4d 100%); }
-.rank-b .grade-main { background: linear-gradient(to bottom, #f58f98 0%, #f58f98 35%, #ffffff 50%, #f58f98 65%, #f58f98 100%); }
-.rank-c .grade-main { background: linear-gradient(to bottom, #adff2f 0%, #adff2f 35%, #ffffff 50%, #adff2f 65%, #adff2f 100%); }
-.rank-d .grade-main { background: linear-gradient(to bottom, #65bbe9 0%, #65bbe9 35%, #ffffff 50%, #65bbe9 65%, #65bbe9 100%); }
-.rank-e .grade-main { background: linear-gradient(to bottom, #9b95c9 0%, #9b95c9 35%, #ffffff 50%, #9b95c9 65%, #9b95c9 100%); }
+.rank-s .grade-main { background-image: linear-gradient(to bottom, #ffd700 0%, #ffd700 35%, #ffffff 50%, #ffd700 65%, #ffd700 100%); }
+.rank-a .grade-main { background-image: linear-gradient(to bottom, #f47a4d 0%, #f47a4d 35%, #ffffff 50%, #f47a4d 65%, #f47a4d 100%); }
+.rank-b .grade-main { background-image: linear-gradient(to bottom, #f58f98 0%, #f58f98 35%, #ffffff 50%, #f58f98 65%, #f58f98 100%); }
+.rank-c .grade-main { background-image: linear-gradient(to bottom, #adff2f 0%, #adff2f 35%, #ffffff 50%, #adff2f 65%, #adff2f 100%); }
+.rank-d .grade-main { background-image: linear-gradient(to bottom, #65bbe9 0%, #65bbe9 35%, #ffffff 50%, #65bbe9 65%, #65bbe9 100%); }
+.rank-e .grade-main { background-image: linear-gradient(to bottom, #9b95c9 0%, #9b95c9 35%, #ffffff 50%, #9b95c9 65%, #9b95c9 100%); }
 
 .bar-bg { width: 90%; height: 12px; border-radius: 3px; overflow: hidden; display: inline-block; vertical-align: middle; border: 1px solid #a69363; box-shadow: 0 0 5px rgba(0,0,0,0.8), inset 0 1px 3px rgba(0,0,0,0.6); box-sizing: border-box; }
 .bar-fill { height: 100%; transition: width 0.3s ease; }
