@@ -1296,7 +1296,7 @@ body.is-pc {
     .grade-plus { font-size: 0.8rem !important; }
 
     /* PC”Å: ‘å–¼‘I‘ð */
-    #daimyo-confirm-modal .modal-content { top: 20px; left: 20px; bottom: auto; right: auto; width: 560px; max-width: 90vw; }
+    #daimyo-confirm-modal .modal-content { top: 20px; left: 20px; bottom: auto; right: auto; width: 640px; max-width: 90vw; }
     
     #daimyo-confirm-body { display: grid; grid-template-columns: 120px 1fr; grid-template-rows: auto auto; column-gap: 20px; row-gap: 10px; }
     .daimyo-confirm-compact, .daimyo-confirm-info { display: contents; }
