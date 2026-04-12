@@ -785,12 +785,14 @@ body:not(.is-pc).daimyo-select-mode #map-wrapper { margin-bottom: 0 !important; 
 }
 
 .daimyo-detail-label {
-    font-size: 0.75rem;
-    color: #666;
+    font-size: 0.85rem;
+    color: #ffd54f;
     margin-right: 5px;
     white-space: nowrap;
     width: 90px;
     display: inline-block;
+    flex-shrink: 0;
+    text-shadow: 1px 1px 0 #000, -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000;
 }
 
 .daimyo-detail-value {
