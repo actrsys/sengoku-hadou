@@ -2281,23 +2281,23 @@ class UIInfoManager {
 
         if (isMultiSliderMode) {
             const stockDiv = document.createElement('div');
-            stockDiv.style.cssText = "background: #f0f4f8; padding: 10px; border-radius: 6px; border: 1px solid #ccc; margin-bottom: 15px; font-size: 0.95rem; font-weight: bold;";
+            stockDiv.style.cssText = "background: rgba(0,0,0,0.4); padding: 10px; border-radius: 6px; border: 1px solid rgba(212, 175, 55, 0.3); margin-bottom: 15px; font-size: 0.95rem; font-weight: bold; color: #fff; text-shadow: 1px 1px 0 #000, -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000;";
             stockDiv.innerHTML = `
                 <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px;">
-                    <div style="background: #ffffff; padding: 6px 8px; border-radius: 4px; border: 1px solid #ddd; display: flex; justify-content: space-between; align-items: center;">
-                        <span style="color:#555;">金</span><span id="multi-stock-gold">${sourceCastleForMulti.gold}</span>
+                    <div style="display: flex; justify-content: space-between; align-items: center;">
+                        <span style="color:#ffd54f;">金</span><span id="multi-stock-gold">${sourceCastleForMulti.gold}</span>
                     </div>
-                    <div style="background: #ffffff; padding: 6px 8px; border-radius: 4px; border: 1px solid #ddd; display: flex; justify-content: space-between; align-items: center;">
-                        <span style="color:#555;">兵糧</span><span id="multi-stock-rice">${sourceCastleForMulti.rice}</span>
+                    <div style="display: flex; justify-content: space-between; align-items: center;">
+                        <span style="color:#ffd54f;">兵糧</span><span id="multi-stock-rice">${sourceCastleForMulti.rice}</span>
                     </div>
-                    <div style="background: #ffffff; padding: 6px 8px; border-radius: 4px; border: 1px solid #ddd; display: flex; justify-content: space-between; align-items: center;">
-                        <span style="color:#555;">兵士</span><span id="multi-stock-soldiers">${sourceCastleForMulti.soldiers}</span>
+                    <div style="display: flex; justify-content: space-between; align-items: center;">
+                        <span style="color:#ffd54f;">兵士</span><span id="multi-stock-soldiers">${sourceCastleForMulti.soldiers}</span>
                     </div>
-                    <div style="background: #ffffff; padding: 6px 8px; border-radius: 4px; border: 1px solid #ddd; display: flex; justify-content: space-between; align-items: center;">
-                        <span style="color:#555;">騎馬</span><span id="multi-stock-horses">${sourceCastleForMulti.horses || 0}</span>
+                    <div style="display: flex; justify-content: space-between; align-items: center;">
+                        <span style="color:#ffd54f;">騎馬</span><span id="multi-stock-horses">${sourceCastleForMulti.horses || 0}</span>
                     </div>
-                    <div style="background: #ffffff; padding: 6px 8px; border-radius: 4px; border: 1px solid #ddd; display: flex; justify-content: space-between; align-items: center;">
-                        <span style="color:#555;">鉄砲</span><span id="multi-stock-guns">${sourceCastleForMulti.guns || 0}</span>
+                    <div style="display: flex; justify-content: space-between; align-items: center;">
+                        <span style="color:#ffd54f;">鉄砲</span><span id="multi-stock-guns">${sourceCastleForMulti.guns || 0}</span>
                     </div>
                 </div>
             `;
@@ -2577,17 +2577,17 @@ class UIInfoManager {
         listEl.innerHTML = '';
 
         if (stockContainer) {
-            stockContainer.style.cssText = "background: #f0f4f8; padding: 10px; border-radius: 6px; border: 1px solid #ccc; margin-bottom: 15px; font-size: 0.95rem; font-weight: bold;";
+            stockContainer.style.cssText = "background: rgba(0,0,0,0.4); padding: 10px; border-radius: 6px; border: 1px solid rgba(212, 175, 55, 0.3); margin-bottom: 15px; font-size: 0.95rem; font-weight: bold; color: #fff; text-shadow: 1px 1px 0 #000, -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000;";
             stockContainer.innerHTML = `
                 <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px;">
-                    <div style="background: #ffffff; padding: 6px 8px; border-radius: 4px; border: 1px solid #ddd; display: flex; justify-content: space-between; align-items: center;">
-                        <span style="color:#555;">兵士</span><span id="divide-stock-soldiers">0</span>
+                    <div style="display: flex; justify-content: space-between; align-items: center;">
+                        <span style="color:#ffd54f;">兵士</span><span id="divide-stock-soldiers">0</span>
                     </div>
-                    <div style="background: #ffffff; padding: 6px 8px; border-radius: 4px; border: 1px solid #ddd; display: flex; justify-content: space-between; align-items: center;">
-                        <span style="color:#555;">騎馬</span><span id="divide-stock-horses">0</span>
+                    <div style="display: flex; justify-content: space-between; align-items: center;">
+                        <span style="color:#ffd54f;">騎馬</span><span id="divide-stock-horses">0</span>
                     </div>
-                    <div style="background: #ffffff; padding: 6px 8px; border-radius: 4px; border: 1px solid #ddd; display: flex; justify-content: space-between; align-items: center;">
-                        <span style="color:#555;">鉄砲</span><span id="divide-stock-guns">0</span>
+                    <div style="display: flex; justify-content: space-between; align-items: center;">
+                        <span style="color:#ffd54f;">鉄砲</span><span id="divide-stock-guns">0</span>
                     </div>
                 </div>
             `;
