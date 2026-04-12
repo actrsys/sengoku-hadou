@@ -442,20 +442,72 @@ body.hide-daimyo-labels .daimyo-name-label { display: none !important; }
 }
 
 /* 入力・スライダー UI */
+/* 1. スライダーごとの枠を消して、項目名を横に戻す（幅を狭めてフィットさせる） */
 .qty-row { 
-    margin-bottom: 15px; 
-    padding: 8px 12px; 
-    background: rgba(0,0,0,0.4); 
-    border: 1px solid rgba(212, 175, 55, 0.3); 
-    border-radius: 6px; 
+    margin-bottom: 12px !important; 
+    padding: 0 !important; 
+    background: transparent !important; 
+    border: none !important; 
+    border-radius: 0 !important;
     color: #fff; 
-    text-shadow: 1px 1px 0 #000, -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000; 
+    display: flex;
+    flex-direction: row; 
+    align-items: center;
+    gap: 4px; 
 }
-.qty-row > span:first-child { 
-    color: #ffd54f; 
-    font-weight: bold; 
-    display: inline-block;
-    margin-bottom: 5px;
+.qty-row > :first-child:not(.qty-control) { 
+    align-self: auto;
+    color: #ffd54f !important; 
+    font-size: 0.85rem; 
+    margin-bottom: 0 !important;
+    margin-right: 0 !important;
+    background: transparent !important;
+    border: none !important;
+    padding: 0 !important;
+    text-shadow: 1px 1px 0 #000, -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000;
+    font-weight: bold;
+    white-space: nowrap;
+    min-width: 35px; 
+    text-align: left;
+    flex-shrink: 0;
+}
+
+/* 2. 全項目をまとめる「大きな枠」を作る（左右の余白を狭くする） */
+#quantity-container, #divide-list {
+    background: rgba(0, 0, 0, 0.4) !important;
+    border: 1px solid rgba(212, 175, 55, 0.3) !important;
+    border-radius: 6px !important;
+    padding: 12px 5px 8px 5px !important; 
+}
+
+/* 3. 「輸送先」などの説明エリアを大きな枠と合体させる */
+#trade-type-info {
+    background: rgba(0, 0, 0, 0.4) !important;
+    border: 1px solid rgba(212, 175, 55, 0.3) !important;
+    border-bottom: none !important; 
+    border-radius: 6px 6px 0 0 !important;
+    padding: 8px 10px 4px 10px !important;
+    color: #ffd54f !important;
+    font-weight: bold;
+    text-shadow: 1px 1px 0 #000, -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000;
+    margin-bottom: 0 !important;
+}
+#trade-type-info:not(:empty) + #quantity-container {
+    border-top: none !important;
+    border-radius: 0 0 6px 6px !important;
+    padding-top: 5px !important;
+}
+
+/* 4. 上部の現在数表示（JSで作られた部分）の枠を消して、区切り線にする */
+#quantity-container > div:first-child[style*="background"],
+#divide-list > div:first-child[style*="background"] {
+    background: transparent !important;
+    border: none !important;
+    padding: 0 5px 10px 5px !important;
+    margin-bottom: 12px !important;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.2) !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
 }
 .qty-control { display: flex; align-items: center; gap: 5px; width: 100%; }
 
@@ -1155,10 +1207,9 @@ body.is-pc {
     .list-container, .daimyo-list-container, .result-body, .faction-list-container, .princess-list-container { scroll-padding-top: 44px; }
     
     /* モーダル拡張（輸送・兵力分配）のタイル化を解除して縦並びに統一 */
-    #quantity-modal .modal-content, #unit-divide-modal .modal-content { max-width: 700px !important; max-height: 90% !important; }
-    #quantity-container, #divide-list { display: flex !important; flex-direction: column; gap: 10px; align-items: stretch; }
-    .qty-row, #divide-list > div { margin-bottom: 0 !important; }
-    .qty-row { background: rgba(0,0,0,0.4); padding: 10px 15px; border: 1px solid rgba(212, 175, 55, 0.3); border-radius: 6px; }
+? ? #quantity-modal .modal-content, #unit-divide-modal .modal-content { max-width: 700px !important; max-height: 90% !important; }
+? ? #quantity-container, #divide-list { display: flex !important; flex-direction: column; gap: 10px; align-items: stretch; }
+? ? .qty-row, #divide-list > div { margin-bottom: 0 !important; }
 
     /* ランク表記 */
     .grade-main { font-size: 1.1rem !important; }
