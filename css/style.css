@@ -1100,11 +1100,17 @@ body:not(.is-pc).daimyo-select-mode #map-wrapper { margin-bottom: 0 !important; 
 body:not(.is-pc) .label-pc { display: none !important; }
 body:not(.is-pc) .label-sp { display: inline !important; }
 
+/* ★追加：スマホ版の全ウインドウを、左右の隙間なく画面いっぱいに広げる魔法 */
+body:not(.is-pc) .modal .modal-content {
+    width: 100% !important;
+    max-width: 100% !important;
+    border-radius: 0 !important; /* 画面端にピッタリくっつくので角丸を消します */
+}
+
 /* スマホ版：ウィンドウのボタンを「決定」が右側になるように逆順にする魔法 */
 body:not(.is-pc) .modal-footer {
     flex-direction: row-reverse;
 }
-
 /* スマホ版: 複数スライダー画面を全画面にする魔法 */
 body:not(.is-pc) #quantity-modal.multi-slider-mode { 
     padding: 0 !important; 
@@ -1126,9 +1132,9 @@ body:not(.is-pc) #quantity-modal.multi-slider-mode .modal-content {
 }
 
 /* スマホ版: 大名選択 */
-body:not(.is-pc) #daimyo-confirm-modal .modal-content { top: max(20px, env(safe-area-inset-top)); bottom: auto; left: 50%; transform: translateX(-50%); width: 90%; max-width: 400px; padding: 15px; }
+body:not(.is-pc) #daimyo-confirm-modal .modal-content { top: max(20px, env(safe-area-inset-top)); bottom: auto; left: 0; transform: none; width: 100% !important; max-width: 100% !important; padding: 15px; }
 /* ★ スマホ版も見切れないように、下の余白を多めに確保しました */
-body:not(.is-pc) .daimyo-confirm-buttons { flex-direction: column; gap: 12px; width: 90%; bottom: max(40px, calc(env(safe-area-inset-bottom) + 20px)); }
+body:not(.is-pc) .daimyo-confirm-buttons { flex-direction: column; gap: 12px; width: 100%; bottom: max(40px, calc(env(safe-area-inset-bottom) + 20px)); padding: 0 15px; box-sizing: border-box; }
 body:not(.is-pc) .daimyo-confirm-buttons button { width: 100%; box-sizing: border-box; border-radius: 20px; }
 
 /* =========================================================
