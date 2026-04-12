@@ -1096,14 +1096,20 @@ class UIInfoManager {
         
         let totalPopulation = 0;
         let totalKokudaka = 0;
+        let totalCommerce = 0;
         let totalGold = 0;
         let totalRice = 0;
+        let totalHorses = 0;
+        let totalGuns = 0;
         
         clanCastles.forEach(c => {
             totalPopulation += (c.population || 0);
             totalKokudaka += (c.kokudaka || 0);
+            totalCommerce += (c.commerce || 0);
             totalGold += (c.gold || 0);
             totalRice += (c.rice || 0);
+            totalHorses += (c.horses || 0);
+            totalGuns += (c.guns || 0);
         });
 
         // 武将の数と姫の数も数えます
@@ -1123,12 +1129,15 @@ class UIInfoManager {
                 <div class="daimyo-confirm-stats">
                     <div class="stat-box"><span>城</span><span class="stat-val">${castlesCount}</span></div>
                     <div class="stat-box"><span>人口</span><span class="stat-val">${totalPopulation}</span></div>
-                    <div class="stat-box"><span>兵士</span><span class="stat-val">${soldiers}</span></div>
-                    <div class="stat-box"><span>石高</span><span class="stat-val">${totalKokudaka}</span></div>
-                    <div class="stat-box"><span>金</span><span class="stat-val">${totalGold}</span></div>
-                    <div class="stat-box"><span>兵糧</span><span class="stat-val">${totalRice}</span></div>
                     <div class="stat-box"><span>武将</span><span class="stat-val">${bushosCount}</span></div>
                     <div class="stat-box"><span>姫</span><span class="stat-val">${princessCount}</span></div>
+                    <div class="stat-box"><span>石高</span><span class="stat-val">${totalKokudaka}</span></div>
+                    <div class="stat-box"><span>鉱山</span><span class="stat-val">${totalCommerce}</span></div>
+                    <div class="stat-box"><span>金</span><span class="stat-val">${totalGold}</span></div>
+                    <div class="stat-box"><span>兵糧</span><span class="stat-val">${totalRice}</span></div>
+                    <div class="stat-box"><span>兵士</span><span class="stat-val">${soldiers}</span></div>
+                    <div class="stat-box"><span>軍馬</span><span class="stat-val">${totalHorses}</span></div>
+                    <div class="stat-box"><span>鉄砲</span><span class="stat-val">${totalGuns}</span></div>
                 </div>
             `;
         }
