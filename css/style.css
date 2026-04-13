@@ -708,10 +708,10 @@ body.hide-daimyo-labels .daimyo-name-label { display: none !important; }
 .qty-control .qty-shortcut-btn:disabled { background: #e0e0e0; border-color: #ccc; color: #999; cursor: not-allowed; box-shadow: none; opacity: 0.7; }
 
 #quantity-modal h3, #trade-type-info, #charity-type-selector, #quantity-modal .modal-footer { flex-shrink: 0; }
-#quantity-container { flex: 1; overflow-y: auto; overflow-x: hidden; min-height: 0; padding-right: 5px; padding-bottom: 2px; margin-bottom: 10px; }
+#quantity-container { flex: 1; overflow-y: auto; overflow-x: hidden; min-height: 0; padding-right: 5px; padding-bottom: 30px; margin-bottom: 10px; }
 #unit-divide-modal .modal-content { overflow: hidden !important; }
 #unit-divide-modal h3, #unit-divide-modal > div:not(#divide-list), #unit-divide-modal .modal-footer { flex-shrink: 0; }
-#divide-list { flex: 1; overflow-y: auto; overflow-x: hidden; min-height: 0; max-height: none !important; padding-right: 5px; padding-bottom: 80px; margin-bottom: 10px; scrollbar-width: none; -ms-overflow-style: none; }
+#divide-list { flex: 1; overflow-y: auto; overflow-x: hidden; min-height: 0; max-height: none !important; padding-right: 5px; padding-bottom: 30px; margin-bottom: 10px; scrollbar-width: none; -ms-overflow-style: none; }
 #divide-list::-webkit-scrollbar { display: none; }
 
 /* 部隊編成画面から邪魔な自作スクロールバー（金色）を消し去る設定 */
@@ -1429,44 +1429,26 @@ body:not(.is-pc) .modal .modal-content {
 body:not(.is-pc) .modal-footer {
     flex-direction: row-reverse;
 }
-/* スマホ版: 複数スライダー（輸送）は元の設定を維持 */
-body:not(.is-pc) #quantity-modal.multi-slider-mode { 
+/* スマホ版: 複数スライダー（輸送）と部隊編成画面を全画面にぴったり収める魔法 */
+body:not(.is-pc) #quantity-modal.multi-slider-mode,
+body:not(.is-pc) #unit-divide-modal { 
     padding: 0 !important; 
     height: 100dvh !important; 
 }
-body:not(.is-pc) #quantity-modal.multi-slider-mode .modal-content { 
+body:not(.is-pc) #quantity-modal.multi-slider-mode .modal-content,
+body:not(.is-pc) #unit-divide-modal .modal-content { 
     width: 100% !important; 
-    height: 95% !important; 
+    height: 95% !important; /* ★少し余裕を持たせて見切れを防ぎます */
     max-width: none !important; 
     max-height: none !important; 
-    margin: auto !important; 
+    margin: 0 !important; 
     border-radius: 0 !important; 
     border: 2px solid #d4af37 !important; 
     box-sizing: border-box !important;
-    padding-top: max(15px, env(safe-area-inset-top)) !important;
-    padding-bottom: max(20px, env(safe-area-inset-bottom)) !important; 
+    padding-top: max(20px, env(safe-area-inset-top)) !important;
+    padding-bottom: max(80px, calc(env(safe-area-inset-bottom) + 40px)) !important; 
     padding-left: 15px !important;
     padding-right: 15px !important;
-}
-
-/* スマホ版: 部隊編成画面だけを単体スライダーの基本設定に合わせて見切れを直す */
-body:not(.is-pc) #unit-divide-modal { 
-    padding: env(safe-area-inset-top) env(safe-area-inset-right) calc(env(safe-area-inset-bottom) + 60px) env(safe-area-inset-left) !important; 
-    height: 100% !important; 
-}
-body:not(.is-pc) #unit-divide-modal .modal-content { 
-    width: 95% !important; 
-    height: auto !important; 
-    max-width: 800px !important; 
-    max-height: calc(95% - 60px) !important; 
-    margin: auto !important; 
-    border-radius: 8px !important; 
-    border: 2px solid #d4af37 !important; 
-    box-sizing: border-box !important;
-    padding-top: max(15px, env(safe-area-inset-top)) !important;
-    padding-bottom: max(20px, env(safe-area-inset-bottom)) !important; 
-    padding-left: 10px !important;
-    padding-right: 10px !important;
 }
 
 /* スマホ版: 大名選択 */
