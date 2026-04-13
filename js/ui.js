@@ -758,91 +758,10 @@ class UIManager {
         this.info.showKyotenList();
     }
 
-    // ==========================================
-    // ★ここから追加：委任する城の一覧を出す魔法
-    // ==========================================
     showDelegateListModal() {
-        const modal = document.getElementById('delegate-list-modal');
-        const listEl = document.getElementById('delegate-list');
-        if (!modal || !listEl) return;
-
-        // 大名のいる城（本拠地）を探します
-        const daimyo = this.game.bushos.find(b => b.clan === this.game.playerClanId && b.isDaimyo);
-        const daimyoCastleId = daimyo ? daimyo.castleId : -1;
-
-        // 自分の城のリストを作成（大名のいる城は除外します）
-        const myCastles = this.game.castles.filter(c => c.ownerClan === this.game.playerClanId && c.id !== daimyoCastleId);
-
-        // ==========================================
-        // ★ここから追加！：一括切替ボタンの魔法
-        // ==========================================
-        const toggleAllBtn = document.getElementById('btn-toggle-all-delegate');
-        if (toggleAllBtn) {
-            // 今、リストにある城が「すべて委任状態」になっているか調べます
-            const isAllDelegated = myCastles.length > 0 && myCastles.every(c => c.isDelegated);
-            
-            // ★書き換え！：ボタンの文字だけでなく、背景色と枠線の色も一緒に変えます
-            if (isAllDelegated) {
-                toggleAllBtn.textContent = '一括';
-                toggleAllBtn.style.color = '#d32f2f';             // 文字を赤に
-                toggleAllBtn.style.backgroundColor = '#ffebee';   // 背景を薄い赤に
-                toggleAllBtn.style.borderColor = '#d32f2f';       // 枠線を赤に
-            } else {
-                toggleAllBtn.textContent = '一括';
-                toggleAllBtn.style.color = '#1976d2';             // 文字を青に
-                toggleAllBtn.style.backgroundColor = '#e3f2fd';   // 背景を薄い青に
-                toggleAllBtn.style.borderColor = '#1976d2';       // 枠線を青に
-            }
-
-            // ボタンを押した時の処理
-            toggleAllBtn.onclick = () => {
-                if (window.AudioManager) window.AudioManager.playSE('choice.ogg');
-                
-                // 今が「すべて委任」なら全員「直轄(false)」に、それ以外なら全員「委任(true)」にします！
-                const newState = !isAllDelegated;
-                myCastles.forEach(c => c.isDelegated = newState);
-                
-                // もう一度画面を描き直して、文字や色を更新します
-                this.showDelegateListModal();
-            };
+        if (this.uiInfo) {
+            this.uiInfo.showDelegateList();
         }
-        // ★追加ここまで！
-        // ==========================================
-
-        let listHtml = '<div class="list-header" style="grid-template-columns: 1fr 1fr;"><span style="justify-content:flex-start; padding-left:5px;">拠点名</span><span>状態</span></div>';
-
-        myCastles.forEach(c => {
-            const statusColor = c.isDelegated ? 'color:#1976d2;' : 'color:#d32f2f;';
-            const statusText = c.isDelegated ? '委任' : '直轄';
-            
-            listHtml += `<div class="select-item delegate-list-item" style="grid-template-columns: 1fr 1fr;" data-id="${c.id}"><span style="justify-content:flex-start; padding-left:5px; font-weight:bold; font-size: 1.1rem;">${c.name}</span><span style="${statusColor} font-weight:bold; font-size: 1.1rem;">${statusText}</span></div>`;
-        });
-
-        const itemCount = myCastles.length;
-        for (let i = itemCount; i < 8; i++) {
-            listHtml += `<div class="select-item" style="grid-template-columns: 1fr 1fr; cursor:default; pointer-events:none;"><span></span><span></span></div>`;
-        }
-
-        listEl.innerHTML = listHtml;
-
-        const items = listEl.querySelectorAll('.delegate-list-item');
-        items.forEach(item => {
-            item.onclick = () => {
-                if (window.AudioManager) window.AudioManager.playSE('choice.ogg');
-                const cid = parseInt(item.getAttribute('data-id'), 10);
-                const targetCastle = myCastles.find(c => c.id === cid);
-                if (targetCastle) {
-                    this.showDelegateSettingModal(targetCastle, () => {
-                        this.showDelegateListModal();
-                    });
-                }
-            };
-        });
-
-        if (listEl) {
-            listEl.scrollTop = 0;
-        }
-        modal.classList.remove('hidden');
     }
 
     // 個別の「直轄・委任」切り替え画面を出す魔法

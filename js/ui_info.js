@@ -5,6 +5,55 @@ class UIInfoManager {
         this.game = game;
     }
     
+    showDelegateList() {
+        const myCastles = this.game.castles.filter(c => c.ownerClan === this.game.playerClanId);
+        const listEl = this.ui.selectorList;
+        const modal = this.ui.selectorModal;
+
+        this.ui.selectorContextInfo.innerHTML = '';
+        this.ui.selectorConfirmBtn.classList.add('hidden');
+        
+        // ヘッダー（2列：拠点名、状態）
+        let listHtml = '<div class="list-header delegate-mode"><span>拠点名</span><span>状態</span></div>';
+
+        // お城のリストを表示（最大8行分回す）
+        for (let i = 0; i < 8; i++) {
+            const c = myCastles[i];
+            if (c) {
+                const statusColor = c.isDelegated ? 'color:#1976d2;' : 'color:#d32f2f;';
+                const statusText = c.isDelegated ? '委任' : '直轄';
+                
+                listHtml += `
+                    <div class="select-item delegate-mode clickable-item" data-id="${c.id}">
+                        <span style="justify-content:flex-start; padding-left:10px;">${c.name}</span>
+                        <span style="${statusColor}">${statusText}</span>
+                    </div>`;
+            } else {
+                // 8行に満たない場合は空行を表示
+                listHtml += `<div class="select-item delegate-mode empty-row"><span></span><span></span></div>`;
+            }
+        }
+
+        listEl.innerHTML = listHtml;
+
+        // クリックイベントの設定
+        listEl.querySelectorAll('.clickable-item').forEach(item => {
+            item.onclick = () => {
+                if (window.AudioManager) window.AudioManager.playSE('choice.ogg');
+                const cid = parseInt(item.getAttribute('data-id'), 10);
+                const target = myCastles.find(c => c.id === cid);
+                if (target) {
+                    this.ui.showDelegateSettingModal(target, () => {
+                        this.showDelegateList();
+                    });
+                }
+            };
+        });
+
+        if (listEl) listEl.scrollTop = 0;
+        modal.classList.remove('hidden');
+    }
+
     showDaimyoList() {
         let listHtml = '<div class="daimyo-list-header"><span>勢力名</span><span>当主名</span><span>城数</span><span>威信</span><span>友好度</span><span>関係</span></div>';
         
