@@ -737,10 +737,8 @@ class UIInfoManager {
             } else {
                 this.selectedPrincessId = null;
                 footer.innerHTML = `
-                    <div style="display: flex; gap: 10px; justify-content: flex-end; width: 100%;">
-                        <button id="princess-confirm-btn" class="btn-primary" disabled style="opacity: 0.5; cursor: not-allowed;" onclick="window.GameApp.ui.info.confirmPrincessSelection(${targetCastleId}, ${doerId})">決定</button>
-                        <button class="btn-secondary" onclick="window.GameApp.ui.openBushoSelector('diplomacy_doer', ${targetCastleId}, { subAction: 'marriage' }); document.getElementById('princess-list-modal').classList.add('hidden');">戻る</button>
-                    </div>
+                    <button id="princess-confirm-btn" class="btn-primary" disabled style="opacity: 0.5; cursor: not-allowed;" onclick="window.GameApp.ui.info.confirmPrincessSelection(${targetCastleId}, ${doerId})">決定</button>
+                    <button class="btn-secondary" onclick="window.GameApp.ui.openBushoSelector('diplomacy_doer', ${targetCastleId}, { subAction: 'marriage' }); document.getElementById('princess-list-modal').classList.add('hidden');">戻る</button>
                 `;
             }
 
