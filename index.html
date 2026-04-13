@@ -356,10 +356,10 @@
         </div>
 
         <div id="gunshi-modal" class="modal hidden">
-            <div class="modal-content result-content" style="max-width: 500px;">
-                <h3 id="gunshi-name">軍師</h3>
-                <p id="gunshi-message" style="margin: 20px 0; font-style: italic; background:#f0f0f0; padding:15px; border-radius:5px;"></p>
-                <div class="modal-footer">
+            <div class="modal-content" style="max-width: 400px; text-align: center;">
+                <h3 id="gunshi-name" style="margin-top:0;">軍師</h3>
+                <div id="gunshi-message" style="margin: 20px 0; font-size:1.1rem; line-height:1.5; white-space: pre-wrap; text-align: left;"></div>
+                <div class="modal-footer" style="justify-content: flex-end; gap: 10px;">
                     <button id="gunshi-execute-btn" class="btn-primary">実行</button>
                     <button class="btn-secondary" onclick="document.getElementById('gunshi-modal').classList.add('hidden')">戻る</button>
                 </div>

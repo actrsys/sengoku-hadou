@@ -1520,7 +1520,7 @@ class UIManager {
         if (this.gunshiModal) {
             this.gunshiModal.classList.remove('hidden'); 
             if (this.gunshiName) this.gunshiName.textContent = `軍師: ${gunshi ? gunshi.name : '不明'}`; 
-            if (this.gunshiMessage) this.gunshiMessage.textContent = msg;
+            if (this.gunshiMessage) this.gunshiMessage.innerHTML = msg.replace(/\n/g, '<br>');
         }
         if (this.gunshiExecuteBtn) {
             this.gunshiExecuteBtn.onclick = () => { 
