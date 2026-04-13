@@ -83,6 +83,12 @@ class UIInfoManager {
     showDaimyoDetail(clanId) {
         const clan = this.game.clans.find(c => c.id === clanId);
         if (!clan) return;
+
+        const daimyoListModal = document.getElementById('daimyo-list-modal');
+        const isDaimyoListVisible = daimyoListModal && !daimyoListModal.classList.contains('hidden');
+        if (isDaimyoListVisible) {
+            daimyoListModal.classList.add('invisible');
+        }
         
         const leader = this.game.getBusho(clan.leaderId);
         const leaderName = leader ? leader.name.replace('|', '') : "不明";
@@ -200,12 +206,16 @@ class UIInfoManager {
         backBtn.onclick = (e) => {
             e.stopPropagation();
             modal.classList.add('hidden');
+            if (isDaimyoListVisible) daimyoListModal.classList.remove('invisible');
         };
 
         diploBtn.onclick = (e) => {
             e.stopPropagation(); 
             if (window.AudioManager) window.AudioManager.playSE('decision.ogg');
-            this.showDiplomacyList(clan.id, clan.name);
+            modal.classList.add('invisible');
+            this.showDiplomacyList(clan.id, clan.name, () => {
+                modal.classList.remove('invisible');
+            });
         };
 
         if (bushoBtn) {
@@ -213,10 +223,12 @@ class UIInfoManager {
                 e.stopPropagation();
                 if (window.AudioManager) window.AudioManager.playSE('decision.ogg');
                 
+                modal.classList.add('invisible');
                 const targetBushos = this.game.bushos.filter(b => b.clan === clanId && b.status === 'active');
                 this.openBushoSelector('view_only', null, { 
                     customBushos: targetBushos,
-                    customInfoHtml: `<div>${clan.name} 所属武将</div>`
+                    customInfoHtml: `<div>${clan.name} 所属武将</div>`,
+                    onCancel: () => { modal.classList.remove('invisible'); }
                 });
             };
         }
@@ -226,13 +238,14 @@ class UIInfoManager {
             if (e.target === modal) {
                 if (window.AudioManager) window.AudioManager.playSE('cancel.ogg');
                 modal.classList.add('hidden');
+                if (isDaimyoListVisible) daimyoListModal.classList.remove('invisible');
             }
         };
 
         modal.classList.remove('hidden');
     }
 
-    showDiplomacyList(clanId, clanName) {
+    showDiplomacyList(clanId, clanName, onClose = null) {
         let listHtml = '<div class="daimyo-list-container"><div class="daimyo-list-header" style="grid-template-columns: 2fr 1.5fr 1fr 3fr;"><span>勢力名</span><span>友好度</span><span>関係</span><span></span></div>';
         
         const activeClans = this.game.clans.filter(c => c.id !== 0 && c.id !== clanId && this.game.castles.some(cs => cs.ownerClan === c.id));
@@ -274,6 +287,15 @@ class UIInfoManager {
         const diploBody = document.getElementById('diplo-list-body');
         
         if (!diploModal || !diploTitle || !diploBody) return;
+
+        const closeBtn = diploModal.querySelector('.btn-secondary');
+        if (closeBtn) {
+            closeBtn.onclick = () => {
+                if (window.AudioManager) window.AudioManager.playSE('cancel.ogg');
+                diploModal.classList.add('hidden');
+                if (onClose) onClose();
+            };
+        }
         
         diploTitle.textContent = `${clanName} 外交関係`;
         diploBody.innerHTML = listHtml;
@@ -390,6 +412,12 @@ class UIInfoManager {
     
     showBushoDetailModal(busho) {
         if (!this.ui.bushoDetailModal || !this.ui.bushoDetailBody) return;
+
+        const selectorModal = document.getElementById('selector-modal');
+        const isSelectorVisible = selectorModal && !selectorModal.classList.contains('hidden');
+        if (isSelectorVisible) {
+            selectorModal.classList.add('invisible');
+        }
 
         let faceHtml = `<img src="data/images/faceicons/unknown_face.webp" class="busho-detail-face">`;
         if (busho.faceIcon) {
@@ -546,6 +574,17 @@ class UIInfoManager {
                 </div>
             </div>
         `;
+
+        const backBtn = this.ui.bushoDetailModal.querySelector('.btn-secondary');
+        if (backBtn) {
+            backBtn.onclick = () => {
+                if (window.AudioManager) window.AudioManager.playSE('cancel.ogg');
+                this.ui.bushoDetailModal.classList.add('hidden');
+                if (isSelectorVisible) {
+                    selectorModal.classList.remove('invisible');
+                }
+            };
+        }
 
         this.ui.bushoDetailModal.classList.remove('hidden');
     }
