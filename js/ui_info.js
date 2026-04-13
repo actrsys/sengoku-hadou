@@ -2720,10 +2720,10 @@ class UIInfoManager {
 
         bushos.forEach((b, index) => {
             const div = document.createElement('div');
-            div.className = 'qty-row';
+            div.className = 'qty-row divide-row';
             
             div.innerHTML = `
-                <div style="font-weight:bold; margin-bottom:10px; display:flex; align-items:center; justify-content:space-between;">
+                <div style="font-weight:bold; width:100%; margin-bottom:0; display:flex; align-items:center; justify-content:space-between;">
                     <span class="slider-row-label">${b.name}</span>
                     <div class="troop-type-selector" id="troop-type-group-${b.id}">
                         <button class="troop-type-btn active" data-type="ashigaru">足軽</button>

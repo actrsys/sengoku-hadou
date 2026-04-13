@@ -621,6 +621,12 @@ body.hide-daimyo-labels .daimyo-name-label { display: none !important; }
     gap: 4px; 
 }
 
+.qty-row.divide-row {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 8px;
+}
+
 /* 単体スライダーのラベル、および複数スライダーの武将名（一元管理） */
 .qty-row > :first-child:not(.qty-control),
 .slider-row-label { 
@@ -1571,9 +1577,9 @@ body.is-pc {
     .list-container, .daimyo-list-container, .result-body, .faction-list-container, .princess-list-container { scroll-padding-top: 44px; }
     
     /* モーダル拡張（輸送・兵力分配）のタイル化を解除して縦並びに統一 */
-? ? #quantity-modal .modal-content, #unit-divide-modal .modal-content { max-width: 700px !important; max-height: 90% !important; }
-? ? #quantity-container, #divide-list { display: flex !important; flex-direction: column; gap: 10px; align-items: stretch; }
-? ? .qty-row, #divide-list > div { margin-bottom: 0 !important; }
+    #quantity-modal .modal-content, #unit-divide-modal .modal-content { max-width: 700px !important; max-height: 90% !important; }
+    #quantity-container, #divide-list { display: flex !important; flex-direction: column; gap: 10px; align-items: stretch; }
+    .qty-row, #divide-list > div { margin-bottom: 0 !important; }
 
     /* ランク表記 */
     .grade-main { font-size: 1.1rem !important; }
