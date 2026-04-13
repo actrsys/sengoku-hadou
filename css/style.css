@@ -254,8 +254,9 @@ body.hide-daimyo-labels .daimyo-name-label { display: none !important; }
 /* ★専用スクロールボタン（上下左右）の魔法 */
 .custom-scrollbar-btn {
     position: absolute; width: 24px; height: 24px;
-    background: linear-gradient(135deg, #d4af37 0%, #9c7516 100%); /* 色を濃くした金色 */
-    border: 1.5px solid #5a3d08; /* 基本はすべて暗いフチにします */
+    background: linear-gradient(135deg, #ffdf80 0%, #d4af37 100%); /* 普段は金色 */
+    border-top: 1.5px solid #fff2cc; border-left: 1.5px solid #fff2cc;
+    border-bottom: 1.5px solid #825a2c; border-right: 1.5px solid #825a2c;
     z-index: 51; box-sizing: border-box;
     display: flex; justify-content: center; align-items: center;
     cursor: pointer;
@@ -265,19 +266,20 @@ body.hide-daimyo-labels .daimyo-name-label { display: none !important; }
 .custom-scrollbar-btn:active:not(.disabled) { 
     filter: brightness(1.2);
 }
-/* これ以上スクロールできない時（濃いめの銀色） */
+/* これ以上スクロールできない時（銀色） */
 .custom-scrollbar-btn.disabled {
-    background: linear-gradient(135deg, #90a4ae 0%, #546e7a 100%); 
-    border-color: #37474f; /* 無効時はフチも沈んだ色に */
+    background: linear-gradient(135deg, #b0bec5 0%, #78909c 100%);
+    border-top-color: #eceff1; border-left-color: #eceff1;
+    border-bottom-color: #455a64; border-right-color: #455a64;
     cursor: default;
     pointer-events: none; /* 押せないようにします */
 }
 
-/* 各ボタンの配置場所と、指定された「明るいフチ」の個別追加 */
-.custom-scrollbar-btn.up { top: 0; right: 0; border-bottom-color: #fff2cc; }
-.custom-scrollbar-btn.down { bottom: 24px; right: 0; border-bottom-color: #fff2cc; border-right-color: #fff2cc; }
-.custom-scrollbar-btn.left { bottom: 0; left: 0; border-bottom-color: #fff2cc; }
-.custom-scrollbar-btn.right { bottom: 0; right: 24px; border-bottom-color: #fff2cc; }
+/* 各ボタンの配置場所 */
+.custom-scrollbar-btn.up { top: 0; right: 0; }
+.custom-scrollbar-btn.down { bottom: 24px; right: 0; }
+.custom-scrollbar-btn.left { bottom: 0; left: 0; }
+.custom-scrollbar-btn.right { bottom: 0; right: 24px; }
 
 /* ★文字ではなくCSSの図形で綺麗な三角形（矢印）を作る魔法 */
 .custom-scrollbar-btn::after {
@@ -287,11 +289,31 @@ body.hide-daimyo-labels .daimyo-name-label { display: none !important; }
     border-style: solid;
     transition: opacity 0.2s;
 }
-/* それぞれの向きに合わせて三角形の形を作ります */
-.custom-scrollbar-btn.up::after { border-width: 0 4px 6px 4px; border-color: transparent transparent #111 transparent; margin-bottom: 2px; }
-.custom-scrollbar-btn.down::after { border-width: 6px 4px 0 4px; border-color: #111 transparent transparent transparent; margin-top: 2px; }
-.custom-scrollbar-btn.left::after { border-width: 4px 6px 4px 0; border-color: transparent #111 transparent transparent; margin-right: 2px; }
-.custom-scrollbar-btn.right::after { border-width: 4px 0 4px 6px; border-color: transparent transparent transparent #111; margin-left: 2px; }
+/* それぞれの向きに合わせて三角形を作り、影(drop-shadow)でフチを描画します */
+.custom-scrollbar-btn.up::after { 
+    border-width: 0 4px 6px 4px; 
+    border-color: transparent transparent #111 transparent; 
+    margin-bottom: 2px;
+    filter: drop-shadow(0px 1px 0px rgba(255, 255, 255, 0.8)); /* 下側に明るいフチ */
+}
+.custom-scrollbar-btn.down::after { 
+    border-width: 6px 4px 0 4px; 
+    border-color: #111 transparent transparent transparent; 
+    margin-top: 2px;
+    filter: drop-shadow(1px 1px 0px rgba(255, 255, 255, 0.8)); /* 右下に明るいフチ */
+}
+.custom-scrollbar-btn.left::after { 
+    border-width: 4px 6px 4px 0; 
+    border-color: transparent #111 transparent transparent; 
+    margin-right: 2px;
+    filter: drop-shadow(0px 1px 0px rgba(255, 255, 255, 0.8)); /* 下側に明るいフチ */
+}
+.custom-scrollbar-btn.right::after { 
+    border-width: 4px 0 4px 6px; 
+    border-color: transparent transparent transparent #111; 
+    margin-left: 2px;
+    filter: drop-shadow(0px 1px 0px rgba(255, 255, 255, 0.8)); /* 下側に明るいフチ */
+}
 
 /* 無効状態の時は、矢印の色も薄くして押せない感を強調します */
 .custom-scrollbar-btn.disabled::after {
