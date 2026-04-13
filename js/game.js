@@ -449,7 +449,7 @@ class GameSystem {
     
     static toGradeHTML(val) {
         let base = "", sub = "", cls = "";
-        if (val >= 96) { base =      "S"; sub = "+"; cls = "rank-s"; } 
+        if      (val >= 96) { base =  S"; sub = "+"; cls = "rank-s"; } 
         else if (val >= 91) { base = "S"; sub = "";  cls = "rank-s"; }
         else if (val >= 81) { base = "A"; sub = "+"; cls = "rank-a"; } 
         else if (val >= 76) { base = "A"; sub = "";  cls = "rank-a"; }
@@ -460,7 +460,7 @@ class GameSystem {
         else if (val >= 36) { base = "D"; sub = "+"; cls = "rank-d"; } 
         else if (val >= 31) { base = "D"; sub = "";  cls = "rank-d"; }
         else if (val >= 21) { base = "E"; sub = "+"; cls = "rank-e"; } 
-        else { base = "E"; sub = "2"; cls = "rank-e"; }
+        else                { base = "E"; sub = "";  cls = "rank-e"; }
 
         return `
             <span class="grade-container ${cls}">
