@@ -84,49 +84,54 @@ class CustomScrollbar {
     }
     
     update() {
-        // --- 縦のバーの更新 ---
         const listHeight = this.list.clientHeight;
         const scrollHeight = this.list.scrollHeight;
-        const trackHeight = this.trackY.clientHeight || listHeight; // ★トラックの実際の高さを測る魔法
-        
-        // 縦バーの表示状態を固定し、中身のサイズに応じてつまみを調整します
+        const listWidth = this.list.clientWidth;
+        const scrollWidth = this.list.scrollWidth;
+        const scrollTop = this.list.scrollTop;
+        const scrollLeft = this.list.scrollLeft;
+
+        // --- 縦のバーの更新 ---
+        const trackHeight = this.trackY.clientHeight || listHeight;
         if (scrollHeight <= listHeight) {
             this.thumbY.style.height = '100%';
             this.thumbY.style.top = '0px';
             this.thumbY.style.pointerEvents = 'none';
         } else {
             this.thumbY.style.pointerEvents = 'auto';
-            // ★つまみの高さや動く範囲も、トラックの高さに合わせて計算します
             let thumbHeight = Math.max(40, (listHeight / scrollHeight) * trackHeight);
             this.thumbY.style.height = `${thumbHeight}px`;
-            
             const maxScrollTop = scrollHeight - listHeight;
             const maxThumbTop = trackHeight - thumbHeight;
-            const scrollRatioY = this.list.scrollTop / maxScrollTop;
+            const scrollRatioY = scrollTop / maxScrollTop;
             this.thumbY.style.top = `${scrollRatioY * maxThumbTop}px`;
         }
 
         // --- 横のバーの更新 ---
-        const listWidth = this.list.clientWidth;
-        const scrollWidth = this.list.scrollWidth;
-
-        // 横バーも常に表示します
+        const actualTrackWidth = this.trackX.clientWidth || listWidth;
         if (scrollWidth <= listWidth) {
             this.thumbX.style.width = '100%';
             this.thumbX.style.left = '0px';
             this.thumbX.style.pointerEvents = 'none';
         } else {
             this.thumbX.style.pointerEvents = 'auto';
-            let thumbWidth = Math.max(40, (listWidth / scrollWidth) * listWidth);
+            let thumbWidth = Math.max(40, (listWidth / scrollWidth) * actualTrackWidth);
             this.thumbX.style.width = `${thumbWidth}px`;
-            
             const maxScrollLeft = scrollWidth - listWidth;
-            const actualTrackWidth = this.trackX.clientWidth || listWidth;
             const maxThumbLeft = actualTrackWidth - thumbWidth;
-            
-            const scrollRatioX = this.list.scrollLeft / maxScrollLeft;
+            const scrollRatioX = scrollLeft / maxScrollLeft;
             this.thumbX.style.left = `${scrollRatioX * maxThumbLeft}px`;
         }
+
+        // --- ボタンの色（有効・無効）の更新 ---
+        // 上端なら「上」ボタンを銀色に
+        this.btnUp.classList.toggle('disabled', scrollTop <= 0);
+        // 下端なら「下」ボタンを銀色に
+        this.btnDown.classList.toggle('disabled', scrollTop + listHeight >= scrollHeight - 1);
+        // 左端なら「左」ボタンを銀色に
+        this.btnLeft.classList.toggle('disabled', scrollLeft <= 0);
+        // 右端なら「右」ボタンを銀色に
+        this.btnRight.classList.toggle('disabled', scrollLeft + listWidth >= scrollWidth - 1);
     }
     
     initEvents() {
