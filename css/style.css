@@ -289,28 +289,28 @@ body.hide-daimyo-labels .daimyo-name-label { display: none !important; }
     border-style: solid;
     transition: opacity 0.2s;
 }
-/* それぞれの向きに合わせて三角形を作り、影(drop-shadow)でフチを描画します */
+/* それぞれの向きに合わせて1.2倍のサイズの三角形を作り、影(drop-shadow)でフチを描画します */
 .custom-scrollbar-btn.up::after { 
-    border-width: 0 4px 6px 4px; 
-    border-color: transparent transparent #111 transparent; 
+    border-width: 0 5px 7px 5px; 
+    border-color: transparent transparent #5c4008 transparent; 
     margin-bottom: 2px;
     filter: drop-shadow(0px 1px 0px rgba(255, 255, 255, 0.8)); /* 下側に明るいフチ */
 }
 .custom-scrollbar-btn.down::after { 
-    border-width: 6px 4px 0 4px; 
-    border-color: #111 transparent transparent transparent; 
+    border-width: 7px 5px 0 5px; 
+    border-color: #5c4008 transparent transparent transparent; 
     margin-top: 2px;
     filter: drop-shadow(1px 1px 0px rgba(255, 255, 255, 0.8)); /* 右下に明るいフチ */
 }
 .custom-scrollbar-btn.left::after { 
-    border-width: 4px 6px 4px 0; 
-    border-color: transparent #111 transparent transparent; 
+    border-width: 5px 7px 5px 0; 
+    border-color: transparent #5c4008 transparent transparent; 
     margin-right: 2px;
     filter: drop-shadow(0px 1px 0px rgba(255, 255, 255, 0.8)); /* 下側に明るいフチ */
 }
 .custom-scrollbar-btn.right::after { 
-    border-width: 4px 0 4px 6px; 
-    border-color: transparent transparent transparent #111; 
+    border-width: 5px 0 5px 7px; 
+    border-color: transparent transparent transparent #5c4008; 
     margin-left: 2px;
     filter: drop-shadow(0px 1px 0px rgba(255, 255, 255, 0.8)); /* 下側に明るいフチ */
 }
