@@ -37,7 +37,7 @@ class UIInfoManager {
 
         clanDataList.forEach(d => {
             let friendScore = 50;
-            let friendStatus = "-";
+            let friendStatus = "";
             let statusColor = "";
             let hasRelation = false;
             
@@ -56,9 +56,9 @@ class UIInfoManager {
             const powerPercent = Math.min(100, (d.power / maxPower) * 100);
             const powerBarHtml = `<div class="bar-bg bar-bg-power"><div class="bar-fill bar-fill-power" style="width:${powerPercent}%;"></div></div>`;
 
-            let friendBarHtml = "-";
+            let friendBarHtml = "";
             if (d.id === this.game.playerClanId) {
-                friendBarHtml = "-"; 
+                friendBarHtml = ""; 
             } else {
                 const friendPercent = Math.min(100, Math.max(0, friendScore));
                 friendBarHtml = `<div class="bar-bg bar-bg-friend"><div class="bar-fill bar-fill-friend" style="width:${friendPercent}%;"></div></div>`;
@@ -345,7 +345,7 @@ class UIInfoManager {
         });
         
         if (nonFactionCount > 0) {
-            listHtml += `<div class="faction-list-item" onclick="if(window.AudioManager) window.AudioManager.playSE('choice.ogg'); window.GameApp.ui.info.showFactionBushoList(${clan.id}, 0, '無派閥')"><strong class="col-faction-name">無派閥</strong><span>${nonFactionCount}</span><span>-</span><span>-</span><span></span></div>`;
+            listHtml += `<div class="faction-list-item" onclick="if(window.AudioManager) window.AudioManager.playSE('choice.ogg'); window.GameApp.ui.info.showFactionBushoList(${clan.id}, 0, '無派閥')"><strong class="col-faction-name">無派閥</strong><span>${nonFactionCount}</span><span></span><span></span><span></span></div>`;
         }
         
         let itemCount = fIds.length + (nonFactionCount > 0 ? 1 : 0);
@@ -921,9 +921,9 @@ class UIInfoManager {
 
                 // 共通の計算処理（並べ替え用）
                 const getClanYomi = (c) => { const cd = this.game.clans.find(cd => cd.id === c.ownerClan); return cd ? (cd.yomi || cd.name) : "んんん"; };
-                const getClanName = (c) => { const cd = this.game.clans.find(cd => cd.id === c.ownerClan); return cd ? cd.name : "中立"; };
+                const getClanName = (c) => { const cd = this.game.clans.find(cd => cd.id === c.ownerClan); return cd ? cd.name : ""; };
                 const getCastellanYomi = (c) => { const cb = this.game.getBusho(c.castellanId); return cb ? (cb.yomi || cb.name) : "んんん"; };
-                const getCastellanName = (c) => { const cb = this.game.getBusho(c.castellanId); return cb ? cb.name : "-"; };
+                const getCastellanName = (c) => { const cb = this.game.getBusho(c.castellanId); return cb ? cb.name : ""; };
                 const getProvinceYomi = (c) => { const p = this.game.provinces && this.game.provinces.find(p => p.id === c.provinceId); return p ? (p.yomi || p.province) : "んんん"; };
                 const getProvinceName = (c) => { const p = this.game.provinces && this.game.provinces.find(p => p.id === c.provinceId); return p ? p.province : ""; };
                 const getBushoCount = (c) => this.game.bushos.filter(b => b.castleId === c.id && b.status === 'active').length;
@@ -1003,9 +1003,9 @@ class UIInfoManager {
         // ★変更：並べ替えたあとの displayCastles を使ってリストを作ります
         displayCastles.forEach(c => {
             const clanData = this.game.clans.find(cd => cd.id === c.ownerClan);
-            const clanName = clanData ? clanData.name : "中立";
+            const clanName = clanData ? clanData.name : "";
             const castellan = this.game.getBusho(c.castellanId);
-            const castellanName = castellan ? castellan.name : "-";
+            const castellanName = castellan ? castellan.name : "";
             
             let provinceName = "";
             if (this.game.provinces) {
