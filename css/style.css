@@ -37,7 +37,7 @@ img { pointer-events: none; -webkit-user-drag: none; user-drag: none; }
    共通ユーティリティ・アニメーション
    ========================================================= */
 .hidden { display: none !important; }
-.invisible { visibility: hidden !important; pointer-events: none; }
+.invisible { visibility: hidden !important; opacity: 0 !important; transition: none !important; animation: none !important; pointer-events: none !important; }
 .disabled-area { pointer-events: none; opacity: 0.5; }
 
 .fade-in { animation: fadeIn 0.3s ease-in; }
