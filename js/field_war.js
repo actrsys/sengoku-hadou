@@ -2175,7 +2175,7 @@ class FieldWarManager {
         if (defender.troopType === 'kiba') {
             if (defToAtkDiff === 2 || defToAtkDiff === 3) defWeaponMult = 0.9; // 側面や背後から攻撃されると防御力ダウン
         } else if (defender.troopType === 'teppo') {
-            defWeaponMult = 0.8; // 鉄砲は常に防御力ダウン
+            defWeaponMult = 0.7; // 鉄砲は常に防御力ダウン
         }
         defFinalDef = defFinalDef * defWeaponMult;
 
@@ -2201,11 +2201,11 @@ class FieldWarManager {
             dmgToAtk = Math.floor(defFinalAtk * 0.5 * counterRatio);
         }
 
-        // ★追加: プレイヤーがいないAI同士の戦いなら、ダメージを約3分の1（0.333）に減らします！
+        // ★追加: プレイヤーがいないAI同士の戦いなら、ダメージを約3分の2（0.666）に減らします！
         const isPlayerInvolved = this.units.some(u => u.isPlayer);
         if (!isPlayerInvolved) {
-            dmgToDef = Math.floor(dmgToDef * 0.333);
-            dmgToAtk = Math.floor(dmgToAtk * 0.333);
+            dmgToDef = Math.floor(dmgToDef * 0.666);
+            dmgToAtk = Math.floor(dmgToAtk * 0.666);
         }
 
         // ダメージ適用（兵数以上のダメージは受けないようにガード）

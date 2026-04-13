@@ -155,7 +155,7 @@ class WarManager {
 
         while (turn <= 20 && totalAtkSoldiers > 0 && s.defender.fieldSoldiers > 0 && safetyLimit > 0) {
             let resAtk = WarSystem.calcWarDamage(atkStats, defStats, totalAtkSoldiers, s.defender.fieldSoldiers, 0, s.attacker.morale, s.defender.training, 'charge');
-            if (!s.isPlayerInvolved) { resAtk.soldierDmg = Math.floor(resAtk.soldierDmg * 0.333); resAtk.counterDmg = Math.floor(resAtk.counterDmg * 0.333); }
+            if (!s.isPlayerInvolved) { resAtk.soldierDmg = Math.floor(resAtk.soldierDmg * 0.666); resAtk.counterDmg = Math.floor(resAtk.counterDmg * 0.666); }
             
             let actDefDmg1 = Math.min(s.defender.fieldSoldiers, resAtk.soldierDmg);
             let actAtkDmg1 = Math.min(totalAtkSoldiers, resAtk.counterDmg);
@@ -167,7 +167,7 @@ class WarManager {
             if (s.defender.fieldSoldiers <= 0 || totalAtkSoldiers <= 0) break;
             
             let resDef = WarSystem.calcWarDamage(defStats, atkStats, s.defender.fieldSoldiers, totalAtkSoldiers, 0, s.defender.morale, s.attacker.training, 'charge');
-            if (!s.isPlayerInvolved) { resDef.soldierDmg = Math.floor(resDef.soldierDmg * 0.333); resDef.counterDmg = Math.floor(resDef.counterDmg * 0.333); }
+            if (!s.isPlayerInvolved) { resDef.soldierDmg = Math.floor(resDef.soldierDmg * 0.666); resDef.counterDmg = Math.floor(resDef.counterDmg * 0.666); }
             
             let actAtkDmg2 = Math.min(totalAtkSoldiers, resDef.soldierDmg);
             let actDefDmg2 = Math.min(s.defender.fieldSoldiers, resDef.counterDmg);
@@ -912,7 +912,7 @@ class WarManager {
                 let dmgRatio = (atkInt * 1.5) / ((atkInt * 1.5) + (defInt * 1.5));
                 //火計の最終ダメージ 実行智謀 * ダメージ倍率 * 0.5
                 let baseDamage = atkInt * dmgRatio * 0.5;
-                let calcDamage = Math.floor(s.isPlayerInvolved ? baseDamage : baseDamage * 0.333);
+                let calcDamage = Math.floor(s.isPlayerInvolved ? baseDamage : baseDamage * 0.666);
                 
                 s.defender.defense = Math.max(0, s.defender.defense - calcDamage);
                 
@@ -1086,9 +1086,9 @@ class WarManager {
         }
 
         if (!s.isPlayerInvolved) {
-            calculatedSoldierDmg = Math.floor(calculatedSoldierDmg * 0.333);
-            calculatedWallDmg = Math.floor(calculatedWallDmg * 0.333);
-            calculatedCounterDmg = Math.floor(calculatedCounterDmg * 0.333);
+            calculatedSoldierDmg = Math.floor(calculatedSoldierDmg * 0.666);
+            calculatedWallDmg = Math.floor(calculatedWallDmg * 0.666);
+            calculatedCounterDmg = Math.floor(calculatedCounterDmg * 0.666);
         }
 
         let dmgResult = this.distributeDamage(isAtkTurnGroup, calculatedSoldierDmg);
