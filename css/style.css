@@ -405,7 +405,7 @@ body.hide-daimyo-labels .daimyo-name-label { display: none !important; }
 .select-item, .daimyo-list-item, .kunishu-list-item, .faction-list-item, .princess-list-item, .delegate-list-item { border-bottom: 1px solid rgba(255,215,79,0.3); scroll-snap-align: start; cursor: pointer; color: #fff; background: linear-gradient(to bottom, #254a2e 0%, #1b3822 100%); text-shadow: 1px 1px 0 #000, -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000; }
 .select-item:nth-child(even), .daimyo-list-item:nth-child(even), .kunishu-list-item:nth-child(even), .faction-list-item:nth-child(even), .princess-list-item:nth-child(even), .delegate-list-item:nth-child(even) { background: linear-gradient(to bottom, #2d5a38 0%, #254a2e 100%); }
 .select-item:hover, .daimyo-list-item:hover, .kunishu-list-item:hover, .faction-list-item:hover, .princess-list-item:hover, .delegate-list-item:hover { background: linear-gradient(to bottom, #3a6b46 0%, #2a5a36 100%) !important; }
-.select-item.disabled { color: #888 !important; pointer-events: none; background: rgba(0, 0, 0, 0.6) !important; text-shadow: 1px 1px 0 #000 !important; }
+.select-item.disabled { color: #9e9e9e !important; pointer-events: none; background: linear-gradient(to bottom, #455a64 0%, #263238 100%) !important; text-shadow: 1px 1px 0 #000 !important; }
 .select-item.selected, .kunishu-list-item.selected { background: rgba(255, 152, 0, 0.4) !important; border-left: 5px solid #ffd54f; }
 .select-item.selected:hover, .kunishu-list-item.selected:hover { background: rgba(255, 152, 0, 0.6) !important; }
 .select-item input[type="checkbox"], .select-item input[type="radio"] { display: none; }
