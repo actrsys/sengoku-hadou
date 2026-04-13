@@ -714,17 +714,16 @@ body.hide-daimyo-labels .daimyo-name-label { display: none !important; }
 #divide-list { flex: 1; overflow-y: auto; overflow-x: hidden; min-height: 0; max-height: none !important; padding-right: 5px; padding-bottom: 2px; margin-bottom: 10px; scrollbar-width: none; -ms-overflow-style: none; }
 #divide-list::-webkit-scrollbar { display: none; }
 
-/* 自作スクロールバー（金色のスライダーと矢印）が誤爆するのを完全に防ぐ魔法 */
+/* 部隊編成画面から邪魔な自作スクロールバー（金色）を消し去る設定 */
 #unit-divide-modal .custom-scrollbar-track,
 #unit-divide-modal .custom-scrollbar-track-x,
 #unit-divide-modal .custom-scrollbar-btn {
     display: none !important;
 }
-/* スライダーが消えた分の隙間をなくして、リストをもっと大きく広げます */
+/* 外枠の余計な隙間と枠線を消して、リストを画面いっぱいまで広げます */
 #unit-divide-modal .scroll-wrapper {
-    padding-right: 0 !important;
-    padding-bottom: 0 !important;
-    border: none !important; /* 二重枠になっていた金枠も消してスッキリさせます */
+    padding: 0 !important;
+    border: none !important;
     box-shadow: none !important;
 }
 #unit-divide-modal .scroll-wrapper::after {
@@ -1430,7 +1429,7 @@ body:not(.is-pc) .modal .modal-content {
 body:not(.is-pc) .modal-footer {
     flex-direction: row-reverse;
 }
-/* スマホ版: 複数スライダー画面・部隊編成画面を全画面にする魔法 */
+/* スマホ版: 複数スライダー（輸送）と部隊編成画面を全画面にぴったり収める魔法 */
 body:not(.is-pc) #quantity-modal.multi-slider-mode,
 body:not(.is-pc) #unit-divide-modal { 
     padding: 0 !important; 
@@ -1439,15 +1438,15 @@ body:not(.is-pc) #unit-divide-modal {
 body:not(.is-pc) #quantity-modal.multi-slider-mode .modal-content,
 body:not(.is-pc) #unit-divide-modal .modal-content { 
     width: 100% !important; 
-    height: 96% !important; /* ★変更：上下の隙間を少し広げて、ウインドウの枠が見切れるのを防ぎます */
+    height: 95% !important; /* ★少し余裕を持たせて見切れを防ぎます */
     max-width: none !important; 
     max-height: none !important; 
     margin: auto !important; 
     border-radius: 0 !important; 
     border: 2px solid #d4af37 !important; 
     box-sizing: border-box !important;
-    padding-top: max(15px, env(safe-area-inset-top)) !important; /* ★上の余白を少し増やします */
-    padding-bottom: max(20px, env(safe-area-inset-bottom)) !important; /* ★スペルミスを直して、決定ボタンの下にしっかり余裕を作ります */
+    padding-top: max(15px, env(safe-area-inset-top)) !important;
+    padding-bottom: max(20px, env(safe-area-inset-bottom)) !important; /* ★正しい名前に修正し、下側に余裕を作ります */
     padding-left: 15px !important;
     padding-right: 15px !important;
 }
