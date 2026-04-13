@@ -206,7 +206,12 @@ class UIInfoManager {
         backBtn.onclick = (e) => {
             e.stopPropagation();
             modal.classList.add('hidden');
-            if (isDaimyoListVisible) daimyoListModal.classList.remove('invisible');
+            if (isDaimyoListVisible) {
+                daimyoListModal.classList.add('instant');
+                daimyoListModal.classList.remove('invisible');
+                void daimyoListModal.offsetWidth;
+                daimyoListModal.classList.remove('instant');
+            }
         };
 
         diploBtn.onclick = (e) => {
@@ -214,7 +219,10 @@ class UIInfoManager {
             if (window.AudioManager) window.AudioManager.playSE('decision.ogg');
             modal.classList.add('invisible');
             this.showDiplomacyList(clan.id, clan.name, () => {
+                modal.classList.add('instant');
                 modal.classList.remove('invisible');
+                void modal.offsetWidth;
+                modal.classList.remove('instant');
             });
         };
 
@@ -228,7 +236,12 @@ class UIInfoManager {
                 this.openBushoSelector('view_only', null, { 
                     customBushos: targetBushos,
                     customInfoHtml: `<div>${clan.name} 所属武将</div>`,
-                    onCancel: () => { modal.classList.remove('invisible'); }
+                    onCancel: () => { 
+                        modal.classList.add('instant');
+                        modal.classList.remove('invisible');
+                        void modal.offsetWidth;
+                        modal.classList.remove('instant');
+                    }
                 });
             };
         }
@@ -238,7 +251,12 @@ class UIInfoManager {
             if (e.target === modal) {
                 if (window.AudioManager) window.AudioManager.playSE('cancel.ogg');
                 modal.classList.add('hidden');
-                if (isDaimyoListVisible) daimyoListModal.classList.remove('invisible');
+                if (isDaimyoListVisible) {
+                    daimyoListModal.classList.add('instant');
+                    daimyoListModal.classList.remove('invisible');
+                    void daimyoListModal.offsetWidth;
+                    daimyoListModal.classList.remove('instant');
+                }
             }
         };
 
@@ -581,7 +599,10 @@ class UIInfoManager {
                 if (window.AudioManager) window.AudioManager.playSE('cancel.ogg');
                 this.ui.bushoDetailModal.classList.add('hidden');
                 if (isSelectorVisible) {
+                    selectorModal.classList.add('instant');
                     selectorModal.classList.remove('invisible');
+                    void selectorModal.offsetWidth;
+                    selectorModal.classList.remove('instant');
                 }
             };
         }
