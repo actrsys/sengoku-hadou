@@ -809,37 +809,36 @@ class UIManager {
         // ★追加ここまで！
         // ==========================================
 
-        listEl.innerHTML = '';
-        if (myCastles.length === 0) {
-            listEl.innerHTML = '<div style="padding: 10px; text-align: center;">委任できる城がありません。</div>';
-        } else {
-            myCastles.forEach(c => {
-                const div = document.createElement('div');
-                div.className = 'select-item';
-                div.style.display = 'flex';
-                div.style.justifyContent = 'space-between';
-                div.style.padding = '15px';
-                
-                // 直轄なら赤っぽく、委任なら青っぽく文字色を変えます
-                const statusColor = c.isDelegated ? '#1976d2' : '#d32f2f';
-                const statusText = c.isDelegated ? '委任' : '直轄';
-                
-                div.innerHTML = `
-                    <span style="font-weight:bold; font-size: 1.1rem;">${c.name}</span>
-                    <span style="color:${statusColor}; font-weight:bold; font-size: 1.1rem;">${statusText}</span>
-                `;
-                
-                div.onclick = () => {
-                    if (window.AudioManager) window.AudioManager.playSE('choice.ogg');
-                    // 城をクリックしたら、個別の設定画面を開きます
-                    this.showDelegateSettingModal(c, () => {
-                        // 戻ってきたら一覧を更新して出し直します
+        let listHtml = '<div class="list-header" style="grid-template-columns: 1fr 1fr;"><span style="justify-content:flex-start; padding-left:5px;">拠点名</span><span>状態</span></div>';
+
+        myCastles.forEach(c => {
+            const statusColor = c.isDelegated ? 'color:#1976d2;' : 'color:#d32f2f;';
+            const statusText = c.isDelegated ? '委任' : '直轄';
+            
+            listHtml += `<div class="select-item delegate-list-item" style="grid-template-columns: 1fr 1fr;" data-id="${c.id}"><span style="justify-content:flex-start; padding-left:5px; font-weight:bold; font-size: 1.1rem;">${c.name}</span><span style="${statusColor} font-weight:bold; font-size: 1.1rem;">${statusText}</span></div>`;
+        });
+
+        const itemCount = myCastles.length;
+        for (let i = itemCount; i < 8; i++) {
+            listHtml += `<div class="select-item" style="grid-template-columns: 1fr 1fr; cursor:default; pointer-events:none;"><span></span><span></span></div>`;
+        }
+
+        listEl.innerHTML = listHtml;
+
+        const items = listEl.querySelectorAll('.delegate-list-item');
+        items.forEach(item => {
+            item.onclick = () => {
+                if (window.AudioManager) window.AudioManager.playSE('choice.ogg');
+                const cid = parseInt(item.getAttribute('data-id'), 10);
+                const targetCastle = myCastles.find(c => c.id === cid);
+                if (targetCastle) {
+                    this.showDelegateSettingModal(targetCastle, () => {
                         this.showDelegateListModal();
                     });
-                };
-                listEl.appendChild(div);
-            });
-        }
+                }
+            };
+        });
+
         if (listEl) {
             listEl.scrollTop = 0;
         }
