@@ -36,33 +36,41 @@ class CustomScrollbar {
         this.trackY.appendChild(this.thumbY);
         this.wrapper.appendChild(this.trackY);
 
-        // ★縦用の上ボタン（▲）を作る魔法
+        // ★縦ボタン（上・下）
         this.btnUp = document.createElement('div');
         this.btnUp.className = 'custom-scrollbar-btn up';
         this.btnUp.innerHTML = '▲';
         this.wrapper.appendChild(this.btnUp);
 
-        // ★縦用の下ボタン（▼）を作る魔法
         this.btnDown = document.createElement('div');
         this.btnDown.className = 'custom-scrollbar-btn down';
         this.btnDown.innerHTML = '▼';
         this.wrapper.appendChild(this.btnDown);
 
-        // ★ボタンを押した時に１行分（約36px）スクロールする魔法
-        this.btnUp.addEventListener('click', () => {
-            this.list.scrollBy({ top: -36, behavior: 'smooth' });
-        });
-        this.btnDown.addEventListener('click', () => {
-            this.list.scrollBy({ top: 36, behavior: 'smooth' });
-        });
-        
-        // ★横用のバー（新しく追加！）
+        // ★横用のバー
         this.trackX = document.createElement('div');
         this.trackX.className = 'custom-scrollbar-track-x';
         this.thumbX = document.createElement('div');
         this.thumbX.className = 'custom-scrollbar-thumb-x';
         this.trackX.appendChild(this.thumbX);
         this.wrapper.appendChild(this.trackX);
+
+        // ★横ボタン（左・右）
+        this.btnLeft = document.createElement('div');
+        this.btnLeft.className = 'custom-scrollbar-btn left';
+        this.btnLeft.innerHTML = '◀';
+        this.wrapper.appendChild(this.btnLeft);
+
+        this.btnRight = document.createElement('div');
+        this.btnRight.className = 'custom-scrollbar-btn right';
+        this.btnRight.innerHTML = '▶';
+        this.wrapper.appendChild(this.btnRight);
+
+        // ボタンのクリックイベント（１行分スクロール）
+        this.btnUp.addEventListener('click', () => this.list.scrollBy({ top: -36, behavior: 'smooth' }));
+        this.btnDown.addEventListener('click', () => this.list.scrollBy({ top: 36, behavior: 'smooth' }));
+        this.btnLeft.addEventListener('click', () => this.list.scrollBy({ left: -60, behavior: 'smooth' }));
+        this.btnRight.addEventListener('click', () => this.list.scrollBy({ left: 60, behavior: 'smooth' }));
         
         this.isDraggingY = false;
         this.isDraggingX = false;
