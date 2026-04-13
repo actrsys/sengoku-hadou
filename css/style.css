@@ -397,11 +397,11 @@ body.hide-daimyo-labels .daimyo-name-label { display: none !important; }
 
 /* 縦の区切り線 */
 .list-header > span, .select-item > span, .daimyo-list-header > span, .daimyo-list-item > span, .kunishu-list-header > span, .kunishu-list-item > span, .kunishu-list-header > strong, .kunishu-list-item > strong, .faction-list-header > span, .faction-list-item > span, .faction-list-item > strong, .princess-list-header > span, .princess-list-item > span, .princess-list-item > strong, .delegate-list-header > span, .delegate-list-item > span { border-right: 1px solid rgba(212,175,55,0.3); padding: 0 2px; display: flex; align-items: center; justify-content: center; box-sizing: border-box; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; height: 100%; }
-.list-header > span, .daimyo-list-header > span, .kunishu-list-header > span, .kunishu-list-header > strong, .faction-list-header > span, .princess-list-header > span, .delegate-list-header > span { border-right: 1px solid #d0b080; }
+.list-header > span, .daimyo-list-header > span, .kunishu-list-header > span, .kunishu-list-header > strong, .faction-list-header > span, .princess-list-header > span, .delegate-list-header > span { border-right: 1px solid #c5ae73; }
 .list-header > span:last-child, .select-item > span:last-child, .daimyo-list-header > span:last-child, .daimyo-list-item > span:last-child, .kunishu-list-header > span:last-child, .kunishu-list-item > span:last-child, .faction-list-header > span:last-child, .faction-list-item > span:last-child, .princess-list-header > span:last-child, .princess-list-item > span:last-child, .delegate-list-header > span:last-child, .delegate-list-item > span:last-child { border-right: none; }
 
 /* リストヘッダー・アイテム (ゼブラ柄) */
-.list-header, .daimyo-list-header, .kunishu-list-header, .faction-list-header, .princess-list-header, .delegate-list-header { background: #fcf8e3; color: #333; font-weight: bold; position: sticky; top: 0; z-index: 10; text-shadow: none; border-bottom: 2px solid #d4af37; box-sizing: border-box; }
+.list-header, .daimyo-list-header, .kunishu-list-header, .faction-list-header, .princess-list-header, .delegate-list-header { background: #e8ede0; color: #1b3822; font-weight: bold; position: sticky; top: 0; z-index: 10; text-shadow: none; border-bottom: 2px solid #d4af37; box-sizing: border-box; }
 .select-item, .daimyo-list-item, .kunishu-list-item, .faction-list-item, .princess-list-item, .delegate-list-item { border-bottom: 1px solid rgba(255,215,79,0.3); scroll-snap-align: start; cursor: pointer; color: #fff; background: linear-gradient(to bottom, #254a2e 0%, #1b3822 100%); text-shadow: 1px 1px 0 #000, -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000; }
 .select-item:nth-child(even), .daimyo-list-item:nth-child(even), .kunishu-list-item:nth-child(even), .faction-list-item:nth-child(even), .princess-list-item:nth-child(even), .delegate-list-item:nth-child(even) { background: linear-gradient(to bottom, #2d5a38 0%, #254a2e 100%); }
 .select-item:hover, .daimyo-list-item:hover, .kunishu-list-item:hover, .faction-list-item:hover, .princess-list-item:hover, .delegate-list-item:hover { background: linear-gradient(to bottom, #3a6b46 0%, #2a5a36 100%) !important; }
@@ -1878,10 +1878,10 @@ body.is-pc.daimyo-select-mode #pc-new-ui-container { display: none !important; }
 }
 
 .busho-tab-btn.active, .busho-scope-btn.active {
-    background: #fcf8e3;
-    color: #333;
+    background: #e8ede0;
+    color: #1b3822;
     border: 2px solid #d4af37;
-    border-bottom: 2px solid #fcf8e3; /* ★リスト見出しと同じ色に変えて、リストの上の金線を隠します */
+    border-bottom: 2px solid #e8ede0; /* ★見出しと同じ色に変えて、リストの上の金線を隠します */
     text-shadow: none;
 }
 
