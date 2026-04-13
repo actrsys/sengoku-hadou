@@ -505,6 +505,8 @@ body.hide-daimyo-labels .daimyo-name-label { display: none !important; }
 .rank-c .grade-main { background-image: linear-gradient(to bottom, #adff2f 0%, #adff2f 35%, #ffffff 50%, #adff2f 65%, #adff2f 100%); }
 .rank-d .grade-main { background-image: linear-gradient(to bottom, #65bbe9 0%, #65bbe9 35%, #ffffff 50%, #65bbe9 65%, #65bbe9 100%); }
 .rank-e .grade-main { background-image: linear-gradient(to bottom, #9b95c9 0%, #9b95c9 35%, #ffffff 50%, #9b95c9 65%, #9b95c9 100%); }
+.select-item.disabled .grade-main { background-image: linear-gradient(to bottom, #78909c 0%, #78909c 35%, #b0bec5 50%, #78909c 65%, #78909c 100%) !important; }
+.select-item.disabled .grade-sub { color: #b0bec5 !important; }
 
 .bar-bg { width: 90%; height: 12px; border-radius: 3px; overflow: hidden; display: inline-block; vertical-align: middle; border: 1px solid #a69363; box-shadow: 0 0 5px rgba(0,0,0,0.8), inset 0 1px 3px rgba(0,0,0,0.6); box-sizing: border-box; }
 .bar-fill { height: 100%; transition: width 0.3s ease; }
