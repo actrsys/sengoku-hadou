@@ -38,6 +38,7 @@ img { pointer-events: none; -webkit-user-drag: none; user-drag: none; }
    ========================================================= */
 .hidden { display: none !important; }
 .invisible { visibility: hidden !important; opacity: 0 !important; transition: none !important; animation: none !important; pointer-events: none !important; }
+.instant { transition: none !important; animation: none !important; }
 .disabled-area { pointer-events: none; opacity: 0.5; }
 
 .fade-in { animation: fadeIn 0.3s ease-in; }
