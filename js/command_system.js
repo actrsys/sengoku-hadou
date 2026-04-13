@@ -368,10 +368,14 @@ class CommandSystem {
 
         // --- 条件分岐（誰をリストに出すか） ---
         if (actionType === 'employ_target') { 
-            bushos = this.game.getCastleBushos(c.id).filter(b => b.status === 'ronin' && b.belongKunishuId === 0); 
-            infoHtml = "<div>登用する在野武将を選択してください</div>"; 
+            bushos = this.game.bushos.filter(b => {
+                if (b.status !== 'ronin' || b.belongKunishuId > 0) return false;
+                const targetCastle = this.game.getCastle(b.castleId);
+                return targetCastle && targetCastle.ownerClan === this.game.playerClanId;
+            });
+            infoHtml = "<div>登用する浪人を選択してください</div>"; 
         }
-        else if (actionType === 'employ_doer') { 
+        else if (actionType === 'employ_doer') {
             bushos = this.game.getCastleBushos(c.id).filter(b => b.clan === c.ownerClan && b.status === 'active'); 
             infoHtml = "<div>登用を行う担当官を選択してください</div>"; 
         } 
@@ -411,10 +415,10 @@ class CommandSystem {
             infoHtml = "<div>引抜を実行する担当官を選択してください</div>"; 
         }
         else if (actionType === 'interview') { 
-            bushos = this.game.getCastleBushos(c.id).filter(b => b.clan === c.ownerClan && b.status === 'active' && !b.isDaimyo); 
+            bushos = this.game.bushos.filter(b => b.clan === this.game.playerClanId && b.status === 'active' && !b.isDaimyo); 
             infoHtml = "<div>面談する武将を選択してください</div>"; 
         }
-        else if (actionType === 'interview_target') { 
+        else if (actionType === 'interview_target') {
             bushos = this.game.bushos.filter(b => b.clan === this.game.playerClanId && b.status === 'active' && b.id !== extraData.interviewer.id && !b.isDaimyo);
             infoHtml = `<div>誰についての印象を聞きますか？</div>`; 
         }
@@ -827,7 +831,19 @@ class CommandSystem {
                 }
             });
             if (isSubordinate) {
-                this.game.ui.showDialog("当家は他勢力に従属しているため、\n他勢力を支配下に置くことはできませぬ。", false);
+                this.game.ui.showDialog("当家は他勢力に従属しているため、\n他勢力を支配下に置くことはできません。", false);
+                return;
+            }
+        }
+
+        if (type === 'employ') {
+            const hasRonin = this.game.bushos.some(b => {
+                if (b.status !== 'ronin' || b.belongKunishuId > 0) return false;
+                const targetCastle = this.game.getCastle(b.castleId);
+                return targetCastle && targetCastle.ownerClan === this.game.playerClanId;
+            });
+            if (!hasRonin) {
+                this.game.ui.showDialog("浪人がいません", false);
                 return;
             }
         }
