@@ -39,12 +39,10 @@ class CustomScrollbar {
         // ★縦ボタン（上・下）
         this.btnUp = document.createElement('div');
         this.btnUp.className = 'custom-scrollbar-btn up';
-        this.btnUp.innerHTML = '▲';
         this.wrapper.appendChild(this.btnUp);
 
         this.btnDown = document.createElement('div');
         this.btnDown.className = 'custom-scrollbar-btn down';
-        this.btnDown.innerHTML = '▼';
         this.wrapper.appendChild(this.btnDown);
 
         // ★横用のバー
@@ -58,12 +56,10 @@ class CustomScrollbar {
         // ★横ボタン（左・右）
         this.btnLeft = document.createElement('div');
         this.btnLeft.className = 'custom-scrollbar-btn left';
-        this.btnLeft.innerHTML = '◀';
         this.wrapper.appendChild(this.btnLeft);
 
         this.btnRight = document.createElement('div');
         this.btnRight.className = 'custom-scrollbar-btn right';
-        this.btnRight.innerHTML = '▶';
         this.wrapper.appendChild(this.btnRight);
 
         // ボタンのクリックイベント（１行分スクロール）
