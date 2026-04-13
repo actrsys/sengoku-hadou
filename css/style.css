@@ -1892,28 +1892,6 @@ body.is-pc.daimyo-select-mode #pc-new-ui-container { display: none !important; }
     grid-template-columns: 2.5fr 1.5fr 2fr 2fr 35px 1fr 1fr 1fr 0fr; 
 }
 
-/* 城主委任リストのレイアウト */
-.list-header.delegate-mode, .select-item.delegate-mode {
-    grid-template-columns: 1fr 1fr;
-}
-
-.select-item.delegate-mode {
-    height: 45px; /* 他のリストと高さを統一 */
-    line-height: 45px;
-    padding: 0;
-    align-items: center;
-}
-
-.select-item.delegate-mode span {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    height: 100%;
-    font-size: 1.1rem;
-    white-space: nowrap;
-    overflow: hidden;
-}
-
 /* 状態タブ選択時のリストレイアウト（PC版） */
 body.is-pc .list-header.status-mode, body.is-pc .select-item.status-mode {
     grid-template-columns: 100px 60px 140px 140px 50px 50px 60px 1fr; 
