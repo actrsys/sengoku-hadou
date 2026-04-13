@@ -2743,11 +2743,9 @@ class UIInfoManager {
             if (stockGuns) stockGuns.textContent = Math.max(0, totalGuns - usedGuns);
             
             if (rem === 0) {
-                if (stockSoldiers) stockSoldiers.style.color = "#388e3c"; // 緑色
                 confirmBtn.disabled = false;
                 confirmBtn.style.opacity = 1.0;
             } else {
-                if (stockSoldiers) stockSoldiers.style.color = "#d32f2f"; // 赤色
                 confirmBtn.disabled = true;
                 confirmBtn.style.opacity = 0.5;
             }
