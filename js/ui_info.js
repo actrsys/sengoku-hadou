@@ -2694,6 +2694,46 @@ class UIInfoManager {
                     num.value = d.count;
                     range.value = d.count;
                 }
+
+                // ボタンの表示・非表示を数量指定スライダーと揃える魔法
+                let otherSum = sum - d.count;
+                let maxAllowed = totalSoldiers - otherSum;
+                if (d.type === 'kiba') {
+                    let otherHorses = usedHorses - d.count; 
+                    maxAllowed = Math.min(maxAllowed, totalHorses - otherHorses);
+                }
+                if (d.type === 'teppo') {
+                    let otherGuns = usedGuns - d.count;
+                    maxAllowed = Math.min(maxAllowed, totalGuns - otherGuns);
+                }
+                if (maxAllowed < 1) maxAllowed = 1;
+
+                const btnMin = document.getElementById(`div-btn-min-${d.id}`);
+                const btnHalf = document.getElementById(`div-btn-half-${d.id}`);
+                const btnMax = document.getElementById(`div-btn-max-${d.id}`);
+                
+                if (btnMin && btnHalf && btnMax) {
+                    if (maxAllowed <= 1) {
+                        btnMin.style.display = ''; btnMin.disabled = true; btnMin.style.order = 1;
+                        btnHalf.style.display = ''; btnHalf.disabled = true; btnHalf.style.order = 3;
+                        btnMax.style.display = 'none';
+                    } else if (d.count <= 1) {
+                        // 最小の時：「最小(無効)」と「半分(有効)」を表示
+                        btnMin.style.display = ''; btnMin.disabled = true; btnMin.style.order = 1;
+                        btnHalf.style.display = ''; btnHalf.disabled = false; btnHalf.style.order = 3;
+                        btnMax.style.display = 'none';
+                    } else if (d.count >= maxAllowed) {
+                        // 最大の時：「半分(有効)」と「最大(無効)」を表示
+                        btnMin.style.display = 'none';
+                        btnHalf.style.display = ''; btnHalf.disabled = false; btnHalf.style.order = 1;
+                        btnMax.style.display = ''; btnMax.disabled = true; btnMax.style.order = 3;
+                    } else {
+                        // 中間の時：「最小(有効)」と「最大(有効)」を表示
+                        btnMin.style.display = ''; btnMin.disabled = false; btnMin.style.order = 1;
+                        btnHalf.style.display = 'none';
+                        btnMax.style.display = ''; btnMax.disabled = false; btnMax.style.order = 3;
+                    }
+                }
             });
             
             const stockSoldiers = document.getElementById('divide-stock-soldiers');
