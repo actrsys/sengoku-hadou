@@ -2411,7 +2411,7 @@ class UIInfoManager {
                     <button class="qty-shortcut-btn" style="visibility:hidden; pointer-events:none; order:1;">空</button>
                     <div style="flex:1; order:2;"></div>
                     <button class="qty-shortcut-btn" style="visibility:hidden; pointer-events:none; order:3;">空</button>
-                    <div style="width: 60px; text-align: center; font-weight: bold; order:4; color: #ffd54f; font-size: 0.85rem; text-shadow: 1px 1px 0 #000, -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000;">輸送先</div>
+                    <div style="width: 48px; text-align: center; font-weight: bold; order:4; color: #ffd54f; font-size: 0.85rem; text-shadow: 1px 1px 0 #000, -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000;">輸送先</div>
                 </div>
             `;
             this.ui.quantityContainer.appendChild(header);

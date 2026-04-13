@@ -604,7 +604,7 @@ body.hide-daimyo-labels .daimyo-name-label { display: none !important; }
 .stock-label {
     color: #ffd54f;
 }
-.qty-control { display: flex; align-items: center; gap: 5px; width: 100%; }
+.qty-control { display: flex; align-items: center; gap: 5px; width: 100%; box-sizing: border-box; }
 
 .troop-type-selector { display: flex; gap: 4px; }
 .troop-type-btn { padding: 4px 12px; font-size: 0.85rem; font-weight: bold; border: 1px solid #aaa; background: #f5f5f5; color: #555; cursor: pointer; border-radius: 4px; transition: all 0.2s; box-shadow: 0 1px 2px rgba(0,0,0,0.1); }
@@ -613,7 +613,7 @@ body.hide-daimyo-labels .daimyo-name-label { display: none !important; }
 
 .qty-control input[type="range"] { flex: 1; -webkit-appearance: none; height: 16px; background: #e0e0e0; border: 1px solid #aaa; border-radius: 0; outline: none; overflow: hidden; }
 .qty-control input[type="range"]::-webkit-slider-thumb { -webkit-appearance: none; width: 16px; height: 24px; border-radius: 2px; background: #f0f0f0; border: 1px solid #777; box-shadow: inset 0 1px 3px rgba(255,255,255,0.8), 0 1px 2px rgba(0,0,0,0.3), -10016px 0 0 10000px #81c784; cursor: pointer; }
-.qty-control input[type="number"] { width: 60px; padding: 5px 2px; text-align: center; border: 1.5px solid #d4af37; background: #000; color: #fff; border-radius: 4px; font-size: 1rem; font-weight: bold; box-shadow: inset 0 1px 3px rgba(255,255,255,0.1); }
+.qty-control input[type="number"] { width: 48px; padding: 5px 2px; text-align: center; border: 1.5px solid #d4af37; background: #000; color: #fff; border-radius: 4px; font-size: 1rem; font-weight: bold; box-shadow: inset 0 1px 3px rgba(255,255,255,0.1); flex-shrink: 0; }
 .qty-control input[type="number"]::-webkit-outer-spin-button,
 .qty-control input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
 .qty-control .qty-shortcut-btn { flex: none; padding: 4px 8px; font-size: 0.85rem; font-weight: bold; background: #ffffff; border: 1px solid #999; border-radius: 4px; cursor: pointer; color: #333; box-shadow: 0 1px 2px rgba(0,0,0,0.1); transition: all 0.2s; }
