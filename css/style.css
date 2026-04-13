@@ -709,9 +709,17 @@ body.hide-daimyo-labels .daimyo-name-label { display: none !important; }
 
 #quantity-modal h3, #trade-type-info, #charity-type-selector, #quantity-modal .modal-footer { flex-shrink: 0; }
 #quantity-container { flex: 1; overflow-y: auto; overflow-x: hidden; min-height: 0; padding-right: 5px; padding-bottom: 2px; margin-bottom: 10px; }
+/* 部隊編成画面のモーダルとフレックスボックス設定 */
 #unit-divide-modal .modal-content { overflow: hidden !important; }
-#unit-divide-modal h3, #unit-divide-modal > div:not(#divide-list), #unit-divide-modal .modal-footer { flex-shrink: 0; }
-#divide-list { flex: 1; overflow-y: auto; overflow-x: hidden; min-height: 0; max-height: none !important; padding-right: 5px; padding-bottom: 2px; margin-bottom: 10px; scrollbar-width: none; -ms-overflow-style: none; }
+/* ヘッダー・フッター・現在数エリアだけを保護し、外枠が縮めなくなる原因(ゴミ)を削除しました */
+#unit-divide-modal h3, #unit-divide-modal #divide-stock-container, #unit-divide-modal .modal-footer { flex-shrink: 0; }
+
+/* スライダーリストの中身の設定（一番下のスライダーが隠れないように余白を15pxに増やします） */
+#divide-list { 
+    flex: 1; overflow-y: auto; overflow-x: hidden; min-height: 0; max-height: none !important; 
+    padding-right: 5px; padding-bottom: 15px; margin-bottom: 0; 
+    scrollbar-width: none; -ms-overflow-style: none; 
+}
 #divide-list::-webkit-scrollbar { display: none; }
 
 /* 部隊編成画面から邪魔な自作スクロールバー（金色）を消し去る設定 */
@@ -720,11 +728,16 @@ body.hide-daimyo-labels .daimyo-name-label { display: none !important; }
 #unit-divide-modal .custom-scrollbar-btn {
     display: none !important;
 }
-/* 外枠の余計な隙間と枠線を消して、リストを画面いっぱいまで広げます */
+
+/* 外枠（.scroll-wrapper）をゴムのように伸び縮みさせ、金枠の中にピッタリ収める設定 */
 #unit-divide-modal .scroll-wrapper {
     padding: 0 !important;
     border: none !important;
     box-shadow: none !important;
+    flex: 1;
+    min-height: 0;
+    max-height: none !important;
+    margin-bottom: 10px;
 }
 #unit-divide-modal .scroll-wrapper::after {
     display: none !important;
