@@ -421,10 +421,21 @@ class UIInfoManager {
 
         const targetBushos = this.game.bushos.filter(b => b.clan === clanId && b.status === 'active' && (b.factionId || 0) === factionId);
 
+        const factionModal = document.getElementById('faction-list-modal');
+        if (factionModal) factionModal.classList.add('invisible');
+
         this.openBushoSelector('view_only', null, { 
             customBushos: targetBushos,
             customInfoHtml: `<div>${clan.name} ${factionName} 所属武将</div>`,
-            isFactionView: true
+            isFactionView: true,
+            onCancel: () => {
+                if (factionModal) {
+                    factionModal.classList.add('instant');
+                    factionModal.classList.remove('invisible');
+                    void factionModal.offsetWidth;
+                    factionModal.classList.remove('instant');
+                }
+            }
         });
     }
     
