@@ -1332,12 +1332,12 @@ body:not(.is-pc) #quantity-modal.multi-slider-mode {
 }
 body:not(.is-pc) #quantity-modal.multi-slider-mode .modal-content { 
     width: 100% !important; 
-    height: 100% !important; 
+    height: 98% !important; /* ★変更：上下にわずかな隙間を作り、枠線が見えるようにします */
     max-width: none !important; 
     max-height: none !important; 
-    margin: 0 !important; 
+    margin: auto !important; /* ★変更：画面中央に配置します */
     border-radius: 0 !important; 
-    border: none !important; 
+    border: 2px solid #d4af37 !important; /* ★修正：他のウインドウと同じ金枠を復活させます */
     box-sizing: border-box !important;
     padding-top: max(10px, env(safe-area-inset-top)) !important;
     padding-bottom: max(10px, env(safe-area-inset-bottom)) !important;
