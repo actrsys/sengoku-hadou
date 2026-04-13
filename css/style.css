@@ -709,8 +709,10 @@ body.hide-daimyo-labels .daimyo-name-label { display: none !important; }
 
 #quantity-modal h3, #trade-type-info, #charity-type-selector, #quantity-modal .modal-footer { flex-shrink: 0; }
 #quantity-container { flex: 1; overflow-y: auto; overflow-x: hidden; min-height: 0; padding-right: 5px; padding-bottom: 2px; margin-bottom: 10px; }
+#unit-divide-modal .modal-content { overflow: hidden !important; } /* ウインドウ自体のスクロールバーを消す */
 #unit-divide-modal h3, #unit-divide-modal > div:not(#divide-list), #unit-divide-modal .modal-footer { flex-shrink: 0; }
-#divide-list { flex: 1; overflow-y: auto; overflow-x: hidden; min-height: 0; max-height: none !important; padding-right: 5px; padding-bottom: 2px; margin-bottom: 10px; }
+#divide-list { flex: 1; overflow-y: auto; overflow-x: hidden; min-height: 0; max-height: none !important; padding-right: 5px; padding-bottom: 2px; margin-bottom: 10px; scrollbar-width: none; -ms-overflow-style: none; }
+#divide-list::-webkit-scrollbar { display: none; } /* リスト右側・下側のスクロールバーを完全に消す */
 
 /* ガード・カットイン */
 #ai-guard { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 5500; display: flex; justify-content: center; align-items: center; color: white; font-size: 1.5rem; font-weight: bold; flex-direction: column; pointer-events: auto; }
@@ -1411,12 +1413,14 @@ body:not(.is-pc) .modal .modal-content {
 body:not(.is-pc) .modal-footer {
     flex-direction: row-reverse;
 }
-/* スマホ版: 複数スライダー画面を全画面にする魔法 */
-body:not(.is-pc) #quantity-modal.multi-slider-mode { 
+/* スマホ版: 複数スライダー画面・部隊編成画面を全画面にする魔法 */
+body:not(.is-pc) #quantity-modal.multi-slider-mode,
+body:not(.is-pc) #unit-divide-modal { 
     padding: 0 !important; 
     height: 100dvh !important; 
 }
-body:not(.is-pc) #quantity-modal.multi-slider-mode .modal-content { 
+body:not(.is-pc) #quantity-modal.multi-slider-mode .modal-content,
+body:not(.is-pc) #unit-divide-modal .modal-content { 
     width: 100% !important; 
     height: 98% !important; /* ★変更：上下にわずかな隙間を作り、枠線が見えるようにします */
     max-width: none !important; 
@@ -1426,7 +1430,7 @@ body:not(.is-pc) #quantity-modal.multi-slider-mode .modal-content {
     border: 2px solid #d4af37 !important; /* ★修正：他のウインドウと同じ金枠を復活させます */
     box-sizing: border-box !important;
     padding-top: max(10px, env(safe-area-inset-top)) !important;
-    padding-bottom: max(10px, env(safe-area-inset-bottom)) !important;
+    padding-bottom: max(10px, env(safe-area-bottom)) !important;
     padding-left: 20px !important;
     padding-right: 20px !important;
 }
