@@ -745,7 +745,7 @@ class UIInfoManager {
     showPrincessSelector(targetCastleId, doerId) {
         this.renderPrincessModal(true, targetCastleId, doerId);
     }
-
+    
     // 姫の画面を描くお仕事をする場所です
     renderPrincessModal(isSelectMode, targetCastleId, doerId) {
         const myClanId = this.game.playerClanId;
@@ -868,7 +868,202 @@ class UIInfoManager {
     // ==========================================
     // ★姫一覧＆姫選択の魔法ここまで！
     // ==========================================
+    
+    // ==========================================
+    // ★ここから追加：城主委任リストの魔法（デザイン統一版）
+    // ==========================================
+    showDelegateListModal() {
+        const modal = document.getElementById('delegate-list-modal');
+        const listEl = document.getElementById('delegate-list');
+        if (!modal || !listEl) return;
 
+        // 大名のいる城（本拠地）を探します
+        const daimyo = this.game.bushos.find(b => b.clan === this.game.playerClanId && b.isDaimyo);
+        const daimyoCastleId = daimyo ? daimyo.castleId : -1;
+
+        // 自分の城のリストを作成（大名のいる城は除外します）
+        const myCastles = this.game.castles.filter(c => c.ownerClan === this.game.playerClanId && c.id !== daimyoCastleId);
+
+        // 一括切替ボタンの魔法
+        const toggleAllBtn = document.getElementById('btn-toggle-all-delegate');
+        if (toggleAllBtn) {
+            // 今、リストにある城が「すべて委任状態」になっているか調べます
+            const isAllDelegated = myCastles.length > 0 && myCastles.every(c => c.isDelegated);
+            
+            if (isAllDelegated) {
+                toggleAllBtn.textContent = '一括';
+                toggleAllBtn.style.color = '#d32f2f';             // 文字を赤に
+                toggleAllBtn.style.backgroundColor = '#ffebee';   // 背景を薄い赤に
+                toggleAllBtn.style.borderColor = '#d32f2f';       // 枠線を赤に
+            } else {
+                toggleAllBtn.textContent = '一括';
+                toggleAllBtn.style.color = '#1976d2';             // 文字を青に
+                toggleAllBtn.style.backgroundColor = '#e3f2fd';   // 背景を薄い青に
+                toggleAllBtn.style.borderColor = '#1976d2';       // 枠線を青に
+            }
+
+            // ボタンを押した時の処理
+            toggleAllBtn.onclick = () => {
+                if (window.AudioManager) window.AudioManager.playSE('choice.ogg');
+                // 今が「すべて委任」なら全員「直轄(false)」に、それ以外なら全員「委任(true)」にします！
+                const newState = !isAllDelegated;
+                myCastles.forEach(c => c.isDelegated = newState);
+                // もう一度画面を描き直して更新します
+                this.showDelegateListModal();
+            };
+        }
+
+        // リストの中身を作成（デザイン統一版）
+        let listHtml = '<div class="delegate-list-header"><span>拠点名</span><span>城攻</span><span>武将移動</span><span>状態</span></div>';
+
+        if (myCastles.length === 0) {
+            listHtml += '<div style="padding: 10px; text-align: center;">委任できる城がありません。</div>';
+        } else {
+            myCastles.forEach(c => {
+                // 直轄なら赤っぽく、委任なら青っぽく文字色を変えます
+                const statusColor = c.isDelegated ? 'color:#1976d2;' : 'color:#d32f2f;';
+                const statusText = c.isDelegated ? '委任' : '直轄';
+                
+                const attackText = c.allowAttack ? '許可' : '不可';
+                const attackColor = c.allowAttack ? 'color:#1976d2;' : 'color:#555;';
+
+                const moveText = c.allowMove ? '許可' : '不可';
+                const moveColor = c.allowMove ? 'color:#1976d2;' : 'color:#555;';
+
+                // 直轄中は「城攻」「武将移動」は設定できないのでハイフンにする
+                const attackDisplay = c.isDelegated ? `<span style="${attackColor}">${attackText}</span>` : `<span style="color:#999;">-</span>`;
+                const moveDisplay = c.isDelegated ? `<span style="${moveColor}">${moveText}</span>` : `<span style="color:#999;">-</span>`;
+
+                listHtml += `<div class="delegate-list-item" onclick="if(window.AudioManager) window.AudioManager.playSE('choice.ogg'); window.GameApp.ui.info.showDelegateSettingModal(${c.id}, () => { window.GameApp.ui.info.showDelegateListModal(); })"><span class="col-castle-name" style="font-weight:bold; justify-content:flex-start; padding-left:5px;">${c.name}</span>${attackDisplay}${moveDisplay}<span style="font-weight:bold; ${statusColor}">${statusText}</span></div>`;
+            });
+            
+            // 空の行を追加して見た目を整えます
+            const itemCount = myCastles.length;
+            for (let i = itemCount; i < 8; i++) {
+                listHtml += `<div class="delegate-list-item" style="cursor:default; pointer-events:none;"><span></span><span></span><span></span><span></span></div>`;
+            }
+        }
+        
+        listEl.innerHTML = listHtml;
+        if (listEl) listEl.scrollTop = 0;
+        modal.classList.remove('hidden');
+    }
+
+    // 個別の「直轄・委任・詳細設定」画面を出す魔法
+    showDelegateSettingModal(castleId, onBack) {
+        // 城のIDからデータを探します
+        const castle = this.game.castles.find(c => c.id === castleId);
+        if (!castle) return;
+
+        const modal = document.getElementById('delegate-setting-modal');
+        const title = document.getElementById('delegate-setting-title');
+        const btnDirect = document.getElementById('btn-direct-control');
+        const btnDelegate = document.getElementById('btn-delegate-control');
+        
+        // 詳細設定のボタンたち
+        const optionsDiv = document.getElementById('delegate-options');
+        const btnAttackDeny = document.getElementById('btn-attack-deny');
+        const btnAttackAllow = document.getElementById('btn-attack-allow');
+        const btnMoveDeny = document.getElementById('btn-move-deny');
+        const btnMoveAllow = document.getElementById('btn-move-allow');
+
+        if (!modal || !title || !btnDirect || !btnDelegate) return;
+
+        title.textContent = `${castle.name} の委任設定`;
+
+        // ボタンの色や状態を更新する魔法
+        const updateButtons = () => {
+            // ① 直轄か委任かの表示
+            if (castle.isDelegated) {
+                btnDelegate.classList.add('active');
+                btnDirect.classList.remove('active');
+                
+                // 委任中は詳細設定を選べるようにします
+                optionsDiv.style.opacity = '1';
+                btnAttackDeny.disabled = false;
+                btnAttackAllow.disabled = false;
+                btnMoveDeny.disabled = false;
+                btnMoveAllow.disabled = false;
+            } else {
+                btnDirect.classList.add('active');
+                btnDelegate.classList.remove('active');
+                
+                // 直轄中は詳細設定を選べないように（半透明に）します
+                optionsDiv.style.opacity = '0.5';
+                btnAttackDeny.disabled = true;
+                btnAttackAllow.disabled = true;
+                btnMoveDeny.disabled = true;
+                btnMoveAllow.disabled = true;
+            }
+
+            // ② 城攻の設定表示
+            if (castle.allowAttack) {
+                btnAttackAllow.classList.add('active-allow');
+                btnAttackAllow.classList.remove('active');
+                btnAttackDeny.classList.remove('active', 'active-allow');
+            } else {
+                btnAttackDeny.classList.add('active');
+                btnAttackDeny.classList.remove('active-allow');
+                btnAttackAllow.classList.remove('active', 'active-allow');
+            }
+
+            // ③ 武将移動の設定表示
+            if (castle.allowMove) {
+                btnMoveAllow.classList.add('active-allow');
+                btnMoveAllow.classList.remove('active');
+                btnMoveDeny.classList.remove('active', 'active-allow');
+            } else {
+                btnMoveDeny.classList.add('active');
+                btnMoveDeny.classList.remove('active-allow');
+                btnMoveAllow.classList.remove('active', 'active-allow');
+            }
+        };
+
+        updateButtons(); // 画面を開いた時の色をセット
+
+        // それぞれのボタンを押した時の処理
+        btnDirect.onclick = () => {
+            if (window.AudioManager) window.AudioManager.playSE('choice.ogg');
+            castle.isDelegated = false;
+            updateButtons();
+        };
+        btnDelegate.onclick = () => {
+            if (window.AudioManager) window.AudioManager.playSE('choice.ogg');
+            castle.isDelegated = true;
+            updateButtons();
+        };
+        btnAttackDeny.onclick = () => {
+            if (window.AudioManager) window.AudioManager.playSE('choice.ogg');
+            castle.allowAttack = false;
+            updateButtons();
+        };
+        btnAttackAllow.onclick = () => {
+            if (window.AudioManager) window.AudioManager.playSE('choice.ogg');
+            castle.allowAttack = true;
+            updateButtons();
+        };
+        btnMoveDeny.onclick = () => {
+            if (window.AudioManager) window.AudioManager.playSE('choice.ogg');
+            castle.allowMove = false;
+            updateButtons();
+        };
+        btnMoveAllow.onclick = () => {
+            if (window.AudioManager) window.AudioManager.playSE('choice.ogg');
+            castle.allowMove = true;
+            updateButtons();
+        };
+
+        const backBtn = modal.querySelector('.btn-secondary');
+        if (backBtn) {
+            backBtn.onclick = () => {
+                modal.classList.add('hidden');
+                if (onBack) onBack(); // 戻るボタンで一覧画面に戻ります
+            };
+        }
+
+        modal.classList.remove('hidden');
+    }
+    
     // ==========================================
     // ★ここから追加：拠点一覧の魔法です！
     // ==========================================
