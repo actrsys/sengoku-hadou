@@ -1898,3 +1898,41 @@ body.is-pc .list-header.status-mode.view-mode, body.is-pc .select-item.status-mo
 #kyoten-list .select-item {
     min-width: 650px; /* 画面が小さくてもこの幅を保って、横にスクロールできるようにします！ */
 }
+/* =========================================================
+   スマホ版 野戦・部隊編成スライダーのレイアウト見切れ修正
+   ========================================================= */
+/* 部隊編成モーダルのウインドウ枠自体を画面内にきっちり収める魔法 */
+#unit-divide-modal .modal-content {
+    /* 金枠が画面からはみ出さないように最大高さを指定し、内部のフレックス配置を整えます */
+    max-height: calc(100% - 20px) !important;
+    display: flex;
+    flex-direction: column;
+}
+
+/* スライダーが並ぶ暗い緑色のリストエリア（#divide-list）の設定 */
+/* 輸送スライダーの #quantity-container と同じように、中身の数に応じて下へ伸びつつ、溢れたらスクロールするようにします */
+#unit-divide-modal #divide-list {
+    flex: 1;               /* 余った高さをすべて使って伸びる魔法 */
+    overflow-y: auto;      /* はみ出た時だけ縦にスクロールさせる魔法 */
+    min-height: 0;         /* flexを使っている時に中身が潰れることを許可する魔法 */
+    max-height: none !important; /* 変な高さ制限を外す魔法 */
+    padding-bottom: 15px;  /* 一番下のスライダーが見切れないように余白を追加 */
+    margin-bottom: 10px;
+    /* スクロールバーは表示しない設定（元の設定を引き継ぎ） */
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+}
+#unit-divide-modal #divide-list::-webkit-scrollbar {
+    display: none;
+}
+
+/* 一番下の決定ボタンなどのエリアが潰れないように守る魔法 */
+#unit-divide-modal .modal-footer {
+    flex-shrink: 0;        /* どんなに上が伸びても、ここは絶対に潰さない魔法 */
+    padding-bottom: 10px;  /* ボタンの下が見切れないように少し余白を足します */
+}
+
+/* ついでに一番上の見出しエリアも潰れないように守っておきます */
+#unit-divide-modal h3 {
+    flex-shrink: 0;
+}
