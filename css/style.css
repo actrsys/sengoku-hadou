@@ -1114,8 +1114,8 @@ body:not(.is-pc) .daimyo-detail-value {
 #war-modal { 
     padding: 0 !important; 
     margin: 0 !important;
-    width: 100vw !important;
-    height: 100dvh !important; 
+    width: 100% !important;
+    height: 100% !important; 
     box-sizing: border-box !important;
     overflow: hidden !important;
 }
