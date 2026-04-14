@@ -609,7 +609,15 @@ window.GameEvents.push({
                 status: '準備中',
                 // ★追加：同盟国には声をかけず、自軍（応援軍）だけを呼ぶように作戦に制限をかけます
                 allowAllyReinforcement: false,
-                allowSelfReinforcement: true
+                allowSelfReinforcement: true,
+                // ★追加：出撃時に読み取らせるためのイベント情報を覚えさせます
+                eventData: {
+                    isEventBattle: true,
+                    eventId: "okehazama",
+                    forceIntercept: true,
+                    designatedAtkGeneralId: 1004001,
+                    designatedDefGeneralId: 1006001
+                }
             };
             
             // 画面にメッセージを出して、プレイヤーにお知らせします
@@ -707,15 +715,7 @@ window.GameEvents.push({
             training: kiyosu.training || 50
         };
 
-        // ★修正：AIに絶対に野戦を選ばせる「強制命令」の旗を立てます
-        context.forceIntercept = true;
-
-        // ★追加：この戦闘が「イベント戦闘」であることと、その「イベントID」を野戦システムに伝えます！
-        context.isEventBattle = true;
-        context.eventId = "okehazama";
-
-        // ★追加：援軍として参戦する信長を、強制的に守備側の総大将に指名します！
-        context.designatedDefGeneralId = 1006001;
+        // （強制野戦などの指示は、作戦に覚えさせた eventData からすでに読み込まれています！）
 
         // ★追加：AIが同盟軍（友軍）を連れてきてしまった場合の確実なガード！
         // 同盟軍のデータがあれば、戦闘開始前にリストから消去して強制的に帰らせます
