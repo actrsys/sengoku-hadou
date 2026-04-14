@@ -461,7 +461,7 @@ body.hide-daimyo-labels .daimyo-name-label { display: none !important; }
 
 /* リストベース */
 /* ★変更：外枠（.scroll-wrapper）の大きさにピッタリ追従するように設定します */
-.list-container, .daimyo-list-container, .faction-list-container, .princess-list-container { 
+.list-container, .daimyo-list-container, .faction-list-container, .princess-list-container, #history-list { 
     flex: 1; width: 100%; height: 100%; max-height: none; overflow-y: scroll; scroll-snap-type: y mandatory; 
     border: none; box-shadow: none; border-radius: 0; /* ★ 外枠に任せるので全て消します */
     scroll-padding-top: 40px; box-sizing: border-box; -webkit-overflow-scrolling: auto; overscroll-behavior: none; 
@@ -487,7 +487,7 @@ body.hide-daimyo-labels .daimyo-name-label { display: none !important; }
 .select-item .col-name, .daimyo-list-item .col-daimyo-name, .daimyo-list-item .col-leader-name, .kunishu-list-item .col-kunishu-name, .faction-list-item .col-faction-name, .princess-list-item .col-princess-name, .delegate-list-item .col-castle-name { justify-content: flex-start !important; padding-left: 5px; }
 
 /* 履歴リストアイテム */
-.history-list-item { padding: 8px 10px; border-bottom: 1px solid rgba(255, 215, 79, 0.3); font-size: 0.9rem; color: #fff; background: linear-gradient(to bottom, #254a2e 0%, #1b3822 100%); text-shadow: 1px 1px 0 #000, -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000; }
+.history-list-item { scroll-snap-align: start; padding: 8px 10px; border-bottom: 1px solid rgba(255, 215, 79, 0.3); font-size: 0.9rem; color: #fff; background: linear-gradient(to bottom, #254a2e 0%, #1b3822 100%); text-shadow: 1px 1px 0 #000, -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000; }
 .history-list-item:nth-child(even) { background: linear-gradient(to bottom, #2d5a38 0%, #254a2e 100%); }
 .history-list-item:last-child { border-bottom: none; }
 
@@ -690,6 +690,22 @@ body.hide-daimyo-labels .daimyo-name-label { display: none !important; }
 #result-modal .modal-content:has(.daimyo-list-container, .faction-list-container, .princess-list-container) {
     max-width: 800px !important;
     text-align: left !important;
+}
+
+/* =========================================================
+   行動履歴画面 (#history-modal) 専用スタイル
+   ========================================================= */
+#history-modal .modal-content {
+    height: 85vh !important; /* ウインドウの縦幅を画面の85%まで大きく広げます */
+    max-height: 800px !important;
+    display: flex;
+    flex-direction: column;
+}
+
+#history-modal .scroll-wrapper {
+    flex: 1 !important;
+    min-height: 0 !important;
+    max-height: none !important; /* リスト共通の高さ制限(40px*9行)を解除してウインドウいっぱいに広げます */
 }
 
 /* =========================================================
@@ -1698,7 +1714,7 @@ body.is-pc {
     /* PCリストレイアウト */
     /* ★変更：パソコン版用の高さに合わせて、外枠と中身をそれぞれ設定します */
     .scroll-wrapper { max-height: calc(44px * 9 + 28px); }
-    .list-container, .daimyo-list-container, .faction-list-container, .princess-list-container { height: 100%; max-height: none; scroll-padding-top: 44px; }
+    .list-container, .daimyo-list-container, .faction-list-container, .princess-list-container, #history-list { height: 100%; max-height: none; scroll-padding-top: 44px; }
     .list-header, .select-item { grid-template-columns: 45px 100px 60px repeat(6, 1fr); font-size: 0.85rem; height: 44px; }
     .list-header.view-mode, .select-item.view-mode { grid-template-columns: 100px 60px repeat(6, 1fr); }
     .daimyo-list-header, .daimyo-list-item { grid-template-columns: 80px 110px 50px 80px 80px 60px; font-size: 0.9rem; height: 44px; }
