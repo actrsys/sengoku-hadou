@@ -569,8 +569,8 @@ window.GameEvents.push({
         });
         if (!hasAllOdaCastles) return false;
 
-        // G. 松平元康（ID: 1005001）が城主として存在するか確認します
-        const motoyasu = game.getBusho(1005001);
+        // G. 松平元康（ID: 1004004）が城主として存在するか確認します
+        const motoyasu = game.getBusho(1004004);
         if (!motoyasu || !motoyasu.isCastellan) return false;
 
         // すべての条件をクリアしたら、イベントを発生させます！
@@ -655,7 +655,7 @@ window.GameEvents.push({
         if (!nagoya || nagoya.ownerClan !== odaClanId) return false;
 
         // G. 松平元康が城主として存在するか確認します
-        const motoyasu = game.getBusho(1005001);
+        const motoyasu = game.getBusho(1004004);
         if (!motoyasu || !motoyasu.isCastellan) return false;
 
         // ★補足条件：プレイヤーが織田家の場合は、勝手に出陣させないようにここでスキップします
@@ -749,7 +749,7 @@ window.GameEvents.push({
         const nobunaga = game.getBusho(1006001);
         if (!nobunaga || !nobunaga.isDaimyo) return false;
         
-        const motoyasu = game.getBusho(1005001);
+        const motoyasu = game.getBusho(1004004);
         if (!motoyasu || !motoyasu.isCastellan) return false;
 
         // B, Eのお城の条件（指定されたお城をすべて持っているか）を確認します
