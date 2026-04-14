@@ -2645,7 +2645,7 @@ class UIInfoManager {
         } else if (type === 'def_intercept') { 
             const interceptCastle = (data && data.length > 0) ? data[0] : c;
             document.getElementById('quantity-title').textContent = "迎撃部隊編成"; 
-            inputs.soldiers = createSlider("出陣兵士数", "soldiers", interceptCastle.soldiers, interceptCastle.soldiers);
+            inputs.soldiers = createSlider("兵士", "soldiers", interceptCastle.soldiers, interceptCastle.soldiers);
             inputs.rice = createSlider("兵糧", "rice", interceptCastle.rice, interceptCastle.rice);
             inputs.horses = createSlider("軍馬", "horses", interceptCastle.horses || 0, 0);
             inputs.guns = createSlider("鉄砲", "guns", interceptCastle.guns || 0, 0);
