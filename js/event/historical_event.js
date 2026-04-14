@@ -31,6 +31,197 @@ window.GameEvents.push({
 });
 
 // ==========================================
+// ★ 将軍候補庇護（予備イベント）
+// ==========================================
+window.GameEvents.push({
+    id: "historical_shogun_protection", 
+    timing: "shogun_death",        // ★ 新しく作った将軍死亡のタイミングです
+    isOneTime: true,               // 一度発生したら二度と起きません
+    
+    checkCondition: function(game, context) {
+        // 将軍死亡の情報が届いていなければ無視します
+        if (!context || !context.deadShogunClanId) return false;
+
+        // 世界に将軍候補（ID80:左馬頭）が存在するか確認します
+        const candidate = game.bushos.find(b => b.courtRankIds && b.courtRankIds.includes(80) && b.status !== 'unborn' && b.status !== 'dead');
+        if (!candidate) return false;
+
+        // 候補が浪人か、諸勢力所属で頭領ではない場合のみイベントを起こします
+        if (candidate.status === 'ronin') {
+            // 浪人なのでOKです
+        } else if ((candidate.belongKunishuId || 0) > 0) {
+            const kunishu = game.kunishuSystem ? game.kunishuSystem.getKunishu(candidate.belongKunishuId) : null;
+            if (kunishu && kunishu.leaderId === candidate.id) {
+                return false; // 頭領なのでダメです
+            }
+        } else {
+            return false; // 浪人でも諸勢力でもない場合はダメです
+        }
+
+        return true;
+    },
+    
+    execute: async function(game, context) {
+        const candidate = game.bushos.find(b => b.courtRankIds && b.courtRankIds.includes(80));
+        if (!candidate) return;
+
+        const killerClanId = context.killerClanId;
+        const deadShogunClanId = context.deadShogunClanId; // 滅亡した将軍家
+
+        let targetClan = null;
+
+        // ② 織田信長（1006001）の勢力判定
+        const nobunaga = game.getBusho(1006001);
+        if (nobunaga && nobunaga.isDaimyo && nobunaga.clan !== 0 && nobunaga.clan !== killerClanId) {
+            const inabaCastle = game.getCastle(3);
+            const nobunagaCastles = game.castles.filter(c => c.ownerClan === nobunaga.clan);
+            if (inabaCastle && inabaCastle.ownerClan === nobunaga.clan && nobunagaCastles.length >= 5) {
+                targetClan = game.clans.find(c => c.id === nobunaga.clan);
+            }
+        }
+
+        // ③ 元々の足利家との友好度・威信による判定
+        if (!targetClan) {
+            let bestClans = [];
+            let maxSentiment = -1;
+
+            game.clans.forEach(c => {
+                if (c.id === 0 || c.id === killerClanId) return;
+                // まだ生き残っているか（城を持っているか）確認します
+                const hasCastle = game.castles.some(castle => castle.ownerClan === c.id);
+                if (!hasCastle) return;
+
+                const rel = game.diplomacyManager.getRelation(deadShogunClanId, c.id);
+                const sentiment = rel ? rel.sentiment : 50;
+
+                if (sentiment > maxSentiment) {
+                    maxSentiment = sentiment;
+                    bestClans = [c];
+                } else if (sentiment === maxSentiment) {
+                    bestClans.push(c);
+                }
+            });
+
+            if (bestClans.length > 0) {
+                // 威信が高い順、同じならIDが若い順に並べ替えます
+                bestClans.sort((a, b) => {
+                    if (b.daimyoPrestige !== a.daimyoPrestige) {
+                        return b.daimyoPrestige - a.daimyoPrestige;
+                    }
+                    return a.id - b.id;
+                });
+                targetClan = bestClans[0];
+            }
+        }
+
+        // ④ 候補となる大名家が存在しなければ、ここでイベントを終了します
+        if (!targetClan) return;
+
+        // 移動先の大名居城を取得します
+        const targetDaimyo = game.bushos.find(b => b.clan === targetClan.id && b.isDaimyo);
+        if (!targetDaimyo) return;
+        const targetCastleId = targetDaimyo.castleId;
+
+        // 【将軍候補の改名処理】
+        // 「daimyo:」の改名予定を持っていれば、その名前に改名します
+        if (candidate.nameChange && candidate.nameChange.includes('daimyo:')) {
+            const changes = candidate.nameChange.split('/');
+            for (const change of changes) {
+                const parts = change.split(':');
+                if (parts.length === 3 && parts[0].trim() === 'daimyo') {
+                    const newNameParts = parts[1].trim().split('|');
+                    candidate.familyName = newNameParts[0] || ""; 
+                    candidate.givenName = newNameParts[1] || "";  
+                    candidate.name = candidate.familyName + candidate.givenName;
+                    
+                    const newYomiParts = parts[2].trim().split('|');
+                    candidate.familyYomi = newYomiParts[0] || ""; 
+                    candidate.givenYomi = newYomiParts[1] || "";  
+                    candidate.yomi = candidate.familyYomi + candidate.givenYomi;
+                }
+            }
+        }
+
+        // 将軍候補を新しい大名家に移動させます
+        candidate.belongKunishuId = 0;
+        if (game.affiliationSystem) {
+            // ★第4引数に「100」を渡して忠誠度を固定します
+            game.affiliationSystem.joinClan(candidate, targetClan.id, targetCastleId, 100);
+        } else {
+            // 万が一システムがない時の安全策
+            if (candidate.castleId > 0) {
+                const oldCastle = game.getCastle(candidate.castleId);
+                if (oldCastle) oldCastle.samuraiIds = oldCastle.samuraiIds.filter(sid => sid !== candidate.id);
+            }
+            candidate.clan = targetClan.id;
+            candidate.castleId = targetCastleId;
+            candidate.status = 'active';
+            candidate.loyalty = 100;
+            const newCandidateCastle = game.getCastle(targetCastleId);
+            if (newCandidateCastle && !newCandidateCastle.samuraiIds.includes(candidate.id)) {
+                newCandidateCastle.samuraiIds.push(candidate.id);
+            }
+        }
+
+        // 【お供の移動処理】（明智光秀、明智秀満、溝尾茂朝）
+        const retainers = [1900001, 1900002, 1900003];
+        retainers.forEach(id => {
+            const rBusho = game.getBusho(id);
+            // 存在し、生きていて、大名ではない場合のみお供として移動します
+            if (rBusho && rBusho.status !== 'unborn' && rBusho.status !== 'dead' && !rBusho.isDaimyo) {
+                let wasCastellan = rBusho.isCastellan;
+                let oldCastleId = rBusho.castleId;
+                
+                // バッジを剥奪します
+                rBusho.isCastellan = false;
+                rBusho.isGunshi = false;
+                rBusho.belongKunishuId = 0;
+
+                if (game.affiliationSystem) {
+                    // ★第4引数に「100」を渡して忠誠度を固定します
+                    game.affiliationSystem.joinClan(rBusho, targetClan.id, targetCastleId, 100);
+                    // もし城主だったなら、古いお城の城主を更新します
+                    if (wasCastellan && oldCastleId > 0) {
+                        const oldCastle = game.getCastle(oldCastleId);
+                        if (oldCastle) game.affiliationSystem.updateCastleLord(oldCastle);
+                    }
+                } else {
+                    // 今いる城から抜きます
+                    if (oldCastleId > 0) {
+                        const oldCastle = game.getCastle(oldCastleId);
+                        if (oldCastle) oldCastle.samuraiIds = oldCastle.samuraiIds.filter(sid => sid !== rBusho.id);
+                    }
+                    // 新しい城へ所属させます
+                    rBusho.clan = targetClan.id;
+                    rBusho.castleId = targetCastleId;
+                    rBusho.status = 'active';
+                    rBusho.loyalty = 100;
+                    
+                    const newCastle = game.getCastle(targetCastleId);
+                    if (newCastle && !newCastle.samuraiIds.includes(rBusho.id)) {
+                        newCastle.samuraiIds.push(rBusho.id);
+                    }
+                }
+            }
+        });
+
+        // ログにお知らせを出力します
+        const candidateName = candidate.name.replace('|', '');
+        const msg = `${candidateName}は幕府再興のため、${targetClan.name}の庇護下に入りました。`;
+        game.ui.log(`【イベント】${msg}`);
+        await game.ui.showDialogAsync(msg, false, 0);
+
+        // 派閥や画面を最新の状態に更新します
+        if (game.factionSystem) {
+            game.factionSystem.updateFactions();
+        }
+        if (game.ui) {
+            game.ui.renderMap();
+        }
+    }
+});
+
+// ==========================================
 // ★ 将軍入城イベント（予備イベント）
 // ==========================================
 window.GameEvents.push({
@@ -268,11 +459,13 @@ window.GameEvents.push({
         // リストに入った武将を将軍家のお引越しセンターで移動させます
         followers.forEach(b => {
             if (game.affiliationSystem) {
-                game.affiliationSystem.joinClan(b, newClanId, 26); // 二条城へお引っ越し
+                // ★追加：第4引数に「100」を渡して、イベント専用の固定忠誠度にします
+                game.affiliationSystem.joinClan(b, newClanId, 26, 100); 
             } else {
                 b.clan = newClanId;
                 b.castleId = 26;
                 b.status = 'active';
+                b.loyalty = 100; // ★システムがない場合の安全策
             }
         });
 
