@@ -521,6 +521,6 @@ window.GameEvents.push({
         const candidateName = candidate.name.replace('|', '');
         const sponsorName = sponsorClan.name;
         
-        await game.ui.showDialogAsync(`${sponsorName}の擁立により、${candidateName}が征夷大将軍に就任し、新たな幕府を開きました！\n${sponsorName}と${newClanName}は固い同盟で結ばれました。`, false, 0);
+        await game.ui.showDialogAsync(`${candidateName}が征夷大将軍に就任しました！\n${sponsorName}と${newClanName}は固い同盟で結ばれました。`, false, 0);
     }
 });
