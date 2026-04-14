@@ -1539,6 +1539,11 @@ Object.assign(WarManager.prototype, {
             // ★ 修正: 諸勢力に所属している武将は、どんな城の戦いでも絶対に巻き添えで捕虜にならないように守ります！
             if (b.belongKunishuId > 0) return;
 
+            // ★追加: 最後の城で、将軍（ID1の官位を持つ）かつ大名の場合は、捕虜にする処理を飛ばします！
+            if (isLastStand && b.isDaimyo && b.courtRankIds && b.courtRankIds.includes(1)) {
+                return;
+            }
+
             let chance = isLastStand ? 1.0 : ((window.WarParams.War.CaptureChanceBase || 0.7) - (b.strength * (window.WarParams.War.CaptureStrFactor || 0.002)) + (Math.random() * 0.3));
             if (!isLastStand && defeatedCastle.soldiers > 1000) chance -= 0.2; 
             if (!isLastStand && b.isDaimyo) chance -= window.WarParams.War.DaimyoCaptureReduction;

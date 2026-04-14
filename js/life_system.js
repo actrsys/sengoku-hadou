@@ -837,6 +837,29 @@ class LifeSystem {
         
         // 滅亡の条件：お城が0個になった、または後継ぎがいない場合です
         if (clanCastles.length === 0 || reason === 'no_heir') {
+            
+            // ★追加：将軍（ID1）が大名で、お城が0になった（滅亡する）場合の特別な死亡処理！
+            const leader = this.game.getBusho(clan.leaderId);
+            if (leader && leader.status !== 'dead' && leader.isDaimyo && leader.courtRankIds && leader.courtRankIds.includes(1) && clanCastles.length === 0) {
+                // 最後の城の今の持ち主がプレイヤーなら、プレイヤーが滅ぼしたと判定します
+                const lastCastle = this.game.getCastle(leader.castleId);
+                const isPlayerDidIt = lastCastle && lastCastle.ownerClan === this.game.playerClanId;
+                
+                const leaderNameStr = leader.name.replace('|', '');
+                let deathMsg = "";
+                if (isPlayerDidIt) {
+                    deathMsg = `${leaderNameStr}は自害しました。`;
+                } else {
+                    deathMsg = `${leaderNameStr}は討死しました。`;
+                }
+                
+                this.game.ui.log(deathMsg);
+                await this.game.ui.showDialogAsync(deathMsg, false, 0);
+                
+                // ここで将軍様を必ず死亡させます！
+                await this.executeDeath(leader);
+            }
+
             clan.extinctionNotified = true; // 二度と呼ばれないように印をつけます
 
             const displayClanName = clan.name.endsWith('家') ? clan.name : clan.name + '家';
