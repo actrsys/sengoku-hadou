@@ -494,81 +494,58 @@ class LifeSystem {
         const activeBushos = this.game.bushos.filter(b => b.clan === daimyo.clan && b.id !== daimyo.id && b.status === 'active' && !b.isDaimyo);
         const unbornFamily = this.game.bushos.filter(b => b.status === 'unborn' && daimyo.familyIds.some(fId => b.familyIds.includes(fId)) && b.birthYear <= currentYear);
         
-        const allCandidates = [...activeBushos, ...unbornFamily];
-
-        // 2. 全員を並べて、誰が一番後継ぎにふさわしいかテストします！
-        if (allCandidates.length > 0) {
-            allCandidates.forEach(b => {
-                b._isRelative = daimyo.familyIds.some(fId => b.familyIds.includes(fId));
-                b._affinityDiff = Math.abs((daimyo.affinity || 0) - (b.affinity || 0));
-                b._baseScore = b.leadership + b.intelligence;
-            });
-
-            allCandidates.sort((a, b) => {
-                // 一門（親戚）を優先します
-                if (a._isRelative && !b._isRelative) return -1;
-                if (!a._isRelative && b._isRelative) return 1;
-                
-                // どちらも一門（またはどちらも一門ではない）場合は、相性などを比べます
-                if (a._isRelative && b._isRelative) {
-                    if (a._affinityDiff !== b._affinityDiff) return a._affinityDiff - b._affinityDiff;
-                    
-                    const aIsYounger = a.birthYear > daimyo.birthYear;
-                    const bIsYounger = b.birthYear > daimyo.birthYear;
-                    if (aIsYounger && !bIsYounger) return -1;
-                    if (!aIsYounger && bIsYounger) return 1;
-                    
-                    if (a.birthYear !== b.birthYear) return a.birthYear - b.birthYear;
+        // 浪人や諸勢力（※頭領は除く）に所属している一門武将も探します！
+        const externalFamily = this.game.bushos.filter(b => {
+            // 自分自身は除外します
+            if (b.id === daimyo.id) return false;
+            // 一門ではない武将も除外します
+            if (!daimyo.familyIds.some(fId => b.familyIds.includes(fId))) return false;
+            
+            // 浪人なら候補に入れます
+            if (b.status === 'ronin') return true;
+            
+            // 諸勢力に所属している武将の場合
+            if ((b.belongKunishuId || 0) > 0 && b.clan === 0) {
+                // 諸勢力のデータを調べて、その武将が頭領かどうかを確認します
+                const kunishu = this.game.kunishuSystem ? this.game.kunishuSystem.getKunishu(b.belongKunishuId) : null;
+                // 頭領だった場合は、候補から外します
+                if (kunishu && kunishu.leaderId === b.id) {
+                    return false; 
                 }
-                // 血の繋がりに関係なく、最後は能力の高さで決めます
-                return b._baseScore - a._baseScore;
-            });
-
-            // ランキング1位の人を見つけます！
-            const bestCandidate = allCandidates[0];
-
-            // 3. もし一番ふさわしい人が「まだ登場していない一門」だったら、急いで元服させます！
-            if (bestCandidate.status === 'unborn') {
-                const baseCastle = clanCastles.length > 0 ? clanCastles[0] : null;
-
-                if (baseCastle) {
-                    bestCandidate.status = 'active';
-                    bestCandidate.clan = daimyo.clan;
-                    bestCandidate.castleId = baseCastle.id;
-                    bestCandidate.loyalty = 100;
-                    if (!baseCastle.samuraiIds.includes(bestCandidate.id)) baseCastle.samuraiIds.push(bestCandidate.id);
-                    extraMsg = `\n ${bestCandidate.name.replace('|','')}が急遽元服しました。`;
-                }
+                // 頭領ではない普通の武将なら候補に入れます
+                return true;
             }
-        }
+            return false;
+        });
 
-        // 緊急登場が終わった「後」で、同じ大名家の中から候補を探し直します！
-        const clanBushos = this.game.bushos.filter(b => b.clan === daimyo.clan && b.status === 'active' && !b.isDaimyo);
-        
-        if (clanBushos.length > 0) {
-            
+        const allCandidates = [...activeBushos, ...unbornFamily, ...externalFamily];
+
+        if (allCandidates.length > 0) {
             let successor = null;
-            
+
             // ★ここから変更：プレイヤーの家なら自分で選ぶ魔法を復活させます！
             if (daimyo.clan === this.game.playerClanId) {
                 // プレイヤーが選ぶまで「待つ」魔法です
                 await new Promise(resolve => {
-                    this.game.ui.showSuccessionModal(clanBushos, (newLeaderId) => {
+                    this.game.ui.showSuccessionModal(allCandidates, (newLeaderId) => {
                         successor = this.game.getBusho(newLeaderId);
                         resolve();
                     });
                 });
             } else {
                 // AIの場合は、自動で一番ふさわしい人を計算して選びます
-                clanBushos.forEach(b => {
+                allCandidates.forEach(b => {
                     b._isRelative = daimyo.familyIds.some(fId => b.familyIds.includes(fId));
                     b._affinityDiff = Math.abs((daimyo.affinity || 0) - (b.affinity || 0));
                     b._baseScore = b.leadership + b.intelligence;
                 });
-                
-                clanBushos.sort((a, b) => {
+
+                allCandidates.sort((a, b) => {
+                    // 一門（親戚）を優先します
                     if (a._isRelative && !b._isRelative) return -1;
                     if (!a._isRelative && b._isRelative) return 1;
+                    
+                    // どちらも一門（またはどちらも一門ではない）場合は、相性などを比べます
                     if (a._isRelative && b._isRelative) {
                         if (a._affinityDiff !== b._affinityDiff) return a._affinityDiff - b._affinityDiff;
                         
@@ -579,11 +556,40 @@ class LifeSystem {
                         
                         if (a.birthYear !== b.birthYear) return a.birthYear - b.birthYear;
                     }
+                    // 血の繋がりに関係なく、最後は能力の高さで決めます
                     return b._baseScore - a._baseScore;
                 });
-                
+
                 // 一番上に来た人を後継ぎにします！
-                successor = clanBushos[0];
+                successor = allCandidates[0];
+            }
+
+            // 選ばれた後継ぎが外部の武将（未登場、浪人、諸勢力）だった場合は、急いで迎え入れます！
+            if (successor.status === 'unborn' || successor.status === 'ronin' || (successor.belongKunishuId || 0) > 0) {
+                const baseCastle = clanCastles.length > 0 ? clanCastles[0] : null;
+
+                if (baseCastle) {
+                    if ((successor.belongKunishuId || 0) > 0) {
+                        // 諸勢力の所属から外します
+                        successor.belongKunishuId = 0;
+                        extraMsg = `\n諸勢力より${successor.name.replace('|','')}を当主として迎え入れました。`;
+                    } else if (successor.status === 'ronin') {
+                        extraMsg = `\n浪人していた${successor.name.replace('|','')}を当主として迎え入れました。`;
+                    } else {
+                        extraMsg = `\n${successor.name.replace('|','')}が急遽元服しました。`;
+                    }
+
+                    // 元々どこかの城にいた場合は、お城を出ます
+                    if (successor.status === 'ronin' || successor.status === 'active') {
+                        this.game.affiliationSystem.leaveCastle(successor);
+                    }
+
+                    successor.status = 'active';
+                    successor.clan = daimyo.clan;
+                    successor.castleId = baseCastle.id;
+                    successor.loyalty = 100;
+                    if (!baseCastle.samuraiIds.includes(successor.id)) baseCastle.samuraiIds.push(successor.id);
+                }
             }
             
             this.game.changeLeader(daimyo.clan, successor.id);
