@@ -202,8 +202,9 @@ window.GameEvents.push({
 
         // お城の持ち主を新しい将軍家に変えます
         if (game.castleManager) {
-            game.castleManager.changeOwner(nijoCastle, newClanId);
-            game.castleManager.changeOwner(makishimaCastle, newClanId);
+            // ★修正：第3引数に「true」を渡して、イベントによる変更であることを教えます
+            game.castleManager.changeOwner(nijoCastle, newClanId, true);
+            game.castleManager.changeOwner(makishimaCastle, newClanId, true);
         } else {
             nijoCastle.ownerClan = newClanId;
             makishimaCastle.ownerClan = newClanId;

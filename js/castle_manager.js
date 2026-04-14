@@ -7,8 +7,8 @@ class CastleManager {
         this.game = game;
     }
 
-    // 城の持ち主を変更する魔法です
-    changeOwner(castle, newOwnerId) {
+    // 城の持ち主を変更する魔法です。isEventがtrueの時は、イベントによる平和的な変更として扱います。
+    changeOwner(castle, newOwnerId, isEvent = false) {
         const oldOwnerId = castle.ownerClan;
         castle.ownerClan = newOwnerId;
         
@@ -18,23 +18,26 @@ class CastleManager {
         // ★追加：城の持ち主が変わった時は、おまかせ（委任）を必ず解除します！
         castle.isDelegated = false;
         
-        // ★追加：城を失った旧勢力の武将たちの忠誠度を下げます！
-        if (oldOwnerId !== 0 && oldOwnerId !== newOwnerId) {
-            // ★変更：失った後、まだお城が残っているか（滅亡していないか）を調べます！
-            const remainingCastles = this.game.castles.filter(c => c.ownerClan === oldOwnerId);
-            if (remainingCastles.length > 0) {
-                this.decreaseLoyaltyOnCastleLost(oldOwnerId);
+        // ★修正：イベントでの変更ではない（合戦などでの奪い合いの）場合のみ、忠誠度や諸勢力への影響を発生させます
+        if (!isEvent) {
+            // ★追加：城を失った旧勢力の武将たちの忠誠度を下げます！
+            if (oldOwnerId !== 0 && oldOwnerId !== newOwnerId) {
+                // ★変更：失った後、まだお城が残っているか（滅亡していないか）を調べます！
+                const remainingCastles = this.game.castles.filter(c => c.ownerClan === oldOwnerId);
+                if (remainingCastles.length > 0) {
+                    this.decreaseLoyaltyOnCastleLost(oldOwnerId);
+                }
             }
-        }
 
-        // ★追加：新しく城を得た勢力の武将たちの忠誠度を上げます！
-        if (newOwnerId !== 0 && oldOwnerId !== newOwnerId) {
-            this.increaseLoyaltyOnCastleGained(newOwnerId);
-        }
+            // ★追加：新しく城を得た勢力の武将たちの忠誠度を上げます！
+            if (newOwnerId !== 0 && oldOwnerId !== newOwnerId) {
+                this.increaseLoyaltyOnCastleGained(newOwnerId);
+            }
 
-        // 持ち主が変わったことによる諸勢力の反発をチェックします
-        if (oldOwnerId !== newOwnerId && newOwnerId !== 0) {
-            this.applyKunishuRelationDropOnCapture(castle, newOwnerId);
+            // 持ち主が変わったことによる諸勢力の反発をチェックします
+            if (oldOwnerId !== newOwnerId && newOwnerId !== 0) {
+                this.applyKunishuRelationDropOnCapture(castle, newOwnerId);
+            }
         }
 
         // ★今回追加：城の持ち主が変わったので、これを外交相手として覚えていた大名家の記憶をリセットします！
