@@ -175,11 +175,14 @@ class CourtRankSystem {
                 // 条件2：献金で上がれるのは rankNo: 4 まで（1〜3は除外）
                 if (r.rankNo < 4) return false;
                 
-                // 条件3：今持っている最高ランクより「上（rankNoが小さい）」であるか
+                // 条件3：IDが80（左馬頭）の官位はイベント用なので、候補から外します
+                if (r.id === 80) return false;
+                
+                // 条件4：今持っている最高ランクより「上（rankNoが小さい）」であるか
                 // ※これで、今のランク以下の官位をもらってしまうのを防ぎます！
                 if (r.rankNo >= currentMaxRankNo) return false;
                 
-                // 条件4：威信と貢献度の基準を満たしているか
+                // 条件5：威信と貢献度の基準を満たしているか
                 return basePrestige >= r.necessaryPrestige && contribution >= (r.necessaryPrestige * 4.5);
             });
 
