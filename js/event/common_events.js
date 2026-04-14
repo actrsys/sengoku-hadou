@@ -587,8 +587,7 @@ window.GameEvents.push({
         game.castles.forEach(c => {
             if (c.ownerClan === 0) return; 
             
-            const baseRice = (c.kokudaka / 2) + c.peoplesLoyalty;
-            let riceIncome = Math.floor(baseRice * window.MainParams.Economy.IncomeRiceRate);
+            let riceIncome = GameSystem.calcBaseRiceIncome(c);
             riceIncome = GameSystem.applyVariance(riceIncome, window.MainParams.Economy.IncomeFluctuation);
             
             if (hasStatus(c.provinceId, 'badHarvest')) {
@@ -971,6 +970,94 @@ window.GameEvents.push({
                 // 士気が 3 ～ 5 ランダムで下がります
                 const moraleDrop = Math.floor(Math.random() * 3) + 3;
                 c.morale = Math.max(0, c.morale - moraleDrop);
+            }
+        });
+    }
+});
+
+// ==========================================
+// ★ 毎月の交易収入イベント（隣接する友好国などとの往来）
+// ==========================================
+window.GameEvents.push({
+    id: "trade_income_monthly",
+    timing: "startMonth_after", // 月初の収入処理が終わった後に実行します
+    isOneTime: false,
+    
+    checkCondition: function(game) {
+        return true; // 毎月必ず実行します
+    },
+    
+    execute: async function(game) {
+        // 各大名家ごとに順番に計算します
+        game.clans.forEach(clan => {
+            if (clan.id === 0) return; // 空き家は除外します
+            
+            let totalTradeIncome = 0;
+            let logMessages = [];
+            
+            // まずは自分の領地（お城のリスト）を集めます
+            const myCastles = game.castles.filter(c => c.ownerClan === clan.id);
+            if (myCastles.length === 0) return; // 城がなければスキップします
+            
+            // 他の大名家との関係を調べます
+            game.clans.forEach(targetClan => {
+                if (targetClan.id === 0 || targetClan.id === clan.id) return;
+                
+                const rel = game.getRelation(clan.id, targetClan.id);
+                // 関係が「友好」「同盟」「支配」「従属」のいずれかの場合のみ
+                if (rel && ['友好', '同盟', '支配', '従属'].includes(rel.status)) {
+                    const sentiment = rel.sentiment;
+                    const targetCastles = game.castles.filter(c => c.ownerClan === targetClan.id);
+                    
+                    let targetIncome = 0;
+                    
+                    // 相手の城を一つずつ見て、自分の城と繋がっているか（隣接しているか）チェックします
+                    targetCastles.forEach(tc => {
+                        let isAdjacentToMe = false;
+                        for (let mc of myCastles) {
+                            if (GameSystem.isAdjacent(mc, tc)) {
+                                isAdjacentToMe = true;
+                                break;
+                            }
+                        }
+                        
+                        // 繋がっていれば（飛び地でなければ）、その城の人口から収入を計算します
+                        if (isAdjacentToMe) {
+                            // 収入量 = √人口 * (関係値 / 200)
+                            const income = Math.floor(Math.sqrt(tc.population) * (sentiment / 200));
+                            targetIncome += income;
+                        }
+                    });
+                    
+                    // 収入が発生し、かつプレイヤーが関係している場合だけログのメモを残します
+                    if (targetIncome > 0) {
+                        totalTradeIncome += targetIncome;
+                        
+                        if (clan.id === game.playerClanId) {
+                            // 自分が得た収入の場合
+                            logMessages.push(`【交易】${targetClan.name}との往来により、金${targetIncome} の収入を得ました`);
+                        } else if (targetClan.id === game.playerClanId) {
+                            // 相手が自分（プレイヤー）の領地のおかげで収入を得た場合
+                            logMessages.push(`【交易】${clan.name}が当家との往来により、金${targetIncome} の利益を得ました`);
+                        }
+                    }
+                }
+            });
+            
+            // 集めた収入を、大名の居城に入れます
+            if (totalTradeIncome > 0) {
+                const leader = game.getBusho(clan.leaderId);
+                if (leader) {
+                    const daimyoCastle = game.getCastle(leader.castleId);
+                    if (daimyoCastle) {
+                        daimyoCastle.gold = Math.min(99999, daimyoCastle.gold + totalTradeIncome);
+                    }
+                }
+            }
+            
+            // プレイヤーに関係するメモがあれば、左下のログに出力します
+            if (logMessages.length > 0 && game.ui && game.ui.log) {
+                logMessages.forEach(msg => game.ui.log(msg));
             }
         });
     }
