@@ -124,7 +124,8 @@ body:not(.is-pc) .sp-face-column {
     width: 60px; /* 顔アイコンの幅に合わせる */
 }
 body:not(.is-pc) .status-marks-carousel {
-    margin-top: 5px;
+    margin-top: auto; /* 右側の情報の一番下（人口の位置）まで自動で押し下げます */
+    margin-bottom: 2px; /* 下端の文字位置と揃うように微調整 */
     width: 100%;
     height: 1.2rem;
     position: relative;
@@ -133,14 +134,13 @@ body:not(.is-pc) .status-marks-carousel {
 body:not(.is-pc) .status-marks-carousel .status-mark {
     position: absolute;
     top: 0;
-    left: 0;
-    right: 0;
-    margin: 0 auto;
+    left: 0; /* 中央揃えをやめて、アイコンの左端に揃えます */
     width: max-content; /* 横幅の伸びすぎを抑制 */
     font-size: 0.75rem;
-    padding: 2px 4px; /* 横幅を絞った分、左右に少し余白を追加 */
+    padding: 2px 4px;
     display: none;
     box-sizing: border-box;
+    text-align: left; /* 左寄せ */
 }
 body:not(.is-pc) .status-marks-carousel .status-mark.active {
     display: block;
