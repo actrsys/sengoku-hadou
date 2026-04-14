@@ -300,6 +300,12 @@ window.GameEvents.push({
         if (game.factionSystem) {
             game.factionSystem.updateFactions();
         }
+
+        // ★追加：城の持ち主が変わったので、システムに大名家の「威信」を再計算してもらいます
+        if (typeof game.updateAllClanPrestige === 'function') {
+            game.updateAllClanPrestige();
+        }
+
         if (game.ui) {
             game.ui.renderMap();
             game.ui.updatePanelHeader();
