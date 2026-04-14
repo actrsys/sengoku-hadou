@@ -564,8 +564,11 @@ class LifeSystem {
                 successor = allCandidates[0];
             }
 
+            let isExternalSuccessor = false;
+
             // 選ばれた後継ぎが外部の武将（未登場、浪人、諸勢力）だった場合は、急いで迎え入れます！
             if (successor.status === 'unborn' || successor.status === 'ronin' || (successor.belongKunishuId || 0) > 0) {
+                isExternalSuccessor = true;
                 const baseCastle = clanCastles.length > 0 ? clanCastles[0] : null;
 
                 if (baseCastle) {
@@ -574,9 +577,9 @@ class LifeSystem {
                         successor.belongKunishuId = 0;
                         extraMsg = `\n${successor.name.replace('|','')}が当主として迎え入れられました。`;
                     } else if (successor.status === 'ronin') {
-                        extraMsg = `\n${successor.name.replace('|','')}を当主として迎え入れられました。`;
+                        extraMsg = `\n${successor.name.replace('|','')}が当主として迎え入れられました。`;
                     } else {
-                        extraMsg = `\n${successor.name.replace('|','')}が急遽元服しました。`;
+                        extraMsg = `\n${successor.name.replace('|','')}が急遽元服し、家督を継ぎました。`;
                     }
 
                     // 元々どこかの城にいた場合は、お城を出ます
@@ -747,7 +750,10 @@ class LifeSystem {
 
             // ★ここから追加：当主交代に合わせて大名家の名前を変更し、マップを更新します！
             const clan = this.game.clans.find(c => c.id === daimyo.clan);
+            let originalClanName = ""; // ★死亡した大名の元の家名を覚えておくメモ帳です！
+            
             if (clan) {
+                originalClanName = clan.name; // ★ここでメモします
                 const oldClanName = clan.name;
                 
                 // 万が一「姓」のデータが空っぽだった場合に備えて、フルネームを代用する安全策を入れます
@@ -772,8 +778,17 @@ class LifeSystem {
                 this.game.ui.renderMap();
             }
             
-            const msg = `${daimyo.name.replace('|','')}が死亡し、${successor.name.replace('|','')}が家督を継ぎました。${extraMsg}`;
-            this.game.ui.log(`【当主交代】${daimyo.name.replace('|','')}が死亡し、${successor.name.replace('|','')}が家督を継ぎました。`);
+            // ★メモしておいた家名を使って「〇〇家の」という言葉を作ります
+            const clanPrefix = originalClanName ? `${originalClanName}の` : "";
+            
+            let msg = "";
+            if (isExternalSuccessor) {
+                msg = `${clanPrefix}${daimyo.name.replace('|','')}が死亡しました。${extraMsg}`;
+                this.game.ui.log(`【当主交代】${clanPrefix}${daimyo.name.replace('|','')}が死亡しました。`);
+            } else {
+                msg = `${clanPrefix}${daimyo.name.replace('|','')}が死亡し、${successor.name.replace('|','')}が家督を継ぎました。${extraMsg}`;
+                this.game.ui.log(`【当主交代】${clanPrefix}${daimyo.name.replace('|','')}が死亡し、${successor.name.replace('|','')}が家督を継ぎました。`);
+            }
             
             await this.game.ui.showDialogAsync(msg, false, 0);
             
