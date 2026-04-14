@@ -167,7 +167,6 @@ window.GameEvents.push({
             leaderId: candidate.id,
             color: newColor,
             yomi: candidate.familyYomi || "",
-            daimyoPrestige: 1000, // 威信を高く設定します
             courtContribution: 0,
             courtTrust: 0
         });
