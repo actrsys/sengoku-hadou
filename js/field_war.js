@@ -2428,8 +2428,8 @@ class FieldWarManager {
         // --- 2. 逃走・移動判定 ---
         if (unit.troopType === 'teppo') {
             if (allies.length === 0 && distToTarget === 1) {
-                if (!isKunishuAttacker) {
-                    // ★修正: 攻撃側の諸勢力でなければ、総大将なら全軍撤退、一般部隊なら個別撤退
+                if (!isKunishuAttacker && !isEventBattleWithPlayer) {
+                    // ★修正: 攻撃側の諸勢力、またはプレイヤー干渉中のイベント戦闘でなければ撤退
                     if (unit.isGeneral) {
                         if (isPlayerInvolved) this.log(`${unit.name}軍は不利を悟り、戦場から離脱しました！`);
                         this.endFieldWar(unit.isAttacker ? 'attacker_retreat' : 'defender_retreat');
