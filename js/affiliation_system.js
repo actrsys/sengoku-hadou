@@ -14,8 +14,9 @@ class AffiliationSystem {
      * @param {object} busho - お引越しする武将
      * @param {number} newClanId - 新しい大名家のID
      * @param {number} newCastleId - 新しく入るお城のID
+     * @param {number|null} forceLoyalty - イベント専用の固定忠誠度（指定がなければ相性計算）
      */
-    joinClan(busho, newClanId, newCastleId) {
+    joinClan(busho, newClanId, newCastleId, forceLoyalty = null) {
         const oldClanId = busho.clan;
 
         // 1. 今いるお城から出ます
@@ -37,7 +38,12 @@ class AffiliationSystem {
         busho.isGunshi = false; // ★ここを書き足します！軍師のバッジを外します
 
         // 5. 新しい殿様との相性を計算して、最初の忠誠度を決めます！
-        this.updateLoyaltyForNewLord(busho, newClanId);
+        // ★追加：イベント専用などで忠誠度が指定されている場合は、相性計算をスキップして固定します
+        if (forceLoyalty !== null) {
+            busho.loyalty = forceLoyalty;
+        } else {
+            this.updateLoyaltyForNewLord(busho, newClanId);
+        }
 
         // 6. 新しいお城に入ります
         this.enterCastle(busho, newCastleId);
