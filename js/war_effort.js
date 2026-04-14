@@ -833,7 +833,8 @@ Object.assign(WarManager.prototype, {
             
             // ★ここから追加：AI同士の戦争の結果メッセージを出して時間を止めます！
             // ★修正：諸勢力の戦いの時は専用のメッセージがあるので、ここではお休みします！
-            if (!s.isPlayerInvolved && !s.isKunishuSubjugation && !s.attacker.isKunishu) {
+            // ★追加：イベントによる決着の時も、専用のメッセージが出るためお休みします！
+            if (!s.isPlayerInvolved && !s.isKunishuSubjugation && !s.attacker.isKunishu && !s.isEventBattle) {
                 const atkClanData = this.game.clans.find(c => c.id === s.attacker.ownerClan);
                 const atkProvData = this.game.provinces.find(p => p.id === s.sourceCastle.provinceId);
                 const defClanData = this.game.clans.find(c => c.id === s.oldDefClanId);
@@ -1541,7 +1542,13 @@ Object.assign(WarManager.prototype, {
                         window.AudioManager.playSE('victory.ogg');
                     }
                 }
-                this.game.ui.showResultModal(resultMsg, finishWarProcess);
+                
+                // ★追加：イベントによる決着の時は、通常の結果画面を省略して進めます！
+                if (s.isEventBattle) {
+                    finishWarProcess();
+                } else {
+                    this.game.ui.showResultModal(resultMsg, finishWarProcess);
+                }
             }
             else finishWarProcess();
         } catch (e) {
