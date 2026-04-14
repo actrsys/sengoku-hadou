@@ -136,8 +136,8 @@ body:not(.is-pc) .status-marks-carousel .status-mark {
     top: 0;
     left: 0; /* 中央揃えをやめて、アイコンの左端に揃えます */
     width: max-content; /* 横幅の伸びすぎを抑制 */
-    font-size: 0.75rem;
-    padding: 2px 4px;
+    font-size: 1.0rem;
+    padding: 8px 8px;
     display: none;
     box-sizing: border-box;
     text-align: left; /* 左寄せ */
