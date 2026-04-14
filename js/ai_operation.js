@@ -277,9 +277,8 @@ class AIOperationManager {
         if (myClanCastles.length === 0) return;
 
         // ゲーム開始から3ターン未満なら、おとなしく内政作戦にします
-        const startYear = this.game.startYear || window.MainParams.StartYear;
-        const startMonth = this.game.startMonth || window.MainParams.StartMonth || 1;
-        const elapsedTurns = ((this.game.year - startYear) * 12) + (this.game.month - startMonth);
+        const startMonth = window.MainParams.StartMonth || 1;
+        const elapsedTurns = ((this.game.year - window.MainParams.StartYear) * 12) + (this.game.month - startMonth);
         if (elapsedTurns < 3) {
             this.setInternalOperation(clanId);
             return;
@@ -381,6 +380,9 @@ class AIOperationManager {
                 const currentData = queue.shift();
                 const current = currentData.castle;
                 const currentDist = currentData.distance;
+
+                // GameSystem.isReachableと同じく、距離3以上は進めません
+                if (currentDist >= 3) continue;
 
                 if (current.adjacentCastleIds) {
                     current.adjacentCastleIds.forEach(adjId => {
