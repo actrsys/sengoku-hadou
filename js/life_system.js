@@ -433,6 +433,10 @@ class LifeSystem {
         
         // ★ここを追加：官位を持っていたら朝廷に返す魔法！
         if (busho.courtRankIds && busho.courtRankIds.length > 0) {
+            // ★追加：もし征夷大将軍（ID1）を持っていたら、後継ぎのためにメモを残しておきます！
+            if (busho.courtRankIds.includes(1)) {
+                busho._wasShogun = true;
+            }
             busho.courtRankIds.forEach(rankId => {
                 this.game.courtRankSystem.returnRank(rankId);
             });
@@ -618,6 +622,16 @@ class LifeSystem {
                         const newNameStr = successor.name.replace('|', '');
                         messages.push(`家督を継ぐにあたり、${oldNameStr}は\n「${newNameStr}」と名を改めました。`);
                     }
+                }
+            }
+
+            // ★追加：先代が征夷大将軍で、後継ぎが一門武将なら「左馬頭（ID80）」をこっそり与える魔法！
+            if (daimyo._wasShogun) {
+                // 後継ぎが一門武将かどうかを血の繋がり（familyIds）で確認します
+                const isRelative = daimyo.familyIds.some(fId => successor.familyIds.includes(fId));
+                if (isRelative) {
+                    // 朝廷システムにお願いして、後継ぎにID80の官位を与えます
+                    this.game.courtRankSystem.grantRank(successor, 80);
                 }
             }
             

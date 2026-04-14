@@ -163,6 +163,25 @@ class CourtRankSystem {
                 }
             }
 
+            // ★追加：もし当主が「左馬頭（ID80）」を持っていて、朝廷に「征夷大将軍（ID1）」が空いていたら特別に就任する魔法！
+            if (leader.courtRankIds && leader.courtRankIds.includes(80)) {
+                if (this.availableRanks.includes(1)) {
+                    // 征夷大将軍（ID1）を与えます
+                    this.grantRank(leader, 1);
+                    // 用済みになった左馬頭（ID80）は朝廷にお返しします
+                    leader.courtRankIds = leader.courtRankIds.filter(id => id !== 80);
+                    this.returnRank(80);
+                    
+                    const leaderName = leader.name.replace('|', '');
+                    const msg = `${leaderName}が征夷大将軍に就任しました。`;
+                    messages.push(msg);
+                    this.game.ui.log(`【叙任】${msg}`);
+                    
+                    // 特別な就任をしたので、この月の通常の官位チェックはパスして次の大名へ進みます
+                    return;
+                }
+            }
+
             // 威信と貢献度を取得
             const basePrestige = clan.basePrestige || 0;
             const contribution = clan.courtContribution || 0;
