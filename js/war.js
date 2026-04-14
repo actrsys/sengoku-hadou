@@ -849,10 +849,19 @@ class WarManager {
             
             atkRoles.forEach(role => {
                 if (s.plannedActions[role] && s.plannedActions[role].type !== 'retreat') {
+                    if (s.plannedActions[role].isProvoked) return;
+                    
                     let targetArmy = getArmyObj(role);
                     let tbushos = (role === 'attacker') ? s.atkBushos : (role === 'attacker_self_reinf' ? s.selfReinforcement.bushos : s.reinforcement.bushos);
                     
                     if (targetArmy && targetArmy.soldiers > 0) {
+                        let targetArmyName = getArmyDisplayName(role);
+                        
+                        if (s.plannedActions[role].type === 'charge') {
+                            pushMsg({ text: `${targetArmyName}軍は挑発を無視した！`, log: `${activeArmyName} 挑発失敗（${targetArmyName}）` });
+                            return;
+                        }
+
                         let atkBestInt = tbushos.reduce((max, b) => Math.max(max, b.intelligence), 0);
                         let atkInt = tbushos[0].intelligence;
                         let atkMorale = targetArmy.morale || 50;
@@ -866,15 +875,16 @@ class WarManager {
                             s.plannedActions[role].type = 'charge';
                             s.plannedActions[role].isProvoked = true;
                             provokedCount++;
+                            pushMsg({ text: `${targetArmyName}軍は挑発にかかった！`, log: `${activeArmyName} 挑発成功（${targetArmyName}）` });
+                        } else {
+                            pushMsg({ text: `${targetArmyName}軍は挑発を無視した！`, log: `${activeArmyName} 挑発失敗（${targetArmyName}）` });
                         }
                     }
                 }
             });
             
-            if (provokedCount > 0) {
-                pushMsg({ text: `敵部隊の挑発に成功した！`, log: `${activeArmyName} 挑発成功！` });
-            } else {
-                pushMsg({ text: `挑発は失敗に終わった……`, log: `${activeArmyName} 挑発失敗……`, se: 'miss.ogg' });
+            if (provokedCount === 0) {
+                pushMsg({ se: 'miss.ogg' });
             }
             executeNext(); return;
         }
