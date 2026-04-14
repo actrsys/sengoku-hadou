@@ -199,11 +199,7 @@ class AIEngine {
                         canReach = true;
                         
                         if (myOperation.isEventOperation) {
-                            // 万が一、すでに仲良しになっていたら攻撃を中止する安全装置です
-                            const targetKunishu = this.game.kunishuSystem.getKunishu(myOperation.targetId);
-                            if (targetKunishu && targetKunishu.getRelation(castle.ownerClan) <= 30) {
-                                isStillEnemy = true;
-                            }
+                            isStillEnemy = true;
                         } else {
                             // 諸勢力がまだ生きているか、仲良しになっていないか（友好度30以下）をチェックします
                             const targetKunishu = this.game.kunishuSystem.getKunishu(myOperation.targetId);
@@ -221,10 +217,7 @@ class AIEngine {
                             
                             if (myOperation.isEventOperation) {
                                 canReach = true;
-                                // 万が一、標的のお城がすでに自分のものになっていたら攻撃を中止する安全装置です
-                                if (targetCastle.ownerClan !== castle.ownerClan) {
-                                    isStillEnemy = true;
-                                }
+                                isStillEnemy = true;
                             } else {
                                 // 道が繋がっているか、魔法を使って再確認します！
                                 canReach = GameSystem.isReachable(this.game, castle, targetCastle, castle.ownerClan);
@@ -303,7 +296,8 @@ class AIEngine {
                         } else {
                             const targetCastle = this.game.getCastle(myOperation.targetId);
                             if (targetCastle) {
-                                this.executeAttack(castle, targetCastle, castellan, myOperation.requiredForce, myOperation.requiredRice);
+                                // ★変更：一番最後に「myOperation（作戦のメモ）」も一緒に渡してあげます！
+                                this.executeAttack(castle, targetCastle, castellan, myOperation.requiredForce, myOperation.requiredRice, myOperation);
                             }
                         }
                         
@@ -780,8 +774,8 @@ class AIEngine {
         return null;
     }
 
-    // ★ここを元のスッキリした形に差し替えます！
-    executeAttack(source, target, general, sendSoldiers, sendRice) {
+    // ★変更：一番最後に「operation = null」を追加して、作戦のメモを受け取れるようにします
+    executeAttack(source, target, general, sendSoldiers, sendRice, operation = null) {
         if (sendSoldiers <= 0 || sendRice <= 0) {
             this.game.finishTurn();
             return;
@@ -832,11 +826,26 @@ class AIEngine {
 
         // 4. 一番強い武将の「7割以下」の武将はお留守番させます（足切り）
         const threshold = maxPower * 0.7;
-        const sorted = evaluatedBushos
+        let sorted = evaluatedBushos // ★変更：後から中身をいじれるように「const」から「let」にします
             .filter(eb => eb.perceivedPower > threshold) // 7割より大きい人だけ残す
             .sort((a, b) => b.perceivedPower - a.perceivedPower) // 見積もり戦闘力が強い順に並べる
             .slice(0, 5) // 最大5人まで選ぶ（既存の仕組みに合わせます）
             .map(eb => eb.busho); // 魔法の箱から武将データだけを取り出す
+
+        // ★追加：イベント作戦で「絶対にこの人を大将にする！」と指名されていたら、一番前にねじ込みます
+        if (operation && operation.designatedCommanderId) {
+            const commander = bushos.find(b => b.id === operation.designatedCommanderId);
+            if (commander) {
+                // すでにリストに入っていれば一度取り除いてから、先頭（0番目）に割り込ませます
+                sorted = sorted.filter(b => b.id !== operation.designatedCommanderId);
+                sorted.unshift(commander);
+                
+                // もし割り込ませた結果、5人を超えてしまったら最後尾の人を外します
+                if (sorted.length > 5) {
+                    sorted = sorted.slice(0, 5);
+                }
+            }
+        }
 
         // 援軍を探す処理へバトンタッチします
         const sendHorses = (source.horses || 0) < sendSoldiers * 0.2 ? 0 : (source.horses || 0);

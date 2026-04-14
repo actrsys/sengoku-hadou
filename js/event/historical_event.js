@@ -587,7 +587,8 @@ window.GameEvents.push({
 
         // 駿府城の兵力を調べて、出撃させる兵士と兵糧の数を決めます
         const sunpuCastle = game.getCastle(13);
-        const force = sunpuCastle ? Math.floor(sunpuCastle.soldiers * 0.8) : 5000;
+        // ★義元は油断していて、総兵力の4分の1しか連れて行きません
+        const force = sunpuCastle ? Math.floor(sunpuCastle.soldiers * 0.25) : 5000;
         const rice = force * 2;
 
         // AIの作戦を管理しているシステムに、新しい作戦をセットします
@@ -595,16 +596,17 @@ window.GameEvents.push({
             game.aiOperationManager.operations[imagawaClanId] = {
                 type: '攻撃',
                 targetId: 11,               // 攻撃目標は名古屋城です
-                isEventOperation: true,     // ★イベントによる特別な作戦です（攻撃制限などを無視します）
-                isKunishuTarget: false,     // 相手は諸勢力ではありません
+                isEventOperation: true,     // ★イベントによる特別な作戦です
+                designatedCommanderId: 1004001, // ★今回追加：絶対にこの人（義元）を大将にするという指定です！
+                isKunishuTarget: false,     
                 stagingBase: 13,            // 出撃するのは駿府城からです
-                supportBase: null,          // 今回は援軍用の拠点は指定しません
-                requiredForce: force,       // 用意する兵士の数です
-                requiredRice: rice,         // 用意する兵糧の数です
-                assignedUnits: [],          // まだ部隊は編成されていません
-                turnsRemaining: 1,          // 準備期間は1ヶ月です
-                maxTurns: 4,                // 作戦の有効期限です
-                status: '準備中'            // 最初は準備中として登録します
+                supportBase: null,          
+                requiredForce: force,       // ★ここで指定した「4分の1の兵力」が、そのまま出撃時に使われます！
+                requiredRice: rice,         
+                assignedUnits: [],          
+                turnsRemaining: 1,          // 準備期間は1ヶ月です（予兆が出ます）
+                maxTurns: 4,                
+                status: '準備中'            
             };
             
             // 画面にメッセージを出して、プレイヤーにお知らせします
