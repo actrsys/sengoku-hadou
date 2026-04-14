@@ -1041,11 +1041,16 @@ class UIManager {
             if (castle.statusEffects.includes('一揆')) {
                 statusMarksHtml += `<div class="status-mark mark-ikki">一揆</div>`;
             }
-            if (castle.statusEffects.includes('heavySnow')) {
-                statusMarksHtml += `<div class="status-mark mark-snow">大雪</div>`;
-            }
             if (castle.statusEffects.includes('糧攻')) {
                 statusMarksHtml += `<div class="status-mark mark-starve">糧攻</div>`;
+            }
+        }
+
+        // 大雪のシールは「城」ではなく「国（地方）」に貼られているので、国をチェックします
+        if (this.game.provinces) {
+            const province = this.game.provinces.find(p => p.id === castle.provinceId);
+            if (province && province.statusEffects && province.statusEffects.includes('heavySnow')) {
+                statusMarksHtml += `<div class="status-mark mark-snow">大雪</div>`;
             }
         }
 
