@@ -1073,7 +1073,22 @@ Object.assign(UIManager.prototype, {
 
         // DataManagerにこっそりしまっておいた画像データ（裏側の秘密マップ）をもらいます
         const sourceData = DataManager.provinceImageData;
-        if (!sourceData) return;
+        
+        // ★修正：ロードしたばかりで画像データが無い場合は、読み込んでからやり直します！
+        if (!sourceData) {
+            const provMapImg = new Image();
+            provMapImg.src = './data/images/map/japan_provinces.png';
+            provMapImg.onload = () => {
+                const tempCanvas = document.createElement('canvas');
+                tempCanvas.width = provMapImg.naturalWidth;
+                tempCanvas.height = provMapImg.naturalHeight;
+                const tempCtx = tempCanvas.getContext('2d');
+                tempCtx.drawImage(provMapImg, 0, 0);
+                DataManager.provinceImageData = tempCtx.getImageData(0, 0, tempCanvas.width, tempCanvas.height);
+                this.highlightRegion(regionId);
+            };
+            return;
+        }
 
         // 指定された地方（regionId）に含まれる国の「色コード」を全部集めます
         const targetColors = this.game.provinces
@@ -1141,7 +1156,22 @@ Object.assign(UIManager.prototype, {
 
         // DataManagerにこっそりしまっておいた画像データ（裏側の秘密マップ）をもらいます
         const sourceData = DataManager.provinceImageData;
-        if (!sourceData) return;
+        
+        // ★修正：ロードしたばかりで画像データが無い場合は、読み込んでからやり直します！
+        if (!sourceData) {
+            const provMapImg = new Image();
+            provMapImg.src = './data/images/map/japan_provinces.png';
+            provMapImg.onload = () => {
+                const tempCanvas = document.createElement('canvas');
+                tempCanvas.width = provMapImg.naturalWidth;
+                tempCanvas.height = provMapImg.naturalHeight;
+                const tempCtx = tempCanvas.getContext('2d');
+                tempCtx.drawImage(provMapImg, 0, 0);
+                DataManager.provinceImageData = tempCtx.getImageData(0, 0, tempCanvas.width, tempCanvas.height);
+                this.updateSnowOverlay();
+            };
+            return;
+        }
 
         // 「heavySnow（大雪）」のシールが貼られている国の色コードを全部集めます
         const targetColors = this.game.provinces
