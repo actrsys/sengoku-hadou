@@ -171,15 +171,16 @@ body:not(.is-pc) .status-marks-carousel .status-mark.fade-in {
 #bottom-command-bar { flex: none; background: linear-gradient(to bottom, #254a2e 0%, #1b3822 100%); border-top: 3px solid #d4af37; padding-bottom: max(5px, env(safe-area-inset-bottom)); padding-left: 5px; padding-right: 5px; z-index: 200; box-shadow: 0 -4px 10px rgba(0,0,0,0.6); height: auto; display: block; }
 #mobile-bottom-info { padding: 0; margin: 0; }
 .command-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 5px; padding: 4px 0; }
-.cmd-btn { padding: 0; height: 32px; border: 2px solid #d4af37; background: linear-gradient(to bottom, #b22222 0%, #8b0000 100%); border-radius: 4px; cursor: pointer; font-size: 1rem; font-weight: bold; display: flex; align-items: center; justify-content: center; touch-action: manipulation; white-space: nowrap; overflow: hidden; color: #fff; text-shadow: 1px 1px 2px #000, -1px -1px 2px #000; box-shadow: inset 0 1px 1px rgba(255,255,255,0.4), 0 3px 6px rgba(0,0,0,0.6); transition: all 0.2s; }
-.cmd-btn:hover { background: linear-gradient(to bottom, #d32f2f 0%, #b22222 100%); border-color: #fff2cc; transform: scale(1.02); box-shadow: inset 0 1px 2px rgba(255,255,255,0.5), 0 5px 10px rgba(0,0,0,0.7); }
-.cmd-btn:active { background: #5d0000; transform: translateY(2px); box-shadow: none; }
-.cmd-btn.category { background: linear-gradient(to bottom, #2c3e50 0%, #000000 100%); border-color: #d4af37; color: #ffd54f; }
-.cmd-btn.category:hover { background: linear-gradient(to bottom, #34495e 0%, #1a1a1a 100%); border-color: #fff; }
-.cmd-btn.finish { background: linear-gradient(to bottom, #d4af37 0%, #b8860b 100%); border-color: #fff2cc; color: #000; text-shadow: none; grid-column: span 3; margin-top: 2px; }
+.cmd-btn { padding: 0; height: 32px; border: 2px solid #d4af37; background: linear-gradient(to bottom, #2c3e50 0%, #000000 100%); border-radius: 4px; cursor: pointer; font-size: 1rem; font-weight: bold; display: flex; align-items: center; justify-content: center; touch-action: manipulation; white-space: nowrap; overflow: hidden; color: #ffd54f; text-shadow: 1px 1px 2px #000; box-shadow: inset 0 1px 1px rgba(255,255,255,0.1), 0 2px 5px rgba(0,0,0,0.5); transition: all 0.2s; }
+.cmd-btn:hover { background: linear-gradient(to bottom, #3e5871 0%, #1a1a1a 100%); border-color: #fff2cc; color: #fff; box-shadow: inset 0 1px 2px rgba(255,255,255,0.2), 0 4px 8px rgba(0,0,0,0.6); }
+.cmd-btn:active { background: #000 !important; border-color: #825a2c !important; transform: translateY(2px); box-shadow: inset 0 2px 5px rgba(0,0,0,0.8); color: #b8860b !important; }
+.cmd-btn.category { background: linear-gradient(to bottom, #1a1a1a 0%, #000000 100%); }
+.cmd-btn.finish { background: linear-gradient(to bottom, #d4af37 0%, #b8860b 100%); color: #000; text-shadow: none; grid-column: span 3; margin-top: 2px; }
 .cmd-btn.finish:hover { background: linear-gradient(to bottom, #ffd700 0%, #daa520 100%); border-color: #fff; }
-.cmd-btn.back { background: linear-gradient(to bottom, #607d8b 0%, #37474f 100%); border-color: #cfd8dc; color: #fff; grid-column: span 3; }
-.cmd-btn.back:hover { background: linear-gradient(to bottom, #78909c 0%, #455a64 100%); border-color: #fff; }
+.cmd-btn.finish:active { background: #825a2c !important; color: #000 !important; }
+.cmd-btn.back { background: linear-gradient(to bottom, #455a64 0%, #263238 100%); border-color: #cfd8dc; color: #fff; grid-column: span 3; }
+.cmd-btn.back:hover { background: linear-gradient(to bottom, #546e7a 0%, #37474f 100%); border-color: #fff; }
+.cmd-btn.back:active { background: #1a252b !important; }
 
 #sidebar-resizer { display: none; }
 #pc-sidebar { display: none !important; }
