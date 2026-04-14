@@ -616,7 +616,7 @@ class LifeSystem {
                         successor.yomi = successor.familyYomi + successor.givenYomi;
 
                         const newNameStr = successor.name.replace('|', '');
-                        messages.push(`家督を継ぐにあたり、${oldNameStr}は「${newNameStr}」と名を改めました。`);
+                        messages.push(`家督を継ぐにあたり、${oldNameStr}は\n「${newNameStr}」と名を改めました。`);
                     }
                 }
             }
