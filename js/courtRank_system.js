@@ -203,11 +203,15 @@ class CourtRankSystem {
             if (this.grantRank(leader, selectedRank.id)) {
                 // 武将の名前から「|」を取り除いて綺麗にします
                 const leaderName = leader.name.replace('|', '');
-                const msg = `朝廷より、${leaderName} が ${selectedRank.rankName1} ${selectedRank.rankName2} に叙されました。`;
+                
+                // rankName1が空欄の場合でも、不自然な空白ができないように整える魔法です
+                const rankFullName = selectedRank.rankName1 ? `${selectedRank.rankName1} ${selectedRank.rankName2}` : selectedRank.rankName2;
+                
+                const msg = `朝廷より、${leaderName} が ${rankFullName} に叙されました。`;
                 messages.push(msg);
                 
                 // 履歴ログにもこっそり残しておきます
-                this.game.ui.log(`【叙任】${leaderName} が ${selectedRank.rankName1} ${selectedRank.rankName2} に叙されました。`);
+                this.game.ui.log(`【叙任】${leaderName} が ${rankFullName} に叙されました。`);
             }
         });
 
