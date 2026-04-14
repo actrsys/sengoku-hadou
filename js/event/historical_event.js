@@ -606,7 +606,10 @@ window.GameEvents.push({
                 assignedUnits: [],          
                 turnsRemaining: 1,          // 準備期間は1ヶ月です（予兆が出ます）
                 maxTurns: 4,                
-                status: '準備中'            
+                status: '準備中',
+                // ★追加：同盟国には声をかけず、自軍（応援軍）だけを呼ぶように作戦に制限をかけます
+                allowAllyReinforcement: false,
+                allowSelfReinforcement: true
             };
             
             // 画面にメッセージを出して、プレイヤーにお知らせします
@@ -713,6 +716,19 @@ window.GameEvents.push({
 
         // ★追加：援軍として参戦する信長を、強制的に守備側の総大将に指名します！
         context.designatedDefGeneralId = 1006001;
+
+        // ★追加：AIが同盟軍（友軍）を連れてきてしまった場合の確実なガード！
+        // 同盟軍のデータがあれば、戦闘開始前にリストから消去して強制的に帰らせます
+        if (context.reinforcement) {
+            if (context.atkAssignments) {
+                // 攻撃部隊のリストから、同盟軍に所属している武将だけを弾きます
+                context.atkAssignments = context.atkAssignments.filter(a => 
+                    !context.reinforcement.bushos.some(b => b.id === a.busho.id)
+                );
+            }
+            // 同盟軍のデータ自体を空っぽにします
+            context.reinforcement = null;
+        }
 
         game.ui.log(`【イベント】織田信長が清州城から名古屋城へ出陣しました！`);
         await game.ui.showDialogAsync(`「人間五十年、下天の内をくらぶれば、夢幻の如くなり…」\n織田信長が今川軍を迎撃するため、清州城より出陣しました！`, false, 0);
