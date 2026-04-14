@@ -611,8 +611,6 @@ class GameSystem {
             const current = currentData.castle;
             const currentDist = currentData.distance;
 
-            if (currentDist >= 3) continue;
-
             const neighbors = [];
             if (current.adjacentCastleIds) {
                 current.adjacentCastleIds.forEach(adjId => {
@@ -838,6 +836,10 @@ class GameManager {
             
             this.year = window.MainParams.StartYear;
             this.month = window.MainParams.StartMonth;
+            
+            // ★追加：ゲーム開始時の年月をゲーム全体で覚えておく魔法です！
+            this.startYear = this.year;
+            this.startMonth = this.month;
             
             // ★追加：今のシナリオのフォルダ名をゲーム全体で覚えておく魔法です！
             this.scenarioFolder = folder;
@@ -1516,8 +1518,10 @@ class GameManager {
         const data = { 
             year: this.year, 
             month: this.month, 
+            startYear: this.startYear,
+            startMonth: this.startMonth,
             marketRate: this.marketRate,
-            castles: this.castles, 
+            castles: this.castles,
             bushos: this.bushos, 
             clans: this.clans,
             princesses: this.princesses, // ★姫の名簿もセーブデータに書き込みます
@@ -1569,8 +1573,10 @@ class GameManager {
                 const d = JSON.parse(evt.target.result); 
                 this.year = d.year;
                 this.month = d.month; 
+                this.startYear = d.startYear || window.MainParams.StartYear;
+                this.startMonth = d.startMonth || window.MainParams.StartMonth;
                 this.playerClanId = d.playerClanId || 1; 
-                this.marketRate = d.marketRate !== undefined ? d.marketRate : 1.0; 
+                this.marketRate = d.marketRate !== undefined ? d.marketRate : 1.0;
                 
                 // ★マップの大きさをセーブデータから復元します
                 this.mapWidth = d.mapWidth;
