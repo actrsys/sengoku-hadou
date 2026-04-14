@@ -486,6 +486,11 @@ body.hide-daimyo-labels .daimyo-name-label { display: none !important; }
 .select-item input[type="checkbox"], .select-item input[type="radio"] { display: none; }
 .select-item .col-name, .daimyo-list-item .col-daimyo-name, .daimyo-list-item .col-leader-name, .kunishu-list-item .col-kunishu-name, .faction-list-item .col-faction-name, .princess-list-item .col-princess-name, .delegate-list-item .col-castle-name { justify-content: flex-start !important; padding-left: 5px; }
 
+/* 履歴リストアイテム */
+.history-list-item { padding: 8px 10px; border-bottom: 1px solid rgba(255, 215, 79, 0.3); font-size: 0.9rem; color: #fff; background: linear-gradient(to bottom, #254a2e 0%, #1b3822 100%); text-shadow: 1px 1px 0 #000, -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000; }
+.history-list-item:nth-child(even) { background: linear-gradient(to bottom, #2d5a38 0%, #254a2e 100%); }
+.history-list-item:last-child { border-bottom: none; }
+
 /* 各種リストの基本グリッド（スマホ向けベース） */
 .list-header, .select-item { display: grid; grid-template-columns: 35px 2.5fr 1.5fr repeat(6, 1fr); font-size: clamp(0.6rem, 2.2vw, 0.85rem); padding: 0; height: 40px; gap: 0; box-sizing: border-box; align-items: stretch; }
 .list-header.view-mode, .select-item.view-mode { grid-template-columns: 2.5fr 1.5fr repeat(6, 1fr); }

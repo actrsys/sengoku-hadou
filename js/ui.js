@@ -724,9 +724,7 @@ class UIManager {
             this.logHistory.forEach(log => {
                 const div = document.createElement('div');
                 div.innerHTML = log; // ★textContent から innerHTML に変更しました！
-                div.style.borderBottom = "1px solid #eee";
-                div.style.padding = "5px";
-                div.style.fontSize = "0.85rem";
+                div.className = 'history-list-item';
                 this.historyList.appendChild(div);
             });
         }
