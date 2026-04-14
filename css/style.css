@@ -78,45 +78,74 @@ img { pointer-events: none; -webkit-user-drag: none; user-drag: none; }
 .sp-castle { flex: 1; font-size: 1rem; display: flex; align-items: center; line-height: 1; }
 .sp-lord-label { display: flex; align-items: center; font-size: 0.75rem; color: #ffd54f; margin-right: 5px; line-height: 1; text-shadow: 1px 1px 0 #000, -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000; }
 
-/* 状態異常マーク (PC/スマホ共通) */
-.status-marks-container {
-    position: absolute;
-    display: flex;
-    flex-direction: column;
-    gap: 5px;
-    pointer-events: none;
-    z-index: 200;
-}
+/* -----------------------------------
+   状態異常マーク (PC/スマホ共通・配置)
+------------------------------------ */
 .status-mark {
     color: #ffffff;
-    font-size: 0.9rem;
-    padding: 4px 8px;
+    font-size: 0.85rem;
+    padding: 3px 0;
     border-radius: 4px;
     font-weight: bold;
     box-shadow: 1px 1px 3px rgba(0,0,0,0.6);
     text-shadow: 1px 1px 0 #000, -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000;
     line-height: 1;
     white-space: nowrap;
+    text-align: center;
 }
 .mark-senran { background-color: #d32f2f; }
 .mark-ikki { background-color: #f57c00; }
 .mark-snow { background-color: #0288d1; }
 .mark-starve { background-color: #5d4037; }
 
-/* スマホ版の状態異常マーク配置 */
-body:not(.is-pc) .status-marks-container {
-    top: 100%;
-    left: 2px;
-    margin-top: 15px;
-    align-items: flex-start;
-}
-
-/* PC版の状態異常マーク配置 */
+/* PC版：城情報ウインドウの右側に縦に並べる */
 body.is-pc .status-marks-container {
+    position: absolute;
     top: 0;
     left: 100%;
     margin-left: 10px;
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+    pointer-events: none;
+    z-index: 200;
+}
+body.is-pc .status-marks-container .status-mark {
+    padding: 4px 8px; /* PC版は幅に余裕があるので左右に少し余白を持たせる */
+}
+
+/* スマホ版：顔アイコンの下でサイクル表示 */
+body:not(.is-pc) .sp-face-column {
+    display: flex;
+    flex-direction: column;
     align-items: flex-start;
+    flex: 0 0 auto;
+    margin-right: 5px;
+    width: 60px; /* 顔アイコンの幅に合わせる */
+}
+body:not(.is-pc) .status-marks-carousel {
+    margin-top: 5px;
+    width: 100%;
+    height: 1.2rem;
+    position: relative;
+    cursor: pointer;
+    pointer-events: auto; /* タップ可能にする */
+}
+body:not(.is-pc) .status-marks-carousel .status-mark {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    display: none;
+    box-sizing: border-box;
+}
+body:not(.is-pc) .status-marks-carousel .status-mark.active {
+    display: block;
+    animation: spMarkFade 0.3s ease-out;
+}
+@keyframes spMarkFade {
+    from { opacity: 0; transform: translateY(-2px); }
+    to { opacity: 1; transform: translateY(0); }
 }
 .sp-lord-name { display: flex; align-items: center; font-size: 0.9rem; text-align: left; line-height: 1; color: #fff; text-shadow: 1px 1px 0 #000, -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000; }
 .sp-info-body { display: flex; padding: 3px 5px; background: transparent; border-bottom: 1px solid rgba(255,255,255,0.2); }

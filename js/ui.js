@@ -1054,44 +1054,109 @@ class UIManager {
             clanHtml = `<span class="sp-clan">${clanName}</span>`;
         }
 
-        let content = `
-            <div class="sp-info-header">${clanHtml}<span class="sp-province">${provinceName}</span><span class="sp-castle">${castle.name}</span><span class="sp-lord-label">城主</span><span class="sp-lord-name">${castellanName}</span></div>
-            <div class="sp-info-body">
-                <div class="sp-face-wrapper">${faceHtml}</div>
-                <div class="sp-params-grid">
-                    <div class="sp-label">石高</div><div class="sp-val">${this.getStatusBarHTML(castle.kokudaka, castle.maxKokudaka, 'blue', isVisible)}</div>
-                    <div class="sp-label">訓練</div><div class="sp-val">${this.getStatusBarHTML(castle.training, 100, 'lightblue', isVisible)}</div>
-                    <div class="sp-label">騎馬</div><div class="sp-val-right">${mask(castle.horses || 0)}</div>
-                    
-                    <div class="sp-label">鉱山</div><div class="sp-val">${this.getStatusBarHTML(castle.commerce, castle.maxCommerce, 'blue', isVisible)}</div>
-                    <div class="sp-label">士気</div><div class="sp-val">${this.getStatusBarHTML(castle.morale, 100, 'lightblue', isVisible)}</div>
-                    <div class="sp-label">鉄砲</div><div class="sp-val-right">${mask(castle.guns || 0)}</div>
-                    
-                    <div class="sp-label">民忠</div><div class="sp-val">${this.getStatusBarHTML(castle.peoplesLoyalty, castle.maxPeoplesLoyalty, 'lightblue', isVisible)}</div>
-                    <div class="sp-label">防御</div><div class="sp-val">${this.getStatusBarHTML(castle.defense, castle.maxDefense, 'lightblue', isVisible)}</div>
-                    <div class="sp-empty"></div><div class="sp-empty"></div>
-                    
-                    <div class="sp-label">人口</div><div class="sp-val-left" style="grid-column: 2 / span 3;">${maskPop(castle.population)}</div>
-                    <div class="sp-label">武将</div><div class="sp-val-right">${maskPop(activeBushoCount)}</div>
+        const isPc = document.body.classList.contains('is-pc');
+        let content = "";
+
+        if (isPc) {
+            content = `
+                <div class="sp-info-header">${clanHtml}<span class="sp-province">${provinceName}</span><span class="sp-castle">${castle.name}</span><span class="sp-lord-label">城主</span><span class="sp-lord-name">${castellanName}</span></div>
+                <div class="sp-info-body">
+                    <div class="sp-face-wrapper">${faceHtml}</div>
+                    <div class="sp-params-grid">
+                        <div class="sp-label">石高</div><div class="sp-val">${this.getStatusBarHTML(castle.kokudaka, castle.maxKokudaka, 'blue', isVisible)}</div>
+                        <div class="sp-label">訓練</div><div class="sp-val">${this.getStatusBarHTML(castle.training, 100, 'lightblue', isVisible)}</div>
+                        <div class="sp-label">騎馬</div><div class="sp-val-right">${mask(castle.horses || 0)}</div>
+                        
+                        <div class="sp-label">鉱山</div><div class="sp-val">${this.getStatusBarHTML(castle.commerce, castle.maxCommerce, 'blue', isVisible)}</div>
+                        <div class="sp-label">士気</div><div class="sp-val">${this.getStatusBarHTML(castle.morale, 100, 'lightblue', isVisible)}</div>
+                        <div class="sp-label">鉄砲</div><div class="sp-val-right">${mask(castle.guns || 0)}</div>
+                        
+                        <div class="sp-label">民忠</div><div class="sp-val">${this.getStatusBarHTML(castle.peoplesLoyalty, castle.maxPeoplesLoyalty, 'lightblue', isVisible)}</div>
+                        <div class="sp-label">防御</div><div class="sp-val">${this.getStatusBarHTML(castle.defense, castle.maxDefense, 'lightblue', isVisible)}</div>
+                        <div class="sp-empty"></div><div class="sp-empty"></div>
+                        
+                        <div class="sp-label">人口</div><div class="sp-val-left" style="grid-column: 2 / span 3;">${maskPop(castle.population)}</div>
+                        <div class="sp-label">武将</div><div class="sp-val-right">${maskPop(activeBushoCount)}</div>
+                    </div>
                 </div>
-            </div>
-            <div class="sp-info-footer">
-                <div class="sp-footer-box"><span>金</span><span>${mask(castle.gold)}</span></div>
-                <div class="sp-footer-box"><span>兵糧</span><span>${mask(castle.rice)}</span></div>
-                <div class="sp-footer-box"><span>兵士</span><span>${mask(castle.soldiers)}</span></div>
-            </div>
-            ${statusMarksHtml ? `<div class="status-marks-container">${statusMarksHtml}</div>` : ''}
-        `;
+                <div class="sp-info-footer">
+                    <div class="sp-footer-box"><span>金</span><span>${mask(castle.gold)}</span></div>
+                    <div class="sp-footer-box"><span>兵糧</span><span>${mask(castle.rice)}</span></div>
+                    <div class="sp-footer-box"><span>兵士</span><span>${mask(castle.soldiers)}</span></div>
+                </div>
+                ${statusMarksHtml ? `<div class="status-marks-container">${statusMarksHtml}</div>` : ''}
+            `;
+        } else {
+            content = `
+                <div class="sp-info-header">${clanHtml}<span class="sp-province">${provinceName}</span><span class="sp-castle">${castle.name}</span><span class="sp-lord-label">城主</span><span class="sp-lord-name">${castellanName}</span></div>
+                <div class="sp-info-body">
+                    <div class="sp-face-column">
+                        <div class="sp-face-wrapper">${faceHtml}</div>
+                        ${statusMarksHtml ? `<div class="status-marks-carousel">${statusMarksHtml}</div>` : ''}
+                    </div>
+                    <div class="sp-params-grid">
+                        <div class="sp-label">石高</div><div class="sp-val">${this.getStatusBarHTML(castle.kokudaka, castle.maxKokudaka, 'blue', isVisible)}</div>
+                        <div class="sp-label">訓練</div><div class="sp-val">${this.getStatusBarHTML(castle.training, 100, 'lightblue', isVisible)}</div>
+                        <div class="sp-label">騎馬</div><div class="sp-val-right">${mask(castle.horses || 0)}</div>
+                        
+                        <div class="sp-label">鉱山</div><div class="sp-val">${this.getStatusBarHTML(castle.commerce, castle.maxCommerce, 'blue', isVisible)}</div>
+                        <div class="sp-label">士気</div><div class="sp-val">${this.getStatusBarHTML(castle.morale, 100, 'lightblue', isVisible)}</div>
+                        <div class="sp-label">鉄砲</div><div class="sp-val-right">${mask(castle.guns || 0)}</div>
+                        
+                        <div class="sp-label">民忠</div><div class="sp-val">${this.getStatusBarHTML(castle.peoplesLoyalty, castle.maxPeoplesLoyalty, 'lightblue', isVisible)}</div>
+                        <div class="sp-label">防御</div><div class="sp-val">${this.getStatusBarHTML(castle.defense, castle.maxDefense, 'lightblue', isVisible)}</div>
+                        <div class="sp-empty"></div><div class="sp-empty"></div>
+                        
+                        <div class="sp-label">人口</div><div class="sp-val-left" style="grid-column: 2 / span 3;">${maskPop(castle.population)}</div>
+                        <div class="sp-label">武将</div><div class="sp-val-right">${maskPop(activeBushoCount)}</div>
+                    </div>
+                </div>
+                <div class="sp-info-footer">
+                    <div class="sp-footer-box"><span>金</span><span>${mask(castle.gold)}</span></div>
+                    <div class="sp-footer-box"><span>兵糧</span><span>${mask(castle.rice)}</span></div>
+                    <div class="sp-footer-box"><span>兵士</span><span>${mask(castle.soldiers)}</span></div>
+                </div>
+            `;
+        }
 
         if (this.mobileTopLeft) {
             this.mobileTopLeft.innerHTML = content;
+            
+            if (!isPc) {
+                const carousel = this.mobileTopLeft.querySelector('.status-marks-carousel');
+                if (carousel) {
+                    const marks = carousel.querySelectorAll('.status-mark');
+                    if (marks.length > 0) {
+                        let currentIndex = 0;
+                        marks[0].classList.add('active');
+                        
+                        if (this._statusCarouselTimer) clearInterval(this._statusCarouselTimer);
+                        
+                        if (marks.length > 1) {
+                            const showNext = () => {
+                                marks[currentIndex].classList.remove('active');
+                                currentIndex = (currentIndex + 1) % marks.length;
+                                marks[currentIndex].classList.add('active');
+                            };
+                            this._statusCarouselTimer = setInterval(showNext, 2500);
+                            
+                            carousel.onclick = (e) => {
+                                e.stopPropagation();
+                                clearInterval(this._statusCarouselTimer);
+                                showNext();
+                                this._statusCarouselTimer = setInterval(showNext, 2500);
+                            };
+                        }
+                    }
+                }
+            }
         }
         
-        if (this.statusContainer && document.body.classList.contains('is-pc')) {
+        if (this.statusContainer && isPc) {
             this.statusContainer.innerHTML = content;
         }
         
-        if (this.pcNewStatusPanel && document.body.classList.contains('is-pc')) {
+        if (this.pcNewStatusPanel && isPc) {
             this.pcNewStatusPanel.innerHTML = content;
         }
 
