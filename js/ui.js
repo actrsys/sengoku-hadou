@@ -1128,15 +1128,18 @@ class UIManager {
                     const marks = carousel.querySelectorAll('.status-mark');
                     if (marks.length > 0) {
                         let currentIndex = 0;
-                        marks[0].classList.add('active');
+                        marks[0].classList.add('active'); // fade-inクラスを付けないので初回は一瞬で出ます
                         
                         if (this._statusCarouselTimer) clearInterval(this._statusCarouselTimer);
                         
                         if (marks.length > 1) {
+                            // 複数ある場合はタップ可能にし、タイマーを回す
+                            carousel.style.cursor = 'pointer';
+                            
                             const showNext = () => {
-                                marks[currentIndex].classList.remove('active');
+                                marks[currentIndex].classList.remove('active', 'fade-in');
                                 currentIndex = (currentIndex + 1) % marks.length;
-                                marks[currentIndex].classList.add('active');
+                                marks[currentIndex].classList.add('active', 'fade-in'); // 切り替わる時だけふわっとさせる
                             };
                             this._statusCarouselTimer = setInterval(showNext, 2500);
                             
@@ -1146,6 +1149,10 @@ class UIManager {
                                 showNext();
                                 this._statusCarouselTimer = setInterval(showNext, 2500);
                             };
+                        } else {
+                            // 1つしかない場合はタップ反応を完全に消す
+                            carousel.style.cursor = 'default';
+                            carousel.onclick = (e) => { e.stopPropagation(); };
                         }
                     }
                 }
