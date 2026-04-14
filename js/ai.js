@@ -197,56 +197,67 @@ class AIEngine {
                     if (myOperation.isKunishuTarget) {
                         // 諸勢力は自分のお城のすぐそばなので、道はいつでも繋がっています！
                         canReach = true;
-                        // 諸勢力がまだ生きているか、仲良しになっていないか（友好度30以下）をチェックします
-                        const targetKunishu = this.game.kunishuSystem.getKunishu(myOperation.targetId);
-                        if (targetKunishu && !targetKunishu.isDestroyed && targetKunishu.getRelation(castle.ownerClan) <= 30) {
-                            // ★追加：その諸勢力が、今もこのお城（出撃する自分の城）にいるか確認します！
-                            if (targetKunishu.castleId === castle.id) {
-                                isStillEnemy = true;
+                        
+                        if (myOperation.isEventOperation) {
+                            isStillEnemy = true;
+                        } else {
+                            // 諸勢力がまだ生きているか、仲良しになっていないか（友好度30以下）をチェックします
+                            const targetKunishu = this.game.kunishuSystem.getKunishu(myOperation.targetId);
+                            if (targetKunishu && !targetKunishu.isDestroyed && targetKunishu.getRelation(castle.ownerClan) <= 30) {
+                                // ★追加：その諸勢力が、今もこのお城（出撃する自分の城）にいるか確認します！
+                                if (targetKunishu.castleId === castle.id) {
+                                    isStillEnemy = true;
+                                }
                             }
                         }
                     } else {
                         const targetCastle = this.game.getCastle(myOperation.targetId);
                         if (targetCastle) {
                             targetProvId = targetCastle.provinceId;
-                            // 道が繋がっているか、魔法を使って再確認します！
-                            canReach = GameSystem.isReachable(this.game, castle, targetCastle, castle.ownerClan);
                             
-                            // ★追加：お休み期間（immunityUntil）ではないか、味方や同盟国になっていないかチェックします！
-                            // 今の月（TurnId）よりもお休み期間の方が未来なら、攻撃は我慢します
-                            if ((targetCastle.immunityUntil || 0) < this.game.getCurrentTurnId()) {
-                                if (targetCastle.ownerClan !== castle.ownerClan) {
-                                    if (targetCastle.ownerClan === 0) {
-                                        isStillEnemy = true; // 空き城なら攻撃OKです
-                                    } else {
-                                        const rel = this.game.getRelation(castle.ownerClan, targetCastle.ownerClan);
-                                        
-                                        // ★今回変更：もし出陣のタイミングで相手が「同盟」や「従属」なら、この瞬間に破棄します！
-                                        if (rel && (rel.status === '同盟' || rel.status === '従属')) {
+                            if (myOperation.isEventOperation) {
+                                canReach = true;
+                                isStillEnemy = true;
+                            } else {
+                                // 道が繋がっているか、魔法を使って再確認します！
+                                canReach = GameSystem.isReachable(this.game, castle, targetCastle, castle.ownerClan);
+                                
+                                // ★追加：お休み期間（immunityUntil）ではないか、味方や同盟国になっていないかチェックします！
+                                // 今の月（TurnId）よりもお休み期間の方が未来なら、攻撃は我慢します
+                                if ((targetCastle.immunityUntil || 0) < this.game.getCurrentTurnId()) {
+                                    if (targetCastle.ownerClan !== castle.ownerClan) {
+                                        if (targetCastle.ownerClan === 0) {
+                                            isStillEnemy = true; // 空き城なら攻撃OKです
+                                        } else {
+                                            const rel = this.game.getRelation(castle.ownerClan, targetCastle.ownerClan);
                                             
-                                            // ★今回追加：大名家の名前を調べて、関係に合わせたメッセージを作ります！
-                                            const myClanData = this.game.clans.find(c => c.id === castle.ownerClan);
-                                            const targetClanData = this.game.clans.find(c => c.id === targetCastle.ownerClan);
-                                            const myClanName = myClanData ? myClanData.name : "不明な勢力";
-                                            const targetClanName = targetClanData ? targetClanData.name : "不明な勢力";
-                                            
-                                            let breakMsg = "";
-                                            if (rel.status === '同盟') {
-                                                breakMsg = `${myClanName}が${targetClanName}との同盟を破棄しました！`;
-                                            } else if (rel.status === '従属') {
-                                                breakMsg = `${myClanName}が${targetClanName}の従属下から独立しました！`;
+                                            // ★今回変更：もし出陣のタイミングで相手が「同盟」や「従属」なら、この瞬間に破棄します！
+                                            if (rel && (rel.status === '同盟' || rel.status === '従属')) {
+                                                
+                                                // ★今回追加：大名家の名前を調べて、関係に合わせたメッセージを作ります！
+                                                const myClanData = this.game.clans.find(c => c.id === castle.ownerClan);
+                                                const targetClanData = this.game.clans.find(c => c.id === targetCastle.ownerClan);
+                                                const myClanName = myClanData ? myClanData.name : "不明な勢力";
+                                                const targetClanName = targetClanData ? targetClanData.name : "不明な勢力";
+                                                
+                                                let breakMsg = "";
+                                                if (rel.status === '同盟') {
+                                                    breakMsg = `${myClanName}が${targetClanName}との同盟を破棄しました！`;
+                                                } else if (rel.status === '従属') {
+                                                    breakMsg = `${myClanName}が${targetClanName}の従属下から独立しました！`;
+                                                }
+                                                
+                                                // 画面のログ（文字の履歴）にお知らせを出します
+                                                if (breakMsg !== "") {
+                                                    this.game.ui.log(`【外交】${breakMsg}`);
+                                                    console.log(breakMsg); // 裏側の記録にも残しておきます
+                                                }
+    
+                                                this.game.diplomacyManager.applyBreakAlliancePenalty(castle.ownerClan, targetCastle.ownerClan);
+                                                isStillEnemy = true; // 破棄して敵になったので出陣OK！
+                                            } else if (!rel || !this.game.diplomacyManager.isNonAggression(rel.status)) {
+                                                isStillEnemy = true; // 同盟などで守られていなければ敵です！
                                             }
-                                            
-                                            // 画面のログ（文字の履歴）にお知らせを出します
-                                            if (breakMsg !== "") {
-                                                this.game.ui.log(`【外交】${breakMsg}`);
-                                                console.log(breakMsg); // 裏側の記録にも残しておきます
-                                            }
-
-                                            this.game.diplomacyManager.applyBreakAlliancePenalty(castle.ownerClan, targetCastle.ownerClan);
-                                            isStillEnemy = true; // 破棄して敵になったので出陣OK！
-                                        } else if (!rel || !this.game.diplomacyManager.isNonAggression(rel.status)) {
-                                            isStillEnemy = true; // 同盟などで守られていなければ敵です！
                                         }
                                     }
                                 }
@@ -261,14 +272,16 @@ class AIEngine {
                     } else {
                         // ★追加：自分のお城か目的地が大雪になっていないかチェックをします！
                         let isHeavySnow = false;
-                        const srcProv = this.game.provinces.find(p => p.id === castle.provinceId);
-                        if (srcProv && srcProv.statusEffects && srcProv.statusEffects.includes('heavySnow')) {
-                            isHeavySnow = true;
-                        }
-                        if (!isHeavySnow) {
-                            const tgtProv = this.game.provinces.find(p => p.id === targetProvId);
-                            if (tgtProv && tgtProv.statusEffects && tgtProv.statusEffects.includes('heavySnow')) {
+                        if (!myOperation.isEventOperation) {
+                            const srcProv = this.game.provinces.find(p => p.id === castle.provinceId);
+                            if (srcProv && srcProv.statusEffects && srcProv.statusEffects.includes('heavySnow')) {
                                 isHeavySnow = true;
+                            }
+                            if (!isHeavySnow) {
+                                const tgtProv = this.game.provinces.find(p => p.id === targetProvId);
+                                if (tgtProv && tgtProv.statusEffects && tgtProv.statusEffects.includes('heavySnow')) {
+                                    isHeavySnow = true;
+                                }
                             }
                         }
 
