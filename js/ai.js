@@ -780,13 +780,6 @@ class AIEngine {
             this.game.finishTurn();
             return;
         }
-
-        // ★追加：作戦にイベント情報があれば、出撃時にゲーム本体に一時的に覚えさせます！
-        if (operation && operation.eventData) {
-            this.game.activeEventData = operation.eventData;
-        } else {
-            this.game.activeEventData = null; // なければリセット
-        }
         
         // 城にいる武将（自勢力で活動中の武将）を集めます
         const bushos = this.game.getCastleBushos(source.id).filter(b => b.clan === source.ownerClan && b.status === 'active');

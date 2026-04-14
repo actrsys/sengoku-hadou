@@ -345,12 +345,6 @@ Object.assign(WarManager.prototype, {
                 reinforcement: reinforcementData, selfReinforcement: selfReinforcementData
             };
 
-            // ★追加：出撃時に覚えさせたイベント情報があれば、戦闘システム（state）に読み取らせます！
-            if (this.game.activeEventData) {
-                Object.assign(this.state, this.game.activeEventData);
-                this.game.activeEventData = null; // 読み取ったら忘れます
-            }
-
             // ★追加：戦闘準備が整ったこのタイミングで「戦闘前」の歴史イベントをチェックします
             if (window.GameEvents) {
                 for (const ev of window.GameEvents) {
