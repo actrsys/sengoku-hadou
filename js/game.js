@@ -611,8 +611,6 @@ class GameSystem {
             const current = currentData.castle;
             const currentDist = currentData.distance;
 
-            if (currentDist >= 3) continue;
-
             const neighbors = [];
             if (current.adjacentCastleIds) {
                 current.adjacentCastleIds.forEach(adjId => {

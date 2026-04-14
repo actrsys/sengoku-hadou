@@ -381,9 +381,6 @@ class AIOperationManager {
                 const current = currentData.castle;
                 const currentDist = currentData.distance;
 
-                // GameSystem.isReachableと同じく、距離3以上は進めません
-                if (currentDist >= 3) continue;
-
                 if (current.adjacentCastleIds) {
                     current.adjacentCastleIds.forEach(adjId => {
                         if (!visited.has(adjId)) {
