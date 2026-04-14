@@ -415,7 +415,9 @@ Object.assign(WarManager.prototype, {
 
                                                         let finalAtkAssignments = [];
                                                         
-                                                        // ★変更: atkBushosにはメイン軍の武将しか入っていないので、そのまま使います！
+                                                        // 敵のメイン軍を忘れずにリストに追加します！
+                                                        finalAtkAssignments = finalAtkAssignments.concat(this.autoDivideSoldiers(atkBushos, atkSoldierCount, atkHorses, atkGuns));
+
                                                         if (this.state.reinforcement) {
                                                             const r = this.state.reinforcement;
                                                             finalAtkAssignments = finalAtkAssignments.concat(this.autoDivideSoldiers(r.bushos, r.soldiers, r.horses, r.guns));
