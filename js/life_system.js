@@ -845,6 +845,8 @@ class LifeSystem {
                 const lastCastle = this.game.getCastle(leader.castleId);
                 const isPlayerDidIt = lastCastle && lastCastle.ownerClan === this.game.playerClanId;
                 
+                const killerClanId = lastCastle ? lastCastle.ownerClan : 0; // ★追加：将軍を滅ぼした勢力をメモします
+                
                 const leaderNameStr = leader.name.replace('|', '');
                 let deathMsg = "";
                 if (isPlayerDidIt) {
@@ -858,6 +860,14 @@ class LifeSystem {
                 
                 // ここで将軍様を必ず死亡させます！
                 await this.executeDeath(leader);
+
+                // ★追加：将軍が死亡したことをイベントシステムに伝えます！
+                if (this.game.eventManager) {
+                    await this.game.eventManager.processEvents('shogun_death', {
+                        deadShogunClanId: clan.id,
+                        killerClanId: killerClanId
+                    });
+                }
             }
 
             clan.extinctionNotified = true; // 二度と呼ばれないように印をつけます

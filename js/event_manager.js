@@ -13,7 +13,8 @@ class EventManager {
             startMonth_before: [], // 月初の最初（収入などの前）
             startMonth_after: [],  // 月初の最後（収入などの後）
             endMonth_before: [],   // 月末の最初（派閥や寿命などの前）
-            endMonth_after: []     // 月末の最後（時間を進める直前）
+            endMonth_after: [],    // 月末の最後（時間を進める直前）
+            shogun_death: []       // ★将軍が死亡した直後に呼ばれる特別な引き出し
         };
         
         window.GameEvents.forEach(ev => this.registerEvent(ev));
@@ -34,13 +35,13 @@ class EventManager {
     }
 
     // 指定したタイミング（引き出し）のイベントをまとめて実行する魔法です
-    async processEvents(timing) {
+    async processEvents(timing, context = null) { // ★追加：context（その時の状況データ）を渡せるようにします
         const targetEvents = this.events[timing];
         if (!targetEvents) return;
 
         for (const ev of targetEvents) {
-            if (ev.checkCondition(this.game)) {
-                await ev.execute(this.game);
+            if (ev.checkCondition(this.game, context)) { // ★追加：contextを渡します
+                await ev.execute(this.game, context);    // ★追加：contextを渡します
                 
                 if (ev.isOneTime) {
                     this.events[timing] = this.events[timing].filter(e => e.id !== ev.id);
