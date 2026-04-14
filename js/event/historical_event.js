@@ -778,27 +778,32 @@ window.GameEvents.push({
         game.flags.okehazama3Done = true;
 
         const yoshimoto = game.getBusho(1004001);
-        
-        // 今川義元のステータスを「死亡」に変更し、役職のバッジを全て外します
-        yoshimoto.status = 'dead';
-        yoshimoto.isDaimyo = false;
-        yoshimoto.isCastellan = false;
-        yoshimoto.isGunshi = false;
-        
-        // 今川義元が元々いたお城の「所属武将リスト」から、義元の名前を消去します
-        if (yoshimoto.castleId > 0) {
-            const oldCastle = game.getCastle(yoshimoto.castleId);
-            if (oldCastle && oldCastle.samuraiIds) {
-                oldCastle.samuraiIds = oldCastle.samuraiIds.filter(sid => sid !== yoshimoto.id);
-            }
-        }
-        
-        // 所属情報を空っぽにします
-        yoshimoto.castleId = 0;
-        yoshimoto.belongKunishuId = 0;
 
+        // まずイベントのメッセージを出して、プレイヤーにお知らせします
         game.ui.log(`【イベント】桶狭間の戦い：織田軍の奇襲により、今川義元が討死しました！`);
         await game.ui.showDialogAsync(`織田軍の決死の奇襲が今川本陣を強襲！\n激戦の末、海道一の弓取り・今川義元は討ち取られました！`, false, 0);
+
+        // ★life_system.js の力を使って、義元を正式に死亡（討死）させます！
+        // これによって後継ぎ選びなどが自動で正しく行われます
+        if (game.lifeSystem) {
+            await game.lifeSystem.executeDeath(yoshimoto);
+        } else {
+            // 万が一システムが見つからなかった場合の安全策です
+            yoshimoto.status = 'dead';
+            yoshimoto.isDaimyo = false;
+            yoshimoto.isCastellan = false;
+            yoshimoto.isGunshi = false;
+            
+            if (yoshimoto.castleId > 0) {
+                const oldCastle = game.getCastle(yoshimoto.castleId);
+                if (oldCastle && oldCastle.samuraiIds) {
+                    oldCastle.samuraiIds = oldCastle.samuraiIds.filter(sid => sid !== yoshimoto.id);
+                }
+            }
+            
+            yoshimoto.castleId = 0;
+            yoshimoto.belongKunishuId = 0;
+        }
 
         // 派閥や画面を最新の状態に更新します
         if (game.factionSystem) {
