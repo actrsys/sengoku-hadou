@@ -695,6 +695,12 @@ class KunishuSystem {
         if (!isPlayer) {
             const startMsg = `${atkDaimyoName}の${leaderName}が、\n${kunishuName}の鎮圧に乗り出しました！`;
             this.game.ui.log(startMsg.replace('\n', ''));
+            if (window.AudioManager) {
+                window.AudioManager.playSE('katana001.ogg');
+                setTimeout(() => {
+                    if (window.AudioManager) window.AudioManager.playSE('katana002.ogg');
+                }, 400);
+            }
             await this.game.ui.showDialogAsync(startMsg);
         }
 
