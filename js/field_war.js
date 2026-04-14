@@ -466,6 +466,18 @@ class FieldWarManager {
             }
         });
 
+        // ★追加：イベントによる「総大将の強制上書き」処理
+        // 指定された武将がいれば、その人を総大将(isGeneral)にし、他の人のフラグを下ろします
+        const designatedAtkId = warState.designatedAtkGeneralId;
+        const designatedDefId = warState.designatedDefGeneralId;
+
+        if (designatedAtkId) {
+            this.units.filter(u => u.isAttacker).forEach(u => u.isGeneral = (u.bushoId === designatedAtkId));
+        }
+        if (designatedDefId) {
+            this.units.filter(u => !u.isAttacker).forEach(u => u.isGeneral = (u.bushoId === designatedDefId));
+        }
+
         this.turnQueue = [];
         
         this.isInfoMode = false;
@@ -1588,11 +1600,10 @@ class FieldWarManager {
     }
     
     consumeRice() {
-        // ★追加：桶狭間イベント中は、こっそり兵糧の消費を０にします！
-        const hasYoshimoto = this.units.some(u => u.bushoId === 1004001);
-        const hasNobunaga = this.units.some(u => u.bushoId === 1006001);
-        if (hasYoshimoto && hasNobunaga) {
-            return; // ここで処理を止めることで、兵糧が減らなくなります
+        // ★変更：「イベント戦闘のフラグ」を使って判定します
+        if (this.warState.isEventBattle) {
+            // イベント戦闘中は兵糧を減らさないようにします
+            return;
         }
 
         // グループごとに兵士数を数えて、兵糧を減らします
@@ -1639,24 +1650,25 @@ class FieldWarManager {
     }
     
     checkEndCondition() {
-        // ★追加：AI同士の桶狭間イベントなら、強制的に今川軍を敗北させます！
         const isPlayerInvolved = this.units.some(u => u.isPlayer);
-        const hasYoshimoto = this.units.some(u => u.bushoId === 1004001);
-        const hasNobunaga = this.units.some(u => u.bushoId === 1006001);
-        const isOkehazama = hasYoshimoto && hasNobunaga;
 
-        if (!isPlayerInvolved && isOkehazama) {
-            const yoshimotoUnit = this.units.find(u => u.bushoId === 1004001);
-            if (yoshimotoUnit) {
-                if (yoshimotoUnit.isAttacker) {
-                    this.log(`【イベント】桶狭間の戦い：今川軍は織田軍の奇襲を受け、総崩れとなった！`);
-                    this.endFieldWar('attacker_lose');
-                } else {
-                    this.log(`【イベント】桶狭間の戦い：今川軍は織田軍の奇襲を受け、総崩れとなった！`);
-                    this.endFieldWar('attacker_win');
+        // ★変更：特定の武将がいるかではなく、「イベント戦闘のフラグ」で判定します
+        if (this.warState.isEventBattle && !isPlayerInvolved) {
+            // どのイベントかによって処理を分けられるようにします
+            if (this.warState.eventId === 'okehazama') {
+                const yoshimotoUnit = this.units.find(u => u.bushoId === 1004001);
+                if (yoshimotoUnit) {
+                    if (yoshimotoUnit.isAttacker) {
+                        this.log(`【イベント】桶狭間の戦い：今川軍は織田軍の奇襲を受け、総崩れとなった！`);
+                        this.endFieldWar('attacker_lose');
+                    } else {
+                        this.log(`【イベント】桶狭間の戦い：今川軍は織田軍の奇襲を受け、総崩れとなった！`);
+                        this.endFieldWar('attacker_win');
+                    }
+                    return true; // ここで野戦を終了させます
                 }
-                return true; // ここで野戦を終了させます
             }
+            // 今後イベントが増えたら、ここに else if (this.warState.eventId === '〇〇') と書き足していけます
         }
 
         let atkAlive = false, defAlive = false;
@@ -2354,17 +2366,15 @@ class FieldWarManager {
         allies.forEach(a => allySoldiers += a.soldiers);
         enemies.forEach(e => enemySoldiers += e.soldiers);
         
-        // ★追加：桶狭間イベントで、プレイヤーが干渉しているかチェックします
-        const hasYoshimoto = this.units.some(u => u.bushoId === 1004001);
-        const hasNobunaga = this.units.some(u => u.bushoId === 1006001);
-        const isOkehazamaEvent = (hasYoshimoto && hasNobunaga && isPlayerInvolved);
+        // ★変更：「イベント戦闘のフラグ」と「プレイヤーが干渉しているか」で判定します
+        const isEventBattleWithPlayer = (this.warState.isEventBattle && isPlayerInvolved);
 
         // ★修正：攻撃側の諸勢力かどうかをチェックします（攻撃側の諸勢力は絶対に撤退しません！）
         let isKunishuAttacker = (unit.isAttacker && this.warState.attacker.isKunishu);
         
         // ★修正: 攻撃側の諸勢力でなければ、総大将なら全軍撤退、一般部隊なら個別撤退の判断をします
-        if (isOkehazamaEvent) {
-            // ★桶狭間のイベントでプレイヤーが参加している場合は絶対に撤退しません！
+        if (isEventBattleWithPlayer) {
+            // ★イベント戦闘でプレイヤーが参加している場合は絶対に撤退しません！
         } else if (!isKunishuAttacker && unit.isGeneral && (allySoldiers < enemySoldiers * 0.2)) {
             if (isPlayerInvolved) {
                 if (unit.isAttacker) this.log(`${unit.name}軍は攻略を諦め、引き揚げていきました！`);

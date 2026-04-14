@@ -707,6 +707,13 @@ window.GameEvents.push({
         // ★修正：AIに絶対に野戦を選ばせる「強制命令」の旗を立てます
         context.forceIntercept = true;
 
+        // ★追加：この戦闘が「イベント戦闘」であることと、その「イベントID」を野戦システムに伝えます！
+        context.isEventBattle = true;
+        context.eventId = "okehazama";
+
+        // ★追加：援軍として参戦する信長を、強制的に守備側の総大将に指名します！
+        context.designatedDefGeneralId = 1006001;
+
         game.ui.log(`【イベント】織田信長が清州城から名古屋城へ出陣しました！`);
         await game.ui.showDialogAsync(`「人間五十年、下天の内をくらぶれば、夢幻の如くなり…」\n織田信長が今川軍を迎撃するため、清州城より出陣しました！`, false, 0);
     }
