@@ -572,9 +572,9 @@ class LifeSystem {
                     if ((successor.belongKunishuId || 0) > 0) {
                         // 諸勢力の所属から外します
                         successor.belongKunishuId = 0;
-                        extraMsg = `\n諸勢力より${successor.name.replace('|','')}を当主として迎え入れました。`;
+                        extraMsg = `\n${successor.name.replace('|','')}が当主として迎え入れられました。`;
                     } else if (successor.status === 'ronin') {
-                        extraMsg = `\n浪人していた${successor.name.replace('|','')}を当主として迎え入れました。`;
+                        extraMsg = `\n${successor.name.replace('|','')}を当主として迎え入れられました。`;
                     } else {
                         extraMsg = `\n${successor.name.replace('|','')}が急遽元服しました。`;
                     }
@@ -589,6 +589,30 @@ class LifeSystem {
                     successor.castleId = baseCastle.id;
                     successor.loyalty = 100;
                     if (!baseCastle.samuraiIds.includes(successor.id)) baseCastle.samuraiIds.push(successor.id);
+                }
+            }
+
+            // ★ここから追加：大名になった瞬間に「daimyo:」の改名データがあれば改名する魔法！
+            if (successor.nameChange && successor.nameChange.includes('daimyo:')) {
+                const changes = successor.nameChange.split('/');
+                for (const change of changes) {
+                    const parts = change.split(':');
+                    if (parts.length === 3 && parts[0].trim() === 'daimyo') {
+                        const oldNameStr = successor.name.replace('|', '');
+                        
+                        const newNameParts = parts[1].trim().split('|');
+                        successor.familyName = newNameParts[0] || "";
+                        successor.givenName = newNameParts[1] || "";
+                        successor.name = successor.familyName + successor.givenName;
+
+                        const newYomiParts = parts[2].trim().split('|');
+                        successor.familyYomi = newYomiParts[0] || "";
+                        successor.givenYomi = newYomiParts[1] || "";
+                        successor.yomi = successor.familyYomi + successor.givenYomi;
+
+                        const newNameStr = successor.name.replace('|', '');
+                        extraMsg += `\n家督を継ぐにあたり、${oldNameStr}は「${newNameStr}」と名を改めました。`;
+                    }
                 }
             }
             

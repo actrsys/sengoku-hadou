@@ -228,15 +228,35 @@ class DataManager {
                 b.isCastellan = false;
                 // まだ登場していないので、お城の中には入れません！
             } else {
-                // 既に登場している武将は、いつも通りの準備をします
-                const clan = clans.find(cl => Number(cl.leaderId) === Number(b.id));
-                if (clan) {
-                    b.isDaimyo = true;
-                    b.loyalty = 100; // ★大名は自分の家なので、忠誠度は絶対に100にします！
-                    // ★\大名の名前が変わっていたら、大名家の名前も自動で「〇〇家」に合わせます！
-                    clan.name = b.familyName + "家";
-                }
-                const castleAsCastellan = castles.find(cs => Number(cs.castellanId) === Number(b.id));
+                    // 既に登場している武将は、いつも通りの準備をします
+                    const clan = clans.find(cl => Number(cl.leaderId) === Number(b.id));
+                    if (clan) {
+                        b.isDaimyo = true;
+                        b.loyalty = 100; // ★大名は自分の家なので、忠誠度は絶対に100にします！
+                        
+                        // ★ここから追加：開始時点で既に大名なら、「daimyo:」の改名を適用します！
+                        if (b.nameChange && b.nameChange.includes('daimyo:')) {
+                            const changes = b.nameChange.split('/');
+                            for (const change of changes) {
+                                const parts = change.split(':');
+                                if (parts.length === 3 && parts[0].trim() === 'daimyo') {
+                                    const newNameParts = parts[1].trim().split('|');
+                                    b.familyName = newNameParts[0] || ""; 
+                                    b.givenName = newNameParts[1] || "";  
+                                    b.name = b.familyName + b.givenName;
+                                    
+                                    const newYomiParts = parts[2].trim().split('|');
+                                    b.familyYomi = newYomiParts[0] || ""; 
+                                    b.givenYomi = newYomiParts[1] || "";  
+                                    b.yomi = b.familyYomi + b.givenYomi;
+                                }
+                            }
+                        }
+                        
+                        // ★大名の名前が変わっていたら、大名家の名前も自動で「〇〇家」に合わせます！
+                        clan.name = b.familyName + "家";
+                    }
+                    const castleAsCastellan = castles.find(cs => Number(cs.castellanId) === Number(b.id));
                 if (castleAsCastellan) b.isCastellan = true;
                 
                 if (b.clan === 0 && (b.belongKunishuId || 0) === 0) {
