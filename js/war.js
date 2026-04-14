@@ -872,7 +872,7 @@ class WarManager {
                 let targetArmyName = getArmyDisplayName(role);
                 
                 if (s.plannedActions[role].type === 'charge') {
-                    pushMsg({ text: `${targetArmyName}軍は挑発を無視した！`, log: `${activeArmyName} 挑発失敗（${targetArmyName}）` });
+                    pushMsg({ text: `${targetArmyName} は挑発を無視した！`, log: `${activeArmyName} 挑発失敗（${targetArmyName}）` });
                     return;
                 }
 
@@ -889,9 +889,9 @@ class WarManager {
                     s.plannedActions[role].type = 'charge';
                     s.plannedActions[role].isProvoked = true;
                     provokedCount++;
-                    pushMsg({ text: `${targetArmyName}軍は挑発に応じて陣形を変更した！`, log: `${activeArmyName} 挑発成功（${targetArmyName}）` });
+                    pushMsg({ text: `${targetArmyName} は挑発に応じて陣形を変更した！`, log: `${activeArmyName} 挑発成功（${targetArmyName}）` });
                 } else {
-                    pushMsg({ text: `${targetArmyName}軍は挑発を無視した！`, log: `${activeArmyName} 挑発失敗（${targetArmyName}）` });
+                    pushMsg({ text: `${targetArmyName} は挑発を無視した！`, log: `${activeArmyName} 挑発失敗（${targetArmyName}）` });
                 }
             });
             
