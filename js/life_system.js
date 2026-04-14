@@ -484,7 +484,7 @@ class LifeSystem {
         }
         // ==========================================
 
-        let extraMsg = ""; // 緊急で元服した時の追加メッセージ
+        const messages = []; // ★順番に出すメッセージを溜めておくリストを作ります
 
         // 今のゲームの年を時計で確認します
         const currentYear = this.game.year;
@@ -573,13 +573,15 @@ class LifeSystem {
 
                 if (baseCastle) {
                     if ((successor.belongKunishuId || 0) > 0) {
-                        // 諸勢力の所属から外します
+                        const kunishu = this.game.kunishuSystem ? this.game.kunishuSystem.getKunishu(successor.belongKunishuId) : null;
+                        const kunishuName = kunishu ? kunishu.getName(this.game) : "諸勢力";
+                        
                         successor.belongKunishuId = 0;
-                        extraMsg = `\n${successor.name.replace('|','')}が当主として迎え入れられました。`;
+                        messages.push(`${kunishuName}より${successor.name.replace('|','')}が\n当主として迎え入れられました。`);
                     } else if (successor.status === 'ronin') {
-                        extraMsg = `\n${successor.name.replace('|','')}が当主として迎え入れられました。`;
+                        messages.push(`${successor.name.replace('|','')}が当主として迎え入れられました。`);
                     } else {
-                        extraMsg = `\n${successor.name.replace('|','')}が急遽元服し、家督を継ぎました。`;
+                        messages.push(`${successor.name.replace('|','')}が急遽元服し、家督を継ぎました。`);
                     }
 
                     // 元々どこかの城にいた場合は、お城を出ます
@@ -614,7 +616,7 @@ class LifeSystem {
                         successor.yomi = successor.familyYomi + successor.givenYomi;
 
                         const newNameStr = successor.name.replace('|', '');
-                        extraMsg += `\n家督を継ぐにあたり、${oldNameStr}は「${newNameStr}」と名を改めました。`;
+                        messages.push(`家督を継ぐにあたり、${oldNameStr}は「${newNameStr}」と名を改めました。`);
                     }
                 }
             }
@@ -680,10 +682,10 @@ class LifeSystem {
                 // ③ プレイヤーの大名家なら、メッセージに結果を書き足してお知らせします！
                 if (daimyo.clan === this.game.playerClanId) {
                     if (changeVal > 0) {
-                        extraMsg += `\n新当主への期待から、家臣団の気勢が高まっています！`;
+                        messages.push(`新当主への期待から、家臣団の気勢が高まっています！`);
                     } else {
                         const decreasePercent = Math.abs(changeVal);
-                        extraMsg += `\n当主交代による不安から、家臣団が動揺しています……`;
+                        messages.push(`当主交代による不安から、家臣団が動揺しています……`);
                     }
                 }
             }
@@ -768,7 +770,7 @@ class LifeSystem {
                 if (oldClanName !== newClanName) {
                     clan.name = newClanName;
                     clan.yomi = newClanYomi; // ★読み仮名も新しく書き換えます
-                    extraMsg += `\n当主の交代により、${oldClanName}は今後「${newClanName}」となります。`;
+                    messages.push(`当主の交代により、${oldClanName}は今後「${newClanName}」となります。`);
                 }
             }
             // ★追加ここまで
@@ -781,16 +783,22 @@ class LifeSystem {
             // ★メモしておいた家名を使って「〇〇家の」という言葉を作ります
             const clanPrefix = originalClanName ? `${originalClanName}の` : "";
             
-            let msg = "";
+            let mainMsg = "";
             if (isExternalSuccessor) {
-                msg = `${clanPrefix}${daimyo.name.replace('|','')}が死亡しました。${extraMsg}`;
-                this.game.ui.log(`【当主交代】${clanPrefix}${daimyo.name.replace('|','')}が死亡しました。`);
+                mainMsg = `${clanPrefix}${daimyo.name.replace('|','')}が死亡しました。`;
+                this.game.ui.log(`【当主交代】${mainMsg}`);
             } else {
-                msg = `${clanPrefix}${daimyo.name.replace('|','')}が死亡し、${successor.name.replace('|','')}が家督を継ぎました。${extraMsg}`;
-                this.game.ui.log(`【当主交代】${clanPrefix}${daimyo.name.replace('|','')}が死亡し、${successor.name.replace('|','')}が家督を継ぎました。`);
+                mainMsg = `${clanPrefix}${daimyo.name.replace('|','')}が死亡し、${successor.name.replace('|','')}が家督を継ぎました。`;
+                this.game.ui.log(`【当主交代】${mainMsg}`);
             }
             
-            await this.game.ui.showDialogAsync(msg, false, 0);
+            // ★一番最初に出すメインの死亡メッセージをリストの先頭に追加します
+            messages.unshift(mainMsg);
+
+            // ★順番に1つずつダイアログを出して、クリックされるまで待ちます！
+            for (const msg of messages) {
+                await this.game.ui.showDialogAsync(msg, false, 0);
+            }
             
             // ★後継ぎにバトンタッチしたので、死んだ大名のマークを外します
             daimyo.isDaimyo = false;
