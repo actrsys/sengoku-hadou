@@ -347,6 +347,14 @@ class AIOperationManager {
         // 攻撃作戦の候補を全部記録しておく箱を用意します
         let operationCandidates = [];
 
+        // ★大雪が降っている国（provinceId）のリストを最初に作っておきます！
+        const heavySnowProvIds = new Set();
+        this.game.provinces.forEach(p => {
+            if (p.statusEffects && p.statusEffects.includes('heavySnow')) {
+                heavySnowProvIds.add(p.id);
+            }
+        });
+
         // 大名家のすべてのお城を順番に見て、一番攻めやすい場所を探します！
         for (const myCastle of myClanCastles) {
             // プレイヤーの委任城で攻撃禁止なら飛ばします
@@ -354,14 +362,46 @@ class AIOperationManager {
                 continue;
             }
 
+            // ★出撃する自分のお城が大雪の時は、出陣できないので重い計算をスパッと飛ばします！
+            if (heavySnowProvIds.has(myCastle.provinceId)) {
+                continue;
+            }
+
             const myGeneral = this.game.getBusho(myCastle.castellanId);
             if (!myGeneral || myGeneral.isActionDone) continue; 
 
-            // 攻め込める敵を探す（ai.jsからお引っ越ししてきた魔法です）
-            const neighbors = this.game.castles.filter(c => 
-                c.ownerClan !== clanId && 
-                GameSystem.isReachable(this.game, myCastle, c, clanId)
-            );
+            // ★飛び地対応＆超高速化：このお城から「自領だけを通って」辿り着ける敵城を直接探し出します！
+            const neighbors = [];
+            const visited = new Set();
+            const queue = [{ castle: myCastle, distance: 0 }];
+            visited.add(myCastle.id);
+
+            while (queue.length > 0) {
+                const currentData = queue.shift();
+                const current = currentData.castle;
+                const currentDist = currentData.distance;
+
+                // GameSystem.isReachableと同じく、距離3以上は進めません
+                if (currentDist >= 3) continue;
+
+                if (current.adjacentCastleIds) {
+                    current.adjacentCastleIds.forEach(adjId => {
+                        if (!visited.has(adjId)) {
+                            visited.add(adjId);
+                            const adjCastle = this.game.getCastle(adjId);
+                            if (adjCastle) {
+                                if (adjCastle.ownerClan === clanId) {
+                                    // 自領ならさらに奥へ進めます
+                                    queue.push({ castle: adjCastle, distance: currentDist + 1 });
+                                } else {
+                                    // 自領以外（敵や空き城）なら、そこが攻撃可能な目標です！
+                                    neighbors.push(adjCastle);
+                                }
+                            }
+                        }
+                    });
+                }
+            }
 
             const validEnemies = neighbors.filter(target => {
                 let isDirectlyAdjacent = false;
