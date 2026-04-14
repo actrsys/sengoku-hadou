@@ -1735,7 +1735,7 @@ class FieldWarManager {
         return false;
     }
     
-    endFieldWar(resultType) {
+    async endFieldWar(resultType) {
         this.active = false;
 
         // ★野戦開始時に「待機していた（部隊に配備しなかった）馬・鉄砲」を計算するための箱を用意します
@@ -1941,6 +1941,18 @@ class FieldWarManager {
             if (this.warState.selfReinforcement && this.warState.selfReinforcement.soldiers <= 0) this.game.warManager.retreatReinforcementForce('selfReinforcement');
             if (this.warState.defReinforcement && this.warState.defReinforcement.soldiers <= 0) this.game.warManager.retreatReinforcementForce('defReinforcement');
             if (this.warState.defSelfReinforcement && this.warState.defSelfReinforcement.soldiers <= 0) this.game.warManager.retreatReinforcementForce('defSelfReinforcement');
+        }
+
+        // ★追加：野戦終了時のイベント（桶狭間での討死など）を発火させます
+        this.warState.resultType = resultType; // 結果をイベント側でも見れるように保存
+        if (window.GameEvents) {
+            for (const ev of window.GameEvents) {
+                if (ev.timing === 'after_field_war') {
+                    if (ev.checkCondition(this.game, this.warState)) {
+                        await ev.execute(this.game, this.warState);
+                    }
+                }
+            }
         }
 
         const isPlayerInvolved = this.units.some(u => u.isPlayer);

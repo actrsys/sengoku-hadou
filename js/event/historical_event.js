@@ -609,15 +609,7 @@ window.GameEvents.push({
                 status: '準備中',
                 // ★追加：同盟国には声をかけず、自軍（応援軍）だけを呼ぶように作戦に制限をかけます
                 allowAllyReinforcement: false,
-                allowSelfReinforcement: true,
-                // ★追加：出撃時に読み取らせるためのイベント情報を覚えさせます
-                eventData: {
-                    isEventBattle: true,
-                    eventId: "okehazama",
-                    forceIntercept: true,
-                    designatedAtkGeneralId: 1004001,
-                    designatedDefGeneralId: 1006001
-                }
+                allowSelfReinforcement: true
             };
             
             // 画面にメッセージを出して、プレイヤーにお知らせします
@@ -702,20 +694,32 @@ window.GameEvents.push({
         // 信長の行動を済ませた状態にします
         nobunaga.isActionDone = true;
 
-        // ★修正：戦闘システムが読み取れる「専用の箱」に信長の援軍データをセットします
-        context.defSelfReinforcement = {
-            castle: kiyosu, 
-            bushos: [nobunaga], 
-            soldiers: force,
-            rice: rice, 
-            horses: horses, 
-            guns: guns, 
-            isSelf: true,
-            morale: kiyosu.morale || 50, 
-            training: kiyosu.training || 50
-        };
+        // ★改修：信長を援軍としてではなく「守備のメイン部隊」の先頭にねじ込みます！
+        let troopType = 'ashigaru';
+        if (horses >= force * 0.5) troopType = 'kiba';
+        else if (guns >= force * 0.5) troopType = 'teppo';
 
-        // （強制野戦などの指示は、作戦に覚えさせた eventData からすでに読み込まれています！）
+        if (!context.defAssignments) context.defAssignments = [];
+        context.defAssignments.unshift({
+            busho: nobunaga,
+            soldiers: force,
+            troopType: troopType
+        });
+
+        // 持ち出した兵糧・馬・鉄砲もメインの防衛物資に足します
+        context.defFieldRice = (context.defFieldRice || 0) + rice;
+        context.defender.fieldHorses = (context.defender.fieldHorses || 0) + horses;
+        context.defender.fieldGuns = (context.defender.fieldGuns || 0) + guns;
+
+        // ★修正：AIに絶対に野戦を選ばせる「強制命令」の旗を立てます
+        context.forceIntercept = true;
+
+        // ★追加：この戦闘が「イベント戦闘」であることと、その「イベントID」を野戦システムに伝えます！
+        context.isEventBattle = true;
+        context.eventId = "okehazama";
+
+        // ★追加：信長を強制的に守備側の総大将に指名します！
+        context.designatedDefGeneralId = 1006001;
 
         // ★追加：AIが同盟軍（友軍）を連れてきてしまった場合の確実なガード！
         // 同盟軍のデータがあれば、戦闘開始前にリストから消去して強制的に帰らせます
@@ -740,32 +744,18 @@ window.GameEvents.push({
 // ==========================================
 window.GameEvents.push({
     id: "historical_okehazama_3",
-    timing: "after_battle", // 戦闘の処理が終わった直後にチェックします
+    timing: "after_field_war", // ★変更：野戦終了直後のタイミング
     isOneTime: true,
     
     checkCondition: function(game, context) {
         if (game.flags && game.flags.okehazama3Done) return false;
         if (!context) return false;
 
-        // 野戦（field）で行われた戦闘か確認します
-        if (context.battleType !== 'field') return false;
+        // 桶狭間のイベント戦闘であるか確認します
+        if (!context.isEventBattle || context.eventId !== 'okehazama') return false;
 
-        // 防衛側（織田家）が勝ったか確認します
-        if (context.winnerClanId !== context.defenderClanId) return false;
-
-        // 攻撃側に今川義元（ID: 1004001）が参加していたか確認します
-        const attackers = context.attackerUnits || [];
-        const hasYoshimoto = attackers.some(unit => 
-            unit.bushoIds && unit.bushoIds.includes(1004001)
-        );
-        if (!hasYoshimoto) return false;
-
-        // 防衛側に織田信長（ID: 1006001）が参加していたか確認します
-        const defenders = context.defenderUnits || [];
-        const hasNobunaga = defenders.some(unit => 
-            unit.bushoIds && unit.bushoIds.includes(1006001)
-        );
-        if (!hasNobunaga) return false;
+        // 今川軍（攻撃側）が負けた、または撤退したかを確認します
+        if (context.resultType !== 'attacker_lose' && context.resultType !== 'attacker_retreat') return false;
 
         // A, D, Gの条件（大名や城主の確認）が今も満たされているか確認します
         const yoshimoto = game.getBusho(1004001);
@@ -777,22 +767,6 @@ window.GameEvents.push({
         const motoyasu = game.getBusho(1004004);
         if (!motoyasu || !motoyasu.isCastellan) return false;
 
-        // B, Eのお城の条件（指定されたお城をすべて持っているか）を確認します
-        const requiredImagawaCastles = [12, 13, 45, 48, 57, 71, 100];
-        const hasAllImagawa = requiredImagawaCastles.every(id => {
-            const c = game.getCastle(id);
-            return c && c.ownerClan === yoshimoto.clan;
-        });
-        if (!hasAllImagawa) return false;
-
-        const requiredOdaCastles = [7, 11];
-        const hasAllOda = requiredOdaCastles.every(id => {
-            const c = game.getCastle(id);
-            return c && c.ownerClan === nobunaga.clan;
-        });
-        if (!hasAllOda) return false;
-
-        // 全ての条件を満たしていたら、討死イベントを実行します！
         return true;
     },
     
