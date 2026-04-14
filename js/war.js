@@ -840,46 +840,58 @@ class WarManager {
         }
 
         if (type === 'provoke') {
-            pushMsg(`${activeArmyName} は敵を挑発している！`);
-            let defBestInt = activeBushos.reduce((max, b) => Math.max(max, b.intelligence), 0);
-            let defInt = activeBushos[0].intelligence;
-            
             let atkRoles = ['attacker', 'attacker_self_reinf', 'attacker_ally_reinf'];
-            let provokedCount = 0;
+            let validTargets = [];
             
+            // まず挑発可能な部隊（兵士がいて、撤退しておらず、まだ挑発にかかっていない）を探します
             atkRoles.forEach(role => {
                 if (s.plannedActions[role] && s.plannedActions[role].type !== 'retreat') {
                     if (s.plannedActions[role].isProvoked) return;
                     
                     let targetArmy = getArmyObj(role);
-                    let tbushos = (role === 'attacker') ? s.atkBushos : (role === 'attacker_self_reinf' ? s.selfReinforcement.bushos : s.reinforcement.bushos);
-                    
                     if (targetArmy && targetArmy.soldiers > 0) {
-                        let targetArmyName = getArmyDisplayName(role);
-                        
-                        if (s.plannedActions[role].type === 'charge') {
-                            pushMsg({ text: `${targetArmyName}軍は挑発を無視した！`, log: `${activeArmyName} 挑発失敗（${targetArmyName}）` });
-                            return;
-                        }
-
-                        let atkBestInt = tbushos.reduce((max, b) => Math.max(max, b.intelligence), 0);
-                        let atkInt = tbushos[0].intelligence;
-                        let atkMorale = targetArmy.morale || 50;
-                        let atkTraining = targetArmy.training || 50;
-                        let atkMoraleTrainBonus = Math.max(0.01, (atkMorale / 100) + (atkTraining / 100));
-                        
-                        let successRate = ((Math.sqrt(10 + defBestInt) * (Math.sqrt(defInt) * 2)) / ((Math.sqrt(50 + atkBestInt) * (Math.sqrt(atkInt) * 2)) * atkMoraleTrainBonus) * 0.75) - 0.2;
-                        successRate = Math.max(0, Math.min(0.99, successRate));
-                        
-                        if (Math.random() < successRate) {
-                            s.plannedActions[role].type = 'charge';
-                            s.plannedActions[role].isProvoked = true;
-                            provokedCount++;
-                            pushMsg({ text: `${targetArmyName}軍は挑発に応じて陣形を変更した！`, log: `${activeArmyName} 挑発成功（${targetArmyName}）` });
-                        } else {
-                            pushMsg({ text: `${targetArmyName}軍は挑発を無視した！`, log: `${activeArmyName} 挑発失敗（${targetArmyName}）` });
-                        }
+                        validTargets.push(role);
                     }
+                }
+            });
+
+            // 挑発できる部隊が誰もいない場合は、メッセージを一切出さずにスキップします
+            if (validTargets.length === 0) {
+                executeNext(); return;
+            }
+
+            pushMsg(`${activeArmyName} は敵を挑発している！`);
+
+            let defBestInt = activeBushos.reduce((max, b) => Math.max(max, b.intelligence), 0);
+            let defInt = activeBushos[0].intelligence;
+            let provokedCount = 0;
+            
+            validTargets.forEach(role => {
+                let targetArmy = getArmyObj(role);
+                let tbushos = (role === 'attacker') ? s.atkBushos : (role === 'attacker_self_reinf' ? s.selfReinforcement.bushos : s.reinforcement.bushos);
+                let targetArmyName = getArmyDisplayName(role);
+                
+                if (s.plannedActions[role].type === 'charge') {
+                    pushMsg({ text: `${targetArmyName}軍は挑発を無視した！`, log: `${activeArmyName} 挑発失敗（${targetArmyName}）` });
+                    return;
+                }
+
+                let atkBestInt = tbushos.reduce((max, b) => Math.max(max, b.intelligence), 0);
+                let atkInt = tbushos[0].intelligence;
+                let atkMorale = targetArmy.morale || 50;
+                let atkTraining = targetArmy.training || 50;
+                let atkMoraleTrainBonus = Math.max(0.01, (atkMorale / 100) + (atkTraining / 100));
+                
+                let successRate = ((Math.sqrt(10 + defBestInt) * (Math.sqrt(defInt) * 2)) / ((Math.sqrt(50 + atkBestInt) * (Math.sqrt(atkInt) * 2)) * atkMoraleTrainBonus) * 0.75) - 0.2;
+                successRate = Math.max(0, Math.min(0.99, successRate));
+                
+                if (Math.random() < successRate) {
+                    s.plannedActions[role].type = 'charge';
+                    s.plannedActions[role].isProvoked = true;
+                    provokedCount++;
+                    pushMsg({ text: `${targetArmyName}軍は挑発に応じて陣形を変更した！`, log: `${activeArmyName} 挑発成功（${targetArmyName}）` });
+                } else {
+                    pushMsg({ text: `${targetArmyName}軍は挑発を無視した！`, log: `${activeArmyName} 挑発失敗（${targetArmyName}）` });
                 }
             });
             
