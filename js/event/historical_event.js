@@ -39,6 +39,10 @@ window.GameEvents.push({
     isOneTime: false, // 条件を満たしている間は、何度でも（毎月）チェックします
     
     checkCondition: function(game) {
+        // ★修正：すでに世界に「征夷大将軍（ID1）」がいるか、「すでに擁立イベントが終わったスタンプ」があるなら、入城イベントはもう起きません！
+        const shogunExists = game.bushos.some(b => b.courtRankIds && b.courtRankIds.includes(1));
+        if (shogunExists || (game.flags && game.flags.shogunCoronationDone)) return false;
+
         // 1. 将軍候補（ID80:左馬頭の官位を持つ武将）を世界中から探します
         const candidate = game.bushos.find(b => b.courtRankIds && b.courtRankIds.includes(80));
         
@@ -53,7 +57,10 @@ window.GameEvents.push({
         const clanCastles = game.castles.filter(c => c.ownerClan === candidate.clan);
         if (clanCastles.length < 9) return false;
 
-        // 4. まだ二条城にいない、または二条城の城主になっていない場合のみ、イベントを実行します
+        // 4. ただし、その勢力が「プレイヤー」だった場合は、勝手に移動させないようにここで止めます
+        if (candidate.clan === game.playerClanId) return false;
+
+        // 5. まだ二条城にいない、または二条城の城主になっていない場合のみ、イベントを実行します
         if (candidate.castleId !== 26 || !candidate.isCastellan) {
             return true;
         }
@@ -106,6 +113,9 @@ window.GameEvents.push({
     isOneTime: true,                    // 一度発生したら二度と起きません
     
     checkCondition: function(game) {
+        // ★追加：ゲームの歴史に「すでに擁立イベントが終わったスタンプ」があれば、絶対に起きません！
+        if (game.flags && game.flags.shogunCoronationDone) return false;
+
         // ① ID80（左馬頭）の官位を持つ武将（将軍候補）を探します
         const candidate = game.bushos.find(b => b.courtRankIds && b.courtRankIds.includes(80));
         if (!candidate) return false; // 見つからなければイベントは起きません
@@ -147,6 +157,10 @@ window.GameEvents.push({
     execute: async function(game) {
         // イベントが起きた時に実際に実行される魔法です
         
+        // ★追加：このイベントが起きたという「消えないスタンプ」をゲームのデータに押しておきます！
+        game.flags = game.flags || {};
+        game.flags.shogunCoronationDone = true;
+
         const candidate = game.bushos.find(b => b.courtRankIds && b.courtRankIds.includes(80));
         if (!candidate) return;
 
