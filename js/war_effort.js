@@ -345,6 +345,17 @@ Object.assign(WarManager.prototype, {
                 reinforcement: reinforcementData, selfReinforcement: selfReinforcementData
             };
 
+            // ★追加：戦闘準備が整ったこのタイミングで「戦闘前」の歴史イベントをチェックします
+            if (window.GameEvents) {
+                for (const ev of window.GameEvents) {
+                    if (ev.timing === 'before_battle') {
+                        if (ev.checkCondition(this.game, this.state)) {
+                            await ev.execute(this.game, this.state);
+                        }
+                    }
+                }
+            }
+
             const showInterceptDialog = async (onResult) => {
                 const startAllyReinforcement = () => {
                     this.checkDefenderReinforcement(defCastle, atkClan, () => {
@@ -477,7 +488,12 @@ Object.assign(WarManager.prototype, {
                         // 判定条件
                         let shouldIntercept = false;
                         let reason = "";
-                        if (isAggressive) {
+                        
+                        // ★追加：イベントによる強制迎撃命令がある場合は絶対に従います！
+                        if (this.state.forceIntercept) {
+                            shouldIntercept = true;
+                            reason = "イベントによる強制出陣（野戦）";
+                        } else if (isAggressive) {
                             if (perceivedTotalDefSoldiers >= perceivedTotalAtkSoldiers * 1.2) {
                                 shouldIntercept = true;
                                 reason = "自軍の兵力が敵より十分に多いから（野戦）";
@@ -633,10 +649,15 @@ Object.assign(WarManager.prototype, {
                     this.game.ui.hideAIGuardTemporarily();
                 }
                 
-                this.checkDefenderSelfReinforcement(defCastle, (selfReinfData) => {
-                    if (selfReinfData) this.state.defSelfReinforcement = selfReinfData;
+                // ★修正：イベントなどで既に自軍の援軍が設定されている場合は、上書きせずにそのまま進めます！
+                if (this.state.defSelfReinforcement) {
                     startAllyReinforcement();
-                });
+                } else {
+                    this.checkDefenderSelfReinforcement(defCastle, (selfReinfData) => {
+                        if (selfReinfData) this.state.defSelfReinforcement = selfReinfData;
+                        startAllyReinforcement();
+                    });
+                }
             };
             
             // ★追加：籠城戦に入った時のメッセージを出す魔法！

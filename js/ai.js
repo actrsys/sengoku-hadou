@@ -199,7 +199,11 @@ class AIEngine {
                         canReach = true;
                         
                         if (myOperation.isEventOperation) {
-                            isStillEnemy = true;
+                            // 万が一、すでに仲良しになっていたら攻撃を中止する安全装置です
+                            const targetKunishu = this.game.kunishuSystem.getKunishu(myOperation.targetId);
+                            if (targetKunishu && targetKunishu.getRelation(castle.ownerClan) <= 30) {
+                                isStillEnemy = true;
+                            }
                         } else {
                             // 諸勢力がまだ生きているか、仲良しになっていないか（友好度30以下）をチェックします
                             const targetKunishu = this.game.kunishuSystem.getKunishu(myOperation.targetId);
@@ -217,7 +221,10 @@ class AIEngine {
                             
                             if (myOperation.isEventOperation) {
                                 canReach = true;
-                                isStillEnemy = true;
+                                // 万が一、標的のお城がすでに自分のものになっていたら攻撃を中止する安全装置です
+                                if (targetCastle.ownerClan !== castle.ownerClan) {
+                                    isStillEnemy = true;
+                                }
                             } else {
                                 // 道が繋がっているか、魔法を使って再確認します！
                                 canReach = GameSystem.isReachable(this.game, castle, targetCastle, castle.ownerClan);
