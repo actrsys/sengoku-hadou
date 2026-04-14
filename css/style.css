@@ -696,16 +696,23 @@ body.hide-daimyo-labels .daimyo-name-label { display: none !important; }
    行動履歴画面 (#history-modal) 専用スタイル
    ========================================================= */
 #history-modal .modal-content {
-    height: 85vh !important; /* ウインドウの縦幅を画面の85%まで大きく広げます */
-    max-height: 800px !important;
+    height: 85vh;
+    max-height: 800px;
     display: flex;
     flex-direction: column;
 }
 
 #history-modal .scroll-wrapper {
-    flex: 1 !important;
-    min-height: 0 !important;
-    max-height: none !important; /* リスト共通の高さ制限(40px*9行)を解除してウインドウいっぱいに広げます */
+    flex: 1 1 auto;
+    min-height: 0;
+    max-height: none;
+}
+
+#history-list {
+    height: 100%;
+    max-height: none;
+    margin: 0;
+    padding: 0;
 }
 
 /* =========================================================
