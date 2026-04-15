@@ -941,8 +941,8 @@ window.GameEvents.push({
         
         for (let oc of odaCastles) {
             for (let mc of matsudairaCastles) {
-                // GameSystem.isAdjacent を使って、道が繋がっているか調べます
-                if (GameSystem.isAdjacent(oc, mc)) {
+                // お城のデータ（adjacentCastleIds）を直接確認して、道が繋がっているか調べます
+                if (oc.adjacentCastleIds && oc.adjacentCastleIds.includes(mc.id)) {
                     isAdjacent = true;
                     break;
                 }
