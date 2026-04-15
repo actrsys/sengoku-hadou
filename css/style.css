@@ -178,7 +178,7 @@ body:not(.is-pc) .status-marks-carousel .status-mark.fade-in {
 .cmd-btn { 
     padding: 0 2px 2px 2px; 
     box-sizing: border-box; 
-    height: 40px; 
+    height: 38px; 
     border-style: solid;
     border-width: 3px;
     border-color: #e6e3d8 #d1c18c #a88a2c #d1c18c;
