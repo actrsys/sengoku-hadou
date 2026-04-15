@@ -209,6 +209,23 @@ body:not(.is-pc) .status-marks-carousel .status-mark.fade-in {
 }
 
 .cmd-btn.category { 
+    position: relative;
+}
+.cmd-btn.category::after {
+    content: "";
+    position: absolute;
+    right: 12px;
+    top: calc(50% - 1px);
+    width: 6px;
+    height: 6px;
+    border-top: 2.5px solid #ffffff;
+    border-right: 2.5px solid #ffffff;
+    /* Y軸を少し潰すことで、90度の角を120度くらいに平べったく広げています */
+    transform: translateY(-50%) scaleY(0.8) rotate(45deg);
+    /* 影をずらして配置することで「>>」のように2つ目を描画しています */
+    box-shadow: 5px -5px 0 0 #ffffff; 
+    /* 文字と同じ暗い緑青のフチドリ（影）をつけます */
+    filter: drop-shadow(1px 1px 0px #0f2b21) drop-shadow(-1px -1px 0px #0f2b21) drop-shadow(1px -1px 0px #0f2b21) drop-shadow(-1px 1px 0px #0f2b21);
 }
 
 .cmd-btn.finish { 
