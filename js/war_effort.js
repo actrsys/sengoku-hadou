@@ -446,7 +446,7 @@ Object.assign(WarManager.prototype, {
                             } else onResult('siege');
                         }
                     } else {
-                        let availableDefBushos = this.game.getCastleBushos(defCastle.id).filter(b => b.status === 'active' && (defCastle.isKunishu ? b.belongKunishuId === defCastle.kunishuId : b.clan === defCastle.ownerClan));
+                        llet availableDefBushos = this.game.getCastleBushos(defCastle.id).filter(b => b.status === 'active' && (defCastle.isKunishu ? b.belongKunishuId === defCastle.kunishuId : (b.clan === defCastle.ownerClan && b.belongKunishuId === 0)));
                         let evaluator = availableDefBushos.find(b => b.isDaimyo);
                         if (!evaluator) evaluator = availableDefBushos.find(b => b.isCastellan);
                         
@@ -1315,7 +1315,7 @@ Object.assign(WarManager.prototype, {
 
             s.atkBushos.forEach(b => { this.game.factionSystem.recordBattle(b, s.defender.id); this.game.factionSystem.updateRecognition(b, 25); });
             // ★大名の戦いなら諸勢力を弾き、諸勢力の戦いなら大名を弾く魔法！
-            const defBushos = this.game.getCastleBushos(s.defender.id).filter(b => b.status === 'active' && (s.defender.isKunishu ? b.belongKunishuId === s.defender.kunishuId : b.clan === s.defender.ownerClan)).concat(this.pendingPrisoners);
+            const defBushos = this.game.getCastleBushos(s.defender.id).filter(b => b.status === 'active' && (s.defender.isKunishu ? b.belongKunishuId === s.defender.kunishuId : (b.clan === s.defender.ownerClan && b.belongKunishuId === 0))).concat(this.pendingPrisoners);
             if (s.defBusho && s.defBusho.id && !defBushos.find(b => b.id === s.defBusho.id)) defBushos.push(s.defBusho);
             defBushos.forEach(b => { this.game.factionSystem.recordBattle(b, s.defender.id); this.game.factionSystem.updateRecognition(b, 25); });
 
