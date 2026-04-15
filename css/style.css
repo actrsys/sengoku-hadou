@@ -171,12 +171,52 @@ body:not(.is-pc) .status-marks-carousel .status-mark.fade-in {
 #bottom-command-bar { flex: none; background: linear-gradient(to bottom, #254a2e 0%, #1b3822 100%); border-top: 3px solid #d4af37; padding-bottom: max(5px, env(safe-area-inset-bottom)); padding-left: 5px; padding-right: 5px; z-index: 200; box-shadow: 0 -4px 10px rgba(0,0,0,0.6); height: auto; display: block; }
 #mobile-bottom-info { padding: 0; margin: 0; }
 .command-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 5px; padding: 4px 0; }
-.cmd-btn { padding: 0; height: 28px; border: 1px solid #bbb; background: #f8f9fa; border-radius: 4px; cursor: pointer; font-size: 1rem; font-weight: bold; display: flex; align-items: center; justify-content: center; touch-action: manipulation; white-space: nowrap; overflow: hidden; }
-.cmd-btn:hover { background: #e3f2fd; }
-.cmd-btn:active { background: #bbdefb; transform: translateY(1px); }
-.cmd-btn.category { background: #e0f7fa; border-color: #0097a7; color: #006064; }
-.cmd-btn.finish { background: #ffebee; border-color: #ef5350; color: #c62828; grid-column: span 3; margin-top: 2px;}
-.cmd-btn.back { background: #cfd8dc; border-color: #90a4ae; color: #455a64; grid-column: span 3; }
+.cmd-btn { 
+    padding: 0; height: 28px; 
+    border: 1px solid rgba(212, 175, 55, 0.6); 
+    background: linear-gradient(to bottom, #333333 0%, #111111 100%); 
+    color: #fff;
+    text-shadow: 1px 1px 0 #000, -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000;
+    border-radius: 4px; cursor: pointer; font-size: 1rem; font-weight: bold; 
+    display: flex; align-items: center; justify-content: center; 
+    touch-action: manipulation; white-space: nowrap; overflow: hidden; 
+    transition: all 0.2s;
+    box-shadow: 0 3px 5px rgba(0,0,0,0.4);
+}
+.cmd-btn:hover { 
+    background: linear-gradient(to bottom, #444444 0%, #222222 100%); 
+    border-color: #ffd54f; 
+}
+.cmd-btn:active { 
+    transform: translateY(1px); 
+    box-shadow: inset 0 2px 6px rgba(0,0,0,0.8); 
+}
+.cmd-btn.category { 
+    /* 階層ボタンも通常コマンドとデザインを統一します */
+}
+.cmd-btn.finish { 
+    border-color: #ef5350; 
+    background: linear-gradient(to bottom, #3a1515 0%, #1a0505 100%);
+    color: #ffcdd2; 
+    grid-column: span 3; 
+    margin-top: 2px;
+}
+.cmd-btn.finish:hover { 
+    background: linear-gradient(to bottom, #4a2020 0%, #2a0a0a 100%);
+    border-color: #f44336; 
+    color: #fff; 
+}
+.cmd-btn.back { 
+    border-color: #90a4ae; 
+    background: linear-gradient(to bottom, #1a2530 0%, #0a1018 100%);
+    color: #cfd8dc; 
+    grid-column: span 3; 
+}
+.cmd-btn.back:hover { 
+    background: linear-gradient(to bottom, #2a3540 0%, #101a25 100%);
+    border-color: #b0bec5; 
+    color: #fff; 
+}
 
 #sidebar-resizer { display: none; }
 #pc-sidebar { display: none !important; }
@@ -1935,9 +1975,10 @@ body.is-pc .pc-cmd-col .cmd-btn:last-child {
 
 /* 開いているメニューを光らせて分かりやすくする魔法 */
 body.is-pc .pc-cmd-col .cmd-btn.category.active {
-    background: #00838f;
-    color: #fff;
-    border-color: #006064;
+    background: rgba(255, 152, 0, 0.4); 
+    color: #ffd54f;
+    border-color: #ffd54f;
+    box-shadow: inset 0 0 10px rgba(255, 213, 79, 0.3);
 }
 
 /* 大名選択画面では非表示にします */
