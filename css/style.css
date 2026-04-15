@@ -2007,10 +2007,10 @@ body.is-pc .pc-cmd-col .cmd-btn:last-child {
 
 /* 開いているメニューを光らせて分かりやすくする魔法 */
 body.is-pc .pc-cmd-col .cmd-btn.category.active {
-    background: linear-gradient(to bottom, #825a2c 0%, #5c4008 100%);
-    color: #fff;
-    border-color: #ffd54f;
-    box-shadow: 0 0 8px rgba(212, 175, 55, 0.6);
+    background: linear-gradient(135deg, #7e9d93 0%, #b4ccc5 100%);
+    color: #ffffff;
+    border-color: #d4af37 #fae8ad #fffcf0 #fae8ad;
+    box-shadow: inset 0 0 0 1px rgba(0, 50, 40, 0.6), inset 0 2px 6px rgba(0,0,0,0.5), 0 0px 0px rgba(0,0,0,0);
 }
 
 /* 大名選択画面では非表示にします */
