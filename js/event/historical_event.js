@@ -75,7 +75,12 @@ window.GameEvents.push({
         if (nobunaga && nobunaga.isDaimyo && nobunaga.clan !== 0 && nobunaga.clan !== killerClanId) {
             const inabaCastle = game.getCastle(3);
             const nobunagaCastles = game.castles.filter(c => c.ownerClan === nobunaga.clan);
-            if (inabaCastle && inabaCastle.ownerClan === nobunaga.clan && nobunagaCastles.length >= 5) {
+            
+            // 稲葉山城を持っているか、桶狭間（義元討死）が終わっているかをチェックします
+            const hasInaba = inabaCastle && inabaCastle.ownerClan === nobunaga.clan;
+            const isOkehazamaDone = game.flags && game.flags['historical_okehazama_3'];
+
+            if ((hasInaba || isOkehazamaDone) && nobunagaCastles.length >= 5) {
                 targetClan = game.clans.find(c => c.id === nobunaga.clan);
             }
         }
@@ -232,7 +237,7 @@ window.GameEvents.push({
     checkCondition: function(game) {
         // ★修正：すでに世界に「征夷大将軍（ID1）」がいるか、「すでに擁立イベントが終わったスタンプ」があるなら、入城イベントはもう起きません！
         const shogunExists = game.bushos.some(b => b.courtRankIds && b.courtRankIds.includes(1));
-        if (shogunExists || (game.flags && game.flags.shogunCoronationDone)) return false;
+        if (shogunExists || (game.flags && game.flags['historical_shogun_coronation'])) return false;
 
         // 1. 将軍候補（ID80:左馬頭の官位を持つ武将）を世界中から探します
         const candidate = game.bushos.find(b => b.courtRankIds && b.courtRankIds.includes(80));
@@ -304,9 +309,6 @@ window.GameEvents.push({
     isOneTime: true,                    // 一度発生したら二度と起きません
     
     checkCondition: function(game) {
-        // ★追加：ゲームの歴史に「すでに擁立イベントが終わったスタンプ」があれば、絶対に起きません！
-        if (game.flags && game.flags.shogunCoronationDone) return false;
-
         // ① ID80（左馬頭）の官位を持つ武将（将軍候補）を探します
         const candidate = game.bushos.find(b => b.courtRankIds && b.courtRankIds.includes(80));
         if (!candidate) return false; // 見つからなければイベントは起きません
@@ -348,10 +350,6 @@ window.GameEvents.push({
     execute: async function(game) {
         // イベントが起きた時に実際に実行される魔法です
         
-        // ★追加：このイベントが起きたという「消えないスタンプ」をゲームのデータに押しておきます！
-        game.flags = game.flags || {};
-        game.flags.shogunCoronationDone = true;
-
         const candidate = game.bushos.find(b => b.courtRankIds && b.courtRankIds.includes(80));
         if (!candidate) return;
 
@@ -534,9 +532,6 @@ window.GameEvents.push({
     isOneTime: true,                 // 一度発生したら二度と起きません
     
     checkCondition: function(game) {
-        // すでにこのイベントが終わっている場合は、ここでストップします
-        if (game.flags && game.flags.okehazama1Done) return false;
-
         // A. 今川義元（ID: 1004001）が大名として存在するか確認します
         const yoshimoto = game.getBusho(1004001);
         if (!yoshimoto || !yoshimoto.isDaimyo) return false;
@@ -578,10 +573,6 @@ window.GameEvents.push({
     },
     
     execute: async function(game) {
-        // 二度と発生しないように、ゲームに「終わりました」というスタンプを押します
-        game.flags = game.flags || {};
-        game.flags.okehazama1Done = true;
-
         const yoshimoto = game.getBusho(1004001);
         const imagawaClanId = yoshimoto.clan;
 
@@ -628,8 +619,6 @@ window.GameEvents.push({
     isOneTime: true,
     
     checkCondition: function(game, context) {
-        if (game.flags && game.flags.okehazama2Done) return false;
-        
         // 戦闘システムからコンテキスト（状況データ）が届いていなければストップします
         if (!context) return false;
 
@@ -667,9 +656,6 @@ window.GameEvents.push({
     },
     
     execute: async function(game, context) {
-        game.flags = game.flags || {};
-        game.flags.okehazama2Done = true;
-
         const nobunaga = game.getBusho(1006001);
         const kiyosu = game.getCastle(7);
 
@@ -722,7 +708,6 @@ window.GameEvents.push({
     isOneTime: true,
     
     checkCondition: function(game, context) {
-        if (game.flags && game.flags.okehazama3Done) return false;
         if (!context) return false;
 
         // 桶狭間のイベント戦闘であるか確認します
@@ -745,9 +730,6 @@ window.GameEvents.push({
     },
     
     execute: async function(game, context) {
-        game.flags = game.flags || {};
-        game.flags.okehazama3Done = true;
-
         const yoshimoto = game.getBusho(1004001);
 
         // まずイベントのメッセージを出して、プレイヤーにお知らせします
@@ -795,9 +777,6 @@ window.GameEvents.push({
     isOneTime: true,
     
     checkCondition: function(game) {
-        // すでにこのイベントが終わっている場合はストップします
-        if (game.flags && game.flags.ieyasuIndependenceDone) return false;
-
         // 1. 今川義元（ID: 1004001）が死亡しているか確認します
         const yoshimoto = game.getBusho(1004001);
         if (!yoshimoto || yoshimoto.status !== 'dead') return false;
@@ -821,10 +800,6 @@ window.GameEvents.push({
     },
     
     execute: async function(game) {
-        // イベント発生のスタンプを押します
-        game.flags = game.flags || {};
-        game.flags.ieyasuIndependenceDone = true;
-
         const ujizane = game.getBusho(1004011);
         const motoyasu = game.getBusho(1004004);
         const castle = game.getCastle(motoyasu.castleId);
@@ -848,11 +823,8 @@ window.GameEvents.push({
     isOneTime: true,             // 一度きりの歴史イベントです
     
     checkCondition: function(game) {
-        // すでにこのイベントが終わっている場合はストップします
-        if (game.flags && game.flags.kiyosuAllianceDone) return false;
-
         // 桶狭間イベント（義元討死）と家康独立イベントが終わっているか確認します
-        if (!game.flags || !game.flags.okehazama3Done || !game.flags.ieyasuIndependenceDone) return false;
+        if (!game.flags || !game.flags['historical_okehazama_3'] || !game.flags['historical_ieyasu_independence']) return false;
 
         // 織田信長（ID: 1006001）が大名であるか確認します
         const nobunaga = game.getBusho(1006001);
@@ -888,10 +860,6 @@ window.GameEvents.push({
     },
     
     execute: async function(game) {
-        // イベント発生のスタンプを押します
-        game.flags = game.flags || {};
-        game.flags.kiyosuAllianceDone = true;
-
         const nobunaga = game.getBusho(1006001);
         const motoyasu = game.getBusho(1004004);
         
