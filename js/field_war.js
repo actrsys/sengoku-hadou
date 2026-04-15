@@ -1931,28 +1931,34 @@ class FieldWarManager {
             if (this.warState.defSelfReinforcement && this.warState.defSelfReinforcement.soldiers <= 0) this.game.warManager.retreatReinforcementForce('defSelfReinforcement');
         }
 
-        // ★追加：野戦終了時のイベント（桶狭間での討死など）を発火させます
-        this.warState.resultType = resultType; // 結果をイベント側でも見れるように保存
-        if (window.GameEvents) {
-            for (const ev of window.GameEvents) {
-                if (ev.timing === 'after_field_war') {
-                    if (ev.checkCondition(this.game, this.warState)) {
-                        await ev.execute(this.game, this.warState);
-                    }
-                }
-            }
-        }
+        // ★追加：イベント側で結果を見れるように保存します
+        this.warState.resultType = resultType; 
 
         const isPlayerInvolved = this.units.some(u => u.isPlayer);
         
+        const finishProcess = async () => {
+            if (this.modal) this.modal.classList.add('hidden');
+            
+            // ★野戦の画面を閉じたあとにイベントを発火させます（裏に隠れて操作不能になるのを防ぐため）
+            if (window.GameEvents) {
+                for (const ev of window.GameEvents) {
+                    if (ev.timing === 'after_field_war') {
+                        if (ev.checkCondition(this.game, this.warState)) {
+                            await ev.execute(this.game, this.warState);
+                        }
+                    }
+                }
+            }
+            
+            if (this.onComplete) this.onComplete(resultType);
+        };
+
         if (isPlayerInvolved) {
             setTimeout(() => {                
-                if (this.modal) this.modal.classList.add('hidden');
-                if (this.onComplete) this.onComplete(resultType);
+                finishProcess();
             }, 1500);
         } else {
-            if (this.modal) this.modal.classList.add('hidden');
-            if (this.onComplete) this.onComplete(resultType);
+            finishProcess();
         }
     }
 
@@ -2366,16 +2372,11 @@ class FieldWarManager {
         allies.forEach(a => allySoldiers += a.soldiers);
         enemies.forEach(e => enemySoldiers += e.soldiers);
         
-        // ★変更：「イベント戦闘のフラグ」と「プレイヤーが干渉しているか」で判定します
-        const isEventBattleWithPlayer = (this.warState.isEventBattle && isPlayerInvolved);
-
         // ★修正：攻撃側の諸勢力かどうかをチェックします（攻撃側の諸勢力は絶対に撤退しません！）
         let isKunishuAttacker = (unit.isAttacker && this.warState.attacker.isKunishu);
         
         // ★修正: 攻撃側の諸勢力でなければ、総大将なら全軍撤退、一般部隊なら個別撤退の判断をします
-        if (isEventBattleWithPlayer) {
-            // ★イベント戦闘でプレイヤーが参加している場合は絶対に撤退しません！
-        } else if (!isKunishuAttacker && unit.isGeneral && (allySoldiers < enemySoldiers * 0.2)) {
+        if (!isKunishuAttacker && unit.isGeneral && (allySoldiers < enemySoldiers * 0.2)) {
             if (isPlayerInvolved) {
                 if (unit.isAttacker) this.log(`${unit.name}軍は攻略を諦め、引き揚げていきました！`);
                 else this.log(`${unit.name}軍は不利を悟り、戦場から離脱しました！`);
@@ -2428,8 +2429,8 @@ class FieldWarManager {
         // --- 2. 逃走・移動判定 ---
         if (unit.troopType === 'teppo') {
             if (allies.length === 0 && distToTarget === 1) {
-                if (!isKunishuAttacker && !isEventBattleWithPlayer) {
-                    // ★修正: 攻撃側の諸勢力、またはプレイヤー干渉中のイベント戦闘でなければ撤退
+                if (!isKunishuAttacker) {
+                    // ★修正: 攻撃側の諸勢力でなければ撤退
                     if (unit.isGeneral) {
                         if (isPlayerInvolved) this.log(`${unit.name}軍は不利を悟り、戦場から離脱しました！`);
                         this.endFieldWar(unit.isAttacker ? 'attacker_retreat' : 'defender_retreat');
