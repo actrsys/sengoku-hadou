@@ -180,6 +180,7 @@ body:not(.is-pc) .status-marks-carousel .status-mark.fade-in {
     border-color: #e6e3d8 #d1c18c #a88a2c #d1c18c;
     background: linear-gradient(135deg, #b0c4b1 0%, #6e8c81 100%); 
     color: #ffffff; 
+    font-family: 'FudeGoshirae', serif;
     text-shadow: 
         1px 1px 0 #0f2b21, -1px -1px 0 #0f2b21, 
         1px -1px 0 #0f2b21, -1px 1px 0 #0f2b21,
