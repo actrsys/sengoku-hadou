@@ -524,6 +524,89 @@ window.GameEvents.push({
 });
 
 // ==========================================
+// ★ 桶狭間の戦い（予備）：松平元康 岡崎城主就任
+// ==========================================
+window.GameEvents.push({
+    id: "historical_motoyasu_okazaki",
+    timing: "startMonth_before",     // 月初の処理前にこっそりチェックします
+    isOneTime: true,                 // 一度発生したら二度と起きません
+    
+    checkCondition: function(game) {
+        // ① 今川義元（ID: 1004001）が大名として存在するか確認します
+        const yoshimoto = game.getBusho(1004001);
+        if (!yoshimoto || !yoshimoto.isDaimyo) return false;
+
+        // ② 今川義元が岡崎城（ID: 48）の城主ではないことを確認します
+        const okazakiCastle = game.getCastle(48);
+        if (!okazakiCastle || okazakiCastle.castellanId === yoshimoto.id) return false;
+
+        // ③ 今川家が指定の5つのお城をすべて持っているか確認します
+        const imagawaClanId = yoshimoto.clan;
+        const requiredCastles = [12, 13, 48, 71, 100];
+        const hasAllCastles = requiredCastles.every(id => {
+            const c = game.getCastle(id);
+            return c && c.ownerClan === imagawaClanId;
+        });
+        if (!hasAllCastles) return false;
+
+        // ④ 松平元康（ID: 1004004）が今川家にいて、大名ではないことを確認します
+        // ※念のため、元康が別の勢力にいないかどうかのチェックも入れています
+        const motoyasu = game.getBusho(1004004);
+        if (!motoyasu || motoyasu.clan !== imagawaClanId || motoyasu.isDaimyo) return false;
+
+        // すべての条件をクリアしたら、イベント発生の合図を出します
+        return true;
+    },
+    
+    execute: async function(game) {
+        const motoyasu = game.getBusho(1004004);
+        const okazakiCastle = game.getCastle(48);
+
+        // 万が一データが見つからなかった時のための安全装置です
+        if (!motoyasu || !okazakiCastle) return;
+
+        // ① 松平元康の功績が1499以下なら、強制的に1500に引き上げます
+        if ((motoyasu.achievementTotal || 0) <= 1499) {
+            motoyasu.achievementTotal = 1500;
+        }
+
+        // ② 岡崎城に元々いた城主の「城主バッジ」を外します
+        const oldLordId = okazakiCastle.castellanId;
+        if (oldLordId && oldLordId !== motoyasu.id) {
+            const oldLord = game.getBusho(oldLordId);
+            if (oldLord) {
+                oldLord.isCastellan = false;
+            }
+        }
+
+        // ③ 松平元康を岡崎城へお引越しさせます
+        // （すでに岡崎城にいる場合は何もしません）
+        if (motoyasu.castleId !== 48) {
+            if (game.affiliationSystem) {
+                game.affiliationSystem.moveCastle(motoyasu, 48);
+            } else {
+                motoyasu.castleId = 48; // システムがない場合の安全策です
+            }
+        }
+
+        // ④ 松平元康に「城主バッジ」をつけて、岡崎城の城主として登録します
+        motoyasu.isCastellan = true;
+        okazakiCastle.castellanId = motoyasu.id;
+
+        // ⑤ 城主が変わったことを、お引越しセンター（affiliationSystem）に報告して、正しく処理してもらいます
+        if (game.affiliationSystem) {
+            game.affiliationSystem.updateCastleLord(okazakiCastle);
+        }
+
+        // ⑥ 画面の見た目を最新の状態に描き直します（裏イベントなのでメッセージなどは出しません）
+        if (game.ui) {
+            game.ui.renderMap();
+            game.ui.updatePanelHeader();
+        }
+    }
+});
+
+// ==========================================
 // ★ 桶狭間の戦い ①義元出陣
 // ==========================================
 window.GameEvents.push({
