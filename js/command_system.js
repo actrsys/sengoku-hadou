@@ -326,8 +326,8 @@ const COMMAND_SPECS = {
     // --- システム (SYSTEM) - UI生成用プレースホルダ ---
     'history': { label: "履歴", category: 'SYSTEM', isSystem: true, action: 'history' },
     'settings': { label: "設定", category: 'SYSTEM', isSystem: true, action: 'settings' },
-    'save': { label: "ファイル保存", category: 'SYSTEM', isSystem: true, action: 'save' },
-    'load': { label: "ファイル読込", category: 'SYSTEM', isSystem: true, action: 'load' },
+    'save': { label: "セーブ", category: 'SYSTEM', isSystem: true, action: 'save' },
+    'load': { label: "ロード", category: 'SYSTEM', isSystem: true, action: 'load' },
     'title': { label: "タイトルへ", category: 'SYSTEM', isSystem: true, action: 'title' } // ★この１行を書き足します！
 };
 
