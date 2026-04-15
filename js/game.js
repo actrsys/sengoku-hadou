@@ -1526,7 +1526,8 @@ class GameManager {
             mapHeight: this.mapHeight,
             aiOperations: this.aiOperationManager.save(),
             turnQueueIds: this.turnQueue.map(c => c.id),
-            currentIndex: this.currentIndex
+            currentIndex: this.currentIndex,
+            flags: this.flags || {}
         };
         const blob = new Blob([JSON.stringify(data, null, 2)], {type: 'application/json'}); 
         const url = URL.createObjectURL(blob); 
@@ -1565,8 +1566,9 @@ class GameManager {
                 // ★お掃除ここまで！
 
                 const d = JSON.parse(evt.target.result); 
+                this.flags = d.flags || {};
                 this.year = d.year;
-                this.month = d.month; 
+                this.month = d.month;
                 this.playerClanId = d.playerClanId || 1; 
                 this.marketRate = d.marketRate !== undefined ? d.marketRate : 1.0; 
                 
