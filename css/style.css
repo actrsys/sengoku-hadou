@@ -216,7 +216,7 @@ body:not(.is-pc) .status-marks-carousel .status-mark.fade-in {
 .cmd-btn.category::after {
     content: "";
     position: absolute;
-    right: -3px;
+    right: -1px;
     top: 50%;
     width: 10px;
     height: 10px;
