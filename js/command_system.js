@@ -319,7 +319,7 @@ const COMMAND_SPECS = {
         msg: "朝廷に使者を送り、金を献上します"
     },
     'court_truce': {
-        label: "和睦", category: 'DIPLOMACY_COURT',
+        label: "朝廷和睦", category: 'DIPLOMACY_COURT',
         costGold: 2000, costRice: 0,
         isMulti: false, hasAdvice: true,
         startMode: 'map_select', targetType: 'hostile_clan_only',
@@ -1934,7 +1934,7 @@ class CommandSystem {
             case 'kunishu_goodwill': return "親善を行う諸勢力がいる城を選択してください";
             case 'kunishu_incorporate': return "取込を行う諸勢力がいる城を選択してください";
             case 'break_alliance': return "関係を破棄する相手を選択してください";
-            case 'court_truce': return "和睦を行う相手を選択してください";
+            case 'court_truce': return "朝廷を介して和睦を行う相手を選択してください";
             case 'marriage': return "婚姻同盟を行う相手を選択してください";
             case 'atk_self_reinforcement': return "援軍を出陣させる城を選択してください";
             case 'atk_ally_reinforcement': return "援軍を要請する城を選択してください";
