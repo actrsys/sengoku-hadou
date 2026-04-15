@@ -810,6 +810,10 @@ class GameManager {
             this.ui.hasInitializedMap = false; // マップも最初から作り直すようにします
             this.ui.selectedDaimyoId = null; // 選んでいた大名の記憶も消します
         }
+        
+        // ★追加：スタンプ帳を真っ白にして、イベントの引き出しも新品に取り替えます！
+        this.flags = {};
+        this.eventManager = new EventManager(this);
         // ★お掃除ここまで！
 
         // ★ここを修正：存在しない謎の魔法を消して、正しいシナリオ選択の魔法に戻します！
@@ -1563,6 +1567,9 @@ class GameManager {
                         this.ui.clearCommandMenu();
                     }
                 }
+                
+                // ★追加：過去に戻るために、イベントの引き出しを新品に取り替えておきます！
+                this.eventManager = new EventManager(this);
                 // ★お掃除ここまで！
 
                 const d = JSON.parse(evt.target.result); 
