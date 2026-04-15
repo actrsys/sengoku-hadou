@@ -558,8 +558,12 @@ body.hide-daimyo-labels .daimyo-name-label { display: none !important; }
 .kunishu-item strong { font-size: 1.1rem; color: #333; margin-right: 15px !important; min-width: 120px; }
 .kunishu-item span { font-size: 0.95rem !important; color: #555 !important; }
 
-/* ボタン類 */
+/* =========================================================
+   ボタン類
+   ========================================================= */
 .toggle-btn { background: none; border: 1px solid #ccc; border-radius: 4px; padding: 2px 8px; font-size: 0.8rem; cursor: pointer; color: #555; }
+
+/* 基本のボタン（青・灰・赤） */
 .btn-primary, .btn-secondary, .btn-danger { 
     padding: 12px 24px; 
     border: 2px solid #cfd8dc; 
@@ -572,6 +576,14 @@ body.hide-daimyo-labels .daimyo-name-label { display: none !important; }
     color: #fff;
     white-space: nowrap; 
 }
+
+/* 小さいサイズのボタン用追加クラス */
+.btn-small {
+    padding: 5px 20px !important;
+    font-size: 1rem !important;
+    border-radius: 6px !important;
+}
+
 .btn-primary { background: #1976d2; border-color: #90caf9; }
 .btn-primary:hover { background: #2196f3; transform: scale(1.05); }
 
@@ -689,6 +701,7 @@ body.hide-daimyo-labels .daimyo-name-label { display: none !important; }
 .modal .context-info { margin-bottom: 10px; padding: 10px; background: rgba(0, 0, 0, 0.4); border: 1px solid rgba(212, 175, 55, 0.3); border-radius: 4px; font-size: 0.9rem; color: #fff; text-shadow: 1px 1px 1px #000; }
 .modal .context-info:empty { display: none !important; padding: 0 !important; border: none !important; margin: 0 !important; }
 .modal-footer { margin-top: 15px; display: flex; justify-content: center; align-items: center; min-height: 60px; gap: 10px; padding-top: 0; border-top: none; flex-shrink: 0; background: transparent; padding-bottom: env(safe-area-inset-bottom); }
+.modal-footer.right { justify-content: flex-end; }
 
 .start-content { max-width: 600px; text-align: center; }
 .clan-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 10px; margin-top: 20px; overflow-y: auto; }

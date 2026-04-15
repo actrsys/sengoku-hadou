@@ -229,12 +229,12 @@
                 <h3 style="margin-top:0; margin-bottom: 15px;">委任設定</h3>
                 
                 <div style="text-align: left; margin-bottom: 10px;">
-                    <button id="btn-toggle-all-delegate" class="btn-secondary" style="padding: 5px 20px; font-size: 1rem; border-radius: 6px; font-weight: bold; border: 2px solid #ccc; transition: all 0.2s;">一括</button>
+                    <button id="btn-toggle-all-delegate" class="btn-secondary btn-small">一括</button>
                 </div>
 
                 <div id="delegate-list" class="list-container" style="max-height: 50vh; overflow-y: auto;"></div>
                 
-                <div class="modal-footer" style="justify-content: center;">
+                <div class="modal-footer">
                     <button class="btn-secondary" onclick="document.getElementById('delegate-list-modal').classList.add('hidden')">閉じる</button>
                 </div>
             </div>
@@ -312,7 +312,7 @@
                 <h3 style="margin-top:0;">部隊編成</h3>
                 <div id="divide-stock-container"></div>
                 <div id="divide-list" class="list-container"></div>
-                <div class="modal-footer" style="justify-content: flex-end;">
+                <div class="modal-footer right">
                     <button id="divide-confirm-btn" class="btn-primary" disabled style="opacity:0.5;">決定</button>
                 </div>
             </div>
@@ -359,7 +359,7 @@
             <div class="modal-content" style="max-width: 400px; text-align: center;">
                 <h3 id="gunshi-name" style="margin-top:0;">軍師</h3>
                 <div id="gunshi-message" style="margin: 20px 0; font-size:1.1rem; line-height:1.5; white-space: pre-wrap; text-align: left;"></div>
-                <div class="modal-footer" style="justify-content: flex-end; gap: 10px;">
+                <div class="modal-footer right">
                     <button id="gunshi-execute-btn" class="btn-primary">実行</button>
                     <button class="btn-secondary" onclick="document.getElementById('gunshi-modal').classList.add('hidden')">戻る</button>
                 </div>
@@ -546,7 +546,7 @@
         <div id="dialog-modal" class="modal hidden">
             <div class="modal-content" style="max-width: 400px; text-align: center;">
                 <div id="dialog-message" style="margin: 20px 0; font-size:1.1rem; line-height:1.5; white-space: pre-wrap;"></div>
-                <div class="modal-footer" style="justify-content: flex-end; gap: 10px;">
+                <div class="modal-footer right">
                     <button id="dialog-btn-ok" class="btn-primary">了承</button>
                     <button id="dialog-btn-cancel" class="btn-secondary">拒否</button>
                 </div>
@@ -601,9 +601,9 @@
             <div class="modal-content" style="max-width: 400px; text-align: center;">
                 <h3 style="margin-top: 0;">城を出て迎え撃ちますか？</h3>
                 <div id="intercept-msg" style="margin: 20px 0; font-size:1.1rem; line-height:1.5; white-space: pre-wrap;"></div>
-                <div class="modal-footer" style="justify-content: flex-end; gap: 10px;">
-                    <button id="btn-intercept" class="btn-primary" style="background-color: #ef5350;">迎撃</button>
-                    <button id="btn-siege" class="btn-secondary" style="background-color: #42a5f5; color: white;">籠城</button>
+                <div class="modal-footer right">
+                    <button id="btn-intercept" class="btn-danger">迎撃</button>
+                    <button id="btn-siege" class="btn-primary">籠城</button>
                 </div>
             </div>
         </div>
