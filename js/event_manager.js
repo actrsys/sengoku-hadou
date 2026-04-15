@@ -35,15 +35,26 @@ class EventManager {
     }
 
     // 指定したタイミング（引き出し）のイベントをまとめて実行する魔法です
-    async processEvents(timing, context = null) { // ★追加：context（その時の状況データ）を渡せるようにします
+    async processEvents(timing, context = null) { 
         const targetEvents = this.events[timing];
         if (!targetEvents) return;
 
+        // ゲームのセーブデータに残る「スタンプ帳（flags）」を準備します
+        this.game.flags = this.game.flags || {};
+
         for (const ev of targetEvents) {
-            if (ev.checkCondition(this.game, context)) { // ★追加：contextを渡します
-                await ev.execute(this.game, context);    // ★追加：contextを渡します
+            // 一度きりのイベントで、かつ既にスタンプが押されているなら、条件確認すら飛ばします
+            if (ev.isOneTime && this.game.flags[ev.id]) {
+                continue;
+            }
+
+            if (ev.checkCondition(this.game, context)) { 
+                await ev.execute(this.game, context);    
                 
                 if (ev.isOneTime) {
+                    // セーブデータに残るように、イベントのIDで自動的にスタンプを押します
+                    this.game.flags[ev.id] = true;
+                    // 今のゲーム中も処理を軽くするために配列から消しておきます
                     this.events[timing] = this.events[timing].filter(e => e.id !== ev.id);
                 }
             }
