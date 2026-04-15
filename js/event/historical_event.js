@@ -919,8 +919,8 @@ window.GameEvents.push({
     isOneTime: true,             // 一度きりの歴史イベントです
     
     checkCondition: function(game) {
-        // 桶狭間イベント（義元討死）と家康独立イベントが終わっているか確認します
-        if (!game.flags || !game.flags['historical_okehazama_3'] || !game.flags['historical_ieyasu_independence']) return false;
+        // 桶狭間イベント（義元討死）が終わっているか確認します
+        if (!game.flags || !game.flags['historical_okehazama_3']) return false;
 
         // 織田信長（ID: 1006001）が大名であるか確認します
         const nobunaga = game.getBusho(1006001);
@@ -930,9 +930,9 @@ window.GameEvents.push({
         const motoyasu = game.getBusho(1004004);
         if (!motoyasu || !motoyasu.isDaimyo || motoyasu.clan === 0) return false;
 
-        // 織田家と松平家の関係が「普通」か「友好」であるか確認します
+        // 織田家と松平家の関係が「敵対」「普通」「友好」のいずれかであるか確認します
         const rel = game.diplomacyManager.getRelation(nobunaga.clan, motoyasu.clan);
-        if (!rel || (rel.status !== '普通' && rel.status !== '友好')) return false;
+        if (!rel || (rel.status !== '敵対' && rel.status !== '普通' && rel.status !== '友好')) return false;
 
         // 織田家と松平家の領地（お城同士の道）が隣接しているか確認します
         const odaCastles = game.castles.filter(c => c.ownerClan === nobunaga.clan);
