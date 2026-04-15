@@ -182,8 +182,15 @@ body:not(.is-pc) .status-marks-carousel .status-mark.fade-in {
     border-style: solid;
     border-width: 3px;
     border-color: #e6e3d8 #d1c18c #a88a2c #d1c18c;
-    background: linear-gradient(135deg, #b0c4b1 0%, #6e8c81 100%); 
-    color: #ffffff; 
+    /* 真ん中(50%)に非常に濃い色(#1a2b25)を配置しました */
+    background: linear-gradient(to bottom, 
+        #b0c4b1 0%, 
+        #b0c4b1 45%, 
+        #1a2b25 50%, 
+        #6e8c81 55%, 
+        #6e8c81 100%
+    ); 
+    color: #ffffff;
     font-family: 'AbashiriMincho', serif;
     letter-spacing: 0.5px;
     text-shadow: 
@@ -194,7 +201,7 @@ body:not(.is-pc) .status-marks-carousel .status-mark.fade-in {
         1px 3px 3px rgba(0,0,0,0.8);
     border-radius: 6px; 
     cursor: pointer; 
-    font-size: 1.05rem; 
+    font-size: 1.2rem; 
     font-weight: bold; 
     display: flex; 
     align-items: center; 
@@ -233,7 +240,14 @@ body:not(.is-pc) .status-marks-carousel .status-mark.fade-in {
 }
 
 .cmd-btn.finish { 
-    background: linear-gradient(135deg, #b05a5a 0%, #803a3a 100%); 
+    /* 真ん中をドロッとした濃い赤黒い色(#2a0a0a)にしています */
+    background: linear-gradient(to bottom, 
+        #b05a5a 0%, 
+        #b05a5a 45%, 
+        #2a0a0a 50%, 
+        #803a3a 55%, 
+        #803a3a 100%
+    ); 
     border-color: #ffb3b3 #e66666 #b30000 #e66666;
     color: #ffffff; 
     text-shadow: 
@@ -258,8 +272,15 @@ body:not(.is-pc) .status-marks-carousel .status-mark.fade-in {
 }
 
 .cmd-btn.back { 
-    background: linear-gradient(135deg, #6c757d 0%, #495057 100%); 
-    border-color: #adb5bd #868e96 #343a40 #868e96; 
+    /* 真ん中をほぼ黒に近いグレー(#111111)にしています */
+    background: linear-gradient(to bottom, 
+        #6c757d 0%, 
+        #6c757d 45%, 
+        #111111 50%, 
+        #495057 55%, 
+        #495057 100%
+    ); 
+    border-color: #adb5bd #868e96 #343a40 #868e96;
     color: #ffffff; 
     text-shadow: 
         1px 1px 0 #1a1e20, -1px -1px 0 #1a1e20, 
