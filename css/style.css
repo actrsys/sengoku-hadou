@@ -177,9 +177,14 @@ body:not(.is-pc) .status-marks-carousel .status-mark.fade-in {
     border-style: solid;
     border-width: 3px;
     border-color: #fffcf0 #fae8ad #d4af37 #fae8ad;
-    background: linear-gradient(135deg, #d0f0e6 0%, #82cbb6 100%); 
-    color: #1a2f26; 
-    text-shadow: 1px 1px 0 rgba(255, 255, 255, 0.7);
+    background: linear-gradient(135deg, #d2e4df 0%, #8baaa0 100%); 
+    color: #ffffff; 
+    text-shadow: 
+        1px 1px 0 #0f2b21, -1px -1px 0 #0f2b21, 
+        1px -1px 0 #0f2b21, -1px 1px 0 #0f2b21,
+        0px 2px 0 #0f2b21, 0px -2px 0 #0f2b21,
+        2px 0px 0 #0f2b21, -2px 0px 0 #0f2b21,
+        1px 3px 3px rgba(0,0,0,0.8);
     border-radius: 6px; 
     cursor: pointer; 
     font-size: 0.95rem; 
@@ -194,12 +199,12 @@ body:not(.is-pc) .status-marks-carousel .status-mark.fade-in {
     transition: background 0.15s ease-out, border-color 0.15s ease-out, color 0.15s ease-out, box-shadow 0.1s;
 }
 .cmd-btn:hover { 
-    background: linear-gradient(135deg, #e4f7f0 0%, #9ddcc9 100%); 
+    background: linear-gradient(135deg, #e3f0ec 0%, #a2c1b7 100%); 
     border-color: #ffffff #fff2cc #e5c158 #fff2cc;
-    color: #0b1a14;
+    color: #ffffff;
 }
 .cmd-btn:active { 
-    background: linear-gradient(135deg, #74bba4 0%, #b8e8d8 100%); 
+    background: linear-gradient(135deg, #7e9d93 0%, #b4ccc5 100%); 
     box-shadow: inset 0 0 0 1px rgba(0, 50, 40, 0.6), inset 0 2px 6px rgba(0,0,0,0.5), 0 0px 0px rgba(0,0,0,0);
 }
 
