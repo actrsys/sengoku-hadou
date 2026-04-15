@@ -71,7 +71,7 @@ const COMMAND_SPECS = {
         msg: "金: 200 (1回あたり)" 
     },
     'charity': { 
-        label: "施し", category: 'DEVELOP', 
+        label: "民施し", category: 'DEVELOP', 
         costGold: 0, costRice: 200, 
         isMulti: true, hasAdvice: false, 
         startMode: 'busho_select', sortKey: 'charm',
@@ -146,7 +146,7 @@ const COMMAND_SPECS = {
     },
     // ★追加: 諸勢力を攻める（鎮圧する）ための軍事コマンド
     'kunishu_subjugate': { 
-        label: "鎮圧", category: 'MILITARY', 
+        label: "諸勢力鎮圧", category: 'MILITARY', 
         costGold: 0, costRice: 0, 
         isMulti: true, hasAdvice: true, 
         startMode: 'map_select', targetType: 'kunishu_subjugate_valid', // ← 専用の合言葉にしました！
@@ -211,21 +211,21 @@ const COMMAND_SPECS = {
 
     // --- 対外：調略 (FOREIGN_STRATEGY) ---
     'incite': { 
-        label: "扇動", category: 'FOREIGN_STRATEGY', 
+        label: "民心撹乱", category: 'FOREIGN_STRATEGY', 
         costGold: 0, costRice: 0, 
         isMulti: false, hasAdvice: true, 
         startMode: 'map_select', targetType: 'enemy_all',
         sortKey: 'intelligence' 
     },
     'rumor': { 
-        label: "流言", category: 'FOREIGN_STRATEGY', 
+        label: "離反工作", category: 'FOREIGN_STRATEGY', 
         costGold: 0, costRice: 0, 
         isMulti: false, hasAdvice: true, 
         startMode: 'map_select', targetType: 'enemy_all',
         sortKey: 'intelligence' 
     },
     'headhunt': { 
-        label: "引抜", category: 'FOREIGN_STRATEGY', 
+        label: "武将引抜", category: 'FOREIGN_STRATEGY', 
         costGold: 0, costRice: 0,
         isMulti: false, hasAdvice: true, 
         startMode: 'map_select', targetType: 'enemy_all',
