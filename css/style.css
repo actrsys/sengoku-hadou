@@ -227,29 +227,53 @@ body:not(.is-pc) .status-marks-carousel .status-mark.fade-in {
 }
 
 .cmd-btn.finish { 
-    background: linear-gradient(to bottom, #4a1c1c 0%, #2b1111 100%); 
-    border-color: rgba(255, 100, 100, 0.6); 
-    color: #ff8a80; 
+    background: linear-gradient(135deg, #b05a5a 0%, #803a3a 100%); 
+    border-color: #ffb3b3 #e66666 #b30000 #e66666;
+    color: #ffffff; 
+    text-shadow: 
+        1px 1px 0 #3a0b0b, -1px -1px 0 #3a0b0b, 
+        1px -1px 0 #3a0b0b, -1px 1px 0 #3a0b0b,
+        0px 2px 0 #3a0b0b, 0px -2px 0 #3a0b0b,
+        2px 0px 0 #3a0b0b, -2px 0px 0 #3a0b0b,
+        1px 3px 3px rgba(0,0,0,0.8);
+    box-shadow: inset 0 0 0 1px rgba(60, 0, 0, 0.4), 0 2px 4px rgba(0,0,0,0.4);
     grid-column: span 3; 
     margin-top: 4px;
 }
 .cmd-btn.finish:hover {
-    background: linear-gradient(to bottom, #602525 0%, #3e1818 100%);
-    border-color: #ff5252;
-    color: #fff;
+    background: linear-gradient(135deg, #c46d6d 0%, #9f4d4d 100%);
+    border-color: #ffffff #ff8080 #cc0000 #ff8080;
+    color: #ffffff;
+}
+.cmd-btn.finish:active { 
+    background: linear-gradient(135deg, #602525 0%, #4a1c1c 100%); 
+    box-shadow: inset 0 0 0 1px rgba(60, 0, 0, 0.6), inset 0 2px 6px rgba(0,0,0,0.5), 0 0px 0px rgba(0,0,0,0);
+    transition: none;
 }
 
 .cmd-btn.back { 
-    background: linear-gradient(to bottom, #303538 0%, #1c1e20 100%); 
-    border-color: rgba(255,255,255,0.3); 
-    color: #eceff1; 
+    background: linear-gradient(135deg, #6c757d 0%, #495057 100%); 
+    border-color: #adb5bd #868e96 #343a40 #868e96; 
+    color: #ffffff; 
+    text-shadow: 
+        1px 1px 0 #1a1e20, -1px -1px 0 #1a1e20, 
+        1px -1px 0 #1a1e20, -1px 1px 0 #1a1e20,
+        0px 2px 0 #1a1e20, 0px -2px 0 #1a1e20,
+        2px 0px 0 #1a1e20, -2px 0px 0 #1a1e20,
+        1px 3px 3px rgba(0,0,0,0.8);
+    box-shadow: inset 0 0 0 1px rgba(20, 30, 40, 0.4), 0 2px 4px rgba(0,0,0,0.4);
     grid-column: span 3; 
     margin-top: 4px;
 }
 .cmd-btn.back:hover {
-    background: linear-gradient(to bottom, #424a4f 0%, #2a2e30 100%);
-    border-color: rgba(255,255,255,0.5); 
-    color: #fff;
+    background: linear-gradient(135deg, #868e96 0%, #5a6268 100%);
+    border-color: #ced4da #adb5bd #495057 #adb5bd; 
+    color: #ffffff;
+}
+.cmd-btn.back:active { 
+    background: linear-gradient(135deg, #343a40 0%, #212529 100%); 
+    box-shadow: inset 0 0 0 1px rgba(20, 30, 40, 0.6), inset 0 2px 6px rgba(0,0,0,0.5), 0 0px 0px rgba(0,0,0,0);
+    transition: none;
 }
 
 #sidebar-resizer { display: none; }
