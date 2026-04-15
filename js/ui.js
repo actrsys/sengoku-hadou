@@ -1365,7 +1365,7 @@ class UIManager {
             
             const btn = document.createElement('button');
             btn.className = 'cmd-btn back';
-            btn.textContent = "自拠点へ戻る";
+            btn.textContent = "自拠点へ";
             btn.onclick = () => {
                 if(this.game.isProcessingAI) return;
                 const myCastle = this.game.getCurrentTurnCastle();
