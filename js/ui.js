@@ -1503,91 +1503,85 @@ class UIManager {
         const pcArea = document.getElementById('pc-new-command-area');
         if (!pcArea) return;
         pcArea.innerHTML = '';
-        
+
         const specs = this.game.commandSystem.getSpecs();
         const cmd = (type) => this.game.commandSystem.startCommand(type);
-
+        
         if (!this.pcMenuPath) this.pcMenuPath = [];
 
-        const buildMenu = (menuList, pathIndex) => {
-            const container = document.createElement('div');
-            container.className = `pc-menu-level pc-menu-level-${pathIndex}`;
-            
-            menuList.forEach(item => {
-                const wrapper = document.createElement('div');
-                wrapper.className = 'pc-menu-item-wrapper';
-
-                const btn = document.createElement('button');
-                const isActive = this.pcMenuPath[pathIndex] === item.label;
-                btn.className = `cmd-btn category ${isActive ? 'active' : ''}`;
-                btn.textContent = item.label;
-                btn.onclick = () => {
-                    if (this.game.isProcessingAI) return;
-                    this.cancelMapSelection(true);
-                    if (isActive) {
-                        this.pcMenuPath = this.pcMenuPath.slice(0, pathIndex);
-                    } else {
-                        this.pcMenuPath = this.pcMenuPath.slice(0, pathIndex);
-                        this.pcMenuPath.push(item.label);
-                    }
-                    this.renderPcCommandMenu();
-                };
-                wrapper.appendChild(btn);
-
-                if (isActive) {
-                    const subContainer = document.createElement('div');
-                    subContainer.className = 'pc-submenu-container';
-                    
-                    if (item.commands) {
-                        const cmdGroup = document.createElement('div');
-                        cmdGroup.className = `pc-menu-level pc-menu-level-${pathIndex + 1}`;
-                        item.commands.forEach(key => {
-                            const spec = specs[key];
-                            if (spec) {
-                                const cWrapper = document.createElement('div');
-                                cWrapper.className = 'pc-menu-item-wrapper';
-                                const cBtn = document.createElement('button');
-                                cBtn.className = 'cmd-btn';
-                                cBtn.textContent = spec.label;
-                                cBtn.onclick = () => {
-                                    if (this.game.isProcessingAI) return;
-                                    this.cancelMapSelection(true);
-                                    cmd(key);
-                                };
-                                cWrapper.appendChild(cBtn);
-                                cmdGroup.appendChild(cWrapper);
-                            }
-                        });
-                        subContainer.appendChild(cmdGroup);
-                    }
-                    if (item.subMenus) {
-                        subContainer.appendChild(buildMenu(item.subMenus, pathIndex + 1));
-                    }
-                    wrapper.appendChild(subContainer);
-                }
-                container.appendChild(wrapper);
-            });
-            return container;
+        const createCol = () => {
+            const col = document.createElement('div');
+            col.className = 'pc-cmd-col';
+            pcArea.appendChild(col);
+            return col;
         };
 
-        const rootMenu = buildMenu(COMMAND_MENU_STRUCTURE, 0);
+        const createBtn = (area, label, cls, onClick) => { 
+            const btn = document.createElement('button'); 
+            btn.className = `cmd-btn ${cls || ''}`; 
+            btn.textContent = label; 
+            btn.onclick = () => {
+                if (this.game.isProcessingAI) return;
+                this.cancelMapSelection(true);
+                onClick();
+            }; 
+            area.appendChild(btn); 
+        };
 
-        const finishWrapper = document.createElement('div');
-        finishWrapper.className = 'pc-menu-item-wrapper';
-        const finishBtn = document.createElement('button');
-        finishBtn.className = "cmd-btn finish";
-        finishBtn.textContent = "命令終了";
-        finishBtn.onclick = () => {
+        const col1 = createCol();
+        
+        COMMAND_MENU_STRUCTURE.forEach(item => {
+            const isActive = this.pcMenuPath[0] === item.label;
+            createBtn(col1, item.label, isActive ? "category active" : "category", () => {
+                if (isActive) {
+                    this.pcMenuPath = [];
+                } else {
+                    this.pcMenuPath = [item.label];
+                }
+                this.renderPcCommandMenu();
+            });
+        });
+        
+        createBtn(col1, "命令終了", "finish", () => {
             if (this.game.isProcessingAI) return;
             this.cancelMapSelection(true);
             this.showDialog("今月の命令を終了しますか？", true, () => {
                 this.game.finishTurn();
             });
-        };
-        finishWrapper.appendChild(finishBtn);
-        rootMenu.appendChild(finishWrapper);
+        });
 
-        pcArea.appendChild(rootMenu);
+        const renderSubMenu = (menuList, pathIndex, parentCol) => {
+            if (this.pcMenuPath.length <= pathIndex) return;
+            const activeLabel = this.pcMenuPath[pathIndex];
+            const activeItem = menuList.find(m => m.label === activeLabel);
+            
+            if (!activeItem) return;
+
+            const col = createCol();
+            
+            if (activeItem.commands) {
+                activeItem.commands.forEach(key => {
+                    const spec = specs[key];
+                    if (spec) {
+                        createBtn(col, spec.label, "", () => cmd(key));
+                    }
+                });
+            }
+
+            if (activeItem.subMenus) {
+                activeItem.subMenus.forEach(sub => {
+                    const isActive = this.pcMenuPath[pathIndex + 1] === sub.label;
+                    createBtn(col, sub.label, isActive ? "category active" : "category", () => {
+                        this.pcMenuPath = this.pcMenuPath.slice(0, pathIndex + 1);
+                        if (!isActive) this.pcMenuPath.push(sub.label);
+                        this.renderPcCommandMenu();
+                    });
+                });
+                renderSubMenu(activeItem.subMenus, pathIndex + 1, col);
+            }
+        };
+
+        renderSubMenu(COMMAND_MENU_STRUCTURE, 0, col1);
     }
 
     clearCommandMenu() {
