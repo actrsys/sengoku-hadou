@@ -14,7 +14,9 @@ class EventManager {
             startMonth_after: [],  // 月初の最後（収入などの後）
             endMonth_before: [],   // 月末の最初（派閥や寿命などの前）
             endMonth_after: [],    // 月末の最後（時間を進める直前）
-            shogun_death: []       // ★将軍が死亡した直後に呼ばれる特別な引き出し
+            before_battle: [],     // 戦闘開始直前の特別な引き出し
+            after_field_war: [],   // 野戦終了直後の特別な引き出し
+            shogun_death: []       // 将軍が死亡した直後に呼ばれる特別な引き出し
         };
         
         window.GameEvents.forEach(ev => this.registerEvent(ev));
