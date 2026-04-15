@@ -446,7 +446,7 @@ Object.assign(WarManager.prototype, {
                             } else onResult('siege');
                         }
                     } else {
-                        llet availableDefBushos = this.game.getCastleBushos(defCastle.id).filter(b => b.status === 'active' && (defCastle.isKunishu ? b.belongKunishuId === defCastle.kunishuId : (b.clan === defCastle.ownerClan && b.belongKunishuId === 0)));
+                        let availableDefBushos = this.game.getCastleBushos(defCastle.id).filter(b => b.status === 'active' && (defCastle.isKunishu ? b.belongKunishuId === defCastle.kunishuId : (b.clan === defCastle.ownerClan && b.belongKunishuId === 0)));
                         let evaluator = availableDefBushos.find(b => b.isDaimyo);
                         if (!evaluator) evaluator = availableDefBushos.find(b => b.isCastellan);
                         
