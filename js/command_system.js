@@ -32,10 +32,10 @@ const COMMAND_MENU_STRUCTURE = [
     },
     {
         label: "人事",
-        commands: ['reward', 'interview', 'employ', 'move', 'banish']
+        commands: ['reward', 'interview', 'employ', 'move', 'banish'],
         subMenus: [
             { label: "任命", commands: ['appoint_gunshi', 'appoint', 'delegate'] }
-        ],
+        ]
     },
     {
         label: "情報",
