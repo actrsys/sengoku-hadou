@@ -32,7 +32,10 @@ const COMMAND_MENU_STRUCTURE = [
     },
     {
         label: "人事",
-        commands: ['appoint_gunshi', 'appoint', 'delegate', 'reward', 'interview', 'employ', 'move', 'banish']
+        subMenus: [
+            { label: "任命", commands: ['appoint_gunshi', 'appoint', 'delegate'] }
+        ],
+        commands: ['reward', 'interview', 'employ', 'move', 'banish']
     },
     {
         label: "情報",
@@ -391,20 +394,20 @@ class CommandSystem {
         else if (actionType === 'rumor_target_busho') { 
             const targetCastle = this.game.getCastle(targetId);
             bushos = this.game.getCastleBushos(targetId).filter(b => b.clan === targetCastle.ownerClan && b.status === 'active' && !b.isDaimyo); 
-            infoHtml = "<div>流言の対象とする武将を選択してください</div>"; 
+            infoHtml = "<div>離反工作の対象とする武将を選択してください</div>"; 
         }
         else if (actionType === 'rumor_doer') { 
             bushos = this.game.getCastleBushos(c.id).filter(b => b.clan === c.ownerClan && b.status === 'active'); 
-            infoHtml = "<div>流言を実行する担当官を選択してください</div>"; 
+            infoHtml = "<div>離反工作を実行する担当官を選択してください</div>"; 
         }
         else if (actionType === 'incite_doer') { 
             bushos = this.game.getCastleBushos(c.id).filter(b => b.clan === c.ownerClan && b.status === 'active'); 
-            infoHtml = "<div>扇動を実行する担当官を選択してください</div>"; 
+            infoHtml = "<div>民心撹乱を実行する担当官を選択してください</div>"; 
         }
         else if (actionType === 'headhunt_target') { 
             const targetCastle = this.game.getCastle(targetId);
             bushos = this.game.getCastleBushos(targetId).filter(b => b.clan === targetCastle.ownerClan && b.status === 'active' && !b.isDaimyo); 
-            infoHtml = "<div>引抜の対象とする武将を選択してください </div>"; 
+            infoHtml = "<div>武将引抜の対象とする武将を選択してください </div>"; 
         }
         else if (actionType === 'kunishu_incorporate_doer') {
             bushos = this.game.getCastleBushos(c.id).filter(b => b.clan === c.ownerClan && b.status === 'active'); 
@@ -1921,13 +1924,13 @@ class CommandSystem {
             case 'move': return "移動先を選択してください";
             case 'transport': return "輸送先を選択してください";
             case 'investigate': return "調査対象の城を選択してください";
-            case 'incite': return "扇動対象の城を選択してください";
-            case 'rumor': return "流言対象の城を選択してください";
+            case 'incite': return "民心撹乱対象の城を選択してください";
+            case 'rumor': return "離反工作対象の城を選択してください";
             case 'headhunt': case 'headhunt_select_castle': return "引抜対象の居城を選択してください";
             case 'goodwill': return "親善を行う相手を選択してください";
             case 'alliance': return "同盟を行う相手を選択してください";
             case 'dominate': return "支配勧告を行う相手を選択してください";
-            case 'subordinate': return "従属する相手を選択してください";
+            case 'subordinate': return "従属嘆願を行う相手を選択してください";
             case 'kunishu_goodwill': return "親善を行う諸勢力がいる城を選択してください";
             case 'kunishu_incorporate': return "取込を行う諸勢力がいる城を選択してください";
             case 'break_alliance': return "関係を破棄する相手を選択してください";
