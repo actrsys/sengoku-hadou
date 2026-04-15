@@ -275,19 +275,19 @@ const COMMAND_SPECS = {
         startMode: 'map_select', targetType: 'marriage_valid' // 婚姻専用の相手を選ぶ合言葉にします
     },
     'dominate': {
-        label: "支配", category: 'FOREIGN_DAIMYO',
+        label: "支配勧告", category: 'FOREIGN_DAIMYO',
         costGold: 0, costRice: 0,
         isMulti: false, hasAdvice: true,
         startMode: 'map_select', targetType: 'other_clan_all'
     },
     'subordinate': {
-        label: "従属", category: 'FOREIGN_DAIMYO',
+        label: "従属嘆願", category: 'FOREIGN_DAIMYO',
         costGold: 0, costRice: 0,
         isMulti: false, hasAdvice: true,
         startMode: 'map_select', targetType: 'other_clan_all'
     },
     'break_alliance': {
-        label: "破棄", category: 'FOREIGN_DAIMYO',
+        label: "関係破棄", category: 'FOREIGN_DAIMYO',
         costGold: 0, costRice: 0,
         isMulti: false, hasAdvice: false,
         startMode: 'map_select', targetType: 'breakable_clan'
