@@ -536,6 +536,9 @@ window.GameEvents.push({
         const yoshimoto = game.getBusho(1004001);
         if (!yoshimoto || !yoshimoto.isDaimyo) return false;
 
+        // 補足：プレイヤーが今川家の場合は、勝手に移動させないようにここで止めます
+        if (game.playerClanId === yoshimoto.clan) return false;
+
         // ② 松平元康（ID: 1004004）が存在するか確認します
         const motoyasu = game.getBusho(1004004);
         if (!motoyasu) return false;
@@ -631,6 +634,9 @@ window.GameEvents.push({
         // A. 今川義元（ID: 1004001）が大名として存在するか確認します
         const yoshimoto = game.getBusho(1004001);
         if (!yoshimoto || !yoshimoto.isDaimyo) return false;
+
+        // 補足：プレイヤーが今川家の場合は、勝手に出陣させないようにここで止めます
+        if (game.playerClanId === yoshimoto.clan) return false;
 
         // C. 今川義元が駿府城（ID: 13）にいるか確認します
         if (yoshimoto.castleId !== 13) return false;
@@ -906,6 +912,21 @@ window.GameEvents.push({
         if (game.independenceSystem) {
             // 第4引数に 'indep' を渡すことで、乗っ取りや寝返りではなく、純粋な「独立」として処理させます
             await game.independenceSystem.executeRebellion(castle, motoyasu, ujizane, 'indep');
+            
+            // 独立が起こったあと、元々の大名家（今川家）に残った武将の下がりすぎた忠誠度を調整の為25回復させます
+            const oldClanId = ujizane.clan;
+            // 氏真がちゃんと大名家に所属しているか確認します
+            if (oldClanId > 0) {
+                // 同じ大名家に所属していて、まだ活動中（生きている）武将を全員集めます
+                const remainingBushos = game.bushos.filter(b => b.clan === oldClanId && b.status === 'active');
+                
+                // 集めた武将たち全員に、順番に忠誠度を回復する魔法をかけます
+                remainingBushos.forEach(b => {
+                    // 現在の忠誠度に25を足します（ただし、最大100までに制限します）
+                    b.loyalty = Math.min(100, (b.loyalty || 0) + 25);
+                });
+                
+            }
         }
     }
 });
