@@ -171,12 +171,64 @@ body:not(.is-pc) .status-marks-carousel .status-mark.fade-in {
 #bottom-command-bar { flex: none; background: linear-gradient(to bottom, #254a2e 0%, #1b3822 100%); border-top: 3px solid #d4af37; padding-bottom: max(5px, env(safe-area-inset-bottom)); padding-left: 5px; padding-right: 5px; z-index: 200; box-shadow: 0 -4px 10px rgba(0,0,0,0.6); height: auto; display: block; }
 #mobile-bottom-info { padding: 0; margin: 0; }
 .command-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 5px; padding: 4px 0; }
-.cmd-btn { padding: 0; height: 28px; border: 1px solid #bbb; background: #f8f9fa; border-radius: 4px; cursor: pointer; font-size: 1rem; font-weight: bold; display: flex; align-items: center; justify-content: center; touch-action: manipulation; white-space: nowrap; overflow: hidden; }
-.cmd-btn:hover { background: #e3f2fd; }
-.cmd-btn:active { background: #bbdefb; transform: translateY(1px); }
-.cmd-btn.category { background: #e0f7fa; border-color: #0097a7; color: #006064; }
-.cmd-btn.finish { background: #ffebee; border-color: #ef5350; color: #c62828; grid-column: span 3; margin-top: 2px;}
-.cmd-btn.back { background: #cfd8dc; border-color: #90a4ae; color: #455a64; grid-column: span 3; }
+.cmd-btn { 
+    padding: 0 2px; 
+    height: 38px; 
+    border: 1px solid rgba(212, 175, 55, 0.6); 
+    background: linear-gradient(to bottom, #3e2723 0%, #261714 100%); 
+    color: #ffd54f; 
+    text-shadow: 1px 1px 2px rgba(0,0,0,0.8);
+    border-radius: 6px; 
+    cursor: pointer; 
+    font-size: 0.95rem; 
+    font-weight: bold; 
+    display: flex; 
+    align-items: center; 
+    justify-content: center; 
+    touch-action: manipulation; 
+    white-space: nowrap; 
+    overflow: hidden; 
+    box-shadow: inset 0 1px 1px rgba(255,255,255,0.1), 0 2px 4px rgba(0,0,0,0.5);
+    transition: background 0.15s ease-out, border-color 0.15s ease-out, color 0.15s ease-out, box-shadow 0.1s;
+}
+.cmd-btn:hover { 
+    background: linear-gradient(to bottom, #5d4037 0%, #3e2723 100%); 
+    border-color: #ffd54f;
+    color: #fff;
+}
+.cmd-btn:active { 
+    background: #1a0f0d; 
+    box-shadow: inset 0 2px 6px rgba(0,0,0,0.9), 0 0px 0px rgba(0,0,0,0);
+}
+
+.cmd-btn.category { 
+}
+
+.cmd-btn.finish { 
+    background: linear-gradient(to bottom, #4a1c1c 0%, #2b1111 100%); 
+    border-color: rgba(255, 100, 100, 0.6); 
+    color: #ff8a80; 
+    grid-column: span 3; 
+    margin-top: 4px;
+}
+.cmd-btn.finish:hover {
+    background: linear-gradient(to bottom, #602525 0%, #3e1818 100%);
+    border-color: #ff5252;
+    color: #fff;
+}
+
+.cmd-btn.back { 
+    background: linear-gradient(to bottom, #303538 0%, #1c1e20 100%); 
+    border-color: rgba(255,255,255,0.3); 
+    color: #eceff1; 
+    grid-column: span 3; 
+    margin-top: 4px;
+}
+.cmd-btn.back:hover {
+    background: linear-gradient(to bottom, #424a4f 0%, #2a2e30 100%);
+    border-color: rgba(255,255,255,0.5); 
+    color: #fff;
+}
 
 #sidebar-resizer { display: none; }
 #pc-sidebar { display: none !important; }
@@ -1935,9 +1987,10 @@ body.is-pc .pc-cmd-col .cmd-btn:last-child {
 
 /* 開いているメニューを光らせて分かりやすくする魔法 */
 body.is-pc .pc-cmd-col .cmd-btn.category.active {
-    background: #00838f;
+    background: linear-gradient(to bottom, #825a2c 0%, #5c4008 100%);
     color: #fff;
-    border-color: #006064;
+    border-color: #ffd54f;
+    box-shadow: 0 0 8px rgba(212, 175, 55, 0.6);
 }
 
 /* 大名選択画面では非表示にします */
