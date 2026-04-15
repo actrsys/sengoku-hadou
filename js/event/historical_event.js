@@ -690,26 +690,19 @@ window.GameEvents.push({
         kiyosu.rice = 0;
         kiyosu.horses = 0;
         kiyosu.guns = 0;
-
-        // 信長の行動を済ませた状態にします
-        nobunaga.isActionDone = true;
-
-        // ★改修：信長を援軍としてではなく「守備のメイン部隊」の先頭にねじ込みます！
-        let troopType = 'ashigaru';
-        if (horses >= force * 0.5) troopType = 'kiba';
-        else if (guns >= force * 0.5) troopType = 'teppo';
-
-        if (!context.defAssignments) context.defAssignments = [];
-        context.defAssignments.unshift({
-            busho: nobunaga,
+        
+        // ★改修：信長を「守備の自勢力援軍」として登録します！
+        context.defSelfReinforcement = {
+            castle: kiyosu, 
+            bushos: [nobunaga], 
             soldiers: force,
-            troopType: troopType
-        });
-
-        // 持ち出した兵糧・馬・鉄砲もメインの防衛物資に足します
-        context.defFieldRice = (context.defFieldRice || 0) + rice;
-        context.defender.fieldHorses = (context.defender.fieldHorses || 0) + horses;
-        context.defender.fieldGuns = (context.defender.fieldGuns || 0) + guns;
+            rice: rice, 
+            horses: horses, 
+            guns: guns, 
+            isSelf: true,
+            morale: kiyosu.morale || 50, 
+            training: kiyosu.training || 50
+        };
 
         // ★修正：AIに絶対に野戦を選ばせる「強制命令」の旗を立てます
         context.forceIntercept = true;
