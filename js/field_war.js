@@ -466,18 +466,6 @@ class FieldWarManager {
             }
         });
 
-        // ★追加：イベントによる「総大将の強制上書き」処理
-        // 指定された武将がいれば、その人を総大将(isGeneral)にし、他の人のフラグを下ろします
-        const designatedAtkId = warState.designatedAtkGeneralId;
-        const designatedDefId = warState.designatedDefGeneralId;
-
-        if (designatedAtkId) {
-            this.units.filter(u => u.isAttacker).forEach(u => u.isGeneral = (u.bushoId === designatedAtkId));
-        }
-        if (designatedDefId) {
-            this.units.filter(u => !u.isAttacker).forEach(u => u.isGeneral = (u.bushoId === designatedDefId));
-        }
-
         this.turnQueue = [];
         
         this.isInfoMode = false;
