@@ -864,6 +864,23 @@ window.GameEvents.push({
         if (game.factionSystem) {
             game.factionSystem.updateFactions();
         }
+
+        // ★追加：織田信長の大名家に所属する武将の忠誠度を+5し、城の民忠を100にします
+        const nobunaga = game.getBusho(1006001);
+        if (nobunaga && nobunaga.clan > 0) {
+            // 武将の忠誠度アップ（最大100まで）
+            const odaBushos = game.bushos.filter(b => b.clan === nobunaga.clan && b.status === 'active');
+            odaBushos.forEach(b => {
+                b.loyalty = Math.min(100, (b.loyalty || 0) + 5);
+            });
+
+            // 城の民忠を100にする
+            const odaCastles = game.castles.filter(c => c.ownerClan === nobunaga.clan);
+            odaCastles.forEach(c => {
+                c.peoplesLoyalty = 100;
+            });
+        }
+
         if (game.ui) {
             game.ui.renderMap();
             game.ui.updatePanelHeader();
@@ -926,6 +943,22 @@ window.GameEvents.push({
                     b.loyalty = Math.min(100, (b.loyalty || 0) + 25);
                 });
                 
+            }
+
+            // ★追加：独立した松平元康の大名家に所属する武将と城のボーナス処理
+            if (motoyasu.clan > 0) {
+                // 武将の忠誠度を+10（最大100まで）
+                const matsudairaBushos = game.bushos.filter(b => b.clan === motoyasu.clan && b.status === 'active');
+                matsudairaBushos.forEach(b => {
+                    b.loyalty = Math.min(100, (b.loyalty || 0) + 10);
+                });
+
+                // 城の人口を+20%（上限99万9999）し、民忠を100にする
+                const matsudairaCastles = game.castles.filter(c => c.ownerClan === motoyasu.clan);
+                matsudairaCastles.forEach(c => {
+                    c.population = Math.min(999999, Math.floor(c.population * 1.2));
+                    c.peoplesLoyalty = 100;
+                });
             }
         }
     }
