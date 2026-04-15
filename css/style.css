@@ -7,6 +7,10 @@ html { width: 100%; height: 100%; }
     font-family: 'FudeGoshirae'; /* プログラムの中で使う「あだ名」です */
     src: url('../data/fonts/fude-goshirae.woff2') format('woff2'); /* ファイルへの道順 */
 }
+@font-face {
+    font-family: 'AbashiriMincho';
+    src: url('../data/fonts/AbashiriMincho.woff2') format('woff2');
+}
 
 :root {
     --bg-color: #eceff1;
@@ -180,7 +184,7 @@ body:not(.is-pc) .status-marks-carousel .status-mark.fade-in {
     border-color: #e6e3d8 #d1c18c #a88a2c #d1c18c;
     background: linear-gradient(135deg, #b0c4b1 0%, #6e8c81 100%); 
     color: #ffffff; 
-    font-family: 'FudeGoshirae', serif;
+    font-family: 'AbashiriMincho', serif;
     letter-spacing: 0.5px;
     text-shadow: 
         1px 1px 0 #0f2b21, -1px -1px 0 #0f2b21, 
@@ -190,7 +194,7 @@ body:not(.is-pc) .status-marks-carousel .status-mark.fade-in {
         1px 3px 3px rgba(0,0,0,0.8);
     border-radius: 6px; 
     cursor: pointer; 
-    font-size: 1.1rem; 
+    font-size: 1.25rem; 
     font-weight: bold; 
     display: flex; 
     align-items: center; 
