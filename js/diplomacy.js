@@ -190,7 +190,7 @@ class DiplomacyManager {
                     
                     for (let tc of targetCastles) {
                         for (let mc of threatCastles) {
-                            if (tc.adjacentCastleIds && tc.adjacentCastleIds.includes(mc.id)) {
+                            if (GameSystem.isAdjacent(tc, mc)) {
                                 isAdjacent = true; break;
                             }
                         }
@@ -788,7 +788,7 @@ class DiplomacyManager {
             for (let mc of myCastles) {
                 for (let tc of targetCastles) {
                     // お城同士の道が繋がっているか確認します
-                    if (mc.adjacentCastleIds && mc.adjacentCastleIds.includes(tc.id)) {
+                    if (GameSystem.isAdjacent(mc, tc)) {
                         isDirectlyAdjacent = true;
                         break;
                     }

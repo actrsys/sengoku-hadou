@@ -919,8 +919,9 @@ window.GameEvents.push({
     isOneTime: true,             // 一度きりの歴史イベントです
     
     checkCondition: function(game) {
-        // 桶狭間イベント（義元討死）が終わっているか確認します
-        if (!game.flags || !game.flags['historical_okehazama_3']) return false;
+        // 今川義元（ID: 1004001）が死亡しているかを確認します
+        const yoshimoto = game.getBusho(1004001);
+        if (yoshimoto && yoshimoto.status !== 'dead') return false;
 
         // 織田信長（ID: 1006001）が大名であるか確認します
         const nobunaga = game.getBusho(1006001);
@@ -941,8 +942,8 @@ window.GameEvents.push({
         
         for (let oc of odaCastles) {
             for (let mc of matsudairaCastles) {
-                // お城のデータ（adjacentCastleIds）を直接確認して、道が繋がっているか調べます
-                if (oc.adjacentCastleIds && oc.adjacentCastleIds.includes(mc.id)) {
+                // GameSystem.isAdjacent を使って、道が繋がっているか調べます
+                if (GameSystem.isAdjacent(oc, mc)) {
                     isAdjacent = true;
                     break;
                 }
