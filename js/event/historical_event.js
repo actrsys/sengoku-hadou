@@ -838,3 +838,87 @@ window.GameEvents.push({
         }
     }
 });
+
+// ==========================================
+// ★ 清州同盟イベント
+// ==========================================
+window.GameEvents.push({
+    id: "historical_kiyosu_alliance",
+    timing: "startMonth_before", // 月初の処理前に発生します
+    isOneTime: true,             // 一度きりの歴史イベントです
+    
+    checkCondition: function(game) {
+        // すでにこのイベントが終わっている場合はストップします
+        if (game.flags && game.flags.kiyosuAllianceDone) return false;
+
+        // 桶狭間イベント（義元討死）と家康独立イベントが終わっているか確認します
+        if (!game.flags || !game.flags.okehazama3Done || !game.flags.ieyasuIndependenceDone) return false;
+
+        // 織田信長（ID: 1006001）が大名であるか確認します
+        const nobunaga = game.getBusho(1006001);
+        if (!nobunaga || !nobunaga.isDaimyo || nobunaga.clan === 0) return false;
+
+        // 松平元康（ID: 1004004）が大名であるか確認します
+        const motoyasu = game.getBusho(1004004);
+        if (!motoyasu || !motoyasu.isDaimyo || motoyasu.clan === 0) return false;
+
+        // 織田家と松平家の関係が「普通」か「友好」であるか確認します
+        const rel = game.diplomacyManager.getRelation(nobunaga.clan, motoyasu.clan);
+        if (!rel || (rel.status !== '普通' && rel.status !== '友好')) return false;
+
+        // 織田家と松平家の領地（お城同士の道）が隣接しているか確認します
+        const odaCastles = game.castles.filter(c => c.ownerClan === nobunaga.clan);
+        const matsudairaCastles = game.castles.filter(c => c.ownerClan === motoyasu.clan);
+        let isAdjacent = false;
+        
+        for (let oc of odaCastles) {
+            for (let mc of matsudairaCastles) {
+                // GameSystem.isAdjacent を使って、道が繋がっているか調べます
+                if (GameSystem.isAdjacent(oc, mc)) {
+                    isAdjacent = true;
+                    break;
+                }
+            }
+            if (isAdjacent) break;
+        }
+        if (!isAdjacent) return false;
+
+        // すべての条件を満たしたらイベント発生です！
+        return true;
+    },
+    
+    execute: async function(game) {
+        // イベント発生のスタンプを押します
+        game.flags = game.flags || {};
+        game.flags.kiyosuAllianceDone = true;
+
+        const nobunaga = game.getBusho(1006001);
+        const motoyasu = game.getBusho(1004004);
+        
+        const nobunagaClan = game.clans.find(c => c.id === nobunaga.clan);
+        const motoyasuClan = game.clans.find(c => c.id === motoyasu.clan);
+
+        // 外交システムを使って、強制的に「同盟」状態にします
+        if (game.diplomacyManager) {
+            game.diplomacyManager.changeStatus(motoyasu.clan, nobunaga.clan, '同盟', 0);
+            
+            // お互いの関係値を最高の100にします！
+            const rel1 = game.diplomacyManager.getRelation(motoyasu.clan, nobunaga.clan);
+            if (rel1) rel1.sentiment = 100;
+            
+            const rel2 = game.diplomacyManager.getRelation(nobunaga.clan, motoyasu.clan);
+            if (rel2) rel2.sentiment = 100;
+        }
+
+        // メッセージを作って画面にお知らせします
+        const msg = `${motoyasuClan.name}が${nobunagaClan.name}と同盟を締結しました！`;
+        game.ui.log(`【イベント】清州同盟：${msg}`);
+        await game.ui.showDialogAsync(msg, false, 0);
+
+        // 画面や情報を最新の状態に更新します
+        if (game.ui) {
+            game.ui.renderMap();
+            game.ui.updatePanelHeader();
+        }
+    }
+});
