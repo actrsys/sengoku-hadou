@@ -907,7 +907,7 @@ window.GameEvents.push({
             // 第4引数に 'indep' を渡すことで、乗っ取りや寝返りではなく、純粋な「独立」として処理させます
             await game.independenceSystem.executeRebellion(castle, motoyasu, ujizane, 'indep');
             
-            // 独立が起こったあと、元々の大名家（今川家）に残った武将の下がりすぎた忠誠度を調整の為20回復させます
+            // 独立が起こったあと、元々の大名家（今川家）に残った武将の下がりすぎた忠誠度を調整の為25回復させます
             const oldClanId = ujizane.clan;
             // 氏真がちゃんと大名家に所属しているか確認します
             if (oldClanId > 0) {
@@ -916,8 +916,8 @@ window.GameEvents.push({
                 
                 // 集めた武将たち全員に、順番に忠誠度を回復する魔法をかけます
                 remainingBushos.forEach(b => {
-                    // 現在の忠誠度に20を足します（ただし、最大100までに制限します）
-                    b.loyalty = Math.min(100, (b.loyalty || 0) + 20);
+                    // 現在の忠誠度に25を足します（ただし、最大100までに制限します）
+                    b.loyalty = Math.min(100, (b.loyalty || 0) + 25);
                 });
                 
             }
