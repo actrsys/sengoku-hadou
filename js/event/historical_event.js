@@ -524,7 +524,7 @@ window.GameEvents.push({
 });
 
 // ==========================================
-// ★ 桶狭間の戦い（予備）：松平元康 岡崎城主就任（裏イベント）
+// ★ 桶壊間の戦い（予備）：松平元康 岡崎城主就任（裏イベント）
 // ==========================================
 window.GameEvents.push({
     id: "historical_motoyasu_okazaki",
@@ -536,15 +536,22 @@ window.GameEvents.push({
         const yoshimoto = game.getBusho(1004001);
         if (!yoshimoto || !yoshimoto.isDaimyo) return false;
 
-        // ② 松平元康（ID: 1004004）が今川家にいて、大名ではないことを確認します
+        // ② 松平元康（ID: 1004004）が存在するか確認します
         const motoyasu = game.getBusho(1004004);
-        if (!motoyasu || motoyasu.clan !== yoshimoto.clan || motoyasu.isDaimyo) return false;
+        if (!motoyasu) return false;
 
-        // ③ すでに元康が岡崎城（ID: 48）の城主なら、このイベントを起こす必要はありません
+        // 【ここが重要！】元康が「義元が殿様を務める大名家」にちゃんと所属しているかチェックします
+        // ※ 義元の clan（勢力番号）と 元康の clan が一致していれば、同じ勢力にいることになります
+        if (motoyasu.clan !== yoshimoto.clan) return false;
+
+        // ③ 元康が自分自身が大名（独立した殿様）になっていないか確認します
+        if (motoyasu.isDaimyo) return false;
+
+        // ④ すでに元康が岡崎城（ID: 48）の城主なら、このイベントを起こす必要はありません
         const okazakiCastle = game.getCastle(48);
         if (!okazakiCastle || okazakiCastle.castellanId === motoyasu.id) return false;
 
-        // ④ 今川家が指定の5つのお城をすべて持っているか確認します
+        // ⑤ 今川家（義元の勢力）が指定の5つのお城をすべて持っているか確認します
         const imagawaClanId = yoshimoto.clan;
         const requiredCastles = [12, 13, 48, 71, 100];
         const hasAllCastles = requiredCastles.every(id => {
@@ -564,12 +571,12 @@ window.GameEvents.push({
         // 万が一データが見つからなかった時のための安全装置です
         if (!motoyasu || !okazakiCastle) return;
 
-        // ① 松平元康の功績が1499以下なら、強制的に1500に引き上げます
+        // 1. 松平元康の功績が1499以下なら、強制的に1500に引き上げます
         if ((motoyasu.achievementTotal || 0) <= 1499) {
             motoyasu.achievementTotal = 1500;
         }
 
-        // ② 元康が別のお城にいる場合、安全に岡崎城へお引越しさせます
+        // 2. 元康が別のお城にいる場合、安全に岡崎城へお引越しさせます
         if (motoyasu.castleId !== 48) {
             if (game.affiliationSystem) {
                 game.affiliationSystem.moveCastle(motoyasu, 48);
@@ -577,15 +584,12 @@ window.GameEvents.push({
                 // システムがない場合の予備の手動お引越し
                 const oldCastle = game.getCastle(motoyasu.castleId);
                 if (oldCastle) {
-                    // 古いお城から元康の名前を消します
                     oldCastle.samuraiIds = oldCastle.samuraiIds.filter(id => id !== motoyasu.id);
-                    // もし古いお城で城主だったなら、その記録も消します
                     if (oldCastle.castellanId === motoyasu.id) {
                         oldCastle.castellanId = 0;
                         motoyasu.isCastellan = false;
                     }
                 }
-                // 岡崎城に入ります
                 motoyasu.castleId = 48;
                 if (!okazakiCastle.samuraiIds.includes(motoyasu.id)) {
                     okazakiCastle.samuraiIds.push(motoyasu.id);
@@ -593,23 +597,21 @@ window.GameEvents.push({
             }
         }
 
-        // ③ お引越しの影響で勝手に他の人が城主に選ばれてしまう現象を防ぐため、
-        // 岡崎城にいる全員の「城主バッジ」をいったん強制的に全員から没収します
+        // 3. 岡崎城にいる他の武将の城主バッジを外し、元康を新しい城主にします
+        // ※ すでに元康が城主だったとしても、ここで改めて正しくバッジを付け直すので安全です
         const residents = game.bushos.filter(b => b.castleId === 48);
         residents.forEach(b => {
             b.isCastellan = false;
         });
 
-        // ④ 誰も城主じゃない真っ白な状態にしてから、元康だけに城主バッジをつけます
         motoyasu.isCastellan = true;
         okazakiCastle.castellanId = motoyasu.id;
 
-        // ⑤ 城主が変わったことをシステムに報告して、正しく処理してもらいます
+        // 4. システムに城主の変更を確定させ、画面を更新します
         if (game.affiliationSystem) {
             game.affiliationSystem.updateCastleLord(okazakiCastle);
         }
 
-        // ⑥ 画面の見た目を最新の状態に描き直します（裏イベントなのでメッセージなどは出しません）
         if (game.ui) {
             game.ui.renderMap();
             game.ui.updatePanelHeader();
