@@ -1579,11 +1579,6 @@ class UIManager {
                 });
                 renderSubMenu(activeItem.subMenus, pathIndex + 1, col);
             }
-
-            createBtn(col, "戻る", "back", () => {
-                this.pcMenuPath = this.pcMenuPath.slice(0, pathIndex);
-                this.renderPcCommandMenu();
-            });
         };
 
         renderSubMenu(COMMAND_MENU_STRUCTURE, 0, col1);
