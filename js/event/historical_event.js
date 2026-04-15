@@ -786,3 +786,55 @@ window.GameEvents.push({
         }
     }
 });
+// ==========================================
+// ★ 松平元康（徳川家康）独立イベント
+// ==========================================
+window.GameEvents.push({
+    id: "historical_ieyasu_independence",
+    timing: "endMonth_before", // 月末の独立チェックなどが始まる前に起こします
+    isOneTime: true,
+    
+    checkCondition: function(game) {
+        // すでにこのイベントが終わっている場合はストップします
+        if (game.flags && game.flags.ieyasuIndependenceDone) return false;
+
+        // 1. 今川義元（ID: 1004001）が死亡しているか確認します
+        const yoshimoto = game.getBusho(1004001);
+        if (!yoshimoto || yoshimoto.status !== 'dead') return false;
+
+        // 2. 今川氏真（ID: 1004011）が大名であるか確認します
+        const ujizane = game.getBusho(1004011);
+        if (!ujizane || !ujizane.isDaimyo || ujizane.clan === 0) return false;
+
+        // 3. 松平元康（ID: 1004004）が存在し、大名ではないことを確認します
+        const motoyasu = game.getBusho(1004004);
+        if (!motoyasu || motoyasu.isDaimyo) return false;
+
+        // 4. 松平元康が氏真と同じ今川家に所属し、城主であるか確認します
+        if (motoyasu.clan !== ujizane.clan || !motoyasu.isCastellan) return false;
+
+        // 5. 松平元康が派閥主であるか確認します
+        if (!motoyasu.isFactionLeader) return false;
+
+        // 全ての条件を満たしたらイベント発生！
+        return true;
+    },
+    
+    execute: async function(game) {
+        // イベント発生のスタンプを押します
+        game.flags = game.flags || {};
+        game.flags.ieyasuIndependenceDone = true;
+
+        const ujizane = game.getBusho(1004011);
+        const motoyasu = game.getBusho(1004004);
+        const castle = game.getCastle(motoyasu.castleId);
+
+        if (!castle) return;
+
+        // 独立システムを呼び出して、強制的に独立を実行します
+        if (game.independenceSystem) {
+            // 第4引数に 'indep' を渡すことで、乗っ取りや寝返りではなく、純粋な「独立」として処理させます
+            await game.independenceSystem.executeRebellion(castle, motoyasu, ujizane, 'indep');
+        }
+    }
+});
