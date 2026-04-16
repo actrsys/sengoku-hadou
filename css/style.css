@@ -618,6 +618,10 @@ body.hide-daimyo-labels .daimyo-name-label { display: none !important; }
     position: relative;
     isolation: isolate;
     padding: 12px 24px; 
+    min-width: calc(3em + 48px);
+    display: inline-flex;
+    justify-content: center;
+    align-items: center;
     border: none;
     background: transparent;
     font-family: 'AbashiriMincho', serif;
