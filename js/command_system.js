@@ -2408,8 +2408,6 @@ class CommandSystem {
                             hc.horses = (hc.horses || 0) + selfReinfData.horses;
                             hc.guns = (hc.guns || 0) + selfReinfData.guns;
                             selfReinfData.bushos.forEach(b => b.isActionDone = false);
-                            let colorClass = "log-color-atk";
-                            this.game.ui.log(`【自軍援軍】出陣が取りやめられたため、<span class="${colorClass}">${hc.name}</span> の援軍は帰還しました。`);
                         }
                         this.game.ui.cancelMapSelection();
                         this.game.ui.scrollToActiveCastle(atkCastle);
