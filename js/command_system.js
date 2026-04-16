@@ -2412,7 +2412,7 @@ class CommandSystem {
                             this.game.ui.log(`【自軍援軍】出陣が取りやめられたため、<span class="${colorClass}">${hc.name}</span> の援軍は帰還しました。`);
                         }
                     },
-                    { okText: '出陣', okClass: 'btn-danger', cancelText: 'やめる' }
+                    { okText: '出陣する', okClass: 'btn-danger', cancelText: 'やめる' }
                 );
             } else {
                 proceedToAlly(selfReinfData, atkBushos, sVal);
