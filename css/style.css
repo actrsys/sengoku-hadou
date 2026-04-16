@@ -613,68 +613,125 @@ body.hide-daimyo-labels .daimyo-name-label { display: none !important; }
    ========================================================= */
 .toggle-btn { background: none; border: 1px solid #ccc; border-radius: 4px; padding: 2px 8px; font-size: 0.8rem; cursor: pointer; color: #555; }
 
-/* 基本のボタン共通スタイル */
+/* 基本のボタン（決定系・キャンセル系） */
 .btn-primary, .btn-secondary, .btn-danger { 
+    position: relative;
+    isolation: isolate;
     padding: 12px 24px; 
-    border-style: solid;
-    border-width: 3px;
-    border-color: #e6e3d8 #d1c18c #a88a2c #d1c18c;
-    border-radius: 0; 
+    border: none;
+    background: transparent;
+    font-family: 'AbashiriMincho', serif;
+    letter-spacing: 0.5px;
     font-size: 1.2rem; 
     font-weight: bold; 
     cursor: pointer; 
     color: #fff;
     white-space: nowrap; 
-    box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.4);
-    clip-path: polygon(15px 0%, 100% 0%, 100% calc(100% - 15px), calc(100% - 10px) calc(100% - 10px), calc(100% - 15px) 100%, 0% 100%, 0% 15px, 10px 10px);
     filter: drop-shadow(0 4px 4px rgba(0,0,0,0.5));
-    transition: all 0.2s; 
+    transition: transform 0.2s; 
+}
+
+/* 枠線レイヤー (::before) */
+.btn-primary::before, .btn-secondary::before, .btn-danger::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: -2;
+    background: linear-gradient(135deg, #e6e3d8 0%, #d1c18c 40%, #a88a2c 100%);
+    -webkit-mask:
+        radial-gradient(circle 12px at top right, transparent 11.5px, #000 12px),
+        radial-gradient(circle 12px at bottom left, transparent 11.5px, #000 12px);
+    -webkit-mask-composite: source-in;
+    mask-composite: intersect;
+}
+
+/* 背景・グラデーションレイヤー (::after) */
+.btn-primary::after, .btn-secondary::after, .btn-danger::after {
+    content: "";
+    position: absolute;
+    inset: 3px; /* 枠線の太さ */
+    z-index: -1;
+    box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.4);
+    -webkit-mask:
+        radial-gradient(circle 15px at calc(100% + 3px) -3px, transparent 14.5px, #000 15px),
+        radial-gradient(circle 15px at -3px calc(100% + 3px), transparent 14.5px, #000 15px);
+    -webkit-mask-composite: source-in;
+    mask-composite: intersect;
+    transition: background 0.2s;
 }
 
 /* 小さいサイズのボタン用追加クラス */
 .btn-small {
     padding: 5px 20px !important;
     font-size: 1rem !important;
-    clip-path: polygon(10px 0%, 100% 0%, 100% calc(100% - 10px), calc(100% - 6px) calc(100% - 6px), calc(100% - 10px) 100%, 0% 100%, 0% 10px, 6px 6px);
+}
+.btn-small::before {
+    -webkit-mask:
+        radial-gradient(circle 8px at top right, transparent 7.5px, #000 8px),
+        radial-gradient(circle 8px at bottom left, transparent 7.5px, #000 8px);
+    -webkit-mask-composite: source-in;
+    mask-composite: intersect;
+}
+.btn-small::after {
+    -webkit-mask:
+        radial-gradient(circle 11px at calc(100% + 3px) -3px, transparent 10.5px, #000 11px),
+        radial-gradient(circle 11px at -3px calc(100% + 3px), transparent 10.5px, #000 11px);
+    -webkit-mask-composite: source-in;
+    mask-composite: intersect;
 }
 
-/* 決定系（緑系・中央やや下に暗いライン） */
-.btn-primary { 
-    background: linear-gradient(to bottom, #66bb6a 0%, #43a047 60%, #1b5e20 60%, #1b5e20 65%, #2e7d32 65%, #388e3c 100%); 
+/* 決定系（緑系・やや明るく） */
+.btn-primary {
+    text-shadow:
+        1px 1px 0 #0f2b21, -1px -1px 0 #0f2b21, 1px -1px 0 #0f2b21, -1px 1px 0 #0f2b21,
+        0px 2px 0 #0f2b21, 0px -2px 0 #0f2b21, 2px 0px 0 #0f2b21, -2px 0px 0 #0f2b21,
+        1px 3px 3px rgba(0,0,0,0.8);
 }
-.btn-primary:hover { 
-    background: linear-gradient(to bottom, #81c784 0%, #4caf50 60%, #2e7d32 60%, #2e7d32 65%, #388e3c 65%, #43a047 100%);
-    border-color: #ffffff #e6d8b3 #c2a142 #e6d8b3;
-    transform: scale(1.05); 
+.btn-primary::after { 
+    background: linear-gradient(to bottom, #81c784 0%, #4caf50 60%, #1b5e20 60%, #1b5e20 65%, #388e3c 65%, #43a047 100%); 
+}
+.btn-primary:hover { transform: scale(1.05); }
+.btn-primary:hover::after { 
+    background: linear-gradient(to bottom, #a5d6a7 0%, #66bb6a 60%, #2e7d32 60%, #2e7d32 65%, #43a047 65%, #4caf50 100%);
 }
 
-/* キャンセル・閉じる系（赤系・中央やや下に暗いライン） */
-.btn-secondary, .btn-danger { 
-    background: linear-gradient(to bottom, #ef5350 0%, #e53935 60%, #b71c1c 60%, #b71c1c 65%, #c62828 65%, #d32f2f 100%); 
+/* 閉じる系（灰系・元の灰っぽく） */
+.btn-secondary {
+    text-shadow:
+        1px 1px 0 #1a1e20, -1px -1px 0 #1a1e20, 1px -1px 0 #1a1e20, -1px 1px 0 #1a1e20,
+        0px 2px 0 #1a1e20, 0px -2px 0 #1a1e20, 2px 0px 0 #1a1e20, -2px 0px 0 #1a1e20,
+        1px 3px 3px rgba(0,0,0,0.8);
 }
-.btn-secondary:hover, .btn-danger:hover { 
-    background: linear-gradient(to bottom, #e57373 0%, #ef5350 60%, #c62828 60%, #c62828 65%, #d32f2f 65%, #e53935 100%);
-    border-color: #ffffff #e6d8b3 #c2a142 #e6d8b3;
-    transform: scale(1.05); 
+.btn-secondary::after { 
+    background: linear-gradient(to bottom, #90a4ae 0%, #607d8b 60%, #263238 60%, #263238 65%, #37474f 65%, #455a64 100%); 
+}
+.btn-secondary:hover { transform: scale(1.05); }
+.btn-secondary:hover::after { 
+    background: linear-gradient(to bottom, #b0bec5 0%, #78909c 60%, #37474f 60%, #37474f 65%, #455a64 65%, #546e7a 100%);
+}
+
+/* 否定系（赤系・やや赤く） */
+.btn-danger {
+    text-shadow:
+        1px 1px 0 #3a0b0b, -1px -1px 0 #3a0b0b, 1px -1px 0 #3a0b0b, -1px 1px 0 #3a0b0b,
+        0px 2px 0 #3a0b0b, 0px -2px 0 #3a0b0b, 2px 0px 0 #3a0b0b, -2px 0px 0 #3a0b0b,
+        1px 3px 3px rgba(0,0,0,0.8);
+}
+.btn-danger::after { 
+    background: linear-gradient(to bottom, #e57373 0%, #f44336 60%, #b71c1c 60%, #b71c1c 65%, #c62828 65%, #d32f2f 100%); 
+}
+.btn-danger:hover { transform: scale(1.05); }
+.btn-danger:hover::after { 
+    background: linear-gradient(to bottom, #ef9a9a 0%, #ef5350 60%, #c62828 60%, #c62828 65%, #d32f2f 65%, #e53935 100%);
 }
 
 /* ボタン無効時のスタイル */
-.btn-primary:disabled, .btn-primary.disabled { 
-    background: linear-gradient(to bottom, #a5d6a7 0%, #81c784 60%, #4caf50 60%, #4caf50 65%, #66bb6a 65%, #81c784 100%) !important; 
-    border-color: #cfd8dc !important;
-    color: #ffffff !important; 
-    filter: drop-shadow(0 0 0 transparent) !important; 
-    cursor: not-allowed !important; 
-    opacity: 1 !important; 
-    transform: none !important; 
-}
-.btn-secondary:disabled, .btn-secondary.disabled, .btn-danger:disabled, .btn-danger.disabled { 
-    background: linear-gradient(to bottom, #ef9a9a 0%, #e57373 60%, #ef5350 60%, #ef5350 65%, #e57373 65%, #ef9a9a 100%) !important; 
-    border-color: #cfd8dc !important;
-    color: #ffffff !important; 
-    filter: drop-shadow(0 0 0 transparent) !important; 
-    cursor: not-allowed !important; 
-    opacity: 1 !important; 
+.btn-primary:disabled, .btn-primary.disabled, 
+.btn-secondary:disabled, .btn-secondary.disabled, 
+.btn-danger:disabled, .btn-danger.disabled { 
+    filter: drop-shadow(0 0 0 transparent) grayscale(60%);
+    cursor: not-allowed; 
+    opacity: 0.8; 
     transform: none !important; 
 }
 
