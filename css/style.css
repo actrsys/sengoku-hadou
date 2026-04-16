@@ -613,40 +613,62 @@ body.hide-daimyo-labels .daimyo-name-label { display: none !important; }
    ========================================================= */
 .toggle-btn { background: none; border: 1px solid #ccc; border-radius: 4px; padding: 2px 8px; font-size: 0.8rem; cursor: pointer; color: #555; }
 
-/* 基本のボタン（青・灰・赤） */
+/* 基本のボタン（決定系・キャンセル系） */
 .btn-primary, .btn-secondary, .btn-danger { 
     padding: 12px 24px; 
-    border: 2px solid #cfd8dc; 
-    border-radius: 8px; 
+    border: none; 
     font-size: 1.2rem; 
     font-weight: bold; 
     cursor: pointer; 
-    box-shadow: 0 4px 6px rgba(0,0,0,0.5); 
-    transition: all 0.2s; 
     color: #fff;
     white-space: nowrap; 
+    clip-path: polygon(15px 0%, 100% 0%, 100% calc(100% - 15px), calc(100% - 15px) 100%, 0% 100%, 0% 15px);
+    filter: drop-shadow(0 4px 4px rgba(0,0,0,0.5));
+    transition: all 0.2s; 
 }
 
 /* 小さいサイズのボタン用追加クラス */
 .btn-small {
     padding: 5px 20px !important;
     font-size: 1rem !important;
-    border-radius: 6px !important;
+    clip-path: polygon(10px 0%, 100% 0%, 100% calc(100% - 10px), calc(100% - 10px) 100%, 0% 100%, 0% 10px);
 }
 
-.btn-primary { background: #1976d2; border-color: #90caf9; }
-.btn-primary:hover { background: #2196f3; transform: scale(1.05); }
+/* 決定系（緑系） */
+.btn-primary { 
+    background: linear-gradient(to bottom, #66bb6a 0%, #43a047 60%, #1b5e20 60%, #1b5e20 65%, #2e7d32 65%, #388e3c 100%); 
+}
+.btn-primary:hover { 
+    background: linear-gradient(to bottom, #81c784 0%, #4caf50 60%, #2e7d32 60%, #2e7d32 65%, #388e3c 65%, #43a047 100%);
+    transform: scale(1.05); 
+}
 
-.btn-secondary { background: #37474f; border-color: #cfd8dc; }
-.btn-secondary:hover { background: #546e7a; transform: scale(1.05); }
-
-.btn-danger { background: #d32f2f; border-color: #ef9a9a; }
-.btn-danger:hover { background: #f44336; transform: scale(1.05); }
+/* キャンセル・閉じる系（赤系） */
+.btn-secondary, .btn-danger { 
+    background: linear-gradient(to bottom, #ef5350 0%, #e53935 60%, #b71c1c 60%, #b71c1c 65%, #c62828 65%, #d32f2f 100%); 
+}
+.btn-secondary:hover, .btn-danger:hover { 
+    background: linear-gradient(to bottom, #e57373 0%, #ef5350 60%, #c62828 60%, #c62828 65%, #d32f2f 65%, #e53935 100%);
+    transform: scale(1.05); 
+}
 
 /* ボタン無効時のスタイル（透けさせず、それぞれの色を薄くする） */
-.btn-primary:disabled, .btn-primary.disabled { background: #90caf9 !important; border-color: #bbdefb !important; color: #ffffff !important; box-shadow: none !important; cursor: not-allowed !important; opacity: 1 !important; transform: none !important; }
-.btn-secondary:disabled, .btn-secondary.disabled { background: #b0bec5 !important; border-color: #cfd8dc !important; color: #ffffff !important; box-shadow: none !important; cursor: not-allowed !important; opacity: 1 !important; transform: none !important; }
-.btn-danger:disabled, .btn-danger.disabled { background: #ef9a9a !important; border-color: #ffcdd2 !important; color: #ffffff !important; box-shadow: none !important; cursor: not-allowed !important; opacity: 1 !important; transform: none !important; }
+.btn-primary:disabled, .btn-primary.disabled { 
+    background: linear-gradient(to bottom, #a5d6a7 0%, #81c784 60%, #4caf50 60%, #4caf50 65%, #66bb6a 65%, #81c784 100%) !important; 
+    color: #ffffff !important; 
+    filter: drop-shadow(0 0 0 transparent) !important; 
+    cursor: not-allowed !important; 
+    opacity: 1 !important; 
+    transform: none !important; 
+}
+.btn-secondary:disabled, .btn-secondary.disabled, .btn-danger:disabled, .btn-danger.disabled { 
+    background: linear-gradient(to bottom, #ef9a9a 0%, #e57373 60%, #ef5350 60%, #ef5350 65%, #e57373 65%, #ef9a9a 100%) !important; 
+    color: #ffffff !important; 
+    filter: drop-shadow(0 0 0 transparent) !important; 
+    cursor: not-allowed !important; 
+    opacity: 1 !important; 
+    transform: none !important; 
+}
 
 .delegate-btn { padding: 15px 30px; font-size: 1.2rem; font-weight: bold; border: 2px solid #ccc; background-color: #f5f5f5; border-radius: 8px; cursor: pointer; color: #777; transition: all 0.2s; }
 .delegate-btn:hover { background-color: #e0e0e0; }
