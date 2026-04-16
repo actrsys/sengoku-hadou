@@ -2411,6 +2411,8 @@ class CommandSystem {
                             let colorClass = "log-color-atk";
                             this.game.ui.log(`【自軍援軍】出陣が取りやめられたため、<span class="${colorClass}">${hc.name}</span> の援軍は帰還しました。`);
                         }
+                        this.game.ui.cancelMapSelection();
+                        this.game.ui.scrollToActiveCastle(atkCastle);
                     },
                     { okText: '出陣する', okClass: 'btn-danger', cancelText: 'やめる' }
                 );
