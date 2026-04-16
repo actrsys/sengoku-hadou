@@ -168,8 +168,8 @@ window.GameEvents.push({
             }
         }
 
-        // 【お供の移動処理】（明智光秀、明智秀満、溝尾茂朝）
-        const retainers = [1900001, 1900002, 1900003];
+        // 【お供の移動処理】（明智光秀、明智秀満、溝尾茂朝、細川藤孝）
+        const retainers = [1900001, 1900002, 1900003, 1017003];
         retainers.forEach(id => {
             const rBusho = game.getBusho(id);
             // 存在し、生きていて、大名ではない場合のみお供として移動します
