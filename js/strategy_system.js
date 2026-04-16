@@ -147,6 +147,7 @@ class StrategySystem {
                 target.isGunshi = false; // 念のため軍師を外しておきます
                 
                 // 部下たちの処理
+                const targetLord = this.game.bushos.find(b => b.clan === oldClanId && b.isDaimyo) || { affinity: 50 };
                 const indSys = this.game.independenceSystem;
                 const captiveMsgs = indSys.resolveSubordinates(oldCastle, target, targetLord, newClanId, oldClanId);
 
