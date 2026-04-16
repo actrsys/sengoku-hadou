@@ -474,17 +474,17 @@ class UIManager {
         });
     }
 
-    showDialogAsync(msg, isConfirm = false, autoCloseTime = 0) {
+    showDialogAsync(msg, isConfirm = false, autoCloseTime = 0, customOpts = null) {
         return new Promise(resolve => {
-            this.dialogQueue.push({ msg, isConfirm, onOk: resolve, onCancel: resolve, autoCloseTime });
+            this.dialogQueue.push({ msg, isConfirm, onOk: resolve, onCancel: resolve, autoCloseTime, customOpts });
             if (!this.isDialogShowing) {
                 this.processDialogQueue();
             }
         });
     }
 
-    showDialog(msg, isConfirm, onOk, onCancel = null) {
-        this.dialogQueue.push({ msg, isConfirm, onOk, onCancel, autoCloseTime: 0 });
+    showDialog(msg, isConfirm, onOk, onCancel = null, customOpts = null) {
+        this.dialogQueue.push({ msg, isConfirm, onOk, onCancel, autoCloseTime: 0, customOpts });
         if (!this.isDialogShowing) {
             this.processDialogQueue();
         }
@@ -564,13 +564,15 @@ class UIManager {
         if (dialog.isConfirm) {
             cancelBtn.classList.remove('hidden'); 
             cancelBtn.onclick = () => { cancelBtn.onclick = null; cleanupAndNext(dialog.onCancel); };
-            okBtn.textContent = '了承';
-            okBtn.className = 'btn-primary';
+            okBtn.textContent = dialog.customOpts?.okText || '了承';
+            okBtn.className = dialog.customOpts?.okClass || 'btn-primary';
+            cancelBtn.textContent = dialog.customOpts?.cancelText || '拒否';
+            cancelBtn.className = dialog.customOpts?.cancelClass || 'btn-secondary';
             footer.style.justifyContent = 'center';
         } else {
             cancelBtn.classList.add('hidden'); 
-            okBtn.textContent = '閉じる';
-            okBtn.className = 'btn-secondary';
+            okBtn.textContent = dialog.customOpts?.okText || '閉じる';
+            okBtn.className = dialog.customOpts?.okClass || 'btn-secondary';
             footer.style.justifyContent = 'center';
         }
 
