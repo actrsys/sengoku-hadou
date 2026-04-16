@@ -564,9 +564,9 @@ class UIManager {
         if (dialog.isConfirm) {
             cancelBtn.classList.remove('hidden'); 
             cancelBtn.onclick = () => { cancelBtn.onclick = null; cleanupAndNext(dialog.onCancel); };
-            okBtn.textContent = dialog.customOpts?.okText || '了承';
+            okBtn.textContent = dialog.customOpts?.okText || 'はい';
             okBtn.className = dialog.customOpts?.okClass || 'btn-primary';
-            cancelBtn.textContent = dialog.customOpts?.cancelText || '拒否';
+            cancelBtn.textContent = dialog.customOpts?.cancelText || 'いいえ';
             cancelBtn.className = dialog.customOpts?.cancelClass || 'btn-secondary';
             footer.style.justifyContent = 'center';
         } else {
