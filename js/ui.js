@@ -300,7 +300,7 @@ class UIManager {
 
             if (window.AudioManager) {
                 // ★「シナリオ選択に戻る」をリストに仲間入りさせます！
-                if (["戻る", "閉じる", "拒否", "やめる", "撤退", "解放", "処断", "シナリオ選択に戻る"].includes(text)) {
+                if (["戻る", "閉じる", "いいえ", "やめる", "撤退", "解放", "処断", "シナリオ選択に戻る"].includes(text)) {
                     window.AudioManager.playSE('cancel.ogg');
                 } else {
                     window.AudioManager.playSE('decision.ogg');
