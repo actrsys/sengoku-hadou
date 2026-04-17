@@ -91,7 +91,6 @@ class UIInfoManager {
         modal.classList.remove('hidden');
         if (title) title.textContent = "勢力一覧";
         if (contextEl) contextEl.classList.add('hidden');
-        if (tabsEl) tabsEl.classList.add('hidden');
         if (confirmBtn) confirmBtn.classList.add('hidden');
 
         if(backBtn) {
@@ -189,7 +188,6 @@ class UIInfoManager {
         modal.classList.remove('hidden');
         if (title) title.textContent = "勢力情報";
         if (contextEl) contextEl.classList.add('hidden');
-        if (tabsEl) tabsEl.classList.add('hidden');
         if (confirmBtn) confirmBtn.classList.add('hidden');
 
         if(backBtn) {
@@ -327,7 +325,6 @@ class UIInfoManager {
         modal.classList.remove('hidden');
         if (titleEl) titleEl.textContent = `${clanName} 外交関係`;
         if (contextEl) contextEl.classList.add('hidden');
-        if (tabsEl) tabsEl.classList.add('hidden');
         if (confirmBtn) confirmBtn.classList.add('hidden');
 
         if(backBtn) {
@@ -414,7 +411,6 @@ class UIInfoManager {
         modal.classList.remove('hidden');
         if (titleEl) titleEl.textContent = `${clan.name} 派閥一覧`;
         if (contextEl) contextEl.classList.add('hidden');
-        if (tabsEl) tabsEl.classList.add('hidden');
         if (confirmBtn) confirmBtn.classList.add('hidden');
 
         if(backBtn) {
@@ -541,7 +537,6 @@ class UIInfoManager {
         modal.classList.remove('hidden');
         if (title) title.textContent = "武将情報";
         if (contextEl) contextEl.classList.add('hidden');
-        if (tabsEl) tabsEl.classList.add('hidden');
         if (confirmBtn) confirmBtn.classList.add('hidden');
 
         if(backBtn) {
@@ -698,7 +693,6 @@ class UIInfoManager {
         modal.classList.remove('hidden');
         if (titleEl) titleEl.textContent = "捕虜処遇";
         if (contextEl) contextEl.classList.add('hidden');
-        if (tabsEl) tabsEl.classList.add('hidden');
         if (confirmBtn) confirmBtn.classList.add('hidden');
 
         // 捕虜処遇は勝手に閉じられないように、戻るボタンを消しておきます
@@ -845,7 +839,6 @@ class UIInfoManager {
         modal.classList.remove('hidden');
         if (titleEl) titleEl.textContent = isSelectMode ? "嫁がせる姫を選択してください" : "姫一覧";
         if (contextEl) contextEl.classList.add('hidden');
-        if (tabsEl) tabsEl.classList.add('hidden');
 
         if(backBtn) {
             backBtn.style.display = '';
@@ -987,7 +980,6 @@ class UIInfoManager {
         if (!modal) return;
         modal.classList.remove('hidden');
         if (titleEl) titleEl.textContent = "委任設定";
-        if (tabsEl) tabsEl.classList.add('hidden');
         if (confirmBtn) confirmBtn.classList.add('hidden');
 
         if(backBtn) {
@@ -1082,7 +1074,6 @@ class UIInfoManager {
         modal.classList.remove('hidden');
         if (titleEl) titleEl.textContent = `${castle.name} の委任設定`;
         if (contextEl) contextEl.classList.add('hidden');
-        if (tabsEl) tabsEl.classList.add('hidden');
         if (confirmBtn) confirmBtn.classList.add('hidden');
 
         if(backBtn) {
@@ -3070,7 +3061,6 @@ class UIInfoManager {
         modal.classList.remove('hidden');
         if (titleEl) titleEl.textContent = "行動履歴";
         if (contextEl) contextEl.classList.add('hidden');
-        if (tabsEl) tabsEl.classList.add('hidden');
         if (confirmBtn) confirmBtn.classList.add('hidden');
 
         if(backBtn) {
