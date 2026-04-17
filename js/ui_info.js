@@ -188,6 +188,7 @@ class UIInfoManager {
         modal.classList.remove('hidden');
         if (title) title.textContent = "勢力情報";
         if (contextEl) contextEl.classList.add('hidden');
+        if (tabsEl) tabsEl.classList.add('hidden');
         if (confirmBtn) confirmBtn.classList.add('hidden');
 
         if(backBtn) {
@@ -537,6 +538,7 @@ class UIInfoManager {
         modal.classList.remove('hidden');
         if (title) title.textContent = "武将情報";
         if (contextEl) contextEl.classList.add('hidden');
+        if (tabsEl) tabsEl.classList.add('hidden');
         if (confirmBtn) confirmBtn.classList.add('hidden');
 
         if(backBtn) {
