@@ -1030,7 +1030,7 @@ window.GameEvents.push({
         }
 
         // メッセージを作って画面にお知らせします
-        const msg = `${motoyasuClan.name}が${nobunagaClan.name}と同盟を締結しました！`;
+        const msg = `${motoyasuClan.name} が ${nobunagaClan.name} と同盟を締結しました！`;
         game.ui.log(`【イベント】清州同盟：${msg}`);
         await game.ui.showDialogAsync(msg, false, 0);
 
