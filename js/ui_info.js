@@ -48,6 +48,16 @@ class UIInfoManager {
     _renderCurrentModal() {
         const info = this.currentModalInfo;
         if (!info) return;
+
+        // ★枠を開くときの基本セット（ダミータブの仕込み）
+        const tabsEl = document.getElementById('selector-tabs');
+        if (tabsEl) {
+            tabsEl.classList.remove('hidden');
+            tabsEl.style.justifyContent = 'flex-start';
+            tabsEl.style.paddingLeft = '10px';
+            tabsEl.style.alignItems = 'flex-end';
+            tabsEl.innerHTML = '<div style="display: flex; gap: 5px;"><button class="busho-tab-btn active" style="cursor: default; pointer-events: none;">基本</button></div>';
+        }
         
         // どの画面を描くか判定して専用の魔法を呼び出します
         if (info.pageType === 'daimyo_list') this._renderDaimyoList(...info.args, info.scrollPos);
