@@ -58,6 +58,10 @@ class UIInfoManager {
         else if (info.pageType === 'diplo_list') this._renderDiplomacyList(...info.args, info.scrollPos);
         else if (info.pageType === 'faction_list') this._renderFactionList(...info.args, info.scrollPos);
         else if (info.pageType === 'princess_list') this._renderPrincessList(...info.args, info.scrollPos);
+        else if (info.pageType === 'delegate_list') this._renderDelegateList(...info.args, info.scrollPos);
+        else if (info.pageType === 'delegate_setting') this._renderDelegateSetting(...info.args, info.scrollPos);
+        else if (info.pageType === 'prisoner_list') this._renderPrisonerList(...info.args, info.scrollPos);
+        else if (info.pageType === 'history_list') this._renderHistoryList(...info.args, info.scrollPos);
     }
     
     showDaimyoList() {
@@ -667,31 +671,45 @@ class UIInfoManager {
     }
     
     showPrisonerModal(captives) {
-        if (!this.ui.prisonerModal) return;
-        this.ui.prisonerModal.classList.remove('hidden');
-        if (this.ui.prisonerList) {
-            this.ui.prisonerList.innerHTML = '';
+        this.closeCommonModal(); 
+        this.pushModal('prisoner_list', [captives]);
+    }
+
+    _renderPrisonerList(captives, scrollPos = 0) {
+        const modal = document.getElementById('selector-modal');
+        const titleEl = document.getElementById('selector-title');
+        const listContainer = document.getElementById('selector-list');
+        const contextEl = document.getElementById('selector-context-info');
+        const tabsEl = document.getElementById('selector-tabs');
+        const confirmBtn = document.getElementById('selector-confirm-btn');
+        const backBtn = document.querySelector('#selector-modal .btn-secondary');
+
+        if (!modal) return;
+        modal.classList.remove('hidden');
+        if (titleEl) titleEl.textContent = "捕虜処遇";
+        if (contextEl) contextEl.classList.add('hidden');
+        if (tabsEl) tabsEl.classList.add('hidden');
+        if (confirmBtn) confirmBtn.classList.add('hidden');
+
+        // 捕虜処遇は勝手に閉じられないように、戻るボタンを消しておきます
+        if(backBtn) {
+            backBtn.style.display = 'none'; 
+        }
+
+        const gunshi = this.game.getClanGunshi(this.game.playerClanId);
+        const myDaimyo = this.game.bushos.find(b => b.clan === this.game.playerClanId && b.isDaimyo);
+
+        let listHtml = '';
+        
+        captives.forEach((p, index) => {
+            let hireBtnHtml = p.hasRefusedHire ? 
+                `<button class="btn-primary" disabled style="opacity:0.5; background-color: #666;">拒否</button>` : 
+                `<button class="btn-primary" onclick="if(window.AudioManager) window.AudioManager.playSE('decision.ogg'); window.GameApp.warManager.handlePrisonerAction(${index}, 'hire')">登用</button>`;
             
-            const gunshi = this.game.getClanGunshi(this.game.playerClanId);
-            const myDaimyo = this.game.bushos.find(b => b.clan === this.game.playerClanId && b.isDaimyo);
+            const getStat = (stat) => GameSystem.getDisplayStatHTML(p, stat, gunshi, null, this.game.playerClanId, myDaimyo);
 
-            captives.forEach((p, index) => {
-                const div = document.createElement('div');
-                div.className = 'select-item';
-                div.style.display = 'flex';
-                div.style.justifyContent = 'space-between';
-                div.style.alignItems = 'center';
-                
-                let hireBtnHtml = '';
-                if (p.hasRefusedHire) {
-                    hireBtnHtml = `<button class="btn-primary" disabled style="opacity:0.5; background-color: #666;">拒否</button>`;
-                } else {
-                    hireBtnHtml = `<button class="btn-primary" onclick="window.GameApp.warManager.handlePrisonerAction(${index}, 'hire')">登用</button>`;
-                }
-                
-                const getStat = (stat) => GameSystem.getDisplayStatHTML(p, stat, gunshi, null, this.game.playerClanId, myDaimyo);
-
-                div.innerHTML = `
+            listHtml += `
+                <div class="select-item" style="display: flex; justify-content: space-between; align-items: center; padding: 10px;">
                     <div style="flex:1;">
                         <strong>${p.name}</strong> (${p.getRankName()})<br>
                         <div style="display:flex; gap:5px; align-items:center; margin-top:2px;">
@@ -700,17 +718,31 @@ class UIInfoManager {
                     </div>
                     <div style="display:flex; gap:5px;">
                         ${hireBtnHtml}
-                        <button class="btn-secondary" onclick="window.GameApp.warManager.handlePrisonerAction(${index}, 'release')">解放</button>
-                        <button class="btn-danger" onclick="window.GameApp.warManager.handlePrisonerAction(${index}, 'kill')">処断</button>
+                        <button class="btn-secondary" onclick="if(window.AudioManager) window.AudioManager.playSE('decision.ogg'); window.GameApp.warManager.handlePrisonerAction(${index}, 'release')">解放</button>
+                        <button class="btn-danger" onclick="if(window.AudioManager) window.AudioManager.playSE('decision.ogg'); window.GameApp.warManager.handlePrisonerAction(${index}, 'kill')">処断</button>
                     </div>
-                `;
-                this.ui.prisonerList.appendChild(div);
-            });
+                </div>
+            `;
+        });
+
+        if (listContainer) {
+            listContainer.className = 'list-container hide-native-scroll';
+            listContainer.style.display = 'block';
+            listContainer.innerHTML = listHtml;
+            if (window.CustomScrollbar) {
+                if (!this.ui.bushoScrollbar) this.ui.bushoScrollbar = new CustomScrollbar(listContainer);
+                setTimeout(() => {
+                    listContainer.scrollTop = scrollPos;
+                    this.ui.bushoScrollbar.update();
+                }, 10);
+            } else {
+                listContainer.scrollTop = scrollPos;
+            }
         }
     }
 
     closePrisonerModal() {
-        if(this.ui.prisonerModal) this.ui.prisonerModal.classList.add('hidden');
+        this.popModal(); 
     }
     
     showDaimyoPrisonerModal(prisoner) {
@@ -924,199 +956,194 @@ class UIInfoManager {
         this.selectedPrincessId = null; 
     }
     
+    
     // ==========================================
-    // ★ここから追加：城主委任リストの魔法（デザイン統一版）
+    // ★城主委任リストの魔法（共通モーダル対応版）
     // ==========================================
     showDelegateListModal() {
-        const modal = document.getElementById('delegate-list-modal');
-        const listEl = document.getElementById('delegate-list');
-        if (!modal || !listEl) return;
+        this.closeCommonModal(); 
+        this.pushModal('delegate_list', []);
+    }
 
-        // 大名のいる城（本拠地）を探します
-        const daimyo = this.game.bushos.find(b => b.clan === this.game.playerClanId && b.isDaimyo);
-        const daimyoCastleId = daimyo ? daimyo.castleId : -1;
+    _renderDelegateList(scrollPos = 0) {
+        const modal = document.getElementById('selector-modal');
+        const titleEl = document.getElementById('selector-title');
+        const listContainer = document.getElementById('selector-list');
+        const contextEl = document.getElementById('selector-context-info');
+        const tabsEl = document.getElementById('selector-tabs');
+        const confirmBtn = document.getElementById('selector-confirm-btn');
+        const backBtn = document.querySelector('#selector-modal .btn-secondary');
 
-        // 自分の城のリストを作成（大名のいる城は除外します）
-        const myCastles = this.game.castles.filter(c => c.ownerClan === this.game.playerClanId && c.id !== daimyoCastleId);
+        if (!modal) return;
+        modal.classList.remove('hidden');
+        if (titleEl) titleEl.textContent = "委任設定";
+        if (tabsEl) tabsEl.classList.add('hidden');
+        if (confirmBtn) confirmBtn.classList.add('hidden');
 
-        // 一括切替ボタンの魔法
-        const toggleAllBtn = document.getElementById('btn-toggle-all-delegate');
-        if (toggleAllBtn) {
-            // 今、リストにある城が「すべて委任状態」になっているか調べます
-            const isAllDelegated = myCastles.length > 0 && myCastles.every(c => c.isDelegated);
-            
-            if (isAllDelegated) {
-                toggleAllBtn.textContent = '一括';
-                toggleAllBtn.style.color = '#d32f2f';             // 文字を赤に
-                toggleAllBtn.style.backgroundColor = '#ffebee';   // 背景を薄い赤に
-                toggleAllBtn.style.borderColor = '#d32f2f';       // 枠線を赤に
-            } else {
-                toggleAllBtn.textContent = '一括';
-                toggleAllBtn.style.color = '#1976d2';             // 文字を青に
-                toggleAllBtn.style.backgroundColor = '#e3f2fd';   // 背景を薄い青に
-                toggleAllBtn.style.borderColor = '#1976d2';       // 枠線を青に
-            }
-
-            // ボタンを押した時の処理
-            toggleAllBtn.onclick = () => {
-                if (window.AudioManager) window.AudioManager.playSE('choice.ogg');
-                // 今が「すべて委任」なら全員「直轄(false)」に、それ以外なら全員「委任(true)」にします！
-                const newState = !isAllDelegated;
-                myCastles.forEach(c => c.isDelegated = newState);
-                // もう一度画面を描き直して更新します
-                this.showDelegateListModal();
+        if(backBtn) {
+            backBtn.style.display = '';
+            backBtn.textContent = this.modalHistory && this.modalHistory.length > 0 ? '戻る' : '閉じる';
+            backBtn.onclick = () => {
+                if (window.AudioManager) window.AudioManager.playSE('cancel.ogg');
+                this.popModal();
             };
+            const footer = backBtn.parentElement;
+            if (footer) footer.style.justifyContent = 'center';
         }
 
-        // リストの中身を作成（デザイン統一版）
-        let listHtml = '<div class="delegate-list-header"><span>拠点名</span><span>城攻</span><span>武将移動</span><span>状態</span></div>';
+        const daimyo = this.game.bushos.find(b => b.clan === this.game.playerClanId && b.isDaimyo);
+        const daimyoCastleId = daimyo ? daimyo.castleId : -1;
+        const myCastles = this.game.castles.filter(c => c.ownerClan === this.game.playerClanId && c.id !== daimyoCastleId);
+
+        const isAllDelegated = myCastles.length > 0 && myCastles.every(c => c.isDelegated);
+        let toggleBtnStyle = isAllDelegated ? "color:#d32f2f; background-color:#ffebee; border-color:#d32f2f;" : "color:#1976d2; background-color:#e3f2fd; border-color:#1976d2;";
+
+        if (contextEl) {
+            contextEl.classList.remove('hidden');
+            contextEl.innerHTML = `<button id="btn-toggle-all-delegate" class="btn-secondary btn-small" style="${toggleBtnStyle}">一括</button>`;
+            
+            const toggleAllBtn = document.getElementById('btn-toggle-all-delegate');
+            if (toggleAllBtn) {
+                toggleAllBtn.onclick = () => {
+                    if (window.AudioManager) window.AudioManager.playSE('choice.ogg');
+                    const newState = !isAllDelegated;
+                    myCastles.forEach(c => c.isDelegated = newState);
+                    this._renderDelegateList(listContainer.scrollTop);
+                };
+            }
+        }
+
+        let listHtml = '<div class="list-header delegate-list-header"><span>拠点名</span><span>城攻</span><span>武将移動</span><span>状態</span></div>';
 
         if (myCastles.length === 0) {
             listHtml += '<div style="padding: 10px; text-align: center;">委任できる城がありません。</div>';
         } else {
             myCastles.forEach(c => {
-                // 直轄なら赤っぽく、委任なら青っぽく文字色を変えます
                 const statusColor = c.isDelegated ? 'color:#1976d2;' : 'color:#d32f2f;';
                 const statusText = c.isDelegated ? '委任' : '直轄';
-                
                 const attackText = c.allowAttack ? '許可' : '不可';
                 const attackColor = c.allowAttack ? 'color:#1976d2;' : 'color:#555;';
-
                 const moveText = c.allowMove ? '許可' : '不可';
                 const moveColor = c.allowMove ? 'color:#1976d2;' : 'color:#555;';
-
-                // 直轄中は「城攻」「武将移動」は設定できないのでハイフンにする
                 const attackDisplay = c.isDelegated ? `<span style="${attackColor}">${attackText}</span>` : `<span style="color:#999;">-</span>`;
                 const moveDisplay = c.isDelegated ? `<span style="${moveColor}">${moveText}</span>` : `<span style="color:#999;">-</span>`;
 
-                listHtml += `<div class="delegate-list-item" onclick="if(window.AudioManager) window.AudioManager.playSE('choice.ogg'); window.GameApp.ui.info.showDelegateSettingModal(${c.id}, () => { window.GameApp.ui.info.showDelegateListModal(); })"><span class="col-castle-name" style="font-weight:bold; justify-content:flex-start; padding-left:5px;">${c.name}</span>${attackDisplay}${moveDisplay}<span style="font-weight:bold; ${statusColor}">${statusText}</span></div>`;
+                listHtml += `<div class="select-item delegate-list-item" style="cursor:pointer;" onclick="if(window.AudioManager) window.AudioManager.playSE('choice.ogg'); window.GameApp.ui.info.showDelegateSettingModal(${c.id})"><span class="col-castle-name" style="font-weight:bold; justify-content:flex-start; padding-left:5px;">${c.name}</span>${attackDisplay}${moveDisplay}<span style="font-weight:bold; ${statusColor}">${statusText}</span></div>`;
             });
-            
-            // 空の行を追加して見た目を整えます
             const itemCount = myCastles.length;
             for (let i = itemCount; i < 8; i++) {
-                listHtml += `<div class="delegate-list-item" style="cursor:default; pointer-events:none;"><span></span><span></span><span></span><span></span></div>`;
+                listHtml += `<div class="select-item delegate-list-item" style="cursor:default; pointer-events:none;"><span></span><span></span><span></span><span></span></div>`;
             }
         }
-        
-        listEl.innerHTML = listHtml;
-        if (listEl) listEl.scrollTop = 0;
-        modal.classList.remove('hidden');
+
+        if (listContainer) {
+            listContainer.className = 'list-container delegate-list-container hide-native-scroll';
+            listContainer.style.display = 'block';
+            listContainer.innerHTML = listHtml;
+            if (window.CustomScrollbar) {
+                if (!this.ui.bushoScrollbar) this.ui.bushoScrollbar = new CustomScrollbar(listContainer);
+                setTimeout(() => {
+                    listContainer.scrollTop = scrollPos;
+                    this.ui.bushoScrollbar.update();
+                }, 10);
+            } else {
+                listContainer.scrollTop = scrollPos;
+            }
+        }
     }
 
-    // 個別の「直轄・委任・詳細設定」画面を出す魔法
-    showDelegateSettingModal(castleId, onBack) {
-        // 城のIDからデータを探します
+    showDelegateSettingModal(castleId) {
+        this.pushModal('delegate_setting', [castleId]);
+    }
+
+    _renderDelegateSetting(castleId, scrollPos = 0) {
         const castle = this.game.castles.find(c => c.id === castleId);
         if (!castle) return;
 
-        const modal = document.getElementById('delegate-setting-modal');
-        const title = document.getElementById('delegate-setting-title');
-        const btnDirect = document.getElementById('btn-direct-control');
-        const btnDelegate = document.getElementById('btn-delegate-control');
-        
-        // 詳細設定のボタンたち
-        const optionsDiv = document.getElementById('delegate-options');
-        const btnAttackDeny = document.getElementById('btn-attack-deny');
-        const btnAttackAllow = document.getElementById('btn-attack-allow');
-        const btnMoveDeny = document.getElementById('btn-move-deny');
-        const btnMoveAllow = document.getElementById('btn-move-allow');
+        const modal = document.getElementById('selector-modal');
+        const titleEl = document.getElementById('selector-title');
+        const listContainer = document.getElementById('selector-list');
+        const contextEl = document.getElementById('selector-context-info');
+        const tabsEl = document.getElementById('selector-tabs');
+        const confirmBtn = document.getElementById('selector-confirm-btn');
+        const backBtn = document.querySelector('#selector-modal .btn-secondary');
 
-        if (!modal || !title || !btnDirect || !btnDelegate) return;
+        if (!modal) return;
+        modal.classList.remove('hidden');
+        if (titleEl) titleEl.textContent = `${castle.name} の委任設定`;
+        if (contextEl) contextEl.classList.add('hidden');
+        if (tabsEl) tabsEl.classList.add('hidden');
+        if (confirmBtn) confirmBtn.classList.add('hidden');
 
-        title.textContent = `${castle.name} の委任設定`;
-
-        // ボタンの色や状態を更新する魔法
-        const updateButtons = () => {
-            // ① 直轄か委任かの表示
-            if (castle.isDelegated) {
-                btnDelegate.classList.add('active');
-                btnDirect.classList.remove('active');
-                
-                // 委任中は詳細設定を選べるようにします
-                optionsDiv.style.opacity = '1';
-                btnAttackDeny.disabled = false;
-                btnAttackAllow.disabled = false;
-                btnMoveDeny.disabled = false;
-                btnMoveAllow.disabled = false;
-            } else {
-                btnDirect.classList.add('active');
-                btnDelegate.classList.remove('active');
-                
-                // 直轄中は詳細設定を選べないように（半透明に）します
-                optionsDiv.style.opacity = '0.5';
-                btnAttackDeny.disabled = true;
-                btnAttackAllow.disabled = true;
-                btnMoveDeny.disabled = true;
-                btnMoveAllow.disabled = true;
-            }
-
-            // ② 城攻の設定表示
-            if (castle.allowAttack) {
-                btnAttackAllow.classList.add('active-allow');
-                btnAttackAllow.classList.remove('active');
-                btnAttackDeny.classList.remove('active', 'active-allow');
-            } else {
-                btnAttackDeny.classList.add('active');
-                btnAttackDeny.classList.remove('active-allow');
-                btnAttackAllow.classList.remove('active', 'active-allow');
-            }
-
-            // ③ 武将移動の設定表示
-            if (castle.allowMove) {
-                btnMoveAllow.classList.add('active-allow');
-                btnMoveAllow.classList.remove('active');
-                btnMoveDeny.classList.remove('active', 'active-allow');
-            } else {
-                btnMoveDeny.classList.add('active');
-                btnMoveDeny.classList.remove('active-allow');
-                btnMoveAllow.classList.remove('active', 'active-allow');
-            }
-        };
-
-        updateButtons(); // 画面を開いた時の色をセット
-
-        // それぞれのボタンを押した時の処理
-        btnDirect.onclick = () => {
-            if (window.AudioManager) window.AudioManager.playSE('choice.ogg');
-            castle.isDelegated = false;
-            updateButtons();
-        };
-        btnDelegate.onclick = () => {
-            if (window.AudioManager) window.AudioManager.playSE('choice.ogg');
-            castle.isDelegated = true;
-            updateButtons();
-        };
-        btnAttackDeny.onclick = () => {
-            if (window.AudioManager) window.AudioManager.playSE('choice.ogg');
-            castle.allowAttack = false;
-            updateButtons();
-        };
-        btnAttackAllow.onclick = () => {
-            if (window.AudioManager) window.AudioManager.playSE('choice.ogg');
-            castle.allowAttack = true;
-            updateButtons();
-        };
-        btnMoveDeny.onclick = () => {
-            if (window.AudioManager) window.AudioManager.playSE('choice.ogg');
-            castle.allowMove = false;
-            updateButtons();
-        };
-        btnMoveAllow.onclick = () => {
-            if (window.AudioManager) window.AudioManager.playSE('choice.ogg');
-            castle.allowMove = true;
-            updateButtons();
-        };
-
-        const backBtn = modal.querySelector('.btn-secondary');
-        if (backBtn) {
+        if(backBtn) {
+            backBtn.style.display = '';
+            backBtn.textContent = this.modalHistory && this.modalHistory.length > 0 ? '戻る' : '閉じる';
             backBtn.onclick = () => {
-                modal.classList.add('hidden');
-                if (onBack) onBack(); // 戻るボタンで一覧画面に戻ります
+                if (window.AudioManager) window.AudioManager.playSE('cancel.ogg');
+                this.popModal();
             };
+            const footer = backBtn.parentElement;
+            if (footer) footer.style.justifyContent = 'center';
         }
 
-        modal.classList.remove('hidden');
+        if (listContainer) {
+            listContainer.className = 'list-container hide-native-scroll';
+            listContainer.style.display = 'block';
+            listContainer.innerHTML = `
+                <div style="padding: 20px; text-align: center;">
+                    <div style="margin: 20px 0; display: flex; justify-content: center; gap: 20px;">
+                        <button id="btn-direct-control" class="delegate-btn ${!castle.isDelegated ? 'active' : ''}">直轄</button>
+                        <button id="btn-delegate-control" class="delegate-btn ${castle.isDelegated ? 'active' : ''}">委任</button>
+                    </div>
+                    
+                    <div id="delegate-options" style="margin-bottom: 20px; padding: 15px; background: #f9f9f9; border-radius: 8px; text-align: left; opacity: ${castle.isDelegated ? '1' : '0.5'}; transition: opacity 0.3s;">
+                        <div style="margin-bottom: 15px;">
+                            <span style="font-weight: bold; display: inline-block; width: 100px;">城攻め：</span>
+                            <button id="btn-attack-deny" class="delegate-sub-btn ${!castle.allowAttack ? 'active' : ''}" ${!castle.isDelegated ? 'disabled' : ''}>不可</button>
+                            <button id="btn-attack-allow" class="delegate-sub-btn ${castle.allowAttack ? 'active-allow' : ''}" ${!castle.isDelegated ? 'disabled' : ''}>許可</button>
+                        </div>
+                        <div>
+                            <span style="font-weight: bold; display: inline-block; width: 100px;">武将移動：</span>
+                            <button id="btn-move-deny" class="delegate-sub-btn ${!castle.allowMove ? 'active' : ''}" ${!castle.isDelegated ? 'disabled' : ''}>不可</button>
+                            <button id="btn-move-allow" class="delegate-sub-btn ${castle.allowMove ? 'active-allow' : ''}" ${!castle.isDelegated ? 'disabled' : ''}>許可</button>
+                        </div>
+                    </div>
+                </div>
+            `;
+
+            const updateView = () => this._renderDelegateSetting(castleId, listContainer.scrollTop);
+
+            document.getElementById('btn-direct-control').onclick = () => {
+                if (window.AudioManager) window.AudioManager.playSE('choice.ogg');
+                castle.isDelegated = false;
+                updateView();
+            };
+            document.getElementById('btn-delegate-control').onclick = () => {
+                if (window.AudioManager) window.AudioManager.playSE('choice.ogg');
+                castle.isDelegated = true;
+                updateView();
+            };
+            document.getElementById('btn-attack-deny').onclick = () => {
+                if (window.AudioManager) window.AudioManager.playSE('choice.ogg');
+                castle.allowAttack = false;
+                updateView();
+            };
+            document.getElementById('btn-attack-allow').onclick = () => {
+                if (window.AudioManager) window.AudioManager.playSE('choice.ogg');
+                castle.allowAttack = true;
+                updateView();
+            };
+            document.getElementById('btn-move-deny').onclick = () => {
+                if (window.AudioManager) window.AudioManager.playSE('choice.ogg');
+                castle.allowMove = false;
+                updateView();
+            };
+            document.getElementById('btn-move-allow').onclick = () => {
+                if (window.AudioManager) window.AudioManager.playSE('choice.ogg');
+                castle.allowMove = true;
+                updateView();
+            };
+        }
     }
     
     // ==========================================
@@ -1557,8 +1584,13 @@ class UIInfoManager {
         }
 
         if (document.getElementById('selector-title')) {
-            if (isViewMode) document.getElementById('selector-title').textContent = "武将一覧";
-            else document.getElementById('selector-title').textContent = isMulti ? "武将を選択（複数可）" : "武将を選択"; 
+            if (extraData && extraData.customTitle) {
+                document.getElementById('selector-title').textContent = extraData.customTitle;
+            } else if (isViewMode) {
+                document.getElementById('selector-title').textContent = "武将一覧";
+            } else {
+                document.getElementById('selector-title').textContent = isMulti ? "武将を選択（複数可）" : "武将を選択"; 
+            }
         }
 
         let isEnemyTarget = false;
@@ -1900,7 +1932,7 @@ class UIInfoManager {
                 
                 let isSelectable = !b.isActionDone; 
                 if (extraData && extraData.allowDone) isSelectable = true; 
-                if (['appoint','employ_target','appoint_gunshi','rumor_target_busho','headhunt_target','interview','interview_target','reward','view_only','war_general', 'kunishu_war_general', 'all_busho_list', 'marriage_princess', 'marriage_kinsman'].includes(actionType)) isSelectable = true;
+                if (['appoint','employ_target','appoint_gunshi','rumor_target_busho','headhunt_target','interview','interview_target','reward','view_only','war_general', 'kunishu_war_general', 'all_busho_list', 'marriage_princess', 'marriage_kinsman', 'succession'].includes(actionType)) isSelectable = true;
                 if (['def_intercept_deploy', 'def_reinf_deploy', 'atk_reinf_deploy'].includes(actionType)) isSelectable = true;
                 
                 let currentAcc = null;
@@ -3006,4 +3038,66 @@ class UIInfoManager {
             onConfirm(finalAssignments);
         };
     }
+    
+    // ==========================================
+    // ★行動履歴の魔法（共通モーダル対応版）
+    // ==========================================
+    showHistoryModal(historyList = []) {
+        this.closeCommonModal();
+        this.pushModal('history_list', [historyList]);
+    }
+
+    _renderHistoryList(historyList, scrollPos = 0) {
+        const modal = document.getElementById('selector-modal');
+        const titleEl = document.getElementById('selector-title');
+        const listContainer = document.getElementById('selector-list');
+        const contextEl = document.getElementById('selector-context-info');
+        const tabsEl = document.getElementById('selector-tabs');
+        const confirmBtn = document.getElementById('selector-confirm-btn');
+        const backBtn = document.querySelector('#selector-modal .btn-secondary');
+
+        if (!modal) return;
+        modal.classList.remove('hidden');
+        if (titleEl) titleEl.textContent = "行動履歴";
+        if (contextEl) contextEl.classList.add('hidden');
+        if (tabsEl) tabsEl.classList.add('hidden');
+        if (confirmBtn) confirmBtn.classList.add('hidden');
+
+        if(backBtn) {
+            backBtn.style.display = '';
+            backBtn.textContent = '閉じる';
+            backBtn.onclick = () => {
+                if (window.AudioManager) window.AudioManager.playSE('cancel.ogg');
+                this.popModal();
+            };
+            const footer = backBtn.parentElement;
+            if (footer) footer.style.justifyContent = 'center';
+        }
+
+        let listHtml = '';
+        if (!historyList || historyList.length === 0) {
+            listHtml = '<div style="padding: 10px; text-align: center;">履歴がありません。</div>';
+        } else {
+            historyList.forEach(log => {
+                const text = typeof log === 'string' ? log : (log.text || "");
+                listHtml += `<div class="select-item" style="padding: 10px; border-bottom: 1px solid #ddd; justify-content: flex-start;">${text}</div>`;
+            });
+        }
+
+        if (listContainer) {
+            listContainer.className = 'list-container hide-native-scroll';
+            listContainer.style.display = 'block';
+            listContainer.innerHTML = listHtml;
+            if (window.CustomScrollbar) {
+                if (!this.ui.bushoScrollbar) this.ui.bushoScrollbar = new CustomScrollbar(listContainer);
+                setTimeout(() => {
+                    listContainer.scrollTop = scrollPos;
+                    this.ui.bushoScrollbar.update();
+                }, 10);
+            } else {
+                listContainer.scrollTop = scrollPos;
+            }
+        }
+    }
+    
 }
