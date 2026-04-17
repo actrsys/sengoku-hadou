@@ -2189,7 +2189,7 @@ body.is-pc.daimyo-select-mode #pc-new-ui-container { display: none !important; }
 }
 
 /* ★ 武将一覧・拠点一覧など、全てのタブグループで横並びになるようにします */
-#selector-tabs, #kyoten-tabs, #kyoten-scope-tabs, #unified-tabs {
+#selector-tabs, #kyoten-tabs, #kyoten-scope-tabs {
     display: flex;
     gap: 4px;
     align-items: flex-end;
