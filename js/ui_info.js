@@ -44,19 +44,41 @@ class UIInfoManager {
         this.currentModalInfo = this.modalHistory.pop();
         this._renderCurrentModal();
     }
-
+    
     _renderCurrentModal() {
         const info = this.currentModalInfo;
         if (!info) return;
 
-        // ★枠を開くときの基本セット（ダミータブの仕込み）
+        // ★ここで「情報系画面」かどうかをタグ付け（判定）します
+        // （委任設定の個別画面もリストではないので情報系扱いにしています）
+        const isInfoScreen = ['daimyo_detail', 'busho_detail', 'delegate_setting'].includes(info.pageType);
+
+        // ★枠の大元で、スライダーの有効/無効を一括管理します
+        const listContainer = document.getElementById('selector-list');
+        if (listContainer) {
+            if (isInfoScreen) {
+                listContainer.style.overflow = 'hidden'; // スクロール禁止
+                if (window.CustomScrollbar && this.ui.bushoScrollbar) {
+                    if (typeof this.ui.bushoScrollbar.destroy === 'function') this.ui.bushoScrollbar.destroy();
+                    this.ui.bushoScrollbar = null;
+                }
+            } else {
+                listContainer.style.overflow = ''; // スクロール許可
+            }
+        }
+
+        // ★枠の大元で、タブの表示/非表示（ダミータブ）を一括管理します
         const tabsEl = document.getElementById('selector-tabs');
         if (tabsEl) {
-            tabsEl.classList.remove('hidden');
-            tabsEl.style.justifyContent = 'flex-start';
-            tabsEl.style.paddingLeft = '10px';
-            tabsEl.style.alignItems = 'flex-end';
-            tabsEl.innerHTML = '<div style="display: flex; gap: 5px;"><button class="busho-tab-btn active" style="cursor: default; pointer-events: none;">基本</button></div>';
+            if (isInfoScreen) {
+                tabsEl.classList.add('hidden');
+            } else {
+                tabsEl.classList.remove('hidden');
+                tabsEl.style.justifyContent = 'flex-start';
+                tabsEl.style.paddingLeft = '10px';
+                tabsEl.style.alignItems = 'flex-end';
+                tabsEl.innerHTML = '<div style="display: flex; gap: 5px;"><button class="busho-tab-btn active" style="cursor: default; pointer-events: none;">基本</button></div>';
+            }
         }
         
         // どの画面を描くか判定して専用の魔法を呼び出します
