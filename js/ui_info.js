@@ -49,6 +49,11 @@ class UIInfoManager {
         const info = this.currentModalInfo;
         if (!info) return;
 
+        // ★他の画面を開いた時に履歴モードが残らないようにお掃除します
+        if (this.ui && this.ui.selectorModal) {
+            this.ui.selectorModal.classList.remove('history-mode');
+        }
+
         // ★ここで「情報系画面」かどうかをタグ付け（判定）します
         // （委任設定の個別画面もリストではないので情報系扱いにしています）
         const isInfoScreen = ['daimyo_detail', 'busho_detail', 'delegate_setting'].includes(info.pageType);
