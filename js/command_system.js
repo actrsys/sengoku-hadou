@@ -890,10 +890,10 @@ class CommandSystem {
                 if(f) f.click(); 
                 break;
             case 'history': 
-                if (this.game.ui.infoManager) {
-                    this.game.ui.infoManager.pushModal('history', this.game.history);
+                if (this.game.ui.info) {
+                    this.game.ui.info.showHistoryModal(this.game.ui.logHistory);
                 } else {
-                    this.game.ui.showHistoryModal();
+                    this.game.ui.showHistoryModal(this.game.ui.logHistory);
                 }
                 break;
             case 'daimyo_list': this.game.ui.showDaimyoList(); break;
