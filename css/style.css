@@ -1306,30 +1306,26 @@ body:not(.is-pc) .daimyo-detail-value {
     font-size: 1rem;
     font-weight: bold;
     color: #fff;
-    background: rgba(0, 0, 0, 0.6);
-    border: 1px solid #d4af37;
+    background: linear-gradient(to bottom, rgba(60, 60, 60, 0.8) 0%, rgba(10, 10, 10, 0.9) 100%);
+    border: 2px solid #d4af37;
     border-radius: 4px;
     cursor: pointer;
     font-family: 'AbashiriMincho', serif;
     letter-spacing: 1px;
     text-shadow: 1px 1px 0 #000, -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000;
-    transition: transform 0.05s, background-color 0.2s, box-shadow 0.05s;
-    box-shadow: 0 4px 0 #8a6d23, 0 5px 10px rgba(0,0,0,0.5);
-    position: relative;
-    top: 0;
+    box-shadow: 0 4px 6px rgba(0,0,0,0.4), inset 0 1px 1px rgba(255,255,255,0.2);
+    transition: all 0.1s ease;
 }
 
 .daimyo-detail-action-btn:hover {
-    background: rgba(212, 175, 55, 0.3);
-    color: #ffd54f;
+    background: linear-gradient(to bottom, rgba(80, 80, 80, 0.9) 0%, rgba(20, 20, 20, 1) 100%);
     border-color: #ffd54f;
+    color: #ffd54f;
 }
 
 .daimyo-detail-action-btn:active {
-    /* âüÇµÇΩéûÇ…4pxâ∫Ç…â∫Ç∞ÇÈ */
-    transform: translateY(4px);
-    /* âeÇè¡Ç∑Ç±Ç∆Ç≈ÅAínñ Ç…ê›íuÇµÇΩÇÊÇ§Ç…å©ÇπÇÈ */
-    box-shadow: 0 0 0 #8a6d23, 0 1px 2px rgba(0,0,0,0.3);
+    transform: translateY(3px);
+    box-shadow: 0 1px 2px rgba(0,0,0,0.4), inset 0 2px 4px rgba(0,0,0,0.8);
 }
 
 /* =========================================================
