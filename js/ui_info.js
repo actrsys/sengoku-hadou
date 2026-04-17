@@ -49,11 +49,6 @@ class UIInfoManager {
         const info = this.currentModalInfo;
         if (!info) return;
 
-        // ★他の画面を開いた時に履歴モードが残らないようにお掃除します
-        if (this.ui && this.ui.selectorModal) {
-            this.ui.selectorModal.classList.remove('history-mode');
-        }
-
         // ★ここで「情報系画面」かどうかをタグ付け（判定）します
         // （委任設定の個別画面もリストではないので情報系扱いにしています）
         const isInfoScreen = ['daimyo_detail', 'busho_detail', 'delegate_setting'].includes(info.pageType);
@@ -3090,6 +3085,7 @@ class UIInfoManager {
         modal.classList.remove('hidden');
         if (titleEl) titleEl.textContent = "行動履歴";
         if (contextEl) contextEl.classList.add('hidden');
+        if (tabsEl) tabsEl.classList.add('hidden');
         if (confirmBtn) confirmBtn.classList.add('hidden');
 
         if(backBtn) {
@@ -3109,7 +3105,7 @@ class UIInfoManager {
         } else {
             historyList.forEach(log => {
                 const text = typeof log === 'string' ? log : (log.text || "");
-                listHtml += `<div class="select-item" style="padding: 10px; border-bottom: 1px solid #ddd; justify-content: flex-start;">${text}</div>`;
+                listHtml += `<div class="history-list-item">${text}</div>`;
             });
         }
 

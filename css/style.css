@@ -398,15 +398,15 @@ body.hide-daimyo-labels .daimyo-name-label { display: none !important; }
    UIコンポーネント（リスト・スクロール・ボタン・バッジ）
    ========================================================= */
 /* スクロールバー装飾 */
-.list-container::-webkit-scrollbar, .daimyo-list-container::-webkit-scrollbar, .result-body::-webkit-scrollbar, #divide-list::-webkit-scrollbar, .faction-list-container::-webkit-scrollbar, .princess-list-container::-webkit-scrollbar, .history-list-container::-webkit-scrollbar { width: 14px; height: 14px; -webkit-appearance: none; }
-.list-container::-webkit-scrollbar-track, .daimyo-list-container::-webkit-scrollbar-track, .result-body::-webkit-scrollbar-track, #divide-list::-webkit-scrollbar-track, .faction-list-container::-webkit-scrollbar-track, .princess-list-container::-webkit-scrollbar-track, .history-list-container::-webkit-scrollbar-track { background: #e0e0e0; border-left: 1px solid #ccc; }
-.list-container::-webkit-scrollbar-thumb, .daimyo-list-container::-webkit-scrollbar-thumb, .result-body::-webkit-scrollbar-thumb, #divide-list::-webkit-scrollbar-thumb, .faction-list-container::-webkit-scrollbar-thumb, .princess-list-container::-webkit-scrollbar-thumb, .history-list-container::-webkit-scrollbar-thumb { background: #78909c; border: 2px solid #e0e0e0; }
-.list-container::-webkit-scrollbar-thumb:hover, .daimyo-list-container::-webkit-scrollbar-thumb:hover, .result-body::-webkit-scrollbar-thumb:hover, #divide-list::-webkit-scrollbar-thumb:hover, .faction-list-container::-webkit-scrollbar-thumb:hover, .princess-list-container::-webkit-scrollbar-thumb:hover, .history-list-container::-webkit-scrollbar-thumb:hover { background: #546e7a; }
-.list-container::-webkit-scrollbar-button, .daimyo-list-container::-webkit-scrollbar-button, .result-body::-webkit-scrollbar-button, #divide-list::-webkit-scrollbar-button, .faction-list-container::-webkit-scrollbar-button, .princess-list-container::-webkit-scrollbar-button, .history-list-container::-webkit-scrollbar-button { display: none; }
-.list-container::-webkit-scrollbar-button:vertical:single-button, .daimyo-list-container::-webkit-scrollbar-button:vertical:single-button, .result-body::-webkit-scrollbar-button:vertical:single-button, #divide-list::-webkit-scrollbar-button:vertical:single-button, .faction-list-container::-webkit-scrollbar-button:vertical:single-button, .princess-list-container::-webkit-scrollbar-button:vertical:single-button, .history-list-container::-webkit-scrollbar-button:vertical:single-button { display: block; height: 14px; background-color: #e0e0e0; border: 1px solid #ccc; cursor: pointer; }
-.list-container::-webkit-scrollbar-button:vertical:single-button:decrement, .daimyo-list-container::-webkit-scrollbar-button:vertical:single-button:decrement, .result-body::-webkit-scrollbar-button:vertical:single-button:decrement, #divide-list::-webkit-scrollbar-button:vertical:single-button:decrement, .faction-list-container::-webkit-scrollbar-button:vertical:single-button:decrement, .princess-list-container::-webkit-scrollbar-button:vertical:single-button:decrement, .history-list-container::-webkit-scrollbar-button:vertical:single-button:decrement { background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 10 10"><polygon points="1,7 5,3 9,7" fill="%23555"/></svg>'); background-position: center; background-repeat: no-repeat; }
-.list-container::-webkit-scrollbar-button:vertical:single-button:increment, .daimyo-list-container::-webkit-scrollbar-button:vertical:single-button:increment, .result-body::-webkit-scrollbar-button:vertical:single-button:increment, #divide-list::-webkit-scrollbar-button:vertical:single-button:increment, .faction-list-container::-webkit-scrollbar-button:vertical:single-button:increment, .princess-list-container::-webkit-scrollbar-button:vertical:single-button:increment, .history-list-container::-webkit-scrollbar-button:vertical:single-button:increment { background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 10 10"><polygon points="1,3 5,7 9,3" fill="%23555"/></svg>'); background-position: center; background-repeat: no-repeat; }
-.list-container::-webkit-scrollbar-button:hover, .daimyo-list-container::-webkit-scrollbar-button:hover, .result-body::-webkit-scrollbar-button:hover, #divide-list::-webkit-scrollbar-button:hover, .faction-list-container::-webkit-scrollbar-button:hover, .princess-list-container::-webkit-scrollbar-button:hover, .history-list-container::-webkit-scrollbar-button:hover { background-color: #cfd8dc; }
+.list-container::-webkit-scrollbar, .daimyo-list-container::-webkit-scrollbar, .result-body::-webkit-scrollbar, #divide-list::-webkit-scrollbar, .faction-list-container::-webkit-scrollbar, .princess-list-container::-webkit-scrollbar { width: 14px; height: 14px; -webkit-appearance: none; }
+.list-container::-webkit-scrollbar-track, .daimyo-list-container::-webkit-scrollbar-track, .result-body::-webkit-scrollbar-track, #divide-list::-webkit-scrollbar-track, .faction-list-container::-webkit-scrollbar-track, .princess-list-container::-webkit-scrollbar-track { background: #e0e0e0; border-left: 1px solid #ccc; }
+.list-container::-webkit-scrollbar-thumb, .daimyo-list-container::-webkit-scrollbar-thumb, .result-body::-webkit-scrollbar-thumb, #divide-list::-webkit-scrollbar-thumb, .faction-list-container::-webkit-scrollbar-thumb, .princess-list-container::-webkit-scrollbar-thumb { background: #78909c; border: 2px solid #e0e0e0; }
+.list-container::-webkit-scrollbar-thumb:hover, .daimyo-list-container::-webkit-scrollbar-thumb:hover, .result-body::-webkit-scrollbar-thumb:hover, #divide-list::-webkit-scrollbar-thumb:hover, .faction-list-container::-webkit-scrollbar-thumb:hover, .princess-list-container::-webkit-scrollbar-thumb:hover { background: #546e7a; }
+.list-container::-webkit-scrollbar-button, .daimyo-list-container::-webkit-scrollbar-button, .result-body::-webkit-scrollbar-button, #divide-list::-webkit-scrollbar-button, .faction-list-container::-webkit-scrollbar-button, .princess-list-container::-webkit-scrollbar-button { display: none; }
+.list-container::-webkit-scrollbar-button:vertical:single-button, .daimyo-list-container::-webkit-scrollbar-button:vertical:single-button, .result-body::-webkit-scrollbar-button:vertical:single-button, #divide-list::-webkit-scrollbar-button:vertical:single-button, .faction-list-container::-webkit-scrollbar-button:vertical:single-button, .princess-list-container::-webkit-scrollbar-button:vertical:single-button { display: block; height: 14px; background-color: #e0e0e0; border: 1px solid #ccc; cursor: pointer; }
+.list-container::-webkit-scrollbar-button:vertical:single-button:decrement, .daimyo-list-container::-webkit-scrollbar-button:vertical:single-button:decrement, .result-body::-webkit-scrollbar-button:vertical:single-button:decrement, #divide-list::-webkit-scrollbar-button:vertical:single-button:decrement, .faction-list-container::-webkit-scrollbar-button:vertical:single-button:decrement, .princess-list-container::-webkit-scrollbar-button:vertical:single-button:decrement { background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 10 10"><polygon points="1,7 5,3 9,7" fill="%23555"/></svg>'); background-position: center; background-repeat: no-repeat; }
+.list-container::-webkit-scrollbar-button:vertical:single-button:increment, .daimyo-list-container::-webkit-scrollbar-button:vertical:single-button:increment, .result-body::-webkit-scrollbar-button:vertical:single-button:increment, #divide-list::-webkit-scrollbar-button:vertical:single-button:increment, .faction-list-container::-webkit-scrollbar-button:vertical:single-button:increment, .princess-list-container::-webkit-scrollbar-button:vertical:single-button:increment { background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 10 10"><polygon points="1,3 5,7 9,3" fill="%23555"/></svg>'); background-position: center; background-repeat: no-repeat; }
+.list-container::-webkit-scrollbar-button:hover, .daimyo-list-container::-webkit-scrollbar-button:hover, .result-body::-webkit-scrollbar-button:hover, #divide-list::-webkit-scrollbar-button:hover, .faction-list-container::-webkit-scrollbar-button:hover, .princess-list-container::-webkit-scrollbar-button:hover { background-color: #cfd8dc; }
 
 /* スマホ用自作スクロールバーのための設定（改良版） */
 .scroll-wrapper { 
@@ -563,7 +563,7 @@ body.hide-daimyo-labels .daimyo-name-label { display: none !important; }
 
 /* リストベース */
 /* ★変更：外枠（.scroll-wrapper）の大きさにピッタリ追従するように設定します */
-.list-container, .daimyo-list-container, .faction-list-container, .princess-list-container, .history-list-container { 
+.list-container, .daimyo-list-container, .faction-list-container, .princess-list-container { 
     flex: 1; width: 100%; height: 100%; max-height: none; overflow-y: scroll; scroll-snap-type: y mandatory;
     border: none; box-shadow: none; border-radius: 0; /* ★ 外枠に任せるので全て消します */
     scroll-padding-top: 40px; box-sizing: border-box; -webkit-overflow-scrolling: auto; overscroll-behavior: none; 
@@ -896,29 +896,6 @@ body.hide-daimyo-labels .daimyo-name-label { display: none !important; }
 #result-modal .modal-content:has(.daimyo-list-container, .faction-list-container, .princess-list-container) {
     max-width: 800px !important;
     text-align: left !important;
-}
-
-/* =========================================================
-   行動履歴画面 専用スタイル
-   ========================================================= */
-#selector-modal.history-mode .modal-content {
-    height: 85vh;
-    max-height: 800px;
-    display: flex;
-    flex-direction: column;
-}
-
-#selector-modal.history-mode .scroll-wrapper {
-    flex: 1 1 auto;
-    min-height: 0;
-    max-height: none;
-}
-
-.history-list-container {
-    height: 100%;
-    max-height: none;
-    margin: 0;
-    padding: 0;
 }
 
 /* =========================================================
@@ -1956,7 +1933,7 @@ body.is-pc {
     /* PCリストレイアウト */
     /* ★変更：パソコン版用の高さに合わせて、外枠と中身をそれぞれ設定します */
     .scroll-wrapper { max-height: calc(44px * 9 + 28px); }
-    .list-container, .daimyo-list-container, .faction-list-container, .princess-list-container, .history-list-container { height: 100%; max-height: none; scroll-padding-top: 44px; }
+    .list-container, .daimyo-list-container, .faction-list-container, .princess-list-container { height: 100%; max-height: none; scroll-padding-top: 44px; }
     .list-header, .select-item { grid-template-columns: 45px 100px 60px repeat(6, 1fr); font-size: 0.85rem; height: 44px; }
     .list-header.view-mode, .select-item.view-mode { grid-template-columns: 100px 60px repeat(6, 1fr); }
     .daimyo-list-header, .daimyo-list-item { grid-template-columns: 80px 110px 50px 80px 80px 60px; font-size: 0.9rem; height: 44px; }
