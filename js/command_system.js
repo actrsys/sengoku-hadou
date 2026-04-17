@@ -889,7 +889,13 @@ class CommandSystem {
                 const f = document.getElementById('load-file-input'); 
                 if(f) f.click(); 
                 break;
-            case 'history': this.game.ui.showHistoryModal(); break;
+            case 'history': 
+                if (this.game.ui.infoManager) {
+                    this.game.ui.infoManager.pushModal('history', this.game.history);
+                } else {
+                    this.game.ui.showHistoryModal();
+                }
+                break;
             case 'daimyo_list': this.game.ui.showDaimyoList(); break;
             case 'faction_list': this.game.ui.showFactionList(this.game.playerClanId, true); break;
             case 'busho_list': this.game.ui.openBushoSelector('all_busho_list', null, null, null); break;
