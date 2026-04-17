@@ -325,6 +325,14 @@ class LifeSystem {
 
     // ★ 寿命のチェック（毎月行います）
     async checkDeath() {
+        // ★追加：ゲーム開始から3ヶ月（3ターン）未満なら、保護期間として誰も死なないようにします！
+        const startYear = this.game.startYear || window.MainParams.StartYear;
+        const startMonth = this.game.startMonth || window.MainParams.StartMonth || 1;
+        const elapsedTurns = ((this.game.year - startYear) * 12) + (this.game.month - startMonth);
+        if (elapsedTurns < 3) {
+            return; // 保護期間なので、ここでチェックをおしまいにします
+        }
+
         const currentYear = this.game.year;
         
         // 【変更点①】没年の「1年前（endYear - 1）」を迎えている武将を探すようにしました！
@@ -531,9 +539,15 @@ class LifeSystem {
             if (daimyo.clan === this.game.playerClanId) {
                 // プレイヤーが選ぶまで「待つ」魔法です
                 await new Promise(resolve => {
-                    this.game.ui.showSuccessionModal(allCandidates, (newLeaderId) => {
-                        successor = this.game.getBusho(newLeaderId);
-                        resolve();
+                    this.game.ui.info.openBushoSelector('succession', null, {
+                        customBushos: allCandidates,
+                        customTitle: "後継者を選択",
+                        hideCancel: true, // 逃げられないように戻るボタンを消します
+                        onConfirm: (selectedIds) => {
+                            // 選ばれたリストの1番目の人（[0]）を後継ぎにします
+                            successor = this.game.getBusho(selectedIds[0]);
+                            resolve();
+                        }
                     });
                 });
             } else {
