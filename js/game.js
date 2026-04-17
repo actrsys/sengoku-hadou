@@ -1284,9 +1284,9 @@ class GameManager {
         const isPlayerCastle = (ownerId === playerId);
 
         const isVisible = this.isCastleVisible(castle);
-        const isNeighbor = this.castles.some(c => Number(c.ownerClan) === playerId && GameSystem.isAdjacent(c, castle));
-        const isImportant = isVisible || isNeighbor;
-        
+            const isNeighbor = this.castles.some(c => Number(c.ownerClan) === playerId && GameSystem.isAdjacent(c, castle));
+            const isImportant = isVisible || isNeighbor;
+            
         // ==========================================
         // ★ここに追加：画面を動かしたり「ご命令ください」を出す前に、
         // 画面上のメッセージが全部終わるまでじっと待ちます！
@@ -1295,7 +1295,9 @@ class GameManager {
         }
         // ==========================================
         
-        if (isPlayerCastle || isImportant || this.currentIndex % 5 === 0) {
+        // ★超軽量化：AIのターン中はマップの再描画をストップします！
+        // プレイヤーの直轄城（手動操作）の時だけマップを綺麗に描き直すようにしました。
+        if (isPlayerCastle && !castle.isDelegated) {
             this.ui.renderMap();
         }
 
