@@ -54,6 +54,7 @@ class UIInfoManager {
         else if (info.pageType === 'daimyo_detail') this._renderDaimyoDetail(...info.args, info.scrollPos);
         else if (info.pageType === 'busho_selector') this._renderBushoSelector(...info.args, info.scrollPos);
         else if (info.pageType === 'busho_detail') this._renderBushoDetail(...info.args, info.scrollPos);
+        else if (info.pageType === 'kyoten_list') this._renderKyotenList(...info.args, info.scrollPos);
     }
     
     showDaimyoList() {
@@ -1070,112 +1071,102 @@ class UIInfoManager {
     // ★ここから追加：拠点一覧の魔法です！
     // ==========================================
     showKyotenList(clanId = null) {
-        const modal = document.getElementById('kyoten-list-modal');
-        const tabsEl = document.getElementById('kyoten-tabs');
-        const scopeTabsEl = document.getElementById('kyoten-scope-tabs');
-        if (!modal) return;
+        this.closeCommonModal(); 
+        this.pushModal('kyoten_list', [clanId]);
+    }
 
-        // 引数で勢力が指定されていればその勢力、なければプレイヤーの勢力として記憶します
+    _renderKyotenList(clanId, scrollPos = 0) {
+        const modal = document.getElementById('selector-modal');
+        const titleEl = document.getElementById('selector-title');
+        const listContainer = document.getElementById('selector-list');
+        const contextEl = document.getElementById('selector-context-info');
+        const tabsEl = document.getElementById('selector-tabs');
+        const confirmBtn = document.getElementById('selector-confirm-btn');
+        const backBtn = document.querySelector('#selector-modal .btn-secondary');
+
+        if (!modal) return;
+        modal.classList.remove('hidden');
+        if (titleEl) titleEl.textContent = "拠点一覧";
+        if (contextEl) contextEl.classList.add('hidden');
+        if (confirmBtn) confirmBtn.classList.add('hidden');
+
+        if(backBtn) {
+            backBtn.style.display = '';
+            backBtn.textContent = this.modalHistory && this.modalHistory.length > 0 ? '戻る' : '閉じる';
+            backBtn.onclick = () => {
+                if (window.AudioManager) window.AudioManager.playSE('cancel.ogg');
+                this.popModal();
+            };
+            const footer = backBtn.parentElement;
+            if (footer) footer.style.justifyContent = 'center';
+        }
+
         this.kyotenTargetClanId = clanId !== null ? clanId : this.game.playerClanId;
         
-        // 最初は「状態」タブ、「自家」タブを選んでいる状態にします
-        this.currentKyotenTab = 'status';
-        this.currentKyotenScope = 'clan';
-        
-        // ★追加：最初は並べ替えをしていない状態にします
-        this.currentKyotenSortKey = null;
-        this.isKyotenSortAsc = false;
-        
-        // 「自家/全国」タブの準備と切り替えの魔法
-        if (scopeTabsEl) {
-            // コマンドから呼ばれた時（勢力指定なし）だけ表示します
-            if (clanId === null) {
-                scopeTabsEl.classList.remove('hidden');
-                const scopeBtns = scopeTabsEl.querySelectorAll('.busho-scope-btn');
-                scopeBtns.forEach(btn => {
-                    btn.classList.remove('active');
-                    if (btn.getAttribute('data-scope') === 'clan') btn.classList.add('active');
-                    
-                    btn.onclick = () => {
-                        if (window.AudioManager) window.AudioManager.playSE('choice.ogg');
-                        scopeBtns.forEach(b => b.classList.remove('active'));
-                        btn.classList.add('active');
-                        this.currentKyotenScope = btn.getAttribute('data-scope');
-                        
-                        // ★追加：タブを切り替えたら並び順をリセットします
-                        this.currentKyotenSortKey = null;
-                        this.isKyotenSortAsc = false;
-                        
-                        this.updateKyotenCastles();
-                        this.renderKyotenList();
-                    };
-                });
-            } else {
-                // 勢力詳細から呼ばれた時はタブを隠します
-                scopeTabsEl.classList.add('hidden');
-            }
-        }
-        
-        // 最初にお城のリストを用意します
-        this.updateKyotenCastles();
+        if (!this.currentKyotenTab) this.currentKyotenTab = 'status';
+        if (!this.currentKyotenScope) this.currentKyotenScope = 'clan';
         
         if (tabsEl) {
+            tabsEl.classList.remove('hidden');
+            tabsEl.style.justifyContent = 'flex-start';
+            tabsEl.style.paddingLeft = '10px';
+            tabsEl.style.alignItems = 'flex-end';
+
+            let scopeHtml = '';
+            if (clanId === null) {
+                scopeHtml = `
+                    <div style="display: flex; gap: 5px; margin-left: 15px;">
+                        <button class="busho-scope-btn ${this.currentKyotenScope === 'clan' ? 'active' : ''}" data-scope="clan">自家</button>
+                        <button class="busho-scope-btn ${this.currentKyotenScope === 'all' ? 'active' : ''}" data-scope="all">全国</button>
+                    </div>
+                `;
+            }
+
+            tabsEl.innerHTML = `
+                <div style="display: flex; gap: 5px;">
+                    <button class="busho-tab-btn ${this.currentKyotenTab === 'status' ? 'active' : ''}" data-tab="status">基本</button>
+                    <button class="busho-tab-btn ${this.currentKyotenTab === 'military' ? 'active' : ''}" data-tab="military">軍事</button>
+                    <button class="busho-tab-btn ${this.currentKyotenTab === 'economy' ? 'active' : ''}" data-tab="economy">経済</button>
+                </div>
+                ${scopeHtml}
+            `;
+
             const tabBtns = tabsEl.querySelectorAll('.busho-tab-btn');
             tabBtns.forEach(btn => {
-                btn.classList.remove('active');
-                if (btn.getAttribute('data-tab') === 'status') btn.classList.add('active');
-                
                 btn.onclick = () => {
-                    // タブを押した時に音を鳴らします
                     if (window.AudioManager) window.AudioManager.playSE('choice.ogg');
-                    
-                    // すべてのタブの色を元に戻して、押したタブだけ色を変えます
-                    tabBtns.forEach(b => b.classList.remove('active'));
-                    btn.classList.add('active');
-                    
-                    // 今選んでいるタブを覚えて、リストを描き直します
                     this.currentKyotenTab = btn.getAttribute('data-tab');
-                    
-                    // ★追加：タブを切り替えたら並び順をリセットします
                     this.currentKyotenSortKey = null;
                     this.isKyotenSortAsc = false;
-                    
-                    this.renderKyotenList();
+                    this._renderKyotenList(clanId, listContainer.scrollTop);
+                };
+            });
+
+            const scopeBtns = tabsEl.querySelectorAll('.busho-scope-btn');
+            scopeBtns.forEach(btn => {
+                btn.onclick = () => {
+                    if (window.AudioManager) window.AudioManager.playSE('choice.ogg');
+                    this.currentKyotenScope = btn.getAttribute('data-scope');
+                    this.currentKyotenSortKey = null;
+                    this.isKyotenSortAsc = false;
+                    this._renderKyotenList(clanId, listContainer.scrollTop);
                 };
             });
         }
-        
-        this.renderKyotenList();
-        modal.classList.remove('hidden');
-    }
 
-    // 表示するお城のリストを更新する魔法
-    updateKyotenCastles() {
         if (this.currentKyotenScope === 'all') {
-            // 全国タブの時はすべてのお城を集めます
             this.kyotenCastles = this.game.castles;
         } else {
-            // 自家タブの時は、対象の勢力のお城だけを集めます
             this.kyotenCastles = this.game.castles.filter(c => c.ownerClan === this.kyotenTargetClanId);
         }
-    }
 
-    renderKyotenList() {
-        const listEl = document.getElementById('kyoten-list');
-        if (!listEl) return;
-        
-        // ★追加：描き直す前の「左右のスクロール位置」をメモしておきます
-        const currentScrollLeft = listEl.scrollLeft;
-        
-        // ★追加：表示用のお城リストを作り、並べ替えができるようにします
+        const currentScrollLeft = listContainer ? listContainer.scrollLeft : 0;
         let displayCastles = [...this.kyotenCastles];
 
-        // ★追加：並べ替え（ソート）の魔法
         if (this.currentKyotenSortKey) {
             displayCastles.sort((a, b) => {
                 let valA = 0, valB = 0;
 
-                // 共通の計算処理（並べ替え用）
                 const getClanYomi = (c) => { const cd = this.game.clans.find(cd => cd.id === c.ownerClan); return cd ? (cd.yomi || cd.name) : "んんん"; };
                 const getClanName = (c) => { const cd = this.game.clans.find(cd => cd.id === c.ownerClan); return cd ? cd.name : ""; };
                 const getCastellanYomi = (c) => { const cb = this.game.getBusho(c.castellanId); return cb ? (cb.yomi || cb.name) : "んんん"; };
@@ -1220,11 +1211,9 @@ class UIInfoManager {
                     case 'riceConsume': valA = getRiceConsume(a); valB = getRiceConsume(b); break;
                 }
 
-                // 文字列（名前など）の比較
                 if (typeof valA === 'string' && typeof valB === 'string') {
                     let cmp = this.isKyotenSortAsc ? valA.localeCompare(valB, 'ja') : valB.localeCompare(valA, 'ja');
                     if (cmp === 0) {
-                        // 読みが同じなら表示名で比較
                         const nameA = this.currentKyotenSortKey === 'clan' ? getClanName(a) : (this.currentKyotenSortKey === 'castellan' ? getCastellanName(a) : (this.currentKyotenSortKey === 'province' ? getProvinceName(a) : a.name));
                         const nameB = this.currentKyotenSortKey === 'clan' ? getClanName(b) : (this.currentKyotenSortKey === 'castellan' ? getCastellanName(b) : (this.currentKyotenSortKey === 'province' ? getProvinceName(b) : b.name));
                         cmp = this.isKyotenSortAsc ? nameA.localeCompare(nameB, 'ja') : nameB.localeCompare(nameA, 'ja');
@@ -1232,7 +1221,6 @@ class UIInfoManager {
                     return cmp;
                 }
                 
-                // 数値の比較
                 if (valA === valB) return 0;
                 return this.isKyotenSortAsc ? (valA - valB) : (valB - valA);
             });
@@ -1244,8 +1232,6 @@ class UIInfoManager {
         };
 
         let headerHtml = '';
-        
-        // ★変更：見出しに sortable-header を追加し、data-sort属性と矢印マーク（▲▼）をつけます
         if (this.currentKyotenTab === 'status') {
             headerHtml = `<div class="list-header sortable-header" style="grid-template-columns: 1.5fr 1.5fr 1.5fr 1fr 1fr 1fr 1fr;"><span data-sort="name" style="padding-left:5px; justify-content:flex-start;">拠点名${getSortMark('name')}</span><span data-sort="clan">勢力${getSortMark('clan')}</span><span data-sort="castellan">城主${getSortMark('castellan')}</span><span data-sort="province">国名${getSortMark('province')}</span><span data-sort="bushoCount">武将数${getSortMark('bushoCount')}</span><span data-sort="gold">金${getSortMark('gold')}</span><span data-sort="rice">兵糧${getSortMark('rice')}</span></div>`;
         } else if (this.currentKyotenTab === 'military') {
@@ -1256,7 +1242,6 @@ class UIInfoManager {
         
         let listHtml = headerHtml;
         
-        // ★変更：並べ替えたあとの displayCastles を使ってリストを作ります
         displayCastles.forEach(c => {
             const clanData = this.game.clans.find(cd => cd.id === c.ownerClan);
             const clanName = clanData ? clanData.name : "";
@@ -1266,21 +1251,17 @@ class UIInfoManager {
             let provinceName = "";
             if (this.game.provinces) {
                 const province = this.game.provinces.find(p => p.id === c.provinceId);
-                if (province) {
-                    provinceName = province.province;
-                }
+                if (province) provinceName = province.province;
             }
             
-            // お城にいる武将をまとめます
             const castleBushos = this.game.bushos.filter(b => b.castleId === c.id && b.status === 'active');
             const bushosCount = castleBushos.length;
             
-            // 金と兵糧の収入・支出をゲームのルール通りに計算します
             let riceIncome = GameSystem.calcBaseRiceIncome(c);
             let goldIncome = GameSystem.calcBaseGoldIncome(c);
 
             let consumeRice = Math.floor(c.soldiers * window.MainParams.Economy.ConsumeRicePerSoldier);
-            let consumeRiceYear = consumeRice * 12; // 年間の消費量に計算し直します
+            let consumeRiceYear = consumeRice * 12; 
             
             let consumeGold = 0;
             const daimyo = this.game.bushos.find(b => b.clan === c.ownerClan && b.isDaimyo);
@@ -1317,45 +1298,47 @@ class UIInfoManager {
             listHtml += `<div class="select-item" style="${dummyStyle} cursor:default; pointer-events:none;">${dummyCols}</div>`;
         }
         
-        listEl.innerHTML = listHtml;
+        if (listContainer) {
+            listContainer.className = 'list-container hide-native-scroll';
+            listContainer.style.display = 'block';
+            listContainer.innerHTML = listHtml;
 
-        // ★追加：見出しをクリックした時に並べ替えを実行する魔法
-        const headerSpans = listEl.querySelectorAll('.sortable-header span[data-sort]');
-        headerSpans.forEach(span => {
-            span.onclick = (e) => {
-                const key = e.currentTarget.getAttribute('data-sort');
-                if (!key) return;
-                if (window.AudioManager) window.AudioManager.playSE('choice.ogg');
-                
-                if (this.currentKyotenSortKey === key) {
-                    this.isKyotenSortAsc = !this.isKyotenSortAsc;
-                } else {
-                    this.currentKyotenSortKey = key;
-                    this.isKyotenSortAsc = false; // 基本は大きい順（降順）から始めます
+            const headerSpans = listContainer.querySelectorAll('.sortable-header span[data-sort]');
+            headerSpans.forEach(span => {
+                span.onclick = (e) => {
+                    const key = e.currentTarget.getAttribute('data-sort');
+                    if (!key) return;
+                    if (window.AudioManager) window.AudioManager.playSE('choice.ogg');
                     
-                    // 名前系の項目は小さい順（昇順）から始まる方が自然です
-                    if (['name', 'clan', 'castellan', 'province'].includes(key)) {
-                        this.isKyotenSortAsc = true;
+                    if (this.currentKyotenSortKey === key) {
+                        this.isKyotenSortAsc = !this.isKyotenSortAsc;
+                    } else {
+                        this.currentKyotenSortKey = key;
+                        this.isKyotenSortAsc = false;
+                        
+                        if (['name', 'clan', 'castellan', 'province'].includes(key)) {
+                            this.isKyotenSortAsc = true;
+                        }
                     }
-                }
-                this.renderKyotenList(); // リストを描き直します！
-            };
-        });
+                    this._renderKyotenList(clanId, listContainer.scrollTop); 
+                };
+            });
 
-        // リストを描き終わった後に、自作スクロールバーを呼び出して長さを合わせます
-        if (window.CustomScrollbar) {
-            if (!this.kyotenScrollbar) {
-                this.kyotenScrollbar = new CustomScrollbar(listEl);
+            if (window.CustomScrollbar) {
+                if (!this.ui.bushoScrollbar) {
+                    this.ui.bushoScrollbar = new CustomScrollbar(listContainer);
+                }
+                setTimeout(() => {
+                    listContainer.scrollTop = scrollPos;
+                    listContainer.scrollLeft = currentScrollLeft;
+                    this.ui.bushoScrollbar.update();
+                }, 10);
+            } else {
+                listContainer.scrollTop = scrollPos;
+                listContainer.scrollLeft = currentScrollLeft;
             }
-            setTimeout(() => {
-                // 縦スクロールは一番上に戻しますが、横スクロールはメモしておいた位置に戻します
-                listEl.scrollTop = 0;
-                listEl.scrollLeft = currentScrollLeft;
-                this.kyotenScrollbar.update();
-            }, 10);
         }
     }
-    // ==========================================
 
     // ==========================================
     // ★ここから追加：大名選択の確認画面の魔法！
