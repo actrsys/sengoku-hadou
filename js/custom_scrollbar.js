@@ -9,6 +9,9 @@ class CustomScrollbar {
         // 親が 'scroll-wrapper' じゃなければ、自動で枠を作って囲んであげる魔法！
         if (this.list.parentElement && this.list.parentElement.classList.contains('scroll-wrapper')) {
             this.wrapper = this.list.parentElement;
+            // 前に作られた古いバーやボタンの残骸があったら、すべてお掃除します！
+            const oldElements = this.wrapper.querySelectorAll('.custom-scrollbar-track, .custom-scrollbar-track-x, .custom-scrollbar-btn');
+            oldElements.forEach(el => el.remove());
         } else {
             this.wrapper = document.createElement('div');
             this.wrapper.className = 'scroll-wrapper';
@@ -89,7 +92,6 @@ class CustomScrollbar {
 
         // --- 縦のバーの更新 ---
         if (this.trackY && this.thumbY) {
-            const trackHeight = this.trackY.clientHeight || listHeight;
             if (scrollHeight <= listHeight) {
                 this.trackY.style.display = 'none';
                 if (this.btnUp) this.btnUp.style.display = 'none';
@@ -99,6 +101,8 @@ class CustomScrollbar {
                 this.trackY.style.display = 'block';
                 if (this.btnUp) this.btnUp.style.display = 'flex';
                 if (this.btnDown) this.btnDown.style.display = 'flex';
+                
+                const trackHeight = this.trackY.clientHeight || listHeight;
                 this.thumbY.style.pointerEvents = 'auto';
                 let thumbHeight = Math.max(40, (listHeight / scrollHeight) * trackHeight);
                 this.thumbY.style.height = `${thumbHeight}px`;
@@ -111,7 +115,6 @@ class CustomScrollbar {
 
         // --- 横のバーの更新 ---
         if (this.trackX && this.thumbX) {
-            const actualTrackWidth = this.trackX.clientWidth || listWidth;
             if (scrollWidth <= listWidth) {
                 this.trackX.style.display = 'none';
                 if (this.btnLeft) this.btnLeft.style.display = 'none';
@@ -120,6 +123,8 @@ class CustomScrollbar {
                 this.trackX.style.display = 'block';
                 if (this.btnLeft) this.btnLeft.style.display = 'flex';
                 if (this.btnRight) this.btnRight.style.display = 'flex';
+                
+                const actualTrackWidth = this.trackX.clientWidth || listWidth;
                 this.thumbX.style.pointerEvents = 'auto';
                 let thumbWidth = Math.max(40, (listWidth / scrollWidth) * actualTrackWidth);
                 this.thumbX.style.width = `${thumbWidth}px`;
