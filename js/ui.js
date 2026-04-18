@@ -946,7 +946,7 @@ class UIManager {
         // 情報専門の ui_info.js にまるごとお任せします
         this.info.showDaimyoConfirmModal(clanId, clanName, soldiers, leader, onStart);
     }
-    
+
     showCastleMenuModal(castle) {
         const modal = document.getElementById('castle-menu-modal');
         if (!modal) return;
@@ -967,12 +967,8 @@ class UIManager {
                 btnKunishu.style.display = ''; 
                 btnKunishu.onclick = () => {
                     modal.classList.add('hidden'); 
-                    this.showKunishuSelector(
-                        kunishus, 
-                        null, 
-                        () => { this.showCastleMenuModal(castle); },
-                        true 
-                    );
+                    // ★ここを書き換え：ui_info.jsの新しい魔法を呼びます！
+                    this.info.showKunishuList(kunishus, castle, () => { this.showCastleMenuModal(castle); });
                 };
             } else {
                 btnKunishu.style.display = 'none'; 
@@ -1796,113 +1792,6 @@ class UIManager {
                 modal.classList.add('hidden');
                 onSelect(selectedForce);
             };
-        }
-        
-        const cancelBtn = modal.querySelector('.btn-secondary');
-        if (cancelBtn) {
-            cancelBtn.onclick = () => {
-                if (listHeader) listHeader.style.display = ''; 
-                modal.classList.add('hidden');
-                if (onCancel) onCancel();
-            };
-        }
-        
-        modal.classList.remove('hidden');
-    }
-
-    // ---------------------------------------------------------
-    // 魔法②：諸勢力専用のリスト（空白なし完全版）
-    // ---------------------------------------------------------
-    showKunishuSelector(kunishus, onSelect, onCancel, isViewOnly = false) {
-        const modal = document.getElementById('selector-modal');
-        const list = document.getElementById('selector-list');
-        const contextInfo = document.getElementById('selector-context-info');
-        const confirmBtn = document.getElementById('selector-confirm-btn');
-        
-        // ★ここを追加：武将専用のタブをしっかり隠します！
-        const tabsEl = document.getElementById('selector-tabs');
-        if (tabsEl) tabsEl.classList.add('hidden');
-        
-        if (!modal || !list || !contextInfo) return;
-        
-        const title = document.getElementById('selector-title');
-        if (title) title.textContent = isViewOnly ? "諸勢力一覧" : "対象とする諸勢力を選択";
-
-        contextInfo.innerHTML = isViewOnly ? "<div>この城に存在する諸勢力です</div>" : "<div>対象とする諸勢力を選択してください</div>";
-        
-        const listHeader = modal.querySelector('.list-header');
-        if (listHeader) listHeader.style.display = 'none';
-
-        list.innerHTML = `
-            <div class="kunishu-list-header" style="grid-template-columns: 1.5fr 1fr 1fr 1.5fr;">
-                <span>勢力名</span><span>兵士</span><span>防御</span><span>友好度</span>
-            </div>
-        `;
-        
-        list.classList.remove('view-mode');
-        
-        let selectedKunishuId = null;
-        
-        kunishus.forEach(kunishu => {
-            const item = document.createElement('div');
-            item.className = 'kunishu-list-item';
-            item.style.gridTemplateColumns = '1.5fr 1fr 1fr 1.5fr';
-            
-            const kunishuName = kunishu.getName(this.game);
-            const relVal = kunishu.getRelation(this.game.playerClanId);
-            const relPercent = Math.min(100, Math.max(0, Number(relVal) || 0));
-            const friendBarHtml = `<div class="bar-bg bar-bg-friend"><div class="bar-fill bar-fill-friend" style="width:${relPercent}%;"></div></div>`;
-            
-            item.innerHTML = `<strong class="col-kunishu-name">${kunishuName}</strong><span>${kunishu.soldiers}</span><span>${kunishu.defense}</span><span>${friendBarHtml}</span>`;
-            
-            if (isViewOnly) {
-                item.style.cursor = 'default';
-            } else {
-                item.style.cursor = 'pointer';
-                item.onclick = () => {
-                    if (window.AudioManager) window.AudioManager.playSE('choice.ogg');
-                    Array.from(list.querySelectorAll('.kunishu-list-item')).forEach(c => c.classList.remove('selected'));
-                    item.classList.add('selected');
-                    selectedKunishuId = kunishu.id;
-                    
-                    if (confirmBtn) {
-                        confirmBtn.disabled = false;
-                        confirmBtn.style.opacity = 1.0;
-                    }
-                };
-            }
-            list.appendChild(item);
-        });
-        
-        const itemCount = kunishus.length;
-        for (let i = itemCount; i < 8; i++) {
-            const dummy = document.createElement('div');
-            dummy.className = 'kunishu-list-item';
-            dummy.style.gridTemplateColumns = '1.5fr 1fr 1fr 1.5fr';
-            dummy.style.cursor = 'default';
-            dummy.style.pointerEvents = 'none';
-            dummy.innerHTML = '<span></span><span></span><span></span><span></span>';
-            list.appendChild(dummy);
-        }
-        
-        if (confirmBtn) {
-            if (isViewOnly) {
-                confirmBtn.classList.add('hidden');
-            } else {
-                confirmBtn.classList.remove('hidden');
-                confirmBtn.disabled = true;
-                confirmBtn.style.opacity = 0.5;
-                
-                confirmBtn.onclick = () => {
-                    if (!selectedKunishuId) {
-                        this.showDialog("諸勢力を選択してください", false);
-                        return;
-                    }
-                    if (listHeader) listHeader.style.display = ''; 
-                    modal.classList.add('hidden');
-                    if (onSelect) onSelect(selectedKunishuId);
-                };
-            }
         }
         
         const cancelBtn = modal.querySelector('.btn-secondary');

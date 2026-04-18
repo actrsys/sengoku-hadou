@@ -93,6 +93,7 @@ class UIInfoManager {
         else if (info.pageType === 'delegate_setting') this._renderDelegateSetting(...info.args, info.scrollPos);
         else if (info.pageType === 'prisoner_list') this._renderPrisonerList(...info.args, info.scrollPos);
         else if (info.pageType === 'history_list') this._renderHistoryList(...info.args, info.scrollPos);
+        else if (info.pageType === 'kunishu_list') this._renderKunishuList(...info.args, info.scrollPos); // ★これを追加！
     }
     
     showDaimyoList() {
@@ -3047,6 +3048,101 @@ class UIInfoManager {
             this.ui.restoreAIGuard(); 
             onConfirm(finalAssignments);
         };
+    }
+
+    // ==========================================
+    // ★諸勢力一覧の魔法（共通モーダル対応版）
+    // ==========================================
+    showKunishuList(kunishus, castle, onBack) {
+        this.pushModal('kunishu_list', [kunishus, castle, onBack]);
+    }
+
+    _renderKunishuList(kunishus, castle, onBack, scrollPos = 0) {
+        const modal = document.getElementById('selector-modal');
+        const titleEl = document.getElementById('selector-title');
+        const listContainer = document.getElementById('selector-list');
+        const contextEl = document.getElementById('selector-context-info');
+        const tabsEl = document.getElementById('selector-tabs');
+        const confirmBtn = document.getElementById('selector-confirm-btn');
+        const backBtn = document.querySelector('#selector-modal .btn-secondary');
+
+        if (!modal) return;
+        modal.classList.remove('hidden');
+        if (titleEl) titleEl.textContent = "諸勢力一覧";
+        
+        if (contextEl) {
+            contextEl.classList.remove('hidden');
+            contextEl.innerHTML = `<div>${castle ? castle.name : ''} に存在する諸勢力です</div>`;
+        }
+        
+        if (tabsEl) {
+            tabsEl.classList.add('hidden'); // 諸勢力一覧ではタブは使いません
+        }
+        
+        if (confirmBtn) confirmBtn.classList.add('hidden'); // 閲覧専用なので決定ボタンは隠します
+
+        if(backBtn) {
+            backBtn.style.display = '';
+            backBtn.textContent = '戻る';
+            backBtn.onclick = () => {
+                if (window.AudioManager) window.AudioManager.playSE('cancel.ogg');
+                if (onBack) onBack();
+                this.popModal();
+            };
+            const footer = backBtn.parentElement;
+            if (footer) footer.style.justifyContent = 'center';
+        }
+
+        let listHtml = `
+            <div class="list-header kunishu-list-header view-mode">
+                <span style="padding-left:5px; justify-content:flex-start;">勢力名</span>
+                <span>兵士</span>
+                <span>防御</span>
+                <span>友好度</span>
+            </div>
+        `;
+        
+        kunishus.forEach(kunishu => {
+            const kunishuName = kunishu.getName(this.game);
+            const relVal = kunishu.getRelation(this.game.playerClanId);
+            const relPercent = Math.min(100, Math.max(0, Number(relVal) || 0));
+            const friendBarHtml = `<div class="bar-bg bar-bg-friend"><div class="bar-fill bar-fill-friend" style="width:${relPercent}%;"></div></div>`;
+            
+            // ★ここではまだクリックできない閲覧専用モードとして作ります
+            listHtml += `
+                <div class="select-item kunishu-list-item view-mode" style="cursor:default;">
+                    <strong class="col-kunishu-name">${kunishuName}</strong>
+                    <span>${kunishu.soldiers}</span>
+                    <span>${kunishu.defense}</span>
+                    <span>${friendBarHtml}</span>
+                </div>
+            `;
+        });
+        
+        const itemCount = kunishus.length;
+        for (let i = itemCount; i < 8; i++) {
+            listHtml += `
+                <div class="select-item kunishu-list-item view-mode" style="cursor:default; pointer-events:none;">
+                    <span></span><span></span><span></span><span></span>
+                </div>
+            `;
+        }
+
+        if (listContainer) {
+            listContainer.className = 'list-container kunishu-list-container hide-native-scroll';
+            listContainer.style.display = 'block';
+            listContainer.innerHTML = listHtml;
+            
+            if (window.CustomScrollbar) {
+                if (!this.ui.bushoScrollbar) this.ui.bushoScrollbar = new CustomScrollbar(listContainer);
+                setTimeout(() => {
+                    listContainer.scrollTop = scrollPos;
+                    this.ui.bushoScrollbar.update();
+                }, 10);
+            } else {
+                listContainer.scrollTop = scrollPos;
+            }
+        }
     }
     
     // ==========================================
