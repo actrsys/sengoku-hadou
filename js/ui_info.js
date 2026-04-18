@@ -3104,6 +3104,7 @@ class UIInfoManager {
                 <span style="padding-left:5px; justify-content:flex-start;">勢力名</span>
                 <span>頭領</span>
                 <span>所在</span>
+                <span>所属</span>
                 <span>兵士</span>
                 <span>友好度</span>
                 <span>関係</span>
@@ -3116,6 +3117,14 @@ class UIInfoManager {
             const leaderName = leader ? leader.name : "不明";
             const castleObj = this.game.getCastle(kunishu.castleId);
             const castleName = castleObj ? castleObj.name : "不明";
+            
+            // ★追加: 拠点から所属している国を調べて名前を割り出します
+            let provinceName = "不明";
+            if (castleObj && this.game.provinces) {
+                const province = this.game.provinces.find(p => p.id === castleObj.provinceId);
+                if (province) provinceName = province.province;
+            }
+
             const relVal = kunishu.getRelation(this.game.playerClanId);
             const relPercent = Math.min(100, Math.max(0, Number(relVal) || 0));
             const friendBarHtml = `<div class="bar-bg bar-bg-friend"><div class="bar-fill bar-fill-friend" style="width:${relPercent}%;"></div></div>`;
@@ -3131,6 +3140,7 @@ class UIInfoManager {
                     <strong class="col-kunishu-name">${kunishuName}</strong>
                     <span>${leaderName}</span>
                     <span>${castleName}</span>
+                    <span>${provinceName}</span>
                     <span>${kunishu.soldiers}</span>
                     <span>${friendBarHtml}</span>
                     <span style="${relColor} font-weight:bold;">${relStatus}</span>
@@ -3142,7 +3152,7 @@ class UIInfoManager {
         for (let i = itemCount; i < 8; i++) {
             listHtml += `
                 <div class="select-item kunishu-list-item view-mode" style="cursor:default; pointer-events:none;">
-                    <span></span><span></span><span></span><span></span><span></span><span></span>
+                    <span></span><span></span><span></span><span></span><span></span><span></span><span></span>
                 </div>
             `;
         }
