@@ -58,12 +58,12 @@ class UIInfoManager {
         if (listContainer) {
             if (isInfoScreen) {
                 listContainer.style.overflow = 'hidden'; // スクロール禁止
-                if (window.CustomScrollbar && this.ui.bushoScrollbar) {
-                    if (typeof this.ui.bushoScrollbar.destroy === 'function') this.ui.bushoScrollbar.destroy();
-                    this.ui.bushoScrollbar = null;
-                }
             } else {
                 listContainer.style.overflow = ''; // スクロール許可
+            }
+            // 状態が変わったことをスクロールバーに教えてあげて、自己管理させます
+            if (window.CustomScrollbar && this.ui.bushoScrollbar) {
+                this.ui.bushoScrollbar.update();
             }
         }
 
