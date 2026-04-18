@@ -131,8 +131,8 @@ class CustomScrollbar {
     }
     
     initEvents() {
-        // リスト本体のタッチ操作（軸固定用）
-        this.list.addEventListener('touchstart', (e) => {
+        // イベントを後から取り外せるように、お名前を付けておきます
+        this.onListTouchStart = (e) => {
             if (e.touches.length > 1) return; // 指２本以上の時は無視します
             this.lockAxis = null;
             this.startY = e.touches[0].clientY;
@@ -140,12 +140,10 @@ class CustomScrollbar {
             // 一度スクロール制限を解除しておきます
             this.list.style.overflowX = 'auto';
             this.list.style.overflowY = 'scroll';
-        }, { passive: true });
+        };
 
-        this.list.addEventListener('touchmove', (e) => {
+        this.onListTouchMove = (e) => {
             if (e.touches.length > 1) return;
-            
-            // すでに動かす方向（軸）が決まっている場合は何もしません
             if (this.lockAxis) return;
 
             const currentY = e.touches[0].clientY;
@@ -156,49 +154,45 @@ class CustomScrollbar {
             // 指が5ピクセル以上動いた時に、どっちに動かしたいのか判定します
             if (diffX > 5 || diffY > 5) {
                 this.lockAxis = diffX > diffY ? 'x' : 'y';
-                
-                // 動かさない方向のスクロールを一時的に禁止する魔法です！
                 if (this.lockAxis === 'x') {
                     this.list.style.overflowY = 'hidden';
                 } else if (this.lockAxis === 'y') {
                     this.list.style.overflowX = 'hidden';
                 }
             }
-        }, { passive: true });
+        };
 
-        // 指を離した時や、画面外に出た時にスクロール制限を元に戻します
-        const onListTouchEnd = () => {
+        this.onListTouchEnd = () => {
             this.lockAxis = null;
             this.list.style.overflowX = 'auto';
             this.list.style.overflowY = 'scroll';
         };
-        this.list.addEventListener('touchend', onListTouchEnd, { passive: true });
-        this.list.addEventListener('touchcancel', onListTouchEnd, { passive: true });
 
-        this.list.addEventListener('scroll', () => {
+        this.onListScroll = () => {
             if (!this.isDraggingY && !this.isDraggingX) this.update();
-        });
-        
+        };
+
         // 縦つまみのドラッグ操作
-        const onStartY = (e) => {
+        this.onStartY = (e) => {
             this.isDraggingY = true;
             this.thumbY.classList.add('dragging');
             this.startY = e.type.includes('touch') ? e.touches[0].clientY : e.clientY;
             this.startScrollTop = this.list.scrollTop;
             if (e.cancelable) e.preventDefault();
         };
-        const onMoveY = (e) => {
+        
+        this.onMoveY = (e) => {
             if (!this.isDraggingY) return;
             const currentY = e.type.includes('touch') ? e.touches[0].clientY : e.clientY;
             const deltaY = currentY - this.startY;
             
             const listHeight = this.list.clientHeight;
             const scrollHeight = this.list.scrollHeight;
-            const trackHeight = this.trackY.clientHeight || listHeight; // ★ここもトラックの高さにする魔法！
+            const trackHeight = this.trackY.clientHeight || listHeight; 
             const thumbHeight = parseFloat(this.thumbY.style.height);
             
             const maxScrollTop = scrollHeight - listHeight;
-            const maxThumbTop = trackHeight - thumbHeight; // ★トラックの高さを使います
+            const maxThumbTop = trackHeight - thumbHeight; 
             
             const scrollRatio = deltaY / maxThumbTop;
             this.list.scrollTop = this.startScrollTop + (scrollRatio * maxScrollTop);
@@ -207,15 +201,16 @@ class CustomScrollbar {
             if (e.cancelable) e.preventDefault();
         };
 
-        // ★横つまみのドラッグ操作（新しく追加！）
-        const onStartX = (e) => {
+        // 横つまみのドラッグ操作
+        this.onStartX = (e) => {
             this.isDraggingX = true;
             this.thumbX.classList.add('dragging');
             this.startX = e.type.includes('touch') ? e.touches[0].clientX : e.clientX;
             this.startScrollLeft = this.list.scrollLeft;
             if (e.cancelable) e.preventDefault();
         };
-        const onMoveX = (e) => {
+        
+        this.onMoveX = (e) => {
             if (!this.isDraggingX) return;
             const currentX = e.type.includes('touch') ? e.touches[0].clientX : e.clientX;
             const deltaX = currentX - this.startX;
@@ -235,35 +230,80 @@ class CustomScrollbar {
             if (e.cancelable) e.preventDefault();
         };
         
-        const onEnd = () => {
+        this.onEnd = () => {
             this.isDraggingY = false;
             this.isDraggingX = false;
             this.thumbY.classList.remove('dragging');
             this.thumbX.classList.remove('dragging');
         };
-        
-        this.thumbY.addEventListener('touchstart', onStartY, { passive: false });
-        this.thumbY.addEventListener('mousedown', onStartY);
 
-        this.thumbX.addEventListener('touchstart', onStartX, { passive: false });
-        this.thumbX.addEventListener('mousedown', onStartX);
+        this.onDocTouchMove = (e) => {
+            if (this.isDraggingY) this.onMoveY(e);
+            if (this.isDraggingX) this.onMoveX(e);
+        };
 
-        document.addEventListener('touchmove', (e) => {
-            if (this.isDraggingY) onMoveY(e);
-            if (this.isDraggingX) onMoveX(e);
-        }, { passive: false });
+        this.onDocMouseMove = (e) => {
+            if (this.isDraggingY) this.onMoveY(e);
+            if (this.isDraggingX) this.onMoveX(e);
+        };
         
-        document.addEventListener('mousemove', (e) => {
-            if (this.isDraggingY) onMoveY(e);
-            if (this.isDraggingX) onMoveX(e);
-        });
+        this.onWindowResize = () => this.update();
 
-        document.addEventListener('touchend', onEnd);
-        document.addEventListener('mouseup', onEnd);
+        // ここから実際にイベントを取り付けます
+        this.list.addEventListener('touchstart', this.onListTouchStart, { passive: true });
+        this.list.addEventListener('touchmove', this.onListTouchMove, { passive: true });
+        this.list.addEventListener('touchend', this.onListTouchEnd, { passive: true });
+        this.list.addEventListener('touchcancel', this.onListTouchEnd, { passive: true });
+        this.list.addEventListener('scroll', this.onListScroll);
         
-        window.addEventListener('resize', () => this.update());
+        this.thumbY.addEventListener('touchstart', this.onStartY, { passive: false });
+        this.thumbY.addEventListener('mousedown', this.onStartY);
+
+        this.thumbX.addEventListener('touchstart', this.onStartX, { passive: false });
+        this.thumbX.addEventListener('mousedown', this.onStartX);
+
+        document.addEventListener('touchmove', this.onDocTouchMove, { passive: false });
+        document.addEventListener('mousemove', this.onDocMouseMove);
+        document.addEventListener('touchend', this.onEnd);
+        document.addEventListener('mouseup', this.onEnd);
+        window.addEventListener('resize', this.onWindowResize);
+    }
+
+    // ★お片付けの魔法（これを呼ばれると、作ったバーやイベントを綺麗に消し去ります）
+    destroy() {
+        if (this.trackY) this.trackY.remove();
+        if (this.btnUp) this.btnUp.remove();
+        if (this.btnDown) this.btnDown.remove();
+        if (this.trackX) this.trackX.remove();
+        if (this.btnLeft) this.btnLeft.remove();
+        if (this.btnRight) this.btnRight.remove();
+        
+        this.list.classList.remove('hide-native-scroll');
+        
+        if (this.onListTouchStart) this.list.removeEventListener('touchstart', this.onListTouchStart);
+        if (this.onListTouchMove) this.list.removeEventListener('touchmove', this.onListTouchMove);
+        if (this.onListTouchEnd) {
+            this.list.removeEventListener('touchend', this.onListTouchEnd);
+            this.list.removeEventListener('touchcancel', this.onListTouchEnd);
+        }
+        if (this.onListScroll) this.list.removeEventListener('scroll', this.onListScroll);
+        
+        if (this.onStartY) {
+            this.thumbY.removeEventListener('touchstart', this.onStartY);
+            this.thumbY.removeEventListener('mousedown', this.onStartY);
+        }
+        if (this.onStartX) {
+            this.thumbX.removeEventListener('touchstart', this.onStartX);
+            this.thumbX.removeEventListener('mousedown', this.onStartX);
+        }
+
+        if (this.onDocTouchMove) document.removeEventListener('touchmove', this.onDocTouchMove);
+        if (this.onDocMouseMove) document.removeEventListener('mousemove', this.onDocMouseMove);
+        if (this.onEnd) {
+            document.removeEventListener('touchend', this.onEnd);
+            document.removeEventListener('mouseup', this.onEnd);
+        }
+        if (this.onWindowResize) window.removeEventListener('resize', this.onWindowResize);
     }
 }
-
-// ★ここが大事！これを書き忘れてごめんね！
 window.CustomScrollbar = CustomScrollbar;
