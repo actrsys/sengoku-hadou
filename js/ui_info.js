@@ -58,12 +58,12 @@ class UIInfoManager {
         if (listContainer) {
             if (isInfoScreen) {
                 listContainer.style.overflow = 'hidden'; // スクロール禁止
+                if (window.CustomScrollbar && this.ui.bushoScrollbar) {
+                    if (typeof this.ui.bushoScrollbar.destroy === 'function') this.ui.bushoScrollbar.destroy();
+                    this.ui.bushoScrollbar = null;
+                }
             } else {
                 listContainer.style.overflow = ''; // スクロール許可
-            }
-            // 状態が変わったことをスクロールバーに教えてあげて、自己管理させます
-            if (window.CustomScrollbar && this.ui.bushoScrollbar) {
-                this.ui.bushoScrollbar.update();
             }
         }
 
@@ -319,8 +319,15 @@ class UIInfoManager {
                 });
             };
 
-            // カスタムスクロールバーの再作成を防止し、スクロール位置の復元のみ行います
-            listContainer.scrollTop = scrollPos;
+            if (window.CustomScrollbar) {
+                if (!this.ui.bushoScrollbar) this.ui.bushoScrollbar = new CustomScrollbar(listContainer);
+                setTimeout(() => {
+                    listContainer.scrollTop = scrollPos;
+                    this.ui.bushoScrollbar.update();
+                }, 10);
+            } else {
+                listContainer.scrollTop = scrollPos;
+            }
         }
     }
 
@@ -680,8 +687,15 @@ class UIInfoManager {
                     </div>
                 </div>
             `;
-            // カスタムスクロールバーの再作成を防止し、スクロール位置の復元のみ行います
-            listContainer.scrollTop = scrollPos;
+            if (window.CustomScrollbar) {
+                if (!this.ui.bushoScrollbar) this.ui.bushoScrollbar = new CustomScrollbar(listContainer);
+                setTimeout(() => {
+                    listContainer.scrollTop = scrollPos;
+                    this.ui.bushoScrollbar.update();
+                }, 10);
+            } else {
+                listContainer.scrollTop = scrollPos;
+            }
         }
     }
     
@@ -1389,7 +1403,7 @@ class UIInfoManager {
         }
         
         if (listContainer) {
-            listContainer.className = 'list-container kyoten-list-container hide-native-scroll';
+            listContainer.className = 'list-container hide-native-scroll';
             listContainer.style.display = 'block';
             listContainer.innerHTML = listHtml;
 

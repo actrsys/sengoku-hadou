@@ -80,26 +80,6 @@ class CustomScrollbar {
     }
     
     update() {
-        const style = window.getComputedStyle(this.list);
-        if (style.display === 'none' || style.overflow === 'hidden' || style.overflowY === 'hidden') {
-            this.trackY.style.display = 'none';
-            this.btnUp.style.display = 'none';
-            this.btnDown.style.display = 'none';
-            this.trackX.style.display = 'none';
-            this.btnLeft.style.display = 'none';
-            this.btnRight.style.display = 'none';
-            this.wrapper.classList.add('hide-scrollbar-parts');
-            return;
-        } else {
-            this.trackY.style.display = '';
-            this.btnUp.style.display = '';
-            this.btnDown.style.display = '';
-            this.trackX.style.display = '';
-            this.btnLeft.style.display = '';
-            this.btnRight.style.display = '';
-            this.wrapper.classList.remove('hide-scrollbar-parts');
-        }
-
         const listHeight = this.list.clientHeight;
         const scrollHeight = this.list.scrollHeight;
         const listWidth = this.list.clientWidth;

@@ -397,16 +397,16 @@ body.hide-daimyo-labels .daimyo-name-label { display: none !important; }
 /* =========================================================
    UIコンポーネント（リスト・スクロール・ボタン・バッジ）
    ========================================================= */
-/* スクロールバー装飾（全体適用、hide-native-scroll以外） */
-.list-container::-webkit-scrollbar, .result-body::-webkit-scrollbar, #divide-list::-webkit-scrollbar, .scenario-desc-box::-webkit-scrollbar, .war-controls-desc::-webkit-scrollbar, .fw-floating-log::-webkit-scrollbar { width: 14px; height: 14px; -webkit-appearance: none; }
-.list-container::-webkit-scrollbar-track, .result-body::-webkit-scrollbar-track, #divide-list::-webkit-scrollbar-track, .scenario-desc-box::-webkit-scrollbar-track, .war-controls-desc::-webkit-scrollbar-track, .fw-floating-log::-webkit-scrollbar-track { background: #e0e0e0; border-left: 1px solid #ccc; }
-.list-container::-webkit-scrollbar-thumb, .result-body::-webkit-scrollbar-thumb, #divide-list::-webkit-scrollbar-thumb, .scenario-desc-box::-webkit-scrollbar-thumb, .war-controls-desc::-webkit-scrollbar-thumb, .fw-floating-log::-webkit-scrollbar-thumb { background: #78909c; border: 2px solid #e0e0e0; border-radius: 6px; }
-.list-container::-webkit-scrollbar-thumb:hover, .result-body::-webkit-scrollbar-thumb:hover, #divide-list::-webkit-scrollbar-thumb:hover, .scenario-desc-box::-webkit-scrollbar-thumb:hover, .war-controls-desc::-webkit-scrollbar-thumb:hover, .fw-floating-log::-webkit-scrollbar-thumb:hover { background: #546e7a; }
-.list-container::-webkit-scrollbar-button, .result-body::-webkit-scrollbar-button, #divide-list::-webkit-scrollbar-button, .scenario-desc-box::-webkit-scrollbar-button, .war-controls-desc::-webkit-scrollbar-button, .fw-floating-log::-webkit-scrollbar-button { display: none; }
-.list-container::-webkit-scrollbar-button:vertical:single-button, .result-body::-webkit-scrollbar-button:vertical:single-button, #divide-list::-webkit-scrollbar-button:vertical:single-button, .scenario-desc-box::-webkit-scrollbar-button:vertical:single-button, .war-controls-desc::-webkit-scrollbar-button:vertical:single-button, .fw-floating-log::-webkit-scrollbar-button:vertical:single-button { display: block; height: 14px; background-color: #e0e0e0; border: 1px solid #ccc; cursor: pointer; }
-.list-container::-webkit-scrollbar-button:vertical:single-button:decrement, .result-body::-webkit-scrollbar-button:vertical:single-button:decrement, #divide-list::-webkit-scrollbar-button:vertical:single-button:decrement, .scenario-desc-box::-webkit-scrollbar-button:vertical:single-button:decrement, .war-controls-desc::-webkit-scrollbar-button:vertical:single-button:decrement, .fw-floating-log::-webkit-scrollbar-button:vertical:single-button:decrement { background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 10 10"><polygon points="1,7 5,3 9,7" fill="%23555"/></svg>'); background-position: center; background-repeat: no-repeat; }
-.list-container::-webkit-scrollbar-button:vertical:single-button:increment, .result-body::-webkit-scrollbar-button:vertical:single-button:increment, #divide-list::-webkit-scrollbar-button:vertical:single-button:increment, .scenario-desc-box::-webkit-scrollbar-button:vertical:single-button:increment, .war-controls-desc::-webkit-scrollbar-button:vertical:single-button:increment, .fw-floating-log::-webkit-scrollbar-button:vertical:single-button:increment { background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 10 10"><polygon points="1,3 5,7 9,3" fill="%23555"/></svg>'); background-position: center; background-repeat: no-repeat; }
-.list-container::-webkit-scrollbar-button:hover, .result-body::-webkit-scrollbar-button:hover, #divide-list::-webkit-scrollbar-button:hover, .scenario-desc-box::-webkit-scrollbar-button:hover, .war-controls-desc::-webkit-scrollbar-button:hover, .fw-floating-log::-webkit-scrollbar-button:hover { background-color: #cfd8dc; }
+/* スクロールバー装飾 */
+.list-container::-webkit-scrollbar, .daimyo-list-container::-webkit-scrollbar, .result-body::-webkit-scrollbar, #divide-list::-webkit-scrollbar, .faction-list-container::-webkit-scrollbar, .princess-list-container::-webkit-scrollbar { width: 14px; height: 14px; -webkit-appearance: none; }
+.list-container::-webkit-scrollbar-track, .daimyo-list-container::-webkit-scrollbar-track, .result-body::-webkit-scrollbar-track, #divide-list::-webkit-scrollbar-track, .faction-list-container::-webkit-scrollbar-track, .princess-list-container::-webkit-scrollbar-track { background: #e0e0e0; border-left: 1px solid #ccc; }
+.list-container::-webkit-scrollbar-thumb, .daimyo-list-container::-webkit-scrollbar-thumb, .result-body::-webkit-scrollbar-thumb, #divide-list::-webkit-scrollbar-thumb, .faction-list-container::-webkit-scrollbar-thumb, .princess-list-container::-webkit-scrollbar-thumb { background: #78909c; border: 2px solid #e0e0e0; }
+.list-container::-webkit-scrollbar-thumb:hover, .daimyo-list-container::-webkit-scrollbar-thumb:hover, .result-body::-webkit-scrollbar-thumb:hover, #divide-list::-webkit-scrollbar-thumb:hover, .faction-list-container::-webkit-scrollbar-thumb:hover, .princess-list-container::-webkit-scrollbar-thumb:hover { background: #546e7a; }
+.list-container::-webkit-scrollbar-button, .daimyo-list-container::-webkit-scrollbar-button, .result-body::-webkit-scrollbar-button, #divide-list::-webkit-scrollbar-button, .faction-list-container::-webkit-scrollbar-button, .princess-list-container::-webkit-scrollbar-button { display: none; }
+.list-container::-webkit-scrollbar-button:vertical:single-button, .daimyo-list-container::-webkit-scrollbar-button:vertical:single-button, .result-body::-webkit-scrollbar-button:vertical:single-button, #divide-list::-webkit-scrollbar-button:vertical:single-button, .faction-list-container::-webkit-scrollbar-button:vertical:single-button, .princess-list-container::-webkit-scrollbar-button:vertical:single-button { display: block; height: 14px; background-color: #e0e0e0; border: 1px solid #ccc; cursor: pointer; }
+.list-container::-webkit-scrollbar-button:vertical:single-button:decrement, .daimyo-list-container::-webkit-scrollbar-button:vertical:single-button:decrement, .result-body::-webkit-scrollbar-button:vertical:single-button:decrement, #divide-list::-webkit-scrollbar-button:vertical:single-button:decrement, .faction-list-container::-webkit-scrollbar-button:vertical:single-button:decrement, .princess-list-container::-webkit-scrollbar-button:vertical:single-button:decrement { background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 10 10"><polygon points="1,7 5,3 9,7" fill="%23555"/></svg>'); background-position: center; background-repeat: no-repeat; }
+.list-container::-webkit-scrollbar-button:vertical:single-button:increment, .daimyo-list-container::-webkit-scrollbar-button:vertical:single-button:increment, .result-body::-webkit-scrollbar-button:vertical:single-button:increment, #divide-list::-webkit-scrollbar-button:vertical:single-button:increment, .faction-list-container::-webkit-scrollbar-button:vertical:single-button:increment, .princess-list-container::-webkit-scrollbar-button:vertical:single-button:increment { background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 10 10"><polygon points="1,3 5,7 9,3" fill="%23555"/></svg>'); background-position: center; background-repeat: no-repeat; }
+.list-container::-webkit-scrollbar-button:hover, .daimyo-list-container::-webkit-scrollbar-button:hover, .result-body::-webkit-scrollbar-button:hover, #divide-list::-webkit-scrollbar-button:hover, .faction-list-container::-webkit-scrollbar-button:hover, .princess-list-container::-webkit-scrollbar-button:hover { background-color: #cfd8dc; }
 
 /* スマホ用自作スクロールバーのための設定（改良版） */
 .scroll-wrapper { 
@@ -422,18 +422,18 @@ body.hide-daimyo-labels .daimyo-name-label { display: none !important; }
     padding-bottom: 24px; 
     box-sizing: border-box; 
 }
-
-/* ★ カスタムスクロールバーを使用する要素ではネイティブを隠す */
 .hide-native-scroll::-webkit-scrollbar { display: none !important; }
 .hide-native-scroll { 
-    -ms-overflow-style: none; scrollbar-width: none; border: none !important; flex: 1; min-width: 0; 
-    overflow-y: scroll; overflow-x: auto; overscroll-behavior: none; 
+    -ms-overflow-style: none; scrollbar-width: none; border: none !important; flex: 1; min-width: 0; /* ★横幅が窮屈な時に縮む魔法を追加！ */
+    overflow-y: scroll; /* 縦は常に許可 */
+    overflow-x: auto;   /* 横にはみ出た時だけ左右スクロールを許可 */
+    overscroll-behavior: none; /* ★バウンド（ゴムバンド効果）を消す魔法 */
 }
 
 /* ★専用スクロールボタン（上下左右）の魔法 */
 .custom-scrollbar-btn {
     position: absolute; width: 24px; height: 24px;
-    background: linear-gradient(135deg, #ffdf80 0%, #d4af37 100%);
+    background: linear-gradient(135deg, #ffdf80 0%, #d4af37 100%); /* 普段は金色 */
     border-top: 1.5px solid #fff2cc; border-left: 1.5px solid #fff2cc;
     border-bottom: 1.5px solid #825a2c; border-right: 1.5px solid #825a2c;
     z-index: 51; box-sizing: border-box;
@@ -441,99 +441,152 @@ body.hide-daimyo-labels .daimyo-name-label { display: none !important; }
     cursor: pointer;
     -webkit-user-select: none; user-select: none;
 }
-.custom-scrollbar-btn:active:not(.disabled) { filter: brightness(1.2); }
+/* 押した時（アクティブ）は少し光らせる */
+.custom-scrollbar-btn:active:not(.disabled) { 
+    filter: brightness(1.2);
+}
+/* これ以上スクロールできない時（銀色） */
 .custom-scrollbar-btn.disabled {
     background: linear-gradient(135deg, #b0bec5 0%, #78909c 100%);
     border-top-color: #eceff1; border-left-color: #eceff1;
     border-bottom-color: #455a64; border-right-color: #455a64;
-    cursor: default; pointer-events: none;
+    cursor: default;
+    pointer-events: none; /* 押せないようにします */
 }
 
+/* 各ボタンの配置場所 */
 .custom-scrollbar-btn.up { top: 0; right: 0; }
 .custom-scrollbar-btn.down { bottom: 24px; right: 0; }
 .custom-scrollbar-btn.left { bottom: 0; left: 0; }
 .custom-scrollbar-btn.right { bottom: 0; right: 24px; }
 
+/* ★文字ではなくCSSの図形で綺麗な三角形（矢印）を作る魔法 */
 .custom-scrollbar-btn::after {
-    content: ""; display: block; width: 0; height: 0; border-style: solid; transition: opacity 0.2s;
+    content: "";
+    display: block;
+    width: 0; height: 0;
+    border-style: solid;
+    transition: opacity 0.2s;
 }
-.custom-scrollbar-btn.up::after { border-width: 0 5px 7px 5px; border-color: transparent transparent #5c4008 transparent; margin-bottom: 2px; filter: drop-shadow(0px 1px 0px rgba(255, 255, 255, 0.8)); }
-.custom-scrollbar-btn.down::after { border-width: 7px 5px 0 5px; border-color: #5c4008 transparent transparent transparent; margin-top: 2px; filter: drop-shadow(1px 1px 0px rgba(255, 255, 255, 0.8)); }
-.custom-scrollbar-btn.left::after { border-width: 5px 7px 5px 0; border-color: transparent #5c4008 transparent transparent; margin-right: 2px; filter: drop-shadow(0px 1px 0px rgba(255, 255, 255, 0.8)); }
-.custom-scrollbar-btn.right::after { border-width: 5px 0 5px 7px; border-color: transparent transparent transparent #5c4008; margin-left: 2px; filter: drop-shadow(0px 1px 0px rgba(255, 255, 255, 0.8)); }
-.custom-scrollbar-btn.disabled::after { opacity: 0.3; }
+/* それぞれの向きに合わせて1.2倍のサイズの三角形を作り、影(drop-shadow)でフチを描画します */
+.custom-scrollbar-btn.up::after { 
+    border-width: 0 5px 7px 5px; 
+    border-color: transparent transparent #5c4008 transparent; 
+    margin-bottom: 2px;
+    filter: drop-shadow(0px 1px 0px rgba(255, 255, 255, 0.8)); /* 下側に明るいフチ */
+}
+.custom-scrollbar-btn.down::after { 
+    border-width: 7px 5px 0 5px; 
+    border-color: #5c4008 transparent transparent transparent; 
+    margin-top: 2px;
+    filter: drop-shadow(1px 1px 0px rgba(255, 255, 255, 0.8)); /* 右下に明るいフチ */
+}
+.custom-scrollbar-btn.left::after { 
+    border-width: 5px 7px 5px 0; 
+    border-color: transparent #5c4008 transparent transparent; 
+    margin-right: 2px;
+    filter: drop-shadow(0px 1px 0px rgba(255, 255, 255, 0.8)); /* 下側に明るいフチ */
+}
+.custom-scrollbar-btn.right::after { 
+    border-width: 5px 0 5px 7px; 
+    border-color: transparent transparent transparent #5c4008; 
+    margin-left: 2px;
+    filter: drop-shadow(0px 1px 0px rgba(255, 255, 255, 0.8)); /* 下側に明るいフチ */
+}
+
+/* 無効状態の時は、矢印の色も薄くして押せない感を強調します */
+.custom-scrollbar-btn.disabled::after {
+    opacity: 0.3;
+}
 
 /* 縦用スクロールバー */
 .custom-scrollbar-track {
     position: absolute; top: 24px; right: 0; width: 24px; bottom: 48px;
-    background-color: #0d1a10; border-left: 1px solid #1b3822; z-index: 50; touch-action: none;
+    background-color: #0d1a10;
+    border-left: 1px solid #1b3822;
+    z-index: 50; touch-action: none;
+    display: block !important;
 }
+/* スライダーの溝を細く描画します */
 .custom-scrollbar-track::before {
-    content: ""; position: absolute; top: 0; bottom: 0; left: 6px; right: 6px; background-color: #050a05; border: 1px solid #000; box-shadow: inset 1px 1px 3px rgba(0,0,0,0.8);
+    content: ""; position: absolute;
+    top: 0; bottom: 0; left: 6px; right: 6px;
+    background-color: #050a05;
+    border: 1px solid #000;
+    box-shadow: inset 1px 1px 3px rgba(0,0,0,0.8);
 }
 .custom-scrollbar-thumb {
     position: absolute; top: 0; left: 2px; right: 2px; min-height: 40px;
     background: linear-gradient(135deg, #ffdf80 0%, #d4af37 100%);
     border-top: 1.5px solid #fff2cc; border-left: 1.5px solid #fff2cc;
     border-bottom: 1.5px solid #825a2c; border-right: 1.5px solid #825a2c;
-    border-radius: 2px; cursor: pointer; touch-action: none; transition: filter 0.2s;
+    border-radius: 2px;
+    cursor: pointer; touch-action: none; transition: filter 0.2s;
 }
-.custom-scrollbar-thumb:active, .custom-scrollbar-thumb.dragging { filter: brightness(1.2); }
+.custom-scrollbar-thumb:active, .custom-scrollbar-thumb.dragging {
+    filter: brightness(1.2);
+}
 
 /* 横用スクロールバー */
 .custom-scrollbar-track-x {
-    position: absolute; bottom: 0; left: 24px; right: 48px; height: 24px;
-    background-color: #0d1a10; border-top: 1px solid #1b3822; z-index: 50; touch-action: none;
+    position: absolute; bottom: 0; left: 24px; right: 48px; height: 24px; /* ★左右にボタンを置くので隙間を空けます */
+    background-color: #0d1a10;
+    border-top: 1px solid #1b3822;
+    z-index: 50; touch-action: none;
+    display: block !important;
 }
 .custom-scrollbar-track-x::before {
-    content: ""; position: absolute; left: 0; right: 0; top: 6px; bottom: 6px; background-color: #050a05; border: 1px solid #000; box-shadow: inset 1px 1px 3px rgba(0,0,0,0.8);
+    content: ""; position: absolute;
+    left: 0; right: 0; top: 6px; bottom: 6px;
+    background-color: #050a05;
+    border: 1px solid #000;
+    box-shadow: inset 1px 1px 3px rgba(0,0,0,0.8);
 }
 .custom-scrollbar-thumb-x {
     position: absolute; left: 0; top: 2px; bottom: 2px; min-width: 40px;
     background: linear-gradient(135deg, #ffdf80 0%, #d4af37 100%);
     border-top: 1.5px solid #fff2cc; border-left: 1.5px solid #fff2cc;
     border-bottom: 1.5px solid #825a2c; border-right: 1.5px solid #825a2c;
-    border-radius: 2px; cursor: pointer; touch-action: none; transition: filter 0.2s;
+    border-radius: 2px;
+    cursor: pointer; touch-action: none; transition: filter 0.2s;
 }
-.custom-scrollbar-thumb-x:active, .custom-scrollbar-thumb-x.dragging { filter: brightness(1.2); }
+.custom-scrollbar-thumb-x:active, .custom-scrollbar-thumb-x.dragging {
+    filter: brightness(1.2);
+}
 
-/* 右下角の空白を埋める四角 */
+/* ★追加：リスト右下角の空白を埋める四角（縦バーと横バーの交差点） */
 .scroll-wrapper::after {
     content: ""; position: absolute; bottom: 0; right: 0; width: 24px; height: 24px;
     background-color: #0d1a10; border-left: 1px solid #1b3822; border-top: 1px solid #1b3822;
     z-index: 49; box-sizing: border-box;
 }
-.scroll-wrapper.hide-scrollbar-parts::after {
-    display: none;
-}
 
 /* リストベース */
-.list-container { 
+/* ★変更：外枠（.scroll-wrapper）の大きさにピッタリ追従するように設定します */
+.list-container, .daimyo-list-container, .faction-list-container, .princess-list-container { 
     flex: 1; width: 100%; height: 100%; max-height: none; overflow-y: scroll; scroll-snap-type: y mandatory;
-    border: none; box-shadow: none; border-radius: 0;
+    border: none; box-shadow: none; border-radius: 0; /* ★ 外枠に任せるので全て消します */
     scroll-padding-top: 40px; box-sizing: border-box; -webkit-overflow-scrolling: auto; overscroll-behavior: none; 
 }
 .result-body { flex: 1; width: 100%; overflow-y: auto; min-height: 0; margin-bottom: 0 !important; padding-bottom: 10px; box-sizing: border-box; overscroll-behavior: none; }
-.select-item:last-child { margin-bottom: 0; }
+/* .select-item:last-child などの margin-bottom: 25px; を削除（固定高さに干渉するため） */
+.select-item:last-child, .daimyo-list-item:last-child, .kunishu-list-item:last-child, .faction-list-item:last-child, .princess-list-item:last-child, .delegate-list-item:last-child { margin-bottom: 0; }
 
-/* 縦の区切り線（子要素全てに適用） */
-.list-header > *, .select-item > * { 
-    border-right: 1px solid rgba(212,175,55,0.3); padding: 0 2px; display: flex; align-items: center; justify-content: center; box-sizing: border-box; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; height: 100%; 
-}
-.list-header > *:last-child, .select-item > *:last-child { border-right: none; }
+/* 縦の区切り線 */
+.list-header > span, .select-item > span, .daimyo-list-header > span, .daimyo-list-item > span, .kunishu-list-header > span, .kunishu-list-item > span, .kunishu-list-header > strong, .kunishu-list-item > strong, .faction-list-header > span, .faction-list-item > span, .faction-list-item > strong, .princess-list-header > span, .princess-list-item > span, .princess-list-item > strong, .delegate-list-header > span, .delegate-list-item > span { border-right: 1px solid rgba(212,175,55,0.3); padding: 0 2px; display: flex; align-items: center; justify-content: center; box-sizing: border-box; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; height: 100%; }
+.list-header > span, .daimyo-list-header > span, .kunishu-list-header > span, .kunishu-list-header > strong, .faction-list-header > span, .princess-list-header > span, .delegate-list-header > span { border-right: 1px solid rgba(212,175,55,0.3); }
+.list-header > span:last-child, .select-item > span:last-child, .daimyo-list-header > span:last-child, .daimyo-list-item > span:last-child, .kunishu-list-header > span:last-child, .kunishu-list-item > span:last-child, .faction-list-header > span:last-child, .faction-list-item > span:last-child, .princess-list-header > span:last-child, .princess-list-item > span:last-child, .delegate-list-header > span:last-child, .delegate-list-item > span:last-child { border-right: none; }
 
 /* リストヘッダー・アイテム (ゼブラ柄) */
-.list-header { background: #0d1a10; color: #ffd54f; font-weight: bold; position: sticky; top: 0; z-index: 10; text-shadow: 1px 1px 0 #000, -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000; }
-.select-item { border-bottom: 1px solid rgba(255,215,79,0.3); scroll-snap-align: start; cursor: pointer; color: #fff; background: linear-gradient(to bottom, #254a2e 0%, #1b3822 100%); text-shadow: 1px 1px 0 #000, -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000; }
-.select-item:nth-child(even) { background: linear-gradient(to bottom, #2d5a38 0%, #254a2e 100%); }
-.select-item:hover { background: linear-gradient(to bottom, #3a6b46 0%, #2a5a36 100%) !important; }
+.list-header, .daimyo-list-header, .kunishu-list-header, .faction-list-header, .princess-list-header, .delegate-list-header { background: #0d1a10; color: #ffd54f; font-weight: bold; position: sticky; top: 0; z-index: 10; text-shadow: 1px 1px 0 #000, -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000; }
+.select-item, .daimyo-list-item, .kunishu-list-item, .faction-list-item, .princess-list-item, .delegate-list-item { border-bottom: 1px solid rgba(255,215,79,0.3); scroll-snap-align: start; cursor: pointer; color: #fff; background: linear-gradient(to bottom, #254a2e 0%, #1b3822 100%); text-shadow: 1px 1px 0 #000, -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000; }
+.select-item:nth-child(even), .daimyo-list-item:nth-child(even), .kunishu-list-item:nth-child(even), .faction-list-item:nth-child(even), .princess-list-item:nth-child(even), .delegate-list-item:nth-child(even) { background: linear-gradient(to bottom, #2d5a38 0%, #254a2e 100%); }
+.select-item:hover, .daimyo-list-item:hover, .kunishu-list-item:hover, .faction-list-item:hover, .princess-list-item:hover, .delegate-list-item:hover { background: linear-gradient(to bottom, #3a6b46 0%, #2a5a36 100%) !important; }
 .select-item.disabled { color: #9e9e9e !important; pointer-events: none; background: linear-gradient(to bottom, #455a64 0%, #263238 100%) !important; text-shadow: 1px 1px 0 #000 !important; }
-.select-item.selected { background: rgba(255, 152, 0, 0.4) !important; border-left: 5px solid #ffd54f; }
-.select-item.selected:hover { background: rgba(255, 152, 0, 0.6) !important; }
+.select-item.selected, .kunishu-list-item.selected { background: rgba(255, 152, 0, 0.4) !important; border-left: 5px solid #ffd54f; }
+.select-item.selected:hover, .kunishu-list-item.selected:hover { background: rgba(255, 152, 0, 0.6) !important; }
 .select-item input[type="checkbox"], .select-item input[type="radio"] { display: none; }
-
-/* 名前カラムの左寄せを共通化 */
-.select-item .col-name, .select-item .col-daimyo-name, .select-item .col-leader-name, .select-item .col-kunishu-name, .select-item .col-faction-name, .select-item .col-princess-name, .select-item .col-castle-name { justify-content: flex-start !important; padding-left: 5px; }
+.select-item .col-name, .daimyo-list-item .col-daimyo-name, .daimyo-list-item .col-leader-name, .kunishu-list-item .col-kunishu-name, .faction-list-item .col-faction-name, .princess-list-item .col-princess-name, .delegate-list-item .col-castle-name { justify-content: flex-start !important; padding-left: 5px; }
 
 /* 履歴リストアイテム */
 .history-list-item { scroll-snap-align: start; padding: 8px 10px; border-bottom: 1px solid rgba(255, 215, 79, 0.3); font-size: 0.9rem; color: #fff; background: linear-gradient(to bottom, #254a2e 0%, #1b3822 100%); text-shadow: 1px 1px 0 #000, -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000; }
@@ -543,14 +596,12 @@ body.hide-daimyo-labels .daimyo-name-label { display: none !important; }
 /* 各種リストの基本グリッド（スマホ向けベース） */
 .list-header, .select-item { display: grid; grid-template-columns: 35px 2.5fr 1.5fr repeat(6, 1fr); font-size: clamp(0.6rem, 2.2vw, 0.85rem); padding: 0; height: 40px; gap: 0; box-sizing: border-box; align-items: stretch; }
 .list-header.view-mode, .select-item.view-mode { grid-template-columns: 2.5fr 1.5fr repeat(6, 1fr); }
-
-/* 個別リストのグリッド調整 */
-.daimyo-list-header, .daimyo-list-item { grid-template-columns: 2fr 2fr 1fr 1.5fr 1.5fr 1fr; }
-.kunishu-list-header, .kunishu-list-item { grid-template-columns: 20px 3fr 1.5fr 1.5fr 1.5fr; }
+.daimyo-list-header, .daimyo-list-item { display: grid; grid-template-columns: 2fr 2fr 1fr 1.5fr 1.5fr 1fr; font-size: clamp(0.6rem, 2.2vw, 0.85rem); padding: 0; height: 40px; gap: 0; box-sizing: border-box; align-items: stretch; }
+.kunishu-list-header, .kunishu-list-item { display: grid; grid-template-columns: 20px 3fr 1.5fr 1.5fr 1.5fr; font-size: clamp(0.6rem, 2.2vw, 0.85rem); padding: 0; height: 40px; gap: 0; box-sizing: border-box; align-items: stretch; }
 .view-mode .kunishu-list-header, .view-mode .kunishu-list-item { grid-template-columns: 3fr 1.5fr 1.5fr 1.5fr; }
-.faction-list-header, .faction-list-item { grid-template-columns: 2.5fr 1fr 1.5fr 1.5fr 3fr; }
-.princess-list-header, .princess-list-item { grid-template-columns: 1.3fr 1fr 1.5fr 1.5fr 3fr; }
-.delegate-list-header, .delegate-list-item { grid-template-columns: 1.5fr 1fr 1fr 1fr; }
+.faction-list-header, .faction-list-item { display: grid; grid-template-columns: 2.5fr 1fr 1.5fr 1.5fr 3fr; font-size: clamp(0.6rem, 2.2vw, 0.85rem); padding: 0; height: 40px; gap: 0; box-sizing: border-box; align-items: stretch; }
+.princess-list-header, .princess-list-item { display: grid; grid-template-columns: 1.3fr 1fr 1.5fr 1.5fr 3fr; font-size: clamp(0.6rem, 2.2vw, 0.85rem); padding: 0; height: 40px; gap: 0; box-sizing: border-box; align-items: stretch; }
+.delegate-list-header, .delegate-list-item { display: grid; grid-template-columns: 1.5fr 1fr 1fr 1fr; font-size: clamp(0.6rem, 2.2vw, 0.85rem); padding: 0; height: 40px; gap: 0; box-sizing: border-box; align-items: stretch; }
 
 .kunishu-item { padding: 12px 15px; border: 1px solid #d0b080; margin-bottom: 8px; cursor: pointer; display: flex; align-items: center; background: rgba(250, 240, 230, 0.95); border-radius: 6px; transition: all 0.2s ease; font-family: 'Sawarabi Mincho', serif; box-shadow: 1px 1px 3px rgba(0,0,0,0.1); }
 .kunishu-item:hover { background: #fff5e0; transform: translateX(3px); box-shadow: 2px 2px 5px rgba(0,0,0,0.15); border-color: #c0a070; }
@@ -1878,19 +1929,19 @@ body.is-pc {
     .command-grid { grid-template-columns: repeat(2, 1fr); gap: 10px; }
     .cmd-btn { padding: 8px 8px; font-size: 1.2rem; height: auto; }
     .cmd-btn.finish, .cmd-btn.back { grid-column: span 2; }
-    
-    
+
     /* PCリストレイアウト */
+    /* ★変更：パソコン版用の高さに合わせて、外枠と中身をそれぞれ設定します */
     .scroll-wrapper { max-height: calc(44px * 9 + 28px); }
-    .list-container { scroll-padding-top: 44px; }
+    .list-container, .daimyo-list-container, .faction-list-container, .princess-list-container { height: 100%; max-height: none; scroll-padding-top: 44px; }
     .list-header, .select-item { grid-template-columns: 45px 100px 60px repeat(6, 1fr); font-size: 0.85rem; height: 44px; }
     .list-header.view-mode, .select-item.view-mode { grid-template-columns: 100px 60px repeat(6, 1fr); }
-    
     .daimyo-list-header, .daimyo-list-item { grid-template-columns: 80px 110px 50px 80px 80px 60px; font-size: 0.9rem; height: 44px; }
     .kunishu-list-header, .kunishu-list-item { grid-template-columns: 25px 130px 80px 80px 80px; font-size: 0.9rem; height: 44px; }
     .view-mode .kunishu-list-header, .view-mode .kunishu-list-item { grid-template-columns: 140px 80px 80px 80px; }
     .faction-list-header, .faction-list-item { grid-template-columns: 140px 80px 100px 100px 1fr; font-size: 0.95rem; height: 44px; }
     .princess-list-header, .princess-list-item { grid-template-columns: 95px 80px 100px 100px 1fr; font-size: 0.95rem; height: 44px; }
+    .list-container, .daimyo-list-container, .result-body, .faction-list-container, .princess-list-container { scroll-padding-top: 44px; }
     
     /* モーダル拡張（輸送・兵力分配）のタイル化を解除して縦並びに統一 */
     #quantity-modal .modal-content, #unit-divide-modal .modal-content { max-width: 700px !important; max-height: 90% !important; }
@@ -2192,7 +2243,7 @@ body.is-pc .list-header.status-mode.view-mode, body.is-pc .select-item.status-mo
 /* =========================================================
    ★ 拠点一覧の横スクロールのための魔法
    ========================================================= */
-.kyoten-list-container .list-header, 
-.kyoten-list-container .select-item {
+#kyoten-list .list-header, 
+#kyoten-list .select-item {
     min-width: 650px; /* 画面が小さくてもこの幅を保って、横にスクロールできるようにします！ */
 }
