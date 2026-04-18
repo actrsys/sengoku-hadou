@@ -175,48 +175,48 @@ body:not(.is-pc) .status-marks-carousel .status-mark.fade-in {
 #bottom-command-bar { flex: none; background: linear-gradient(to bottom, #254a2e 0%, #1b3822 100%); border-top: 3px solid #d4af37; padding-bottom: max(5px, env(safe-area-inset-bottom)); padding-left: 5px; padding-right: 5px; z-index: 200; box-shadow: 0 -4px 10px rgba(0,0,0,0.6); height: auto; display: block; }
 #mobile-bottom-info { padding: 0; margin: 0; }
 .command-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 5px; padding: 4px 0; }
-.cmd-btn { 
-    padding: 0 2px 2px 2px; 
-    box-sizing: border-box; 
-    height: 38px; 
+.cmd-btn {
+    padding: 0 2px 2px 2px;
+    box-sizing: border-box;
+    height: 38px;
     border-style: solid;
     border-width: 3px;
     border-color: #e6e3d8 #d1c18c #a88a2c #d1c18c;
-    background: linear-gradient(135deg, #b0c4b1 0%, #6e8c81 100%); 
-    color: #ffffff; 
+    background: linear-gradient(135deg, #b0c4b1 0%, #6e8c81 100%);
+    color: #ffffff;
     font-family: 'AbashiriMincho', serif;
     letter-spacing: 0.5px;
-    text-shadow: 
-        1px 1px 0 #0f2b21, -1px -1px 0 #0f2b21, 
+    text-shadow:
+        1px 1px 0 #0f2b21, -1px -1px 0 #0f2b21,
         1px -1px 0 #0f2b21, -1px 1px 0 #0f2b21,
         0px 2px 0 #0f2b21, 0px -2px 0 #0f2b21,
         2px 0px 0 #0f2b21, -2px 0px 0 #0f2b21,
         1px 3px 3px rgba(0,0,0,0.8);
-    border-radius: 6px; 
-    cursor: pointer; 
-    font-size: 1.1rem; 
-    font-weight: bold; 
-    display: flex; 
-    align-items: center; 
-    justify-content: center; 
-    touch-action: manipulation; 
-    white-space: nowrap; 
-    overflow: hidden; 
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 1.1rem;
+    font-weight: bold;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    touch-action: manipulation;
+    white-space: nowrap;
+    overflow: hidden;
     box-shadow: inset 0 0 0 1px rgba(0, 50, 40, 0.4), 0 2px 4px rgba(0,0,0,0.4);
     transition: background 0.15s ease-out, border-color 0.15s ease-out, color 0.15s ease-out, box-shadow 0.1s;
 }
-.cmd-btn:hover { 
-    background: linear-gradient(135deg, #c2d6c3 0%, #82a396 100%); 
+.cmd-btn:hover {
+    background: linear-gradient(135deg, #c2d6c3 0%, #82a396 100%);
     border-color: #ffffff #e6d8b3 #c2a142 #e6d8b3;
     color: #ffffff;
 }
-.cmd-btn:active { 
-    background: linear-gradient(135deg, #5a7a6f 0%, #90a89f 100%); 
+.cmd-btn:active {
+    background: linear-gradient(135deg, #5a7a6f 0%, #90a89f 100%);
     box-shadow: inset 0 0 0 1px rgba(0, 50, 40, 0.6), inset 0 2px 6px rgba(0,0,0,0.5), 0 0px 0px rgba(0,0,0,0);
     transition: none;
 }
 
-.cmd-btn.category { 
+.cmd-btn.category {
     position: relative;
 }
 .cmd-btn.category::after {
@@ -232,50 +232,50 @@ body:not(.is-pc) .status-marks-carousel .status-mark.fade-in {
     filter: drop-shadow(1px 1px 0px #0f2b21) drop-shadow(-1px -1px 0px #0f2b21) drop-shadow(1px -1px 0px #0f2b21) drop-shadow(-1px 1px 0px #0f2b21);
 }
 
-.cmd-btn.finish { 
-    background: linear-gradient(135deg, #b05a5a 0%, #803a3a 100%); 
+.cmd-btn.finish {
+    background: linear-gradient(135deg, #b05a5a 0%, #803a3a 100%);
     border-color: #ffb3b3 #e66666 #b30000 #e66666;
-    color: #ffffff; 
-    text-shadow: 
-        1px 1px 0 #3a0b0b, -1px -1px 0 #3a0b0b, 
+    color: #ffffff;
+    text-shadow:
+        1px 1px 0 #3a0b0b, -1px -1px 0 #3a0b0b,
         1px -1px 0 #3a0b0b, -1px 1px 0 #3a0b0b,
         0px 2px 0 #3a0b0b, 0px -2px 0 #3a0b0b,
         2px 0px 0 #3a0b0b, -2px 0px 0 #3a0b0b,
         1px 3px 3px rgba(0,0,0,0.8);
     box-shadow: inset 0 0 0 1px rgba(60, 0, 0, 0.4), 0 2px 4px rgba(0,0,0,0.4);
-    grid-column: span 3; 
+    grid-column: span 3;
 }
 .cmd-btn.finish:hover {
     background: linear-gradient(135deg, #c46d6d 0%, #9f4d4d 100%);
     border-color: #ffffff #ff8080 #cc0000 #ff8080;
     color: #ffffff;
 }
-.cmd-btn.finish:active { 
-    background: linear-gradient(135deg, #602525 0%, #4a1c1c 100%); 
+.cmd-btn.finish:active {
+    background: linear-gradient(135deg, #602525 0%, #4a1c1c 100%);
     box-shadow: inset 0 0 0 1px rgba(60, 0, 0, 0.6), inset 0 2px 6px rgba(0,0,0,0.5), 0 0px 0px rgba(0,0,0,0);
     transition: none;
 }
 
-.cmd-btn.back { 
-    background: linear-gradient(135deg, #6c757d 0%, #495057 100%); 
-    border-color: #adb5bd #868e96 #343a40 #868e96; 
-    color: #ffffff; 
-    text-shadow: 
-        1px 1px 0 #1a1e20, -1px -1px 0 #1a1e20, 
+.cmd-btn.back {
+    background: linear-gradient(135deg, #6c757d 0%, #495057 100%);
+    border-color: #adb5bd #868e96 #343a40 #868e96;
+    color: #ffffff;
+    text-shadow:
+        1px 1px 0 #1a1e20, -1px -1px 0 #1a1e20,
         1px -1px 0 #1a1e20, -1px 1px 0 #1a1e20,
         0px 2px 0 #1a1e20, 0px -2px 0 #1a1e20,
         2px 0px 0 #1a1e20, -2px 0px 0 #1a1e20,
         1px 3px 3px rgba(0,0,0,0.8);
     box-shadow: inset 0 0 0 1px rgba(20, 30, 40, 0.4), 0 2px 4px rgba(0,0,0,0.4);
-    grid-column: span 3; 
+    grid-column: span 3;
 }
 .cmd-btn.back:hover {
     background: linear-gradient(135deg, #868e96 0%, #5a6268 100%);
-    border-color: #ced4da #adb5bd #495057 #adb5bd; 
+    border-color: #ced4da #adb5bd #495057 #adb5bd;
     color: #ffffff;
 }
-.cmd-btn.back:active { 
-    background: linear-gradient(135deg, #343a40 0%, #212529 100%); 
+.cmd-btn.back:active {
+    background: linear-gradient(135deg, #343a40 0%, #212529 100%);
     box-shadow: inset 0 0 0 1px rgba(20, 30, 40, 0.6), inset 0 2px 6px rgba(0,0,0,0.5), 0 0px 0px rgba(0,0,0,0);
     transition: none;
 }
@@ -299,26 +299,26 @@ body:not(.is-pc) .status-marks-carousel .status-mark.fade-in {
 /* =========================================================
    年月・浪人・米相場のフローティング表示
    ========================================================= */
-#mobile-floating-info { 
-    position: absolute; bottom: 20px; left: 10px; 
-    display: flex; flex-direction: column; gap: 6px; 
-    z-index: 500; pointer-events: none; 
+#mobile-floating-info {
+    position: absolute; bottom: 20px; left: 10px;
+    display: flex; flex-direction: column; gap: 6px;
+    z-index: 500; pointer-events: none;
 }
 
-#mobile-floating-market { 
-    position: absolute; top: 10px; right: 10px; 
-    z-index: 500; pointer-events: none; 
-    display: flex; gap: 10px; 
-    justify-content: flex-end; 
+#mobile-floating-market {
+    position: absolute; top: 10px; right: 10px;
+    z-index: 500; pointer-events: none;
+    display: flex; gap: 10px;
+    justify-content: flex-end;
     align-items: flex-start; /* ★根本原因：要素が縦に引き伸ばされるのを防ぐ指定です */
 }
 
-.floating-time, .floating-market { 
-    background: rgba(0, 0, 0, 0.75); color: #fff; 
-    padding: 4px 12px; border-radius: 12px; 
-    font-size: 0.9rem; font-weight: bold; 
-    box-shadow: 0 2px 5px rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.2); 
-    text-shadow: 1px 1px 2px rgba(0,0,0,0.8); 
+.floating-time, .floating-market {
+    background: rgba(0, 0, 0, 0.75); color: #fff;
+    padding: 4px 12px; border-radius: 12px;
+    font-size: 0.9rem; font-weight: bold;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.2);
+    text-shadow: 1px 1px 2px rgba(0,0,0,0.8);
     white-space: nowrap; /* ★根本原因：文字が画面幅で自動改行されるのを防ぐ指定です */
     line-height: 1.2; /* 行間による間延びをリセットします */
 }
@@ -397,43 +397,43 @@ body.hide-daimyo-labels .daimyo-name-label { display: none !important; }
 /* =========================================================
    UIコンポーネント（リスト・スクロール・ボタン・バッジ）
    ========================================================= */
-/* スクロールバー装飾 */
-.list-container::-webkit-scrollbar, .daimyo-list-container::-webkit-scrollbar, .result-body::-webkit-scrollbar, #divide-list::-webkit-scrollbar, .faction-list-container::-webkit-scrollbar, .princess-list-container::-webkit-scrollbar { width: 14px; height: 14px; -webkit-appearance: none; }
-.list-container::-webkit-scrollbar-track, .daimyo-list-container::-webkit-scrollbar-track, .result-body::-webkit-scrollbar-track, #divide-list::-webkit-scrollbar-track, .faction-list-container::-webkit-scrollbar-track, .princess-list-container::-webkit-scrollbar-track { background: #e0e0e0; border-left: 1px solid #ccc; }
-.list-container::-webkit-scrollbar-thumb, .daimyo-list-container::-webkit-scrollbar-thumb, .result-body::-webkit-scrollbar-thumb, #divide-list::-webkit-scrollbar-thumb, .faction-list-container::-webkit-scrollbar-thumb, .princess-list-container::-webkit-scrollbar-thumb { background: #78909c; border: 2px solid #e0e0e0; }
-.list-container::-webkit-scrollbar-thumb:hover, .daimyo-list-container::-webkit-scrollbar-thumb:hover, .result-body::-webkit-scrollbar-thumb:hover, #divide-list::-webkit-scrollbar-thumb:hover, .faction-list-container::-webkit-scrollbar-thumb:hover, .princess-list-container::-webkit-scrollbar-thumb:hover { background: #546e7a; }
-.list-container::-webkit-scrollbar-button, .daimyo-list-container::-webkit-scrollbar-button, .result-body::-webkit-scrollbar-button, #divide-list::-webkit-scrollbar-button, .faction-list-container::-webkit-scrollbar-button, .princess-list-container::-webkit-scrollbar-button { display: none; }
-.list-container::-webkit-scrollbar-button:vertical:single-button, .daimyo-list-container::-webkit-scrollbar-button:vertical:single-button, .result-body::-webkit-scrollbar-button:vertical:single-button, #divide-list::-webkit-scrollbar-button:vertical:single-button, .faction-list-container::-webkit-scrollbar-button:vertical:single-button, .princess-list-container::-webkit-scrollbar-button:vertical:single-button { display: block; height: 14px; background-color: #e0e0e0; border: 1px solid #ccc; cursor: pointer; }
-.list-container::-webkit-scrollbar-button:vertical:single-button:decrement, .daimyo-list-container::-webkit-scrollbar-button:vertical:single-button:decrement, .result-body::-webkit-scrollbar-button:vertical:single-button:decrement, #divide-list::-webkit-scrollbar-button:vertical:single-button:decrement, .faction-list-container::-webkit-scrollbar-button:vertical:single-button:decrement, .princess-list-container::-webkit-scrollbar-button:vertical:single-button:decrement { background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 10 10"><polygon points="1,7 5,3 9,7" fill="%23555"/></svg>'); background-position: center; background-repeat: no-repeat; }
-.list-container::-webkit-scrollbar-button:vertical:single-button:increment, .daimyo-list-container::-webkit-scrollbar-button:vertical:single-button:increment, .result-body::-webkit-scrollbar-button:vertical:single-button:increment, #divide-list::-webkit-scrollbar-button:vertical:single-button:increment, .faction-list-container::-webkit-scrollbar-button:vertical:single-button:increment, .princess-list-container::-webkit-scrollbar-button:vertical:single-button:increment { background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 10 10"><polygon points="1,3 5,7 9,3" fill="%23555"/></svg>'); background-position: center; background-repeat: no-repeat; }
-.list-container::-webkit-scrollbar-button:hover, .daimyo-list-container::-webkit-scrollbar-button:hover, .result-body::-webkit-scrollbar-button:hover, #divide-list::-webkit-scrollbar-button:hover, .faction-list-container::-webkit-scrollbar-button:hover, .princess-list-container::-webkit-scrollbar-button:hover { background-color: #cfd8dc; }
+/* スクロールバー装飾（全体適用、hide-native-scroll以外） */
+.list-container::-webkit-scrollbar, .result-body::-webkit-scrollbar, #divide-list::-webkit-scrollbar, .scenario-desc-box::-webkit-scrollbar, .war-controls-desc::-webkit-scrollbar, .fw-floating-log::-webkit-scrollbar { width: 14px; height: 14px; -webkit-appearance: none; }
+.list-container::-webkit-scrollbar-track, .result-body::-webkit-scrollbar-track, #divide-list::-webkit-scrollbar-track, .scenario-desc-box::-webkit-scrollbar-track, .war-controls-desc::-webkit-scrollbar-track, .fw-floating-log::-webkit-scrollbar-track { background: #e0e0e0; border-left: 1px solid #ccc; }
+.list-container::-webkit-scrollbar-thumb, .result-body::-webkit-scrollbar-thumb, #divide-list::-webkit-scrollbar-thumb, .scenario-desc-box::-webkit-scrollbar-thumb, .war-controls-desc::-webkit-scrollbar-thumb, .fw-floating-log::-webkit-scrollbar-thumb { background: #78909c; border: 2px solid #e0e0e0; border-radius: 6px; }
+.list-container::-webkit-scrollbar-thumb:hover, .result-body::-webkit-scrollbar-thumb:hover, #divide-list::-webkit-scrollbar-thumb:hover, .scenario-desc-box::-webkit-scrollbar-thumb:hover, .war-controls-desc::-webkit-scrollbar-thumb:hover, .fw-floating-log::-webkit-scrollbar-thumb:hover { background: #546e7a; }
+.list-container::-webkit-scrollbar-button, .result-body::-webkit-scrollbar-button, #divide-list::-webkit-scrollbar-button, .scenario-desc-box::-webkit-scrollbar-button, .war-controls-desc::-webkit-scrollbar-button, .fw-floating-log::-webkit-scrollbar-button { display: none; }
+.list-container::-webkit-scrollbar-button:vertical:single-button, .result-body::-webkit-scrollbar-button:vertical:single-button, #divide-list::-webkit-scrollbar-button:vertical:single-button, .scenario-desc-box::-webkit-scrollbar-button:vertical:single-button, .war-controls-desc::-webkit-scrollbar-button:vertical:single-button, .fw-floating-log::-webkit-scrollbar-button:vertical:single-button { display: block; height: 14px; background-color: #e0e0e0; border: 1px solid #ccc; cursor: pointer; }
+.list-container::-webkit-scrollbar-button:vertical:single-button:decrement, .result-body::-webkit-scrollbar-button:vertical:single-button:decrement, #divide-list::-webkit-scrollbar-button:vertical:single-button:decrement, .scenario-desc-box::-webkit-scrollbar-button:vertical:single-button:decrement, .war-controls-desc::-webkit-scrollbar-button:vertical:single-button:decrement, .fw-floating-log::-webkit-scrollbar-button:vertical:single-button:decrement { background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 10 10"><polygon points="1,7 5,3 9,7" fill="%23555"/></svg>'); background-position: center; background-repeat: no-repeat; }
+.list-container::-webkit-scrollbar-button:vertical:single-button:increment, .result-body::-webkit-scrollbar-button:vertical:single-button:increment, #divide-list::-webkit-scrollbar-button:vertical:single-button:increment, .scenario-desc-box::-webkit-scrollbar-button:vertical:single-button:increment, .war-controls-desc::-webkit-scrollbar-button:vertical:single-button:increment, .fw-floating-log::-webkit-scrollbar-button:vertical:single-button:increment { background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 10 10"><polygon points="1,3 5,7 9,3" fill="%23555"/></svg>'); background-position: center; background-repeat: no-repeat; }
+.list-container::-webkit-scrollbar-button:hover, .result-body::-webkit-scrollbar-button:hover, #divide-list::-webkit-scrollbar-button:hover, .scenario-desc-box::-webkit-scrollbar-button:hover, .war-controls-desc::-webkit-scrollbar-button:hover, .fw-floating-log::-webkit-scrollbar-button:hover { background-color: #cfd8dc; }
 
 /* スマホ用自作スクロールバーのための設定（改良版） */
-.scroll-wrapper { 
-    position: relative; 
+.scroll-wrapper {
+    position: relative;
     flex: 1; /* ★ ゴムのように画面に合わせて縮む魔法 */
     min-height: 0; /* ★ 潰れることを許可する魔法 */
     max-height: calc(40px * 9 + 28px);
-    width: 100%; display: flex; overflow: hidden; 
+    width: 100%; display: flex; overflow: hidden;
     border: 2px solid #d4af37;
-    border-radius: 4px; 
+    border-radius: 4px;
     box-shadow: 0 0 10px rgba(0,0,0,0.5);
-    padding-right: 24px; 
-    padding-bottom: 24px; 
-    box-sizing: border-box; 
+    padding-right: 24px;
+    padding-bottom: 24px;
+    box-sizing: border-box;
 }
+
+/* ★ カスタムスクロールバーを使用する要素ではネイティブを隠す */
 .hide-native-scroll::-webkit-scrollbar { display: none !important; }
-.hide-native-scroll { 
-    -ms-overflow-style: none; scrollbar-width: none; border: none !important; flex: 1; min-width: 0; /* ★横幅が窮屈な時に縮む魔法を追加！ */
-    overflow-y: scroll; /* 縦は常に許可 */
-    overflow-x: auto;   /* 横にはみ出た時だけ左右スクロールを許可 */
-    overscroll-behavior: none; /* ★バウンド（ゴムバンド効果）を消す魔法 */
+.hide-native-scroll {
+    -ms-overflow-style: none; scrollbar-width: none; border: none !important; flex: 1; min-width: 0;
+    overflow-y: scroll; overflow-x: auto; overscroll-behavior: none;
 }
 
 /* ★専用スクロールボタン（上下左右）の魔法 */
 .custom-scrollbar-btn {
     position: absolute; width: 24px; height: 24px;
-    background: linear-gradient(135deg, #ffdf80 0%, #d4af37 100%); /* 普段は金色 */
+    background: linear-gradient(135deg, #ffdf80 0%, #d4af37 100%);
     border-top: 1.5px solid #fff2cc; border-left: 1.5px solid #fff2cc;
     border-bottom: 1.5px solid #825a2c; border-right: 1.5px solid #825a2c;
     z-index: 51; box-sizing: border-box;
@@ -441,120 +441,63 @@ body.hide-daimyo-labels .daimyo-name-label { display: none !important; }
     cursor: pointer;
     -webkit-user-select: none; user-select: none;
 }
-/* 押した時（アクティブ）は少し光らせる */
-.custom-scrollbar-btn:active:not(.disabled) { 
-    filter: brightness(1.2);
-}
-/* これ以上スクロールできない時（銀色） */
+.custom-scrollbar-btn:active:not(.disabled) { filter: brightness(1.2); }
 .custom-scrollbar-btn.disabled {
     background: linear-gradient(135deg, #b0bec5 0%, #78909c 100%);
     border-top-color: #eceff1; border-left-color: #eceff1;
     border-bottom-color: #455a64; border-right-color: #455a64;
-    cursor: default;
-    pointer-events: none; /* 押せないようにします */
+    cursor: default; pointer-events: none;
 }
 
-/* 各ボタンの配置場所 */
 .custom-scrollbar-btn.up { top: 0; right: 0; }
 .custom-scrollbar-btn.down { bottom: 24px; right: 0; }
 .custom-scrollbar-btn.left { bottom: 0; left: 0; }
 .custom-scrollbar-btn.right { bottom: 0; right: 24px; }
 
-/* ★文字ではなくCSSの図形で綺麗な三角形（矢印）を作る魔法 */
 .custom-scrollbar-btn::after {
-    content: "";
-    display: block;
-    width: 0; height: 0;
-    border-style: solid;
-    transition: opacity 0.2s;
+    content: ""; display: block; width: 0; height: 0; border-style: solid; transition: opacity 0.2s;
 }
-/* それぞれの向きに合わせて1.2倍のサイズの三角形を作り、影(drop-shadow)でフチを描画します */
-.custom-scrollbar-btn.up::after { 
-    border-width: 0 5px 7px 5px; 
-    border-color: transparent transparent #5c4008 transparent; 
-    margin-bottom: 2px;
-    filter: drop-shadow(0px 1px 0px rgba(255, 255, 255, 0.8)); /* 下側に明るいフチ */
-}
-.custom-scrollbar-btn.down::after { 
-    border-width: 7px 5px 0 5px; 
-    border-color: #5c4008 transparent transparent transparent; 
-    margin-top: 2px;
-    filter: drop-shadow(1px 1px 0px rgba(255, 255, 255, 0.8)); /* 右下に明るいフチ */
-}
-.custom-scrollbar-btn.left::after { 
-    border-width: 5px 7px 5px 0; 
-    border-color: transparent #5c4008 transparent transparent; 
-    margin-right: 2px;
-    filter: drop-shadow(0px 1px 0px rgba(255, 255, 255, 0.8)); /* 下側に明るいフチ */
-}
-.custom-scrollbar-btn.right::after { 
-    border-width: 5px 0 5px 7px; 
-    border-color: transparent transparent transparent #5c4008; 
-    margin-left: 2px;
-    filter: drop-shadow(0px 1px 0px rgba(255, 255, 255, 0.8)); /* 下側に明るいフチ */
-}
-
-/* 無効状態の時は、矢印の色も薄くして押せない感を強調します */
-.custom-scrollbar-btn.disabled::after {
-    opacity: 0.3;
-}
+.custom-scrollbar-btn.up::after { border-width: 0 5px 7px 5px; border-color: transparent transparent #5c4008 transparent; margin-bottom: 2px; filter: drop-shadow(0px 1px 0px rgba(255, 255, 255, 0.8)); }
+.custom-scrollbar-btn.down::after { border-width: 7px 5px 0 5px; border-color: #5c4008 transparent transparent transparent; margin-top: 2px; filter: drop-shadow(1px 1px 0px rgba(255, 255, 255, 0.8)); }
+.custom-scrollbar-btn.left::after { border-width: 5px 7px 5px 0; border-color: transparent #5c4008 transparent transparent; margin-right: 2px; filter: drop-shadow(0px 1px 0px rgba(255, 255, 255, 0.8)); }
+.custom-scrollbar-btn.right::after { border-width: 5px 0 5px 7px; border-color: transparent transparent transparent #5c4008; margin-left: 2px; filter: drop-shadow(0px 1px 0px rgba(255, 255, 255, 0.8)); }
+.custom-scrollbar-btn.disabled::after { opacity: 0.3; }
 
 /* 縦用スクロールバー */
 .custom-scrollbar-track {
     position: absolute; top: 24px; right: 0; width: 24px; bottom: 48px;
-    background-color: #0d1a10;
-    border-left: 1px solid #1b3822;
-    z-index: 50; touch-action: none;
-    display: block !important;
+    background-color: #0d1a10; border-left: 1px solid #1b3822; z-index: 50; touch-action: none; display: block !important;
 }
-/* スライダーの溝を細く描画します */
 .custom-scrollbar-track::before {
-    content: ""; position: absolute;
-    top: 0; bottom: 0; left: 6px; right: 6px;
-    background-color: #050a05;
-    border: 1px solid #000;
-    box-shadow: inset 1px 1px 3px rgba(0,0,0,0.8);
+    content: ""; position: absolute; top: 0; bottom: 0; left: 6px; right: 6px; background-color: #050a05; border: 1px solid #000; box-shadow: inset 1px 1px 3px rgba(0,0,0,0.8);
 }
 .custom-scrollbar-thumb {
     position: absolute; top: 0; left: 2px; right: 2px; min-height: 40px;
     background: linear-gradient(135deg, #ffdf80 0%, #d4af37 100%);
     border-top: 1.5px solid #fff2cc; border-left: 1.5px solid #fff2cc;
     border-bottom: 1.5px solid #825a2c; border-right: 1.5px solid #825a2c;
-    border-radius: 2px;
-    cursor: pointer; touch-action: none; transition: filter 0.2s;
+    border-radius: 2px; cursor: pointer; touch-action: none; transition: filter 0.2s;
 }
-.custom-scrollbar-thumb:active, .custom-scrollbar-thumb.dragging {
-    filter: brightness(1.2);
-}
+.custom-scrollbar-thumb:active, .custom-scrollbar-thumb.dragging { filter: brightness(1.2); }
 
 /* 横用スクロールバー */
 .custom-scrollbar-track-x {
-    position: absolute; bottom: 0; left: 24px; right: 48px; height: 24px; /* ★左右にボタンを置くので隙間を空けます */
-    background-color: #0d1a10;
-    border-top: 1px solid #1b3822;
-    z-index: 50; touch-action: none;
-    display: block !important;
+    position: absolute; bottom: 0; left: 24px; right: 48px; height: 24px;
+    background-color: #0d1a10; border-top: 1px solid #1b3822; z-index: 50; touch-action: none; display: block !important;
 }
 .custom-scrollbar-track-x::before {
-    content: ""; position: absolute;
-    left: 0; right: 0; top: 6px; bottom: 6px;
-    background-color: #050a05;
-    border: 1px solid #000;
-    box-shadow: inset 1px 1px 3px rgba(0,0,0,0.8);
+    content: ""; position: absolute; left: 0; right: 0; top: 6px; bottom: 6px; background-color: #050a05; border: 1px solid #000; box-shadow: inset 1px 1px 3px rgba(0,0,0,0.8);
 }
 .custom-scrollbar-thumb-x {
     position: absolute; left: 0; top: 2px; bottom: 2px; min-width: 40px;
     background: linear-gradient(135deg, #ffdf80 0%, #d4af37 100%);
     border-top: 1.5px solid #fff2cc; border-left: 1.5px solid #fff2cc;
     border-bottom: 1.5px solid #825a2c; border-right: 1.5px solid #825a2c;
-    border-radius: 2px;
-    cursor: pointer; touch-action: none; transition: filter 0.2s;
+    border-radius: 2px; cursor: pointer; touch-action: none; transition: filter 0.2s;
 }
-.custom-scrollbar-thumb-x:active, .custom-scrollbar-thumb-x.dragging {
-    filter: brightness(1.2);
-}
+.custom-scrollbar-thumb-x:active, .custom-scrollbar-thumb-x.dragging { filter: brightness(1.2); }
 
-/* ★追加：リスト右下角の空白を埋める四角（縦バーと横バーの交差点） */
+/* 右下角の空白を埋める四角 */
 .scroll-wrapper::after {
     content: ""; position: absolute; bottom: 0; right: 0; width: 24px; height: 24px;
     background-color: #0d1a10; border-left: 1px solid #1b3822; border-top: 1px solid #1b3822;
@@ -562,31 +505,32 @@ body.hide-daimyo-labels .daimyo-name-label { display: none !important; }
 }
 
 /* リストベース */
-/* ★変更：外枠（.scroll-wrapper）の大きさにピッタリ追従するように設定します */
-.list-container, .daimyo-list-container, .faction-list-container, .princess-list-container { 
+.list-container {
     flex: 1; width: 100%; height: 100%; max-height: none; overflow-y: scroll; scroll-snap-type: y mandatory;
-    border: none; box-shadow: none; border-radius: 0; /* ★ 外枠に任せるので全て消します */
-    scroll-padding-top: 40px; box-sizing: border-box; -webkit-overflow-scrolling: auto; overscroll-behavior: none; 
+    border: none; box-shadow: none; border-radius: 0;
+    scroll-padding-top: 40px; box-sizing: border-box; -webkit-overflow-scrolling: auto; overscroll-behavior: none;
 }
 .result-body { flex: 1; width: 100%; overflow-y: auto; min-height: 0; margin-bottom: 0 !important; padding-bottom: 10px; box-sizing: border-box; overscroll-behavior: none; }
-/* .select-item:last-child などの margin-bottom: 25px; を削除（固定高さに干渉するため） */
-.select-item:last-child, .daimyo-list-item:last-child, .kunishu-list-item:last-child, .faction-list-item:last-child, .princess-list-item:last-child, .delegate-list-item:last-child { margin-bottom: 0; }
+.select-item:last-child { margin-bottom: 0; }
 
-/* 縦の区切り線 */
-.list-header > span, .select-item > span, .daimyo-list-header > span, .daimyo-list-item > span, .kunishu-list-header > span, .kunishu-list-item > span, .kunishu-list-header > strong, .kunishu-list-item > strong, .faction-list-header > span, .faction-list-item > span, .faction-list-item > strong, .princess-list-header > span, .princess-list-item > span, .princess-list-item > strong, .delegate-list-header > span, .delegate-list-item > span { border-right: 1px solid rgba(212,175,55,0.3); padding: 0 2px; display: flex; align-items: center; justify-content: center; box-sizing: border-box; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; height: 100%; }
-.list-header > span, .daimyo-list-header > span, .kunishu-list-header > span, .kunishu-list-header > strong, .faction-list-header > span, .princess-list-header > span, .delegate-list-header > span { border-right: 1px solid rgba(212,175,55,0.3); }
-.list-header > span:last-child, .select-item > span:last-child, .daimyo-list-header > span:last-child, .daimyo-list-item > span:last-child, .kunishu-list-header > span:last-child, .kunishu-list-item > span:last-child, .faction-list-header > span:last-child, .faction-list-item > span:last-child, .princess-list-header > span:last-child, .princess-list-item > span:last-child, .delegate-list-header > span:last-child, .delegate-list-item > span:last-child { border-right: none; }
+/* 縦の区切り線（子要素全てに適用） */
+.list-header > *, .select-item > * {
+    border-right: 1px solid rgba(212,175,55,0.3); padding: 0 2px; display: flex; align-items: center; justify-content: center; box-sizing: border-box; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; height: 100%;
+}
+.list-header > *:last-child, .select-item > *:last-child { border-right: none; }
 
 /* リストヘッダー・アイテム (ゼブラ柄) */
-.list-header, .daimyo-list-header, .kunishu-list-header, .faction-list-header, .princess-list-header, .delegate-list-header { background: #0d1a10; color: #ffd54f; font-weight: bold; position: sticky; top: 0; z-index: 10; text-shadow: 1px 1px 0 #000, -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000; }
-.select-item, .daimyo-list-item, .kunishu-list-item, .faction-list-item, .princess-list-item, .delegate-list-item { border-bottom: 1px solid rgba(255,215,79,0.3); scroll-snap-align: start; cursor: pointer; color: #fff; background: linear-gradient(to bottom, #254a2e 0%, #1b3822 100%); text-shadow: 1px 1px 0 #000, -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000; }
-.select-item:nth-child(even), .daimyo-list-item:nth-child(even), .kunishu-list-item:nth-child(even), .faction-list-item:nth-child(even), .princess-list-item:nth-child(even), .delegate-list-item:nth-child(even) { background: linear-gradient(to bottom, #2d5a38 0%, #254a2e 100%); }
-.select-item:hover, .daimyo-list-item:hover, .kunishu-list-item:hover, .faction-list-item:hover, .princess-list-item:hover, .delegate-list-item:hover { background: linear-gradient(to bottom, #3a6b46 0%, #2a5a36 100%) !important; }
+.list-header { background: #0d1a10; color: #ffd54f; font-weight: bold; position: sticky; top: 0; z-index: 10; text-shadow: 1px 1px 0 #000, -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000; }
+.select-item { border-bottom: 1px solid rgba(255,215,79,0.3); scroll-snap-align: start; cursor: pointer; color: #fff; background: linear-gradient(to bottom, #254a2e 0%, #1b3822 100%); text-shadow: 1px 1px 0 #000, -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000; }
+.select-item:nth-child(even) { background: linear-gradient(to bottom, #2d5a38 0%, #254a2e 100%); }
+.select-item:hover { background: linear-gradient(to bottom, #3a6b46 0%, #2a5a36 100%) !important; }
 .select-item.disabled { color: #9e9e9e !important; pointer-events: none; background: linear-gradient(to bottom, #455a64 0%, #263238 100%) !important; text-shadow: 1px 1px 0 #000 !important; }
-.select-item.selected, .kunishu-list-item.selected { background: rgba(255, 152, 0, 0.4) !important; border-left: 5px solid #ffd54f; }
-.select-item.selected:hover, .kunishu-list-item.selected:hover { background: rgba(255, 152, 0, 0.6) !important; }
+.select-item.selected { background: rgba(255, 152, 0, 0.4) !important; border-left: 5px solid #ffd54f; }
+.select-item.selected:hover { background: rgba(255, 152, 0, 0.6) !important; }
 .select-item input[type="checkbox"], .select-item input[type="radio"] { display: none; }
-.select-item .col-name, .daimyo-list-item .col-daimyo-name, .daimyo-list-item .col-leader-name, .kunishu-list-item .col-kunishu-name, .faction-list-item .col-faction-name, .princess-list-item .col-princess-name, .delegate-list-item .col-castle-name { justify-content: flex-start !important; padding-left: 5px; }
+
+/* 名前カラムの左寄せを共通化 */
+.select-item .col-name, .select-item .col-daimyo-name, .select-item .col-leader-name, .select-item .col-kunishu-name, .select-item .col-faction-name, .select-item .col-princess-name, .select-item .col-castle-name { justify-content: flex-start !important; padding-left: 5px; }
 
 /* 履歴リストアイテム */
 .history-list-item { scroll-snap-align: start; padding: 8px 10px; border-bottom: 1px solid rgba(255, 215, 79, 0.3); font-size: 0.9rem; color: #fff; background: linear-gradient(to bottom, #254a2e 0%, #1b3822 100%); text-shadow: 1px 1px 0 #000, -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000; }
@@ -596,12 +540,14 @@ body.hide-daimyo-labels .daimyo-name-label { display: none !important; }
 /* 各種リストの基本グリッド（スマホ向けベース） */
 .list-header, .select-item { display: grid; grid-template-columns: 35px 2.5fr 1.5fr repeat(6, 1fr); font-size: clamp(0.6rem, 2.2vw, 0.85rem); padding: 0; height: 40px; gap: 0; box-sizing: border-box; align-items: stretch; }
 .list-header.view-mode, .select-item.view-mode { grid-template-columns: 2.5fr 1.5fr repeat(6, 1fr); }
-.daimyo-list-header, .daimyo-list-item { display: grid; grid-template-columns: 2fr 2fr 1fr 1.5fr 1.5fr 1fr; font-size: clamp(0.6rem, 2.2vw, 0.85rem); padding: 0; height: 40px; gap: 0; box-sizing: border-box; align-items: stretch; }
-.kunishu-list-header, .kunishu-list-item { display: grid; grid-template-columns: 20px 3fr 1.5fr 1.5fr 1.5fr; font-size: clamp(0.6rem, 2.2vw, 0.85rem); padding: 0; height: 40px; gap: 0; box-sizing: border-box; align-items: stretch; }
+
+/* 個別リストのグリッド調整 */
+.daimyo-list-header, .daimyo-list-item { grid-template-columns: 2fr 2fr 1fr 1.5fr 1.5fr 1fr; }
+.kunishu-list-header, .kunishu-list-item { grid-template-columns: 20px 3fr 1.5fr 1.5fr 1.5fr; }
 .view-mode .kunishu-list-header, .view-mode .kunishu-list-item { grid-template-columns: 3fr 1.5fr 1.5fr 1.5fr; }
-.faction-list-header, .faction-list-item { display: grid; grid-template-columns: 2.5fr 1fr 1.5fr 1.5fr 3fr; font-size: clamp(0.6rem, 2.2vw, 0.85rem); padding: 0; height: 40px; gap: 0; box-sizing: border-box; align-items: stretch; }
-.princess-list-header, .princess-list-item { display: grid; grid-template-columns: 1.3fr 1fr 1.5fr 1.5fr 3fr; font-size: clamp(0.6rem, 2.2vw, 0.85rem); padding: 0; height: 40px; gap: 0; box-sizing: border-box; align-items: stretch; }
-.delegate-list-header, .delegate-list-item { display: grid; grid-template-columns: 1.5fr 1fr 1fr 1fr; font-size: clamp(0.6rem, 2.2vw, 0.85rem); padding: 0; height: 40px; gap: 0; box-sizing: border-box; align-items: stretch; }
+.faction-list-header, .faction-list-item { grid-template-columns: 2.5fr 1fr 1.5fr 1.5fr 3fr; }
+.princess-list-header, .princess-list-item { grid-template-columns: 1.3fr 1fr 1.5fr 1.5fr 3fr; }
+.delegate-list-header, .delegate-list-item { grid-template-columns: 1.5fr 1fr 1fr 1fr; }
 
 .kunishu-item { padding: 12px 15px; border: 1px solid #d0b080; margin-bottom: 8px; cursor: pointer; display: flex; align-items: center; background: rgba(250, 240, 230, 0.95); border-radius: 6px; transition: all 0.2s ease; font-family: 'Sawarabi Mincho', serif; box-shadow: 1px 1px 3px rgba(0,0,0,0.1); }
 .kunishu-item:hover { background: #fff5e0; transform: translateX(3px); box-shadow: 2px 2px 5px rgba(0,0,0,0.15); border-color: #c0a070; }
@@ -614,10 +560,10 @@ body.hide-daimyo-labels .daimyo-name-label { display: none !important; }
 .toggle-btn { background: none; border: 1px solid #ccc; border-radius: 4px; padding: 2px 8px; font-size: 0.8rem; cursor: pointer; color: #555; }
 
 /* 基本のボタン（決定系・キャンセル系） */
-.btn-primary, .btn-secondary, .btn-danger { 
+.btn-primary, .btn-secondary, .btn-danger {
     position: relative;
     isolation: isolate;
-    padding: 12px 24px; 
+    padding: 12px 24px;
     min-width: calc(3em + 48px);
     display: inline-flex;
     justify-content: center;
@@ -626,13 +572,13 @@ body.hide-daimyo-labels .daimyo-name-label { display: none !important; }
     background: transparent;
     font-family: 'AbashiriMincho', serif;
     letter-spacing: 0.5px;
-    font-size: 1.2rem; 
-    font-weight: bold; 
-    cursor: pointer; 
+    font-size: 1.2rem;
+    font-weight: bold;
+    cursor: pointer;
     color: #fff;
-    white-space: nowrap; 
+    white-space: nowrap;
     filter: drop-shadow(0 4px 4px rgba(0,0,0,0.5));
-    transition: transform 0.2s; 
+    transition: transform 0.2s;
 }
 
 /* 枠線レイヤー (::before) */
@@ -691,11 +637,11 @@ body.hide-daimyo-labels .daimyo-name-label { display: none !important; }
         0px 2px 0 #0f2b21, 0px -2px 0 #0f2b21, 2px 0px 0 #0f2b21, -2px 0px 0 #0f2b21,
         1px 3px 3px rgba(0,0,0,0.8);
 }
-.btn-primary::after { 
-    background: linear-gradient(to bottom, #81c784 0%, #4caf50 60%, #1b5e20 60%, #1b5e20 65%, #388e3c 65%, #43a047 100%); 
+.btn-primary::after {
+    background: linear-gradient(to bottom, #81c784 0%, #4caf50 60%, #1b5e20 60%, #1b5e20 65%, #388e3c 65%, #43a047 100%);
 }
 .btn-primary:hover { transform: scale(1.05); }
-.btn-primary:hover::after { 
+.btn-primary:hover::after {
     background: linear-gradient(to bottom, #a5d6a7 0%, #66bb6a 60%, #2e7d32 60%, #2e7d32 65%, #43a047 65%, #4caf50 100%);
 }
 
@@ -706,11 +652,11 @@ body.hide-daimyo-labels .daimyo-name-label { display: none !important; }
         0px 2px 0 #1a1e20, 0px -2px 0 #1a1e20, 2px 0px 0 #1a1e20, -2px 0px 0 #1a1e20,
         1px 3px 3px rgba(0,0,0,0.8);
 }
-.btn-secondary::after { 
-    background: linear-gradient(to bottom, #90a4ae 0%, #607d8b 60%, #263238 60%, #263238 65%, #37474f 65%, #455a64 100%); 
+.btn-secondary::after {
+    background: linear-gradient(to bottom, #90a4ae 0%, #607d8b 60%, #263238 60%, #263238 65%, #37474f 65%, #455a64 100%);
 }
 .btn-secondary:hover { transform: scale(1.05); }
-.btn-secondary:hover::after { 
+.btn-secondary:hover::after {
     background: linear-gradient(to bottom, #b0bec5 0%, #78909c 60%, #37474f 60%, #37474f 65%, #455a64 65%, #546e7a 100%);
 }
 
@@ -721,22 +667,22 @@ body.hide-daimyo-labels .daimyo-name-label { display: none !important; }
         0px 2px 0 #3a0b0b, 0px -2px 0 #3a0b0b, 2px 0px 0 #3a0b0b, -2px 0px 0 #3a0b0b,
         1px 3px 3px rgba(0,0,0,0.8);
 }
-.btn-danger::after { 
-    background: linear-gradient(to bottom, #e57373 0%, #f44336 60%, #b71c1c 60%, #b71c1c 65%, #c62828 65%, #d32f2f 100%); 
+.btn-danger::after {
+    background: linear-gradient(to bottom, #e57373 0%, #f44336 60%, #b71c1c 60%, #b71c1c 65%, #c62828 65%, #d32f2f 100%);
 }
 .btn-danger:hover { transform: scale(1.05); }
-.btn-danger:hover::after { 
+.btn-danger:hover::after {
     background: linear-gradient(to bottom, #ef9a9a 0%, #ef5350 60%, #c62828 60%, #c62828 65%, #d32f2f 65%, #e53935 100%);
 }
 
 /* ボタン無効時のスタイル */
-.btn-primary:disabled, .btn-primary.disabled, 
-.btn-secondary:disabled, .btn-secondary.disabled, 
-.btn-danger:disabled, .btn-danger.disabled { 
+.btn-primary:disabled, .btn-primary.disabled,
+.btn-secondary:disabled, .btn-secondary.disabled,
+.btn-danger:disabled, .btn-danger.disabled {
     filter: drop-shadow(0 0 0 transparent) grayscale(60%);
-    cursor: not-allowed; 
-    opacity: 0.8; 
-    transform: none !important; 
+    cursor: not-allowed;
+    opacity: 0.8;
+    transform: none !important;
 }
 
 .delegate-btn { padding: 15px 30px; font-size: 1.2rem; font-weight: bold; border: 2px solid #ccc; background-color: #f5f5f5; border-radius: 8px; cursor: pointer; color: #777; transition: all 0.2s; }
@@ -749,21 +695,21 @@ body.hide-daimyo-labels .daimyo-name-label { display: none !important; }
 .delegate-sub-btn:disabled { opacity: 0.5; cursor: not-allowed; }
 
 /* ランクバッジ・ゲージ類 */
-.grade-container { 
-    display: inline-flex; 
-    position: relative; 
-    align-items: center; 
-    justify-content: center; 
-    width: 24px; 
-    height: 1.2em; 
-    font-family: 'Arial Black', sans-serif; 
-    filter: drop-shadow(2px 2px 2px rgba(0,0,0,0.5)); 
+.grade-container {
+    display: inline-flex;
+    position: relative;
+    align-items: center;
+    justify-content: center;
+    width: 24px;
+    height: 1.2em;
+    font-family: 'Arial Black', sans-serif;
+    filter: drop-shadow(2px 2px 2px rgba(0,0,0,0.5));
 }
-.grade-main { 
-    display: inline-block; 
-    font-weight: normal; 
-    font-size: 0.95rem !important; 
-    text-shadow: none !important; 
+.grade-main {
+    display: inline-block;
+    font-weight: normal;
+    font-size: 0.95rem !important;
+    text-shadow: none !important;
     background-clip: text;
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
@@ -771,18 +717,18 @@ body.hide-daimyo-labels .daimyo-name-label { display: none !important; }
     /* 文字の内側を黒く潰してしまう text-stroke をやめ、外側だけの影でフチを作ります */
     filter: drop-shadow(1px 1px 0 #000) drop-shadow(-1px -1px 0 #000) drop-shadow(1px -1px 0 #000) drop-shadow(-1px 1px 0 #000);
 }
-.grade-sub { 
-    position: absolute !important; 
-    font-size: 0.65rem !important; 
-    top: 0 !important; 
-    right: 0 !important; 
-    left: auto !important; 
-    bottom: auto !important; 
-    font-weight: bold; 
-    color: #ffffff; 
+.grade-sub {
+    position: absolute !important;
+    font-size: 0.65rem !important;
+    top: 0 !important;
+    right: 0 !important;
+    left: auto !important;
+    bottom: auto !important;
+    font-weight: bold;
+    color: #ffffff;
     /* 小さい数字を潰してしまう text-stroke は使わず、標準の text-shadow で綺麗にフチ取りします */
     text-shadow: 1px 1px 0 #000, -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000;
-    transform: translate(30%, -10%) !important; 
+    transform: translate(30%, -10%) !important;
 }
 .rank-s .grade-main { background-image: linear-gradient(to bottom, #ffd700 0%, #ffd700 35%, #ffffff 50%, #ffd700 65%, #ffd700 100%); }
 .rank-a .grade-main { background-image: linear-gradient(to bottom, #f47a4d 0%, #f47a4d 35%, #ffffff 50%, #f47a4d 65%, #f47a4d 100%); }
@@ -818,12 +764,12 @@ body.hide-daimyo-labels .daimyo-name-label { display: none !important; }
    各種モーダル・オーバーレイ・ガード
    ========================================================= */
 .modal { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); z-index: 6000; display: flex; justify-content: center; align-items: center; opacity: 1; transition: opacity 0.2s; padding: env(safe-area-inset-top) env(safe-area-inset-right) calc(env(safe-area-inset-bottom) + 60px) env(safe-area-inset-left); box-sizing: border-box; }
-.modal.hidden { opacity: 0; pointer-events: none; display: none !important;} 
+.modal.hidden { opacity: 0; pointer-events: none; display: none !important;}
 
 /* モーダル（小窓）の重なり順（z-index）の統一リスト */
 #intercept-confirm-modal { z-index: 6000; }
 #castle-menu-modal { z-index: 6500; }
-#quantity-modal { z-index: 6500; } 
+#quantity-modal { z-index: 6500; }
 #delegate-setting-modal { z-index: 6600; }
 #settings-modal { z-index: 7000; }
 #result-modal { z-index: 8000; }
@@ -850,44 +796,44 @@ body.hide-daimyo-labels .daimyo-name-label { display: none !important; }
 .scenario-list-vertical { display: flex; flex-direction: column; gap: 10px; margin-top: 20px; padding: 5px; overflow: visible; }
 
 /* シナリオボタンのデザインを和風に統一 */
-.clan-btn { 
-    padding: 15px; 
-    border: 2px solid rgba(212, 175, 55, 0.4); 
-    border-radius: 8px; 
-    font-weight: bold; 
-    cursor: pointer; 
-    background: linear-gradient(to bottom, #254a2e 0%, #1b3822 100%); 
+.clan-btn {
+    padding: 15px;
+    border: 2px solid rgba(212, 175, 55, 0.4);
+    border-radius: 8px;
+    font-weight: bold;
+    cursor: pointer;
+    background: linear-gradient(to bottom, #254a2e 0%, #1b3822 100%);
     color: #fff;
     text-shadow: 1px 1px 0 #000, -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000;
-    transition: transform 0.1s, background 0.2s, border-color 0.2s; 
-    display: flex; 
-    justify-content: center; 
-    align-items: center; 
+    transition: transform 0.1s, background 0.2s, border-color 0.2s;
+    display: flex;
+    justify-content: center;
+    align-items: center;
 }
-.clan-btn:hover { 
-    transform: scale(1.02); 
-    background: linear-gradient(to bottom, #3a6b46 0%, #2a5a36 100%); 
+.clan-btn:hover {
+    transform: scale(1.02);
+    background: linear-gradient(to bottom, #3a6b46 0%, #2a5a36 100%);
     border-color: #ffd54f;
 }
-.clan-btn.selected { 
-    background: rgba(255, 152, 0, 0.4); 
-    border-color: #ffd54f; 
-    color: #ffd54f; 
-    box-shadow: 0 0 10px rgba(255, 213, 79, 0.5); 
-    transform: scale(1.02); 
+.clan-btn.selected {
+    background: rgba(255, 152, 0, 0.4);
+    border-color: #ffd54f;
+    color: #ffd54f;
+    box-shadow: 0 0 10px rgba(255, 213, 79, 0.5);
+    transform: scale(1.02);
 }
 
 /* シナリオ説明文の箱を和風に統一 */
-.scenario-desc-box { 
-    margin-top: 20px; 
-    padding: 15px; 
-    background: rgba(0, 0, 0, 0.4); 
-    border: 1px solid rgba(212, 175, 55, 0.3); 
-    border-radius: 8px; 
-    text-align: left; 
-    font-size: 0.95rem; 
-    line-height: 1.5; 
-    display: none; 
+.scenario-desc-box {
+    margin-top: 20px;
+    padding: 15px;
+    background: rgba(0, 0, 0, 0.4);
+    border: 1px solid rgba(212, 175, 55, 0.3);
+    border-radius: 8px;
+    text-align: left;
+    font-size: 0.95rem;
+    line-height: 1.5;
+    display: none;
     color: #fff;
     text-shadow: 1px 1px 1px #000;
 }
@@ -903,13 +849,13 @@ body.hide-daimyo-labels .daimyo-name-label { display: none !important; }
    ========================================================= */
 
 /* 1. スライダーの行と、項目名（武将名や[購入量]など）の設定 */
-.qty-row { 
-    margin-bottom: 12px; 
-    padding: 0; 
+.qty-row {
+    margin-bottom: 12px;
+    padding: 0;
     display: flex;
-    flex-direction: row; 
+    flex-direction: row;
     align-items: center;
-    gap: 4px; 
+    gap: 4px;
 }
 
 .qty-row.divide-row {
@@ -920,13 +866,13 @@ body.hide-daimyo-labels .daimyo-name-label { display: none !important; }
 
 /* 単体スライダーのラベル、および複数スライダーの武将名（一元管理） */
 .qty-row > :first-child:not(.qty-control),
-.slider-row-label { 
-    color: #ffd54f; 
-    font-size: 0.85rem; 
+.slider-row-label {
+    color: #ffd54f;
+    font-size: 0.85rem;
     text-shadow: 1px 1px 0 #000, -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000;
     font-weight: bold;
     white-space: nowrap;
-    min-width: 50px; 
+    min-width: 50px;
     text-align: left;
     flex-shrink: 0;
 }
@@ -936,7 +882,7 @@ body.hide-daimyo-labels .daimyo-name-label { display: none !important; }
     background: rgba(0, 0, 0, 0.4);
     border: 1px solid rgba(212, 175, 55, 0.3);
     border-radius: 6px;
-    padding: 12px 5px 8px 5px; 
+    padding: 12px 5px 8px 5px;
     margin-bottom: 15px;
 }
 
@@ -944,7 +890,7 @@ body.hide-daimyo-labels .daimyo-name-label { display: none !important; }
 #trade-type-info {
     background: rgba(0, 0, 0, 0.4);
     border: 1px solid rgba(212, 175, 55, 0.3);
-    border-bottom: none; 
+    border-bottom: none;
     border-radius: 6px 6px 0 0;
     padding: 8px 10px 4px 10px;
     color: #ffd54f;
@@ -1004,30 +950,30 @@ body.hide-daimyo-labels .daimyo-name-label { display: none !important; }
 /* =========================================================
    部隊編成画面 (#unit-divide-modal) 専用スタイル
    ========================================================= */
-#unit-divide-modal .modal-content { 
-    overflow: hidden !important; 
+#unit-divide-modal .modal-content {
+    overflow: hidden !important;
 }
 
 /* ヘッダー・在庫状況・フッターは縮まないように固定 */
-#unit-divide-modal h3, 
-#unit-divide-modal #divide-stock-container, 
-#unit-divide-modal .modal-footer { 
-    flex-shrink: 0; 
+#unit-divide-modal h3,
+#unit-divide-modal #divide-stock-container,
+#unit-divide-modal .modal-footer {
+    flex-shrink: 0;
 }
 
 /* スライダーリスト本体：背景・枠線・余白・スクロール設定をここに集約 */
-#divide-list { 
-    flex: 1; 
-    min-height: 0; 
-    overflow-y: auto; 
-    overflow-x: hidden; 
+#divide-list {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+    overflow-x: hidden;
     background: rgba(0, 0, 0, 0.4);
     border: 1px solid rgba(212, 175, 55, 0.3);
     border-radius: 6px;
     padding: 12px 5px 15px 5px; /* 下部に見切れ防止の余白を追加 */
     margin-bottom: 0; /* ★ 外側の余白を消して、箱を限界まで下へ伸ばす魔法 */
-    scrollbar-width: none; 
-    -ms-overflow-style: none; 
+    scrollbar-width: none;
+    -ms-overflow-style: none;
 }
 #divide-list::-webkit-scrollbar { display: none; }
 
@@ -1079,21 +1025,21 @@ body:not(.is-pc).daimyo-select-mode #map-wrapper { margin-bottom: 0 !important; 
 
 /* 独立ボタン・シナリオに戻るボタン共通 */
 /* ★ 画面下部からの距離(bottom)を少し上げて、見切れないように調整しました */
-.floating-back-btn { 
-    position: absolute; bottom: 45px; left: 50%; transform: translateX(-50%); z-index: 4000; 
-    padding: 12px 24px; 
-    background: linear-gradient(to bottom, #254a2e 0%, #1b3822 100%); 
-    color: #fff; 
-    border: 2px solid #d4af37; 
-    border-radius: 8px; 
-    font-size: 1.2rem; font-weight: bold; cursor: pointer; 
-    box-shadow: 0 4px 10px rgba(0,0,0,0.6); 
+.floating-back-btn {
+    position: absolute; bottom: 45px; left: 50%; transform: translateX(-50%); z-index: 4000;
+    padding: 12px 24px;
+    background: linear-gradient(to bottom, #254a2e 0%, #1b3822 100%);
+    color: #fff;
+    border: 2px solid #d4af37;
+    border-radius: 8px;
+    font-size: 1.2rem; font-weight: bold; cursor: pointer;
+    box-shadow: 0 4px 10px rgba(0,0,0,0.6);
     text-shadow: 1px 1px 0 #000, -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000;
-    transition: all 0.2s; pointer-events: auto; white-space: nowrap; 
+    transition: all 0.2s; pointer-events: auto; white-space: nowrap;
 }
-.floating-back-btn:hover { 
-    background: linear-gradient(to bottom, #3a6b46 0%, #2a5a36 100%); 
-    transform: translateX(-50%) scale(1.05); 
+.floating-back-btn:hover {
+    background: linear-gradient(to bottom, #3a6b46 0%, #2a5a36 100%);
+    transform: translateX(-50%) scale(1.05);
     border-color: #ffd54f;
 }
 .floating-back-btn.hidden, .daimyo-confirm-buttons.hidden { display: none !important; }
@@ -1119,10 +1065,10 @@ body.is-pc .sp-only { display: none !important; }
 
 .daimyo-detail-header {
     display: flex;
-    align-items: center; 
-    gap: 10px; 
-    margin-bottom: 10px; 
-    border-bottom: none !important; 
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 10px;
+    border-bottom: none !important;
     padding-bottom: 0 !important;
 }
 .daimyo-detail-header.sp-only {
@@ -1138,12 +1084,12 @@ body.is-pc .sp-only { display: none !important; }
 .daimyo-detail-ideology {
     font-size: 0.95rem;
     font-weight: bold;
-    color: #ffffff; 
-    padding: 1px 6px; 
-    border-radius: 3px; 
-    box-shadow: 1px 1px 3px rgba(0,0,0,0.4); 
-    text-shadow: 1px 1px 2px #000000; 
-    letter-spacing: 1px; 
+    color: #ffffff;
+    padding: 1px 6px;
+    border-radius: 3px;
+    box-shadow: 1px 1px 3px rgba(0,0,0,0.4);
+    text-shadow: 1px 1px 2px #000000;
+    letter-spacing: 1px;
     white-space: nowrap;
     flex-shrink: 0;
 }
@@ -1154,8 +1100,8 @@ body.is-pc .sp-only { display: none !important; }
 
 .daimyo-detail-body {
     display: flex;
-    flex-direction: column; 
-    align-items: flex-start; 
+    flex-direction: column;
+    align-items: flex-start;
     gap: 15px;
     padding: 10px 0;
     width: 100%;
@@ -1172,7 +1118,7 @@ body.is-pc .daimyo-detail-body {
     flex-direction: row; /* スマホ版は横に並べて顔と名前を表示 */
     align-items: center; /* 縦中央揃え */
     gap: 15px;
-    width: 100%; 
+    width: 100%;
     flex-shrink: 0;
 }
 
@@ -1184,7 +1130,7 @@ body.is-pc .daimyo-detail-left {
 }
 
 .daimyo-detail-face {
-    width: 60px; 
+    width: 60px;
     height: 60px;
     object-fit: cover;
     border: 2px solid #fff;
@@ -1226,12 +1172,12 @@ body.is-pc .daimyo-detail-face {
 }
 
 .daimyo-detail-stat-box {
-    background: rgba(0,0,0,0.4); 
+    background: rgba(0,0,0,0.4);
     border: 1px solid rgba(212, 175, 55, 0.3);
-    padding: 3px 6px; 
-    border-radius: 4px; 
+    padding: 3px 6px;
+    border-radius: 4px;
     display: flex;
-    justify-content: space-between; 
+    justify-content: space-between;
     align-items: center;
     white-space: nowrap;
     min-width: 0; /* 箱自体を縮小可能にします */
@@ -1426,22 +1372,22 @@ body:not(.is-pc) .daimyo-detail-value {
 /* =========================================================
    攻城戦 (#war-modal 関連)
    ========================================================= */
-#war-modal { 
-    padding: 0 !important; 
+#war-modal {
+    padding: 0 !important;
     margin: 0 !important;
     width: 100% !important;
-    height: 100% !important; 
+    height: 100% !important;
     box-sizing: border-box !important;
     overflow: hidden !important;
 }
-#war-modal .modal-content { 
-    width: 100% !important; 
-    height: 100% !important; 
-    max-width: none !important; 
-    max-height: none !important; 
-    margin: 0 !important; 
-    border-radius: 0 !important; 
-    border: none !important; 
+#war-modal .modal-content {
+    width: 100% !important;
+    height: 100% !important;
+    max-width: none !important;
+    max-height: none !important;
+    margin: 0 !important;
+    border-radius: 0 !important;
+    border: none !important;
     padding: 0 !important;
     box-sizing: border-box !important;
     overflow: hidden !important;
@@ -1704,9 +1650,9 @@ body:not(.is-pc) .daimyo-detail-value {
 .fw-hex.movable { cursor: pointer; filter: brightness(1.1); }
 .fw-hex.movable::after { background-color: rgba(244, 143, 177, 0.58); }
 .fw-hex.current-pos { cursor: pointer; filter: brightness(1.1); }
-.fw-hex.current-pos::after { background-color: rgba(255, 255, 255, 0.65); } 
+.fw-hex.current-pos::after { background-color: rgba(255, 255, 255, 0.65); }
 .fw-hex.attackable { cursor: pointer; filter: brightness(1.1); }
-.fw-hex.attackable::after { background-color: rgba(239, 83, 80, 0.58); box-shadow: inset 0 0 15px red; } 
+.fw-hex.attackable::after { background-color: rgba(239, 83, 80, 0.58); box-shadow: inset 0 0 15px red; }
 .fw-hex.fw-dir-highlight { cursor: pointer; filter: brightness(1.2); }
 .fw-hex.fw-dir-highlight::after { background-color: rgba(255, 235, 59, 0.5); box-shadow: inset 0 0 10px #fbc02d; }
 
@@ -1778,19 +1724,19 @@ body:not(.is-pc) .modal-footer {
 }
 /* スマホ版: 複数スライダー（輸送）と部隊編成画面を全画面にぴったり収める魔法 */
 body:not(.is-pc) #quantity-modal.multi-slider-mode,
-body:not(.is-pc) #unit-divide-modal { 
-    padding: 0 !important; 
-    height: 100dvh !important; 
+body:not(.is-pc) #unit-divide-modal {
+    padding: 0 !important;
+    height: 100dvh !important;
 }
 body:not(.is-pc) #quantity-modal.multi-slider-mode .modal-content,
-body:not(.is-pc) #unit-divide-modal .modal-content { 
-    width: 100% !important; 
+body:not(.is-pc) #unit-divide-modal .modal-content {
+    width: 100% !important;
     height: 95% !important; /* ★少し余裕を持たせて見切れを防ぎます */
-    max-width: none !important; 
-    max-height: none !important; 
-    margin: auto !important; 
-    border-radius: 0 !important; 
-    border: 2px solid #d4af37 !important; 
+    max-width: none !important;
+    max-height: none !important;
+    margin: auto !important;
+    border-radius: 0 !important;
+    border: 2px solid #d4af37 !important;
     box-sizing: border-box !important;
     padding-top: max(15px, env(safe-area-inset-top)) !important;
     padding-bottom: max(20px, env(safe-area-inset-bottom)) !important; /* ★正しい名前に修正し、下側に余裕を作ります */
@@ -1827,48 +1773,48 @@ body:not(.is-pc) #war-def-wall-info { font-size: 1.4rem !important; }
 
 /* ① メイン軍・援軍【共通】の魔法 */
 body:not(.is-pc) .responsive-army-box,
-body:not(.is-pc) .war-reinf-card { 
-    align-items: stretch !important; 
+body:not(.is-pc) .war-reinf-card {
+    align-items: stretch !important;
 }
 body:not(.is-pc) .responsive-army-title,
-body:not(.is-pc) .war-reinf-card .responsive-army-title { 
-    text-align: left !important; 
-    padding: 0 !important; 
+body:not(.is-pc) .war-reinf-card .responsive-army-title {
+    text-align: left !important;
+    padding: 0 !important;
 }
 body:not(.is-pc) .main-busho-label,
-body:not(.is-pc) .war-reinf-card .reinf-busho-label { 
-    display: flex !important; 
-    align-items: center !important; 
-    position: static !important; 
-    width: 100% !important; 
-    text-align: left !important; 
-    background: rgba(0,0,0,0.5) !important; 
-    color: #fff !important; 
-    padding: 2px 5px !important; 
-    margin: 0 0 5px 0 !important; 
-    box-sizing: border-box !important; 
+body:not(.is-pc) .war-reinf-card .reinf-busho-label {
+    display: flex !important;
+    align-items: center !important;
+    position: static !important;
+    width: 100% !important;
+    text-align: left !important;
+    background: rgba(0,0,0,0.5) !important;
+    color: #fff !important;
+    padding: 2px 5px !important;
+    margin: 0 0 5px 0 !important;
+    box-sizing: border-box !important;
 }
 
 /* ② 【メイン軍だけ】の魔法 */
-body:not(.is-pc) .main-busho-label { 
-    font-size: 0.95rem !important; 
+body:not(.is-pc) .main-busho-label {
+    font-size: 0.95rem !important;
 }
-body:not(.is-pc) .responsive-army-content { 
-    display: flex !important; flex-direction: row !important; align-items: flex-start !important; padding: 0 !important; gap: 10px !important; min-height: auto !important; 
+body:not(.is-pc) .responsive-army-content {
+    display: flex !important; flex-direction: row !important; align-items: flex-start !important; padding: 0 !important; gap: 10px !important; min-height: auto !important;
 }
-body:not(.is-pc) .responsive-war-face { 
-    position: static !important; width: 60px !important; height: 60px !important; margin: 0 !important; 
+body:not(.is-pc) .responsive-war-face {
+    position: static !important; width: 60px !important; height: 60px !important; margin: 0 !important;
 }
-body:not(.is-pc) .responsive-army-stats { 
-    flex: 1 !important; 
+body:not(.is-pc) .responsive-army-stats {
+    flex: 1 !important;
 }
 
 /* ③ 【援軍だけ】の魔法 */
-body:not(.is-pc) .war-reinf-card .responsive-army-title { 
-    font-size: 0.85rem !important; margin-bottom: 2px !important; height: 20px !important; 
+body:not(.is-pc) .war-reinf-card .responsive-army-title {
+    font-size: 0.85rem !important; margin-bottom: 2px !important; height: 20px !important;
 }
-body:not(.is-pc) .war-reinf-card .reinf-busho-label { 
-    font-size: 0.6rem !important; 
+body:not(.is-pc) .war-reinf-card .reinf-busho-label {
+    font-size: 0.6rem !important;
 }
 body:not(.is-pc) .war-reinf-card .stat-row { font-size: 0.75rem !important; }
 body:not(.is-pc) .war-reinf-card .stat-val-large { font-size: 0.85rem !important; }
@@ -1887,28 +1833,28 @@ body.is-pc {
     background-color: #111111; display: flex; justify-content: center; align-items: center; margin: 0;
 
     #game-screen { overflow: hidden; background-color: var(--bg-color); position: relative; }
-    
+   
     #app { flex-direction: row; }
     #top-info-bar, #bottom-command-bar, #pc-map-overlay { display: none !important; }
     #map-reset-zoom { bottom: 20px; right: 20px; }
-    
+   
     /* PC版：マップの周りの余白をタイトル画面と同じ色に塗りつぶす魔法 */
     #map-wrapper { background: linear-gradient(135deg, #263238 0%, #37474f 100%); }
-    
+   
     /* PC版：年月、浪人、米相場を右上に横並びで配置 */
-    #mobile-floating-info { 
-        top: 20px; 
-        bottom: auto; 
-        left: auto; 
-        right: 280px; /* 計算して割り出した、ピッタリの位置です */
-        flex-direction: row; 
-    }
-    #mobile-floating-market { 
-        top: 20px; 
+    #mobile-floating-info {
+        top: 20px;
         bottom: auto;
         left: auto;
-        right: 30px; 
-        flex-direction: row; 
+        right: 280px; /* 計算して割り出した、ピッタリの位置です */
+        flex-direction: row;
+    }
+    #mobile-floating-market {
+        top: 20px;
+        bottom: auto;
+        left: auto;
+        right: 30px;
+        flex-direction: row;
         gap: 15px; /* 浪人と米相場の間の隙間を15pxに固定します */
     }
 
@@ -1929,20 +1875,20 @@ body.is-pc {
     .command-grid { grid-template-columns: repeat(2, 1fr); gap: 10px; }
     .cmd-btn { padding: 8px 8px; font-size: 1.2rem; height: auto; }
     .cmd-btn.finish, .cmd-btn.back { grid-column: span 2; }
-
+   
+   
     /* PCリストレイアウト */
-    /* ★変更：パソコン版用の高さに合わせて、外枠と中身をそれぞれ設定します */
     .scroll-wrapper { max-height: calc(44px * 9 + 28px); }
-    .list-container, .daimyo-list-container, .faction-list-container, .princess-list-container { height: 100%; max-height: none; scroll-padding-top: 44px; }
+    .list-container { scroll-padding-top: 44px; }
     .list-header, .select-item { grid-template-columns: 45px 100px 60px repeat(6, 1fr); font-size: 0.85rem; height: 44px; }
     .list-header.view-mode, .select-item.view-mode { grid-template-columns: 100px 60px repeat(6, 1fr); }
+   
     .daimyo-list-header, .daimyo-list-item { grid-template-columns: 80px 110px 50px 80px 80px 60px; font-size: 0.9rem; height: 44px; }
     .kunishu-list-header, .kunishu-list-item { grid-template-columns: 25px 130px 80px 80px 80px; font-size: 0.9rem; height: 44px; }
     .view-mode .kunishu-list-header, .view-mode .kunishu-list-item { grid-template-columns: 140px 80px 80px 80px; }
     .faction-list-header, .faction-list-item { grid-template-columns: 140px 80px 100px 100px 1fr; font-size: 0.95rem; height: 44px; }
     .princess-list-header, .princess-list-item { grid-template-columns: 95px 80px 100px 100px 1fr; font-size: 0.95rem; height: 44px; }
-    .list-container, .daimyo-list-container, .result-body, .faction-list-container, .princess-list-container { scroll-padding-top: 44px; }
-    
+   
     /* モーダル拡張（輸送・兵力分配）のタイル化を解除して縦並びに統一 */
     #quantity-modal .modal-content, #unit-divide-modal .modal-content { max-width: 700px !important; max-height: 90% !important; }
     #quantity-container, #divide-list { display: flex !important; flex-direction: column; gap: 10px; align-items: stretch; }
@@ -1954,15 +1900,15 @@ body.is-pc {
 
     /* PC版: 大名選択 */
     #daimyo-confirm-modal .modal-content { top: 20px; left: 20px; bottom: auto; right: auto; width: 640px; max-width: calc(100vw - 40px); overflow-x: hidden;}
-    
+   
     #daimyo-confirm-body { display: grid; grid-template-columns: minmax(80px, 120px) minmax(0, 1fr); grid-template-rows: auto auto; column-gap: 20px; row-gap: 10px; }
     .daimyo-confirm-compact, .daimyo-confirm-info { display: contents; }
-    
+   
     .daimyo-confirm-compact .daimyo-confirm-face { grid-column: 1; grid-row: 2; width: 120px; height: 120px; border: 3px solid #fff; border-radius: 8px; box-shadow: inset 0 0 0 1px rgba(0,0,0,0.7), 0 0 6px rgba(0,0,0,0.8); margin: 0; }
-    
+   
     .daimyo-confirm-info h3 { grid-column: 1; grid-row: 1; font-size: 1.6rem !important; margin: 0 !important; padding: 0 !important; border: none !important; white-space: nowrap; text-align: left; }
     .daimyo-confirm-info div { grid-column: 2; grid-row: 1; font-size: 1.2rem !important; margin: 0 !important; display: flex; align-items: center; }
-    
+   
     .daimyo-confirm-stats { grid-column: 2; grid-row: 2; gap: 4px; margin-top: 0; width: 100%; box-sizing: border-box; display: grid; grid-template-columns: repeat(auto-fit, minmax(80px, 1fr)); }
     .daimyo-confirm-stats .stat-box { font-size: 1.1rem; padding: 6px 10px; background: rgba(0,0,0,0.4); border: 1px solid rgba(212, 175, 55, 0.3); border-radius: 4px; color: #fff; text-shadow: 1px 1px 0 #000, -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000; }
     .daimyo-confirm-stats .stat-box span:first-child { color: #ffd54f; }
@@ -1984,23 +1930,23 @@ body.is-pc {
     .war-side-wrapper > .war-reinf-col:first-child { flex-direction: column !important; }
 
     /* ① メイン軍・援軍【共通】の魔法 */
-    .responsive-army-box, .war-reinf-card { 
-        align-items: stretch !important; 
+    .responsive-army-box, .war-reinf-card {
+        align-items: stretch !important;
     }
-    .responsive-army-title, .war-reinf-card .responsive-army-title { 
-        text-align: left !important; 
-        padding: 0 !important; 
+    .responsive-army-title, .war-reinf-card .responsive-army-title {
+        text-align: left !important;
+        padding: 0 !important;
     }
-    .main-busho-label, .war-reinf-card .reinf-busho-label { 
-        display: flex !important; 
-        align-items: center !important; 
-        position: static !important; 
-        width: 100% !important; 
-        text-align: left !important; 
-        background: rgba(0,0,0,0.5) !important; 
-        color: #fff !important; 
-        box-sizing: border-box !important; 
-        padding: 2px 5px !important; 
+    .main-busho-label, .war-reinf-card .reinf-busho-label {
+        display: flex !important;
+        align-items: center !important;
+        position: static !important;
+        width: 100% !important;
+        text-align: left !important;
+        background: rgba(0,0,0,0.5) !important;
+        color: #fff !important;
+        box-sizing: border-box !important;
+        padding: 2px 5px !important;
     }
 
     /* ② 【メイン軍だけ】の魔法 */
@@ -2031,43 +1977,43 @@ body.is-pc {
    ★ 撤退先選択専用の魔法（完全独立版）
    ========================================================= */
 .retreat-grid {
-    display: grid; 
-    grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); 
-    gap: 10px; 
-    margin-top: 20px; 
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+    gap: 10px;
+    margin-top: 20px;
     overflow-y: auto;
 }
-.retreat-btn { 
-    padding: 15px; 
-    border: 2px solid #ccc; 
-    border-radius: 8px; 
-    font-weight: bold; 
-    cursor: pointer; 
-    background: #fff; 
-    transition: transform 0.1s, background-color 0.2s, border-color 0.2s; 
-    display: flex; 
-    justify-content: center; 
-    align-items: center; 
+.retreat-btn {
+    padding: 15px;
+    border: 2px solid #ccc;
+    border-radius: 8px;
+    font-weight: bold;
+    cursor: pointer;
+    background: #fff;
+    transition: transform 0.1s, background-color 0.2s, border-color 0.2s;
+    display: flex;
+    justify-content: center;
+    align-items: center;
 }
-body.is-pc .retreat-btn:hover { 
-    transform: scale(1.02); 
-    background: #f0f8ff; 
+body.is-pc .retreat-btn:hover {
+    transform: scale(1.02);
+    background: #f0f8ff;
 }
 /* =========================================================
    ★ 専用ロード画面の魔法
    ========================================================= */
 #global-loading-screen {
     position: absolute; /* ★差し替え：親要素（ゲーム画面）を基準にします */
-    top: 0; 
-    left: 0; 
-    width: 100%; 
+    top: 0;
+    left: 0;
+    width: 100%;
     height: 100%;
     background-color: #263238; /* タイトル画面のような暗い色 */
     z-index: 9999; /* どんな画面よりも手前に出します */
     display: flex;
     justify-content: center; /* ★中央に寄せます（左右） */
-    align-items: center;     /* ★中央に寄せます（上下） */
-    padding: 0;              /* 余計な隙間をなくします */
+    align-items: center;    /* ★中央に寄せます（上下） */
+    padding: 0;             /* 余計な隙間をなくします */
     box-sizing: border-box;
 }
 
@@ -2184,7 +2130,7 @@ body.is-pc.daimyo-select-mode #pc-new-ui-container { display: none !important; }
     color: #aaa;
     transition: all 0.2s;
     box-sizing: border-box; /* ★高さ計算を厳密にします */
-    
+   
     /* ★親コンテナに関係なく、ボタン自身を2px下にずらしてリストに被せます */
     position: relative;
     top: 2px;
@@ -2206,18 +2152,18 @@ body.is-pc.daimyo-select-mode #pc-new-ui-container { display: none !important; }
 
 /* 状態タブ選択時のリストレイアウト（スマホ） */
 .list-header.status-mode, .select-item.status-mode {
-    grid-template-columns: 2.5fr 1.5fr 2fr 2fr 1fr 1fr 1fr 0fr; 
+    grid-template-columns: 2.5fr 1.5fr 2fr 2fr 1fr 1fr 1fr 0fr;
 }
 .list-header.status-mode.view-mode, .select-item.status-mode.view-mode {
-    grid-template-columns: 2.5fr 1.5fr 2fr 2fr 35px 1fr 1fr 1fr 0fr; 
+    grid-template-columns: 2.5fr 1.5fr 2fr 2fr 35px 1fr 1fr 1fr 0fr;
 }
 
 /* 状態タブ選択時のリストレイアウト（PC版） */
 body.is-pc .list-header.status-mode, body.is-pc .select-item.status-mode {
-    grid-template-columns: 100px 60px 140px 140px 50px 50px 60px 1fr; 
+    grid-template-columns: 100px 60px 140px 140px 50px 50px 60px 1fr;
 }
 body.is-pc .list-header.status-mode.view-mode, body.is-pc .select-item.status-mode.view-mode {
-    grid-template-columns: 100px 60px 140px 140px 45px 50px 50px 60px 1fr; 
+    grid-template-columns: 100px 60px 140px 140px 45px 50px 50px 60px 1fr;
 }
 
 /* ★一門の◯印のスタイル（黒・太字） */
@@ -2243,7 +2189,7 @@ body.is-pc .list-header.status-mode.view-mode, body.is-pc .select-item.status-mo
 /* =========================================================
    ★ 拠点一覧の横スクロールのための魔法
    ========================================================= */
-#kyoten-list .list-header, 
-#kyoten-list .select-item {
+.kyoten-list-container .list-header,
+.kyoten-list-container .select-item {
     min-width: 650px; /* 画面が小さくてもこの幅を保って、横にスクロールできるようにします！ */
 }
