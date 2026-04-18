@@ -262,8 +262,26 @@ class CustomScrollbar {
         document.addEventListener('mouseup', onEnd);
         
         window.addEventListener('resize', () => this.update());
+
+        // ★追加：外枠に「スクロールバーがあるよ」という目印のシールを貼ります
+        this.wrapper.classList.add('has-custom-scrollbar');
+    }
+
+    // ★追加：スクロールバーの部品を画面から綺麗にお片付けする魔法です
+    destroy() {
+        if (this.trackY) this.trackY.remove();
+        if (this.btnUp) this.btnUp.remove();
+        if (this.btnDown) this.btnDown.remove();
+        if (this.trackX) this.trackX.remove();
+        if (this.btnLeft) this.btnLeft.remove();
+        if (this.btnRight) this.btnRight.remove();
+        
+        this.list.classList.remove('hide-native-scroll');
+        
+        if (this.wrapper) {
+            // ★目印のシールも剥がして、右下の四角い枠（隙間埋め）も消します
+            this.wrapper.classList.remove('has-custom-scrollbar');
+        }
     }
 }
-
-// ★ここが大事！これを書き忘れてごめんね！
 window.CustomScrollbar = CustomScrollbar;
