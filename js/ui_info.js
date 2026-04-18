@@ -3108,8 +3108,8 @@ class UIInfoManager {
 
         // 諸勢力のイデオロギーカラー（大名家のCSSを流用します）
         let ideologyClass = "ideology-chudo";
-        if (ideology === '宗教') ideologyClass = "ideology-kakushin"; 
-        else if (ideology === '傭兵') ideologyClass = "ideology-hoshu";
+        if (ideology === '宗教') ideologyClass = "ideology-hoshu"; 
+        else if (ideology === '傭兵') ideologyClass = "ideology-kakushin";
 
         let faceSrc = leader && leader.faceIcon ? `data/images/faceicons/${leader.faceIcon}` : "data/images/faceicons/unknown_face.webp";
 
@@ -3132,24 +3132,24 @@ class UIInfoManager {
                         </div>
                         <div class="daimyo-detail-right">
                             <div class="daimyo-detail-row daimyo-detail-2col">
+                                <div class="daimyo-detail-stat-box"><span class="daimyo-detail-label">武将</span><span class="daimyo-detail-value">${bushosCount}</span></div>
                                 <div class="daimyo-detail-stat-box"><span class="daimyo-detail-label">頭領</span><span class="daimyo-detail-value">${leaderName}</span></div>
+                            </div>
+                            <div class="daimyo-detail-row daimyo-detail-2col">
                                 <div class="daimyo-detail-stat-box"><span class="daimyo-detail-label">所在</span><span class="daimyo-detail-value">${baseCastleName}</span></div>
-                            </div>
-                            <div class="daimyo-detail-row daimyo-detail-2col">
                                 <div class="daimyo-detail-stat-box"><span class="daimyo-detail-label">所属</span><span class="daimyo-detail-value">${provinceName}</span></div>
-                                <div class="daimyo-detail-stat-box"><span class="daimyo-detail-label">武将数</span><span class="daimyo-detail-value">${bushosCount}</span></div>
                             </div>
                             <div class="daimyo-detail-row daimyo-detail-2col">
-                                <div class="daimyo-detail-stat-box"><span class="daimyo-detail-label">兵士</span><span class="daimyo-detail-value">${kunishu.soldiers} / ${kunishu.maxSoldiers}</span></div>
-                                <div class="daimyo-detail-stat-box"><span class="daimyo-detail-label">防御</span><span class="daimyo-detail-value">${kunishu.defense} / ${kunishu.maxDefense}</span></div>
+                                <div class="daimyo-detail-stat-box"><span class="daimyo-detail-label">兵士</span><span class="daimyo-detail-value">${kunishu.soldiers}</span></div>
+                                <div class="daimyo-detail-stat-box"><span class="daimyo-detail-label">防御</span><span class="daimyo-detail-value">${kunishu.defense}</span></div>
                             </div>
                             <div class="daimyo-detail-row daimyo-detail-2col">
                                 <div class="daimyo-detail-stat-box"><span class="daimyo-detail-label">訓練</span><span class="daimyo-detail-value">${kunishu.training}</span></div>
-                                <div class="daimyo-detail-stat-box"><span class="daimyo-detail-label">軍馬</span><span class="daimyo-detail-value">${kunishu.horses || 0} / ${kunishu.maxHorses || 0}</span></div>
+                                <div class="daimyo-detail-stat-box"><span class="daimyo-detail-label">軍馬</span><span class="daimyo-detail-value">${kunishu.horses || 0}</span></div>
                             </div>
                             <div class="daimyo-detail-row daimyo-detail-2col">
                                 <div class="daimyo-detail-stat-box"><span class="daimyo-detail-label">士気</span><span class="daimyo-detail-value">${kunishu.morale}</span></div>
-                                <div class="daimyo-detail-stat-box"><span class="daimyo-detail-label">鉄砲</span><span class="daimyo-detail-value">${kunishu.guns || 0} / ${kunishu.maxGuns || 0}</span></div>
+                                <div class="daimyo-detail-stat-box"><span class="daimyo-detail-label">鉄砲</span><span class="daimyo-detail-value">${kunishu.guns || 0}</span></div>
                             </div>
                         </div>
                     </div>
