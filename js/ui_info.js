@@ -3057,6 +3057,12 @@ class UIInfoManager {
         this.pushModal('kunishu_list', [kunishus, castle, onBack]);
     }
 
+    showAllKunishuList() {
+        this.closeCommonModal(); 
+        const allKunishus = this.game.kunishuSystem.getAliveKunishus();
+        this.pushModal('kunishu_list', [allKunishus, null, null]);
+    }
+
     _renderKunishuList(kunishus, castle, onBack, scrollPos = 0) {
         const modal = document.getElementById('selector-modal');
         const titleEl = document.getElementById('selector-title');
@@ -3072,7 +3078,7 @@ class UIInfoManager {
         
         if (contextEl) {
             contextEl.classList.remove('hidden');
-            contextEl.innerHTML = `<div>${castle ? castle.name : ''} に存在する諸勢力です</div>`;
+            contextEl.innerHTML = `<div>${castle ? castle.name + ' に存在する諸勢力です' : '全国の諸勢力一覧です'}</div>`;
         }
         
         if (tabsEl) {
@@ -3092,10 +3098,11 @@ class UIInfoManager {
             const footer = backBtn.parentElement;
             if (footer) footer.style.justifyContent = 'center';
         }
-
+        
         let listHtml = `
             <div class="list-header kunishu-list-header view-mode">
                 <span style="padding-left:5px; justify-content:flex-start;">勢力名</span>
+                <span>所在</span>
                 <span>兵士</span>
                 <span>防御</span>
                 <span>友好度</span>
@@ -3104,6 +3111,8 @@ class UIInfoManager {
         
         kunishus.forEach(kunishu => {
             const kunishuName = kunishu.getName(this.game);
+            const castleObj = this.game.getCastle(kunishu.castleId);
+            const castleName = castleObj ? castleObj.name : "不明";
             const relVal = kunishu.getRelation(this.game.playerClanId);
             const relPercent = Math.min(100, Math.max(0, Number(relVal) || 0));
             const friendBarHtml = `<div class="bar-bg bar-bg-friend"><div class="bar-fill bar-fill-friend" style="width:${relPercent}%;"></div></div>`;
@@ -3112,6 +3121,7 @@ class UIInfoManager {
             listHtml += `
                 <div class="select-item kunishu-list-item view-mode" style="cursor:default;">
                     <strong class="col-kunishu-name">${kunishuName}</strong>
+                    <span>${castleName}</span>
                     <span>${kunishu.soldiers}</span>
                     <span>${kunishu.defense}</span>
                     <span>${friendBarHtml}</span>
@@ -3123,7 +3133,7 @@ class UIInfoManager {
         for (let i = itemCount; i < 8; i++) {
             listHtml += `
                 <div class="select-item kunishu-list-item view-mode" style="cursor:default; pointer-events:none;">
-                    <span></span><span></span><span></span><span></span>
+                    <span></span><span></span><span></span><span></span><span></span>
                 </div>
             `;
         }

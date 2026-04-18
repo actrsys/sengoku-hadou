@@ -551,7 +551,7 @@ body.hide-daimyo-labels .daimyo-name-label { display: none !important; }
 /* 個別リストのグリッド調整 */
 .daimyo-list-header, .daimyo-list-item { grid-template-columns: 2fr 2fr 1fr 1.5fr 1.5fr 1fr; }
 .kunishu-list-header, .kunishu-list-item { grid-template-columns: 20px 3fr 1.5fr 1.5fr 1.5fr; }
-.view-mode .kunishu-list-header, .view-mode .kunishu-list-item { grid-template-columns: 3fr 1.5fr 1.5fr 1.5fr; }
+.view-mode .kunishu-list-header, .view-mode .kunishu-list-item { grid-template-columns: 3fr 2fr 1.5fr 1.5fr 1.5fr; }
 .faction-list-header, .faction-list-item { grid-template-columns: 2.5fr 1fr 1.5fr 1.5fr 3fr; }
 .princess-list-header, .princess-list-item { grid-template-columns: 1.3fr 1fr 1.5fr 1.5fr 3fr; }
 .delegate-list-header, .delegate-list-item { grid-template-columns: 1.5fr 1fr 1fr 1fr; }
@@ -1886,7 +1886,7 @@ body.is-pc {
     
     .daimyo-list-header, .daimyo-list-item { grid-template-columns: 80px 110px 50px 80px 80px 60px; font-size: 0.9rem; height: 44px; }
     .kunishu-list-header, .kunishu-list-item { grid-template-columns: 25px 130px 80px 80px 80px; font-size: 0.9rem; height: 44px; }
-    .view-mode .kunishu-list-header, .view-mode .kunishu-list-item { grid-template-columns: 140px 80px 80px 80px; }
+    .view-mode .kunishu-list-header, .view-mode .kunishu-list-item { grid-template-columns: 140px 100px 80px 80px 80px; }
     .faction-list-header, .faction-list-item { grid-template-columns: 140px 80px 100px 100px 1fr; font-size: 0.95rem; height: 44px; }
     .princess-list-header, .princess-list-item { grid-template-columns: 95px 80px 100px 100px 1fr; font-size: 0.95rem; height: 44px; }
     

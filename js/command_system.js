@@ -36,7 +36,7 @@ const COMMAND_MENU_STRUCTURE = [
     },
     {
         label: "情報",
-        commands: ['busho_list', 'princess_list', 'kyoten_list', 'faction_list', 'daimyo_list']
+        commands: ['busho_list', 'princess_list', 'kyoten_list', 'faction_list', 'daimyo_list', 'kunishu_list']
     },
     {
         label: "システム",
@@ -252,6 +252,10 @@ const COMMAND_SPECS = {
     'daimyo_list': {
         label: "勢力", category: 'INFO',
         isSystem: true, action: 'daimyo_list'
+    },
+    'kunishu_list': {
+        label: "諸勢力", category: 'INFO',
+        isSystem: true, action: 'kunishu_list'
     },
 
     // --- 対外：外交 (FOREIGN_DAIMYO) ---
@@ -897,6 +901,7 @@ class CommandSystem {
                 }
                 break;
             case 'daimyo_list': this.game.ui.showDaimyoList(); break;
+            case 'kunishu_list': this.game.ui.info.showAllKunishuList(); break;
             case 'faction_list': this.game.ui.showFactionList(this.game.playerClanId, true); break;
             case 'busho_list': this.game.ui.openBushoSelector('all_busho_list', null, null, null); break;
             case 'princess_list': this.game.ui.showPrincessList(); break;
