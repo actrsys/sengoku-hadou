@@ -3102,29 +3102,38 @@ class UIInfoManager {
         let listHtml = `
             <div class="list-header kunishu-list-header view-mode">
                 <span style="padding-left:5px; justify-content:flex-start;">勢力名</span>
+                <span>頭領</span>
                 <span>所在</span>
                 <span>兵士</span>
-                <span>防御</span>
                 <span>友好度</span>
+                <span>関係</span>
             </div>
         `;
         
         kunishus.forEach(kunishu => {
             const kunishuName = kunishu.getName(this.game);
+            const leader = this.game.getBusho(kunishu.leaderId);
+            const leaderName = leader ? leader.name : "不明";
             const castleObj = this.game.getCastle(kunishu.castleId);
             const castleName = castleObj ? castleObj.name : "不明";
             const relVal = kunishu.getRelation(this.game.playerClanId);
             const relPercent = Math.min(100, Math.max(0, Number(relVal) || 0));
             const friendBarHtml = `<div class="bar-bg bar-bg-friend"><div class="bar-fill bar-fill-friend" style="width:${relPercent}%;"></div></div>`;
             
+            let relStatus = "普通";
+            let relColor = "";
+            if (relVal >= 70) { relStatus = "友好"; relColor = "color:#388e3c;"; }
+            else if (relVal < 40) { relStatus = "敵対"; relColor = "color:#d32f2f;"; }
+
             // ★ここではまだクリックできない閲覧専用モードとして作ります
             listHtml += `
                 <div class="select-item kunishu-list-item view-mode" style="cursor:default;">
                     <strong class="col-kunishu-name">${kunishuName}</strong>
+                    <span>${leaderName}</span>
                     <span>${castleName}</span>
                     <span>${kunishu.soldiers}</span>
-                    <span>${kunishu.defense}</span>
                     <span>${friendBarHtml}</span>
+                    <span style="${relColor} font-weight:bold;">${relStatus}</span>
                 </div>
             `;
         });
@@ -3133,7 +3142,7 @@ class UIInfoManager {
         for (let i = itemCount; i < 8; i++) {
             listHtml += `
                 <div class="select-item kunishu-list-item view-mode" style="cursor:default; pointer-events:none;">
-                    <span></span><span></span><span></span><span></span><span></span>
+                    <span></span><span></span><span></span><span></span><span></span><span></span>
                 </div>
             `;
         }
