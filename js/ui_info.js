@@ -1403,7 +1403,7 @@ class UIInfoManager {
         }
         
         if (listContainer) {
-            listContainer.className = 'list-container hide-native-scroll';
+            listContainer.className = 'list-container kyoten-list-container hide-native-scroll';
             listContainer.style.display = 'block';
             listContainer.innerHTML = listHtml;
 
