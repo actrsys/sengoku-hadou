@@ -88,61 +88,62 @@ class CustomScrollbar {
         const scrollLeft = this.list.scrollLeft;
 
         // --- 縦のバーの更新 ---
-        const trackHeight = this.trackY.clientHeight || listHeight;
-        if (scrollHeight <= listHeight) {
-            // ★修正：スクロール不要な時は縦のバーとボタンを隠す魔法
-            this.trackY.style.display = 'none';
-            this.btnUp.style.display = 'none';
-            this.btnDown.style.display = 'none';
-            this.thumbY.style.pointerEvents = 'none';
-        } else {
-            // ★修正：スクロールが必要な時は表示する
-            this.trackY.style.display = 'block';
-            this.btnUp.style.display = 'flex';
-            this.btnDown.style.display = 'flex';
-            this.thumbY.style.pointerEvents = 'auto';
-            let thumbHeight = Math.max(40, (listHeight / scrollHeight) * trackHeight);
-            this.thumbY.style.height = `${thumbHeight}px`;
-            const maxScrollTop = scrollHeight - listHeight;
-            const maxThumbTop = trackHeight - thumbHeight;
-            const scrollRatioY = scrollTop / maxScrollTop;
-            this.thumbY.style.top = `${scrollRatioY * maxThumbTop}px`;
+        if (this.trackY && this.thumbY) {
+            const trackHeight = this.trackY.clientHeight || listHeight;
+            if (scrollHeight <= listHeight) {
+                this.trackY.style.display = 'none';
+                if (this.btnUp) this.btnUp.style.display = 'none';
+                if (this.btnDown) this.btnDown.style.display = 'none';
+                this.thumbY.style.pointerEvents = 'none';
+            } else {
+                this.trackY.style.display = 'block';
+                if (this.btnUp) this.btnUp.style.display = 'flex';
+                if (this.btnDown) this.btnDown.style.display = 'flex';
+                this.thumbY.style.pointerEvents = 'auto';
+                let thumbHeight = Math.max(40, (listHeight / scrollHeight) * trackHeight);
+                this.thumbY.style.height = `${thumbHeight}px`;
+                const maxScrollTop = scrollHeight - listHeight;
+                const maxThumbTop = trackHeight - thumbHeight;
+                const scrollRatioY = scrollTop / maxScrollTop;
+                this.thumbY.style.top = `${scrollRatioY * maxThumbTop}px`;
+            }
         }
 
         // --- 横のバーの更新 ---
-        const actualTrackWidth = this.trackX.clientWidth || listWidth;
-        if (scrollWidth <= listWidth) {
-            // ★修正：スクロール不要な時は横のバーとボタンを隠す魔法
-            this.trackX.style.display = 'none';
-            this.btnLeft.style.display = 'none';
-            this.btnRight.style.display = 'none';
-        } else {
-            // ★修正：スクロールが必要な時は表示する
-            this.trackX.style.display = 'block';
-            this.btnLeft.style.display = 'flex';
-            this.btnRight.style.display = 'flex';
-            this.thumbX.style.pointerEvents = 'auto';
-            let thumbWidth = Math.max(40, (listWidth / scrollWidth) * actualTrackWidth);
-            this.thumbX.style.width = `${thumbWidth}px`;
-            const maxScrollLeft = scrollWidth - listWidth;
-            const maxThumbLeft = actualTrackWidth - thumbWidth;
-            const scrollRatioX = scrollLeft / maxScrollLeft;
-            this.thumbX.style.left = `${scrollRatioX * maxThumbLeft}px`;
+        if (this.trackX && this.thumbX) {
+            const actualTrackWidth = this.trackX.clientWidth || listWidth;
+            if (scrollWidth <= listWidth) {
+                this.trackX.style.display = 'none';
+                if (this.btnLeft) this.btnLeft.style.display = 'none';
+                if (this.btnRight) this.btnRight.style.display = 'none';
+            } else {
+                this.trackX.style.display = 'block';
+                if (this.btnLeft) this.btnLeft.style.display = 'flex';
+                if (this.btnRight) this.btnRight.style.display = 'flex';
+                this.thumbX.style.pointerEvents = 'auto';
+                let thumbWidth = Math.max(40, (listWidth / scrollWidth) * actualTrackWidth);
+                this.thumbX.style.width = `${thumbWidth}px`;
+                const maxScrollLeft = scrollWidth - listWidth;
+                const maxThumbLeft = actualTrackWidth - thumbWidth;
+                const scrollRatioX = scrollLeft / maxScrollLeft;
+                this.thumbX.style.left = `${scrollRatioX * maxThumbLeft}px`;
+            }
         }
 
         // --- 右下の隙間埋めブロックの更新 ---
-        // ★追加：縦と横、両方のスクロールバーが出ている時だけ表示します
-        if (scrollHeight > listHeight && scrollWidth > listWidth) {
-            this.wrapper.classList.add('has-custom-scrollbar');
-        } else {
-            this.wrapper.classList.remove('has-custom-scrollbar');
+        if (this.wrapper) {
+            if (scrollHeight > listHeight && scrollWidth > listWidth) {
+                this.wrapper.classList.add('has-custom-scrollbar');
+            } else {
+                this.wrapper.classList.remove('has-custom-scrollbar');
+            }
         }
 
         // --- ボタンの色（有効・無効）の更新 ---
-        this.btnUp.classList.toggle('disabled', scrollTop <= 0);
-        this.btnDown.classList.toggle('disabled', scrollTop + listHeight >= scrollHeight - 1);
-        this.btnLeft.classList.toggle('disabled', scrollLeft <= 0);
-        this.btnRight.classList.toggle('disabled', scrollLeft + listWidth >= scrollWidth - 1);
+        if (this.btnUp) this.btnUp.classList.toggle('disabled', scrollTop <= 0);
+        if (this.btnDown) this.btnDown.classList.toggle('disabled', scrollTop + listHeight >= scrollHeight - 1);
+        if (this.btnLeft) this.btnLeft.classList.toggle('disabled', scrollLeft <= 0);
+        if (this.btnRight) this.btnRight.classList.toggle('disabled', scrollLeft + listWidth >= scrollWidth - 1);
     }
     
     initEvents() {
