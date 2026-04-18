@@ -90,10 +90,16 @@ class CustomScrollbar {
         // --- 縦のバーの更新 ---
         const trackHeight = this.trackY.clientHeight || listHeight;
         if (scrollHeight <= listHeight) {
-            this.thumbY.style.height = '100%';
-            this.thumbY.style.top = '0px';
+            // ★修正：スクロール不要な時は縦のバーとボタンを隠す魔法
+            this.trackY.style.display = 'none';
+            this.btnUp.style.display = 'none';
+            this.btnDown.style.display = 'none';
             this.thumbY.style.pointerEvents = 'none';
         } else {
+            // ★修正：スクロールが必要な時は表示する
+            this.trackY.style.display = 'block';
+            this.btnUp.style.display = 'flex';
+            this.btnDown.style.display = 'flex';
             this.thumbY.style.pointerEvents = 'auto';
             let thumbHeight = Math.max(40, (listHeight / scrollHeight) * trackHeight);
             this.thumbY.style.height = `${thumbHeight}px`;
@@ -106,10 +112,15 @@ class CustomScrollbar {
         // --- 横のバーの更新 ---
         const actualTrackWidth = this.trackX.clientWidth || listWidth;
         if (scrollWidth <= listWidth) {
-            this.thumbX.style.width = '100%';
-            this.thumbX.style.left = '0px';
-            this.thumbX.style.pointerEvents = 'none';
+            // ★修正：スクロール不要な時は横のバーとボタンを隠す魔法
+            this.trackX.style.display = 'none';
+            this.btnLeft.style.display = 'none';
+            this.btnRight.style.display = 'none';
         } else {
+            // ★修正：スクロールが必要な時は表示する
+            this.trackX.style.display = 'block';
+            this.btnLeft.style.display = 'flex';
+            this.btnRight.style.display = 'flex';
             this.thumbX.style.pointerEvents = 'auto';
             let thumbWidth = Math.max(40, (listWidth / scrollWidth) * actualTrackWidth);
             this.thumbX.style.width = `${thumbWidth}px`;
@@ -119,14 +130,18 @@ class CustomScrollbar {
             this.thumbX.style.left = `${scrollRatioX * maxThumbLeft}px`;
         }
 
+        // --- 右下の隙間埋めブロックの更新 ---
+        // ★追加：縦と横、両方のスクロールバーが出ている時だけ表示します
+        if (scrollHeight > listHeight && scrollWidth > listWidth) {
+            this.wrapper.classList.add('has-custom-scrollbar');
+        } else {
+            this.wrapper.classList.remove('has-custom-scrollbar');
+        }
+
         // --- ボタンの色（有効・無効）の更新 ---
-        // 上端なら「上」ボタンを銀色に
         this.btnUp.classList.toggle('disabled', scrollTop <= 0);
-        // 下端なら「下」ボタンを銀色に
         this.btnDown.classList.toggle('disabled', scrollTop + listHeight >= scrollHeight - 1);
-        // 左端なら「左」ボタンを銀色に
         this.btnLeft.classList.toggle('disabled', scrollLeft <= 0);
-        // 右端なら「右」ボタンを銀色に
         this.btnRight.classList.toggle('disabled', scrollLeft + listWidth >= scrollWidth - 1);
     }
     
