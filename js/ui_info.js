@@ -654,7 +654,7 @@ class UIInfoManager {
                         ${faceHtml}
                         <div class="busho-detail-info-col">
                             <div class="busho-detail-box busho-detail-affiliation-box">
-                                <span class="busho-label">所属</span>
+                                <span class="busho-label">勢力</span>
                                 <span class="busho-val" style="margin-right: auto;">${affiliationName}${familyBadge}</span>
                                 <span class="busho-val">${castleName}</span>
                             </div>
@@ -1323,7 +1323,7 @@ class UIInfoManager {
 
         let headerHtml = '';
         if (this.currentKyotenTab === 'status') {
-            headerHtml = `<div class="list-header sortable-header" style="grid-template-columns: 1.5fr 1.5fr 1.5fr 1fr 1fr 1fr 1fr;"><span data-sort="name" style="padding-left:5px; justify-content:flex-start;">拠点名${getSortMark('name')}</span><span data-sort="clan">勢力${getSortMark('clan')}</span><span data-sort="castellan">城主${getSortMark('castellan')}</span><span data-sort="province">国名${getSortMark('province')}</span><span data-sort="bushoCount">武将数${getSortMark('bushoCount')}</span><span data-sort="gold">金${getSortMark('gold')}</span><span data-sort="rice">兵糧${getSortMark('rice')}</span></div>`;
+            headerHtml = `<div class="list-header sortable-header" style="grid-template-columns: 1.5fr 1.5fr 1.5fr 1fr 1fr 1fr 1fr;"><span data-sort="name" style="padding-left:5px; justify-content:flex-start;">拠点名${getSortMark('name')}</span><span data-sort="clan">勢力${getSortMark('clan')}</span><span data-sort="castellan">城主${getSortMark('castellan')}</span><span data-sort="province">所属${getSortMark('province')}</span><span data-sort="bushoCount">武将数${getSortMark('bushoCount')}</span><span data-sort="gold">金${getSortMark('gold')}</span><span data-sort="rice">兵糧${getSortMark('rice')}</span></div>`;
         } else if (this.currentKyotenTab === 'military') {
             headerHtml = `<div class="list-header sortable-header" style="grid-template-columns: 1.5fr 1.5fr 1fr 1fr 1fr 1fr 1fr;"><span data-sort="name" style="padding-left:5px; justify-content:flex-start;">拠点名${getSortMark('name')}</span><span data-sort="soldiers">兵士${getSortMark('soldiers')}</span><span data-sort="defense">防御${getSortMark('defense')}</span><span data-sort="morale">士気${getSortMark('morale')}</span><span data-sort="training">訓練${getSortMark('training')}</span><span data-sort="horses">軍馬${getSortMark('horses')}</span><span data-sort="guns">鉄砲${getSortMark('guns')}</span></div>`;
         } else if (this.currentKyotenTab === 'economy') {
