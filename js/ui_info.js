@@ -50,20 +50,19 @@ class UIInfoManager {
         if (!info) return;
 
         // ★ここで「情報系画面」かどうかをタグ付け（判定）します
-        // （委任設定の個別画面もリストではないので情報系扱いにしています）
         const isInfoScreen = ['daimyo_detail', 'busho_detail', 'delegate_setting'].includes(info.pageType);
 
-        // ★枠の大元で、スライダーの有効/無効を一括管理します
+        // ★枠の大元で、スクロールバーの表示/非表示をクラスで一括管理します
+        const listWrapper = document.getElementById('selector-list-wrapper');
         const listContainer = document.getElementById('selector-list');
-        if (listContainer) {
+        
+        if (listWrapper) {
             if (isInfoScreen) {
-                listContainer.style.overflow = 'hidden'; // スクロール禁止
-                if (window.CustomScrollbar && this.ui.bushoScrollbar) {
-                    if (typeof this.ui.bushoScrollbar.destroy === 'function') this.ui.bushoScrollbar.destroy();
-                    this.ui.bushoScrollbar = null;
-                }
+                listWrapper.classList.add('no-custom-scrollbar');
+                if (listContainer) listContainer.style.overflow = 'hidden'; 
             } else {
-                listContainer.style.overflow = ''; // スクロール許可
+                listWrapper.classList.remove('no-custom-scrollbar');
+                if (listContainer) listContainer.style.overflow = '';
             }
         }
 
