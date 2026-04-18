@@ -94,8 +94,7 @@ class UIInfoManager {
         else if (info.pageType === 'prisoner_list') this._renderPrisonerList(...info.args, info.scrollPos);
         else if (info.pageType === 'history_list') this._renderHistoryList(...info.args, info.scrollPos);
         else if (info.pageType === 'kunishu_list') this._renderKunishuList(...info.args, info.scrollPos);
-        else if (info.pageType === 'kunishu_detail') this._renderKunishuDetail(...info.args, info.scrollPos);
-        else if (info.pageType === 'kunishu_diplo_list') this._renderKunishuDiplomacyList(...info.args, info.scrollPos);
+        else if (info.pageType === 'kunishu_detail') this._renderKunishuDetail(...info.args, info.scrollPos); // ★これを追加！
     }
     
     showDaimyoList() {
@@ -3107,7 +3106,7 @@ class UIInfoManager {
         const kunishuName = kunishu.getName(this.game);
         const ideology = kunishu.ideology || "地縁";
 
-        // 諸勢力のイデオロギーカラー（宗教＝緑、傭兵＝青に変更）
+        // 諸勢力のイデオロギーカラー（大名家のCSSを流用します）
         let ideologyClass = "ideology-chudo";
         if (ideology === '宗教') ideologyClass = "ideology-hoshu"; 
         else if (ideology === '傭兵') ideologyClass = "ideology-kakushin";
@@ -3133,12 +3132,12 @@ class UIInfoManager {
                         </div>
                         <div class="daimyo-detail-right">
                             <div class="daimyo-detail-row daimyo-detail-2col">
-                                <div class="daimyo-detail-stat-box"><span class="daimyo-detail-label">頭領</span><span class="daimyo-detail-value">${leaderName}</span></div>
                                 <div class="daimyo-detail-stat-box"><span class="daimyo-detail-label">武将</span><span class="daimyo-detail-value">${bushosCount}</span></div>
+                                <div class="daimyo-detail-stat-box"><span class="daimyo-detail-label">頭領</span><span class="daimyo-detail-value">${leaderName}</span></div>
                             </div>
                             <div class="daimyo-detail-row daimyo-detail-2col">
-                                <div class="daimyo-detail-stat-box"><span class="daimyo-detail-label">所属</span><span class="daimyo-detail-value">${provinceName}</span></div>
                                 <div class="daimyo-detail-stat-box"><span class="daimyo-detail-label">所在</span><span class="daimyo-detail-value">${baseCastleName}</span></div>
+                                <div class="daimyo-detail-stat-box"><span class="daimyo-detail-label">所属</span><span class="daimyo-detail-value">${provinceName}</span></div>
                             </div>
                             <div class="daimyo-detail-row daimyo-detail-2col">
                                 <div class="daimyo-detail-stat-box"><span class="daimyo-detail-label">兵士</span><span class="daimyo-detail-value">${kunishu.soldiers}</span></div>
@@ -3146,39 +3145,19 @@ class UIInfoManager {
                             </div>
                             <div class="daimyo-detail-row daimyo-detail-2col">
                                 <div class="daimyo-detail-stat-box"><span class="daimyo-detail-label">訓練</span><span class="daimyo-detail-value">${kunishu.training}</span></div>
-                                <div class="daimyo-detail-stat-box"><span class="daimyo-detail-label">士気</span><span class="daimyo-detail-value">${kunishu.morale}</span></div>
+                                <div class="daimyo-detail-stat-box"><span class="daimyo-detail-label">軍馬</span><span class="daimyo-detail-value">${kunishu.horses || 0}</span></div>
                             </div>
                             <div class="daimyo-detail-row daimyo-detail-2col">
-                                <div class="daimyo-detail-stat-box"><span class="daimyo-detail-label">軍馬</span><span class="daimyo-detail-value">${kunishu.horses || 0}</span></div>
+                                <div class="daimyo-detail-stat-box"><span class="daimyo-detail-label">士気</span><span class="daimyo-detail-value">${kunishu.morale}</span></div>
                                 <div class="daimyo-detail-stat-box"><span class="daimyo-detail-label">鉄砲</span><span class="daimyo-detail-value">${kunishu.guns || 0}</span></div>
                             </div>
                         </div>
                     </div>
                     <div style="display: flex; justify-content: flex-end; gap: 10px; margin-top: 15px;">
-                        <button class="daimyo-detail-action-btn" id="temp-kunishu-diplo-btn">外交</button>
                         <button class="daimyo-detail-action-btn" id="temp-kunishu-busho-btn">武将</button>
                     </div>
                 </div>
             `;
-
-            document.getElementById('temp-kunishu-diplo-btn').onclick = (e) => {
-                e.stopPropagation();
-                if (window.AudioManager) window.AudioManager.playSE('decision.ogg');
-                this.showKunishuDiplomacy(kunishuId);
-            };
-
-            document.getElementById('temp-kunishu-busho-btn').onclick = (e) => {
-                e.stopPropagation();
-                if (window.AudioManager) window.AudioManager.playSE('decision.ogg');
-                this.openBushoSelector('view_only', null, { 
-                    customBushos: this.game.kunishuSystem.getKunishuMembers(kunishuId),
-                    customInfoHtml: `<div>${kunishuName} 所属武将</div>`
-                });
-            };
-                e.stopPropagation();
-                if (window.AudioManager) window.AudioManager.playSE('decision.ogg');
-                this.showKunishuDiplomacy(kunishuId);
-            };
 
             document.getElementById('temp-kunishu-busho-btn').onclick = (e) => {
                 e.stopPropagation();
@@ -3195,66 +3174,8 @@ class UIInfoManager {
     }
 
     // ==========================================
-    // ★諸勢力外交の魔法
+    // ★諸勢力一覧の魔法（共通モーダル対応版）
     // ==========================================
-    showKunishuDiplomacy(kunishuId) {
-        this.pushModal('kunishu_diplo_list', [kunishuId]);
-    }
-
-    _renderKunishuDiplomacyList(kunishuId, scrollPos = 0) {
-        const kunishu = this.game.kunishuSystem.getKunishu(kunishuId);
-        if (!kunishu) return;
-
-        const title = document.getElementById('selector-title');
-        const listContainer = document.getElementById('selector-list');
-        const backBtn = document.querySelector('#selector-modal .btn-secondary');
-
-        if (title) title.textContent = `${kunishu.getName(this.game)} 外交`;
-        if (backBtn) {
-            backBtn.textContent = '戻る';
-            backBtn.onclick = () => {
-                if (window.AudioManager) window.AudioManager.playSE('cancel.ogg');
-                this.popModal();
-            };
-        }
-
-        // 大名情報の外交一覧と同じCSSクラス（diplomacy-mode）を使い回します
-        let listHtml = `
-            <div class="list-header diplomacy-mode">
-                <span class="col-clan-name">大名家</span>
-                <span>友好度</span>
-                <span>関係</span>
-            </div>
-        `;
-
-        this.game.clans.forEach(clan => {
-            const relVal = kunishu.getRelation(clan.id);
-            const relPercent = Math.min(100, Math.max(0, Number(relVal) || 0));
-            
-            let relStatus = "普通";
-            let relColor = "";
-            if (relVal >= 70) { relStatus = "友好"; relColor = "color:#388e3c;"; }
-            else if (relVal < 40) { relStatus = "敵対"; relColor = "color:#d32f2f;"; }
-
-            const barHtml = `<div class="bar-bg bar-bg-friend"><div class="bar-fill bar-fill-friend" style="width:${relPercent}%;"></div></div>`;
-
-            listHtml += `
-                <div class="select-item diplomacy-mode view-mode">
-                    <strong class="col-clan-name">${clan.name}</strong>
-                    <span>${barHtml}</span>
-                    <span style="${relColor} font-weight:bold;">${relStatus}</span>
-                </div>
-            `;
-        });
-
-        if (listContainer) {
-            listContainer.className = 'list-container';
-            listContainer.style.display = 'block';
-            listContainer.innerHTML = listHtml;
-            listContainer.scrollTop = scrollPos;
-        }
-    }
-
     showKunishuList(kunishus, castle, onBack) {
         this.pushModal('kunishu_list', [kunishus, castle, onBack]);
     }
