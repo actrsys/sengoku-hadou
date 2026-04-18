@@ -319,15 +319,8 @@ class UIInfoManager {
                 });
             };
 
-            if (window.CustomScrollbar) {
-                if (!this.ui.bushoScrollbar) this.ui.bushoScrollbar = new CustomScrollbar(listContainer);
-                setTimeout(() => {
-                    listContainer.scrollTop = scrollPos;
-                    this.ui.bushoScrollbar.update();
-                }, 10);
-            } else {
-                listContainer.scrollTop = scrollPos;
-            }
+            // カスタムスクロールバーの再作成を防止し、スクロール位置の復元のみ行います
+            listContainer.scrollTop = scrollPos;
         }
     }
 
@@ -687,15 +680,8 @@ class UIInfoManager {
                     </div>
                 </div>
             `;
-            if (window.CustomScrollbar) {
-                if (!this.ui.bushoScrollbar) this.ui.bushoScrollbar = new CustomScrollbar(listContainer);
-                setTimeout(() => {
-                    listContainer.scrollTop = scrollPos;
-                    this.ui.bushoScrollbar.update();
-                }, 10);
-            } else {
-                listContainer.scrollTop = scrollPos;
-            }
+            // カスタムスクロールバーの再作成を防止し、スクロール位置の復元のみ行います
+            listContainer.scrollTop = scrollPos;
         }
     }
     
