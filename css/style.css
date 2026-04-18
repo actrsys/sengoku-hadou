@@ -466,7 +466,7 @@ body.hide-daimyo-labels .daimyo-name-label { display: none !important; }
 /* 縦用スクロールバー */
 .custom-scrollbar-track {
     position: absolute; top: 24px; right: 0; width: 24px; bottom: 48px;
-    background-color: #0d1a10; border-left: 1px solid #1b3822; z-index: 50; touch-action: none; display: block;
+    background-color: #0d1a10; border-left: 1px solid #1b3822; z-index: 50; touch-action: none; display: block !important;
 }
 .custom-scrollbar-track::before {
     content: ""; position: absolute; top: 0; bottom: 0; left: 6px; right: 6px; background-color: #050a05; border: 1px solid #000; box-shadow: inset 1px 1px 3px rgba(0,0,0,0.8);
@@ -483,7 +483,7 @@ body.hide-daimyo-labels .daimyo-name-label { display: none !important; }
 /* 横用スクロールバー */
 .custom-scrollbar-track-x {
     position: absolute; bottom: 0; left: 24px; right: 48px; height: 24px;
-    background-color: #0d1a10; border-top: 1px solid #1b3822; z-index: 50; touch-action: none; display: block;
+    background-color: #0d1a10; border-top: 1px solid #1b3822; z-index: 50; touch-action: none; display: block !important;
 }
 .custom-scrollbar-track-x::before {
     content: ""; position: absolute; left: 0; right: 0; top: 6px; bottom: 6px; background-color: #050a05; border: 1px solid #000; box-shadow: inset 1px 1px 3px rgba(0,0,0,0.8);
