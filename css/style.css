@@ -408,11 +408,11 @@ body.hide-daimyo-labels .daimyo-name-label { display: none !important; }
 .list-container::-webkit-scrollbar-button:vertical:single-button:increment, .result-body::-webkit-scrollbar-button:vertical:single-button:increment, #divide-list::-webkit-scrollbar-button:vertical:single-button:increment, .scenario-desc-box::-webkit-scrollbar-button:vertical:single-button:increment, .war-controls-desc::-webkit-scrollbar-button:vertical:single-button:increment, .fw-floating-log::-webkit-scrollbar-button:vertical:single-button:increment { background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 10 10"><polygon points="1,3 5,7 9,3" fill="%23555"/></svg>'); background-position: center; background-repeat: no-repeat; }
 .list-container::-webkit-scrollbar-button:hover, .result-body::-webkit-scrollbar-button:hover, #divide-list::-webkit-scrollbar-button:hover, .scenario-desc-box::-webkit-scrollbar-button:hover, .war-controls-desc::-webkit-scrollbar-button:hover, .fw-floating-log::-webkit-scrollbar-button:hover { background-color: #cfd8dc; }
 
-/* スマホ用自作スクロールバーのための設定（改良版） */
+/* スマホ用自作スクロールバーのための設定 */
 .scroll-wrapper { 
     position: relative; 
-    flex: 1; /* ★ ゴムのように画面に合わせて縮む魔法 */
-    min-height: 0; /* ★ 潰れることを許可する魔法 */
+    flex: 1; 
+    min-height: 0; 
     max-height: calc(40px * 9 + 28px);
     width: 100%; display: flex; overflow: hidden; 
     border: 2px solid #d4af37;
@@ -423,14 +423,24 @@ body.hide-daimyo-labels .daimyo-name-label { display: none !important; }
     box-sizing: border-box; 
 }
 
-/* ★ カスタムスクロールバーを使用する要素ではネイティブを隠す */
+/* ★追加：独自スクロールバーを強制的に非表示にする設定 */
+.scroll-wrapper.no-custom-scrollbar {
+    padding-right: 0 !important;
+    padding-bottom: 0 !important;
+}
+.scroll-wrapper.no-custom-scrollbar .custom-scrollbar-track,
+.scroll-wrapper.no-custom-scrollbar .custom-scrollbar-track-x,
+.scroll-wrapper.no-custom-scrollbar .custom-scrollbar-btn,
+.scroll-wrapper.no-custom-scrollbar::after {
+    display: none !important;
+}
+
 .hide-native-scroll::-webkit-scrollbar { display: none !important; }
 .hide-native-scroll { 
     -ms-overflow-style: none; scrollbar-width: none; border: none !important; flex: 1; min-width: 0; 
     overflow-y: scroll; overflow-x: auto; overscroll-behavior: none; 
 }
 
-/* ★専用スクロールボタン（上下左右）の魔法 */
 .custom-scrollbar-btn {
     position: absolute; width: 24px; height: 24px;
     background: linear-gradient(135deg, #ffdf80 0%, #d4af37 100%);
@@ -463,7 +473,6 @@ body.hide-daimyo-labels .daimyo-name-label { display: none !important; }
 .custom-scrollbar-btn.right::after { border-width: 5px 0 5px 7px; border-color: transparent transparent transparent #5c4008; margin-left: 2px; filter: drop-shadow(0px 1px 0px rgba(255, 255, 255, 0.8)); }
 .custom-scrollbar-btn.disabled::after { opacity: 0.3; }
 
-/* 縦用スクロールバー */
 .custom-scrollbar-track {
     position: absolute; top: 24px; right: 0; width: 24px; bottom: 48px;
     background-color: #0d1a10; border-left: 1px solid #1b3822; z-index: 50; touch-action: none; display: block !important;
@@ -480,7 +489,6 @@ body.hide-daimyo-labels .daimyo-name-label { display: none !important; }
 }
 .custom-scrollbar-thumb:active, .custom-scrollbar-thumb.dragging { filter: brightness(1.2); }
 
-/* 横用スクロールバー */
 .custom-scrollbar-track-x {
     position: absolute; bottom: 0; left: 24px; right: 48px; height: 24px;
     background-color: #0d1a10; border-top: 1px solid #1b3822; z-index: 50; touch-action: none; display: block !important;
@@ -497,7 +505,6 @@ body.hide-daimyo-labels .daimyo-name-label { display: none !important; }
 }
 .custom-scrollbar-thumb-x:active, .custom-scrollbar-thumb-x.dragging { filter: brightness(1.2); }
 
-/* 右下角の空白を埋める四角 */
 .scroll-wrapper::after {
     content: ""; position: absolute; bottom: 0; right: 0; width: 24px; height: 24px;
     background-color: #0d1a10; border-left: 1px solid #1b3822; border-top: 1px solid #1b3822;
