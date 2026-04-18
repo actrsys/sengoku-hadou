@@ -497,8 +497,8 @@ body.hide-daimyo-labels .daimyo-name-label { display: none !important; }
 }
 .custom-scrollbar-thumb-x:active, .custom-scrollbar-thumb-x.dragging { filter: brightness(1.2); }
 
-/* 右下角の空白を埋める四角（スクロールバーがある時だけ表示します） */
-.scroll-wrapper.has-custom-scrollbar::after {
+/* 右下角の空白を埋める四角 */
+.scroll-wrapper::after {
     content: ""; position: absolute; bottom: 0; right: 0; width: 24px; height: 24px;
     background-color: #0d1a10; border-left: 1px solid #1b3822; border-top: 1px solid #1b3822;
     z-index: 49; box-sizing: border-box;

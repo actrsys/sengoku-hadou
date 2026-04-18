@@ -319,8 +319,15 @@ class UIInfoManager {
                 });
             };
 
-            // ★削除：勢力情報ではスクロールしないので、スクロールバーを新しく作る処理を消しました
-            listContainer.scrollTop = 0;
+            if (window.CustomScrollbar) {
+                if (!this.ui.bushoScrollbar) this.ui.bushoScrollbar = new CustomScrollbar(listContainer);
+                setTimeout(() => {
+                    listContainer.scrollTop = scrollPos;
+                    this.ui.bushoScrollbar.update();
+                }, 10);
+            } else {
+                listContainer.scrollTop = scrollPos;
+            }
         }
     }
 
@@ -680,9 +687,15 @@ class UIInfoManager {
                     </div>
                 </div>
             `;
-            
-            // ★削除：武将情報でもスクロールしないので、スクロールバーを新しく作る処理を消しました
-            listContainer.scrollTop = 0;
+            if (window.CustomScrollbar) {
+                if (!this.ui.bushoScrollbar) this.ui.bushoScrollbar = new CustomScrollbar(listContainer);
+                setTimeout(() => {
+                    listContainer.scrollTop = scrollPos;
+                    this.ui.bushoScrollbar.update();
+                }, 10);
+            } else {
+                listContainer.scrollTop = scrollPos;
+            }
         }
     }
     
