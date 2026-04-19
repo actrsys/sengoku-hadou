@@ -947,9 +947,33 @@ class UIManager {
     }
 
     showCastleMenuModal(castle) {
-        // 前のように小さなメニューを出すのではなく、情報専門の ui_info.js に「拠点情報」を全画面で出すようにお願いします！
-        this.info.showCastleDetail(castle.id);
-    }
+        const modal = document.getElementById('castle-menu-modal');
+        if (!modal) return;
+        modal.classList.remove('hidden'); 
+        
+        const btnBusho = document.getElementById('btn-busho-list');
+        if (btnBusho) {
+            btnBusho.onclick = () => {
+                modal.classList.add('hidden'); 
+                this.openBushoSelector('view_only', castle.id, null, () => { this.showCastleMenuModal(castle); }); 
+            };
+        }
+
+        const btnKunishu = document.getElementById('btn-kunishu-list');
+        if (btnKunishu) {
+            const kunishus = this.game.kunishuSystem.getKunishusInCastle(castle.id);
+            if (kunishus && kunishus.length > 0) {
+                btnKunishu.style.display = ''; 
+                btnKunishu.onclick = () => {
+                    modal.classList.add('hidden'); 
+                    // ★ここを書き換え：ui_info.jsの新しい魔法を呼びます！
+                    this.info.showKunishuList(kunishus, castle, () => { this.showCastleMenuModal(castle); });
+                };
+            } else {
+                btnKunishu.style.display = 'none'; 
+            }
+        }
+    }
     
     updatePanelHeader() { 
         if (!this.currentCastle) return; 
