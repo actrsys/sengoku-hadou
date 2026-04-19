@@ -2099,8 +2099,12 @@ class CommandSystem {
                 }
             };
             
-            // ★修正: 1つしかない場合でも、必ず一覧画面を開いて確認できるようにします！
-            this.game.ui.showKunishuSelector(kunishus, proceedKunishuCommand, onBackToMap);
+            // ★修正: リスト側の機能に合わせて、引数に targetCastle を追加し、呼び出し元を ui.info に繋ぎ直しました！
+            if (this.game.ui.info && typeof this.game.ui.info.showKunishuSelector === 'function') {
+                this.game.ui.info.showKunishuSelector(kunishus, targetCastle, proceedKunishuCommand, onBackToMap);
+            } else {
+                this.game.ui.showKunishuSelector(kunishus, targetCastle, proceedKunishuCommand, onBackToMap);
+            }
             return; // 諸勢力コマンドの場合はここで終了
         }
 
