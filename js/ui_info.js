@@ -3314,7 +3314,7 @@ class UIInfoManager {
                 listContainer.scrollTop = scrollPos;
             }
         }
-
+        
         // ★新規追加：選択モードの時は決定ボタンを表示し、動作を割り当てます
         if (confirmBtn) {
             if (isSelectMode) {
@@ -3325,7 +3325,6 @@ class UIInfoManager {
                 confirmBtn.style.cursor = 'not-allowed';
                 confirmBtn.onclick = () => {
                     if (!this.selectedKunishuId) return;
-                    if (window.AudioManager) window.AudioManager.playSE('choice.ogg');
                     this.closeCommonModal(); // 枠を閉じる
                     if (onConfirm) onConfirm(this.selectedKunishuId); // 選んだ勢力を伝える
                 };
