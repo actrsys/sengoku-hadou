@@ -770,8 +770,7 @@ body.hide-daimyo-labels .daimyo-name-label { display: none !important; }
 
 /* モーダル（小窓）の重なり順（z-index）の統一リスト */
 #intercept-confirm-modal { z-index: 6000; }
-#castle-menu-modal { z-index: 6500; }
-#quantity-modal { z-index: 6500; } 
+#quantity-modal { z-index: 6500; }
 #delegate-setting-modal { z-index: 6600; }
 #settings-modal { z-index: 7000; }
 #result-modal { z-index: 8000; }

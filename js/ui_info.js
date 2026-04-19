@@ -54,7 +54,7 @@ class UIInfoManager {
         if (!info) return;
 
         // ★ここで「情報系画面」かどうかをタグ付け（判定）します
-        const isInfoScreen = ['daimyo_detail', 'busho_detail', 'delegate_setting', 'kunishu_detail'].includes(info.pageType);
+        const isInfoScreen = ['daimyo_detail', 'busho_detail', 'delegate_setting', 'kunishu_detail', 'castle_detail'].includes(info.pageType);
 
         // ★枠の大元で、スクロールバーの表示/非表示をクラスで一括管理します
         const listWrapper = document.getElementById('selector-list-wrapper');
@@ -98,7 +98,8 @@ class UIInfoManager {
         else if (info.pageType === 'prisoner_list') this._renderPrisonerList(...info.args, info.scrollPos);
         else if (info.pageType === 'history_list') this._renderHistoryList(...info.args, info.scrollPos);
         else if (info.pageType === 'kunishu_list') this._renderKunishuList(...info.args, info.scrollPos);
-        else if (info.pageType === 'kunishu_detail') this._renderKunishuDetail(...info.args, info.scrollPos); // ★これを追加！
+        else if (info.pageType === 'kunishu_detail') this._renderKunishuDetail(...info.args, info.scrollPos);
+        else if (info.pageType === 'castle_detail') this._renderCastleDetail(...info.args, info.scrollPos); // ★これを追加！
     }
     
     showDaimyoList() {
@@ -1162,6 +1163,137 @@ class UIInfoManager {
         }
     }
     
+    // ==========================================
+    // ★ここから追加：拠点詳細の魔法です！
+    // ==========================================
+    showCastleDetail(castleId) {
+        this.closeCommonModal(); 
+        this.pushModal('castle_detail', [castleId]);
+    }
+
+    _renderCastleDetail(castleId, scrollPos = 0) {
+        const castle = this.game.castles.find(c => c.id === castleId);
+        if (!castle) return;
+
+        const modal = document.getElementById('selector-modal');
+        const title = document.getElementById('selector-title');
+        const listContainer = document.getElementById('selector-list');
+        const contextEl = document.getElementById('selector-context-info');
+        const tabsEl = document.getElementById('selector-tabs');
+        const confirmBtn = document.getElementById('selector-confirm-btn');
+        const backBtn = document.querySelector('#selector-modal .btn-secondary');
+
+        modal.classList.remove('hidden');
+        if (title) title.textContent = "拠点情報";
+        if (contextEl) contextEl.classList.add('hidden');
+        if (tabsEl) tabsEl.classList.add('hidden');
+        if (confirmBtn) confirmBtn.classList.add('hidden');
+
+        if(backBtn) {
+            backBtn.style.display = '';
+            backBtn.textContent = this.modalHistory.length > 0 ? '戻る' : '閉じる';
+            backBtn.onclick = () => {
+                if (window.AudioManager) window.AudioManager.playSE('cancel.ogg');
+                this.popModal();
+            };
+            const footer = backBtn.parentElement;
+            if (footer) footer.style.justifyContent = 'center';
+        }
+
+        const clanData = this.game.clans.find(cd => cd.id === castle.ownerClan);
+        const clanName = clanData ? clanData.name : "無所属";
+        const castellan = this.game.getBusho(castle.castellanId);
+        const castellanName = castellan ? castellan.name : "なし";
+
+        let provinceName = "不明";
+        if (this.game.provinces) {
+            const province = this.game.provinces.find(p => p.id === castle.provinceId);
+            if (province) provinceName = province.province;
+        }
+
+        const kunishus = this.game.kunishuSystem ? this.game.kunishuSystem.getKunishusInCastle(castle.id) : [];
+        const kunishuCount = kunishus.length;
+
+        let totalGoldIncome = GameSystem.calcBaseGoldIncome(castle);
+        let totalRiceIncome = GameSystem.calcBaseRiceIncome(castle);
+
+        if (listContainer) {
+            listContainer.className = 'list-container hide-native-scroll';
+            listContainer.style.display = 'block';
+            listContainer.innerHTML = `
+                <div class="daimyo-detail-container" style="padding: 10px;">
+                    <div class="daimyo-detail-header" style="margin-bottom: 10px; justify-content: center;">
+                        <div class="daimyo-detail-name" style="font-size: 1.5rem;">${castle.name}</div>
+                    </div>
+                    <div class="daimyo-detail-body">
+                        <div class="daimyo-detail-right" style="width: 100%;">
+                            <div class="daimyo-detail-row daimyo-detail-3col">
+                                <div class="daimyo-detail-stat-box"><span class="daimyo-detail-label">所属</span><span class="daimyo-detail-value">${clanName}</span></div>
+                                <div class="daimyo-detail-stat-box"><span class="daimyo-detail-label">地方</span><span class="daimyo-detail-value">${provinceName}</span></div>
+                                <div class="daimyo-detail-stat-box"><span class="daimyo-detail-label">城主</span><span class="daimyo-detail-value">${castellanName}</span></div>
+                            </div>
+                            <div class="daimyo-detail-row daimyo-detail-3col">
+                                <div class="daimyo-detail-stat-box"><span class="daimyo-detail-label">石高</span><span class="daimyo-detail-value">${castle.kokudaka}</span></div>
+                                <div class="daimyo-detail-stat-box"><span class="daimyo-detail-label">鉱山</span><span class="daimyo-detail-value">${castle.commerce}</span></div>
+                                <div class="daimyo-detail-stat-box"><span class="daimyo-detail-label">民忠</span><span class="daimyo-detail-value">${castle.peoplesLoyalty}</span></div>
+                            </div>
+                            <div class="daimyo-detail-row daimyo-detail-2col">
+                                <div class="daimyo-detail-stat-box"><span class="daimyo-detail-label">兵士</span><span class="daimyo-detail-value">${castle.soldiers}</span></div>
+                                <div class="daimyo-detail-stat-box"><span class="daimyo-detail-label">人口</span><span class="daimyo-detail-value">${castle.population}</span></div>
+                            </div>
+                            <div class="daimyo-detail-row daimyo-detail-2col">
+                                <div class="daimyo-detail-stat-box"><span class="daimyo-detail-label">金</span><span class="daimyo-detail-value">${castle.gold}</span></div>
+                                <div class="daimyo-detail-stat-box"><span class="daimyo-detail-label">金収入/月</span><span class="daimyo-detail-value">${totalGoldIncome}</span></div>
+                            </div>
+                            <div class="daimyo-detail-row daimyo-detail-2col">
+                                <div class="daimyo-detail-stat-box"><span class="daimyo-detail-label">兵糧</span><span class="daimyo-detail-value">${castle.rice}</span></div>
+                                <div class="daimyo-detail-stat-box"><span class="daimyo-detail-label">兵糧収入/年</span><span class="daimyo-detail-value">${totalRiceIncome}</span></div>
+                            </div>
+                            <div class="daimyo-detail-row daimyo-detail-3col">
+                                <div class="daimyo-detail-stat-box"><span class="daimyo-detail-label">防御</span><span class="daimyo-detail-value">${castle.defense}</span></div>
+                                <div class="daimyo-detail-stat-box"><span class="daimyo-detail-label">軍馬</span><span class="daimyo-detail-value">${castle.horses || 0}</span></div>
+                                <div class="daimyo-detail-stat-box"><span class="daimyo-detail-label">鉄砲</span><span class="daimyo-detail-value">${castle.guns || 0}</span></div>
+                            </div>
+                        </div>
+                    </div>
+                    <div style="display: flex; justify-content: flex-end; gap: 10px; margin-top: 15px;">
+                        <button class="daimyo-detail-action-btn" id="castle-busho-btn">武将</button>
+                        <button class="daimyo-detail-action-btn" id="castle-kunishu-btn" style="display: ${kunishuCount > 0 ? '' : 'none'};">諸勢力</button>
+                    </div>
+                </div>
+            `;
+
+            const btnKunishu = document.getElementById('castle-kunishu-btn');
+            if (btnKunishu) {
+                btnKunishu.onclick = (e) => {
+                    e.stopPropagation();
+                    if (window.AudioManager) window.AudioManager.playSE('decision.ogg');
+                    this.showKunishuList(kunishus, castle);
+                };
+            }
+
+            document.getElementById('castle-busho-btn').onclick = (e) => {
+                e.stopPropagation();
+                if (window.AudioManager) window.AudioManager.playSE('decision.ogg');
+                
+                // ★ アクティブな武将と浪人のみ（諸勢力の武将は除外して抽出します）
+                const targetBushos = this.game.bushos.filter(b => 
+                    b.castleId === castle.id && 
+                    (b.status === 'active' || b.status === 'ronin') && 
+                    (b.belongKunishuId === 0 || !b.belongKunishuId)
+                );
+
+                this.openBushoSelector('view_only', null, { 
+                    customBushos: targetBushos,
+                    customInfoHtml: `<div>${castle.name} 滞在武将</div>`
+                });
+            };
+
+            // ★情報画面ではスクロールバーは不要なので、位置を戻すだけにします
+            listContainer.scrollTop = scrollPos;
+        }
+    }
+
     // ==========================================
     // ★ここから追加：拠点一覧の魔法です！
     // ==========================================

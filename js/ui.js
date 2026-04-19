@@ -947,32 +947,8 @@ class UIManager {
     }
 
     showCastleMenuModal(castle) {
-        const modal = document.getElementById('castle-menu-modal');
-        if (!modal) return;
-        modal.classList.remove('hidden'); 
-        
-        const btnBusho = document.getElementById('btn-busho-list');
-        if (btnBusho) {
-            btnBusho.onclick = () => {
-                modal.classList.add('hidden'); 
-                this.openBushoSelector('view_only', castle.id, null, () => { this.showCastleMenuModal(castle); }); 
-            };
-        }
-
-        const btnKunishu = document.getElementById('btn-kunishu-list');
-        if (btnKunishu) {
-            const kunishus = this.game.kunishuSystem.getKunishusInCastle(castle.id);
-            if (kunishus && kunishus.length > 0) {
-                btnKunishu.style.display = ''; 
-                btnKunishu.onclick = () => {
-                    modal.classList.add('hidden'); 
-                    // ★ここを書き換え：ui_info.jsの新しい魔法を呼びます！
-                    this.info.showKunishuList(kunishus, castle, () => { this.showCastleMenuModal(castle); });
-                };
-            } else {
-                btnKunishu.style.display = 'none'; 
-            }
-        }
+        // ★修正：以前のちっちゃいポップアップはやめて、新しい「拠点情報」画面を呼び出します！
+        this.info.showCastleDetail(castle.id);
     }
     
     updatePanelHeader() { 
