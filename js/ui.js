@@ -287,19 +287,18 @@ class UIManager {
             const btn = e.target.closest('button');
             if (!btn) return; 
 
-            // ★追加：合戦のコマンドボタンは個別に音を鳴らすので、共通の音をキャンセルします！
+            // 合戦のコマンドボタンは個別に音を鳴らすので、共通の音をキャンセルします！
             if (btn.closest('#war-controls')) return;
             
-            // ★追加：タブ切り替えボタンも個別に音を鳴らすので、共通の音をキャンセルします！
+            // タブ切り替えボタンも個別に音を鳴らすので、共通の音をキャンセルします！
             if (btn.classList.contains('busho-tab-btn') || btn.classList.contains('busho-scope-btn')) return;
 
             const text = btn.textContent.trim();
             
-            // ★ここを書き足し！：個別に音を鳴らす設定をしたボタンは、共通の「decision.ogg」をキャンセルします
+            // 個別に音を鳴らす設定をしたボタンは、共通の「decision.ogg」をキャンセルします
             if (["一括", "直轄", "委任", "不可", "許可"].includes(text)) return;
 
             if (window.AudioManager) {
-                // ★「シナリオ選択に戻る」をリストに仲間入りさせます！
                 if (["戻る", "閉じる", "いいえ", "やめる", "撤退", "解放", "処断", "シナリオ選択に戻る"].includes(text)) {
                     window.AudioManager.playSE('cancel.ogg');
                 } else {
@@ -948,33 +947,9 @@ class UIManager {
     }
 
     showCastleMenuModal(castle) {
-        const modal = document.getElementById('castle-menu-modal');
-        if (!modal) return;
-        modal.classList.remove('hidden'); 
-        
-        const btnBusho = document.getElementById('btn-busho-list');
-        if (btnBusho) {
-            btnBusho.onclick = () => {
-                modal.classList.add('hidden'); 
-                this.openBushoSelector('view_only', castle.id, null, () => { this.showCastleMenuModal(castle); }); 
-            };
-        }
-
-        const btnKunishu = document.getElementById('btn-kunishu-list');
-        if (btnKunishu) {
-            const kunishus = this.game.kunishuSystem.getKunishusInCastle(castle.id);
-            if (kunishus && kunishus.length > 0) {
-                btnKunishu.style.display = ''; 
-                btnKunishu.onclick = () => {
-                    modal.classList.add('hidden'); 
-                    // ★ここを書き換え：ui_info.jsの新しい魔法を呼びます！
-                    this.info.showKunishuList(kunishus, castle, () => { this.showCastleMenuModal(castle); });
-                };
-            } else {
-                btnKunishu.style.display = 'none'; 
-            }
-        }
-    }
+        // 前のように小さなメニューを出すのではなく、情報専門の ui_info.js に「拠点情報」を全画面で出すようにお願いします！
+        this.info.showCastleDetail(castle.id);
+    }
     
     updatePanelHeader() { 
         if (!this.currentCastle) return; 
