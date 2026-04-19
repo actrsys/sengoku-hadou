@@ -88,7 +88,7 @@ class KunishuSystem {
 
     // 指定した城にいる諸勢力を取得
     getKunishusInCastle(castleId) {
-        return this.getAliveKunishus().filter(k => k.castleId === castleId);
+        return this.getAliveKunishus().filter(k => Number(k.castleId) === Number(castleId));
     }
 
     // 特定の諸勢力に所属している武将一覧を取得

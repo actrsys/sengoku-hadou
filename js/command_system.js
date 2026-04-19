@@ -687,23 +687,23 @@ class CommandSystem {
             // ★追加: 鎮圧コマンド専用！自分の城か、隣の城だけを選べるようにします
             case 'kunishu_subjugate_valid': {
                 const activeKunishus = this.game.kunishuSystem.getAliveKunishus();
-                // まず諸勢力がいる城を全部集めます
-                const allKunishuCastleIds = [...new Set(activeKunishus.map(k => k.castleId))];
+                // まず諸勢力がいる城を全部集めます（Numberで数字に揃えます）
+                const allKunishuCastleIds = [...new Set(activeKunishus.map(k => Number(k.castleId)))];
                 
                 // ★追加：出陣するお城から道が繋がっている「自勢力の領土ネットワーク」を調べます！
                 const connectedCastles = new Set();
                 const queue = [c];
-                connectedCastles.add(c.id);
+                connectedCastles.add(Number(c.id));
 
                 while (queue.length > 0) {
                     const current = queue.shift();
                     const neighbors = this.game.castles.filter(adj => 
-                        adj.ownerClan === playerClanId && 
+                        Number(adj.ownerClan) === Number(playerClanId) && 
                         GameSystem.isAdjacent(current, adj) &&
-                        !connectedCastles.has(adj.id)
+                        !connectedCastles.has(Number(adj.id))
                     );
                     for (const n of neighbors) {
-                        connectedCastles.add(n.id);
+                        connectedCastles.add(Number(n.id));
                         queue.push(n);
                     }
                 }
@@ -711,11 +711,12 @@ class CommandSystem {
                 // 集めた城を「フィルター（ふるい）」にかけて、条件に合うものだけを残します！
                 return allKunishuCastleIds.filter(targetCastleId => {
                     const targetCastle = this.game.getCastle(targetCastleId);
+                    if (!targetCastle) return false; // 安全のためのストッパー
                     
                     // 条件①：道が繋がっている自分の領土かどうか？
-                    const isConnected = connectedCastles.has(targetCastleId);
+                    const isConnected = connectedCastles.has(Number(targetCastleId));
                     // 条件②：道が繋がっている領土の「すぐ隣の城」かどうか？
-                    const isNextToConnected = this.game.castles.some(myC => connectedCastles.has(myC.id) && GameSystem.isAdjacent(targetCastle, myC));
+                    const isNextToConnected = this.game.castles.some(myC => connectedCastles.has(Number(myC.id)) && GameSystem.isAdjacent(targetCastle, myC));
                     
                     // どちらか1つでも当てはまればOK（地図で光らせる）！
                     return isConnected || isNextToConnected;
@@ -1953,7 +1954,11 @@ class CommandSystem {
     }
     
     resolveMapSelection(targetCastle) {
-        if (!this.game.validTargets.includes(targetCastle.id)) return;
+        // ★追加：比較する前に、IDをすべて「数字」に揃えてあげます！
+        const targetId = Number(targetCastle.id);
+        const validIds = this.game.validTargets.map(id => Number(id));
+        
+        if (!validIds.includes(targetId)) return;
         
         const mode = this.game.selectionMode;
         
