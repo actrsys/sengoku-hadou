@@ -638,16 +638,8 @@ class KunishuSystem {
         const atkBushos = atkBushosIds.map(id => this.game.getBusho(id));
         const targetCastle = this.game.getCastle(targetCastleId);
         
-        // 攻撃する側（プレイヤー）の城から、出陣する数だけ兵士や兵糧、騎馬、鉄砲を減らします
-        atkCastle.soldiers = Math.max(0, atkCastle.soldiers - sendSoldiers);
-        atkCastle.rice = Math.max(0, atkCastle.rice - sendRice);
-        atkCastle.horses = Math.max(0, (atkCastle.horses || 0) - sendHorses);
-        atkCastle.guns = Math.max(0, (atkCastle.guns || 0) - sendGuns);
-        atkBushos.forEach(b => b.isActionDone = true);
-
         // 諸勢力側の準備（一時的なダミーの城と軍団を作ります）
         const kunishuName = kunishu.getName(this.game);
-        const leader = this.game.getBusho(kunishu.leaderId);
         // この戦い限定の「守備側データ」を作成
         const dummyDefender = {
             id: targetCastleId,
@@ -666,12 +658,6 @@ class KunishuSystem {
             samuraiIds: [] 
         };
 
-        const attackerForce = { 
-            name: atkCastle.name + "遠征軍", ownerClan: atkCastle.ownerClan, soldiers: sendSoldiers, 
-            bushos: atkBushos, training: atkCastle.training, morale: atkCastle.morale, rice: sendRice, maxRice: sendRice,
-            horses: sendHorses, guns: sendGuns
-        };
-
         let currentRel = kunishu.getRelation(atkCastle.ownerClan);
         let nextRel = currentRel;
         if (currentRel >= 60) nextRel = 30;
@@ -681,31 +667,64 @@ class KunishuSystem {
 
         const isPlayer = (Number(atkCastle.ownerClan) === Number(this.game.playerClanId) && !atkCastle.isDelegated);
 
-        this.game.warManager.state = { 
-            active: true, round: 1, attacker: attackerForce, sourceCastle: atkCastle, 
-            defender: dummyDefender, atkBushos: atkBushos, defBusho: leader || {name:"諸勢力", strength:50, intelligence:50, leadership:50}, 
-            turn: 'attacker', isPlayerInvolved: isPlayer, deadSoldiers: { attacker: 0, defender: 0 }, defenderGuarding: false,
-            isKunishuSubjugation: true 
+        // ==========================================
+        // ★ここから修正！：戦争が「完全に」終わるまで見届ける監視カメラの魔法！
+        // （反乱と同じように、戦争システムに完全に丸投げします）
+        // ==========================================
+        let isWarReallyFinished = false;
+        const originalCloseWar = this.game.warManager.closeWar;
+        
+        // closeWar（合戦画面を閉じる最後の処理）が呼ばれたら、監視カメラに「終わったよ！」と報告させます
+        this.game.warManager.closeWar = function() {
+            if (originalCloseWar) originalCloseWar.call(this); // 元の終了処理をちゃんと実行します
+            isWarReallyFinished = true;  // 報告！
         };
 
-        const atkClanData = this.game.clans.find(c => c.id === Number(atkCastle.ownerClan));
-        const atkDaimyoName = atkClanData ? atkClanData.name : "大名家";
-        const leaderName = atkBushos[0].name;
-
-        if (!isPlayer) {
-            const startMsg = `${atkDaimyoName}の${leaderName}が、\n${kunishuName}の鎮圧に乗り出しました！`;
-            this.game.ui.log(startMsg.replace('\n', ''));
-            if (window.AudioManager) {
-                window.AudioManager.playSE('katana001.ogg');
-                setTimeout(() => {
-                    if (window.AudioManager) window.AudioManager.playSE('katana002.ogg');
-                }, 400);
-            }
-            await this.game.ui.showDialogAsync(startMsg);
-        }
-
-        this.game.warManager.startSiegeWarPhase();
+        // WarManagerの開始フローに合流（いざ、戦争スタート！）
+        this.game.warManager.startWar(atkCastle, dummyDefender, atkBushos, sendSoldiers, sendRice, sendHorses, sendGuns); 
         
+        // ★追加：startWarが作ったstateに、鎮圧戦であるという目印をつけます
+        if (this.game.warManager.state) {
+            this.game.warManager.state.isKunishuSubjugation = true;
+        }
+        
+        // 戦争とメッセージ表示が完全に終わるまでじっと待ちます
+        let failSafeCounter = 0; 
+        
+        while (!isWarReallyFinished) {
+            await new Promise(resolve => setTimeout(resolve, 500));
+            
+            // 安全装置：裏でエラーが起きて closeWar が一生呼ばれない場合のためのタイマー
+            if (this.game.warManager.state && !this.game.warManager.state.active) {
+                let anyModalOpen = false;
+                if (this.game.ui) {
+                    const isVisible = (id) => { const el = document.getElementById(id); return el && !el.classList.contains('hidden'); };
+                    if (isVisible('result-modal') || isVisible('dialog-modal') || isVisible('war-modal')) {
+                        anyModalOpen = true;
+                    }
+                    // タップメッセージ等、名前がわからない画面が出ている場合も検知します
+                    const overlay = document.querySelector('[class*="tap"], [id*="tap"]');
+                    if (overlay && !overlay.classList.contains('hidden') && overlay.style.display !== 'none') {
+                        anyModalOpen = true;
+                    }
+                }
+                
+                if (!anyModalOpen) {
+                    failSafeCounter++;
+                    // 何の画面も出ていないのに3秒（6回）止まっていたら、エラーとみなして強制的に次へ進めます
+                    if (failSafeCounter > 6) {
+                        break;
+                    }
+                } else {
+                    failSafeCounter = 0; // 画面が出ている間は大人しく待ちます
+                }
+            }
+        }
+        
+        // 監視カメラを片付けて、元の状態に綺麗に戻します！
+        delete this.game.warManager.closeWar;
+        // ==========================================
+
         if (isPlayer) {
             this.game.ui.updatePanelHeader();
             this.game.ui.renderCommandMenu();
