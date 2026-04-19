@@ -1681,10 +1681,16 @@ class UIInfoManager {
     openBushoSelector(actionType, targetId = null, extraData = null, onBack = null) {
         if (actionType === 'appoint' && this.ui.currentCastle) { const isDaimyoHere = this.game.getCastleBushos(this.ui.currentCastle.id).some(b => b.isDaimyo); if (isDaimyoHere) { this.ui.showDialog("大名の居城は城主を変更できません", false); return; } }
         
+        // ★修正：新しく武将一覧を開くときは、以前開いたリストの記憶（キャッシュ）を消してリセットします
+        this.bushoCurrentSortKey = null;
+        this.bushoIsSortAsc = false;
+        this.bushoSavedBushos = null;
+        this.bushoLastScope = null;
+
         if (actionType === 'view_only' || actionType === 'all_busho_list') {
             this.pushModal('busho_selector', [actionType, targetId, extraData, onBack]);
         } else {
-            this.closeCommonModal(); // アクションの時は新しく開くのでリセットします
+            this.closeCommonModal(); // アクションの時は新しく開くので履歴ごとリセットします
             this.pushModal('busho_selector', [actionType, targetId, extraData, onBack]);
         }
     }
