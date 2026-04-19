@@ -342,7 +342,8 @@ Object.assign(WarManager.prototype, {
                 active: true, round: 1, attacker: attackerForce, sourceCastle: atkCastle, 
                 defender: defCastle, atkBushos: atkBushos, defBusho: defBusho, 
                 turn: 'attacker', isPlayerInvolved: isPlayerInvolved, deadSoldiers: { attacker: 0, defender: 0 }, defenderGuarding: false,
-                reinforcement: reinforcementData, selfReinforcement: selfReinforcementData
+                reinforcement: reinforcementData, selfReinforcement: selfReinforcementData,
+                isKunishuSubjugation: defCastle.isKunishu || false // ★フラグが消えないように追加！
             };
 
             // ★追加：戦闘準備が整ったこのタイミングで「戦闘前」の歴史イベントをチェックします
