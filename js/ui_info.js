@@ -1,3 +1,7 @@
+/**
+ * ui_info.js
+ * リストの表示を管理するファイルです
+ */
 class UIInfoManager {
     constructor(ui, game) {
         // 元のui.jsとgameの情報を覚えておきます
@@ -3174,19 +3178,26 @@ class UIInfoManager {
     }
 
     // ==========================================
-    // ★諸勢力一覧の魔法（共通モーダル対応版）
+    // ★諸勢力一覧＆選択の魔法（共通モーダル対応版）
     // ==========================================
     showKunishuList(kunishus, castle, onBack) {
-        this.pushModal('kunishu_list', [kunishus, castle, onBack]);
+        this.pushModal('kunishu_list', [kunishus, castle, false, onBack, null]);
     }
 
     showAllKunishuList() {
         this.closeCommonModal(); 
         const allKunishus = this.game.kunishuSystem.getAliveKunishus();
-        this.pushModal('kunishu_list', [allKunishus, null, null]);
+        this.pushModal('kunishu_list', [allKunishus, null, false, null, null]);
     }
 
-    _renderKunishuList(kunishus, castle, onBack, scrollPos = 0) {
+    // ★新規追加：鎮圧などで諸勢力を選択するための窓口
+    showKunishuSelector(kunishus, castle, onConfirm, onBack = null) {
+        this.closeCommonModal();
+        this.pushModal('kunishu_list', [kunishus, castle, true, onBack, onConfirm]);
+    }
+
+    // ★引数に isSelectMode と onConfirm を追加して両対応にしました
+    _renderKunishuList(kunishus, castle, isSelectMode = false, onBack = null, onConfirm = null, scrollPos = 0) {
         const modal = document.getElementById('selector-modal');
         const titleEl = document.getElementById('selector-title');
         const listContainer = document.getElementById('selector-list');
@@ -3197,7 +3208,9 @@ class UIInfoManager {
 
         if (!modal) return;
         modal.classList.remove('hidden');
-        if (titleEl) titleEl.textContent = "諸勢力一覧";
+        
+        // ★モードによってタイトルを変えます
+        if (titleEl) titleEl.textContent = isSelectMode ? "対象とする諸勢力をお選びください" : "諸勢力一覧";
         
         if (contextEl) {
             contextEl.classList.remove('hidden');
@@ -3207,8 +3220,6 @@ class UIInfoManager {
         if (tabsEl) {
             tabsEl.classList.add('hidden'); // 諸勢力一覧ではタブは使いません
         }
-        
-        if (confirmBtn) confirmBtn.classList.add('hidden'); // 閲覧専用なので決定ボタンは隠します
 
         if(backBtn) {
             backBtn.style.display = '';
@@ -3222,8 +3233,10 @@ class UIInfoManager {
             if (footer) footer.style.justifyContent = 'center';
         }
         
+        let modeClassStr = isSelectMode ? "" : "view-mode";
+
         let listHtml = `
-            <div class="list-header kunishu-list-header view-mode">
+            <div class="list-header kunishu-list-header ${modeClassStr}">
                 <span style="padding-left:5px; justify-content:flex-start;">勢力名</span>
                 <span>頭領</span>
                 <span>所在</span>
@@ -3241,7 +3254,6 @@ class UIInfoManager {
             const castleObj = this.game.getCastle(kunishu.castleId);
             const castleName = castleObj ? castleObj.name : "不明";
             
-            // ★追加: 拠点から所属している国を調べて名前を割り出します
             let provinceName = "不明";
             if (castleObj && this.game.provinces) {
                 const province = this.game.provinces.find(p => p.id === castleObj.provinceId);
@@ -3257,9 +3269,16 @@ class UIInfoManager {
             if (relVal >= 70) { relStatus = "友好"; relColor = "color:#388e3c;"; }
             else if (relVal < 40) { relStatus = "敵対"; relColor = "color:#d32f2f;"; }
 
-            // ★クリックして諸勢力情報を開けるようにします
+            // ★モードによって、クリックした時の処理を切り替えます
+            let onClickStr = "";
+            if (isSelectMode) {
+                onClickStr = `onclick="window.GameApp.ui.info.selectKunishu(${kunishu.id}, this)"`;
+            } else {
+                onClickStr = `onclick="if(window.AudioManager) window.AudioManager.playSE('choice.ogg'); window.GameApp.ui.info.showKunishuDetail(${kunishu.id})"`;
+            }
+
             listHtml += `
-                <div class="select-item kunishu-list-item view-mode" style="cursor:pointer;" onclick="if(window.AudioManager) window.AudioManager.playSE('choice.ogg'); window.GameApp.ui.info.showKunishuDetail(${kunishu.id})">
+                <div class="select-item kunishu-list-item ${modeClassStr}" style="cursor:pointer;" ${onClickStr}>
                     <strong class="col-kunishu-name">${kunishuName}</strong>
                     <span>${leaderName}</span>
                     <span>${castleName}</span>
@@ -3274,7 +3293,7 @@ class UIInfoManager {
         const itemCount = kunishus.length;
         for (let i = itemCount; i < 8; i++) {
             listHtml += `
-                <div class="select-item kunishu-list-item view-mode" style="cursor:default; pointer-events:none;">
+                <div class="select-item kunishu-list-item ${modeClassStr}" style="cursor:default; pointer-events:none;">
                     <span></span><span></span><span></span><span></span><span></span><span></span><span></span>
                 </div>
             `;
@@ -3294,6 +3313,48 @@ class UIInfoManager {
             } else {
                 listContainer.scrollTop = scrollPos;
             }
+        }
+
+        // ★新規追加：選択モードの時は決定ボタンを表示し、動作を割り当てます
+        if (confirmBtn) {
+            if (isSelectMode) {
+                confirmBtn.classList.remove('hidden');
+                this.selectedKunishuId = null;
+                confirmBtn.disabled = true;
+                confirmBtn.style.opacity = '0.5';
+                confirmBtn.style.cursor = 'not-allowed';
+                confirmBtn.onclick = () => {
+                    if (!this.selectedKunishuId) return;
+                    if (window.AudioManager) window.AudioManager.playSE('choice.ogg');
+                    this.closeCommonModal(); // 枠を閉じる
+                    if (onConfirm) onConfirm(this.selectedKunishuId); // 選んだ勢力を伝える
+                };
+            } else {
+                confirmBtn.classList.add('hidden'); // 閲覧専用なので決定ボタンは隠します
+            }
+        }
+    }
+
+    // ★新規追加：リストから勢力を選んだ時のハイライト処理
+    selectKunishu(kunishuId, element) {
+        if (window.AudioManager) window.AudioManager.playSE('choice.ogg');
+        
+        const items = document.querySelectorAll('.kunishu-list-item');
+        items.forEach(item => {
+            item.style.backgroundColor = '';
+            item.style.borderLeft = '';
+        });
+
+        element.style.backgroundColor = '#ffe0b2';
+        element.style.borderLeft = '5px solid #ff9800';
+
+        this.selectedKunishuId = kunishuId;
+
+        const confirmBtn = document.getElementById('selector-confirm-btn');
+        if (confirmBtn) {
+            confirmBtn.disabled = false;
+            confirmBtn.style.opacity = '1';
+            confirmBtn.style.cursor = 'pointer';
         }
     }
     
