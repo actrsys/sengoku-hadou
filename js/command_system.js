@@ -1276,14 +1276,7 @@ class CommandSystem {
                                 (tgtProv && tgtProv.statusEffects && tgtProv.statusEffects.includes('heavySnow'));
 
             const proceedWar = () => {
-                if (extraData && extraData.isKunishu) {
-                    // ★追加：諸勢力鎮圧の場合は、kunishu_system.js に作った専用の魔法を呼び出します！
-                    const kunishu = this.game.kunishuSystem.getKunishu(extraData.kunishuId);
-                    this.game.kunishuSystem.executeKunishuSubjugate(castle, targetId, data, sVal, rVal, hVal, gVal, kunishu);
-                } else {
-                    // 通常の戦争の場合は、今まで通りの魔法を使います
-                    this.checkReinforcementAndStartWar(castle, targetId, data.map(id => this.game.getBusho(id)), sVal, rVal, hVal, gVal, extraData);
-                }
+                this.checkReinforcementAndStartWar(castle, targetId, data.map(id => this.game.getBusho(id)), sVal, rVal, hVal, gVal, extraData);
             };
 
             if (isHeavySnow) {
