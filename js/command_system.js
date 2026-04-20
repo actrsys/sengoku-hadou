@@ -2018,8 +2018,9 @@ class CommandSystem {
                 }
 
                 // ★修正：条件のチェックをすべて「外交の専門部署」に任せます！
+                // 【原因】ここに渡す情報が1つ抜けていてズレてしまっていました！
                 const allAvailableForces = this.game.diplomacyManager.findAvailableReinforcements(
-                    false, isDefending, temp.targetCastle || temp.defCastle, myClanId, enemyClanId, connectedCastles
+                    false, isDefending, startCastle.id, temp.targetCastle || temp.defCastle, myClanId, enemyClanId, connectedCastles
                 );
 
                 // 返ってきたリストの中から、プレイヤーがクリックした城（targetCastle）にいる勢力だけを絞り込みます
@@ -2169,7 +2170,7 @@ class CommandSystem {
                 soldiers: kunishu.soldiers,
                 rice: kunishu.soldiers * 2, // 無から湧く兵糧
                 horses: kunishu.horses || 0,
-                guns: kunishu.guns || 0,
+                guns: kunishu.guns || 0,f
                 defense: kunishu.defense,
                 training: kunishu.training,
                 morale: kunishu.morale
