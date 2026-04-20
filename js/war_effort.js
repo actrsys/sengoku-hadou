@@ -2097,7 +2097,11 @@ Object.assign(WarManager.prototype, {
             // 2. 諸勢力
             const kunishus = this.game.kunishuSystem.getKunishusInCastle(c.id);
             kunishus.forEach(k => {
-                if (k.soldiers >= 1000) {
+                // ★追加：戦争相手（攻撃側）との関係値を取得します
+                const enemyRel = k.getRelation(atkClanId);
+
+                // ★修正：敵と友好状態（関係値が70以上）の諸勢力は候補から外します
+                if (enemyRel < 70 && k.soldiers >= 1000) {
                     const isConnected = connectedCastles.has(c.id) || this.game.castles.some(myC => connectedCastles.has(myC.id) && GameSystem.isAdjacent(c, myC));
                     if (isConnected) {
                         const members = this.game.kunishuSystem.getKunishuMembers(k.id);
