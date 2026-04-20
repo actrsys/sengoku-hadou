@@ -2080,7 +2080,7 @@ Object.assign(WarManager.prototype, {
             // 1. 大名家
             if (c.ownerClan !== 0 && c.ownerClan !== defClanId && c.ownerClan !== atkClanId) {
                 const rel = this.game.getRelation(defClanId, c.ownerClan);
-                if (rel && ['友好', '同盟', '支配', '従属'].includes(rel.status) && rel.sentiment >= 50) {
+                if (rel) {
                     const enemyRel = this.game.getRelation(c.ownerClan, atkClanId);
                     if (!enemyRel || !this.game.diplomacyManager.isNonAggression(enemyRel.status)) {
                         const isConnected = connectedCastles.has(c.id) || this.game.castles.some(myC => connectedCastles.has(myC.id) && GameSystem.isAdjacent(c, myC));
@@ -2097,8 +2097,7 @@ Object.assign(WarManager.prototype, {
             // 2. 諸勢力
             const kunishus = this.game.kunishuSystem.getKunishusInCastle(c.id);
             kunishus.forEach(k => {
-                const kRel = k.getRelation(defClanId);
-                if (kRel >= 70 && k.soldiers >= 1000) {
+                if (k.soldiers >= 1000) {
                     const isConnected = connectedCastles.has(c.id) || this.game.castles.some(myC => connectedCastles.has(myC.id) && GameSystem.isAdjacent(c, myC));
                     if (isConnected) {
                         const members = this.game.kunishuSystem.getKunishuMembers(k.id);
@@ -2301,6 +2300,14 @@ Object.assign(WarManager.prototype, {
         const force = helperCastle.selectedForce;
         const myClanId = defCastle.ownerClan;
 
+        // ★追加：戦力比較用の合計兵力算出
+        let defTotalSoldiers = defCastle.soldiers;
+        if (this.state.defSelfReinforcement) defTotalSoldiers += this.state.defSelfReinforcement.soldiers;
+        
+        let atkTotalSoldiers = this.state.attacker.soldiers;
+        if (this.state.reinforcement) atkTotalSoldiers += this.state.reinforcement.soldiers;
+        if (this.state.selfReinforcement) atkTotalSoldiers += this.state.selfReinforcement.soldiers;
+
         // ★ここから追加：大雪の判定です
         const srcProv = this.game.provinces.find(p => p.id === helperCastle.provinceId);
         const tgtProv = this.game.provinces.find(p => p.id === defCastle.provinceId);
@@ -2315,10 +2322,23 @@ Object.assign(WarManager.prototype, {
             // ★追加：大雪ならAI（諸勢力）は絶対に断ります！
             let isSuccess = false;
             if (!isHeavySnow) {
-                let prob = currentRel - 50; 
-                prob += Math.floor((gold / 1500) * 15);
-                prob += 50; 
-                isSuccess = (Math.random() * 100 < prob);
+                const enemyClanId = this.state.attacker.ownerClan;
+                
+                const sentimentBonus = currentRel / 200;
+                const goldBonus = Math.min(1500, gold) / 20000;
+                const relationBonus = 0; // 諸勢力に同盟・従属関係はなし
+                const enemyHateBonus = (50 - kunishu.getRelation(enemyClanId)) / 200;
+                const powerBonus = -1 + ((Math.sqrt(defTotalSoldiers) / 2) / Math.max(0.1, (Math.sqrt(atkTotalSoldiers) / 2)));
+                
+                // ★修正：諸勢力の頭領の義理を参照します
+                const leader = this.game.getBusho(kunishu.leaderId);
+                const duty = leader ? leader.duty : 50;
+                const dutyBonus = 0.5 + (duty / 100);
+                
+                let successRate = (sentimentBonus + goldBonus + relationBonus + enemyHateBonus + powerBonus) * dutyBonus;
+                successRate = Math.max(0, Math.min(1, successRate));
+                
+                isSuccess = (Math.random() * 100 < (successRate * 100));
             }
             
             if (!isSuccess) {
@@ -2384,7 +2404,7 @@ Object.assign(WarManager.prototype, {
             return;
         }
 
-        // 以降は今まで通りの大名家の処理です
+        // 以降は大名家の処理
         const helperClanId = helperCastle.ownerClan;
         const enemyClanId = this.state.attacker.ownerClan;
 
@@ -2411,11 +2431,19 @@ Object.assign(WarManager.prototype, {
         let isSuccess = false;
         if (myToHelperRel.status === '支配' && !isHeavySnow) isSuccess = true;
         else if (!isHeavySnow) {
-            let prob = (myToHelperRel.sentiment >= 50) ? (myToHelperRel.sentiment - 49) : 0;
-            prob += Math.floor((gold / 1500) * 15);
-            if (myToHelperRel.status === '同盟' || myToHelperRel.status === '従属') prob += 30;
-            if (helperToEnemyRel) prob -= Math.floor((helperToEnemyRel.sentiment - 50) * (20 / 50)); 
-            prob += 10; 
+            const sentimentBonus = myToHelperRel.sentiment / 200;
+            const goldBonus = Math.min(1500, gold) / 20000;
+            const relationBonus = (myToHelperRel.status === '同盟' || myToHelperRel.status === '従属') ? 0.15 : 0;
+            const helperToEnemySentiment = helperToEnemyRel ? helperToEnemyRel.sentiment : 50;
+            const enemyHateBonus = (50 - helperToEnemySentiment) / 200;
+            const powerBonus = -1 + ((Math.sqrt(defTotalSoldiers) / 2) / Math.max(0.1, (Math.sqrt(atkTotalSoldiers) / 2)));
+            
+            const helperDaimyo = this.game.bushos.find(b => b.clan === helperClanId && b.isDaimyo) || { duty: 50 };
+            const dutyBonus = 0.5 + (helperDaimyo.duty / 100);
+            
+            let successRate = (sentimentBonus + goldBonus + relationBonus + enemyHateBonus + powerBonus) * dutyBonus;
+            successRate = Math.max(0, Math.min(1, successRate));
+            let prob = successRate * 100;
             
             // ★追加：お願いした先の大名家が、攻撃の作戦中だったら確率を半分にします！
             const helperOp = this.game.aiOperationManager.operations[helperClanId];
