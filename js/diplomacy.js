@@ -1138,8 +1138,7 @@ class DiplomacyManager {
                         // 除外
                     } else {
                         const enemyRel = this.getRelation(cOwnerClanId, actualEnemyClanId);
-                        
-                        const isEnemyAlly = enemyRel && ['同盟', '支配', '従属'].includes(enemyRel.status);
+                        const isEnemyAlly = enemyRel && ['同盟', '支配', '従属', '和睦'].includes(enemyRel.status);
                         const isEnemyMaxGoodwill = enemyRel && enemyRel.sentiment >= 100;
                         
                         // 敵と仲良し過ぎないかチェック（戦争相手と同盟・支配・従属等ではないか）
