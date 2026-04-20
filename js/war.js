@@ -1,12 +1,6 @@
 /**
  * war.js
  * 戦争処理マネージャー & 戦争計算ロジック
- * 修正: 捕虜の処遇結果のアラートをカスタムダイアログ（showDialog）に置き換えました
- * 修正: 迎撃時の出陣兵士・兵糧の取得処理を修正（ID指定のオブジェクト構造に対応）
- * ★追加: 諸勢力の蜂起（反乱）・制圧時の特別な結末と、捕虜の特別ルールを追加しました
- * ★追加: 部隊分割時に兵科（troopType）の情報を保持・伝達するようにしました
- * ★修正: 大名死亡時の後継者選択で、一門・相性・年齢を優先するようにしました
- * ★追加: 既存の一門がいない場合、未登場の一門を強制的に元服させて後継者にする処理を追加しました
  */
 
 window.WarParams = {
@@ -1373,12 +1367,12 @@ class WarManager {
                 
                 // もし実行する前にやられて（兵士ゼロに）しまっていたら、行動はスキップ！
                 let isDead = false;
-                if (s.turn === 'attacker' && s.attacker.soldiers <= 0) isDead = true;
-                else if (s.turn === 'attacker_self_reinf' && s.selfReinforcement.soldiers <= 0) isDead = true;
-                else if (s.turn === 'attacker_ally_reinf' && s.reinforcement.soldiers <= 0) isDead = true;
-                else if (s.turn === 'defender' && s.defender.soldiers <= 0) isDead = true;
-                else if (s.turn === 'defender_self_reinf' && s.defSelfReinforcement.soldiers <= 0) isDead = true;
-                else if (s.turn === 'defender_ally_reinf' && s.defReinforcement.soldiers <= 0) isDead = true;
+                if (s.turn === 'attacker' && (!s.attacker || s.attacker.soldiers <= 0)) isDead = true;
+                else if (s.turn === 'attacker_self_reinf' && (!s.selfReinforcement || s.selfReinforcement.soldiers <= 0)) isDead = true;
+                else if (s.turn === 'attacker_ally_reinf' && (!s.reinforcement || s.reinforcement.soldiers <= 0)) isDead = true;
+                else if (s.turn === 'defender' && (!s.defender || s.defender.soldiers <= 0)) isDead = true;
+                else if (s.turn === 'defender_self_reinf' && (!s.defSelfReinforcement || s.defSelfReinforcement.soldiers <= 0)) isDead = true;
+                else if (s.turn === 'defender_ally_reinf' && (!s.defReinforcement || s.defReinforcement.soldiers <= 0)) isDead = true;
                 
                 if (isDead || !action) {
                     this.advanceWarTurn();
