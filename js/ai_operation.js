@@ -1,6 +1,6 @@
 /**
  * ai_operation.js - AIの作戦（長期計画）システム
- * 責務: 大名家ごとの作戦（攻撃、防衛、集結、内政）の立案・準備・実行の管理
+ * 大名家ごとの作戦（攻撃、防衛、集結、内政）の立案・準備・実行の管理
  */
 
 class AIOperationManager {
@@ -272,13 +272,13 @@ class AIOperationManager {
     }
 
     generateOperation(clanId) {
-        // 大名家のお城を全部集めます
         const myClanCastles = this.game.castles.filter(c => c.ownerClan === clanId);
         if (myClanCastles.length === 0) return;
 
-        // ゲーム開始から3ターン未満なら、おとなしく内政作戦にします
-        const startMonth = window.MainParams.StartMonth || 1;
-        const elapsedTurns = ((this.game.year - window.MainParams.StartYear) * 12) + (this.game.month - startMonth);
+        const startY = this.game.gameStartYear || window.MainParams.StartYear;
+        const startM = this.game.gameStartMonth || window.MainParams.StartMonth || 1;
+        const elapsedTurns = ((this.game.year - startY) * 12) + (this.game.month - startM);
+        
         if (elapsedTurns < 3) {
             this.setInternalOperation(clanId);
             return;

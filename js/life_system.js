@@ -325,12 +325,12 @@ class LifeSystem {
 
     // ★ 寿命のチェック（毎月行います）
     async checkDeath() {
-        // ★追加：ゲーム開始から3ヶ月（3ターン）未満なら、保護期間として誰も死なないようにします！
-        const startYear = this.game.startYear || window.MainParams.StartYear;
-        const startMonth = this.game.startMonth || window.MainParams.StartMonth || 1;
-        const elapsedTurns = ((this.game.year - startYear) * 12) + (this.game.month - startMonth);
+        const startY = this.game.gameStartYear || window.MainParams.StartYear;
+        const startM = this.game.gameStartMonth || window.MainParams.StartMonth || 1;
+        const elapsedTurns = ((this.game.year - startY) * 12) + (this.game.month - startM);
+        
         if (elapsedTurns < 3) {
-            return; // 保護期間なので、ここでチェックをおしまいにします
+            return; 
         }
 
         const currentYear = this.game.year;

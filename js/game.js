@@ -841,6 +841,10 @@ class GameManager {
             this.year = window.MainParams.StartYear;
             this.month = window.MainParams.StartMonth;
             
+            // ★修正：ゲーム開始時の年と月を、ゲーム本体にしっかり記憶させます！
+            this.gameStartYear = this.year;
+            this.gameStartMonth = this.month;
+            
             // ★追加：今のシナリオのフォルダ名をゲーム全体で覚えておく魔法です！
             this.scenarioFolder = folder;
             
@@ -1520,6 +1524,8 @@ class GameManager {
         const data = { 
             year: this.year, 
             month: this.month, 
+            gameStartYear: this.gameStartYear || window.MainParams.StartYear,
+            gameStartMonth: this.gameStartMonth || window.MainParams.StartMonth,
             marketRate: this.marketRate,
             castles: this.castles, 
             bushos: this.bushos, 
@@ -1578,8 +1584,10 @@ class GameManager {
                 this.flags = d.flags || {};
                 this.year = d.year;
                 this.month = d.month;
-                this.playerClanId = d.playerClanId || 1; 
-                this.marketRate = d.marketRate !== undefined ? d.marketRate : 1.0; 
+                this.gameStartYear = d.gameStartYear || window.MainParams.StartYear;
+                this.gameStartMonth = d.gameStartMonth || window.MainParams.StartMonth;
+                this.playerClanId = d.playerClanId || 1;
+                this.marketRate = d.marketRate !== undefined ? d.marketRate : 1.0;
                 
                 // ★マップの大きさをセーブデータから復元します
                 this.mapWidth = d.mapWidth;
