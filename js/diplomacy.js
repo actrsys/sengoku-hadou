@@ -386,7 +386,7 @@ class DiplomacyManager {
         const sentimentBonus = sentiment / 200;
         const goldBonus = Math.min(1500, gold) / 20000;
         const relationBonus = (relationStatus === '同盟' || relationStatus === '従属') ? 0.15 : 0;
-        const enemyHateBonus = (50 - helperToEnemySentiment) / 200;
+        const enemyHateBonus = (50 - helperToEnemySentiment) / 100;
         const powerBonus = -1 + ((Math.sqrt(Math.max(1, myTotalSoldiers)) / 2) / Math.max(0.1, (Math.sqrt(Math.max(1, enemyTotalSoldiers)) / 2)));
         const dutyBonus = 0.5 + (duty / 100);
         
