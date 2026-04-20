@@ -3611,7 +3611,10 @@ class UIInfoManager {
         // 選択時にデータを取り出すため、一時的にクラスに保存しておきます
         this.currentForces = forces;
 
-        forces.forEach((force, index) => {
+        forces.forEach((item, index) => {
+            // ★修正：データが { castle, force } の形で送られてくるようになったため、中身を取り出します
+            const force = item.force || item; 
+
             let relVal = 50;
             if (force.isKunishu) {
                 const k = this.game.kunishuSystem.getKunishu(force.id);
