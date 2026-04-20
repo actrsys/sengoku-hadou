@@ -1674,111 +1674,11 @@ class UIManager {
     }
     
     // ---------------------------------------------------------
-    // 魔法①：大名家と諸勢力が混ざった「援軍用」のリスト（外交デザイン版・空白なし）
+    // 魔法①：大名家と諸勢力が混ざった「援軍用」のリスト（共通化版）
     // ---------------------------------------------------------
     showForceSelector(forces, onSelect, onCancel) {
-        const modal = document.getElementById('selector-modal');
-        const list = document.getElementById('selector-list');
-        const contextInfo = document.getElementById('selector-context-info');
-        const confirmBtn = document.getElementById('selector-confirm-btn');
-        
-        // ★ここを追加：武将専用のタブをしっかり隠します！
-        const tabsEl = document.getElementById('selector-tabs');
-        if (tabsEl) tabsEl.classList.add('hidden');
-        
-        if (!modal || !list || !contextInfo) return;
-        
-        const titleEl = document.getElementById('selector-title');
-        if (titleEl) titleEl.textContent = "勢力一覧";
-
-        contextInfo.innerHTML = "<div>援軍を要請する勢力を選択してください</div>";
-        
-        const listHeader = modal.querySelector('.list-header');
-        if (listHeader) listHeader.style.display = 'none';
-
-        list.innerHTML = `
-            <div class="kunishu-list-header" style="grid-template-columns: 1.5fr 1fr 1fr 1.5fr;">
-                <span>勢力名</span><span>代表者</span><span>兵士</span><span>友好度</span>
-            </div>
-        `;
-        list.classList.remove('view-mode');
-        
-        let selectedForce = null;
-        
-        forces.forEach(force => {
-            const item = document.createElement('div');
-            item.className = 'kunishu-list-item';
-            item.style.cursor = 'pointer';
-            item.style.gridTemplateColumns = '1.5fr 1fr 1fr 1.5fr';
-            
-            let relVal = 50;
-            if (force.isKunishu) {
-                const k = this.game.kunishuSystem.getKunishu(force.id);
-                if (k) relVal = k.getRelation(this.game.playerClanId);
-            } else {
-                const rel = this.game.getRelation(this.game.playerClanId, force.id);
-                if (rel) relVal = rel.sentiment;
-            }
-            const relPercent = Math.min(100, Math.max(0, Number(relVal) || 0));
-            const friendBarHtml = `<div class="bar-bg bar-bg-friend"><div class="bar-fill bar-fill-friend" style="width:${relPercent}%;"></div></div>`;
-            
-            item.innerHTML = `
-                <strong class="col-kunishu-name">${force.name}</strong>
-                <span>${force.leaderName}</span>
-                <span>${force.soldiers}</span>
-                <span>${friendBarHtml}</span>
-            `;
-            
-            item.onclick = () => {
-                if (window.AudioManager) window.AudioManager.playSE('choice.ogg');
-                Array.from(list.querySelectorAll('.kunishu-list-item')).forEach(c => c.classList.remove('selected'));
-                item.classList.add('selected');
-                selectedForce = force;
-                
-                if (confirmBtn) {
-                    confirmBtn.disabled = false;
-                    confirmBtn.style.opacity = 1.0;
-                }
-            };
-            list.appendChild(item);
-        });
-        
-        const itemCount = forces.length;
-        for (let i = itemCount; i < 8; i++) {
-            const dummy = document.createElement('div');
-            dummy.className = 'kunishu-list-item';
-            dummy.style.gridTemplateColumns = '1.5fr 1fr 1fr 1.5fr';
-            dummy.style.cursor = 'default';
-            dummy.style.pointerEvents = 'none';
-            dummy.innerHTML = '<span></span><span></span><span></span><span></span>';
-            list.appendChild(dummy);
-        }
-        
-        if (confirmBtn) {
-            confirmBtn.disabled = true;
-            confirmBtn.style.opacity = 0.5;
-            
-            confirmBtn.onclick = () => {
-                if (!selectedForce) {
-                    this.showDialog("勢力を選択してください", false);
-                    return;
-                }
-                if (listHeader) listHeader.style.display = ''; 
-                modal.classList.add('hidden');
-                onSelect(selectedForce);
-            };
-        }
-        
-        const cancelBtn = modal.querySelector('.btn-secondary');
-        if (cancelBtn) {
-            cancelBtn.onclick = () => {
-                if (listHeader) listHeader.style.display = ''; 
-                modal.classList.add('hidden');
-                if (onCancel) onCancel();
-            };
-        }
-        
-        modal.classList.remove('hidden');
+        // ★修正：手動で作っていたリストをやめ、情報専門部署（ui_info.js）の共通リストに任せます！
+        this.info.showForceSelector(forces, onSelect, onCancel);
     }
     
     setWarModalVisible(visible) {

@@ -555,6 +555,7 @@ body.hide-daimyo-labels .daimyo-name-label { display: none !important; }
 .faction-list-header, .faction-list-item { grid-template-columns: 2.5fr 1fr 1.5fr 1.5fr 3fr; }
 .princess-list-header, .princess-list-item { grid-template-columns: 1.3fr 1fr 1.5fr 1.5fr 3fr; }
 .delegate-list-header, .delegate-list-item { grid-template-columns: 1.5fr 1fr 1fr 1fr; }
+.force-list-header, .force-list-item { grid-template-columns: 1.5fr 1fr 1fr 1.5fr; } /* ★追加：勢力選択リスト用の幅 */
 
 /* =========================================================
    ボタン類
@@ -1888,6 +1889,7 @@ body.is-pc {
     .kunishu-list-header.view-mode, .kunishu-list-item.view-mode { grid-template-columns: 100px 120px 80px 80px 60px 80px 60px; }
     .faction-list-header, .faction-list-item { grid-template-columns: 140px 80px 100px 100px 1fr; font-size: 0.95rem; height: 44px; }
     .princess-list-header, .princess-list-item { grid-template-columns: 95px 80px 100px 100px 1fr; font-size: 0.95rem; height: 44px; }
+    .force-list-header, .force-list-item { grid-template-columns: 150px 120px 100px 1fr; font-size: 0.95rem; height: 44px; } /* ★追加：PC版の勢力選択リスト用の幅 */
     
     /* モーダル拡張（輸送・兵力分配）のタイル化を解除して縦並びに統一 */
     #quantity-modal .modal-content, #unit-divide-modal .modal-content { max-width: 700px !important; max-height: 90% !important; }

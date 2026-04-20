@@ -99,7 +99,8 @@ class UIInfoManager {
         else if (info.pageType === 'history_list') this._renderHistoryList(...info.args, info.scrollPos);
         else if (info.pageType === 'kunishu_list') this._renderKunishuList(...info.args, info.scrollPos);
         else if (info.pageType === 'kunishu_detail') this._renderKunishuDetail(...info.args, info.scrollPos);
-        else if (info.pageType === 'castle_detail') this._renderCastleDetail(...info.args, info.scrollPos); // ★これを追加！
+        else if (info.pageType === 'castle_detail') this._renderCastleDetail(...info.args, info.scrollPos);
+        else if (info.pageType === 'force_selector') this._renderForceSelector(...info.args, info.scrollPos);
     }
     
     showDaimyoList() {
@@ -3555,5 +3556,142 @@ class UIInfoManager {
             }
         }
     }
-    
+
+    // ==========================================
+    // ★援軍の勢力選択リストの魔法（共通モーダル対応版）
+    // ==========================================
+    showForceSelector(forces, onSelect, onCancel) {
+        this.closeCommonModal(); 
+        this.pushModal('force_selector', [forces, onSelect, onCancel]);
+    }
+
+    _renderForceSelector(forces, onSelect, onCancel, scrollPos = 0) {
+        const modal = document.getElementById('selector-modal');
+        const titleEl = document.getElementById('selector-title');
+        const listContainer = document.getElementById('selector-list');
+        const contextEl = document.getElementById('selector-context-info');
+        const tabsEl = document.getElementById('selector-tabs');
+        const confirmBtn = document.getElementById('selector-confirm-btn');
+        const backBtn = document.querySelector('#selector-modal .btn-secondary');
+
+        if (!modal) return;
+        modal.classList.remove('hidden');
+        if (titleEl) titleEl.textContent = "勢力一覧";
+        
+        if (contextEl) {
+            contextEl.classList.remove('hidden');
+            contextEl.innerHTML = "<div>援軍を要請する勢力を選択してください</div>";
+        }
+        
+        if (tabsEl) {
+            tabsEl.classList.add('hidden'); 
+        }
+
+        if(backBtn) {
+            backBtn.style.display = '';
+            backBtn.textContent = '戻る';
+            backBtn.onclick = () => {
+                if (window.AudioManager) window.AudioManager.playSE('cancel.ogg');
+                if (onCancel) onCancel();
+                this.popModal();
+            };
+            const footer = backBtn.parentElement;
+            if (footer) footer.style.justifyContent = 'center';
+        }
+
+        let listHtml = `
+            <div class="list-header force-list-header">
+                <span style="padding-left:5px; justify-content:flex-start;">勢力名</span>
+                <span>代表者</span>
+                <span>兵士</span>
+                <span>友好度</span>
+            </div>
+        `;
+        
+        // 選択時にデータを取り出すため、一時的にクラスに保存しておきます
+        this.currentForces = forces;
+
+        forces.forEach((force, index) => {
+            let relVal = 50;
+            if (force.isKunishu) {
+                const k = this.game.kunishuSystem.getKunishu(force.id);
+                if (k) relVal = k.getRelation(this.game.playerClanId);
+            } else {
+                const rel = this.game.getRelation(this.game.playerClanId, force.id);
+                if (rel) relVal = rel.sentiment;
+            }
+            const relPercent = Math.min(100, Math.max(0, Number(relVal) || 0));
+            const friendBarHtml = `<div class="bar-bg bar-bg-friend"><div class="bar-fill bar-fill-friend" style="width:${relPercent}%;"></div></div>`;
+            
+            listHtml += `
+                <div class="select-item force-list-item" style="cursor:pointer;" onclick="window.GameApp.ui.info.selectForce(${index}, this)">
+                    <strong class="col-kunishu-name">${force.name}</strong>
+                    <span>${force.leaderName}</span>
+                    <span>${force.soldiers}</span>
+                    <span>${friendBarHtml}</span>
+                </div>
+            `;
+        });
+        
+        const itemCount = forces.length;
+        for (let i = itemCount; i < 8; i++) {
+            listHtml += `
+                <div class="select-item force-list-item" style="cursor:default; pointer-events:none;">
+                    <span></span><span></span><span></span><span></span>
+                </div>
+            `;
+        }
+
+        if (listContainer) {
+            listContainer.className = 'list-container hide-native-scroll';
+            listContainer.style.display = 'block';
+            listContainer.innerHTML = listHtml;
+            
+            if (window.CustomScrollbar) {
+                if (!this.ui.bushoScrollbar) this.ui.bushoScrollbar = new CustomScrollbar(listContainer);
+                setTimeout(() => {
+                    listContainer.scrollTop = scrollPos;
+                    this.ui.bushoScrollbar.update();
+                }, 10);
+            } else {
+                listContainer.scrollTop = scrollPos;
+            }
+        }
+        
+        if (confirmBtn) {
+            confirmBtn.classList.remove('hidden');
+            this.selectedForceIndex = null;
+            confirmBtn.disabled = true;
+            confirmBtn.style.opacity = '0.5';
+            confirmBtn.style.cursor = 'not-allowed';
+            confirmBtn.onclick = () => {
+                if (this.selectedForceIndex === null) return;
+                this.closeCommonModal(); 
+                const selectedForce = this.currentForces[this.selectedForceIndex];
+                if (onSelect) onSelect(selectedForce); 
+            };
+        }
+    }
+
+    selectForce(index, element) {
+        if (window.AudioManager) window.AudioManager.playSE('choice.ogg');
+        
+        const items = document.querySelectorAll('.force-list-item');
+        items.forEach(item => {
+            item.style.backgroundColor = '';
+            item.style.borderLeft = '';
+        });
+
+        element.style.backgroundColor = '#ffe0b2';
+        element.style.borderLeft = '5px solid #ff9800';
+
+        this.selectedForceIndex = index;
+
+        const confirmBtn = document.getElementById('selector-confirm-btn');
+        if (confirmBtn) {
+            confirmBtn.disabled = false;
+            confirmBtn.style.opacity = '1';
+            confirmBtn.style.cursor = 'pointer';
+        }
+    }
 }
