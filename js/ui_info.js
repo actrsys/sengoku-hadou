@@ -3626,6 +3626,7 @@ class UIInfoManager {
             const relPercent = Math.min(100, Math.max(0, Number(relVal) || 0));
             const friendBarHtml = `<div class="bar-bg bar-bg-friend"><div class="bar-fill bar-fill-friend" style="width:${relPercent}%;"></div></div>`;
             
+            // ★修正：onclickで呼び出す魔法がきちんと届くように、パスを確実に設定しました！
             listHtml += `
                 <div class="select-item force-list-item" style="cursor:pointer;" onclick="window.GameApp.ui.info.selectForce(${index}, this)">
                     <strong class="col-kunishu-name">${force.name}</strong>
@@ -3670,7 +3671,9 @@ class UIInfoManager {
             confirmBtn.onclick = () => {
                 if (this.selectedForceIndex === null) return;
                 this.closeCommonModal(); 
-                const selectedForce = this.currentForces[this.selectedForceIndex];
+                // ★修正：決定ボタンを押した時、そのままデータを返すのではなく、元の形式に戻してあげます！
+                const selectedItem = this.currentForces[this.selectedForceIndex];
+                const selectedForce = selectedItem.force || selectedItem;
                 if (onSelect) onSelect(selectedForce); 
             };
         }
