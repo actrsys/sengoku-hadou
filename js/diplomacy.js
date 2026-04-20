@@ -1054,6 +1054,49 @@ class DiplomacyManager {
      */
     findAvailableReinforcements(isSelf, isDefending, initiatorCastleId, targetCastle, myClanId, enemyClanId, connectedCastles) {
         let forces = [];
+        
+        // ★追加：敵対陣営に参加している勢力（大名家や諸勢力）を除外するためのリストを作成
+        const hostileClans = new Set();
+        const hostileKunishus = new Set();
+
+        if (enemyClanId) {
+            hostileClans.add(Number(enemyClanId));
+        }
+
+        if (this.game.warManager && this.game.warManager.state && this.game.warManager.state.active) {
+            const s = this.game.warManager.state;
+            
+            // 自分が防衛側なら、攻撃陣営（メイン、援軍）を敵とみなす
+            if (isDefending) {
+                if (s.attacker) {
+                    if (s.attacker.isKunishu) hostileKunishus.add(Number(s.attacker.kunishuId));
+                    else hostileClans.add(Number(s.attacker.ownerClan));
+                }
+                if (s.reinforcement) {
+                    if (s.reinforcement.isKunishuForce) hostileKunishus.add(Number(s.reinforcement.kunishuId));
+                    else hostileClans.add(Number(s.reinforcement.castle.ownerClan));
+                }
+                if (s.selfReinforcement) {
+                    hostileClans.add(Number(s.selfReinforcement.castle.ownerClan));
+                }
+            } 
+            // 自分が攻撃側なら、防衛陣営（メイン、援軍）を敵とみなす
+            else {
+                if (s.defender) {
+                    if (s.defender.isKunishu) hostileKunishus.add(Number(s.defender.kunishuId));
+                    else hostileClans.add(Number(s.defender.ownerClan));
+                }
+                if (s.oldDefClanId) hostileClans.add(Number(s.oldDefClanId));
+
+                if (s.defReinforcement) {
+                    if (s.defReinforcement.isKunishuForce) hostileKunishus.add(Number(s.defReinforcement.kunishuId));
+                    else hostileClans.add(Number(s.defReinforcement.castle.ownerClan));
+                }
+                if (s.defSelfReinforcement) {
+                    hostileClans.add(Number(s.defSelfReinforcement.castle.ownerClan));
+                }
+            }
+        }
 
         this.game.castles.forEach(c => {
             // ★追加：自分自身（出陣元の城）および対象（攻撃/防衛されている城）は援軍候補から除外します
@@ -1065,7 +1108,7 @@ class DiplomacyManager {
 
             // 2. 自勢力（自分の別のお城）を探す場合
             if (isSelf) {
-                if (c.ownerClan !== myClanId) return;
+                if (Number(c.ownerClan) !== Number(myClanId)) return;
                 
                 // 道が繋がっているか、すぐ隣か
                 const isConnected = connectedCastles.has(c.id) || this.game.castles.some(myC => connectedCastles.has(myC.id) && GameSystem.isAdjacent(c, myC));
@@ -1085,30 +1128,36 @@ class DiplomacyManager {
             else {
                 // 目標が諸勢力かどうかで敵大名を判定
                 const isTargetKunishu = targetCastle.isKunishu;
-                const actualEnemyClanId = isTargetKunishu ? 0 : enemyClanId;
+                const actualEnemyClanId = isTargetKunishu ? 0 : Number(enemyClanId);
+                const cOwnerClanId = Number(c.ownerClan);
 
                 // --- 大名家のチェック ---
-                if (c.ownerClan !== 0 && c.ownerClan !== myClanId && c.ownerClan !== actualEnemyClanId) {
-                    const enemyRel = this.getRelation(c.ownerClan, actualEnemyClanId);
-                    
-                    const isEnemyAlly = enemyRel && ['同盟', '支配', '従属'].includes(enemyRel.status);
-                    const isEnemyMaxGoodwill = enemyRel && enemyRel.sentiment >= 100;
-                    
-                    // 敵と仲良し過ぎないかチェック（戦争相手と同盟・支配・従属等ではないか）
-                    if (!isEnemyAlly && !isEnemyMaxGoodwill && (!enemyRel || !this.isNonAggression(enemyRel.status))) {
-                        // 対象のお城が繋がっているかチェック
-                        const isConnected = connectedCastles.has(c.id) || this.game.castles.some(myC => connectedCastles.has(myC.id) && GameSystem.isAdjacent(c, myC));
-                        // 自軍側が応援を呼ぶ時は、対象と隣接していればOK
-                        const isNextToEnemy = !isDefending && ((c.id === targetCastle.id) || GameSystem.isAdjacent(c, targetCastle));
+                if (cOwnerClanId !== 0 && cOwnerClanId !== Number(myClanId)) {
+                    // ★追加：敵対陣営として参加確定している勢力は呼べない
+                    if (hostileClans.has(cOwnerClanId)) {
+                        // 除外
+                    } else {
+                        const enemyRel = this.getRelation(cOwnerClanId, actualEnemyClanId);
                         
-                        if (isConnected || isNextToEnemy) {
-                            const normalBushos = this.game.getCastleBushos(c.id).filter(b => b.clan === c.ownerClan && b.status === 'active' && !b.isDaimyo && !b.isCastellan);
-                            const minRice = isDefending ? 500 : 0;
+                        const isEnemyAlly = enemyRel && ['同盟', '支配', '従属'].includes(enemyRel.status);
+                        const isEnemyMaxGoodwill = enemyRel && enemyRel.sentiment >= 100;
+                        
+                        // 敵と仲良し過ぎないかチェック（戦争相手と同盟・支配・従属等ではないか）
+                        if (!isEnemyAlly && !isEnemyMaxGoodwill && (!enemyRel || !this.isNonAggression(enemyRel.status))) {
+                            // 対象のお城が繋がっているかチェック
+                            const isConnected = connectedCastles.has(c.id) || this.game.castles.some(myC => connectedCastles.has(myC.id) && GameSystem.isAdjacent(c, myC));
+                            // 自軍側が応援を呼ぶ時は、対象と隣接していればOK
+                            const isNextToEnemy = !isDefending && ((c.id === targetCastle.id) || GameSystem.isAdjacent(c, targetCastle));
                             
-                            if (c.soldiers >= 1000 && c.rice >= minRice && normalBushos.length > 0) {
-                                const clan = this.game.clans.find(clanInfo => clanInfo.id === c.ownerClan);
-                                const castellan = this.game.getBusho(c.castellanId) || {name: "城主"};
-                                forces.push({ castle: c, force: { isKunishu: false, id: c.ownerClan, name: clan ? clan.name : "大名家", leaderName: castellan.name, soldiers: c.soldiers } });
+                            if (isConnected || isNextToEnemy) {
+                                const normalBushos = this.game.getCastleBushos(c.id).filter(b => b.clan === c.ownerClan && b.status === 'active' && !b.isDaimyo && !b.isCastellan);
+                                const minRice = isDefending ? 500 : 0;
+                                
+                                if (c.soldiers >= 1000 && c.rice >= minRice && normalBushos.length > 0) {
+                                    const clan = this.game.clans.find(clanInfo => clanInfo.id === c.ownerClan);
+                                    const castellan = this.game.getBusho(c.castellanId) || {name: "城主"};
+                                    forces.push({ castle: c, force: { isKunishu: false, id: c.ownerClan, name: clan ? clan.name : "大名家", leaderName: castellan.name, soldiers: c.soldiers } });
+                                }
                             }
                         }
                     }
@@ -1120,6 +1169,9 @@ class DiplomacyManager {
                 kunishus.forEach(k => {
                     // 攻撃対象の諸勢力自身は呼べないようにガード
                     if (isTargetKunishu && targetCastle.kunishuId === k.id) return;
+                    
+                    // ★追加：敵対陣営として参加確定している諸勢力は呼べない
+                    if (hostileKunishus.has(Number(k.id))) return;
 
                     const enemyKunishuRel = isTargetKunishu ? 0 : k.getRelation(actualEnemyClanId);
                     // ★関係条件（友好度）を撤廃。兵力と敵との関係のみチェック
