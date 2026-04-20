@@ -337,12 +337,13 @@ Object.assign(WarManager.prototype, {
                     this.game.diplomacyManager.changeStatus(helperClan, defClan, '敵対');
                 }
             }
-
+            
             this.state = { 
                 active: true, round: 1, attacker: attackerForce, sourceCastle: atkCastle, 
                 defender: defCastle, atkBushos: atkBushos, defBusho: defBusho, 
                 turn: 'attacker', isPlayerInvolved: isPlayerInvolved, deadSoldiers: { attacker: 0, defender: 0 }, defenderGuarding: false,
-                reinforcement: reinforcementData, selfReinforcement: selfReinforcementData
+                reinforcement: reinforcementData, selfReinforcement: selfReinforcementData,
+                isKunishuSubjugation: defCastle.isKunishu === true && !atkCastle.isKunishu // 防衛側が諸勢力で、攻撃側が諸勢力(蜂起)でないなら鎮圧戦！
             };
 
             // ★追加：戦闘準備が整ったこのタイミングで「戦闘前」の歴史イベントをチェックします

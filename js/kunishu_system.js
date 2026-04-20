@@ -632,18 +632,13 @@ class KunishuSystem {
         this.game.ui.renderCommandMenu();
         this.game.ui.renderMap();
     }
-
+    
     // 諸勢力を攻めて壊滅させるための処理
-    async executeKunishuSubjugate(atkCastle, targetCastleId, atkBushosIds, sendSoldiers, sendRice, sendHorses, sendGuns, kunishu) {
+    // 援軍データを受け取れるように引数を追加しました！
+    async executeKunishuSubjugate(atkCastle, targetCastleId, atkBushosIds, sendSoldiers, sendRice, sendHorses, sendGuns, kunishu, reinforcementData = null, selfReinforcementData = null) {
         const atkBushos = atkBushosIds.map(id => this.game.getBusho(id));
-        const targetCastle = this.game.getCastle(targetCastleId);
         
-        // 攻撃する側（プレイヤー）の城から、出陣する数だけ兵士や兵糧、騎馬、鉄砲を減らします
-        atkCastle.soldiers = Math.max(0, atkCastle.soldiers - sendSoldiers);
-        atkCastle.rice = Math.max(0, atkCastle.rice - sendRice);
-        atkCastle.horses = Math.max(0, (atkCastle.horses || 0) - sendHorses);
-        atkCastle.guns = Math.max(0, (atkCastle.guns || 0) - sendGuns);
-        atkBushos.forEach(b => b.isActionDone = true);
+        // startWarの中で減らす処理が行われるため、ここで兵士や物資を減らす手動処理を消去しました（二重減り防止）
 
         // 諸勢力側の準備（一時的なダミーの城と軍団を作ります）
         const kunishuName = kunishu.getName(this.game);
@@ -656,20 +651,16 @@ class KunishuSystem {
             soldiers: kunishu.soldiers,
             defense: kunishu.defense,
             maxDefense: kunishu.maxDefense,
-            training: kunishu.training, // ★修正：諸勢力の訓練度を使う
-            morale: kunishu.morale,     // ★修正：諸勢力の士気を使う
+            training: kunishu.training, 
+            morale: kunishu.morale,     
+            horses: kunishu.horses || 0, // ★追加：防衛側の軍馬
+            guns: kunishu.guns || 0,     // ★追加：防衛側の鉄砲
             rice: Math.floor(kunishu.soldiers * 1.5), 
             isKunishu: true,
             kunishuId: kunishu.id,
             peoplesLoyalty: 100, 
             population: 1000,
             samuraiIds: [] 
-        };
-
-        const attackerForce = { 
-            name: atkCastle.name + "遠征軍", ownerClan: atkCastle.ownerClan, soldiers: sendSoldiers, 
-            bushos: atkBushos, training: atkCastle.training, morale: atkCastle.morale, rice: sendRice, maxRice: sendRice,
-            horses: sendHorses, guns: sendGuns
         };
 
         let currentRel = kunishu.getRelation(atkCastle.ownerClan);
@@ -679,34 +670,54 @@ class KunishuSystem {
         else nextRel = 0;
         kunishu.setRelation(atkCastle.ownerClan, nextRel);
 
-        const isPlayer = (Number(atkCastle.ownerClan) === Number(this.game.playerClanId) && !atkCastle.isDelegated);
-
-        this.game.warManager.state = { 
-            active: true, round: 1, attacker: attackerForce, sourceCastle: atkCastle, 
-            defender: dummyDefender, atkBushos: atkBushos, defBusho: leader || {name:"諸勢力", strength:50, intelligence:50, leadership:50}, 
-            turn: 'attacker', isPlayerInvolved: isPlayer, deadSoldiers: { attacker: 0, defender: 0 }, defenderGuarding: false,
-            isKunishuSubjugation: true 
+        // ==========================================
+        // ★ここから修正！：蜂起(executeUprising)と同じように、startWarに合流させます！
+        // ==========================================
+        let isWarReallyFinished = false;
+        const originalCloseWar = this.game.warManager.closeWar;
+        
+        // closeWarが呼ばれたら、終わったよと報告させます
+        this.game.warManager.closeWar = function() {
+            if (originalCloseWar) originalCloseWar.call(this); 
+            isWarReallyFinished = true;  
         };
 
-        const atkClanData = this.game.clans.find(c => c.id === Number(atkCastle.ownerClan));
-        const atkDaimyoName = atkClanData ? atkClanData.name : "大名家";
-        const leaderName = atkBushos[0].name;
-
-        if (!isPlayer) {
-            const startMsg = `${atkDaimyoName}の${leaderName}が、\n${kunishuName}の鎮圧に乗り出しました！`;
-            this.game.ui.log(startMsg.replace('\n', ''));
-            if (window.AudioManager) {
-                window.AudioManager.playSE('katana001.ogg');
-                setTimeout(() => {
-                    if (window.AudioManager) window.AudioManager.playSE('katana002.ogg');
-                }, 400);
-            }
-            await this.game.ui.showDialogAsync(startMsg);
-        }
-
-        this.game.warManager.startSiegeWarPhase();
+        // startWarに攻撃側の援軍データも渡してスタートします！
+        this.game.warManager.startWar(atkCastle, dummyDefender, atkBushos, sendSoldiers, sendRice, sendHorses, sendGuns, reinforcementData, selfReinforcementData); 
         
-        if (isPlayer) {
+        // 戦争とメッセージ表示が完全に終わるまで待ちます
+        let failSafeCounter = 0; 
+        
+        while (!isWarReallyFinished) {
+            await new Promise(resolve => setTimeout(resolve, 500));
+            
+            if (this.game.warManager.state && !this.game.warManager.state.active) {
+                let anyModalOpen = false;
+                if (this.game.ui) {
+                    const isVisible = (id) => { const el = document.getElementById(id); return el && !el.classList.contains('hidden'); };
+                    if (isVisible('result-modal') || isVisible('dialog-modal') || isVisible('war-modal')) {
+                        anyModalOpen = true;
+                    }
+                    const overlay = document.querySelector('[class*="tap"], [id*="tap"]');
+                    if (overlay && !overlay.classList.contains('hidden') && overlay.style.display !== 'none') {
+                        anyModalOpen = true;
+                    }
+                }
+                
+                if (!anyModalOpen) {
+                    failSafeCounter++;
+                    if (failSafeCounter > 6) break;
+                } else {
+                    failSafeCounter = 0; 
+                }
+            }
+        }
+        
+        delete this.game.warManager.closeWar;
+        
+        // プレイヤー関与時のUI更新
+        const isPlayer = (Number(atkCastle.ownerClan) === Number(this.game.playerClanId) && !atkCastle.isDelegated);
+        if (isPlayer && this.game.ui) {
             this.game.ui.updatePanelHeader();
             this.game.ui.renderCommandMenu();
         }
