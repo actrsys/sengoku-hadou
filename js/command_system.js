@@ -550,6 +550,14 @@ class CommandSystem {
     }
 
     getValidTargets(type) {
+        // 援軍要請の時は、すでに計算されている候補リストをそのまま使います！
+        if (['atk_self_reinforcement', 'atk_ally_reinforcement', 'def_self_reinforcement', 'def_ally_reinforcement'].includes(type)) {
+            if (this.game.tempReinfData && this.game.tempReinfData.candidates) {
+                return this.game.tempReinfData.candidates.map(c => c.id);
+            }
+            return [];
+        }
+
         const spec = COMMAND_SPECS[type];
         if (!spec || !spec.targetType) return [];
 
