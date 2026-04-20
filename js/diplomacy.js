@@ -361,12 +361,12 @@ class DiplomacyManager {
         let relationStatus = '普通';
         let helperToEnemySentiment = 50;
         let duty = 50;
+        let isMarriage = false; // 結婚しているかを記録する箱を用意します
 
         if (isKunishu) {
             const kunishu = this.game.kunishuSystem.getKunishu(helperForceId);
             if (!kunishu) return 0;
             sentiment = kunishu.getRelation(myClanId);
-            // 敵が諸勢力（IDが0）の時は、敵への友好度は50（普通）とみなします
             helperToEnemySentiment = (enemyClanId === 0) ? 50 : kunishu.getRelation(enemyClanId);
             const leader = this.game.getBusho(kunishu.leaderId);
             duty = leader ? leader.duty : 50;
@@ -374,6 +374,7 @@ class DiplomacyManager {
             const myToHelperRel = this.getRelation(myClanId, helperForceId);
             sentiment = myToHelperRel ? myToHelperRel.sentiment : 50;
             relationStatus = myToHelperRel ? myToHelperRel.status : '普通';
+            isMarriage = myToHelperRel ? myToHelperRel.isMarriage : false; // 結婚シールを確認します
             
             const helperToEnemyRel = (enemyClanId === 0) ? null : this.getRelation(helperForceId, enemyClanId);
             helperToEnemySentiment = helperToEnemyRel ? helperToEnemyRel.sentiment : 50;
@@ -382,10 +383,24 @@ class DiplomacyManager {
             duty = helperDaimyo ? helperDaimyo.duty : 50;
         }
 
-        // ★指示された計算式
+        // ★AIが援軍を受諾する確率を求める計算式
         const sentimentBonus = sentiment / 200;
         const goldBonus = Math.min(1500, gold) / 20000;
-        const relationBonus = (relationStatus === '同盟' || relationStatus === '従属') ? 0.15 : 0;
+        
+        let relationBonus = 0;
+        if (relationStatus === '同盟') {
+            if (isMarriage) {
+                // 政略結婚している同盟なら、最大の30%（0.30）ボーナスで固定します
+                relationBonus = 0.30;
+            } else {
+                // 普通の同盟なら、相手の義理に関係な15%（0.15）ボーナスで固定します
+                relationBonus = 0.15;
+            }
+        } else if (relationStatus === '従属') {
+            // 自分が相手に従属（支配されている状態）している時だけ、相手の義理に合わせて0%〜30%の間で変動させます
+            relationBonus = duty * 0.003;
+        }
+        
         const enemyHateBonus = (50 - helperToEnemySentiment) / 100;
         const powerBonus = -1 + ((Math.sqrt(Math.max(1, myTotalSoldiers)) / 2) / Math.max(0.1, (Math.sqrt(Math.max(1, enemyTotalSoldiers)) / 2)));
         const dutyBonus = 0.5 + (duty / 100);
