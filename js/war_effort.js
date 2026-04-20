@@ -1938,8 +1938,9 @@ Object.assign(WarManager.prototype, {
         const defClanId = defCastle.ownerClan;
         const pid = this.game.playerClanId;
         
-        // 守備側が中立や諸勢力の場合は自家援軍はなし
-        if (defClanId === 0 || defCastle.isKunishu || this.state.isKunishuSubjugation || this.state.attacker.isKunishu) {
+        // ★修正：反乱（蜂起）された側は援軍を呼べるように、「this.state.attacker.isKunishu」の条件を消しました！
+        // 守備側が中立や諸勢力、またはこちらから諸勢力を鎮圧しに行っている場合は自家援軍はなし
+        if (defClanId === 0 || defCastle.isKunishu || this.state.isKunishuSubjugation) {
             onComplete(null);
             return;
         }
@@ -2040,7 +2041,8 @@ Object.assign(WarManager.prototype, {
         const defClanId = defCastle.ownerClan;
         const pid = this.game.playerClanId;
         
-        if (defClanId === 0 || defCastle.isKunishu || this.state.isKunishuSubjugation || this.state.attacker.isKunishu) {
+        // ★修正：反乱（蜂起）された側は援軍を呼べるように、「this.state.attacker.isKunishu」の条件を消しました！
+        if (defClanId === 0 || defCastle.isKunishu || this.state.isKunishuSubjugation) {
             onComplete();
             return;
         }
@@ -2117,19 +2119,19 @@ Object.assign(WarManager.prototype, {
             reinfGold = Math.floor(reinfGold / 100) * 100;
             
             // 足りなければお城の全額にします
-            if (reinfGold > defCastle.gold) {
-                reinfGold = defCastle.gold;
-            }
+            if (reinfGold > defCastle.gold) {
+                reinfGold = defCastle.gold;
+            }
 
-            // ★追加：自分が相手を「支配」しているなら強制参加なので、持参金は０にします！
-            if (!best.force.isKunishu) {
-                const rel = this.game.getRelation(defClanId, best.force.id);
-                if (rel && rel.status === '支配') {
-                    reinfGold = 0;
-                }
-            }
+            // ★追加：自分が相手を「支配」しているなら強制参加なので、持参金は０にします！
+            if (!best.force.isKunishu) {
+                const rel = this.game.getRelation(defClanId, best.force.id);
+                if (rel && rel.status === '支配') {
+                    reinfGold = 0;
+                }
+            }
 
-            this.executeDefReinforcement(reinfGold, best.castle, defCastle, onComplete);
+            this.executeDefReinforcement(reinfGold, best.castle, defCastle, onComplete);
         }
     },
 
