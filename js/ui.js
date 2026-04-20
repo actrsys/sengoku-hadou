@@ -2535,40 +2535,17 @@ class UIManager {
             return;
         }
 
-        if (!this.quantityModal) return;
-        this.quantityModal.classList.remove('hidden'); 
-        if (this.quantityContainer) this.quantityContainer.innerHTML = '';
-        if (this.charityTypeSelector) this.charityTypeSelector.classList.add('hidden'); 
-        if (this.tradeTypeInfo) this.tradeTypeInfo.classList.add('hidden'); 
-
-        document.getElementById('quantity-title').textContent = "使者に持たせる金 (最大1500)"; 
-        const maxGold = Math.min(1500, atkCastle.gold);
-
-        const wrap = document.createElement('div'); 
-        wrap.className = 'qty-row'; 
-        wrap.innerHTML = `<label>持参金 (Max: ${maxGold})</label><div class="qty-control"><input type="range" id="range-reinf-gold" min="0" max="${maxGold}" value="0"><input type="number" id="num-reinf-gold" min="0" max="${maxGold}" value="0"></div>`; 
-        this.quantityContainer.appendChild(wrap); 
-
-        const range = wrap.querySelector(`#range-reinf-gold`); 
-        const num = wrap.querySelector(`#num-reinf-gold`); 
-        const setVal = (v) => { if (v < 0) v = 0; if (v > maxGold) v = maxGold; range.value = v; num.value = v; };
-        range.oninput = () => num.value = range.value; 
-        num.oninput = () => { let v = parseInt(num.value); if (!isNaN(v)) setVal(v); };
-
-        this.quantityConfirmBtn.onclick = () => {
-            this.quantityModal.classList.add('hidden');
-            this.game.commandSystem.executeReinforcementRequest(parseInt(num.value) || 0, helperCastle, atkCastle, targetCastle, atkBushos, sVal, rVal, hVal, gVal, selfReinfData);
-        };
-        
-        const cancelBtn = this.quantityModal.querySelector('.btn-secondary');
-        if (cancelBtn) {
-            cancelBtn.onclick = () => {
-                this.quantityModal.classList.add('hidden');
-                // ★ 変更：キャンセルした時にマップ選択に戻ります
+        // 情報専門の ui_info.js が持っている共通の数量選択スライダー（openQuantitySelector）を呼び出します
+        this.info.openQuantitySelector('reinf_gold', [atkCastle], null, {
+            onConfirm: (inputs) => {
+                const gold = inputs.gold ? parseInt(inputs.gold.num.value) : 0;
+                this.game.commandSystem.executeReinforcementRequest(gold, helperCastle, atkCastle, targetCastle, atkBushos, sVal, rVal, hVal, gVal, selfReinfData);
+            },
+            onCancel: () => {
                 if (backToMap) backToMap();
                 else this.game.warManager.startWar(atkCastle, targetCastle, atkBushos, sVal, rVal, hVal, gVal, null, selfReinfData);
-            };
-        }
+            }
+        });
     }
 
     showSelfReinforcementSelector(candidateCastles, atkCastle, targetCastle, onComplete) {
@@ -2611,39 +2588,17 @@ class UIManager {
             return;
         }
 
-        if (!this.quantityModal) return;
-        this.quantityModal.classList.remove('hidden'); 
-        if (this.quantityContainer) this.quantityContainer.innerHTML = '';
-        if (this.charityTypeSelector) this.charityTypeSelector.classList.add('hidden'); 
-        if (this.tradeTypeInfo) this.tradeTypeInfo.classList.add('hidden'); 
-
-        document.getElementById('quantity-title').textContent = "使者に持たせる金 (最大1500)"; 
-        const maxGold = Math.min(1500, defCastle.gold);
-
-        const wrap = document.createElement('div'); 
-        wrap.className = 'qty-row'; 
-        wrap.innerHTML = `<label>持参金 (Max: ${maxGold})</label><div class="qty-control"><input type="range" id="range-def-gold" min="0" max="${maxGold}" value="0"><input type="number" id="num-def-gold" min="0" max="${maxGold}" value="0"></div>`; 
-        this.quantityContainer.appendChild(wrap); 
-
-        const range = wrap.querySelector(`#range-def-gold`); 
-        const num = wrap.querySelector(`#num-def-gold`); 
-        const setVal = (v) => { if (v < 0) v = 0; if (v > maxGold) v = maxGold; range.value = v; num.value = v; };
-        range.oninput = () => num.value = range.value; 
-        num.oninput = () => { let v = parseInt(num.value) || 0; setVal(v); };
-
-        this.quantityConfirmBtn.onclick = () => {
-            this.quantityModal.classList.add('hidden');
-            this.game.warManager.executeDefReinforcement(parseInt(num.value) || 0, helperCastle, defCastle, onComplete);
-        };
-        const cancelBtn = this.quantityModal.querySelector('.btn-secondary');
-        if (cancelBtn) { 
-            cancelBtn.onclick = () => { 
-                this.quantityModal.classList.add('hidden'); 
-                // ★ 変更：キャンセルした時にマップ選択に戻ります
+        // 情報専門の ui_info.js が持っている共通の数量選択スライダー（openQuantitySelector）を呼び出します
+        this.info.openQuantitySelector('reinf_gold', [defCastle], null, {
+            onConfirm: (inputs) => {
+                const gold = inputs.gold ? parseInt(inputs.gold.num.value) : 0;
+                this.game.warManager.executeDefReinforcement(gold, helperCastle, defCastle, onComplete);
+            },
+            onCancel: () => {
                 if (backToMap) backToMap();
                 else onComplete(); 
-            }; 
-        }
+            }
+        });
     }
 
     showDefSelfReinforcementSelector(candidateCastles, defCastle, onComplete) {

@@ -2334,7 +2334,7 @@ class UIInfoManager {
                 const h = parseInt(document.getElementById('num-horses')?.value) || 0;
                 const gun = parseInt(document.getElementById('num-guns')?.value) || 0;
                 if (g === 0 && r === 0 && s === 0 && h === 0 && gun === 0) isValid = false;
-            } else if (type === 'headhunt_gold' || type === 'charity') {
+            } else if (type === 'headhunt_gold' || type === 'charity' || type === 'reinf_gold') {
                 isValid = true; 
             } else if (type === 'war_supplies' || type === 'def_intercept' || type === 'def_reinf_supplies' || type === 'atk_reinf_supplies') {
                 const s = parseInt(document.getElementById('num-soldiers')?.value) || 0;
@@ -2676,6 +2676,11 @@ class UIInfoManager {
             inputs.gold = createSlider("金", "gold", maxGoodwillGold, 200, 200);
         } else if (type === 'headhunt_gold') {
             document.getElementById('quantity-title').textContent = "持参金 (任意)"; inputs.gold = createSlider("金", "gold", c.gold, 0);
+        } else if (type === 'reinf_gold') {
+            document.getElementById('quantity-title').textContent = "使者に持たせる金 (最大1500)"; 
+            const baseCastle = (data && data.length > 0) ? data[0] : c;
+            const maxGold = Math.min(1500, baseCastle.gold);
+            inputs.gold = createSlider("持参金", "gold", maxGold, 0);
         } else if (type === 'tribute_gold') {
             document.getElementById('quantity-title').textContent = "献上金 (最大1500)"; 
             const maxTributeGold = Math.max(200, Math.min(1500, c.gold));
