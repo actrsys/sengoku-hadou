@@ -2328,21 +2328,9 @@ Object.assign(WarManager.prototype, {
             if (!isHeavySnow) {
                 const enemyClanId = this.state.attacker.ownerClan;
                 
-                const sentimentBonus = currentRel / 200;
-                const goldBonus = Math.min(1500, gold) / 20000;
-                const relationBonus = 0; // 諸勢力に同盟・従属関係はなし
-                const enemyHateBonus = (50 - kunishu.getRelation(enemyClanId)) / 200;
-                const powerBonus = -1 + ((Math.sqrt(defTotalSoldiers) / 2) / Math.max(0.1, (Math.sqrt(atkTotalSoldiers) / 2)));
-                
-                // ★修正：諸勢力の頭領の義理を参照します
-                const leader = this.game.getBusho(kunishu.leaderId);
-                const duty = leader ? leader.duty : 50;
-                const dutyBonus = 0.5 + (duty / 100);
-                
-                let successRate = (sentimentBonus + goldBonus + relationBonus + enemyHateBonus + powerBonus) * dutyBonus;
-                successRate = Math.max(0, Math.min(1, successRate));
-                
-                isSuccess = (Math.random() * 100 < (successRate * 100));
+                // ★修正：確率の計算を、外交の専門部署にお任せします！
+                const prob = this.game.diplomacyManager.getReinforcementAcceptProb(myClanId, force.id, enemyClanId, gold, true, defTotalSoldiers, atkTotalSoldiers);
+                isSuccess = (Math.random() * 100 < prob);
             }
             
             if (!isSuccess) {
@@ -2435,27 +2423,9 @@ Object.assign(WarManager.prototype, {
         let isSuccess = false;
         if (myToHelperRel.status === '支配' && !isHeavySnow) isSuccess = true;
         else if (!isHeavySnow) {
-            const sentimentBonus = myToHelperRel.sentiment / 200;
-            const goldBonus = Math.min(1500, gold) / 20000;
-            const relationBonus = (myToHelperRel.status === '同盟' || myToHelperRel.status === '従属') ? 0.15 : 0;
-            const helperToEnemySentiment = helperToEnemyRel ? helperToEnemyRel.sentiment : 50;
-            const enemyHateBonus = (50 - helperToEnemySentiment) / 200;
-            const powerBonus = -1 + ((Math.sqrt(defTotalSoldiers) / 2) / Math.max(0.1, (Math.sqrt(atkTotalSoldiers) / 2)));
-            
-            const helperDaimyo = this.game.bushos.find(b => b.clan === helperClanId && b.isDaimyo) || { duty: 50 };
-            const dutyBonus = 0.5 + (helperDaimyo.duty / 100);
-            
-            let successRate = (sentimentBonus + goldBonus + relationBonus + enemyHateBonus + powerBonus) * dutyBonus;
-            successRate = Math.max(0, Math.min(1, successRate));
-            let prob = successRate * 100;
-            
-            // ★追加：お願いした先の大名家が、攻撃の作戦中だったら確率を半分にします！
-            const helperOp = this.game.aiOperationManager.operations[helperClanId];
-            if (helperOp && helperOp.type === '攻撃') {
-                prob = Math.floor(prob / 2);
-            }
-            
-            if (Math.random() * 100 < prob) isSuccess = true;
+            // ★修正：確率計算とサイコロは、外交の専門部署にお任せします！
+            const prob = this.game.diplomacyManager.getReinforcementAcceptProb(myClanId, helperClanId, enemyClanId, gold, false, defTotalSoldiers, atkTotalSoldiers);
+            isSuccess = (Math.random() * 100 < prob);
         }
 
         if (!isSuccess) {

@@ -348,24 +348,60 @@ class DiplomacyManager {
     }
 
     /**
-     * 他の大名家が援軍要請を承諾する確率（％）を計算する魔法です
+     * 他の大名家や諸勢力が援軍要請を承諾する確率（％）を計算する魔法です（最新版）
      */
-    getReinforcementAcceptProb(myClanId, helperClanId, enemyClanId, gold) {
-        const myToHelperRel = this.getRelation(myClanId, helperClanId);
-        const helperToEnemyRel = this.getRelation(helperClanId, enemyClanId);
-
-        if (myToHelperRel.status === '支配') return 100; // 支配下なら絶対来てくれる！
-
-        let prob = (myToHelperRel.sentiment >= 50) ? (myToHelperRel.sentiment - 49) : 0;
-        prob += Math.floor((gold / 1500) * 15); // 持参金ボーナス
-        
-        if (myToHelperRel.status === '同盟' || myToHelperRel.status === '従属') {
-            prob += 30; // 同盟や従属関係ならボーナス
+    getReinforcementAcceptProb(myClanId, helperForceId, enemyClanId, gold, isKunishu, myTotalSoldiers, enemyTotalSoldiers) {
+        // ★ 大名家で、相手を「支配」しているなら100%（諸勢力は支配がないのでチェック不要）
+        if (!isKunishu) {
+            const myToHelperRel = this.getRelation(myClanId, helperForceId);
+            if (myToHelperRel && myToHelperRel.status === '支配') return 100;
         }
+
+        let sentiment = 50;
+        let relationStatus = '普通';
+        let helperToEnemySentiment = 50;
+        let duty = 50;
+
+        if (isKunishu) {
+            const kunishu = this.game.kunishuSystem.getKunishu(helperForceId);
+            if (!kunishu) return 0;
+            sentiment = kunishu.getRelation(myClanId);
+            // 敵が諸勢力（IDが0）の時は、敵への友好度は50（普通）とみなします
+            helperToEnemySentiment = (enemyClanId === 0) ? 50 : kunishu.getRelation(enemyClanId);
+            const leader = this.game.getBusho(kunishu.leaderId);
+            duty = leader ? leader.duty : 50;
+        } else {
+            const myToHelperRel = this.getRelation(myClanId, helperForceId);
+            sentiment = myToHelperRel ? myToHelperRel.sentiment : 50;
+            relationStatus = myToHelperRel ? myToHelperRel.status : '普通';
+            
+            const helperToEnemyRel = (enemyClanId === 0) ? null : this.getRelation(helperForceId, enemyClanId);
+            helperToEnemySentiment = helperToEnemyRel ? helperToEnemyRel.sentiment : 50;
+            
+            const helperDaimyo = this.game.bushos.find(b => b.clan === helperForceId && b.isDaimyo);
+            duty = helperDaimyo ? helperDaimyo.duty : 50;
+        }
+
+        const sentimentBonus = sentiment / 200;
+        const goldBonus = Math.min(1500, gold) / 20000;
+        const relationBonus = (relationStatus === '同盟' || relationStatus === '従属') ? 0.15 : 0;
+        const enemyHateBonus = (50 - helperToEnemySentiment) / 200;
         
-        if (helperToEnemyRel) {
-            // 相手が敵と仲良しなら、来てくれにくくなる
-            prob -= Math.floor((helperToEnemyRel.sentiment - 50) * (20 / 50)); 
+        // ★味方と敵の兵力差によるボーナス
+        const powerBonus = -1 + ((Math.sqrt(Math.max(1, myTotalSoldiers)) / 2) / Math.max(0.1, (Math.sqrt(Math.max(1, enemyTotalSoldiers)) / 2)));
+        
+        const dutyBonus = 0.5 + (duty / 100);
+        
+        let successRate = (sentimentBonus + goldBonus + relationBonus + enemyHateBonus + powerBonus) * dutyBonus;
+        successRate = Math.max(0, Math.min(1, successRate));
+        let prob = successRate * 100;
+        
+        // ★お願いした先の大名家が攻撃の作戦中だったら確率を半分にする
+        if (!isKunishu && this.game.aiOperationManager && this.game.aiOperationManager.operations) {
+            const helperOp = this.game.aiOperationManager.operations[helperForceId];
+            if (helperOp && helperOp.type === '攻撃') {
+                prob = Math.floor(prob / 2);
+            }
         }
 
         return Math.max(0, Math.min(100, prob));
