@@ -2170,7 +2170,7 @@ class CommandSystem {
                 soldiers: kunishu.soldiers,
                 rice: kunishu.soldiers * 2, // 無から湧く兵糧
                 horses: kunishu.horses || 0,
-                guns: kunishu.guns || 0,f
+                guns: kunishu.guns || 0,
                 defense: kunishu.defense,
                 training: kunishu.training,
                 morale: kunishu.morale
