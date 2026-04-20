@@ -382,19 +382,18 @@ class DiplomacyManager {
             duty = helperDaimyo ? helperDaimyo.duty : 50;
         }
 
+        // ★指示された計算式
         const sentimentBonus = sentiment / 200;
         const goldBonus = Math.min(1500, gold) / 20000;
         const relationBonus = (relationStatus === '同盟' || relationStatus === '従属') ? 0.15 : 0;
         const enemyHateBonus = (50 - helperToEnemySentiment) / 200;
-        
-        // ★味方と敵の兵力差によるボーナス
         const powerBonus = -1 + ((Math.sqrt(Math.max(1, myTotalSoldiers)) / 2) / Math.max(0.1, (Math.sqrt(Math.max(1, enemyTotalSoldiers)) / 2)));
-        
         const dutyBonus = 0.5 + (duty / 100);
         
-        let successRate = (sentimentBonus + goldBonus + relationBonus + enemyHateBonus + powerBonus) * dutyBonus;
-        successRate = Math.max(0, Math.min(1, successRate));
-        let prob = successRate * 100;
+        let successRate = ((sentimentBonus + goldBonus + relationBonus + enemyHateBonus + powerBonus) * dutyBonus);
+        
+        // 0%～100%の範囲に収める
+        let prob = Math.max(0, Math.min(1, successRate)) * 100;
         
         // ★お願いした先の大名家が攻撃の作戦中だったら確率を半分にする
         if (!isKunishu && this.game.aiOperationManager && this.game.aiOperationManager.operations) {
@@ -1072,29 +1071,26 @@ class DiplomacyManager {
 
                 // --- 大名家のチェック ---
                 if (c.ownerClan !== 0 && c.ownerClan !== myClanId && c.ownerClan !== actualEnemyClanId) {
-                    const rel = this.getRelation(myClanId, c.ownerClan);
                     const enemyRel = this.getRelation(c.ownerClan, actualEnemyClanId);
                     
-                    if (rel && ['友好', '同盟', '支配', '従属'].includes(rel.status) && rel.sentiment >= 50) {
-                        const isEnemyAlly = enemyRel && ['同盟', '支配', '従属'].includes(enemyRel.status);
-                        const isEnemyMaxGoodwill = enemyRel && enemyRel.sentiment >= 100;
+                    const isEnemyAlly = enemyRel && ['同盟', '支配', '従属'].includes(enemyRel.status);
+                    const isEnemyMaxGoodwill = enemyRel && enemyRel.sentiment >= 100;
+                    
+                    // 敵と仲良し過ぎないかチェック（戦争相手と同盟・支配・従属等ではないか）
+                    if (!isEnemyAlly && !isEnemyMaxGoodwill && (!enemyRel || !this.isNonAggression(enemyRel.status))) {
+                        // 対象のお城が繋がっているかチェック
+                        const isConnected = connectedCastles.has(c.id) || this.game.castles.some(myC => connectedCastles.has(myC.id) && GameSystem.isAdjacent(c, myC));
+                        // 自軍側が応援を呼ぶ時は、対象と隣接していればOK
+                        const isNextToEnemy = !isDefending && ((c.id === targetCastle.id) || GameSystem.isAdjacent(c, targetCastle));
                         
-                        // 敵と仲良し過ぎないかチェック
-                        if (!isEnemyAlly && !isEnemyMaxGoodwill && (!enemyRel || !this.isNonAggression(enemyRel.status))) {
-                            // 対象のお城が繋がっているかチェック
-                            const isConnected = connectedCastles.has(c.id) || this.game.castles.some(myC => connectedCastles.has(myC.id) && GameSystem.isAdjacent(c, myC));
-                            // 自軍側が応援を呼ぶ時は、対象と隣接していればOK
-                            const isNextToEnemy = !isDefending && ((c.id === targetCastle.id) || GameSystem.isAdjacent(c, targetCastle));
+                        if (isConnected || isNextToEnemy) {
+                            const normalBushos = this.game.getCastleBushos(c.id).filter(b => b.clan === c.ownerClan && b.status === 'active' && !b.isDaimyo && !b.isCastellan);
+                            const minRice = isDefending ? 500 : 0;
                             
-                            if (isConnected || isNextToEnemy) {
-                                const normalBushos = this.game.getCastleBushos(c.id).filter(b => b.clan === c.ownerClan && b.status === 'active' && !b.isDaimyo && !b.isCastellan);
-                                const minRice = isDefending ? 500 : 0;
-                                
-                                if (c.soldiers >= 1000 && c.rice >= minRice && normalBushos.length > 0) {
-                                    const clan = this.game.clans.find(clanInfo => clanInfo.id === c.ownerClan);
-                                    const castellan = this.game.getBusho(c.castellanId) || {name: "城主"};
-                                    forces.push({ castle: c, force: { isKunishu: false, id: c.ownerClan, name: clan ? clan.name : "大名家", leaderName: castellan.name, soldiers: c.soldiers } });
-                                }
+                            if (c.soldiers >= 1000 && c.rice >= minRice && normalBushos.length > 0) {
+                                const clan = this.game.clans.find(clanInfo => clanInfo.id === c.ownerClan);
+                                const castellan = this.game.getBusho(c.castellanId) || {name: "城主"};
+                                forces.push({ castle: c, force: { isKunishu: false, id: c.ownerClan, name: clan ? clan.name : "大名家", leaderName: castellan.name, soldiers: c.soldiers } });
                             }
                         }
                     }
@@ -1108,9 +1104,10 @@ class DiplomacyManager {
                     if (isTargetKunishu && targetCastle.kunishuId === k.id) return;
 
                     const enemyKunishuRel = isTargetKunishu ? 0 : k.getRelation(actualEnemyClanId);
+                    // ★関係条件（友好度）を撤廃。兵力と敵との関係のみチェック
                     const canRequest = isTargetKunishu ? 
-                        (k.getRelation(myClanId) >= 70 && k.soldiers >= 1000) : 
-                        (k.getRelation(myClanId) >= 70 && k.soldiers >= 1000 && enemyKunishuRel < 100);
+                        (k.soldiers >= 1000) : 
+                        (k.soldiers >= 1000 && enemyKunishuRel < 100);
 
                     if (canRequest) {
                         const isConnected = connectedCastles.has(c.id) || this.game.castles.some(myC => connectedCastles.has(myC.id) && GameSystem.isAdjacent(c, myC));
