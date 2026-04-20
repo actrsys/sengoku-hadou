@@ -706,36 +706,21 @@ class AIEngine {
                     }
                 }
             }
-            // =========================================================================
-            // ★さらに追加：同盟国を通って遠くを攻める（飛び地への攻撃）のを控えめにする魔法！
-            let isDirectlyAdjacent = false;
             
-            // 攻めようとしているお城の「お隣さん（道が繋がっている城）」をチェックします
-            if (target.adjacentCastleIds) {
-                isDirectlyAdjacent = target.adjacentCastleIds.some(adjId => {
-                    const adjCastle = this.game.getCastle(adjId);
-                    // ★修正：castle ではなく myCastle に直しました！
-                    return adjCastle && adjCastle.ownerClan === myCastle.ownerClan;
-                });
+            // ★恨みを晴らすため、または執着によるスコアアップ！
+            // 1. 「敵対」状態の勢力に対する攻撃ボーナス
+            if (rel.status === '敵対') {
+                prob += 15; // 敵対している相手を優先します
             }
-
-            // もし自分のお城と直接くっついていなかったら（同盟国を通る遠征だったら）
-            if (!isDirectlyAdjacent) {
-                // 攻めたい気持ち（確率）をガクッと減らします！
-                // 確率を「半分」にした上で、さらに「10」引くことで、よっぽどの隙がない限り攻めなくなります。
-                prob = (prob * 0.5) - 10; 
-            }
-
-            // ★追加：恨みを晴らすため、または執着によるスコアアップ！
-            // 1. 過去に自領を攻撃してきた大名家への反撃
+            // 2. 過去に自領を攻撃してきた大名家への反撃
             if (pastAttackerClans.has(target.ownerClan)) {
-                prob += 15; // 攻撃してきた相手には少し攻撃的になります！
+                prob += 10; // 攻撃してきた相手には少し攻撃的になります！
             }
-            // 2. 元々自分の城だった場所を取り返す
+            // 3. 元々自分の城だった場所を取り返す
             if (target.lastAttackedOwnerId === myClanId) {
-                prob += 20; // 奪われた城を取り返す時はさらに攻撃的になります！
+                prob += 15; // 奪われた城を取り返す時はさらに攻撃的になります！
             }
-            // 3. 自分から攻撃して、まだ落とせていない城への執着
+            // 4. 自分から攻撃して、まだ落とせていない城への執着
             if (target.lastAttackerClanId === myClanId && target.ownerClan !== myClanId) {
                 prob += 5; // 諦めきれない執着ボーナスとして少しだけ確率を上げます！
             }
