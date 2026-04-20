@@ -2203,14 +2203,14 @@ class CommandSystem {
         
         // ★修正：条件のチェックをすべて「外交の専門部署」に任せます！
         const selfCandidates = this.game.diplomacyManager.findAvailableReinforcements(
-            true, false, targetCastle, myClanId, targetCastle.ownerClan, connectedCastles
+            true, false, atkCastle.id, targetCastle, myClanId, targetCastle.ownerClan, connectedCastles
         );
 
         // ★追加：兵数や武将が変わるので、最新のものを引数で受け取るようにしました
         const proceedToAlly = (selfReinfData, currentAtkBushos = atkBushos, currentSVal = sVal) => {
             // ★修正：こちらも他勢力の条件チェックを「外交の専門部署」に一任します！
             const allyForceCandidates = this.game.diplomacyManager.findAvailableReinforcements(
-                false, false, targetCastle, myClanId, targetCastle.ownerClan, connectedCastles
+                false, false, atkCastle.id, targetCastle, myClanId, targetCastle.ownerClan, connectedCastles
             );
 
             if (allyForceCandidates.length === 0) {

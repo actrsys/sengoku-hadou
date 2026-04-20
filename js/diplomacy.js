@@ -1035,19 +1035,22 @@ class DiplomacyManager {
 
     /**
      * ★新規追加：援軍として呼べるお城や諸勢力のリストを探す専門の魔法です！
-     * 自勢力・他勢力、攻撃・守備の全てをここで判定し、全権を担います。
+     * 自勢力・他勢力、攻撃・守備のすべてをここで判定し、全権を担います。
      */
-    findAvailableReinforcements(isSelf, isDefending, targetCastle, myClanId, enemyClanId, connectedCastles) {
+    findAvailableReinforcements(isSelf, isDefending, initiatorCastleId, targetCastle, myClanId, enemyClanId, connectedCastles) {
         let forces = [];
 
         this.game.castles.forEach(c => {
+            // ★追加：自分自身（出陣元の城）および対象（攻撃/防衛されている城）は援軍候補から除外します
+            if (Number(c.id) === Number(initiatorCastleId) || Number(c.id) === Number(targetCastle.id)) return;
+
             // 1. 共通の条件：大雪の国からは出陣できません
             const prov = this.game.provinces.find(p => p.id === c.provinceId);
             if (prov && prov.statusEffects && prov.statusEffects.includes('heavySnow')) return;
 
             // 2. 自勢力（自分の別のお城）を探す場合
             if (isSelf) {
-                if (c.ownerClan !== myClanId || c.id === targetCastle.id) return;
+                if (c.ownerClan !== myClanId) return;
                 
                 // 道が繋がっているか、すぐ隣か
                 const isConnected = connectedCastles.has(c.id) || this.game.castles.some(myC => connectedCastles.has(myC.id) && GameSystem.isAdjacent(c, myC));

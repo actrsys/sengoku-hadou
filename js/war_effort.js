@@ -1970,7 +1970,7 @@ Object.assign(WarManager.prototype, {
 
         // ★修正：条件のチェックをすべて「外交の専門部署」に任せます！
         const candidateCastles = this.game.diplomacyManager.findAvailableReinforcements(
-            true, true, defCastle, defClanId, this.state.attacker.ownerClan, connectedCastles
+            true, true, defCastle.id, defCastle, defClanId, this.state.attacker.ownerClan, connectedCastles
         );
 
         if (candidateCastles.length === 0) {
@@ -2072,7 +2072,7 @@ Object.assign(WarManager.prototype, {
         // ★修正：条件のチェックをすべて「外交の専門部署」に任せます！
         // （上で作った connectedCastles をそのまま専門部署に渡します）
         const allyForceCandidates = this.game.diplomacyManager.findAvailableReinforcements(
-            false, true, defCastle, defClanId, atkClanId, connectedCastles
+            false, true, defCastle.id, defCastle, defClanId, atkClanId, connectedCastles
         );
 
         if (allyForceCandidates.length === 0) {
