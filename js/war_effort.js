@@ -2100,38 +2100,85 @@ Object.assign(WarManager.prototype, {
                 }
             );
         } else {
-            allyForceCandidates.sort((a,b) => b.force.soldiers - a.force.soldiers);
+            // ★追加：戦力比較用の合計兵力を計算しておきます（確率計算で必要になります）
+            let defTotalSoldiers = defCastle.soldiers;
+            if (this.state.defSelfReinforcement) defTotalSoldiers += this.state.defSelfReinforcement.soldiers;
+            
+            let atkTotalSoldiers = this.state.attacker.soldiers;
+            if (this.state.reinforcement) atkTotalSoldiers += this.state.reinforcement.soldiers;
+            if (this.state.selfReinforcement) atkTotalSoldiers += this.state.selfReinforcement.soldiers;
+
+            // ★既存の「見誤り」ロジックを使用して、評価者の智謀による誤差を計算します
+            let evaluatorInt = 50;
+            const castellan = this.game.getBusho(defCastle.castellanId);
+            if (castellan) evaluatorInt = castellan.intelligence;
+            
+            let maxError = 0;
+            if (evaluatorInt >= 95) {
+                maxError = 0.01;
+            } else if (evaluatorInt >= 50) {
+                maxError = 0.15 - ((evaluatorInt - 50) * (0.14 / 45));
+            } else if (evaluatorInt > 5) {
+                maxError = 0.60 - ((evaluatorInt - 5) * 0.01);
+            } else {
+                maxError = 0.60;
+            }
+
+            const myPower = this.game.getClanTotalSoldiers(defClanId) || 1;
+
+            // 候補となるお城の点数（スコア）をひとつずつ計算していきます
+            allyForceCandidates.forEach(candidate => {
+                let realProb = 0; // 本当の成功確率
+                let reinfGold = 0;
+                
+                if (candidate.force.isKunishu) {
+                    // 諸勢力の場合の確率
+                    realProb = this.game.diplomacyManager.getReinforcementAcceptProb(defClanId, candidate.force.id, atkClanId, 0, true, defTotalSoldiers, atkTotalSoldiers);
+                } else {
+                    // 大名家の場合、持参金を計算してから確率を出します
+                    const helperClanId = candidate.force.id;
+                    const helperPower = this.game.getClanTotalSoldiers(helperClanId) || 1;
+                    const ratio = helperPower / Math.max(1, myPower);
+                    
+                    reinfGold = 300;
+                    if (ratio >= 3.0) reinfGold = 1000;
+                    else if (ratio > 1.5) reinfGold = 300 + ((ratio - 1.5) / 1.5) * 700;
+                    reinfGold = Math.floor(reinfGold / 100) * 100;
+                    if (reinfGold > defCastle.gold) reinfGold = defCastle.gold;
+                    
+                    const rel = this.game.getRelation(defClanId, helperClanId);
+                    if (rel && rel.status === '支配') {
+                        realProb = 100; // 支配している相手なら100%成功します
+                        reinfGold = 0;
+                    } else {
+                        realProb = this.game.diplomacyManager.getReinforcementAcceptProb(defClanId, helperClanId, atkClanId, reinfGold, false, defTotalSoldiers, atkTotalSoldiers);
+                    }
+                }
+                
+                // ★智謀による見誤り（ブレ）を適用
+                const probError = (Math.random() * 2 - 1.0) * (maxError * 100);
+                const perceivedProb = Math.max(0, Math.min(100, realProb + probError));
+                
+                const forceError = 1.0 + (Math.random() * 2 - 1.0) * maxError;
+                const perceivedSoldiers = candidate.force.soldiers * forceError;
+                
+                // ★期待値（スコア） = 見誤った兵数 × (見誤った確率 / 100)
+                candidate.score = perceivedSoldiers * (perceivedProb / 100);
+                candidate.expectedGold = reinfGold; // 実行時に使用する金額を保持
+            });
+
+            // ★追加：スコアが高い順に並べ替えて、一番高いところを選びます
+            allyForceCandidates.sort((a,b) => b.score - a.score);
             const best = allyForceCandidates[0];
             best.castle.selectedForce = best.force; // シールを貼る
-            console.log(`他勢力の援軍を呼ぶ勢力（お城）を選びました: ${best.castle.name} の ${best.force.name}`);
+            console.log(`他勢力の援軍を呼ぶ勢力（お城）を選びました: ${best.castle.name} の ${best.force.name} (スコア: ${Math.floor(best.score)})`);
 
-            // ★追加：親善と同じロジックで持参金を計算します
-            const myPower = this.game.getClanTotalSoldiers(defClanId) || 1;
-            const helperPower = best.force.isKunishu ? best.force.soldiers : (this.game.getClanTotalSoldiers(best.force.id) || 1);
-            const ratio = helperPower / Math.max(1, myPower);
-            
-            let reinfGold = 300;
-            if (ratio >= 3.0) {
-                reinfGold = 1000;
-            } else if (ratio > 1.5) {
-                reinfGold = 300 + ((ratio - 1.5) / 1.5) * 700;
-            }
-            reinfGold = Math.floor(reinfGold / 100) * 100;
-            
-            // 足りなければお城の全額にします
-            if (reinfGold > defCastle.gold) {
-                reinfGold = defCastle.gold;
-            }
-
-            // ★追加：自分が相手を「支配」しているなら強制参加なので、持参金は０にします！
+            let finalGold = 0;
             if (!best.force.isKunishu) {
-                const rel = this.game.getRelation(defClanId, best.force.id);
-                if (rel && rel.status === '支配') {
-                    reinfGold = 0;
-                }
+                finalGold = best.expectedGold || 0;
             }
 
-            this.executeDefReinforcement(reinfGold, best.castle, defCastle, onComplete);
+            this.executeDefReinforcement(finalGold, best.castle, defCastle, onComplete);
         }
     },
 
