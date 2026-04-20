@@ -1033,4 +1033,101 @@ class DiplomacyManager {
 
         return -999;
     }
+
+    /**
+     * ★新規追加：援軍として呼べるお城や諸勢力のリストを探す専門の魔法です！
+     * 自勢力・他勢力、攻撃・守備の全てをここで判定し、全権を担います。
+     */
+    findAvailableReinforcements(isSelf, isDefending, targetCastle, myClanId, enemyClanId, connectedCastles) {
+        let forces = [];
+
+        this.game.castles.forEach(c => {
+            // 1. 共通の条件：大雪の国からは出陣できません
+            const prov = this.game.provinces.find(p => p.id === c.provinceId);
+            if (prov && prov.statusEffects && prov.statusEffects.includes('heavySnow')) return;
+
+            // 2. 自勢力（自分の別のお城）を探す場合
+            if (isSelf) {
+                if (c.ownerClan !== myClanId || c.id === targetCastle.id) return;
+                
+                // 道が繋がっているか、すぐ隣か
+                const isConnected = connectedCastles.has(c.id) || this.game.castles.some(myC => connectedCastles.has(myC.id) && GameSystem.isAdjacent(c, myC));
+                const isNextToEnemy = (c.id === targetCastle.id) || GameSystem.isAdjacent(c, targetCastle);
+                
+                if (isConnected || isNextToEnemy) {
+                    const normalBushos = this.game.getCastleBushos(c.id).filter(b => b.clan === c.ownerClan && b.status === 'active' && !b.isDaimyo && !b.isCastellan);
+                    // 守備の場合は兵糧も500必要
+                    const minRice = isDefending ? 500 : 0;
+                    
+                    if (c.soldiers >= 1000 && c.rice >= minRice && normalBushos.length > 0) {
+                        forces.push(c); // 自勢力の場合はお城のデータをそのまま渡します
+                    }
+                }
+            } 
+            // 3. 他勢力（同盟国や諸勢力）を探す場合
+            else {
+                // 目標が諸勢力かどうかで敵大名を判定
+                const isTargetKunishu = targetCastle.isKunishu;
+                const actualEnemyClanId = isTargetKunishu ? 0 : enemyClanId;
+
+                // --- 大名家のチェック ---
+                if (c.ownerClan !== 0 && c.ownerClan !== myClanId && c.ownerClan !== actualEnemyClanId) {
+                    const rel = this.getRelation(myClanId, c.ownerClan);
+                    const enemyRel = this.getRelation(c.ownerClan, actualEnemyClanId);
+                    
+                    if (rel && ['友好', '同盟', '支配', '従属'].includes(rel.status) && rel.sentiment >= 50) {
+                        const isEnemyAlly = enemyRel && ['同盟', '支配', '従属'].includes(enemyRel.status);
+                        const isEnemyMaxGoodwill = enemyRel && enemyRel.sentiment >= 100;
+                        
+                        // 敵と仲良し過ぎないかチェック
+                        if (!isEnemyAlly && !isEnemyMaxGoodwill && (!enemyRel || !this.isNonAggression(enemyRel.status))) {
+                            // 対象のお城が繋がっているかチェック
+                            const isConnected = connectedCastles.has(c.id) || this.game.castles.some(myC => connectedCastles.has(myC.id) && GameSystem.isAdjacent(c, myC));
+                            // 自軍側が応援を呼ぶ時は、対象と隣接していればOK
+                            const isNextToEnemy = !isDefending && ((c.id === targetCastle.id) || GameSystem.isAdjacent(c, targetCastle));
+                            
+                            if (isConnected || isNextToEnemy) {
+                                const normalBushos = this.game.getCastleBushos(c.id).filter(b => b.clan === c.ownerClan && b.status === 'active' && !b.isDaimyo && !b.isCastellan);
+                                const minRice = isDefending ? 500 : 0;
+                                
+                                if (c.soldiers >= 1000 && c.rice >= minRice && normalBushos.length > 0) {
+                                    const clan = this.game.clans.find(clanInfo => clanInfo.id === c.ownerClan);
+                                    const castellan = this.game.getBusho(c.castellanId) || {name: "城主"};
+                                    forces.push({ castle: c, force: { isKunishu: false, id: c.ownerClan, name: clan ? clan.name : "大名家", leaderName: castellan.name, soldiers: c.soldiers } });
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // --- 諸勢力のチェック ---
+                // その城にいる諸勢力を全員チェックします
+                const kunishus = this.game.kunishuSystem.getKunishusInCastle(c.id);
+                kunishus.forEach(k => {
+                    // 攻撃対象の諸勢力自身は呼べないようにガード
+                    if (isTargetKunishu && targetCastle.kunishuId === k.id) return;
+
+                    const enemyKunishuRel = isTargetKunishu ? 0 : k.getRelation(actualEnemyClanId);
+                    const canRequest = isTargetKunishu ? 
+                        (k.getRelation(myClanId) >= 70 && k.soldiers >= 1000) : 
+                        (k.getRelation(myClanId) >= 70 && k.soldiers >= 1000 && enemyKunishuRel < 100);
+
+                    if (canRequest) {
+                        const isConnected = connectedCastles.has(c.id) || this.game.castles.some(myC => connectedCastles.has(myC.id) && GameSystem.isAdjacent(c, myC));
+                        const isNextToEnemy = !isDefending && ((c.id === targetCastle.id) || GameSystem.isAdjacent(c, targetCastle));
+                        
+                        if (isConnected || isNextToEnemy) {
+                            const members = this.game.kunishuSystem.getKunishuMembers(k.id);
+                            if (members.length > 0) {
+                                const leader = this.game.getBusho(k.leaderId) || members[0];
+                                forces.push({ castle: c, force: { isKunishu: true, id: k.id, name: k.getName(this.game), leaderName: leader.name, soldiers: k.soldiers } });
+                            }
+                        }
+                    }
+                });
+            }
+        });
+
+        return forces;
+    }
 }

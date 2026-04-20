@@ -1950,29 +1950,28 @@ Object.assign(WarManager.prototype, {
             return;
         }
 
-        let candidateCastles = [];
+        // ★追加：防衛するお城から道が繋がっている「自勢力の領土ネットワーク」を調べます（専門部署に渡すため）
+        const connectedCastles = new Set();
+        const queue = [defCastle];
+        connectedCastles.add(defCastle.id);
 
-        this.game.castles.forEach(c => {
-            // 自分の城で、攻められている城以外を探す
-            if (c.ownerClan !== defClanId || c.id === defCastle.id) return;
-            // 道が繋がっているか（到達可能か）
-            if (!GameSystem.isReachable(this.game, defCastle, c, defClanId)) return;
-            // 兵力と兵糧の余裕があるか
-            if (c.soldiers < 1000) return;
-            if (c.rice < 500) return;
-
-            // ★追加：そのお城がある国が「大雪」だったら、援軍候補から外します！
-            const prov = this.game.provinces.find(p => p.id === c.provinceId);
-            if (prov && prov.statusEffects && prov.statusEffects.includes('heavySnow')) return;
-
-            // 大名・城主以外の、動かせる一般武将がいるか
-            const normalBushos = this.game.getCastleBushos(c.id).filter(b => 
-                b.clan === c.ownerClan && b.status === 'active' && !b.isDaimyo && !b.isCastellan
+        while (queue.length > 0) {
+            const current = queue.shift();
+            const neighbors = this.game.castles.filter(adj => 
+                adj.ownerClan === defClanId && 
+                GameSystem.isAdjacent(current, adj) &&
+                !connectedCastles.has(adj.id)
             );
-            if (normalBushos.length === 0) return;
+            for (const n of neighbors) {
+                connectedCastles.add(n.id);
+                queue.push(n);
+            }
+        }
 
-            candidateCastles.push(c);
-        });
+        // ★修正：条件のチェックをすべて「外交の専門部署」に任せます！
+        const candidateCastles = this.game.diplomacyManager.findAvailableReinforcements(
+            true, true, defCastle, defClanId, this.state.attacker.ownerClan, connectedCastles
+        );
 
         if (candidateCastles.length === 0) {
             console.log("条件に合う自勢力の援軍候補のお城がありませんでした。");
@@ -2070,48 +2069,11 @@ Object.assign(WarManager.prototype, {
             }
         }
 
-        let allyForceCandidates = [];
-
-        this.game.castles.forEach(c => {
-            // ★追加：そのお城がある国が「大雪」だったら、援軍候補から外します！
-            const prov = this.game.provinces.find(p => p.id === c.provinceId);
-            if (prov && prov.statusEffects && prov.statusEffects.includes('heavySnow')) return;
-
-            // 1. 大名家
-            if (c.ownerClan !== 0 && c.ownerClan !== defClanId && c.ownerClan !== atkClanId) {
-                const rel = this.game.getRelation(defClanId, c.ownerClan);
-                if (rel) {
-                    const enemyRel = this.game.getRelation(c.ownerClan, atkClanId);
-                    if (!enemyRel || !this.game.diplomacyManager.isNonAggression(enemyRel.status)) {
-                        const isConnected = connectedCastles.has(c.id) || this.game.castles.some(myC => connectedCastles.has(myC.id) && GameSystem.isAdjacent(c, myC));
-                        if (isConnected) {
-                            const normalBushos = this.game.getCastleBushos(c.id).filter(b => b.clan === c.ownerClan && b.status === 'active' && !b.isDaimyo && !b.isCastellan);
-                            if (c.soldiers >= 1000 && c.rice >= 500 && normalBushos.length > 0) {
-                                allyForceCandidates.push({ castle: c, force: { isKunishu: false, id: c.ownerClan, name: this.game.clans.find(clan=>clan.id===c.ownerClan)?.name || "勢力", soldiers: c.soldiers } });
-                            }
-                        }
-                    }
-                }
-            }
-
-            // 2. 諸勢力
-            const kunishus = this.game.kunishuSystem.getKunishusInCastle(c.id);
-            kunishus.forEach(k => {
-                // ★追加：戦争相手（攻撃側）との関係値を取得します
-                const enemyRel = k.getRelation(atkClanId);
-
-                // ★修正：敵と友好状態（関係値が70以上）の諸勢力は候補から外します
-                if (enemyRel < 70 && k.soldiers >= 1000) {
-                    const isConnected = connectedCastles.has(c.id) || this.game.castles.some(myC => connectedCastles.has(myC.id) && GameSystem.isAdjacent(c, myC));
-                    if (isConnected) {
-                        const members = this.game.kunishuSystem.getKunishuMembers(k.id);
-                        if (members.length > 0) {
-                            allyForceCandidates.push({ castle: c, force: { isKunishu: true, id: k.id, name: k.getName(this.game), soldiers: k.soldiers } });
-                        }
-                    }
-                }
-            });
-        });
+        // ★修正：条件のチェックをすべて「外交の専門部署」に任せます！
+        // （上で作った connectedCastles をそのまま専門部署に渡します）
+        const allyForceCandidates = this.game.diplomacyManager.findAvailableReinforcements(
+            false, true, defCastle, defClanId, atkClanId, connectedCastles
+        );
 
         if (allyForceCandidates.length === 0) {
             console.log("条件に合う他勢力の援軍候補がありませんでした。");
