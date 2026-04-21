@@ -1029,7 +1029,7 @@ class UIInfoManager {
 
         this._renderListModal({
             title: isSelectMode ? "嫁がせる姫を選択してください" : "姫一覧",
-            headers: ["名前", "年齢", "父親", "配偶者", ""],
+            headers: ["姫", "年齢", "父親", "配偶者", ""],
             headerClass: "princess-list-header",
             itemClass: "princess-list-item",
             listClass: "princess-list-container",
