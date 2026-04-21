@@ -384,8 +384,8 @@ class UIInfoManager {
         relations.forEach(r => {
             let statusClass = "text-white";
             if (r.status === '敵対') statusClass = 'text-red';
-            else if (r.status === '友好') statusClass = 'text-green';
-            else if (['同盟', '支配', '従属', '婚姻'].includes(r.status)) statusClass = 'text-blue';
+            else if (r.status === '友好') statusClass = 'text-white';
+            else if (['同盟', '支配', '従属', '婚姻'].includes(r.status)) statusClass = 'text-green';
 
             const friendPercent = Math.min(100, Math.max(0, r.sentiment));
             const friendBarHtml = `<div class="bar-bg bar-bg-friend"><div class="bar-fill bar-fill-friend" style="width:${friendPercent}%;"></div></div>`;
