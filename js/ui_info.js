@@ -2197,64 +2197,37 @@ class UIInfoManager {
         let headerClassStr = "sortable-header";
         let itemClassStr = "";
 
+        if (isViewMode) {
+            headerClassStr += " view-mode";
+            itemClassStr += " view-mode";
+        }
+
         if (this.bushoCurrentTab === 'stats') {
-            if (isViewMode) {
-                headerClassStr += " view-mode";
-                itemClassStr += " view-mode";
-                headers = [
-                    `<span class="col-name" data-sort="name">名前${getSortMark('name')}</span>`,
-                    `<span class="col-rank" data-sort="rank">身分${getSortMark('rank')}</span>`,
-                    `<span class="col-stat" data-sort="leadership">統率${getSortMark('leadership')}</span>`,
-                    `<span class="col-stat" data-sort="strength">武勇${getSortMark('strength')}</span>`,
-                    `<span class="col-stat" data-sort="politics">内政${getSortMark('politics')}</span>`,
-                    `<span class="col-stat" data-sort="diplomacy">外交${getSortMark('diplomacy')}</span>`,
-                    `<span class="col-stat" data-sort="intelligence">智謀${getSortMark('intelligence')}</span>`,
-                    `<span class="col-stat" data-sort="charm">魅力${getSortMark('charm')}</span>`
-                ];
-            } else {
-                headers = [
-                    `<span class="col-act" data-sort="action">行動${getSortMark('action')}</span>`,
-                    `<span class="col-name" data-sort="name">名前${getSortMark('name')}</span>`,
-                    `<span class="col-rank" data-sort="rank">身分${getSortMark('rank')}</span>`,
-                    `<span class="col-stat" data-sort="leadership">統率${getSortMark('leadership')}</span>`,
-                    `<span class="col-stat" data-sort="strength">武勇${getSortMark('strength')}</span>`,
-                    `<span class="col-stat" data-sort="politics">内政${getSortMark('politics')}</span>`,
-                    `<span class="col-stat" data-sort="diplomacy">外交${getSortMark('diplomacy')}</span>`,
-                    `<span class="col-stat" data-sort="intelligence">智謀${getSortMark('intelligence')}</span>`,
-                    `<span class="col-stat" data-sort="charm">魅力${getSortMark('charm')}</span>`
-                ];
-            }
+            headers = [
+                !isViewMode ? `<span class="col-act" data-sort="action">行動${getSortMark('action')}</span>` : null,
+                `<span class="col-name" data-sort="name">名前${getSortMark('name')}</span>`,
+                `<span class="col-rank" data-sort="rank">身分${getSortMark('rank')}</span>`,
+                `<span class="col-stat" data-sort="leadership">統率${getSortMark('leadership')}</span>`,
+                `<span class="col-stat" data-sort="strength">武勇${getSortMark('strength')}</span>`,
+                `<span class="col-stat" data-sort="politics">内政${getSortMark('politics')}</span>`,
+                `<span class="col-stat" data-sort="diplomacy">外交${getSortMark('diplomacy')}</span>`,
+                `<span class="col-stat" data-sort="intelligence">智謀${getSortMark('intelligence')}</span>`,
+                `<span class="col-stat" data-sort="charm">魅力${getSortMark('charm')}</span>`
+            ].filter(Boolean);
         } else {
             headerClassStr += " status-mode";
             itemClassStr += " status-mode";
-            if (isViewMode) {
-                headerClassStr += " view-mode";
-                itemClassStr += " view-mode";
-                headers = [
-                    `<span class="col-name" data-sort="name">名前${getSortMark('name')}</span>`,
-                    `<span class="col-rank" data-sort="rank">身分${getSortMark('rank')}</span>`,
-                    `<span class="col-faction" data-sort="faction">勢力${getSortMark('faction')}</span>`,
-                    `<span class="col-castle" data-sort="castle">所在${getSortMark('castle')}</span>`,
-                    `<span class="col-act" data-sort="action">行動${getSortMark('action')}</span>`,
-                    `<span class="col-age" data-sort="age">年齢${getSortMark('age')}</span>`,
-                    `<span class="col-family" data-sort="family">一門${getSortMark('family')}</span>`,
-                    `<span class="col-salary" data-sort="salary">俸禄${getSortMark('salary')}</span>`,
-                    `<span class="col-faction-leader" data-sort="faction_leader">派閥${getSortMark('faction_leader')}</span>`,
-                    `<span></span>`
-                ];
-            } else {
-                headers = [
-                    `<span class="col-name" data-sort="name">名前${getSortMark('name')}</span>`,
-                    `<span class="col-rank" data-sort="rank">身分${getSortMark('rank')}</span>`,
-                    `<span class="col-faction" data-sort="faction">勢力${getSortMark('faction')}</span>`,
-                    `<span class="col-castle" data-sort="castle">所在${getSortMark('castle')}</span>`,
-                    `<span class="col-age" data-sort="age">年齢${getSortMark('age')}</span>`,
-                    `<span class="col-family" data-sort="family">一門${getSortMark('family')}</span>`,
-                    `<span class="col-salary" data-sort="salary">俸禄${getSortMark('salary')}</span>`,
-                    `<span class="col-faction-leader" data-sort="faction_leader">派閥${getSortMark('faction_leader')}</span>`,
-                    `<span></span>`
-                ];
-            }
+            headers = [
+                `<span class="col-name" data-sort="name">名前${getSortMark('name')}</span>`,
+                `<span class="col-rank" data-sort="rank">身分${getSortMark('rank')}</span>`,
+                `<span class="col-faction" data-sort="faction">勢力${getSortMark('faction')}</span>`,
+                `<span class="col-castle" data-sort="castle">所在${getSortMark('castle')}</span>`,
+                isViewMode ? `<span class="col-act" data-sort="action">行動${getSortMark('action')}</span>` : null,
+                `<span class="col-age" data-sort="age">年齢${getSortMark('age')}</span>`,
+                `<span class="col-family" data-sort="family">一門${getSortMark('family')}</span>`,
+                `<span class="col-salary" data-sort="salary">俸禄${getSortMark('salary')}</span>`,
+                `<span class="col-faction-leader" data-sort="faction_leader">派閥${getSortMark('faction_leader')}</span>`
+            ].filter(Boolean);
         }
 
         let items = [];
@@ -2282,21 +2255,17 @@ class UIInfoManager {
 
             let cells = [];
             if (this.bushoCurrentTab === 'stats') {
-                if (isViewMode) {
-                    cells = [
-                        `<span class="col-name">${b.name}</span>`, `<span class="col-rank">${b.getRankName()}</span>`,
-                        `<span class="col-stat">${getStat('leadership')}</span>`, `<span class="col-stat">${getStat('strength')}</span>`,
-                        `<span class="col-stat">${getStat('politics')}</span>`, `<span class="col-stat">${getStat('diplomacy')}</span>`,
-                        `<span class="col-stat">${getStat('intelligence')}</span>`, `<span class="col-stat">${getStat('charm')}</span>`
-                    ];
-                } else {
-                    cells = [
-                        `<span class="col-act">${inputHtml}${b.isActionDone?'済':'未'}</span>`, `<span class="col-name">${b.name}</span>`, `<span class="col-rank">${b.getRankName()}</span>`,
-                        `<span class="col-stat">${getStat('leadership')}</span>`, `<span class="col-stat">${getStat('strength')}</span>`,
-                        `<span class="col-stat">${getStat('politics')}</span>`, `<span class="col-stat">${getStat('diplomacy')}</span>`,
-                        `<span class="col-stat">${getStat('intelligence')}</span>`, `<span class="col-stat">${getStat('charm')}</span>`
-                    ];
-                }
+                cells = [
+                    !isViewMode ? `<span class="col-act">${inputHtml}${b.isActionDone?'済':'未'}</span>` : null,
+                    `<span class="col-name">${b.name}</span>`,
+                    `<span class="col-rank">${b.getRankName()}</span>`,
+                    `<span class="col-stat">${getStat('leadership')}</span>`,
+                    `<span class="col-stat">${getStat('strength')}</span>`,
+                    `<span class="col-stat">${getStat('politics')}</span>`,
+                    `<span class="col-stat">${getStat('diplomacy')}</span>`,
+                    `<span class="col-stat">${getStat('intelligence')}</span>`,
+                    `<span class="col-stat">${getStat('charm')}</span>`
+                ].filter(Boolean);
             } else {
                 let forceName = "-"; 
                 let familyMark = "";
@@ -2336,22 +2305,17 @@ class UIInfoManager {
                     }
                 }
 
-                if (isViewMode) {
-                    cells = [
-                        `<span class="col-name">${b.name}</span>`, `<span class="col-rank">${b.getRankName()}</span>`,
-                        `<span class="col-faction">${forceName}</span>`, `<span class="col-castle">${bCastleName}</span>`,
-                        `<span class="col-act">${b.isActionDone?'済':'未'}</span>`, `<span class="col-age">${age}</span>`,
-                        `<span class="col-family">${familyMark}</span>`, `<span class="col-salary">${salary}</span>`,
-                        `<span class="col-faction-leader">${factionNameStr}</span>`, `<span></span>`
-                    ];
-                } else {
-                    cells = [
-                        `<span class="col-name">${inputHtml}${b.name}</span>`, `<span class="col-rank">${b.getRankName()}</span>`,
-                        `<span class="col-faction">${forceName}</span>`, `<span class="col-castle">${bCastleName}</span>`,
-                        `<span class="col-age">${age}</span>`, `<span class="col-family">${familyMark}</span>`,
-                        `<span class="col-salary">${salary}</span>`, `<span class="col-faction-leader">${factionNameStr}</span>`, `<span></span>`
-                    ];
-                }
+                cells = [
+                    `<span class="col-name">${!isViewMode ? inputHtml : ''}${b.name}</span>`,
+                    `<span class="col-rank">${b.getRankName()}</span>`,
+                    `<span class="col-faction">${forceName}</span>`,
+                    `<span class="col-castle">${bCastleName}</span>`,
+                    isViewMode ? `<span class="col-act">${b.isActionDone?'済':'未'}</span>` : null,
+                    `<span class="col-age">${age}</span>`,
+                    `<span class="col-family">${familyMark}</span>`,
+                    `<span class="col-salary">${salary}</span>`,
+                    `<span class="col-faction-leader">${factionNameStr}</span>`
+                ].filter(Boolean);
             }
 
             let onClickStr = "";
