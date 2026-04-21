@@ -236,7 +236,7 @@ const COMMAND_SPECS = {
         costGold: 0, costRice: 0, 
         isMulti: false, hasAdvice: true, 
         startMode: 'map_select',  targetType: 'enemy_all',
-        sortKey: 'strength' 
+        sortKey: 'intelligence' 
     },
 
     // --- 情報 (INFO) ---
