@@ -950,7 +950,7 @@ class UIInfoManager {
     }
 
     _renderListModal(config) {
-        // ★安全装置：タブ切り替えが連打された時、古い描画処理をストップさせるためのID
+        // ★安全装置：タブ切り替え連打時に古い描画処理をストップさせる
         this._currentListRenderId = (this._currentListRenderId || 0) + 1;
         const renderId = this._currentListRenderId;
 
@@ -965,11 +965,7 @@ class UIInfoManager {
         if (!modal) return;
         modal.classList.remove('hidden');
 
-        // ★レイアウト崩れ防止：一瞬隠して、即座に中身を空っぽにする
-        if (listContainer) {
-            listContainer.style.visibility = 'hidden';
-            listContainer.innerHTML = '';
-        }
+        // ★修正点：隠したり空っぽにしたりするとチラつくので、ここでは一切何もしません！
 
         if (titleEl) titleEl.textContent = config.title || "";
 
@@ -1026,8 +1022,35 @@ class UIInfoManager {
         if (!listContainer) return;
         listContainer.className = `list-container ${config.listClass || ''} hide-native-scroll`;
 
-        // データが0件の場合の処理
-        if (!config.items || config.items.length === 0) {
+        // 1アイテム分のHTMLを文字列で作る魔法
+        const buildItemHtml = (item) => {
+            const cursorStr = item.onClick ? "style='cursor:pointer;'" : "style='cursor:default;'";
+            const extraClass = item.itemClass || '';
+            
+            let clickStr = "";
+            let indexAttr = "";
+            if (item.onClick) {
+                if (typeof item.onClick === 'function') {
+                    // ユニークなID（今回は配列インデックス）を付与
+                    indexAttr = `data-action-id="${item.id || Math.random().toString(36).substring(7)}"`; 
+                } else {
+                    clickStr = `onclick="${item.onClick}"`;
+                }
+            }
+
+            const cells = item.cells.map(c => {
+                const strC = String(c);
+                if (strC.trim().startsWith('<')) return strC;
+                return `<span>${strC}</span>`;
+            }).join('');
+
+            return `<div class="select-item ${config.itemClass || ''} ${extraClass}" ${cursorStr} ${clickStr} ${indexAttr}>${cells}</div>`;
+        };
+
+        const totalItems = config.items ? config.items.length : 0;
+        
+        // データが0件の場合
+        if (totalItems === 0) {
             let emptyHtml = '';
             if (config.headers && config.headers.length > 0) {
                 const headerCols = config.headers.map(h => h.trim().startsWith('<') ? h : `<span>${h}</span>`).join('');
@@ -1035,25 +1058,12 @@ class UIInfoManager {
             }
             emptyHtml += config.emptyHtml || '<div style="padding: 10px; text-align: center;">データがありません。</div>';
             listContainer.innerHTML = emptyHtml;
-            listContainer.style.visibility = 'visible';
             return;
         }
 
-        // 1アイテム分のHTMLを文字列で作る魔法
-        const buildItemHtml = (item) => {
-            const cursorStr = item.onClick ? "style='cursor:pointer;'" : "style='cursor:default;'";
-            const extraClass = item.itemClass || '';
-            const clickStr = item.onClick ? `onclick="${item.onClick}"` : "";
-            const cells = item.cells.map(c => {
-                const strC = String(c);
-                return strC.trim().startsWith('<') ? strC : `<span>${strC}</span>`;
-            }).join('');
-            return `<div class="select-item ${config.itemClass || ''} ${extraClass}" ${cursorStr} ${clickStr}>${cells}</div>`;
-        };
-
-        const totalItems = config.items.length;
-        const INITIAL_RENDER_COUNT = 25; // ★画面が埋まる最初の25件だけ先に作る
-        const CHUNK_SIZE = 50; // ★以降は裏で50件ずつ追加する
+        // ★チャンク分割：最初の50件を高速描画し、残りは裏で追加する
+        const INITIAL_RENDER_COUNT = 50; 
+        const CHUNK_SIZE = 100; 
         const htmlParts = [];
 
         if (config.headers && config.headers.length > 0) {
@@ -1061,9 +1071,10 @@ class UIInfoManager {
             htmlParts.push(`<div class="list-header ${config.headerClass || ''}">${headerCols}</div>`);
         }
 
-        // 最初の25件だけ組み立てる
+        // 最初の初期件数だけ組み立てる
         const initialLimit = Math.min(totalItems, INITIAL_RENDER_COUNT);
         for (let i = 0; i < initialLimit; i++) {
+            if (!config.items[i].id) config.items[i].id = `item_${i}`;
             htmlParts.push(buildItemHtml(config.items[i]));
         }
 
@@ -1073,41 +1084,58 @@ class UIInfoManager {
             htmlParts.push(`<div class="select-item ${config.itemClass || ''}" style="cursor:default; pointer-events:none;">${emptyCells}</div>`);
         }
 
-        // ★最初の25件を即座に流し込む（これだけなので一瞬で終わる）
+        // ★既存のDOMを一瞬で「上書き」する（隠す必要がないのでチラつかない）
         listContainer.innerHTML = htmlParts.join('');
+        listContainer.style.display = 'block';
+
+        // イベントリスナーの取り付け
+        const attachEvents = (startIndex, endIndex) => {
+            for (let i = startIndex; i < endIndex; i++) {
+                const item = config.items[i];
+                if (item && typeof item.onClick === 'function') {
+                    const el = listContainer.querySelector(`[data-action-id="${item.id}"]`);
+                    if (el) el.addEventListener('click', item.onClick);
+                }
+            }
+        };
+        attachEvents(0, initialLimit);
         
+        // スクロール位置をセット
+        listContainer.scrollTop = config.scrollPos || 0;
+
         if (window.CustomScrollbar) {
             if (!this.ui.bushoScrollbar) this.ui.bushoScrollbar = new CustomScrollbar(listContainer);
+            this.ui.bushoScrollbar.update();
         }
-        
-        // ★レイアウトが整ったので、一瞬で表示させる
-        listContainer.scrollTop = config.scrollPos || 0;
-        if (this.ui.bushoScrollbar) this.ui.bushoScrollbar.update();
-        listContainer.style.visibility = 'visible';
 
-        // ★ここからが「チャンク分割」の魔法！裏で残りを少しずつ追加する
+        // ★残りのデータを裏で少しずつ追加する
         if (totalItems > initialLimit) {
             let currentIndex = initialLimit;
 
             const renderNextChunk = () => {
-                // タブ切り替え等で別のリストを描き始めていたら、この裏作業は即中止する！
+                // タブ切り替え等で別のリストを描き始めていたら、即中止
                 if (this._currentListRenderId !== renderId) return;
 
                 const chunkParts = [];
                 const endLimit = Math.min(currentIndex + CHUNK_SIZE, totalItems);
                 
                 for (let i = currentIndex; i < endLimit; i++) {
+                    if (!config.items[i].id) config.items[i].id = `item_${i}`;
                     chunkParts.push(buildItemHtml(config.items[i]));
                 }
                 
                 // 作った塊をリストの最後（beforeend）に静かに追加する
                 listContainer.insertAdjacentHTML('beforeend', chunkParts.join(''));
+                
+                // 追加した分のイベントリスナーを取り付け
+                attachEvents(currentIndex, endLimit);
+
                 currentIndex = endLimit;
 
                 if (this.ui.bushoScrollbar) this.ui.bushoScrollbar.update();
 
                 if (currentIndex < totalItems) {
-                    // まだ残っていれば、ブラウザの次の休憩時間（フレーム）で続きを描画
+                    // まだ残っていれば、ブラウザの次のフレームで続きを描画
                     requestAnimationFrame(renderNextChunk);
                 }
             };
