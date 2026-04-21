@@ -402,13 +402,14 @@ class UIInfoManager {
             title: `${name} 外交関係`,
             tabsHtml: tabsHtml,
             headers: customHeaderCols,
-            headerClass: "daimyo-list-header",
-            itemClass: "daimyo-list-item",
-            listClass: "daimyo-list-container",
+            headerClass: "",
+            itemClass: "",
+            listClass: "diplo-list-container",
             items: items,
             scrollPos: scrollPos,
+            gridTemplateSp: "2fr 1.5fr 1fr 3fr",
+            gridTemplatePc: "150px 100px 80px 1fr",
             onBack: onClose,
-            gridTemplate: "2fr 1.5fr 1fr 3fr",
             onTabClick: (tabKey) => {
                 this.diploCurrentTab = tabKey;
                 this._renderDiplomacyList(id, name, type, onClose, 0);
@@ -1015,8 +1016,13 @@ class UIInfoManager {
 
         listContainer.className = `list-container ${config.listClass || ''} hide-native-scroll`;
 
+        if (config.gridTemplateSp) listContainer.style.setProperty('--grid-cols-sp', config.gridTemplateSp);
+        else listContainer.style.removeProperty('--grid-cols-sp');
+        
+        if (config.gridTemplatePc) listContainer.style.setProperty('--grid-cols-pc', config.gridTemplatePc);
+        else listContainer.style.removeProperty('--grid-cols-pc');
+
         let gridStyle = "";
-        if (config.gridTemplate) gridStyle += `grid-template-columns: ${config.gridTemplate}; `;
         if (config.minWidth) gridStyle += `min-width: ${config.minWidth}; `;
         if (config.alignItems) gridStyle += `align-items: ${config.alignItems}; `;
 
