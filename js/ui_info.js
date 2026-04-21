@@ -1024,7 +1024,6 @@ class UIInfoManager {
 
         let gridStyle = "";
         if (config.minWidth) gridStyle += `min-width: ${config.minWidth}; `;
-        if (config.alignItems) gridStyle += `align-items: ${config.alignItems}; `;
 
         const buildItemHtml = (item, index) => {
             const cursorStr = item.onClick ? "style='cursor:pointer;'" : "style='cursor:default;'";
@@ -2389,13 +2388,9 @@ class UIInfoManager {
 
         let colStr = "";
         let minW = "";
-        let alignSt = "";
 
         if (this.bushoCurrentTab === 'status') {
-            colStr = isViewMode ? "1.5fr 1fr 1.5fr 1.5fr 0.8fr 0.8fr 0.8fr 1fr 1.5fr 0.2fr" : "1.5fr 1fr 1.5fr 1.5fr 0.8fr 0.8fr 1fr 1.5fr 0.2fr";
             minW = isViewMode ? "900px" : "850px";
-        } else {
-            if (isViewMode) alignSt = "center";
         }
 
         this._renderListModal({
@@ -2408,9 +2403,7 @@ class UIInfoManager {
             listClass: "",
             items: items,
             scrollPos: scrollPos,
-            gridTemplate: colStr,
             minWidth: minW,
-            alignItems: alignSt,
             onBack: () => {
                 if (onBack) onBack(); 
                 else if (extraData && extraData.onCancel) extraData.onCancel();
