@@ -21,7 +21,7 @@ const COMMAND_MENU_STRUCTURE = [
         // ★ここが「入れ子（サブメニュー）」になる部分です！
         subMenus: [
             { label: "外交", commands: ['goodwill', 'alliance', 'marriage', 'dominate', 'subordinate', 'break_alliance'] }, // ★ 'marriage' を追加！
-            { label: "調略", commands: ['incite', 'rumor', 'headhunt'] },
+            { label: "調略", commands: ['incite', 'rumor', 'headhunt', 'sabotage'] },
             { label: "諸勢力", commands: ['kunishu_goodwill', 'kunishu_incorporate'] },
             { label: "朝廷", commands: ['tribute', 'court_truce'] }
         ]
@@ -231,6 +231,13 @@ const COMMAND_SPECS = {
         startMode: 'map_select', targetType: 'enemy_all',
         sortKey: 'intelligence'
     },
+    'sabotage': { 
+        label: "破壊工作", category: 'FOREIGN_STRATEGY', 
+        costGold: 0, costRice: 0, 
+        isMulti: false, hasAdvice: true, 
+        startMode: 'map_select', targetType: 'enemy_all',
+        sortKey: 'strength' 
+    },
 
     // --- 情報 (INFO) ---
     'busho_list': {
@@ -404,6 +411,10 @@ class CommandSystem {
         else if (actionType === 'incite_doer') { 
             bushos = this.game.getCastleBushos(c.id).filter(b => b.clan === c.ownerClan && b.status === 'active'); 
             infoHtml = "<div>民心撹乱を実行する担当官を選択してください</div>"; 
+        }
+        else if (actionType === 'sabotage_doer') { 
+            bushos = this.game.getCastleBushos(c.id).filter(b => b.clan === c.ownerClan && b.status === 'active'); 
+            infoHtml = "<div>破壊工作を実行する担当官を選択してください</div>"; 
         }
         else if (actionType === 'headhunt_target') { 
             const targetCastle = this.game.getCastle(targetId);
@@ -1170,6 +1181,12 @@ class CommandSystem {
              // ★専門部署である StrategySystem の計算魔法を呼びます！
              const trueProb = this.game.strategySystem.getInciteProb(firstId, targetId);
              this.showAdviceAndExecute('incite', () => this.game.strategySystem.executeIncite(firstId, targetId), { trueProb: trueProb });
+             return;
+        }
+
+        if (actionType === 'sabotage_doer') {
+             const trueProb = this.game.strategySystem.getSabotageProb(firstId, targetId);
+             this.showAdviceAndExecute('sabotage', () => this.game.strategySystem.executeSabotage(firstId, targetId), { trueProb: trueProb });
              return;
         }
 
@@ -1942,6 +1959,7 @@ class CommandSystem {
             case 'transport': return "輸送先を選択してください";
             case 'investigate': return "調査対象の城を選択してください";
             case 'incite': return "民心撹乱対象の城を選択してください";
+            case 'sabotage': return "破壊工作対象の城を選択してください";
             case 'rumor': return "離反工作対象の城を選択してください";
             case 'headhunt': case 'headhunt_select_castle': return "引抜対象の居城を選択してください";
             case 'goodwill': return "親善を行う相手を選択してください";
@@ -2120,6 +2138,8 @@ class CommandSystem {
             this.game.ui.openBushoSelector('investigate_deploy', targetCastle.id, null, onBackToMap);
         } else if (mode === 'incite') {
             this.game.ui.openBushoSelector('incite_doer', targetCastle.id, null, onBackToMap);
+        } else if (mode === 'sabotage') {
+            this.game.ui.openBushoSelector('sabotage_doer', targetCastle.id, null, onBackToMap);
         } else if (mode === 'rumor') {
             this.game.ui.openBushoSelector('rumor_target_busho', targetCastle.id, null, onBackToMap);
         } else if (mode === 'headhunt' || mode === 'headhunt_select_castle') {
@@ -2135,10 +2155,8 @@ class CommandSystem {
         } else if (mode === 'dominate') {
             this.game.ui.openBushoSelector('diplomacy_doer', targetCastle.id, { subAction: 'dominate' }, onBackToMap);
         } else if (mode === 'court_truce') {
-            // ★追加：朝廷和睦の使者選びへ繋げます
             this.game.ui.openBushoSelector('diplomacy_doer', targetCastle.id, { subAction: 'court_truce' }, onBackToMap);
         } else if (mode === 'marriage') {
-            // ★今回追加：婚姻の使者選びへ繋げます
             this.game.ui.openBushoSelector('diplomacy_doer', targetCastle.id, { subAction: 'marriage' }, onBackToMap);
         }
     }

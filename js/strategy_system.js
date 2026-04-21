@@ -58,6 +58,28 @@ class StrategySystem {
         return Math.min(1.0, successRate);
     }
 
+    // ★追加: 破壊工作の確率を計算する魔法
+    getSabotageProb(doerId, targetId) {
+        const busho = this.game.getBusho(doerId);
+
+        const prob = ((busho.strength * 1.5) + (Math.sqrt(busho.loyalty) * 2)) / 200;
+        
+        return Math.max(0.01, Math.min(0.99, prob));
+    }
+
+    // ★追加: 破壊工作の成否とダメージを計算する魔法
+    calcSabotage(doerId, targetId) { 
+        const busho = this.game.getBusho(doerId);
+        
+        const prob = this.getSabotageProb(doerId, targetId);
+        const success = Math.random() < prob; 
+        
+        if(!success) return { success: false, val: 0 }; 
+        
+        const damage = Math.max(1, Math.floor(((busho.intelligence * 1.5) + (Math.sqrt(busho.loyalty) * 2)) / 10));
+        return { success: true, val: damage }; 
+    }
+
     calcIncite(doerId, targetId) { 
         const busho = this.game.getBusho(doerId);
         const targetCastle = this.game.getCastle(targetId);
@@ -246,6 +268,29 @@ class StrategySystem {
             this.game.factionSystem.updateRecognition(doer, 20); 
         } else { 
             this.game.ui.showResultModal(`${doer.name}の流言は失敗しました`); 
+            doer.achievementTotal += 5; 
+            this.game.factionSystem.updateRecognition(doer, 10); 
+        } 
+        doer.isActionDone = true; 
+        this.game.ui.updatePanelHeader(); 
+        this.game.ui.renderCommandMenu(); 
+    }
+
+    // ★追加: 破壊工作を実行する魔法
+    executeSabotage(doerId, targetId) { 
+        const doer = this.game.getBusho(doerId);
+        const target = this.game.getCastle(targetId); 
+        
+        const result = this.calcSabotage(doerId, targetId); 
+        if(result.success) {
+            const oldVal = target.defense;
+            target.defense = Math.max(0, target.defense - result.val); 
+            const actualDrop = oldVal - target.defense;
+            this.game.ui.showResultModal(`${doer.name}の破壊工作が成功！\n${target.name}の城壁が${actualDrop}低下しました`); 
+            doer.achievementTotal += Math.floor(doer.intelligence * 0.2) + 10;
+            this.game.factionSystem.updateRecognition(doer, 20); 
+        } else { 
+            this.game.ui.showResultModal(`${doer.name}の破壊工作は失敗しました`); 
             doer.achievementTotal += 5; 
             this.game.factionSystem.updateRecognition(doer, 10); 
         } 
