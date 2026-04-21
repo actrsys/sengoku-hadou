@@ -106,38 +106,7 @@ class UIInfoManager {
         else if (info.pageType === 'force_selector') this._renderForceSelector(...info.args, info.scrollPos);
     }
     
-    showDaimyoList() {
-        this.closeCommonModal(); // 新しく開く時は履歴をリセットします
-        this.pushModal('daimyo_list', []);
-    }
-
     _renderDaimyoList(scrollPos = 0) {
-        const modal = document.getElementById('selector-modal');
-        const title = document.getElementById('selector-title');
-        const listContainer = document.getElementById('selector-list');
-        const contextEl = document.getElementById('selector-context-info');
-        const tabsEl = document.getElementById('selector-tabs');
-        const confirmBtn = document.getElementById('selector-confirm-btn');
-        const backBtn = document.querySelector('#selector-modal .btn-secondary');
-
-        modal.classList.remove('hidden');
-        if (title) title.textContent = "勢力一覧";
-        if (contextEl) contextEl.classList.add('hidden');
-        if (confirmBtn) confirmBtn.classList.add('hidden');
-
-        if(backBtn) {
-            backBtn.style.display = '';
-            backBtn.textContent = this.modalHistory.length > 0 ? '戻る' : '閉じる';
-            backBtn.onclick = () => {
-                if (window.AudioManager) window.AudioManager.playSE('cancel.ogg');
-                this.popModal();
-            };
-            const footer = backBtn.parentElement;
-            if (footer) footer.style.justifyContent = 'center';
-        }
-
-        let listHtml = '<div class="list-header daimyo-list-header"><span>勢力名</span><span>当主名</span><span>城数</span><span>威信</span><span>友好度</span><span>関係</span></div>';
-        
         const activeClans = this.game.clans.filter(c => c.id !== 0 && this.game.castles.some(cs => cs.ownerClan === c.id));
         this.game.updateAllClanPrestige();
         
@@ -156,6 +125,8 @@ class UIInfoManager {
             if (b.id === this.game.playerClanId) return 1;
             return b.power - a.power;
         });
+
+        let items = [];
 
         clanDataList.forEach(d => {
             let friendScore = 50;
@@ -179,29 +150,28 @@ class UIInfoManager {
             const powerBarHtml = `<div class="bar-bg bar-bg-power"><div class="bar-fill bar-fill-power" style="width:${powerPercent}%;"></div></div>`;
             const friendBarHtml = d.id === this.game.playerClanId ? "" : `<div class="bar-bg bar-bg-friend"><div class="bar-fill bar-fill-friend" style="width:${Math.min(100, Math.max(0, friendScore))}%;"></div></div>`;
 
-            listHtml += `<div class="select-item daimyo-list-item" style="cursor:pointer;" onclick="if(window.AudioManager) window.AudioManager.playSE('choice.ogg'); window.GameApp.ui.info.showDaimyoDetail(${d.id})"><span class="col-daimyo-name" style="font-weight:bold;">${d.name}</span><span class="col-leader-name">${d.leaderName}</span><span>${d.castlesCount}</span><span>${powerBarHtml}</span><span>${friendBarHtml}</span><span class="${statusClass}">${friendStatus}</span></div>`;
+            items.push({
+                onClick: `if(window.AudioManager) window.AudioManager.playSE('choice.ogg'); window.GameApp.ui.info.showDaimyoDetail(${d.id})`,
+                cells: [
+                    `<span class="col-daimyo-name" style="font-weight:bold;">${d.name}</span>`,
+                    `<span class="col-leader-name">${d.leaderName}</span>`,
+                    `${d.castlesCount}`,
+                    powerBarHtml,
+                    friendBarHtml,
+                    `<span class="${statusClass}">${friendStatus}</span>`
+                ]
+            });
         });
 
-        const itemCount = clanDataList.length;
-        for (let i = itemCount; i < 8; i++) {
-            listHtml += `<div class="select-item daimyo-list-item" style="cursor:default; pointer-events:none;"><span></span><span></span><span></span><span></span><span></span><span></span></div>`;
-        }
-        
-        if (listContainer) {
-            listContainer.className = 'list-container daimyo-list-container hide-native-scroll';
-            listContainer.style.display = 'block';
-            listContainer.innerHTML = listHtml;
-            
-            if (window.CustomScrollbar) {
-                if (!this.ui.bushoScrollbar) this.ui.bushoScrollbar = new CustomScrollbar(listContainer);
-                setTimeout(() => {
-                    listContainer.scrollTop = scrollPos;
-                    this.ui.bushoScrollbar.update();
-                }, 10);
-            } else {
-                listContainer.scrollTop = scrollPos;
-            }
-        }
+        this._renderListModal({
+            title: "勢力一覧",
+            headers: ["勢力名", "当主名", "城数", "威信", "友好度", "関係"],
+            headerClass: "daimyo-list-header",
+            itemClass: "daimyo-list-item",
+            listClass: "daimyo-list-container",
+            items: items,
+            scrollPos: scrollPos
+        });
     }
 
     showDaimyoDetail(clanId) {
@@ -337,69 +307,21 @@ class UIInfoManager {
         }
     }
 
-    showDiplomacyList(id, name, type = 'daimyo', onClose = null) {
-        this.pushModal('diplo_list', [id, name, type, onClose]);
-    }
-
     _renderDiplomacyList(id, name, type, onClose, scrollPos = 0) {
-        const modal = document.getElementById('selector-modal');
-        const titleEl = document.getElementById('selector-title');
-        const listContainer = document.getElementById('selector-list');
-        const contextEl = document.getElementById('selector-context-info');
-        const tabsEl = document.getElementById('selector-tabs');
-        const confirmBtn = document.getElementById('selector-confirm-btn');
-        const backBtn = document.querySelector('#selector-modal .btn-secondary');
-
-        if (!modal) return;
-        modal.classList.remove('hidden');
-        if (titleEl) titleEl.textContent = `${name} 外交関係`;
-        if (contextEl) contextEl.classList.add('hidden');
-        if (confirmBtn) confirmBtn.classList.add('hidden');
-
-        if(backBtn) {
-            backBtn.style.display = '';
-            backBtn.textContent = this.modalHistory && this.modalHistory.length > 0 ? '戻る' : '閉じる';
-            backBtn.onclick = () => {
-                if (window.AudioManager) window.AudioManager.playSE('cancel.ogg');
-                if (onClose) onClose();
-                this.popModal();
-            };
-            const footer = backBtn.parentElement;
-            if (footer) footer.style.justifyContent = 'center';
-        }
-
         if (!this.diploCurrentTab) this.diploCurrentTab = 'daimyo';
 
-        if (tabsEl) {
-            if (type === 'daimyo') {
-                tabsEl.classList.remove('hidden');
-                tabsEl.style.justifyContent = 'flex-start';
-                tabsEl.style.paddingLeft = '10px';
-                tabsEl.style.alignItems = 'flex-end';
-                
-                tabsEl.innerHTML = `
-                    <div style="display: flex; gap: 5px;">
-                        <button class="busho-tab-btn ${this.diploCurrentTab === 'daimyo' ? 'active' : ''}" data-tab="daimyo">大名家</button>
-                        <button class="busho-tab-btn ${this.diploCurrentTab === 'kunishu' ? 'active' : ''}" data-tab="kunishu">諸勢力</button>
-                    </div>
-                `;
-
-                const tabBtns = tabsEl.querySelectorAll('.busho-tab-btn');
-                tabBtns.forEach(btn => {
-                    btn.onclick = () => {
-                        if (window.AudioManager) window.AudioManager.playSE('choice.ogg');
-                        this.diploCurrentTab = btn.getAttribute('data-tab');
-                        this._renderDiplomacyList(id, name, type, onClose, 0);
-                    };
-                });
-            } else {
-                tabsEl.classList.add('hidden');
-                this.diploCurrentTab = 'daimyo'; // 諸勢力からの場合は強制的に大名リスト扱いにします
-            }
+        let tabsHtml = null;
+        if (type === 'daimyo') {
+            tabsHtml = `
+                <div style="display: flex; gap: 5px;">
+                    <button class="busho-tab-btn ${this.diploCurrentTab === 'daimyo' ? 'active' : ''}" data-tab="daimyo">大名家</button>
+                    <button class="busho-tab-btn ${this.diploCurrentTab === 'kunishu' ? 'active' : ''}" data-tab="kunishu">諸勢力</button>
+                </div>
+            `;
+        } else {
+            this.diploCurrentTab = 'daimyo'; 
         }
 
-        let listHtml = '<div class="list-header daimyo-list-header" style="grid-template-columns: 2fr 1.5fr 1fr 3fr;"><span>勢力名</span><span>友好度</span><span>関係</span><span></span></div>';
-        
         let relations = [];
 
         if (type === 'daimyo' && this.diploCurrentTab === 'daimyo') {
@@ -440,6 +362,7 @@ class UIInfoManager {
 
         relations.sort((a,b) => b.sentiment - a.sentiment);
 
+        let items = [];
         relations.forEach(r => {
             let statusClass = "text-white";
             if (r.status === '敵対') statusClass = 'text-red';
@@ -449,29 +372,67 @@ class UIInfoManager {
             const friendPercent = Math.min(100, Math.max(0, r.sentiment));
             const friendBarHtml = `<div class="bar-bg bar-bg-friend"><div class="bar-fill bar-fill-friend" style="width:${friendPercent}%;"></div></div>`;
 
-            listHtml += `<div class="select-item daimyo-list-item" style="grid-template-columns: 2fr 1.5fr 1fr 3fr; cursor:default;"><span class="col-daimyo-name" style="font-weight:bold;">${r.name}</span><span>${friendBarHtml}</span><span class="${statusClass}">${r.status}</span><span></span></div>`;
+            items.push({
+                onClick: null, 
+                cells: [
+                    `<span class="col-daimyo-name" style="font-weight:bold;">${r.name}</span>`,
+                    friendBarHtml,
+                    `<span class="${statusClass}">${r.status}</span>`,
+                    ""
+                ]
+            });
         });
 
-        const itemCount = relations.length;
-        for (let i = itemCount; i < 8; i++) {
-            listHtml += `<div class="select-item daimyo-list-item" style="grid-template-columns: 2fr 1.5fr 1fr 3fr; cursor:default; pointer-events:none;"><span></span><span></span><span></span><span></span></div>`;
-        }
-        
-        if (listContainer) {
-            listContainer.className = 'list-container daimyo-list-container hide-native-scroll';
-            listContainer.style.display = 'block';
-            listContainer.innerHTML = listHtml;
-            
-            if (window.CustomScrollbar) {
-                if (!this.ui.bushoScrollbar) this.ui.bushoScrollbar = new CustomScrollbar(listContainer);
-                setTimeout(() => {
-                    listContainer.scrollTop = scrollPos;
-                    this.ui.bushoScrollbar.update();
-                }, 10);
-            } else {
-                listContainer.scrollTop = scrollPos;
+        // カスタムの列幅を指定するためのヘッダーを作ります
+        const customHeaderCols = [
+            '<span style="padding-left:5px; justify-content:flex-start;">勢力名</span>',
+            '<span>友好度</span>',
+            '<span>関係</span>',
+            '<span></span>'
+        ];
+
+        this._renderListModal({
+            title: `${name} 外交関係`,
+            tabsHtml: tabsHtml,
+            headers: customHeaderCols,
+            headerClass: "daimyo-list-header",
+            itemClass: "daimyo-list-item",
+            listClass: "daimyo-list-container",
+            items: items,
+            scrollPos: scrollPos,
+            onBack: onClose
+        });
+
+        // タブを描画した後に、クリックされた時の動きを設定します
+        setTimeout(() => {
+            const tabsEl = document.getElementById('selector-tabs');
+            if (tabsEl && type === 'daimyo') {
+                tabsEl.style.justifyContent = 'flex-start';
+                tabsEl.style.paddingLeft = '10px';
+                tabsEl.style.alignItems = 'flex-end';
+
+                const tabBtns = tabsEl.querySelectorAll('.busho-tab-btn');
+                tabBtns.forEach(btn => {
+                    btn.onclick = () => {
+                        if (window.AudioManager) window.AudioManager.playSE('choice.ogg');
+                        this.diploCurrentTab = btn.getAttribute('data-tab');
+                        this._renderDiplomacyList(id, name, type, onClose, 0);
+                    };
+                });
             }
-        }
+        }, 10);
+
+        // ★追加：外交リストはアイテム側のCSSで横幅を指定しているため、共通工場で描いた後に強引にスタイルを当てます
+        setTimeout(() => {
+            const header = document.querySelector('.daimyo-list-header');
+            if (header) header.style.gridTemplateColumns = '2fr 1.5fr 1fr 3fr';
+            
+            const listItems = document.querySelectorAll('.daimyo-list-item');
+            listItems.forEach(item => {
+                item.style.gridTemplateColumns = '2fr 1.5fr 1fr 3fr';
+                item.style.cursor = 'default';
+            });
+        }, 20);
     }
 
     showFactionList(clanId, isDirect = false) {
