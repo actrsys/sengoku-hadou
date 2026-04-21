@@ -23,6 +23,9 @@ class UIInfoManager {
         this.bushoIsSortAsc = false;
         this.bushoSavedBushos = null;
         this.bushoLastScope = null;
+        
+        // 外交リストのタブ状態リセット
+        this.diploCurrentTab = 'daimyo';
     }
 
     pushModal(pageType, renderArgs) {
@@ -317,7 +320,7 @@ class UIInfoManager {
             document.getElementById('temp-diplo-btn').onclick = (e) => {
                 e.stopPropagation(); 
                 if (window.AudioManager) window.AudioManager.playSE('decision.ogg');
-                this.showDiplomacyList(clan.id, clan.name);
+                this.showDiplomacyList(clan.id, clan.name, 'daimyo');
             };
 
             document.getElementById('temp-busho-btn').onclick = (e) => {
@@ -334,11 +337,11 @@ class UIInfoManager {
         }
     }
 
-    showDiplomacyList(clanId, clanName, onClose = null) {
-        this.pushModal('diplo_list', [clanId, clanName, onClose]);
+    showDiplomacyList(id, name, type = 'daimyo', onClose = null) {
+        this.pushModal('diplo_list', [id, name, type, onClose]);
     }
 
-    _renderDiplomacyList(clanId, clanName, onClose, scrollPos = 0) {
+    _renderDiplomacyList(id, name, type, onClose, scrollPos = 0) {
         const modal = document.getElementById('selector-modal');
         const titleEl = document.getElementById('selector-title');
         const listContainer = document.getElementById('selector-list');
@@ -349,7 +352,7 @@ class UIInfoManager {
 
         if (!modal) return;
         modal.classList.remove('hidden');
-        if (titleEl) titleEl.textContent = `${clanName} 外交関係`;
+        if (titleEl) titleEl.textContent = `${name} 外交関係`;
         if (contextEl) contextEl.classList.add('hidden');
         if (confirmBtn) confirmBtn.classList.add('hidden');
 
@@ -365,19 +368,75 @@ class UIInfoManager {
             if (footer) footer.style.justifyContent = 'center';
         }
 
+        if (!this.diploCurrentTab) this.diploCurrentTab = 'daimyo';
+
+        if (tabsEl) {
+            if (type === 'daimyo') {
+                tabsEl.classList.remove('hidden');
+                tabsEl.style.justifyContent = 'flex-start';
+                tabsEl.style.paddingLeft = '10px';
+                tabsEl.style.alignItems = 'flex-end';
+                
+                tabsEl.innerHTML = `
+                    <div style="display: flex; gap: 5px;">
+                        <button class="busho-tab-btn ${this.diploCurrentTab === 'daimyo' ? 'active' : ''}" data-tab="daimyo">大名家</button>
+                        <button class="busho-tab-btn ${this.diploCurrentTab === 'kunishu' ? 'active' : ''}" data-tab="kunishu">諸勢力</button>
+                    </div>
+                `;
+
+                const tabBtns = tabsEl.querySelectorAll('.busho-tab-btn');
+                tabBtns.forEach(btn => {
+                    btn.onclick = () => {
+                        if (window.AudioManager) window.AudioManager.playSE('choice.ogg');
+                        this.diploCurrentTab = btn.getAttribute('data-tab');
+                        this._renderDiplomacyList(id, name, type, onClose, 0);
+                    };
+                });
+            } else {
+                tabsEl.classList.add('hidden');
+                this.diploCurrentTab = 'daimyo'; // 諸勢力からの場合は強制的に大名家リスト扱いにします
+            }
+        }
+
         let listHtml = '<div class="list-header daimyo-list-header" style="grid-template-columns: 2fr 1.5fr 1fr 3fr;"><span>勢力名</span><span>友好度</span><span>関係</span><span></span></div>';
         
-        const activeClans = this.game.clans.filter(c => c.id !== 0 && c.id !== clanId && this.game.castles.some(cs => cs.ownerClan === c.id));
-        
-        const relations = activeClans.map(c => {
-            const rel = this.game.getRelation(clanId, c.id);
-            return {
-                id: c.id,
-                name: c.name,
-                sentiment: rel ? rel.sentiment : 50,
-                status: rel ? (rel.displayStatus || rel.status) : "普通"
-            };
-        });
+        let relations = [];
+
+        if (type === 'daimyo' && this.diploCurrentTab === 'daimyo') {
+            const activeClans = this.game.clans.filter(c => c.id !== 0 && c.id !== id && this.game.castles.some(cs => cs.ownerClan === c.id));
+            relations = activeClans.map(c => {
+                const rel = this.game.getRelation(id, c.id);
+                return {
+                    id: c.id,
+                    name: c.name,
+                    sentiment: rel ? rel.sentiment : 50,
+                    status: rel ? (rel.displayStatus || rel.status) : "普通"
+                };
+            });
+        } else if (type === 'daimyo' && this.diploCurrentTab === 'kunishu') {
+            const activeKunishus = this.game.kunishuSystem.getAliveKunishus();
+            relations = activeKunishus.map(k => {
+                return {
+                    id: k.id,
+                    name: k.getName(this.game),
+                    sentiment: k.getRelation(id, false),
+                    status: k.daimyoRelations[id] ? k.daimyoRelations[id].status : "普通"
+                };
+            });
+        } else if (type === 'kunishu') {
+            const kunishu = this.game.kunishuSystem.getKunishu(id);
+            if (kunishu) {
+                const activeClans = this.game.clans.filter(c => c.id !== 0 && this.game.castles.some(cs => cs.ownerClan === c.id));
+                relations = activeClans.map(c => {
+                    return {
+                        id: c.id,
+                        name: c.name,
+                        sentiment: kunishu.getRelation(c.id, false),
+                        status: kunishu.daimyoRelations[c.id] ? kunishu.daimyoRelations[c.id].status : "普通"
+                    };
+                });
+            }
+        }
 
         relations.sort((a,b) => b.sentiment - a.sentiment);
 
@@ -3306,9 +3365,16 @@ class UIInfoManager {
                     </div>
                     <div style="display: flex; justify-content: flex-end; gap: 10px; margin-top: 15px;">
                         <button class="daimyo-detail-action-btn" id="temp-kunishu-busho-btn">武将</button>
+                        <button class="daimyo-detail-action-btn" id="temp-kunishu-diplo-btn">外交</button>
                     </div>
                 </div>
             `;
+
+            document.getElementById('temp-kunishu-diplo-btn').onclick = (e) => {
+                e.stopPropagation(); 
+                if (window.AudioManager) window.AudioManager.playSE('decision.ogg');
+                this.showDiplomacyList(kunishu.id, kunishuName, 'kunishu');
+            };
 
             document.getElementById('temp-kunishu-busho-btn').onclick = (e) => {
                 e.stopPropagation();
