@@ -168,7 +168,7 @@ class UIInfoManager {
                     friendStatus = relation.displayStatus || relation.status; 
                     if (friendStatus === '敵対') statusClass = 'text-red';
                     else if (friendStatus === '友好') statusClass = 'text-green';
-                    else if (['同盟', '支配', '従属', '婚姻'].includes(friendStatus)) statusClass = 'text-pink';
+                    else if (['同盟', '支配', '従属', '婚姻'].includes(friendStatus)) statusClass = 'text-green';
                 }
             } else {
                 friendStatus = "自勢力";
@@ -3699,7 +3699,7 @@ class UIInfoManager {
                     relStatus = rel.displayStatus || rel.status;
                     if (relStatus === '敵対') statusClass = 'text-red';
                     else if (relStatus === '友好') statusClass = 'text-green';
-                    else if (['同盟', '支配', '従属', '婚姻'].includes(relStatus)) statusClass = 'text-pink';
+                    else if (['同盟', '支配', '従属', '婚姻'].includes(relStatus)) statusClass = 'text-green';
                 }
             }
             const relPercent = Math.min(100, Math.max(0, Number(relVal) || 0));
