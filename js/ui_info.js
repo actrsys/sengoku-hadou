@@ -3671,6 +3671,7 @@ class UIInfoManager {
                 <span>代表者</span>
                 <span>兵士</span>
                 <span>友好度</span>
+                <span>関係</span>
             </div>
         `;
         
@@ -3682,12 +3683,24 @@ class UIInfoManager {
             const force = item.force || item; 
 
             let relVal = 50;
+            let relStatus = "普通";
+            let statusClass = "text-white";
+
             if (force.isKunishu) {
                 const k = this.game.kunishuSystem.getKunishu(force.id);
                 if (k) relVal = k.getRelation(this.game.playerClanId);
+                
+                if (relVal >= 70) { relStatus = "友好"; statusClass = "text-green"; }
+                else if (relVal < 40) { relStatus = "敵対"; statusClass = "text-red"; }
             } else {
                 const rel = this.game.getRelation(this.game.playerClanId, force.id);
-                if (rel) relVal = rel.sentiment;
+                if (rel) {
+                    relVal = rel.sentiment;
+                    relStatus = rel.displayStatus || rel.status;
+                    if (relStatus === '敵対') statusClass = 'text-red';
+                    else if (relStatus === '友好') statusClass = 'text-green';
+                    else if (['同盟', '支配', '従属', '婚姻'].includes(relStatus)) statusClass = 'text-pink';
+                }
             }
             const relPercent = Math.min(100, Math.max(0, Number(relVal) || 0));
             const friendBarHtml = `<div class="bar-bg bar-bg-friend"><div class="bar-fill bar-fill-friend" style="width:${relPercent}%;"></div></div>`;
@@ -3699,6 +3712,7 @@ class UIInfoManager {
                     <span>${force.leaderName}</span>
                     <span>${force.soldiers}</span>
                     <span>${friendBarHtml}</span>
+                    <span class="${statusClass}" style="font-weight:bold;">${relStatus}</span>
                 </div>
             `;
         });
@@ -3707,7 +3721,7 @@ class UIInfoManager {
         for (let i = itemCount; i < 8; i++) {
             listHtml += `
                 <div class="select-item force-list-item" style="cursor:default; pointer-events:none;">
-                    <span></span><span></span><span></span><span></span>
+                    <span></span><span></span><span></span><span></span><span></span>
                 </div>
             `;
         }
