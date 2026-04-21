@@ -482,32 +482,8 @@ class UIInfoManager {
     }
 
     _renderFactionList(clanId, isDirect, scrollPos = 0) {
-        const modal = document.getElementById('selector-modal');
-        const titleEl = document.getElementById('selector-title');
-        const listContainer = document.getElementById('selector-list');
-        const contextEl = document.getElementById('selector-context-info');
-        const tabsEl = document.getElementById('selector-tabs');
-        const confirmBtn = document.getElementById('selector-confirm-btn');
-        const backBtn = document.querySelector('#selector-modal .btn-secondary');
-
         const clan = this.game.clans.find(c => c.id === clanId);
-        if (!clan || !modal) return;
-
-        modal.classList.remove('hidden');
-        if (titleEl) titleEl.textContent = `${clan.name} 派閥一覧`;
-        if (contextEl) contextEl.classList.add('hidden');
-        if (confirmBtn) confirmBtn.classList.add('hidden');
-
-        if(backBtn) {
-            backBtn.style.display = '';
-            backBtn.textContent = this.modalHistory && this.modalHistory.length > 0 ? '戻る' : '閉じる';
-            backBtn.onclick = () => {
-                if (window.AudioManager) window.AudioManager.playSE('cancel.ogg');
-                this.popModal();
-            };
-            const footer = backBtn.parentElement;
-            if (footer) footer.style.justifyContent = 'center';
-        }
+        if (!clan) return;
 
         const bushos = this.game.bushos.filter(b => b.clan === clanId && b.status === 'active');
         const factions = {};
@@ -532,8 +508,8 @@ class UIInfoManager {
             if (b === daimyoFactionId) return 1;  
             return factions[b].count - factions[a].count; 
         });
-        
-        let listHtml = `<div class="list-header faction-list-header"><span>派閥主</span><span>武将数</span><span>方針</span><span>思想</span><span></span></div>`;
+
+        let items = [];
         
         fIds.forEach(fId => {
             const fData = factions[fId];
@@ -561,36 +537,38 @@ class UIInfoManager {
                 nameClass = "text-orange";
             }
 
-            listHtml += `<div class="select-item faction-list-item" style="cursor:pointer;" onclick="if(window.AudioManager) window.AudioManager.playSE('choice.ogg'); window.GameApp.ui.info.showFactionBushoList(${clan.id}, ${fId}, '${leaderName}派')"><strong class="col-faction-name ${nameClass}">${leaderName}</strong><span>${count}</span><span class="${seikakuClass}">${seikaku}</span><span class="${hoshinClass}">${hoshin}</span><span></span></div>`;
+            items.push({
+                onClick: `window.GameApp.ui.info.showFactionBushoList(${clan.id}, ${fId}, '${leaderName}派')`,
+                cells: [
+                    `<strong class="col-faction-name ${nameClass}">${leaderName}</strong>`,
+                    `${count}`,
+                    `<span class="${seikakuClass}">${seikaku}</span>`,
+                    `<span class="${hoshinClass}">${hoshin}</span>`,
+                    ""
+                ]
+            });
         });
         
         if (nonFactionCount > 0) {
-            listHtml += `<div class="select-item faction-list-item" style="cursor:pointer;" onclick="if(window.AudioManager) window.AudioManager.playSE('choice.ogg'); window.GameApp.ui.info.showFactionBushoList(${clan.id}, 0, '無派閥')"><strong class="col-faction-name">無派閥</strong><span>${nonFactionCount}</span><span></span><span></span><span></span></div>`;
-        }
-        
-        let itemCount = fIds.length + (nonFactionCount > 0 ? 1 : 0);
-        if (itemCount === 0) {
-            itemCount = 1; 
-        }
-        for (let i = itemCount; i < 8; i++) {
-            listHtml += `<div class="select-item faction-list-item" style="cursor:default; pointer-events:none;"><span></span><span></span><span></span><span></span><span></span></div>`;
+            items.push({
+                onClick: `window.GameApp.ui.info.showFactionBushoList(${clan.id}, 0, '無派閥')`,
+                cells: [
+                    `<strong class="col-faction-name">無派閥</strong>`,
+                    `${nonFactionCount}`,
+                    "", "", ""
+                ]
+            });
         }
 
-        if (listContainer) {
-            listContainer.className = 'list-container faction-list-container hide-native-scroll';
-            listContainer.style.display = 'block';
-            listContainer.innerHTML = listHtml;
-            
-            if (window.CustomScrollbar) {
-                if (!this.ui.bushoScrollbar) this.ui.bushoScrollbar = new CustomScrollbar(listContainer);
-                setTimeout(() => {
-                    listContainer.scrollTop = scrollPos;
-                    this.ui.bushoScrollbar.update();
-                }, 10);
-            } else {
-                listContainer.scrollTop = scrollPos;
-            }
-        }
+        this._renderListModal({
+            title: `${clan.name} 派閥一覧`,
+            headers: ["派閥主", "武将数", "方針", "思想", ""],
+            headerClass: "faction-list-header",
+            itemClass: "faction-list-item",
+            listClass: "faction-list-container",
+            items: items,
+            scrollPos: scrollPos
+        });
     }
 
     showFactionBushoList(clanId, factionId, factionName) {
@@ -1099,30 +1077,6 @@ class UIInfoManager {
     }
 
     _renderDelegateList(scrollPos = 0) {
-        const modal = document.getElementById('selector-modal');
-        const titleEl = document.getElementById('selector-title');
-        const listContainer = document.getElementById('selector-list');
-        const contextEl = document.getElementById('selector-context-info');
-        const tabsEl = document.getElementById('selector-tabs');
-        const confirmBtn = document.getElementById('selector-confirm-btn');
-        const backBtn = document.querySelector('#selector-modal .btn-secondary');
-
-        if (!modal) return;
-        modal.classList.remove('hidden');
-        if (titleEl) titleEl.textContent = "委任設定";
-        if (confirmBtn) confirmBtn.classList.add('hidden');
-
-        if(backBtn) {
-            backBtn.style.display = '';
-            backBtn.textContent = this.modalHistory && this.modalHistory.length > 0 ? '戻る' : '閉じる';
-            backBtn.onclick = () => {
-                if (window.AudioManager) window.AudioManager.playSE('cancel.ogg');
-                this.popModal();
-            };
-            const footer = backBtn.parentElement;
-            if (footer) footer.style.justifyContent = 'center';
-        }
-
         const daimyo = this.game.bushos.find(b => b.clan === this.game.playerClanId && b.isDaimyo);
         const daimyoCastleId = daimyo ? daimyo.castleId : -1;
         const myCastles = this.game.castles.filter(c => c.ownerClan === this.game.playerClanId && c.id !== daimyoCastleId);
@@ -1130,58 +1084,54 @@ class UIInfoManager {
         const isAllDelegated = myCastles.length > 0 && myCastles.every(c => c.isDelegated);
         let toggleBtnClass = isAllDelegated ? "btn-toggle-delegated" : "btn-toggle-direct";
 
-        if (contextEl) {
-            contextEl.classList.remove('hidden');
-            contextEl.innerHTML = `<button id="btn-toggle-all-delegate" class="btn-secondary btn-small ${toggleBtnClass}">一括</button>`;
-            
+        const contextHtml = `<button id="btn-toggle-all-delegate" class="btn-secondary btn-small ${toggleBtnClass}">一括</button>`;
+
+        let items = [];
+        myCastles.forEach(c => {
+            const statusClass = c.isDelegated ? 'text-blue' : 'text-red';
+            const statusText = c.isDelegated ? '委任' : '直轄';
+            const attackText = c.allowAttack ? '許可' : '不可';
+            const attackClass = c.allowAttack ? 'text-blue' : 'text-gray';
+            const moveText = c.allowMove ? '許可' : '不可';
+            const moveClass = c.allowMove ? 'text-blue' : 'text-gray';
+            const attackDisplay = c.isDelegated ? `<span class="${attackClass}">${attackText}</span>` : `<span class="text-gray">-</span>`;
+            const moveDisplay = c.isDelegated ? `<span class="${moveClass}">${moveText}</span>` : `<span class="text-gray">-</span>`;
+
+            items.push({
+                onClick: `window.GameApp.ui.info.showDelegateSettingModal(${c.id})`,
+                cells: [
+                    `<span class="col-castle-name" style="font-weight:bold; justify-content:flex-start; padding-left:5px;">${c.name}</span>`,
+                    attackDisplay,
+                    moveDisplay,
+                    `<span class="${statusClass}" style="font-weight:bold;">${statusText}</span>`
+                ]
+            });
+        });
+
+        this._renderListModal({
+            title: "委任設定",
+            contextHtml: contextHtml,
+            headers: ["拠点名", "城攻", "武将移動", "状態"],
+            headerClass: "delegate-list-header",
+            itemClass: "delegate-list-item",
+            listClass: "delegate-list-container",
+            items: items,
+            emptyHtml: '<div style="padding: 10px; text-align: center;">委任できる城がありません。</div>',
+            scrollPos: scrollPos
+        });
+
+        setTimeout(() => {
             const toggleAllBtn = document.getElementById('btn-toggle-all-delegate');
             if (toggleAllBtn) {
                 toggleAllBtn.onclick = () => {
                     if (window.AudioManager) window.AudioManager.playSE('choice.ogg');
                     const newState = !isAllDelegated;
                     myCastles.forEach(c => c.isDelegated = newState);
-                    this._renderDelegateList(listContainer.scrollTop);
+                    const listContainer = document.getElementById('selector-list');
+                    this._renderDelegateList(listContainer ? listContainer.scrollTop : 0);
                 };
             }
-        }
-
-        let listHtml = '<div class="list-header delegate-list-header"><span>拠点名</span><span>城攻</span><span>武将移動</span><span>状態</span></div>';
-
-        if (myCastles.length === 0) {
-            listHtml += '<div style="padding: 10px; text-align: center;">委任できる城がありません。</div>';
-        } else {
-            myCastles.forEach(c => {
-                const statusClass = c.isDelegated ? 'text-blue' : 'text-red';
-                const statusText = c.isDelegated ? '委任' : '直轄';
-                const attackText = c.allowAttack ? '許可' : '不可';
-                const attackClass = c.allowAttack ? 'text-blue' : 'text-gray';
-                const moveText = c.allowMove ? '許可' : '不可';
-                const moveClass = c.allowMove ? 'text-blue' : 'text-gray';
-                const attackDisplay = c.isDelegated ? `<span class="${attackClass}">${attackText}</span>` : `<span class="text-gray">-</span>`;
-                const moveDisplay = c.isDelegated ? `<span class="${moveClass}">${moveText}</span>` : `<span class="text-gray">-</span>`;
-
-                listHtml += `<div class="select-item delegate-list-item" style="cursor:pointer;" onclick="if(window.AudioManager) window.AudioManager.playSE('choice.ogg'); window.GameApp.ui.info.showDelegateSettingModal(${c.id})"><span class="col-castle-name" style="font-weight:bold; justify-content:flex-start; padding-left:5px;">${c.name}</span>${attackDisplay}${moveDisplay}<span class="${statusClass}" style="font-weight:bold;">${statusText}</span></div>`;
-            });
-            const itemCount = myCastles.length;
-            for (let i = itemCount; i < 8; i++) {
-                listHtml += `<div class="select-item delegate-list-item" style="cursor:default; pointer-events:none;"><span></span><span></span><span></span><span></span></div>`;
-            }
-        }
-
-        if (listContainer) {
-            listContainer.className = 'list-container delegate-list-container hide-native-scroll';
-            listContainer.style.display = 'block';
-            listContainer.innerHTML = listHtml;
-            if (window.CustomScrollbar) {
-                if (!this.ui.bushoScrollbar) this.ui.bushoScrollbar = new CustomScrollbar(listContainer);
-                setTimeout(() => {
-                    listContainer.scrollTop = scrollPos;
-                    this.ui.bushoScrollbar.update();
-                }, 10);
-            } else {
-                listContainer.scrollTop = scrollPos;
-            }
-        }
+        }, 10);
     }
 
     showDelegateSettingModal(castleId) {
