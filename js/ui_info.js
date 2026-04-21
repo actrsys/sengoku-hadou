@@ -157,23 +157,26 @@ class UIInfoManager {
         clanDataList.forEach(d => {
             let friendScore = 50;
             let friendStatus = "";
-            let statusColor = "";
+            let statusClass = "text-gray";
             if (d.id !== this.game.playerClanId) {
                 const relation = this.game.getRelation(this.game.playerClanId, d.id);
                 if (relation) {
                     friendScore = relation.sentiment;
                     friendStatus = relation.displayStatus || relation.status; 
-                    if (friendStatus === '敵対') statusColor = 'color:#d32f2f;';
-                    else if (friendStatus === '友好') statusColor = 'color:#388e3c;';
-                    else if (['同盟', '支配', '従属', '婚姻'].includes(friendStatus)) statusColor = 'color:#1976d2;';
+                    if (friendStatus === '敵対') statusClass = 'text-red';
+                    else if (friendStatus === '友好') statusClass = 'text-cyan';
+                    else if (['同盟', '支配', '従属', '婚姻'].includes(friendStatus)) statusClass = 'text-blue';
                 }
+            } else {
+                friendStatus = "自勢力";
+                statusClass = "text-orange";
             }
 
             const powerPercent = Math.min(100, (d.power / maxPower) * 100);
             const powerBarHtml = `<div class="bar-bg bar-bg-power"><div class="bar-fill bar-fill-power" style="width:${powerPercent}%;"></div></div>`;
             const friendBarHtml = d.id === this.game.playerClanId ? "" : `<div class="bar-bg bar-bg-friend"><div class="bar-fill bar-fill-friend" style="width:${Math.min(100, Math.max(0, friendScore))}%;"></div></div>`;
 
-            listHtml += `<div class="select-item daimyo-list-item" style="cursor:pointer;" onclick="if(window.AudioManager) window.AudioManager.playSE('choice.ogg'); window.GameApp.ui.info.showDaimyoDetail(${d.id})"><span class="col-daimyo-name" style="font-weight:bold;">${d.name}</span><span class="col-leader-name">${d.leaderName}</span><span>${d.castlesCount}</span><span>${powerBarHtml}</span><span>${friendBarHtml}</span><span style="${statusColor}">${friendStatus}</span></div>`;
+            listHtml += `<div class="select-item daimyo-list-item" style="cursor:pointer;" onclick="if(window.AudioManager) window.AudioManager.playSE('choice.ogg'); window.GameApp.ui.info.showDaimyoDetail(${d.id})"><span class="col-daimyo-name" style="font-weight:bold;">${d.name}</span><span class="col-leader-name">${d.leaderName}</span><span>${d.castlesCount}</span><span>${powerBarHtml}</span><span>${friendBarHtml}</span><span class="${statusClass}">${friendStatus}</span></div>`;
         });
 
         const itemCount = clanDataList.length;
@@ -379,15 +382,15 @@ class UIInfoManager {
         relations.sort((a,b) => b.sentiment - a.sentiment);
 
         relations.forEach(r => {
-            let statusColor = "";
-            if (r.status === '敵対') statusColor = 'color:#d32f2f;';
-            else if (r.status === '友好') statusColor = 'color:#388e3c;';
-            else if (['同盟', '支配', '従属', '婚姻'].includes(r.status)) statusColor = 'color:#1976d2;';
+            let statusClass = "text-gray";
+            if (r.status === '敵対') statusClass = 'text-red';
+            else if (r.status === '友好') statusClass = 'text-cyan';
+            else if (['同盟', '支配', '従属', '婚姻'].includes(r.status)) statusClass = 'text-blue';
 
             const friendPercent = Math.min(100, Math.max(0, r.sentiment));
             const friendBarHtml = `<div class="bar-bg bar-bg-friend"><div class="bar-fill bar-fill-friend" style="width:${friendPercent}%;"></div></div>`;
 
-            listHtml += `<div class="select-item daimyo-list-item" style="grid-template-columns: 2fr 1.5fr 1fr 3fr; cursor:default;"><span class="col-daimyo-name" style="font-weight:bold;">${r.name}</span><span>${friendBarHtml}</span><span style="${statusColor}">${r.status}</span><span></span></div>`;
+            listHtml += `<div class="select-item daimyo-list-item" style="grid-template-columns: 2fr 1.5fr 1fr 3fr; cursor:default;"><span class="col-daimyo-name" style="font-weight:bold;">${r.name}</span><span>${friendBarHtml}</span><span class="${statusClass}">${r.status}</span><span></span></div>`;
         });
 
         const itemCount = relations.length;
@@ -3409,9 +3412,9 @@ class UIInfoManager {
             const friendBarHtml = `<div class="bar-bg bar-bg-friend"><div class="bar-fill bar-fill-friend" style="width:${relPercent}%;"></div></div>`;
             
             let relStatus = "普通";
-            let relColor = "";
-            if (relVal >= 70) { relStatus = "友好"; relColor = "color:#388e3c;"; }
-            else if (relVal < 40) { relStatus = "敵対"; relColor = "color:#d32f2f;"; }
+            let relClass = "text-gray";
+            if (relVal >= 70) { relStatus = "友好"; relClass = "text-cyan"; }
+            else if (relVal < 40) { relStatus = "敵対"; relClass = "text-red"; }
 
             // ★モードによって、クリックした時の処理を切り替えます
             let onClickStr = "";
@@ -3429,7 +3432,7 @@ class UIInfoManager {
                     <span>${provinceName}</span>
                     <span>${kunishu.soldiers}</span>
                     <span>${friendBarHtml}</span>
-                    <span style="${relColor} font-weight:bold;">${relStatus}</span>
+                    <span class="${relClass}" style="font-weight:bold;">${relStatus}</span>
                 </div>
             `;
         });
