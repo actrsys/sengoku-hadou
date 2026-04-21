@@ -394,7 +394,7 @@ class UIInfoManager {
                 });
             } else {
                 tabsEl.classList.add('hidden');
-                this.diploCurrentTab = 'daimyo'; // 諸勢力からの場合は強制的に大名家リスト扱いにします
+                this.diploCurrentTab = 'daimyo'; // 諸勢力からの場合は強制的に大名リスト扱いにします
             }
         }
 
@@ -3342,8 +3342,8 @@ class UIInfoManager {
                         </div>
                         <div class="daimyo-detail-right">
                             <div class="daimyo-detail-row daimyo-detail-2col">
-                                <div class="daimyo-detail-stat-box"><span class="daimyo-detail-label">武将</span><span class="daimyo-detail-value">${bushosCount}</span></div>
                                 <div class="daimyo-detail-stat-box"><span class="daimyo-detail-label">頭領</span><span class="daimyo-detail-value">${leaderName}</span></div>
+                                <div class="daimyo-detail-stat-box"><span class="daimyo-detail-label">武将</span><span class="daimyo-detail-value">${bushosCount}</span></div>
                             </div>
                             <div class="daimyo-detail-row daimyo-detail-2col">
                                 <div class="daimyo-detail-stat-box"><span class="daimyo-detail-label">所在</span><span class="daimyo-detail-value">${baseCastleName}</span></div>
