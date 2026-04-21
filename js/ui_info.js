@@ -157,14 +157,14 @@ class UIInfoManager {
         clanDataList.forEach(d => {
             let friendScore = 50;
             let friendStatus = "";
-            let statusClass = "text-gray";
+            let statusClass = "text-white";
             if (d.id !== this.game.playerClanId) {
                 const relation = this.game.getRelation(this.game.playerClanId, d.id);
                 if (relation) {
                     friendScore = relation.sentiment;
                     friendStatus = relation.displayStatus || relation.status; 
                     if (friendStatus === '敵対') statusClass = 'text-red';
-                    else if (friendStatus === '友好') statusClass = 'text-cyan';
+                    else if (friendStatus === '友好') statusClass = 'text-green';
                     else if (['同盟', '支配', '従属', '婚姻'].includes(friendStatus)) statusClass = 'text-blue';
                 }
             } else {
@@ -382,9 +382,9 @@ class UIInfoManager {
         relations.sort((a,b) => b.sentiment - a.sentiment);
 
         relations.forEach(r => {
-            let statusClass = "text-gray";
+            let statusClass = "text-white";
             if (r.status === '敵対') statusClass = 'text-red';
-            else if (r.status === '友好') statusClass = 'text-cyan';
+            else if (r.status === '友好') statusClass = 'text-green';
             else if (['同盟', '支配', '従属', '婚姻'].includes(r.status)) statusClass = 'text-blue';
 
             const friendPercent = Math.min(100, Math.max(0, r.sentiment));
@@ -3412,8 +3412,8 @@ class UIInfoManager {
             const friendBarHtml = `<div class="bar-bg bar-bg-friend"><div class="bar-fill bar-fill-friend" style="width:${relPercent}%;"></div></div>`;
             
             let relStatus = "普通";
-            let relClass = "text-gray";
-            if (relVal >= 70) { relStatus = "友好"; relClass = "text-cyan"; }
+            let relClass = "text-white";
+            if (relVal >= 70) { relStatus = "友好"; relClass = "text-green"; }
             else if (relVal < 40) { relStatus = "敵対"; relClass = "text-red"; }
 
             // ★モードによって、クリックした時の処理を切り替えます
