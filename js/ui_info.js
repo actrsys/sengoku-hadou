@@ -893,6 +893,117 @@ class UIInfoManager {
     }
 
     // ==========================================
+    // ★リスト画面の共通生成工場（ステップ１）
+    // ==========================================
+    _renderListModal(config) {
+        const modal = document.getElementById('selector-modal');
+        const titleEl = document.getElementById('selector-title');
+        const listContainer = document.getElementById('selector-list');
+        const contextEl = document.getElementById('selector-context-info');
+        const tabsEl = document.getElementById('selector-tabs');
+        const confirmBtn = document.getElementById('selector-confirm-btn');
+        const backBtn = document.querySelector('#selector-modal .btn-secondary');
+
+        if (!modal) return;
+        modal.classList.remove('hidden');
+
+        if (titleEl) titleEl.textContent = config.title || "";
+
+        if (contextEl) {
+            if (config.contextHtml) {
+                contextEl.classList.remove('hidden');
+                contextEl.innerHTML = config.contextHtml;
+            } else {
+                contextEl.classList.add('hidden');
+            }
+        }
+
+        if (tabsEl) {
+            if (config.tabsHtml) {
+                tabsEl.classList.remove('hidden');
+                tabsEl.innerHTML = config.tabsHtml;
+            } else {
+                tabsEl.classList.add('hidden');
+            }
+        }
+
+        if (backBtn) {
+            if (config.hideBackBtn) {
+                backBtn.style.display = 'none';
+            } else {
+                backBtn.style.display = '';
+                backBtn.textContent = (this.modalHistory && this.modalHistory.length > 0) ? '戻る' : '閉じる';
+                backBtn.onclick = () => {
+                    if (window.AudioManager) window.AudioManager.playSE('cancel.ogg');
+                    if (config.onBack) config.onBack();
+                    this.popModal();
+                };
+                const footer = backBtn.parentElement;
+                if (footer) footer.style.justifyContent = 'center';
+            }
+        }
+
+        if (confirmBtn) {
+            if (config.onConfirm) {
+                confirmBtn.classList.remove('hidden');
+                confirmBtn.disabled = true;
+                confirmBtn.style.opacity = '0.5';
+                confirmBtn.style.cursor = 'not-allowed';
+                confirmBtn.onclick = config.onConfirm;
+            } else {
+                confirmBtn.classList.add('hidden');
+            }
+        }
+
+        let listHtml = '';
+        if (config.headers && config.headers.length > 0) {
+            const headerCols = config.headers.map(h => {
+                if (h.trim().startsWith('<')) return h;
+                return `<span>${h}</span>`;
+            }).join('');
+            listHtml += `<div class="list-header ${config.headerClass || ''}">${headerCols}</div>`;
+        }
+
+        if (config.items && config.items.length > 0) {
+            config.items.forEach(item => {
+                const cursorStr = item.onClick ? "style='cursor:pointer;'" : "style='cursor:default;'";
+                const clickStr = item.onClick ? `onclick="${item.onClick}"` : "";
+                
+                const cells = item.cells.map(c => {
+                    if (c.trim().startsWith('<')) return c;
+                    return `<span>${c}</span>`;
+                }).join('');
+                
+                listHtml += `<div class="select-item ${config.itemClass || ''}" ${cursorStr} ${clickStr}>${cells}</div>`;
+            });
+            
+            const itemCount = config.items.length;
+            for (let i = itemCount; i < 8; i++) {
+                const emptyCells = config.headers ? config.headers.map(() => `<span></span>`).join('') : '';
+                listHtml += `<div class="select-item ${config.itemClass || ''}" style="cursor:default; pointer-events:none;">${emptyCells}</div>`;
+            }
+        } else {
+            listHtml = config.emptyHtml || '<div style="padding: 10px; text-align: center;">データがありません。</div>';
+        }
+
+        if (listContainer) {
+            listContainer.className = `list-container ${config.listClass || ''} hide-native-scroll`;
+            listContainer.style.display = 'block';
+            listContainer.innerHTML = listHtml;
+
+            if (window.CustomScrollbar) {
+                if (!this.ui.bushoScrollbar) this.ui.bushoScrollbar = new CustomScrollbar(listContainer);
+                setTimeout(() => {
+                    listContainer.scrollTop = config.scrollPos || 0;
+                    this.ui.bushoScrollbar.update();
+                }, 10);
+            } else {
+                listContainer.scrollTop = config.scrollPos || 0;
+            }
+        }
+    }
+
+    // ==========================================
     // ★姫一覧＆姫選択の魔法（共通モーダル対応版）
     // ==========================================
 
@@ -906,34 +1017,6 @@ class UIInfoManager {
     }
     
     _renderPrincessList(isSelectMode, targetCastleId, doerId, scrollPos = 0) {
-        const modal = document.getElementById('selector-modal');
-        const titleEl = document.getElementById('selector-title');
-        const listContainer = document.getElementById('selector-list');
-        const contextEl = document.getElementById('selector-context-info');
-        const tabsEl = document.getElementById('selector-tabs');
-        const confirmBtn = document.getElementById('selector-confirm-btn');
-        const backBtn = document.querySelector('#selector-modal .btn-secondary');
-
-        if (!modal) return;
-        modal.classList.remove('hidden');
-        if (titleEl) titleEl.textContent = isSelectMode ? "嫁がせる姫を選択してください" : "姫一覧";
-        if (contextEl) contextEl.classList.add('hidden');
-
-        if(backBtn) {
-            backBtn.style.display = '';
-            backBtn.textContent = this.modalHistory && this.modalHistory.length > 0 ? '戻る' : '閉じる';
-            backBtn.onclick = () => {
-                if (window.AudioManager) window.AudioManager.playSE('cancel.ogg');
-                if (isSelectMode) {
-                    this.openBushoSelector('diplomacy_doer', targetCastleId, { subAction: 'marriage' });
-                } else {
-                    this.popModal();
-                }
-            };
-            const footer = backBtn.parentElement;
-            if (footer) footer.style.justifyContent = 'center';
-        }
-
         const myClanId = this.game.playerClanId;
         const myClan = this.game.clans.find(c => c.id === myClanId);
         
@@ -946,63 +1029,37 @@ class UIInfoManager {
 
         if (isSelectMode) {
             princesses = princesses.filter(p => p.status === 'unmarried');
+            this.selectedPrincessId = null; 
         }
-        
-        let listHtml = '<div class="list-header princess-list-header"><span>名前</span><span>年齢</span><span>父親</span><span>配偶者</span><span></span></div>';
 
-        princesses.forEach(p => {
+        const items = princesses.map(p => {
             const age = this.game.year - p.birthYear;
             const father = this.game.getBusho(p.fatherId);
-            const fatherName = father ? father.name : "不明";
             const husband = this.game.getBusho(p.husbandId);
-            const husbandName = husband ? husband.name : "なし";
 
-            let onClickStr = "";
-            let cursorStr = "style='cursor:default;'";
-
-            if (isSelectMode) {
-                cursorStr = "style='cursor:pointer;'";
-                onClickStr = `onclick="window.GameApp.ui.info.selectPrincess(${p.id}, this)"`;
-            }
-
-            listHtml += `<div class="select-item princess-list-item" ${cursorStr} ${onClickStr}><strong class="col-princess-name">${p.name}</strong><span>${age}歳</span><span>${fatherName}</span><span>${husbandName}</span><span></span></div>`;
+            return {
+                onClick: isSelectMode ? `window.GameApp.ui.info.selectPrincess(${p.id}, this)` : null,
+                cells: [
+                    `<strong class="col-princess-name">${p.name}</strong>`,
+                    `${age}歳`,
+                    father ? father.name : "不明",
+                    husband ? husband.name : "なし",
+                    "" 
+                ]
+            };
         });
-        
-        let itemCount = princesses.length;
-        for (let i = itemCount; i < 8; i++) {
-            listHtml += `<div class="select-item princess-list-item" style="cursor:default; pointer-events:none;"><span></span><span></span><span></span><span></span><span></span></div>`;
-        }
 
-        if (listContainer) {
-            listContainer.className = 'list-container princess-list-container hide-native-scroll';
-            listContainer.style.display = 'block';
-            listContainer.innerHTML = listHtml;
-            
-            if (window.CustomScrollbar) {
-                if (!this.ui.bushoScrollbar) this.ui.bushoScrollbar = new CustomScrollbar(listContainer);
-                setTimeout(() => {
-                    listContainer.scrollTop = scrollPos;
-                    this.ui.bushoScrollbar.update();
-                }, 10);
-            } else {
-                listContainer.scrollTop = scrollPos;
-            }
-        }
-
-        if (confirmBtn) {
-            if (isSelectMode) {
-                confirmBtn.classList.remove('hidden');
-                this.selectedPrincessId = null;
-                confirmBtn.disabled = true;
-                confirmBtn.style.opacity = '0.5';
-                confirmBtn.style.cursor = 'not-allowed';
-                confirmBtn.onclick = () => {
-                    this.confirmPrincessSelection(targetCastleId, doerId);
-                };
-            } else {
-                confirmBtn.classList.add('hidden');
-            }
-        }
+        this._renderListModal({
+            title: isSelectMode ? "嫁がせる姫を選択してください" : "姫一覧",
+            headers: ["名前", "年齢", "父親", "配偶者", ""],
+            headerClass: "princess-list-header",
+            itemClass: "princess-list-item",
+            listClass: "princess-list-container",
+            items: items,
+            scrollPos: scrollPos,
+            onBack: isSelectMode ? () => this.openBushoSelector('diplomacy_doer', targetCastleId, { subAction: 'marriage' }) : null,
+            onConfirm: isSelectMode ? () => this.confirmPrincessSelection(targetCastleId, doerId) : null
+        });
     }
 
     selectPrincess(princessId, element) {
@@ -1012,7 +1069,6 @@ class UIInfoManager {
         items.forEach(item => item.classList.remove('selected'));
 
         element.classList.add('selected');
-
         this.selectedPrincessId = princessId;
 
         const confirmBtn = document.getElementById('selector-confirm-btn');
@@ -1033,7 +1089,6 @@ class UIInfoManager {
         window.GameApp.commandSystem.handleBushoSelection('marriage_princess', [this.selectedPrincessId], targetCastleId, { doerId: doerId });
         this.selectedPrincessId = null; 
     }
-    
     
     // ==========================================
     // ★城主委任リストの魔法（共通モーダル対応版）
@@ -1805,7 +1860,7 @@ class UIInfoManager {
                 document.getElementById('selector-title').textContent = isMulti ? "武将を選択（複数可）" : "武将を選択"; 
             }
         }
-
+        
         let isEnemyTarget = false;
         let targetCastle = null;
         if (['rumor_target_busho','headhunt_target','view_only'].includes(actionType)) {
@@ -1815,7 +1870,29 @@ class UIInfoManager {
         const gunshi = this.game.getClanGunshi(this.game.playerClanId);
         const myDaimyo = this.game.bushos.find(b => b.clan === this.game.playerClanId && b.isDaimyo);
         
-        const updateContextCost = () => { 
+        // ★ここから追加：コマンドを開いた時に、大名などを特別扱いせず、純粋に有効なステータス順にする魔法です！
+        if (!isViewMode && !this.bushoCurrentSortKey) {
+            if (spec && spec.stat) {
+                this.bushoCurrentSortKey = spec.stat;
+            } else if (actionType) {
+                const leadershipActions = ['draft', 'train', 'war_deploy', 'def_intercept_deploy', 'def_reinf_deploy', 'atk_reinf_deploy', 'def_self_reinf_deploy', 'atk_self_reinf_deploy', 'kunishu_subjugate_deploy', 'war_general', 'kunishu_war_general', 'appoint'];
+                const politicsActions = ['develop'];
+                const diplomacyActions = ['diplomacy_doer', 'goodwill', 'tribute', 'marriage_princess', 'marriage_kinsman', 'succession'];
+                const intelligenceActions = ['rumor', 'headhunt', 'destroy', 'revolt', 'rumor_target_busho', 'headhunt_target', 'appoint_gunshi'];
+                const charmActions = ['charity', 'employ', 'employ_target'];
+                
+                if (leadershipActions.includes(actionType)) this.bushoCurrentSortKey = 'leadership';
+                else if (politicsActions.includes(actionType)) this.bushoCurrentSortKey = 'politics';
+                else if (diplomacyActions.includes(actionType)) this.bushoCurrentSortKey = 'diplomacy';
+                else if (intelligenceActions.includes(actionType)) this.bushoCurrentSortKey = 'intelligence';
+                else if (charmActions.includes(actionType)) this.bushoCurrentSortKey = 'charm';
+                else this.bushoCurrentSortKey = 'leadership'; // どれにも当てはまらない時はとりあえず統率にしておきます
+            }
+            if (this.bushoCurrentSortKey) this.bushoIsSortAsc = false;
+        }
+        // ★追加ここまで
+
+        const updateContextCost = () => {
             if (!isMulti || !contextEl) return; 
             const checkedCount = document.querySelectorAll('input[name="sel_busho"]:checked').length; 
             let cost = 0, item = ""; 
