@@ -218,7 +218,7 @@ const COMMAND_SPECS = {
         sortKey: 'intelligence' 
     },
     'rumor': { 
-        label: "離反工作", category: 'FOREIGN_STRATEGY', 
+        label: "離間計", category: 'FOREIGN_STRATEGY', 
         costGold: 0, costRice: 0, 
         isMulti: false, hasAdvice: true, 
         startMode: 'map_select', targetType: 'enemy_all',
@@ -235,7 +235,7 @@ const COMMAND_SPECS = {
         label: "破壊工作", category: 'FOREIGN_STRATEGY', 
         costGold: 0, costRice: 0, 
         isMulti: false, hasAdvice: true, 
-        startMode: 'map_select', targetType: 'enemy_all',
+        startMode: 'map_select',  targetType: 'enemy_all',
         sortKey: 'strength' 
     },
 
@@ -402,11 +402,11 @@ class CommandSystem {
         else if (actionType === 'rumor_target_busho') { 
             const targetCastle = this.game.getCastle(targetId);
             bushos = this.game.getCastleBushos(targetId).filter(b => b.clan === targetCastle.ownerClan && b.status === 'active' && !b.isDaimyo); 
-            infoHtml = "<div>離反工作の対象とする武将を選択してください</div>"; 
+            infoHtml = "<div>離間計の対象とする武将を選択してください</div>"; 
         }
         else if (actionType === 'rumor_doer') { 
             bushos = this.game.getCastleBushos(c.id).filter(b => b.clan === c.ownerClan && b.status === 'active'); 
-            infoHtml = "<div>離反工作を実行する担当官を選択してください</div>"; 
+            infoHtml = "<div>離間計を実行する担当官を選択してください</div>"; 
         }
         else if (actionType === 'incite_doer') { 
             bushos = this.game.getCastleBushos(c.id).filter(b => b.clan === c.ownerClan && b.status === 'active'); 
@@ -1958,9 +1958,9 @@ class CommandSystem {
             case 'move': return "移動先を選択してください";
             case 'transport': return "輸送先を選択してください";
             case 'investigate': return "調査対象の城を選択してください";
-            case 'incite': return "民心撹乱対象の城を選択してください";
-            case 'sabotage': return "破壊工作対象の城を選択してください";
-            case 'rumor': return "離反工作対象の城を選択してください";
+            case 'incite': return "民心撹乱を行う城を選択してください";
+            case 'sabotage': return "破壊工作を行う城を選択してください";
+            case 'rumor': return "離間計対象の居城を選択してください";
             case 'headhunt': case 'headhunt_select_castle': return "引抜対象の居城を選択してください";
             case 'goodwill': return "親善を行う相手を選択してください";
             case 'alliance': return "同盟を行う相手を選択してください";
