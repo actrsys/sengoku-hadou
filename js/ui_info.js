@@ -950,6 +950,10 @@ class UIInfoManager {
     }
 
     _renderListModal(config) {
+        // ★安全装置：タブ切り替えが連打された時、古い描画処理をストップさせるためのID
+        this._currentListRenderId = (this._currentListRenderId || 0) + 1;
+        const renderId = this._currentListRenderId;
+
         const modal = document.getElementById('selector-modal');
         const titleEl = document.getElementById('selector-title');
         const listContainer = document.getElementById('selector-list');
@@ -961,9 +965,10 @@ class UIInfoManager {
         if (!modal) return;
         modal.classList.remove('hidden');
 
-        // ★究極のレイアウト崩れ防止：中身をいじる前に透明マントを被せる
+        // ★レイアウト崩れ防止：一瞬隠して、即座に中身を空っぽにする
         if (listContainer) {
             listContainer.style.visibility = 'hidden';
+            listContainer.innerHTML = '';
         }
 
         if (titleEl) titleEl.textContent = config.title || "";
@@ -995,6 +1000,7 @@ class UIInfoManager {
                 backBtn.onclick = () => {
                     if (window.AudioManager) window.AudioManager.playSE('cancel.ogg');
                     if (config.onBack) config.onBack();
+                    this._currentListRenderId++; // 戻る時もバックグラウンド描画をキャンセル
                     this.popModal();
                 };
                 const footer = backBtn.parentElement;
@@ -1008,92 +1014,106 @@ class UIInfoManager {
                 confirmBtn.disabled = true;
                 confirmBtn.style.opacity = '0.5';
                 confirmBtn.style.cursor = 'not-allowed';
-                confirmBtn.onclick = config.onConfirm;
+                confirmBtn.onclick = () => {
+                    this._currentListRenderId++; // 決定時もバックグラウンド描画をキャンセル
+                    config.onConfirm();
+                };
             } else {
                 confirmBtn.classList.add('hidden');
             }
         }
 
-        // ★超高速化：配列にHTMLの文字列を貯めて、最後に一度だけくっつける
+        if (!listContainer) return;
+        listContainer.className = `list-container ${config.listClass || ''} hide-native-scroll`;
+
+        // データが0件の場合の処理
+        if (!config.items || config.items.length === 0) {
+            let emptyHtml = '';
+            if (config.headers && config.headers.length > 0) {
+                const headerCols = config.headers.map(h => h.trim().startsWith('<') ? h : `<span>${h}</span>`).join('');
+                emptyHtml += `<div class="list-header ${config.headerClass || ''}">${headerCols}</div>`;
+            }
+            emptyHtml += config.emptyHtml || '<div style="padding: 10px; text-align: center;">データがありません。</div>';
+            listContainer.innerHTML = emptyHtml;
+            listContainer.style.visibility = 'visible';
+            return;
+        }
+
+        // 1アイテム分のHTMLを文字列で作る魔法
+        const buildItemHtml = (item) => {
+            const cursorStr = item.onClick ? "style='cursor:pointer;'" : "style='cursor:default;'";
+            const extraClass = item.itemClass || '';
+            const clickStr = item.onClick ? `onclick="${item.onClick}"` : "";
+            const cells = item.cells.map(c => {
+                const strC = String(c);
+                return strC.trim().startsWith('<') ? strC : `<span>${strC}</span>`;
+            }).join('');
+            return `<div class="select-item ${config.itemClass || ''} ${extraClass}" ${cursorStr} ${clickStr}>${cells}</div>`;
+        };
+
+        const totalItems = config.items.length;
+        const INITIAL_RENDER_COUNT = 25; // ★画面が埋まる最初の25件だけ先に作る
+        const CHUNK_SIZE = 50; // ★以降は裏で50件ずつ追加する
         const htmlParts = [];
 
         if (config.headers && config.headers.length > 0) {
-            const headerCols = config.headers.map(h => {
-                if (h.trim().startsWith('<')) return h;
-                return `<span>${h}</span>`;
-            }).join('');
+            const headerCols = config.headers.map(h => h.trim().startsWith('<') ? h : `<span>${h}</span>`).join('');
             htmlParts.push(`<div class="list-header ${config.headerClass || ''}">${headerCols}</div>`);
         }
 
-        if (config.items && config.items.length > 0) {
-            config.items.forEach(item => {
-                const cursorStr = item.onClick ? "style='cursor:pointer;'" : "style='cursor:default;'";
-                const extraClass = item.itemClass || '';
-                
-                // onClickが関数の場合は後でイベントリスナーを付けるための目印(data-index)を付与
-                let clickStr = "";
-                let indexAttr = "";
-                if (item.onClick) {
-                    if (typeof item.onClick === 'function') {
-                        indexAttr = `data-action-index="${htmlParts.length}"`; // 配列のインデックスをID代わりに使う
-                    } else {
-                        clickStr = `onclick="${item.onClick}"`;
-                    }
-                }
-
-                const cells = item.cells.map(c => {
-                    const strC = String(c);
-                    if (strC.trim().startsWith('<')) return strC;
-                    return `<span>${strC}</span>`;
-                }).join('');
-
-                htmlParts.push(`<div class="select-item ${config.itemClass || ''} ${extraClass}" ${cursorStr} ${clickStr} ${indexAttr}>${cells}</div>`);
-            });
-            
-            const itemCount = config.items.length;
-            for (let i = itemCount; i < 8; i++) {
-                const emptyCells = config.headers ? config.headers.map(() => `<span></span>`).join('') : '';
-                htmlParts.push(`<div class="select-item ${config.itemClass || ''}" style="cursor:default; pointer-events:none;">${emptyCells}</div>`);
-            }
-        } else {
-            htmlParts.push(config.emptyHtml || '<div style="padding: 10px; text-align: center;">データがありません。</div>');
+        // 最初の25件だけ組み立てる
+        const initialLimit = Math.min(totalItems, INITIAL_RENDER_COUNT);
+        for (let i = 0; i < initialLimit; i++) {
+            htmlParts.push(buildItemHtml(config.items[i]));
         }
 
-        if (listContainer) {
-            listContainer.className = `list-container ${config.listClass || ''} hide-native-scroll`;
-            
-            // ★高速化：配列の文字列を一度にDOMに流し込む（これが一番速い！）
-            listContainer.innerHTML = htmlParts.join('');
+        // 行数が少なすぎる時は空枠で埋める
+        for (let i = totalItems; i < 8; i++) {
+            const emptyCells = config.headers ? config.headers.map(() => `<span></span>`).join('') : '';
+            htmlParts.push(`<div class="select-item ${config.itemClass || ''}" style="cursor:default; pointer-events:none;">${emptyCells}</div>`);
+        }
 
-            // onClickが関数で渡された要素に、イベントリスナーを取り付ける
-            if (config.items) {
-                const actionElements = listContainer.querySelectorAll('[data-action-index]');
-                actionElements.forEach(el => {
-                    const index = parseInt(el.getAttribute('data-action-index'));
-                    // headersがある場合はインデックスが1ズレるため補正
-                    const itemIndex = config.headers && config.headers.length > 0 ? index - 1 : index; 
-                    if (config.items[itemIndex] && typeof config.items[itemIndex].onClick === 'function') {
-                        el.addEventListener('click', config.items[itemIndex].onClick);
-                    }
-                });
-            }
+        // ★最初の25件を即座に流し込む（これだけなので一瞬で終わる）
+        listContainer.innerHTML = htmlParts.join('');
+        
+        if (window.CustomScrollbar) {
+            if (!this.ui.bushoScrollbar) this.ui.bushoScrollbar = new CustomScrollbar(listContainer);
+        }
+        
+        // ★レイアウトが整ったので、一瞬で表示させる
+        listContainer.scrollTop = config.scrollPos || 0;
+        if (this.ui.bushoScrollbar) this.ui.bushoScrollbar.update();
+        listContainer.style.visibility = 'visible';
 
-            // スクロールバーの初期化
-            if (window.CustomScrollbar) {
-                if (!this.ui.bushoScrollbar) this.ui.bushoScrollbar = new CustomScrollbar(listContainer);
-            }
+        // ★ここからが「チャンク分割」の魔法！裏で残りを少しずつ追加する
+        if (totalItems > initialLimit) {
+            let currentIndex = initialLimit;
 
-            // ★ブラウザがHTMLの計算を終わらせるのを少しだけ待ってから、透明マントを外す
-            requestAnimationFrame(() => {
-                requestAnimationFrame(() => {
-                    listContainer.scrollTop = config.scrollPos || 0;
-                    if (this.ui.bushoScrollbar) {
-                        this.ui.bushoScrollbar.update();
-                    }
-                    // 透明マントを解除！
-                    listContainer.style.visibility = 'visible';
-                });
-            });
+            const renderNextChunk = () => {
+                // タブ切り替え等で別のリストを描き始めていたら、この裏作業は即中止する！
+                if (this._currentListRenderId !== renderId) return;
+
+                const chunkParts = [];
+                const endLimit = Math.min(currentIndex + CHUNK_SIZE, totalItems);
+                
+                for (let i = currentIndex; i < endLimit; i++) {
+                    chunkParts.push(buildItemHtml(config.items[i]));
+                }
+                
+                // 作った塊をリストの最後（beforeend）に静かに追加する
+                listContainer.insertAdjacentHTML('beforeend', chunkParts.join(''));
+                currentIndex = endLimit;
+
+                if (this.ui.bushoScrollbar) this.ui.bushoScrollbar.update();
+
+                if (currentIndex < totalItems) {
+                    // まだ残っていれば、ブラウザの次の休憩時間（フレーム）で続きを描画
+                    requestAnimationFrame(renderNextChunk);
+                }
+            };
+
+            // 裏作業スタート
+            requestAnimationFrame(renderNextChunk);
         }
     }
 
