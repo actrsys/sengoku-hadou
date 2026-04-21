@@ -106,6 +106,11 @@ class UIInfoManager {
         else if (info.pageType === 'force_selector') this._renderForceSelector(...info.args, info.scrollPos);
     }
     
+    showDaimyoList() {
+        this.closeCommonModal(); 
+        this.pushModal('daimyo_list', []);
+    }
+
     _renderDaimyoList(scrollPos = 0) {
         const activeClans = this.game.clans.filter(c => c.id !== 0 && this.game.castles.some(cs => cs.ownerClan === c.id));
         this.game.updateAllClanPrestige();
@@ -305,6 +310,10 @@ class UIInfoManager {
             // ★情報画面ではスクロールバーは不要なので、位置を戻すだけにします
             listContainer.scrollTop = scrollPos;
         }
+    }
+
+    showDiplomacyList(id, name, type = 'daimyo', onClose = null) {
+        this.pushModal('diplo_list', [id, name, type, onClose]);
     }
 
     _renderDiplomacyList(id, name, type, onClose, scrollPos = 0) {
@@ -909,8 +918,10 @@ class UIInfoManager {
                 const clickStr = item.onClick ? `onclick="${item.onClick}"` : "";
                 
                 const cells = item.cells.map(c => {
-                    if (c.trim().startsWith('<')) return c;
-                    return `<span>${c}</span>`;
+                    // ★万が一数値が渡ってきても文字列にしてエラーを防ぎます
+                    const strC = String(c);
+                    if (strC.trim().startsWith('<')) return strC;
+                    return `<span>${strC}</span>`;
                 }).join('');
                 
                 listHtml += `<div class="select-item ${config.itemClass || ''}" ${cursorStr} ${clickStr}>${cells}</div>`;
