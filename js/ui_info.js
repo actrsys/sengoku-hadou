@@ -165,7 +165,7 @@ class UIInfoManager {
                     friendStatus = relation.displayStatus || relation.status; 
                     if (friendStatus === '敵対') statusClass = 'text-red';
                     else if (friendStatus === '友好') statusClass = 'text-green';
-                    else if (['同盟', '支配', '従属', '婚姻'].includes(friendStatus)) statusClass = 'text-blue';
+                    else if (['同盟', '支配', '従属', '婚姻'].includes(friendStatus)) statusClass = 'text-pink';
                 }
             } else {
                 friendStatus = "自勢力";
@@ -494,7 +494,7 @@ class UIInfoManager {
             else if (seikaku === '穏健派') seikakuClass = 'text-blue';
 
             let hoshinClass = "";
-            if (hoshin === '革新的') hoshinClass = 'text-pink';
+            if (hoshin === '革新的') hoshinClass = 'text-red';
             else if (hoshin === '保守的') hoshinClass = 'text-blue';
 
             let nameClass = "";
