@@ -486,20 +486,20 @@ class UIInfoManager {
                 hoshin = leader.factionHoshin || "保守的";
             }
             
-            let seikakuColor = "";
-            if (seikaku === '武闘派') seikakuColor = 'color:#d32f2f;';
-            else if (seikaku === '穏健派') seikakuColor = 'color:#1976d2;';
+            let seikakuClass = "";
+            if (seikaku === '武闘派') seikakuClass = 'text-red';
+            else if (seikaku === '穏健派') seikakuClass = 'text-blue';
 
-            let hoshinColor = "";
-            if (hoshin === '革新的') hoshinColor = 'color:#e91e63;';
-            else if (hoshin === '保守的') hoshinColor = 'color:#1976d2;';
+            let hoshinClass = "";
+            if (hoshin === '革新的') hoshinClass = 'text-pink';
+            else if (hoshin === '保守的') hoshinClass = 'text-blue';
 
-            let nameStyle = "";
+            let nameClass = "";
             if (fId === daimyoFactionId) {
-                nameStyle = "color: darkorange;";
+                nameClass = "text-orange";
             }
 
-            listHtml += `<div class="select-item faction-list-item" style="cursor:pointer;" onclick="if(window.AudioManager) window.AudioManager.playSE('choice.ogg'); window.GameApp.ui.info.showFactionBushoList(${clan.id}, ${fId}, '${leaderName}派')"><strong class="col-faction-name" style="${nameStyle}">${leaderName}</strong><span>${count}</span><span style="${seikakuColor}">${seikaku}</span><span style="${hoshinColor}">${hoshin}</span><span></span></div>`;
+            listHtml += `<div class="select-item faction-list-item" style="cursor:pointer;" onclick="if(window.AudioManager) window.AudioManager.playSE('choice.ogg'); window.GameApp.ui.info.showFactionBushoList(${clan.id}, ${fId}, '${leaderName}派')"><strong class="col-faction-name ${nameClass}">${leaderName}</strong><span>${count}</span><span class="${seikakuClass}">${seikaku}</span><span class="${hoshinClass}">${hoshin}</span><span></span></div>`;
         });
         
         if (nonFactionCount > 0) {
@@ -1015,11 +1015,11 @@ class UIInfoManager {
         const myCastles = this.game.castles.filter(c => c.ownerClan === this.game.playerClanId && c.id !== daimyoCastleId);
 
         const isAllDelegated = myCastles.length > 0 && myCastles.every(c => c.isDelegated);
-        let toggleBtnStyle = isAllDelegated ? "color:#d32f2f; background-color:#ffebee; border-color:#d32f2f;" : "color:#1976d2; background-color:#e3f2fd; border-color:#1976d2;";
+        let toggleBtnClass = isAllDelegated ? "btn-toggle-delegated" : "btn-toggle-direct";
 
         if (contextEl) {
             contextEl.classList.remove('hidden');
-            contextEl.innerHTML = `<button id="btn-toggle-all-delegate" class="btn-secondary btn-small" style="${toggleBtnStyle}">一括</button>`;
+            contextEl.innerHTML = `<button id="btn-toggle-all-delegate" class="btn-secondary btn-small ${toggleBtnClass}">一括</button>`;
             
             const toggleAllBtn = document.getElementById('btn-toggle-all-delegate');
             if (toggleAllBtn) {
@@ -1038,16 +1038,16 @@ class UIInfoManager {
             listHtml += '<div style="padding: 10px; text-align: center;">委任できる城がありません。</div>';
         } else {
             myCastles.forEach(c => {
-                const statusColor = c.isDelegated ? 'color:#1976d2;' : 'color:#d32f2f;';
+                const statusClass = c.isDelegated ? 'text-blue' : 'text-red';
                 const statusText = c.isDelegated ? '委任' : '直轄';
                 const attackText = c.allowAttack ? '許可' : '不可';
-                const attackColor = c.allowAttack ? 'color:#1976d2;' : 'color:#555;';
+                const attackClass = c.allowAttack ? 'text-blue' : 'text-gray';
                 const moveText = c.allowMove ? '許可' : '不可';
-                const moveColor = c.allowMove ? 'color:#1976d2;' : 'color:#555;';
-                const attackDisplay = c.isDelegated ? `<span style="${attackColor}">${attackText}</span>` : `<span style="color:#999;">-</span>`;
-                const moveDisplay = c.isDelegated ? `<span style="${moveColor}">${moveText}</span>` : `<span style="color:#999;">-</span>`;
+                const moveClass = c.allowMove ? 'text-blue' : 'text-gray';
+                const attackDisplay = c.isDelegated ? `<span class="${attackClass}">${attackText}</span>` : `<span class="text-gray">-</span>`;
+                const moveDisplay = c.isDelegated ? `<span class="${moveClass}">${moveText}</span>` : `<span class="text-gray">-</span>`;
 
-                listHtml += `<div class="select-item delegate-list-item" style="cursor:pointer;" onclick="if(window.AudioManager) window.AudioManager.playSE('choice.ogg'); window.GameApp.ui.info.showDelegateSettingModal(${c.id})"><span class="col-castle-name" style="font-weight:bold; justify-content:flex-start; padding-left:5px;">${c.name}</span>${attackDisplay}${moveDisplay}<span style="font-weight:bold; ${statusColor}">${statusText}</span></div>`;
+                listHtml += `<div class="select-item delegate-list-item" style="cursor:pointer;" onclick="if(window.AudioManager) window.AudioManager.playSE('choice.ogg'); window.GameApp.ui.info.showDelegateSettingModal(${c.id})"><span class="col-castle-name" style="font-weight:bold; justify-content:flex-start; padding-left:5px;">${c.name}</span>${attackDisplay}${moveDisplay}<span class="${statusClass}" style="font-weight:bold;">${statusText}</span></div>`;
             });
             const itemCount = myCastles.length;
             for (let i = itemCount; i < 8; i++) {

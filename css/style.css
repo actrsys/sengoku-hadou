@@ -548,6 +548,25 @@ body.hide-daimyo-labels .daimyo-name-label { display: none !important; }
 .list-header, .select-item { display: grid; grid-template-columns: 35px 2.5fr 1.5fr repeat(6, 1fr); font-size: clamp(0.6rem, 2.2vw, 0.85rem); padding: 0; height: 40px; gap: 0; box-sizing: border-box; align-items: stretch; }
 .list-header.view-mode, .select-item.view-mode { grid-template-columns: 2.5fr 1.5fr repeat(6, 1fr); }
 
+/* リスト内文字色（暗い背景用） */
+.text-red { color: #ff8a80 !important; }
+.text-blue { color: #82b1ff !important; }
+.text-pink { color: #ff80ab !important; }
+.text-orange { color: #ffd180 !important; }
+.text-gray { color: #b0bec5 !important; }
+
+/* 委任一括ボタン用 */
+.btn-toggle-delegated {
+    color: #ff8a80 !important;
+    background-color: #3e2723 !important;
+    border-color: #ff8a80 !important;
+}
+.btn-toggle-direct {
+    color: #82b1ff !important;
+    background-color: #0d47a1 !important;
+    border-color: #82b1ff !important;
+}
+
 /* 個別リストのグリッド調整 */
 .daimyo-list-header, .daimyo-list-item { grid-template-columns: 2fr 2fr 1fr 1.5fr 1.5fr 1fr; }
 .kunishu-list-header, .kunishu-list-item { grid-template-columns: 2fr 2.5fr 1.5fr 1.5fr 1fr 1.5fr 1fr; }
