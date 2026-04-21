@@ -545,8 +545,8 @@ body.hide-daimyo-labels .daimyo-name-label { display: none !important; }
 .history-list-item:last-child { border-bottom: none; }
 
 /* 各種リストの基本グリッド（スマホ向けベース） */
-.list-header, .select-item { display: grid; grid-template-columns: 35px 2.5fr 1.5fr repeat(6, 1fr); font-size: clamp(0.6rem, 2.2vw, 0.85rem); padding: 0; height: 40px; gap: 0; box-sizing: border-box; align-items: stretch; }
-.list-header.view-mode, .select-item.view-mode { grid-template-columns: 2.5fr 1.5fr repeat(6, 1fr); }
+.list-header, .select-item { display: grid; grid-template-columns: var(--grid-cols-sp, 35px 2.5fr 1.5fr repeat(6, 1fr)); font-size: clamp(0.6rem, 2.2vw, 0.85rem); padding: 0; height: 40px; gap: 0; box-sizing: border-box; align-items: center; }
+.list-header.view-mode, .select-item.view-mode { grid-template-columns: var(--grid-cols-sp, 2.5fr 1.5fr repeat(6, 1fr)); }
 
 /* リスト内文字色（暗い背景用） */
 .text-white { color: #ffffff !important; }
@@ -1900,10 +1900,10 @@ body.is-pc {
     .cmd-btn.finish, .cmd-btn.back { grid-column: span 2; }
 
     /* PCリストレイアウト */
-    .scroll-wrapper { max-height: calc(44px * 9 + 28px); }
-    .list-container { scroll-padding-top: 44px; }
-    .list-header, .select-item { grid-template-columns: 45px 100px 60px repeat(6, 1fr); font-size: 0.85rem; height: 44px; }
-    .list-header.view-mode, .select-item.view-mode { grid-template-columns: 100px 60px repeat(6, 1fr); }
+.scroll-wrapper { max-height: calc(44px * 9 + 28px); }
+.list-container { scroll-padding-top: 44px; }
+.list-header, .select-item { grid-template-columns: var(--grid-cols-pc, 45px 100px 60px repeat(6, 1fr)); font-size: 0.85rem; height: 44px; }
+.list-header.view-mode, .select-item.view-mode { grid-template-columns: var(--grid-cols-pc, 100px 60px repeat(6, 1fr)); }
     
     .daimyo-list-header, .daimyo-list-item { grid-template-columns: 80px 110px 50px 80px 80px 60px; font-size: 0.9rem; height: 44px; }
     .kunishu-list-header, .kunishu-list-item { grid-template-columns: 100px 120px 80px 80px 60px 80px 60px; font-size: 0.9rem; height: 44px; }
