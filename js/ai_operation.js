@@ -298,6 +298,8 @@ class AIOperationManager {
 
         // ★追加：周りの敵対勢力の数を数えます！
         const adjacentEnemyClans = new Set();
+        const adjacentEnemyCastles = []; // ★追加：仮想ターゲットとして選ぶための敵城リストです
+
         for (const myCastle of myClanCastles) {
             if (myCastle.adjacentCastleIds) {
                 for (const adjId of myCastle.adjacentCastleIds) {
@@ -307,10 +309,18 @@ class AIOperationManager {
                         const rel = this.game.getRelation(clanId, adjCastle.ownerClan);
                         if (rel && rel.status === '敵対') {
                             adjacentEnemyClans.add(adjCastle.ownerClan);
+                            adjacentEnemyCastles.push(adjCastle); // ★敵の城をリストに集めます
                         }
                     }
                 }
             }
+        }
+
+        // ★追加：見つかった敵の城の中から、ランダムで1つを「仮想ターゲット」として選びます！
+        let virtualTargetId = null;
+        if (adjacentEnemyCastles.length > 0) {
+            const randIndex = Math.floor(Math.random() * adjacentEnemyCastles.length);
+            virtualTargetId = adjacentEnemyCastles[randIndex].id;
         }
 
         const enemyCount = adjacentEnemyClans.size;
@@ -335,11 +345,12 @@ class AIOperationManager {
                 
                 this.operations[clanId] = {
                     type: '外交',
+                    virtualTargetId: virtualTargetId, // ★追加：将来の工作活動のために覚えておきます
                     turnsRemaining: 0, // すぐに実行するので準備期間はゼロです
                     maxTurns: duration,
                     status: '実行中'
                 };
-                console.log(`大名家[${clanId}]が【外交作戦】を立案しました！(隣接敵対: ${enemyCount}勢力, 期間: ${duration}ヶ月)`);
+                console.log(`大名家[${clanId}]が【外交作戦】を立案しました！(隣接敵対: ${enemyCount}勢力, 期間: ${duration}ヶ月, 仮想目標: ${virtualTargetId})`);
                 return; // 外交作戦が決まったら、今回の作戦会議はこれでおしまいです
             }
         }
@@ -578,13 +589,14 @@ class AIOperationManager {
         }
 
         // 攻撃する場所がなかったり、サイコロに外れたら、おとなしく内政作戦にします
-        this.setInternalOperation(clanId);
+        this.setInternalOperation(clanId, virtualTargetId);
     }
 
-    setInternalOperation(clanId) {
+    setInternalOperation(clanId, virtualTargetId = null) {
         this.operations[clanId] = {
             type: '内政',
             targetId: null,
+            virtualTargetId: virtualTargetId, // ★追加：将来の工作活動のために覚えておきます
             isKunishuTarget: false,
             stagingBase: null,
             requiredForce: 0,
@@ -594,7 +606,7 @@ class AIOperationManager {
             maxTurns: 1,
             status: '準備中'
         };
-        console.log(`大名家[${clanId}]は今月、【内政作戦】を行います。`);
+        console.log(`大名家[${clanId}]は今月、【内政作戦】を行います。(仮想目標: ${virtualTargetId})`);
     }
 
     updateOperation(clanId) {
