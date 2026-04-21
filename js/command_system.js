@@ -21,7 +21,7 @@ const COMMAND_MENU_STRUCTURE = [
         // ★ここが「入れ子（サブメニュー）」になる部分です！
         subMenus: [
             { label: "外交", commands: ['goodwill', 'alliance', 'marriage', 'dominate', 'subordinate', 'break_alliance'] }, // ★ 'marriage' を追加！
-            { label: "調略", commands: ['incite', 'rumor', 'headhunt', 'sabotage'] },
+            { label: "調略", commands: ['sabotage', 'incite', 'rumor', 'headhunt'] },
             { label: "諸勢力", commands: ['kunishu_goodwill', 'kunishu_incorporate'] },
             { label: "朝廷", commands: ['tribute', 'court_truce'] }
         ]
@@ -210,7 +210,13 @@ const COMMAND_SPECS = {
     },
 
     // --- 対外：調略 (FOREIGN_STRATEGY) ---
-    'incite': { 
+    'sabotage': { 
+        label: "破壊工作", category: 'FOREIGN_STRATEGY', 
+        costGold: 0, costRice: 0, 
+        isMulti: false, hasAdvice: true, 
+        startMode: 'map_select',  targetType: 'enemy_all',
+        sortKey: 'intelligence' 
+    },'incite': { 
         label: "民心撹乱", category: 'FOREIGN_STRATEGY', 
         costGold: 0, costRice: 0, 
         isMulti: false, hasAdvice: true, 
@@ -231,13 +237,7 @@ const COMMAND_SPECS = {
         startMode: 'map_select', targetType: 'enemy_all',
         sortKey: 'intelligence'
     },
-    'sabotage': { 
-        label: "破壊工作", category: 'FOREIGN_STRATEGY', 
-        costGold: 0, costRice: 0, 
-        isMulti: false, hasAdvice: true, 
-        startMode: 'map_select',  targetType: 'enemy_all',
-        sortKey: 'intelligence' 
-    },
+    
 
     // --- 情報 (INFO) ---
     'busho_list': {
