@@ -961,6 +961,13 @@ class UIInfoManager {
         if (!modal) return;
         modal.classList.remove('hidden');
 
+        // ★組み立て中はリスト全体を隠す（レイアウト崩れ防止）
+        if (listContainer) {
+            listContainer.style.display = 'none';
+            // 古い中身をクリア
+            listContainer.innerHTML = '';
+        }
+
         if (titleEl) titleEl.textContent = config.title || "";
 
         if (contextEl) {
@@ -1009,53 +1016,81 @@ class UIInfoManager {
             }
         }
 
-        let listHtml = '';
+        // ★高速化：DocumentFragmentを使ってメモリ上で一気に組み立てる
+        const fragment = document.createDocumentFragment();
+
         if (config.headers && config.headers.length > 0) {
-            const headerCols = config.headers.map(h => {
+            const headerDiv = document.createElement('div');
+            headerDiv.className = `list-header ${config.headerClass || ''}`;
+            headerDiv.innerHTML = config.headers.map(h => {
                 if (h.trim().startsWith('<')) return h;
                 return `<span>${h}</span>`;
             }).join('');
-            listHtml += `<div class="list-header ${config.headerClass || ''}">${headerCols}</div>`;
+            fragment.appendChild(headerDiv);
         }
 
         if (config.items && config.items.length > 0) {
             config.items.forEach(item => {
-                const cursorStr = item.onClick ? "style='cursor:pointer;'" : "style='cursor:default;'";
-                const clickStr = item.onClick ? `onclick="${item.onClick}"` : "";
+                const rowDiv = document.createElement('div');
+                const extraClass = item.itemClass || '';
+                rowDiv.className = `select-item ${config.itemClass || ''} ${extraClass}`;
                 
-                const cells = item.cells.map(c => {
+                if (item.onClick) {
+                    rowDiv.style.cursor = 'pointer';
+                    // ★onclick属性ではなく、イベントリスナーで設定するとより安全で高速
+                    if (typeof item.onClick === 'function') {
+                         rowDiv.addEventListener('click', item.onClick);
+                    } else {
+                         rowDiv.setAttribute('onclick', item.onClick);
+                    }
+                } else {
+                    rowDiv.style.cursor = 'default';
+                }
+
+                rowDiv.innerHTML = item.cells.map(c => {
                     const strC = String(c);
                     if (strC.trim().startsWith('<')) return strC;
                     return `<span>${strC}</span>`;
                 }).join('');
-                
-                const extraClass = item.itemClass || '';
-                listHtml += `<div class="select-item ${config.itemClass || ''} ${extraClass}" ${cursorStr} ${clickStr}>${cells}</div>`;
+
+                fragment.appendChild(rowDiv);
             });
             
             const itemCount = config.items.length;
             for (let i = itemCount; i < 8; i++) {
-                const emptyCells = config.headers ? config.headers.map(() => `<span></span>`).join('') : '';
-                listHtml += `<div class="select-item ${config.itemClass || ''}" style="cursor:default; pointer-events:none;">${emptyCells}</div>`;
+                const emptyDiv = document.createElement('div');
+                emptyDiv.className = `select-item ${config.itemClass || ''}`;
+                emptyDiv.style.cursor = 'default';
+                emptyDiv.style.pointerEvents = 'none';
+                emptyDiv.innerHTML = config.headers ? config.headers.map(() => `<span></span>`).join('') : '';
+                fragment.appendChild(emptyDiv);
             }
         } else {
-            listHtml = config.emptyHtml || '<div style="padding: 10px; text-align: center;">データがありません。</div>';
+            const emptyDiv = document.createElement('div');
+            emptyDiv.style.padding = '10px';
+            emptyDiv.style.textAlign = 'center';
+            emptyDiv.innerHTML = config.emptyHtml || 'データがありません。';
+            fragment.appendChild(emptyDiv);
         }
 
         if (listContainer) {
             listContainer.className = `list-container ${config.listClass || ''} hide-native-scroll`;
-            listContainer.style.display = 'block';
-            listContainer.innerHTML = listHtml;
+            // ★組み立てた塊を一度に追加する
+            listContainer.appendChild(fragment);
 
             if (window.CustomScrollbar) {
                 if (!this.ui.bushoScrollbar) this.ui.bushoScrollbar = new CustomScrollbar(listContainer);
-                setTimeout(() => {
-                    listContainer.scrollTop = config.scrollPos || 0;
-                    this.ui.bushoScrollbar.update();
-                }, 10);
-            } else {
-                listContainer.scrollTop = config.scrollPos || 0;
             }
+
+            // ★DOMが完全に構築されてから表示（display: block）し、スクロール位置を復元する
+            // ブラウザの描画タイミングを待つために requestAnimationFrame を使用します
+            requestAnimationFrame(() => {
+                listContainer.style.display = 'block';
+                listContainer.scrollTop = config.scrollPos || 0;
+                if (this.ui.bushoScrollbar) {
+                    this.ui.bushoScrollbar.update();
+                }
+            });
         }
     }
 
