@@ -151,9 +151,8 @@ class UIInfoManager {
                 statusClass = "text-orange";
             }
 
-            const powerPercent = Math.min(100, (d.power / maxPower) * 100);
-            const powerBarHtml = `<div class="bar-bg bar-bg-power"><div class="bar-fill bar-fill-power" style="width:${powerPercent}%;"></div></div>`;
-            const friendBarHtml = d.id === this.game.playerClanId ? "" : `<div class="bar-bg bar-bg-friend"><div class="bar-fill bar-fill-friend" style="width:${Math.min(100, Math.max(0, friendScore))}%;"></div></div>`;
+            const powerBarHtml = this._createBarHtml((d.power / maxPower) * 100, 'power');
+            const friendBarHtml = d.id === this.game.playerClanId ? "" : this._createBarHtml(friendScore, 'friend');
 
             items.push({
                 onClick: `if(window.AudioManager) window.AudioManager.playSE('choice.ogg'); window.GameApp.ui.info.showDaimyoDetail(${d.id})`,
@@ -378,8 +377,7 @@ class UIInfoManager {
             else if (r.status === '友好') statusClass = 'text-white';
             else if (['同盟', '支配', '従属', '婚姻'].includes(r.status)) statusClass = 'text-green';
 
-            const friendPercent = Math.min(100, Math.max(0, r.sentiment));
-            const friendBarHtml = `<div class="bar-bg bar-bg-friend"><div class="bar-fill bar-fill-friend" style="width:${friendPercent}%;"></div></div>`;
+            const friendBarHtml = this._createBarHtml(r.sentiment, 'friend');
 
             items.push({
                 onClick: null, 
@@ -843,6 +841,11 @@ class UIInfoManager {
     // ==========================================
     // ★リスト画面の共通生成工場（ステップ１）
     // ==========================================
+    _createBarHtml(percent, type) {
+        const safePercent = Math.min(100, Math.max(0, Number(percent) || 0));
+        return `<div style="display: flex; align-items: center; width: 100%; height: 100%;"><div class="bar-bg bar-bg-${type}"><div class="bar-fill bar-fill-${type}" style="width:${safePercent}%;"></div></div></div>`;
+    }
+
     _renderListModal(config) {
         const modal = document.getElementById('selector-modal');
         const titleEl = document.getElementById('selector-title');
@@ -3424,8 +3427,7 @@ class UIInfoManager {
             }
 
             const relVal = kunishu.getRelation(this.game.playerClanId);
-            const relPercent = Math.min(100, Math.max(0, Number(relVal) || 0));
-            const friendBarHtml = `<div class="bar-bg bar-bg-friend"><div class="bar-fill bar-fill-friend" style="width:${relPercent}%;"></div></div>`;
+            const friendBarHtml = this._createBarHtml(relVal, 'friend');
             
             let relStatus = "普通";
             let relClass = "text-white";
@@ -3591,8 +3593,7 @@ class UIInfoManager {
                     else if (['同盟', '支配', '従属', '婚姻'].includes(relStatus)) statusClass = 'text-green';
                 }
             }
-            const relPercent = Math.min(100, Math.max(0, Number(relVal) || 0));
-            const friendBarHtml = `<div class="bar-bg bar-bg-friend"><div class="bar-fill bar-fill-friend" style="width:${relPercent}%;"></div></div>`;
+            const friendBarHtml = this._createBarHtml(relVal, 'friend');
             
             items.push({
                 onClick: `window.GameApp.ui.info.selectForce(${index}, this)`,
