@@ -1009,13 +1009,9 @@ class UIInfoManager {
         if (window.AudioManager) window.AudioManager.playSE('choice.ogg');
         
         const items = document.querySelectorAll('.princess-list-item');
-        items.forEach(item => {
-            item.style.backgroundColor = '';
-            item.style.borderLeft = '';
-        });
+        items.forEach(item => item.classList.remove('selected'));
 
-        element.style.backgroundColor = '#ffe0b2';
-        element.style.borderLeft = '5px solid #ff9800';
+        element.classList.add('selected');
 
         this.selectedPrincessId = princessId;
 
@@ -3552,13 +3548,9 @@ class UIInfoManager {
         if (window.AudioManager) window.AudioManager.playSE('choice.ogg');
         
         const items = document.querySelectorAll('.kunishu-list-item');
-        items.forEach(item => {
-            item.style.backgroundColor = '';
-            item.style.borderLeft = '';
-        });
+        items.forEach(item => item.classList.remove('selected'));
 
-        element.style.backgroundColor = '#ffe0b2';
-        element.style.borderLeft = '5px solid #ff9800';
+        element.classList.add('selected');
 
         this.selectedKunishuId = kunishuId;
 
@@ -3757,13 +3749,9 @@ class UIInfoManager {
         if (window.AudioManager) window.AudioManager.playSE('choice.ogg');
         
         const items = document.querySelectorAll('.force-list-item');
-        items.forEach(item => {
-            item.style.backgroundColor = '';
-            item.style.borderLeft = '';
-        });
+        items.forEach(item => item.classList.remove('selected'));
 
-        element.style.backgroundColor = '#ffe0b2';
-        element.style.borderLeft = '5px solid #ff9800';
+        element.classList.add('selected');
 
         this.selectedForceIndex = index;
 
