@@ -407,39 +407,13 @@ class UIInfoManager {
             listClass: "daimyo-list-container",
             items: items,
             scrollPos: scrollPos,
-            onBack: onClose
-        });
-
-        // タブを描画した後に、クリックされた時の動きを設定します
-        setTimeout(() => {
-            const tabsEl = document.getElementById('selector-tabs');
-            if (tabsEl && type === 'daimyo') {
-                tabsEl.style.justifyContent = 'flex-start';
-                tabsEl.style.paddingLeft = '10px';
-                tabsEl.style.alignItems = 'flex-end';
-
-                const tabBtns = tabsEl.querySelectorAll('.busho-tab-btn');
-                tabBtns.forEach(btn => {
-                    btn.onclick = () => {
-                        if (window.AudioManager) window.AudioManager.playSE('choice.ogg');
-                        this.diploCurrentTab = btn.getAttribute('data-tab');
-                        this._renderDiplomacyList(id, name, type, onClose, 0);
-                    };
-                });
+            onBack: onClose,
+            gridTemplate: "2fr 1.5fr 1fr 3fr",
+            onTabClick: (tabKey) => {
+                this.diploCurrentTab = tabKey;
+                this._renderDiplomacyList(id, name, type, onClose, 0);
             }
-        }, 10);
-
-        // ★追加：外交リストはアイテム側のCSSで横幅を指定しているため、共通工場で描いた後に強引にスタイルを当てます
-        setTimeout(() => {
-            const header = document.querySelector('.daimyo-list-header');
-            if (header) header.style.gridTemplateColumns = '2fr 1.5fr 1fr 3fr';
-            
-            const listItems = document.querySelectorAll('.daimyo-list-item');
-            listItems.forEach(item => {
-                item.style.gridTemplateColumns = '2fr 1.5fr 1fr 3fr';
-                item.style.cursor = 'default';
-            });
-        }, 20);
+        });
     }
 
     showFactionList(clanId, isDirect = false) {
@@ -950,8 +924,8 @@ class UIInfoManager {
     }
 
     _renderListModal(config) {
-        // ★連打対策のID
         this._currentListRenderId = (this._currentListRenderId || 0) + 1;
+        const currentRenderId = this._currentListRenderId;
 
         const modal = document.getElementById('selector-modal');
         const titleEl = document.getElementById('selector-title');
@@ -963,7 +937,6 @@ class UIInfoManager {
 
         if (!modal || !listContainer) return;
         
-        // ★最重要：描き始める前に「完全に空っぽ」にして「非表示」にする。これで残像を消す。
         listContainer.style.display = 'none';
         listContainer.innerHTML = '';
         modal.classList.remove('hidden');
@@ -983,6 +956,26 @@ class UIInfoManager {
             if (config.tabsHtml) {
                 tabsEl.classList.remove('hidden');
                 tabsEl.innerHTML = config.tabsHtml;
+                
+                // タブ切り替えとスコープ切り替えの一元化
+                if (config.onTabClick) {
+                    const tabBtns = tabsEl.querySelectorAll('.busho-tab-btn');
+                    tabBtns.forEach(btn => {
+                        btn.onclick = () => {
+                            if (window.AudioManager) window.AudioManager.playSE('choice.ogg');
+                            config.onTabClick(btn.getAttribute('data-tab'));
+                        };
+                    });
+                }
+                if (config.onScopeClick) {
+                    const scopeBtns = tabsEl.querySelectorAll('.busho-scope-btn');
+                    scopeBtns.forEach(btn => {
+                        btn.onclick = () => {
+                            if (window.AudioManager) window.AudioManager.playSE('choice.ogg');
+                            config.onScopeClick(btn.getAttribute('data-scope'));
+                        };
+                    });
+                }
             } else {
                 tabsEl.classList.add('hidden');
             }
@@ -1022,63 +1015,90 @@ class UIInfoManager {
 
         listContainer.className = `list-container ${config.listClass || ''} hide-native-scroll`;
 
-        // ★超高速化：巨大な配列を作って、最後に `join('')` で一撃で文字列にする
-        let htmlParts = [];
+        let gridStyle = "";
+        if (config.gridTemplate) gridStyle += `grid-template-columns: ${config.gridTemplate}; `;
+        if (config.minWidth) gridStyle += `min-width: ${config.minWidth}; `;
+        if (config.alignItems) gridStyle += `align-items: ${config.alignItems}; `;
 
-        // ヘッダー作成
+        const buildItemHtml = (item, index) => {
+            const cursorStr = item.onClick ? "style='cursor:pointer;'" : "style='cursor:default;'";
+            const extraClass = item.itemClass || '';
+            let clickStr = "";
+            let indexAttr = "";
+            if (item.onClick) {
+                if (typeof item.onClick === 'function') {
+                    indexAttr = `data-action-index="${index}"`; 
+                } else {
+                    clickStr = `onclick="${item.onClick}"`;
+                }
+            }
+            const cells = item.cells.map(c => {
+                const strC = String(c);
+                return strC.trim().startsWith('<') ? strC : `<span>${strC}</span>`;
+            }).join('');
+            return `<div class="select-item ${config.itemClass || ''} ${extraClass}" ${cursorStr} ${clickStr} ${indexAttr} style="${gridStyle}">${cells}</div>`;
+        };
+
+        if (!config.items || config.items.length === 0) {
+            let emptyHtml = '';
+            if (config.headers && config.headers.length > 0) {
+                const headerCols = config.headers.map(h => h.trim().startsWith('<') ? h : `<span>${h}</span>`).join('');
+                emptyHtml += `<div class="list-header ${config.headerClass || ''}" style="${gridStyle}">${headerCols}</div>`;
+            }
+            emptyHtml += config.emptyHtml || '<div style="padding: 10px; text-align: center;">データがありません。</div>';
+            listContainer.innerHTML = emptyHtml;
+            listContainer.style.display = 'block';
+            return;
+        }
+
+        const totalItems = config.items.length;
+        const INITIAL_RENDER_COUNT = 30;
+        const CHUNK_SIZE = 50;
+
+        let initialHtmlParts = [];
+        
         if (config.headers && config.headers.length > 0) {
             const headerCols = config.headers.map(h => h.trim().startsWith('<') ? h : `<span>${h}</span>`).join('');
-            htmlParts.push(`<div class="list-header ${config.headerClass || ''}">${headerCols}</div>`);
+            initialHtmlParts.push(`<div class="list-header sortable-header ${config.headerClass || ''}" style="${gridStyle}">${headerCols}</div>`);
         }
 
-        // アイテム作成
-        if (config.items && config.items.length > 0) {
-            const totalItems = config.items.length;
-            for (let i = 0; i < totalItems; i++) {
-                const item = config.items[i];
-                const cursorStr = item.onClick ? "style='cursor:pointer;'" : "style='cursor:default;'";
-                const extraClass = item.itemClass || '';
-                
-                // onClickが関数の場合は後でイベントを付けるための目印
-                let clickStr = "";
-                let indexAttr = "";
-                if (item.onClick) {
-                    if (typeof item.onClick === 'function') {
-                        indexAttr = `data-action-index="${i}"`; 
-                    } else {
-                        clickStr = `onclick="${item.onClick}"`;
+        const initialLimit = Math.min(totalItems, INITIAL_RENDER_COUNT);
+        for (let i = 0; i < initialLimit; i++) {
+            initialHtmlParts.push(buildItemHtml(config.items[i], i));
+        }
+        
+        for (let i = totalItems; i < 8; i++) {
+            const emptyCells = config.headers ? config.headers.map(() => `<span></span>`).join('') : '';
+            initialHtmlParts.push(`<div class="select-item ${config.itemClass || ''}" style="cursor:default; pointer-events:none; ${gridStyle}">${emptyCells}</div>`);
+        }
+
+        listContainer.innerHTML = initialHtmlParts.join('');
+
+        const attachEvents = (startIndex, endIndex) => {
+            if (config.items) {
+                const actionElements = listContainer.querySelectorAll('[data-action-index]');
+                actionElements.forEach(el => {
+                    if (el.dataset.eventAttached) return;
+                    const index = parseInt(el.getAttribute('data-action-index'));
+                    if (index >= startIndex && index < endIndex && config.items[index] && typeof config.items[index].onClick === 'function') {
+                        el.addEventListener('click', config.items[index].onClick);
+                        el.dataset.eventAttached = "true";
                     }
-                }
-
-                const cells = item.cells.map(c => {
-                    const strC = String(c);
-                    return strC.trim().startsWith('<') ? strC : `<span>${strC}</span>`;
-                }).join('');
-
-                htmlParts.push(`<div class="select-item ${config.itemClass || ''} ${extraClass}" ${cursorStr} ${clickStr} ${indexAttr}>${cells}</div>`);
+                });
             }
-            
-            // 行数が少ない時の埋め草
-            for (let i = totalItems; i < 8; i++) {
-                const emptyCells = config.headers ? config.headers.map(() => `<span></span>`).join('') : '';
-                htmlParts.push(`<div class="select-item ${config.itemClass || ''}" style="cursor:default; pointer-events:none;">${emptyCells}</div>`);
-            }
-        } else {
-            let emptyHtml = config.emptyHtml || '<div style="padding: 10px; text-align: center;">データがありません。</div>';
-            htmlParts.push(emptyHtml);
-        }
+        };
 
-        // ★ブラウザにとって一番速い「一撃流し込み」
-        listContainer.innerHTML = htmlParts.join('');
+        attachEvents(0, initialLimit);
 
-        // イベントリスナーの付与
-        if (config.items) {
-            const actionElements = listContainer.querySelectorAll('[data-action-index]');
-            actionElements.forEach(el => {
-                const index = parseInt(el.getAttribute('data-action-index'));
-                if (config.items[index] && typeof config.items[index].onClick === 'function') {
-                    el.addEventListener('click', config.items[index].onClick);
-                }
+        if (config.onSortClick) {
+            const headerSpans = listContainer.querySelectorAll('.sortable-header span[data-sort]');
+            headerSpans.forEach(span => {
+                span.onclick = (e) => {
+                    const key = e.currentTarget.getAttribute('data-sort');
+                    if (!key) return;
+                    if (window.AudioManager) window.AudioManager.playSE('choice.ogg');
+                    config.onSortClick(key);
+                };
             });
         }
 
@@ -1086,11 +1106,35 @@ class UIInfoManager {
             if (!this.ui.bushoScrollbar) this.ui.bushoScrollbar = new CustomScrollbar(listContainer);
         }
 
-        // ★すべてが終わってから、パッと表示してスクロールを戻す
         listContainer.style.display = 'block';
         listContainer.scrollTop = config.scrollPos || 0;
         if (this.ui.bushoScrollbar) {
             this.ui.bushoScrollbar.update();
+        }
+
+        if (totalItems > initialLimit) {
+            let currentIndex = initialLimit;
+            const renderNextChunk = () => {
+                if (this._currentListRenderId !== currentRenderId) return;
+
+                const chunkParts = [];
+                const endLimit = Math.min(currentIndex + CHUNK_SIZE, totalItems);
+                
+                for (let i = currentIndex; i < endLimit; i++) {
+                    chunkParts.push(buildItemHtml(config.items[i], i));
+                }
+                
+                listContainer.insertAdjacentHTML('beforeend', chunkParts.join(''));
+                attachEvents(currentIndex, endLimit);
+                currentIndex = endLimit;
+
+                if (this.ui.bushoScrollbar) this.ui.bushoScrollbar.update();
+
+                if (currentIndex < totalItems) {
+                    requestAnimationFrame(renderNextChunk);
+                }
+            };
+            requestAnimationFrame(renderNextChunk);
         }
     }
 
@@ -1542,7 +1586,7 @@ class UIInfoManager {
                     this.currentKyotenTab = btn.getAttribute('data-tab');
                     this.currentKyotenSortKey = null;
                     this.isKyotenSortAsc = false;
-                    this._renderKyotenList(clanId, listContainer.scrollTop);
+                    this._renderKyotenList(clanId, 0);
                 };
             });
 
@@ -1553,7 +1597,7 @@ class UIInfoManager {
                     this.currentKyotenScope = btn.getAttribute('data-scope');
                     this.currentKyotenSortKey = null;
                     this.isKyotenSortAsc = false;
-                    this._renderKyotenList(clanId, listContainer.scrollTop);
+                    this._renderKyotenList(clanId, 0);
                 };
             });
         }
@@ -1724,7 +1768,7 @@ class UIInfoManager {
                             this.isKyotenSortAsc = true;
                         }
                     }
-                    this._renderKyotenList(clanId, listContainer.scrollTop); 
+                    this._renderKyotenList(clanId, 0);
                 };
             });
 
@@ -2337,6 +2381,17 @@ class UIInfoManager {
             };
         }
 
+        let colStr = "";
+        let minW = "";
+        let alignSt = "";
+
+        if (this.bushoCurrentTab === 'status') {
+            colStr = isViewMode ? "1.5fr 1fr 1.5fr 1.5fr 0.8fr 0.8fr 0.8fr 1fr 1.5fr 0.2fr" : "1.5fr 1fr 1.5fr 1.5fr 0.8fr 0.8fr 1fr 1.5fr 0.2fr";
+            minW = isViewMode ? "900px" : "850px";
+        } else {
+            if (isViewMode) alignSt = "center";
+        }
+
         this._renderListModal({
             title: titleStr,
             tabsHtml: tabsHtml,
@@ -2347,80 +2402,38 @@ class UIInfoManager {
             listClass: "",
             items: items,
             scrollPos: scrollPos,
+            gridTemplate: colStr,
+            minWidth: minW,
+            alignItems: alignSt,
             onBack: () => {
                 if (onBack) onBack(); 
                 else if (extraData && extraData.onCancel) extraData.onCancel();
             },
             onConfirm: onConfirmHandler,
-            hideBackBtn: extraData && extraData.hideCancel
+            hideBackBtn: extraData && extraData.hideCancel,
+            onTabClick: (tabKey) => {
+                this.bushoCurrentTab = tabKey;
+                this._renderBushoSelector(actionType, targetId, extraData, onBack, 0);
+            },
+            onScopeClick: (scopeKey) => {
+                this.bushoCurrentScope = scopeKey;
+                this._renderBushoSelector(actionType, targetId, extraData, onBack, 0);
+            },
+            onSortClick: (sortKey) => {
+                if (this.bushoCurrentSortKey === sortKey) {
+                    this.bushoIsSortAsc = !this.bushoIsSortAsc;
+                } else {
+                    this.bushoCurrentSortKey = sortKey;
+                    this.bushoIsSortAsc = false; 
+                    if (['name', 'faction', 'castle', 'faction_leader'].includes(sortKey)) {
+                        this.bushoIsSortAsc = true;
+                    }
+                }
+                this._renderBushoSelector(actionType, targetId, extraData, onBack, 0);
+            }
         });
 
-        setTimeout(() => {
-            const tabsEl = document.getElementById('selector-tabs');
-            if (tabsEl) {
-                const tabBtns = tabsEl.querySelectorAll('.busho-tab-btn');
-                tabBtns.forEach(btn => {
-                    btn.onclick = () => {
-                        if (window.AudioManager) window.AudioManager.playSE('choice.ogg');
-                        this.bushoCurrentTab = btn.getAttribute('data-tab');
-                        this._renderBushoSelector(actionType, targetId, extraData, onBack, scrollPos);
-                    };
-                });
-                const scopeBtns = tabsEl.querySelectorAll('.busho-scope-btn');
-                scopeBtns.forEach(btn => {
-                    btn.onclick = () => {
-                        if (window.AudioManager) window.AudioManager.playSE('choice.ogg');
-                        this.bushoCurrentScope = btn.getAttribute('data-scope');
-                        this._renderBushoSelector(actionType, targetId, extraData, onBack, scrollPos);
-                    };
-                });
-            }
-
-            const listContainer = document.getElementById('selector-list');
-            if (listContainer) {
-                const headerSpans = listContainer.querySelectorAll('.sortable-header span[data-sort]');
-                headerSpans.forEach(span => {
-                    span.onclick = (e) => {
-                        const key = e.currentTarget.getAttribute('data-sort');
-                        if (!key) return;
-                        if (window.AudioManager) window.AudioManager.playSE('choice.ogg');
-                        if (this.bushoCurrentSortKey === key) {
-                            this.bushoIsSortAsc = !this.bushoIsSortAsc;
-                        } else {
-                            this.bushoCurrentSortKey = key;
-                            this.bushoIsSortAsc = false; 
-                            if (['name', 'faction', 'castle', 'faction_leader'].includes(key)) {
-                                this.bushoIsSortAsc = true;
-                            }
-                        }
-                        this._renderBushoSelector(actionType, targetId, extraData, onBack, listContainer.scrollTop);
-                    };
-                });
-            }
-            
-            // css grid fix
-            if (this.bushoCurrentTab === 'status') {
-                const header = document.querySelector('.sortable-header.status-mode');
-                const listItems = document.querySelectorAll('.select-item.status-mode');
-                const colStr = isViewMode ? "1.5fr 1fr 1.5fr 1.5fr 0.8fr 0.8fr 0.8fr 1fr 1.5fr 0.2fr" : "1.5fr 1fr 1.5fr 1.5fr 0.8fr 0.8fr 1fr 1.5fr 0.2fr";
-                const minW = isViewMode ? "900px" : "850px";
-                if (header) {
-                    header.style.gridTemplateColumns = colStr;
-                    header.style.minWidth = minW;
-                }
-                listItems.forEach(item => {
-                    item.style.gridTemplateColumns = colStr;
-                    item.style.minWidth = minW;
-                });
-            } else {
-                const header = document.querySelector('.sortable-header:not(.status-mode)');
-                if(header && isViewMode) {
-                    header.style.alignItems = 'center';
-                }
-            }
-
-            this._updateBushoSelectorUI();
-        }, 10);
+        this._updateBushoSelectorUI();
     }
     
     // ==========================================
