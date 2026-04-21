@@ -3434,55 +3434,10 @@ class UIInfoManager {
 
     // ★引数に isSelectMode と onConfirm を追加して両対応にしました
     _renderKunishuList(kunishus, castle, isSelectMode = false, onBack = null, onConfirm = null, scrollPos = 0) {
-        const modal = document.getElementById('selector-modal');
-        const titleEl = document.getElementById('selector-title');
-        const listContainer = document.getElementById('selector-list');
-        const contextEl = document.getElementById('selector-context-info');
-        const tabsEl = document.getElementById('selector-tabs');
-        const confirmBtn = document.getElementById('selector-confirm-btn');
-        const backBtn = document.querySelector('#selector-modal .btn-secondary');
-
-        if (!modal) return;
-        modal.classList.remove('hidden');
-        
-        // ★モードによってタイトルを変えます
-        if (titleEl) titleEl.textContent = isSelectMode ? "対象とする諸勢力をお選びください" : "諸勢力一覧";
-        
-        if (contextEl) {
-            contextEl.classList.remove('hidden');
-            contextEl.innerHTML = `<div>${castle ? castle.name + ' に存在する諸勢力です' : '全国の諸勢力一覧です'}</div>`;
-        }
-        
-        if (tabsEl) {
-            tabsEl.classList.add('hidden'); // 諸勢力一覧ではタブは使いません
-        }
-
-        if(backBtn) {
-            backBtn.style.display = '';
-            backBtn.textContent = '戻る';
-            backBtn.onclick = () => {
-                if (window.AudioManager) window.AudioManager.playSE('cancel.ogg');
-                if (onBack) onBack();
-                this.popModal();
-            };
-            const footer = backBtn.parentElement;
-            if (footer) footer.style.justifyContent = 'center';
-        }
-        
+        let contextHtml = `<div>${castle ? castle.name + ' に存在する諸勢力です' : '全国の諸勢力一覧です'}</div>`;
         let modeClassStr = isSelectMode ? "" : "view-mode";
 
-        let listHtml = `
-            <div class="list-header kunishu-list-header ${modeClassStr}">
-                <span style="padding-left:5px; justify-content:flex-start;">勢力名</span>
-                <span>頭領</span>
-                <span>所在</span>
-                <span>所属</span>
-                <span>兵士</span>
-                <span>友好度</span>
-                <span>関係</span>
-            </div>
-        `;
-        
+        let items = [];
         kunishus.forEach(kunishu => {
             const kunishuName = kunishu.getName(this.game);
             const leader = this.game.getBusho(kunishu.leaderId);
@@ -3505,69 +3460,45 @@ class UIInfoManager {
             if (relVal >= 70) { relStatus = "友好"; relClass = "text-green"; }
             else if (relVal < 40) { relStatus = "敵対"; relClass = "text-red"; }
 
-            // ★モードによって、クリックした時の処理を切り替えます
             let onClickStr = "";
             if (isSelectMode) {
-                onClickStr = `onclick="window.GameApp.ui.info.selectKunishu(${kunishu.id}, this)"`;
+                onClickStr = `window.GameApp.ui.info.selectKunishu(${kunishu.id}, this)`;
             } else {
-                onClickStr = `onclick="if(window.AudioManager) window.AudioManager.playSE('choice.ogg'); window.GameApp.ui.info.showKunishuDetail(${kunishu.id})"`;
+                onClickStr = `if(window.AudioManager) window.AudioManager.playSE('choice.ogg'); window.GameApp.ui.info.showKunishuDetail(${kunishu.id})`;
             }
 
-            listHtml += `
-                <div class="select-item kunishu-list-item ${modeClassStr}" style="cursor:pointer;" ${onClickStr}>
-                    <strong class="col-kunishu-name">${kunishuName}</strong>
-                    <span>${leaderName}</span>
-                    <span>${castleName}</span>
-                    <span>${provinceName}</span>
-                    <span>${kunishu.soldiers}</span>
-                    <span>${friendBarHtml}</span>
-                    <span class="${relClass}" style="font-weight:bold;">${relStatus}</span>
-                </div>
-            `;
+            items.push({
+                onClick: onClickStr,
+                cells: [
+                    `<strong class="col-kunishu-name">${kunishuName}</strong>`,
+                    `<span>${leaderName}</span>`,
+                    `<span>${castleName}</span>`,
+                    `<span>${provinceName}</span>`,
+                    `<span>${kunishu.soldiers}</span>`,
+                    `<span>${friendBarHtml}</span>`,
+                    `<span class="${relClass}" style="font-weight:bold;">${relStatus}</span>`
+                ]
+            });
         });
-        
-        const itemCount = kunishus.length;
-        for (let i = itemCount; i < 8; i++) {
-            listHtml += `
-                <div class="select-item kunishu-list-item ${modeClassStr}" style="cursor:default; pointer-events:none;">
-                    <span></span><span></span><span></span><span></span><span></span><span></span><span></span>
-                </div>
-            `;
-        }
 
-        if (listContainer) {
-            listContainer.className = 'list-container kunishu-list-container hide-native-scroll';
-            listContainer.style.display = 'block';
-            listContainer.innerHTML = listHtml;
-            
-            if (window.CustomScrollbar) {
-                if (!this.ui.bushoScrollbar) this.ui.bushoScrollbar = new CustomScrollbar(listContainer);
-                setTimeout(() => {
-                    listContainer.scrollTop = scrollPos;
-                    this.ui.bushoScrollbar.update();
-                }, 10);
-            } else {
-                listContainer.scrollTop = scrollPos;
-            }
-        }
-        
-        // ★新規追加：選択モードの時は決定ボタンを表示し、動作を割り当てます
-        if (confirmBtn) {
-            if (isSelectMode) {
-                confirmBtn.classList.remove('hidden');
-                this.selectedKunishuId = null;
-                confirmBtn.disabled = true;
-                confirmBtn.style.opacity = '0.5';
-                confirmBtn.style.cursor = 'not-allowed';
-                confirmBtn.onclick = () => {
-                    if (!this.selectedKunishuId) return;
-                    this.closeCommonModal(); // 枠を閉じる
-                    if (onConfirm) onConfirm(this.selectedKunishuId); // 選んだ勢力を伝える
-                };
-            } else {
-                confirmBtn.classList.add('hidden'); // 閲覧専用なので決定ボタンは隠します
-            }
-        }
+        this.selectedKunishuId = null;
+
+        this._renderListModal({
+            title: isSelectMode ? "対象とする諸勢力をお選びください" : "諸勢力一覧",
+            contextHtml: contextHtml,
+            headers: ["勢力名", "頭領", "所在", "所属", "兵士", "友好度", "関係"],
+            headerClass: `kunishu-list-header ${modeClassStr}`,
+            itemClass: `kunishu-list-item ${modeClassStr}`,
+            listClass: "kunishu-list-container",
+            items: items,
+            scrollPos: scrollPos,
+            onBack: onBack,
+            onConfirm: isSelectMode ? () => {
+                if (!this.selectedKunishuId) return;
+                this.closeCommonModal(); 
+                if (onConfirm) onConfirm(this.selectedKunishuId); 
+            } : null
+        });
     }
 
     // ★新規追加：リストから勢力を選んだ時のハイライト処理
@@ -3659,52 +3590,11 @@ class UIInfoManager {
     }
 
     _renderForceSelector(forces, onSelect, onCancel, scrollPos = 0) {
-        const modal = document.getElementById('selector-modal');
-        const titleEl = document.getElementById('selector-title');
-        const listContainer = document.getElementById('selector-list');
-        const contextEl = document.getElementById('selector-context-info');
-        const tabsEl = document.getElementById('selector-tabs');
-        const confirmBtn = document.getElementById('selector-confirm-btn');
-        const backBtn = document.querySelector('#selector-modal .btn-secondary');
-
-        if (!modal) return;
-        modal.classList.remove('hidden');
-        if (titleEl) titleEl.textContent = "勢力一覧";
-        
-        if (contextEl) {
-            contextEl.classList.remove('hidden');
-            contextEl.innerHTML = "<div>援軍を要請する勢力を選択してください</div>";
-        }
-        
-        if (tabsEl) {
-            tabsEl.classList.add('hidden'); 
-        }
-
-        if(backBtn) {
-            backBtn.style.display = '';
-            backBtn.textContent = '戻る';
-            backBtn.onclick = () => {
-                if (window.AudioManager) window.AudioManager.playSE('cancel.ogg');
-                if (onCancel) onCancel();
-                this.popModal();
-            };
-            const footer = backBtn.parentElement;
-            if (footer) footer.style.justifyContent = 'center';
-        }
-
-        let listHtml = `
-            <div class="list-header force-list-header">
-                <span style="padding-left:5px; justify-content:flex-start;">勢力名</span>
-                <span>代表者</span>
-                <span>兵士</span>
-                <span>友好度</span>
-                <span>関係</span>
-            </div>
-        `;
-        
-        // 選択時にデータを取り出すため、一時的にクラスに保存しておきます
+        let contextHtml = "<div>援軍を要請する勢力を選択してください</div>";
         this.currentForces = forces;
+        this.selectedForceIndex = null;
 
+        let items = [];
         forces.forEach((item, index) => {
             // ★修正：データが { castle, force } の形で送られてくるようになったため、中身を取り出します
             const force = item.force || item; 
@@ -3732,58 +3622,37 @@ class UIInfoManager {
             const relPercent = Math.min(100, Math.max(0, Number(relVal) || 0));
             const friendBarHtml = `<div class="bar-bg bar-bg-friend"><div class="bar-fill bar-fill-friend" style="width:${relPercent}%;"></div></div>`;
             
-            // ★修正：onclickで呼び出す魔法がきちんと届くように、パスを確実に設定しました！
-            listHtml += `
-                <div class="select-item force-list-item" style="cursor:pointer;" onclick="window.GameApp.ui.info.selectForce(${index}, this)">
-                    <strong class="col-kunishu-name">${force.name}</strong>
-                    <span>${force.leaderName}</span>
-                    <span>${force.soldiers}</span>
-                    <span>${friendBarHtml}</span>
-                    <span class="${statusClass}" style="font-weight:bold;">${relStatus}</span>
-                </div>
-            `;
+            items.push({
+                onClick: `window.GameApp.ui.info.selectForce(${index}, this)`,
+                cells: [
+                    `<strong class="col-kunishu-name">${force.name}</strong>`,
+                    `<span>${force.leaderName}</span>`,
+                    `<span>${force.soldiers}</span>`,
+                    `<span>${friendBarHtml}</span>`,
+                    `<span class="${statusClass}" style="font-weight:bold;">${relStatus}</span>`
+                ]
+            });
         });
-        
-        const itemCount = forces.length;
-        for (let i = itemCount; i < 8; i++) {
-            listHtml += `
-                <div class="select-item force-list-item" style="cursor:default; pointer-events:none;">
-                    <span></span><span></span><span></span><span></span><span></span>
-                </div>
-            `;
-        }
 
-        if (listContainer) {
-            listContainer.className = 'list-container hide-native-scroll';
-            listContainer.style.display = 'block';
-            listContainer.innerHTML = listHtml;
-            
-            if (window.CustomScrollbar) {
-                if (!this.ui.bushoScrollbar) this.ui.bushoScrollbar = new CustomScrollbar(listContainer);
-                setTimeout(() => {
-                    listContainer.scrollTop = scrollPos;
-                    this.ui.bushoScrollbar.update();
-                }, 10);
-            } else {
-                listContainer.scrollTop = scrollPos;
-            }
-        }
-        
-        if (confirmBtn) {
-            confirmBtn.classList.remove('hidden');
-            this.selectedForceIndex = null;
-            confirmBtn.disabled = true;
-            confirmBtn.style.opacity = '0.5';
-            confirmBtn.style.cursor = 'not-allowed';
-            confirmBtn.onclick = () => {
+        this._renderListModal({
+            title: "勢力一覧",
+            contextHtml: contextHtml,
+            headers: ["勢力名", "武将", "兵士", "友好度", "関係"],
+            headerClass: "force-list-header",
+            itemClass: "force-list-item",
+            listClass: "",
+            items: items,
+            scrollPos: scrollPos,
+            onBack: onCancel,
+            onConfirm: () => {
                 if (this.selectedForceIndex === null) return;
                 this.closeCommonModal(); 
                 // ★修正：決定ボタンを押した時、そのままデータを返すのではなく、元の形式に戻してあげます！
                 const selectedItem = this.currentForces[this.selectedForceIndex];
                 const selectedForce = selectedItem.force || selectedItem;
                 if (onSelect) onSelect(selectedForce); 
-            };
-        }
+            }
+        });
     }
 
     selectForce(index, element) {
