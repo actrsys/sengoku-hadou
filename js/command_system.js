@@ -798,6 +798,14 @@ class CommandSystem {
             }
         }
 
+        // ★ここから追加：対象をマップで選ぶコマンドの場合、選べる対象が1つもなければ実行不可にします
+        if (spec.startMode === 'map_select') {
+            const validTargets = this.getValidTargets(type);
+            if (!validTargets || validTargets.length === 0) {
+                return false;
+            }
+        }
+
         return true;
     }
 
