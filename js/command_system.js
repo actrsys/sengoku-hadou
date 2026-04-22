@@ -568,6 +568,14 @@ class CommandSystem {
         const castle = this.game.getCurrentTurnCastle();
         if (!castle) return false;
 
+        // 大名の居城（本拠）では城主任命（appoint）を禁止します
+        if (type === 'appoint') {
+            const daimyo = this.game.bushos.find(b => b.clan === this.game.playerClanId && b.isDaimyo);
+            if (daimyo && Number(daimyo.castleId) === Number(castle.id)) {
+                return false;
+            }
+        }
+
         if (type === 'farm' && castle.kokudaka >= castle.maxKokudaka) return false;
         if (type === 'commerce' && castle.commerce >= castle.maxCommerce) return false;
         if (type === 'repair' && castle.defense >= castle.maxDefense) return false;
