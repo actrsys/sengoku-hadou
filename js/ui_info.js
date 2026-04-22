@@ -2010,14 +2010,16 @@ class UIInfoManager {
         const myDaimyo = this.game.bushos.find(b => b.clan === this.game.playerClanId && b.isDaimyo);
         
         if (!isViewMode && !this.bushoCurrentSortKey) {
-            if (spec && spec.stat) {
+            if (spec && spec.sortKey) {
+                this.bushoCurrentSortKey = spec.sortKey;
+            } else if (spec && spec.stat) {
                 this.bushoCurrentSortKey = spec.stat;
             } else if (actionType) {
-                const leadershipActions = ['draft', 'train', 'war_deploy', 'def_intercept_deploy', 'def_reinf_deploy', 'atk_reinf_deploy', 'def_self_reinf_deploy', 'atk_self_reinf_deploy', 'kunishu_subjugate_deploy', 'war_general', 'kunishu_war_general', 'appoint'];
-                const politicsActions = ['develop'];
+                const leadershipActions = ['draft', 'train', 'training', 'war_deploy', 'def_intercept_deploy', 'def_reinf_deploy', 'atk_reinf_deploy', 'def_self_reinf_deploy', 'atk_self_reinf_deploy', 'kunishu_subjugate_deploy', 'war_general', 'kunishu_war_general', 'appoint'];
+                const politicsActions = ['farm', 'commerce', 'repair'];
                 const diplomacyActions = ['diplomacy_doer', 'goodwill', 'tribute', 'marriage_princess', 'marriage_kinsman', 'succession'];
-                const intelligenceActions = ['rumor', 'headhunt', 'destroy', 'revolt', 'rumor_target_busho', 'headhunt_target', 'appoint_gunshi'];
-                const charmActions = ['charity', 'employ', 'employ_target'];
+                const intelligenceActions = ['rumor', 'headhunt', 'sabotage', 'incite', 'destroy', 'revolt', 'rumor_target_busho', 'headhunt_target', 'appoint_gunshi'];
+                const charmActions = ['charity', 'soldier_charity', 'employ', 'employ_target'];
                 
                 if (leadershipActions.includes(actionType)) this.bushoCurrentSortKey = 'leadership';
                 else if (politicsActions.includes(actionType)) this.bushoCurrentSortKey = 'politics';
