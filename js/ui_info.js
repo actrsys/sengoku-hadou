@@ -1529,83 +1529,29 @@ class UIInfoManager {
     }
 
     _renderKyotenList(clanId, scrollPos = 0) {
-        const modal = document.getElementById('selector-modal');
-        const titleEl = document.getElementById('selector-title');
-        const listContainer = document.getElementById('selector-list');
-        const contextEl = document.getElementById('selector-context-info');
-        const tabsEl = document.getElementById('selector-tabs');
-        const confirmBtn = document.getElementById('selector-confirm-btn');
-        const backBtn = document.querySelector('#selector-modal .btn-secondary');
-
-        if (!modal) return;
-        modal.classList.remove('hidden');
-        if (titleEl) titleEl.textContent = "拠点一覧";
-        if (contextEl) contextEl.classList.add('hidden');
-        if (confirmBtn) confirmBtn.classList.add('hidden');
-
-        if(backBtn) {
-            backBtn.style.display = '';
-            backBtn.textContent = this.modalHistory && this.modalHistory.length > 0 ? '戻る' : '閉じる';
-            backBtn.onclick = () => {
-                if (window.AudioManager) window.AudioManager.playSE('cancel.ogg');
-                this.popModal();
-            };
-            const footer = backBtn.parentElement;
-            if (footer) footer.style.justifyContent = 'center';
-        }
-
         this.kyotenTargetClanId = clanId !== null ? clanId : this.game.playerClanId;
         
         if (!this.currentKyotenTab) this.currentKyotenTab = 'status';
         if (!this.currentKyotenScope) this.currentKyotenScope = 'clan';
         
-        if (tabsEl) {
-            tabsEl.classList.remove('hidden');
-            tabsEl.style.justifyContent = 'flex-start';
-            tabsEl.style.paddingLeft = '10px';
-            tabsEl.style.alignItems = 'flex-end';
-
-            let scopeHtml = '';
-            if (clanId === null) {
-                scopeHtml = `
-                    <div style="display: flex; gap: 5px; margin-left: 15px;">
-                        <button class="busho-scope-btn ${this.currentKyotenScope === 'clan' ? 'active' : ''}" data-scope="clan">自家</button>
-                        <button class="busho-scope-btn ${this.currentKyotenScope === 'all' ? 'active' : ''}" data-scope="all">全国</button>
-                    </div>
-                `;
-            }
-
-            tabsEl.innerHTML = `
-                <div style="display: flex; gap: 5px;">
-                    <button class="busho-tab-btn ${this.currentKyotenTab === 'status' ? 'active' : ''}" data-tab="status">基本</button>
-                    <button class="busho-tab-btn ${this.currentKyotenTab === 'military' ? 'active' : ''}" data-tab="military">軍事</button>
-                    <button class="busho-tab-btn ${this.currentKyotenTab === 'economy' ? 'active' : ''}" data-tab="economy">経済</button>
+        let scopeHtml = '';
+        if (clanId === null) {
+            scopeHtml = `
+                <div style="display: flex; gap: 5px; margin-left: 15px;">
+                    <button class="busho-scope-btn ${this.currentKyotenScope === 'clan' ? 'active' : ''}" data-scope="clan">自家</button>
+                    <button class="busho-scope-btn ${this.currentKyotenScope === 'all' ? 'active' : ''}" data-scope="all">全国</button>
                 </div>
-                ${scopeHtml}
             `;
-
-            const tabBtns = tabsEl.querySelectorAll('.busho-tab-btn');
-            tabBtns.forEach(btn => {
-                btn.onclick = () => {
-                    if (window.AudioManager) window.AudioManager.playSE('choice.ogg');
-                    this.currentKyotenTab = btn.getAttribute('data-tab');
-                    this.currentKyotenSortKey = null;
-                    this.isKyotenSortAsc = false;
-                    this._renderKyotenList(clanId, 0);
-                };
-            });
-
-            const scopeBtns = tabsEl.querySelectorAll('.busho-scope-btn');
-            scopeBtns.forEach(btn => {
-                btn.onclick = () => {
-                    if (window.AudioManager) window.AudioManager.playSE('choice.ogg');
-                    this.currentKyotenScope = btn.getAttribute('data-scope');
-                    this.currentKyotenSortKey = null;
-                    this.isKyotenSortAsc = false;
-                    this._renderKyotenList(clanId, 0);
-                };
-            });
         }
+
+        let tabsHtml = `
+            <div style="display: flex; gap: 5px;">
+                <button class="busho-tab-btn ${this.currentKyotenTab === 'status' ? 'active' : ''}" data-tab="status">基本</button>
+                <button class="busho-tab-btn ${this.currentKyotenTab === 'military' ? 'active' : ''}" data-tab="military">軍事</button>
+                <button class="busho-tab-btn ${this.currentKyotenTab === 'economy' ? 'active' : ''}" data-tab="economy">経済</button>
+            </div>
+            ${scopeHtml}
+        `;
 
         if (this.currentKyotenScope === 'all') {
             this.kyotenCastles = this.game.castles;
@@ -1613,7 +1559,6 @@ class UIInfoManager {
             this.kyotenCastles = this.game.castles.filter(c => c.ownerClan === this.kyotenTargetClanId);
         }
 
-        const currentScrollLeft = listContainer ? listContainer.scrollLeft : 0;
         let displayCastles = [...this.kyotenCastles];
 
         if (this.currentKyotenSortKey) {
@@ -1684,16 +1629,47 @@ class UIInfoManager {
             return this.isKyotenSortAsc ? ' ▲' : ' ▼';
         };
 
-        let headerHtml = '';
+        let headers = [];
+        let gridStyle = "";
+
         if (this.currentKyotenTab === 'status') {
-            headerHtml = `<div class="list-header sortable-header" style="grid-template-columns: 1.5fr 1.5fr 1.5fr 1fr 1fr 1fr 1fr;"><span data-sort="name" style="padding-left:5px; justify-content:flex-start;">拠点名${getSortMark('name')}</span><span data-sort="clan">勢力${getSortMark('clan')}</span><span data-sort="castellan">城主${getSortMark('castellan')}</span><span data-sort="province">所属${getSortMark('province')}</span><span data-sort="bushoCount">武将数${getSortMark('bushoCount')}</span><span data-sort="gold">金${getSortMark('gold')}</span><span data-sort="rice">兵糧${getSortMark('rice')}</span></div>`;
+            gridStyle = "1.5fr 1.5fr 1.5fr 1fr 1fr 1fr 1fr";
+            headers = [
+                `<span data-sort="name" style="padding-left:5px; justify-content:flex-start;">拠点名${getSortMark('name')}</span>`,
+                `<span data-sort="clan">勢力${getSortMark('clan')}</span>`,
+                `<span data-sort="castellan">城主${getSortMark('castellan')}</span>`,
+                `<span data-sort="province">所属${getSortMark('province')}</span>`,
+                `<span data-sort="bushoCount">武将数${getSortMark('bushoCount')}</span>`,
+                `<span data-sort="gold">金${getSortMark('gold')}</span>`,
+                `<span data-sort="rice">兵糧${getSortMark('rice')}</span>`
+            ];
         } else if (this.currentKyotenTab === 'military') {
-            headerHtml = `<div class="list-header sortable-header" style="grid-template-columns: 1.5fr 1.5fr 1fr 1fr 1fr 1fr 1fr;"><span data-sort="name" style="padding-left:5px; justify-content:flex-start;">拠点名${getSortMark('name')}</span><span data-sort="soldiers">兵士${getSortMark('soldiers')}</span><span data-sort="defense">防御${getSortMark('defense')}</span><span data-sort="morale">士気${getSortMark('morale')}</span><span data-sort="training">訓練${getSortMark('training')}</span><span data-sort="horses">軍馬${getSortMark('horses')}</span><span data-sort="guns">鉄砲${getSortMark('guns')}</span></div>`;
+            gridStyle = "1.5fr 1.5fr 1fr 1fr 1fr 1fr 1fr";
+            headers = [
+                `<span data-sort="name" style="padding-left:5px; justify-content:flex-start;">拠点名${getSortMark('name')}</span>`,
+                `<span data-sort="soldiers">兵士${getSortMark('soldiers')}</span>`,
+                `<span data-sort="defense">防御${getSortMark('defense')}</span>`,
+                `<span data-sort="morale">士気${getSortMark('morale')}</span>`,
+                `<span data-sort="training">訓練${getSortMark('training')}</span>`,
+                `<span data-sort="horses">軍馬${getSortMark('horses')}</span>`,
+                `<span data-sort="guns">鉄砲${getSortMark('guns')}</span>`
+            ];
         } else if (this.currentKyotenTab === 'economy') {
-            headerHtml = `<div class="list-header sortable-header" style="grid-template-columns: 1.5fr 1fr 1fr 1fr 1fr 1.5fr 1.5fr 1.5fr 1.5fr;"><span data-sort="name" style="padding-left:5px; justify-content:flex-start;">拠点名${getSortMark('name')}</span><span data-sort="population">人口${getSortMark('population')}</span><span data-sort="loyalty">民忠${getSortMark('loyalty')}</span><span data-sort="kokudaka">石高${getSortMark('kokudaka')}</span><span data-sort="commerce">鉱山${getSortMark('commerce')}</span><span data-sort="goldIncome">金収入/月${getSortMark('goldIncome')}</span><span data-sort="goldConsume">金支出/月${getSortMark('goldConsume')}</span><span data-sort="riceIncome">兵糧収入/年${getSortMark('riceIncome')}</span><span data-sort="riceConsume">兵糧支出/年${getSortMark('riceConsume')}</span></div>`;
+            gridStyle = "1.5fr 1fr 1fr 1fr 1fr 1.5fr 1.5fr 1.5fr 1.5fr";
+            headers = [
+                `<span data-sort="name" style="padding-left:5px; justify-content:flex-start;">拠点名${getSortMark('name')}</span>`,
+                `<span data-sort="population">人口${getSortMark('population')}</span>`,
+                `<span data-sort="loyalty">民忠${getSortMark('loyalty')}</span>`,
+                `<span data-sort="kokudaka">石高${getSortMark('kokudaka')}</span>`,
+                `<span data-sort="commerce">鉱山${getSortMark('commerce')}</span>`,
+                `<span data-sort="goldIncome">金収入/月${getSortMark('goldIncome')}</span>`,
+                `<span data-sort="goldConsume">金支出/月${getSortMark('goldConsume')}</span>`,
+                `<span data-sort="riceIncome">兵糧収入/年${getSortMark('riceIncome')}</span>`,
+                `<span data-sort="riceConsume">兵糧支出/年${getSortMark('riceConsume')}</span>`
+            ];
         }
-        
-        let listHtml = headerHtml;
+
+        let items = [];
         
         displayCastles.forEach(c => {
             const clanData = this.game.clans.find(cd => cd.id === c.ownerClan);
@@ -1724,73 +1700,83 @@ class UIInfoManager {
                 });
             }
             
+            let cells = [];
             if (this.currentKyotenTab === 'status') {
-                listHtml += `<div class="select-item" style="grid-template-columns: 1.5fr 1.5fr 1.5fr 1fr 1fr 1fr 1fr;"><span style="justify-content:flex-start; padding-left:5px;">${c.name}</span><span>${clanName}</span><span>${castellanName}</span><span>${provinceName}</span><span>${bushosCount}</span><span>${c.gold}</span><span>${c.rice}</span></div>`;
+                cells = [
+                    `<span class="col-castle-name" style="justify-content:flex-start; padding-left:5px;">${c.name}</span>`,
+                    `${clanName}`,
+                    `${castellanName}`,
+                    `${provinceName}`,
+                    `${bushosCount}`,
+                    `${c.gold}`,
+                    `${c.rice}`
+                ];
             } else if (this.currentKyotenTab === 'military') {
-                listHtml += `<div class="select-item" style="grid-template-columns: 1.5fr 1.5fr 1fr 1fr 1fr 1fr 1fr;"><span style="justify-content:flex-start; padding-left:5px;">${c.name}</span><span>${c.soldiers}</span><span>${c.defense}</span><span>${c.morale}</span><span>${c.training}</span><span>${c.horses}</span><span>${c.guns}</span></div>`;
+                cells = [
+                    `<span class="col-castle-name" style="justify-content:flex-start; padding-left:5px;">${c.name}</span>`,
+                    `${c.soldiers}`,
+                    `${c.defense}`,
+                    `${c.morale}`,
+                    `${c.training}`,
+                    `${c.horses || 0}`,
+                    `${c.guns || 0}`
+                ];
             } else if (this.currentKyotenTab === 'economy') {
-                listHtml += `<div class="select-item" style="grid-template-columns: 1.5fr 1fr 1fr 1fr 1fr 1.5fr 1.5fr 1.5fr 1.5fr;"><span style="justify-content:flex-start; padding-left:5px;">${c.name}</span><span>${c.population}</span><span>${c.peoplesLoyalty}</span><span>${c.kokudaka}</span><span>${c.commerce}</span><span>${goldIncome}</span><span>${consumeGold}</span><span>${riceIncome}</span><span>${consumeRiceYear}</span></div>`;
+                cells = [
+                    `<span class="col-castle-name" style="justify-content:flex-start; padding-left:5px;">${c.name}</span>`,
+                    `${c.population}`,
+                    `${c.peoplesLoyalty}`,
+                    `${c.kokudaka}`,
+                    `${c.commerce}`,
+                    `${goldIncome}`,
+                    `${consumeGold}`,
+                    `${riceIncome}`,
+                    `${consumeRiceYear}`
+                ];
+            }
+
+            items.push({
+                onClick: `if(window.AudioManager) window.AudioManager.playSE('choice.ogg'); window.GameApp.ui.info.showCastleDetail(${c.id})`,
+                cells: cells
+            });
+        });
+
+        this._renderListModal({
+            title: "拠点一覧",
+            tabsHtml: tabsHtml,
+            headers: headers,
+            headerClass: "sortable-header",
+            itemClass: "",
+            listClass: "kyoten-list-container",
+            items: items,
+            scrollPos: scrollPos,
+            gridTemplateSp: gridStyle,
+            gridTemplatePc: gridStyle,
+            onTabClick: (tabKey) => {
+                this.currentKyotenTab = tabKey;
+                this.currentKyotenSortKey = null;
+                this.isKyotenSortAsc = false;
+                this._renderKyotenList(clanId, 0);
+            },
+            onScopeClick: (scopeKey) => {
+                this.currentKyotenScope = scopeKey;
+                this.currentKyotenSortKey = null;
+                this.isKyotenSortAsc = false;
+                this._renderKyotenList(clanId, 0);
+            },
+            onSortClick: (sortKey) => {
+                if (this.currentKyotenSortKey === sortKey) {
+                    this.isKyotenSortAsc = !this.isKyotenSortAsc;
+                } else {
+                    this.currentKyotenSortKey = sortKey;
+                    this.isKyotenSortAsc = false;
+                    if (['name', 'clan', 'castellan', 'province'].includes(sortKey)) {
+                        this.isKyotenSortAsc = true;
+                    }
+                }
+                this._renderKyotenList(clanId, 0);
             }
         });
-        
-        const itemCount = displayCastles.length;
-        let dummyCols = "";
-        let dummyStyle = "";
-        if (this.currentKyotenTab === 'status') {
-            dummyCols = "<span></span><span></span><span></span><span></span><span></span><span></span><span></span>";
-            dummyStyle = "grid-template-columns: 1.5fr 1.5fr 1.5fr 1fr 1fr 1fr 1fr;";
-        } else if (this.currentKyotenTab === 'military') {
-            dummyCols = "<span></span><span></span><span></span><span></span><span></span><span></span><span></span>";
-            dummyStyle = "grid-template-columns: 1.5fr 1.5fr 1fr 1fr 1fr 1fr 1fr;";
-        } else if (this.currentKyotenTab === 'economy') {
-            dummyCols = "<span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span>";
-            dummyStyle = "grid-template-columns: 1.5fr 1fr 1fr 1fr 1fr 1.5fr 1.5fr 1.5fr 1.5fr;";
-        }
-
-        for (let i = itemCount; i < 8; i++) {
-            listHtml += `<div class="select-item" style="${dummyStyle} cursor:default; pointer-events:none;">${dummyCols}</div>`;
-        }
-        
-        if (listContainer) {
-            listContainer.className = 'list-container kyoten-list-container hide-native-scroll';
-            listContainer.style.display = 'block';
-            listContainer.innerHTML = listHtml;
-
-            const headerSpans = listContainer.querySelectorAll('.sortable-header span[data-sort]');
-            headerSpans.forEach(span => {
-                span.onclick = (e) => {
-                    const key = e.currentTarget.getAttribute('data-sort');
-                    if (!key) return;
-                    if (window.AudioManager) window.AudioManager.playSE('choice.ogg');
-                    
-                    if (this.currentKyotenSortKey === key) {
-                        this.isKyotenSortAsc = !this.isKyotenSortAsc;
-                    } else {
-                        this.currentKyotenSortKey = key;
-                        this.isKyotenSortAsc = false;
-                        
-                        if (['name', 'clan', 'castellan', 'province'].includes(key)) {
-                            this.isKyotenSortAsc = true;
-                        }
-                    }
-                    this._renderKyotenList(clanId, 0);
-                };
-            });
-
-            if (window.CustomScrollbar) {
-                if (!this.ui.bushoScrollbar) {
-                    this.ui.bushoScrollbar = new CustomScrollbar(listContainer);
-                }
-                setTimeout(() => {
-                    listContainer.scrollTop = scrollPos;
-                    listContainer.scrollLeft = currentScrollLeft;
-                    this.ui.bushoScrollbar.update();
-                }, 10);
-            } else {
-                listContainer.scrollTop = scrollPos;
-                listContainer.scrollLeft = currentScrollLeft;
-            }
-        }
     }
 
     // ==========================================
