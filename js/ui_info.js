@@ -1903,6 +1903,10 @@ class UIInfoManager {
         }
     }
     
+    // ==========================================
+    // ★武将一覧＆武将選択の魔法（共通モーダル対応版）
+    // ==========================================
+    
     openBushoSelector(actionType, targetId = null, extraData = null, onBack = null) {
         if (actionType === 'appoint' && this.ui.currentCastle) { const isDaimyoHere = this.game.getCastleBushos(this.ui.currentCastle.id).some(b => b.isDaimyo); if (isDaimyoHere) { this.ui.showDialog("大名の居城は城主を変更できません", false); return; } }
         
@@ -2207,11 +2211,11 @@ class UIInfoManager {
         if (this.bushoCurrentTab === 'stats') {
             if (isViewMode) {
                 // 基本タブ・見るだけモードの幅（左から：名前, 身分, 統率, 武勇, 内政, 外交, 智謀, 魅力）
-                gridSpStr = "2.5fr 1.5fr 1fr 1fr 1fr 1fr 1fr 1fr";
+                gridSpStr = "2fr 1.8fr 1.2fr 1.2fr 1.2fr 1.2fr 1.2fr 1.2fr";
                 gridPcStr = "100px 60px 1fr 1fr 1fr 1fr 1fr 1fr";
             } else {
                 // 基本タブ・選択モードの幅（左から：行動, 名前, 身分, 統率, 武勇, 内政, 外交, 智謀, 魅力）
-                gridSpStr = "25px 2.5fr 1.5fr 1fr 1fr 1fr 1fr 1fr 1fr";
+                gridSpStr = "25px 2fr 1.8fr 1.2fr 1.2fr 1.2fr 1.2fr 1.2fr 1.2fr";
                 gridPcStr = "35px 100px 60px 1fr 1fr 1fr 1fr 1fr 1fr";
             }
             headers = [
@@ -2230,11 +2234,11 @@ class UIInfoManager {
             itemClassStr += " status-mode";
             if (isViewMode) {
                 // 状態タブ・見るだけモードの幅（左から：名前, 勢力, 所在, 年齢, 一門, 俸禄, 派閥）
-                gridSpStr = "2.5fr 2fr 2fr 1fr 1fr 1fr 1.5fr";
+                gridSpStr = "2fr 2fr 2fr 1fr 1fr 1fr 2fr";
                 gridPcStr = "100px 140px 140px 50px 50px 60px 1fr";
             } else {
                 // 状態タブ・選択モードの幅（左から：行動, 名前, 勢力, 所在, 年齢, 一門, 俸禄, 派閥）
-                gridSpStr = "25px 2.5fr 2fr 2fr 1fr 1fr 1fr 1.5fr";
+                gridSpStr = "25px 2fr 2fr 2fr 1fr 1fr 1fr 2fr";
                 gridPcStr = "35px 100px 140px 140px 50px 50px 60px 1fr";
             }
             headers = [
