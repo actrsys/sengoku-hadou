@@ -185,8 +185,8 @@ class UIInfoManager {
             title: "勢力一覧",
             headers: [
                 `<span class="col-daimyo-name">勢力名</span>`,
-                `<span class="col-leader-name">当主名</span>`,
-                `<span class="col-castle-count">城数</span>`,
+                `<span class="col-leader-name">当主</span>`,
+                `<span class="col-castle-count">拠点</span>`,
                 `<span class="col-prestige">威信</span>`,
                 `<span class="col-friend">友好度</span>`,
                 `<span class="col-relation">関係</span>`,
@@ -531,7 +531,7 @@ class UIInfoManager {
             title: `${clan.name} 派閥一覧`,
             headers: [
                 `<span class="col-faction-name">派閥主</span>`,
-                `<span class="col-busho-count">武将数</span>`,
+                `<span class="col-busho-count">武将</span>`,
                 `<span class="col-seikaku">方針</span>`,
                 `<span class="col-hoshin">思想</span>`,
                 `<span></span>`
@@ -1704,7 +1704,7 @@ class UIInfoManager {
                 `<span class="col-clan" data-sort="clan">勢力${getSortMark('clan')}</span>`,
                 `<span class="col-castellan" data-sort="castellan">城主${getSortMark('castellan')}</span>`,
                 `<span class="col-province" data-sort="province">所属${getSortMark('province')}</span>`,
-                `<span class="col-busho-count" data-sort="bushoCount">武将数${getSortMark('bushoCount')}</span>`,
+                `<span class="col-busho-count" data-sort="bushoCount">武将${getSortMark('bushoCount')}</span>`,
                 `<span class="col-gold" data-sort="gold">金${getSortMark('gold')}</span>`,
                 `<span class="col-rice" data-sort="rice">兵糧${getSortMark('rice')}</span>`
             ];
@@ -2878,7 +2878,7 @@ class UIInfoManager {
             inputs.soldiers = createSlider("兵士数", "soldiers", maxSoldiers, 0);
             
         } else if (type === 'charity') {
-            document.getElementById('quantity-title').textContent = "施し"; this.ui.charityTypeSelector.classList.remove('hidden'); const count = data.length; this.ui.quantityContainer.innerHTML = `<p>選択武将数: ${count}名</p>`;
+            document.getElementById('quantity-title').textContent = "施し"; this.ui.charityTypeSelector.classList.remove('hidden'); const count = data.length; this.ui.quantityContainer.innerHTML = `<p>選択武将: ${count}名</p>`;
         } else if (type === 'goodwill') {
             document.getElementById('quantity-title').textContent = "贈与金指定"; 
             const maxGoodwillGold = Math.max(200, Math.min(1500, c.gold));
