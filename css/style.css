@@ -633,13 +633,10 @@ body.hide-daimyo-labels .daimyo-name-label { display: none !important; }
 }
 
 /* 個別リストのグリッド調整 */
-.daimyo-list-header, .daimyo-list-item { grid-template-columns: 2fr 2fr 1fr 1.5fr 1.5fr 1fr; }
-.kunishu-list-header, .kunishu-list-item { grid-template-columns: 2fr 2.5fr 1.5fr 1.5fr 1fr 1.5fr 1fr; }
-.kunishu-list-header.view-mode, .kunishu-list-item.view-mode { grid-template-columns: 2fr 2.5fr 1.5fr 1.5fr 1fr 1.5fr 1fr; }
 .faction-list-header, .faction-list-item { grid-template-columns: 2.5fr 1fr 1.5fr 1.5fr 3fr; }
 .princess-list-header, .princess-list-item { grid-template-columns: 1.3fr 1fr 1.5fr 1.5fr 3fr; }
 .delegate-list-header, .delegate-list-item { grid-template-columns: 1.5fr 1fr 1fr 1fr; }
-.force-list-header, .force-list-item { grid-template-columns: 1.5fr 1fr 1fr 1.5fr 1fr; } /* ★追加：勢力選択リスト用の幅 */
+.force-list-header, .force-list-item { grid-template-columns: 1.5fr 1fr 1fr 1.5fr 1fr; }
 
 /* =========================================================
    ボタン類
@@ -1965,14 +1962,15 @@ body.is-pc {
     .cmd-btn.finish, .cmd-btn.back { grid-column: span 2; }
 
     /* PCリストレイアウト */
-.scroll-wrapper { max-height: calc(44px * 9 + 28px); }
-.list-container { scroll-padding-top: 44px; }
-.list-header, .select-item { grid-template-columns: var(--grid-cols-pc, 45px 100px 60px repeat(6, 1fr)); font-size: 0.85rem; height: 44px; }
-.list-header.view-mode, .select-item.view-mode { grid-template-columns: var(--grid-cols-pc, 100px 60px repeat(6, 1fr)); }
+    .scroll-wrapper { max-height: calc(44px * 9 + 28px); }
+    .list-container { scroll-padding-top: 44px; }
+    .list-header, .select-item { grid-template-columns: var(--grid-cols-pc, 45px 100px 60px repeat(6, 1fr)); font-size: 0.85rem; height: 44px; }
+    .list-header.view-mode, .select-item.view-mode { grid-template-columns: var(--grid-cols-pc, 100px 60px repeat(6, 1fr)); }
     
-    .daimyo-list-header, .daimyo-list-item { grid-template-columns: 80px 110px 50px 80px 80px 60px; font-size: 0.9rem; height: 44px; }
-    .kunishu-list-header, .kunishu-list-item { grid-template-columns: 100px 120px 80px 80px 60px 80px 60px; font-size: 0.9rem; height: 44px; }
-    .kunishu-list-header.view-mode, .kunishu-list-item.view-mode { grid-template-columns: 100px 120px 80px 80px 60px 80px 60px; }
+    /* ※勢力一覧・諸勢力一覧の列幅は JS側で指定しているため削除しました */
+    .daimyo-list-header, .daimyo-list-item { font-size: 0.9rem; height: 44px; }
+    .kunishu-list-header, .kunishu-list-item { font-size: 0.9rem; height: 44px; }
+    
     .faction-list-header, .faction-list-item { grid-template-columns: 140px 80px 100px 100px 1fr; font-size: 0.95rem; height: 44px; }
     .princess-list-header, .princess-list-item { grid-template-columns: 95px 80px 100px 100px 1fr; font-size: 0.95rem; height: 44px; }
     .force-list-header, .force-list-item { grid-template-columns: 150px 120px 100px 1fr 80px; font-size: 0.95rem; height: 44px; } /* ★追加：PC版の勢力選択リスト用の幅 */
