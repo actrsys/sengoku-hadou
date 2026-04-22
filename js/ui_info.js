@@ -1399,7 +1399,6 @@ class UIInfoManager {
     // ★ここから追加：拠点詳細の魔法です！
     // ==========================================
     showCastleDetail(castleId) {
-        this.closeCommonModal(); 
         this.pushModal('castle_detail', [castleId]);
     }
 
@@ -1535,8 +1534,6 @@ class UIInfoManager {
     }
     
     _renderKyotenList(clanId, scrollPos = 0) {
-        this.pushModal('kyotenList', [clanId, scrollPos]);
-        
         this.kyotenTargetClanId = clanId !== null ? clanId : this.game.playerClanId;
         
         if (!this.currentKyotenTab) this.currentKyotenTab = 'status';
