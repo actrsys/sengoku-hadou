@@ -2341,7 +2341,6 @@ class UIInfoManager {
             };
         }
 
-        let colStr = "";
         let minW = isViewMode ? "900px" : "850px";
 
         this._renderListModal({
@@ -2351,7 +2350,7 @@ class UIInfoManager {
             headers: headers,
             headerClass: headerClassStr,
             itemClass: itemClassStr,
-            listClass: "",
+            listClass: "busho-list-container",
             items: items,
             scrollPos: scrollPos,
             minWidth: minW,
