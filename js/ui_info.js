@@ -2342,11 +2342,7 @@ class UIInfoManager {
         }
 
         let colStr = "";
-        let minW = "";
-
-        if (this.bushoCurrentTab === 'status') {
-            minW = isViewMode ? "900px" : "850px";
-        }
+        let minW = isViewMode ? "900px" : "850px";
 
         this._renderListModal({
             title: titleStr,
