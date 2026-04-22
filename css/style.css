@@ -2193,6 +2193,6 @@ body.is-pc.daimyo-select-mode #pc-new-ui-container { display: none !important; }
    ========================================================= */
 .kyoten-list-container .list-header, 
 .kyoten-list-container .select-item {
-    min-width: 650px; /* 画面が小さくてもこの幅を保って、横にスクロールできるようにします！ */
-    width: max(100%, 650px);
+    width: 650px;
+    min-width: 100%;
 }

@@ -1030,7 +1030,7 @@ class UIInfoManager {
 
         let gridStyle = "";
         if (config.minWidth) {
-            gridStyle += `min-width: ${config.minWidth}; width: max(100%, ${config.minWidth}); `;
+            gridStyle += `width: ${config.minWidth}; min-width: 100%; `;
         }
 
         const buildItemHtml = (item, index) => {
