@@ -568,6 +568,22 @@ class CommandSystem {
         const castle = this.game.getCurrentTurnCastle();
         if (!castle) return false;
 
+        // ★ここから追加：未行動の武将が必要なコマンドのチェック
+        const actionRequiredCommands = [
+            'farm', 'commerce', 'repair', 'charity', // 内政
+            'war', 'draft', 'training', 'soldier_charity', 'transport', 'kunishu_subjugate', // 軍事
+            'goodwill', 'alliance', 'marriage', 'dominate', 'subordinate', 'break_alliance', // 外交
+            'kunishu_goodwill', 'kunishu_incorporate', // 諸勢力
+            'sabotage', 'incite', 'rumor', 'headhunt', // 調略
+            'tribute', 'court_truce', // 朝廷
+            'employ', 'move', 'banish' // 人事（一部）
+        ];
+        if (actionRequiredCommands.includes(type)) {
+            const activeBushos = this.game.bushos.filter(b => b.castleId === castle.id && b.clan === castle.ownerClan && b.status === 'active' && !b.isActionDone);
+            if (activeBushos.length === 0) return false;
+        }
+        // ★追加ここまで
+
         // 大名の居城（本拠）では城主任命（appoint）を禁止します
         if (type === 'appoint') {
             const daimyo = this.game.bushos.find(b => b.clan === this.game.playerClanId && b.isDaimyo);
