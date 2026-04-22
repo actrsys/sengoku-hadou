@@ -174,7 +174,10 @@ const COMMAND_SPECS = {
         costGold: 0, costRice: 0, 
         isMulti: false, hasAdvice: false, 
         startMode: 'busho_select', sortKey: 'intelligence',
-        msg: "軍師を任命します" 
+        msg: "軍師を任命します",
+        canExecute: (game, castle) => {
+            return game.bushos.some(b => b.clan === game.playerClanId && b.status === 'active' && !b.isDaimyo && !b.isCastellan);
+        }
     },
     'appoint': { 
         label: "城主任命", category: 'PERSONNEL', 
@@ -190,21 +193,32 @@ const COMMAND_SPECS = {
     },
     'delegate': { 
         label: "城主委任", category: 'PERSONNEL', 
-        isSystem: true, action: 'delegate_list' 
+        isSystem: true, action: 'delegate_list',
+        canExecute: (game, castle) => {
+            const daimyo = game.bushos.find(b => b.clan === game.playerClanId && b.isDaimyo);
+            if (!daimyo) return false;
+            return game.castles.some(c => c.ownerClan === game.playerClanId && c.id !== daimyo.castleId);
+        }
     },
     'reward': { 
         label: "褒美", category: 'PERSONNEL', 
         costGold: 100, costRice: 0, 
         isMulti: true, hasAdvice: false, 
         startMode: 'busho_select', sortKey: 'loyalty',
-        msg: "金: 100 (1人あたり)\n褒美を与えます" 
+        msg: "金: 100 (1人あたり)\n褒美を与えます",
+        canExecute: (game, castle) => {
+            return game.bushos.some(b => b.clan === game.playerClanId && b.status === 'active' && !b.isDaimyo);
+        }
     },
     'interview': { 
         label: "面談", category: 'PERSONNEL', 
         costGold: 0, costRice: 0, 
         isMulti: false, hasAdvice: false, 
         startMode: 'busho_select', sortKey: 'leadership',
-        msg: "武将と面談します" 
+        msg: "武将と面談します",
+        canExecute: (game, castle) => {
+            return game.bushos.some(b => b.clan === game.playerClanId && b.status === 'active' && !b.isDaimyo);
+        }
     },
     'employ': { 
         label: "登用", category: 'PERSONNEL', 
@@ -233,7 +247,10 @@ const COMMAND_SPECS = {
         costGold: 0, costRice: 0, 
         isMulti: false, hasAdvice: false, 
         startMode: 'busho_select', sortKey: 'loyalty',
-        msg: "武将を追放します" 
+        msg: "武将を追放します",
+        canExecute: (game, castle) => {
+            return game.bushos.some(b => b.clan === game.playerClanId && b.status === 'active' && !b.isDaimyo);
+        }
     },
 
     // --- 対外：調略 (FOREIGN_STRATEGY) ---
@@ -633,7 +650,7 @@ class CommandSystem {
     canExecuteCommand(type) {
         const spec = COMMAND_SPECS[type];
         if (!spec) return true;
-        if (spec.isSystem) return true;
+        if (spec.isSystem && typeof spec.canExecute !== 'function') return true;
 
         const castle = this.game.getCurrentTurnCastle();
         if (!castle) return false;
