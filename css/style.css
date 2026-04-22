@@ -536,8 +536,32 @@ body.hide-daimyo-labels .daimyo-name-label { display: none !important; }
 .select-item.selected:hover { background: rgba(255, 152, 0, 0.6) !important; }
 .select-item input[type="checkbox"], .select-item input[type="radio"] { display: none; }
 
-/* 名前カラムの左寄せを共通化 */
-// すべて中央寄せの状態でテスト中 このままの可能性も有り .select-item .col-name, .select-item .col-daimyo-name, .select-item .col-leader-name, .select-item .col-kunishu-name, .select-item .col-faction-name, .select-item .col-princess-name, .select-item .col-castle-name { justify-content: flex-start !important; padding-left: 5px; }
+/* =========================================================
+   列の文字揃え（左・中央・右）のルール
+   ========================================================= */
+/* 【左寄せグループ（文字）】 */
+.list-header .col-name, .select-item .col-name, 
+.list-header .col-daimyo-name, .select-item .col-daimyo-name, 
+.list-header .col-leader-name, .select-item .col-leader-name, 
+.list-header .col-kunishu-name, .select-item .col-kunishu-name, 
+.list-header .col-faction, .select-item .col-faction, 
+.list-header .col-faction-name, .select-item .col-faction-name, 
+.list-header .col-princess-name, .select-item .col-princess-name, 
+.list-header .col-castle, .select-item .col-castle, 
+.list-header .col-castle-name, .select-item .col-castle-name,
+.list-header .col-rank, .select-item .col-rank,
+.list-header .col-faction-leader, .select-item .col-faction-leader { 
+    justify-content: flex-start !important; 
+    padding-left: 5px; 
+}
+
+/* 【右寄せグループ（数字）】 */
+.list-header .col-age, .select-item .col-age,
+.list-header .col-salary, .select-item .col-salary { 
+    justify-content: flex-end !important; 
+    padding-right: 5px; 
+}
+/* ※これら以外の列（行動、一門、能力ランク、各種ゲージなど）は、ベース設定の「中央寄せ」がそのまま適用されます */
 
 /* 履歴リストアイテム */
 .history-list-item { scroll-snap-align: start; padding: 8px 10px; border-bottom: 1px solid rgba(255, 215, 79, 0.3); font-size: 0.9rem; color: #fff; background: linear-gradient(to bottom, #254a2e 0%, #1b3822 100%); text-shadow: 1px 1px 0 #000, -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000; }
