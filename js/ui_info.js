@@ -2209,11 +2209,11 @@ class UIInfoManager {
             headerClassStr += " status-mode";
             itemClassStr += " status-mode";
             headers = [
+                !isViewMode ? `<span class="col-act" data-sort="action">行動${getSortMark('action')}</span>` : null,
                 `<span class="col-name" data-sort="name">名前${getSortMark('name')}</span>`,
                 `<span class="col-rank" data-sort="rank">身分${getSortMark('rank')}</span>`,
                 `<span class="col-faction" data-sort="faction">勢力${getSortMark('faction')}</span>`,
                 `<span class="col-castle" data-sort="castle">所在${getSortMark('castle')}</span>`,
-                isViewMode ? `<span class="col-act" data-sort="action">行動${getSortMark('action')}</span>` : null,
                 `<span class="col-age" data-sort="age">年齢${getSortMark('age')}</span>`,
                 `<span class="col-family" data-sort="family">一門${getSortMark('family')}</span>`,
                 `<span class="col-salary" data-sort="salary">俸禄${getSortMark('salary')}</span>`,
@@ -2297,11 +2297,11 @@ class UIInfoManager {
                 }
 
                 cells = [
-                    `<span class="col-name">${!isViewMode ? inputHtml : ''}${b.name}</span>`,
+                    !isViewMode ? `<span class="col-act">${inputHtml}${b.isActionDone?'済':'未'}</span>` : null,
+                    `<span class="col-name">${b.name}</span>`,
                     `<span class="col-rank">${b.getRankName()}</span>`,
                     `<span class="col-faction">${forceName}</span>`,
                     `<span class="col-castle">${bCastleName}</span>`,
-                    isViewMode ? `<span class="col-act">${b.isActionDone?'済':'未'}</span>` : null,
                     `<span class="col-age">${age}</span>`,
                     `<span class="col-family">${familyMark}</span>`,
                     `<span class="col-salary">${salary}</span>`,
