@@ -1029,7 +1029,9 @@ class UIInfoManager {
         else listContainer.style.removeProperty('--grid-cols-pc');
 
         let gridStyle = "";
-        if (config.minWidth) gridStyle += `min-width: ${config.minWidth}; `;
+        if (config.minWidth) {
+            gridStyle += `min-width: ${config.minWidth}; width: max(100%, ${config.minWidth}); `;
+        }
 
         const buildItemHtml = (item, index) => {
             const cursorStr = item.onClick ? "style='cursor:pointer;'" : "style='cursor:default;'";
