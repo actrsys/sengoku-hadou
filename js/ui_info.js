@@ -1201,8 +1201,14 @@ class UIInfoManager {
             };
         });
 
+        let contextHtml = null;
+        if (isSelectMode) {
+            contextHtml = "<div>嫁がせる姫を選択してください</div>";
+        }
+
         this._renderListModal({
-            title: isSelectMode ? "嫁がせる姫を選択してください" : "姫一覧",
+            title: "姫一覧",
+            contextHtml: contextHtml,
             headers: ["姫", "年齢", "父親", "配偶者", ""],
             headerClass: "princess-list-header",
             itemClass: "princess-list-item",
@@ -3460,6 +3466,9 @@ class UIInfoManager {
     // ★引数に isSelectMode と onConfirm を追加して両対応にしました
     _renderKunishuList(kunishus, castle, isSelectMode = false, onBack = null, onConfirm = null, scrollPos = 0) {
         let contextHtml = `<div>${castle ? castle.name + ' に存在する諸勢力です' : '全国の諸勢力一覧です'}</div>`;
+        if (isSelectMode) {
+            contextHtml = "<div>対象とする諸勢力をお選びください</div>";
+        }
         let modeClassStr = isSelectMode ? "" : "view-mode";
 
         let items = [];
@@ -3508,7 +3517,7 @@ class UIInfoManager {
         this.selectedKunishuId = null;
 
         this._renderListModal({
-            title: isSelectMode ? "対象とする諸勢力をお選びください" : "諸勢力一覧",
+            title: "諸勢力一覧",
             contextHtml: contextHtml,
             headers: ["勢力名", "頭領", "所在", "所属", "兵士", "友好度", "関係"],
             headerClass: `kunishu-list-header ${modeClassStr}`,
@@ -3608,13 +3617,13 @@ class UIInfoManager {
     // ==========================================
     // ★援軍の勢力選択リストの魔法（共通モーダル対応版）
     // ==========================================
-    showForceSelector(forces, onSelect, onCancel) {
+    showForceSelector(forces, onSelect, onCancel, message = "対象の勢力を選択してください") {
         this.closeCommonModal(); 
-        this.pushModal('force_selector', [forces, onSelect, onCancel]);
+        this.pushModal('force_selector', [forces, onSelect, onCancel, message]);
     }
 
-    _renderForceSelector(forces, onSelect, onCancel, scrollPos = 0) {
-        let contextHtml = "<div>援軍を要請する勢力を選択してください</div>";
+    _renderForceSelector(forces, onSelect, onCancel, message = "対象の勢力を選択してください", scrollPos = 0) {
+        let contextHtml = `<div>${message}</div>`;
         this.currentForces = forces;
         this.selectedForceIndex = null;
 
