@@ -2350,7 +2350,7 @@ class UIInfoManager {
                 itemClass: itemClassThis
             });
         });
-
+        
         let onConfirmHandler = null;
         if (!isViewMode) {
             onConfirmHandler = () => {
@@ -2367,7 +2367,14 @@ class UIInfoManager {
         }
 
         let colStr = "";
-        let minW = isViewMode ? "700px" : "750px";
+        // 基本タブの時は横幅の制限を外して画面内に収めます
+        let minW = this.bushoCurrentTab === 'stats' ? "100%" : (isViewMode ? "700px" : "750px");
+
+        // CSSで見た目を微調整するための目印を追加します
+        if (this.bushoCurrentTab === 'stats') {
+            headerClassStr += " stats-mode";
+            itemClassStr += " stats-mode";
+        }
 
         this._renderListModal({
             title: titleStr,
