@@ -1741,9 +1741,12 @@ body:not(.is-pc) .daimyo-detail-value {
 body:not(.is-pc) .label-pc { display: none !important; }
 body:not(.is-pc) .label-sp { display: inline !important; }
 
-/* スマホ版武将一覧（基本タブ）を画面内に収めるための微調整 */
+/* スマホ版武将一覧（基本・状態タブ）を画面内に収めるための微調整 */
+/* 横スクロールに戻すときは .status-mode の2行を消すだけでOKです */
 body:not(.is-pc) .list-header.stats-mode > *, 
-body:not(.is-pc) .select-item.stats-mode > * { padding: 0 1px; font-size: clamp(0.55rem, 2vw, 0.8rem); }
+body:not(.is-pc) .select-item.stats-mode > *,
+body:not(.is-pc) .list-header.status-mode > *, 
+body:not(.is-pc) .select-item.status-mode > * { padding: 0 1px; font-size: clamp(0.55rem, 2vw, 0.8rem); }
 
 /* ★追加：スマホ版の全ウインドウを、左右の隙間なく画面いっぱいに広げる魔法 */
 body:not(.is-pc) .modal .modal-content {

@@ -2227,16 +2227,16 @@ class UIInfoManager {
             headerClassStr += " status-mode";
             itemClassStr += " status-mode";
             if (isViewMode) {
-                gridSpStr = "2.5fr 1.5fr 2fr 2fr 1fr 1fr 1fr 1.5fr";
-                gridPcStr = "100px 60px 140px 140px 50px 50px 60px 1fr";
+                gridSpStr = "2.5fr 2fr 2fr 1fr 1fr 1fr 1.5fr";
+                gridPcStr = "100px 140px 140px 50px 50px 60px 1fr";
             } else {
-                gridSpStr = "35px 2.5fr 1.5fr 2fr 2fr 1fr 1fr 1fr 1.5fr";
-                gridPcStr = "45px 100px 60px 140px 140px 50px 50px 60px 1fr";
+                gridSpStr = "35px 2.5fr 2fr 2fr 1fr 1fr 1fr 1.5fr";
+                gridPcStr = "45px 100px 140px 140px 50px 50px 60px 1fr";
             }
             headers = [
                 !isViewMode ? `<span class="col-act" data-sort="action">行動${getSortMark('action')}</span>` : null,
                 `<span class="col-name" data-sort="name">名前${getSortMark('name')}</span>`,
-                `<span class="col-rank" data-sort="rank">身分${getSortMark('rank')}</span>`,
+                // 横スクロールに戻す時のために残しておきます： `<span class="col-rank" data-sort="rank">身分${getSortMark('rank')}</span>`,
                 `<span class="col-faction" data-sort="faction">勢力${getSortMark('faction')}</span>`,
                 `<span class="col-castle" data-sort="castle">所在${getSortMark('castle')}</span>`,
                 `<span class="col-age" data-sort="age">年齢${getSortMark('age')}</span>`,
@@ -2320,11 +2320,11 @@ class UIInfoManager {
                         else factionNameStr = myLeader.familyName + "派";
                     }
                 }
-
+                
                 cells = [
                     !isViewMode ? `<span class="col-act">${inputHtml}${b.isActionDone?'済':'未'}</span>` : null,
                     `<span class="col-name">${b.name}</span>`,
-                    `<span class="col-rank">${b.getRankName()}</span>`,
+                    // 横スクロールに戻す時のために残しておきます： `<span class="col-rank">${b.getRankName()}</span>`,
                     `<span class="col-faction">${forceName}</span>`,
                     `<span class="col-castle">${bCastleName}</span>`,
                     `<span class="col-age">${age}</span>`,
@@ -2367,8 +2367,11 @@ class UIInfoManager {
         }
 
         let colStr = "";
-        // 基本タブの時は横幅の制限を外して画面内に収めます
-        let minW = this.bushoCurrentTab === 'stats' ? "100%" : (isViewMode ? "700px" : "750px");
+        
+        // 基本タブ・状態タブの時は横幅の制限を外して画面内に収めます
+        // （将来「状態タブ」だけ横スクロールに戻す場合は、ここから `|| this.bushoCurrentTab === 'status'` を消すだけでOK）
+        let isFitMode = this.bushoCurrentTab === 'stats' || this.bushoCurrentTab === 'status';
+        let minW = isFitMode ? "100%" : (isViewMode ? "700px" : "750px");
 
         // CSSで見た目を微調整するための目印を追加します
         if (this.bushoCurrentTab === 'stats') {
