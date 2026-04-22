@@ -166,28 +166,39 @@ class UIInfoManager {
 
             const powerBarHtml = this._createBarHtml((d.power / maxPower) * 100, 'power');
             const friendBarHtml = d.id === this.game.playerClanId ? "" : this._createBarHtml(friendScore, 'friend');
-
+            
             items.push({
                 onClick: `window.GameApp.ui.info.showDaimyoDetail(${d.id})`,
                 cells: [
                     `<span class="col-daimyo-name" style="font-weight:bold;">${d.name}</span>`,
                     `<span class="col-leader-name">${d.leaderName}</span>`,
-                    `${d.castlesCount}`,
-                    powerBarHtml,
-                    friendBarHtml,
-                    `<span class="${statusClass}">${friendStatus}</span>`
+                    `<span class="col-castle-count">${d.castlesCount}</span>`,
+                    `<span class="col-prestige">${powerBarHtml}</span>`,
+                    `<span class="col-friend">${friendBarHtml}</span>`,
+                    `<span class="col-relation ${statusClass}">${friendStatus}</span>`,
+                    `<span class="col-empty"></span>`
                 ]
             });
         });
 
         this._renderListModal({
             title: "勢力一覧",
-            headers: ["勢力名", "当主名", "城数", "威信", "友好度", "関係"],
+            headers: [
+                `<span class="col-daimyo-name">勢力名</span>`,
+                `<span class="col-leader-name">当主名</span>`,
+                `<span class="col-castle-count">城数</span>`,
+                `<span class="col-prestige">威信</span>`,
+                `<span class="col-friend">友好度</span>`,
+                `<span class="col-relation">関係</span>`,
+                `<span class="col-empty"></span>`
+            ],
             headerClass: "daimyo-list-header",
             itemClass: "daimyo-list-item",
             listClass: "daimyo-list-container",
             items: items,
-            scrollPos: scrollPos
+            scrollPos: scrollPos,
+            gridTemplateSp: "2.5fr 2fr 1fr 2fr 2fr 1fr 1fr",
+            gridTemplatePc: "140px 100px 60px 100px 100px 60px 1fr"
         });
     }
 
@@ -492,14 +503,14 @@ class UIInfoManager {
             if (fId === daimyoFactionId) {
                 nameClass = "text-orange";
             }
-
+            
             items.push({
                 onClick: `window.GameApp.ui.info.showFactionBushoList(${clan.id}, ${fId}, '${leaderName}派')`,
                 cells: [
                     `<strong class="col-faction-name ${nameClass}">${leaderName}</strong>`,
-                    `${count}`,
-                    `<span class="${seikakuClass}">${seikaku}</span>`,
-                    `<span class="${hoshinClass}">${hoshin}</span>`,
+                    `<span class="col-busho-count">${count}</span>`,
+                    `<span class="col-seikaku ${seikakuClass}">${seikaku}</span>`,
+                    `<span class="col-hoshin ${hoshinClass}">${hoshin}</span>`,
                     ""
                 ]
             });
@@ -510,7 +521,7 @@ class UIInfoManager {
                 onClick: `window.GameApp.ui.info.showFactionBushoList(${clan.id}, 0, '無派閥')`,
                 cells: [
                     `<strong class="col-faction-name">無派閥</strong>`,
-                    `${nonFactionCount}`,
+                    `<span class="col-busho-count">${nonFactionCount}</span>`,
                     "", "", ""
                 ]
             });
@@ -518,7 +529,13 @@ class UIInfoManager {
 
         this._renderListModal({
             title: `${clan.name} 派閥一覧`,
-            headers: ["派閥主", "武将数", "方針", "思想", ""],
+            headers: [
+                `<span class="col-faction-name">派閥主</span>`,
+                `<span class="col-busho-count">武将数</span>`,
+                `<span class="col-seikaku">方針</span>`,
+                `<span class="col-hoshin">思想</span>`,
+                `<span></span>`
+            ],
             headerClass: "faction-list-header",
             itemClass: "faction-list-item",
             listClass: "faction-list-container",
@@ -1196,14 +1213,14 @@ class UIInfoManager {
             const age = this.game.year - p.birthYear;
             const father = this.game.getBusho(p.fatherId);
             const husband = this.game.getBusho(p.husbandId);
-            
+            // 差し替え後
             return {
                 onClick: isSelectMode ? `window.GameApp.ui.info.selectPrincess(${p.id}, this)` : null,
                 cells: [
                     `<strong class="col-princess-name">${p.name}</strong>`,
-                    `${age}`,
-                    father ? father.name : "不明",
-                    husband ? husband.name : "なし",
+                    `<span class="col-age">${age}</span>`,
+                    `<span class="col-father">${father ? father.name : "不明"}</span>`,
+                    `<span class="col-husband">${husband ? husband.name : "なし"}</span>`,
                     "" 
                 ]
             };
@@ -1217,7 +1234,13 @@ class UIInfoManager {
         this._renderListModal({
             title: "姫一覧",
             contextHtml: contextHtml,
-            headers: ["姫", "年齢", "父親", "配偶者", ""],
+            headers: [
+                `<span class="col-princess-name">姫</span>`,
+                `<span class="col-age">年齢</span>`,
+                `<span class="col-father">父親</span>`,
+                `<span class="col-husband">配偶者</span>`,
+                `<span></span>`
+            ],
             headerClass: "princess-list-header",
             itemClass: "princess-list-item",
             listClass: "princess-list-container",
@@ -1670,44 +1693,44 @@ class UIInfoManager {
             if (this.currentKyotenSortKey !== key) return '';
             return this.isKyotenSortAsc ? ' ▲' : ' ▼';
         };
-
+        
         let headers = [];
         let gridStyle = "";
 
         if (this.currentKyotenTab === 'status') {
             gridStyle = "1.5fr 1.5fr 1.5fr 1fr 1fr 1fr 1fr";
             headers = [
-                `<span data-sort="name" style="padding-left:5px; justify-content:flex-start;">拠点名${getSortMark('name')}</span>`,
-                `<span data-sort="clan">勢力${getSortMark('clan')}</span>`,
-                `<span data-sort="castellan">城主${getSortMark('castellan')}</span>`,
-                `<span data-sort="province">所属${getSortMark('province')}</span>`,
-                `<span data-sort="bushoCount">武将数${getSortMark('bushoCount')}</span>`,
-                `<span data-sort="gold">金${getSortMark('gold')}</span>`,
-                `<span data-sort="rice">兵糧${getSortMark('rice')}</span>`
+                `<span class="col-castle-name" data-sort="name" style="padding-left:5px; justify-content:flex-start;">拠点名${getSortMark('name')}</span>`,
+                `<span class="col-clan" data-sort="clan">勢力${getSortMark('clan')}</span>`,
+                `<span class="col-castellan" data-sort="castellan">城主${getSortMark('castellan')}</span>`,
+                `<span class="col-province" data-sort="province">所属${getSortMark('province')}</span>`,
+                `<span class="col-busho-count" data-sort="bushoCount">武将数${getSortMark('bushoCount')}</span>`,
+                `<span class="col-gold" data-sort="gold">金${getSortMark('gold')}</span>`,
+                `<span class="col-rice" data-sort="rice">兵糧${getSortMark('rice')}</span>`
             ];
         } else if (this.currentKyotenTab === 'military') {
             gridStyle = "1.5fr 1.5fr 1fr 1fr 1fr 1fr 1fr";
             headers = [
-                `<span data-sort="name" style="padding-left:5px; justify-content:flex-start;">拠点名${getSortMark('name')}</span>`,
-                `<span data-sort="soldiers">兵士${getSortMark('soldiers')}</span>`,
-                `<span data-sort="defense">防御${getSortMark('defense')}</span>`,
-                `<span data-sort="morale">士気${getSortMark('morale')}</span>`,
-                `<span data-sort="training">訓練${getSortMark('training')}</span>`,
-                `<span data-sort="horses">軍馬${getSortMark('horses')}</span>`,
-                `<span data-sort="guns">鉄砲${getSortMark('guns')}</span>`
+                `<span class="col-castle-name" data-sort="name" style="padding-left:5px; justify-content:flex-start;">拠点名${getSortMark('name')}</span>`,
+                `<span class="col-soldiers" data-sort="soldiers">兵士${getSortMark('soldiers')}</span>`,
+                `<span class="col-defense" data-sort="defense">防御${getSortMark('defense')}</span>`,
+                `<span class="col-morale" data-sort="morale">士気${getSortMark('morale')}</span>`,
+                `<span class="col-training" data-sort="training">訓練${getSortMark('training')}</span>`,
+                `<span class="col-horses" data-sort="horses">軍馬${getSortMark('horses')}</span>`,
+                `<span class="col-guns" data-sort="guns">鉄砲${getSortMark('guns')}</span>`
             ];
         } else if (this.currentKyotenTab === 'economy') {
             gridStyle = "1.5fr 1fr 1fr 1fr 1fr 1.5fr 1.5fr 1.5fr 1.5fr";
             headers = [
-                `<span data-sort="name" style="padding-left:5px; justify-content:flex-start;">拠点名${getSortMark('name')}</span>`,
-                `<span data-sort="population">人口${getSortMark('population')}</span>`,
-                `<span data-sort="loyalty">民忠${getSortMark('loyalty')}</span>`,
-                `<span data-sort="kokudaka">石高${getSortMark('kokudaka')}</span>`,
-                `<span data-sort="commerce">鉱山${getSortMark('commerce')}</span>`,
-                `<span data-sort="goldIncome">金収入/月${getSortMark('goldIncome')}</span>`,
-                `<span data-sort="goldConsume">金支出/月${getSortMark('goldConsume')}</span>`,
-                `<span data-sort="riceIncome">兵糧収入/年${getSortMark('riceIncome')}</span>`,
-                `<span data-sort="riceConsume">兵糧支出/年${getSortMark('riceConsume')}</span>`
+                `<span class="col-castle-name" data-sort="name" style="padding-left:5px; justify-content:flex-start;">拠点名${getSortMark('name')}</span>`,
+                `<span class="col-population" data-sort="population">人口${getSortMark('population')}</span>`,
+                `<span class="col-loyalty" data-sort="loyalty">民忠${getSortMark('loyalty')}</span>`,
+                `<span class="col-kokudaka" data-sort="kokudaka">石高${getSortMark('kokudaka')}</span>`,
+                `<span class="col-commerce" data-sort="commerce">鉱山${getSortMark('commerce')}</span>`,
+                `<span class="col-gold-income" data-sort="goldIncome">金収入/月${getSortMark('goldIncome')}</span>`,
+                `<span class="col-gold-consume" data-sort="goldConsume">金支出/月${getSortMark('goldConsume')}</span>`,
+                `<span class="col-rice-income" data-sort="riceIncome">兵糧収入/年${getSortMark('riceIncome')}</span>`,
+                `<span class="col-rice-consume" data-sort="riceConsume">兵糧支出/年${getSortMark('riceConsume')}</span>`
             ];
         }
 
@@ -1746,34 +1769,34 @@ class UIInfoManager {
             if (this.currentKyotenTab === 'status') {
                 cells = [
                     `<span class="col-castle-name" style="justify-content:flex-start; padding-left:5px;">${c.name}</span>`,
-                    `${clanName}`,
-                    `${castellanName}`,
-                    `${provinceName}`,
-                    `${bushosCount}`,
-                    `${c.gold}`,
-                    `${c.rice}`
+                    `<span class="col-clan">${clanName}</span>`,
+                    `<span class="col-castellan">${castellanName}</span>`,
+                    `<span class="col-province">${provinceName}</span>`,
+                    `<span class="col-busho-count">${bushosCount}</span>`,
+                    `<span class="col-gold">${c.gold}</span>`,
+                    `<span class="col-rice">${c.rice}</span>`
                 ];
             } else if (this.currentKyotenTab === 'military') {
                 cells = [
                     `<span class="col-castle-name" style="justify-content:flex-start; padding-left:5px;">${c.name}</span>`,
-                    `${c.soldiers}`,
-                    `${c.defense}`,
-                    `${c.morale}`,
-                    `${c.training}`,
-                    `${c.horses || 0}`,
-                    `${c.guns || 0}`
+                    `<span class="col-soldiers">${c.soldiers}</span>`,
+                    `<span class="col-defense">${c.defense}</span>`,
+                    `<span class="col-morale">${c.morale}</span>`,
+                    `<span class="col-training">${c.training}</span>`,
+                    `<span class="col-horses">${c.horses || 0}</span>`,
+                    `<span class="col-guns">${c.guns || 0}</span>`
                 ];
             } else if (this.currentKyotenTab === 'economy') {
                 cells = [
                     `<span class="col-castle-name" style="justify-content:flex-start; padding-left:5px;">${c.name}</span>`,
-                    `${c.population}`,
-                    `${c.peoplesLoyalty}`,
-                    `${c.kokudaka}`,
-                    `${c.commerce}`,
-                    `${goldIncome}`,
-                    `${consumeGold}`,
-                    `${riceIncome}`,
-                    `${consumeRiceYear}`
+                    `<span class="col-population">${c.population}</span>`,
+                    `<span class="col-loyalty">${c.peoplesLoyalty}</span>`,
+                    `<span class="col-kokudaka">${c.kokudaka}</span>`,
+                    `<span class="col-commerce">${c.commerce}</span>`,
+                    `<span class="col-gold-income">${goldIncome}</span>`,
+                    `<span class="col-gold-consume">${consumeGold}</span>`,
+                    `<span class="col-rice-income">${riceIncome}</span>`,
+                    `<span class="col-rice-consume">${consumeRiceYear}</span>`
                 ];
             }
 
@@ -3569,17 +3592,18 @@ class UIInfoManager {
             } else {
                 onClickStr = `window.GameApp.ui.info.showKunishuDetail(${kunishu.id})`;
             }
-
+            
             items.push({
                 onClick: onClickStr,
                 cells: [
                     `<strong class="col-kunishu-name">${kunishuName}</strong>`,
-                    `<span>${leaderName}</span>`,
-                    `<span>${castleName}</span>`,
-                    `<span>${provinceName}</span>`,
-                    `<span>${kunishu.soldiers}</span>`,
-                    `<span>${friendBarHtml}</span>`,
-                    `<span class="${relClass}" style="font-weight:bold;">${relStatus}</span>`
+                    `<span class="col-leader-name">${leaderName}</span>`,
+                    `<span class="col-castle-name">${castleName}</span>`,
+                    `<span class="col-province">${provinceName}</span>`,
+                    `<span class="col-soldiers">${kunishu.soldiers}</span>`,
+                    `<span class="col-friend">${friendBarHtml}</span>`,
+                    `<span class="col-relation ${relClass}" style="font-weight:bold;">${relStatus}</span>`,
+                    `<span class="col-empty pc-only"></span>`
                 ]
             });
         });
@@ -3589,12 +3613,23 @@ class UIInfoManager {
         this._renderListModal({
             title: "諸勢力一覧",
             contextHtml: contextHtml,
-            headers: ["勢力名", "頭領", "所在", "所属", "兵士", "友好度", "関係"],
+            headers: [
+                `<span class="col-kunishu-name">勢力名</span>`,
+                `<span class="col-leader-name">頭領</span>`,
+                `<span class="col-castle-name">所在</span>`,
+                `<span class="col-province">所属</span>`,
+                `<span class="col-soldiers">兵士</span>`,
+                `<span class="col-friend">友好度</span>`,
+                `<span class="col-relation">関係</span>`,
+                `<span class="col-empty pc-only"></span>`
+            ],
             headerClass: `kunishu-list-header ${modeClassStr}`,
             itemClass: `kunishu-list-item ${modeClassStr}`,
             listClass: "kunishu-list-container",
             items: items,
             scrollPos: scrollPos,
+            gridTemplateSp: "2.5fr 2fr 2fr 1.5fr 1.5fr 2fr 1fr",
+            gridTemplatePc: "140px 100px 140px 100px 80px 100px 60px 1fr",
             onBack: onBack,
             onConfirm: isSelectMode ? () => {
                 if (!this.selectedKunishuId) return;

@@ -550,14 +550,40 @@ body.hide-daimyo-labels .daimyo-name-label { display: none !important; }
 .select-item .col-castle, 
 .select-item .col-castle-name,
 .select-item .col-rank,
-.select-item .col-faction-leader { 
+.select-item .col-faction-leader,
+.select-item .col-father,
+.select-item .col-husband,
+.select-item .col-clan,
+.select-item .col-castellan,
+.select-item .col-province,
+.select-item .col-seikaku,
+.select-item .col-hoshin,
+.select-item .col-relation { 
     justify-content: flex-start !important; 
     padding-left: 3px !important; 
 }
 
 /* 【右寄せグループ（数字）】 */
 .select-item .col-age,
-.select-item .col-salary { 
+.select-item .col-salary,
+.select-item .col-busho-count,
+.select-item .col-gold,
+.select-item .col-rice,
+.select-item .col-soldiers,
+.select-item .col-defense,
+.select-item .col-morale,
+.select-item .col-training,
+.select-item .col-horses,
+.select-item .col-guns,
+.select-item .col-population,
+.select-item .col-loyalty,
+.select-item .col-kokudaka,
+.select-item .col-commerce,
+.select-item .col-gold-income,
+.select-item .col-gold-consume,
+.select-item .col-rice-income,
+.select-item .col-rice-consume,
+.select-item .col-castle-count { 
     justify-content: flex-end !important; 
     padding-right: 3px !important; 
 }
