@@ -1385,6 +1385,7 @@ class UIManager {
 
     renderCommandMenu() {
         const overlay = document.getElementById('command-overlay');
+        const mobileArea = document.getElementById('command-area');
         if (mobileArea) {
             mobileArea.innerHTML = '';
             const createBtn = (label, cls, onClick, isDisabled = false) => {
