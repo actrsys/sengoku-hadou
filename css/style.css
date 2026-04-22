@@ -552,14 +552,14 @@ body.hide-daimyo-labels .daimyo-name-label { display: none !important; }
 .select-item .col-rank,
 .select-item .col-faction-leader { 
     justify-content: flex-start !important; 
-    padding-left: 5px; 
+    padding-left: 3px !important; 
 }
 
 /* 【右寄せグループ（数字）】 */
 .select-item .col-age,
 .select-item .col-salary { 
     justify-content: flex-end !important; 
-    padding-right: 5px; 
+    padding-right: 3px !important; 
 }
 
 /* ※見出し（.list-header）および上記以外の列は、ベース設定の「中央寄せ」が適用されます */
