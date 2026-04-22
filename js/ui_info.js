@@ -2206,11 +2206,13 @@ class UIInfoManager {
 
         if (this.bushoCurrentTab === 'stats') {
             if (isViewMode) {
+                // 基本タブ・見るだけモードの幅（左から：名前, 身分, 統率, 武勇, 内政, 外交, 智謀, 魅力）
                 gridSpStr = "2.5fr 1.5fr 1fr 1fr 1fr 1fr 1fr 1fr";
                 gridPcStr = "100px 60px 1fr 1fr 1fr 1fr 1fr 1fr";
             } else {
-                gridSpStr = "35px 2.5fr 1.5fr 1fr 1fr 1fr 1fr 1fr 1fr";
-                gridPcStr = "45px 100px 60px 1fr 1fr 1fr 1fr 1fr 1fr";
+                // 基本タブ・選択モードの幅（左から：行動, 名前, 身分, 統率, 武勇, 内政, 外交, 智謀, 魅力）
+                gridSpStr = "25px 2.5fr 1.5fr 1fr 1fr 1fr 1fr 1fr 1fr";
+                gridPcStr = "35px 100px 60px 1fr 1fr 1fr 1fr 1fr 1fr";
             }
             headers = [
                 !isViewMode ? `<span class="col-act" data-sort="action">行動${getSortMark('action')}</span>` : null,
@@ -2227,11 +2229,13 @@ class UIInfoManager {
             headerClassStr += " status-mode";
             itemClassStr += " status-mode";
             if (isViewMode) {
+                // 状態タブ・見るだけモードの幅（左から：名前, 勢力, 所在, 年齢, 一門, 俸禄, 派閥）
                 gridSpStr = "2.5fr 2fr 2fr 1fr 1fr 1fr 1.5fr";
                 gridPcStr = "100px 140px 140px 50px 50px 60px 1fr";
             } else {
-                gridSpStr = "35px 2.5fr 2fr 2fr 1fr 1fr 1fr 1.5fr";
-                gridPcStr = "45px 100px 140px 140px 50px 50px 60px 1fr";
+                // 状態タブ・選択モードの幅（左から：行動, 名前, 勢力, 所在, 年齢, 一門, 俸禄, 派閥）
+                gridSpStr = "25px 2.5fr 2fr 2fr 1fr 1fr 1fr 1.5fr";
+                gridPcStr = "35px 100px 140px 140px 50px 50px 60px 1fr";
             }
             headers = [
                 !isViewMode ? `<span class="col-act" data-sort="action">行動${getSortMark('action')}</span>` : null,
