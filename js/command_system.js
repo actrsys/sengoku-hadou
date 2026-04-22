@@ -45,6 +45,28 @@ const COMMAND_MENU_STRUCTURE = [
 ];
 
 /* ==========================================================================
+   ★ よく使う実行条件まとめ（条件の一元化）
+   ========================================================================== */
+const CAN_EXECUTE_RULES = {
+    // 大名以外の活動可能な所属武将がいるか（褒美、面談、追放などに使います）
+    hasActiveBushoExceptDaimyo: (game) => {
+        return game.bushos.some(b => b.clan === game.playerClanId && b.status === 'active' && !b.isDaimyo);
+    },
+    // 大名・城主以外の活動可能な所属武将がいるか（軍師任命などに使います）
+    hasActiveBushoExceptDaimyoAndCastellan: (game) => {
+        return game.bushos.some(b => b.clan === game.playerClanId && b.status === 'active' && !b.isDaimyo && !b.isCastellan);
+    },
+    // 自領に浪人がいるか（登用に使います）
+    hasEmployableRonin: (game) => {
+        return game.bushos.some(b => {
+            if (b.status !== 'ronin' || b.belongKunishuId > 0) return false;
+            const targetCastle = game.getCastle(b.castleId);
+            return targetCastle && targetCastle.ownerClan === game.playerClanId;
+        });
+    }
+};
+
+/* ==========================================================================
    ★ コマンド定義 (COMMAND_SPECS)
    ========================================================================== */
 const COMMAND_SPECS = {
@@ -175,9 +197,7 @@ const COMMAND_SPECS = {
         isMulti: false, hasAdvice: false, 
         startMode: 'busho_select', sortKey: 'intelligence',
         msg: "軍師を任命します",
-        canExecute: (game, castle) => {
-            return game.bushos.some(b => b.clan === game.playerClanId && b.status === 'active' && !b.isDaimyo && !b.isCastellan);
-        }
+        canExecute: (game, castle) => CAN_EXECUTE_RULES.hasActiveBushoExceptDaimyoAndCastellan(game)
     },
     'appoint': { 
         label: "城主任命", category: 'PERSONNEL', 
@@ -206,9 +226,7 @@ const COMMAND_SPECS = {
         isMulti: true, hasAdvice: false, 
         startMode: 'busho_select', sortKey: 'loyalty',
         msg: "金: 100 (1人あたり)\n褒美を与えます",
-        canExecute: (game, castle) => {
-            return game.bushos.some(b => b.clan === game.playerClanId && b.status === 'active' && !b.isDaimyo);
-        }
+        canExecute: (game, castle) => CAN_EXECUTE_RULES.hasActiveBushoExceptDaimyo(game)
     },
     'interview': { 
         label: "面談", category: 'PERSONNEL', 
@@ -216,9 +234,7 @@ const COMMAND_SPECS = {
         isMulti: false, hasAdvice: false, 
         startMode: 'busho_select', sortKey: 'leadership',
         msg: "武将と面談します",
-        canExecute: (game, castle) => {
-            return game.bushos.some(b => b.clan === game.playerClanId && b.status === 'active' && !b.isDaimyo);
-        }
+        canExecute: (game, castle) => CAN_EXECUTE_RULES.hasActiveBushoExceptDaimyo(game)
     },
     'employ': { 
         label: "登用", category: 'PERSONNEL', 
@@ -227,13 +243,7 @@ const COMMAND_SPECS = {
         startMode: 'busho_select_special', subType: 'employ_target',
         sortKey: 'strength',
         msg: "在野武将を登用します",
-        canExecute: (game, castle) => {
-            return game.bushos.some(b => {
-                if (b.status !== 'ronin' || b.belongKunishuId > 0) return false;
-                const targetCastle = game.getCastle(b.castleId);
-                return targetCastle && targetCastle.ownerClan === game.playerClanId;
-            });
-        }
+        canExecute: (game, castle) => CAN_EXECUTE_RULES.hasEmployableRonin(game)
     },
     'move': { 
         label: "移動", category: 'PERSONNEL', 
@@ -248,9 +258,7 @@ const COMMAND_SPECS = {
         isMulti: false, hasAdvice: false, 
         startMode: 'busho_select', sortKey: 'loyalty',
         msg: "武将を追放します",
-        canExecute: (game, castle) => {
-            return game.bushos.some(b => b.clan === game.playerClanId && b.status === 'active' && !b.isDaimyo);
-        }
+        canExecute: (game, castle) => CAN_EXECUTE_RULES.hasActiveBushoExceptDaimyo(game)
     },
 
     // --- 対外：調略 (FOREIGN_STRATEGY) ---
