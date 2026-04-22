@@ -22,7 +22,10 @@ class UIInfoManager {
         this.bushoCurrentSortKey = null;
         this.bushoIsSortAsc = false;
         this.bushoSavedBushos = null;
+        this.bushoSavedSortedBushos = null;
+        this.bushoLastSortStateKey = null;
         this.bushoLastScope = null;
+        this.bushoSavedData = null;
         
         // 外交リストのタブ状態リセット
         this.diploCurrentTab = 'daimyo';
@@ -32,6 +35,10 @@ class UIInfoManager {
         this.currentKyotenScope = 'clan';
         this.currentKyotenSortKey = null;
         this.isKyotenSortAsc = false;
+        this.kyotenSavedCastles = null;
+        this.kyotenSavedSortedCastles = null;
+        this.kyotenLastSortStateKey = null;
+        this.kyotenLastScope = null;
     }
 
     pushModal(pageType, renderArgs) {
@@ -1065,6 +1072,11 @@ class UIInfoManager {
         const INITIAL_RENDER_COUNT = 30;
         const CHUNK_SIZE = 50;
 
+        // ★スクロール位置を復元するために、あらかじめ必要な数だけリストを生成しておく魔法
+        let assumedItemHeight = 40; 
+        let requiredItems = config.scrollPos ? Math.ceil(config.scrollPos / assumedItemHeight) + 20 : INITIAL_RENDER_COUNT;
+        const initialLimit = Math.min(totalItems, Math.max(INITIAL_RENDER_COUNT, requiredItems));
+
         let initialHtmlParts = [];
         
         if (config.headers && config.headers.length > 0) {
@@ -1072,7 +1084,6 @@ class UIInfoManager {
             initialHtmlParts.push(`<div class="list-header sortable-header ${config.headerClass || ''}">${headerCols}</div>`);
         }
 
-        const initialLimit = Math.min(totalItems, INITIAL_RENDER_COUNT);
         for (let i = 0; i < initialLimit; i++) {
             initialHtmlParts.push(buildItemHtml(config.items[i], i));
         }
@@ -1537,6 +1548,10 @@ class UIInfoManager {
     // ==========================================
     showKyotenList(clanId = null) {
         this.closeCommonModal(); 
+        this.kyotenSavedCastles = null;
+        this.kyotenSavedSortedCastles = null;
+        this.kyotenLastSortStateKey = null;
+        this.kyotenLastScope = null;
         this.pushModal('kyoten_list', [clanId]);
     }
     
@@ -1565,75 +1580,90 @@ class UIInfoManager {
             ${scopeHtml}
         `;
 
-        if (this.currentKyotenScope === 'all') {
-            this.kyotenCastles = this.game.castles;
-        } else {
-            this.kyotenCastles = this.game.castles.filter(c => c.ownerClan === this.kyotenTargetClanId);
+        if (!this.kyotenSavedCastles || this.kyotenLastScope !== this.currentKyotenScope) {
+            if (this.currentKyotenScope === 'all') {
+                this.kyotenCastles = this.game.castles;
+            } else {
+                this.kyotenCastles = this.game.castles.filter(c => c.ownerClan === this.kyotenTargetClanId);
+            }
+            this.kyotenSavedCastles = this.kyotenCastles;
+            this.kyotenLastScope = this.currentKyotenScope;
+            this.kyotenSavedSortedCastles = null;
         }
 
-        let displayCastles = [...this.kyotenCastles];
+        let displayCastles;
+        const currentSortStateKey = `${this.currentKyotenSortKey}_${this.isKyotenSortAsc}`;
 
-        if (this.currentKyotenSortKey) {
-            displayCastles.sort((a, b) => {
-                let valA = 0, valB = 0;
+        if (this.kyotenSavedSortedCastles && this.kyotenLastSortStateKey === currentSortStateKey) {
+            displayCastles = this.kyotenSavedSortedCastles;
+        } else {
+            displayCastles = [...this.kyotenSavedCastles];
 
-                const getClanYomi = (c) => { const cd = this.game.clans.find(cd => cd.id === c.ownerClan); return cd ? (cd.yomi || cd.name) : "んんん"; };
-                const getClanName = (c) => { const cd = this.game.clans.find(cd => cd.id === c.ownerClan); return cd ? cd.name : ""; };
-                const getCastellanYomi = (c) => { const cb = this.game.getBusho(c.castellanId); return cb ? (cb.yomi || cb.name) : "んんん"; };
-                const getCastellanName = (c) => { const cb = this.game.getBusho(c.castellanId); return cb ? cb.name : ""; };
-                const getProvinceYomi = (c) => { const p = this.game.provinces && this.game.provinces.find(p => p.id === c.provinceId); return p ? (p.yomi || p.province) : "んんん"; };
-                const getProvinceName = (c) => { const p = this.game.provinces && this.game.provinces.find(p => p.id === c.provinceId); return p ? p.province : ""; };
-                const getBushoCount = (c) => this.game.bushos.filter(b => b.castleId === c.id && b.status === 'active').length;
+            if (this.currentKyotenSortKey) {
+                displayCastles.sort((a, b) => {
+                    let valA = 0, valB = 0;
 
-                const getGoldIncome = (c) => GameSystem.calcBaseGoldIncome(c);
-                const getGoldConsume = (c) => {
-                    let consume = 0;
-                    const daimyo = this.game.bushos.find(b => b.clan === c.ownerClan && b.isDaimyo);
-                    if (daimyo) {
-                        this.game.bushos.filter(b => b.castleId === c.id && b.status === 'active').forEach(b => consume += b.getSalary(daimyo));
+                    const getClanYomi = (c) => { const cd = this.game.clans.find(cd => cd.id === c.ownerClan); return cd ? (cd.yomi || cd.name) : "んんん"; };
+                    const getClanName = (c) => { const cd = this.game.clans.find(cd => cd.id === c.ownerClan); return cd ? cd.name : ""; };
+                    const getCastellanYomi = (c) => { const cb = this.game.getBusho(c.castellanId); return cb ? (cb.yomi || cb.name) : "んんん"; };
+                    const getCastellanName = (c) => { const cb = this.game.getBusho(c.castellanId); return cb ? cb.name : ""; };
+                    const getProvinceYomi = (c) => { const p = this.game.provinces && this.game.provinces.find(p => p.id === c.provinceId); return p ? (p.yomi || p.province) : "んんん"; };
+                    const getProvinceName = (c) => { const p = this.game.provinces && this.game.provinces.find(p => p.id === c.provinceId); return p ? p.province : ""; };
+                    const getBushoCount = (c) => this.game.bushos.filter(b => b.castleId === c.id && b.status === 'active').length;
+
+                    const getGoldIncome = (c) => GameSystem.calcBaseGoldIncome(c);
+                    const getGoldConsume = (c) => {
+                        let consume = 0;
+                        const daimyo = this.game.bushos.find(b => b.clan === c.ownerClan && b.isDaimyo);
+                        if (daimyo) {
+                            this.game.bushos.filter(b => b.castleId === c.id && b.status === 'active').forEach(b => consume += b.getSalary(daimyo));
+                        }
+                        return consume;
+                    };
+                    const getRiceIncome = (c) => GameSystem.calcBaseRiceIncome(c);
+                    const getRiceConsume = (c) => Math.floor(c.soldiers * window.MainParams.Economy.ConsumeRicePerSoldier) * 12;
+
+                    switch (this.currentKyotenSortKey) {
+                        case 'name': valA = a.yomi || a.name; valB = b.yomi || b.name; break;
+                        case 'clan': valA = getClanYomi(a); valB = getClanYomi(b); break;
+                        case 'castellan': valA = getCastellanYomi(a); valB = getCastellanYomi(b); break;
+                        case 'province': valA = getProvinceYomi(a); valB = getProvinceYomi(b); break;
+                        case 'bushoCount': valA = getBushoCount(a); valB = getBushoCount(b); break;
+                        case 'gold': valA = a.gold || 0; valB = b.gold || 0; break;
+                        case 'rice': valA = a.rice || 0; valB = b.rice || 0; break;
+                        case 'soldiers': valA = a.soldiers || 0; valB = b.soldiers || 0; break;
+                        case 'defense': valA = a.defense || 0; valB = b.defense || 0; break;
+                        case 'morale': valA = a.morale || 0; valB = b.morale || 0; break;
+                        case 'training': valA = a.training || 0; valB = b.training || 0; break;
+                        case 'horses': valA = a.horses || 0; valB = b.horses || 0; break;
+                        case 'guns': valA = a.guns || 0; valB = b.guns || 0; break;
+                        case 'population': valA = a.population || 0; valB = b.population || 0; break;
+                        case 'loyalty': valA = a.peoplesLoyalty || 0; valB = b.peoplesLoyalty || 0; break;
+                        case 'kokudaka': valA = a.kokudaka || 0; valB = b.kokudaka || 0; break;
+                        case 'commerce': valA = a.commerce || 0; valB = b.commerce || 0; break;
+                        case 'goldIncome': valA = getGoldIncome(a); valB = getGoldIncome(b); break;
+                        case 'goldConsume': valA = getGoldConsume(a); valB = getGoldConsume(b); break;
+                        case 'riceIncome': valA = getRiceIncome(a); valB = getRiceIncome(b); break;
+                        case 'riceConsume': valA = getRiceConsume(a); valB = getRiceConsume(b); break;
                     }
-                    return consume;
-                };
-                const getRiceIncome = (c) => GameSystem.calcBaseRiceIncome(c);
-                const getRiceConsume = (c) => Math.floor(c.soldiers * window.MainParams.Economy.ConsumeRicePerSoldier) * 12;
 
-                switch (this.currentKyotenSortKey) {
-                    case 'name': valA = a.yomi || a.name; valB = b.yomi || b.name; break;
-                    case 'clan': valA = getClanYomi(a); valB = getClanYomi(b); break;
-                    case 'castellan': valA = getCastellanYomi(a); valB = getCastellanYomi(b); break;
-                    case 'province': valA = getProvinceYomi(a); valB = getProvinceYomi(b); break;
-                    case 'bushoCount': valA = getBushoCount(a); valB = getBushoCount(b); break;
-                    case 'gold': valA = a.gold || 0; valB = b.gold || 0; break;
-                    case 'rice': valA = a.rice || 0; valB = b.rice || 0; break;
-                    case 'soldiers': valA = a.soldiers || 0; valB = b.soldiers || 0; break;
-                    case 'defense': valA = a.defense || 0; valB = b.defense || 0; break;
-                    case 'morale': valA = a.morale || 0; valB = b.morale || 0; break;
-                    case 'training': valA = a.training || 0; valB = b.training || 0; break;
-                    case 'horses': valA = a.horses || 0; valB = b.horses || 0; break;
-                    case 'guns': valA = a.guns || 0; valB = b.guns || 0; break;
-                    case 'population': valA = a.population || 0; valB = b.population || 0; break;
-                    case 'loyalty': valA = a.peoplesLoyalty || 0; valB = b.peoplesLoyalty || 0; break;
-                    case 'kokudaka': valA = a.kokudaka || 0; valB = b.kokudaka || 0; break;
-                    case 'commerce': valA = a.commerce || 0; valB = b.commerce || 0; break;
-                    case 'goldIncome': valA = getGoldIncome(a); valB = getGoldIncome(b); break;
-                    case 'goldConsume': valA = getGoldConsume(a); valB = getGoldConsume(b); break;
-                    case 'riceIncome': valA = getRiceIncome(a); valB = getRiceIncome(b); break;
-                    case 'riceConsume': valA = getRiceConsume(a); valB = getRiceConsume(b); break;
-                }
-
-                if (typeof valA === 'string' && typeof valB === 'string') {
-                    let cmp = this.isKyotenSortAsc ? valA.localeCompare(valB, 'ja') : valB.localeCompare(valA, 'ja');
-                    if (cmp === 0) {
-                        const nameA = this.currentKyotenSortKey === 'clan' ? getClanName(a) : (this.currentKyotenSortKey === 'castellan' ? getCastellanName(a) : (this.currentKyotenSortKey === 'province' ? getProvinceName(a) : a.name));
-                        const nameB = this.currentKyotenSortKey === 'clan' ? getClanName(b) : (this.currentKyotenSortKey === 'castellan' ? getCastellanName(b) : (this.currentKyotenSortKey === 'province' ? getProvinceName(b) : b.name));
-                        cmp = this.isKyotenSortAsc ? nameA.localeCompare(nameB, 'ja') : nameB.localeCompare(nameA, 'ja');
+                    if (typeof valA === 'string' && typeof valB === 'string') {
+                        let cmp = this.isKyotenSortAsc ? valA.localeCompare(valB, 'ja') : valB.localeCompare(valA, 'ja');
+                        if (cmp === 0) {
+                            const nameA = this.currentKyotenSortKey === 'clan' ? getClanName(a) : (this.currentKyotenSortKey === 'castellan' ? getCastellanName(a) : (this.currentKyotenSortKey === 'province' ? getProvinceName(a) : a.name));
+                            const nameB = this.currentKyotenSortKey === 'clan' ? getClanName(b) : (this.currentKyotenSortKey === 'castellan' ? getCastellanName(b) : (this.currentKyotenSortKey === 'province' ? getProvinceName(b) : b.name));
+                            cmp = this.isKyotenSortAsc ? nameA.localeCompare(nameB, 'ja') : nameB.localeCompare(nameA, 'ja');
+                        }
+                        return cmp;
                     }
-                    return cmp;
-                }
-                
-                if (valA === valB) return 0;
-                return this.isKyotenSortAsc ? (valA - valB) : (valB - valA);
-            });
+                    
+                    if (valA === valB) return 0;
+                    return this.isKyotenSortAsc ? (valA - valB) : (valB - valA);
+                });
+            }
+
+            this.kyotenSavedSortedCastles = displayCastles;
+            this.kyotenLastSortStateKey = currentSortStateKey;
         }
 
         const getSortMark = (key) => {
@@ -1914,7 +1944,10 @@ class UIInfoManager {
         this.bushoCurrentSortKey = null;
         this.bushoIsSortAsc = false;
         this.bushoSavedBushos = null;
+        this.bushoSavedSortedBushos = null;
+        this.bushoLastSortStateKey = null;
         this.bushoLastScope = null;
+        this.bushoSavedData = null;
 
         if (actionType === 'view_only' || actionType === 'all_busho_list') {
             this.pushModal('busho_selector', [actionType, targetId, extraData, onBack]);
@@ -1929,11 +1962,24 @@ class UIInfoManager {
         
         const isViewMode = (actionType === 'view_only' || actionType === 'all_busho_list');
         const c = this.ui.currentCastle; 
-        const data = this.game.commandSystem.getBushoSelectorData(actionType, targetId, extraData, c);
-        let bushos = extraData && extraData.customBushos ? extraData.customBushos : data.bushos;
-        let infoHtml = extraData && extraData.customInfoHtml ? extraData.customInfoHtml : data.infoHtml;
-        let isMulti = data.isMulti;
-        let spec = data.spec || {};
+        
+        // ★キャッシュを利用して毎回重い処理が走るのを防ぐ魔法
+        let bushos, infoHtml, isMulti, spec;
+        if (this.bushoSavedData && this.bushoSavedData.actionType === actionType && this.bushoSavedData.targetId === targetId) {
+            bushos = this.bushoSavedData.bushos;
+            infoHtml = this.bushoSavedData.infoHtml;
+            isMulti = this.bushoSavedData.isMulti;
+            spec = this.bushoSavedData.spec;
+        } else {
+            const data = this.game.commandSystem.getBushoSelectorData(actionType, targetId, extraData, c);
+            bushos = extraData && extraData.customBushos ? extraData.customBushos : data.bushos;
+            infoHtml = extraData && extraData.customInfoHtml ? extraData.customInfoHtml : data.infoHtml;
+            isMulti = data.isMulti;
+            spec = data.spec || {};
+            this.bushoSavedData = { actionType, targetId, bushos, infoHtml, isMulti, spec };
+            this.bushoSavedBushos = null;
+            this.bushoSavedSortedBushos = null;
+        }
 
         // クリック処理などで使う状態を保存しておきます
         this._bushoSelectorContext = {
@@ -2005,17 +2051,17 @@ class UIInfoManager {
 
         let displayBushos;
         if (!this.bushoSavedBushos || this.bushoLastScope !== this.bushoCurrentScope) {
-            displayBushos = [...bushos]; 
+            let baseBushos = [...bushos]; 
             if (actionType === 'all_busho_list' && this.bushoCurrentScope === 'all') {
-                displayBushos = this.game.bushos.filter(b => {
+                baseBushos = this.game.bushos.filter(b => {
                     if (b.status === 'unborn' || b.status === 'dead') return false;
                     if (b.clan > 0 || b.belongKunishuId > 0 || b.status === 'ronin') return true;
                     return false;
                 });
             }
             this.bushoLastScope = this.bushoCurrentScope;
-        } else {
-            displayBushos = [...this.bushoSavedBushos];
+            this.bushoSavedBushos = baseBushos;
+            this.bushoSavedSortedBushos = null; // スコープが変わったらソートキャッシュは破棄
         }
 
         const getSortRankAll = (b) => {
@@ -2042,154 +2088,163 @@ class UIInfoManager {
         let acc = null;
         if (isEnemyTarget && targetCastle) acc = targetCastle.investigatedAccuracy;
 
-        if (this.bushoCurrentSortKey) {
-            displayBushos.sort((a, b) => {
-                let valA = 0, valB = 0;
-                if (this.bushoCurrentSortKey === 'action') {
-                    valA = a.isActionDone ? 1 : 0; valB = b.isActionDone ? 1 : 0;
-                } else if (this.bushoCurrentSortKey === 'name') {
-                    const yomiA = a.yomi || a.name || ""; const yomiB = b.yomi || b.name || "";
-                    let cmp = this.bushoIsSortAsc ? yomiA.localeCompare(yomiB, 'ja') : yomiB.localeCompare(yomiA, 'ja');
-                    if (cmp === 0) {
-                        const nameA = a.name || ""; const nameB = b.name || "";
-                        cmp = this.bushoIsSortAsc ? nameA.localeCompare(nameB, 'ja') : nameB.localeCompare(nameA, 'ja');
-                    }
-                    return cmp;
-                } else if (this.bushoCurrentSortKey === 'rank') {
-                    valA = getSortRankClan(a); valB = getSortRankClan(b);
-                } else if (this.bushoCurrentSortKey === 'faction') {
-                    const isRoninA = a.status === 'ronin'; const isRoninB = b.status === 'ronin';
-                    if (isRoninA && !isRoninB) return 1;
-                    if (!isRoninA && isRoninB) return -1;
-                    const getFactionInfo = (busho) => {
-                        if (busho.belongKunishuId > 0) {
-                            const kunishu = this.game.kunishuSystem.getKunishu(busho.belongKunishuId);
-                            return { yomi: kunishu ? (kunishu.yomi || kunishu.name || "") : "んんん", name: kunishu ? (kunishu.name || "") : "んんん" };
-                        } else if (busho.clan > 0) {
-                            const clan = this.game.clans.find(c => c.id === busho.clan);
-                            return { yomi: clan ? (clan.yomi || clan.name || "") : "んんん", name: clan ? (clan.name || "") : "んんん" };
-                        }
-                        return { yomi: "んんん", name: "んんん" };
-                    };
-                    const infoA = getFactionInfo(a); const infoB = getFactionInfo(b);
-                    let cmp = this.bushoIsSortAsc ? infoA.yomi.localeCompare(infoB.yomi, 'ja') : infoB.yomi.localeCompare(infoA.yomi, 'ja');
-                    if (cmp === 0) cmp = this.bushoIsSortAsc ? infoA.name.localeCompare(infoB.name, 'ja') : infoB.name.localeCompare(infoA.name, 'ja');
-                    return cmp;
-                } else if (this.bushoCurrentSortKey === 'castle') {
-                    const getCastleInfo = (busho) => {
-                        const castle = this.game.getCastle(busho.castleId);
-                        return { yomi: castle ? (castle.yomi || castle.name || "") : "んんん", name: castle ? (castle.name || "") : "んんん" };
-                    };
-                    const infoA = getCastleInfo(a); const infoB = getCastleInfo(b);
-                    let cmp = this.bushoIsSortAsc ? infoA.yomi.localeCompare(infoB.yomi, 'ja') : infoB.yomi.localeCompare(infoA.yomi, 'ja');
-                    if (cmp === 0) cmp = this.bushoIsSortAsc ? infoA.name.localeCompare(infoB.name, 'ja') : infoB.name.localeCompare(infoA.name, 'ja');
-                    return cmp;
-                } else if (this.bushoCurrentSortKey === 'faction_leader') {
-                    const getLeaderInfo = (busho) => {
-                        if (busho.factionId > 0 && busho.clan > 0) {
-                            const clanBushos = this.game.bushos.filter(b => b.clan === busho.clan && b.status === 'active');
-                            const factionLeaders = clanBushos.filter(b => b.isFactionLeader);
-                            const myLeader = factionLeaders.find(leader => leader.factionId === busho.factionId);
-                            if (myLeader) {
-                                const sameFamilyLeaders = factionLeaders.filter(leader => leader.familyName && leader.familyName === myLeader.familyName && leader.id !== myLeader.id);
-                                let yomiStr = "", nameStr = "";
-                                if (!myLeader.givenName) { yomiStr = (myLeader.familyYomi || myLeader.yomi || "") + "は"; nameStr = myLeader.familyName + "派"; } 
-                                else if (sameFamilyLeaders.length > 0) { yomiStr = (myLeader.givenYomi || myLeader.yomi || "") + "は"; nameStr = myLeader.givenName + "派"; } 
-                                else { yomiStr = (myLeader.familyYomi || myLeader.yomi || "") + "は"; nameStr = myLeader.familyName + "派"; }
-                                return { yomi: yomiStr, name: nameStr };
-                            }
-                        }
-                        return { yomi: "んんん", name: "んんん" };
-                    };
-                    const infoA = getLeaderInfo(a); const infoB = getLeaderInfo(b);
-                    let cmp = this.bushoIsSortAsc ? infoA.yomi.localeCompare(infoB.yomi, 'ja') : infoB.yomi.localeCompare(infoA.yomi, 'ja');
-                    if (cmp === 0) cmp = this.bushoIsSortAsc ? infoA.name.localeCompare(infoB.name, 'ja') : infoB.name.localeCompare(infoA.name, 'ja');
-                    return cmp;
-                } else if (this.bushoCurrentSortKey === 'age') {
-                    const isNullA = a.isAutoLeader; const isNullB = b.isAutoLeader;
-                    if (isNullA && !isNullB) return 1;
-                    if (!isNullA && isNullB) return -1;
-                    valA = isNullA ? 0 : this.game.year - a.birthYear;
-                    valB = isNullB ? 0 : this.game.year - b.birthYear;
-                } else if (this.bushoCurrentSortKey === 'family') {
-                    const checkFamily = (busho) => {
-                        if (busho.clan > 0) {
-                            const clan = this.game.clans.find(c => c.id === busho.clan);
-                            const daimyo = clan ? this.game.getBusho(clan.leaderId) : null;
-                            if (daimyo && (busho.id === daimyo.id || busho.isDaimyo)) return 1;
-                            if (daimyo) {
-                                const bFam = Array.isArray(busho.familyIds) ? busho.familyIds : [];
-                                const dFam = Array.isArray(daimyo.familyIds) ? daimyo.familyIds : [];
-                                if (bFam.includes(daimyo.id) || dFam.includes(busho.id)) return 1;
-                            }
-                        }
-                        return 0;
-                    };
-                    valA = checkFamily(a); valB = checkFamily(b);
-                } else if (this.bushoCurrentSortKey === 'salary') {
-                    const daimyoA = a.clan > 0 ? this.game.getBusho(this.game.clans.find(c=>c.id===a.clan)?.leaderId) : null;
-                    const daimyoB = b.clan > 0 ? this.game.getBusho(this.game.clans.find(c=>c.id===b.clan)?.leaderId) : null;
-                    valA = a.clan > 0 && !a.isDaimyo && a.status !== 'ronin' ? a.getSalary(daimyoA) : 0;
-                    valB = b.clan > 0 && !b.isDaimyo && b.status !== 'ronin' ? b.getSalary(daimyoB) : 0;
-                } else {
-                    const getAccForSort = (busho) => {
-                        const c = this.game.getCastle(busho.castleId);
-                        if (c && c.investigatedUntil >= this.game.getCurrentTurnId()) return c.investigatedAccuracy;
-                        return acc;
-                    };
+        const currentSortStateKey = `${this.bushoCurrentSortKey}_${this.bushoIsSortAsc}`;
 
-                    let perceivedA = GameSystem.getPerceivedStatValue(a, this.bushoCurrentSortKey, gunshi, getAccForSort(a), this.game.playerClanId, myDaimyo);
-                    let perceivedB = GameSystem.getPerceivedStatValue(b, this.bushoCurrentSortKey, gunshi, getAccForSort(b), this.game.playerClanId, myDaimyo);
-
-                    if (a.clan === this.game.playerClanId && a.isDaimyo) perceivedA = a[this.bushoCurrentSortKey];
-                    if (b.clan === this.game.playerClanId && b.isDaimyo) perceivedB = b[this.bushoCurrentSortKey];
-
-                    const isMaskedA = perceivedA === null; const isMaskedB = perceivedB === null;
-                    
-                    if (isMaskedA && !isMaskedB) return 1;  
-                    if (!isMaskedA && isMaskedB) return -1; 
-                    
-                    const getGradeValue = (val) => {
-                        if (val >= 96) return 12; if (val >= 91) return 11; if (val >= 81) return 10; if (val >= 76) return 9;
-                        if (val >= 66) return 8; if (val >= 61) return 7; if (val >= 51) return 6; if (val >= 46) return 5;
-                        if (val >= 36) return 4; if (val >= 31) return 3; if (val >= 21) return 2; return 1;
-                    };
-
-                    if (isMaskedA && isMaskedB) {
-                        valA = 0; valB = 0;
-                    } else {
-                        const gradeA = getGradeValue(perceivedA); const gradeB = getGradeValue(perceivedB);
-                        if (gradeA === gradeB) { valA = a[this.bushoCurrentSortKey] || 0; valB = b[this.bushoCurrentSortKey] || 0; } 
-                        else { valA = gradeA; valB = gradeB; }
-                    }
-                }
-                
-                const checkContent = (val) => {
-                    if (val === false || val === '-' || val === '' || val === null || val === undefined) return 0;
-                    if (typeof val === 'number') return val;
-                    return 1;
-                };
-                valA = checkContent(valA); valB = checkContent(valB);
-                if (valA === valB) return 0; 
-                return this.bushoIsSortAsc ? (valA - valB) : (valB - valA);
-            });
+        if (this.bushoSavedSortedBushos && this.bushoLastSortStateKey === currentSortStateKey) {
+            displayBushos = this.bushoSavedSortedBushos;
         } else {
-            if (extraData && extraData.isFactionView) {
-                displayBushos.sort((a, b) => {
-                    if (a.isFactionLeader && !b.isFactionLeader) return -1;
-                    if (!a.isFactionLeader && b.isFactionLeader) return 1;
-                    if (a.isDaimyo && !b.isDaimyo) return -1;
-                    if (!a.isDaimyo && b.isDaimyo) return 1;
-                    return getSortRankClan(b) - getSortRankClan(a);
-                });
-            } else if (actionType === 'all_busho_list' && this.bushoCurrentScope === 'all') {
-                displayBushos.sort((a, b) => getSortRankAll(b) - getSortRankAll(a));
-            } else if (isViewMode) {
-                displayBushos.sort((a, b) => getSortRankClan(b) - getSortRankClan(a));
-            }
-        }
+            displayBushos = [...this.bushoSavedBushos];
 
-        this.bushoSavedBushos = [...displayBushos];
+            if (this.bushoCurrentSortKey) {
+                displayBushos.sort((a, b) => {
+                    let valA = 0, valB = 0;
+                    if (this.bushoCurrentSortKey === 'action') {
+                        valA = a.isActionDone ? 1 : 0; valB = b.isActionDone ? 1 : 0;
+                    } else if (this.bushoCurrentSortKey === 'name') {
+                        const yomiA = a.yomi || a.name || ""; const yomiB = b.yomi || b.name || "";
+                        let cmp = this.bushoIsSortAsc ? yomiA.localeCompare(yomiB, 'ja') : yomiB.localeCompare(yomiA, 'ja');
+                        if (cmp === 0) {
+                            const nameA = a.name || ""; const nameB = b.name || "";
+                            cmp = this.bushoIsSortAsc ? nameA.localeCompare(nameB, 'ja') : nameB.localeCompare(nameA, 'ja');
+                        }
+                        return cmp;
+                    } else if (this.bushoCurrentSortKey === 'rank') {
+                        valA = getSortRankClan(a); valB = getSortRankClan(b);
+                    } else if (this.bushoCurrentSortKey === 'faction') {
+                        const isRoninA = a.status === 'ronin'; const isRoninB = b.status === 'ronin';
+                        if (isRoninA && !isRoninB) return 1;
+                        if (!isRoninA && isRoninB) return -1;
+                        const getFactionInfo = (busho) => {
+                            if (busho.belongKunishuId > 0) {
+                                const kunishu = this.game.kunishuSystem.getKunishu(busho.belongKunishuId);
+                                return { yomi: kunishu ? (kunishu.yomi || kunishu.name || "") : "んんん", name: kunishu ? (kunishu.name || "") : "んんん" };
+                            } else if (busho.clan > 0) {
+                                const clan = this.game.clans.find(c => c.id === busho.clan);
+                                return { yomi: clan ? (clan.yomi || clan.name || "") : "んんん", name: clan ? (clan.name || "") : "んんん" };
+                            }
+                            return { yomi: "んんん", name: "んんん" };
+                        };
+                        const infoA = getFactionInfo(a); const infoB = getFactionInfo(b);
+                        let cmp = this.bushoIsSortAsc ? infoA.yomi.localeCompare(infoB.yomi, 'ja') : infoB.yomi.localeCompare(infoA.yomi, 'ja');
+                        if (cmp === 0) cmp = this.bushoIsSortAsc ? infoA.name.localeCompare(infoB.name, 'ja') : infoB.name.localeCompare(infoA.name, 'ja');
+                        return cmp;
+                    } else if (this.bushoCurrentSortKey === 'castle') {
+                        const getCastleInfo = (busho) => {
+                            const castle = this.game.getCastle(busho.castleId);
+                            return { yomi: castle ? (castle.yomi || castle.name || "") : "んんん", name: castle ? (castle.name || "") : "んんん" };
+                        };
+                        const infoA = getCastleInfo(a); const infoB = getCastleInfo(b);
+                        let cmp = this.bushoIsSortAsc ? infoA.yomi.localeCompare(infoB.yomi, 'ja') : infoB.yomi.localeCompare(infoA.yomi, 'ja');
+                        if (cmp === 0) cmp = this.bushoIsSortAsc ? infoA.name.localeCompare(infoB.name, 'ja') : infoB.name.localeCompare(infoA.name, 'ja');
+                        return cmp;
+                    } else if (this.bushoCurrentSortKey === 'faction_leader') {
+                        const getLeaderInfo = (busho) => {
+                            if (busho.factionId > 0 && busho.clan > 0) {
+                                const clanBushos = this.game.bushos.filter(b => b.clan === busho.clan && b.status === 'active');
+                                const factionLeaders = clanBushos.filter(b => b.isFactionLeader);
+                                const myLeader = factionLeaders.find(leader => leader.factionId === busho.factionId);
+                                if (myLeader) {
+                                    const sameFamilyLeaders = factionLeaders.filter(leader => leader.familyName && leader.familyName === myLeader.familyName && leader.id !== myLeader.id);
+                                    let yomiStr = "", nameStr = "";
+                                    if (!myLeader.givenName) { yomiStr = (myLeader.familyYomi || myLeader.yomi || "") + "は"; nameStr = myLeader.familyName + "派"; } 
+                                    else if (sameFamilyLeaders.length > 0) { yomiStr = (myLeader.givenYomi || myLeader.yomi || "") + "は"; nameStr = myLeader.givenName + "派"; } 
+                                    else { yomiStr = (myLeader.familyYomi || myLeader.yomi || "") + "は"; nameStr = myLeader.familyName + "派"; }
+                                    return { yomi: yomiStr, name: nameStr };
+                                }
+                            }
+                            return { yomi: "んんん", name: "んんん" };
+                        };
+                        const infoA = getLeaderInfo(a); const infoB = getLeaderInfo(b);
+                        let cmp = this.bushoIsSortAsc ? infoA.yomi.localeCompare(infoB.yomi, 'ja') : infoB.yomi.localeCompare(infoA.yomi, 'ja');
+                        if (cmp === 0) cmp = this.bushoIsSortAsc ? infoA.name.localeCompare(infoB.name, 'ja') : infoB.name.localeCompare(infoA.name, 'ja');
+                        return cmp;
+                    } else if (this.bushoCurrentSortKey === 'age') {
+                        const isNullA = a.isAutoLeader; const isNullB = b.isAutoLeader;
+                        if (isNullA && !isNullB) return 1;
+                        if (!isNullA && isNullB) return -1;
+                        valA = isNullA ? 0 : this.game.year - a.birthYear;
+                        valB = isNullB ? 0 : this.game.year - b.birthYear;
+                    } else if (this.bushoCurrentSortKey === 'family') {
+                        const checkFamily = (busho) => {
+                            if (busho.clan > 0) {
+                                const clan = this.game.clans.find(c => c.id === busho.clan);
+                                const daimyo = clan ? this.game.getBusho(clan.leaderId) : null;
+                                if (daimyo && (busho.id === daimyo.id || busho.isDaimyo)) return 1;
+                                if (daimyo) {
+                                    const bFam = Array.isArray(busho.familyIds) ? busho.familyIds : [];
+                                    const dFam = Array.isArray(daimyo.familyIds) ? daimyo.familyIds : [];
+                                    if (bFam.includes(daimyo.id) || dFam.includes(busho.id)) return 1;
+                                }
+                            }
+                            return 0;
+                        };
+                        valA = checkFamily(a); valB = checkFamily(b);
+                    } else if (this.bushoCurrentSortKey === 'salary') {
+                        const daimyoA = a.clan > 0 ? this.game.getBusho(this.game.clans.find(c=>c.id===a.clan)?.leaderId) : null;
+                        const daimyoB = b.clan > 0 ? this.game.getBusho(this.game.clans.find(c=>c.id===b.clan)?.leaderId) : null;
+                        valA = a.clan > 0 && !a.isDaimyo && a.status !== 'ronin' ? a.getSalary(daimyoA) : 0;
+                        valB = b.clan > 0 && !b.isDaimyo && b.status !== 'ronin' ? b.getSalary(daimyoB) : 0;
+                    } else {
+                        const getAccForSort = (busho) => {
+                            const c = this.game.getCastle(busho.castleId);
+                            if (c && c.investigatedUntil >= this.game.getCurrentTurnId()) return c.investigatedAccuracy;
+                            return acc;
+                        };
+
+                        let perceivedA = GameSystem.getPerceivedStatValue(a, this.bushoCurrentSortKey, gunshi, getAccForSort(a), this.game.playerClanId, myDaimyo);
+                        let perceivedB = GameSystem.getPerceivedStatValue(b, this.bushoCurrentSortKey, gunshi, getAccForSort(b), this.game.playerClanId, myDaimyo);
+
+                        if (a.clan === this.game.playerClanId && a.isDaimyo) perceivedA = a[this.bushoCurrentSortKey];
+                        if (b.clan === this.game.playerClanId && b.isDaimyo) perceivedB = b[this.bushoCurrentSortKey];
+
+                        const isMaskedA = perceivedA === null; const isMaskedB = perceivedB === null;
+                        
+                        if (isMaskedA && !isMaskedB) return 1;  
+                        if (!isMaskedA && isMaskedB) return -1; 
+                        
+                        const getGradeValue = (val) => {
+                            if (val >= 96) return 12; if (val >= 91) return 11; if (val >= 81) return 10; if (val >= 76) return 9;
+                            if (val >= 66) return 8; if (val >= 61) return 7; if (val >= 51) return 6; if (val >= 46) return 5;
+                            if (val >= 36) return 4; if (val >= 31) return 3; if (val >= 21) return 2; return 1;
+                        };
+
+                        if (isMaskedA && isMaskedB) {
+                            valA = 0; valB = 0;
+                        } else {
+                            const gradeA = getGradeValue(perceivedA); const gradeB = getGradeValue(perceivedB);
+                            if (gradeA === gradeB) { valA = a[this.bushoCurrentSortKey] || 0; valB = b[this.bushoCurrentSortKey] || 0; } 
+                            else { valA = gradeA; valB = gradeB; }
+                        }
+                    }
+                    
+                    const checkContent = (val) => {
+                        if (val === false || val === '-' || val === '' || val === null || val === undefined) return 0;
+                        if (typeof val === 'number') return val;
+                        return 1;
+                    };
+                    valA = checkContent(valA); valB = checkContent(valB);
+                    if (valA === valB) return 0; 
+                    return this.bushoIsSortAsc ? (valA - valB) : (valB - valA);
+                });
+            } else {
+                if (extraData && extraData.isFactionView) {
+                    displayBushos.sort((a, b) => {
+                        if (a.isFactionLeader && !b.isFactionLeader) return -1;
+                        if (!a.isFactionLeader && b.isFactionLeader) return 1;
+                        if (a.isDaimyo && !b.isDaimyo) return -1;
+                        if (!a.isDaimyo && b.isDaimyo) return 1;
+                        return getSortRankClan(b) - getSortRankClan(a);
+                    });
+                } else if (actionType === 'all_busho_list' && this.bushoCurrentScope === 'all') {
+                    displayBushos.sort((a, b) => getSortRankAll(b) - getSortRankAll(a));
+                } else if (isViewMode) {
+                    displayBushos.sort((a, b) => getSortRankClan(b) - getSortRankClan(a));
+                }
+            }
+
+            this.bushoSavedSortedBushos = displayBushos;
+            this.bushoLastSortStateKey = currentSortStateKey;
+        }
 
         const getSortMark = (key) => {
             if (this.bushoCurrentSortKey !== key) return '';
