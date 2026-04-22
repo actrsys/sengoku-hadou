@@ -2227,10 +2227,10 @@ class UIInfoManager {
             itemClassStr += " status-mode";
             if (isViewMode) {
                 gridSpStr = "2.5fr 1.5fr 2fr 2fr 1fr 1fr 1fr 1.5fr";
-                gridPcStr = "100px 60px 140px 140px 50px 50px 60px 100px";
+                gridPcStr = "100px 60px 140px 140px 50px 50px 60px 1fr";
             } else {
                 gridSpStr = "35px 2.5fr 1.5fr 2fr 2fr 1fr 1fr 1fr 1.5fr";
-                gridPcStr = "45px 100px 60px 140px 140px 50px 50px 60px 100px";
+                gridPcStr = "45px 100px 60px 140px 140px 50px 50px 60px 1fr";
             }
             headers = [
                 !isViewMode ? `<span class="col-act" data-sort="action">行動${getSortMark('action')}</span>` : null,
@@ -2366,7 +2366,7 @@ class UIInfoManager {
         }
 
         let colStr = "";
-        let minW = isViewMode ? "750px" : "800px";
+        let minW = isViewMode ? "700px" : "750px";
 
         this._renderListModal({
             title: titleStr,
