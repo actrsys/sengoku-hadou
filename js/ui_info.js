@@ -2192,8 +2192,18 @@ class UIInfoManager {
             headerClassStr += " view-mode";
             itemClassStr += " view-mode";
         }
+        
+        let gridSpStr = "";
+        let gridPcStr = "";
 
         if (this.bushoCurrentTab === 'stats') {
+            if (isViewMode) {
+                gridSpStr = "2.5fr 1.5fr repeat(6, 1fr)";
+                gridPcStr = "100px 60px repeat(6, 1fr)";
+            } else {
+                gridSpStr = "35px 2.5fr 1.5fr repeat(6, 1fr)";
+                gridPcStr = "45px 100px 60px repeat(6, 1fr)";
+            }
             headers = [
                 !isViewMode ? `<span class="col-act" data-sort="action">行動${getSortMark('action')}</span>` : null,
                 `<span class="col-name" data-sort="name">名前${getSortMark('name')}</span>`,
@@ -2208,6 +2218,13 @@ class UIInfoManager {
         } else {
             headerClassStr += " status-mode";
             itemClassStr += " status-mode";
+            if (isViewMode) {
+                gridSpStr = "2.5fr 1.5fr 2fr 2fr 1fr 1fr 1fr 1.5fr";
+                gridPcStr = "100px 60px 140px 140px 50px 50px 60px 1fr";
+            } else {
+                gridSpStr = "35px 2.5fr 1.5fr 2fr 2fr 1fr 1fr 1fr 1.5fr";
+                gridPcStr = "45px 100px 60px 140px 140px 50px 50px 60px 1fr";
+            }
             headers = [
                 !isViewMode ? `<span class="col-act" data-sort="action">行動${getSortMark('action')}</span>` : null,
                 `<span class="col-name" data-sort="name">名前${getSortMark('name')}</span>`,
@@ -2341,23 +2358,8 @@ class UIInfoManager {
             };
         }
 
+        let colStr = "";
         let minW = isViewMode ? "900px" : "850px";
-
-        // ここから追加：タブとモードに合わせた列幅の設定
-        let gridSp = null;
-        let gridPc = null;
-
-        // 状態タブの時だけ、JSから直接「この幅で並べてね」と指示を出します
-        if (this.bushoCurrentTab === 'status') {
-            if (isViewMode) {
-                gridSp = "2.5fr 1.5fr 2fr 2fr 1fr 1fr 1fr 1.5fr";
-                gridPc = "100px 60px 140px 140px 50px 50px 60px 1fr";
-            } else {
-                gridSp = "35px 2.5fr 1.5fr 2fr 2fr 1fr 1fr 1fr 1.5fr";
-                gridPc = "45px 100px 60px 140px 140px 50px 50px 60px 1fr";
-            }
-        }
-        // 基本（stats）タブの時は null のままになり、今まで通りCSSの基本設定にお任せします
 
         this._renderListModal({
             title: titleStr,
@@ -2370,8 +2372,8 @@ class UIInfoManager {
             items: items,
             scrollPos: scrollPos,
             minWidth: minW,
-            gridTemplateSp: gridSp,
-            gridTemplatePc: gridPc,
+            gridTemplateSp: gridSpStr,
+            gridTemplatePc: gridPcStr,
             onBack: () => {
                 if (onBack) onBack(); 
                 else if (extraData && extraData.onCancel) extraData.onCancel();

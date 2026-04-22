@@ -2168,22 +2168,6 @@ body.is-pc.daimyo-select-mode #pc-new-ui-container { display: none !important; }
     text-shadow: 1px 1px 0 #000, -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000;
 }
 
-/* 状態タブ選択時のリストレイアウト（スマホ） */
-.list-header.status-mode, .select-item.status-mode {
-    grid-template-columns: 35px 2.5fr 1.5fr 2fr 2fr 1fr 1fr 1fr 1.5fr; 
-}
-.list-header.status-mode.view-mode, .select-item.status-mode.view-mode {
-    grid-template-columns: 2.5fr 1.5fr 2fr 2fr 1fr 1fr 1fr 1.5fr; 
-}
-
-/* 状態タブ選択時のリストレイアウト（PC版） */
-body.is-pc .list-header.status-mode, body.is-pc .select-item.status-mode {
-    grid-template-columns: 45px 100px 60px 140px 140px 50px 50px 60px 1fr; 
-}
-body.is-pc .list-header.status-mode.view-mode, body.is-pc .select-item.status-mode.view-mode {
-    grid-template-columns: 100px 60px 140px 140px 50px 50px 60px 1fr; 
-}
-
 /* ★一門の◯印のスタイル（黒・太字） */
 .select-item.status-mode .col-family {
     font-weight: bold;
