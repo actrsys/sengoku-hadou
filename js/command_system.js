@@ -1987,7 +1987,8 @@ class CommandSystem {
         // ★書き換えここまで！
         
         if(type === 'buy_rice') { 
-            const cost = Math.floor(amount * rate);
+            // ★修正：端数切り捨てだと無料で買える場合があるので、切り上げ（Math.ceil）にして最低1金はかかるようにします！
+            const cost = Math.max(1, Math.ceil(amount * rate));
             if(castle.gold < cost) { this.game.ui.showDialog("資金不足", false); return; } 
             // ★追加: 買うと上限を超えるならストップ
             if(castle.rice + amount > 99999) { this.game.ui.showDialog("これ以上兵糧は買えません", false); return; }
