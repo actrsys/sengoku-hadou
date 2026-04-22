@@ -20,9 +20,9 @@ const COMMAND_MENU_STRUCTURE = [
         label: "対外",
         // ★ここが「入れ子（サブメニュー）」になる部分です！
         subMenus: [
-            { label: "外交", commands: ['goodwill', 'alliance', 'marriage', 'dominate', 'subordinate', 'break_alliance'] }, // ★ 'marriage' を追加！
-            { label: "調略", commands: ['sabotage', 'incite', 'rumor', 'headhunt'] },
+            { label: "外交", commands: ['goodwill', 'alliance', 'marriage', 'dominate', 'subordinate', 'break_alliance'] },
             { label: "諸勢力", commands: ['kunishu_goodwill', 'kunishu_incorporate'] },
+            { label: "調略", commands: ['sabotage', 'incite', 'rumor', 'headhunt'] },
             { label: "朝廷", commands: ['tribute', 'court_truce'] }
         ]
     },
