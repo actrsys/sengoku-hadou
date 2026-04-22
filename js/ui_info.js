@@ -623,7 +623,7 @@ class UIInfoManager {
         let familyBadge = isFamily ? `<span style="font-size: 0.8rem; background: #8b0000; color: #ffffff; padding: 2px 6px; border-radius: 4px; margin-left: 10px; box-shadow: 1px 1px 2px rgba(0,0,0,0.3);">一門</span>` : "";
         const castle = this.game.getCastle(busho.castleId);
         const castleName = castle ? castle.name : "不明";
-        const age = busho.isAutoLeader ? "-" : (this.game.year - busho.birthYear);
+        const age = busho.isAutoLeader ? "" : (this.game.year - busho.birthYear);
         const ageStr = busho.isAutoLeader ? age : `${age}歳`;
 
         let rankName = "";
@@ -1303,8 +1303,8 @@ class UIInfoManager {
             const attackClass = c.allowAttack ? 'text-blue' : 'text-gray';
             const moveText = c.allowMove ? '許可' : '不可';
             const moveClass = c.allowMove ? 'text-blue' : 'text-gray';
-            const attackDisplay = c.isDelegated ? `<span class="${attackClass}">${attackText}</span>` : `<span class="text-gray">-</span>`;
-            const moveDisplay = c.isDelegated ? `<span class="${moveClass}">${moveText}</span>` : `<span class="text-gray">-</span>`;
+            const attackDisplay = c.isDelegated ? `<span class="${attackClass}">${attackText}</span>` : `<span class="text-gray"></span>`;
+            const moveDisplay = c.isDelegated ? `<span class="${moveClass}">${moveText}</span>` : `<span class="text-gray"></span>`;
 
             items.push({
                 onClick: `window.GameApp.ui.info.showDelegateSettingModal(${c.id})`,
