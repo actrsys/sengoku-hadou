@@ -106,6 +106,31 @@ const CAN_EXECUTE_RULES = {
     hasCourtTrust500: (game) => {
         const currentTrust = game.courtRankSystem ? game.courtRankSystem.getTrust(game.playerClanId) : 0;
         return currentTrust >= 500;
+    },
+    // --- 軍事取引 ---
+    canBuyRice: (game, castle) => {
+        let rate = 1.0;
+        if (castle && game.provinces) {
+            const province = game.provinces.find(p => p.id === castle.provinceId);
+            if (province && province.marketRate !== undefined) rate = province.marketRate;
+        }
+        const minCost = Math.floor(1 * rate);
+        return castle.gold >= (minCost > 0 ? minCost : 1);
+    },
+    canSellRice: (game, castle) => {
+        return castle.rice >= 1;
+    },
+    canBuyHorses: (game, castle) => {
+        const daimyo = game.bushos.find(b => b.clan === castle.ownerClan && b.isDaimyo);
+        const castellan = game.getBusho(castle.castellanId);
+        const cost = GameSystem.calcBuyHorseCost(1, daimyo, castellan);
+        return castle.gold >= cost;
+    },
+    canBuyGuns: (game, castle) => {
+        const daimyo = game.bushos.find(b => b.clan === castle.ownerClan && b.isDaimyo);
+        const castellan = game.getBusho(castle.castellanId);
+        const cost = GameSystem.calcBuyGunCost(1, daimyo, castellan);
+        return castle.gold >= cost;
     }
 };
 
@@ -146,35 +171,39 @@ const COMMAND_SPECS = {
         msg: "米: 200 (1回あたり)",
         canExecute: (game, castle) => castle.peoplesLoyalty < castle.maxPeoplesLoyalty
     },
-
+    
     // --- 軍事取引 (MIL_TRADE) ---
     'buy_rice': {
         label: "兵糧購入", category: 'MIL_TRADE',
         costGold: 0, costRice: 0,
         isMulti: false, hasAdvice: false,
         startMode: 'quantity_select',
-        msg: "金を払い兵糧を買います"
+        msg: "金を払い兵糧を買います",
+        canExecute: (game, castle) => CAN_EXECUTE_RULES.canBuyRice(game, castle)
     },
     'sell_rice': {
         label: "兵糧売却", category: 'MIL_TRADE',
         costGold: 0, costRice: 0,
         isMulti: false, hasAdvice: false,
         startMode: 'quantity_select',
-        msg: "兵糧を売り金を得ます"
+        msg: "兵糧を売り金を得ます",
+        canExecute: (game, castle) => CAN_EXECUTE_RULES.canSellRice(game, castle)
     },
     'buy_horses': {
         label: "軍馬購入", category: 'MIL_TRADE',
         costGold: 0, costRice: 0,
         isMulti: false, hasAdvice: false,
         startMode: 'quantity_select',
-        msg: "金を払い軍馬を買います"
+        msg: "金を払い軍馬を買います",
+        canExecute: (game, castle) => CAN_EXECUTE_RULES.canBuyHorses(game, castle)
     },
     'buy_guns': {
         label: "鉄砲購入", category: 'MIL_TRADE',
         costGold: 0, costRice: 0,
         isMulti: false, hasAdvice: false,
         startMode: 'quantity_select',
-        msg: "金を払い鉄砲を買います"
+        msg: "金を払い鉄砲を買います",
+        canExecute: (game, castle) => CAN_EXECUTE_RULES.canBuyGuns(game, castle)
     },
 
     // --- 軍事 (MILITARY) ---
@@ -645,22 +674,40 @@ class CommandSystem {
     getSpecs() {
         return COMMAND_SPECS;
     }
-
+    
     // ==========================================
     // ★ここから追加：カテゴリ（大枠のボタン）が押せるかどうかを判定する専門窓口
     // ==========================================
     isCategoryDisabled(categoryLabel) {
-        // 今は「内政」「軍事」「対外」だけですが、今後ルールが増えてもここで一括管理できます
-        if (!['内政', '軍事', '対外'].includes(categoryLabel)) return false;
-        
-        const castle = this.game.getCurrentTurnCastle();
-        if (!castle) return false;
-        
-        // この城で「まだ行動できる武将」が1人でもいるか数えます
-        const activeBushos = this.game.bushos.filter(b => b.castleId === castle.id && b.clan === castle.ownerClan && b.status === 'active' && !b.isActionDone);
-        
-        // 行動できる武将が「0人」なら、ボタンを押せなくする（true）と答えます
-        return activeBushos.length === 0;
+        const findMenu = (list, label) => {
+            for (const item of list) {
+                if (item.label === label) return item;
+                if (item.subMenus) {
+                    const found = findMenu(item.subMenus, label);
+                    if (found) return found;
+                }
+            }
+            return null;
+        };
+
+        const targetMenu = findMenu(COMMAND_MENU_STRUCTURE, categoryLabel);
+        if (!targetMenu) return false;
+
+        const hasExecutableCommand = (menuItem) => {
+            if (menuItem.commands) {
+                for (const cmdKey of menuItem.commands) {
+                    if (this.canExecuteCommand(cmdKey)) return true;
+                }
+            }
+            if (menuItem.subMenus) {
+                for (const sub of menuItem.subMenus) {
+                    if (hasExecutableCommand(sub)) return true;
+                }
+            }
+            return false;
+        };
+
+        return !hasExecutableCommand(targetMenu);
     }
     // ==========================================
 

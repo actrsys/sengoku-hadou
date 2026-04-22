@@ -1456,7 +1456,8 @@ class UIManager {
                     }
                     if (currentMenuInfo.subMenus) {
                         currentMenuInfo.subMenus.forEach(sub => {
-                            createBtn(sub.label, "category", () => menu(sub.label));
+                            const isDisabled = this.game.commandSystem.isCategoryDisabled(sub.label);
+                            createBtn(sub.label, "category", () => menu(sub.label), isDisabled);
                             btnCount++;
                         });
                     }
@@ -1550,11 +1551,12 @@ class UIManager {
             if (activeItem.subMenus) {
                 activeItem.subMenus.forEach(sub => {
                     const isActive = this.pcMenuPath[pathIndex + 1] === sub.label;
+                    const isDisabled = this.game.commandSystem.isCategoryDisabled(sub.label);
                     createBtn(col, sub.label, isActive ? "category active" : "category", () => {
                         this.pcMenuPath = this.pcMenuPath.slice(0, pathIndex + 1);
                         if (!isActive) this.pcMenuPath.push(sub.label);
                         this.renderPcCommandMenu();
-                    });
+                    }, isDisabled);
                 });
                 renderSubMenu(activeItem.subMenus, pathIndex + 1, col);
             }
