@@ -2198,11 +2198,11 @@ class UIInfoManager {
 
         if (this.bushoCurrentTab === 'stats') {
             if (isViewMode) {
-                gridSpStr = "2.5fr 1.5fr repeat(6, 1fr)";
-                gridPcStr = "100px 60px repeat(6, 1fr)";
+                gridSpStr = "2.5fr 1.5fr 1fr 1fr 1fr 1fr 1fr 1fr";
+                gridPcStr = "100px 60px 1fr 1fr 1fr 1fr 1fr 1fr";
             } else {
-                gridSpStr = "35px 2.5fr 1.5fr repeat(6, 1fr)";
-                gridPcStr = "45px 100px 60px repeat(6, 1fr)";
+                gridSpStr = "35px 2.5fr 1.5fr 1fr 1fr 1fr 1fr 1fr 1fr";
+                gridPcStr = "45px 100px 60px 1fr 1fr 1fr 1fr 1fr 1fr";
             }
             headers = [
                 !isViewMode ? `<span class="col-act" data-sort="action">行動${getSortMark('action')}</span>` : null,
