@@ -26,6 +26,12 @@ class UIInfoManager {
         
         // 外交リストのタブ状態リセット
         this.diploCurrentTab = 'daimyo';
+
+        // 拠点一覧で使う状態のリセット
+        this.currentKyotenTab = 'status';
+        this.currentKyotenScope = 'clan';
+        this.currentKyotenSortKey = null;
+        this.isKyotenSortAsc = false;
     }
 
     pushModal(pageType, renderArgs) {
@@ -1527,8 +1533,10 @@ class UIInfoManager {
         this.closeCommonModal(); 
         this.pushModal('kyoten_list', [clanId]);
     }
-
+    
     _renderKyotenList(clanId, scrollPos = 0) {
+        this.pushModal('kyotenList', [clanId, scrollPos]);
+        
         this.kyotenTargetClanId = clanId !== null ? clanId : this.game.playerClanId;
         
         if (!this.currentKyotenTab) this.currentKyotenTab = 'status';
