@@ -537,7 +537,7 @@ body.hide-daimyo-labels .daimyo-name-label { display: none !important; }
 .select-item input[type="checkbox"], .select-item input[type="radio"] { display: none; }
 
 /* 名前カラムの左寄せを共通化 */
-.select-item .col-name, .select-item .col-daimyo-name, .select-item .col-leader-name, .select-item .col-kunishu-name, .select-item .col-faction-name, .select-item .col-princess-name, .select-item .col-castle-name { justify-content: flex-start !important; padding-left: 5px; }
+// すべて中央寄せの状態でテスト中 このままの可能性も有り .select-item .col-name, .select-item .col-daimyo-name, .select-item .col-leader-name, .select-item .col-kunishu-name, .select-item .col-faction-name, .select-item .col-princess-name, .select-item .col-castle-name { justify-content: flex-start !important; padding-left: 5px; }
 
 /* 履歴リストアイテム */
 .history-list-item { scroll-snap-align: start; padding: 8px 10px; border-bottom: 1px solid rgba(255, 215, 79, 0.3); font-size: 0.9rem; color: #fff; background: linear-gradient(to bottom, #254a2e 0%, #1b3822 100%); text-shadow: 1px 1px 0 #000, -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000; }
