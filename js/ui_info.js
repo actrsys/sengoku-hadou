@@ -1185,12 +1185,12 @@ class UIInfoManager {
             const age = this.game.year - p.birthYear;
             const father = this.game.getBusho(p.fatherId);
             const husband = this.game.getBusho(p.husbandId);
-
+            
             return {
                 onClick: isSelectMode ? `window.GameApp.ui.info.selectPrincess(${p.id}, this)` : null,
                 cells: [
                     `<strong class="col-princess-name">${p.name}</strong>`,
-                    `${age}歳`,
+                    `${age}`,
                     father ? father.name : "不明",
                     husband ? husband.name : "なし",
                     "" 
@@ -2287,7 +2287,7 @@ class UIInfoManager {
                     `<span class="col-stat">${getStat('charm')}</span>`
                 ].filter(Boolean);
             } else {
-                let forceName = "-"; 
+                let forceName = ""; 
                 let familyMark = "";
                 if (b.belongKunishuId > 0) {
                     const kunishu = this.game.kunishuSystem.getKunishu(b.belongKunishuId);
@@ -2303,16 +2303,16 @@ class UIInfoManager {
                         if (bFamily.includes(daimyo.id) || dFamily.includes(b.id)) familyMark = "◯";
                     }
                 }
-                const bCastleName = bCastle ? bCastle.name : "-";
-                const age = b.isAutoLeader ? "-" : (this.game.year - b.birthYear);
-                let salary = "-";
+                const bCastleName = bCastle ? bCastle.name : "";
+                const age = b.isAutoLeader ? "" : (this.game.year - b.birthYear);
+                let salary = "";
                 if (b.clan > 0 && !b.isDaimyo && b.status !== 'ronin') {
                     const clan = this.game.clans.find(c => c.id === b.clan);
                     const daimyo = clan ? this.game.getBusho(clan.leaderId) : null;
                     salary = b.getSalary(daimyo);
-                    if (salary === 0) salary = "-";
+                    if (salary === 0) salary = "";
                 }
-                let factionNameStr = "-";
+                let factionNameStr = "";
                 if (b.factionId > 0 && b.clan > 0) {
                     const clanBushos = this.game.bushos.filter(busho => busho.clan === b.clan && busho.status === 'active');
                     const factionLeaders = clanBushos.filter(busho => busho.isFactionLeader);
