@@ -393,7 +393,7 @@ class UIInfoManager {
         }
 
         relations.sort((a,b) => b.sentiment - a.sentiment);
-
+        
         let items = [];
         relations.forEach(r => {
             let statusClass = "text-white";
@@ -408,7 +408,7 @@ class UIInfoManager {
                 cells: [
                     `<span class="col-daimyo-name" style="font-weight:bold;">${r.name}</span>`,
                     friendBarHtml,
-                    `<span class="${statusClass}">${r.status}</span>`,
+                    `<span class="col-relation ${statusClass}">${r.status}</span>`,
                     ""
                 ]
             });
