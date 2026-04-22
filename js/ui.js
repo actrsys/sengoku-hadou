@@ -1377,31 +1377,35 @@ class UIManager {
     
     renderCommandMenu() {
         const mobileArea = document.getElementById('command-area');
-        
         if (mobileArea) {
             mobileArea.innerHTML = '';
-            
-            const createBtn = (label, cls, onClick) => { 
-                const btn = document.createElement('button'); 
-                btn.className = `cmd-btn ${cls || ''}`; 
-                btn.textContent = label; 
+            const createBtn = (label, cls, onClick, isDisabled = false) => {
+                const btn = document.createElement('button');
+                btn.className = `cmd-btn ${cls || ''}`;
+                btn.textContent = label;
+                if (isDisabled) {
+                    btn.disabled = true;
+                    btn.classList.add('disabled');
+                }
                 btn.onclick = () => {
                     if (this.game.isProcessingAI) return;
                     this.cancelMapSelection(true);
                     onClick();
-                }; 
-                mobileArea.appendChild(btn); 
+                };
+                mobileArea.appendChild(btn);
+            };
+            const cmd = (type) => this.game.commandSystem.startCommand(type);
+            const menu = (targetMenu) => {
+                this.menuState = targetMenu;
+                this.renderCommandMenu();
             };
             
-            const cmd = (type) => this.game.commandSystem.startCommand(type);
-            const menu = (targetMenu) => { this.menuState = targetMenu; this.renderCommandMenu(); };
             const specs = this.game.commandSystem.getSpecs();
             
             if (this.menuState === 'MAIN') {
                 COMMAND_MENU_STRUCTURE.forEach(item => {
                     createBtn(item.label, "category", () => menu(item.label));
                 });
-
                 const finishBtn = document.createElement('button');
                 finishBtn.className = `cmd-btn finish`;
                 finishBtn.textContent = "命令終了";
@@ -1417,7 +1421,6 @@ class UIManager {
             } else {
                 let currentMenuInfo = null;
                 let parentMenuName = 'MAIN';
-
                 for (const topItem of COMMAND_MENU_STRUCTURE) {
                     if (topItem.label === this.menuState) {
                         currentMenuInfo = topItem;
@@ -1433,7 +1436,7 @@ class UIManager {
                         }
                     }
                 }
-
+                
                 if (!currentMenuInfo) {
                     menu('MAIN');
                 } else {
@@ -1442,19 +1445,18 @@ class UIManager {
                         currentMenuInfo.commands.forEach(key => {
                             const spec = specs[key];
                             if (spec) {
-                                createBtn(spec.label, "", () => cmd(key));
+                                const isDisabled = typeof this.game.commandSystem.canExecuteCommand === 'function' ? !this.game.commandSystem.canExecuteCommand(key) : false;
+                                createBtn(spec.label, "", () => cmd(key), isDisabled);
                                 btnCount++;
                             }
                         });
                     }
-
                     if (currentMenuInfo.subMenus) {
                         currentMenuInfo.subMenus.forEach(sub => {
                             createBtn(sub.label, "category", () => menu(sub.label));
                             btnCount++;
                         });
                     }
-
                     const emptyCount = 3 - (btnCount % 3);
                     if (emptyCount < 3) {
                         for(let i=0; i<emptyCount; i++) {
@@ -1462,6 +1464,7 @@ class UIManager {
                             mobileArea.appendChild(d);
                         }
                     }
+                    
                     createBtn("戻る", "back", () => menu(parentMenuName));
                 }
             }
@@ -1476,31 +1479,31 @@ class UIManager {
         const pcArea = document.getElementById('pc-new-command-area');
         if (!pcArea) return;
         pcArea.innerHTML = '';
-
         const specs = this.game.commandSystem.getSpecs();
         const cmd = (type) => this.game.commandSystem.startCommand(type);
-        
         if (!this.pcMenuPath) this.pcMenuPath = [];
-
         const createCol = () => {
             const col = document.createElement('div');
             col.className = 'pc-cmd-col';
             pcArea.appendChild(col);
             return col;
         };
-
-        const createBtn = (area, label, cls, onClick) => { 
-            const btn = document.createElement('button'); 
-            btn.className = `cmd-btn ${cls || ''}`; 
-            btn.textContent = label; 
+        const createBtn = (area, label, cls, onClick, isDisabled = false) => {
+            const btn = document.createElement('button');
+            btn.className = `cmd-btn ${cls || ''}`;
+            btn.textContent = label;
+            if (isDisabled) {
+                btn.disabled = true;
+                btn.classList.add('disabled');
+            }
             btn.onclick = () => {
                 if (this.game.isProcessingAI) return;
                 this.cancelMapSelection(true);
                 onClick();
-            }; 
-            area.appendChild(btn); 
+            };
+            area.appendChild(btn);
         };
-
+        
         const col1 = createCol();
         
         COMMAND_MENU_STRUCTURE.forEach(item => {
@@ -1522,25 +1525,25 @@ class UIManager {
                 this.game.finishTurn();
             });
         });
-
+        
         const renderSubMenu = (menuList, pathIndex, parentCol) => {
             if (this.pcMenuPath.length <= pathIndex) return;
+            
             const activeLabel = this.pcMenuPath[pathIndex];
             const activeItem = menuList.find(m => m.label === activeLabel);
-            
             if (!activeItem) return;
-
+            
             const col = createCol();
             
             if (activeItem.commands) {
                 activeItem.commands.forEach(key => {
                     const spec = specs[key];
                     if (spec) {
-                        createBtn(col, spec.label, "", () => cmd(key));
+                        const isDisabled = typeof this.game.commandSystem.canExecuteCommand === 'function' ? !this.game.commandSystem.canExecuteCommand(key) : false;
+                        createBtn(col, spec.label, "", () => cmd(key), isDisabled);
                     }
                 });
             }
-
             if (activeItem.subMenus) {
                 activeItem.subMenus.forEach(sub => {
                     const isActive = this.pcMenuPath[pathIndex + 1] === sub.label;
@@ -1553,7 +1556,7 @@ class UIManager {
                 renderSubMenu(activeItem.subMenus, pathIndex + 1, col);
             }
         };
-
+        
         renderSubMenu(COMMAND_MENU_STRUCTURE, 0, col1);
     }
 

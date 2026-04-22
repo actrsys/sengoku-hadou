@@ -560,6 +560,72 @@ class CommandSystem {
         return COMMAND_SPECS;
     }
 
+    canExecuteCommand(type) {
+        const spec = COMMAND_SPECS[type];
+        if (!spec) return true;
+        if (spec.isSystem) return true;
+
+        const castle = this.game.getCurrentTurnCastle();
+        if (!castle) return false;
+
+        if (type === 'farm' && castle.kokudaka >= castle.maxKokudaka) return false;
+        if (type === 'commerce' && castle.commerce >= castle.maxCommerce) return false;
+        if (type === 'repair' && castle.defense >= castle.maxDefense) return false;
+        if (type === 'charity' && castle.peoplesLoyalty >= castle.maxPeoplesLoyalty) return false;
+        
+        const maxTraining = (window.WarParams && window.WarParams.Military && window.WarParams.Military.MaxTraining) ? window.WarParams.Military.MaxTraining : 100;
+        const maxMorale = (window.WarParams && window.WarParams.Military && window.WarParams.Military.MaxMorale) ? window.WarParams.Military.MaxMorale : 100;
+        if (type === 'training' && castle.training >= maxTraining) return false;
+        if (type === 'soldier_charity' && castle.morale >= maxMorale) return false;
+
+        if ((type === 'training' || type === 'soldier_charity') && castle.soldiers <= 0) return false;
+
+        if (spec.costGold > 0 && castle.gold < spec.costGold) return false;
+        if (spec.costRice > 0 && castle.rice < spec.costRice) return false;
+
+        if (type === 'court_truce') {
+            const currentTrust = this.game.courtRankSystem ? this.game.courtRankSystem.getTrust(this.game.playerClanId) : 0;
+            if (currentTrust < 500) return false;
+        }
+
+        if (type === 'marriage') {
+            const myClan = this.game.clans.find(c => c.id === this.game.playerClanId);
+            const hasUnmarriedPrincess = myClan && myClan.princessIds && myClan.princessIds.some(pId => {
+                const p = this.game.princesses.find(princess => princess.id === pId);
+                return p && p.status === 'unmarried';
+            });
+            if (!hasUnmarriedPrincess) return false;
+        }
+
+        if (type === 'dominate') {
+            let isSubordinate = false;
+            this.game.clans.forEach(c => {
+                if (c.id !== 0 && c.id !== Number(this.game.playerClanId)) {
+                    const rel = this.game.getRelation(this.game.playerClanId, c.id);
+                    if (rel && rel.status === '従属') {
+                        isSubordinate = true;
+                    }
+                }
+            });
+            if (isSubordinate) return false;
+        }
+
+        if (type === 'employ') {
+            const hasRonin = this.game.bushos.some(b => {
+                if (b.status !== 'ronin' || b.belongKunishuId > 0) return false;
+                const targetCastle = this.game.getCastle(b.castleId);
+                return targetCastle && targetCastle.ownerClan === this.game.playerClanId;
+            });
+            if (!hasRonin) return false;
+        }
+
+        if (type === 'goodwill' || type === 'kunishu_goodwill' || type === 'tribute') {
+            if (castle.gold < 200) return false;
+        }
+
+        return true;
+    }
+
     getValidTargets(type) {
         // 援軍要請の時は、すでに計算されている候補リストをそのまま使います！
         if (['atk_self_reinforcement', 'atk_ally_reinforcement', 'def_self_reinforcement', 'def_ally_reinforcement'].includes(type)) {
