@@ -620,6 +620,14 @@ class CommandSystem {
             );
             infoHtml = "<div>褒美を与える武将を選択してください</div>"; 
         }
+        else if (actionType === 'banish') {
+            bushos = this.game.bushos.filter(b => 
+                b.clan === this.game.playerClanId && 
+                b.status === 'active' && 
+                !b.isDaimyo                          
+            );
+            infoHtml = "<div>追放する武将を選択してください</div>"; 
+        }
         else {
             // ★追加: 内政などの通常の命令でも、未登場の武将や諸勢力が勝手にリストに出ないようにします
             bushos = this.game.getCastleBushos(c.id).filter(b => b.clan === c.ownerClan && b.status === 'active');
