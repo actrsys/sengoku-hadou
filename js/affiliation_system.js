@@ -108,7 +108,7 @@ class AffiliationSystem {
             let targetCastle = null;
 
             // 滅亡ではなく、自ら出奔した場合のみ、お引越し先を探します
-            if (!isClanDestroyed && currentCastle) {
+            if (oldClanId !== 0 && !isClanDestroyed && currentCastle) {
                 // 自分のもともといた大名家（oldClanId）ではなく、かつ誰かの持ち物であるお城だけを集めます
                 const otherCastles = this.game.castles.filter(c => c.ownerClan !== oldClanId && c.ownerClan !== 0);
 
