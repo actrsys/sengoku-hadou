@@ -160,7 +160,7 @@ class UIInfoManager {
                     else if (['同盟', '支配', '従属', '婚姻'].includes(friendStatus)) statusClass = 'text-green';
                 }
             } else {
-                friendStatus = "自勢力";
+                friendStatus = "自家";
                 statusClass = "text-orange";
             }
 
