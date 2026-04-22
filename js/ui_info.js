@@ -3562,56 +3562,29 @@ class UIInfoManager {
     }
 
     _renderHistoryList(historyList, scrollPos = 0) {
-        const modal = document.getElementById('selector-modal');
-        const titleEl = document.getElementById('selector-title');
-        const listContainer = document.getElementById('selector-list');
-        const contextEl = document.getElementById('selector-context-info');
-        const tabsEl = document.getElementById('selector-tabs');
-        const confirmBtn = document.getElementById('selector-confirm-btn');
-        const backBtn = document.querySelector('#selector-modal .btn-secondary');
-
-        if (!modal) return;
-        modal.classList.remove('hidden');
-        if (titleEl) titleEl.textContent = "行動履歴";
-        if (contextEl) contextEl.classList.add('hidden');
-        if (tabsEl) tabsEl.classList.add('hidden');
-        if (confirmBtn) confirmBtn.classList.add('hidden');
-
-        if(backBtn) {
-            backBtn.style.display = '';
-            backBtn.textContent = '閉じる';
-            backBtn.onclick = () => {
-                if (window.AudioManager) window.AudioManager.playSE('cancel.ogg');
-                this.popModal();
-            };
-            const footer = backBtn.parentElement;
-            if (footer) footer.style.justifyContent = 'center';
-        }
-
-        let listHtml = '';
-        if (!historyList || historyList.length === 0) {
-            listHtml = '<div style="padding: 10px; text-align: center;">履歴がありません。</div>';
-        } else {
-            historyList.forEach(log => {
+        let items = [];
+        
+        // 履歴の文章をリストに並べる準備をします
+        if (historyList && historyList.length > 0) {
+            items = historyList.map(log => {
                 const text = typeof log === 'string' ? log : (log.text || "");
-                listHtml += `<div class="history-list-item">${text}</div>`;
+                return {
+                    onClick: null, // クリックしても何も起きないようにします
+                    cells: [text], // 表示するテキストをそのまま渡します
+                    itemClass: "history-list-item" // 特別なCSSを当てるための目印です
+                };
             });
         }
 
-        if (listContainer) {
-            listContainer.className = 'list-container hide-native-scroll';
-            listContainer.style.display = 'block';
-            listContainer.innerHTML = listHtml;
-            if (window.CustomScrollbar) {
-                if (!this.ui.bushoScrollbar) this.ui.bushoScrollbar = new CustomScrollbar(listContainer);
-                setTimeout(() => {
-                    listContainer.scrollTop = scrollPos;
-                    this.ui.bushoScrollbar.update();
-                }, 10);
-            } else {
-                listContainer.scrollTop = scrollPos;
-            }
-        }
+        // 共通のリスト作成工場にお願いします！
+        this._renderListModal({
+            title: "行動履歴",
+            items: items,
+            emptyHtml: '<div style="padding: 10px; text-align: center;">履歴がありません。</div>',
+            gridTemplateSp: "1fr", // スマホ版は横幅いっぱいの1つの部屋にします
+            gridTemplatePc: "1fr", // パソコン版も同じです
+            scrollPos: scrollPos
+        });
     }
 
     // ==========================================

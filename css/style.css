@@ -544,6 +544,18 @@ body.hide-daimyo-labels .daimyo-name-label { display: none !important; }
 .history-list-item:nth-child(even) { background: linear-gradient(to bottom, #2d5a38 0%, #254a2e 100%); }
 .history-list-item:last-child { border-bottom: none; }
 
+.select-item.history-list-item {
+    height: auto !important; /* 箱の高さを文字に合わせて伸ばす魔法 */
+    display: block !important; /* 表のルールを無効化する魔法 */
+}
+.select-item.history-list-item > * {
+    white-space: normal !important; /* はみ出した文字を折り返す魔法 */
+    height: auto !important;
+    border-right: none !important; /* 右側の区切り線を消す魔法 */
+    text-align: left !important; /* 文字を左揃えにする魔法 */
+    padding: 4px 0 !important;
+}
+
 /* 各種リストの基本グリッド（スマホ向けベース） */
 .list-header, .select-item { display: grid; grid-template-columns: var(--grid-cols-sp, 35px 2.5fr 1.5fr repeat(6, 1fr)); font-size: clamp(0.6rem, 2.2vw, 0.85rem); padding: 0; height: 40px; gap: 0; box-sizing: border-box; align-items: center; }
 .list-header.view-mode, .select-item.view-mode { grid-template-columns: var(--grid-cols-sp, 2.5fr 1.5fr repeat(6, 1fr)); }
