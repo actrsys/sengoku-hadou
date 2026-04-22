@@ -1375,14 +1375,6 @@ class UIManager {
         }
     }
     
-    // ★追加：スマホとPCで使い回せる「ボタンを押せなくするかの確認係」
-    checkIfCategoryDisabled(label) {
-        if (!['内政', '軍事', '対外'].includes(label)) return false;
-        const myCastle = this.game.getCurrentTurnCastle();
-        if (!myCastle) return false;
-        return this.game.bushos.filter(b => b.castleId === myCastle.id && b.clan === myCastle.ownerClan && b.status === 'active' && !b.isActionDone).length === 0;
-    }
-
     renderCommandMenu() {
         const overlay = document.getElementById('command-overlay');
         const mobileArea = document.getElementById('command-area');
@@ -1413,8 +1405,8 @@ class UIManager {
             
             if (this.menuState === 'MAIN') {
                 COMMAND_MENU_STRUCTURE.forEach(item => {
-                    // ★修正：上で作った「確認係」にチェックしてもらいます
-                    const isDisabled = this.checkIfCategoryDisabled(item.label);
+                    // ★修正：ルールの専門家（command_system.js）にチェックしてもらいます
+                    const isDisabled = this.game.commandSystem.isCategoryDisabled(item.label);
                     createBtn(item.label, "category", () => menu(item.label), isDisabled);
                 });
                 const finishBtn = document.createElement('button');
@@ -1518,8 +1510,8 @@ class UIManager {
         const col1 = createCol();
         COMMAND_MENU_STRUCTURE.forEach(item => {
             const isActive = this.pcMenuPath[0] === item.label;
-            // ★修正：PC版でも「確認係」を使い回します
-            const isDisabled = this.checkIfCategoryDisabled(item.label);
+            // ★修正：PC版でもルールの専門家（command_system.js）にチェックしてもらいます
+            const isDisabled = this.game.commandSystem.isCategoryDisabled(item.label);
             createBtn(col1, item.label, isActive ? "category active" : "category", () => {
                 if (isActive) {
                     this.pcMenuPath = [];

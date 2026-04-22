@@ -560,6 +560,24 @@ class CommandSystem {
         return COMMAND_SPECS;
     }
 
+    // ==========================================
+    // ★ここから追加：カテゴリ（大枠のボタン）が押せるかどうかを判定する専門窓口
+    // ==========================================
+    isCategoryDisabled(categoryLabel) {
+        // 今は「内政」「軍事」「対外」だけですが、今後ルールが増えてもここで一括管理できます
+        if (!['内政', '軍事', '対外'].includes(categoryLabel)) return false;
+        
+        const castle = this.game.getCurrentTurnCastle();
+        if (!castle) return false;
+        
+        // この城で「まだ行動できる武将」が1人でもいるか数えます
+        const activeBushos = this.game.bushos.filter(b => b.castleId === castle.id && b.clan === castle.ownerClan && b.status === 'active' && !b.isActionDone);
+        
+        // 行動できる武将が「0人」なら、ボタンを押せなくする（true）と答えます
+        return activeBushos.length === 0;
+    }
+    // ==========================================
+
     canExecuteCommand(type) {
         const spec = COMMAND_SPECS[type];
         if (!spec) return true;
