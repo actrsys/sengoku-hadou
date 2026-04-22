@@ -161,7 +161,7 @@ class UIInfoManager {
             const friendBarHtml = d.id === this.game.playerClanId ? "" : this._createBarHtml(friendScore, 'friend');
 
             items.push({
-                onClick: `if(window.AudioManager) window.AudioManager.playSE('choice.ogg'); window.GameApp.ui.info.showDaimyoDetail(${d.id})`,
+                onClick: `window.GameApp.ui.info.showDaimyoDetail(${d.id})`,
                 cells: [
                     `<span class="col-daimyo-name" style="font-weight:bold;">${d.name}</span>`,
                     `<span class="col-leader-name">${d.leaderName}</span>`,
@@ -682,7 +682,6 @@ class UIInfoManager {
     }
     
     showBushoDetailModalById(bushoId) {
-        if (window.AudioManager) window.AudioManager.playSE('choice.ogg');
         const busho = this.game.getBusho(bushoId);
         if (busho) this.showBushoDetailModal(busho);
     }
@@ -718,8 +717,6 @@ class UIInfoManager {
     }
 
     handleBushoSelect(e, isMulti, costGold, costRice, actionType) {
-        if (window.AudioManager && e.target.tagName !== 'INPUT') window.AudioManager.playSE('choice.ogg');
-        
         let div = e.currentTarget;
         let input = null;
 
@@ -1042,7 +1039,7 @@ class UIInfoManager {
                 if (typeof item.onClick === 'function') {
                     indexAttr = `data-action-index="${index}"`; 
                 } else {
-                    clickStr = `onclick="${item.onClick}"`;
+                    clickStr = `onclick="if(window.AudioManager) window.AudioManager.playSE('choice.ogg'); ${item.onClick}"`;
                 }
             }
             const cells = item.cells.map(c => {
@@ -1221,8 +1218,6 @@ class UIInfoManager {
     }
 
     selectPrincess(princessId, element) {
-        if (window.AudioManager) window.AudioManager.playSE('choice.ogg');
-        
         const items = document.querySelectorAll('.princess-list-item');
         items.forEach(item => item.classList.remove('selected'));
 
@@ -1753,7 +1748,7 @@ class UIInfoManager {
             }
 
             items.push({
-                onClick: `if(window.AudioManager) window.AudioManager.playSE('choice.ogg'); window.GameApp.ui.info.showCastleDetail(${c.id})`,
+                onClick: `window.GameApp.ui.info.showCastleDetail(${c.id})`,
                 cells: cells
             });
         });
@@ -3497,7 +3492,7 @@ class UIInfoManager {
             if (isSelectMode) {
                 onClickStr = `window.GameApp.ui.info.selectKunishu(${kunishu.id}, this)`;
             } else {
-                onClickStr = `if(window.AudioManager) window.AudioManager.playSE('choice.ogg'); window.GameApp.ui.info.showKunishuDetail(${kunishu.id})`;
+                onClickStr = `window.GameApp.ui.info.showKunishuDetail(${kunishu.id})`;
             }
 
             items.push({
@@ -3536,8 +3531,6 @@ class UIInfoManager {
 
     // ★新規追加：リストから勢力を選んだ時のハイライト処理
     selectKunishu(kunishuId, element) {
-        if (window.AudioManager) window.AudioManager.playSE('choice.ogg');
-        
         const items = document.querySelectorAll('.kunishu-list-item');
         items.forEach(item => item.classList.remove('selected'));
 
@@ -3661,8 +3654,6 @@ class UIInfoManager {
     }
 
     selectForce(index, element) {
-        if (window.AudioManager) window.AudioManager.playSE('choice.ogg');
-        
         const items = document.querySelectorAll('.force-list-item');
         items.forEach(item => item.classList.remove('selected'));
 
