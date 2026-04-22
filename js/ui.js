@@ -1375,8 +1375,16 @@ class UIManager {
         }
     }
     
+    // ★追加：スマホとPCで使い回せる「ボタンを押せなくするかの確認係」
+    checkIfCategoryDisabled(label) {
+        if (!['内政', '軍事', '対外'].includes(label)) return false;
+        const myCastle = this.game.getCurrentTurnCastle();
+        if (!myCastle) return false;
+        return this.game.bushos.filter(b => b.castleId === myCastle.id && b.clan === myCastle.ownerClan && b.status === 'active' && !b.isActionDone).length === 0;
+    }
+
     renderCommandMenu() {
-        const mobileArea = document.getElementById('command-area');
+        const overlay = document.getElementById('command-overlay');
         if (mobileArea) {
             mobileArea.innerHTML = '';
             const createBtn = (label, cls, onClick, isDisabled = false) => {
@@ -1403,19 +1411,9 @@ class UIManager {
             const specs = this.game.commandSystem.getSpecs();
             
             if (this.menuState === 'MAIN') {
-                // ★追加：未行動の武将がいるかチェックします
-                const myCastle = this.game.getCurrentTurnCastle();
-                let activeBushoCount = 0;
-                if (myCastle) {
-                    activeBushoCount = this.game.bushos.filter(b => b.castleId === myCastle.id && b.clan === myCastle.ownerClan && b.status === 'active' && !b.isActionDone).length;
-                }
-
                 COMMAND_MENU_STRUCTURE.forEach(item => {
-                    // ★追加：未行動の武将がいない場合、内政・軍事・対外のボタンを押せなくします
-                    let isDisabled = false;
-                    if (activeBushoCount === 0 && ['内政', '軍事', '対外'].includes(item.label)) {
-                        isDisabled = true;
-                    }
+                    // ★修正：上で作った「確認係」にチェックしてもらいます
+                    const isDisabled = this.checkIfCategoryDisabled(item.label);
                     createBtn(item.label, "category", () => menu(item.label), isDisabled);
                 });
                 const finishBtn = document.createElement('button');
@@ -1517,21 +1515,10 @@ class UIManager {
         };
         
         const col1 = createCol();
-
-        // ★追加：未行動の武将がいるかチェックします
-        const myCastle = this.game.getCurrentTurnCastle();
-        let activeBushoCount = 0;
-        if (myCastle) {
-            activeBushoCount = this.game.bushos.filter(b => b.castleId === myCastle.id && b.clan === myCastle.ownerClan && b.status === 'active' && !b.isActionDone).length;
-        }
-
         COMMAND_MENU_STRUCTURE.forEach(item => {
             const isActive = this.pcMenuPath[0] === item.label;
-            // ★追加：未行動の武将がいない場合、内政・軍事・対外のボタンを押せなくします
-            let isDisabled = false;
-            if (activeBushoCount === 0 && ['内政', '軍事', '対外'].includes(item.label)) {
-                isDisabled = true;
-            }
+            // ★修正：PC版でも「確認係」を使い回します
+            const isDisabled = this.checkIfCategoryDisabled(item.label);
             createBtn(col1, item.label, isActive ? "category active" : "category", () => {
                 if (isActive) {
                     this.pcMenuPath = [];
@@ -1539,7 +1526,7 @@ class UIManager {
                     this.pcMenuPath = [item.label];
                 }
                 this.renderPcCommandMenu();
-            }, isDisabled); // ★修正：isDisabled を渡すようにしました
+            }, isDisabled); // ★ここも忘れずに isDisabled を渡します
         });
         createBtn(col1, "命令終了", "finish", () => {
             if (this.game.isProcessingAI) return;
