@@ -54,28 +54,32 @@ const COMMAND_SPECS = {
         costGold: 200, costRice: 0, 
         isMulti: true, hasAdvice: false, 
         startMode: 'busho_select', sortKey: 'politics',
-        msg: "金: 200 (1回あたり)" 
+        msg: "金: 200 (1回あたり)",
+        canExecute: (game, castle) => castle.kokudaka < castle.maxKokudaka
     },
     'commerce': { 
         label: "鉱山開発", category: 'DEVELOP', 
         costGold: 200, costRice: 0, 
         isMulti: true, hasAdvice: false, 
         startMode: 'busho_select', sortKey: 'politics',
-        msg: "金: 200 (1回あたり)" 
+        msg: "金: 200 (1回あたり)",
+        canExecute: (game, castle) => castle.commerce < castle.maxCommerce
     },
     'repair': { 
         label: "城壁修復", category: 'DEVELOP', 
         costGold: 200, costRice: 0, 
         isMulti: true, hasAdvice: false, 
         startMode: 'busho_select', sortKey: 'politics',
-        msg: "金: 200 (1回あたり)" 
+        msg: "金: 200 (1回あたり)",
+        canExecute: (game, castle) => castle.defense < castle.maxDefense
     },
     'charity': { 
         label: "民施し", category: 'DEVELOP', 
         costGold: 0, costRice: 200, 
         isMulti: true, hasAdvice: false, 
         startMode: 'busho_select', sortKey: 'charm',
-        msg: "米: 200 (1回あたり)" 
+        msg: "米: 200 (1回あたり)",
+        canExecute: (game, castle) => castle.peoplesLoyalty < castle.maxPeoplesLoyalty
     },
 
     // --- 軍事取引 (MIL_TRADE) ---
@@ -128,14 +132,26 @@ const COMMAND_SPECS = {
         costGold: 0, costRice: 0, 
         isMulti: true, hasAdvice: false, 
         startMode: 'busho_select', sortKey: 'leadership',
-        msg: "兵士の訓練度を上げます" 
+        msg: "兵士の訓練度を上げます",
+        canExecute: (game, castle) => {
+            const maxTraining = (window.WarParams && window.WarParams.Military && window.WarParams.Military.MaxTraining) ? window.WarParams.Military.MaxTraining : 100;
+            if (castle.training >= maxTraining) return false;
+            if (castle.soldiers <= 0) return false;
+            return true;
+        }
     },
     'soldier_charity': { 
         label: "兵施し", category: 'MILITARY', 
         costGold: 0, costRice: 200, 
         isMulti: true, hasAdvice: false, 
         startMode: 'busho_select', sortKey: 'leadership',
-        msg: "米: 200 (1回あたり)\n兵士の士気を上げます" 
+        msg: "米: 200 (1回あたり)\n兵士の士気を上げます",
+        canExecute: (game, castle) => {
+            const maxMorale = (window.WarParams && window.WarParams.Military && window.WarParams.Military.MaxMorale) ? window.WarParams.Military.MaxMorale : 100;
+            if (castle.morale >= maxMorale) return false;
+            if (castle.soldiers <= 0) return false;
+            return true;
+        }
     },
     'transport': { 
         label: "輸送", category: 'MILITARY', 
@@ -144,12 +160,11 @@ const COMMAND_SPECS = {
         startMode: 'map_select', targetType: 'ally_other',
         sortKey: 'strength' 
     },
-    // ★追加: 諸勢力を攻める（鎮圧する）ための軍事コマンド
     'kunishu_subjugate': { 
         label: "諸勢力鎮圧", category: 'MILITARY', 
         costGold: 0, costRice: 0, 
         isMulti: true, hasAdvice: true, 
-        startMode: 'map_select', targetType: 'kunishu_subjugate_valid', // ← 専用の合言葉にしました！
+        startMode: 'map_select', targetType: 'kunishu_subjugate_valid',
         sortKey: 'strength'
     },
 
@@ -166,7 +181,12 @@ const COMMAND_SPECS = {
         costGold: 0, costRice: 0, 
         isMulti: false, hasAdvice: false, 
         startMode: 'busho_select', sortKey: 'leadership',
-        msg: "城主を任命します" 
+        msg: "城主を任命します",
+        canExecute: (game, castle) => {
+            const daimyo = game.bushos.find(b => b.clan === game.playerClanId && b.isDaimyo);
+            if (daimyo && Number(daimyo.castleId) === Number(castle.id)) return false;
+            return true;
+        }
     },
     'delegate': { 
         label: "城主委任", category: 'PERSONNEL', 
@@ -192,7 +212,14 @@ const COMMAND_SPECS = {
         isMulti: false, hasAdvice: true, 
         startMode: 'busho_select_special', subType: 'employ_target',
         sortKey: 'strength',
-        msg: "在野武将を登用します" 
+        msg: "在野武将を登用します",
+        canExecute: (game, castle) => {
+            return game.bushos.some(b => {
+                if (b.status !== 'ronin' || b.belongKunishuId > 0) return false;
+                const targetCastle = game.getCastle(b.castleId);
+                return targetCastle && targetCastle.ownerClan === game.playerClanId;
+            });
+        }
     },
     'move': { 
         label: "移動", category: 'PERSONNEL', 
@@ -216,7 +243,8 @@ const COMMAND_SPECS = {
         isMulti: false, hasAdvice: true, 
         startMode: 'map_select',  targetType: 'enemy_all',
         sortKey: 'intelligence' 
-    },'incite': { 
+    },
+    'incite': { 
         label: "民心撹乱", category: 'FOREIGN_STRATEGY', 
         costGold: 0, costRice: 0, 
         isMulti: false, hasAdvice: true, 
@@ -237,7 +265,6 @@ const COMMAND_SPECS = {
         startMode: 'map_select', targetType: 'enemy_all',
         sortKey: 'intelligence'
     },
-    
 
     // --- 情報 (INFO) ---
     'busho_list': {
@@ -270,7 +297,8 @@ const COMMAND_SPECS = {
         label: "親善", category: 'FOREIGN_DAIMYO',
         costGold: 0, costRice: 0,
         isMulti: false, hasAdvice: true,
-        startMode: 'map_select', targetType: 'other_clan_all'
+        startMode: 'map_select', targetType: 'other_clan_all',
+        canExecute: (game, castle) => castle.gold >= 200
     },
     'alliance': {
         label: "同盟", category: 'FOREIGN_DAIMYO',
@@ -278,18 +306,36 @@ const COMMAND_SPECS = {
         isMulti: false, hasAdvice: true,
         startMode: 'map_select', targetType: 'other_clan_all'
     },
-    // ★今回追加：婚姻の設計図です！
     'marriage': {
         label: "婚姻", category: 'FOREIGN_DAIMYO',
         costGold: 0, costRice: 0,
         isMulti: false, hasAdvice: true,
-        startMode: 'map_select', targetType: 'marriage_valid' // 婚姻専用の相手を選ぶ合言葉にします
+        startMode: 'map_select', targetType: 'marriage_valid',
+        canExecute: (game, castle) => {
+            const myClan = game.clans.find(c => c.id === game.playerClanId);
+            return myClan && myClan.princessIds && myClan.princessIds.some(pId => {
+                const p = game.princesses.find(princess => princess.id === pId);
+                return p && p.status === 'unmarried';
+            });
+        }
     },
     'dominate': {
         label: "支配勧告", category: 'FOREIGN_DAIMYO',
         costGold: 0, costRice: 0,
         isMulti: false, hasAdvice: true,
-        startMode: 'map_select', targetType: 'other_clan_all'
+        startMode: 'map_select', targetType: 'other_clan_all',
+        canExecute: (game, castle) => {
+            let isSubordinate = false;
+            game.clans.forEach(c => {
+                if (c.id !== 0 && c.id !== Number(game.playerClanId)) {
+                    const rel = game.getRelation(game.playerClanId, c.id);
+                    if (rel && rel.status === '従属') {
+                        isSubordinate = true;
+                    }
+                }
+            });
+            return !isSubordinate;
+        }
     },
     'subordinate': {
         label: "従属嘆願", category: 'FOREIGN_DAIMYO',
@@ -309,7 +355,8 @@ const COMMAND_SPECS = {
         label: "諸勢力親善", category: 'FOREIGN_KUNISHU',
         costGold: 0, costRice: 0,
         isMulti: false, hasAdvice: true,
-        startMode: 'map_select', targetType: 'kunishu_valid'
+        startMode: 'map_select', targetType: 'kunishu_valid',
+        canExecute: (game, castle) => castle.gold >= 200
     },
     'kunishu_incorporate': {
         label: "諸勢力取込", category: 'FOREIGN_KUNISHU',
@@ -324,14 +371,19 @@ const COMMAND_SPECS = {
         costGold: 0, costRice: 0,
         isMulti: false, hasAdvice: true,
         startMode: 'busho_select_special', subType: 'tribute_doer', sortKey: 'politics',
-        msg: "朝廷に使者を送り、金を献上します"
+        msg: "朝廷に使者を送り、金を献上します",
+        canExecute: (game, castle) => castle.gold >= 200
     },
     'court_truce': {
         label: "朝廷和睦", category: 'DIPLOMACY_COURT',
         costGold: 2000, costRice: 0,
         isMulti: false, hasAdvice: true,
         startMode: 'map_select', targetType: 'hostile_clan_only',
-        msg: "朝廷の威光により、敵対大名と和睦します"
+        msg: "朝廷の威光により、敵対大名と和睦します",
+        canExecute: (game, castle) => {
+            const currentTrust = game.courtRankSystem ? game.courtRankSystem.getTrust(game.playerClanId) : 0;
+            return currentTrust >= 500;
+        }
     },
 
     // --- システム (SYSTEM) - UI生成用プレースホルダ ---
@@ -339,7 +391,7 @@ const COMMAND_SPECS = {
     'settings': { label: "設定", category: 'SYSTEM', isSystem: true, action: 'settings' },
     'save': { label: "セーブ", category: 'SYSTEM', isSystem: true, action: 'save' },
     'load': { label: "ロード", category: 'SYSTEM', isSystem: true, action: 'load' },
-    'title': { label: "タイトルへ", category: 'SYSTEM', isSystem: true, action: 'title' } // ★この１行を書き足します！
+    'title': { label: "タイトルへ", category: 'SYSTEM', isSystem: true, action: 'title' }
 };
 
 class CommandSystem {
@@ -586,83 +638,30 @@ class CommandSystem {
         const castle = this.game.getCurrentTurnCastle();
         if (!castle) return false;
 
-        // ★ここから追加：未行動の武将が必要なコマンドのチェック
+        // 【共通ルール】未行動の武将が必要なコマンドのチェック
         const actionRequiredCommands = [
-            'farm', 'commerce', 'repair', 'charity', // 内政
-            'war', 'draft', 'training', 'soldier_charity', 'transport', 'kunishu_subjugate', // 軍事
-            'goodwill', 'alliance', 'marriage', 'dominate', 'subordinate', 'break_alliance', // 外交
-            'kunishu_goodwill', 'kunishu_incorporate', // 諸勢力
-            'sabotage', 'incite', 'rumor', 'headhunt', // 調略
-            'tribute', 'court_truce', // 朝廷
-            'employ', 'move', 'banish' // 人事（一部）
+            'farm', 'commerce', 'repair', 'charity', 
+            'war', 'draft', 'training', 'soldier_charity', 'transport', 'kunishu_subjugate', 
+            'goodwill', 'alliance', 'marriage', 'dominate', 'subordinate', 'break_alliance', 
+            'kunishu_goodwill', 'kunishu_incorporate', 
+            'sabotage', 'incite', 'rumor', 'headhunt', 
+            'tribute', 'court_truce', 
+            'employ', 'move'
         ];
         if (actionRequiredCommands.includes(type)) {
             const activeBushos = this.game.bushos.filter(b => b.castleId === castle.id && b.clan === castle.ownerClan && b.status === 'active' && !b.isActionDone);
             if (activeBushos.length === 0) return false;
         }
-        // ★追加ここまで
 
-        // 大名の居城（本拠）では城主任命（appoint）を禁止します
-        if (type === 'appoint') {
-            const daimyo = this.game.bushos.find(b => b.clan === this.game.playerClanId && b.isDaimyo);
-            if (daimyo && Number(daimyo.castleId) === Number(castle.id)) {
-                return false;
-            }
-        }
-
-        if (type === 'farm' && castle.kokudaka >= castle.maxKokudaka) return false;
-        if (type === 'commerce' && castle.commerce >= castle.maxCommerce) return false;
-        if (type === 'repair' && castle.defense >= castle.maxDefense) return false;
-        if (type === 'charity' && castle.peoplesLoyalty >= castle.maxPeoplesLoyalty) return false;
-        
-        const maxTraining = (window.WarParams && window.WarParams.Military && window.WarParams.Military.MaxTraining) ? window.WarParams.Military.MaxTraining : 100;
-        const maxMorale = (window.WarParams && window.WarParams.Military && window.WarParams.Military.MaxMorale) ? window.WarParams.Military.MaxMorale : 100;
-        if (type === 'training' && castle.training >= maxTraining) return false;
-        if (type === 'soldier_charity' && castle.morale >= maxMorale) return false;
-
-        if ((type === 'training' || type === 'soldier_charity') && castle.soldiers <= 0) return false;
-
+        // 【共通ルール】設計図に設定されているコスト（金・兵糧）のチェック
         if (spec.costGold > 0 && castle.gold < spec.costGold) return false;
         if (spec.costRice > 0 && castle.rice < spec.costRice) return false;
 
-        if (type === 'court_truce') {
-            const currentTrust = this.game.courtRankSystem ? this.game.courtRankSystem.getTrust(this.game.playerClanId) : 0;
-            if (currentTrust < 500) return false;
-        }
-
-        if (type === 'marriage') {
-            const myClan = this.game.clans.find(c => c.id === this.game.playerClanId);
-            const hasUnmarriedPrincess = myClan && myClan.princessIds && myClan.princessIds.some(pId => {
-                const p = this.game.princesses.find(princess => princess.id === pId);
-                return p && p.status === 'unmarried';
-            });
-            if (!hasUnmarriedPrincess) return false;
-        }
-
-        if (type === 'dominate') {
-            let isSubordinate = false;
-            this.game.clans.forEach(c => {
-                if (c.id !== 0 && c.id !== Number(this.game.playerClanId)) {
-                    const rel = this.game.getRelation(this.game.playerClanId, c.id);
-                    if (rel && rel.status === '従属') {
-                        isSubordinate = true;
-                    }
-                }
-            });
-            if (isSubordinate) return false;
-        }
-
-        if (type === 'employ') {
-            const hasRonin = this.game.bushos.some(b => {
-                if (b.status !== 'ronin' || b.belongKunishuId > 0) return false;
-                const targetCastle = this.game.getCastle(b.castleId);
-                return targetCastle && targetCastle.ownerClan === this.game.playerClanId;
-            });
-            if (!hasRonin) return false;
-        }
-
-        if (type === 'goodwill' || type === 'kunishu_goodwill' || type === 'tribute') {
-            if (castle.gold < 200) return false;
+        // 【個別ルール】設計図に専用のルール(canExecute)が設定されているか確認し、実行します
+        if (typeof spec.canExecute === 'function') {
+            if (spec.canExecute(this.game, castle) === false) {
+                return false;
+            }
         }
 
         return true;
