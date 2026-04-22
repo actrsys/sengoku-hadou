@@ -2187,12 +2187,3 @@ body.is-pc.daimyo-select-mode #pc-new-ui-container { display: none !important; }
     background-color: #546e7a;
     color: #ffcc80;
 }
-
-/* =========================================================
-   ★ 拠点一覧の横スクロールのための魔法
-   ========================================================= */
-.kyoten-list-container .list-header, 
-.kyoten-list-container .select-item {
-    width: 650px;
-    min-width: 100%;
-}

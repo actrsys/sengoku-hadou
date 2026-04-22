@@ -1028,9 +1028,9 @@ class UIInfoManager {
         if (config.gridTemplatePc) listContainer.style.setProperty('--grid-cols-pc', config.gridTemplatePc);
         else listContainer.style.removeProperty('--grid-cols-pc');
 
-        let gridStyle = "";
+        let wrapperStyle = "";
         if (config.minWidth) {
-            gridStyle += `width: ${config.minWidth}; min-width: 100%; `;
+            wrapperStyle = `width: ${config.minWidth}; min-width: 100%;`;
         }
 
         const buildItemHtml = (item, index) => {
@@ -1049,17 +1049,17 @@ class UIInfoManager {
                 const strC = String(c);
                 return strC.trim().startsWith('<') ? strC : `<span>${strC}</span>`;
             }).join('');
-            return `<div class="select-item ${config.itemClass || ''} ${extraClass}" ${cursorStr} ${clickStr} ${indexAttr} style="${gridStyle}">${cells}</div>`;
+            return `<div class="select-item ${config.itemClass || ''} ${extraClass}" ${cursorStr} ${clickStr} ${indexAttr}>${cells}</div>`;
         };
 
         if (!config.items || config.items.length === 0) {
             let emptyHtml = '';
             if (config.headers && config.headers.length > 0) {
                 const headerCols = config.headers.map(h => h.trim().startsWith('<') ? h : `<span>${h}</span>`).join('');
-                emptyHtml += `<div class="list-header ${config.headerClass || ''}" style="${gridStyle}">${headerCols}</div>`;
+                emptyHtml += `<div class="list-header ${config.headerClass || ''}">${headerCols}</div>`;
             }
             emptyHtml += config.emptyHtml || '<div style="padding: 10px; text-align: center;">データがありません。</div>';
-            listContainer.innerHTML = emptyHtml;
+            listContainer.innerHTML = `<div class="list-inner-wrapper" style="${wrapperStyle}">${emptyHtml}</div>`;
             listContainer.style.display = 'block';
             return;
         }
@@ -1072,7 +1072,7 @@ class UIInfoManager {
         
         if (config.headers && config.headers.length > 0) {
             const headerCols = config.headers.map(h => h.trim().startsWith('<') ? h : `<span>${h}</span>`).join('');
-            initialHtmlParts.push(`<div class="list-header sortable-header ${config.headerClass || ''}" style="${gridStyle}">${headerCols}</div>`);
+            initialHtmlParts.push(`<div class="list-header sortable-header ${config.headerClass || ''}">${headerCols}</div>`);
         }
 
         const initialLimit = Math.min(totalItems, INITIAL_RENDER_COUNT);
@@ -1082,10 +1082,10 @@ class UIInfoManager {
         
         for (let i = totalItems; i < 8; i++) {
             const emptyCells = config.headers ? config.headers.map(() => `<span></span>`).join('') : '';
-            initialHtmlParts.push(`<div class="select-item ${config.itemClass || ''}" style="cursor:default; pointer-events:none; ${gridStyle}">${emptyCells}</div>`);
+            initialHtmlParts.push(`<div class="select-item ${config.itemClass || ''}" style="cursor:default; pointer-events:none;">${emptyCells}</div>`);
         }
 
-        listContainer.innerHTML = initialHtmlParts.join('');
+        listContainer.innerHTML = `<div class="list-inner-wrapper" style="${wrapperStyle}">${initialHtmlParts.join('')}</div>`;
 
         const attachEvents = (startIndex, endIndex) => {
             if (config.items) {
@@ -1137,7 +1137,11 @@ class UIInfoManager {
                     chunkParts.push(buildItemHtml(config.items[i], i));
                 }
                 
-                listContainer.insertAdjacentHTML('beforeend', chunkParts.join(''));
+                const innerWrapper = listContainer.querySelector('.list-inner-wrapper');
+                if (innerWrapper) {
+                    innerWrapper.insertAdjacentHTML('beforeend', chunkParts.join(''));
+                }
+                
                 attachEvents(currentIndex, endLimit);
                 currentIndex = endLimit;
 
@@ -1757,6 +1761,7 @@ class UIInfoManager {
             listClass: "kyoten-list-container",
             items: items,
             scrollPos: scrollPos,
+            minWidth: "650px",
             gridTemplateSp: gridStyle,
             gridTemplatePc: gridStyle,
             onTabClick: (tabKey) => {
