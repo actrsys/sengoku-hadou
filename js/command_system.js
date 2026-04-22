@@ -48,21 +48,64 @@ const COMMAND_MENU_STRUCTURE = [
    ★ よく使う実行条件まとめ（条件の一元化）
    ========================================================================== */
 const CAN_EXECUTE_RULES = {
-    // 大名以外の活動可能な所属武将がいるか（褒美、面談、追放などに使います）
+    // --- 人事用 ---
     hasActiveBushoExceptDaimyo: (game) => {
         return game.bushos.some(b => b.clan === game.playerClanId && b.status === 'active' && !b.isDaimyo);
     },
-    // 大名・城主以外の活動可能な所属武将がいるか（軍師任命などに使います）
     hasActiveBushoExceptDaimyoAndCastellan: (game) => {
         return game.bushos.some(b => b.clan === game.playerClanId && b.status === 'active' && !b.isDaimyo && !b.isCastellan);
     },
-    // 自領に浪人がいるか（登用に使います）
     hasEmployableRonin: (game) => {
         return game.bushos.some(b => {
             if (b.status !== 'ronin' || b.belongKunishuId > 0) return false;
             const targetCastle = game.getCastle(b.castleId);
             return targetCastle && targetCastle.ownerClan === game.playerClanId;
         });
+    },
+    hasDelegatableCastle: (game) => {
+        const daimyo = game.bushos.find(b => b.clan === game.playerClanId && b.isDaimyo);
+        if (!daimyo) return false;
+        return game.castles.some(c => c.ownerClan === game.playerClanId && c.id !== daimyo.castleId);
+    },
+    // --- 軍事用 ---
+    canTraining: (game, castle) => {
+        const maxTraining = (window.WarParams && window.WarParams.Military && window.WarParams.Military.MaxTraining) ? window.WarParams.Military.MaxTraining : 100;
+        if (castle.training >= maxTraining) return false;
+        if (castle.soldiers <= 0) return false;
+        return true;
+    },
+    canSoldierCharity: (game, castle) => {
+        const maxMorale = (window.WarParams && window.WarParams.Military && window.WarParams.Military.MaxMorale) ? window.WarParams.Military.MaxMorale : 100;
+        if (castle.morale >= maxMorale) return false;
+        if (castle.soldiers <= 0) return false;
+        return true;
+    },
+    // --- 外交・朝廷・諸勢力用 ---
+    hasGold200: (game, castle) => {
+        return castle.gold >= 200;
+    },
+    hasUnmarriedPrincess: (game) => {
+        const myClan = game.clans.find(c => c.id === game.playerClanId);
+        return myClan && myClan.princessIds && myClan.princessIds.some(pId => {
+            const p = game.princesses.find(princess => princess.id === pId);
+            return p && p.status === 'unmarried';
+        });
+    },
+    isNotSubordinate: (game) => {
+        let isSubordinate = false;
+        game.clans.forEach(c => {
+            if (c.id !== 0 && c.id !== Number(game.playerClanId)) {
+                const rel = game.getRelation(game.playerClanId, c.id);
+                if (rel && rel.status === '従属') {
+                    isSubordinate = true;
+                }
+            }
+        });
+        return !isSubordinate;
+    },
+    hasCourtTrust500: (game) => {
+        const currentTrust = game.courtRankSystem ? game.courtRankSystem.getTrust(game.playerClanId) : 0;
+        return currentTrust >= 500;
     }
 };
 
@@ -155,12 +198,7 @@ const COMMAND_SPECS = {
         isMulti: true, hasAdvice: false, 
         startMode: 'busho_select', sortKey: 'leadership',
         msg: "兵士の訓練度を上げます",
-        canExecute: (game, castle) => {
-            const maxTraining = (window.WarParams && window.WarParams.Military && window.WarParams.Military.MaxTraining) ? window.WarParams.Military.MaxTraining : 100;
-            if (castle.training >= maxTraining) return false;
-            if (castle.soldiers <= 0) return false;
-            return true;
-        }
+        canExecute: (game, castle) => CAN_EXECUTE_RULES.canTraining(game, castle)
     },
     'soldier_charity': { 
         label: "兵施し", category: 'MILITARY', 
@@ -168,12 +206,7 @@ const COMMAND_SPECS = {
         isMulti: true, hasAdvice: false, 
         startMode: 'busho_select', sortKey: 'leadership',
         msg: "米: 200 (1回あたり)\n兵士の士気を上げます",
-        canExecute: (game, castle) => {
-            const maxMorale = (window.WarParams && window.WarParams.Military && window.WarParams.Military.MaxMorale) ? window.WarParams.Military.MaxMorale : 100;
-            if (castle.morale >= maxMorale) return false;
-            if (castle.soldiers <= 0) return false;
-            return true;
-        }
+        canExecute: (game, castle) => CAN_EXECUTE_RULES.canSoldierCharity(game, castle)
     },
     'transport': { 
         label: "輸送", category: 'MILITARY', 
@@ -214,11 +247,7 @@ const COMMAND_SPECS = {
     'delegate': { 
         label: "城主委任", category: 'PERSONNEL', 
         isSystem: true, action: 'delegate_list',
-        canExecute: (game, castle) => {
-            const daimyo = game.bushos.find(b => b.clan === game.playerClanId && b.isDaimyo);
-            if (!daimyo) return false;
-            return game.castles.some(c => c.ownerClan === game.playerClanId && c.id !== daimyo.castleId);
-        }
+        canExecute: (game, castle) => CAN_EXECUTE_RULES.hasDelegatableCastle(game)
     },
     'reward': { 
         label: "褒美", category: 'PERSONNEL', 
@@ -323,7 +352,7 @@ const COMMAND_SPECS = {
         costGold: 0, costRice: 0,
         isMulti: false, hasAdvice: true,
         startMode: 'map_select', targetType: 'other_clan_all',
-        canExecute: (game, castle) => castle.gold >= 200
+        canExecute: (game, castle) => CAN_EXECUTE_RULES.hasGold200(game, castle)
     },
     'alliance': {
         label: "同盟", category: 'FOREIGN_DAIMYO',
@@ -336,31 +365,14 @@ const COMMAND_SPECS = {
         costGold: 0, costRice: 0,
         isMulti: false, hasAdvice: true,
         startMode: 'map_select', targetType: 'marriage_valid',
-        canExecute: (game, castle) => {
-            const myClan = game.clans.find(c => c.id === game.playerClanId);
-            return myClan && myClan.princessIds && myClan.princessIds.some(pId => {
-                const p = game.princesses.find(princess => princess.id === pId);
-                return p && p.status === 'unmarried';
-            });
-        }
+        canExecute: (game, castle) => CAN_EXECUTE_RULES.hasUnmarriedPrincess(game)
     },
     'dominate': {
         label: "支配勧告", category: 'FOREIGN_DAIMYO',
         costGold: 0, costRice: 0,
         isMulti: false, hasAdvice: true,
         startMode: 'map_select', targetType: 'other_clan_all',
-        canExecute: (game, castle) => {
-            let isSubordinate = false;
-            game.clans.forEach(c => {
-                if (c.id !== 0 && c.id !== Number(game.playerClanId)) {
-                    const rel = game.getRelation(game.playerClanId, c.id);
-                    if (rel && rel.status === '従属') {
-                        isSubordinate = true;
-                    }
-                }
-            });
-            return !isSubordinate;
-        }
+        canExecute: (game, castle) => CAN_EXECUTE_RULES.isNotSubordinate(game)
     },
     'subordinate': {
         label: "従属嘆願", category: 'FOREIGN_DAIMYO',
@@ -381,7 +393,7 @@ const COMMAND_SPECS = {
         costGold: 0, costRice: 0,
         isMulti: false, hasAdvice: true,
         startMode: 'map_select', targetType: 'kunishu_valid',
-        canExecute: (game, castle) => castle.gold >= 200
+        canExecute: (game, castle) => CAN_EXECUTE_RULES.hasGold200(game, castle)
     },
     'kunishu_incorporate': {
         label: "諸勢力取込", category: 'FOREIGN_KUNISHU',
@@ -397,7 +409,7 @@ const COMMAND_SPECS = {
         isMulti: false, hasAdvice: true,
         startMode: 'busho_select_special', subType: 'tribute_doer', sortKey: 'politics',
         msg: "朝廷に使者を送り、金を献上します",
-        canExecute: (game, castle) => castle.gold >= 200
+        canExecute: (game, castle) => CAN_EXECUTE_RULES.hasGold200(game, castle)
     },
     'court_truce': {
         label: "朝廷和睦", category: 'DIPLOMACY_COURT',
@@ -405,10 +417,7 @@ const COMMAND_SPECS = {
         isMulti: false, hasAdvice: true,
         startMode: 'map_select', targetType: 'hostile_clan_only',
         msg: "朝廷の威光により、敵対大名と和睦します",
-        canExecute: (game, castle) => {
-            const currentTrust = game.courtRankSystem ? game.courtRankSystem.getTrust(game.playerClanId) : 0;
-            return currentTrust >= 500;
-        }
+        canExecute: (game, castle) => CAN_EXECUTE_RULES.hasCourtTrust500(game)
     },
 
     // --- システム (SYSTEM) - UI生成用プレースホルダ ---
