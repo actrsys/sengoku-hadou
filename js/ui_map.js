@@ -1533,19 +1533,21 @@ Object.assign(UIManager.prototype, {
             
             // ピクセルマップから、そのお城の領地だけを抜き出して色を塗ります
             if (this.pixelCastleMap) {
+                // 中立(0)や諸勢力の場合は白にするためのデフォルト値
+                const colorA_RGB = colorA || { r: 255, g: 255, b: 255 };
+                const colorB_RGB = colorB || { r: 255, g: 255, b: 255 };
+
                 for (let i = 0; i < this.pixelCastleMap.length; i++) {
                     if (this.pixelCastleMap[i] === castleId) {
                         const idx = i * 4;
-                        // 1色目
-                        outputDataA.data[idx] = colorA.r;
-                        outputDataA.data[idx+1] = colorA.g;
-                        outputDataA.data[idx+2] = colorA.b;
-                        outputDataA.data[idx+3] = 200; // 少し濃い目にします
+                        outputDataA.data[idx] = colorA_RGB.r;
+                        outputDataA.data[idx+1] = colorA_RGB.g;
+                        outputDataA.data[idx+2] = colorA_RGB.b;
+                        outputDataA.data[idx+3] = 200;
                         
-                        // 2色目
-                        outputDataB.data[idx] = colorB.r;
-                        outputDataB.data[idx+1] = colorB.g;
-                        outputDataB.data[idx+2] = colorB.b;
+                        outputDataB.data[idx] = colorB_RGB.r;
+                        outputDataB.data[idx+1] = colorB_RGB.g;
+                        outputDataB.data[idx+2] = colorB_RGB.b;
                         outputDataB.data[idx+3] = 200; 
                     }
                 }

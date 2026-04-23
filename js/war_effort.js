@@ -851,27 +851,28 @@ Object.assign(WarManager.prototype, {
             // ★変更：城の所有者が変わる前に、古い大名家のIDをしっかり記憶しておきます！
             s.oldDefClanId = s.defender.ownerClan; 
             s.extinctionNotified = false; // フラグの初期化
+
+            // ==========================================
+            // ★勝敗決定前の「戦域点滅」ギミック
+            // ==========================================
+            let atkColor = { r: 255, g: 255, b: 255 };
+            if (!s.attacker.isKunishu && s.attacker.ownerClan !== 0) {
+                const clanData = this.game.clans.find(c => c.id === s.attacker.ownerClan);
+                if (clanData && clanData.color) atkColor = DataManager.hexToRgb(clanData.color);
+            }
+            let defColor = { r: 255, g: 255, b: 255 };
+            if (!s.defender.isKunishu && s.oldDefClanId !== 0) {
+                const clanData = this.game.clans.find(c => c.id === s.oldDefClanId);
+                if (clanData && clanData.color) defColor = DataManager.hexToRgb(clanData.color);
+            }
+
+            // 勝敗が決まる前に、戦場となった城の領土を2秒間点滅させる（この間は操作不可）
+            await this.game.ui.playBattleBlink(s.defender.id, atkColor, defColor, 2000);
+            // ==========================================
             
-            // ★ここから追加：AI同士の戦争の結果メッセージを出して時間を止めます！
-            // ★修正：諸勢力の戦いの時は専用のメッセージがあるので、ここではお休みします！
-            // ★追加：イベントによる決着の時も、専用のメッセージが出るためお休みします！
+            // ★ここから追加：AI同士の戦争の結果メッセージを記憶しておきます（表示は色が塗られた一番最後にします！）
+            let aiResultMsg = "";
             if (!s.isPlayerInvolved && !s.isKunishuSubjugation && !s.attacker.isKunishu && !s.isEventBattle) {
-                
-                // ★ここから追加：援軍メッセージなどがすべて終わった後、勝敗メッセージの前に2秒間点滅させます！
-                let atkColor = { r: 255, g: 255, b: 255 };
-                if (s.attacker.ownerClan !== 0) {
-                    const clanData = this.game.clans.find(c => c.id === s.attacker.ownerClan);
-                    if (clanData && clanData.color) atkColor = DataManager.hexToRgb(clanData.color);
-                }
-                let defColor = { r: 255, g: 255, b: 255 };
-                if (s.oldDefClanId !== 0) {
-                    const clanData = this.game.clans.find(c => c.id === s.oldDefClanId);
-                    if (clanData && clanData.color) defColor = DataManager.hexToRgb(clanData.color);
-                }
-                
-                await this.game.ui.playBattleBlink(s.defender.id, atkColor, defColor, 2000);
-                // ★追加ここまで
-                
                 const atkClanData = this.game.clans.find(c => c.id === s.attacker.ownerClan);
                 const atkProvData = this.game.provinces.find(p => p.id === s.sourceCastle.provinceId);
                 const defClanData = this.game.clans.find(c => c.id === s.oldDefClanId);
@@ -879,17 +880,11 @@ Object.assign(WarManager.prototype, {
                 const atkDaimyoName = atkClanData ? atkClanData.name : (s.attacker.isKunishu ? s.attacker.name : (atkProvData ? atkProvData.province : "中立"));
                 const defDaimyoName = defClanData ? defClanData.name : (s.defender.isKunishu ? s.defender.name : (defProvData ? defProvData.province : "中立"));
                 
-                let resultMsg = "";
                 if (attackerWon) {
-                    // ★変更：城の名前の代わりに、攻撃軍の総大将（s.atkBushos[0].name）にします！
-                    resultMsg = `${atkDaimyoName}の${s.atkBushos[0].name}が\n${defDaimyoName}の${s.defender.name}を攻め落としました！`;
+                    aiResultMsg = `${atkDaimyoName}の${s.atkBushos[0].name}が\n${defDaimyoName}の${s.defender.name}を攻め落としました！`;
                 } else {
-                    // ★変更：守備成功した時も、守備隊の総大将（s.defBusho.name）にします！
-                    resultMsg = `${defDaimyoName}の${s.defBusho.name}が\n${atkDaimyoName}の攻撃を撃退しました！`;
+                    aiResultMsg = `${defDaimyoName}の${s.defBusho.name}が\n${atkDaimyoName}の攻撃を撃退しました！`;
                 }
-                
-                // どこを触っても消せるメッセージを表示します！
-                await this.game.ui.showDialogAsync(resultMsg);
             }
             // ==========================================
             
@@ -1280,6 +1275,10 @@ Object.assign(WarManager.prototype, {
                     const oldOwner = targetC.ownerClan;
                     // ★城の管理システムにお任せします！
                     this.game.castleManager.changeOwner(targetC, 0); 
+
+                    // ★追加：色が中立に変わったので、メッセージの前に地図を更新します！
+                    this.game.ui.updateClanColors();
+                    
                     targetC.castellanId = 0;
                     
                     const kunishuMembers = this.game.kunishuSystem.getKunishuMembers(s.attacker.kunishuId).map(b => b.id);
@@ -1452,6 +1451,10 @@ Object.assign(WarManager.prototype, {
             if (isRetreat && attackerWon) {
                 // ★城の管理システムにお任せします！
                 this.game.castleManager.changeOwner(s.defender, s.attacker.ownerClan);
+
+                // ★追加：色が更新されたので、メッセージの前に地図を更新します！
+                this.game.ui.updateClanColors();
+
                 s.defender.soldiers = totalAtkSurvivors;
 
                 // ★追加：敵が逃げて空っぽになった城に入るので、自分たちの士気と訓練をそのまま使います！
@@ -1483,6 +1486,10 @@ Object.assign(WarManager.prototype, {
                 if (s.isPlayerInvolved) {
                     this.game.ui.showResultModal(`撤退しました。\n${retreatTargetId ? '部隊は移動しました。' : '部隊は解散しました。'}`, finishWarProcess);
                 } else {
+                    // ★AIの結果メッセージを最後に表示します（イベント決着時などは空なのでスキップ）
+                    if (aiResultMsg) {
+                        await this.game.ui.showDialogAsync(aiResultMsg);
+                    }
                     finishWarProcess();
                 }
                 return;
@@ -1521,6 +1528,10 @@ Object.assign(WarManager.prototype, {
                 
                 // ★城の管理システムにお任せします！
                 this.game.castleManager.changeOwner(s.defender, s.attacker.ownerClan);
+
+                // ★追加：色が更新されたので、メッセージの前に地図を更新します！
+                this.game.ui.updateClanColors();
+
                 s.defender.immunityUntil = this.game.getCurrentTurnId() + 1;
                 
                 const srcC = this.game.getCastle(s.sourceCastle.id);
@@ -1587,7 +1598,13 @@ Object.assign(WarManager.prototype, {
                     this.game.ui.showResultModal(resultMsg, finishWarProcess);
                 }
             }
-            else finishWarProcess();
+            else {
+                // ★AIの結果メッセージを最後に表示します（イベント決着時などは空なのでスキップ）
+                if (aiResultMsg) {
+                    await this.game.ui.showDialogAsync(aiResultMsg);
+                }
+                finishWarProcess();
+            }
         } catch (e) {
             console.error("EndWar Error: ", e);
             if (this.state.isPlayerInvolved) this.game.ui.showResultModal("合戦処理中にエラーが発生しましたが、\nゲームを継続します。", () => { this.game.finishTurn(); });
