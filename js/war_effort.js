@@ -832,7 +832,7 @@ Object.assign(WarManager.prototype, {
             s.oldDefClanId = s.defender.ownerClan; 
             s.extinctionNotified = false; // フラグの初期化
             
-            // ★AI同士の戦争の演出フロー（改良版：援軍チェック付き）
+            // ★AI同士の戦争の演出フロー（完全版：タイミング制御を最適化）
             if (!s.isPlayerInvolved && !s.isKunishuSubjugation && !s.attacker.isKunishu && !s.isEventBattle) {
                 const atkClanData = this.game.clans.find(c => c.id === s.attacker.ownerClan);
                 const atkProvData = this.game.provinces.find(p => p.id === s.sourceCastle.provinceId);
@@ -845,51 +845,56 @@ Object.assign(WarManager.prototype, {
                 const atkColor = (atkClanData && atkClanData.color) ? atkClanData.color : "#ffffff";
                 const defColor = (defClanData && defClanData.color) ? defClanData.color : "#ffffff";
 
-                // 1. 「攻め込みました！」のメッセージ
+                // ① 「攻め込みました！」のメッセージ（ここで一旦止まります）
                 const attackStartMsg = `${atkDaimyoName}の${s.atkBushos[0].name}が、\n${defDaimyoName}の${s.defender.name}へ攻め込みました！`;
                 await this.game.ui.showDialogAsync(attackStartMsg);
 
-                // 2. 戦場の城へスクロール（完了を少し待ちます）
+                // ② メッセージを閉じたら、戦場の城へスクロール
                 await this.game.ui.scrollToActiveCastle(s.defender, false);
-                await new Promise(resolve => setTimeout(resolve, 500)); 
+                
+                // スクロールが落ち着くまで少しだけ待つ魔法（0.8秒）
+                await new Promise(resolve => setTimeout(resolve, 800));
 
-                // 3. 点滅（1秒間）
+                // ③ 最初の点滅（攻撃側 vs 守備側：1秒間）
                 if (this.game.ui.playProvinceBlinkAnimation) {
                     await this.game.ui.playProvinceBlinkAnimation(s.defender.provinceId, atkColor, defColor, 1000);
                 }
 
-                // 4. 援軍がある場合はメッセージと追加点滅
+                // ④ 援軍がいる場合のみ、援軍メッセージと追加点滅
                 if (s.defReinforcement) {
                     const reinfClan = this.game.clans.find(c => c.id === s.defReinforcement.castle.ownerClan);
                     const reinfName = reinfClan ? reinfClan.name : "援軍";
-                    await this.game.ui.showDialogAsync(`${reinfName}から${s.defReinforcement.bushos[0].name}が援軍に駆けつけました！`);
+                    const reinfBushoName = s.defReinforcement.bushos[0] ? s.defReinforcement.bushos[0].name : "精鋭";
+                    
+                    await this.game.ui.showDialogAsync(`${reinfName}から${reinfBushoName}が援軍に駆けつけました！`);
                     
                     const reinfColor = (reinfClan && reinfClan.color) ? reinfClan.color : "#ffffff";
                     if (this.game.ui.playProvinceBlinkAnimation) {
+                        // 攻撃側 vs 援軍側の色で点滅
                         await this.game.ui.playProvinceBlinkAnimation(s.defender.provinceId, atkColor, reinfColor, 1000);
                     }
                 }
 
-                // 5. 結果メッセージの作成
+                // ⑤ 勝敗の結果メッセージを作成
                 let resultMsg = "";
                 if (attackerWon) {
-                    resultMsg = `${atkDaimyoName}の${s.atkBushos[0].name}が\n${defDaimyoName}の${s.defender.name}を攻め落としたようです！`;
+                    resultMsg = `${atkDaimyoName}の${s.atkBushos[0].name}が\n${defDaimyoName}の${s.defender.name}を攻め落としました！`;
                 } else {
-                    resultMsg = `${defDaimyoName}の${s.defBusho.name}が\n${atkDaimyoName}の攻撃を撃退したようです！`;
+                    resultMsg = `${defDaimyoName}の${s.defBusho.name}が\n${atkDaimyoName}の攻撃を撃退しました！`;
                 }
 
-                // 6. 結果メッセージを表示
+                // ⑥ 結果メッセージを表示
                 await this.game.ui.showDialogAsync(resultMsg);
 
-                // 7. 城の持ち主（色）を変える処理をここで行う
+                // ⑦ 実際の色の塗り替え処理（メッセージを閉じた後に行います）
                 if (attackerWon) {
                     s.defender.ownerClan = s.attacker.ownerClan;
-                    // 地図を塗り直す
+                    // 地図を塗り直す魔法
                     if (this.game.ui.updateMap) this.game.ui.updateMap();
                 }
 
-                // 8. 0.5秒間じっと待つ（余韻の時間）
-                await new Promise(resolve => setTimeout(resolve, 500));
+                // ⑧ 1秒間じっと待つ（塗り替わった余韻の時間）
+                await new Promise(resolve => setTimeout(resolve, 1000));
             }
             
             // ★変更：順番待ちができるように async を付けます

@@ -881,7 +881,6 @@ Object.assign(UIManager.prototype, {
             if (backToScenarioBtn) backToScenarioBtn.classList.add('hidden');
             if (confirmButtons) confirmButtons.classList.add('hidden');
         }
-        // ==========================================
     },
     
     // ★新魔法：勢力の名前を賢く並べる魔法です
@@ -1172,7 +1171,6 @@ Object.assign(UIManager.prototype, {
                 return result ? { r: parseInt(result[1], 16), g: parseInt(result[2], 16), b: parseInt(result[3], 16) } : { r: 255, g: 255, b: 255 };
             };
             
-            // 地図の画像データを確認
             const sourceData = (typeof DataManager !== 'undefined') ? DataManager.provinceImageData : null;
             if (!sourceData) { resolve(); return; }
 
@@ -1202,7 +1200,7 @@ Object.assign(UIManager.prototype, {
             const outData = ctx.createImageData(width, height);
             const od = outData.data;
 
-            // 操作不能ガード
+            // 操作不能ガード（点滅中だけ画面を触れなくします）
             const oldPointerEvents = document.body.style.pointerEvents;
             document.body.style.pointerEvents = 'none';
 
@@ -1235,7 +1233,6 @@ Object.assign(UIManager.prototype, {
                     ctx.putImageData(outData, 0, 0);
                     requestAnimationFrame(animate);
                 } catch (e) {
-                    // もしアニメーション中にエラーが起きても、必ずガードを解く
                     ctx.clearRect(0, 0, width, height);
                     document.body.style.pointerEvents = oldPointerEvents;
                     resolve();
