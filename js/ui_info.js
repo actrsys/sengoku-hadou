@@ -41,6 +41,23 @@ class UIInfoManager {
         this.kyotenLastScope = null;
     }
 
+    // --- ソート状態の一元管理 ---
+    _toggleSortState(currentSortKey, currentIsAsc, clickedSortKey, defaultAscKeys) {
+        if (currentSortKey === clickedSortKey) {
+            const isDefaultAsc = defaultAscKeys.includes(clickedSortKey);
+            // 2回目のクリック（現在の向きがデフォルトと同じ）なら逆向きにする
+            if (currentIsAsc === isDefaultAsc) {
+                return { key: clickedSortKey, isAsc: !currentIsAsc };
+            } else {
+                // 3回目のクリック（現在の向きがデフォルトと逆）ならソートを解除する
+                return { key: null, isAsc: false };
+            }
+        } else {
+            // 1回目のクリック（新しいキー）ならデフォルトの向きでソートする
+            return { key: clickedSortKey, isAsc: defaultAscKeys.includes(clickedSortKey) };
+        }
+    }
+
     pushModal(pageType, renderArgs) {
         if (!this.modalHistory) this.modalHistory = [];
         
@@ -1831,15 +1848,10 @@ class UIInfoManager {
                 this._renderKyotenList(clanId, 0);
             },
             onSortClick: (sortKey) => {
-                if (this.currentKyotenSortKey === sortKey) {
-                    this.isKyotenSortAsc = !this.isKyotenSortAsc;
-                } else {
-                    this.currentKyotenSortKey = sortKey;
-                    this.isKyotenSortAsc = false;
-                    if (['name', 'clan', 'castellan', 'province'].includes(sortKey)) {
-                        this.isKyotenSortAsc = true;
-                    }
-                }
+                const defaultAscKeys = ['name', 'clan', 'castellan', 'province'];
+                const newState = this._toggleSortState(this.currentKyotenSortKey, this.isKyotenSortAsc, sortKey, defaultAscKeys);
+                this.currentKyotenSortKey = newState.key;
+                this.isKyotenSortAsc = newState.isAsc;
                 this._renderKyotenList(clanId, 0);
             }
         });
@@ -2476,15 +2488,10 @@ class UIInfoManager {
                 this._renderBushoSelector(actionType, targetId, extraData, onBack, 0);
             },
             onSortClick: (sortKey) => {
-                if (this.bushoCurrentSortKey === sortKey) {
-                    this.bushoIsSortAsc = !this.bushoIsSortAsc;
-                } else {
-                    this.bushoCurrentSortKey = sortKey;
-                    this.bushoIsSortAsc = false; 
-                    if (['name', 'faction', 'castle', 'faction_leader'].includes(sortKey)) {
-                        this.bushoIsSortAsc = true;
-                    }
-                }
+                const defaultAscKeys = ['name', 'faction', 'castle', 'faction_leader'];
+                const newState = this._toggleSortState(this.bushoCurrentSortKey, this.bushoIsSortAsc, sortKey, defaultAscKeys);
+                this.bushoCurrentSortKey = newState.key;
+                this.bushoIsSortAsc = newState.isAsc;
                 this._renderBushoSelector(actionType, targetId, extraData, onBack, 0);
             }
         });
