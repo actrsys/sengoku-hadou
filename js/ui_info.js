@@ -3680,7 +3680,7 @@ class UIInfoManager {
         this._renderListModal({
             title: "行動履歴",
             items: items,
-            emptyHtml: '<div style="padding: 30px 10px; text-align: center; min-height: 60px; display: flex; align-items: center; justify-content: center; color: #aaa;">履歴がありません。</div>',
+            emptyHtml: '<div class="history-empty-msg" style="padding: 10px; text-align: center; height: 100%; min-height: 200px; display: flex; align-items: center; justify-content: center; color: #aaa;">履歴がありません。</div>',
             gridTemplateSp: "1fr",
             gridTemplatePc: "1fr",
             scrollPos: scrollPos

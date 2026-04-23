@@ -595,17 +595,24 @@ body.hide-daimyo-labels .daimyo-name-label { display: none !important; }
 .history-list-item:nth-child(even) { background: linear-gradient(to bottom, #2d5a38 0%, #254a2e 100%); }
 .history-list-item:last-child { border-bottom: none; }
 
+/* ★追加：履歴画面の全体高さを、行数や空っぽに関係なく固定する魔法 */
+.modal-content:has(.history-list-item),
+.modal-content:has(.history-empty-msg) {
+    min-height: 60vh;
+}
+
 .select-item.history-list-item {
     height: auto !important; /* 箱の高さを文字に合わせて伸ばす魔法 */
     display: block !important; /* 表のルールを無効化する魔法 */
 }
 .select-item.history-list-item > * {
-    white-space: normal !important; /* はみ出した文字を折り返す魔法 */
-    height: auto !important;
-    border-right: none !important; /* 右側の区切り線を消す魔法 */
-    text-align: left !important; /* 文字を左揃えにする魔法 */
-    justify-content: flex-start !important; /* 中央寄せを解除して左寄せにする魔法 */
-    padding: 4px 10px !important; /* 左端に少し余白を作って読みやすくします */
+    white-space: normal !important; /* はみ出した文字を折り返す魔法 */
+    height: auto !important;
+    border-right: none !important; /* 右側の区切り線を消す魔法 */
+    text-align: left !important; /* 文字を左揃えにする魔法 */
+    justify-content: flex-start !important; /* ★中央寄せを強制解除 */
+    display: block !important; /* ★フレックスボックスを解除して確実に左寄せにする */
+    padding: 4px 10px !important; /* ★左端に少し余白を作って読みやすくする */
 }
 
 /* 各種リストの基本グリッド（スマホ向けベース） */
