@@ -1359,7 +1359,8 @@ Object.assign(UIManager.prototype, {
         const queueX = new Int32Array(pixelSize);
         const queueY = new Int32Array(pixelSize);
         const queueClan = new Int32Array(pixelSize);
-        const queueCastleId = new Int32Array(pixelSize); // ★追加：城のIDも一緒に並ばせます
+        const queueCastleId = new Int32Array(pixelSize); 
+        const queueProvId = new Int32Array(pixelSize); // ★追加：正しい国のIDを覚える箱
         let head = 0;
         let tail = 0;
         
@@ -1383,11 +1384,12 @@ Object.assign(UIManager.prototype, {
                     queueX[tail] = cx;
                     queueY[tail] = cy;
                     queueClan[tail] = c.ownerClan;
-                    queueCastleId[tail] = c.id; // ★城ID
+                    queueCastleId[tail] = c.id; 
+                    queueProvId[tail] = provId; // ★お城が本来所属している「正解の国ID」を持たせます
                     tail++;
                     
                     pixelClanMap[idx] = c.ownerClan;
-                    this.pixelCastleMap[idx] = c.id; // ★城ID
+                    this.pixelCastleMap[idx] = c.id; 
                     distanceMap[idx] = 0;
                 }
             });
@@ -1401,12 +1403,12 @@ Object.assign(UIManager.prototype, {
             const x = queueX[head];
             const y = queueY[head];
             const clanId = queueClan[head];
-            const qCastleId = queueCastleId[head]; // ★追加
+            const qCastleId = queueCastleId[head]; 
+            const qProvId = queueProvId[head]; // ★正解の国IDを取り出す
             head++;
             
             const currIdx = y * width + x;
             const currDist = distanceMap[currIdx];
-            const provId = provinceMap[currIdx];
 
             for (let d = 0; d < 4; d++) {
                 const nx = x + dx[d];
@@ -1415,17 +1417,20 @@ Object.assign(UIManager.prototype, {
                 if (nx >= 0 && nx < width && ny >= 0 && ny < height) {
                     const nIdx = ny * width + nx;
                     
-                    // 同じ国の中だけを塗っていきます
-                    if (provinceMap[nIdx] === provId) {
+                    // ★修正：スタートしたピクセルの色ではなく、「正解の国ID(qProvId)」と比較します！
+                    // これで、お城の位置が境界線（黒い線＝国IDが0）に重なっていても、
+                    // 海や境界線全体に水が広がってしまうバグを完全に防げます！
+                    if (provinceMap[nIdx] === qProvId) {
                         if (distanceMap[nIdx] > currDist + 1) {
                             distanceMap[nIdx] = currDist + 1;
                             pixelClanMap[nIdx] = clanId;
-                            this.pixelCastleMap[nIdx] = qCastleId; // ★追加
+                            this.pixelCastleMap[nIdx] = qCastleId; 
                             
                             queueX[tail] = nx;
                             queueY[tail] = ny;
                             queueClan[tail] = clanId;
-                            queueCastleId[tail] = qCastleId; // ★追加
+                            queueCastleId[tail] = qCastleId; 
+                            queueProvId[tail] = qProvId; // ★次へパス
                             tail++;
                         }
                     }
