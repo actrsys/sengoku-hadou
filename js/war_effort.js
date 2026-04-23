@@ -167,9 +167,9 @@ Object.assign(WarManager.prototype, {
         this.state = this.state || {};
         this.state.active = true;
 
-        // ★追加：戦争が始まったら、終わるまで「思考中...」を隠し続けます
-        if (this.game.ui) {
-            this.game.ui.hideAIGuardTemporarily();
+        const aiGuardEl = document.getElementById('ai-guard');
+        if (aiGuardEl) {
+            aiGuardEl.style.display = 'none';
         }
 
         try {
@@ -902,9 +902,9 @@ Object.assign(WarManager.prototype, {
                 }
                 // ★追加ここまで
 
-                // ★追加：勝敗メッセージが閉じたこのタイミングで「思考中...」を再表示します！
-                if (this.game.ui) {
-                    this.game.ui.restoreAIGuard();
+                const aiGuardEl = document.getElementById('ai-guard');
+                if (aiGuardEl) {
+                    aiGuardEl.style.display = '';
                 }
                 
                 const winnerClan = s.attacker.ownerClan; // 勝ったのは攻撃側です
@@ -1970,6 +1970,11 @@ Object.assign(WarManager.prototype, {
 
     
     closeWar() { 
+        const aiGuardEl = document.getElementById('ai-guard');
+        if (aiGuardEl) {
+            aiGuardEl.style.display = '';
+        }
+
         // ★諸勢力との戦いが終わった時も平時のBGMに戻す！
         if (window.AudioManager && this.state.isPlayerInvolved) {
             window.AudioManager.restoreMemorizedBgm();
