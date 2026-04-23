@@ -1299,34 +1299,121 @@ Object.assign(UIManager.prototype, {
         const outputData = ctx.createImageData(width, height);
         const sd = sourceData.data;
 
-        // 画像の点を一個ずつ調べます
+        // ★ここから差し替え：陣取りゲーム（BFS）で地形に沿って国を分割する魔法です！
+        const pixelClanMap = new Int32Array(width * height);
+        const provinceMap = new Int32Array(width * height);
+        
+        // 1. まずは画像の全ての点（ピクセル）が「どの国」か調べます
+        for (let i = 0; i < sd.length; i += 4) {
+            if (sd[i+3] === 0) continue;
+            const provStr = `${sd[i]},${sd[i+1]},${sd[i+2]}`;
+            const province = colorToProvince.get(provStr);
+            if (province) {
+                provinceMap[i / 4] = province.id;
+            }
+        }
+
+        // 2. 複数の勢力がいる国は、お城から「陣取りゲーム」をスタートするための準備をします
+        const maxQueueSize = width * height;
+        const queueX = new Int32Array(maxQueueSize);
+        const queueY = new Int32Array(maxQueueSize);
+        const queueClan = new Int32Array(maxQueueSize);
+        let head = 0;
+        let tail = 0;
+        
+        const distanceMap = new Int32Array(width * height);
+        distanceMap.fill(999999); // 最初は誰も届いていないので「無限遠」にしておきます
+
+        provinceInfo.forEach((info, provId) => {
+            if (info.owner === -1) {
+                info.castles.forEach(c => {
+                    const cx = Math.floor(c.pixelX !== undefined ? c.pixelX : (c.x * 80 + 40));
+                    const cy = Math.floor(c.pixelY !== undefined ? c.pixelY : (c.y * 80 + 40));
+                    
+                    if (cx >= 0 && cx < width && cy >= 0 && cy < height) {
+                        const idx = cy * width + cx;
+                        queueX[tail] = cx;
+                        queueY[tail] = cy;
+                        queueClan[tail] = c.ownerClan;
+                        tail++;
+                        
+                        pixelClanMap[idx] = c.ownerClan;
+                        distanceMap[idx] = 0;
+                    }
+                });
+            }
+        });
+
+        // 3. 水が広がるように、同じ国の中だけを陣取りしていきます（幅優先探索）
+        const dx = [0, 1, 0, -1];
+        const dy = [-1, 0, 1, 0];
+        
+        while (head < tail) {
+            const x = queueX[head];
+            const y = queueY[head];
+            const clanId = queueClan[head];
+            head++;
+            
+            const currIdx = y * width + x;
+            const currDist = distanceMap[currIdx];
+            const provId = provinceMap[currIdx];
+
+            for (let d = 0; d < 4; d++) {
+                const nx = x + dx[d];
+                const ny = y + dy[d];
+                
+                // 画像の枠からはみ出さないようにガードします
+                if (nx >= 0 && nx < width && ny >= 0 && ny < height) {
+                    const nIdx = ny * width + nx;
+                    
+                    // 「同じ国の中」だけを陣取りします（海や隣の国にはみ出しません！）
+                    if (provinceMap[nIdx] === provId) {
+                        if (distanceMap[nIdx] > currDist + 1) {
+                            distanceMap[nIdx] = currDist + 1;
+                            pixelClanMap[nIdx] = clanId;
+                            
+                            queueX[tail] = nx;
+                            queueY[tail] = ny;
+                            queueClan[tail] = clanId;
+                            tail++;
+                        }
+                    }
+                }
+            }
+        }
+
+        // 4. 陣取りの結果を使って、実際に画用紙（outputData）に色を塗ります！
         for (let i = 0; i < sd.length; i += 4) {
             if (sd[i+3] === 0) continue; // 透明（海）なら飛ばす
 
-            const province = colorToProvince.get(`${sd[i]},${sd[i+1]},${sd[i+2]}`);
-            if (!province) continue;
+            const pxIdx = i / 4;
+            const provId = provinceMap[pxIdx];
+            if (provId === 0) continue;
 
-            const info = provinceInfo.get(province.id);
+            const info = provinceInfo.get(provId);
             let targetClanId = 0;
 
             if (info.owner !== -1) {
                 // その国にお城がないか、あるいは一勢力が全部支配しているとき
                 targetClanId = info.owner;
             } else {
-                // 勢力が分かれているとき（Uの字対策：同じ国のお城だけで距離を競う）
-                const pixelIndex = i / 4;
-                const px = pixelIndex % width;
-                const py = Math.floor(pixelIndex / width);
-                let minDistSq = Infinity;
-
-                for (let j = 0; j < info.castles.length; j++) {
-                    const c = info.castles[j];
-                    const cx = c.pixelX !== undefined ? c.pixelX : (c.x * 80 + 40);
-                    const cy = c.pixelY !== undefined ? c.pixelY : (c.y * 80 + 40);
-                    const dSq = (px - cx) ** 2 + (py - cy) ** 2;
-                    if (dSq < minDistSq) {
-                        minDistSq = dSq;
-                        targetClanId = c.ownerClan;
+                // 陣取りゲームで勝った勢力の色にします
+                targetClanId = pixelClanMap[pxIdx];
+                
+                // もし海を隔てた「飛び地」などでお城から陣取りが届かなかった場所は、今まで通り直線距離で塗ります
+                if (targetClanId === 0) {
+                    const px = pxIdx % width;
+                    const py = Math.floor(pxIdx / width);
+                    let minDistSq = Infinity;
+                    for (let j = 0; j < info.castles.length; j++) {
+                        const c = info.castles[j];
+                        const cx = c.pixelX !== undefined ? c.pixelX : (c.x * 80 + 40);
+                        const cy = c.pixelY !== undefined ? c.pixelY : (c.y * 80 + 40);
+                        const dSq = (px - cx) ** 2 + (py - cy) ** 2;
+                        if (dSq < minDistSq) {
+                            minDistSq = dSq;
+                            targetClanId = c.ownerClan;
+                        }
                     }
                 }
             }
