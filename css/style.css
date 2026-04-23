@@ -1131,20 +1131,10 @@ body:not(.is-pc).daimyo-select-mode #map-wrapper { margin-bottom: 0 !important; 
 /* š ‰æ–Ê‰º•”‚©‚ç‚Ì‹——£(bottom)‚ğ­‚µã‚°‚ÄAŒ©Ø‚ê‚È‚¢‚æ‚¤‚É’²®‚µ‚Ü‚µ‚½ */
 .floating-back-btn { 
     position: absolute; bottom: 45px; left: 50%; transform: translateX(-50%); z-index: 4000; 
-    padding: 12px 24px; 
-    background: linear-gradient(to bottom, #254a2e 0%, #1b3822 100%); 
-    color: #fff; 
-    border: 2px solid #d4af37; 
-    border-radius: 8px; 
-    font-size: 1.2rem; font-weight: bold; cursor: pointer; 
-    box-shadow: 0 4px 10px rgba(0,0,0,0.6); 
-    text-shadow: 1px 1px 0 #000, -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000;
-    transition: all 0.2s; pointer-events: auto; white-space: nowrap; 
+    pointer-events: auto; white-space: nowrap; 
 }
 .floating-back-btn:hover { 
-    background: linear-gradient(to bottom, #3a6b46 0%, #2a5a36 100%); 
     transform: translateX(-50%) scale(1.05); 
-    border-color: #ffd54f;
 }
 .floating-back-btn.hidden, .daimyo-confirm-buttons.hidden { display: none !important; }
 .daimyo-confirm-buttons { position: absolute; bottom: 45px; left: 50%; transform: translateX(-50%); display: flex; gap: 20px; pointer-events: auto; z-index: 4001; }
