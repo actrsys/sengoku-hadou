@@ -1451,5 +1451,4 @@ Object.assign(UIManager.prototype, {
 
         ctx.putImageData(outputData, 0, 0);
     }
-    // ==========================================
 });
