@@ -2933,7 +2933,7 @@ class CommandSystem {
                 // ★メッセージ係にお任せします！
                 this.game.warManager.reinfMsgHelper.showAcceptance(this.game, nameStr, true, atkCastle.isDelegated, false, () => {
                     this.game.warManager.startWar(atkCastle, targetCastle, atkBushos, sVal, rVal, hVal, gVal, reinforcementData, selfReinfData);
-                });
+                }, true, "攻撃側");
             } else {
                 this.game.warManager.startWar(atkCastle, targetCastle, atkBushos, sVal, rVal, hVal, gVal, reinforcementData, selfReinfData);
             }

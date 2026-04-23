@@ -29,7 +29,7 @@ Object.assign(WarManager.prototype, {
         },
         
         // 3. 相手が援軍を承諾してくれた時のメッセージ
-        showAcceptance: (game, nameStr, isKunishu, isDelegated, isEnemy, onComplete, isPlayerRequest = true) => {
+        showAcceptance: (game, nameStr, isKunishu, isDelegated, isEnemy, onComplete, isPlayerRequest = true, sideName = "援軍") => {
             if (isEnemy) {
                 game.ui.showDialog(`${nameStr}が敵の援軍として参戦しました！`, false, onComplete);
                 return;
@@ -39,7 +39,7 @@ Object.assign(WarManager.prototype, {
                 game.ui.showDialog(`${nameStr}が友軍として参戦しました！`, false, onComplete);
             } else {
                 if (isKunishu || !isPlayerRequest) {
-                    game.ui.showDialog(`${nameStr}が援軍として参戦しました！`, false, onComplete);
+                    game.ui.showDialog(`${nameStr}が${sideName}の援軍として参戦しました！`, false, onComplete);
                 } else {
                     game.ui.showDialog(`${nameStr}が援軍要請を承諾しました！`, false, onComplete);
                 }
@@ -2582,10 +2582,10 @@ Object.assign(WarManager.prototype, {
                 const isEnemy = (atkClanId === this.game.playerClanId);
                 
                 if (isEnemy) {
-                    this.reinfMsgHelper.showAcceptance(this.game, nameStr, true, false, true, onComplete, false);
+                    this.reinfMsgHelper.showAcceptance(this.game, nameStr, true, false, true, onComplete, false, "守備側");
                 } else {
                     this.game.ui.log(`【友軍】${defCastle.name}の要請により、${kunishu.getName(this.game)}が守備側の援軍として駆けつけました。`);
-                    this.reinfMsgHelper.showAcceptance(this.game, nameStr, true, false, false, onComplete, false);
+                    this.reinfMsgHelper.showAcceptance(this.game, nameStr, true, false, false, onComplete, false, "守備側");
                 }
             }
             return;
@@ -2702,11 +2702,11 @@ Object.assign(WarManager.prototype, {
             
             if (isEnemy) {
                 // ★メッセージ係にお任せします！
-                this.reinfMsgHelper.showAcceptance(this.game, nameStr, false, false, true, onComplete, false);
+                this.reinfMsgHelper.showAcceptance(this.game, nameStr, false, false, true, onComplete, false, "守備側");
             } else {
                 this.game.ui.log(`【友軍】${defCastle.name}の要請により、${helperClanName}が守備側の援軍として駆けつけました。`);
                 // ★メッセージ係にお任せします！
-                this.reinfMsgHelper.showAcceptance(this.game, nameStr, false, false, false, onComplete, false);
+                this.reinfMsgHelper.showAcceptance(this.game, nameStr, false, false, false, onComplete, false, "守備側");
             }
         }
     },
