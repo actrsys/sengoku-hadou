@@ -851,6 +851,17 @@ Object.assign(WarManager.prototype, {
                     // ★変更：守備成功した時も、守備隊の総大将（s.defBusho.name）にします！
                     resultMsg = `${defDaimyoName}の${s.defBusho.name}が\n${atkDaimyoName}の攻撃を撃退しました！`;
                 }
+
+                // ★追加：メッセージの前に2秒間点滅させる魔法！
+                const atkColor = (atkClanData && atkClanData.color) ? atkClanData.color : "#ffffff";
+                const defColor = (defClanData && defClanData.color) ? defClanData.color : "#ffffff";
+                
+                // 画面を対象の城に移動させておく
+                this.game.ui.scrollToActiveCastle(s.defender, false);
+                
+                if (this.game.ui.playProvinceBlinkAnimation) {
+                     await this.game.ui.playProvinceBlinkAnimation(s.defender.provinceId, atkColor, defColor, 2000);
+                }
                 
                 // どこを触っても消せるメッセージを表示します！
                 await this.game.ui.showDialogAsync(resultMsg);
