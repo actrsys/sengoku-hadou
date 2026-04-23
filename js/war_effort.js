@@ -1354,7 +1354,15 @@ Object.assign(WarManager.prototype, {
                     this.game.castleManager.changeOwner(targetC, 0); 
 
                     // ★追加：色が中立に変わったので、メッセージの前に地図を更新します！
-                    this.game.ui.updateClanColors();
+                    // ★今回追加：色を変える時に、かっこいいアニメーションの魔法を使います！
+                    if (typeof this.game.ui.playCaptureEffect === 'function') {
+                        // 画面が真っ白になった瞬間に色を塗り替えるお願いを渡します
+                        await this.game.ui.playCaptureEffect(targetC.id, () => {
+                            this.game.ui.updateClanColors();
+                        });
+                    } else {
+                        this.game.ui.updateClanColors();
+                    }
                     
                     targetC.castellanId = 0;
                     
@@ -1530,7 +1538,14 @@ Object.assign(WarManager.prototype, {
                 this.game.castleManager.changeOwner(s.defender, s.attacker.ownerClan);
 
                 // ★追加：色が更新されたので、メッセージの前に地図を更新します！
-                this.game.ui.updateClanColors();
+                // ★今回追加：色を変える時に、かっこいいアニメーションの魔法を使います！
+                if (typeof this.game.ui.playCaptureEffect === 'function') {
+                    await this.game.ui.playCaptureEffect(s.defender.id, () => {
+                        this.game.ui.updateClanColors();
+                    });
+                } else {
+                    this.game.ui.updateClanColors();
+                }
 
                 s.defender.soldiers = totalAtkSurvivors;
 
@@ -1607,7 +1622,14 @@ Object.assign(WarManager.prototype, {
                 this.game.castleManager.changeOwner(s.defender, s.attacker.ownerClan);
 
                 // ★追加：色が更新されたので、メッセージの前に地図を更新します！
-                this.game.ui.updateClanColors();
+                // ★今回追加：色を変える時に、かっこいいアニメーションの魔法を使います！
+                if (typeof this.game.ui.playCaptureEffect === 'function') {
+                    await this.game.ui.playCaptureEffect(s.defender.id, () => {
+                        this.game.ui.updateClanColors();
+                    });
+                } else {
+                    this.game.ui.updateClanColors();
+                }
 
                 s.defender.immunityUntil = this.game.getCurrentTurnId() + 1;
                 
