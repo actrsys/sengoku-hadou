@@ -926,6 +926,20 @@ Object.assign(WarManager.prototype, {
 
             // 勝敗が決まる前に、戦場となった城の領土を2秒間点滅させる（この間は操作不可）
             await this.game.ui.playBattleBlink(s.defender.id, atkColor, defColor, 2000);
+            
+            // ★追加：点滅が終わったこのタイミングで「戦闘直後」の歴史イベントをチェック・実行します！
+            if (window.GameEvents) {
+                const eventContext = Object.assign({}, s, {
+                    resultType: attackerWon ? 'attacker_win' : (isRetreat ? 'attacker_retreat' : 'attacker_lose')
+                });
+                for (const ev of window.GameEvents) {
+                    if (ev.timing === 'after_battle_blink') {
+                        if (ev.checkCondition(this.game, eventContext)) {
+                            await ev.execute(this.game, eventContext);
+                        }
+                    }
+                }
+            }
             // ==========================================
             
             // ★ここから追加：AI同士の戦争の結果メッセージを記憶しておきます（表示は色が塗られた一番最後にします！）

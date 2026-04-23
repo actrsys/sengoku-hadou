@@ -806,7 +806,7 @@ window.GameEvents.push({
 // ==========================================
 window.GameEvents.push({
     id: "historical_okehazama_3",
-    timing: "after_field_war", // ★変更：野戦終了直後のタイミング
+    timing: "after_battle_blink", // ★変更：地図の点滅が終わった直後のタイミング
     isOneTime: true,
     
     checkCondition: function(game, context) {
