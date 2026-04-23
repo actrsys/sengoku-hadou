@@ -1647,7 +1647,7 @@ class UIInfoManager {
                     const getClanName = (c) => { const cd = this.game.clans.find(cd => cd.id === c.ownerClan); return cd ? cd.name : ""; };
                     const getCastellanYomi = (c) => { const cb = this.game.getBusho(c.castellanId); return cb ? (cb.yomi || cb.name) : "んんん"; };
                     const getCastellanName = (c) => { const cb = this.game.getBusho(c.castellanId); return cb ? cb.name : ""; };
-                    const getProvinceYomi = (c) => { const p = this.game.provinces && this.game.provinces.find(p => p.id === c.provinceId); return p ? (p.yomi || p.province) : "んんん"; };
+                    const getProvinceYomi = (c) => { const p = this.game.provinces && this.game.provinces.find(p => p.id === c.provinceId); return p ? (p.provinceYomi || p.province) : "んんん"; };
                     const getProvinceName = (c) => { const p = this.game.provinces && this.game.provinces.find(p => p.id === c.provinceId); return p ? p.province : ""; };
                     const getBushoCount = (c) => this.game.bushos.filter(b => b.castleId === c.id && b.status === 'active').length;
 
