@@ -108,47 +108,11 @@ const CAN_EXECUTE_RULES = {
         return currentTrust >= 500;
     },
     // --- 移動・輸送用 ---
-    canMoveOrTransport: (game, castle) => {
-        const playerClanId = Number(game.playerClanId);
-        let hasTarget = false;
-        const targetCastles = game.castles.filter(target => Number(target.ownerClan) === playerClanId && target.id !== castle.id);
-        
-        for (const target of targetCastles) {
-            const visited = new Set();
-            const queue = [castle];
-            visited.add(castle.id);
-
-            let reachable = false;
-            while (queue.length > 0) {
-                const current = queue.shift();
-                if (current.id === target.id) {
-                    reachable = true;
-                    break;
-                }
-
-                const neighbors = game.castles.filter(adj => 
-                    adj.ownerClan === playerClanId && 
-                    GameSystem.isAdjacent(current, adj) &&
-                    !visited.has(adj.id)
-                );
-
-                for (const n of neighbors) {
-                    visited.add(n.id);
-                    queue.push(n);
-                }
-            }
-            if (reachable) {
-                hasTarget = true;
-                break;
-            }
-        }
-        return hasTarget;
-    },
     canTransport: (game, castle) => {
         if (castle.soldiers <= 0 && castle.gold <= 0 && castle.rice <= 0 && (castle.horses || 0) <= 0 && (castle.guns || 0) <= 0) {
             return false;
         }
-        return CAN_EXECUTE_RULES.canMoveOrTransport(game, castle);
+        return true;
     },
     // --- 軍事取引 ---
     canBuyRice: (game, castle) => {
@@ -352,11 +316,10 @@ const COMMAND_SPECS = {
         costGold: 0, costRice: 0, 
         isMulti: true, hasAdvice: false, 
         startMode: 'map_select', targetType: 'ally_other',
-        sortKey: 'strength',
-        canExecute: (game, castle) => CAN_EXECUTE_RULES.canMoveOrTransport(game, castle)
+        sortKey: 'strength'
     },
     'banish': { 
-        label: "追放", category: 'PERSONNEL', 
+        label: "追放", category: 'PERSONNEL',
         costGold: 0, costRice: 0, 
         isMulti: false, hasAdvice: false, 
         startMode: 'busho_select', sortKey: 'loyalty',
