@@ -2951,15 +2951,27 @@ class CommandSystem {
 
         if (helperClanId === this.game.playerClanId) {
             const myClanName = this.game.clans.find(c => c.id === myClanId)?.name || "不明";
-            const targetClanName = this.game.clans.find(c => c.id === enemyClanId)?.name || "敵軍";
+            const targetClanName = this.game.clans.find(c => c.id === enemyClanId)?.name || "中立勢力";
+            
+            let targetInfoStr = "";
+            if (targetCastle.isKunishu) {
+                const provData = this.game.provinces.find(p => p.id === targetCastle.provinceId);
+                const provName = provData ? provData.province : "不明な国";
+                const kunishu = this.game.kunishuSystem.getKunishu(targetCastle.kunishuId);
+                const kName = kunishu ? kunishu.getName(this.game) : "諸勢力";
+                targetInfoStr = `${provName}の${kName}の攻略のため、\n`;
+            } else {
+                targetInfoStr = `${targetClanName}の${targetCastle.name}の攻略のため、\n`;
+            }
+
             // ★修正：AI（要請側）から見てプレイヤー（受諾側）が「支配」されている相手かどうかを確認します！
             const isBoss = (myToHelperRel && myToHelperRel.status === '支配');
             const startSelection = () => this._promptPlayerAtkReinforcement(helperCastle, atkCastle, targetCastle, atkBushos, sVal, rVal, hVal, gVal, isBoss, selfReinfData);
             
             if (isBoss) {
-                this.game.ui.showDialog(`主家である ${myClanName} が侵攻します。\n当家は従属しているため直ちに出陣します！`, false, startSelection);
+                this.game.ui.showDialog(`主家である ${myClanName} が\n${targetInfoStr}侵攻します。\n当家は従属しているため直ちに出陣します！`, false, startSelection);
             } else {
-                this.game.ui.showDialog(`${myClanName} から攻撃の援軍要請が届きました。(持参金: ${gold})\n援軍を派遣しますか？`, true, startSelection, () => {
+                this.game.ui.showDialog(`${myClanName} から\n${targetInfoStr}攻撃の援軍要請が届きました。(持参金: ${gold})\n援軍を派遣しますか？`, true, startSelection, () => {
                     this.game.diplomacyManager.updateSentiment(myClanId, helperClanId, -10);
                     this.game.ui.showDialog(`援軍要請を断りました。`, false, () => this.game.warManager.startWar(atkCastle, targetCastle, atkBushos, sVal, rVal, hVal, gVal, null, selfReinfData));
                 });
