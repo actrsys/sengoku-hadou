@@ -166,6 +166,11 @@ Object.assign(WarManager.prototype, {
     async startWar(atkCastle, defCastle, atkBushos, atkSoldierCount, atkRice, atkHorses = 0, atkGuns = 0, reinforcementData = null, selfReinforcementData = null) {
         this.state = this.state || {};
         this.state.active = true;
+        
+        // ★追加：戦争が始まったら、終わるまで「思考中...」の膜を隠し続ける魔法！
+        if (this.game.ui) {
+            this.game.ui.hideAIGuardTemporarily();
+        }
 
         try {
             let atkLeaderIdx = atkBushos.findIndex(b => b.isDaimyo);
@@ -1977,6 +1982,11 @@ Object.assign(WarManager.prototype, {
         if (this.state.isPlayerInvolved) { 
             this.game.ui.updatePanelHeader();
             this.game.ui.renderCommandMenu(); 
+        }
+        
+        // ★追加：戦争が終わったので、隠していた「思考中...」の膜を元に戻す魔法！
+        if (this.game.ui) {
+            this.game.ui.restoreAIGuard();
         }
         
         setTimeout(() => {
