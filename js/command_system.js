@@ -689,29 +689,60 @@ class CommandSystem {
             else if (['training','soldier_charity'].includes(actionType)) { infoHtml = `<div>状態: 訓練${c.training}/士気${c.morale}</div>`; }
             else if (actionType === 'war_deploy' || actionType === 'kunishu_subjugate_deploy') { infoHtml = `<div>出陣武将を選択してください（最大5名まで）</div>`; }
         }
-
+        
         // --- 並び替え（ソート） ---
+        const isViewOnly = actionType === 'view_only' || actionType === 'all_busho_list';
+        
         bushos.sort((a,b) => {
-            const getRankScore = (target) => {
-                if (target.isPrincess) return 5; // ★追加：姫を一番上にします！
-                if (target.isDaimyo || target.isCastellan) return 10; 
-                if (target.isGunshi) return 20;
-                if (target.belongKunishuId && target.belongKunishuId > 0) {
-                    const kunishu = this.game.kunishuSystem.getKunishu(target.belongKunishuId);
-                    const isBoss = kunishu && (Number(kunishu.leaderId) === Number(target.id));
-                    if (isBoss) return 40 + (target.belongKunishuId * 0.001); 
-                    return 50 + (target.belongKunishuId * 0.001); 
-                }
-                if (target.status === 'ronin') return 90; 
-                return 30; 
-            };
-            const rankA = getRankScore(a);
-            const rankB = getRankScore(b);
-            if (rankA !== rankB) return rankA - rankB;
+            if (isViewOnly) {
+                const getRankScore = (target) => {
+                    if (target.isPrincess) return 5; // ★追加：姫を一番上にします！
+                    if (target.isDaimyo || target.isCastellan) return 10; 
+                    if (target.isGunshi) return 20;
+                    if (target.belongKunishuId && target.belongKunishuId > 0) {
+                        const kunishu = this.game.kunishuSystem.getKunishu(target.belongKunishuId);
+                        const isBoss = kunishu && (Number(kunishu.leaderId) === Number(target.id));
+                        if (isBoss) return 40 + (target.belongKunishuId * 0.001); 
+                        return 50 + (target.belongKunishuId * 0.001); 
+                    }
+                    if (target.status === 'ronin') return 90; 
+                    return 30; 
+                };
+                const rankA = getRankScore(a);
+                const rankB = getRankScore(b);
+                if (rankA !== rankB) return rankA - rankB;
+            }
 
             const getSortVal = (target) => {
                  let acc = null;
                  if (isEnemyTarget && targetCastle) acc = targetCastle.investigatedAccuracy;
+
+                 const cCastle = currentCastle;
+                 try {
+                     if (['farm', 'commerce'].includes(actionType)) {
+                         return typeof GameSystem.calcDevelopment === 'function' ? GameSystem.calcDevelopment(target, 1.0) : target.politics;
+                     }
+                     if (actionType === 'repair') {
+                         return typeof GameSystem.calcRepair === 'function' ? GameSystem.calcRepair(target, 1.0) : target.politics;
+                     }
+                     if (actionType === 'charity') {
+                         return typeof GameSystem.calcCharity === 'function' ? GameSystem.calcCharity(target, 1.0) : target.charm;
+                     }
+                     if (actionType === 'training') {
+                         return typeof GameSystem.calcTraining === 'function' ? GameSystem.calcTraining(target, cCastle.soldiers || 1, 1.0) : target.leadership;
+                     }
+                     if (actionType === 'soldier_charity') {
+                         return typeof GameSystem.calcSoldierCharity === 'function' ? GameSystem.calcSoldierCharity(target, cCastle.soldiers || 1, 1.0) : target.leadership;
+                     }
+                     if (actionType === 'draft') {
+                         return (target.leadership * 1.5) + (target.charm * 1.5) + (Math.sqrt(target.loyalty) * 2);
+                     }
+                     if (['war_deploy', 'def_intercept_deploy', 'def_reinf_deploy', 'atk_reinf_deploy', 'def_self_reinf_deploy', 'atk_self_reinf_deploy', 'kunishu_subjugate_deploy'].includes(actionType)) {
+                         return (target.leadership * 1.5) + target.strength;
+                     }
+                 } catch (e) {
+                 }
+
                  if (isEnemyTarget) return GameSystem.getPerceivedStatValue(target, sortKey, gunshi, acc, this.game.playerClanId, myDaimyo) || 0;
                  const val = GameSystem.getPerceivedStatValue(target, sortKey, gunshi, null, this.game.playerClanId, myDaimyo);
                  return val === null ? 0 : val;

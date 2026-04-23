@@ -2032,27 +2032,8 @@ class UIInfoManager {
         const gunshi = this.game.getClanGunshi(this.game.playerClanId);
         const myDaimyo = this.game.bushos.find(b => b.clan === this.game.playerClanId && b.isDaimyo);
         
-        if (!isViewMode && !this.bushoCurrentSortKey) {
-            if (spec && spec.sortKey) {
-                this.bushoCurrentSortKey = spec.sortKey;
-            } else if (spec && spec.stat) {
-                this.bushoCurrentSortKey = spec.stat;
-            } else if (actionType) {
-                const leadershipActions = ['draft', 'train', 'training', 'war_deploy', 'def_intercept_deploy', 'def_reinf_deploy', 'atk_reinf_deploy', 'def_self_reinf_deploy', 'atk_self_reinf_deploy', 'kunishu_subjugate_deploy', 'war_general', 'kunishu_war_general', 'appoint'];
-                const politicsActions = ['farm', 'commerce', 'repair'];
-                const diplomacyActions = ['diplomacy_doer', 'goodwill', 'tribute', 'marriage_princess', 'marriage_kinsman', 'succession'];
-                const intelligenceActions = ['rumor', 'headhunt', 'sabotage', 'incite', 'destroy', 'revolt', 'rumor_target_busho', 'headhunt_target', 'appoint_gunshi'];
-                const charmActions = ['charity', 'soldier_charity', 'employ', 'employ_target'];
-                
-                if (leadershipActions.includes(actionType)) this.bushoCurrentSortKey = 'leadership';
-                else if (politicsActions.includes(actionType)) this.bushoCurrentSortKey = 'politics';
-                else if (diplomacyActions.includes(actionType)) this.bushoCurrentSortKey = 'diplomacy';
-                else if (intelligenceActions.includes(actionType)) this.bushoCurrentSortKey = 'intelligence';
-                else if (charmActions.includes(actionType)) this.bushoCurrentSortKey = 'charm';
-                else this.bushoCurrentSortKey = 'leadership'; 
-            }
-            if (this.bushoCurrentSortKey) this.bushoIsSortAsc = false;
-        }
+        // デフォルトではヘッダーのソート状態を指定せず、コマンドごとの最適な計算結果順（初期並び順）で表示します
+        // （ユーザーがヘッダーをクリックした時のみ this.bushoCurrentSortKey が設定され、ソートが実行されます）
 
         let tabsHtml = null;
         if (isViewMode) {
