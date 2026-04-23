@@ -881,6 +881,7 @@ Object.assign(UIManager.prototype, {
             if (backToScenarioBtn) backToScenarioBtn.classList.add('hidden');
             if (confirmButtons) confirmButtons.classList.add('hidden');
         }
+        // ==========================================
     },
     
     // ★新魔法：勢力の名前を賢く並べる魔法です
@@ -1155,92 +1156,6 @@ Object.assign(UIManager.prototype, {
         const ctx = overlay.getContext('2d');
         // 画用紙を綺麗にするだけ！
         ctx.clearRect(0, 0, overlay.width, overlay.height);
-    },
-
-    // ==========================================
-    // ★戦場となった国を点滅させる魔法です（改良版）
-    // ==========================================
-    playProvinceBlinkAnimation(provinceId, color1Hex, color2Hex, duration) {
-        return new Promise((resolve) => {
-            const overlay = document.getElementById('province-overlay');
-            if (!overlay) { resolve(); return; }
-
-            // 色コード(#ffffffなど)をRGBに変換する内蔵ヘルパー
-            const toRgb = (hex) => {
-                const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex || "#ffffff");
-                return result ? { r: parseInt(result[1], 16), g: parseInt(result[2], 16), b: parseInt(result[3], 16) } : { r: 255, g: 255, b: 255 };
-            };
-            
-            const sourceData = (typeof DataManager !== 'undefined') ? DataManager.provinceImageData : null;
-            if (!sourceData) { resolve(); return; }
-
-            const targetProvince = this.game.provinces.find(p => p.id === provinceId);
-            if (!targetProvince) { resolve(); return; }
-            
-            const targetColorRgb = toRgb(targetProvince.color_code);
-            const c1 = toRgb(color1Hex);
-            const c2 = toRgb(color2Hex);
-
-            const ctx = overlay.getContext('2d');
-            const width = overlay.width;
-            const height = overlay.height;
-            
-            const pixelIndices = [];
-            const sd = sourceData.data;
-            for (let i = 0; i < sd.length; i += 4) {
-                if (sd[i+3] === 0) continue;
-                if (sd[i] === targetColorRgb.r && sd[i+1] === targetColorRgb.g && sd[i+2] === targetColorRgb.b) {
-                    pixelIndices.push(i);
-                }
-            }
-            
-            if (pixelIndices.length === 0) { resolve(); return; }
-
-            const startTime = performance.now();
-            const outData = ctx.createImageData(width, height);
-            const od = outData.data;
-
-            // 操作不能ガード（点滅中だけ画面を触れなくします）
-            const oldPointerEvents = document.body.style.pointerEvents;
-            document.body.style.pointerEvents = 'none';
-
-            const animate = (currentTime) => {
-                try {
-                    const elapsed = currentTime - startTime;
-                    if (elapsed >= duration) {
-                        ctx.clearRect(0, 0, width, height);
-                        document.body.style.pointerEvents = oldPointerEvents;
-                        resolve();
-                        return;
-                    }
-
-                    const phase = (elapsed % 300) / 300;
-                    const wave = (Math.sin(phase * Math.PI * 2) + 1) / 2;
-                    const whiteLight = (Math.sin((elapsed % 150) / 150 * Math.PI * 2) + 1) / 2 * 0.5;
-
-                    const mixedR = Math.min(255, (c1.r * (1 - wave) + c2.r * wave) + (255 * whiteLight));
-                    const mixedG = Math.min(255, (c1.g * (1 - wave) + c2.g * wave) + (255 * whiteLight));
-                    const mixedB = Math.min(255, (c1.b * (1 - wave) + c2.b * wave) + (255 * whiteLight));
-
-                    for (let i = 0; i < pixelIndices.length; i++) {
-                        const idx = pixelIndices[i];
-                        od[idx] = mixedR;
-                        od[idx+1] = mixedG;
-                        od[idx+2] = mixedB;
-                        od[idx+3] = 200; 
-                    }
-
-                    ctx.putImageData(outData, 0, 0);
-                    requestAnimationFrame(animate);
-                } catch (e) {
-                    ctx.clearRect(0, 0, width, height);
-                    document.body.style.pointerEvents = oldPointerEvents;
-                    resolve();
-                }
-            };
-
-            requestAnimationFrame(animate);
-        });
     },
 
     // ==========================================
