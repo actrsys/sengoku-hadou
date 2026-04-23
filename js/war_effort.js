@@ -242,7 +242,8 @@ Object.assign(WarManager.prototype, {
                 await this.game.ui.showDialogAsync(startMsg);
 
                 // ★ここから追加：メッセージを閉じた後、戦場となるお城にスクロールして点滅させます！
-                this.game.ui.scrollToActiveCastle(defCastle, false);
+                const realDefCastle = this.game.getCastle(defCastle.id);
+                this.game.ui.scrollToActiveCastle(realDefCastle, false);
                 await new Promise(res => setTimeout(res, 600)); // スクロール完了を少し待ちます
                 
                 let atkColor = { r: 255, g: 255, b: 255 };
