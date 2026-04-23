@@ -6,6 +6,47 @@
 // Object.assign を使って、WarManager に魔法をくっつけます！
 Object.assign(WarManager.prototype, {
 
+    // ★追加：援軍のメッセージを一元管理する専門の窓口（係）です！
+    // これを作っておくことで、あちこちに同じ文章を書かなくて済むようになります。
+    reinfMsgHelper: {
+        // 1. プレイヤーに援軍の要請が来た時のメッセージ
+        showRequest: (game, myClanName, targetInfoStr, gold, isBoss, isAttack, onAccept, onDecline) => {
+            const typeStr = isAttack ? "攻撃の" : "守備側の";
+            if (isBoss) {
+                const bossMsg = isAttack 
+                    ? `主家である ${myClanName} が\n${targetInfoStr}侵攻します。\n当家は従属しているため直ちに出陣します！`
+                    : `主家である ${myClanName} から${typeStr}援軍要請が届きました。\n当家は従属しているため直ちに出陣します！`;
+                game.ui.showDialog(bossMsg, false, onAccept);
+            } else {
+                game.ui.showDialog(`${myClanName} から\n${targetInfoStr}${typeStr}援軍要請が届きました。(持参金: ${gold})\n援軍を派遣しますか？`, true, onAccept, onDecline);
+            }
+        },
+        
+        // 2. 相手が援軍を断ってきた時のメッセージ
+        showRefusal: (game, nameStr, isHeavySnow, onComplete) => {
+            const reasonMsg = isHeavySnow ? "大雪のため、" : "";
+            game.ui.showDialog(`${reasonMsg}${nameStr}は援軍を拒否しました……`, false, onComplete);
+        },
+        
+        // 3. 相手が援軍を承諾してくれた時のメッセージ
+        showAcceptance: (game, nameStr, isKunishu, isDelegated, isEnemy, onComplete) => {
+            if (isEnemy) {
+                game.ui.showDialog(`${nameStr}が敵の援軍として参戦しました！`, false, onComplete);
+                return;
+            }
+            
+            if (isDelegated) {
+                game.ui.showDialog(`${nameStr}が友軍として参戦しました！`, false, onComplete);
+            } else {
+                if (isKunishu) {
+                    game.ui.showDialog(`${nameStr}が援軍として参戦しました！`, false, onComplete);
+                } else {
+                    game.ui.showDialog(`${nameStr}が援軍要請を承諾しました！`, false, onComplete);
+                }
+            }
+        }
+    },
+
     // ★攻撃側と守備側の敵対関係をセットする魔法
     applyWarHostility(atkId, atkIsKunishu, defId, defIsKunishu, isReinforcement) {
         // どちらかが諸勢力の場合、あるいは中立（0）の場合は外交関係がないので何もしません
@@ -2434,8 +2475,10 @@ Object.assign(WarManager.prototype, {
                 if (myClanId === this.game.playerClanId) {
                     const leader = this.game.getBusho(kunishu.leaderId);
                     const leaderName = leader ? leader.name : "頭領";
-                    const reasonMsg = isHeavySnow ? "大雪のため、" : "";
-                    this.game.ui.showDialog(`${reasonMsg}${kunishu.getName(this.game)}の${leaderName}は援軍を拒否しました……`, false, onComplete);
+                    const nameStr = `${kunishu.getName(this.game)}の${leaderName}`;
+                    
+                    // ★メッセージ係にお任せします！
+                    this.reinfMsgHelper.showRefusal(this.game, nameStr, isHeavySnow, onComplete);
                 } else {
                     onComplete();
                 }
@@ -2472,22 +2515,22 @@ Object.assign(WarManager.prototype, {
             if (myClanId === this.game.playerClanId) {
                 const leader = this.game.getBusho(kunishu.leaderId);
                 const leaderName = leader ? leader.name : "頭領";
+                const nameStr = `${kunishu.getName(this.game)}の${leaderName}`;
                 
-                // ★追加：委任城主（AI）が攻められた時ならメッセージを「参戦しました！」に変えます！
-                if (defCastle.isDelegated) {
-                    this.game.ui.showDialog(`${kunishu.getName(this.game)}の${leaderName}が援軍として参戦しました！`, false, onComplete);
-                } else {
-                    this.game.ui.showDialog(`${kunishu.getName(this.game)}の${leaderName}が援軍要請を承諾しました！`, false, onComplete);
-                }
+                // ★メッセージ係にお任せします！
+                this.reinfMsgHelper.showAcceptance(this.game, nameStr, true, defCastle.isDelegated, false, onComplete);
             } else {
                 const leaderName = reinfBushos.length > 0 ? reinfBushos[0].name : "頭領";
                 const atkForce = this.state.attacker;
                 const atkClanId = atkForce.isKunishu ? 0 : atkForce.ownerClan;
-                if (atkClanId === this.game.playerClanId) {
-                    this.game.ui.showDialog(`${kunishu.getName(this.game)}の${leaderName}が敵の援軍として参戦しました！`, false, onComplete);
+                const nameStr = `${kunishu.getName(this.game)}の${leaderName}`;
+                const isEnemy = (atkClanId === this.game.playerClanId);
+                
+                if (isEnemy) {
+                    this.reinfMsgHelper.showAcceptance(this.game, nameStr, true, false, true, onComplete);
                 } else {
                     this.game.ui.log(`【友軍】${defCastle.name}の要請により、${kunishu.getName(this.game)}が守備側の援軍として駆けつけました。`);
-                    this.game.ui.showDialog(`${kunishu.getName(this.game)}の${leaderName}が守備側の援軍として参戦しました！`, false, onComplete);
+                    this.reinfMsgHelper.showAcceptance(this.game, nameStr, true, false, false, onComplete);
                 }
             }
             return;
@@ -2506,13 +2549,11 @@ Object.assign(WarManager.prototype, {
             const isBoss = (myToHelperRel.status === '支配');
             const startSelection = () => this._promptPlayerDefReinforcement(helperCastle, defCastle, myToHelperRel, onComplete, isBoss);
 
-            if (isBoss) this.game.ui.showDialog(`主家である ${myClanName} から守備側の援軍要請が届きました。\n当家は従属しているため直ちに出陣します！`, false, startSelection);
-            else {
-                this.game.ui.showDialog(`${myClanName} から守備側の援軍要請が届きました。(持参金: ${gold})\n派遣しますか？`, true, startSelection, () => {
-                    this.game.diplomacyManager.updateSentiment(myClanId, helperClanId, -5);
-                    this.game.ui.showDialog(`援軍要請を断りました。`, false, onComplete);
-                });
-            }
+            // ★メッセージ係にお任せします！
+            this.reinfMsgHelper.showRequest(this.game, myClanName, "", gold, isBoss, false, startSelection, () => {
+                this.game.diplomacyManager.updateSentiment(myClanId, helperClanId, -5);
+                this.game.ui.showDialog(`援軍要請を断りました。`, false, onComplete);
+            });
             return;
         }
 
@@ -2529,8 +2570,10 @@ Object.assign(WarManager.prototype, {
             if (myClanId === this.game.playerClanId) {
                 const castellan = this.game.getBusho(helperCastle.castellanId);
                 const castellanName = castellan ? castellan.name : "城主";
-                const reasonMsg = isHeavySnow ? "大雪のため、" : "";
-                this.game.ui.showDialog(`${reasonMsg}${helperCastle.name}の${castellanName}は援軍を拒否しました……`, false, onComplete);
+                const nameStr = `${helperCastle.name}の${castellanName}`;
+                
+                // ★メッセージ係にお任せします！
+                this.reinfMsgHelper.showRefusal(this.game, nameStr, isHeavySnow, onComplete);
             } else {
                 onComplete();
             }
@@ -2589,25 +2632,26 @@ Object.assign(WarManager.prototype, {
         if (myClanId === this.game.playerClanId) {
             const castellan = this.game.getBusho(helperCastle.castellanId);
             const castellanName = castellan ? castellan.name : "城主";
+            const nameStr = `${helperCastle.name}の${castellanName}`;
             
-            // ★追加：こちらも委任城主（AI）が攻められた時ならメッセージを「参戦しました！」に変えます！
-            if (defCastle.isDelegated) {
-                this.game.ui.showDialog(`${helperCastle.name}の${castellanName}が友軍として参戦しました！`, false, onComplete);
-            } else {
-                this.game.ui.showDialog(`${helperCastle.name}の${castellanName}が援軍要請を承諾しました！`, false, onComplete);
-            }
+            // ★メッセージ係にお任せします！
+            this.reinfMsgHelper.showAcceptance(this.game, nameStr, false, defCastle.isDelegated, false, onComplete);
+            
         } else if (helperClanId === this.game.playerClanId) {
             const leaderName = reinfBushos.length > 0 ? reinfBushos[0].name : "総大将";
             this.game.ui.showDialog(`${helperClanName}の${leaderName} (${helperCastle.name}) が守備側の援軍に駆けつけました！`, false, onComplete);
         } else {
-            const atkForce = this.state.attacker;
-            const atkClanId = atkForce.isKunishu ? 0 : atkForce.ownerClan;
             const leaderName = reinfBushos.length > 0 ? reinfBushos[0].name : "総大将";
-            if (atkClanId === this.game.playerClanId) {
-                this.game.ui.showDialog(`${helperClanName}の${leaderName}が敵の援軍として参戦しました！`, false, onComplete);
+            const isEnemy = (atkId === this.game.playerClanId);
+            const nameStr = `${helperClanName}の${leaderName}`;
+            
+            if (isEnemy) {
+                // ★メッセージ係にお任せします！
+                this.reinfMsgHelper.showAcceptance(this.game, nameStr, false, false, true, onComplete);
             } else {
                 this.game.ui.log(`【友軍】${defCastle.name}の要請により、${helperClanName}が守備側の援軍として駆けつけました。`);
-                this.game.ui.showDialog(`${helperClanName}の${leaderName}が守備側の援軍として参戦しました！`, false, onComplete);
+                // ★メッセージ係にお任せします！
+                this.reinfMsgHelper.showAcceptance(this.game, nameStr, false, false, false, onComplete);
             }
         }
     },
