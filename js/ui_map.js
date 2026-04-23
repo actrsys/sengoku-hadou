@@ -1159,25 +1159,29 @@ Object.assign(UIManager.prototype, {
     },
 
     // ==========================================
-    // ★戦場となった国を点滅させる魔法です（点滅中は操作不能になります）
+    // ★戦場となった国を点滅させる魔法です（改良版）
     // ==========================================
     playProvinceBlinkAnimation(provinceId, color1Hex, color2Hex, duration) {
         return new Promise((resolve) => {
             const overlay = document.getElementById('province-overlay');
             if (!overlay) { resolve(); return; }
+
+            // 色コード(#ffffffなど)をRGBに変換する内蔵ヘルパー
+            const toRgb = (hex) => {
+                const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex || "#ffffff");
+                return result ? { r: parseInt(result[1], 16), g: parseInt(result[2], 16), b: parseInt(result[3], 16) } : { r: 255, g: 255, b: 255 };
+            };
             
-            const sourceData = DataManager.provinceImageData;
+            // 地図の画像データを確認
+            const sourceData = (typeof DataManager !== 'undefined') ? DataManager.provinceImageData : null;
             if (!sourceData) { resolve(); return; }
 
             const targetProvince = this.game.provinces.find(p => p.id === provinceId);
             if (!targetProvince) { resolve(); return; }
             
-            const targetColorRgb = DataManager.hexToRgb(targetProvince.color_code);
-            if (!targetColorRgb) { resolve(); return; }
-
-            // お互いの色を準備します（色がなければ白にします）
-            const c1 = DataManager.hexToRgb(color1Hex) || {r:255, g:255, b:255};
-            const c2 = DataManager.hexToRgb(color2Hex) || {r:255, g:255, b:255};
+            const targetColorRgb = toRgb(targetProvince.color_code);
+            const c1 = toRgb(color1Hex);
+            const c2 = toRgb(color2Hex);
 
             const ctx = overlay.getContext('2d');
             const width = overlay.width;
@@ -1198,41 +1202,44 @@ Object.assign(UIManager.prototype, {
             const outData = ctx.createImageData(width, height);
             const od = outData.data;
 
-            // 【重要】点滅が終わるまで、画面のどこも触れないようにバリアを張ります！
+            // 操作不能ガード
             const oldPointerEvents = document.body.style.pointerEvents;
             document.body.style.pointerEvents = 'none';
 
             const animate = (currentTime) => {
-                const elapsed = currentTime - startTime;
-                if (elapsed >= duration) {
+                try {
+                    const elapsed = currentTime - startTime;
+                    if (elapsed >= duration) {
+                        ctx.clearRect(0, 0, width, height);
+                        document.body.style.pointerEvents = oldPointerEvents;
+                        resolve();
+                        return;
+                    }
+
+                    const phase = (elapsed % 300) / 300;
+                    const wave = (Math.sin(phase * Math.PI * 2) + 1) / 2;
+                    const whiteLight = (Math.sin((elapsed % 150) / 150 * Math.PI * 2) + 1) / 2 * 0.5;
+
+                    const mixedR = Math.min(255, (c1.r * (1 - wave) + c2.r * wave) + (255 * whiteLight));
+                    const mixedG = Math.min(255, (c1.g * (1 - wave) + c2.g * wave) + (255 * whiteLight));
+                    const mixedB = Math.min(255, (c1.b * (1 - wave) + c2.b * wave) + (255 * whiteLight));
+
+                    for (let i = 0; i < pixelIndices.length; i++) {
+                        const idx = pixelIndices[i];
+                        od[idx] = mixedR;
+                        od[idx+1] = mixedG;
+                        od[idx+2] = mixedB;
+                        od[idx+3] = 200; 
+                    }
+
+                    ctx.putImageData(outData, 0, 0);
+                    requestAnimationFrame(animate);
+                } catch (e) {
+                    // もしアニメーション中にエラーが起きても、必ずガードを解く
                     ctx.clearRect(0, 0, width, height);
-                    // バリアを解除します
                     document.body.style.pointerEvents = oldPointerEvents;
                     resolve();
-                    return;
                 }
-
-                // 0.3秒ごとに色が交互に変わるように計算します
-                const phase = (elapsed % 300) / 300;
-                const wave = (Math.sin(phase * Math.PI * 2) + 1) / 2;
-                
-                // 光の輝き（白っぽさ）を足します
-                const whiteLight = (Math.sin((elapsed % 150) / 150 * Math.PI * 2) + 1) / 2 * 0.5;
-
-                const mixedR = Math.min(255, (c1.r * (1 - wave) + c2.r * wave) + (255 * whiteLight));
-                const mixedG = Math.min(255, (c1.g * (1 - wave) + c2.g * wave) + (255 * whiteLight));
-                const mixedB = Math.min(255, (c1.b * (1 - wave) + c2.b * wave) + (255 * whiteLight));
-
-                for (let i = 0; i < pixelIndices.length; i++) {
-                    const idx = pixelIndices[i];
-                    od[idx] = mixedR;
-                    od[idx+1] = mixedG;
-                    od[idx+2] = mixedB;
-                    od[idx+3] = 200; 
-                }
-
-                ctx.putImageData(outData, 0, 0);
-                requestAnimationFrame(animate);
             };
 
             requestAnimationFrame(animate);
