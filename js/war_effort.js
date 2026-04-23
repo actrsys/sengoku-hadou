@@ -166,8 +166,8 @@ Object.assign(WarManager.prototype, {
     async startWar(atkCastle, defCastle, atkBushos, atkSoldierCount, atkRice, atkHorses = 0, atkGuns = 0, reinforcementData = null, selfReinforcementData = null) {
         this.state = this.state || {};
         this.state.active = true;
-        
-        // ★追加：戦争が始まったら、終わるまで「思考中...」の膜を隠し続ける魔法！
+
+        // ★追加：戦争が始まったら、終わるまで「思考中...」を隠し続けます
         if (this.game.ui) {
             this.game.ui.hideAIGuardTemporarily();
         }
@@ -901,6 +901,11 @@ Object.assign(WarManager.prototype, {
                     window.AudioManager.restoreMemorizedBgm();
                 }
                 // ★追加ここまで
+
+                // ★追加：勝敗メッセージが閉じたこのタイミングで「思考中...」を再表示します！
+                if (this.game.ui) {
+                    this.game.ui.restoreAIGuard();
+                }
                 
                 const winnerClan = s.attacker.ownerClan; // 勝ったのは攻撃側です
                 
@@ -1983,8 +1988,8 @@ Object.assign(WarManager.prototype, {
             this.game.ui.updatePanelHeader();
             this.game.ui.renderCommandMenu(); 
         }
-        
-        // ★追加：戦争が終わったので、隠していた「思考中...」の膜を元に戻す魔法！
+
+        // ★追加：勝敗メッセージが閉じたこのタイミングで「思考中...」を再表示します！
         if (this.game.ui) {
             this.game.ui.restoreAIGuard();
         }
