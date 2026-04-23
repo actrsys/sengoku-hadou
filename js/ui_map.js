@@ -1164,12 +1164,6 @@ Object.assign(UIManager.prototype, {
     updateSnowOverlay() {
         const overlay = document.getElementById('snow-overlay');
         if (!overlay) return;
-        const ctx = overlay.getContext('2d');
-        const width = overlay.width;
-        const height = overlay.height;
-        
-        // まずは前の雪を全部消して綺麗にします
-        ctx.clearRect(0, 0, width, height);
 
         // DataManagerにこっそりしまっておいた画像データ（裏側の秘密マップ）をもらいます
         const sourceData = DataManager.provinceImageData;
@@ -1190,12 +1184,38 @@ Object.assign(UIManager.prototype, {
             return;
         }
 
+        // ★ここから記憶の魔法！
+        // 全部の国の大雪状態を「0（降ってない）」「1（降ってる）」という文字にして繋げます
+        const currentSnowHash = this.game.provinces.map(p => p.statusEffects && p.statusEffects.includes('heavySnow') ? '1' : '0').join('');
+        
+        // もし前回の状態と全く同じで、しかも記憶した絵（写真）が残っていれば…
+        if (this.lastSnowHash === currentSnowHash && this.lastSnowImageData && this.lastSnowImageData.width === overlay.width) {
+            // 新しく計算せずに、記憶しておいた写真をそのまま画用紙に貼り付けて終わります！（超軽量化！）
+            const ctx = overlay.getContext('2d');
+            ctx.putImageData(this.lastSnowImageData, 0, 0);
+            return;
+        }
+        // 今の状態を「前回」として記憶しておきます
+        this.lastSnowHash = currentSnowHash;
+        // ★記憶の魔法ここまで！
+
+        const ctx = overlay.getContext('2d');
+        const width = overlay.width;
+        const height = overlay.height;
+        
+        // まずは前の雪を全部消して綺麗にします
+        ctx.clearRect(0, 0, width, height);
+
         // 「heavySnow（大雪）」のシールが貼られている国の色コードを全部集めます
         const targetColors = this.game.provinces
             .filter(p => p.statusEffects && p.statusEffects.includes('heavySnow'))
             .map(p => DataManager.hexToRgb(p.color_code));
 
-        if (targetColors.length === 0) return;
+        if (targetColors.length === 0) {
+            // ★雪が全く無い場合も「透明な絵」として記憶しておきます
+            this.lastSnowImageData = ctx.getImageData(0, 0, width, height);
+            return;
+        }
 
         // 新しく雪を降らせるための透明な絵の具セットを作ります
         const outputData = ctx.createImageData(width, height);
@@ -1239,6 +1259,9 @@ Object.assign(UIManager.prototype, {
         
         // 完成した雪の絵の具を、画用紙にドーンと乗せます！
         ctx.putImageData(outputData, 0, 0);
+        
+        // ★ここで描いた雪の絵（写真）を丸ごと記憶します！
+        this.lastSnowImageData = outputData;
     },
 
     // ==========================================
@@ -1247,10 +1270,6 @@ Object.assign(UIManager.prototype, {
     updateClanColors() {
         const overlay = document.getElementById('clan-color-overlay');
         if (!overlay) return;
-        const ctx = overlay.getContext('2d');
-        const width = overlay.width;
-        const height = overlay.height;
-        ctx.clearRect(0, 0, width, height);
 
         if (this.game.phase === 'daimyo_select') return;
 
@@ -1269,6 +1288,26 @@ Object.assign(UIManager.prototype, {
             };
             return;
         }
+
+        // ★ここから記憶の魔法！
+        // お城の持ち主の「出席番号」を全員分繋げた文字の暗号を作ります（例：1,1,2,0,3...）
+        const currentOwnerHash = this.game.castles.map(c => c.ownerClan).join(',');
+        
+        // もし前回の状態と全く同じで、しかも記憶した絵（写真）が残っていれば…
+        if (this.lastClanColorsHash === currentOwnerHash && this.lastClanColorsImageData && this.lastClanColorsImageData.width === overlay.width) {
+            // 新しく計算せずに、記憶しておいた写真をそのまま画用紙に貼り付けて終わります！（超軽量化！）
+            const ctx = overlay.getContext('2d');
+            ctx.putImageData(this.lastClanColorsImageData, 0, 0);
+            return;
+        }
+        // 今の状態を「前回」として記憶しておきます
+        this.lastClanColorsHash = currentOwnerHash;
+        // ★記憶の魔法ここまで！
+
+        const ctx = overlay.getContext('2d');
+        const width = overlay.width;
+        const height = overlay.height;
+        ctx.clearRect(0, 0, width, height);
 
         // 1. 国の色とデータを紐付けます（文字列ではなく数字に変換して超高速化！）
         const colorToProvince = new Map();
@@ -1303,7 +1342,7 @@ Object.assign(UIManager.prototype, {
         const outputData = ctx.createImageData(width, height);
         const sd = sourceData.data;
 
-        // ★今回追加：超高速な「陣取りゲーム（幅優先探索）」の準備です！
+        // ★ここから陣取りゲーム（幅優先探索）の準備です！
         const pixelSize = width * height;
         const pixelClanMap = new Int32Array(pixelSize);
         const provinceMap = new Int32Array(pixelSize);
@@ -1434,5 +1473,8 @@ Object.assign(UIManager.prototype, {
         }
 
         ctx.putImageData(outputData, 0, 0);
+        
+        // ★ここで描いた勢力の色（写真）を丸ごと記憶します！
+        this.lastClanColorsImageData = outputData;
     }
 });
