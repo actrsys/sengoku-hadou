@@ -282,6 +282,9 @@ Object.assign(WarManager.prototype, {
                 // ★修正：諸勢力に対する鎮圧や反乱の時も、開始メッセージをしっかり出して結果を知らせます！
                 await this.game.ui.showDialogAsync(startMsg);
 
+                // ★追加：メッセージを閉じた後からバリアを張ります！
+                if (typeof this.game.ui.showMapGuard === 'function') this.game.ui.showMapGuard();
+
                 // ★ここから追加：メッセージを閉じた後、戦場となるお城にスクロールして点滅させます！
                 const realDefCastle = this.game.getCastle(defCastle.id);
                 this.game.ui.scrollToActiveCastle(realDefCastle, false);
@@ -300,7 +303,9 @@ Object.assign(WarManager.prototype, {
                 
                 // ★１秒間点滅させます
                 await this.game.ui.playBattleBlink(defCastle.id, atkColor, defColor, 1000);
-                // ★追加ここまで
+                
+                // ★追加：点滅が終わったらバリアを外します！
+                if (typeof this.game.ui.hideMapGuard === 'function') this.game.ui.hideMapGuard();
 
             } else {
                 if (defCastle.isKunishu) {
@@ -807,7 +812,12 @@ Object.assign(WarManager.prototype, {
                     }
                 });
             }
-        } catch(e) { console.error("StartWar Error:", e); this.state.active = false; this.game.finishTurn(); }
+        } catch(e) { 
+            console.error("StartWar Error:", e); 
+            if (typeof this.game.ui.hideMapGuard === 'function') this.game.ui.hideMapGuard(true); 
+            this.state.active = false; 
+            this.game.finishTurn(); 
+        }
     },
     
     // ★ここから追加：援軍が途中で「もう無理～！」と撤退する時の魔法！
@@ -903,6 +913,9 @@ Object.assign(WarManager.prototype, {
         // ★ここを書き足します：既に「終わったよ」の処理中なら、2回目は無視するストッパーです！
         if (!this.state.active) return;
 
+        // ★追加：合戦終了の演出中に触られないようにバリアを張ります！
+        if (typeof this.game.ui.showMapGuard === 'function') this.game.ui.showMapGuard();
+
         try {
             const s = this.state; s.active = false;
             
@@ -963,11 +976,13 @@ Object.assign(WarManager.prototype, {
             // ★変更：順番待ちができるように async を付けます
             const finishWarProcess = async () => {
                 
+                // ★追加：演出が終わったのでバリアを解除します！
+                if (typeof this.game.ui.hideMapGuard === 'function') this.game.ui.hideMapGuard(true);
+
                 // ★ここから追加：合戦結果の画面を閉じたら、平時のBGMに戻す！
                 if (window.AudioManager && s.isPlayerInvolved) {
                     window.AudioManager.restoreMemorizedBgm();
                 }
-                // ★追加ここまで
 
                 const aiGuardEl = document.getElementById('ai-guard');
                 if (aiGuardEl) {
@@ -1706,12 +1721,13 @@ Object.assign(WarManager.prototype, {
             }
         } catch (e) {
             console.error("EndWar Error: ", e);
+            if (typeof this.game.ui.hideMapGuard === 'function') this.game.ui.hideMapGuard(true);
             if (this.state.isPlayerInvolved) this.game.ui.showResultModal("合戦処理中にエラーが発生しましたが、\nゲームを継続します。", () => { this.game.finishTurn(); });
             else this.game.finishTurn();
         }
     },
     
-    processCaptures(defeatedCastle, winnerClanId) { 
+    processCaptures(defeatedCastle, winnerClanId) {
         const losers = this.game.getCastleBushos(defeatedCastle.id); const captives = []; const escapees = [];
         const friendlyCastles = this.game.castles.filter(c => c.ownerClan === defeatedCastle.ownerClan && c.id !== defeatedCastle.id);
         const isLastStand = friendlyCastles.length === 0;
@@ -2059,6 +2075,9 @@ Object.assign(WarManager.prototype, {
 
     
     closeWar() { 
+        // ★念のためバリアを強制解除します！
+        if (typeof this.game.ui.hideMapGuard === 'function') this.game.ui.hideMapGuard(true);
+
         const aiGuardEl = document.getElementById('ai-guard');
         if (aiGuardEl) {
             aiGuardEl.style.display = '';

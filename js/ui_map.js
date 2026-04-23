@@ -1581,25 +1581,48 @@ Object.assign(UIManager.prototype, {
     },
 
     // ==========================================
+    // ★追加：マップを操作できなくする透明なバリアを張る/消す魔法！
+    // ==========================================
+    showMapGuard() {
+        this.mapGuardCount = (this.mapGuardCount || 0) + 1;
+        let guard = document.getElementById('battle-blink-guard');
+        if (!guard) {
+            guard = document.createElement('div');
+            guard.id = 'battle-blink-guard';
+            guard.style.position = 'fixed';
+            guard.style.top = '0';
+            guard.style.left = '0';
+            guard.style.width = '100vw';
+            guard.style.height = '100vh';
+            guard.style.zIndex = '9999';
+            guard.style.pointerEvents = 'all'; // ここに触れるようにして後ろをガードします
+            document.body.appendChild(guard);
+        }
+        guard.style.display = 'block';
+    },
+
+    hideMapGuard(force = false) {
+        if (force) {
+            this.mapGuardCount = 0;
+        } else {
+            this.mapGuardCount = Math.max(0, (this.mapGuardCount || 0) - 1);
+        }
+        
+        if (this.mapGuardCount === 0) {
+            let guard = document.getElementById('battle-blink-guard');
+            if (guard) {
+                guard.style.display = 'none';
+            }
+        }
+    },
+
+    // ==========================================
     // ★追加：指定したお城の領地だけをチカチカ点滅させる魔法です！
     // ==========================================
     playBattleBlink(castleId, colorA, colorB, durationMs) {
         return new Promise(resolve => {
-            // タッチ防止の透明な壁を作ります
-            let guard = document.getElementById('battle-blink-guard');
-            if (!guard) {
-                guard = document.createElement('div');
-                guard.id = 'battle-blink-guard';
-                guard.style.position = 'fixed';
-                guard.style.top = '0';
-                guard.style.left = '0';
-                guard.style.width = '100vw';
-                guard.style.height = '100vh';
-                guard.style.zIndex = '9999';
-                guard.style.pointerEvents = 'all'; // ここに触れるようにして後ろをガードします
-                document.body.appendChild(guard);
-            }
-            guard.style.display = 'block';
+            // タッチ防止の透明な壁を作ります（共通の魔法を使います）
+            this.showMapGuard();
 
             // 点滅を描くための新しい透明な画用紙を作ります
             let overlay = document.getElementById('battle-blink-overlay');
@@ -1682,7 +1705,7 @@ Object.assign(UIManager.prototype, {
             const animate = (currentTime) => {
                 if (currentTime - startTime > durationMs) {
                     ctx.clearRect(0, 0, width, height);
-                    guard.style.display = 'none';
+                    this.hideMapGuard(); // 共通の魔法で壁を消します
                     resolve();
                     return;
                 }
@@ -1707,21 +1730,8 @@ Object.assign(UIManager.prototype, {
     // ==========================================
     playCaptureEffect(castleId, onHalfway) {
         return new Promise(resolve => {
-            // アニメーション中に画面を触れないようにバリアを張ります
-            let guard = document.getElementById('battle-blink-guard');
-            if (!guard) {
-                guard = document.createElement('div');
-                guard.id = 'battle-blink-guard';
-                guard.style.position = 'fixed';
-                guard.style.top = '0';
-                guard.style.left = '0';
-                guard.style.width = '100vw';
-                guard.style.height = '100vh';
-                guard.style.zIndex = '9999';
-                guard.style.pointerEvents = 'all';
-                document.body.appendChild(guard);
-            }
-            guard.style.display = 'block';
+            // アニメーション中に画面を触れないようにバリアを張ります（共通の魔法を使います）
+            this.showMapGuard();
 
             // エフェクトを描くための「専用の透明な画用紙」を用意します
             let overlay = document.getElementById('capture-effect-overlay');
@@ -1813,7 +1823,7 @@ Object.assign(UIManager.prototype, {
                     requestAnimationFrame(animate);
                 } else {
                     ctx.clearRect(0, 0, width, height);
-                    guard.style.display = 'none'; // 終わったらバリアを消します
+                    this.hideMapGuard(); // 終わったらバリアを消します
                     resolve();
                 }
             };
