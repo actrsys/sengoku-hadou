@@ -542,8 +542,22 @@ Object.assign(UIManager.prototype, {
 
         const mapW = this.game.mapWidth || 1200;
         const mapH = this.game.mapHeight || 800;
+        
+        // ==========================================
+        // ★今回追加：勢力の色で国を塗るための画用紙を敷きます！
+        // ==========================================
+        const clanColorOverlay = document.createElement('canvas');
+        clanColorOverlay.id = 'clan-color-overlay';
+        clanColorOverlay.width = mapW;
+        clanColorOverlay.height = mapH;
+        clanColorOverlay.style.position = 'absolute';
+        clanColorOverlay.style.left = '0px';
+        clanColorOverlay.style.top = '0px';
+        clanColorOverlay.style.pointerEvents = 'none'; 
+        clanColorOverlay.style.zIndex = '2'; // province-overlay(3)より下、マップ画像より上に敷きます
+        this.mapEl.appendChild(clanColorOverlay);
 
-        // ★ここから追加！：地方を光らせるための「透明な画用紙（キャンバス）」を敷いておきます！
+        // 地方を光らせるための「透明な画用紙（キャンバス）」を敷いておきます！
         const overlay = document.createElement('canvas');
         overlay.id = 'province-overlay';
         overlay.width = mapW;
@@ -555,8 +569,7 @@ Object.assign(UIManager.prototype, {
         overlay.style.zIndex = '3'; // お城の線より下、マップ画像より上に敷きます
         overlay.classList.add('anim-map-glow'); // ぼわーっと光るアニメーションの準備
         this.mapEl.appendChild(overlay);
-        // ★追加ここまで！
-
+        
         // ==========================================
         // ★今回追加：大雪を表現するための水玉キャンバスを敷きます！
         // ==========================================
@@ -827,6 +840,7 @@ Object.assign(UIManager.prototype, {
         
         this.updateCastleGlows();
         this.updateSnowOverlay(); // ★大雪の表示を更新します！
+        this.updateClanColors(); // ★勢力の色で地図を塗る魔法を実行します！
 
         // ==========================================
         // ★大名選択モードの見た目とボタンを切り替える魔法です！
@@ -1219,10 +1233,142 @@ Object.assign(UIManager.prototype, {
                 }
             }
         }
-
+        
         // 完成した雪の絵の具を、画用紙にドーンと乗せます！
+        ctx.putImageData(outputData, 0, 0);
+    },
+
+    // ==========================================
+    // ★新魔法：国を勢力の色で塗りつぶす魔法です！
+    // ==========================================
+    updateClanColors() {
+        const overlay = document.getElementById('clan-color-overlay');
+        if (!overlay) return;
+        const ctx = overlay.getContext('2d');
+        const width = overlay.width;
+        const height = overlay.height;
+        
+        // まずは前の色を全部消して綺麗にします
+        ctx.clearRect(0, 0, width, height);
+
+        // 大名選択画面では色を塗りません
+        if (this.game.phase === 'daimyo_select') return;
+
+        // 裏側の秘密マップ（国ごとの色分け画像）をもらいます
+        const sourceData = DataManager.provinceImageData;
+        
+        // 画像データが無い場合は、読み込んでからやり直します
+        if (!sourceData) {
+            const provMapImg = new Image();
+            provMapImg.src = './data/images/map/japan_provinces.png';
+            provMapImg.onload = () => {
+                const tempCanvas = document.createElement('canvas');
+                tempCanvas.width = provMapImg.naturalWidth;
+                tempCanvas.height = provMapImg.naturalHeight;
+                const tempCtx = tempCanvas.getContext('2d');
+                tempCtx.drawImage(provMapImg, 0, 0);
+                DataManager.provinceImageData = tempCtx.getImageData(0, 0, tempCanvas.width, tempCanvas.height);
+                this.updateClanColors();
+            };
+            return;
+        }
+
+        // 1. 下準備：「画像の色」から「どの国か」をすぐ探せる辞書を作ります
+        const colorToProvince = new Map();
+        this.game.provinces.forEach(p => {
+            const rgb = DataManager.hexToRgb(p.color_code);
+            if (rgb) {
+                // "255,0,0" のような文字列を鍵にして、国のデータをしまいます
+                colorToProvince.set(`${rgb.r},${rgb.g},${rgb.b}`, p);
+            }
+        });
+
+        // 2. 下準備：「国」ごとに、そこにある「お城のリスト」をまとめます
+        const provinceCastles = new Map();
+        this.game.castles.forEach(c => {
+            if (!provinceCastles.has(c.provinceId)) {
+                provinceCastles.set(c.provinceId, []);
+            }
+            provinceCastles.get(c.provinceId).push(c);
+        });
+
+        // 3. 下準備：「勢力ID」から「RGBの色」をすぐ探せる辞書を作ります
+        const clanColors = new Map();
+        this.game.clans.forEach(clan => {
+            if (clan.id !== 0 && clan.color) {
+                clanColors.set(clan.id, DataManager.hexToRgb(clan.color));
+            }
+        });
+
+        // 新しく色を塗るための透明な絵の具セットを作ります
+        const outputData = ctx.createImageData(width, height);
+
+        // 画像の「点（ピクセル）」を1個ずつ調べていきます！
+        for (let i = 0; i < sourceData.data.length; i += 4) {
+            const r = sourceData.data[i];
+            const g = sourceData.data[i+1];
+            const b = sourceData.data[i+2];
+            const a = sourceData.data[i+3];
+
+            if (a === 0) continue; // 透明な海などは無視します
+
+            // このピクセルがどの国か調べます
+            const province = colorToProvince.get(`${r},${g},${b}`);
+            if (!province) continue;
+
+            const castlesInProv = provinceCastles.get(province.id);
+            if (!castlesInProv || castlesInProv.length === 0) continue; // お城がない国は塗りません
+
+            let targetClanId = 0;
+
+            // 国の中のお城が全て同じ勢力か調べます
+            const firstClan = castlesInProv[0].ownerClan;
+            const isFullyOwned = castlesInProv.every(c => c.ownerClan === firstClan);
+
+            if (isFullyOwned) {
+                // 完全支配なら、その勢力の色にします
+                targetClanId = firstClan;
+            } else {
+                // 完全に支配していない場合は、一番近いお城を探します（ボロノイ図の魔法）
+                const pixelIndex = i / 4;
+                const px = pixelIndex % width;
+                const py = Math.floor(pixelIndex / width);
+
+                let minDistSq = Infinity;
+                let nearestCastle = null;
+
+                for (let c of castlesInProv) {
+                    const cx = c.pixelX !== undefined ? c.pixelX : (c.x * 80 + 40);
+                    const cy = c.pixelY !== undefined ? c.pixelY : (c.y * 80 + 40);
+                    const dx = px - cx;
+                    const dy = py - cy;
+                    const distSq = dx * dx + dy * dy;
+
+                    if (distSq < minDistSq) {
+                        minDistSq = distSq;
+                        nearestCastle = c;
+                    }
+                }
+                
+                if (nearestCastle) {
+                    targetClanId = nearestCastle.ownerClan;
+                }
+            }
+
+            // 選ばれた勢力の色で塗ります（中立の場合は塗りません）
+            if (targetClanId !== 0) {
+                const clanRgb = clanColors.get(targetClanId);
+                if (clanRgb) {
+                    outputData.data[i] = clanRgb.r;
+                    outputData.data[i+1] = clanRgb.g;
+                    outputData.data[i+2] = clanRgb.b;
+                    outputData.data[i+3] = 100; // 半透明にして下の地図が見えるようにします（255がMAX）
+                }
+            }
+        }
+
+        // 完成した絵の具を、画用紙にドーンと乗せます！
         ctx.putImageData(outputData, 0, 0);
     }
     // ==========================================
-    // ★追加ここまで！
-}); // 合体魔法はここで終わり
+});
