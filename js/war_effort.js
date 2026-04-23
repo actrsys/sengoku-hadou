@@ -286,10 +286,18 @@ Object.assign(WarManager.prototype, {
                 const requesterName = atkBushos[0].name;
                 const reinfCastleName = selfReinforcementData.castle.name;
                 
+                let targetInfoStr = "";
+                if (defCastle.isKunishu) {
+                    const provName = defProvData ? defProvData.province : "不明な国";
+                    targetInfoStr = `${provName}の${defCastle.name}の攻略のため、\n`;
+                } else {
+                    targetInfoStr = `${defDaimyoName}の${defCastle.name}の攻略のため、\n`;
+                }
+                
                 this.game.ui.hideAIGuardTemporarily();
                 
                 const isConfirmed = await new Promise((resolve) => {
-                    this.game.ui.showDialog(`${requesterName}殿が${reinfCastleName}に参戦を求めています。\n援軍を送りますか？`, true, 
+                    this.game.ui.showDialog(`${requesterName}殿が${targetInfoStr}${reinfCastleName}に参戦を求めています。\n援軍を送りますか？`, true, 
                         () => resolve(true), 
                         () => resolve(false)
                     );
