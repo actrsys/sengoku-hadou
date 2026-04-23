@@ -3671,7 +3671,7 @@ class UIInfoManager {
                 const text = typeof log === 'string' ? log : (log.text || "");
                 return {
                     onClick: null,
-                    cells: [`<div style="text-align: left; width: 100%; box-sizing: border-box; padding-left: 10px;">${text}</div>`],
+                    cells: [text],
                     itemClass: "history-list-item"
                 };
             });
