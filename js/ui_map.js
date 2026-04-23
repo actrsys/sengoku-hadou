@@ -1354,35 +1354,43 @@ Object.assign(UIManager.prototype, {
                 provinceMap[i / 4] = province.id;
             }
         }
-
+        
         // ② 複数の勢力がいる国は、お城から陣取りゲームをスタートするための準備をします
         const queueX = new Int32Array(pixelSize);
         const queueY = new Int32Array(pixelSize);
         const queueClan = new Int32Array(pixelSize);
+        const queueCastleId = new Int32Array(pixelSize); // ★追加：城のIDも一緒に並ばせます
         let head = 0;
         let tail = 0;
         
         const distanceMap = new Int32Array(pixelSize);
         distanceMap.fill(999999);
 
+        // ★追加：各ピクセルが「どの城の領地か」を記録する新しい箱を用意します！
+        if (!this.pixelCastleMap || this.pixelCastleMap.length !== pixelSize) {
+            this.pixelCastleMap = new Int32Array(pixelSize);
+        }
+        this.pixelCastleMap.fill(0);
+
         provinceInfo.forEach((info, provId) => {
-            if (info.owner === -1) {
-                info.castles.forEach(c => {
-                    const cx = Math.floor(c.pixelX !== undefined ? c.pixelX : (c.x * 80 + 40));
-                    const cy = Math.floor(c.pixelY !== undefined ? c.pixelY : (c.y * 80 + 40));
+            // ★変更：１つの勢力しかいない国でも、どの城の領土かを記録するために全城から陣取りさせます！
+            info.castles.forEach(c => {
+                const cx = Math.floor(c.pixelX !== undefined ? c.pixelX : (c.x * 80 + 40));
+                const cy = Math.floor(c.pixelY !== undefined ? c.pixelY : (c.y * 80 + 40));
+                
+                if (cx >= 0 && cx < width && cy >= 0 && cy < height) {
+                    const idx = cy * width + cx;
+                    queueX[tail] = cx;
+                    queueY[tail] = cy;
+                    queueClan[tail] = c.ownerClan;
+                    queueCastleId[tail] = c.id; // ★城ID
+                    tail++;
                     
-                    if (cx >= 0 && cx < width && cy >= 0 && cy < height) {
-                        const idx = cy * width + cx;
-                        queueX[tail] = cx;
-                        queueY[tail] = cy;
-                        queueClan[tail] = c.ownerClan;
-                        tail++;
-                        
-                        pixelClanMap[idx] = c.ownerClan;
-                        distanceMap[idx] = 0;
-                    }
-                });
-            }
+                    pixelClanMap[idx] = c.ownerClan;
+                    this.pixelCastleMap[idx] = c.id; // ★城ID
+                    distanceMap[idx] = 0;
+                }
+            });
         });
 
         // ③ 水が広がるように、同じ国の中だけを陣取りしていきます
@@ -1393,6 +1401,7 @@ Object.assign(UIManager.prototype, {
             const x = queueX[head];
             const y = queueY[head];
             const clanId = queueClan[head];
+            const qCastleId = queueCastleId[head]; // ★追加
             head++;
             
             const currIdx = y * width + x;
@@ -1411,10 +1420,12 @@ Object.assign(UIManager.prototype, {
                         if (distanceMap[nIdx] > currDist + 1) {
                             distanceMap[nIdx] = currDist + 1;
                             pixelClanMap[nIdx] = clanId;
+                            this.pixelCastleMap[nIdx] = qCastleId; // ★追加
                             
                             queueX[tail] = nx;
                             queueY[tail] = ny;
                             queueClan[tail] = clanId;
+                            queueCastleId[tail] = qCastleId; // ★追加
                             tail++;
                         }
                     }
@@ -1431,30 +1442,32 @@ Object.assign(UIManager.prototype, {
             if (provId === 0) continue;
 
             const info = provinceInfo.get(provId);
-            let targetClanId = 0;
+            let targetClanId = pixelClanMap[pxIdx]; // ★変更
+            let targetCastleId = this.pixelCastleMap[pxIdx]; // ★追加
 
-            if (info.owner !== -1) {
-                targetClanId = info.owner;
-            } else {
-                targetClanId = pixelClanMap[pxIdx];
-                
-                // もし海を隔てた「飛び地」などでお城から陣取りが届かなかった場所は、今まで通り直線距離で塗ります
-                if (targetClanId === 0) {
-                    const px = pxIdx % width;
-                    const py = Math.floor(pxIdx / width);
-                    let minDistSq = Infinity;
-                    for (let j = 0; j < info.castles.length; j++) {
-                        const c = info.castles[j];
-                        const cx = c.pixelX !== undefined ? c.pixelX : (c.x * 80 + 40);
-                        const cy = c.pixelY !== undefined ? c.pixelY : (c.y * 80 + 40);
-                        // 計算を軽くするため、二乗の記号（**2）ではなく掛け算を使います
-                        const dSq = (px - cx) * (px - cx) + (py - cy) * (py - cy);
-                        if (dSq < minDistSq) {
-                            minDistSq = dSq;
-                            targetClanId = c.ownerClan;
-                        }
+            // もし海を隔てた「飛び地」などでお城から陣取りが届かなかった場所は、今まで通り直線距離で塗ります
+            if (targetClanId === 0 && info.castles.length > 0) {
+                const px = pxIdx % width;
+                const py = Math.floor(pxIdx / width);
+                let minDistSq = Infinity;
+                for (let j = 0; j < info.castles.length; j++) {
+                    const c = info.castles[j];
+                    const cx = c.pixelX !== undefined ? c.pixelX : (c.x * 80 + 40);
+                    const cy = c.pixelY !== undefined ? c.pixelY : (c.y * 80 + 40);
+                    // 計算を軽くするため、二乗の記号（**2）ではなく掛け算を使います
+                    const dSq = (px - cx) * (px - cx) + (py - cy) * (py - cy);
+                    if (dSq < minDistSq) {
+                        minDistSq = dSq;
+                        targetClanId = c.ownerClan;
+                        targetCastleId = c.id; // ★追加
                     }
                 }
+                this.pixelCastleMap[pxIdx] = targetCastleId; // ★追加
+            }
+
+            // info.owner !== -1（全城が同じ勢力）の場合は念のため上書き
+            if (info.owner !== -1) {
+                targetClanId = info.owner;
             }
 
             const clanRgb = (targetClanId !== 0) ? clanColors.get(targetClanId) : null;
@@ -1474,5 +1487,96 @@ Object.assign(UIManager.prototype, {
         
         // ★ここで描いた勢力の色（写真）を丸ごと記憶します！
         this.lastClanColorsImageData = outputData;
+    },
+
+    // ==========================================
+    // ★追加：指定したお城の領地だけをチカチカ点滅させる魔法です！
+    // ==========================================
+    playBattleBlink(castleId, colorA, colorB, durationMs) {
+        return new Promise(resolve => {
+            // タッチ防止の透明な壁を作ります
+            let guard = document.getElementById('battle-blink-guard');
+            if (!guard) {
+                guard = document.createElement('div');
+                guard.id = 'battle-blink-guard';
+                guard.style.position = 'fixed';
+                guard.style.top = '0';
+                guard.style.left = '0';
+                guard.style.width = '100vw';
+                guard.style.height = '100vh';
+                guard.style.zIndex = '9999';
+                guard.style.pointerEvents = 'all'; // ここに触れるようにして後ろをガードします
+                document.body.appendChild(guard);
+            }
+            guard.style.display = 'block';
+
+            // 点滅を描くための新しい透明な画用紙を作ります
+            let overlay = document.getElementById('battle-blink-overlay');
+            if (!overlay) {
+                overlay = document.createElement('canvas');
+                overlay.id = 'battle-blink-overlay';
+                overlay.width = this.game.mapWidth || 1200;
+                overlay.height = this.game.mapHeight || 800;
+                overlay.style.position = 'absolute';
+                overlay.style.left = '0px';
+                overlay.style.top = '0px';
+                overlay.style.pointerEvents = 'none';
+                overlay.style.zIndex = '6'; // 勢力色の画用紙より少し上に置きます
+                this.mapEl.appendChild(overlay);
+            }
+            
+            const ctx = overlay.getContext('2d');
+            const width = overlay.width;
+            const height = overlay.height;
+            const outputDataA = ctx.createImageData(width, height);
+            const outputDataB = ctx.createImageData(width, height);
+            
+            // ピクセルマップから、そのお城の領地だけを抜き出して色を塗ります
+            if (this.pixelCastleMap) {
+                for (let i = 0; i < this.pixelCastleMap.length; i++) {
+                    if (this.pixelCastleMap[i] === castleId) {
+                        const idx = i * 4;
+                        // 1色目
+                        outputDataA.data[idx] = colorA.r;
+                        outputDataA.data[idx+1] = colorA.g;
+                        outputDataA.data[idx+2] = colorA.b;
+                        outputDataA.data[idx+3] = 200; // 少し濃い目にします
+                        
+                        // 2色目
+                        outputDataB.data[idx] = colorB.r;
+                        outputDataB.data[idx+1] = colorB.g;
+                        outputDataB.data[idx+2] = colorB.b;
+                        outputDataB.data[idx+3] = 200; 
+                    }
+                }
+            }
+            
+            let startTime = performance.now();
+            let isA = true;
+            const blinkInterval = 250; // 0.25秒ごとに色を切り替えます（チカチカ早すぎないように）
+            let lastSwitchTime = startTime;
+
+            // アニメーションを動かす魔法です
+            const animate = (currentTime) => {
+                if (currentTime - startTime > durationMs) {
+                    ctx.clearRect(0, 0, width, height);
+                    guard.style.display = 'none';
+                    resolve();
+                    return;
+                }
+                
+                if (currentTime - lastSwitchTime > blinkInterval) {
+                    isA = !isA;
+                    lastSwitchTime = currentTime;
+                    ctx.clearRect(0, 0, width, height);
+                    ctx.putImageData(isA ? outputDataA : outputDataB, 0, 0);
+                }
+                
+                requestAnimationFrame(animate);
+            };
+            
+            ctx.putImageData(outputDataA, 0, 0);
+            requestAnimationFrame(animate);
+        });
     }
 });

@@ -235,6 +235,26 @@ Object.assign(WarManager.prototype, {
 
                 // ★修正：諸勢力に対する鎮圧や反乱の時も、開始メッセージをしっかり出して結果を知らせます！
                 await this.game.ui.showDialogAsync(startMsg);
+
+                // ★ここから追加：メッセージを閉じた後、戦場となるお城にスクロールして点滅させます！
+                this.game.ui.scrollToActiveCastle(defCastle, false);
+                await new Promise(res => setTimeout(res, 600)); // スクロール完了を少し待ちます
+                
+                let atkColor = { r: 255, g: 255, b: 255 };
+                if (!atkCastle.isKunishu && atkClan !== 0) {
+                    const clanData = this.game.clans.find(c => c.id === atkClan);
+                    if (clanData && clanData.color) atkColor = DataManager.hexToRgb(clanData.color);
+                }
+                let defColor = { r: 255, g: 255, b: 255 };
+                if (!defCastle.isKunishu && defClan !== 0) {
+                    const clanData = this.game.clans.find(c => c.id === defClan);
+                    if (clanData && clanData.color) defColor = DataManager.hexToRgb(clanData.color);
+                }
+                
+                // ★１秒間点滅させます
+                await this.game.ui.playBattleBlink(defCastle.id, atkColor, defColor, 1000);
+                // ★追加ここまで
+
             } else {
                 if (defCastle.isKunishu) {
                     await this.game.ui.showCutin(`${atkArmyName}の${atkBushos[0].name}が\n${defCastle.name}の鎮圧に乗り出しました！`);
@@ -836,6 +856,22 @@ Object.assign(WarManager.prototype, {
             // ★修正：諸勢力の戦いの時は専用のメッセージがあるので、ここではお休みします！
             // ★追加：イベントによる決着の時も、専用のメッセージが出るためお休みします！
             if (!s.isPlayerInvolved && !s.isKunishuSubjugation && !s.attacker.isKunishu && !s.isEventBattle) {
+                
+                // ★ここから追加：援軍メッセージなどがすべて終わった後、勝敗メッセージの前に2秒間点滅させます！
+                let atkColor = { r: 255, g: 255, b: 255 };
+                if (s.attacker.ownerClan !== 0) {
+                    const clanData = this.game.clans.find(c => c.id === s.attacker.ownerClan);
+                    if (clanData && clanData.color) atkColor = DataManager.hexToRgb(clanData.color);
+                }
+                let defColor = { r: 255, g: 255, b: 255 };
+                if (s.oldDefClanId !== 0) {
+                    const clanData = this.game.clans.find(c => c.id === s.oldDefClanId);
+                    if (clanData && clanData.color) defColor = DataManager.hexToRgb(clanData.color);
+                }
+                
+                await this.game.ui.playBattleBlink(s.defender.id, atkColor, defColor, 2000);
+                // ★追加ここまで
+                
                 const atkClanData = this.game.clans.find(c => c.id === s.attacker.ownerClan);
                 const atkProvData = this.game.provinces.find(p => p.id === s.sourceCastle.provinceId);
                 const defClanData = this.game.clans.find(c => c.id === s.oldDefClanId);
