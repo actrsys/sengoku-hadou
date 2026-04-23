@@ -362,7 +362,7 @@ window.GameEvents.push({
         const newClanId = Math.max(...game.clans.map(c => c.id)) + 1; // 一番大きいIDの次を使います
         const surname = candidate.name.includes('|') ? candidate.name.split('|')[0] : candidate.familyName || "足利";
         const newClanName = surname + "家";
-        const newColor = "#e6b422"; // 黄金色にして特別感を出します
+        const newColor = "#f8b500"; // 黄金色にして特別感を出します
         
         const newClan = new Clan({
             id: newClanId,
