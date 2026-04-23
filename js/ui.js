@@ -1205,6 +1205,10 @@ class UIManager {
         if (this.game.selectionMode) {
             this.renderSelectionModeMenu();
         }
+        else if (this.game.isProcessingAI) {
+            // ★追加：AIのターン進行中は、コマンドボタンを隠してスッキリさせます！
+            this.clearCommandMenu();
+        }
         else if (Number(castle.ownerClan) === Number(this.game.playerClanId)) {
              if (!this.game.selectionMode) {
                  if (this.game.getCurrentTurnCastle() === castle) {

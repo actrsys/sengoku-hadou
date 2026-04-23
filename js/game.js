@@ -1269,7 +1269,10 @@ class GameManager {
         
         if (castle.isDone) {
             // ★ここを書き足し：行動済みの城をスキップする時も、一瞬だけ数字を進めます！
-            if (this.isProcessingAI && this.ui) this.ui.updateAIProgress(this.currentIndex + 1, this.turnQueue.length);
+            if (this.isProcessingAI && this.ui) {
+                this.ui.updateAIProgress(this.currentIndex + 1, this.turnQueue.length);
+                this.ui.showControlPanel(castle); // ★追加：スキップ時も城の情報をババッと切り替えます！
+            }
             this.finishTurn();
             return;
         }
@@ -1277,7 +1280,10 @@ class GameManager {
         if(!castle || castle.ownerClan === 0 || !this.clans.find(c => Number(c.id) === Number(castle.ownerClan))) { 
             console.log(`空き城またはデータのない城をスキップしました。`);
             // ★ここを書き足し：空城をスキップする時も、一瞬だけ数字を進めます！
-            if (this.isProcessingAI && this.ui) this.ui.updateAIProgress(this.currentIndex + 1, this.turnQueue.length);
+            if (this.isProcessingAI && this.ui) {
+                this.ui.updateAIProgress(this.currentIndex + 1, this.turnQueue.length);
+                this.ui.showControlPanel(castle); // ★追加：スキップ時も城の情報をババッと切り替えます！
+            }
             this.currentIndex++; 
             this.processTurn(); 
             return; 
@@ -1315,7 +1321,8 @@ class GameManager {
                 if(this.ui.aiGuard) this.ui.aiGuard.classList.remove('hidden'); 
                 
                 this.ui.updateAIProgress(this.currentIndex + 1, this.turnQueue.length);
-                if(this.ui.panelEl) this.ui.panelEl.classList.add('hidden');
+                // ★ここを修正：パネルを隠さずに、現在処理中の城の情報を表示します！
+                this.ui.showControlPanel(castle);
                 
                 const delay = isImportant ? 10 : 10;
 
@@ -1360,7 +1367,8 @@ class GameManager {
             // ★追加ここまで！
             // ==========================================
 
-            if(this.ui.panelEl) this.ui.panelEl.classList.add('hidden');
+            // ★ここを修正：パネルを隠さずに、現在処理中の城の情報を表示します！
+            this.ui.showControlPanel(castle);
             
             const delay = isImportant ? 10 : 10;
 
