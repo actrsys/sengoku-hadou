@@ -290,6 +290,9 @@ Object.assign(WarManager.prototype, {
                 if (defCastle.isKunishu) {
                     const provName = defProvData ? defProvData.province : "不明な国";
                     targetInfoStr = `${provName}の${defCastle.name}の攻略のため、\n`;
+                } else if (defCastle.ownerClan === 0) {
+                    const provName = defProvData ? defProvData.province : "不明な国";
+                    targetInfoStr = `${provName}の${defCastle.name}の攻略のため、\n`;
                 } else {
                     targetInfoStr = `${defDaimyoName}の${defCastle.name}の攻略のため、\n`;
                 }

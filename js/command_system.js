@@ -2954,12 +2954,15 @@ class CommandSystem {
             const targetClanName = this.game.clans.find(c => c.id === enemyClanId)?.name || "中立勢力";
             
             let targetInfoStr = "";
+            const provData = this.game.provinces.find(p => p.id === targetCastle.provinceId);
+            const provName = provData ? provData.province : "不明な国";
+
             if (targetCastle.isKunishu) {
-                const provData = this.game.provinces.find(p => p.id === targetCastle.provinceId);
-                const provName = provData ? provData.province : "不明な国";
                 const kunishu = this.game.kunishuSystem.getKunishu(targetCastle.kunishuId);
                 const kName = kunishu ? kunishu.getName(this.game) : "諸勢力";
                 targetInfoStr = `${provName}の${kName}の攻略のため、\n`;
+            } else if (targetCastle.ownerClan === 0) {
+                targetInfoStr = `${provName}の${targetCastle.name}の攻略のため、\n`;
             } else {
                 targetInfoStr = `${targetClanName}の${targetCastle.name}の攻略のため、\n`;
             }
