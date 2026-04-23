@@ -326,11 +326,18 @@ class UIInfoManager {
                         </div>
                     </div>
                     <div style="display: flex; justify-content: flex-end; gap: 10px; margin-top: 15px;">
+                        <button class="daimyo-detail-action-btn" id="temp-kyoten-btn">拠点</button>
                         <button class="daimyo-detail-action-btn" id="temp-busho-btn">武将</button>
                         <button class="daimyo-detail-action-btn" id="temp-diplo-btn">外交</button>
                     </div>
                 </div>
             `;
+
+            document.getElementById('temp-kyoten-btn').onclick = (e) => {
+                e.stopPropagation();
+                if (window.AudioManager) window.AudioManager.playSE('decision.ogg');
+                this.showKyotenList(clan.id);
+            };
 
             document.getElementById('temp-diplo-btn').onclick = (e) => {
                 e.stopPropagation(); 
@@ -1600,6 +1607,10 @@ class UIInfoManager {
         
         if (!this.currentKyotenTab) this.currentKyotenTab = 'status';
         if (!this.currentKyotenScope) this.currentKyotenScope = 'clan';
+        
+        if (clanId !== null) {
+            this.currentKyotenScope = 'clan';
+        }
         
         let scopeHtml = '';
         if (clanId === null) {
