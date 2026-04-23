@@ -1594,8 +1594,8 @@ Object.assign(UIManager.prototype, {
             guard.style.left = '0';
             guard.style.width = '100vw';
             guard.style.height = '100vh';
-            guard.style.zIndex = '9999';
-            guard.style.pointerEvents = 'all'; // ここに触れるようにして後ろをガードします
+            guard.style.zIndex = '500';
+            guard.style.pointerEvents = 'all';
             document.body.appendChild(guard);
         }
         guard.style.display = 'block';
