@@ -435,6 +435,7 @@ class Princess {
         Object.assign(this, data);
         this.id = Number(this.id);
         this.name = data.name || "姫";
+        this.yomi = data.yomi || "";
         this.birthYear = Number(this.birthYear || 1500);
         
         // ★今回追加：登場年、没年、顔画像
@@ -593,7 +594,7 @@ class CourtRank {
     }
 }
 
-// ★新しく追加：地方（Province）クラス
+// 地方（Province）クラス
 class Province {
     constructor(data) {
         Object.assign(this, data);
@@ -601,8 +602,10 @@ class Province {
         // ★CSVから読み込んだデータを、確実な形にして箱にしまいます
         this.id = Number(this.id || 0);             // 国の出席番号（例：23）
         this.province = data.province || "";        // 国の名前（例：尾張国）
+        this.provinceYomi = data.provinceYomi || "";
         this.regionId = Number(this.regionId || 0); // 地方の出席番号（例：5）
         this.region = data.region || "";            // 地方の名前（例：東海）
+        this.regionYomi = data.regionYomi || "";
         this.color_code = data.color_code || "";    // マップ用の色（例：#ff5d00）
         this.typhoon = Number(this.typhoon || 0);   // 台風の発生確率（例：0.15）
         this.marketRate = data.marketRate !== undefined ? Number(data.marketRate) : 1.0; // 国ごとの米相場（例：1.0）
