@@ -1707,6 +1707,22 @@ Object.assign(UIManager.prototype, {
     // ==========================================
     playCaptureEffect(castleId, onHalfway) {
         return new Promise(resolve => {
+            // アニメーション中に画面を触れないようにバリアを張ります
+            let guard = document.getElementById('battle-blink-guard');
+            if (!guard) {
+                guard = document.createElement('div');
+                guard.id = 'battle-blink-guard';
+                guard.style.position = 'fixed';
+                guard.style.top = '0';
+                guard.style.left = '0';
+                guard.style.width = '100vw';
+                guard.style.height = '100vh';
+                guard.style.zIndex = '9999';
+                guard.style.pointerEvents = 'all';
+                document.body.appendChild(guard);
+            }
+            guard.style.display = 'block';
+
             // エフェクトを描くための「専用の透明な画用紙」を用意します
             let overlay = document.getElementById('capture-effect-overlay');
             if (!overlay) {
@@ -1717,8 +1733,8 @@ Object.assign(UIManager.prototype, {
                 overlay.style.position = 'absolute';
                 overlay.style.left = '0px';
                 overlay.style.top = '0px';
-                overlay.style.pointerEvents = 'none'; // クリックの邪魔をしないようにするおまじない
-                overlay.style.zIndex = '7'; // 点滅する画用紙よりさらに手前に置きます
+                overlay.style.pointerEvents = 'none';
+                overlay.style.zIndex = '7';
                 this.mapEl.appendChild(overlay);
             }
             
@@ -1726,23 +1742,19 @@ Object.assign(UIManager.prototype, {
             const width = overlay.width;
             const height = overlay.height;
             
-            // お城の「領土全体の形」と「境界線（フチ）」を探し出して記憶します
             const targetPixels = new Uint8Array(width * height);
             const edgePixels = new Uint8Array(width * height);
             
             if (this.pixelCastleMap) {
-                // まず領土全体をマークします
                 for (let i = 0; i < this.pixelCastleMap.length; i++) {
                     if (this.pixelCastleMap[i] === castleId) {
                         targetPixels[i] = 1;
                     }
                 }
-                // 次に、領土のフチ（海や他の国との境目）を見つけます
                 for (let y = 1; y < height - 1; y++) {
                     for (let x = 1; x < width - 1; x++) {
                         const i = y * width + x;
                         if (targetPixels[i] === 1) {
-                            // 上下左右のどこかが領土外なら、そこは「フチ」です！
                             if (targetPixels[i - width] === 0 || targetPixels[i + width] === 0 ||
                                 targetPixels[i - 1] === 0 || targetPixels[i + 1] === 0) {
                                 edgePixels[i] = 1;
@@ -1753,66 +1765,37 @@ Object.assign(UIManager.prototype, {
             }
             
             let startTime = performance.now();
-            const durationRise = 800;  // 第1段階：障壁が立ち上る時間（0.8秒）
-            const durationFlash = 600; // 第2段階：真っ白からスッと消える時間（0.6秒）
+            const durationRise = 800;
+            const durationFlash = 600;
             const totalDuration = durationRise + durationFlash;
-            let halfwayDone = false; // 色を変えたかどうかの目印
+            let halfwayDone = false;
 
-            // パラパラ漫画のように少しずつ絵を動かす魔法です
             const animate = (currentTime) => {
                 const elapsed = currentTime - startTime;
-                ctx.clearRect(0, 0, width, height); // 前のコマの絵を消します
+                ctx.clearRect(0, 0, width, height);
 
                 if (elapsed < durationRise) {
-                    // === 第1段階：フチが上に立ち上り、全体が白く輝き始める ===
-                    const progress = elapsed / durationRise; // 0 から 1 に増える数字
-                    const riseY = progress * 40; // フチが最大40ピクセル上へフワッと昇ります
-                    const alpha = 1.0 - progress; // フチは徐々に透明になります
-
+                    const progress = elapsed / durationRise;
+                    const riseY = progress * 40;
+                    const alpha = 1.0 - progress;
                     const imgData = ctx.createImageData(width, height);
-                    
-                    // 全体を白く塗っていきます
                     for (let i = 0; i < targetPixels.length; i++) {
                         if (targetPixels[i] === 1) {
                             const idx = i * 4;
-                            imgData.data[idx] = 255;     // 赤
-                            imgData.data[idx+1] = 255;   // 緑
-                            imgData.data[idx+2] = 255;   // 青
-                            imgData.data[idx+3] = Math.floor(255 * (progress * 0.9)); // だんだん濃い白（最大90%）になります
-                        }
-                    }
-                    
-                    // フチだけを上にズラして描きます（立ち上る障壁！）
-                    for (let y = 0; y < height; y++) {
-                        for (let x = 0; x < width; x++) {
-                            const i = y * width + x;
-                            if (edgePixels[i] === 1) {
-                                const drawY = Math.floor(y - riseY); // 上にズラす計算
-                                if (drawY >= 0 && drawY < height) {
-                                    const idx = (drawY * width + x) * 4;
-                                    imgData.data[idx] = 255;
-                                    imgData.data[idx+1] = 255;
-                                    imgData.data[idx+2] = 255;
-                                    // フチは最初は濃く、だんだん透明になって消えます
-                                    imgData.data[idx+3] = Math.max(imgData.data[idx+3], Math.floor(255 * alpha));
-                                }
-                            }
+                            imgData.data[idx] = 255;
+                            imgData.data[idx+1] = 255;
+                            imgData.data[idx+2] = 255;
+                            imgData.data[idx+3] = Math.floor(255 * (progress * 0.9));
                         }
                     }
                     ctx.putImageData(imgData, 0, 0);
-
                 } else if (elapsed < totalDuration) {
-                    // === 輝きがMAXになった瞬間！ ===
-                    // ここで、渡された「色を変える魔法（onHalfway）」をこっそり実行します！
                     if (!halfwayDone) {
                         halfwayDone = true;
                         if (onHalfway) onHalfway();
                     }
-
-                    // === 第2段階：全体が真っ白な状態から、徐々に透明になって消える ===
-                    const progress = (elapsed - durationRise) / durationFlash; // 0 から 1 に増える数字
-                    const alpha = 1.0 - progress; // だんだん透明になります
-
+                    const progress = (elapsed - durationRise) / durationFlash;
+                    const alpha = 1.0 - progress;
                     const imgData = ctx.createImageData(width, height);
                     for (let i = 0; i < targetPixels.length; i++) {
                         if (targetPixels[i] === 1) {
@@ -1827,14 +1810,14 @@ Object.assign(UIManager.prototype, {
                 }
 
                 if (elapsed < totalDuration) {
-                    requestAnimationFrame(animate); // まだ時間が来ていないなら、次のコマを描きます
+                    requestAnimationFrame(animate);
                 } else {
-                    ctx.clearRect(0, 0, width, height); // 最後に画用紙を綺麗にお掃除します
-                    resolve(); // アニメーションおしまい！の合図を出します
+                    ctx.clearRect(0, 0, width, height);
+                    guard.style.display = 'none'; // 終わったらバリアを消します
+                    resolve();
                 }
             };
-
-            requestAnimationFrame(animate); // パラパラ漫画スタート！
+            requestAnimationFrame(animate);
         });
     }
 });
