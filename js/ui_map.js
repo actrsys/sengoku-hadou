@@ -732,11 +732,6 @@ Object.assign(UIManager.prototype, {
         
         this.game.castles.forEach(c => {
             const el = document.createElement('div'); el.className = 'castle-card';
-            
-            // ★修正：『activeCastle』の代わりに、さっき覚えた『turnCastle』を使うようにします！
-            if (!isSelectionMode && turnCastle && c.id === turnCastle.id && c.ownerClan === this.game.playerClanId && !c.isDelegated) {
-                el.classList.add('current-turn');
-            }
 
             el.dataset.clan = c.ownerClan;
             
