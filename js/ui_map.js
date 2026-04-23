@@ -1270,11 +1270,15 @@ Object.assign(UIManager.prototype, {
             return;
         }
 
-        // 1. 国の色とデータを紐付けます
+        // 1. 国の色とデータを紐付けます（文字列ではなく数字に変換して超高速化！）
         const colorToProvince = new Map();
         this.game.provinces.forEach(p => {
             const rgb = DataManager.hexToRgb(p.color_code);
-            if (rgb) colorToProvince.set(`${rgb.r},${rgb.g},${rgb.b}`, p);
+            if (rgb) {
+                // R, G, Bの色をビット演算で「１つの数字」に合体させます
+                const colorInt = (rgb.r << 16) | (rgb.g << 8) | rgb.b;
+                colorToProvince.set(colorInt, p);
+            }
         });
 
         // 2. 国ごとの「お城のリスト」と「全員同じ勢力かどうか」を事前に調べます
@@ -1299,30 +1303,30 @@ Object.assign(UIManager.prototype, {
         const outputData = ctx.createImageData(width, height);
         const sd = sourceData.data;
 
-        // ★ここから差し替え：陣取りゲーム（BFS）で地形に沿って国を分割する魔法です！
-        const pixelClanMap = new Int32Array(width * height);
-        const provinceMap = new Int32Array(width * height);
+        // ★今回追加：超高速な「陣取りゲーム（幅優先探索）」の準備です！
+        const pixelSize = width * height;
+        const pixelClanMap = new Int32Array(pixelSize);
+        const provinceMap = new Int32Array(pixelSize);
         
-        // 1. まずは画像の全ての点（ピクセル）が「どの国」か調べます
+        // ① 画像の全ての点が「どの国」か調べます（文字を使わずに計算を軽くします）
         for (let i = 0; i < sd.length; i += 4) {
-            if (sd[i+3] === 0) continue;
-            const provStr = `${sd[i]},${sd[i+1]},${sd[i+2]}`;
-            const province = colorToProvince.get(provStr);
+            if (sd[i+3] === 0) continue; // 透明（海）なら飛ばす
+            const colorInt = (sd[i] << 16) | (sd[i+1] << 8) | sd[i+2];
+            const province = colorToProvince.get(colorInt);
             if (province) {
                 provinceMap[i / 4] = province.id;
             }
         }
 
-        // 2. 複数の勢力がいる国は、お城から「陣取りゲーム」をスタートするための準備をします
-        const maxQueueSize = width * height;
-        const queueX = new Int32Array(maxQueueSize);
-        const queueY = new Int32Array(maxQueueSize);
-        const queueClan = new Int32Array(maxQueueSize);
+        // ② 複数の勢力がいる国は、お城から陣取りゲームをスタートするための準備をします
+        const queueX = new Int32Array(pixelSize);
+        const queueY = new Int32Array(pixelSize);
+        const queueClan = new Int32Array(pixelSize);
         let head = 0;
         let tail = 0;
         
-        const distanceMap = new Int32Array(width * height);
-        distanceMap.fill(999999); // 最初は誰も届いていないので「無限遠」にしておきます
+        const distanceMap = new Int32Array(pixelSize);
+        distanceMap.fill(999999);
 
         provinceInfo.forEach((info, provId) => {
             if (info.owner === -1) {
@@ -1344,7 +1348,7 @@ Object.assign(UIManager.prototype, {
             }
         });
 
-        // 3. 水が広がるように、同じ国の中だけを陣取りしていきます（幅優先探索）
+        // ③ 水が広がるように、同じ国の中だけを陣取りしていきます
         const dx = [0, 1, 0, -1];
         const dy = [-1, 0, 1, 0];
         
@@ -1362,11 +1366,10 @@ Object.assign(UIManager.prototype, {
                 const nx = x + dx[d];
                 const ny = y + dy[d];
                 
-                // 画像の枠からはみ出さないようにガードします
                 if (nx >= 0 && nx < width && ny >= 0 && ny < height) {
                     const nIdx = ny * width + nx;
                     
-                    // 「同じ国の中」だけを陣取りします（海や隣の国にはみ出しません！）
+                    // 同じ国の中だけを塗っていきます
                     if (provinceMap[nIdx] === provId) {
                         if (distanceMap[nIdx] > currDist + 1) {
                             distanceMap[nIdx] = currDist + 1;
@@ -1382,9 +1385,9 @@ Object.assign(UIManager.prototype, {
             }
         }
 
-        // 4. 陣取りの結果を使って、実際に画用紙（outputData）に色を塗ります！
+        // ④ 陣取りの結果を使って、実際に画用紙（outputData）に色を塗ります！
         for (let i = 0; i < sd.length; i += 4) {
-            if (sd[i+3] === 0) continue; // 透明（海）なら飛ばす
+            if (sd[i+3] === 0) continue;
 
             const pxIdx = i / 4;
             const provId = provinceMap[pxIdx];
@@ -1394,10 +1397,8 @@ Object.assign(UIManager.prototype, {
             let targetClanId = 0;
 
             if (info.owner !== -1) {
-                // その国にお城がないか、あるいは一勢力が全部支配しているとき
                 targetClanId = info.owner;
             } else {
-                // 陣取りゲームで勝った勢力の色にします
                 targetClanId = pixelClanMap[pxIdx];
                 
                 // もし海を隔てた「飛び地」などでお城から陣取りが届かなかった場所は、今まで通り直線距離で塗ります
@@ -1409,7 +1410,8 @@ Object.assign(UIManager.prototype, {
                         const c = info.castles[j];
                         const cx = c.pixelX !== undefined ? c.pixelX : (c.x * 80 + 40);
                         const cy = c.pixelY !== undefined ? c.pixelY : (c.y * 80 + 40);
-                        const dSq = (px - cx) ** 2 + (py - cy) ** 2;
+                        // 計算を軽くするため、二乗の記号（**2）ではなく掛け算を使います
+                        const dSq = (px - cx) * (px - cx) + (py - cy) * (py - cy);
                         if (dSq < minDistSq) {
                             minDistSq = dSq;
                             targetClanId = c.ownerClan;
@@ -1428,7 +1430,7 @@ Object.assign(UIManager.prototype, {
                 outputData.data[i+1] = 255;
                 outputData.data[i+2] = 255;
             }
-            outputData.data[i+3] = 100;
+            outputData.data[i+3] = 100; // 少し透明にします
         }
 
         ctx.putImageData(outputData, 0, 0);
