@@ -1271,8 +1271,6 @@ Object.assign(UIManager.prototype, {
         const overlay = document.getElementById('clan-color-overlay');
         if (!overlay) return;
 
-        if (this.game.phase === 'daimyo_select') return;
-
         const sourceData = DataManager.provinceImageData;
         if (!sourceData) {
             const provMapImg = new Image();
