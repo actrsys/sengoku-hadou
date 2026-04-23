@@ -439,6 +439,9 @@ Object.assign(UIManager.prototype, {
         const targetCastle = castle || this.currentCastle || this.game.getCurrentTurnCastle();
         const sc = document.getElementById('map-scroll-container');
         if (!sc || !targetCastle) return;
+
+        // ★ここから追加：移動が始まる前に、透明なバリアを張って操作できなくします
+        sc.style.pointerEvents = 'none';
         
         const posX = targetCastle.pixelX !== undefined ? targetCastle.pixelX : (targetCastle.x * 80 + 40);
         const posY = targetCastle.pixelY !== undefined ? targetCastle.pixelY : (targetCastle.y * 80 + 40);
@@ -454,6 +457,13 @@ Object.assign(UIManager.prototype, {
             top: scaledY - sc.clientHeight / 2,
             behavior: immediate ? 'auto' : 'smooth'
         });
+
+        // ★ここから追加：移動が終わる頃合いを見て、タイマーでバリアを解除します
+        // immediate（一瞬で移動）の時は50ミリ秒後、スムーズに移動する時は800ミリ秒（0.8秒）後に解除します
+        const waitTime = immediate ? 50 : 800;
+        setTimeout(() => {
+            sc.style.pointerEvents = '';
+        }, waitTime);
     },
     
     updateZoomButtons() {
