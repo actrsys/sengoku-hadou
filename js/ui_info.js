@@ -3660,31 +3660,29 @@ class UIInfoManager {
     // ==========================================
     showHistoryModal(historyList = []) {
         this.closeCommonModal();
-        this.pushModal('history_list', [historyList]);
+        this.pushModal('history_list', [historyList, 999999]);
     }
 
     _renderHistoryList(historyList, scrollPos = 0) {
         let items = [];
         
-        // 履歴の文章をリストに並べる準備をします
         if (historyList && historyList.length > 0) {
             items = historyList.map(log => {
                 const text = typeof log === 'string' ? log : (log.text || "");
                 return {
-                    onClick: null, // クリックしても何も起きないようにします
-                    cells: [text], // 表示するテキストをそのまま渡します
-                    itemClass: "history-list-item" // 特別なCSSを当てるための目印です
+                    onClick: null,
+                    cells: [`<div style="text-align: left; width: 100%; box-sizing: border-box; padding-left: 10px;">${text}</div>`],
+                    itemClass: "history-list-item"
                 };
             });
         }
 
-        // 共通のリスト作成工場にお願いします！
         this._renderListModal({
             title: "行動履歴",
             items: items,
             emptyHtml: '<div style="padding: 10px; text-align: center;">履歴がありません。</div>',
-            gridTemplateSp: "1fr", // スマホ版は横幅いっぱいの1つの部屋にします
-            gridTemplatePc: "1fr", // パソコン版も同じです
+            gridTemplateSp: "1fr",
+            gridTemplatePc: "1fr",
             scrollPos: scrollPos
         });
     }

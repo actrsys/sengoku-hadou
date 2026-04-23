@@ -704,30 +704,16 @@ class UIManager {
 
         this.hideContextMenu();
     }
-
+    
     log(msg) { 
-        this.logHistory.unshift(`[${this.game.year}年${this.game.month}月] ${msg}`);
-        if(this.logHistory.length > 50) this.logHistory.pop();
+        this.logHistory.push(`[${this.game.year}年${this.game.month}月] ${msg}`);
+        if(this.logHistory.length > 50) this.logHistory.shift();
         
         if(this.game.warManager && this.game.warManager.state.active && this.game.warManager.state.isPlayerInvolved && this.warLog) {
              const div = document.createElement('div');
-             div.innerHTML = msg; // ★textContent から innerHTML に変更しました！
+             div.innerHTML = msg;
              this.warLog.appendChild(div);
              this.warLog.scrollTop = this.warLog.scrollHeight;
-        }
-    }
-    
-    showHistoryModal() {
-        if (!this.historyModal) return;
-        this.historyModal.classList.remove('hidden');
-        if (this.historyList) {
-            this.historyList.innerHTML = '';
-            this.logHistory.forEach(log => {
-                const div = document.createElement('div');
-                div.innerHTML = log; // ★textContent から innerHTML に変更しました！
-                div.className = 'history-list-item';
-                this.historyList.appendChild(div);
-            });
         }
     }
     
