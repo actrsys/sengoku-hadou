@@ -452,18 +452,50 @@ Object.assign(UIManager.prototype, {
         const scaledX = posX * this.mapScale + currentLeft;
         const scaledY = posY * this.mapScale + currentTop;
         
+        const targetLeft = scaledX - sc.clientWidth / 2;
+        const targetTop = scaledY - sc.clientHeight / 2;
+
         sc.scrollTo({
-            left: scaledX - sc.clientWidth / 2,
-            top: scaledY - sc.clientHeight / 2,
+            left: targetLeft,
+            top: targetTop,
             behavior: immediate ? 'auto' : 'smooth'
         });
 
-        // ★ここから追加：移動が終わる頃合いを見て、タイマーでバリアを解除します
-        // immediate（一瞬で移動）の時は50ミリ秒後、スムーズに移動する時は800ミリ秒（0.8秒）後に解除します
-        const waitTime = immediate ? 50 : 800;
-        setTimeout(() => {
-            sc.style.pointerEvents = '';
-        }, waitTime);
+        // ★ここを書き換え：スクロールが終わったか監視して、終わってから0.2秒待ちます！
+        const finishScroll = () => {
+            setTimeout(() => {
+                sc.style.pointerEvents = '';
+            }, 200); // スクロール完了から0.2秒（200ミリ秒）待ってバリア解除
+        };
+
+        if (immediate) {
+            finishScroll(); // 一瞬で移動する時はすぐにタイマーをスタート
+        } else {
+            let scrollTimer;
+            let isScrolling = false;
+
+            const checkScroll = () => {
+                isScrolling = true;
+                clearTimeout(scrollTimer);
+                // スクロールが100ミリ秒止まったら「完了した」とみなします
+                scrollTimer = setTimeout(() => {
+                    sc.removeEventListener('scroll', checkScroll);
+                    finishScroll();
+                }, 100); 
+            };
+
+            // ブラウザが「スクロールしてるよ！」と教えてくれるたびにチェックします
+            sc.addEventListener('scroll', checkScroll);
+
+            // すでに目的地にいるなど、スクロールが全く起きなかった時のお守り
+            setTimeout(() => {
+                if (!isScrolling) {
+                    sc.removeEventListener('scroll', checkScroll);
+                    clearTimeout(scrollTimer);
+                    finishScroll();
+                }
+            }, 200);
+        }
     },
     
     updateZoomButtons() {
@@ -1596,8 +1628,37 @@ Object.assign(UIManager.prototype, {
                 const colorA_RGB = colorA || { r: 255, g: 255, b: 255 };
                 const colorB_RGB = colorB || { r: 255, g: 255, b: 255 };
 
+                // ★追加：2ピクセル分広く塗るための準備
+                const targetPixels = new Uint8Array(width * height);
+
+                // まずは本来のお城の領地をマークします
                 for (let i = 0; i < this.pixelCastleMap.length; i++) {
                     if (this.pixelCastleMap[i] === castleId) {
+                        targetPixels[i] = 1;
+                    }
+                }
+
+                // ★2回繰り返すことで、2ピクセル分外側に広げます
+                for (let step = 0; step < 2; step++) {
+                    const tempPixels = new Uint8Array(targetPixels);
+                    for (let y = 1; y < height - 1; y++) {
+                        for (let x = 1; x < width - 1; x++) {
+                            const i = y * width + x;
+                            if (tempPixels[i] === 0) {
+                                // 上下左右のどこかが 1 なら、ここも 1 にします
+                                if (tempPixels[i - width] === 1 ||
+                                    tempPixels[i + width] === 1 ||
+                                    tempPixels[i - 1] === 1 ||
+                                    tempPixels[i + 1] === 1) {
+                                    targetPixels[i] = 1;
+                                }
+                            }
+                        }
+                    }
+                }
+
+                for (let i = 0; i < targetPixels.length; i++) {
+                    if (targetPixels[i] === 1) {
                         const idx = i * 4;
                         outputDataA.data[idx] = colorA_RGB.r;
                         outputDataA.data[idx+1] = colorA_RGB.g;
