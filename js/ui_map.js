@@ -1498,6 +1498,50 @@ Object.assign(UIManager.prototype, {
             outputData.data[i+3] = 100; // 少し透明にします
         }
 
+        // ★ここから追加：色を1px広く塗る（じわっと滲ませる）魔法です！
+        // 一度塗り終わった絵をコピーして「お手本」にします
+        const tempOutput = new Uint8ClampedArray(outputData.data);
+        
+        // 絵の端っこはチェックできないので、1ピクセル内側から調べます
+        for (let y = 1; y < height - 1; y++) {
+            for (let x = 1; x < width - 1; x++) {
+                const idx = (y * width + x) * 4;
+                
+                // もし今の場所が「まだ塗られていない（透明）」なら…
+                if (tempOutput[idx + 3] === 0) {
+                    // 上・下・左・右の場所を計算します
+                    const up = ((y - 1) * width + x) * 4;
+                    const down = ((y + 1) * width + x) * 4;
+                    const left = (y * width + (x - 1)) * 4;
+                    const right = (y * width + (x + 1)) * 4;
+
+                    // もし上下左右のどこかに色が塗られていたら、その色をコッソリ借ります！
+                    if (tempOutput[up + 3] > 0) {
+                        outputData.data[idx] = tempOutput[up];
+                        outputData.data[idx+1] = tempOutput[up+1];
+                        outputData.data[idx+2] = tempOutput[up+2];
+                        outputData.data[idx+3] = tempOutput[up+3];
+                    } else if (tempOutput[down + 3] > 0) {
+                        outputData.data[idx] = tempOutput[down];
+                        outputData.data[idx+1] = tempOutput[down+1];
+                        outputData.data[idx+2] = tempOutput[down+2];
+                        outputData.data[idx+3] = tempOutput[down+3];
+                    } else if (tempOutput[left + 3] > 0) {
+                        outputData.data[idx] = tempOutput[left];
+                        outputData.data[idx+1] = tempOutput[left+1];
+                        outputData.data[idx+2] = tempOutput[left+2];
+                        outputData.data[idx+3] = tempOutput[left+3];
+                    } else if (tempOutput[right + 3] > 0) {
+                        outputData.data[idx] = tempOutput[right];
+                        outputData.data[idx+1] = tempOutput[right+1];
+                        outputData.data[idx+2] = tempOutput[right+2];
+                        outputData.data[idx+3] = tempOutput[right+3];
+                    }
+                }
+            }
+        }
+        // ★追加ここまで！
+
         ctx.putImageData(outputData, 0, 0);
         
         // ★ここで描いた勢力の色（写真）を丸ごと記憶します！
