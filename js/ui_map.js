@@ -1159,7 +1159,7 @@ Object.assign(UIManager.prototype, {
     },
 
     // ==========================================
-    // ★ここから追加：戦場となった国を点滅させる魔法です！
+    // ★戦場となった国を点滅させる魔法です（点滅中は操作不能になります）
     // ==========================================
     playProvinceBlinkAnimation(provinceId, color1Hex, color2Hex, duration) {
         return new Promise((resolve) => {
@@ -1167,7 +1167,6 @@ Object.assign(UIManager.prototype, {
             if (!overlay) { resolve(); return; }
             
             const sourceData = DataManager.provinceImageData;
-            // 画像データがない時は点滅を諦めます
             if (!sourceData) { resolve(); return; }
 
             const targetProvince = this.game.provinces.find(p => p.id === provinceId);
@@ -1176,7 +1175,7 @@ Object.assign(UIManager.prototype, {
             const targetColorRgb = DataManager.hexToRgb(targetProvince.color_code);
             if (!targetColorRgb) { resolve(); return; }
 
-            // 中立などで色が設定されていない場合は白にします
+            // お互いの色を準備します（色がなければ白にします）
             const c1 = DataManager.hexToRgb(color1Hex) || {r:255, g:255, b:255};
             const c2 = DataManager.hexToRgb(color2Hex) || {r:255, g:255, b:255};
 
@@ -1184,7 +1183,6 @@ Object.assign(UIManager.prototype, {
             const width = overlay.width;
             const height = overlay.height;
             
-            // ピクセルデータを集める（計算を軽くするため）
             const pixelIndices = [];
             const sd = sourceData.data;
             for (let i = 0; i < sd.length; i += 4) {
@@ -1196,57 +1194,48 @@ Object.assign(UIManager.prototype, {
             
             if (pixelIndices.length === 0) { resolve(); return; }
 
-            // 点滅のための準備
             const startTime = performance.now();
-            let animationFrameId;
-
-            // 画用紙を用意（毎フレーム使い回します）
             const outData = ctx.createImageData(width, height);
             const od = outData.data;
 
-            // ガード：点滅中は画面を触れないようにします！
+            // 【重要】点滅が終わるまで、画面のどこも触れないようにバリアを張ります！
             const oldPointerEvents = document.body.style.pointerEvents;
             document.body.style.pointerEvents = 'none';
 
             const animate = (currentTime) => {
                 const elapsed = currentTime - startTime;
                 if (elapsed >= duration) {
-                    // 時間が来たら綺麗にして魔法を解きます
                     ctx.clearRect(0, 0, width, height);
+                    // バリアを解除します
                     document.body.style.pointerEvents = oldPointerEvents;
                     resolve();
                     return;
                 }
 
-                // 色の混ざり具合（0〜1）
-                const phase = (elapsed % 600) / 600; // 0.6秒周期で色が変わる
+                // 0.3秒ごとに色が交互に変わるように計算します
+                const phase = (elapsed % 300) / 300;
                 const wave = (Math.sin(phase * Math.PI * 2) + 1) / 2;
                 
-                // 白く光るエフェクトの強さ
-                const whiteWave = (Math.sin((elapsed % 300) / 300 * Math.PI * 2) + 1) / 2 * 0.4;
+                // 光の輝き（白っぽさ）を足します
+                const whiteLight = (Math.sin((elapsed % 150) / 150 * Math.PI * 2) + 1) / 2 * 0.5;
 
-                const mixedR = c1.r * (1 - wave) + c2.r * wave;
-                const mixedG = c1.g * (1 - wave) + c2.g * wave;
-                const mixedB = c1.b * (1 - wave) + c2.b * wave;
-
-                const finalR = Math.min(255, mixedR + 255 * whiteWave);
-                const finalG = Math.min(255, mixedG + 255 * whiteWave);
-                const finalB = Math.min(255, mixedB + 255 * whiteWave);
+                const mixedR = Math.min(255, (c1.r * (1 - wave) + c2.r * wave) + (255 * whiteLight));
+                const mixedG = Math.min(255, (c1.g * (1 - wave) + c2.g * wave) + (255 * whiteLight));
+                const mixedB = Math.min(255, (c1.b * (1 - wave) + c2.b * wave) + (255 * whiteLight));
 
                 for (let i = 0; i < pixelIndices.length; i++) {
                     const idx = pixelIndices[i];
-                    od[idx] = finalR;
-                    od[idx+1] = finalG;
-                    od[idx+2] = finalB;
-                    od[idx+3] = 180; // 半透明で塗る
+                    od[idx] = mixedR;
+                    od[idx+1] = mixedG;
+                    od[idx+2] = mixedB;
+                    od[idx+3] = 200; 
                 }
 
                 ctx.putImageData(outData, 0, 0);
-
-                animationFrameId = requestAnimationFrame(animate);
+                requestAnimationFrame(animate);
             };
 
-            animationFrameId = requestAnimationFrame(animate);
+            requestAnimationFrame(animate);
         });
     },
 

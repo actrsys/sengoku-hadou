@@ -832,41 +832,51 @@ Object.assign(WarManager.prototype, {
             s.oldDefClanId = s.defender.ownerClan; 
             s.extinctionNotified = false; // フラグの初期化
             
-            // ★ここから追加：AI同士の戦争の結果メッセージを出して時間を止めます！
-            // ★修正：諸勢力の戦いの時は専用のメッセージがあるので、ここではお休みします！
-            // ★追加：イベントによる決着の時も、専用のメッセージが出るためお休みします！
+            // ★AI同士の戦争の演出フロー（メッセージ -> 移動 -> 点滅 -> 結果 -> 塗り替え -> 待機）
             if (!s.isPlayerInvolved && !s.isKunishuSubjugation && !s.attacker.isKunishu && !s.isEventBattle) {
                 const atkClanData = this.game.clans.find(c => c.id === s.attacker.ownerClan);
                 const atkProvData = this.game.provinces.find(p => p.id === s.sourceCastle.provinceId);
                 const defClanData = this.game.clans.find(c => c.id === s.oldDefClanId);
                 const defProvData = this.game.provinces.find(p => p.id === s.defender.provinceId);
+                
                 const atkDaimyoName = atkClanData ? atkClanData.name : (s.attacker.isKunishu ? s.attacker.name : (atkProvData ? atkProvData.province : "中立"));
                 const defDaimyoName = defClanData ? defClanData.name : (s.defender.isKunishu ? s.defender.name : (defProvData ? defProvData.province : "中立"));
-                
+
+                // 1. 「攻め込みました！」のメッセージを出す
+                const attackStartMsg = `${atkDaimyoName}の${s.atkBushos[0].name}が、\n${defDaimyoName}の${s.defender.name}へ攻め込みました！`;
+                await this.game.ui.showDialogAsync(attackStartMsg);
+
+                // 2. 戦場の城へスクロールする
+                await this.game.ui.scrollToActiveCastle(s.defender, false);
+
+                // 3. 城の国を1秒間点滅させる
+                const atkColor = (atkClanData && atkClanData.color) ? atkClanData.color : "#ffffff";
+                const defColor = (defClanData && defClanData.color) ? defClanData.color : "#ffffff";
+                if (this.game.ui.playProvinceBlinkAnimation) {
+                    await this.game.ui.playProvinceBlinkAnimation(s.defender.provinceId, atkColor, defColor, 1000);
+                }
+
+                // 4. 結果のメッセージを作る
                 let resultMsg = "";
                 if (attackerWon) {
-                    // ★変更：城の名前の代わりに、攻撃軍の総大将（s.atkBushos[0].name）にします！
                     resultMsg = `${atkDaimyoName}の${s.atkBushos[0].name}が\n${defDaimyoName}の${s.defender.name}を攻め落としました！`;
                 } else {
-                    // ★変更：守備成功した時も、守備隊の総大将（s.defBusho.name）にします！
                     resultMsg = `${defDaimyoName}の${s.defBusho.name}が\n${atkDaimyoName}の攻撃を撃退しました！`;
                 }
 
-                // ★追加：メッセージの前に2秒間点滅させる魔法！
-                const atkColor = (atkClanData && atkClanData.color) ? atkClanData.color : "#ffffff";
-                const defColor = (defClanData && defClanData.color) ? defClanData.color : "#ffffff";
-                
-                // 画面を対象の城に移動させておく
-                this.game.ui.scrollToActiveCastle(s.defender, false);
-                
-                if (this.game.ui.playProvinceBlinkAnimation) {
-                     await this.game.ui.playProvinceBlinkAnimation(s.defender.provinceId, atkColor, defColor, 2000);
-                }
-                
-                // どこを触っても消せるメッセージを表示します！
+                // 5. 結果メッセージを表示
                 await this.game.ui.showDialogAsync(resultMsg);
+
+                // 6. 城の持ち主（色）を変える処理をここで行う
+                if (attackerWon) {
+                    s.defender.ownerClan = s.attacker.ownerClan;
+                    // 地図を塗り直す魔法を呼ぶ
+                    if (this.game.ui.updateMap) this.game.ui.updateMap();
+                }
+
+                // 7. 1秒間じっと待つ（余韻の時間）
+                await new Promise(resolve => setTimeout(resolve, 1000));
             }
-            // ==========================================
             
             // ★変更：順番待ちができるように async を付けます
             const finishWarProcess = async () => {
