@@ -29,7 +29,7 @@ Object.assign(WarManager.prototype, {
         },
         
         // 3. 相手が援軍を承諾してくれた時のメッセージ
-        showAcceptance: (game, nameStr, isKunishu, isDelegated, isEnemy, onComplete, isPlayerRequest = true, sideName = "援軍") => {
+        showAcceptance: (game, nameStr, isKunishu, isDelegated, isEnemy, onComplete, isPlayerRequest = true) => {
             if (isEnemy) {
                 game.ui.showDialog(`${nameStr}が敵の援軍として参戦しました！`, false, onComplete);
                 return;
@@ -39,7 +39,7 @@ Object.assign(WarManager.prototype, {
                 game.ui.showDialog(`${nameStr}が友軍として参戦しました！`, false, onComplete);
             } else {
                 if (isKunishu || !isPlayerRequest) {
-                    game.ui.showDialog(`${nameStr}が${sideName}の援軍として参戦しました！`, false, onComplete);
+                    game.ui.showDialog(`${nameStr}が守備側の援軍として参戦しました！`, false, onComplete);
                 } else {
                     game.ui.showDialog(`${nameStr}が援軍要請を承諾しました！`, false, onComplete);
                 }
@@ -444,6 +444,14 @@ Object.assign(WarManager.prototype, {
                 const startAllyReinforcement = () => {
                     this.checkDefenderReinforcement(defCastle, atkClan, () => {
                     
+                    // ★追加：守備側の援軍に「プレイヤーが操作できる部隊（直轄領）」が含まれている場合は、強制的に手動戦闘（画面表示）にします！
+                    if (this.state.defSelfReinforcement && this.state.defSelfReinforcement.castle.ownerClan === pid && !this.state.defSelfReinforcement.castle.isDelegated && !this.state.defSelfReinforcement.isKunishuForce) {
+                        this.state.isPlayerInvolved = true;
+                    }
+                    if (this.state.defReinforcement && this.state.defReinforcement.castle.ownerClan === pid && !this.state.defReinforcement.castle.isDelegated && !this.state.defReinforcement.isKunishuForce) {
+                        this.state.isPlayerInvolved = true;
+                    }
+
                     if (defClan === pid && !defCastle.isDelegated && !defCastle.isKunishu) {
                         this.game.ui.hideAIGuardTemporarily();
                     }
@@ -2582,10 +2590,10 @@ Object.assign(WarManager.prototype, {
                 const isEnemy = (atkClanId === this.game.playerClanId);
                 
                 if (isEnemy) {
-                    this.reinfMsgHelper.showAcceptance(this.game, nameStr, true, false, true, onComplete, false, "守備側");
+                    this.reinfMsgHelper.showAcceptance(this.game, nameStr, true, false, true, onComplete, false);
                 } else {
                     this.game.ui.log(`【友軍】${defCastle.name}の要請により、${kunishu.getName(this.game)}が守備側の援軍として駆けつけました。`);
-                    this.reinfMsgHelper.showAcceptance(this.game, nameStr, true, false, false, onComplete, false, "守備側");
+                    this.reinfMsgHelper.showAcceptance(this.game, nameStr, true, false, false, onComplete, false);
                 }
             }
             return;
@@ -2702,11 +2710,11 @@ Object.assign(WarManager.prototype, {
             
             if (isEnemy) {
                 // ★メッセージ係にお任せします！
-                this.reinfMsgHelper.showAcceptance(this.game, nameStr, false, false, true, onComplete, false, "守備側");
+                this.reinfMsgHelper.showAcceptance(this.game, nameStr, false, false, true, onComplete, false);
             } else {
                 this.game.ui.log(`【友軍】${defCastle.name}の要請により、${helperClanName}が守備側の援軍として駆けつけました。`);
                 // ★メッセージ係にお任せします！
-                this.reinfMsgHelper.showAcceptance(this.game, nameStr, false, false, false, onComplete, false, "守備側");
+                this.reinfMsgHelper.showAcceptance(this.game, nameStr, false, false, false, onComplete, false);
             }
         }
     },
