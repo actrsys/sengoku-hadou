@@ -344,6 +344,31 @@ class AIEngine {
         const myClanCastles = this.game.castles.filter(c => c.ownerClan === myClanId);
         const myTotalPower = this.getClanPrestige(myClanId);
 
+        // ★ここから追加：自分が持っている「国」と「地方」が、統一されているか調べる魔法！
+        // まずは自分が持っている国と地方の出席番号を書き出します
+        const myProvIds = new Set();
+        const myRegionIds = new Set();
+        myClanCastles.forEach(c => {
+            myProvIds.add(c.provinceId);
+            const prov = this.game.provinces.find(p => p.id === c.provinceId);
+            if (prov) myRegionIds.add(prov.regionId);
+        });
+
+        // 次に、世界中のすべてのお城を調べて、自分以外のお城がある国や地方は「まだ統一していない」とメモします
+        const ununifiedProvIds = new Set();
+        const ununifiedRegionIds = new Set();
+        this.game.castles.forEach(c => {
+            if (c.ownerClan !== myClanId) {
+                if (myProvIds.has(c.provinceId)) {
+                    ununifiedProvIds.add(c.provinceId);
+                }
+                const prov = this.game.provinces.find(p => p.id === c.provinceId);
+                if (prov && myRegionIds.has(prov.regionId)) {
+                    ununifiedRegionIds.add(prov.regionId);
+                }
+            }
+        });
+
         // ★追加：過去に自領を攻撃してきた大名家や諸勢力をリストアップします！
         const pastAttackerClans = new Set();
         const pastAttackerKunishus = new Set();
@@ -723,6 +748,18 @@ class AIEngine {
             // 4. 自分から攻撃して、まだ落とせていない城への執着
             if (target.lastAttackerClanId === myClanId && target.ownerClan !== myClanId) {
                 prob += 5; // 諦めきれない執着ボーナスとして少しだけ確率を上げます！
+            }
+            
+            // 国や地方を統一するための執着ボーナス！
+            // もしターゲットの城がある国が、自分が持っているけどまだ統一していない国だったら
+            if (ununifiedProvIds.has(target.provinceId)) {
+                prob += 10; // 国を統一するために少し頑張ります！
+            } else {
+                // 国は違うけど、ターゲットの城がある地方が、自分が持っているけどまだ統一していない地方だったら
+                const tgtProv = this.game.provinces.find(p => p.id === target.provinceId);
+                if (tgtProv && ununifiedRegionIds.has(tgtProv.regionId)) {
+                    prob += 5; // 地方を統一するためにちょっと頑張ります！
+                }
             }
             
             // 攻撃確率の最大値設定
