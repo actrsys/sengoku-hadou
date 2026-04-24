@@ -2138,7 +2138,7 @@ Object.assign(WarManager.prototype, {
         await this.game.lifeSystem.checkClanExtinction(this.state.oldDefClanId, 'no_castle');
         if (window.GameApp) window.GameApp.updateAllClanPrestige();
         this.game.finishTurn();
-    }
+    },
     
     async autoResolvePrisoners(captives, winnerClanId) { // ★ async を追加
         const aiBushos = this.game.bushos.filter(b => b.clan === winnerClanId && b.status !== 'unborn'); 
