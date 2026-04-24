@@ -79,19 +79,23 @@ class IndependenceSystem {
         
         if (prob <= 0) return;
         if (Math.random() * 1000 < prob) {
-            // ★変更：他の魔法に上書きされないよう、「絶対に見せない」強力な透明マントを被せます！
-            const aiGuardEl = document.getElementById('ai-guard');
-            if (aiGuardEl) {
-                aiGuardEl.style.setProperty('display', 'none', 'important');
+            // ★変更：画面の更新で要素が作り直されても絶対に隠し続けるために、専用のCSS（透明マント）をページ全体に張ります！
+            let hideStyle = document.getElementById('hide-ai-guard-style');
+            if (!hideStyle) {
+                hideStyle = document.createElement('style');
+                hideStyle.id = 'hide-ai-guard-style';
+                hideStyle.innerHTML = '#ai-guard { display: none !important; }';
+                document.head.appendChild(hideStyle);
             }
 
             try {
                 // ★変更：いきなり独立するのではなく、お家乗っ取りの作戦会議を開きます！
                 await this.planCoupDetatOrRebellion(castle, castellan, daimyo);
             } finally {
-                // ★追加：一連の処理が終わったら、透明マントを外して元に戻します！
-                if (aiGuardEl) {
-                    aiGuardEl.style.removeProperty('display');
+                // ★追加：一連の処理が終わったら、透明マント（CSS）を取り外して元に戻します！
+                const styleToRemove = document.getElementById('hide-ai-guard-style');
+                if (styleToRemove) {
+                    styleToRemove.remove();
                 }
             }
         }
