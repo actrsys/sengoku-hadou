@@ -52,18 +52,66 @@ class CastleManager {
 
         // ★このお城を使おうとしていた大名家の作戦を中止させる魔法です！
         if (this.game.aiOperationManager && this.game.aiOperationManager.operations) {
-            // 全ての大名家の作戦（メモ帳）を順番にめくって確認します
-            for (const clanId in this.game.aiOperationManager.operations) {
+            for (const clanIdStr in this.game.aiOperationManager.operations) {
+                const clanId = Number(clanIdStr);
                 const op = this.game.aiOperationManager.operations[clanId];
                 
-                // 作戦の目標が「お城」で、それが今回持ち主が変わったお城だった場合
-                const isTarget = (op.type === '攻撃' && op.isKunishuTarget === false && op.targetId === castle.id);
-                // 出発するお城、またはお手伝い（援軍）をするお城が、今回持ち主が変わったお城だった場合
-                const isBase = (op.stagingBase === castle.id || op.supportBase === castle.id);
+                if (op.type === '攻撃') {
+                    if (op.attackTargets && op.attackTargets.length > 0) {
+                        // まず、今持ち主が変わったお城に関係する目標や拠点をリストから消します
+                        op.attackTargets = op.attackTargets.filter(t => {
+                            const isTarget = (t.isKunishuTarget === false && t.targetId === castle.id);
+                            const isBase = (t.stagingBase === castle.id || t.supportBase === castle.id);
+                            return !(isTarget || isBase);
+                        });
 
-                // どれかに当てはまったら、その作戦はもうできないので中止（メモを消去）します！
-                if (isTarget || isBase) {
-                    delete this.game.aiOperationManager.operations[clanId];
+                        // リストの先頭から順番に「本当に今も攻められるか」をループでチェックします！
+                        let foundValid = false;
+                        while (op.attackTargets.length > 0) {
+                            const next = op.attackTargets[0];
+                            
+                            const targetCastle = next.isKunishuTarget ? null : this.game.getCastle(next.targetId);
+                            const stagingCastle = this.game.getCastle(next.stagingBase);
+                            
+                            let isTargetOk = true;
+                            if (!next.isKunishuTarget) {
+                                // 目標が自分のものになっていたり、存在しなければ不合格です
+                                if (!targetCastle || targetCastle.ownerClan === clanId) isTargetOk = false;
+                            }
+                            // 出撃元のお城が自分のものでなくなっていたら不合格です
+                            const isBaseOk = (stagingCastle && stagingCastle.ownerClan === clanId);
+
+                            if (isTargetOk && isBaseOk) {
+                                // 合格！この目標を今のメイン作戦としてセットします
+                                foundValid = true;
+                                op.targetId = next.targetId;
+                                op.isKunishuTarget = next.isKunishuTarget;
+                                op.stagingBase = next.stagingBase;
+                                op.supportBase = next.supportBase;
+                                op.requiredForce = next.requiredForce;
+                                op.requiredRice = next.requiredRice;
+                                op.turnsRemaining = next.turnsRemaining;
+                                op.maxTurns = next.maxTurns;
+                                op.status = next.turnsRemaining <= 0 ? '実行中' : '準備中';
+                                break; 
+                            } else {
+                                // ダメならリストから外して、次の予備目標（第三目標など）をチェックします
+                                op.attackTargets.shift();
+                            }
+                        }
+
+                        // 全部チェックして合格者がゼロなら、作戦のメモを白紙に戻します
+                        if (!foundValid) {
+                            delete this.game.aiOperationManager.operations[clanId];
+                        }
+                    } else {
+                        // 予備リストがない場合、今の目標や拠点がダメになったら中止します
+                        const isTarget = (op.isKunishuTarget === false && op.targetId === castle.id);
+                        const isBase = (op.stagingBase === castle.id || op.supportBase === castle.id);
+                        if (isTarget || isBase) {
+                            delete this.game.aiOperationManager.operations[clanId];
+                        }
+                    }
                 }
             }
         }
