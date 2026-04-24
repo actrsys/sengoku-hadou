@@ -750,15 +750,28 @@ class AIEngine {
                 prob += 5; // 諦めきれない執着ボーナスとして少しだけ確率を上げます！
             }
             
-            // 国や地方を統一するための執着ボーナス！
+            // ★国や地方を統一するための執着ボーナス！
             // もしターゲットの城がある国が、自分が持っているけどまだ統一していない国だったら
             if (ununifiedProvIds.has(target.provinceId)) {
-                prob += 10; // 国を統一するために少し頑張ります！
+                prob += 5; // 国を統一するために少し頑張ります！
             } else {
                 // 国は違うけど、ターゲットの城がある地方が、自分が持っているけどまだ統一していない地方だったら
                 const tgtProv = this.game.provinces.find(p => p.id === target.provinceId);
                 if (tgtProv && ununifiedRegionIds.has(tgtProv.regionId)) {
                     prob += 5; // 地方を統一するためにちょっと頑張ります！
+                }
+            }
+
+            // ★保守的・隠居気質な大名の「外に出たくない」ペナルティ！
+            if (myDaimyo.personality === 'conservative' || myDaimyo.personality === 'hermit') {
+                // 自分が１つもお城を持っていない「国」への攻撃は気が進まない
+                if (!myProvIds.has(target.provinceId)) {
+                    prob -= 5;
+                }
+                // 自分が１つもお城を持っていない「地方」への攻撃はさらに気が進まない
+                const tgtProv = this.game.provinces.find(p => p.id === target.provinceId);
+                if (tgtProv && !myRegionIds.has(tgtProv.regionId)) {
+                    prob -= 5;
                 }
             }
             
