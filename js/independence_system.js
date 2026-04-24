@@ -79,24 +79,19 @@ class IndependenceSystem {
         
         if (prob <= 0) return;
         if (Math.random() * 1000 < prob) {
-            // ★追加：謀反や独立の処理中、「思考中」が復活しないようにUIの魔法を使います！
-            if (this.game.ui && typeof this.game.ui.hideAIGuardTemporarily === 'function') {
-                this.game.ui.hideAIGuardTemporarily();
-            } else {
-                const aiGuardEl = document.getElementById('ai-guard');
-                if (aiGuardEl) aiGuardEl.style.display = 'none';
+            // ★変更：他の魔法に上書きされないよう、「絶対に見せない」強力な透明マントを被せます！
+            const aiGuardEl = document.getElementById('ai-guard');
+            if (aiGuardEl) {
+                aiGuardEl.style.setProperty('display', 'none', 'important');
             }
 
             try {
                 // ★変更：いきなり独立するのではなく、お家乗っ取りの作戦会議を開きます！
                 await this.planCoupDetatOrRebellion(castle, castellan, daimyo);
             } finally {
-                // ★追加：一連の処理が終わったら、見張り番を解任して元に戻します！
-                if (this.game.ui && typeof this.game.ui.restoreAIGuard === 'function') {
-                    this.game.ui.restoreAIGuard();
-                } else {
-                    const aiGuardEl = document.getElementById('ai-guard');
-                    if (aiGuardEl) aiGuardEl.style.display = '';
+                // ★追加：一連の処理が終わったら、透明マントを外して元に戻します！
+                if (aiGuardEl) {
+                    aiGuardEl.style.removeProperty('display');
                 }
             }
         }
