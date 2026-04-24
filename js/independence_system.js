@@ -184,7 +184,7 @@ class IndependenceSystem {
             
         } else {
             newClanId = Math.max(...this.game.clans.map(c => c.id)) + 1;
-            const newColor = '#' + Math.floor(Math.random()*16777215).toString(16).padStart(6, '0');
+            const newColor = this.generateDistinctColor(castle);
             // ★新大名家の名前は神輿の人物ベース
             const familyName = rebellionLeader.familyName || rebellionLeader.name.split('|')[0] || rebellionLeader.name; 
             newClanName = `${familyName}家`;
@@ -1008,8 +1008,117 @@ class IndependenceSystem {
             });
         });
     }
+    
+    /**
+     * 新大名家用の色を生成する魔法
+     * （隣接する大名家の色から遠く、かつ見やすい色を選びます）
+     */
+    generateDistinctColor(castle) {
+        const neighborClanIds = new Set();
+        const hop1Ids = castle.adjacentCastleIds || [];
+        const hop2Ids = new Set();
+        
+        // 1ホップ目（隣）の城と、そこから繋がる2ホップ目（隣の隣）の城の出席番号を集めます
+        for (const id of hop1Ids) {
+            const c1 = this.game.castles.find(c => c.id === id);
+            if (c1) {
+                if (c1.ownerClan !== 0) neighborClanIds.add(c1.ownerClan);
+                if (c1.adjacentCastleIds) {
+                    c1.adjacentCastleIds.forEach(id2 => hop2Ids.add(id2));
+                }
+            }
+        }
+        
+        // 2ホップ目の城がどこの大名家のものかも調べます
+        for (const id of hop2Ids) {
+            if (id === castle.id) continue;
+            const c2 = this.game.castles.find(c => c.id === id);
+            if (c2 && c2.ownerClan !== 0) {
+                neighborClanIds.add(c2.ownerClan);
+            }
+        }
+        
+        // 対象となる周辺大名家の色をリストアップしてメモしておきます
+        const existingColors = [];
+        for (const clanId of neighborClanIds) {
+            const clan = this.game.clans.find(c => c.id === clanId);
+            if (clan && clan.color) {
+                const rgb = this.hexToRgb(clan.color);
+                if (rgb) existingColors.push(rgb);
+            }
+        }
+        
+        let bestColor = "#ffffff";
+        let maxMinDistance = -1;
+        
+        // 色の候補を50個作って、一番ご近所さんと違う色を採用します！
+        for (let i = 0; i < 50; i++) {
+            const h = Math.random(); // 色合い：0〜1のランダム
+            const s = 0.5 + Math.random() * 0.4; // 鮮やかさ：50%〜90% (グレーを避ける)
+            const l = 0.4 + Math.random() * 0.3; // 明るさ：40%〜70% (白すぎ・黒すぎを避ける)
+            
+            const hex = this.hslToHex(h, s, l);
+            const rgb = this.hexToRgb(hex);
+            
+            // 周りに大名家がいない場合は、最初の候補で決定します
+            if (existingColors.length === 0) {
+                return hex;
+            }
+            
+            // 近隣の色と見比べて、一番似てしまっている色との「距離」を測ります
+            let minDistance = Infinity;
+            for (const exColor of existingColors) {
+                const dist = Math.sqrt(Math.pow(rgb.r - exColor.r, 2) + Math.pow(rgb.g - exColor.g, 2) + Math.pow(rgb.b - exColor.b, 2));
+                if (dist < minDistance) {
+                    minDistance = dist;
+                }
+            }
+            
+            // これまでの候補よりも「一番似ている色との距離」が遠ければ、ベストな色として記録します
+            if (minDistance > maxMinDistance) {
+                maxMinDistance = minDistance;
+                bestColor = hex;
+            }
+        }
+        
+        return bestColor;
+    }
 
-    // =========================================================================
-    // ★ここまで追加
-    // =========================================================================
+    /**
+     * 色合い・鮮やかさ・明るさ（HSL）を、パソコン用のカラーコード（HEX）に翻訳する道具です
+     */
+    hslToHex(h, s, l) {
+        let r, g, b;
+        if (s === 0) {
+            r = g = b = l; 
+        } else {
+            const hue2rgb = (p, q, t) => {
+                if (t < 0) t += 1;
+                if (t > 1) t -= 1;
+                if (t < 1 / 6) return p + (q - p) * 6 * t;
+                if (t < 1 / 2) return q;
+                if (t < 2 / 3) return p + (q - p) * (2 / 3 - t) * 6;
+                return p;
+            };
+            const q = l < 0.5 ? l * (1 + s) : l + s - l * s;
+            const p = 2 * l - q;
+            r = hue2rgb(p, q, h + 1 / 3);
+            g = hue2rgb(p, q, h);
+            b = hue2rgb(p, q, h - 1 / 3);
+        }
+        const toHex = x => Math.round(x * 255).toString(16).padStart(2, '0');
+        return `#${toHex(r)}${toHex(g)}${toHex(b)}`;
+    }
+
+    /**
+     * パソコン用のカラーコード（HEX）を、赤・緑・青の数字（RGB）に分解する道具です
+     */
+    hexToRgb(hex) {
+        const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+        return result ? {
+            r: parseInt(result[1], 16),
+            g: parseInt(result[2], 16),
+            b: parseInt(result[3], 16)
+        } : null;
+    }
 }
