@@ -361,8 +361,11 @@ class IndependenceSystem {
         this.resolveFactionWideRebellion(rebellionLeader, oldClanId, newClanId, oldDaimyo);
         this.resolveDistantFactionMembers(rebellionLeader, oldClanId, newClanId, oldDaimyo);
 
-        // ★変更：演出の前に色が変わってしまわないように、威信更新などはアニメーションの後に行います！
-
+        this.game.updateCastleLord(castle);
+        
+        // ★追加：独立や寝返りで勢力が大きく変わるので、威信を最新に更新しておきます！
+        if (window.GameApp) window.GameApp.updateAllClanPrestige();
+        
         // ★ここから複数城に対応した演出魔法の始まりです！
         // 今回勢力が変わった城（独立・寝返りに参加した城）のIDをすべて集めます
         const changedCastleIds = [];
@@ -374,6 +377,9 @@ class IndependenceSystem {
         });
         // 万が一見つからなかったら起点のお城だけを入れます
         if (changedCastleIds.length === 0) changedCastleIds.push(castle.id);
+
+        // まずは最初のメッセージを出します
+        await this.game.ui.showDialogAsync(msg, false, 0);
 
         // 画面を勝手に触られないようにバリアを張ります
         if (typeof this.game.ui.showMapGuard === 'function') this.game.ui.showMapGuard();
@@ -409,12 +415,6 @@ class IndependenceSystem {
         // バリアを解除します
         if (typeof this.game.ui.hideMapGuard === 'function') this.game.ui.hideMapGuard(true);
 
-        // ★アニメーションが終わってから、内部の更新とメッセージ表示を行います！
-        this.game.updateCastleLord(castle);
-        
-        // ★独立や寝返りで勢力が大きく変わるので、威信を最新に更新しておきます！
-        if (window.GameApp) window.GameApp.updateAllClanPrestige();
-
         // 追加のメッセージを作ります
         let extraMsg = "";
         if (!isDefection) {
@@ -424,10 +424,7 @@ class IndependenceSystem {
         }
 
         if (captiveMsgs && captiveMsgs.length > 0) extraMsg += '\n\n' + captiveMsgs.join('\n');
-        
-        // ★修正：最初のメッセージと追加のメッセージを合体させて、アニメーションの後に１回だけ表示します！
-        const finalMsg = msg + "\n\n" + extraMsg;
-        await this.game.ui.showDialogAsync(finalMsg, false, 0);
+        await this.game.ui.showDialogAsync(extraMsg, false, 0);
     }
 
     calculateLoyaltyScores(busho, newDaimyo, oldDaimyo) {
