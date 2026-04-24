@@ -1342,6 +1342,9 @@ Object.assign(UIManager.prototype, {
     // ★新魔法：国を勢力の色で塗りつぶす魔法です！
     // ==========================================
     updateClanColors() {
+        // ★追加：独立や謀反の演出中は、色がフライングで変わらないようにストップをかけます！
+        if (this.game && this.game.isSuspendingColorUpdate) return;
+
         const overlay = document.getElementById('clan-color-overlay');
         if (!overlay) return;
 

@@ -79,19 +79,24 @@ class IndependenceSystem {
         
         if (prob <= 0) return;
         if (Math.random() * 1000 < prob) {
-            // ★追加：謀反や独立が始まる時に「思考中」の表示を一時的に隠します！
-            const aiGuardEl = document.getElementById('ai-guard');
-            if (aiGuardEl) {
-                aiGuardEl.style.display = 'none';
-            }
+            // ★追加：謀反や独立の処理中に裏で戦闘が起きても「思考中」が復活しないように、見張り番を立てます！
+            const hideAIGuard = () => {
+                const aiGuardEl = document.getElementById('ai-guard');
+                if (aiGuardEl) aiGuardEl.style.display = 'none';
+            };
+            hideAIGuard();
+            const guardTimer = setInterval(hideAIGuard, 50);
 
-            // ★変更：いきなり独立するのではなく、お家乗っ取りの作戦会議を開きます！
-            await this.planCoupDetatOrRebellion(castle, castellan, daimyo);
-
-            // ★追加：一連の処理が終わったら「思考中」の表示を元に戻します！
-            if (aiGuardEl) {
-                aiGuardEl.style.display = '';
-                // 念のため、UI管理の仕組みでも状態を元に戻しておきます
+            try {
+                // ★変更：いきなり独立するのではなく、お家乗っ取りの作戦会議を開きます！
+                await this.planCoupDetatOrRebellion(castle, castellan, daimyo);
+            } finally {
+                // ★追加：一連の処理が終わったら、見張り番を解任して元に戻します！
+                clearInterval(guardTimer);
+                const aiGuardEl = document.getElementById('ai-guard');
+                if (aiGuardEl) {
+                    aiGuardEl.style.display = '';
+                }
                 if (this.game.ui && typeof this.game.ui.restoreAIGuard === 'function') {
                     this.game.ui.restoreAIGuard();
                 }
@@ -182,7 +187,9 @@ class IndependenceSystem {
                 }
             }
         }
-        // --- ★ここまで ---
+        
+        // ★追加：データが変わってマップの色がフライングで塗り替わるのを防ぐストッパーをかけます！
+        this.game.isSuspendingColorUpdate = true;
 
         let isDefection = false;
         let newClanId;
@@ -398,6 +405,9 @@ class IndependenceSystem {
 
         // 参加したお城をすべて同時にチカチカ点滅させます！
         await this.game.ui.playBattleBlink(changedCastleIds, oldColor, newColorRgb, 1000);
+
+        // ★追加：点滅が終わったらストッパーを外して、新しい色を塗れるようにします！
+        this.game.isSuspendingColorUpdate = false;
 
         // フワッと光るアニメーションと一緒に、色を新しく塗り替えます！
         if (typeof this.game.ui.playCaptureEffect === 'function') {
@@ -794,6 +804,9 @@ class IndependenceSystem {
                 // 【反乱軍の勝利】
                 this.game.ui.log(`【謀反】反乱軍が勝利し、${oldDaimyo.name}は討死しました。`);
 
+                // ★追加：データが変わってマップの色がフライングで塗り替わるのを防ぐストッパーをかけます！
+                this.game.isSuspendingColorUpdate = true;
+
                 // 勝手に後継ぎが選ばれて大名が2人にならないように、先に大名の印を外しておきます
                 oldDaimyo.isDaimyo = false;
 
@@ -958,6 +971,9 @@ class IndependenceSystem {
                 const allClanCastleIds = this.game.castles.filter(c => c.ownerClan === oldClanId).map(c => c.id);
 
                 if (typeof this.game.ui.showMapGuard === 'function') this.game.ui.showMapGuard();
+
+                // ★追加：ストッパーを外して、新しい色を塗れるようにします！
+                this.game.isSuspendingColorUpdate = false;
 
                 // プレイヤーの場合でも、野戦からマップに戻ってきた後にこのアニメーションが行われます！
                 // 色が変わるアニメーションを入れてから、マップを描き直します！
