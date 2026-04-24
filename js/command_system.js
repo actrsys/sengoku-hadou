@@ -32,7 +32,7 @@ const COMMAND_MENU_STRUCTURE = [
     },
     {
         label: "人事",
-        commands: ['appoint_gunshi', 'appoint', 'delegate', 'reward', 'interview', 'employ', 'move', 'banish']
+        commands: ['appoint_gunshi', 'appoint', 'delegate', 'reward', 'interview', 'employ', 'move', 'succession', 'banish']
     },
     {
         label: "情報",
@@ -66,6 +66,16 @@ const CAN_EXECUTE_RULES = {
         const daimyo = game.bushos.find(b => b.clan === game.playerClanId && b.isDaimyo);
         if (!daimyo) return false;
         return game.castles.some(c => c.ownerClan === game.playerClanId && c.id !== daimyo.castleId);
+    },
+    hasSuccessor: (game) => {
+        const daimyo = game.bushos.find(b => b.clan === game.playerClanId && b.isDaimyo);
+        if (!daimyo) return false;
+        const dFamily = Array.isArray(daimyo.familyIds) ? daimyo.familyIds : [];
+        return game.bushos.some(b => {
+            if (b.clan !== game.playerClanId || b.status !== 'active' || b.isDaimyo) return false;
+            const bFamily = Array.isArray(b.familyIds) ? b.familyIds : [];
+            return bFamily.includes(daimyo.id) || dFamily.includes(b.id);
+        });
     },
     // --- 軍事用 ---
     canTraining: (game, castle) => {
@@ -325,6 +335,15 @@ const COMMAND_SPECS = {
         startMode: 'busho_select', sortKey: 'loyalty',
         msg: "武将を追放します",
         canExecute: (game, castle) => CAN_EXECUTE_RULES.hasActiveBushoExceptDaimyo(game)
+    },
+    'succession': { 
+        label: "家督相続", category: 'PERSONNEL', 
+        costGold: 0, costRice: 0, 
+        isMulti: false, hasAdvice: false, 
+        startMode: 'busho_select_special', subType: 'succession_target',
+        sortKey: 'leadership',
+        msg: "家督を譲る一門武将を選択します",
+        canExecute: (game, castle) => CAN_EXECUTE_RULES.hasSuccessor(game)
     },
 
     // --- 対外：調略 (FOREIGN_STRATEGY) ---
@@ -635,6 +654,18 @@ class CommandSystem {
                 !b.isDaimyo                          
             );
             infoHtml = "<div>追放する武将を選択してください</div>"; 
+        }
+        else if (actionType === 'succession_target') {
+            const daimyo = this.game.bushos.find(b => b.clan === this.game.playerClanId && b.isDaimyo);
+            if (daimyo) {
+                const dFamily = Array.isArray(daimyo.familyIds) ? daimyo.familyIds : [];
+                bushos = this.game.bushos.filter(b => {
+                    if (b.clan !== this.game.playerClanId || b.status !== 'active' || b.isDaimyo) return false;
+                    const bFamily = Array.isArray(b.familyIds) ? b.familyIds : [];
+                    return bFamily.includes(daimyo.id) || dFamily.includes(b.id);
+                });
+            }
+            infoHtml = "<div>家督を譲る一門武将を選択してください</div>";
         }
         else {
             // ★追加: 内政などの通常の命令でも、未登場の武将や諸勢力が勝手にリストに出ないようにします
@@ -1442,12 +1473,24 @@ class CommandSystem {
             this.game.ui.openQuantitySelector(actionType, selectedIds, targetId);
             return;
         }
-
+        
         const spec = COMMAND_SPECS[actionType];
         
         if (['appoint_gunshi'].includes(actionType)) { 
              this.executeAppointGunshi(firstId);
              return;
+        }
+
+        if (actionType === 'succession_target') {
+            const bushoA = this.game.getBusho(firstId);
+            this.game.ui.showDialog(`${bushoA.name} に家督を譲りますか？`, true, 
+                () => {
+                    this.executeSuccession(firstId);
+                },
+                null,
+                { okText: '家督を譲る', okClass: 'btn-danger', cancelText: 'やめる' }
+            );
+            return;
         }
         
         if (actionType === 'reward') {
@@ -3099,5 +3142,50 @@ class CommandSystem {
     // ★修正：婚姻のデータ書き換え処理も、専門部署（diplomacy.js）にお任せします！
     applyMarriageData(princessId, targetBushoId, targetClanId) {
         this.game.diplomacyManager.applyMarriageData(princessId, targetBushoId, targetClanId);
+    }
+
+    executeSuccession(newDaimyoId) {
+        const bushoA = this.game.getBusho(newDaimyoId);
+        const clan = this.game.clans.find(c => c.id === this.game.playerClanId);
+        const oldDaimyo = this.game.getBusho(clan.leaderId);
+
+        if (oldDaimyo) {
+            oldDaimyo.isDaimyo = false;
+        }
+
+        bushoA.isDaimyo = true;
+        bushoA.isCastellan = true;
+        if (bushoA.isGunshi) {
+            bushoA.isGunshi = false;
+        }
+
+        const targetCastle = this.game.getCastle(bushoA.castleId);
+        if (targetCastle) {
+            const castleBushos = this.game.getCastleBushos(targetCastle.id);
+            castleBushos.forEach(b => {
+                if (b.id !== bushoA.id && b.isCastellan) {
+                    b.isCastellan = false;
+                }
+            });
+            targetCastle.castellanId = bushoA.id;
+        }
+
+        clan.leaderId = bushoA.id;
+        bushoA.isActionDone = true;
+
+        if (oldDaimyo && oldDaimyo.castleId) {
+            const oldCastle = this.game.getCastle(oldDaimyo.castleId);
+            if (oldCastle) {
+                if (this.game.affiliationSystem) {
+                    this.game.affiliationSystem.updateCastleLord(oldCastle);
+                }
+            }
+        }
+
+        this.game.ui.showResultModal(`${bushoA.name} が家督を継ぎ、新たな大名となりました！`, () => {
+            this.game.ui.updatePanelHeader();
+            this.game.ui.renderCommandMenu();
+            this.game.ui.renderMap();
+        });
     }
 }
