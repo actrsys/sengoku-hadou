@@ -79,23 +79,18 @@ class IndependenceSystem {
         
         if (prob <= 0) return;
         if (Math.random() * 1000 < prob) {
-            // ★変更：画面の更新で要素が作り直されても絶対に隠し続けるために、専用のCSS（透明マント）をページ全体に張ります！
-            let hideStyle = document.getElementById('hide-ai-guard-style');
-            if (!hideStyle) {
-                hideStyle = document.createElement('style');
-                hideStyle.id = 'hide-ai-guard-style';
-                hideStyle.innerHTML = '#ai-guard { display: none !important; }';
-                document.head.appendChild(hideStyle);
-            }
+            // ★変更：謀反や独立の処理中に「思考中」が復活しないよう、CSSの魔法（クラス）を使います！
+            document.body.classList.add('is-independence-processing');
 
             try {
                 // ★変更：いきなり独立するのではなく、お家乗っ取りの作戦会議を開きます！
                 await this.planCoupDetatOrRebellion(castle, castellan, daimyo);
             } finally {
-                // ★追加：一連の処理が終わったら、透明マント（CSS）を取り外して元に戻します！
-                const styleToRemove = document.getElementById('hide-ai-guard-style');
-                if (styleToRemove) {
-                    styleToRemove.remove();
+                // ★変更：一連の処理が終わったら、クラスを外して元に戻します！
+                document.body.classList.remove('is-independence-processing');
+                
+                if (this.game.ui && typeof this.game.ui.restoreAIGuard === 'function') {
+                    this.game.ui.restoreAIGuard();
                 }
             }
         }
