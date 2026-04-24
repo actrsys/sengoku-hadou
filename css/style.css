@@ -1395,9 +1395,9 @@ body:not(.is-pc) .daimyo-detail-value {
 
 .bar-fill-busho {
     height: 100%;
-    /* ゲージ自体の色：オレンジ系のグラデーション */
-    background: linear-gradient(to right, #f39c12, #e67e22);
-    box-shadow: 0 0 4px rgba(230, 126, 34, 0.5);
+    /* ゲージ自体の色：左が濃いオレンジ、右に行くほど明るいオレンジ */
+    background: linear-gradient(to right, #d35400, #ffb74d);
+    box-shadow: 0 0 4px rgba(255, 183, 77, 0.5);
 }
 
 /* =========================================================
