@@ -283,7 +283,7 @@ class AIOperationManager {
             this.setInternalOperation(clanId);
             return;
         }
-
+        
         // 親大名がいるか探します
         let myBossId = 0;
         for (const c of this.game.clans) {
@@ -298,7 +298,6 @@ class AIOperationManager {
 
         // ★追加：周りの敵対勢力の数を数えます！
         const adjacentEnemyClans = new Set();
-        const adjacentEnemyCastles = []; // ★追加：仮想ターゲットとして選ぶための敵城リストです
 
         for (const myCastle of myClanCastles) {
             if (myCastle.adjacentCastleIds) {
@@ -309,51 +308,13 @@ class AIOperationManager {
                         const rel = this.game.getRelation(clanId, adjCastle.ownerClan);
                         if (rel && rel.status === '敵対') {
                             adjacentEnemyClans.add(adjCastle.ownerClan);
-                            adjacentEnemyCastles.push(adjCastle); // ★敵の城をリストに集めます
                         }
                     }
                 }
             }
         }
 
-        // ★追加：見つかった敵の城の中から、ランダムで1つを「仮想ターゲット」として選びます！
-        let virtualTargetId = null;
-        if (adjacentEnemyCastles.length > 0) {
-            const randIndex = Math.floor(Math.random() * adjacentEnemyCastles.length);
-            virtualTargetId = adjacentEnemyCastles[randIndex].id;
-        }
-
         const enemyCount = adjacentEnemyClans.size;
-        // 敵が2つ以上いたら「外交作戦」を考えます！
-        if (enemyCount >= 2) {
-            // 1年（12ヶ月）の間にどれくらいの確率で立案するかを決めます
-            let yearlyProb = 0;
-            if (enemyCount === 2) yearlyProb = 0.10;      // 2勢力：ごくまれ (10%)
-            else if (enemyCount === 3) yearlyProb = 0.20; 
-            else if (enemyCount === 4) yearlyProb = 0.35; 
-            else if (enemyCount === 5) yearlyProb = 0.50; // 5勢力：そこそこ (50%)
-            else if (enemyCount === 6) yearlyProb = 0.65; 
-            else if (enemyCount >= 7) yearlyProb = 0.80;  // 7勢力以上：かなりの高確率 (80%)
-
-            // 12ヶ月で上の確率になるように、1ヶ月あたりのサイコロの確率を計算する魔法です！
-            const monthlyProb = 1 - Math.pow(1 - yearlyProb, 1 / 12);
-
-            // サイコロを振ります！
-            if (Math.random() < monthlyProb) {
-                // 期間の計算：敵が2勢力なら3ヶ月。そこから敵が2つ増えるごとに1ヶ月プラスします
-                const duration = 3 + Math.floor((enemyCount - 2) / 2);
-                
-                this.operations[clanId] = {
-                    type: '外交',
-                    virtualTargetId: virtualTargetId, // ★追加：将来の工作活動のために覚えておきます
-                    turnsRemaining: 0, // すぐに実行するので準備期間はゼロです
-                    maxTurns: duration,
-                    status: '実行中'
-                };
-                console.log(`大名家[${clanId}]が【外交作戦】を立案しました！(隣接敵対: ${enemyCount}勢力, 期間: ${duration}ヶ月, 仮想目標: ${virtualTargetId})`);
-                return; // 外交作戦が決まったら、今回の作戦会議はこれでおしまいです
-            }
-        }
 
         // 攻撃作戦の候補を全部記録しておく箱を用意します
         let operationCandidates = [];
@@ -479,14 +440,77 @@ class AIOperationManager {
             }
         }
 
+        // 候補の箱をスコアの高い順に並べ替えます！
+        operationCandidates.sort((a, b) => b.score - a.score);
+
+        // ★追加：攻撃目標のスコア順から、調略の第一～第三目標を抽出します！
+        const myDaimyo = this.game.bushos.find(b => b.clan === clanId && b.isDaimyo) || { intelligence: 50 };
+        const myDaimyoInt = myDaimyo.intelligence;
+        
+        let maxSabotageTargets = 1; // 智謀69以下は第一目標まで
+        if (myDaimyoInt >= 90) maxSabotageTargets = 3; // 智謀90以上は第三目標まで
+        else if (myDaimyoInt >= 70) maxSabotageTargets = 2; // 智謀70～89は第二目標まで
+
+        let sabotageTargets = [];
+        let addedCastleIds = new Set();
+
+        for (const cand of operationCandidates) {
+            if (cand.target.isKunishuTarget) continue; // 諸勢力は除外
+            if (cand.target.ownerClan === 0) continue; // 空き城は除外
+            
+            // 同盟・支配・従属・和睦関係ではないかをチェック
+            const rel = this.game.getRelation(clanId, cand.target.ownerClan);
+            const isProtected = rel && ['同盟', '支配', '従属', '和睦'].includes(rel.status);
+            
+            if (!isProtected && !addedCastleIds.has(cand.target.id)) {
+                // 城IDとその城を所有している大名家IDをセットで記憶します
+                sabotageTargets.push({
+                    castleId: cand.target.id,
+                    clanId: cand.target.ownerClan
+                });
+                addedCastleIds.add(cand.target.id);
+                
+                // 上限に達したら探すのをやめます
+                if (sabotageTargets.length >= maxSabotageTargets) break;
+            }
+        }
+
+        // 敵が2つ以上いたら「外交作戦」を考えます！
+        if (enemyCount >= 2) {
+            // 1年（12ヶ月）の間にどれくらいの確率で立案するかを決めます
+            let yearlyProb = 0;
+            if (enemyCount === 2) yearlyProb = 0.10;      // 2勢力：ごくまれ (10%)
+            else if (enemyCount === 3) yearlyProb = 0.20; 
+            else if (enemyCount === 4) yearlyProb = 0.35; 
+            else if (enemyCount === 5) yearlyProb = 0.50; // 5勢力：そこそこ (50%)
+            else if (enemyCount === 6) yearlyProb = 0.65; 
+            else if (enemyCount >= 7) yearlyProb = 0.80;  // 7勢力以上：かなりの高確率 (80%)
+
+            // 12ヶ月で上の確率になるように、1ヶ月あたりのサイコロの確率を計算する魔法です！
+            const monthlyProb = 1 - Math.pow(1 - yearlyProb, 1 / 12);
+
+            // サイコロを振ります！
+            if (Math.random() < monthlyProb) {
+                // 期間の計算：敵が2勢力なら3ヶ月。そこから敵が2つ増えるごとに1ヶ月プラスします
+                const duration = 3 + Math.floor((enemyCount - 2) / 2);
+                
+                this.operations[clanId] = {
+                    type: '外交',
+                    sabotageTargets: sabotageTargets, // ★変更：新しく作った調略目標を記憶させます
+                    turnsRemaining: 0, // すぐに実行するので準備期間はゼロです
+                    maxTurns: duration,
+                    status: '実行中'
+                };
+                console.log(`大名家[${clanId}]が【外交作戦】を立案しました！(隣接敵対: ${enemyCount}勢力, 期間: ${duration}ヶ月, 調略目標: ${sabotageTargets.length}件)`);
+                return; // 外交作戦が決まったら、今回の作戦会議はこれでおしまいです
+            }
+        }
+
         let bestOperation = null;
         let highestScore = -1;
 
         // 候補の箱の中から、一番点数が高い作戦を見つけます！
         if (operationCandidates.length > 0) {
-            // 点数が高い順に並べ替えます
-            operationCandidates.sort((a, b) => b.score - a.score);
-            
             // ★ここから追加：点数が高い作戦から順番に見て、サポートが用意できるか確認します！
             for (const cand of operationCandidates) {
                 let supportBaseId = null;
@@ -557,7 +581,7 @@ class AIOperationManager {
                         if (execMonth > 12) execMonth -= 12;
                     }
                 }
-
+                
                 bestOperation = {
                     type: '攻撃',
                     targetId: targetId, 
@@ -569,7 +593,8 @@ class AIOperationManager {
                     assignedUnits: [], 
                     turnsRemaining: prepTurns, 
                     maxTurns: prepTurns + 3,   
-                    status: prepTurns <= 0 ? '実行中' : '準備中'
+                    status: prepTurns <= 0 ? '実行中' : '準備中',
+                    sabotageTargets: sabotageTargets // ★追加：攻撃作戦中も調略目標を記憶します
                 };
 
                 // 最高の作戦が1つ決まったら、もう他の候補は見なくていいのでループを終わらせます
@@ -589,14 +614,14 @@ class AIOperationManager {
         }
 
         // 攻撃する場所がなかったり、サイコロに外れたら、おとなしく内政作戦にします
-        this.setInternalOperation(clanId, virtualTargetId);
+        this.setInternalOperation(clanId, sabotageTargets);
     }
 
-    setInternalOperation(clanId, virtualTargetId = null) {
+    setInternalOperation(clanId, sabotageTargets = []) {
         this.operations[clanId] = {
             type: '内政',
             targetId: null,
-            virtualTargetId: virtualTargetId, // ★追加：将来の工作活動のために覚えておきます
+            sabotageTargets: sabotageTargets, // ★変更：新しく作った調略目標を記憶させます
             isKunishuTarget: false,
             stagingBase: null,
             requiredForce: 0,
@@ -606,7 +631,7 @@ class AIOperationManager {
             maxTurns: 1,
             status: '準備中'
         };
-        console.log(`大名家[${clanId}]は今月、【内政作戦】を行います。(仮想目標: ${virtualTargetId})`);
+        console.log(`大名家[${clanId}]は今月、【内政作戦】を行います。(調略目標: ${sabotageTargets.length}件)`);
     }
 
     updateOperation(clanId) {

@@ -1630,30 +1630,62 @@ class AIEngine {
                 
                 actions.push({ type: 'reward', stat: 'none', score: rewardScore, cost: 100, targets: rewardTargets });
             }
-
+            
             // ★追加 13. 調略（スコアは一律低めに設定）
-            // 作戦（myOp）で決められた「仮想目標（virtualTargetId）」に対して工作を行います！
-            if (myOp && myOp.virtualTargetId) {
-                const targetCastle = this.game.getCastle(myOp.virtualTargetId);
-                // 目標の城が存在して、空き城ではなく、味方でもない場合のみ実行します
-                if (targetCastle && targetCastle.ownerClan !== 0 && targetCastle.ownerClan !== castle.ownerClan) {
-                    // ① 破壊工作（防御力を下げる魔法です）
-                    actions.push({ type: 'sabotage', stat: 'intelligence', score: 5, cost: 0, targetId: targetCastle.id });
-                    
-                    // ② 民心撹乱（民忠を下げる魔法です）
-                    actions.push({ type: 'incite', stat: 'intelligence', score: 5, cost: 0, targetId: targetCastle.id });
+            // 作戦（myOp）で決められた「調略目標（sabotageTargets）」に対して工作を行います！
+            if (myOp && myOp.sabotageTargets && myOp.sabotageTargets.length > 0) {
+                // 第一目標から順番にチェックして、有効な目標が見つかるまで繰り上げます
+                while (myOp.sabotageTargets.length > 0) {
+                    const targetData = myOp.sabotageTargets[0];
+                    const targetCastle = this.game.getCastle(targetData.castleId);
+                    const memoryClanId = targetData.clanId;
 
-                    // お城の中にいる敵の武将たちを調べます（大名以外の人たちです）
-                    const enemyBushos = this.game.getCastleBushos(targetCastle.id).filter(b => b.clan === targetCastle.ownerClan && b.status === 'active' && !b.isDaimyo);
-                    enemyBushos.forEach(targetBusho => {
-                        // ③ 離間計（忠誠度を下げる魔法です）
-                        actions.push({ type: 'rumor', stat: 'intelligence', score: 5, cost: 0, targetId: targetCastle.id, targetBushoId: targetBusho.id });
+                    // 城が消滅している等のエラー回避
+                    if (!targetCastle) {
+                        myOp.sabotageTargets.shift(); // 繰り上げ
+                        continue;
+                    }
+
+                    const currentCastleOwner = targetCastle.ownerClan;
+
+                    // 判定用の魔法（同盟・支配・従属・和睦状態か？）
+                    const isProtected = (clan1, clan2) => {
+                        if (clan1 === clan2) return true; // 自分自身
+                        if (clan2 === 0) return false; // 空き城
+                        const rel = this.game.getRelation(clan1, clan2);
+                        return rel && ['同盟', '支配', '従属', '和睦'].includes(rel.status);
+                    };
+
+                    const isCastleProtected = isProtected(castle.ownerClan, currentCastleOwner);
+                    const isClanProtected = isProtected(castle.ownerClan, memoryClanId);
+
+                    // 両方とも保護されている場合は第一目標を削除して繰り上げます
+                    if (isCastleProtected && isClanProtected) {
+                        myOp.sabotageTargets.shift();
+                        continue;
+                    }
+
+                    // ① 第一目標城を所有している勢力が保護されていない場合（破壊工作、民心撹乱が可能）
+                    if (!isCastleProtected && currentCastleOwner !== 0 && currentCastleOwner !== castle.ownerClan) {
+                        actions.push({ type: 'sabotage', stat: 'intelligence', score: 5, cost: 0, targetId: targetCastle.id });
+                        actions.push({ type: 'incite', stat: 'intelligence', score: 5, cost: 0, targetId: targetCastle.id });
+                    }
+
+                    // ② 第一目標勢力（記憶している大名家）が保護されていない場合（離間計、武将引抜が可能）
+                    if (!isClanProtected && memoryClanId !== 0 && memoryClanId !== castle.ownerClan) {
+                        // 第一目標勢力に所属する武将を全員取得（大名は除く）
+                        const enemyBushos = this.game.bushos.filter(b => b.clan === memoryClanId && b.status === 'active' && !b.isDaimyo && b.castleId > 0);
                         
-                        // ④ 武将引抜（味方にする魔法です。とりあえず100金だけ使う設定にしておきます）
-                        if (castle.gold >= 100) {
-                            actions.push({ type: 'headhunt', stat: 'intelligence', score: 5, cost: 100, targetId: targetCastle.id, targetBushoId: targetBusho.id, gold: 100 });
-                        }
-                    });
+                        enemyBushos.forEach(targetBusho => {
+                            actions.push({ type: 'rumor', stat: 'intelligence', score: 5, cost: 0, targetId: targetBusho.castleId, targetBushoId: targetBusho.id });
+                            
+                            if (castle.gold >= 100) {
+                                actions.push({ type: 'headhunt', stat: 'intelligence', score: 5, cost: 100, targetId: targetBusho.castleId, targetBushoId: targetBusho.id, gold: 100 });
+                            }
+                        });
+                    }
+
+                    break; // 第一目標の処理（アクションの追加）を終えたらループを抜けます
                 }
             }
 
