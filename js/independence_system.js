@@ -83,9 +83,14 @@ class IndependenceSystem {
             await this.planCoupDetatOrRebellion(castle, castellan, daimyo);
         }
     }
-
+    
     async executeRebellion(castle, castellan, oldDaimyo, intention = 'indep') {
         const oldClanId = castle.ownerClan;
+        
+        // ★追加：複数のお城が同時に寝返ったか調べるために、最初のお城の持ち主を全部メモしておきます！
+        const initialClanMap = new Map();
+        this.game.castles.forEach(c => initialClanMap.set(c.id, c.ownerClan));
+        
         const I = window.WarParams.Independence || {};
 
         // --- ★追加：派閥主を神輿（みこし）に担ぐ処理 ---
@@ -342,18 +347,69 @@ class IndependenceSystem {
         this.resolveDistantFactionMembers(rebellionLeader, oldClanId, newClanId, oldDaimyo);
 
         this.game.updateCastleLord(castle);
-
+        
         // ★追加：独立や寝返りで勢力が大きく変わるので、威信を最新に更新しておきます！
         if (window.GameApp) window.GameApp.updateAllClanPrestige();
         
-        // ★追加：独立や寝返りが起きたら、すぐにマップを新しい状態に描き直します！
-        if (this.game.ui && typeof this.game.ui.renderMap === 'function') {
-            this.game.ui.renderMap();
-        }
-        
-        // メッセージ画面を出す処理は一番最後に行います
-        if (captiveMsgs && captiveMsgs.length > 0) msg += '\n\n' + captiveMsgs.join('\n');
+        // ★ここから複数城に対応した演出魔法の始まりです！
+        // 今回勢力が変わった城（独立・寝返りに参加した城）のIDをすべて集めます
+        const changedCastleIds = [];
+        this.game.castles.forEach(c => {
+            const oldOwner = initialClanMap.get(c.id);
+            if (oldOwner === oldClanId && c.ownerClan === newClanId) {
+                changedCastleIds.push(c.id);
+            }
+        });
+        // 万が一見つからなかったら起点のお城だけを入れます
+        if (changedCastleIds.length === 0) changedCastleIds.push(castle.id);
+
+        // まずは最初のメッセージを出します
         await this.game.ui.showDialogAsync(msg, false, 0);
+
+        // 画面を勝手に触られないようにバリアを張ります
+        if (typeof this.game.ui.showMapGuard === 'function') this.game.ui.showMapGuard();
+
+        // 独立したお城（起点の城）にカメラを移動させます！
+        this.game.ui.scrollToActiveCastle(castle, false);
+        await new Promise(res => setTimeout(res, 600)); 
+
+        // お城の元の色と、新しい色を調べます
+        let oldColor = { r: 255, g: 255, b: 255 };
+        let newColorRgb = { r: 255, g: 255, b: 255 };
+        const oldClanData = this.game.clans.find(c => c.id === oldClanId);
+        if (oldClanData && oldClanData.color && typeof DataManager !== 'undefined') oldColor = DataManager.hexToRgb(oldClanData.color);
+        const newClanDataObj = this.game.clans.find(c => c.id === newClanId);
+        if (newClanDataObj && newClanDataObj.color && typeof DataManager !== 'undefined') newColorRgb = DataManager.hexToRgb(newClanDataObj.color);
+
+        // 参加したお城をすべて同時にチカチカ点滅させます！
+        await this.game.ui.playBattleBlink(changedCastleIds, oldColor, newColorRgb, 1000);
+
+        // フワッと光るアニメーションと一緒に、色を新しく塗り替えます！
+        if (typeof this.game.ui.playCaptureEffect === 'function') {
+            await this.game.ui.playCaptureEffect(changedCastleIds, () => {
+                if (this.game.ui && typeof this.game.ui.renderMap === 'function') {
+                    this.game.ui.renderMap();
+                }
+            });
+        } else {
+            if (this.game.ui && typeof this.game.ui.renderMap === 'function') {
+                this.game.ui.renderMap();
+            }
+        }
+
+        // バリアを解除します
+        if (typeof this.game.ui.hideMapGuard === 'function') this.game.ui.hideMapGuard(true);
+
+        // 追加のメッセージを作ります
+        let extraMsg = "";
+        if (!isDefection) {
+            extraMsg = `${rebellionLeader.name}が大名となりました！`;
+        } else {
+            extraMsg = `${rebellionLeader.name}は寝返りを果たしました！`;
+        }
+
+        if (captiveMsgs && captiveMsgs.length > 0) extraMsg += '\n\n' + captiveMsgs.join('\n');
+        await this.game.ui.showDialogAsync(extraMsg, false, 0);
     }
 
     calculateLoyaltyScores(busho, newDaimyo, oldDaimyo) {
@@ -678,18 +734,49 @@ class IndependenceSystem {
             action = 'coup';
             maxScore = coupScore;
         }
-
+        
         // 決定した行動を実行します
         if (action === 'coup') {
             this.game.ui.log(`【謀反】${rebellionLeader.name}が主君である${oldDaimyo.name}に対し、謀反を起こしました。`);
             await this.game.ui.showDialogAsync(`【謀反】\n${rebellionLeader.name}が主君である${oldDaimyo.name}に対し、謀反を起こしました！`);
+
+            // ★ここから追加：謀反の時もカメラを移動してチカチカさせます！
+            // ただし、プレイヤー大名家の場合は野戦画面になるのでチカチカさせません！
+            const isPlayerDaimyo = (oldClanId === this.game.playerClanId);
+            
+            if (!isPlayerDaimyo) {
+                if (typeof this.game.ui.showMapGuard === 'function') this.game.ui.showMapGuard();
+                
+                // お城にカメラを移動します
+                this.game.ui.scrollToActiveCastle(castle, false);
+                await new Promise(res => setTimeout(res, 600));
+
+                // 謀反に参加する城（反乱軍の城）をすべて集めます
+                const rebelCastleIds = [];
+                rebelMembers.forEach(b => {
+                    if (b.castleId && !rebelCastleIds.includes(b.castleId)) {
+                        rebelCastleIds.push(b.castleId);
+                    }
+                });
+                if (rebelCastleIds.length === 0) rebelCastleIds.push(castle.id);
+
+                // 元の色を調べて、謀反軍の仮の色（少し赤っぽく）と交互に点滅させます
+                let oldColor = { r: 255, g: 255, b: 255 };
+                let rebelColor = { r: 255, g: 100, b: 100 }; 
+                const oldClanData = this.game.clans.find(c => c.id === oldClanId);
+                if (oldClanData && oldClanData.color && typeof DataManager !== 'undefined') oldColor = DataManager.hexToRgb(oldClanData.color);
+
+                // 反乱軍の城をすべて同時に点滅させます！
+                await this.game.ui.playBattleBlink(rebelCastleIds, oldColor, rebelColor, 1000);
+                if (typeof this.game.ui.hideMapGuard === 'function') this.game.ui.hideMapGuard(true);
+            }
+            // ★追加ここまで
 
             // 裏で野戦を行います！
             const result = await this.executeSecretFieldWar(daimyoMembers, rebelMembers, oldDaimyo, rebellionLeader);
 
             if (result === 'rebel_win') {
                 // 【反乱軍の勝利】
-                await this.game.ui.showDialogAsync(`【謀反】${oldDaimyo.name}は討死しました！\n${rebellionLeader.name}が新たな大名となります！`);
                 this.game.ui.log(`【謀反】反乱軍が勝利し、${oldDaimyo.name}は討死しました。`);
 
                 // 勝手に後継ぎが選ばれて大名が2人にならないように、先に大名の印を外しておきます
@@ -851,10 +938,30 @@ class IndependenceSystem {
                 // 勢力情報が変わったので威信を更新
                 if (window.GameApp) window.GameApp.updateAllClanPrestige();
 
-                // ★追加：謀反が成功して大名が変わったので、すぐにマップを新しい状態に描き直します！
-                if (this.game.ui && typeof this.game.ui.renderMap === 'function') {
-                    this.game.ui.renderMap();
+                // ★ここから演出魔法の始まりです！
+                // 乗っ取った大名家の城をすべて集めます
+                const allClanCastleIds = this.game.castles.filter(c => c.ownerClan === oldClanId).map(c => c.id);
+
+                if (typeof this.game.ui.showMapGuard === 'function') this.game.ui.showMapGuard();
+
+                // プレイヤーの場合でも、野戦からマップに戻ってきた後にこのアニメーションが行われます！
+                // 色が変わるアニメーションを入れてから、マップを描き直します！
+                if (typeof this.game.ui.playCaptureEffect === 'function') {
+                    await this.game.ui.playCaptureEffect(allClanCastleIds.length > 0 ? allClanCastleIds : castle.id, () => {
+                        if (this.game.ui && typeof this.game.ui.renderMap === 'function') {
+                            this.game.ui.renderMap();
+                        }
+                    });
+                } else {
+                    if (this.game.ui && typeof this.game.ui.renderMap === 'function') {
+                        this.game.ui.renderMap();
+                    }
                 }
+
+                if (typeof this.game.ui.hideMapGuard === 'function') this.game.ui.hideMapGuard(true);
+
+                // アニメーションが終わってから、結果のメッセージを出します！
+                await this.game.ui.showDialogAsync(`【謀反】${oldDaimyo.name}は討死しました！\n${rebellionLeader.name}が新たな大名となります！`);
 
             } else if (result === 'daimyo_win') {
                 // 【主家軍の勝利】

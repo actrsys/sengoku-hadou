@@ -1651,7 +1651,7 @@ Object.assign(UIManager.prototype, {
     // ==========================================
     // ★追加：指定したお城の領地だけをチカチカ点滅させる魔法です！
     // ==========================================
-    playBattleBlink(castleId, colorA, colorB, durationMs) {
+    playBattleBlink(castleIdOrIds, colorA, colorB, durationMs) {
         return new Promise(resolve => {
             // タッチ防止の透明な壁を作ります（共通の魔法を使います）
             this.showMapGuard();
@@ -1686,9 +1686,12 @@ Object.assign(UIManager.prototype, {
                 // ★追加：2ピクセル分広く塗るための準備
                 const targetPixels = new Uint8Array(width * height);
 
+                // ★修正：１つの城でも、複数の城でも同時に光るようにリストにします！
+                const targetIds = Array.isArray(castleIdOrIds) ? castleIdOrIds : [castleIdOrIds];
+
                 // まずは本来のお城の領地をマークします
                 for (let i = 0; i < this.pixelCastleMap.length; i++) {
-                    if (this.pixelCastleMap[i] === castleId) {
+                    if (targetIds.includes(this.pixelCastleMap[i])) {
                         targetPixels[i] = 1;
                     }
                 }
@@ -1760,7 +1763,7 @@ Object.assign(UIManager.prototype, {
     // ==========================================
     // ★ここから追加：城が落ちた時の、障壁がフワッと立ち上って白く光る魔法！
     // ==========================================
-    playCaptureEffect(castleId, onHalfway) {
+    playCaptureEffect(castleIdOrIds, onHalfway) {
         return new Promise(resolve => {
             // アニメーション中に画面を触れないようにバリアを張ります（共通の魔法を使います）
             this.showMapGuard();
@@ -1788,8 +1791,11 @@ Object.assign(UIManager.prototype, {
             const edgePixels = new Uint8Array(width * height);
             
             if (this.pixelCastleMap) {
+                // ★修正：１つの城でも、複数の城でも同時に光るようにリストにします！
+                const targetIds = Array.isArray(castleIdOrIds) ? castleIdOrIds : [castleIdOrIds];
+
                 for (let i = 0; i < this.pixelCastleMap.length; i++) {
-                    if (this.pixelCastleMap[i] === castleId) {
+                    if (targetIds.includes(this.pixelCastleMap[i])) {
                         targetPixels[i] = 1;
                     }
                 }
