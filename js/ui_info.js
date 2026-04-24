@@ -1513,12 +1513,7 @@ class UIInfoManager {
         let totalGoldIncome = GameSystem.calcBaseGoldIncome(castle);
         let totalRiceIncome = GameSystem.calcBaseRiceIncome(castle);
 
-        let faceHtml = "";
-        if (castellan && castellan.faceIcon) {
-            faceHtml = `<img src="data/images/faceicons/${castellan.faceIcon}" class="daimyo-detail-face" onerror="this.src='data/images/faceicons/unknown_face.webp'">`;
-        } else {
-            faceHtml = `<div class="daimyo-detail-face" style="background: linear-gradient(to top right, #eeeeee, #777777);"></div>`;
-        }
+        let faceSrc = castellan && castellan.faceIcon ? `data/images/faceicons/${castellan.faceIcon}` : "data/images/faceicons/unknown_face.webp";
 
         if (listContainer) {
             listContainer.className = 'list-container hide-native-scroll';
@@ -1530,7 +1525,7 @@ class UIInfoManager {
                     </div>
                     <div class="daimyo-detail-body">
                         <div class="daimyo-detail-left">
-                            ${faceHtml}
+                            <img src="${faceSrc}" class="daimyo-detail-face" onerror="this.src='data/images/faceicons/unknown_face.webp'">
                             <div class="daimyo-detail-header sp-only" style="margin-bottom: 10px; justify-content: center;">
                                 <div class="daimyo-detail-name" style="font-size: 1.5rem;">${castle.name}</div>
                             </div>
