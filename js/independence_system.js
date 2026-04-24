@@ -89,6 +89,12 @@ class IndependenceSystem {
                 // ★変更：一連の処理が終わったら、クラスを外して元に戻します！
                 document.body.classList.remove('is-independence-processing');
                 
+                // ★復活：元のコードにあった、見張り番の表示状態を確実にリセットする処理を戻します
+                const aiGuardEl = document.getElementById('ai-guard');
+                if (aiGuardEl) {
+                    aiGuardEl.style.display = '';
+                }
+                
                 if (this.game.ui && typeof this.game.ui.restoreAIGuard === 'function') {
                     this.game.ui.restoreAIGuard();
                 }
