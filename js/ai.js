@@ -1631,6 +1631,32 @@ class AIEngine {
                 actions.push({ type: 'reward', stat: 'none', score: rewardScore, cost: 100, targets: rewardTargets });
             }
 
+            // ★追加 13. 調略（スコアは一律低めに設定）
+            // 作戦（myOp）で決められた「仮想目標（virtualTargetId）」に対して工作を行います！
+            if (myOp && myOp.virtualTargetId) {
+                const targetCastle = this.game.getCastle(myOp.virtualTargetId);
+                // 目標の城が存在して、空き城ではなく、味方でもない場合のみ実行します
+                if (targetCastle && targetCastle.ownerClan !== 0 && targetCastle.ownerClan !== castle.ownerClan) {
+                    // ① 破壊工作（防御力を下げる魔法です）
+                    actions.push({ type: 'sabotage', stat: 'intelligence', score: 5, cost: 0, targetId: targetCastle.id });
+                    
+                    // ② 民心撹乱（民忠を下げる魔法です）
+                    actions.push({ type: 'incite', stat: 'intelligence', score: 5, cost: 0, targetId: targetCastle.id });
+
+                    // お城の中にいる敵の武将たちを調べます（大名以外の人たちです）
+                    const enemyBushos = this.game.getCastleBushos(targetCastle.id).filter(b => b.clan === targetCastle.ownerClan && b.status === 'active' && !b.isDaimyo);
+                    enemyBushos.forEach(targetBusho => {
+                        // ③ 離間計（忠誠度を下げる魔法です）
+                        actions.push({ type: 'rumor', stat: 'intelligence', score: 5, cost: 0, targetId: targetCastle.id, targetBushoId: targetBusho.id });
+                        
+                        // ④ 武将引抜（味方にする魔法です。とりあえず100金だけ使う設定にしておきます）
+                        if (castle.gold >= 100) {
+                            actions.push({ type: 'headhunt', stat: 'intelligence', score: 5, cost: 100, targetId: targetCastle.id, targetBushoId: targetBusho.id, gold: 100 });
+                        }
+                    });
+                }
+            }
+
             // 点数が高い順に並べ替えます
             actions.sort((a, b) => b.score - a.score);
 
@@ -1749,6 +1775,105 @@ class AIEngine {
                     doer.isActionDone = true; 
                     actionDoneInThisStep = true; 
                     break;
+                }
+                if (action.type === 'sabotage') {
+                    const result = this.game.strategySystem.calcSabotage(doer.id, action.targetId);
+                    this.game.strategySystem.handleCovertAction(doer.id, action.targetId, result.success, 'sabotage');
+                    if (result.success) {
+                        const target = this.game.getCastle(action.targetId);
+                        target.defense = Math.max(0, target.defense - result.val);
+                        doer.achievementTotal = (doer.achievementTotal || 0) + Math.floor(doer.intelligence * 0.2) + 10;
+                        if (this.game.factionSystem && this.game.factionSystem.updateRecognition) this.game.factionSystem.updateRecognition(doer, 20);
+                    } else {
+                        doer.achievementTotal = (doer.achievementTotal || 0) + 5;
+                        if (this.game.factionSystem && this.game.factionSystem.updateRecognition) this.game.factionSystem.updateRecognition(doer, 10);
+                    }
+                    doer.isActionDone = true; actionDoneInThisStep = true; break;
+                }
+                if (action.type === 'incite') {
+                    const result = this.game.strategySystem.calcIncite(doer.id, action.targetId);
+                    this.game.strategySystem.handleCovertAction(doer.id, action.targetId, result.success, 'incite');
+                    if (result.success) {
+                        const target = this.game.getCastle(action.targetId);
+                        target.peoplesLoyalty = Math.max(0, target.peoplesLoyalty - result.val);
+                        doer.achievementTotal = (doer.achievementTotal || 0) + Math.floor(doer.intelligence * 0.2) + 10;
+                        if (this.game.factionSystem && this.game.factionSystem.updateRecognition) this.game.factionSystem.updateRecognition(doer, 20);
+                    } else {
+                        doer.achievementTotal = (doer.achievementTotal || 0) + 5;
+                        if (this.game.factionSystem && this.game.factionSystem.updateRecognition) this.game.factionSystem.updateRecognition(doer, 10);
+                    }
+                    doer.isActionDone = true; actionDoneInThisStep = true; break;
+                }
+                if (action.type === 'rumor') {
+                    let result = this.game.strategySystem.calcRumor(doer.id, action.targetBushoId);
+                    const targetBusho = this.game.getBusho(action.targetBushoId);
+                    if (targetBusho.isCastellan && result.success) {
+                        if (Math.random() > 0.33) result.success = false;
+                    }
+                    this.game.strategySystem.handleCovertAction(doer.id, targetBusho.castleId, result.success, 'rumor');
+                    if (result.success) {
+                        targetBusho.loyalty = Math.max(0, targetBusho.loyalty - result.val);
+                        doer.achievementTotal = (doer.achievementTotal || 0) + Math.floor(doer.intelligence * 0.2) + 10;
+                        if (this.game.factionSystem && this.game.factionSystem.updateRecognition) this.game.factionSystem.updateRecognition(doer, 20);
+                    } else {
+                        doer.achievementTotal = (doer.achievementTotal || 0) + 5;
+                        if (this.game.factionSystem && this.game.factionSystem.updateRecognition) this.game.factionSystem.updateRecognition(doer, 10);
+                    }
+                    doer.isActionDone = true; actionDoneInThisStep = true; break;
+                }
+                if (action.type === 'headhunt' && castle.gold >= action.cost) {
+                    castle.gold -= action.cost;
+                    const targetBusho = this.game.getBusho(action.targetBushoId);
+                    let isSuccess = this.game.strategySystem.calcHeadhunt(doer.id, action.targetBushoId, action.gold);
+                    if (targetBusho.isCastellan && isSuccess) {
+                        if (Math.random() > 0.33) isSuccess = false;
+                    }
+                    this.game.strategySystem.handleCovertAction(doer.id, targetBusho.castleId, isSuccess, 'headhunt', targetBusho.isCastellan && isSuccess);
+                    if (isSuccess) {
+                        const oldCastle = this.game.getCastle(targetBusho.castleId);
+                        const oldClanId = targetBusho.clan;
+                        const newClanId = doer.clan;
+                        
+                        if (oldClanId !== 0 && oldClanId !== newClanId) {
+                            targetBusho.achievementTotal = Math.floor(targetBusho.achievementTotal / 2);
+                        }
+                        
+                        if (targetBusho.isCastellan && oldCastle) {
+                            this.game.castleManager.changeOwner(oldCastle, newClanId);
+                            targetBusho.clan = newClanId;
+                            targetBusho.isActionDone = true;
+                            targetBusho.status = 'active';
+                            targetBusho.isGunshi = false;
+                            
+                            const targetLord = this.game.bushos.find(b => b.clan === oldClanId && b.isDaimyo) || { affinity: 50 };
+                            this.game.independenceSystem.resolveSubordinates(oldCastle, targetBusho, targetLord, newClanId, oldClanId);
+                            
+                            this.game.getCastleBushos(oldCastle.id).forEach(b => {
+                                if (b.clan === newClanId && b.status === 'active') {
+                                    this.game.affiliationSystem.updateLoyaltyForNewLord(b, newClanId);
+                                }
+                            });
+                            
+                            const myGunshi = this.game.bushos.find(b => b.clan === newClanId && b.isGunshi);
+                            this.game.getCastleBushos(oldCastle.id).forEach(b => {
+                                if (!myGunshi || b.id !== myGunshi.id) {
+                                    if (b.clan === newClanId && b.status === 'active') b.isGunshi = false;
+                                }
+                            });
+                            this.game.updateCastleLord(oldCastle);
+                        } else {
+                            targetBusho.belongKunishuId = 0;
+                            targetBusho.isActionDone = true;
+                            this.game.affiliationSystem.joinClan(targetBusho, newClanId, castle.id);
+                        }
+                        const maxStat = Math.max(targetBusho.strength, targetBusho.intelligence, targetBusho.leadership, targetBusho.charm, targetBusho.diplomacy);
+                        doer.achievementTotal = (doer.achievementTotal || 0) + Math.floor(maxStat * 0.3);
+                        if (this.game.factionSystem && this.game.factionSystem.updateRecognition) this.game.factionSystem.updateRecognition(doer, 25);
+                    } else {
+                        doer.achievementTotal = (doer.achievementTotal || 0) + 5;
+                        if (this.game.factionSystem && this.game.factionSystem.updateRecognition) this.game.factionSystem.updateRecognition(doer, 10);
+                    }
+                    doer.isActionDone = true; actionDoneInThisStep = true; break;
                 }
                 if (action.type === 'repair' && castle.gold >= 200) {
                     castle.gold -= 200;
