@@ -292,6 +292,12 @@ class KunishuSystem {
         } 
         // 敵対 (30以下)
         else if (currentRel <= 30) {
+            // ★追加：お城のある国が大雪の時は、諸勢力も身動きが取れないので略奪や反乱を起こしません！
+            const province = this.game.provinces.find(p => p.id === castle.provinceId);
+            if (province && province.statusEffects && province.statusEffects.includes('heavySnow')) {
+                return; // 大雪なら何もせずにおしまいです
+            }
+
             let actionDone = false;
             
             // まずは「略奪」の判定から行います！
