@@ -79,26 +79,24 @@ class IndependenceSystem {
         
         if (prob <= 0) return;
         if (Math.random() * 1000 < prob) {
-            // ★追加：謀反や独立の処理中に裏で戦闘が起きても「思考中」が復活しないように、見張り番を立てます！
-            const hideAIGuard = () => {
+            // ★追加：謀反や独立の処理中、「思考中」が復活しないようにUIの魔法を使います！
+            if (this.game.ui && typeof this.game.ui.hideAIGuardTemporarily === 'function') {
+                this.game.ui.hideAIGuardTemporarily();
+            } else {
                 const aiGuardEl = document.getElementById('ai-guard');
                 if (aiGuardEl) aiGuardEl.style.display = 'none';
-            };
-            hideAIGuard();
-            const guardTimer = setInterval(hideAIGuard, 50);
+            }
 
             try {
                 // ★変更：いきなり独立するのではなく、お家乗っ取りの作戦会議を開きます！
                 await this.planCoupDetatOrRebellion(castle, castellan, daimyo);
             } finally {
                 // ★追加：一連の処理が終わったら、見張り番を解任して元に戻します！
-                clearInterval(guardTimer);
-                const aiGuardEl = document.getElementById('ai-guard');
-                if (aiGuardEl) {
-                    aiGuardEl.style.display = '';
-                }
                 if (this.game.ui && typeof this.game.ui.restoreAIGuard === 'function') {
                     this.game.ui.restoreAIGuard();
+                } else {
+                    const aiGuardEl = document.getElementById('ai-guard');
+                    if (aiGuardEl) aiGuardEl.style.display = '';
                 }
             }
         }
