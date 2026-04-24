@@ -819,6 +819,21 @@ class LifeSystem {
         // ① 先代大名の役職を外します
         oldDaimyo.isDaimyo = false;
 
+        // ★追加：もし選ばれたのが「元服前（未登場）」の武将だったら、急いで元服させてお城に呼びます！
+        if (successor.status === 'unborn') {
+            successor.status = 'active'; // 登場済みにします
+            successor.clan = oldDaimyo.clan; // 大名家を合わせます
+            successor.castleId = oldDaimyo.castleId; // 先代大名と同じお城に呼びます
+            successor.loyalty = 100; // 忠誠度をマックスにします
+            
+            // お城の武将リストに加えてあげます
+            const castle = this.game.getCastle(successor.castleId);
+            if (castle && !castle.samuraiIds.includes(successor.id)) {
+                castle.samuraiIds.push(successor.id);
+            }
+            messages.push(`${successor.name.replace('|','')}が急遽元服し、家督を継ぎました。`);
+        }
+
         // ② 新しい大名を任命します
         successor.isDaimyo = true;
         successor.isCastellan = true;

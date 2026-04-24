@@ -72,7 +72,8 @@ const CAN_EXECUTE_RULES = {
         if (!daimyo) return false;
         const dFamily = Array.isArray(daimyo.familyIds) ? daimyo.familyIds : [];
         return game.bushos.some(b => {
-            if (b.clan !== game.playerClanId || b.status !== 'active' || b.isDaimyo) return false;
+            // active（登場済み）だけでなく、unborn（元服前）の武将がいてもコマンドを押せるようにします！
+            if (b.clan !== game.playerClanId || (b.status !== 'active' && b.status !== 'unborn') || b.isDaimyo) return false;
             const bFamily = Array.isArray(b.familyIds) ? b.familyIds : [];
             return bFamily.includes(daimyo.id) || dFamily.includes(b.id);
         });
@@ -660,7 +661,8 @@ class CommandSystem {
             if (daimyo) {
                 const dFamily = Array.isArray(daimyo.familyIds) ? daimyo.familyIds : [];
                 bushos = this.game.bushos.filter(b => {
-                    if (b.clan !== this.game.playerClanId || b.status !== 'active' || b.isDaimyo) return false;
+                    // active（登場済み）だけでなく、unborn（元服前）の武将もリストに並ぶようにします！
+                    if (b.clan !== this.game.playerClanId || (b.status !== 'active' && b.status !== 'unborn') || b.isDaimyo) return false;
                     const bFamily = Array.isArray(b.familyIds) ? b.familyIds : [];
                     return bFamily.includes(daimyo.id) || dFamily.includes(b.id);
                 });
