@@ -1943,6 +1943,9 @@ Object.assign(WarManager.prototype, {
             return;
         }
         
+        // 合戦で使った「援軍リスト」などの過去の履歴を綺麗にお掃除します！
+        this.game.ui.closeCommonModal();
+        
         // 登用フェーズ開始時、全員が選べるように「行動済」フラグを外しておきます
         this.pendingPrisoners.forEach(p => p.isActionDone = false);
         this.game.ui.showDialog("登用する武将を選択してください。", false, () => {
@@ -1955,6 +1958,10 @@ Object.assign(WarManager.prototype, {
             this.finishPrisonerPhase();
             return;
         }
+
+        // 決定ボタンを押すたびにリストが履歴に重なっていくのを防ぎます
+        this.game.ui.closeCommonModal();
+
         // まだ登用を断っていない（選べる）人を探します
         const selectable = this.pendingPrisoners.filter(p => !p.isActionDone);
         
@@ -1962,7 +1969,10 @@ Object.assign(WarManager.prototype, {
         if (selectable.length === 0) {
             this.game.ui.showDialog("登用を終了しますか？", true, 
                 () => { this.startKillPhase(); },
-                () => { this.game.ui.openBushoSelector('prisoner_hire', null, this._getHireListConfig()); }
+                () => { 
+                    this.game.ui.closeCommonModal(); // 念のためお掃除
+                    this.game.ui.openBushoSelector('prisoner_hire', null, this._getHireListConfig()); 
+                }
             );
             return;
         }
@@ -2048,6 +2058,10 @@ Object.assign(WarManager.prototype, {
             this.finishPrisonerPhase();
             return;
         }
+
+        // ★リストを開く前のお掃除
+        this.game.ui.closeCommonModal();
+        
         // 処断フェーズの開始時、さっき登用を断った人も選べるように「行動済」フラグを外しておきます
         this.pendingPrisoners.forEach(p => p.isActionDone = false);
         this.game.ui.showDialog("処断する武将を選択してください。", false, () => {
@@ -2060,11 +2074,18 @@ Object.assign(WarManager.prototype, {
             this.finishPrisonerPhase();
             return;
         }
+
+        // ★リストが開くたびに重なるのを防ぐお掃除
+        this.game.ui.closeCommonModal();
+
         const selectable = this.pendingPrisoners.filter(p => !p.isActionDone);
         if (selectable.length === 0) {
             this.game.ui.showDialog("処断を終了しますか？", true, 
                 () => { this.finishPrisonerPhase(); },
-                () => { this.game.ui.openBushoSelector('prisoner_kill', null, this._getKillListConfig()); }
+                () => { 
+                    this.game.ui.closeCommonModal(); // 念のためお掃除
+                    this.game.ui.openBushoSelector('prisoner_kill', null, this._getKillListConfig()); 
+                }
             );
             return;
         }
