@@ -584,8 +584,7 @@ class UIInfoManager {
     showBushoDetailModal(busho) {
         this.pushModal('busho_detail', [busho]);
     }
-
-    // --- 差し替え後 ---
+    
     _renderBushoDetail(busho, scrollPos = 0) {
         const modal = document.getElementById('selector-modal');
         const title = document.getElementById('selector-title');
@@ -712,8 +711,8 @@ class UIInfoManager {
                 <div class="daimyo-detail-stat-box" style="padding-right: 5px;">
                     <span class="daimyo-detail-label">${label}</span>
                     <span class="daimyo-detail-value" style="display:flex; align-items:center; flex:1; justify-content: flex-end;">
-                        <div class="bar-bg bar-bg-busho" style="flex:1; max-width: 80px; margin-right: 8px; height: 10px;"><div class="bar-fill bar-fill-busho" style="width:${percent}%;"></div></div>
-                        <div style="width: 25px; text-align: center;">${gradeHtml}</div>
+                        <div class="bar-bg-busho"><div class="bar-fill-busho" style="width:${percent}%;"></div></div>
+                        <div style="width: 30px; text-align: center; font-weight: bold;">${gradeHtml}</div>
                     </span>
                 </div>
             `;
@@ -767,9 +766,11 @@ class UIInfoManager {
                                 ${getStatRow('intelligence', '智謀')}
                                 ${getStatRow('charm', '魅力')}
                             </div>
-                            <div class="daimyo-detail-row daimyo-detail-3col">
+                            <div class="daimyo-detail-row daimyo-detail-2col">
                                 <div class="daimyo-detail-stat-box"><span class="daimyo-detail-label">俸禄</span><span class="daimyo-detail-value">${salary}</span></div>
                                 <div class="daimyo-detail-stat-box"><span class="daimyo-detail-label">一門</span><span class="daimyo-detail-value">${isFamily ? "◯" : ""}</span></div>
+                            </div>
+                            <div class="daimyo-detail-row">
                                 <div class="daimyo-detail-stat-box"><span class="daimyo-detail-label">派閥</span><span class="daimyo-detail-value">${factionNameStr}</span></div>
                             </div>
                         </div>
