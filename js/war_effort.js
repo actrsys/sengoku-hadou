@@ -1011,8 +1011,8 @@ Object.assign(WarManager.prototype, {
                             // 大名がいたら、先ほど作った大名専用の画面を最初に出します
                             this.game.ui.showDaimyoPrisonerModal(this.pendingPrisoners[daimyoIndex]);
                         } else {
-                            // 大名がいなければ、いつもの一覧画面を出します
-                            this.game.ui.showPrisonerModal(this.pendingPrisoners);
+                            // 大名がいなければ、新しく作った共通の処遇フローに入ります
+                            this.startPrisonerPhase();
                         }
                         
                         // ==========================================
@@ -1800,15 +1800,12 @@ Object.assign(WarManager.prototype, {
         const nextStep = async () => { 
             this.pendingPrisoners.splice(index, 1); 
             if (this.pendingPrisoners.length === 0) {
-                this.game.ui.closePrisonerModal();
-                
-                // ★ここを直します！「this.game.lifeSystem.」を付け足します！
+                this.game.ui.closeCommonModal();
                 await this.game.lifeSystem.checkClanExtinction(this.state.oldDefClanId, 'no_castle');
                 if (window.GameApp) window.GameApp.updateAllClanPrestige(); // 威信を更新
                 this.game.finishTurn();
-                
             } else {
-                this.game.ui.showPrisonerModal(this.pendingPrisoners); 
+                this.startPrisonerPhase(); 
             }
         };
 
@@ -1817,13 +1814,12 @@ Object.assign(WarManager.prototype, {
              if (prisoner.isDaimyo) {
                  this.game.ui.showDaimyoPrisonerModal(prisoner);
              } else {
-                 this.game.ui.showPrisonerModal(this.pendingPrisoners);
+                 this.startPrisonerPhase();
              }
         };
         
         if (action === 'hire') { 
             if (kunishu && prisoner.id === kunishu.leaderId) {
-                // ★ここを修正：「stayStep」を付け足して、ちゃんとやり直せるようにしました！
                 this.game.ui.showDialog(`${prisoner.name}「諸勢力を束ねるこの俺が、お前になど仕えるか！」\n(※諸勢力の代表者は登用できません)`, false, stayStep); 
                 return; // やり直し
             }
@@ -1939,6 +1935,210 @@ Object.assign(WarManager.prototype, {
             }
         } 
     },
+
+    startPrisonerPhase() {
+        // ★捕虜がいなければすぐに解放・終了処理へ向かいます
+        if (!this.pendingPrisoners || this.pendingPrisoners.length === 0) {
+            this.finishPrisonerPhase();
+            return;
+        }
+        
+        // 登用フェーズ開始時、全員が選べるように「行動済」フラグを外しておきます
+        this.pendingPrisoners.forEach(p => p.isActionDone = false);
+        this.game.ui.showDialog("登用する武将を選択してください。", false, () => {
+            this.openHireList();
+        });
+    },
+
+    openHireList() {
+        if (!this.pendingPrisoners || this.pendingPrisoners.length === 0) {
+            this.finishPrisonerPhase();
+            return;
+        }
+        // まだ登用を断っていない（選べる）人を探します
+        const selectable = this.pendingPrisoners.filter(p => !p.isActionDone);
+        
+        // もし誰も選べなくなっていたら、すぐに終了するかどうかの確認を出します
+        if (selectable.length === 0) {
+            this.game.ui.showDialog("登用を終了しますか？", true, 
+                () => { this.startKillPhase(); },
+                () => { this.game.ui.openBushoSelector('prisoner_hire', null, this._getHireListConfig()); }
+            );
+            return;
+        }
+        
+        // 共通の武将リストを開きます！
+        this.game.ui.openBushoSelector('prisoner_hire', null, this._getHireListConfig());
+    },
+
+    _getHireListConfig() {
+        return {
+            customBushos: this.pendingPrisoners,
+            customInfoHtml: "登用する武将を選択してください",
+            isMulti: true,
+            onConfirm: async (selectedIds) => {
+                // 決定ボタンが押されたら、選ばれた人たちを一人ずつ登用できるかチェックします
+                await this.processHirePrisoners(selectedIds);
+                // 処理が終わったら、再びリストを開きます
+                this.openHireList();
+            },
+            onCancel: () => {
+                // 閉じるボタンが押されたら、終了確認を出します
+                this.game.ui.showDialog("登用を終了しますか？", true, 
+                    () => { this.startKillPhase(); },
+                    () => { this.openHireList(); }
+                );
+            }
+        };
+    },
+
+    async processHirePrisoners(selectedIds) {
+        const myBushos = this.game.bushos.filter(b=>b.clan===this.game.playerClanId && b.status !== 'unborn');
+        const recruiter = myBushos.find(b => b.isDaimyo) || myBushos[0];
+        const hiredBushos = [];
+
+        for (const id of selectedIds) {
+            const prisoner = this.pendingPrisoners.find(p => p.id === id);
+            if (!prisoner) continue;
+            
+            const originalClanId = prisoner.clan;
+            const friendlyCastles = this.game.castles.filter(c => c.ownerClan === originalClanId && originalClanId !== 0);
+            const isExtinct = (friendlyCastles.length === 0);
+            
+            // ★登用確率の計算です（既存と同じです）
+            let baseProb = ((recruiter.charm || 50) * 1.5) / ((prisoner.loyalty || 50) * 3) - (isExtinct ? 0 : 0.4);
+            let randomBonus = (Math.random() * 0.2) - 0.1;
+            const affinityDiff = Math.abs((recruiter.affinity || 0) - (prisoner.affinity || 0));
+            let affinityBonus = 0;
+            if (affinityDiff <= 10) affinityBonus = 0.1;
+            else if (affinityDiff >= 50) affinityBonus = -0.3;
+            else affinityBonus = 0.1 - (affinityDiff - 10) * 0.01;
+            
+            let hireProb = baseProb + randomBonus + affinityBonus;
+            hireProb = Math.max(0, Math.min(0.99, hireProb));
+            
+            if (this.daimyoHiredBonus) {
+                hireProb += this.daimyoHiredBonus;
+                hireProb = Math.max(0, Math.min(0.99, hireProb));
+            }
+
+            if (hireProb > Math.random()) {
+                // ★登用成功！
+                prisoner.belongKunishuId = 0;
+                const targetC = this.game.getCastle(prisoner.castleId) || this.game.getCurrentTurnCastle(); 
+                if(targetC) { 
+                    this.game.affiliationSystem.joinClan(prisoner, this.game.playerClanId, targetC.id);
+                }
+                // ダイアログを出して、プレイヤーが閉じるのを待ちます
+                await this.game.ui.showDialogAsync(`${prisoner.name}を登用しました！`);
+                hiredBushos.push(prisoner);
+            } else {
+                // ★登用失敗！
+                prisoner.isActionDone = true; // 断った人は、リスト上でグレーアウト（選択不可）にします
+                await this.game.ui.showDialogAsync(`${prisoner.name}は登用を拒否しました……`);
+            }
+        }
+        
+        // 登用できた人たちを捕虜リストから削除します
+        this.pendingPrisoners = this.pendingPrisoners.filter(p => !hiredBushos.includes(p));
+    },
+
+    startKillPhase() {
+        if (!this.pendingPrisoners || this.pendingPrisoners.length === 0) {
+            this.finishPrisonerPhase();
+            return;
+        }
+        // 処断フェーズの開始時、さっき登用を断った人も選べるように「行動済」フラグを外しておきます
+        this.pendingPrisoners.forEach(p => p.isActionDone = false);
+        this.game.ui.showDialog("処断する武将を選択してください。", false, () => {
+            this.openKillList();
+        });
+    },
+
+    openKillList() {
+        if (!this.pendingPrisoners || this.pendingPrisoners.length === 0) {
+            this.finishPrisonerPhase();
+            return;
+        }
+        const selectable = this.pendingPrisoners.filter(p => !p.isActionDone);
+        if (selectable.length === 0) {
+            this.game.ui.showDialog("処断を終了しますか？", true, 
+                () => { this.finishPrisonerPhase(); },
+                () => { this.game.ui.openBushoSelector('prisoner_kill', null, this._getKillListConfig()); }
+            );
+            return;
+        }
+        this.game.ui.openBushoSelector('prisoner_kill', null, this._getKillListConfig());
+    },
+
+    _getKillListConfig() {
+        return {
+            customBushos: this.pendingPrisoners,
+            customInfoHtml: "処断する武将を選択してください",
+            isMulti: true,
+            onConfirm: async (selectedIds) => {
+                await this.processKillPrisoners(selectedIds);
+                this.openKillList();
+            },
+            onCancel: () => {
+                this.game.ui.showDialog("処断を終了しますか？", true, 
+                    () => { this.finishPrisonerPhase(); },
+                    () => { this.openKillList(); }
+                );
+            }
+        };
+    },
+
+    async processKillPrisoners(selectedIds) {
+        const killedBushos = [];
+        for (const id of selectedIds) {
+            const prisoner = this.pendingPrisoners.find(p => p.id === id);
+            if (!prisoner) continue;
+            
+            // ★命の管理システムにお任せして処断します
+            await this.game.lifeSystem.executeDeath(prisoner);
+            killedBushos.push(prisoner);
+        }
+        
+        // 処断した人たちを捕虜リストから削除します
+        this.pendingPrisoners = this.pendingPrisoners.filter(p => !killedBushos.includes(p));
+    },
+
+    async finishPrisonerPhase() {
+        // 残った武将たちを解放してあげます
+        if (this.pendingPrisoners && this.pendingPrisoners.length > 0) {
+            for (const prisoner of this.pendingPrisoners) {
+                const originalClanId = prisoner.clan;
+                const friendlyCastles = this.game.castles.filter(c => c.ownerClan === originalClanId && originalClanId !== 0);
+                const isExtinct = (friendlyCastles.length === 0);
+                
+                const kunishu = prisoner.belongKunishuId > 0 ? this.game.kunishuSystem.getKunishu(prisoner.belongKunishuId) : null;
+                if (kunishu && !kunishu.isDestroyed) {
+                    this.game.affiliationSystem.enterCastle(prisoner, kunishu.castleId);
+                    prisoner.status = 'active'; 
+                } else {
+                    if (!isExtinct && friendlyCastles.length > 0) {
+                        const returnCastle = friendlyCastles[Math.floor(Math.random() * friendlyCastles.length)];
+                        this.game.factionSystem.handleMove(prisoner, 0, returnCastle.id); 
+                        this.game.affiliationSystem.enterCastle(prisoner, returnCastle.id);
+                        prisoner.status = 'active'; 
+                        prisoner.isCastellan = false;
+                    } else { 
+                        this.game.affiliationSystem.becomeRonin(prisoner);
+                    }
+                }
+            }
+            // 解放したことをまとめて報告します
+            await this.game.ui.showDialogAsync(`残りの武将(${this.pendingPrisoners.length}名)を解放しました。`);
+            this.pendingPrisoners = [];
+        }
+
+        // 最後に枠を閉じて、ターン進行を再開します！
+        this.game.ui.closeCommonModal();
+        await this.game.lifeSystem.checkClanExtinction(this.state.oldDefClanId, 'no_castle');
+        if (window.GameApp) window.GameApp.updateAllClanPrestige();
+        this.game.finishTurn();
+    }
     
     async autoResolvePrisoners(captives, winnerClanId) { // ★ async を追加
         const aiBushos = this.game.bushos.filter(b => b.clan === winnerClanId && b.status !== 'unborn'); 
