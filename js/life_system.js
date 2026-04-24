@@ -816,6 +816,13 @@ class LifeSystem {
 
         const messages = []; // 順番に出すメッセージを溜めておくリスト
 
+        // ★今回追加：功績の譲渡処理
+        // 先代大名の功績（achievementTotal）の3分の1を計算して、新大名に引き継ぎます
+        // 小数点が出ないように、Math.floorを使って整数に直します
+        const meritTransfer = Math.floor((oldDaimyo.achievementTotal || 0) / 3);
+        successor.achievementTotal = (successor.achievementTotal || 0) + meritTransfer;
+        oldDaimyo.achievementTotal = (oldDaimyo.achievementTotal || 0) - meritTransfer;
+
         // ① 先代大名の役職を外します
         oldDaimyo.isDaimyo = false;
 
