@@ -643,8 +643,12 @@ Object.assign(UIManager.prototype, {
 
         const drawnLines = new Set();
         
-        const forceSCurve = [];
-        const forceStraight = [];
+        // ★特定の道だけ形を変えるためのリストです！
+        // 「小さい番号-大きい番号」の順番で書きます。
+        const forceSCurve = []; // 例：["1-2"] と書くと1番と2番の城の道がS字になります
+        const forceStraight = []; // 例：["3-4"] と書くと3番と4番の城の道が真っ直ぐになります
+        const forceReverse = []; // 例：["5-6"] と書くと5番と6番の城の道の曲がる向きが逆になります
+        const forceNormalCurve = ["33-42"]; // S字を強制的に「普通のカーブ」に戻すリストです
 
         this.game.castles.forEach(c1 => {
             const pos1X = c1.pixelX !== undefined ? c1.pixelX : (c1.x * 80 + 40);
@@ -668,7 +672,12 @@ Object.assign(UIManager.prototype, {
                         const dist = Math.hypot(dx, dy);
 
                         const curveSize = dist * (0.05 + ((c1.id * c2.id) % 10) * 0.005);
-                        const dir = ((c1.id + c2.id) % 2 === 0) ? 1 : -1;
+                        let dir = ((c1.id + c2.id) % 2 === 0) ? 1 : -1;
+
+                        // もし「曲がる向きを逆にするリスト」にこの道が入っていたら、向きを反対にします！
+                        if (forceReverse.includes(pairKey)) {
+                            dir = dir * -1;
+                        }
 
                         const nx = -dy / dist;
                         const ny = dx / dist;
@@ -683,6 +692,11 @@ Object.assign(UIManager.prototype, {
                         
                         if (forceSCurve.includes(pairKey)) lineType = "s-curve";
                         if (forceStraight.includes(pairKey)) lineType = "straight";
+                        
+                        // もし「強制的に普通のカーブにするリスト」に入っていたら、S字をやめてカーブに戻します！
+                        if (forceNormalCurve.includes(pairKey)) {
+                            lineType = "curve";
+                        }
 
                         if (lineType === "s-curve") {
                             const cp1X = pos1X + dx * 0.33 + nx * curveSize * dir;
