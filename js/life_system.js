@@ -336,16 +336,18 @@ class LifeSystem {
         const currentYear = this.game.year;
         
         // 【変更点①】没年の「1年前（endYear - 1）」を迎えている武将を探すようにしました！
-        const targetBushos = this.game.bushos.filter(b => 
-            b.status !== 'unborn' && b.status !== 'dead' && currentYear >= (b.endYear - 1)
-        );
+        // プレイヤーの大名武将のみ、寿命を本来の寿命＋５年として計算します！
+        const targetBushos = this.game.bushos.filter(b => {
+            if (b.status === 'unborn' || b.status === 'dead') return false;
+            const actualEndYear = (b.isDaimyo && b.clan === this.game.playerClanId) ? b.endYear + 5 : b.endYear;
+            return currentYear >= (actualEndYear - 1);
+        });
 
         for (const b of targetBushos) {
-            // プレイヤーの大名だけは絶対に死なない魔法をかけます！
-            if (b.isDaimyo && b.clan === this.game.playerClanId) continue;
-
             // 【変更点②】没年の「1年前」をスタート地点として、そこから何年過ぎたかを計算します
-            const yearsPassed = currentYear - (b.endYear - 1);
+            // ここでもプレイヤーの大名武将なら寿命を＋５年として計算します！
+            const actualEndYear = (b.isDaimyo && b.clan === this.game.playerClanId) ? b.endYear + 5 : b.endYear;
+            const yearsPassed = currentYear - (actualEndYear - 1);
             
             // 【変更点③】確率は、スタート（没年1年前）が2%(0.02)、次の年（没年）が4%(0.04)...と増えます
             const deathProb = 0.02 + (yearsPassed * 0.02);
