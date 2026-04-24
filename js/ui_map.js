@@ -650,6 +650,14 @@ Object.assign(UIManager.prototype, {
         const forceReverse = ["33-42"]; // 例：["5-6"] と書くと5番と6番の城の道の曲がる向きが逆になります
         const forceNormalCurve = ["33-42"]; // S字を強制的に「普通のカーブ」に戻すリストです
 
+        // ★今回追加：個別にカーブの角度（深さ）を調整する箱です！
+        // 今の標準サイズは「0.05 ～ 0.095」くらいです。
+        const customCurveSizes = {
+            "87-175": 0.1,
+            // 例："7-12": 0.2,   ←かなり大回りなカーブになります
+            // 例："3-5": 0.02    ←かなり直線に近い浅いカーブになります
+        };
+
         this.game.castles.forEach(c1 => {
             const pos1X = c1.pixelX !== undefined ? c1.pixelX : (c1.x * 80 + 40);
             const pos1Y = c1.pixelY !== undefined ? c1.pixelY : (c1.y * 80 + 40);
@@ -671,7 +679,13 @@ Object.assign(UIManager.prototype, {
                         const dy = pos2Y - pos1Y;
                         const dist = Math.hypot(dx, dy);
 
-                        const curveSize = dist * (0.05 + ((c1.id * c2.id) % 10) * 0.005);
+                        let curveSize = dist * (0.05 + ((c1.id * c2.id) % 10) * 0.005);
+                        
+                        // もし「個別に角度を調整する箱」に数字が書かれていたら、それで上書きします！
+                        if (customCurveSizes[pairKey] !== undefined) {
+                            curveSize = dist * customCurveSizes[pairKey];
+                        }
+
                         let dir = ((c1.id + c2.id) % 2 === 0) ? 1 : -1;
 
                         // もし「曲がる向きを逆にするリスト」にこの道が入っていたら、向きを反対にします！
