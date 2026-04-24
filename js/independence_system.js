@@ -605,7 +605,7 @@ class IndependenceSystem {
         
         // 性格が隠遁者（hermit）の場合は野に下ります
         if (personality === 'hermit') {
-            this.game.ui.log(`【下野】${rebellionLeader.name}は謀反せず野に下りました。`);
+            this.game.ui.log(`【下野】${rebellionLeader.name}は野に下りました。`);
             this.game.affiliationSystem.becomeRonin(rebellionLeader);
             // もし神輿と城主が違う人物なら、城主も一緒に浪人にします
             if (castellan.id !== rebellionLeader.id && castellan.status === 'active') {
