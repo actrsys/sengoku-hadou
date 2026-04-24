@@ -1510,6 +1510,14 @@ class UIInfoManager {
         const kunishus = this.game.kunishuSystem ? this.game.kunishuSystem.getKunishusInCastle(castle.id) : [];
         const kunishuCount = kunishus.length;
 
+        // ★ 武将の人数も数えておきます
+        const targetBushos = this.game.bushos.filter(b => 
+            b.castleId === castle.id && 
+            (b.status === 'active' || b.status === 'ronin') && 
+            (b.belongKunishuId === 0 || !b.belongKunishuId)
+        );
+        const bushoCount = targetBushos.length;
+
         let totalGoldIncome = GameSystem.calcBaseGoldIncome(castle);
         let totalRiceIncome = GameSystem.calcBaseRiceIncome(castle);
 
@@ -1517,7 +1525,6 @@ class UIInfoManager {
         if (castellan && castellan.faceIcon) {
             faceHtml = `<img src="data/images/faceicons/${castellan.faceIcon}" class="daimyo-detail-face" onerror="this.style.display='none'">`;
         } else {
-            // 画像がない場合は、メイン画面と同じ青黒いグラデーション(sp-face-wrapper)の空枠を作ります
             faceHtml = `<div class="sp-face-wrapper daimyo-detail-face" style="display: flex; box-sizing: border-box;"></div>`;
         }
 
@@ -1567,14 +1574,14 @@ class UIInfoManager {
                         </div>
                     </div>
                     <div style="display: flex; justify-content: flex-end; gap: 10px; margin-top: 15px;">
-                        <button class="daimyo-detail-action-btn" id="castle-busho-btn">武将</button>
-                        <button class="daimyo-detail-action-btn" id="castle-kunishu-btn" style="display: ${kunishuCount > 0 ? '' : 'none'};">諸勢力</button>
+                        <button class="daimyo-detail-action-btn" id="castle-busho-btn" ${bushoCount === 0 ? 'disabled' : ''}>武将</button>
+                        <button class="daimyo-detail-action-btn" id="castle-kunishu-btn" ${kunishuCount === 0 ? 'disabled' : ''}>諸勢力</button>
                     </div>
                 </div>
             `;
 
             const btnKunishu = document.getElementById('castle-kunishu-btn');
-            if (btnKunishu) {
+            if (btnKunishu && kunishuCount > 0) {
                 btnKunishu.onclick = (e) => {
                     e.stopPropagation();
                     if (window.AudioManager) window.AudioManager.playSE('decision.ogg');
@@ -1582,24 +1589,18 @@ class UIInfoManager {
                 };
             }
 
-            document.getElementById('castle-busho-btn').onclick = (e) => {
-                e.stopPropagation();
-                if (window.AudioManager) window.AudioManager.playSE('decision.ogg');
-                
-                // ★ アクティブな武将と浪人のみ（諸勢力の武将は除外して抽出します）
-                const targetBushos = this.game.bushos.filter(b => 
-                    b.castleId === castle.id && 
-                    (b.status === 'active' || b.status === 'ronin') && 
-                    (b.belongKunishuId === 0 || !b.belongKunishuId)
-                );
+            const btnBusho = document.getElementById('castle-busho-btn');
+            if (btnBusho && bushoCount > 0) {
+                btnBusho.onclick = (e) => {
+                    e.stopPropagation();
+                    if (window.AudioManager) window.AudioManager.playSE('decision.ogg');
+                    this.openBushoSelector('view_only', null, { 
+                        customBushos: targetBushos,
+                        customInfoHtml: `<div>${castle.name} 滞在武将</div>`
+                    });
+                };
+            }
 
-                this.openBushoSelector('view_only', null, { 
-                    customBushos: targetBushos,
-                    customInfoHtml: `<div>${castle.name} 滞在武将</div>`
-                });
-            };
-
-            // ★情報画面ではスクロールバーは不要なので、位置を戻すだけにします
             listContainer.scrollTop = scrollPos;
         }
     }

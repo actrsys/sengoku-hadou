@@ -1342,16 +1342,26 @@ body:not(.is-pc) .daimyo-detail-value {
     box-shadow: 1px 1px 3px rgba(0,0,0,0.5);
 }
 
-.daimyo-detail-action-btn:hover {
+/* マウスを乗せた時（無効化されていない時だけ光らせる） */
+.daimyo-detail-action-btn:hover:not(:disabled) {
     background: linear-gradient(to bottom, rgba(80, 80, 80, 0.9) 0%, rgba(20, 20, 20, 1) 100%);
     color: #ffd54f;
     border-color: #ffd54f;
     box-shadow: 2px 2px 5px rgba(0,0,0,0.6);
 }
 
-.daimyo-detail-action-btn:active {
+/* 押した時（無効化されていない時だけ沈ませる） */
+.daimyo-detail-action-btn:active:not(:disabled) {
     background: linear-gradient(to bottom, rgba(20, 20, 20, 1) 0%, rgba(60, 60, 60, 0.9) 100%);
     box-shadow: none;
+}
+
+/* ★ 無効化（disabled）されている時の見た目 */
+.daimyo-detail-action-btn:disabled {
+    filter: grayscale(100%) brightness(0.6); /* モノクロにして暗くする */
+    cursor: not-allowed; /* マウスカーソルを禁止マークにする */
+    opacity: 0.5; /* 半透明にする */
+    pointer-events: none; /* クリックを完全に無視する */
 }
 
 /* =========================================================
