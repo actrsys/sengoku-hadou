@@ -653,162 +653,12 @@ class LifeSystem {
             
             this.game.changeLeader(daimyo.clan, successor.id);
             
-            // ★当主交代があったら、今まで進めていた作戦（攻撃準備など）を一旦キャンセルして白紙に戻します！
-            if (this.game.aiOperationManager && this.game.aiOperationManager.operations[daimyo.clan]) {
-                delete this.game.aiOperationManager.operations[daimyo.clan];
-            }
-            
-            // ★新旧大名の能力比較と、忠誠・民忠への影響！
-            
-            // 1. 交代前の大名と、新しい大名の「6つの能力の合計」を計算します
-            const oldTotal = daimyo.leadership + daimyo.strength + (daimyo.politics || 0) + (daimyo.diplomacy || 0) + daimyo.intelligence + daimyo.charm;
-            const newTotal = successor.leadership + successor.strength + (successor.politics || 0) + (successor.diplomacy || 0) + successor.intelligence + successor.charm;
-            
-            // 2. 差額を計算します（プラスなら優秀、マイナスなら不安）
-            const diff = newTotal - oldTotal;
-            
-            // 3. 差が「101以上」離れているかチェックします
-            let changeVal = 0;
-            // 差額の絶対値（プラスマイナスをなくした純粋な差）が101以上なら計算を始めます
-            if (Math.abs(diff) >= 101) {
-                // 差がプラスなら100を引き、マイナスなら100を足して、「100をはみ出した分」だけを取り出します
-                const overDiff = diff > 0 ? diff - 100 : diff + 100;
-                
-                // はみ出した分に0.2を掛け算します
-                changeVal = Math.floor(overDiff * 0.2);
-            }
-            
-            // 上限30、下限-30でストッパーをかけます
-            changeVal = Math.max(-30, Math.min(30, changeVal));
-
-            // もし能力に差があって、変動する数値が0じゃないなら魔法発動！
-            if (changeVal !== 0) {
-                // ① 配下武将の忠誠を変動させます（新当主本人は除きます）
-                const retainers = this.game.bushos.filter(b => b.clan === daimyo.clan && b.id !== successor.id && b.status === 'active');
-                retainers.forEach(b => {
-                    // 忠誠度は0～100の間で収まるようにします
-                    b.loyalty = Math.max(0, Math.min(100, b.loyalty + changeVal));
-                });
-                
-                // ② 所有しているお城の民忠を変動させます
-                const clanCastlesInfo = this.game.castles.filter(c => c.ownerClan === daimyo.clan);
-                clanCastlesInfo.forEach(c => {
-                    // 民忠も0～100の間で収まるようにします
-                    c.peoplesLoyalty = Math.max(0, Math.min(100, (c.peoplesLoyalty || 50) + changeVal));
-
-                    // 能力が下がって、changeValがマイナスになっている時の処理
-                    if (changeVal < 0) {
-                        // マイナスの記号を取って、純粋な数字（パーセント）にします
-                        const decreasePercent = Math.abs(changeVal);
-                        
-                        // 兵士は decreasePercent ％減らします（残る割合を掛け算します）
-                        c.soldiers = Math.floor(c.soldiers * ((100 - decreasePercent) / 100));
-                        
-                        // 人口はその半分（decreasePercent / 2）％減らします
-                        c.population = Math.floor(c.population * ((100 - (decreasePercent / 2)) / 100));
-                    }
-                });
-
-                // ③ プレイヤーの大名家なら、メッセージに結果を書き足してお知らせします！
-                if (daimyo.clan === this.game.playerClanId) {
-                    if (changeVal > 0) {
-                        messages.push(`新当主への期待から、家臣団の気勢が高まっています！`);
-                    } else {
-                        const decreasePercent = Math.abs(changeVal);
-                        messages.push(`当主交代による不安から、家臣団が動揺しています……`);
-                    }
-                }
-            }
-            
-            // ★ここから追加：当主交代による外交関係の変動！
-            this.game.clans.forEach(otherClan => {
-                // 空き家（0）や自分自身は計算しません
-                if (otherClan.id === 0 || otherClan.id === daimyo.clan) return;
-
-                // 相手との外交データを取得します
-                const rel = this.game.diplomacyManager.getRelation(daimyo.clan, otherClan.id);
-                if (!rel) return;
-
-                let changeAmount = 0;
-
-                // 関係が「普通」か「友好」の場合
-                if (rel.status === '普通' || rel.status === '友好') {
-                    if (rel.sentiment >= 51 && rel.sentiment <= 54) {
-                        // 50にするための差分を計算します
-                        changeAmount = 50 - rel.sentiment; 
-                    } else if (rel.sentiment >= 55) {
-                        // 55以上の場合は5下げます
-                        changeAmount = -5;
-                    }
-                } 
-                // 関係が「同盟」「従属」「支配」の場合（婚姻はステータスが「同盟」になっています）
-                else if (rel.status === '同盟' || rel.status === '従属' || rel.status === '支配') {
-                    // 基本は10下げますが、新当主の能力による変動（changeVal）も一緒に計算します
-                    changeAmount = -10 + changeVal;
-                }
-
-                // 変化がある場合のみ、外交システムに更新をお願いします
-                if (changeAmount !== 0) {
-                    this.game.diplomacyManager.updateSentiment(daimyo.clan, otherClan.id, changeAmount);
-                }
-            });
-            // ★追加ここまで
-
-            // ★ここから追加：当主交代による諸勢力との友好度の変動！
-            if (this.game.kunishuSystem) {
-                const aliveKunishus = this.game.kunishuSystem.getAliveKunishus();
-                aliveKunishus.forEach(kunishu => {
-                    // 現在の諸勢力との仲良し度を調べます
-                    const currentRel = kunishu.getRelation(daimyo.clan);
-                    
-                    let changeAmount = 0;
-                    
-                    // 仲良し度が51〜54なら、50に戻します
-                    if (currentRel >= 51 && currentRel <= 54) {
-                        changeAmount = 50 - currentRel; 
-                    } 
-                    // 仲良し度が55以上なら、5下げます
-                    else if (currentRel >= 55) {
-                        changeAmount = -5;
-                    }
-                    
-                    // 変化がある場合のみ、新しい仲良し度を箱にしまいます
-                    if (changeAmount !== 0) {
-                        kunishu.setRelation(daimyo.clan, currentRel + changeAmount);
-                    }
-                });
-            }
-            // ★諸勢力の追加ここまで
-
-            // ★ここから追加：当主交代に合わせて大名家の名前を変更し、マップを更新します！
+            // ==========================================
+            // ★大名交代の共通の魔法を呼び出します！
             const clan = this.game.clans.find(c => c.id === daimyo.clan);
-            let originalClanName = ""; // ★死亡した大名の元の家名を覚えておくメモ帳です！
-            
-            if (clan) {
-                originalClanName = clan.name; // ★ここでメモします
-                const oldClanName = clan.name;
-                
-                // 万が一「姓」のデータが空っぽだった場合に備えて、フルネームを代用する安全策を入れます
-                const safeFamilyName = successor.familyName || successor.name;
-                const newClanName = `${safeFamilyName}家`;
-                
-                // ★読み仮名も新しい当主の「姓の読み」から作ります！
-                const safeFamilyYomi = successor.familyYomi || successor.yomi;
-                const newClanYomi = safeFamilyYomi ? `${safeFamilyYomi}け` : "";
-                
-                // 家の名前が本当に変わる場合のみ変更します
-                if (oldClanName !== newClanName) {
-                    clan.name = newClanName;
-                    clan.yomi = newClanYomi; // ★読み仮名も新しく書き換えます
-                    messages.push(`当主の交代により、${oldClanName}は今後「${newClanName}」となります。`);
-                }
-            }
-            // ★追加ここまで
-            
-            // ★変更：大名家の名前が変わったかどうかにかかわらず、大名が交代したら必ずマップを描き直します！
-            if (this.game.ui && typeof this.game.ui.renderMap === 'function') {
-                this.game.ui.renderMap();
-            }
+            const originalClanName = clan ? clan.name : ""; // ★元の家名をメモしておきます
+            this.applyDaimyoChangeEffects(daimyo, successor, messages);
+            // ==========================================
             
             // ★メモしておいた家名を使って「〇〇家の」という言葉を作ります
             const clanPrefix = originalClanName ? `${originalClanName}の` : "";
@@ -840,6 +690,212 @@ class LifeSystem {
         }
     }
     
+    // ==========================================
+    // ★ここから追加：大名が交代した時に起こる変化をまとめた「共通の魔法」です！
+    // ==========================================
+    // ★変更：4つ目の枠に「isSuccession（生前退位かどうか）」の目印を受け取れるようにしました
+    applyDaimyoChangeEffects(oldDaimyo, successor, messages, isSuccession = false) {
+        // ★当主交代があったら、今まで進めていた作戦（攻撃準備など）を一旦キャンセルして白紙に戻します！
+        if (this.game.aiOperationManager && this.game.aiOperationManager.operations[oldDaimyo.clan]) {
+            delete this.game.aiOperationManager.operations[oldDaimyo.clan];
+        }
+        
+        // ★新旧大名の能力比較と、忠誠・民忠への影響！
+        const oldTotal = oldDaimyo.leadership + oldDaimyo.strength + (oldDaimyo.politics || 0) + (oldDaimyo.diplomacy || 0) + oldDaimyo.intelligence + oldDaimyo.charm;
+        const newTotal = successor.leadership + successor.strength + (successor.politics || 0) + (successor.diplomacy || 0) + successor.intelligence + successor.charm;
+        const diff = newTotal - oldTotal;
+        let changeVal = 0;
+        if (Math.abs(diff) >= 101) {
+            const overDiff = diff > 0 ? diff - 100 : diff + 100;
+            changeVal = Math.floor(overDiff * 0.2);
+        }
+        changeVal = Math.max(-30, Math.min(30, changeVal));
+
+        // ★追加：生前退位（家督相続コマンド）の場合は、能力差によるショックの揺れを半分にします！
+        if (isSuccession) {
+            changeVal = Math.floor(changeVal / 2);
+        }
+
+        if (changeVal !== 0) {
+            const retainers = this.game.bushos.filter(b => b.clan === oldDaimyo.clan && b.id !== successor.id && b.status === 'active');
+            retainers.forEach(b => {
+                b.loyalty = Math.max(0, Math.min(100, b.loyalty + changeVal));
+            });
+            
+            const clanCastlesInfo = this.game.castles.filter(c => c.ownerClan === oldDaimyo.clan);
+            clanCastlesInfo.forEach(c => {
+                c.peoplesLoyalty = Math.max(0, Math.min(100, (c.peoplesLoyalty || 50) + changeVal));
+                if (changeVal < 0) {
+                    const decreasePercent = Math.abs(changeVal);
+                    c.soldiers = Math.floor(c.soldiers * ((100 - decreasePercent) / 100));
+                    c.population = Math.floor(c.population * ((100 - (decreasePercent / 2)) / 100));
+                }
+            });
+
+            if (oldDaimyo.clan === this.game.playerClanId) {
+                if (changeVal > 0) {
+                    messages.push(`新当主への期待から、家臣団の気勢が高まっています！`);
+                } else {
+                    messages.push(`当主交代による不安から、家臣団が動揺しています……`);
+                }
+            }
+        }
+        
+        // ★当主交代による外交関係の変動！
+        this.game.clans.forEach(otherClan => {
+            if (otherClan.id === 0 || otherClan.id === oldDaimyo.clan) return;
+            const rel = this.game.diplomacyManager.getRelation(oldDaimyo.clan, otherClan.id);
+            if (!rel) return;
+
+            let changeAmount = 0;
+            if (rel.status === '普通' || rel.status === '友好') {
+                if (rel.sentiment >= 51 && rel.sentiment <= 54) {
+                    changeAmount = 50 - rel.sentiment; 
+                    if (isSuccession) changeAmount = Math.floor(changeAmount / 2); // ★生前退位なら半減
+                } else if (rel.sentiment >= 55) {
+                    changeAmount = isSuccession ? -2 : -5; // ★生前退位なら半減
+                }
+            } else if (rel.status === '同盟' || rel.status === '従属' || rel.status === '支配') {
+                const baseDrop = isSuccession ? -5 : -10; // ★生前退位なら基本の低下分も半減（-10を-5に）
+                changeAmount = baseDrop + changeVal;
+            }
+
+            if (changeAmount !== 0) {
+                this.game.diplomacyManager.updateSentiment(oldDaimyo.clan, otherClan.id, changeAmount);
+            }
+        });
+
+        // ★当主交代による諸勢力との友好度の変動！
+        if (this.game.kunishuSystem) {
+            const aliveKunishus = this.game.kunishuSystem.getAliveKunishus();
+            aliveKunishus.forEach(kunishu => {
+                const currentRel = kunishu.getRelation(oldDaimyo.clan);
+                let changeAmount = 0;
+                if (currentRel >= 51 && currentRel <= 54) {
+                    changeAmount = 50 - currentRel; 
+                    if (isSuccession) changeAmount = Math.floor(changeAmount / 2); // ★生前退位なら半減
+                } else if (currentRel >= 55) {
+                    changeAmount = isSuccession ? -2 : -5; // ★生前退位なら半減
+                }
+                if (changeAmount !== 0) {
+                    kunishu.setRelation(oldDaimyo.clan, currentRel + changeAmount);
+                }
+            });
+        }
+
+        // ★当主交代に合わせて大名家の名前を変更し、マップを更新します！
+        const clan = this.game.clans.find(c => c.id === oldDaimyo.clan);
+        if (clan) {
+            const oldClanName = clan.name;
+            const safeFamilyName = successor.familyName || successor.name;
+            const newClanName = `${safeFamilyName}家`;
+            const safeFamilyYomi = successor.familyYomi || successor.yomi;
+            const newClanYomi = safeFamilyYomi ? `${safeFamilyYomi}け` : "";
+            
+            if (oldClanName !== newClanName) {
+                clan.name = newClanName;
+                clan.yomi = newClanYomi; 
+                messages.push(`当主の交代により、${oldClanName}は今後「${newClanName}」となります。`);
+            }
+        }
+        
+        if (this.game.ui && typeof this.game.ui.renderMap === 'function') {
+            this.game.ui.renderMap();
+        }
+    }
+
+    // ==========================================
+    // ★ここから追加：コマンドから「生前退位（家督相続）」を実行する魔法です！
+    // ==========================================
+    async executeSuccessionCommand(newDaimyoId) {
+        const successor = this.game.getBusho(newDaimyoId);
+        const clan = this.game.clans.find(c => c.id === this.game.playerClanId);
+        const oldDaimyo = this.game.getBusho(clan.leaderId);
+
+        if (!oldDaimyo || !successor) return;
+
+        const messages = []; // 順番に出すメッセージを溜めておくリスト
+
+        // ① 先代大名の役職を外します
+        oldDaimyo.isDaimyo = false;
+
+        // ② 新しい大名を任命します
+        successor.isDaimyo = true;
+        successor.isCastellan = true;
+        if (successor.isGunshi) {
+            successor.isGunshi = false;
+        }
+
+        // ③ 新大名のお城の城主を新大名にします
+        const targetCastle = this.game.getCastle(successor.castleId);
+        if (targetCastle) {
+            const castleBushos = this.game.getCastleBushos(targetCastle.id);
+            castleBushos.forEach(b => {
+                if (b.id !== successor.id && b.isCastellan) {
+                    b.isCastellan = false;
+                }
+            });
+            targetCastle.castellanId = successor.id;
+        }
+
+        // ★大名になった瞬間に「daimyo:」の改名データがあれば改名する魔法！
+        if (successor.nameChange && successor.nameChange.includes('daimyo:')) {
+            const changes = successor.nameChange.split('/');
+            for (const change of changes) {
+                const parts = change.split(':');
+                if (parts.length === 3 && parts[0].trim() === 'daimyo') {
+                    const oldNameStr = successor.name.replace('|', '');
+                    const newNameParts = parts[1].trim().split('|');
+                    successor.familyName = newNameParts[0] || "";
+                    successor.givenName = newNameParts[1] || "";
+                    successor.name = successor.familyName + successor.givenName;
+                    const newYomiParts = parts[2].trim().split('|');
+                    successor.familyYomi = newYomiParts[0] || "";
+                    successor.givenYomi = newYomiParts[1] || "";
+                    successor.yomi = successor.familyYomi + successor.givenYomi;
+                    const newNameStr = successor.name.replace('|', '');
+                    messages.push(`家督を継ぐにあたり、${oldNameStr}は\n「${newNameStr}」と名を改めました。`);
+                }
+            }
+        }
+
+        // ★先代が征夷大将軍（ID1）を持っていれば、後継ぎに「左馬頭（ID80）」を与える魔法！
+        if (oldDaimyo.courtRankIds && oldDaimyo.courtRankIds.includes(1)) {
+            const isRelative = oldDaimyo.familyIds.some(fId => successor.familyIds.includes(fId));
+            if (isRelative) {
+                this.game.courtRankSystem.grantRank(successor, 80);
+            }
+        }
+
+        this.game.changeLeader(clan.id, successor.id);
+        successor.isActionDone = true;
+
+        if (oldDaimyo.castleId) {
+            const oldCastle = this.game.getCastle(oldDaimyo.castleId);
+            if (oldCastle && this.game.affiliationSystem) {
+                this.game.affiliationSystem.updateCastleLord(oldCastle);
+            }
+        }
+
+        // ==========================================
+        // ★大名交代の共通の魔法を呼び出します！
+        // ※生前退位（家督相続）の場合は、4つ目のスイッチに「true」を渡して揺れを半分にします！
+        this.applyDaimyoChangeEffects(oldDaimyo, successor, messages, true);
+        // ==========================================
+
+        const mainMsg = `${successor.name.replace('|', '')} が家督を継ぎ、新たな大名となりました！`;
+        this.game.ui.log(`【家督相続】${mainMsg}`);
+        messages.unshift(mainMsg);
+
+        // 順番にダイアログを出します
+        for (const msg of messages) {
+            await this.game.ui.showDialogAsync(msg, false, 0);
+        }
+
+        this.game.ui.updatePanelHeader();
+        this.game.ui.renderCommandMenu();
+    }
+
     // ★大名家の滅亡を処理する魔法です！
     async checkClanExtinction(clanId, reason = 'no_castle') {
         if (!clanId || clanId === 0) return;

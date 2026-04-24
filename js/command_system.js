@@ -3145,47 +3145,7 @@ class CommandSystem {
     }
 
     executeSuccession(newDaimyoId) {
-        const bushoA = this.game.getBusho(newDaimyoId);
-        const clan = this.game.clans.find(c => c.id === this.game.playerClanId);
-        const oldDaimyo = this.game.getBusho(clan.leaderId);
-
-        if (oldDaimyo) {
-            oldDaimyo.isDaimyo = false;
-        }
-
-        bushoA.isDaimyo = true;
-        bushoA.isCastellan = true;
-        if (bushoA.isGunshi) {
-            bushoA.isGunshi = false;
-        }
-
-        const targetCastle = this.game.getCastle(bushoA.castleId);
-        if (targetCastle) {
-            const castleBushos = this.game.getCastleBushos(targetCastle.id);
-            castleBushos.forEach(b => {
-                if (b.id !== bushoA.id && b.isCastellan) {
-                    b.isCastellan = false;
-                }
-            });
-            targetCastle.castellanId = bushoA.id;
-        }
-
-        clan.leaderId = bushoA.id;
-        bushoA.isActionDone = true;
-
-        if (oldDaimyo && oldDaimyo.castleId) {
-            const oldCastle = this.game.getCastle(oldDaimyo.castleId);
-            if (oldCastle) {
-                if (this.game.affiliationSystem) {
-                    this.game.affiliationSystem.updateCastleLord(oldCastle);
-                }
-            }
-        }
-
-        this.game.ui.showResultModal(`${bushoA.name} が家督を継ぎ、新たな大名となりました！`, () => {
-            this.game.ui.updatePanelHeader();
-            this.game.ui.renderCommandMenu();
-            this.game.ui.renderMap();
-        });
+        // ★家督相続の難しい処理は、専門の life_system.js にお任せして魔法を呼び出します！
+        this.game.lifeSystem.executeSuccessionCommand(newDaimyoId);
     }
 }
