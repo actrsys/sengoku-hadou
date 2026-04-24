@@ -366,8 +366,8 @@ class Busho {
     // UI表示用メソッド
     getRankName() {
         if (this.status === 'unborn') {
-            if (this.clan === 0) return "元服前:浪人";
-            return "元服前:仕官";
+            if (this.clan === 0) return "元服前";
+            return "元服前";
         }
         if (this.isDaimyo) return "大名";
         if (this.isCastellan) return "城主";
