@@ -2435,7 +2435,8 @@ class CommandSystem {
                 guns: kunishu.guns || 0,
                 defense: kunishu.defense,
                 training: kunishu.training,
-                morale: kunishu.morale
+                morale: kunishu.morale,
+                ownerClan: -1 // ★ここを書き足し！諸勢力の陣地なので、お城の持ち主を一時的に「無所属（-1）」にします！
             });
             this.game.warManager.state = this.game.warManager.state || {};
             this.game.warManager.state.isKunishuSubjugation = true; 
