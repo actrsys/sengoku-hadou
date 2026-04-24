@@ -1513,7 +1513,13 @@ class UIInfoManager {
         let totalGoldIncome = GameSystem.calcBaseGoldIncome(castle);
         let totalRiceIncome = GameSystem.calcBaseRiceIncome(castle);
 
-        let faceSrc = castellan && castellan.faceIcon ? `data/images/faceicons/${castellan.faceIcon}` : "data/images/faceicons/unknown_face.webp";
+        let faceHtml = "";
+        if (castellan && castellan.faceIcon) {
+            faceHtml = `<img src="data/images/faceicons/${castellan.faceIcon}" class="daimyo-detail-face" onerror="this.style.display='none'">`;
+        } else {
+            // 画像がない場合は、メイン画面と同じ青黒いグラデーション(sp-face-wrapper)の空枠を作ります
+            faceHtml = `<div class="sp-face-wrapper daimyo-detail-face" style="display: flex; box-sizing: border-box;"></div>`;
+        }
 
         if (listContainer) {
             listContainer.className = 'list-container hide-native-scroll';
@@ -1525,7 +1531,7 @@ class UIInfoManager {
                     </div>
                     <div class="daimyo-detail-body">
                         <div class="daimyo-detail-left">
-                            <img src="${faceSrc}" class="daimyo-detail-face" onerror="this.src='data/images/faceicons/unknown_face.webp'">
+                            ${faceHtml}
                             <div class="daimyo-detail-header sp-only" style="margin-bottom: 10px; justify-content: center;">
                                 <div class="daimyo-detail-name" style="font-size: 1.5rem;">${castle.name}</div>
                             </div>
