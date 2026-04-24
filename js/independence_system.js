@@ -964,32 +964,16 @@ class IndependenceSystem {
                 // 勢力情報が変わったので威信を更新
                 if (window.GameApp) window.GameApp.updateAllClanPrestige();
 
-                // ★ここから演出魔法の始まりです！
-                // 乗っ取った大名家の城をすべて集めます
-                const allClanCastleIds = this.game.castles.filter(c => c.ownerClan === oldClanId).map(c => c.id);
-
-                if (typeof this.game.ui.showMapGuard === 'function') this.game.ui.showMapGuard();
-
                 // ★追加：ストッパーを外して、新しい色を塗れるようにします！
                 this.game.isSuspendingColorUpdate = false;
 
-                // プレイヤーの場合でも、野戦からマップに戻ってきた後にこのアニメーションが行われます！
-                // 色が変わるアニメーションを入れてから、マップを描き直します！
-                if (typeof this.game.ui.playCaptureEffect === 'function') {
-                    await this.game.ui.playCaptureEffect(allClanCastleIds.length > 0 ? allClanCastleIds : castle.id, () => {
-                        if (this.game.ui && typeof this.game.ui.renderMap === 'function') {
-                            this.game.ui.renderMap();
-                        }
-                    });
-                } else {
-                    if (this.game.ui && typeof this.game.ui.renderMap === 'function') {
-                        this.game.ui.renderMap();
-                    }
+                // 謀反成功時は大名家の色がそのまま引き継がれるため、
+                // 光るアニメーションは出さずに、マップをそのまま描き直します。
+                if (this.game.ui && typeof this.game.ui.renderMap === 'function') {
+                    this.game.ui.renderMap();
                 }
 
-                if (typeof this.game.ui.hideMapGuard === 'function') this.game.ui.hideMapGuard(true);
-
-                // アニメーションが終わってから、結果のメッセージを出します！
+                // 結果のメッセージを出します！
                 await this.game.ui.showDialogAsync(`【謀反】${oldDaimyo.name}は討死しました！\n${rebellionLeader.name}が新たな大名となります！`);
 
             } else if (result === 'daimyo_win') {
