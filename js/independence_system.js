@@ -79,22 +79,24 @@ class IndependenceSystem {
         
         if (prob <= 0) return;
         if (Math.random() * 1000 < prob) {
-            // ★変更：謀反や独立の処理中に「思考中」が復活しないよう、CSSの魔法（クラス）を使います！
-            document.body.classList.add('is-independence-processing');
+            // ★変更：思考中の表示が被らないように、UIのバリアを一時的に隠す魔法をしっかり呼び出します！
+            if (this.game.ui && typeof this.game.ui.hideAIGuard === 'function') {
+                this.game.ui.hideAIGuard();
+            }
+            // 念押しで直接見えなくします
+            const aiGuardEl = document.getElementById('ai-guard');
+            if (aiGuardEl) {
+                aiGuardEl.style.display = 'none';
+            }
 
             try {
                 // ★変更：いきなり独立するのではなく、お家乗っ取りの作戦会議を開きます！
                 await this.planCoupDetatOrRebellion(castle, castellan, daimyo);
             } finally {
-                // ★変更：一連の処理が終わったら、クラスを外して元に戻します！
-                document.body.classList.remove('is-independence-processing');
-                
-                // ★復活：元のコードにあった、見張り番の表示状態を確実にリセットする処理を戻します
-                const aiGuardEl = document.getElementById('ai-guard');
+                // ★復活：一連の処理が終わったら、見張り番の表示状態を元に戻します
                 if (aiGuardEl) {
                     aiGuardEl.style.display = '';
                 }
-                
                 if (this.game.ui && typeof this.game.ui.restoreAIGuard === 'function') {
                     this.game.ui.restoreAIGuard();
                 }
