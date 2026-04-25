@@ -600,6 +600,9 @@ class LifeSystem {
                 successor = allCandidates[0];
             }
 
+            // ★修正：改名前の「元の名前」をメモしておきます！
+            const originalName = successor.name.replace('|', '');
+
             let isExternalSuccessor = false;
 
             // 選ばれた後継ぎが外部の武将（未登場、浪人、諸勢力）だった場合は、急いで迎え入れます！
@@ -684,7 +687,8 @@ class LifeSystem {
                 mainMsg = `${clanPrefix}${daimyo.name.replace('|','')}が死亡しました。`;
                 this.game.ui.log(`【当主交代】${mainMsg}`);
             } else {
-                mainMsg = `${clanPrefix}${daimyo.name.replace('|','')}が死亡し、${successor.name.replace('|','')}が家督を継ぎました。`;
+                // ★修正：改名する前の「元の名前」を使います！
+                mainMsg = `${clanPrefix}${daimyo.name.replace('|','')}が死亡し、${originalName}が家督を継ぎました。`;
                 this.game.ui.log(`【当主交代】${mainMsg}`);
             }
             
@@ -830,11 +834,12 @@ class LifeSystem {
 
         if (!oldDaimyo || !successor) return;
 
+        // ★追加：改名する前に、いまの「元の名前」をメモしておきます！
+        const originalName = successor.name.replace('|', '');
+
         const messages = []; // 順番に出すメッセージを溜めておくリスト
 
         // ★今回追加：功績の譲渡処理
-        // 先代大名の功績（achievementTotal）の3分の1を計算して、新大名に引き継ぎます
-        // 小数点が出ないように、Math.floorを使って整数に直します
         const meritTransfer = Math.floor((oldDaimyo.achievementTotal || 0) / 3);
         successor.achievementTotal = (successor.achievementTotal || 0) + meritTransfer;
         oldDaimyo.achievementTotal = (oldDaimyo.achievementTotal || 0) - meritTransfer;
@@ -842,19 +847,17 @@ class LifeSystem {
         // ① 先代大名の役職を外します
         oldDaimyo.isDaimyo = false;
 
-        // ★追加：もし選ばれたのが「元服前（未登場）」の武将だったら、急いで元服させてお城に呼びます！
+        // ★修正：コマンドの時は「急遽元服し～」の文章は出さないように、messages.push を削除しました！
         if (successor.status === 'unborn') {
-            successor.status = 'active'; // 登場済みにします
-            successor.clan = oldDaimyo.clan; // 大名家を合わせます
-            successor.castleId = oldDaimyo.castleId; // 先代大名と同じお城に呼びます
-            successor.loyalty = 100; // 忠誠度をマックスにします
+            successor.status = 'active'; 
+            successor.clan = oldDaimyo.clan; 
+            successor.castleId = oldDaimyo.castleId; 
+            successor.loyalty = 100; 
             
-            // お城の武将リストに加えてあげます
             const castle = this.game.getCastle(successor.castleId);
             if (castle && !castle.samuraiIds.includes(successor.id)) {
                 castle.samuraiIds.push(successor.id);
             }
-            messages.push(`${successor.name.replace('|','')}が急遽元服し、家督を継ぎました。`);
         }
 
         // ② 新しい大名を任命します
@@ -917,11 +920,11 @@ class LifeSystem {
 
         // ==========================================
         // ★大名交代の共通の魔法を呼び出します！
-        // ※生前退位（家督相続）の場合は、4つ目のスイッチに「true」を渡して揺れを半分にします！
         this.applyDaimyoChangeEffects(oldDaimyo, successor, messages, true);
         // ==========================================
 
-        const mainMsg = `${successor.name.replace('|', '')} が家督を継ぎ、新たな大名となりました！`;
+        // ★修正：改名する前の「元の名前」を使ってメッセージを作ります！
+        const mainMsg = `${originalName} が家督を継ぎ、新たな大名となりました！`;
         this.game.ui.log(`【家督相続】${mainMsg}`);
         messages.unshift(mainMsg);
 
