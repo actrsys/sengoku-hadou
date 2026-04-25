@@ -9,18 +9,29 @@ class LifeSystem {
     }
 
     // 毎月の初め（1月）に「新しく登場する武将がいないか」をチェックします
-    async processStartMonth() {
-        if (this.game.month === 1) {
-            this.updateAllBushosAge(); // 毎年1月に、全員の年齢と能力を計算し直します！
-            await this.checkBirth();
-            await this.checkNameChange();
+    async processStartMonth() {
+        if (this.game.month === 1) {
+            this.updateAllBushosAge(); // 毎年1月に、全員の年齢と能力を計算し直します！
+            
+            // ★ここから追加：姫の年齢（出生前かどうか）も毎年1月にチェックします！
+            const currentYear = this.game.year;
+            for (const p of this.game.princesses) {
+                if (p.birthYear > currentYear) {
+                    p.status = 'not_born';
+                } else if (p.status === 'not_born' && p.birthYear <= currentYear) {
+                    p.status = 'unborn';
+                }
+            }
 
-            // 新しく登場した武将たちのために、派閥を組み直す魔法を呼び出します！
-            if (this.game.factionSystem) {
-                this.game.factionSystem.updateFactions();
-            }
-        }
-    }
+            await this.checkBirth();
+            await this.checkNameChange();
+
+            // 新しく登場した武将たちのために、派閥を組み直す魔法を呼び出します！
+            if (this.game.factionSystem) {
+                this.game.factionSystem.updateFactions();
+            }
+        }
+    }
 
     // 毎月の終わりに「寿命を迎えて亡くなる武将がいないか」をチェックします
     async processEndMonth() {
@@ -32,8 +43,16 @@ class LifeSystem {
         const currentYear = this.game.year;
         
         for (const b of this.game.bushos) {
-            // まだ生まれていない武将は計算しません
-            if (b.status === 'unborn') continue;
+            // ★ここから修正：状態は変えず、フラグで「出生前」を管理します
+            if (b.birthYear > currentYear) {
+                b.status = 'unborn';
+                b.isNotBorn = true; // まだ生まれていないバリエーション
+            } else if (b.isNotBorn && b.birthYear <= currentYear) {
+                b.isNotBorn = false; // 生まれたのでフラグを下ろします
+            }
+
+            // 出生前（フラグあり）や、まだ登場していない（元服前）武将は能力計算をスキップ
+            if (b.isNotBorn || b.status === 'unborn') continue;
 
             // 今の年齢を計算します
             const age = currentYear - b.birthYear;
@@ -58,13 +77,10 @@ class LifeSystem {
             }
             
             // 基礎値からペナルティを引いて、0以下にならないように（最低1）セットします
-            // 統率・武勇・政治・外交は、若い時のマイナスと、46歳からのマイナスを引きます
             b.leadership = Math.max(1, b.baseLeadership - penaltyYoung - penaltyOldGeneral);
             b.strength = Math.max(1, b.baseStrength - penaltyYoung - penaltyOldGeneral);
             b.politics = Math.max(1, b.basePolitics - penaltyYoung - penaltyOldGeneral);
             b.diplomacy = Math.max(1, b.baseDiplomacy - penaltyYoung - penaltyOldGeneral);
-            
-            // 智謀だけは、若い時のマイナスと、56歳からのマイナスを引きます
             b.intelligence = Math.max(1, b.baseIntelligence - penaltyYoung - penaltyOldInt);
         }
     }

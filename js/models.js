@@ -366,7 +366,7 @@ class Busho {
     // UI表示用メソッド
     getRankName() {
         if (this.status === 'unborn') {
-            if (this.clan === 0) return "元服前";
+            if (this.isNotBorn) return "出生前"; // ★フラグが立っていれば「出生前」と表示
             return "元服前";
         }
         if (this.isDaimyo) return "大名";

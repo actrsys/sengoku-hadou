@@ -72,8 +72,13 @@ const CAN_EXECUTE_RULES = {
         if (!daimyo) return false;
         const dFamily = Array.isArray(daimyo.familyIds) ? daimyo.familyIds : [];
         return game.bushos.some(b => {
-            // active（登場済み）だけでなく、unborn（元服前）の武将がいてもコマンドを押せるようにします！
-            if (b.clan !== game.playerClanId || (b.status !== 'active' && b.status !== 'unborn') || b.isDaimyo) return false;
+            // active（登場済み）または unborn（元服前）を対象にする
+            if (b.clan !== game.playerClanId || b.isDaimyo) return false;
+            if (b.status !== 'active' && b.status !== 'unborn') return false;
+            
+            // ★追加：unborn の中でも「出生前」フラグが立っている場合は除外する
+            if (b.status === 'unborn' && b.isNotBorn) return false;
+
             const bFamily = Array.isArray(b.familyIds) ? b.familyIds : [];
             return bFamily.includes(daimyo.id) || dFamily.includes(b.id);
         });
@@ -661,8 +666,12 @@ class CommandSystem {
             if (daimyo) {
                 const dFamily = Array.isArray(daimyo.familyIds) ? daimyo.familyIds : [];
                 bushos = this.game.bushos.filter(b => {
-                    // active（登場済み）だけでなく、unborn（元服前）の武将もリストに並ぶようにします！
-                    if (b.clan !== this.game.playerClanId || (b.status !== 'active' && b.status !== 'unborn') || b.isDaimyo) return false;
+                    if (b.clan !== this.game.playerClanId || b.isDaimyo) return false;
+                    if (b.status !== 'active' && b.status !== 'unborn') return false;
+
+                    // ★追加：unborn の中でも「出生前」フラグが立っている場合は除外する
+                    if (b.status === 'unborn' && b.isNotBorn) return false;
+
                     const bFamily = Array.isArray(b.familyIds) ? b.familyIds : [];
                     return bFamily.includes(daimyo.id) || dFamily.includes(b.id);
                 });
