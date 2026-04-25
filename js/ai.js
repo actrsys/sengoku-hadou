@@ -1842,7 +1842,7 @@ class AIEngine {
                     if (targetBusho.isCastellan && result.success) {
                         if (Math.random() > 0.33) result.success = false;
                     }
-                    this.game.strategySystem.handleCovertAction(doer.id, targetBusho.castleId, result.success, 'rumor');
+                    this.game.strategySystem.handleCovertAction(doer.id, targetBusho.castleId, result.success, 'rumor', false, targetBusho.id);
                     if (result.success) {
                         targetBusho.loyalty = Math.max(0, targetBusho.loyalty - result.val);
                         doer.achievementTotal = (doer.achievementTotal || 0) + Math.floor(doer.intelligence * 0.2) + 10;
@@ -1860,7 +1860,7 @@ class AIEngine {
                     if (targetBusho.isCastellan && isSuccess) {
                         if (Math.random() > 0.33) isSuccess = false;
                     }
-                    this.game.strategySystem.handleCovertAction(doer.id, targetBusho.castleId, isSuccess, 'headhunt', targetBusho.isCastellan && isSuccess);
+                    this.game.strategySystem.handleCovertAction(doer.id, targetBusho.castleId, isSuccess, 'headhunt', targetBusho.isCastellan && isSuccess, targetBusho.id);
                     if (isSuccess) {
                         const oldCastle = this.game.getCastle(targetBusho.castleId);
                         const oldClanId = targetBusho.clan;

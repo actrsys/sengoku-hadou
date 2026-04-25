@@ -146,7 +146,7 @@ class StrategySystem {
     }
 
     // ★追加：バレずに工作できたか（隠密成功）のチェックと、バレた時のペナルティを行う魔法です
-    handleCovertAction(doerId, targetCastleId, isSuccess, actionType, isCastellanHeadhunt = false) {
+    handleCovertAction(doerId, targetCastleId, isSuccess, actionType, isCastellanHeadhunt = false, targetBushoId = null) {
         const doer = this.game.getBusho(doerId);
         const targetCastle = this.game.getCastle(targetCastleId);
         if (!targetCastle) return "";
@@ -208,8 +208,36 @@ class StrategySystem {
             if (doer.clan === this.game.playerClanId) {
                 const targetClanName = this.game.clans.find(c => c.id === targetClanId)?.name || "不明な勢力";
                 return `\n工作が発覚し、${targetClanName}との友好度が低下しました……`;
+            } 
+            // ★敵AIがプレイヤーに対して工作し、バレた場合のお知らせ
+            else if (targetClanId === this.game.playerClanId) {
+                const doerClanName = this.game.clans.find(c => c.id === doer.clan)?.name || "不明な勢力";
+                let targetBushoName = "◯◯";
+                if (targetBushoId) {
+                    const tBusho = this.game.getBusho(targetBushoId);
+                    if (tBusho) targetBushoName = tBusho.name;
+                }
+                
+                let msg1 = "";
+                if (actionType === 'incite' || actionType === 'sabotage') {
+                    msg1 = `${doerClanName}の手の者が${targetCastle.name}の城下で目撃されたようです`;
+                } else if (actionType === 'rumor') {
+                    msg1 = `${targetBushoName}が${doerClanName}の手の者と面会していたようです`;
+                } else if (actionType === 'headhunt') {
+                    msg1 = `${targetBushoName}が${doerClanName}から寝返りの誘いを受けているようです`;
+                }
+                
+                if (msg1) {
+                    this.game.ui.showDialog(msg1, false);
+                }
             }
         }
+
+        // ★破壊工作が成功していたら、隠密の成否に関わらず確定で追加メッセージを表示
+        if (actionType === 'sabotage' && isSuccess && targetClanId === this.game.playerClanId && doer.clan !== this.game.playerClanId) {
+            this.game.ui.showDialog(`${targetCastle.name}の防備が一部破壊されたようです……`, false);
+        }
+
         return "";
     }
 
@@ -231,7 +259,7 @@ class StrategySystem {
         }
         
         // ★追加：隠密チェックを行います
-        const covertMsg = this.handleCovertAction(doerId, target.castleId, isSuccess, 'headhunt', target.isCastellan && isSuccess);
+        const covertMsg = this.handleCovertAction(doerId, target.castleId, isSuccess, 'headhunt', target.isCastellan && isSuccess, target.id);
         
         if (isSuccess) {
             const oldCastle = this.game.getCastle(target.castleId);
@@ -334,7 +362,7 @@ class StrategySystem {
         this.game.ui.renderCommandMenu(); 
     }
 
-    // 流言を実行する魔法
+    // 離間計を実行する魔法
     executeRumor(doerId, castleId, targetBushoId) { 
         const doer = this.game.getBusho(doerId); 
         const targetBusho = this.game.getBusho(targetBushoId); 
@@ -348,17 +376,17 @@ class StrategySystem {
         }
 
         // ★追加：隠密チェックを行います
-        const covertMsg = this.handleCovertAction(doerId, targetBusho.castleId, result.success, 'rumor');
+        const covertMsg = this.handleCovertAction(doerId, targetBusho.castleId, result.success, 'rumor', false, targetBusho.id);
 
         if(result.success) { 
             const oldVal = targetBusho.loyalty;
             targetBusho.loyalty = Math.max(0, targetBusho.loyalty - result.val); 
             const actualDrop = oldVal - targetBusho.loyalty;
-            this.game.ui.showResultModal(`${doer.name}の流言が成功！\n${targetBusho.name}の忠誠が低下しました${covertMsg}`);
+            this.game.ui.showResultModal(`${doer.name}の離間計が成功！\n${targetBusho.name}の忠誠が低下しました${covertMsg}`);
             doer.achievementTotal += Math.floor(doer.intelligence * 0.2) + 10;
             this.game.factionSystem.updateRecognition(doer, 20); 
         } else { 
-            this.game.ui.showResultModal(`${doer.name}の流言は失敗しました${covertMsg}`); 
+            this.game.ui.showResultModal(`${doer.name}の離間計は失敗しました${covertMsg}`); 
             doer.achievementTotal += 5; 
             this.game.factionSystem.updateRecognition(doer, 10); 
         } 
