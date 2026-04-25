@@ -208,7 +208,7 @@ class StrategySystem {
             if (isDiscovered) {
                 let msg1 = "";
                 if (actionType === 'incite' || actionType === 'sabotage') {
-                    msg1 = `${doerClanName}の手の者が${targetCastle.name}の城下で目撃されたようです`;
+                    msg1 = `${doerClanName}の手の者が${targetCastle.name}周辺で目撃されたようです`;
                 } else if (actionType === 'rumor') {
                     msg1 = `${targetBushoName}が${doerClanName}の手の者と面会していたようです`;
                 } else if (actionType === 'headhunt') {
