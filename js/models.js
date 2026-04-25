@@ -441,7 +441,7 @@ class Princess {
         // ★今回追加：登場年、没年、顔画像
         this.startYear = Number(this.startYear || 1500); // 登場年
         this.endYear = Number(this.endYear || 1650);     // 没年
-        this.faceIcon = this.faceIcon || 'unknown_face.webp'; // 姫用の汎用画像があればその名前に変えてもOKです
+        this.faceIcon = data.faceIcon || 'unknown_princess_face.webp'; // 姫用の汎用画像
         
         this.originalClanId = Number(this.originalClanId || 0); // 生まれた大名家のID
         this.fatherId = Number(this.fatherId || 0);             // 父親（武将）のID
