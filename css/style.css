@@ -1146,7 +1146,7 @@ body:not(.is-pc).daimyo-select-mode #map-wrapper { margin-bottom: 0 !important; 
 }
 .floating-back-btn.hidden, .daimyo-confirm-buttons.hidden { display: none !important; }
 .daimyo-confirm-buttons { position: absolute; bottom: 45px; left: 50%; transform: translateX(-50%); display: flex; gap: 20px; pointer-events: auto; z-index: 4001; }
-.daimyo-confirm-buttons button { padding: 12px 30px; font-size: 1.2rem; border-radius: 8px; font-weight: bold; cursor: pointer; }
+.daimyo-confirm-buttons button { padding: 12px 30px; font-size: 1.2rem; font-weight: bold; cursor: pointer; }
 
 /* =========================================================
    大名家詳細モーダルのデザイン（完全版）
@@ -1786,7 +1786,7 @@ body:not(.is-pc) #unit-divide-modal .modal-content {
 body:not(.is-pc) #daimyo-confirm-modal .modal-content { top: 0; bottom: auto; left: 0; transform: none; width: 100% !important; max-width: 100% !important; padding: max(15px, env(safe-area-inset-top)) 15px 15px 15px;}
 /* ★ スマホ版も見切れないように、下の余白を多めに確保しました */
 body:not(.is-pc) .daimyo-confirm-buttons { flex-direction: column; gap: 12px; width: 100%; bottom: max(40px, calc(env(safe-area-inset-bottom) + 20px)); padding: 0 15px; box-sizing: border-box; }
-body:not(.is-pc) .daimyo-confirm-buttons button { width: 100%; box-sizing: border-box; border-radius: 20px; }
+body:not(.is-pc) .daimyo-confirm-buttons button { width: 100%; box-sizing: border-box; }
 
 /* =========================================================
    スマホ版: 攻城戦メイン軍・援軍レイアウト（★整理整頓版）
