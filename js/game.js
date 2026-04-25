@@ -789,7 +789,7 @@ class GameManager {
     startNewGame() {
         if(this.ui) this.ui.forceResetModals();
         
-        // ★ここから追加：前回のゲームの記憶やフラグを綺麗にお掃除します！
+        // ★前回のゲームの記憶やフラグを綺麗にお掃除します！
         this.isProcessingAI = false; // AI思考中フラグを解除！
         if (this.aiTimer) {
             clearTimeout(this.aiTimer);
@@ -811,12 +811,16 @@ class GameManager {
             this.ui.selectedDaimyoId = null; // 選んでいた大名の記憶も消します
         }
         
-        // ★追加：スタンプ帳を真っ白にして、イベントの引き出しも新品に取り替えます！
+        // ★スタンプ帳を真っ白にして、イベントの引き出しも新品に取り替えます！
         this.flags = {};
         this.eventManager = new EventManager(this);
-        // ★お掃除ここまで！
-
-        // ★ここを修正：存在しない謎の魔法を消して、正しいシナリオ選択の魔法に戻します！
+        
+        // ★AIの作戦データも真っ白にします（これで保護期間無視のバグを防ぎます）！
+        if (this.aiOperationManager) {
+            this.aiOperationManager.operations = {};
+            this.aiOperationManager.draftBases = {};
+        }
+        
         this.ui.showScenarioSelection(SCENARIOS, (folder) => {
             this.loadScenario(folder);
         });
