@@ -275,11 +275,13 @@ class AIOperationManager {
         const myClanCastles = this.game.castles.filter(c => c.ownerClan === clanId);
         if (myClanCastles.length === 0) return;
 
-        const startY = this.game.gameStartYear || window.MainParams.StartYear;
-        const startM = this.game.gameStartMonth || window.MainParams.StartMonth || 1;
-        const elapsedTurns = ((this.game.year - startY) * 12) + (this.game.month - startM);
+        const startY = Number(this.game.gameStartYear || window.MainParams.StartYear || 1560);
+        const startM = Number(this.game.gameStartMonth || window.MainParams.StartMonth || 1);
+        const currentY = Number(this.game.year);
+        const currentM = Number(this.game.month);
+        const elapsedTurns = ((currentY - startY) * 12) + (currentM - startM);
         
-        if (elapsedTurns < 3) {
+        if (isNaN(elapsedTurns) || elapsedTurns < 3) {
             this.setInternalOperation(clanId);
             return;
         }
