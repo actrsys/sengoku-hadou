@@ -1342,11 +1342,17 @@ Object.assign(UIManager.prototype, {
     // ★新魔法：国を勢力の色で塗りつぶす魔法です！
     // ==========================================
     updateClanColors() {
-        // ★追加：独立や謀反の演出中は、色がフライングで変わらないようにストップをかけます！
-        if (this.game && this.game.isSuspendingColorUpdate) return;
-
         const overlay = document.getElementById('clan-color-overlay');
         if (!overlay) return;
+
+        // ★修正：独立や謀反の演出中でストップがかかっている時は、新しい計算をせずに「記憶しておいた前の画像」を貼り直して終わります！
+        if (this.game && this.game.isSuspendingColorUpdate) {
+            if (this.lastClanColorsImageData) {
+                const ctx = overlay.getContext('2d');
+                ctx.putImageData(this.lastClanColorsImageData, 0, 0);
+            }
+            return;
+        }
 
         const sourceData = DataManager.provinceImageData;
         if (!sourceData) {
@@ -1690,11 +1696,13 @@ Object.assign(UIManager.prototype, {
                 const targetPixels = new Uint8Array(width * height);
 
                 // ★修正：１つの城でも、複数の城でも同時に光るようにリストにします！
-                const targetIds = Array.isArray(castleIdOrIds) ? castleIdOrIds : [castleIdOrIds];
+                // 計算を劇的に軽くするために Set（集合）の魔法を使います！
+                const targetIdsArray = Array.isArray(castleIdOrIds) ? castleIdOrIds : [castleIdOrIds];
+                const targetIdsSet = new Set(targetIdsArray);
 
                 // まずは本来のお城の領地をマークします
                 for (let i = 0; i < this.pixelCastleMap.length; i++) {
-                    if (targetIds.includes(this.pixelCastleMap[i])) {
+                    if (targetIdsSet.has(this.pixelCastleMap[i])) {
                         targetPixels[i] = 1;
                     }
                 }
@@ -1795,10 +1803,12 @@ Object.assign(UIManager.prototype, {
             
             if (this.pixelCastleMap) {
                 // ★修正：１つの城でも、複数の城でも同時に光るようにリストにします！
-                const targetIds = Array.isArray(castleIdOrIds) ? castleIdOrIds : [castleIdOrIds];
+                // 計算を劇的に軽くするために Set（集合）の魔法を使います！
+                const targetIdsArray = Array.isArray(castleIdOrIds) ? castleIdOrIds : [castleIdOrIds];
+                const targetIdsSet = new Set(targetIdsArray);
 
                 for (let i = 0; i < this.pixelCastleMap.length; i++) {
-                    if (targetIds.includes(this.pixelCastleMap[i])) {
+                    if (targetIdsSet.has(this.pixelCastleMap[i])) {
                         targetPixels[i] = 1;
                     }
                 }
