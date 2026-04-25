@@ -146,6 +146,7 @@ class StrategySystem {
     }
 
     // ★追加：バレずに工作できたか（隠密成功）のチェックと、バレた時のペナルティを行う魔法です
+    // 引数（受け取るデータ）に targetBushoId を追加して、誰が狙われたか分かるようにします
     handleCovertAction(doerId, targetCastleId, isSuccess, actionType, isCastellanHeadhunt = false, targetBushoId = null) {
         const doer = this.game.getBusho(doerId);
         const targetCastle = this.game.getCastle(targetCastleId);
@@ -165,7 +166,6 @@ class StrategySystem {
         const soldiers = targetCastle.soldiers;
 
         if (actionType === 'incite' || actionType === 'rumor') {
-            // 民心撹乱・離間計の場合
             const numerator = Math.sqrt(30 + (doer.strength * 1.5) + doer.intelligence);
             const denominator = Math.sqrt(bestStr + (bestInt * 1.5));
             const safeDenominator = denominator > 0 ? denominator : 1; 
@@ -173,11 +173,8 @@ class StrategySystem {
             
             if (isSuccess) penalty = 4;
             else penalty = 2;
-
         } else if (actionType === 'sabotage' || actionType === 'headhunt') {
-            // 破壊工作・武将引抜の場合
             if (isSuccess) {
-                // 成功したら絶対にバレます！
                 alwaysDiscovered = true;
                 if (actionType === 'sabotage') penalty = 4;
                 else if (actionType === 'headhunt') {
@@ -185,7 +182,6 @@ class StrategySystem {
                     else penalty = 16;
                 }
             } else {
-                // 失敗した時は隠密チェックをします
                 const numerator = Math.sqrt((doer.strength * 1.5) + doer.intelligence);
                 const denominator = Math.sqrt(15 + bestStr + (bestInt * 1.5));
                 const safeDenominator = denominator > 0 ? denominator : 1;
@@ -194,30 +190,22 @@ class StrategySystem {
             }
         }
 
-        // 確率は0未満や0.99より大きくならないように調整します
         covertProb = Math.max(0, Math.min(0.99, covertProb));
-        
-        // サイコロを振ってバレたかどうか判定します
         let isDiscovered = alwaysDiscovered || (Math.random() >= covertProb);
 
-        if (isDiscovered) {
-            // バレたら友好度を下げます！
-            this.game.diplomacyManager.updateSentiment(doer.clan, targetClanId, -penalty);
+        // --- お知らせメッセージの作成 (プレイヤーが被害者の場合) ---
+        if (targetClanId === this.game.playerClanId && doer.clan !== this.game.playerClanId) {
+            const doerClanName = this.game.clans.find(c => c.id === doer.clan)?.name || "不明な勢力";
             
-            // もしプレイヤーがやったなら、メッセージを追加してお知らせします
-            if (doer.clan === this.game.playerClanId) {
-                const targetClanName = this.game.clans.find(c => c.id === targetClanId)?.name || "不明な勢力";
-                return `\n工作が発覚し、${targetClanName}との友好度が低下しました……`;
-            } 
-            // ★敵AIがプレイヤーに対して工作し、バレた場合のお知らせ
-            else if (targetClanId === this.game.playerClanId) {
-                const doerClanName = this.game.clans.find(c => c.id === doer.clan)?.name || "不明な勢力";
-                let targetBushoName = "◯◯";
-                if (targetBushoId) {
-                    const tBusho = this.game.getBusho(targetBushoId);
-                    if (tBusho) targetBushoName = tBusho.name;
-                }
-                
+            // 狙われた武将の名前を取得します
+            let targetBushoName = "◯◯";
+            if (targetBushoId) {
+                const tBusho = this.game.getBusho(targetBushoId);
+                if (tBusho) targetBushoName = tBusho.name;
+            }
+
+            // ① 犯人がバレた場合（隠密失敗）の目撃報告
+            if (isDiscovered) {
                 let msg1 = "";
                 if (actionType === 'incite' || actionType === 'sabotage') {
                     msg1 = `${doerClanName}の手の者が${targetCastle.name}の城下で目撃されたようです`;
@@ -228,16 +216,23 @@ class StrategySystem {
                 }
                 
                 if (msg1) {
-                    this.game.ui.showDialog(msg1, false);
+                    this.game.ui.showDialog(msg1, false); // 犯人の名前付きで警告
                 }
+            }
+
+            // ② 破壊工作が成功していた場合、犯人の成否に関わらず「壊れたこと」だけは必ず報告
+            if (actionType === 'sabotage' && isSuccess) {
+                this.game.ui.showDialog(`${targetCastle.name}の防備が一部破壊されたようです……`, false);
             }
         }
 
-        // ★破壊工作が成功していたら、隠密の成否に関わらず確定で追加メッセージを表示
-        if (actionType === 'sabotage' && isSuccess && targetClanId === this.game.playerClanId && doer.clan !== this.game.playerClanId) {
-            this.game.ui.showDialog(`${targetCastle.name}の防備が一部破壊されたようです……`, false);
+        if (isDiscovered) {
+            this.game.diplomacyManager.updateSentiment(doer.clan, targetClanId, -penalty);
+            if (doer.clan === this.game.playerClanId) {
+                const targetClanName = this.game.clans.find(c => c.id === targetClanId)?.name || "不明な勢力";
+                return `\n工作が発覚し、${targetClanName}との友好度が低下しました……`;
+            }
         }
-
         return "";
     }
 
