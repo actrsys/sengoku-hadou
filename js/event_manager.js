@@ -52,11 +52,21 @@ class EventManager {
             }
 
             if (ev.checkCondition(this.game, context)) { 
-                await ev.execute(this.game, context);    
+                // イベントを実行する「前」にスタンプを押します。
+                // これにより、実行中にどんなエラーが起きても歴史のフラグは絶対に刻まれます。
+                if (ev.isOneTime) {
+                    this.game.flags[ev.id] = true;
+                }
+
+                // 「try〜catch」という安全装置で魔法を実行します
+                try {
+                    await ev.execute(this.game, context);    
+                } catch (error) {
+                    // 裏側で透明なエラーが起きても、ゲームが止まらないようにしてここで受け止めます
+                    console.warn(`イベント ${ev.id} の実行中にエラーが出ましたが、進行を継続します:`, error);
+                }
                 
                 if (ev.isOneTime) {
-                    // セーブデータに残るように、イベントのIDで自動的にスタンプを押します
-                    this.game.flags[ev.id] = true;
                     // 今のゲーム中も処理を軽くするために配列から消しておきます
                     this.events[timing] = this.events[timing].filter(e => e.id !== ev.id);
                 }
