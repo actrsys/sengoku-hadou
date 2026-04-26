@@ -1154,8 +1154,15 @@ class GameManager {
                 // 2. 民忠補正: 民忠 * 0.01
                 const loyaltyBonus = c.peoplesLoyalty * 0.01;
                 
-                // 3. 増加量: √城の人口 * ((大名補正 + 民忠補正) / 2) * 0.5
-                const soldierGrowth = Math.floor(Math.sqrt(c.population) * ((daimyoBonus + loyaltyBonus) / 2) * 0.5);
+                // 3. 増加量の基本値: √城の人口 * ((大名補正 + 民忠補正) / 2) * 0.5
+                const baseGrowth = Math.sqrt(c.population) * ((daimyoBonus + loyaltyBonus) / 2) * 0.5;
+
+                // ★追加：人口に対する兵士の割合を計算して、ブレーキをかけます！
+                // 兵士の割合が50%で0.375倍になり、75%で0.0625倍（雀の涙）になります。
+                const soldierRatio = c.population > 0 ? (c.soldiers / c.population) : 1.0;
+                const penaltyMultiplier = Math.max(0, 1.0 - (soldierRatio * 1.25));
+
+                const soldierGrowth = Math.floor(baseGrowth * penaltyMultiplier);
 
                 // 計算した増える人数を、今のお城の兵士の数に足し合わせます（最大99999人まで）
                 c.soldiers = Math.min(99999, c.soldiers + Math.max(0, soldierGrowth));
