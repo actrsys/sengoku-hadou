@@ -10,6 +10,7 @@ class EventManager {
         this.game = game;
         // 4つの引き出しを用意します
         this.events = {
+            game_start: [],        // ゲーム開始直後の特別な引き出し
             startMonth_before: [], // 月初の最初（収入などの前）
             startMonth_after: [],  // 月初の最後（収入などの後）
             endMonth_before: [],   // 月末の最初（派閥や寿命などの前）
@@ -19,6 +20,9 @@ class EventManager {
             after_battle_blink: [], // 地図の点滅が終わった直後の特別な引き出し
             shogun_death: []       // 将軍が死亡した直後に呼ばれる特別な引き出し
         };
+        
+        window.GameEvents.forEach(ev => this.registerEvent(ev));
+    }
         
         window.GameEvents.forEach(ev => this.registerEvent(ev));
     }

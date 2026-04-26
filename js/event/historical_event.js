@@ -31,6 +31,33 @@ window.GameEvents.push({
 });
 
 // ==========================================
+// ★ ゲーム開始時：特定武将の寿命延長（裏イベント）
+// ==========================================
+window.GameEvents.push({
+    id: "historical_life_extension",
+    timing: "game_start",            // ゲーム開始直後のタイミング
+    isOneTime: true,                 // 1回だけ実行します
+    
+    checkCondition: function(game) {
+        // ゲーム開始時に必ず実行するので、無条件で true を返します
+        return true;
+    },
+    
+    execute: async function(game) {
+        // 対象となる武将のIDリスト（今川義元、足利義輝、三好長慶）
+        const targetIds = [1004001, 1017001, 1020001];
+        
+        for (const id of targetIds) {
+            const busho = game.getBusho(id);
+            // 武将が見つかったら、寿命（没年）を5年延ばします
+            if (busho) {
+                busho.endYear += 5;
+            }
+        }
+    }
+});
+
+// ==========================================
 // ★ 三好義興の死による長慶の寿命減少（裏イベント）
 // ==========================================
 window.GameEvents.push({
@@ -54,8 +81,8 @@ window.GameEvents.push({
     execute: async function(game) {
         const nagayoshi = game.getBusho(1020001);
         if (nagayoshi) {
-            // 長慶の寿命（没年）を1年減らします
-            nagayoshi.endYear -= 1;
+            // 長慶の寿命（没年）を3年減らします
+            nagayoshi.endYear -= 3;
         }
     }
 });
@@ -84,8 +111,8 @@ window.GameEvents.push({
     execute: async function(game) {
         const nagayoshi = game.getBusho(1020001);
         if (nagayoshi) {
-            // 長慶の寿命（没年）を1年減らします
-            nagayoshi.endYear -= 1;
+            // 長慶の寿命（没年）を3年減らします
+            nagayoshi.endYear -= 3;
         }
     }
 });
@@ -109,8 +136,8 @@ window.GameEvents.push({
         
         const miyoshiClanId = yoshitsugu.clan;
 
-        // 3. 三好家に特定の4名が所属しているか確認します
-        const requiredMembers = [1020006, 1020007, 1020008, 1901001];
+        // 3. 三好家に特定の５名（三好長逸、三好政生、岩成友通、松永久秀、松永久通）が所属しているか確認します
+        const requiredMembers = [1020006, 1020007, 1020008, 1901001, 1901003];
         for (let id of requiredMembers) {
             const member = game.getBusho(id);
             // 死んでいる、生まれていない、浪人、または三好家以外にいる場合はイベントが起きません

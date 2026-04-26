@@ -860,6 +860,11 @@ class GameManager {
             
             // ★ここを書き足し！：ゲーム開始の瞬間に、全員の年齢による能力値変動を計算します！
             this.lifeSystem.updateAllBushosAge();
+
+            // ★ここから追加：ゲーム開始時の特別なイベント（寿命の延長など）を実行します！
+            if (this.eventManager) {
+                await this.eventManager.processEvents('game_start');
+            }
             
             // ★ここを書き足し！：画像の大きさをゲーム全体で覚えるようにします！
             this.mapWidth = data.mapWidth || 1200;
