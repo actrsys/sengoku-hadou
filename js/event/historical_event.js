@@ -684,8 +684,8 @@ window.GameEvents.push({
         
         const miyoshiClanId = yoshitsugu.clan;
 
-        // 3. 三好家に特定の５名（三好長逸、三好政生、岩成友通、松永久秀、松永久通）が所属しているか確認します
-        const requiredMembers = [1020006, 1020007, 1020008, 1901001, 1901003];
+        // 3. 三好家に特定の３名（三好長逸、三好政生、岩成友通）が所属しているか確認します
+        const requiredMembers = [1020006, 1020007, 1020008];
         for (let id of requiredMembers) {
             const member = game.getBusho(id);
             // 死んでいる、生まれていない、浪人、または三好家以外にいる場合はイベントが起きません
