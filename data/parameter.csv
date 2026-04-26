@@ -19,9 +19,9 @@ Economy.BaseCharity,10,施しの基礎値。上げると民忠誠を上げやす
 Economy.CharmEffect,0.4,施し時の魅力の影響係数。上げると「魅力」が高い武将の施し効果が激増する
 Economy.CharityFluctuation,0.15,施し効果の変動幅。上げると民忠上昇値が不安定になる
 Economy.MaxLoyalty,100,民忠の最大値。上げると一揆発生率をより低く抑えられる、下げると維持が難しくなる
-Economy.TradeRateMin,0.3,相場の最小値。上げると米価暴落時の底値が上がり金策しやすくなる、下げると米が紙屑同然になるリスク増
+Economy.TradeRateMin,0.7,相場の最小値。上げると米価暴落時の底値が上がり金策しやすくなる、下げると米が紙屑同然になるリスク増
 Economy.TradeRateMax,1.8,相場の最大値。上げると米が高騰した際に莫大な利益が出る、下げると相場変動の幅が狭まる
-Economy.TradeFluctuation,0.7,相場の変動幅。上げると毎月の相場変動が激しくなる、下げると相場が固定化される
+Economy.TradeFluctuation,0.3,相場の変動幅。上げると毎月の相場変動が激しくなる、下げると相場が固定化される
 Economy.PriceAmmo,1,物資購入：矢弾の基本単価
 Economy.PriceHorse,5,物資購入：騎馬の基本単価
 Economy.PriceGun,50,物資購入：鉄砲の基本単価
