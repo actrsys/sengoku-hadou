@@ -53,12 +53,12 @@ class EventManager {
 
             if (ev.checkCondition(this.game, context)) { 
                 // イベントを実行する「前」にスタンプを押します。
-                // これにより、実行中にどんなエラーが起きても歴史のフラグは絶対に刻まれます。
-                if (ev.isOneTime) {
+                // ★大修正：歴史イベントを作る時に「isOneTime: true」を書き忘れていても、
+                // イベントの名前（id）さえあれば、絶対に本物のスタンプ帳に記録を残す最強の魔法にしました！
+                if (ev.id) {
                     this.game.flags[ev.id] = true;
                     
-                    // 戦闘の裏側など、もし「分身のデータ」で動いていた時でも、
-                    // 絶対に「本物のゲーム（GameApp）」のスタンプ帳に記録を残すための強力な魔法です！
+                    // 念のため、本物のゲーム本体（GameApp）にも直接スタンプを刻み込みます
                     if (window.GameApp) {
                         window.GameApp.flags = window.GameApp.flags || {};
                         window.GameApp.flags[ev.id] = true;
