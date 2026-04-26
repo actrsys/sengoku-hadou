@@ -459,14 +459,35 @@ class LifeSystem {
         
         // ★ここを追加：官位を持っていたら朝廷に返す魔法！
         if (busho.courtRankIds && busho.courtRankIds.length > 0) {
+            let wasShogun = false;
             // ★追加：もし征夷大将軍（ID1）を持っていたら、後継ぎのためにメモを残しておきます！
             if (busho.courtRankIds.includes(1)) {
                 busho._wasShogun = true;
+                wasShogun = true;
             }
             busho.courtRankIds.forEach(rankId => {
                 this.game.courtRankSystem.returnRank(rankId);
             });
             busho.courtRankIds = []; // 自分の持ち物リストは空っぽにします
+
+            // 武将が死亡した時点で、将軍なら生き残っている一門に「左馬頭（ID80）」を託します！
+            if (wasShogun) {
+                const relative = this.game.bushos.find(b => 
+                    b.status !== 'dead' && 
+                    b.status !== 'unborn' && 
+                    b.id !== busho.id && 
+                    busho.familyIds.some(fId => b.familyIds.includes(fId))
+                );
+                
+                if (relative) {
+                    if (this.game.courtRankSystem) {
+                        this.game.courtRankSystem.grantRank(relative, 80);
+                    } else {
+                        if (!relative.courtRankIds) relative.courtRankIds = [];
+                        if (!relative.courtRankIds.includes(80)) relative.courtRankIds.push(80);
+                    }
+                }
+            }
         }
         
         const castle = this.game.getCastle(busho.castleId);
@@ -660,16 +681,6 @@ class LifeSystem {
                 }
             }
 
-            // ★追加：先代が征夷大将軍で、後継ぎが一門武将なら「左馬頭（ID80）」をこっそり与える魔法！
-            if (daimyo._wasShogun) {
-                // 後継ぎが一門武将かどうかを血の繋がり（familyIds）で確認します
-                const isRelative = daimyo.familyIds.some(fId => successor.familyIds.includes(fId));
-                if (isRelative) {
-                    // 朝廷システムにお願いして、後継ぎにID80の官位を与えます
-                    this.game.courtRankSystem.grantRank(successor, 80);
-                }
-            }
-            
             this.game.changeLeader(daimyo.clan, successor.id);
             
             // ==========================================
@@ -951,30 +962,12 @@ class LifeSystem {
         // 滅亡の条件：お城が0個になった、または後継ぎがいない場合です
         if (clanCastles.length === 0 || reason === 'no_heir') {
             
-            // ★追加：将軍（ID1）が大名で、お城が0になった（滅亡する）場合の特別な死亡処理！
             const leader = this.game.getBusho(clan.leaderId);
             if (leader && leader.status !== 'dead' && leader.isDaimyo && leader.courtRankIds && leader.courtRankIds.includes(1) && clanCastles.length === 0) {
-                // 最後の城の今の持ち主がプレイヤーなら、プレイヤーが滅ぼしたと判定します
                 const lastCastle = this.game.getCastle(leader.castleId);
-                const isPlayerDidIt = lastCastle && lastCastle.ownerClan === this.game.playerClanId;
-                
                 const killerClanId = lastCastle ? lastCastle.ownerClan : 0; // ★追加：将軍を滅ぼした勢力をメモします
-                
-                const leaderNameStr = leader.name.replace('|', '');
-                let deathMsg = "";
-                if (isPlayerDidIt) {
-                    deathMsg = `${leaderNameStr}は自害しました。`;
-                } else {
-                    deathMsg = `${leaderNameStr}は討死しました。`;
-                }
-                
-                this.game.ui.log(deathMsg);
-                await this.game.ui.showDialogAsync(deathMsg, false, 0);
-                
-                // ここで将軍様を必ず死亡させます！
-                await this.executeDeath(leader);
 
-                // ★追加：将軍が死亡したことをイベントシステムに伝えます！
+                // ★追加：将軍の勢力が滅亡したことをイベントシステムに伝えます！
                 if (this.game.eventManager) {
                     await this.game.eventManager.processEvents('shogun_death', {
                         deadShogunClanId: clan.id,
