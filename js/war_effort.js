@@ -2004,26 +2004,57 @@ Object.assign(WarManager.prototype, {
     },
 
     processKillSelection(selectedIds) {
-        let killedNames = []; // ★追加：誰を処断したのか覚えておくための新しい箱（メモ帳）です
+        let targetNames = [];
 
-        // 選ばれた武将たちを処断予定リストに移します
+        // まずは誰を選んだのか、名前だけをメモ帳に書き出します（ここではまだ処断リストには移しません！）
         for (let id of selectedIds) {
             const prisoner = this.pendingPrisoners.find(p => p.id === id);
             if (prisoner) {
-                killedNames.push(prisoner.name); // メッセージに出すために、名前をメモ帳に書き込みます
-                this.pendingKills.push(prisoner);
-                this.pendingPrisoners = this.pendingPrisoners.filter(p => p.id !== prisoner.id);
+                targetNames.push(prisoner.name);
             }
         }
 
-        // ★追加：メモ帳に名前が書かれていたら、メッセージを出してからリストに戻ります
-        if (killedNames.length > 0) {
-            this.game.ui.showDialog(`${killedNames.join('、')} を処断しました。`, false, () => {
-                this.openKillSelector();
-            });
-        } else {
+        if (targetNames.length === 0) {
             this.openKillSelector();
+            return;
         }
+
+        // 確認のメッセージダイアログを出します（true にして、２つの選択肢が出るようにします）
+        this.game.ui.showDialog(`${targetNames.join('、')} を本当に処断してよろしいですか？`, true, 
+            () => { 
+                // 「処断する」を選んだ時の処理：ここで初めて処断予定リストに移します
+                for (let id of selectedIds) {
+                    const prisoner = this.pendingPrisoners.find(p => p.id === id);
+                    if (prisoner) {
+                        this.pendingKills.push(prisoner);
+                        this.pendingPrisoners = this.pendingPrisoners.filter(p => p.id !== prisoner.id);
+                    }
+                }
+                // そして、処断完了のメッセージを出します
+                this.game.ui.showDialog(`${targetNames.join('、')} を処断しました。`, false, () => {
+                    this.openKillSelector();
+                });
+            },
+            () => { 
+                // 「やめる」を選んだ時の処理：武将は移さず、そのままリストに戻ります
+                this.openKillSelector();
+            }
+        );
+
+        // ★魔法の裏技：ダイアログが出た直後に、ボタンの文字と色を一瞬で書き換えます！
+        setTimeout(() => {
+            const buttons = document.querySelectorAll('button');
+            buttons.forEach(btn => {
+                if (btn.textContent === 'はい') {
+                    btn.textContent = '処断する';
+                    btn.classList.remove('btn-primary'); // 青いボタンの色を消して…
+                    btn.classList.add('btn-danger'); // 赤いボタン（危険色）に変更します！
+                }
+                if (btn.textContent === 'いいえ') {
+                    btn.textContent = 'やめる';
+                }
+            });
+        }, 10);
     },
 
     async finishPrisonerPhase() {
