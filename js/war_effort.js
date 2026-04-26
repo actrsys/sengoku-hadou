@@ -1777,7 +1777,7 @@ Object.assign(WarManager.prototype, {
             // 大名がいなければ登用フェーズへ進みます
             this.startHirePhaseIntro();
         }
-    }
+    },
 
     async handleDaimyoPrisonerAction(action) {
         // 大名の画面を閉じてから処理を行います
@@ -1856,7 +1856,7 @@ Object.assign(WarManager.prototype, {
             }
             this.game.ui.showDialog(`${prisoner.name}を解放しました。`, false, nextStep);
         }
-    }
+    },
 
     startHirePhaseIntro() {
         // ②登用フェーズ
@@ -1867,7 +1867,7 @@ Object.assign(WarManager.prototype, {
         this.game.ui.showDialog("登用する武将を選択してください。", false, () => {
             this.openHireSelector();
         });
-    }
+    },
 
     openHireSelector() {
         const selectableCount = this.pendingPrisoners.filter(p => !p.hasRefusedHire).length;
@@ -1884,14 +1884,14 @@ Object.assign(WarManager.prototype, {
                 this.checkFinishHirePhase();
             }
         );
-    }
+    },
 
     checkFinishHirePhase() {
         this.game.ui.showDialog("登用を終了しますか？", true, 
             () => { this.startKillPhaseIntro(); }, // はい：次のフェーズへ
             () => { this.openHireSelector(); } // いいえ：リストに戻る
         );
-    }
+    },
 
     async processHireList(selectedIds) {
         // 選ばれた武将たちを順番に登用していきます
@@ -1959,7 +1959,7 @@ Object.assign(WarManager.prototype, {
         this.game.ui.showDialog(msg, false, () => {
             this.openHireSelector();
         });
-    }
+    },
 
     startKillPhaseIntro() {
         // ③処断フェーズ
@@ -1972,7 +1972,7 @@ Object.assign(WarManager.prototype, {
         this.game.ui.showDialog("処断する武将を選択してください。", false, () => {
             this.openKillSelector();
         });
-    }
+    },
 
     openKillSelector() {
         if (this.pendingPrisoners.length === 0) {
@@ -1988,14 +1988,14 @@ Object.assign(WarManager.prototype, {
                 this.checkFinishKillPhase();
             }
         );
-    }
+    },
 
     checkFinishKillPhase() {
         this.game.ui.showDialog("処断を終了しますか？", true, 
             () => { this.finishPrisonerPhase(); }, // はい：全員の処遇を確定させます
             () => { this.openKillSelector(); } // いいえ：リストに戻る
         );
-    }
+    },
 
     processKillSelection(selectedIds) {
         // 選ばれた武将たちを処断予定リストに移します
@@ -2007,7 +2007,7 @@ Object.assign(WarManager.prototype, {
             }
         }
         this.openKillSelector();
-    }
+    },
 
     async finishPrisonerPhase() {
         // 予定通りに処断を実行します
@@ -2058,7 +2058,7 @@ Object.assign(WarManager.prototype, {
         await this.game.lifeSystem.checkClanExtinction(this.state.oldDefClanId, 'no_castle');
         if (window.GameApp) window.GameApp.updateAllClanPrestige();
         this.game.finishTurn();
-    }
+    },
     
     async autoResolvePrisoners(captives, winnerClanId) { // ★ async を追加
         const aiBushos = this.game.bushos.filter(b => b.clan === winnerClanId && b.status !== 'unborn'); 
