@@ -1651,20 +1651,13 @@ class UIManager {
     }
     
     showTurnStartDialog(castle, onProceed) {
-        const msg = `
-            <div>
-                <div style="font-weight:bold; margin-bottom:5px;">小姓</div>
-                <div>「殿、${castle.name}にご命令ください。」</div>
-            </div>
-        `;
-        if (this.resultBody) this.resultBody.innerHTML = msg;
-        this.hideAIGuardTemporarily(); 
-        if (this.resultModal) this.resultModal.classList.remove('hidden');
-        this.onResultModalClose = onProceed;
+        const msg = `小姓\n「殿、${castle.name}にご命令ください。」`;
 
         if (window.AudioManager) {
             window.AudioManager.playSE('myturn.ogg');
         }
+
+        this.showDialog(msg, false, onProceed);
     }
 
     openQuantitySelector(type, data, targetId, extraData = null) {
