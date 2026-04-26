@@ -2004,15 +2004,26 @@ Object.assign(WarManager.prototype, {
     },
 
     processKillSelection(selectedIds) {
+        let killedNames = []; // ★追加：誰を処断したのか覚えておくための新しい箱（メモ帳）です
+
         // 選ばれた武将たちを処断予定リストに移します
         for (let id of selectedIds) {
             const prisoner = this.pendingPrisoners.find(p => p.id === id);
             if (prisoner) {
+                killedNames.push(prisoner.name); // メッセージに出すために、名前をメモ帳に書き込みます
                 this.pendingKills.push(prisoner);
                 this.pendingPrisoners = this.pendingPrisoners.filter(p => p.id !== prisoner.id);
             }
         }
-        this.openKillSelector();
+
+        // ★追加：メモ帳に名前が書かれていたら、メッセージを出してからリストに戻ります
+        if (killedNames.length > 0) {
+            this.game.ui.showDialog(`${killedNames.join('、')} を処断しました。`, false, () => {
+                this.openKillSelector();
+            });
+        } else {
+            this.openKillSelector();
+        }
     },
 
     async finishPrisonerPhase() {
