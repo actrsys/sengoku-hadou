@@ -59,9 +59,9 @@
         <div id="start-screen" class="modal hidden"></div>
         
         <button id="btn-back-to-scenario" class="btn-secondary floating-back-btn hidden">シナリオ選択に戻る</button>
-
+        
         <div id="daimyo-confirm-modal" class="modal hidden">
-            <div class="modal-content" style="text-align: center;">
+            <div class="modal-content daimyo-confirm-content">
                 <div id="daimyo-confirm-body"></div>
             </div>
             <div class="daimyo-confirm-buttons hidden">
@@ -123,7 +123,7 @@
         </div>
 
         <div id="quantity-modal" class="modal hidden">
-            <div class="modal-content quantity-content" style="max-width: 400px;">
+            <div class="modal-content quantity-content">
                 <h3 id="quantity-title">数量指定</h3>
                 <div id="trade-type-info" class="info-text hidden"></div>
                 <div id="charity-type-selector" class="radio-group hidden" style="margin-bottom:10px;">
@@ -139,8 +139,8 @@
         </div>
 
         <div id="unit-divide-modal" class="modal hidden">
-            <div class="modal-content" style="max-width: 600px;">
-                <h3 style="margin-top:0;">部隊編成</h3>
+            <div class="modal-content divide-content">
+                <h3>部隊編成</h3>
                 <div id="divide-stock-container"></div>
                 <div id="divide-list" class="list-container"></div>
                 <div class="modal-footer right">
@@ -154,18 +154,18 @@
         </div>
 
         <div id="result-modal" class="modal hidden">
-            <div class="modal-content result-content" style="max-width: 500px; text-align:center;">
-                <div id="result-body" class="result-body" style="margin:20px 0; font-size:1.1rem; line-height:1.6;"></div>
-                <div class="modal-footer" id="result-footer" style="justify-content: center;">
+            <div class="modal-content result-content">
+                <div id="result-body" class="result-body message-area"></div>
+                <div class="modal-footer" id="result-footer">
                     <button class="btn-secondary" onclick="window.GameApp.ui.closeResultModal()">閉じる</button>
                 </div>
             </div>
         </div>
         
         <div id="gunshi-modal" class="modal hidden">
-            <div class="modal-content" style="max-width: 400px; text-align: center;">
-                <h3 id="gunshi-name" style="margin-top:0;">軍師</h3>
-                <div id="gunshi-message" style="margin: 20px 0; font-size:1.1rem; line-height:1.5; white-space: pre-wrap; text-align: left;"></div>
+            <div class="modal-content modal-small">
+                <h3 id="gunshi-name">軍師</h3>
+                <div id="gunshi-message" class="message-area"></div>
                 <div class="modal-footer right">
                     <button id="gunshi-execute-btn" class="btn-primary">実行</button>
                     <button class="btn-secondary" onclick="document.getElementById('gunshi-modal').classList.add('hidden')">戻る</button>
@@ -174,11 +174,11 @@
         </div>
 
         <div id="war-modal" class="modal hidden">
-            <div class="modal-content" style="max-width: 900px; height: 90%; display: flex; flex-direction: column; background: #fff; border: 2px solid #333;">
+            <div class="modal-content war-modal-content">
                 
-                <div class="war-screen responsive-war-layout" style="flex:1; padding:0; background:radial-gradient(circle, #2a1f3d 0%, #110d1a 100%); border-radius:0; overflow:hidden;">
+                <div class="war-screen responsive-war-layout">
                     
-                    <div class="responsive-war-left" style="display:flex; flex-direction:column; flex:1; overflow:hidden;">
+                    <div class="responsive-war-left">
                         <div id="war-top-bar" class="war-top-bar">
                             <span id="war-date-info"></span>
                         </div>
@@ -198,60 +198,60 @@
                                 <span id="war-turn-info"></span>
                             </div>
                         </div>
-                        <div class="war-visual responsive-war-visual" style="display: flex; justify-content: center; width: 100%; box-sizing: border-box; padding: 10px;">
+                        <div class="war-visual responsive-war-visual">
                             
-                            <div class="war-side-wrapper" style="display: flex; flex-direction: row; align-items: stretch; flex: 1; max-width: calc(50% - 10px); justify-content: center; height: 100%; gap: 8px;">
-                                <div class="war-reinf-col" style="display: flex; flex-direction: column; gap: 8px; flex: 1; min-width: 0;">
+                            <div class="war-side-wrapper">
+                                <div class="war-reinf-col">
                                     
-                                    <div id="war-atk-self-reinf-card" class="war-side-info war-reinf-card responsive-army-box" style="background-color: #ef9a9a; color: #fff; text-shadow: 1px 1px 2px rgba(0,0,0,0.6); padding: 5px; margin: 0; display: flex; flex-direction: column; box-sizing: border-box; width: 100%; flex: 1;">
-                                        <div class="responsive-army-title" style="font-size: 0.85rem; margin-bottom: 2px;">
+                                    <div id="war-atk-self-reinf-card" class="war-side-info war-reinf-card responsive-army-box atk-self">
+                                        <div class="responsive-army-title">
                                             <span id="war-atk-self-reinf-org">---</span>
                                         </div>
                                         <div id="war-atk-self-reinf-busho" class="stat-busho reinf-busho-label">---</div>
                                         <div class="reinf-content-wrap">
-                                            <div class="reinf-face-container" style="flex-shrink: 0;">
+                                            <div class="reinf-face-container">
                                                 <div id="war-atk-self-reinf-face-container">
-                                                    <img id="war-atk-self-reinf-face" class="responsive-war-face" style="width:35px; height:35px; border-width:2px; margin:0;" src="data/images/faceicons/unknown_face.webp">
+                                                    <img id="war-atk-self-reinf-face" class="responsive-war-face" src="data/images/faceicons/unknown_face.webp">
                                                 </div>
-                                                <div id="war-atk-self-reinf-empty-icon" class="hidden" style="width:35px; height:35px; border:2px solid #999; display:flex; align-items:center; justify-content:center; font-size:0.6rem; background:#eee; box-shadow: 2px 2px 5px rgba(0,0,0,0.3); color: #888; text-shadow: none;">なし</div>
+                                                <div id="war-atk-self-reinf-empty-icon" class="hidden empty-icon">なし</div>
                                             </div>
                                             
-                                            <div class="responsive-army-stats" style="width: 100%; margin-top: 0; font-size: 0.8rem; gap: 1px;">
-                                                <div class="stat-row" style="padding-bottom: 1px; width: 100%;"><div><span class="label-pc">兵士</span><span class="label-sp" style="display:none;">兵</span></div><span id="war-atk-self-reinf-soldier" class="stat-val-large" style="font-size: 0.95rem;">---</span></div>
-                                                <div class="stat-row" style="padding-bottom: 1px; width: 100%;"><div><span class="label-pc">兵糧</span><span class="label-sp" style="display:none;">糧</span></div><span id="war-atk-self-reinf-rice">---</span></div>
-                                                <div class="stat-row label-pc" style="padding-bottom: 1px; width: 100%;"><span>士気</span><span id="war-atk-self-reinf-morale">---</span></div>
-                                                <div class="stat-row label-pc" style="padding-bottom: 1px; width: 100%;"><span>訓練</span><span id="war-atk-self-reinf-training">---</span></div>
-                                                <div class="stat-row label-sp-flex" style="display:none; padding-bottom: 1px; width: 100%;"><div><span>士</span><span id="war-atk-self-reinf-morale-sp">---</span></div><div><span>練</span><span id="war-atk-self-reinf-training-sp">---</span></div></div>
+                                            <div class="responsive-army-stats">
+                                                <div class="stat-row"><div><span class="label-pc">兵士</span><span class="label-sp" style="display:none;">兵</span></div><span id="war-atk-self-reinf-soldier" class="stat-val-large">---</span></div>
+                                                <div class="stat-row"><div><span class="label-pc">兵糧</span><span class="label-sp" style="display:none;">糧</span></div><span id="war-atk-self-reinf-rice">---</span></div>
+                                                <div class="stat-row label-pc"><span>士気</span><span id="war-atk-self-reinf-morale">---</span></div>
+                                                <div class="stat-row label-pc"><span>訓練</span><span id="war-atk-self-reinf-training">---</span></div>
+                                                <div class="stat-row label-sp-flex"><div><span>士</span><span id="war-atk-self-reinf-morale-sp">---</span></div><div><span>練</span><span id="war-atk-self-reinf-training-sp">---</span></div></div>
                                             </div>
                                         </div>
                                     </div>
 
-                                    <div id="war-atk-ally-reinf-card" class="war-side-info war-reinf-card responsive-army-box" style="background-color: #ffcc80; color: #fff; text-shadow: 1px 1px 2px rgba(0,0,0,0.6); padding: 5px; margin: 0; display: flex; flex-direction: column; box-sizing: border-box; width: 100%; flex: 1;">
-                                        <div class="responsive-army-title" style="font-size: 0.85rem; margin-bottom: 2px;">
+                                    <div id="war-atk-ally-reinf-card" class="war-side-info war-reinf-card responsive-army-box atk-ally">
+                                        <div class="responsive-army-title">
                                             <span id="war-atk-ally-reinf-org">---</span>
                                         </div>
                                         <div id="war-atk-ally-reinf-busho" class="stat-busho reinf-busho-label">---</div>
                                         <div class="reinf-content-wrap">
-                                            <div class="reinf-face-container" style="flex-shrink: 0;">
+                                            <div class="reinf-face-container">
                                                 <div id="war-atk-ally-reinf-face-container">
-                                                    <img id="war-atk-ally-reinf-face" class="responsive-war-face" style="width:35px; height:35px; border-width:2px; margin:0;" src="data/images/faceicons/unknown_face.webp">
+                                                    <img id="war-atk-ally-reinf-face" class="responsive-war-face" src="data/images/faceicons/unknown_face.webp">
                                                 </div>
-                                                <div id="war-atk-ally-reinf-empty-icon" class="hidden" style="width:35px; height:35px; border:2px solid #999; display:flex; align-items:center; justify-content:center; font-size:0.6rem; background:#eee; box-shadow: 2px 2px 5px rgba(0,0,0,0.3); color: #888; text-shadow: none;">なし</div>
+                                                <div id="war-atk-ally-reinf-empty-icon" class="hidden empty-icon">なし</div>
                                             </div>
                                             
-                                            <div class="responsive-army-stats" style="width: 100%; margin-top: 0; font-size: 0.8rem; gap: 1px;">
-                                                <div class="stat-row" style="padding-bottom: 1px; width: 100%;"><div><span class="label-pc">兵士</span><span class="label-sp" style="display:none;">兵</span></div><span id="war-atk-ally-reinf-soldier" class="stat-val-large" style="font-size: 0.95rem;">---</span></div>
-                                                <div class="stat-row" style="padding-bottom: 1px; width: 100%;"><div><span class="label-pc">兵糧</span><span class="label-sp" style="display:none;">糧</span></div><span id="war-atk-ally-reinf-rice">---</span></div>
-                                                <div class="stat-row label-pc" style="padding-bottom: 1px; width: 100%;"><span>士気</span><span id="war-atk-ally-reinf-morale">---</span></div>
-                                                <div class="stat-row label-pc" style="padding-bottom: 1px; width: 100%;"><span>訓練</span><span id="war-atk-ally-reinf-training">---</span></div>
-                                                <div class="stat-row label-sp-flex" style="display:none; padding-bottom: 1px; width: 100%;"><div><span>士</span><span id="war-atk-ally-reinf-morale-sp">---</span></div><div><span>練</span><span id="war-atk-ally-reinf-training-sp">---</span></div></div>
+                                            <div class="responsive-army-stats">
+                                                <div class="stat-row"><div><span class="label-pc">兵士</span><span class="label-sp" style="display:none;">兵</span></div><span id="war-atk-ally-reinf-soldier" class="stat-val-large">---</span></div>
+                                                <div class="stat-row"><div><span class="label-pc">兵糧</span><span class="label-sp" style="display:none;">糧</span></div><span id="war-atk-ally-reinf-rice">---</span></div>
+                                                <div class="stat-row label-pc"><span>士気</span><span id="war-atk-ally-reinf-morale">---</span></div>
+                                                <div class="stat-row label-pc"><span>訓練</span><span id="war-atk-ally-reinf-training">---</span></div>
+                                                <div class="stat-row label-sp-flex"><div><span>士</span><span id="war-atk-ally-reinf-morale-sp">---</span></div><div><span>練</span><span id="war-atk-ally-reinf-training-sp">---</span></div></div>
                                             </div>
                                         </div>
                                     </div>
 
                                 </div>
                                 
-                                <div class="army-box attacker responsive-army-box" style="background:#ef5350; margin: 0; flex: 1; min-width: 0;">
+                                <div class="army-box attacker responsive-army-box main-army-box">
                                     <h3 class="army-title responsive-army-title"><span id="war-atk-name"></span></h3>
                                     <div class="stat-busho main-busho-label"><span id="war-atk-busho"></span></div>
                                     <div class="responsive-army-content">
@@ -266,9 +266,9 @@
                                 </div>
                             </div>
 
-                            <div class="war-side-wrapper" style="display: flex; flex-direction: row; align-items: stretch; flex: 1; max-width: calc(50% - 10px); justify-content: center; height: 100%; gap: 8px;">
+                            <div class="war-side-wrapper">
                                 
-                                <div class="army-box defender responsive-army-box" style="background:#42a5f5; margin: 0; flex: 1; min-width: 0;">
+                                <div class="army-box defender responsive-army-box main-army-box">
                                     <h3 class="army-title responsive-army-title"><span id="war-def-name"></span></h3>
                                     <div class="stat-busho main-busho-label"><span id="war-def-busho"></span></div>
                                     <div class="responsive-army-content">
@@ -282,50 +282,50 @@
                                     </div>
                                 </div>
 
-                                <div class="war-reinf-col" style="display: flex; flex-direction: column; gap: 8px; flex: 1; min-width: 0;">
+                                <div class="war-reinf-col">
                                     
-                                    <div id="war-def-self-reinf-card" class="war-side-info war-reinf-card responsive-army-box" style="background-color: #81d4fa; color: #fff; text-shadow: 1px 1px 2px rgba(0,0,0,0.6); padding: 5px; margin: 0; display: flex; flex-direction: column; box-sizing: border-box; width: 100%; flex: 1;">
-                                        <div class="responsive-army-title" style="font-size: 0.85rem; margin-bottom: 2px;">
+                                    <div id="war-def-self-reinf-card" class="war-side-info war-reinf-card responsive-army-box def-self">
+                                        <div class="responsive-army-title">
                                             <span id="war-def-self-reinf-org">---</span>
                                         </div>
                                         <div id="war-def-self-reinf-busho" class="stat-busho reinf-busho-label">---</div>
                                         <div class="reinf-content-wrap">
-                                            <div class="reinf-face-container" style="flex-shrink: 0;">
+                                            <div class="reinf-face-container">
                                                 <div id="war-def-self-reinf-face-container">
-                                                    <img id="war-def-self-reinf-face" class="responsive-war-face" style="width:35px; height:35px; border-width:2px; margin:0;" src="data/images/faceicons/unknown_face.webp">
+                                                    <img id="war-def-self-reinf-face" class="responsive-war-face" src="data/images/faceicons/unknown_face.webp">
                                                 </div>
-                                                <div id="war-def-self-reinf-empty-icon" class="hidden" style="width:35px; height:35px; border:2px solid #999; display:flex; align-items:center; justify-content:center; font-size:0.6rem; background:#eee; box-shadow: 2px 2px 5px rgba(0,0,0,0.3); color: #888; text-shadow: none;">なし</div>
+                                                <div id="war-def-self-reinf-empty-icon" class="hidden empty-icon">なし</div>
                                             </div>
                                             
-                                            <div class="responsive-army-stats" style="width: 100%; margin-top: 0; font-size: 0.8rem; gap: 1px;">
-                                                <div class="stat-row" style="padding-bottom: 1px; width: 100%;"><div><span class="label-pc">兵士</span><span class="label-sp" style="display:none;">兵</span></div><span id="war-def-self-reinf-soldier" class="stat-val-large" style="font-size: 0.95rem;">---</span></div>
-                                                <div class="stat-row" style="padding-bottom: 1px; width: 100%;"><div><span class="label-pc">兵糧</span><span class="label-sp" style="display:none;">糧</span></div><span id="war-def-self-reinf-rice">---</span></div>
-                                                <div class="stat-row label-pc" style="padding-bottom: 1px; width: 100%;"><span>士気</span><span id="war-def-self-reinf-morale">---</span></div>
-                                                <div class="stat-row label-pc" style="padding-bottom: 1px; width: 100%;"><span>訓練</span><span id="war-def-self-reinf-training">---</span></div>
-                                                <div class="stat-row label-sp-flex" style="display:none; padding-bottom: 1px; width: 100%;"><div><span>士</span><span id="war-def-self-reinf-morale-sp">---</span></div><div><span>練</span><span id="war-def-self-reinf-training-sp">---</span></div></div>
+                                            <div class="responsive-army-stats">
+                                                <div class="stat-row"><div><span class="label-pc">兵士</span><span class="label-sp" style="display:none;">兵</span></div><span id="war-def-self-reinf-soldier" class="stat-val-large">---</span></div>
+                                                <div class="stat-row"><div><span class="label-pc">兵糧</span><span class="label-sp" style="display:none;">糧</span></div><span id="war-def-self-reinf-rice">---</span></div>
+                                                <div class="stat-row label-pc"><span>士気</span><span id="war-def-self-reinf-morale">---</span></div>
+                                                <div class="stat-row label-pc"><span>訓練</span><span id="war-def-self-reinf-training">---</span></div>
+                                                <div class="stat-row label-sp-flex"><div><span>士</span><span id="war-def-self-reinf-morale-sp">---</span></div><div><span>練</span><span id="war-def-self-reinf-training-sp">---</span></div></div>
                                             </div>
                                         </div>
                                     </div>
 
-                                    <div id="war-def-ally-reinf-card" class="war-side-info war-reinf-card responsive-army-box" style="background-color: #80cbc4; color: #fff; text-shadow: 1px 1px 2px rgba(0,0,0,0.6); padding: 5px; margin: 0; display: flex; flex-direction: column; box-sizing: border-box; width: 100%; flex: 1;">
-                                        <div class="responsive-army-title" style="font-size: 0.85rem; margin-bottom: 2px;">
+                                    <div id="war-def-ally-reinf-card" class="war-side-info war-reinf-card responsive-army-box def-ally">
+                                        <div class="responsive-army-title">
                                             <span id="war-def-ally-reinf-org">---</span>
                                         </div>
                                         <div id="war-def-ally-reinf-busho" class="stat-busho reinf-busho-label">---</div>
                                         <div class="reinf-content-wrap">
-                                            <div class="reinf-face-container" style="flex-shrink: 0;">
+                                            <div class="reinf-face-container">
                                                 <div id="war-def-ally-reinf-face-container">
-                                                    <img id="war-def-ally-reinf-face" class="responsive-war-face" style="width:35px; height:35px; border-width:2px; margin:0;" src="data/images/faceicons/unknown_face.webp">
+                                                    <img id="war-def-ally-reinf-face" class="responsive-war-face" src="data/images/faceicons/unknown_face.webp">
                                                 </div>
-                                                <div id="war-def-ally-reinf-empty-icon" class="hidden" style="width:35px; height:35px; border:2px solid #999; display:flex; align-items:center; justify-content:center; font-size:0.6rem; background:#eee; box-shadow: 2px 2px 5px rgba(0,0,0,0.3); color: #888; text-shadow: none;">なし</div>
+                                                <div id="war-def-ally-reinf-empty-icon" class="hidden empty-icon">なし</div>
                                             </div>
                                             
-                                            <div class="responsive-army-stats" style="width: 100%; margin-top: 0; font-size: 0.8rem; gap: 1px;">
-                                                <div class="stat-row" style="padding-bottom: 1px; width: 100%;"><div><span class="label-pc">兵士</span><span class="label-sp" style="display:none;">兵</span></div><span id="war-def-ally-reinf-soldier" class="stat-val-large" style="font-size: 0.95rem;">---</span></div>
-                                                <div class="stat-row" style="padding-bottom: 1px; width: 100%;"><div><span class="label-pc">兵糧</span><span class="label-sp" style="display:none;">糧</span></div><span id="war-def-ally-reinf-rice">---</span></div>
-                                                <div class="stat-row label-pc" style="padding-bottom: 1px; width: 100%;"><span>士気</span><span id="war-def-ally-reinf-morale">---</span></div>
-                                                <div class="stat-row label-pc" style="padding-bottom: 1px; width: 100%;"><span>訓練</span><span id="war-def-ally-reinf-training">---</span></div>
-                                                <div class="stat-row label-sp-flex" style="display:none; padding-bottom: 1px; width: 100%;"><div><span>士</span><span id="war-def-ally-reinf-morale-sp">---</span></div><div><span>練</span><span id="war-def-ally-reinf-training-sp">---</span></div></div>
+                                            <div class="responsive-army-stats">
+                                                <div class="stat-row"><div><span class="label-pc">兵士</span><span class="label-sp" style="display:none;">兵</span></div><span id="war-def-ally-reinf-soldier" class="stat-val-large">---</span></div>
+                                                <div class="stat-row"><div><span class="label-pc">兵糧</span><span class="label-sp" style="display:none;">糧</span></div><span id="war-def-ally-reinf-rice">---</span></div>
+                                                <div class="stat-row label-pc"><span>士気</span><span id="war-def-ally-reinf-morale">---</span></div>
+                                                <div class="stat-row label-pc"><span>訓練</span><span id="war-def-ally-reinf-training">---</span></div>
+                                                <div class="stat-row label-sp-flex"><div><span>士</span><span id="war-def-ally-reinf-morale-sp">---</span></div><div><span>練</span><span id="war-def-ally-reinf-training-sp">---</span></div></div>
                                             </div>
                                         </div>
                                     </div>
@@ -336,23 +336,23 @@
                         </div>
                         
                         <div style="position: relative; flex-shrink: 0;">
-                            <div id="war-controls" class="war-controls-area disabled-area" style="padding:10px; background:#fff; grid-template-columns: repeat(3, 1fr); gap:10px; border-top:2px solid #333;"></div>
+                            <div id="war-controls" class="war-controls-area disabled-area"></div>
                             
-                            <div id="war-ai-guard" class="hidden" style="position: absolute; top:0; left:0; width:100%; height:100%; background:transparent; color:#fff; display:flex; flex-direction:column; justify-content:center; align-items:center; font-size:1.5rem; font-weight:bold; z-index:10; text-shadow: 2px 2px 4px #000, -2px -2px 4px #000, 2px -2px 4px #000, -2px 2px 4px #000;">
+                            <div id="war-ai-guard" class="hidden">
                                 <div class="loading-spinner" style="margin-bottom:10px;"></div>
                                 <span id="war-ai-guard-text">敵軍思考中...</span>
                             </div>
                         </div>
                     </div>
                     
-                    <div id="war-log" class="responsive-war-log" style="overflow-y: auto; background: #fff; padding: 5px; font-size: 0.85rem; color:#333; text-align:left;"></div>
+                    <div id="war-log" class="responsive-war-log"></div>
                 </div>
             </div>
         </div>
 
         <div id="dialog-modal" class="modal hidden">
-            <div class="modal-content" style="max-width: 400px; text-align: center;">
-                <div id="dialog-message" style="margin: 20px 0; font-size:1.1rem; line-height:1.5; white-space: pre-wrap;"></div>
+            <div class="modal-content modal-small">
+                <div id="dialog-message" class="message-area"></div>
                 <div class="modal-footer right">
                     <button id="dialog-btn-ok" class="btn-primary">はい</button>
                     <button id="dialog-btn-cancel" class="btn-secondary">いいえ</button>
@@ -405,9 +405,9 @@
             </div>
         </div>
         <div id="intercept-confirm-modal" class="modal hidden" style="z-index: 6000;">
-            <div class="modal-content" style="max-width: 400px; text-align: center;">
-                <h3 style="margin-top: 0;">城を出て迎え撃ちますか？</h3>
-                <div id="intercept-msg" style="margin: 20px 0; font-size:1.1rem; line-height:1.5; white-space: pre-wrap;"></div>
+            <div class="modal-content modal-small">
+                <h3>城を出て迎え撃ちますか？</h3>
+                <div id="intercept-msg" class="message-area"></div>
                 <div class="modal-footer right">
                     <button id="btn-intercept" class="btn-danger">迎撃</button>
                     <button id="btn-siege" class="btn-primary">籠城</button>
@@ -415,8 +415,8 @@
             </div>
         </div>
         <div id="settings-modal" class="modal hidden" style="z-index: 7000;">
-            <div class="modal-content" style="max-width: 400px; text-align: center;">
-                <h3 style="margin-top:0; border-bottom: 2px solid #ddd; padding-bottom: 10px;">設定</h3>
+            <div class="modal-content modal-small">
+                <h3 class="settings-title">設定</h3>
                 
                 <div style="margin: 20px 0; text-align: left;">
                     <label style="font-weight: bold; display: block; margin-bottom: 5px;">BGM 音量</label>

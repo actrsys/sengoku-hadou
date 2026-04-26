@@ -1649,10 +1649,10 @@ class UIManager {
         this.closeResultModal();
         setTimeout(() => this.showInterviewModal(busho), 100);
     }
-
+    
     showTurnStartDialog(castle, onProceed) {
         const msg = `
-            <div style="text-align:center; padding: 10px;">
+            <div style="padding: 10px;">
                 <div style="font-weight:bold; margin-bottom:10px; font-size:1.1rem;">小姓</div>
                 <div style="margin-bottom:20px; font-size:1rem;">「殿、${castle.name}にご命令ください。」</div>
             </div>
