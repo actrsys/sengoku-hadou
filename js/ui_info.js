@@ -128,7 +128,7 @@ class UIInfoManager {
         else if (info.pageType === 'princess_list') this._renderPrincessList(...info.args, info.scrollPos);
         else if (info.pageType === 'delegate_list') this._renderDelegateList(...info.args, info.scrollPos);
         else if (info.pageType === 'delegate_setting') this._renderDelegateSetting(...info.args, info.scrollPos);
-        else if (info.pageType === 'prisoner_list') this._renderPrisonerList(...info.args, info.scrollPos);
+        else if (info.pageType === 'prisoner_selector') this._renderPrisonerSelector(...info.args, info.scrollPos);
         else if (info.pageType === 'history_list') this._renderHistoryList(...info.args, info.scrollPos);
         else if (info.pageType === 'kunishu_list') this._renderKunishuList(...info.args, info.scrollPos);
         else if (info.pageType === 'kunishu_detail') this._renderKunishuDetail(...info.args, info.scrollPos);
@@ -881,78 +881,112 @@ class UIInfoManager {
         this._updateBushoSelectorUI();
     }
     
-    showPrisonerModal(captives) {
+    showPrisonerSelector(phaseType, captives, onConfirm, onBack) {
         this.closeCommonModal(); 
-        this.pushModal('prisoner_list', [captives]);
+        this.pushModal('prisoner_selector', [phaseType, captives, onConfirm, onBack]);
     }
 
-    _renderPrisonerList(captives, scrollPos = 0) {
-        const modal = document.getElementById('selector-modal');
-        const titleEl = document.getElementById('selector-title');
-        const listContainer = document.getElementById('selector-list');
-        const contextEl = document.getElementById('selector-context-info');
-        const tabsEl = document.getElementById('selector-tabs');
-        const confirmBtn = document.getElementById('selector-confirm-btn');
-        const backBtn = document.querySelector('#selector-modal .btn-secondary');
+    _renderPrisonerSelector(phaseType, captives, onConfirm, onBack, scrollPos = 0) {
+        const titleStr = phaseType === 'hire' ? "武将を選択（複数可）" : "武将を選択（複数可）";
+        const contextHtml = phaseType === 'hire' ? "<div>登用する武将を選択してください</div>" : "<div>処断する武将を選択してください</div>";
 
-        if (!modal) return;
-        modal.classList.remove('hidden');
-        if (titleEl) titleEl.textContent = "捕虜処遇";
-        if (contextEl) contextEl.classList.add('hidden');
-        if (confirmBtn) confirmBtn.classList.add('hidden');
-
-        // 捕虜処遇は勝手に閉じられないように、戻るボタンを消しておきます
-        if(backBtn) {
-            backBtn.style.display = 'none'; 
-        }
-
+        let items = [];
         const gunshi = this.game.getClanGunshi(this.game.playerClanId);
         const myDaimyo = this.game.bushos.find(b => b.clan === this.game.playerClanId && b.isDaimyo);
 
-        let listHtml = '';
-        
-        captives.forEach((p, index) => {
-            let hireBtnHtml = p.hasRefusedHire ? 
-                `<button class="btn-primary" disabled style="opacity:0.5; background-color: #666;">拒否</button>` : 
-                `<button class="btn-primary" onclick="if(window.AudioManager) window.AudioManager.playSE('decision.ogg'); window.GameApp.warManager.handlePrisonerAction(${index}, 'hire')">登用</button>`;
-            
-            const getStat = (stat) => GameSystem.getDisplayStatHTML(p, stat, gunshi, null, this.game.playerClanId, myDaimyo);
+        captives.forEach((b) => {
+            let isSelectable = true;
+            // 登用フェーズで断った人は選べないようにします
+            if (phaseType === 'hire' && b.hasRefusedHire) isSelectable = false;
 
-            listHtml += `
-                <div class="select-item" style="display: flex; justify-content: space-between; align-items: center; padding: 10px;">
-                    <div style="flex:1;">
-                        <strong>${p.name}</strong> (${p.getRankName()})<br>
-                        <div style="display:flex; gap:5px; align-items:center; margin-top:2px;">
-                            統:${getStat('leadership')} 武:${getStat('strength')} 智:${getStat('intelligence')}
-                        </div>
-                    </div>
-                    <div style="display:flex; gap:5px;">
-                        ${hireBtnHtml}
-                        <button class="btn-secondary" onclick="if(window.AudioManager) window.AudioManager.playSE('decision.ogg'); window.GameApp.warManager.handlePrisonerAction(${index}, 'release')">解放</button>
-                        <button class="btn-danger" onclick="if(window.AudioManager) window.AudioManager.playSE('decision.ogg'); window.GameApp.warManager.handlePrisonerAction(${index}, 'kill')">処断</button>
-                    </div>
-                </div>
-            `;
+            const inputType = 'checkbox';
+            let inputHtml = `<input type="${inputType}" name="sel_prisoner" value="${b.id}" ${!isSelectable ? 'disabled' : ''} style="display:none;">`;
+
+            const getStat = (stat) => GameSystem.getDisplayStatHTML(b, stat, gunshi, null, this.game.playerClanId, myDaimyo);
+
+            let cells = [
+                `<span class="col-act">${inputHtml}${!isSelectable ? '済' : '未'}</span>`,
+                `<span class="col-name">${b.name}</span>`,
+                `<span class="col-rank">${b.getRankName()}</span>`,
+                `<span class="col-stat">${getStat('leadership')}</span>`,
+                `<span class="col-stat">${getStat('strength')}</span>`,
+                `<span class="col-stat">${getStat('politics')}</span>`,
+                `<span class="col-stat">${getStat('diplomacy')}</span>`,
+                `<span class="col-stat">${getStat('intelligence')}</span>`,
+                `<span class="col-stat">${getStat('charm')}</span>`
+            ];
+
+            // 断った武将は暗くして触れないようにします
+            let itemClassThis = "stats-mode";
+            if (!isSelectable) itemClassThis += " disabled";
+
+            items.push({
+                onClick: !isSelectable ? null : `window.GameApp.ui.info.handlePrisonerSelect(event)`,
+                cells: cells,
+                itemClass: itemClassThis
+            });
         });
 
-        if (listContainer) {
-            listContainer.className = 'list-container hide-native-scroll';
-            listContainer.style.display = 'block';
-            listContainer.innerHTML = listHtml;
-            if (window.CustomScrollbar) {
-                if (!this.ui.bushoScrollbar) this.ui.bushoScrollbar = new CustomScrollbar(listContainer);
-                setTimeout(() => {
-                    listContainer.scrollTop = scrollPos;
-                    this.ui.bushoScrollbar.update();
-                }, 10);
-            } else {
-                listContainer.scrollTop = scrollPos;
+        this._renderListModal({
+            title: titleStr,
+            contextHtml: contextHtml,
+            headers: [
+                `<span class="col-act">行動</span>`,
+                `<span class="col-name">名前</span>`,
+                `<span class="col-rank">身分</span>`,
+                `<span class="col-stat">統率</span>`,
+                `<span class="col-stat">武勇</span>`,
+                `<span class="col-stat">内政</span>`,
+                `<span class="col-stat">外交</span>`,
+                `<span class="col-stat">智謀</span>`,
+                `<span class="col-stat">魅力</span>`
+            ],
+            headerClass: "sortable-header stats-mode",
+            itemClass: "",
+            listClass: "",
+            items: items,
+            scrollPos: scrollPos,
+            minWidth: "750px",
+            gridTemplateSp: "25px 2fr 1.8fr 1.2fr 1.2fr 1.2fr 1.2fr 1.2fr 1.2fr",
+            gridTemplatePc: "35px 100px 60px 1fr 1fr 1fr 1fr 1fr 1fr",
+            onBack: onBack,
+            onConfirm: () => {
+                const inputs = document.querySelectorAll('input[name="sel_prisoner"]:checked'); 
+                if (inputs.length === 0) return;
+                const selectedIds = Array.from(inputs).map(i => parseInt(i.value)); 
+                this.closeCommonModal(); 
+                if (onConfirm) onConfirm(selectedIds);
             }
-        }
+        });
+
+        this._updatePrisonerSelectorUI();
     }
 
-    closePrisonerModal() {
-        this.popModal(); 
+    handlePrisonerSelect(e) {
+        let div = e.currentTarget;
+        let input = e.target.tagName === 'INPUT' ? e.target : div.querySelector('input');
+        if (!input) return;
+
+        if (e.target.tagName !== 'INPUT') {
+             input.checked = !input.checked; 
+        }
+        if(input.checked) div.classList.add('selected'); else div.classList.remove('selected');
+        this._updatePrisonerSelectorUI();
+    }
+
+    _updatePrisonerSelectorUI() {
+        const checkedCount = document.querySelectorAll('input[name="sel_prisoner"]:checked').length; 
+        const confirmBtn = document.getElementById('selector-confirm-btn');
+
+        if (confirmBtn) {
+            if (checkedCount > 0) {
+                confirmBtn.disabled = false;
+                confirmBtn.style.opacity = 1.0;
+            } else {
+                confirmBtn.disabled = true;
+                confirmBtn.style.opacity = 0.5;
+            }
+        }
     }
     
     showDaimyoPrisonerModal(prisoner) {
