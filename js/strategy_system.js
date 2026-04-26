@@ -224,6 +224,11 @@ class StrategySystem {
             if (actionType === 'sabotage' && isSuccess) {
                 this.game.ui.showDialog(`${targetCastle.name}の防備が一部破壊されたようです……`, false);
             }
+
+            // ★追加：引抜が成功していた場合、寝返り報告を出す
+            if (actionType === 'headhunt' && isSuccess) {
+                this.game.ui.showDialog(`当家の${targetBushoName}が${doerClanName}に寝返りました！`, false);
+            }
         }
 
         if (isDiscovered) {
