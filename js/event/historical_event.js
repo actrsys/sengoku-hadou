@@ -58,6 +58,528 @@ window.GameEvents.push({
 });
 
 // ==========================================
+// ★ 桶壊間の戦い（予備）：松平元康 岡崎城主就任（裏イベント）
+// ==========================================
+window.GameEvents.push({
+    id: "historical_motoyasu_okazaki",
+    timing: "startMonth_before",     // 月初の処理前にこっそりチェックします
+    isOneTime: true,                 // 一度発生したら二度と起きません
+    
+    checkCondition: function(game) {
+        // ① 今川義元（ID: 1004001）が大名として存在するか確認します
+        const yoshimoto = game.getBusho(1004001);
+        if (!yoshimoto || !yoshimoto.isDaimyo) return false;
+
+        // 補足：プレイヤーが今川家の場合は、勝手に移動させないようにここで止めます
+        if (game.playerClanId === yoshimoto.clan) return false;
+
+        // ② 松平元康（ID: 1004004）が存在するか確認します
+        const motoyasu = game.getBusho(1004004);
+        if (!motoyasu) return false;
+
+        // 【ここが重要！】元康が「義元が殿様を務める大名家」にちゃんと所属しているかチェックします
+        // ※ 義元の clan（勢力番号）と 元康の clan が一致していれば、同じ勢力にいることになります
+        if (motoyasu.clan !== yoshimoto.clan) return false;
+
+        // ③ 元康が自分自身が大名（独立した殿様）になっていないか確認します
+        if (motoyasu.isDaimyo) return false;
+
+        // ④ すでに元康が岡崎城（ID: 48）の城主なら、このイベントを起こす必要はありません
+        const okazakiCastle = game.getCastle(48);
+        if (!okazakiCastle || okazakiCastle.castellanId === motoyasu.id) return false;
+
+        // ⑤ 今川家（義元の勢力）が指定の5つのお城をすべて持っているか確認します
+        const imagawaClanId = yoshimoto.clan;
+        const requiredCastles = [12, 13, 48, 71, 100];
+        const hasAllCastles = requiredCastles.every(id => {
+            const c = game.getCastle(id);
+            return c && c.ownerClan === imagawaClanId;
+        });
+        if (!hasAllCastles) return false;
+
+        // すべての条件をクリアしたら、イベント発生の合図を出します
+        return true;
+    },
+    
+    execute: async function(game) {
+        const motoyasu = game.getBusho(1004004);
+        const okazakiCastle = game.getCastle(48);
+
+        // 万が一データが見つからなかった時のための安全装置です
+        if (!motoyasu || !okazakiCastle) return;
+
+        // 1. 松平元康の功績が1499以下なら、強制的に1500に引き上げます
+        if ((motoyasu.achievementTotal || 0) <= 1499) {
+            motoyasu.achievementTotal = 1500;
+        }
+
+        // 2. 元康が別のお城にいる場合、安全に岡崎城へお引越しさせます
+        if (motoyasu.castleId !== 48) {
+            if (game.affiliationSystem) {
+                game.affiliationSystem.moveCastle(motoyasu, 48);
+            } else {
+                // システムがない場合の予備の手動お引越し
+                const oldCastle = game.getCastle(motoyasu.castleId);
+                if (oldCastle) {
+                    oldCastle.samuraiIds = oldCastle.samuraiIds.filter(id => id !== motoyasu.id);
+                    if (oldCastle.castellanId === motoyasu.id) {
+                        oldCastle.castellanId = 0;
+                        motoyasu.isCastellan = false;
+                    }
+                }
+                motoyasu.castleId = 48;
+                if (!okazakiCastle.samuraiIds.includes(motoyasu.id)) {
+                    okazakiCastle.samuraiIds.push(motoyasu.id);
+                }
+            }
+        }
+
+        // 3. 岡崎城にいる他の武将の城主バッジを外し、元康を新しい城主にします
+        // ※ すでに元康が城主だったとしても、ここで改めて正しくバッジを付け直すので安全です
+        const residents = game.bushos.filter(b => b.castleId === 48);
+        residents.forEach(b => {
+            b.isCastellan = false;
+        });
+
+        motoyasu.isCastellan = true;
+        okazakiCastle.castellanId = motoyasu.id;
+
+        // 4. システムに城主の変更を確定させ、画面を更新します
+        if (game.affiliationSystem) {
+            game.affiliationSystem.updateCastleLord(okazakiCastle);
+        }
+
+        if (game.ui) {
+            game.ui.renderMap();
+            game.ui.updatePanelHeader();
+        }
+    }
+});
+
+// ==========================================
+// ★ 桶狭間の戦い ①義元出陣
+// ==========================================
+window.GameEvents.push({
+    id: "historical_okehazama_1",
+    timing: "startMonth_before",     // 月初の処理前に発生するかチェックします
+    isOneTime: true,                 // 一度発生したら二度と起きません
+    
+    checkCondition: function(game) {
+        // A. 今川義元（ID: 1004001）が大名として存在するか確認します
+        const yoshimoto = game.getBusho(1004001);
+        if (!yoshimoto || !yoshimoto.isDaimyo) return false;
+
+        // 補足：プレイヤーが今川家の場合は、勝手に出陣させないようにここで止めます
+        if (game.playerClanId === yoshimoto.clan) return false;
+
+        // C. 今川義元が駿府城（ID: 13）にいるか確認します
+        if (yoshimoto.castleId !== 13) return false;
+
+        // B. 今川家が指定のお城をすべて持っているか確認します
+        const imagawaClanId = yoshimoto.clan;
+        const requiredImagawaCastles = [12, 13, 45, 48, 57, 71, 100];
+        const hasAllImagawaCastles = requiredImagawaCastles.every(id => {
+            const c = game.getCastle(id);
+            return c && c.ownerClan === imagawaClanId;
+        });
+        if (!hasAllImagawaCastles) return false;
+
+        // D. 織田信長（ID: 1006001）が大名として存在するか確認します
+        const nobunaga = game.getBusho(1006001);
+        if (!nobunaga || !nobunaga.isDaimyo) return false;
+
+        // F. 織田信長が清州城（ID: 7）にいるか確認します
+        if (nobunaga.castleId !== 7) return false;
+
+        // E. 織田家が指定のお城をすべて持っているか確認します
+        const odaClanId = nobunaga.clan;
+        const requiredOdaCastles = [7, 11];
+        const hasAllOdaCastles = requiredOdaCastles.every(id => {
+            const c = game.getCastle(id);
+            return c && c.ownerClan === odaClanId;
+        });
+        if (!hasAllOdaCastles) return false;
+
+        // G. 松平元康（ID: 1004004）が城主として存在するか確認します
+        const motoyasu = game.getBusho(1004004);
+        if (!motoyasu || !motoyasu.isCastellan) return false;
+
+        // すべての条件をクリアしたら、イベントを発生させます！
+        return true;
+    },
+    
+    execute: async function(game) {
+        const yoshimoto = game.getBusho(1004001);
+        const imagawaClanId = yoshimoto.clan;
+
+        // 駿府城の兵力を調べて、出撃させる兵士と兵糧の数を決めます
+        const sunpuCastle = game.getCastle(13);
+        // ★義元は油断していて、総兵力の4分の1しか連れて行きません
+        const force = sunpuCastle ? Math.floor(sunpuCastle.soldiers * 0.25) : 5000;
+        const rice = force * 2;
+
+        // AIの作戦を管理しているシステムに、新しい作戦をセットします
+        if (game.aiOperationManager) {
+            game.aiOperationManager.operations[imagawaClanId] = {
+                type: '攻撃',
+                targetId: 11,               // 攻撃目標は名古屋城です
+                isEventOperation: true,     // ★イベントによる特別な作戦です
+                designatedCommanderId: 1004001, // ★今回追加：絶対にこの人（義元）を大将にするという指定です！
+                isKunishuTarget: false,     
+                stagingBase: 13,            // 出撃するのは駿府城からです
+                supportBase: null,          
+                requiredForce: force,       // ★ここで指定した「4分の1の兵力」が、そのまま出撃時に使われます！
+                requiredRice: rice,         
+                assignedUnits: [],          
+                turnsRemaining: 1,          // 準備期間は1ヶ月です（予兆が出ます）
+                maxTurns: 4,                
+                status: '準備中'
+            };
+                
+            // 画面にメッセージを出して、プレイヤーにお知らせします
+            const imagawaClan = game.clans.find(c => c.id === imagawaClanId);
+            const clanName = imagawaClan ? imagawaClan.name : '今川家';
+            game.ui.log(`【イベント】桶狭間の戦い：${clanName}が尾張侵攻の軍を興しました。`);
+            await game.ui.showDialogAsync(`今川義元が上洛へ向けて、\n尾張への侵攻作戦を進めているようです。`, false, 0);
+        }
+    }
+});
+
+// ==========================================
+// ★ 桶狭間の戦い ②織田信長出陣
+// ==========================================
+window.GameEvents.push({
+    id: "historical_okehazama_2",
+    // ★特殊な発火タイミング：部隊が城に到着して、野戦や攻城戦が始まる直前を想定します
+    timing: "before_battle", 
+    isOneTime: true,
+    
+    checkCondition: function(game, context) {
+        // 戦闘システムからコンテキスト（状況データ）が届いていなければストップします
+        if (!context) return false;
+
+        // H. 攻撃目標が名古屋城（ID: 11）か確認します
+        if (!context.defender || context.defender.id !== 11) return false;
+
+        // H. 攻撃側に今川義元（ID: 1004001）がいるか確認します
+        const atkBushos = context.atkBushos || [];
+        const hasYoshimoto = atkBushos.some(b => b.id === 1004001);
+        if (!hasYoshimoto) return false;
+
+        // A. 義元が大名であるか確認します
+        const yoshimoto = game.getBusho(1004001);
+        if (!yoshimoto || !yoshimoto.isDaimyo) return false;
+
+        // D, F. 信長が大名で、清州城（ID: 7）にいるか確認します
+        const nobunaga = game.getBusho(1006001);
+        if (!nobunaga || !nobunaga.isDaimyo || nobunaga.castleId !== 7) return false;
+
+        // E. 織田家が清州城（7）と名古屋城（11）をまだ持っているか確認します
+        const odaClanId = nobunaga.clan;
+        const kiyosu = game.getCastle(7);
+        const nagoya = game.getCastle(11);
+        if (!kiyosu || kiyosu.ownerClan !== odaClanId) return false;
+        if (!nagoya || nagoya.ownerClan !== odaClanId) return false;
+
+        // G. 松平元康が城主として存在するか確認します
+        const motoyasu = game.getBusho(1004004);
+        if (!motoyasu || !motoyasu.isCastellan) return false;
+
+        return true;
+    },
+    
+    execute: async function(game, context) {
+        const nobunaga = game.getBusho(1006001);
+        const kiyosu = game.getCastle(7);
+
+        // 【安全装置】もし清州城のデータが読み取れなかったら、エラーを防ぐためにここで処理を中断します
+        if (!kiyosu || !nobunaga) return;
+
+        // ★追加：この戦闘が「イベント戦闘」であることと、その「イベントID」を野戦システムに伝えます！
+        // （プレイヤーの場合でも討死イベントが発生するように、フラグだけは最初に立てておきます）
+        context.isEventBattle = true;
+        context.eventId = "okehazama";
+
+        // ★追加：プレイヤーが織田家の場合は、勝手な部隊移動や強制野戦は行いません。フラグを立てるだけで終了します。
+        if (game.playerClanId === nobunaga.clan) {
+            return;
+        }
+
+        // 桶狭間は全力出撃！清州城にある資源を全て（100%）持ち出します
+        const force = kiyosu.soldiers;
+        const rice = kiyosu.rice;
+        const horses = kiyosu.horses || 0;
+        const guns = kiyosu.guns || 0;
+
+        // 出陣後、清州城の資源は文字通り「ゼロ」になります
+        kiyosu.soldiers = 0;
+        kiyosu.rice = 0;
+        kiyosu.horses = 0;
+        kiyosu.guns = 0;
+        
+        // ★改修：信長を「守備の自勢力援軍」として登録します！
+        context.defSelfReinforcement = {
+            castle: kiyosu, 
+            bushos: [nobunaga], 
+            soldiers: force,
+            rice: rice, 
+            horses: horses, 
+            guns: guns, 
+            isSelf: true,
+            morale: kiyosu.morale || 50, 
+            training: kiyosu.training || 50
+        };
+
+        // ★修正：AIに絶対に野戦を選ばせる「強制命令」の旗を立てます
+        context.forceIntercept = true;
+
+        game.ui.log(`【イベント】織田信長が清州城から名古屋城へ出陣しました！`);
+        await game.ui.showDialogAsync(`「人間五十年、下天の内をくらぶれば、夢幻の如くなり…」\n織田信長が今川軍を迎撃するため、清州城より出陣しました！`, false, 0);
+    }
+});
+
+// ==========================================
+// ★ 桶狭間の戦い ③今川義元討死
+// ==========================================
+window.GameEvents.push({
+    id: "historical_okehazama_3",
+    timing: "after_battle_blink", // ★変更：地図の点滅が終わった直後のタイミング
+    isOneTime: true,
+    
+    checkCondition: function(game, context) {
+        if (!context) return false;
+
+        // 桶狭間のイベント戦闘であるか確認します
+        if (!context.isEventBattle || context.eventId !== 'okehazama') return false;
+
+        // 今川軍（攻撃側）が負けた、または撤退したかを確認します
+        if (context.resultType !== 'attacker_lose' && context.resultType !== 'attacker_retreat') return false;
+
+        // A, D, Gの条件（大名や城主の確認）が今も満たされているか確認します
+        const yoshimoto = game.getBusho(1004001);
+        if (!yoshimoto || !yoshimoto.isDaimyo) return false;
+        
+        const nobunaga = game.getBusho(1006001);
+        if (!nobunaga || !nobunaga.isDaimyo) return false;
+        
+        const motoyasu = game.getBusho(1004004);
+        if (!motoyasu || !motoyasu.isCastellan) return false;
+
+        return true;
+    },
+    
+    execute: async function(game, context) {
+        const yoshimoto = game.getBusho(1004001);
+
+        // まずイベントのメッセージを出して、プレイヤーにお知らせします
+        game.ui.log(`【イベント】桶狭間の戦い：織田軍の奇襲により、今川義元が討死しました！`);
+        await game.ui.showDialogAsync(`織田軍の決死の奇襲が今川本陣を強襲！\n激戦の末、海道一の弓取り・今川義元は討ち取られました！`, false, 0);
+
+        // ★life_system.js の力を使って、義元を正式に死亡（討死）させます！
+        // これによって後継ぎ選びなどが自動で正しく行われます
+        if (game.lifeSystem) {
+            await game.lifeSystem.executeDeath(yoshimoto);
+        } else {
+            // 万が一システムが見つからなかった場合の安全策です
+            yoshimoto.status = 'dead';
+            yoshimoto.isDaimyo = false;
+            yoshimoto.isCastellan = false;
+            yoshimoto.isGunshi = false;
+            
+            if (yoshimoto.castleId > 0) {
+                const oldCastle = game.getCastle(yoshimoto.castleId);
+                if (oldCastle && oldCastle.samuraiIds) {
+                    oldCastle.samuraiIds = oldCastle.samuraiIds.filter(sid => sid !== yoshimoto.id);
+                }
+            }
+            
+            yoshimoto.castleId = 0;
+            yoshimoto.belongKunishuId = 0;
+        }
+
+        // 派閥や画面を最新の状態に更新します
+        if (game.factionSystem) {
+            game.factionSystem.updateFactions();
+        }
+
+        // ★追加：織田信長の大名家に所属する武将の忠誠度を+5し、城の民忠を100にします
+        const nobunaga = game.getBusho(1006001);
+        if (nobunaga && nobunaga.clan > 0) {
+            // 武将の忠誠度アップ（最大100まで）
+            const odaBushos = game.bushos.filter(b => b.clan === nobunaga.clan && b.status === 'active');
+            odaBushos.forEach(b => {
+                b.loyalty = Math.min(100, (b.loyalty || 0) + 5);
+            });
+
+            // 城の民忠を100にする
+            const odaCastles = game.castles.filter(c => c.ownerClan === nobunaga.clan);
+            odaCastles.forEach(c => {
+                c.peoplesLoyalty = 100;
+            });
+        }
+
+        if (game.ui) {
+            game.ui.renderMap();
+            game.ui.updatePanelHeader();
+        }
+    }
+});
+// ==========================================
+// ★ 松平元康（徳川家康）独立イベント
+// ==========================================
+window.GameEvents.push({
+    id: "historical_ieyasu_independence",
+    timing: "endMonth_before", // 月末の独立チェックなどが始まる前に起こします
+    isOneTime: true,
+    
+    checkCondition: function(game) {
+        // 1. 今川義元（ID: 1004001）が死亡しているか確認します
+        const yoshimoto = game.getBusho(1004001);
+        if (!yoshimoto || yoshimoto.status !== 'dead') return false;
+
+        // 2. 今川氏真（ID: 1004011）が大名であるか確認します
+        const ujizane = game.getBusho(1004011);
+        if (!ujizane || !ujizane.isDaimyo || ujizane.clan === 0) return false;
+
+        // 3. 松平元康（ID: 1004004）が存在し、大名ではないことを確認します
+        const motoyasu = game.getBusho(1004004);
+        if (!motoyasu || motoyasu.isDaimyo) return false;
+
+        // 4. 松平元康が氏真と同じ今川家に所属し、城主であるか確認します
+        if (motoyasu.clan !== ujizane.clan || !motoyasu.isCastellan) return false;
+
+        // 5. 松平元康が派閥主であるか確認します
+        if (!motoyasu.isFactionLeader) return false;
+
+        // 全ての条件を満たしたらイベント発生！
+        return true;
+    },
+    
+    execute: async function(game) {
+        const ujizane = game.getBusho(1004011);
+        const motoyasu = game.getBusho(1004004);
+        const castle = game.getCastle(motoyasu.castleId);
+
+        if (!castle) return;
+
+        // 独立システムを呼び出して、強制的に独立を実行します
+        if (game.independenceSystem) {
+            // 第4引数に 'indep' を渡すことで、乗っ取りや寝返りではなく、純粋な「独立」として処理させます
+            await game.independenceSystem.executeRebellion(castle, motoyasu, ujizane, 'indep');
+            
+            // 独立が起こったあと、元々の大名家（今川家）に残った武将の下がりすぎた忠誠度を調整の為25回復させます
+            const oldClanId = ujizane.clan;
+            // 氏真がちゃんと大名家に所属しているか確認します
+            if (oldClanId > 0) {
+                // 同じ大名家に所属していて、まだ活動中（生きている）武将を全員集めます
+                const remainingBushos = game.bushos.filter(b => b.clan === oldClanId && b.status === 'active');
+                
+                // 集めた武将たち全員に、順番に忠誠度を回復する魔法をかけます
+                remainingBushos.forEach(b => {
+                    // 現在の忠誠度に25を足します（ただし、最大100までに制限します）
+                    b.loyalty = Math.min(100, (b.loyalty || 0) + 25);
+                });
+                
+            }
+
+            // ★追加：独立した松平元康の大名家に所属する武将と城のボーナス処理
+            if (motoyasu.clan > 0) {
+                // 武将の忠誠度を+10（最大100まで）
+                const matsudairaBushos = game.bushos.filter(b => b.clan === motoyasu.clan && b.status === 'active');
+                matsudairaBushos.forEach(b => {
+                    b.loyalty = Math.min(100, (b.loyalty || 0) + 10);
+                });
+
+                // 城の人口を+20%（上限99万9999）し、民忠を100にする
+                const matsudairaCastles = game.castles.filter(c => c.ownerClan === motoyasu.clan);
+                matsudairaCastles.forEach(c => {
+                    c.population = Math.min(999999, Math.floor(c.population * 1.2));
+                    c.peoplesLoyalty = 100;
+                });
+            }
+        }
+    }
+});
+
+// ==========================================
+// ★ 清州同盟イベント
+// ==========================================
+window.GameEvents.push({
+    id: "historical_kiyosu_alliance",
+    timing: "startMonth_before", // 月初の処理前に発生します
+    isOneTime: true,             // 一度きりの歴史イベントです
+    
+    checkCondition: function(game) {
+        // 今川義元（ID: 1004001）が死亡しているかを確認します
+        const yoshimoto = game.getBusho(1004001);
+        if (yoshimoto && yoshimoto.status !== 'dead') return false;
+
+        // 織田信長（ID: 1006001）が大名であるか確認します
+        const nobunaga = game.getBusho(1006001);
+        if (!nobunaga || !nobunaga.isDaimyo || nobunaga.clan === 0) return false;
+
+        // 松平元康（ID: 1004004）が大名であるか確認します
+        const motoyasu = game.getBusho(1004004);
+        if (!motoyasu || !motoyasu.isDaimyo || motoyasu.clan === 0) return false;
+
+        // 織田家と松平家の関係が「敵対」「普通」「友好」のいずれかであるか確認します
+        const rel = game.diplomacyManager.getRelation(nobunaga.clan, motoyasu.clan);
+        if (!rel || (rel.status !== '敵対' && rel.status !== '普通' && rel.status !== '友好')) return false;
+
+        // 織田家と松平家の領地（お城同士の道）が隣接しているか確認します
+        const odaCastles = game.castles.filter(c => c.ownerClan === nobunaga.clan);
+        const matsudairaCastles = game.castles.filter(c => c.ownerClan === motoyasu.clan);
+        let isAdjacent = false;
+        
+        for (let oc of odaCastles) {
+            for (let mc of matsudairaCastles) {
+                // GameSystem.isAdjacent を使って、道が繋がっているか調べます
+                if (GameSystem.isAdjacent(oc, mc)) {
+                    isAdjacent = true;
+                    break;
+                }
+            }
+            if (isAdjacent) break;
+        }
+        if (!isAdjacent) return false;
+
+        // すべての条件を満たしたらイベント発生です！
+        return true;
+    },
+    
+    execute: async function(game) {
+        const nobunaga = game.getBusho(1006001);
+        const motoyasu = game.getBusho(1004004);
+        
+        const nobunagaClan = game.clans.find(c => c.id === nobunaga.clan);
+        const motoyasuClan = game.clans.find(c => c.id === motoyasu.clan);
+
+        // 外交システムを使って、強制的に「同盟」状態にします
+        if (game.diplomacyManager) {
+            game.diplomacyManager.changeStatus(motoyasu.clan, nobunaga.clan, '同盟', 0);
+            
+            // お互いの関係値を最高の100にします！
+            const rel1 = game.diplomacyManager.getRelation(motoyasu.clan, nobunaga.clan);
+            if (rel1) rel1.sentiment = 100;
+            
+            const rel2 = game.diplomacyManager.getRelation(nobunaga.clan, motoyasu.clan);
+            if (rel2) rel2.sentiment = 100;
+        }
+
+        // メッセージを作って画面にお知らせします
+        const msg = `${motoyasuClan.name} が ${nobunagaClan.name} と同盟を締結しました！`;
+        game.ui.log(`【イベント】清州同盟：${msg}`);
+        await game.ui.showDialogAsync(msg, false, 0);
+
+        // 画面や情報を最新の状態に更新します
+        if (game.ui) {
+            game.ui.renderMap();
+            game.ui.updatePanelHeader();
+        }
+    }
+});
+
+// ==========================================
 // ★ 三好義興の死による長慶の寿命減少（裏イベント）
 // ==========================================
 window.GameEvents.push({
@@ -789,520 +1311,96 @@ window.GameEvents.push({
 });
 
 // ==========================================
-// ★ 桶壊間の戦い（予備）：松平元康 岡崎城主就任（裏イベント）
+// ★ 三好義継追放イベント
 // ==========================================
 window.GameEvents.push({
-    id: "historical_motoyasu_okazaki",
-    timing: "startMonth_before",     // 月初の処理前にこっそりチェックします
-    isOneTime: true,                 // 一度発生したら二度と起きません
-    
-    checkCondition: function(game) {
-        // ① 今川義元（ID: 1004001）が大名として存在するか確認します
-        const yoshimoto = game.getBusho(1004001);
-        if (!yoshimoto || !yoshimoto.isDaimyo) return false;
-
-        // 補足：プレイヤーが今川家の場合は、勝手に移動させないようにここで止めます
-        if (game.playerClanId === yoshimoto.clan) return false;
-
-        // ② 松平元康（ID: 1004004）が存在するか確認します
-        const motoyasu = game.getBusho(1004004);
-        if (!motoyasu) return false;
-
-        // 【ここが重要！】元康が「義元が殿様を務める大名家」にちゃんと所属しているかチェックします
-        // ※ 義元の clan（勢力番号）と 元康の clan が一致していれば、同じ勢力にいることになります
-        if (motoyasu.clan !== yoshimoto.clan) return false;
-
-        // ③ 元康が自分自身が大名（独立した殿様）になっていないか確認します
-        if (motoyasu.isDaimyo) return false;
-
-        // ④ すでに元康が岡崎城（ID: 48）の城主なら、このイベントを起こす必要はありません
-        const okazakiCastle = game.getCastle(48);
-        if (!okazakiCastle || okazakiCastle.castellanId === motoyasu.id) return false;
-
-        // ⑤ 今川家（義元の勢力）が指定の5つのお城をすべて持っているか確認します
-        const imagawaClanId = yoshimoto.clan;
-        const requiredCastles = [12, 13, 48, 71, 100];
-        const hasAllCastles = requiredCastles.every(id => {
-            const c = game.getCastle(id);
-            return c && c.ownerClan === imagawaClanId;
-        });
-        if (!hasAllCastles) return false;
-
-        // すべての条件をクリアしたら、イベント発生の合図を出します
-        return true;
-    },
-    
-    execute: async function(game) {
-        const motoyasu = game.getBusho(1004004);
-        const okazakiCastle = game.getCastle(48);
-
-        // 万が一データが見つからなかった時のための安全装置です
-        if (!motoyasu || !okazakiCastle) return;
-
-        // 1. 松平元康の功績が1499以下なら、強制的に1500に引き上げます
-        if ((motoyasu.achievementTotal || 0) <= 1499) {
-            motoyasu.achievementTotal = 1500;
-        }
-
-        // 2. 元康が別のお城にいる場合、安全に岡崎城へお引越しさせます
-        if (motoyasu.castleId !== 48) {
-            if (game.affiliationSystem) {
-                game.affiliationSystem.moveCastle(motoyasu, 48);
-            } else {
-                // システムがない場合の予備の手動お引越し
-                const oldCastle = game.getCastle(motoyasu.castleId);
-                if (oldCastle) {
-                    oldCastle.samuraiIds = oldCastle.samuraiIds.filter(id => id !== motoyasu.id);
-                    if (oldCastle.castellanId === motoyasu.id) {
-                        oldCastle.castellanId = 0;
-                        motoyasu.isCastellan = false;
-                    }
-                }
-                motoyasu.castleId = 48;
-                if (!okazakiCastle.samuraiIds.includes(motoyasu.id)) {
-                    okazakiCastle.samuraiIds.push(motoyasu.id);
-                }
-            }
-        }
-
-        // 3. 岡崎城にいる他の武将の城主バッジを外し、元康を新しい城主にします
-        // ※ すでに元康が城主だったとしても、ここで改めて正しくバッジを付け直すので安全です
-        const residents = game.bushos.filter(b => b.castleId === 48);
-        residents.forEach(b => {
-            b.isCastellan = false;
-        });
-
-        motoyasu.isCastellan = true;
-        okazakiCastle.castellanId = motoyasu.id;
-
-        // 4. システムに城主の変更を確定させ、画面を更新します
-        if (game.affiliationSystem) {
-            game.affiliationSystem.updateCastleLord(okazakiCastle);
-        }
-
-        if (game.ui) {
-            game.ui.renderMap();
-            game.ui.updatePanelHeader();
-        }
-    }
-});
-
-// ==========================================
-// ★ 桶狭間の戦い ①義元出陣
-// ==========================================
-window.GameEvents.push({
-    id: "historical_okehazama_1",
-    timing: "startMonth_before",     // 月初の処理前に発生するかチェックします
-    isOneTime: true,                 // 一度発生したら二度と起きません
-    
-    checkCondition: function(game) {
-        // A. 今川義元（ID: 1004001）が大名として存在するか確認します
-        const yoshimoto = game.getBusho(1004001);
-        if (!yoshimoto || !yoshimoto.isDaimyo) return false;
-
-        // 補足：プレイヤーが今川家の場合は、勝手に出陣させないようにここで止めます
-        if (game.playerClanId === yoshimoto.clan) return false;
-
-        // C. 今川義元が駿府城（ID: 13）にいるか確認します
-        if (yoshimoto.castleId !== 13) return false;
-
-        // B. 今川家が指定のお城をすべて持っているか確認します
-        const imagawaClanId = yoshimoto.clan;
-        const requiredImagawaCastles = [12, 13, 45, 48, 57, 71, 100];
-        const hasAllImagawaCastles = requiredImagawaCastles.every(id => {
-            const c = game.getCastle(id);
-            return c && c.ownerClan === imagawaClanId;
-        });
-        if (!hasAllImagawaCastles) return false;
-
-        // D. 織田信長（ID: 1006001）が大名として存在するか確認します
-        const nobunaga = game.getBusho(1006001);
-        if (!nobunaga || !nobunaga.isDaimyo) return false;
-
-        // F. 織田信長が清州城（ID: 7）にいるか確認します
-        if (nobunaga.castleId !== 7) return false;
-
-        // E. 織田家が指定のお城をすべて持っているか確認します
-        const odaClanId = nobunaga.clan;
-        const requiredOdaCastles = [7, 11];
-        const hasAllOdaCastles = requiredOdaCastles.every(id => {
-            const c = game.getCastle(id);
-            return c && c.ownerClan === odaClanId;
-        });
-        if (!hasAllOdaCastles) return false;
-
-        // G. 松平元康（ID: 1004004）が城主として存在するか確認します
-        const motoyasu = game.getBusho(1004004);
-        if (!motoyasu || !motoyasu.isCastellan) return false;
-
-        // すべての条件をクリアしたら、イベントを発生させます！
-        return true;
-    },
-    
-    execute: async function(game) {
-        const yoshimoto = game.getBusho(1004001);
-        const imagawaClanId = yoshimoto.clan;
-
-        // 駿府城の兵力を調べて、出撃させる兵士と兵糧の数を決めます
-        const sunpuCastle = game.getCastle(13);
-        // ★義元は油断していて、総兵力の4分の1しか連れて行きません
-        const force = sunpuCastle ? Math.floor(sunpuCastle.soldiers * 0.25) : 5000;
-        const rice = force * 2;
-
-        // AIの作戦を管理しているシステムに、新しい作戦をセットします
-        if (game.aiOperationManager) {
-            game.aiOperationManager.operations[imagawaClanId] = {
-                type: '攻撃',
-                targetId: 11,               // 攻撃目標は名古屋城です
-                isEventOperation: true,     // ★イベントによる特別な作戦です
-                designatedCommanderId: 1004001, // ★今回追加：絶対にこの人（義元）を大将にするという指定です！
-                isKunishuTarget: false,     
-                stagingBase: 13,            // 出撃するのは駿府城からです
-                supportBase: null,          
-                requiredForce: force,       // ★ここで指定した「4分の1の兵力」が、そのまま出撃時に使われます！
-                requiredRice: rice,         
-                assignedUnits: [],          
-                turnsRemaining: 1,          // 準備期間は1ヶ月です（予兆が出ます）
-                maxTurns: 4,                
-                status: '準備中'
-            };
-                
-            // 画面にメッセージを出して、プレイヤーにお知らせします
-            const imagawaClan = game.clans.find(c => c.id === imagawaClanId);
-            const clanName = imagawaClan ? imagawaClan.name : '今川家';
-            game.ui.log(`【イベント】桶狭間の戦い：${clanName}が尾張侵攻の軍を興しました。`);
-            await game.ui.showDialogAsync(`今川義元が上洛へ向けて、\n尾張への侵攻作戦を進めているようです。`, false, 0);
-        }
-    }
-});
-
-// ==========================================
-// ★ 桶狭間の戦い ②織田信長出陣
-// ==========================================
-window.GameEvents.push({
-    id: "historical_okehazama_2",
-    // ★特殊な発火タイミング：部隊が城に到着して、野戦や攻城戦が始まる直前を想定します
-    timing: "before_battle", 
-    isOneTime: true,
-    
-    checkCondition: function(game, context) {
-        // 戦闘システムからコンテキスト（状況データ）が届いていなければストップします
-        if (!context) return false;
-
-        // H. 攻撃目標が名古屋城（ID: 11）か確認します
-        if (!context.defender || context.defender.id !== 11) return false;
-
-        // H. 攻撃側に今川義元（ID: 1004001）がいるか確認します
-        const atkBushos = context.atkBushos || [];
-        const hasYoshimoto = atkBushos.some(b => b.id === 1004001);
-        if (!hasYoshimoto) return false;
-
-        // A. 義元が大名であるか確認します
-        const yoshimoto = game.getBusho(1004001);
-        if (!yoshimoto || !yoshimoto.isDaimyo) return false;
-
-        // D, F. 信長が大名で、清州城（ID: 7）にいるか確認します
-        const nobunaga = game.getBusho(1006001);
-        if (!nobunaga || !nobunaga.isDaimyo || nobunaga.castleId !== 7) return false;
-
-        // E. 織田家が清州城（7）と名古屋城（11）をまだ持っているか確認します
-        const odaClanId = nobunaga.clan;
-        const kiyosu = game.getCastle(7);
-        const nagoya = game.getCastle(11);
-        if (!kiyosu || kiyosu.ownerClan !== odaClanId) return false;
-        if (!nagoya || nagoya.ownerClan !== odaClanId) return false;
-
-        // G. 松平元康が城主として存在するか確認します
-        const motoyasu = game.getBusho(1004004);
-        if (!motoyasu || !motoyasu.isCastellan) return false;
-
-        return true;
-    },
-    
-    execute: async function(game, context) {
-        const nobunaga = game.getBusho(1006001);
-        const kiyosu = game.getCastle(7);
-
-        // 【安全装置】もし清州城のデータが読み取れなかったら、エラーを防ぐためにここで処理を中断します
-        if (!kiyosu || !nobunaga) return;
-
-        // ★追加：この戦闘が「イベント戦闘」であることと、その「イベントID」を野戦システムに伝えます！
-        // （プレイヤーの場合でも討死イベントが発生するように、フラグだけは最初に立てておきます）
-        context.isEventBattle = true;
-        context.eventId = "okehazama";
-
-        // ★追加：プレイヤーが織田家の場合は、勝手な部隊移動や強制野戦は行いません。フラグを立てるだけで終了します。
-        if (game.playerClanId === nobunaga.clan) {
-            return;
-        }
-
-        // 桶狭間は全力出撃！清州城にある資源を全て（100%）持ち出します
-        const force = kiyosu.soldiers;
-        const rice = kiyosu.rice;
-        const horses = kiyosu.horses || 0;
-        const guns = kiyosu.guns || 0;
-
-        // 出陣後、清州城の資源は文字通り「ゼロ」になります
-        kiyosu.soldiers = 0;
-        kiyosu.rice = 0;
-        kiyosu.horses = 0;
-        kiyosu.guns = 0;
-        
-        // ★改修：信長を「守備の自勢力援軍」として登録します！
-        context.defSelfReinforcement = {
-            castle: kiyosu, 
-            bushos: [nobunaga], 
-            soldiers: force,
-            rice: rice, 
-            horses: horses, 
-            guns: guns, 
-            isSelf: true,
-            morale: kiyosu.morale || 50, 
-            training: kiyosu.training || 50
-        };
-
-        // ★修正：AIに絶対に野戦を選ばせる「強制命令」の旗を立てます
-        context.forceIntercept = true;
-
-        game.ui.log(`【イベント】織田信長が清州城から名古屋城へ出陣しました！`);
-        await game.ui.showDialogAsync(`「人間五十年、下天の内をくらぶれば、夢幻の如くなり…」\n織田信長が今川軍を迎撃するため、清州城より出陣しました！`, false, 0);
-    }
-});
-
-// ==========================================
-// ★ 桶狭間の戦い ③今川義元討死
-// ==========================================
-window.GameEvents.push({
-    id: "historical_okehazama_3",
-    timing: "after_battle_blink", // ★変更：地図の点滅が終わった直後のタイミング
-    isOneTime: true,
-    
-    checkCondition: function(game, context) {
-        if (!context) return false;
-
-        // 桶狭間のイベント戦闘であるか確認します
-        if (!context.isEventBattle || context.eventId !== 'okehazama') return false;
-
-        // 今川軍（攻撃側）が負けた、または撤退したかを確認します
-        if (context.resultType !== 'attacker_lose' && context.resultType !== 'attacker_retreat') return false;
-
-        // A, D, Gの条件（大名や城主の確認）が今も満たされているか確認します
-        const yoshimoto = game.getBusho(1004001);
-        if (!yoshimoto || !yoshimoto.isDaimyo) return false;
-        
-        const nobunaga = game.getBusho(1006001);
-        if (!nobunaga || !nobunaga.isDaimyo) return false;
-        
-        const motoyasu = game.getBusho(1004004);
-        if (!motoyasu || !motoyasu.isCastellan) return false;
-
-        return true;
-    },
-    
-    execute: async function(game, context) {
-        const yoshimoto = game.getBusho(1004001);
-
-        // まずイベントのメッセージを出して、プレイヤーにお知らせします
-        game.ui.log(`【イベント】桶狭間の戦い：織田軍の奇襲により、今川義元が討死しました！`);
-        await game.ui.showDialogAsync(`織田軍の決死の奇襲が今川本陣を強襲！\n激戦の末、海道一の弓取り・今川義元は討ち取られました！`, false, 0);
-
-        // ★life_system.js の力を使って、義元を正式に死亡（討死）させます！
-        // これによって後継ぎ選びなどが自動で正しく行われます
-        if (game.lifeSystem) {
-            await game.lifeSystem.executeDeath(yoshimoto);
-        } else {
-            // 万が一システムが見つからなかった場合の安全策です
-            yoshimoto.status = 'dead';
-            yoshimoto.isDaimyo = false;
-            yoshimoto.isCastellan = false;
-            yoshimoto.isGunshi = false;
-            
-            if (yoshimoto.castleId > 0) {
-                const oldCastle = game.getCastle(yoshimoto.castleId);
-                if (oldCastle && oldCastle.samuraiIds) {
-                    oldCastle.samuraiIds = oldCastle.samuraiIds.filter(sid => sid !== yoshimoto.id);
-                }
-            }
-            
-            yoshimoto.castleId = 0;
-            yoshimoto.belongKunishuId = 0;
-        }
-
-        // 派閥や画面を最新の状態に更新します
-        if (game.factionSystem) {
-            game.factionSystem.updateFactions();
-        }
-
-        // ★追加：織田信長の大名家に所属する武将の忠誠度を+5し、城の民忠を100にします
-        const nobunaga = game.getBusho(1006001);
-        if (nobunaga && nobunaga.clan > 0) {
-            // 武将の忠誠度アップ（最大100まで）
-            const odaBushos = game.bushos.filter(b => b.clan === nobunaga.clan && b.status === 'active');
-            odaBushos.forEach(b => {
-                b.loyalty = Math.min(100, (b.loyalty || 0) + 5);
-            });
-
-            // 城の民忠を100にする
-            const odaCastles = game.castles.filter(c => c.ownerClan === nobunaga.clan);
-            odaCastles.forEach(c => {
-                c.peoplesLoyalty = 100;
-            });
-        }
-
-        if (game.ui) {
-            game.ui.renderMap();
-            game.ui.updatePanelHeader();
-        }
-    }
-});
-// ==========================================
-// ★ 松平元康（徳川家康）独立イベント
-// ==========================================
-window.GameEvents.push({
-    id: "historical_ieyasu_independence",
-    timing: "endMonth_before", // 月末の独立チェックなどが始まる前に起こします
-    isOneTime: true,
-    
-    checkCondition: function(game) {
-        // 1. 今川義元（ID: 1004001）が死亡しているか確認します
-        const yoshimoto = game.getBusho(1004001);
-        if (!yoshimoto || yoshimoto.status !== 'dead') return false;
-
-        // 2. 今川氏真（ID: 1004011）が大名であるか確認します
-        const ujizane = game.getBusho(1004011);
-        if (!ujizane || !ujizane.isDaimyo || ujizane.clan === 0) return false;
-
-        // 3. 松平元康（ID: 1004004）が存在し、大名ではないことを確認します
-        const motoyasu = game.getBusho(1004004);
-        if (!motoyasu || motoyasu.isDaimyo) return false;
-
-        // 4. 松平元康が氏真と同じ今川家に所属し、城主であるか確認します
-        if (motoyasu.clan !== ujizane.clan || !motoyasu.isCastellan) return false;
-
-        // 5. 松平元康が派閥主であるか確認します
-        if (!motoyasu.isFactionLeader) return false;
-
-        // 全ての条件を満たしたらイベント発生！
-        return true;
-    },
-    
-    execute: async function(game) {
-        const ujizane = game.getBusho(1004011);
-        const motoyasu = game.getBusho(1004004);
-        const castle = game.getCastle(motoyasu.castleId);
-
-        if (!castle) return;
-
-        // 独立システムを呼び出して、強制的に独立を実行します
-        if (game.independenceSystem) {
-            // 第4引数に 'indep' を渡すことで、乗っ取りや寝返りではなく、純粋な「独立」として処理させます
-            await game.independenceSystem.executeRebellion(castle, motoyasu, ujizane, 'indep');
-            
-            // 独立が起こったあと、元々の大名家（今川家）に残った武将の下がりすぎた忠誠度を調整の為25回復させます
-            const oldClanId = ujizane.clan;
-            // 氏真がちゃんと大名家に所属しているか確認します
-            if (oldClanId > 0) {
-                // 同じ大名家に所属していて、まだ活動中（生きている）武将を全員集めます
-                const remainingBushos = game.bushos.filter(b => b.clan === oldClanId && b.status === 'active');
-                
-                // 集めた武将たち全員に、順番に忠誠度を回復する魔法をかけます
-                remainingBushos.forEach(b => {
-                    // 現在の忠誠度に25を足します（ただし、最大100までに制限します）
-                    b.loyalty = Math.min(100, (b.loyalty || 0) + 25);
-                });
-                
-            }
-
-            // ★追加：独立した松平元康の大名家に所属する武将と城のボーナス処理
-            if (motoyasu.clan > 0) {
-                // 武将の忠誠度を+10（最大100まで）
-                const matsudairaBushos = game.bushos.filter(b => b.clan === motoyasu.clan && b.status === 'active');
-                matsudairaBushos.forEach(b => {
-                    b.loyalty = Math.min(100, (b.loyalty || 0) + 10);
-                });
-
-                // 城の人口を+20%（上限99万9999）し、民忠を100にする
-                const matsudairaCastles = game.castles.filter(c => c.ownerClan === motoyasu.clan);
-                matsudairaCastles.forEach(c => {
-                    c.population = Math.min(999999, Math.floor(c.population * 1.2));
-                    c.peoplesLoyalty = 100;
-                });
-            }
-        }
-    }
-});
-
-// ==========================================
-// ★ 清州同盟イベント
-// ==========================================
-window.GameEvents.push({
-    id: "historical_kiyosu_alliance",
+    id: "historical_yoshitsugu_exile",
     timing: "startMonth_before", // 月初の処理前に発生します
     isOneTime: true,             // 一度きりの歴史イベントです
     
     checkCondition: function(game) {
-        // 今川義元（ID: 1004001）が死亡しているかを確認します
-        const yoshimoto = game.getBusho(1004001);
-        if (yoshimoto && yoshimoto.status !== 'dead') return false;
+        // 1. 三好長慶（ID: 1020001）が死亡しているか確認します
+        const nagayoshi = game.getBusho(1020001);
+        if (!nagayoshi || nagayoshi.status !== 'dead') return false;
 
-        // 織田信長（ID: 1006001）が大名であるか確認します
-        const nobunaga = game.getBusho(1006001);
-        if (!nobunaga || !nobunaga.isDaimyo || nobunaga.clan === 0) return false;
+        // 2. 三好義継（ID: 1020033）が大名であるか確認します
+        const yoshitsugu = game.getBusho(1020033);
+        if (!yoshitsugu || !yoshitsugu.isDaimyo || yoshitsugu.clan === 0) return false;
 
-        // 松平元康（ID: 1004004）が大名であるか確認します
-        const motoyasu = game.getBusho(1004004);
-        if (!motoyasu || !motoyasu.isDaimyo || motoyasu.clan === 0) return false;
+        // 3. 松永久秀（ID: 1901001）が大名であるか確認します
+        const hisahide = game.getBusho(1901001);
+        if (!hisahide || !hisahide.isDaimyo || hisahide.clan === 0) return false;
 
-        // 織田家と松平家の関係が「敵対」「普通」「友好」のいずれかであるか確認します
-        const rel = game.diplomacyManager.getRelation(nobunaga.clan, motoyasu.clan);
-        if (!rel || (rel.status !== '敵対' && rel.status !== '普通' && rel.status !== '友好')) return false;
-
-        // 織田家と松平家の領地（お城同士の道）が隣接しているか確認します
-        const odaCastles = game.castles.filter(c => c.ownerClan === nobunaga.clan);
-        const matsudairaCastles = game.castles.filter(c => c.ownerClan === motoyasu.clan);
-        let isAdjacent = false;
-        
-        for (let oc of odaCastles) {
-            for (let mc of matsudairaCastles) {
-                // GameSystem.isAdjacent を使って、道が繋がっているか調べます
-                if (GameSystem.isAdjacent(oc, mc)) {
-                    isAdjacent = true;
-                    break;
-                }
+        // 4. 三好家に三好三人衆（長逸、政生、岩成友通）が所属しているか確認します
+        const trioIds = [1020006, 1020007, 1020008];
+        const miyoshiClanId = yoshitsugu.clan;
+        for (let id of trioIds) {
+            const member = game.getBusho(id);
+            if (!member || member.status !== 'active' || member.clan !== miyoshiClanId) {
+                return false;
             }
-            if (isAdjacent) break;
         }
-        if (!isAdjacent) return false;
+
+        // 5. 三好家と松永家が「敵対」状態であるか確認します
+        const rel = game.diplomacyManager ? game.diplomacyManager.getRelation(miyoshiClanId, hisahide.clan) : null;
+        if (!rel || rel.status !== '敵対') return false;
 
         // すべての条件を満たしたらイベント発生です！
         return true;
     },
     
     execute: async function(game) {
-        const nobunaga = game.getBusho(1006001);
-        const motoyasu = game.getBusho(1004004);
-        
-        const nobunagaClan = game.clans.find(c => c.id === nobunaga.clan);
-        const motoyasuClan = game.clans.find(c => c.id === motoyasu.clan);
+        const yoshitsugu = game.getBusho(1020033);
+        const hisahide = game.getBusho(1901001);
+        const nagayasu = game.getBusho(1020006);
+        const miyoshiClanId = yoshitsugu.clan;
 
-        // 外交システムを使って、強制的に「同盟」状態にします
-        if (game.diplomacyManager) {
-            game.diplomacyManager.changeStatus(motoyasu.clan, nobunaga.clan, '同盟', 0);
+        // ① 三好長逸を新しい大名（殿様）にします
+        const miyoshiClan = game.clans.find(c => c.id === miyoshiClanId);
+        if (miyoshiClan) {
+            miyoshiClan.leaderId = nagayasu.id;
+        }
+        
+        // 義継から大名バッジを外します
+        yoshitsugu.isDaimyo = false;
+        
+        // 長逸に大名バッジをつけます（もし軍師だった場合はバッジを外します）
+        nagayasu.isDaimyo = true;
+        nagayasu.isGunshi = false;
+
+        // ② 三好長逸を、今いるお城の城主にします
+        const nagayasuCastle = game.getCastle(nagayasu.castleId);
+        if (nagayasuCastle) {
+            // 元々いた城主のバッジを外します
+            const oldCastellan = game.getBusho(nagayasuCastle.castellanId);
+            if (oldCastellan && oldCastellan.id !== nagayasu.id) {
+                oldCastellan.isCastellan = false;
+            }
+            nagayasu.isCastellan = true;
+            nagayasuCastle.castellanId = nagayasu.id;
             
-            // お互いの関係値を最高の100にします！
-            const rel1 = game.diplomacyManager.getRelation(motoyasu.clan, nobunaga.clan);
-            if (rel1) rel1.sentiment = 100;
-            
-            const rel2 = game.diplomacyManager.getRelation(nobunaga.clan, motoyasu.clan);
-            if (rel2) rel2.sentiment = 100;
+            // システムにお城の持ち主が変わったことを伝えます
+            game.affiliationSystem.updateCastleLord(nagayasuCastle);
         }
 
-        // メッセージを作って画面にお知らせします
-        const msg = `${motoyasuClan.name} が ${nobunagaClan.name} と同盟を締結しました！`;
-        game.ui.log(`【イベント】清州同盟：${msg}`);
-        await game.ui.showDialogAsync(msg, false, 0);
+        // ③ 三好義継の貢献度（功績）を0にします
+        yoshitsugu.achievementTotal = 0;
 
-        // 画面や情報を最新の状態に更新します
+        // ④ 三好義継を松永家へお引越しさせ、忠誠度を100にします
+        // お引越しセンターの魔法（joinClan）を使って、古いお城から出して新しいお城に入れます
+        game.affiliationSystem.joinClan(yoshitsugu, hisahide.clan, hisahide.castleId, 100);
+
+        // ⑤ 画面にメッセージを出してお知らせします
+        game.ui.log(`【イベント】三好三人衆が当主・三好義継に対して反旗を翻し、三好義継が追放されました。`);
+        await game.ui.showDialogAsync(`三好三人衆が当主・三好義継に対して反旗を翻しました！\n義継は追放され、敵対していた松永久秀の元へ逃れました。\n三好家は三好長逸が新たな当主となります。`, false, 0);
+
+        // ⑥ 派閥や画面を最新の状態に更新します
+        if (game.factionSystem) {
+            game.factionSystem.updateFactions();
+        }
+        if (typeof game.updateAllClanPrestige === 'function') {
+            game.updateAllClanPrestige();
+        }
         if (game.ui) {
             game.ui.renderMap();
             game.ui.updatePanelHeader();
