@@ -985,6 +985,14 @@ window.GameEvents.push({
             }
         }
 
+        // 庇護された時に大名用の顔画像があれば差し替えます！
+        if (candidate.faceChange && candidate.faceChange.startsWith('daimyo:')) {
+            const newFace = candidate.faceChange.split(':')[1].trim();
+            if (newFace) {
+                candidate.faceIcon = newFace;
+            }
+        }
+
         // 将軍候補を新しい大名家に移動させます
         candidate.belongKunishuId = 0;
         if (game.affiliationSystem) {
