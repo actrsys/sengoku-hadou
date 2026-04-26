@@ -31,6 +31,161 @@ window.GameEvents.push({
 });
 
 // ==========================================
+// ★ 永禄の変（将軍襲撃イベント）
+// ==========================================
+window.GameEvents.push({
+    id: "historical_eiroku_no_hen",
+    timing: "startMonth_before", // 月初の処理前に発生します
+    isOneTime: true,             // 一度きりの歴史イベントです
+    
+    checkCondition: function(game) {
+        // 1. 三好長慶（ID: 1020001）が死亡しているか確認します
+        const nagayoshi = game.getBusho(1020001);
+        if (nagayoshi && nagayoshi.status !== 'dead') return false;
+
+        // 2. 三好義継（ID: 1020033）が大名として存在するか確認します
+        const yoshitsugu = game.getBusho(1020033);
+        if (!yoshitsugu || !yoshitsugu.isDaimyo || yoshitsugu.clan === 0) return false;
+        
+        const miyoshiClanId = yoshitsugu.clan;
+
+        // 3. 三好家に特定の4名が所属しているか確認します
+        const requiredMembers = [1020006, 1020007, 1020008, 1901001];
+        for (let id of requiredMembers) {
+            const member = game.getBusho(id);
+            // 死んでいる、生まれていない、浪人、または三好家以外にいる場合はイベントが起きません
+            if (!member || member.status === 'dead' || member.status === 'unborn' || member.status === 'ronin' || member.clan !== miyoshiClanId) {
+                return false;
+            }
+        }
+
+        // 4. 足利義輝（ID: 1017001）が生存しており、大名であるか確認します
+        const yoshiteru = game.getBusho(1017001);
+        if (!yoshiteru || yoshiteru.status === 'dead' || yoshiteru.status === 'unborn' || !yoshiteru.isDaimyo || yoshiteru.clan === 0) return false;
+        
+        const ashikagaClanId = yoshiteru.clan;
+
+        // 5. 足利家と三好家の領地（お城同士の道）が隣接しているか確認します
+        const ashikagaCastles = game.castles.filter(c => c.ownerClan === ashikagaClanId);
+        const miyoshiCastles = game.castles.filter(c => c.ownerClan === miyoshiClanId);
+        
+        // どちらかがお城を一つも持っていなければ条件を満たしません
+        if (ashikagaCastles.length === 0 || miyoshiCastles.length === 0) return false;
+
+        let isAdjacent = false;
+        for (let ac of ashikagaCastles) {
+            for (let mc of miyoshiCastles) {
+                // GameSystemを使って、道が繋がっているか調べます
+                if (GameSystem.isAdjacent(ac, mc)) {
+                    isAdjacent = true;
+                    break;
+                }
+            }
+            if (isAdjacent) break;
+        }
+        if (!isAdjacent) return false;
+
+        // すべての条件を満たしたらイベント発生の合図を出します
+        return true;
+    },
+    
+    execute: async function(game) {
+        const yoshiteru = game.getBusho(1017001);
+        const yoshitsugu = game.getBusho(1020033);
+        const ashikagaClanId = yoshiteru.clan;
+        const miyoshiClanId = yoshitsugu.clan;
+
+        // 大名家のデータを取得し、現在の家名（動的）を特定します
+        const miyoshiClan = game.clans.find(c => c.id === miyoshiClanId);
+        const miyoshiClanName = miyoshiClan ? miyoshiClan.name : "三好家";
+        const ashikagaClan = game.clans.find(c => c.id === ashikagaClanId);
+        const ashikagaClanName = ashikagaClan ? ashikagaClan.name : "足利家";
+        const yoshiteruName = yoshiteru.name.replace('|', '');
+
+        // ① まず、足利家の城をすべて三好家のものにします
+        const ashikagaCastles = game.castles.filter(c => c.ownerClan === ashikagaClanId);
+        ashikagaCastles.forEach(castle => {
+            if (game.castleManager) {
+                game.castleManager.changeOwner(castle, miyoshiClanId, true);
+            } else {
+                castle.ownerClan = miyoshiClanId;
+            }
+            castle.castellanId = 0;
+        });
+
+        // ② 足利義輝の死亡処理
+        yoshiteru.status = 'dead';
+        yoshiteru.isDaimyo = false;
+        yoshiteru.isCastellan = false;
+
+        if (yoshiteru.courtRankIds && yoshiteru.courtRankIds.length > 0) {
+            if (yoshiteru.courtRankIds.includes(1)) {
+                yoshiteru._wasShogun = true;
+            }
+            yoshiteru.courtRankIds.forEach(rankId => {
+                if (game.courtRankSystem) game.courtRankSystem.returnRank(rankId);
+            });
+            yoshiteru.courtRankIds = [];
+        }
+
+        // ③ 武将を浪人にする
+        const ashikagaBushos = game.bushos.filter(b => b.clan === ashikagaClanId && b.status === 'active');
+        ashikagaBushos.forEach(b => {
+            if (game.affiliationSystem) {
+                game.affiliationSystem.becomeRonin(b);
+            } else {
+                b.status = 'ronin';
+                b.clan = 0;
+                b.isCastellan = false;
+                b.isGunshi = false;
+                b.loyalty = 50;
+            }
+        });
+
+        // ④ 滅亡処理のフラグ
+        if (ashikagaClan) {
+            ashikagaClan.extinctionNotified = true;
+        }
+
+        // ⑤ 城主更新
+        ashikagaCastles.forEach(castle => {
+            if (game.affiliationSystem) {
+                game.affiliationSystem.updateCastleLord(castle);
+            }
+        });
+
+        // ⑥ メッセージ表示（動的な名前を使用）
+        const msg = `三好義継と三好三人衆らが御所を襲撃！\n奮戦の末に${yoshiteruName}は討死し、${ashikagaClanName}は滅亡しました。\n旧領はすべて${miyoshiClanName}の手に落ちました。`;
+        game.ui.log(`【イベント】永禄の変：${msg}`);
+        await game.ui.showDialogAsync(msg, false, 0);
+
+        // ⑦ 死亡イベントの通知
+        if (game.eventManager) {
+            await game.eventManager.processEvents('shogun_death', {
+                deadShogunClanId: ashikagaClanId,
+                killerClanId: miyoshiClanId
+            });
+        }
+
+        // ⑧ 画面更新
+        if (game.factionSystem) game.factionSystem.updateFactions();
+        if (typeof game.updateAllClanPrestige === 'function') game.updateAllClanPrestige();
+        if (game.ui) {
+            game.ui.renderMap();
+            game.ui.updatePanelHeader();
+        }
+
+        if (game.playerClanId === ashikagaClanId) {
+            setTimeout(() => {
+                game.ui.showDialog(`${ashikagaClanName}は滅亡しました……`, false, () => {
+                    game.ui.returnToTitle();
+                });
+            }, 1000);
+        }
+    }
+});
+
+// ==========================================
 // ★ 将軍候補庇護（予備イベント）
 // ==========================================
 window.GameEvents.push({
