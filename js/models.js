@@ -331,9 +331,24 @@ class Busho {
         this.cooperation = Number(this.cooperation || 50);
 
         // 顔画像ファイル名 (例: "nobunaga.png")。未設定なら null または undefined
-        this.faceIcon = data.faceIcon || 'unknown_face.webp';
+        // ★修正：「通常顔|daimyo:大名顔」のような設定を読み取れるようにします！
+        if (data.faceChange !== undefined) {
+            // セーブデータから読み込んだ場合はそのまま使います
+            this.faceIcon = data.faceIcon || 'unknown_face.webp';
+            this.faceChange = data.faceChange || "";
+        } else if (data.faceIcon && typeof data.faceIcon === 'string' && data.faceIcon.includes('|')) {
+            // CSVから「|」区切りで読み込んだ場合、分割して箱に入れます
+            const parts = data.faceIcon.split('|');
+            this.faceIcon = parts[0].trim() || 'unknown_face.webp';
+            this.faceChange = parts[1].trim();
+        } else {
+            // 今まで通りの普通のデータの場合
+            this.faceIcon = data.faceIcon || 'unknown_face.webp';
+            this.faceChange = "";
+        }
 
         // 派閥・システム関連パラメータの初期化
+        this.achievementTotal = Number(this.achievementTotal || 0); // 功績累計
         this.achievementTotal = Number(this.achievementTotal || 0); // 功績累計
         this.recognitionNeed = Number(this.recognitionNeed || 0);   // 承認欲求
         this.factionId = Number(this.factionId || 0);               // 派閥ID

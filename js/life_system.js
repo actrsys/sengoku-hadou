@@ -681,6 +681,14 @@ class LifeSystem {
                 }
             }
 
+            // ★ここから追加：大名になった瞬間に「daimyo:」の顔変更データがあれば顔を変える魔法！
+            if (successor.faceChange && successor.faceChange.startsWith('daimyo:')) {
+                const newFace = successor.faceChange.split(':')[1].trim();
+                if (newFace) {
+                    successor.faceIcon = newFace;
+                }
+            }
+
             this.game.changeLeader(daimyo.clan, successor.id);
             
             // ==========================================
@@ -908,6 +916,14 @@ class LifeSystem {
                     const newNameStr = successor.name.replace('|', '');
                     messages.push(`家督を継ぐにあたり、${oldNameStr}は\n「${newNameStr}」と名を改めました。`);
                 }
+            }
+        }
+
+        // 大名になった瞬間に「daimyo:」の顔変更データがあれば顔を変える魔法！
+        if (successor.faceChange && successor.faceChange.startsWith('daimyo:')) {
+            const newFace = successor.faceChange.split(':')[1].trim();
+            if (newFace) {
+                successor.faceIcon = newFace;
             }
         }
 
