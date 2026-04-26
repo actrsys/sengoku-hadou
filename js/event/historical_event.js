@@ -285,14 +285,21 @@ window.GameEvents.push({
         // ② 織田信長（1006001）の勢力判定
         const nobunaga = game.getBusho(1006001);
         if (nobunaga && nobunaga.isDaimyo && nobunaga.clan !== 0 && nobunaga.clan !== killerClanId) {
-            const inabaCastle = game.getCastle(3);
-            const nobunagaCastles = game.castles.filter(c => c.ownerClan === nobunaga.clan);
-            
-            // 稲葉山城を持っているか、桶狭間（義元討死）が終わっているかをチェックします
-            const hasInaba = inabaCastle && inabaCastle.ownerClan === nobunaga.clan;
-            const isOkehazamaDone = game.flags && game.flags['historical_okehazama_3'];
+            // 条件１：今川義元（1004001）が死亡しているかチェックします
+            const yoshimoto = game.getBusho(1004001);
+            const isYoshimotoDead = yoshimoto && yoshimoto.status === 'dead';
 
-            if ((hasInaba || isOkehazamaDone) && nobunagaCastles.length >= 5) {
+            // 条件２：尾張国（地方ID: 23）のすべての城を所有しているかチェックします
+            // まず尾張国の城をすべて集めて、そのすべてが織田家の持ち物か確認します
+            const owariCastles = game.castles.filter(c => c.provinceId === 23);
+            const ownsAllOwari = owariCastles.length > 0 && owariCastles.every(c => c.ownerClan === nobunaga.clan);
+
+            // 条件３：美濃国（地方ID: 27）の城を1つ以上所有しているかチェックします
+            // 日本中の城の中から、美濃国にあって、かつ織田家の持ち物である城が1つでもあるか確認します
+            const hasMinoCastle = game.castles.some(c => c.provinceId === 27 && c.ownerClan === nobunaga.clan);
+
+            // 上記の３つの条件をすべてクリアしていたら、将軍の逃げ込み先を織田家に決定します
+            if (isYoshimotoDead && ownsAllOwari && hasMinoCastle) {
                 targetClan = game.clans.find(c => c.id === nobunaga.clan);
             }
         }
