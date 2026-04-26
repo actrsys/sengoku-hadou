@@ -173,18 +173,15 @@ window.GameEvents.push({
             castle.castellanId = 0;
         });
 
-        // ② 足利義輝の死亡処理
-        yoshiteru.status = 'dead';
-        yoshiteru.isDaimyo = false;
-        yoshiteru.isCastellan = false;
-
-        if (yoshiteru.courtRankIds && yoshiteru.courtRankIds.length > 0) {
-            if (yoshiteru.courtRankIds.includes(1)) {
-                yoshiteru._wasShogun = true;
-            }
-            yoshiteru.courtRankIds.forEach(rankId => {
-                if (game.courtRankSystem) game.courtRankSystem.returnRank(rankId);
-            });
+        // ② 足利義輝の死亡処理と左馬頭の引継ぎ
+        // life_system に任せれば、将軍だった場合の処理も全部やってくれます！
+        if (game.lifeSystem) {
+            await game.lifeSystem.executeDeath(yoshiteru);
+        } else {
+            // 万が一システムがない時の安全策
+            yoshiteru.status = 'dead';
+            yoshiteru.isDaimyo = false;
+            yoshiteru.isCastellan = false;
             yoshiteru.courtRankIds = [];
         }
 
