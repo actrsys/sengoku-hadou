@@ -1940,14 +1940,9 @@ class FieldWarManager {
             if (this.modal) this.modal.classList.add('hidden');
             
             // ★野戦の画面を閉じたあとにイベントを発火させます（裏に隠れて操作不能になるのを防ぐため）
-            if (window.GameEvents) {
-                for (const ev of window.GameEvents) {
-                    if (ev.timing === 'after_field_war') {
-                        if (ev.checkCondition(this.game, this.warState)) {
-                            await ev.execute(this.game, this.warState);
-                        }
-                    }
-                }
+            if (this.game.eventManager) {
+                // イベントマネージャー（受付）を経由させることでフラグが保存されます
+                await this.game.eventManager.processEvents('after_field_war', this.warState);
             }
             
             if (this.onComplete) this.onComplete(resultType);
