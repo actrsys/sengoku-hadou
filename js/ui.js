@@ -1652,9 +1652,9 @@ class UIManager {
     
     showTurnStartDialog(castle, onProceed) {
         const msg = `
-            <div style="padding: 10px;">
-                <div style="font-weight:bold; margin-bottom:10px; font-size:1.1rem;">小姓</div>
-                <div style="margin-bottom:20px; font-size:1rem;">「殿、${castle.name}にご命令ください。」</div>
+            <div>
+                <div style="font-weight:bold; margin-bottom:5px;">小姓</div>
+                <div>「殿、${castle.name}にご命令ください。」</div>
             </div>
         `;
         if (this.resultBody) this.resultBody.innerHTML = msg;
@@ -2676,11 +2676,10 @@ class UIManager {
 
         const msgContainer = document.createElement('div');
         msgContainer.className = 'war-action-message-container';
-        msgContainer.style.cssText = 'text-align: left; position: relative; display: block; padding: 15px; box-sizing: border-box; height: 100%;';
         
         const textContainer = document.createElement('div');
         textContainer.className = 'war-action-message-text';
-        textContainer.style.cssText = `text-align: left; width: 100%; display: block; ${msgFontSize}`;
+        textContainer.style.cssText = `width: 100%; display: block; ${msgFontSize}`;
         textContainer.innerHTML = `<span style="color: #eee;">${armyName} が作戦を思案中...</span>`;
         
         msgContainer.onclick = (e) => {
