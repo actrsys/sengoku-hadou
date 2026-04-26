@@ -1872,7 +1872,10 @@ Object.assign(WarManager.prototype, {
     openHireSelector() {
         const selectableCount = this.pendingPrisoners.filter(p => !p.hasRefusedHire).length;
         if (selectableCount === 0) {
-            this.checkFinishHirePhase();
+            // ★変更：0人の時は終了確認をせず、メッセージを出して次の処断フェーズへ進みます
+            this.game.ui.showDialog("登用できる武将がいないため、次の処遇へ進みます。", false, () => {
+                this.startKillPhaseIntro();
+            });
             return;
         }
 
@@ -1976,7 +1979,10 @@ Object.assign(WarManager.prototype, {
 
     openKillSelector() {
         if (this.pendingPrisoners.length === 0) {
-            this.checkFinishKillPhase();
+            // ★変更：0人の時は終了確認をせず、メッセージを出して捕虜処遇を完了させます
+            this.game.ui.showDialog("処断できる武将がいないため、捕虜の処遇を終了します。", false, () => {
+                this.finishPrisonerPhase();
+            });
             return;
         }
 
