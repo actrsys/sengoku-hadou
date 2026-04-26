@@ -23,9 +23,6 @@ class EventManager {
         
         window.GameEvents.forEach(ev => this.registerEvent(ev));
     }
-        
-        window.GameEvents.forEach(ev => this.registerEvent(ev));
-    }
 
     registerEvent(eventData) {
         const t = eventData.timing;
