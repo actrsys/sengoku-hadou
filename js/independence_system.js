@@ -428,13 +428,25 @@ class IndependenceSystem {
         // 追加のメッセージを作ります
         let extraMsg = "";
         if (!isDefection) {
+            // 独立して大名になった時だけメッセージを入れます
             extraMsg = `${rebellionLeader.name}が大名となりました！`;
-        } else {
-            extraMsg = `${rebellionLeader.name}は寝返りを果たしました！`;
         }
 
-        if (captiveMsgs && captiveMsgs.length > 0) extraMsg += '\n\n' + captiveMsgs.join('\n');
-        await this.game.ui.showDialogAsync(extraMsg, false, 0);
+        // 捕虜になった武将たちのお知らせがあれば追加します
+        if (captiveMsgs && captiveMsgs.length > 0) {
+            if (extraMsg !== "") {
+                extraMsg += '\n\n';
+            }
+            extraMsg += captiveMsgs.join('\n');
+        }
+
+        // もし表示する文字が何かあれば、画面にメッセージを出します
+        if (extraMsg !== "") {
+            await this.game.ui.showDialogAsync(extraMsg, false, 0);
+        }
+
+        // 次の処理（AIの動きなど）が始まるまでのクールタイムとして、0.5秒（500ミリ秒）待ちます
+        await new Promise(res => setTimeout(res, 500));
     }
 
     calculateLoyaltyScores(busho, newDaimyo, oldDaimyo) {
