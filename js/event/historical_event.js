@@ -1148,6 +1148,10 @@ window.GameEvents.push({
             nijo.castellanId = candidate.id;
         }
 
+        // ★追加：将軍を擁立した勢力を記録します（game.flagsに入れるだけで自動でセーブデータに保存されます）
+        game.flags = game.flags || {};
+        game.flags['shogun_sponsor_clan_id'] = candidate.clan;
+
         // 何が起きたか後でわかるように、履歴（ログ）にこっそり記録しておきます
         const name = candidate.name.replace('|', '');
         game.ui.log(`(将軍候補の${name}が、幕府再興のため二条城へ入城しました)`);
@@ -1383,6 +1387,53 @@ window.GameEvents.push({
 });
 
 // ==========================================
+// ★ 松永久秀独立イベント
+// ==========================================
+window.GameEvents.push({
+    id: "historical_hisahide_independence",
+    timing: "endMonth_before", // 月末の独立チェックなどが始まる前に起こします
+    isOneTime: true,
+    
+    checkCondition: function(game) {
+        // 1. 三好長慶（ID: 1020001）が死亡しているか確認します
+        const nagayoshi = game.getBusho(1020001);
+        if (!nagayoshi || nagayoshi.status !== 'dead') return false;
+
+        // 2. 三好義継（ID: 1020033）が大名であるか確認します
+        const yoshitsugu = game.getBusho(1020033);
+        if (!yoshitsugu || !yoshitsugu.isDaimyo || yoshitsugu.clan === 0) return false;
+
+        // 3. 松永長頼（ID: 1901002）が死亡しているか確認します
+        const nagayori = game.getBusho(1901002);
+        if (!nagayori || nagayori.status !== 'dead') return false;
+
+        // 4. 松永久秀（ID: 1901001）が存在し、大名ではないことを確認します
+        const hisahide = game.getBusho(1901001);
+        if (!hisahide || hisahide.isDaimyo) return false;
+
+        // 5. 松永久秀が義継と同じ三好家に所属し、城主であるか確認します
+        if (hisahide.clan !== yoshitsugu.clan || !hisahide.isCastellan) return false;
+
+        // 全ての条件を満たしたらイベント発生です！
+        return true;
+    },
+    
+    execute: async function(game) {
+        const yoshitsugu = game.getBusho(1020033);
+        const hisahide = game.getBusho(1901001);
+        const castle = game.getCastle(hisahide.castleId);
+
+        if (!castle) return;
+
+        // 独立システムを呼び出して、強制的に独立を実行します
+        if (game.independenceSystem) {
+            // 第4引数に 'indep' を渡すことで、純粋な「独立」として処理させます
+            await game.independenceSystem.executeRebellion(castle, hisahide, yoshitsugu, 'indep');
+        }
+    }
+});
+
+// ==========================================
 // ★ 三好義継追放イベント
 // ==========================================
 window.GameEvents.push({
@@ -1593,10 +1644,31 @@ window.GameEvents.push({
     isOneTime: true,             
     
     checkCondition: function(game) {
-        // 1. 将軍候補（ID80:左馬頭）と、その擁立勢力を特定します
+        // 1. 将軍候補（ID80:左馬頭）または将軍家（ID1:征夷大将軍）と、その擁立勢力を特定します
+        let sponsorClanId = 0;
+        let shogunClanId = 0;
+
         const candidate = game.bushos.find(b => b.courtRankIds && b.courtRankIds.includes(80));
-        if (!candidate || candidate.clan === 0) return false;
-        const sponsorClanId = candidate.clan;
+        const shogun = game.bushos.find(b => b.courtRankIds && b.courtRankIds.includes(1));
+
+        if (candidate && candidate.clan !== 0) {
+            sponsorClanId = candidate.clan;
+        } else if (shogun && shogun.isDaimyo && shogun.clan !== 0) {
+            shogunClanId = shogun.clan;
+            // 入城イベントで記録した擁立勢力を取得します
+            if (game.flags && game.flags['shogun_sponsor_clan_id']) {
+                sponsorClanId = game.flags['shogun_sponsor_clan_id'];
+                // 将軍家と擁立勢力が同盟しているか確認します
+                const rel = game.diplomacyManager ? game.diplomacyManager.getRelation(sponsorClanId, shogunClanId) : null;
+                if (!rel || rel.status !== '同盟') {
+                    return false;
+                }
+            } else {
+                return false;
+            }
+        } else {
+            return false; // どちらもいなければイベントは起きません
+        }
 
         // 2. 三好長逸（ID: 1020006）が大名であるか確認します
         const nagayasu = game.getBusho(1020006);
@@ -1621,16 +1693,29 @@ window.GameEvents.push({
         const hisahide = game.getBusho(1901001);
         if (!hisahide || hisahide.clan !== sponsorClanId) return false;
 
-        // 7. 伊丹城と、将軍擁立勢力の城が隣接しているか確認します
-        // 擁立勢力の城を全部集めて、一つずつ伊丹城と繋がっているか調べます
-        const sponsorCastles = game.castles.filter(c => c.ownerClan === sponsorClanId);
+        // 7. 伊丹城と、将軍擁立勢力または将軍家の城が隣接しているか確認します
         let isAdjacent = false;
+        
+        // まず擁立勢力の城と繋がっているか調べます
+        const sponsorCastles = game.castles.filter(c => c.ownerClan === sponsorClanId);
         for (let sc of sponsorCastles) {
             if (GameSystem.isAdjacent(sc, itamiCastle)) {
                 isAdjacent = true;
                 break;
             }
         }
+
+        // 擁立勢力と繋がっておらず、将軍家が存在する場合は、将軍家の城とも隣接判定します
+        if (!isAdjacent && shogunClanId !== 0) {
+            const shogunCastles = game.castles.filter(c => c.ownerClan === shogunClanId);
+            for (let sc of shogunCastles) {
+                if (GameSystem.isAdjacent(sc, itamiCastle)) {
+                    isAdjacent = true;
+                    break;
+                }
+            }
+        }
+
         if (!isAdjacent) return false;
 
         // すべての条件をクリアしたら、イベント発生です！
@@ -1639,8 +1724,15 @@ window.GameEvents.push({
     
     execute: async function(game) {
         // メッセージを出すために必要な人たちや勢力の名前を集めます
+        let sponsorClanId = 0;
         const candidate = game.bushos.find(b => b.courtRankIds && b.courtRankIds.includes(80));
-        const sponsorClanId = candidate.clan;
+        
+        if (candidate && candidate.clan !== 0) {
+            sponsorClanId = candidate.clan;
+        } else if (game.flags && game.flags['shogun_sponsor_clan_id']) {
+            sponsorClanId = game.flags['shogun_sponsor_clan_id'];
+        }
+        
         const sponsorClan = game.clans.find(c => c.id === sponsorClanId);
         
         const nagayasu = game.getBusho(1020006);
