@@ -52,13 +52,13 @@ class EventManager {
             }
 
             if (ev.checkCondition(this.game, context)) { 
-                // イベントを実行する「前」にスタンプを押します。
-                // ★大修正：歴史イベントを作る時に「isOneTime: true」を書き忘れていても、
-                // イベントの名前（id）さえあれば、絶対に本物のスタンプ帳に記録を残す最強の魔法にしました！
-                if (ev.id) {
+                // ★修正：前回の誤った魔法を元に戻し、「一度きり（isOneTime）」のイベントだけを記録するように直します！
+                // これで毎月起こる汎用イベントがスタンプ帳に刻まれてしまう不具合が直ります。
+                if (ev.isOneTime) {
+                    this.game.flags = this.game.flags || {};
                     this.game.flags[ev.id] = true;
                     
-                    // 念のため、本物のゲーム本体（GameApp）にも直接スタンプを刻み込みます
+                    // さらに絶対にセーブデータに残すため、本物のゲーム本体にも念押しで記録します
                     if (window.GameApp) {
                         window.GameApp.flags = window.GameApp.flags || {};
                         window.GameApp.flags[ev.id] = true;
