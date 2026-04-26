@@ -252,6 +252,14 @@ class DataManager {
                                 }
                             }
                         }
+
+                        // ★開始時点で既に大名なら、「daimyo:」の顔変更データを適用します！
+                        if (b.faceChange && b.faceChange.startsWith('daimyo:')) {
+                            const newFace = b.faceChange.split(':')[1].trim();
+                            if (newFace) {
+                                b.faceIcon = newFace;
+                            }
+                        }
                         
                         // ★大名の名前が変わっていたら、大名家の名前も自動で「〇〇家」に合わせます！
                         clan.name = b.familyName + "家";
