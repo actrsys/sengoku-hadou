@@ -79,28 +79,8 @@ class IndependenceSystem {
         
         if (prob <= 0) return;
         if (Math.random() * 1000 < prob) {
-            // ★変更：思考中の表示が被らないように、UIのバリアを一時的に隠す魔法をしっかり呼び出します！
-            if (this.game.ui && typeof this.game.ui.hideAIGuard === 'function') {
-                this.game.ui.hideAIGuard();
-            }
-            // 念押しで直接見えなくします
-            const aiGuardEl = document.getElementById('ai-guard');
-            if (aiGuardEl) {
-                aiGuardEl.style.display = 'none';
-            }
-
-            try {
-                // ★変更：いきなり独立するのではなく、お家乗っ取りの作戦会議を開きます！
-                await this.planCoupDetatOrRebellion(castle, castellan, daimyo);
-            } finally {
-                // ★復活：一連の処理が終わったら、見張り番の表示状態を元に戻します
-                if (aiGuardEl) {
-                    aiGuardEl.style.display = '';
-                }
-                if (this.game.ui && typeof this.game.ui.restoreAIGuard === 'function') {
-                    this.game.ui.restoreAIGuard();
-                }
-            }
+            // ★変更：いきなり独立するのではなく、お家乗っ取りの作戦会議を開きます！
+            await this.planCoupDetatOrRebellion(castle, castellan, daimyo);
         }
     }
     

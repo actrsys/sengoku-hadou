@@ -1263,8 +1263,12 @@ class GameManager {
             // ★ここから追加：全部終わって翌月に行く前に、安心感のために数字を「MAX/MAX」にしておきます！
             if (this.isProcessingAI && this.ui && this.turnQueue.length > 0) {
                 this.ui.updateAIProgress(this.turnQueue.length, this.turnQueue.length);
+                // ★追加：MAXになった数字を一瞬だけ見せてから、月末イベントの邪魔にならないように表示を消します！
+                await new Promise(resolve => setTimeout(resolve, 300));
+                if (this.ui.aiGuard) {
+                    this.ui.aiGuard.innerHTML = '';
+                }
             }
-            // ★追加ここまで
             await this.endMonth(); // ← ★「await」を書き足します！
             return; 
         }
