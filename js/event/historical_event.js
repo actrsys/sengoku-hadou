@@ -1560,3 +1560,150 @@ window.GameEvents.push({
         }
     }
 });
+
+// ==========================================
+// ★ 摂津衆（池田・荒木）臣従イベント
+// ==========================================
+window.GameEvents.push({
+    id: "historical_settsu_submission",
+    timing: "startMonth_before", 
+    isOneTime: true,             
+    
+    checkCondition: function(game) {
+        // 1. 将軍候補（ID80:左馬頭）と、その擁立勢力を特定します
+        const candidate = game.bushos.find(b => b.courtRankIds && b.courtRankIds.includes(80));
+        if (!candidate || candidate.clan === 0) return false;
+        const sponsorClanId = candidate.clan;
+
+        // 2. 三好長逸（ID: 1020006）が大名であるか確認します
+        const nagayasu = game.getBusho(1020006);
+        if (!nagayasu || !nagayasu.isDaimyo) return false;
+        const miyoshiClanId = nagayasu.clan;
+
+        // 3. 伊丹城（ID: 51）を三好家が持っているか確認します
+        const itamiCastle = game.getCastle(51);
+        if (!itamiCastle || itamiCastle.ownerClan !== miyoshiClanId) return false;
+
+        // 4. 池田長正、池田勝正、荒木村重のいずれかが伊丹城の城主か確認します
+        const targetLordIds = [1902001, 1902002, 1902003];
+        const isTargetLord = targetLordIds.includes(itamiCastle.castellanId);
+        if (!isTargetLord) return false;
+
+        // 5. 将軍擁立勢力と三好家が敵対しているか確認します
+        // 外交システムに「この2つの家の関係を教えて」と質問します
+        const rel = game.diplomacyManager ? game.diplomacyManager.getRelation(sponsorClanId, miyoshiClanId) : null;
+        if (!rel || rel.status !== '敵対') return false;
+
+        // 6. 松永久秀（ID: 1901001）が将軍擁立勢力に所属しているか確認します
+        const hisahide = game.getBusho(1901001);
+        if (!hisahide || hisahide.clan !== sponsorClanId) return false;
+
+        // 7. 伊丹城と、将軍擁立勢力の城が隣接しているか確認します
+        // 擁立勢力の城を全部集めて、一つずつ伊丹城と繋がっているか調べます
+        const sponsorCastles = game.castles.filter(c => c.ownerClan === sponsorClanId);
+        let isAdjacent = false;
+        for (let sc of sponsorCastles) {
+            if (GameSystem.isAdjacent(sc, itamiCastle)) {
+                isAdjacent = true;
+                break;
+            }
+        }
+        if (!isAdjacent) return false;
+
+        // すべての条件をクリアしたら、イベント発生です！
+        return true;
+    },
+    
+    execute: async function(game) {
+        // メッセージを出すために必要な人たちや勢力の名前を集めます
+        const candidate = game.bushos.find(b => b.courtRankIds && b.courtRankIds.includes(80));
+        const sponsorClanId = candidate.clan;
+        const sponsorClan = game.clans.find(c => c.id === sponsorClanId);
+        
+        const nagayasu = game.getBusho(1020006);
+        const miyoshiClanId = nagayasu.clan;
+
+        const itamiCastle = game.getCastle(51);
+        const itamiLord = game.getBusho(itamiCastle.castellanId);
+
+        const sponsorName = sponsorClan ? sponsorClan.name : "擁立勢力";
+        const itamiLordName = itamiLord ? itamiLord.name.replace('|', '') : "伊丹城主";
+
+        // ① 三好家所属でIDが1902001～1902999の武将を全員集めます
+        const targetBushos = game.bushos.filter(b => b.clan === miyoshiClanId && b.status === 'active' && b.id >= 1902001 && b.id <= 1902999);
+        
+        // その人たちを伊丹城にお引越しさせます
+        targetBushos.forEach(busho => {
+            if (busho.castleId !== 51) {
+                // 他の城で城主や軍師をしていたら、そのバッジを外してあげます
+                busho.isCastellan = false;
+                busho.isGunshi = false;
+                
+                if (game.affiliationSystem) {
+                    game.affiliationSystem.moveCastle(busho, 51);
+                } else {
+                    busho.castleId = 51;
+                }
+            }
+        });
+
+        // ② 元々伊丹城にいた人で、今回は降伏しない人（対象ID以外）を長逸の居城へ逃がします
+        const residents = game.bushos.filter(b => b.castleId === 51 && b.status === 'active');
+        residents.forEach(busho => {
+            // IDの範囲外の人がいれば、お引越しさせます
+            if (busho.id < 1902001 || busho.id > 1902999) {
+                busho.isCastellan = false; // 城を追い出されるので城主バッジは外れます
+                if (game.affiliationSystem) {
+                    game.affiliationSystem.moveCastle(busho, nagayasu.castleId);
+                } else {
+                    busho.castleId = nagayasu.castleId;
+                }
+            }
+        });
+
+        // ③ 伊丹城の持ち主の看板を「将軍擁立勢力」に掛け替えます
+        if (game.castleManager) {
+            game.castleManager.changeOwner(itamiCastle, sponsorClanId, true);
+        } else {
+            itamiCastle.ownerClan = sponsorClanId;
+        }
+
+        // ④ 伊丹城に集めた降伏組（対象IDの武将）を、将軍擁立勢力に所属変更させます
+        targetBushos.forEach(busho => {
+            if (game.affiliationSystem) {
+                // 第4引数に「100」を渡すことで、忠誠度をピッタリ100にセットできます
+                game.affiliationSystem.joinClan(busho, sponsorClanId, 51, 100);
+            } else {
+                busho.clan = sponsorClanId;
+                busho.loyalty = 100;
+            }
+        });
+
+        // ⑤ 降伏を主導した元の城主に、もう一度伊丹城の城主のバッジを付けてあげます
+        if (itamiLord) {
+            itamiLord.isCastellan = true;
+            itamiCastle.castellanId = itamiLord.id;
+            if (game.affiliationSystem) {
+                game.affiliationSystem.updateCastleLord(itamiCastle);
+            }
+        }
+
+        // ⑥ 画面に何が起きたかメッセージを出してお知らせします
+        const msg = `将軍を擁立する${sponsorName}の勢いに押され、${itamiLordName}ら摂津衆が伊丹城ごと降伏し、臣従しました！`;
+        
+        game.ui.log(`【イベント】${msg}`);
+        await game.ui.showDialogAsync(msg, false, 0);
+
+        // ⑦ 最後に、画面の表示や派閥のデータを最新のものに更新します
+        if (game.factionSystem) {
+            game.factionSystem.updateFactions();
+        }
+        if (typeof game.updateAllClanPrestige === 'function') {
+            game.updateAllClanPrestige();
+        }
+        if (game.ui) {
+            game.ui.renderMap();
+            game.ui.updatePanelHeader();
+        }
+    }
+});
