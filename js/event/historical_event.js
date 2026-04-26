@@ -1407,3 +1407,114 @@ window.GameEvents.push({
         }
     }
 });
+
+if (game.ui) {
+            game.ui.renderMap();
+            game.ui.updatePanelHeader();
+        }
+    }
+});
+
+// ==========================================
+// ★ 松永久秀臣従イベント
+// ==========================================
+window.GameEvents.push({
+    id: "historical_hisahide_submission",
+    timing: "startMonth_before", 
+    isOneTime: true,             
+    
+    checkCondition: function(game) {
+        // 1. 将軍候補（ID80:左馬頭）と、その擁立勢力を特定します
+        const candidate = game.bushos.find(b => b.courtRankIds && b.courtRankIds.includes(80));
+        if (!candidate || candidate.clan === 0) return false;
+        const sponsorClanId = candidate.clan;
+
+        // 2. 三好長逸（ID: 1020006）が大名であるか確認します
+        const nagayasu = game.getBusho(1020006);
+        if (!nagayasu || !nagayasu.isDaimyo) return false;
+
+        // 3. 松永久秀（ID: 1901001）が大名であるか確認します
+        const hisahide = game.getBusho(1901001);
+        if (!hisahide || !hisahide.isDaimyo) return false;
+        const matsunagaClanId = hisahide.clan;
+
+        // 4. 三好義継（ID: 1020033）が松永家に所属しているか確認します
+        const yoshitsugu = game.getBusho(1020033);
+        if (!yoshitsugu || yoshitsugu.clan !== matsunagaClanId) return false;
+
+        // 5. 将軍擁立勢力と松永家の領地が隣接しているか確認します
+        const sponsorCastles = game.castles.filter(c => c.ownerClan === sponsorClanId);
+        const matsunagaCastles = game.castles.filter(c => c.ownerClan === matsunagaClanId);
+        
+        let isAdjacent = false;
+        for (let sc of sponsorCastles) {
+            for (let mc of matsunagaCastles) {
+                if (GameSystem.isAdjacent(sc, mc)) {
+                    isAdjacent = true;
+                    break;
+                }
+            }
+            if (isAdjacent) break;
+        }
+        if (!isAdjacent) return false;
+
+        return true;
+    },
+    
+    execute: async function(game) {
+        const hisahide = game.getBusho(1901001);
+        const matsunagaClanId = hisahide.clan;
+        const matsunagaClan = game.clans.find(c => c.id === matsunagaClanId);
+        
+        const candidate = game.bushos.find(b => b.courtRankIds && b.courtRankIds.includes(80));
+        const sponsorClanId = candidate.clan;
+        const sponsorClan = game.clans.find(c => c.id === sponsorClanId);
+        
+        // 全て変数から名前を取るように徹底しました
+        const hisahideName = hisahide.name.replace('|', '');
+        const candidateName = candidate.name.replace('|', '');
+        const sponsorName = sponsorClan ? sponsorClan.name : "擁立勢力";
+        const matsunagaClanName = matsunagaClan ? matsunagaClan.name : "松永家";
+        const hisahideCastle = game.getCastle(hisahide.castleId);
+        const hisahideCastleName = hisahideCastle ? hisahideCastle.name : "居城";
+
+        // ① 城の所有権を移す処理（内部処理）
+        const matsunagaCastles = game.castles.filter(c => c.ownerClan === matsunagaClanId);
+        matsunagaCastles.forEach(castle => {
+            game.castleManager.changeOwner(castle, sponsorClanId, true);
+        });
+
+        // ② 武将を全員合流させる処理（内部処理）
+        const matsunagaBushos = game.bushos.filter(b => b.clan === matsunagaClanId && b.status === 'active');
+        matsunagaBushos.forEach(busho => {
+            game.affiliationSystem.joinClan(busho, sponsorClanId, busho.castleId, 100);
+        });
+
+        // ③ 松永久秀を改めて城主に任命する処理
+        hisahide.isCastellan = true;
+        if (hisahideCastle) {
+            hisahideCastle.castellanId = hisahide.id;
+            game.affiliationSystem.updateCastleLord(hisahideCastle);
+        }
+
+        // ④ 勢力としては終了させる処理（内部処理）
+        if (matsunagaClan) {
+            matsunagaClan.extinctionNotified = true;
+        }
+
+        // ⑤ メッセージ表示
+        const msg = `${hisahideName}が、${candidateName}を擁立した${sponsorName}の上洛に同調し、${hisahideCastleName}を安堵されました。`;
+        const systemMsg = `（${matsunagaClanName}が${sponsorName}に臣従しました）`;
+        
+        game.ui.log(`【イベント】${msg}${systemMsg}`);
+        await game.ui.showDialogAsync(`${msg}\n\n${systemMsg}`, false, 0);
+
+        // ⑥ 各種更新処理
+        game.factionSystem.updateFactions();
+        if (typeof game.updateAllClanPrestige === 'function') game.updateAllClanPrestige();
+        if (game.ui) {
+            game.ui.renderMap();
+            game.ui.updatePanelHeader();
+        }
+    }
+});
