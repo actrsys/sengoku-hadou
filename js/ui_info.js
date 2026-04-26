@@ -881,6 +881,80 @@ class UIInfoManager {
         this._updateBushoSelectorUI();
     }
     
+    showPrisonerModal(captives) {
+        this.closeCommonModal(); 
+        this.pushModal('prisoner_list', [captives]);
+    }
+
+    _renderPrisonerList(captives, scrollPos = 0) {
+        const modal = document.getElementById('selector-modal');
+        const titleEl = document.getElementById('selector-title');
+        const listContainer = document.getElementById('selector-list');
+        const contextEl = document.getElementById('selector-context-info');
+        const tabsEl = document.getElementById('selector-tabs');
+        const confirmBtn = document.getElementById('selector-confirm-btn');
+        const backBtn = document.querySelector('#selector-modal .btn-secondary');
+
+        if (!modal) return;
+        modal.classList.remove('hidden');
+        if (titleEl) titleEl.textContent = "捕虜処遇";
+        if (contextEl) contextEl.classList.add('hidden');
+        if (confirmBtn) confirmBtn.classList.add('hidden');
+
+        // 捕虜処遇は勝手に閉じられないように、戻るボタンを消しておきます
+        if(backBtn) {
+            backBtn.style.display = 'none'; 
+        }
+
+        const gunshi = this.game.getClanGunshi(this.game.playerClanId);
+        const myDaimyo = this.game.bushos.find(b => b.clan === this.game.playerClanId && b.isDaimyo);
+
+        let listHtml = '';
+        
+        captives.forEach((p, index) => {
+            let hireBtnHtml = p.hasRefusedHire ? 
+                `<button class="btn-primary" disabled style="opacity:0.5; background-color: #666;">拒否</button>` : 
+                `<button class="btn-primary" onclick="if(window.AudioManager) window.AudioManager.playSE('decision.ogg'); window.GameApp.warManager.handlePrisonerAction(${index}, 'hire')">登用</button>`;
+            
+            const getStat = (stat) => GameSystem.getDisplayStatHTML(p, stat, gunshi, null, this.game.playerClanId, myDaimyo);
+
+            listHtml += `
+                <div class="select-item" style="display: flex; justify-content: space-between; align-items: center; padding: 10px;">
+                    <div style="flex:1;">
+                        <strong>${p.name}</strong> (${p.getRankName()})<br>
+                        <div style="display:flex; gap:5px; align-items:center; margin-top:2px;">
+                            統:${getStat('leadership')} 武:${getStat('strength')} 智:${getStat('intelligence')}
+                        </div>
+                    </div>
+                    <div style="display:flex; gap:5px;">
+                        ${hireBtnHtml}
+                        <button class="btn-secondary" onclick="if(window.AudioManager) window.AudioManager.playSE('decision.ogg'); window.GameApp.warManager.handlePrisonerAction(${index}, 'release')">解放</button>
+                        <button class="btn-danger" onclick="if(window.AudioManager) window.AudioManager.playSE('decision.ogg'); window.GameApp.warManager.handlePrisonerAction(${index}, 'kill')">処断</button>
+                    </div>
+                </div>
+            `;
+        });
+
+        if (listContainer) {
+            listContainer.className = 'list-container hide-native-scroll';
+            listContainer.style.display = 'block';
+            listContainer.innerHTML = listHtml;
+            if (window.CustomScrollbar) {
+                if (!this.ui.bushoScrollbar) this.ui.bushoScrollbar = new CustomScrollbar(listContainer);
+                setTimeout(() => {
+                    listContainer.scrollTop = scrollPos;
+                    this.ui.bushoScrollbar.update();
+                }, 10);
+            } else {
+                listContainer.scrollTop = scrollPos;
+            }
+        }
+    }
+
+    closePrisonerModal() {
+        this.popModal(); 
+    }
+    
     showDaimyoPrisonerModal(prisoner) {
         this.ui.hideAIGuardTemporarily();
         
@@ -1586,8 +1660,10 @@ class UIInfoManager {
     // ==========================================
     // ★ここから追加：拠点一覧の魔法です！
     // ==========================================
-    showKyotenList(clanId = null) {
-        this.closeCommonModal(); 
+    showKyotenList(clanId = null, isDirect = false) {
+        if (isDirect) {
+            this.closeCommonModal(); 
+        }
         this.kyotenSavedCastles = null;
         this.kyotenSavedSortedCastles = null;
         this.kyotenLastSortStateKey = null;
@@ -2010,10 +2086,10 @@ class UIInfoManager {
             isMulti = this.bushoSavedData.isMulti;
             spec = this.bushoSavedData.spec;
         } else {
-            const data = this.game.commandSystem.getBushoSelectorData(actionType, targetId, extraData, c) || {};
-            bushos = extraData && extraData.customBushos ? extraData.customBushos : (data.bushos || []);
-            infoHtml = extraData && extraData.customInfoHtml ? extraData.customInfoHtml : (data.infoHtml || "");
-            isMulti = (extraData && extraData.isMulti !== undefined) ? extraData.isMulti : !!data.isMulti;
+            const data = this.game.commandSystem.getBushoSelectorData(actionType, targetId, extraData, c);
+            bushos = extraData && extraData.customBushos ? extraData.customBushos : data.bushos;
+            infoHtml = extraData && extraData.customInfoHtml ? extraData.customInfoHtml : data.infoHtml;
+            isMulti = data.isMulti;
             spec = data.spec || {};
             this.bushoSavedData = { actionType, targetId, bushos, infoHtml, isMulti, spec };
             this.bushoSavedBushos = null;
