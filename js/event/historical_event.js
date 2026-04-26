@@ -31,6 +31,66 @@ window.GameEvents.push({
 });
 
 // ==========================================
+// ★ 三好義興の死による長慶の寿命減少（裏イベント）
+// ==========================================
+window.GameEvents.push({
+    id: "historical_yoshioki_death",
+    timing: "startMonth_before", // 毎月の初めにこっそりチェックします
+    isOneTime: true,             // 一度発生したら二度と起きません
+    
+    checkCondition: function(game) {
+        // 1. 三好長慶（ID: 1020001）が生きているか確認します
+        const nagayoshi = game.getBusho(1020001);
+        if (!nagayoshi || nagayoshi.status === 'dead' || nagayoshi.status === 'unborn') return false;
+
+        // 2. 三好義興（ID: 1020009）が亡くなっているか確認します
+        const yoshioki = game.getBusho(1020009);
+        if (!yoshioki || yoshioki.status !== 'dead') return false;
+
+        // 条件をクリアしたらイベント発生の合図を出します
+        return true;
+    },
+    
+    execute: async function(game) {
+        const nagayoshi = game.getBusho(1020001);
+        if (nagayoshi) {
+            // 長慶の寿命（没年）を1年減らします
+            nagayoshi.endYear -= 1;
+        }
+    }
+});
+
+// ==========================================
+// ★ 安宅冬康の死による長慶の寿命減少（裏イベント）
+// ==========================================
+window.GameEvents.push({
+    id: "historical_fuyuyasu_death",
+    timing: "startMonth_before", // 毎月の初めにこっそりチェックします
+    isOneTime: true,             // 一度発生したら二度と起きません
+    
+    checkCondition: function(game) {
+        // 1. 三好長慶（ID: 1020001）が生きているか確認します
+        const nagayoshi = game.getBusho(1020001);
+        if (!nagayoshi || nagayoshi.status === 'dead' || nagayoshi.status === 'unborn') return false;
+
+        // 2. 安宅冬康（ID: 1020021）が亡くなっているか確認します
+        const fuyuyasu = game.getBusho(1020021);
+        if (!fuyuyasu || fuyuyasu.status !== 'dead') return false;
+
+        // 条件をクリアしたらイベント発生の合図を出します
+        return true;
+    },
+    
+    execute: async function(game) {
+        const nagayoshi = game.getBusho(1020001);
+        if (nagayoshi) {
+            // 長慶の寿命（没年）を1年減らします
+            nagayoshi.endYear -= 1;
+        }
+    }
+});
+
+// ==========================================
 // ★ 永禄の変（将軍襲撃イベント）
 // ==========================================
 window.GameEvents.push({
