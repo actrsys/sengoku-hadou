@@ -56,6 +56,13 @@ class EventManager {
                 // これにより、実行中にどんなエラーが起きても歴史のフラグは絶対に刻まれます。
                 if (ev.isOneTime) {
                     this.game.flags[ev.id] = true;
+                    
+                    // 戦闘の裏側など、もし「分身のデータ」で動いていた時でも、
+                    // 絶対に「本物のゲーム（GameApp）」のスタンプ帳に記録を残すための強力な魔法です！
+                    if (window.GameApp) {
+                        window.GameApp.flags = window.GameApp.flags || {};
+                        window.GameApp.flags[ev.id] = true;
+                    }
                 }
 
                 // 「try〜catch」という安全装置で魔法を実行します
