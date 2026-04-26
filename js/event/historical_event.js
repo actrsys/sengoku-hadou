@@ -799,6 +799,10 @@ window.GameEvents.push({
     timing: "shogun_death",        // ★ 新しく作った将軍死亡のタイミングです
     isOneTime: true,               // 一度発生したら二度と起きません
     
+    // お供の武将IDリストを「このイベントの持ち物」としてここに1箇所だけ書きます！
+    // 和田惟政、細川藤孝、明智光秀、明智秀満、溝尾茂朝
+    retainerIds: [1017002, 1017003, 1900001, 1900002, 1900003],
+    
     checkCondition: function(game, context) {
         // 将軍死亡の情報が届いていなければ無視します
         if (!context || !context.deadShogunClanId) return false;
@@ -818,6 +822,17 @@ window.GameEvents.push({
         } else {
             return false; // 浪人でも諸勢力でもない場合はダメです
         }
+
+        // お供の武将が1人以上存在するかチェックします
+        // 「some」という魔法を使って、リストの中に1人でも条件に合う人がいるか探します
+        const hasRetainer = this.retainerIds.some(id => {
+            const rBusho = game.getBusho(id);
+            // 存在し、生まれていて、死んでおらず、大名ではない人がいればOK（true）になります
+            return rBusho && rBusho.status !== 'unborn' && rBusho.status !== 'dead' && !rBusho.isDaimyo;
+        });
+        
+        // もし条件に合うお供が誰もいなければ、イベントは起きません
+        if (!hasRetainer) return false;
 
         return true;
     },
@@ -936,9 +951,8 @@ window.GameEvents.push({
             }
         }
 
-        // 【お供の移動処理】（和田惟政、細川藤孝、明智光秀、明智秀満、溝尾茂朝）
-        const retainers = [1017002, 1017003, 1900001, 1900002, 1900003];
-        retainers.forEach(id => {
+        // 【お供の移動処理】ここで直接リストを書かず、上で登録した「this.retainerIds」を使います！
+        this.retainerIds.forEach(id => {
             const rBusho = game.getBusho(id);
             // 存在し、生きていて、大名ではない場合のみお供として移動します
             if (rBusho && rBusho.status !== 'unborn' && rBusho.status !== 'dead' && !rBusho.isDaimyo) {
