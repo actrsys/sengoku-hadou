@@ -427,7 +427,7 @@ class AIEngine {
                 if (powerRatio >= 1.0) {
                     let cautionLevel = (powerRatio - 0.5) / (2.5 - 0.8);
                     cautionLevel = Math.min(1.0, Math.max(0.0, cautionLevel));
-                    penalty = cautionLevel * 12.5; // ★周辺の敵に対する警戒ペナルティを半分に抑制します
+                    penalty = cautionLevel * 6.25; // ★周辺の敵に対する警戒ペナルティ
                 }
                 if (penalty > 0) {
                     // ★powerには「見誤った威信」を入れておき、後で一番脅威に感じた敵を選べるようにします
