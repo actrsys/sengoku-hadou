@@ -16,6 +16,7 @@ class EventManager {
             endMonth_after: [],    // 月末の最後（時間を進める直前）
             before_battle: [],     // 戦闘開始直前の特別な引き出し
             after_field_war: [],   // 野戦終了直後の特別な引き出し
+            after_battle_blink: [], // 地図の点滅が終わった直後の特別な引き出し
             shogun_death: []       // 将軍が死亡した直後に呼ばれる特別な引き出し
         };
         
