@@ -1689,7 +1689,7 @@ window.GameEvents.push({
         }
 
         // ⑥ 画面に何が起きたかメッセージを出してお知らせします
-        const msg = `将軍を擁立する${sponsorName}の勢いに押され、${itamiLordName}ら摂津衆が伊丹城ごと降伏し、臣従しました！`;
+        const msg = `将軍を擁立する${sponsorName}の勢いに押され、\n伊丹城の${itamiLordName}ら摂津衆が${sponsorName}に降伏しました！`;
         
         game.ui.log(`【イベント】${msg}`);
         await game.ui.showDialogAsync(msg, false, 0);
