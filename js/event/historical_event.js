@@ -1575,6 +1575,9 @@ window.GameEvents.push({
         if (!hisahide || !hisahide.isDaimyo) return false;
         const matsunagaClanId = hisahide.clan;
 
+        // ストッパー：松永家がすでに将軍を擁立している家だった場合は中止します
+        if (matsunagaClanId === sponsorClanId || (shogunClanId !== 0 && matsunagaClanId === shogunClanId)) return false;
+
         // 4. 三好義継（ID: 1020033）が松永家に所属しているか確認します
         const yoshitsugu = game.getBusho(1020033);
         if (!yoshitsugu || yoshitsugu.clan !== matsunagaClanId) return false;
@@ -1723,6 +1726,9 @@ window.GameEvents.push({
         if (!nagayasu || !nagayasu.isDaimyo) return false;
         const miyoshiClanId = nagayasu.clan;
 
+        // ストッパー：三好家自身が将軍を擁立している家だった場合は中止します
+        if (miyoshiClanId === sponsorClanId || (shogunClanId !== 0 && miyoshiClanId === shogunClanId)) return false;
+
         // 3. 伊丹城（ID: 51）を三好家が持っているか確認します
         const itamiCastle = game.getCastle(51);
         if (!itamiCastle || itamiCastle.ownerClan !== miyoshiClanId) return false;
@@ -1858,6 +1864,180 @@ window.GameEvents.push({
         await game.ui.showDialogAsync(msg, false, 0);
 
         // ⑦ 最後に、画面の表示や派閥のデータを最新のものに更新します
+        if (game.factionSystem) {
+            game.factionSystem.updateFactions();
+        }
+        if (typeof game.updateAllClanPrestige === 'function') {
+            game.updateAllClanPrestige();
+        }
+        if (game.ui) {
+            game.ui.renderMap();
+            game.ui.updatePanelHeader();
+        }
+    }
+});
+
+// ==========================================
+// ★ 畠山家臣従イベント
+// ==========================================
+window.GameEvents.push({
+    id: "historical_hatakeyama_submission",
+    timing: "startMonth_before", 
+    isOneTime: true,             
+    
+    checkCondition: function(game) {
+        // 1. 畠山家の対象大名（高政、政頼、政尚）のいずれかが存在し、大名であるか確認します
+        const targetDaimyoIds = [1041001, 1041002, 1041003];
+        let hatakeyamaDaimyo = null;
+        for (let id of targetDaimyoIds) {
+            const busho = game.getBusho(id);
+            if (busho && busho.isDaimyo && busho.clan !== 0) {
+                hatakeyamaDaimyo = busho;
+                break; // 見つかったら探すのをやめます
+            }
+        }
+        // もし誰も大名じゃなかったらイベントは起きません
+        if (!hatakeyamaDaimyo) return false;
+        
+        const hatakeyamaClanId = hatakeyamaDaimyo.clan;
+
+        // 2. 将軍候補（ID80:左馬頭）または将軍家（ID1:征夷大将軍）と、その擁立勢力を特定します
+        let sponsorClanId = 0;
+        let shogunClanId = 0;
+
+        const candidate = game.bushos.find(b => b.courtRankIds && b.courtRankIds.includes(80));
+        const shogun = game.bushos.find(b => b.courtRankIds && b.courtRankIds.includes(1));
+
+        if (candidate && candidate.clan !== 0) {
+            sponsorClanId = candidate.clan;
+        } else if (shogun && shogun.isDaimyo && shogun.clan !== 0) {
+            shogunClanId = shogun.clan;
+            // 入城イベントで記録した擁立勢力を取得します
+            if (game.flags && game.flags['shogun_sponsor_clan_id']) {
+                sponsorClanId = game.flags['shogun_sponsor_clan_id'];
+                // 将軍家と擁立勢力が同盟しているか確認します
+                const rel = game.diplomacyManager ? game.diplomacyManager.getRelation(sponsorClanId, shogunClanId) : null;
+                if (!rel || rel.status !== '同盟') {
+                    return false;
+                }
+            } else {
+                return false;
+            }
+        } else {
+            return false; // どちらもいなければイベントは起きません
+        }
+
+        // 万が一、畠山家自身が将軍を擁立していたら、自分自身に降伏することになってしまうので止めます
+        if (hatakeyamaClanId === sponsorClanId || hatakeyamaClanId === shogunClanId) return false;
+
+        // 3. 将軍擁立勢力または将軍家の領地と、畠山家の領地が隣接しているか確認します
+        const hatakeyamaCastles = game.castles.filter(c => c.ownerClan === hatakeyamaClanId);
+        let isAdjacent = false;
+
+        // まず擁立勢力の城と繋がっているか調べます
+        const sponsorCastles = game.castles.filter(c => c.ownerClan === sponsorClanId);
+        for (let sc of sponsorCastles) {
+            for (let hc of hatakeyamaCastles) {
+                if (GameSystem.isAdjacent(sc, hc)) {
+                    isAdjacent = true;
+                    break;
+                }
+            }
+            if (isAdjacent) break;
+        }
+
+        // 擁立勢力と繋がっておらず、将軍家が存在する場合は、将軍家の城とも隣接判定します
+        if (!isAdjacent && shogunClanId !== 0) {
+            const shogunCastles = game.castles.filter(c => c.ownerClan === shogunClanId);
+            for (let sc of shogunCastles) {
+                for (let hc of hatakeyamaCastles) {
+                    if (GameSystem.isAdjacent(sc, hc)) {
+                        isAdjacent = true;
+                        break;
+                    }
+                }
+                if (isAdjacent) break;
+            }
+        }
+
+        if (!isAdjacent) return false;
+
+        return true;
+    },
+    
+    execute: async function(game) {
+        // 対象の畠山大名をもう一度特定します
+        const targetDaimyoIds = [1041001, 1041002, 1041003];
+        let hatakeyamaDaimyo = null;
+        for (let id of targetDaimyoIds) {
+            const busho = game.getBusho(id);
+            if (busho && busho.isDaimyo && busho.clan !== 0) {
+                hatakeyamaDaimyo = busho;
+                break;
+            }
+        }
+        if (!hatakeyamaDaimyo) return;
+
+        const hatakeyamaClanId = hatakeyamaDaimyo.clan;
+        const hatakeyamaClan = game.clans.find(c => c.id === hatakeyamaClanId);
+        
+        let sponsorClanId = 0;
+        let candidateName = "将軍";
+
+        const candidate = game.bushos.find(b => b.courtRankIds && b.courtRankIds.includes(80));
+        const shogun = game.bushos.find(b => b.courtRankIds && b.courtRankIds.includes(1));
+
+        if (candidate && candidate.clan !== 0) {
+            sponsorClanId = candidate.clan;
+            candidateName = candidate.name.replace('|', '');
+        } else if (shogun && game.flags && game.flags['shogun_sponsor_clan_id']) {
+            sponsorClanId = game.flags['shogun_sponsor_clan_id'];
+            candidateName = shogun.name.replace('|', '');
+        }
+        
+        const sponsorClan = game.clans.find(c => c.id === sponsorClanId);
+        
+        // メッセージ用に名前を用意します
+        const hatakeyamaName = hatakeyamaDaimyo.name.replace('|', '');
+        const sponsorName = sponsorClan ? sponsorClan.name : "擁立勢力";
+        const hatakeyamaClanName = hatakeyamaClan ? hatakeyamaClan.name : "畠山家";
+        const hatakeyamaCastle = game.getCastle(hatakeyamaDaimyo.castleId);
+        const hatakeyamaCastleName = hatakeyamaCastle ? hatakeyamaCastle.name : "居城";
+
+        // ① 畠山家の城の所有権を、将軍擁立勢力に移します
+        // 第3引数の「true」によって、平和的な引き渡しとなりバグを防ぎます
+        const hatakeyamaCastles = game.castles.filter(c => c.ownerClan === hatakeyamaClanId);
+        hatakeyamaCastles.forEach(castle => {
+            game.castleManager.changeOwner(castle, sponsorClanId, true);
+        });
+
+        // ② 畠山家の武将を全員、将軍擁立勢力に合流させます
+        // 第4引数の「100」によって、忠誠度がピッタリ100になります
+        const hatakeyamaBushos = game.bushos.filter(b => b.clan === hatakeyamaClanId && b.status === 'active');
+        hatakeyamaBushos.forEach(busho => {
+            game.affiliationSystem.joinClan(busho, sponsorClanId, busho.castleId, 100);
+        });
+
+        // ③ 畠山大名を改めて城主に任命します（joinClanの中で大名や城主のバッジは一度外れているため）
+        hatakeyamaDaimyo.isCastellan = true;
+        if (hatakeyamaCastle) {
+            hatakeyamaCastle.castellanId = hatakeyamaDaimyo.id;
+            game.affiliationSystem.updateCastleLord(hatakeyamaCastle);
+        }
+
+        // ④ 畠山家という勢力自体を終了させます（滅亡フラグを立てます）
+        if (hatakeyamaClan) {
+            hatakeyamaClan.extinctionNotified = true;
+        }
+
+        // ⑤ 画面に何が起きたかメッセージを出してお知らせします
+        const msg = `${hatakeyamaName}が、${candidateName}を擁立した${sponsorName}の上洛に同調し、${hatakeyamaCastleName}を安堵されました。`;
+        const systemMsg = `（${hatakeyamaClanName}が${sponsorName}に臣従しました）`;
+        
+        game.ui.log(`【イベント】${msg}${systemMsg}`);
+        await game.ui.showDialogAsync(`${msg}\n\n${systemMsg}`, false, 0);
+
+        // ⑥ 各種システムや画面の表示を最新のものに更新します
         if (game.factionSystem) {
             game.factionSystem.updateFactions();
         }
