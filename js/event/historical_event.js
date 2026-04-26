@@ -462,6 +462,25 @@ window.GameEvents.push({
         game.ui.log(`【イベント】${msg}`);
         await game.ui.showDialogAsync(msg, false, 0);
 
+        // 将軍を庇護した大名家にボーナスを与えます
+        const targetClanId = targetClan.id;
+        
+        // ①所属する武将の忠誠度を+5します（最大100まで）
+        const clanBushos = game.bushos.filter(b => b.clan === targetClanId && b.status === 'active');
+        clanBushos.forEach(b => {
+            b.loyalty = Math.min(100, (b.loyalty || 0) + 5);
+        });
+
+        // ②所有する城の人口、兵士、金、兵糧、民忠をアップさせます（それぞれの上限を超えないように制限します）
+        const clanCastles = game.castles.filter(c => c.ownerClan === targetClanId);
+        clanCastles.forEach(c => {
+            c.population = Math.min(999999, c.population + 2000);
+            c.soldiers = Math.min(99999, c.soldiers + 1000);
+            c.gold = Math.min(99999, c.gold + 1000);
+            c.rice = Math.min(99999, c.rice + 2000);
+            c.peoplesLoyalty = Math.min(c.maxPeoplesLoyalty || 100, c.peoplesLoyalty + 30);
+        });
+
         // 派閥や画面を最新の状態に更新します
         if (game.factionSystem) {
             game.factionSystem.updateFactions();
