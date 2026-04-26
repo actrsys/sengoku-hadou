@@ -239,8 +239,10 @@ window.GameEvents.push({
             // 画面にメッセージを出して、プレイヤーにお知らせします
             const imagawaClan = game.clans.find(c => c.id === imagawaClanId);
             const clanName = imagawaClan ? imagawaClan.name : '今川家';
+            const yoshimotoName = yoshimoto.name.replace('|', '');
+
             game.ui.log(`【イベント】桶狭間の戦い：${clanName}が尾張侵攻の軍を興しました。`);
-            await game.ui.showDialogAsync(`今川義元が上洛へ向けて、\n尾張への侵攻作戦を進めているようです。`, false, 0);
+            await game.ui.showDialogAsync(`${clanName}の${yoshimotoName}が上洛へ向けて、\n尾張への侵攻作戦を進めているようです。`, false, 0);
         }
     }
 });
@@ -291,9 +293,21 @@ window.GameEvents.push({
     execute: async function(game, context) {
         const nobunaga = game.getBusho(1006001);
         const kiyosu = game.getCastle(7);
+        const nagoya = game.getCastle(11);
 
-        // 【安全装置】もし清州城のデータが読み取れなかったら、エラーを防ぐためにここで処理を中断します
-        if (!kiyosu || !nobunaga) return;
+        // 【安全装置】もしデータが読み取れなかったら、エラーを防ぐためにここで処理を中断します
+        if (!kiyosu || !nagoya || !nobunaga) return;
+
+        // ★名前の変数を用意します
+        const nobunagaName = nobunaga.name.replace('|', '');
+        const kiyosuName = kiyosu.name;
+        const nagoyaName = nagoya.name;
+        
+        // 今川軍の名前を作るため、義元のデータから勢力を探します
+        const yoshimoto = game.getBusho(1004001);
+        const imagawaClan = yoshimoto ? game.clans.find(c => c.id === yoshimoto.clan) : null;
+        // 既存の getArmyName() を使って「今川家」から「今川軍」に変換します
+        const imagawaArmyName = imagawaClan ? imagawaClan.getArmyName() : "今川軍";
 
         // ★追加：この戦闘が「イベント戦闘」であることと、その「イベントID」を野戦システムに伝えます！
         // （プレイヤーの場合でも討死イベントが発生するように、フラグだけは最初に立てておきます）
@@ -333,8 +347,8 @@ window.GameEvents.push({
         // ★修正：AIに絶対に野戦を選ばせる「強制命令」の旗を立てます
         context.forceIntercept = true;
 
-        game.ui.log(`【イベント】織田信長が清州城から名古屋城へ出陣しました！`);
-        await game.ui.showDialogAsync(`「人間五十年、下天の内をくらぶれば、夢幻の如くなり…」\n織田信長が今川軍を迎撃するため、清州城より出陣しました！`, false, 0);
+        game.ui.log(`【イベント】${nobunagaName}が${kiyosuName}から${nagoyaName}へ出陣しました！`);
+        await game.ui.showDialogAsync(`「人間五十年、下天の内をくらぶれば、夢幻の如くなり…」\n${nobunagaName}が${imagawaArmyName}を迎撃するため、${kiyosuName}より出陣しました！`, false, 0);
     }
 });
 
@@ -371,9 +385,22 @@ window.GameEvents.push({
     execute: async function(game, context) {
         const yoshimoto = game.getBusho(1004001);
 
+        // ★名前の変数を用意します
+        const yoshimotoName = yoshimoto.name.replace('|', '');
+        
+        // 織田軍の名前を作るため、信長のデータから勢力を探します
+        const nobunaga = game.getBusho(1006001);
+        const odaClan = nobunaga ? game.clans.find(c => c.id === nobunaga.clan) : null;
+        const odaArmyName = odaClan ? odaClan.getArmyName() : "織田軍";
+        
+        // 今川本陣の名前を作るため、義元の勢力を探します
+        const imagawaClan = game.clans.find(c => c.id === yoshimoto.clan);
+        // 「今川家」から「家」を削って「本陣」をくっつけます
+        const imagawaHonjin = imagawaClan ? imagawaClan.name.replace('家', '') + '本陣' : "本陣";
+
         // まずイベントのメッセージを出して、プレイヤーにお知らせします
-        game.ui.log(`【イベント】桶狭間の戦い：織田軍の奇襲により、今川義元が討死しました！`);
-        await game.ui.showDialogAsync(`織田軍の決死の奇襲が今川本陣を強襲！\n激戦の末、海道一の弓取り・今川義元は討ち取られました！`, false, 0);
+        game.ui.log(`【イベント】桶狭間の戦い：${odaArmyName}の奇襲により、${yoshimotoName}が討死しました！`);
+        await game.ui.showDialogAsync(`${odaArmyName}の決死の奇襲が${imagawaHonjin}を強襲！\n激戦の末、海道一の弓取り・${yoshimotoName}は討ち取られました！`, false, 0);
 
         // ★life_system.js の力を使って、義元を正式に死亡（討死）させます！
         // これによって後継ぎ選びなどが自動で正しく行われます
@@ -403,7 +430,6 @@ window.GameEvents.push({
         }
 
         // ★追加：織田信長の大名家に所属する武将の忠誠度を+5し、城の民忠を100にします
-        const nobunaga = game.getBusho(1006001);
         if (nobunaga && nobunaga.clan > 0) {
             // 武将の忠誠度アップ（最大100まで）
             const odaBushos = game.bushos.filter(b => b.clan === nobunaga.clan && b.status === 'active');
@@ -760,8 +786,10 @@ window.GameEvents.push({
             }
         });
 
+        const yoshitsuguName = yoshitsugu.name.replace('|', '');
+
         // ⑥ メッセージ表示（動的な名前を使用）
-        const msg = `三好義継と三好三人衆らが御所を襲撃！\n奮戦の末に${yoshiteruName}は討死し、${ashikagaClanName}は滅亡しました。\n旧領はすべて${miyoshiClanName}の手に落ちました。`;
+        const msg = `${yoshitsuguName}と三好三人衆らが御所を襲撃！\n奮戦の末に${yoshiteruName}は討死し、${ashikagaClanName}は滅亡しました。\n旧領はすべて${miyoshiClanName}の手に落ちました。`;
         game.ui.log(`【イベント】永禄の変：${msg}`);
         await game.ui.showDialogAsync(msg, false, 0);
 
