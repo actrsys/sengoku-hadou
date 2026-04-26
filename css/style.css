@@ -2208,8 +2208,3 @@ body.is-pc.daimyo-select-mode #pc-new-ui-container { display: none !important; }
     background-color: #546e7a;
     color: #ffcc80;
 }
-
-/* ★追加：謀反や独立の処理中に「思考中」を強制的に隠す魔法 */
-body.is-independence-processing #ai-guard {
-    display: none !important;
-}
