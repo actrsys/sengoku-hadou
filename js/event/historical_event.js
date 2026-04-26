@@ -1540,10 +1540,31 @@ window.GameEvents.push({
     isOneTime: true,             
     
     checkCondition: function(game) {
-        // 1. 将軍候補（ID80:左馬頭）と、その擁立勢力を特定します
+        // 1. 将軍候補（ID80:左馬頭）または将軍家（ID1:征夷大将軍）と、その擁立勢力を特定します
+        let sponsorClanId = 0;
+        let shogunClanId = 0;
+
         const candidate = game.bushos.find(b => b.courtRankIds && b.courtRankIds.includes(80));
-        if (!candidate || candidate.clan === 0) return false;
-        const sponsorClanId = candidate.clan;
+        const shogun = game.bushos.find(b => b.courtRankIds && b.courtRankIds.includes(1));
+
+        if (candidate && candidate.clan !== 0) {
+            sponsorClanId = candidate.clan;
+        } else if (shogun && shogun.isDaimyo && shogun.clan !== 0) {
+            shogunClanId = shogun.clan;
+            // 入城イベントで記録した擁立勢力を取得します
+            if (game.flags && game.flags['shogun_sponsor_clan_id']) {
+                sponsorClanId = game.flags['shogun_sponsor_clan_id'];
+                // 将軍家と擁立勢力が同盟しているか確認します
+                const rel = game.diplomacyManager ? game.diplomacyManager.getRelation(sponsorClanId, shogunClanId) : null;
+                if (!rel || rel.status !== '同盟') {
+                    return false;
+                }
+            } else {
+                return false;
+            }
+        } else {
+            return false; // どちらもいなければイベントは起きません
+        }
 
         // 2. 三好長逸（ID: 1020006）が大名であるか確認します
         const nagayasu = game.getBusho(1020006);
@@ -1558,11 +1579,12 @@ window.GameEvents.push({
         const yoshitsugu = game.getBusho(1020033);
         if (!yoshitsugu || yoshitsugu.clan !== matsunagaClanId) return false;
 
-        // 5. 将軍擁立勢力と松永家の領地が隣接しているか確認します
-        const sponsorCastles = game.castles.filter(c => c.ownerClan === sponsorClanId);
+        // 5. 将軍擁立勢力または将軍家の領地と、松永家の領地が隣接しているか確認します
         const matsunagaCastles = game.castles.filter(c => c.ownerClan === matsunagaClanId);
-        
         let isAdjacent = false;
+
+        // まず擁立勢力の城と繋がっているか調べます
+        const sponsorCastles = game.castles.filter(c => c.ownerClan === sponsorClanId);
         for (let sc of sponsorCastles) {
             for (let mc of matsunagaCastles) {
                 if (GameSystem.isAdjacent(sc, mc)) {
@@ -1572,6 +1594,21 @@ window.GameEvents.push({
             }
             if (isAdjacent) break;
         }
+
+        // 擁立勢力と繋がっておらず、将軍家が存在する場合は、将軍家の城とも隣接判定します
+        if (!isAdjacent && shogunClanId !== 0) {
+            const shogunCastles = game.castles.filter(c => c.ownerClan === shogunClanId);
+            for (let sc of shogunCastles) {
+                for (let mc of matsunagaCastles) {
+                    if (GameSystem.isAdjacent(sc, mc)) {
+                        isAdjacent = true;
+                        break;
+                    }
+                }
+                if (isAdjacent) break;
+            }
+        }
+
         if (!isAdjacent) return false;
 
         return true;
@@ -1582,13 +1619,24 @@ window.GameEvents.push({
         const matsunagaClanId = hisahide.clan;
         const matsunagaClan = game.clans.find(c => c.id === matsunagaClanId);
         
+        let sponsorClanId = 0;
+        let candidateName = "将軍";
+
         const candidate = game.bushos.find(b => b.courtRankIds && b.courtRankIds.includes(80));
-        const sponsorClanId = candidate.clan;
+        const shogun = game.bushos.find(b => b.courtRankIds && b.courtRankIds.includes(1));
+
+        if (candidate && candidate.clan !== 0) {
+            sponsorClanId = candidate.clan;
+            candidateName = candidate.name.replace('|', '');
+        } else if (shogun && game.flags && game.flags['shogun_sponsor_clan_id']) {
+            sponsorClanId = game.flags['shogun_sponsor_clan_id'];
+            candidateName = shogun.name.replace('|', '');
+        }
+        
         const sponsorClan = game.clans.find(c => c.id === sponsorClanId);
         
         // 全て変数から名前を取るように徹底しました
         const hisahideName = hisahide.name.replace('|', '');
-        const candidateName = candidate.name.replace('|', '');
         const sponsorName = sponsorClan ? sponsorClan.name : "擁立勢力";
         const matsunagaClanName = matsunagaClan ? matsunagaClan.name : "松永家";
         const hisahideCastle = game.getCastle(hisahide.castleId);
