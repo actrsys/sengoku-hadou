@@ -2497,11 +2497,11 @@ class UIInfoManager {
             itemClassStr += " status-mode";
             if (hideActionCol) {
                 // 状態タブ・行動列なしの幅（左から：名前, 勢力, 所在, 年齢, 一門, 俸禄, 派閥）
-                gridSpStr = "2fr 2fr 2fr 1fr 1fr 1fr 2fr";
+                gridSpStr = "2.5fr 2fr 2fr 0.9fr 0.9fr 0.9fr 1.8fr";
                 gridPcStr = "100px 140px 140px 50px 50px 60px 1fr";
             } else {
                 // 状態タブ・行動列ありの幅（左から：行動, 名前, 勢力, 所在, 年齢, 一門, 俸禄, 派閥）
-                gridSpStr = "25px 2fr 2fr 2fr 1fr 1fr 1fr 2fr";
+                gridSpStr = "25px 2.5fr 2fr 2fr 0.9fr 0.9fr 0.9fr 1.8fr";
                 gridPcStr = "35px 100px 140px 140px 50px 50px 60px 1fr";
             }
             headers = [
