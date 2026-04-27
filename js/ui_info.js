@@ -442,7 +442,7 @@ class UIInfoManager {
 
         // カスタムの列幅を指定するためのヘッダーを作ります
         const customHeaderCols = [
-            '<span style="padding-left:5px; style="justify-content:flex-start;">勢力名</span>',
+            '<span style="padding-left:5px; justify-content:flex-start;">勢力名</span>',
             '<span>友好度</span>',
             '<span>関係</span>',
             '<span></span>'
@@ -1898,7 +1898,7 @@ class UIInfoManager {
             gridSpStr = "2fr 1.2fr 1.5fr 1.2fr 0.8fr 1.2fr 1.2fr";
             gridPcStr = "140px 100px 100px 100px 60px 80px 80px";
             headers = [
-                `<span class="col-castle-name" data-sort="name" style="justify-content:flex-start;">拠点名${getSortMark('name')}</span>`,
+                `<span class="col-castle-name" data-sort="name" style="padding-left:5px; justify-content:flex-start;">拠点名${getSortMark('name')}</span>`,
                 `<span class="col-clan" data-sort="clan">勢力${getSortMark('clan')}</span>`,
                 `<span class="col-castellan" data-sort="castellan">城主${getSortMark('castellan')}</span>`,
                 `<span class="col-province" data-sort="province">所属${getSortMark('province')}</span>`,
@@ -1908,27 +1908,25 @@ class UIInfoManager {
             ];
         } else if (this.currentKyotenTab === 'military') {
             gridSpStr = "2fr 1.2fr 1fr 1fr 1fr 1fr 1fr";
-            gridPcStr = "140px 80px 60px 60px 60px 80px 80px 1fr";
+            gridPcStr = "140px 80px 60px 60px 60px 80px 80px";
             headers = [
-                `<span class="col-castle-name" data-sort="name" style="justify-content:flex-start;">拠点名${getSortMark('name')}</span>`,
+                `<span class="col-castle-name" data-sort="name" style="padding-left:5px; justify-content:flex-start;">拠点名${getSortMark('name')}</span>`,
                 `<span class="col-soldiers" data-sort="soldiers">兵士${getSortMark('soldiers')}</span>`,
                 `<span class="col-defense" data-sort="defense">防御${getSortMark('defense')}</span>`,
                 `<span class="col-morale" data-sort="morale">士気${getSortMark('morale')}</span>`,
                 `<span class="col-training" data-sort="training">訓練${getSortMark('training')}</span>`,
                 `<span class="col-horses" data-sort="horses">軍馬${getSortMark('horses')}</span>`,
-                `<span class="col-guns" data-sort="guns">鉄砲${getSortMark('guns')}</span>`,
-                `<span class="col-empty pc-only-col"></span>`
+                `<span class="col-guns" data-sort="guns">鉄砲${getSortMark('guns')}</span>`
             ];
         } else if (this.currentKyotenTab === 'economy') {
-            // スマホ版（gridSpStr）から石高と鉱山の分の「0.9fr」を2つ削除して、合計7列にします
-            gridSpStr = "2fr 0.9fr 0.8fr 1.2fr 1.2fr 1.3fr 1.3fr";
+            gridSpStr = "2fr 0.9fr 0.8fr 0.9fr 0.9fr 1.2fr 1.2fr 1.3fr 1.3fr";
             gridPcStr = "140px 60px 50px 60px 60px 80px 80px 100px 100px";
             headers = [
-                `<span class="col-castle-name" data-sort="name" style="justify-content:flex-start;">拠点名${getSortMark('name')}</span>`,
+                `<span class="col-castle-name" data-sort="name" style="padding-left:5px; justify-content:flex-start;">拠点名${getSortMark('name')}</span>`,
                 `<span class="col-population" data-sort="population">人口${getSortMark('population')}</span>`,
                 `<span class="col-loyalty" data-sort="loyalty">民忠${getSortMark('loyalty')}</span>`,
-                `<span class="col-kokudaka pc-only-col" data-sort="kokudaka">石高${getSortMark('kokudaka')}</span>`,
-                `<span class="col-commerce pc-only-col" data-sort="commerce">鉱山${getSortMark('commerce')}</span>`,
+                `<span class="col-kokudaka" data-sort="kokudaka">石高${getSortMark('kokudaka')}</span>`,
+                `<span class="col-commerce" data-sort="commerce">鉱山${getSortMark('commerce')}</span>`,
                 `<span class="col-gold-income" data-sort="goldIncome">金収入/月${getSortMark('goldIncome')}</span>`,
                 `<span class="col-gold-consume" data-sort="goldConsume">金支出/月${getSortMark('goldConsume')}</span>`,
                 `<span class="col-rice-income" data-sort="riceIncome">兵糧収入/年${getSortMark('riceIncome')}</span>`,
@@ -1986,16 +1984,15 @@ class UIInfoManager {
                     `<span class="col-morale">${c.morale}</span>`,
                     `<span class="col-training">${c.training}</span>`,
                     `<span class="col-horses">${c.horses || 0}</span>`,
-                    `<span class="col-guns">${c.guns || 0}</span>`,
-                    `<span class="col-empty pc-only-col"></span>`
+                    `<span class="col-guns">${c.guns || 0}</span>`
                 ];
             } else if (this.currentKyotenTab === 'economy') {
                 cells = [
                     `<span class="col-castle-name" style="justify-content:flex-start; padding-left:5px;">${c.name}</span>`,
                     `<span class="col-population">${c.population}</span>`,
                     `<span class="col-loyalty">${c.peoplesLoyalty}</span>`,
-                    `<span class="col-kokudaka pc-only-col">${c.kokudaka}</span>`,
-                    `<span class="col-commerce pc-only-col">${c.commerce}</span>`,
+                    `<span class="col-kokudaka">${c.kokudaka}</span>`,
+                    `<span class="col-commerce">${c.commerce}</span>`,
                     `<span class="col-gold-income">${goldIncome}</span>`,
                     `<span class="col-gold-consume">${consumeGold}</span>`,
                     `<span class="col-rice-income">${riceIncome}</span>`,
@@ -2021,7 +2018,6 @@ class UIInfoManager {
             minWidth: "100%",
             gridTemplateSp: gridSpStr,
             gridTemplatePc: gridPcStr,
-            colCount: headers.length,
             onTabClick: (tabKey) => {
                 this.currentKyotenTab = tabKey;
                 this.currentKyotenSortKey = null;
@@ -2675,7 +2671,6 @@ class UIInfoManager {
             minWidth: minW,
             gridTemplateSp: gridSpStr,
             gridTemplatePc: gridPcStr,
-            colCount: headers.length,
             onBack: () => {
                 if (onBack) onBack(); 
                 else if (extraData && extraData.onCancel) extraData.onCancel();
@@ -3794,7 +3789,7 @@ class UIInfoManager {
                     `<span class="col-soldiers">${kunishu.soldiers}</span>`,
                     `<span class="col-friend">${friendBarHtml}</span>`,
                     `<span class="col-relation ${relClass}" style="font-weight:bold;">${relStatus}</span>`,
-                    `<span class="col-empty pc-only-col"></span>`
+                    `<span class="col-empty pc-only"></span>`
                 ]
             });
         });
