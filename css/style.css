@@ -526,6 +526,16 @@ body.hide-daimyo-labels .daimyo-name-label { display: none !important; }
 }
 .list-header > *:last-child, .select-item > *:last-child { border-right: none; }
 
+/* スマホ版でpc-only（非表示列）が最後にある場合、その1つ前の要素の右罫線を消す設定 */
+body:not(.is-pc) .list-header > *:has(+ .pc-only:last-child),
+body:not(.is-pc) .select-item > *:has(+ .pc-only:last-child) { border-right: none; }
+
+/* 姫一覧など、データが少ない時に形が崩れないように底を固定する設定 */
+.princess-list-container {
+    border-bottom: 1px solid rgba(212, 175, 55, 0.3);
+    min-height: 150px;
+}
+
 /* リストヘッダー・アイテム (ゼブラ柄) */
 .list-header { background: #0d1a10; color: #ffd54f; font-weight: bold; position: sticky; top: 0; z-index: 10; text-shadow: 1px 1px 0 #000, -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000; }
 .select-item { border-bottom: 1px solid rgba(255,215,79,0.3); scroll-snap-align: start; cursor: pointer; color: #fff; background: linear-gradient(to bottom, #254a2e 0%, #1b3822 100%); text-shadow: 1px 1px 0 #000, -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000; }
