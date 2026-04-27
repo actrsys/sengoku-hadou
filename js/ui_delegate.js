@@ -33,12 +33,19 @@ class UIDelegateManager {
         const myCastles = this.game.castles.filter(c => c.ownerClan === this.game.playerClanId && c.id !== daimyoCastleId);
 
         let html = `
+            <div class="delegate-bulk-row">
+                <span class="col-castle-name"></span>
+                <span class="col-castellan"></span>
+                <span class="col-attack"><button class="delegate-header-btn" onclick="window.GameApp.ui.delegate.toggleAllAttack()">一括</button></span>
+                <span class="col-move"><button class="delegate-header-btn" onclick="window.GameApp.ui.delegate.toggleAllMove()">一括</button></span>
+                <span class="col-status"><button class="delegate-header-btn" onclick="window.GameApp.ui.delegate.toggleAllStatus()">一括</button></span>
+            </div>
             <div class="list-header delegate-list-header">
                 <span class="col-castle-name">拠点名</span>
                 <span class="col-castellan">城主</span>
-                <span class="col-attack">城攻め<button class="delegate-header-btn" onclick="window.GameApp.ui.delegate.toggleAllAttack()">一括</button></span>
-                <span class="col-move">武将移動<button class="delegate-header-btn" onclick="window.GameApp.ui.delegate.toggleAllMove()">一括</button></span>
-                <span class="col-status">状態<button class="delegate-header-btn" onclick="window.GameApp.ui.delegate.toggleAllStatus()">一括</button></span>
+                <span class="col-attack">城攻め</span>
+                <span class="col-move">武将移動</span>
+                <span class="col-status">状態</span>
             </div>
         `;
 
