@@ -210,9 +210,10 @@ Object.assign(WarManager.prototype, {
 
         const aiGuardEl = document.getElementById('ai-guard');
         if (aiGuardEl) {
-            // 壁を完全に消すのではなく、文字だけ消します！
-            aiGuardEl.style.display = ''; 
+            // 壁を確実に表示させてから、文字だけ透明にして隠します！
+            aiGuardEl.classList.remove('hidden'); 
             aiGuardEl.classList.add('hide-text');
+            aiGuardEl.style.display = ''; 
         }
 
         try {

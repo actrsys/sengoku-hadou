@@ -1349,11 +1349,10 @@ class GameManager {
                 this.isProcessingAI = true; 
                 if(this.ui.aiGuard) {
                     this.ui.aiGuard.classList.remove('hidden'); 
-                    this.ui.aiGuard.classList.remove('hide-text');
+                    this.ui.aiGuard.classList.remove('hide-text'); // ★透明マントを脱いで文字を見せます！
                 }
                 
                 this.ui.updateAIProgress(this.currentIndex + 1, this.turnQueue.length);
-                // ★ここを修正：パネルを隠さずに、現在処理中の城の情報を表示します！
                 this.ui.showControlPanel(castle);
                 
                 const delay = isImportant ? 10 : 10;
@@ -1374,50 +1373,32 @@ class GameManager {
                 if(this.ui.aiGuard) this.ui.aiGuard.classList.add('hidden'); 
 
                 this.ui.renderMap(); 
-                
                 this.ui.scrollToActiveCastle(castle);
                 
-                // ★修正：小姓のダイアログを出した「あと」に軍師のチェックを入れます！
                 this.ui.showTurnStartDialog(castle, () => {
-                    // 小姓のダイアログが閉じたら、軍師にチェックさせます
                     this.gunshiSystem.checkAndShowAdvice(castle, () => {
-                        // 軍師の処理が終わったら、いつものメニュー画面を出します
                         this.ui.showControlPanel(castle); 
                     });
                 });
             }
-            // ==========================================
-
         } else {
+            // ★ここから「プレイヤー以外の勢力」のターンの処理を一つにまとめました！
             this.isProcessingAI = true;
             if(this.ui.aiGuard) {
                 this.ui.aiGuard.classList.remove('hidden'); 
-                this.ui.aiGuard.classList.remove('hide-text');
+                this.ui.aiGuard.classList.remove('hide-text'); // ★透明マントを脱いで文字を見せます！
             }
             
-            // ==========================================
-
-        } else {
-            this.isProcessingAI = true;
-            if(this.ui.aiGuard) this.ui.aiGuard.classList.remove('hidden'); 
-            
-            // ==========================================
-            // ★ここから追加！：進捗を表示する魔法を呼び出します！
-            // this.currentIndex が「今何番目か（0からスタートするので+1します）」、this.turnQueue.length が「全部の数」です
+            // 進捗を表示
             this.ui.updateAIProgress(this.currentIndex + 1, this.turnQueue.length);
-            // ★追加ここまで！
-            // ==========================================
-
-            // ★ここを修正：パネルを隠さずに、現在処理中の城の情報を表示します！
+            // パネルに情報を表示
             this.ui.showControlPanel(castle);
             
             const delay = isImportant ? 10 : 10;
 
             this.aiTimer = setTimeout(() => {
                 if (this.warManager.state.active) return;
-                
                 if (this.turnQueue[this.currentIndex] !== castle) return;
-
                 try {
                     this.aiEngine.execAI(castle);
                 } catch(e) {
