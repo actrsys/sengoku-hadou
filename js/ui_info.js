@@ -2474,11 +2474,11 @@ class UIInfoManager {
         if (this.bushoCurrentTab === 'stats') {
             if (hideActionCol) {
                 // 基本タブ・行動列なしの幅（左から：名前, 身分, 統率, 武勇, 内政, 外交, 智謀, 魅力）
-                gridSpStr = "2.5fr 1.3fr 1.2fr 1.2fr 1.2fr 1.2fr 1.2fr 1.2fr";
+                gridSpStr = "2.4fr 1.4fr 1.2fr 1.2fr 1.2fr 1.2fr 1.2fr 1.2fr";
                 gridPcStr = "100px 60px 1fr 1fr 1fr 1fr 1fr 1fr";
             } else {
                 // 基本タブ・行動列ありの幅（左から：行動, 名前, 身分, 統率, 武勇, 内政, 外交, 智謀, 魅力）
-                gridSpStr = "25px 2.5fr 1.3fr 1.2fr 1.2fr 1.2fr 1.2fr 1.2fr 1.2fr";
+                gridSpStr = "25px 2.4fr 1.4fr 1.2fr 1.2fr 1.2fr 1.2fr 1.2fr 1.2fr";
                 gridPcStr = "35px 100px 60px 1fr 1fr 1fr 1fr 1fr 1fr";
             }
             headers = [
@@ -2497,11 +2497,11 @@ class UIInfoManager {
             itemClassStr += " status-mode";
             if (hideActionCol) {
                 // 状態タブ・行動列なしの幅（左から：名前, 勢力, 所在, 年齢, 一門, 俸禄, 派閥）
-                gridSpStr = "2.5fr 2fr 2fr 0.9fr 0.9fr 0.9fr 1.8fr";
+                gridSpStr = "2.4fr 2fr 2fr 0.9fr 0.9fr 0.9fr 1.9fr";
                 gridPcStr = "100px 140px 140px 50px 50px 60px 1fr";
             } else {
                 // 状態タブ・行動列ありの幅（左から：行動, 名前, 勢力, 所在, 年齢, 一門, 俸禄, 派閥）
-                gridSpStr = "25px 2.5fr 2fr 2fr 0.9fr 0.9fr 0.9fr 1.8fr";
+                gridSpStr = "25px 2.4fr 2fr 2fr 0.9fr 0.9fr 0.9fr 1.9fr";
                 gridPcStr = "35px 100px 140px 140px 50px 50px 60px 1fr";
             }
             headers = [
