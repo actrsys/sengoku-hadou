@@ -901,17 +901,43 @@ body.hide-daimyo-labels .daimyo-name-label { display: none !important; }
 .modal .context-info:empty { display: none !important; padding: 0 !important; border: none !important; margin: 0 !important; }
 
 /* =========================================================
-   文章選択肢専用UI（メッセージウインドウの上に浮かせる）
+   文章選択肢専用UI（メッセージウインドウと選択肢）
    ========================================================= */
+/* 小さなウインドウの中身を「縦並び」にして、順番を入れ替えられるようにする魔法です */
+.modal-content.modal-small {
+    position: relative;
+    overflow: visible !important; 
+    padding-top: 15px; 
+    display: flex;
+    flex-direction: column;
+}
+
+/* メッセージの箱を「1番目（上）」にする魔法です */
+.dialog-body-container {
+    display: flex;
+    align-items: flex-start;
+    min-height: 130px; 
+    gap: 15px;
+    margin: 10px 0; 
+    order: 1; 
+}
+
+/* 選択肢の箱を「2番目（下）」にする魔法です */
 .dialog-choices {
     display: flex;
     flex-direction: column;
     gap: 10px;
-    margin-bottom: 20px; /* 下のメッセージウインドウとの隙間を作ります */
-    width: 90%;
+    margin-top: 5px; 
+    margin-bottom: 10px;
+    width: 100%;
     max-width: 600px;
-    z-index: 9501; /* メッセージウインドウより手前に出します */
+    z-index: 9501; 
+    order: 2; 
+    /* 左側の顔画像(110px)と隙間(15px)の分だけ、ボタンの左端をずらして揃えます */
+    padding-left: 125px; 
+    box-sizing: border-box;
 }
+
 .dialog-choice-btn {
     background: rgba(0, 0, 0, 0.8);
     border: 2px solid #d4af37;
@@ -920,7 +946,7 @@ body.hide-daimyo-labels .daimyo-name-label { display: none !important; }
     border-radius: 8px;
     font-size: 1.2rem;
     font-family: 'AbashiriMincho', serif;
-    text-align: left; /* 文字を左揃えにします */
+    text-align: left; 
     cursor: pointer;
     box-shadow: 0 4px 10px rgba(0,0,0,0.5);
     transition: background 0.2s, transform 0.1s, border-color 0.2s;
@@ -932,57 +958,28 @@ body.hide-daimyo-labels .daimyo-name-label { display: none !important; }
     transform: scale(1.02);
 }
 
-/* 抽出したメッセージボックス用スタイル
-/* メッセージウィンドウ全体の基準位置を設定 */
-.modal-content.modal-small {
-    position: relative;
-    /* 名前が枠の外に飛び出しても切れないように「visible」に変更します */
-    overflow: visible !important; 
-    padding-top: 15px; 
-}
-
-.dialog-body-container {
-    display: flex;
-    align-items: flex-start;
-    min-height: 130px; /* 顔を大きくしたので少し高くします */
-    gap: 15px;
-    margin: 10px 0; 
-}
-
 .dialog-face-column {
     display: flex;
     flex-direction: column;
     align-items: center;
-    /* 100px以上の幅を確保して、大きな顔グラフィックが入るようにします */
     width: 110px; 
     flex-shrink: 0;
 }
 
-/* 名前ラベルをウィンドウの枠に重ねる魔法 */
+/* 名前ラベルを「顔画像の下にくっつく名札」のような自然なデザインにする魔法です */
 .dialog-name-label {
-    position: absolute;
-    /* ラベルの高さの半分くらいを上にずらして、枠線の真上に乗るようにします */
-    top: -18px; 
-    background: #0d1a10;
-    border: 2px solid #d4af37;
+    position: relative; 
+    background: linear-gradient(to bottom, #1a2a3a 0%, #050a10 100%); 
+    border: 1px solid #d4af37;
     color: #ffd54f;
-    padding: 2px 10px;
+    padding: 2px 8px;
     font-size: 0.9rem;
-    border-radius: 4px;
+    border-radius: 2px;
     white-space: nowrap;
-    z-index: 1000; /* 他のものより一番手前に表示させます */
+    z-index: 1000; 
     box-shadow: 0 2px 4px rgba(0,0,0,0.5);
     font-family: 'AbashiriMincho', serif;
-}
-
-/* 左側の名前ラベルの位置 */
-#dialog-left-name {
-    left: 20px;
-}
-
-/* 右側の名前ラベルの位置（PC版のみ） */
-#dialog-right-name {
-    right: 20px;
+    margin-top: -5px; /* 顔画像に少しだけ重ねて、一体感を出します */
 }
 
 .dialog-face-space {
@@ -992,7 +989,6 @@ body.hide-daimyo-labels .daimyo-name-label { display: none !important; }
     margin-top: 5px;
 }
 
-/* 顔グラフィックを囲む枠（ui.jsのwidth指定を優先しつつ表示を整える） */
 .sp-face-wrapper {
     border: 2px solid #fff;
     border-radius: 6px;
@@ -1007,7 +1003,7 @@ body.hide-daimyo-labels .daimyo-name-label { display: none !important; }
     flex: 1;
     padding: 15px;
     background: rgba(0, 0, 0, 0.4);
-    border: 1px solid rgba(212, 175, 55, 0.3); /* これが「メッセージ枠」になります */
+    border: 1px solid rgba(212, 175, 55, 0.3); 
     border-radius: 8px;
     font-size: 1.1rem;
     line-height: 1.5;
@@ -1019,47 +1015,23 @@ body.hide-daimyo-labels .daimyo-name-label { display: none !important; }
     min-height: 110px; 
 }
 
-/* スマホ版特有の処理（左固定・詰める・文字サイズ調整） */
+/* スマホ版特有の処理（重複していたものをスッキリと一つにまとめました） */
 body:not(.is-pc) .dialog-body-container {
     gap: 10px;
 }
 body:not(.is-pc) .message-area {
-    font-size: 0.95rem;
-    padding: 10px;
+    font-size: 0.95rem; 
+    padding: 10px; 
 }
 body:not(.is-pc) .dialog-face-column {
-    width: 85px; /* スマホでも顔を見やすく、かつメッセージ幅を殺さない絶妙なサイズ */
-}
-.message-area {
-    margin: 0;
-    flex: 1;
-    padding: 15px;
-    background: rgba(0, 0, 0, 0.4);
-    border: 1px solid rgba(212, 175, 55, 0.3);
-    border-radius: 8px;
-    font-size: 1.1rem;
-    line-height: 1.5;
-    white-space: pre-wrap;
-    text-align: left;
-    color: #fff;
-    text-shadow: 1px 1px 1px #000;
-    box-sizing: border-box;
-    min-height: 110px; 
-}
-
-/* スマホ版特有の処理：文字を少し小さくし、メッセージ領域をさらに広く取ります */
-body:not(.is-pc) .dialog-body-container {
-    gap: 10px;
-}
-body:not(.is-pc) .message-area {
-    font-size: 0.95rem; /* スマホ版のメッセージ文字サイズを小さくします */
-    padding: 10px; /* メッセージの余白を削って領域を広くします */
-}
-body:not(.is-pc) .dialog-face-column {
-    width: 75px; /* スマホ版では顔グラフィックの列幅を少し狭くします */
+    width: 75px; 
 }
 body:not(.is-pc) .dialog-name-label {
-    font-size: 0.8rem; /* スマホ版の名前文字サイズを小さくします */
+    font-size: 0.8rem; 
+}
+/* スマホ版では顔画像(75px)と隙間(10px)に合わせて、ボタンの位置を調整します */
+body:not(.is-pc) .dialog-choices {
+    padding-left: 85px; 
 }
 
 /* 戦闘中の思考メッセージ用 */
