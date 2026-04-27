@@ -901,8 +901,20 @@ body.hide-daimyo-labels .daimyo-name-label { display: none !important; }
 .modal .context-info:empty { display: none !important; padding: 0 !important; border: none !important; margin: 0 !important; }
 
 /* 抽出したメッセージボックス用スタイル */
-.message-area {
+.dialog-body-container {
+    display: flex;
+    align-items: flex-start;
+    min-height: 90px;
+    gap: 10px;
     margin: 15px 0;
+}
+.dialog-face-space {
+    width: 60px;
+    flex-shrink: 0;
+}
+.message-area {
+    margin: 0;
+    flex: 1;
     padding: 15px;
     background: rgba(0, 0, 0, 0.4);
     border: 1px solid rgba(212, 175, 55, 0.3);
