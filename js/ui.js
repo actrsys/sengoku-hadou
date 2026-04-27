@@ -1662,17 +1662,22 @@ class UIManager {
     }
     
     openGunshiModal(gunshi, msg, onConfirm) {
-        if (this.gunshiModal) {
-            this.gunshiModal.classList.remove('hidden'); 
-            if (this.gunshiName) this.gunshiName.textContent = `軍師: ${gunshi ? gunshi.name : '不明'}`; 
-            if (this.gunshiMessage) this.gunshiMessage.innerHTML = msg.replace(/\n/g, '<br>');
-        }
-        if (this.gunshiExecuteBtn) {
-            this.gunshiExecuteBtn.onclick = () => { 
-                if (this.gunshiModal) this.gunshiModal.classList.add('hidden'); 
-                onConfirm(); // 実行ボタンを押したら、約束の処理(onConfirm)を進めます
-            };
-        }
+        // 顔の画像が設定されていない場合は、シルエット画像を使います
+        const faceIcon = gunshi && gunshi.faceIcon ? gunshi.faceIcon : 'unknown_face.webp';
+        const gunshiName = gunshi ? gunshi.name : '不明';
+
+        // メッセージを「」で囲みます
+        const formattedMsg = `「${msg}」`;
+
+        // 顔グラフィック付きのダイアログを呼び出す魔法に横流しします
+        this.showDialog(formattedMsg, true, onConfirm, null, {
+            leftFace: faceIcon,
+            leftName: `${gunshiName}`,
+            okText: '実行',
+            okClass: 'btn-primary',
+            cancelText: '戻る',
+            cancelClass: 'btn-secondary'
+        });
     }
     
     openBushoSelector(actionType, targetId = null, extraData = null, onBack = null) {
