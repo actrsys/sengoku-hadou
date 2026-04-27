@@ -501,40 +501,50 @@ class UIManager {
         const dialog = this.dialogQueue.shift(); 
 
         const modal = document.getElementById('dialog-modal');
-        const msgEl = document.getElementById('dialog-message');
-        const leftFaceEl = document.getElementById('dialog-left-face');
-        const rightFaceEl = document.getElementById('dialog-right-face');
-        const okBtn = document.getElementById('dialog-btn-ok');
-        const cancelBtn = document.getElementById('dialog-btn-cancel');
+        const msgEl = document.getElementById('dialog-message');
+        const leftFaceEl = document.getElementById('dialog-left-face');
+        const leftNameEl = document.getElementById('dialog-left-name');
+        const rightFaceEl = document.getElementById('dialog-right-face');
+        const rightNameEl = document.getElementById('dialog-right-name');
+        const okBtn = document.getElementById('dialog-btn-ok');
+        const cancelBtn = document.getElementById('dialog-btn-cancel');
 
-        this.hideAIGuardTemporarily();
+        this.hideAIGuardTemporarily();
 
-        if (!modal) {
-            if (dialog.isConfirm) {
-                if (confirm(dialog.msg)) { if (dialog.onOk) dialog.onOk(); } else { if (dialog.onCancel) dialog.onCancel(); }
-            } else {
-                alert(dialog.msg);
-                if (dialog.onOk) dialog.onOk();
-            }
-            this.restoreAIGuard(); 
-            this.processDialogQueue(); 
-            return;
-        }
+        if (!modal) {
+            if (dialog.isConfirm) {
+                if (confirm(dialog.msg)) { if (dialog.onOk) dialog.onOk(); } else { if (dialog.onCancel) dialog.onCancel(); }
+            } else {
+                alert(dialog.msg);
+                if (dialog.onOk) dialog.onOk();
+            }
+            this.restoreAIGuard(); 
+            this.processDialogQueue(); 
+            return;
+        }
 
-        msgEl.innerHTML = dialog.msg.replace(/\n/g, '<br>');
+        msgEl.innerHTML = dialog.msg.replace(/\n/g, '<br>');
 
-        const setFace = (el, faceIcon) => {
-            if (el) {
-                if (faceIcon) {
-                    el.innerHTML = `<div class="sp-face-wrapper" style="margin: 0; width: 60px; height: 60px;"><img src="data/images/faceicons/${faceIcon}" onerror="this.src='data/images/faceicons/unknown_face.webp'"></div>`;
-                } else {
-                    el.innerHTML = '';
-                }
-            }
-        };
+        const setFaceAndName = (faceEl, nameEl, faceIcon, nameText) => {
+            if (faceEl) {
+                if (faceIcon) {
+                    faceEl.innerHTML = `<div class="sp-face-wrapper" style="margin: 0; width: 60px; height: 60px;"><img src="data/images/faceicons/${faceIcon}" onerror="this.src='data/images/faceicons/unknown_face.webp'"></div>`;
+                } else {
+                    faceEl.innerHTML = '';
+                }
+            }
+            if (nameEl) {
+                if (nameText) {
+                    nameEl.textContent = nameText;
+                    nameEl.classList.remove('hidden');
+                } else {
+                    nameEl.classList.add('hidden');
+                }
+            }
+        };
 
-        setFace(leftFaceEl, dialog.customOpts?.leftFace);
-        setFace(rightFaceEl, dialog.customOpts?.rightFace);
+        setFaceAndName(leftFaceEl, leftNameEl, dialog.customOpts?.leftFace, dialog.customOpts?.leftName);
+        setFaceAndName(rightFaceEl, rightNameEl, dialog.customOpts?.rightFace, dialog.customOpts?.rightName);
         
         let autoCloseTimer = null;
 
@@ -1671,14 +1681,17 @@ class UIManager {
     }
     
     showTurnStartDialog(castle, onProceed) {
-        const msg = `小姓\n「殿、${castle.name}にご命令ください。」`;
+        const msg = `小姓\n「殿、${castle.name}にご命令ください。」`;
 
-        if (window.AudioManager) {
-            window.AudioManager.playSE('myturn.ogg');
-        }
+        if (window.AudioManager) {
+            window.AudioManager.playSE('myturn.ogg');
+        }
 
-        this.showDialog(msg, false, onProceed, null, { leftFace: 'koshou.webp' });
-    }
+        this.showDialog(msg, false, onProceed, null, { 
+            leftFace: 'koshou.webp', 
+            leftName: '小姓' 
+        });
+    }
 
     openQuantitySelector(type, data, targetId, extraData = null) {
         this.info.openQuantitySelector(type, data, targetId, extraData);
