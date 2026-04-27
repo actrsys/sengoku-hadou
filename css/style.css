@@ -936,49 +936,50 @@ body.hide-daimyo-labels .daimyo-name-label { display: none !important; }
     box-sizing: border-box;
 }
 
+/* 選択肢の箱（下側） */
+.dialog-choices {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch; /* ★子要素（ボタン）をメッセージウインドウの横幅いっぱいに広げます */
+    gap: 12px;
+    margin: 15px 0 5px 0;
+    padding: 0;
+    width: 100%; /* ★メッセージウインドウの枠の幅に合わせます */
+    z-index: 9501;
+    order: 2; /* これでメッセージの下に配置されます */
+    box-sizing: border-box;
+}
+
 /* 選択肢ボタンのデザイン */
 .dialog-choice-btn {
-    background: linear-gradient(to right, rgba(37, 74, 46, 0.95) 0%, rgba(27, 56, 34, 1) 50%, rgba(37, 74, 46, 0.95) 100%); /* ★ゲーム全体に馴染む和風の緑グラデーション */
-    border: 1px solid #d4af37; /* ★金色の枠線 */
-    border-top: 2px solid #f9e596; /* ★上を明るくして立体感を出す */
-    border-bottom: 2px solid #825a2c; /* ★下を暗くして立体感を出す */
+    background: linear-gradient(to right, rgba(37, 74, 46, 0.95) 0%, rgba(27, 56, 34, 1) 50%, rgba(37, 74, 46, 0.95) 100%);
+    border: 1px solid #d4af37;
+    border-top: 2px solid #f9e596;
+    border-bottom: 2px solid #825a2c;
     color: #fff;
-    padding: 12px 40px; /* ★左右の装飾アイコンと被らないように余白を多めに取ります */
+    padding: 12px 15px 12px 35px; /* ★文字の左側にだけ装飾を置くため、左だけ余白を多く取り、右は減らします */
     border-radius: 6px;
     font-size: 1.15rem;
     font-family: 'AbashiriMincho', serif;
-    text-align: center !important; /* ★選択肢と分かりやすいように文字を中央揃えに */
+    text-align: left !important; /* ★メッセージ枠の左端に揃えるため、文字も左寄せに戻します */
     cursor: pointer;
     box-shadow: 0 4px 6px rgba(0,0,0,0.6), inset 0 0 10px rgba(212, 175, 55, 0.1);
     transition: all 0.2s ease-out;
     text-shadow: 1px 1px 2px #000;
     
-    /* ★ここがウインドウ幅に合わせるための超重要ポイントです！ */
     display: block;
-    width: calc(100% - 20px); /* ★ウインドウ幅から少しだけ内側に収まるように計算（はみ出しを絶対に防ぎます） */
-    max-width: 500px; /* ★PCなど画面が広すぎる時に、ボタンが伸びすぎないように制限します */
+    width: 100%; /* ★ウインドウ幅の計算をやめ、メッセージ枠に100%合わせて左端を揃えます */
+    max-width: none; /* ★変な制限を解除します */
     box-sizing: border-box;
-    margin: 0 auto; /* ★中央に配置します */
+    margin: 0; /* ★中央寄せをやめて左端に配置します */
     position: relative;
 }
 
 /* 選択肢のアイコン（左側の装飾） */
 .dialog-choice-btn::before {
-    content: "◆"; /* ★矢印から和風のひし形に変更し、選択肢っぽさを強調します */
+    content: "◆"; 
     position: absolute;
-    left: 15px;
-    top: 50%;
-    transform: translateY(-50%);
-    color: #d4af37;
-    font-size: 1.1rem;
-    text-shadow: 1px 1px 0 #000;
-}
-
-/* 選択肢のアイコン（右側の装飾） */
-.dialog-choice-btn::after {
-    content: "◆"; /* ★右側にもひし形を置いて、左右対称の美しいデザインにします */
-    position: absolute;
-    right: 15px;
+    left: 12px;
     top: 50%;
     transform: translateY(-50%);
     color: #d4af37;
