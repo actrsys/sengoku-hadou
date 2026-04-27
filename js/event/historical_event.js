@@ -792,13 +792,17 @@ window.GameEvents.push({
         if (yoshimoto && yoshimoto.status !== 'dead') return false;
 
         // 6. お市（姫ID: 2）を織田家が所有しており、未婚であるか確認します
-        const nobunagaClan = game.clans.find(c => c.id === nobunaga.clan);
-        if (!nobunagaClan || !nobunagaClan.princessIds.includes(2)) return false;
+        if (!game.princesses) return false;
+        
+        const oichi = game.princesses.find(p => p.id === 2);
+        if (!oichi) return false; // お市のデータが見つからなければストップします
 
-        const oichi = game.princesses ? game.princesses.find(p => p.id === 2) : null;
-        if (oichi && oichi.status !== 'unmarried') return false;
+        // 7. お市が未婚であることと、「今の状況（現在の所属）」が織田家であることを確認します
+        // ※万が一「今の所属」のデータがうまく作られていなかった時の保険として、「元々の実家」も確認します
+        const isOdaPrincess = (oichi.currentClanId === nobunaga.clan || oichi.originalClanId === nobunaga.clan);
+        if (oichi.status !== 'unmarried' || !isOdaPrincess) return false;
 
-        // 7. 六角義賢（ID: 1018001）または六角義治（ID: 1018002）が大名であるか確認します
+        // 8. 六角義賢（ID: 1018001）または六角義治（ID: 1018002）が大名であるか確認します
         const yoshikata = game.getBusho(1018001);
         const yoshiharu = game.getBusho(1018002);
         let rokkakuDaimyo = null;
@@ -811,7 +815,7 @@ window.GameEvents.push({
         
         if (!rokkakuDaimyo) return false;
 
-        // 8. 浅井家と六角家が敵対関係にあるか確認します
+        // 9. 浅井家と六角家が敵対関係にあるか確認します
         if (game.diplomacyManager) {
             const rel = game.diplomacyManager.getRelation(nagamasa.clan, rokkakuDaimyo.clan);
             if (!rel || rel.status !== '敵対') return false;
