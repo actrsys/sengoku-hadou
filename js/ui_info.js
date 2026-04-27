@@ -2474,11 +2474,11 @@ class UIInfoManager {
         if (this.bushoCurrentTab === 'stats') {
             if (hideActionCol) {
                 // 基本タブ・行動列なしの幅（左から：名前, 身分, 統率, 武勇, 内政, 外交, 智謀, 魅力）
-                gridSpStr = "2fr 1.8fr 1.2fr 1.2fr 1.2fr 1.2fr 1.2fr 1.2fr";
+                gridSpStr = "2.5fr 1.3fr 1.2fr 1.2fr 1.2fr 1.2fr 1.2fr 1.2fr";
                 gridPcStr = "100px 60px 1fr 1fr 1fr 1fr 1fr 1fr";
             } else {
                 // 基本タブ・行動列ありの幅（左から：行動, 名前, 身分, 統率, 武勇, 内政, 外交, 智謀, 魅力）
-                gridSpStr = "25px 2fr 1.8fr 1.2fr 1.2fr 1.2fr 1.2fr 1.2fr 1.2fr";
+                gridSpStr = "25px 2.5fr 1.3fr 1.2fr 1.2fr 1.2fr 1.2fr 1.2fr 1.2fr";
                 gridPcStr = "35px 100px 60px 1fr 1fr 1fr 1fr 1fr 1fr";
             }
             headers = [
