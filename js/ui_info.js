@@ -2021,6 +2021,7 @@ class UIInfoManager {
             minWidth: "100%",
             gridTemplateSp: gridSpStr,
             gridTemplatePc: gridPcStr,
+            colCount: headers.length,
             onTabClick: (tabKey) => {
                 this.currentKyotenTab = tabKey;
                 this.currentKyotenSortKey = null;
@@ -2674,6 +2675,7 @@ class UIInfoManager {
             minWidth: minW,
             gridTemplateSp: gridSpStr,
             gridTemplatePc: gridPcStr,
+            colCount: headers.length,
             onBack: () => {
                 if (onBack) onBack(); 
                 else if (extraData && extraData.onCancel) extraData.onCancel();
