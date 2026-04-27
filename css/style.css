@@ -936,7 +936,9 @@ body.hide-daimyo-labels .daimyo-name-label { display: none !important; }
 /* メッセージウィンドウ全体の基準位置を設定 */
 .modal-content.modal-small {
     position: relative;
-    padding-top: 25px; /* 名前ラベルが枠の上に重なるための余白 */
+    /* 名前が枠の外に飛び出しても切れないように「visible」に変更します */
+    overflow: visible !important; 
+    padding-top: 15px; 
 }
 
 .dialog-body-container {
@@ -951,14 +953,16 @@ body.hide-daimyo-labels .daimyo-name-label { display: none !important; }
     display: flex;
     flex-direction: column;
     align-items: center;
-    width: 95px; /* 顔を大きくしたので幅も少し広げます */
+    /* 100px以上の幅を確保して、大きな顔グラフィックが入るようにします */
+    width: 110px; 
     flex-shrink: 0;
 }
 
 /* 名前ラベルをウィンドウの枠に重ねる魔法 */
 .dialog-name-label {
     position: absolute;
-    top: -14px; /* 枠線のちょうど上に重なるように調整 */
+    /* ラベルの高さの半分くらいを上にずらして、枠線の真上に乗るようにします */
+    top: -18px; 
     background: #0d1a10;
     border: 2px solid #d4af37;
     color: #ffd54f;
@@ -966,7 +970,7 @@ body.hide-daimyo-labels .daimyo-name-label { display: none !important; }
     font-size: 0.9rem;
     border-radius: 4px;
     white-space: nowrap;
-    z-index: 100;
+    z-index: 1000; /* 他のものより一番手前に表示させます */
     box-shadow: 0 2px 4px rgba(0,0,0,0.5);
     font-family: 'AbashiriMincho', serif;
 }

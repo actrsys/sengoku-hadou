@@ -1757,7 +1757,7 @@ class UIManager {
     }
     
     showTurnStartDialog(castle, onProceed) {
-        const msg = `小姓\n「殿、${castle.name}にご命令ください。」`;
+        const msg = `「殿、${castle.name}にご命令ください。」`;
 
         if (window.AudioManager) {
             window.AudioManager.playSE('myturn.ogg');
