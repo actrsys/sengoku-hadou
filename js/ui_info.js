@@ -2117,6 +2117,13 @@ class UIInfoManager {
     openBushoSelector(actionType, targetId = null, extraData = null, onBack = null) {
         if (actionType === 'appoint' && this.ui.currentCastle) { const isDaimyoHere = this.game.getCastleBushos(this.ui.currentCastle.id).some(b => b.isDaimyo); if (isDaimyoHere) { this.ui.showDialog("大名の居城は城主を変更できません", false); return; } }
         
+        // ★ここから追加：面談で他の武将を選ぶ際に戻るを押したら、面談画面に戻るようにします
+        if (actionType === 'interview_target' && extraData && extraData.interviewer) {
+            extraData.onCancel = () => {
+                this.ui.reopenInterviewModal(extraData.interviewer);
+            };
+        }
+        
         // ★修正：新しく武将一覧を開くときは、以前開いたリストの記憶（キャッシュ）を消してリセットします
         this.bushoCurrentSortKey = null;
         this.bushoIsSortAsc = false;
