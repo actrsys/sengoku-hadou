@@ -567,10 +567,21 @@ Object.assign(UIManager.prototype, {
             }
         }
         if (this.aiGuard) { 
-            // ★修正：マップで何かを選んでいる最中や、一時的に隠している時は、思考中の膜を復活させない魔法！
-            if (this.game.isProcessingAI && !isSelectionMode && (this.guardHiddenCount || 0) === 0) {
+            // マップで対象を選んでいる最中(isSelectionMode)は、バリアを完全に消して触れるようにします
+            if (isSelectionMode) {
+                this.aiGuard.classList.add('hidden'); 
+            } else if (this.game.isProcessingAI) {
+                // AI処理中なら絶対にバリアを張ります！
                 this.aiGuard.classList.remove('hidden'); 
+                
+                // ただし、ダイアログなどで一時的に隠したい時(guardHiddenCount)は、壁ごと消すのではなく文字だけを透明にして隠します！
+                if ((this.guardHiddenCount || 0) > 0) {
+                    this.aiGuard.classList.add('hide-text');
+                } else {
+                    this.aiGuard.classList.remove('hide-text');
+                }
             } else {
+                // AI処理中でなければバリアを消します
                 this.aiGuard.classList.add('hidden'); 
             }
         }
@@ -1635,7 +1646,7 @@ Object.assign(UIManager.prototype, {
             guard.style.left = '0';
             guard.style.width = '100vw';
             guard.style.height = '100vh';
-            guard.style.zIndex = '500';
+            guard.style.zIndex = '5900';
             guard.style.pointerEvents = 'all';
             document.body.appendChild(guard);
         }

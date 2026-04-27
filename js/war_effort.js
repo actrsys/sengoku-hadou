@@ -210,7 +210,9 @@ Object.assign(WarManager.prototype, {
 
         const aiGuardEl = document.getElementById('ai-guard');
         if (aiGuardEl) {
-            aiGuardEl.style.display = 'none';
+            // 壁を完全に消すのではなく、文字だけ消します！
+            aiGuardEl.style.display = ''; 
+            aiGuardEl.classList.add('hide-text');
         }
 
         try {
@@ -430,14 +432,9 @@ Object.assign(WarManager.prototype, {
             };
 
             // ★追加：戦闘準備が整ったこのタイミングで「戦闘前」の歴史イベントをチェックします
-            if (window.GameEvents) {
-                for (const ev of window.GameEvents) {
-                    if (ev.timing === 'before_battle') {
-                        if (ev.checkCondition(this.game, this.state)) {
-                            await ev.execute(this.game, this.state);
-                        }
-                    }
-                }
+            if (this.game.eventManager) {
+                // イベントマネージャー（受付）を経由させることでフラグが保存されます
+                await this.game.eventManager.processEvents('before_battle', this.state);
             }
 
             const showInterceptDialog = async (onResult) => {
@@ -949,17 +946,12 @@ Object.assign(WarManager.prototype, {
             await this.game.ui.playBattleBlink(s.defender.id, atkColor, defColor, 2000);
             
             // ★追加：点滅が終わったこのタイミングで「戦闘直後」の歴史イベントをチェック・実行します！
-            if (window.GameEvents) {
+            if (this.game.eventManager) {
                 const eventContext = Object.assign({}, s, {
                     resultType: attackerWon ? 'attacker_win' : (isRetreat ? 'attacker_retreat' : 'attacker_lose')
                 });
-                for (const ev of window.GameEvents) {
-                    if (ev.timing === 'after_battle_blink') {
-                        if (ev.checkCondition(this.game, eventContext)) {
-                            await ev.execute(this.game, eventContext);
-                        }
-                    }
-                }
+                // イベントマネージャー（受付）を経由させることでフラグが保存されます
+                await this.game.eventManager.processEvents('after_battle_blink', eventContext);
             }
             // ==========================================
             
@@ -994,7 +986,7 @@ Object.assign(WarManager.prototype, {
 
                 const aiGuardEl = document.getElementById('ai-guard');
                 if (aiGuardEl) {
-                    aiGuardEl.style.display = '';
+                    aiGuardEl.classList.remove('hide-text');
                 }
                 
                 const winnerClan = s.attacker.ownerClan; // 勝ったのは攻撃側です
@@ -1733,11 +1725,6 @@ Object.assign(WarManager.prototype, {
             // ★ 修正: 諸勢力に所属している武将は、どんな城の戦いでも絶対に巻き添えで捕虜にならないように守ります！
             if (b.belongKunishuId > 0) return;
 
-            // ★追加: 最後の城で、将軍（ID1の官位を持つ）かつ大名の場合は、捕虜にする処理を飛ばします！
-            if (isLastStand && b.isDaimyo && b.courtRankIds && b.courtRankIds.includes(1)) {
-                return;
-            }
-
             let chance = isLastStand ? 1.0 : ((window.WarParams.War.CaptureChanceBase || 0.7) - (b.strength * (window.WarParams.War.CaptureStrFactor || 0.002)) + (Math.random() * 0.3));
             if (!isLastStand && defeatedCastle.soldiers > 1000) chance -= 0.2; 
             if (!isLastStand && b.isDaimyo) chance -= window.WarParams.War.DaimyoCaptureReduction;
@@ -2256,7 +2243,7 @@ Object.assign(WarManager.prototype, {
 
         const aiGuardEl = document.getElementById('ai-guard');
         if (aiGuardEl) {
-            aiGuardEl.style.display = '';
+            aiGuardEl.classList.remove('hide-text');
         }
 
         // ★諸勢力との戦いが終わった時も平時のBGMに戻す！

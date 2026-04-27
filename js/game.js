@@ -1023,7 +1023,7 @@ class GameManager {
         this.isProcessingAI = true;
         if (this.ui && this.ui.aiGuard) {
             this.ui.aiGuard.classList.remove('hidden');
-            this.ui.aiGuard.innerHTML = '';
+            this.ui.aiGuard.classList.add('hide-text'); // 中身を壊さずに、透明にして文字だけ隠します！
         }
 
         // ★月が替わったら軍師の報告印を消します
@@ -1282,11 +1282,12 @@ class GameManager {
             }
             // ★ここから追加：全部終わって翌月に行く前に、安心感のために数字を「MAX/MAX」にしておきます！
             if (this.isProcessingAI && this.ui && this.turnQueue.length > 0) {
+                this.ui.aiGuard.classList.remove('hide-text');
                 this.ui.updateAIProgress(this.turnQueue.length, this.turnQueue.length);
                 // ★追加：MAXになった数字を一瞬だけ見せてから、月末イベントの邪魔にならないように表示を消します！
                 await new Promise(resolve => setTimeout(resolve, 300));
                 if (this.ui.aiGuard) {
-                    this.ui.aiGuard.innerHTML = '';
+                    this.ui.aiGuard.classList.add('hide-text'); // ★中身を壊さずに、透明にして文字だけを隠します！
                 }
             }
             await this.endMonth(); // ← ★「await」を書き足します！
@@ -1346,7 +1347,10 @@ class GameManager {
             if (castle.isDelegated) {
                 // 委任されている場合はAIに任せます！
                 this.isProcessingAI = true; 
-                if(this.ui.aiGuard) this.ui.aiGuard.classList.remove('hidden'); 
+                if(this.ui.aiGuard) {
+                    this.ui.aiGuard.classList.remove('hidden'); 
+                    this.ui.aiGuard.classList.remove('hide-text');
+                }
                 
                 this.ui.updateAIProgress(this.currentIndex + 1, this.turnQueue.length);
                 // ★ここを修正：パネルを隠さずに、現在処理中の城の情報を表示します！
@@ -1382,6 +1386,15 @@ class GameManager {
                     });
                 });
             }
+            // ==========================================
+
+        } else {
+            this.isProcessingAI = true;
+            if(this.ui.aiGuard) {
+                this.ui.aiGuard.classList.remove('hidden'); 
+                this.ui.aiGuard.classList.remove('hide-text');
+            }
+            
             // ==========================================
 
         } else {
@@ -1433,8 +1446,8 @@ class GameManager {
         this.isProcessingAI = true;
         if (this.ui && this.ui.aiGuard) {
             this.ui.aiGuard.classList.remove('hidden');
+            this.ui.aiGuard.classList.remove('hide-text');
         }
-        // ★追加ここまで
         
         // ★追加：月末のイベント処理中（独立や反乱など）は、ここでストップします！
         if (this.currentIndex >= this.turnQueue.length) {
