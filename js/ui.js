@@ -1504,8 +1504,12 @@ class UIManager {
                 finishBtn.onclick = () => {
                     if (this.game.isProcessingAI) return;
                     this.cancelMapSelection(true);
-                    this.showDialog("今月の命令を終了しますか？", true, () => {
+                    const nav = this.game.getNavigatorInfo(this.currentCastle);
+                    this.showDialog("「今月の命令を終了しますか？」", true, () => {
                         this.game.finishTurn();
+                    }, null, {
+                        leftFace: nav.faceIcon,
+                        leftName: nav.name
                     });
                 };
                 mobileArea.appendChild(finishBtn);
@@ -1613,8 +1617,12 @@ class UIManager {
         createBtn(col1, "命令終了", "finish", () => {
             if (this.game.isProcessingAI) return;
             this.cancelMapSelection(true);
-            this.showDialog("今月の命令を終了しますか？", true, () => {
+            const nav = this.game.getNavigatorInfo(this.currentCastle);
+            this.showDialog("「今月の命令を終了しますか？」", true, () => {
                 this.game.finishTurn();
+            }, null, {
+                leftFace: nav.faceIcon,
+                leftName: nav.name
             });
         });
         
