@@ -3825,8 +3825,8 @@ class UIInfoManager {
             listClass: "kunishu-list-container",
             items: items,
             scrollPos: scrollPos,
-            gridTemplateSp: "2.5fr 2fr 2fr 1.5fr 1.5fr 2fr 1fr",
-            gridTemplatePc: "140px 100px 140px 100px 80px 100px 60px 1fr",
+            gridTemplateSp: "1.8fr 2.4fr 2.4fr 1.5fr 1.5fr 2fr 1fr",
+            gridTemplatePc: "120px 120px 120px 60px 80px 100px 60px 1fr",
             onBack: onBack,
             onConfirm: isSelectMode ? () => {
                 if (!this.selectedKunishuId) return;
