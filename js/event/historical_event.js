@@ -1080,6 +1080,45 @@ window.GameEvents.push({
             c.peoplesLoyalty = Math.min(c.maxPeoplesLoyalty || 100, c.peoplesLoyalty + 30);
         });
 
+        // ③近江国、山城国に城を持つ勢力（友好勢力などを除く）との関係を敵対にします
+        // まず「近江国」と「山城国」の地方IDを調べます
+        const targetProvinces = game.provinces.filter(p => p.province === '近江国' || p.province === '山城国');
+        const targetProvinceIds = targetProvinces.map(p => p.id);
+
+        // 対象となる国にある城の持ち主（大名家ID）を、重複しないように集めます
+        const enemyClanIds = new Set();
+        game.castles.forEach(c => {
+            // 城が対象の国にあり、空き城（0）ではなく、将軍を庇護した勢力自身でもない場合
+            if (targetProvinceIds.includes(c.provinceId) && c.ownerClan !== 0 && c.ownerClan !== targetClanId) {
+                enemyClanIds.add(c.ownerClan);
+            }
+        });
+
+        // 見つかった勢力との関係をひとつずつチェックし、変更します
+        if (game.diplomacyManager) {
+            enemyClanIds.forEach(clanId => {
+                const relation = game.diplomacyManager.getRelation(targetClanId, clanId);
+                if (relation) {
+                    // 元々「友好」「同盟」「支配」「従属」ではない場合のみ、敵対にします
+                    if (!['友好', '同盟', '支配', '従属'].includes(relation.status)) {
+                        // 状態を「敵対」にします
+                        game.diplomacyManager.changeStatus(targetClanId, clanId, '敵対', 0);
+                        // お互いの関係値を「0」まで下げます
+                        if (typeof game.diplomacyManager.setSentiment === 'function') {
+                            game.diplomacyManager.setSentiment(targetClanId, clanId, 0);
+                            game.diplomacyManager.setSentiment(clanId, targetClanId, 0);
+                        } else {
+                            // 万が一専用の魔法がなくても、直接数字を0に書き換える安全装置です
+                            const relA = game.diplomacyManager.getRelation(targetClanId, clanId);
+                            const relB = game.diplomacyManager.getRelation(clanId, targetClanId);
+                            if (relA) relA.sentiment = 0;
+                            if (relB) relB.sentiment = 0;
+                        }
+                    }
+                }
+            });
+        }
+
         // 派閥や画面を最新の状態に更新します
         if (game.factionSystem) {
             game.factionSystem.updateFactions();
