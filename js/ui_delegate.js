@@ -56,19 +56,13 @@ class UIDelegateManager {
 
         let html = `
             <div class="list-header delegate-list-header">
-                <span class="col-castle-name" style="justify-content:flex-start; padding-left:5px;">拠点名</span>
+                <span class="col-castle-name">拠点名</span>
                 <span class="col-castellan">城主</span>
                 <span class="col-attack">城攻</span>
-                <span class="col-move">武将移動</span>
+                <span class="col-move">移動</span>
                 <span class="col-status">状態</span>
             </div>
         `;
-
-        if (myCastles.length === 0) {
-            html += '<div style="padding: 10px; text-align: center;">委任できる城がありません。</div>';
-            listContainer.innerHTML = `<div class="list-inner-wrapper">${html}</div>`;
-            return;
-        }
 
         // 1つ1つのお城のボタンを作っていきます
         myCastles.forEach(c => {
@@ -93,7 +87,7 @@ class UIDelegateManager {
 
             html += `
                 <div class="select-item delegate-list-item" style="cursor:default;">
-                    <span class="col-castle-name" style="font-weight:bold; justify-content:flex-start; padding-left:5px;">${c.name}</span>
+                    <span class="col-castle-name">${c.name}</span>
                     <span class="col-castellan">${castellanName}</span>
                     <span class="col-attack">
                         <button class="delegate-inline-btn ${attackBtnClass}" onclick="window.GameApp.ui.delegate.toggleAttack(${c.id})" ${attackDisabled}>${attackText}</button>
@@ -108,10 +102,22 @@ class UIDelegateManager {
             `;
         });
 
-        listContainer.innerHTML = `<div class="list-inner-wrapper" style="width: 100%; min-width: 100%;">${html}</div>`;
-        if (this.ui.bushoScrollbar) {
-            this.ui.bushoScrollbar.update();
+        // 8行に満たない場合は空行を追加して高さを固定します
+        for (let i = myCastles.length; i < 8; i++) {
+            html += `
+                <div class="select-item delegate-list-item empty-row" style="cursor:default;">
+                    <span class="col-castle-name"></span>
+                    <span class="col-castellan"></span>
+                    <span class="col-attack"></span>
+                    <span class="col-move"></span>
+                    <span class="col-status"></span>
+                </div>
+            `;
         }
+
+        listContainer.innerHTML = `<div class="list-inner-wrapper" style="width: 100%; min-width: 100%;">${html}</div>`;
+        
+        // カスタムスクロールバーの自動生成を避けるため、ここではスクロールバーの更新処理を呼び出しません
     }
 
     toggleStatus(castleId) {

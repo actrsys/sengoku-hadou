@@ -651,35 +651,73 @@ body:not(.is-pc) .select-item > *:has(+ .pc-only:last-child) { border-right: non
 }
 
 /* 委任設定（独自リスト） */
+#delegate-list {
+    height: 320px; /* 40px * 8行分 */
+    overflow: hidden !important;
+    scrollbar-width: none; /* Firefox用 */
+    -ms-overflow-style: none; /* IE用 */
+}
+
+#delegate-list::-webkit-scrollbar {
+    display: none; /* Chrome, Safari用 */
+}
+
+/* カスタムスクロールバーのパーツが強制挿入された場合も隠す */
+#delegate-list .ps__rail-x,
+#delegate-list .ps__rail-y {
+    display: none !important;
+}
+
 .delegate-list-header, .delegate-list-item {
     display: grid;
-    grid-template-columns: 1.5fr 1.2fr 1fr 1fr 1fr;
-    font-size: clamp(0.6rem, 2.2vw, 0.85rem);
+    grid-template-columns: 1.6fr 1.2fr 0.8fr 0.8fr 1fr;
+    font-size: clamp(0.65rem, 2.2vw, 0.85rem);
     padding: 0;
     height: 40px;
     gap: 0;
     box-sizing: border-box;
     align-items: center;
     overflow: hidden;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
 }
 
 @media (min-width: 768px) {
     .delegate-list-header, .delegate-list-item {
-        grid-template-columns: 150px 120px 80px 80px 80px;
+        grid-template-columns: 160px 120px 80px 80px 100px;
     }
 }
 
+.delegate-list-header span, .delegate-list-item span {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+}
+
+.delegate-list-item .col-castle-name, 
+.delegate-list-item .col-castellan {
+    justify-content: flex-start;
+    padding-left: 10px;
+    font-weight: bold;
+}
+
+.delegate-list-header .col-castle-name,
+.delegate-list-header .col-castellan {
+    justify-content: flex-start;
+    padding-left: 10px;
+}
+
 .delegate-inline-btn {
-    padding: 4px 0px;
-    font-size: 0.85rem;
+    padding: 2px 0px;
+    font-size: 0.8rem;
     font-weight: bold;
     border-radius: 4px;
     border: 1px solid #ccc;
     cursor: pointer;
     font-family: inherit;
     transition: all 0.2s;
-    width: 90%;
-    height: 30px;
+    width: 85%;
+    height: 28px;
 }
 
 .delegate-inline-btn:disabled {
@@ -714,7 +752,11 @@ body:not(.is-pc) .select-item > *:has(+ .pc-only:last-child) { border-right: non
     border-color: #d32f2f;
 }
 
-/* 個別リストのグリッド調整（JavaScript側で設定するように変更しました） */
+/* 空行のスタイル */
+.delegate-list-item.empty-row {
+    background: transparent !important;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.03);
+}
 
 /* =========================================================
    ボタン類
