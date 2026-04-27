@@ -924,34 +924,60 @@ body.hide-daimyo-labels .daimyo-name-label { display: none !important; }
 
 /* 選択肢ボタンのデザイン */
 .dialog-choice-btn {
-    background: linear-gradient(135deg, #2c1e14 0%, #1a0f0a 100%);
-    border: 2px solid #d4af37;
+    background: linear-gradient(to bottom, #254a2e 0%, #1b3822 100%);
+    border: 2px solid rgba(212, 175, 55, 0.8);
     color: #fff;
-    padding: 12px 20px;
-    border-radius: 4px;
+    padding: 12px 15px 12px 35px;
+    border-radius: 6px;
     font-size: 1.1rem;
     font-family: 'AbashiriMincho', serif;
-    text-align: left !important; 
+    text-align: left !important;
     cursor: pointer;
-    box-shadow: 0 4px 8px rgba(0,0,0,0.6);
+    box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.5), 0 4px 6px rgba(0,0,0,0.6);
     transition: all 0.2s;
     text-shadow: 1px 1px 2px #000;
     display: block;
     width: 100%;
     box-sizing: border-box;
     margin: 0;
+    position: relative;
+}
+
+/* 選択肢のアイコン（矢印） */
+.dialog-choice-btn::before {
+    content: "▶";
+    position: absolute;
+    left: 12px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: #ffd54f;
+    font-size: 0.9rem;
+    text-shadow: 1px 1px 0 #000;
+}
+
+/* マウスが乗った時 */
+.dialog-choice-btn:hover {
+    background: linear-gradient(to bottom, #3a6b46 0%, #2a5a36 100%);
+    border-color: #ffd54f;
+    transform: translateY(-2px);
+    box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.5), 0 6px 8px rgba(0,0,0,0.7);
+}
+
+/* 押した時 */
+.dialog-choice-btn:active {
+    transform: translateY(1px);
+    box-shadow: inset 0 2px 5px rgba(0,0,0,0.8), 0 1px 2px rgba(0,0,0,0.6);
 }
 
 /* 選択肢の箱（下側） */
 .dialog-choices {
     display: flex;
     flex-direction: column;
-    align-self: flex-end; /* ★箱自体を右端にピッタリ寄せます */
+    align-items: stretch; /* ★子要素を横幅いっぱいに伸ばします */
     gap: 10px;
-    margin-top: 10px; 
-    margin-bottom: 15px;
-    width: calc(100% - 125px); /* ★メッセージエリアと全く同じ「全体から顔110pxと隙間15pxを引いた幅」に設定します */
-    z-index: 9501; 
+    margin: 10px 0 15px calc(110px + 15px); /* ★顔幅(110px) + 隙間(15px) の分だけ左を空けます */
+    width: auto; /* ★計算をやめて、残り幅を自動で埋めるようにします */
+    z-index: 9501;
     order: 2; /* これでメッセージの下に配置されます */
     box-sizing: border-box;
 }
@@ -1011,8 +1037,9 @@ body:not(.is-pc) .message-area { font-size: 0.95rem; padding: 10px; }
 body:not(.is-pc) .dialog-face-column { width: 75px; }
 body:not(.is-pc) .dialog-name-label { font-size: 0.85rem; top: -16px; padding: 2px 10px; }
 /* スマホ版の選択肢の左端：顔(75px)＋隙間(10px)＝85pxで揃えます */
-body:not(.is-pc) .dialog-choices { 
-    width: calc(100% - 85px); /* スマホ版のメッセージエリアと完全に同じ幅にします */
+body:not(.is-pc) .dialog-choices {
+    margin-left: calc(75px + 10px); /* ★スマホ版の顔幅と隙間に合わせます */
+    width: auto; /* ★横幅の計算をやめます */
 }
 
 /* 戦闘中の思考メッセージ用 */
