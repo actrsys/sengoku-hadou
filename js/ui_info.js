@@ -1178,6 +1178,7 @@ class UIInfoManager {
                     clickStr = `onclick="if(window.AudioManager) window.AudioManager.playSE('choice.ogg'); ${item.onClick}"`;
                 }
             }
+            // 先ほどの文字数を数える魔法は取り消して、シンプルな形に戻します
             const cells = item.cells.map(c => {
                 const strC = String(c);
                 return strC.trim().startsWith('<') ? strC : `<span>${strC}</span>`;
@@ -1224,6 +1225,31 @@ class UIInfoManager {
 
         listContainer.innerHTML = `<div class="list-inner-wrapper" style="${wrapperStyle}">${initialHtmlParts.join('')}</div>`;
 
+        // ★新しい魔法：リストが画面に出た直後に、実際の「枠の幅」と「文字の幅」を測って調整します
+        const adjustTextFit = (startIndex, endIndex) => {
+            const listInner = listContainer.querySelector('.list-inner-wrapper');
+            if (!listInner) return;
+            const itemEls = listInner.querySelectorAll('.select-item');
+            for (let i = startIndex; i < endIndex; i++) {
+                if (itemEls[i]) {
+                    const cells = itemEls[i].children;
+                    for (let j = 0; j < cells.length; j++) {
+                        const cell = cells[j];
+                        // ゲージやアイコンなどの複雑な要素はスキップします
+                        if (cell.querySelector('.bar-bg') || cell.querySelector('.bar-bg-busho') || cell.querySelector('input') || cell.querySelector('img')) continue;
+                        
+                        // はみ出しているかチェック（scrollWidth が clientWidth より大きければはみ出しています）
+                        if (cell.scrollWidth > cell.clientWidth && cell.clientWidth > 0) {
+                            // はみ出している割合を計算して、ギリギリ収まるサイズに縮めます（少しだけ余裕を持たせます）
+                            const ratio = cell.clientWidth / cell.scrollWidth;
+                            const scale = Math.max(0.6, ratio * 0.95); // 限界まで小さくなっても読めるように0.6倍でストップさせます
+                            cell.style.fontSize = `calc(100% * ${scale})`;
+                        }
+                    }
+                }
+            }
+        };
+
         const attachEvents = (startIndex, endIndex) => {
             if (config.items) {
                 const actionElements = listContainer.querySelectorAll('[data-action-index]');
@@ -1236,6 +1262,11 @@ class UIInfoManager {
                     }
                 });
             }
+            
+            // ★イベントを付けた直後（画面に文字が描画された直後）にサイズ調整の魔法を発動します！
+            requestAnimationFrame(() => {
+                adjustTextFit(startIndex, endIndex);
+            });
         };
 
         attachEvents(0, initialLimit);
