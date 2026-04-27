@@ -626,7 +626,7 @@ body:not(.is-pc) .select-item > *:has(+ .pc-only:last-child) { border-right: non
 }
 
 /* 各種リストの基本グリッド（スマホ向けベース） */
-.list-header, .select-item { display: grid; grid-template-columns: var(--grid-cols-sp, 35px 2.5fr 1.5fr repeat(6, 1fr)); font-size: clamp(0.6rem, 2.2vw, 0.85rem); padding: 0; height: 40px; gap: 0; box-sizing: border-box; align-items: center; }
+.list-header, .select-item { display: grid; grid-template-columns: var(--grid-cols-sp, 35px 2.5fr 1.5fr repeat(6, 1fr)); font-size: clamp(0.6rem, 2.2vw, 0.85rem); padding: 0; height: 40px; gap: 0; box-sizing: border-box; align-items: center; grid-template-rows: 100%; overflow: hidden; }
 .list-header.view-mode, .select-item.view-mode { grid-template-columns: var(--grid-cols-sp, 2.5fr 1.5fr repeat(6, 1fr)); }
 
 /* リスト内文字色（暗い背景用） */
