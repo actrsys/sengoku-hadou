@@ -1659,8 +1659,8 @@ class UIInfoManager {
                         </div>
                         <div class="daimyo-detail-right">
                             <div class="daimyo-detail-row daimyo-detail-3col">
-                                <div class="daimyo-detail-stat-box"><span class="daimyo-detail-label">所属</span><span class="daimyo-detail-value">${clanName}</span></div>
-                                <div class="daimyo-detail-stat-box"><span class="daimyo-detail-label">地方</span><span class="daimyo-detail-value">${provinceName}</span></div>
+                                <div class="daimyo-detail-stat-box"><span class="daimyo-detail-label">勢力</span><span class="daimyo-detail-value">${clanName}</span></div>
+                                <div class="daimyo-detail-stat-box"><span class="daimyo-detail-label">所属</span><span class="daimyo-detail-value">${provinceName}</span></div>
                                 <div class="daimyo-detail-stat-box"><span class="daimyo-detail-label">城主</span><span class="daimyo-detail-value">${castellanName}</span></div>
                             </div>
                             <div class="daimyo-detail-row daimyo-detail-3col">
