@@ -922,7 +922,7 @@ body.hide-daimyo-labels .daimyo-name-label { display: none !important; }
     order: 1; /* これで一番上に配置されます */
 }
 
-/* 選択肢ボタンの基本デザイン（共通） */
+/* 選択肢ボタンのデザイン */
 .dialog-choice-btn {
     background: linear-gradient(to bottom, #254a2e 0%, #1b3822 100%);
     border: 2px solid rgba(212, 175, 55, 0.8);
@@ -937,10 +937,10 @@ body.hide-daimyo-labels .daimyo-name-label { display: none !important; }
     transition: all 0.2s;
     text-shadow: 1px 1px 2px #000;
     display: block;
+    width: 100%;
     box-sizing: border-box;
     margin: 0;
     position: relative;
-    width: 100%; /* 箱の幅いっぱいに広がるようにします */
 }
 
 /* 選択肢のアイコン（矢印） */
@@ -955,28 +955,33 @@ body.hide-daimyo-labels .daimyo-name-label { display: none !important; }
     text-shadow: 1px 1px 0 #000;
 }
 
-/* 動きの演出 */
+/* マウスが乗った時 */
 .dialog-choice-btn:hover {
     background: linear-gradient(to bottom, #3a6b46 0%, #2a5a36 100%);
     border-color: #ffd54f;
     transform: translateY(-2px);
     box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.5), 0 6px 8px rgba(0,0,0,0.7);
 }
+
+/* 押した時 */
 .dialog-choice-btn:active {
     transform: translateY(1px);
+    box-shadow: inset 0 2px 5px rgba(0,0,0,0.8), 0 1px 2px rgba(0,0,0,0.6);
 }
 
-/* 選択肢の箱の基本設定 */
+/* 選択肢の箱（下側） */
 .dialog-choices {
     display: flex;
     flex-direction: column;
+    align-self: stretch; /* ★横幅を親の枠いっぱいに広げる絶対ルール */
+    margin-left: 125px; /* ★左側だけPC版の顔アイコン(110px)＋隙間(15px)の分を空けます */
+    width: auto; /* ★幅は自動計算になり、絶対にはみ出さなくなります */
     gap: 10px;
     margin-top: 10px;
     margin-bottom: 15px;
     z-index: 9501;
-    order: 2;
+    order: 2; /* これでメッセージの下に配置されます */
     box-sizing: border-box;
-    align-items: stretch; /* 中のボタンを横いっぱいに伸ばします */
 }
 
 /* PC版の調整：メッセージエリアに幅を合わせる */
@@ -985,10 +990,10 @@ body.is-pc .dialog-choices {
     margin-left: 125px; /* 顔アイコンの分だけ左を空けます */
 }
 
-/* スマホ版の調整：完璧な状態を維持 */
+/* スマホ版の選択肢の左端：顔(75px)＋隙間(10px)＝85pxで揃えます */
 body:not(.is-pc) .dialog-choices {
-    width: 95%;
-    margin-left: 85px; /* スマホ版の顔アイコン(75px)＋隙間に合わせます */
+    margin-left: 85px; /* ★スマホ版の顔幅と隙間に合わせます */
+    width: auto;
 }
 
 /* 戦闘中の思考メッセージ用 */
