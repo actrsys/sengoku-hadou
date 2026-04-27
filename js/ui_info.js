@@ -1461,8 +1461,6 @@ class UIInfoManager {
     confirmPrincessSelection(targetCastleId, doerId) {
         if (!this.selectedPrincessId) return;
 
-        if (window.AudioManager) window.AudioManager.playSE('choice.ogg');
-        
         this.closeCommonModal(); 
         
         window.GameApp.commandSystem.handleBushoSelection('marriage_princess', [this.selectedPrincessId], targetCastleId, { doerId: doerId });
