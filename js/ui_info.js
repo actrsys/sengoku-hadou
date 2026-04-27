@@ -566,7 +566,9 @@ class UIInfoManager {
             itemClass: "faction-list-item",
             listClass: "faction-list-container",
             items: items,
-            scrollPos: scrollPos
+            scrollPos: scrollPos,
+            gridTemplateSp: "2.5fr 1fr 1.5fr 1.5fr 3fr",
+            gridTemplatePc: "140px 80px 100px 100px 1fr"
         });
     }
 
@@ -1411,6 +1413,8 @@ class UIInfoManager {
             listClass: "princess-list-container",
             items: items,
             scrollPos: scrollPos,
+            gridTemplateSp: "1.3fr 1fr 1.5fr 1.5fr 3fr",
+            gridTemplatePc: "95px 80px 100px 100px 1fr",
             onBack: isSelectMode ? () => this.openBushoSelector('diplomacy_doer', targetCastleId, { subAction: 'marriage' }) : null,
             onConfirm: isSelectMode ? () => this.confirmPrincessSelection(targetCastleId, doerId) : null,
             onScopeClick: (scopeKey) => {
@@ -1495,7 +1499,9 @@ class UIInfoManager {
             listClass: "delegate-list-container",
             items: items,
             emptyHtml: '<div style="padding: 10px; text-align: center;">委任できる城がありません。</div>',
-            scrollPos: scrollPos
+            scrollPos: scrollPos,
+            gridTemplateSp: "1.5fr 1fr 1fr 1fr",
+            gridTemplatePc: "200px 100px 100px 100px"
         });
 
         setTimeout(() => {
@@ -1885,10 +1891,12 @@ class UIInfoManager {
         };
         
         let headers = [];
-        let gridStyle = "";
+        let gridSpStr = "";
+        let gridPcStr = "";
 
         if (this.currentKyotenTab === 'status') {
-            gridStyle = "1.5fr 1.5fr 1.5fr 1fr 1fr 1fr 1fr";
+            gridSpStr = "2fr 1.2fr 1.5fr 1.2fr 0.8fr 1.2fr 1.2fr";
+            gridPcStr = "140px 100px 100px 100px 60px 80px 80px";
             headers = [
                 `<span class="col-castle-name" data-sort="name" style="padding-left:5px; justify-content:flex-start;">拠点名${getSortMark('name')}</span>`,
                 `<span class="col-clan" data-sort="clan">勢力${getSortMark('clan')}</span>`,
@@ -1899,7 +1907,8 @@ class UIInfoManager {
                 `<span class="col-rice" data-sort="rice">兵糧${getSortMark('rice')}</span>`
             ];
         } else if (this.currentKyotenTab === 'military') {
-            gridStyle = "1.5fr 1.5fr 1fr 1fr 1fr 1fr 1fr";
+            gridSpStr = "2fr 1.2fr 1fr 1fr 1fr 1fr 1fr";
+            gridPcStr = "140px 80px 60px 60px 60px 80px 80px";
             headers = [
                 `<span class="col-castle-name" data-sort="name" style="padding-left:5px; justify-content:flex-start;">拠点名${getSortMark('name')}</span>`,
                 `<span class="col-soldiers" data-sort="soldiers">兵士${getSortMark('soldiers')}</span>`,
@@ -1910,7 +1919,8 @@ class UIInfoManager {
                 `<span class="col-guns" data-sort="guns">鉄砲${getSortMark('guns')}</span>`
             ];
         } else if (this.currentKyotenTab === 'economy') {
-            gridStyle = "1.5fr 1fr 1fr 1fr 1fr 1.5fr 1.5fr 1.5fr 1.5fr";
+            gridSpStr = "2fr 0.9fr 0.8fr 0.9fr 0.9fr 1.2fr 1.2fr 1.3fr 1.3fr";
+            gridPcStr = "140px 60px 50px 60px 60px 80px 80px 100px 100px";
             headers = [
                 `<span class="col-castle-name" data-sort="name" style="padding-left:5px; justify-content:flex-start;">拠点名${getSortMark('name')}</span>`,
                 `<span class="col-population" data-sort="population">人口${getSortMark('population')}</span>`,
@@ -2000,14 +2010,14 @@ class UIInfoManager {
             title: "拠点一覧",
             tabsHtml: tabsHtml,
             headers: headers,
-            headerClass: "sortable-header",
-            itemClass: "",
+            headerClass: "sortable-header kyoten-mode",
+            itemClass: "kyoten-mode",
             listClass: "kyoten-list-container",
             items: items,
             scrollPos: scrollPos,
-            minWidth: "650px",
-            gridTemplateSp: gridStyle,
-            gridTemplatePc: gridStyle,
+            minWidth: "100%",
+            gridTemplateSp: gridSpStr,
+            gridTemplatePc: gridPcStr,
             onTabClick: (tabKey) => {
                 this.currentKyotenTab = tabKey;
                 this.currentKyotenSortKey = null;
@@ -3925,6 +3935,8 @@ class UIInfoManager {
             listClass: "",
             items: items,
             scrollPos: scrollPos,
+            gridTemplateSp: "1.5fr 1fr 1fr 1.5fr 1fr",
+            gridTemplatePc: "150px 120px 100px 1fr 80px",
             onBack: onCancel,
             onConfirm: () => {
                 if (this.selectedForceIndex === null) return;

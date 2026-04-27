@@ -640,11 +640,7 @@ body.hide-daimyo-labels .daimyo-name-label { display: none !important; }
     border-color: #82b1ff !important;
 }
 
-/* 個別リストのグリッド調整 */
-.faction-list-header, .faction-list-item { grid-template-columns: 2.5fr 1fr 1.5fr 1.5fr 3fr; }
-.princess-list-header, .princess-list-item { grid-template-columns: 1.3fr 1fr 1.5fr 1.5fr 3fr; }
-.delegate-list-header, .delegate-list-item { grid-template-columns: 1.5fr 1fr 1fr 1fr; }
-.force-list-header, .force-list-item { grid-template-columns: 1.5fr 1fr 1fr 1.5fr 1fr; }
+/* 個別リストのグリッド調整（JavaScript側で設定するように変更しました） */
 
 /* =========================================================
    ボタン類
@@ -1952,12 +1948,14 @@ body:not(.is-pc) .daimyo-detail-value {
 body:not(.is-pc) .label-pc { display: none !important; }
 body:not(.is-pc) .label-sp { display: inline !important; }
 
-/* スマホ版武将一覧（基本・状態タブ）を画面内に収めるための微調整 */
-/* 横スクロールに戻すときは .status-mode の2行を消すだけでOKです */
+/* スマホ版各種リストを画面内に収めるための微調整 */
+/* 横スクロールに戻すときは対象のクラスを消すだけでOKです */
 body:not(.is-pc) .list-header.stats-mode > *, 
 body:not(.is-pc) .select-item.stats-mode > *,
 body:not(.is-pc) .list-header.status-mode > *, 
-body:not(.is-pc) .select-item.status-mode > * { padding: 0 1px; font-size: clamp(0.55rem, 2vw, 0.8rem); }
+body:not(.is-pc) .select-item.status-mode > *,
+body:not(.is-pc) .list-header.kyoten-mode > *, 
+body:not(.is-pc) .select-item.kyoten-mode > * { padding: 0 1px; font-size: clamp(0.55rem, 2vw, 0.8rem); }
 
 /* ★追加：スマホ版の全ウインドウを、左右の隙間なく画面いっぱいに広げる魔法 */
 body:not(.is-pc) .modal .modal-content {
@@ -2130,13 +2128,12 @@ body.is-pc {
     .list-header, .select-item { grid-template-columns: var(--grid-cols-pc, 45px 100px 60px repeat(6, 1fr)); font-size: 0.85rem; height: 44px; }
     .list-header.view-mode, .select-item.view-mode { grid-template-columns: var(--grid-cols-pc, 100px 60px repeat(6, 1fr)); }
     
-    /* ※勢力一覧・諸勢力一覧の列幅は JS側で指定しているため削除しました */
+    /* 各種リストの高さと文字サイズ設定（幅はJavaScript側で指定） */
     .daimyo-list-header, .daimyo-list-item { font-size: 0.9rem; height: 44px; }
     .kunishu-list-header, .kunishu-list-item { font-size: 0.9rem; height: 44px; }
-    
-    .faction-list-header, .faction-list-item { grid-template-columns: 140px 80px 100px 100px 1fr; font-size: 0.95rem; height: 44px; }
-    .princess-list-header, .princess-list-item { grid-template-columns: 95px 80px 100px 100px 1fr; font-size: 0.95rem; height: 44px; }
-    .force-list-header, .force-list-item { grid-template-columns: 150px 120px 100px 1fr 80px; font-size: 0.95rem; height: 44px; } /* ★追加：PC版の勢力選択リスト用の幅 */
+    .faction-list-header, .faction-list-item { font-size: 0.95rem; height: 44px; }
+    .princess-list-header, .princess-list-item { font-size: 0.95rem; height: 44px; }
+    .force-list-header, .force-list-item { font-size: 0.95rem; height: 44px; }
     
     /* モーダル拡張（輸送・兵力分配）のタイル化を解除して縦並びに統一 */
     #quantity-modal .modal-content, #unit-divide-modal .modal-content { max-width: 700px !important; max-height: 90% !important; }
