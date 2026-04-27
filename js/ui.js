@@ -490,7 +490,7 @@ class UIManager {
             this.processDialogQueue();
         }
     }
-
+    
     processDialogQueue() {
         if (this.dialogQueue.length === 0) {
             this.isDialogShowing = false;
@@ -501,31 +501,31 @@ class UIManager {
         const dialog = this.dialogQueue.shift(); 
 
         const modal = document.getElementById('dialog-modal');
-        const msgEl = document.getElementById('dialog-message');
-        const leftFaceEl = document.getElementById('dialog-left-face');
-        const leftNameEl = document.getElementById('dialog-left-name');
-        const rightFaceEl = document.getElementById('dialog-right-face');
-        const rightNameEl = document.getElementById('dialog-right-name');
-        const okBtn = document.getElementById('dialog-btn-ok');
-        const cancelBtn = document.getElementById('dialog-btn-cancel');
+        const msgEl = document.getElementById('dialog-message');
+        const leftFaceEl = document.getElementById('dialog-left-face');
+        const leftNameEl = document.getElementById('dialog-left-name');
+        const rightFaceEl = document.getElementById('dialog-right-face');
+        const rightNameEl = document.getElementById('dialog-right-name');
+        const okBtn = document.getElementById('dialog-btn-ok');
+        const cancelBtn = document.getElementById('dialog-btn-cancel');
 
-        this.hideAIGuardTemporarily();
+        this.hideAIGuardTemporarily();
 
-        if (!modal) {
-            if (dialog.isConfirm) {
-                if (confirm(dialog.msg)) { if (dialog.onOk) dialog.onOk(); } else { if (dialog.onCancel) dialog.onCancel(); }
-            } else {
-                alert(dialog.msg);
-                if (dialog.onOk) dialog.onOk();
-            }
-            this.restoreAIGuard(); 
-            this.processDialogQueue(); 
-            return;
-        }
+        if (!modal) {
+            if (dialog.isConfirm) {
+                if (confirm(dialog.msg)) { if (dialog.onOk) dialog.onOk(); } else { if (dialog.onCancel) dialog.onCancel(); }
+            } else {
+                alert(dialog.msg);
+                if (dialog.onOk) dialog.onOk();
+            }
+            this.restoreAIGuard(); 
+            this.processDialogQueue(); 
+            return;
+        }
 
-        msgEl.innerHTML = dialog.msg.replace(/\n/g, '<br>');
+        msgEl.innerHTML = dialog.msg.replace(/\n/g, '<br>');
 
-        // スマホ版の場合は強制的に左側に寄せて、右側を空にする処理
+        // スマホ版の場合は強制的に左側に寄せて、右側を空にする処理
         let leftFace = dialog.customOpts?.leftFace;
         let leftName = dialog.customOpts?.leftName;
         let rightFace = dialog.customOpts?.rightFace;
@@ -622,6 +622,7 @@ class UIManager {
         // もし「選択肢」が指定されていたら、特別な処理をします
         if (dialog.customOpts && dialog.customOpts.choices) {
             footer.classList.add('hidden'); // いつもの「はい・いいえ」ボタンを隠します
+            cancelBtn.classList.remove('hidden'); // ★追加：外側クリックで閉じられないようにするための細工
             
             if (choicesContainer) {
                 choicesContainer.innerHTML = ''; // 中身を一度きれいにします
@@ -1762,17 +1763,18 @@ class UIManager {
     }
     
     showTurnStartDialog(castle, onProceed) {
-        const msg = `「殿、${castle.name}にご命令ください。」`;
+        const nav = this.game.getNavigatorInfo(castle);
+        const msg = `「殿、${castle.name}にご命令ください。」`;
 
-        if (window.AudioManager) {
-            window.AudioManager.playSE('myturn.ogg');
-        }
+        if (window.AudioManager) {
+            window.AudioManager.playSE('myturn.ogg');
+        }
 
-        this.showDialog(msg, false, onProceed, null, { 
-            leftFace: 'koshou.webp', 
-            leftName: '小姓' 
-        });
-    }
+        this.showDialog(msg, false, onProceed, null, { 
+            leftFace: nav.faceIcon, 
+            leftName: nav.name 
+        });
+    }
 
     openQuantitySelector(type, data, targetId, extraData = null) {
         this.info.openQuantitySelector(type, data, targetId, extraData);

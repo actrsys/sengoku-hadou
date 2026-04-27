@@ -966,6 +966,38 @@ class GameManager {
     getCurrentTurnId() { return this.year * 12 + this.month; }
     getClanTotalSoldiers(clanId) { return this.castles.filter(c => Number(c.ownerClan) === Number(clanId)).reduce((sum, c) => sum + c.soldiers, 0); }
     getClanGunshi(clanId) { return this.bushos.find(b => Number(b.clan) === Number(clanId) && b.isGunshi && b.status === 'active'); }
+
+    getNavigatorInfo(castle) {
+        let faceIcon = 'koshou.webp';
+        let name = '小姓';
+        
+        const ownerClanId = castle.ownerClan;
+        const daimyo = this.bushos.find(b => b.clan === ownerClanId && b.isDaimyo);
+        
+        if (daimyo && Number(daimyo.castleId) === Number(castle.id)) {
+            let hasSpecialPrincess = false;
+            if (daimyo.wifeIds && daimyo.wifeIds.length > 0) {
+                for (const wId of daimyo.wifeIds) {
+                    const wife = this.princesses.find(p => Number(p.id) === Number(wId));
+                    if (wife && wife.faceIcon && wife.faceIcon !== 'unknown_princess_face.webp') {
+                        faceIcon = wife.faceIcon;
+                        name = wife.name;
+                        hasSpecialPrincess = true;
+                        break;
+                    }
+                }
+            }
+        } else {
+            const castellan = this.getBusho(castle.castellanId);
+            if (castellan) {
+                faceIcon = castellan.faceIcon || 'unknown_face.webp';
+                name = castellan.name.split('|').join('');
+            }
+        }
+        
+        return { faceIcon, name };
+    }
+
     isCastleVisible(castle) { 
         return true; 
     }
@@ -1515,7 +1547,7 @@ class GameManager {
             this.startMonth(); 
         }
     }
-
+    
     checkAllActionsDone() {
         const c = this.getCurrentTurnCastle();
         if (!c || Number(c.ownerClan) !== Number(this.playerClanId)) return; 
@@ -1526,8 +1558,12 @@ class GameManager {
         
         if(bushos.length > 0 && bushos.every(b => b.isActionDone)) {
              setTimeout(() => {
-                 this.ui.showDialog("すべての武将が行動を終えました。\n今月の命令を終了しますか？", true, () => {
+                 const nav = this.getNavigatorInfo(c);
+                 this.ui.showDialog("「すべての武将が行動を終えました。\n今月の命令を終了しますか？」", true, () => {
                      this.finishTurn();
+                 }, null, {
+                     leftFace: nav.faceIcon,
+                     leftName: nav.name
                  });
              }, 100);
         }
