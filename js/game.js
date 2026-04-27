@@ -1387,7 +1387,7 @@ class GameManager {
                 this.ui.updateAIProgress(this.currentIndex + 1, this.turnQueue.length);
                 this.ui.showControlPanel(castle);
                 
-                const delay = isImportant ? 10 : 10;
+                const delay = isImportant ? 30 : 30;
 
                 this.aiTimer = setTimeout(() => {
                     if (this.warManager.state.active) return;
@@ -1426,7 +1426,7 @@ class GameManager {
             // パネルに情報を表示
             this.ui.showControlPanel(castle);
             
-            const delay = isImportant ? 10 : 10;
+            const delay = isImportant ? 30 : 30;
 
             this.aiTimer = setTimeout(() => {
                 if (this.warManager.state.active) return;
@@ -1766,6 +1766,14 @@ window.addEventListener('DOMContentLoaded', () => {
     // 右クリックメニューが出ないようにする設定です
     document.addEventListener('contextmenu', (e) => {
         e.preventDefault();
+    }, { passive: false });
+
+    // スマホ特有の「引っ張って更新」やスワイプによる誤動作を完全に防ぐ魔法です！
+    document.addEventListener('touchmove', (e) => {
+        // スクロールできる場所（地図やリストなど）以外を触った時は、画面が動かないように固定します
+        if (!e.target.closest('.scroll-wrapper, .list-container, #map-scroll-container, .fw-map-scroll, .scenario-desc-box, .result-body, .message-area')) {
+            e.preventDefault();
+        }
     }, { passive: false });
 
     // ゲームの本体（心臓）を新しく作って、動き出せるようにします
