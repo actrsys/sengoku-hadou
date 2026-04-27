@@ -1908,7 +1908,7 @@ class UIInfoManager {
             ];
         } else if (this.currentKyotenTab === 'military') {
             gridSpStr = "2fr 1.2fr 1fr 1fr 1fr 1fr 1fr";
-            gridPcStr = "140px 80px 60px 60px 60px 80px 80px";
+            gridPcStr = "140px 80px 60px 60px 60px 80px 80px 1fr";
             headers = [
                 `<span class="col-castle-name" data-sort="name" style="padding-left:5px; justify-content:flex-start;">拠点名${getSortMark('name')}</span>`,
                 `<span class="col-soldiers" data-sort="soldiers">兵士${getSortMark('soldiers')}</span>`,
@@ -1916,7 +1916,8 @@ class UIInfoManager {
                 `<span class="col-morale" data-sort="morale">士気${getSortMark('morale')}</span>`,
                 `<span class="col-training" data-sort="training">訓練${getSortMark('training')}</span>`,
                 `<span class="col-horses" data-sort="horses">軍馬${getSortMark('horses')}</span>`,
-                `<span class="col-guns" data-sort="guns">鉄砲${getSortMark('guns')}</span>`
+                `<span class="col-guns" data-sort="guns">鉄砲${getSortMark('guns')}</span>`,
+                `<span class="col-empty pc-only-col"></span>`
             ];
         } else if (this.currentKyotenTab === 'economy') {
             // スマホ版（gridSpStr）から石高と鉱山の分の「0.9fr」を2つ削除して、合計7列にします
@@ -3790,7 +3791,7 @@ class UIInfoManager {
                     `<span class="col-soldiers">${kunishu.soldiers}</span>`,
                     `<span class="col-friend">${friendBarHtml}</span>`,
                     `<span class="col-relation ${relClass}" style="font-weight:bold;">${relStatus}</span>`,
-                    `<span class="col-empty pc-only"></span>`
+                    `<span class="col-empty pc-only-col"></span>`
                 ]
             });
         });
