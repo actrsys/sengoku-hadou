@@ -946,16 +946,15 @@ body.hide-daimyo-labels .daimyo-name-label { display: none !important; }
     align-items: center; /* これで顔に対して看板が横中央になります */
     width: 60px;
     flex-shrink: 0;
-    position: relative; /* 看板の位置を決める基準になります */
 }
 .dialog-face-space {
     width: 60px;
     height: 60px;
 }
 .dialog-name-label {
-    position: absolute;
-    bottom: 0;
-    transform: translateY(50%);
+    order: 2; /* 顔グラの下に名前を配置し、重なるのを防ぎます */
+    transform: translateY(50%); /* 半分下にずらして枠線の中央に重ねます */
+    margin-top: 5px; /* 顔グラと重ならないよう少し隙間を作ります */
     background: #0d1a10;
     border: 1.5px solid #d4af37;
     color: #ffd54f;
