@@ -39,6 +39,8 @@ class UIInfoManager {
         this.kyotenSavedSortedCastles = null;
         this.kyotenLastSortStateKey = null;
         this.kyotenLastScope = null;
+        
+        this.princessCurrentScope = null;
     }
 
     // --- ソート状態の一元管理 ---
@@ -1307,23 +1309,44 @@ class UIInfoManager {
         const myClanId = this.game.playerClanId;
         const myClan = this.game.clans.find(c => c.id === myClanId);
         
-        let princesses = [];
+        let myPrincesses = [];
         if (myClan && myClan.princessIds) {
-            princesses = myClan.princessIds
+            myPrincesses = myClan.princessIds
                 .map(id => this.game.princesses.find(p => p.id === id))
                 .filter(p => p !== undefined); 
         }
 
+        let princesses = [];
+        let tabsHtml = null;
+
         if (isSelectMode) {
-            princesses = princesses.filter(p => p.status === 'unmarried');
+            princesses = myPrincesses.filter(p => p.status === 'unmarried');
             this.selectedPrincessId = null; 
+        } else {
+            if (!this.princessCurrentScope) this.princessCurrentScope = 'clan';
+
+            if (this.princessCurrentScope === 'clan' && myPrincesses.length === 0) {
+                this.princessCurrentScope = 'all';
+            }
+
+            if (this.princessCurrentScope === 'clan') {
+                princesses = myPrincesses;
+            } else {
+                princesses = this.game.princesses.filter(p => p.status !== 'unborn' && p.status !== 'dead');
+            }
+
+            tabsHtml = `
+                <div style="display: flex; gap: 5px; margin-left: 15px;">
+                    <button class="busho-scope-btn ${this.princessCurrentScope === 'clan' ? 'active' : ''}" data-scope="clan">自家</button>
+                    <button class="busho-scope-btn ${this.princessCurrentScope === 'all' ? 'active' : ''}" data-scope="all">全国</button>
+                </div>
+            `;
         }
 
         const items = princesses.map(p => {
             const age = this.game.year - p.birthYear;
             const father = this.game.getBusho(p.fatherId);
             const husband = this.game.getBusho(p.husbandId);
-            // 差し替え後
             return {
                 onClick: isSelectMode ? `window.GameApp.ui.info.selectPrincess(${p.id}, this)` : null,
                 cells: [
@@ -1344,6 +1367,7 @@ class UIInfoManager {
         this._renderListModal({
             title: "姫一覧",
             contextHtml: contextHtml,
+            tabsHtml: tabsHtml,
             headers: [
                 `<span class="col-princess-name">姫</span>`,
                 `<span class="col-age">年齢</span>`,
@@ -1357,7 +1381,11 @@ class UIInfoManager {
             items: items,
             scrollPos: scrollPos,
             onBack: isSelectMode ? () => this.openBushoSelector('diplomacy_doer', targetCastleId, { subAction: 'marriage' }) : null,
-            onConfirm: isSelectMode ? () => this.confirmPrincessSelection(targetCastleId, doerId) : null
+            onConfirm: isSelectMode ? () => this.confirmPrincessSelection(targetCastleId, doerId) : null,
+            onScopeClick: (scopeKey) => {
+                this.princessCurrentScope = scopeKey;
+                this._renderPrincessList(isSelectMode, targetCastleId, doerId, 0);
+            }
         });
     }
 
