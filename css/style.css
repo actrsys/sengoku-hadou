@@ -927,48 +927,85 @@ body.hide-daimyo-labels .daimyo-name-label { display: none !important; }
     display: flex;
     flex-direction: column;
     align-items: stretch;
-    gap: 12px;
-    margin: 10px 0 0 0;
+    gap: 10px;
+    margin: 5px 0 15px 0; /* ★メッセージとの間、下のボタンとの間の隙間を調整 */
     padding: 0;
-    width: 100%; /* ★ウインドウの中に入ったので、純粋に100%にするだけで枠にピッタリ合います！ */
+    width: 100%;
+    z-index: 9501;
+    order: 2; /* ★メッセージ(order:1)の下に配置されます */
     box-sizing: border-box;
 }
 
 /* 選択肢ボタンのデザイン */
 .dialog-choice-btn {
-    background: linear-gradient(to right, rgba(37, 74, 46, 0.95) 0%, rgba(27, 56, 34, 1) 50%, rgba(37, 74, 46, 0.95) 100%);
-    border: 1px solid #d4af37;
-    border-top: 2px solid #f9e596;
-    border-bottom: 2px solid #825a2c;
+    /* ★ウインドウの緑色と区別するため、漆器のような深い茶色（#3e3a36）を基調にしたグラデーションに変更 */
+    background: linear-gradient(to right, #3e3a36 0%, #2b2824 50%, #3e3a36 100%);
+    border: 1px solid #a88a2c; /* 少し落ち着いた金色の枠線 */
+    border-top: 1.5px solid #d4af37; /* 上側を光らせる */
     color: #fff;
-    padding: 12px 15px 12px 35px; /* ★文字の左側にだけ装飾を置くため、左だけ余白を多く取り、右は減らします */
-    border-radius: 6px;
-    font-size: 1.15rem;
+    padding: 12px 40px; /* 左右の矢印アイコン用に左右の余白を均等に確保 */
+    border-radius: 4px;
+    font-size: 1.1rem;
     font-family: 'AbashiriMincho', serif;
-    text-align: left !important; /* ★メッセージ枠の左端に揃えるため、文字も左寄せに戻します */
+    text-align: center !important; /* ★選択の意思決定を促すため、中央揃えに変更 */
     cursor: pointer;
-    box-shadow: 0 4px 6px rgba(0,0,0,0.6), inset 0 0 10px rgba(212, 175, 55, 0.1);
-    transition: all 0.2s ease-out;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.5), inset 0 0 5px rgba(255,255,255,0.05);
+    transition: all 0.15s ease-out;
     text-shadow: 1px 1px 2px #000;
-    
     display: block;
-    width: 100%; /* ★ウインドウ幅の計算をやめ、メッセージ枠に100%合わせて左端を揃えます */
-    max-width: none; /* ★変な制限を解除します */
+    width: 100%;
     box-sizing: border-box;
-    margin: 0; /* ★中央寄せをやめて左端に配置します */
+    margin: 0;
     position: relative;
 }
 
 /* 選択肢のアイコン（左側の装飾） */
 .dialog-choice-btn::before {
-    content: "◆"; 
+    content: "◀"; /* 装飾を「◀」に変更 */
     position: absolute;
-    left: 12px;
+    left: 15px;
     top: 50%;
     transform: translateY(-50%);
     color: #d4af37;
-    font-size: 1.1rem;
+    font-size: 0.8rem;
     text-shadow: 1px 1px 0 #000;
+    opacity: 0.7;
+}
+
+/* 選択肢のアイコン（右側の装飾） */
+.dialog-choice-btn::after {
+    content: "▶"; /* 右側にも対になるアイコンを配置 */
+    position: absolute;
+    right: 15px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: #d4af37;
+    font-size: 0.8rem;
+    text-shadow: 1px 1px 0 #000;
+    opacity: 0.7;
+}
+
+/* マウスが乗った時（またはタップした瞬間） */
+.dialog-choice-btn:hover {
+    background: linear-gradient(to right, #54504b 0%, #3e3a36 50%, #54504b 100%);
+    border-color: #ffd54f;
+    color: #ffd54f;
+    box-shadow: 0 4px 8px rgba(0,0,0,0.6), 0 0 10px rgba(212, 175, 55, 0.2);
+}
+
+.dialog-choice-btn:hover::before,
+.dialog-choice-btn:hover::after {
+    opacity: 1;
+    color: #ffd54f;
+    transform: translateY(-50%) scale(1.2);
+}
+
+/* 押した時 */
+.dialog-choice-btn:active {
+    transform: translateY(1px);
+    background: #1a1816;
+    box-shadow: inset 0 2px 5px rgba(0,0,0,0.8);
+    transition: none;
 }
 
 /* マウスが乗った時 */
