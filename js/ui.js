@@ -502,6 +502,8 @@ class UIManager {
 
         const modal = document.getElementById('dialog-modal');
         const msgEl = document.getElementById('dialog-message');
+        const leftFaceEl = document.getElementById('dialog-left-face');
+        const rightFaceEl = document.getElementById('dialog-right-face');
         const okBtn = document.getElementById('dialog-btn-ok');
         const cancelBtn = document.getElementById('dialog-btn-cancel');
 
@@ -520,6 +522,19 @@ class UIManager {
         }
 
         msgEl.innerHTML = dialog.msg.replace(/\n/g, '<br>');
+
+        const setFace = (el, faceIcon) => {
+            if (el) {
+                if (faceIcon) {
+                    el.innerHTML = `<div class="sp-face-wrapper" style="margin: 0; width: 60px; height: 60px;"><img src="data/images/faceicons/${faceIcon}" onerror="this.src='data/images/faceicons/unknown_face.webp'"></div>`;
+                } else {
+                    el.innerHTML = '';
+                }
+            }
+        };
+
+        setFace(leftFaceEl, dialog.customOpts?.leftFace);
+        setFace(rightFaceEl, dialog.customOpts?.rightFace);
         
         let autoCloseTimer = null;
 
@@ -1662,7 +1677,7 @@ class UIManager {
             window.AudioManager.playSE('myturn.ogg');
         }
 
-        this.showDialog(msg, false, onProceed);
+        this.showDialog(msg, false, onProceed, null, { leftFace: 'koshou.webp' });
     }
 
     openQuantitySelector(type, data, targetId, extraData = null) {
