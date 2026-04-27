@@ -938,7 +938,7 @@ body.hide-daimyo-labels .daimyo-name-label { display: none !important; }
     align-items: flex-end; /* 顔とメッセージの下端を揃えます */
     min-height: 120px;
     gap: 10px;
-    margin: 30px 0 15px 0; /* 看板が上にはみ出すので、上の隙間を広くしました */
+    margin: 15px 0;
 }
 .dialog-face-column {
     display: flex;
@@ -954,7 +954,8 @@ body.hide-daimyo-labels .daimyo-name-label { display: none !important; }
 }
 .dialog-name-label {
     position: absolute;
-    top: -25px; /* 上にずらして、枠からはみ出させます */
+    bottom: 0;
+    transform: translateY(50%);
     background: #0d1a10;
     border: 1.5px solid #d4af37;
     color: #ffd54f;
