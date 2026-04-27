@@ -2145,7 +2145,17 @@ class UIInfoManager {
         this.ui.hideAIGuardTemporarily(); 
         
         const isViewMode = (actionType === 'view_only' || actionType === 'all_busho_list');
-        const c = this.ui.currentCastle; 
+        
+        // ★追加：行動を消費しないコマンドかどうかを判定します
+        let isActionFree = false;
+        if (extraData && extraData.allowDone) isActionFree = true; 
+        if (['appoint','employ_target','appoint_gunshi','rumor_target_busho','headhunt_target','interview','interview_target','reward','war_general', 'kunishu_war_general', 'marriage_princess', 'marriage_kinsman', 'succession'].includes(actionType)) isActionFree = true;
+        if (['def_intercept_deploy', 'def_reinf_deploy', 'atk_reinf_deploy', 'def_self_reinf_deploy', 'atk_self_reinf_deploy', 'kunishu_subjugate_deploy'].includes(actionType)) isActionFree = true;
+        
+        // ★追加：行動列を隠すかどうかのフラグです
+        const hideActionCol = isViewMode || isActionFree;
+
+        const c = this.ui.currentCastle;
         
         // ★キャッシュを利用して毎回重い処理が走るのを防ぐ魔法
         let bushos, infoHtml, isMulti, spec;
@@ -2431,17 +2441,17 @@ class UIInfoManager {
         let gridPcStr = "";
 
         if (this.bushoCurrentTab === 'stats') {
-            if (isViewMode) {
-                // 基本タブ・見るだけモードの幅（左から：名前, 身分, 統率, 武勇, 内政, 外交, 智謀, 魅力）
+            if (hideActionCol) {
+                // 基本タブ・行動列なしの幅（左から：名前, 身分, 統率, 武勇, 内政, 外交, 智謀, 魅力）
                 gridSpStr = "2fr 1.8fr 1.2fr 1.2fr 1.2fr 1.2fr 1.2fr 1.2fr";
                 gridPcStr = "100px 60px 1fr 1fr 1fr 1fr 1fr 1fr";
             } else {
-                // 基本タブ・選択モードの幅（左から：行動, 名前, 身分, 統率, 武勇, 内政, 外交, 智謀, 魅力）
+                // 基本タブ・行動列ありの幅（左から：行動, 名前, 身分, 統率, 武勇, 内政, 外交, 智謀, 魅力）
                 gridSpStr = "25px 2fr 1.8fr 1.2fr 1.2fr 1.2fr 1.2fr 1.2fr 1.2fr";
                 gridPcStr = "35px 100px 60px 1fr 1fr 1fr 1fr 1fr 1fr";
             }
             headers = [
-                !isViewMode ? `<span class="col-act" data-sort="action">行動${getSortMark('action')}</span>` : null,
+                !hideActionCol ? `<span class="col-act" data-sort="action">行動${getSortMark('action')}</span>` : null,
                 `<span class="col-name" data-sort="name">名前${getSortMark('name')}</span>`,
                 `<span class="col-rank" data-sort="rank">身分${getSortMark('rank')}</span>`,
                 `<span class="col-stat" data-sort="leadership">統率${getSortMark('leadership')}</span>`,
@@ -2454,17 +2464,17 @@ class UIInfoManager {
         } else {
             headerClassStr += " status-mode";
             itemClassStr += " status-mode";
-            if (isViewMode) {
-                // 状態タブ・見るだけモードの幅（左から：名前, 勢力, 所在, 年齢, 一門, 俸禄, 派閥）
+            if (hideActionCol) {
+                // 状態タブ・行動列なしの幅（左から：名前, 勢力, 所在, 年齢, 一門, 俸禄, 派閥）
                 gridSpStr = "2fr 2fr 2fr 1fr 1fr 1fr 2fr";
                 gridPcStr = "100px 140px 140px 50px 50px 60px 1fr";
             } else {
-                // 状態タブ・選択モードの幅（左から：行動, 名前, 勢力, 所在, 年齢, 一門, 俸禄, 派閥）
+                // 状態タブ・行動列ありの幅（左から：行動, 名前, 勢力, 所在, 年齢, 一門, 俸禄, 派閥）
                 gridSpStr = "25px 2fr 2fr 2fr 1fr 1fr 1fr 2fr";
                 gridPcStr = "35px 100px 140px 140px 50px 50px 60px 1fr";
             }
             headers = [
-                !isViewMode ? `<span class="col-act" data-sort="action">行動${getSortMark('action')}</span>` : null,
+                !hideActionCol ? `<span class="col-act" data-sort="action">行動${getSortMark('action')}</span>` : null,
                 `<span class="col-name" data-sort="name">名前${getSortMark('name')}</span>`,
                 // 横スクロールに戻す時のために残しておきます： `<span class="col-rank" data-sort="rank">身分${getSortMark('rank')}</span>`,
                 `<span class="col-faction" data-sort="faction">勢力${getSortMark('faction')}</span>`,
@@ -2483,9 +2493,7 @@ class UIInfoManager {
             if (actionType === 'reward' && b.isDaimyo) return; 
             
             let isSelectable = !b.isActionDone; 
-            if (extraData && extraData.allowDone) isSelectable = true; 
-            if (['appoint','employ_target','appoint_gunshi','rumor_target_busho','headhunt_target','interview','interview_target','reward','view_only','war_general', 'kunishu_war_general', 'all_busho_list', 'marriage_princess', 'marriage_kinsman', 'succession'].includes(actionType)) isSelectable = true;
-            if (['def_intercept_deploy', 'def_reinf_deploy', 'atk_reinf_deploy'].includes(actionType)) isSelectable = true;
+            if (isActionFree) isSelectable = true; 
             
             let currentAcc = null;
             const bCastle = this.game.getCastle(b.castleId);
@@ -2502,8 +2510,8 @@ class UIInfoManager {
             let cells = [];
             if (this.bushoCurrentTab === 'stats') {
                 cells = [
-                    !isViewMode ? `<span class="col-act">${inputHtml}${b.isActionDone?'済':'未'}</span>` : null,
-                    `<span class="col-name">${b.name}</span>`,
+                    !hideActionCol ? `<span class="col-act">${inputHtml}${b.isActionDone?'済':'未'}</span>` : null,
+                    `<span class="col-name">${hideActionCol && !isViewMode ? inputHtml : ''}${b.name}</span>`,
                     `<span class="col-rank">${b.getRankName()}</span>`,
                     `<span class="col-stat">${getStat('leadership')}</span>`,
                     `<span class="col-stat">${getStat('strength')}</span>`,
@@ -2552,8 +2560,8 @@ class UIInfoManager {
                 }
                 
                 cells = [
-                    !isViewMode ? `<span class="col-act">${inputHtml}${b.isActionDone?'済':'未'}</span>` : null,
-                    `<span class="col-name">${b.name}</span>`,
+                    !hideActionCol ? `<span class="col-act">${inputHtml}${b.isActionDone?'済':'未'}</span>` : null,
+                    `<span class="col-name">${hideActionCol && !isViewMode ? inputHtml : ''}${b.name}</span>`,
                     // 横スクロールに戻す時のために残しておきます： `<span class="col-rank">${b.getRankName()}</span>`,
                     `<span class="col-faction">${forceName}</span>`,
                     `<span class="col-castle">${bCastleName}</span>`,
