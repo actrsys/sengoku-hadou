@@ -2094,3 +2094,165 @@ window.GameEvents.push({
         }
     }
 });
+
+// ==========================================
+// ★ 浅井長政 家督相続イベント
+// ==========================================
+window.GameEvents.push({
+    id: "historical_nagamasa_succession",
+    timing: "startMonth_before", 
+    isOneTime: true,             
+    
+    checkCondition: function(game) {
+        // 1. 浅井久政（ID: 1015001）が存在し、大名であるか確認します
+        const hisamasa = game.getBusho(1015001);
+        if (!hisamasa || !hisamasa.isDaimyo || hisamasa.clan === 0) return false;
+
+        // 2. プレイヤーが浅井家の担当ではないか確認します
+        if (game.playerClanId === hisamasa.clan) return false;
+
+        // 3. 浅井長政（ID: 1015002）が存在し、久政と同じ勢力に所属しているか確認します
+        const nagamasa = game.getBusho(1015002);
+        if (!nagamasa || nagamasa.status !== 'active' || nagamasa.clan !== hisamasa.clan) return false;
+
+        // 4. 浅井長政が16歳以上か確認します
+        const currentYear = game.year;
+        if (currentYear - nagamasa.birthYear < 16) return false;
+
+        // 5. 六角義賢（ID: 1018001）または六角義治（ID: 1018002）が大名であるか確認します
+        const yoshikata = game.getBusho(1018001);
+        const yoshiharu = game.getBusho(1018002);
+        let rokkakuDaimyo = null;
+        
+        if (yoshikata && yoshikata.isDaimyo && yoshikata.clan !== 0) {
+            rokkakuDaimyo = yoshikata;
+        } else if (yoshiharu && yoshiharu.isDaimyo && yoshiharu.clan !== 0) {
+            rokkakuDaimyo = yoshiharu;
+        }
+        
+        if (!rokkakuDaimyo) return false;
+
+        // 6. 浅井家と六角家が敵対関係にあるか確認します
+        if (game.diplomacyManager) {
+            const rel = game.diplomacyManager.getRelation(hisamasa.clan, rokkakuDaimyo.clan);
+            if (!rel || rel.status !== '敵対') return false;
+        } else {
+            return false;
+        }
+
+        // すべての条件をクリアしたらイベント発生です！
+        return true;
+    },
+    
+    execute: async function(game) {
+        const oldDaimyo = game.getBusho(1015001);
+        const successor = game.getBusho(1015002);
+        const clanId = oldDaimyo.clan;
+        const messages = [];
+
+        // ① 功績の譲渡（生前退位コマンドと同じように、旧大名の功績の3分の1を譲り受けます）
+        const meritTransfer = Math.floor((oldDaimyo.achievementTotal || 0) / 3);
+        successor.achievementTotal = (successor.achievementTotal || 0) + meritTransfer;
+        oldDaimyo.achievementTotal = (oldDaimyo.achievementTotal || 0) - meritTransfer;
+
+        // ② 久政から大名のバッジを外します
+        oldDaimyo.isDaimyo = false;
+
+        // ③ もし長政が久政と違うお城にいたら、久政のいるお城へ呼び寄せます
+        if (successor.castleId !== oldDaimyo.castleId) {
+            if (game.affiliationSystem) {
+                game.affiliationSystem.moveCastle(successor, oldDaimyo.castleId);
+            } else {
+                successor.castleId = oldDaimyo.castleId;
+            }
+        }
+
+        // ④ 長政を新しい大名、そして城主に任命します
+        successor.isDaimyo = true;
+        successor.isCastellan = true;
+        if (successor.isGunshi) {
+            successor.isGunshi = false; // もし軍師だったらバッジを外します
+        }
+
+        // ⑤ お城の城主データを長政に書き換えます
+        const targetCastle = game.getCastle(successor.castleId);
+        if (targetCastle) {
+            const castleBushos = game.bushos.filter(b => b.castleId === targetCastle.id && b.status === 'active');
+            castleBushos.forEach(b => {
+                if (b.id !== successor.id && b.isCastellan) {
+                    b.isCastellan = false; // 他の人の城主バッジを外します
+                }
+            });
+            targetCastle.castellanId = successor.id;
+            if (game.affiliationSystem) {
+                game.affiliationSystem.updateCastleLord(targetCastle);
+            }
+        }
+
+        // ⑥ 改名の魔法（大名になった時に名前が変わる設定があれば適用します）
+        if (successor.nameChange && successor.nameChange.includes('daimyo:')) {
+            const changes = successor.nameChange.split('/');
+            for (const change of changes) {
+                const parts = change.split(':');
+                if (parts.length === 3 && parts[0].trim() === 'daimyo') {
+                    const oldNameStr = successor.name.replace('|', '');
+                    const newNameParts = parts[1].trim().split('|');
+                    successor.familyName = newNameParts[0] || "";
+                    successor.givenName = newNameParts[1] || "";
+                    successor.name = successor.familyName + successor.givenName;
+                    const newYomiParts = parts[2].trim().split('|');
+                    successor.familyYomi = newYomiParts[0] || "";
+                    successor.givenYomi = newYomiParts[1] || "";
+                    successor.yomi = successor.familyYomi + successor.givenYomi;
+                    const newNameStr = successor.name.replace('|', '');
+                    messages.push(`家督を継ぐにあたり、${oldNameStr}は\n「${newNameStr}」と名を改めました。`);
+                }
+            }
+        }
+
+        // ⑦ 顔変更の魔法（大名になった時の顔画像があれば適用します）
+        if (successor.faceChange && successor.faceChange.startsWith('daimyo:')) {
+            const newFace = successor.faceChange.split(':')[1].trim();
+            if (newFace) {
+                successor.faceIcon = newFace;
+            }
+        }
+
+        // ⑧ 大名家のリーダーを長政に設定します
+        game.changeLeader(clanId, successor.id);
+        successor.isActionDone = true;
+
+        // ⑨ 旧大名の城の城主情報を更新します
+        if (oldDaimyo.castleId) {
+            const oldCastle = game.getCastle(oldDaimyo.castleId);
+            if (oldCastle && game.affiliationSystem) {
+                game.affiliationSystem.updateCastleLord(oldCastle);
+            }
+        }
+
+        // ⑩ 当主交代の共通の魔法を呼び出します（能力差による忠誠度の変化など）
+        // 第4引数に true を入れて、生前退位（家督相続）と同じようにショックを和らげる設定にしています！
+        if (game.lifeSystem) {
+            game.lifeSystem.applyDaimyoChangeEffects(oldDaimyo, successor, messages, true);
+        }
+
+        // ⑪ メッセージを画面に出してお知らせします
+        const hisamasaName = oldDaimyo.name.replace('|', '');
+        const nagamasaName = successor.name.replace('|', '');
+        const mainMsg = `浅井家の${hisamasaName}が隠居し。\n${nagamasaName}が新たな当主として家督を継ぎました！`;
+        
+        game.ui.log(`【イベント】浅井家家督相続：${mainMsg}`);
+        messages.unshift(mainMsg); // 一番最初にメインのメッセージを入れます
+
+        // 溜めておいたメッセージを順番に出します
+        for (const msg of messages) {
+            await game.ui.showDialogAsync(msg, false, 0);
+        }
+
+        // ⑫ 画面を最新の状態に更新します
+        if (game.ui) {
+            game.ui.updatePanelHeader();
+            game.ui.renderMap();
+        }
+    }
+});
