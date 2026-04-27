@@ -638,180 +638,168 @@ body:not(.is-pc) .select-item > *:has(+ .pc-only:last-child) { border-right: non
 .text-orange { color: #ffd180 !important; }
 .text-pink { color: #ff96ba !important; }
 
-/* 委任設定（独自リスト） */
+/* =========================================================
+   委任設定（独自リスト）
+   ========================================================= */
+/* リストの大枠 */
+#delegate-scroll-wrapper {
+    height: 384px !important; /* 48px * 8行 */
+    flex: none !important;
+    border: 2px solid #d4af37 !important;
+    border-radius: 0 0 6px 6px !important;
+    padding: 0 !important;
+    background: #1b3822 !important;
+    margin-bottom: 10px !important;
+}
+
 #delegate-list {
-    height: 320px;
+    height: 100% !important;
     overflow: hidden !important;
     scrollbar-width: none;
     -ms-overflow-style: none;
 }
 
 #delegate-list::-webkit-scrollbar {
-    display: none;
-}
-
-#delegate-list .ps__rail-x,
-#delegate-list .ps__rail-y {
     display: none !important;
 }
 
-/* 共通グリッドクラス */
+/* 一括ボタンの置き場（上部固定） */
+#delegate-top-section {
+    background: #0d1a10 !important;
+    border: 2px solid #d4af37 !important;
+    border-bottom: none !important;
+    border-radius: 6px 6px 0 0 !important;
+    flex-shrink: 0 !important;
+}
+
+/* 行ごとの高さと枠線 */
+.delegate-bulk-row {
+    height: 50px !important;
+    border-bottom: none !important;
+}
+.delegate-list-header {
+    height: 34px !important;
+    background: rgba(0, 0, 0, 0.3) !important;
+    font-weight: bold !important;
+    color: #ffd54f !important;
+    font-size: 0.85rem !important;
+    border-top: 1px solid rgba(212, 175, 55, 0.3) !important;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05) !important;
+}
+.delegate-list-item {
+    height: 48px !important;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05) !important;
+    padding: 0 !important;
+}
+
+/* グリッドレイアウト（スマホ基本） */
 .delegate-bulk-row,
 .delegate-list-header, 
 .delegate-list-item {
-    display: grid;
-    /* 拠点名を広く、残り3つを統一。はみ出さないように minmax で制御 */
-    grid-template-columns: minmax(0, 2.4fr) minmax(0, 1.2fr) minmax(0, 1.2fr) minmax(0, 1.2fr) minmax(0, 1.2fr);
-    font-size: clamp(0.7rem, 2.2vw, 0.9rem);
-    padding: 0;
-    gap: 0;
-    box-sizing: border-box;
-    align-items: center;
-    overflow: hidden;
+    display: grid !important;
+    grid-template-columns: 2.2fr 1.3fr 1fr 1fr 1fr !important;
+    width: 100% !important;
+    box-sizing: border-box !important;
+    align-items: center !important;
+    gap: 0 !important;
+    padding: 0 !important;
 }
 
-/* 行ごとの高さ設定 */
-.delegate-bulk-row {
-    height: 45px;
-    border-bottom: none;
-}
-.delegate-list-header {
-    height: 35px;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
-}
-.delegate-list-item {
-    height: 48px;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+/* グリッドレイアウト（PC版上書き絶対防止） */
+body.is-pc #delegate-modal .delegate-bulk-row,
+body.is-pc #delegate-modal .delegate-list-header, 
+body.is-pc #delegate-modal .delegate-list-item {
+    grid-template-columns: 120px 100px 100px 100px 100px !important;
+    width: 520px !important;
+    margin: 0 auto !important;
 }
 
-/* PC版：横幅を固定してレイアウト崩れを防ぐ魔法 */
-@media (min-width: 768px) {
-    .delegate-bulk-row,
-    .delegate-list-header, 
-    .delegate-list-item {
-        /* 拠点名を広く、残り3つを100pxに統一 */
-        grid-template-columns: 200px 100px 100px 100px 100px;
-    }
-}
-
-/* セルの基本スタイル */
+/* 各セルの基本設定 */
 .delegate-bulk-row span,
-.delegate-list-header span, 
+.delegate-list-header span,
 .delegate-list-item span {
-    display: flex;
-    flex-direction: row;
-    align-items: center;
-    justify-content: center; /* 左右中央揃え */
-    height: 100%;
+    display: flex !important;
+    justify-content: center !important;
+    align-items: center !important;
+    height: 100% !important;
+    text-align: center !important;
+    border-right: none !important;
+    padding: 0 !important;
 }
 
-.delegate-list-item .col-castle-name, 
-.delegate-list-item .col-castellan,
-.delegate-list-header .col-castle-name,
-.delegate-list-header .col-castellan {
-    justify-content: flex-start; /* 左寄せ */
-    padding-left: 10px;
+/* 拠点名・城主は左寄せ */
+#delegate-modal .col-castle-name, 
+#delegate-modal .col-castellan {
+    justify-content: flex-start !important;
+    padding-left: 12px !important;
+    text-align: left !important;
 }
 
-.delegate-list-item .col-castle-name {
-    font-weight: bold;
+#delegate-modal .col-castle-name {
+    font-weight: bold !important;
 }
 
-/* 一括ボタンのデザイン */
+/* 一括ボタン */
 .delegate-header-btn {
-    padding: 4px 12px;
-    font-size: 0.85rem;
-    font-weight: bold;
-    border-radius: 4px;
-    border: 2px solid #d4af37;
-    background: linear-gradient(135deg, #254a2e 0%, #1b3822 100%);
-    color: #ffd54f;
-    cursor: pointer;
-    font-family: inherit;
-    transition: all 0.1s;
-    box-shadow: 0 2px 4px rgba(0,0,0,0.5), inset 0 1px 2px rgba(255,255,255,0.2);
-    text-shadow: 1px 1px 1px #000;
-}
-.delegate-header-btn:hover {
-    background: linear-gradient(135deg, #3a6b46 0%, #2a5a36 100%);
-    transform: translateY(-1px);
+    width: 70px !important;
+    height: 32px !important;
+    font-size: 0.85rem !important;
+    font-weight: bold !important;
+    cursor: pointer !important;
+    border-radius: 4px !important;
+    font-family: inherit !important;
+    color: #fff !important;
+    background: linear-gradient(to bottom, #826a32, #4a3318) !important;
+    border: 1.5px solid #d4af37 !important;
+    box-shadow: 0 2px 0 #222, inset 0 1px 1px rgba(255,255,255,0.3) !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    padding: 0 !important;
+    margin: 0 auto !important;
 }
 .delegate-header-btn:active {
-    transform: translateY(1px);
-    box-shadow: inset 0 1px 2px rgba(0,0,0,0.8);
+    transform: translateY(2px) !important;
+    box-shadow: none !important;
 }
 
-/* 各行のインラインボタン（許可/不可、委任/直轄）のデザイン */
+/* インラインボタン */
 .delegate-inline-btn {
-    padding: 0;
-    font-size: 0.85rem;
-    font-weight: bold;
-    border-radius: 4px;
-    cursor: pointer;
-    font-family: inherit;
-    transition: all 0.1s;
-    width: 90%;
-    max-width: 80px;
-    height: 34px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    box-shadow: 0 2px 4px rgba(0,0,0,0.5), inset 0 1px 2px rgba(255,255,255,0.2);
-    text-shadow: 1px 1px 1px #000;
+    width: 80px !important;
+    height: 34px !important;
+    font-size: 0.85rem !important;
+    font-weight: bold !important;
+    border-radius: 4px !important;
+    cursor: pointer !important;
+    font-family: inherit !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    text-shadow: 1px 1px 1px #000 !important;
+    padding: 0 !important;
+    margin: 0 auto !important;
 }
-
-.delegate-inline-btn:disabled {
-    opacity: 0.5;
-    cursor: not-allowed;
-    background: #2a2a2a !important;
-    color: #777 !important;
-    border-color: #444 !important;
-    box-shadow: none;
-    transform: none;
-}
-.delegate-inline-btn:active:not(:disabled) {
-    transform: translateY(1px);
-    box-shadow: inset 0 1px 2px rgba(0,0,0,0.8);
-}
-
 .btn-status-on {
-    background: linear-gradient(135deg, #254a2e 0%, #1b3822 100%);
-    color: #ffd54f;
-    border: 2px solid #d4af37;
+    background: linear-gradient(to bottom, #43a047, #1b5e20) !important;
+    border: 2px solid #81c784 !important;
+    color: #fff !important;
+    box-shadow: 0 2px 0 #0d1a10 !important;
 }
-.btn-status-on:hover:not(:disabled) {
-    background: linear-gradient(135deg, #3a6b46 0%, #2a5a36 100%);
-}
-
 .btn-status-off {
-    background: linear-gradient(135deg, #495057 0%, #343a40 100%);
-    color: #ccc;
-    border: 2px solid #777;
+    background: linear-gradient(to bottom, #757575, #424242) !important;
+    border: 2px solid #9e9e9e !important;
+    color: #eee !important;
+    box-shadow: 0 2px 0 #212121 !important;
 }
-.btn-status-off:hover:not(:disabled) {
-    background: linear-gradient(135deg, #5a6268 0%, #454d55 100%);
-}
-
-.delegate-bulk-row {
-    background: #0d1a10; /* 見出しと同じ色で統一して自然に繋げる */
-}
-
-/* ヘッダーをスクロール外に出したための調整 */
-.delegate-list-header {
-    position: static !important; /* スクロール外なので固定を解除 */
+.delegate-inline-btn:disabled {
+    filter: grayscale(1) opacity(0.5) !important;
+    cursor: not-allowed !important;
+    box-shadow: none !important;
 }
 
-#delegate-scroll-wrapper {
-    flex: 0 1 auto !important; /* 中身の数に合わせて箱がピッタリ縮むようにする魔法 */
-    max-height: 288px; /* 48px × 6行分を上限にして、超えたらスクロールバーを出す */
-    margin-bottom: 15px; /* 下のボタンとの隙間を確保 */
-}
-
-#delegate-list {
-    height: auto !important; /* 常に最大まで広がって余白ができるのを防ぐ */
-    overflow-y: auto !important;
-    padding-top: 0 !important; /* 見切れ・ズレの原因を完全に消去 */
-    scroll-padding-top: 0 !important;
+.delegate-list-item.empty-row {
+    background: transparent !important;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.03) !important;
 }
 
 /* =========================================================
