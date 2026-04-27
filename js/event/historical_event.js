@@ -789,7 +789,6 @@ window.GameEvents.push({
         if (yoshimoto && yoshimoto.status !== 'dead') return false;
 
         // 5. お市（姫ID: 2）を織田家が所有しており、未婚であるか確認します
-        // 姫のデータは game.princesses の中にあるので、そこから探します
         const oichi = game.princesses ? game.princesses.find(p => p.id === 2) : null;
         if (!oichi || oichi.status !== 'unmarried' || oichi.currentClanId !== nobunaga.clan) return false;
 
@@ -810,6 +809,14 @@ window.GameEvents.push({
         if (game.diplomacyManager) {
             const rel = game.diplomacyManager.getRelation(nagamasa.clan, rokkakuDaimyo.clan);
             if (!rel || rel.status !== '敵対') return false;
+
+            // ★追加：8. 織田家と浅井家がすでに婚姻同盟ではないことを確認します
+            const odaAzaiRel = game.diplomacyManager.getRelation(nobunaga.clan, nagamasa.clan);
+            // すでに「同盟」状態で、かつ「結婚シール」が貼られている場合はイベントをストップします
+            if (odaAzaiRel && odaAzaiRel.status === '同盟' && odaAzaiRel.isMarriage) {
+                return false;
+            }
+
         } else {
             return false;
         }
