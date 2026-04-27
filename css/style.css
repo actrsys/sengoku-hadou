@@ -900,6 +900,38 @@ body.hide-daimyo-labels .daimyo-name-label { display: none !important; }
 .modal .context-info { margin-bottom: 10px; padding: 10px; background: rgba(0, 0, 0, 0.4); border: 1px solid rgba(212, 175, 55, 0.3); border-radius: 4px; font-size: 0.9rem; color: #fff; text-shadow: 1px 1px 1px #000; }
 .modal .context-info:empty { display: none !important; padding: 0 !important; border: none !important; margin: 0 !important; }
 
+/* =========================================================
+   文章選択肢専用UI（メッセージウインドウの上に浮かせる）
+   ========================================================= */
+.dialog-choices {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    margin-bottom: 20px; /* 下のメッセージウインドウとの隙間を作ります */
+    width: 90%;
+    max-width: 600px;
+    z-index: 9501; /* メッセージウインドウより手前に出します */
+}
+.dialog-choice-btn {
+    background: rgba(0, 0, 0, 0.8);
+    border: 2px solid #d4af37;
+    color: #fff;
+    padding: 15px 20px;
+    border-radius: 8px;
+    font-size: 1.2rem;
+    font-family: 'AbashiriMincho', serif;
+    text-align: left; /* 文字を左揃えにします */
+    cursor: pointer;
+    box-shadow: 0 4px 10px rgba(0,0,0,0.5);
+    transition: background 0.2s, transform 0.1s, border-color 0.2s;
+    text-shadow: 1px 1px 1px #000;
+}
+.dialog-choice-btn:hover {
+    background: rgba(50, 50, 50, 0.9);
+    border-color: #ffe066;
+    transform: scale(1.02);
+}
+
 /* 抽出したメッセージボックス用スタイル */
 .dialog-body-container {
     display: flex;

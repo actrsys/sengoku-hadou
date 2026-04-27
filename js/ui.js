@@ -586,20 +586,56 @@ class UIManager {
         okBtn.onclick = () => { okBtn.onclick = null; cleanupAndNext(dialog.onOk); };
 
         const footer = okBtn.parentElement; // ★追加：ボタンが入っているフッターの箱を取得します
+        const choicesContainer = document.getElementById('dialog-choices-container'); // ★新しく作った選択肢の箱を取得します
 
-        if (dialog.isConfirm) {
-            cancelBtn.classList.remove('hidden'); 
-            cancelBtn.onclick = () => { cancelBtn.onclick = null; cleanupAndNext(dialog.onCancel); };
-            okBtn.textContent = dialog.customOpts?.okText || 'はい';
-            okBtn.className = dialog.customOpts?.okClass || 'btn-primary';
-            cancelBtn.textContent = dialog.customOpts?.cancelText || 'いいえ';
-            cancelBtn.className = dialog.customOpts?.cancelClass || 'btn-secondary';
-            footer.style.justifyContent = 'center';
+        // もし「選択肢」が指定されていたら、特別な処理をします
+        if (dialog.customOpts && dialog.customOpts.choices) {
+            footer.classList.add('hidden'); // いつもの「はい・いいえ」ボタンを隠します
+            
+            if (choicesContainer) {
+                choicesContainer.innerHTML = ''; // 中身を一度きれいにします
+                
+                // 用意された選択肢の数だけ、新しくボタンを作ります
+                dialog.customOpts.choices.forEach(choice => {
+                    const btn = document.createElement('button');
+                    btn.className = 'dialog-choice-btn';
+                    btn.textContent = choice.label;
+                    
+                    // ボタンが押された時の処理を登録します
+                    btn.onclick = () => {
+                        // 音を鳴らします（「戻る」ならキャンセルの音、それ以外なら決定の音）
+                        if (window.AudioManager) {
+                            if (choice.label === "戻る") window.AudioManager.playSE('cancel.ogg');
+                            else window.AudioManager.playSE('decision.ogg');
+                        }
+                        
+                        choicesContainer.classList.add('hidden'); // 選択肢を隠します
+                        cleanupAndNext(choice.onClick); // 約束されていた処理（onClick）を実行します
+                    };
+                    choicesContainer.appendChild(btn);
+                });
+                
+                choicesContainer.classList.remove('hidden'); // 選択肢の箱を表示します
+            }
         } else {
-            cancelBtn.classList.add('hidden'); 
-            okBtn.textContent = dialog.customOpts?.okText || '閉じる';
-            okBtn.className = dialog.customOpts?.okClass || 'btn-secondary';
-            footer.style.justifyContent = 'center';
+            // 通常のダイアログの場合は、いつものボタンを出して、選択肢を隠します
+            footer.classList.remove('hidden');
+            if (choicesContainer) choicesContainer.classList.add('hidden');
+
+            if (dialog.isConfirm) {
+                cancelBtn.classList.remove('hidden'); 
+                cancelBtn.onclick = () => { cancelBtn.onclick = null; cleanupAndNext(dialog.onCancel); };
+                okBtn.textContent = dialog.customOpts?.okText || 'はい';
+                okBtn.className = dialog.customOpts?.okClass || 'btn-primary';
+                cancelBtn.textContent = dialog.customOpts?.cancelText || 'いいえ';
+                cancelBtn.className = dialog.customOpts?.cancelClass || 'btn-secondary';
+                footer.style.justifyContent = 'center';
+            } else {
+                cancelBtn.classList.add('hidden'); 
+                okBtn.textContent = dialog.customOpts?.okText || '閉じる';
+                okBtn.className = dialog.customOpts?.okClass || 'btn-secondary';
+                footer.style.justifyContent = 'center';
+            }
         }
 
         modal.classList.remove('hidden');
@@ -1652,31 +1688,40 @@ class UIManager {
     }
 
     renderNormalInterview(busho) {
-        if (!this.resultModal) return;
-        this.resultModal.classList.remove('hidden');
-        let content = "";
         const isSelf = busho.isDaimyo && busho.clan === this.game.playerClanId;
+        
+        let msg = "";
+        let choices = [];
+
+        // 自分（大名）の場合は独り言、他人の場合は会話になります
         if (isSelf) {
-            content = `<h3>独り言 (${busho.name})</h3><div style="margin:20px 0; text-align:left;"><p>（ふむ……${busho.ambition >= 80 ? "天下統一も夢ではないか。" : "家の安泰こそ第一。無理は禁物だ。"}）</p><p>（家中の者たちはどう思っているのか……）</p><div style="margin-top:20px; display:flex; flex-direction:column; gap:10px;"><button class="btn-primary" id="interview-ask">他者について考える</button><button class="btn-secondary" onclick="window.GameApp.ui.reopenInterviewSelector()">戻る</button></div></div>`;
+            msg = `（ふむ……${busho.ambition >= 80 ? "天下統一も夢ではないか。" : "家の安泰こそ第一。無理は禁物だ。"}）\n（家中の者たちはどう思っているのか……）`;
+            choices = [
+                { label: "他者について考える", onClick: () => { this.openBushoSelector('interview_target', null, { interviewer: busho }); } },
+                { label: "戻る", onClick: () => { this.reopenInterviewSelector(); } }
+            ];
         } else {
-            content = `<h3>${busho.name}との面談</h3><div style="margin:20px 0; text-align:left;"><p>「殿、どのようなご用件でしょうか？」</p><div style="margin-top:20px; display:flex; flex-direction:column; gap:10px;"><button class="btn-primary" id="interview-status">調子はどうだ</button><button class="btn-primary" id="interview-ask">他者について聞く</button><button class="btn-secondary" onclick="window.GameApp.ui.reopenInterviewSelector()">戻る</button></div></div>`;
+            msg = `「殿、どのようなご用件でしょうか？」`;
+            choices = [
+                { label: "調子はどうだ", onClick: () => { this.game.commandSystem.executeInterviewStatus(busho); } },
+                { label: "他者について聞く", onClick: () => { this.openBushoSelector('interview_target', null, { interviewer: busho }); } },
+                { label: "戻る", onClick: () => { this.reopenInterviewSelector(); } }
+            ];
         }
-        if (this.resultBody) this.resultBody.innerHTML = content;
-        
-        const statusBtn = document.getElementById('interview-status');
-        if (statusBtn) statusBtn.onclick = () => { this.game.commandSystem.executeInterviewStatus(busho); };
-        
-        const askBtn = document.getElementById('interview-ask');
-        if (askBtn) askBtn.onclick = () => { 
-            this.closeResultModal(); 
-            this.openBushoSelector('interview_target', null, { interviewer: busho }); 
-        };
+
+        // 新しく作った「選択肢（choices）」の機能を指定して、いつものダイアログを呼び出します
+        this.showDialog(msg, false, null, null, {
+            leftFace: busho.faceIcon,
+            leftName: busho.name,
+            choices: choices
+        });
     }
     
-    reopenInterviewSelector() { this.closeResultModal(); this.openBushoSelector('interview', null, {allowDone: true}); }
+    reopenInterviewSelector() { 
+        this.openBushoSelector('interview', null, {allowDone: true}); 
+    }
     
     reopenInterviewModal(busho) {
-        this.closeResultModal();
         setTimeout(() => this.showInterviewModal(busho), 100);
     }
     
