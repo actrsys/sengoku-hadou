@@ -792,8 +792,11 @@ window.GameEvents.push({
         if (yoshimoto && yoshimoto.status !== 'dead') return false;
 
         // 6. お市（姫ID: 2）を織田家が所有しており、未婚であるか確認します
+        const nobunagaClan = game.clans.find(c => c.id === nobunaga.clan);
+        if (!nobunagaClan || !nobunagaClan.princessIds.includes(2)) return false;
+
         const oichi = game.princesses ? game.princesses.find(p => p.id === 2) : null;
-        if (!oichi || oichi.status !== 'unmarried' || oichi.currentClanId !== nobunaga.clan) return false;
+        if (oichi && oichi.status !== 'unmarried') return false;
 
         // 7. 六角義賢（ID: 1018001）または六角義治（ID: 1018002）が大名であるか確認します
         const yoshikata = game.getBusho(1018001);
@@ -833,7 +836,8 @@ window.GameEvents.push({
         const nagamasa = game.getBusho(1015002);
         const oichiId = 2;
 
-        const oichi = game.princesses.find(p => p.id === oichiId);
+        // 万が一姫のデータ集（game.princesses）が未定義だった時のエラーを防ぎます
+        const oichi = game.princesses ? game.princesses.find(p => p.id === oichiId) : null;
         const nobunagaClan = game.clans.find(c => c.id === nobunaga.clan);
         const nagamasaClan = game.clans.find(c => c.id === nagamasa.clan);
 
