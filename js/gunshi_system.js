@@ -65,7 +65,10 @@ class GunshiSystem {
             }
 
             // ダイアログを表示して、閉じたら(onComplete)次に進む
-            this.game.ui.showDialog(`<strong>${gunshi.name}</strong><br><br>${msg}`, false, onComplete);
+            this.game.ui.showDialog(msg, false, onComplete, null, {
+                leftFace: gunshi.faceIcon,
+                leftName: gunshi.name
+            });
         } else {
             // 不満な人がいなければ、そのまま次に進む
             if (onComplete) onComplete();
