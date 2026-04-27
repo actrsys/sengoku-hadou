@@ -922,19 +922,22 @@ body.hide-daimyo-labels .daimyo-name-label { display: none !important; }
     order: 1; /* これで一番上に配置されます */
 }
 
-/* 選択肢の箱（下側） */
-.dialog-choices {
-    display: flex;
-    flex-direction: column;
-    gap: 10px;
-    margin-top: 10px; 
-    margin-bottom: 15px;
-    width: 100%;
-    z-index: 9501; 
-    order: 2; /* これでメッセージの下に配置されます */
-    /* 顔画像(110px)と隙間(15px)の分だけ左にクッションを入れ、メッセージと左端を揃えます */
-    padding-left: 125px; 
-    box-sizing: border-box;
+/* 選択肢ボタンのデザイン */
+.dialog-choice-btn {
+    background: linear-gradient(135deg, #2c1e14 0%, #1a0f0a 100%);
+    border: 2px solid #d4af37;
+    color: #fff;
+    padding: 12px 20px;
+    border-radius: 4px;
+    font-size: 1.1rem;
+    font-family: 'AbashiriMincho', serif;
+    text-align: left; 
+    cursor: pointer;
+    box-shadow: 0 4px 8px rgba(0,0,0,0.6);
+    transition: all 0.2s;
+    text-shadow: 1px 1px 2px #000;
+    width: 100%; /* ★メッセージの箱と幅をピッタリ揃えるおまじないです */
+    box-sizing: border-box; /* ★枠線や余白の分だけ右にはみ出してしまうのを防ぐ魔法です */
 }
 
 /* 選択肢ボタンのデザイン */
