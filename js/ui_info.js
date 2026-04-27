@@ -9,7 +9,7 @@ class UIInfoManager {
         this.game = game;
         this.closeCommonModal(); // 履歴や状態変数の初期化
     }
-
+    
     // --- 共通モーダル（枠の使い回し）管理 ---
     closeCommonModal() {
         this.modalHistory = [];
@@ -26,6 +26,7 @@ class UIInfoManager {
         this.bushoLastSortStateKey = null;
         this.bushoLastScope = null;
         this.bushoSavedData = null;
+        this.bushoSavedSelectedIds = [];
         
         // 外交リストのタブ状態リセット
         this.diploCurrentTab = 'daimyo';
@@ -364,7 +365,7 @@ class UIInfoManager {
     showDiplomacyList(id, name, type = 'daimyo', onClose = null) {
         this.pushModal('diplo_list', [id, name, type, onClose]);
     }
-
+    
     _renderDiplomacyList(id, name, type, onClose, scrollPos = 0) {
         if (!this.diploCurrentTab) this.diploCurrentTab = 'daimyo';
 
@@ -462,7 +463,9 @@ class UIInfoManager {
             onBack: onClose,
             onTabClick: (tabKey) => {
                 this.diploCurrentTab = tabKey;
-                this._renderDiplomacyList(id, name, type, onClose, 0);
+                const listEl = document.getElementById('selector-list');
+                const scroll = listEl ? listEl.scrollTop : 0;
+                this._renderDiplomacyList(id, name, type, onClose, scroll);
             }
         });
     }
@@ -788,6 +791,15 @@ class UIInfoManager {
     showBushoDetailModalById(bushoId) {
         const busho = this.game.getBusho(bushoId);
         if (busho) this.showBushoDetailModal(busho);
+    }
+    
+    _saveBushoSelection() {
+        const inputs = document.querySelectorAll('input[name="sel_busho"]:checked');
+        if (inputs) {
+            this.bushoSavedSelectedIds = Array.from(inputs).map(i => parseInt(i.value));
+        } else {
+            this.bushoSavedSelectedIds = [];
+        }
     }
 
     _updateBushoSelectorUI() {
@@ -2033,20 +2045,26 @@ class UIInfoManager {
                 this.currentKyotenTab = tabKey;
                 this.currentKyotenSortKey = null;
                 this.isKyotenSortAsc = false;
-                this._renderKyotenList(clanId, 0);
+                const listEl = document.getElementById('selector-list');
+                const scroll = listEl ? listEl.scrollTop : 0;
+                this._renderKyotenList(clanId, scroll);
             },
             onScopeClick: (scopeKey) => {
                 this.currentKyotenScope = scopeKey;
                 this.currentKyotenSortKey = null;
                 this.isKyotenSortAsc = false;
-                this._renderKyotenList(clanId, 0);
+                const listEl = document.getElementById('selector-list');
+                const scroll = listEl ? listEl.scrollTop : 0;
+                this._renderKyotenList(clanId, scroll);
             },
             onSortClick: (sortKey) => {
                 const defaultAscKeys = ['name', 'clan', 'castellan', 'province'];
                 const newState = this._toggleSortState(this.currentKyotenSortKey, this.isKyotenSortAsc, sortKey, defaultAscKeys);
                 this.currentKyotenSortKey = newState.key;
                 this.isKyotenSortAsc = newState.isAsc;
-                this._renderKyotenList(clanId, 0);
+                const listEl = document.getElementById('selector-list');
+                const scroll = listEl ? listEl.scrollTop : 0;
+                this._renderKyotenList(clanId, scroll);
             }
         });
     }
@@ -2192,7 +2210,7 @@ class UIInfoManager {
             this.pushModal('busho_selector', [actionType, targetId, extraData, onBack]);
         }
     }
-
+    
     _renderBushoSelector(actionType, targetId, extraData, onBack, scrollPos = 0) {
         this.ui.hideAIGuardTemporarily(); 
         
@@ -2326,6 +2344,10 @@ class UIInfoManager {
 
             if (this.bushoCurrentSortKey) {
                 displayBushos.sort((a, b) => {
+                    const selA = (this.bushoSavedSelectedIds || []).includes(a.id) ? 1 : 0;
+                    const selB = (this.bushoSavedSelectedIds || []).includes(b.id) ? 1 : 0;
+                    if (selA !== selB) return selB - selA;
+
                     let valA = 0, valB = 0;
                     if (this.bushoCurrentSortKey === 'action') {
                         valA = a.isActionDone ? 1 : 0; valB = b.isActionDone ? 1 : 0;
@@ -2458,6 +2480,10 @@ class UIInfoManager {
             } else {
                 if (extraData && extraData.isFactionView) {
                     displayBushos.sort((a, b) => {
+                        const selA = (this.bushoSavedSelectedIds || []).includes(a.id) ? 1 : 0;
+                        const selB = (this.bushoSavedSelectedIds || []).includes(b.id) ? 1 : 0;
+                        if (selA !== selB) return selB - selA;
+
                         if (a.isFactionLeader && !b.isFactionLeader) return -1;
                         if (!a.isFactionLeader && b.isFactionLeader) return 1;
                         if (a.isDaimyo && !b.isDaimyo) return -1;
@@ -2465,9 +2491,21 @@ class UIInfoManager {
                         return getSortRankClan(b) - getSortRankClan(a);
                     });
                 } else if (actionType === 'all_busho_list' && this.bushoCurrentScope === 'all') {
-                    displayBushos.sort((a, b) => getSortRankAll(b) - getSortRankAll(a));
+                    displayBushos.sort((a, b) => {
+                        const selA = (this.bushoSavedSelectedIds || []).includes(a.id) ? 1 : 0;
+                        const selB = (this.bushoSavedSelectedIds || []).includes(b.id) ? 1 : 0;
+                        if (selA !== selB) return selB - selA;
+                        
+                        return getSortRankAll(b) - getSortRankAll(a);
+                    });
                 } else if (isViewMode) {
-                    displayBushos.sort((a, b) => getSortRankClan(b) - getSortRankClan(a));
+                    displayBushos.sort((a, b) => {
+                        const selA = (this.bushoSavedSelectedIds || []).includes(a.id) ? 1 : 0;
+                        const selB = (this.bushoSavedSelectedIds || []).includes(b.id) ? 1 : 0;
+                        if (selA !== selB) return selB - selA;
+                        
+                        return getSortRankClan(b) - getSortRankClan(a);
+                    });
                 }
             }
 
@@ -2547,6 +2585,8 @@ class UIInfoManager {
             let isSelectable = !b.isActionDone; 
             if (isActionFree) isSelectable = true; 
             
+            const isSelected = (this.bushoSavedSelectedIds || []).includes(b.id);
+            
             let currentAcc = null;
             const bCastle = this.game.getCastle(b.castleId);
             if (bCastle && bCastle.investigatedUntil >= this.game.getCurrentTurnId()) {
@@ -2557,7 +2597,7 @@ class UIInfoManager {
             const getStat = (stat) => GameSystem.getDisplayStatHTML(b, stat, gunshi, currentAcc, this.game.playerClanId, myDaimyo);
 
             const inputType = isMulti ? 'checkbox' : 'radio';
-            let inputHtml = !isViewMode ? `<input type="${inputType}" name="sel_busho" value="${b.id}" ${!isSelectable ? 'disabled' : ''} style="display:none;">` : '';
+            let inputHtml = !isViewMode ? `<input type="${inputType}" name="sel_busho" value="${b.id}" ${!isSelectable ? 'disabled' : ''} ${isSelected ? 'checked' : ''} style="display:none;">` : '';
 
             let cells = [];
             if (this.bushoCurrentTab === 'stats') {
@@ -2628,6 +2668,8 @@ class UIInfoManager {
             let itemClassThis = itemClassStr;
             if (!isSelectable && !isViewMode) {
                 itemClassThis += " disabled";
+            } else if (isSelected) {
+                itemClassThis += " selected";
             } else if (isViewMode) {
                 onClickStr = `window.GameApp.ui.info.showBushoDetailModalById(${b.id})`;
             } else {
@@ -2689,19 +2731,28 @@ class UIInfoManager {
             onConfirm: onConfirmHandler,
             hideBackBtn: extraData && extraData.hideCancel,
             onTabClick: (tabKey) => {
+                this._saveBushoSelection();
                 this.bushoCurrentTab = tabKey;
-                this._renderBushoSelector(actionType, targetId, extraData, onBack, 0);
+                const listEl = document.getElementById('selector-list');
+                const scroll = listEl ? listEl.scrollTop : 0;
+                this._renderBushoSelector(actionType, targetId, extraData, onBack, scroll);
             },
             onScopeClick: (scopeKey) => {
+                this._saveBushoSelection();
                 this.bushoCurrentScope = scopeKey;
-                this._renderBushoSelector(actionType, targetId, extraData, onBack, 0);
+                const listEl = document.getElementById('selector-list');
+                const scroll = listEl ? listEl.scrollTop : 0;
+                this._renderBushoSelector(actionType, targetId, extraData, onBack, scroll);
             },
             onSortClick: (sortKey) => {
+                this._saveBushoSelection();
                 const defaultAscKeys = ['name', 'faction', 'castle', 'faction_leader'];
                 const newState = this._toggleSortState(this.bushoCurrentSortKey, this.bushoIsSortAsc, sortKey, defaultAscKeys);
                 this.bushoCurrentSortKey = newState.key;
                 this.bushoIsSortAsc = newState.isAsc;
-                this._renderBushoSelector(actionType, targetId, extraData, onBack, 0);
+                const listEl = document.getElementById('selector-list');
+                const scroll = listEl ? listEl.scrollTop : 0;
+                this._renderBushoSelector(actionType, targetId, extraData, onBack, scroll);
             }
         });
 
