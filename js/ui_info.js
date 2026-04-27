@@ -2331,11 +2331,12 @@ class UIInfoManager {
             }
             return 4; 
         };
-
+        
         let acc = null;
         if (isEnemyTarget && targetCastle) acc = targetCastle.investigatedAccuracy;
 
-        const currentSortStateKey = `${this.bushoCurrentSortKey}_${this.bushoIsSortAsc}`;
+        const selectedIdsStr = (this.bushoSavedSelectedIds || []).sort().join('_');
+        const currentSortStateKey = `${this.bushoCurrentSortKey}_${this.bushoIsSortAsc}_${selectedIdsStr}`;
 
         if (this.bushoSavedSortedBushos && this.bushoLastSortStateKey === currentSortStateKey) {
             displayBushos = this.bushoSavedSortedBushos;
@@ -2663,17 +2664,22 @@ class UIInfoManager {
                     `<span class="col-faction-leader">${factionNameStr}</span>`
                 ].filter(Boolean);
             }
-
+            
             let onClickStr = "";
             let itemClassThis = itemClassStr;
+            
             if (!isSelectable && !isViewMode) {
                 itemClassThis += " disabled";
-            } else if (isSelected) {
-                itemClassThis += " selected";
-            } else if (isViewMode) {
-                onClickStr = `window.GameApp.ui.info.showBushoDetailModalById(${b.id})`;
             } else {
-                onClickStr = `window.GameApp.ui.info.handleBushoSelect(event, ${isMulti}, ${spec.costGold || 0}, ${spec.costRice || 0}, '${actionType}')`;
+                if (isSelected) {
+                    itemClassThis += " selected";
+                }
+                
+                if (isViewMode) {
+                    onClickStr = `window.GameApp.ui.info.showBushoDetailModalById(${b.id})`;
+                } else {
+                    onClickStr = `window.GameApp.ui.info.handleBushoSelect(event, ${isMulti}, ${spec.costGold || 0}, ${spec.costRice || 0}, '${actionType}')`;
+                }
             }
 
             items.push({
