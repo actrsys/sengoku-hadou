@@ -90,7 +90,7 @@ class UIInfoManager {
         if (!info) return;
 
         // ★ここで「情報系画面」かどうかをタグ付け（判定）します
-        const isInfoScreen = ['daimyo_detail', 'busho_detail', 'kunishu_detail', 'castle_detail'].includes(info.pageType);
+        const isInfoScreen = ['daimyo_detail', 'busho_detail', 'delegate_setting', 'kunishu_detail', 'castle_detail'].includes(info.pageType);
 
         // ★枠の大元で、スクロールバーの表示/非表示をクラスで一括管理します
         const listWrapper = document.getElementById('selector-list-wrapper');
@@ -129,6 +129,8 @@ class UIInfoManager {
         else if (info.pageType === 'diplo_list') this._renderDiplomacyList(...info.args, info.scrollPos);
         else if (info.pageType === 'faction_list') this._renderFactionList(...info.args, info.scrollPos);
         else if (info.pageType === 'princess_list') this._renderPrincessList(...info.args, info.scrollPos);
+        else if (info.pageType === 'delegate_list') this._renderDelegateList(...info.args, info.scrollPos);
+        else if (info.pageType === 'delegate_setting') this._renderDelegateSetting(...info.args, info.scrollPos);
         else if (info.pageType === 'prisoner_selector') this._renderPrisonerSelector(...info.args, info.scrollPos);
         else if (info.pageType === 'history_list') this._renderHistoryList(...info.args, info.scrollPos);
         else if (info.pageType === 'kunishu_list') this._renderKunishuList(...info.args, info.scrollPos);
@@ -1459,10 +1461,173 @@ class UIInfoManager {
     confirmPrincessSelection(targetCastleId, doerId) {
         if (!this.selectedPrincessId) return;
 
+        if (window.AudioManager) window.AudioManager.playSE('choice.ogg');
+        
         this.closeCommonModal(); 
         
         window.GameApp.commandSystem.handleBushoSelection('marriage_princess', [this.selectedPrincessId], targetCastleId, { doerId: doerId });
         this.selectedPrincessId = null; 
+    }
+    
+    // ==========================================
+    // ★城主委任リストの魔法（共通モーダル対応版）
+    // ==========================================
+    showDelegateListModal() {
+        this.closeCommonModal(); 
+        this.pushModal('delegate_list', []);
+    }
+
+    _renderDelegateList(scrollPos = 0) {
+        const daimyo = this.game.bushos.find(b => b.clan === this.game.playerClanId && b.isDaimyo);
+        const daimyoCastleId = daimyo ? daimyo.castleId : -1;
+        const myCastles = this.game.castles.filter(c => c.ownerClan === this.game.playerClanId && c.id !== daimyoCastleId);
+
+        const isAllDelegated = myCastles.length > 0 && myCastles.every(c => c.isDelegated);
+        let toggleBtnClass = isAllDelegated ? "btn-toggle-delegated" : "btn-toggle-direct";
+
+        const contextHtml = `<button id="btn-toggle-all-delegate" class="btn-secondary btn-small ${toggleBtnClass}">一括</button>`;
+
+        let items = [];
+        myCastles.forEach(c => {
+            const statusClass = c.isDelegated ? 'text-blue' : 'text-red';
+            const statusText = c.isDelegated ? '委任' : '直轄';
+            const attackText = c.allowAttack ? '許可' : '不可';
+            const attackClass = c.allowAttack ? 'text-blue' : 'text-gray';
+            const moveText = c.allowMove ? '許可' : '不可';
+            const moveClass = c.allowMove ? 'text-blue' : 'text-gray';
+            const attackDisplay = c.isDelegated ? `<span class="${attackClass}">${attackText}</span>` : `<span class="text-gray"></span>`;
+            const moveDisplay = c.isDelegated ? `<span class="${moveClass}">${moveText}</span>` : `<span class="text-gray"></span>`;
+
+            items.push({
+                onClick: `window.GameApp.ui.info.showDelegateSettingModal(${c.id})`,
+                cells: [
+                    `<span class="col-castle-name" style="font-weight:bold; justify-content:flex-start; padding-left:5px;">${c.name}</span>`,
+                    attackDisplay,
+                    moveDisplay,
+                    `<span class="${statusClass}" style="font-weight:bold;">${statusText}</span>`
+                ]
+            });
+        });
+
+        this._renderListModal({
+            title: "委任設定",
+            contextHtml: contextHtml,
+            headers: ["拠点名", "城攻", "武将移動", "状態"],
+            headerClass: "delegate-list-header",
+            itemClass: "delegate-list-item",
+            listClass: "delegate-list-container",
+            items: items,
+            emptyHtml: '<div style="padding: 10px; text-align: center;">委任できる城がありません。</div>',
+            scrollPos: scrollPos,
+            gridTemplateSp: "1.5fr 1fr 1fr 1fr",
+            gridTemplatePc: "200px 100px 100px 100px"
+        });
+
+        setTimeout(() => {
+            const toggleAllBtn = document.getElementById('btn-toggle-all-delegate');
+            if (toggleAllBtn) {
+                toggleAllBtn.onclick = () => {
+                    if (window.AudioManager) window.AudioManager.playSE('choice.ogg');
+                    const newState = !isAllDelegated;
+                    myCastles.forEach(c => c.isDelegated = newState);
+                    const listContainer = document.getElementById('selector-list');
+                    this._renderDelegateList(listContainer ? listContainer.scrollTop : 0);
+                };
+            }
+        }, 10);
+    }
+
+    showDelegateSettingModal(castleId) {
+        this.pushModal('delegate_setting', [castleId]);
+    }
+
+    _renderDelegateSetting(castleId, scrollPos = 0) {
+        const castle = this.game.castles.find(c => c.id === castleId);
+        if (!castle) return;
+
+        const modal = document.getElementById('selector-modal');
+        const titleEl = document.getElementById('selector-title');
+        const listContainer = document.getElementById('selector-list');
+        const contextEl = document.getElementById('selector-context-info');
+        const tabsEl = document.getElementById('selector-tabs');
+        const confirmBtn = document.getElementById('selector-confirm-btn');
+        const backBtn = document.querySelector('#selector-modal .btn-secondary');
+
+        if (!modal) return;
+        modal.classList.remove('hidden');
+        if (titleEl) titleEl.textContent = `${castle.name} の委任設定`;
+        if (contextEl) contextEl.classList.add('hidden');
+        if (confirmBtn) confirmBtn.classList.add('hidden');
+
+        if(backBtn) {
+            backBtn.style.display = '';
+            backBtn.textContent = this.modalHistory && this.modalHistory.length > 0 ? '戻る' : '閉じる';
+            backBtn.onclick = () => {
+                if (window.AudioManager) window.AudioManager.playSE('cancel.ogg');
+                this.popModal();
+            };
+            const footer = backBtn.parentElement;
+            if (footer) footer.style.justifyContent = 'center';
+        }
+
+        if (listContainer) {
+            listContainer.className = 'list-container hide-native-scroll';
+            listContainer.style.display = 'block';
+            listContainer.innerHTML = `
+                <div style="padding: 20px; text-align: center;">
+                    <div style="margin: 20px 0; display: flex; justify-content: center; gap: 20px;">
+                        <button id="btn-direct-control" class="delegate-btn ${!castle.isDelegated ? 'active' : ''}">直轄</button>
+                        <button id="btn-delegate-control" class="delegate-btn ${castle.isDelegated ? 'active' : ''}">委任</button>
+                    </div>
+                    
+                    <div id="delegate-options" style="margin-bottom: 20px; padding: 15px; background: #f9f9f9; border-radius: 8px; text-align: left; opacity: ${castle.isDelegated ? '1' : '0.5'}; transition: opacity 0.3s;">
+                        <div style="margin-bottom: 15px;">
+                            <span style="font-weight: bold; display: inline-block; width: 100px;">城攻め：</span>
+                            <button id="btn-attack-deny" class="delegate-sub-btn ${!castle.allowAttack ? 'active' : ''}" ${!castle.isDelegated ? 'disabled' : ''}>不可</button>
+                            <button id="btn-attack-allow" class="delegate-sub-btn ${castle.allowAttack ? 'active-allow' : ''}" ${!castle.isDelegated ? 'disabled' : ''}>許可</button>
+                        </div>
+                        <div>
+                            <span style="font-weight: bold; display: inline-block; width: 100px;">武将移動：</span>
+                            <button id="btn-move-deny" class="delegate-sub-btn ${!castle.allowMove ? 'active' : ''}" ${!castle.isDelegated ? 'disabled' : ''}>不可</button>
+                            <button id="btn-move-allow" class="delegate-sub-btn ${castle.allowMove ? 'active-allow' : ''}" ${!castle.isDelegated ? 'disabled' : ''}>許可</button>
+                        </div>
+                    </div>
+                </div>
+            `;
+
+            const updateView = () => this._renderDelegateSetting(castleId, listContainer.scrollTop);
+
+            document.getElementById('btn-direct-control').onclick = () => {
+                if (window.AudioManager) window.AudioManager.playSE('choice.ogg');
+                castle.isDelegated = false;
+                updateView();
+            };
+            document.getElementById('btn-delegate-control').onclick = () => {
+                if (window.AudioManager) window.AudioManager.playSE('choice.ogg');
+                castle.isDelegated = true;
+                updateView();
+            };
+            document.getElementById('btn-attack-deny').onclick = () => {
+                if (window.AudioManager) window.AudioManager.playSE('choice.ogg');
+                castle.allowAttack = false;
+                updateView();
+            };
+            document.getElementById('btn-attack-allow').onclick = () => {
+                if (window.AudioManager) window.AudioManager.playSE('choice.ogg');
+                castle.allowAttack = true;
+                updateView();
+            };
+            document.getElementById('btn-move-deny').onclick = () => {
+                if (window.AudioManager) window.AudioManager.playSE('choice.ogg');
+                castle.allowMove = false;
+                updateView();
+            };
+            document.getElementById('btn-move-allow').onclick = () => {
+                if (window.AudioManager) window.AudioManager.playSE('choice.ogg');
+                castle.allowMove = true;
+                updateView();
+            };
+        }
     }
     
     // ==========================================
