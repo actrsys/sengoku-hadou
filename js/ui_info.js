@@ -195,7 +195,7 @@ class UIInfoManager {
                     `<span class="col-prestige">${powerBarHtml}</span>`,
                     `<span class="col-friend">${friendBarHtml}</span>`,
                     `<span class="col-relation ${statusClass}">${friendStatus}</span>`,
-                    `<span class="col-empty"></span>`
+                    `<span class="col-empty pc-only"></span>`
                 ]
             });
         });
@@ -209,14 +209,14 @@ class UIInfoManager {
                 `<span class="col-prestige">威信</span>`,
                 `<span class="col-friend">友好度</span>`,
                 `<span class="col-relation">関係</span>`,
-                `<span class="col-empty"></span>`
+                `<span class="col-empty pc-only"></span>`
             ],
             headerClass: "daimyo-list-header",
             itemClass: "daimyo-list-item",
             listClass: "daimyo-list-container",
             items: items,
             scrollPos: scrollPos,
-            gridTemplateSp: "2.5fr 2fr 1fr 2fr 2fr 1fr 1fr",
+            gridTemplateSp: "2.5fr 2fr 1fr 2fr 2fr 1.5fr",
             gridTemplatePc: "140px 100px 60px 100px 100px 60px 1fr"
         });
     }
@@ -1380,14 +1380,19 @@ class UIInfoManager {
             const age = this.game.year - p.birthYear;
             const father = this.game.getBusho(p.fatherId);
             const husband = this.game.getBusho(p.husbandId);
+            
+            const currentClan = this.game.clans.find(c => c.id === p.currentClanId);
+            const clanName = currentClan ? currentClan.name : "";
+
             return {
                 onClick: isSelectMode ? `window.GameApp.ui.info.selectPrincess(${p.id}, this)` : null,
                 cells: [
                     `<strong class="col-princess-name">${p.name}</strong>`,
+                    `<span class="col-clan">${clanName}</span>`,
                     `<span class="col-age">${age}</span>`,
-                    `<span class="col-father">${father ? father.name : "不明"}</span>`,
-                    `<span class="col-husband">${husband ? husband.name : "なし"}</span>`,
-                    "" 
+                    `<span class="col-father">${father ? father.name : ""}</span>`,
+                    `<span class="col-husband">${husband ? husband.name : ""}</span>`,
+                    `<span class="pc-only"></span>` 
                 ]
             };
         });
@@ -1403,18 +1408,19 @@ class UIInfoManager {
             tabsHtml: tabsHtml,
             headers: [
                 `<span class="col-princess-name">姫</span>`,
+                `<span class="col-clan">勢力</span>`,
                 `<span class="col-age">年齢</span>`,
                 `<span class="col-father">父親</span>`,
                 `<span class="col-husband">配偶者</span>`,
-                `<span></span>`
+                `<span class="pc-only"></span>`
             ],
             headerClass: "princess-list-header",
             itemClass: "princess-list-item",
             listClass: "princess-list-container",
             items: items,
             scrollPos: scrollPos,
-            gridTemplateSp: "1.3fr 1fr 1.5fr 1.5fr 3fr",
-            gridTemplatePc: "95px 80px 100px 100px 1fr",
+            gridTemplateSp: "1.3fr 1.5fr 1fr 1.5fr 1.5fr",
+            gridTemplatePc: "95px 100px 80px 100px 100px 1fr",
             onBack: isSelectMode ? () => this.openBushoSelector('diplomacy_doer', targetCastleId, { subAction: 'marriage' }) : null,
             onConfirm: isSelectMode ? () => this.confirmPrincessSelection(targetCastleId, doerId) : null,
             onScopeClick: (scopeKey) => {
@@ -1919,14 +1925,14 @@ class UIInfoManager {
                 `<span class="col-guns" data-sort="guns">鉄砲${getSortMark('guns')}</span>`
             ];
         } else if (this.currentKyotenTab === 'economy') {
-            gridSpStr = "2fr 0.9fr 0.8fr 0.9fr 0.9fr 1.2fr 1.2fr 1.3fr 1.3fr";
+            gridSpStr = "2.5fr 1fr 0.8fr 1.2fr 1.2fr 1.5fr 1.5fr";
             gridPcStr = "140px 60px 50px 60px 60px 80px 80px 100px 100px";
             headers = [
                 `<span class="col-castle-name" data-sort="name" style="padding-left:5px; justify-content:flex-start;">拠点名${getSortMark('name')}</span>`,
                 `<span class="col-population" data-sort="population">人口${getSortMark('population')}</span>`,
                 `<span class="col-loyalty" data-sort="loyalty">民忠${getSortMark('loyalty')}</span>`,
-                `<span class="col-kokudaka" data-sort="kokudaka">石高${getSortMark('kokudaka')}</span>`,
-                `<span class="col-commerce" data-sort="commerce">鉱山${getSortMark('commerce')}</span>`,
+                `<span class="col-kokudaka pc-only" data-sort="kokudaka">石高${getSortMark('kokudaka')}</span>`,
+                `<span class="col-commerce pc-only" data-sort="commerce">鉱山${getSortMark('commerce')}</span>`,
                 `<span class="col-gold-income" data-sort="goldIncome">金収入/月${getSortMark('goldIncome')}</span>`,
                 `<span class="col-gold-consume" data-sort="goldConsume">金支出/月${getSortMark('goldConsume')}</span>`,
                 `<span class="col-rice-income" data-sort="riceIncome">兵糧収入/年${getSortMark('riceIncome')}</span>`,
@@ -1991,8 +1997,8 @@ class UIInfoManager {
                     `<span class="col-castle-name" style="justify-content:flex-start; padding-left:5px;">${c.name}</span>`,
                     `<span class="col-population">${c.population}</span>`,
                     `<span class="col-loyalty">${c.peoplesLoyalty}</span>`,
-                    `<span class="col-kokudaka">${c.kokudaka}</span>`,
-                    `<span class="col-commerce">${c.commerce}</span>`,
+                    `<span class="col-kokudaka pc-only">${c.kokudaka}</span>`,
+                    `<span class="col-commerce pc-only">${c.commerce}</span>`,
                     `<span class="col-gold-income">${goldIncome}</span>`,
                     `<span class="col-gold-consume">${consumeGold}</span>`,
                     `<span class="col-rice-income">${riceIncome}</span>`,
