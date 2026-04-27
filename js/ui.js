@@ -375,8 +375,9 @@ class UIManager {
     
     hideAIGuardTemporarily() {
         const aiGuard = document.getElementById('ai-guard');
-        if (aiGuard && !aiGuard.classList.contains('hidden')) {
-            aiGuard.classList.add('hidden');
+        // ★変更：壁そのものを消すのではなく、文字だけを透明にして壁を残します！
+        if (aiGuard && !aiGuard.classList.contains('hidden') && aiGuard.style.opacity !== '0') {
+            aiGuard.style.opacity = '0';
             this.guardHiddenCount = (this.guardHiddenCount || 0) + 1;
         } else if (this.guardHiddenCount > 0) {
             this.guardHiddenCount++; 
@@ -384,14 +385,12 @@ class UIManager {
     }
     
     // ==========================================
-    // ★ここから追加！：AI思考中に進捗を表示する魔法です！
+    // AI思考中に進捗を表示する魔法です！
     updateAIProgress(current, total) {
         if (!this.aiGuard) return;
         // ぐるぐる回るアイコンと一緒に、「思考中... (今の数/全部の数)」と表示します
         this.aiGuard.innerHTML = `<div class="loading-spinner"></div>思考中... (${current}/${total})`;
     }
-    // ★追加ここまで！
-    // ==========================================
 
     async waitForDialogs() {
         const isVisible = (id) => {
@@ -401,7 +400,7 @@ class UIManager {
 
         let didWait = false; 
 
-        // ★書き換え：チェックする条件をひとまとめにします
+        // チェックする条件をひとまとめにします
         const checkActive = () => {
             return (this.dialogQueue && this.dialogQueue.length > 0) ||
             isVisible('dialog-modal') ||
@@ -411,8 +410,8 @@ class UIManager {
             isVisible('prisoner-modal') ||
             isVisible('selector-modal') || 
             isVisible('quantity-modal') || 
-            isVisible('war-modal') ||      // ★ここを追加！！！戦争画面が開いている間も待ちます！
-            isVisible('cutin-overlay') ||  // ★ここを書き足し！！！月替わりのカットイン表示中も絶対に待ちます！
+            isVisible('war-modal') ||      // 戦争画面が開いている間も待ちます！
+            isVisible('cutin-overlay') ||  // 月替わりのカットイン表示中も絶対に待ちます！
             this.game.selectionMode != null;
         };
 
@@ -420,7 +419,7 @@ class UIManager {
             didWait = true; 
             await new Promise(resolve => setTimeout(resolve, 200));
             
-            // ★追加：ダイアログが消えたと思っても、次のダイアログが出るまでの隙間（プログラムの準備時間）を考慮して、念のため少し待ってからもう一度確認します！
+            // ダイアログが消えたと思っても、次のダイアログが出るまでの隙間（プログラムの準備時間）を考慮して、念のため少し待ってからもう一度確認します！
             if (!checkActive()) {
                 await new Promise(resolve => setTimeout(resolve, 500)); 
             }
@@ -435,10 +434,13 @@ class UIManager {
         if (this.guardHiddenCount > 0) {
             this.guardHiddenCount--;
             if (this.guardHiddenCount === 0 && this.game && this.game.isProcessingAI) {
-                // ★追加：マップで援軍の城を選んでいる最中は、絶対に膜を復活させない魔法！
+                // マップで援軍の城を選んでいる最中は、絶対に膜を復活させない魔法！
                 if (!this.game.selectionMode) {
                     const aiGuard = document.getElementById('ai-guard');
-                    if (aiGuard) aiGuard.classList.remove('hidden');
+                    if (aiGuard) {
+                        aiGuard.classList.remove('hidden');
+                        aiGuard.style.opacity = '1'; // 透明にする魔法を解いて、文字を見えるように戻します！
+                    }
                 }
             }
         }
@@ -682,14 +684,18 @@ class UIManager {
         if(this.cutinOverlay) this.cutinOverlay.classList.add('hidden');
         if(this.warModal) this.warModal.classList.add('hidden');
         if(this.unitDivideModal) this.unitDivideModal.classList.add('hidden');
-        if(this.aiGuard) this.aiGuard.classList.add('hidden'); 
+        if(this.aiGuard) {
+            this.aiGuard.classList.add('hidden'); 
+            this.aiGuard.style.opacity = '1'; // もし透明になっていたら元に戻しておきます！
+            this.guardHiddenCount = 0;        // 何回隠したかの記憶もきれいに忘れます！
+        }
         
-        // ★ここから追加：さっき作った、コマンドを初期化して隠す魔法をここでも使います！
+        // コマンドを初期化して隠す魔法をここでも使います！
         if (typeof this.clearCommandMenu === 'function') {
             this.clearCommandMenu();
         }
         
-        // ★ここから書き足し：前に遊んでいた時の画面の枠をしっかり隠します！
+        // 前に遊んでいた時の画面の枠をしっかり隠します！
         if(this.panelEl) this.panelEl.classList.add('hidden'); // PC版のサイドバーを隠します
         if(this.statusContainer) this.statusContainer.innerHTML = ''; // PC版の上の情報も消します
         if(this.pcNewUiContainer) this.pcNewUiContainer.classList.add('hidden');
@@ -699,8 +705,7 @@ class UIManager {
         if(this.mobileFloatingInfo) this.mobileFloatingInfo.innerHTML = ''; // スマホ版の時計を消します
         if(this.mobileFloatingMarket) this.mobileFloatingMarket.innerHTML = ''; // スマホ版の相場を消します
         const cmdGrid = document.getElementById('command-area');
-        if(cmdGrid) cmdGrid.style.display = 'none'; // スマホ版のボタン置き場を隠します
-        // ★書き足すのはここまで！
+        if(cmdGrid) cmdGrid.style.display = 'none'; // スマホ版のボタン置き場を隠します0
 
         this.hideContextMenu();
     }
@@ -744,7 +749,7 @@ class UIManager {
     }
 
     // ==========================================
-    // ★ここから追加：委任する城の一覧を出す魔法
+    // 委任する城の一覧を出す魔法
     // ==========================================
     showDelegateListModal() {
         this.info.showDelegateListModal();
