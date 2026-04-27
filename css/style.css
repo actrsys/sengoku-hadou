@@ -901,9 +901,9 @@ body.hide-daimyo-labels .daimyo-name-label { display: none !important; }
 .modal .context-info:empty { display: none !important; padding: 0 !important; border: none !important; margin: 0 !important; }
 
 /* =========================================================
-   文章選択肢専用UI（メッセージウインドウと選択肢）
+   文章選択肢・メッセージ専用UI
    ========================================================= */
-/* 小さなウインドウの中身を「縦並び」にして、順番を入れ替えられるようにする魔法です */
+/* 小窓全体の並び順：メッセージ(order:1)を上、選択肢(order:2)を下にする設定です */
 .modal-content.modal-small {
     position: relative;
     overflow: visible !important; 
@@ -912,52 +912,53 @@ body.hide-daimyo-labels .daimyo-name-label { display: none !important; }
     flex-direction: column;
 }
 
-/* メッセージの箱を「1番目（上）」にする魔法です */
+/* メッセージの箱（上側） */
 .dialog-body-container {
     display: flex;
     align-items: flex-start;
     min-height: 130px; 
     gap: 15px;
     margin: 10px 0; 
-    order: 1; 
+    order: 1; /* これで一番上に配置されます */
 }
 
-/* 選択肢の箱を「2番目（下）」にする魔法です */
+/* 選択肢の箱（下側） */
 .dialog-choices {
     display: flex;
     flex-direction: column;
     gap: 10px;
-    margin-top: 5px; 
-    margin-bottom: 10px;
+    margin-top: 10px; 
+    margin-bottom: 15px;
     width: 100%;
-    max-width: 600px;
     z-index: 9501; 
-    order: 2; 
-    /* 左側の顔画像(110px)と隙間(15px)の分だけ、ボタンの左端をずらして揃えます */
+    order: 2; /* これでメッセージの下に配置されます */
+    /* 顔画像(110px)と隙間(15px)の分だけ左にクッションを入れ、メッセージと左端を揃えます */
     padding-left: 125px; 
     box-sizing: border-box;
 }
 
+/* 選択肢ボタンのデザイン */
 .dialog-choice-btn {
-    background: rgba(0, 0, 0, 0.8);
+    background: linear-gradient(135deg, #2c1e14 0%, #1a0f0a 100%);
     border: 2px solid #d4af37;
     color: #fff;
-    padding: 15px 20px;
-    border-radius: 8px;
-    font-size: 1.2rem;
+    padding: 12px 20px;
+    border-radius: 4px;
+    font-size: 1.1rem;
     font-family: 'AbashiriMincho', serif;
     text-align: left; 
     cursor: pointer;
-    box-shadow: 0 4px 10px rgba(0,0,0,0.5);
-    transition: background 0.2s, transform 0.1s, border-color 0.2s;
-    text-shadow: 1px 1px 1px #000;
+    box-shadow: 0 4px 8px rgba(0,0,0,0.6);
+    transition: all 0.2s;
+    text-shadow: 1px 1px 2px #000;
 }
 .dialog-choice-btn:hover {
-    background: rgba(50, 50, 50, 0.9);
+    background: linear-gradient(135deg, #4d3322 0%, #2c1e14 100%);
     border-color: #ffe066;
-    transform: scale(1.02);
+    transform: translateX(5px); /* 押したくなるように少しだけ右に動きます */
 }
 
+/* 顔グラフィックの列 */
 .dialog-face-column {
     display: flex;
     flex-direction: column;
@@ -966,44 +967,35 @@ body.hide-daimyo-labels .daimyo-name-label { display: none !important; }
     flex-shrink: 0;
 }
 
-/* 名前ラベルを「顔画像の下にくっつく名札」のような自然なデザインにする魔法です */
+/* 【修正】名前ラベル：枠線の上に戻し、デザインをより和風で豪華にしました */
 .dialog-name-label {
-    position: relative; 
-    background: linear-gradient(to bottom, #1a2a3a 0%, #050a10 100%); 
-    border: 1px solid #d4af37;
+    position: absolute; /* 元の「枠に重ねる」位置に戻します */
+    top: -18px; 
+    background: linear-gradient(to bottom, #4a3318 0%, #0d1a10 100%); 
+    border: 2px solid #d4af37;
     color: #ffd54f;
-    padding: 2px 8px;
-    font-size: 0.9rem;
-    border-radius: 2px;
+    padding: 3px 15px;
+    font-size: 1rem;
+    font-weight: bold;
+    border-radius: 4px;
     white-space: nowrap;
     z-index: 1000; 
-    box-shadow: 0 2px 4px rgba(0,0,0,0.5);
+    box-shadow: 0 2px 6px rgba(0,0,0,0.8), inset 0 0 5px rgba(212,175,55,0.4);
     font-family: 'AbashiriMincho', serif;
-    margin-top: -5px; /* 顔画像に少しだけ重ねて、一体感を出します */
+    letter-spacing: 1px;
 }
 
-.dialog-face-space {
-    width: 100%;
-    display: flex;
-    justify-content: center;
-    margin-top: 5px;
-}
-
-.sp-face-wrapper {
-    border: 2px solid #fff;
-    border-radius: 6px;
-    box-shadow: inset 0 0 0 1px rgba(0,0,0,0.7), 0 0 6px rgba(0,0,0,0.8);
-    background: radial-gradient(circle, #1a2a3a 0%, #050a10 100%);
-    overflow: hidden;
-    flex-shrink: 0;
-}
+/* 名前を左側に置く設定 */
+#dialog-left-name { left: 20px; }
+/* 名前を右側に置く設定（PC用） */
+#dialog-right-name { right: 20px; }
 
 .message-area {
     margin: 0;
     flex: 1;
     padding: 15px;
     background: rgba(0, 0, 0, 0.4);
-    border: 1px solid rgba(212, 175, 55, 0.3); 
+    border: 1px solid rgba(212, 175, 55, 0.3);
     border-radius: 8px;
     font-size: 1.1rem;
     line-height: 1.5;
@@ -1015,24 +1007,13 @@ body.hide-daimyo-labels .daimyo-name-label { display: none !important; }
     min-height: 110px; 
 }
 
-/* スマホ版特有の処理（重複していたものをスッキリと一つにまとめました） */
-body:not(.is-pc) .dialog-body-container {
-    gap: 10px;
-}
-body:not(.is-pc) .message-area {
-    font-size: 0.95rem; 
-    padding: 10px; 
-}
-body:not(.is-pc) .dialog-face-column {
-    width: 75px; 
-}
-body:not(.is-pc) .dialog-name-label {
-    font-size: 0.8rem; 
-}
-/* スマホ版では顔画像(75px)と隙間(10px)に合わせて、ボタンの位置を調整します */
-body:not(.is-pc) .dialog-choices {
-    padding-left: 85px; 
-}
+/* スマホで見るときの微調整（画面が狭いので少し詰めます） */
+body:not(.is-pc) .dialog-body-container { gap: 10px; }
+body:not(.is-pc) .message-area { font-size: 0.95rem; padding: 10px; }
+body:not(.is-pc) .dialog-face-column { width: 75px; }
+body:not(.is-pc) .dialog-name-label { font-size: 0.85rem; top: -16px; padding: 2px 10px; }
+/* スマホ版の選択肢の左端：顔(75px)＋隙間(10px)＝85pxで揃えます */
+body:not(.is-pc) .dialog-choices { padding-left: 85px; }
 
 /* 戦闘中の思考メッセージ用 */
 .war-action-message-container {
