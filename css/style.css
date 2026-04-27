@@ -931,13 +931,11 @@ body.hide-daimyo-labels .daimyo-name-label { display: none !important; }
     border-radius: 4px;
     font-size: 1.1rem;
     font-family: 'AbashiriMincho', serif;
-    text-align: left !important;
+    text-align: left !important; /* ★文字を左寄せにします */
     cursor: pointer;
     box-shadow: 0 4px 8px rgba(0,0,0,0.6);
     transition: all 0.2s;
     text-shadow: 1px 1px 2px #000;
-    display: block;
-    width: 100%;
     box-sizing: border-box;
     margin: 0;
 }
@@ -946,16 +944,14 @@ body.hide-daimyo-labels .daimyo-name-label { display: none !important; }
 .dialog-choices {
     display: flex;
     flex-direction: column;
-    align-items: stretch;
+    align-items: stretch; /* ★ボタンを親の幅まで自然に引き伸ばします */
     gap: 10px;
     margin-top: 10px; 
     margin-bottom: 15px;
-    width: 100%;
     z-index: 9501; 
-    order: 2; /* これでメッセージの下に配置されます */
-    /* 顔画像(110px)と隙間(15px)の分だけ左にクッションを入れ、メッセージと左端を揃えます */
+    order: 2;
+    /* メッセージエリアの左端（顔110px + 隙間15px = 125px）に合わせます */
     padding-left: 125px; 
-    padding-right: 0;
     box-sizing: border-box;
 }
 
