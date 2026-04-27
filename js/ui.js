@@ -59,6 +59,7 @@ class UIManager {
         // ★ここを書き足します！
         // 情報表示の専門家（さっき作った新しい箱）を準備しておきます
         this.info = new UIInfoManager(this, this.game);
+        this.delegate = new UIDelegateManager(this, this.game);
         
         this.warModal = document.getElementById('war-modal');
         this.warLog = document.getElementById('war-log');
@@ -845,12 +846,7 @@ class UIManager {
     // 委任する城の一覧を出す魔法
     // ==========================================
     showDelegateListModal() {
-        this.info.showDelegateListModal();
-    }
-
-    // 個別の「直轄・委任・詳細設定」画面を出す魔法
-    showDelegateSettingModal(castleId, onBack) {
-        this.info.showDelegateSettingModal(castleId, onBack);
+        this.delegate.showModal();
     }
     
     showDiplomacyList(clanId, clanName) {

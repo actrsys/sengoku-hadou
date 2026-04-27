@@ -149,6 +149,21 @@
             </div>
         </div>
         
+        <div id="delegate-modal" class="modal hidden">
+            <div class="modal-content delegate-content">
+                <h3>委任設定</h3>
+                <div class="context-info">
+                    <button id="btn-toggle-all-delegate" class="btn-secondary btn-small">一括</button>
+                </div>
+                <div class="scroll-wrapper">
+                    <div id="delegate-list" class="list-container hide-native-scroll" style="min-width: 100%; display: block;"></div>
+                </div>
+                <div class="modal-footer">
+                    <button class="btn-secondary" onclick="window.GameApp.ui.delegate.closeModal()">戻る</button>
+                </div>
+            </div>
+        </div>
+
         <div id="cutin-overlay" class="cutin-overlay hidden">
             <div class="cutin-text" id="cutin-message"></div>
         </div>
@@ -489,6 +504,7 @@
     <script src="js/event/common_events.js"></script>
     <script src="js/event/typhoon_event.js"></script>
     <script src="js/event/historical_event.js"></script>
+    <script src="js/ui_delegate.js"></script>
     <script src="js/game.js"></script>
     
     <script>

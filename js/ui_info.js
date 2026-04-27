@@ -90,7 +90,7 @@ class UIInfoManager {
         if (!info) return;
 
         // ★ここで「情報系画面」かどうかをタグ付け（判定）します
-        const isInfoScreen = ['daimyo_detail', 'busho_detail', 'delegate_setting', 'kunishu_detail', 'castle_detail'].includes(info.pageType);
+        const isInfoScreen = ['daimyo_detail', 'busho_detail', 'kunishu_detail', 'castle_detail'].includes(info.pageType);
 
         // ★枠の大元で、スクロールバーの表示/非表示をクラスで一括管理します
         const listWrapper = document.getElementById('selector-list-wrapper');
