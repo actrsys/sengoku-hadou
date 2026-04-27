@@ -525,10 +525,29 @@ class UIManager {
 
         msgEl.innerHTML = dialog.msg.replace(/\n/g, '<br>');
 
+        // スマホ版の場合は強制的に左側に寄せて、右側を空にする処理
+        let leftFace = dialog.customOpts?.leftFace;
+        let leftName = dialog.customOpts?.leftName;
+        let rightFace = dialog.customOpts?.rightFace;
+        let rightName = dialog.customOpts?.rightName;
+
+        if (!document.body.classList.contains('is-pc')) {
+            // 右側にしか設定されていない場合は左側に移動します
+            if (rightFace && !leftFace) {
+                leftFace = rightFace;
+                leftName = rightName;
+            }
+            // 右側は常にクリアして空っぽにします
+            rightFace = null;
+            rightName = null;
+        }
+
         const setFaceAndName = (faceEl, nameEl, faceIcon, nameText) => {
+            let hasContent = false;
             if (faceEl) {
                 if (faceIcon) {
-                    faceEl.innerHTML = `<div class="sp-face-wrapper" style="margin: 0; width: 60px; height: 60px;"><img src="data/images/faceicons/${faceIcon}" onerror="this.src='data/images/faceicons/unknown_face.webp'"></div>`;
+                    faceEl.innerHTML = `<div class="sp-face-wrapper" style="margin: 0; width: 70px; height: 70px;"><img src="data/images/faceicons/${faceIcon}" onerror="this.src='data/images/faceicons/unknown_face.webp'"></div>`;
+                    hasContent = true;
                 } else {
                     faceEl.innerHTML = '';
                 }
@@ -537,14 +556,24 @@ class UIManager {
                 if (nameText) {
                     nameEl.textContent = nameText;
                     nameEl.classList.remove('hidden');
+                    hasContent = true;
                 } else {
                     nameEl.classList.add('hidden');
                 }
             }
+            
+            // 顔も名前もない場合は、親の箱ごと隠してスペースを詰めます
+            if (faceEl && faceEl.parentElement) {
+                if (hasContent) {
+                    faceEl.parentElement.classList.remove('hidden');
+                } else {
+                    faceEl.parentElement.classList.add('hidden');
+                }
+            }
         };
 
-        setFaceAndName(leftFaceEl, leftNameEl, dialog.customOpts?.leftFace, dialog.customOpts?.leftName);
-        setFaceAndName(rightFaceEl, rightNameEl, dialog.customOpts?.rightFace, dialog.customOpts?.rightName);
+        setFaceAndName(leftFaceEl, leftNameEl, leftFace, leftName);
+        setFaceAndName(rightFaceEl, rightNameEl, rightFace, rightName);
         
         let autoCloseTimer = null;
 

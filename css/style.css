@@ -935,36 +935,37 @@ body.hide-daimyo-labels .daimyo-name-label { display: none !important; }
 /* 抽出したメッセージボックス用スタイル */
 .dialog-body-container {
     display: flex;
-    align-items: flex-end; /* 顔とメッセージの下端を揃えます */
+    align-items: flex-start; /* 上端を揃えて、上から下に自然に並べます */
     min-height: 120px;
-    gap: 10px;
-    margin: 15px 0; /* 上下の余白を狭い方に統一 */
+    gap: 15px; /* メッセージとの隙間を少し広げます */
+    margin: 15px 0; 
 }
 .dialog-face-column {
     display: flex;
     flex-direction: column;
-    align-items: center; /* これで顔に対して看板が横中央になります */
-    width: 60px;
+    align-items: center; 
+    width: 90px; /* 名前が長くても対応できるように、列の幅をしっかり取ります */
     flex-shrink: 0;
-    position: relative; /* 看板の位置を決める基準になります */
+    gap: 5px; /* 名前と顔グラフィックの間の隙間です */
 }
 .dialog-face-space {
-    width: 60px;
-    height: 60px;
+    width: 100%;
+    display: flex;
+    justify-content: center;
 }
 .dialog-name-label {
-    position: absolute;
-    bottom: -25px; /* 顔グラから完全に下へ逃がし、絶対に重ならないようにします */
-    transform: translateY(50%); /* 名前の中央がウインドウの外枠線を突っ切るように調整 */
     background: #0d1a10;
     border: 1.5px solid #d4af37;
     color: #ffd54f;
-    padding: 2px 8px;
-    font-size: 0.8rem;
+    padding: 2px 6px;
+    font-size: 0.85rem;
     border-radius: 4px;
     white-space: nowrap;
-    z-index: 10;
     box-shadow: 0 2px 4px rgba(0,0,0,0.5);
+    max-width: 100%; /* 長すぎた場合はみ出さないように制限します */
+    box-sizing: border-box;
+    overflow: hidden;
+    text-overflow: ellipsis; /* 枠を超えたら「…」で省略します */
 }
 .message-area {
     margin: 0;
@@ -980,8 +981,24 @@ body.hide-daimyo-labels .daimyo-name-label { display: none !important; }
     color: #fff;
     text-shadow: 1px 1px 1px #000;
     box-sizing: border-box;
-    min-height: 110px; /* 文字が少なくてもこの高さはキープします */
+    min-height: 110px; 
 }
+
+/* スマホ版特有の処理：文字を少し小さくし、メッセージ領域をさらに広く取ります */
+body:not(.is-pc) .dialog-body-container {
+    gap: 10px;
+}
+body:not(.is-pc) .message-area {
+    font-size: 0.95rem; /* スマホ版のメッセージ文字サイズを小さくします */
+    padding: 10px; /* メッセージの余白を削って領域を広くします */
+}
+body:not(.is-pc) .dialog-face-column {
+    width: 75px; /* スマホ版では顔グラフィックの列幅を少し狭くします */
+}
+body:not(.is-pc) .dialog-name-label {
+    font-size: 0.8rem; /* スマホ版の名前文字サイズを小さくします */
+}
+
 /* 戦闘中の思考メッセージ用 */
 .war-action-message-container {
     background: rgba(0, 0, 0, 0.4);
