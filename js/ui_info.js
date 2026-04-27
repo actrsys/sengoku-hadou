@@ -1381,8 +1381,9 @@ class UIInfoManager {
             const father = this.game.getBusho(p.fatherId);
             const husband = this.game.getBusho(p.husbandId);
             
-            const currentClan = this.game.clans.find(c => c.id === p.currentClanId);
-            const clanName = currentClan ? currentClan.name : "";
+            const targetClanId = (p.husbandId && p.husbandId !== 0) ? p.currentClanId : p.originalClanId;
+            const targetClan = this.game.clans.find(c => c.id === targetClanId);
+            const clanName = targetClan ? targetClan.name : "無所属";
 
             return {
                 onClick: isSelectMode ? `window.GameApp.ui.info.selectPrincess(${p.id}, this)` : null,
@@ -1390,8 +1391,8 @@ class UIInfoManager {
                     `<strong class="col-princess-name">${p.name}</strong>`,
                     `<span class="col-clan">${clanName}</span>`,
                     `<span class="col-age">${age}</span>`,
-                    `<span class="col-father">${father ? father.name : ""}</span>`,
-                    `<span class="col-husband">${husband ? husband.name : ""}</span>`,
+                    `<span class="col-father">${father ? father.name : "不明"}</span>`,
+                    `<span class="col-husband">${husband ? husband.name : "なし"}</span>`,
                     `<span class="pc-only"></span>` 
                 ]
             };
@@ -1901,28 +1902,30 @@ class UIInfoManager {
         let gridPcStr = "";
 
         if (this.currentKyotenTab === 'status') {
-            gridSpStr = "2fr 1.2fr 1.5fr 1.2fr 0.8fr 1.2fr 1.2fr";
-            gridPcStr = "140px 100px 100px 100px 60px 80px 80px";
+            gridSpStr = "2fr 1fr 1fr 1fr 0.8fr 1fr 1fr";
+            gridPcStr = "140px 100px 100px 100px 60px 80px 80px 1fr";
             headers = [
                 `<span class="col-castle-name" data-sort="name" style="padding-left:5px; justify-content:flex-start;">拠点名${getSortMark('name')}</span>`,
                 `<span class="col-clan" data-sort="clan">勢力${getSortMark('clan')}</span>`,
-                `<span class="col-castellan" data-sort="castellan">城主${getSortMark('castellan')}</span>`,
-                `<span class="col-province" data-sort="province">所属${getSortMark('province')}</span>`,
+                `<span class="col-castellan" data-sort="castellan">城代${getSortMark('castellan')}</span>`,
+                `<span class="col-province" data-sort="province">国${getSortMark('province')}</span>`,
                 `<span class="col-busho-count" data-sort="bushoCount">武将${getSortMark('bushoCount')}</span>`,
                 `<span class="col-gold" data-sort="gold">金${getSortMark('gold')}</span>`,
-                `<span class="col-rice" data-sort="rice">兵糧${getSortMark('rice')}</span>`
+                `<span class="col-rice" data-sort="rice">兵糧${getSortMark('rice')}</span>`,
+                `<span class="pc-only"></span>`
             ];
         } else if (this.currentKyotenTab === 'military') {
-            gridSpStr = "2fr 1.2fr 1fr 1fr 1fr 1fr 1fr";
-            gridPcStr = "140px 80px 60px 60px 60px 80px 80px";
+            gridSpStr = "2fr 1fr 1fr 1fr 1fr 1fr 1fr";
+            gridPcStr = "140px 80px 80px 80px 80px 80px 80px 1fr";
             headers = [
                 `<span class="col-castle-name" data-sort="name" style="padding-left:5px; justify-content:flex-start;">拠点名${getSortMark('name')}</span>`,
-                `<span class="col-soldiers" data-sort="soldiers">兵士${getSortMark('soldiers')}</span>`,
+                `<span class="col-soldiers" data-sort="soldiers">兵数${getSortMark('soldiers')}</span>`,
                 `<span class="col-defense" data-sort="defense">防御${getSortMark('defense')}</span>`,
                 `<span class="col-morale" data-sort="morale">士気${getSortMark('morale')}</span>`,
                 `<span class="col-training" data-sort="training">訓練${getSortMark('training')}</span>`,
                 `<span class="col-horses" data-sort="horses">軍馬${getSortMark('horses')}</span>`,
-                `<span class="col-guns" data-sort="guns">鉄砲${getSortMark('guns')}</span>`
+                `<span class="col-guns" data-sort="guns">鉄砲${getSortMark('guns')}</span>`,
+                `<span class="pc-only"></span>`
             ];
         } else if (this.currentKyotenTab === 'economy') {
             gridSpStr = "2.5fr 1fr 0.8fr 1.2fr 1.2fr 1.5fr 1.5fr";
@@ -1980,7 +1983,8 @@ class UIInfoManager {
                     `<span class="col-province">${provinceName}</span>`,
                     `<span class="col-busho-count">${bushosCount}</span>`,
                     `<span class="col-gold">${c.gold}</span>`,
-                    `<span class="col-rice">${c.rice}</span>`
+                    `<span class="col-rice">${c.rice}</span>`,
+                    `<span class="pc-only"></span>`
                 ];
             } else if (this.currentKyotenTab === 'military') {
                 cells = [
@@ -1990,7 +1994,8 @@ class UIInfoManager {
                     `<span class="col-morale">${c.morale}</span>`,
                     `<span class="col-training">${c.training}</span>`,
                     `<span class="col-horses">${c.horses || 0}</span>`,
-                    `<span class="col-guns">${c.guns || 0}</span>`
+                    `<span class="col-guns">${c.guns || 0}</span>`,
+                    `<span class="pc-only"></span>`
                 ];
             } else if (this.currentKyotenTab === 'economy') {
                 cells = [
