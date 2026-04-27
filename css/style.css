@@ -938,7 +938,7 @@ body.hide-daimyo-labels .daimyo-name-label { display: none !important; }
     align-items: flex-end; /* 顔とメッセージの下端を揃えます */
     min-height: 120px;
     gap: 10px;
-    margin: 15px 0;
+    margin: 15px 0; /* 上下の余白を狭い方に統一 */
 }
 .dialog-face-column {
     display: flex;
@@ -946,15 +946,16 @@ body.hide-daimyo-labels .daimyo-name-label { display: none !important; }
     align-items: center; /* これで顔に対して看板が横中央になります */
     width: 60px;
     flex-shrink: 0;
+    position: relative; /* 看板の位置を決める基準になります */
 }
 .dialog-face-space {
     width: 60px;
     height: 60px;
 }
 .dialog-name-label {
-    order: 2; /* 顔グラの下に名前を配置し、重なるのを防ぎます */
-    transform: translateY(50%); /* 半分下にずらして枠線の中央に重ねます */
-    margin-top: 5px; /* 顔グラと重ならないよう少し隙間を作ります */
+    position: absolute;
+    bottom: -25px; /* 顔グラから完全に下へ逃がし、絶対に重ならないようにします */
+    transform: translateY(50%); /* 名前の中央がウインドウの外枠線を突っ切るように調整 */
     background: #0d1a10;
     border: 1.5px solid #d4af37;
     color: #ffd54f;
@@ -964,22 +965,6 @@ body.hide-daimyo-labels .daimyo-name-label { display: none !important; }
     white-space: nowrap;
     z-index: 10;
     box-shadow: 0 2px 4px rgba(0,0,0,0.5);
-}
-.message-area {
-    margin: 0;
-    flex: 1;
-    padding: 15px;
-    background: rgba(0, 0, 0, 0.4);
-    border: 1px solid rgba(212, 175, 55, 0.3);
-    border-radius: 8px;
-    font-size: 1.1rem;
-    line-height: 1.5;
-    white-space: pre-wrap;
-    text-align: left;
-    color: #fff;
-    text-shadow: 1px 1px 1px #000;
-    box-sizing: border-box;
-    min-height: 110px; /* 文字が少なくてもこの高さはキープします */
 }
 
 /* 戦闘中の思考メッセージ用 */
