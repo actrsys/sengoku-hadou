@@ -2415,3 +2415,10 @@ body.is-pc.daimyo-select-mode #pc-new-ui-container { display: none !important; }
     background-color: #546e7a;
     color: #ffcc80;
 }
+
+// スマホ版では非表示にする、PC限定リスト
+@media screen and (max-width: 768px) {
+    .pc-only-col {
+        display: none !important;
+    }
+}

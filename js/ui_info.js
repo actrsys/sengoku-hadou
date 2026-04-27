@@ -1919,14 +1919,15 @@ class UIInfoManager {
                 `<span class="col-guns" data-sort="guns">鉄砲${getSortMark('guns')}</span>`
             ];
         } else if (this.currentKyotenTab === 'economy') {
-            gridSpStr = "2fr 0.9fr 0.8fr 0.9fr 0.9fr 1.2fr 1.2fr 1.3fr 1.3fr";
+            // スマホ版（gridSpStr）から石高と鉱山の分の「0.9fr」を2つ削除して、合計7列にします
+            gridSpStr = "2fr 0.9fr 0.8fr 1.2fr 1.2fr 1.3fr 1.3fr";
             gridPcStr = "140px 60px 50px 60px 60px 80px 80px 100px 100px";
             headers = [
                 `<span class="col-castle-name" data-sort="name" style="padding-left:5px; justify-content:flex-start;">拠点名${getSortMark('name')}</span>`,
                 `<span class="col-population" data-sort="population">人口${getSortMark('population')}</span>`,
                 `<span class="col-loyalty" data-sort="loyalty">民忠${getSortMark('loyalty')}</span>`,
-                `<span class="col-kokudaka" data-sort="kokudaka">石高${getSortMark('kokudaka')}</span>`,
-                `<span class="col-commerce" data-sort="commerce">鉱山${getSortMark('commerce')}</span>`,
+                `<span class="col-kokudaka pc-only-col" data-sort="kokudaka">石高${getSortMark('kokudaka')}</span>`,
+                `<span class="col-commerce pc-only-col" data-sort="commerce">鉱山${getSortMark('commerce')}</span>`,
                 `<span class="col-gold-income" data-sort="goldIncome">金収入/月${getSortMark('goldIncome')}</span>`,
                 `<span class="col-gold-consume" data-sort="goldConsume">金支出/月${getSortMark('goldConsume')}</span>`,
                 `<span class="col-rice-income" data-sort="riceIncome">兵糧収入/年${getSortMark('riceIncome')}</span>`,
@@ -1991,8 +1992,8 @@ class UIInfoManager {
                     `<span class="col-castle-name" style="justify-content:flex-start; padding-left:5px;">${c.name}</span>`,
                     `<span class="col-population">${c.population}</span>`,
                     `<span class="col-loyalty">${c.peoplesLoyalty}</span>`,
-                    `<span class="col-kokudaka">${c.kokudaka}</span>`,
-                    `<span class="col-commerce">${c.commerce}</span>`,
+                    `<span class="col-kokudaka pc-only-col">${c.kokudaka}</span>`,
+                    `<span class="col-commerce pc-only-col">${c.commerce}</span>`,
                     `<span class="col-gold-income">${goldIncome}</span>`,
                     `<span class="col-gold-consume">${consumeGold}</span>`,
                     `<span class="col-rice-income">${riceIncome}</span>`,
