@@ -930,10 +930,7 @@ body.hide-daimyo-labels .daimyo-name-label { display: none !important; }
     gap: 12px;
     margin: 10px 0 0 0;
     padding: 0;
-    width: 95%; /* ★ウインドウの枠と同じ幅（95%）に合わせます */
-    max-width: 400px; /* ★ウインドウの枠と同じ最大幅（400px）でストッパーをかけます */
-    z-index: 9501;
-    order: 2; /* これでメッセージの下に配置されます */
+    width: 100%; /* ★ウインドウの中に入ったので、純粋に100%にするだけで枠にピッタリ合います！ */
     box-sizing: border-box;
 }
 
