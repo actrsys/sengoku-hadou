@@ -932,40 +932,99 @@ body.hide-daimyo-labels .daimyo-name-label { display: none !important; }
     transform: scale(1.02);
 }
 
-/* 抽出したメッセージボックス用スタイル */
+/* 抽出したメッセージボックス用スタイル
+/* メッセージウィンドウ全体の基準位置を設定 */
+.modal-content.modal-small {
+    position: relative;
+    padding-top: 25px; /* 名前ラベルが枠の上に重なるための余白 */
+}
+
 .dialog-body-container {
     display: flex;
-    align-items: flex-start; /* 上端を揃えて、上から下に自然に並べます */
-    min-height: 120px;
-    gap: 15px; /* メッセージとの隙間を少し広げます */
-    margin: 15px 0; 
+    align-items: flex-start;
+    min-height: 130px; /* 顔を大きくしたので少し高くします */
+    gap: 15px;
+    margin: 10px 0; 
 }
+
 .dialog-face-column {
     display: flex;
     flex-direction: column;
-    align-items: center; 
-    width: 90px; /* 名前が長くても対応できるように、列の幅をしっかり取ります */
+    align-items: center;
+    width: 95px; /* 顔を大きくしたので幅も少し広げます */
     flex-shrink: 0;
-    gap: 5px; /* 名前と顔グラフィックの間の隙間です */
 }
+
+/* 名前ラベルをウィンドウの枠に重ねる魔法 */
+.dialog-name-label {
+    position: absolute;
+    top: -14px; /* 枠線のちょうど上に重なるように調整 */
+    background: #0d1a10;
+    border: 2px solid #d4af37;
+    color: #ffd54f;
+    padding: 2px 10px;
+    font-size: 0.9rem;
+    border-radius: 4px;
+    white-space: nowrap;
+    z-index: 100;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.5);
+    font-family: 'AbashiriMincho', serif;
+}
+
+/* 左側の名前ラベルの位置 */
+#dialog-left-name {
+    left: 20px;
+}
+
+/* 右側の名前ラベルの位置（PC版のみ） */
+#dialog-right-name {
+    right: 20px;
+}
+
 .dialog-face-space {
     width: 100%;
     display: flex;
     justify-content: center;
+    margin-top: 5px;
 }
-.dialog-name-label {
-    background: #0d1a10;
-    border: 1.5px solid #d4af37;
-    color: #ffd54f;
-    padding: 2px 6px;
-    font-size: 0.85rem;
-    border-radius: 4px;
-    white-space: nowrap;
-    box-shadow: 0 2px 4px rgba(0,0,0,0.5);
-    max-width: 100%; /* 長すぎた場合はみ出さないように制限します */
-    box-sizing: border-box;
+
+/* 顔グラフィックを囲む枠（ui.jsのwidth指定を優先しつつ表示を整える） */
+.sp-face-wrapper {
+    border: 2px solid #fff;
+    border-radius: 6px;
+    box-shadow: inset 0 0 0 1px rgba(0,0,0,0.7), 0 0 6px rgba(0,0,0,0.8);
+    background: radial-gradient(circle, #1a2a3a 0%, #050a10 100%);
     overflow: hidden;
-    text-overflow: ellipsis; /* 枠を超えたら「…」で省略します */
+    flex-shrink: 0;
+}
+
+.message-area {
+    margin: 0;
+    flex: 1;
+    padding: 15px;
+    background: rgba(0, 0, 0, 0.4);
+    border: 1px solid rgba(212, 175, 55, 0.3); /* これが「メッセージ枠」になります */
+    border-radius: 8px;
+    font-size: 1.1rem;
+    line-height: 1.5;
+    white-space: pre-wrap;
+    text-align: left;
+    color: #fff;
+    text-shadow: 1px 1px 1px #000;
+    box-sizing: border-box;
+    min-height: 110px; 
+}
+
+/* スマホ版特有の処理（左固定・詰める・文字サイズ調整） */
+body:not(.is-pc) .dialog-body-container {
+    gap: 10px;
+}
+body:not(.is-pc) .message-area {
+    font-size: 0.95rem;
+    padding: 10px;
+}
+body:not(.is-pc) .dialog-face-column {
+    width: 85px; /* スマホでも顔を見やすく、かつメッセージ幅を殺さない絶妙なサイズ */
 }
 .message-area {
     margin: 0;
