@@ -204,7 +204,6 @@ body:not(.is-pc) .status-marks-carousel .status-mark.fade-in {
     white-space: nowrap; 
     overflow: hidden; 
     box-shadow: inset 0 0 0 1px rgba(0, 50, 40, 0.4), 0 2px 4px rgba(0,0,0,0.4);
-    transition: background 0.15s ease-out, border-color 0.15s ease-out, color 0.15s ease-out, box-shadow 0.1s;
 }
 .cmd-btn:hover { 
     background: linear-gradient(135deg, #c2d6c3 0%, #82a396 100%); 
