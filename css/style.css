@@ -638,39 +638,39 @@ body:not(.is-pc) .select-item > *:has(+ .pc-only:last-child) { border-right: non
 .text-orange { color: #ffd180 !important; }
 .text-pink { color: #ff96ba !important; }
 
-/* 委任一括ボタン用 */
-.btn-toggle-delegated {
-    color: #ff8a80 !important;
-    background-color: #3e2723 !important;
-    border-color: #ff8a80 !important;
-}
-.btn-toggle-direct {
-    color: #82b1ff !important;
-    background-color: #0d47a1 !important;
-    border-color: #82b1ff !important;
-}
-
 /* 委任設定（独自リスト） */
 #delegate-list {
-    height: 320px; /* 40px * 8行分 */
+    height: 320px;
     overflow: hidden !important;
-    scrollbar-width: none; /* Firefox用 */
-    -ms-overflow-style: none; /* IE用 */
+    scrollbar-width: none;
+    -ms-overflow-style: none;
 }
 
 #delegate-list::-webkit-scrollbar {
-    display: none; /* Chrome, Safari用 */
+    display: none;
 }
 
-/* カスタムスクロールバーのパーツが強制挿入された場合も隠す */
 #delegate-list .ps__rail-x,
 #delegate-list .ps__rail-y {
     display: none !important;
 }
 
-.delegate-list-header, .delegate-list-item {
+.delegate-list-header {
     display: grid;
-    grid-template-columns: 1.6fr 1.2fr 0.8fr 0.8fr 1fr;
+    grid-template-columns: 1.6fr 1.2fr 1fr 1fr 1fr;
+    font-size: clamp(0.65rem, 2.2vw, 0.85rem);
+    padding: 0;
+    height: 50px;
+    gap: 0;
+    box-sizing: border-box;
+    align-items: center;
+    overflow: hidden;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.delegate-list-item {
+    display: grid;
+    grid-template-columns: 1.6fr 1.2fr 1fr 1fr 1fr;
     font-size: clamp(0.65rem, 2.2vw, 0.85rem);
     padding: 0;
     height: 40px;
@@ -683,12 +683,13 @@ body:not(.is-pc) .select-item > *:has(+ .pc-only:last-child) { border-right: non
 
 @media (min-width: 768px) {
     .delegate-list-header, .delegate-list-item {
-        grid-template-columns: 160px 120px 80px 80px 100px;
+        grid-template-columns: 160px 120px 90px 90px 90px;
     }
 }
 
 .delegate-list-header span, .delegate-list-item span {
     display: flex;
+    flex-direction: column;
     align-items: center;
     justify-content: center;
     height: 100%;
@@ -697,6 +698,7 @@ body:not(.is-pc) .select-item > *:has(+ .pc-only:last-child) { border-right: non
 .delegate-list-item .col-castle-name, 
 .delegate-list-item .col-castellan {
     justify-content: flex-start;
+    flex-direction: row;
     padding-left: 10px;
     font-weight: bold;
 }
@@ -704,7 +706,27 @@ body:not(.is-pc) .select-item > *:has(+ .pc-only:last-child) { border-right: non
 .delegate-list-header .col-castle-name,
 .delegate-list-header .col-castellan {
     justify-content: flex-start;
+    flex-direction: row;
     padding-left: 10px;
+}
+
+.delegate-header-btn {
+    padding: 1px 6px;
+    margin-top: 2px;
+    font-size: 0.7rem;
+    font-weight: bold;
+    border-radius: 3px;
+    border: 1px solid #d4af37;
+    background: #1b3822;
+    color: #ffd54f;
+    cursor: pointer;
+    font-family: inherit;
+    transition: all 0.2s;
+    line-height: 1.2;
+}
+
+.delegate-header-btn:hover {
+    background: #2a5a36;
 }
 
 .delegate-inline-btn {
@@ -721,38 +743,27 @@ body:not(.is-pc) .select-item > *:has(+ .pc-only:last-child) { border-right: non
 }
 
 .delegate-inline-btn:disabled {
-    opacity: 0.4;
+    opacity: 0.5;
     cursor: not-allowed;
-    background-color: #555 !important;
-    color: #aaa !important;
+    background-color: #2a2a2a !important;
+    color: #777 !important;
     border-color: #444 !important;
 }
 
-.btn-status-delegated {
-    background-color: #0d47a1;
-    color: #82b1ff;
-    border-color: #82b1ff;
+.btn-status-on {
+    background-color: #2a5a36;
+    color: #ffd54f;
+    border-color: #d4af37;
+    box-shadow: inset 0 0 5px rgba(0,0,0,0.5);
 }
 
-.btn-status-direct {
-    background-color: #3e2723;
-    color: #ff8a80;
-    border-color: #ff8a80;
+.btn-status-off {
+    background-color: #3e3a36;
+    color: #c5b485;
+    border-color: #826a32;
+    box-shadow: inset 0 0 5px rgba(0,0,0,0.8);
 }
 
-.btn-allow {
-    background-color: #e3f2fd;
-    color: #1976d2;
-    border-color: #1976d2;
-}
-
-.btn-deny {
-    background-color: #ffebee;
-    color: #d32f2f;
-    border-color: #d32f2f;
-}
-
-/* 空行のスタイル */
 .delegate-list-item.empty-row {
     background: transparent !important;
     border-bottom: 1px solid rgba(255, 255, 255, 0.03);

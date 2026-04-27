@@ -30,58 +30,32 @@ class UIDelegateManager {
 
         const daimyo = this.game.bushos.find(b => b.clan === this.game.playerClanId && b.isDaimyo);
         const daimyoCastleId = daimyo ? daimyo.castleId : -1;
-        // 大名のいるお城以外をリストアップします
         const myCastles = this.game.castles.filter(c => c.ownerClan === this.game.playerClanId && c.id !== daimyoCastleId);
-
-        // 全部委任されているかチェックします
-        const isAllDelegated = myCastles.length > 0 && myCastles.every(c => c.isDelegated);
-        const toggleAllBtn = document.getElementById('btn-toggle-all-delegate');
-        
-        if (toggleAllBtn) {
-            toggleAllBtn.className = `btn-secondary btn-small ${isAllDelegated ? "btn-toggle-delegated" : "btn-toggle-direct"}`;
-            toggleAllBtn.onclick = () => {
-                if (window.AudioManager) window.AudioManager.playSE('choice.ogg');
-                const newState = !isAllDelegated;
-                myCastles.forEach(c => {
-                    const hasCastellan = c.castellanId && c.castellanId > 0;
-                    if (hasCastellan) {
-                        c.isDelegated = newState; // 城主がいれば切り替え
-                    } else if (!newState) {
-                        c.isDelegated = false; // 城主がいない城でも「直轄」に戻すことは許可します
-                    }
-                });
-                this.renderList();
-            };
-        }
 
         let html = `
             <div class="list-header delegate-list-header">
                 <span class="col-castle-name">拠点名</span>
                 <span class="col-castellan">城主</span>
-                <span class="col-attack">城攻</span>
-                <span class="col-move">移動</span>
-                <span class="col-status">状態</span>
+                <span class="col-attack">城攻め<button class="delegate-header-btn" onclick="window.GameApp.ui.delegate.toggleAllAttack()">一括</button></span>
+                <span class="col-move">武将移動<button class="delegate-header-btn" onclick="window.GameApp.ui.delegate.toggleAllMove()">一括</button></span>
+                <span class="col-status">状態<button class="delegate-header-btn" onclick="window.GameApp.ui.delegate.toggleAllStatus()">一括</button></span>
             </div>
         `;
 
-        // 1つ1つのお城のボタンを作っていきます
         myCastles.forEach(c => {
             const hasCastellan = c.castellanId && c.castellanId > 0;
             const castellan = this.game.getBusho(c.castellanId);
             const castellanName = castellan ? castellan.name : "なし";
 
-            // 状態ボタン
-            let statusBtnClass = c.isDelegated ? "btn-status-delegated" : "btn-status-direct";
+            let statusBtnClass = c.isDelegated ? "btn-status-on" : "btn-status-off";
             let statusText = c.isDelegated ? "委任" : "直轄";
             let statusDisabled = (!hasCastellan && !c.isDelegated) ? "disabled" : "";
 
-            // 城攻めボタン
-            let attackBtnClass = c.allowAttack ? "btn-allow" : "btn-deny";
+            let attackBtnClass = c.allowAttack ? "btn-status-on" : "btn-status-off";
             let attackText = c.allowAttack ? "許可" : "不可";
             let attackDisabled = !c.isDelegated ? "disabled" : "";
 
-            // 武将移動ボタン
-            let moveBtnClass = c.allowMove ? "btn-allow" : "btn-deny";
+            let moveBtnClass = c.allowMove ? "btn-status-on" : "btn-status-off";
             let moveText = c.allowMove ? "許可" : "不可";
             let moveDisabled = !c.isDelegated ? "disabled" : "";
 
@@ -102,8 +76,7 @@ class UIDelegateManager {
             `;
         });
 
-        // 8行に満たない場合は空行を追加して高さを固定します
-        for (let i = myCastles.length; i < 8; i++) {
+        for (let i = myCastles.length; i < 7; i++) {
             html += `
                 <div class="select-item delegate-list-item empty-row" style="cursor:default;">
                     <span class="col-castle-name"></span>
@@ -116,8 +89,60 @@ class UIDelegateManager {
         }
 
         listContainer.innerHTML = `<div class="list-inner-wrapper" style="width: 100%; min-width: 100%;">${html}</div>`;
+    }
+
+    toggleAllStatus() {
+        const daimyo = this.game.bushos.find(b => b.clan === this.game.playerClanId && b.isDaimyo);
+        const daimyoCastleId = daimyo ? daimyo.castleId : -1;
+        const myCastles = this.game.castles.filter(c => c.ownerClan === this.game.playerClanId && c.id !== daimyoCastleId);
         
-        // カスタムスクロールバーの自動生成を避けるため、ここではスクロールバーの更新処理を呼び出しません
+        const hasDirectWithCastellan = myCastles.some(c => !c.isDelegated && c.castellanId && c.castellanId > 0);
+        
+        if (window.AudioManager) window.AudioManager.playSE('choice.ogg');
+        
+        const newState = hasDirectWithCastellan;
+        
+        myCastles.forEach(c => {
+            const hasCastellan = c.castellanId && c.castellanId > 0;
+            if (hasCastellan) {
+                c.isDelegated = newState;
+            } else if (!newState) {
+                c.isDelegated = false;
+            }
+        });
+        this.renderList();
+    }
+
+    toggleAllAttack() {
+        const daimyo = this.game.bushos.find(b => b.clan === this.game.playerClanId && b.isDaimyo);
+        const daimyoCastleId = daimyo ? daimyo.castleId : -1;
+        const delegatedCastles = this.game.castles.filter(c => c.ownerClan === this.game.playerClanId && c.id !== daimyoCastleId && c.isDelegated);
+        
+        if (delegatedCastles.length === 0) return;
+
+        const hasDeny = delegatedCastles.some(c => !c.allowAttack);
+        
+        if (window.AudioManager) window.AudioManager.playSE('choice.ogg');
+        
+        const newState = hasDeny;
+        delegatedCastles.forEach(c => c.allowAttack = newState);
+        this.renderList();
+    }
+
+    toggleAllMove() {
+        const daimyo = this.game.bushos.find(b => b.clan === this.game.playerClanId && b.isDaimyo);
+        const daimyoCastleId = daimyo ? daimyo.castleId : -1;
+        const delegatedCastles = this.game.castles.filter(c => c.ownerClan === this.game.playerClanId && c.id !== daimyoCastleId && c.isDelegated);
+        
+        if (delegatedCastles.length === 0) return;
+
+        const hasDeny = delegatedCastles.some(c => !c.allowMove);
+        
+        if (window.AudioManager) window.AudioManager.playSE('choice.ogg');
+        
+        const newState = hasDeny;
+        delegatedCastles.forEach(c => c.allowMove = newState);
+        this.renderList();
     }
 
     toggleStatus(castleId) {
