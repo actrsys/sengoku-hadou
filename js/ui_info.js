@@ -1986,7 +1986,8 @@ class UIInfoManager {
                     `<span class="col-morale">${c.morale}</span>`,
                     `<span class="col-training">${c.training}</span>`,
                     `<span class="col-horses">${c.horses || 0}</span>`,
-                    `<span class="col-guns">${c.guns || 0}</span>`
+                    `<span class="col-guns">${c.guns || 0}</span>`,
+                    `<span class="col-empty pc-only-col"></span>`
                 ];
             } else if (this.currentKyotenTab === 'economy') {
                 cells = [
