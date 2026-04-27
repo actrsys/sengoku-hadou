@@ -903,14 +903,35 @@ body.hide-daimyo-labels .daimyo-name-label { display: none !important; }
 /* 抽出したメッセージボックス用スタイル */
 .dialog-body-container {
     display: flex;
-    align-items: flex-start;
-    min-height: 90px;
+    align-items: flex-end; /* 顔とメッセージの下端を揃えます */
+    min-height: 120px;
     gap: 10px;
-    margin: 15px 0;
+    margin: 30px 0 15px 0; /* 看板が上にはみ出すので、上の隙間を広くしました */
+}
+.dialog-face-column {
+    display: flex;
+    flex-direction: column;
+    align-items: center; /* これで顔に対して看板が横中央になります */
+    width: 60px;
+    flex-shrink: 0;
+    position: relative; /* 看板の位置を決める基準になります */
 }
 .dialog-face-space {
     width: 60px;
-    flex-shrink: 0;
+    height: 60px;
+}
+.dialog-name-label {
+    position: absolute;
+    top: -25px; /* 上にずらして、枠からはみ出させます */
+    background: #0d1a10;
+    border: 1.5px solid #d4af37;
+    color: #ffd54f;
+    padding: 2px 8px;
+    font-size: 0.8rem;
+    border-radius: 4px;
+    white-space: nowrap;
+    z-index: 10;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.5);
 }
 .message-area {
     margin: 0;
@@ -926,6 +947,7 @@ body.hide-daimyo-labels .daimyo-name-label { display: none !important; }
     color: #fff;
     text-shadow: 1px 1px 1px #000;
     box-sizing: border-box;
+    min-height: 110px; /* 文字が少なくてもこの高さはキープします */
 }
 
 /* 戦闘中の思考メッセージ用 */
