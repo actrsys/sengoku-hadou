@@ -922,64 +922,85 @@ body.hide-daimyo-labels .daimyo-name-label { display: none !important; }
     order: 1; /* これで一番上に配置されます */
 }
 
+/* 選択肢の箱（下側） */
+.dialog-choices {
+    display: flex;
+    flex-direction: column;
+    align-items: center; /* ★横幅の管理を子要素に任せ、中央に揃えます */
+    gap: 12px;
+    margin: 15px 0 5px 0; /* ★顔アイコンの幅に合わせる謎の計算をやめ、純粋に上下の隙間だけを指定します */
+    padding: 0;
+    width: 100%; /* ★親（ウインドウ）の幅に合わせます */
+    z-index: 9501;
+    order: 2; /* これでメッセージの下に配置されます */
+    box-sizing: border-box;
+}
+
 /* 選択肢ボタンのデザイン */
 .dialog-choice-btn {
-    background: linear-gradient(to bottom, #254a2e 0%, #1b3822 100%);
-    border: 2px solid rgba(212, 175, 55, 0.8);
+    background: linear-gradient(to right, rgba(37, 74, 46, 0.95) 0%, rgba(27, 56, 34, 1) 50%, rgba(37, 74, 46, 0.95) 100%); /* ★ゲーム全体に馴染む和風の緑グラデーション */
+    border: 1px solid #d4af37; /* ★金色の枠線 */
+    border-top: 2px solid #f9e596; /* ★上を明るくして立体感を出す */
+    border-bottom: 2px solid #825a2c; /* ★下を暗くして立体感を出す */
     color: #fff;
-    padding: 12px 15px 12px 35px;
+    padding: 12px 40px; /* ★左右の装飾アイコンと被らないように余白を多めに取ります */
     border-radius: 6px;
-    font-size: 1.1rem;
+    font-size: 1.15rem;
     font-family: 'AbashiriMincho', serif;
-    text-align: left !important;
+    text-align: center !important; /* ★選択肢と分かりやすいように文字を中央揃えに */
     cursor: pointer;
-    box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.5), 0 4px 6px rgba(0,0,0,0.6);
-    transition: all 0.2s;
+    box-shadow: 0 4px 6px rgba(0,0,0,0.6), inset 0 0 10px rgba(212, 175, 55, 0.1);
+    transition: all 0.2s ease-out;
     text-shadow: 1px 1px 2px #000;
+    
+    /* ★ここがウインドウ幅に合わせるための超重要ポイントです！ */
     display: block;
-    width: 100%;
+    width: calc(100% - 20px); /* ★ウインドウ幅から少しだけ内側に収まるように計算（はみ出しを絶対に防ぎます） */
+    max-width: 500px; /* ★PCなど画面が広すぎる時に、ボタンが伸びすぎないように制限します */
     box-sizing: border-box;
-    margin: 0;
+    margin: 0 auto; /* ★中央に配置します */
     position: relative;
 }
 
-/* 選択肢のアイコン（矢印） */
+/* 選択肢のアイコン（左側の装飾） */
 .dialog-choice-btn::before {
-    content: "▶";
+    content: "◆"; /* ★矢印から和風のひし形に変更し、選択肢っぽさを強調します */
     position: absolute;
-    left: 12px;
+    left: 15px;
     top: 50%;
     transform: translateY(-50%);
-    color: #ffd54f;
-    font-size: 0.9rem;
+    color: #d4af37;
+    font-size: 1.1rem;
+    text-shadow: 1px 1px 0 #000;
+}
+
+/* 選択肢のアイコン（右側の装飾） */
+.dialog-choice-btn::after {
+    content: "◆"; /* ★右側にもひし形を置いて、左右対称の美しいデザインにします */
+    position: absolute;
+    right: 15px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: #d4af37;
+    font-size: 1.1rem;
     text-shadow: 1px 1px 0 #000;
 }
 
 /* マウスが乗った時 */
 .dialog-choice-btn:hover {
-    background: linear-gradient(to bottom, #3a6b46 0%, #2a5a36 100%);
+    background: linear-gradient(to right, rgba(58, 107, 70, 0.95) 0%, rgba(42, 90, 54, 1) 50%, rgba(58, 107, 70, 0.95) 100%);
     border-color: #ffd54f;
     transform: translateY(-2px);
-    box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.5), 0 6px 8px rgba(0,0,0,0.7);
+    box-shadow: 0 6px 12px rgba(0,0,0,0.7), inset 0 0 15px rgba(212, 175, 55, 0.4);
+    color: #ffd54f;
 }
 
 /* 押した時 */
 .dialog-choice-btn:active {
     transform: translateY(1px);
-    box-shadow: inset 0 2px 5px rgba(0,0,0,0.8), 0 1px 2px rgba(0,0,0,0.6);
-}
-
-/* 選択肢の箱（下側） */
-.dialog-choices {
-    display: flex;
-    flex-direction: column;
-    align-items: stretch; /* ★子要素を横幅いっぱいに伸ばします */
-    gap: 10px;
-    margin: 10px 0 15px calc(110px + 15px); /* ★顔幅(110px) + 隙間(15px) の分だけ左を空けます */
-    width: auto; /* ★計算をやめて、残り幅を自動で埋めるようにします */
-    z-index: 9501;
-    order: 2; /* これでメッセージの下に配置されます */
-    box-sizing: border-box;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.8), inset 0 3px 8px rgba(0,0,0,0.6);
+    border-top: 2px solid #825a2c;
+    border-bottom: 1px solid #f9e596;
 }
 
 /* 顔グラフィックの列 */
