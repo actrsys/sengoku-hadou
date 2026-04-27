@@ -1954,8 +1954,13 @@ class CommandSystem {
 
         let msg = displayParts.filter(Boolean).join('<br>');
         
-        msg += `<br><br><button class='btn-secondary' onclick='window.GameApp.ui.reopenInterviewModal(window.GameApp.getBusho(${busho.id}))'>戻る</button>`;
-        this.game.ui.showResultModal(msg);
+        this.game.ui.showDialog(msg, false, null, null, {
+            leftFace: busho.faceIcon,
+            leftName: busho.name,
+            choices: [
+                { label: "戻る", onClick: () => { this.game.ui.reopenInterviewModal(busho); } }
+            ]
+        });
     }
 
     executeInterviewTopic(interviewer, target) {
@@ -1965,8 +1970,13 @@ class CommandSystem {
             else if (interviewer.personality === 'cautious') comment = "「慎重に行かねば、<br>足元をすくわれよう」";
             else comment = "「今のところは順調か……<br>いや、油断はできん」";
             
-            const returnScript = `window.GameApp.ui.reopenInterviewModal(window.GameApp.getBusho(${interviewer.id}))`;
-            this.game.ui.showResultModal(`<strong>${interviewer.name}</strong><br>「${target.name}か……」<br><br>${comment}<br><br><button class='btn-secondary' onclick='${returnScript}'>戻る</button>`);
+            this.game.ui.showDialog(`「${target.name}か……<br><br>${comment}」`, false, null, null, {
+                leftFace: interviewer.faceIcon,
+                leftName: interviewer.name,
+                choices: [
+                    { label: "戻る", onClick: () => { this.game.ui.reopenInterviewModal(interviewer); } }
+                ]
+            });
             return;
         }
 
@@ -2011,7 +2021,6 @@ class CommandSystem {
 
         const targetCall = `${target.name}殿ですか……`;
         const displayParts = [];
-        displayParts.push(`<strong>${interviewer.name}</strong>`); 
         displayParts.push(`「${targetCall}<br>${affinityText}<br>${loyaltyText}」`); 
         
         if (togaki) {
@@ -2020,9 +2029,13 @@ class CommandSystem {
 
         let msg = displayParts.filter(Boolean).join('<br>');
         
-        const returnScript = `window.GameApp.ui.reopenInterviewModal(window.GameApp.getBusho(${interviewer.id}))`;
-        msg += `<br><br><button class='btn-secondary' onclick='${returnScript}'>戻る</button>`;
-        this.game.ui.showResultModal(msg);
+        this.game.ui.showDialog(msg, false, null, null, {
+            leftFace: interviewer.faceIcon,
+            leftName: interviewer.name,
+            choices: [
+                { label: "戻る", onClick: () => { this.game.ui.reopenInterviewModal(interviewer); } }
+            ]
+        });
     }
     
     executeTransport(bushoIds, targetId, vals) {
