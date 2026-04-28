@@ -1289,9 +1289,8 @@ class GameManager {
 
         // ★ここから追加：毎月の初めに、各大名家に「作戦会議（カウントダウンの進行や新しい目標決め）」をさせます！
         if (this.aiOperationManager) {
-            this.aiOperationManager.processMonthlyOperations();
+            await this.aiOperationManager.processMonthlyOperations();
         }
-        // ★追加ここまで
 
         this.currentIndex = 0; 
         this.processTurn();
@@ -1366,6 +1365,17 @@ class GameManager {
         }
         // ==========================================
         
+        // ★イベント追加：各城の行動開始前
+        if (this.eventManager) {
+            await this.eventManager.processEvents('turn_start', castle);
+        }
+
+        // 行動開始前イベントで城の持ち主や状態が変わった場合の安全措置
+        if (castle.isDone || castle.ownerClan === 0) {
+            this.finishTurn();
+            return;
+        }
+
         // ★超軽量化：AIのターン中はマップの再描画をストップします！
         // プレイヤーの直轄城（手動操作）の時だけマップを綺麗に描き直すようにしました。
         if (isPlayerCastle && !castle.isDelegated) {
@@ -1389,11 +1399,11 @@ class GameManager {
                 
                 const delay = isImportant ? 30 : 30;
 
-                this.aiTimer = setTimeout(() => {
+                this.aiTimer = setTimeout(async () => {
                     if (this.warManager.state.active) return;
                     if (this.turnQueue[this.currentIndex] !== castle) return;
                     try {
-                        this.aiEngine.execAI(castle); // AIにバトンタッチ！
+                        await this.aiEngine.execAI(castle); // AIにバトンタッチ！
                     } catch(e) {
                         console.error("AI Error caught:", e);
                         this.finishTurn(); 
@@ -1408,7 +1418,11 @@ class GameManager {
                 this.ui.scrollToActiveCastle(castle);
                 
                 this.ui.showTurnStartDialog(castle, () => {
-                    this.gunshiSystem.checkAndShowAdvice(castle, () => {
+                    this.gunshiSystem.checkAndShowAdvice(castle, async () => {
+                        // ★イベント追加：コマンドの選択前（手動操作時）
+                        if (this.eventManager) {
+                            await this.eventManager.processEvents('before_command', castle);
+                        }
                         this.ui.showControlPanel(castle); 
                     });
                 });
@@ -1428,11 +1442,11 @@ class GameManager {
             
             const delay = isImportant ? 30 : 30;
 
-            this.aiTimer = setTimeout(() => {
+            this.aiTimer = setTimeout(async () => {
                 if (this.warManager.state.active) return;
                 if (this.turnQueue[this.currentIndex] !== castle) return;
                 try {
-                    this.aiEngine.execAI(castle);
+                    await this.aiEngine.execAI(castle);
                 } catch(e) {
                     console.error("AI Error caught:", e);
                     this.finishTurn(); 
@@ -1441,7 +1455,7 @@ class GameManager {
         }
     }
     
-    finishTurn() { 
+    async finishTurn() { 
         // ★最強ストッパー２：合戦中やマップ選択中なら、絶対にターンを勝手に終わらせない！
         if (this.warManager && this.warManager.state && this.warManager.state.active) return; 
         if (this.selectionMode != null) return;
@@ -1468,7 +1482,13 @@ class GameManager {
         }
 
         const castle = this.getCurrentTurnCastle(); 
-        if(castle) castle.isDone = true; 
+        if(castle) {
+            castle.isDone = true; 
+            // ★イベント追加：各城の行動終了直後
+            if (this.eventManager) {
+                await this.eventManager.processEvents('turn_end', castle);
+            }
+        }
         
         this.currentIndex++; 
         this.processTurn(); 

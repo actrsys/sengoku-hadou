@@ -47,8 +47,13 @@ class AIEngine {
         return Math.max(0.05, Math.min(1.0, prob));
     }
 
-    execAI(castle) {
+    async execAI(castle) {
         try {
+            // ★イベント追加：コマンドの選択前（AI操作時）
+            if (this.game.eventManager) {
+                await this.game.eventManager.processEvents('before_command', castle);
+            }
+
             // ★AIが考え始める前に、すべての大名の威信を最新にします！
             this.game.updateAllClanPrestige();
             // ★自分の城で、かつ「委任されていない（直轄）」の時だけプレイヤーに操作を戻します

@@ -29,9 +29,9 @@ class AIOperationManager {
         }
     }
     
-    processMonthlyOperations() {
-        this.game.clans.forEach(clan => {
-            if (clan.id === 0 || clan.id === this.game.playerClanId) return;
+    async processMonthlyOperations() {
+        for (const clan of this.game.clans) {
+            if (clan.id === 0 || clan.id === this.game.playerClanId) continue;
 
             // ★追加：毎月、同盟や自分を支配している相手への不満を溜める魔法です！
             this.decreaseSentimentForHighTension(clan.id);
@@ -40,14 +40,14 @@ class AIOperationManager {
             this.thinkMonthlyDiplomacy(clan);
             
             if (!this.operations[clan.id]) {
-                this.generateOperation(clan.id);
+                await this.generateOperation(clan.id);
             } else {
                 this.updateOperation(clan.id);
             }
 
             // ★追加：作戦とは別に、毎月「徴兵用のお城」を考えて選びます！
             this.selectDraftBase(clan.id);
-        });
+        }
     }
 
     // ★追加：同盟や支配されている相手に攻撃したいけど友好度が高くて我慢している時に、友好度を1下げる魔法です
@@ -271,7 +271,12 @@ class AIOperationManager {
         }
     }
 
-    generateOperation(clanId) {
+    async generateOperation(clanId) {
+        // ★イベント追加：AIの作戦立案前
+        if (this.game.eventManager) {
+            await this.game.eventManager.processEvents('before_ai_operation', clanId);
+        }
+
         const myClanCastles = this.game.castles.filter(c => c.ownerClan === clanId);
         if (myClanCastles.length === 0) return;
 
