@@ -58,6 +58,11 @@ class CastleManager {
                 
                 if (op.type === '攻撃') {
                     if (op.attackTargets && op.attackTargets.length > 0) {
+                        // ★修正：第一目標が消されたかどうかを後で判定するため、最初の目標のIDなどを覚えておきます
+                        const currentTargetId = op.targetId;
+                        const currentIsKunishu = op.isKunishuTarget;
+                        const currentStagingBase = op.stagingBase;
+
                         // まず、今持ち主が変わったお城に関係する目標や拠点をリストから消します
                         op.attackTargets = op.attackTargets.filter(t => {
                             const isTarget = (t.isKunishuTarget === false && t.targetId === castle.id);
@@ -69,6 +74,12 @@ class CastleManager {
                         let foundValid = false;
                         while (op.attackTargets.length > 0) {
                             const next = op.attackTargets[0];
+                            
+                            // ★今回追加：先頭の目標が、今まで実行していた作戦と同じなら、何も上書きせずにそのまま続行します！
+                            if (next.targetId === currentTargetId && next.isKunishuTarget === currentIsKunishu && next.stagingBase === currentStagingBase) {
+                                foundValid = true;
+                                break;
+                            }
                             
                             const targetCastle = next.isKunishuTarget ? null : this.game.getCastle(next.targetId);
                             const stagingCastle = this.game.getCastle(next.stagingBase);
@@ -82,7 +93,7 @@ class CastleManager {
                             const isBaseOk = (stagingCastle && stagingCastle.ownerClan === clanId);
 
                             if (isTargetOk && isBaseOk) {
-                                // 合格！この目標を今のメイン作戦としてセットします
+                                // 合格！この新しい目標を今のメイン作戦としてセットします
                                 foundValid = true;
                                 op.targetId = next.targetId;
                                 op.isKunishuTarget = next.isKunishuTarget;
