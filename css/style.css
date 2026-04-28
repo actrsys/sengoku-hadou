@@ -1081,6 +1081,37 @@ body:not(.is-pc) .message-area { font-size: 0.95rem; padding: 10px; }
 body:not(.is-pc) .dialog-face-column { width: 75px; }
 body:not(.is-pc) .dialog-name-label { font-size: 0.85rem; top: -16px; padding: 2px 10px; }
 
+/* =========================================================
+   ★追加：会話モード（顔グラありの単なるメッセージ）の専用デザイン
+   ========================================================= */
+.dialog-conversation-mode {
+    position: absolute !important;
+    bottom: 0 !important;
+    left: 50% !important;
+    transform: translateX(-50%) !important;
+    width: 100% !important;
+    max-width: 800px !important; /* PC版などで広がりすぎないようにします */
+    border-radius: 8px 8px 0 0 !important; /* 上の角だけ丸くして、下は画面にくっつけます */
+    border-bottom: none !important; /* 画面の一番下なので下の枠線は消します */
+    margin: 0 !important;
+    cursor: pointer !important; /* クリックできることがわかるように、指のマークにします */
+    /* 画面下部の安全領域（iPhoneの横線など）を考慮して余白を入れます */
+    padding-bottom: max(15px, env(safe-area-inset-bottom)) !important;
+    transition: background 0.2s; /* 色が変わる時フワッとさせます */
+}
+
+/* スマホ版の時の微調整 */
+body:not(.is-pc) .dialog-conversation-mode {
+    border-radius: 0 !important; /* スマホ版は横幅いっぱいなので角丸を全て消します */
+    border-left: none !important;
+    border-right: none !important;
+}
+
+/* 会話モードの時はマウスを乗せたら少しだけ明るくして、押せることをアピールします */
+.dialog-conversation-mode:hover {
+    background: linear-gradient(to bottom, #2d5a38 0%, #22452b 100%) !important;
+}
+
 /* 戦闘中の思考メッセージ用 */
 .war-action-message-container {
     background: rgba(0, 0, 0, 0.4);

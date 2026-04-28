@@ -619,6 +619,30 @@ class UIManager {
         const footer = okBtn.parentElement; // ★追加：ボタンが入っているフッターの箱を取得します
         const choicesContainer = document.getElementById('dialog-choices-container'); // ★新しく作った選択肢の箱を取得します
 
+        // ★ここから追加：会話モード（顔グラあり、選択肢なし、確認なし）の判定
+        const hasFace = !!(leftFace || rightFace);
+        const isSimpleMessage = !dialog.isConfirm && !(dialog.customOpts && dialog.customOpts.choices);
+        const isConversation = hasFace && isSimpleMessage;
+        
+        const modalContent = modal.querySelector('.modal-content');
+
+        if (isConversation) {
+            // 会話モードのシールを貼ります
+            modalContent.classList.add('dialog-conversation-mode');
+            
+            // ウインドウ自体を押した時に次に進む魔法
+            modalContent.onclick = (e) => {
+                if (e.target.closest('button')) return; // ボタンを押した時は無視します
+                // 決定の音を鳴らして、隠れている「閉じる」ボタンを強制的に押します
+                if (window.AudioManager) window.AudioManager.playSE('decision.ogg');
+                okBtn.click();
+            };
+        } else {
+            // 会話モードではない時はシールを剥がして、クリックの魔法も解きます
+            modalContent.classList.remove('dialog-conversation-mode');
+            modalContent.onclick = null;
+        }
+
         // もし「選択肢」が指定されていたら、特別な処理をします
         if (dialog.customOpts && dialog.customOpts.choices) {
             footer.classList.add('hidden'); // いつもの「はい・いいえ」ボタンを隠します
@@ -667,6 +691,11 @@ class UIManager {
                 okBtn.textContent = dialog.customOpts?.okText || '閉じる';
                 okBtn.className = dialog.customOpts?.okClass || 'btn-secondary';
                 footer.style.justifyContent = 'center';
+
+                // ★追加：会話モードの時はボタンを入れる箱（フッター）ごと隠します
+                if (isConversation) {
+                    footer.classList.add('hidden');
+                }
             }
         }
 
