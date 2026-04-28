@@ -695,7 +695,21 @@ class GameSystem {
         const threshold = resistance / base - 0.5;
         if (threshold >= 1.0) return 0;
         if (threshold <= 0.0) return 1.0;
-        return 1.0 - threshold;
+        
+        let prob = 1.0 - threshold;
+        
+        // ★追加：宿敵が登用主の大名家にいる場合は、成功率を半分にします！
+        if (target.nemesisIds && target.nemesisIds.length > 0 && window.GameApp) {
+            const hasNemesis = target.nemesisIds.some(nId => {
+                const nBusho = window.GameApp.getBusho(nId);
+                return nBusho && nBusho.clan === recruiter.clan && nBusho.status !== 'dead';
+            });
+            if (hasNemesis) {
+                prob *= 0.5;
+            }
+        }
+        
+        return prob;
     }
 
     static calcAffinityDiff(a, b) { const diff = Math.abs(a - b); return Math.min(diff, 100 - diff); }
@@ -723,7 +737,19 @@ class GameSystem {
         if (target.clan !== 0 && target.ambition > 70 && recruiterClanPower < targetClanPower * 0.7) return false; 
         const affDiff = this.calcAffinityDiff(recruiter.affinity, target.affinity);
         let affBonus = (affDiff < 10) ? 30 : (affDiff < 25) ? 15 : (affDiff > 40) ? -10 : 0; 
-        const resistance = target.clan === 0 ? target.ambition : target.loyalty * window.MainParams.Strategy.EmploymentDiff; 
+        let resistance = target.clan === 0 ? target.ambition : target.loyalty * window.MainParams.Strategy.EmploymentDiff; 
+        
+        // ★追加：宿敵が登用主の大名家にいる場合は、抵抗値を2倍（成功しにくく）します！
+        if (target.nemesisIds && target.nemesisIds.length > 0 && window.GameApp) {
+            const hasNemesis = target.nemesisIds.some(nId => {
+                const nBusho = window.GameApp.getBusho(nId);
+                return nBusho && nBusho.clan === recruiter.clan && nBusho.status !== 'dead';
+            });
+            if (hasNemesis) {
+                resistance *= 2;
+            }
+        }
+        
         return ((recruiter.charm + affBonus) * (Math.random() + 0.5)) > resistance; 
     }
 }

@@ -1855,6 +1855,17 @@ Object.assign(WarManager.prototype, {
                 hireProb = Math.max(0, Math.min(0.99, hireProb));
                 hireProb *= 0.5; // 大名は登用しにくくします
 
+                // ★追加：宿敵が登用先の大名家にいる場合は成功率を半分にします
+                if (prisoner.nemesisIds && prisoner.nemesisIds.length > 0) {
+                    const hasNemesis = prisoner.nemesisIds.some(nId => {
+                        const nBusho = this.game.getBusho(nId);
+                        return nBusho && nBusho.clan === this.game.playerClanId && nBusho.status !== 'dead';
+                    });
+                    if (hasNemesis) {
+                        hireProb *= 0.5;
+                    }
+                }
+
                 if (hireProb > Math.random()) {
                     prisoner.isDaimyo = false;
                     this.daimyoHiredBonus = 0.5; 
@@ -1870,6 +1881,7 @@ Object.assign(WarManager.prototype, {
                 }
             }
         } else if (action === 'kill') {
+            this.registerNemesisForExecuted(prisoner, this.game.playerClanId);
             await this.game.lifeSystem.executeDeath(prisoner);
             nextStep();
         } else if (action === 'release') {
@@ -1966,6 +1978,17 @@ Object.assign(WarManager.prototype, {
             if (this.daimyoHiredBonus) {
                 hireProb += this.daimyoHiredBonus;
                 hireProb = Math.max(0, Math.min(0.99, hireProb));
+            }
+
+            // ★追加：宿敵が登用先の大名家にいる場合は成功率を半分にします
+            if (prisoner.nemesisIds && prisoner.nemesisIds.length > 0) {
+                const hasNemesis = prisoner.nemesisIds.some(nId => {
+                    const nBusho = this.game.getBusho(nId);
+                    return nBusho && nBusho.clan === this.game.playerClanId && nBusho.status !== 'dead';
+                });
+                if (hasNemesis) {
+                    hireProb *= 0.5;
+                }
             }
 
             if (hireProb > Math.random()) {
@@ -2091,6 +2114,7 @@ Object.assign(WarManager.prototype, {
         // 予定通りに処断を実行します
         if (this.pendingKills && this.pendingKills.length > 0) {
             for (let p of this.pendingKills) {
+                this.registerNemesisForExecuted(p, this.game.playerClanId);
                 await this.game.lifeSystem.executeDeath(p);
             }
         }
@@ -2154,6 +2178,7 @@ Object.assign(WarManager.prototype, {
 
             // ★変更：fe_system.js の魔法にお任せします！
             if (p.isDaimyo && !isExtinct) { 
+                this.registerNemesisForExecuted(p, winnerClanId);
                 await this.game.lifeSystem.executeDeath(p); 
                 continue; 
             }
@@ -2192,6 +2217,17 @@ Object.assign(WarManager.prototype, {
             } else if (!p.isDaimyo && daimyoHiredBonus > 0) {
                 hireProb += daimyoHiredBonus;
                 hireProb = Math.max(0, Math.min(0.99, hireProb));
+            }
+
+            // ★追加：宿敵が登用先の大名家にいる場合は成功率を半分にします
+            if (p.nemesisIds && p.nemesisIds.length > 0) {
+                const hasNemesis = p.nemesisIds.some(nId => {
+                    const nBusho = this.game.getBusho(nId);
+                    return nBusho && nBusho.clan === winnerClanId && nBusho.status !== 'dead';
+                });
+                if (hasNemesis) {
+                    hireProb *= 0.5;
+                }
             }
 
             if (!isKunishuBoss && hireProb > Math.random()) {
@@ -2246,6 +2282,7 @@ Object.assign(WarManager.prototype, {
             if (Math.random() * 100 < killProb) {
                 // ==========================================
                 // ★処断される場合も、life_system.js の魔法にお任せします！
+                this.registerNemesisForExecuted(p, winnerClanId);
                 await this.game.lifeSystem.executeDeath(p);
                 // ==========================================
             } else {
@@ -2973,6 +3010,35 @@ Object.assign(WarManager.prototype, {
         const helperClanName = this.game.clans.find(c => c.id === helperClanId)?.name || "援軍";
         const leaderName = reinfBushos.length > 0 ? reinfBushos[0].name : "総大将";
         this.game.ui.showDialog(`${helperClanName}の${leaderName} (${helperCastle.name}) が守備側の援軍として出発しました！`, false, onComplete);
+    },
+
+    // ★追加：処断した時に、その武将の元の同僚たちの宿敵リストに大名を登録する魔法
+    registerNemesisForExecuted(executedBusho, killerClanId) {
+        if (!executedBusho || killerClanId === 0 || executedBusho.clan === 0) return;
+        
+        // 斬った側の大名武将を探す
+        const killerDaimyo = this.game.bushos.find(b => b.clan === killerClanId && b.isDaimyo);
+        if (!killerDaimyo) return;
+        const killerId = killerDaimyo.id;
+
+        const victimClanId = executedBusho.clan;
+        
+        // 斬られた武将の元の同僚（同じ大名家に所属する武将）全員をチェック
+        this.game.bushos.forEach(b => {
+            if (b.clan === victimClanId && b.status === 'active' && b.id !== executedBusho.id) {
+                if (!b.nemesisList) b.nemesisList = [];
+                
+                // 既に宿敵リストにいるか確認
+                const existing = b.nemesisList.find(n => n.id === killerId);
+                if (existing) {
+                    existing.count = 60; // 既にいる場合はタイマーを60にリセット
+                } else {
+                    b.nemesisList.push({ id: killerId, count: 60 }); // 新規追加
+                }
+                
+                // 後方互換と参照用のIDリストも更新
+                b.nemesisIds = b.nemesisList.map(n => n.id);
+            }
+        });
     }
-    
 });
