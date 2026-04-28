@@ -198,6 +198,7 @@ window.GameEvents.push({
         
         // E. 織田家が指定のお城をすべて持っているか確認します
         const odaClanId = nobunaga.clan;
+        // 清州城、名古屋城
         const requiredOdaCastles = [7, 11];
         const hasAllOdaCastles = requiredOdaCastles.every(id => {
             const c = game.getCastle(id);
