@@ -527,6 +527,14 @@
     
     window.addEventListener('resize', resizeGameScreen);
     window.addEventListener('DOMContentLoaded', resizeGameScreen);
+
+    // リロードやページを閉じようとした時に警告を出す
+    window.addEventListener('beforeunload', function (e) {
+        // ブラウザに「ちょっと待って！本当に閉じていいの？」と言わせる命令
+        e.preventDefault();
+        // 古いブラウザでも動くようにするおまじない
+        e.returnValue = '';
+    });
     </script>
     
 </body>
