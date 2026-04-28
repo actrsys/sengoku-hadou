@@ -574,6 +574,14 @@ window.GameEvents.push({
     },
     
     execute: async function(game) {
+        // ★ 1. 今流れているBGMを「後で戻す用」にメモしておきます
+        const oldBgm = game.audioManager ? game.audioManager.currentBgm : null;
+
+        // ★ 2. イベント用のBGM「06_Snowy Sacred Approach.ogg」を流します
+        if (game.audioManager) {
+            game.audioManager.playBgm("06_Snowy Sacred Approach.ogg");
+        }
+
         const nobunaga = game.getBusho(1006001);
         const motoyasu = game.getBusho(1004004);
         
@@ -654,6 +662,11 @@ window.GameEvents.push({
         if (game.ui) {
             game.ui.renderMap();
             game.ui.updatePanelHeader();
+        }
+
+        // ★ 3. イベントが全て終わったので、メモしておいた元のBGMに戻します
+        if (game.audioManager && oldBgm) {
+            game.audioManager.playBgm(oldBgm);
         }
     }
 });
