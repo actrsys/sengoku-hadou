@@ -28,8 +28,52 @@ class AIOperationManager {
             this.draftBases = {};
         }
     }
+
+    // ★追加：すべての作戦を巡回して、不正なデータ（矛盾）がないか健康診断をする魔法です！
+    validateAllOperations() {
+        for (const clanIdStr in this.operations) {
+            const clanId = Number(clanIdStr);
+            const op = this.operations[clanId];
+            let isInvalid = false;
+
+            // 1. その大名家がもう滅亡していないかチェック
+            const clan = this.game.clans.find(c => c.id === clanId);
+            if (!clan || clan.id === 0) {
+                isInvalid = true;
+            } else if (!op) {
+                isInvalid = true;
+            } else {
+                // 2. 作戦データの中身が壊れていないかチェック
+                if (op.type === '攻撃') {
+                    // 数値が「NaN（非数）」になってしまっていないか、出撃元が設定されているか
+                    if (!op.stagingBase || isNaN(op.requiredForce) || isNaN(op.requiredRice) || isNaN(op.turnsRemaining)) {
+                        isInvalid = true;
+                    } else {
+                        // 出撃予定のお城が、イベントなどで別の大名家に奪われていないか
+                        const stagingCastle = this.game.getCastle(op.stagingBase);
+                        if (!stagingCastle || stagingCastle.ownerClan !== clanId) {
+                            isInvalid = true;
+                        }
+                    }
+                } else if (op.type === '外交' || op.type === '内政') {
+                    if (isNaN(op.turnsRemaining) || isNaN(op.maxTurns)) {
+                        isInvalid = true;
+                    }
+                }
+            }
+
+            // 不正が見つかったら、作戦を白紙に戻して安全に立て直させます
+            if (isInvalid) {
+                console.warn(`【AI自己診断】大名家[${clanId}]の不正な作戦データ(${op ? op.type : '不明'})を検知したため、破棄しました。`);
+                delete this.operations[clanId];
+            }
+        }
+    }
     
     async processMonthlyOperations() {
+        // ★追加：毎月の作戦会議を始める前に、まず全体の健康診断を行います！
+        this.validateAllOperations();
+
         for (const clan of this.game.clans) {
             if (clan.id === 0 || clan.id === this.game.playerClanId) continue;
 
