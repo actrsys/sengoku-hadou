@@ -36,40 +36,40 @@ window.EventTextManager = {
         return [
             {
                 type: 'log',
-                msg: `今川義元の死後、三河で独立を果たした${args.motoyasuName}は、\n隣国${args.imagawaClanName}と敵対関係となっていた。`
+                msg: `今川義元の死後、三河で独立を果たした${args.motoyasuName}は、隣国${args.imagawaClanName}と敵対関係となっていた。`
             },
             {
                 type: 'log',
-                msg: `${args.motoyasuName}は隣国を統一した${args.nobunagaName}との接近を考え、\n${args.odaClanName}との同盟を模索していた。`
+                msg: `${args.motoyasuName}は${args.nobunagaName}との接近を考え、${args.odaClanName}との同盟を模索していた。`
             },
             {
                 type: 'dialog',
-                rightName: args.vassalName,  // 武将は右側から話しかけます
-                rightFace: args.vassalFace,
-                msg: `「殿、${args.odaClanName}と手を結ぶは必定なれど、${args.nobunagaGivenName}は油断ならぬ男。\nやすやすとうまくはいきますまい。」`
+                leftName: args.vassalName,
+                leftFace: args.vassalFace,
+                msg: `「殿、${args.odaClanName}と手を結ぶは必定なれど、${args.nobunagaGivenName}は油断ならぬ男。やすやすとうまくはいきますまい。」`
             },
             {
                 type: 'dialog',
-                leftName: args.motoyasuName,  // 家康（元康）は常に左側です
+                leftName: args.motoyasuName,
                 leftFace: args.motoyasuFace,
-                msg: `「うむ。それゆえ、此度はわしみずから、\n${args.nobunagaCastleName}に赴こうと考えておる。\nかのお方とは腹を割って話さねばならぬのだ。」`
+                msg: `「うむ。それゆえ、此度はわしみずから、${args.nobunagaCastleName}に赴こうと考えておる。かのお方とは腹を割って話さねばならぬのだ。」`
             },
             {
                 type: 'dialog',
-                rightName: args.vassalName,
-                rightFace: args.vassalFace,
+                leftName: args.vassalName,
+                leftFace: args.vassalFace,
                 msg: `「殿自ら……？\nしかし、それは危険にございます。」`
             },
             {
                 type: 'dialog',
                 leftName: args.motoyasuName,
                 leftFace: args.motoyasuFace,
-                msg: `「わし自ら訪問することで、当方の誠意と覚悟を見せるのだ。\n最早決めたことじゃ。もう何も言うでない。」`
+                msg: `「わし自ら訪問することで、当方の誠意と覚悟を見せるのだ。最早決めたことじゃ。もう何も言うでない。」`
             },
             {
                 type: 'dialog',
-                rightName: args.vassalName,
-                rightFace: args.vassalFace,
+                leftName: args.vassalName,
+                leftFace: args.vassalFace,
                 msg: `「はっ……」`
             },
             {
@@ -78,33 +78,45 @@ window.EventTextManager = {
             },
             {
                 type: 'dialog',
-                rightName: args.nobunagaName,  // 信長は右側に登場します
-                rightFace: args.nobunagaFace,
-                msg: `「よう来たのう、竹千代。\n久しいのう。よう来てくれた。」`
+                leftName: args.nobunagaName,
+                leftFace: args.nobunagaFace,
+                msg: `「よう来たのう、竹千代。久しいのう。よう来てくれた。」`
             },
             {
                 type: 'dialog',
                 leftName: args.motoyasuName,
                 leftFace: args.motoyasuFace,
-                msg: `「お懐かしゅうございまする、吉法師様。\nいえ、${args.nobunagaTitle}様。」`
+                msg: `「お懐かしゅうございまする、吉法師様。いえ、${args.nobunagaTitle}様。」`
             },
             {
                 type: 'dialog',
-                rightName: args.nobunagaName,
-                rightFace: args.nobunagaFace,
+                leftName: args.nobunagaName,
+                leftFace: args.nobunagaFace,
                 msg: `「わしとそなたの仲ではないか。吉法師で構わぬわい。」`
             },
             {
                 type: 'dialog',
                 leftName: args.motoyasuName,
                 leftFace: args.motoyasuFace,
-                msg: `「はっ、吉法師様。\n此度は${args.matsudairaClanName}と${args.odaClanName}の同盟の件で参りました。」`
+                msg: `「はっ、吉法師様。まこと、懐かしゅうござりまする。」`
             },
             {
                 type: 'dialog',
-                rightName: args.nobunagaName,
-                rightFace: args.nobunagaFace,
-                msg: `「応とも。\nわしと竹千代が組めば、怖いものはないわい。\nはっはっはっ……」`
+                leftName: args.nobunagaName,
+                leftFace: args.nobunagaFace,
+                msg: `「うむ……\nして、同盟の話であろう？」`
+            },
+            {
+                type: 'dialog',
+                leftName: args.motoyasuName,
+                leftFace: args.motoyasuFace,
+                msg: `「ご明察にござる。此度は${args.matsudairaClanName}と${args.odaClanName}の同盟の件で参りました。」`
+            },
+            {
+                type: 'dialog',
+                leftName: args.nobunagaName,
+                leftFace: args.nobunagaFace,
+                msg: `「うむ、わかっておる。わしと竹千代が組めば、怖いものはないわい。はっはっはっ……」`
             },
             {
                 type: 'dialog',
