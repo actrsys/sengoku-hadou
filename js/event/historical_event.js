@@ -177,7 +177,8 @@ window.GameEvents.push({
 
         // B. 今川家が指定のお城をすべて持っているか確認します
         const imagawaClanId = yoshimoto.clan;
-        const requiredImagawaCastles = [12, 13, 45, 48, 57, 71, 100];
+        //曳馬城、駿府城、長篠城、岡崎城、犬居城、鳴海城、高天神城、吉田城、興国寺城
+        const requiredImagawaCastles = [12, 13, 45, 48, 54, 57, 71, 100, 101];
         const hasAllImagawaCastles = requiredImagawaCastles.every(id => {
             const c = game.getCastle(id);
             return c && c.ownerClan === imagawaClanId;
@@ -217,66 +218,149 @@ window.GameEvents.push({
         const nobunaga = game.getBusho(1006001);
 
         const imagawaClan = game.clans.find(c => c.id === imagawaClanId);
-        const imagawaClanName = imagawaClan ? imagawaClan.name : '今川家';
-        const yoshimotoName = yoshimoto.name.replace('|', '');
-
-        const nobunagaName = nobunaga.name.replace('|', '');
-
         const odaClan = game.clans.find(c => c.id === nobunaga.clan);
-        const odaArmyName = odaClan ? odaClan.getArmyName() : "織田軍";
-        const imagawaHonjin = imagawaClan ? imagawaClan.name.replace('家', '') + '本陣' : "本陣";
 
-        // ①義元出陣のメッセージ
-        game.ui.log(`【イベント】桶狭間の戦い：${imagawaClanName}が尾張侵攻の軍を興しました。`);
-        await game.ui.showDialogAsync(`${imagawaClanName}の${yoshimotoName}が上洛へ向けて、\n尾張への侵攻作戦を進めているようです。`, false, 0);
+        // --- 1. 武将の配役決定（オーディション） ---
+        // 織田家にいる武将（信長以外）を全員集めます
+        let odaBushos = game.bushos.filter(b => b.clan === nobunaga.clan && b.status === 'active' && b.id !== nobunaga.id);
 
-        // ②信長出陣のメッセージ
-        game.ui.log(`【イベント】${nobunagaName}が清州城から出陣しました！`);
-        await game.ui.showDialogAsync(`「人間五十年、下天の内をくらぶれば、夢幻の如くなり…」\n${nobunagaName}が今川軍を迎撃するため、清州城より出陣しました！`, false, 0);
+        // 重臣A: 貢献度500以上で外交最高。いなければ貢献度最高の中で外交最高。
+        let juushinA = odaBushos.filter(b => b.achievementTotal >= 500).sort((a, b) => (b.diplomacy || 0) - (a.diplomacy || 0))[0];
+        if (!juushinA) juushinA = [...odaBushos].sort((a, b) => ((b.achievementTotal || 0) !== (a.achievementTotal || 0) ? (b.achievementTotal || 0) - (a.achievementTotal || 0) : (b.diplomacy || 0) - (a.diplomacy || 0)))[0];
+        // 選ばれた人は次のオーディションから外します
+        odaBushos = odaBushos.filter(b => b.id !== (juushinA ? juushinA.id : 0));
 
-        // ③義元討死のメッセージ
-        game.ui.log(`【イベント】桶狭間の戦い：${odaArmyName}の奇襲により、${yoshimotoName}が討死しました！`);
-        await game.ui.showDialogAsync(`${odaArmyName}の決死の奇襲が${imagawaHonjin}を強襲！\n激戦の末、海道一の弓取り・${yoshimotoName}は討ち取られました！`, false, 0);
+        // 重臣B: 貢献度500以上で武勇最高。いなければ貢献度最高の中で武勇最高。
+        let juushinB = odaBushos.filter(b => b.achievementTotal >= 500).sort((a, b) => (b.strength || 0) - (a.strength || 0))[0];
+        if (!juushinB) juushinB = [...odaBushos].sort((a, b) => ((b.achievementTotal || 0) !== (a.achievementTotal || 0) ? (b.achievementTotal || 0) - (a.achievementTotal || 0) : (b.strength || 0) - (a.strength || 0)))[0];
+        odaBushos = odaBushos.filter(b => b.id !== (juushinB ? juushinB.id : 0));
 
-        // ★life_system.js の力を使って、義元を正式に死亡（討死）させます
-        if (game.lifeSystem) {
-            await game.lifeSystem.executeDeath(yoshimoto);
-        } else {
-            // 万が一システムが見つからなかった場合の安全策です
-            yoshimoto.status = 'dead';
-            yoshimoto.isDaimyo = false;
-            yoshimoto.isCastellan = false;
-            yoshimoto.isGunshi = false;
-            
-            if (yoshimoto.castleId > 0) {
-                const oldCastle = game.getCastle(yoshimoto.castleId);
-                if (oldCastle && oldCastle.samuraiIds) {
-                    oldCastle.samuraiIds = oldCastle.samuraiIds.filter(sid => sid !== yoshimoto.id);
-                }
-            }
-            
-            yoshimoto.castleId = 0;
-            yoshimoto.belongKunishuId = 0;
+        // 新参C: 貢献度300以下で武勇最高。いなければ武勇最高。
+        let shinzanC = odaBushos.filter(b => b.achievementTotal <= 300).sort((a, b) => (b.strength || 0) - (a.strength || 0))[0];
+        if (!shinzanC) shinzanC = [...odaBushos].sort((a, b) => (b.strength || 0) - (a.strength || 0))[0];
+        odaBushos = odaBushos.filter(b => b.id !== (shinzanC ? shinzanC.id : 0));
+
+        // 新参D: 貢献度300以下で智謀最高。いなければ智謀最高。
+        let shinzanD = odaBushos.filter(b => b.achievementTotal <= 300).sort((a, b) => (b.intelligence || 0) - (a.intelligence || 0))[0];
+        if (!shinzanD) shinzanD = [...odaBushos].sort((a, b) => (b.intelligence || 0) - (a.intelligence || 0))[0];
+        odaBushos = odaBushos.filter(b => b.id !== (shinzanD ? shinzanD.id : 0));
+
+        // 毛利良勝: ID1006020、いなければ貢献度100以下で武勇最高、いなければ武勇最高
+        let mouri = odaBushos.find(b => b.id === 1006020);
+        if (!mouri) {
+            mouri = odaBushos.filter(b => b.achievementTotal <= 100).sort((a, b) => (b.strength || 0) - (a.strength || 0))[0];
+            if (!mouri) mouri = [...odaBushos].sort((a, b) => (b.strength || 0) - (a.strength || 0))[0];
         }
 
-        // 派閥や画面を最新の状態に更新します
+        // 台本に渡す情報をひとまとめにします
+        const args = {
+            yoshimotoName: yoshimoto.name.replace('|', ''),
+            yoshimotoGivenName: yoshimoto.givenName || "義元",
+            yoshimotoFace: yoshimoto.faceIcon || "unknown_face.webp",
+            nobunagaName: nobunaga.name.replace('|', ''),
+            nobunagaGivenName: nobunaga.givenName || "信長",
+            nobunagaFace: nobunaga.faceIcon || "unknown_face.webp",
+            sunpuCastleName: game.getCastle(13)?.name || "駿府城",
+            owariProvinceName: "尾張国",
+            odaClanName: odaClan ? odaClan.name : "織田家",
+            imagawaClanName: imagawaClan ? imagawaClan.name : "今川家",
+            
+            juushinAName: juushinA ? juushinA.name.replace('|', '') : "小姓",
+            juushinAFace: juushinA ? juushinA.faceIcon : "koshou.webp",
+            juushinBName: juushinB ? juushinB.name.replace('|', '') : "小姓",
+            juushinBFace: juushinB ? juushinB.faceIcon : "koshou.webp",
+            shinzanCName: shinzanC ? shinzanC.name.replace('|', '') : "小姓",
+            shinzanCFace: shinzanC ? shinzanC.faceIcon : "koshou.webp",
+            shinzanDName: shinzanD ? shinzanD.name.replace('|', '') : "小姓",
+            shinzanDFace: shinzanD ? shinzanD.faceIcon : "koshou.webp",
+            mouriName: mouri ? mouri.name.replace('|', '') : "小姓",
+            mouriFace: mouri ? mouri.faceIcon : "koshou.webp"
+        };
+
+        // --- 2. イベント開始 ---
+        // BGMをメモして専用の曲に変更します
+        if (window.AudioManager) {
+            window.AudioManager.memorizeCurrentBgm();
+            window.AudioManager.playBGM("06_Snowy Sacred Approach.ogg");
+        }
+
+        // パート1（軍議まで）の台本を読み込みます
+        if (window.EventTextManager && window.EventTextManager.okehazama_part1) {
+            await window.EventTextManager.playSequence(game, window.EventTextManager.okehazama_part1(args));
+        }
+
+        // --- 3. プレイヤーの分岐選択 ---
+        let isAttack = true; // プレイヤー以外は史実通り自動で出陣します
+
+        // プレイヤーが織田家の場合は、選択肢の窓を出して待ちます
+        if (game.playerClanId === nobunaga.clan) {
+            await new Promise(resolve => {
+                game.ui.showDialog("「殿、どうなさりまするか？」", false, null, null, {
+                    leftName: args.juushinBName,
+                    leftFace: args.juushinBFace,
+                    choices: [
+                        { label: "出陣する", onClick: () => { isAttack = true; resolve(); } },
+                        { label: "籠城する", onClick: () => { isAttack = false; resolve(); } }
+                    ]
+                });
+            });
+        }
+
+        // --- 4. 選んだ選択肢ごとの結果 ---
+        if (isAttack) {
+            // 【出陣ルート】
+            if (window.EventTextManager && window.EventTextManager.okehazama_attack) {
+                await window.EventTextManager.playSequence(game, window.EventTextManager.okehazama_attack(args));
+            }
+
+            // 義元の討死処理を行います
+            if (game.lifeSystem) {
+                await game.lifeSystem.executeDeath(yoshimoto);
+            } else {
+                yoshimoto.status = 'dead';
+                yoshimoto.isDaimyo = false;
+                yoshimoto.isCastellan = false;
+                yoshimoto.isGunshi = false;
+                if (yoshimoto.castleId > 0) {
+                    const oldCastle = game.getCastle(yoshimoto.castleId);
+                    if (oldCastle && oldCastle.samuraiIds) {
+                        oldCastle.samuraiIds = oldCastle.samuraiIds.filter(sid => sid !== yoshimoto.id);
+                    }
+                }
+                yoshimoto.castleId = 0;
+                yoshimoto.belongKunishuId = 0;
+            }
+
+            // 織田家に勝利のボーナス（忠誠と民忠アップ）を与えます
+            if (nobunaga && nobunaga.clan > 0) {
+                const odaBushos = game.bushos.filter(b => b.clan === nobunaga.clan && b.status === 'active');
+                odaBushos.forEach(b => {
+                    b.loyalty = Math.min(100, (b.loyalty || 0) + 5);
+                });
+                const odaCastles = game.castles.filter(c => c.ownerClan === nobunaga.clan);
+                odaCastles.forEach(c => {
+                    c.peoplesLoyalty = 100;
+                });
+            }
+
+        } else {
+            // 【籠城ルート】
+            if (window.EventTextManager && window.EventTextManager.okehazama_defend) {
+                await window.EventTextManager.playSequence(game, window.EventTextManager.okehazama_defend(args));
+            }
+            // 籠城ルートはここでイベントが終わり、義元も生き残ります
+        }
+
+        // --- 5. 終了のお片付け ---
+        // メモしておいた元のBGMに戻します
+        if (window.AudioManager) {
+            window.AudioManager.restoreMemorizedBgm();
+        }
+        
+        // 画面の情報を最新のものに更新します
         if (game.factionSystem) {
             game.factionSystem.updateFactions();
         }
-
-        // 織田信長の大名家に所属する武将の忠誠度を+5し、城の民忠を100にします
-        if (nobunaga && nobunaga.clan > 0) {
-            const odaBushos = game.bushos.filter(b => b.clan === nobunaga.clan && b.status === 'active');
-            odaBushos.forEach(b => {
-                b.loyalty = Math.min(100, (b.loyalty || 0) + 5);
-            });
-
-            const odaCastles = game.castles.filter(c => c.ownerClan === nobunaga.clan);
-            odaCastles.forEach(c => {
-                c.peoplesLoyalty = 100;
-            });
-        }
-
         if (game.ui) {
             game.ui.renderMap();
             game.ui.updatePanelHeader();
