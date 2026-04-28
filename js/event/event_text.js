@@ -223,7 +223,7 @@ window.EventTextManager = {
     okehazama_defend: function(args) {
         return [
             { type: 'dialog', leftName: args.nobunagaName, leftFace: args.nobunagaFace, msg: `「籠城じゃ。打って出るべきではないわ。」` },
-            { type: 'dialog', leftName: args.juushinAName, leftFace: args.juushinAFace, msg: `「はっ、承知いたしました！」` },
+            { type: 'dialog', leftName: args.juushinAName, leftFace: args.juushinAFace, msg: `「御意にございます。」` },
             { type: 'dialog', leftName: args.shinzanCName, leftFace: args.shinzanCFace, msg: `「むむむ……」` }
         ];
     }
