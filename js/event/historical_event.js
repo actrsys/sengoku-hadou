@@ -400,21 +400,9 @@ window.GameEvents.push({
             }
 
             // 義元の討死処理を行います
+            // 死亡システムに全てお任せして、後継ぎの決定なども自動で行ってもらいます
             if (game.lifeSystem) {
                 await game.lifeSystem.executeDeath(yoshimoto);
-            } else {
-                yoshimoto.status = 'dead';
-                yoshimoto.isDaimyo = false;
-                yoshimoto.isCastellan = false;
-                yoshimoto.isGunshi = false;
-                if (yoshimoto.castleId > 0) {
-                    const oldCastle = game.getCastle(yoshimoto.castleId);
-                    if (oldCastle && oldCastle.samuraiIds) {
-                        oldCastle.samuraiIds = oldCastle.samuraiIds.filter(sid => sid !== yoshimoto.id);
-                    }
-                }
-                yoshimoto.castleId = 0;
-                yoshimoto.belongKunishuId = 0;
             }
 
             // 織田家に勝利のボーナス（忠誠と民忠アップ）を与えます
