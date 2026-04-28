@@ -295,14 +295,18 @@ window.GameEvents.push({
         // プレイヤーが織田家の場合は、選択肢の窓を出して待ちます
         if (game.playerClanId === nobunaga.clan) {
             await new Promise(resolve => {
-                game.ui.showDialog("「殿、どうなさりまするか？」", false, null, null, {
-                    leftName: args.juushinBName,
-                    leftFace: args.juushinBFace,
-                    choices: [
-                        { label: "出陣する", onClick: () => { isAttack = true; resolve(); } },
-                        { label: "籠城する", onClick: () => { isAttack = false; resolve(); } }
-                    ]
-                });
+                game.ui.showDialog("「殿、どうなさりまするか？」", true, 
+                    () => { isAttack = true; resolve(); },
+                    () => { isAttack = false; resolve(); },
+                    {
+                        leftName: args.juushinBName,
+                        leftFace: args.juushinBFace,
+                        okText: "出陣する",
+                        okClass: "btn-danger",
+                        cancelText: "籠城する",
+                        cancelClass: "btn-primary"
+                    }
+                );
             });
         }
 
