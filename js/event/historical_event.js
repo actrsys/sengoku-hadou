@@ -168,13 +168,13 @@ window.GameEvents.push({
         // A. 今川義元（ID: 1004001）が大名として存在するか確認します
         const yoshimoto = game.getBusho(1004001);
         if (!yoshimoto || !yoshimoto.isDaimyo) return false;
-
+        
         // プレイヤーが今川家の場合は、勝手に死んでしまわないようにここで止めます
         if (game.playerClanId === yoshimoto.clan) return false;
-
+        
         // C. 今川義元が駿府城（ID: 13）にいるか確認します
         if (yoshimoto.castleId !== 13) return false;
-
+        
         // B. 今川家が指定のお城をすべて持っているか確認します
         const imagawaClanId = yoshimoto.clan;
         //曳馬城、駿府城、長篠城、岡崎城、犬居城、鳴海城、高天神城、吉田城、興国寺城
@@ -184,17 +184,14 @@ window.GameEvents.push({
             return c && c.ownerClan === imagawaClanId;
         });
         if (!hasAllImagawaCastles) return false;
-
+        
         // D. 織田信長（ID: 1006001）が大名として存在するか確認します
         const nobunaga = game.getBusho(1006001);
         if (!nobunaga || !nobunaga.isDaimyo) return false;
-
-        // プレイヤーが織田家の場合も、勝手に話が進まないようにここで止めます
-        if (game.playerClanId === nobunaga.clan) return false;
-
+        
         // F. 織田信長が清州城（ID: 7）にいるか確認します
         if (nobunaga.castleId !== 7) return false;
-
+        
         // E. 織田家が指定のお城をすべて持っているか確認します
         const odaClanId = nobunaga.clan;
         const requiredOdaCastles = [7, 11];
@@ -203,11 +200,11 @@ window.GameEvents.push({
             return c && c.ownerClan === odaClanId;
         });
         if (!hasAllOdaCastles) return false;
-
+        
         // G. 松平元康（ID: 1004004）が城主として存在するか確認します
         const motoyasu = game.getBusho(1004004);
         if (!motoyasu || !motoyasu.isCastellan) return false;
-
+        
         // すべての条件をクリアしたら、イベントを発生させます！
         return true;
     },
