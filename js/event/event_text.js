@@ -64,7 +64,7 @@ window.EventTextManager = {
                 type: 'dialog',
                 leftName: args.motoyasuName,
                 leftFace: args.motoyasuFace,
-                msg: `「うむ。それゆえ、此度はわしみずから、${args.nobunagaCastleName}に赴こうと考えておる。かのお方とは腹を割って話さねばならぬのだ。」`
+                msg: `「うむ。それゆえ、此度はわし自ら、${args.nobunagaCastleName}に赴こうと考えておる。かのお方とは腹を割って話さねばならぬのだ。」`
             },
             {
                 type: 'dialog',
