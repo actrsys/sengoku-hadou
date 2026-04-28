@@ -169,9 +169,6 @@ window.GameEvents.push({
         const yoshimoto = game.getBusho(1004001);
         if (!yoshimoto || !yoshimoto.isDaimyo) return false;
         
-        // プレイヤーが今川家の場合は、勝手に死んでしまわないようにここで止めます
-        if (game.playerClanId === yoshimoto.clan) return false;
-        
         // C. 今川義元が駿府城（ID: 13）にいるか確認します
         if (yoshimoto.castleId !== 13) return false;
         
@@ -249,6 +246,36 @@ window.GameEvents.push({
             if (!mouri) mouri = [...odaBushos].sort((a, b) => (b.strength || 0) - (a.strength || 0))[0];
         }
 
+        // 今川家重臣Fの選出
+        let juushinF = null;
+        let imagawaBushosForF = game.bushos.filter(b => b.clan === imagawaClanId && b.status === 'active' && b.id !== yoshimoto.id && b.id !== 1004004);
+
+        // 1. 今川家所属の軍師
+        juushinF = imagawaBushosForF.find(b => b.isGunshi);
+
+        // 2. 功績500以上で智謀最高
+        if (!juushinF) {
+            let candidates = imagawaBushosForF.filter(b => b.achievementTotal >= 500);
+            if (candidates.length > 0) {
+                juushinF = candidates.sort((a, b) => (b.intelligence || 0) - (a.intelligence || 0))[0];
+            }
+        }
+
+        // 3. 相性が近くて功績最高
+        if (!juushinF && imagawaBushosForF.length > 0) {
+            juushinF = [...imagawaBushosForF].sort((a, b) => {
+                const diffA = Math.abs((yoshimoto.affinity || 0) - (a.affinity || 0));
+                const trueDiffA = Math.min(diffA, 100 - diffA);
+                const diffB = Math.abs((yoshimoto.affinity || 0) - (b.affinity || 0));
+                const trueDiffB = Math.min(diffB, 100 - diffB);
+                
+                if (trueDiffA !== trueDiffB) {
+                    return trueDiffA - trueDiffB; // 相性が近い順
+                }
+                return (b.achievementTotal || 0) - (a.achievementTotal || 0); // 功績が高い順
+            })[0];
+        }
+
         // 台本に渡す情報をひとまとめにします
         const args = {
             yoshimotoName: yoshimoto.name.replace('|', ''),
@@ -274,7 +301,10 @@ window.GameEvents.push({
             shinzanDName: shinzanD ? shinzanD.name.replace('|', '') : "小姓",
             shinzanDFace: shinzanD ? shinzanD.faceIcon : "koshou.webp",
             mouriName: mouri ? mouri.name.replace('|', '') : "小姓",
-            mouriFace: mouri ? mouri.faceIcon : "koshou.webp"
+            mouriFace: mouri ? mouri.faceIcon : "koshou.webp",
+            juushinFName: juushinF ? juushinF.name.replace('|', '') : "小姓",
+            juushinFFace: juushinF ? juushinF.faceIcon : "koshou.webp",
+            juushinFGivenName: juushinF ? (juushinF.givenName || juushinF.name.replace('|', '')) : "小姓"
         };
 
         // --- 2. イベント開始 ---
@@ -284,9 +314,61 @@ window.GameEvents.push({
             window.AudioManager.playBGM("SC_ex_Scene1_Duel.ogg");
         }
 
-        // パート1（軍議まで）の台本を読み込みます
-        if (window.EventTextManager && window.EventTextManager.okehazama_part1) {
-            await window.EventTextManager.playSequence(game, window.EventTextManager.okehazama_part1(args));
+        // プレイヤーが今川家の場合は、専用の会話と選択肢になります
+        let imagawaAttack = true;
+        
+        if (game.playerClanId === imagawaClanId) {
+            // 今川プレイヤー専用のパート1を再生します
+            if (window.EventTextManager && window.EventTextManager.okehazama_imagawa_part1) {
+                await window.EventTextManager.playSequence(game, window.EventTextManager.okehazama_imagawa_part1(args));
+            }
+            
+            // 出陣するかどうかの選択肢を出します
+            await new Promise(resolve => {
+                game.ui.showDialog("尾張国に出陣しますか？", true, 
+                    () => { imagawaAttack = true; resolve(); },
+                    () => { imagawaAttack = false; resolve(); },
+                    {
+                        leftName: args.juushinFName,
+                        leftFace: args.juushinFFace,
+                        okText: "出陣する",
+                        okClass: "btn-danger",
+                        cancelText: "やめる",
+                        cancelClass: "btn-primary"
+                    }
+                );
+            });
+            
+            if (imagawaAttack) {
+                // 出陣する場合のテキストを再生し、織田家の軍議へと繋ぎます
+                if (window.EventTextManager && window.EventTextManager.okehazama_imagawa_attack) {
+                    await window.EventTextManager.playSequence(game, window.EventTextManager.okehazama_imagawa_attack(args));
+                }
+                if (window.EventTextManager && window.EventTextManager.okehazama_oda_gungi) {
+                    await window.EventTextManager.playSequence(game, window.EventTextManager.okehazama_oda_gungi(args));
+                }
+            } else {
+                // 出陣しない場合のテキストを再生します
+                if (window.EventTextManager && window.EventTextManager.okehazama_imagawa_defend) {
+                    await window.EventTextManager.playSequence(game, window.EventTextManager.okehazama_imagawa_defend(args));
+                }
+                // 義元の寿命を10年延ばします
+                yoshimoto.endYear += 10;
+                
+                // ここでイベントを終了して、元の画面に戻ります
+                if (window.AudioManager) window.AudioManager.restoreMemorizedBgm();
+                if (game.factionSystem) game.factionSystem.updateFactions();
+                if (game.ui) {
+                    game.ui.renderMap();
+                    game.ui.updatePanelHeader();
+                }
+                return;
+            }
+        } else {
+            // プレイヤーが今川家以外の場合は、これまで通りのパート1を読み込みます
+            if (window.EventTextManager && window.EventTextManager.okehazama_part1) {
+                await window.EventTextManager.playSequence(game, window.EventTextManager.okehazama_part1(args));
+            }
         }
 
         // --- 3. プレイヤーの分岐選択 ---
