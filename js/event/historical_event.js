@@ -278,7 +278,7 @@ window.GameEvents.push({
         // BGMをメモして専用の曲に変更します
         if (window.AudioManager) {
             window.AudioManager.memorizeCurrentBgm();
-            window.AudioManager.playBGM("06_Snowy Sacred Approach.ogg");
+            window.AudioManager.playBGM("SC_ex_Scene1_Duel.ogg");
         }
 
         // パート1（軍議まで）の台本を読み込みます
