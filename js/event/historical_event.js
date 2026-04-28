@@ -237,8 +237,8 @@ window.GameEvents.push({
         if (!juushinB) juushinB = [...odaBushos].sort((a, b) => ((b.achievementTotal || 0) !== (a.achievementTotal || 0) ? (b.achievementTotal || 0) - (a.achievementTotal || 0) : (b.strength || 0) - (a.strength || 0)))[0];
         odaBushos = odaBushos.filter(b => b.id !== (juushinB ? juushinB.id : 0));
 
-        // 新参C（柴田勝家）: 貢献度500以下で武勇最高。いなければ武勇最高。
-        let shinzanC = odaBushos.filter(b => b.achievementTotal <= 500).sort((a, b) => (b.strength || 0) - (a.strength || 0))[0];
+        // 新参C（柴田勝家）: 貢献度599以下で武勇最高。いなければ武勇最高。
+        let shinzanC = odaBushos.filter(b => b.achievementTotal <= 599).sort((a, b) => (b.strength || 0) - (a.strength || 0))[0];
         if (!shinzanC) shinzanC = [...odaBushos].sort((a, b) => (b.strength || 0) - (a.strength || 0))[0];
         odaBushos = odaBushos.filter(b => b.id !== (shinzanC ? shinzanC.id : 0));
 
