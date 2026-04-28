@@ -616,65 +616,59 @@ class UIManager {
 
         okBtn.onclick = () => { okBtn.onclick = null; cleanupAndNext(dialog.onOk); };
 
-        const footer = okBtn.parentElement; // ★追加：ボタンが入っているフッターの箱を取得します
-        const choicesContainer = document.getElementById('dialog-choices-container'); // ★新しく作った選択肢の箱を取得します
-
-        // ★ここから追加：会話モード（顔グラあり、選択肢なし、確認なし）の判定
-        const hasFace = !!(leftFace || rightFace);
         const isSimpleMessage = !dialog.isConfirm && !(dialog.customOpts && dialog.customOpts.choices);
-        const isConversation = hasFace && isSimpleMessage;
+        const isConversation = isSimpleMessage;
         
         const modalContent = modal.querySelector('.modal-content');
 
         if (isConversation) {
-            // 会話モードのシールを貼ります
             modalContent.classList.add('dialog-conversation-mode');
             
-            // ウインドウ自体を押した時に次に進む魔法
+            // ナレーション（顔がない）の場合は、専用のクラスを追加して文字を広げる
+            if (!leftFace && !rightFace) {
+                modalContent.classList.add('narration-style');
+            } else {
+                modalContent.classList.remove('narration-style');
+            }
+            
             modalContent.onclick = (e) => {
-                if (e.target.closest('button')) return; // ボタンを押した時は無視します
-                // 決定の音を鳴らして、隠れている「閉じる」ボタンを強制的に押します
+                if (e.target.closest('button')) return;
                 if (window.AudioManager) window.AudioManager.playSE('decision.ogg');
                 okBtn.click();
             };
         } else {
-            // 会話モードではない時はシールを剥がして、クリックの魔法も解きます
             modalContent.classList.remove('dialog-conversation-mode');
+            modalContent.classList.remove('narration-style');
             modalContent.onclick = null;
         }
 
-        // もし「選択肢」が指定されていたら、特別な処理をします
         if (dialog.customOpts && dialog.customOpts.choices) {
-            footer.classList.add('hidden'); // いつもの「はい・いいえ」ボタンを隠します
-            cancelBtn.classList.remove('hidden'); // ★追加：外側クリックで閉じられないようにするための細工
+            footer.classList.add('hidden');
+            cancelBtn.classList.remove('hidden');
             
             if (choicesContainer) {
-                choicesContainer.innerHTML = ''; // 中身を一度きれいにします
+                choicesContainer.innerHTML = '';
                 
-                // 用意された選択肢の数だけ、新しくボタンを作ります
                 dialog.customOpts.choices.forEach(choice => {
                     const btn = document.createElement('button');
                     btn.className = 'dialog-choice-btn';
                     btn.textContent = choice.label;
                     
-                    // ボタンが押された時の処理を登録します
                     btn.onclick = () => {
-                        // 音を鳴らします（「戻る」ならキャンセルの音、それ以外なら決定の音）
                         if (window.AudioManager) {
                             if (choice.label === "戻る") window.AudioManager.playSE('cancel.ogg');
                             else window.AudioManager.playSE('decision.ogg');
                         }
                         
-                        choicesContainer.classList.add('hidden'); // 選択肢を隠します
-                        cleanupAndNext(choice.onClick); // 約束されていた処理（onClick）を実行します
+                        choicesContainer.classList.add('hidden');
+                        cleanupAndNext(choice.onClick);
                     };
                     choicesContainer.appendChild(btn);
                 });
                 
-                choicesContainer.classList.remove('hidden'); // 選択肢の箱を表示します
+                choicesContainer.classList.remove('hidden');
             }
         } else {
-            // 通常のダイアログの場合は、いつものボタンを出して、選択肢を隠します
             footer.classList.remove('hidden');
             if (choicesContainer) choicesContainer.classList.add('hidden');
 
@@ -692,7 +686,6 @@ class UIManager {
                 okBtn.className = dialog.customOpts?.okClass || 'btn-secondary';
                 footer.style.justifyContent = 'center';
 
-                // ★追加：会話モードの時はボタンを入れる箱（フッター）ごと隠します
                 if (isConversation) {
                     footer.classList.add('hidden');
                 }
