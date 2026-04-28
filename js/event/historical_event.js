@@ -577,8 +577,69 @@ window.GameEvents.push({
         const nobunaga = game.getBusho(1006001);
         const motoyasu = game.getBusho(1004004);
         
-        const nobunagaClan = game.clans.find(c => c.id === nobunaga.clan);
-        const motoyasuClan = game.clans.find(c => c.id === motoyasu.clan);
+        const odaClan = game.clans.find(c => c.id === nobunaga.clan);
+        const matsudairaClan = game.clans.find(c => c.id === motoyasu.clan);
+
+        // 今川氏真(1004011)の大名家名を取得します
+        const ujizane = game.getBusho(1004011);
+        let imagawaClanName = "今川家";
+        if (ujizane && ujizane.clan > 0) {
+            const imagawaClan = game.clans.find(c => c.id === ujizane.clan);
+            if (imagawaClan) imagawaClanName = imagawaClan.name;
+        }
+
+        // 松平家の智謀最高武将を取得します（いなければ名もなき小姓にします）
+        let vassalName = "小姓";
+        let vassalFace = "unknown_face.webp";
+        const vassals = game.bushos.filter(b => b.clan === motoyasu.clan && b.id !== motoyasu.id && b.status === 'active');
+        if (vassals.length > 0) {
+            vassals.sort((a, b) => (b.intelligence || 0) - (a.intelligence || 0));
+            const topVassal = vassals[0];
+            vassalName = topVassal.name.replace('|', '');
+            vassalFace = topVassal.faceIcon || "unknown_face.webp";
+        }
+
+        // 信長の官位名を取得します
+        let nobunagaTitle = "上総介";
+        if (nobunaga.courtRankIds && nobunaga.courtRankIds.length > 0 && game.courtRankSystem) {
+            const topRankId = Math.min(...nobunaga.courtRankIds);
+            const rank = game.courtRankSystem.getRank(topRankId);
+            if (rank) nobunagaTitle = rank.rankName2 || rank.rankName;
+        }
+
+        // 信長の居城名を取得します
+        let nobunagaCastleName = "城";
+        if (nobunaga.castleId > 0) {
+            const castle = game.getCastle(nobunaga.castleId);
+            if (castle) nobunagaCastleName = castle.name;
+        }
+
+        // イベントテキストの台本に渡す変数をひとまとめにします
+        const args = {
+            motoyasuName: motoyasu.name.replace('|', ''),
+            motoyasuFace: motoyasu.faceIcon || "unknown_face.webp",
+            imagawaClanName: imagawaClanName,
+            nobunagaName: nobunaga.name.replace('|', ''),
+            nobunagaGivenName: nobunaga.givenName || "信長", 
+            nobunagaFace: nobunaga.faceIcon || "unknown_face.webp",
+            odaClanName: odaClan ? odaClan.name : "織田家",
+            matsudairaClanName: matsudairaClan ? matsudairaClan.name : "松平家",
+            vassalName: vassalName,
+            vassalFace: vassalFace,
+            nobunagaCastleName: nobunagaCastleName,
+            nobunagaTitle: nobunagaTitle,
+            year: game.year,
+            month: game.month
+        };
+
+        // 新しく作ったファイルから台本を受け取り、再生プレイヤーで順番に表示させます
+        if (window.EventTextManager && window.EventTextManager.kiyosu_alliance) {
+            const sequence = window.EventTextManager.kiyosu_alliance(args);
+            await window.EventTextManager.playSequence(game, sequence);
+        }
+
+        // ログ出力
+        game.ui.log(`【イベント】清州同盟：${args.matsudairaClanName}と${args.odaClanName}の同盟が成立しました。`);
 
         // 外交システムを使って、強制的に「同盟」状態にします
         if (game.diplomacyManager) {
@@ -588,11 +649,6 @@ window.GameEvents.push({
             game.diplomacyManager.setSentiment(motoyasu.clan, nobunaga.clan, 100);
             game.diplomacyManager.setSentiment(nobunaga.clan, motoyasu.clan, 100);
         }
-
-        // メッセージを作って画面にお知らせします
-        const msg = `${motoyasuClan.name} が ${nobunagaClan.name} と同盟を締結しました！`;
-        game.ui.log(`【イベント】清州同盟：${msg}`);
-        await game.ui.showDialogAsync(msg, false, 0);
 
         // 画面や情報を最新の状態に更新します
         if (game.ui) {
