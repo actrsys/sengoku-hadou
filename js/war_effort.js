@@ -205,6 +205,11 @@ Object.assign(WarManager.prototype, {
     },
     
     async startWar(atkCastle, defCastle, atkBushos, atkSoldierCount, atkRice, atkHorses = 0, atkGuns = 0, reinforcementData = null, selfReinforcementData = null) {
+        // ★追加：戦争全体の「開始処理前」の合図を出します
+        if (this.game.eventManager) {
+            await this.game.eventManager.processEvents('before_war', { atkCastle, defCastle, atkBushos, atkSoldierCount, atkRice, atkHorses, atkGuns, reinforcementData, selfReinforcementData });
+        }
+
         this.state = this.state || {};
         this.state.active = true;
 
@@ -773,6 +778,11 @@ Object.assign(WarManager.prototype, {
                 }
             };
 
+            // ★追加：戦争全体の「開始処理後」の合図を出します
+            if (this.game.eventManager) {
+                await this.game.eventManager.processEvents('start_war', this.state);
+            }
+
             console.log("【チェック】諸勢力の鎮圧戦ですか？: " + (this.state.isKunishuSubjugation ? "はい" : "いいえ"));
             console.log("【チェック】野戦システム(FieldWarManager)は読み込まれていますか？: " + (typeof window.FieldWarManager !== 'undefined' ? "はい" : "いいえ（未定義）"));
 
@@ -939,6 +949,11 @@ Object.assign(WarManager.prototype, {
     async endWar(attackerWon, isRetreat = false, capturedInRetreat = [], retreatTargetId = null) { // ★ async を追加
         // ★ここを書き足します：既に「終わったよ」の処理中なら、2回目は無視するストッパーです！
         if (!this.state.active) return;
+
+        // ★追加：戦争全体の「終了処理前」の合図を出します
+        if (this.game.eventManager) {
+            await this.game.eventManager.processEvents('before_war_end', this.state);
+        }
 
         // ★追加：籠城戦（攻城戦）の「戦闘終了前」の合図を出します
         // ※野戦だけで決着がついた場合も呼ばれますが、イベント側で区別できます！
@@ -2268,9 +2283,8 @@ Object.assign(WarManager.prototype, {
             }
         }
     },
-
     
-    closeWar() { 
+    async closeWar() { 
         // ★念のためバリアを強制解除します！
         if (typeof this.game.ui.hideMapGuard === 'function') this.game.ui.hideMapGuard(true);
 
@@ -2301,6 +2315,11 @@ Object.assign(WarManager.prototype, {
         // ★追加：勝敗メッセージが閉じたこのタイミングで「思考中...」を再表示します！
         if (this.game.ui) {
             this.game.ui.restoreAIGuard();
+        }
+
+        // ★追加：戦争全体の「終了処理後」の合図を出します
+        if (this.game.eventManager) {
+            await this.game.eventManager.processEvents('after_war', this.state);
         }
         
         setTimeout(() => {

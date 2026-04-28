@@ -1283,36 +1283,38 @@ class CommandSystem {
 
             this.game.ui.showDialog(msg, true, 
                 () => {
-                    // ★追加：diplomacy.js の専門部署に「marriage（婚姻）」の確率計算をお願いします！
-                    const myPower = this.game.getClanTotalSoldiers(doer.clan) || 1;
-                    const targetPower = this.game.getClanTotalSoldiers(targetClanId) || 1;
-                    const isSuccess = this.game.diplomacyManager.checkDiplomacySuccess(doer.clan, targetClanId, 'marriage', doer.diplomacy, myPower, targetPower);
+                    this.executeWithEvent('marriage', () => {
+                        // ★追加：diplomacy.js の専門部署に「marriage（婚姻）」の確率計算をお願いします！
+                        const myPower = this.game.getClanTotalSoldiers(doer.clan) || 1;
+                        const targetPower = this.game.getClanTotalSoldiers(targetClanId) || 1;
+                        const isSuccess = this.game.diplomacyManager.checkDiplomacySuccess(doer.clan, targetClanId, 'marriage', doer.diplomacy, myPower, targetPower);
 
-                    if (isSuccess) {
-                        // 成功した時の処理
-                        this.applyMarriageData(princessId, targetBushoId, targetClanId);
-                        doer.isActionDone = true;
-                        doer.achievementTotal += Math.floor(doer.diplomacy * 0.2) + 20;
-                        this.game.factionSystem.updateRecognition(doer, 30);
+                        if (isSuccess) {
+                            // 成功した時の処理
+                            this.applyMarriageData(princessId, targetBushoId, targetClanId);
+                            doer.isActionDone = true;
+                            doer.achievementTotal += Math.floor(doer.diplomacy * 0.2) + 20;
+                            this.game.factionSystem.updateRecognition(doer, 30);
 
-                        this.game.ui.showResultModal(`${targetClan.name} と婚姻同盟を結びました！\n${princess.name} は ${targetBusho.name} の正室として迎えられました。`, () => {
-                            this.game.ui.updatePanelHeader();
-                            this.game.ui.renderCommandMenu();
-                            this.game.ui.renderMap();
-                        });
-                    } else {
-                        // 失敗した時の処理
-                        this.game.diplomacyManager.updateSentiment(doer.clan, targetClanId, -10); // 断られたので少し仲が悪くなります
-                        doer.isActionDone = true;
-                        doer.achievementTotal += 5;
-                        this.game.factionSystem.updateRecognition(doer, 10);
+                            this.game.ui.showResultModal(`${targetClan.name} と婚姻同盟を結びました！\n${princess.name} は ${targetBusho.name} の正室として迎えられました。`, () => {
+                                this.game.ui.updatePanelHeader();
+                                this.game.ui.renderCommandMenu();
+                                this.game.ui.renderMap();
+                            });
+                        } else {
+                            // 失敗した時の処理
+                            this.game.diplomacyManager.updateSentiment(doer.clan, targetClanId, -10); // 断られたので少し仲が悪くなります
+                            doer.isActionDone = true;
+                            doer.achievementTotal += 5;
+                            this.game.factionSystem.updateRecognition(doer, 10);
 
-                        this.game.ui.showResultModal(`${targetClan.name} に婚姻を断られました……\n使者は失意のまま帰還しました。`, () => {
-                            this.game.ui.updatePanelHeader();
-                            this.game.ui.renderCommandMenu();
-                            this.game.ui.renderMap();
-                        });
-                    }
+                            this.game.ui.showResultModal(`${targetClan.name} に婚姻を断られました……\n使者は失意のまま帰還しました。`, () => {
+                                this.game.ui.updatePanelHeader();
+                                this.game.ui.renderCommandMenu();
+                                this.game.ui.renderMap();
+                            });
+                        }
+                    });
                 }, 
                 () => {
                     // いいえ：もう一度相手武将選びに戻る
@@ -1342,7 +1344,7 @@ class CommandSystem {
                 const prob = this.game.diplomacyManager.getDiplomacyProb(doer.clan, targetClanId, 'alliance', doer.diplomacy, myPower, targetPower);
                 this.showAdviceAndExecute('diplomacy', () => this.executeDiplomacy(firstId, targetId, 'alliance'), { trueProb: prob / 100 });
             } else if (extraData.subAction === 'break_alliance') {
-                this.executeDiplomacy(firstId, targetId, 'break_alliance');
+                this.executeWithEvent('break_alliance', () => this.executeDiplomacy(firstId, targetId, 'break_alliance'));
             } else if (extraData.subAction === 'subordinate') {
                 this.showAdviceAndExecute('diplomacy', () => this.executeDiplomacy(firstId, targetId, 'subordinate'), { trueProb: 1.0 });
             } else if (extraData.subAction === 'dominate') {
@@ -1451,7 +1453,7 @@ class CommandSystem {
             return;
         }
         if (actionType === 'move_deploy') {
-            this.executeCommand('move_deploy', selectedIds, targetId);
+            this.executeWithEvent('move', () => this.executeCommand('move_deploy', selectedIds, targetId));
             return;
         }
 
@@ -1488,7 +1490,7 @@ class CommandSystem {
         const spec = COMMAND_SPECS[actionType];
         
         if (['appoint_gunshi'].includes(actionType)) { 
-             this.executeAppointGunshi(firstId);
+             this.executeWithEvent('appoint_gunshi', () => this.executeAppointGunshi(firstId));
              return;
         }
 
@@ -1496,7 +1498,7 @@ class CommandSystem {
             const bushoA = this.game.getBusho(firstId);
             this.game.ui.showDialog(`${bushoA.name} に家督を譲りますか？`, true, 
                 () => {
-                    this.executeSuccession(firstId);
+                    this.executeWithEvent('succession', () => this.executeSuccession(firstId));
                 },
                 null,
                 { okText: '家督を譲る', okClass: 'btn-danger', cancelText: 'やめる' }
@@ -1513,7 +1515,7 @@ class CommandSystem {
             if (spec.hasAdvice) {
                 this.showAdviceAndExecute(actionType, () => this.executeCommand(actionType, selectedIds, targetId), { trueProb: 1.0 });
             } else {
-                this.executeCommand(actionType, selectedIds, targetId);
+                this.executeWithEvent(actionType, () => this.executeCommand(actionType, selectedIds, targetId));
             }
             return;
         }
@@ -1564,24 +1566,24 @@ class CommandSystem {
                 guns: inputs.guns ? parseInt(inputs.guns.num.value) : 0
             };
             if (vals.gold === 0 && vals.rice === 0 && vals.soldiers === 0 && vals.horses === 0 && vals.guns === 0) return;
-            this.executeTransport(data, targetId, vals);
+            this.executeWithEvent('transport', () => this.executeTransport(data, targetId, vals));
         }
         // ★ここから追加！ 米を買うときの受け取り窓口です
         else if (type === 'buy_rice') {
             const val = parseInt(inputs.amount.num.value);
             if (val <= 0) return;
-            this.executeTrade('buy_rice', val);
+            this.executeWithEvent(type, () => this.executeTrade('buy_rice', val));
         }
         // ★追加ここまで！
         else if (type === 'sell_rice') {
             const val = parseInt(inputs.amount.num.value);
             if (val <= 0) return;
-            this.executeTrade('sell_rice', val);
+            this.executeWithEvent(type, () => this.executeTrade('sell_rice', val));
         }
         else if (['buy_ammo', 'buy_horses', 'buy_guns'].includes(type)) {
             const val = parseInt(inputs.amount.num.value);
             if (val <= 0) return;
-            this.executeTrade(type, val);
+            this.executeWithEvent(type, () => this.executeTrade(type, val));
         }
         // ★修正: 出陣時に軍馬と鉄砲の数をスライダーから読み取って渡すようにしました
         else if (type === 'war_supplies') {
@@ -1604,22 +1606,34 @@ class CommandSystem {
 
             if (isHeavySnow) {
                 this.game.ui.showDialog("大雪の影響により、被害が出る場合があります。\nそれでも出陣しますか？", true, () => {
-                    proceedWar();
+                    this.executeWithEvent('war', () => proceedWar());
                 });
             } else {
-                proceedWar();
+                this.executeWithEvent('war', () => proceedWar());
             }
         }
         else if (type === 'war_repair') {
              const val = parseInt(inputs.soldiers.num.value);
              if (val <= 0) return;
-             this.game.warManager.execWarCmd('repair', val);
+             this.executeWithEvent('war_repair', () => this.game.warManager.execWarCmd('repair', val));
+        }
+    }
+
+    async executeWithEvent(type, executeFunc, extraContext = {}) {
+        if (this.game.eventManager) {
+            await this.game.eventManager.processEvents('before_command', { commandType: type, ...extraContext });
+        }
+        await executeFunc();
+        if (this.game.eventManager) {
+            await this.game.eventManager.processEvents('after_command', { commandType: type, ...extraContext });
         }
     }
 
     showAdviceAndExecute(actionType, executeCallback, extraContext = {}) {
         const adviceAction = { type: actionType, ...extraContext };
-        this.game.gunshiSystem.showCommandAdvice(adviceAction, executeCallback);
+        this.game.gunshiSystem.showCommandAdvice(adviceAction, () => {
+            this.executeWithEvent(actionType, executeCallback, extraContext);
+        });
     }
 
     executeCommand(type, bushoIds, targetId) {

@@ -17,6 +17,12 @@ class EventManager {
             endMonth_after: [],    // 月末の最後（時間を進める直前）
             before_battle: [],     // 戦闘開始直前の特別な引き出し
             
+            // ★ここから追加：戦争全体用の引き出し
+            before_war: [],           // 戦争：開始処理前
+            start_war: [],            // 戦争：開始処理後
+            before_war_end: [],       // 戦争：終了処理前
+            after_war: [],            // 戦争：終了処理後
+
             // ★ここから追加：野戦用の引き出し
             before_field_war: [],     // 野戦：戦争開始前
             start_field_war: [],      // 野戦：戦闘開始後
@@ -29,6 +35,10 @@ class EventManager {
             before_siege_war_end: [], // 籠城戦：戦闘終了前
             after_siege_war: [],      // 籠城戦：戦闘終了後
             
+            // ★ここから追加：コマンド用の引き出し
+            before_command: [],       // コマンド実行直前
+            after_command: [],        // コマンド実行直後
+
             after_battle_blink: [], // 地図の点滅が終わった直後の特別な引き出し
             shogun_death: []       // 将軍が死亡した直後に呼ばれる特別な引き出し
         };
