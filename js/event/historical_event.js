@@ -656,8 +656,11 @@ window.GameEvents.push({
             game.diplomacyManager.changeStatus(motoyasu.clan, nobunaga.clan, '同盟', 0);
             
             // お互いの関係値を最高の100にします！
-            game.diplomacyManager.setSentiment(motoyasu.clan, nobunaga.clan, 100);
-            game.diplomacyManager.setSentiment(nobunaga.clan, motoyasu.clan, 100);
+            const relA = game.diplomacyManager.getRelation(motoyasu.clan, nobunaga.clan);
+            if (relA) relA.sentiment = 100;
+            
+            const relB = game.diplomacyManager.getRelation(nobunaga.clan, motoyasu.clan);
+            if (relB) relB.sentiment = 100;
         }
 
         // 画面や情報を最新の状態に更新します
