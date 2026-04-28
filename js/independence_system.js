@@ -407,17 +407,11 @@ class IndependenceSystem {
             await this.game.ui.playCaptureEffect(changedCastleIds, () => {
                 if (this.game.ui && typeof this.game.ui.renderMap === 'function') {
                     this.game.ui.renderMap();
-                    // ★追加：地図を描き直した時に思考中の文字が復活しないように、もう一度透明にしておきます！
-                    const guardEl = document.getElementById('ai-guard');
-                    if (guardEl) guardEl.classList.add('hide-text');
                 }
             });
         } else {
             if (this.game.ui && typeof this.game.ui.renderMap === 'function') {
                 this.game.ui.renderMap();
-                // ★追加：地図を描き直した時に思考中の文字が復活しないように、もう一度透明にしておきます！
-                const guardEl = document.getElementById('ai-guard');
-                if (guardEl) guardEl.classList.add('hide-text');
             }
         }
         // バリアを解除します
