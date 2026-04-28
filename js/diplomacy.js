@@ -832,6 +832,14 @@ class DiplomacyManager {
     
     determineAIDiplomacyAction(myClanId, targetClanId, myPower, targetClanTotal, perceivedTargetTotal, myDaimyoDuty, smartness, isStrategicPartner, allyCount, neighbors) {
         const rel = this.getRelation(myClanId, targetClanId);
+
+        // ★追加：相手の大名から「宿敵」として恨まれている場合、交渉しても失敗しやすいので外交対象から外します！
+        // （無駄な資金や行動回数を消費しないようにする賢いAIの魔法です）
+        const myDaimyo = this.game.bushos.find(b => b.clan === myClanId && b.isDaimyo);
+        const targetDaimyo = this.game.bushos.find(b => b.clan === targetClanId && b.isDaimyo);
+        if (myDaimyo && targetDaimyo && targetDaimyo.nemesisIds && targetDaimyo.nemesisIds.includes(myDaimyo.id)) {
+            return { action: 'none', gold: 0 };
+        }
         
         // 仲良しが2つ以上なら、外交する確率を下げる魔法（1つ増えるごとに20%ダウン）
         let sendProbModifier = 1.0;
