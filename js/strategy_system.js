@@ -54,6 +54,18 @@ class StrategySystem {
         const totalOffense = offense + newBonus + doerBonus;
         const totalDefense = defense + lordBonus;
         let successRate = (totalOffense / totalDefense) * 0.5; 
+        
+        // ★ここから追加：引抜先に自分の宿敵がいる場合は、成功率が半分になります！
+        if (target.nemesisIds && target.nemesisIds.length > 0) {
+            const hasNemesis = target.nemesisIds.some(nId => {
+                const nBusho = this.game.getBusho(nId);
+                return nBusho && nBusho.clan === doer.clan && nBusho.status !== 'dead';
+            });
+            if (hasNemesis) {
+                successRate *= 0.5;
+            }
+        }
+        
         if (target.isCastellan) successRate *= 0.67;
         return Math.min(1.0, successRate);
     }
@@ -125,7 +137,19 @@ class StrategySystem {
         const doerBonus = (50 - affDoer) * S.AffinityDoerWeight; 
         const totalOffense = offense + newBonus + doerBonus;
         const totalDefense = defense + lordBonus;
-        const successRate = (totalOffense / totalDefense) * 0.5; 
+        let successRate = (totalOffense / totalDefense) * 0.5; 
+
+        // ★ここから追加：引抜先に自分の宿敵がいる場合は、成功率が半分になります！
+        if (target.nemesisIds && target.nemesisIds.length > 0) {
+            const hasNemesis = target.nemesisIds.some(nId => {
+                const nBusho = this.game.getBusho(nId);
+                return nBusho && nBusho.clan === doer.clan && nBusho.status !== 'dead';
+            });
+            if (hasNemesis) {
+                successRate *= 0.5;
+            }
+        }
+
         return Math.random() < successRate;
     }
 
