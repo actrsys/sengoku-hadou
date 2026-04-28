@@ -16,10 +16,22 @@ window.EventTextManager = {
             } else if (item.type === 'dialog') {
                 // 顔画像や名前をつけて、会話として表示します
                 const opts = {};
+                
                 if (item.leftName) opts.leftName = item.leftName;
-                if (item.leftFace) opts.leftFace = item.leftFace;
+                // もし顔が指定されていればそれを使用し、指定がなくて名前が「小姓」なら自動でセットします
+                if (item.leftFace) {
+                    opts.leftFace = item.leftFace;
+                } else if (item.leftName === '小姓') {
+                    opts.leftFace = 'koshou.webp';
+                }
+                
                 if (item.rightName) opts.rightName = item.rightName;
-                if (item.rightFace) opts.rightFace = item.rightFace;
+                // 右側も同じように自動でセットする仕組みです
+                if (item.rightFace) {
+                    opts.rightFace = item.rightFace;
+                } else if (item.rightName === '小姓') {
+                    opts.rightFace = 'koshou.webp';
+                }
                 
                 await game.ui.showDialogAsync(item.msg, false, 0, opts);
             }

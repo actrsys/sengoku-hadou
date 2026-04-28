@@ -598,7 +598,7 @@ window.GameEvents.push({
 
         // 松平家の智謀最高武将を取得します（いなければ名もなき小姓にします）
         let vassalName = "小姓";
-        let vassalFace = "unknown_face.webp";
+        let vassalFace = "koshou.webp";
         const vassals = game.bushos.filter(b => b.clan === motoyasu.clan && b.id !== motoyasu.id && b.status === 'active');
         if (vassals.length > 0) {
             vassals.sort((a, b) => (b.intelligence || 0) - (a.intelligence || 0));
