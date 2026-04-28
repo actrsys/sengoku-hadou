@@ -252,6 +252,7 @@ window.GameEvents.push({
         // 台本に渡す情報をひとまとめにします
         const args = {
             yoshimotoName: yoshimoto.name.replace('|', ''),
+            yoshimotoFamilyName: yoshimoto.familyName || "今川",
             yoshimotoGivenName: yoshimoto.givenName || "義元",
             yoshimotoFace: yoshimoto.faceIcon || "unknown_face.webp",
             nobunagaName: nobunaga.name.replace('|', ''),
@@ -260,6 +261,7 @@ window.GameEvents.push({
             nobunagaFace: nobunaga.faceIcon || "unknown_face.webp",
             sunpuCastleName: game.getCastle(13)?.name || "駿府城",
             owariProvinceName: "尾張国",
+            owariProvinceShort: "尾張",
             odaClanName: odaClan ? odaClan.name : "織田家",
             imagawaClanName: imagawaClan ? imagawaClan.name : "今川家",
             

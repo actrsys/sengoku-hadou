@@ -150,7 +150,7 @@ window.EventTextManager = {
             { type: 'log', msg: `${args.yoshimotoName}。\n駿河・遠江・三河を従え、海道一の弓取りと名高い大大名である。` },
             { type: 'log', msg: `三河を平定した${args.yoshimotoName}はさらに支配地域を拡大するべく、大軍を率いて${args.sunpuCastleName}より出陣。${args.owariProvinceName}への侵攻を開始した。` },
             { type: 'log', msg: `一方、${args.yoshimotoGivenName}出陣の報を受け、${args.owariProvinceName}・${args.nobunagaFamilyName}家では重臣らが一同に介し、軍議を行っていた。` },
-            { type: 'dialog', leftName: args.juushinAName, leftFace: args.juushinAFace, msg: `「${args.nobunagaGivenName}様、${args.imagawaClanName}軍は総勢二万五千の大軍でござる。かくなる上は、降伏するしかありませぬ。」` },
+            { type: 'dialog', leftName: args.juushinAName, leftFace: args.juushinAFace, msg: `「${args.nobunagaGivenName}様、${args.yoshimotoFamilyName}軍は総勢二万五千の大軍でござる。かくなる上は、降伏するしかありませぬ。」` },
             { type: 'dialog', leftName: args.juushinBName, leftFace: args.juushinBFace, msg: `「馬鹿なことを申すな！\n一戦交えずして降伏など武士の名折れにござる。」` },
             { type: 'dialog', leftName: args.juushinBName, leftFace: args.juushinBFace, msg: `「${args.nobunagaGivenName}様、ここは籠城して援軍を待つべきかと。」` },
             { type: 'dialog', leftName: args.shinzanCName, leftFace: args.shinzanCFace, msg: `「何を悠長なことを……殿、ここは一か八か打って出るべきしかありませぬ！\n引き籠っていては、勝機は開けませぬぞ！」` }
@@ -166,7 +166,7 @@ window.EventTextManager = {
             { type: 'dialog', leftName: args.shinzanCName, leftFace: args.shinzanCFace, msg: `「はっ、お供いたしまする！」` },
             { type: 'dialog', leftName: args.juushinBName, leftFace: args.juushinBFace, msg: `「ははっ！」` },
             { type: 'log', msg: `国境での迎撃を採用した${args.nobunagaGivenName}は、軍勢を率いて出陣した。` },
-            { type: 'log', msg: `その頃、${args.imagawaClanName}軍が${args.nobunagaFamilyName}方の丸根砦、鷲津城を陥落せしめたとの知らせが${args.nobunagaGivenName}に届く。` },
+            { type: 'log', msg: `その頃、${args.yoshimotoFamilyName}軍が${args.nobunagaFamilyName}方の丸根砦、鷲津城を陥落せしめたとの知らせが${args.nobunagaGivenName}に届く。` },
             { type: 'log', msg: `${args.nobunagaGivenName}は善照寺に入り、およそ三千の軍勢を整え、迂回して出撃。進軍を開始した。` },
             { type: 'dialog', leftName: args.shinzanDName, leftFace: args.shinzanDFace, msg: `「殿、${args.yoshimotoName}本隊は、桶狭間山にて軍を休めておりまする！」` },
             { type: 'log', msg: `その時、にわかに雨が降り出した。たちまち黒雲が戦場を覆い、雷鳴が轟いた。視界を妨げる程の豪雨であった。` },
@@ -178,8 +178,8 @@ window.EventTextManager = {
             { type: 'dialog', leftName: args.yoshimotoName, leftFace: args.yoshimotoFace, msg: `「まさか、かようなところでこのわしが……\n天が、${args.nobunagaGivenName}に味方したというのか……」` },
             { type: 'dialog', leftName: args.yoshimotoName, leftFace: args.yoshimotoFace, msg: `「ぐふっ……」` },
             { type: 'dialog', leftName: args.mouriName, leftFace: args.mouriFace, msg: `「${args.yoshimotoName}、${args.mouriName}が討ち取ったり！」` },
-            { type: 'log', msg: `こうして、海道一の弓取りとうたわれた${args.yoshimotoName}は${args.owariProvinceName}の地でその生涯を終えた。` },
-            { type: 'log', msg: `${args.owariProvinceName}のうつけが${args.yoshimotoName}を討ち取ったとの知らせはまたたく間に広まり、${args.nobunagaGivenName}は一躍その名を全国に轟かせることとなった。` }
+            { type: 'log', msg: `こうして、海道一の弓取りとうたわれた${args.yoshimotoName}は${args.owariProvinceShort}の地でその生涯を終えた。` },
+            { type: 'log', msg: `${args.owariProvinceShort}のうつけが${args.yoshimotoName}を討ち取ったとの知らせはまたたく間に広まり、${args.nobunagaGivenName}は一躍その名を全国に轟かせることとなった。` }
         ];
     },
     okehazama_defend: function(args) {
