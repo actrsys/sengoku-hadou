@@ -600,6 +600,11 @@ class IndependenceSystem {
     // =========================================================================
 
     async planCoupDetatOrRebellion(castle, castellan, oldDaimyo) {
+        // ★ここから「謀反・独立ドラマ」の始まり！まず透明化の魔法を予約します。
+        if (this.game.ui) {
+            this.game.ui.guardHiddenCount = (this.game.ui.guardHiddenCount || 0) + 1;
+        }
+
         // 1. まずは反乱のリーダー（神輿）を探します。
         let rebellionLeader = castellan;
         const oldClanId = castle.ownerClan;
@@ -676,6 +681,12 @@ class IndependenceSystem {
             // もし神輿と城主が違う人物なら、城主も一緒に浪人にします
             if (castellan.id !== rebellionLeader.id && castellan.status === 'active') {
                 this.game.affiliationSystem.becomeRonin(castellan);
+            }
+            
+            // ★処理が終わって戻る前に、透明化の魔法を解きます
+            if (this.game.ui) {
+                this.game.ui.guardHiddenCount = Math.max(0, (this.game.ui.guardHiddenCount || 0) - 1);
+                if (typeof this.game.ui.renderMap === 'function') this.game.ui.renderMap();
             }
             return;
         }
@@ -1012,6 +1023,15 @@ class IndependenceSystem {
         } else {
             // スコア計算の結果、寝返りか独立に決まった場合の処理です
             await this.executeRebellion(castle, castellan, oldDaimyo, action);
+        }
+
+        // ★最後に「－１」して、透明化の魔法を解きます！
+        // これですべてのメッセージが表示し終わるまで、絶対に「思考中」の文字が出なくなります。
+        if (this.game.ui) {
+            this.game.ui.guardHiddenCount = Math.max(0, (this.game.ui.guardHiddenCount || 0) - 1);
+            if (typeof this.game.ui.renderMap === 'function') {
+                this.game.ui.renderMap();
+            }
         }
     }
 
