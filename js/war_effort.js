@@ -221,6 +221,15 @@ Object.assign(WarManager.prototype, {
             aiGuardEl.style.display = ''; 
         }
 
+        // ★今回追加：「透明化しっぱなし」にするための強力な魔法です！
+        // 地図が何度描き直されても、絶対に文字が表示されないようにルール（CSS）をブラウザに追加します。
+        if (!document.getElementById('force-hide-ai-text')) {
+            const style = document.createElement('style');
+            style.id = 'force-hide-ai-text';
+            style.innerHTML = '#ai-guard { color: transparent !important; text-shadow: none !important; } #ai-guard * { opacity: 0 !important; }';
+            document.head.appendChild(style);
+        }
+
         try {
             let atkLeaderIdx = atkBushos.findIndex(b => b.isDaimyo);
             if (atkLeaderIdx === -1) atkLeaderIdx = atkBushos.findIndex(b => b.isCastellan);
@@ -2337,6 +2346,12 @@ Object.assign(WarManager.prototype, {
     async closeWar() { 
         // ★念のためバリアを強制解除します！
         if (typeof this.game.ui.hideMapGuard === 'function') this.game.ui.hideMapGuard(true);
+
+        // ★今回追加：「透明化しっぱなし」のルールを剥がして元に戻します！
+        const forceHideStyle = document.getElementById('force-hide-ai-text');
+        if (forceHideStyle) {
+            forceHideStyle.remove();
+        }
 
         const aiGuardEl = document.getElementById('ai-guard');
         if (aiGuardEl) {
