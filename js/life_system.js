@@ -575,7 +575,8 @@ class LifeSystem {
             let successor = null;
 
             // ★ここから変更：プレイヤーの家なら自分で選ぶ魔法を復活させます！
-            if (daimyo.clan === this.game.playerClanId) {
+            // 念のため、文字と数字の違いで誤判定（勝手にAIが決めてしまうバグ）が起きないように Number() で包んで比較します
+            if (Number(daimyo.clan) === Number(this.game.playerClanId)) {
                 // プレイヤーが選ぶまで「待つ」魔法です
                 await new Promise(resolve => {
                     this.game.ui.info.openBushoSelector('succession', null, {

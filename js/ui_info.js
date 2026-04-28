@@ -2235,12 +2235,21 @@ class UIInfoManager {
             isMulti = this.bushoSavedData.isMulti;
             spec = this.bushoSavedData.spec;
         } else {
-            const data = this.game.commandSystem.getBushoSelectorData(actionType, targetId, extraData, c);
-            bushos = extraData && extraData.customBushos ? extraData.customBushos : data.bushos;
-            infoHtml = extraData && extraData.customInfoHtml ? extraData.customInfoHtml : data.infoHtml;
-            isMulti = data.isMulti;
-            spec = data.spec || {};
-            this.bushoSavedData = { actionType, targetId, bushos, infoHtml, isMulti, spec };
+            // イベントからの呼び出し時など、特別に武将リストが渡されている場合はシステムへの問い合わせをスキップしてエラーを防ぎます！
+            if (extraData && extraData.customBushos) {
+                bushos = extraData.customBushos;
+                infoHtml = extraData.customInfoHtml || "";
+                isMulti = false;
+                spec = {};
+                this.bushoSavedData = { actionType, targetId, bushos, infoHtml, isMulti, spec };
+            } else {
+                const data = this.game.commandSystem.getBushoSelectorData(actionType, targetId, extraData, c);
+                bushos = data.bushos;
+                infoHtml = data.infoHtml;
+                isMulti = data.isMulti;
+                spec = data.spec || {};
+                this.bushoSavedData = { actionType, targetId, bushos, infoHtml, isMulti, spec };
+            }
             this.bushoSavedBushos = null;
             this.bushoSavedSortedBushos = null;
         }
