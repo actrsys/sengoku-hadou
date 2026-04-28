@@ -2224,7 +2224,7 @@ class UIInfoManager {
         
         // ★追加：行動列を隠すかどうかのフラグです
         const hideActionCol = isViewMode || isActionFree;
-
+        
         const c = this.ui.currentCastle;
         
         // ★キャッシュを利用して毎回重い処理が走るのを防ぐ魔法
@@ -2235,7 +2235,7 @@ class UIInfoManager {
             isMulti = this.bushoSavedData.isMulti;
             spec = this.bushoSavedData.spec;
         } else {
-            // イベントからの呼び出し時など、特別に武将リストが渡されている場合はシステムへの問い合わせをスキップしてエラーを防ぎます！
+            // ★修正：イベントからの呼び出し時など、特別に武将リストが渡されている場合はシステムへの問い合わせをスキップしてエラーを防ぎます！
             if (extraData && extraData.customBushos) {
                 bushos = extraData.customBushos;
                 infoHtml = extraData.customInfoHtml || "";
