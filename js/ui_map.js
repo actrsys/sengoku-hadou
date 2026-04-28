@@ -699,6 +699,9 @@ Object.assign(UIManager.prototype, {
                         const dy = pos2Y - pos1Y;
                         const dist = Math.hypot(dx, dy);
 
+                        // ★追加：距離が0（スタートとゴールが同じ場所）の時は、計算が壊れてしまうので線を引くのをやめます！
+                        if (dist === 0) return;
+
                         let curveSize = dist * (0.05 + ((c1.id * c2.id) % 10) * 0.005);
                         
                         // もし「個別に角度を調整する箱」に数字が書かれていたら、それで上書きします！
