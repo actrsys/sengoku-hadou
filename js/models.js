@@ -322,21 +322,52 @@ class Busho {
         // 血縁リストと奥さんリストを合体させる機能は、後で姫の名簿を読み込んでから呼び出します！
         this.familyIds = [...this.baseFamilyIds];
         
-        // ★【ここから書き足し：宿敵の設定】
-        // 宿敵（敵対する武将）の出席番号をリストで覚えておくための箱です
-        this.nemesisIds = [];
-        if (data.nemesisIds && Array.isArray(data.nemesisIds)) {
-            // セーブデータから読み込んだ時は、すでにリストになっているのでそのまま使います！
-            this.nemesisIds = data.nemesisIds;
-        } else if (typeof data.nemesis === 'string' && data.nemesis.trim() !== "") {
-            // CSVから届いた文字を切り離して数字にし、さらに「0より大きい数字だけ」を厳選して箱に入れます！
-            this.nemesisIds = String(data.nemesis).split('|')
-                .map(id => Number(id.trim()))
-                .filter(id => !isNaN(id) && id > 0);
-        } else if (Number(data.nemesis) > 0) {
-            // 数字が1つだけ入っていた場合は、その1つだけをリストに入れます
-            this.nemesisIds = [Number(data.nemesis)];
+        // ★【ここから書き足し：宿敵の設定（タイマー付きに進化）】
+        // 宿敵（敵対する武将）の出席番号と、怒りが収まるまでの「タイマー（月数）」をセットで覚えておくための箱です
+        this.nemesisList = [];
+
+        // セーブデータから読み込んだ時（すでに新しいタイマー付きの箱がある場合）
+        if (data.nemesisList && Array.isArray(data.nemesisList)) {
+            this.nemesisList = data.nemesisList;
+        } 
+        // 古いセーブデータ（タイマー無しの昔の箱）が残っている場合
+        else if (data.nemesisIds && Array.isArray(data.nemesisIds)) {
+            data.nemesisIds.forEach(id => {
+                if (id > 0) {
+                    this.nemesisList.push({ id: Number(id), count: 60 }); // デフォルトの60ヶ月をセットします
+                }
+            });
+        } 
+        // CSVなどから「1:30|2」のような文字で届いた場合
+        else if (typeof data.nemesis === 'string' && data.nemesis.trim() !== "") {
+            const parts = String(data.nemesis).split('|');
+            parts.forEach(part => {
+                // 「:」があるか確認して、左側（出席番号）と右側（期間）に切り分けます
+                const items = part.split(':');
+                const id = Number(items[0].trim());
+                
+                if (!isNaN(id) && id > 0) {
+                    // もし「:」の右側に期間が書いてあればその数字を、書いてなければ基本の「60」を使います
+                    let count = 60;
+                    if (items.length >= 2) {
+                        const parsedCount = Number(items[1].trim());
+                        // ちゃんと数字として読み取れた場合だけ、その数字を採用します
+                        if (!isNaN(parsedCount) && parsedCount > 0) {
+                            count = parsedCount;
+                        }
+                    }
+                    this.nemesisList.push({ id: id, count: count });
+                }
+            });
         }
+        // 数字が1つだけ入っていた場合
+        else if (Number(data.nemesis) > 0) {
+            this.nemesisList.push({ id: Number(data.nemesis), count: 60 });
+        }
+
+        // ★他のシステムが今まで通り「数字だけのリスト」を探しに来てもエラーにならないように、
+        // タイマー無しのIDだけのリストも自動で作っておきます！
+        this.nemesisIds = this.nemesisList.map(n => n.id);
 
         // --- 忠誠・義理など（ここから下は既存の続き） ---
         this.loyalty = Number(this.loyalty || 0);

@@ -1161,7 +1161,23 @@ class GameManager {
         
         this.updateAllCastlesLords();
         
-        if (this.month % 3 === 0) this.factionSystem.optimizeCastellans(); 
+        // 毎月、全武将の宿敵のタイマーを1ずつ減らす処理です
+        this.bushos.forEach(b => {
+            // 活動中の武将と浪人のみが対象です（まだ生まれていない人や亡くなった人は無視します）
+            if (b.status === 'active' || b.status === 'ronin') {
+                if (b.nemesisList && b.nemesisList.length > 0) {
+                    // タイマーを1減らして、0より大きい（まだ怒っている）宿敵だけをリストに残します
+                    b.nemesisList = b.nemesisList.filter(nemesis => {
+                        nemesis.count -= 1;
+                        return nemesis.count > 0;
+                    });
+                    // 他のシステムが混乱しないように、IDだけのリストも最新の状態に書き直しておきます
+                    b.nemesisIds = b.nemesisList.map(n => n.id);
+                }
+            }
+        });
+        
+        if (this.month % 3 === 0) this.factionSystem.optimizeCastellans();
         
         this.castles.forEach(c => {
             if (c.ownerClan === 0) return;
