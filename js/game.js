@@ -1734,7 +1734,7 @@ class GameManager {
                     this.clans = data.clans;
                 }
                 
-                // ★追加：セーブデータ読み込み時にも官位マスタデータをセットします
+                // セーブデータ読み込み時にも官位マスタデータをセットします
                 const courtRanksText = await DataManager.fetchText("./data/imperialCourtRank.csv").catch(() => "");
                 const courtRanks = courtRanksText ? DataManager.parseCSV(courtRanksText, CourtRank) : [];
                 this.courtRankSystem.setRankData(courtRanks);
@@ -1744,7 +1744,7 @@ class GameManager {
                 
                 this.phase = 'game';
                 
-                // ★ここをごっそり差し替え！：セーブデータのメモから順番を復元します！
+                // セーブデータのメモから順番を復元します！
                 if (d.turnQueueIds && d.turnQueueIds.length > 0) {
                     // メモ書きがある場合は、そのIDの順番通りに城を並べ直して、続きから始めます
                     this.turnQueue = d.turnQueueIds.map(id => this.castles.find(c => c.id === id)).filter(c => c !== undefined);
@@ -1754,24 +1754,22 @@ class GameManager {
                     this.turnQueue = [...this.castles].sort(() => Math.random() - 0.5);
                     this.currentIndex = 0;
                 }
-                // ★差し替えここまで！
-
+                
                 this.updateAllCastlesLords();
 
-                // ★ここを書き足し！：ロードした時も、念のため年齢による能力変動を再計算しておきます
+                // ロードした時も、念のため年齢による能力変動を再計算しておきます
                 this.lifeSystem.updateAllBushosAge();
 
-                // ★ここを修正！：カットインを出す「前」に、先にマップを描いておく魔法です！
+                // カットインを出す「前」に、先にマップを描いておく魔法です！
                 this.ui.hasInitializedMap = false; 
                 this.ui.renderMap();
 
-                // ★ ここから追加！ セーブデータを読み込んだ瞬間にBGMを切り替えます
+                // セーブデータを読み込んだ瞬間にBGMを切り替えます
                 if (window.AudioManager) {
                     window.AudioManager.playBGM('SC_ex_Town2_Fortress.ogg');
                 }
-                // ★ ここまで追加
 
-                // ★マップが描かれた綺麗な画面の上で、カットインをゆっくり出します
+                // マップが描かれた綺麗な画面の上で、カットインをゆっくり出します
                 await this.ui.showCutin(`ロード完了: ${this.year}年 ${this.month}月`);
                 
                 this.processTurn();
