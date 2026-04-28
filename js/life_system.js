@@ -540,10 +540,14 @@ class LifeSystem {
         // 今のゲームの年を時計で確認します
         const currentYear = this.game.year;
 
-        // 1. 今活躍している家臣たちと、まだ登場していない一門を全員集めます！
-        // （ただし、まだ生まれていない人は絶対に除外します！）
+        // 1. 今活躍している家臣たちを集めます！
         const activeBushos = this.game.bushos.filter(b => b.clan === daimyo.clan && b.id !== daimyo.id && b.status === 'active' && !b.isDaimyo);
-        const unbornFamily = this.game.bushos.filter(b => b.status === 'unborn' && daimyo.familyIds.some(fId => b.familyIds.includes(fId)) && b.birthYear <= currentYear);
+        
+        // その中で「一門」の武将だけを抽出します！
+        const activeFamily = activeBushos.filter(b => daimyo.familyIds.some(fId => b.familyIds.includes(fId)));
+
+        // まだ登場していない一門（※コマンドからの家督相続に合わせ、出生前の武将は除外します！）
+        const unbornFamily = this.game.bushos.filter(b => b.status === 'unborn' && !b.isNotBorn && daimyo.familyIds.some(fId => b.familyIds.includes(fId)) && b.birthYear <= currentYear);
         
         // 浪人や諸勢力（※頭領は除く）に所属している一門武将も探します！
         const externalFamily = this.game.bushos.filter(b => {
@@ -569,7 +573,13 @@ class LifeSystem {
             return false;
         });
 
-        const allCandidates = [...activeBushos, ...unbornFamily, ...externalFamily];
+        // まずは一門だけで候補リストを作ります
+        let allCandidates = [...activeFamily, ...unbornFamily, ...externalFamily];
+
+        // もし一門の候補が誰もいなければ、特例として「今活躍している家臣全員（一門以外も含む）」を候補にします！
+        if (allCandidates.length === 0) {
+            allCandidates = [...activeBushos];
+        }
 
         if (allCandidates.length > 0) {
             let successor = null;
