@@ -322,6 +322,22 @@ class Busho {
         // 血縁リストと奥さんリストを合体させる機能は、後で姫の名簿を読み込んでから呼び出します！
         this.familyIds = [...this.baseFamilyIds];
         
+        // ★【ここから書き足し：仇敵の設定】
+        // 仇敵（敵対する武将）の出席番号をリストで覚えておくための箱です
+        this.nemesisIds = [];
+        if (data.nemesisIds && Array.isArray(data.nemesisIds)) {
+            // セーブデータから読み込んだ時は、すでにリストになっているのでそのまま使います！
+            this.nemesisIds = data.nemesisIds;
+        } else if (typeof data.nemesis === 'string' && data.nemesis.trim() !== "") {
+            // CSVから届いた文字を切り離して数字にし、さらに「0より大きい数字だけ」を厳選して箱に入れます！
+            this.nemesisIds = String(data.nemesis).split('|')
+                .map(id => Number(id.trim()))
+                .filter(id => !isNaN(id) && id > 0);
+        } else if (Number(data.nemesis) > 0) {
+            // 数字が1つだけ入っていた場合は、その1つだけをリストに入れます
+            this.nemesisIds = [Number(data.nemesis)];
+        }
+
         // --- 忠誠・義理など（ここから下は既存の続き） ---
         this.loyalty = Number(this.loyalty || 0);
         this.duty = Number(this.duty || 0);
