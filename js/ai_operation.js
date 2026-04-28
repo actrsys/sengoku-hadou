@@ -725,7 +725,10 @@ class AIOperationManager {
             if (op.turnsRemaining <= 0) {
                 op.status = '実行中';
                 console.log(`大名家[${clanId}]の作戦【${op.type}】の準備が完了し、実行フェーズに入りました！`);
+            } else if (op.type === '攻撃') {
+                // ★追加：まだ準備中の場合（カウントダウンが0より大きい時）にログを出します
+                console.log(`大名家[${clanId}]は【攻撃作戦】を準備中です。(出撃元: ${op.stagingBase}, 残り準備期間: ${op.turnsRemaining}ヶ月)`);
             }
-        } 
+        }
     }
 }
