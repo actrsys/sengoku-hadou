@@ -655,6 +655,9 @@ window.GameEvents.push({
             if (relB) relB.sentiment = 100;
         }
 
+        // 汎用メッセージの表示（システムからのお知らせのように、画面の真ん中にメッセージを出します）
+        await game.ui.showDialogAsync(`${args.odaClanName} が ${args.matsudairaClanName} と同盟を締結しました！`, false, 0);
+
         // 画面や情報を最新の状態に更新します
         if (game.ui) {
             game.ui.renderMap();
