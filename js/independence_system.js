@@ -85,6 +85,11 @@ class IndependenceSystem {
     }
     
     async executeRebellion(castle, castellan, oldDaimyo, intention = 'indep') {
+        // ★追加：独立や寝返りの処理中も思考中の文字を隠すために、透明化の魔法を予約します！
+        if (this.game.ui) {
+            this.game.ui.guardHiddenCount = (this.game.ui.guardHiddenCount || 0) + 1;
+        }
+
         const oldClanId = castle.ownerClan;
         
         // ★追加：複数のお城が同時に寝返ったか調べるために、最初のお城の持ち主を全部メモしておきます！
@@ -419,6 +424,14 @@ class IndependenceSystem {
         // もし表示する文字が何かあれば、画面にメッセージを出します
         if (extraMsg !== "") {
             await this.game.ui.showDialogAsync(extraMsg, false, 0);
+        }
+
+        // ★追加：独立や寝返りのすべてが終わったら、透明化の魔法を解きます！
+        if (this.game.ui) {
+            this.game.ui.guardHiddenCount = Math.max(0, (this.game.ui.guardHiddenCount || 0) - 1);
+            if (typeof this.game.ui.renderMap === 'function') {
+                this.game.ui.renderMap();
+            }
         }
     }
 
