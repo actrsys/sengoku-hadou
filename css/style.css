@@ -2425,3 +2425,36 @@ body.is-pc.daimyo-select-mode #pc-new-ui-container { display: none !important; }
     background-color: #546e7a;
     color: #ffcc80;
 }
+/* =========================================================
+   イベント専用メッセージウィンドウ
+   ========================================================= */
+.event-dialog-modal {
+    align-items: flex-end !important;
+    padding-bottom: max(10px, env(safe-area-inset-bottom)) !important;
+}
+
+.event-dialog-modal .modal-content.modal-small {
+    /* 画面下部に配置しつつ、枠（ボーダー）を残すための設定 */
+    width: calc(100% - 20px) !important;
+    max-width: 800px !important;
+    margin: 0 auto !important;
+    border-radius: 8px !important;
+}
+
+body:not(.is-pc) .event-dialog-modal .modal-content.modal-small {
+    /* スマホ版で枠が消えてしまうのを防ぎ、少し隙間を空けます */
+    width: calc(100% - 20px) !important;
+    border-radius: 8px !important;
+}
+
+/* 次へ進む（▼）マークを追加して分かりやすくします */
+.event-dialog-modal .modal-content.modal-small::after {
+    content: "▼";
+    position: absolute;
+    bottom: 8px;
+    right: 15px;
+    color: #ffd54f;
+    font-size: 1rem;
+    animation: fw-blink 1.5s infinite;
+    pointer-events: none;
+}

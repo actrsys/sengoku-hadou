@@ -91,7 +91,7 @@ class UIManager {
             });
         }
 
-        // ★ここから追加：単なるメッセージ表示のウインドウも、外側を押して閉じられるようにします！
+        // 単なるメッセージ表示のウインドウも、外側を押して閉じられるようにします！
         const dialogModal = document.getElementById('dialog-modal');
         if (dialogModal) {
             dialogModal.addEventListener('click', (e) => {
@@ -102,15 +102,20 @@ class UIManager {
                     if (cancelBtn && cancelBtn.classList.contains('hidden')) {
                         const okBtn = document.getElementById('dialog-btn-ok');
                         if (okBtn) {
-                            // 背景を押して閉じたので、キャンセルの音を鳴らして「閉じる」ボタンを押したことにします
-                            if (window.AudioManager) window.AudioManager.playSE('cancel.ogg');
+                            // イベント中の場合は選択音、そうでない場合はキャンセル音を鳴らします
+                            if (window.AudioManager) {
+                                if (dialogModal.classList.contains('event-dialog-modal')) {
+                                    window.AudioManager.playSE('choice.ogg');
+                                } else {
+                                    window.AudioManager.playSE('cancel.ogg');
+                                }
+                            }
                             okBtn.click();
                         }
                     }
                 }
             });
         }
-        // ★追加ここまで
         
         if (this.mapZoomInBtn) {
             this.mapZoomInBtn.onclick = (e) => { e.stopPropagation(); this.changeMapZoom(1); };
@@ -619,8 +624,38 @@ class UIManager {
         const footer = okBtn.parentElement; // ★追加：ボタンが入っているフッターの箱を取得します
         const choicesContainer = document.getElementById('dialog-choices-container'); // ★新しく作った選択肢の箱を取得します
 
+        // ------------------
+        // イベントモード専用のクリック操作の定義
+        const eventClickHandler = (e) => {
+            // 選択肢ボタンをクリックした場合は邪魔をしません
+            if (e.target.closest('.dialog-choice-btn')) return;
+            
+            // 外側の黒い背景をクリックした場合は、別の処理に任せます
+            if (e.target === modal) return;
+
+            e.stopPropagation(); // 他のクリック音が鳴るのを防ぎます
+            if (window.AudioManager) window.AudioManager.playSE('choice.ogg');
+            
+            // 次へ進むために、クリックの受付を解除してから決定ボタンを押したことにします
+            const content = modal.querySelector('.modal-content');
+            if (content) {
+                content.removeEventListener('click', eventClickHandler);
+                content.style.cursor = '';
+            }
+            okBtn.click(); 
+        };
+
+        // 前回のイベント設定が残っていたら一旦消しておきます
+        const modalContent = modal.querySelector('.modal-content');
+        if (modalContent) {
+            modalContent.removeEventListener('click', eventClickHandler);
+            modalContent.style.cursor = '';
+        }
+        // ------------------
+
         // もし「選択肢」が指定されていたら、特別な処理をします
         if (dialog.customOpts && dialog.customOpts.choices) {
+            modal.classList.remove('event-dialog-modal'); // イベントクラスを外す
             footer.classList.add('hidden'); // いつもの「はい・いいえ」ボタンを隠します
             cancelBtn.classList.remove('hidden'); // ★追加：外側クリックで閉じられないようにするための細工
             
@@ -650,23 +685,41 @@ class UIManager {
                 choicesContainer.classList.remove('hidden'); // 選択肢の箱を表示します
             }
         } else {
-            // 通常のダイアログの場合は、いつものボタンを出して、選択肢を隠します
-            footer.classList.remove('hidden');
-            if (choicesContainer) choicesContainer.classList.add('hidden');
+            // イベント専用の指定があるか確認します
+            const isEventMode = dialog.customOpts && dialog.customOpts.isEvent;
 
-            if (dialog.isConfirm) {
-                cancelBtn.classList.remove('hidden'); 
-                cancelBtn.onclick = () => { cancelBtn.onclick = null; cleanupAndNext(dialog.onCancel); };
-                okBtn.textContent = dialog.customOpts?.okText || 'はい';
-                okBtn.className = dialog.customOpts?.okClass || 'btn-primary';
-                cancelBtn.textContent = dialog.customOpts?.cancelText || 'いいえ';
-                cancelBtn.className = dialog.customOpts?.cancelClass || 'btn-secondary';
-                footer.style.justifyContent = 'center';
+            if (isEventMode) {
+                // イベントの時は、専用の目印をつけ、フッター（ボタン）を隠します
+                modal.classList.add('event-dialog-modal');
+                footer.classList.add('hidden');
+                if (choicesContainer) choicesContainer.classList.add('hidden');
+                cancelBtn.classList.add('hidden'); // 背景クリック判定用に隠す
+                
+                // メッセージエリア全体をクリックで進めるようにします
+                if (modalContent) {
+                    modalContent.style.cursor = 'pointer';
+                    modalContent.addEventListener('click', eventClickHandler);
+                }
             } else {
-                cancelBtn.classList.add('hidden'); 
-                okBtn.textContent = dialog.customOpts?.okText || '閉じる';
-                okBtn.className = dialog.customOpts?.okClass || 'btn-secondary';
-                footer.style.justifyContent = 'center';
+                // 通常のダイアログの場合は、目印を外し、いつものボタンを出します
+                modal.classList.remove('event-dialog-modal');
+                footer.classList.remove('hidden');
+                if (choicesContainer) choicesContainer.classList.add('hidden');
+
+                if (dialog.isConfirm) {
+                    cancelBtn.classList.remove('hidden'); 
+                    cancelBtn.onclick = () => { cancelBtn.onclick = null; cleanupAndNext(dialog.onCancel); };
+                    okBtn.textContent = dialog.customOpts?.okText || 'はい';
+                    okBtn.className = dialog.customOpts?.okClass || 'btn-primary';
+                    cancelBtn.textContent = dialog.customOpts?.cancelText || 'いいえ';
+                    cancelBtn.className = dialog.customOpts?.cancelClass || 'btn-secondary';
+                    footer.style.justifyContent = 'center';
+                } else {
+                    cancelBtn.classList.add('hidden'); 
+                    okBtn.textContent = dialog.customOpts?.okText || '閉じる';
+                    okBtn.className = dialog.customOpts?.okClass || 'btn-secondary';
+                    footer.style.justifyContent = 'center';
+                }
             }
         }
 
