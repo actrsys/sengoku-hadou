@@ -165,6 +165,13 @@ window.GameEvents.push({
     isOneTime: true,                 // 一度発生したら二度と起きません
     
     checkCondition: function(game) {
+        // 5月であるか確認します（5月じゃなければストップ）
+        if (game.month !== 5) return false;
+
+        // 太原崇孚（ID: 1004057）が死亡しているか確認します（生きていたらストップ）
+        const sessai = game.getBusho(1004057);
+        if (sessai && sessai.status !== 'dead') return false;
+
         // A. 今川義元（ID: 1004001）が大名として存在するか確認します
         const yoshimoto = game.getBusho(1004001);
         if (!yoshimoto || !yoshimoto.isDaimyo) return false;
