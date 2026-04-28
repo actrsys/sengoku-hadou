@@ -754,6 +754,14 @@ class AIEngine {
             if (target.lastAttackerClanId === myClanId && target.ownerClan !== myClanId) {
                 prob += 5; // 諦めきれない執着ボーナスとして少しだけ確率を上げます！
             }
+
+            // 5. 相手の殿様が、自分の殿様の「宿敵」だった場合の特別な執着！
+            const targetDaimyo = this.game.bushos.find(b => b.clan === target.ownerClan && b.isDaimyo);
+            let isNemesisDaimyo = false;
+            if (targetDaimyo && myDaimyo.nemesisIds && myDaimyo.nemesisIds.includes(targetDaimyo.id)) {
+                prob += 10; // 宿敵には容赦しません！
+                isNemesisDaimyo = true; // 上限を広げるための印をつけておきます
+            }
             
             // ★国や地方を統一するための執着ボーナス！
             // もしターゲットの城がある国が、自分が持っているけどまだ統一していない国だったら
@@ -781,7 +789,10 @@ class AIEngine {
             }
             
             // 攻撃確率の最大値設定
-            const maxProb = rel.status === '敵対' ? 60 : 10;
+            let maxProb = rel.status === '敵対' ? 60 : 10;
+            if (isNemesisDaimyo) {
+                maxProb += 10; // 宿敵の場合は、上限を10%広げて攻めやすくします！
+            }
             
             // 最大値の適用
             prob = Math.min(prob, maxProb);
