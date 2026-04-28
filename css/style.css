@@ -2459,3 +2459,22 @@ body:not(.is-pc) .event-dialog-modal .modal-content.modal-small {
     animation: fw-blink 1.5s infinite;
     pointer-events: none;
 }
+/* =========================================================
+   イベント時の選択肢ボタンを画面中央に浮かせる
+   ========================================================= */
+#dialog-choices-container.event-choices-container {
+    position: fixed !important;
+    top: 45% !important; /* 真ん中より少し上が見やすいです */
+    left: 50% !important;
+    transform: translate(-50%, -50%) !important;
+    width: 90% !important;
+    max-width: 400px !important;
+    z-index: 9999 !important;
+    padding: 0 !important;
+    margin: 0 !important;
+}
+
+/* 選択肢を表示している時は、待機の「▼（次へ進む）」マークを隠します */
+.event-dialog-modal.event-choices-active .modal-content.modal-small::after {
+    display: none !important;
+}
