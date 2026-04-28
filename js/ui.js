@@ -298,6 +298,9 @@ class UIManager {
             // タブ切り替えボタンも個別に音を鳴らすので、共通の音をキャンセルします！
             if (btn.classList.contains('busho-tab-btn') || btn.classList.contains('busho-scope-btn')) return;
 
+            // ★追加：イベントダイアログ内の隠しボタンによる決定音を防ぐため、共通の音をキャンセルします！
+            if (btn.closest('.event-dialog-modal')) return;
+
             const text = btn.textContent.trim();
             
             // 個別に音を鳴らす設定をしたボタンは、共通の「decision.ogg」をキャンセルします
