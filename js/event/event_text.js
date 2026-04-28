@@ -44,20 +44,20 @@ window.EventTextManager = {
             },
             {
                 type: 'dialog',
-                leftName: args.vassalName,
-                leftFace: args.vassalFace,
+                rightName: args.vassalName,  // 武将は右側から話しかけます
+                rightFace: args.vassalFace,
                 msg: `「殿、${args.odaClanName}と手を結ぶは必定なれど、${args.nobunagaGivenName}は油断ならぬ男。\nやすやすとうまくはいきますまい。」`
             },
             {
                 type: 'dialog',
-                leftName: args.motoyasuName,
+                leftName: args.motoyasuName,  // 家康（元康）は常に左側です
                 leftFace: args.motoyasuFace,
                 msg: `「うむ。それゆえ、此度はわしみずから、\n${args.nobunagaCastleName}に赴こうと考えておる。\nかのお方とは腹を割って話さねばならぬのだ。」`
             },
             {
                 type: 'dialog',
-                leftName: args.vassalName,
-                leftFace: args.vassalFace,
+                rightName: args.vassalName,
+                rightFace: args.vassalFace,
                 msg: `「殿自ら……？\nしかし、それは危険にございます。」`
             },
             {
@@ -68,8 +68,8 @@ window.EventTextManager = {
             },
             {
                 type: 'dialog',
-                leftName: args.vassalName,
-                leftFace: args.vassalFace,
+                rightName: args.vassalName,
+                rightFace: args.vassalFace,
                 msg: `「はっ……」`
             },
             {
@@ -78,9 +78,7 @@ window.EventTextManager = {
             },
             {
                 type: 'dialog',
-                leftName: args.motoyasuName,
-                leftFace: args.motoyasuFace,
-                rightName: args.nobunagaName,
+                rightName: args.nobunagaName,  // 信長は右側に登場します
                 rightFace: args.nobunagaFace,
                 msg: `「よう来たのう、竹千代。\n久しいのう。よう来てくれた。」`
             },
@@ -88,14 +86,10 @@ window.EventTextManager = {
                 type: 'dialog',
                 leftName: args.motoyasuName,
                 leftFace: args.motoyasuFace,
-                rightName: args.nobunagaName,
-                rightFace: args.nobunagaFace,
                 msg: `「お懐かしゅうございまする、吉法師様。\nいえ、${args.nobunagaTitle}様。」`
             },
             {
                 type: 'dialog',
-                leftName: args.motoyasuName,
-                leftFace: args.motoyasuFace,
                 rightName: args.nobunagaName,
                 rightFace: args.nobunagaFace,
                 msg: `「わしとそなたの仲ではないか。吉法師で構わぬわい。」`
@@ -104,14 +98,10 @@ window.EventTextManager = {
                 type: 'dialog',
                 leftName: args.motoyasuName,
                 leftFace: args.motoyasuFace,
-                rightName: args.nobunagaName,
-                rightFace: args.nobunagaFace,
                 msg: `「はっ、吉法師様。\n此度は${args.matsudairaClanName}と${args.odaClanName}の同盟の件で参りました。」`
             },
             {
                 type: 'dialog',
-                leftName: args.motoyasuName,
-                leftFace: args.motoyasuFace,
                 rightName: args.nobunagaName,
                 rightFace: args.nobunagaFace,
                 msg: `「応とも。\nわしと竹千代が組めば、怖いものはないわい。\nはっはっはっ……」`
@@ -120,8 +110,6 @@ window.EventTextManager = {
                 type: 'dialog',
                 leftName: args.motoyasuName,
                 leftFace: args.motoyasuFace,
-                rightName: args.nobunagaName,
-                rightFace: args.nobunagaFace,
                 msg: `「はっはっはっ……」`
             },
             {
