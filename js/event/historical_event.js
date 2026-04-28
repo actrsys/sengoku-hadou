@@ -1473,16 +1473,10 @@ window.GameEvents.push({
                         // 状態を「敵対」にします
                         game.diplomacyManager.changeStatus(targetClanId, clanId, '敵対', 0);
                         // お互いの関係値を「0」まで下げます
-                        if (typeof game.diplomacyManager.setSentiment === 'function') {
-                            game.diplomacyManager.setSentiment(targetClanId, clanId, 0);
-                            game.diplomacyManager.setSentiment(clanId, targetClanId, 0);
-                        } else {
-                            // 万が一専用の魔法がなくても、直接数字を0に書き換える安全装置です
-                            const relA = game.diplomacyManager.getRelation(targetClanId, clanId);
-                            const relB = game.diplomacyManager.getRelation(clanId, targetClanId);
-                            if (relA) relA.sentiment = 0;
-                            if (relB) relB.sentiment = 0;
-                        }
+                        const relA = game.diplomacyManager.getRelation(targetClanId, clanId);
+                        const relB = game.diplomacyManager.getRelation(clanId, targetClanId);
+                        if (relA) relA.sentiment = 0;
+                        if (relB) relB.sentiment = 0;
                     }
                 }
             });
@@ -1704,8 +1698,12 @@ window.GameEvents.push({
         // --- 5. 擁立勢力と将軍家を「同盟」にして、関係値を100にします ---
         if (game.diplomacyManager) {
             game.diplomacyManager.changeStatus(sponsorClanId, newClanId, '同盟', 0);
-            game.diplomacyManager.setSentiment(sponsorClanId, newClanId, 100);
-            game.diplomacyManager.setSentiment(newClanId, sponsorClanId, 100);
+            
+            const relA = game.diplomacyManager.getRelation(sponsorClanId, newClanId);
+            if (relA) relA.sentiment = 100;
+            
+            const relB = game.diplomacyManager.getRelation(newClanId, sponsorClanId);
+            if (relB) relB.sentiment = 100;
         } else {
             if (!sponsorClan.diplomacyValue) sponsorClan.diplomacyValue = {};
             sponsorClan.diplomacyValue[newClanId] = { status: '同盟', sentiment: 100, trucePeriod: 0, isMarriage: false };
