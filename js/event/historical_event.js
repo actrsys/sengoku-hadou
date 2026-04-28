@@ -255,6 +255,7 @@ window.GameEvents.push({
             yoshimotoGivenName: yoshimoto.givenName || "義元",
             yoshimotoFace: yoshimoto.faceIcon || "unknown_face.webp",
             nobunagaName: nobunaga.name.replace('|', ''),
+            nobunagaFamilyName: nobunaga.familyName || "織田",
             nobunagaGivenName: nobunaga.givenName || "信長",
             nobunagaFace: nobunaga.faceIcon || "unknown_face.webp",
             sunpuCastleName: game.getCastle(13)?.name || "駿府城",
