@@ -26,13 +26,19 @@ class AudioManager {
             'SC_ex_Town1_Castle.ogg': { 
                 baseVolume: 0.05 
             },
-            // ★野戦のBGM
+            // イベントBGM
+            '06_Snowy Sacred Approach.ogg': {
+                start: 807703 / 44100, 
+                end: (807703 + 2538065) / 44100,
+                baseVolume: 0.06
+            },
+            // 野戦BGM
             '08_Legend of bear slaying.ogg': {
                 start: 671034 / 44100, 
                 end: (671034 + 5327048) / 44100,
                 baseVolume: 0.06
             },
-            // ★ここを書き足し！：攻城戦のBGM
+            // 攻城戦BGM
             '07_Underworld dance.ogg': {
                 start: 4943179 / 44100, 
                 end: (4943179 + 3587798) / 44100,
