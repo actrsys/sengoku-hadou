@@ -122,7 +122,7 @@ window.EventTextManager = {
                 type: 'dialog',
                 leftName: args.motoyasuName,
                 leftFace: args.motoyasuFace,
-                msg: `「ご明察にござる。此度は${args.matsudairaClanName}と${args.odaClanName}の同盟の件で参りました。」`
+                msg: `「ご明察にござる。此度は${args.odaClanName}と${args.matsudairaClanName}との同盟の件で参りました。」`
             },
             {
                 type: 'dialog',
