@@ -264,6 +264,8 @@ class DiplomacyManager {
 
         // 仲良しの大名家の数
         const allyCount = this.getAllyCount(targetClanId);
+        
+        let finalProb = 0;
 
         if (type === 'goodwill') {
             let acceptProb = 100;
@@ -272,7 +274,7 @@ class DiplomacyManager {
             if (allyCount >= 2) acceptProb -= (allyCount - 1) * 20;
             if (targetPower > myPower) acceptProb *= (myPower / targetPower);
             
-            return Math.max(0, Math.min(100, acceptProb));
+            finalProb = Math.max(0, Math.min(100, acceptProb));
         } 
         else if (type === 'alliance') {
             let threshold = commonEnemy ? 90 : 120; 
@@ -287,8 +289,9 @@ class DiplomacyManager {
             }
 
             const chance = relation.sentiment + doerDiplomacy;
-            if (chance <= threshold) return 0;
-            return Math.max(0, Math.min(100, acceptProb));
+            if (chance > threshold) {
+                finalProb = Math.max(0, Math.min(100, acceptProb));
+            }
         }
         // ★ここから追加：婚姻の成功確率（同盟より少し成功しやすく緩和します！）
         else if (type === 'marriage') {
@@ -318,33 +321,44 @@ class DiplomacyManager {
 
             // オマケしてもらった友好度を使って、成功のハードルを超えられるかチェックします
             const chance = effectiveSentiment + doerDiplomacy;
-            if (chance <= threshold) return 0;
-            
-            return Math.max(0, Math.min(100, acceptProb));
+            if (chance > threshold) {
+                finalProb = Math.max(0, Math.min(100, acceptProb));
+            }
         }
         else if (type === 'dominate') {
             const powerRatio = myPower / Math.max(1, targetPower);
-            if (powerRatio < 5) return 0;
-
-            let prob = 20;
-            if (powerRatio >= 15) prob = 70;
-            else prob = 20 + (powerRatio - 5) * (50 / 10);
-            
-            if (doerDiplomacy >= 50) prob += Math.min(10, (doerDiplomacy - 50) * 0.2);
-            
-            let isAlreadySubordinate = false;
-            this.game.clans.forEach(c => {
-                if (c.id !== targetClanId && c.id !== doerClanId) {
-                    const rel = this.getRelation(targetClanId, c.id);
-                    if (rel && rel.status === '従属') isAlreadySubordinate = true;
-                }
-            });
-            
-            if (isAlreadySubordinate) prob *= 0.2;
-            
-            return Math.max(0, Math.min(100, prob));
+            if (powerRatio >= 5) {
+                let prob = 20;
+                if (powerRatio >= 15) prob = 70;
+                else prob = 20 + (powerRatio - 5) * (50 / 10);
+                
+                if (doerDiplomacy >= 50) prob += Math.min(10, (doerDiplomacy - 50) * 0.2);
+                
+                let isAlreadySubordinate = false;
+                this.game.clans.forEach(c => {
+                    if (c.id !== targetClanId && c.id !== doerClanId) {
+                        const rel = this.getRelation(targetClanId, c.id);
+                        if (rel && rel.status === '従属') isAlreadySubordinate = true;
+                    }
+                });
+                
+                if (isAlreadySubordinate) prob *= 0.2;
+                
+                finalProb = Math.max(0, Math.min(100, prob));
+            }
         }
-        return 0;
+
+        // ★追加：使者を送った側の大名が、送られた側の大名の宿敵リストに入っている場合は確率を半減
+        if (finalProb > 0) {
+            const doerDaimyo = this.game.bushos.find(b => b.clan === doerClanId && b.isDaimyo);
+            const targetDaimyo = this.game.bushos.find(b => b.clan === targetClanId && b.isDaimyo);
+            
+            if (doerDaimyo && targetDaimyo && targetDaimyo.nemesisIds && targetDaimyo.nemesisIds.includes(doerDaimyo.id)) {
+                finalProb = Math.floor(finalProb / 2);
+            }
+        }
+
+        return finalProb;
     }
 
     /**
@@ -414,6 +428,15 @@ class DiplomacyManager {
         if (!isKunishu && this.game.aiOperationManager && this.game.aiOperationManager.operations) {
             const helperOp = this.game.aiOperationManager.operations[helperForceId];
             if (helperOp && helperOp.type === '攻撃') {
+                prob = Math.floor(prob / 2);
+            }
+        }
+
+        // ★追加：要請した側の大名が、要請された側の大名の宿敵なら確率半減
+        if (!isKunishu && prob > 0) {
+            const myDaimyo = this.game.bushos.find(b => b.clan === myClanId && b.isDaimyo);
+            const helperDaimyo = this.game.bushos.find(b => b.clan === helperForceId && b.isDaimyo);
+            if (myDaimyo && helperDaimyo && helperDaimyo.nemesisIds && helperDaimyo.nemesisIds.includes(myDaimyo.id)) {
                 prob = Math.floor(prob / 2);
             }
         }
