@@ -575,7 +575,9 @@ window.GameEvents.push({
     
     execute: async function(game) {
         // ★ 1. 今流れているBGMを「後で戻す用」にメモしておきます
-        const oldBgm = window.AudioManager ? window.AudioManager.currentBgmName : null;
+        if (window.AudioManager) {
+            window.AudioManager.memorizeCurrentBgm();
+        }
 
         // ★ 2. イベント用のBGM「06_Snowy Sacred Approach.ogg」を流します
         if (window.AudioManager) {
@@ -665,8 +667,8 @@ window.GameEvents.push({
         }
 
         // ★ 3. イベントが全て終わったので、メモしておいた元のBGMに戻します
-        if (window.AudioManager && oldBgm) {
-            window.AudioManager.playBGM(oldBgm);
+        if (window.AudioManager) {
+            window.AudioManager.restoreMemorizedBgm();
         }
     }
 });
