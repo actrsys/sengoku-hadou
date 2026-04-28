@@ -1409,9 +1409,15 @@ Object.assign(WarManager.prototype, {
                         // 画面が真っ白になった瞬間に色を塗り替えるお願いを渡します
                         await this.game.ui.playCaptureEffect(targetC.id, () => {
                             this.game.ui.updateClanColors();
+                            // ★追加：地図を描き直した時に思考中の文字が復活しないように、もう一度透明にしておきます！
+                            const guardEl = document.getElementById('ai-guard');
+                            if (guardEl) guardEl.classList.add('hide-text');
                         });
                     } else {
                         this.game.ui.updateClanColors();
+                        // ★追加：地図を描き直した時に思考中の文字が復活しないように、もう一度透明にしておきます！
+                        const guardEl = document.getElementById('ai-guard');
+                        if (guardEl) guardEl.classList.add('hide-text');
                     }
                     
                     targetC.castellanId = 0;
@@ -1592,9 +1598,15 @@ Object.assign(WarManager.prototype, {
                 if (typeof this.game.ui.playCaptureEffect === 'function') {
                     await this.game.ui.playCaptureEffect(s.defender.id, () => {
                         this.game.ui.updateClanColors();
+                        // ★追加：地図を描き直した時に思考中の文字が復活しないように、もう一度透明にしておきます！
+                        const guardEl = document.getElementById('ai-guard');
+                        if (guardEl) guardEl.classList.add('hide-text');
                     });
                 } else {
                     this.game.ui.updateClanColors();
+                    // ★追加：地図を描き直した時に思考中の文字が復活しないように、もう一度透明にしておきます！
+                    const guardEl = document.getElementById('ai-guard');
+                    if (guardEl) guardEl.classList.add('hide-text');
                 }
 
                 s.defender.soldiers = totalAtkSurvivors;
@@ -1676,9 +1688,15 @@ Object.assign(WarManager.prototype, {
                 if (typeof this.game.ui.playCaptureEffect === 'function') {
                     await this.game.ui.playCaptureEffect(s.defender.id, () => {
                         this.game.ui.updateClanColors();
+                        // ★追加：地図を描き直した時に思考中の文字が復活しないように、もう一度透明にしておきます！
+                        const guardEl = document.getElementById('ai-guard');
+                        if (guardEl) guardEl.classList.add('hide-text');
                     });
                 } else {
                     this.game.ui.updateClanColors();
+                    // ★追加：地図を描き直した時に思考中の文字が復活しないように、もう一度透明にしておきます！
+                        const guardEl = document.getElementById('ai-guard');
+                    if (guardEl) guardEl.classList.add('hide-text');
                 }
 
                 s.defender.immunityUntil = this.game.getCurrentTurnId() + 1;
