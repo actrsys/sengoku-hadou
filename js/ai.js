@@ -269,7 +269,7 @@ class AIEngine {
                     // もし道が途切れていたり、すでに敵じゃなくなっていたら、作戦のメモを消して中止します！
                     if (!canReach || !isStillEnemy) {
                         delete this.game.aiOperationManager.operations[castle.ownerClan];
-                        this.game.aiOperationManager.generateOperation(castle.ownerClan);
+                        await this.game.aiOperationManager.generateOperation(castle.ownerClan);
                     } else {
                         // ★追加：自分のお城か目的地が大雪になっていないかチェックをします！
                         let isHeavySnow = false;
@@ -341,7 +341,7 @@ class AIEngine {
 
         // --- 修正後：正確な見積もりと戦闘力比の計算 ---
 
-        const myDaimyo = this.game.bushos.find(b => b.clan === myCastle.ownerClan && b.isDaimyo) || { personality: 'normal' };
+        const myDaimyo = this.game.bushos.find(b => b.clan === myCastle.ownerClan && b.isDaimyo) || { personality: 'normal', intelligence: 50, duty: 50, nemesisIds: [] };
 
         // =========================================================================
         // ★新規追加：周囲の敵対大名をすべて調べて、それぞれの警戒度を計算します！

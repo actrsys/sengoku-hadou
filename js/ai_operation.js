@@ -42,7 +42,7 @@ class AIOperationManager {
             if (!this.operations[clan.id]) {
                 await this.generateOperation(clan.id);
             } else {
-                this.updateOperation(clan.id);
+                await this.updateOperation(clan.id);
             }
 
             // ★追加：作戦とは別に、毎月「徴兵用のお城」を考えて選びます！
@@ -585,13 +585,13 @@ class AIOperationManager {
                 const isSnowArea = snowProvs.includes(myCastle.provinceId) || snowProvs.includes(targetProvId);
                 
                 if (isSnowArea) {
-                    let execMonth = this.game.month + prepTurns;
-                    if (execMonth > 12) execMonth -= 12;
+                    let execMonth = (this.game.month + prepTurns) % 12;
+                    if (execMonth === 0) execMonth = 12;
                     
                     while (execMonth === 12 || execMonth === 1 || execMonth === 2) {
                         prepTurns++;
-                        execMonth = this.game.month + prepTurns;
-                        if (execMonth > 12) execMonth -= 12;
+                        execMonth = (this.game.month + prepTurns) % 12;
+                        if (execMonth === 0) execMonth = 12;
                     }
                 }
                 
@@ -660,7 +660,7 @@ class AIOperationManager {
         console.log(`大名家[${clanId}]は今月、【内政作戦】を行います。(調略目標: ${sabotageTargets.length}件)`);
     }
 
-    updateOperation(clanId) {
+    async updateOperation(clanId) {
         const op = this.operations[clanId];
 
         // 1. 期限切れのチェック
@@ -668,7 +668,7 @@ class AIOperationManager {
         if (op.maxTurns <= 0) {
             console.log(`大名家[${clanId}]の作戦【${op.type}】は期限切れで中止されました。`);
             delete this.operations[clanId];
-            this.generateOperation(clanId);
+            await this.generateOperation(clanId);
             return;
         }
 
