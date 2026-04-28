@@ -169,7 +169,7 @@ window.EventTextManager = {
             { type: 'log', msg: `その頃、${args.imagawaClanName}軍が${args.odaClanName}方の丸根砦、鷲津城を陥落せしめたとの知らせが${args.nobunagaGivenName}に届く。` },
             { type: 'log', msg: `${args.nobunagaGivenName}は善照寺に入り、およそ三千の軍勢を整え、迂回して出撃。進軍を開始した。` },
             { type: 'dialog', leftName: args.shinzanDName, leftFace: args.shinzanDFace, msg: `「殿、${args.yoshimotoName}本隊は、桶狭間山にて軍を休めておりまする！」` },
-            { type: 'log', msg: `その時、にわかに雨がふりました。たちまち黒雲が戦場を覆い、雷鳴が轟いた。視界を妨げる程の豪雨であった。` },
+            { type: 'log', msg: `その時、にわかに雨が降り出した。たちまち黒雲が戦場を覆い、雷鳴が轟いた。視界を妨げる程の豪雨であった。` },
             { type: 'dialog', leftName: args.nobunagaName, leftFace: args.nobunagaFace, msg: `「見よ！　天も我に味方しておるわ！\n此度の戦、勝ったも同然よ！」` },
             { type: 'dialog', leftName: args.nobunagaName, leftFace: args.nobunagaFace, msg: `「今じゃ！　全軍、一丸となって突っ込め！」` },
             { type: 'dialog', leftName: args.shinzanCName, leftFace: args.shinzanCFace, msg: `「おおお－っ！！」` },
