@@ -89,100 +89,7 @@ class AIEngine {
             const mods = this.getDifficultyMods();
             const smartness = this.getAISmartness(castellan.intelligence);
 
-            // ★追加：外交や戦争を考えるよりも先に、城防御上げや民忠上げを優先します！
-            let emergencyActionDone = false;
-            if (castle.defense <= castle.maxDefense / 4 && castle.gold >= 200) {
-                // 城壁修復
-                castle.gold -= 200;
-                const val = GameSystem.calcRepair(castellan);
-                const oldVal = castle.defense;
-                castle.defense = Math.min(castle.maxDefense, castle.defense + val);
-                
-                const actualVal = castle.defense - oldVal;
-                castellan.achievementTotal = (castellan.achievementTotal || 0) + Math.floor(actualVal * 0.5);
-                if (this.game.factionSystem && this.game.factionSystem.updateRecognition) this.game.factionSystem.updateRecognition(castellan, 10);
-                
-                castellan.isActionDone = true;
-                emergencyActionDone = true;
-            } else if (castle.peoplesLoyalty <= 70 && castle.rice >= 200) {
-                // 施し
-                castle.rice -= 200;
-                const val = GameSystem.calcCharity(castellan);
-                
-                castle.peoplesLoyalty = Math.min(100, castle.peoplesLoyalty + val);
-                
-                castellan.achievementTotal = (castellan.achievementTotal || 0) + Math.floor(val * 0.5);
-                if (this.game.factionSystem && this.game.factionSystem.updateRecognition) this.game.factionSystem.updateRecognition(castellan, 15);
-                
-                castellan.isActionDone = true;
-                emergencyActionDone = true;
-            }
-
-            // ★追加：緊急の修復や施しを行ったら、戦争などは行わずに残りの内政のみ行います
-            if (emergencyActionDone) {
-                this.execInternalAffairs(castle, castellan, mods, smartness);
-                this.game.finishTurn();
-                return;
-            }
-
-            // 外交フェーズ (確率で実行)
-            // プレイヤーの城（委任中）の場合は、勝手に外交させないようにします
-            if (Number(castle.ownerClan) !== Number(this.game.playerClanId)) {
-                
-                // ★今回変更：大名家が今月「この相手と外交するぞ！」と決めているか、記憶を確認します
-                const myClan = this.game.clans.find(c => c.id === castle.ownerClan);
-                
-                if (myClan && myClan.currentDiplomacyTarget) {
-                    // まずは自分のお殿様（大名）を探します。いない時は城主を大名の代わりにします
-                    const daimyo = this.game.bushos.find(b => b.clan === castle.ownerClan && b.isDaimyo) || castellan;
-                    
-                    // 今までの基本の確率（約10%）を計算します
-                    let diplomacyChance = ((window.AIParams.AI.DiplomacyChance || 0.3) / 3) * (mods.aggression); 
-                    
-                    // 大名の外交ステータスから基準の50を引いて、差を計算します（-50から+50になります）
-                    const dipDiff = daimyo.diplomacy - 50;
-                    
-                    // 差が50の時に10%（0.1）になるように、少しずつ増減する数字（ボーナス）を作ります
-                    let dipBonus = dipDiff * 0.002;
-                    
-                    // お殿様の性格が好戦的（aggressive）で、かつボーナスがプラス（外交が50より高い）の時
-                    if (daimyo.personality === 'aggressive' && dipBonus > 0) {
-                        // アップする分だけを半分にします（最大で5%アップになります）
-                        dipBonus = dipBonus / 2;
-                    }
-                    
-                    // 基本の確率にボーナスを足し算します
-                    diplomacyChance += dipBonus;
-                    
-                    // 大名家の作戦が「外交」なら、外交確率を2倍にします！
-                    const myOp = this.game.aiOperationManager.operations[castle.ownerClan];
-                    if (myOp && myOp.type === '外交' && myOp.status === '実行中') {
-                        diplomacyChance *= 2;
-                    }
-                    
-                    // お城がピンチ（兵士が少ない等）の時は、内政（徴兵など）を優先したくて外交確率を下げます！
-                    if (castle.soldiers <= 1000) {
-                        diplomacyChance = 0; // 兵士1000以下の超ピンチなら、外交してる場合じゃない！
-                    } else if (castle.soldiers <= 3000) {
-                        // 1000〜3000の間なら、兵士が少ないほど外交確率が下がっていく魔法です！
-                        const penaltyRatio = (castle.soldiers - 1000) / 2000; // 0(少ない) 〜 1(多い) になります
-                        diplomacyChance = diplomacyChance * penaltyRatio; 
-                    }
-                    
-                    // 確率がマイナス（0%より下）にならないように、最低でも0にしておきます
-                    diplomacyChance = Math.max(0, diplomacyChance);
-
-                    // 出来上がった確率でサイコロを振ります！当たったら記憶の通りに外交を実行します！
-                    if (Math.random() < diplomacyChance) {
-                        const dipResult = this.execAIDiplomacy(castle, castellan, smartness, myClan.currentDiplomacyTarget); 
-                        if (dipResult === 'waiting') return; // プレイヤーのお返事待ちならここで一旦ストップ！
-                        if (castellan.isActionDone) { this.game.finishTurn(); return; }
-                    }
-                }
-            }
-            
-            // 軍事フェーズ
-            // ★ここをごっそり差し替え！：軍事フェーズ（新しい作戦システム版）
+            // ★修正：軍事フェーズ（出陣）を一番最初に確認するように順番を上に移動させます！
             const myOperation = this.game.aiOperationManager.operations[castle.ownerClan];
             
             // 自分の大名家に「作戦」があり、それが「攻撃」で、かつ「実行中」の場合
@@ -289,34 +196,126 @@ class AIEngine {
                         // 大雪じゃなければ、予定通り出陣します！
                         if (!isHeavySnow) {
                             // メモしておいたIDから、お城や諸勢力のデータを復元して出発の魔法を呼びます
-                        if (myOperation.isKunishuTarget) {
-                            const targetKunishu = this.game.kunishuSystem.getKunishu(myOperation.targetId);
-                            if (targetKunishu) {
-                                this.executeKunishuSubjugateAI(castle, targetKunishu, castellan, myOperation.requiredForce, myOperation.requiredRice);
+                            if (myOperation.isKunishuTarget) {
+                                const targetKunishu = this.game.kunishuSystem.getKunishu(myOperation.targetId);
+                                if (targetKunishu) {
+                                    this.executeKunishuSubjugateAI(castle, targetKunishu, castellan, myOperation.requiredForce, myOperation.requiredRice);
+                                }
+                            } else {
+                                const targetCastle = this.game.getCastle(myOperation.targetId);
+                                if (targetCastle) {
+                                    // ★変更：一番最後に「myOperation（作戦のメモ）」も一緒に渡してあげます！
+                                    this.executeAttack(castle, targetCastle, castellan, myOperation.requiredForce, myOperation.requiredRice, myOperation);
+                                }
                             }
-                        } else {
-                            const targetCastle = this.game.getCastle(myOperation.targetId);
-                            if (targetCastle) {
-                                // ★変更：一番最後に「myOperation（作戦のメモ）」も一緒に渡してあげます！
-                                this.executeAttack(castle, targetCastle, castellan, myOperation.requiredForce, myOperation.requiredRice, myOperation);
-                            }
+                            
+                            // ★出撃が終わったら、この作戦のメモは「完了」にして消しておきます
+                            myOperation.status = '完了';
+                            delete this.game.aiOperationManager.operations[castle.ownerClan];
+                            
+                            // 出陣したので、このお城のターンはおしまいです！
+                            return; 
                         }
-                        
-                        // ★出撃が終わったら、この作戦のメモは「完了」にして消しておきます
-                        myOperation.status = '完了';
-                        delete this.game.aiOperationManager.operations[castle.ownerClan];
-                        
-                        // 出陣したので、このお城のターンはおしまいです！
-                        return; 
+                        // 大雪の時は出陣を我慢して、何もしない（内政フェーズに進む）ようにします
                     }
-                    // 大雪の時は出陣を我慢して、何もしない（内政フェーズに進む）ようにします
                 }
             }
-        }
+
+            // ★追加：外交や戦争を考えるよりも先に、城防御上げや民忠上げを優先します！
+            let emergencyActionDone = false;
+            if (castle.defense <= castle.maxDefense / 4 && castle.gold >= 200) {
+                // 城壁修復
+                castle.gold -= 200;
+                const val = GameSystem.calcRepair(castellan);
+                const oldVal = castle.defense;
+                castle.defense = Math.min(castle.maxDefense, castle.defense + val);
+                
+                const actualVal = castle.defense - oldVal;
+                castellan.achievementTotal = (castellan.achievementTotal || 0) + Math.floor(actualVal * 0.5);
+                if (this.game.factionSystem && this.game.factionSystem.updateRecognition) this.game.factionSystem.updateRecognition(castellan, 10);
+                
+                castellan.isActionDone = true;
+                emergencyActionDone = true;
+            } else if (castle.peoplesLoyalty <= 70 && castle.rice >= 200) {
+                // 施し
+                castle.rice -= 200;
+                const val = GameSystem.calcCharity(castellan);
+                
+                castle.peoplesLoyalty = Math.min(100, castle.peoplesLoyalty + val);
+                
+                castellan.achievementTotal = (castellan.achievementTotal || 0) + Math.floor(val * 0.5);
+                if (this.game.factionSystem && this.game.factionSystem.updateRecognition) this.game.factionSystem.updateRecognition(castellan, 15);
+                
+                castellan.isActionDone = true;
+                emergencyActionDone = true;
+            }
+
+            // ★追加：緊急の修復や施しを行ったら、戦争などは行わずに残りの内政のみ行います
+            if (emergencyActionDone) {
+                this.execInternalAffairs(castle, castellan, mods, smartness);
+                this.game.finishTurn();
+                return;
+            }
+
+            // 外交フェーズ (確率で実行)
+            // プレイヤーの城（委任中）の場合は、勝手に外交させないようにします
+            if (Number(castle.ownerClan) !== Number(this.game.playerClanId)) {
+                
+                // ★今回変更：大名家が今月「この相手と外交するぞ！」と決めているか、記憶を確認します
+                const myClan = this.game.clans.find(c => c.id === castle.ownerClan);
+                
+                if (myClan && myClan.currentDiplomacyTarget) {
+                    // まずは自分のお殿様（大名）を探します。いない時は城主を大名の代わりにします
+                    const daimyo = this.game.bushos.find(b => b.clan === castle.ownerClan && b.isDaimyo) || castellan;
+                    
+                    // 今までの基本の確率（約10%）を計算します
+                    let diplomacyChance = ((window.AIParams.AI.DiplomacyChance || 0.3) / 3) * (mods.aggression); 
+                    
+                    // 大名の外交ステータスから基準の50を引いて、差を計算します（-50から+50になります）
+                    const dipDiff = daimyo.diplomacy - 50;
+                    
+                    // 差が50の時に10%（0.1）になるように、少しずつ増減する数字（ボーナス）を作ります
+                    let dipBonus = dipDiff * 0.002;
+                    
+                    // お殿様の性格が好戦的（aggressive）で、かつボーナスがプラス（外交が50より高い）の時
+                    if (daimyo.personality === 'aggressive' && dipBonus > 0) {
+                        // アップする分だけを半分にします（最大で5%アップになります）
+                        dipBonus = dipBonus / 2;
+                    }
+                    
+                    // 基本の確率にボーナスを足し算します
+                    diplomacyChance += dipBonus;
+                    
+                    // 大名家の作戦が「外交」なら、外交確率を2倍にします！
+                    const myOp = this.game.aiOperationManager.operations[castle.ownerClan];
+                    if (myOp && myOp.type === '外交' && myOp.status === '実行中') {
+                        diplomacyChance *= 2;
+                    }
+                    
+                    // お城がピンチ（兵士が少ない等）の時は、内政（徴兵など）を優先したくて外交確率を下げます！
+                    if (castle.soldiers <= 1000) {
+                        diplomacyChance = 0; // 兵士1000以下の超ピンチなら、外交してる場合じゃない！
+                    } else if (castle.soldiers <= 3000) {
+                        // 1000〜3000の間なら、兵士が少ないほど外交確率が下がっていく魔法です！
+                        const penaltyRatio = (castle.soldiers - 1000) / 2000; // 0(少ない) 〜 1(多い) になります
+                        diplomacyChance = diplomacyChance * penaltyRatio; 
+                    }
+                    
+                    // 確率がマイナス（0%より下）にならないように、最低でも0にしておきます
+                    diplomacyChance = Math.max(0, diplomacyChance);
+
+                    // 出来上がった確率でサイコロを振ります！当たったら記憶の通りに外交を実行します！
+                    if (Math.random() < diplomacyChance) {
+                        const dipResult = this.execAIDiplomacy(castle, castellan, smartness, myClan.currentDiplomacyTarget); 
+                        if (dipResult === 'waiting') return; // プレイヤーのお返事待ちならここで一旦ストップ！
+                        if (castellan.isActionDone) { this.game.finishTurn(); return; }
+                    }
+                }
+            }
             
-        // 内政フェーズ (軍事行動をしなかった場合)
-        this.execInternalAffairs(castle, castellan, mods, smartness);
-        this.game.finishTurn();
+            // 内政フェーズ (軍事行動をしなかった場合)
+            this.execInternalAffairs(castle, castellan, mods, smartness);
+            this.game.finishTurn();
 
         } catch(e) {
             console.error("AI Logic Error:", e);
