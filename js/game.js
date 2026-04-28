@@ -1134,21 +1134,27 @@ class GameManager {
                 p.marketRate = nextRates.get(p.id);
             }
         });
-        // ★差し替えここまで！
+        // 年月や相場が新しくなったので、イベントが始まる前に画面の表示を最新にします！
+        if (this.ui) {
+            const displayCastle = this.ui.currentCastle || this.getCurrentTurnCastle();
+            if (displayCastle) {
+                this.ui.updateInfoPanel(displayCastle);
+            }
+        }
         
         await this.ui.showCutin(`${this.year}年 ${this.month}月`);
         
         this.ui.log(`=== ${this.year}年 ${this.month}月 ===`);
         
-        // ★ここを書き換え！：月初イベント【前】をチェックして実行します
+        // 月初イベント【前】をチェックして実行します
         if (this.eventManager) {
             await this.eventManager.processEvents('startMonth_before');
         }
         
-        // ★修正：await を書き足して、元服の処理が終わるまでしっかり待ちます！
+        // 元服の処理が終わるまでしっかり待ちます！
         await this.lifeSystem.processStartMonth();
         
-        // ★修正：ここも await を書き足して、武将の下野（出奔）が終わるまで待ちます！
+        // 武将の下野（出奔）が終わるまで待ちます！
         await this.factionSystem.processStartMonth(); 
         
         this.affiliationSystem.processRoninMovements();
