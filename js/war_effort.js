@@ -779,6 +779,13 @@ Object.assign(WarManager.prototype, {
             if (typeof window.FieldWarManager === 'undefined') {
                 console.log("野戦のシステムが見つからないため、強制的に籠城戦になります！");
                 await showSiegeMessage();
+
+                // ★追加：籠城戦の「戦争開始前」と「戦闘開始後」の合図を出します
+                if (this.game.eventManager) {
+                    await this.game.eventManager.processEvents('before_siege_war', this.state);
+                    await this.game.eventManager.processEvents('start_siege_war', this.state);
+                }
+
                 this.startSiegeWarPhase();
             } else {
                 console.log("野戦ができる状態なので、選択フェーズに入ります！");
@@ -809,16 +816,30 @@ Object.assign(WarManager.prototype, {
                             defCastle.guns = (defCastle.guns || 0) + (this.state.defender.fieldGuns || 0);
                             if (resultType === 'attacker_win' || resultType === 'defender_retreat' || resultType === 'draw_to_siege') {
                                 await showSiegeMessage();
+
+                                // ★追加：野戦から籠城戦に移る時の「戦争開始前」と「戦闘開始後」の合図を出します
+                                if (this.game.eventManager) {
+                                    await this.game.eventManager.processEvents('before_siege_war', this.state);
+                                    await this.game.eventManager.processEvents('start_siege_war', this.state);
+                                }
+
                                 this.startSiegeWarPhase();
                             } else this.endWar(false);
                         });
                     } else {
                         await showSiegeMessage();
+
+                        // ★追加：初めから籠城戦を選んだ時の「戦争開始前」と「戦闘開始後」の合図を出します
+                        if (this.game.eventManager) {
+                            await this.game.eventManager.processEvents('before_siege_war', this.state);
+                            await this.game.eventManager.processEvents('start_siege_war', this.state);
+                        }
+
                         this.startSiegeWarPhase();
                     }
                 });
             }
-        } catch(e) { 
+        } catch(e) {
             console.error("StartWar Error:", e); 
             if (typeof this.game.ui.hideMapGuard === 'function') this.game.ui.hideMapGuard(true); 
             this.state.active = false; 
@@ -919,6 +940,12 @@ Object.assign(WarManager.prototype, {
         // ★ここを書き足します：既に「終わったよ」の処理中なら、2回目は無視するストッパーです！
         if (!this.state.active) return;
 
+        // ★追加：籠城戦（攻城戦）の「戦闘終了前」の合図を出します
+        // ※野戦だけで決着がついた場合も呼ばれますが、イベント側で区別できます！
+        if (this.game.eventManager) {
+            await this.game.eventManager.processEvents('before_siege_war_end', this.state);
+        }
+
         // ★追加：合戦終了の演出中に触られないようにバリアを張ります！
         if (typeof this.game.ui.showMapGuard === 'function') this.game.ui.showMapGuard();
 
@@ -990,6 +1017,11 @@ Object.assign(WarManager.prototype, {
                     aiGuardEl.classList.remove('hide-text');
                 }
                 
+                // ★追加：籠城戦（攻城戦）の「戦闘終了後」の合図を出します
+                if (this.game.eventManager) {
+                    await this.game.eventManager.processEvents('after_siege_war', s);
+                }
+
                 const winnerClan = s.attacker.ownerClan; // 勝ったのは攻撃側です
                 
                 // ★追加：大名を登用した時のご褒美パワーをリセットしておきます

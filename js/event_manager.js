@@ -8,7 +8,7 @@ window.GameEvents = window.GameEvents || [];
 class EventManager {
     constructor(game) {
         this.game = game;
-        // 4つの引き出しを用意します
+        // イベントを入れるための引き出しを用意します
         this.events = {
             game_start: [],        // ゲーム開始直後の特別な引き出し
             startMonth_before: [], // 月初の最初（収入などの前）
@@ -16,7 +16,19 @@ class EventManager {
             endMonth_before: [],   // 月末の最初（派閥や寿命などの前）
             endMonth_after: [],    // 月末の最後（時間を進める直前）
             before_battle: [],     // 戦闘開始直前の特別な引き出し
-            after_field_war: [],   // 野戦終了直後の特別な引き出し
+            
+            // ★ここから追加：野戦用の引き出し
+            before_field_war: [],     // 野戦：戦争開始前
+            start_field_war: [],      // 野戦：戦闘開始後
+            before_field_war_end: [], // 野戦：戦闘終了前
+            after_field_war: [],      // 野戦：戦闘終了後
+
+            // ★ここから追加：籠城戦用の引き出し
+            before_siege_war: [],     // 籠城戦：戦争開始前
+            start_siege_war: [],      // 籠城戦：戦闘開始後
+            before_siege_war_end: [], // 籠城戦：戦闘終了前
+            after_siege_war: [],      // 籠城戦：戦闘終了後
+            
             after_battle_blink: [], // 地図の点滅が終わった直後の特別な引き出し
             shogun_death: []       // 将軍が死亡した直後に呼ばれる特別な引き出し
         };

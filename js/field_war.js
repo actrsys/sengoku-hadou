@@ -139,9 +139,15 @@ class FieldWarManager {
         scrollArea.style.display = 'block';
     }
     
-    startFieldWar(warState, onComplete) {
+    async startFieldWar(warState, onComplete) {
         this.warState = warState;
         this.onComplete = onComplete;
+        
+        // ★追加：野戦の「戦争開始前」の合図を出します
+        if (this.game.eventManager) {
+            await this.game.eventManager.processEvents('before_field_war', this.warState);
+        }
+
         this.turnCount = 1;
         this.maxTurns = 30; // 30ターンに固定
         this.active = true;
@@ -499,6 +505,11 @@ class FieldWarManager {
             if (modal) modal.classList.add('hidden');
         }
         
+        // ★追加：野戦の「戦闘開始後」の合図を出します
+        if (this.game.eventManager) {
+            await this.game.eventManager.processEvents('start_field_war', this.warState);
+        }
+
         this.startTurn();
     }
 
@@ -1725,6 +1736,11 @@ class FieldWarManager {
     
     async endFieldWar(resultType) {
         this.active = false;
+
+        // ★追加：野戦の「戦闘終了前」の合図を出します
+        if (this.game.eventManager) {
+            await this.game.eventManager.processEvents('before_field_war_end', this.warState);
+        }
 
         // ★野戦開始時に「待機していた（部隊に配備しなかった）馬・鉄砲」を計算するための箱を用意します
         let atkMainWaitHorses = this.warState.attacker.horses || 0;
