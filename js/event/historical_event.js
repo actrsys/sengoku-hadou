@@ -221,19 +221,19 @@ window.GameEvents.push({
         // 織田家にいる武将（信長以外）を全員集めます
         let odaBushos = game.bushos.filter(b => b.clan === nobunaga.clan && b.status === 'active' && b.id !== nobunaga.id);
 
-        // 重臣A: 貢献度500以上で外交最高。いなければ貢献度最高の中で外交最高。
-        let juushinA = odaBushos.filter(b => b.achievementTotal >= 500).sort((a, b) => (b.diplomacy || 0) - (a.diplomacy || 0))[0];
+        // 重臣A: 貢献度600以上で外交最高。いなければ貢献度最高の中で外交最高。
+        let juushinA = odaBushos.filter(b => b.achievementTotal >= 600).sort((a, b) => (b.diplomacy || 0) - (a.diplomacy || 0))[0];
         if (!juushinA) juushinA = [...odaBushos].sort((a, b) => ((b.achievementTotal || 0) !== (a.achievementTotal || 0) ? (b.achievementTotal || 0) - (a.achievementTotal || 0) : (b.diplomacy || 0) - (a.diplomacy || 0)))[0];
         // 選ばれた人は次のオーディションから外します
         odaBushos = odaBushos.filter(b => b.id !== (juushinA ? juushinA.id : 0));
 
-        // 重臣B: 貢献度500以上で武勇最高。いなければ貢献度最高の中で武勇最高。
-        let juushinB = odaBushos.filter(b => b.achievementTotal >= 500).sort((a, b) => (b.strength || 0) - (a.strength || 0))[0];
+        // 重臣B: 貢献度600以上で武勇最高。いなければ貢献度最高の中で武勇最高。
+        let juushinB = odaBushos.filter(b => b.achievementTotal >= 600).sort((a, b) => (b.strength || 0) - (a.strength || 0))[0];
         if (!juushinB) juushinB = [...odaBushos].sort((a, b) => ((b.achievementTotal || 0) !== (a.achievementTotal || 0) ? (b.achievementTotal || 0) - (a.achievementTotal || 0) : (b.strength || 0) - (a.strength || 0)))[0];
         odaBushos = odaBushos.filter(b => b.id !== (juushinB ? juushinB.id : 0));
 
-        // 新参C: 貢献度300以下で武勇最高。いなければ武勇最高。
-        let shinzanC = odaBushos.filter(b => b.achievementTotal <= 300).sort((a, b) => (b.strength || 0) - (a.strength || 0))[0];
+        // 新参C: 貢献度500以下で武勇最高。いなければ武勇最高。
+        let shinzanC = odaBushos.filter(b => b.achievementTotal <= 500).sort((a, b) => (b.strength || 0) - (a.strength || 0))[0];
         if (!shinzanC) shinzanC = [...odaBushos].sort((a, b) => (b.strength || 0) - (a.strength || 0))[0];
         odaBushos = odaBushos.filter(b => b.id !== (shinzanC ? shinzanC.id : 0));
 
