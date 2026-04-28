@@ -1599,12 +1599,6 @@ class FieldWarManager {
     }
     
     consumeRice() {
-        // ★変更：「イベント戦闘のフラグ」を使って判定します
-        if (this.warState.isEventBattle) {
-            // イベント戦闘中は兵糧を減らさないようにします
-            return;
-        }
-
         // グループごとに兵士数を数えて、兵糧を減らします
         let groupSoldiers = {};
         this.units.forEach(u => {
@@ -1650,25 +1644,6 @@ class FieldWarManager {
     
     checkEndCondition() {
         const isPlayerInvolved = this.units.some(u => u.isPlayer);
-
-        // ★変更：特定の武将がいるかではなく、「イベント戦闘のフラグ」で判定します
-        if (this.warState.isEventBattle && !isPlayerInvolved) {
-            // どのイベントかによって処理を分けられるようにします
-            if (this.warState.eventId === 'okehazama') {
-                const yoshimotoUnit = this.units.find(u => u.bushoId === 1004001);
-                if (yoshimotoUnit) {
-                    if (yoshimotoUnit.isAttacker) {
-                        this.log(`【イベント】桶狭間の戦い：今川軍は織田軍の奇襲を受け、総崩れとなった！`);
-                        this.endFieldWar('attacker_lose');
-                    } else {
-                        this.log(`【イベント】桶狭間の戦い：今川軍は織田軍の奇襲を受け、総崩れとなった！`);
-                        this.endFieldWar('attacker_win');
-                    }
-                    return true; // ここで野戦を終了させます
-                }
-            }
-            // 今後イベントが増えたら、ここに else if (this.warState.eventId === '〇〇') と書き足していけます
-        }
 
         let atkAlive = false, defAlive = false;
         let atkGeneralAlive = false, defGeneralAlive = false;

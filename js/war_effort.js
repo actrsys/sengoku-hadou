@@ -1000,7 +1000,7 @@ Object.assign(WarManager.prototype, {
             
             // ★ここから追加：AI同士の戦争の結果メッセージを記憶しておきます（表示は色が塗られた一番最後にします！）
             let aiResultMsg = "";
-            if (!s.isPlayerInvolved && !s.isKunishuSubjugation && !s.attacker.isKunishu && !s.isEventBattle) {
+            if (!s.isPlayerInvolved && !s.isKunishuSubjugation && !s.attacker.isKunishu) {
                 const atkClanData = this.game.clans.find(c => c.id === s.attacker.ownerClan);
                 const atkProvData = this.game.provinces.find(p => p.id === s.sourceCastle.provinceId);
                 const defClanData = this.game.clans.find(c => c.id === s.oldDefClanId);
@@ -1740,12 +1740,7 @@ Object.assign(WarManager.prototype, {
                     }
                 }
                 
-                // ★追加：イベントによる決着の時は、通常の結果画面を省略して進めます！
-                if (s.isEventBattle) {
-                    finishWarProcess();
-                } else {
-                    this.game.ui.showResultModal(resultMsg, finishWarProcess);
-                }
+                this.game.ui.showResultModal(resultMsg, finishWarProcess);
             }
             else {
                 // ★AIの結果メッセージを最後に表示します（イベント決着時などは空なのでスキップ）
