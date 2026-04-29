@@ -112,6 +112,11 @@ class GunshiSystem {
         // 実際の成功確率を受け取ります（無い場合は絶対に成功するコマンドとして扱います）
         let trueProb = action.trueProb !== undefined ? action.trueProb : 1.0;
         
+        // ★追加：もし確率が「0〜100（パーセント）」の数字で届いた場合は、「0.0〜1.0」の形に直してあげます！
+        if (trueProb > 1.0) {
+            trueProb = trueProb / 100;
+        }
+        
         // 正確さを計算します（智謀95以上で最大0.99になります）
         let accuracy = 0.5 + (gunshi.intelligence / 95) * 0.49;
         if (accuracy > 0.99 || gunshi.intelligence >= 95) accuracy = 0.99;
@@ -125,11 +130,10 @@ class GunshiSystem {
         let perceivedProb = trueProb + noise * maxError;
         perceivedProb = Math.max(0.0, Math.min(1.0, perceivedProb));
 
-        if (perceivedProb > 0.9) return "必ずや成功するでしょう。好機です！"; 
+        if (perceivedProb > 0.95) return "必ずや成功するでしょう。好機です！"; 
         if (perceivedProb > 0.7) return "おそらく上手くいくでしょう。"; 
         if (perceivedProb > 0.4) return "五分五分といったところです。油断めさるな。"; 
-        if (perceivedProb > 0.2) return "厳しい結果になるかもしれません。"; 
+        if (perceivedProb > 0.15) return "厳しい結果になるかもしれません。"; 
         return "おやめください。失敗する未来が見えます。"; 
     }
-    // ==========================================
 }
