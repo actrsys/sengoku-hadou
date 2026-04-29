@@ -39,7 +39,7 @@ const COMMAND_MENU_STRUCTURE = [
         commands: ['appoint_gunshi', 'appoint', 'delegate'],
         subMenus: [
             {
-                label: "軍団長任命",
+                label: "軍団新設",
                 commands: [
                     'appoint_legion_leader_1', 'appoint_legion_leader_2', 'appoint_legion_leader_3', 'appoint_legion_leader_4',
                     'appoint_legion_leader_5', 'appoint_legion_leader_6', 'appoint_legion_leader_7', 'appoint_legion_leader_8'
