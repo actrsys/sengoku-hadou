@@ -83,13 +83,11 @@ class EventManager {
             }
 
             if (ev.checkCondition(this.game, context)) {
-                // ★修正：前回の誤った魔法を元に戻し、「一度きり（isOneTime）」のイベントだけを記録するように直します！
-                // これで毎月起こる汎用イベントがスタンプ帳に刻まれてしまう不具合が直ります。
                 if (ev.isOneTime) {
                     this.game.flags = this.game.flags || {};
                     this.game.flags[ev.id] = true;
                     
-                    // さらに絶対にセーブデータに残すため、本物のゲーム本体にも念押しで記録します
+                    // 絶対にセーブデータに残すため、本物のゲーム本体にも念押しで記録します
                     if (window.GameApp) {
                         window.GameApp.flags = window.GameApp.flags || {};
                         window.GameApp.flags[ev.id] = true;
