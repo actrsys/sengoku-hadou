@@ -1909,16 +1909,21 @@ class UIManager {
 
         const msgContainer = document.createElement('div');
         msgContainer.className = 'war-action-message-container';
+        msgContainer.style.cssText = 'text-align: left; position: relative; display: block; padding: 15px; box-sizing: border-box; height: 100%;';
         
         const textContainer = document.createElement('div');
         textContainer.className = 'war-action-message-text';
-        if (msgFontSize) {
-            textContainer.style.cssText = msgFontSize;
-        }
+        textContainer.style.cssText = `text-align: left; width: 100%; display: block; ${msgFontSize}`;
         
         const promptContainer = document.createElement('div');
         promptContainer.className = 'war-action-message-prompt';
-        promptContainer.textContent = '▼';
+        promptContainer.textContent = '▼'; 
+        
+        if (isPc) {
+            promptContainer.style.cssText = 'position: absolute; bottom: 5px; left: 50%; transform: translateX(-50%); font-size: 1.2rem; color: #eee; cursor: pointer;';
+        } else {
+            promptContainer.style.cssText = 'position: absolute; bottom: 5px; right: 15px; font-size: 0.8rem; color: #eee; cursor: pointer;';
+        }
 
         msgContainer.appendChild(textContainer);
         msgContainer.appendChild(promptContainer);

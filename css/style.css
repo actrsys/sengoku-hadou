@@ -1801,7 +1801,7 @@ body:not(.is-pc) .daimyo-detail-value {
 
 .war-controls-area { display: flex !important; width: 100%; gap: 5px; flex-shrink: 0; height: 150px; box-sizing: border-box; }
 .war-controls-buttons { flex: 2; display: grid; grid-template-columns: repeat(3, 1fr); grid-template-rows: repeat(2, 1fr); gap: 5px; height: 100%; box-sizing: border-box; }
-.war-controls-desc { flex: 1; background: #f9f9f9; border: 2px solid #ccc; border-radius: 4px; padding: 8px; font-size: 0.85rem; color: #333; text-align: left; overflow-y: auto; height: 100%; box-sizing: border-box; }
+.war-controls-desc { flex: 3; background: #f9f9f9; border: 2px solid #ccc; border-radius: 4px; padding: 8px; font-size: 0.85rem; color: #333; text-align: left; overflow-y: auto; height: 100%; box-sizing: border-box; }
 .war-controls-buttons button { writing-mode: horizontal-tb; padding: 0 !important; cursor: pointer; font-size: 1rem !important; background: #fff; border: 2px solid #ccc !important; border-radius: 4px !important; font-weight: bold; color: #333; transition: all 0.2s; height: 100%; width: 100%; display: flex; align-items: center; justify-content: center; white-space: nowrap; box-sizing: border-box; }
 .war-controls-buttons button:hover { background: #f0f0f0; }
 .war-controls-buttons button.active-cmd { background: #ffe0b2 !important; border-color: #ff9800 !important; color: #e65100; box-shadow: 0 0 8px rgba(255, 152, 0, 0.4); transform: translateY(1px); }
