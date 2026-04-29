@@ -4152,11 +4152,8 @@ class UIInfoManager {
         }
 
         let targetLegionId = legionNo;
-        let legionName = "直轄軍";
-        if (legionNo > 0) {
-            const numberNames = ["直轄", "一席", "二席", "三席", "四席", "五席", "六席", "七席", "八席"];
-            legionName = numberNames[legionNo] ? `第${numberNames[legionNo]}席` : `第${legionNo}席`;
-        }
+        const numberNames = ["直轄", "第一席", "第二席", "第三席", "第四席", "第五席", "第六席", "第七席", "第八席"];
+        let legionName = numberNames[legionNo] || `第${legionNo}席`;
 
         const myCastles = this.game.castles.filter(c => {
             const cId = Number(c.id);
@@ -4189,20 +4186,36 @@ class UIInfoManager {
             const isChecked = this.allotFiefSelectedIds.includes(cId);
             const inputHtml = `<input type="checkbox" name="sel_allot_fief" value="${cId}" ${isChecked ? 'checked' : ''} style="display:none;">`;
 
-            let currentLegionStr = "直轄";
+            let originalLegionStr = "直轄";
             if (c.legionId > 0) {
-                const numberNames = ["直轄", "一席", "二席", "三席", "四席", "五席", "六席", "七席", "八席"];
-                currentLegionStr = numberNames[c.legionId] ? `第${numberNames[c.legionId]}席` : `第${c.legionId}席`;
+                originalLegionStr = numberNames[c.legionId] || `第${c.legionId}席`;
             }
 
+            let displayLegionStr = "";
+            let statusStyle = "";
+            if (isChecked) {
+                displayLegionStr = legionName;
+                statusStyle = "color:#fdea60; font-weight:bold;";
+            } else {
+                if (Number(c.legionId) === Number(legionNo)) {
+                    displayLegionStr = "直轄";
+                } else {
+                    displayLegionStr = originalLegionStr;
+                }
+                statusStyle = "color:#ccc; font-weight:normal;";
+            }
+
+            const castellan = this.game.getBusho(c.castellanId);
+            const castellanName = castellan ? castellan.name : "なし";
+
             items.push({
-                onClick: (e) => this.handleAllotFiefSelect(e, cId),
+                onClick: (e) => this.handleAllotFiefSelect(e, cId, legionNo, legionName, c.legionId),
                 cells: [
-                    `<span class="col-act" style="text-align:center;">${inputHtml}${isChecked ? '<span class="status-mark" style="color:#fdea60; font-weight:bold;">◯</span>' : '<span class="status-mark" style="color:#666; font-weight:normal;">-</span>'}</span>`,
+                    `<span class="col-act" style="justify-content:flex-start; padding-left:5px;">${inputHtml}<span class="status-mark" style="${statusStyle}">${displayLegionStr}</span></span>`,
                     `<span class="col-castle-name" style="justify-content:flex-start; padding-left:5px;">${c.name}</span>`,
-                    `<span class="col-soldiers">${c.soldiers}</span>`,
-                    `<span class="col-defense">${c.defense}</span>`,
-                    `<span>${currentLegionStr}</span>`
+                    `<span class="col-castellan-name" style="justify-content:flex-start; padding-left:5px;">${castellanName}</span>`,
+                    `<span class="col-soldiers" style="justify-content:flex-end; padding-right:5px;">${c.soldiers}</span>`,
+                    `<span class="col-defense" style="justify-content:flex-end; padding-right:5px;">${c.defense}</span>`
                 ],
                 itemClass: isChecked ? "selected" : ""
             });
@@ -4211,14 +4224,20 @@ class UIInfoManager {
         this._renderListModal({
             title: `${legionName}の所領分配`,
             contextHtml: `<div>${legionName}の所属とする拠点にチェックを入れてください</div>`,
-            headers: ["所属", "拠点名", "兵数", "城壁", "現在の所属"],
+            headers: [
+                `<span style="justify-content:center;">所属</span>`, 
+                `<span style="justify-content:center;">拠点名</span>`, 
+                `<span style="justify-content:center;">城主</span>`, 
+                `<span style="justify-content:center;">兵数</span>`, 
+                `<span style="justify-content:center;">城壁</span>`
+            ],
             headerClass: "delegate-list-header",
             itemClass: "delegate-list-item",
             listClass: "delegate-list-container",
             items: items,
             scrollPos: scrollPos,
-            gridTemplateSp: "40px 200px 100px 100px 150px",
-            gridTemplatePc: "60px 200px 100px 100px 150px",
+            gridTemplateSp: "1.2fr 2fr 1.5fr 1fr 1fr",
+            gridTemplatePc: "100px 160px 120px 80px 80px",
             onBack: () => {
                 this.allotFiefSelectedIds = null;
                 this.allotFiefSavedState = false;
@@ -4236,7 +4255,7 @@ class UIInfoManager {
         this._updateAllotFiefUI();
     }
 
-    handleAllotFiefSelect(e, castleId) {
+    handleAllotFiefSelect(e, castleId, legionNo, legionName, originalLegionId) {
         let div = e.currentTarget;
         let input = div.querySelector('input[name="sel_allot_fief"]');
         if (!input) return;
@@ -4248,25 +4267,30 @@ class UIInfoManager {
         const cId = Number(castleId);
         const isCurrentlyChecked = this.allotFiefSelectedIds.includes(cId);
 
+        const statusSpan = div.querySelector('.status-mark');
+
         if (isCurrentlyChecked) {
             this.allotFiefSelectedIds = this.allotFiefSelectedIds.filter(id => id !== cId);
             input.checked = false;
             div.classList.remove('selected');
-            const statusSpan = div.querySelector('.status-mark');
             if (statusSpan) {
-                statusSpan.style.color = '#666';
+                statusSpan.style.color = '#ccc';
                 statusSpan.style.fontWeight = 'normal';
-                statusSpan.textContent = '-';
+                if (Number(originalLegionId) === Number(legionNo)) {
+                    statusSpan.textContent = "直轄";
+                } else {
+                    const numberNames = ["直轄", "第一席", "第二席", "第三席", "第四席", "第五席", "第六席", "第七席", "第八席"];
+                    statusSpan.textContent = numberNames[originalLegionId] || `第${originalLegionId}席`;
+                }
             }
         } else {
             if (!this.allotFiefSelectedIds.includes(cId)) this.allotFiefSelectedIds.push(cId);
             input.checked = true;
             div.classList.add('selected');
-            const statusSpan = div.querySelector('.status-mark');
             if (statusSpan) {
                 statusSpan.style.color = '#fdea60';
                 statusSpan.style.fontWeight = 'bold';
-                statusSpan.textContent = '◯';
+                statusSpan.textContent = legionName;
             }
         }
         

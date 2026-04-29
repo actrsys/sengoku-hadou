@@ -3327,8 +3327,8 @@ class CommandSystem {
             }
         });
 
-        const numberNames = ["", "第一席", "第二席", "第三席", "第四席", "第五席", "第六席", "第七席", "第八席"];
-        const legionName = `第${numberNames[legionNo]}席`;
+        const numberNames = ["直轄", "第一席", "第二席", "第三席", "第四席", "第五席", "第六席", "第七席", "第八席"];
+        const legionName = numberNames[legionNo] || `第${legionNo}席`;
         
         this.game.ui.showResultModal(`${legionName}の所領分配を完了しました。\n${count}件の拠点の所属が変更されました。`);
         this.game.ui.updatePanelHeader();
