@@ -114,10 +114,10 @@ window.GameEvents.push({
     isOneTime: true,                 // 一度発生したら二度と起きません
     
     checkCondition: function(game) {
-        // 5月であるか確認します（5月じゃなければストップ）
-        if (game.month !== 5) return false;
+        // 5月、6月、7月のいずれかであるか確認します
+        if (game.month !== 5 && game.month !== 6 && game.month !== 7) return false;
 
-        // 太原崇孚（ID: 1004057）が死亡しているか確認します（生きていたらストップ）
+        // H. 太原崇孚（ID: 1004057）が死亡しているか確認します（生きていたらストップ）
         const sessai = game.getBusho(1004057);
         if (sessai && sessai.status !== 'dead') return false;
 
@@ -130,8 +130,8 @@ window.GameEvents.push({
         
         // B. 今川家が指定のお城をすべて持っているか確認します
         const imagawaClanId = yoshimoto.clan;
-        //曳馬城、駿府城、長篠城、岡崎城、犬居城、鳴海城、高天神城、吉田城、興国寺城
-        const requiredImagawaCastles = [12, 13, 45, 48, 54, 57, 71, 100, 101];
+        //曳馬城、駿府城、長篠城、岡崎城、犬居城、高天神城、吉田城、興国寺城
+        const requiredImagawaCastles = [12, 13, 45, 48, 54, 71, 100, 101];
         const hasAllImagawaCastles = requiredImagawaCastles.every(id => {
             const c = game.getCastle(id);
             return c && c.ownerClan === imagawaClanId;
@@ -154,6 +154,24 @@ window.GameEvents.push({
             return c && c.ownerClan === odaClanId;
         });
         if (!hasAllOdaCastles) return false;
+
+        // I. 織田家と今川家の領地（お城同士の道）が隣接しているか確認します
+        const odaCastles = game.castles.filter(c => c.ownerClan === odaClanId);
+        const imagawaCastles = game.castles.filter(c => c.ownerClan === imagawaClanId);
+        let isAdjacent = false;
+        
+        for (let oc of odaCastles) {
+            for (let ic of imagawaCastles) {
+                // GameSystemを使って、道が繋がっているか調べます
+                if (GameSystem.isAdjacent(oc, ic)) {
+                    isAdjacent = true;
+                    break;
+                }
+            }
+            if (isAdjacent) break;
+        }
+        // 隣接していなければストップします
+        if (!isAdjacent) return false;
         
         // G. 松平元康（ID: 1004004）が城主として存在するか確認します
         const motoyasu = game.getBusho(1004004);
@@ -485,70 +503,40 @@ window.GameEvents.push({
     isOneTime: true,             // 一度きりの歴史イベントです
     
     checkCondition: function(game) {
-        // 5月、6月、7月のいずれかであるか確認します
-        if (game.month !== 5 && game.month !== 6 && game.month !== 7) return false;
-
-        // G. 太原崇孚（ID: 1004057）が死亡しているか確認します（生きていたらストップ）
-        const sessai = game.getBusho(1004057);
-        if (sessai && sessai.status !== 'dead') return false;
-
-        // A. 今川義元（ID: 1004001）が大名として存在するか確認します
+        // 今川義元（ID: 1004001）が死亡しているかを確認します
         const yoshimoto = game.getBusho(1004001);
-        if (!yoshimoto || !yoshimoto.isDaimyo) return false;
-        
-        // C. 今川義元が駿府城（ID: 13）にいるか確認します
-        if (yoshimoto.castleId !== 13) return false;
-        
-        // B. 今川家が指定のお城をすべて持っているか確認します
-        const imagawaClanId = yoshimoto.clan;
-        //曳馬城、駿府城、長篠城、岡崎城、犬居城、高天神城、吉田城、興国寺城
-        const requiredImagawaCastles = [12, 13, 45, 48, 54, 71, 100, 101];
-        const hasAllImagawaCastles = requiredImagawaCastles.every(id => {
-            const c = game.getCastle(id);
-            return c && c.ownerClan === imagawaClanId;
-        });
-        if (!hasAllImagawaCastles) return false;
-        
-        // D. 織田信長（ID: 1006001）が大名として存在するか確認します
-        const nobunaga = game.getBusho(1006001);
-        if (!nobunaga || !nobunaga.isDaimyo) return false;
-        
-        // F. 織田信長が清州城（ID: 7）にいるか確認します
-        if (nobunaga.castleId !== 7) return false;
-        
-        // E. 織田家が指定のお城をすべて持っているか確認します
-        const odaClanId = nobunaga.clan;
-        // 清州城、名古屋城
-        const requiredOdaCastles = [7, 11];
-        const hasAllOdaCastles = requiredOdaCastles.every(id => {
-            const c = game.getCastle(id);
-            return c && c.ownerClan === odaClanId;
-        });
-        if (!hasAllOdaCastles) return false;
+        if (yoshimoto && yoshimoto.status !== 'dead') return false;
 
-        // H. 織田家と今川家の領地（お城同士の道）が隣接しているか確認します
-        const odaCastles = game.castles.filter(c => c.ownerClan === odaClanId);
-        const imagawaCastles = game.castles.filter(c => c.ownerClan === imagawaClanId);
+        // 織田信長（ID: 1006001）が大名であるか確認します
+        const nobunaga = game.getBusho(1006001);
+        if (!nobunaga || !nobunaga.isDaimyo || nobunaga.clan === 0) return false;
+
+        // 松平元康（ID: 1004004）が大名であるか確認します
+        const motoyasu = game.getBusho(1004004);
+        if (!motoyasu || !motoyasu.isDaimyo || motoyasu.clan === 0) return false;
+
+        // 織田家と松平家の関係が「敵対」「普通」「友好」のいずれかであるか確認します
+        const rel = game.diplomacyManager.getRelation(nobunaga.clan, motoyasu.clan);
+        if (!rel || (rel.status !== '敵対' && rel.status !== '普通' && rel.status !== '友好')) return false;
+
+        // 織田家と松平家の領地（お城同士の道）が隣接しているか確認します
+        const odaCastles = game.castles.filter(c => c.ownerClan === nobunaga.clan);
+        const matsudairaCastles = game.castles.filter(c => c.ownerClan === motoyasu.clan);
         let isAdjacent = false;
         
         for (let oc of odaCastles) {
-            for (let ic of imagawaCastles) {
-                // GameSystemを使って、道が繋がっているか調べます
-                if (GameSystem.isAdjacent(oc, ic)) {
+            for (let mc of matsudairaCastles) {
+                // GameSystem.isAdjacent を使って、道が繋がっているか調べます
+                if (GameSystem.isAdjacent(oc, mc)) {
                     isAdjacent = true;
                     break;
                 }
             }
             if (isAdjacent) break;
         }
-        // 隣接していなければストップします
         if (!isAdjacent) return false;
-        
-        // G. 松平元康（ID: 1004004）が城主として存在するか確認します
-        const motoyasu = game.getBusho(1004004);
-        if (!motoyasu || !motoyasu.isCastellan) return false;
-        
-        // すべての条件をクリアしたら、イベントを発生させます！
+
+        // すべての条件を満たしたらイベント発生です！
         return true;
     },
     
