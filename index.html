@@ -449,6 +449,27 @@
                     </div>
                 </div>
 
+                <div style="margin: 20px 0; text-align: left;">
+                    <label style="font-weight: bold; display: block; margin-bottom: 5px;">他家戦争の通知</label>
+                    <div style="display: flex; align-items: center; gap: 10px;">
+                        <label><input type="radio" name="setting-ai-war-notify" value="true" onchange="window.GameConfig=window.GameConfig||{}; window.GameConfig.aiWarNotify=true; localStorage.setItem('aiWarNotify', 'true');" checked id="notify-true"> 通知する</label>
+                        <label><input type="radio" name="setting-ai-war-notify" value="false" onchange="window.GameConfig=window.GameConfig||{}; window.GameConfig.aiWarNotify=false; localStorage.setItem('aiWarNotify', 'false');" id="notify-false"> 通知しない</label>
+                    </div>
+                </div>
+                <script>
+                    window.GameConfig = window.GameConfig || {};
+                    const savedNotify = localStorage.getItem('aiWarNotify');
+                    if (savedNotify === 'false') {
+                        window.GameConfig.aiWarNotify = false;
+                        document.addEventListener("DOMContentLoaded", () => {
+                            const rb = document.getElementById('notify-false');
+                            if(rb) rb.checked = true;
+                        });
+                    } else {
+                        window.GameConfig.aiWarNotify = true;
+                    }
+                </script>
+
                 <div class="modal-footer" style="justify-content: center;">
                     <button class="btn-secondary" onclick="document.getElementById('settings-modal').classList.add('hidden')">閉じる</button>
                 </div>

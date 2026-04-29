@@ -287,43 +287,45 @@ Object.assign(WarManager.prototype, {
             
             this.game.ui.log(startMsg.replace('\n', ''));
             if (!isPlayerInvolved) {
-                // ★追加：メッセージが出ると同時に、最初の刀の音を鳴らします
-                if (window.AudioManager) {
-                    window.AudioManager.playSE('katana001.ogg');
-                    // 0.4秒（400ミリ秒）待ってから、次の音を鳴らします
-                    setTimeout(() => {
-                        if (window.AudioManager) window.AudioManager.playSE('katana002.ogg');
-                    }, 400);
+                const skipAnim = window.GameConfig && window.GameConfig.aiWarNotify === false;
+                if (!skipAnim) {
+                    // ★追加：メッセージが出ると同時に、最初の刀の音を鳴らします
+                    if (window.AudioManager) {
+                        window.AudioManager.playSE('katana001.ogg');
+                        // 0.4秒（400ミリ秒）待ってから、次の音を鳴らします
+                        setTimeout(() => {
+                            if (window.AudioManager) window.AudioManager.playSE('katana002.ogg');
+                        }, 400);
+                    }
+
+                    // ★修正：諸勢力に対する鎮圧や反乱の時も、開始メッセージをしっかり出して結果を知らせます！
+                    await this.game.ui.showDialogAsync(startMsg);
+
+                    // ★追加：メッセージを閉じた後からバリアを張ります！
+                    if (typeof this.game.ui.showMapGuard === 'function') this.game.ui.showMapGuard();
+
+                    // ★ここから追加：メッセージを閉じた後、戦場となるお城にスクロールして点滅させます！
+                    const realDefCastle = this.game.getCastle(defCastle.id);
+                    this.game.ui.scrollToActiveCastle(realDefCastle, false);
+                    await new Promise(res => setTimeout(res, 600)); // スクロール完了を少し待ちます
+                    
+                    let atkColor = { r: 255, g: 255, b: 255 };
+                    if (!atkCastle.isKunishu && atkClan !== 0) {
+                        const clanData = this.game.clans.find(c => c.id === atkClan);
+                        if (clanData && clanData.color) atkColor = DataManager.hexToRgb(clanData.color);
+                    }
+                    let defColor = { r: 255, g: 255, b: 255 };
+                    if (!defCastle.isKunishu && defClan !== 0) {
+                        const clanData = this.game.clans.find(c => c.id === defClan);
+                        if (clanData && clanData.color) defColor = DataManager.hexToRgb(clanData.color);
+                    }
+                    
+                    // ★１秒間点滅させます
+                    await this.game.ui.playBattleBlink(defCastle.id, atkColor, defColor, 1000);
+                    
+                    // ★追加：点滅が終わったらバリアを外します！
+                    if (typeof this.game.ui.hideMapGuard === 'function') this.game.ui.hideMapGuard();
                 }
-
-                // ★修正：諸勢力に対する鎮圧や反乱の時も、開始メッセージをしっかり出して結果を知らせます！
-                await this.game.ui.showDialogAsync(startMsg);
-
-                // ★追加：メッセージを閉じた後からバリアを張ります！
-                if (typeof this.game.ui.showMapGuard === 'function') this.game.ui.showMapGuard();
-
-                // ★ここから追加：メッセージを閉じた後、戦場となるお城にスクロールして点滅させます！
-                const realDefCastle = this.game.getCastle(defCastle.id);
-                this.game.ui.scrollToActiveCastle(realDefCastle, false);
-                await new Promise(res => setTimeout(res, 600)); // スクロール完了を少し待ちます
-                
-                let atkColor = { r: 255, g: 255, b: 255 };
-                if (!atkCastle.isKunishu && atkClan !== 0) {
-                    const clanData = this.game.clans.find(c => c.id === atkClan);
-                    if (clanData && clanData.color) atkColor = DataManager.hexToRgb(clanData.color);
-                }
-                let defColor = { r: 255, g: 255, b: 255 };
-                if (!defCastle.isKunishu && defClan !== 0) {
-                    const clanData = this.game.clans.find(c => c.id === defClan);
-                    if (clanData && clanData.color) defColor = DataManager.hexToRgb(clanData.color);
-                }
-                
-                // ★１秒間点滅させます
-                await this.game.ui.playBattleBlink(defCastle.id, atkColor, defColor, 1000);
-                
-                // ★追加：点滅が終わったらバリアを外します！
-                if (typeof this.game.ui.hideMapGuard === 'function') this.game.ui.hideMapGuard();
-
             } else {
                 if (defCastle.isKunishu) {
                     await this.game.ui.showCutin(`${atkArmyName}の${atkBushos[0].name}が\n${defCastle.name}の鎮圧に乗り出しました！`);
@@ -387,7 +389,7 @@ Object.assign(WarManager.prototype, {
             atkCastle.horses = Math.max(0, (atkCastle.horses || 0) - atkHorses);
             atkCastle.guns = Math.max(0, (atkCastle.guns || 0) - atkGuns);
             atkBushos.forEach(b => b.isActionDone = true);
-
+            
             // ★変更: ログだけでなく、すべての援軍の参戦を画面のメッセージ（ダイアログ）でもお知らせするようにしました！
             const processReinforcement = async (reinfData, isSelf) => {
                 if (reinfData) {
@@ -400,7 +402,10 @@ Object.assign(WarManager.prototype, {
                     
                     this.game.ui.log(`【${reinfType}】${hC.name}の${leaderName}が攻撃側の援軍として参戦しました。`);
                     
-                    await this.game.ui.showDialogAsync(msg);
+                    const skipAnim = window.GameConfig && window.GameConfig.aiWarNotify === false;
+                    if (isPlayerInvolved || !skipAnim) {
+                        await this.game.ui.showDialogAsync(msg);
+                    }
                 }
             };
             await processReinforcement(selfReinforcementData, true);
@@ -993,9 +998,12 @@ Object.assign(WarManager.prototype, {
                 const clanData = this.game.clans.find(c => c.id === s.oldDefClanId);
                 if (clanData && clanData.color) defColor = DataManager.hexToRgb(clanData.color);
             }
-
+            
             // 勝敗が決まる前に、戦場となった城の領土を2秒間点滅させる（この間は操作不可）
-            await this.game.ui.playBattleBlink(s.defender.id, atkColor, defColor, 2000);
+            const skipAnimBlink = window.GameConfig && window.GameConfig.aiWarNotify === false;
+            if (s.isPlayerInvolved || !skipAnimBlink) {
+                await this.game.ui.playBattleBlink(s.defender.id, atkColor, defColor, 2000);
+            }
             
             // ★追加：点滅が終わったこのタイミングで「戦闘直後」の歴史イベントをチェック・実行します！
             if (this.game.eventManager) {
@@ -1396,7 +1404,10 @@ Object.assign(WarManager.prototype, {
                     });
                 } else {
                     // ★修正：戦闘画面は飛ばしますが、結果のメッセージは表示してタップを待ちます！
-                    await this.game.ui.showDialogAsync(resultMsg);
+                    const skipAnim = window.GameConfig && window.GameConfig.aiWarNotify === false;
+                    if (!skipAnim) {
+                        await this.game.ui.showDialogAsync(resultMsg);
+                    }
                     this.closeWar();
                 }
                 return;
@@ -1414,7 +1425,8 @@ Object.assign(WarManager.prototype, {
 
                     // ★追加：色が中立に変わったので、メッセージの前に地図を更新します！
                     // ★今回追加：色を変える時に、かっこいいアニメーションの魔法を使います！
-                    if (typeof this.game.ui.playCaptureEffect === 'function') {
+                    const skipAnim = window.GameConfig && window.GameConfig.aiWarNotify === false;
+                    if (typeof this.game.ui.playCaptureEffect === 'function' && (s.isPlayerInvolved || !skipAnim)) {
                         // 画面が真っ白になった瞬間に色を塗り替えるお願いを渡します
                         await this.game.ui.playCaptureEffect(targetC.id, () => {
                             this.game.ui.updateClanColors();
@@ -1487,10 +1499,14 @@ Object.assign(WarManager.prototype, {
                     });
                 } else {
                     // ★追加：AIの城で反乱が起きた時も、専用のメッセージを出してタップを待ちます！
-                    await this.game.ui.showDialogAsync(resultMsg);
+                    const skipAnim = window.GameConfig && window.GameConfig.aiWarNotify === false;
+                    if (!skipAnim) {
+                        await this.game.ui.showDialogAsync(resultMsg);
+                    }
                     this.closeWar();
                 }
                 return;
+                
             }
 
             s.atkBushos.forEach(b => { this.game.factionSystem.recordBattle(b, s.defender.id); this.game.factionSystem.updateRecognition(b, 25); });
@@ -1598,7 +1614,8 @@ Object.assign(WarManager.prototype, {
 
                 // ★追加：色が更新されたので、メッセージの前に地図を更新します！
                 // ★今回追加：色を変える時に、かっこいいアニメーションの魔法を使います！
-                if (typeof this.game.ui.playCaptureEffect === 'function') {
+                const skipAnim = window.GameConfig && window.GameConfig.aiWarNotify === false;
+                if (typeof this.game.ui.playCaptureEffect === 'function' && (s.isPlayerInvolved || !skipAnim)) {
                     await this.game.ui.playCaptureEffect(s.defender.id, () => {
                         this.game.ui.updateClanColors();
                     });
@@ -1607,7 +1624,7 @@ Object.assign(WarManager.prototype, {
                 }
 
                 s.defender.soldiers = totalAtkSurvivors;
-
+                
                 // ★追加：敵が逃げて空っぽになった城に入るので、自分たちの士気と訓練をそのまま使います！
                 s.defender.training = s.attacker.training || 0;
                 s.defender.morale = s.attacker.morale || 0;
@@ -1638,14 +1655,14 @@ Object.assign(WarManager.prototype, {
                     this.game.ui.showResultModal(`撤退しました。\n${retreatTargetId ? '部隊は移動しました。' : '部隊は解散しました。'}`, finishWarProcess);
                 } else {
                     // ★AIの結果メッセージを最後に表示します（イベント決着時などは空なのでスキップ）
-                    if (aiResultMsg) {
+                    const skipAnim = window.GameConfig && window.GameConfig.aiWarNotify === false;
+                    if (aiResultMsg && !skipAnim) {
                         await this.game.ui.showDialogAsync(aiResultMsg);
                     }
                     finishWarProcess();
                 }
                 return;
-            }
-
+                
             let resultMsg = "";
             const isAtkPlayer = (Number(s.attacker.ownerClan) === Number(this.game.playerClanId));
             const isDefPlayer = (Number(s.defender.ownerClan) === Number(this.game.playerClanId));
@@ -1682,7 +1699,8 @@ Object.assign(WarManager.prototype, {
 
                 // ★追加：色が更新されたので、メッセージの前に地図を更新します！
                 // ★今回追加：色を変える時に、かっこいいアニメーションの魔法を使います！
-                if (typeof this.game.ui.playCaptureEffect === 'function') {
+                const skipAnim = window.GameConfig && window.GameConfig.aiWarNotify === false;
+                if (typeof this.game.ui.playCaptureEffect === 'function' && (s.isPlayerInvolved || !skipAnim)) {
                     await this.game.ui.playCaptureEffect(s.defender.id, () => {
                         this.game.ui.updateClanColors();
                     });
@@ -1737,7 +1755,7 @@ Object.assign(WarManager.prototype, {
             if (s.defender) {
                 this.game.affiliationSystem.updateCastleLord(s.defender);
             }
-
+            
             if (s.isPlayerInvolved) {
                 if (attackerWon && !isRetreat && isAtkPlayer) {
                     if (window.AudioManager) {
@@ -1753,7 +1771,8 @@ Object.assign(WarManager.prototype, {
             }
             else {
                 // ★AIの結果メッセージを最後に表示します（イベント決着時などは空なのでスキップ）
-                if (aiResultMsg) {
+                const skipAnim = window.GameConfig && window.GameConfig.aiWarNotify === false;
+                if (aiResultMsg && !skipAnim) {
                     await this.game.ui.showDialogAsync(aiResultMsg);
                 }
                 finishWarProcess();
