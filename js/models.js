@@ -444,8 +444,9 @@ class Busho {
             return "元服前";
         }
         if (this.isDaimyo) return "大名";
-        if (this.isCastellan) return "城主";
         if (this.isGunshi) return "軍師";
+        if (window.GameApp && window.GameApp.legions && window.GameApp.legions.some(l => l.commanderId === this.id)) return "司令官";
+        if (this.isCastellan) return "城主";
         if (this.belongKunishuId > 0 && this.id === (window.GameApp ? window.GameApp.kunishuSystem.getKunishu(this.belongKunishuId)?.leaderId : 0)) return "頭領";
         if (this.belongKunishuId > 0) return "諸勢力";
         if (this.status === 'ronin') return "浪人";
@@ -698,7 +699,7 @@ class Legion {
         this.clanId = Number(this.clanId || 0);
         // その大名家の中で第何軍団か（1〜7）
         this.legionNo = Number(this.legionNo || 1);
-        // 軍団長を任されている武将の出席番号
+        // 司令官を任されている武将の出席番号
         this.commanderId = Number(this.commanderId || 0);
     }
 }
