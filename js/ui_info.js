@@ -4211,11 +4211,11 @@ class UIInfoManager {
             items.push({
                 onClick: (e) => this.handleAllotFiefSelect(e, cId, legionNo, legionName, c.legionId),
                 cells: [
-                    `<span class="col-act" style="justify-content:flex-start; padding-left:5px;">${inputHtml}<span class="status-mark" style="${statusStyle}">${displayLegionStr}</span></span>`,
-                    `<span class="col-castle-name" style="justify-content:flex-start; padding-left:5px;">${c.name}</span>`,
-                    `<span class="col-castellan-name" style="justify-content:flex-start; padding-left:5px;">${castellanName}</span>`,
-                    `<span class="col-soldiers" style="justify-content:flex-end; padding-right:5px;">${c.soldiers}</span>`,
-                    `<span class="col-defense" style="justify-content:flex-end; padding-right:5px;">${c.defense}</span>`
+                    `<span class="col-act">${inputHtml}<span class="status-mark" style="${statusStyle}">${displayLegionStr}</span></span>`,
+                    `<span class="col-castle-name">${c.name}</span>`,
+                    `<span class="col-castellan">${castellanName}</span>`,
+                    `<span class="col-soldiers">${c.soldiers}</span>`,
+                    `<span class="col-defense">${c.defense}</span>`
                 ],
                 itemClass: isChecked ? "selected" : ""
             });
@@ -4224,13 +4224,7 @@ class UIInfoManager {
         this._renderListModal({
             title: `${legionName}の所領分配`,
             contextHtml: `<div>${legionName}の所属とする拠点にチェックを入れてください</div>`,
-            headers: [
-                `<span style="justify-content:center;">所属</span>`, 
-                `<span style="justify-content:center;">拠点名</span>`, 
-                `<span style="justify-content:center;">城主</span>`, 
-                `<span style="justify-content:center;">兵数</span>`, 
-                `<span style="justify-content:center;">城壁</span>`
-            ],
+            headers: ["所属", "拠点名", "城主", "兵数", "城壁"],
             headerClass: "delegate-list-header",
             itemClass: "delegate-list-item",
             listClass: "delegate-list-container",
