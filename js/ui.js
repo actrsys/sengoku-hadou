@@ -656,14 +656,29 @@ class UIManager {
         }
         // ------------------
 
+        // イベント専用の指定があるか先に確認しておきます
+        const isEventMode = dialog.customOpts && dialog.customOpts.isEvent;
+
         // もし「選択肢」が指定されていたら、特別な処理をします
         if (dialog.customOpts && dialog.customOpts.choices) {
-            modal.classList.remove('event-dialog-modal'); // イベントクラスを外す
+            if (isEventMode) {
+                modal.classList.add('event-dialog-modal'); // イベント中は下部表示を維持します
+                modal.classList.add('event-choices-active'); // ▼マークを消すための目印をつけます
+            } else {
+                modal.classList.remove('event-dialog-modal'); 
+            }
+            
             footer.classList.add('hidden'); // いつもの「はい・いいえ」ボタンを隠します
             cancelBtn.classList.remove('hidden'); // ★追加：外側クリックで閉じられないようにするための細工
             
             if (choicesContainer) {
                 choicesContainer.innerHTML = ''; // 中身を一度きれいにします
+                
+                if (isEventMode) {
+                    choicesContainer.classList.add('event-choices-container'); // 選択肢を中央へ飛ばす目印
+                } else {
+                    choicesContainer.classList.remove('event-choices-container');
+                }
                 
                 // 用意された選択肢の数だけ、新しくボタンを作ります
                 dialog.customOpts.choices.forEach(choice => {
@@ -679,6 +694,8 @@ class UIManager {
                             else window.AudioManager.playSE('decision.ogg');
                         }
                         
+                        modal.classList.remove('event-choices-active'); // ▼マークを消す目印を外す
+                        choicesContainer.classList.remove('event-choices-container'); // 中央表示の目印を外す
                         choicesContainer.classList.add('hidden'); // 選択肢を隠します
                         cleanupAndNext(choice.onClick); // 約束されていた処理（onClick）を実行します
                     };
@@ -688,9 +705,6 @@ class UIManager {
                 choicesContainer.classList.remove('hidden'); // 選択肢の箱を表示します
             }
         } else {
-            // イベント専用の指定があるか確認します
-            const isEventMode = dialog.customOpts && dialog.customOpts.isEvent;
-
             if (isEventMode) {
                 // イベントの時は、専用の目印をつけ、フッター（ボタン）を隠します
                 modal.classList.add('event-dialog-modal');
@@ -1895,21 +1909,16 @@ class UIManager {
 
         const msgContainer = document.createElement('div');
         msgContainer.className = 'war-action-message-container';
-        msgContainer.style.cssText = 'text-align: left; position: relative; display: block; padding: 15px; box-sizing: border-box; height: 100%;';
         
         const textContainer = document.createElement('div');
         textContainer.className = 'war-action-message-text';
-        textContainer.style.cssText = `text-align: left; width: 100%; display: block; ${msgFontSize}`;
+        if (msgFontSize) {
+            textContainer.style.cssText = msgFontSize;
+        }
         
         const promptContainer = document.createElement('div');
         promptContainer.className = 'war-action-message-prompt';
-        promptContainer.textContent = '▼'; 
-        
-        if (isPc) {
-            promptContainer.style.cssText = 'position: absolute; bottom: 5px; left: 50%; transform: translateX(-50%); font-size: 1.2rem; color: #eee; cursor: pointer;';
-        } else {
-            promptContainer.style.cssText = 'position: absolute; bottom: 5px; right: 15px; font-size: 0.8rem; color: #eee; cursor: pointer;';
-        }
+        promptContainer.textContent = '▼';
 
         msgContainer.appendChild(textContainer);
         msgContainer.appendChild(promptContainer);
