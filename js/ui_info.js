@@ -4140,7 +4140,7 @@ class UIInfoManager {
         const daimyoCastleId = daimyo ? daimyo.castleId : -1;
         const commanderCastleIds = this.game.bushos
             .filter(b => b.clan === this.game.playerClanId && b.isCommander)
-            .map(b => b.castleId);
+            .map(b => Number(b.castleId));
 
         let targetLegionId = 0;
         let legionName = "直轄軍";
@@ -4158,7 +4158,6 @@ class UIInfoManager {
             return true;
         });
 
-        // 初回表示時のみ初期化
         if (!this.allotFiefSavedState) {
             if (!this.allotFiefSelectedIds) this.allotFiefSelectedIds = [];
             myCastles.forEach(c => {
@@ -4171,7 +4170,6 @@ class UIInfoManager {
             this.allotFiefSavedState = true;
         }
 
-        // ソート：チェックが入っているものを一番上にする
         myCastles.sort((a, b) => {
             const aSelected = this.allotFiefSelectedIds.includes(a.id) ? 1 : 0;
             const bSelected = this.allotFiefSelectedIds.includes(b.id) ? 1 : 0;
@@ -4196,7 +4194,7 @@ class UIInfoManager {
             items.push({
                 onClick: `window.GameApp.ui.info.handleAllotFiefSelect(event, ${c.id})`,
                 cells: [
-                    `<span class="col-act" style="text-align:center;">${inputHtml}${isChecked ? '<span style="color:#fdea60; font-weight:bold;">◯</span>' : '<span style="color:#666;">-</span>'}</span>`,
+                    `<span class="col-act" style="text-align:center;">${inputHtml}${isChecked ? '<span class="status-mark" style="color:#fdea60; font-weight:bold;">◯</span>' : '<span class="status-mark" style="color:#666; font-weight:normal;">-</span>'}</span>`,
                     `<span class="col-castle-name" style="justify-content:flex-start; padding-left:5px;">${c.name}</span>`,
                     `<span class="col-soldiers">${c.soldiers}</span>`,
                     `<span class="col-defense">${c.defense}</span>`,
@@ -4245,16 +4243,24 @@ class UIInfoManager {
              input.checked = !input.checked; 
         }
         
+        const statusSpan = div.querySelector('.status-mark');
+
         if (input.checked) {
             div.classList.add('selected');
             if (!this.allotFiefSelectedIds.includes(castleId)) this.allotFiefSelectedIds.push(castleId);
-            const actCol = div.querySelector('.col-act');
-            if(actCol) actCol.innerHTML = `${input.outerHTML}<span style="color:#fdea60; font-weight:bold;">◯</span>`;
+            if (statusSpan) {
+                statusSpan.style.color = '#fdea60';
+                statusSpan.style.fontWeight = 'bold';
+                statusSpan.textContent = '◯';
+            }
         } else {
             div.classList.remove('selected');
             this.allotFiefSelectedIds = this.allotFiefSelectedIds.filter(id => id !== castleId);
-            const actCol = div.querySelector('.col-act');
-            if(actCol) actCol.innerHTML = `${input.outerHTML}<span style="color:#666;">-</span>`;
+            if (statusSpan) {
+                statusSpan.style.color = '#666';
+                statusSpan.style.fontWeight = 'normal';
+                statusSpan.textContent = '-';
+            }
         }
         
         if (window.AudioManager) window.AudioManager.playSE('choice.ogg');
