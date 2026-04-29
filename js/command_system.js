@@ -42,14 +42,14 @@ const COMMAND_MENU_STRUCTURE = [
                 label: "軍団新設",
                 commands: [
                     'appoint_legion_leader_1', 'appoint_legion_leader_2', 'appoint_legion_leader_3', 'appoint_legion_leader_4',
-                    'appoint_legion_leader_5', 'appoint_legion_leader_6', 'appoint_legion_leader_7', 'appoint_legion_leader_8'
+                    'appoint_legion_leader_5', 'appoint_legion_leader_6', 'appoint_legion_leader_7'
                 ]
             },
             {
                 label: "所領分配",
                 commands: [
-                    'allot_fief_1', 'allot_fief_2', 'allot_fief_3', 'allot_fief_4',
-                    'allot_fief_5', 'allot_fief_6', 'allot_fief_7', 'allot_fief_8'
+                    'allot_fief_0', 'allot_fief_1', 'allot_fief_2', 'allot_fief_3', 'allot_fief_4',
+                    'allot_fief_5', 'allot_fief_6', 'allot_fief_7'
                 ]
             }
         ]
@@ -95,6 +95,17 @@ const CAN_EXECUTE_RULES = {
             if (hasLegion) return false;
         }
         return legionNumber <= myCastles.length;
+    },
+    // ★追加：所領分配用の判定ルール（軍団が存在する時だけ押せるようにします）
+    canAllotFief: (game, legionNumber) => {
+        const myCastles = game.castles.filter(c => Number(c.ownerClan) === Number(game.playerClanId));
+        if (myCastles.length <= 1) return false;
+        if (legionNumber === 0) return true; // 直轄はいつでも選べます
+        if (game.legions) {
+            const hasLegion = game.legions.some(l => Number(l.clanId) === Number(game.playerClanId) && Number(l.legionNo) === legionNumber && Number(l.commanderId) > 0);
+            return hasLegion;
+        }
+        return false;
     },
     hasSuccessor: (game) => {
         const daimyo = game.bushos.find(b => b.clan === game.playerClanId && b.isDaimyo);
@@ -382,21 +393,22 @@ const COMMAND_SPECS = {
         isSystem: true, action: 'delegate_list',
         canExecute: (game, castle) => CAN_EXECUTE_RULES.hasDelegatableCastle(game)
     },
-    'appoint_legion_leader_1': { label: "第一席", category: 'LEGION', isSystem: true, action: 'appoint_legion_leader_0', canExecute: (game, castle) => CAN_EXECUTE_RULES.canManageLegion(game, 1) },
-    'appoint_legion_leader_2': { label: "第二席", category: 'LEGION', isSystem: true, action: 'appoint_legion_leader_1', canExecute: (game, castle) => CAN_EXECUTE_RULES.canManageLegion(game, 2) },
-    'appoint_legion_leader_3': { label: "第三席", category: 'LEGION', isSystem: true, action: 'appoint_legion_leader_2', canExecute: (game, castle) => CAN_EXECUTE_RULES.canManageLegion(game, 3) },
-    'appoint_legion_leader_4': { label: "第四席", category: 'LEGION', isSystem: true, action: 'appoint_legion_leader_3', canExecute: (game, castle) => CAN_EXECUTE_RULES.canManageLegion(game, 4) },
-    'appoint_legion_leader_5': { label: "第五席", category: 'LEGION', isSystem: true, action: 'appoint_legion_leader_4', canExecute: (game, castle) => CAN_EXECUTE_RULES.canManageLegion(game, 5) },
-    'appoint_legion_leader_6': { label: "第六席", category: 'LEGION', isSystem: true, action: 'appoint_legion_leader_5', canExecute: (game, castle) => CAN_EXECUTE_RULES.canManageLegion(game, 6) },
-    'appoint_legion_leader_7': { label: "第七席", category: 'LEGION', isSystem: true, action: 'appoint_legion_leader_6', canExecute: (game, castle) => CAN_EXECUTE_RULES.canManageLegion(game, 7) },
-    'allot_fief_0': { label: "直轄軍", category: 'LEGION', isSystem: true, action: 'allot_fief_0', canExecute: (game, castle) => CAN_EXECUTE_RULES.canManageLegion(game, 0) },
-    'allot_fief_1': { label: "第一席", category: 'LEGION', isSystem: true, action: 'allot_fief_1', canExecute: (game, castle) => CAN_EXECUTE_RULES.canManageLegion(game, 1) },
-    'allot_fief_2': { label: "第二席", category: 'LEGION', isSystem: true, action: 'allot_fief_2', canExecute: (game, castle) => CAN_EXECUTE_RULES.canManageLegion(game, 2) },
-    'allot_fief_3': { label: "第三席", category: 'LEGION', isSystem: true, action: 'allot_fief_3', canExecute: (game, castle) => CAN_EXECUTE_RULES.canManageLegion(game, 3) },
-    'allot_fief_4': { label: "第四席", category: 'LEGION', isSystem: true, action: 'allot_fief_4', canExecute: (game, castle) => CAN_EXECUTE_RULES.canManageLegion(game, 4) },
-    'allot_fief_5': { label: "第五席", category: 'LEGION', isSystem: true, action: 'allot_fief_5', canExecute: (game, castle) => CAN_EXECUTE_RULES.canManageLegion(game, 5) },
-    'allot_fief_6': { label: "第六席", category: 'LEGION', isSystem: true, action: 'allot_fief_6', canExecute: (game, castle) => CAN_EXECUTE_RULES.canManageLegion(game, 6) },
-    'allot_fief_7': { label: "第七席", category: 'LEGION', isSystem: true, action: 'allot_fief_7', canExecute: (game, castle) => CAN_EXECUTE_RULES.canManageLegion(game, 7) },
+    'appoint_legion_leader_1': { label: "第一席", category: 'LEGION', isSystem: true, action: 'appoint_legion_leader_1', canExecute: (game, castle) => CAN_EXECUTE_RULES.canManageLegion(game, 1) },
+    'appoint_legion_leader_2': { label: "第二席", category: 'LEGION', isSystem: true, action: 'appoint_legion_leader_2', canExecute: (game, castle) => CAN_EXECUTE_RULES.canManageLegion(game, 2) },
+    'appoint_legion_leader_3': { label: "第三席", category: 'LEGION', isSystem: true, action: 'appoint_legion_leader_3', canExecute: (game, castle) => CAN_EXECUTE_RULES.canManageLegion(game, 3) },
+    'appoint_legion_leader_4': { label: "第四席", category: 'LEGION', isSystem: true, action: 'appoint_legion_leader_4', canExecute: (game, castle) => CAN_EXECUTE_RULES.canManageLegion(game, 4) },
+    'appoint_legion_leader_5': { label: "第五席", category: 'LEGION', isSystem: true, action: 'appoint_legion_leader_5', canExecute: (game, castle) => CAN_EXECUTE_RULES.canManageLegion(game, 5) },
+    'appoint_legion_leader_6': { label: "第六席", category: 'LEGION', isSystem: true, action: 'appoint_legion_leader_6', canExecute: (game, castle) => CAN_EXECUTE_RULES.canManageLegion(game, 6) },
+    'appoint_legion_leader_7': { label: "第七席", category: 'LEGION', isSystem: true, action: 'appoint_legion_leader_7', canExecute: (game, castle) => CAN_EXECUTE_RULES.canManageLegion(game, 7) },
+    
+    'allot_fief_0': { label: "直轄軍", category: 'LEGION', isSystem: true, action: 'allot_fief_0', canExecute: (game, castle) => CAN_EXECUTE_RULES.canAllotFief(game, 0) },
+    'allot_fief_1': { label: "第一席", category: 'LEGION', isSystem: true, action: 'allot_fief_1', canExecute: (game, castle) => CAN_EXECUTE_RULES.canAllotFief(game, 1) },
+    'allot_fief_2': { label: "第二席", category: 'LEGION', isSystem: true, action: 'allot_fief_2', canExecute: (game, castle) => CAN_EXECUTE_RULES.canAllotFief(game, 2) },
+    'allot_fief_3': { label: "第三席", category: 'LEGION', isSystem: true, action: 'allot_fief_3', canExecute: (game, castle) => CAN_EXECUTE_RULES.canAllotFief(game, 3) },
+    'allot_fief_4': { label: "第四席", category: 'LEGION', isSystem: true, action: 'allot_fief_4', canExecute: (game, castle) => CAN_EXECUTE_RULES.canAllotFief(game, 4) },
+    'allot_fief_5': { label: "第五席", category: 'LEGION', isSystem: true, action: 'allot_fief_5', canExecute: (game, castle) => CAN_EXECUTE_RULES.canAllotFief(game, 5) },
+    'allot_fief_6': { label: "第六席", category: 'LEGION', isSystem: true, action: 'allot_fief_6', canExecute: (game, castle) => CAN_EXECUTE_RULES.canAllotFief(game, 6) },
+    'allot_fief_7': { label: "第七席", category: 'LEGION', isSystem: true, action: 'allot_fief_7', canExecute: (game, castle) => CAN_EXECUTE_RULES.canAllotFief(game, 7) },
 
     // --- 対外：調略 (FOREIGN_STRATEGY) ---
     'sabotage': { 
@@ -1267,13 +1279,14 @@ class CommandSystem {
             case 'princess_list': this.game.ui.showPrincessList(); break;
             case 'kyoten_list': this.game.ui.showKyotenList(); break;
             case 'delegate_list': this.game.ui.showDelegateListModal(); break;
+            case 'appoint_legion_leader_1': this.game.ui.showAppointLegionLeaderModal(1); break;
             case 'appoint_legion_leader_2': this.game.ui.showAppointLegionLeaderModal(2); break;
             case 'appoint_legion_leader_3': this.game.ui.showAppointLegionLeaderModal(3); break;
             case 'appoint_legion_leader_4': this.game.ui.showAppointLegionLeaderModal(4); break;
             case 'appoint_legion_leader_5': this.game.ui.showAppointLegionLeaderModal(5); break;
             case 'appoint_legion_leader_6': this.game.ui.showAppointLegionLeaderModal(6); break;
             case 'appoint_legion_leader_7': this.game.ui.showAppointLegionLeaderModal(7); break;
-            case 'appoint_legion_leader_8': this.game.ui.showAppointLegionLeaderModal(8); break;
+            case 'allot_fief_0': this.game.ui.showAllotFiefModal(0); break;
             case 'allot_fief_1': this.game.ui.showAllotFiefModal(1); break;
             case 'allot_fief_2': this.game.ui.showAllotFiefModal(2); break;
             case 'allot_fief_3': this.game.ui.showAllotFiefModal(3); break;
@@ -1281,7 +1294,6 @@ class CommandSystem {
             case 'allot_fief_5': this.game.ui.showAllotFiefModal(5); break;
             case 'allot_fief_6': this.game.ui.showAllotFiefModal(6); break;
             case 'allot_fief_7': this.game.ui.showAllotFiefModal(7); break;
-            case 'allot_fief_8': this.game.ui.showAllotFiefModal(8); break;
             // ★ここを書き足し！：「settings」と呼ばれたら小窓を開きます
             case 'settings': this.game.ui.showSettingsModal(); break;
             // ★ここから下を書き足します！
