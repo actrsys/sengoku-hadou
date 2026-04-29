@@ -137,6 +137,7 @@ class UIInfoManager {
         else if (info.pageType === 'kunishu_detail') this._renderKunishuDetail(...info.args, info.scrollPos);
         else if (info.pageType === 'castle_detail') this._renderCastleDetail(...info.args, info.scrollPos);
         else if (info.pageType === 'force_selector') this._renderForceSelector(...info.args, info.scrollPos);
+        else if (info.pageType === 'appoint_legion_castle') this._renderAppointLegionCastle(...info.args, info.scrollPos);
     }
     
     showDaimyoList() {
@@ -4036,6 +4037,70 @@ class UIInfoManager {
         element.classList.add('selected');
 
         this.selectedForceIndex = index;
+
+        const confirmBtn = document.getElementById('selector-confirm-btn');
+        if (confirmBtn) {
+            confirmBtn.disabled = false;
+            confirmBtn.style.opacity = '1';
+            confirmBtn.style.cursor = 'pointer';
+        }
+    }
+
+    showAppointLegionCastleSelector(bushoId, legionNo) {
+        this.closeCommonModal();
+        this.pushModal('appoint_legion_castle', [bushoId, legionNo]);
+    }
+
+    _renderAppointLegionCastle(bushoId, legionNo, scrollPos = 0) {
+        const myCastles = this.game.castles.filter(c => Number(c.ownerClan) === Number(this.game.playerClanId));
+        
+        let items = [];
+        myCastles.forEach(c => {
+            items.push({
+                onClick: `window.GameApp.ui.info.selectAppointLegionCastle(${bushoId}, ${legionNo}, ${c.id}, this)`,
+                cells: [
+                    `<span class="col-castle-name" style="justify-content:flex-start; padding-left:5px;">${c.name}</span>`,
+                    `<span class="col-soldiers">${c.soldiers}</span>`,
+                    `<span class="col-defense">${c.defense}</span>`
+                ]
+            });
+        });
+
+        this._renderListModal({
+            title: "任せる拠点を選択してください",
+            contextHtml: "<div>任せる拠点を選択してください</div>",
+            headers: ["拠点名", "兵数", "城壁"],
+            headerClass: "delegate-list-header",
+            itemClass: "delegate-list-item",
+            listClass: "delegate-list-container",
+            items: items,
+            scrollPos: scrollPos,
+            gridTemplateSp: "2fr 1fr 1fr",
+            gridTemplatePc: "200px 100px 100px",
+            onBack: () => {
+                this.closeCommonModal();
+                window.GameApp.ui.showAppointLegionLeaderModal(legionNo);
+            },
+            onConfirm: () => {
+                if (!this.selectedCastleIdForLegion) return;
+                const castleId = this.selectedCastleIdForLegion;
+                
+                window.GameApp.ui.showDialog("よろしいですか？", true, () => {
+                    this.closeCommonModal();
+                    window.GameApp.commandSystem.executeAppointLegionLeader(bushoId, legionNo, castleId);
+                }, () => {
+                    this._renderAppointLegionCastle(bushoId, legionNo, 0);
+                });
+            }
+        });
+    }
+
+    selectAppointLegionCastle(bushoId, legionNo, castleId, element) {
+        const items = document.querySelectorAll('.delegate-list-item');
+        items.forEach(item => item.classList.remove('selected'));
+
+        element.classList.add('selected');
+        this.selectedCastleIdForLegion = castleId;
 
         const confirmBtn = document.getElementById('selector-confirm-btn');
         if (confirmBtn) {
