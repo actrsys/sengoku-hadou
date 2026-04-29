@@ -58,48 +58,45 @@ class DataManager {
                     this.parseGenericNames(namesText);
                 } catch (e) { console.warn("汎用武将名ファイルなし"); }
             }
-            // ★今回追加：princess.csv も一緒に読み込むようにリストに加えます！
-            const [clansText, castlesText, bushosText, kunishusText, courtRanksText, princessesText, provincesText] = await Promise.all([                
+            // ★今回追加：princess.csv と legions.csv も一緒に読み込むようにリストに加えます！
+            const [clansText, castlesText, bushosText, kunishusText, courtRanksText, princessesText, provincesText, legionsText] = await Promise.all([                
                 this.fetchText(path + "clans.csv"),                
                 this.fetchText(path + "castles.csv"),                
                 this.fetchText(path + "warriors.csv"),
                 this.fetchText(path + "kunishuClan.csv").catch(() => ""),
                 this.fetchText("./data/imperialCourtRank.csv").catch(() => ""),
-                this.fetchText(path + "princess.csv").catch(() => ""), // 姫データがないシナリオでもエラーにならないように守ります
-                this.fetchText("./data/provinces_map.csv").catch(() => "") // ★今回追加：地方のデータを読み込みます
+                this.fetchText(path + "princess.csv").catch(() => ""), 
+                this.fetchText("./data/provinces_map.csv").catch(() => ""),
+                this.fetchText(path + "legions.csv").catch(() => "") // ★軍団データを読み込みます（なければ空文字）
             ]);
             const clans = this.parseCSV(clansText, Clan);
             const castles = this.parseCSV(castlesText, Castle);
             const bushos = this.parseCSV(bushosText, Busho);
             const kunishus = kunishusText ? this.parseCSV(kunishusText, Kunishu) : [];
             const courtRanks = courtRanksText ? this.parseCSV(courtRanksText, CourtRank) : [];
-            // ★今回追加：読み込んだ文字を、新しく作った姫クラス（器）に流し込みます
             const princesses = princessesText ? this.parseCSV(princessesText, Princess) : [];
-            // ★今回追加：読み込んだ地方の文字を、さっき作った地方クラス（箱）に流し込みます
             const provinces = provincesText ? this.parseCSV(provincesText, Province) : [];
+            // ★新しく作った軍団クラス（器）に流し込みます
+            const legions = legionsText ? this.parseCSV(legionsText, Legion) : [];
             
-            // ★今回追加：ゲーム開始時の準備係（joinData）に、姫の名簿も一緒に渡してあげます
-            this.joinData(clans, castles, bushos, princesses);
+            // ★準備係（joinData）に、軍団の名簿も一緒に渡して初期設定を行います
+            this.joinData(clans, castles, bushos, princesses, legions);
             if (bushos.length < 50) this.generateGenericBushos(bushos, castles, clans);
             
-            // ★ここを書き足し！：お城のデータが揃った後で、色を探す魔法を発動させます！
             try {
-                // ★差し替え！：.png を .webp に変更しました！
                 await this.loadColorMap('./data/images/map/japan_colorcode_map.png', castles);
             } catch (e) {
                 console.log("マップ画像の解析をスキップしました");
             }
 
-            // ★ここから追加！：地方のマップ画像もこっそり読み込んでおく魔法です！
             try {
                 await this.loadProvinceMap('./data/images/map/japan_provinces.png');
             } catch (e) {
                 console.log("地方マップ画像の解析をスキップしました");
             }
-            // ★追加ここまで！
 
-            // ★今回追加：完成した姫の名簿をゲーム本体に返します！
-            return { clans, castles, bushos, kunishus, courtRanks, princesses, provinces, mapWidth: this.mapImageWidth, mapHeight: this.mapImageHeight };
+            // ★完成した全データをゲーム本体に返します！
+            return { clans, castles, bushos, kunishus, courtRanks, princesses, provinces, legions, mapWidth: this.mapImageWidth, mapHeight: this.mapImageHeight };
         } catch (error) {
             console.error(error);
             alert(`データの読み込みに失敗しました。\nフォルダ構成を確認してください。`);
@@ -163,8 +160,8 @@ class DataManager {
         return text;
     }
     
-    // ★ゲーム開始時の状態を作る魔法です！（今回から姫の名簿も受け取ります）
-    static joinData(clans, castles, bushos, princesses = []) {
+    // ★ゲーム開始時の状態を作る魔法です！（今回から軍団の名簿も受け取ります）
+    static joinData(clans, castles, bushos, princesses = [], legions = []) {
         const startYear = window.MainParams.StartYear; // 今のシナリオの開始年（例：1560年）
         
         castles.forEach(c => c.samuraiIds = []);
@@ -281,6 +278,34 @@ class DataManager {
 
             // ★今回追加：ゲーム開始の瞬間に、姫の名簿を使って「武将の一門関係（血の繋がり）」を繋ぎます！
             b.updateFamilyIds(princesses);
+
+            // ★今回追加：軍師の設定
+            if (b.clan !== 0) {
+                const clan = clans.find(cl => cl.id === b.clan);
+                if (clan && Number(clan.gunshiId) === Number(b.id)) {
+                    b.isGunshi = true;
+                }
+            }
+        });
+
+        // ★ここから軍団の初期設定です！
+        legions.forEach(legion => {
+            // 軍団長に就任する武将を探します
+            const commander = bushos.find(b => b.id === legion.commanderId);
+            if (commander) {
+                // 軍団長に「あなたは第○軍団の所属ですよ」とシールを貼ります
+                commander.legionId = legion.legionNo;
+            }
+
+            // この軍団に所属するはずのお城を探してシールを貼ります
+            // (CSVでお城側にもlegionIdを書くことができますが、ここで軍団データから反映させることも可能です)
+            castles.forEach(c => {
+                // まだ軍団が決まっていないお城で、大名家が一致している場合
+                if (c.ownerClan === legion.clanId && c.legionId === 0) {
+                    // ※本来はここでお城ごとにどの軍団か選別するロジックが必要ですが、
+                    // まずはデータの「箱」が繋がるようにします。
+                }
+            });
         });
     }
     
