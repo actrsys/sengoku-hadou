@@ -4143,7 +4143,7 @@ class UIInfoManager {
         if (this.game.legions) {
             this.game.legions.forEach(l => {
                 if (Number(l.clanId) === Number(this.game.playerClanId)) {
-                    const leader = this.game.bushos.find(b => Number(b.id) === Number(l.leaderId));
+                    const leader = this.game.bushos.find(b => Number(b.id) === Number(l.commanderId));
                     if (leader) {
                         commanderCastleIds.push(Number(leader.castleId));
                     }
@@ -4156,7 +4156,7 @@ class UIInfoManager {
         if (legionNo > 0) {
             const legion = this.game.legions.find(l => Number(l.clanId) === Number(this.game.playerClanId) && Number(l.legionNo) === legionNo);
             targetLegionId = legion ? legion.id : -1;
-            const numberNames = ["直轄", "一席", "二席", "三席", "四席", "五席", "六席", "七席"];
+            const numberNames = ["直轄", "一席", "二席", "三席", "四席", "五席", "六席", "七席", "八席"];
             legionName = `第${numberNames[legionNo]}席`;
         }
 
@@ -4195,7 +4195,7 @@ class UIInfoManager {
             if (c.legionId > 0 && this.game.legions) {
                 const l = this.game.legions.find(lg => Number(lg.id) === Number(c.legionId));
                 if (l) {
-                    const numberNames = ["直轄", "一席", "二席", "三席", "四席", "五席", "六席", "七席"];
+                    const numberNames = ["直轄", "一席", "二席", "三席", "四席", "五席", "六席", "七席", "八席"];
                     currentLegionStr = `第${numberNames[l.legionNo]}席`;
                 }
             }
@@ -4239,47 +4239,5 @@ class UIInfoManager {
         });
         
         this._updateAllotFiefUI();
-    }
-
-    handleAllotFiefSelect(e, castleId) {
-        let div = e.currentTarget;
-        let input = div.querySelector('input[name="sel_allot_fief"]');
-        if (!input) return;
-
-        const cId = Number(castleId);
-        const isCurrentlyChecked = this.allotFiefSelectedIds.includes(cId);
-
-        if (isCurrentlyChecked) {
-            this.allotFiefSelectedIds = this.allotFiefSelectedIds.filter(id => id !== cId);
-            input.checked = false;
-            div.classList.remove('selected');
-            const statusSpan = div.querySelector('.status-mark');
-            if (statusSpan) {
-                statusSpan.style.color = '#666';
-                statusSpan.style.fontWeight = 'normal';
-                statusSpan.textContent = '-';
-            }
-        } else {
-            if (!this.allotFiefSelectedIds.includes(cId)) this.allotFiefSelectedIds.push(cId);
-            input.checked = true;
-            div.classList.add('selected');
-            const statusSpan = div.querySelector('.status-mark');
-            if (statusSpan) {
-                statusSpan.style.color = '#fdea60';
-                statusSpan.style.fontWeight = 'bold';
-                statusSpan.textContent = '◯';
-            }
-        }
-        
-        if (window.AudioManager) window.AudioManager.playSE('choice.ogg');
-        this._updateAllotFiefUI();
-    }
-
-    _updateAllotFiefUI() {
-        const confirmBtn = document.getElementById('selector-confirm-btn');
-        if (confirmBtn) {
-            confirmBtn.disabled = false;
-            confirmBtn.style.opacity = 1.0;
-        }
     }
 }
