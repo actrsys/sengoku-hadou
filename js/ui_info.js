@@ -1919,7 +1919,7 @@ class UIInfoManager {
             headers = [
                 `<span class="col-castle-name" data-sort="name" style="padding-left:5px; justify-content:flex-start;">拠点名${getSortMark('name')}</span>`,
                 `<span class="col-clan" data-sort="clan">勢力${getSortMark('clan')}</span>`,
-                `<span class="col-castellan" data-sort="castellan">城代${getSortMark('castellan')}</span>`,
+                `<span class="col-castellan" data-sort="castellan">城主${getSortMark('castellan')}</span>`,
                 `<span class="col-province" data-sort="province">国${getSortMark('province')}</span>`,
                 `<span class="col-busho-count" data-sort="bushoCount">武将${getSortMark('bushoCount')}</span>`,
                 `<span class="col-gold" data-sort="gold">金${getSortMark('gold')}</span>`,
