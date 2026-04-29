@@ -459,7 +459,10 @@ class IndependenceSystem {
         stayScore += this.calcDaimyoPowerBonus(oldDaimyo);
 
         if (busho.loyalty < 90) joinScore += (90 - busho.loyalty);
-        joinScore += (50 - busho.duty) * 0.4;
+        
+        // ★変更：義理による補正（25〜75でカンスト、50基準）
+        const clampedDuty = Math.max(25, Math.min(75, busho.duty || 50));
+        joinScore += (50 - clampedDuty) * 0.4;
 
         if (busho.factionId !== 0) {
             if (busho.factionId === newDaimyo.factionId) joinScore += 50;
@@ -470,13 +473,13 @@ class IndependenceSystem {
 
     resolveSubordinates(castle, newDaimyo, oldDaimyo, newClanId, oldClanId) {
         const subordinates = this.game.getCastleBushos(castle.id).filter(b => b.clan === oldClanId && b.status === 'active' && b.id !== newDaimyo.id);
-        const captives = [], joiners = [];
+        const joiners = [];
         const escapeCastles = this.game.castles.filter(c => c.ownerClan === oldClanId && c.id !== castle.id);
         
         subordinates.forEach(busho => {
             const { joinScore, stayScore } = this.calculateLoyaltyScores(busho, newDaimyo, oldDaimyo);
             if (joinScore > stayScore) {
-                // ★大名家が変わるので功績半分！
+                // ★ついていくと決めた場合：大名家が変わるので功績半分！
                 if (busho.clan !== 0 && busho.clan !== newClanId) {
                     busho.achievementTotal = Math.floor((busho.achievementTotal || 0) / 2);
                 }
@@ -484,29 +487,21 @@ class IndependenceSystem {
                 busho.loyalty = this.calcNewLoyalty(busho, newDaimyo);
                 joiners.push(busho);
             } else {
-                if (escapeCastles.length > 0 && busho.duty >= 30) {
-                    if ((busho.strength + busho.intelligence) * (Math.random() + 0.5) > (newDaimyo.leadership + newDaimyo.intelligence) * 0.8) {
-                        const target = escapeCastles[Math.floor(Math.random() * escapeCastles.length)];
-                        // ★新しいお引越しセンターの魔法を使います！
-                        this.game.affiliationSystem.moveCastle(busho, target.id);
-                        this.game.updateCastleLord(target);
-                    } else {
-                        castle.samuraiIds = castle.samuraiIds.filter(id => id !== busho.id);
-                        busho.castleId = 0; captives.push(busho);
-                    }
+                // ★ついていかない場合：逃げるか浪人になる
+                if (escapeCastles.length > 0) {
+                    const target = escapeCastles[Math.floor(Math.random() * escapeCastles.length)];
+                    // ★新しいお引越しセンターの魔法を使います！
+                    this.game.affiliationSystem.moveCastle(busho, target.id);
+                    this.game.updateCastleLord(target);
                 } else {
-                    // ★大名家が変わるので功績半分！
-                    if (busho.clan !== 0 && busho.clan !== newClanId) {
-                        busho.achievementTotal = Math.floor((busho.achievementTotal || 0) / 2);
-                    }
-                    busho.clan = newClanId;
-                    busho.loyalty = Math.max(0, Math.min(40, this.calcNewLoyalty(busho, newDaimyo) - 50)); // 消極的合流は低めに設定
-                    joiners.push(busho);
+                    // ★逃げる城がもう無い場合は浪人になります
+                    this.game.affiliationSystem.becomeRonin(busho);
                 }
             }
         });
         if (joiners.length > 0) this.game.ui.log(`  -> ${castle.name}にて${joiners.length}名が追随しました。`);
-        return captives.length > 0 ? this.handleCaptives(captives, oldClanId, newClanId, newDaimyo) : [];
+        
+        return [];
     }
 
     resolveFactionWideRebellion(leader, oldClanId, newClanId, oldDaimyo) {
@@ -578,7 +573,6 @@ class IndependenceSystem {
                     alertMsgs.push(`解放：${p.name} は解放されました。`);
                 }
             } else if (newClanId === this.game.playerClanId) {
-                // ★プレイヤーの城に寝返った場合、戦争画面ではないので捕虜画面を出さず、逃がしてあげる魔法にします！
                 if (returnCastles.length > 0) {
                     const target = returnCastles[Math.floor(Math.random() * returnCastles.length)];
                     p.clan = oldClanId; p.castleId = target.id; target.samuraiIds.push(p.id);
