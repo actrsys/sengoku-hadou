@@ -1145,10 +1145,13 @@ window.GameEvents.push({
             }
             
             // 確率を計算します。
-            const prob = 0.005 + 0.01 * (1.0 - (affDiff / 25));
+            // 基本確率2%(0.02) + 相性による変動分(最大±3%。相性差0で+3%, 25で0%, 50で-3%)
+            let prob = 0.02 + 0.03 * (1.0 - (affDiff / 25));
+            // 確率が0%を下回った場合は0%（カンスト最低値）にします
+            prob = Math.max(0, prob);
             
             // サイコロを振って当たった場合、仕官の処理に入ります
-            if (Math.random() < prob) {
+            if (prob > 0 && Math.random() < prob) {
                 processedRonins.add(ronin.id); // 処理済みとしてメモします
                 
                 if (clanId === game.playerClanId) {
