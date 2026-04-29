@@ -456,6 +456,14 @@
                         <label><input type="radio" name="setting-ai-war-notify" value="false" onchange="window.GameConfig=window.GameConfig||{}; window.GameConfig.aiWarNotify=false; localStorage.setItem('aiWarNotify', 'false');" id="notify-false"> 通知しない</label>
                     </div>
                 </div>
+
+                <div style="margin: 20px 0; text-align: left;">
+                    <label style="font-weight: bold; display: block; margin-bottom: 5px;">歴史イベント</label>
+                    <div style="display: flex; align-items: center; gap: 10px;">
+                        <label><input type="radio" name="setting-historical-event" value="true" onchange="window.GameConfig=window.GameConfig||{}; window.GameConfig.historicalEvent=true; localStorage.setItem('historicalEvent', 'true');" checked id="historical-true"> 発生する</label>
+                        <label><input type="radio" name="setting-historical-event" value="false" onchange="window.GameConfig=window.GameConfig||{}; window.GameConfig.historicalEvent=false; localStorage.setItem('historicalEvent', 'false');" id="historical-false"> 発生しない</label>
+                    </div>
+                </div>
                 <script>
                     window.GameConfig = window.GameConfig || {};
                     const savedNotify = localStorage.getItem('aiWarNotify');
@@ -467,6 +475,17 @@
                         });
                     } else {
                         window.GameConfig.aiWarNotify = true;
+                    }
+
+                    const savedHistorical = localStorage.getItem('historicalEvent');
+                    if (savedHistorical === 'false') {
+                        window.GameConfig.historicalEvent = false;
+                        document.addEventListener("DOMContentLoaded", () => {
+                            const rbHistorical = document.getElementById('historical-false');
+                            if(rbHistorical) rbHistorical.checked = true;
+                        });
+                    } else {
+                        window.GameConfig.historicalEvent = true;
                     }
                 </script>
 

@@ -68,13 +68,21 @@ class EventManager {
         // ゲームのセーブデータに残る「スタンプ帳（flags）」を準備します
         this.game.flags = this.game.flags || {};
 
+        // 設定で「歴史イベントが発生しない」になっているか確認します
+        const isHistoricalOff = (window.GameConfig && window.GameConfig.historicalEvent === false);
+
         for (const ev of targetEvents) {
+            // もし設定がオフで、かつ歴史イベント（IDが "historical_" で始まる）なら、このイベントは無視します！
+            if (isHistoricalOff && ev.id && ev.id.startsWith("historical_")) {
+                continue;
+            }
+
             // 一度きりのイベントで、かつ既にスタンプが押されているなら、条件確認すら飛ばします
             if (ev.isOneTime && this.game.flags[ev.id]) {
                 continue;
             }
 
-            if (ev.checkCondition(this.game, context)) { 
+            if (ev.checkCondition(this.game, context)) {
                 // ★修正：前回の誤った魔法を元に戻し、「一度きり（isOneTime）」のイベントだけを記録するように直します！
                 // これで毎月起こる汎用イベントがスタンプ帳に刻まれてしまう不具合が直ります。
                 if (ev.isOneTime) {
