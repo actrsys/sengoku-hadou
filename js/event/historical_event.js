@@ -57,9 +57,9 @@ window.GameEvents.push({
         // 万が一データが見つからなかった時のための安全装置です
         if (!motoyasu || !okazakiCastle) return;
 
-        // 1. 松平元康の功績が1499以下なら、強制的に1500に引き上げます
-        if ((motoyasu.achievementTotal || 0) <= 1499) {
-            motoyasu.achievementTotal = 1500;
+        // 1. 松平元康の功績が699以下なら、強制的に700に引き上げます
+        if ((motoyasu.achievementTotal || 0) <= 699) {
+            motoyasu.achievementTotal = 700;
         }
 
         // 2. 元康が別のお城にいる場合、安全に岡崎城へお引越しさせます
