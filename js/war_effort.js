@@ -882,6 +882,12 @@ Object.assign(WarManager.prototype, {
         } catch(e) {
             console.error("StartWar Error:", e); 
             if (typeof this.game.ui.hideMapGuard === 'function') this.game.ui.hideMapGuard(true); 
+
+            const forceHideStyle = document.getElementById('force-hide-ai-text');
+            if (forceHideStyle) forceHideStyle.remove();
+            const aiGuardEl = document.getElementById('ai-guard');
+            if (aiGuardEl) aiGuardEl.classList.remove('hide-text');
+
             this.state.active = false; 
             this.game.finishTurn(); 
         }
@@ -1062,6 +1068,12 @@ Object.assign(WarManager.prototype, {
                 const aiGuardEl = document.getElementById('ai-guard');
                 if (aiGuardEl) {
                     aiGuardEl.classList.remove('hide-text');
+                }
+
+                // ★今回追加：「透明化しっぱなし」の強力なルールもここでしっかり消します！
+                const forceHideStyle = document.getElementById('force-hide-ai-text');
+                if (forceHideStyle) {
+                    forceHideStyle.remove();
                 }
                 
                 // ★追加：籠城戦（攻城戦）の「戦闘終了後」の合図を出します
@@ -1796,6 +1808,12 @@ Object.assign(WarManager.prototype, {
         } catch (e) {
             console.error("EndWar Error: ", e);
             if (typeof this.game.ui.hideMapGuard === 'function') this.game.ui.hideMapGuard(true);
+
+            const forceHideStyle = document.getElementById('force-hide-ai-text');
+            if (forceHideStyle) forceHideStyle.remove();
+            const aiGuardEl = document.getElementById('ai-guard');
+            if (aiGuardEl) aiGuardEl.classList.remove('hide-text');
+
             if (this.state.isPlayerInvolved) this.game.ui.showResultModal("合戦処理中にエラーが発生しましたが、\nゲームを継続します。", () => { this.game.finishTurn(); });
             else this.game.finishTurn();
         }
