@@ -90,6 +90,10 @@ const CAN_EXECUTE_RULES = {
     canManageLegion: (game, legionNumber) => {
         const myCastles = game.castles.filter(c => Number(c.ownerClan) === Number(game.playerClanId));
         if (myCastles.length <= 1) return false;
+        if (game.legions) {
+            const hasLegion = game.legions.some(l => Number(l.clanId) === Number(game.playerClanId) && Number(l.legionNo) === legionNumber && Number(l.commanderId) > 0);
+            if (hasLegion) return false;
+        }
         return legionNumber <= myCastles.length;
     },
     hasSuccessor: (game) => {
@@ -378,21 +382,21 @@ const COMMAND_SPECS = {
         isSystem: true, action: 'delegate_list',
         canExecute: (game, castle) => CAN_EXECUTE_RULES.hasDelegatableCastle(game)
     },
-    'appoint_legion_leader_2': { label: "第二軍団", category: 'LEGION', isSystem: true, action: 'appoint_legion_leader_2', canExecute: (game, castle) => CAN_EXECUTE_RULES.canManageLegion(game, 2) },
-    'appoint_legion_leader_3': { label: "第三軍団", category: 'LEGION', isSystem: true, action: 'appoint_legion_leader_3', canExecute: (game, castle) => CAN_EXECUTE_RULES.canManageLegion(game, 3) },
-    'appoint_legion_leader_4': { label: "第四軍団", category: 'LEGION', isSystem: true, action: 'appoint_legion_leader_4', canExecute: (game, castle) => CAN_EXECUTE_RULES.canManageLegion(game, 4) },
-    'appoint_legion_leader_5': { label: "第五軍団", category: 'LEGION', isSystem: true, action: 'appoint_legion_leader_5', canExecute: (game, castle) => CAN_EXECUTE_RULES.canManageLegion(game, 5) },
-    'appoint_legion_leader_6': { label: "第六軍団", category: 'LEGION', isSystem: true, action: 'appoint_legion_leader_6', canExecute: (game, castle) => CAN_EXECUTE_RULES.canManageLegion(game, 6) },
-    'appoint_legion_leader_7': { label: "第七軍団", category: 'LEGION', isSystem: true, action: 'appoint_legion_leader_7', canExecute: (game, castle) => CAN_EXECUTE_RULES.canManageLegion(game, 7) },
-    'appoint_legion_leader_8': { label: "第八軍団", category: 'LEGION', isSystem: true, action: 'appoint_legion_leader_8', canExecute: (game, castle) => CAN_EXECUTE_RULES.canManageLegion(game, 8) },
-    'allot_fief_1': { label: "第一軍団", category: 'LEGION', isSystem: true, action: 'allot_fief_1', canExecute: (game, castle) => CAN_EXECUTE_RULES.canManageLegion(game, 1) },
-    'allot_fief_2': { label: "第二軍団", category: 'LEGION', isSystem: true, action: 'allot_fief_2', canExecute: (game, castle) => CAN_EXECUTE_RULES.canManageLegion(game, 2) },
-    'allot_fief_3': { label: "第三軍団", category: 'LEGION', isSystem: true, action: 'allot_fief_3', canExecute: (game, castle) => CAN_EXECUTE_RULES.canManageLegion(game, 3) },
-    'allot_fief_4': { label: "第四軍団", category: 'LEGION', isSystem: true, action: 'allot_fief_4', canExecute: (game, castle) => CAN_EXECUTE_RULES.canManageLegion(game, 4) },
-    'allot_fief_5': { label: "第五軍団", category: 'LEGION', isSystem: true, action: 'allot_fief_5', canExecute: (game, castle) => CAN_EXECUTE_RULES.canManageLegion(game, 5) },
-    'allot_fief_6': { label: "第六軍団", category: 'LEGION', isSystem: true, action: 'allot_fief_6', canExecute: (game, castle) => CAN_EXECUTE_RULES.canManageLegion(game, 6) },
-    'allot_fief_7': { label: "第七軍団", category: 'LEGION', isSystem: true, action: 'allot_fief_7', canExecute: (game, castle) => CAN_EXECUTE_RULES.canManageLegion(game, 7) },
-    'allot_fief_8': { label: "第八軍団", category: 'LEGION', isSystem: true, action: 'allot_fief_8', canExecute: (game, castle) => CAN_EXECUTE_RULES.canManageLegion(game, 8) },
+    'appoint_legion_leader_2': { label: "第一席", category: 'LEGION', isSystem: true, action: 'appoint_legion_leader_2', canExecute: (game, castle) => CAN_EXECUTE_RULES.canManageLegion(game, 2) },
+    'appoint_legion_leader_3': { label: "第二席", category: 'LEGION', isSystem: true, action: 'appoint_legion_leader_3', canExecute: (game, castle) => CAN_EXECUTE_RULES.canManageLegion(game, 3) },
+    'appoint_legion_leader_4': { label: "第三席", category: 'LEGION', isSystem: true, action: 'appoint_legion_leader_4', canExecute: (game, castle) => CAN_EXECUTE_RULES.canManageLegion(game, 4) },
+    'appoint_legion_leader_5': { label: "第四席", category: 'LEGION', isSystem: true, action: 'appoint_legion_leader_5', canExecute: (game, castle) => CAN_EXECUTE_RULES.canManageLegion(game, 5) },
+    'appoint_legion_leader_6': { label: "第五席", category: 'LEGION', isSystem: true, action: 'appoint_legion_leader_6', canExecute: (game, castle) => CAN_EXECUTE_RULES.canManageLegion(game, 6) },
+    'appoint_legion_leader_7': { label: "第六席", category: 'LEGION', isSystem: true, action: 'appoint_legion_leader_7', canExecute: (game, castle) => CAN_EXECUTE_RULES.canManageLegion(game, 7) },
+    'appoint_legion_leader_8': { label: "第七席", category: 'LEGION', isSystem: true, action: 'appoint_legion_leader_8', canExecute: (game, castle) => CAN_EXECUTE_RULES.canManageLegion(game, 8) },
+    'allot_fief_1': { label: "直轄軍", category: 'LEGION', isSystem: true, action: 'allot_fief_1', canExecute: (game, castle) => CAN_EXECUTE_RULES.canManageLegion(game, 1) },
+    'allot_fief_2': { label: "第一席", category: 'LEGION', isSystem: true, action: 'allot_fief_2', canExecute: (game, castle) => CAN_EXECUTE_RULES.canManageLegion(game, 2) },
+    'allot_fief_3': { label: "第二席", category: 'LEGION', isSystem: true, action: 'allot_fief_3', canExecute: (game, castle) => CAN_EXECUTE_RULES.canManageLegion(game, 3) },
+    'allot_fief_4': { label: "第三席", category: 'LEGION', isSystem: true, action: 'allot_fief_4', canExecute: (game, castle) => CAN_EXECUTE_RULES.canManageLegion(game, 4) },
+    'allot_fief_5': { label: "第四席", category: 'LEGION', isSystem: true, action: 'allot_fief_5', canExecute: (game, castle) => CAN_EXECUTE_RULES.canManageLegion(game, 5) },
+    'allot_fief_6': { label: "第五席", category: 'LEGION', isSystem: true, action: 'allot_fief_6', canExecute: (game, castle) => CAN_EXECUTE_RULES.canManageLegion(game, 6) },
+    'allot_fief_7': { label: "第六席", category: 'LEGION', isSystem: true, action: 'allot_fief_7', canExecute: (game, castle) => CAN_EXECUTE_RULES.canManageLegion(game, 7) },
+    'allot_fief_8': { label: "第七席", category: 'LEGION', isSystem: true, action: 'allot_fief_8', canExecute: (game, castle) => CAN_EXECUTE_RULES.canManageLegion(game, 8) },
 
     // --- 対外：調略 (FOREIGN_STRATEGY) ---
     'sabotage': { 
@@ -671,6 +675,15 @@ class CommandSystem {
                 !b.isCastellan
             );
             infoHtml = "<div>軍師に任命する武将を選択してください</div>";
+        }
+        else if (actionType === 'appoint_legion_leader') {
+            bushos = this.game.bushos.filter(b => 
+                b.clan === this.game.playerClanId && 
+                b.status === 'active' && 
+                !b.isDaimyo                          
+            );
+            infoHtml = "<div>国主に任命する武将を選択してください</div>"; 
+            isMulti = false;
         }
         else if (actionType === 'def_intercept_deploy') {
             const targetC = this.game.getCastle(targetId);
@@ -1545,9 +1558,13 @@ class CommandSystem {
         
         const spec = COMMAND_SPECS[actionType];
         
-        if (['appoint_gunshi'].includes(actionType)) { 
-             this.executeWithEvent('appoint_gunshi', () => this.executeAppointGunshi(firstId));
-             return;
+        if (['appoint_gunshi'].includes(actionType)) {
+            this.executeWithEvent('appoint_gunshi', () => this.executeAppointGunshi(firstId));
+            return;
+        }
+        if (actionType === 'appoint_legion_leader') {
+            this.game.ui.showAppointLegionCastleSelector(firstId, extraData.legionNo);
+            return;
         }
 
         if (actionType === 'succession_target') {
@@ -2153,19 +2170,59 @@ class CommandSystem {
         this.game.ui.showResultModal(`${this.game.getBusho(bushoIds[0]).name}が${t.name}へ物資を輸送しました`); this.game.ui.updatePanelHeader(); this.game.ui.renderCommandMenu();
     }
     
-    executeAppointGunshi(bushoId) { 
-        const busho = this.game.getBusho(bushoId); 
-        const oldGunshi = this.game.bushos.find(b => b.clan === this.game.playerClanId && b.isGunshi); 
-        if (oldGunshi) oldGunshi.isGunshi = false; 
-        busho.isGunshi = true; 
-
+    executeAppointGunshi(bushoId) {
+        const busho = this.game.getBusho(bushoId);
+        const oldGunshi = this.game.bushos.find(b => b.clan === this.game.playerClanId && b.isGunshi);
+        if (oldGunshi) oldGunshi.isGunshi = false;
+        busho.isGunshi = true;
         // ★ここから追加！：軍師に任命された時に、この軍師専用の「秘密の番号（タネ）」を作ります！
         busho.gunshiSeed = Math.floor(Math.random() * 10000);
         // ★追加ここまで！
+        this.game.ui.showResultModal(`${busho.name}を軍師に任命しました`);
+        this.game.ui.updatePanelHeader();
+        this.game.ui.renderCommandMenu();
+    }
 
-        this.game.ui.showResultModal(`${busho.name}を軍師に任命しました`); 
-        this.game.ui.updatePanelHeader(); 
-        this.game.ui.renderCommandMenu(); 
+    executeAppointLegionLeader(bushoId, legionNo, castleId) {
+        const busho = this.game.getBusho(bushoId);
+        const castle = this.game.getCastle(castleId);
+        if (!busho || !castle) return;
+
+        this.game.affiliationSystem.moveCastle(busho, castleId);
+
+        if (!this.game.legions) this.game.legions = [];
+        let legion = this.game.legions.find(l => Number(l.clanId) === Number(this.game.playerClanId) && Number(l.legionNo) === legionNo);
+        if (!legion) {
+            const maxId = this.game.legions.length > 0 ? Math.max(...this.game.legions.map(l => Number(l.id) || 0)) : 0;
+            const legionData = { id: maxId + 1, clanId: this.game.playerClanId, legionNo: legionNo };
+            legion = typeof window.Legion === 'function' ? new window.Legion(legionData) : legionData;
+            this.game.legions.push(legion);
+        }
+        legion.commanderId = busho.id;
+
+        const oldCastellan = this.game.getBusho(castle.castellanId);
+        if (oldCastellan) {
+            oldCastellan.isCastellan = false;
+        }
+        castle.castellanId = busho.id;
+        busho.isCastellan = true;
+        busho.isCommander = true;
+
+        castle.legionId = legion.id;
+
+        const numberNames = ["直轄", "一席", "二席", "三席", "四席", "五席", "六席", "七席"];
+        const legionName = numberNames[legionNo] || `第${legionNo}席`;
+        
+        let displayMessage = "";
+        if (legionNo === 0) {
+            displayMessage = `${busho.name} を直轄軍団の担当に任命し、\n${castle.name} を本拠としました`;
+        } else {
+            displayMessage = `${busho.name} を「${legionName}」の国主に任命し、\n${castle.name} を本拠としました`;
+        }
+        
+        this.game.ui.showResultModal(displayMessage);
+        this.game.ui.updatePanelHeader();
+        this.game.ui.renderCommandMenu();
     }
 
     executeTrade(type, amount) {
