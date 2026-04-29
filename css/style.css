@@ -2147,7 +2147,6 @@ body.is-pc {
     #pc-command-area { padding: 10px; flex: 1; overflow-y: auto; }
     .command-grid { grid-template-columns: repeat(2, 1fr); gap: 10px; }
     .cmd-btn { padding: 8px 8px; font-size: 1.2rem; height: auto; }
-    .cmd-btn.finish, .cmd-btn.back { grid-column: span 2; }
 
     /* PCリストレイアウト */
     .scroll-wrapper { max-height: calc(44px * 9 + 28px); }
