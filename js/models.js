@@ -426,9 +426,15 @@ class Busho {
 
         // ★ここを書き足し！：自動生成された頭領かどうかの「秘密のシール」を貼る専用の枠です！
         this.isAutoLeader = data.isAutoLeader === true;
+    }
 
-        // ★今回追加：どの軍団に所属しているか（0は直轄、1～7が各軍団）
-        this.legionId = Number(data.legionId || 0);
+    // ★新しく追加：武将自身のデータには軍団IDを持たせず、今いる「お城」のデータを覗きに行く魔法です！
+    // こうしておけば、お城の軍団が変われば武将の軍団も自動で変わるので、間違いが起きません。
+    get legionId() {
+        // もしお城のデータが見つからなかったら、とりあえず「0（直轄）」と答えます
+        if (!window.GameApp || !window.GameApp.castles) return 0;
+        const castle = window.GameApp.castles.find(c => c.id === this.castleId);
+        return castle ? castle.legionId : 0;
     }
 
     // UI表示用メソッド

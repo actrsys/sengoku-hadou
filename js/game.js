@@ -293,17 +293,20 @@ class DataManager {
             // 軍団長に就任する武将を探します
             const commander = bushos.find(b => b.id === legion.commanderId);
             if (commander) {
-                // 軍団長に「あなたは第○軍団の所属ですよ」とシールを貼ります
-                commander.legionId = legion.legionNo;
+                // ★修正：武将本人ではなく、その武将がいる「お城」に軍団番号を書き込みます
+                const castle = castles.find(c => c.id === commander.castleId);
+                if (castle) {
+                    castle.legionId = legion.legionNo;
+                }
             }
 
             // この軍団に所属するはずのお城を探してシールを貼ります
-            // (CSVでお城側にもlegionIdを書くことができますが、ここで軍団データから反映させることも可能です)
             castles.forEach(c => {
-                // まだ軍団が決まっていないお城で、大名家が一致している場合
-                if (c.ownerClan === legion.clanId && c.legionId === 0) {
-                    // ※本来はここでお城ごとにどの軍団か選別するロジックが必要ですが、
-                    // まずはデータの「箱」が繋がるようにします。
+                // CSVなどでお城側に直接legionIdが書かれていない場合の保険として、
+                // 軍団長のいるお城と同じ軍団にするなどの処理も可能ですが、
+                // まずは「お城が主体」でデータを管理する形に整えました。
+                if (c.ownerClan === legion.clanId) {
+                    // 必要に応じて、ここでお城の所属軍団を決定するロジックを書き足せます
                 }
             });
         });
