@@ -30,7 +30,7 @@ class UIInfoManager {
         
         // 外交リストのタブ状態リセット
         this.diploCurrentTab = 'daimyo';
-
+        
         // 拠点一覧で使う状態のリセット
         this.currentKyotenTab = 'status';
         this.currentKyotenScope = 'clan';
@@ -42,6 +42,10 @@ class UIInfoManager {
         this.kyotenLastScope = null;
         
         this.princessCurrentScope = null;
+
+        // 所領分配のリセット
+        this.allotFiefSelectedIds = null;
+        this.allotFiefSavedState = false;
     }
 
     // --- ソート状態の一元管理 ---
@@ -138,6 +142,7 @@ class UIInfoManager {
         else if (info.pageType === 'castle_detail') this._renderCastleDetail(...info.args, info.scrollPos);
         else if (info.pageType === 'force_selector') this._renderForceSelector(...info.args, info.scrollPos);
         else if (info.pageType === 'appoint_legion_castle') this._renderAppointLegionCastle(...info.args, info.scrollPos);
+        else if (info.pageType === 'allot_fief') this._renderAllotFief(...info.args, info.scrollPos);
     }
     
     showDaimyoList() {
@@ -4104,7 +4109,7 @@ class UIInfoManager {
             }
         });
     }
-
+    
     selectAppointLegionCastle(bushoId, legionNo, castleId, element) {
         const items = document.querySelectorAll('.delegate-list-item');
         items.forEach(item => item.classList.remove('selected'));
@@ -4117,6 +4122,150 @@ class UIInfoManager {
             confirmBtn.disabled = false;
             confirmBtn.style.opacity = '1';
             confirmBtn.style.cursor = 'pointer';
+        }
+    }
+
+    // ==========================================
+    // ★所領分配の魔法
+    // ==========================================
+    showAllotFiefModal(legionNo) {
+        this.closeCommonModal();
+        this.allotFiefSelectedIds = null;
+        this.allotFiefSavedState = false;
+        this.pushModal('allot_fief', [legionNo]);
+    }
+
+    _renderAllotFief(legionNo, scrollPos = 0) {
+        const daimyo = this.game.bushos.find(b => b.clan === this.game.playerClanId && b.isDaimyo);
+        const daimyoCastleId = daimyo ? daimyo.castleId : -1;
+        const commanderCastleIds = this.game.bushos
+            .filter(b => b.clan === this.game.playerClanId && b.isCommander)
+            .map(b => b.castleId);
+
+        let targetLegionId = 0;
+        let legionName = "直轄軍";
+        if (legionNo > 0) {
+            const legion = this.game.legions.find(l => Number(l.clanId) === Number(this.game.playerClanId) && Number(l.legionNo) === legionNo);
+            targetLegionId = legion ? legion.id : -1;
+            const numberNames = ["直轄", "一席", "二席", "三席", "四席", "五席", "六席", "七席"];
+            legionName = `第${numberNames[legionNo]}席`;
+        }
+
+        const myCastles = this.game.castles.filter(c => {
+            if (Number(c.ownerClan) !== Number(this.game.playerClanId)) return false;
+            if (Number(c.id) === Number(daimyoCastleId)) return false;
+            if (commanderCastleIds.includes(Number(c.id))) return false;
+            return true;
+        });
+
+        // 初回表示時のみ初期化
+        if (!this.allotFiefSavedState) {
+            if (!this.allotFiefSelectedIds) this.allotFiefSelectedIds = [];
+            myCastles.forEach(c => {
+                if (Number(c.legionId) === Number(targetLegionId)) {
+                    if (!this.allotFiefSelectedIds.includes(c.id)) {
+                        this.allotFiefSelectedIds.push(c.id);
+                    }
+                }
+            });
+            this.allotFiefSavedState = true;
+        }
+
+        // ソート：チェックが入っているものを一番上にする
+        myCastles.sort((a, b) => {
+            const aSelected = this.allotFiefSelectedIds.includes(a.id) ? 1 : 0;
+            const bSelected = this.allotFiefSelectedIds.includes(b.id) ? 1 : 0;
+            if (aSelected !== bSelected) return bSelected - aSelected;
+            return a.id - b.id;
+        });
+
+        let items = [];
+        myCastles.forEach(c => {
+            const isChecked = this.allotFiefSelectedIds.includes(c.id);
+            const inputHtml = `<input type="checkbox" name="sel_allot_fief" value="${c.id}" ${isChecked ? 'checked' : ''} style="display:none;">`;
+
+            let currentLegionStr = "直轄";
+            if (c.legionId > 0 && this.game.legions) {
+                const l = this.game.legions.find(lg => Number(lg.id) === Number(c.legionId));
+                if (l) {
+                    const numberNames = ["直轄", "一席", "二席", "三席", "四席", "五席", "六席", "七席"];
+                    currentLegionStr = `第${numberNames[l.legionNo]}席`;
+                }
+            }
+
+            items.push({
+                onClick: `window.GameApp.ui.info.handleAllotFiefSelect(event, ${c.id})`,
+                cells: [
+                    `<span class="col-act" style="text-align:center;">${inputHtml}${isChecked ? '<span style="color:#fdea60; font-weight:bold;">◯</span>' : '<span style="color:#666;">-</span>'}</span>`,
+                    `<span class="col-castle-name" style="justify-content:flex-start; padding-left:5px;">${c.name}</span>`,
+                    `<span class="col-soldiers">${c.soldiers}</span>`,
+                    `<span class="col-defense">${c.defense}</span>`,
+                    `<span>${currentLegionStr}</span>`
+                ],
+                itemClass: isChecked ? "selected" : ""
+            });
+        });
+
+        this._renderListModal({
+            title: `${legionName}の所領分配`,
+            contextHtml: `<div>${legionName}の所属とする拠点にチェックを入れてください</div>`,
+            headers: ["所属", "拠点名", "兵数", "城壁", "現在の所属"],
+            headerClass: "delegate-list-header",
+            itemClass: "delegate-list-item",
+            listClass: "delegate-list-container",
+            items: items,
+            scrollPos: scrollPos,
+            gridTemplateSp: "40px 2fr 1fr 1fr 1.5fr",
+            gridTemplatePc: "60px 200px 100px 100px 150px",
+            onBack: () => {
+                this.allotFiefSelectedIds = null;
+                this.allotFiefSavedState = false;
+                this.closeCommonModal();
+            },
+            onConfirm: () => {
+                const inputs = document.querySelectorAll('input[name="sel_allot_fief"]:checked');
+                const selectedIds = Array.from(inputs).map(i => parseInt(i.value));
+                
+                this.closeCommonModal();
+                this.allotFiefSelectedIds = null;
+                this.allotFiefSavedState = false;
+                window.GameApp.commandSystem.executeAllotFief(legionNo, targetLegionId, selectedIds, myCastles);
+            }
+        });
+        
+        this._updateAllotFiefUI();
+    }
+
+    handleAllotFiefSelect(e, castleId) {
+        let div = e.currentTarget;
+        let input = e.target.tagName === 'INPUT' ? e.target : div.querySelector('input');
+        if (!input) return;
+
+        if (e.target.tagName !== 'INPUT') {
+             input.checked = !input.checked; 
+        }
+        
+        if (input.checked) {
+            div.classList.add('selected');
+            if (!this.allotFiefSelectedIds.includes(castleId)) this.allotFiefSelectedIds.push(castleId);
+            const actCol = div.querySelector('.col-act');
+            if(actCol) actCol.innerHTML = `${input.outerHTML}<span style="color:#fdea60; font-weight:bold;">◯</span>`;
+        } else {
+            div.classList.remove('selected');
+            this.allotFiefSelectedIds = this.allotFiefSelectedIds.filter(id => id !== castleId);
+            const actCol = div.querySelector('.col-act');
+            if(actCol) actCol.innerHTML = `${input.outerHTML}<span style="color:#666;">-</span>`;
+        }
+        
+        if (window.AudioManager) window.AudioManager.playSE('choice.ogg');
+        this._updateAllotFiefUI();
+    }
+
+    _updateAllotFiefUI() {
+        const confirmBtn = document.getElementById('selector-confirm-btn');
+        if (confirmBtn) {
+            confirmBtn.disabled = false;
+            confirmBtn.style.opacity = 1.0;
         }
     }
 }

@@ -940,9 +940,13 @@ class UIManager {
         }
     }
 
-    // 個別の「直轄・委任・詳細設定」画面を出す魔法
+    // 個別の「直轄・委任・詳細設定」画面を出す魔法/
     showDelegateSettingModal(castleId, onBack) {
         this.info.showDelegateSettingModal(castleId, onBack);
+    }
+
+    showAllotFiefModal(legionNo) {
+        this.info.showAllotFiefModal(legionNo);
     }
     
     showDiplomacyList(clanId, clanName) {

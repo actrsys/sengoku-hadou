@@ -401,7 +401,7 @@ const COMMAND_SPECS = {
     'appoint_legion_leader_6': { label: "第六席", category: 'LEGION', isSystem: true, action: 'appoint_legion_leader_6', canExecute: (game, castle) => CAN_EXECUTE_RULES.canManageLegion(game, 6) },
     'appoint_legion_leader_7': { label: "第七席", category: 'LEGION', isSystem: true, action: 'appoint_legion_leader_7', canExecute: (game, castle) => CAN_EXECUTE_RULES.canManageLegion(game, 7) },
     
-    'allot_fief_0': { label: "直轄軍", category: 'LEGION', isSystem: true, action: 'allot_fief_0', canExecute: (game, castle) => CAN_EXECUTE_RULES.canAllotFief(game, 0) },
+    'allot_fief_0': { label: "直轄", category: 'LEGION', isSystem: true, action: 'allot_fief_0', canExecute: (game, castle) => CAN_EXECUTE_RULES.canAllotFief(game, 0) },
     'allot_fief_1': { label: "第一席", category: 'LEGION', isSystem: true, action: 'allot_fief_1', canExecute: (game, castle) => CAN_EXECUTE_RULES.canAllotFief(game, 1) },
     'allot_fief_2': { label: "第二席", category: 'LEGION', isSystem: true, action: 'allot_fief_2', canExecute: (game, castle) => CAN_EXECUTE_RULES.canAllotFief(game, 2) },
     'allot_fief_3': { label: "第三席", category: 'LEGION', isSystem: true, action: 'allot_fief_3', canExecute: (game, castle) => CAN_EXECUTE_RULES.canAllotFief(game, 3) },
@@ -3307,9 +3307,36 @@ class CommandSystem {
     applyMarriageData(princessId, targetBushoId, targetClanId) {
         this.game.diplomacyManager.applyMarriageData(princessId, targetBushoId, targetClanId);
     }
-
+    
     executeSuccession(newDaimyoId) {
         // ★家督相続の難しい処理は、専門の life_system.js にお任せして魔法を呼び出します！
         this.game.lifeSystem.executeSuccessionCommand(newDaimyoId);
+    }
+
+    // ★追加：所領分配の実行
+    executeAllotFief(legionNo, targetLegionId, selectedCastleIds, candidateCastles) {
+        let count = 0;
+        
+        candidateCastles.forEach(c => {
+            if (selectedCastleIds.includes(c.id)) {
+                if (Number(c.legionId) !== Number(targetLegionId)) {
+                    c.legionId = targetLegionId;
+                    count++;
+                }
+            } else {
+                if (Number(c.legionId) === Number(targetLegionId)) {
+                    // 直轄に戻す
+                    c.legionId = 0;
+                    count++;
+                }
+            }
+        });
+
+        const numberNames = ["直轄", "一席", "二席", "三席", "四席", "五席", "六席", "七席"];
+        const legionName = legionNo === 0 ? "直轄軍" : `第${numberNames[legionNo]}席`;
+        
+        this.game.ui.showResultModal(`${legionName}の所領分配を完了しました。\n${count}件の拠点の所属が変更されました。`);
+        this.game.ui.updatePanelHeader();
+        this.game.ui.renderCommandMenu();
     }
 }
