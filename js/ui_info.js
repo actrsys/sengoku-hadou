@@ -4084,7 +4084,7 @@ class UIInfoManager {
         this._renderListModal({
             title: "任せる拠点を選択してください",
             contextHtml: "<div>任せる拠点を選択してください</div>",
-            headers: ["拠点名", "兵数", "城壁"],
+            headers: ["拠点名", "兵数", "防御"],
             headerClass: "delegate-list-header",
             itemClass: "delegate-list-item",
             listClass: "delegate-list-container",
@@ -4224,7 +4224,7 @@ class UIInfoManager {
         this._renderListModal({
             title: `${legionName}の所領分配`,
             contextHtml: `<div>${legionName}の所属とする拠点にチェックを入れてください</div>`,
-            headers: ["所属", "拠点名", "城主", "兵数", "城壁"],
+            headers: ["所属", "拠点名", "城主", "兵数", "防御"],
             headerClass: "delegate-list-header",
             itemClass: "delegate-list-item",
             listClass: "delegate-list-container",
