@@ -447,9 +447,9 @@ class Busho {
         if (this.isDaimyo) return "大名";
         if (this.isGunshi) return "軍師";
         
-        // 司令官のシールを持っているか、軍団の名簿に載っているか、両方チェックします！
+        // 国主のシールを持っているか、軍団の名簿に載っているか、両方チェックします！
         const isLegionCommander = this.isCommander || (window.GameApp && window.GameApp.legions && window.GameApp.legions.some(l => l.commanderId === this.id));
-        if (this.status === 'active' && isLegionCommander) return "司令官";
+        if (this.status === 'active' && isLegionCommander) return "国主";
         
         if (this.isCastellan) return "城主";
         if (this.belongKunishuId > 0 && this.id === (window.GameApp ? window.GameApp.kunishuSystem.getKunishu(this.belongKunishuId)?.leaderId : 0)) return "頭領";
@@ -708,7 +708,7 @@ class Legion {
         // ★ここを修正：CSVの一番右端の項目は、見えない「改行マーク」がくっついて迷子になりやすいです！
         // なので、色々なパターンの名前で探しに行って、確実に出席番号を見つけ出します。
         const foundCommanderId = data.commanderId || data['commanderId\r'] || data['commanderId\n'] || this.commanderId || 0;
-        // 司令官を任されている武将の出席番号
+        // 国主を任されている武将の出席番号
         this.commanderId = Number(foundCommanderId);
     }
 }
