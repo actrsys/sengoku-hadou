@@ -378,7 +378,6 @@ const COMMAND_SPECS = {
         isSystem: true, action: 'delegate_list',
         canExecute: (game, castle) => CAN_EXECUTE_RULES.hasDelegatableCastle(game)
     },
-    'appoint_legion_leader_1': { label: "第一軍団", category: 'LEGION', isSystem: true, action: 'appoint_legion_leader_1', canExecute: (game, castle) => CAN_EXECUTE_RULES.canManageLegion(game, 1) },
     'appoint_legion_leader_2': { label: "第二軍団", category: 'LEGION', isSystem: true, action: 'appoint_legion_leader_2', canExecute: (game, castle) => CAN_EXECUTE_RULES.canManageLegion(game, 2) },
     'appoint_legion_leader_3': { label: "第三軍団", category: 'LEGION', isSystem: true, action: 'appoint_legion_leader_3', canExecute: (game, castle) => CAN_EXECUTE_RULES.canManageLegion(game, 3) },
     'appoint_legion_leader_4': { label: "第四軍団", category: 'LEGION', isSystem: true, action: 'appoint_legion_leader_4', canExecute: (game, castle) => CAN_EXECUTE_RULES.canManageLegion(game, 4) },
@@ -1255,7 +1254,6 @@ class CommandSystem {
             case 'princess_list': this.game.ui.showPrincessList(); break;
             case 'kyoten_list': this.game.ui.showKyotenList(); break;
             case 'delegate_list': this.game.ui.showDelegateListModal(); break;
-            case 'appoint_legion_leader_1': this.game.ui.showAppointLegionLeaderModal(1); break;
             case 'appoint_legion_leader_2': this.game.ui.showAppointLegionLeaderModal(2); break;
             case 'appoint_legion_leader_3': this.game.ui.showAppointLegionLeaderModal(3); break;
             case 'appoint_legion_leader_4': this.game.ui.showAppointLegionLeaderModal(4); break;
