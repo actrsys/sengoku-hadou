@@ -39,7 +39,7 @@ const COMMAND_MENU_STRUCTURE = [
         commands: ['appoint_gunshi', 'appoint', 'delegate'],
         subMenus: [
             {
-                label: "軍団新設",
+                label: "国主任命",
                 commands: [
                     'appoint_legion_leader_1', 'appoint_legion_leader_2', 'appoint_legion_leader_3', 'appoint_legion_leader_4',
                     'appoint_legion_leader_5', 'appoint_legion_leader_6', 'appoint_legion_leader_7'
@@ -96,7 +96,7 @@ const CAN_EXECUTE_RULES = {
         }
         return legionNumber <= myCastles.length;
     },
-    // ★追加：所領分配用の判定ルール（軍団が存在する時だけ押せるようにします）
+    // ★追加：所領分配用の判定ルール（国主が存在する時だけ押せるようにします）
     canAllotFief: (game, legionNumber) => {
         const myCastles = game.castles.filter(c => Number(c.ownerClan) === Number(game.playerClanId));
         if (myCastles.length <= 1) return false;
