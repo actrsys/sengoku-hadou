@@ -1790,10 +1790,8 @@ Object.assign(UIManager.prototype, {
     // ==========================================
     playCaptureEffect(castleIdOrIds, onHalfway) {
         return new Promise(resolve => {
-            // アニメーション中に画面を触れないようにバリアを張ります（共通の魔法を使います）
             this.showMapGuard();
 
-            // エフェクトを描くための「専用の透明な画用紙」を用意します
             let overlay = document.getElementById('capture-effect-overlay');
             if (!overlay) {
                 overlay = document.createElement('canvas');
@@ -1816,8 +1814,6 @@ Object.assign(UIManager.prototype, {
             const edgePixels = new Uint8Array(width * height);
             
             if (this.pixelCastleMap) {
-                // ★修正：１つの城でも、複数の城でも同時に光るようにリストにします！
-                // 計算を劇的に軽くするために Set（集合）の魔法を使います！
                 const targetIdsArray = Array.isArray(castleIdOrIds) ? castleIdOrIds : [castleIdOrIds];
                 const targetIdsSet = new Set(targetIdsArray);
 
@@ -1838,6 +1834,25 @@ Object.assign(UIManager.prototype, {
                     }
                 }
             }
+
+            // ★ここから新しい魔法：最初に1枚だけ「光るスタンプ」を作っておきます！
+            const tempCanvas = document.createElement('canvas');
+            tempCanvas.width = width;
+            tempCanvas.height = height;
+            const tempCtx = tempCanvas.getContext('2d');
+            const baseImgData = tempCtx.createImageData(width, height);
+            
+            for (let i = 0; i < targetPixels.length; i++) {
+                if (targetPixels[i] === 1) {
+                    const idx = i * 4;
+                    baseImgData.data[idx] = 255;
+                    baseImgData.data[idx+1] = 255;
+                    baseImgData.data[idx+2] = 255;
+                    baseImgData.data[idx+3] = 255; // 完全に不透明な白で作ります
+                }
+            }
+            tempCtx.putImageData(baseImgData, 0, 0);
+            // ★新しい魔法ここまで！
             
             let startTime = performance.now();
             const durationRise = 800;
@@ -1851,19 +1866,10 @@ Object.assign(UIManager.prototype, {
 
                 if (elapsed < durationRise) {
                     const progress = elapsed / durationRise;
-                    const riseY = progress * 40;
-                    const alpha = 1.0 - progress;
-                    const imgData = ctx.createImageData(width, height);
-                    for (let i = 0; i < targetPixels.length; i++) {
-                        if (targetPixels[i] === 1) {
-                            const idx = i * 4;
-                            imgData.data[idx] = 255;
-                            imgData.data[idx+1] = 255;
-                            imgData.data[idx+2] = 255;
-                            imgData.data[idx+3] = Math.floor(255 * (progress * 0.9));
-                        }
-                    }
-                    ctx.putImageData(imgData, 0, 0);
+                    // ★毎フレーム絵の具を作るのをやめて、スタンプを半透明にして押します！
+                    ctx.globalAlpha = progress * 0.9;
+                    ctx.drawImage(tempCanvas, 0, 0);
+                    ctx.globalAlpha = 1.0; // 忘れずに元に戻します
                 } else if (elapsed < totalDuration) {
                     if (!halfwayDone) {
                         halfwayDone = true;
@@ -1871,24 +1877,17 @@ Object.assign(UIManager.prototype, {
                     }
                     const progress = (elapsed - durationRise) / durationFlash;
                     const alpha = 1.0 - progress;
-                    const imgData = ctx.createImageData(width, height);
-                    for (let i = 0; i < targetPixels.length; i++) {
-                        if (targetPixels[i] === 1) {
-                            const idx = i * 4;
-                            imgData.data[idx] = 255;
-                            imgData.data[idx+1] = 255;
-                            imgData.data[idx+2] = 255;
-                            imgData.data[idx+3] = Math.floor(255 * alpha);
-                        }
-                    }
-                    ctx.putImageData(imgData, 0, 0);
+                    // ★ここもスタンプを押すだけです！
+                    ctx.globalAlpha = alpha;
+                    ctx.drawImage(tempCanvas, 0, 0);
+                    ctx.globalAlpha = 1.0;
                 }
 
                 if (elapsed < totalDuration) {
                     requestAnimationFrame(animate);
                 } else {
                     ctx.clearRect(0, 0, width, height);
-                    this.hideMapGuard(); // 終わったらバリアを消します
+                    this.hideMapGuard();
                     resolve();
                 }
             };
