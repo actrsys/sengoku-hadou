@@ -185,6 +185,33 @@ window.playProvinceMapEffect = async function(game, eventType, initialMsg, affec
 };
 
 // ==========================================
+// ★ ゲーム開始時：特定武将の寿命延長
+// ==========================================
+window.GameEvents.push({
+    id: "common_life_extension",
+    timing: "game_start",            // ゲーム開始直後のタイミング
+    isOneTime: true,                 // 1回だけ実行します
+    
+    checkCondition: function(game) {
+        // ゲーム開始時に必ず実行するので、無条件で true を返します
+        return true;
+    },
+    
+    execute: async function(game) {
+        // 対象となる武将のIDリスト（今川義元、足利義輝、三好長慶）
+        const targetIds = [1004001, 1017001, 1020001];
+        
+        for (const id of targetIds) {
+            const busho = game.getBusho(id);
+            // 武将が見つかったら、寿命（没年）を5年延ばします
+            if (busho) {
+                busho.endYear += 10;
+            }
+        }
+    }
+});
+
+// ==========================================
 // ★ 民忠低下イベント（月初の収入処理が終わった後に実行！）
 // ==========================================
 window.GameEvents.push({

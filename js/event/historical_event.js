@@ -7,57 +7,6 @@
 window.GameEvents = window.GameEvents || [];
 
 // ==========================================
-// ★ 歴史イベントのひな形（器）
-// ==========================================
-window.GameEvents.push({
-    id: "historical_event_template", // イベントの固有の名前です（他と被らないようにします）
-    timing: "startMonth_before",     // イベントが起きるタイミングです（月初の処理前など）
-    isOneTime: true,                 // 歴史イベントなので、一度発生したら二度と起きないように true にします
-    
-    checkCondition: function(game) {
-        // ここにイベントが起きる条件（特定の年や月、大名が生きているかなど）を書きます
-        // 例: 1560年の5月になったら起きる場合
-        // if (game.year === 1560 && game.month === 5) return true;
-        
-        return false; // ひな形なので、今は勝手に発生しないように false にして蓋をしておきます
-    },
-    
-    execute: async function(game) {
-        // 条件を満たした時に、実際に起こる出来事（セリフや同盟の成立など）をここに書きます
-        
-        // （例）メッセージを出す場合
-        // await game.ui.showDialogAsync("歴史が動きました。", false, 0);
-    }
-});
-
-// ==========================================
-// ★ ゲーム開始時：特定武将の寿命延長（裏イベント）
-// ==========================================
-window.GameEvents.push({
-    id: "historical_life_extension",
-    timing: "game_start",            // ゲーム開始直後のタイミング
-    isOneTime: true,                 // 1回だけ実行します
-    
-    checkCondition: function(game) {
-        // ゲーム開始時に必ず実行するので、無条件で true を返します
-        return true;
-    },
-    
-    execute: async function(game) {
-        // 対象となる武将のIDリスト（今川義元、足利義輝、三好長慶）
-        const targetIds = [1004001, 1017001, 1020001];
-        
-        for (const id of targetIds) {
-            const busho = game.getBusho(id);
-            // 武将が見つかったら、寿命（没年）を5年延ばします
-            if (busho) {
-                busho.endYear += 5;
-            }
-        }
-    }
-});
-
-// ==========================================
 // ★ 桶壊間の戦い（予備）：松平元康 岡崎城主就任（裏イベント）
 // ==========================================
 window.GameEvents.push({
@@ -1005,36 +954,6 @@ window.GameEvents.push({
 });
 
 // ==========================================
-// ★ 三好義興の死による長慶の寿命減少（裏イベント）
-// ==========================================
-window.GameEvents.push({
-    id: "historical_yoshioki_death",
-    timing: "startMonth_before", // 毎月の初めにこっそりチェックします
-    isOneTime: true,             // 一度発生したら二度と起きません
-    
-    checkCondition: function(game) {
-        // 1. 三好長慶（ID: 1020001）が生きているか確認します
-        const nagayoshi = game.getBusho(1020001);
-        if (!nagayoshi || nagayoshi.status === 'dead' || nagayoshi.status === 'unborn') return false;
-
-        // 2. 三好義興（ID: 1020009）が亡くなっているか確認します
-        const yoshioki = game.getBusho(1020009);
-        if (!yoshioki || yoshioki.status !== 'dead') return false;
-
-        // 条件をクリアしたらイベント発生の合図を出します
-        return true;
-    },
-    
-    execute: async function(game) {
-        const nagayoshi = game.getBusho(1020001);
-        if (nagayoshi) {
-            // 長慶の寿命（没年）を3年減らします
-            nagayoshi.endYear -= 3;
-        }
-    }
-});
-
-// ==========================================
 // ★ 安宅冬康の死による長慶の寿命減少（裏イベント）
 // ==========================================
 window.GameEvents.push({
@@ -1060,6 +979,36 @@ window.GameEvents.push({
         if (nagayoshi) {
             // 長慶の寿命（没年）を3年減らします
             nagayoshi.endYear -= 3;
+        }
+    }
+});
+
+// ==========================================
+// ★ 三好義興の死による長慶の寿命減少（裏イベント）
+// ==========================================
+window.GameEvents.push({
+    id: "historical_yoshioki_death",
+    timing: "startMonth_before", // 毎月の初めにこっそりチェックします
+    isOneTime: true,             // 一度発生したら二度と起きません
+    
+    checkCondition: function(game) {
+        // 1. 三好長慶（ID: 1020001）が生きているか確認します
+        const nagayoshi = game.getBusho(1020001);
+        if (!nagayoshi || nagayoshi.status === 'dead' || nagayoshi.status === 'unborn') return false;
+
+        // 2. 三好義興（ID: 1020009）が亡くなっているか確認します
+        const yoshioki = game.getBusho(1020009);
+        if (!yoshioki || yoshioki.status !== 'dead') return false;
+
+        // 条件をクリアしたらイベント発生の合図を出します
+        return true;
+    },
+    
+    execute: async function(game) {
+        const nagayoshi = game.getBusho(1020001);
+        if (nagayoshi) {
+            // 長慶の寿命（没年）を5年減らします
+            nagayoshi.endYear -= 5;
         }
     }
 });
