@@ -445,7 +445,7 @@ class Busho {
         }
         if (this.isDaimyo) return "大名";
         if (this.isGunshi) return "軍師";
-        if (window.GameApp && window.GameApp.legions && window.GameApp.legions.some(l => l.commanderId === this.id)) return "司令官";
+        if (this.status === 'active' && window.GameApp && window.GameApp.legions && window.GameApp.legions.some(l => l.commanderId === this.id)) return "司令官";
         if (this.isCastellan) return "城主";
         if (this.belongKunishuId > 0 && this.id === (window.GameApp ? window.GameApp.kunishuSystem.getKunishu(this.belongKunishuId)?.leaderId : 0)) return "頭領";
         if (this.belongKunishuId > 0) return "諸勢力";
