@@ -30,6 +30,8 @@ Object.assign(WarManager.prototype, {
         
         // 3. 相手が援軍を承諾してくれた時のメッセージ
         showAcceptance: (game, nameStr, isKunishu, isDelegated, isEnemy, onComplete, isPlayerRequest = true) => {
+            const skipAnim = window.GameConfig && window.GameConfig.aiWarNotify === false;
+            
             if (isEnemy) {
                 game.ui.showDialog(`${nameStr}が敵の援軍として参戦しました！`, false, onComplete);
                 return;
@@ -39,7 +41,11 @@ Object.assign(WarManager.prototype, {
                 game.ui.showDialog(`${nameStr}が友軍として参戦しました！`, false, onComplete);
             } else {
                 if (isKunishu || !isPlayerRequest) {
-                    game.ui.showDialog(`${nameStr}が守備側の援軍として参戦しました！`, false, onComplete);
+                    if (skipAnim) {
+                        if (onComplete) onComplete();
+                    } else {
+                        game.ui.showDialog(`${nameStr}が守備側の援軍として参戦しました！`, false, onComplete);
+                    }
                 } else {
                     game.ui.showDialog(`${nameStr}が援軍要請を承諾しました！`, false, onComplete);
                 }
@@ -381,6 +387,10 @@ Object.assign(WarManager.prototype, {
                     hc.guns = Math.min(99999, (hc.guns || 0) + (selfReinforcementData.guns || 0));
                     selfReinforcementData.bushos.forEach(b => b.isActionDone = false);
                     selfReinforcementData = null; 
+                } else {
+                    // ★追加：プレイヤーが参戦することになったので、透明化の魔法を解除して文字が見えるようにします！
+                    const forceHideStyle = document.getElementById('force-hide-ai-text');
+                    if (forceHideStyle) forceHideStyle.remove();
                 }
             }
 
@@ -734,8 +744,11 @@ Object.assign(WarManager.prototype, {
                                 }
                                 
                                 this.game.ui.log(interceptMsg.replace('\n', ''));
+                                const skipAnim = window.GameConfig && window.GameConfig.aiWarNotify === false;
                                 if (!isPlayerInvolved) {
-                                    await this.game.ui.showDialogAsync(interceptMsg);
+                                    if (!skipAnim) {
+                                        await this.game.ui.showDialogAsync(interceptMsg);
+                                    }
                                 } else {
                                     await this.game.ui.showCutin(interceptMsg);
                                 }
@@ -785,8 +798,11 @@ Object.assign(WarManager.prototype, {
                 }
                 
                 this.game.ui.log(siegeMsg.replace('\n', ''));
+                const skipAnim = window.GameConfig && window.GameConfig.aiWarNotify === false;
                 if (!isPlayerInvolved) {
-                    await this.game.ui.showDialogAsync(siegeMsg);
+                    if (!skipAnim) {
+                        await this.game.ui.showDialogAsync(siegeMsg);
+                    }
                 } else {
                     await this.game.ui.showCutin(siegeMsg);
                 }
@@ -2721,9 +2737,14 @@ Object.assign(WarManager.prototype, {
                 });
             } else {
                 this.game.ui.log(`【応援軍】<span class="${colorClass}">${helperCastle.name}の${leaderName}</span>が守備側の援軍として参戦しました。`);
-                this.game.ui.showDialog(`${helperCastle.name}の${leaderName}が守備側の援軍として参戦しました！`, false, () => {
+                const skipAnim = window.GameConfig && window.GameConfig.aiWarNotify === false;
+                if (skipAnim) {
                     onComplete(selfReinfData);
-                });
+                } else {
+                    this.game.ui.showDialog(`${helperCastle.name}の${leaderName}が守備側の援軍として参戦しました！`, false, () => {
+                        onComplete(selfReinfData);
+                    });
+                }
             }
         };
 
@@ -2744,6 +2765,10 @@ Object.assign(WarManager.prototype, {
         const reinfBushos = selectedIds.map(id => this.game.getBusho(id));
         this.game.ui.openQuantitySelector('def_self_reinf_supplies', [helperCastle], null, {
             onConfirm: (inputs) => {
+                // ★追加：プレイヤーが参戦することになったので、透明化の魔法を解除して文字が見えるようにします！
+                const forceHideStyle = document.getElementById('force-hide-ai-text');
+                if (forceHideStyle) forceHideStyle.remove();
+
                 const i = inputs[helperCastle.id] || inputs;
                 const rS = i.soldiers ? parseInt(i.soldiers.num.value) : 500;
                 const rR = i.rice ? parseInt(i.rice.num.value) : 500;
@@ -3018,6 +3043,10 @@ Object.assign(WarManager.prototype, {
 
     _applyManualDefReinforcement(helperCastle, defCastle, myToHelperRel, reinfBushos, reinfSoldiers, reinfRice, reinfHorses, reinfGuns, onComplete) {
         const helperClanId = helperCastle.ownerClan;
+
+        // ★追加：プレイヤーが参戦することになったので、透明化の魔法を解除して文字が見えるようにします！
+        const forceHideStyle = document.getElementById('force-hide-ai-text');
+        if (forceHideStyle) forceHideStyle.remove();
 
         helperCastle.soldiers = Math.max(0, helperCastle.soldiers - reinfSoldiers);
         helperCastle.rice = Math.max(0, helperCastle.rice - reinfRice);
