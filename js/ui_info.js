@@ -4052,7 +4052,17 @@ class UIInfoManager {
     }
 
     _renderAppointLegionCastle(bushoId, legionNo, scrollPos = 0) {
-        const myCastles = this.game.castles.filter(c => Number(c.ownerClan) === Number(this.game.playerClanId));
+        const daimyo = this.game.bushos.find(b => b.clan === this.game.playerClanId && b.isDaimyo);
+        const myCastles = this.game.castles.filter(c => {
+            if (Number(c.ownerClan) !== Number(this.game.playerClanId)) return false;
+            
+            if (daimyo && Number(c.id) === Number(daimyo.castleId)) return false;
+
+            const isCommanderCastle = this.game.bushos.some(b => Number(b.castleId) === Number(c.id) && b.isCommander && b.clan === this.game.playerClanId);
+            if (isCommanderCastle) return false;
+
+            return true;
+        });
         
         let items = [];
         myCastles.forEach(c => {

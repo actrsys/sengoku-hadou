@@ -692,7 +692,8 @@ class CommandSystem {
             bushos = this.game.bushos.filter(b => 
                 b.clan === this.game.playerClanId && 
                 b.status === 'active' && 
-                !b.isDaimyo                          
+                !b.isDaimyo &&
+                !b.isCommander
             );
             infoHtml = "<div>国主に任命する武将を選択してください</div>"; 
             isMulti = false;
