@@ -36,7 +36,16 @@ const COMMAND_MENU_STRUCTURE = [
     },
     {
         label: "軍団",
-        commands: ['appoint_gunshi', 'appoint', 'delegate']
+        commands: ['appoint_gunshi', 'appoint', 'delegate'],
+        subMenus: [
+            {
+                label: "軍団編成",
+                commands: [
+                    'organize_legion_1', 'organize_legion_2', 'organize_legion_3', 'organize_legion_4',
+                    'organize_legion_5', 'organize_legion_6', 'organize_legion_7', 'organize_legion_8'
+                ]
+            }
+        ]
     },
     {
         label: "情報",
@@ -70,6 +79,11 @@ const CAN_EXECUTE_RULES = {
         const daimyo = game.bushos.find(b => b.clan === game.playerClanId && b.isDaimyo);
         if (!daimyo) return false;
         return game.castles.some(c => c.ownerClan === game.playerClanId && c.id !== daimyo.castleId);
+    },
+    canOrganizeLegion: (game, legionNumber) => {
+        const myCastles = game.castles.filter(c => Number(c.ownerClan) === Number(game.playerClanId));
+        if (myCastles.length <= 1) return false;
+        return legionNumber <= myCastles.length;
     },
     hasSuccessor: (game) => {
         const daimyo = game.bushos.find(b => b.clan === game.playerClanId && b.isDaimyo);
@@ -357,7 +371,15 @@ const COMMAND_SPECS = {
         isSystem: true, action: 'delegate_list',
         canExecute: (game, castle) => CAN_EXECUTE_RULES.hasDelegatableCastle(game)
     },
-    
+    'organize_legion_1': { label: "第一軍団", category: 'LEGION', isSystem: true, action: 'organize_legion_1', canExecute: (game, castle) => CAN_EXECUTE_RULES.canOrganizeLegion(game, 1) },
+    'organize_legion_2': { label: "第二軍団", category: 'LEGION', isSystem: true, action: 'organize_legion_2', canExecute: (game, castle) => CAN_EXECUTE_RULES.canOrganizeLegion(game, 2) },
+    'organize_legion_3': { label: "第三軍団", category: 'LEGION', isSystem: true, action: 'organize_legion_3', canExecute: (game, castle) => CAN_EXECUTE_RULES.canOrganizeLegion(game, 3) },
+    'organize_legion_4': { label: "第四軍団", category: 'LEGION', isSystem: true, action: 'organize_legion_4', canExecute: (game, castle) => CAN_EXECUTE_RULES.canOrganizeLegion(game, 4) },
+    'organize_legion_5': { label: "第五軍団", category: 'LEGION', isSystem: true, action: 'organize_legion_5', canExecute: (game, castle) => CAN_EXECUTE_RULES.canOrganizeLegion(game, 5) },
+    'organize_legion_6': { label: "第六軍団", category: 'LEGION', isSystem: true, action: 'organize_legion_6', canExecute: (game, castle) => CAN_EXECUTE_RULES.canOrganizeLegion(game, 6) },
+    'organize_legion_7': { label: "第七軍団", category: 'LEGION', isSystem: true, action: 'organize_legion_7', canExecute: (game, castle) => CAN_EXECUTE_RULES.canOrganizeLegion(game, 7) },
+    'organize_legion_8': { label: "第八軍団", category: 'LEGION', isSystem: true, action: 'organize_legion_8', canExecute: (game, castle) => CAN_EXECUTE_RULES.canOrganizeLegion(game, 8) },
+
     // --- 対外：調略 (FOREIGN_STRATEGY) ---
     'sabotage': { 
         label: "破壊工作", category: 'FOREIGN_STRATEGY', 
@@ -1218,6 +1240,14 @@ class CommandSystem {
             case 'princess_list': this.game.ui.showPrincessList(); break;
             case 'kyoten_list': this.game.ui.showKyotenList(); break;
             case 'delegate_list': this.game.ui.showDelegateListModal(); break;
+            case 'organize_legion_1': this.game.ui.showLegionModal(1); break;
+            case 'organize_legion_2': this.game.ui.showLegionModal(2); break;
+            case 'organize_legion_3': this.game.ui.showLegionModal(3); break;
+            case 'organize_legion_4': this.game.ui.showLegionModal(4); break;
+            case 'organize_legion_5': this.game.ui.showLegionModal(5); break;
+            case 'organize_legion_6': this.game.ui.showLegionModal(6); break;
+            case 'organize_legion_7': this.game.ui.showLegionModal(7); break;
+            case 'organize_legion_8': this.game.ui.showLegionModal(8); break;
             // ★ここを書き足し！：「settings」と呼ばれたら小窓を開きます
             case 'settings': this.game.ui.showSettingsModal(); break;
             // ★ここから下を書き足します！
@@ -1229,7 +1259,6 @@ class CommandSystem {
                     if (appScreen) appScreen.classList.add('hidden');
                 });
                 break;
-            // ★書き足すのはここまで！
         }
     }
 
