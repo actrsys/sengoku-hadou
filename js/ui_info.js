@@ -2322,15 +2322,18 @@ class UIInfoManager {
 
         const getSortRankAll = (b) => {
             const isGunshi = b.isGunshi || (b.clan > 0 && this.game.clans.find(c => c.id === b.clan)?.gunshiId === b.id);
-            if (b.clan === this.game.playerClanId) return b.isDaimyo ? 10000 : (b.isCastellan ? 9000 : (isGunshi ? 8500 : 8000));
-            if (b.clan > 0) return 5000 - b.clan * 10 + (b.isDaimyo ? 3 : (b.isCastellan ? 2 : (isGunshi ? 1.5 : 1)));
+            const isCommander = window.GameApp && window.GameApp.legions && window.GameApp.legions.some(l => l.commanderId === b.id);
+            if (b.clan === this.game.playerClanId) return b.isDaimyo ? 10000 : (isCommander ? 9500 : (b.isCastellan ? 9000 : (isGunshi ? 8500 : 8000)));
+            if (b.clan > 0) return 5000 - b.clan * 10 + (b.isDaimyo ? 4 : (isCommander ? 3.5 : (b.isCastellan ? 3 : (isGunshi ? 2 : 1))));
             if (b.belongKunishuId > 0) return 2000 - b.belongKunishuId * 10 + (b.id === (window.GameApp ? window.GameApp.kunishuSystem.getKunishu(b.belongKunishuId)?.leaderId : 0) ? 2 : 1);
             if (b.status === 'ronin') return 1000;
             return 0;
         };
         const getSortRankClan = (b) => {
             const isGunshi = b.isGunshi || (b.clan > 0 && this.game.clans.find(c => c.id === b.clan)?.gunshiId === b.id);
-            if (b.isDaimyo) return 7;
+            const isCommander = window.GameApp && window.GameApp.legions && window.GameApp.legions.some(l => l.commanderId === b.id);
+            if (b.isDaimyo) return 8;
+            if (isCommander) return 7;
             if (b.isCastellan) return 6;
             if (isGunshi) return 5; 
             if (b.status === 'ronin') return 1;
