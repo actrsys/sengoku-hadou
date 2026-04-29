@@ -42,14 +42,14 @@ const COMMAND_MENU_STRUCTURE = [
                 label: "国主任命",
                 commands: [
                     'appoint_legion_leader_1', 'appoint_legion_leader_2', 'appoint_legion_leader_3', 'appoint_legion_leader_4',
-                    'appoint_legion_leader_5', 'appoint_legion_leader_6', 'appoint_legion_leader_7'
+                    'appoint_legion_leader_5', 'appoint_legion_leader_6', 'appoint_legion_leader_7', 'appoint_legion_leader_8'
                 ]
             },
             {
                 label: "所領分配",
                 commands: [
-                    'allot_fief_0', 'allot_fief_1', 'allot_fief_2', 'allot_fief_3', 'allot_fief_4',
-                    'allot_fief_5', 'allot_fief_6', 'allot_fief_7'
+                    'allot_fief_1', 'allot_fief_2', 'allot_fief_3', 'allot_fief_4',
+                    'allot_fief_5', 'allot_fief_6', 'allot_fief_7', 'allot_fief_8'
                 ]
             }
         ]
@@ -400,8 +400,8 @@ const COMMAND_SPECS = {
     'appoint_legion_leader_5': { label: "第五席", category: 'LEGION', isSystem: true, action: 'appoint_legion_leader_5', canExecute: (game, castle) => CAN_EXECUTE_RULES.canManageLegion(game, 5) },
     'appoint_legion_leader_6': { label: "第六席", category: 'LEGION', isSystem: true, action: 'appoint_legion_leader_6', canExecute: (game, castle) => CAN_EXECUTE_RULES.canManageLegion(game, 6) },
     'appoint_legion_leader_7': { label: "第七席", category: 'LEGION', isSystem: true, action: 'appoint_legion_leader_7', canExecute: (game, castle) => CAN_EXECUTE_RULES.canManageLegion(game, 7) },
+    'appoint_legion_leader_8': { label: "第八席", category: 'LEGION', isSystem: true, action: 'appoint_legion_leader_8', canExecute: (game, castle) => CAN_EXECUTE_RULES.canManageLegion(game, 8) },
     
-    'allot_fief_0': { label: "直轄", category: 'LEGION', isSystem: true, action: 'allot_fief_0', canExecute: (game, castle) => CAN_EXECUTE_RULES.canAllotFief(game, 0) },
     'allot_fief_1': { label: "第一席", category: 'LEGION', isSystem: true, action: 'allot_fief_1', canExecute: (game, castle) => CAN_EXECUTE_RULES.canAllotFief(game, 1) },
     'allot_fief_2': { label: "第二席", category: 'LEGION', isSystem: true, action: 'allot_fief_2', canExecute: (game, castle) => CAN_EXECUTE_RULES.canAllotFief(game, 2) },
     'allot_fief_3': { label: "第三席", category: 'LEGION', isSystem: true, action: 'allot_fief_3', canExecute: (game, castle) => CAN_EXECUTE_RULES.canAllotFief(game, 3) },
@@ -409,6 +409,7 @@ const COMMAND_SPECS = {
     'allot_fief_5': { label: "第五席", category: 'LEGION', isSystem: true, action: 'allot_fief_5', canExecute: (game, castle) => CAN_EXECUTE_RULES.canAllotFief(game, 5) },
     'allot_fief_6': { label: "第六席", category: 'LEGION', isSystem: true, action: 'allot_fief_6', canExecute: (game, castle) => CAN_EXECUTE_RULES.canAllotFief(game, 6) },
     'allot_fief_7': { label: "第七席", category: 'LEGION', isSystem: true, action: 'allot_fief_7', canExecute: (game, castle) => CAN_EXECUTE_RULES.canAllotFief(game, 7) },
+    'allot_fief_8': { label: "第八席", category: 'LEGION', isSystem: true, action: 'allot_fief_8', canExecute: (game, castle) => CAN_EXECUTE_RULES.canAllotFief(game, 8) },
 
     // --- 対外：調略 (FOREIGN_STRATEGY) ---
     'sabotage': { 
@@ -1287,7 +1288,7 @@ class CommandSystem {
             case 'appoint_legion_leader_5': this.game.ui.showAppointLegionLeaderModal(5); break;
             case 'appoint_legion_leader_6': this.game.ui.showAppointLegionLeaderModal(6); break;
             case 'appoint_legion_leader_7': this.game.ui.showAppointLegionLeaderModal(7); break;
-            case 'allot_fief_0': this.game.ui.showAllotFiefModal(0); break;
+            case 'appoint_legion_leader_8': this.game.ui.showAppointLegionLeaderModal(8); break;
             case 'allot_fief_1': this.game.ui.showAllotFiefModal(1); break;
             case 'allot_fief_2': this.game.ui.showAllotFiefModal(2); break;
             case 'allot_fief_3': this.game.ui.showAllotFiefModal(3); break;
@@ -1295,6 +1296,7 @@ class CommandSystem {
             case 'allot_fief_5': this.game.ui.showAllotFiefModal(5); break;
             case 'allot_fief_6': this.game.ui.showAllotFiefModal(6); break;
             case 'allot_fief_7': this.game.ui.showAllotFiefModal(7); break;
+            case 'allot_fief_8': this.game.ui.showAllotFiefModal(8); break;
             // ★ここを書き足し！：「settings」と呼ばれたら小窓を開きます
             case 'settings': this.game.ui.showSettingsModal(); break;
             // ★ここから下を書き足します！
@@ -2223,7 +2225,7 @@ class CommandSystem {
 
         castle.legionId = legion.id;
 
-        const numberNames = ["直轄", "一席", "二席", "三席", "四席", "五席", "六席", "七席"];
+        const numberNames = ["直轄", "一席", "二席", "三席", "四席", "五席", "六席", "七席", "八席"];
         const legionName = numberNames[legionNo] || `第${legionNo}席`;
         
         let displayMessage = "";
@@ -3332,7 +3334,7 @@ class CommandSystem {
             }
         });
 
-        const numberNames = ["直轄", "一席", "二席", "三席", "四席", "五席", "六席", "七席"];
+        const numberNames = ["直轄", "一席", "二席", "三席", "四席", "五席", "六席", "七席", "八席"];
         const legionName = legionNo === 0 ? "直轄軍" : `第${numberNames[legionNo]}席`;
         
         this.game.ui.showResultModal(`${legionName}の所領分配を完了しました。\n${count}件の拠点の所属が変更されました。`);
