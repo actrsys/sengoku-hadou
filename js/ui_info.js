@@ -4136,11 +4136,16 @@ class UIInfoManager {
     }
 
     _renderAllotFief(legionNo, scrollPos = 0) {
-        const daimyo = this.game.bushos.find(b => b.clan === this.game.playerClanId && b.isDaimyo);
-        const daimyoCastleId = daimyo ? daimyo.castleId : -1;
-        const commanderCastleIds = this.game.bushos
-            .filter(b => b.clan === this.game.playerClanId && b.isCommander)
-            .map(b => Number(b.castleId));
+        const daimyo = this.game.bushos.find(b => Number(b.clan) === Number(this.game.playerClanId) && b.isDaimyo);
+        const daimyoCastleId = daimyo ? Number(daimyo.castleId) : -1;
+        
+        const commanderCastleIds = this.game.legions
+            .filter(l => Number(l.clanId) === Number(this.game.playerClanId))
+            .map(l => {
+                const leader = this.game.bushos.find(b => Number(b.id) === Number(l.leaderId));
+                return leader ? Number(leader.castleId) : -1;
+            })
+            .filter(id => id !== -1);
 
         let targetLegionId = 0;
         let legionName = "直轄軍";
@@ -4152,35 +4157,35 @@ class UIInfoManager {
         }
 
         const myCastles = this.game.castles.filter(c => {
+            const cId = Number(c.id);
             if (Number(c.ownerClan) !== Number(this.game.playerClanId)) return false;
-            if (Number(c.id) === Number(daimyoCastleId)) return false;
-            if (commanderCastleIds.includes(Number(c.id))) return false;
+            if (cId === daimyoCastleId) return false;
+            if (commanderCastleIds.includes(cId)) return false;
             return true;
         });
 
         if (!this.allotFiefSavedState) {
-            if (!this.allotFiefSelectedIds) this.allotFiefSelectedIds = [];
+            this.allotFiefSelectedIds = [];
             myCastles.forEach(c => {
                 if (Number(c.legionId) === Number(targetLegionId)) {
-                    if (!this.allotFiefSelectedIds.includes(c.id)) {
-                        this.allotFiefSelectedIds.push(c.id);
-                    }
+                    this.allotFiefSelectedIds.push(Number(c.id));
                 }
             });
             this.allotFiefSavedState = true;
         }
 
         myCastles.sort((a, b) => {
-            const aSelected = this.allotFiefSelectedIds.includes(a.id) ? 1 : 0;
-            const bSelected = this.allotFiefSelectedIds.includes(b.id) ? 1 : 0;
+            const aSelected = this.allotFiefSelectedIds.includes(Number(a.id)) ? 1 : 0;
+            const bSelected = this.allotFiefSelectedIds.includes(Number(b.id)) ? 1 : 0;
             if (aSelected !== bSelected) return bSelected - aSelected;
             return a.id - b.id;
         });
 
         let items = [];
         myCastles.forEach(c => {
-            const isChecked = this.allotFiefSelectedIds.includes(c.id);
-            const inputHtml = `<input type="checkbox" name="sel_allot_fief" value="${c.id}" ${isChecked ? 'checked' : ''} style="display:none;">`;
+            const cId = Number(c.id);
+            const isChecked = this.allotFiefSelectedIds.includes(cId);
+            const inputHtml = `<input type="checkbox" name="sel_allot_fief" value="${cId}" ${isChecked ? 'checked' : ''} style="display:none;">`;
 
             let currentLegionStr = "直轄";
             if (c.legionId > 0 && this.game.legions) {
@@ -4192,7 +4197,7 @@ class UIInfoManager {
             }
 
             items.push({
-                onClick: `window.GameApp.ui.info.handleAllotFiefSelect(event, ${c.id})`,
+                onClick: `window.GameApp.ui.info.handleAllotFiefSelect(event, ${cId})`,
                 cells: [
                     `<span class="col-act" style="text-align:center;">${inputHtml}${isChecked ? '<span class="status-mark" style="color:#fdea60; font-weight:bold;">◯</span>' : '<span class="status-mark" style="color:#666; font-weight:normal;">-</span>'}</span>`,
                     `<span class="col-castle-name" style="justify-content:flex-start; padding-left:5px;">${c.name}</span>`,
@@ -4221,9 +4226,7 @@ class UIInfoManager {
                 this.closeCommonModal();
             },
             onConfirm: () => {
-                const inputs = document.querySelectorAll('input[name="sel_allot_fief"]:checked');
-                const selectedIds = Array.from(inputs).map(i => parseInt(i.value));
-                
+                const selectedIds = [...this.allotFiefSelectedIds];
                 this.closeCommonModal();
                 this.allotFiefSelectedIds = null;
                 this.allotFiefSavedState = false;
@@ -4236,30 +4239,31 @@ class UIInfoManager {
 
     handleAllotFiefSelect(e, castleId) {
         let div = e.currentTarget;
-        let input = e.target.tagName === 'INPUT' ? e.target : div.querySelector('input');
+        let input = div.querySelector('input[name="sel_allot_fief"]');
         if (!input) return;
 
-        if (e.target.tagName !== 'INPUT') {
-             input.checked = !input.checked; 
-        }
-        
-        const statusSpan = div.querySelector('.status-mark');
+        const cId = Number(castleId);
+        const isCurrentlyChecked = this.allotFiefSelectedIds.includes(cId);
 
-        if (input.checked) {
-            div.classList.add('selected');
-            if (!this.allotFiefSelectedIds.includes(castleId)) this.allotFiefSelectedIds.push(castleId);
-            if (statusSpan) {
-                statusSpan.style.color = '#fdea60';
-                statusSpan.style.fontWeight = 'bold';
-                statusSpan.textContent = '◯';
-            }
-        } else {
+        if (isCurrentlyChecked) {
+            this.allotFiefSelectedIds = this.allotFiefSelectedIds.filter(id => id !== cId);
+            input.checked = false;
             div.classList.remove('selected');
-            this.allotFiefSelectedIds = this.allotFiefSelectedIds.filter(id => id !== castleId);
+            const statusSpan = div.querySelector('.status-mark');
             if (statusSpan) {
                 statusSpan.style.color = '#666';
                 statusSpan.style.fontWeight = 'normal';
                 statusSpan.textContent = '-';
+            }
+        } else {
+            if (!this.allotFiefSelectedIds.includes(cId)) this.allotFiefSelectedIds.push(cId);
+            input.checked = true;
+            div.classList.add('selected');
+            const statusSpan = div.querySelector('.status-mark');
+            if (statusSpan) {
+                statusSpan.style.color = '#fdea60';
+                statusSpan.style.fontWeight = 'bold';
+                statusSpan.textContent = '◯';
             }
         }
         
