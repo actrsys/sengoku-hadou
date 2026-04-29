@@ -1582,7 +1582,6 @@ class UIManager {
                 const finishBtn = document.createElement('button');
                 finishBtn.className = `cmd-btn finish`;
                 finishBtn.textContent = "命令終了";
-                finishBtn.style.gridColumn = "span 2";
                 finishBtn.onclick = () => {
                     if (this.game.isProcessingAI) return;
                     this.cancelMapSelection(true);
