@@ -32,7 +32,11 @@ const COMMAND_MENU_STRUCTURE = [
     },
     {
         label: "人事",
-        commands: ['appoint_gunshi', 'appoint', 'delegate', 'reward', 'interview', 'employ', 'move', 'succession', 'banish']
+        commands: ['reward', 'interview', 'employ', 'move', 'succession', 'banish']
+    },
+    {
+        label: "軍団",
+        commands: ['appoint_gunshi', 'appoint', 'delegate']
     },
     {
         label: "情報",
@@ -277,31 +281,6 @@ const COMMAND_SPECS = {
     },
 
     // --- 人事 (PERSONNEL) ---
-    'appoint_gunshi': { 
-        label: "軍師任命", category: 'PERSONNEL', 
-        costGold: 0, costRice: 0, 
-        isMulti: false, hasAdvice: false, 
-        startMode: 'busho_select', sortKey: 'intelligence',
-        msg: "軍師を任命します",
-        canExecute: (game, castle) => CAN_EXECUTE_RULES.hasActiveBushoExceptDaimyoAndCastellan(game)
-    },
-    'appoint': { 
-        label: "城主任命", category: 'PERSONNEL', 
-        costGold: 0, costRice: 0, 
-        isMulti: false, hasAdvice: false, 
-        startMode: 'busho_select', sortKey: 'leadership',
-        msg: "城主を任命します",
-        canExecute: (game, castle) => {
-            const daimyo = game.bushos.find(b => b.clan === game.playerClanId && b.isDaimyo);
-            if (daimyo && Number(daimyo.castleId) === Number(castle.id)) return false;
-            return true;
-        }
-    },
-    'delegate': { 
-        label: "城主委任", category: 'PERSONNEL', 
-        isSystem: true, action: 'delegate_list',
-        canExecute: (game, castle) => CAN_EXECUTE_RULES.hasDelegatableCastle(game)
-    },
     'reward': { 
         label: "褒美", category: 'PERSONNEL', 
         costGold: 100, costRice: 0, 
@@ -351,7 +330,34 @@ const COMMAND_SPECS = {
         msg: "家督を譲る一門武将を選択します",
         canExecute: (game, castle) => CAN_EXECUTE_RULES.hasSuccessor(game)
     },
-
+    
+    // --- 軍団 (LEGION) ---
+    'appoint_gunshi': { 
+        label: "軍師任命", category: 'LEGION', 
+        costGold: 0, costRice: 0, 
+        isMulti: false, hasAdvice: false, 
+        startMode: 'busho_select', sortKey: 'intelligence',
+        msg: "軍師を任命します",
+        canExecute: (game, castle) => CAN_EXECUTE_RULES.hasActiveBushoExceptDaimyoAndCastellan(game)
+    },
+    'appoint': { 
+        label: "城主任命", category: 'LEGION', 
+        costGold: 0, costRice: 0, 
+        isMulti: false, hasAdvice: false, 
+        startMode: 'busho_select', sortKey: 'leadership',
+        msg: "城主を任命します",
+        canExecute: (game, castle) => {
+            const daimyo = game.bushos.find(b => b.clan === game.playerClanId && b.isDaimyo);
+            if (daimyo && Number(daimyo.castleId) === Number(castle.id)) return false;
+            return true;
+        }
+    },
+    'delegate': { 
+        label: "城主委任", category: 'LEGION', 
+        isSystem: true, action: 'delegate_list',
+        canExecute: (game, castle) => CAN_EXECUTE_RULES.hasDelegatableCastle(game)
+    },
+    
     // --- 対外：調略 (FOREIGN_STRATEGY) ---
     'sabotage': { 
         label: "破壊工作", category: 'FOREIGN_STRATEGY', 
