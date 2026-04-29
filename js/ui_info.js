@@ -4139,13 +4139,17 @@ class UIInfoManager {
         const daimyo = this.game.bushos.find(b => Number(b.clan) === Number(this.game.playerClanId) && b.isDaimyo);
         const daimyoCastleId = daimyo ? Number(daimyo.castleId) : -1;
         
-        const commanderCastleIds = this.game.legions
-            .filter(l => Number(l.clanId) === Number(this.game.playerClanId))
-            .map(l => {
-                const leader = this.game.bushos.find(b => Number(b.id) === Number(l.leaderId));
-                return leader ? Number(leader.castleId) : -1;
-            })
-            .filter(id => id !== -1);
+        const commanderCastleIds = [];
+        if (this.game.legions) {
+            this.game.legions.forEach(l => {
+                if (Number(l.clanId) === Number(this.game.playerClanId)) {
+                    const leader = this.game.bushos.find(b => Number(b.id) === Number(l.leaderId));
+                    if (leader) {
+                        commanderCastleIds.push(Number(leader.castleId));
+                    }
+                }
+            });
+        }
 
         let targetLegionId = 0;
         let legionName = "直轄軍";
@@ -4218,7 +4222,7 @@ class UIInfoManager {
             listClass: "delegate-list-container",
             items: items,
             scrollPos: scrollPos,
-            gridTemplateSp: "40px 2fr 1fr 1fr 1.5fr",
+            gridTemplateSp: "40px 200px 100px 100px 150px",
             gridTemplatePc: "60px 200px 100px 100px 150px",
             onBack: () => {
                 this.allotFiefSelectedIds = null;
