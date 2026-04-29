@@ -894,7 +894,6 @@ Object.assign(WarManager.prototype, {
         // メモし終わったら、戦場のリストからは消してあげます（これで戦闘から除外されます！）
         s[reinfKey] = null;
     },
-    // ★追加ここまで
     
     executeRetreatLogic(defCastle) {
         // ★修正：大名家が「0（中立の空き城）」の時は、他の空き城を仲間の城だと勘違いしないように空っぽ（[]）にします！
@@ -1662,6 +1661,7 @@ Object.assign(WarManager.prototype, {
                     finishWarProcess();
                 }
                 return;
+            }
                 
             let resultMsg = "";
             const isAtkPlayer = (Number(s.attacker.ownerClan) === Number(this.game.playerClanId));
