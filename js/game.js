@@ -905,8 +905,8 @@ class GameManager {
             // ★今回追加：ゲーム本体に、地方の名簿も持たせます！
             this.provinces = data.provinces || [];
             
-            // ★今回追加：新しいゲームを始める時は、軍団のリストも空っぽの新品にしておきます！
-            this.legions = [];
+            // ★今回追加：新しいゲームを始める時は、読み込んだ軍団の名簿をしっかり受け取ります！
+            this.legions = data.legions || [];
             
             this.year = window.MainParams.StartYear;
             this.month = window.MainParams.StartMonth;
