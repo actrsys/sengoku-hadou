@@ -1676,10 +1676,8 @@ Object.assign(UIManager.prototype, {
     // ==========================================
     playBattleBlink(castleIdOrIds, colorA, colorB, durationMs) {
         return new Promise(resolve => {
-            // タッチ防止の透明な壁を作ります（共通の魔法を使います）
             this.showMapGuard();
 
-            // 点滅を描くための新しい透明な画用紙を作ります
             let overlay = document.getElementById('battle-blink-overlay');
             if (!overlay) {
                 overlay = document.createElement('canvas');
@@ -1690,7 +1688,7 @@ Object.assign(UIManager.prototype, {
                 overlay.style.left = '0px';
                 overlay.style.top = '0px';
                 overlay.style.pointerEvents = 'none';
-                overlay.style.zIndex = '6'; // 勢力色の画用紙より少し上に置きます
+                overlay.style.zIndex = '6'; 
                 this.mapEl.appendChild(overlay);
             }
             
@@ -1700,35 +1698,27 @@ Object.assign(UIManager.prototype, {
             const outputDataA = ctx.createImageData(width, height);
             const outputDataB = ctx.createImageData(width, height);
             
-            // ピクセルマップから、そのお城の領地だけを抜き出して色を塗ります
             if (this.pixelCastleMap) {
-                // 中立(0)や諸勢力の場合は白にするためのデフォルト値
                 const colorA_RGB = colorA || { r: 255, g: 255, b: 255 };
                 const colorB_RGB = colorB || { r: 255, g: 255, b: 255 };
 
-                // ★追加：2ピクセル分広く塗るための準備
                 const targetPixels = new Uint8Array(width * height);
 
-                // ★修正：１つの城でも、複数の城でも同時に光るようにリストにします！
-                // 計算を劇的に軽くするために Set（集合）の魔法を使います！
                 const targetIdsArray = Array.isArray(castleIdOrIds) ? castleIdOrIds : [castleIdOrIds];
                 const targetIdsSet = new Set(targetIdsArray);
 
-                // まずは本来のお城の領地をマークします
                 for (let i = 0; i < this.pixelCastleMap.length; i++) {
                     if (targetIdsSet.has(this.pixelCastleMap[i])) {
                         targetPixels[i] = 1;
                     }
                 }
 
-                // ★2回繰り返すことで、2ピクセル分外側に広げます
                 for (let step = 0; step < 2; step++) {
                     const tempPixels = new Uint8Array(targetPixels);
                     for (let y = 1; y < height - 1; y++) {
                         for (let x = 1; x < width - 1; x++) {
                             const i = y * width + x;
                             if (tempPixels[i] === 0) {
-                                // 上下左右のどこかが 1 なら、ここも 1 にします
                                 if (tempPixels[i - width] === 1 ||
                                     tempPixels[i + width] === 1 ||
                                     tempPixels[i - 1] === 1 ||
@@ -1755,17 +1745,28 @@ Object.assign(UIManager.prototype, {
                     }
                 }
             }
+
+            // ★ここから新しい魔法：2つの色の「スタンプ」をあらかじめ作っておきます！
+            const tempCanvasA = document.createElement('canvas');
+            tempCanvasA.width = width;
+            tempCanvasA.height = height;
+            tempCanvasA.getContext('2d').putImageData(outputDataA, 0, 0);
+
+            const tempCanvasB = document.createElement('canvas');
+            tempCanvasB.width = width;
+            tempCanvasB.height = height;
+            tempCanvasB.getContext('2d').putImageData(outputDataB, 0, 0);
+            // ★新しい魔法ここまで！
             
             let startTime = performance.now();
             let isA = true;
-            const blinkInterval = 250; // 0.25秒ごとに色を切り替えます（チカチカ早すぎないように）
+            const blinkInterval = 250; 
             let lastSwitchTime = startTime;
 
-            // アニメーションを動かす魔法です
             const animate = (currentTime) => {
                 if (currentTime - startTime > durationMs) {
                     ctx.clearRect(0, 0, width, height);
-                    this.hideMapGuard(); // 共通の魔法で壁を消します
+                    this.hideMapGuard(); 
                     resolve();
                     return;
                 }
@@ -1774,13 +1775,15 @@ Object.assign(UIManager.prototype, {
                     isA = !isA;
                     lastSwitchTime = currentTime;
                     ctx.clearRect(0, 0, width, height);
-                    ctx.putImageData(isA ? outputDataA : outputDataB, 0, 0);
+                    // ★重たい作業をやめて、用意したスタンプをポンッと押すだけにします！
+                    ctx.drawImage(isA ? tempCanvasA : tempCanvasB, 0, 0);
                 }
                 
                 requestAnimationFrame(animate);
             };
             
-            ctx.putImageData(outputDataA, 0, 0);
+            // ★最初の1回目もスタンプを押します！
+            ctx.drawImage(tempCanvasA, 0, 0);
             requestAnimationFrame(animate);
         });
     },
