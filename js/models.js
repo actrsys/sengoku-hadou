@@ -199,7 +199,7 @@ class Castle {
         this.lastAttackerClanId = Number(data.lastAttackerClanId || 0);   // 攻撃してきた勢力のID
         this.lastAttackerIsKunishu = data.lastAttackerIsKunishu === true; // 攻撃してきたのが諸勢力かどうか
 
-        // ★今回追加：どの軍団に所属しているか（0は直轄、1～7が各軍団）
+        // ★今回追加：どの軍団に所属しているか（0は直轄、1～8が各軍団）
         this.legionId = Number(data.legionId || 0);
     }
 }
