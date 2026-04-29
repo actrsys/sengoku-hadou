@@ -702,7 +702,7 @@ class Legion {
         this.id = Number(this.id || 0);
         // どの大名家に所属している軍団か
         this.clanId = Number(this.clanId || 0);
-        // その大名家の中で第何席次か？（1〜7）
+        // その大名家の中で第何席次か？（0は直轄。1〜8）
         this.legionNo = Number(this.legionNo || 1);
         
         // ★ここを修正：CSVの一番右端の項目は、見えない「改行マーク」がくっついて迷子になりやすいです！

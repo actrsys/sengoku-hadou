@@ -4151,13 +4151,11 @@ class UIInfoManager {
             });
         }
 
-        let targetLegionId = 0;
+        let targetLegionId = legionNo;
         let legionName = "直轄軍";
         if (legionNo > 0) {
-            const legion = this.game.legions.find(l => Number(l.clanId) === Number(this.game.playerClanId) && Number(l.legionNo) === legionNo);
-            targetLegionId = legion ? legion.id : -1;
             const numberNames = ["直轄", "一席", "二席", "三席", "四席", "五席", "六席", "七席", "八席"];
-            legionName = `第${numberNames[legionNo]}席`;
+            legionName = numberNames[legionNo] ? `第${numberNames[legionNo]}席` : `第${legionNo}席`;
         }
 
         const myCastles = this.game.castles.filter(c => {
@@ -4171,7 +4169,7 @@ class UIInfoManager {
         if (!this.allotFiefSavedState) {
             this.allotFiefSelectedIds = [];
             myCastles.forEach(c => {
-                if (Number(c.legionId) === Number(targetLegionId)) {
+                if (Number(c.legionId) === Number(legionNo)) {
                     this.allotFiefSelectedIds.push(Number(c.id));
                 }
             });
@@ -4192,12 +4190,9 @@ class UIInfoManager {
             const inputHtml = `<input type="checkbox" name="sel_allot_fief" value="${cId}" ${isChecked ? 'checked' : ''} style="display:none;">`;
 
             let currentLegionStr = "直轄";
-            if (c.legionId > 0 && this.game.legions) {
-                const l = this.game.legions.find(lg => Number(lg.id) === Number(c.legionId));
-                if (l) {
-                    const numberNames = ["直轄", "一席", "二席", "三席", "四席", "五席", "六席", "七席", "八席"];
-                    currentLegionStr = `第${numberNames[l.legionNo]}席`;
-                }
+            if (c.legionId > 0) {
+                const numberNames = ["直轄", "一席", "二席", "三席", "四席", "五席", "六席", "七席", "八席"];
+                currentLegionStr = numberNames[c.legionId] ? `第${numberNames[c.legionId]}席` : `第${c.legionId}席`;
             }
 
             items.push({

@@ -2222,7 +2222,7 @@ class CommandSystem {
         busho.isCastellan = true;
         busho.isCommander = true;
 
-        castle.legionId = legion.id;
+        castle.legionId = legionNo;
 
         const numberNames = ["", "第一席", "第二席", "第三席", "第四席", "第五席", "第六席", "第七席", "第八席"];
         const legionName = numberNames[legionNo] || `第${legionNo}席`;
@@ -3315,12 +3315,12 @@ class CommandSystem {
         
         candidateCastles.forEach(c => {
             if (selectedCastleIds.includes(c.id)) {
-                if (Number(c.legionId) !== Number(targetLegionId)) {
-                    c.legionId = targetLegionId;
+                if (Number(c.legionId) !== Number(legionNo)) {
+                    c.legionId = legionNo;
                     count++;
                 }
             } else {
-                if (Number(c.legionId) === Number(targetLegionId)) {
+                if (Number(c.legionId) === Number(legionNo)) {
                     c.legionId = 0;
                     count++;
                 }
