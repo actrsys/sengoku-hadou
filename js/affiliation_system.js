@@ -36,6 +36,7 @@ class AffiliationSystem {
         busho.isCastellan = false;
         busho.isDaimyo = false;
         busho.isGunshi = false; // ★ここを書き足します！軍師のバッジを外します
+        busho.isCommander = false; // ★ここを追加：司令官のバッジも外します
 
         // 5. 新しい殿様との相性を計算して、最初の忠誠度を決めます！
         // ★追加：イベント専用などで忠誠度が指定されている場合は、相性計算をスキップして固定します
@@ -72,11 +73,11 @@ class AffiliationSystem {
             busho.isCastellan = false;
             busho.isDaimyo = false;
             busho.isGunshi = false; // ★念のためここにも書き足します！
+            busho.isCommander = false; // ★ここを追加：司令官のバッジも外します
             busho.belongKunishuId = 0; // 諸勢力からも外します
             this.leaveCastle(busho); // お城から綺麗にいなくなります
             return; // これ以上下の「浪人になる処理」には進ませません！
         }
-        // ★追加ここまで！
 
         const oldClanId = busho.clan;
 
@@ -95,6 +96,7 @@ class AffiliationSystem {
         busho.isCastellan = false;
         busho.isDaimyo = false;
         busho.isGunshi = false; // ★ここを書き足します！軍師のバッジを外します
+        busho.isCommander = false; // ★ここを追加：司令官のバッジも外します
 
         // 4. お城から出ます
         this.leaveCastle(busho);
@@ -255,6 +257,14 @@ class AffiliationSystem {
         busho.factionSeikaku = "無所属";
         busho.factionHoshin = "無所属";
         busho.belongKunishuId = 0;
+
+        // ★ここを追加：もし軍団の司令官だった場合、その軍団の名簿からも名前を消します
+        if (this.game && this.game.legions) {
+            const myLegion = this.game.legions.find(l => Number(l.commanderId) === Number(busho.id));
+            if (myLegion) {
+                myLegion.commanderId = 0;
+            }
+        }
     }
 
     /**
