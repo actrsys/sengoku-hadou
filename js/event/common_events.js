@@ -1155,7 +1155,7 @@ window.GameEvents.push({
                     // プレイヤーの勢力への仕官なら、ダイアログを表示して選択してもらいます
                     const rName = ronin.name.replace(/\|/g, ''); 
                     const nav = game.getNavigatorInfo(currentCastle);
-                    const msg = `殿、${rName}という者が仕官先を求めて参りました。\n家臣に取り立てますか？`;
+                    const msg = `殿、${rName}という者が仕官先を求めて参りました。家臣に取り立てますか？`;
                     
                     if (window.playEventSoundAndBlock) window.playEventSoundAndBlock();
                     
@@ -1166,7 +1166,12 @@ window.GameEvents.push({
                             game.ui.showDialog(msg, true, 
                                 () => { resolve(true); },  // 決定を選んだ場合
                                 () => { resolve(false); }, // キャンセルを選んだ場合
-                                { leftFace: nav.faceIcon, leftName: nav.name }
+                                { 
+                                    leftFace: nav.faceIcon, 
+                                    leftName: nav.name,
+                                    confirmText: '家臣にする', // ←決定ボタンの文字を変更
+                                    cancelText: '追い払う'     // ←キャンセルボタンの文字を変更
+                                }
                             );
                         } else {
                             // 万が一UIが見つからない場合の安全策
