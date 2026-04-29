@@ -4196,7 +4196,7 @@ class UIInfoManager {
             }
 
             items.push({
-                onClick: `window.GameApp.ui.info.handleAllotFiefSelect(event, ${cId})`,
+                onClick: (e) => this.handleAllotFiefSelect(e, cId),
                 cells: [
                     `<span class="col-act" style="text-align:center;">${inputHtml}${isChecked ? '<span class="status-mark" style="color:#fdea60; font-weight:bold;">◯</span>' : '<span class="status-mark" style="color:#666; font-weight:normal;">-</span>'}</span>`,
                     `<span class="col-castle-name" style="justify-content:flex-start; padding-left:5px;">${c.name}</span>`,
@@ -4234,5 +4234,51 @@ class UIInfoManager {
         });
         
         this._updateAllotFiefUI();
+    }
+
+    handleAllotFiefSelect(e, castleId) {
+        let div = e.currentTarget;
+        let input = div.querySelector('input[name="sel_allot_fief"]');
+        if (!input) return;
+
+        if (!this.allotFiefSelectedIds) {
+            this.allotFiefSelectedIds = [];
+        }
+
+        const cId = Number(castleId);
+        const isCurrentlyChecked = this.allotFiefSelectedIds.includes(cId);
+
+        if (isCurrentlyChecked) {
+            this.allotFiefSelectedIds = this.allotFiefSelectedIds.filter(id => id !== cId);
+            input.checked = false;
+            div.classList.remove('selected');
+            const statusSpan = div.querySelector('.status-mark');
+            if (statusSpan) {
+                statusSpan.style.color = '#666';
+                statusSpan.style.fontWeight = 'normal';
+                statusSpan.textContent = '-';
+            }
+        } else {
+            if (!this.allotFiefSelectedIds.includes(cId)) this.allotFiefSelectedIds.push(cId);
+            input.checked = true;
+            div.classList.add('selected');
+            const statusSpan = div.querySelector('.status-mark');
+            if (statusSpan) {
+                statusSpan.style.color = '#fdea60';
+                statusSpan.style.fontWeight = 'bold';
+                statusSpan.textContent = '◯';
+            }
+        }
+        
+        if (window.AudioManager) window.AudioManager.playSE('choice.ogg');
+        this._updateAllotFiefUI();
+    }
+
+    _updateAllotFiefUI() {
+        const confirmBtn = document.getElementById('selector-confirm-btn');
+        if (confirmBtn) {
+            confirmBtn.disabled = false;
+            confirmBtn.style.opacity = 1.0;
+        }
     }
 }
