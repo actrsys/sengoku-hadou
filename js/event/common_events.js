@@ -1002,6 +1002,7 @@ window.GameEvents.push({
     }
 });
 
+// 差し替え後
 // ==========================================
 // ★ 毎月の交易収入イベント（隣接する友好国などとの往来）
 // ==========================================
@@ -1087,5 +1088,111 @@ window.GameEvents.push({
                 logMessages.forEach(msg => game.ui.log(msg));
             }
         });
+    }
+});
+
+// ==========================================
+// ★ 毎月の浪人仕官イベント
+// ==========================================
+window.GameEvents.push({
+    id: "ronin_employment_monthly",
+    timing: "startMonth_after", 
+    isOneTime: false,
+    
+    checkCondition: function(game) {
+        return true; 
+    },
+    
+    execute: async function(game) {
+        // 諸勢力の頭領などでない、純粋な「浪人」だけをリストアップします
+        const ronins = game.bushos.filter(b => b.status === 'ronin' && !b.belongKunishuId && !b.isAutoLeader);
+        
+        // 今月すでに処理した浪人をメモしておく箱です（追い払われた人が移動先で再度判定されないようにします）
+        const processedRonins = new Set();
+        
+        for (const ronin of ronins) {
+            if (processedRonins.has(ronin.id)) continue;
+            
+            const currentCastle = game.getCastle(ronin.castleId);
+            // 浪人がお城にいない場合や、その城が空き城（所有者が0）の場合は仕官しません
+            if (!currentCastle || currentCastle.ownerClan === 0) continue; 
+            
+            const clanId = currentCastle.ownerClan;
+            const clanBushos = game.bushos.filter(b => b.clan === clanId && b.status !== 'dead');
+            const daimyo = clanBushos.find(b => b.isDaimyo);
+            
+            // 何らかの理由でその大名家に大名がいなければスキップします
+            if (!daimyo) continue;
+            
+            // 仕官先の勢力に、浪人の「宿敵」がいるかチェックします
+            let hasNemesis = false;
+            if (ronin.nemesisIds && ronin.nemesisIds.length > 0) {
+                hasNemesis = ronin.nemesisIds.some(nId => {
+                    const nBusho = game.getBusho(nId);
+                    return nBusho && nBusho.clan === clanId && nBusho.status !== 'dead';
+                });
+            }
+            // 宿敵がいれば絶対に仕官しないので、次の浪人のチェックへ進みます
+            if (hasNemesis) continue; 
+            
+            // 大名と浪人の相性のズレを計算します（0〜50の数字になります）
+            let affDiff = 50;
+            if (typeof GameSystem !== 'undefined' && GameSystem.calcAffinityDiff) {
+                affDiff = GameSystem.calcAffinityDiff(ronin.affinity, daimyo.affinity);
+            } else {
+                const diff = Math.abs(ronin.affinity - daimyo.affinity);
+                affDiff = Math.min(diff, 100 - diff);
+            }
+            
+            // 確率を計算します。
+            const prob = 0.005 + 0.01 * (1.0 - (affDiff / 25));
+            
+            // サイコロを振って当たった場合、仕官の処理に入ります
+            if (Math.random() < prob) {
+                processedRonins.add(ronin.id); // 処理済みとしてメモします
+                
+                if (clanId === game.playerClanId) {
+                    // プレイヤーの勢力への仕官なら、ダイアログを表示して選択してもらいます
+                    const rName = ronin.name.replace(/\|/g, ''); 
+                    const nav = game.getNavigatorInfo(currentCastle);
+                    const msg = `殿、${rName}という者が仕官先を求めて参りました。\n家臣に取り立てますか？`;
+                    
+                    if (window.playEventSoundAndBlock) window.playEventSoundAndBlock();
+                    
+                    // ゲームに元々あるダイアログ機能（決定・キャンセル付き）を呼び出します
+                    const isEmployed = await new Promise(resolve => {
+                        if (game.ui && game.ui.showDialog) {
+                            // 第2引数を true にすると、自動で決定・キャンセルボタンが出ます
+                            game.ui.showDialog(msg, true, 
+                                () => { resolve(true); },  // 決定を選んだ場合
+                                () => { resolve(false); }, // キャンセルを選んだ場合
+                                { leftFace: nav.faceIcon, leftName: nav.name }
+                            );
+                        } else {
+                            // 万が一UIが見つからない場合の安全策
+                            resolve(false);
+                        }
+                    });
+                    
+                    if (isEmployed) {
+                        game.affiliationSystem.joinClan(ronin, clanId, currentCastle.id);
+                    } else {
+                        const otherCastles = game.castles.filter(c => c.ownerClan !== clanId && c.ownerClan !== 0);
+                        if (otherCastles.length > 0) {
+                            otherCastles.sort((a, b) => {
+                                const distA = Math.pow(a.x - currentCastle.x, 2) + Math.pow(a.y - currentCastle.y, 2);
+                                const distB = Math.pow(b.x - currentCastle.x, 2) + Math.pow(b.y - currentCastle.y, 2);
+                                return distA - distB;
+                            });
+                            const target = otherCastles[0];
+                            game.affiliationSystem.leaveCastle(ronin);
+                            game.affiliationSystem.enterCastle(ronin, target.id);
+                        }
+                    }
+                } else {
+                    game.affiliationSystem.joinClan(ronin, clanId, currentCastle.id);
+                }
+            }
+        }
     }
 });
