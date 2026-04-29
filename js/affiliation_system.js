@@ -348,6 +348,16 @@ class AffiliationSystem {
             return;
         }
 
+        const commander = bushos.find(b => this.game.legions && this.game.legions.some(l => l.commanderId === b.id));
+        if (commander) {
+            bushos.forEach(b => { 
+                b.isCastellan = false; 
+            });
+            commander.isCastellan = true; 
+            castle.castellanId = commander.id;
+            return;
+        }
+
         // 城内にいる城主バッジを持っている武将のリストを作成します
         const lords = bushos.filter(b => b.isCastellan);
 
