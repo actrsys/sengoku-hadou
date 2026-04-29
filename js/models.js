@@ -198,6 +198,9 @@ class Castle {
         this.lastAttackedOwnerId = Number(data.lastAttackedOwnerId || 0); // 攻撃された時に誰の城だったか
         this.lastAttackerClanId = Number(data.lastAttackerClanId || 0);   // 攻撃してきた勢力のID
         this.lastAttackerIsKunishu = data.lastAttackerIsKunishu === true; // 攻撃してきたのが諸勢力かどうか
+
+        // ★今回追加：どの軍団に所属しているか（0は直轄、1～7が各軍団）
+        this.legionId = Number(data.legionId || 0);
     }
 }
 
@@ -423,6 +426,9 @@ class Busho {
 
         // ★ここを書き足し！：自動生成された頭領かどうかの「秘密のシール」を貼る専用の枠です！
         this.isAutoLeader = data.isAutoLeader === true;
+
+        // ★今回追加：どの軍団に所属しているか（0は直轄、1～7が各軍団）
+        this.legionId = Number(data.legionId || 0);
     }
 
     // UI表示用メソッド
@@ -672,5 +678,21 @@ class Province {
         this.typhoon = Number(this.typhoon || 0);   // 台風の発生確率（例：0.15）
         this.marketRate = data.marketRate !== undefined ? Number(data.marketRate) : 1.0; // 国ごとの米相場（例：1.0）
         this.statusEffects = Array.isArray(data.statusEffects) ? data.statusEffects : []; // ★豊作・凶作などの「状態異常」
+    }
+}
+
+// ★軍団（Legion）クラスを新しく追加しました！
+class Legion {
+    constructor(data) {
+        Object.assign(this, data);
+        
+        // 軍団の出席番号（ゲーム全体で重ならない固有のID）
+        this.id = Number(this.id || 0);
+        // どの大名家に所属している軍団か
+        this.clanId = Number(this.clanId || 0);
+        // その大名家の中で第何軍団か（1〜7）
+        this.legionNo = Number(this.legionNo || 1);
+        // 軍団長を任されている武将の出席番号
+        this.commanderId = Number(this.commanderId || 0);
     }
 }

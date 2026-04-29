@@ -763,9 +763,10 @@ class GameManager {
         this.month = window.MainParams.StartMonth; 
         this.castles = []; 
         this.bushos = []; 
+        this.legions = []; // ★今回追加：軍団の名簿を入れておく空っぽの箱です
         this.turnQueue = []; 
         this.currentIndex = 0; 
-        this.playerClanId = 1; 
+        this.playerClanId = 1;
         this.ui = new UIManager(this); 
         this.selectionMode = null; 
         this.validTargets = []; 
@@ -875,6 +876,9 @@ class GameManager {
             this.princesses = data.princesses || []; 
             // ★今回追加：ゲーム本体に、地方の名簿も持たせます！
             this.provinces = data.provinces || [];
+            
+            // ★今回追加：新しいゲームを始める時は、軍団のリストも空っぽの新品にしておきます！
+            this.legions = [];
             
             this.year = window.MainParams.StartYear;
             this.month = window.MainParams.StartMonth;
@@ -1247,8 +1251,8 @@ class GameManager {
                 // 2. 民忠補正: 民忠 * 0.01
                 const loyaltyBonus = c.peoplesLoyalty * 0.01;
                 
-                // 3. 増加量の基本値: √城の人口 * ((大名補正 + 民忠補正) / 2) * 0.5
-                const baseGrowth = Math.sqrt(c.population) * ((daimyoBonus + loyaltyBonus) / 2) * 0.5;
+                // 3. 増加量の基本値: √城の人口 * ((大名補正 + 民忠補正) / 2) * 0.6
+                const baseGrowth = Math.sqrt(c.population) * ((daimyoBonus + loyaltyBonus) / 2) * 0.6;
 
                 // ★追加：人口に対する兵士の割合を計算して、ブレーキをかけます！
                 // 兵士の割合が50%で0.375倍になり、75%で0.0625倍（雀の涙）になります。
@@ -1666,6 +1670,7 @@ class GameManager {
             clans: this.clans,
             princesses: this.princesses, // ★姫の名簿もセーブデータに書き込みます
             provinces: this.provinces, // ★地方の名簿もセーブデータに書き込みます
+            legions: this.legions, // ★今回追加：軍団の名簿もセーブデータに書き込みます
             playerClanId: this.playerClanId,
             kunishus: this.kunishuSystem.kunishus,
             mapWidth: this.mapWidth,
@@ -1766,6 +1771,8 @@ class GameManager {
                 this.princesses = (d.princesses || []).map(p => new Princess(p));
                 // ★今回追加：セーブデータから地方の名簿を元通りに復元します
                 this.provinces = (d.provinces || []).map(p => new Province(p));
+                // ★今回追加：セーブデータから軍団の名簿を元通りに復元します
+                this.legions = (d.legions || []).map(l => new Legion(l));
                 
                 if (d.kunishus) {
                     this.kunishuSystem.setKunishuData(d.kunishus.map(k => new Kunishu(k)));
