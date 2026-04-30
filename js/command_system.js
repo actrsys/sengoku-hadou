@@ -82,7 +82,7 @@ const CAN_EXECUTE_RULES = {
             return targetCastle && targetCastle.ownerClan === game.playerClanId;
         });
     },
-    hcanManageLegion: (game, legionNumber) => {
+    canManageLegion: (game, legionNumber) => {
         const myCastles = game.castles.filter(c => Number(c.ownerClan) === Number(game.playerClanId));
         if (myCastles.length <= 1) return false;
         if (game.legions) {
