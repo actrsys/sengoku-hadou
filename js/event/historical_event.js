@@ -684,7 +684,7 @@ window.GameEvents.push({
                         leftName: args.shinzanCName,
                         leftFace: args.shinzanCFace,
                         okText: "面会する",
-                        okClass: "btn-success",
+                        okClass: "btn-primary",
                         cancelText: "追い返す",
                         cancelClass: "btn-secondary"
                     }
