@@ -579,25 +579,35 @@ window.GameEvents.push({
         
         const odaClan = game.clans.find(c => c.id === nobunaga.clan);
         const matsudairaClan = game.clans.find(c => c.id === motoyasu.clan);
-
+        
         // 今川氏真(1004011)の大名家名を取得します
         const ujizane = game.getBusho(1004011);
         let imagawaClanName = "今川家";
+        let imagawaFamilyName = "今川";
         if (ujizane && ujizane.clan > 0) {
             const imagawaClan = game.clans.find(c => c.id === ujizane.clan);
             if (imagawaClan) imagawaClanName = imagawaClan.name;
+            if (ujizane.familyName) imagawaFamilyName = ujizane.familyName;
         }
 
-        // 松平家の智謀最高武将を取得します（いなければ名もなき小姓にします）
-        let vassalName = "小姓";
-        let vassalFace = "koshou.webp";
-        const vassals = game.bushos.filter(b => b.clan === motoyasu.clan && b.id !== motoyasu.id && b.status === 'active');
-        if (vassals.length > 0) {
-            vassals.sort((a, b) => (b.intelligence || 0) - (a.intelligence || 0));
-            const topVassal = vassals[0];
-            vassalName = topVassal.name.replace('|', '');
-            vassalFace = topVassal.faceIcon || "unknown_face.webp";
-        }
+        // --- ここから松平家の配役を選出します ---
+        // まず、松平家に所属していて、元康以外の活動中の武将を全員集めます
+        let matsuBushos = game.bushos.filter(b => b.clan === motoyasu.clan && b.id !== motoyasu.id && b.status === 'active');
+        
+        // 松平家臣A：統率がもっとも高い武将
+        let kashinA = matsuBushos.sort((a, b) => (b.leadership || 0) - (a.leadership || 0))[0];
+        // 選ばれた家臣Aを次のオーディション候補から外します
+        matsuBushos = matsuBushos.filter(b => b.id !== (kashinA ? kashinA.id : 0));
+        
+        // 松平家臣B：残りの武将の中で、智謀がもっとも高い武将
+        let kashinB = matsuBushos.sort((a, b) => (b.intelligence || 0) - (a.intelligence || 0))[0];
+
+        // --- ここから織田家の配役を選出します ---
+        // 織田家に所属していて、信長以外の活動中の武将を全員集めます
+        let odaBushos = game.bushos.filter(b => b.clan === nobunaga.clan && b.id !== nobunaga.id && b.status === 'active');
+        
+        // 織田家新参C：功績が300以下で、智謀がもっとも高い武将
+        let shinzanC = odaBushos.filter(b => (b.achievementTotal || 0) <= 300).sort((a, b) => (b.intelligence || 0) - (a.intelligence || 0))[0];
 
         // 信長の官位名を取得します
         let nobunagaTitle = "上総介";
@@ -617,49 +627,117 @@ window.GameEvents.push({
         // イベントテキストの台本に渡す変数をひとまとめにします
         const args = {
             motoyasuName: motoyasu.name.replace('|', ''),
+            motoyasuGivenName: motoyasu.givenName || "元康",
+            matsudairaFamilyName: motoyasu.familyName || "松平",
             motoyasuFace: motoyasu.faceIcon || "unknown_face.webp",
+            
             imagawaClanName: imagawaClanName,
+            imagawaFamilyName: imagawaFamilyName,
+            
             nobunagaName: nobunaga.name.replace('|', ''),
             nobunagaGivenName: nobunaga.givenName || "信長", 
+            odaFamilyName: nobunaga.familyName || "織田",
             nobunagaFace: nobunaga.faceIcon || "unknown_face.webp",
+            
             odaClanName: odaClan ? odaClan.name : "織田家",
             matsudairaClanName: matsudairaClan ? matsudairaClan.name : "松平家",
-            vassalName: vassalName,
-            vassalFace: vassalFace,
+            
+            kashinAName: kashinA ? kashinA.name.replace('|', '') : "小姓",
+            kashinAGivenName: kashinA ? (kashinA.givenName || kashinA.name.replace('|', '')) : "小姓",
+            kashinAFace: kashinA ? kashinA.faceIcon : "koshou.webp",
+            
+            kashinBName: kashinB ? kashinB.name.replace('|', '') : "小姓",
+            kashinBGivenName: kashinB ? (kashinB.givenName || kashinB.name.replace('|', '')) : "小姓",
+            kashinBFace: kashinB ? kashinB.faceIcon : "koshou.webp",
+            
+            shinzanCName: shinzanC ? shinzanC.name.replace('|', '') : "小姓",
+            shinzanCGivenName: shinzanC ? (shinzanC.givenName || shinzanC.name.replace('|', '')) : "小姓",
+            shinzanCFace: shinzanC ? shinzanC.faceIcon : "koshou.webp",
+
             nobunagaCastleName: nobunagaCastleName,
+            nobunagaCastleShort: nobunagaCastleName.replace(/城$/, ''), // 「清州城」から「城」を消した名前を作ります
             nobunagaTitle: nobunagaTitle,
             year: game.year,
             month: game.month
         };
-
+        
         // 新しく作ったファイルから台本を受け取り、再生プレイヤーで順番に表示させます
-        if (window.EventTextManager && window.EventTextManager.kiyosu_alliance) {
-            const sequence = window.EventTextManager.kiyosu_alliance(args);
-            await window.EventTextManager.playSequence(game, sequence);
+        // まずは共通のパート１（城に到着するまで）を再生します
+        if (window.EventTextManager && window.EventTextManager.kiyosu_alliance_part1) {
+            await window.EventTextManager.playSequence(game, window.EventTextManager.kiyosu_alliance_part1(args));
         }
 
-        // ログ出力
-        game.ui.log(`【イベント】清州同盟：${args.matsudairaClanName}と${args.odaClanName}の同盟が成立しました。`);
+        // 同盟を結ぶかどうかの判定用スイッチです（初期値は「結ぶ」にしておきます）
+        let isAccept = true;
 
-        // 外交システムを使って、強制的に「同盟」状態にします
-        if (game.diplomacyManager) {
-            game.diplomacyManager.changeStatus(motoyasu.clan, nobunaga.clan, '同盟', 0);
-            
-            // お互いの関係値を最高の100にします！
-            const relA = game.diplomacyManager.getRelation(motoyasu.clan, nobunaga.clan);
-            if (relA) relA.sentiment = 100;
-            
-            const relB = game.diplomacyManager.getRelation(nobunaga.clan, motoyasu.clan);
-            if (relB) relB.sentiment = 100;
+        // プレイヤーが織田家を担当している場合だけ、使者の取り次ぎと選択肢の窓を出します
+        if (game.playerClanId === nobunaga.clan) {
+            if (window.EventTextManager && window.EventTextManager.kiyosu_alliance_oda_arrival) {
+                await window.EventTextManager.playSequence(game, window.EventTextManager.kiyosu_alliance_oda_arrival(args));
+            }
+
+            await new Promise(resolve => {
+                game.ui.showDialog(`「${args.matsudairaFamilyName}家の使者とお会いになられまするか？」`, true, 
+                    () => { isAccept = true; resolve(); },
+                    () => { isAccept = false; resolve(); },
+                    {
+                        leftName: args.shinzanCName,
+                        leftFace: args.shinzanCFace,
+                        okText: "面会する",
+                        okClass: "btn-danger",
+                        cancelText: "追い返す",
+                        cancelClass: "btn-primary"
+                    }
+                );
+            });
         }
 
-        // 汎用メッセージの表示（システムからのお知らせのように、画面の真ん中にメッセージを出します）
-        await game.ui.showDialogAsync(`${args.odaClanName} が ${args.matsudairaClanName} と同盟を締結しました！`, false, 0);
+        // 面会する（同盟を結ぶ）ルート
+        if (isAccept) {
+            // 織田家プレイヤーの時だけ、通す命令と対面ナレーションを再生します
+            if (game.playerClanId === nobunaga.clan) {
+                if (window.EventTextManager && window.EventTextManager.kiyosu_alliance_oda_accept) {
+                    await window.EventTextManager.playSequence(game, window.EventTextManager.kiyosu_alliance_oda_accept(args));
+                }
+            }
+            
+            // 共通のパート２（対面して同盟成立）を再生します
+            if (window.EventTextManager && window.EventTextManager.kiyosu_alliance_accept) {
+                await window.EventTextManager.playSequence(game, window.EventTextManager.kiyosu_alliance_accept(args));
+            }
 
-        // 画面や情報を最新の状態に更新します
-        if (game.ui) {
-            game.ui.renderMap();
-            game.ui.updatePanelHeader();
+            // ログ出力
+            game.ui.log(`【イベント】清州同盟：${args.matsudairaClanName}と${args.odaClanName}の同盟が成立しました。`);
+
+            // 外交システムを使って、強制的に「同盟」状態にします
+            if (game.diplomacyManager) {
+                game.diplomacyManager.changeStatus(motoyasu.clan, nobunaga.clan, '同盟', 0);
+                
+                // お互いの関係値を最高の100にします！
+                const relA = game.diplomacyManager.getRelation(motoyasu.clan, nobunaga.clan);
+                if (relA) relA.sentiment = 100;
+                
+                const relB = game.diplomacyManager.getRelation(nobunaga.clan, motoyasu.clan);
+                if (relB) relB.sentiment = 100;
+            }
+
+            // 汎用メッセージの表示
+            await game.ui.showDialogAsync(`${args.odaClanName} が ${args.matsudairaClanName} と同盟を締結しました！`, false, 0);
+
+            // 画面や情報を最新の状態に更新します
+            if (game.ui) {
+                game.ui.renderMap();
+                game.ui.updatePanelHeader();
+            }
+        } 
+        // 追い返す（同盟を結ばない）ルート
+        else {
+            // パート３（拒否）を再生します
+            if (window.EventTextManager && window.EventTextManager.kiyosu_alliance_reject) {
+                await window.EventTextManager.playSequence(game, window.EventTextManager.kiyosu_alliance_reject(args));
+            }
+            // ログ出力
+            game.ui.log(`【イベント】清州同盟：${args.odaFamilyName}家は${args.matsudairaFamilyName}家との同盟を拒否しました。`);
         }
 
         // ★ 3. イベントが全て終わったので、メモしておいた元のBGMに戻します

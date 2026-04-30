@@ -41,105 +41,57 @@ window.EventTextManager = {
     // ==========================================
     // ★ イベントごとの台本置き場
     // ==========================================
-    
-    // ① 清州同盟
-    kiyosu_alliance: function(args) {
-        // args（引数）として、その時の武将の名前や勢力名を受け取り、文章に埋め込みます
+    // ① 清州同盟（パート１：使者の到着まで）
+    kiyosu_alliance_part1: function(args) {
         return [
-            {
-                type: 'log',
-                msg: `今川義元の死後、三河で独立を果たした${args.motoyasuName}は、隣国${args.imagawaClanName}と敵対関係となっていた。`
-            },
-            {
-                type: 'log',
-                msg: `${args.motoyasuName}は${args.nobunagaName}との接近を考え、${args.odaClanName}との同盟を模索していた。`
-            },
-            {
-                type: 'dialog',
-                leftName: args.vassalName,
-                leftFace: args.vassalFace,
-                msg: `「殿、${args.odaClanName}と手を結ぶは必定なれど、${args.nobunagaGivenName}は油断ならぬ男。やすやすとうまくはいきますまい。」`
-            },
-            {
-                type: 'dialog',
-                leftName: args.motoyasuName,
-                leftFace: args.motoyasuFace,
-                msg: `「うむ。それゆえ、此度はわし自ら、${args.nobunagaCastleName}に赴こうと考えておる。かのお方とは腹を割って話さねばならぬのだ。」`
-            },
-            {
-                type: 'dialog',
-                leftName: args.vassalName,
-                leftFace: args.vassalFace,
-                msg: `「殿自ら……？\nしかし、それは危険にございます。」`
-            },
-            {
-                type: 'dialog',
-                leftName: args.motoyasuName,
-                leftFace: args.motoyasuFace,
-                msg: `「わし自ら訪問することで、当方の誠意と覚悟を見せるのだ。最早決めたことじゃ。もう何も言うでない。」`
-            },
-            {
-                type: 'dialog',
-                leftName: args.vassalName,
-                leftFace: args.vassalFace,
-                msg: `「はっ……」`
-            },
-            {
-                type: 'log',
-                msg: `${args.year}年${args.month}月　${args.nobunagaCastleName}`
-            },
-            {
-                type: 'dialog',
-                leftName: args.nobunagaName,
-                leftFace: args.nobunagaFace,
-                msg: `「よう来たのう、竹千代。久しいのう。よう来てくれた。」`
-            },
-            {
-                type: 'dialog',
-                leftName: args.motoyasuName,
-                leftFace: args.motoyasuFace,
-                msg: `「お懐かしゅうございまする、吉法師様。いえ、${args.nobunagaTitle}様。」`
-            },
-            {
-                type: 'dialog',
-                leftName: args.nobunagaName,
-                leftFace: args.nobunagaFace,
-                msg: `「わしとそなたの仲ではないか。吉法師で構わぬわい。」`
-            },
-            {
-                type: 'dialog',
-                leftName: args.motoyasuName,
-                leftFace: args.motoyasuFace,
-                msg: `「はっ、吉法師様。まこと、懐かしゅうござりまする。」`
-            },
-            {
-                type: 'dialog',
-                leftName: args.nobunagaName,
-                leftFace: args.nobunagaFace,
-                msg: `「うむ……\nして、同盟の話であろう？」`
-            },
-            {
-                type: 'dialog',
-                leftName: args.motoyasuName,
-                leftFace: args.motoyasuFace,
-                msg: `「ご明察にござる。此度は${args.odaClanName}と${args.matsudairaClanName}との同盟の件で参りました。」`
-            },
-            {
-                type: 'dialog',
-                leftName: args.nobunagaName,
-                leftFace: args.nobunagaFace,
-                msg: `「うむ、わかっておる。わしと竹千代が組めば、怖いものはないわい。はっはっはっ……」`
-            },
-            {
-                type: 'dialog',
-                leftName: args.motoyasuName,
-                leftFace: args.motoyasuFace,
-                msg: `「はっはっはっ……」`
-            },
-            {
-                type: 'log',
-                msg: `こうして、${args.matsudairaClanName}と${args.odaClanName}の同盟は成立した。`
-            }
+            { type: 'log', msg: `今川義元の死後、三河で独立を果たした${args.motoyasuName}は、隣国${args.imagawaFamilyName}家と敵対関係となっていた。` },
+            { type: 'log', msg: `${args.motoyasuGivenName}は長年に渡り敵対関係にあった${args.odaFamilyName}家との同盟を模索していた。` },
+            { type: 'dialog', leftName: args.kashinAName, leftFace: args.kashinAFace, msg: `「殿、なりませぬぞ。」` },
+            { type: 'dialog', leftName: args.kashinAName, leftFace: args.kashinAFace, msg: `「${args.odaFamilyName}と我らは、先々代であらせられる清孝公の時代より敵対してまいりました。今さら同盟などと、納得できぬ者も多いでしょう。」` },
+            { type: 'dialog', leftName: args.kashinBName, leftFace: args.kashinBFace, msg: `「そうは申すが、人質を出さぬと決めた以上、${args.imagawaFamilyName}とはもはやこれまで。一触即発の関係にござる。」` },
+            { type: 'dialog', leftName: args.kashinBName, leftFace: args.kashinBFace, msg: `「その上、三河の掌握もままならぬとなっては、${args.odaFamilyName}の力添えなくして、我らの生き残る道はありますまい。」` },
+            { type: 'dialog', leftName: args.motoyasuName, leftFace: args.motoyasuFace, msg: `「うむ……\n${args.kashinAGivenName}よ、おぬしの言い分ももっともじゃ。しかし、それでも${args.odaFamilyName}と結ぶは必定であるとわしは考えておる。」` },
+            { type: 'dialog', leftName: args.kashinAName, leftFace: args.kashinAFace, msg: `「は……\nなれど、${args.nobunagaGivenName}は油断ならぬ男。容易にはいきますまい。」` },
+            { type: 'dialog', leftName: args.motoyasuName, leftFace: args.motoyasuFace, msg: `「うむ。此度はわし自ら${args.nobunagaCastleShort}に赴かねばなるまい。」` },
+            { type: 'dialog', leftName: args.motoyasuName, leftFace: args.motoyasuFace, msg: `「わし自ら訪問することで、当方の誠意と覚悟を見せるのじゃ。よいな。」` },
+            { type: 'dialog', leftName: args.kashinAName, leftFace: args.kashinAFace, msg: `「ははっ！」` },
+            { type: 'log', msg: `${args.year}年${args.month}月　${args.nobunagaCastleName}` }
+        ];
+    },
+
+    // ① 清州同盟（織田家専用：使者の取り次ぎ）
+    kiyosu_alliance_oda_arrival: function(args) {
+        return [
+            { type: 'dialog', leftName: args.shinzanCName, leftFace: args.shinzanCFace, msg: `「殿。${args.matsudairaFamilyName}家の使者が参っておりまする。」` },
+            { type: 'dialog', leftName: args.nobunagaName, leftFace: args.nobunagaFace, msg: `「${args.matsudairaFamilyName}か……ふむ。」` }
+        ];
+    },
+
+    // ① 清州同盟（織田家専用：面会決定〜対面）
+    kiyosu_alliance_oda_accept: function(args) {
+        return [
+            { type: 'dialog', leftName: args.nobunagaName, leftFace: args.nobunagaFace, msg: `「ふっ、会うてやろうではないか。通せ。」` },
+            { type: 'dialog', leftName: args.shinzanCName, leftFace: args.shinzanCFace, msg: `「はっ！」` },
+            { type: 'log', msg: `${args.nobunagaGivenName}と${args.motoyasuGivenName}は、${args.nobunagaCastleName}内で対面した。` }
+        ];
+    },
+
+    // ① 清州同盟（パート２：面会して同盟成立ルート）
+    kiyosu_alliance_accept: function(args) {
+        return [
+            { type: 'dialog', leftName: args.nobunagaName, leftFace: args.nobunagaFace, msg: `「おぬし自ら来るとはのう。よう来た、竹千代。」` },
+            { type: 'dialog', leftName: args.motoyasuName, leftFace: args.motoyasuFace, msg: `「お懐かしゅうございまする、吉法師様。いえ、${args.nobunagaTitle}様。」` },
+            { type: 'dialog', leftName: args.nobunagaName, leftFace: args.nobunagaFace, msg: `「はっはっは！\nわしとそなたの仲ではないか。吉法師で構わぬわい。」` },
+            { type: 'dialog', leftName: args.motoyasuName, leftFace: args.motoyasuFace, msg: `「はっ、吉法師様。まこと、懐かしゅうござりまする。」` },
+            { type: 'dialog', leftName: args.nobunagaName, leftFace: args.nobunagaFace, msg: `「うむ、息災で何よりである。」` },
+            { type: 'dialog', leftName: args.nobunagaName, leftFace: args.nobunagaFace, msg: `「して……\nおぬしがここへ来たとなれば、${args.imagawaFamilyName}とは袂を分かつ心づもりであるな？」` },
+            { type: 'dialog', leftName: args.motoyasuName, leftFace: args.motoyasuFace, msg: `「はっ、ご明察にござる。${args.matsudairaFamilyName}家が生き残る道はこれしかござらぬ。どうか我らと結んでいただきたく。」` },
+            { type: 'dialog', leftName: args.nobunagaName, leftFace: args.nobunagaFace, msg: `「……ふっ、敵地に堂々と乗り込むおぬしの豪胆さには参ったわい。」` },
+            { type: 'dialog', leftName: args.nobunagaName, leftFace: args.nobunagaFace, msg: `「あいわかった。今日より我らは盟友でござる。西はわし。東はおぬしじゃ。それで良かろう？」` },
+            { type: 'dialog', leftName: args.motoyasuName, leftFace: args.motoyasuFace, msg: `「ははっ！　まこと、うれしゅう存じまする！」` },
+            { type: 'dialog', leftName: args.nobunagaName, leftFace: args.nobunagaFace, msg: `「うむ、今日はよい日じゃ。はっはっはっ……」` },
+            { type: 'dialog', leftName: args.motoyasuName, leftFace: args.motoyasuFace, msg: `「はっはっはっ……」` },
+            { type: 'log', msg: `こうして、${args.odaClanName}と${args.matsudairaClanName}の同盟は成立した。` }
         ];
     },
     
