@@ -377,7 +377,7 @@ class AffiliationSystem {
             return;
         }
 
-        const commander = bushos.find(b => this.game.legions && this.game.legions.some(l => l.commanderId === b.id));
+        const commander = bushos.find(b => b.isCommander);
         if (commander) {
             bushos.forEach(b => { 
                 b.isCastellan = false; 
