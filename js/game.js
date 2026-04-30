@@ -293,6 +293,9 @@ class DataManager {
             // 軍団長に就任する武将を探します
             const commander = bushos.find(b => b.id === legion.commanderId);
             if (commander) {
+                // ★ここを書き足し！：軍団長（国主）のシールをしっかり貼ります！
+                commander.isCommander = true;
+
                 // ★修正：武将本人ではなく、その武将がいる「お城」に軍団番号を書き込みます
                 const castle = castles.find(c => c.id === commander.castleId);
                 if (castle) {
@@ -1802,6 +1805,14 @@ class GameManager {
                 // ★今回追加：セーブデータから軍団の名簿を元通りに復元します
                 this.legions = (d.legions || []).map(l => new Legion(l));
                 
+                // ★ここを書き足し！：古いデータでシールが剥がれている場合のために、名簿を見て貼り直します！
+                this.legions.forEach(legion => {
+                    const commander = this.bushos.find(b => b.id === legion.commanderId);
+                    if (commander) {
+                        commander.isCommander = true;
+                    }
+                });
+
                 if (d.kunishus) {
                     this.kunishuSystem.setKunishuData(d.kunishus.map(k => new Kunishu(k)));
                 } else {
