@@ -1285,16 +1285,16 @@ class GameManager {
                 // 3. 増加量の基本値: √城の人口 * ((大名補正 + 民忠補正) / 2) * 1.0(調整用)
                 const baseGrowth = Math.sqrt(c.population) * ((daimyoBonus + loyaltyBonus) / 2) * 1.0;
 
-                // 城の所有数によるブレーキです
+                // ★追加：城の所有数によるブレーキです！
                 // まず、このお城の持ち主が、全部でいくつお城を持っているか数えます
                 const ownedCastlesCount = this.castles.filter(castle => castle.ownerClan === c.ownerClan).length;
-                // 城の数にルートをかけて、そこから1を引きます（ただし、1より小さくならないようにMath.maxで守ります！）
-                const castlePenalty = Math.max(1, Math.sqrt(ownedCastlesCount) - 1);
+                // 城の所有数を25で割り、1を足してペナルティ値とします（最低でも1なので安全です）
+                const castlePenalty = 1 + (ownedCastlesCount / 25);
                 
                 // 基本値から先に城数ブレーキで「割り算」をして、抑制された基本値を作ります
                 const suppressedGrowth = baseGrowth / castlePenalty;
 
-                // 人口に対する兵士の割合を計算して、ブレーキをかけます
+                // ★追加：人口に対する兵士の割合を計算して、ブレーキをかけます！
                 // 兵士の割合が50%で0.375倍になり、75%で0.0625倍（雀の涙）になります。
                 const soldierRatio = c.population > 0 ? (c.soldiers / c.population) : 1.0;
                 const penaltyMultiplier = Math.max(0, 1.0 - (soldierRatio * 1.25));
