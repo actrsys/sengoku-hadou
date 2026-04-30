@@ -638,10 +638,19 @@ class UIManager {
 
         const footer = okBtn.parentElement; // ★追加：ボタンが入っているフッターの箱を取得します
         const choicesContainer = document.getElementById('dialog-choices-container'); // ★新しく作った選択肢の箱を取得します
+        const modalContent = modal.querySelector('.modal-content');
+
+        // 前回のイベント設定が残っていたら一旦消しておきます
+        if (modalContent) {
+            if (this._currentEventClickHandler) {
+                modalContent.removeEventListener('click', this._currentEventClickHandler);
+            }
+            modalContent.style.cursor = '';
+        }
 
         // ------------------
         // イベントモード専用のクリック操作の定義
-        const eventClickHandler = (e) => {
+        this._currentEventClickHandler = (e) => {
             // 選択肢ボタンをクリックした場合は邪魔をしません
             if (e.target.closest('.dialog-choice-btn')) return;
             
@@ -654,18 +663,11 @@ class UIManager {
             // 次へ進むために、クリックの受付を解除してから決定ボタンを押したことにします
             const content = modal.querySelector('.modal-content');
             if (content) {
-                content.removeEventListener('click', eventClickHandler);
+                content.removeEventListener('click', this._currentEventClickHandler);
                 content.style.cursor = '';
             }
             okBtn.click(); 
         };
-
-        // 前回のイベント設定が残っていたら一旦消しておきます
-        const modalContent = modal.querySelector('.modal-content');
-        if (modalContent) {
-            modalContent.removeEventListener('click', eventClickHandler);
-            modalContent.style.cursor = '';
-        }
         // ------------------
 
         // イベント専用の指定があるか先に確認しておきます
@@ -727,7 +729,7 @@ class UIManager {
                 // メッセージエリア全体をクリックで進めるようにします
                 if (modalContent) {
                     modalContent.style.cursor = 'pointer';
-                    modalContent.addEventListener('click', eventClickHandler);
+                    modalContent.addEventListener('click', this._currentEventClickHandler);
                 }
             } else {
                 // 通常のダイアログの場合は、目印を外し、いつものボタンを出します
