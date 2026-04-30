@@ -2225,7 +2225,7 @@ class UIInfoManager {
         // ★追加：行動を消費しないコマンドかどうかを判定します
         let isActionFree = false;
         if (extraData && extraData.allowDone) isActionFree = true; 
-        if (['appoint','employ_target','appoint_gunshi','rumor_target_busho','headhunt_target','interview','interview_target','reward','war_general', 'kunishu_war_general', 'marriage_princess', 'marriage_kinsman', 'succession'].includes(actionType)) isActionFree = true;
+        if (['appoint','appoint_legion_leader','employ_target','appoint_gunshi','rumor_target_busho','headhunt_target','interview','interview_target','reward','war_general', 'kunishu_war_general', 'marriage_princess', 'marriage_kinsman', 'succession'].includes(actionType)) isActionFree = true;
         if (['def_intercept_deploy', 'def_reinf_deploy', 'atk_reinf_deploy', 'def_self_reinf_deploy', 'atk_self_reinf_deploy', 'kunishu_subjugate_deploy'].includes(actionType)) isActionFree = true;
         
         // ★追加：行動列を隠すかどうかのフラグです
