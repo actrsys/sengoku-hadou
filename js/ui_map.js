@@ -828,7 +828,13 @@ Object.assign(UIManager.prototype, {
                     kunishuHtml += `</div>`;
                 }
 
-                // 城の吹き出しと、諸勢力のアイコンを一緒にセットします！
+                // ★軍団マーカーの作成（第1～第8軍団の場合のみ）
+                let legionMarkerHtml = '';
+                if (c.legionId > 0) {
+                    legionMarkerHtml = `<div class="legion-marker legion-${c.legionId}">${c.legionId}</div>`;
+                }
+
+                // 城の吹き出しと、諸勢力のアイコン、軍団マーカーをセットします！
                 el.innerHTML = `
                     <div class="hover-info">
                         <div class="info-line name">${c.name}</div>
@@ -836,6 +842,7 @@ Object.assign(UIManager.prototype, {
                         <div class="info-line">${castellanName}</div>
                     </div>
                     ${kunishuHtml}
+                    ${legionMarkerHtml}
                 `;
             }
             
