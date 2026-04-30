@@ -926,11 +926,28 @@ class UIManager {
     showAppointLegionLeaderModal(legionNo) {
         this.info.openBushoSelector('appoint_legion_leader', null, { legionNo: legionNo });
     }
-
+    
     showAppointLegionCastleSelector(bushoId, legionNo) {
         if (this.info) {
             this.info.showAppointLegionCastleSelector(bushoId, legionNo);
         }
+    }
+
+    showDismissLegionLeaderConfirm(legionNo) {
+        if (!this.game.legions) return;
+        const legion = this.game.legions.find(l => Number(l.clanId) === Number(this.game.playerClanId) && Number(l.legionNo) === legionNo);
+        if (!legion || !legion.commanderId) return;
+        
+        const commander = this.game.getBusho(legion.commanderId);
+        if (!commander) return;
+
+        this.showDialog(`${commander.name} を国主の座から解任しますか？`, true, 
+            () => {
+                this.game.commandSystem.executeDismissLegionLeader(legionNo);
+            },
+            null,
+            { okText: '解任する', okClass: 'btn-danger', cancelText: 'やめる' }
+        );
     }
 
     showAllotFiefModal(legionNo) {

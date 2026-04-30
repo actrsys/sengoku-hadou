@@ -46,6 +46,13 @@ const COMMAND_MENU_STRUCTURE = [
                 ]
             },
             {
+                label: "国主解任",
+                commands: [
+                    'dismiss_legion_leader_1', 'dismiss_legion_leader_2', 'dismiss_legion_leader_3', 'dismiss_legion_leader_4',
+                    'dismiss_legion_leader_5', 'dismiss_legion_leader_6', 'dismiss_legion_leader_7', 'dismiss_legion_leader_8'
+                ]
+            },
+            {
                 label: "所領分配",
                 commands: [
                     'allot_fief_1', 'allot_fief_2', 'allot_fief_3', 'allot_fief_4',
@@ -90,6 +97,12 @@ const CAN_EXECUTE_RULES = {
             if (hasLegion) return false;
         }
         return legionNumber <= myCastles.length;
+    },
+    // ★追加：国主解任用の判定ルール（国主が存在する時だけ押せるようにします）
+    canDismissLegion: (game, legionNumber) => {
+        if (!game.legions) return false;
+        const legion = game.legions.find(l => Number(l.clanId) === Number(game.playerClanId) && Number(l.legionNo) === legionNumber && Number(l.commanderId) > 0);
+        return !!legion;
     },
     // ★追加：所領分配用の判定ルール（国主が存在する時だけ押せるようにします）
     canAllotFief: (game, legionNumber) => {
@@ -390,6 +403,15 @@ const COMMAND_SPECS = {
     'appoint_legion_leader_6': { label: "第六席", category: 'LEGION', isSystem: true, action: 'appoint_legion_leader_6', canExecute: (game, castle) => CAN_EXECUTE_RULES.canManageLegion(game, 6) },
     'appoint_legion_leader_7': { label: "第七席", category: 'LEGION', isSystem: true, action: 'appoint_legion_leader_7', canExecute: (game, castle) => CAN_EXECUTE_RULES.canManageLegion(game, 7) },
     'appoint_legion_leader_8': { label: "第八席", category: 'LEGION', isSystem: true, action: 'appoint_legion_leader_8', canExecute: (game, castle) => CAN_EXECUTE_RULES.canManageLegion(game, 8) },
+
+    'dismiss_legion_leader_1': { label: "第一席", category: 'LEGION', isSystem: true, action: 'dismiss_legion_leader_1', canExecute: (game, castle) => CAN_EXECUTE_RULES.canDismissLegion(game, 1) },
+    'dismiss_legion_leader_2': { label: "第二席", category: 'LEGION', isSystem: true, action: 'dismiss_legion_leader_2', canExecute: (game, castle) => CAN_EXECUTE_RULES.canDismissLegion(game, 2) },
+    'dismiss_legion_leader_3': { label: "第三席", category: 'LEGION', isSystem: true, action: 'dismiss_legion_leader_3', canExecute: (game, castle) => CAN_EXECUTE_RULES.canDismissLegion(game, 3) },
+    'dismiss_legion_leader_4': { label: "第四席", category: 'LEGION', isSystem: true, action: 'dismiss_legion_leader_4', canExecute: (game, castle) => CAN_EXECUTE_RULES.canDismissLegion(game, 4) },
+    'dismiss_legion_leader_5': { label: "第五席", category: 'LEGION', isSystem: true, action: 'dismiss_legion_leader_5', canExecute: (game, castle) => CAN_EXECUTE_RULES.canDismissLegion(game, 5) },
+    'dismiss_legion_leader_6': { label: "第六席", category: 'LEGION', isSystem: true, action: 'dismiss_legion_leader_6', canExecute: (game, castle) => CAN_EXECUTE_RULES.canDismissLegion(game, 6) },
+    'dismiss_legion_leader_7': { label: "第七席", category: 'LEGION', isSystem: true, action: 'dismiss_legion_leader_7', canExecute: (game, castle) => CAN_EXECUTE_RULES.canDismissLegion(game, 7) },
+    'dismiss_legion_leader_8': { label: "第八席", category: 'LEGION', isSystem: true, action: 'dismiss_legion_leader_8', canExecute: (game, castle) => CAN_EXECUTE_RULES.canDismissLegion(game, 8) },
     
     'allot_fief_1': { label: "第一席", category: 'LEGION', isSystem: true, action: 'allot_fief_1', canExecute: (game, castle) => CAN_EXECUTE_RULES.canAllotFief(game, 1) },
     'allot_fief_2': { label: "第二席", category: 'LEGION', isSystem: true, action: 'allot_fief_2', canExecute: (game, castle) => CAN_EXECUTE_RULES.canAllotFief(game, 2) },
@@ -1277,6 +1299,14 @@ class CommandSystem {
             case 'appoint_legion_leader_6': this.game.ui.showAppointLegionLeaderModal(6); break;
             case 'appoint_legion_leader_7': this.game.ui.showAppointLegionLeaderModal(7); break;
             case 'appoint_legion_leader_8': this.game.ui.showAppointLegionLeaderModal(8); break;
+            case 'dismiss_legion_leader_1': this.game.ui.showDismissLegionLeaderConfirm(1); break;
+            case 'dismiss_legion_leader_2': this.game.ui.showDismissLegionLeaderConfirm(2); break;
+            case 'dismiss_legion_leader_3': this.game.ui.showDismissLegionLeaderConfirm(3); break;
+            case 'dismiss_legion_leader_4': this.game.ui.showDismissLegionLeaderConfirm(4); break;
+            case 'dismiss_legion_leader_5': this.game.ui.showDismissLegionLeaderConfirm(5); break;
+            case 'dismiss_legion_leader_6': this.game.ui.showDismissLegionLeaderConfirm(6); break;
+            case 'dismiss_legion_leader_7': this.game.ui.showDismissLegionLeaderConfirm(7); break;
+            case 'dismiss_legion_leader_8': this.game.ui.showDismissLegionLeaderConfirm(8); break;
             case 'allot_fief_1': this.game.ui.showAllotFiefModal(1); break;
             case 'allot_fief_2': this.game.ui.showAllotFiefModal(2); break;
             case 'allot_fief_3': this.game.ui.showAllotFiefModal(3); break;
@@ -3320,6 +3350,43 @@ class CommandSystem {
         const legionName = numberNames[legionNo] || `第${legionNo}席`;
         
         this.game.ui.showResultModal(`${legionName}の所領分配を完了しました。\n${count}件の拠点の所属が変更されました。`);
+        this.game.ui.updatePanelHeader();
+        this.game.ui.renderCommandMenu();
+    }
+
+    // ★追加：国主解任の実行
+    executeDismissLegionLeader(legionNo) {
+        if (!this.game.legions) return;
+        const legion = this.game.legions.find(l => Number(l.clanId) === Number(this.game.playerClanId) && Number(l.legionNo) === legionNo);
+        if (!legion || !legion.commanderId) return;
+
+        const commander = this.game.getBusho(legion.commanderId);
+        if (commander) {
+            commander.isCommander = false;
+        }
+
+        // その軍団の所属をすべて直轄（ID0）に変更
+        let count = 0;
+        this.game.castles.forEach(c => {
+            if (Number(c.ownerClan) === Number(this.game.playerClanId) && Number(c.legionId) === legionNo) {
+                c.legionId = 0;
+                count++;
+            }
+        });
+
+        // 軍団の作戦などを破棄
+        legion.commanderId = 0;
+        legion.objective = null;
+        legion.status = 'wait';
+        legion.targetId = 0;
+        legion.route = [];
+
+        const numberNames = ["", "第一席", "第二席", "第三席", "第四席", "第五席", "第六席", "第七席", "第八席"];
+        const legionName = numberNames[legionNo] || `第${legionNo}席`;
+        
+        const commanderName = commander ? commander.name : "不明";
+
+        this.game.ui.showResultModal(`${commanderName} を ${legionName} の国主から解任しました。\n所属していた ${count} 件の拠点はすべて直轄領に変更されました。`);
         this.game.ui.updatePanelHeader();
         this.game.ui.renderCommandMenu();
     }
