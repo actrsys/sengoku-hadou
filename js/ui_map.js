@@ -574,8 +574,8 @@ Object.assign(UIManager.prototype, {
                 // AI処理中なら絶対にバリアを張ります！
                 this.aiGuard.classList.remove('hidden'); 
                 
-                // ただし、ダイアログなどで一時的に隠したい時(guardHiddenCount)は、壁ごと消すのではなく文字だけを透明にして隠します！
-                if ((this.guardHiddenCount || 0) > 0) {
+                // ただし、ダイアログなどで一時的に隠したい時(guardTextHiddenCount)は、壁ごと消すのではなく文字だけを透明にして隠します！
+                if ((this.guardTextHiddenCount || 0) > 0) {
                     this.aiGuard.classList.add('hide-text');
                 } else {
                     this.aiGuard.classList.remove('hide-text');
