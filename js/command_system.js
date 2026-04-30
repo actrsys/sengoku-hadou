@@ -2249,6 +2249,7 @@ class CommandSystem {
         this.game.ui.showResultModal(displayMessage);
         this.game.ui.updatePanelHeader();
         this.game.ui.renderCommandMenu();
+        this.game.ui.renderMap();
     }
 
     executeTrade(type, amount) {
@@ -3349,6 +3350,7 @@ class CommandSystem {
         this.game.ui.showResultModal(`${legionName}の所領分配を完了しました。\n${count}件の拠点の所属が変更されました。`);
         this.game.ui.updatePanelHeader();
         this.game.ui.renderCommandMenu();
+        this.game.ui.renderMap();
     }
 
     // ★追加：国主解任の実行
@@ -3386,5 +3388,6 @@ class CommandSystem {
         this.game.ui.showResultModal(`${commanderName} を ${legionName} の国主から解任しました。\n所属していた ${count} 件の拠点はすべて直轄領に変更されました。`);
         this.game.ui.updatePanelHeader();
         this.game.ui.renderCommandMenu();
+        this.game.ui.renderMap();
     }
 }
