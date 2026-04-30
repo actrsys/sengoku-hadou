@@ -955,11 +955,22 @@ class AIEngine {
         // ★ kunishuSystem（諸勢力の専門部署）の executeKunishuSubjugate を呼び出します！
         this.game.kunishuSystem.executeKunishuSubjugate(sourceCastle, sourceCastle.id, sorted.map(b => b.id), sendSoldiers, sendRice, sendHorses, sendGuns, kunishu);
     }
-
-    // 差し替え後 (ai.js - execInternalAffairs部分)
+    
     execInternalAffairs(castle, castellan, mods, smartness) {
-        // ① 大名を取得します（行動回数の計算に使います）
+        // ① 大名を取得します（全体で使う用）
         const daimyo = this.game.bushos.find(b => b.clan === castle.ownerClan && b.isDaimyo) || castellan;
+
+        // ★追加：行動回数の計算基準となる「リーダー（直轄なら大名、それ以外なら国主）」を決めます！
+        let leader = daimyo;
+        if (castle.legionId !== 0) {
+            const legion = this.game.legions ? this.game.legions.find(l => l.clanId === castle.ownerClan && l.legionNo === castle.legionId) : null;
+            if (legion && legion.commanderId) {
+                const commander = this.game.getBusho(legion.commanderId);
+                if (commander) {
+                    leader = commander;
+                }
+            }
+        }
 
         // ★魔法の改善：最初にお城の繋がりを1回だけ全部調べて、リストを作ります！
         const reachableMyCastles = [];
@@ -988,20 +999,20 @@ class AIEngine {
             }
         }
 
-        // ★大名の城と「自領で地続き」で繋がっているかをリストから一瞬で判断します！
+        // ★リーダーの城と「自領で地続き」で繋がっているかをリストから一瞬で判断します！
         let isConnected = false;
-        if (!daimyo.castleId || daimyo.castleId === castle.id) {
+        if (!leader.castleId || leader.castleId === castle.id) {
             isConnected = true;
         } else {
-            // リストの中に大名のお城があるか探すだけですぐ分かります！
-            isConnected = reachableMyCastles.some(c => c.id === daimyo.castleId);
+            // リストの中にリーダーのお城があるか探すだけですぐ分かります！
+            isConnected = reachableMyCastles.some(c => c.id === leader.castleId);
         }
 
         // ② 行動回数の計算
         let baseAP = 0;
         if (isConnected) {
-            // 大名と地続きの城：「(城主内政＋城主魅力＋大名内政＋大名魅力) ÷ 2」
-            baseAP = Math.floor((castellan.politics + castellan.charm + daimyo.politics + daimyo.charm) / 2);
+            // リーダーと地続きの城：「(城主内政＋城主魅力＋リーダー内政＋リーダー魅力) ÷ 2」
+            baseAP = Math.floor((castellan.politics + castellan.charm + leader.politics + leader.charm) / 2);
         } else {
             // 飛び地（地続きではない）城：「(城主内政＋城主魅力) ÷ 2」
             baseAP = Math.floor((castellan.politics + castellan.charm) / 2);
