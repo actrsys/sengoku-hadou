@@ -1399,8 +1399,21 @@ class GameManager {
         if (this.warManager && this.warManager.state && this.warManager.state.active) return;
         if (this.selectionMode != null) return;
 
+        // ★ここから追加：毎ターンの開始時に、絶対に透明化の呪いを解く強制リセット魔法！
+        if (this.ui) {
+            this.ui.guardHiddenCount = 0;
+            if (this.ui.aiGuard) {
+                this.ui.aiGuard.classList.remove('hide-text');
+            }
+        }
+        const forceHideStyle = document.getElementById('force-hide-ai-text');
+        if (forceHideStyle) {
+            forceHideStyle.remove();
+        }
+        // ★追加ここまで
+
         // ★ここを修正！ 全ての城が終わって翌月（endMonth）に行く前にも、メッセージが消えるのをじっと待ちます！
-        if (this.currentIndex >= this.turnQueue.length) { 
+        if (this.currentIndex >= this.turnQueue.length) {
             if (this.ui && this.ui.waitForDialogs) {
                 await this.ui.waitForDialogs();
             }
