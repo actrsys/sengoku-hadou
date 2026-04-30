@@ -98,13 +98,18 @@ class AIOperationManager {
         this.validateAllOperations();
 
         for (const clan of this.game.clans) {
-            if (clan.id === 0 || clan.id === this.game.playerClanId) continue;
+            if (clan.id === 0) continue; // ★変更：プレイヤー大名家でも一旦スキップせずに中に入ります！
 
-            // ★追加：毎月、同盟や自分を支配している相手への不満を溜める魔法です！
-            this.decreaseSentimentForHighTension(clan.id);
+            const isPlayerClan = (clan.id === this.game.playerClanId);
 
-            // ★追加：毎月、まずは大名家単位で「誰と外交するか」を考えます！
-            this.thinkMonthlyDiplomacy(clan);
+            // ★変更：外交などの全体方針は、プレイヤー大名家以外の時だけAIに考えさせます
+            if (!isPlayerClan) {
+                // ★追加：毎月、同盟や自分を支配している相手への不満を溜める魔法です！
+                this.decreaseSentimentForHighTension(clan.id);
+
+                // ★追加：毎月、まずは大名家単位で「誰と外交するか」を考えます！
+                this.thinkMonthlyDiplomacy(clan);
+            }
             
             if (!this.operations[clan.id]) {
                 this.operations[clan.id] = {};
@@ -118,6 +123,9 @@ class AIOperationManager {
             const legionIds = [...new Set(myCastles.map(c => Number(c.legionId || 0)))];
 
             for (const legionId of legionIds) {
+                // ★追加：プレイヤー大名家で、かつ直轄（ID0）の場合は、勝手に作戦を立てないようにスキップします！
+                if (isPlayerClan && legionId === 0) continue;
+
                 if (!this.operations[clan.id][legionId]) {
                     await this.generateOperation(clan.id, legionId);
                 } else {
