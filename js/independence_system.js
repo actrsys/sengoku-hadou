@@ -85,19 +85,6 @@ class IndependenceSystem {
     }
     
     async executeRebellion(castle, castellan, oldDaimyo, intention = 'indep') {
-        // ★追加：独立や寝返りの処理中も思考中の文字を隠すために、透明化の魔法を予約します！
-        if (this.game.ui) {
-            this.game.ui.guardHiddenCount = (this.game.ui.guardHiddenCount || 0) + 1;
-        }
-
-        // ★今回追加：独立や寝返りの時も「透明化しっぱなし」のルールを書き込みます！
-        if (!document.getElementById('force-hide-ai-text')) {
-            const style = document.createElement('style');
-            style.id = 'force-hide-ai-text';
-            style.innerHTML = '#ai-guard { color: transparent !important; text-shadow: none !important; } #ai-guard * { opacity: 0 !important; }';
-            document.head.appendChild(style);
-        }
-
         const oldClanId = castle.ownerClan;
         
         // ★追加：複数のお城が同時に寝返ったか調べるために、最初のお城の持ち主を全部メモしておきます！
@@ -438,20 +425,6 @@ class IndependenceSystem {
         if (extraMsg !== "") {
             await this.game.ui.showDialogAsync(extraMsg, false, 0);
         }
-
-        // ★今回追加：「透明化しっぱなし」のルールを剥がして元に戻します！
-        const forceHideStyle = document.getElementById('force-hide-ai-text');
-        if (forceHideStyle) {
-            forceHideStyle.remove();
-        }
-
-        // ★追加：独立や寝返りのすべてが終わったら、透明化の魔法を解きます！
-        if (this.game.ui) {
-            this.game.ui.guardHiddenCount = Math.max(0, (this.game.ui.guardHiddenCount || 0) - 1);
-            if (typeof this.game.ui.renderMap === 'function') {
-                this.game.ui.renderMap();
-            }
-        }
     }
 
     // ★修正：独立処理中に派閥がリセットされても判定できるように、記憶した元の派閥ID(targetFactionId)をオプションで受け取れるようにします
@@ -644,19 +617,6 @@ class IndependenceSystem {
     // =========================================================================
 
     async planCoupDetatOrRebellion(castle, castellan, oldDaimyo) {
-        // ★ここから「謀反・独立ドラマ」の始まり！まず透明化の魔法を予約します。
-        if (this.game.ui) {
-            this.game.ui.guardHiddenCount = (this.game.ui.guardHiddenCount || 0) + 1;
-        }
-
-        // ★今回追加：謀反のドラマ中も「透明化しっぱなし」のルールを書き込みます！
-        if (!document.getElementById('force-hide-ai-text')) {
-            const style = document.createElement('style');
-            style.id = 'force-hide-ai-text';
-            style.innerHTML = '#ai-guard { color: transparent !important; text-shadow: none !important; } #ai-guard * { opacity: 0 !important; }';
-            document.head.appendChild(style);
-        }
-
         // 1. まずは反乱のリーダー（神輿）を探します。
         let rebellionLeader = castellan;
         const oldClanId = castle.ownerClan;
@@ -733,18 +693,6 @@ class IndependenceSystem {
             // もし神輿と城主が違う人物なら、城主も一緒に浪人にします
             if (castellan.id !== rebellionLeader.id && castellan.status === 'active') {
                 this.game.affiliationSystem.becomeRonin(castellan);
-            }
-            
-            // ★今回追加：「透明化しっぱなし」のルールを剥がして元に戻します！
-            const forceHideStyle = document.getElementById('force-hide-ai-text');
-            if (forceHideStyle) {
-                forceHideStyle.remove();
-            }
-
-            // ★処理が終わって戻る前に、透明化の魔法を解きます
-            if (this.game.ui) {
-                this.game.ui.guardHiddenCount = Math.max(0, (this.game.ui.guardHiddenCount || 0) - 1);
-                if (typeof this.game.ui.renderMap === 'function') this.game.ui.renderMap();
             }
             return;
         }
@@ -1082,21 +1030,6 @@ class IndependenceSystem {
         } else {
             // スコア計算の結果、寝返りか独立に決まった場合の処理です
             await this.executeRebellion(castle, castellan, oldDaimyo, action);
-        }
-
-        // ★今回追加：「透明化しっぱなし」のルールを剥がして元に戻します！
-        const forceHideStyle = document.getElementById('force-hide-ai-text');
-        if (forceHideStyle) {
-            forceHideStyle.remove();
-        }
-
-        // ★最後に「－１」して、透明化の魔法を解きます！
-        // これですべてのメッセージが表示し終わるまで、絶対に「思考中」の文字が出なくなります。
-        if (this.game.ui) {
-            this.game.ui.guardHiddenCount = Math.max(0, (this.game.ui.guardHiddenCount || 0) - 1);
-            if (typeof this.game.ui.renderMap === 'function') {
-                this.game.ui.renderMap();
-            }
         }
     }
 
