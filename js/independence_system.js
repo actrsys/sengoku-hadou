@@ -439,15 +439,23 @@ class IndependenceSystem {
             await this.game.ui.showDialogAsync(extraMsg, false, 0);
         }
 
-        // ★今回追加：「透明化しっぱなし」のルールを剥がして元に戻します！
+        // 1. 「透明化しっぱなし」のルールを剥がして元に戻します！
         const forceHideStyle = document.getElementById('force-hide-ai-text');
         if (forceHideStyle) {
             forceHideStyle.remove();
         }
+        
+        const aiGuardEl = document.getElementById('ai-guard');
+        if (aiGuardEl) {
+            aiGuardEl.classList.remove('hide-text');
+        }
 
-        // ★追加：独立や寝返りのすべてが終わったら、透明化の魔法を解きます！
+        // 1. 独立や寝返りのすべてが終わったら、透明化の魔法を解きます！
         if (this.game.ui) {
             this.game.ui.guardHiddenCount = Math.max(0, (this.game.ui.guardHiddenCount || 0) - 1);
+            if (typeof this.game.ui.restoreAIGuard === 'function') {
+                this.game.ui.restoreAIGuard();
+            }
             if (typeof this.game.ui.renderMap === 'function') {
                 this.game.ui.renderMap();
             }
@@ -735,15 +743,23 @@ class IndependenceSystem {
                 this.game.affiliationSystem.becomeRonin(castellan);
             }
             
-            // ★今回追加：「透明化しっぱなし」のルールを剥がして元に戻します！
+            // 2. 「透明化しっぱなし」のルールを剥がして元に戻します！
             const forceHideStyle = document.getElementById('force-hide-ai-text');
             if (forceHideStyle) {
                 forceHideStyle.remove();
             }
 
-            // ★処理が終わって戻る前に、透明化の魔法を解きます
+            const aiGuardEl = document.getElementById('ai-guard');
+            if (aiGuardEl) {
+                aiGuardEl.classList.remove('hide-text');
+            }
+
+            // 2. 処理が終わって戻る前に、透明化の魔法を解きます
             if (this.game.ui) {
                 this.game.ui.guardHiddenCount = Math.max(0, (this.game.ui.guardHiddenCount || 0) - 1);
+                if (typeof this.game.ui.restoreAIGuard === 'function') {
+                    this.game.ui.restoreAIGuard();
+                }
                 if (typeof this.game.ui.renderMap === 'function') this.game.ui.renderMap();
             }
             return;
@@ -1084,16 +1100,24 @@ class IndependenceSystem {
             await this.executeRebellion(castle, castellan, oldDaimyo, action);
         }
 
-        // ★今回追加：「透明化しっぱなし」のルールを剥がして元に戻します！
+        // 3. 「透明化しっぱなし」のルールを剥がして元に戻します！
         const forceHideStyle = document.getElementById('force-hide-ai-text');
         if (forceHideStyle) {
             forceHideStyle.remove();
         }
 
-        // ★最後に「－１」して、透明化の魔法を解きます！
+        const aiGuardEl = document.getElementById('ai-guard');
+        if (aiGuardEl) {
+            aiGuardEl.classList.remove('hide-text');
+        }
+
+        // 最後に「－１」して、透明化の魔法を解きます！
         // これですべてのメッセージが表示し終わるまで、絶対に「思考中」の文字が出なくなります。
         if (this.game.ui) {
             this.game.ui.guardHiddenCount = Math.max(0, (this.game.ui.guardHiddenCount || 0) - 1);
+            if (typeof this.game.ui.restoreAIGuard === 'function') {
+                this.game.ui.restoreAIGuard();
+            }
             if (typeof this.game.ui.renderMap === 'function') {
                 this.game.ui.renderMap();
             }
