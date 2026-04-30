@@ -830,11 +830,12 @@ Object.assign(UIManager.prototype, {
 
                 // ★軍団マーカーの作成（第1～第8軍団の場合のみ）
                 let legionMarkerHtml = '';
+                // c.legionId が 0 より大きい（軍団に所属している）かチェックします[cite: 2]
                 if (c.legionId > 0) {
-                    legionMarkerHtml = `<div class="legion-marker legion-${c.legionId}">${c.legionId}</div>`;
+                    legionMarkerHtml = `<div class="legion-marker-base legion-color-${c.legionId}">${c.legionId}</div>`;
                 }
 
-                // 城の吹き出しと、諸勢力のアイコン、軍団マーカーをセットします！
+                // 城の吹き出しと、諸勢力のアイコン、そして軍団マーカーを合体させます！
                 el.innerHTML = `
                     <div class="hover-info">
                         <div class="info-line name">${c.name}</div>
