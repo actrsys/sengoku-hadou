@@ -20,12 +20,31 @@ class AIOperationManager {
 
     load(data) {
         // ★変更：古いセーブデータと、新しいセーブデータの両方に対応する魔法です！
+        this.operations = {};
+        this.draftBases = {};
         if (data && data.operations) {
-            this.operations = data.operations;
-            this.draftBases = data.draftBases || {};
+            for (const clanId in data.operations) {
+                if (data.operations[clanId].type) {
+                    this.operations[clanId] = { 0: data.operations[clanId] };
+                } else {
+                    this.operations[clanId] = data.operations[clanId];
+                }
+            }
+            if (data.draftBases) {
+                for (const clanId in data.draftBases) {
+                    if (typeof data.draftBases[clanId] === 'number') {
+                        this.draftBases[clanId] = { 0: data.draftBases[clanId] };
+                    } else {
+                        this.draftBases[clanId] = data.draftBases[clanId] || {};
+                    }
+                }
+            }
         } else {
-            this.operations = data || {};
-            this.draftBases = {};
+            for (const clanId in data) {
+                 if (data[clanId] && data[clanId].type) {
+                     this.operations[clanId] = { 0: data[clanId] };
+                 }
+            }
         }
     }
 
@@ -33,39 +52,43 @@ class AIOperationManager {
     validateAllOperations() {
         for (const clanIdStr in this.operations) {
             const clanId = Number(clanIdStr);
-            const op = this.operations[clanId];
-            let isInvalid = false;
+            const clanOps = this.operations[clanId];
+            for (const legionIdStr in clanOps) {
+                const legionId = Number(legionIdStr);
+                const op = clanOps[legionId];
+                let isInvalid = false;
 
-            // 1. その大名家がもう滅亡していないかチェック
-            const clan = this.game.clans.find(c => c.id === clanId);
-            if (!clan || clan.id === 0) {
-                isInvalid = true;
-            } else if (!op) {
-                isInvalid = true;
-            } else {
-                // 2. 作戦データの中身が壊れていないかチェック
-                if (op.type === '攻撃') {
-                    // 数値が「NaN（非数）」になってしまっていないか、出撃元が設定されているか
-                    if (!op.stagingBase || isNaN(op.requiredForce) || isNaN(op.requiredRice) || isNaN(op.turnsRemaining)) {
-                        isInvalid = true;
-                    } else {
-                        // 出撃予定のお城が、イベントなどで別の大名家に奪われていないか
-                        const stagingCastle = this.game.getCastle(op.stagingBase);
-                        if (!stagingCastle || stagingCastle.ownerClan !== clanId) {
+                // 1. その大名家がもう滅亡していないかチェック
+                const clan = this.game.clans.find(c => c.id === clanId);
+                if (!clan || clan.id === 0) {
+                    isInvalid = true;
+                } else if (!op) {
+                    isInvalid = true;
+                } else {
+                    // 2. 作戦データの中身が壊れていないかチェック
+                    if (op.type === '攻撃') {
+                        // 数値が「NaN（非数）」になってしまっていないか、出撃元が設定されているか
+                        if (!op.stagingBase || isNaN(op.requiredForce) || isNaN(op.requiredRice) || isNaN(op.turnsRemaining)) {
+                            isInvalid = true;
+                        } else {
+                            // 出撃予定のお城が、イベントなどで別の大名家に奪われていないか
+                            const stagingCastle = this.game.getCastle(op.stagingBase);
+                            if (!stagingCastle || stagingCastle.ownerClan !== clanId || stagingCastle.legionId !== legionId) {
+                                isInvalid = true;
+                            }
+                        }
+                    } else if (op.type === '外交' || op.type === '内政') {
+                        if (isNaN(op.turnsRemaining) || isNaN(op.maxTurns)) {
                             isInvalid = true;
                         }
                     }
-                } else if (op.type === '外交' || op.type === '内政') {
-                    if (isNaN(op.turnsRemaining) || isNaN(op.maxTurns)) {
-                        isInvalid = true;
-                    }
                 }
-            }
 
-            // 不正が見つかったら、作戦を白紙に戻して安全に立て直させます
-            if (isInvalid) {
-                console.warn(`【AI自己診断】大名家[${clanId}]の不正な作戦データ(${op ? op.type : '不明'})を検知したため、破棄しました。`);
-                delete this.operations[clanId];
+                // 不正が見つかったら、作戦を白紙に戻して安全に立て直させます
+                if (isInvalid) {
+                    console.warn(`【AI自己診断】大名家[${clanId}]軍団[${legionId}]の不正な作戦データ(${op ? op.type : '不明'})を検知したため、破棄しました。`);
+                    delete this.operations[clanId][legionId];
+                }
             }
         }
     }
@@ -84,13 +107,25 @@ class AIOperationManager {
             this.thinkMonthlyDiplomacy(clan);
             
             if (!this.operations[clan.id]) {
-                await this.generateOperation(clan.id);
-            } else {
-                await this.updateOperation(clan.id);
+                this.operations[clan.id] = {};
+            }
+            if (!this.draftBases[clan.id]) {
+                this.draftBases[clan.id] = {};
             }
 
-            // ★追加：作戦とは別に、毎月「徴兵用のお城」を考えて選びます！
-            this.selectDraftBase(clan.id);
+            const myCastles = this.game.castles.filter(c => c.ownerClan === clan.id);
+            const legionIds = [...new Set(myCastles.map(c => c.legionId))];
+
+            for (const legionId of legionIds) {
+                if (!this.operations[clan.id][legionId]) {
+                    await this.generateOperation(clan.id, legionId);
+                } else {
+                    await this.updateOperation(clan.id, legionId);
+                }
+
+                // ★追加：作戦とは別に、毎月「徴兵用のお城」を考えて選びます！
+                this.selectDraftBase(clan.id, legionId);
+            }
         }
     }
 
@@ -153,16 +188,16 @@ class AIOperationManager {
     }
 
     // ★ここから追加：徴兵用の拠点を選ぶ魔法です
-    selectDraftBase(clanId) {
+    selectDraftBase(clanId, legionId) {
         // まずは前の月の記憶を消しておきます
-        this.draftBases[clanId] = null;
+        this.draftBases[clanId][legionId] = null;
 
-        const myClanCastles = this.game.castles.filter(c => c.ownerClan === clanId);
+        const myClanCastles = this.game.castles.filter(c => c.ownerClan === clanId && c.legionId === legionId);
         // お城が1つしかない時は、輸送できないので選びません！
         if (myClanCastles.length <= 1) return; 
 
         let startCastleId = null;
-        const op = this.operations[clanId];
+        const op = this.operations[clanId][legionId];
         
         // 攻撃作戦中なら、出撃するお城をスタート地点にします
         if (op && op.type === '攻撃' && op.stagingBase) {
@@ -171,7 +206,12 @@ class AIOperationManager {
             // そうでなければ、お殿様がいるお城をスタート地点にします
             const daimyo = this.game.bushos.find(b => b.clan === clanId && b.isDaimyo);
             if (daimyo && daimyo.castleId) {
-                startCastleId = daimyo.castleId;
+                const daimyoCastle = this.game.getCastle(daimyo.castleId);
+                if (daimyoCastle && daimyoCastle.legionId === legionId) {
+                    startCastleId = daimyo.castleId;
+                } else {
+                    startCastleId = myClanCastles[0].id;
+                }
             } else {
                 startCastleId = myClanCastles[0].id;
             }
@@ -193,7 +233,7 @@ class AIOperationManager {
             if (current.adjacentCastleIds) {
                 current.adjacentCastleIds.forEach(adjId => {
                     const c = this.game.getCastle(adjId);
-                    if (c && c.ownerClan === clanId && !visitedCastles.has(c.id)) {
+                    if (c && c.ownerClan === clanId && c.legionId === legionId && !visitedCastles.has(c.id)) {
                         visitedCastles.add(c.id);
                         searchQueue.push(c);
                     }
@@ -214,7 +254,7 @@ class AIOperationManager {
 
         // 決まったら、記憶の箱にしまいます
         if (bestCastle) {
-            this.draftBases[clanId] = bestCastle.id;
+            this.draftBases[clanId][legionId] = bestCastle.id;
         }
     }
 
@@ -315,13 +355,13 @@ class AIOperationManager {
         }
     }
 
-    async generateOperation(clanId) {
+    async generateOperation(clanId, legionId) {
         // ★イベント追加：AIの作戦立案前
         if (this.game.eventManager) {
             await this.game.eventManager.processEvents('before_ai_operation', clanId);
         }
 
-        const myClanCastles = this.game.castles.filter(c => c.ownerClan === clanId);
+        const myClanCastles = this.game.castles.filter(c => c.ownerClan === clanId && c.legionId === legionId);
         if (myClanCastles.length === 0) return;
 
         const startY = Number(this.game.gameStartYear || window.MainParams.StartYear || 1560);
@@ -331,7 +371,7 @@ class AIOperationManager {
         const elapsedTurns = ((currentY - startY) * 12) + (currentM - startM);
         
         if (isNaN(elapsedTurns) || elapsedTurns < 3) {
-            this.setInternalOperation(clanId);
+            this.setInternalOperation(clanId, legionId);
             return;
         }
         
@@ -410,10 +450,10 @@ class AIOperationManager {
                             visited.add(adjId);
                             const adjCastle = this.game.getCastle(adjId);
                             if (adjCastle) {
-                                if (adjCastle.ownerClan === clanId) {
+                                if (adjCastle.ownerClan === clanId && adjCastle.legionId === legionId) {
                                     // 自領ならさらに奥へ進めます
                                     queue.push({ castle: adjCastle, distance: currentDist + 1 });
-                                } else {
+                                } else if (adjCastle.ownerClan !== clanId) {
                                     // 自領以外（敵や空き城）なら、そこが攻撃可能な目標です！
                                     neighbors.push(adjCastle);
                                 }
@@ -428,7 +468,7 @@ class AIOperationManager {
                 if (target.adjacentCastleIds) {
                     isDirectlyAdjacent = target.adjacentCastleIds.some(adjId => {
                         const adjCastle = this.game.getCastle(adjId);
-                        return adjCastle && adjCastle.ownerClan === clanId;
+                        return adjCastle && adjCastle.ownerClan === clanId && adjCastle.legionId === legionId;
                     });
                 }
                 if (!isDirectlyAdjacent) return false;
@@ -545,14 +585,14 @@ class AIOperationManager {
                 // 期間の計算：敵が2勢力なら3ヶ月。そこから敵が2つ増えるごとに1ヶ月プラスします
                 const duration = 3 + Math.floor((enemyCount - 2) / 2);
                 
-                this.operations[clanId] = {
+                this.operations[clanId][legionId] = {
                     type: '外交',
                     sabotageTargets: sabotageTargets, // ★変更：新しく作った調略目標を記憶させます
                     turnsRemaining: 0, // すぐに実行するので準備期間はゼロです
                     maxTurns: duration,
                     status: '実行中'
                 };
-                console.log(`大名家[${clanId}]が【外交作戦】を立案しました！(隣接敵対: ${enemyCount}勢力, 期間: ${duration}ヶ月, 調略目標: ${sabotageTargets.length}件)`);
+                console.log(`大名家[${clanId}]軍団[${legionId}]が【外交作戦】を立案しました！(隣接敵対: ${enemyCount}勢力, 期間: ${duration}ヶ月, 調略目標: ${sabotageTargets.length}件)`);
                 return; // 外交作戦が決まったら、今回の作戦会議はこれでおしまいです
             }
         }
@@ -591,7 +631,7 @@ class AIOperationManager {
                     if (stagingCastle && stagingCastle.adjacentCastleIds) {
                         const adjMyCastles = stagingCastle.adjacentCastleIds
                             .map(id => this.game.getCastle(id))
-                            .filter(c => c && c.ownerClan === clanId)
+                            .filter(c => c && c.ownerClan === clanId && c.legionId === legionId)
                             .sort((a, b) => (b.soldiers + b.defense) - (a.soldiers + a.defense));
                         if (adjMyCastles.length > 0) {
                             supportBaseId = adjMyCastles[0].id;
@@ -663,7 +703,7 @@ class AIOperationManager {
                 // 第一目標のデータを取り出します
                 const firstTarget = attackTargets[0];
                 
-                this.operations[clanId] = {
+                this.operations[clanId][legionId] = {
                     type: '攻撃',
                     attackTargets: attackTargets, // ★追加：第一～第三までの目標リストを全部記憶します
                     targetId: firstTarget.targetId, 
@@ -678,17 +718,17 @@ class AIOperationManager {
                     status: firstTarget.turnsRemaining <= 0 ? '実行中' : '準備中',
                     sabotageTargets: sabotageTargets
                 };
-                console.log(`大名家[${clanId}]が【攻撃作戦】を立案しました！(目標数: ${attackTargets.length}, 第一出撃元: ${firstTarget.stagingBase}, 準備: ${firstTarget.turnsRemaining}ヶ月)`);
+                console.log(`大名家[${clanId}]軍団[${legionId}]が【攻撃作戦】を立案しました！(目標数: ${attackTargets.length}, 第一出撃元: ${firstTarget.stagingBase}, 準備: ${firstTarget.turnsRemaining}ヶ月)`);
                 return;
             }
         }
 
         // 攻撃する場所がなかったり、サイコロに外れたら、おとなしく内政作戦にします
-        this.setInternalOperation(clanId, sabotageTargets);
+        this.setInternalOperation(clanId, legionId, sabotageTargets);
     }
 
-    setInternalOperation(clanId, sabotageTargets = []) {
-        this.operations[clanId] = {
+    setInternalOperation(clanId, legionId, sabotageTargets = []) {
+        this.operations[clanId][legionId] = {
             type: '内政',
             targetId: null,
             sabotageTargets: sabotageTargets, // ★変更：新しく作った調略目標を記憶させます
@@ -701,18 +741,18 @@ class AIOperationManager {
             maxTurns: 1,
             status: '準備中'
         };
-        console.log(`大名家[${clanId}]は今月、【内政作戦】を行います。(調略目標: ${sabotageTargets.length}件)`);
+        console.log(`大名家[${clanId}]軍団[${legionId}]は今月、【内政作戦】を行います。(調略目標: ${sabotageTargets.length}件)`);
     }
 
-    async updateOperation(clanId) {
-        const op = this.operations[clanId];
+    async updateOperation(clanId, legionId) {
+        const op = this.operations[clanId][legionId];
 
         // 1. 期限切れのチェック
         op.maxTurns--;
         if (op.maxTurns <= 0) {
-            console.log(`大名家[${clanId}]の作戦【${op.type}】は期限切れで中止されました。`);
-            delete this.operations[clanId];
-            await this.generateOperation(clanId);
+            console.log(`大名家[${clanId}]軍団[${legionId}]の作戦【${op.type}】は期限切れで中止されました。`);
+            delete this.operations[clanId][legionId];
+            await this.generateOperation(clanId, legionId);
             return;
         }
 
@@ -724,10 +764,10 @@ class AIOperationManager {
             op.turnsRemaining--;
             if (op.turnsRemaining <= 0) {
                 op.status = '実行中';
-                console.log(`大名家[${clanId}]の作戦【${op.type}】の準備が完了し、実行フェーズに入りました！`);
+                console.log(`大名家[${clanId}]軍団[${legionId}]の作戦【${op.type}】の準備が完了し、実行フェーズに入りました！`);
             } else if (op.type === '攻撃') {
                 // ★追加：まだ準備中の場合（カウントダウンが0より大きい時）にログを出します
-                console.log(`大名家[${clanId}]は【攻撃作戦】を準備中です。(出撃元: ${op.stagingBase}, 残り準備期間: ${op.turnsRemaining}ヶ月)`);
+                console.log(`大名家[${clanId}]軍団[${legionId}]は【攻撃作戦】を準備中です。(出撃元: ${op.stagingBase}, 残り準備期間: ${op.turnsRemaining}ヶ月)`);
             }
         }
     }

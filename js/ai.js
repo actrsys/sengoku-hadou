@@ -46,7 +46,7 @@ class AIEngine {
         if (mods.accuracy < 0.7) prob -= 0.1;
         return Math.max(0.05, Math.min(1.0, prob));
     }
-
+    
     async execAI(castle) {
         try {
             // ★イベント追加：コマンドの選択前（AI操作時）
@@ -90,7 +90,8 @@ class AIEngine {
             const smartness = this.getAISmartness(castellan.intelligence);
 
             // ★修正：軍事フェーズ（出陣）を一番最初に確認するように順番を上に移動させます！
-            const myOperation = this.game.aiOperationManager.operations[castle.ownerClan];
+            const clanOps = this.game.aiOperationManager.operations[castle.ownerClan];
+            const myOperation = clanOps ? clanOps[castle.legionId] : null;
             
             // 自分の大名家に「作戦」があり、それが「攻撃」で、かつ「実行中」の場合
             if (myOperation && myOperation.type === '攻撃' && myOperation.status === '実行中') {
@@ -175,8 +176,8 @@ class AIEngine {
 
                     // もし道が途切れていたり、すでに敵じゃなくなっていたら、作戦のメモを消して中止します！
                     if (!canReach || !isStillEnemy) {
-                        delete this.game.aiOperationManager.operations[castle.ownerClan];
-                        await this.game.aiOperationManager.generateOperation(castle.ownerClan);
+                        delete this.game.aiOperationManager.operations[castle.ownerClan][castle.legionId];
+                        await this.game.aiOperationManager.generateOperation(castle.ownerClan, castle.legionId);
                     } else {
                         // ★追加：自分のお城か目的地が大雪になっていないかチェックをします！
                         let isHeavySnow = false;
@@ -211,7 +212,7 @@ class AIEngine {
                             
                             // ★出撃が終わったら、この作戦のメモは「完了」にして消しておきます
                             myOperation.status = '完了';
-                            delete this.game.aiOperationManager.operations[castle.ownerClan];
+                            delete this.game.aiOperationManager.operations[castle.ownerClan][castle.legionId];
                             
                             // 出陣したので、このお城のターンはおしまいです！
                             return; 
@@ -287,7 +288,8 @@ class AIEngine {
                     diplomacyChance += dipBonus;
                     
                     // 大名家の作戦が「外交」なら、外交確率を2倍にします！
-                    const myOp = this.game.aiOperationManager.operations[castle.ownerClan];
+                    const clanOps = this.game.aiOperationManager.operations[castle.ownerClan];
+                    const myOp = clanOps ? clanOps[castle.legionId] : null;
                     if (myOp && myOp.type === '外交' && myOp.status === '実行中') {
                         diplomacyChance *= 2;
                     }
@@ -954,6 +956,7 @@ class AIEngine {
         this.game.kunishuSystem.executeKunishuSubjugate(sourceCastle, sourceCastle.id, sorted.map(b => b.id), sendSoldiers, sendRice, sendHorses, sendGuns, kunishu);
     }
 
+    // 差し替え後 (ai.js - execInternalAffairs部分)
     execInternalAffairs(castle, castellan, mods, smartness) {
         // ① 大名を取得します（行動回数の計算に使います）
         const daimyo = this.game.bushos.find(b => b.clan === castle.ownerClan && b.isDaimyo) || castellan;
@@ -1080,7 +1083,8 @@ class AIEngine {
             // ★変更：鉄砲と軍馬の購入（大名の革新性、自家の装備比率、城の兵士数を元に点数を作ります）
             // ★追加：攻撃作戦中は出撃・援軍拠点のみ、それ以外は大名居城のみで購入します
             let canBuyEq = false;
-            const myOpEq = this.game.aiOperationManager.operations[castle.ownerClan];
+            const clanOpsEq = this.game.aiOperationManager.operations[castle.ownerClan];
+            const myOpEq = clanOpsEq ? clanOpsEq[castle.legionId] : null;
             if (myOpEq && myOpEq.type === '攻撃') {
                 if (castle.id === myOpEq.stagingBase || castle.id === myOpEq.supportBase) {
                     canBuyEq = true;
@@ -1260,7 +1264,8 @@ class AIEngine {
             }
 
             // --- 性格による点数の調整 ---
-            const myOp = this.game.aiOperationManager.operations[castle.ownerClan];
+            const clanOps = this.game.aiOperationManager.operations[castle.ownerClan];
+            const myOp = clanOps ? clanOps[castle.legionId] : null;
             const isPreparingAttack = (myOp && myOp.type === '攻撃');
 
             actions.forEach(a => {
@@ -1365,7 +1370,8 @@ class AIEngine {
 
             // ① 徴兵用拠点へのお金輸送
             if (isPreparingAttack && this.game.aiOperationManager.draftBases) {
-                const draftBaseId = this.game.aiOperationManager.draftBases[castle.ownerClan];
+                const clanDrafts = this.game.aiOperationManager.draftBases[castle.ownerClan];
+                const draftBaseId = clanDrafts ? clanDrafts[castle.legionId] : null;
                 if (draftBaseId && draftBaseId !== castle.id && castle.gold >= 1000) {
                     const isConnected = targetCastlesForTransport.some(c => c.id === draftBaseId);
                     if (isConnected) {

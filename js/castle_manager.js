@@ -54,108 +54,113 @@ class CastleManager {
         if (this.game.aiOperationManager && this.game.aiOperationManager.operations) {
             for (const clanIdStr in this.game.aiOperationManager.operations) {
                 const clanId = Number(clanIdStr);
-                const op = this.game.aiOperationManager.operations[clanId];
+                const opDict = this.game.aiOperationManager.operations[clanId];
                 
-                // ★追加：このお城が、作戦に全く関係なければスキップします（高速化の魔法！）
-                let isRelated = false;
-                
-                if (op.type === '攻撃') {
-                    if (op.attackTargets && op.attackTargets.length > 0) {
-                        isRelated = op.attackTargets.some(t => 
-                            (t.isKunishuTarget === false && t.targetId === castle.id) || 
-                            t.stagingBase === castle.id || 
-                            t.supportBase === castle.id
-                        );
-                    } else {
-                        isRelated = (op.isKunishuTarget === false && op.targetId === castle.id) || 
-                                    op.stagingBase === castle.id || 
-                                    op.supportBase === castle.id;
-                    }
-                }
-                
-                // 調略目標（sabotageTargets）に含まれているかもチェックします
-                if (op.sabotageTargets && op.sabotageTargets.length > 0) {
-                    const inSabotage = op.sabotageTargets.some(t => t.castleId === castle.id);
-                    if (inSabotage) {
-                        isRelated = true;
-                    }
-                }
-
-                // 全く関係ない大名家の作戦なら、この先の重い処理を飛ばして次へ行きます！
-                if (!isRelated) {
-                    continue; 
-                }
-
-                // ★追加：調略目標のリストから、持ち主が変わったお城を綺麗に消しておきます
-                if (op.sabotageTargets && op.sabotageTargets.length > 0) {
-                    op.sabotageTargets = op.sabotageTargets.filter(t => t.castleId !== castle.id);
-                }
-                
-                if (op.type === '攻撃') {
-                    if (op.attackTargets && op.attackTargets.length > 0) {
-                        // 第一目標が消されたかどうかを後で判定するため、最初の目標のIDなどを覚えておきます
-                        const currentTargetId = op.targetId;
-                        const currentIsKunishu = op.isKunishuTarget;
-                        const currentStagingBase = op.stagingBase;
-
-                        // まず、今持ち主が変わったお城に関係する目標や拠点をリストから消します
-                        op.attackTargets = op.attackTargets.filter(t => {
-                            const isTarget = (t.isKunishuTarget === false && t.targetId === castle.id);
-                            const isBase = (t.stagingBase === castle.id || t.supportBase === castle.id);
-                            return !(isTarget || isBase);
-                        });
-
-                        // リストの先頭から順番に「本当に今も攻められるか」をループでチェックします！
-                        let foundValid = false;
-                        while (op.attackTargets.length > 0) {
-                            const next = op.attackTargets[0];
-                            
-                            // 先頭の目標が、今まで実行していた作戦と同じなら、何も上書きせずにそのまま続行します！
-                            if (next.targetId === currentTargetId && next.isKunishuTarget === currentIsKunishu && next.stagingBase === currentStagingBase) {
-                                foundValid = true;
-                                break;
-                            }
-                            
-                            const targetCastle = next.isKunishuTarget ? null : this.game.getCastle(next.targetId);
-                            const stagingCastle = this.game.getCastle(next.stagingBase);
-                            
-                            let isTargetOk = true;
-                            if (!next.isKunishuTarget) {
-                                // 目標が自分のものになっていたり、存在しなければ不合格です
-                                if (!targetCastle || targetCastle.ownerClan === clanId) isTargetOk = false;
-                            }
-                            // 出撃元のお城が自分のものでなくなっていたら不合格です
-                            const isBaseOk = (stagingCastle && stagingCastle.ownerClan === clanId);
-
-                            if (isTargetOk && isBaseOk) {
-                                // 合格！この新しい目標を今のメイン作戦としてセットします
-                                foundValid = true;
-                                op.targetId = next.targetId;
-                                op.isKunishuTarget = next.isKunishuTarget;
-                                op.stagingBase = next.stagingBase;
-                                op.supportBase = next.supportBase;
-                                op.requiredForce = next.requiredForce;
-                                op.requiredRice = next.requiredRice;
-                                op.turnsRemaining = next.turnsRemaining;
-                                op.maxTurns = next.maxTurns;
-                                op.status = next.turnsRemaining <= 0 ? '実行中' : '準備中';
-                                break; 
-                            } else {
-                                // ダメならリストから外して、次の予備目標（第三目標など）をチェックします
-                                op.attackTargets.shift();
-                            }
+                for (const legionIdStr in opDict) {
+                    const legionId = Number(legionIdStr);
+                    const op = opDict[legionId];
+                    
+                    // ★追加：このお城が、作戦に全く関係なければスキップします（高速化の魔法！）
+                    let isRelated = false;
+                    
+                    if (op.type === '攻撃') {
+                        if (op.attackTargets && op.attackTargets.length > 0) {
+                            isRelated = op.attackTargets.some(t => 
+                                (t.isKunishuTarget === false && t.targetId === castle.id) || 
+                                t.stagingBase === castle.id || 
+                                t.supportBase === castle.id
+                            );
+                        } else {
+                            isRelated = (op.isKunishuTarget === false && op.targetId === castle.id) || 
+                                        op.stagingBase === castle.id || 
+                                        op.supportBase === castle.id;
                         }
-
-                        // 全部チェックして合格者がゼロなら、作戦のメモを白紙に戻します
-                        if (!foundValid) {
-                            delete this.game.aiOperationManager.operations[clanId];
+                    }
+                    
+                    // 調略目標（sabotageTargets）に含まれているかもチェックします
+                    if (op.sabotageTargets && op.sabotageTargets.length > 0) {
+                        const inSabotage = op.sabotageTargets.some(t => t.castleId === castle.id);
+                        if (inSabotage) {
+                            isRelated = true;
                         }
-                    } else {
-                        // 予備リストがない場合、今の目標や拠点がダメになったら中止します
-                        const isTarget = (op.isKunishuTarget === false && op.targetId === castle.id);
-                        const isBase = (op.stagingBase === castle.id || op.supportBase === castle.id);
-                        if (isTarget || isBase) {
-                            delete this.game.aiOperationManager.operations[clanId];
+                    }
+
+                    // 全く関係ない大名家の作戦なら、この先の重い処理を飛ばして次へ行きます！
+                    if (!isRelated) {
+                        continue; 
+                    }
+
+                    // ★追加：調略目標のリストから、持ち主が変わったお城を綺麗に消しておきます
+                    if (op.sabotageTargets && op.sabotageTargets.length > 0) {
+                        op.sabotageTargets = op.sabotageTargets.filter(t => t.castleId !== castle.id);
+                    }
+                    
+                    if (op.type === '攻撃') {
+                        if (op.attackTargets && op.attackTargets.length > 0) {
+                            // 第一目標が消されたかどうかを後で判定するため、最初の目標のIDなどを覚えておきます
+                            const currentTargetId = op.targetId;
+                            const currentIsKunishu = op.isKunishuTarget;
+                            const currentStagingBase = op.stagingBase;
+
+                            // まず、今持ち主が変わったお城に関係する目標や拠点をリストから消します
+                            op.attackTargets = op.attackTargets.filter(t => {
+                                const isTarget = (t.isKunishuTarget === false && t.targetId === castle.id);
+                                const isBase = (t.stagingBase === castle.id || t.supportBase === castle.id);
+                                return !(isTarget || isBase);
+                            });
+
+                            // リストの先頭から順番に「本当に今も攻められるか」をループでチェックします！
+                            let foundValid = false;
+                            while (op.attackTargets.length > 0) {
+                                const next = op.attackTargets[0];
+                                
+                                // 先頭の目標が、今まで実行していた作戦と同じなら、何も上書きせずにそのまま続行します！
+                                if (next.targetId === currentTargetId && next.isKunishuTarget === currentIsKunishu && next.stagingBase === currentStagingBase) {
+                                    foundValid = true;
+                                    break;
+                                }
+                                
+                                const targetCastle = next.isKunishuTarget ? null : this.game.getCastle(next.targetId);
+                                const stagingCastle = this.game.getCastle(next.stagingBase);
+                                
+                                let isTargetOk = true;
+                                if (!next.isKunishuTarget) {
+                                    // 目標が自分のものになっていたり、存在しなければ不合格です
+                                    if (!targetCastle || targetCastle.ownerClan === clanId) isTargetOk = false;
+                                }
+                                // 出撃元のお城が自分のものでなくなっていたら不合格です
+                                const isBaseOk = (stagingCastle && stagingCastle.ownerClan === clanId);
+
+                                if (isTargetOk && isBaseOk) {
+                                    // 合格！この新しい目標を今のメイン作戦としてセットします
+                                    foundValid = true;
+                                    op.targetId = next.targetId;
+                                    op.isKunishuTarget = next.isKunishuTarget;
+                                    op.stagingBase = next.stagingBase;
+                                    op.supportBase = next.supportBase;
+                                    op.requiredForce = next.requiredForce;
+                                    op.requiredRice = next.requiredRice;
+                                    op.turnsRemaining = next.turnsRemaining;
+                                    op.maxTurns = next.maxTurns;
+                                    op.status = next.turnsRemaining <= 0 ? '実行中' : '準備中';
+                                    break; 
+                                } else {
+                                    // ダメならリストから外して、次の予備目標（第三目標など）をチェックします
+                                    op.attackTargets.shift();
+                                }
+                            }
+
+                            // 全部チェックして合格者がゼロなら、作戦のメモを白紙に戻します
+                            if (!foundValid) {
+                                delete this.game.aiOperationManager.operations[clanId][legionId];
+                            }
+                        } else {
+                            // 予備リストがない場合、今の目標や拠点がダメになったら中止します
+                            const isTarget = (op.isKunishuTarget === false && op.targetId === castle.id);
+                            const isBase = (op.stagingBase === castle.id || op.supportBase === castle.id);
+                            if (isTarget || isBase) {
+                                delete this.game.aiOperationManager.operations[clanId][legionId];
+                            }
                         }
                     }
                 }

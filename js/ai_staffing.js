@@ -1,6 +1,6 @@
 /**
  * ai_staffing.js - 武将移動・配置システム
- * 責務: 大名家全体の戦略、拠点の重要度、武将の能力タイプに基づいた移動先の決定
+ * 大名家全体の戦略、拠点の重要度、武将の能力タイプに基づいた移動先の決定
  */
 
 class AIStaffing {    
@@ -24,6 +24,7 @@ class AIStaffing {
 
             const adjMyCastles = this.game.castles.filter(c => 
                 c.ownerClan === clanId && 
+                c.legionId === castle.legionId && // ★追加：同じ軍団のお城だけに制限します！
                 GameSystem.isAdjacent(current, c) &&
                 !visitedCastles.has(c.id)
             );
@@ -43,7 +44,8 @@ class AIStaffing {
         let stagingBaseId = null;
         let operationBonus = 0;
         
-        const myOp = this.game.aiOperationManager.operations[clanId];
+        const clanOps = this.game.aiOperationManager.operations[clanId];
+        const myOp = clanOps ? clanOps[castle.legionId] : null;
         if (myOp && myOp.type === '攻撃') {
             stagingBaseId = myOp.stagingBase;
             if (daimyo.personality === 'aggressive') {
@@ -343,9 +345,10 @@ class AIStaffing {
     }
 
     // 大名家の目的（防衛、攻撃、内政など）を決めます
-    determineClanGoal(clanId) {
-        if (!this.evaluationCache[clanId]) this.evaluationCache[clanId] = {};
-        if (this.evaluationCache[clanId].goal) return this.evaluationCache[clanId].goal;
+    determineClanGoal(clanId, legionId) {
+        const cacheKey = `${clanId}_${legionId}`;
+        if (!this.evaluationCache[cacheKey]) this.evaluationCache[cacheKey] = {};
+        if (this.evaluationCache[cacheKey].goal) return this.evaluationCache[cacheKey].goal;
 
         const roles = this.evaluateCastles(clanId);
         let goal = '集結';
@@ -355,12 +358,16 @@ class AIStaffing {
         let isFrontPushed = false;
 
         roles.forEach((data, cId) => {
-            if (data.isBase && data.dangerLevel > 30) isBaseInDanger = true;
-            if (data.role === '前線拠点' && data.dangerLevel > 50) isFrontPushed = true;
+            const c = this.game.getCastle(cId);
+            if (c && c.legionId === legionId) {
+                if (data.isBase && data.dangerLevel > 30) isBaseInDanger = true;
+                if (data.role === '前線拠点' && data.dangerLevel > 50) isFrontPushed = true;
+            }
         });
 
         // 作戦システムで攻撃準備中かチェック
-        const myOperation = this.game.aiOperationManager.operations[clanId];
+        const clanOps = this.game.aiOperationManager.operations[clanId];
+        const myOperation = clanOps ? clanOps[legionId] : null;
         const isPreparingAttack = (myOperation && myOperation.type === '攻撃');
 
         if (isBaseInDanger) {
@@ -374,7 +381,7 @@ class AIStaffing {
             goal = '内政';
         }
 
-        this.evaluationCache[clanId].goal = goal;
+        this.evaluationCache[cacheKey].goal = goal;
         return goal;
     }
 
@@ -383,9 +390,12 @@ class AIStaffing {
         this.clearCacheIfNeeded();
         const clanId = castle.ownerClan;
         
+        // ★追加：武将の移動先を「同じ軍団のお城」だけに限定します！
+        const sameLegionCastles = reachableMyCastles.filter(c => c.legionId === castle.legionId);
+        
         const bushoTypes = this.evaluateBushos(clanId);
         const castleRoles = this.evaluateCastles(clanId);
-        const clanGoal = this.determineClanGoal(clanId);
+        const clanGoal = this.determineClanGoal(clanId, castle.legionId);
 
         const currentRoleData = castleRoles.get(castle.id);
         if (!currentRoleData) return null;
@@ -394,13 +404,13 @@ class AIStaffing {
         let totalBushosInNetwork = 0;
         let totalScale = 0;
         
-        reachableMyCastles.forEach(c => {
+        sameLegionCastles.forEach(c => {
             totalBushosInNetwork += c.samuraiIds.length;
             totalScale += (c.maxKokudaka + c.maxCommerce);
         });
 
-        const avgBushos = Math.max(1, totalBushosInNetwork / Math.max(1, reachableMyCastles.length));
-        const avgScale = Math.max(1, totalScale / Math.max(1, reachableMyCastles.length));
+        const avgBushos = Math.max(1, totalBushosInNetwork / Math.max(1, sameLegionCastles.length));
+        const avgScale = Math.max(1, totalScale / Math.max(1, sameLegionCastles.length));
 
         // お引越しの候補者を入れる箱を用意します
         let candidates = [];
@@ -418,7 +428,7 @@ class AIStaffing {
             let targetForThisBusho = null;
 
             // 自領のすべてのお城（今の城を含む）に、この武将にとっての「魅力点数」をつけていきます
-            for (let target of reachableMyCastles) {
+            for (let target of sameLegionCastles) {
                 const tRoleData = castleRoles.get(target.id);
                 if (!tRoleData) continue;
 
@@ -512,7 +522,8 @@ class AIStaffing {
                 }
 
                 // 6. 攻撃作戦の準備拠点・援軍拠点ならプラス
-                const myOp = this.game.aiOperationManager.operations[clanId];
+                const clanOps = this.game.aiOperationManager.operations[clanId];
+                const myOp = clanOps ? clanOps[castle.legionId] : null;
                 if (clanGoal === '攻撃準備' && myOp) {
                     if (bType !== '無能型') {
                         if (myOp.stagingBase === target.id) {
@@ -625,7 +636,7 @@ class AIStaffing {
 
         // もし行きたい人が誰もいなくて、空き城があった時のお留守番機能です
         if (moveActions.length === 0) {
-            const emptyCastles = reachableMyCastles.filter(c => c.samuraiIds.length <= 1 && c.id !== castle.id);
+            const emptyCastles = sameLegionCastles.filter(c => c.samuraiIds.length <= 1 && c.id !== castle.id);
             if (emptyCastles.length > 0 && castle.samuraiIds.length > 4) {
                 const lowSkillMovers = availableBushos
                     .filter(b => b.id !== castle.castellanId)
