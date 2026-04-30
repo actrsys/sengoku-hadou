@@ -2492,7 +2492,7 @@ body:not(.is-pc) .event-dialog-modal .modal-content.modal-small {
     font-weight: bold;
     color: #fff;
     /* めっちゃ細い白い枠線を文字に追加して、擬似的に太字にします */
-    -webkit-text-stroke: 0.5px #fff;
+    -webkit-text-stroke: 0.8px #fff;
     /* 上下左右の影で黒く細いフチを作り、最後に元のぼんやりとした影をつけます */
     text-shadow: 
         1px 1px 0 #000, 
