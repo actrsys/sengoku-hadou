@@ -515,6 +515,29 @@ window.GameEvents.push({
         const motoyasu = game.getBusho(1004004);
         if (!motoyasu || !motoyasu.isDaimyo || motoyasu.clan === 0) return false;
 
+        // 今川氏真（ID: 1004011）が大名であるか確認します
+        const ujizane = game.getBusho(1004011);
+        if (!ujizane || !ujizane.isDaimyo || ujizane.clan === 0) return false;
+
+        // 一色義龍（ID: 1005001）または一色龍興（ID: 1005011）が大名であるか確認します
+        const yoshitatsu = game.getBusho(1005001);
+        const tatsuoki = game.getBusho(1005011);
+        let isshikiDaimyo = null;
+        if (yoshitatsu && yoshitatsu.isDaimyo && yoshitatsu.clan !== 0) {
+            isshikiDaimyo = yoshitatsu;
+        } else if (tatsuoki && tatsuoki.isDaimyo && tatsuoki.clan !== 0) {
+            isshikiDaimyo = tatsuoki;
+        }
+        if (!isshikiDaimyo) return false;
+
+        // 織田家と一色家の関係が敵対であるか確認します
+        const relOdaIsshiki = game.diplomacyManager.getRelation(nobunaga.clan, isshikiDaimyo.clan);
+        if (!relOdaIsshiki || relOdaIsshiki.status !== '敵対') return false;
+
+        // 松平家と今川家の関係が敵対であるか確認します
+        const relMatsudairaImagawa = game.diplomacyManager.getRelation(motoyasu.clan, ujizane.clan);
+        if (!relMatsudairaImagawa || relMatsudairaImagawa.status !== '敵対') return false;
+
         // 織田家と松平家の関係が「敵対」「普通」「友好」のいずれかであるか確認します
         const rel = game.diplomacyManager.getRelation(nobunaga.clan, motoyasu.clan);
         if (!rel || (rel.status !== '敵対' && rel.status !== '普通' && rel.status !== '友好')) return false;
