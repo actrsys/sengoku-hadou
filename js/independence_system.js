@@ -84,362 +84,382 @@ class IndependenceSystem {
         }
     }
     
-    // 差し替え後
     async executeRebellion(castle, castellan, oldDaimyo, intention = 'indep') {
         // ★追加：独立や寝返りの処理中も思考中の文字を隠すために、透明化の魔法を予約します！
         if (this.game.ui) {
             this.game.ui.guardHiddenCount = (this.game.ui.guardHiddenCount || 0) + 1;
-            if (typeof this.game.ui.renderMap === 'function') {
-                this.game.ui.renderMap();
-            }
         }
 
-        const oldClanId = castle.ownerClan;
-        
-        // ★追加：複数のお城が同時に寝返ったか調べるために、最初のお城の持ち主を全部メモしておきます！
-        const initialClanMap = new Map();
-        this.game.castles.forEach(c => initialClanMap.set(c.id, c.ownerClan));
-        
-        const I = window.WarParams.Independence || {};
-
-        // --- ★追加：派閥主を神輿（みこし）に担ぐ処理 ---
-        let rebellionLeader = castellan; // デフォルトは謀反を起こした城主
-        let isProxyRebellion = false;    // 神輿担ぎかどうかを覚える旗
-
-        // もし独立を起こす城主が派閥に属していて、なおかつ派閥主ではない場合
-        if (castellan.factionId !== 0 && !castellan.isFactionLeader) {
-            // 同じ大名家で、同じ派閥のリーダー（派閥主）を探す
-            const factionLeader = this.game.bushos.find(b => b.clan === oldClanId && b.factionId === castellan.factionId && b.isFactionLeader && !b.belongKunishuId);
-            if (factionLeader) {
-                // 派閥主が、今の殿様よりも独立計画に賛同してくれるかを計算
-                const { joinScore, stayScore } = this.calculateLoyaltyScores(factionLeader, castellan, oldDaimyo);
-                if (joinScore > stayScore) {
-                    rebellionLeader = factionLeader; // 派閥主が神輿になる！
-                    isProxyRebellion = true;
-                }
-            }
+        // ★今回追加：独立や寝返りの時も「透明化しっぱなし」のルールを書き込みます！
+        if (!document.getElementById('force-hide-ai-text')) {
+            const style = document.createElement('style');
+            style.id = 'force-hide-ai-text';
+            style.innerHTML = '#ai-guard { color: transparent !important; text-shadow: none !important; } #ai-guard * { opacity: 0 !important; }';
+            document.head.appendChild(style);
         }
 
-        // ★修正：独立・寝返り処理の途中で役職がリセットされても呼応するように、元の派閥IDを記憶しておきます！
-        const leaderOriginalFactionId = rebellionLeader.factionId;
+        try {
+            const oldClanId = castle.ownerClan;
+            
+            // ★追加：複数のお城が同時に寝返ったか調べるために、最初のお城の持ち主を全部メモしておきます！
+            const initialClanMap = new Map();
+            this.game.castles.forEach(c => initialClanMap.set(c.id, c.ownerClan));
+            
+            const I = window.WarParams.Independence || {};
 
-        // --- ★ここから：寝返り先を探す処理 ---
-        let targetClanId = null;
-        let targetDaimyo = null;
-        let bestScore = -1;
+            // --- ★追加：派閥主を神輿（みこし）に担ぐ処理 ---
+            let rebellionLeader = castellan; // デフォルトは謀反を起こした城主
+            let isProxyRebellion = false;    // 神輿担ぎかどうかを覚える旗
 
-        // ★追加：独立志向(indep)でなければ、寝返り先を探します
-        if (intention !== 'indep') {
-            // ★変更：寝返り前の「今のままの大名家の戦力」を計算します
-            const oldClanPower = this.calcClanPower(oldClanId);
-
-            // 相性の計算基準を rebellionLeader（神輿になる人物）に変更
-            const oldAffinityDiff = GameSystem.calcAffinityDiff(rebellionLeader.affinity, oldDaimyo.affinity);
-
-            for (const clan of this.game.clans) {
-                if (clan.id === 0 || clan.id === oldClanId) continue; 
-                const rel = this.game.getRelation(oldClanId, clan.id);
-                if (!rel || rel.status !== '敵対') continue;
-                
-                // その敵対大名が持っている城の中に、ここから「3マス以内」の城があるか探します
-                const enemyCastles = this.game.castles.filter(c => c.ownerClan === clan.id);
-                let isNear = false; // 最初は「近くない」としておきます
-                for (const ec of enemyCastles) {
-                    // タテの距離とヨコの距離を足して、何マス離れているか計算します
-                    const distance = Math.abs(castle.x - ec.x) + Math.abs(castle.y - ec.y);
-                    if (distance <= 3) {
-                        isNear = true; // 3マス以内の城が見つかったら「近い！」とメモします
-                        break; // 1つでも見つかればOKなので、探すのをやめます
-                    }
-                }
-                // もし3マス以内に城が1つもなかったら、この大名家は遠すぎるので無視（スキップ）します
-                if (!isNear) continue; 
-                
-                const enemyDaimyo = this.game.bushos.find(b => b.clan === clan.id && b.isDaimyo);
-                if (!enemyDaimyo) continue;
-
-                // ★変更：寝返り前の「そのままの敵対大名の戦力」を計算します
-                let enemyCurrentPower = this.calcClanPower(clan.id);
-                
-                // 相性の計算基準を rebellionLeader に変更
-                const enemyAffinityDiff = GameSystem.calcAffinityDiff(rebellionLeader.affinity, enemyDaimyo.affinity);
-                let affinityBonus = 0;
-                if (enemyAffinityDiff < oldAffinityDiff) {
-                    affinityBonus = oldAffinityDiff - enemyAffinityDiff; 
-                }
-
-                // ★変更：「今の敵対大名戦力」 ＞ 「今の元大名戦力」 になるなら候補に入れます
-                if ((enemyCurrentPower + affinityBonus) > oldClanPower) {
-                    const score = enemyCurrentPower + affinityBonus;
-                    if (score > bestScore) {
-                        bestScore = score;
-                        targetClanId = clan.id;
-                        targetDaimyo = enemyDaimyo;
+            // もし独立を起こす城主が派閥に属していて、なおかつ派閥主ではない場合
+            if (castellan.factionId !== 0 && !castellan.isFactionLeader) {
+                // 同じ大名家で、同じ派閥のリーダー（派閥主）を探す
+                const factionLeader = this.game.bushos.find(b => b.clan === oldClanId && b.factionId === castellan.factionId && b.isFactionLeader && !b.belongKunishuId);
+                if (factionLeader) {
+                    // 派閥主が、今の殿様よりも独立計画に賛同してくれるかを計算
+                    const { joinScore, stayScore } = this.calculateLoyaltyScores(factionLeader, castellan, oldDaimyo);
+                    if (joinScore > stayScore) {
+                        rebellionLeader = factionLeader; // 派閥主が神輿になる！
+                        isProxyRebellion = true;
                     }
                 }
             }
-        }
-        
-        // ★追加：データが変わってマップの色がフライングで塗り替わるのを防ぐストッパーをかけます！
-        this.game.isSuspendingColorUpdate = true;
 
-        let isDefection = false;
-        let newClanId;
-        let newClanName;
-        
-        if (targetClanId) {
-            isDefection = true;
-            newClanId = targetClanId;
-            const targetClan = this.game.clans.find(c => c.id === targetClanId);
-            newClanName = targetClan ? targetClan.name : "敵対大名";
+            // ★修正：独立・寝返り処理の途中で役職がリセットされても呼応するように、元の派閥IDを記憶しておきます！
+            const leaderOriginalFactionId = rebellionLeader.factionId;
 
-            // ★追加：大名家が変わるので功績半分！
-            if (castellan.clan !== 0 && castellan.clan !== newClanId) {
-                castellan.achievementTotal = Math.floor((castellan.achievementTotal || 0) / 2);
-            }
-            castellan.clan = newClanId;
-            castellan.loyalty = this.calcNewLoyalty(castellan, targetDaimyo);
-            this.game.castleManager.changeOwner(castle, newClanId);
-            
-        } else {
-            newClanId = Math.max(...this.game.clans.map(c => c.id)) + 1;
-            const newColor = this.generateDistinctColor(castle);
-            // ★新大名家の名前は神輿の人物ベース
-            const familyName = rebellionLeader.familyName || rebellionLeader.name.split('|')[0] || rebellionLeader.name; 
-            newClanName = `${familyName}家`;
-            
-            // ★新大名家の読み仮名も神輿の人物から取ります！
-            const familyYomi = rebellionLeader.familyYomi || rebellionLeader.yomi.split('|')[0] || rebellionLeader.yomi;
-            const newClanYomi = familyYomi ? `${familyYomi}け` : "";
+            // --- ★ここから：寝返り先を探す処理 ---
+            let targetClanId = null;
+            let targetDaimyo = null;
+            let bestScore = -1;
 
-            const newClan = new Clan({
-                id: newClanId, name: newClanName, yomi: newClanYomi, color: newColor, leaderId: rebellionLeader.id
-            });
+            // ★追加：独立志向(indep)でなければ、寝返り先を探します
+            if (intention !== 'indep') {
+                // ★変更：寝返り前の「今のままの大名家の戦力」を計算します
+                const oldClanPower = this.calcClanPower(oldClanId);
 
-            const oldClanForDip = this.game.clans.find(c => c.id === oldClanId);
-            if (oldClanForDip) {
-                this.game.clans.forEach(otherClan => {
-                    if (otherClan.id === 0 || otherClan.id === oldClanId) return;
+                // 相性の計算基準を rebellionLeader（神輿になる人物）に変更
+                const oldAffinityDiff = GameSystem.calcAffinityDiff(rebellionLeader.affinity, oldDaimyo.affinity);
+
+                for (const clan of this.game.clans) {
+                    if (clan.id === 0 || clan.id === oldClanId) continue; 
+                    const rel = this.game.getRelation(oldClanId, clan.id);
+                    if (!rel || rel.status !== '敵対') continue;
                     
-                    const oldRel = this.game.getRelation(oldClanId, otherClan.id);
-                    if (oldRel) {
-                        let newSentiment = 100 - oldRel.sentiment;
-                        newSentiment = Math.max(30, Math.min(70, newSentiment));
-                        
-                        let newStatus = '普通';
-                        if (newSentiment >= 70) newStatus = '友好';
-                        if (newSentiment <= 30) newStatus = '敵対';
-                        
-                        newClan.diplomacyValue[otherClan.id] = {
-                            status: newStatus,
-                            sentiment: newSentiment,
-                            trucePeriod: 0,
-                            isMarriage: false
-                        };
-                        
-                        if (!otherClan.diplomacyValue) otherClan.diplomacyValue = {};
-                        otherClan.diplomacyValue[newClanId] = {
-                            status: newStatus,
-                            sentiment: newSentiment,
-                            trucePeriod: 0,
-                            isMarriage: false
-                        };
+                    // その敵対大名が持っている城の中に、ここから「3マス以内」の城があるか探します
+                    const enemyCastles = this.game.castles.filter(c => c.ownerClan === clan.id);
+                    let isNear = false; // 最初は「近くない」としておきます
+                    for (const ec of enemyCastles) {
+                        // タテの距離とヨコの距離を足して、何マス離れているか計算します
+                        const distance = Math.abs(castle.x - ec.x) + Math.abs(castle.y - ec.y);
+                        if (distance <= 3) {
+                            isNear = true; // 3マス以内の城が見つかったら「近い！」とメモします
+                            break; // 1つでも見つかればOKなので、探すのをやめます
+                        }
                     }
+                    // もし3マス以内に城が1つもなかったら、この大名家は遠すぎるので無視（スキップ）します
+                    if (!isNear) continue; 
+                    
+                    const enemyDaimyo = this.game.bushos.find(b => b.clan === clan.id && b.isDaimyo);
+                    if (!enemyDaimyo) continue;
+
+                    // ★変更：寝返り前の「そのままの敵対大名の戦力」を計算します
+                    let enemyCurrentPower = this.calcClanPower(clan.id);
+                    
+                    // 相性の計算基準を rebellionLeader に変更
+                    const enemyAffinityDiff = GameSystem.calcAffinityDiff(rebellionLeader.affinity, enemyDaimyo.affinity);
+                    let affinityBonus = 0;
+                    if (enemyAffinityDiff < oldAffinityDiff) {
+                        affinityBonus = oldAffinityDiff - enemyAffinityDiff; 
+                    }
+
+                    // ★変更：「今の敵対大名戦力」 ＞ 「今の元大名戦力」 になるなら候補に入れます
+                    if ((enemyCurrentPower + affinityBonus) > oldClanPower) {
+                        const score = enemyCurrentPower + affinityBonus;
+                        if (score > bestScore) {
+                            bestScore = score;
+                            targetClanId = clan.id;
+                            targetDaimyo = enemyDaimyo;
+                        }
+                    }
+                }
+            }
+            
+            // ★追加：データが変わってマップの色がフライングで塗り替わるのを防ぐストッパーをかけます！
+            this.game.isSuspendingColorUpdate = true;
+
+            let isDefection = false;
+            let newClanId;
+            let newClanName;
+            
+            if (targetClanId) {
+                isDefection = true;
+                newClanId = targetClanId;
+                const targetClan = this.game.clans.find(c => c.id === targetClanId);
+                newClanName = targetClan ? targetClan.name : "敵対大名";
+
+                // ★追加：大名家が変わるので功績半分！
+                if (castellan.clan !== 0 && castellan.clan !== newClanId) {
+                    castellan.achievementTotal = Math.floor((castellan.achievementTotal || 0) / 2);
+                }
+                castellan.clan = newClanId;
+                castellan.loyalty = this.calcNewLoyalty(castellan, targetDaimyo);
+                this.game.castleManager.changeOwner(castle, newClanId);
+                
+            } else {
+                newClanId = Math.max(...this.game.clans.map(c => c.id)) + 1;
+                const newColor = this.generateDistinctColor(castle);
+                // ★新大名家の名前は神輿の人物ベース
+                const familyName = rebellionLeader.familyName || rebellionLeader.name.split('|')[0] || rebellionLeader.name; 
+                newClanName = `${familyName}家`;
+                
+                // ★新大名家の読み仮名も神輿の人物から取ります！
+                const familyYomi = rebellionLeader.familyYomi || rebellionLeader.yomi.split('|')[0] || rebellionLeader.yomi;
+                const newClanYomi = familyYomi ? `${familyYomi}け` : "";
+
+                const newClan = new Clan({
+                    id: newClanId, name: newClanName, yomi: newClanYomi, color: newColor, leaderId: rebellionLeader.id
                 });
 
-                // ★ここから追加：諸勢力との関係値も反転させます！
-                if (this.game.kunishuSystem) {
-                    const aliveKunishus = this.game.kunishuSystem.getAliveKunishus();
-                    aliveKunishus.forEach(kunishu => {
-                        const oldRel = kunishu.getRelation(oldClanId);
-                        let newSentiment = 100 - oldRel;
-                        newSentiment = Math.max(30, Math.min(70, newSentiment));
-                        kunishu.setRelation(newClanId, newSentiment);
+                const oldClanForDip = this.game.clans.find(c => c.id === oldClanId);
+                if (oldClanForDip) {
+                    this.game.clans.forEach(otherClan => {
+                        if (otherClan.id === 0 || otherClan.id === oldClanId) return;
+                        
+                        const oldRel = this.game.getRelation(oldClanId, otherClan.id);
+                        if (oldRel) {
+                            let newSentiment = 100 - oldRel.sentiment;
+                            newSentiment = Math.max(30, Math.min(70, newSentiment));
+                            
+                            let newStatus = '普通';
+                            if (newSentiment >= 70) newStatus = '友好';
+                            if (newSentiment <= 30) newStatus = '敵対';
+                            
+                            newClan.diplomacyValue[otherClan.id] = {
+                                status: newStatus,
+                                sentiment: newSentiment,
+                                trucePeriod: 0,
+                                isMarriage: false
+                            };
+                            
+                            if (!otherClan.diplomacyValue) otherClan.diplomacyValue = {};
+                            otherClan.diplomacyValue[newClanId] = {
+                                status: newStatus,
+                                sentiment: newSentiment,
+                                trucePeriod: 0,
+                                isMarriage: false
+                            };
+                        }
                     });
+
+                    // ★ここから追加：諸勢力との関係値も反転させます！
+                    if (this.game.kunishuSystem) {
+                        const aliveKunishus = this.game.kunishuSystem.getAliveKunishus();
+                        aliveKunishus.forEach(kunishu => {
+                            const oldRel = kunishu.getRelation(oldClanId);
+                            let newSentiment = 100 - oldRel;
+                            newSentiment = Math.max(30, Math.min(70, newSentiment));
+                            kunishu.setRelation(newClanId, newSentiment);
+                        });
+                    }
+                    // ★追加ここまで
                 }
-                // ★追加ここまで
-            }
 
-            this.game.clans.push(newClan);
+                this.game.clans.push(newClan);
 
-            rebellionLeader.isDaimyo = true;
-            
-            // ★追加：新しい大名が住んでいるお城のおまかせ（委任）を解除します
-            const daimyoCastle = this.game.castles.find(c => c.id === rebellionLeader.castleId);
-            if (daimyoCastle) {
-                daimyoCastle.isDelegated = false;
-            }
+                rebellionLeader.isDaimyo = true;
+                
+                // ★追加：新しい大名が住んでいるお城のおまかせ（委任）を解除します
+                const daimyoCastle = this.game.castles.find(c => c.id === rebellionLeader.castleId);
+                if (daimyoCastle) {
+                    daimyoCastle.isDelegated = false;
+                }
 
-            // ★大名家が変わる（新設）ので功績半分！
-            if (castellan.clan !== 0 && castellan.clan !== newClanId) {
-                castellan.achievementTotal = Math.floor((castellan.achievementTotal || 0) / 2);
-            }
-            castellan.clan = newClanId;
-            if (castellan.id === rebellionLeader.id) {
-                castellan.loyalty = 100;
-            } else {
-                castellan.loyalty = this.calcNewLoyalty(castellan, rebellionLeader);
-            }
-            this.game.castleManager.changeOwner(castle, newClanId);
-
-            const oldClan = this.game.clans.find(c => c.id === oldClanId);
-            if (oldClan) oldClan.diplomacyValue[newClanId] = { status: '敵対', sentiment: 0 };
-            newClan.diplomacyValue[oldClanId] = { status: '敵対', sentiment: 0 };
-        }
-
-        // ★神輿（派閥主）本人の処遇
-        if (isProxyRebellion) {
-            const leaderCastle = this.game.castles.find(c => c.id === rebellionLeader.castleId);
-            // ★神輿（派閥主）も大名家が変わるので功績半分！
-            if (rebellionLeader.clan !== 0 && rebellionLeader.clan !== newClanId) {
-                rebellionLeader.achievementTotal = Math.floor((rebellionLeader.achievementTotal || 0) / 2);
-            }
-            if (rebellionLeader.isCastellan && leaderCastle) {
-                // 派閥主がどこかの城主なら、その城も新勢力になる
-                this.game.castleManager.changeOwner(leaderCastle, newClanId);
-                rebellionLeader.clan = newClanId;
-                if (rebellionLeader.isDaimyo) {
-                    rebellionLeader.loyalty = 100;
+                // ★大名家が変わる（新設）ので功績半分！
+                if (castellan.clan !== 0 && castellan.clan !== newClanId) {
+                    castellan.achievementTotal = Math.floor((castellan.achievementTotal || 0) / 2);
+                }
+                castellan.clan = newClanId;
+                if (castellan.id === rebellionLeader.id) {
+                    castellan.loyalty = 100;
                 } else {
-                    rebellionLeader.loyalty = this.calcNewLoyalty(rebellionLeader, targetDaimyo);
+                    castellan.loyalty = this.calcNewLoyalty(castellan, rebellionLeader);
+                }
+                this.game.castleManager.changeOwner(castle, newClanId);
+
+                const oldClan = this.game.clans.find(c => c.id === oldClanId);
+                if (oldClan) oldClan.diplomacyValue[newClanId] = { status: '敵対', sentiment: 0 };
+                newClan.diplomacyValue[oldClanId] = { status: '敵対', sentiment: 0 };
+            }
+
+            // ★神輿（派閥主）本人の処遇
+            if (isProxyRebellion) {
+                const leaderCastle = this.game.castles.find(c => c.id === rebellionLeader.castleId);
+                // ★神輿（派閥主）も大名家が変わるので功績半分！
+                if (rebellionLeader.clan !== 0 && rebellionLeader.clan !== newClanId) {
+                    rebellionLeader.achievementTotal = Math.floor((rebellionLeader.achievementTotal || 0) / 2);
+                }
+                if (rebellionLeader.isCastellan && leaderCastle) {
+                    // 派閥主がどこかの城主なら、その城も新勢力になる
+                    this.game.castleManager.changeOwner(leaderCastle, newClanId);
+                    rebellionLeader.clan = newClanId;
+                    if (rebellionLeader.isDaimyo) {
+                        rebellionLeader.loyalty = 100;
+                    } else {
+                        rebellionLeader.loyalty = this.calcNewLoyalty(rebellionLeader, targetDaimyo);
+                    }
+                } else {
+                    // 城主でない（どこかの城の部下）なら、脱出して起点の城に合流する
+                    if (leaderCastle) {
+                        leaderCastle.samuraiIds = leaderCastle.samuraiIds.filter(id => id !== rebellionLeader.id);
+                        this.game.updateCastleLord(leaderCastle);
+                    }
+                    rebellionLeader.clan = newClanId;
+                    rebellionLeader.castleId = castle.id;
+                    castle.samuraiIds.push(rebellionLeader.id);
+                    if (rebellionLeader.isDaimyo) {
+                        rebellionLeader.loyalty = 100;
+                    } else {
+                        rebellionLeader.loyalty = this.calcNewLoyalty(rebellionLeader, targetDaimyo);
+                    }
+                }
+            }
+
+            // ★先に独立・寝返りのメインメッセージを作り、ログに出力します
+            const oldClanName = this.game.clans.find(c => c.id === oldClanId)?.name || "不明";
+            let msg = "";
+            
+            // ★メッセージの出し分け
+            if (isProxyRebellion) {
+                if (isDefection) {
+                    msg = `${oldClanName}の${castellan.name}が、${rebellionLeader.name}を誘って${newClanName}に寝返りました！`;
+                } else {
+                    msg = `${oldClanName}の${castellan.name}が、${rebellionLeader.name}を大名として擁立し、独立を宣言しました！`;
                 }
             } else {
-                // 城主でない（どこかの城の部下）なら、脱出して起点の城に合流する
-                if (leaderCastle) {
-                    leaderCastle.samuraiIds = leaderCastle.samuraiIds.filter(id => id !== rebellionLeader.id);
+                if (isDefection) {
+                    msg = `${oldClanName}の${castellan.name}が、${castle.name}ごと${newClanName}に寝返りました！`;
+                } else {
+                    msg = `${oldClanName}の${castellan.name}が、${castle.name}にて独立を宣言しました！`;
+                }
+            }
+            
+            // ここで一番最初にログに書き込みます！
+            this.game.ui.log(msg);
+
+            // 部下たちの去就
+            // ★主君の基準を rebellionLeader にする
+            // ★修正：記憶しておいた元の派閥ID(leaderOriginalFactionId)を渡して判定させます
+            let captiveMsgs = this.resolveSubordinates(castle, rebellionLeader, oldDaimyo, newClanId, oldClanId, leaderOriginalFactionId);
+
+            // ★派閥主が別の城の城主だった場合、その城の部下たちも処遇を決定する
+            if (isProxyRebellion && rebellionLeader.isCastellan) {
+                const leaderCastle = this.game.castles.find(c => c.id === rebellionLeader.castleId);
+                if (leaderCastle && leaderCastle.id !== castle.id) {
+                    const extraMsgs = this.resolveSubordinates(leaderCastle, rebellionLeader, oldDaimyo, newClanId, oldClanId, leaderOriginalFactionId);
+                    if (extraMsgs.length > 0) captiveMsgs = captiveMsgs.concat(extraMsgs);
                     this.game.updateCastleLord(leaderCastle);
                 }
-                rebellionLeader.clan = newClanId;
-                rebellionLeader.castleId = castle.id;
-                castle.samuraiIds.push(rebellionLeader.id);
-                if (rebellionLeader.isDaimyo) {
-                    rebellionLeader.loyalty = 100;
-                } else {
-                    rebellionLeader.loyalty = this.calcNewLoyalty(rebellionLeader, targetDaimyo);
+            }
+
+            // ★基準を rebellionLeader にして派閥全体の呼応を処理
+            // ★修正：記憶しておいた元の派閥ID(leaderOriginalFactionId)を渡して判定させます
+            this.resolveFactionWideRebellion(rebellionLeader, oldClanId, newClanId, oldDaimyo, leaderOriginalFactionId);
+            this.resolveDistantFactionMembers(rebellionLeader, oldClanId, newClanId, oldDaimyo, leaderOriginalFactionId);
+
+            this.game.updateCastleLord(castle);
+            
+            // ★追加：独立や寝返りで勢力が大きく変わるので、威信を最新に更新しておきます！
+            if (window.GameApp) window.GameApp.updateAllClanPrestige();
+            
+            // ★ここから複数城に対応した演出魔法の始まりです！
+            // 今回勢力が変わった城（独立・寝返りに参加した城）のIDをすべて集めます
+            const changedCastleIds = [];
+            this.game.castles.forEach(c => {
+                const oldOwner = initialClanMap.get(c.id);
+                if (oldOwner === oldClanId && c.ownerClan === newClanId) {
+                    changedCastleIds.push(c.id);
                 }
-            }
-        }
+            });
+            // 万が一見つからなかったら起点のお城だけを入れます
+            if (changedCastleIds.length === 0) changedCastleIds.push(castle.id);
 
-        // ★先に独立・寝返りのメインメッセージを作り、ログに出力します
-        const oldClanName = this.game.clans.find(c => c.id === oldClanId)?.name || "不明";
-        let msg = "";
-        
-        // ★メッセージの出し分け
-        if (isProxyRebellion) {
-            if (isDefection) {
-                msg = `${oldClanName}の${castellan.name}が、${rebellionLeader.name}を誘って${newClanName}に寝返りました！`;
+            // まずは最初のメッセージを出します
+            await this.game.ui.showDialogAsync(msg, false, 0);
+
+            // 画面を勝手に触られないようにバリアを張ります
+            if (typeof this.game.ui.showMapGuard === 'function') this.game.ui.showMapGuard();
+
+            // 独立したお城（起点の城）にカメラを移動させます！
+            this.game.ui.scrollToActiveCastle(castle, false);
+            await new Promise(res => setTimeout(res, 600)); 
+
+            // お城の元の色と、新しい色を調べます
+            let oldColor = { r: 255, g: 255, b: 255 };
+            let newColorRgb = { r: 255, g: 255, b: 255 };
+            const oldClanData = this.game.clans.find(c => c.id === oldClanId);
+            if (oldClanData && oldClanData.color && typeof DataManager !== 'undefined') oldColor = DataManager.hexToRgb(oldClanData.color);
+            const newClanDataObj = this.game.clans.find(c => c.id === newClanId);
+            if (newClanDataObj && newClanDataObj.color && typeof DataManager !== 'undefined') newColorRgb = DataManager.hexToRgb(newClanDataObj.color);
+
+            // 参加したお城をすべて同時にチカチカ点滅させます！
+            await this.game.ui.playBattleBlink(changedCastleIds, oldColor, newColorRgb, 1000);
+
+            // ★追加：点滅が終わったらストッパーを外して、新しい色を塗れるようにします！
+            this.game.isSuspendingColorUpdate = false;
+
+            // フワッと光るアニメーションと一緒に、色を新しく塗り替えます！
+            if (typeof this.game.ui.playCaptureEffect === 'function') {
+                await this.game.ui.playCaptureEffect(changedCastleIds, () => {
+                    if (this.game.ui && typeof this.game.ui.renderMap === 'function') {
+                        this.game.ui.renderMap();
+                    }
+                });
             } else {
-                msg = `${oldClanName}の${castellan.name}が、${rebellionLeader.name}を大名として擁立し、独立を宣言しました！`;
-            }
-        } else {
-            if (isDefection) {
-                msg = `${oldClanName}の${castellan.name}が、${castle.name}ごと${newClanName}に寝返りました！`;
-            } else {
-                msg = `${oldClanName}の${castellan.name}が、${castle.name}にて独立を宣言しました！`;
-            }
-        }
-        
-        // ここで一番最初にログに書き込みます！
-        this.game.ui.log(msg);
-
-        // 部下たちの去就
-        // ★主君の基準を rebellionLeader にする
-        // ★修正：記憶しておいた元の派閥ID(leaderOriginalFactionId)を渡して判定させます
-        let captiveMsgs = this.resolveSubordinates(castle, rebellionLeader, oldDaimyo, newClanId, oldClanId, leaderOriginalFactionId);
-
-        // ★派閥主が別の城の城主だった場合、その城の部下たちも処遇を決定する
-        if (isProxyRebellion && rebellionLeader.isCastellan) {
-            const leaderCastle = this.game.castles.find(c => c.id === rebellionLeader.castleId);
-            if (leaderCastle && leaderCastle.id !== castle.id) {
-                const extraMsgs = this.resolveSubordinates(leaderCastle, rebellionLeader, oldDaimyo, newClanId, oldClanId, leaderOriginalFactionId);
-                if (extraMsgs.length > 0) captiveMsgs = captiveMsgs.concat(extraMsgs);
-                this.game.updateCastleLord(leaderCastle);
-            }
-        }
-
-        // ★基準を rebellionLeader にして派閥全体の呼応を処理
-        // ★修正：記憶しておいた元の派閥ID(leaderOriginalFactionId)を渡して判定させます
-        this.resolveFactionWideRebellion(rebellionLeader, oldClanId, newClanId, oldDaimyo, leaderOriginalFactionId);
-        this.resolveDistantFactionMembers(rebellionLeader, oldClanId, newClanId, oldDaimyo, leaderOriginalFactionId);
-
-        this.game.updateCastleLord(castle);
-        
-        // ★追加：独立や寝返りで勢力が大きく変わるので、威信を最新に更新しておきます！
-        if (window.GameApp) window.GameApp.updateAllClanPrestige();
-        
-        // ★ここから複数城に対応した演出魔法の始まりです！
-        // 今回勢力が変わった城（独立・寝返りに参加した城）のIDをすべて集めます
-        const changedCastleIds = [];
-        this.game.castles.forEach(c => {
-            const oldOwner = initialClanMap.get(c.id);
-            if (oldOwner === oldClanId && c.ownerClan === newClanId) {
-                changedCastleIds.push(c.id);
-            }
-        });
-        // 万が一見つからなかったら起点のお城だけを入れます
-        if (changedCastleIds.length === 0) changedCastleIds.push(castle.id);
-
-        // まずは最初のメッセージを出します
-        await this.game.ui.showDialogAsync(msg, false, 0);
-
-        // 画面を勝手に触られないようにバリアを張ります
-        if (typeof this.game.ui.showMapGuard === 'function') this.game.ui.showMapGuard();
-
-        // 独立したお城（起点の城）にカメラを移動させます！
-        this.game.ui.scrollToActiveCastle(castle, false);
-        await new Promise(res => setTimeout(res, 600)); 
-
-        // お城の元の色と、新しい色を調べます
-        let oldColor = { r: 255, g: 255, b: 255 };
-        let newColorRgb = { r: 255, g: 255, b: 255 };
-        const oldClanData = this.game.clans.find(c => c.id === oldClanId);
-        if (oldClanData && oldClanData.color && typeof DataManager !== 'undefined') oldColor = DataManager.hexToRgb(oldClanData.color);
-        const newClanDataObj = this.game.clans.find(c => c.id === newClanId);
-        if (newClanDataObj && newClanDataObj.color && typeof DataManager !== 'undefined') newColorRgb = DataManager.hexToRgb(newClanDataObj.color);
-
-        // 参加したお城をすべて同時にチカチカ点滅させます！
-        await this.game.ui.playBattleBlink(changedCastleIds, oldColor, newColorRgb, 1000);
-
-        // ★追加：点滅が終わったらストッパーを外して、新しい色を塗れるようにします！
-        this.game.isSuspendingColorUpdate = false;
-
-        // フワッと光るアニメーションと一緒に、色を新しく塗り替えます！
-        if (typeof this.game.ui.playCaptureEffect === 'function') {
-            await this.game.ui.playCaptureEffect(changedCastleIds, () => {
                 if (this.game.ui && typeof this.game.ui.renderMap === 'function') {
                     this.game.ui.renderMap();
                 }
-            });
-        } else {
-            if (this.game.ui && typeof this.game.ui.renderMap === 'function') {
-                this.game.ui.renderMap();
             }
-        }
-        // バリアを解除します
-        if (typeof this.game.ui.hideMapGuard === 'function') this.game.ui.hideMapGuard(true);
-        // 追加のメッセージを作ります
-        let extraMsg = "";
-        if (!isDefection) {
-            // 独立して大名になった時だけメッセージを入れます
-            extraMsg = `${rebellionLeader.name}が大名となりました！`;
-        }
-        // 捕虜になった武将たちのお知らせがあれば追加します
-        if (captiveMsgs && captiveMsgs.length > 0) {
+            // バリアを解除します
+            if (typeof this.game.ui.hideMapGuard === 'function') this.game.ui.hideMapGuard(true);
+            // 追加のメッセージを作ります
+            let extraMsg = "";
+            if (!isDefection) {
+                // 独立して大名になった時だけメッセージを入れます
+                extraMsg = `${rebellionLeader.name}が大名となりました！`;
+            }
+            // 捕虜になった武将たちのお知らせがあれば追加します
+            if (captiveMsgs && captiveMsgs.length > 0) {
+                if (extraMsg !== "") {
+                    extraMsg += '\n\n';
+                }
+                extraMsg += captiveMsgs.join('\n');
+            }
+            // もし表示する文字が何かあれば、画面にメッセージを出します
             if (extraMsg !== "") {
-                extraMsg += '\n\n';
+                await this.game.ui.showDialogAsync(extraMsg, false, 0);
             }
-            extraMsg += captiveMsgs.join('\n');
-        }
-        // もし表示する文字が何かあれば、画面にメッセージを出します
-        if (extraMsg !== "") {
-            await this.game.ui.showDialogAsync(extraMsg, false, 0);
-        }
 
-        // ★追加：独立や寝返りのすべてが終わったら、透明化の魔法を解きます！
-        if (this.game.ui) {
-            this.game.ui.guardHiddenCount = Math.max(0, (this.game.ui.guardHiddenCount || 0) - 1);
-            if (typeof this.game.ui.renderMap === 'function') {
-                this.game.ui.renderMap();
+        } catch (e) {
+            console.error("ExecuteRebellion Error:", e);
+        } finally {
+            // ★今回追加：war_effort.jsを参考に、エラー時でも必ず透明化を解除する魔法！
+            const forceHideStyle = document.getElementById('force-hide-ai-text');
+            if (forceHideStyle) {
+                forceHideStyle.remove();
+            }
+
+            const aiGuardEl = document.getElementById('ai-guard');
+            if (aiGuardEl) {
+                aiGuardEl.classList.remove('hide-text');
+            }
+
+            // ★追加：独立や寝返りのすべてが終わったら、透明化の魔法を解きます！
+            if (this.game.ui) {
+                this.game.ui.guardHiddenCount = Math.max(0, (this.game.ui.guardHiddenCount || 0) - 1);
+                if (typeof this.game.ui.renderMap === 'function') {
+                    this.game.ui.renderMap();
+                }
             }
         }
     }
@@ -632,444 +652,457 @@ class IndependenceSystem {
     // =========================================================================
     // ★ここから追加：お家乗っ取りの作戦会議と、裏での決戦を行う魔法！
     // =========================================================================
-
-    // 差し替え後
+    
     async planCoupDetatOrRebellion(castle, castellan, oldDaimyo) {
         // ★ここから「謀反・独立ドラマ」の始まり！まず透明化の魔法を予約します。
         if (this.game.ui) {
             this.game.ui.guardHiddenCount = (this.game.ui.guardHiddenCount || 0) + 1;
-            if (typeof this.game.ui.renderMap === 'function') {
-                this.game.ui.renderMap();
-            }
         }
 
-        // 1. まずは反乱のリーダー（神輿）を探します。
-        let rebellionLeader = castellan;
-        const oldClanId = castle.ownerClan;
-        
-        if (castellan.factionId !== 0 && !castellan.isFactionLeader) {
-            const factionLeader = this.game.bushos.find(b => b.clan === oldClanId && b.factionId === castellan.factionId && b.isFactionLeader && !b.belongKunishuId);
-            if (factionLeader) {
-                const { joinScore, stayScore } = this.calculateLoyaltyScores(factionLeader, castellan, oldDaimyo);
-                if (joinScore > stayScore) {
-                    rebellionLeader = factionLeader;
-                }
-            }
+        // ★今回追加：謀反のドラマ中も「透明化しっぱなし」のルールを書き込みます！
+        if (!document.getElementById('force-hide-ai-text')) {
+            const style = document.createElement('style');
+            style.id = 'force-hide-ai-text';
+            style.innerHTML = '#ai-guard { color: transparent !important; text-shadow: none !important; } #ai-guard * { opacity: 0 !important; }';
+            document.head.appendChild(style);
         }
 
-        // 2. 勢力内の全員を呼び出して、どっちの味方か振り分けます。
-        const allMembers = this.game.bushos.filter(b => b.clan === oldClanId && b.status === 'active');
-        const totalMembers = allMembers.length;
-
-        let rebelMembers = [];
-        let daimyoMembers = [];
-
-        // 全員が必ずどちらかに属するように、スコアの条件を少しずつ甘くしていくループです
-        let thresholdOffset = 0;
-        let allAssigned = false;
-
-        while (!allAssigned && thresholdOffset < 100) {
-            rebelMembers = [];
-            daimyoMembers = [];
-
-            for (const b of allMembers) {
-                // 本人たちは確定で自分の陣営へ
-                if (b.id === rebellionLeader.id) {
-                    rebelMembers.push(b);
-                    continue;
-                }
-                if (b.id === oldDaimyo.id) {
-                    daimyoMembers.push(b);
-                    continue;
-                }
-
-                // すでに派閥に属している場合
-                if (b.factionId !== 0) {
-                    // リーダーと同じ派閥なら反乱軍、それ以外はすべて主家（大名）軍
-                    if (b.factionId === rebellionLeader.factionId) {
-                        rebelMembers.push(b);
-                    } else {
-                        daimyoMembers.push(b);
+        try {
+            // 1. まずは反乱のリーダー（神輿）を探します。
+            let rebellionLeader = castellan;
+            const oldClanId = castle.ownerClan;
+            
+            if (castellan.factionId !== 0 && !castellan.isFactionLeader) {
+                const factionLeader = this.game.bushos.find(b => b.clan === oldClanId && b.factionId === castellan.factionId && b.isFactionLeader && !b.belongKunishuId);
+                if (factionLeader) {
+                    const { joinScore, stayScore } = this.calculateLoyaltyScores(factionLeader, castellan, oldDaimyo);
+                    if (joinScore > stayScore) {
+                        rebellionLeader = factionLeader;
                     }
+                }
+            }
+
+            // 2. 勢力内の全員を呼び出して、どっちの味方か振り分けます。
+            const allMembers = this.game.bushos.filter(b => b.clan === oldClanId && b.status === 'active');
+            const totalMembers = allMembers.length;
+
+            let rebelMembers = [];
+            let daimyoMembers = [];
+
+            // 全員が必ずどちらかに属するように、スコアの条件を少しずつ甘くしていくループです
+            let thresholdOffset = 0;
+            let allAssigned = false;
+
+            while (!allAssigned && thresholdOffset < 100) {
+                rebelMembers = [];
+                daimyoMembers = [];
+
+                for (const b of allMembers) {
+                    // 本人たちは確定で自分の陣営へ
+                    if (b.id === rebellionLeader.id) {
+                        rebelMembers.push(b);
+                        continue;
+                    }
+                    if (b.id === oldDaimyo.id) {
+                        daimyoMembers.push(b);
+                        continue;
+                    }
+
+                    // すでに派閥に属している場合
+                    if (b.factionId !== 0) {
+                        // リーダーと同じ派閥なら反乱軍、それ以外はすべて主家（大名）軍
+                        if (b.factionId === rebellionLeader.factionId) {
+                            rebelMembers.push(b);
+                        } else {
+                            daimyoMembers.push(b);
+                        }
+                    } else {
+                        // 無所属の場合は、スコアで判定します（offset分だけ条件を緩和します）
+                        const { joinScore, stayScore } = this.calculateLoyaltyScores(b, rebellionLeader, oldDaimyo);
+                        if (joinScore + thresholdOffset > stayScore) {
+                            rebelMembers.push(b);
+                        } else {
+                            daimyoMembers.push(b);
+                        }
+                    }
+                }
+
+                if (rebelMembers.length + daimyoMembers.length === totalMembers) {
+                    allAssigned = true;
                 } else {
-                    // 無所属の場合は、スコアで判定します（offset分だけ条件を緩和します）
-                    const { joinScore, stayScore } = this.calculateLoyaltyScores(b, rebellionLeader, oldDaimyo);
-                    if (joinScore + thresholdOffset > stayScore) {
-                        rebelMembers.push(b);
-                    } else {
-                        daimyoMembers.push(b);
-                    }
+                    thresholdOffset += 5; // まだ迷っている人がいたら、条件を甘くして再計算
                 }
             }
 
-            if (rebelMembers.length + daimyoMembers.length === totalMembers) {
-                allAssigned = true;
+            // 3. ★改修：謀反・独立・寝返りのスコア計算と性格による判定
+            const personality = rebellionLeader.personality || 'balanced';
+            
+            // 性格が隠遁者（hermit）の場合は野に下ります
+            if (personality === 'hermit') {
+                this.game.ui.log(`【下野】${rebellionLeader.name}は野に下りました。`);
+                this.game.affiliationSystem.becomeRonin(rebellionLeader);
+                // もし神輿と城主が違う人物なら、城主も一緒に浪人にします
+                if (castellan.id !== rebellionLeader.id && castellan.status === 'active') {
+                    this.game.affiliationSystem.becomeRonin(castellan);
+                }
+                return; // ★finallyで自動解除されるので、自力での解除は不要になります！
+            }
+
+            const rebelRatio = rebelMembers.length / totalMembers;
+            let canCoup = false;
+
+            // 性格によって、謀反を起こすために必要な味方の割合を変えます
+            if (personality === 'aggressive') {
+                if (rebelRatio >= 1 / 2) canCoup = true;
+            } else if (personality === 'c' || personality === 'cautious') {
+                if (rebelRatio >= 4 / 5) canCoup = true;
             } else {
-                thresholdOffset += 5; // まだ迷っている人がいたら、条件を甘くして再計算
+                // balance, balanced など
+                if (rebelRatio >= 2 / 3) canCoup = true;
             }
-        }
 
-        // 3. ★改修：謀反・独立・寝返りのスコア計算と性格による判定
-        const personality = rebellionLeader.personality || 'balanced';
-        
-        // 性格が隠遁者（hermit）の場合は野に下ります
-        if (personality === 'hermit') {
-            this.game.ui.log(`【下野】${rebellionLeader.name}は野に下りました。`);
-            this.game.affiliationSystem.becomeRonin(rebellionLeader);
-            // もし神輿と城主が違う人物なら、城主も一緒に浪人にします
-            if (castellan.id !== rebellionLeader.id && castellan.status === 'active') {
-                this.game.affiliationSystem.becomeRonin(castellan);
+            // 野心と義理の数字を準備します（40より下、100より上は切り捨てます）
+            const ambition = Math.max(40, Math.min(100, rebellionLeader.ambition || 70));
+            const duty = Math.max(40, Math.min(100, rebellionLeader.duty || 70));
+
+            let coupScore = 50;   // 謀反スコア
+            let indepScore = 50;  // 独立スコア
+            let defectScore = 50; // 寝返りスコア
+
+            // 【野心による志向の計算】
+            if (ambition >= 70) {
+                const diff = ambition - 70;
+                coupScore += diff;
+                indepScore += diff;
+                defectScore -= diff;
+            } else {
+                const diff = 70 - ambition;
+                defectScore += diff;
+                indepScore += Math.floor(diff / 2); // 独立志向も少しあります
+                coupScore -= diff;
+            }
+
+            // 【義理による志向の計算】
+            if (duty >= 70) {
+                const diff = duty - 70;
+                indepScore += diff;
+                coupScore -= diff;
+                defectScore -= diff;
+            } else {
+                const diff = 70 - duty;
+                coupScore += diff;
+                defectScore += diff;
+                indepScore -= diff;
+            }
+
+            // 味方が足りなくて謀反できない場合は、謀反スコアを無くします
+            if (!canCoup) {
+                coupScore = -9999;
+            }
+
+            // 一番点数が高い行動を選びます（同点の場合は 謀反 ＞ 寝返り ＞ 独立 の順で優先します）
+            let action = 'indep';
+            let maxScore = indepScore;
+
+            if (defectScore >= maxScore) {
+                action = 'defect';
+                maxScore = defectScore;
+            }
+            if (coupScore >= maxScore) {
+                action = 'coup';
+                maxScore = coupScore;
             }
             
-            // ★処理が終わって戻る前に、透明化の魔法を解きます
-            if (this.game.ui) {
-                this.game.ui.guardHiddenCount = Math.max(0, (this.game.ui.guardHiddenCount || 0) - 1);
-                if (typeof this.game.ui.renderMap === 'function') this.game.ui.renderMap();
-            }
-            return;
-        }
+            // 決定した行動を実行します
+            if (action === 'coup') {
+                this.game.ui.log(`【謀反】${rebellionLeader.name}が主君である${oldDaimyo.name}に対し、謀反を起こしました。`);
+                await this.game.ui.showDialogAsync(`【謀反】\n${rebellionLeader.name}が主君である${oldDaimyo.name}に対し、謀反を起こしました！`);
 
-        const rebelRatio = rebelMembers.length / totalMembers;
-        let canCoup = false;
-
-        // 性格によって、謀反を起こすために必要な味方の割合を変えます
-        if (personality === 'aggressive') {
-            if (rebelRatio >= 1 / 2) canCoup = true;
-        } else if (personality === 'c' || personality === 'cautious') {
-            if (rebelRatio >= 4 / 5) canCoup = true;
-        } else {
-            // balance, balanced など
-            if (rebelRatio >= 2 / 3) canCoup = true;
-        }
-
-        // 野心と義理の数字を準備します（40より下、100より上は切り捨てます）
-        const ambition = Math.max(40, Math.min(100, rebellionLeader.ambition || 70));
-        const duty = Math.max(40, Math.min(100, rebellionLeader.duty || 70));
-
-        let coupScore = 50;   // 謀反スコア
-        let indepScore = 50;  // 独立スコア
-        let defectScore = 50; // 寝返りスコア
-
-        // 【野心による志向の計算】
-        if (ambition >= 70) {
-            const diff = ambition - 70;
-            coupScore += diff;
-            indepScore += diff;
-            defectScore -= diff;
-        } else {
-            const diff = 70 - ambition;
-            defectScore += diff;
-            indepScore += Math.floor(diff / 2); // 独立志向も少しあります
-            coupScore -= diff;
-        }
-
-        // 【義理による志向の計算】
-        if (duty >= 70) {
-            const diff = duty - 70;
-            indepScore += diff;
-            coupScore -= diff;
-            defectScore -= diff;
-        } else {
-            const diff = 70 - duty;
-            coupScore += diff;
-            defectScore += diff;
-            indepScore -= diff;
-        }
-
-        // 味方が足りなくて謀反できない場合は、謀反スコアを無くします
-        if (!canCoup) {
-            coupScore = -9999;
-        }
-
-        // 一番点数が高い行動を選びます（同点の場合は 謀反 ＞ 寝返り ＞ 独立 の順で優先します）
-        let action = 'indep';
-        let maxScore = indepScore;
-
-        if (defectScore >= maxScore) {
-            action = 'defect';
-            maxScore = defectScore;
-        }
-        if (coupScore >= maxScore) {
-            action = 'coup';
-            maxScore = coupScore;
-        }
-        
-        // 決定した行動を実行します
-        if (action === 'coup') {
-            this.game.ui.log(`【謀反】${rebellionLeader.name}が主君である${oldDaimyo.name}に対し、謀反を起こしました。`);
-            await this.game.ui.showDialogAsync(`【謀反】\n${rebellionLeader.name}が主君である${oldDaimyo.name}に対し、謀反を起こしました！`);
-
-            // ★ここから追加：謀反の時もカメラを移動してチカチカさせます！
-            // ただし、プレイヤー大名家の場合は野戦画面になるのでチカチカさせません！
-            const isPlayerDaimyo = (oldClanId === this.game.playerClanId);
-            
-            if (!isPlayerDaimyo) {
-                if (typeof this.game.ui.showMapGuard === 'function') this.game.ui.showMapGuard();
+                // ★ここから追加：謀反の時もカメラを移動してチカチカさせます！
+                // ただし、プレイヤー大名家の場合は野戦画面になるのでチカチカさせません！
+                const isPlayerDaimyo = (oldClanId === this.game.playerClanId);
                 
-                // お城にカメラを移動します
-                this.game.ui.scrollToActiveCastle(castle, false);
-                await new Promise(res => setTimeout(res, 600));
+                if (!isPlayerDaimyo) {
+                    if (typeof this.game.ui.showMapGuard === 'function') this.game.ui.showMapGuard();
+                    
+                    // お城にカメラを移動します
+                    this.game.ui.scrollToActiveCastle(castle, false);
+                    await new Promise(res => setTimeout(res, 600));
 
-                // 謀反に参加する城（反乱軍の城）をすべて集めます
-                const rebelCastleIds = [];
-                rebelMembers.forEach(b => {
-                    if (b.castleId && !rebelCastleIds.includes(b.castleId)) {
-                        rebelCastleIds.push(b.castleId);
-                    }
-                });
-                if (rebelCastleIds.length === 0) rebelCastleIds.push(castle.id);
-
-                // 元の色を調べて、謀反軍の仮の色（少し赤っぽく）と交互に点滅させます
-                let oldColor = { r: 255, g: 255, b: 255 };
-                let rebelColor = { r: 255, g: 100, b: 100 }; 
-                const oldClanData = this.game.clans.find(c => c.id === oldClanId);
-                if (oldClanData && oldClanData.color && typeof DataManager !== 'undefined') oldColor = DataManager.hexToRgb(oldClanData.color);
-
-                // 反乱軍の城をすべて同時に点滅させます！
-                await this.game.ui.playBattleBlink(rebelCastleIds, oldColor, rebelColor, 1000);
-                if (typeof this.game.ui.hideMapGuard === 'function') this.game.ui.hideMapGuard(true);
-            }
-            // ★追加ここまで
-
-            // 裏で野戦を行います！
-            const result = await this.executeSecretFieldWar(daimyoMembers, rebelMembers, oldDaimyo, rebellionLeader);
-
-            if (result === 'rebel_win') {
-                // 【反乱軍の勝利】
-                this.game.ui.log(`【謀反】反乱軍が勝利し、${oldDaimyo.name}は討死しました。`);
-
-                // ★追加：データが変わってマップの色がフライングで塗り替わるのを防ぐストッパーをかけます！
-                this.game.isSuspendingColorUpdate = true;
-
-                // 勝手に後継ぎが選ばれて大名が2人にならないように、先に大名の印を外しておきます
-                oldDaimyo.isDaimyo = false;
-
-                // 大名死亡処理（life_systemにお任せします）
-                await this.game.lifeSystem.executeDeath(oldDaimyo);
-
-                // ★ここから追加：逃亡先の城を探す魔法です
-                let escapeCastleId = castle.id; // 万が一見つからなかった時のために、今の城を覚えておきます
-                const oldClanData = this.game.clans.find(c => c.id === oldClanId);
-                
-                if (oldClanData) {
-                    let candidateClans = [];
-                    // 外交の箱（diplomacyValue）を調べて、敵対していない大名家をリストアップします
-                    for (const targetIdStr in oldClanData.diplomacyValue) {
-                        const targetId = Number(targetIdStr);
-                        if (targetId === oldClanId) continue;
-                        
-                        const rel = oldClanData.diplomacyValue[targetId];
-                        // 敵対していなければ、候補に入れます（仲の良さも一緒にメモします）
-                        if (rel && rel.status !== '敵対') {
-                            candidateClans.push({ id: targetId, sentiment: rel.sentiment });
+                    // 謀反に参加する城（反乱軍の城）をすべて集めます
+                    const rebelCastleIds = [];
+                    rebelMembers.forEach(b => {
+                        if (b.castleId && !rebelCastleIds.includes(b.castleId)) {
+                            rebelCastleIds.push(b.castleId);
                         }
-                    }
-                    
-                    // 仲が良い順に並べ替えます
-                    candidateClans.sort((a, b) => b.sentiment - a.sentiment);
-                    
-                    let targetCastles = [];
-                    // 仲が良い大名家から順番に、城を持っているか調べます
-                    for (const cClan of candidateClans) {
-                        const cList = this.game.castles.filter(c => c.ownerClan === cClan.id);
-                        if (cList.length > 0) {
-                            targetCastles = cList; // 城が見つかったら、それをターゲットにします
-                            break; 
-                        }
-                    }
-                    
-                    // もし、仲の良い大名家が一つも城を持っていなかったら…敵以外の誰かの城を探します
-                    if (targetCastles.length === 0) {
-                        targetCastles = this.game.castles.filter(c => c.ownerClan !== oldClanId && c.ownerClan !== 0);
-                    }
-                    
-                    // ターゲットの城が見つかったら、今の城から「一番近い城」を選びます
-                    if (targetCastles.length > 0) {
-                        targetCastles.sort((a, b) => {
-                            const distA = Math.abs(castle.x - a.x) + Math.abs(castle.y - a.y);
-                            const distB = Math.abs(castle.x - b.x) + Math.abs(castle.y - b.y);
-                            return distA - distB;
-                        });
-                        escapeCastleId = targetCastles[0].id;
-                    }
+                    });
+                    if (rebelCastleIds.length === 0) rebelCastleIds.push(castle.id);
+
+                    // 元の色を調べて、謀反軍の仮の色（少し赤っぽく）と交互に点滅させます
+                    let oldColor = { r: 255, g: 255, b: 255 };
+                    let rebelColor = { r: 255, g: 100, b: 100 }; 
+                    const oldClanData = this.game.clans.find(c => c.id === oldClanId);
+                    if (oldClanData && oldClanData.color && typeof DataManager !== 'undefined') oldColor = DataManager.hexToRgb(oldClanData.color);
+
+                    // 反乱軍の城をすべて同時に点滅させます！
+                    await this.game.ui.playBattleBlink(rebelCastleIds, oldColor, rebelColor, 1000);
+                    if (typeof this.game.ui.hideMapGuard === 'function') this.game.ui.hideMapGuard(true);
                 }
-                // ★逃亡先探しここまで
-                
-                // ★変更：主家側として戦って負けた武将たちを全員「浪人」にして、逃亡先に移動させます！（亡くなった大名本人は除外）
-                const roninBushos = []; // 後で一門の子どもたちを探すためのメモ帳です
-                daimyoMembers.forEach(b => {
-                    if (b.id !== oldDaimyo.id) {
-                        this.game.affiliationSystem.becomeRonin(b);
-                        this.game.affiliationSystem.moveCastle(b, escapeCastleId);
-                        roninBushos.push(b);
-                    }
-                });
+                // ★追加ここまで
 
-                // ★追加：主家や逃げた武将の「一門」で、まだ登場していない子どもたちを処理します！
-                const currentYear = this.game.year;
-                const unbornFamily = this.game.bushos.filter(b => {
-                    if (b.status !== 'unborn') return false; // まだ登場していない人だけを探します
-                    
-                    // 亡くなった旧大名の一門かチェック
-                    const isFamilyOfOldDaimyo = b.familyIds.some(fId => oldDaimyo.familyIds.includes(fId));
-                    // 逃げた武将たちの一門かチェック
-                    const isFamilyOfRonin = roninBushos.some(ronin => b.familyIds.some(fId => ronin.familyIds.includes(fId)));
-                    
-                    return isFamilyOfOldDaimyo || isFamilyOfRonin;
-                });
-                
-                unbornFamily.forEach(b => {
-                    b.clan = 0; // ★まだ生まれていない武将も含め、大名家IDを0にして浪人として登場するようにします
-                    
-                    if (b.birthYear <= currentYear) {
-                        // すでに生まれているなら、今すぐ元服して一緒に逃げます
-                        b.status = 'ronin'; // 浪人にします
-                        b.loyalty = 50;
-                        b.isCastellan = false;
-                        b.isDaimyo = false;
-                        b.isGunshi = false;
-                        // お引越しセンターの魔法で、安全に逃亡先の城に入れます
-                        this.game.affiliationSystem.enterCastle(b, escapeCastleId);
-                        
-                        // フルネームから「|」を消して綺麗なお名前にします
-                        const cleanName = b.name.replace('|', '');
-                        this.game.ui.log(`【逃亡】${cleanName}は一門の危機に元服を早め、行動を共にしました。`);
-                    }
-                });
+                // 裏で野戦を行います！
+                const result = await this.executeSecretFieldWar(daimyoMembers, rebelMembers, oldDaimyo, rebellionLeader);
 
-                // ★安全装置：反乱リーダーが新しい大名になるため、軍団長バッジや派閥などの過去の役職を綺麗にリセットします！
-                this.game.affiliationSystem.resetFactionData(rebellionLeader);
-                rebellionLeader.isDaimyo = true;
-                
-                // ★追加：新しい大名が住んでいるお城のおまかせ（委任）を解除します
-                const daimyoCastle = this.game.castles.find(c => c.id === rebellionLeader.castleId);
-                if (daimyoCastle) {
-                    daimyoCastle.isDelegated = false;
-                }
+                if (result === 'rebel_win') {
+                    // 【反乱軍の勝利】
+                    this.game.ui.log(`【謀反】反乱軍が勝利し、${oldDaimyo.name}は討死しました。`);
 
-                // 勢力名を変更
-                const clan = this.game.clans.find(c => c.id === oldClanId);
-                if (clan) {
-                    const familyName = rebellionLeader.familyName || rebellionLeader.name.split('|')[0] || rebellionLeader.name;
-                    clan.name = `${familyName}家`;
-                    
-                    // ★読み仮名も一緒に変更します！
-                    const familyYomi = rebellionLeader.familyYomi || rebellionLeader.yomi.split('|')[0] || rebellionLeader.yomi;
-                    clan.yomi = familyYomi ? `${familyYomi}け` : "";
-                    
-                    clan.leaderId = rebellionLeader.id;
+                    // ★追加：データが変わってマップの色がフライングで塗り替わるのを防ぐストッパーをかけます！
+                    this.game.isSuspendingColorUpdate = true;
 
-                    this.game.clans.forEach(otherClan => {
-                        if (otherClan.id === 0 || otherClan.id === clan.id) return;
-                        
-                        const currentRel = this.game.getRelation(clan.id, otherClan.id);
-                        if (currentRel) {
-                            let newSentiment = 100 - currentRel.sentiment;
-                            newSentiment = Math.max(30, Math.min(70, newSentiment));
+                    // 勝手に後継ぎが選ばれて大名が2人にならないように、先に大名の印を外しておきます
+                    oldDaimyo.isDaimyo = false;
+
+                    // 大名死亡処理（life_systemにお任せします）
+                    await this.game.lifeSystem.executeDeath(oldDaimyo);
+
+                    // ★ここから追加：逃亡先の城を探す魔法です
+                    let escapeCastleId = castle.id; // 万が一見つからなかった時のために、今の城を覚えておきます
+                    const oldClanData = this.game.clans.find(c => c.id === oldClanId);
+                    
+                    if (oldClanData) {
+                        let candidateClans = [];
+                        // 外交の箱（diplomacyValue）を調べて、敵対していない大名家をリストアップします
+                        for (const targetIdStr in oldClanData.diplomacyValue) {
+                            const targetId = Number(targetIdStr);
+                            if (targetId === oldClanId) continue;
                             
-                            let newStatus = '普通';
-                            if (newSentiment >= 70) newStatus = '友好';
-                            if (newSentiment <= 30) newStatus = '敵対';
-                            
-                            currentRel.status = newStatus;
-                            currentRel.sentiment = newSentiment;
-                            currentRel.trucePeriod = 0;
-                            currentRel.isMarriage = false;
-                            
-                            const oppRel = this.game.getRelation(otherClan.id, clan.id);
-                            if (oppRel) {
-                                oppRel.status = newStatus;
-                                oppRel.sentiment = newSentiment;
-                                oppRel.trucePeriod = 0;
-                                oppRel.isMarriage = false;
+                            const rel = oldClanData.diplomacyValue[targetId];
+                            // 敵対していなければ、候補に入れます（仲の良さも一緒にメモします）
+                            if (rel && rel.status !== '敵対') {
+                                candidateClans.push({ id: targetId, sentiment: rel.sentiment });
                             }
+                        }
+                        
+                        // 仲が良い順に並べ替えます
+                        candidateClans.sort((a, b) => b.sentiment - a.sentiment);
+                        
+                        let targetCastles = [];
+                        // 仲が良い大名家から順番に、城を持っているか調べます
+                        for (const cClan of candidateClans) {
+                            const cList = this.game.castles.filter(c => c.ownerClan === cClan.id);
+                            if (cList.length > 0) {
+                                targetCastles = cList; // 城が見つかったら、それをターゲットにします
+                                break; 
+                            }
+                        }
+                        
+                        // もし、仲の良い大名家が一つも城を持っていなかったら…敵以外の誰かの城を探します
+                        if (targetCastles.length === 0) {
+                            targetCastles = this.game.castles.filter(c => c.ownerClan !== oldClanId && c.ownerClan !== 0);
+                        }
+                        
+                        // ターゲットの城が見つかったら、今の城から「一番近い城」を選びます
+                        if (targetCastles.length > 0) {
+                            targetCastles.sort((a, b) => {
+                                const distA = Math.abs(castle.x - a.x) + Math.abs(castle.y - a.y);
+                                const distB = Math.abs(castle.x - b.x) + Math.abs(castle.y - b.y);
+                                return distA - distB;
+                            });
+                            escapeCastleId = targetCastles[0].id;
+                        }
+                    }
+                    // ★逃亡先探しここまで
+                    
+                    // ★変更：主家側として戦って負けた武将たちを全員「浪人」にして、逃亡先に移動させます！（亡くなった大名本人は除外）
+                    const roninBushos = []; // 後で一門の子どもたちを探すためのメモ帳です
+                    daimyoMembers.forEach(b => {
+                        if (b.id !== oldDaimyo.id) {
+                            this.game.affiliationSystem.becomeRonin(b);
+                            this.game.affiliationSystem.moveCastle(b, escapeCastleId);
+                            roninBushos.push(b);
                         }
                     });
 
-                    // ★ここから追加：諸勢力との関係値も反転させます！
-                    if (this.game.kunishuSystem) {
-                        const aliveKunishus = this.game.kunishuSystem.getAliveKunishus();
-                        aliveKunishus.forEach(kunishu => {
-                            const currentRel = kunishu.getRelation(clan.id);
-                            let newSentiment = 100 - currentRel;
-                            newSentiment = Math.max(30, Math.min(70, newSentiment));
-                            kunishu.setRelation(clan.id, newSentiment);
-                        });
+                    // ★追加：主家や逃げた武将の「一門」で、まだ登場していない子どもたちを処理します！
+                    const currentYear = this.game.year;
+                    const unbornFamily = this.game.bushos.filter(b => {
+                        if (b.status !== 'unborn') return false; // まだ登場していない人だけを探します
+                        
+                        // 亡くなった旧大名の一門かチェック
+                        const isFamilyOfOldDaimyo = b.familyIds.some(fId => oldDaimyo.familyIds.includes(fId));
+                        // 逃げた武将たちの一門かチェック
+                        const isFamilyOfRonin = roninBushos.some(ronin => b.familyIds.some(fId => ronin.familyIds.includes(fId)));
+                        
+                        return isFamilyOfOldDaimyo || isFamilyOfRonin;
+                    });
+                    
+                    unbornFamily.forEach(b => {
+                        b.clan = 0; // ★まだ生まれていない武将も含め、大名家IDを0にして浪人として登場するようにします
+                        
+                        if (b.birthYear <= currentYear) {
+                            // すでに生まれているなら、今すぐ元服して一緒に逃げます
+                            b.status = 'ronin'; // 浪人にします
+                            b.loyalty = 50;
+                            b.isCastellan = false;
+                            b.isDaimyo = false;
+                            b.isGunshi = false;
+                            // お引越しセンターの魔法で、安全に逃亡先の城に入れます
+                            this.game.affiliationSystem.enterCastle(b, escapeCastleId);
+                            
+                            // フルネームから「|」を消して綺麗なお名前にします
+                            const cleanName = b.name.replace('|', '');
+                            this.game.ui.log(`【逃亡】${cleanName}は一門の危機に元服を早め、行動を共にしました。`);
+                        }
+                    });
+
+                    // ★安全装置：反乱リーダーが新しい大名になるため、軍団長バッジや派閥などの過去の役職を綺麗にリセットします！
+                    this.game.affiliationSystem.resetFactionData(rebellionLeader);
+                    rebellionLeader.isDaimyo = true;
+                    
+                    // ★追加：新しい大名が住んでいるお城のおまかせ（委任）を解除します
+                    const daimyoCastle = this.game.castles.find(c => c.id === rebellionLeader.castleId);
+                    if (daimyoCastle) {
+                        daimyoCastle.isDelegated = false;
                     }
-                    // ★追加ここまで
+
+                    // 勢力名を変更
+                    const clan = this.game.clans.find(c => c.id === oldClanId);
+                    if (clan) {
+                        const familyName = rebellionLeader.familyName || rebellionLeader.name.split('|')[0] || rebellionLeader.name;
+                        clan.name = `${familyName}家`;
+                        
+                        // ★読み仮名も一緒に変更します！
+                        const familyYomi = rebellionLeader.familyYomi || rebellionLeader.yomi.split('|')[0] || rebellionLeader.yomi;
+                        clan.yomi = familyYomi ? `${familyYomi}け` : "";
+                        
+                        clan.leaderId = rebellionLeader.id;
+
+                        this.game.clans.forEach(otherClan => {
+                            if (otherClan.id === 0 || otherClan.id === clan.id) return;
+                            
+                            const currentRel = this.game.getRelation(clan.id, otherClan.id);
+                            if (currentRel) {
+                                let newSentiment = 100 - currentRel.sentiment;
+                                newSentiment = Math.max(30, Math.min(70, newSentiment));
+                                
+                                let newStatus = '普通';
+                                if (newSentiment >= 70) newStatus = '友好';
+                                if (newSentiment <= 30) newStatus = '敵対';
+                                
+                                currentRel.status = newStatus;
+                                currentRel.sentiment = newSentiment;
+                                currentRel.trucePeriod = 0;
+                                currentRel.isMarriage = false;
+                                
+                                const oppRel = this.game.getRelation(otherClan.id, clan.id);
+                                if (oppRel) {
+                                    oppRel.status = newStatus;
+                                    oppRel.sentiment = newSentiment;
+                                    oppRel.trucePeriod = 0;
+                                    oppRel.isMarriage = false;
+                                }
+                            }
+                        });
+
+                        // ★ここから追加：諸勢力との関係値も反転させます！
+                        if (this.game.kunishuSystem) {
+                            const aliveKunishus = this.game.kunishuSystem.getAliveKunishus();
+                            aliveKunishus.forEach(kunishu => {
+                                const currentRel = kunishu.getRelation(clan.id);
+                                let newSentiment = 100 - currentRel;
+                                newSentiment = Math.max(30, Math.min(70, newSentiment));
+                                kunishu.setRelation(clan.id, newSentiment);
+                            });
+                        }
+                        // ★追加ここまで
+                    }
+                    // 勢力情報が変わったので威信を更新
+                    if (window.GameApp) window.GameApp.updateAllClanPrestige();
+
+                    // ★追加：ストッパーを外して、新しい色を塗れるようにします！
+                    this.game.isSuspendingColorUpdate = false;
+
+                    // 謀反成功時は大名家の色がそのまま引き継がれるため、
+                    // 光るアニメーションは出さずに、マップをそのまま描き直します。
+                    if (this.game.ui && typeof this.game.ui.renderMap === 'function') {
+                        this.game.ui.renderMap();
+                    }
+
+                    // 結果のメッセージを出します！
+                    await this.game.ui.showDialogAsync(`【謀反】${oldDaimyo.name}は討死しました！\n${rebellionLeader.name}が新たな大名となります！`);
+
+                } else if (result === 'daimyo_win') {
+                    // 【主家軍の勝利】
+                    await this.game.ui.showDialogAsync(`【謀反】\n${oldDaimyo.name}が勝利をおさめ、\n首魁の${rebellionLeader.name}は自領に逃亡しました。`);
+                    this.game.ui.log(`【謀反】${oldDaimyo.name}が勝利をおさめ、首魁の${rebellionLeader.name}は自領に逃亡しました。`);
+
+                    // ★追加：後で元に戻せるように、元の功績を覚えておくためのメモ帳を用意します
+                    const originalAchievements = new Map();
+
+                    // 主家軍の功績を一時的に+3000します
+                    daimyoMembers.forEach(b => {
+                        originalAchievements.set(b.id, b.achievementTotal || 0); // 元の数字をメモ！
+                        b.achievementTotal = (b.achievementTotal || 0) + 3000;
+                    });
+                    
+                    // 大名様は普段は派閥主になれないので、一時的に「普通の武将」のフリをしてもらって候補に含めます
+                    oldDaimyo.isDaimyo = false;
+
+                    // この特別な状態で、派閥の振り分け直しを行います
+                    this.game.factionSystem.updateFactions();
+
+                    // ★追加：計算が終わったら、すべて元の状態（永続化しないように）に戻します！
+                    daimyoMembers.forEach(b => {
+                        b.achievementTotal = originalAchievements.get(b.id); // メモを見て元通りに！
+                    });
+                    oldDaimyo.isDaimyo = true; // 大名様に戻ってもらいます
+
+                    // その後、敗れた反乱分子たちは通常の独立処理へ移行
+                    await this.executeRebellion(castle, castellan, oldDaimyo, 'indep');
+
+                } else {
+                    // 【引き分け】
+                    await this.game.ui.showDialogAsync(`【謀反】\n決着は着かず、首魁の${rebellionLeader.name}は自領に逃亡しました。`);
+                    this.game.ui.log(`【謀反】決着は着かず、首魁の${rebellionLeader.name}は自領に逃亡しました。`);
+
+                    // 全員を強制的に追従させるため、一時的に派閥IDを反乱リーダーと同じにします
+                    const dummyFactionId = rebellionLeader.factionId || 999;
+                    rebellionLeader.factionId = dummyFactionId;
+                    rebellionLeader.isFactionLeader = true;
+                    rebelMembers.forEach(b => {
+                        b.factionId = dummyFactionId;
+                    });
+
+                    // 通常の独立処理へ
+                    await this.executeRebellion(castle, castellan, oldDaimyo, 'indep');
                 }
-                // 勢力情報が変わったので威信を更新
-                if (window.GameApp) window.GameApp.updateAllClanPrestige();
-
-                // ★追加：ストッパーを外して、新しい色を塗れるようにします！
-                this.game.isSuspendingColorUpdate = false;
-
-                // 謀反成功時は大名家の色がそのまま引き継がれるため、
-                // 光るアニメーションは出さずに、マップをそのまま描き直します。
-                if (this.game.ui && typeof this.game.ui.renderMap === 'function') {
-                    this.game.ui.renderMap();
-                }
-
-                // 結果のメッセージを出します！
-                await this.game.ui.showDialogAsync(`【謀反】${oldDaimyo.name}は討死しました！\n${rebellionLeader.name}が新たな大名となります！`);
-
-            } else if (result === 'daimyo_win') {
-                // 【主家軍の勝利】
-                await this.game.ui.showDialogAsync(`【謀反】\n${oldDaimyo.name}が勝利をおさめ、\n首魁の${rebellionLeader.name}は自領に逃亡しました。`);
-                this.game.ui.log(`【謀反】${oldDaimyo.name}が勝利をおさめ、首魁の${rebellionLeader.name}は自領に逃亡しました。`);
-
-                // ★追加：後で元に戻せるように、元の功績を覚えておくためのメモ帳を用意します
-                const originalAchievements = new Map();
-
-                // 主家軍の功績を一時的に+3000します
-                daimyoMembers.forEach(b => {
-                    originalAchievements.set(b.id, b.achievementTotal || 0); // 元の数字をメモ！
-                    b.achievementTotal = (b.achievementTotal || 0) + 3000;
-                });
-                
-                // 大名様は普段は派閥主になれないので、一時的に「普通の武将」のフリをしてもらって候補に含めます
-                oldDaimyo.isDaimyo = false;
-
-                // この特別な状態で、派閥の振り分け直しを行います
-                this.game.factionSystem.updateFactions();
-
-                // ★追加：計算が終わったら、すべて元の状態（永続化しないように）に戻します！
-                daimyoMembers.forEach(b => {
-                    b.achievementTotal = originalAchievements.get(b.id); // メモを見て元通りに！
-                });
-                oldDaimyo.isDaimyo = true; // 大名様に戻ってもらいます
-
-                // その後、敗れた反乱分子たちは通常の独立処理へ移行
-                await this.executeRebellion(castle, castellan, oldDaimyo, 'indep');
 
             } else {
-                // 【引き分け】
-                await this.game.ui.showDialogAsync(`【謀反】\n決着は着かず、首魁の${rebellionLeader.name}は自領に逃亡しました。`);
-                this.game.ui.log(`【謀反】決着は着かず、首魁の${rebellionLeader.name}は自領に逃亡しました。`);
-
-                // 全員を強制的に追従させるため、一時的に派閥IDを反乱リーダーと同じにします
-                const dummyFactionId = rebellionLeader.factionId || 999;
-                rebellionLeader.factionId = dummyFactionId;
-                rebellionLeader.isFactionLeader = true;
-                rebelMembers.forEach(b => {
-                    b.factionId = dummyFactionId;
-                });
-
-                // 通常の独立処理へ
-                await this.executeRebellion(castle, castellan, oldDaimyo, 'indep');
+                // スコア計算の結果、寝返りか独立に決まった場合の処理です
+                await this.executeRebellion(castle, castellan, oldDaimyo, action);
+            }
+        } catch (e) {
+            console.error("PlanCoupDetatOrRebellion Error:", e);
+        } finally {
+            // ★今回追加：エラー時でも必ず透明化を解除する魔法！
+            const forceHideStyle = document.getElementById('force-hide-ai-text');
+            if (forceHideStyle) {
+                forceHideStyle.remove();
             }
 
-        } else {
-            // スコア計算の結果、寝返りか独立に決まった場合の処理です
-            await this.executeRebellion(castle, castellan, oldDaimyo, action);
-        }
+            const aiGuardEl = document.getElementById('ai-guard');
+            if (aiGuardEl) {
+                aiGuardEl.classList.remove('hide-text');
+            }
 
-        // ★最後に「－１」して、透明化の魔法を解きます！
-        // これですべてのメッセージが表示し終わるまで、絶対に「思考中」の文字が出なくなります。
-        if (this.game.ui) {
-            this.game.ui.guardHiddenCount = Math.max(0, (this.game.ui.guardHiddenCount || 0) - 1);
-            if (typeof this.game.ui.renderMap === 'function') {
-                this.game.ui.renderMap();
+            // ★最後に「－１」して、透明化の魔法を解きます！
+            // これですべてのメッセージが表示し終わるまで、絶対に「思考中」の文字が出なくなります。
+            if (this.game.ui) {
+                this.game.ui.guardHiddenCount = Math.max(0, (this.game.ui.guardHiddenCount || 0) - 1);
+                if (typeof this.game.ui.renderMap === 'function') {
+                    this.game.ui.renderMap();
+                }
             }
         }
     }
