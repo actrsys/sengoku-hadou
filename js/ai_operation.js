@@ -114,7 +114,8 @@ class AIOperationManager {
             }
 
             const myCastles = this.game.castles.filter(c => c.ownerClan === clan.id);
-            const legionIds = [...new Set(myCastles.map(c => c.legionId))];
+            // ★修正：数値の0と文字の"0"が混ざって重複しないように、必ず数値(Number)に統一します！
+            const legionIds = [...new Set(myCastles.map(c => Number(c.legionId || 0)))];
 
             for (const legionId of legionIds) {
                 if (!this.operations[clan.id][legionId]) {
