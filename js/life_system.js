@@ -509,6 +509,11 @@ class LifeSystem {
             await this.handleDaimyoDeath(busho);
         }
 
+        // ★もし国主だったら、後任を決めます
+        if (busho.isCommander) {
+            await this.handleCommanderDeath(busho);
+        }
+
         // 軍師だったら役職を外します
         if (busho.isGunshi) {
             busho.isGunshi = false;
@@ -576,9 +581,9 @@ class LifeSystem {
         // まずは一門だけで候補リストを作ります
         let allCandidates = [...activeFamily, ...unbornFamily, ...externalFamily];
 
-        // もし一門の候補が誰もいなければ、特例として「今活躍している家臣全員（一門以外も含む）」を候補にします！
+        // もし一門の候補が誰もいなければ、特例として「同じ軍団で活躍している家臣」を候補にします！
         if (allCandidates.length === 0) {
-            allCandidates = [...activeBushos];
+            allCandidates = activeBushos.filter(b => b.legionId === legion.id);
         }
 
         if (allCandidates.length > 0) {
@@ -740,6 +745,167 @@ class LifeSystem {
         }
     }
     
+    // ★国主が亡くなった時の後任選びです
+    async handleCommanderDeath(commander) {
+        const legion = this.game.legions ? this.game.legions.find(l => l.commanderId === commander.id) : null;
+        if (!legion) {
+            commander.isCommander = false;
+            return; 
+        }
+
+        const messages = []; 
+        const currentYear = this.game.year;
+        
+        // 大名家の当主を探します（相性などの基準にします）
+        const daimyo = this.game.bushos.find(b => b.clan === commander.clan && b.isDaimyo) || commander;
+
+        // 1. 今活躍している家臣たちを集めます！（大名と国主は弾きます）
+        const activeBushos = this.game.bushos.filter(b => b.clan === commander.clan && b.id !== commander.id && b.status === 'active' && !b.isDaimyo && !b.isCommander);
+        
+        // その中で大名の「一門」の武将だけを抽出します！
+        const activeFamily = activeBushos.filter(b => daimyo.familyIds.some(fId => b.familyIds.includes(fId)));
+
+        // まだ登場していない一門
+        const unbornFamily = this.game.bushos.filter(b => b.status === 'unborn' && !b.isNotBorn && daimyo.familyIds.some(fId => b.familyIds.includes(fId)) && b.birthYear <= currentYear);
+        
+        // 浪人や諸勢力に所属している一門武将も探します！
+        const externalFamily = this.game.bushos.filter(b => {
+            if (b.id === commander.id || b.isDaimyo || b.isCommander) return false;
+            if (!daimyo.familyIds.some(fId => b.familyIds.includes(fId))) return false;
+            if (b.status === 'ronin') return true;
+            if ((b.belongKunishuId || 0) > 0 && b.clan === 0) {
+                const kunishu = this.game.kunishuSystem ? this.game.kunishuSystem.getKunishu(b.belongKunishuId) : null;
+                if (kunishu && kunishu.leaderId === b.id) return false; 
+                return true;
+            }
+            return false;
+        });
+
+        // まずは一門だけで候補リストを作ります
+        let allCandidates = [...activeFamily, ...unbornFamily, ...externalFamily];
+
+        // もし一門の候補が誰もいなければ、特例として「今活躍している家臣全員（一門以外も含む）」を候補にします！
+        if (allCandidates.length === 0) {
+            allCandidates = [...activeBushos];
+        }
+
+        if (allCandidates.length > 0) {
+            let successor = null;
+
+            if (Number(commander.clan) === Number(this.game.playerClanId)) {
+                // プレイヤーの勢力なら、自分で選ぶ画面を出します
+                await new Promise(resolve => {
+                    this.game.ui.info.openBushoSelector('succession_commander', null, {
+                        customBushos: allCandidates,
+                        customTitle: "後任の国主を選択",
+                        hideCancel: true, 
+                        onConfirm: (selectedIds) => {
+                            successor = this.game.getBusho(selectedIds[0]);
+                            resolve();
+                        }
+                    });
+                });
+            } else {
+                // AIの場合は自動で選びます
+                allCandidates.forEach(b => {
+                    b._isRelative = daimyo.familyIds.some(fId => b.familyIds.includes(fId));
+                    b._affinityDiff = Math.abs((daimyo.affinity || 0) - (b.affinity || 0));
+                    b._baseScore = b.leadership + b.intelligence;
+                });
+
+                allCandidates.sort((a, b) => {
+                    if (a._isRelative && !b._isRelative) return -1;
+                    if (!a._isRelative && b._isRelative) return 1;
+                    if (a._isRelative && b._isRelative) {
+                        if (a._affinityDiff !== b._affinityDiff) return a._affinityDiff - b._affinityDiff;
+                    }
+                    return b._baseScore - a._baseScore;
+                });
+
+                successor = allCandidates[0];
+            }
+
+            const originalName = successor.name.replace('|', '');
+            let isExternalSuccessor = false;
+
+            if (successor.status === 'unborn' || successor.status === 'ronin' || (successor.belongKunishuId || 0) > 0) {
+                isExternalSuccessor = true;
+                const clanCastles = this.game.castles.filter(c => c.ownerClan === commander.clan);
+                const baseCastle = clanCastles.length > 0 ? clanCastles[0] : null;
+
+                if (baseCastle) {
+                    if ((successor.belongKunishuId || 0) > 0) {
+                        const kunishu = this.game.kunishuSystem ? this.game.kunishuSystem.getKunishu(successor.belongKunishuId) : null;
+                        const kunishuName = kunishu ? kunishu.getName(this.game) : "諸勢力";
+                        successor.belongKunishuId = 0;
+                        messages.push(`${kunishuName}より${successor.name.replace('|','')}が\n国主として迎え入れられました。`);
+                    } else if (successor.status === 'ronin') {
+                        messages.push(`${successor.name.replace('|','')}が国主として迎え入れられました。`);
+                    } else {
+                        messages.push(`${successor.name.replace('|','')}が急遽元服し、国主を任されました。`);
+                    }
+
+                    if (successor.status === 'ronin' || successor.status === 'active') {
+                        this.game.affiliationSystem.leaveCastle(successor);
+                    }
+
+                    successor.status = 'active';
+                    successor.clan = commander.clan;
+                    successor.castleId = baseCastle.id;
+                    successor.loyalty = 100;
+                    if (!baseCastle.samuraiIds.includes(successor.id)) baseCastle.samuraiIds.push(successor.id);
+                }
+            }
+
+            // 国主の役職を引き継ぎます
+            commander.isCommander = false;
+            successor.isCommander = true;
+            legion.commanderId = successor.id;
+            
+            // 国主になったら城主にします
+            successor.isCastellan = true;
+            const targetCastle = this.game.getCastle(successor.castleId);
+            if (targetCastle) {
+                const castleBushos = this.game.getCastleBushos(targetCastle.id);
+                castleBushos.forEach(b => {
+                    if (b.id !== successor.id && b.isCastellan) {
+                        b.isCastellan = false;
+                    }
+                });
+                targetCastle.castellanId = successor.id;
+            }
+
+            const clan = this.game.clans.find(c => c.id === commander.clan);
+            const clanPrefix = clan ? `${clan.name}の` : "";
+            
+            let mainMsg = "";
+            if (isExternalSuccessor) {
+                mainMsg = `${clanPrefix}国主・${commander.name.replace('|','')}が死亡しました。`;
+            } else {
+                mainMsg = `${clanPrefix}国主・${commander.name.replace('|','')}が死亡し、${originalName}が新たな国主となりました。`;
+            }
+            this.game.ui.log(`【国主交代】${mainMsg}`);
+            messages.unshift(mainMsg);
+
+            for (const msg of messages) {
+                await this.game.ui.showDialogAsync(msg, false, 0);
+            }
+
+        } else {
+            commander.isCommander = false;
+            if (this.game.castleManager) {
+                this.game.castleManager.disbandLegion(legion.id);
+            }
+            
+            const clan = this.game.clans.find(c => c.id === commander.clan);
+            const clanPrefix = clan ? `${clan.name}の` : "";
+            
+            const msg = `${clanPrefix}国主・${commander.name.replace('|','')}が死亡しました。\n後任となる武将がいないため、軍団は解散されました。`;
+            this.game.ui.log(msg);
+            await this.game.ui.showDialogAsync(msg, false, 0);
+        }
+    }
+
     // ==========================================
     // ★ここから追加：大名が交代した時に起こる変化をまとめた「共通の魔法」です！
     // ==========================================
