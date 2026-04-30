@@ -46,20 +46,19 @@ const COMMAND_MENU_STRUCTURE = [
                 ]
             },
             {
-                label: "所領分配",
-                commands: [
-                    'allot_fief_1', 'allot_fief_2', 'allot_fief_3', 'allot_fief_4',
-                    'allot_fief_5', 'allot_fief_6', 'allot_fief_7', 'allot_fief_8'
-                ]
-            },
-            {
                 label: "国主解任",
                 commands: [
                     'dismiss_legion_leader_1', 'dismiss_legion_leader_2', 'dismiss_legion_leader_3', 'dismiss_legion_leader_4',
                     'dismiss_legion_leader_5', 'dismiss_legion_leader_6', 'dismiss_legion_leader_7', 'dismiss_legion_leader_8'
                 ]
+            },
+            {
+                label: "所領分配",
+                commands: [
+                    'allot_fief_1', 'allot_fief_2', 'allot_fief_3', 'allot_fief_4',
+                    'allot_fief_5', 'allot_fief_6', 'allot_fief_7', 'allot_fief_8'
+                ]
             }
-            
         ]
     },
     {
