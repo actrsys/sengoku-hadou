@@ -1116,7 +1116,7 @@ class GameManager {
         this.isProcessingAI = true;
         if (this.ui && this.ui.aiGuard) {
             this.ui.aiGuard.classList.remove('hidden');
-            this.ui.hideAIGuardTemporarily(); // ★中身を壊さずに、透明にして文字だけ隠します！
+            this.ui.hideAIGuardText(); // ★中身を壊さずに、透明にして文字だけ隠します！
         }
 
         // ★月が替わったら軍師の報告印を消します
@@ -1406,12 +1406,12 @@ class GameManager {
             }
             // ★ここから追加：全部終わって翌月に行く前に、安心感のために数字を「MAX/MAX」にしておきます！
             if (this.isProcessingAI && this.ui && this.turnQueue.length > 0) {
-                this.ui.restoreAIGuard(true); // ★強制表示
+                this.ui.restoreAIGuardText(true); // ★強制表示
                 this.ui.updateAIProgress(this.turnQueue.length, this.turnQueue.length);
                 // ★追加：MAXになった数字を一瞬だけ見せてから、月末イベントの邪魔にならないように表示を消します！
                 await new Promise(resolve => setTimeout(resolve, 300));
                 if (this.ui) {
-                    this.ui.hideAIGuardTemporarily(); // ★中身を壊さずに、透明にして文字だけを隠します！
+                    this.ui.hideAIGuardText(); // ★中身を壊さずに、透明にして文字だけを隠します！
                 }
             }
             await this.endMonth(); // ← ★「await」を書き足します！
@@ -1484,7 +1484,7 @@ class GameManager {
                 this.isProcessingAI = true; 
                 if(this.ui.aiGuard) {
                     this.ui.aiGuard.classList.remove('hidden'); 
-                    this.ui.restoreAIGuard(true); // ★透明マントを脱いで文字を見せます！
+                    this.ui.restoreAIGuardText(true); // ★透明マントを脱いで文字を見せます！
                 }
                 
                 this.ui.updateAIProgress(this.currentIndex + 1, this.turnQueue.length);
@@ -1525,7 +1525,7 @@ class GameManager {
             this.isProcessingAI = true;
             if(this.ui.aiGuard) {
                 this.ui.aiGuard.classList.remove('hidden'); 
-                this.ui.restoreAIGuard(true); // ★透明マントを脱いで文字を見せます！
+                this.ui.restoreAIGuardText(true); // ★透明マントを脱いで文字を見せます！
             }
             
             // 進捗を表示
@@ -1566,7 +1566,7 @@ class GameManager {
         this.isProcessingAI = true;
         if (this.ui && this.ui.aiGuard) {
             this.ui.aiGuard.classList.remove('hidden');
-            this.ui.restoreAIGuard(true); // ★透明マントを脱いで文字を見せます！
+            this.ui.restoreAIGuardText(true); // ★透明マントを脱いで文字を見せます！
         }
         
         // ★追加：月末のイベント処理中（独立や反乱など）は、ここでストップします！

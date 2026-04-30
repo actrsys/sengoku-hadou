@@ -273,7 +273,7 @@ Object.assign(WarManager.prototype, {
         if (aiGuardEl) {
             // 壁を確実に表示させてから、一元管理の魔法で文字だけ透明にして隠します！
             aiGuardEl.classList.remove('hidden'); 
-            this.game.ui.hideAIGuardTemporarily();
+            this.game.ui.hideAIGuardText();
             aiGuardEl.style.display = ''; 
         }
 
@@ -429,7 +429,7 @@ Object.assign(WarManager.prototype, {
                     selfReinforcementData = null; 
                 } else {
                     // ★追加：プレイヤーが参戦することになったので、透明化の魔法を解除して文字が見えるようにします！
-                    this.game.ui.restoreAIGuard(true);
+                    this.game.ui.restoreAIGuardText(true);
                 }
             }
 
@@ -922,7 +922,7 @@ Object.assign(WarManager.prototype, {
             console.error("StartWar Error:", e); 
             if (typeof this.game.ui.hideMapGuard === 'function') this.game.ui.hideMapGuard(true); 
 
-            this.game.ui.restoreAIGuard(true);
+            this.game.ui.restoreAIGuardText(true);
 
             this.state.active = false; 
             this.game.finishTurn(); 
@@ -1111,7 +1111,7 @@ Object.assign(WarManager.prototype, {
                 }
 
                 // 一元管理の魔法で透明化を完全に解除します！
-                this.game.ui.restoreAIGuard(true);
+                this.game.ui.restoreAIGuardText(true);
                 
                 // ★追加：籠城戦（攻城戦）の「戦闘終了後」の合図を出します
                 if (this.game.eventManager) {
@@ -1858,7 +1858,7 @@ Object.assign(WarManager.prototype, {
             console.error("EndWar Error: ", e);
             if (typeof this.game.ui.hideMapGuard === 'function') this.game.ui.hideMapGuard(true);
 
-            this.game.ui.restoreAIGuard(true);
+            this.game.ui.restoreAIGuardText(true);
 
             if (this.state.isPlayerInvolved) this.game.ui.showResultModal("合戦処理中にエラーが発生しましたが、\nゲームを継続します。", () => { this.game.finishTurn(); });
             else this.game.finishTurn();
@@ -2439,7 +2439,7 @@ Object.assign(WarManager.prototype, {
         if (typeof this.game.ui.hideMapGuard === 'function') this.game.ui.hideMapGuard(true);
 
         // 一元管理の魔法で透明化を完全に解除します！
-        this.game.ui.restoreAIGuard(true);
+        this.game.ui.restoreAIGuardText(true);
 
         // ★諸勢力との戦いが終わった時も平時のBGMに戻す！
         if (window.AudioManager && this.state.isPlayerInvolved) {
@@ -2832,7 +2832,7 @@ Object.assign(WarManager.prototype, {
         this.game.ui.openQuantitySelector('def_self_reinf_supplies', [helperCastle], null, {
             onConfirm: (inputs) => {
                 // ★追加：プレイヤーが参戦することになったので、透明化の魔法を解除して文字が見えるようにします！
-                this.game.ui.restoreAIGuard(true);
+                this.game.ui.restoreAIGuardText(true);
 
                 const i = inputs[helperCastle.id] || inputs;
                 const rS = i.soldiers ? parseInt(i.soldiers.num.value) : 500;
@@ -3110,7 +3110,7 @@ Object.assign(WarManager.prototype, {
         const helperClanId = helperCastle.ownerClan;
 
         // ★追加：プレイヤーが参戦することになったので、透明化の魔法を解除して文字が見えるようにします！
-        this.game.ui.restoreAIGuard(true);
+        this.game.ui.restoreAIGuardText(true);
 
         helperCastle.soldiers = Math.max(0, helperCastle.soldiers - reinfSoldiers);
         helperCastle.rice = Math.max(0, helperCastle.rice - reinfRice);

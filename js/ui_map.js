@@ -1681,20 +1681,21 @@ Object.assign(UIManager.prototype, {
             }
         }
     },
-
+    
     // ==========================================
     // ★追加：AIの「思考中...」の文字を一時的に透明にする魔法を一元管理（スタック式）します！
+    // ※元の「ガード自体を消す魔法(hideAIGuardTemporarily)」と名前が被らないように変更！
     // ==========================================
-    hideAIGuardTemporarily() {
-        this.guardHiddenCount = (this.guardHiddenCount || 0) + 1;
+    hideAIGuardText() {
+        this.guardTextHiddenCount = (this.guardTextHiddenCount || 0) + 1;
         this.applyAIGuardTextState();
     },
 
-    restoreAIGuard(force = false) {
+    restoreAIGuardText(force = false) {
         if (force) {
-            this.guardHiddenCount = 0;
+            this.guardTextHiddenCount = 0;
         } else {
-            this.guardHiddenCount = Math.max(0, (this.guardHiddenCount || 0) - 1);
+            this.guardTextHiddenCount = Math.max(0, (this.guardTextHiddenCount || 0) - 1);
         }
         this.applyAIGuardTextState();
     },
@@ -1703,7 +1704,7 @@ Object.assign(UIManager.prototype, {
         const guard = this.aiGuard || document.getElementById('ai-guard');
         if (!guard) return;
         
-        if ((this.guardHiddenCount || 0) > 0) {
+        if ((this.guardTextHiddenCount || 0) > 0) {
             guard.classList.add('hide-text');
         } else {
             guard.classList.remove('hide-text');
