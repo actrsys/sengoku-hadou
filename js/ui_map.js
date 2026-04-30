@@ -830,9 +830,12 @@ Object.assign(UIManager.prototype, {
 
                 // ★軍団マーカーの作成（第1～第8軍団の場合のみ）
                 let legionMarkerHtml = '';
-                // c.legionId が 0 より大きい（軍団に所属している）かチェックします[cite: 2]
-                if (c.legionId > 0) {
-                    legionMarkerHtml = `<div class="legion-marker-base legion-color-${c.legionId}">${c.legionId}</div>`;
+                // プレイヤーの城で、かつ軍団に所属しているかチェックします
+                if (c.legionId > 0 && c.ownerClan === this.game.playerClanId) {
+                    // 漢数字に変換するためのリストを用意します
+                    const kanjiNumbers = ["", "一", "二", "三", "四", "五", "六", "七", "八"];
+                    const kanjiLegionId = kanjiNumbers[c.legionId] || c.legionId;
+                    legionMarkerHtml = `<div class="legion-marker-base legion-color-${c.legionId}">${kanjiLegionId}</div>`;
                 }
 
                 // 城の吹き出しと、諸勢力のアイコン、そして軍団マーカーを合体させます！

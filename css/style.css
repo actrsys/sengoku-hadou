@@ -2472,22 +2472,23 @@ body:not(.is-pc) .event-dialog-modal .modal-content.modal-small {
 .event-dialog-modal.event-choices-active .modal-content.modal-small::after {
     display: none !important;
 }
-/* --- 軍団マーカー（道の交点配置用） --- */
+
+/* --- 軍団マーカー（お城の右上に配置用） --- */
 .legion-marker-base {
     position: absolute;
-    /* 道が交差する pixelX, pixelY の位置に合わせるための魔法の座標です */
-    bottom: 0%; 
-    left: 50%;
-    transform: translate(-50%, 50%); /* ちょうど中心に重なるようにずらします */
+    /* 城画像の右上に配置します */
+    top: -2px; 
+    right: -2px;
+    transform: none; 
     
-    width: 28px;
-    height: 28px;
-    border-radius: 50%;
-    border: 2px solid rgba(255, 255, 255, 0.8);
+    width: 20px;
+    height: 20px;
+    border-radius: 0; /* 角の丸みをなくして正方形にします */
+    border: 1px solid rgba(255, 255, 255, 0.8);
     display: flex;
     justify-content: center;
     align-items: center;
-    font-size: 18px;
+    font-size: 13px; /* サイズに合わせて文字も少し小さくします */
     font-weight: bold;
     color: #fff;
     /* 文字が見えやすいように少し影をつけます */
