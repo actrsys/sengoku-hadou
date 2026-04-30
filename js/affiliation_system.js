@@ -403,6 +403,9 @@ class AffiliationSystem {
     }
 
     electCastellan(castle, bushos) {
+        // 国主が存在する城では、城主の再任命ロジックを走らせないようにガードします
+        if (bushos && bushos.some(b => b.isCommander)) return;
+
         if (castle.ownerClan === this.game.playerClanId) {
             const currentLord = bushos.find(b => b.id === castle.castellanId);
             if (currentLord) {

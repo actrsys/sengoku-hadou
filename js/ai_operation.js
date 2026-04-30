@@ -60,9 +60,16 @@ class AIOperationManager {
 
                 // 1. その大名家がもう滅亡していないかチェック
                 const clan = this.game.clans.find(c => c.id === clanId);
+                
+                // ★追加：軍団のデータを探します（直轄である0番は除きます）
+                const legion = legionId === 0 ? true : this.game.legions.find(l => l.clanId === clanId && l.legionNo === legionId);
+
                 if (!clan || clan.id === 0) {
                     isInvalid = true;
                 } else if (!op) {
+                    isInvalid = true;
+                } else if (legionId !== 0 && (!legion || legion.commanderId === 0)) {
+                    // ★追加：国主が剥奪されたり、軍団が解体された場合は不正とみなして作戦を破棄します
                     isInvalid = true;
                 } else {
                     // 2. 作戦データの中身が壊れていないかチェック
