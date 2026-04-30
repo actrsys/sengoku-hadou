@@ -96,7 +96,15 @@ window.EventTextManager = {
             { type: 'log', msg: `こうして、${args.odaClanName}と${args.matsudairaClanName}の同盟は成立した。` }
         ];
     },
-    
+    // ① 清州同盟（パート３：追い返すルート）
+    kiyosu_alliance_reject: function(args) {
+        return [
+            { type: 'dialog', leftName: args.nobunagaName, leftFace: args.nobunagaFace, msg: `「追い返せ。」` },
+            { type: 'dialog', leftName: args.shinzanCName, leftFace: args.shinzanCFace, msg: `「へ……？　よろしいのですか？」` },
+            { type: 'dialog', leftName: args.nobunagaName, leftFace: args.nobunagaFace, msg: `「どうせ我らと結びたいと申すのであろう。構わぬ。追っ払え。」` },
+            { type: 'dialog', leftName: args.shinzanCName, leftFace: args.shinzanCFace, msg: `「はっ、ははっ！」` }
+        ];
+    },
     //桶狭間の戦い
     okehazama_part1: function(args) {
         return [
