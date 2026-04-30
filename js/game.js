@@ -1399,24 +1399,6 @@ class GameManager {
         if (this.warManager && this.warManager.state && this.warManager.state.active) return;
         if (this.selectionMode != null) return;
 
-        // ==========================================
-        // ★究極のリセット魔法：毎ターン開始時にあらゆる透明化を強制解除します！
-        // ==========================================
-        if (this.ui) {
-            this.ui.guardHiddenCount = 0;
-            if (this.ui.aiGuard) {
-                // クラスによる非表示を全て解除
-                this.ui.aiGuard.classList.remove('hide-text', 'hidden');
-                // 直接書き込まれた見えないスタイルも全て解除
-                this.ui.aiGuard.style.display = '';
-                this.ui.aiGuard.style.opacity = '';
-                this.ui.aiGuard.style.color = '';
-            }
-        }
-        // 重複して作られた可能性のある透明化CSSを「全て」探し出して消滅させます
-        document.querySelectorAll('#force-hide-ai-text').forEach(el => el.remove());
-        // ==========================================
-
         // ★ここを修正！ 全ての城が終わって翌月（endMonth）に行く前にも、メッセージが消えるのをじっと待ちます！
         if (this.currentIndex >= this.turnQueue.length) { 
             if (this.ui && this.ui.waitForDialogs) {
