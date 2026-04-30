@@ -1110,13 +1110,13 @@ class GameManager {
     updateAllCastlesLords() {
         this.affiliationSystem.updateAllCastlesLords();
     }
-
+    
     async startMonth() { 
         // ★追加：月初の処理が始まったら、ユーザーが勝手に操作できないように膜（ガード）を張ります！
         this.isProcessingAI = true;
         if (this.ui && this.ui.aiGuard) {
             this.ui.aiGuard.classList.remove('hidden');
-            this.ui.aiGuard.classList.add('hide-text'); // 中身を壊さずに、透明にして文字だけ隠します！
+            this.ui.hideAIGuardTemporarily(); // ★中身を壊さずに、透明にして文字だけ隠します！
         }
 
         // ★月が替わったら軍師の報告印を消します
@@ -1398,7 +1398,7 @@ class GameManager {
         // ★最強ストッパー１：合戦中やマップ選択中にフライングで呼ばれたら絶対に弾く！
         if (this.warManager && this.warManager.state && this.warManager.state.active) return;
         if (this.selectionMode != null) return;
-
+        
         // ★ここを修正！ 全ての城が終わって翌月（endMonth）に行く前にも、メッセージが消えるのをじっと待ちます！
         if (this.currentIndex >= this.turnQueue.length) { 
             if (this.ui && this.ui.waitForDialogs) {
@@ -1406,12 +1406,12 @@ class GameManager {
             }
             // ★ここから追加：全部終わって翌月に行く前に、安心感のために数字を「MAX/MAX」にしておきます！
             if (this.isProcessingAI && this.ui && this.turnQueue.length > 0) {
-                this.ui.aiGuard.classList.remove('hide-text');
+                this.ui.restoreAIGuard(true); // ★強制表示
                 this.ui.updateAIProgress(this.turnQueue.length, this.turnQueue.length);
                 // ★追加：MAXになった数字を一瞬だけ見せてから、月末イベントの邪魔にならないように表示を消します！
                 await new Promise(resolve => setTimeout(resolve, 300));
-                if (this.ui.aiGuard) {
-                    this.ui.aiGuard.classList.add('hide-text'); // ★中身を壊さずに、透明にして文字だけを隠します！
+                if (this.ui) {
+                    this.ui.hideAIGuardTemporarily(); // ★中身を壊さずに、透明にして文字だけを隠します！
                 }
             }
             await this.endMonth(); // ← ★「await」を書き足します！
@@ -1475,7 +1475,7 @@ class GameManager {
             this.ui.renderMap();
         }
 
-        if (isPlayerCastle) { 
+        if (isPlayerCastle) {
             // ==========================================
             // ★ごっそり差し替え！委任のチェックを入れます
             // ==========================================
@@ -1484,7 +1484,7 @@ class GameManager {
                 this.isProcessingAI = true; 
                 if(this.ui.aiGuard) {
                     this.ui.aiGuard.classList.remove('hidden'); 
-                    this.ui.aiGuard.classList.remove('hide-text'); // ★透明マントを脱いで文字を見せます！
+                    this.ui.restoreAIGuard(true); // ★透明マントを脱いで文字を見せます！
                 }
                 
                 this.ui.updateAIProgress(this.currentIndex + 1, this.turnQueue.length);
@@ -1525,7 +1525,7 @@ class GameManager {
             this.isProcessingAI = true;
             if(this.ui.aiGuard) {
                 this.ui.aiGuard.classList.remove('hidden'); 
-                this.ui.aiGuard.classList.remove('hide-text'); // ★透明マントを脱いで文字を見せます！
+                this.ui.restoreAIGuard(true); // ★透明マントを脱いで文字を見せます！
             }
             
             // 進捗を表示
@@ -1566,7 +1566,7 @@ class GameManager {
         this.isProcessingAI = true;
         if (this.ui && this.ui.aiGuard) {
             this.ui.aiGuard.classList.remove('hidden');
-            this.ui.aiGuard.classList.remove('hide-text');
+            this.ui.restoreAIGuard(true); // ★透明マントを脱いで文字を見せます！
         }
         
         // ★追加：月末のイベント処理中（独立や反乱など）は、ここでストップします！

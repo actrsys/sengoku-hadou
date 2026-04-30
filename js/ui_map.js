@@ -1666,7 +1666,7 @@ Object.assign(UIManager.prototype, {
         }
         guard.style.display = 'block';
     },
-
+    
     hideMapGuard(force = false) {
         if (force) {
             this.mapGuardCount = 0;
@@ -1679,6 +1679,34 @@ Object.assign(UIManager.prototype, {
             if (guard) {
                 guard.style.display = 'none';
             }
+        }
+    },
+
+    // ==========================================
+    // ★追加：AIの「思考中...」の文字を一時的に透明にする魔法を一元管理（スタック式）します！
+    // ==========================================
+    hideAIGuardTemporarily() {
+        this.guardHiddenCount = (this.guardHiddenCount || 0) + 1;
+        this.applyAIGuardTextState();
+    },
+
+    restoreAIGuard(force = false) {
+        if (force) {
+            this.guardHiddenCount = 0;
+        } else {
+            this.guardHiddenCount = Math.max(0, (this.guardHiddenCount || 0) - 1);
+        }
+        this.applyAIGuardTextState();
+    },
+
+    applyAIGuardTextState() {
+        const guard = this.aiGuard || document.getElementById('ai-guard');
+        if (!guard) return;
+        
+        if ((this.guardHiddenCount || 0) > 0) {
+            guard.classList.add('hide-text');
+        } else {
+            guard.classList.remove('hide-text');
         }
     },
 

@@ -265,25 +265,16 @@ Object.assign(WarManager.prototype, {
         if (this.game.eventManager) {
             await this.game.eventManager.processEvents('before_war', { atkCastle, defCastle, atkBushos, atkSoldierCount, atkRice, atkHorses, atkGuns, reinforcementData, selfReinforcementData });
         }
-
+        
         this.state = this.state || {};
         this.state.active = true;
 
         const aiGuardEl = document.getElementById('ai-guard');
         if (aiGuardEl) {
-            // 壁を確実に表示させてから、文字だけ透明にして隠します！
+            // 壁を確実に表示させてから、一元管理の魔法で文字だけ透明にして隠します！
             aiGuardEl.classList.remove('hidden'); 
-            aiGuardEl.classList.add('hide-text');
+            this.game.ui.hideAIGuardTemporarily();
             aiGuardEl.style.display = ''; 
-        }
-
-        // ★今回追加：「透明化しっぱなし」にするための強力な魔法です！
-        // 地図が何度描き直されても、絶対に文字が表示されないようにルール（CSS）をブラウザに追加します。
-        if (!document.getElementById('force-hide-ai-text')) {
-            const style = document.createElement('style');
-            style.id = 'force-hide-ai-text';
-            style.innerHTML = '#ai-guard { color: transparent !important; text-shadow: none !important; } #ai-guard * { opacity: 0 !important; }';
-            document.head.appendChild(style);
         }
 
         try {
@@ -428,7 +419,6 @@ Object.assign(WarManager.prototype, {
                 });
                 
                 this.game.ui.restoreAIGuard();
-                
                 if (!isConfirmed) {
                     const hc = selfReinforcementData.castle;
                     hc.soldiers = Math.min(99999, hc.soldiers + selfReinforcementData.soldiers);
@@ -439,8 +429,7 @@ Object.assign(WarManager.prototype, {
                     selfReinforcementData = null; 
                 } else {
                     // ★追加：プレイヤーが参戦することになったので、透明化の魔法を解除して文字が見えるようにします！
-                    const forceHideStyle = document.getElementById('force-hide-ai-text');
-                    if (forceHideStyle) forceHideStyle.remove();
+                    this.game.ui.restoreAIGuard(true);
                 }
             }
 
@@ -933,10 +922,7 @@ Object.assign(WarManager.prototype, {
             console.error("StartWar Error:", e); 
             if (typeof this.game.ui.hideMapGuard === 'function') this.game.ui.hideMapGuard(true); 
 
-            const forceHideStyle = document.getElementById('force-hide-ai-text');
-            if (forceHideStyle) forceHideStyle.remove();
-            const aiGuardEl = document.getElementById('ai-guard');
-            if (aiGuardEl) aiGuardEl.classList.remove('hide-text');
+            this.game.ui.restoreAIGuard(true);
 
             this.state.active = false; 
             this.game.finishTurn(); 
@@ -1112,7 +1098,6 @@ Object.assign(WarManager.prototype, {
                     aiResultMsg = `${defDaimyoName}の${s.defBusho.name}が\n${atkDaimyoName}の攻撃を撃退しました！`;
                 }
             }
-            // ==========================================
             
             // ★変更：順番待ちができるように async を付けます
             const finishWarProcess = async () => {
@@ -1125,16 +1110,8 @@ Object.assign(WarManager.prototype, {
                     window.AudioManager.restoreMemorizedBgm();
                 }
 
-                const aiGuardEl = document.getElementById('ai-guard');
-                if (aiGuardEl) {
-                    aiGuardEl.classList.remove('hide-text');
-                }
-
-                // ★今回追加：「透明化しっぱなし」の強力なルールもここでしっかり消します！
-                const forceHideStyle = document.getElementById('force-hide-ai-text');
-                if (forceHideStyle) {
-                    forceHideStyle.remove();
-                }
+                // 一元管理の魔法で透明化を完全に解除します！
+                this.game.ui.restoreAIGuard(true);
                 
                 // ★追加：籠城戦（攻城戦）の「戦闘終了後」の合図を出します
                 if (this.game.eventManager) {
@@ -1881,10 +1858,7 @@ Object.assign(WarManager.prototype, {
             console.error("EndWar Error: ", e);
             if (typeof this.game.ui.hideMapGuard === 'function') this.game.ui.hideMapGuard(true);
 
-            const forceHideStyle = document.getElementById('force-hide-ai-text');
-            if (forceHideStyle) forceHideStyle.remove();
-            const aiGuardEl = document.getElementById('ai-guard');
-            if (aiGuardEl) aiGuardEl.classList.remove('hide-text');
+            this.game.ui.restoreAIGuard(true);
 
             if (this.state.isPlayerInvolved) this.game.ui.showResultModal("合戦処理中にエラーが発生しましたが、\nゲームを継続します。", () => { this.game.finishTurn(); });
             else this.game.finishTurn();
@@ -2464,16 +2438,8 @@ Object.assign(WarManager.prototype, {
         // ★念のためバリアを強制解除します！
         if (typeof this.game.ui.hideMapGuard === 'function') this.game.ui.hideMapGuard(true);
 
-        // ★今回追加：「透明化しっぱなし」のルールを剥がして元に戻します！
-        const forceHideStyle = document.getElementById('force-hide-ai-text');
-        if (forceHideStyle) {
-            forceHideStyle.remove();
-        }
-
-        const aiGuardEl = document.getElementById('ai-guard');
-        if (aiGuardEl) {
-            aiGuardEl.classList.remove('hide-text');
-        }
+        // 一元管理の魔法で透明化を完全に解除します！
+        this.game.ui.restoreAIGuard(true);
 
         // ★諸勢力との戦いが終わった時も平時のBGMに戻す！
         if (window.AudioManager && this.state.isPlayerInvolved) {
@@ -2866,8 +2832,7 @@ Object.assign(WarManager.prototype, {
         this.game.ui.openQuantitySelector('def_self_reinf_supplies', [helperCastle], null, {
             onConfirm: (inputs) => {
                 // ★追加：プレイヤーが参戦することになったので、透明化の魔法を解除して文字が見えるようにします！
-                const forceHideStyle = document.getElementById('force-hide-ai-text');
-                if (forceHideStyle) forceHideStyle.remove();
+                this.game.ui.restoreAIGuard(true);
 
                 const i = inputs[helperCastle.id] || inputs;
                 const rS = i.soldiers ? parseInt(i.soldiers.num.value) : 500;
@@ -3140,13 +3105,12 @@ Object.assign(WarManager.prototype, {
         };
         promptBusho();
     },
-
+    
     _applyManualDefReinforcement(helperCastle, defCastle, myToHelperRel, reinfBushos, reinfSoldiers, reinfRice, reinfHorses, reinfGuns, onComplete) {
         const helperClanId = helperCastle.ownerClan;
 
         // ★追加：プレイヤーが参戦することになったので、透明化の魔法を解除して文字が見えるようにします！
-        const forceHideStyle = document.getElementById('force-hide-ai-text');
-        if (forceHideStyle) forceHideStyle.remove();
+        this.game.ui.restoreAIGuard(true);
 
         helperCastle.soldiers = Math.max(0, helperCastle.soldiers - reinfSoldiers);
         helperCastle.rice = Math.max(0, helperCastle.rice - reinfRice);
