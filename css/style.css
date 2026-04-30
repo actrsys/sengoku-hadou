@@ -2488,18 +2488,23 @@ body:not(.is-pc) .event-dialog-modal .modal-content.modal-small {
     display: flex;
     justify-content: center;
     align-items: center;
-    font-size: 13px; /* サイズに合わせて文字も少し小さくします */
+    font-size: 15px; /* 文字サイズをやや大きくしました */
     font-weight: bold;
     color: #fff;
-    /* 文字が見えやすいように少し影をつけます */
-    text-shadow: 1px 1px 2px #000;
+    /* 上下左右の影で黒く細いフチを作り、最後に元のぼんやりとした影をつけます */
+    text-shadow: 
+        1px 1px 0 #000, 
+        -1px -1px 0 #000, 
+        1px -1px 0 #000, 
+        -1px 1px 0 #000,
+        1px 1px 2px rgba(0,0,0,0.8);
     box-shadow: 0 2px 4px rgba(0,0,0,0.5);
     z-index: 5; /* お城の画像(2)よりは手前、吹き出し(100)よりは奥にします */
 }
 
-/* 渋めの色設定（彩度を抑えた和風カラー） */
-.legion-color-1 { background-color: #1e88e5; } /* 青 */
-.legion-color-2 { background-color: #e53935; } /* 赤 */
+/* 軍団ごとの色分け（一目で区別できるようにします） */
+.legion-color-1 { background-color: #e53935; } /* 赤 */
+.legion-color-2 { background-color: #1e88e5; } /* 青 */
 .legion-color-3 { background-color: #43a047; } /* 緑 */
 .legion-color-4 { background-color: #fb8c00; } /* オレンジ */
 .legion-color-5 { background-color: #8e24aa; } /* 紫 */
