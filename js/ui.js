@@ -923,13 +923,6 @@ class UIManager {
         this.info.showKyotenList();
     }
 
-    // ==========================================
-    // 委任する城の一覧を出す魔法
-    // ==========================================
-    showDelegateListModal() {
-        this.info.showDelegateListModal();
-    }
-
     showAppointLegionLeaderModal(legionNo) {
         this.info.openBushoSelector('appoint_legion_leader', null, { legionNo: legionNo });
     }
@@ -938,11 +931,6 @@ class UIManager {
         if (this.info) {
             this.info.showAppointLegionCastleSelector(bushoId, legionNo);
         }
-    }
-
-    // 個別の「直轄・委任・詳細設定」画面を出す魔法/
-    showDelegateSettingModal(castleId, onBack) {
-        this.info.showDelegateSettingModal(castleId, onBack);
     }
 
     showAllotFiefModal(legionNo) {

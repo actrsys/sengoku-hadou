@@ -636,18 +636,6 @@ body:not(.is-pc) .select-item > *:has(+ .pc-only:last-child) { border-right: non
 .text-orange { color: #ffd180 !important; }
 .text-pink { color: #ff96ba !important; }
 
-/* 委任一括ボタン用 */
-.btn-toggle-delegated {
-    color: #ff8a80 !important;
-    background-color: #3e2723 !important;
-    border-color: #ff8a80 !important;
-}
-.btn-toggle-direct {
-    color: #82b1ff !important;
-    background-color: #0d47a1 !important;
-    border-color: #82b1ff !important;
-}
-
 /* 個別リストのグリッド調整（JavaScript側で設定するように変更しました） */
 
 /* =========================================================
@@ -807,15 +795,6 @@ body:not(.is-pc) .select-item > *:has(+ .pc-only:last-child) { border-right: non
     transform: translateY(1px) !important;
 }
 
-.delegate-btn { padding: 15px 30px; font-size: 1.2rem; font-weight: bold; border: 2px solid #ccc; background-color: #f5f5f5; border-radius: 8px; cursor: pointer; color: #777; transition: all 0.2s; }
-.delegate-btn:hover { background-color: #e0e0e0; }
-.delegate-btn.active { border-color: #1976d2; background-color: #e3f2fd; color: #1976d2; box-shadow: 0 0 10px rgba(25, 118, 210, 0.3); }
-.delegate-sub-btn { padding: 8px 16px; font-size: 1rem; font-weight: bold; border: 2px solid #ccc; background-color: #f5f5f5; border-radius: 6px; cursor: pointer; color: #777; margin-right: 10px; transition: all 0.2s; }
-.delegate-sub-btn:hover:not(:disabled) { background-color: #e0e0e0; }
-.delegate-sub-btn.active { border-color: #d32f2f; background-color: #ffebee; color: #d32f2f; }
-.delegate-sub-btn.active-allow { border-color: #1976d2; background-color: #e3f2fd; color: #1976d2; }
-.delegate-sub-btn:disabled { opacity: 0.5; cursor: not-allowed; }
-
 /* ランクバッジ・ゲージ類 */
 .grade-container { 
     display: inline-flex; 
@@ -886,7 +865,6 @@ body:not(.is-pc) .select-item > *:has(+ .pc-only:last-child) { border-right: non
 /* モーダル（小窓）の重なり順（z-index）の統一リスト */
 #intercept-confirm-modal { z-index: 6000; }
 #quantity-modal { z-index: 6500; }
-#delegate-setting-modal { z-index: 6600; }
 #settings-modal { z-index: 7000; }
 #result-modal { z-index: 8000; }
 #daimyo-list-modal { z-index: 8100; }

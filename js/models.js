@@ -184,12 +184,21 @@ class Castle {
         this.investigatedUntil = Number(this.investigatedUntil || 0);
         this.investigatedAccuracy = Number(this.investigatedAccuracy || 0);
         
-        // ★委任されているかどうかを覚える箱（最初はfalse＝直轄）
-        this.isDelegated = data.isDelegated === true;
+        // ★委任されているかどうかを覚える箱（軍団IDが0以外なら自動で委任状態）
+        Object.defineProperty(this, 'isDelegated', {
+            get: function() { return this.legionId > 0; },
+            set: function(val) { /* 何もしない（エラー防止用） */ }
+        });
 
-        // ★委任中の細かい許可設定（デフォルトは false ＝ 不可）
-        this.allowAttack = data.allowAttack === true;
-        this.allowMove = data.allowMove === true;
+        // ★委任中の細かい許可設定（移動と城攻めは一旦すべて許可）
+        Object.defineProperty(this, 'allowAttack', {
+            get: function() { return true; },
+            set: function(val) { /* 何もしない */ }
+        });
+        Object.defineProperty(this, 'allowMove', {
+            get: function() { return true; },
+            set: function(val) { /* 何もしない */ }
+        });
 
         // ★一揆や豪雪などの「状態異常」のシールを複数貼っておくための箱です
         this.statusEffects = Array.isArray(data.statusEffects) ? data.statusEffects : [];

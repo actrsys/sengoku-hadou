@@ -36,7 +36,7 @@ const COMMAND_MENU_STRUCTURE = [
     },
     {
         label: "軍団",
-        commands: ['appoint_gunshi', 'appoint', 'delegate'],
+        commands: ['appoint_gunshi', 'appoint'],
         subMenus: [
             {
                 label: "国主任命",
@@ -82,12 +82,7 @@ const CAN_EXECUTE_RULES = {
             return targetCastle && targetCastle.ownerClan === game.playerClanId;
         });
     },
-    hasDelegatableCastle: (game) => {
-        const daimyo = game.bushos.find(b => b.clan === game.playerClanId && b.isDaimyo);
-        if (!daimyo) return false;
-        return game.castles.some(c => c.ownerClan === game.playerClanId && c.id !== daimyo.castleId);
-    },
-    canManageLegion: (game, legionNumber) => {
+    hcanManageLegion: (game, legionNumber) => {
         const myCastles = game.castles.filter(c => Number(c.ownerClan) === Number(game.playerClanId));
         if (myCastles.length <= 1) return false;
         if (game.legions) {
@@ -386,11 +381,6 @@ const COMMAND_SPECS = {
             if (daimyo && Number(daimyo.castleId) === Number(castle.id)) return false;
             return true;
         }
-    },
-    'delegate': { 
-        label: "城主委任", category: 'LEGION', 
-        isSystem: true, action: 'delegate_list',
-        canExecute: (game, castle) => CAN_EXECUTE_RULES.hasDelegatableCastle(game)
     },
     'appoint_legion_leader_1': { label: "第一席", category: 'LEGION', isSystem: true, action: 'appoint_legion_leader_1', canExecute: (game, castle) => CAN_EXECUTE_RULES.canManageLegion(game, 1) },
     'appoint_legion_leader_2': { label: "第二席", category: 'LEGION', isSystem: true, action: 'appoint_legion_leader_2', canExecute: (game, castle) => CAN_EXECUTE_RULES.canManageLegion(game, 2) },
@@ -1279,7 +1269,6 @@ class CommandSystem {
             case 'busho_list': this.game.ui.openBushoSelector('all_busho_list', null, null, null); break;
             case 'princess_list': this.game.ui.showPrincessList(); break;
             case 'kyoten_list': this.game.ui.showKyotenList(); break;
-            case 'delegate_list': this.game.ui.showDelegateListModal(); break;
             case 'appoint_legion_leader_1': this.game.ui.showAppointLegionLeaderModal(1); break;
             case 'appoint_legion_leader_2': this.game.ui.showAppointLegionLeaderModal(2); break;
             case 'appoint_legion_leader_3': this.game.ui.showAppointLegionLeaderModal(3); break;
