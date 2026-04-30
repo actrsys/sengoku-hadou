@@ -2,12 +2,62 @@
  * war_effort.js
  * 戦争の準備（戦前）と、戦後処理・捕虜の処遇などを担当するファイルです
  */
-
+ 
 // Object.assign を使って、WarManager に魔法をくっつけます！
 Object.assign(WarManager.prototype, {
 
+    // ★追加：落城時などに逃げ込む「味方の城」の候補を探し出す魔法
+    getEscapeCandidates(defCastle) {
+        const oldOwner = defCastle.ownerClan;
+        
+        // ★追加：持ち主が0（中立）のお城の場合は、そもそも味方はいないので探しに行きません！
+        if (oldOwner === 0) return [];
+        
+        const oldLegionId = defCastle.legionId || 0;
+        const allFriendlyCastles = this.game.castles.filter(c => c.ownerClan === oldOwner && c.id !== defCastle.id);
+        
+        if (allFriendlyCastles.length === 0) return [];
+        
+        const hasDaimyo = this.game.getCastleBushos(defCastle.id).some(b => b.isDaimyo);
+        
+        // 1. まずは同じ軍団IDの城を探す
+        let candidates = allFriendlyCastles.filter(c => (c.legionId || 0) === oldLegionId);
+        
+        // 2. なければ直轄（ID0）の城を探す
+        if (candidates.length === 0) {
+            candidates = allFriendlyCastles.filter(c => (c.legionId || 0) === 0);
+        }
+        
+        // 3. 大名がいて、直轄領もない場合、他軍団の城へ
+        if (candidates.length === 0 && hasDaimyo) {
+            // 国主がいない城を優先する
+            const withoutCommander = allFriendlyCastles.filter(c => {
+                const legion = this.game.legions ? this.game.legions.find(l => l.id === c.legionId) : null;
+                return !legion || !legion.commanderId;
+            });
+            if (withoutCommander.length > 0) {
+                candidates = withoutCommander;
+            } else {
+                candidates = allFriendlyCastles;
+            }
+        }
+        
+        // それでもなければ、どこでもいいから自領へ（武将を宙ぶらりんにしない）
+        if (candidates.length === 0) {
+            candidates = allFriendlyCastles;
+        }
+        
+        // 経路がつながっているものを優先して返す
+        const reachable = candidates.filter(c => GameSystem.isReachable(this.game, defCastle, c, oldOwner));
+        if (reachable.length > 0) {
+            return reachable;
+        }
+        
+        // 繋がっていなくても、最終的には必ずどこかの自領に逃げるようにする
+        return candidates;
+    },
+
     // ★追加：援軍のメッセージを一元管理する専門の窓口（係）です！
-    // これを作っておくことで、あちこちに同じ文章を書かなくて済むようになります。
     reinfMsgHelper: {
         // 1. プレイヤーに援軍の要請が来た時のメッセージ
         showRequest: (game, myClanName, targetInfoStr, gold, isBoss, isAttack, onAccept, onDecline) => {
@@ -917,9 +967,10 @@ Object.assign(WarManager.prototype, {
         s[reinfKey] = null;
     },
     
+    // 差し替え後
     executeRetreatLogic(defCastle) {
-        // ★修正：大名家が「0（中立の空き城）」の時は、他の空き城を仲間の城だと勘違いしないように空っぽ（[]）にします！
-        let candidates = defCastle.ownerClan === 0 ? [] : this.game.castles.filter(c => c.ownerClan === defCastle.ownerClan && c.id !== defCastle.id && GameSystem.isReachable(this.game, defCastle, c, defCastle.ownerClan));
+        // ★修正：新しい逃げ先を探す魔法を使います！
+        let candidates = defCastle.ownerClan === 0 ? [] : this.getEscapeCandidates(defCastle);
         if (defCastle.isKunishu) candidates = []; // ★諸勢力は撤退先がない
         if (candidates.length === 0) { this.endWar(true); return; }
         const s = this.state;
@@ -956,9 +1007,18 @@ Object.assign(WarManager.prototype, {
                         this.game.factionSystem.handleMove(b, defCastle.id, target.id);
                         // ★新しいお引越しセンターの魔法を使います！
                         this.game.affiliationSystem.moveCastle(b, target.id); 
+                        
+                        // ★追加：大名が他軍団の城に逃げ込んだ時の処理
+                        if (b.isDaimyo && target.legionId !== 0) {
+                            if (this.game.castleManager && this.game.castleManager.disbandLegion) {
+                                this.game.castleManager.disbandLegion(target.legionId);
+                            }
+                            target.legionId = 0;
+                            target.isDelegated = false;
+                        }
                     }
                 });
-                defCastle.gold -= carryGold; defCastle.rice = 0; defCastle.soldiers = 0; 
+                defCastle.gold -= carryGold; defCastle.rice = 0; defCastle.soldiers = 0;
                 defCastle.horses = 0; defCastle.guns = 0;
                 
                 defCastle.samuraiIds = defCastle.samuraiIds.filter(id => {
@@ -1447,8 +1507,12 @@ Object.assign(WarManager.prototype, {
                 if (attackerWon) {
                     const targetC = this.game.getCastle(s.defender.id);
                     const oldOwner = targetC.ownerClan;
+                    
+                    // ★修正：お城の持ち主が中立に書き換えられてしまう「前」に、逃げ込める味方の城を探しておきます！
+                    const friendlyCastles = this.getEscapeCandidates(targetC);
+
                     // ★城の管理システムにお任せします！
-                    this.game.castleManager.changeOwner(targetC, 0); 
+                    this.game.castleManager.changeOwner(targetC, 0, false, 0); 
 
                     // ★追加：色が中立に変わったので、メッセージの前に地図を更新します！
                     // ★今回追加：色を変える時に、かっこいいアニメーションの魔法を使います！
@@ -1466,9 +1530,6 @@ Object.assign(WarManager.prototype, {
                     
                     const kunishuMembers = this.game.kunishuSystem.getKunishuMembers(s.attacker.kunishuId).map(b => b.id);
                     
-                    // ★ここから追加：逃げ込める「味方の城」が他にあるか探します！
-                    const friendlyCastles = this.game.castles.filter(c => c.ownerClan === oldOwner && c.id !== targetC.id);
-                    
                     this.game.getCastleBushos(targetC.id).forEach(b => {
                         // もし諸勢力のメンバーじゃなかったら（大名家の武将だったら）
                         if (!kunishuMembers.includes(b.id)) {
@@ -1481,6 +1542,15 @@ Object.assign(WarManager.prototype, {
                                 }
                                 // ★新しいお引越しセンターの魔法を使います！
                                 this.game.affiliationSystem.moveCastle(b, escapeCastle.id);
+                                
+                                // ★追加：大名が他軍団の城に逃げ込んだ時の処理
+                                if (b.isDaimyo && escapeCastle.legionId !== 0) {
+                                    if (this.game.castleManager && this.game.castleManager.disbandLegion) {
+                                        this.game.castleManager.disbandLegion(escapeCastle.legionId);
+                                    }
+                                    escapeCastle.legionId = 0;
+                                    escapeCastle.isDelegated = false;
+                                }
                             } else {
                                 // ★味方の城がない場合（最後の城だった場合）：浪人になります
                                 // ★新しいお引越しセンターの魔法を使います！
@@ -1637,7 +1707,8 @@ Object.assign(WarManager.prototype, {
             
             if (isRetreat && attackerWon) {
                 // ★城の管理システムにお任せします！
-                this.game.castleManager.changeOwner(s.defender, s.attacker.ownerClan);
+                const newLegionId = s.sourceCastle ? (s.sourceCastle.legionId || 0) : 0;
+                this.game.castleManager.changeOwner(s.defender, s.attacker.ownerClan, false, newLegionId);
 
                 // ★追加：色が更新されたので、メッセージの前に地図を更新します！
                 // ★今回追加：色を変える時に、かっこいいアニメーションの魔法を使います！
@@ -1723,7 +1794,8 @@ Object.assign(WarManager.prototype, {
                 }
                 
                 // ★城の管理システムにお任せします！
-                this.game.castleManager.changeOwner(s.defender, s.attacker.ownerClan);
+                const newLegionId = s.sourceCastle ? (s.sourceCastle.legionId || 0) : 0;
+                this.game.castleManager.changeOwner(s.defender, s.attacker.ownerClan, false, newLegionId);
 
                 // ★追加：色が更新されたので、メッセージの前に地図を更新します！
                 // ★今回追加：色を変える時に、かっこいいアニメーションの魔法を使います！
@@ -1821,7 +1893,8 @@ Object.assign(WarManager.prototype, {
     
     processCaptures(defeatedCastle, winnerClanId) {
         const losers = this.game.getCastleBushos(defeatedCastle.id); const captives = []; const escapees = [];
-        const friendlyCastles = this.game.castles.filter(c => c.ownerClan === defeatedCastle.ownerClan && c.id !== defeatedCastle.id);
+        // ★修正：新しい逃げ先を探す魔法を使います！
+        const friendlyCastles = this.getEscapeCandidates(defeatedCastle);
         const isLastStand = friendlyCastles.length === 0;
 
         losers.forEach(b => { 
@@ -1845,6 +1918,15 @@ Object.assign(WarManager.prototype, {
                     // ★新しいお引越しセンターの魔法を使います！
                     this.game.affiliationSystem.moveCastle(b, escapeCastle.id);
                     escapees.push(b);
+                    
+                    // ★追加：大名が他軍団の城に逃げ込んだ時の処理
+                    if (b.isDaimyo && escapeCastle.legionId !== 0) {
+                        if (this.game.castleManager && this.game.castleManager.disbandLegion) {
+                            this.game.castleManager.disbandLegion(escapeCastle.legionId);
+                        }
+                        escapeCastle.legionId = 0;
+                        escapeCastle.isDelegated = false;
+                    }
                 } else { 
                     // ★新しいお引越しセンターの魔法を使います！
                     this.game.affiliationSystem.becomeRonin(b);

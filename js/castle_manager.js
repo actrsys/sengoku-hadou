@@ -8,15 +8,26 @@ class CastleManager {
     }
 
     // 城の持ち主を変更する魔法です。isEventがtrueの時は、イベントによる平和的な変更として扱います。
-    changeOwner(castle, newOwnerId, isEvent = false) {
+    changeOwner(castle, newOwnerId, isEvent = false, newLegionId = 0) {
         const oldOwnerId = castle.ownerClan;
+        const oldLegionId = castle.legionId || 0;
+
         castle.ownerClan = newOwnerId;
-        
+        castle.legionId = newLegionId; // 攻撃側の軍団IDになる
+
         // 調査状態などをリセットします
         castle.investigatedUntil = 0;
         
         // ★追加：城の持ち主が変わった時は、おまかせ（委任）を必ず解除します！
         castle.isDelegated = false;
+
+        // ★追加：旧軍団の城がゼロになったかチェックして、ゼロなら壊滅させる
+        if (oldOwnerId !== 0 && oldLegionId !== 0) {
+            const remaining = this.game.castles.filter(c => c.ownerClan === oldOwnerId && c.legionId === oldLegionId);
+            if (remaining.length === 0) {
+                this.disbandLegion(oldLegionId);
+            }
+        }
         
         // ★修正：イベントでの変更ではない（合戦などでの奪い合いの）場合のみ、忠誠度や諸勢力への影響を発生させます
         if (!isEvent) {
@@ -84,7 +95,7 @@ class CastleManager {
                             isRelated = true;
                         }
                     }
-
+                    
                     // 全く関係ない大名家の作戦なら、この先の重い処理を飛ばして次へ行きます！
                     if (!isRelated) {
                         continue; 
@@ -165,6 +176,29 @@ class CastleManager {
                     }
                 }
             }
+        }
+    }
+
+    // ★追加：軍団を壊滅させ、国主を解任する魔法
+    disbandLegion(legionId) {
+        if (!legionId || legionId === 0 || !this.game.legions) return;
+        
+        const legion = this.game.legions.find(l => l.id === legionId);
+        if (legion) {
+            const commanderId = legion.commanderId;
+            if (commanderId > 0) {
+                const commander = this.game.getBusho(commanderId);
+                if (commander) {
+                    commander.isCommander = false;
+                }
+            }
+            legion.commanderId = 0;
+            
+            // もしその軍団の他の城が残っていたら、それらの城も直轄にする
+            this.game.castles.filter(c => c.legionId === legionId).forEach(c => {
+                c.legionId = 0;
+                c.isDelegated = false;
+            });
         }
     }
 
