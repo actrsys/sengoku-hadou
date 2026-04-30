@@ -684,9 +684,9 @@ window.GameEvents.push({
                         leftName: args.shinzanCName,
                         leftFace: args.shinzanCFace,
                         okText: "面会する",
-                        okClass: "btn-danger",
+                        okClass: "btn-primary",
                         cancelText: "追い返す",
-                        cancelClass: "btn-primary"
+                        cancelClass: "btn-secondary"
                     }
                 );
             });
