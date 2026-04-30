@@ -46,19 +46,20 @@ const COMMAND_MENU_STRUCTURE = [
                 ]
             },
             {
-                label: "国主解任",
-                commands: [
-                    'dismiss_legion_leader_1', 'dismiss_legion_leader_2', 'dismiss_legion_leader_3', 'dismiss_legion_leader_4',
-                    'dismiss_legion_leader_5', 'dismiss_legion_leader_6', 'dismiss_legion_leader_7', 'dismiss_legion_leader_8'
-                ]
-            },
-            {
                 label: "所領分配",
                 commands: [
                     'allot_fief_1', 'allot_fief_2', 'allot_fief_3', 'allot_fief_4',
                     'allot_fief_5', 'allot_fief_6', 'allot_fief_7', 'allot_fief_8'
                 ]
+            },
+            {
+                label: "国主解任",
+                commands: [
+                    'dismiss_legion_leader_1', 'dismiss_legion_leader_2', 'dismiss_legion_leader_3', 'dismiss_legion_leader_4',
+                    'dismiss_legion_leader_5', 'dismiss_legion_leader_6', 'dismiss_legion_leader_7', 'dismiss_legion_leader_8'
+                ]
             }
+            
         ]
     },
     {
@@ -98,13 +99,13 @@ const CAN_EXECUTE_RULES = {
         }
         return legionNumber <= myCastles.length;
     },
-    // ★追加：国主解任用の判定ルール（国主が存在する時だけ押せるようにします）
+    // 国主解任用の判定ルール（国主が存在する時だけ押せるようにします）
     canDismissLegion: (game, legionNumber) => {
         if (!game.legions) return false;
         const legion = game.legions.find(l => Number(l.clanId) === Number(game.playerClanId) && Number(l.legionNo) === legionNumber && Number(l.commanderId) > 0);
         return !!legion;
     },
-    // ★追加：所領分配用の判定ルール（国主が存在する時だけ押せるようにします）
+    // 所領分配用の判定ルール（国主が存在する時だけ押せるようにします）
     canAllotFief: (game, legionNumber) => {
         const myCastles = game.castles.filter(c => Number(c.ownerClan) === Number(game.playerClanId));
         if (myCastles.length <= 1) return false;
@@ -123,7 +124,7 @@ const CAN_EXECUTE_RULES = {
             if (b.clan !== game.playerClanId || b.isDaimyo) return false;
             if (b.status !== 'active' && b.status !== 'unborn') return false;
             
-            // ★追加：unborn の中でも「出生前」フラグが立っている場合は除外する
+            // unborn の中でも「出生前」フラグが立っている場合は除外する
             if (b.status === 'unborn' && b.isNotBorn) return false;
 
             const bFamily = Array.isArray(b.familyIds) ? b.familyIds : [];
@@ -1680,7 +1681,6 @@ class CommandSystem {
             if (val <= 0) return;
             this.executeWithEvent(type, () => this.executeTrade('buy_rice', val));
         }
-        // ★追加ここまで！
         else if (type === 'sell_rice') {
             const val = parseInt(inputs.amount.num.value);
             if (val <= 0) return;
@@ -2210,7 +2210,6 @@ class CommandSystem {
         busho.isGunshi = true;
         // ★ここから追加！：軍師に任命された時に、この軍師専用の「秘密の番号（タネ）」を作ります！
         busho.gunshiSeed = Math.floor(Math.random() * 10000);
-        // ★追加ここまで！
         this.game.ui.showResultModal(`${busho.name}を軍師に任命しました`);
         this.game.ui.updatePanelHeader();
         this.game.ui.renderCommandMenu();
@@ -2261,7 +2260,6 @@ class CommandSystem {
             const province = this.game.provinces.find(p => p.id === castle.provinceId);
             if (province && province.marketRate !== undefined) rate = province.marketRate;
         }
-        // ★書き換えここまで！
         
         if(type === 'buy_rice') { 
             // ★修正：端数切り捨てだと無料で買える場合があるので、切り上げ（Math.ceil）にして最低1金はかかるようにします！
