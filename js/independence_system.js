@@ -194,12 +194,8 @@ class IndependenceSystem {
             const targetClan = this.game.clans.find(c => c.id === targetClanId);
             newClanName = targetClan ? targetClan.name : "敵対大名";
 
-            // ★追加：大名家が変わるので功績半分！
-            if (castellan.clan !== 0 && castellan.clan !== newClanId) {
-                castellan.achievementTotal = Math.floor((castellan.achievementTotal || 0) / 2);
-            }
-            castellan.clan = newClanId;
-            castellan.loyalty = this.calcNewLoyalty(castellan, targetDaimyo);
+            // ★安全装置：お引越しセンターを使って所属を変更します
+            this.game.affiliationSystem.joinClan(castellan, newClanId, castle.id, this.calcNewLoyalty(castellan, targetDaimyo));
             this.game.castleManager.changeOwner(castle, newClanId);
             
         } else {
@@ -263,24 +259,9 @@ class IndependenceSystem {
 
             this.game.clans.push(newClan);
 
-            rebellionLeader.isDaimyo = true;
-            
-            // ★追加：新しい大名が住んでいるお城のおまかせ（委任）を解除します
-            const daimyoCastle = this.game.castles.find(c => c.id === rebellionLeader.castleId);
-            if (daimyoCastle) {
-                daimyoCastle.isDelegated = false;
-            }
-
-            // ★大名家が変わる（新設）ので功績半分！
-            if (castellan.clan !== 0 && castellan.clan !== newClanId) {
-                castellan.achievementTotal = Math.floor((castellan.achievementTotal || 0) / 2);
-            }
-            castellan.clan = newClanId;
-            if (castellan.id === rebellionLeader.id) {
-                castellan.loyalty = 100;
-            } else {
-                castellan.loyalty = this.calcNewLoyalty(castellan, rebellionLeader);
-            }
+            // ★安全装置：お引越しセンターを使って所属を変更します
+            let newLoyalty = (castellan.id === rebellionLeader.id) ? 100 : this.calcNewLoyalty(castellan, rebellionLeader);
+            this.game.affiliationSystem.joinClan(castellan, newClanId, castle.id, newLoyalty);
             this.game.castleManager.changeOwner(castle, newClanId);
 
             const oldClan = this.game.clans.find(c => c.id === oldClanId);
@@ -291,33 +272,27 @@ class IndependenceSystem {
         // ★神輿（派閥主）本人の処遇
         if (isProxyRebellion) {
             const leaderCastle = this.game.castles.find(c => c.id === rebellionLeader.castleId);
-            // ★神輿（派閥主）も大名家が変わるので功績半分！
-            if (rebellionLeader.clan !== 0 && rebellionLeader.clan !== newClanId) {
-                rebellionLeader.achievementTotal = Math.floor((rebellionLeader.achievementTotal || 0) / 2);
-            }
             if (rebellionLeader.isCastellan && leaderCastle) {
                 // 派閥主がどこかの城主なら、その城も新勢力になる
                 this.game.castleManager.changeOwner(leaderCastle, newClanId);
-                rebellionLeader.clan = newClanId;
-                if (rebellionLeader.isDaimyo) {
-                    rebellionLeader.loyalty = 100;
-                } else {
-                    rebellionLeader.loyalty = this.calcNewLoyalty(rebellionLeader, targetDaimyo);
-                }
+                let newLoyalty = isDefection ? this.calcNewLoyalty(rebellionLeader, targetDaimyo) : 100;
+                // ★安全装置：神輿本人をお引越しセンターで移動させます
+                this.game.affiliationSystem.joinClan(rebellionLeader, newClanId, leaderCastle.id, newLoyalty);
             } else {
                 // 城主でない（どこかの城の部下）なら、脱出して起点の城に合流する
-                if (leaderCastle) {
-                    leaderCastle.samuraiIds = leaderCastle.samuraiIds.filter(id => id !== rebellionLeader.id);
-                    this.game.updateCastleLord(leaderCastle);
-                }
-                rebellionLeader.clan = newClanId;
-                rebellionLeader.castleId = castle.id;
-                castle.samuraiIds.push(rebellionLeader.id);
-                if (rebellionLeader.isDaimyo) {
-                    rebellionLeader.loyalty = 100;
-                } else {
-                    rebellionLeader.loyalty = this.calcNewLoyalty(rebellionLeader, targetDaimyo);
-                }
+                let newLoyalty = isDefection ? this.calcNewLoyalty(rebellionLeader, targetDaimyo) : 100;
+                // ★安全装置：神輿本人をお引越しセンターで起点の城に移動させます
+                this.game.affiliationSystem.joinClan(rebellionLeader, newClanId, castle.id, newLoyalty);
+            }
+        }
+        
+        // ★独立（新大名家）の場合、神輿となった人物を大名に再設定する（joinClanで外れてしまうため）
+        if (!isDefection) {
+            rebellionLeader.isDaimyo = true;
+            rebellionLeader.loyalty = 100;
+            const daimyoCastle = this.game.castles.find(c => c.id === rebellionLeader.castleId);
+            if (daimyoCastle) {
+                daimyoCastle.isDelegated = false;
             }
         }
 
@@ -479,12 +454,8 @@ class IndependenceSystem {
         subordinates.forEach(busho => {
             const { joinScore, stayScore } = this.calculateLoyaltyScores(busho, newDaimyo, oldDaimyo);
             if (joinScore > stayScore) {
-                // ★ついていくと決めた場合：大名家が変わるので功績半分！
-                if (busho.clan !== 0 && busho.clan !== newClanId) {
-                    busho.achievementTotal = Math.floor((busho.achievementTotal || 0) / 2);
-                }
-                busho.clan = newClanId;
-                busho.loyalty = this.calcNewLoyalty(busho, newDaimyo);
+                // ★安全装置：ついていくと決めた場合、お引越しセンターで所属変更します
+                this.game.affiliationSystem.joinClan(busho, newClanId, castle.id, this.calcNewLoyalty(busho, newDaimyo));
                 joiners.push(busho);
             } else {
                 // ★ついていかない場合：逃げるか浪人になる
@@ -513,12 +484,10 @@ class IndependenceSystem {
                 if (joinScore > stayScore) {
                     this.game.ui.log(`  -> 呼応！${castle.name}城主の${busho.name}が${leader.name}に与しました！`);
                     this.game.castleManager.changeOwner(castle, newClanId);
-                    // ★大名家が変わるので功績半分！
-                    if (busho.clan !== 0 && busho.clan !== newClanId) {
-                        busho.achievementTotal = Math.floor((busho.achievementTotal || 0) / 2);
-                    }
-                    busho.clan = newClanId;
-                    busho.loyalty = this.calcNewLoyalty(busho, leader);
+                    
+                    // ★安全装置：お引越しセンターで所属変更
+                    this.game.affiliationSystem.joinClan(busho, newClanId, castle.id, this.calcNewLoyalty(busho, leader));
+                    
                     this.resolveSubordinates(castle, leader, oldDaimyo, newClanId, oldClanId);
                     this.game.updateCastleLord(castle);
                 }
@@ -535,19 +504,8 @@ class IndependenceSystem {
         potential.forEach(busho => {
             const { joinScore, stayScore } = this.calculateLoyaltyScores(busho, newDaimyo, oldDaimyo);
             if (joinScore > stayScore && Math.random() * 300 < joinScore) {
-                const oldCastle = this.game.castles.find(c => c.id === busho.castleId);
-                if (oldCastle) {
-                    oldCastle.samuraiIds = oldCastle.samuraiIds.filter(id => id !== busho.id);
-                    this.game.updateCastleLord(oldCastle);
-                }
-                // ★大名家が変わるので功績半分！
-                if (busho.clan !== 0 && busho.clan !== newClanId) {
-                    busho.achievementTotal = Math.floor((busho.achievementTotal || 0) / 2);
-                }
-                busho.clan = newClanId;
-                busho.castleId = mainCastle.id;
-                busho.loyalty = this.calcNewLoyalty(busho, newDaimyo);
-                mainCastle.samuraiIds.push(busho.id);
+                // ★安全装置：お引越しセンターで所属変更。自動で元の城から出て mainCastle に入ります。
+                this.game.affiliationSystem.joinClan(busho, newClanId, mainCastle.id, this.calcNewLoyalty(busho, newDaimyo));
                 this.game.ui.log(`  -> ${busho.name}が城を脱出し、${newDaimyo.name}の元へ駆けつけました！`);
             }
         });
@@ -934,7 +892,8 @@ class IndependenceSystem {
                     }
                 });
 
-                // 反乱リーダーを新たな大名に
+                // ★安全装置：反乱リーダーが新しい大名になるため、軍団長バッジや派閥などの過去の役職を綺麗にリセットします！
+                this.game.affiliationSystem.resetFactionData(rebellionLeader);
                 rebellionLeader.isDaimyo = true;
                 
                 // ★追加：新しい大名が住んでいるお城のおまかせ（委任）を解除します
