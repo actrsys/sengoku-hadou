@@ -2477,8 +2477,8 @@ body:not(.is-pc) .event-dialog-modal .modal-content.modal-small {
 .legion-marker-base {
     position: absolute;
     /* 城画像の右上に配置します */
-    top: -2px; 
-    right: -2px;
+    top: 5px; 
+    right: 5px;
     transform: none; 
     
     width: 20px;
@@ -2498,11 +2498,11 @@ body:not(.is-pc) .event-dialog-modal .modal-content.modal-small {
 }
 
 /* 渋めの色設定（彩度を抑えた和風カラー） */
-.legion-color-1 { background-color: #5a7b9a; } /* 縹色（はなだいろ）風 */
-.legion-color-2 { background-color: #a65d5d; } /* 茜色を渋くした感じ */
-.legion-color-3 { background-color: #6a8d73; } /* 苔色風 */
-.legion-color-4 { background-color: #b98e5e; } /* 黄土色風 */
-.legion-color-5 { background-color: #7d6a8d; } /* 鈍い紫色 */
-.legion-color-6 { background-color: #b9ae5e; } /* 渋い金茶風 */
-.legion-color-7 { background-color: #5e9a9a; } /* 錆浅葱風 */
-.legion-color-8 { background-color: #8d7d6a; } /* 焦茶を薄くした感じ */
+.legion-color-1 { background-color: #1e88e5; } /* 青 */
+.legion-color-2 { background-color: #e53935; } /* 赤 */
+.legion-color-3 { background-color: #43a047; } /* 緑 */
+.legion-color-4 { background-color: #fb8c00; } /* オレンジ */
+.legion-color-5 { background-color: #8e24aa; } /* 紫 */
+.legion-color-6 { background-color: #fdd835; } /* 黄 */
+.legion-color-7 { background-color: #00acc1; } /* シアン */
+.legion-color-8 { background-color: #546e7a; } /* グレー */
