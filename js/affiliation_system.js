@@ -202,30 +202,17 @@ class AffiliationSystem {
     changeCastleOwner(castle, newClanId) {
         if (!castle) return;
         
-        // ★ここを追加：お城の持ち主が変わった時、その城の中に「国主」がいれば役職を剥奪し、軍団を解散します！
-        if (this.game && this.game.bushos) {
+        // ★修正：お城の持ち主が変わった時、もし逃げ遅れた「国主」がいたら、専門のシステムに解散をお願いします！
+        if (this.game && this.game.bushos && this.game.legions && this.game.castleManager) {
             // その城にいる活動中の武将を探します
             const bushosInCastle = this.game.bushos.filter(b => Number(b.castleId) === Number(castle.id) && b.status === 'active');
             
             bushosInCastle.forEach(b => {
                 if (b.isCommander) {
-                    b.isCommander = false; // 国主のバッジを外します
-                    
-                    // 軍団の名簿からも名前を消し、所属していた城を全て直轄に戻して「壊滅」させます
-                    if (this.game.legions) {
-                        const myLegion = this.game.legions.find(l => Number(l.commanderId) === Number(b.id));
-                        if (myLegion) {
-                            myLegion.commanderId = 0; // 軍団長を空っぽに
-                            
-                            // この軍団に所属していたお城をすべて探して、直轄（0）に戻します
-                            if (this.game.castles) {
-                                this.game.castles.forEach(c => {
-                                    if (Number(c.legionId) === Number(myLegion.legionNo) && Number(c.ownerClan) === Number(myLegion.clanId)) {
-                                        c.legionId = 0;
-                                    }
-                                });
-                            }
-                        }
+                    const myLegion = this.game.legions.find(l => Number(l.commanderId) === Number(b.id));
+                    if (myLegion) {
+                        // 専門のシステムに解散をお任せします！
+                        this.game.castleManager.disbandLegion(myLegion.id);
                     }
                 }
             });
@@ -290,11 +277,11 @@ class AffiliationSystem {
         busho.factionHoshin = "無所属";
         busho.belongKunishuId = 0;
 
-        // ★ここを追加：もし軍団の国主だった場合、その軍団の名簿からも名前を消します
-        if (this.game && this.game.legions) {
+        // ★修正：もし軍団の国主だった場合、城の管理システムにお願いして軍団ごと解散させます！
+        if (this.game && this.game.legions && this.game.castleManager) {
             const myLegion = this.game.legions.find(l => Number(l.commanderId) === Number(busho.id));
             if (myLegion) {
-                myLegion.commanderId = 0;
+                this.game.castleManager.disbandLegion(myLegion.id);
             }
         }
     }
