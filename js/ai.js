@@ -714,16 +714,12 @@ class AIEngine {
             if (target.adjacentCastleIds) {
                 target.adjacentCastleIds.forEach(adjId => {
                     const adjCastle = this.game.getCastle(adjId);
-                    // 取った後は自分の城になるので、自分以外の城を調べます
-                    if (adjCastle && adjCastle.ownerClan !== myCastle.ownerClan) {
-                        if (adjCastle.ownerClan === 0) {
-                            futureEnemyNeighbors++; // 空き城も誰かに取られるリスクがあるので数えます
-                        } else {
-                            const adjRel = this.game.getRelation(myCastle.ownerClan, adjCastle.ownerClan);
-                            // 関係が「敵対」か「普通」のものを敵とみなします
-                            if (!adjRel || adjRel.status === '敵対' || adjRel.status === '普通') {
-                                futureEnemyNeighbors++;
-                            }
+                    // 取った後は自分の城になるので、自分以外の城を調べます。空き城（IDが0）は数えません。
+                    if (adjCastle && adjCastle.ownerClan !== myCastle.ownerClan && adjCastle.ownerClan !== 0) {
+                        const adjRel = this.game.getRelation(myCastle.ownerClan, adjCastle.ownerClan);
+                        // 関係が「敵対」か「普通」のものを敵とみなします
+                        if (!adjRel || adjRel.status === '敵対' || adjRel.status === '普通') {
+                            futureEnemyNeighbors++;
                         }
                     }
                 });
