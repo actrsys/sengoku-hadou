@@ -756,22 +756,19 @@ class LifeSystem {
         const messages = []; 
         const currentYear = this.game.year;
         
-        // 大名家の当主を探します（相性などの基準にします）
-        const daimyo = this.game.bushos.find(b => b.clan === commander.clan && b.isDaimyo) || commander;
-
         // 1. 今活躍している家臣たちを集めます！（大名と国主は弾きます）
         const activeBushos = this.game.bushos.filter(b => b.clan === commander.clan && b.id !== commander.id && b.status === 'active' && !b.isDaimyo && !b.isCommander);
         
-        // その中で大名の「一門」の武将だけを抽出します！
-        const activeFamily = activeBushos.filter(b => daimyo.familyIds.some(fId => b.familyIds.includes(fId)));
+        // その中で国主の「一門」の武将だけを抽出します！
+        const activeFamily = activeBushos.filter(b => commander.familyIds.some(fId => b.familyIds.includes(fId)));
 
         // まだ登場していない一門
-        const unbornFamily = this.game.bushos.filter(b => b.status === 'unborn' && !b.isNotBorn && daimyo.familyIds.some(fId => b.familyIds.includes(fId)) && b.birthYear <= currentYear);
+        const unbornFamily = this.game.bushos.filter(b => b.status === 'unborn' && !b.isNotBorn && commander.familyIds.some(fId => b.familyIds.includes(fId)) && b.birthYear <= currentYear);
         
         // 浪人や諸勢力に所属している一門武将も探します！
         const externalFamily = this.game.bushos.filter(b => {
             if (b.id === commander.id || b.isDaimyo || b.isCommander) return false;
-            if (!daimyo.familyIds.some(fId => b.familyIds.includes(fId))) return false;
+            if (!commander.familyIds.some(fId => b.familyIds.includes(fId))) return false;
             if (b.status === 'ronin') return true;
             if ((b.belongKunishuId || 0) > 0 && b.clan === 0) {
                 const kunishu = this.game.kunishuSystem ? this.game.kunishuSystem.getKunishu(b.belongKunishuId) : null;
@@ -808,8 +805,8 @@ class LifeSystem {
             } else {
                 // AIの場合は自動で選びます
                 allCandidates.forEach(b => {
-                    b._isRelative = daimyo.familyIds.some(fId => b.familyIds.includes(fId));
-                    b._affinityDiff = Math.abs((daimyo.affinity || 0) - (b.affinity || 0));
+                    b._isRelative = commander.familyIds.some(fId => b.familyIds.includes(fId));
+                    b._affinityDiff = Math.abs((commander.affinity || 0) - (b.affinity || 0));
                     b._baseScore = b.leadership + b.intelligence;
                 });
 
