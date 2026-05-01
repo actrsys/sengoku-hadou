@@ -402,12 +402,14 @@ class FactionSystem {
 
                 // 3. 派閥名の生成
                 const sameFamilyLeaders = validLeaders.filter(l => l.familyName && l.familyName === leader.familyName && l.id !== leader.id);
+                const isSameFamilyAsDaimyo = daimyo && daimyo.familyName && leader.familyName === daimyo.familyName;
+                
                 let fName = "";
                 let fYomi = "";
                 if (!leader.givenName) {
                     fName = leader.familyName + "派";
                     fYomi = (leader.familyYomi || leader.yomi || "") + "は";
-                } else if (sameFamilyLeaders.length > 0) {
+                } else if (sameFamilyLeaders.length > 0 || isSameFamilyAsDaimyo) {
                     fName = leader.givenName + "派";
                     fYomi = (leader.givenYomi || leader.yomi || "") + "は";
                 } else {
