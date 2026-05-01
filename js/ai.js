@@ -727,8 +727,8 @@ class AIEngine {
                                 if (['同盟', '支配', '従属'].includes(adjRel.status)) {
                                     friendlyNeighbors++;
                                 } 
-                                // 敵対、普通なら敵として数えます
-                                else if (adjRel.status === '敵対' || adjRel.status === '普通') {
+                                // 敵対、普通、友好なら敵（潜在的な脅威）として数えます
+                                else if (['敵対', '普通', '友好'].includes(adjRel.status)) {
                                     futureEnemyNeighbors++;
                                 }
                             }
