@@ -2425,22 +2425,23 @@ body.is-pc.daimyo-select-mode #pc-new-ui-container { display: none !important; }
 .sortable-header span[data-sort] {
     cursor: pointer;
     transition: background-color 0.2s, color 0.2s;
+    position: relative;
 }
 .sortable-header span[data-sort]:hover {
     background-color: #546e7a;
     color: #ffcc80;
 }
 .sort-mark {
-    display: inline-block;
-    width: 0;
-    overflow: visible;
-    white-space: nowrap;
-    margin-left: 2px;
-    font-size: 0.7em;
-    transform: translateY(-0.2em);
+    position: absolute;
+    bottom: 2px;          /* セルの下端ギリギリに配置します */
+    left: 50%;            /* セルの横幅の真ん中に配置します */
+    transform: translateX(-50%); /* ズレを補正して完璧な真ん中にします */
+    font-size: 0.65em;    /* 文字に被らないよう記号を少し小さくします */
     color: #fdea60;
     pointer-events: none;
+    line-height: 1;       /* 縦幅を広げないための安全対策です */
 }
+
 /* =========================================================
    イベント専用メッセージウィンドウ
    ========================================================= */
