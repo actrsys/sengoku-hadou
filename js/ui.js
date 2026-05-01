@@ -405,12 +405,6 @@ class UIManager {
                     inner = document.createElement('span');
                     inner.className = 'compressed-text-wrapper';
                     inner.textContent = text;
-                    
-                    // ★追加：文字の引き伸ばしによるズレを防ぎ、上下中央にピシッと揃える魔法です！
-                    inner.style.display = 'inline-block';
-                    inner.style.verticalAlign = 'middle';
-                    inner.style.transformOrigin = 'center';
-                    
                     el.appendChild(inner);
                 } else {
                     text = inner.textContent.trim();
