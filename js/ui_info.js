@@ -516,7 +516,7 @@ class UIInfoManager {
         fIds.forEach(fId => {
             const fData = factions[fId];
             const leader = fData.leader;
-            let leaderName = leader ? leader.name : "不明";
+            let factionNameStr = leader && leader.factionName ? leader.factionName : (leader ? leader.name + "派" : "不明");
             let count = fData.count;
             let seikaku = "不明";
             let hoshin = "不明";
@@ -540,9 +540,9 @@ class UIInfoManager {
             }
             
             items.push({
-                onClick: `window.GameApp.ui.info.showFactionBushoList(${clan.id}, ${fId}, '${leaderName}派')`,
+                onClick: `window.GameApp.ui.info.showFactionBushoList(${clan.id}, ${fId}, '${factionNameStr}')`,
                 cells: [
-                    `<strong class="col-faction-name ${nameClass}">${leaderName}</strong>`,
+                    `<strong class="col-faction-name ${nameClass}">${factionNameStr}</strong>`,
                     `<span class="col-busho-count">${count}</span>`,
                     `<span class="col-seikaku ${seikakuClass}">${seikaku}</span>`,
                     `<span class="col-hoshin ${hoshinClass}">${hoshin}</span>`,
@@ -565,7 +565,7 @@ class UIInfoManager {
         this._renderListModal({
             title: `${clan.name} 派閥一覧`,
             headers: [
-                `<span class="col-faction-name">派閥主</span>`,
+                `<span class="col-faction-name">派閥名</span>`,
                 `<span class="col-busho-count">武将</span>`,
                 `<span class="col-seikaku">方針</span>`,
                 `<span class="col-hoshin">思想</span>`,
@@ -694,18 +694,7 @@ class UIInfoManager {
             if (salary === 0) salary = "";
         }
 
-        let factionNameStr = "";
-        if (busho.factionId > 0 && busho.clan > 0) {
-            const clanBushos = this.game.bushos.filter(b => b.clan === busho.clan && b.status === 'active');
-            const factionLeaders = clanBushos.filter(b => b.isFactionLeader);
-            const myLeader = factionLeaders.find(leader => leader.factionId === busho.factionId);
-            if (myLeader) {
-                const sameFamilyLeaders = factionLeaders.filter(leader => leader.familyName && leader.familyName === myLeader.familyName && leader.id !== myLeader.id);
-                if (!myLeader.givenName) factionNameStr = myLeader.familyName + "派";
-                else if (sameFamilyLeaders.length > 0) factionNameStr = myLeader.givenName + "派";
-                else factionNameStr = myLeader.familyName + "派";
-            }
-        }
+        let factionNameStr = busho.factionName || "";
 
         const gunshi = this.game.getClanGunshi(this.game.playerClanId);
         const myDaimyo = this.game.bushos.find(b => b.clan === this.game.playerClanId && b.isDaimyo);
@@ -2409,18 +2398,8 @@ class UIInfoManager {
                         return cmp;
                     } else if (this.bushoCurrentSortKey === 'faction_leader') {
                         const getLeaderInfo = (busho) => {
-                            if (busho.factionId > 0 && busho.clan > 0) {
-                                const clanBushos = this.game.bushos.filter(b => b.clan === busho.clan && b.status === 'active');
-                                const factionLeaders = clanBushos.filter(b => b.isFactionLeader);
-                                const myLeader = factionLeaders.find(leader => leader.factionId === busho.factionId);
-                                if (myLeader) {
-                                    const sameFamilyLeaders = factionLeaders.filter(leader => leader.familyName && leader.familyName === myLeader.familyName && leader.id !== myLeader.id);
-                                    let yomiStr = "", nameStr = "";
-                                    if (!myLeader.givenName) { yomiStr = (myLeader.familyYomi || myLeader.yomi || "") + "は"; nameStr = myLeader.familyName + "派"; } 
-                                    else if (sameFamilyLeaders.length > 0) { yomiStr = (myLeader.givenYomi || myLeader.yomi || "") + "は"; nameStr = myLeader.givenName + "派"; } 
-                                    else { yomiStr = (myLeader.familyYomi || myLeader.yomi || "") + "は"; nameStr = myLeader.familyName + "派"; }
-                                    return { yomi: yomiStr, name: nameStr };
-                                }
+                            if (busho.factionId > 0 && busho.clan > 0 && busho.factionName) {
+                                return { yomi: busho.factionYomi || "んんん", name: busho.factionName };
                             }
                             return { yomi: "んんん", name: "んんん" };
                         };
@@ -2657,18 +2636,7 @@ class UIInfoManager {
                     salary = b.getSalary(daimyo);
                     if (salary === 0) salary = "";
                 }
-                let factionNameStr = "";
-                if (b.factionId > 0 && b.clan > 0) {
-                    const clanBushos = this.game.bushos.filter(busho => busho.clan === b.clan && busho.status === 'active');
-                    const factionLeaders = clanBushos.filter(busho => busho.isFactionLeader);
-                    const myLeader = factionLeaders.find(leader => leader.factionId === b.factionId);
-                    if (myLeader) {
-                        const sameFamilyLeaders = factionLeaders.filter(leader => leader.familyName && leader.familyName === myLeader.familyName && leader.id !== myLeader.id);
-                        if (!myLeader.givenName) factionNameStr = myLeader.familyName + "派";
-                        else if (sameFamilyLeaders.length > 0) factionNameStr = myLeader.givenName + "派";
-                        else factionNameStr = myLeader.familyName + "派";
-                    }
-                }
+                let factionNameStr = b.factionName || "";
                 
                 cells = [
                     !hideActionCol ? `<span class="col-act">${inputHtml}${b.isActionDone?'済':'未'}</span>` : null,

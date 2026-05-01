@@ -164,6 +164,8 @@ class FactionSystem {
                 // ★ここに追加：派閥が解散したら、方針と思想も「無所属」に戻します！
                 b.factionSeikaku = "無所属";
                 b.factionHoshin = "無所属";
+                b.factionName = "";
+                b.factionYomi = "";
             });
 
             // リーダー候補選出
@@ -398,14 +400,30 @@ class FactionSystem {
                 else if (inn >= 36) hoshin = "中道";
                 else hoshin = "保守的";
 
-                // 3. このリーダーと同じ派閥IDを持つメンバー全員（自分も含む）に、方針と思想を配ります
+                // 3. 派閥名の生成
+                const sameFamilyLeaders = validLeaders.filter(l => l.familyName && l.familyName === leader.familyName && l.id !== leader.id);
+                let fName = "";
+                let fYomi = "";
+                if (!leader.givenName) {
+                    fName = leader.familyName + "派";
+                    fYomi = (leader.familyYomi || leader.yomi || "") + "は";
+                } else if (sameFamilyLeaders.length > 0) {
+                    fName = leader.givenName + "派";
+                    fYomi = (leader.givenYomi || leader.yomi || "") + "は";
+                } else {
+                    fName = leader.familyName + "派";
+                    fYomi = (leader.familyYomi || leader.yomi || "") + "は";
+                }
+
+                // 4. このリーダーと同じ派閥IDを持つメンバー全員（自分も含む）に、方針と思想、派閥名を配ります
                 const factionMembers = members.filter(b => b.factionId === leader.factionId);
                 factionMembers.forEach(b => {
                     b.factionSeikaku = seikaku;
                     b.factionHoshin = hoshin;
+                    b.factionName = fName;
+                    b.factionYomi = fYomi;
                 });
             });
-            // ★追加ここまで
             
         });
 

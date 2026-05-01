@@ -418,6 +418,8 @@ class Busho {
         // ★ここに追加：派閥の「方針」と「思想」を覚えておくための箱です！
         this.factionSeikaku = this.factionSeikaku || "無所属";
         this.factionHoshin = this.factionHoshin || "無所属";
+        this.factionName = this.factionName || "";
+        this.factionYomi = this.factionYomi || "";
 
         // ★今回追加：軍師としての「秘密の番号（タネ）」を覚えておく箱です！
         this.gunshiSeed = Number(data.gunshiSeed || 0);
