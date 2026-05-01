@@ -2167,7 +2167,7 @@ body.is-pc {
     
     .daimyo-confirm-compact .daimyo-confirm-face { grid-column: 1; grid-row: 2; width: 120px; height: 120px; border: 3px solid #fff; border-radius: 8px; box-shadow: inset 0 0 0 1px rgba(0,0,0,0.7), 0 0 6px rgba(0,0,0,0.8); margin: 0; }
     
-    .daimyo-confirm-info h3 { grid-column: 1; grid-row: 1; font-size: 1.6rem !important; margin: 0 !important; padding: 0 !important; border: none !important; white-space: nowrap; text-align: left; }
+    .daimyo-confirm-info h3 { grid-column: 1; grid-row: 1; font-size: 1.6rem !important; margin: 0 !important; padding: 0 !important; border: none !important; white-space: nowrap; text-align: left; display: flex; align-items: center; justify-content: flex-start; }
     .daimyo-confirm-info div { grid-column: 2; grid-row: 1; font-size: 1.2rem !important; margin: 0 !important; display: flex; align-items: center; }
     
     .daimyo-confirm-stats { grid-column: 2; grid-row: 2; gap: 4px; margin-top: 0; width: 100%; box-sizing: border-box; display: grid; grid-template-columns: repeat(auto-fit, minmax(80px, 1fr)); }
