@@ -11,6 +11,9 @@ class Clan {
         this.leaderId = Number(this.leaderId);
         // data.color, data.name 等はCSVから自動で割り当たります
         
+        // ★元々の大名家の名前を覚える箱を用意します（同名被り回避用）
+        this.baseName = data.baseName || data.name || "";
+        
         // ★大名家の読み仮名を覚える箱を用意します
         this.yomi = data.yomi || "";
 

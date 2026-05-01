@@ -259,6 +259,7 @@ class DataManager {
                         
                         // ★大名の名前が変わっていたら、大名家の名前も自動で「〇〇家」に合わせます！
                         clan.name = b.familyName + "家";
+                        clan.baseName = clan.name; // ★元々の名前の箱にも入れておきます！
                     }
                     const castleAsCastellan = castles.find(cs => Number(cs.castellanId) === Number(b.id));
                 if (castleAsCastellan) b.isCastellan = true;
@@ -929,6 +930,9 @@ class GameManager {
                 await this.eventManager.processEvents('game_start');
             }
             
+            // ★ここから追加：大名家の表示名を更新して同名被りを防ぎます！
+            this.updateClanDisplayNames();
+            
             // ★ここを書き足し！：画像の大きさをゲーム全体で覚えるようにします！
             this.mapWidth = data.mapWidth || 1200;
             this.mapHeight = data.mapHeight || 800;
@@ -1088,6 +1092,74 @@ class GameManager {
         });
     }
     // ==========================================
+
+    // ★大名家の表示名を更新する魔法です（同名被りの回避）
+    updateClanDisplayNames() {
+        if (!this.provinces) return;
+
+        // まず、今の大名に合わせて本来の名前（baseName）を更新します
+        this.clans.forEach(clan => {
+            if (clan.id === 0) return;
+            const leader = this.getBusho(clan.leaderId);
+            if (leader && leader.familyName) {
+                clan.baseName = leader.familyName + "家";
+            } else if (!clan.baseName) {
+                clan.baseName = clan.name;
+            }
+            // 表示用の名前を一旦本来の名前にリセットします
+            clan.name = clan.baseName;
+        });
+
+        // 本来の名前で被っている数を数えます
+        const nameCounts = {};
+        this.clans.forEach(clan => {
+            if (clan.id === 0) return;
+            const baseName = clan.baseName;
+            nameCounts[baseName] = (nameCounts[baseName] || 0) + 1;
+        });
+
+        // 1回目のチェック：被っていたら国名（「国」抜き）をつける
+        this.clans.forEach(clan => {
+            if (clan.id === 0) return;
+            const baseName = clan.baseName;
+            if (nameCounts[baseName] > 1) {
+                const leader = this.getBusho(clan.leaderId);
+                if (leader) {
+                    const castle = this.getCastle(leader.castleId);
+                    if (castle) {
+                        const province = this.provinces.find(p => p.id === castle.provinceId);
+                        if (province && province.province) {
+                            const provName = province.province.replace(/国$/, "");
+                            clan.name = provName + baseName;
+                        }
+                    }
+                }
+            }
+        });
+
+        // 新しい名前で被っている数をもう一度数えます
+        const newNameCounts = {};
+        this.clans.forEach(clan => {
+            if (clan.id === 0) return;
+            newNameCounts[clan.name] = (newNameCounts[clan.name] || 0) + 1;
+        });
+
+        // 2回目のチェック：国名をつけても被っていたら城名（「城」抜き）をつける
+        this.clans.forEach(clan => {
+            if (clan.id === 0) return;
+            const baseName = clan.baseName;
+            if (nameCounts[baseName] > 1 && newNameCounts[clan.name] > 1) {
+                const leader = this.getBusho(clan.leaderId);
+                if (leader) {
+                    const castle = this.getCastle(leader.castleId);
+                    if (castle && castle.name) {
+                        const castleName = castle.name.replace(/城$/, "");
+                        clan.name = castleName + baseName;
+                    }
+                }
+            }
+        });
+    }
 
     // ★城主を決める仕事は、すべて人事部（affiliationSystem）に転送します！
     updateCastleLord(castle) {
@@ -1636,8 +1708,11 @@ class GameManager {
         this.month++;
         if(this.month > 12) { this.month = 1; this.year++; }
         
+        // ★ここから追加：月末のタイミングで大名家の表示名を更新して同名被りを防ぎます！
+        this.updateClanDisplayNames();
+        
         const clans = new Set(this.castles.filter(c => c.ownerClan !== 0).map(c => c.ownerClan)); 
-        const playerAlive = clans.has(this.playerClanId); 
+        const playerAlive = clans.has(this.playerClanId);
         
         if (clans.size === 1 && playerAlive) {
             this.ui.showDialog("天下統一！", false, () => {
@@ -1854,8 +1929,11 @@ class GameManager {
                 // ロードした時も、念のため年齢による能力変動を再計算しておきます
                 this.lifeSystem.updateAllBushosAge();
 
+                // ★ここから追加：ロード時にも大名家の表示名を更新して同名被りを防ぎます！
+                this.updateClanDisplayNames();
+
                 // カットインを出す「前」に、先にマップを描いておく魔法です！
-                this.ui.hasInitializedMap = false; 
+                this.ui.hasInitializedMap = false;
                 this.ui.renderMap();
 
                 // セーブデータを読み込んだ瞬間にBGMを切り替えます
