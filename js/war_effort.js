@@ -2732,7 +2732,7 @@ Object.assign(WarManager.prototype, {
         let reinfSoldiers = Math.max(500, Math.floor(helperCastle.soldiers * 0.5));
         if (reinfSoldiers > helperCastle.soldiers) reinfSoldiers = helperCastle.soldiers;
         
-        const availableBushos = this.game.getCastleBushos(helperCastle.id).filter(b => b.clan === helperCastle.ownerClan && b.status === 'active' && !b.isDaimyo && !b.isCastellan).sort((a,b) => b.strength - a.strength);
+        const availableBushos = this.game.getCastleBushos(helperCastle.id).filter(b => b.clan === helperCastle.ownerClan && b.status === 'active').sort((a,b) => b.strength - a.strength);
         let bushoCount = reinfSoldiers >= 2500 ? 3 : (reinfSoldiers >= 1500 ? 2 : 1);
         const reinfBushos = availableBushos.slice(0, Math.min(bushoCount, availableBushos.length));
 
@@ -3021,7 +3021,7 @@ Object.assign(WarManager.prototype, {
         let reinfSoldiers = Math.floor(helperCastle.soldiers * rate);
         reinfSoldiers = Math.max(500, Math.min(reinfSoldiers, helperCastle.soldiers));
         
-        const availableBushos = this.game.getCastleBushos(helperCastle.id).filter(b => b.clan === helperCastle.ownerClan && b.status === 'active' && !b.isDaimyo && !b.isCastellan).sort((a,b) => b.strength - a.strength);
+        const availableBushos = this.game.getCastleBushos(helperCastle.id).filter(b => b.clan === helperCastle.ownerClan && b.status === 'active').sort((a,b) => b.strength - a.strength);
         let bushoCount = reinfSoldiers >= 2500 ? 3 : (reinfSoldiers >= 1500 ? 2 : 1);
         const reinfBushos = availableBushos.slice(0, Math.min(bushoCount, availableBushos.length));
 

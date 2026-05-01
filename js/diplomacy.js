@@ -1136,7 +1136,7 @@ class DiplomacyManager {
             // 1. 共通の条件：大雪の国からは出陣できません
             const prov = this.game.provinces.find(p => p.id === c.provinceId);
             if (prov && prov.statusEffects && prov.statusEffects.includes('heavySnow')) return;
-
+            
             // 2. 自勢力（自分の別のお城）を探す場合
             if (isSelf) {
                 if (Number(c.ownerClan) !== Number(myClanId)) return;
@@ -1146,11 +1146,11 @@ class DiplomacyManager {
                 const isNextToEnemy = (c.id === targetCastle.id) || GameSystem.isAdjacent(c, targetCastle);
                 
                 if (isConnected || isNextToEnemy) {
-                    const normalBushos = this.game.getCastleBushos(c.id).filter(b => b.clan === c.ownerClan && b.status === 'active' && !b.isDaimyo && !b.isCastellan);
+                    const availableBushos = this.game.getCastleBushos(c.id).filter(b => b.clan === c.ownerClan && b.status === 'active');
                     // 守備の場合は兵糧も500必要
                     const minRice = isDefending ? 500 : 0;
                     
-                    if (c.soldiers >= 1000 && c.rice >= minRice && normalBushos.length > 0) {
+                    if (c.soldiers >= 1000 && c.rice >= minRice && availableBushos.length > 0) {
                         forces.push(c); // 自勢力の場合はお城のデータをそのまま渡します
                     }
                 }
@@ -1180,10 +1180,10 @@ class DiplomacyManager {
                             const isNextToEnemy = !isDefending && ((c.id === targetCastle.id) || GameSystem.isAdjacent(c, targetCastle));
                             
                             if (isConnected || isNextToEnemy) {
-                                const normalBushos = this.game.getCastleBushos(c.id).filter(b => b.clan === c.ownerClan && b.status === 'active' && !b.isDaimyo && !b.isCastellan);
+                                const availableBushos = this.game.getCastleBushos(c.id).filter(b => b.clan === c.ownerClan && b.status === 'active');
                                 const minRice = isDefending ? 500 : 0;
                                 
-                                if (c.soldiers >= 1000 && c.rice >= minRice && normalBushos.length > 0) {
+                                if (c.soldiers >= 1000 && c.rice >= minRice && availableBushos.length > 0) {
                                     const clan = this.game.clans.find(clanInfo => clanInfo.id === c.ownerClan);
                                     const castellan = this.game.getBusho(c.castellanId) || {name: "城主"};
                                     forces.push({ castle: c, force: { isKunishu: false, id: c.ownerClan, name: clan ? clan.name : "大名家", leaderName: castellan.name, soldiers: c.soldiers } });
