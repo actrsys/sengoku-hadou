@@ -835,11 +835,11 @@ class LifeSystem {
                         const kunishu = this.game.kunishuSystem ? this.game.kunishuSystem.getKunishu(successor.belongKunishuId) : null;
                         const kunishuName = kunishu ? kunishu.getName(this.game) : "諸勢力";
                         successor.belongKunishuId = 0;
-                        messages.push(`${kunishuName}より${successor.name.replace('|','')}が\n国主として迎え入れられました。`);
+                        messages.push(`${kunishuName}より${successor.name.replace('|','')}が\n跡継ぎとして迎え入れられました。`);
                     } else if (successor.status === 'ronin') {
-                        messages.push(`${successor.name.replace('|','')}が国主として迎え入れられました。`);
+                        messages.push(`${successor.name.replace('|','')}が跡を継ぎました。`);
                     } else {
-                        messages.push(`${successor.name.replace('|','')}が急遽元服し、国主を任されました。`);
+                        messages.push(`${successor.name.replace('|','')}が急遽元服し、跡を継ぎました。`);
                     }
 
                     if (successor.status === 'ronin' || successor.status === 'active') {
