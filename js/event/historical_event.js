@@ -142,12 +142,12 @@ window.GameEvents.push({
         const nobunaga = game.getBusho(1006001);
         if (!nobunaga || !nobunaga.isDaimyo) return false;
         
-        // F. 織田信長が清州城（ID: 7）にいるか確認します
+        // F. 織田信長が清洲城（ID: 7）にいるか確認します
         if (nobunaga.castleId !== 7) return false;
         
         // E. 織田家が指定のお城をすべて持っているか確認します
         const odaClanId = nobunaga.clan;
-        // 清州城、名古屋城
+        // 清洲城、名古屋城
         const requiredOdaCastles = [7, 11];
         const hasAllOdaCastles = requiredOdaCastles.every(id => {
             const c = game.getCastle(id);
@@ -495,7 +495,7 @@ window.GameEvents.push({
 });
 
 // ==========================================
-// ★ 清州同盟イベント
+// ★ 清洲同盟イベント
 // ==========================================
 window.GameEvents.push({
     id: "historical_kiyosu_alliance",
@@ -655,7 +655,7 @@ window.GameEvents.push({
             shinzanCFace: shinzanC ? shinzanC.faceIcon : "koshou.webp",
 
             nobunagaCastleName: nobunagaCastleName,
-            nobunagaCastleShort: nobunagaCastleName.replace(/城$/, ''), // 「清州城」から「城」を消した名前を作ります
+            nobunagaCastleShort: nobunagaCastleName.replace(/城$/, ''), // 「清洲城」から「城」を消した名前を作ります
             nobunagaTitle: nobunagaTitle,
             year: game.year,
             month: game.month
@@ -707,7 +707,7 @@ window.GameEvents.push({
             }
 
             // ログ出力
-            game.ui.log(`【イベント】清州同盟：${args.matsudairaClanName}と${args.odaClanName}の同盟が成立しました。`);
+            game.ui.log(`【イベント】清洲同盟：${args.matsudairaClanName}と${args.odaClanName}の同盟が成立しました。`);
 
             // 外交システムを使って、強制的に「同盟」状態にします
             if (game.diplomacyManager) {
@@ -737,7 +737,7 @@ window.GameEvents.push({
                 await window.EventTextManager.playSequence(game, window.EventTextManager.kiyosu_alliance_reject(args));
             }
             // ログ出力
-            game.ui.log(`【イベント】清州同盟：${args.odaFamilyName}家は${args.matsudairaFamilyName}家との同盟を拒否しました。`);
+            game.ui.log(`【イベント】清洲同盟：${args.odaFamilyName}家は${args.matsudairaFamilyName}家との同盟を拒否しました。`);
         }
 
         // ★ 3. イベントが全て終わったので、メモしておいた元のBGMに戻します
@@ -1167,7 +1167,10 @@ window.GameEvents.push({
         
         const ashikagaClanId = yoshiteru.clan;
 
-        // 5. 足利家と三好家の領地（お城同士の道）が隣接しているか確認します
+        // 5. プレイヤーが足利家を担当している場合はイベントを起こしません
+        if (game.playerClanId === ashikagaClanId) return false;
+
+        // 6. 足利家と三好家の領地（お城同士の道）が隣接しているか確認します
         const ashikagaCastles = game.castles.filter(c => c.ownerClan === ashikagaClanId);
         const miyoshiCastles = game.castles.filter(c => c.ownerClan === miyoshiClanId);
         
@@ -2383,7 +2386,10 @@ window.GameEvents.push({
         
         const hatakeyamaClanId = hatakeyamaDaimyo.clan;
 
-        // 2. 将軍候補（ID80:左馬頭）または将軍家（ID1:征夷大将軍）と、その擁立勢力を特定します
+        // 2. プレイヤーが畠山家を担当している場合はイベントを起こしません
+        if (game.playerClanId === hatakeyamaClanId) return false;
+
+        // 3. 将軍候補（ID80:左馬頭）または将軍家（ID1:征夷大将軍）と、その擁立勢力を特定します
         let sponsorClanId = 0;
         let shogunClanId = 0;
 
@@ -2412,7 +2418,7 @@ window.GameEvents.push({
         // 万が一、畠山家自身が将軍を擁立していたら、自分自身に降伏することになってしまうので止めます
         if (hatakeyamaClanId === sponsorClanId || hatakeyamaClanId === shogunClanId) return false;
 
-        // 3. 将軍擁立勢力または将軍家の領地と、畠山家の領地が隣接しているか確認します
+        // 4. 将軍擁立勢力または将軍家の領地と、畠山家の領地が隣接しているか確認します
         const hatakeyamaCastles = game.castles.filter(c => c.ownerClan === hatakeyamaClanId);
         let isAdjacent = false;
 

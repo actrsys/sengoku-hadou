@@ -41,7 +41,7 @@ window.EventTextManager = {
     // ==========================================
     // ★ イベントごとの台本置き場
     // ==========================================
-    // ① 清州同盟（パート１：使者の到着まで）
+    // ① 清洲同盟（パート１：使者の到着まで）
     kiyosu_alliance_part1: function(args) {
         return [
             { type: 'log', msg: `今川義元の死後、三河で独立を果たした${args.motoyasuName}は、隣国${args.imagawaFamilyName}家と敵対関係となっていた。` },
@@ -60,7 +60,7 @@ window.EventTextManager = {
         ];
     },
 
-    // ① 清州同盟（織田家専用：使者の取り次ぎ）
+    // ① 清洲同盟（織田家専用：使者の取り次ぎ）
     kiyosu_alliance_oda_arrival: function(args) {
         return [
             { type: 'dialog', leftName: args.shinzanCName, leftFace: args.shinzanCFace, msg: `「殿。${args.matsudairaFamilyName}家の使者が参っておりまする。」` },
@@ -68,7 +68,7 @@ window.EventTextManager = {
         ];
     },
 
-    // ① 清州同盟（織田家専用：面会決定〜対面）
+    // ① 清洲同盟（織田家専用：面会決定〜対面）
     kiyosu_alliance_oda_accept: function(args) {
         return [
             { type: 'dialog', leftName: args.nobunagaName, leftFace: args.nobunagaFace, msg: `「ふっ、会うてやろうではないか。通せ。」` },
@@ -77,7 +77,7 @@ window.EventTextManager = {
         ];
     },
 
-    // ① 清州同盟（パート２：面会して同盟成立ルート）
+    // ① 清洲同盟（パート２：面会して同盟成立ルート）
     kiyosu_alliance_accept: function(args) {
         return [
             { type: 'dialog', leftName: args.nobunagaName, leftFace: args.nobunagaFace, msg: `「おぬし自ら来るとはのう。よう来た、竹千代。」` },
@@ -96,7 +96,7 @@ window.EventTextManager = {
             { type: 'log', msg: `こうして、${args.odaClanName}と${args.matsudairaClanName}の同盟は成立した。` }
         ];
     },
-    // ① 清州同盟（パート３：追い返すルート）
+    // ① 清洲同盟（パート３：追い返すルート）
     kiyosu_alliance_reject: function(args) {
         return [
             { type: 'dialog', leftName: args.nobunagaName, leftFace: args.nobunagaFace, msg: `「追い返せ。」` },
