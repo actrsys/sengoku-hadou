@@ -1142,6 +1142,12 @@ class IndependenceSystem {
         const neighborClanIds = new Set();
         const degree1Clans = new Set();
         
+        // 独立元の主家（元の持ち主）も絶対に避ける色として追加しておきます
+        if (castle.ownerClan !== 0) {
+            neighborClanIds.add(castle.ownerClan);
+            degree1Clans.add(castle.ownerClan);
+        }
+        
         // 1. 独立する城に隣接する城から「第1隣接大名」を取得
         if (castle.adjacentCastleIds) {
             for (const adjId of castle.adjacentCastleIds) {
@@ -1177,24 +1183,29 @@ class IndependenceSystem {
             }
         }
         
+        // 周辺に大名家が一つもない場合は、ランダムな色を返します
+        if (existingColors.length === 0) {
+            const h = Math.random(); 
+            const s = 0.5 + Math.random() * 0.4;
+            const l = 0.4 + Math.random() * 0.3;
+            return this.hslToHex(h, s, l);
+        }
+        
         let bestColor = "#ffffff";
         let maxMinDistance = -1;
         
-        // 色の候補を50個生成し、最も距離が遠い色を採用（グレー・明るすぎ・暗すぎを回避）
-        for (let i = 0; i < 50; i++) {
-            const h = Math.random(); 
-            const s = 0.5 + Math.random() * 0.4; // 彩度: 50%〜90%
-            const l = 0.4 + Math.random() * 0.3; // 明度: 40%〜70%
+        // 運任せにならないように、色相(色合い)を均等に分けた候補を36個(10度ずつ)作って比べます
+        for (let i = 0; i < 36; i++) {
+            const h = i / 36; // 0から1まで均等に色合いをずらします
+            const s = 0.6 + Math.random() * 0.3; // 彩度: 60%〜90%
+            const l = 0.4 + Math.random() * 0.2; // 明度: 40%〜60%
             
             const hex = this.hslToHex(h, s, l);
             const rgb = this.hexToRgb(hex);
             
-            if (existingColors.length === 0) {
-                return hex;
-            }
-            
             let minDistance = Infinity;
             for (const exColor of existingColors) {
+                // RGBの差を計算します
                 const dist = Math.sqrt(Math.pow(rgb.r - exColor.r, 2) + Math.pow(rgb.g - exColor.g, 2) + Math.pow(rgb.b - exColor.b, 2));
                 if (dist < minDistance) {
                     minDistance = dist;
