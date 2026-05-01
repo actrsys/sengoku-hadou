@@ -1906,7 +1906,7 @@ class UIInfoManager {
 
         const getSortMark = (key) => {
             if (this.currentKyotenSortKey !== key) return '';
-            return this.isKyotenSortAsc ? ' ▲' : ' ▼';
+            return this.isKyotenSortAsc ? '<span class="sort-mark">▲</span>' : '<span class="sort-mark">▼</span>';
         };
         
         let headers = [];
@@ -2518,7 +2518,7 @@ class UIInfoManager {
 
         const getSortMark = (key) => {
             if (this.bushoCurrentSortKey !== key) return '';
-            return this.bushoIsSortAsc ? ' ▲' : ' ▼';
+            return this.bushoIsSortAsc ? '<span class="sort-mark">▲</span>' : '<span class="sort-mark">▼</span>';
         };
 
         let headers = [];
