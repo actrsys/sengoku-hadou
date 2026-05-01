@@ -539,10 +539,13 @@ class UIInfoManager {
                 nameClass = "text-orange";
             }
             
+            let leaderFullName = leader ? leader.name : "不明";
+            
             items.push({
                 onClick: `window.GameApp.ui.info.showFactionBushoList(${clan.id}, ${fId}, '${factionNameStr}')`,
                 cells: [
                     `<strong class="col-faction-name ${nameClass}">${factionNameStr}</strong>`,
+                    `<span class="col-leader-name">${leaderFullName}</span>`,
                     `<span class="col-busho-count">${count}</span>`,
                     `<span class="col-seikaku ${seikakuClass}">${seikaku}</span>`,
                     `<span class="col-hoshin ${hoshinClass}">${hoshin}</span>`,
@@ -556,6 +559,7 @@ class UIInfoManager {
                 onClick: `window.GameApp.ui.info.showFactionBushoList(${clan.id}, 0, '無派閥')`,
                 cells: [
                     `<strong class="col-faction-name">無派閥</strong>`,
+                    `<span class="col-leader-name">-</span>`,
                     `<span class="col-busho-count">${nonFactionCount}</span>`,
                     "", "", ""
                 ]
@@ -566,6 +570,7 @@ class UIInfoManager {
             title: `${clan.name} 派閥一覧`,
             headers: [
                 `<span class="col-faction-name">派閥名</span>`,
+                `<span class="col-leader-name">派閥主</span>`,
                 `<span class="col-busho-count">武将</span>`,
                 `<span class="col-seikaku">方針</span>`,
                 `<span class="col-hoshin">思想</span>`,
@@ -576,8 +581,8 @@ class UIInfoManager {
             listClass: "faction-list-container",
             items: items,
             scrollPos: scrollPos,
-            gridTemplateSp: "2.5fr 1fr 1.5fr 1.5fr 3fr",
-            gridTemplatePc: "140px 80px 100px 100px 1fr"
+            gridTemplateSp: "2fr 2fr 1fr 1.2fr 1.2fr 1.5fr",
+            gridTemplatePc: "120px 120px 60px 80px 80px 1fr"
         });
     }
 
