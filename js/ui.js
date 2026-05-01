@@ -379,6 +379,56 @@ class UIManager {
         });
         // ==========================================
 
+        // ==========================================
+        // ★ここから追加：長い名前を自動で見つけてギュッと縮める「文字圧縮ロボット」
+        // ==========================================
+        const textObserver = new MutationObserver(() => {
+            // 文字をギュッとしたい場所の目印（クラス名やID）をここにまとめます
+            // これらを指定しておけば、各画面のHTMLを一切書き換える必要がありません！
+            const targetSelectors = [
+                '#war-atk-name', '#war-def-name', // 合戦画面の名前
+                '.sp-clan',                       // マップ上のステータスパネルの勢力名
+                '.daimyo-detail-name',            // 大名詳細などの大きな名前
+                '.daimyo-confirm-info h3',        // 大名選択の確認画面の名前
+                '.col-daimyo-name', '.col-clan'   // リスト内の勢力名
+            ];
+
+            // 画面の中から、上の目印がついている場所を全部探してきます
+            const targets = document.querySelectorAll(targetSelectors.join(', '));
+            
+            targets.forEach(el => {
+                // 中に入っている文字の数を数えます（空白などは無視します）
+                const text = el.textContent.trim();
+                
+                // すでにこの文字でチェックしたよ、という印（シール）があれば二度手間を防ぎます
+                if (el.dataset.compressedText === text) return;
+                
+                // 5文字以上の時だけ、スタイル（文字の大きさと隙間）を直接いじってギュッとします
+                if (text.length >= 6) {
+                    el.style.fontSize = '0.85em';
+                    el.style.letterSpacing = '-1px';
+                } else if (text.length >= 5) {
+                    el.style.fontSize = '0.9em';
+                    el.style.letterSpacing = '-0.5px';
+                } else {
+                    // 4文字以下の場合は、念のため普通の大きさに戻しておきます
+                    el.style.fontSize = '';
+                    el.style.letterSpacing = '';
+                }
+                
+                // 「今の文字ではチェック済みだよ」というシールを貼っておきます
+                el.dataset.compressedText = text;
+            });
+        });
+        
+        // 画面全体の文字の変化をずっと見張るようにロボットにお願いします
+        textObserver.observe(document.body, {
+            childList: true,
+            subtree: true,
+            characterData: true
+        });
+        // ==========================================
+
         // ★ここから追加：ウィンドウ付属のボタンを外に出す改修
         const modals = document.querySelectorAll('.modal');
         modals.forEach(modal => {
