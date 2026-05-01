@@ -377,14 +377,11 @@ class UIManager {
             attributes: true,
             attributeFilter: ['class']
         });
+        
         // ==========================================
-
-        // ==========================================
-        // ★ここから追加：長い名前を自動で見つけてギュッと縮める「文字圧縮ロボット」
+        // 長い名前を自動で見つけてギュッと縮める「文字圧縮ロボット」（長体対応・究極版）
         // ==========================================
         const textObserver = new MutationObserver(() => {
-            // 文字をギュッとしたい場所の目印（クラス名やID）をここにまとめます
-            // これらを指定しておけば、各画面のHTMLを一切書き換える必要がありません！
             const targetSelectors = [
                 '#war-atk-name', '#war-def-name', // 合戦画面の名前
                 '.sp-clan',                       // マップ上のステータスパネルの勢力名
@@ -393,35 +390,45 @@ class UIManager {
                 '.col-daimyo-name', '.col-clan'   // リスト内の勢力名
             ];
 
-            // 画面の中から、上の目印がついている場所を全部探してきます
             const targets = document.querySelectorAll(targetSelectors.join(', '));
             
             targets.forEach(el => {
-                // 中に入っている文字の数を数えます（空白などは無視します）
                 const text = el.textContent.trim();
                 
-                // すでにこの文字でチェックしたよ、という印（シール）があれば二度手間を防ぎます
                 if (el.dataset.compressedText === text) return;
                 
-                // 5文字以上の時だけ、スタイル（文字の大きさと隙間）を直接いじってギュッとします
-                if (text.length >= 6) {
-                    el.style.fontSize = '0.85em';
-                    el.style.letterSpacing = '-1px';
-                } else if (text.length >= 5) {
-                    el.style.fontSize = '0.9em';
+                if (text.length >= 5) {
+                    // ★夢の魔法：長ければ長いほど、横幅を縮める倍率を自動計算します！
+                    // 5文字=0.9倍、6文字=0.8倍、7文字=0.7倍...（限界は0.55倍まで）
+                    let scale = 1.0 - (text.length - 4) * 0.1;
+                    if (scale < 0.55) scale = 0.55; 
+
+                    // ★文字の高さ（フォントサイズ）はそのままに、横幅だけをギュッと縮める（長体）設定
+                    el.style.display = 'inline-block'; // この設定がないと横幅を縮められません
+                    el.style.transform = `scaleX(${scale})`; // ここで横幅をscale倍に潰します
+                    el.style.transformOrigin = 'left center'; // 左端を固定したまま、右側をギュッと引き寄せます
+                    
+                    // はみ出して勝手に改行されないようにする保険
+                    el.style.whiteSpace = 'nowrap';
+                    
+                    // 文字同士の隙間もほんの少しだけ詰めて、さらに美しく見せます
                     el.style.letterSpacing = '-0.5px';
-                } else {
-                    // 4文字以下の場合は、念のため普通の大きさに戻しておきます
+
+                    // 念のため、フォントサイズが小さくならないようにリセットしておきます
                     el.style.fontSize = '';
+                } else {
+                    // 4文字以下の場合は、すべての魔法を解いて普通の文字に戻します
+                    el.style.display = '';
+                    el.style.transform = '';
+                    el.style.transformOrigin = '';
+                    el.style.whiteSpace = '';
                     el.style.letterSpacing = '';
                 }
                 
-                // 「今の文字ではチェック済みだよ」というシールを貼っておきます
                 el.dataset.compressedText = text;
             });
         });
         
-        // 画面全体の文字の変化をずっと見張るようにロボットにお願いします
         textObserver.observe(document.body, {
             childList: true,
             subtree: true,
