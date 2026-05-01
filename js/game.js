@@ -150,8 +150,7 @@ class DataManager {
         
         // 元々は fetch(url) だったところを、おまじない付きの fetch(noCacheUrl) に変えています！
         const response = await fetch(noCacheUrl);
-        // ★追加した魔法ここまで！
-
+        
         if (!response.ok) throw new Error(`Failed to load ${url}`);
         let text = await response.text();
         if (text.charCodeAt(0) === 0xFEFF) {
@@ -473,11 +472,6 @@ class DataManager {
             img.src = url;
         });
     }
-    // ★追加ここまで！
-
-    // ============================================
-    // ★画像から色を探す魔法ここまで！
-    // ============================================
 }
 
 /* ==========================================================================
@@ -990,9 +984,6 @@ class GameManager {
 
         loadBatch(0);
     }
-    // ==========================================
-    // ★顔画像の裏側読み込み魔法ここまで！
-    // ==========================================
     
     handleDaimyoSelect(castle) {
         if (castle.ownerClan === 0) {
@@ -1758,8 +1749,7 @@ class GameManager {
                 
                 // ★追加：過去に戻るために、イベントの引き出しを新品に取り替えておきます！
                 this.eventManager = new EventManager(this);
-                // ★お掃除ここまで！
-
+                
                 const d = JSON.parse(evt.target.result); 
                 this.flags = d.flags || {};
                 this.year = d.year;
