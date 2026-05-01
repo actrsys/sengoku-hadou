@@ -379,53 +379,61 @@ class UIManager {
         });
         
         // ==========================================
-        // 長い名前を自動で見つけてギュッと縮める「文字圧縮ロボット」（長体対応・究極版）
+        // ★ここから追加：長い名前を自動で見つけてギュッと縮める「文字圧縮ロボット」（レイアウト崩れ完全解決版）
         // ==========================================
         const textObserver = new MutationObserver(() => {
             const targetSelectors = [
-                '#war-atk-name', '#war-def-name', // 合戦画面の名前
-                '.sp-clan',                       // マップ上のステータスパネルの勢力名
-                '.daimyo-detail-name',            // 大名詳細などの大きな名前
-                '.daimyo-confirm-info h3',        // 大名選択の確認画面の名前
-                '.col-daimyo-name', '.col-clan'   // リスト内の勢力名
+                '#war-atk-name', '#war-def-name', 
+                '.sp-clan',                       
+                '.daimyo-detail-name',            
+                '.daimyo-confirm-info h3',        
+                '.col-daimyo-name', '.col-clan'   
             ];
 
             const targets = document.querySelectorAll(targetSelectors.join(', '));
             
             targets.forEach(el => {
-                const text = el.textContent.trim();
+                // ★改善点1：リストの枠組み（Grid）を壊さないように、文字を包む「専用の内箱（span）」を作ります
+                let inner = el.querySelector('.compressed-text-wrapper');
+                let text = "";
                 
-                if (el.dataset.compressedText === text) return;
+                if (!inner) {
+                    text = el.textContent.trim();
+                    if (!text) return; // 空っぽなら何もしない
+                    
+                    el.innerHTML = ''; // 元の文字を消して、内箱に詰め直します
+                    inner = document.createElement('span');
+                    inner.className = 'compressed-text-wrapper';
+                    inner.textContent = text;
+                    el.appendChild(inner);
+                } else {
+                    text = inner.textContent.trim();
+                }
+                
+                if (inner.dataset.compressedText === text) return;
                 
                 if (text.length >= 5) {
-                    // ★夢の魔法：長ければ長いほど、横幅を縮める倍率を自動計算します！
-                    // 5文字=0.9倍、6文字=0.8倍、7文字=0.7倍...（限界は0.55倍まで）
                     let scale = 1.0 - (text.length - 4) * 0.1;
                     if (scale < 0.55) scale = 0.55; 
 
-                    // ★文字の高さ（フォントサイズ）はそのままに、横幅だけをギュッと縮める（長体）設定
-                    el.style.display = 'inline-block'; // この設定がないと横幅を縮められません
-                    el.style.transform = `scaleX(${scale})`; // ここで横幅をscale倍に潰します
-                    el.style.transformOrigin = 'left center'; // 左端を固定したまま、右側をギュッと引き寄せます
+                    // ★改善点2：魔法のタネあかし★
+                    // 1. まずフォントサイズ（em）を直接小さくします。
+                    // これによりシステム上の「横幅」も小さくなるため、リストの列が押し広げられなくなります！
+                    inner.style.fontSize = `${scale}em`;
                     
-                    // はみ出して勝手に改行されないようにする保険
-                    el.style.whiteSpace = 'nowrap';
+                    // 2. フォントサイズを下げたことで「縦幅」も小さくなってしまうので、
+                    // transformの『scaleY（縦方向の引き伸ばし）』を使って、元の高さ（1.0）まで引き伸ばします！
+                    inner.style.transform = `scaleY(${1 / scale})`;
                     
-                    // 文字同士の隙間もほんの少しだけ詰めて、さらに美しく見せます
-                    el.style.letterSpacing = '-0.5px';
-
-                    // 念のため、フォントサイズが小さくならないようにリセットしておきます
-                    el.style.fontSize = '';
+                    inner.style.letterSpacing = '-0.5px';
                 } else {
-                    // 4文字以下の場合は、すべての魔法を解いて普通の文字に戻します
-                    el.style.display = '';
-                    el.style.transform = '';
-                    el.style.transformOrigin = '';
-                    el.style.whiteSpace = '';
-                    el.style.letterSpacing = '';
+                    // 4文字以下の場合は元に戻す
+                    inner.style.fontSize = '';
+                    inner.style.transform = '';
+                    inner.style.letterSpacing = '';
                 }
                 
-                el.dataset.compressedText = text;
+                inner.dataset.compressedText = text;
             });
         });
         

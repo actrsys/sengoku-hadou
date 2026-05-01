@@ -46,6 +46,17 @@ img { pointer-events: none; -webkit-user-drag: none; user-drag: none; }
 .instant { transition: none !important; animation: none !important; }
 .disabled-area { pointer-events: none; opacity: 0.5; }
 
+/* =========================================================
+   ★追加：長い名前をギュッと圧縮（長体）するための専用内箱
+   ========================================================= */
+.compressed-text-wrapper {
+    display: inline-block;
+    white-space: nowrap;
+    transform-origin: left center;
+    vertical-align: middle;
+    line-height: 1;
+}
+
 .fade-in { animation: fadeIn 0.3s ease-in; }
 @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
 @keyframes blink { 0% { opacity: 0.2; } 50% { opacity: 1; } 100% { opacity: 0.2; } }
