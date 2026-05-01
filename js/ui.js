@@ -56,9 +56,10 @@ class UIManager {
         this.pcNewCommandArea = document.getElementById('pc-new-command-area');
         this.pcMenuPath = [];
         
-        // ★ここを書き足します！
         // 情報表示の専門家（さっき作った新しい箱）を準備しておきます
         this.info = new UIInfoManager(this, this.game);
+        // ★追加：スライダーの専門家を準備しておきます
+        this.slider = new UISliderManager(this, this.game);
         
         this.warModal = document.getElementById('war-modal');
         this.warLog = document.getElementById('war-log');
@@ -675,7 +676,7 @@ class UIManager {
                 window.AudioManager.fadeOutSe(0.1);
             }
 
-            // ★ここを書き足します！：今のダイアログが閉じたので「表示中」の合図を消します！
+            // 今のダイアログが閉じたので「表示中」の合図を消します！
             this.isDialogShowing = false;
 
             const executeNext = () => {
@@ -1881,7 +1882,7 @@ class UIManager {
     }
 
     showUnitDivideModal(bushos, totalSoldiers, totalHorses, totalGuns, onConfirm, onCancel = null) {
-        this.info.showUnitDivideModal(bushos, totalSoldiers, totalHorses, totalGuns, onConfirm, onCancel);
+        this.slider.showUnitDivideModal(bushos, totalSoldiers, totalHorses, totalGuns, onConfirm, onCancel);
     }
 
     showInterviewModal(busho) {
@@ -1968,7 +1969,7 @@ class UIManager {
     }
 
     openQuantitySelector(type, data, targetId, extraData = null) {
-        this.info.openQuantitySelector(type, data, targetId, extraData);
+        this.slider.openQuantitySelector(type, data, targetId, extraData);
     }
     
     // ---------------------------------------------------------
@@ -2833,8 +2834,8 @@ class UIManager {
             return;
         }
 
-        // 情報専門の ui_info.js が持っている共通の数量選択スライダー（openQuantitySelector）を呼び出します
-        this.info.openQuantitySelector('reinf_gold', [atkCastle], null, {
+        // 情報専門の ui_slider.js が持っている共通の数量選択スライダー（openQuantitySelector）を呼び出します
+        this.slider.openQuantitySelector('reinf_gold', [atkCastle], null, {
             onConfirm: (inputs) => {
                 const gold = inputs.gold ? parseInt(inputs.gold.num.value) : 0;
                 this.game.commandSystem.executeReinforcementRequest(gold, helperCastle, atkCastle, targetCastle, atkBushos, sVal, rVal, hVal, gVal, selfReinfData);
@@ -2886,8 +2887,8 @@ class UIManager {
             return;
         }
 
-        // 情報専門の ui_info.js が持っている共通の数量選択スライダー（openQuantitySelector）を呼び出します
-        this.info.openQuantitySelector('reinf_gold', [defCastle], null, {
+        // 情報専門の ui_slider.js が持っている共通の数量選択スライダー（openQuantitySelector）を呼び出します
+        this.slider.openQuantitySelector('reinf_gold', [defCastle], null, {
             onConfirm: (inputs) => {
                 const gold = inputs.gold ? parseInt(inputs.gold.num.value) : 0;
                 this.game.warManager.executeDefReinforcement(gold, helperCastle, defCastle, onComplete);
