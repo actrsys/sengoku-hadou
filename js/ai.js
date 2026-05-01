@@ -707,6 +707,29 @@ class AIEngine {
                 }
             });
             prob -= totalCautionPenalty;
+
+            // ★今回追加：その城を取った後の戦況を考えて、周囲の敵城を警戒する魔法！
+            // 攻撃目標の城に隣接している城のうち、「敵」がいくつあるかを数えます。
+            let futureEnemyNeighbors = 0;
+            if (target.adjacentCastleIds) {
+                target.adjacentCastleIds.forEach(adjId => {
+                    const adjCastle = this.game.getCastle(adjId);
+                    // 取った後は自分の城になるので、自分以外の城を調べます
+                    if (adjCastle && adjCastle.ownerClan !== myCastle.ownerClan) {
+                        if (adjCastle.ownerClan === 0) {
+                            futureEnemyNeighbors++; // 空き城も誰かに取られるリスクがあるので数えます
+                        } else {
+                            const adjRel = this.game.getRelation(myCastle.ownerClan, adjCastle.ownerClan);
+                            // 関係が「敵対」か「普通」のものを敵とみなします
+                            if (!adjRel || adjRel.status === '敵対' || adjRel.status === '普通') {
+                                futureEnemyNeighbors++;
+                            }
+                        }
+                    }
+                });
+            }
+            // 敵城が少ないほど優先され、多いほど守りにくいため後回しにします（1城につき4点マイナス）
+            prob -= (futureEnemyNeighbors * 4);
             
             // ★新しく戦線を広げる場合、周辺大名と威信を比較して弱いところを狙う魔法！
             // まだ「敵対」していない相手で、空き城(0)ではない場合だけ発動します
