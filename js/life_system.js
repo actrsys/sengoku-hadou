@@ -159,12 +159,14 @@ class LifeSystem {
                                     const clan = this.game.clans.find(c => c.id === b.clan);
                                     if (clan) {
                                         const oldClanName = clan.name;
-                                        const newClanName = `${newFamilyName}家`;
+                                        const newBaseName = `${newFamilyName}家`;
                                         const newClanYomi = newFamilyYomi ? `${newFamilyYomi}け` : ""; // ★読み仮名も作ります
                                         
-                                        // ★大名家の名前が本当に変わる時だけ、お知らせを出します！
-                                        if (oldClanName !== newClanName) {
-                                            clan.name = newClanName;
+                                        // ★修正：大名家の名前が本当に変わる時だけ、お知らせを出します！
+                                        // 今の家名ではなく、本来の家名（baseName）と比べて判定します。
+                                        if (clan.baseName !== newBaseName) {
+                                            clan.baseName = newBaseName; // ★本来の家名も更新しておきます
+                                            clan.name = newBaseName;
                                             clan.yomi = newClanYomi; // ★読み仮名も新しく書き換えます
                                             
                                             // ==========================================
@@ -1009,14 +1011,17 @@ class LifeSystem {
         if (clan) {
             const oldClanName = clan.name;
             const safeFamilyName = successor.familyName || successor.name;
-            const newClanName = `${safeFamilyName}家`;
+            const newBaseName = `${safeFamilyName}家`;
             const safeFamilyYomi = successor.familyYomi || successor.yomi;
             const newClanYomi = safeFamilyYomi ? `${safeFamilyYomi}け` : "";
             
-            if (oldClanName !== newClanName) {
-                clan.name = newClanName;
+            // ★修正：今の家名（例：若狭武田家）ではなく、本来の家名（baseName：武田家）と比べるようにします！
+            // そうしないと、同じ武田家が跡を継いだ時に「若狭武田家は武田家になります」と出てしまいます。
+            if (clan.baseName !== newBaseName) {
+                clan.baseName = newBaseName; // ★本来の家名も更新しておきます
+                clan.name = newBaseName;
                 clan.yomi = newClanYomi; 
-                messages.push(`当主の交代により、${oldClanName}は今後「${newClanName}」となります。`);
+                messages.push(`当主の交代により、${oldClanName}は今後「${newBaseName}」となります。`);
             }
         }
         
