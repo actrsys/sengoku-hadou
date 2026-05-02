@@ -78,21 +78,31 @@ class StrategySystem {
         
         return Math.max(0.01, Math.min(0.99, prob));
     }
-
+    
     // ★追加: 破壊工作の成否とダメージを計算する魔法
-    calcSabotage(doerId, targetId) { 
+    calcSabotage(doerId, targetId, isExecute = false) { 
         const busho = this.game.getBusho(doerId);
         
         const prob = this.getSabotageProb(doerId, targetId);
         const success = Math.random() < prob; 
+
+        if (isExecute) {
+            if (success) {
+                busho.expStrength = (busho.expStrength || 0) + 5;
+                busho.expIntelligence = (busho.expIntelligence || 0) + 10;
+            } else {
+                busho.expStrength = (busho.expStrength || 0) + 3;
+                busho.expIntelligence = (busho.expIntelligence || 0) + 5;
+            }
+        }
         
         if(!success) return { success: false, val: 0 }; 
         
         const damage = Math.max(1, Math.floor(((busho.intelligence * 1.5) + (Math.sqrt(busho.loyalty) * 2)) / 10));
         return { success: true, val: damage }; 
     }
-
-    calcIncite(doerId, targetId) { 
+    
+    calcIncite(doerId, targetId, isExecute = false) { 
         const busho = this.game.getBusho(doerId);
         const targetCastle = this.game.getCastle(targetId);
 
@@ -102,6 +112,16 @@ class StrategySystem {
         
         const prob = Math.max(0.01, Math.min(0.99, strBonus / loyaltyBonus));
         const success = Math.random() < prob; 
+
+        if (isExecute) {
+            if (success) {
+                busho.expStrength = (busho.expStrength || 0) + 5;
+                busho.expIntelligence = (busho.expIntelligence || 0) + 10;
+            } else {
+                busho.expStrength = (busho.expStrength || 0) + 3;
+                busho.expIntelligence = (busho.expIntelligence || 0) + 5;
+            }
+        }
         
         if(!success) return { success: false, val: 0 }; 
         
@@ -109,17 +129,34 @@ class StrategySystem {
         return { success: true, val: damage }; 
     }
     
-    calcRumor(doerId, targetBushoId) { 
+    calcRumor(doerId, targetBushoId, isExecute = false) { 
         const busho = this.game.getBusho(doerId);
         const targetBusho = this.game.getBusho(targetBushoId);
         const score = (busho.intelligence * 0.7) + (busho.strength * 0.3); 
         const defScore = (targetBusho.intelligence * 0.5) + (targetBusho.loyalty * 0.5); 
-        const success = Math.random() < (score / (defScore + window.MainParams.Strategy.RumorFactor)); 
+        let success = Math.random() < (score / (defScore + window.MainParams.Strategy.RumorFactor)); 
+
+        if (targetBusho.isCastellan && success) {
+            if (Math.random() > 0.33) {
+                success = false;
+            }
+        }
+
+        if (isExecute) {
+            if (success) {
+                busho.expStrength = (busho.expStrength || 0) + 5;
+                busho.expIntelligence = (busho.expIntelligence || 0) + 10;
+            } else {
+                busho.expStrength = (busho.expStrength || 0) + 3;
+                busho.expIntelligence = (busho.expIntelligence || 0) + 5;
+            }
+        }
+
         if(!success) return { success: false, val: 0 }; 
         return { success: true, val: Math.floor((20 + Math.random()*20) / 4) }; 
     }
-
-    calcHeadhunt(doerId, targetBushoId, gold) {
+    
+    calcHeadhunt(doerId, targetBushoId, gold, isExecute = false) {
         const doer = this.game.getBusho(doerId);
         const target = this.game.getBusho(targetBushoId);
         const targetLord = this.game.bushos.find(b => b.clan === target.clan && b.isDaimyo) || { affinity: 50 }; 
@@ -150,7 +187,25 @@ class StrategySystem {
             }
         }
 
-        return Math.random() < successRate;
+        let success = Math.random() < successRate;
+
+        if (target.isCastellan && success) {
+            if (Math.random() > 0.33) {
+                success = false;
+            }
+        }
+
+        if (isExecute) {
+            if (success) {
+                doer.expStrength = (doer.expStrength || 0) + 10;
+                doer.expIntelligence = (doer.expIntelligence || 0) + 20;
+            } else {
+                doer.expStrength = (doer.expStrength || 0) + 3;
+                doer.expIntelligence = (doer.expIntelligence || 0) + 5;
+            }
+        }
+
+        return success;
     }
 
     // ==========================================
@@ -264,7 +319,7 @@ class StrategySystem {
         }
         return "";
     }
-
+    
     // 引抜を実行する魔法
     executeHeadhunt(doerId, targetBushoId, gold) {
         const doer = this.game.getBusho(doerId);
@@ -275,12 +330,7 @@ class StrategySystem {
         castle.gold -= gold;
         
         // ★専門部署である StrategySystem の計算魔法を呼びます！
-        let isSuccess = this.calcHeadhunt(doerId, targetBushoId, gold);
-        if (target.isCastellan && isSuccess) {
-            if (Math.random() > 0.33) {
-                isSuccess = false;
-            }
-        }
+        let isSuccess = this.calcHeadhunt(doerId, targetBushoId, gold, true);
         
         // ★追加：隠密チェックを行います
         const covertMsg = this.handleCovertAction(doerId, target.castleId, isSuccess, 'headhunt', target.isCastellan && isSuccess, target.id);
@@ -358,13 +408,13 @@ class StrategySystem {
         this.game.ui.renderCommandMenu();
         this.game.ui.renderMap();
     }
-
+    
     // 扇動を実行する魔法
     executeIncite(doerId, targetId) { 
         const doer = this.game.getBusho(doerId);
         const target = this.game.getCastle(targetId); 
         // ★専門部署である StrategySystem の計算魔法を呼びます！
-        const result = this.calcIncite(doerId, targetId); 
+        const result = this.calcIncite(doerId, targetId, true); 
         
         // ★追加：隠密チェックを行います
         const covertMsg = this.handleCovertAction(doerId, targetId, result.success, 'incite');
@@ -385,19 +435,14 @@ class StrategySystem {
         this.game.ui.updatePanelHeader(); 
         this.game.ui.renderCommandMenu(); 
     }
-
+    
     // 離間計を実行する魔法
     executeRumor(doerId, castleId, targetBushoId) { 
         const doer = this.game.getBusho(doerId); 
         const targetBusho = this.game.getBusho(targetBushoId); 
         
         // ★専門部署である StrategySystem の計算魔法を呼びます！
-        let result = this.calcRumor(doerId, targetBushoId);
-        if (targetBusho.isCastellan && result.success) {
-            if (Math.random() > 0.33) {
-                result.success = false;
-            }
-        }
+        let result = this.calcRumor(doerId, targetBushoId, true);
 
         // ★追加：隠密チェックを行います
         const covertMsg = this.handleCovertAction(doerId, targetBusho.castleId, result.success, 'rumor', false, targetBusho.id);
@@ -418,13 +463,13 @@ class StrategySystem {
         this.game.ui.updatePanelHeader(); 
         this.game.ui.renderCommandMenu(); 
     }
-
+    
     // ★追加: 破壊工作を実行する魔法
     executeSabotage(doerId, targetId) { 
         const doer = this.game.getBusho(doerId);
         const target = this.game.getCastle(targetId); 
         
-        const result = this.calcSabotage(doerId, targetId); 
+        const result = this.calcSabotage(doerId, targetId, true); 
         
         // ★追加：隠密チェックを行います
         const covertMsg = this.handleCovertAction(doerId, targetId, result.success, 'sabotage');

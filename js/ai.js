@@ -1876,7 +1876,7 @@ class AIEngine {
                     break;
                 }
                 if (action.type === 'sabotage') {
-                    const result = this.game.strategySystem.calcSabotage(doer.id, action.targetId);
+                    const result = this.game.strategySystem.calcSabotage(doer.id, action.targetId, true);
                     this.game.strategySystem.handleCovertAction(doer.id, action.targetId, result.success, 'sabotage');
                     if (result.success) {
                         const target = this.game.getCastle(action.targetId);
@@ -1890,7 +1890,7 @@ class AIEngine {
                     doer.isActionDone = true; actionDoneInThisStep = true; break;
                 }
                 if (action.type === 'incite') {
-                    const result = this.game.strategySystem.calcIncite(doer.id, action.targetId);
+                    const result = this.game.strategySystem.calcIncite(doer.id, action.targetId, true);
                     this.game.strategySystem.handleCovertAction(doer.id, action.targetId, result.success, 'incite');
                     if (result.success) {
                         const target = this.game.getCastle(action.targetId);
@@ -1904,11 +1904,8 @@ class AIEngine {
                     doer.isActionDone = true; actionDoneInThisStep = true; break;
                 }
                 if (action.type === 'rumor') {
-                    let result = this.game.strategySystem.calcRumor(doer.id, action.targetBushoId);
+                    let result = this.game.strategySystem.calcRumor(doer.id, action.targetBushoId, true);
                     const targetBusho = this.game.getBusho(action.targetBushoId);
-                    if (targetBusho.isCastellan && result.success) {
-                        if (Math.random() > 0.33) result.success = false;
-                    }
                     this.game.strategySystem.handleCovertAction(doer.id, targetBusho.castleId, result.success, 'rumor', false, targetBusho.id);
                     if (result.success) {
                         targetBusho.loyalty = Math.max(0, targetBusho.loyalty - result.val);
@@ -1923,10 +1920,7 @@ class AIEngine {
                 if (action.type === 'headhunt' && castle.gold >= action.cost) {
                     castle.gold -= action.cost;
                     const targetBusho = this.game.getBusho(action.targetBushoId);
-                    let isSuccess = this.game.strategySystem.calcHeadhunt(doer.id, action.targetBushoId, action.gold);
-                    if (targetBusho.isCastellan && isSuccess) {
-                        if (Math.random() > 0.33) isSuccess = false;
-                    }
+                    let isSuccess = this.game.strategySystem.calcHeadhunt(doer.id, action.targetBushoId, action.gold, true);
                     this.game.strategySystem.handleCovertAction(doer.id, targetBusho.castleId, isSuccess, 'headhunt', targetBusho.isCastellan && isSuccess, targetBusho.id);
                     if (isSuccess) {
                         const oldCastle = this.game.getCastle(targetBusho.castleId);
