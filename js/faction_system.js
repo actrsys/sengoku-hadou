@@ -157,6 +157,20 @@ class FactionSystem {
 
             const members = this.game.bushos.filter(b => b.clan === clan.id && b.status === 'active');
             
+            // ★追加：記憶を消す前に、「前回の派閥リーダー」が誰だったかメモしておきます！
+            members.forEach(b => {
+                if (b.factionId > 0) {
+                    const prevLeader = members.find(m => m.factionId === b.factionId && m.isFactionLeader);
+                    if (prevLeader) {
+                        b.previousLeaderId = prevLeader.id;
+                    } else {
+                        b.previousLeaderId = 0;
+                    }
+                } else {
+                    b.previousLeaderId = 0;
+                }
+            });
+
             // 既存の派閥IDとリーダーフラグをクリア (再編)
             members.forEach(b => {
                 b.factionId = 0;
@@ -246,9 +260,26 @@ class FactionSystem {
                 if (voter.personality && leader.personality && voter.personality === leader.personality) {
                     personalityBonus = 5;
                 }
+
+                // ★追加：前回の派閥リーダーに関するボーナスとペナルティ
+                let stayFactionBonus = 0;
+                let factionChangePenalty = 0;
+
+                // 自分の前のリーダーが今回も候補（availableLeaders）にいるか確認します
+                const isPrevLeaderAvailable = availableLeaders.some(l => l.id === voter.previousLeaderId);
+
+                if (voter.previousLeaderId > 0) {
+                    if (voter.previousLeaderId === leader.id) {
+                        // 同じリーダーなら留まりやすいようにボーナス（点数を下げます）
+                        stayFactionBonus = 5; 
+                    } else if (isPrevLeaderAvailable) {
+                        // 前のリーダーが健在なのに、違う派閥に移ろうとする場合はペナルティ（点数を上げます）
+                        factionChangePenalty = 5;
+                    }
+                }
                 
                 //基準となる持ち点を「35」点に設定しました。
-                return ((affDiff * 0.5) + (innoDiff * 0.25) + 35) - finalBonus - abilityBonus + charmBonus - achievementBonus - personalityBonus;
+                return ((affDiff * 0.5) + (innoDiff * 0.25) + 35) - finalBonus - abilityBonus + charmBonus - achievementBonus - personalityBonus - stayFactionBonus + factionChangePenalty;
             };
 
             // 派閥に入れる処理の共通ルール
