@@ -183,12 +183,25 @@ class AffiliationSystem {
         // 2. 新しいお城に入る前にバッジを外します
         busho.isCastellan = false; 
         
-        // ★追加：国主が移動する場合は国主バッジも外し、担当していた軍団を解散させます
+        // ★修正：国主が自分の担当する軍団「以外」の城に移動する場合のみ、国主バッジを外して軍団を解散させます
         if (busho.isCommander) {
-            busho.isCommander = false;
-            if (this.game && this.game.legions && this.game.castleManager) {
-                const myLegion = this.game.legions.find(l => Number(l.commanderId) === Number(busho.id));
-                if (myLegion) {
+            const newCastle = this.game.getCastle(newCastleId);
+            let keepCommander = false;
+            let myLegion = null;
+
+            // 自分の担当している軍団を探します
+            if (this.game && this.game.legions) {
+                myLegion = this.game.legions.find(l => Number(l.commanderId) === Number(busho.id));
+                // 移動先のお城が、自分の担当軍団と同じ所属であれば、国主を維持します
+                if (newCastle && myLegion && Number(newCastle.legionId) === Number(myLegion.legionNo)) {
+                    keepCommander = true;
+                }
+            }
+
+            // 国主を維持しない（別の軍団や直轄地への移動）場合は、バッジを外して解散します
+            if (!keepCommander) {
+                busho.isCommander = false;
+                if (myLegion && this.game && this.game.castleManager) {
                     this.game.castleManager.disbandLegion(myLegion.id);
                 }
             }
