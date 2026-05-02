@@ -2033,6 +2033,9 @@ class AIEngine {
                     }
 
                     if (soldiers > 0 && draftCost > 0) {
+                        // 実行確定：経験値を加算します
+                        GameSystem.calcDraftCost(soldiers, doer, castle.peoplesLoyalty, true);
+
                         // AIもプレイヤーと同じように、割合で民忠と人口を減らします
                         const draftRatio = soldiers / castle.population;
                         const penaltyRatio = draftRatio * 2;
@@ -2062,7 +2065,7 @@ class AIEngine {
                     }
                 }
                 if (action.type === 'training') {
-                    const val = GameSystem.calcTraining(doer, castle.soldiers);
+                    const val = GameSystem.calcTraining(doer, castle.soldiers, 1.0, true);
                     const oldVal = castle.training;
                     castle.training = Math.min(100, castle.training + val);
                     
@@ -2074,7 +2077,7 @@ class AIEngine {
                 }
                 if (action.type === 'soldier_charity' && castle.rice >= 200) {
                     castle.rice -= 200;
-                    const val = GameSystem.calcSoldierCharity(doer, castle.soldiers);
+                    const val = GameSystem.calcSoldierCharity(doer, castle.soldiers, 1.0, true);
                     const oldVal = castle.morale;
                     castle.morale = Math.min(100, castle.morale + val);
                     

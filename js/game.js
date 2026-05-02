@@ -544,12 +544,20 @@ class GameSystem {
     }
     
     // 新しい計算式です。兵士数(soldiers)を引数として受け取ります
-    static calcTraining(busho, soldiers, bonusRate = 1.0) { 
+    static calcTraining(busho, soldiers, bonusRate = 1.0, isExecute = false) { 
+        if (isExecute) {
+            busho.expLeadership = (busho.expLeadership || 0) + 3;
+            busho.expStrength = (busho.expStrength || 0) + 5;
+        }
         const safeSoldiers = Math.max(1, soldiers); // 兵士0の時は計算エラーを防ぐため1として扱います
         const val = (((busho.leadership * 1.5) + busho.strength + (Math.sqrt(busho.loyalty) * 2)) / (Math.sqrt(safeSoldiers) * 0.5)) * bonusRate;
         return Math.max(1, Math.round(val)); 
     }
-    static calcSoldierCharity(busho, soldiers, bonusRate = 1.0) { 
+    static calcSoldierCharity(busho, soldiers, bonusRate = 1.0, isExecute = false) { 
+        if (isExecute) {
+            busho.expLeadership = (busho.expLeadership || 0) + 3;
+            busho.expStrength = (busho.expStrength || 0) + 5;
+        }
         const safeSoldiers = Math.max(1, soldiers); // こちらも同じく兵士0の時は1として扱います
         const val = (((busho.politics * 1.5) + busho.charm + (Math.sqrt(busho.loyalty) * 2)) / (Math.sqrt(safeSoldiers) * 0.5)) * bonusRate;
         return Math.max(1, Math.round(val)); 
@@ -583,7 +591,11 @@ class GameSystem {
         return Math.floor(gold * efficiency); 
     }
     // プレイヤー用：集めたい兵士数を指定して、必要なお金を計算します
-    static calcDraftCost(soldiers, busho, peoplesLoyalty) { 
+    static calcDraftCost(soldiers, busho, peoplesLoyalty, isExecute = false) { 
+        if (isExecute) {
+            busho.expLeadership = (busho.expLeadership || 0) + Math.floor(soldiers / 300);
+            busho.expStrength = (busho.expStrength || 0) + Math.floor(soldiers / 200);
+        }
         const efficiency = ((busho.leadership * 1.5) + (busho.charm * 1.5) + (Math.sqrt(busho.loyalty) * 2) + (Math.sqrt(peoplesLoyalty) * 2)) / 500;
         return Math.ceil(soldiers / efficiency); 
     }

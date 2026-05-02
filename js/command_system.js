@@ -1857,7 +1857,7 @@ class CommandSystem {
                     castle.rice -= spec.costRice;  
 
                     // 「その城の兵士数 (castle.soldiers)」を渡して計算してもらいます
-                    const val = GameSystem.calcTraining(busho, castle.soldiers, bonusRate); 
+                    const val = GameSystem.calcTraining(busho, castle.soldiers, bonusRate, true); 
                     const maxTraining = window.WarParams.Military.MaxTraining || 100;
                     const oldVal = castle.training;
                     castle.training = Math.min(maxTraining, castle.training + val); 
@@ -1873,7 +1873,7 @@ class CommandSystem {
                     castle.rice -= spec.costRice;  
 
                     // こちらも「その城の兵士数」を渡します
-                    const val = GameSystem.calcSoldierCharity(busho, castle.soldiers, bonusRate); 
+                    const val = GameSystem.calcSoldierCharity(busho, castle.soldiers, bonusRate, true); 
                     const maxMorale = window.WarParams.Military.MaxMorale || 100;
                     const oldVal = castle.morale;
                     castle.morale = Math.min(maxMorale, castle.morale + val); 
@@ -2329,6 +2329,9 @@ class CommandSystem {
             return;
         }
         
+        // 実行確定：経験値を加算します
+        GameSystem.calcDraftCost(soldiers, busho, castle.peoplesLoyalty, true);
+
         // ★ 徴兵の割合を計算して、民忠と人口を減らす処理を行います
         const draftRatio = soldiers / castle.population;          // 徴兵した割合
         const penaltyRatio = draftRatio * 2;                      // ペナルティはその2倍
