@@ -830,12 +830,13 @@ Object.assign(UIManager.prototype, {
 
                 // ★軍団マーカーの作成（第1～第8軍団の場合のみ）
                 let legionMarkerHtml = '';
-                // プレイヤーの城で、かつ軍団に所属しているかチェックします
-                if (c.legionId > 0 && c.ownerClan === this.game.playerClanId) {
+                // どの勢力でも軍団に所属していればマーカーを作ります
+                if (c.legionId > 0) {
                     // 漢数字に変換するためのリストを用意します
                     const kanjiNumbers = ["", "一", "二", "三", "四", "五", "六", "七", "八"];
                     const kanjiLegionId = kanjiNumbers[c.legionId] || c.legionId;
-                    legionMarkerHtml = `<div class="legion-marker-base legion-color-${c.legionId}">${kanjiLegionId}</div>`;
+                    // 最初は隠しておきます。後で updateCastleGlows() が必要な勢力だけを表示します
+                    legionMarkerHtml = `<div class="legion-marker-base legion-color-${c.legionId}" style="display: none;">${kanjiLegionId}</div>`;
                 }
 
                 // 城の吹き出しと、諸勢力のアイコン、そして軍団マーカーを合体させます！
@@ -1141,6 +1142,9 @@ Object.assign(UIManager.prototype, {
                 if (this.selectedDaimyoId && clanId === this.selectedDaimyoId) {
                     card.classList.add('glow-blue');
                 }
+                // 大名選択時は軍団マーカーを消します
+                const marker = card.querySelector('.legion-marker-base');
+                if (marker) marker.style.display = 'none';
             });
             return;
         }
@@ -1156,6 +1160,16 @@ Object.assign(UIManager.prototype, {
             const clanId = parseInt(card.dataset.clan, 10);
             
             card.classList.remove('glow-blue', 'glow-red', 'glow-green');
+            
+            // ★追加：基準となる勢力（選択中の城の勢力）と同じなら軍団マーカーを表示します
+            const marker = card.querySelector('.legion-marker-base');
+            if (marker) {
+                if (clanId === baseClanId && clanId !== 0) {
+                    marker.style.display = 'flex';
+                } else {
+                    marker.style.display = 'none';
+                }
+            }
             
             if (clanId === 0) return;
             
