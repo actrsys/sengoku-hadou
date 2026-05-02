@@ -642,15 +642,20 @@ class WarManager {
             // 守備側
             let ratio = totalDefSoldiers / Math.max(1, totalAtkSoldiers);
             
+            // 守備側
+            let ratio = totalDefSoldiers / Math.max(1, totalAtkSoldiers);
+            
             // 撤退: 兵力が少ないほど、防御が低いほど、なめらかにスコアが大きくなる
-            // ★兵数による撤退の判断（スコア）を下げました（3000→1000）
+            // ★変更：兵数による撤退の判断（スコア）を下げました（3000→1000）
             let retreatRatioBonus = Math.max(0, 0.2 - ratio) * 1000; // 兵力比0.2(1/5)以下から意識しはじめる
             let retreatDefBonus = Math.max(0, 400 - def) * 1.5; // 防御400以下から意識しはじめる
             
-            // ★直近5回までのダメージ記憶による予測スコア
+            // ★追加：直近5ターンのダメージ記憶による予測スコア
             let dangerScore = 0;
+            let rojoRescueScore = 0; // ★追加：籠城すれば耐えられる場合の救済スコア
+            
             if (s.defDamageHistory && s.defDamageHistory.length >= 5) {
-                // 5回分のダメージの平均を計算します
+                // 5ターン分のダメージの平均を計算します
                 let avgDefDmg = s.defDamageHistory.reduce((a, b) => a + b, 0) / 5;
                 let avgWallDmg = s.wallDamageHistory.reduce((a, b) => a + b, 0) / 5;
                 
@@ -672,17 +677,49 @@ class WarManager {
                 let predictedDefDmg = avgDefDmg * randomFactorDmg;
                 let predictedWallDmg = avgWallDmg * randomFactorWall;
                 
-                // 今の兵数や防御力から、あと何回で0になるかを予測します
+                // 普通に戦った場合、あと何ターンで0になるかを予測します
                 let surviveTurnsDef = predictedDefDmg > 0 ? (s.defender.soldiers / predictedDefDmg) : 99;
                 let surviveTurnsWall = predictedWallDmg > 0 ? (def / predictedWallDmg) : 99;
-                
                 let minSurviveTurns = Math.min(surviveTurnsDef, surviveTurnsWall);
                 
-                // 予測結果に基づいて「まだいける」「まだいけない（限界）」のスコアを出します
+                // ★追加：「籠城」した場合の予測（受けるダメージが約半分になります）
+                let predictedDefDmgRojo = predictedDefDmg * 0.5;
+                let predictedWallDmgRojo = predictedWallDmg * 0.5;
+                let surviveTurnsDefRojo = predictedDefDmgRojo > 0 ? (s.defender.soldiers / predictedDefDmgRojo) : 99;
+                let surviveTurnsWallRojo = predictedWallDmgRojo > 0 ? (def / predictedWallDmgRojo) : 99;
+                let minSurviveTurnsRojo = Math.min(surviveTurnsDefRojo, surviveTurnsWallRojo);
+                
+                // ★追加：あと何ターンで「時間切れ（防衛成功）」になるか
+                let maxRounds = window.WarParams.Military.WarMaxRounds || 15;
+                let turnsLeftToWin = Math.max(1, maxRounds - (s.round || 1));
+                
+                // 予測結果に基づいて「まだいける」「籠城すれば耐えられる」「もう限界」を判断します
                 if (minSurviveTurns <= 3) {
-                    dangerScore += 5000; // まだいけない（もう限界、すぐに逃げろ）
+                    // 普通に戦うと3ターン以内に落ちる絶体絶命のピンチ
+                    if (minSurviveTurnsRojo >= turnsLeftToWin) {
+                        // 籠城すれば時間切れまで耐えきれる！ -> 撤退せずに絶対籠城する
+                        rojoRescueScore += 8000;
+                        dangerScore -= 2000;
+                    } else if (minSurviveTurnsRojo > 3) {
+                        // 時間切れまでは無理でも、籠城すれば今は持ちこたえられる
+                        rojoRescueScore += 5000;
+                        dangerScore += 1000; // 撤退も考えるが籠城を大きく優先
+                    } else {
+                        // 籠城してもすぐ落ちる -> 逃げるしかない
+                        dangerScore += 5000;
+                    }
                 } else if (minSurviveTurns <= 5) {
-                    dangerScore += 2000; // 少し危険
+                    // 普通に戦うと5ターン以内に落ちる（少し危険）
+                    if (minSurviveTurnsRojo >= turnsLeftToWin) {
+                        // 籠城すれば勝ち確
+                        rojoRescueScore += 4000;
+                    } else if (minSurviveTurnsRojo > 5) {
+                        // 籠城すれば寿命が延びる
+                        rojoRescueScore += 2000;
+                        dangerScore += 500;
+                    } else {
+                        dangerScore += 2000;
+                    }
                 } else {
                     dangerScore -= 1000; // まだいける（撤退スコアを下げる）
                 }
@@ -693,7 +730,7 @@ class WarManager {
             // 籠城: 防御が低いほど、兵力が少ないほど、なめらかにスコアが大きくなる
             let defAttackDefBonus = Math.max(0, 500 - def) * 0.8; // 防御500以下から意識しはじめる
             let defAttackRatioBonus = Math.max(0, 0.25 - ratio) * 1200; // 兵力比0.25(1/4)以下から意識しはじめる
-            scores['def_attack'] = defAttackDefBonus + defAttackRatioBonus + (timidDegree * 200);
+            scores['def_attack'] = defAttackDefBonus + defAttackRatioBonus + (timidDegree * 200) + rojoRescueScore; // ★籠城の救済スコアを加算
             
             // 鼓舞: 目標となる士気（30）に足りない分だけなめらかにスコアが大きくなる
             let targetMoraleDef = 30;
