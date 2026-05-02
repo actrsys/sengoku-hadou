@@ -376,7 +376,7 @@ class AffiliationSystem {
             castle.castellanId = 0;
             return;
         }
-
+        
         const daimyo = bushos.find(b => b.isDaimyo);
         if (daimyo) {
             bushos.forEach(b => { 
@@ -385,9 +385,10 @@ class AffiliationSystem {
             daimyo.isCastellan = true; 
             castle.castellanId = daimyo.id;
             castle.isDelegated = false;
+            if (daimyo.isGunshi) daimyo.isGunshi = false;
             return;
         }
-
+        
         const commander = bushos.find(b => b.isCommander);
         if (commander) {
             bushos.forEach(b => { 
@@ -395,18 +396,20 @@ class AffiliationSystem {
             });
             commander.isCastellan = true; 
             castle.castellanId = commander.id;
+            if (commander.isGunshi) commander.isGunshi = false;
             return;
         }
 
         // 城内にいる城主バッジを持っている武将のリストを作成します
         const lords = bushos.filter(b => b.isCastellan);
-
+        
         if (lords.length >= 2) {
             // 城主が２人以上いる場合は、その複数の中から新しい城主を決めます
             this.electCastellan(castle, lords);
         } else if (lords.length === 1) {
             // 城主が１人だけなら、元々の城主をそのまま維持します
             castle.castellanId = lords[0].id;
+            if (lords[0].isGunshi) lords[0].isGunshi = false;
         } else {
             // 城主が誰もいない場合は、城内の全武将から新しい城主を決めます
             this.electCastellan(castle, bushos);

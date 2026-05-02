@@ -286,6 +286,7 @@ class AIStaffing {
         // 新国主を移動させて国主にする
         this.game.affiliationSystem.moveCastle(newCommander, baseCastle.id);
         newCommander.isCommander = true;
+        newCommander.isGunshi = false; // ★ここを書き足します：国主になる時、軍師のバッジを外します
         
         // 対象城の軍団変更
         targetCastles.forEach(c => {
