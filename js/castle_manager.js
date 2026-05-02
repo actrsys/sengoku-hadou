@@ -198,8 +198,9 @@ class CastleManager {
             }
             legion.commanderId = 0;
             
-            // もしその軍団の他の城が残っていたら、それらの城も直轄にする
-            this.game.castles.filter(c => c.legionId === legionId).forEach(c => {
+            // ★修正：c.legionIdに入っているのは固有IDではなく「軍団No(1~8)」なので、
+            // 大名家の一致と、軍団Noの一致の両方を確認して直轄に戻します！
+            this.game.castles.filter(c => c.ownerClan === legion.clanId && c.legionId === legion.legionNo).forEach(c => {
                 c.legionId = 0;
                 c.isDelegated = false;
             });
