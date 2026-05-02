@@ -827,8 +827,8 @@ class LifeSystem {
 
             if (successor.status === 'unborn' || successor.status === 'ronin' || (successor.belongKunishuId || 0) > 0) {
                 isExternalSuccessor = true;
-                const clanCastles = this.game.castles.filter(c => c.ownerClan === commander.clan);
-                const baseCastle = clanCastles.length > 0 ? clanCastles[0] : null;
+                const legionCastles = this.game.castles.filter(c => c.ownerClan === commander.clan && c.legionId === legion.legionNo);
+                const baseCastle = legionCastles.length > 0 ? legionCastles[0] : null;
 
                 if (baseCastle) {
                     if ((successor.belongKunishuId || 0) > 0) {

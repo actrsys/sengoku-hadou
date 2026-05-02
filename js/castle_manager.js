@@ -24,10 +24,14 @@ class CastleManager {
         // ★追加：旧軍団の城がゼロになったかチェックして、ゼロなら壊滅させる
         if (oldOwnerId !== 0 && oldLegionId !== 0) {
             const remaining = this.game.castles.filter(c => c.ownerClan === oldOwnerId && c.legionId === oldLegionId);
-            if (remaining.length === 0) {
-                // ★修正：oldLegionIdは軍団No(1~8)なので、正確な軍団データを探し出して固有IDを渡すように直します！
-                const targetLegion = this.game.legions.find(l => l.clanId === oldOwnerId && l.legionNo === oldLegionId);
-                if (targetLegion) {
+            const targetLegion = this.game.legions.find(l => l.clanId === oldOwnerId && l.legionNo === oldLegionId);
+            
+            if (targetLegion) {
+                if (remaining.length === 0) {
+                    // ★修正：oldLegionIdは軍団No(1~8)なので、正確な軍団データを探し出して固有IDを渡すように直します！
+                    this.disbandLegion(targetLegion.id);
+                } else if (Number(castle.castellanId) === Number(targetLegion.commanderId)) {
+                    // 城が残っていても、国主の居城が奪われた場合は軍団を解散する
                     this.disbandLegion(targetLegion.id);
                 }
             }

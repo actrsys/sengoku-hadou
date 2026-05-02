@@ -3336,8 +3336,13 @@ class CommandSystem {
     executeAllotFief(legionNo, targetLegionId, selectedCastleIds, candidateCastles) {
         let count = 0;
         
+        const legion = this.game.legions ? this.game.legions.find(l => Number(l.clanId) === Number(this.game.playerClanId) && Number(l.legionNo) === Number(legionNo)) : null;
+        
         candidateCastles.forEach(c => {
-            if (selectedCastleIds.includes(c.id)) {
+            const isCommanderCastle = legion && Number(c.castellanId) === Number(legion.commanderId);
+            const isSelected = selectedCastleIds.includes(c.id) || isCommanderCastle;
+
+            if (isSelected) {
                 if (Number(c.legionId) !== Number(legionNo)) {
                     c.legionId = legionNo;
                     count++;
