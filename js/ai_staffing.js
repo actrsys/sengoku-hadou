@@ -558,7 +558,7 @@ class AIStaffing {
 
         // 今のお城にいる武将たちを順番に見ていきます
         for (let busho of availableBushos) {
-            if (busho.id === castle.castellanId) continue; // 城主は移動しません
+            if (busho.id === castle.castellanId || busho.isCommander) continue; // 城主と国主は移動しません
 
             const bTypeInfo = bushoTypes.get(busho.id);
             if (!bTypeInfo) continue;

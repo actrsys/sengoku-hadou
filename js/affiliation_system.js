@@ -183,6 +183,17 @@ class AffiliationSystem {
         // 2. 新しいお城に入る前にバッジを外します
         busho.isCastellan = false; 
         
+        // ★追加：国主が移動する場合は国主バッジも外し、担当していた軍団を解散させます
+        if (busho.isCommander) {
+            busho.isCommander = false;
+            if (this.game && this.game.legions && this.game.castleManager) {
+                const myLegion = this.game.legions.find(l => Number(l.commanderId) === Number(busho.id));
+                if (myLegion) {
+                    this.game.castleManager.disbandLegion(myLegion.id);
+                }
+            }
+        }
+        
         // 3. 新しいお城に入ります
         this.enterCastle(busho, newCastleId);
 
