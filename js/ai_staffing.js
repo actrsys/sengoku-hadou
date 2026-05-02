@@ -12,6 +12,15 @@ class AIStaffing {
         // このお城に大名も国主もいないなら、お引越しの判定はしません
         if (!leader || (!leader.isDaimyo && !leader.isCommander) || leader.castleId !== castle.id) return false;
 
+        // ★追加：リーダーの本来の所属軍団IDを取得します
+        let targetLegionId = 0;
+        if (leader.isCommander) {
+            const myLegion = this.game.legions.find(l => Number(l.commanderId) === Number(leader.id));
+            if (myLegion) {
+                targetLegionId = myLegion.legionNo;
+            }
+        }
+
         // 自分が移動できるお城（自領で繋がっている城）のリストを作ります
         const reachableMyCastles = [];
         const visitedCastles = new Set();
@@ -24,7 +33,7 @@ class AIStaffing {
 
             const adjMyCastles = this.game.castles.filter(c => 
                 c.ownerClan === clanId && 
-                c.legionId === castle.legionId && // ★追加：同じ軍団のお城だけに制限します！
+                c.legionId === targetLegionId && // ★修正：本来の軍団のお城だけに制限します！
                 GameSystem.isAdjacent(current, c) &&
                 !visitedCastles.has(c.id)
             );
@@ -45,7 +54,8 @@ class AIStaffing {
         let operationBonus = 0;
         
         const clanOps = this.game.aiOperationManager.operations[clanId];
-        const myOp = clanOps ? clanOps[castle.legionId] : null;
+        // ★修正：作戦を探す時も、本来の軍団IDを使います！
+        const myOp = clanOps ? clanOps[targetLegionId] : null;
         if (myOp && myOp.type === '攻撃') {
             stagingBaseId = myOp.stagingBase;
             if (leader.personality === 'aggressive') {
@@ -121,7 +131,13 @@ class AIStaffing {
             // ==========================================
             // 仲良しのお供（武将）を連れて行きます
             // ==========================================
-            const castleBushos = this.game.getCastleBushos(castle.id).filter(b => b.clan === castle.ownerClan && b.status === 'active' && b.id !== castellan.id);
+            const castleBushos = this.game.getCastleBushos(castle.id).filter(b => 
+                b.clan === castle.ownerClan && 
+                b.status === 'active' && 
+                b.id !== castellan.id &&
+                !b.isDaimyo &&         // ★追加：大名はお供にしない！
+                !b.isCommander         // ★追加：国主もお供にしない！
+            );
             const keepCount = Math.max(3, Math.ceil(castleBushos.length * 0.4));
             
             castleBushos.sort((a, b) => {
