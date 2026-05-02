@@ -1382,6 +1382,29 @@ class GameManager {
                     // 他のシステムが混乱しないように、IDだけのリストも最新の状態に書き直しておきます
                     b.nemesisIds = b.nemesisList.map(n => n.id);
                 }
+
+                // ★追加：諸勢力武将に毎月経験値を地道に与える処理
+                if (b.status === 'active' && (b.belongKunishuId || 0) > 0) {
+                    const kunishu = this.kunishuSystem ? this.kunishuSystem.getKunishu(b.belongKunishuId) : null;
+                    if (kunishu) {
+                        const isLeader = (b.id === kunishu.leaderId);
+                        
+                        // 頭領は1〜3、それ以外は0〜2の経験値を与えます
+                        if (isLeader) {
+                            b.expLeadership = (b.expLeadership || 0) + Math.floor(Math.random() * 3) + 1;
+                            b.expStrength = (b.expStrength || 0) + Math.floor(Math.random() * 3) + 1;
+                            b.expPolitics = (b.expPolitics || 0) + Math.floor(Math.random() * 3) + 1;
+                            b.expDiplomacy = (b.expDiplomacy || 0) + Math.floor(Math.random() * 3) + 1;
+                            b.expIntelligence = (b.expIntelligence || 0) + Math.floor(Math.random() * 3) + 1;
+                        } else {
+                            b.expLeadership = (b.expLeadership || 0) + Math.floor(Math.random() * 3);
+                            b.expStrength = (b.expStrength || 0) + Math.floor(Math.random() * 3);
+                            b.expPolitics = (b.expPolitics || 0) + Math.floor(Math.random() * 3);
+                            b.expDiplomacy = (b.expDiplomacy || 0) + Math.floor(Math.random() * 3);
+                            b.expIntelligence = (b.expIntelligence || 0) + Math.floor(Math.random() * 3);
+                        }
+                    }
+                }
             }
         });
         
