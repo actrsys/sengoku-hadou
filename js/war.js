@@ -391,8 +391,20 @@ class WarManager {
 
         // s.phase がない、または 'init'（ラウンドの最初）の時の準備
         if (!s.phase || s.phase === 'init') {
+            // ★直近5ターンのダメージを記憶する箱を用意します
+            s.defDamageHistory = s.defDamageHistory || [];
+            s.wallDamageHistory = s.wallDamageHistory || [];
+            
+            // ★新しいターンが始まったら、今ターン用の新しいメモ書き（0ダメージ）を追加します
+            s.defDamageHistory.push(0);
+            s.wallDamageHistory.push(0);
+            
+            // 5ターン分より古くなったメモは捨てます
+            if (s.defDamageHistory.length > 5) s.defDamageHistory.shift();
+            if (s.wallDamageHistory.length > 5) s.wallDamageHistory.shift();
+
             if (s.defender.defense <= 0) {
-                // ★追加：城壁が壊れて落ちた場合、少しだけ城壁（防御力）を修復してあげます！
+                // ★城壁が壊れて落ちた場合、少しだけ城壁（防御力）を修復してあげます！
                 s.defender.defense += 150; 
                 this.endWar(true); 
                 return; 
@@ -404,7 +416,7 @@ class WarManager {
             if (s.defender.rice <= 0) { if(s.isPlayerInvolved) this.game.ui.log("守備軍の兵糧が尽きました！"); this.endWar(true); return; }
 
             // みんなが作戦（コマンド）を決める順番のリストを作ります
-            // ★修正：野戦などで兵士が0になって全滅した援軍には、作戦を聞かないようにガードを追加しました！
+            // ★野戦などで兵士が0になって全滅した援軍には、作戦を聞かないようにガードを追加しました！
             s.commandQueue = ['attacker'];
             if (s.selfReinforcement && s.selfReinforcement.soldiers > 0) s.commandQueue.push('attacker_self_reinf');
             if (s.reinforcement && s.reinforcement.soldiers > 0) s.commandQueue.push('attacker_ally_reinf');
@@ -415,7 +427,7 @@ class WarManager {
             s.plannedActions = {}; // 選んだ作戦をメモしておくノートです
             s.phase = 'command'; // ゲームの状態を「作戦を決めるフェーズ」にします
 
-            // ★追加：攻城戦の毎ラウンド開始時に、参戦している武将に経験値を加算します
+            // ★攻城戦の毎ラウンド開始時に、参戦している武将に経験値を加算します
             const isIntTurn = (s.round % 2 === 1);
             const addExp = (bushos, isAtk) => {
                 if (!bushos) return;
@@ -455,12 +467,12 @@ class WarManager {
         if (!this.state.active) return;
         if (this.state.phase !== 'command') return; // 作戦を決めるフェーズだけ動きます
 
-        // ★追加：自分の操作ターンでない場合は、ボタンを押しても完全に無視する鉄壁のガードです！
+        // ★自分の操作ターンでない場合は、ボタンを押しても完全に無視する鉄壁のガードです！
         // 野戦直後など、AIが考えている最中に画面のボタンが残っていて押せてしまう不具合を防ぎます。
         if (!this.checkIsMyTurn(this.state)) return;
 
         const ctrl = document.getElementById('war-controls'); 
-        // ★修正：ボタンを押した瞬間に、ボタンの中身を空っぽにして完全に消し去ります！
+        // ★ボタンを押した瞬間に、ボタンの中身を空っぽにして完全に消し去ります！
         if(ctrl) ctrl.innerHTML = '';
 
         // すぐに実行せずに、予定メモに書き込んでおきます！
@@ -488,7 +500,7 @@ class WarManager {
         else if (s.turn === 'defender_self_reinf') { actor = s.defSelfReinforcement.bushos[0]; mySoldiers = s.defSelfReinforcement.soldiers; myMorale = s.defSelfReinforcement.morale ?? 50; myArmy = s.defSelfReinforcement; }
         else if (s.turn === 'defender_ally_reinf') { actor = s.defReinforcement.bushos[0]; mySoldiers = s.defReinforcement.soldiers; myMorale = s.defReinforcement.morale ?? 50; myArmy = s.defReinforcement; }
 
-        // ★追加：行動する部隊の軍馬・鉄砲の割合（0.0〜1.0）と、大勢に影響しない程度のスコアボーナス（最大20点）を計算します
+        // ★行動する部隊の軍馬・鉄砲の割合（0.0〜1.0）と、大勢に影響しない程度のスコアボーナス（最大20点）を計算します
         let horseRatio = (myArmy && mySoldiers > 0) ? Math.min(1.0, (myArmy.horses || 0) / mySoldiers) : 0;
         let gunRatio = (myArmy && mySoldiers > 0) ? Math.min(1.0, (myArmy.guns || 0) / mySoldiers) : 0;
         let horseBonus = horseRatio * 20;
@@ -533,7 +545,7 @@ class WarManager {
         let intBonus = (myInt - 50) * 1.5 + (myInt - enemyBestInt) * 2.0 - 20;
         if (myInt <= 50) intBonus -= 30; // 智謀が中以下の場合はマイナス補正を強くする
 
-        // ★追加：自部隊の陣営内での割合と、それに伴う「弱気度」の計算
+        // ★自部隊の陣営内での割合と、それに伴う「弱気度」の計算
         let myTotalSoldiers = isDefenderTurn ? totalDefSoldiers : totalAtkSoldiers;
         let myRatio = mySoldiers / Math.max(1, myTotalSoldiers);
         
@@ -562,14 +574,14 @@ class WarManager {
         const options = isDefenderTurn ? ['def_charge', 'def_bow', 'def_attack', 'provoke', 'def_inspire'] : ['charge', 'bow', 'siege', 'fire', 'inspire'];
         
         // 撤退の選択肢を追加
-        // ★修正：中立の空き城（ownerClanが0）や諸勢力（isKunishu）の部隊は、AIも絶対に撤退を選ばないようにします！
+        // ★中立の空き城（ownerClanが0）や諸勢力（isKunishu）の部隊は、AIも絶対に撤退を選ばないようにします！
         if (isDefenderTurn && s.turn === 'defender' && s.defender.ownerClan !== 0 && !s.defender.isKunishu && this.game.castles.some(c => c.ownerClan === s.defender.ownerClan && c.id !== s.defender.id && GameSystem.isReachable(this.game, s.defender, c, s.defender.ownerClan))) {
             options.push('retreat');
         } else if (!isDefenderTurn && s.turn === 'attacker' && !s.attacker.isKunishu) {
             options.push('retreat');
         }
         
-        // ★追加：鼓舞でどれくらい士気が上がるかを計算しておきます
+        // ★鼓舞でどれくらい士気が上がるかを計算しておきます
         let moraleUp = Math.round((Math.sqrt(actor.leadership * 1.5) + Math.sqrt(actor.charm)) / 4);
 
         if (!isDefenderTurn) {
@@ -586,14 +598,14 @@ class WarManager {
             let targetMorale = 30;
             scores['inspire'] = Math.max(0, targetMorale - myMorale) * 20 + 20;
             
-            // ★追加：士気が70以上なら、線形でマイナスを入れます！100以上なら絶対に選びません
+            // ★士気が70以上なら、線形でマイナスを入れます！100以上なら絶対に選びません
             if (myMorale >= 100) {
                 scores['inspire'] = -9999;
             } else if (myMorale >= 70) {
                 scores['inspire'] -= (myMorale - 70) * 20;
             }
 
-            // ★追加：上がる士気が0の場合は絶対に選びません！
+            // ★上がる士気が0の場合は絶対に選びません！
             if (moraleUp <= 0) {
                 scores['inspire'] = -9999;
             }
@@ -602,7 +614,7 @@ class WarManager {
             let siegeDefBonus = Math.max(0, 800 - def) * 0.6; // 防御800以下から意識しはじめる
             let siegeRatioBonus = Math.max(0, ratio - 1.5) * 150; // 兵力比1.5倍以上から意識しはじめる
             
-            // ★今回追加：単体の兵士数が相手の総兵士数の1.5倍以下ならペナルティ！1.0以下で激減します
+            // ★単体の兵士数が相手の総兵士数の1.5倍以下ならペナルティ！1.0以下で激減します
             let siegeUnitPenalty = 0;
             if (unitRatio <= 1.5) {
                 siegeUnitPenalty = (1.5 - unitRatio) * 1000;
@@ -631,9 +643,52 @@ class WarManager {
             let ratio = totalDefSoldiers / Math.max(1, totalAtkSoldiers);
             
             // 撤退: 兵力が少ないほど、防御が低いほど、なめらかにスコアが大きくなる
-            let retreatRatioBonus = Math.max(0, 0.2 - ratio) * 3000; // 兵力比0.2(1/5)以下から意識しはじめる
+            // ★兵数による撤退の判断（スコア）を下げました（3000→1000）
+            let retreatRatioBonus = Math.max(0, 0.2 - ratio) * 1000; // 兵力比0.2(1/5)以下から意識しはじめる
             let retreatDefBonus = Math.max(0, 400 - def) * 1.5; // 防御400以下から意識しはじめる
-            scores['retreat'] = retreatRatioBonus + retreatDefBonus + (timidDegree * 300);
+            
+            // ★直近5回までのダメージ記憶による予測スコア
+            let dangerScore = 0;
+            if (s.defDamageHistory && s.defDamageHistory.length >= 5) {
+                // 5回分のダメージの平均を計算します
+                let avgDefDmg = s.defDamageHistory.reduce((a, b) => a + b, 0) / 5;
+                let avgWallDmg = s.wallDamageHistory.reduce((a, b) => a + b, 0) / 5;
+                
+                // 智謀による「見誤り（ブレ）」の計算
+                // 智謀100以上で絶対に見誤らない(ブレ0)、95以上でほぼ見誤らない、50以下で最大30%のブレ
+                let errorRate = 0;
+                if (myInt <= 50) {
+                    errorRate = 0.3; // 50以下は常に30%のブレ
+                } else if (myInt >= 100) {
+                    errorRate = 0; // 100以上はブレなし
+                } else {
+                    // 50から100の間は、智謀が高くなるほどなだらかにブレが0に近づきます
+                    errorRate = 0.3 * ((100 - myInt) / 50);
+                }
+                
+                let randomFactorDmg = 1.0 + (Math.random() * errorRate - errorRate / 2);
+                let randomFactorWall = 1.0 + (Math.random() * errorRate - errorRate / 2);
+                
+                let predictedDefDmg = avgDefDmg * randomFactorDmg;
+                let predictedWallDmg = avgWallDmg * randomFactorWall;
+                
+                // 今の兵数や防御力から、あと何回で0になるかを予測します
+                let surviveTurnsDef = predictedDefDmg > 0 ? (s.defender.soldiers / predictedDefDmg) : 99;
+                let surviveTurnsWall = predictedWallDmg > 0 ? (def / predictedWallDmg) : 99;
+                
+                let minSurviveTurns = Math.min(surviveTurnsDef, surviveTurnsWall);
+                
+                // 予測結果に基づいて「まだいける」「まだいけない（限界）」のスコアを出します
+                if (minSurviveTurns <= 3) {
+                    dangerScore += 5000; // まだいけない（もう限界、すぐに逃げろ）
+                } else if (minSurviveTurns <= 5) {
+                    dangerScore += 2000; // 少し危険
+                } else {
+                    dangerScore -= 1000; // まだいける（撤退スコアを下げる）
+                }
+            }
+            
+            scores['retreat'] = retreatRatioBonus + retreatDefBonus + (timidDegree * 300) + dangerScore;
             
             // 籠城: 防御が低いほど、兵力が少ないほど、なめらかにスコアが大きくなる
             let defAttackDefBonus = Math.max(0, 500 - def) * 0.8; // 防御500以下から意識しはじめる
@@ -992,6 +1047,11 @@ class WarManager {
                 // ★今回追加：火計が成功したという記憶（警戒フラグ）を守備側に刻み込みます！
                 s.fireSufferedCount = (s.fireSufferedCount || 0) + 1;
                 
+                // ★今ターン（最後尾）のメモにダメージを足し算します！
+                s.defDamageHistory = s.defDamageHistory || [0];
+                s.wallDamageHistory = s.wallDamageHistory || [0];
+                s.wallDamageHistory[s.wallDamageHistory.length - 1] += (calcDamage || 0);
+                
                 pushMsg({ type: 'damage', target: 'defender', wallDmg: calcDamage, se: 'fire001.mp3', currentStats: getCurrentStats() });
                 pushMsg({ text: `敵城壁に${calcDamage}の被害を与えた！`, log: `${activeArmyName} 火計成功！ 敵城壁に${calcDamage}の被害`});
                 checkDefeatAndPushMsg();
@@ -1186,7 +1246,15 @@ class WarManager {
             moraleDiffs[s.turn] += Math.round(Math.sqrt(actualSoldierDmg) / 2);
         }
         
-        if (isAtkTurnGroup) { s.defender.defense = Math.max(0, s.defender.defense - calculatedWallDmg); } 
+        if (isAtkTurnGroup) { 
+            s.defender.defense = Math.max(0, s.defender.defense - calculatedWallDmg); 
+            
+            // ★今ターン（最後尾）のメモにダメージを足し算します！
+            s.defDamageHistory = s.defDamageHistory || [0];
+            s.wallDamageHistory = s.wallDamageHistory || [0];
+            s.defDamageHistory[s.defDamageHistory.length - 1] += (dmgResult.details['defender'] || 0);
+            s.wallDamageHistory[s.wallDamageHistory.length - 1] += (calculatedWallDmg || 0);
+        } 
         
         let actualCounterDmg = 0;
         if (calculatedCounterDmg > 0) { 
