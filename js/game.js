@@ -1118,9 +1118,13 @@ class GameManager {
     updateClanDisplayNames() {
         if (!this.provinces) return;
 
+        // ★追加：現在生き残っている（城を1つ以上持っている）大名家の出席番号リストを作ります
+        const aliveClanIds = new Set(this.castles.filter(c => c.ownerClan !== 0).map(c => c.ownerClan));
+
         // まず、今の大名に合わせて本来の名前（baseName）を更新します
         this.clans.forEach(clan => {
-            if (clan.id === 0) return;
+            // ★変更：空き家（0）や、生き残りリストに入っていない（滅亡した）大名家は無視します
+            if (clan.id === 0 || !aliveClanIds.has(clan.id)) return; 
             const leader = this.getBusho(clan.leaderId);
             if (leader && leader.familyName) {
                 clan.baseName = leader.familyName + "家";
@@ -1134,14 +1138,14 @@ class GameManager {
         // 本来の名前で被っている数を数えます
         const nameCounts = {};
         this.clans.forEach(clan => {
-            if (clan.id === 0) return;
+            if (clan.id === 0 || !aliveClanIds.has(clan.id)) return; // ★ここも同じようにガードします
             const baseName = clan.baseName;
             nameCounts[baseName] = (nameCounts[baseName] || 0) + 1;
         });
 
         // 1回目のチェック：被っていたら国名（「国」抜き）をつける
         this.clans.forEach(clan => {
-            if (clan.id === 0) return;
+            if (clan.id === 0 || !aliveClanIds.has(clan.id)) return; // ★ここもガード
             const baseName = clan.baseName;
             if (nameCounts[baseName] > 1) {
                 const leader = this.getBusho(clan.leaderId);
@@ -1161,13 +1165,13 @@ class GameManager {
         // 新しい名前で被っている数をもう一度数えます
         const newNameCounts = {};
         this.clans.forEach(clan => {
-            if (clan.id === 0) return;
+            if (clan.id === 0 || !aliveClanIds.has(clan.id)) return; // ★ここもガード
             newNameCounts[clan.name] = (newNameCounts[clan.name] || 0) + 1;
         });
 
         // 2回目のチェック：国名をつけても被っていたら城名（「城」抜き）をつける
         this.clans.forEach(clan => {
-            if (clan.id === 0) return;
+            if (clan.id === 0 || !aliveClanIds.has(clan.id)) return; // ★ここもガード
             const baseName = clan.baseName;
             if (nameCounts[baseName] > 1 && newNameCounts[clan.name] > 1) {
                 const leader = this.getBusho(clan.leaderId);
