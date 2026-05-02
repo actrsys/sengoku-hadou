@@ -4,13 +4,13 @@
  */
 
 class AIStaffing {    
-    // 大名のお引越し先を考えます（お金や兵士の分配、お供の随伴機能付き！）
+    // 大名や国主のお引越し先を考えます（お金や兵士の分配、お供の随伴機能付き！）
     relocateDaimyo(castle, castellan) {
         const clanId = castle.ownerClan;
-        const daimyo = castellan; // castellanは大名自身です
+        const leader = castellan; // castellanは大名または国主です
         
-        // このお城に大名がいないなら、お引越しの判定はしません
-        if (!daimyo || !daimyo.isDaimyo || daimyo.castleId !== castle.id) return false;
+        // このお城に大名も国主もいないなら、お引越しの判定はしません
+        if (!leader || (!leader.isDaimyo && !leader.isCommander) || leader.castleId !== castle.id) return false;
 
         // 自分が移動できるお城（自領で繋がっている城）のリストを作ります
         const reachableMyCastles = [];
@@ -48,9 +48,9 @@ class AIStaffing {
         const myOp = clanOps ? clanOps[castle.legionId] : null;
         if (myOp && myOp.type === '攻撃') {
             stagingBaseId = myOp.stagingBase;
-            if (daimyo.personality === 'aggressive') {
+            if (leader.personality === 'aggressive') {
                 operationBonus = 60;
-            } else if (daimyo.personality === 'balanced') {
+            } else if (leader.personality === 'balanced') {
                 operationBonus = 30;
             }
         }
