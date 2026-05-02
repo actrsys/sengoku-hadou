@@ -479,13 +479,20 @@ class WarManager {
         let actor;
         let mySoldiers = 0;
         let myMorale = 50;
+        let myArmy = null;
         
-        if (s.turn === 'attacker') { actor = s.atkBushos[0]; mySoldiers = s.attacker.soldiers; myMorale = s.attacker.morale ?? 50; }
-        else if (s.turn === 'attacker_self_reinf') { actor = s.selfReinforcement.bushos[0]; mySoldiers = s.selfReinforcement.soldiers; myMorale = s.selfReinforcement.morale ?? 50; }
-        else if (s.turn === 'attacker_ally_reinf') { actor = s.reinforcement.bushos[0]; mySoldiers = s.reinforcement.soldiers; myMorale = s.reinforcement.morale ?? 50; }
-        else if (s.turn === 'defender') { actor = s.defBusho; mySoldiers = s.defender.soldiers; myMorale = s.defender.morale ?? 50; }
-        else if (s.turn === 'defender_self_reinf') { actor = s.defSelfReinforcement.bushos[0]; mySoldiers = s.defSelfReinforcement.soldiers; myMorale = s.defSelfReinforcement.morale ?? 50; }
-        else if (s.turn === 'defender_ally_reinf') { actor = s.defReinforcement.bushos[0]; mySoldiers = s.defReinforcement.soldiers; myMorale = s.defReinforcement.morale ?? 50; }
+        if (s.turn === 'attacker') { actor = s.atkBushos[0]; mySoldiers = s.attacker.soldiers; myMorale = s.attacker.morale ?? 50; myArmy = s.attacker; }
+        else if (s.turn === 'attacker_self_reinf') { actor = s.selfReinforcement.bushos[0]; mySoldiers = s.selfReinforcement.soldiers; myMorale = s.selfReinforcement.morale ?? 50; myArmy = s.selfReinforcement; }
+        else if (s.turn === 'attacker_ally_reinf') { actor = s.reinforcement.bushos[0]; mySoldiers = s.reinforcement.soldiers; myMorale = s.reinforcement.morale ?? 50; myArmy = s.reinforcement; }
+        else if (s.turn === 'defender') { actor = s.defBusho; mySoldiers = s.defender.soldiers; myMorale = s.defender.morale ?? 50; myArmy = s.defender; }
+        else if (s.turn === 'defender_self_reinf') { actor = s.defSelfReinforcement.bushos[0]; mySoldiers = s.defSelfReinforcement.soldiers; myMorale = s.defSelfReinforcement.morale ?? 50; myArmy = s.defSelfReinforcement; }
+        else if (s.turn === 'defender_ally_reinf') { actor = s.defReinforcement.bushos[0]; mySoldiers = s.defReinforcement.soldiers; myMorale = s.defReinforcement.morale ?? 50; myArmy = s.defReinforcement; }
+
+        // ★追加：行動する部隊の軍馬・鉄砲の割合（0.0〜1.0）と、大勢に影響しない程度のスコアボーナス（最大20点）を計算します
+        let horseRatio = (myArmy && mySoldiers > 0) ? Math.min(1.0, (myArmy.horses || 0) / mySoldiers) : 0;
+        let gunRatio = (myArmy && mySoldiers > 0) ? Math.min(1.0, (myArmy.guns || 0) / mySoldiers) : 0;
+        let horseBonus = horseRatio * 20;
+        let gunBonus = gunRatio * 20;
 
         let totalAtkSoldiers = s.attacker.soldiers + (s.selfReinforcement ? s.selfReinforcement.soldiers : 0) + (s.reinforcement ? s.reinforcement.soldiers : 0);
         let totalDefSoldiers = s.defender.soldiers + (s.defSelfReinforcement ? s.defSelfReinforcement.soldiers : 0) + (s.defReinforcement ? s.defReinforcement.soldiers : 0);
@@ -609,7 +616,7 @@ class WarManager {
             
             // 斉射: 防御が高いほど、なめらかにスコアが大きくなる（火計に選ばれない時に選ばれやすく）
             let bowDefBonus = Math.max(0, def - 600) * 0.3;
-            scores['bow'] = 50 + bowDefBonus + (ratio * 50);
+            scores['bow'] = 50 + bowDefBonus + (ratio * 50) + gunBonus; // ★追加：鉄砲の割合ボーナス
             
             // 突撃: 基本の攻撃。弱気なときは控える
             // ★今回追加：単体の兵士数が相手の総兵士数の1.0倍以下ならペナルティ！0.5以下で激減します
@@ -617,7 +624,7 @@ class WarManager {
             if (unitRatio <= 1.0) {
                 chargeUnitPenalty = (1.0 - unitRatio) * 1000;
             }
-            scores['charge'] = 150 - (timidDegree * 200) - chargeUnitPenalty;
+            scores['charge'] = 150 - (timidDegree * 200) - chargeUnitPenalty + horseBonus; // ★追加：軍馬の割合ボーナス
 
         } else {
             // 守備側
@@ -665,10 +672,10 @@ class WarManager {
             scores['provoke'] = provokeDefBonus + provokeRatioBonus + intBonus - (timidDegree * 100);
             
             // 突撃: 兵力が多いほど、なめらかにスコアが大きくなる
-            scores['def_charge'] = 50 + Math.max(0, ratio - 0.5) * 300 - (timidDegree * 200); 
+            scores['def_charge'] = 50 + Math.max(0, ratio - 0.5) * 300 - (timidDegree * 200) + horseBonus; // ★追加：軍馬の割合ボーナス
             
             // 斉射: 基本の攻撃
-            scores['def_bow'] = 120;
+            scores['def_bow'] = 120 + gunBonus; // ★追加：鉄砲の割合ボーナス
         }
 
         options.forEach(cmd => {
