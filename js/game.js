@@ -1490,6 +1490,15 @@ class GameManager {
         });
 
         // ★ここから追加：毎月の初めに、各大名家に「作戦会議（カウントダウンの進行や新しい目標決め）」をさせます！
+        if (this.month === 1 || this.month === 4 || this.month === 7 || this.month === 10) {
+            if (this.aiStaffing) {
+                this.clans.forEach(clan => {
+                    if (clan.id !== 0 && clan.id !== this.playerClanId) {
+                        this.aiStaffing.createNewLegionIfNeeded(clan.id);
+                    }
+                });
+            }
+        }
         if (this.aiOperationManager) {
             await this.aiOperationManager.processMonthlyOperations();
         }

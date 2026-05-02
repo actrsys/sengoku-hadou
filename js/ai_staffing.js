@@ -160,6 +160,124 @@ class AIStaffing {
         this.lastMonth = -1;
     }
 
+    // ★追加：AI大名が軍団を新設する機能
+    createNewLegionIfNeeded(clanId) {
+        const myCastles = this.game.castles.filter(c => c.ownerClan === clanId);
+        const myDirectCastles = myCastles.filter(c => c.legionId === 0);
+        
+        // 条件：直轄領が8城以上
+        if (myDirectCastles.length < 8) return;
+        
+        // 条件：直轄領の合計兵士数が20000を越えている
+        const totalSoldiers = myDirectCastles.reduce((sum, c) => sum + c.soldiers, 0);
+        if (totalSoldiers <= 20000) return;
+        
+        const occupiedProvinces = new Set();
+        const daimyo = this.game.bushos.find(b => b.clan === clanId && b.isDaimyo);
+        if (daimyo && daimyo.castleId) {
+            const dCastle = this.game.getCastle(daimyo.castleId);
+            if(dCastle) occupiedProvinces.add(dCastle.provinceId);
+        }
+        const clanLegions = this.game.legions.filter(l => l.clanId === clanId);
+        clanLegions.forEach(l => {
+            const cmd = this.game.getBusho(l.commanderId);
+            if (cmd && cmd.castleId) {
+                const cCastle = this.game.getCastle(cmd.castleId);
+                if(cCastle) occupiedProvinces.add(cCastle.provinceId);
+            }
+        });
+        
+        // 条件：大名・国主のいない国に直轄領を所有している
+        const candidateCastles = myDirectCastles.filter(c => c.provinceId > 0 && !occupiedProvinces.has(c.provinceId));
+        if (candidateCastles.length === 0) return;
+        
+        // 新国主の選定
+        const myBushos = this.game.bushos.filter(b => b.clan === clanId && b.status === 'active');
+        let candidates = myBushos.filter(b => !b.isDaimyo && !b.isCommander && (b.achievementTotal || 0) >= 1000);
+        if (candidates.length === 0) return;
+        
+        let newCommander = null;
+        const factionLeaders = candidates.filter(b => b.isFactionLeader);
+        if (factionLeaders.length > 0) {
+            if (factionLeaders.length === 1) {
+                newCommander = factionLeaders[0];
+            } else {
+                factionLeaders.sort((a, b) => {
+                    const countA = myBushos.filter(x => x.factionId === a.factionId).length;
+                    const countB = myBushos.filter(x => x.factionId === b.factionId).length;
+                    if (countA !== countB) return countB - countA;
+                    return (b.achievementTotal || 0) - (a.achievementTotal || 0);
+                });
+                newCommander = factionLeaders[0];
+            }
+        } else {
+            candidates.sort((a, b) => (b.achievementTotal || 0) - (a.achievementTotal || 0));
+            newCommander = candidates[0];
+        }
+        
+        // 対象城の選定：大名の居城移動ロジック（スコア計算）を参照して平均を基準に評価
+        const avgMaxKoku = Math.max(1, candidateCastles.reduce((s,c)=>s+c.maxKokudaka,0) / candidateCastles.length);
+        const avgMaxDef = Math.max(1, candidateCastles.reduce((s,c)=>s+c.maxDefense,0) / candidateCastles.length);
+        const avgKoku = Math.max(1, candidateCastles.reduce((s,c)=>s+c.kokudaka,0) / candidateCastles.length);
+        const avgDef = Math.max(1, candidateCastles.reduce((s,c)=>s+c.defense,0) / candidateCastles.length);
+
+        const castleScores = [];
+        for (const target of candidateCastles) {
+            let score = 0;
+            const rateMaxKoku = target.maxKokudaka / avgMaxKoku;
+            score += (rateMaxKoku >= 1.0) ? (rateMaxKoku - 1.0) * 30 : (rateMaxKoku - 1.0) * 60;
+            const rateMaxDef = target.maxDefense / avgMaxDef;
+            score += (rateMaxDef >= 1.0) ? (rateMaxDef - 1.0) * 30 : (rateMaxDef - 1.0) * 60;
+            const rateKoku = target.kokudaka / avgKoku;
+            score += (rateKoku >= 1.0) ? (rateKoku - 1.0) * 50 : (rateKoku - 1.0) * 100;
+            const rateDef = target.defense / avgDef;
+            score += (rateDef >= 1.0) ? (rateDef - 1.0) * 50 : (rateDef - 1.0) * 100;
+            castleScores.push({ castle: target, score: score });
+        }
+        
+        castleScores.sort((a, b) => b.score - a.score);
+        const baseCastle = castleScores[0].castle;
+        
+        // 居城と同じ国にある直轄城をスコア順に最大3つ（居城含む）選ぶ
+        const sameProvinceCastles = castleScores.filter(cs => cs.castle.provinceId === baseCastle.provinceId);
+        const targetCastles = sameProvinceCastles.slice(0, 3).map(cs => cs.castle);
+        
+        // 新規軍団IDと番号の決定
+        let newLegionNo = 1;
+        const existingNos = clanLegions.map(l => l.legionNo);
+        while (existingNos.includes(newLegionNo)) {
+            newLegionNo++;
+        }
+        
+        let maxLegionId = 0;
+        if (this.game.legions && this.game.legions.length > 0) {
+            this.game.legions.forEach(l => { if (l.id > maxLegionId) maxLegionId = l.id; });
+        }
+        const newLegionId = maxLegionId + 1;
+        
+        // 軍団データ作成と登録
+        const newLegion = new Legion({
+            id: newLegionId,
+            clanId: clanId,
+            legionNo: newLegionNo,
+            commanderId: newCommander.id
+        });
+        if (!this.game.legions) this.game.legions = [];
+        this.game.legions.push(newLegion);
+        
+        // 新国主を移動させて国主にする
+        this.game.affiliationSystem.moveCastle(newCommander, baseCastle.id);
+        newCommander.isCommander = true;
+        
+        // 対象城の軍団変更
+        targetCastles.forEach(c => {
+            c.legionId = newLegionNo;
+            c.isDelegated = true; // AIなので委任
+        });
+        
+        this.game.updateCastleLord(baseCastle);
+    }
+
     // 毎月、古いメモ（キャッシュ）を消して新しく調べ直す準備をします
     clearCacheIfNeeded() {
         if (this.game.month !== this.lastMonth) {
