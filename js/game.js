@@ -1498,6 +1498,15 @@ class GameManager {
             if (this.aiStaffing) {
                 this.clans.forEach(clan => {
                     if (clan.id !== 0 && clan.id !== this.playerClanId) {
+                        // ★追加：国主を決める前に、まずは大名自身に最適な居城を探させてお引越しさせます！
+                        const daimyo = this.bushos.find(b => b.clan === clan.id && b.isDaimyo);
+                        if (daimyo && daimyo.castleId) {
+                            const daimyoCastle = this.getCastle(daimyo.castleId);
+                            if (daimyoCastle) {
+                                this.aiStaffing.relocateDaimyo(daimyoCastle, daimyo);
+                            }
+                        }
+
                         this.aiStaffing.createNewLegionIfNeeded(clan.id);
                     }
                 });
