@@ -693,35 +693,45 @@ class WarManager {
                 let maxRounds = window.WarParams.Military.WarMaxRounds || 15;
                 let turnsLeftToWin = Math.max(1, maxRounds - (s.round || 1));
                 
-                // 予測結果に基づいて「まだいける」「籠城すれば耐えられる」「もう限界」を判断します
-                if (minSurviveTurns <= 3) {
-                    // 普通に戦うと3ターン以内に落ちる絶体絶命のピンチ
-                    if (minSurviveTurnsRojo >= turnsLeftToWin) {
-                        // 籠城すれば時間切れまで耐えきれる！ -> 撤退せずに絶対籠城する
-                        rojoRescueScore += 8000;
-                        dangerScore -= 2000;
-                    } else if (minSurviveTurnsRojo > 3) {
-                        // 時間切れまでは無理でも、籠城すれば今は持ちこたえられる
-                        rojoRescueScore += 5000;
-                        dangerScore += 1000; // 撤退も考えるが籠城を大きく優先
+                // ★追加：武将の智謀による「先読み限界ターン数」（智謀10につき1ターン予測可能）
+                let predictableLimit = Math.max(0, Math.floor(myInt / 10));
+                
+                // 予測結果に基づいて判断しますが、先読み限界より先のこと（未来すぎる）は考慮できません。
+                if (predictableLimit > 0 && minSurviveTurns <= predictableLimit) {
+                    // 自分の予測できる範囲内で「城が落ちる（あるいは全滅する）」と察知した！
+                    
+                    // 致命的ライン（予測限界の半分。小数点以下切り捨てで最低1）
+                    let criticalLine = Math.max(1, Math.floor(predictableLimit / 2));
+                    
+                    if (minSurviveTurns <= criticalLine) {
+                        // 予測限界の半分以下まで迫る、絶体絶命のピンチ
+                        if (minSurviveTurnsRojo >= turnsLeftToWin) {
+                            // 籠城すれば時間切れまで耐えきれる！ -> 撤退せずに絶対籠城する
+                            rojoRescueScore += 8000;
+                            dangerScore -= 2000;
+                        } else if (minSurviveTurnsRojo > criticalLine) {
+                            // 時間切れまでは無理でも、籠城すれば今は持ちこたえられる
+                            rojoRescueScore += 5000;
+                            dangerScore += 1000; // 撤退も考えるが籠城を大きく優先
+                        } else {
+                            // 籠城してもすぐ落ちる -> 逃げるしかない
+                            dangerScore += 5000;
+                        }
                     } else {
-                        // 籠城してもすぐ落ちる -> 逃げるしかない
-                        dangerScore += 5000;
-                    }
-                } else if (minSurviveTurns <= 5) {
-                    // 普通に戦うと5ターン以内に落ちる（少し危険）
-                    if (minSurviveTurnsRojo >= turnsLeftToWin) {
-                        // 籠城すれば勝ち確
-                        rojoRescueScore += 4000;
-                    } else if (minSurviveTurnsRojo > 5) {
-                        // 籠城すれば寿命が延びる
-                        rojoRescueScore += 2000;
-                        dangerScore += 500;
-                    } else {
-                        dangerScore += 2000;
+                        // 絶体絶命ではないが、予測限界内で落ちることを察知（少し危険）
+                        if (minSurviveTurnsRojo >= turnsLeftToWin) {
+                            rojoRescueScore += 4000;
+                        } else if (minSurviveTurnsRojo > minSurviveTurns) {
+                            // 籠城すれば寿命が延びる
+                            rojoRescueScore += 2000;
+                            dangerScore += 500;
+                        } else {
+                            dangerScore += 2000;
+                        }
                     }
                 } else {
-                    dangerScore -= 1000; // まだいける（撤退スコアを下げる）
+                    // まだいける（落ちるのが予測限界より先）、または智謀が低すぎて全く予測できない
+                    dangerScore -= 1000;
                 }
             }
             
