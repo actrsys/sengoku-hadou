@@ -509,6 +509,27 @@ class DiplomacyManager {
     }
     
     /**
+     * 外交の経験値を計算し加算する魔法です
+     * 内政などと同じ仕様で、isExecuteフラグを受け取ります
+     */
+    calcDiplomacyExp(doer, type, isSuccess, isExecute = false) {
+        if (!doer) return 0;
+        let exp = 0;
+        
+        if (['goodwill', 'subordinate', 'break_alliance'].includes(type)) {
+            exp = 5;
+        } else if (['alliance', 'marriage', 'dominate'].includes(type)) {
+            exp = isSuccess ? 15 : 5;
+        }
+
+        if (isExecute) {
+            doer.expDiplomacy = (doer.expDiplomacy || 0) + exp;
+        }
+        
+        return exp;
+    }
+
+    /**
      * 指定した関係が「攻撃してはいけない関係（不可侵）」かどうかを判定します
      */
     isNonAggression(status) {
@@ -540,6 +561,9 @@ class DiplomacyManager {
                 isSuccess = this.checkDiplomacySuccess(doer.clan, targetClanId, type, doer.diplomacy, myPower, targetPower);
             }
 
+            // ★追加：経験値の計算と加算を専門の魔法にお願いします！
+            this.calcDiplomacyExp(doer, type, isSuccess, true);
+
             if (isSuccess) {
                 const increase = this.calcGoodwillIncrease(gold, doer);
                 this.updateSentiment(doer.clan, targetClanId, increase);
@@ -558,6 +582,8 @@ class DiplomacyManager {
 
         } else if (type === 'alliance') {
             let isSuccess = this.checkDiplomacySuccess(doer.clan, targetClanId, type, doer.diplomacy, myPower, targetPower);
+
+            this.calcDiplomacyExp(doer, type, isSuccess, true);
 
             if (isSuccess) {
                 this.changeStatus(doer.clan, targetClanId, '同盟');
@@ -595,6 +621,8 @@ class DiplomacyManager {
         } else if (type === 'break_alliance') {
             const result = this.applyBreakAlliancePenalty(doer.clan, targetClanId);
 
+            this.calcDiplomacyExp(doer, type, true, true);
+
             msg = `${result.oldStatus}関係を破棄しました`;
             if (!isPlayerInvolved) {
                 if (result.oldStatus === '同盟') {
@@ -616,6 +644,8 @@ class DiplomacyManager {
             this.game.factionSystem.updateRecognition(doer, 10);
 
         } else if (type === 'subordinate') {
+            this.calcDiplomacyExp(doer, type, true, true);
+
             this.changeStatus(doer.clan, targetClanId, '従属');
             
             // ★追加：従属した時に、関係値を調整します！
@@ -638,44 +668,52 @@ class DiplomacyManager {
             this.game.factionSystem.updateRecognition(doer, 30);
 
         } else if (type === 'dominate') {
-            let isSuccess = this.checkDiplomacySuccess(doer.clan, targetClanId, type, doer.diplomacy, myPower, targetPower);
+            let isSuccess = false;
             
             if (myPower / targetPower < 5) {
+                isSuccess = false;
+                this.calcDiplomacyExp(doer, type, isSuccess, true);
+                
                 this.updateSentiment(doer.clan, targetClanId, -5);
                 msg = `要求を跳ね除けられました……`;
                 doer.achievementTotal += 5;
                 this.game.factionSystem.updateRecognition(doer, 10);
-            } else if (isSuccess) {
-                this.changeStatus(doer.clan, targetClanId, '支配');
-                
-                // ★追加：支配した時に、関係値を調整します！
-                const relation = this.getRelation(doer.clan, targetClanId);
-                if (relation) {
-                    if (relation.sentiment <= 40) {
-                        relation.sentiment = 50;
-                    } else {
-                        relation.sentiment = Math.min(100, relation.sentiment + 10);
-                    }
-                    const oppRelation = this.getRelation(targetClanId, doer.clan);
-                    if (oppRelation) oppRelation.sentiment = relation.sentiment;
-                }
-
-                // ★追加：支配が成功したら、この大名家の「今月の外交目標」を親善に書き換えます
-                const doerClan = this.game.clans.find(c => c.id === doer.clan);
-                if (doerClan && doerClan.currentDiplomacyTarget && doerClan.currentDiplomacyTarget.targetId === targetClanId) {
-                    doerClan.currentDiplomacyTarget.action = 'goodwill';
-                    doerClan.currentDiplomacyTarget.gold = 300; // 支配下への親善は基本の300にします
-                }
-
-                msg = `${this.game.clans.find(c => c.id === targetClanId).name} を支配下に置くことに成功しました！`;
-                if (!isPlayerInvolved) aiMsg = `${doerClanName} が ${targetClanName} を支配下に置きました！`;
-                doer.achievementTotal += Math.floor(doer.diplomacy * 0.2) + 20;
-                this.game.factionSystem.updateRecognition(doer, 40);
             } else {
-                this.updateSentiment(doer.clan, targetClanId, -5);
-                msg = `支配の要求は拒否されました……`;
-                doer.achievementTotal += 5;
-                this.game.factionSystem.updateRecognition(doer, 10);
+                isSuccess = this.checkDiplomacySuccess(doer.clan, targetClanId, type, doer.diplomacy, myPower, targetPower);
+                this.calcDiplomacyExp(doer, type, isSuccess, true);
+                
+                if (isSuccess) {
+                    this.changeStatus(doer.clan, targetClanId, '支配');
+                    
+                    // ★追加：支配した時に、関係値を調整します！
+                    const relation = this.getRelation(doer.clan, targetClanId);
+                    if (relation) {
+                        if (relation.sentiment <= 40) {
+                            relation.sentiment = 50;
+                        } else {
+                            relation.sentiment = Math.min(100, relation.sentiment + 10);
+                        }
+                        const oppRelation = this.getRelation(targetClanId, doer.clan);
+                        if (oppRelation) oppRelation.sentiment = relation.sentiment;
+                    }
+
+                    // ★追加：支配が成功したら、この大名家の「今月の外交目標」を親善に書き換えます
+                    const doerClan = this.game.clans.find(c => c.id === doer.clan);
+                    if (doerClan && doerClan.currentDiplomacyTarget && doerClan.currentDiplomacyTarget.targetId === targetClanId) {
+                        doerClan.currentDiplomacyTarget.action = 'goodwill';
+                        doerClan.currentDiplomacyTarget.gold = 300; // 支配下への親善は基本の300にします
+                    }
+
+                    msg = `${this.game.clans.find(c => c.id === targetClanId).name} を支配下に置くことに成功しました！`;
+                    if (!isPlayerInvolved) aiMsg = `${doerClanName} が ${targetClanName} を支配下に置きました！`;
+                    doer.achievementTotal += Math.floor(doer.diplomacy * 0.2) + 20;
+                    this.game.factionSystem.updateRecognition(doer, 40);
+                } else {
+                    this.updateSentiment(doer.clan, targetClanId, -5);
+                    msg = `支配の要求は拒否されました……`;
+                    doer.achievementTotal += 5;
+                    this.game.factionSystem.updateRecognition(doer, 10);
+                }
             }
         }
         doer.isActionDone = true;
@@ -764,6 +802,9 @@ class DiplomacyManager {
 
         this.game.ui.showDialog(msg, true, 
             () => {
+                // 受諾（成功）時の経験値加算
+                this.calcDiplomacyExp(doer, type, true, true);
+
                 if (type === 'goodwill') {
                     const myCastle = this.game.castles.find(c => c.ownerClan === targetClanId);
                     if (myCastle) myCastle.gold = Math.min(99999, myCastle.gold + gold);
@@ -805,6 +846,9 @@ class DiplomacyManager {
                 }
             },
             () => {
+                // 拒否（失敗）時の経験値加算
+                this.calcDiplomacyExp(doer, type, false, true);
+
                 if (type === 'goodwill') {
                     const doerCastle = this.game.getCastle(doer.castleId);
                     if (doerCastle) doerCastle.gold = Math.min(99999, doerCastle.gold + gold);

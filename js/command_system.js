@@ -1391,6 +1391,9 @@ class CommandSystem {
                         const targetPower = this.game.getClanTotalSoldiers(targetClanId) || 1;
                         const isSuccess = this.game.diplomacyManager.checkDiplomacySuccess(doer.clan, targetClanId, 'marriage', doer.diplomacy, myPower, targetPower);
 
+                        // ★追加：外交経験値を計算・加算します！
+                        this.game.diplomacyManager.calcDiplomacyExp(doer, 'marriage', isSuccess, true);
+
                         if (isSuccess) {
                             // 成功した時の処理
                             this.applyMarriageData(princessId, targetBushoId, targetClanId);
