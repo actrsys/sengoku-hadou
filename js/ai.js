@@ -1822,8 +1822,8 @@ class AIEngine {
                     // 朝廷への貢献度をアップさせます
                     this.game.courtRankSystem.addContribution(castle.ownerClan, action.cost);
                     
-                    // ★差し替え：信用の上昇値を「専門部署（courtRankSystem）」に計算してもらいます！
-                    const trustIncrease = this.game.courtRankSystem.calcTributeTrustIncrease(action.cost, doer);
+                    // ★差し替え：信用の上昇値を「専門部署（courtRankSystem）」に計算してもらいます！（ここで経験値も足します）
+                    const trustIncrease = this.game.courtRankSystem.calcTributeTrustIncrease(action.cost, doer, true);
                     this.game.courtRankSystem.addTrust(castle.ownerClan, trustIncrease);
                     
                     // ★差し替え：使者の功績も「専門部署」に計算してもらいます！

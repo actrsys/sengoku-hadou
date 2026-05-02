@@ -243,8 +243,19 @@ class CourtRankSystem {
     // ==========================================
     
     // ★追加：貢物による「信用」の上がり幅を計算する専用の魔法です！
-    calcTributeTrustIncrease(gold, doer) {
+    calcTributeTrustIncrease(gold, doer, isExecute = false) {
+        if (isExecute) {
+            doer.expDiplomacy = (doer.expDiplomacy || 0) + Math.floor(gold / 300);
+        }
         return Math.max(1, Math.floor(gold * (doer.diplomacy / 100) * 0.15));
+    }
+
+    // ★追加：朝廷和睦による経験値を計算・加算する専用の魔法です！
+    calcCourtTruceExp(doer, isExecute = false) {
+        if (isExecute) {
+            doer.expDiplomacy = (doer.expDiplomacy || 0) + 5;
+        }
+        return 5;
     }
 
     // ★追加：貢物をした使者の「功績」の上がり幅を計算する専用の魔法です！
@@ -268,8 +279,8 @@ class CourtRankSystem {
         // 魔法で大名家の「朝廷への貢献度」をアップさせます！
         this.addContribution(this.game.playerClanId, gold);
         
-        // ★差し替え：信用の上昇値を専門部署（自分自身）の魔法で出します！
-        const trustIncrease = this.calcTributeTrustIncrease(gold, doer);
+        // ★差し替え：信用の上昇値を専門部署（自分自身）の魔法で出します！（ここで経験値も足します）
+        const trustIncrease = this.calcTributeTrustIncrease(gold, doer, true);
         
         // 新しく作った魔法で、大名家の「朝廷からの信用」をアップさせます！
         this.addTrust(this.game.playerClanId, trustIncrease);
@@ -310,6 +321,9 @@ class CourtRankSystem {
         
         // 信用を「500」消費（マイナス）します！
         this.addTrust(this.game.playerClanId, -500);
+
+        // ★追加：和睦の経験値を計算・加算します！
+        this.calcCourtTruceExp(doer, true);
 
         // 外交状態を強制的に「和睦」にし、期間を「6」にセットします！
         this.game.diplomacyManager.changeStatus(this.game.playerClanId, targetClanId, '和睦', 6);
