@@ -1445,11 +1445,36 @@ class GameManager {
             
             bushos.forEach(b => {
                 b.isActionDone = false;
+                
+                // 毎月城主と軍師の功績が５増えます
                 if (b.isCastellan || b.isGunshi) {
-                    // 毎月城主と軍師の功績が５増えます
                     b.achievementTotal += 5;
                 }
                 
+                // 大名・国主は追加で功績が２増えます
+                if (b.isDaimyo || b.isCommander) {
+                    b.achievementTotal += 2;
+                }
+
+                // 役職ごとの経験値追加
+                if (b.isCastellan) {
+                    b.expStrength = (b.expStrength || 0) + 3;
+                    b.expPolitics = (b.expPolitics || 0) + 3;
+                }
+                
+                if (b.isDaimyo || b.isCommander) {
+                    b.expLeadership = (b.expLeadership || 0) + 5;
+                    b.expDiplomacy = (b.expDiplomacy || 0) + 5;
+                    b.expIntelligence = (b.expIntelligence || 0) + 2;
+                }
+                
+                if (b.isGunshi) {
+                    b.expLeadership = (b.expLeadership || 0) + 5;
+                    b.expIntelligence = (b.expIntelligence || 0) + 5;
+                    b.expPolitics = (b.expPolitics || 0) + 2;
+                    b.expDiplomacy = (b.expDiplomacy || 0) + 2;
+                }
+
                 // 金が足りなかったら城にいる家臣の忠誠度が１下がる
                 if (!b.isDaimyo && isGoldShort) {
                     b.loyalty = Math.max(0, b.loyalty - 1);
