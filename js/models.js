@@ -251,21 +251,37 @@ class Busho {
             this.yomi = this.yomi || "";
         }
         
-        // --- 能力値（既存の処理） ---
-        this.leadership = Number(this.leadership || 0);
-        this.strength = Number(this.strength || 0);
-        this.politics = Number(this.politics || 0);
-        this.diplomacy = Number(this.diplomacy || 0);
-        this.intelligence = Number(this.intelligence || 0);
-        this.charm = Number(this.charm || 0);
+        // --- 能力値と経験値の処理 ---
+        // 1. 古いセーブデータやCSVから読み込んだ基本の能力値を「_」付きの秘密の箱に入れます
+        this._leadership = Number(data._leadership !== undefined ? data._leadership : (data.leadership || 0));
+        this._strength = Number(data._strength !== undefined ? data._strength : (data.strength || 0));
+        this._politics = Number(data._politics !== undefined ? data._politics : (data.politics || 0));
+        this._diplomacy = Number(data._diplomacy !== undefined ? data._diplomacy : (data.diplomacy || 0));
+        this._intelligence = Number(data._intelligence !== undefined ? data._intelligence : (data.intelligence || 0));
+        this.charm = Number(data.charm || 0); // 魅力は経験値を持たないのでそのままにします
+
+        // 2. 新しく用意した「経験値」の箱です。最初は0が入ります
+        this.expLeadership = Number(data.expLeadership || 0);
+        this.expStrength = Number(data.expStrength || 0);
+        this.expPolitics = Number(data.expPolitics || 0);
+        this.expDiplomacy = Number(data.expDiplomacy || 0);
+        this.expIntelligence = Number(data.expIntelligence || 0);
 
         // ★【ここから書き足し：能力の基礎値】
-        // 年齢によって能力が下がっても、元の「全盛期の能力」を忘れないように箱に入れておきます！
-        this.baseLeadership = Number(data.baseLeadership !== undefined ? data.baseLeadership : this.leadership);
-        this.baseStrength = Number(data.baseStrength !== undefined ? data.baseStrength : this.strength);
-        this.basePolitics = Number(data.basePolitics !== undefined ? data.basePolitics : this.politics);
-        this.baseDiplomacy = Number(data.baseDiplomacy !== undefined ? data.baseDiplomacy : this.diplomacy);
-        this.baseIntelligence = Number(data.baseIntelligence !== undefined ? data.baseIntelligence : this.intelligence);
+        // 全盛期の能力を覚える箱。古い箱や秘密の箱から数字をもらいます
+        this.baseLeadership = Number(data.baseLeadership !== undefined ? data.baseLeadership : this._leadership);
+        this.baseStrength = Number(data.baseStrength !== undefined ? data.baseStrength : this._strength);
+        this.basePolitics = Number(data.basePolitics !== undefined ? data.basePolitics : this._politics);
+        this.baseDiplomacy = Number(data.baseDiplomacy !== undefined ? data.baseDiplomacy : this._diplomacy);
+        this.baseIntelligence = Number(data.baseIntelligence !== undefined ? data.baseIntelligence : this._intelligence);
+
+        // 3. Object.assignのせいで勝手に作られてしまった古い名前の箱を、綺麗にお掃除します
+        // （これをしないと、後で作る自動計算の仕組みがうまく動きません）
+        delete this.leadership;
+        delete this.strength;
+        delete this.politics;
+        delete this.diplomacy;
+        delete this.intelligence;
 
         // ★【ここから書き足し：兵科適性】
         // 何も入っていない（空っぽ）なら、最低ランクの 'E' を入れる設定です
@@ -451,6 +467,23 @@ class Busho {
         const castle = window.GameApp.castles.find(c => c.id === this.castleId);
         return castle ? castle.legionId : 0;
     }
+
+    // ==========================================
+    // ★ここから追加：能力値の「自動計算」の魔法（ゲッター・セッター）です！
+    // 誰かが「leadershipはいくつ？」と聞いた時に、秘密の箱の数字と経験値を足して答えます。
+    get leadership() { return this._leadership + Math.floor(this.expLeadership / 100); }
+    get strength() { return this._strength + Math.floor(this.expStrength / 100); }
+    get politics() { return this._politics + Math.floor(this.expPolitics / 100); }
+    get diplomacy() { return this._diplomacy + Math.floor(this.expDiplomacy / 100); }
+    get intelligence() { return this._intelligence + Math.floor(this.expIntelligence / 100); }
+
+    // 逆に、年齢の変化などで「leadershipを80にして！」と命令された時は、秘密の箱だけにその数字をしまいます。
+    set leadership(val) { this._leadership = val; }
+    set strength(val) { this._strength = val; }
+    set politics(val) { this._politics = val; }
+    set diplomacy(val) { this._diplomacy = val; }
+    set intelligence(val) { this._intelligence = val; }
+    // ==========================================
 
     // UI表示用メソッド
     getRankName() {
