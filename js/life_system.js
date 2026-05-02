@@ -581,9 +581,9 @@ class LifeSystem {
         // まずは一門だけで候補リストを作ります
         let allCandidates = [...activeFamily, ...unbornFamily, ...externalFamily];
 
-        // もし一門の候補が誰もいなければ、特例として「同じ軍団で活躍している家臣」を候補にします！
+        // もし一門の候補が誰もいなければ、特例として「今活躍している家臣全員」を候補にします！
         if (allCandidates.length === 0) {
-            allCandidates = activeBushos.filter(b => b.legionId === legion.id);
+            allCandidates = [...activeBushos];
         }
 
         if (allCandidates.length > 0) {
@@ -781,9 +781,9 @@ class LifeSystem {
         // まずは一門だけで候補リストを作ります
         let allCandidates = [...activeFamily, ...unbornFamily, ...externalFamily];
 
-        // もし一門の候補が誰もいなければ、特例として「今活躍している家臣全員（一門以外も含む）」を候補にします！
+        // もし一門の候補が誰もいなければ、特例として「同じ軍団で活躍している家臣」を候補にします！
         if (allCandidates.length === 0) {
-            allCandidates = [...activeBushos];
+            allCandidates = activeBushos.filter(b => b.legionId === legion.id);
         }
 
         if (allCandidates.length > 0) {
