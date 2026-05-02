@@ -400,7 +400,8 @@ class AIEngine {
         // 自領のどこかと隣接している大名家をリストアップします
         const adjacentClans = new Set();
         myClanCastles.forEach(myC => {
-            if (myC.adjacentCastleIds) {
+            // ★変更：大名家全体ではなく、このお城と同じ「軍団」に隣接している敵だけをリストに入れます！
+            if (myC.legionId === myCastle.legionId && myC.adjacentCastleIds) {
                 myC.adjacentCastleIds.forEach(adjId => {
                     const c = this.game.getCastle(adjId);
                     if (c && c.ownerClan !== 0 && c.ownerClan !== myClanId) {
