@@ -503,17 +503,17 @@ class GameSystem {
     
     static toGradeHTML(val) {
         let base = "", sub = "", cls = "";
-        if (val >= 95) { base = "S"; sub = "+"; cls = "rank-s"; } 
-        else if (val >= 90) { base = "S"; sub = "";  cls = "rank-s"; }
-        else if (val >= 80) { base = "A"; sub = "+"; cls = "rank-a"; } 
-        else if (val >= 75) { base = "A"; sub = "";  cls = "rank-a"; }
-        else if (val >= 65) { base = "B"; sub = "+"; cls = "rank-b"; } 
+        if (val >= 110) { base = "S"; sub = "+"; cls = "rank-s"; } 
+        else if (val >= 100) { base = "S"; sub = "";  cls = "rank-s"; }
+        else if (val >= 90) { base = "A"; sub = "+"; cls = "rank-a"; } 
+        else if (val >= 80) { base = "A"; sub = "";  cls = "rank-a"; }
+        else if (val >= 70) { base = "B"; sub = "+"; cls = "rank-b"; } 
         else if (val >= 60) { base = "B"; sub = "";  cls = "rank-b"; }
-        else if (val >= 55) { base = "C"; sub = "+"; cls = "rank-c"; } 
-        else if (val >= 45) { base = "C"; sub = "";  cls = "rank-c"; }
-        else if (val >= 35) { base = "D"; sub = "+"; cls = "rank-d"; } 
-        else if (val >= 30) { base = "D"; sub = "";  cls = "rank-d"; }
-        else if (val >= 20) { base = "E"; sub = "+"; cls = "rank-e"; } 
+        else if (val >= 50) { base = "C"; sub = "+"; cls = "rank-c"; } 
+        else if (val >= 40) { base = "C"; sub = "";  cls = "rank-c"; }
+        else if (val >= 30) { base = "D"; sub = "+"; cls = "rank-d"; } 
+        else if (val >= 20) { base = "D"; sub = "";  cls = "rank-d"; }
+        else if (val >= 10) { base = "E"; sub = "+"; cls = "rank-e"; } 
         else { base = "E"; sub = ""; cls = "rank-e"; }
 
         return `
