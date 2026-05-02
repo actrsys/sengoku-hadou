@@ -1459,10 +1459,25 @@ class FieldWarManager {
     startTurn() {
         if (!this.active) return;
         
+        // ★追加：野戦の毎ターン開始時に、参戦している武将へ経験値を加算します
+        const isIntTurn = (this.turnCount % 2 === 1);
+        
         this.units.forEach(u => {
             u.hasActionDone = false;
             u.hasMoved = false; // ★ ターン開始時に移動フラグをリセット
             u.ap = u.mobility;
+            
+            // 経験値の加算処理
+            if (u.bushoId && this.game) {
+                const busho = this.game.getBusho(u.bushoId);
+                if (busho && busho.id && String(busho.id).indexOf('dummy') === -1) {
+                    busho.expLeadership = (busho.expLeadership || 0) + 1;
+                    busho.expStrength = (busho.expStrength || 0) + 1;
+                    if (isIntTurn) {
+                        busho.expIntelligence = (busho.expIntelligence || 0) + 1;
+                    }
+                }
+            }
         });
         
         this.turnQueue = [...this.units].sort((a, b) => {

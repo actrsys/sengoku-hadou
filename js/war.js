@@ -148,6 +148,24 @@ class WarManager {
         let totalAtkRice = s.attacker.rice + (s.reinforcement ? s.reinforcement.rice : 0) + (s.selfReinforcement ? s.selfReinforcement.rice : 0);
 
         while (turn <= 20 && totalAtkSoldiers > 0 && s.defender.fieldSoldiers > 0 && safetyLimit > 0) {
+            // ★追加：野戦（自動）の毎ターン開始時に経験値を加算します
+            const isIntTurn = (turn % 2 === 1);
+            const addExp = (bushos) => {
+                if (!bushos) return;
+                bushos.forEach(b => {
+                    if (b && b.id && String(b.id).indexOf('dummy') === -1) {
+                        b.expLeadership = (b.expLeadership || 0) + 1;
+                        b.expStrength = (b.expStrength || 0) + 1;
+                        if (isIntTurn) b.expIntelligence = (b.expIntelligence || 0) + 1;
+                    }
+                });
+            };
+            if (s.atkAssignments) s.atkAssignments.forEach(a => { if (a.soldiers > 0) addExp([a.busho]); });
+            else if (s.atkBushos) addExp(s.atkBushos);
+
+            if (s.defAssignments) s.defAssignments.forEach(a => { if (a.soldiers > 0) addExp([a.busho]); });
+            else if (s.defBusho) addExp([s.defBusho]);
+
             let resAtk = WarSystem.calcWarDamage(atkStats, defStats, totalAtkSoldiers, s.defender.fieldSoldiers, 0, s.attacker.morale, s.defender.training, 'charge');
             if (!s.isPlayerInvolved) { resAtk.soldierDmg = Math.floor(resAtk.soldierDmg * 0.666); resAtk.counterDmg = Math.floor(resAtk.counterDmg * 0.666); }
             
@@ -396,9 +414,41 @@ class WarManager {
 
             s.plannedActions = {}; // 選んだ作戦をメモしておくノートです
             s.phase = 'command'; // ゲームの状態を「作戦を決めるフェーズ」にします
+
+            // ★追加：攻城戦の毎ラウンド開始時に、参戦している武将に経験値を加算します
+            const isIntTurn = (s.round % 2 === 1);
+            const addExp = (bushos, isAtk) => {
+                if (!bushos) return;
+                bushos.forEach(b => {
+                    if (b && b.id && String(b.id).indexOf('dummy') === -1) {
+                        b.expLeadership = (b.expLeadership || 0) + (isAtk ? 2 : 1);
+                        b.expStrength = (b.expStrength || 0) + (isAtk ? 2 : 1);
+                        if (isAtk) {
+                            b.expIntelligence = (b.expIntelligence || 0) + 1;
+                        } else if (isIntTurn) {
+                            b.expIntelligence = (b.expIntelligence || 0) + 1;
+                        }
+                    }
+                });
+            };
+
+            if (s.attacker && s.attacker.soldiers > 0) addExp(s.atkBushos, true);
+            if (s.selfReinforcement && s.selfReinforcement.soldiers > 0) addExp(s.selfReinforcement.bushos, true);
+            if (s.reinforcement && s.reinforcement.soldiers > 0) addExp(s.reinforcement.bushos, true);
+
+            if (s.defender && s.defender.soldiers > 0) {
+                let defBushos = [];
+                if (this.game && this.game.getCastleBushos) {
+                    defBushos = this.game.getCastleBushos(s.defender.id).filter(b => b.status === 'active' && (s.defender.isKunishu ? b.belongKunishuId === s.defender.kunishuId : (b.clan === s.defender.ownerClan && b.belongKunishuId === 0)));
+                }
+                if (defBushos.length === 0 && s.defBusho) defBushos = [s.defBusho];
+                addExp(defBushos, false);
+            }
+            if (s.defSelfReinforcement && s.defSelfReinforcement.soldiers > 0) addExp(s.defSelfReinforcement.bushos, false);
+            if (s.defReinforcement && s.defReinforcement.soldiers > 0) addExp(s.defReinforcement.bushos, false);
         }
 
-        this.advanceWarTurn(); 
+        this.advanceWarTurn();
     }
 
     execWarCmd(type, extraVal = null) { 
