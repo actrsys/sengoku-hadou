@@ -573,101 +573,74 @@ class WarManager {
 
         const options = isDefenderTurn ? ['def_charge', 'def_bow', 'def_attack', 'provoke', 'def_inspire'] : ['charge', 'bow', 'siege', 'fire', 'inspire'];
         
-        // 撤退の選択肢を追加
-        // ★中立の空き城（ownerClanが0）や諸勢力（isKunishu）の部隊は、AIも絶対に撤退を選ばないようにします！
         if (isDefenderTurn && s.turn === 'defender' && s.defender.ownerClan !== 0 && !s.defender.isKunishu && this.game.castles.some(c => c.ownerClan === s.defender.ownerClan && c.id !== s.defender.id && GameSystem.isReachable(this.game, s.defender, c, s.defender.ownerClan))) {
             options.push('retreat');
         } else if (!isDefenderTurn && s.turn === 'attacker' && !s.attacker.isKunishu) {
             options.push('retreat');
         }
         
-        // ★鼓舞でどれくらい士気が上がるかを計算しておきます
         let moraleUp = Math.round((Math.sqrt(actor.leadership * 1.5) + Math.sqrt(actor.charm)) / 4);
 
         if (!isDefenderTurn) {
-            // 攻撃側
             let ratio = totalAtkSoldiers / Math.max(1, totalDefSoldiers);
-            
-            // ★今回追加：行動部隊「単体」の兵士数と、相手の「総」兵士数の比率です
             let unitRatio = mySoldiers / Math.max(1, totalDefSoldiers);
             
-            // 撤退: 相手の半分の兵力(0.5)を下回るほど、なめらかにスコアが大きくなる
             scores['retreat'] = Math.max(0, 0.5 - ratio) * 1500 + (timidDegree * 300);
             
-            // 鼓舞: 目標となる士気（30）に足りない分だけなめらかにスコアが大きくなる
             let targetMorale = 30;
             scores['inspire'] = Math.max(0, targetMorale - myMorale) * 20 + 20;
             
-            // ★士気が70以上なら、線形でマイナスを入れます！100以上なら絶対に選びません
             if (myMorale >= 100) {
                 scores['inspire'] = -9999;
             } else if (myMorale >= 70) {
                 scores['inspire'] -= (myMorale - 70) * 20;
             }
 
-            // ★上がる士気が0の場合は絶対に選びません！
             if (moraleUp <= 0) {
                 scores['inspire'] = -9999;
             }
             
-            // 破壊: 防御が低いほど、兵力が多いほど、なめらかにスコアが大きくなる
-            let siegeDefBonus = Math.max(0, 800 - def) * 0.6; // 防御800以下から意識しはじめる
-            let siegeRatioBonus = Math.max(0, ratio - 1.5) * 150; // 兵力比1.5倍以上から意識しはじめる
+            let siegeDefBonus = Math.max(0, 800 - def) * 0.6;
+            let siegeRatioBonus = Math.max(0, ratio - 1.5) * 150;
             
-            // ★単体の兵士数が相手の総兵士数の1.5倍以下ならペナルティ！1.0以下で激減します
             let siegeUnitPenalty = 0;
             if (unitRatio <= 1.5) {
                 siegeUnitPenalty = (1.5 - unitRatio) * 1000;
             }
             scores['siege'] = siegeDefBonus + siegeRatioBonus - (timidDegree * 200) - siegeUnitPenalty;
             
-            // 火計: 防御が高いほど、兵力が少ないほど、なめらかにスコアが大きくなる
-            let fireDefBonus = Math.max(0, def - 500) * 0.4; // 防御500以上から意識しはじめる
-            let fireRatioBonus = Math.max(0, 2.5 - ratio) * 200; // 兵力比2.5倍未満から意識しはじめる
+            let fireDefBonus = Math.max(0, def - 500) * 0.4;
+            let fireRatioBonus = Math.max(0, 2.5 - ratio) * 200;
             scores['fire'] = fireDefBonus + fireRatioBonus + intBonus - (timidDegree * 100);
             
-            // 斉射: 防御が高いほど、なめらかにスコアが大きくなる（火計に選ばれない時に選ばれやすく）
             let bowDefBonus = Math.max(0, def - 600) * 0.3;
-            scores['bow'] = 50 + bowDefBonus + (ratio * 50) + gunBonus; // ★追加：鉄砲の割合ボーナス
+            scores['bow'] = 50 + bowDefBonus + (ratio * 50) + gunBonus;
             
-            // 突撃: 基本の攻撃。弱気なときは控える
-            // ★今回追加：単体の兵士数が相手の総兵士数の1.0倍以下ならペナルティ！0.5以下で激減します
             let chargeUnitPenalty = 0;
             if (unitRatio <= 1.0) {
                 chargeUnitPenalty = (1.0 - unitRatio) * 1000;
             }
-            scores['charge'] = 150 - (timidDegree * 200) - chargeUnitPenalty + horseBonus; // ★追加：軍馬の割合ボーナス
+            scores['charge'] = 150 - (timidDegree * 200) - chargeUnitPenalty + horseBonus;
 
         } else {
-            // 守備側
             let ratio = totalDefSoldiers / Math.max(1, totalAtkSoldiers);
             
-            // 守備側
-            let ratio = totalDefSoldiers / Math.max(1, totalAtkSoldiers);
+            let retreatRatioBonus = Math.max(0, 0.2 - ratio) * 1000;
+            let retreatDefBonus = Math.max(0, 400 - def) * 1.5;
             
-            // 撤退: 兵力が少ないほど、防御が低いほど、なめらかにスコアが大きくなる
-            // ★変更：兵数による撤退の判断（スコア）を下げました（3000→1000）
-            let retreatRatioBonus = Math.max(0, 0.2 - ratio) * 1000; // 兵力比0.2(1/5)以下から意識しはじめる
-            let retreatDefBonus = Math.max(0, 400 - def) * 1.5; // 防御400以下から意識しはじめる
-            
-            // ★追加：直近5ターンのダメージ記憶による予測スコア
             let dangerScore = 0;
-            let rojoRescueScore = 0; // ★追加：籠城すれば耐えられる場合の救済スコア
+            let rojoRescueScore = 0;
             
             if (s.defDamageHistory && s.defDamageHistory.length >= 5) {
-                // 5ターン分のダメージの平均を計算します
                 let avgDefDmg = s.defDamageHistory.reduce((a, b) => a + b, 0) / 5;
                 let avgWallDmg = s.wallDamageHistory.reduce((a, b) => a + b, 0) / 5;
                 
-                // 智謀による「見誤り（ブレ）」の計算
-                // 智謀100以上で絶対に見誤らない(ブレ0)、95以上でほぼ見誤らない、50以下で最大30%のブレ
                 let errorRate = 0;
                 if (myInt <= 50) {
-                    errorRate = 0.3; // 50以下は常に30%のブレ
+                    errorRate = 0.3;
                 } else if (myInt >= 100) {
-                    errorRate = 0; // 100以上はブレなし
+                    errorRate = 0;
                 } else {
-                    // 50から100の間は、智謀が高くなるほどなだらかにブレが0に近づきます
                     errorRate = 0.3 * ((100 - myInt) / 50);
                 }
                 
@@ -677,52 +650,38 @@ class WarManager {
                 let predictedDefDmg = avgDefDmg * randomFactorDmg;
                 let predictedWallDmg = avgWallDmg * randomFactorWall;
                 
-                // 普通に戦った場合、あと何ターンで0になるかを予測します
                 let surviveTurnsDef = predictedDefDmg > 0 ? (s.defender.soldiers / predictedDefDmg) : 99;
                 let surviveTurnsWall = predictedWallDmg > 0 ? (def / predictedWallDmg) : 99;
                 let minSurviveTurns = Math.min(surviveTurnsDef, surviveTurnsWall);
                 
-                // ★追加：「籠城」した場合の予測（受けるダメージが約半分になります）
                 let predictedDefDmgRojo = predictedDefDmg * 0.5;
                 let predictedWallDmgRojo = predictedWallDmg * 0.5;
                 let surviveTurnsDefRojo = predictedDefDmgRojo > 0 ? (s.defender.soldiers / predictedDefDmgRojo) : 99;
                 let surviveTurnsWallRojo = predictedWallDmgRojo > 0 ? (def / predictedWallDmgRojo) : 99;
                 let minSurviveTurnsRojo = Math.min(surviveTurnsDefRojo, surviveTurnsWallRojo);
                 
-                // ★追加：あと何ターンで「時間切れ（防衛成功）」になるか
                 let maxRounds = window.WarParams.Military.WarMaxRounds || 15;
                 let turnsLeftToWin = Math.max(1, maxRounds - (s.round || 1));
                 
-                // ★追加：武将の智謀による「先読み限界ターン数」（智謀10につき1ターン予測可能）
                 let predictableLimit = Math.max(0, Math.floor(myInt / 10));
                 
-                // 予測結果に基づいて判断しますが、先読み限界より先のこと（未来すぎる）は考慮できません。
                 if (predictableLimit > 0 && minSurviveTurns <= predictableLimit) {
-                    // 自分の予測できる範囲内で「城が落ちる（あるいは全滅する）」と察知した！
-                    
-                    // 致命的ライン（予測限界の半分。小数点以下切り捨てで最低1）
                     let criticalLine = Math.max(1, Math.floor(predictableLimit / 2));
                     
                     if (minSurviveTurns <= criticalLine) {
-                        // 予測限界の半分以下まで迫る、絶体絶命のピンチ
                         if (minSurviveTurnsRojo >= turnsLeftToWin) {
-                            // 籠城すれば時間切れまで耐えきれる！ -> 撤退せずに絶対籠城する
                             rojoRescueScore += 8000;
                             dangerScore -= 2000;
                         } else if (minSurviveTurnsRojo > criticalLine) {
-                            // 時間切れまでは無理でも、籠城すれば今は持ちこたえられる
                             rojoRescueScore += 5000;
-                            dangerScore += 1000; // 撤退も考えるが籠城を大きく優先
+                            dangerScore += 1000;
                         } else {
-                            // 籠城してもすぐ落ちる -> 逃げるしかない
                             dangerScore += 5000;
                         }
                     } else {
-                        // 絶体絶命ではないが、予測限界内で落ちることを察知（少し危険）
                         if (minSurviveTurnsRojo >= turnsLeftToWin) {
                             rojoRescueScore += 4000;
                         } else if (minSurviveTurnsRojo > minSurviveTurns) {
-                            // 籠城すれば寿命が延びる
                             rojoRescueScore += 2000;
                             dangerScore += 500;
                         } else {
@@ -730,54 +689,44 @@ class WarManager {
                         }
                     }
                 } else {
-                    // まだいける（落ちるのが予測限界より先）、または智謀が低すぎて全く予測できない
                     dangerScore -= 1000;
                 }
             }
             
             scores['retreat'] = retreatRatioBonus + retreatDefBonus + (timidDegree * 300) + dangerScore;
             
-            // 籠城: 防御が低いほど、兵力が少ないほど、なめらかにスコアが大きくなる
-            let defAttackDefBonus = Math.max(0, 500 - def) * 0.8; // 防御500以下から意識しはじめる
-            let defAttackRatioBonus = Math.max(0, 0.25 - ratio) * 1200; // 兵力比0.25(1/4)以下から意識しはじめる
-            scores['def_attack'] = defAttackDefBonus + defAttackRatioBonus + (timidDegree * 200) + rojoRescueScore; // ★籠城の救済スコアを加算
+            let defAttackDefBonus = Math.max(0, 500 - def) * 0.8;
+            let defAttackRatioBonus = Math.max(0, 0.25 - ratio) * 1200;
+            scores['def_attack'] = defAttackDefBonus + defAttackRatioBonus + (timidDegree * 200) + rojoRescueScore;
             
-            // 鼓舞: 目標となる士気（30）に足りない分だけなめらかにスコアが大きくなる
             let targetMoraleDef = 30;
             scores['def_inspire'] = Math.max(0, targetMoraleDef - myMorale) * 20 + 20;
             
-            // ★今回追加：相手の火計が成功している場合、防ぐために鼓舞のスコアを上げます！
             if (s.fireSufferedCount && s.fireSufferedCount > 0) {
                 let fireBonus = s.fireSufferedCount * 120;
-                // ★追加：ただし、士気が70以上ある時は火計の焦り（ボーナス）の影響も線形で薄まるようにします
                 if (myMorale >= 70) {
-                    fireBonus *= (100 - myMorale) / 30; // 70で1.0倍、100で0倍になるようにします
+                    fireBonus *= (100 - myMorale) / 30;
                 }
                 scores['def_inspire'] += fireBonus;
             }
             
-            // ★追加：士気が70以上なら、線形でマイナスを入れます！100以上なら絶対に選びません
             if (myMorale >= 100) {
                 scores['def_inspire'] = -9999;
             } else if (myMorale >= 70) {
                 scores['def_inspire'] -= (myMorale - 70) * 20;
             }
 
-            // ★追加：上がる士気が0の場合は絶対に選びません！
             if (moraleUp <= 0) {
                 scores['def_inspire'] = -9999;
             }
             
-            // 挑発: 防御が高いほど、兵力が多いほど、なめらかにスコアが大きくなる
             let provokeDefBonus = Math.max(0, def - 600) * 0.4;
             let provokeRatioBonus = Math.max(0, ratio - 0.1) * 300;
             scores['provoke'] = provokeDefBonus + provokeRatioBonus + intBonus - (timidDegree * 100);
             
-            // 突撃: 兵力が多いほど、なめらかにスコアが大きくなる
-            scores['def_charge'] = 50 + Math.max(0, ratio - 0.5) * 300 - (timidDegree * 200) + horseBonus; // ★追加：軍馬の割合ボーナス
+            scores['def_charge'] = 50 + Math.max(0, ratio - 0.5) * 300 - (timidDegree * 200) + horseBonus;
             
-            // 斉射: 基本の攻撃
-            scores['def_bow'] = 120 + gunBonus; // ★追加：鉄砲の割合ボーナス
+            scores['def_bow'] = 120 + gunBonus;
         }
 
         options.forEach(cmd => {
