@@ -294,6 +294,11 @@ class AIStaffing {
         });
         
         this.game.updateCastleLord(baseCastle);
+
+        // ★追加：軍団が新設されたため、この大名家の現在の作戦を白紙に戻し、各軍団で新しく作戦を考え直させます！
+        if (this.game.aiOperationManager && this.game.aiOperationManager.operations[clanId]) {
+            delete this.game.aiOperationManager.operations[clanId];
+        }
     }
 
     // 毎月、古いメモ（キャッシュ）を消して新しく調べ直す準備をします
