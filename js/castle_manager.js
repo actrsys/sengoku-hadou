@@ -25,7 +25,11 @@ class CastleManager {
         if (oldOwnerId !== 0 && oldLegionId !== 0) {
             const remaining = this.game.castles.filter(c => c.ownerClan === oldOwnerId && c.legionId === oldLegionId);
             if (remaining.length === 0) {
-                this.disbandLegion(oldLegionId);
+                // ★修正：oldLegionIdは軍団No(1~8)なので、正確な軍団データを探し出して固有IDを渡すように直します！
+                const targetLegion = this.game.legions.find(l => l.clanId === oldOwnerId && l.legionNo === oldLegionId);
+                if (targetLegion) {
+                    this.disbandLegion(targetLegion.id);
+                }
             }
         }
         

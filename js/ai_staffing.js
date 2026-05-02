@@ -162,6 +162,12 @@ class AIStaffing {
 
     // ★追加：AI大名が軍団を新設する機能
     createNewLegionIfNeeded(clanId) {
+        // ★追加：すでに軍団が最大数（8個）に達している場合は作らない！
+        if (this.game.legions) {
+            const activeLegionsCount = this.game.legions.filter(l => l.clanId === clanId && l.commanderId > 0).length;
+            if (activeLegionsCount >= 8) return;
+        }
+
         const myCastles = this.game.castles.filter(c => c.ownerClan === clanId);
         const myDirectCastles = myCastles.filter(c => c.legionId === 0);
         
@@ -242,28 +248,40 @@ class AIStaffing {
         const sameProvinceCastles = castleScores.filter(cs => cs.castle.provinceId === baseCastle.provinceId);
         const targetCastles = sameProvinceCastles.slice(0, 3).map(cs => cs.castle);
         
-        // 新規軍団IDと番号の決定
+        // ★修正：空き枠（解散済みの軍団）があれば再利用するロジックに変更！
+        const deadLegion = clanLegions.find(l => l.commanderId === 0);
         let newLegionNo = 1;
-        const existingNos = clanLegions.map(l => l.legionNo);
-        while (existingNos.includes(newLegionNo)) {
-            newLegionNo++;
-        }
         
-        let maxLegionId = 0;
-        if (this.game.legions && this.game.legions.length > 0) {
-            this.game.legions.forEach(l => { if (l.id > maxLegionId) maxLegionId = l.id; });
+        if (deadLegion) {
+            // 空き枠（解散済み）があれば、その軍団データを再利用します
+            newLegionNo = deadLegion.legionNo;
+            deadLegion.commanderId = newCommander.id;
+        } else {
+            // 空き枠がなければ、新しく番号を作ります（活動中の番号だけを避ける）
+            const activeNos = clanLegions.filter(l => l.commanderId > 0).map(l => l.legionNo);
+            while (activeNos.includes(newLegionNo)) {
+                newLegionNo++;
+            }
+            
+            // ★念のためのフェイルセーフ：番号が8を超えてしまったら中止します
+            if (newLegionNo > 8) return;
+            
+            let maxLegionId = 0;
+            if (this.game.legions && this.game.legions.length > 0) {
+                this.game.legions.forEach(l => { if (l.id > maxLegionId) maxLegionId = l.id; });
+            }
+            const newLegionId = maxLegionId + 1;
+            
+            // 軍団データ作成と登録
+            const newLegion = new Legion({
+                id: newLegionId,
+                clanId: clanId,
+                legionNo: newLegionNo,
+                commanderId: newCommander.id
+            });
+            if (!this.game.legions) this.game.legions = [];
+            this.game.legions.push(newLegion);
         }
-        const newLegionId = maxLegionId + 1;
-        
-        // 軍団データ作成と登録
-        const newLegion = new Legion({
-            id: newLegionId,
-            clanId: clanId,
-            legionNo: newLegionNo,
-            commanderId: newCommander.id
-        });
-        if (!this.game.legions) this.game.legions = [];
-        this.game.legions.push(newLegion);
         
         // 新国主を移動させて国主にする
         this.game.affiliationSystem.moveCastle(newCommander, baseCastle.id);
