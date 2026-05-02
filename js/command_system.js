@@ -392,6 +392,11 @@ const COMMAND_SPECS = {
         canExecute: (game, castle) => {
             const daimyo = game.bushos.find(b => b.clan === game.playerClanId && b.isDaimyo);
             if (daimyo && Number(daimyo.castleId) === Number(castle.id)) return false;
+            
+            // ★追加：国主の居城の城主も、勝手に変えられないようにします
+            const castellan = game.getBusho(castle.castellanId);
+            if (castellan && castellan.isCommander) return false;
+
             return true;
         }
     },

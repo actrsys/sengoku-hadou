@@ -697,11 +697,19 @@ class LifeSystem {
                 }
             }
 
-            // ★ここから追加：大名になった瞬間に「daimyo:」の顔変更データがあれば顔を変える魔法！
+            // ★大名になった瞬間に「daimyo:」の顔変更データがあれば顔を変える魔法！
             if (successor.faceChange && successor.faceChange.startsWith('daimyo:')) {
                 const newFace = successor.faceChange.split(':')[1].trim();
                 if (newFace) {
                     successor.faceIcon = newFace;
+                }
+            }
+
+            // ★追加：新大名がもし国主だった場合、その軍団を解散させます
+            if (successor.isCommander && this.game.castleManager) {
+                const oldLegion = this.game.legions ? this.game.legions.find(l => l.commanderId === successor.id) : null;
+                if (oldLegion) {
+                    this.game.castleManager.disbandLegion(oldLegion.id);
                 }
             }
 
@@ -1039,6 +1047,14 @@ class LifeSystem {
 
         // ① 先代大名の役職を外します
         oldDaimyo.isDaimyo = false;
+
+        // ★追加：新大名がもし国主だった場合、その軍団を解散させます
+        if (successor.isCommander && this.game.castleManager) {
+            const oldLegion = this.game.legions ? this.game.legions.find(l => l.commanderId === successor.id) : null;
+            if (oldLegion) {
+                this.game.castleManager.disbandLegion(oldLegion.id);
+            }
+        }
 
         // ★修正：コマンドの時は「急遽元服し～」の文章は出さないように、messages.push を削除しました！
         if (successor.status === 'unborn') {
