@@ -91,7 +91,7 @@ class StrategySystem {
                 busho.expStrength = (busho.expStrength || 0) + 5;
                 busho.expIntelligence = (busho.expIntelligence || 0) + 10;
             } else {
-                busho.expStrength = (busho.expStrength || 0) + 3;
+                busho.expStrength = (busho.expStrength || 0) + 2;
                 busho.expIntelligence = (busho.expIntelligence || 0) + 5;
             }
         }
@@ -118,7 +118,7 @@ class StrategySystem {
                 busho.expStrength = (busho.expStrength || 0) + 5;
                 busho.expIntelligence = (busho.expIntelligence || 0) + 10;
             } else {
-                busho.expStrength = (busho.expStrength || 0) + 3;
+                busho.expStrength = (busho.expStrength || 0) + 2;
                 busho.expIntelligence = (busho.expIntelligence || 0) + 5;
             }
         }
@@ -147,7 +147,7 @@ class StrategySystem {
                 busho.expStrength = (busho.expStrength || 0) + 5;
                 busho.expIntelligence = (busho.expIntelligence || 0) + 10;
             } else {
-                busho.expStrength = (busho.expStrength || 0) + 3;
+                busho.expStrength = (busho.expStrength || 0) + 2;
                 busho.expIntelligence = (busho.expIntelligence || 0) + 5;
             }
         }
@@ -200,7 +200,7 @@ class StrategySystem {
                 doer.expStrength = (doer.expStrength || 0) + 10;
                 doer.expIntelligence = (doer.expIntelligence || 0) + 20;
             } else {
-                doer.expStrength = (doer.expStrength || 0) + 3;
+                doer.expStrength = (doer.expStrength || 0) + 2;
                 doer.expIntelligence = (doer.expIntelligence || 0) + 5;
             }
         }
