@@ -1069,19 +1069,6 @@ body:not(.is-pc) .dialog-face-column { width: 75px; }
 body:not(.is-pc) .dialog-name-label { font-size: 0.85rem; top: -16px; padding: 2px 10px; }
 
 /* 戦闘中の思考メッセージ用 */
-.war-action-message-container {
-    background: rgba(0, 0, 0, 0.4);
-    border: 1px solid rgba(212, 175, 55, 0.3);
-    border-radius: 8px;
-    padding: 15px;
-    box-sizing: border-box;
-    height: 100%;
-    text-align: left;
-    position: relative;
-    color: #fff;
-    text-shadow: 1px 1px 1px #000;
-}
-
 /* 各モーダルのサイズ・レイアウト調整 */
 .modal-small { max-width: 400px; }
 .result-content { max-width: 500px !important; }
@@ -1668,7 +1655,7 @@ body:not(.is-pc) .daimyo-detail-value {
 #war-modal .scroll-wrapper::after {
     display: none !important;
 }
-.war-screen { flex: 1; display: flex; flex-direction: column; background: radial-gradient(circle, #2a1f3d 0%, #110d1a 100%) !important; padding: 0 !important; border-radius: 0 !important; overflow: hidden;}
+.war-screen { flex: 1; display: flex; flex-direction: column; background: radial-gradient(circle, #1b3822 0%, #0d1a10 100%), repeating-radial-gradient(circle, rgba(255,255,255,0.03) 0px, transparent 2px, rgba(0,0,0,0.05) 4px) !important; padding: 0 !important; border-radius: 0 !important; overflow: hidden;}
 #war-log { height: 45px !important; min-height: 45px !important; margin-bottom: 5px !important; display: none !important; }
 .responsive-war-log { overflow-y: auto; background: #fff; padding: 5px; font-size: 0.85rem; color:#333; text-align:left; }
 
@@ -1789,8 +1776,8 @@ body:not(.is-pc) .daimyo-detail-value {
 .responsive-war-layout { display: flex; flex-direction: column; width: 100%; }
 .responsive-war-left { display: flex; flex-direction: column; flex: 1; overflow: hidden; border-right: none !important; }
 
-.war-visual { flex: 1; display: flex; flex-direction: column; justify-content: space-around; align-items: center; background: radial-gradient(circle, #2a1f3d 0%, #110d1a 100%); margin-bottom: 5px; padding: 10px; overflow-y: auto;}
-.responsive-war-visual { flex: 1; display: flex !important; flex-direction: row !important; width: 100% !important; background: radial-gradient(circle, #2a1f3d 0%, #110d1a 100%); overflow: hidden; align-items: flex-start !important; justify-content: center; padding: 10px !important; gap: 8px !important; margin: 0 !important; box-sizing: border-box !important; }
+.war-visual { flex: 1; display: flex; flex-direction: column; justify-content: space-around; align-items: center; background: transparent; margin-bottom: 5px; padding: 10px; overflow-y: auto;}
+.responsive-war-visual { flex: 1; display: flex !important; flex-direction: row !important; width: 100% !important; background: transparent; overflow: hidden; align-items: flex-start !important; justify-content: center; padding: 10px !important; gap: 8px !important; margin: 0 !important; box-sizing: border-box !important; }
 .war-side-wrapper { display: flex !important; flex-direction: row !important; align-items: stretch !important; flex: 1 !important; max-width: calc(50% - 10px) !important; box-sizing: border-box !important; overflow: hidden !important; justify-content: center !important; height: 100% !important; gap: 8px !important; }
 
 .war-reinf-col { display: flex; flex-direction: column; gap: 8px; flex: 1; min-width: 0; }
@@ -1823,9 +1810,9 @@ body:not(.is-pc) .daimyo-detail-value {
 .stat-val-large { font-size: 0.95rem !important; }
 .war-reinf-card .stat-row { display: flex !important; justify-content: space-between !important; width: 100% !important; box-sizing: border-box !important; }
 
-.war-controls-area { display: flex !important; width: 100%; gap: 10px; flex-shrink: 0; height: 150px; box-sizing: border-box; padding: 10px; background: #fff; border-top: 2px solid #333; }
+.war-controls-area { display: flex !important; width: 100%; gap: 10px; flex-shrink: 0; height: 150px; box-sizing: border-box; padding: 10px; background: transparent; border-top: none; }
 .war-controls-buttons { flex: 2; display: grid; grid-template-columns: repeat(3, 1fr); grid-template-rows: repeat(2, 1fr); gap: 5px; height: 100%; box-sizing: border-box; }
-.war-controls-desc { flex: 3; background: #f9f9f9; border: 2px solid #ccc; border-radius: 4px; padding: 8px; font-size: 0.85rem; color: #333; text-align: left; overflow-y: auto; height: 100%; box-sizing: border-box; }
+.war-controls-desc { flex: 3; background: rgba(0, 0, 0, 0.4); border: 1px solid rgba(212, 175, 55, 0.3); border-radius: 8px; padding: 8px 15px; font-size: 0.95rem; color: #fff; text-shadow: 1px 1px 1px #000; text-align: left; overflow-y: auto; height: 100%; box-sizing: border-box; }
 /* ★攻城戦のコマンドボタンを内政と同じ（cmd-btn）にするための調整 */
 .war-controls-buttons button { height: 100%; width: 100%; font-size: 1rem; padding: 0; }
 .war-controls-buttons button.active-cmd { 
@@ -1849,26 +1836,28 @@ body:not(.is-pc) .daimyo-detail-value {
     display: flex;
     flex-direction: column;
     justify-content: center;
-    align-items: center;
-    background: rgba(0, 0, 0, 0.85);
-    border: 2px solid #ff9800;
-    border-radius: 6px;
+    align-items: flex-start;
+    background: rgba(0, 0, 0, 0.4);
+    border: 1px solid rgba(212, 175, 55, 0.3);
+    border-radius: 8px;
     padding: 15px;
     box-sizing: border-box;
     cursor: pointer;
     transition: background 0.2s;
-    box-shadow: inset 0 0 10px rgba(0,0,0,0.8);
+    color: #fff;
+    text-shadow: 1px 1px 1px #000;
 }
 .war-action-message-container:hover {
-    background: rgba(30, 30, 30, 0.95);
+    background: rgba(30, 30, 30, 0.6);
 }
 .war-action-message-text {
-    font-size: 1.15rem;
+    font-size: 1.1rem;
     color: #fff;
-    text-align: center;
-    line-height: 1.6;
+    text-align: left;
+    line-height: 1.5;
     margin-bottom: 12px;
-    text-shadow: 1px 1px 2px #000;
+    text-shadow: 1px 1px 1px #000;
+    width: 100%;
 }
 .war-action-message-prompt {
     font-size: 0.95rem;

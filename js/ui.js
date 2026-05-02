@@ -2020,14 +2020,13 @@ class UIManager {
         
         const isPc = document.body.classList.contains('is-pc');
         const msgFontSize = isPc ? '' : 'font-size: 60%; line-height: 1.4;';
-
+        
         const msgContainer = document.createElement('div');
         msgContainer.className = 'war-action-message-container';
-        msgContainer.style.cssText = 'text-align: left; position: relative; display: block; padding: 15px; box-sizing: border-box; height: 100%;';
         
         const textContainer = document.createElement('div');
         textContainer.className = 'war-action-message-text';
-        textContainer.style.cssText = `text-align: left; width: 100%; display: block; ${msgFontSize}`;
+        textContainer.style.cssText = `${msgFontSize}`;
         
         const promptContainer = document.createElement('div');
         promptContainer.className = 'war-action-message-prompt';
@@ -2695,7 +2694,7 @@ class UIManager {
         // ★右側の説明を入れる箱（3分の1）
         const descContainer = document.createElement('div');
         descContainer.className = 'war-controls-desc';
-        descContainer.innerHTML = '<div style="color:#666; text-align:center; margin-top:15px;">命令を選択してください</div>';
+        descContainer.innerHTML = '<div style="color:#aaa; text-align:center; margin-top:15px;">命令を選択してください</div>';
 
         // 2つの箱を画面に追加します
         this.warControls.appendChild(btnContainer);
@@ -2727,9 +2726,9 @@ class UIManager {
                     
                     // 右側の箱に説明を書き出します
                     descContainer.innerHTML = `
-                        <div style="font-weight:bold; font-size:1.1rem; border-bottom:1px solid #ccc; padding-bottom:5px; margin-bottom:5px;">${cmd.label}</div>
+                        <div style="font-weight:bold; font-size:1.1rem; border-bottom:1px solid rgba(212, 175, 55, 0.5); padding-bottom:5px; margin-bottom:5px; color:#ffd54f;">${cmd.label}</div>
                         <div>${cmd.desc}</div>
-                        <div style="margin-top:8px; color:#d32f2f; font-weight:bold; font-size:0.85rem;">もう一度押すと実行します</div>
+                        <div style="margin-top:8px; color:#ff8a80; font-weight:bold; font-size:0.85rem;">もう一度押すと実行します</div>
                     `;
 
                     // すべてのボタンの「選択中」の光を消して、今押したボタンだけを光らせます
@@ -2985,8 +2984,8 @@ class UIManager {
         
         const textContainer = document.createElement('div');
         textContainer.className = 'war-action-message-text';
-        textContainer.style.cssText = `width: 100%; display: block; ${msgFontSize}`;
-        textContainer.innerHTML = `<span style="color: #eee;">${armyName} が作戦を思案中...</span>`;
+        textContainer.style.cssText = `${msgFontSize}`;
+        textContainer.innerHTML = `<span>${armyName} が作戦を思案中...</span>`;
         
         msgContainer.onclick = (e) => {
             e.stopPropagation();
