@@ -2373,6 +2373,7 @@ Object.assign(WarManager.prototype, {
                 killProb = 0;
             } else {
                 killProb = 50 - (p.charm - 10) * (50 / 60);
+                killProb = Math.max(0, killProb);
             }
 
             const totalStats = p.leadership + p.strength + (p.politics || 0) + (p.diplomacy || 0) + p.intelligence;
