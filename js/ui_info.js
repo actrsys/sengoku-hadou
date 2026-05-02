@@ -717,13 +717,14 @@ class UIInfoManager {
             let basePercent = Math.min(100, percent);
             let overPercent = percent > 100 ? percent - 100 : 0;
             let overBarHtml = overPercent > 0 ? `<div class="bar-fill-busho-over" style="width:${overPercent}%;"></div>` : "";
+            let fillClass = overPercent > 0 ? "bar-fill-busho over-connected" : "bar-fill-busho";
 
             return `
                 <div class="daimyo-detail-stat-box" style="padding-right: 5px;">
                     <span class="daimyo-detail-label">${label}</span>
                     <span class="daimyo-detail-value" style="display:flex; align-items:center; flex:1; justify-content: flex-end;">
                         <div class="bar-bg-busho">
-                            <div class="bar-fill-busho" style="width:${basePercent}%;"></div>
+                            <div class="${fillClass}" style="width:${basePercent}%;"></div>
                             ${overBarHtml}
                         </div>
                         <div style="width: 30px; text-align: center; font-weight: bold;">${gradeHtml}</div>

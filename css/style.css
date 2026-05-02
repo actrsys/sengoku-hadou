@@ -1604,6 +1604,10 @@ body:not(.is-pc) .daimyo-detail-value {
     border-radius: 2px;
 }
 
+.bar-fill-busho.over-connected {
+    border-radius: 2px 0 0 2px;
+}
+
 .bar-fill-busho-over {
     position: absolute;
     top: -1px;
