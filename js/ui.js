@@ -2705,6 +2705,11 @@ class UIManager {
 
         options.forEach(cmd => {
             const btn = document.createElement('button');
+            // ★追加：内政ボタンと同じデザイン（cmd-btn）を適用します
+            btn.className = 'cmd-btn';
+            if (cmd.type === 'retreat') {
+                btn.classList.add('back'); // 撤退ボタンは「戻る」と同じグレーのデザインにします
+            }
             btn.textContent = cmd.label;
             
             btn.onclick = () => {
