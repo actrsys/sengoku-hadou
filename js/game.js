@@ -530,9 +530,18 @@ class GameSystem {
         return this.toGradeHTML(target[statName]);
     }
 
-    static calcDevelopment(busho, bonusRate = 1.0) { return Math.max(1, Math.round((((busho.politics * 1.5) + (Math.sqrt(busho.loyalty) * 2)) / 20) * bonusRate)); }
-    static calcRepair(busho, bonusRate = 1.0) { return Math.max(1, Math.round((((busho.politics * 1.5) + (Math.sqrt(busho.loyalty) * 2)) / 15) * bonusRate)); }
-    static calcCharity(busho, bonusRate = 1.0) { return Math.max(1, Math.round((((busho.politics * 1.5) + busho.charm + (Math.sqrt(busho.loyalty) * 2)) / 30) * bonusRate)); }
+    static calcDevelopment(busho, bonusRate = 1.0, isExecute = false) { 
+        if (isExecute) busho.expPolitics = (busho.expPolitics || 0) + 10;
+        return Math.max(1, Math.round((((busho.politics * 1.5) + (Math.sqrt(busho.loyalty) * 2)) / 20) * bonusRate)); 
+    }
+    static calcRepair(busho, bonusRate = 1.0, isExecute = false) { 
+        if (isExecute) busho.expPolitics = (busho.expPolitics || 0) + 10;
+        return Math.max(1, Math.round((((busho.politics * 1.5) + (Math.sqrt(busho.loyalty) * 2)) / 15) * bonusRate)); 
+    }
+    static calcCharity(busho, bonusRate = 1.0, isExecute = false) { 
+        if (isExecute) busho.expPolitics = (busho.expPolitics || 0) + 5;
+        return Math.max(1, Math.round((((busho.politics * 1.5) + busho.charm + (Math.sqrt(busho.loyalty) * 2)) / 30) * bonusRate)); 
+    }
     
     // 新しい計算式です。兵士数(soldiers)を引数として受け取ります
     static calcTraining(busho, soldiers, bonusRate = 1.0) { 

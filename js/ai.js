@@ -227,7 +227,7 @@ class AIEngine {
             if (castle.defense <= castle.maxDefense / 4 && castle.gold >= 200) {
                 // 城壁修復
                 castle.gold -= 200;
-                const val = GameSystem.calcRepair(castellan);
+                const val = GameSystem.calcRepair(castellan, 1.0, true);
                 const oldVal = castle.defense;
                 castle.defense = Math.min(castle.maxDefense, castle.defense + val);
                 
@@ -240,7 +240,7 @@ class AIEngine {
             } else if (castle.peoplesLoyalty <= 70 && castle.rice >= 200) {
                 // 施し
                 castle.rice -= 200;
-                const val = GameSystem.calcCharity(castellan);
+                const val = GameSystem.calcCharity(castellan, 1.0, true);
                 
                 castle.peoplesLoyalty = Math.min(100, castle.peoplesLoyalty + val);
                 
@@ -1976,7 +1976,7 @@ class AIEngine {
                 }
                 if (action.type === 'repair' && castle.gold >= 200) {
                     castle.gold -= 200;
-                    const val = GameSystem.calcRepair(doer);
+                    const val = GameSystem.calcRepair(doer, 1.0, true);
                     const oldVal = castle.defense;
                     castle.defense = Math.min(castle.maxDefense, castle.defense + val);
                     
@@ -1990,7 +1990,7 @@ class AIEngine {
                 if (action.type === 'charity' && castle.rice >= 200) {
                     castle.rice -= 200;
                     
-                    const val = GameSystem.calcCharity(doer);
+                    const val = GameSystem.calcCharity(doer, 1.0, true);
                     
                     const oldVal = castle.peoplesLoyalty;
                     castle.peoplesLoyalty = Math.min(100, castle.peoplesLoyalty + val);
@@ -2086,7 +2086,7 @@ class AIEngine {
                 }
                 if (action.type === 'farm' && castle.gold >= 200) {
                     castle.gold -= 200;
-                    const val = GameSystem.calcDevelopment(doer);
+                    const val = GameSystem.calcDevelopment(doer, 1.0, true);
                     const oldVal = castle.kokudaka;
                     castle.kokudaka = Math.min(castle.maxKokudaka, castle.kokudaka + val);
                     
@@ -2098,7 +2098,7 @@ class AIEngine {
                 }
                 if (action.type === 'commerce' && castle.gold >= 200) {
                     castle.gold -= 200;
-                    const val = GameSystem.calcDevelopment(doer);
+                    const val = GameSystem.calcDevelopment(doer, 1.0, true);
                     const oldVal = castle.commerce;
                     castle.commerce = Math.min(castle.maxCommerce, castle.commerce + val);
                     

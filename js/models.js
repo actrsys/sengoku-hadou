@@ -471,11 +471,11 @@ class Busho {
     // ==========================================
     // ★ここから追加：能力値の「自動計算」の魔法（ゲッター・セッター）です！
     // 誰かが「leadershipはいくつ？」と聞いた時に、秘密の箱の数字と経験値を足して答えます。
-    get leadership() { return this._leadership + Math.floor(this.expLeadership / 100); }
-    get strength() { return this._strength + Math.floor(this.expStrength / 100); }
-    get politics() { return this._politics + Math.floor(this.expPolitics / 100); }
-    get diplomacy() { return this._diplomacy + Math.floor(this.expDiplomacy / 100); }
-    get intelligence() { return this._intelligence + Math.floor(this.expIntelligence / 100); }
+    get leadership() { return Math.min(100, this._leadership + Math.floor(this.expLeadership / 100)); }
+    get strength() { return Math.min(100, this._strength + Math.floor(this.expStrength / 100)); }
+    get politics() { return Math.min(100, this._politics + Math.floor(this.expPolitics / 100)); }
+    get diplomacy() { return Math.min(100, this._diplomacy + Math.floor(this.expDiplomacy / 100)); }
+    get intelligence() { return Math.min(100, this._intelligence + Math.floor(this.expIntelligence / 100)); }
 
     // 逆に、年齢の変化などで「leadershipを80にして！」と命令された時は、秘密の箱だけにその数字をしまいます。
     set leadership(val) { this._leadership = val; }

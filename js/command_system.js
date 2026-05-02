@@ -1820,7 +1820,7 @@ class CommandSystem {
             
             if (type === 'farm') { 
                 if (castle.gold >= spec.costGold) { 
-                    const val = GameSystem.calcDevelopment(busho, bonusRate); castle.gold -= spec.costGold; 
+                    const val = GameSystem.calcDevelopment(busho, bonusRate, true); castle.gold -= spec.costGold; 
                     const oldVal = castle.kokudaka;
                     castle.kokudaka = Math.min(castle.maxKokudaka, castle.kokudaka + val); 
                     const actualVal = castle.kokudaka - oldVal;
@@ -1831,7 +1831,7 @@ class CommandSystem {
             }
             else if (type === 'commerce') { 
                 if (castle.gold >= spec.costGold) { 
-                    const val = GameSystem.calcDevelopment(busho, bonusRate); castle.gold -= spec.costGold; 
+                    const val = GameSystem.calcDevelopment(busho, bonusRate, true); castle.gold -= spec.costGold; 
                     const oldVal = castle.commerce;
                     castle.commerce = Math.min(castle.maxCommerce, castle.commerce + val); 
                     const actualVal = castle.commerce - oldVal;
@@ -1842,7 +1842,7 @@ class CommandSystem {
             }
             else if (type === 'repair') { 
                 if (castle.gold >= spec.costGold) { 
-                    const val = GameSystem.calcRepair(busho, bonusRate); castle.gold -= spec.costGold; 
+                    const val = GameSystem.calcRepair(busho, bonusRate, true); castle.gold -= spec.costGold; 
                     const oldVal = castle.defense;
                     castle.defense = Math.min(castle.maxDefense, castle.defense + val); 
                     const actualVal = castle.defense - oldVal;
@@ -2382,7 +2382,7 @@ class CommandSystem {
             const busho = this.game.getBusho(bid);
             if (!busho) return;
 
-            const val = GameSystem.calcCharity(busho, bonusRate); 
+            const val = GameSystem.calcCharity(busho, bonusRate, true); 
 
             totalVal += val;
             count++;
