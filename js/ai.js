@@ -594,8 +594,8 @@ class AIEngine {
 
                 // ★大雪の城からは援軍が来ないので、計算に入れません！
                 if (!isReinfHeavySnow) {
-                    // 自分が呼べそうな自家援軍（出撃元の城以外で、兵力1000以上の城）
-                    if (c.ownerClan === myCastle.ownerClan && c.id !== myCastle.id && c.soldiers >= 1000) {
+                    // 自分が呼べそうな自家援軍（出撃元の城と同じ軍団で、出撃元の城以外で、兵力1000以上の城）
+                    if (c.ownerClan === myCastle.ownerClan && c.legionId === myCastle.legionId && c.id !== myCastle.id && c.soldiers >= 1000) {
                         myReinfPower += (c.soldiers * 0.5) * errorRate; // 兵力の半分くらい来てくれると予想
                     }
                     // 相手が呼べそうな自家援軍（守る城以外で、兵力1000以上の城）
@@ -1022,7 +1022,7 @@ class AIEngine {
             if (current.adjacentCastleIds) {
                 current.adjacentCastleIds.forEach(adjId => {
                     const c = this.game.getCastle(adjId);
-                    if (c && c.ownerClan === castle.ownerClan && !visitedCastles.has(c.id)) {
+                    if (c && c.ownerClan === castle.ownerClan && c.legionId === castle.legionId && !visitedCastles.has(c.id)) {
                         adjMyCastles.push(c);
                     }
                 });
@@ -1238,8 +1238,8 @@ class AIEngine {
                 maxDraft = Math.min(maxDraft, castle.population);
 
                 // ===== 目標兵力の計算 =====
-                // 自分の大名家全体の「総石高」を調べます！
-                const myCastles = this.game.castles.filter(c => c.ownerClan === castle.ownerClan);
+                // 自分の軍団全体の「総石高」を調べます！
+                const myCastles = this.game.castles.filter(c => c.ownerClan === castle.ownerClan && c.legionId === castle.legionId);
                 const totalKokudaka = myCastles.reduce((sum, c) => sum + c.kokudaka, 0);
 
                 // 石高をベースにした新しい計算式で、目標にする兵士の数を決めます
@@ -1491,8 +1491,8 @@ class AIEngine {
                     // 最大勢力の中で、一番兵士が多いお城の「半分」をお留守番の目標にします
                     keepSoldiers = Math.floor(maxEnemyMaxCastleSoldiers * 0.5);
 
-                    // でも、自分の大名家全体の兵力が、敵の全体の半分以下なら…
-                    const myCastles = this.game.castles.filter(c => c.ownerClan === castle.ownerClan);
+                    // でも、自分の軍団全体の兵力が、敵の全体の半分以下なら…
+                    const myCastles = this.game.castles.filter(c => c.ownerClan === castle.ownerClan && c.legionId === castle.legionId);
                     const myTotalSoldiers = myCastles.reduce((sum, c) => sum + c.soldiers, 0);
                     const enemyHalf = maxEnemyTotalSoldiers * 0.5;
 
