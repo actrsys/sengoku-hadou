@@ -954,8 +954,8 @@ class GameManager {
                 // 年齢を計算します（現在の年 - 生まれた年）
                 let age = this.year - b.birthYear;
                 
-                // 万が一、年齢が0以下の場合は処理をスキップします
-                if (age <= 0) return;
+                // 万が一、年齢がマイナス（生まれる前など）の場合は処理をスキップします！
+                if (age < 0) return;
 
                 // ５つの能力の「基本の高さ」と「経験値を入れる箱の名前」をセットにしてリスト化します
                 let stats = [
@@ -987,8 +987,21 @@ class GameManager {
                     // ① 一番高い能力が単独の場合：一番上の能力に年齢×10の経験値を与えます
                     b[stats[0].name] += age * 10;
                     
-                    // ② 二番目に高い能力に：上から二番目の能力に年齢×5の経験値を与えます
-                    b[stats[1].name] += age * 5;
+                    // ② 二番目に高い能力が複数あるかチェックします
+                    let secondHighestVal = stats[1].val;
+                    let secondPlaceStats = stats.filter(s => s.val === secondHighestVal);
+                    
+                    if (secondPlaceStats.length > 1) {
+                        // 二番目が同率で複数ある場合：年齢×5の経験値を均等に割り振ります
+                        let totalSecondExp = age * 5;
+                        let expPerSecondStat = Math.ceil(totalSecondExp / secondPlaceStats.length); // 小数点以下は繰り上げます
+                        secondPlaceStats.forEach(s => {
+                            b[s.name] += expPerSecondStat;
+                        });
+                    } else {
+                        // 二番目も単独の場合：そのまま年齢×5の経験値を与えます
+                        b[stats[1].name] += age * 5;
+                    }
                 }
             });
 
