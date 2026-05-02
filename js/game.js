@@ -946,6 +946,52 @@ class GameManager {
             // ★ここを書き足し！：ゲーム開始の瞬間に、全員の年齢による能力値変動を計算します！
             this.lifeSystem.updateAllBushosAge();
 
+            // ★今回追加：ゲーム開始時に、武将の年齢と得意な能力に応じた経験値をプレゼントします！
+            this.bushos.forEach(b => {
+                // まだ生まれていない武将は対象外とします
+                if (b.status === 'unborn') return;
+
+                // 年齢を計算します（現在の年 - 生まれた年）
+                let age = this.year - b.birthYear;
+                
+                // 万が一、年齢が0以下の場合は処理をスキップします
+                if (age <= 0) return;
+
+                // ５つの能力の「基本の高さ」と「経験値を入れる箱の名前」をセットにしてリスト化します
+                let stats = [
+                    { name: 'expLeadership', val: b.baseLeadership },
+                    { name: 'expStrength', val: b.baseStrength },
+                    { name: 'expPolitics', val: b.basePolitics },
+                    { name: 'expDiplomacy', val: b.baseDiplomacy },
+                    { name: 'expIntelligence', val: b.baseIntelligence }
+                ];
+
+                // 数値が高い（大きい）順に並び替えます
+                stats.sort((x, y) => y.val - x.val);
+
+                // 一番高い数値をメモしておきます
+                let highestVal = stats[0].val;
+                
+                // 一番高い数値と同じ数値を持つ能力を集めます（同率一位が複数いないかチェックします）
+                let firstPlaceStats = stats.filter(s => s.val === highestVal);
+
+                if (firstPlaceStats.length > 1) {
+                    // ③ 同率一位が複数ある場合：年齢×15の経験値を、その複数の能力に均等に割り振ります
+                    let totalExp = age * 15;
+                    let expPerStat = Math.ceil(totalExp / firstPlaceStats.length); // 小数点以下は繰り上げます
+                    
+                    firstPlaceStats.forEach(s => {
+                        b[s.name] += expPerStat;
+                    });
+                } else {
+                    // ① 一番高い能力が単独の場合：一番上の能力に年齢×10の経験値を与えます
+                    b[stats[0].name] += age * 10;
+                    
+                    // ② 二番目に高い能力に：上から二番目の能力に年齢×5の経験値を与えます
+                    b[stats[1].name] += age * 5;
+                }
+            });
+
             // ★ここから追加：ゲーム開始時の特別なイベント（寿命の延長など）を実行します！
             if (this.eventManager) {
                 await this.eventManager.processEvents('game_start');
