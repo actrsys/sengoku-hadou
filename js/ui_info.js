@@ -711,14 +711,21 @@ class UIInfoManager {
             let perceived = GameSystem.getPerceivedStatValue(busho, statKey, gunshi, acc, this.game.playerClanId, myDaimyo);
             if (busho.clan === this.game.playerClanId && busho.isDaimyo) perceived = busho[statKey];
             
-            let percent = perceived !== null ? Math.min(100, Math.max(0, perceived)) : 0;
+            let percent = perceived !== null ? Math.max(0, perceived) : 0;
             if(perceived === null) percent = 0; 
+
+            let basePercent = Math.min(100, percent);
+            let overPercent = percent > 100 ? percent - 100 : 0;
+            let overBarHtml = overPercent > 0 ? `<div class="bar-fill-busho-over" style="width:${overPercent}%;"></div>` : "";
 
             return `
                 <div class="daimyo-detail-stat-box" style="padding-right: 5px;">
                     <span class="daimyo-detail-label">${label}</span>
                     <span class="daimyo-detail-value" style="display:flex; align-items:center; flex:1; justify-content: flex-end;">
-                        <div class="bar-bg-busho"><div class="bar-fill-busho" style="width:${percent}%;"></div></div>
+                        <div class="bar-bg-busho">
+                            <div class="bar-fill-busho" style="width:${basePercent}%;"></div>
+                            ${overBarHtml}
+                        </div>
                         <div style="width: 30px; text-align: center; font-weight: bold;">${gradeHtml}</div>
                     </span>
                 </div>
