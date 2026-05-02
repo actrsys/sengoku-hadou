@@ -1174,15 +1174,18 @@ class DiplomacyManager {
         }
 
         this.game.castles.forEach(c => {
-            // ★追加：自分自身（出陣元の城）および対象（攻撃/防衛されている城）は援軍候補から除外します
-            if (Number(c.id) === Number(initiatorCastleId) || Number(c.id) === Number(targetCastle.id)) return;
-
             // 1. 共通の条件：大雪の国からは出陣できません
             const prov = this.game.provinces.find(p => p.id === c.provinceId);
             if (prov && prov.statusEffects && prov.statusEffects.includes('heavySnow')) return;
             
+            // ★修正：自分自身（出陣元の城）および対象（攻撃/防衛されている城）かどうかを判定します
+            const isInitiatorOrTarget = (Number(c.id) === Number(initiatorCastleId) || Number(c.id) === Number(targetCastle.id));
+
             // 2. 自勢力（自分の別のお城）を探す場合
             if (isSelf) {
+                // ★大名家の自軍援軍として、出陣元や対象の城は除外します
+                if (isInitiatorOrTarget) return;
+
                 if (Number(c.ownerClan) !== Number(myClanId)) return;
                 
                 // 道が繋がっているか、すぐ隣か
@@ -1207,7 +1210,8 @@ class DiplomacyManager {
                 const cOwnerClanId = Number(c.ownerClan);
 
                 // --- 大名家のチェック ---
-                if (cOwnerClanId !== 0 && cOwnerClanId !== Number(myClanId)) {
+                // ★大名家の他勢力援軍として、出陣元や対象の城は除外します
+                if (!isInitiatorOrTarget && cOwnerClanId !== 0 && cOwnerClanId !== Number(myClanId)) {
                     // ★追加：敵対陣営として参加確定している勢力は呼べない
                     if (hostileClans.has(cOwnerClanId)) {
                         // 除外
