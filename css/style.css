@@ -1614,10 +1614,11 @@ body:not(.is-pc) .daimyo-detail-value {
     bottom: -1px;
     left: 100%;
     height: calc(100% + 2px);
-    border: 1px solid rgba(212, 175, 55, 0.5);
+    border: 1px solid transparent;
     border-left: none;
     border-radius: 0 3px 3px 0;
     background: linear-gradient(to right, #dcd8c0, #fffff0);
+    background-clip: padding-box;
     box-shadow: 0 0 6px rgba(255, 255, 240, 0.6);
     box-sizing: border-box;
 }
