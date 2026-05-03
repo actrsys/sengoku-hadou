@@ -261,12 +261,19 @@ window.GameEvents.push({
                 const finalScale = damagedProvinceMap.get(castle.provinceId);
                 const dropPercent = finalScale * 0.03;
                 
-                castle.kokudaka = Math.floor(castle.kokudaka * (1.0 - dropPercent));
-                castle.defense = Math.floor(castle.defense * (1.0 - dropPercent));
+                // 城防御力15につき1%のダメージ軽減率を計算します（最大100%カット）
+                const defenseCutRate = Math.min(1.0, Math.floor(castle.defense / 15) * 0.01);
+                const actualDropPercent = dropPercent * (1.0 - defenseCutRate);
+                
+                castle.kokudaka = Math.floor(castle.kokudaka * (1.0 - actualDropPercent));
+                castle.defense = Math.floor(castle.defense * (1.0 - dropPercent)); // 防御のダメージは軽減しません
                 
                 if (finalScale >= 6) {
-                    castle.soldiers = Math.floor(castle.soldiers * (1.0 - ((finalScale - 5) * 0.04)));
-                    castle.population = Math.floor(castle.population * (1.0 - ((finalScale - 5) * 0.02)));
+                    const solDropRate = ((finalScale - 5) * 0.04) * (1.0 - defenseCutRate);
+                    castle.soldiers = Math.floor(castle.soldiers * (1.0 - solDropRate));
+                    
+                    const popDropRate = ((finalScale - 5) * 0.02) * (1.0 - defenseCutRate);
+                    castle.population = Math.floor(castle.population * (1.0 - popDropRate));
                 }
 
                 if (castle.ownerClan === game.playerClanId) {

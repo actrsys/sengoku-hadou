@@ -751,7 +751,7 @@ window.GameEvents.push({
             128, 0, 128
         );
 
-        // 選ばれた国のお城に被害を与えます
+        // 選ばれた国のお城に疫病の被害を与えます
         game.castles.forEach(c => {
             if (c.ownerClan === 0) return; 
             
@@ -803,24 +803,27 @@ window.GameEvents.push({
             139, 69, 19
         );
 
-        // 選ばれた国のお城に被害を与えます
+        // 選ばれた国のお城に地震の被害を与えます
         game.castles.forEach(c => {
             if (c.ownerClan === 0) return; 
             
             if (affectedProvIds.has(c.provinceId)) {
-                // 兵士数が 5% ～ 15% ランダムで減ります
-                const solDropRate = 0.05 + (Math.random() * 0.10);
+                // 城防御力15につき1%のダメージ軽減率を計算します（最大100%カット）
+                const defenseCutRate = Math.min(1.0, Math.floor(c.defense / 15) * 0.01);
+
+                // 兵士数が 5% ～ 15% ランダムで減ります（防御力で被害軽減）
+                const solDropRate = (0.05 + (Math.random() * 0.10)) * (1.0 - defenseCutRate);
                 c.soldiers = Math.max(0, Math.floor(c.soldiers * (1.0 - solDropRate)));
                 
-                // 人口が 0.1% ～ 5% ランダムで減ります
-                const popDropRate = 0.001 + (Math.random() * 0.049);
+                // 人口が 0.1% ～ 5% ランダムで減ります（防御力で被害軽減）
+                const popDropRate = (0.001 + (Math.random() * 0.049)) * (1.0 - defenseCutRate);
                 c.population = Math.max(0, Math.floor(c.population * (1.0 - popDropRate)));
                 
-                // 石高が 5% ～ 30% ランダムで減ります（田んぼが崩れてしまいます）
-                const kokuDropRate = 0.05 + (Math.random() * 0.25);
+                // 石高が 5% ～ 30% ランダムで減ります（防御力で被害軽減）
+                const kokuDropRate = (0.05 + (Math.random() * 0.25)) * (1.0 - defenseCutRate);
                 c.kokudaka = Math.max(0, Math.floor(c.kokudaka * (1.0 - kokuDropRate)));
                 
-                // 城防御が 20% ～ 50% も大きく減ります（城壁や門が壊れてしまいます）
+                // 城防御が 20% ～ 50% も大きく減ります（城壁や門のダメージは軽減しません）
                 const defDropRate = 0.20 + (Math.random() * 0.30);
                 c.defense = Math.max(0, Math.floor(c.defense * (1.0 - defDropRate)));
             }
