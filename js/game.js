@@ -1452,8 +1452,8 @@ class GameManager {
                 // 2. 民忠補正: 民忠 * 0.01
                 const loyaltyBonus = c.peoplesLoyalty * 0.01;
                 
-                // 3. 増加量の基本値: √城の人口 * ((大名補正 + 民忠補正) / 2) * 1.0(調整用)
-                const baseGrowth = Math.sqrt(c.population) * ((daimyoBonus + loyaltyBonus) / 2) * 1.0;
+                // 3. 増加量の基本値: √城の人口 * ((大名補正 + 民忠補正) / 2) * 1.25(調整用)
+                const baseGrowth = Math.sqrt(c.population) * ((daimyoBonus + loyaltyBonus) / 2) * 1.25;
 
                 // ★追加：城の所有数によるブレーキです！
                 // まず、このお城の持ち主が、全部でいくつお城を持っているか数えます
