@@ -441,13 +441,32 @@ class AffiliationSystem {
                 return; 
             }
         }
+
+        // 忠誠度による候補の絞り込み（元々城主の場合は除外して常に候補に含める）
+        let candidates = [];
+        const loyal90 = bushos.filter(b => b.loyalty >= 90 || b.isCastellan);
+        if (loyal90.length > 0) {
+            candidates = loyal90;
+        } else {
+            const loyal80 = bushos.filter(b => b.loyalty >= 80 || b.isCastellan);
+            if (loyal80.length > 0) {
+                candidates = loyal80;
+            } else {
+                const loyal70 = bushos.filter(b => b.loyalty >= 70 || b.isCastellan);
+                if (loyal70.length > 0) {
+                    candidates = loyal70;
+                } else {
+                    candidates = bushos;
+                }
+            }
+        }
         
         const daimyo = this.game.bushos.find(b => b.clan === castle.ownerClan && b.isDaimyo);
         const innovation = daimyo ? daimyo.innovation : 50; 
         const abilityFactor = innovation / 100;
         const meritFactor = (100 - innovation) / 100;
 
-        bushos.forEach(b => {
+        candidates.forEach(b => {
             const leadScore = Math.min(b.leadership, 80) * 0.8 + Math.max(b.leadership - 80, 0) * 0.8 * 0.3;
             const strScore = Math.min(b.strength, 50) * 0.5 + Math.max(b.strength - 50, 0) * 0.5 * 0.3;
             const polScore = Math.min(b.politics, 80) * 0.8 + Math.max(b.politics - 80, 0) * 0.8 * 0.3;
@@ -472,8 +491,8 @@ class AffiliationSystem {
             }
         });
 
-        bushos.sort((a, b) => b._lordScore - a._lordScore);
-        const best = bushos[0];
+        candidates.sort((a, b) => b._lordScore - a._lordScore);
+        const best = candidates[0];
 
         bushos.forEach(b => b.isCastellan = false);
         best.isCastellan = true;
