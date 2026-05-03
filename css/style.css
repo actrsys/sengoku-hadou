@@ -1807,6 +1807,8 @@ body:not(.is-pc) .daimyo-detail-value {
 .stat-busho { white-space: nowrap !important; overflow: hidden !important; text-overflow: ellipsis !important; color: #fff; font-weight: bold; }
 .reinf-content-wrap { display: flex; width: 100%; }
 .stat-row { display: flex; justify-content: space-between; align-items: center !important; border-bottom: 1px solid rgba(255,255,255,0.3) !important; padding-bottom: 1px !important; font-weight: bold; font-size: 0.8rem !important; }
+.stat-row-group { display: flex; width: 100%; gap: 10px; border-bottom: 1px solid rgba(255,255,255,0.3); padding-bottom: 1px; align-items: center; }
+.stat-row-group .stat-row { flex: 1; border-bottom: none !important; padding-bottom: 0 !important; }
 .stat-val-large { font-size: 0.95rem !important; }
 .war-reinf-card .stat-row { display: flex !important; justify-content: space-between !important; width: 100% !important; box-sizing: border-box !important; }
 
@@ -2235,6 +2237,7 @@ body.is-pc {
     .stat-busho { font-size: 1.3rem !important; }
     .stat-busho > * { font-size: 1.3rem !important; }
     .stat-row { width: 100% !important; font-size: 1.2rem !important; border-bottom-width: 4px !important; padding-bottom: 2px !important; align-items: center !important; }
+    .stat-row-group { border-bottom-width: 4px; padding-bottom: 2px; }
     .stat-val-large { font-size: 1.5rem !important; }
     .title-long-text { font-size: 1.15rem !important; }
 
@@ -2246,6 +2249,7 @@ body.is-pc {
     .war-reinf-card .reinf-face-container { display: block; }
     .war-reinf-card .responsive-war-face { width: 60px !important; height: 60px !important; border-width: 2px; }
     .war-reinf-card .stat-row { width: 100% !important; font-size: 0.8rem !important; border-bottom-width: 1px !important; }
+    .war-reinf-card .stat-row-group { border-bottom-width: 1px; }
 }
 
 /* =========================================================
