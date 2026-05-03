@@ -1088,6 +1088,9 @@ class AIEngine {
 
         // ★追加：取引の回数を数えるカウンター
         let tradeCount = 0;
+        
+        // ★追加：行動回数消費なしの特別調略を行ったかのフラグ
+        let hasBonusSabotageUsed = false;
 
         // ★高速化：今の国の兵糧の単価（相場）をループの「外」で１回だけ調べておきます！
         let riceRate = 1.0;
@@ -1744,11 +1747,17 @@ class AIEngine {
                         // 第一目標勢力に所属する武将を全員取得（大名は除く）
                         const enemyBushos = this.game.bushos.filter(b => b.clan === memoryClanId && b.status === 'active' && !b.isDaimyo && b.castleId > 0);
                         
+                        // ★修正：リーダー（直轄なら大名、軍団なら国主）の智謀によるスコアアップ（75以上でアップ、95で最大+5）
+                        let rumorHeadhuntScore = 5;
+                        if (leader.intelligence >= 75) {
+                            rumorHeadhuntScore += Math.min(5, Math.floor((leader.intelligence - 75) / 4));
+                        }
+                        
                         enemyBushos.forEach(targetBusho => {
-                            actions.push({ type: 'rumor', stat: 'intelligence', score: 5, cost: 0, targetId: targetBusho.castleId, targetBushoId: targetBusho.id });
+                            actions.push({ type: 'rumor', stat: 'intelligence', score: rumorHeadhuntScore, cost: 0, targetId: targetBusho.castleId, targetBushoId: targetBusho.id });
                             
                             if (castle.gold >= 100) {
-                                actions.push({ type: 'headhunt', stat: 'intelligence', score: 5, cost: 100, targetId: targetBusho.castleId, targetBushoId: targetBusho.id, gold: 100 });
+                                actions.push({ type: 'headhunt', stat: 'intelligence', score: rumorHeadhuntScore, cost: 100, targetId: targetBusho.castleId, targetBushoId: targetBusho.id, gold: 100 });
                             }
                         });
                     }
@@ -1888,7 +1897,17 @@ class AIEngine {
                         doer.achievementTotal = (doer.achievementTotal || 0) + 5;
                         if (this.game.factionSystem && this.game.factionSystem.updateRecognition) this.game.factionSystem.updateRecognition(doer, 10);
                     }
-                    doer.isActionDone = true; actionDoneInThisStep = true; break;
+                    
+                    let keepAction = false;
+                    if (!hasBonusSabotageUsed && leader.intelligence >= 91) {
+                        const bonusProb = Math.min(100, 3 + Math.floor((leader.intelligence - 91) / 5) * 3);
+                        if (Math.random() * 100 < bonusProb) {
+                            keepAction = true;
+                            hasBonusSabotageUsed = true;
+                        }
+                    }
+                    if (!keepAction) doer.isActionDone = true; 
+                    actionDoneInThisStep = true; break;
                 }
                 if (action.type === 'incite') {
                     const result = this.game.strategySystem.calcIncite(doer.id, action.targetId, true);
@@ -1902,7 +1921,17 @@ class AIEngine {
                         doer.achievementTotal = (doer.achievementTotal || 0) + 5;
                         if (this.game.factionSystem && this.game.factionSystem.updateRecognition) this.game.factionSystem.updateRecognition(doer, 10);
                     }
-                    doer.isActionDone = true; actionDoneInThisStep = true; break;
+                    
+                    let keepAction = false;
+                    if (!hasBonusSabotageUsed && leader.intelligence >= 91) {
+                        const bonusProb = Math.min(100, 3 + Math.floor((leader.intelligence - 91) / 5) * 3);
+                        if (Math.random() * 100 < bonusProb) {
+                            keepAction = true;
+                            hasBonusSabotageUsed = true;
+                        }
+                    }
+                    if (!keepAction) doer.isActionDone = true; 
+                    actionDoneInThisStep = true; break;
                 }
                 if (action.type === 'rumor') {
                     let result = this.game.strategySystem.calcRumor(doer.id, action.targetBushoId, true);
@@ -1916,7 +1945,17 @@ class AIEngine {
                         doer.achievementTotal = (doer.achievementTotal || 0) + 5;
                         if (this.game.factionSystem && this.game.factionSystem.updateRecognition) this.game.factionSystem.updateRecognition(doer, 10);
                     }
-                    doer.isActionDone = true; actionDoneInThisStep = true; break;
+                    
+                    let keepAction = false;
+                    if (!hasBonusSabotageUsed && leader.intelligence >= 91) {
+                        const bonusProb = Math.min(100, 3 + Math.floor((leader.intelligence - 91) / 5) * 3);
+                        if (Math.random() * 100 < bonusProb) {
+                            keepAction = true;
+                            hasBonusSabotageUsed = true;
+                        }
+                    }
+                    if (!keepAction) doer.isActionDone = true; 
+                    actionDoneInThisStep = true; break;
                 }
                 if (action.type === 'headhunt' && castle.gold >= action.cost) {
                     castle.gold -= action.cost;
@@ -1967,7 +2006,17 @@ class AIEngine {
                         doer.achievementTotal = (doer.achievementTotal || 0) + 5;
                         if (this.game.factionSystem && this.game.factionSystem.updateRecognition) this.game.factionSystem.updateRecognition(doer, 10);
                     }
-                    doer.isActionDone = true; actionDoneInThisStep = true; break;
+                    
+                    let keepAction = false;
+                    if (!hasBonusSabotageUsed && leader.intelligence >= 91) {
+                        const bonusProb = Math.min(100, 3 + Math.floor((leader.intelligence - 91) / 5) * 3);
+                        if (Math.random() * 100 < bonusProb) {
+                            keepAction = true;
+                            hasBonusSabotageUsed = true;
+                        }
+                    }
+                    if (!keepAction) doer.isActionDone = true; 
+                    actionDoneInThisStep = true; break;
                 }
                 if (action.type === 'repair' && castle.gold >= 200) {
                     castle.gold -= 200;
