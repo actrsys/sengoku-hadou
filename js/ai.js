@@ -156,8 +156,9 @@ class AIEngine {
                                                     breakMsg = `${myClanName}が${targetClanName}の従属下から独立しました！`;
                                                 }
                                                 
-                                                // 画面のログ（文字の履歴）にお知らせを出します
+                                                // 画面のログ（文字の履歴）やダイアログにお知らせを出します
                                                 if (breakMsg !== "") {
+                                                    this.game.ui.showDialog(breakMsg, false);
                                                     this.game.ui.log(`【外交】${breakMsg}`);
                                                     console.log(breakMsg); // 裏側の記録にも残しておきます
                                                 }
