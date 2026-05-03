@@ -2039,8 +2039,6 @@ body:not(.is-pc) .war-side-wrapper > .war-reinf-col { order: 2 !important; flex-
 body:not(.is-pc) .war-side-wrapper > .war-reinf-col:first-child { flex-direction: row-reverse !important; }
 
 body:not(.is-pc) .responsive-army-content .stat-busho > * { font-size: 0.75rem !important; }
-body:not(.is-pc) .label-sp-flex { display: flex !important; justify-content: space-between !important; gap: 8px !important; }
-body:not(.is-pc) .label-sp-flex > div { flex: 1 !important; display: flex !important; justify-content: space-between !important; }
 body:not(.is-pc) .war-visual { padding: 3px 5px !important; margin-bottom: 0 !important; flex-shrink: 1 !important; min-height: 0 !important; overflow-y: auto !important; }
 body:not(.is-pc) .responsive-war-visual { padding: 2px !important; gap: 2px !important; }
 body:not(.is-pc) #war-title-name { font-size: 1.05rem !important; margin: 1px 0 !important; }
@@ -2248,7 +2246,6 @@ body.is-pc {
     .war-reinf-card .reinf-face-container { display: block; }
     .war-reinf-card .responsive-war-face { width: 60px !important; height: 60px !important; border-width: 2px; }
     .war-reinf-card .stat-row { width: 100% !important; font-size: 0.8rem !important; border-bottom-width: 1px !important; }
-    .label-sp-flex { display: none !important; }
 }
 
 /* =========================================================

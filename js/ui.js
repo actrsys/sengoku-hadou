@@ -2326,12 +2326,6 @@ class UIManager {
                 updateTxt('war-atk-ally-reinf-morale', data.currentStats.atkAllyMorale);
                 updateTxt('war-def-self-reinf-morale', data.currentStats.defSelfMorale);
                 updateTxt('war-def-ally-reinf-morale', data.currentStats.defAllyMorale);
-                
-                // スマホ用の縦並びレイアウト時の士気も念のため同時に更新します
-                updateTxt('war-atk-self-reinf-morale-sp', data.currentStats.atkSelfMorale);
-                updateTxt('war-atk-ally-reinf-morale-sp', data.currentStats.atkAllyMorale);
-                updateTxt('war-def-self-reinf-morale-sp', data.currentStats.defSelfMorale);
-                updateTxt('war-def-ally-reinf-morale-sp', data.currentStats.defAllyMorale);
 
                 let highlightIds = [];
                 
@@ -2469,9 +2463,11 @@ class UIManager {
         
         setTxt('war-atk-busho', s.atkBushos[0].name.split('|').join('') + '軍');
         setTxt('war-atk-soldier', s.attacker.soldiers + '人');
-        setTxt('war-atk-morale', s.attacker.morale);
-        setTxt('war-atk-training', s.attacker.training);
         setTxt('war-atk-rice', s.attacker.rice); 
+        setTxt('war-atk-training', s.attacker.training);
+        setTxt('war-atk-morale', s.attacker.morale);
+        setTxt('war-atk-horses', s.attacker.horses || 0);
+        setTxt('war-atk-guns', s.attacker.guns || 0);
         updateFace('war-atk-face', s.atkBushos[0]);
         
         const defClan = this.game.clans.find(c => c.id === s.defender.ownerClan);
@@ -2487,9 +2483,11 @@ class UIManager {
 
         setTxt('war-def-busho', s.defBusho.name.split('|').join('') + '軍');
         setTxt('war-def-soldier', s.defender.soldiers + '人');
-        setTxt('war-def-morale', s.defender.morale);
-        setTxt('war-def-training', s.defender.training);
         setTxt('war-def-rice', s.defender.rice); 
+        setTxt('war-def-training', s.defender.training);
+        setTxt('war-def-morale', s.defender.morale);
+        setTxt('war-def-horses', s.defender.horses || 0);
+        setTxt('war-def-guns', s.defender.guns || 0);
         updateFace('war-def-face', s.defBusho);
         
         // ★HTMLに用意した枠へ、援軍の情報を流し込む魔法です！
@@ -2504,10 +2502,10 @@ class UIManager {
             const bushoEl = document.getElementById(`war-${prefix}-reinf-busho`);
             const soldierEl = document.getElementById(`war-${prefix}-reinf-soldier`);
             const riceEl = document.getElementById(`war-${prefix}-reinf-rice`);
-            const moraleEl = document.getElementById(`war-${prefix}-reinf-morale`);
             const trainingEl = document.getElementById(`war-${prefix}-reinf-training`);
-            const moraleSpEl = document.getElementById(`war-${prefix}-reinf-morale-sp`);
-            const trainingSpEl = document.getElementById(`war-${prefix}-reinf-training-sp`);
+            const moraleEl = document.getElementById(`war-${prefix}-reinf-morale`);
+            const horsesEl = document.getElementById(`war-${prefix}-reinf-horses`);
+            const gunsEl = document.getElementById(`war-${prefix}-reinf-guns`);
             
             const titleEl = card.querySelector('.responsive-army-title');
             const statsEl = card.querySelector('.responsive-army-stats');
@@ -2534,10 +2532,10 @@ class UIManager {
                     bushoEl.textContent = '';
                     soldierEl.textContent = '';
                     riceEl.textContent = '';
-                    moraleEl.textContent = '';
                     trainingEl.textContent = '';
-                    if(moraleSpEl) moraleSpEl.textContent = '';
-                    if(trainingSpEl) trainingSpEl.textContent = '';
+                    moraleEl.textContent = '';
+                    if(horsesEl) horsesEl.textContent = '';
+                    if(gunsEl) gunsEl.textContent = '';
                     
                     card.dataset.hasUnit = 'false'; // 念のためシールを「いない」にしておきます
                 }
@@ -2589,14 +2587,13 @@ class UIManager {
 
                 // ここでHTMLに値を流し込みます
                 orgEl.textContent = orgName;
-                orgEl.textContent = orgName;
                 bushoEl.textContent = leaderName;
                 soldierEl.textContent = (reinfData.soldiers || 0) + '人';
                 riceEl.textContent = reinfData.rice || 0;
-                moraleEl.textContent = reinfData.morale || 0;
                 trainingEl.textContent = reinfData.training || 0;
-                if(moraleSpEl) moraleSpEl.textContent = reinfData.morale || 0;
-                if(trainingSpEl) trainingSpEl.textContent = reinfData.training || 0;
+                moraleEl.textContent = reinfData.morale || 0;
+                if(horsesEl) horsesEl.textContent = reinfData.horses || 0;
+                if(gunsEl) gunsEl.textContent = reinfData.guns || 0;
             }
         };
         
@@ -2957,16 +2954,19 @@ class UIManager {
             const orgEl = card.querySelector('[id$="-org"]');
             const soldierEl = card.querySelector('[id$="-soldier"]');
             const riceEl = card.querySelector('[id$="-rice"]');
-            const moraleEl = card.querySelector('[id$="-morale"]');
             const trainingEl = card.querySelector('[id$="-training"]');
+            const moraleEl = card.querySelector('[id$="-morale"]');
+            const horsesEl = card.querySelector('[id$="-horses"]');
+            const gunsEl = card.querySelector('[id$="-guns"]');
             if (orgEl) orgEl.textContent = '';
             if (bushoEl) bushoEl.textContent = '';
             if (soldierEl) soldierEl.textContent = '';
             if (riceEl) riceEl.textContent = '';
-            if (moraleEl) moraleEl.textContent = '';
             if (trainingEl) trainingEl.textContent = '';
+            if (moraleEl) moraleEl.textContent = '';
+            if (horsesEl) horsesEl.textContent = '';
+            if (gunsEl) gunsEl.textContent = '';
             
-            // 幕はもう不要なので消します
             if (overlay.parentNode) overlay.parentNode.removeChild(overlay);
         }, 1000);
     }
