@@ -2134,7 +2134,7 @@ class AIEngine {
                     // 足りないお金分のお米だけを売るように計算します
                     const needSellAmount = Math.floor(shortageGold / rate);
                     
-                    let sellAmount = Math.floor(Math.min(canSellAmount, needSellAmount));
+                    let sellAmount = Math.floor(Math.min(canSellAmount, needSellAmount, castle.tradeLimit || 0));
                     
                     // 少しだけしか売らないなら、手間なのでやめます
                     if (sellAmount < Math.floor(castle.soldiers * 0.2)) {
@@ -2147,14 +2147,17 @@ class AIEngine {
                         if (castle.gold + gain <= 99999) {
                             castle.rice -= sellAmount;
                             castle.gold += gain;
+                            castle.tradeLimit -= sellAmount;
                             tradeCount++; step--; actionDoneInThisStep = true; break;
                         } else {
                             // もし上限(99,999)を超えてしまう場合は、持てる分だけ売るように調整してあげます
                             const maxGain = 99999 - castle.gold;
                             sellAmount = Math.floor(maxGain / rate);
+                            sellAmount = Math.min(sellAmount, castle.tradeLimit || 0);
                             if (sellAmount > 0) {
                                 castle.rice -= sellAmount;
                                 castle.gold += Math.floor(sellAmount * rate);
+                                castle.tradeLimit -= sellAmount;
                                 tradeCount++; step--; actionDoneInThisStep = true; break;
                             } else {
                                 continue;
@@ -2171,7 +2174,7 @@ class AIEngine {
                     const extendedShortage = Math.max(0, buyTarget - castle.rice);
                     
                     // 欲しい分と、お金で買える分の、少ない方にします
-                    let buyAmount = Math.floor(Math.min(extendedShortage, castle.gold / rate));
+                    let buyAmount = Math.floor(Math.min(extendedShortage, castle.gold / rate, castle.tradeLimit || 0));
                     
                     // ちょい買い防止
                     const minRice = Math.floor(castle.soldiers * 0.3);
@@ -2183,7 +2186,7 @@ class AIEngine {
 
                     // 上限(99,999)を超えないように調整します
                     if (castle.rice + buyAmount > 99999) {
-                        buyAmount = 99999 - castle.rice;
+                        buyAmount = Math.min(buyAmount, 99999 - castle.rice);
                     }
 
                     // 買う量が決まったら実行します
@@ -2191,6 +2194,7 @@ class AIEngine {
                         const cost = Math.floor(buyAmount * rate);
                         castle.gold -= cost;
                         castle.rice += buyAmount;
+                        castle.tradeLimit -= buyAmount;
                         tradeCount++; step--; actionDoneInThisStep = true; break;
                     } else {
                         // 買うのをやめたら、別の行動を探します

@@ -213,6 +213,9 @@ class Castle {
 
         // ★今回追加：どの軍団に所属しているか（0は直轄、1～8が各軍団）
         this.legionId = Number(data.legionId || 0);
+
+        // ★追加：毎月の兵糧取引上限
+        this.tradeLimit = Number(data.tradeLimit || 0);
     }
 }
 

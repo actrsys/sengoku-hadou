@@ -455,12 +455,12 @@ class UISliderManager {
             while (maxBuy > 0 && Math.ceil(maxBuy * rate) > c.gold) {
                 maxBuy--;
             }
-            // 城の兵糧上限(99,999)を超えないようにします
-            const realMaxBuy = Math.min(maxBuy, 99999 - c.rice);
+            // 城の兵糧上限(99,999)や取引上限を超えないようにします
+            const realMaxBuy = Math.min(maxBuy, 99999 - c.rice, c.tradeLimit || 0);
 
             this.ui.tradeTypeInfo.classList.remove('hidden'); 
             // ★変更：相場の金額を小数点以下1桁で表示します！
-            this.ui.tradeTypeInfo.textContent = `兵糧 10 ＝ 金 ${(10 * rate).toFixed(1)}`;
+            this.ui.tradeTypeInfo.textContent = `兵糧 10 ＝ 金 ${(10 * rate).toFixed(1)} (取引上限: ${c.tradeLimit || 0})`;
 
             // ★変更：スライダーより前に数字の箱を作って、スライダーの上に表示させます！
             const costDiv = document.createElement('div');
@@ -479,11 +479,11 @@ class UISliderManager {
             }
             // 売ったお金が所持金の上限(99,999)を超えないように、売れる最大量を逆算します
             const maxSellByGold = Math.floor((99999 - c.gold) / rate);
-            const realMaxSell = Math.min(c.rice, maxSellByGold);
+            const realMaxSell = Math.min(c.rice, maxSellByGold, c.tradeLimit || 0);
 
             this.ui.tradeTypeInfo.classList.remove('hidden'); 
             // ★変更：相場の金額を小数点以下1桁で表示します！
-            this.ui.tradeTypeInfo.textContent = `兵糧 10 ＝ 金 ${(10 * rate).toFixed(1)}`;
+            this.ui.tradeTypeInfo.textContent = `兵糧 10 ＝ 金 ${(10 * rate).toFixed(1)} (取引上限: ${c.tradeLimit || 0})`;
 
             // ★変更：スライダーより前に数字の箱を作って、スライダーの上に表示させます！
             const costDiv = document.createElement('div');
