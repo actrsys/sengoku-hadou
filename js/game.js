@@ -1477,7 +1477,7 @@ class GameManager {
             }
             
             // ★追加：毎月月初に取引上限を決定（最大値まで回復）
-            c.tradeLimit = Math.floor((c.population / 20) + (c.kokudaka * 3));
+            c.tradeLimit = Math.floor((c.population / 50) + (c.kokudaka * 4));
         });
 
         // ★ここを書き換え！：空っぽの城（中立）も仲間はずれにせず、一緒に混ぜて順番リストに入れます！
