@@ -772,6 +772,58 @@ class AIEngine {
                         prob -= (ratio - 1.0) * 15; 
                     }
                 }
+
+                // ★今回追加：その城を攻撃して新しく敵対することによって、自軍の城がすべて囲まれてしまう（糧攻状態になってしまう）リスクを計算する魔法！
+                let starvingRiskCount = 0;
+                
+                // 自分のすべての城をチェックします
+                myClanCastles.forEach(c => {
+                    if (c.adjacentCastleIds && c.adjacentCastleIds.length > 0) {
+                        let isSurrounded = true; // 最初は囲まれていると仮定します
+                        
+                        for (let adjId of c.adjacentCastleIds) {
+                            const adjCastle = this.game.getCastle(adjId);
+                            if (!adjCastle) continue;
+                            
+                            // お隣さんが自分と同じ大名家なら、囲まれていません！
+                            if (adjCastle.ownerClan === myClanId) {
+                                isSurrounded = false;
+                                break;
+                            }
+                            
+                            // お隣さんが敵かどうかを調べます
+                            let isEnemy = false;
+                            if (adjCastle.ownerClan !== 0) {
+                                // 今から攻撃する相手なら、新しい敵になります！
+                                if (adjCastle.ownerClan === target.ownerClan) {
+                                    isEnemy = true;
+                                } else {
+                                    // それ以外の相手なら、今の関係を調べます
+                                    const adjRel = this.game.getRelation(myClanId, adjCastle.ownerClan);
+                                    if (adjRel && adjRel.status === '敵対') {
+                                        isEnemy = true;
+                                    }
+                                }
+                            }
+                            
+                            // もしお隣さんが「敵じゃない（味方、同盟、支配、従属、空き城）」なら、安全な道があるので囲まれていません！
+                            if (!isEnemy) {
+                                isSurrounded = false;
+                                break;
+                            }
+                        }
+                        
+                        // 新しく敵対することで、この城が逃げ道なしの包囲状態になってしまうならカウントします
+                        if (isSurrounded) {
+                            starvingRiskCount++;
+                        }
+                    }
+                });
+                
+                // 囲まれてしまう城が1つでもある場合、攻撃スコアを大きく下げます（1城につき -50 点）
+                if (starvingRiskCount > 0) {
+                    prob -= (starvingRiskCount * 50);
+                }
             }
             
             // ★恨みを晴らすため、または執着によるスコアアップ！
@@ -1747,17 +1799,75 @@ class AIEngine {
                         // 第一目標勢力に所属する武将を全員取得（大名は除く）
                         const enemyBushos = this.game.bushos.filter(b => b.clan === memoryClanId && b.status === 'active' && !b.isDaimyo && b.castleId > 0);
                         
-                        // ★修正：リーダー（直轄なら大名、軍団なら国主）の智謀によるスコアアップ（75以上でアップ、95で最大+5）
-                        let rumorHeadhuntScore = 5;
+                        // ★修正：リーダー（直轄なら大名、軍団なら国主）の智謀による基本スコアアップ (5〜10点の枠に収めます)
+                        let baseRumorHeadhuntScore = 5;
                         if (leader.intelligence >= 75) {
-                            rumorHeadhuntScore += Math.min(5, Math.floor((leader.intelligence - 75) / 4));
+                            baseRumorHeadhuntScore += Math.min(5, Math.floor((leader.intelligence - 75) / 4));
+                        }
+
+                        // ★追加：リーダーの智謀による「見誤り」の最大誤差を決めます
+                        let evaluatorInt = leader.intelligence;
+                        let maxError = 0;
+                        if (evaluatorInt <= 50) {
+                            maxError = 0.3; // 智謀50以下なら最大3割（±30%）見誤る
+                        } else if (evaluatorInt >= 95) {
+                            maxError = 0;   // 智謀95以上なら正確（誤差なし）
+                        } else {
+                            // 智謀51〜94の間は、少しずつ誤差が減っていきます
+                            maxError = 0.3 * (95 - evaluatorInt) / 45;
                         }
                         
                         enemyBushos.forEach(targetBusho => {
-                            actions.push({ type: 'rumor', stat: 'intelligence', score: rumorHeadhuntScore, cost: 0, targetId: targetBusho.castleId, targetBushoId: targetBusho.id });
+                            // ターゲット個別の「優先度」を計算します
+                            let targetPriority = 0;
+
+                            // 誤差のサイコロを振ります（1.0を中心に、-maxError から +maxError まで揺れます）
+                            const errorRateLoyalty = 1.0 + (Math.random() - 0.5) * 2 * maxError;
+                            const errorRateDuty = 1.0 + (Math.random() - 0.5) * 2 * maxError;
                             
-                            if (castle.gold >= 100) {
-                                actions.push({ type: 'headhunt', stat: 'intelligence', score: rumorHeadhuntScore, cost: 100, targetId: targetBusho.castleId, targetBushoId: targetBusho.id, gold: 100 });
+                            // 智謀によって見誤った（思い込んでいる）忠誠度と義理を計算します
+                            const perceivedLoyalty = targetBusho.loyalty * errorRateLoyalty;
+                            const perceivedDuty = targetBusho.duty * errorRateDuty;
+
+                            // ① 忠誠度が低い武将ほど優先（100から下がるごとに加点、50で約+12、0で+25）
+                            if (perceivedLoyalty < 100) {
+                                targetPriority += Math.floor((100 - perceivedLoyalty) / 4);
+                            }
+
+                            // ② 義理が低い武将ほど優先（100から下がるごとに加点、50で約+6、0で約+12）
+                            if (perceivedDuty < 100) {
+                                targetPriority += Math.floor((100 - perceivedDuty) / 8);
+                            }
+
+                            // ③ 第一攻撃目標としている城にいる武将なら優先
+                            if (myOp && myOp.targetId === targetBusho.castleId && !myOp.isKunishuTarget) {
+                                targetPriority += 10;
+                            }
+
+                            // ④ 城主に対してはやや優先
+                            if (targetBusho.isCastellan) {
+                                targetPriority += 5;
+                            }
+                            
+                            // ★追加：ターゲットが自家の武将を「宿敵」として恨んでいないかチェックします
+                            let hasNemesis = false;
+                            if (targetBusho.nemesisIds && targetBusho.nemesisIds.length > 0) {
+                                hasNemesis = targetBusho.nemesisIds.some(nId => {
+                                    const nBusho = this.game.getBusho(nId);
+                                    return nBusho && nBusho.clan === castle.ownerClan && nBusho.status !== 'dead';
+                                });
+                            }
+                            
+                            // ★大魔法：内政の邪魔をしないように、優先度を「小数点」として基本スコアに足します！
+                            // 例：基本スコア8、優先度45なら「8.45点」となり、最大10点強の枠に収まります。
+                            let finalScore = baseRumorHeadhuntScore + (targetPriority / 100);
+                            
+                            // 離間計は宿敵がいても実行します（忠誠度を下げて謀反を誘発させるため）
+                            actions.push({ type: 'rumor', stat: 'intelligence', score: finalScore, cost: 0, targetId: targetBusho.castleId, targetBushoId: targetBusho.id });
+                            
+                            // 引抜は、宿敵がいない場合のみ実行します
+                            if (!hasNemesis && castle.gold >= 100) {
+                                actions.push({ type: 'headhunt', stat: 'intelligence', score: finalScore, cost: 100, targetId: targetBusho.castleId, targetBushoId: targetBusho.id, gold: 100 });
                             }
                         });
                     }
