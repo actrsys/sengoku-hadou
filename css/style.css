@@ -1794,7 +1794,7 @@ body:not(.is-pc) .daimyo-detail-value {
 .army-box.defender { background: #42a5f5 !important; }
 .responsive-army-box { flex: 1; max-width: none !important; padding: 4px 6px !important; margin: 0 !important; border-radius: 4px !important; display: flex; flex-direction: column; overflow-y: hidden !important; color: #333; box-sizing: border-box !important; border: 1px solid #555; box-shadow: inset 0 0 0 1px #eee, inset 0 0 0 2px #555, 2px 2px 6px rgba(0,0,0,0.5); position: relative; }
 
-.responsive-army-title { margin: 0 0 5px 0; border-bottom: 2px solid rgba(255,255,255,0.8); width: 100%; text-align: left; font-size: 1.2rem; padding: 0 !important; color: #fff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex-shrink: 0; line-height: 1.4; display: flex; align-items: center; justify-content: flex-start; height: 28px; box-sizing: border-box; }
+.responsive-army-title { margin: 0 0 5px 0; border-bottom: none; width: 100%; text-align: left; font-size: 1.2rem; padding: 0 !important; color: #ffd54f !important; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex-shrink: 0; line-height: 1.4; display: flex; align-items: center; justify-content: flex-start; height: 28px; box-sizing: border-box; }
 .title-long-text { font-size: 0.95rem !important; }
 
 .responsive-army-content { width: 100% !important; box-sizing: border-box !important; }
@@ -1807,6 +1807,7 @@ body:not(.is-pc) .daimyo-detail-value {
 .stat-busho { white-space: nowrap !important; overflow: hidden !important; text-overflow: ellipsis !important; color: #fff; font-weight: bold; }
 .reinf-content-wrap { display: flex; width: 100%; }
 .stat-row { display: flex; justify-content: space-between; align-items: center !important; background: rgba(0, 0, 0, 0.4) !important; border-radius: 4px; padding: 2px 6px !important; border-bottom: none !important; font-weight: bold; font-size: 0.8rem !important; box-sizing: border-box !important; }
+.stat-row > div:first-child { color: #ffd54f; }
 .stat-row-group { display: flex; width: 100%; gap: 10px; border-bottom: none; padding-bottom: 0; align-items: center; }
 .stat-row-group .stat-row { flex: 1; border-bottom: none !important; padding: 2px 6px !important; }
 .stat-val-large { font-size: 0.95rem !important; }
@@ -2211,27 +2212,42 @@ body.is-pc {
     /* ① メイン軍・援軍【共通】の魔法 */
     .responsive-army-box, .war-reinf-card { 
         align-items: stretch !important; 
+        display: grid !important;
+        grid-template-columns: auto 1fr;
+        grid-template-rows: auto 1fr;
+        column-gap: 10px;
     }
     .responsive-army-title, .war-reinf-card .responsive-army-title { 
         text-align: left !important; 
         padding: 0 !important; 
+        width: auto !important;
+        grid-column: 1;
+        grid-row: 1;
     }
     .main-busho-label, .war-reinf-card .reinf-busho-label { 
         display: flex !important; 
         align-items: center !important; 
         position: static !important; 
-        width: 100% !important; 
+        width: auto !important; 
         text-align: left !important; 
-        background: rgba(0,0,0,0.5) !important; 
+        background: transparent !important; 
         color: #fff !important; 
         box-sizing: border-box !important; 
-        padding: 2px 5px !important; 
+        padding: 0 !important; 
+        margin: 0 !important;
+        grid-column: 2;
+        grid-row: 1;
+        justify-content: flex-start !important;
+    }
+    .responsive-army-content, .war-reinf-card .reinf-content-wrap {
+        grid-column: 1 / span 2;
+        grid-row: 2;
     }
 
     /* ② 【メイン軍だけ】の魔法 */
     .responsive-army-box { padding: 10px !important; }
     .responsive-army-title { font-size: 1.4rem; margin-bottom: 5px; height: 35px !important; }
-    .main-busho-label { font-size: 1.2rem !important; margin: 0 0 10px 0 !important; }
+    .main-busho-label { font-size: 1.2rem !important; margin-bottom: 5px !important; height: 35px !important; }
     .responsive-army-content { display: flex !important; flex-direction: row !important; align-items: flex-start !important; justify-content: flex-start !important; padding: 0 !important; gap: 15px !important; }
     .responsive-war-face { width: 100px !important; height: 100px !important; margin: 0 !important; position: static !important; border-width: 3px; }
     .responsive-army-stats { width: 100%; font-size: 1.2rem; gap: 8px; display: flex; flex-direction: column; align-items: stretch; margin-top: 0 !important; flex: 1; }
@@ -2244,8 +2260,8 @@ body.is-pc {
 
     /* ③ 【援軍だけ】の魔法 */
     .war-reinf-card { padding: 10px !important; }
-    .war-reinf-card .responsive-army-title { font-size: 1.05rem !important; height: 26px !important; }
-    .war-reinf-card .reinf-busho-label { font-size: 0.7rem !important; margin: 0 0 5px 0 !important; }
+    .war-reinf-card .responsive-army-title { font-size: 1.05rem !important; height: 26px !important; margin-bottom: 5px !important; }
+    .war-reinf-card .reinf-busho-label { font-size: 0.7rem !important; margin-bottom: 5px !important; height: 26px !important; }
     .war-reinf-card .reinf-content-wrap { flex-direction: row; gap: 8px; align-items: flex-start; }
     .war-reinf-card .reinf-face-container { display: block; }
     .war-reinf-card .responsive-war-face { width: 60px !important; height: 60px !important; border-width: 2px; }
