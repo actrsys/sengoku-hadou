@@ -2213,14 +2213,15 @@ body.is-pc {
     .responsive-army-box, .war-reinf-card { 
         align-items: stretch !important; 
         display: grid !important;
-        grid-template-columns: auto 1fr;
+        grid-template-columns: max-content 1fr;
         grid-template-rows: auto 1fr;
-        column-gap: 10px;
+        column-gap: 8px;
     }
     .responsive-army-title, .war-reinf-card .responsive-army-title { 
         text-align: left !important; 
         padding: 0 !important; 
-        width: auto !important;
+        width: fit-content !important;
+        margin-right: 0 !important;
         grid-column: 1;
         grid-row: 1;
     }
