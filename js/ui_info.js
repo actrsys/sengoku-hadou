@@ -1706,19 +1706,29 @@ class UIInfoManager {
             faceHtml = `<div class="sp-face-wrapper daimyo-detail-face" style="display: flex; box-sizing: border-box;"></div>`;
         }
 
+        const yomiStr = castle.yomi ? castle.yomi : "";
+
         if (listContainer) {
             listContainer.className = 'list-container hide-native-scroll';
             listContainer.style.display = 'block';
             listContainer.innerHTML = `
                 <div class="daimyo-detail-container" style="padding: 10px;">
-                    <div class="daimyo-detail-header pc-only" style="margin-bottom: 10px; justify-content: center;">
-                        <div class="daimyo-detail-name" style="font-size: 1.5rem;">${castle.name}</div>
+                    <div class="daimyo-detail-header pc-only" style="margin-bottom: 10px;">
+                        <div style="display:flex; flex-direction:column;">
+                            <span style="font-size:0.8rem; color:#ccc; margin-bottom:2px;">${yomiStr}</span>
+                            <div style="display:flex; align-items:center; gap:10px;">
+                                <div class="daimyo-detail-name" style="font-size: 1.5rem;">${castle.name}</div>
+                            </div>
+                        </div>
                     </div>
                     <div class="daimyo-detail-body">
                         <div class="daimyo-detail-left">
                             ${faceHtml}
-                            <div class="daimyo-detail-header sp-only" style="margin-bottom: 10px; justify-content: center;">
-                                <div class="daimyo-detail-name" style="font-size: 1.5rem;">${castle.name}</div>
+                            <div class="daimyo-detail-header sp-only" style="flex-direction:column; align-items:flex-start; gap:2px; margin-bottom: 0; justify-content: center;">
+                                <span style="font-size:0.75rem; color:#ccc;">${yomiStr}</span>
+                                <div style="display:flex; align-items:center; gap:5px;">
+                                    <div class="daimyo-detail-name" style="font-size:1.3rem;">${castle.name}</div>
+                                </div>
                             </div>
                         </div>
                         <div class="daimyo-detail-right">
