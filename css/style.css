@@ -1794,7 +1794,7 @@ body:not(.is-pc) .daimyo-detail-value {
 .army-box.defender { background: #42a5f5 !important; }
 .responsive-army-box { flex: 1; max-width: none !important; padding: 4px 6px !important; margin: 0 !important; border-radius: 4px !important; display: flex; flex-direction: column; overflow-y: hidden !important; color: #333; box-sizing: border-box !important; border: 1px solid #555; box-shadow: inset 0 0 0 1px #eee, inset 0 0 0 2px #555, 2px 2px 6px rgba(0,0,0,0.5); position: relative; }
 
-.responsive-army-title { margin: 0 0 5px 0; border-bottom: none; width: 100%; text-align: left; font-size: 1.2rem; padding: 0 !important; color: #ffd54f !important; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex-shrink: 0; line-height: 1.4; display: flex; align-items: center; justify-content: flex-start; height: 28px; box-sizing: border-box; }
+.responsive-army-title { margin: 0 0 5px 0; border-bottom: none !important; width: 100%; text-align: left; font-size: 1.2rem; padding: 0 !important; color: #ffd54f !important; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex-shrink: 0; line-height: 1.4; display: flex; align-items: center; justify-content: flex-start; height: 28px; box-sizing: border-box; }
 .title-long-text { font-size: 0.95rem !important; }
 
 .responsive-army-content { width: 100% !important; box-sizing: border-box !important; }
