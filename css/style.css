@@ -1777,7 +1777,7 @@ body:not(.is-pc) .daimyo-detail-value {
 .responsive-war-left { display: flex; flex-direction: column; flex: 1; overflow: hidden; border-right: none !important; }
 
 .war-visual { flex: 1; display: flex; flex-direction: column; justify-content: space-around; align-items: center; background: transparent; margin-bottom: 5px; padding: 10px; overflow-y: auto;}
-.responsive-war-visual { flex: 1; display: flex !important; flex-direction: row !important; width: 100% !important; background: transparent; overflow: hidden; align-items: flex-start !important; justify-content: center; padding: 10px !important; gap: 8px !important; margin: 0 !important; box-sizing: border-box !important; }
+.responsive-war-visual { flex: 1; display: flex !important; flex-direction: row !important; width: 100% !important; background: transparent; overflow: hidden; align-items: flex-start !important; justify-content: center; padding: 10px 4px !important; gap: 8px !important; margin: 0 !important; box-sizing: border-box !important; }
 .war-side-wrapper { display: flex !important; flex-direction: row !important; align-items: stretch !important; flex: 1 !important; max-width: calc(50% - 10px) !important; box-sizing: border-box !important; overflow: hidden !important; justify-content: center !important; height: 100% !important; gap: 8px !important; }
 
 .war-reinf-col { display: flex; flex-direction: column; gap: 8px; flex: 1; min-width: 0; }
@@ -2042,8 +2042,8 @@ body:not(.is-pc) .war-side-wrapper > .war-reinf-col { order: 2 !important; flex-
 body:not(.is-pc) .war-side-wrapper > .war-reinf-col:first-child { flex-direction: row-reverse !important; }
 
 body:not(.is-pc) .responsive-army-content .stat-busho > * { font-size: 0.75rem !important; }
-body:not(.is-pc) .war-visual { padding: 3px 5px !important; margin-bottom: 0 !important; flex-shrink: 1 !important; min-height: 0 !important; overflow-y: auto !important; }
-body:not(.is-pc) .responsive-war-visual { padding: 2px !important; gap: 2px !important; }
+body:not(.is-pc) .war-visual { padding: 3px 1px !important; margin-bottom: 0 !important; flex-shrink: 1 !important; min-height: 0 !important; overflow-y: auto !important; }
+body:not(.is-pc) .responsive-war-visual { padding: 2px 0px !important; gap: 2px !important; }
 body:not(.is-pc) #war-title-name { font-size: 1.05rem !important; margin: 1px 0 !important; }
 body:not(.is-pc) .war-header-info, body:not(.is-pc) #war-date-info, body:not(.is-pc) #war-turn-info { font-size: 0.8rem !important; margin-bottom: 1px !important; }
 body:not(.is-pc) .war-top-bar { gap: 10px !important; padding: 4px 8px !important; font-size: 0.9rem !important; }
