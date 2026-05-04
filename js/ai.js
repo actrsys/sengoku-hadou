@@ -223,9 +223,28 @@ class AIEngine {
                 }
             }
 
+            // ★追加：城主の智謀によって、城の状況を「十分足りている」と高めに見誤る魔法です！
+            let maxErrorEmg = 0;
+            if (castellan.intelligence <= 50) {
+                maxErrorEmg = 0.3; // 智謀50以下で最大30%の誤差
+            } else if (castellan.intelligence >= 95) {
+                maxErrorEmg = 0;   // 智謀95以上で誤差なし
+            } else {
+                maxErrorEmg = 0.3 * (95 - castellan.intelligence) / 45; // 51〜94の間は線形で減らす
+            }
+            
+            // サイコロを振って「勘違いして高く見積もる」分を計算します
+            const errDefenseEmg = castle.maxDefense * (Math.random() * maxErrorEmg);
+            const errLoyaltyEmg = 100 * (Math.random() * maxErrorEmg);
+            
+            // 実際の数値に「勘違い分」を足した「AIの思い込みステータス」を作ります
+            const perceivedDefenseEmg = Math.min(castle.maxDefense, castle.defense + errDefenseEmg);
+            const perceivedLoyaltyEmg = Math.min(100, castle.peoplesLoyalty + errLoyaltyEmg);
+
             // ★追加：外交や戦争を考えるよりも先に、城防御上げや民忠上げを優先します！
             let emergencyActionDone = false;
-            if (castle.defense <= castle.maxDefense / 4 && castle.gold >= 200) {
+            // ★修正：思い込みステータスで緊急事態かどうかを判断させます
+            if (perceivedDefenseEmg <= castle.maxDefense / 4 && castle.gold >= 200) {
                 // 城壁修復
                 castle.gold -= 200;
                 const val = GameSystem.calcRepair(castellan, 1.0, true);
@@ -238,7 +257,7 @@ class AIEngine {
                 
                 castellan.isActionDone = true;
                 emergencyActionDone = true;
-            } else if (castle.peoplesLoyalty <= 70 && castle.rice >= 200) {
+            } else if (perceivedLoyaltyEmg <= 70 && castle.rice >= 200) {
                 // 施し
                 castle.rice -= 200;
                 const val = GameSystem.calcCharity(castellan, 1.0, true);
@@ -1162,10 +1181,32 @@ class AIEngine {
             // --- 候補となる行動の点数（スコア）をつける表を作ります ---
             let actions = [];
 
+            // ★追加：城主の智謀によって、城の状況を「十分足りている」と高めに見誤る魔法です！
+            let maxError = 0;
+            if (castellan.intelligence <= 50) {
+                maxError = 0.3; // 智謀50以下で最大30%の誤差
+            } else if (castellan.intelligence >= 95) {
+                maxError = 0;   // 智謀95以上で誤差なし
+            } else {
+                maxError = 0.3 * (95 - castellan.intelligence) / 45; // 51〜94の間は線形で減らす
+            }
+            
+            // サイコロを振って「勘違いして高く見積もる」分を計算します
+            const errDefense = castle.maxDefense * (Math.random() * maxError);
+            const errLoyalty = 100 * (Math.random() * maxError);
+            const errTraining = 100 * (Math.random() * maxError);
+            const errMorale = 100 * (Math.random() * maxError);
+            
+            // 実際の数値に「勘違い分」を足した「AIの思い込みステータス」を作ります
+            const perceivedDefense = Math.min(castle.maxDefense, castle.defense + errDefense);
+            const perceivedLoyalty = Math.min(100, castle.peoplesLoyalty + errLoyalty);
+            const perceivedTraining = Math.min(100, castle.training + errTraining);
+            const perceivedMorale = Math.min(100, castle.morale + errMorale);
+
             // 1. 城壁修復（最大値の1/4以下なら超優先！）
-            if (castle.defense < castle.maxDefense) {
+            if (perceivedDefense < castle.maxDefense) {
                 let score = 0;
-                if (castle.defense <= castle.maxDefense / 4) score = 80; // ★修正：緊急事態でも80点に抑えます
+                if (perceivedDefense <= castle.maxDefense / 4) score = 80; // ★修正：思い込みステータスで判定
                 else score = 20;
                 
                 // ★追加：最大防御力が1000の時を「1倍」として、低いほど点数が上がり、高いほど点数が下がる魔法！
@@ -1176,10 +1217,10 @@ class AIEngine {
             }
 
             // 2. 施し（民忠70以下なら優先！）
-            if (castle.peoplesLoyalty < 100) {
+            if (perceivedLoyalty < 100) {
                 let score = 0;
-                if (castle.peoplesLoyalty <= 70) score = 120;
-                else score = (100 - castle.peoplesLoyalty) * 2;
+                if (perceivedLoyalty <= 70) score = 120; // ★修正：思い込みステータスで判定
+                else score = (100 - perceivedLoyalty) * 2; // ★修正：思い込みステータスで計算
                 actions.push({ type: 'charity', stat: 'charm', score: score, cost: 200 }); 
             }
 
@@ -1345,14 +1386,14 @@ class AIEngine {
             }
 
             // 4. 訓練
-            if (castle.training < 100) {
-                let score = 100 - castle.training;
+            if (perceivedTraining < 100) {
+                let score = 100 - perceivedTraining; // ★修正：思い込みステータスで計算
                 actions.push({ type: 'training', stat: 'leadership', score: score, cost: 0 }); 
             }
 
             // 5. 兵施し（士気）
-            if (castle.morale < 100) {
-                let score = 100 - castle.morale;
+            if (perceivedMorale < 100) {
+                let score = 100 - perceivedMorale; // ★修正：思い込みステータスで計算
                 actions.push({ type: 'soldier_charity', stat: 'leadership', score: score, cost: 200 }); 
             }
 
