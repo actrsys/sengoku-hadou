@@ -649,6 +649,9 @@ Object.assign(WarManager.prototype, {
                         let shouldIntercept = false;
                         let reason = "";
                         
+                        // ★追加：諸勢力（国衆）の場合は、大名の城と比べて防御力が低いので、判定の基準値を半分（0.5倍）にします！
+                        const defenseThresholdRate = defCastle.isKunishu ? 0.5 : 1.0;
+                        
                         // ★追加：イベントによる強制迎撃命令がある場合は絶対に従います！
                         if (this.state.forceIntercept) {
                             shouldIntercept = true;
@@ -657,10 +660,12 @@ Object.assign(WarManager.prototype, {
                             if (perceivedTotalDefSoldiers >= perceivedTotalAtkSoldiers * 1.2) {
                                 shouldIntercept = true;
                                 reason = "自軍の兵力が敵より十分に多いから（野戦）";
-                            } else if (perceivedDefRice < perceivedDefSoldiers * 1.5) {
+                            } else if (!defCastle.isKunishu && perceivedDefRice < perceivedDefSoldiers * 1.5) {
+                                // ★修正：諸勢力は兵糧を無から生み出す設定なので、兵糧不足を理由に野戦には出ません！
                                 shouldIntercept = true;
                                 reason = "兵糧が足りないから（野戦）";
-                            } else if (perceivedDefDefense < 300) {
+                            } else if (perceivedDefDefense < 300 * defenseThresholdRate) {
+                                // ★修正：諸勢力の場合は基準を半分（150）にして判断します！
                                 shouldIntercept = true;
                                 reason = "城の防御が低いから（野戦）";
                             } else {
@@ -670,10 +675,12 @@ Object.assign(WarManager.prototype, {
                             if (perceivedTotalDefSoldiers >= perceivedTotalAtkSoldiers * 1.5) {
                                 shouldIntercept = true;
                                 reason = "自軍の兵力が敵より圧倒的に多いから（野戦）";
-                            } else if (perceivedDefRice < perceivedDefSoldiers * 1.2) {
+                            } else if (!defCastle.isKunishu && perceivedDefRice < perceivedDefSoldiers * 1.2) {
+                                // ★修正：諸勢力は兵糧を無から生み出す設定なので、兵糧不足を理由に野戦には出ません！
                                 shouldIntercept = true;
                                 reason = "兵糧が足りないから（野戦）";
-                            } else if (perceivedDefDefense < 400) {
+                            } else if (perceivedDefDefense < 400 * defenseThresholdRate) {
+                                // ★修正：諸勢力の場合は基準を半分（200）にして判断します！
                                 shouldIntercept = true;
                                 reason = "城の防御が低いから（野戦）";
                             } else {
