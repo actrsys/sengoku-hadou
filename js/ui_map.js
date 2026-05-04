@@ -107,9 +107,15 @@ Object.assign(UIManager.prototype, {
             const walkX = (x - this.dragStartX);
             const walkY = (y - this.dragStartY);
             
-            if (Math.abs(walkX) > 5 || Math.abs(walkY) > 5) {
-                this.isDraggingMap = true;
+            // ★遊び（デッドゾーン）の追加：10ピクセル動くまではクリックのブレとみなします
+            if (!this.isDraggingMap) {
+                if (Math.abs(walkX) > 10 || Math.abs(walkY) > 10) {
+                    this.isDraggingMap = true;
+                } else {
+                    return; // まだ遊びの範囲内なので、ここで処理をストップして地図を動かしません
+                }
             }
+
             sc.scrollLeft = this.scrollLeft - walkX;
             sc.scrollTop = this.scrollTop - walkY;
 
