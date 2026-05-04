@@ -2451,7 +2451,16 @@ class UIManager {
         }
         
         const atkClan = this.game.clans.find(c => c.id === s.attacker.ownerClan);
-        const atkName = s.attacker.isKunishu ? s.attacker.name : (atkClan ? atkClan.name : "土豪");
+        let atkName = "土豪";
+        if (s.attacker.isKunishu) {
+            const kunishu = this.game.kunishuSystem ? this.game.kunishuSystem.getKunishu(s.attacker.kunishuId) : null;
+            atkName = kunishu ? kunishu.getName(this.game) : s.attacker.name;
+        } else if (atkClan) {
+            atkName = atkClan.name;
+        } else {
+            const prov = this.game.provinces.find(p => p.id === s.sourceCastle.provinceId);
+            atkName = prov ? prov.province : "土豪";
+        }
         setTxt('war-atk-name', atkName);
         
         const atkTitleEl = document.getElementById('war-atk-name').parentElement;
@@ -2471,7 +2480,16 @@ class UIManager {
         updateFace('war-atk-face', s.atkBushos[0]);
         
         const defClan = this.game.clans.find(c => c.id === s.defender.ownerClan);
-        const defNameText = s.defender.isKunishu ? s.defender.name : (defClan ? defClan.name : "土豪");
+        let defNameText = "土豪";
+        if (s.defender.isKunishu) {
+            const kunishu = this.game.kunishuSystem ? this.game.kunishuSystem.getKunishu(s.defender.kunishuId) : null;
+            defNameText = kunishu ? kunishu.getName(this.game) : s.defender.name;
+        } else if (defClan) {
+            defNameText = defClan.name;
+        } else {
+            const prov = this.game.provinces.find(p => p.id === s.defender.provinceId);
+            defNameText = prov ? prov.province : "土豪";
+        }
         setTxt('war-def-name', defNameText);
         
         const defTitleEl = document.getElementById('war-def-name').parentElement;
