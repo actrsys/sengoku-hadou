@@ -245,7 +245,7 @@ body:not(.is-pc) .status-marks-carousel .status-mark.fade-in {
 
 .cmd-btn.finish { 
     background: linear-gradient(135deg, #b05a5a 0%, #803a3a 100%); 
-    border-color: #ffb3b3 #e66666 #b30000 #e66666;
+    border-color: #ffb3b3 #e66666 #b05a5a #e66666;
     color: #ffffff; 
     text-shadow: 
         1px 1px 0 #3a0b0b, -1px -1px 0 #3a0b0b, 
@@ -257,7 +257,7 @@ body:not(.is-pc) .status-marks-carousel .status-mark.fade-in {
 }
 .cmd-btn.finish:hover {
     background: linear-gradient(135deg, #c46d6d 0%, #9f4d4d 100%);
-    border-color: #ffffff #ff8080 #cc0000 #ff8080;
+    border-color: #ffffff #ff8080 #c46d6d #ff8080;
     color: #ffffff;
 }
 .cmd-btn.finish:active { 
