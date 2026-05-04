@@ -2076,6 +2076,11 @@ body:not(.is-pc) .war-reinf-card .reinf-busho-label {
 }
 
 /* ② 【スマホ版】メイン軍だけの魔法 */
+body:not(.is-pc) .responsive-army-box .responsive-army-title {
+    font-size: 1.05rem !important;
+    height: 22px !important;
+    margin-bottom: 2px !important;
+}
 body:not(.is-pc) .main-busho-label { 
     font-size: 0.95rem !important; 
 }
