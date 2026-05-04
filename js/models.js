@@ -101,6 +101,7 @@ class Castle {
     constructor(data) {
         Object.assign(this, data);
         this.id = Number(this.id);
+        this.sortNo = Number(data.sortNo || 0);
         this.yomi = data.yomi || "";
         this.ownerClan = Number(this.ownerClan);
         this.castellanId = Number(this.castellanId);
@@ -731,6 +732,7 @@ class Province {
         
         // ★CSVから読み込んだデータを、確実な形にして箱にしまいます
         this.id = Number(this.id || 0);             // 国の出席番号（例：23）
+        this.sortNo = Number(data.sortNo || 0);
         this.province = data.province || "";        // 国の名前（例：尾張国）
         this.provinceYomi = data.provinceYomi || "";
         this.regionId = Number(this.regionId || 0); // 地方の出席番号（例：5）

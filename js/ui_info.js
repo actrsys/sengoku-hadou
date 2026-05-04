@@ -1855,6 +1855,9 @@ class UIInfoManager {
         } else {
             displayCastles = [...this.kyotenSavedCastles];
 
+            // 基本の並び順として、sortNo を使って順番を整えます
+            displayCastles.sort((a, b) => (a.sortNo || 0) - (b.sortNo || 0));
+
             if (this.currentKyotenSortKey) {
                 displayCastles.sort((a, b) => {
                     let valA = 0, valB = 0;
