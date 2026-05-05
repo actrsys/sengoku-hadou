@@ -53,8 +53,8 @@ window.GameEvents.push({
         }
 
         // ⑥ 最後に、少し手間のかかる今川家の領地確認をします
-        // 指定の5つのお城（曳馬城、駿府城、岡崎城、高天神城、吉田城）をすべて持っているか
-        const requiredCastles = [12, 13, 48, 71, 100];
+        // 指定のお城（曳馬城、駿府城、長篠城、岡崎城、犬居城、高天神城、吉田城、興国寺城）をすべて持っているか
+        const requiredCastles = [12, 13, 45, 48, 54, 71, 100, 101];
         const hasAllCastles = requiredCastles.every(id => {
             const c = game.getCastle(id);
             return c && c.ownerClan === imagawaClanId;
