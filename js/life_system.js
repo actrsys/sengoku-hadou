@@ -1293,7 +1293,22 @@ class LifeSystem {
         const age = isInitial ? Math.floor(Math.random() * 16) : 0;
         const birthYear = currentYear - age;
         const startYear = birthYear; // ★誕生と同時に登場（ゲームにアクセス可能）になります！
-        const endYear = startYear + 30 + Math.floor(Math.random() * 20); // 寿命は誕生から30〜50年
+        
+        // ★修正：寿命の設定です
+        // 50年を基準として長生き（最大80歳）しやすく、低確率で早死（20歳〜）する確率の魔法です
+        let lifespan = 50;
+        const lifeRand = Math.random();
+        if (lifeRand < 0.05) {
+            // 5%の確率で20〜39歳の早死に
+            lifespan = 20 + Math.floor(Math.random() * 20);
+        } else if (lifeRand < 0.15) {
+            // 10%の確率で40〜49歳
+            lifespan = 40 + Math.floor(Math.random() * 10);
+        } else {
+            // 85%の確率で50〜80歳
+            lifespan = 50 + Math.floor(Math.random() * 31);
+        }
+        const endYear = startYear + lifespan; 
 
         // 上で作った情報をひとつの箱（データ）にまとめます
         const princessData = {
