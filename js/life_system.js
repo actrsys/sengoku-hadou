@@ -1391,26 +1391,43 @@ class LifeSystem {
     distributeInitialPrincesses() {
         const currentYear = this.game.year;
         
-        // ★例外リスト：ランダムな姫が絶対に誕生しない大名のID（出席番号）です
+        // ★例外リスト：ランダムな姫が絶対に誕生しない武将のID（出席番号）です
         // 1001001=上杉謙信、1053024=立花誾千代
         // （追加する時は、カンマ区切りで数字を足していくだけでOKです！）
-        const excludedDaimyoIds = [1001001, 1053024];
+        const excludedIds = [1001001, 1053024];
         
         this.game.clans.forEach(clan => {
             if (clan.id === 0) return; // 空き家（中立）は無視します
 
-            // ★例外チェック：今の大名がリストに含まれていたら、姫は配りません！
-            if (excludedDaimyoIds.includes(Number(clan.leaderId))) {
-                return;
-            }
-
             // すでにCSVで設定された「史実の姫」がいるか数えます
             const existingPrincesses = this.game.princesses.filter(p => p.currentClanId === clan.id && p.status === 'unmarried');
             
-            // 史実の姫が誰もいない大名家にだけ、50%の確率で1人ランダムな姫を登場させます
+            // 史実の姫が誰もいない大名家にだけ、ランダムな姫を登場させます
             if (existingPrincesses.length === 0) {
-                if (Math.random() < 0.5) {
-                    this.createRandomPrincess(clan.id, currentYear, true);
+                // ★大名の姫の登場判定（50%の確率）
+                if (!excludedIds.includes(Number(clan.leaderId))) {
+                    if (Math.random() < 0.5) {
+                        this.createRandomPrincess(clan.id, currentYear, true, clan.leaderId);
+                    }
+                }
+
+                // ★追加：一門武将の姫の登場判定（大名とは別枠で、半分の25%の確率）
+                const leader = this.game.getBusho(clan.leaderId);
+                if (leader) {
+                    const familyBushos = this.game.bushos.filter(b => 
+                        b.clan === clan.id && 
+                        b.status === 'active' && 
+                        b.id !== leader.id && 
+                        !excludedIds.includes(b.id) &&
+                        leader.familyIds.some(fId => b.familyIds.includes(fId))
+                    );
+
+                    if (familyBushos.length > 0) {
+                        if (Math.random() < 0.25) {
+                            const randomFather = familyBushos[Math.floor(Math.random() * familyBushos.length)];
+                            this.createRandomPrincess(clan.id, currentYear, true, randomFather.id);
+                        }
+                    }
                 }
             }
         });
