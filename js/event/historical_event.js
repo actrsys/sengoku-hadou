@@ -7,7 +7,7 @@
 window.GameEvents = window.GameEvents || [];
 
 // ==========================================
-// ★ 桶壊間の戦い（予備）：松平元康 岡崎城主就任（裏イベント）
+// ★ 桶狭間の戦い（予備）：松平元康 岡崎城主就任（裏イベント）
 // ==========================================
 window.GameEvents.push({
     id: "historical_motoyasu_okazaki",
@@ -38,6 +38,7 @@ window.GameEvents.push({
         if (!okazakiCastle || okazakiCastle.castellanId === motoyasu.id) return false;
 
         // ⑤ 今川家（義元の勢力）が指定の5つのお城をすべて持っているか確認します
+        // （曳馬城、駿府城、岡崎城、高天神城、吉田城）
         const imagawaClanId = yoshimoto.clan;
         const requiredCastles = [12, 13, 48, 71, 100];
         const hasAllCastles = requiredCastles.every(id => {
@@ -176,6 +177,14 @@ window.GameEvents.push({
         // G. 松平元康（ID: 1004004）が城主として存在するか確認します
         const motoyasu = game.getBusho(1004004);
         if (!motoyasu || !motoyasu.isCastellan) return false;
+        
+        // J. 織田家と今川家の関係が、同盟・従属・支配・友好ではないことを確認します
+        if (game.diplomacyManager) {
+            const rel = game.diplomacyManager.getRelation(odaClanId, imagawaClanId);
+            if (rel && ['同盟', '従属', '支配', '友好'].includes(rel.status)) {
+                return false; // もし対象の関係だったら、ここでイベントをストップします
+            }
+        }
         
         // すべての条件をクリアしたら、イベントを発生させます！
         return true;
