@@ -15,31 +15,45 @@ window.GameEvents.push({
     isOneTime: true,                 // 一度発生したら二度と起きません
     
     checkCondition: function(game) {
-        // ① 今川義元（ID: 1004001）が大名として存在するか確認します
+        // ① まず、主要な登場人物の確認をします
+        // 今川義元（ID: 1004001）が大名として存在するか
         const yoshimoto = game.getBusho(1004001);
         if (!yoshimoto || !yoshimoto.isDaimyo) return false;
 
-        // 補足：プレイヤーが今川家の場合は、勝手に移動させないようにここで止めます
-        if (game.playerClanId === yoshimoto.clan) return false;
+        // 織田信長（ID: 1006001）が大名として存在するか
+        const nobunaga = game.getBusho(1006001);
+        if (!nobunaga || !nobunaga.isDaimyo || nobunaga.clan === 0) return false;
 
-        // ② 松平元康（ID: 1004004）が存在するか確認します
-        const motoyasu = game.getBusho(1004004);
-        if (!motoyasu) return false;
-
-        // 【ここが重要！】元康が「義元が殿様を務める大名家」にちゃんと所属しているかチェックします
-        // ※ 義元の clan（勢力番号）と 元康の clan が一致していれば、同じ勢力にいることになります
-        if (motoyasu.clan !== yoshimoto.clan) return false;
-
-        // ③ 元康が自分自身が大名（独立した殿様）になっていないか確認します
-        if (motoyasu.isDaimyo) return false;
-
-        // ④ すでに元康が岡崎城（ID: 48）の城主なら、このイベントを起こす必要はありません
-        const okazakiCastle = game.getCastle(48);
-        if (!okazakiCastle || okazakiCastle.castellanId === motoyasu.id) return false;
-
-        // ⑤ 今川家（義元の勢力）が指定の5つのお城をすべて持っているか確認します
-        // （曳馬城、駿府城、岡崎城、高天神城、吉田城）
+        // ② プレイヤーが今川家を担当している場合は、勝手な移動を防ぐためここで止めます
         const imagawaClanId = yoshimoto.clan;
+        if (game.playerClanId === imagawaClanId) return false;
+
+        // ③ 松平元康（ID: 1004004）の存在と、今の立場を確認します
+        const motoyasu = game.getBusho(1004004);
+        if (!motoyasu) return false; // 存在しない場合はストップ
+
+        // 元康が「義元の今川家」に所属しているか
+        if (motoyasu.clan !== imagawaClanId) return false;
+
+        // 元康がすでに「大名（独立した殿様）」や「国主」になっていないか
+        if (motoyasu.isDaimyo || motoyasu.isCommander) return false;
+
+        // ④ 目的のお城（岡崎城：ID48）の状態を確認します
+        // すでに元康が城主ではないこと、かつ「直轄領（軍団IDが0）」であることを確認します
+        const okazakiCastle = game.getCastle(48);
+        if (!okazakiCastle || okazakiCastle.castellanId === motoyasu.id || okazakiCastle.legionId !== 0) return false;
+
+        // ⑤ 勢力同士の外交関係を確認します
+        // 織田家と今川家が、同盟・従属・支配・友好関係ではないこと
+        if (game.diplomacyManager) {
+            const rel = game.diplomacyManager.getRelation(imagawaClanId, nobunaga.clan);
+            if (rel && ['同盟', '従属', '支配', '友好'].includes(rel.status)) {
+                return false;
+            }
+        }
+
+        // ⑥ 最後に、少し手間のかかる今川家の領地確認をします
+        // 指定の5つのお城（曳馬城、駿府城、岡崎城、高天神城、吉田城）をすべて持っているか
         const requiredCastles = [12, 13, 48, 71, 100];
         const hasAllCastles = requiredCastles.every(id => {
             const c = game.getCastle(id);
