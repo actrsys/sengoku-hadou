@@ -1341,8 +1341,18 @@ class LifeSystem {
     distributeInitialPrincesses() {
         const currentYear = this.game.year;
         
+        // ★例外リスト：ランダムな姫が絶対に誕生しない大名のID（出席番号）です
+        // 1001001=上杉謙信、1053024=立花誾千代
+        // （追加する時は、カンマ区切りで数字を足していくだけでOKです！）
+        const excludedDaimyoIds = [1001001, 1053024];
+        
         this.game.clans.forEach(clan => {
             if (clan.id === 0) return; // 空き家（中立）は無視します
+
+            // ★例外チェック：今の大名がリストに含まれていたら、姫は配りません！
+            if (excludedDaimyoIds.includes(Number(clan.leaderId))) {
+                return;
+            }
 
             // すでにCSVで設定された「史実の姫」がいるか数えます
             const existingPrincesses = this.game.princesses.filter(p => p.currentClanId === clan.id && p.status === 'unmarried');
@@ -1360,8 +1370,17 @@ class LifeSystem {
     async checkRandomPrincessAppearance() {
         const currentYear = this.game.year;
         
+        // ★例外リスト：ランダムな姫が絶対に誕生しない大名のID（出席番号）です
+        // （上と同じリストです。後で追加する時はこちらも一緒に足してください）
+        const excludedDaimyoIds = [1001001, 1053024];
+
         for (const clan of this.game.clans) {
             if (clan.id === 0) continue;
+
+            // ★例外チェック：今の大名がリストに含まれていたら、姫は誕生しません！
+            if (excludedDaimyoIds.includes(Number(clan.leaderId))) {
+                continue;
+            }
 
             // 今その家にいる未婚の姫を数えます
             const currentPrincesses = this.game.princesses.filter(p => p.currentClanId === clan.id && p.status === 'unmarried');
@@ -1380,7 +1399,6 @@ class LifeSystem {
                 if (newPrincess && clan.id === this.game.playerClanId) {
                     const father = this.game.getBusho(newPrincess.fatherId);
                     const fatherName = father ? father.name.replace('|', '') : "当家";
-                    // ★修正：「元服し」から「誕生し」に変えました！
                     const msg = `${fatherName}の息女、${newPrincess.name}が誕生しました！`;
                     
                     this.game.ui.log(msg);
