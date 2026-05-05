@@ -1258,11 +1258,11 @@ class LifeSystem {
 
     // ① ランダムな姫のプロフィール（データ）を作る機能です
     createRandomPrincess(clanId, currentYear, isInitial) {
-        // ★修正：CSVから読み込んだ姫の名前リスト（DataManager.genericPrincessNames）を使います！
+        // ★修正：「window.」を外して、直接 DataManager のリストを見に行くように直しました！
         let randomName = "姫";
-        if (window.DataManager && window.DataManager.genericPrincessNames && window.DataManager.genericPrincessNames.length > 0) {
-            // リストの中からランダムで1つ選びます（勝手に「姫」を付け足すのはやめました！）
-            randomName = window.DataManager.genericPrincessNames[Math.floor(Math.random() * window.DataManager.genericPrincessNames.length)];
+        if (typeof DataManager !== 'undefined' && DataManager.genericPrincessNames && DataManager.genericPrincessNames.length > 0) {
+            // リストの中からランダムで1つ選びます
+            randomName = DataManager.genericPrincessNames[Math.floor(Math.random() * DataManager.genericPrincessNames.length)];
         } else {
             // もしCSVが読み込めなかった場合の予備のリストです
             const names = ["雪", "桜", "琴", "菊", "桔梗", "百合", "藤", "萩", "蘭", "梅", "楓", "桂", "椿", "凛", "華", "千代", "鶴", "亀", "松", "竹"];
