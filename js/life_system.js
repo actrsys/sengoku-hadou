@@ -1261,16 +1261,12 @@ class LifeSystem {
         // ★修正：CSVから読み込んだ姫の名前リスト（DataManager.genericPrincessNames）を使います！
         let randomName = "姫";
         if (window.DataManager && window.DataManager.genericPrincessNames && window.DataManager.genericPrincessNames.length > 0) {
-            // リストの中からランダムで1つ選びます
+            // リストの中からランダムで1つ選びます（勝手に「姫」を付け足すのはやめました！）
             randomName = window.DataManager.genericPrincessNames[Math.floor(Math.random() * window.DataManager.genericPrincessNames.length)];
-            // もしCSVの文字の中に「姫」や「女」が含まれていなかったら、自動で「姫」を付け足してあげます
-            if (!randomName.includes('姫') && !randomName.includes('女')) {
-                randomName += "姫";
-            }
         } else {
             // もしCSVが読み込めなかった場合の予備のリストです
             const names = ["雪", "桜", "琴", "菊", "桔梗", "百合", "藤", "萩", "蘭", "梅", "楓", "桂", "椿", "凛", "華", "千代", "鶴", "亀", "松", "竹"];
-            randomName = names[Math.floor(Math.random() * names.length)] + "姫";
+            randomName = names[Math.floor(Math.random() * names.length)];
         }
         
         // 既存の姫と出席番号が被らないように、90000番台から自動で番号を割り振ります
@@ -1288,24 +1284,19 @@ class LifeSystem {
         const father = this.game.getBusho(clan.leaderId);
         const fatherId = father ? father.id : 0;
 
-        // ★修正：年齢の設定です
-        // ゲーム開始時は「0歳〜15歳」でばらけさせ、ゲームの途中で生まれる時は「0歳」にします！
+        // 年齢の設定です
         const age = isInitial ? Math.floor(Math.random() * 16) : 0;
         const birthYear = currentYear - age;
-        const startYear = birthYear; // ★誕生と同時に登場（ゲームにアクセス可能）になります！
+        const startYear = birthYear; // 誕生と同時に登場（ゲームにアクセス可能）になります！
         
-        // ★修正：寿命の設定です
-        // 50年を基準として長生き（最大80歳）しやすく、低確率で早死（20歳〜）する確率の魔法です
+        // 寿命の設定です
         let lifespan = 50;
         const lifeRand = Math.random();
         if (lifeRand < 0.05) {
-            // 5%の確率で20〜39歳の早死に
             lifespan = 20 + Math.floor(Math.random() * 20);
         } else if (lifeRand < 0.15) {
-            // 10%の確率で40〜49歳
             lifespan = 40 + Math.floor(Math.random() * 10);
         } else {
-            // 85%の確率で50〜80歳
             lifespan = 50 + Math.floor(Math.random() * 31);
         }
         const endYear = startYear + lifespan; 
@@ -1329,6 +1320,15 @@ class LifeSystem {
         // 完成したデータを正式な「姫クラス」にして、ゲーム本体の名簿に登録します
         const princess = new Princess(princessData);
         this.game.princesses.push(princess);
+
+        // ★ここを書き足し！：大名家の「所有している姫リスト」にしっかり登録します！
+        if (!clan.princessIds) {
+            clan.princessIds = [];
+        }
+        // 出席番号をリストに追加して、システムに「この家の姫ですよ」と教えます
+        if (!clan.princessIds.includes(princess.id)) {
+            clan.princessIds.push(princess.id);
+        }
 
         return princess;
     }
