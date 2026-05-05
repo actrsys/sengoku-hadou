@@ -1257,7 +1257,7 @@ class LifeSystem {
     // ==========================================
 
     // ① ランダムな姫のプロフィール（データ）を作る機能です
-    createRandomPrincess(clanId, currentYear, isInitial) {
+    createRandomPrincess(clanId, currentYear, isInitial, specificFatherId = null) {
         let randomName = "姫";
         let candidateNames = [];
 
@@ -1303,14 +1303,39 @@ class LifeSystem {
             }
         }
 
-        // お父さん（その家の大名）を探してメモします
+        // ★変更：お父さんを探してメモします（一門武将も選べるようにしました）
         const clan = this.game.clans.find(c => c.id === clanId);
         if (!clan) return null;
-        const father = this.game.getBusho(clan.leaderId);
+        
+        let father = null;
+        if (specificFatherId) {
+            father = this.game.getBusho(specificFatherId);
+        } else {
+            father = this.game.getBusho(clan.leaderId);
+        }
         const fatherId = father ? father.id : 0;
 
+        // ★追加：お父さんの年齢をチェックして、15歳以上離れるようにします！
+        let age = 0;
+        if (father) {
+            const fatherAge = currentYear - father.birthYear;
+            
+            // お父さんが14歳以下の場合は、15歳以上離れた子供は作れないので誕生をキャンセルします
+            if (fatherAge < 15) {
+                return null;
+            }
+            
+            if (isInitial) {
+                // 初期登場時は0〜15歳の中から選びますが、お父さんとの年齢差が最低15歳になるように年齢の上限を制限します
+                const maxAge = Math.min(15, fatherAge - 15);
+                age = Math.floor(Math.random() * (maxAge + 1));
+            }
+        } else {
+            // 万が一お父さんのデータが見つからない場合の予備の計算です
+            age = isInitial ? Math.floor(Math.random() * 16) : 0;
+        }
+
         // 年齢の設定です
-        const age = isInitial ? Math.floor(Math.random() * 16) : 0;
         const birthYear = currentYear - age;
         const startYear = birthYear; // 誕生と同時に登場（ゲームにアクセス可能）になります！
         
@@ -1395,17 +1420,12 @@ class LifeSystem {
     async checkRandomPrincessAppearance() {
         const currentYear = this.game.year;
         
-        // ★例外リスト：ランダムな姫が絶対に誕生しない大名のID（出席番号）です
+        // ★例外リスト：ランダムな姫が絶対に誕生しない武将のID（出席番号）です
         // （上と同じリストです。後で追加する時はこちらも一緒に足してください）
-        const excludedDaimyoIds = [1001001, 1053024];
+        const excludedIds = [1001001, 1053024];
 
         for (const clan of this.game.clans) {
             if (clan.id === 0) continue;
-
-            // ★例外チェック：今の大名がリストに含まれていたら、姫は誕生しません！
-            if (excludedDaimyoIds.includes(Number(clan.leaderId))) {
-                continue;
-            }
 
             // 今その家にいる未婚の姫を数えます
             const currentPrincesses = this.game.princesses.filter(p => p.currentClanId === clan.id && p.status === 'unmarried');
@@ -1416,18 +1436,50 @@ class LifeSystem {
             if (currentPrincesses.length === 0) prob = 0.20;
             else if (currentPrincesses.length === 1) prob = 0.10;
 
-            // サイコロを振って当たりが出たら、新しい姫を作ります
-            if (Math.random() < prob) {
-                const newPrincess = this.createRandomPrincess(clan.id, currentYear, false);
-                
-                // プレイヤーの大名家だった場合は、画面にお知らせのメッセージを出します
-                if (newPrincess && clan.id === this.game.playerClanId) {
-                    const father = this.game.getBusho(newPrincess.fatherId);
-                    const fatherName = father ? father.name.replace('|', '') : "当家";
-                    const msg = `${fatherName}の息女、${newPrincess.name}が誕生しました！`;
+            // ★変更：大名の姫の誕生判定
+            if (!excludedIds.includes(Number(clan.leaderId))) {
+                if (Math.random() < prob) {
+                    const newPrincess = this.createRandomPrincess(clan.id, currentYear, false, clan.leaderId);
                     
-                    this.game.ui.log(msg);
-                    await this.game.ui.showDialogAsync(msg, false, 0); // プレイヤーがOKを押すまでしっかり待ちます
+                    // プレイヤーの大名家だった場合は、画面にお知らせのメッセージを出します
+                    if (newPrincess && clan.id === this.game.playerClanId) {
+                        const father = this.game.getBusho(newPrincess.fatherId);
+                        const fatherName = father ? father.name.replace('|', '') : "当家";
+                        const msg = `${fatherName}の息女、${newPrincess.name}が誕生しました！`;
+                        
+                        this.game.ui.log(msg);
+                        await this.game.ui.showDialogAsync(msg, false, 0); 
+                    }
+                }
+            }
+
+            // ★追加：一門武将の姫の誕生判定（大名の姫とは別枠で、確率を半分にして判定します）
+            const leader = this.game.getBusho(clan.leaderId);
+            if (leader) {
+                // 生きている同じ家の一門武将（大名本人と例外リストを除く）を探します
+                const familyBushos = this.game.bushos.filter(b => 
+                    b.clan === clan.id && 
+                    b.status === 'active' && 
+                    b.id !== leader.id && 
+                    !excludedIds.includes(b.id) &&
+                    leader.familyIds.some(fId => b.familyIds.includes(fId))
+                );
+
+                if (familyBushos.length > 0) {
+                    const familyProb = prob / 2; // 確率は半枠
+                    if (Math.random() < familyProb) {
+                        // 一門武将の中からランダムに一人を父親に選びます
+                        const randomFather = familyBushos[Math.floor(Math.random() * familyBushos.length)];
+                        const newPrincess = this.createRandomPrincess(clan.id, currentYear, false, randomFather.id);
+                        
+                        if (newPrincess && clan.id === this.game.playerClanId) {
+                            const fatherName = randomFather.name.replace('|', '');
+                            const msg = `${fatherName}のご息女、${newPrincess.name}が誕生しました！`;
+                            
+                            this.game.ui.log(msg);
+                            await this.game.ui.showDialogAsync(msg, false, 0);
+                        }
+                    }
                 }
             }
         }
