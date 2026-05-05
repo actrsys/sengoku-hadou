@@ -368,6 +368,21 @@ class DataManager {
     }
 
     // ★ここから追加：読み込んだ generic_princess.csv の文字を、名前のリストに翻訳する魔法です！
+    static parseGenericPrincessNames(text) {
+        // 読み込んだ文字を1行ずつバラバラにして、整理します
+        const lines = text.split('\n').map(l => l.trim()).filter(l => l);
+        if (lines.length < 2) return; // 1行目（見出し）しかなければ終わります
+        
+        // 2行目から順番に名前を読み取っていきます
+        for (let i = 1; i < lines.length; i++) {
+            // カンマ（,）で区切られている場合は、最初の項目を名前として受け取ります
+            const name = lines[i].split(',')[0];
+            if (name) {
+                // 用意しておいた汎用姫のリストに名前を書き込みます
+                this.genericPrincessNames.push(name.trim());
+            }
+        }
+    }
 
     static generateGenericBushos(bushos, castles, clans) {
         let idCounter = 90000;
