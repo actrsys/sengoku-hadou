@@ -43,6 +43,9 @@ window.MainParams = {
    ========================================================================== */
 class DataManager {
     static genericNames = { surnames: [], names: [] };
+    // ★追加：汎用の姫の名前を入れる箱を用意します！
+    static genericPrincessNames = [];
+    
     static async loadAll(folderName) {
         const selectedScenario = SCENARIOS.find(s => s.folder === folderName);
         if (selectedScenario) {
@@ -57,6 +60,12 @@ class DataManager {
                     const namesText = await this.fetchText("./data/generic_officer.csv");
                     this.parseGenericNames(namesText);
                 } catch (e) { console.warn("汎用武将名ファイルなし"); }
+                
+                // ★ここから追加：generic_princess.csv を読み込む魔法です！
+                try {
+                    const princessNamesText = await this.fetchText("./data/generic_princess.csv");
+                    this.parseGenericPrincessNames(princessNamesText);
+                } catch (e) { console.warn("汎用姫名ファイルなし"); }
             }
             // ★今回追加：princess.csv と legions.csv も一緒に読み込むようにリストに加えます！
             const [clansText, castlesText, bushosText, kunishusText, courtRanksText, princessesText, provincesText, legionsText] = await Promise.all([                
@@ -357,6 +366,27 @@ class DataManager {
             if (name) this.genericNames.names.push(name.trim());
         }
     }
+
+    // ★ここから追加：読み込んだ generic_princess.csv の文字を、名前のリストに翻訳する魔法です！
+    static parseGenericPrincessNames(text) {
+        // 行ごとに分けて、余計な空白を消します
+        const lines = text.split('\n').map(l => l.trim()).filter(l => l);
+        // もし中身が少なすぎたら（1行目しかないなど）やめます
+        if (lines.length < 2) return;
+        
+        // 2行目から順番に見ていきます（1行目は「name」などの見出しだと想定して飛ばします）
+        for (let i = 1; i < lines.length; i++) {
+            // カンマで区切って、一番左の文字（名前）を取り出します
+            const parts = lines[i].split(',');
+            if (parts[0]) {
+                const nameStr = parts[0].trim();
+                if (nameStr) {
+                    this.genericPrincessNames.push(nameStr);
+                }
+            }
+        }
+    }
+
     static generateGenericBushos(bushos, castles, clans) {
         let idCounter = 90000;
         const personalities = ['aggressive', 'cautious', 'balanced'];
@@ -945,6 +975,9 @@ class GameManager {
             
             // ★ここを書き足し！：ゲーム開始の瞬間に、全員の年齢による能力値変動を計算します！
             this.lifeSystem.updateAllBushosAge();
+
+            // ★追加：ゲーム開始時に、各大名家にランダムな姫をある程度割り振ります！
+            this.lifeSystem.distributeInitialPrincesses();
 
             // ★今回追加：ゲーム開始時に、武将の年齢と得意な能力に応じた経験値をプレゼントします！
             this.bushos.forEach(b => {

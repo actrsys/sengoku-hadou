@@ -25,6 +25,9 @@ class LifeSystem {
 
             await this.checkBirth();
             await this.checkNameChange();
+            
+            // ★追加：毎年1月に、ランダムで新しい姫が登場するかチェックします！
+            await this.checkRandomPrincessAppearance();
 
             // 新しく登場した武将たちのために、派閥を組み直す魔法を呼び出します！
             if (this.game.factionSystem) {
@@ -1247,5 +1250,124 @@ class LifeSystem {
                 }
             }
         }
-    }    
+    }
+    
+    // ==========================================
+    // ★ここから追加：ランダム姫システム用の機能です！
+    // ==========================================
+
+    // ① ランダムな姫のプロフィール（データ）を作る機能です
+    createRandomPrincess(clanId, currentYear, isInitial) {
+        // ★修正：CSVから読み込んだ姫の名前リスト（DataManager.genericPrincessNames）を使います！
+        let randomName = "姫";
+        if (window.DataManager && window.DataManager.genericPrincessNames && window.DataManager.genericPrincessNames.length > 0) {
+            // リストの中からランダムで1つ選びます
+            randomName = window.DataManager.genericPrincessNames[Math.floor(Math.random() * window.DataManager.genericPrincessNames.length)];
+            // もしCSVの文字の中に「姫」や「女」が含まれていなかったら、自動で「姫」を付け足してあげます
+            if (!randomName.includes('姫') && !randomName.includes('女')) {
+                randomName += "姫";
+            }
+        } else {
+            // もしCSVが読み込めなかった場合の予備のリストです
+            const names = ["雪", "桜", "琴", "菊", "桔梗", "百合", "藤", "萩", "蘭", "梅", "楓", "桂", "椿", "凛", "華", "千代", "鶴", "亀", "松", "竹"];
+            randomName = names[Math.floor(Math.random() * names.length)] + "姫";
+        }
+        
+        // 既存の姫と出席番号が被らないように、90000番台から自動で番号を割り振ります
+        let nextId = 90000; 
+        if (this.game.princesses.length > 0) {
+            const maxId = Math.max(...this.game.princesses.map(p => p.id));
+            if (maxId >= 90000) {
+                nextId = maxId + 1;
+            }
+        }
+
+        // お父さん（その家の大名）を探してメモします
+        const clan = this.game.clans.find(c => c.id === clanId);
+        if (!clan) return null;
+        const father = this.game.getBusho(clan.leaderId);
+        const fatherId = father ? father.id : 0;
+
+        // ★修正：年齢の設定です
+        // ゲーム開始時は「0歳〜15歳」でばらけさせ、ゲームの途中で生まれる時は「0歳」にします！
+        const age = isInitial ? Math.floor(Math.random() * 16) : 0;
+        const birthYear = currentYear - age;
+        const startYear = birthYear; // ★誕生と同時に登場（ゲームにアクセス可能）になります！
+        const endYear = startYear + 30 + Math.floor(Math.random() * 20); // 寿命は誕生から30〜50年
+
+        // 上で作った情報をひとつの箱（データ）にまとめます
+        const princessData = {
+            id: nextId,
+            name: randomName,
+            yomi: "",
+            birthYear: birthYear,
+            startYear: startYear,
+            endYear: endYear,
+            faceIcon: 'unknown_princess_face.webp', // 汎用の姫画像
+            originalClanId: clanId,
+            currentClanId: clanId,
+            fatherId: fatherId,
+            husbandId: 0,
+            status: 'unmarried' // 最初から「未婚（結婚可能）」として登場させます
+        };
+
+        // 完成したデータを正式な「姫クラス」にして、ゲーム本体の名簿に登録します
+        const princess = new Princess(princessData);
+        this.game.princesses.push(princess);
+
+        return princess;
+    }
+
+    // ② ゲーム開始時に、各家に姫を分配する機能です
+    distributeInitialPrincesses() {
+        const currentYear = this.game.year;
+        
+        this.game.clans.forEach(clan => {
+            if (clan.id === 0) return; // 空き家（中立）は無視します
+
+            // すでにCSVで設定された「史実の姫」がいるか数えます
+            const existingPrincesses = this.game.princesses.filter(p => p.currentClanId === clan.id && p.status === 'unmarried');
+            
+            // 史実の姫が誰もいない大名家にだけ、50%の確率で1人ランダムな姫を登場させます
+            if (existingPrincesses.length === 0) {
+                if (Math.random() < 0.5) {
+                    this.createRandomPrincess(clan.id, currentYear, true);
+                }
+            }
+        });
+    }
+
+    // ③ 毎年1月にランダムで新しい姫を登場させる機能です
+    async checkRandomPrincessAppearance() {
+        const currentYear = this.game.year;
+        
+        for (const clan of this.game.clans) {
+            if (clan.id === 0) continue;
+
+            // 今その家にいる未婚の姫を数えます
+            const currentPrincesses = this.game.princesses.filter(p => p.currentClanId === clan.id && p.status === 'unmarried');
+            
+            // 姫が少ない家ほど、新しい姫が生まれやすくします
+            // （姫0人：20%、姫1人：10%、姫2人以上：5% の確率）
+            let prob = 0.05;
+            if (currentPrincesses.length === 0) prob = 0.20;
+            else if (currentPrincesses.length === 1) prob = 0.10;
+
+            // サイコロを振って当たりが出たら、新しい姫を作ります
+            if (Math.random() < prob) {
+                const newPrincess = this.createRandomPrincess(clan.id, currentYear, false);
+                
+                // プレイヤーの大名家だった場合は、画面にお知らせのメッセージを出します
+                if (newPrincess && clan.id === this.game.playerClanId) {
+                    const father = this.game.getBusho(newPrincess.fatherId);
+                    const fatherName = father ? father.name.replace('|', '') : "当家";
+                    // ★修正：「元服し」から「誕生し」に変えました！
+                    const msg = `${fatherName}の息女、${newPrincess.name}が誕生しました！`;
+                    
+                    this.game.ui.log(msg);
+                    await this.game.ui.showDialogAsync(msg, false, 0); // プレイヤーがOKを押すまでしっかり待ちます
+                }
+            }
+        }
+    }
 }
