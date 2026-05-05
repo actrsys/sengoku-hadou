@@ -769,12 +769,20 @@ class DiplomacyManager {
         const relation = this.getDiplomacyData(this.game.playerClanId, targetClanId);
         if (relation) {
             relation.isMarriage = true;
-            relation.sentiment = Math.max(relation.sentiment, 70); 
+            if (relation.sentiment >= 41) {
+                relation.sentiment = Math.min(100, relation.sentiment + 30);
+            } else {
+                relation.sentiment = 70;
+            }
         }
         const oppRelation = this.getDiplomacyData(targetClanId, this.game.playerClanId);
         if (oppRelation) {
             oppRelation.isMarriage = true;
-            oppRelation.sentiment = Math.max(oppRelation.sentiment, 70);
+            if (oppRelation.sentiment >= 41) {
+                oppRelation.sentiment = Math.min(100, oppRelation.sentiment + 30);
+            } else {
+                oppRelation.sentiment = 70;
+            }
         }
     }
     
