@@ -1258,16 +1258,41 @@ class LifeSystem {
 
     // ① ランダムな姫のプロフィール（データ）を作る機能です
     createRandomPrincess(clanId, currentYear, isInitial) {
-        // ★修正：「window.」を外して、直接 DataManager のリストを見に行くように直しました！
         let randomName = "姫";
+        let candidateNames = [];
+
+        // 1. まずは名前の候補リストを準備します
         if (typeof DataManager !== 'undefined' && DataManager.genericPrincessNames && DataManager.genericPrincessNames.length > 0) {
-            // リストの中からランダムで1つ選びます
-            randomName = DataManager.genericPrincessNames[Math.floor(Math.random() * DataManager.genericPrincessNames.length)];
+            candidateNames = DataManager.genericPrincessNames;
         } else {
             // もしCSVが読み込めなかった場合の予備のリストです
-            const names = ["雪", "桜", "琴", "菊", "桔梗", "百合", "藤", "萩", "蘭", "梅", "楓", "桂", "椿", "凛", "華", "千代", "鶴", "亀", "松", "竹"];
-            randomName = names[Math.floor(Math.random() * names.length)];
+            candidateNames = ["雪", "桜", "琴", "菊", "桔梗", "百合", "藤", "萩", "蘭", "梅", "楓", "桂", "椿", "凛", "華", "千代", "鶴", "亀", "松", "竹"];
         }
+
+        // 2. それぞれの名前が「今ゲームの中で何回使われているか」を記録するメモ帳を作ります
+        const nameCounts = {};
+        candidateNames.forEach(name => nameCounts[name] = 0); // 最初は全部0回にします
+
+        // 3. ゲーム内にいる全ての姫を調べて、同じ名前があったらメモ帳の回数を1ずつ増やします
+        this.game.princesses.forEach(p => {
+            if (nameCounts[p.name] !== undefined) {
+                nameCounts[p.name]++;
+            }
+        });
+
+        // 4. メモ帳の中から、「一番使われている回数が少ない数」を探し出します
+        let minCount = Infinity; // 最初はわざと無限大の大きさにしておきます
+        for (const name of candidateNames) {
+            if (nameCounts[name] < minCount) {
+                minCount = nameCounts[name];
+            }
+        }
+
+        // 5. その「一番少ない回数」と同じ回数の名前だけを集めて、新しいグループを作ります
+        const leastUsedNames = candidateNames.filter(name => nameCounts[name] === minCount);
+
+        // 6. 最後に、その一番少ないグループの中からランダムで1つ選びます！
+        randomName = leastUsedNames[Math.floor(Math.random() * leastUsedNames.length)];
         
         // 既存の姫と出席番号が被らないように、90000番台から自動で番号を割り振ります
         let nextId = 90000; 
