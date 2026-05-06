@@ -413,6 +413,10 @@ class DiplomacyManager {
         } else if (relationStatus === '従属') {
             // 自分が相手に従属（支配されている状態）している時だけ、相手の義理に合わせて0%〜30%の間で変動させます
             relationBonus = duty * 0.003;
+            if (isMarriage) {
+                // ★追加：婚姻している場合はさらに15%のボーナスを上乗せします！
+                relationBonus += 0.15;
+            }
         }
         
         const enemyHateBonus = (50 - helperToEnemySentiment) / 100;
@@ -764,7 +768,11 @@ class DiplomacyManager {
         }
         targetBusho.updateFamilyIds(this.game.princesses);
 
-        this.changeStatus(this.game.playerClanId, targetClanId, '同盟');
+        // ★修正：現在の関係が「支配」や「従属」の場合は、それを維持して同盟に上書きしないようにします
+        const currentRelation = this.getRelation(this.game.playerClanId, targetClanId);
+        if (!currentRelation || (currentRelation.status !== '支配' && currentRelation.status !== '従属')) {
+            this.changeStatus(this.game.playerClanId, targetClanId, '同盟');
+        }
         
         const relation = this.getDiplomacyData(this.game.playerClanId, targetClanId);
         if (relation) {

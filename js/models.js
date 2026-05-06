@@ -72,11 +72,17 @@ class Clan {
                             statusStr = '和睦';
                         }
                         
-                        // ★「婚姻」と書かれていたら、同盟状態にして結婚シールを貼ります
+                        // ★「婚姻」という文字が含まれていたら結婚シールを貼ります。
+                        // 同盟の場合は婚姻、従属・支配は従属婚姻・支配婚姻と記述
                         let isMarriage = false;
-                        if (statusStr === '婚姻') {
-                            statusStr = '同盟';
+                        if (statusStr.includes('婚姻')) {
                             isMarriage = true;
+                            // 「婚姻」の文字を取り除きます（「従属婚姻」なら「従属」だけが残ります）
+                            statusStr = statusStr.replace('婚姻', '');
+                            // もし単に「婚姻」とだけ書かれていて空っぽになったら、今まで通り基本の「同盟」にします
+                            if (statusStr === '') {
+                                statusStr = '同盟';
+                            }
                         }
 
                         this.diplomacyValue[targetId] = {
