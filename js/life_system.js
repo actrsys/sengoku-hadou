@@ -462,6 +462,101 @@ class LifeSystem {
     async executeDeath(busho) {
         busho.status = 'dead'; // ステータスを「死亡」にします
         
+        // ★ここから追加：夫が死亡したことによる姫の帰還処理と婚姻同盟の解消
+        if (busho.wifeIds && busho.wifeIds.length > 0) {
+            for (const wifeId of busho.wifeIds) {
+                const princess = this.game.princesses.find(p => p.id === wifeId);
+                if (princess && princess.status === 'married') {
+                    princess.husbandId = 0; // 未亡人になります
+                    
+                    // 1. 婚姻同盟の解消チェック
+                    const clanA = princess.originalClanId;
+                    const clanB = busho.clan;
+                    
+                    if (clanA > 0 && clanB > 0 && clanA !== clanB) {
+                        const hasOtherMarriage = this.game.princesses.some(otherP => {
+                            if (otherP.status === 'dead' || otherP.status === 'unborn' || otherP.husbandId === 0) return false;
+                            const otherHusband = this.game.getBusho(otherP.husbandId);
+                            if (!otherHusband) return false;
+                            return (otherP.originalClanId === clanA && otherHusband.clan === clanB) || 
+                                   (otherP.originalClanId === clanB && otherHusband.clan === clanA);
+                        });
+                        
+                        if (!hasOtherMarriage) {
+                            const clanAData = this.game.clans.find(c => c.id === clanA);
+                            const clanBData = this.game.clans.find(c => c.id === clanB);
+                            
+                            if (clanAData && clanAData.diplomacyValue[clanB]) {
+                                clanAData.diplomacyValue[clanB].isMarriage = false;
+                            }
+                            if (clanBData && clanBData.diplomacyValue[clanA]) {
+                                clanBData.diplomacyValue[clanA].isMarriage = false;
+                            }
+                            
+                            if (clanA === this.game.playerClanId || clanB === this.game.playerClanId) {
+                                const targetClanName = (clanA === this.game.playerClanId) ? clanBData?.name : clanAData?.name;
+                                if (targetClanName) {
+                                    const breakMsg = `夫である${busho.name.replace('|', '')}の死により、${targetClanName}との婚姻関係は解消され、通常の同盟となりました。`;
+                                    this.game.ui.log(breakMsg);
+                                    await this.game.ui.showDialogAsync(breakMsg, false, 0);
+                                }
+                            }
+                        }
+                    }
+
+                    // 2. 姫の帰還先を探す
+                    let nextClanId = 0;
+                    
+                    // 実家（originalClanId）が残っているか
+                    if (princess.originalClanId > 0) {
+                        const originalClanCastles = this.game.castles.filter(c => c.ownerClan === princess.originalClanId);
+                        if (originalClanCastles.length > 0) {
+                            nextClanId = princess.originalClanId;
+                        }
+                    }
+
+                    // 実家がない場合、お父さんの一門武将を頼る
+                    if (nextClanId === 0 && princess.fatherId > 0) {
+                        const father = this.game.getBusho(princess.fatherId);
+                        if (father) {
+                            const relatives = this.game.bushos.filter(b => 
+                                b.status !== 'dead' && b.status !== 'unborn' && b.clan > 0 &&
+                                father.familyIds.some(fId => b.familyIds.includes(fId))
+                            );
+
+                            if (relatives.length > 0) {
+                                let maxAchieve = -1;
+                                let candidates = [];
+                                for (const rel of relatives) {
+                                    const achieve = rel.achievementTotal || 0;
+                                    if (achieve > maxAchieve) {
+                                        maxAchieve = achieve;
+                                        candidates = [rel];
+                                    } else if (achieve === maxAchieve) {
+                                        candidates.push(rel);
+                                    }
+                                }
+                                if (candidates.length > 0) {
+                                    const targetBusho = candidates[Math.floor(Math.random() * candidates.length)];
+                                    nextClanId = targetBusho.clan;
+                                }
+                            }
+                        }
+                    }
+
+                    // 行き先の決定
+                    if (nextClanId > 0) {
+                        princess.currentClanId = nextClanId;
+                        princess.status = 'unmarried'; // 再び未婚に戻ります
+                    } else {
+                        // 戻る場所がどこにもない場合は、もう登場させない
+                        princess.status = 'dead';
+                    }
+                }
+            }
+            busho.wifeIds = []; // リストを空にします
+        }
+        
         // ★ここを追加：官位を持っていたら朝廷に返す魔法！
         if (busho.courtRankIds && busho.courtRankIds.length > 0) {
             let wasShogun = false;
