@@ -1405,12 +1405,23 @@ class UIInfoManager {
             const targetClan = this.game.clans.find(c => c.id === targetClanId);
             const clanName = targetClan ? targetClan.name : "無所属";
 
+            let familyMark = "";
+            if (targetClan) {
+                const daimyo = this.game.getBusho(targetClan.leaderId);
+                if (daimyo) {
+                    const pFamily = Array.isArray(p.familyIds) ? p.familyIds : [];
+                    const dFamily = Array.isArray(daimyo.familyIds) ? daimyo.familyIds : [];
+                    if (pFamily.includes(daimyo.id) || dFamily.includes(p.id)) familyMark = "◯";
+                }
+            }
+
             return {
                 onClick: isSelectMode ? `window.GameApp.ui.info.selectPrincess(${p.id}, this)` : null,
                 cells: [
                     `<strong class="col-princess-name">${p.name}</strong>`,
                     `<span class="col-clan">${clanName}</span>`,
                     `<span class="col-age">${age}</span>`,
+                    `<span class="col-family">${familyMark}</span>`,
                     `<span class="col-father">${father ? father.name : "不明"}</span>`,
                     `<span class="col-husband">${husband ? husband.name : "なし"}</span>`,
                     `<span class="pc-only"></span>` 
@@ -1431,6 +1442,7 @@ class UIInfoManager {
                 `<span class="col-princess-name">姫</span>`,
                 `<span class="col-clan">勢力</span>`,
                 `<span class="col-age">年齢</span>`,
+                `<span class="col-family">一門</span>`,
                 `<span class="col-father">父親</span>`,
                 `<span class="col-husband">配偶者</span>`,
                 `<span class="pc-only"></span>`
@@ -1440,8 +1452,8 @@ class UIInfoManager {
             listClass: "princess-list-container",
             items: items,
             scrollPos: scrollPos,
-            gridTemplateSp: "1.3fr 1.5fr 1fr 1.5fr 1.5fr",
-            gridTemplatePc: "95px 100px 80px 100px 100px 1fr",
+            gridTemplateSp: "1.3fr 1.5fr 0.8fr 0.8fr 1.5fr 1.5fr",
+            gridTemplatePc: "95px 100px 50px 50px 100px 100px 1fr",
             onBack: isSelectMode ? () => this.openBushoSelector('diplomacy_doer', targetCastleId, { subAction: 'marriage' }) : null,
             onConfirm: isSelectMode ? () => this.confirmPrincessSelection(targetCastleId, doerId) : null,
             onScopeClick: (scopeKey) => {
