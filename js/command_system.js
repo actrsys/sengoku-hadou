@@ -1004,6 +1004,25 @@ class CommandSystem {
                         if (type === 'dominate' && rel.status === '支配') return false;
                         if (type === 'subordinate' && rel.status === '従属') return false;
                     }
+
+                    // ★追加：支配勧告と従属嘆願は、自領と接している勢力に限定します！
+                    if (type === 'dominate' || type === 'subordinate') {
+                        let isAdjacent = false;
+                        const myCastles = this.game.castles.filter(c => Number(c.ownerClan) === playerClanId);
+                        for (let mc of myCastles) {
+                            if (mc.adjacentCastleIds) {
+                                for (let adjId of mc.adjacentCastleIds) {
+                                    const adjC = this.game.getCastle(adjId);
+                                    if (adjC && Number(adjC.ownerClan) === Number(target.ownerClan)) {
+                                        isAdjacent = true;
+                                        break;
+                                    }
+                                }
+                            }
+                            if (isAdjacent) break;
+                        }
+                        if (!isAdjacent) return false;
+                    }
                     
                     // その大名家の「大名（当主）」を探して、その人がいる城だけをOK（選択可能）にします！
                     const daimyo = this.game.bushos.find(b => b.clan === target.ownerClan && b.isDaimyo);
