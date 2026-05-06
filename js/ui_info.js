@@ -1373,7 +1373,23 @@ class UIInfoManager {
         let tabsHtml = null;
 
         if (isSelectMode) {
-            princesses = myPrincesses.filter(p => p.status === 'unmarried');
+            // ★自家の大名を取得します
+            const myDaimyo = this.game.bushos.find(b => b.clan === myClanId && b.isDaimyo);
+            
+            princesses = myPrincesses.filter(p => {
+                // 未婚でなければリストに入れません
+                if (p.status !== 'unmarried') return false;
+                
+                // ★大名が存在し、一門であるかチェックします
+                if (myDaimyo) {
+                    const pFamily = Array.isArray(p.familyIds) ? p.familyIds : [];
+                    const dFamily = Array.isArray(myDaimyo.familyIds) ? myDaimyo.familyIds : [];
+                    if (pFamily.includes(myDaimyo.id) || dFamily.includes(p.id)) {
+                        return true;
+                    }
+                }
+                return false; // 一門でなければリストから除外します
+            });
             this.selectedPrincessId = null; 
         } else {
             if (!this.princessCurrentScope) this.princessCurrentScope = 'clan';
