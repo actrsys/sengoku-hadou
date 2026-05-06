@@ -768,11 +768,7 @@ class DiplomacyManager {
         }
         targetBusho.updateFamilyIds(this.game.princesses);
 
-        // ★修正：現在の関係が「支配」や「従属」の場合は、それを維持して同盟に上書きしないようにします
-        const currentRelation = this.getRelation(this.game.playerClanId, targetClanId);
-        if (!currentRelation || (currentRelation.status !== '支配' && currentRelation.status !== '従属')) {
-            this.changeStatus(this.game.playerClanId, targetClanId, '同盟');
-        }
+        this.changeStatus(this.game.playerClanId, targetClanId, '同盟');
         
         const relation = this.getDiplomacyData(this.game.playerClanId, targetClanId);
         if (relation) {
