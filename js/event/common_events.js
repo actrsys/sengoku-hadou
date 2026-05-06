@@ -1187,6 +1187,19 @@ window.GameEvents.push({
                     
                     if (isEmployed) {
                         game.affiliationSystem.joinClan(ronin, clanId, currentCastle.id);
+                        
+                        // ここから追加した部分です。勢力（大名家）の名前を調べて、メッセージ画面を出します。
+                        const clanData = game.clans.find(c => c.id === clanId);
+                        const clanName = clanData ? clanData.name : "当家";
+                        if (game.ui && game.ui.showDialogAsync) {
+                            await game.ui.showDialogAsync(`「ははっ！　これから${clanName}のために身命を賭して働きまする！」`, false, 0, {
+                                leftFace: ronin.faceIcon,
+                                leftName: rName
+                            });
+                            // さらにシステムメッセージを追加します。
+                            await game.ui.showDialogAsync(`${rName}が${clanName}に加わりました！`, false, 0);
+                        }
+                        
                     } else {
                         const otherCastles = game.castles.filter(c => c.ownerClan !== clanId && c.ownerClan !== 0);
                         if (otherCastles.length > 0) {
