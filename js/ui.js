@@ -863,15 +863,14 @@ class UIManager {
 
         // ★ここから追加：代わりに、右クリック（スマホなら長押し）で「命令終了」を押したことにする魔法です！
         document.addEventListener('contextmenu', (e) => {
-            // ブラウザ本来の右クリックメニューが出ないように防ぎます
-            e.preventDefault(); 
-            
             // 画面の中に「命令終了」のボタンがあるか探します
             // （パソコン版でもスマホ版でも、このクラス名がついています）
             const finishBtn = document.querySelector('.cmd-btn.finish');
             
             // ボタンが見つかって、かつ画面に表示されている（隠れていない）時だけポチッと押します！
             if (finishBtn && finishBtn.offsetParent !== null) {
+                // ボタンが出ている時だけ、ブラウザ本来の右クリックメニューが出ないように防ぎます
+                e.preventDefault(); 
                 finishBtn.click();
             }
         });
