@@ -438,7 +438,7 @@ class LifeSystem {
                                 if (clanA === this.game.playerClanId || clanB === this.game.playerClanId) {
                                     const targetClanName = (clanA === this.game.playerClanId) ? clanBData?.name : clanAData?.name;
                                     if (targetClanName) {
-                                        const breakMsg = `${p.name}の死により、${targetClanName}との婚姻関係は解消され、通常の同盟となりました。`;
+                                        const breakMsg = `${p.name}の死により、${targetClanName}との婚姻関係は解消されました。`;
                                         this.game.ui.log(breakMsg);
                                         await this.game.ui.showDialogAsync(breakMsg, false, 0);
                                     }
@@ -496,7 +496,7 @@ class LifeSystem {
                             if (clanA === this.game.playerClanId || clanB === this.game.playerClanId) {
                                 const targetClanName = (clanA === this.game.playerClanId) ? clanBData?.name : clanAData?.name;
                                 if (targetClanName) {
-                                    const breakMsg = `夫である${busho.name.replace('|', '')}の死により、${targetClanName}との婚姻関係は解消され、通常の同盟となりました。`;
+                                    const breakMsg = `夫である${busho.name.replace('|', '')}の死により、${targetClanName}との婚姻関係は解消されました。`;
                                     this.game.ui.log(breakMsg);
                                     await this.game.ui.showDialogAsync(breakMsg, false, 0);
                                 }
