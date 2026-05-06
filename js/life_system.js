@@ -1274,11 +1274,23 @@ class LifeSystem {
         // 滅亡の条件：お城が0個になった、または後継ぎがいない場合です
         if (clanCastles.length === 0 || reason === 'no_heir') {
             
+            // ★追加：滅ぼした勢力を探します
+            let killerClanId = 0;
+            if (reason === 'no_castle') {
+                // 最後に攻撃されて奪われたお城の記録から、滅ぼした勢力を探します
+                const lastLostCastle = this.game.castles.find(c => c.lastAttackedOwnerId === clan.id && c.ownerClan !== clan.id);
+                if (lastLostCastle) {
+                    killerClanId = lastLostCastle.ownerClan; // 今の持ち主（攻め滅ぼした大名家）
+                    
+                    // 万が一いまの持ち主が諸勢力や空き城（中立）だった場合のための保険
+                    if (killerClanId === 0 && lastLostCastle.lastAttackerClanId > 0 && !lastLostCastle.lastAttackerIsKunishu) {
+                        killerClanId = lastLostCastle.lastAttackerClanId;
+                    }
+                }
+            }
+
             const leader = this.game.getBusho(clan.leaderId);
             if (leader && leader.status !== 'dead' && leader.isDaimyo && leader.courtRankIds && leader.courtRankIds.includes(1) && clanCastles.length === 0) {
-                const lastCastle = this.game.getCastle(leader.castleId);
-                const killerClanId = lastCastle ? lastCastle.ownerClan : 0; // ★追加：将軍を滅ぼした勢力をメモします
-
                 // ★追加：将軍の勢力が滅亡したことをイベントシステムに伝えます！
                 if (this.game.eventManager) {
                     await this.game.eventManager.processEvents('shogun_death', {
@@ -1287,6 +1299,33 @@ class LifeSystem {
                     });
                 }
             }
+            
+            // ★ここから追加：未婚の姫を、攻め滅ぼした大名家が総取りする魔法
+            if (killerClanId > 0 && killerClanId !== clan.id) {
+                const killerClan = this.game.clans.find(c => c.id === killerClanId);
+                if (killerClan) {
+                    // その家にいる未婚の姫を全員集めます
+                    const targetPrincesses = this.game.princesses.filter(p => p.currentClanId === clan.id && p.status === 'unmarried');
+                    for (const p of targetPrincesses) {
+                        p.originalClanId = killerClanId; // 実家も書き換えます
+                        p.currentClanId = killerClanId;  // 現在の所属も書き換えます
+                        
+                        // 滅亡した家のリストから外します
+                        if (clan.princessIds) {
+                            clan.princessIds = clan.princessIds.filter(id => id !== p.id);
+                        }
+                        
+                        // 攻め滅ぼした家のリストに加えます
+                        if (!killerClan.princessIds) {
+                            killerClan.princessIds = [];
+                        }
+                        if (!killerClan.princessIds.includes(p.id)) {
+                            killerClan.princessIds.push(p.id);
+                        }
+                    }
+                }
+            }
+            // ★追加ここまで
 
             clan.extinctionNotified = true; // 二度と呼ばれないように印をつけます
 
