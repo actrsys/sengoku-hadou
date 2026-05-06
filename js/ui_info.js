@@ -559,7 +559,7 @@ class UIInfoManager {
                 onClick: `window.GameApp.ui.info.showFactionBushoList(${clan.id}, 0, '無派閥')`,
                 cells: [
                     `<strong class="col-faction-name">無派閥</strong>`,
-                    `<span class="col-leader-name">-</span>`,
+                    `<span class="col-leader-name"></span>`,
                     `<span class="col-busho-count">${nonFactionCount}</span>`,
                     "", "", ""
                 ]
