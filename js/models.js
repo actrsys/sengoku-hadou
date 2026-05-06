@@ -583,6 +583,53 @@ class Princess {
         
         // 状態（unmarried:未婚, married:既婚, unborn:登場前, dead:死亡 など）
         this.status = data.status || 'unmarried';     
+
+        // ★ここから追加：一門設定
+        this.baseFamilyIds = [];
+        if (data.baseFamilyIds && Array.isArray(data.baseFamilyIds)) {
+            this.baseFamilyIds = data.baseFamilyIds;
+        } else if (data.familyIds && Array.isArray(data.familyIds)) {
+            this.baseFamilyIds = data.familyIds;
+        } else if (typeof data.familyId === 'string' && data.familyId.trim() !== "") {
+            this.baseFamilyIds = String(data.familyId).split('|').map(id => Number(id.trim()));
+        } else if (Number(data.familyId) > 0) {
+            this.baseFamilyIds = [Number(data.familyId)];
+        }
+        
+        if (!this.baseFamilyIds.includes(this.id)) {
+            this.baseFamilyIds.push(this.id);
+        }
+
+        this.familyIds = [...this.baseFamilyIds];
+    }
+
+    // ★追加：父親や夫の一門を反映させる機能
+    updateFamilyIds(bushos = []) {
+        this.familyIds = [...this.baseFamilyIds];
+
+        // 父親の一門を追加（父親が死亡していても追加する）
+        if (this.fatherId > 0) {
+            const father = bushos.find(b => b.id === this.fatherId);
+            if (father) {
+                father.baseFamilyIds.forEach(fId => {
+                    if (!this.familyIds.includes(fId)) {
+                        this.familyIds.push(fId);
+                    }
+                });
+            }
+        }
+
+        // 夫の一門を追加（夫がいる間だけ追加する）
+        if (this.husbandId > 0) {
+            const husband = bushos.find(b => b.id === this.husbandId);
+            if (husband) {
+                husband.baseFamilyIds.forEach(fId => {
+                    if (!this.familyIds.includes(fId)) {
+                        this.familyIds.push(fId);
+                    }
+                });
+            }
+        }
     }
 }
 

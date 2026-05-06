@@ -287,7 +287,7 @@ class DataManager {
 
             // ★今回追加：ゲーム開始の瞬間に、姫の名簿を使って「武将の一門関係（血の繋がり）」を繋ぎます！
             b.updateFamilyIds(princesses);
-
+            
             // ★今回追加：軍師の設定
             if (b.clan !== 0) {
                 const clan = clans.find(cl => cl.id === b.clan);
@@ -295,6 +295,11 @@ class DataManager {
                     b.isGunshi = true;
                 }
             }
+        });
+
+        // ★今回追加：姫自身にも一門情報（父親・夫）を持たせます！
+        princesses.forEach(p => {
+            p.updateFamilyIds(bushos);
         });
 
         // ★ここから軍団の初期設定です！
@@ -2063,6 +2068,9 @@ class GameManager {
                 // ★今回追加：セーブデータから軍団の名簿を元通りに復元します
                 this.legions = (d.legions || []).map(l => new Legion(l));
                 
+                // ★追加：ロード時に姫の一門情報を再構築します
+                this.princesses.forEach(p => p.updateFamilyIds(this.bushos));
+
                 // ★ここを書き足し！：古いデータでシールが剥がれている場合のために、名簿を見て貼り直します！
                 this.legions.forEach(legion => {
                     const commander = this.bushos.find(b => b.id === legion.commanderId);

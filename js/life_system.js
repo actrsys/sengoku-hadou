@@ -543,7 +543,7 @@ class LifeSystem {
                             }
                         }
                     }
-
+                    
                     // 行き先の決定
                     if (nextClanId > 0) {
                         princess.currentClanId = nextClanId;
@@ -552,6 +552,9 @@ class LifeSystem {
                         // 戻る場所がどこにもない場合は、もう登場させない
                         princess.status = 'dead';
                     }
+                    
+                    // ★追加：夫が死亡したので、夫の一門から外れるようリストを更新します
+                    princess.updateFamilyIds(this.game.bushos);
                 }
             }
             busho.wifeIds = []; // リストを空にします
@@ -1465,9 +1468,13 @@ class LifeSystem {
             husbandId: 0,
             status: 'unmarried' // 最初から「未婚（結婚可能）」として登場させます
         };
-
+        
         // 完成したデータを正式な「姫クラス」にして、ゲーム本体の名簿に登録します
         const princess = new Princess(princessData);
+        
+        // ★追加：父親の一門を引き継ぐためリストを更新します
+        princess.updateFamilyIds(this.game.bushos);
+        
         this.game.princesses.push(princess);
 
         // ★ここを書き足し！：大名家の「所有している姫リスト」にしっかり登録します！
