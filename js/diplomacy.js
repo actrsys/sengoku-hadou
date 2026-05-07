@@ -756,41 +756,62 @@ class DiplomacyManager {
                     }
                     return;
                 }
-
+                
                 const p = result.atMercyPrincesses[index];
                 const isCapturedByPlayer = (p.currentClanId === this.game.playerClanId);
 
                 if (isCapturedByPlayer) {
-                    // プレイヤーが捕まえている場合、姫用の窓口（据置ボタンあり）を出します
-                    this.game.ui.info.showDaimyoPrisonerModal(p, { hideHire: true });
-                    
-                    const originalAction = this.game.warManager.handleDaimyoPrisonerAction;
-                    this.game.warManager.handleDaimyoPrisonerAction = async (action) => {
-                        if (action === 'keep') {
-                            // 据置：何もしません（そのまま夫婦として残ります）
-                            this.game.ui.log(`${p.name} は引き続き妻として留まることになりました`);
-                        } else if (action === 'release') {
-                            // 解放：夫婦を解消して実家に帰します
-                            p.status = 'unmarried';
-                            p.currentClanId = p.originalClanId;
-                            const husband = this.game.getBusho(p.husbandId);
-                            if (husband && husband.wifeIds) husband.wifeIds = husband.wifeIds.filter(id => id !== p.id);
-                            p.husbandId = 0;
-                            this.game.ui.log(`${p.name} と離縁し、実家へ送り返しました`);
-                        } else if (action === 'kill') {
-                            // 処断：死亡させます
-                            p.status = 'dead';
-                            const husband = this.game.getBusho(p.husbandId);
-                            if (husband && husband.wifeIds) husband.wifeIds = husband.wifeIds.filter(id => id !== p.id);
-                            p.husbandId = 0;
-                            this.game.ui.log(`${p.name} を処断しました`);
-                        }
+                    const originClan = this.game.clans.find(c => c.id === p.originalClanId);
+                    const originClanName = originClan ? originClan.name : "他勢力";
+                    const msg = `＜${originClanName}から嫁いできた${p.name}の処遇を決定してください。＞`;
 
-                        // 画面を閉じて次の処理へ
-                        this.game.ui.closeResultModal();
-                        this.game.warManager.handleDaimyoPrisonerAction = originalAction;
-                        processPrincesses(index + 1);
-                    };
+                    this.game.ui.showDialog(msg, false, null, null, {
+                        choices: [
+                            {
+                                label: '据置',
+                                className: 'btn-green',
+                                onClick: () => {
+                                    this.game.ui.showDialog(`${p.name}\n「これも戦国の世の習い。最後までお供いたしましょう」`, false, () => {
+                                        this.game.ui.log(`${p.name} は引き続き妻として留まることになりました`);
+                                        processPrincesses(index + 1);
+                                    });
+                                }
+                            },
+                            {
+                                label: '処断',
+                                className: 'btn-danger',
+                                onClick: () => {
+                                    this.game.ui.showDialog(`${p.name}\n「私の怨念は必ずや貴方様を取り殺します。きっと非業の最期を遂げることでしょう。」`, false, () => {
+                                        this.game.ui.showDialog(`＜${p.name}を処断しました。＞`, false, () => {
+                                            p.status = 'dead';
+                                            const husband = this.game.getBusho(p.husbandId);
+                                            if (husband && husband.wifeIds) husband.wifeIds = husband.wifeIds.filter(id => id !== p.id);
+                                            p.husbandId = 0;
+                                            this.game.ui.log(`${p.name} を処断しました`);
+                                            processPrincesses(index + 1);
+                                        });
+                                    });
+                                }
+                            },
+                            {
+                                label: '送り返す',
+                                className: 'btn-secondary',
+                                onClick: () => {
+                                    this.game.ui.showDialog(`${p.name}\n「黄泉の国までお連れいただきとうございました……」`, false, () => {
+                                        this.game.ui.showDialog(`＜${p.name}を親元へと送り返しました。＞`, false, () => {
+                                            p.status = 'unmarried';
+                                            p.currentClanId = p.originalClanId;
+                                            const husband = this.game.getBusho(p.husbandId);
+                                            if (husband && husband.wifeIds) husband.wifeIds = husband.wifeIds.filter(id => id !== p.id);
+                                            p.husbandId = 0;
+                                            this.game.ui.log(`${p.name} と離縁し、実家へ送り返しました`);
+                                            processPrincesses(index + 1);
+                                        });
+                                    });
+                                }
+                            }
+                        ]
+                    });
                 } else {
                     // AIが捕まえている場合、一定確率で処断か解放かを決めさせます
                     let aiChoice = Math.random() < 0.5 ? 'kill' : 'release';

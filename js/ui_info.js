@@ -997,7 +997,7 @@ class UIInfoManager {
         if(input.checked) div.classList.add('selected'); else div.classList.remove('selected');
         this._updatePrisonerSelectorUI();
     }
-
+    
     _updatePrisonerSelectorUI() {
         const checkedCount = document.querySelectorAll('input[name="sel_prisoner"]:checked').length; 
         const confirmBtn = document.getElementById('selector-confirm-btn');
@@ -1011,53 +1011,6 @@ class UIInfoManager {
                 confirmBtn.style.opacity = 0.5;
             }
         }
-    }
-    
-    showDaimyoPrisonerModal(prisoner, options = {}) {
-        this.ui.hideAIGuardTemporarily();
-        
-        // オプションの中に hideHire（登用を隠す）の指示がない時だけ、登用ボタンを作ります
-        let hireBtnHtml = '';
-        if (!options.hideHire) {
-            if (prisoner.hasRefusedHire) {
-                hireBtnHtml = `<button class="btn-primary" disabled style="opacity:0.5; background-color: #666;">拒否</button>`;
-            } else {
-                hireBtnHtml = `<button class="btn-primary" onclick="window.GameApp.warManager.handleDaimyoPrisonerAction('hire')">登用</button>`;
-            }
-        }
-
-        // 大名か姫かで、画面に表示されるタイトルと説明文を変えてあげます
-        const titleText = options.hideHire ? '姫の処遇' : '敵大名 捕縛！';
-        const descText = options.hideHire ? `<strong>${prisoner.name}</strong>を捕らえました。<br>処遇を決めてください。` : `敵大名・<strong>${prisoner.name}</strong>を捕縛しました。<br>処遇を決めてください。`;
-
-        // ボタンの並びを姫と大名で切り替えます
-        let buttonsHtml = '';
-        if (options.hideHire) {
-            // 姫の場合：解放（灰）、据置（青）、処断（赤）の順番にします
-            buttonsHtml = `
-                <button class="btn-secondary" onclick="window.GameApp.warManager.handleDaimyoPrisonerAction('release')">解放</button>
-                <button class="btn-primary" onclick="window.GameApp.warManager.handleDaimyoPrisonerAction('keep')">据置</button>
-                <button class="btn-danger" onclick="window.GameApp.warManager.handleDaimyoPrisonerAction('kill')">処断</button>
-            `;
-        } else {
-            // 大名の場合：登用（青）、解放（灰）、処断（赤）
-            buttonsHtml = `
-                ${hireBtnHtml}
-                <button class="btn-secondary" onclick="window.GameApp.warManager.handleDaimyoPrisonerAction('release')">解放</button>
-                <button class="btn-danger" onclick="window.GameApp.warManager.handleDaimyoPrisonerAction('kill')">処断</button>
-            `;
-        }
-
-        const content = `
-            <div style="text-align:center; padding: 10px;">
-                <h3 style="margin-top:0;">${titleText}</h3>
-                <p style="font-size:1.1rem;">${descText}</p>
-                <div style="margin-top:20px; display:flex; justify-content:center; gap:10px;">
-                    ${buttonsHtml}
-                </div>
-            </div>
-        `;
-        this.ui.showResultModal(content, null, ""); 
     }
     
     showSettingsModal() {

@@ -763,7 +763,7 @@ class UIManager {
                 // 用意された選択肢の数だけ、新しくボタンを作ります
                 dialog.customOpts.choices.forEach(choice => {
                     const btn = document.createElement('button');
-                    btn.className = 'dialog-choice-btn';
+                    btn.className = choice.className ? `dialog-choice-btn ${choice.className}` : 'dialog-choice-btn';
                     btn.textContent = choice.label;
                     
                     // ボタンが押された時の処理を登録します
@@ -2795,16 +2795,12 @@ class UIManager {
             list.appendChild(div);
         });
     }
-
+    
     showPrisonerModal(captives) {
         this.info.showPrisonerModal(captives);
     }
     closePrisonerModal() {
         this.info.closePrisonerModal();
-    }
-    
-    showDaimyoPrisonerModal(prisoner) {
-        this.info.showDaimyoPrisonerModal(prisoner);
     }
     
     showSuccessionModal(candidates, onSelect) {
