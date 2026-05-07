@@ -700,8 +700,10 @@ class UIManager {
             executeNext();
         };
 
-        const footer = okBtn.parentElement;
-        const choicesContainer = document.getElementById('dialog-choices-container');
+        okBtn.onclick = () => { okBtn.onclick = null; cleanupAndNext(dialog.onOk); };
+
+        const footer = okBtn.parentElement; // ★追加：ボタンが入っているフッターの箱を取得します
+        const choicesContainer = document.getElementById('dialog-choices-container'); // ★新しく作った選択肢の箱を取得します
         const modalContent = modal.querySelector('.modal-content');
 
         // 前回のイベント設定が残っていたら一旦消しておきます
@@ -712,88 +714,109 @@ class UIManager {
             modalContent.style.cursor = '';
         }
 
-        // --- 根本改修：フッターのボタンを動的に生成し、何個でも並べられるようにします ---
-        footer.innerHTML = ''; 
-        if (choicesContainer) choicesContainer.classList.add('hidden');
-
-        // イベントモード専用のクリック操作
+        // ------------------
+        // イベントモード専用のクリック操作の定義
         this._currentEventClickHandler = (e) => {
-            if (e.target.closest('button')) return;
+            // 選択肢ボタンをクリックした場合は邪魔をしません
+            if (e.target.closest('.dialog-choice-btn')) return;
+            
+            // 外側の黒い背景をクリックした場合は、別の処理に任せます
             if (e.target === modal) return;
-            e.stopPropagation();
+
+            e.stopPropagation(); // 他のクリック音が鳴るのを防ぎます
             if (window.AudioManager) window.AudioManager.playSE('choice.ogg');
+            
+            // 次へ進むために、クリックの受付を解除してから決定ボタンを押したことにします
             const content = modal.querySelector('.modal-content');
             if (content) {
                 content.removeEventListener('click', this._currentEventClickHandler);
                 content.style.cursor = '';
             }
-            // 擬似的に「決定」の動作をさせます（引数なしのonOkを呼び出します）
-            cleanupAndNext(dialog.onOk);
+            okBtn.click(); 
         };
+        // ------------------
 
+        // イベント専用の指定があるか先に確認しておきます
         const isEventMode = dialog.customOpts && dialog.customOpts.isEvent;
 
+        // もし「選択肢」が指定されていたら、特別な処理をします
         if (dialog.customOpts && dialog.customOpts.choices) {
-            // 選択肢がある場合：指定された数だけボタンを作って横に並べます
             if (isEventMode) {
-                modal.classList.add('event-dialog-modal');
-                modal.classList.add('event-choices-active');
+                modal.classList.add('event-dialog-modal'); // イベント中は下部表示を維持します
+                modal.classList.add('event-choices-active'); // ▼マークを消すための目印をつけます
             } else {
-                modal.classList.remove('event-dialog-modal');
+                modal.classList.remove('event-dialog-modal'); 
             }
-            footer.classList.remove('hidden');
-            footer.style.display = 'flex';
-            footer.style.justifyContent = 'center';
-            footer.style.gap = '10px';
-
-            dialog.customOpts.choices.forEach(choice => {
-                const btn = document.createElement('button');
-                // btn-primary(緑系), btn-danger(赤), btn-secondary(銀)を使い分けられるようにします
-                btn.className = choice.className || 'btn-secondary';
-                btn.textContent = choice.label;
-                btn.onclick = (e) => {
-                    e.stopPropagation();
-                    if (window.AudioManager) {
-                        if (["戻る", "いいえ", "送り返す"].includes(choice.label)) window.AudioManager.playSE('cancel.ogg');
-                        else window.AudioManager.playSE('decision.ogg');
-                    }
-                    modal.classList.remove('event-choices-active');
-                    cleanupAndNext(choice.onClick);
-                };
-                footer.appendChild(btn);
-            });
-        } else if (isEventMode) {
-            // 選択肢のないイベント：フッターを隠して画面クリックで進行
-            modal.classList.add('event-dialog-modal');
-            footer.classList.add('hidden');
-            if (modalContent) {
-                modalContent.style.cursor = 'pointer';
-                modalContent.addEventListener('click', this._currentEventClickHandler);
+            
+            footer.classList.add('hidden'); // いつもの「はい・いいえ」ボタンを隠します
+            cancelBtn.classList.remove('hidden'); // ★追加：外側クリックで閉じられないようにするための細工
+            
+            if (choicesContainer) {
+                choicesContainer.innerHTML = ''; // 中身を一度きれいにします
+                
+                if (isEventMode) {
+                    choicesContainer.classList.add('event-choices-container'); // 選択肢を中央へ飛ばす目印
+                } else {
+                    choicesContainer.classList.remove('event-choices-container');
+                }
+                
+                // 用意された選択肢の数だけ、新しくボタンを作ります
+                dialog.customOpts.choices.forEach(choice => {
+                    const btn = document.createElement('button');
+                    btn.className = 'dialog-choice-btn';
+                    btn.textContent = choice.label;
+                    
+                    // ボタンが押された時の処理を登録します
+                    btn.onclick = () => {
+                        // 音を鳴らします（「戻る」ならキャンセルの音、それ以外なら決定の音）
+                        if (window.AudioManager) {
+                            if (choice.label === "戻る") window.AudioManager.playSE('cancel.ogg');
+                            else window.AudioManager.playSE('decision.ogg');
+                        }
+                        
+                        modal.classList.remove('event-choices-active'); // ▼マークを消す目印を外す
+                        choicesContainer.classList.remove('event-choices-container'); // 中央表示の目印を外す
+                        choicesContainer.classList.add('hidden'); // 選択肢を隠します
+                        cleanupAndNext(choice.onClick); // 約束されていた処理（onClick）を実行します
+                    };
+                    choicesContainer.appendChild(btn);
+                });
+                
+                choicesContainer.classList.remove('hidden'); // 選択肢の箱を表示します
             }
         } else {
-            // 通常のダイアログ：はい/いいえ、または閉じる
-            modal.classList.remove('event-dialog-modal');
-            footer.classList.remove('hidden');
-            footer.style.justifyContent = 'center';
-
-            if (dialog.isConfirm) {
-                const okB = document.createElement('button');
-                okB.className = dialog.customOpts?.okClass || 'btn-primary';
-                okB.textContent = dialog.customOpts?.okText || 'はい';
-                okB.onclick = () => cleanupAndNext(dialog.onOk);
-                footer.appendChild(okB);
-
-                const canB = document.createElement('button');
-                canB.className = dialog.customOpts?.cancelClass || 'btn-secondary';
-                canB.textContent = dialog.customOpts?.cancelText || 'いいえ';
-                canB.onclick = () => cleanupAndNext(dialog.onCancel);
-                footer.appendChild(canB);
+            if (isEventMode) {
+                // イベントの時は、専用の目印をつけ、フッター（ボタン）を隠します
+                modal.classList.add('event-dialog-modal');
+                footer.classList.add('hidden');
+                if (choicesContainer) choicesContainer.classList.add('hidden');
+                cancelBtn.classList.add('hidden'); // 背景クリック判定用に隠す
+                
+                // メッセージエリア全体をクリックで進めるようにします
+                if (modalContent) {
+                    modalContent.style.cursor = 'pointer';
+                    modalContent.addEventListener('click', this._currentEventClickHandler);
+                }
             } else {
-                const closeB = document.createElement('button');
-                closeB.className = dialog.customOpts?.okClass || 'btn-secondary';
-                closeB.textContent = dialog.customOpts?.okText || '閉じる';
-                closeB.onclick = () => cleanupAndNext(dialog.onOk);
-                footer.appendChild(closeB);
+                // 通常のダイアログの場合は、目印を外し、いつものボタンを出します
+                modal.classList.remove('event-dialog-modal');
+                footer.classList.remove('hidden');
+                if (choicesContainer) choicesContainer.classList.add('hidden');
+
+                if (dialog.isConfirm) {
+                    cancelBtn.classList.remove('hidden'); 
+                    cancelBtn.onclick = () => { cancelBtn.onclick = null; cleanupAndNext(dialog.onCancel); };
+                    okBtn.textContent = dialog.customOpts?.okText || 'はい';
+                    okBtn.className = dialog.customOpts?.okClass || 'btn-primary';
+                    cancelBtn.textContent = dialog.customOpts?.cancelText || 'いいえ';
+                    cancelBtn.className = dialog.customOpts?.cancelClass || 'btn-secondary';
+                    footer.style.justifyContent = 'center';
+                } else {
+                    cancelBtn.classList.add('hidden'); 
+                    okBtn.textContent = dialog.customOpts?.okText || '閉じる';
+                    okBtn.className = dialog.customOpts?.okClass || 'btn-secondary';
+                    footer.style.justifyContent = 'center';
+                }
             }
         }
 
