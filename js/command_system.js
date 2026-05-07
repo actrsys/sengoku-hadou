@@ -1324,41 +1324,9 @@ class CommandSystem {
             this.game.ui.showDialog(msg, true, 
                 () => {
                     this.executeWithEvent('marriage', () => {
-                        // ★追加：diplomacy.js の専門部署に「marriage（婚姻）」の確率計算をお願いします！
-                        const myPower = this.game.getClanTotalSoldiers(doer.clan) || 1;
-                        const targetPower = this.game.getClanTotalSoldiers(targetClanId) || 1;
-                        const isSuccess = this.game.diplomacyManager.checkDiplomacySuccess(doer.clan, targetClanId, 'marriage', doer.diplomacy, myPower, targetPower);
-
-                        // ★追加：外交経験値を計算・加算します！
-                        this.game.diplomacyManager.calcDiplomacyExp(doer, 'marriage', isSuccess, true);
-
-                        if (isSuccess) {
-                            // 成功した時の処理
-                            this.applyMarriageData(princessId, targetBushoId, targetClanId);
-                            doer.isActionDone = true;
-                            doer.achievementTotal += Math.floor(doer.diplomacy * 0.2) + 20;
-                            this.game.factionSystem.updateRecognition(doer, 30);
-
-                            this.game.ui.showResultModal(`${targetClan.name} と婚姻同盟を結びました！\n${princess.name} は ${targetBusho.name} の正室として迎えられました。`, () => {
-                                this.game.ui.updatePanelHeader();
-                                this.game.ui.renderCommandMenu();
-                                this.game.ui.renderMap();
-                            });
-                        } else {
-                            // 失敗した時の処理
-                            this.game.diplomacyManager.updateSentiment(doer.clan, targetClanId, -10); // 断られたので少し仲が悪くなります
-                            doer.isActionDone = true;
-                            doer.achievementTotal += 5;
-                            this.game.factionSystem.updateRecognition(doer, 10);
-
-                            this.game.ui.showResultModal(`${targetClan.name} に婚姻を断られました……\n使者は失意のまま帰還しました。`, () => {
-                                this.game.ui.updatePanelHeader();
-                                this.game.ui.renderCommandMenu();
-                                this.game.ui.renderMap();
-                            });
-                        }
+                        this.game.diplomacyManager.executeMarriage(doerId, targetId, princessId, targetBushoId);
                     });
-                }, 
+                },
                 () => {
                     // いいえ：もう一度相手武将選びに戻る
                     this.game.ui.openBushoSelector('marriage_kinsman', targetId, extraData);
@@ -1380,19 +1348,19 @@ class CommandSystem {
             const targetClanId = targetCastle.ownerClan;
             const myPower = this.game.getClanTotalSoldiers(doer.clan);
             const targetPower = this.game.getClanTotalSoldiers(targetClanId) || 1;
-
+            
             if (extraData.subAction === 'goodwill') {
                 this.game.ui.openQuantitySelector('goodwill', selectedIds, targetId);
             } else if (extraData.subAction === 'alliance') {
                 const prob = this.game.diplomacyManager.getDiplomacyProb(doer.clan, targetClanId, 'alliance', doer.diplomacy, myPower, targetPower);
-                this.showAdviceAndExecute('diplomacy', () => this.executeDiplomacy(firstId, targetId, 'alliance'), { trueProb: prob / 100 });
+                this.showAdviceAndExecute('diplomacy', () => this.game.diplomacyManager.executeDiplomacy(firstId, targetId, 'alliance'), { trueProb: prob / 100 });
             } else if (extraData.subAction === 'break_alliance') {
-                this.executeWithEvent('break_alliance', () => this.executeDiplomacy(firstId, targetId, 'break_alliance'));
+                this.executeWithEvent('break_alliance', () => this.game.diplomacyManager.executeDiplomacy(firstId, targetId, 'break_alliance'));
             } else if (extraData.subAction === 'subordinate') {
-                this.showAdviceAndExecute('diplomacy', () => this.executeDiplomacy(firstId, targetId, 'subordinate'), { trueProb: 1.0 });
+                this.showAdviceAndExecute('diplomacy', () => this.game.diplomacyManager.executeDiplomacy(firstId, targetId, 'subordinate'), { trueProb: 1.0 });
             } else if (extraData.subAction === 'dominate') {
                 const prob = this.game.diplomacyManager.getDiplomacyProb(doer.clan, targetClanId, 'dominate', doer.diplomacy, myPower, targetPower);
-                this.showAdviceAndExecute('diplomacy', () => this.executeDiplomacy(firstId, targetId, 'dominate'), { trueProb: prob / 100 });
+                this.showAdviceAndExecute('diplomacy', () => this.game.diplomacyManager.executeDiplomacy(firstId, targetId, 'dominate'), { trueProb: prob / 100 });
             } else if (extraData.subAction === 'court_truce') {
                 // ★追加：朝廷和睦は条件を満たしていれば確実に成功します！
                 this.showAdviceAndExecute('diplomacy', () => this.game.courtRankSystem.executeCourtTruce(firstId, targetId), { trueProb: 1.0 });
@@ -1589,7 +1557,7 @@ class CommandSystem {
             if (extraData && extraData.isKunishu) {
                 this.showAdviceAndExecute('kunishu_goodwill', () => this.game.kunishuSystem.executeKunishuGoodwill(data[0], extraData.kunishuId, val), { trueProb: 1.0 });
             } else {
-                this.showAdviceAndExecute('goodwill', () => this.executeDiplomacy(data[0], targetId, 'goodwill', val), { trueProb: 1.0 });
+                this.showAdviceAndExecute('goodwill', () => this.game.diplomacyManager.executeDiplomacy(data[0], targetId, 'goodwill', val), { trueProb: 1.0 });
             }
         }
         else if (type === 'tribute_gold') {
@@ -1911,25 +1879,6 @@ class CommandSystem {
             this.game.factionSystem.updateRecognition(doer, 10); 
         } 
         doer.isActionDone = true; this.game.ui.showResultModal(msg); this.game.ui.renderCommandMenu(); 
-    }
-    
-    // ★修正：外交専用の魔法を呼び出すようにしました
-    calcGoodwillIncrease(gold, doer) {
-        return this.game.diplomacyManager.calcGoodwillIncrease(gold, doer);
-    }
-
-    // ★修正：外交の複雑な処理は、すべて外交の専門部署（diplomacy.js）にお任せするようにしました！
-    executeDiplomacy(doerId, targetCastleId, type, gold = 0) {
-        this.game.diplomacyManager.executeDiplomacy(doerId, targetCastleId, type, gold);
-    }
-
-    executeSubjugation(winnerClanId, loserClanId) {
-        this.game.diplomacyManager.changeStatus(winnerClanId, loserClanId, '支配');
-        const winner = this.game.clans.find(c => Number(c.id) === Number(winnerClanId));
-        const loser = this.game.clans.find(c => Number(c.id) === Number(loserClanId));
-        if (winner && loser) {
-            this.game.ui.log(`${winner.name}が${loser.name}を従属させました`);
-        }
     }
     
     executeReward(bushoIds) {
@@ -2571,16 +2520,6 @@ class CommandSystem {
         } else if (mode === 'marriage') {
             this.game.ui.openBushoSelector('diplomacy_doer', targetCastle.id, { subAction: 'marriage' }, onBackToMap);
         }
-    }
-    
-    // ★修正：この処理も専門部署にお任せします！
-    clearDominationRelations(clanId) {
-        this.game.diplomacyManager.clearDominationRelations(clanId);
-    }
-    
-    // ★修正：AIからの外交提案の処理も、専門部署（diplomacy.js）にお任せします！
-    proposeDiplomacyToPlayer(doer, targetClanId, type, gold, onComplete) {
-        this.game.diplomacyManager.proposeDiplomacyToPlayer(doer, targetClanId, type, gold, onComplete);
     }
     
     // ★ここから下全部、援軍を探してお願いする新しい機能です！
@@ -3262,11 +3201,6 @@ class CommandSystem {
         this.game.ui.showDialog(`自軍の同盟援軍が出発しました！\n共に ${targetCastle.name} へ侵攻します！`, false, () => {
             this.game.warManager.startWar(atkCastle, targetCastle, atkBushos, sVal, rVal, hVal, gVal, reinforcementData, selfReinfData);
         });
-    }
-    
-    // ★修正：婚姻のデータ書き換え処理も、専門部署（diplomacy.js）にお任せします！
-    applyMarriageData(princessId, targetBushoId, targetClanId) {
-        this.game.diplomacyManager.applyMarriageData(princessId, targetBushoId, targetClanId);
     }
     
     executeSuccession(newDaimyoId) {

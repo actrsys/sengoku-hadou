@@ -789,6 +789,63 @@ class DiplomacyManager {
             }
         }
     }
+
+    /**
+     * 婚姻コマンドを実行する魔法です
+     */
+    executeMarriage(doerId, targetCastleId, princessId, targetBushoId) {
+        const doer = this.game.getBusho(doerId);
+        const targetCastle = this.game.getCastle(targetCastleId);
+        if (!targetCastle) return;
+        
+        const targetClanId = targetCastle.ownerClan;
+        const targetClan = this.game.clans.find(c => c.id === targetClanId);
+        const targetBusho = this.game.getBusho(targetBushoId);
+        const princess = this.game.princesses.find(p => p.id === princessId);
+
+        const myPower = this.game.getClanTotalSoldiers(doer.clan) || 1;
+        const targetPower = this.game.getClanTotalSoldiers(targetClanId) || 1;
+
+        const isSuccess = this.checkDiplomacySuccess(doer.clan, targetClanId, 'marriage', doer.diplomacy, myPower, targetPower);
+        
+        this.calcDiplomacyExp(doer, 'marriage', isSuccess, true);
+
+        if (isSuccess) {
+            this.applyMarriageData(princessId, targetBushoId, targetClanId);
+            doer.isActionDone = true;
+            doer.achievementTotal += Math.floor(doer.diplomacy * 0.2) + 20;
+            this.game.factionSystem.updateRecognition(doer, 30);
+
+            this.game.ui.showResultModal(`${targetClan.name} と婚姻同盟を結びました！\n${princess.name} は ${targetBusho.name} の正室として迎えられました。`, () => {
+                this.game.ui.updatePanelHeader();
+                this.game.ui.renderCommandMenu();
+                this.game.ui.renderMap();
+            });
+        } else {
+            this.updateSentiment(doer.clan, targetClanId, -10);
+            doer.isActionDone = true;
+            doer.achievementTotal += 5;
+            this.game.factionSystem.updateRecognition(doer, 10);
+
+            this.game.ui.showResultModal(`${targetClan.name} に婚姻を断られました……\n使者は失意のまま帰還しました。`, () => {
+                this.game.ui.updatePanelHeader();
+                this.game.ui.renderCommandMenu();
+                this.game.ui.renderMap();
+            });
+        }
+    }
+
+    /**
+     * 戦闘などで敗北した勢力を従属させる処理です
+     */
+    executeSubjugation(winnerClanId, loserClanId) {
+        this.changeStatus(winnerClanId, loserClanId, '支配');
+        const winner = this.game.clans.find(c => Number(c.id) === Number(winnerClanId));
+        const loser = this.game.clans.find(c => Number(c.id) === Number(loserClanId));
+        if (winner && loser) {
+            this.game.ui.log(`${winner.name}が${loser.name}を従属させました`);
+        }
+    }
     
     /**
      * AIからプレイヤーへの外交提案を受ける処理です

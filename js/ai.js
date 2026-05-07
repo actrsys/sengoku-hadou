@@ -2531,13 +2531,13 @@ class AIEngine {
         // 記憶されていた作戦（親善、同盟、支配）を実行します！
         if (targetData.action === 'dominate') {
             if (targetClanId === this.game.playerClanId) {
-                this.game.commandSystem.proposeDiplomacyToPlayer(castellan, targetClanId, 'dominate', 0, () => {
+                this.game.diplomacyManager.proposeDiplomacyToPlayer(castellan, targetClanId, 'dominate', 0, () => {
                     castellan.isActionDone = true;
                     this.game.finishTurn(); 
                 });
                 return 'waiting';
             } else {
-                this.game.commandSystem.executeDiplomacy(castellan.id, targetCastleId, 'dominate'); 
+                this.game.diplomacyManager.executeDiplomacy(castellan.id, targetCastleId, 'dominate'); 
                 castellan.isActionDone = true;
             }
         } else if (targetData.action === 'goodwill') {
@@ -2550,25 +2550,25 @@ class AIEngine {
 
             if (castle.gold >= targetData.gold) {
                 if (targetClanId === this.game.playerClanId) {
-                    this.game.commandSystem.proposeDiplomacyToPlayer(castellan, targetClanId, 'goodwill', targetData.gold, () => {
+                    this.game.diplomacyManager.proposeDiplomacyToPlayer(castellan, targetClanId, 'goodwill', targetData.gold, () => {
                         castellan.isActionDone = true;
                         this.game.finishTurn();
                     });
                     return 'waiting';
                 } else {
-                    this.game.commandSystem.executeDiplomacy(castellan.id, targetCastleId, 'goodwill', targetData.gold);
+                    this.game.diplomacyManager.executeDiplomacy(castellan.id, targetCastleId, 'goodwill', targetData.gold);
                     castellan.isActionDone = true;
                 }
             }
         } else if (targetData.action === 'alliance') {
              if (targetClanId === this.game.playerClanId) {
-                 this.game.commandSystem.proposeDiplomacyToPlayer(castellan, targetClanId, 'alliance', 0, () => {
+                 this.game.diplomacyManager.proposeDiplomacyToPlayer(castellan, targetClanId, 'alliance', 0, () => {
                      castellan.isActionDone = true;
                      this.game.finishTurn();
                  });
                  return 'waiting';
              } else {
-                 this.game.commandSystem.executeDiplomacy(castellan.id, targetCastleId, 'alliance');
+                 this.game.diplomacyManager.executeDiplomacy(castellan.id, targetCastleId, 'alliance');
                  castellan.isActionDone = true;
              }
         }
