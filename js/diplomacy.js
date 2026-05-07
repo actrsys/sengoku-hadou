@@ -711,17 +711,32 @@ class DiplomacyManager {
                                 const hostages = aiCaptured.filter(b => b.clan === cId);
                                 const clan = this.game.clans.find(c => c.id === cId);
                                 const clanName = clan ? clan.name : "他勢力";
-                                const names = hostages.map(b => b.name).join('、');
                                 
-                                // プレイヤーの武将が含まれていたらダイアログで教えてあげます
-                                const hasMyBusho = hostages.some(b => b.originalClanId === this.game.playerClanId);
-                                if (hasMyBusho) {
-                                    this.game.ui.showDialog(`我が軍の ${names} は ${clanName} に捕らえられました……\n処遇は相手に委ねられます。`, false);
-                                }
-                                this.game.ui.log(`${names} が ${clanName} に捕らえられました`);
+                                // 判定の前に、我が家の武将を覚えておきます
+                                const myBushos = hostages.filter(b => b.originalClanId === this.game.playerClanId);
                                 
-                                // AIに判断を任せます
+                                // AIに判断を任せます（この中で状態が書き換わります）
                                 this.game.warManager.autoResolvePrisoners(hostages, cId);
+                                
+                                if (myBushos.length > 0) {
+                                    let resultMsg = `${clanName} に捕らえられた我が武将の処遇が決まりました。\n\n`;
+                                    myBushos.forEach(b => {
+                                        if (b.status === 'dead') {
+                                            resultMsg += `・${b.name}：見せしめとして処断されました……\n`;
+                                            this.game.ui.log(`${b.name} は ${clanName} によって処断されました`);
+                                        } else if (b.clan === cId) {
+                                            resultMsg += `・${b.name}：敵に降伏し、登用されました。\n`;
+                                            this.game.ui.log(`${b.name} は ${clanName} に登用されました`);
+                                        } else {
+                                            resultMsg += `・${b.name}：無事に解放され、戻って参りました！\n`;
+                                            this.game.ui.log(`${b.name} が ${clanName} より解放されました`);
+                                        }
+                                    });
+                                    this.game.ui.showDialog(resultMsg, false);
+                                } else {
+                                    const names = hostages.map(b => b.name).join('、');
+                                    this.game.ui.log(`${names} が ${clanName} に捕らえられ、処遇が決定しました`);
+                                }
                             });
                         }
 
