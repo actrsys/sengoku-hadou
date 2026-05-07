@@ -607,6 +607,7 @@ class DiplomacyManager {
         const targetClanId = targetCastle.ownerClan;
         let msg = "";
         let aiMsg = ""; // AI同士の場合のメッセージ用
+        let logMsg = ""; // ★追加：履歴に残す用のメッセージです
         const isPlayerInvolved = (doer.clan === this.game.playerClanId || targetClanId === this.game.playerClanId);
 
         const myPower = this.game.getClanTotalSoldiers(doer.clan) || 1;
@@ -632,6 +633,7 @@ class DiplomacyManager {
                 if(castle) castle.gold -= gold;
                 
                 msg = `${doer.name}が親善を行いました\n友好度が上昇しました`;
+                if (isPlayerInvolved) logMsg = `${doerClanName}が${targetClanName}に親善を行いました`;
                 doer.achievementTotal += Math.floor(doer.diplomacy * 0.2) + 10;
                 this.game.factionSystem.updateRecognition(doer, 15);
             } else {
@@ -669,6 +671,7 @@ class DiplomacyManager {
 
                 msg = `同盟の締結に成功しました！`;
                 if (!isPlayerInvolved) aiMsg = `${doerClanName} が ${targetClanName} と同盟を締結しました！`;
+                else logMsg = `${doerClanName}が${targetClanName}と同盟を結びました`;
                 doer.achievementTotal += Math.floor(doer.diplomacy * 0.2) + 10;
                 this.game.factionSystem.updateRecognition(doer, 30);
             } else {
@@ -683,6 +686,7 @@ class DiplomacyManager {
             this.calcDiplomacyExp(doer, type, true, true);
 
             msg = `${result.oldStatus}関係を破棄しました`;
+            logMsg = `${doerClanName}が${targetClanName}との関係を破棄しました`;
             if (result.isBetrayal) msg += `\n諸大名からの心証が悪化しました……`;
             if (result.isBreakDomination) msg += `\n家臣団の中でも動揺が広がっているようです……`;
             
@@ -784,12 +788,14 @@ class DiplomacyManager {
 
                     msg = `${this.game.clans.find(c => c.id === targetClanId).name} に従属しました！${conditionMsg}`;
                     if (!isPlayerInvolved) aiMsg = `${targetClanName} が ${doerClanName} を支配下に置きました！`;
+                    else logMsg = `${doerClanName}が${targetClanName}に従属しました`;
                     doer.achievementTotal += Math.floor(doer.diplomacy * 0.2) + 10;
                     this.game.factionSystem.updateRecognition(doer, 30);
 
                     doer.isActionDone = true;
                     if (isPlayerInvolved) {
                         this.game.ui.showResultModal(msg);
+                        if (logMsg !== "") this.game.ui.log(logMsg);
                         if (doer.clan === this.game.playerClanId) {
                             this.game.ui.updatePanelHeader();
                             this.game.ui.renderCommandMenu();
@@ -847,6 +853,7 @@ class DiplomacyManager {
 
                     msg = `${this.game.clans.find(c => c.id === targetClanId).name} を支配下に置くことに成功しました！`;
                     if (!isPlayerInvolved) aiMsg = `${doerClanName} が ${targetClanName} を支配下に置きました！`;
+                    else logMsg = `${doerClanName}が${targetClanName}を支配下に置きました`;
                     doer.achievementTotal += Math.floor(doer.diplomacy * 0.2) + 20;
                     this.game.factionSystem.updateRecognition(doer, 40);
                 } else {
@@ -860,6 +867,7 @@ class DiplomacyManager {
         doer.isActionDone = true;
         if (isPlayerInvolved) {
             this.game.ui.showResultModal(msg);
+            if (logMsg !== "") this.game.ui.log(logMsg);
             if (doer.clan === this.game.playerClanId) {
                 this.game.ui.updatePanelHeader();
                 this.game.ui.renderCommandMenu();
@@ -1164,7 +1172,10 @@ class DiplomacyManager {
             doer.achievementTotal += Math.floor(doer.diplomacy * 0.2) + 20;
             this.game.factionSystem.updateRecognition(doer, 30);
 
-            this.game.ui.showResultModal(`${targetClan.name} と婚姻同盟を結びました！\n${princess.name} は ${targetBusho.name} の正室として迎えられました。`, () => {
+            const doerClan = this.game.clans.find(c => c.id === doer.clan);
+            this.game.ui.log(`${doerClan.name}が${targetClan.name}と婚姻同盟を締結しました`);
+
+            this.game.ui.showResultModal(`${targetClan.name} と婚姻同盟を締結しました！\n${princess.name} は ${targetBusho.name} の正室として迎えられました。`, () => {
                 this.game.ui.updatePanelHeader();
                 this.game.ui.renderCommandMenu();
                 this.game.ui.renderMap();
@@ -1228,11 +1239,13 @@ class DiplomacyManager {
                     // ★窓口の時とは違い、専門部署用に少しだけ計算の仕方を整えています
                     const increase = this.calcGoodwillIncrease(gold, doer);
                     this.updateSentiment(doer.clan, targetClanId, increase);
+                    this.game.ui.log(`${doerClan.name}からの親善を受け入れました`);
                     this.game.ui.showResultModal(`${doerClan.name} からの親善を受け入れました！\n友好度が上昇しました`, () => {
                         if (onComplete) setTimeout(onComplete, 100);
                     });
                 } else if (type === 'alliance') {
                     this.changeStatus(doer.clan, targetClanId, '同盟');
+                    this.game.ui.log(`${doerClan.name}と同盟を結びました`);
                     this.game.ui.showResultModal(`${doerClan.name} と同盟を結びました！`, () => {
                         if (onComplete) setTimeout(onComplete, 100);
                     });
@@ -1257,6 +1270,7 @@ class DiplomacyManager {
                         doerClan.currentDiplomacyTarget.gold = 300; // 支配下への親善は基本の300にします
                     }
 
+                    this.game.ui.log(`${doerClan.name}に従属しました`);
                     this.game.ui.showResultModal(`${doerClan.name} に従属しました……`, () => {
                         if (onComplete) setTimeout(onComplete, 100);
                     });
