@@ -507,124 +507,64 @@ class DiplomacyManager {
             });
         }
 
-        // ★ここから追加：人質や姫の処刑・捕縛判定
-        let executedHostages = [];
-        let executedPrincesses = [];
-        let escapedHostages = [];
-        let executedEnemyHostages = [];
-        let hiredEnemyHostages = []; // ★追加：家臣になった人質のリスト
+        // ★人質・姫の「捕縛リスト」を準備します
+        let atMercyPrincesses = []; // 処遇を決められる姫
+        let capturedHostages = [];   // 捕らえられた人質武将
+        let escapedHostages = [];    // 逃げ出した人質
 
-        // １．破棄した側（A）から、破棄された側（B）への人質 -> 怒ったBに処断されます
+        // １．破棄した側(A)から破棄された側(B)への人質・姫（怒ったBが捕まえます）
         this.game.bushos.forEach(b => {
             if (b.isHostage && b.originalClanId === doerClanId && b.clan === targetClanId) {
-                executedHostages.push(b);
+                capturedHostages.push(b);
             }
         });
-
-        // ２．破棄した側（A）から、破棄された側（B）へ嫁いでいる姫 -> 怒ったBに処断されます
         if (this.game.princesses) {
             this.game.princesses.forEach(p => {
                 let father = p.fatherId ? this.game.getBusho(p.fatherId) : null;
                 let originClan = p.originalClanId !== undefined ? p.originalClanId : (father ? father.clan : null);
-
                 if (p.status === 'married' && originClan === doerClanId && p.currentClanId === targetClanId) {
-                    executedPrincesses.push(p);
+                    atMercyPrincesses.push(p);
                 }
             });
         }
-        
-        // 当主（A）の情報を取得します（登用判定用）
-        const doerDaimyo = this.game.bushos.find(b => b.clan === doerClanId && b.isDaimyo) || { charm: 50, affinity: 0 };
 
-        // ３．破棄された側（B）から、破棄した側（A）への人質 -> Aが捕獲判定を行います
+        // ２．破棄された側(B)から破棄した側(A)への人質（Aの目を盗んで逃げられるか判定！）
         this.game.bushos.forEach(b => {
             if (b.isHostage && b.originalClanId === targetClanId && b.clan === doerClanId) {
-                // まずは武力（strength）を使って逃げ切れるかサイコロを振ります
-                let captureChance = 0.5 - ((b.strength || 30) * 0.002) + (Math.random() * 0.3);
-                
-                if (captureChance > 0.5) {
-                    // 捕まったら、次は登用（家臣になるか）の判定をします
-                    let baseProb = ((doerDaimyo.charm || 50) * 1.5) / ((b.loyalty || 50) * 3);
-                    let randomBonus = (Math.random() * 0.2) - 0.1;
-                    let affinityDiff = Math.abs((doerDaimyo.affinity || 0) - (b.affinity || 0));
-                    let affinityBonus = affinityDiff <= 10 ? 0.1 : (affinityDiff >= 50 ? -0.3 : 0.1 - (affinityDiff - 10) * 0.01);
-                    
-                    let hireProb = baseProb + randomBonus + affinityBonus;
-                    hireProb = Math.max(0, Math.min(0.99, hireProb));
-                    
-                    if (hireProb > Math.random()) {
-                        // 登用成功！家臣になります
-                        hiredEnemyHostages.push(b);
-                    } else {
-                        // 登用失敗…処断リストへ
-                        executedEnemyHostages.push(b);
-                    }
+                // 武力が高いほど逃げやすい判定です
+                let chance = 0.5 - ((b.strength || 30) * 0.002) + (Math.random() * 0.3);
+                if (chance > 0.5) {
+                    capturedHostages.push(b); // 逃げられなかったら捕虜リストへ
                 } else {
-                    // 逃げ切ったら脱出リストへ
-                    escapedHostages.push(b);
+                    escapedHostages.push(b);  // 逃げ切ったら逃亡リストへ
                 }
             }
         });
 
-        // 処断の実行
-        executedHostages.forEach(b => {
-            if (this.game.lifeSystem && this.game.lifeSystem.executeDeath) {
-                this.game.lifeSystem.executeDeath(b);
-            }
-        });
-        executedPrincesses.forEach(p => {
-            p.status = 'dead';
-            const husband = this.game.getBusho(p.husbandId);
-            if (husband && husband.wifeIds) {
-                husband.wifeIds = husband.wifeIds.filter(id => id !== p.id);
-            }
-        });
-        executedEnemyHostages.forEach(b => {
-            if (this.game.lifeSystem && this.game.lifeSystem.executeDeath) {
-                this.game.lifeSystem.executeDeath(b);
-            }
-        });
-        
-        // 逃げ切った人質の帰還処理
+        // 逃げ切った人たちの帰還処理（味方の城へ移動）
         escapedHostages.forEach(b => {
-            const friendlyCastles = this.game.castles.filter(c => c.ownerClan === targetClanId);
+            const originalClan = b.originalClanId;
+            const friendlyCastles = this.game.castles.filter(c => c.ownerClan === originalClan);
             if (friendlyCastles.length > 0) {
                 const escapeCastle = friendlyCastles[Math.floor(Math.random() * friendlyCastles.length)];
-                if (this.game.affiliationSystem && this.game.affiliationSystem.moveCastle) {
-                    this.game.affiliationSystem.moveCastle(b, escapeCastle.id);
-                } else {
-                    b.clan = targetClanId;
-                    b.castleId = escapeCastle.id;
-                }
+                this.game.affiliationSystem.moveCastle(b, escapeCastle.id);
             } else {
-                if (this.game.affiliationSystem && this.game.affiliationSystem.becomeRonin) {
-                    this.game.affiliationSystem.becomeRonin(b);
-                } else {
-                    b.status = 'ronin';
-                    b.clan = 0;
-                    b.castleId = 0;
-                }
+                this.game.affiliationSystem.becomeRonin(b);
             }
-            // 人質のシールを剥がして自由の身にします
             b.isHostage = false;
             b.originalClanId = undefined;
         });
 
-        // ★追加：家臣になった人質の処理
-        hiredEnemyHostages.forEach(b => {
-            // 人質のシールを剥がして、完全に家臣（Aの所属）として扱います
-            b.isHostage = false;
-            b.originalClanId = undefined;
-        });
-
-        // お互いの外交データから、人質と婚姻のシールを完全に剥がします
+        // 外交データの婚姻・人質情報をリセット（もう敵同士なので）
         const dataA = this.getDiplomacyData(doerClanId, targetClanId);
         const dataB = this.getDiplomacyData(targetClanId, doerClanId);
         if (dataA) { dataA.hostageIds = []; dataA.isMarriage = false; }
         if (dataB) { dataB.hostageIds = []; dataB.isMarriage = false; }
 
-        // 最後に、結果をお知らせする魔法にシールや処遇の結果も一緒に渡してあげます
-        return { oldStatus, isBetrayal, isBreakDomination, executedHostages, executedPrincesses, escapedHostages, executedEnemyHostages, hiredEnemyHostages };
+        return { 
+            oldStatus, isBetrayal, isBreakDomination, 
+            atMercyPrincesses, capturedHostages, escapedHostages 
+        };
     }
     
     /**
@@ -739,56 +679,70 @@ class DiplomacyManager {
 
         } else if (type === 'break_alliance') {
             const result = this.applyBreakAlliancePenalty(doer.clan, targetClanId);
-
             this.calcDiplomacyExp(doer, type, true, true);
 
             msg = `${result.oldStatus}関係を破棄しました`;
-            if (!isPlayerInvolved) {
-                if (result.oldStatus === '同盟') {
-                    aiMsg = `${doerClanName} が ${targetClanName} との同盟を破棄しました！`;
-                } else if (result.oldStatus === '従属') {
-                    aiMsg = `${doerClanName} が ${targetClanName} の支配下からの独立を宣言しました！`;
-                } else if (result.oldStatus === '支配') {
-                    aiMsg = `${doerClanName} が ${targetClanName} への支配を放棄しました！`;
-                }
-            }
-            if (result.isBetrayal) {
-                msg += `\n諸大名からの心証が悪化しました……`;
-            }
+            if (result.isBetrayal) msg += `\n諸大名からの心証が悪化しました……`;
+            if (result.isBreakDomination) msg += `\n家臣団の中でも動揺が広がっているようです……`;
             
-            if (result.isBreakDomination) {
-                msg += `\n家臣団の中でも動揺が広がっているようです……`;
-            }
-
-            if (result.executedHostages && result.executedHostages.length > 0) {
-                const names = result.executedHostages.map(b => b.name).join('、');
-                msg += `\n激怒した${targetClanName}により、人質として送られていた ${names} が処断されました。`;
-                if (aiMsg !== "") aiMsg += `\n激怒した${targetClanName}は、人質の ${names} を処断しました。`;
-            }
-            if (result.executedPrincesses && result.executedPrincesses.length > 0) {
-                const names = result.executedPrincesses.map(p => p.name).join('、');
-                msg += `\n激怒した${targetClanName}により、嫁いでいた ${names} が処断されました。`;
-                if (aiMsg !== "") aiMsg += `\n激怒した${targetClanName}は、嫁いでいた ${names} を処断しました。`;
-            }
-            if (result.executedEnemyHostages && result.executedEnemyHostages.length > 0) {
-                const names = result.executedEnemyHostages.map(b => b.name).join('、');
-                msg += `\n預かっていた人質 ${names} を処断しました。`;
-                if (aiMsg !== "") aiMsg += `\n${doerClanName}は、預かっていた人質 ${names} を処断しました。`;
-            }
-            if (result.escapedHostages && result.escapedHostages.length > 0) {
+            // 逃げ出した人質のログ
+            if (result.escapedHostages.length > 0) {
                 const names = result.escapedHostages.map(b => b.name).join('、');
-                msg += `\n預かっていた人質 ${names} には逃げられてしまいました……`;
-                if (aiMsg !== "") aiMsg += `\n預かっていた人質 ${names} は、間一髪で逃亡したようです。`;
-            }
-            // ★追加：家臣になった人質のメッセージ
-            if (result.hiredEnemyHostages && result.hiredEnemyHostages.length > 0) {
-                const names = result.hiredEnemyHostages.map(b => b.name).join('、');
-                msg += `\n預かっていた人質 ${names} は当家に臣従しました。`;
-                if (aiMsg !== "") aiMsg += `\n預かっていた人質 ${names} は、${doerClanName}に臣従したようです。`;
+                this.game.ui.log(`(人質となっていた ${names} は間一髪で逃走しました)`);
             }
 
-            doer.achievementTotal += 5;
-            this.game.factionSystem.updateRecognition(doer, 10);
+            // 捕虜（人質武将）を戦争のロジックに投げ込みます
+            if (result.capturedHostages.length > 0) {
+                this.game.warManager.pendingPrisoners = result.capturedHostages;
+            }
+
+            // 姫の処遇をプレイヤーに決めてもらう魔法（プレイヤーが関係している時だけ）
+            const handlePrincesses = async () => {
+                for (let p of result.atMercyPrincesses) {
+                    if (targetClanId === this.game.playerClanId || doer.clan === this.game.playerClanId) {
+                        // プレイヤーが「預かっている側」なら選択肢を出します
+                        const isCapturedByPlayer = (p.currentClanId === this.game.playerClanId);
+                        if (isCapturedByPlayer) {
+                            await new Promise(resolve => {
+                                const pMsg = `裏切りにより捕らえた${p.name}の処遇を選んでください。`;
+                                this.game.ui.showDialog(pMsg, true, 
+                                    () => { // 処断する
+                                        p.status = 'dead';
+                                        const husband = this.game.getBusho(p.husbandId);
+                                        if (husband && husband.wifeIds) husband.wifeIds = husband.wifeIds.filter(id => id !== p.id);
+                                        this.game.ui.showResultModal(`${p.name}を処断しました。`, resolve);
+                                    },
+                                    () => { // 許す（家臣または浪人へ）
+                                        p.status = 'unmarried'; // 離縁扱い
+                                        this.game.ui.showResultModal(`${p.name}の命を助け、離縁させました。`, resolve);
+                                    },
+                                    { okText: '処断', okClass: 'btn-danger', cancelText: '助ける' }
+                                );
+                            });
+                        }
+                    } else {
+                        // AI同士なら、感情値が低いとたまに処断される設定（とりあえず生存にしておきます）
+                        p.status = 'unmarried';
+                    }
+                }
+                
+                // 全ての姫の処遇が終わったら、武将の捕虜フェーズを開始します
+                if (this.game.warManager.pendingPrisoners.length > 0) {
+                    if (this.game.playerClanId === targetClanId || this.game.playerClanId === doer.clan) {
+                        // プレイヤーが当事者なら、戦争と同じ捕虜画面を開きます
+                        this.game.warManager.startPrisonerPhase();
+                    } else {
+                        // AI同士なら自動で判定させます
+                        const winnerId = (targetClanId === this.game.playerClanId) ? targetClanId : doer.clan; 
+                        this.game.warManager.autoResolvePrisoners(this.game.warManager.pendingPrisoners, winnerId);
+                    }
+                }
+            };
+
+            doer.isActionDone = true;
+            this.game.ui.showResultModal(msg, () => {
+                handlePrincesses(); // メッセージを閉じたあとに姫と武将の処遇フェーズへ
+            });
 
         } else if (type === 'subordinate') {
             this.calcDiplomacyExp(doer, type, true, true);
