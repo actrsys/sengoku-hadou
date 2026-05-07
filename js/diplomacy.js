@@ -692,16 +692,20 @@ class DiplomacyManager {
             
             if (result.escapedHostages.length > 0) {
                 const names = result.escapedHostages.map(b => b.name).join('、');
-                this.game.ui.log(`(人質とて送っていた ${names} は脱走し、戻って参りました！)`);
+                // msgに文章を追加して、断交のメイン画面に表示されるようにします
+                msg += `\n人質として送られていた ${names} は脱走し、無事に帰還しました！`;
+                this.game.ui.log(`人質として送られていた ${names} は脱走し、戻って参りました！`);
             }
 
             // 姫を１人ずつ順番に処理するための関数です（幼稚園児にもわかる再帰処理です）
             const processPrincesses = async (index) => {
                 if (index >= result.atMercyPrincesses.length) {
-                    // 全ての姫が終わったら、武将の捕虜判定へ
+                    // 全ての姫が終わったら、武将の捕虜判定（戦争と同じロジック）へ
                     if (result.capturedHostages.length > 0) {
                         const playerCaptured = result.capturedHostages.filter(b => b.clan === this.game.playerClanId);
                         const aiCaptured = result.capturedHostages.filter(b => b.clan !== this.game.playerClanId);
+
+                        let aiResultMsgs = []; // AIが処遇を決めた結果をまとめる箱です
 
                         if (aiCaptured.length > 0) {
                             const aiClans = [...new Set(aiCaptured.map(b => b.clan))];
@@ -709,29 +713,45 @@ class DiplomacyManager {
                                 const hostages = aiCaptured.filter(b => b.clan === cId);
                                 const clan = this.game.clans.find(c => c.id === cId);
                                 const clanName = clan ? clan.name : "他勢力";
+                                
                                 const myBushos = hostages.filter(b => b.originalClanId === this.game.playerClanId);
                                 this.game.warManager.autoResolvePrisoners(hostages, cId);
+                                
                                 if (myBushos.length > 0) {
-                                    let resultMsg = "";
                                     myBushos.forEach(b => {
                                         if (b.status === 'dead') {
-                                            resultMsg += `人質として送っていた ${b.name} は${clanName} によって処断されました……\n`;
+                                            aiResultMsgs.push(`人質として送っていた ${b.name} は${clanName} によって処断されました……`);
                                             this.game.ui.log(`${b.name} は ${clanName} によって処断されました`);
                                         } else if (b.clan === cId) {
-                                            resultMsg += `人質として送っていた ${b.name} は${clanName} に臣従しました……\n`;
+                                            aiResultMsgs.push(`人質として送っていた ${b.name} は${clanName} に臣従しました……`);
                                             this.game.ui.log(`${b.name} は ${clanName} に登用されました`);
                                         } else {
-                                            resultMsg += `人質として送っていた ${b.name} は無事に解放され、戻って参りました！\n`;
+                                            aiResultMsgs.push(`人質として送っていた ${b.name} は無事に解放され、戻って参りました！`);
                                             this.game.ui.log(`${b.name} が ${clanName} より解放されました`);
                                         }
                                     });
-                                    this.game.ui.showDialog(resultMsg, false);
+                                } else {
+                                    const names = hostages.map(b => b.name).join('、');
+                                    this.game.ui.log(`${names} が ${clanName} に捕らえられ、処遇が決定しました`);
                                 }
                             });
                         }
-                        if (playerCaptured.length > 0) {
-                            this.game.warManager.pendingPrisoners = playerCaptured;
-                            this.game.warManager.startPrisonerPhase();
+
+                        // もしAIがプレイヤーの武将を処遇したメッセージがあれば、ダイアログを出します
+                        if (aiResultMsgs.length > 0) {
+                            this.game.ui.showDialog(aiResultMsgs.join('\n'), false, () => {
+                                // ダイアログを閉じた後、プレイヤーの捕虜がいれば処遇画面を出します
+                                if (playerCaptured.length > 0) {
+                                    this.game.warManager.pendingPrisoners = playerCaptured;
+                                    this.game.warManager.startPrisonerPhase();
+                                }
+                            });
+                        } else {
+                            // メッセージがなければ、そのままプレイヤーの捕虜画面へ進みます
+                            if (playerCaptured.length > 0) {
+                                this.game.warManager.pendingPrisoners = playerCaptured;
+                                this.game.warManager.startPrisonerPhase();
+                            }
                         }
                     }
                     return;
