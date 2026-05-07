@@ -700,14 +700,35 @@ class DiplomacyManager {
                 if (index >= result.atMercyPrincesses.length) {
                     // 全ての姫が終わったら、武将の捕虜判定（戦争と同じロジック）へ
                     if (result.capturedHostages.length > 0) {
-                        this.game.warManager.pendingPrisoners = result.capturedHostages;
-                        // プレイヤーが関わっているなら画面を出します
-                        if (targetClanId === this.game.playerClanId || doer.clan === this.game.playerClanId) {
+                        // 誰が捕まえたか（現在の滞在先）でグループ分けします
+                        const playerCaptured = result.capturedHostages.filter(b => b.clan === this.game.playerClanId);
+                        const aiCaptured = result.capturedHostages.filter(b => b.clan !== this.game.playerClanId);
+
+                        // AIが捕まえた分は、AIに勝手に処遇を決めさせます
+                        if (aiCaptured.length > 0) {
+                            const aiClans = [...new Set(aiCaptured.map(b => b.clan))];
+                            aiClans.forEach(cId => {
+                                const hostages = aiCaptured.filter(b => b.clan === cId);
+                                const clan = this.game.clans.find(c => c.id === cId);
+                                const clanName = clan ? clan.name : "他勢力";
+                                const names = hostages.map(b => b.name).join('、');
+                                
+                                // プレイヤーの武将が含まれていたらダイアログで教えてあげます
+                                const hasMyBusho = hostages.some(b => b.originalClanId === this.game.playerClanId);
+                                if (hasMyBusho) {
+                                    this.game.ui.showDialog(`我が軍の ${names} は ${clanName} に捕らえられました……\n処遇は相手に委ねられます。`, false);
+                                }
+                                this.game.ui.log(`${names} が ${clanName} に捕らえられました`);
+                                
+                                // AIに判断を任せます
+                                this.game.warManager.autoResolvePrisoners(hostages, cId);
+                            });
+                        }
+
+                        // プレイヤーが捕まえた分は、処遇を決める画面を出します
+                        if (playerCaptured.length > 0) {
+                            this.game.warManager.pendingPrisoners = playerCaptured;
                             this.game.warManager.startPrisonerPhase();
-                        } else {
-                            // AI同士なら勝手に解決させます
-                            const winnerId = (targetClanId === this.game.playerClanId) ? targetClanId : doer.clan;
-                            this.game.warManager.autoResolvePrisoners(result.capturedHostages, winnerId);
                         }
                     }
                     return;
