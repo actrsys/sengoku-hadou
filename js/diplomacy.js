@@ -752,9 +752,19 @@ class DiplomacyManager {
             };
 
             doer.isActionDone = true;
-            this.game.ui.showResultModal(msg, () => {
-                processPrincesses(0); // 最初の姫からスタート！
-            });
+            if (isPlayerInvolved) {
+                if (logMsg !== "") this.game.ui.log(logMsg);
+                if (doer.clan === this.game.playerClanId) {
+                    this.game.ui.updatePanelHeader();
+                    this.game.ui.renderCommandMenu();
+                }
+                this.game.ui.showResultModal(msg, () => {
+                    processPrincesses(0); // 最初の姫からスタート！
+                });
+            } else {
+                processPrincesses(0);
+            }
+            return;
 
         } else if (type === 'subordinate') {
             this.calcDiplomacyExp(doer, type, true, true);
