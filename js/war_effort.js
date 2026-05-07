@@ -1999,7 +1999,10 @@ Object.assign(WarManager.prototype, {
             if (!isExtinct) {
                 // 所領が残っている時（確定失敗）
                 prisoner.hasRefusedHire = true;
-                this.game.ui.showDialog(`${prisoner.name}\n「敵の軍門には降らぬ！」`, false, stayStep);
+                this.game.ui.showDialog(`「敵の軍門には降らぬ！」`, false, stayStep, null, {
+                    leftFace: prisoner.faceIcon,
+                    leftName: prisoner.name
+                });
             } else {
                 // 滅亡時の登用判定
                 let baseProb = ((recruiter.charm || 50) * 1.5) / ((prisoner.loyalty || 50) * 3);
@@ -2036,21 +2039,30 @@ Object.assign(WarManager.prototype, {
                     if(targetC) { 
                         this.game.affiliationSystem.joinClan(prisoner, this.game.playerClanId, targetC.id);
                     }
-                    this.game.ui.showDialog(`${prisoner.name}\n「もはや趨勢は決したか……致し方あるまい」`, false, () => {
+                    this.game.ui.showDialog(`「もはや趨勢は決したか……致し方あるまい」`, false, () => {
                         this.game.ui.showDialog(`${prisoner.name}は当家に臣従を誓いました！`, false, nextStep);
+                    }, null, {
+                        leftFace: prisoner.faceIcon,
+                        leftName: prisoner.name
                     });
                 } else {
                     // 登用失敗時
                     prisoner.hasRefusedHire = true;
-                    this.game.ui.showDialog(`${prisoner.name}\n「断る。煮るなり焼くなり好きにせい。」`, false, stayStep);
+                    this.game.ui.showDialog(`「断る。煮るなり焼くなり好きにせい。」`, false, stayStep, null, {
+                        leftFace: prisoner.faceIcon,
+                        leftName: prisoner.name
+                    });
                 }
             }
         } else if (action === 'kill') {
             // 処断時
-            this.game.ui.showDialog(`${prisoner.name}\n「斯様な所で果てようとは……ぐふっ」`, false, async () => {
+            this.game.ui.showDialog(`「斯様な所で果てようとは……ぐふっ」`, false, async () => {
                 this.registerNemesisForExecuted(prisoner, this.game.playerClanId);
                 await this.game.lifeSystem.executeDeath(prisoner);
                 this.game.ui.showDialog(`${prisoner.name}を処断しました。`, false, nextStep);
+            }, null, {
+                leftFace: prisoner.faceIcon,
+                leftName: prisoner.name
             });
         } else if (action === 'release') {
             // 解放時
@@ -2065,8 +2077,11 @@ Object.assign(WarManager.prototype, {
             } else {
                 this.game.affiliationSystem.becomeRonin(prisoner);
             }
-            this.game.ui.showDialog(`${prisoner.name}\n「生きて恥を晒せと申すか……」`, false, () => {
+            this.game.ui.showDialog(`「生きて恥を晒せと申すか……」`, false, () => {
                 this.game.ui.showDialog(`${prisoner.name}を解放しました。`, false, nextStep);
+            }, null, {
+                leftFace: prisoner.faceIcon,
+                leftName: prisoner.name
             });
         }
     },
