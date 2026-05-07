@@ -1476,6 +1476,62 @@ class DiplomacyManager {
     }
 
     /**
+     * 臣従願を実行して、相手の大名家に乗り換える魔法です！
+     */
+    executeVassalage(doerId, targetCastleId) {
+        const targetCastle = this.game.getCastle(targetCastleId);
+        if (!targetCastle) return;
+        
+        const targetClanId = targetCastle.ownerClan;
+        const myClanId = this.game.playerClanId;
+        
+        const targetClan = this.game.clans.find(c => c.id === targetClanId);
+        
+        // 1. プレイヤー側の軍団をすべて解散させます（お片付け）
+        if (this.game.legions) {
+            const myLegions = this.game.legions.filter(l => Number(l.clanId) === Number(myClanId));
+            myLegions.forEach(l => {
+                this.game.castleManager.disbandLegion(l.id);
+            });
+        }
+        
+        // 2. プレイヤー側のお城をすべて対象の大名家にプレゼントして、直轄（0）にします
+        const myCastles = this.game.castles.filter(c => Number(c.ownerClan) === Number(myClanId));
+        myCastles.forEach(c => {
+            this.game.castleManager.changeOwner(c, targetClanId, true, 0);
+        });
+        
+        // 3. プレイヤー側の武将のバッジ（身分）を外し、新しい大名家に入れます
+        const myBushos = this.game.bushos.filter(b => Number(b.clan) === Number(myClanId));
+        myBushos.forEach(b => {
+            b.isDaimyo = false;
+            b.isCommander = false;
+            b.isGunshi = false;
+            
+            b.clan = targetClanId;
+            
+            // 人事部（お引越しセンター）にお願いして、新しい殿様との相性で忠誠度を再計算します！
+            this.game.affiliationSystem.updateLoyaltyForNewLord(b, targetClanId);
+        });
+
+        // 外交担当者に行動完了のシールを貼ります
+        const doer = this.game.getBusho(doerId);
+        if (doer) doer.isActionDone = true;
+        
+        // 4. プレイヤーの操作担当を、新しい大名家に切り替えます！
+        this.game.playerClanId = targetClanId;
+        
+        const msg = `当家は ${targetClan.name} に臣従し、全ての領地と家臣を献上いたしました。\nこれより ${targetClan.name} を担当し、天下統一を目指します！`;
+        
+        this.game.ui.showResultModal(msg, () => {
+            // 新しい大名家の情報に合わせて画面を綺麗に描き直します
+            this.game.ui.updatePanelHeader();
+            this.game.ui.renderCommandMenu();
+            this.game.ui.renderMap();
+        });
+    }
+
+    /**
      * 戦闘などで敗北した勢力を従属させる処理です
      */
     executeSubjugation(winnerClanId, loserClanId) {

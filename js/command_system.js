@@ -20,7 +20,7 @@ const COMMAND_MENU_STRUCTURE = [
         label: "対外",
         // ★ここが「入れ子（サブメニュー）」になる部分です！
         subMenus: [
-            { label: "外交", commands: ['goodwill', 'alliance', 'marriage', 'dominate', 'subordinate', 'break_alliance'] },
+            { label: "外交", commands: ['goodwill', 'alliance', 'marriage', 'dominate', 'subordinate', 'vassalage', 'break_alliance'] },
             { label: "諸勢力", commands: ['kunishu_goodwill', 'kunishu_incorporate'] },
             { label: "調略", commands: ['sabotage', 'incite', 'rumor', 'headhunt'] },
             { label: "朝廷", commands: ['tribute', 'court_truce'] }
@@ -547,6 +547,12 @@ const COMMAND_SPECS = {
         startMode: 'map_select', targetType: 'other_clan_all',
         canExecute: (game, castle) => CAN_EXECUTE_RULES.canSubordinate(game, castle)
     },
+    'vassalage': {
+        label: "臣従願", category: 'FOREIGN_DAIMYO',
+        costGold: 0, costRice: 0,
+        isMulti: false, hasAdvice: false,
+        startMode: 'map_select', targetType: 'other_clan_all'
+    },
     'break_alliance': {
         label: "断交", category: 'FOREIGN_DAIMYO',
         costGold: 0, costRice: 0,
@@ -1035,8 +1041,8 @@ class CommandSystem {
                         if (type === 'subordinate' && rel.status === '従属') return false;
                     }
 
-                    // ★追加：降伏勧告と従属願は、自領と接している勢力に限定します！
-                    if (type === 'dominate' || type === 'subordinate') {
+                    // ★追加：降伏勧告と従属願と臣従願は、自領と接している勢力に限定します！
+                    if (type === 'dominate' || type === 'subordinate' || type === 'vassalage') {
                         let isAdjacent = false;
                         const myCastles = this.game.castles.filter(c => Number(c.ownerClan) === playerClanId);
                         for (let mc of myCastles) {
@@ -1388,6 +1394,10 @@ class CommandSystem {
                 this.executeWithEvent('break_alliance', () => this.game.diplomacyManager.executeDiplomacy(firstId, targetId, 'break_alliance'));
             } else if (extraData.subAction === 'subordinate') {
                 this.showAdviceAndExecute('diplomacy', () => this.game.diplomacyManager.executeDiplomacy(firstId, targetId, 'subordinate'), { trueProb: 1.0 });
+            } else if (extraData.subAction === 'vassalage') {
+                this.game.ui.showDialog(`本当に臣従しますか？\n当家は滅亡し、全ての領地を明け渡します。`, true, () => {
+                    this.executeWithEvent('vassalage', () => this.game.diplomacyManager.executeVassalage(firstId, targetId));
+                });
             } else if (extraData.subAction === 'dominate') {
                 const prob = this.game.diplomacyManager.getDiplomacyProb(doer.clan, targetClanId, 'dominate', doer.diplomacy, myPower, targetPower);
                 this.showAdviceAndExecute('diplomacy', () => this.game.diplomacyManager.executeDiplomacy(firstId, targetId, 'dominate'), { trueProb: prob / 100 });
@@ -2357,6 +2367,7 @@ class CommandSystem {
             case 'alliance': return "同盟を行う相手を選択してください";
             case 'dominate': return "降伏勧告を行う相手を選択してください";
             case 'subordinate': return "従属願を行う相手を選択してください";
+            case 'vassalage': return "臣従願を行う相手を選択してください";
             case 'kunishu_goodwill': return "親善を行う諸勢力がいる城を選択してください";
             case 'kunishu_incorporate': return "取込を行う諸勢力がいる城を選択してください";
             case 'break_alliance': return "断交する相手を選択してください";
@@ -2543,6 +2554,8 @@ class CommandSystem {
             this.game.ui.openBushoSelector('diplomacy_doer', targetCastle.id, { subAction: 'break_alliance' }, onBackToMap);
         } else if (mode === 'subordinate') {
             this.game.ui.openBushoSelector('diplomacy_doer', targetCastle.id, { subAction: 'subordinate' }, onBackToMap);
+        } else if (mode === 'vassalage') {
+            this.game.ui.openBushoSelector('diplomacy_doer', targetCastle.id, { subAction: 'vassalage' }, onBackToMap);
         } else if (mode === 'dominate') {
             this.game.ui.openBushoSelector('diplomacy_doer', targetCastle.id, { subAction: 'dominate' }, onBackToMap);
         } else if (mode === 'court_truce') {
