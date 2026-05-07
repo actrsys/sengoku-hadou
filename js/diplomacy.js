@@ -692,7 +692,7 @@ class DiplomacyManager {
             
             if (result.escapedHostages.length > 0) {
                 const names = result.escapedHostages.map(b => b.name).join('、');
-                this.game.ui.log(`(人質とて送っていた ${names} はすんでの所を脱走し、戻って参りました！)`);
+                this.game.ui.log(`(人質とて送っていた ${names} は脱走し、戻って参りました！)`);
             }
 
             // 姫を１人ずつ順番に処理するための関数です（幼稚園児にもわかる再帰処理です）
