@@ -1045,7 +1045,7 @@ class DiplomacyManager {
             }
         });
     }
-
+    
     /**
      * 従属により指定した拠点を割譲する処理
      */
@@ -1101,9 +1101,23 @@ class DiplomacyManager {
         if (isDaimyoInA && castleB.legionId !== 0 && lordB && lordB.isCommander) {
             lordB.isCommander = false;
             lordB.isCastellan = false;
-            const legion = this.game.legions.find(l => l.clanId === subordinateClanId && l.legionNo === castleB.legionId);
+            const targetLegionId = castleB.legionId;
+            
+            // 拠点Bと同じ軍団の城をすべて直轄にする
+            this.game.castles.forEach(c => {
+                if (c.ownerClan === subordinateClanId && c.legionId === targetLegionId) {
+                    c.legionId = 0;
+                }
+            });
+            
+            // 軍団データの初期化（解散状態にする）
+            const legion = this.game.legions.find(l => l.clanId === subordinateClanId && l.legionNo === targetLegionId);
             if (legion) {
-                this.game.castleManager.disbandLegion(legion.id);
+                legion.commanderId = 0;
+                legion.objective = null;
+                legion.status = 'wait';
+                legion.targetId = 0;
+                legion.route = [];
             }
         }
 
@@ -1111,20 +1125,35 @@ class DiplomacyManager {
         if (commanderInA && myLegionCastles.length === 0) {
             commanderInA.isCommander = false;
             commanderInA.isCastellan = false;
-            const legion = this.game.legions.find(l => l.clanId === subordinateClanId && l.legionNo === castleA.legionId);
+            const targetLegionId = castleA.legionId;
+            
+            this.game.castles.forEach(c => {
+                if (c.ownerClan === subordinateClanId && c.legionId === targetLegionId && c.id !== castleId) {
+                    c.legionId = 0;
+                }
+            });
+            
+            const legion = this.game.legions.find(l => l.clanId === subordinateClanId && l.legionNo === targetLegionId);
             if (legion) {
-                this.game.castleManager.disbandLegion(legion.id);
+                legion.commanderId = 0;
+                legion.objective = null;
+                legion.status = 'wait';
+                legion.targetId = 0;
+                legion.route = [];
             }
             disbandedCommander = true;
         }
 
         bushosInA.forEach(b => {
             const wasCastellan = b.isCastellan;
+            // 一旦全員の城主フラグを外します
             b.isCastellan = false;
 
-            if (wasCastellan && b.isCommander && !disbandedCommander) {
-                if (lordB && lordB.isCommander) {
-                    // 移動先の拠点Bの城主が国主だった場合は、Aの城主身分は剥奪のまま
+            // 大名か、解散されなかった国主で、元々城主だった場合のみ
+            if (wasCastellan && (b.isDaimyo || b.isCommander) && !disbandedCommander) {
+                // 移動先Bの城主が国主で、自分が大名ではない場合は城主になれません
+                if (lordB && lordB.isCommander && !b.isDaimyo) {
+                    // 何もしない（Aでの城主身分は剥奪のまま）
                 } else {
                     if (lordB) lordB.isCastellan = false;
                     b.isCastellan = true;
