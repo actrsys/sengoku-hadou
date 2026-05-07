@@ -1028,7 +1028,7 @@ class UIInfoManager {
 
         // 大名か姫かで、画面に表示されるタイトルと説明文を変えてあげます
         const titleText = options.hideHire ? '姫の処遇' : '敵大名 捕縛！';
-        const descText = options.hideHire ? `裏切りにより、<strong>${prisoner.name}</strong>を捕らえました。<br>処遇を決めてください。` : `敵大名・<strong>${prisoner.name}</strong>を捕縛しました。<br>処遇を決めてください。`;
+        const descText = options.hideHire ? `<strong>${prisoner.name}</strong>を捕らえました。<br>処遇を決めてください。` : `敵大名・<strong>${prisoner.name}</strong>を捕縛しました。<br>処遇を決めてください。`;
 
         const content = `
             <div style="text-align:center; padding: 10px;">
