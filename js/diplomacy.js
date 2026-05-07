@@ -761,25 +761,25 @@ class DiplomacyManager {
                 const isCapturedByPlayer = (p.currentClanId === this.game.playerClanId);
 
                 if (isCapturedByPlayer) {
-                    // プレイヤーが捕まえている場合、選択肢付きのメッセージウインドウを出します
+                    // プレイヤーが捕まえている場合
                     const pOriginClan = this.game.clans.find(c => c.id === p.originalClanId);
                     const pOriginClanName = pOriginClan ? pOriginClan.name : "他勢力";
                     
+                    // ① ナレーション（顔グラなし）：括弧内のメッセージのみを表示
                     this.game.ui.showDialog(
-                        `＜${pOriginClanName}から嫁いできた${p.name}の処遇を決定してください。＞`,
+                        `${pOriginClanName}から嫁いできた${p.name}の処遇を決定してください。`,
                         false,
                         null,
                         null,
                         {
-                            leftFace: p.faceIcon || 'unknown_face.webp',
-                            leftName: p.name,
                             choices: [
                                 {
                                     label: '据置',
-                                    className: 'btn-primary', // いつもの緑(青)ボタン
+                                    className: 'btn-primary', // 緑
                                     onClick: () => {
+                                        // ② 会話（顔グラあり）：据置
                                         this.game.ui.showDialog(
-                                            `「これも戦国の習い。最後までお供いたしましょう」`,
+                                            `「これも戦国の世の習い。最後までお供いたしましょう」`,
                                             false,
                                             () => {
                                                 this.game.ui.log(`${p.name} は引き続き妻として留まることになりました`);
@@ -792,18 +792,26 @@ class DiplomacyManager {
                                 },
                                 {
                                     label: '処断',
-                                    className: 'btn-danger', // いつもの赤ボタン
+                                    className: 'btn-danger', // 赤
                                     onClick: () => {
+                                        // ③ 会話（顔グラあり）：処断
                                         this.game.ui.showDialog(
-                                            `「私の怨念は必ずや貴方様を取り殺します。きっと非業の最期を遂げることでしょう。」\n\n＜${p.name}を処断しました。＞`,
+                                            `「私の怨念は必ずや貴方様を取り殺します。きっと非業の最期を遂げることでしょう。」`,
                                             false,
                                             () => {
-                                                p.status = 'dead';
-                                                const husband = this.game.getBusho(p.husbandId);
-                                                if (husband && husband.wifeIds) husband.wifeIds = husband.wifeIds.filter(id => id !== p.id);
-                                                p.husbandId = 0;
-                                                this.game.ui.log(`${p.name} を処断しました`);
-                                                processPrincesses(index + 1);
+                                                // ナレーション（顔グラなし）：処断結果
+                                                this.game.ui.showDialog(
+                                                    `${p.name}を処断しました。`,
+                                                    false,
+                                                    () => {
+                                                        p.status = 'dead';
+                                                        const husband = this.game.getBusho(p.husbandId);
+                                                        if (husband && husband.wifeIds) husband.wifeIds = husband.wifeIds.filter(id => id !== p.id);
+                                                        p.husbandId = 0;
+                                                        this.game.ui.log(`${p.name} を処断しました`);
+                                                        processPrincesses(index + 1);
+                                                    }
+                                                );
                                             },
                                             null,
                                             { leftFace: p.faceIcon || 'unknown_face.webp', leftName: p.name }
@@ -812,19 +820,27 @@ class DiplomacyManager {
                                 },
                                 {
                                     label: '送り返す',
-                                    className: 'btn-secondary', // いつもの銀ボタン
+                                    className: 'btn-secondary', // 銀
                                     onClick: () => {
+                                        // ④ 会話（顔グラあり）：送り返す
                                         this.game.ui.showDialog(
-                                            `「黄泉の国までお連れいただきとうございました……」\n\n＜${p.name}を親元へと送り返しました。＞`,
+                                            `「黄泉の国までお連れいただきとうございました……」`,
                                             false,
                                             () => {
-                                                p.status = 'unmarried';
-                                                p.currentClanId = p.originalClanId;
-                                                const husband = this.game.getBusho(p.husbandId);
-                                                if (husband && husband.wifeIds) husband.wifeIds = husband.wifeIds.filter(id => id !== p.id);
-                                                p.husbandId = 0;
-                                                this.game.ui.log(`${p.name} を実家へ送り返しました`);
-                                                processPrincesses(index + 1);
+                                                // ナレーション（顔グラなし）：送り返し結果
+                                                this.game.ui.showDialog(
+                                                    `${p.name}を親元へと送り返しました。`,
+                                                    false,
+                                                    () => {
+                                                        p.status = 'unmarried';
+                                                        p.currentClanId = p.originalClanId;
+                                                        const husband = this.game.getBusho(p.husbandId);
+                                                        if (husband && husband.wifeIds) husband.wifeIds = husband.wifeIds.filter(id => id !== p.id);
+                                                        p.husbandId = 0;
+                                                        this.game.ui.log(`${p.name} と離縁し、実家へ送り返しました`);
+                                                        processPrincesses(index + 1);
+                                                    }
+                                                );
                                             },
                                             null,
                                             { leftFace: p.faceIcon || 'unknown_face.webp', leftName: p.name }
