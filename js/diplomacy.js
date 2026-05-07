@@ -692,7 +692,7 @@ class DiplomacyManager {
             
             if (result.escapedHostages.length > 0) {
                 const names = result.escapedHostages.map(b => b.name).join('、');
-                this.game.ui.log(`(人質となっていた ${names} は間一髪で逃走しました)`);
+                this.game.ui.log(`(人質とて送っていた ${names} はすんでの所を脱走し、戻って参りました！)`);
             }
 
             // 姫を１人ずつ順番に処理するための関数です（幼稚園児にもわかる再帰処理です）
@@ -719,16 +719,16 @@ class DiplomacyManager {
                                 this.game.warManager.autoResolvePrisoners(hostages, cId);
                                 
                                 if (myBushos.length > 0) {
-                                    let resultMsg = `${clanName} に捕らえられた我が武将の処遇が決まりました。\n\n`;
+                                    let resultMsg = "";
                                     myBushos.forEach(b => {
                                         if (b.status === 'dead') {
-                                            resultMsg += `・${b.name}：見せしめとして処断されました……\n`;
+                                            resultMsg += `人質として送っていた ${b.name} は${clanName} によって処断されました……\n`;
                                             this.game.ui.log(`${b.name} は ${clanName} によって処断されました`);
                                         } else if (b.clan === cId) {
-                                            resultMsg += `・${b.name}：敵に降伏し、登用されました。\n`;
+                                            resultMsg += `人質として送っていた ${b.name} は${clanName} に臣従しました……\n`;
                                             this.game.ui.log(`${b.name} は ${clanName} に登用されました`);
                                         } else {
-                                            resultMsg += `・${b.name}：無事に解放され、戻って参りました！\n`;
+                                            resultMsg += `人質として送っていた ${b.name} は無事に解放され、戻って参りました！\n`;
                                             this.game.ui.log(`${b.name} が ${clanName} より解放されました`);
                                         }
                                     });
