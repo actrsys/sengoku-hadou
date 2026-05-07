@@ -672,7 +672,7 @@ class DiplomacyManager {
                     // どの条件を呑んだかでメッセージを変えます
                     let conditionMsg = "";
                     if (conditionType === 'marriage') {
-                        conditionMsg = `\n${conditionData.princess.name} が ${conditionData.busho.name} の正室として迎えられました。`;
+                        conditionMsg = `\n${conditionData.princess.name} が ${conditionData.busho.name} の側室として迎えられました。`;
                     } else if (conditionType === 'hostage') {
                         conditionMsg = `\n${conditionData.busho.name} を人質として差し出しました。（※機能準備中）`;
                     } else if (conditionType === 'castle') {
@@ -823,7 +823,21 @@ class DiplomacyManager {
                 let minDiff = 999;
                 const domBushos = this.game.bushos.filter(b => b.clan === dominantClanId && b.status === 'active' && (!b.wifeIds || b.wifeIds.length === 0));
                 
-                domBushos.forEach(b => {
+                // 大名とその一門武将を探します
+                const domDaimyo = this.game.bushos.find(b => b.clan === dominantClanId && b.isDaimyo);
+                let kinsmen = [];
+                if (domDaimyo) {
+                    const dFamily = Array.isArray(domDaimyo.familyIds) ? domDaimyo.familyIds : [];
+                    kinsmen = domBushos.filter(b => {
+                        const bFamily = Array.isArray(b.familyIds) ? b.familyIds : [];
+                        return bFamily.includes(domDaimyo.id) || dFamily.includes(b.id) || b.id === domDaimyo.id;
+                    });
+                }
+                
+                // 一門武将がいれば優先し、いなければ全体から探します
+                const candidates = kinsmen.length > 0 ? kinsmen : domBushos;
+                
+                candidates.forEach(b => {
                     const diff = Math.abs(b.birthYear - availablePrincess.birthYear);
                     if (diff < minDiff) {
                         minDiff = diff;
