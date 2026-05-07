@@ -756,62 +756,84 @@ class DiplomacyManager {
                     }
                     return;
                 }
-                
+
                 const p = result.atMercyPrincesses[index];
                 const isCapturedByPlayer = (p.currentClanId === this.game.playerClanId);
 
                 if (isCapturedByPlayer) {
-                    const originClan = this.game.clans.find(c => c.id === p.originalClanId);
-                    const originClanName = originClan ? originClan.name : "他勢力";
-                    const msg = `＜${originClanName}から嫁いできた${p.name}の処遇を決定してください。＞`;
-
-                    this.game.ui.showDialog(msg, false, null, null, {
-                        choices: [
-                            {
-                                label: '据置',
-                                className: 'btn-green',
-                                onClick: () => {
-                                    this.game.ui.showDialog(`${p.name}\n「これも戦国の世の習い。最後までお供いたしましょう」`, false, () => {
-                                        this.game.ui.log(`${p.name} は引き続き妻として留まることになりました`);
-                                        processPrincesses(index + 1);
-                                    });
+                    // プレイヤーが捕まえている場合、選択肢付きのメッセージウインドウを出します
+                    const pOriginClan = this.game.clans.find(c => c.id === p.originalClanId);
+                    const pOriginClanName = pOriginClan ? pOriginClan.name : "他勢力";
+                    
+                    this.game.ui.showDialog(
+                        `＜${pOriginClanName}から嫁いできた${p.name}の処遇を決定してください。＞`,
+                        false,
+                        null,
+                        null,
+                        {
+                            leftFace: p.faceIcon || 'unknown_face.webp',
+                            leftName: p.name,
+                            choices: [
+                                {
+                                    label: '据置',
+                                    className: 'btn-primary', // いつもの緑(青)ボタン
+                                    onClick: () => {
+                                        this.game.ui.showDialog(
+                                            `「これも戦国の習い。最後までお供いたしましょう」`,
+                                            false,
+                                            () => {
+                                                this.game.ui.log(`${p.name} は引き続き妻として留まることになりました`);
+                                                processPrincesses(index + 1);
+                                            },
+                                            null,
+                                            { leftFace: p.faceIcon || 'unknown_face.webp', leftName: p.name }
+                                        );
+                                    }
+                                },
+                                {
+                                    label: '処断',
+                                    className: 'btn-danger', // いつもの赤ボタン
+                                    onClick: () => {
+                                        this.game.ui.showDialog(
+                                            `「私の怨念は必ずや貴方様を取り殺します。きっと非業の最期を遂げることでしょう。」\n\n＜${p.name}を処断しました。＞`,
+                                            false,
+                                            () => {
+                                                p.status = 'dead';
+                                                const husband = this.game.getBusho(p.husbandId);
+                                                if (husband && husband.wifeIds) husband.wifeIds = husband.wifeIds.filter(id => id !== p.id);
+                                                p.husbandId = 0;
+                                                this.game.ui.log(`${p.name} を処断しました`);
+                                                processPrincesses(index + 1);
+                                            },
+                                            null,
+                                            { leftFace: p.faceIcon || 'unknown_face.webp', leftName: p.name }
+                                        );
+                                    }
+                                },
+                                {
+                                    label: '送り返す',
+                                    className: 'btn-secondary', // いつもの銀ボタン
+                                    onClick: () => {
+                                        this.game.ui.showDialog(
+                                            `「黄泉の国までお連れいただきとうございました……」\n\n＜${p.name}を親元へと送り返しました。＞`,
+                                            false,
+                                            () => {
+                                                p.status = 'unmarried';
+                                                p.currentClanId = p.originalClanId;
+                                                const husband = this.game.getBusho(p.husbandId);
+                                                if (husband && husband.wifeIds) husband.wifeIds = husband.wifeIds.filter(id => id !== p.id);
+                                                p.husbandId = 0;
+                                                this.game.ui.log(`${p.name} を実家へ送り返しました`);
+                                                processPrincesses(index + 1);
+                                            },
+                                            null,
+                                            { leftFace: p.faceIcon || 'unknown_face.webp', leftName: p.name }
+                                        );
+                                    }
                                 }
-                            },
-                            {
-                                label: '処断',
-                                className: 'btn-danger',
-                                onClick: () => {
-                                    this.game.ui.showDialog(`${p.name}\n「私の怨念は必ずや貴方様を取り殺します。きっと非業の最期を遂げることでしょう。」`, false, () => {
-                                        this.game.ui.showDialog(`＜${p.name}を処断しました。＞`, false, () => {
-                                            p.status = 'dead';
-                                            const husband = this.game.getBusho(p.husbandId);
-                                            if (husband && husband.wifeIds) husband.wifeIds = husband.wifeIds.filter(id => id !== p.id);
-                                            p.husbandId = 0;
-                                            this.game.ui.log(`${p.name} を処断しました`);
-                                            processPrincesses(index + 1);
-                                        });
-                                    });
-                                }
-                            },
-                            {
-                                label: '送り返す',
-                                className: 'btn-secondary',
-                                onClick: () => {
-                                    this.game.ui.showDialog(`${p.name}\n「黄泉の国までお連れいただきとうございました……」`, false, () => {
-                                        this.game.ui.showDialog(`＜${p.name}を親元へと送り返しました。＞`, false, () => {
-                                            p.status = 'unmarried';
-                                            p.currentClanId = p.originalClanId;
-                                            const husband = this.game.getBusho(p.husbandId);
-                                            if (husband && husband.wifeIds) husband.wifeIds = husband.wifeIds.filter(id => id !== p.id);
-                                            p.husbandId = 0;
-                                            this.game.ui.log(`${p.name} と離縁し、実家へ送り返しました`);
-                                            processPrincesses(index + 1);
-                                        });
-                                    });
-                                }
-                            }
-                        ]
-                    });
+                            ]
+                        }
+                    );
                 } else {
                     // AIが捕まえている場合、一定確率で処断か解放かを決めさせます
                     let aiChoice = Math.random() < 0.5 ? 'kill' : 'release';

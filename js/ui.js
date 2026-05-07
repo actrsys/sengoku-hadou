@@ -2795,12 +2795,16 @@ class UIManager {
             list.appendChild(div);
         });
     }
-    
+
     showPrisonerModal(captives) {
         this.info.showPrisonerModal(captives);
     }
     closePrisonerModal() {
         this.info.closePrisonerModal();
+    }
+    
+    showDaimyoPrisonerModal(prisoner) {
+        this.info.showDaimyoPrisonerModal(prisoner);
     }
     
     showSuccessionModal(candidates, onSelect) {
