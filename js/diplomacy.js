@@ -1521,7 +1521,7 @@ class DiplomacyManager {
         // 4. プレイヤーの操作担当を、新しい大名家に切り替えます！
         this.game.playerClanId = targetClanId;
         
-        const msg = `当家は ${targetClan.name} に臣従し、全ての領地と家臣を献上いたしました。\nこれより ${targetClan.name} を担当し、天下統一を目指します！`;
+        const msg = `当家は ${targetClan.name} に臣従しました。これより我々は ${targetClan.name} として天下統一を目指します！`;
         
         this.game.ui.showResultModal(msg, () => {
             // 新しい大名家の情報に合わせて画面を綺麗に描き直します
