@@ -507,39 +507,40 @@ class DiplomacyManager {
             });
         }
 
-        // ★人質・姫の「捕縛リスト」を準備します
-        let atMercyPrincesses = []; // 処遇を決められる姫
-        let capturedHostages = [];   // 捕らえられた人質武将
-        let escapedHostages = [];    // 逃げ出した人質
+        // ★人質・姫の「処遇待ちリスト」を作成します
+        let atMercyPrincesses = []; 
+        let capturedHostages = [];   
+        let escapedHostages = [];    
 
-        // １．破棄した側(A)から破棄された側(B)への人質・姫（怒ったBが捕まえます）
+        // 破棄した側（A）とされた側（B）に関わらず、敵対している場所にいる人質や姫をチェックします
         this.game.bushos.forEach(b => {
-            if (b.isHostage && b.originalClanId === doerClanId && b.clan === targetClanId) {
-                capturedHostages.push(b);
+            // AからBへ、またはBからAへ送られている人質を探します
+            if (b.isHostage && ((b.originalClanId === doerClanId && b.clan === targetClanId) || (b.originalClanId === targetClanId && b.clan === doerClanId))) {
+                // 武力(strength)を使って逃げ出せるか判定します
+                let chance = 0.5 - ((b.strength || 30) * 0.002) + (Math.random() * 0.3);
+                if (chance > 0.5) {
+                    capturedHostages.push(b); // 捕まった！捕虜リストへ
+                } else {
+                    escapedHostages.push(b);  // 逃げ切った！脱出リストへ
+                }
             }
         });
+
         if (this.game.princesses) {
             this.game.princesses.forEach(p => {
+                // 出身を調べる魔法
                 let father = p.fatherId ? this.game.getBusho(p.fatherId) : null;
                 let originClan = p.originalClanId !== undefined ? p.originalClanId : (father ? father.clan : null);
-                if (p.status === 'married' && originClan === doerClanId && p.currentClanId === targetClanId) {
+
+                // 嫁ぎ先が、今まさに敵対した相手（または自分が破棄した相手）なら捕らえられた扱いにします
+                const isBreakerPrincessInTarget = (originClan === doerClanId && p.currentClanId === targetClanId);
+                const isTargetPrincessInBreaker = (originClan === targetClanId && p.currentClanId === doerClanId);
+
+                if (p.status === 'married' && (isBreakerPrincessInTarget || isTargetPrincessInBreaker)) {
                     atMercyPrincesses.push(p);
                 }
             });
         }
-
-        // ２．破棄された側(B)から破棄した側(A)への人質（Aの目を盗んで逃げられるか判定！）
-        this.game.bushos.forEach(b => {
-            if (b.isHostage && b.originalClanId === targetClanId && b.clan === doerClanId) {
-                // 武力が高いほど逃げやすい判定です
-                let chance = 0.5 - ((b.strength || 30) * 0.002) + (Math.random() * 0.3);
-                if (chance > 0.5) {
-                    capturedHostages.push(b); // 逃げられなかったら捕虜リストへ
-                } else {
-                    escapedHostages.push(b);  // 逃げ切ったら逃亡リストへ
-                }
-            }
-        });
 
         // 逃げ切った人たちの帰還処理（味方の城へ移動）
         escapedHostages.forEach(b => {
@@ -555,7 +556,7 @@ class DiplomacyManager {
             b.originalClanId = undefined;
         });
 
-        // 外交データの婚姻・人質情報をリセット（もう敵同士なので）
+        // 外交データの婚姻・人質情報をリセット
         const dataA = this.getDiplomacyData(doerClanId, targetClanId);
         const dataB = this.getDiplomacyData(targetClanId, doerClanId);
         if (dataA) { dataA.hostageIds = []; dataA.isMarriage = false; }
@@ -685,63 +686,70 @@ class DiplomacyManager {
             if (result.isBetrayal) msg += `\n諸大名からの心証が悪化しました……`;
             if (result.isBreakDomination) msg += `\n家臣団の中でも動揺が広がっているようです……`;
             
-            // 逃げ出した人質のログ
             if (result.escapedHostages.length > 0) {
                 const names = result.escapedHostages.map(b => b.name).join('、');
                 this.game.ui.log(`(人質となっていた ${names} は間一髪で逃走しました)`);
             }
 
-            // 捕虜（人質武将）を戦争のロジックに投げ込みます
-            if (result.capturedHostages.length > 0) {
-                this.game.warManager.pendingPrisoners = result.capturedHostages;
-            }
-
-            // 姫の処遇をプレイヤーに決めてもらう魔法（プレイヤーが関係している時だけ）
-            const handlePrincesses = async () => {
-                for (let p of result.atMercyPrincesses) {
-                    if (targetClanId === this.game.playerClanId || doer.clan === this.game.playerClanId) {
-                        // プレイヤーが「預かっている側」なら選択肢を出します
-                        const isCapturedByPlayer = (p.currentClanId === this.game.playerClanId);
-                        if (isCapturedByPlayer) {
-                            await new Promise(resolve => {
-                                const pMsg = `裏切りにより捕らえた${p.name}の処遇を選んでください。`;
-                                this.game.ui.showDialog(pMsg, true, 
-                                    () => { // 処断する
-                                        p.status = 'dead';
-                                        const husband = this.game.getBusho(p.husbandId);
-                                        if (husband && husband.wifeIds) husband.wifeIds = husband.wifeIds.filter(id => id !== p.id);
-                                        this.game.ui.showResultModal(`${p.name}を処断しました。`, resolve);
-                                    },
-                                    () => { // 許す（家臣または浪人へ）
-                                        p.status = 'unmarried'; // 離縁扱い
-                                        this.game.ui.showResultModal(`${p.name}の命を助け、離縁させました。`, resolve);
-                                    },
-                                    { okText: '処断', okClass: 'btn-danger', cancelText: '助ける' }
-                                );
-                            });
+            // 姫を１人ずつ順番に処理するための関数です（幼稚園児にもわかる再帰処理です）
+            const processPrincesses = async (index) => {
+                if (index >= result.atMercyPrincesses.length) {
+                    // 全ての姫が終わったら、武将の捕虜判定（戦争と同じロジック）へ
+                    if (result.capturedHostages.length > 0) {
+                        this.game.warManager.pendingPrisoners = result.capturedHostages;
+                        // プレイヤーが関わっているなら画面を出します
+                        if (targetClanId === this.game.playerClanId || doer.clan === this.game.playerClanId) {
+                            this.game.warManager.startPrisonerPhase();
+                        } else {
+                            // AI同士なら勝手に解決させます
+                            const winnerId = (targetClanId === this.game.playerClanId) ? targetClanId : doer.clan;
+                            this.game.warManager.autoResolvePrisoners(result.capturedHostages, winnerId);
                         }
-                    } else {
-                        // AI同士なら、感情値が低いとたまに処断される設定（とりあえず生存にしておきます）
-                        p.status = 'unmarried';
                     }
+                    return;
                 }
-                
-                // 全ての姫の処遇が終わったら、武将の捕虜フェーズを開始します
-                if (this.game.warManager.pendingPrisoners.length > 0) {
-                    if (this.game.playerClanId === targetClanId || this.game.playerClanId === doer.clan) {
-                        // プレイヤーが当事者なら、戦争と同じ捕虜画面を開きます
-                        this.game.warManager.startPrisonerPhase();
-                    } else {
-                        // AI同士なら自動で判定させます
-                        const winnerId = (targetClanId === this.game.playerClanId) ? targetClanId : doer.clan; 
-                        this.game.warManager.autoResolvePrisoners(this.game.warManager.pendingPrisoners, winnerId);
-                    }
+
+                const p = result.atMercyPrincesses[index];
+                const isCapturedByPlayer = (p.currentClanId === this.game.playerClanId);
+
+                if (isCapturedByPlayer) {
+                    // プレイヤーが捕まえている場合、大名処遇の画面を「登用なし」で出します
+                    // 第２引数に { hideHire: true } を渡して、ui.js側でボタンを隠すようにお願いします
+                    this.game.ui.showDaimyoPrisonerModal(p, { hideHire: true });
+                    
+                    // ui.jsからの「解放」や「処断」の結果を待つようにします
+                    // ※ ここでは handleDaimyoPrisonerAction が次を呼ぶように作られている前提です
+                    // 次の姫の処理は、画面が閉じられた時に呼ばれるようにイベントをセットします
+                    const originalAction = this.game.warManager.handleDaimyoPrisonerAction;
+                    this.game.warManager.handleDaimyoPrisonerAction = async (action) => {
+                        // 姫が解放（離縁）された時の特別な処理です
+                        if (action === 'release') {
+                            p.status = 'unmarried'; // 未婚に戻します
+                            p.currentClanId = p.originalClanId; // 実家に帰します
+                            // 旦那様の奥様リストから消します
+                            const husband = this.game.getBusho(p.husbandId);
+                            if (husband && husband.wifeIds) husband.wifeIds = husband.wifeIds.filter(id => id !== p.id);
+                            p.husbandId = 0;
+                        }
+                        // 元の処理を実行します（処断などは元々入っているので）
+                        await originalAction.call(this.game.warManager, action);
+                        // 魔法を元に戻して、次の姫へ進みます
+                        this.game.warManager.handleDaimyoPrisonerAction = originalAction;
+                        processPrincesses(index + 1);
+                    };
+                } else {
+                    // AIが捕まえている場合、今はとりあえず離縁して生かしておきます
+                    p.status = 'unmarried';
+                    const husband = this.game.getBusho(p.husbandId);
+                    if (husband && husband.wifeIds) husband.wifeIds = husband.wifeIds.filter(id => id !== p.id);
+                    p.husbandId = 0;
+                    processPrincesses(index + 1);
                 }
             };
 
             doer.isActionDone = true;
             this.game.ui.showResultModal(msg, () => {
-                handlePrincesses(); // メッセージを閉じたあとに姫と武将の処遇フェーズへ
+                processPrincesses(0); // 最初の姫からスタート！
             });
 
         } else if (type === 'subordinate') {

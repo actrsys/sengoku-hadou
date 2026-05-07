@@ -1013,20 +1013,27 @@ class UIInfoManager {
         }
     }
     
-    showDaimyoPrisonerModal(prisoner) {
+    showDaimyoPrisonerModal(prisoner, options = {}) {
         this.ui.hideAIGuardTemporarily();
         
+        // オプションの中に hideHire（登用を隠す）の指示がない時だけ、登用ボタンを作ります
         let hireBtnHtml = '';
-        if (prisoner.hasRefusedHire) {
-            hireBtnHtml = `<button class="btn-primary" disabled style="opacity:0.5; background-color: #666;">拒否</button>`;
-        } else {
-            hireBtnHtml = `<button class="btn-primary" onclick="window.GameApp.warManager.handleDaimyoPrisonerAction('hire')">登用</button>`;
+        if (!options.hideHire) {
+            if (prisoner.hasRefusedHire) {
+                hireBtnHtml = `<button class="btn-primary" disabled style="opacity:0.5; background-color: #666;">拒否</button>`;
+            } else {
+                hireBtnHtml = `<button class="btn-primary" onclick="window.GameApp.warManager.handleDaimyoPrisonerAction('hire')">登用</button>`;
+            }
         }
+
+        // 大名か姫かで、画面に表示されるタイトルと説明文を変えてあげます
+        const titleText = options.hideHire ? '姫の処遇' : '敵大名 捕縛！';
+        const descText = options.hideHire ? `裏切りにより、<strong>${prisoner.name}</strong>を捕らえました。<br>処遇を決めてください。` : `敵大名・<strong>${prisoner.name}</strong>を捕縛しました。<br>処遇を決めてください。`;
 
         const content = `
             <div style="text-align:center; padding: 10px;">
-                <h3 style="margin-top:0;">敵大名 捕縛！</h3>
-                <p style="font-size:1.1rem;">敵大名・<strong>${prisoner.name}</strong>を捕縛しました。<br>処遇を決めてください。</p>
+                <h3 style="margin-top:0;">${titleText}</h3>
+                <p style="font-size:1.1rem;">${descText}</p>
                 <div style="margin-top:20px; display:flex; justify-content:center; gap:10px;">
                     ${hireBtnHtml}
                     <button class="btn-secondary" onclick="window.GameApp.warManager.handleDaimyoPrisonerAction('release')">解放</button>
