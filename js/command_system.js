@@ -230,6 +230,39 @@ const CAN_EXECUTE_RULES = {
         const castellan = game.getBusho(castle.castellanId);
         const cost = GameSystem.calcBuyGunCost(1, daimyo, castellan);
         return castle.gold >= cost;
+    },
+    // --- 臣従願のルール追加 ---
+    canVassalage: (game) => {
+        // 条件①：生き残っている大名家が3つ以上あるかチェックします（自分を含めて2つ以下ならダメです）
+        const aliveClans = new Set(game.castles.filter(c => c.ownerClan !== 0).map(c => c.ownerClan));
+        if (aliveClans.size <= 2) return false;
+        
+        // 条件②：お隣さんの大名家の中に、自家の「5倍以上」の威信を持つ大名家があるかチェックします
+        const myClanId = game.playerClanId;
+        const myClan = game.clans.find(c => c.id === myClanId);
+        if (!myClan) return false;
+        
+        const myPrestige = myClan.daimyoPrestige;
+        const myCastles = game.castles.filter(c => Number(c.ownerClan) === Number(myClanId));
+        
+        let hasValidTarget = false;
+        for (let mc of myCastles) {
+            if (mc.adjacentCastleIds) {
+                for (let adjId of mc.adjacentCastleIds) {
+                    const adjC = game.getCastle(adjId);
+                    if (adjC && adjC.ownerClan !== 0 && adjC.ownerClan !== myClanId) {
+                        const targetClan = game.clans.find(c => c.id === adjC.ownerClan);
+                        if (targetClan && targetClan.daimyoPrestige >= myPrestige * 5) {
+                            hasValidTarget = true;
+                            break;
+                        }
+                    }
+                }
+            }
+            if (hasValidTarget) break;
+        }
+        
+        return hasValidTarget;
     }
 };
 
@@ -551,7 +584,8 @@ const COMMAND_SPECS = {
         label: "臣従願", category: 'FOREIGN_DAIMYO',
         costGold: 0, costRice: 0,
         isMulti: false, hasAdvice: false,
-        startMode: 'map_select', targetType: 'other_clan_all'
+        startMode: 'map_select', targetType: 'other_clan_all',
+        canExecute: (game, castle) => CAN_EXECUTE_RULES.canVassalage(game)
     },
     'break_alliance': {
         label: "断交", category: 'FOREIGN_DAIMYO',
@@ -1040,7 +1074,7 @@ class CommandSystem {
                         if (type === 'dominate' && rel.status === '支配') return false;
                         if (type === 'subordinate' && rel.status === '従属') return false;
                     }
-
+                    
                     // ★追加：降伏勧告と従属願と臣従願は、自領と接している勢力に限定します！
                     if (type === 'dominate' || type === 'subordinate' || type === 'vassalage') {
                         let isAdjacent = false;
@@ -1058,6 +1092,17 @@ class CommandSystem {
                             if (isAdjacent) break;
                         }
                         if (!isAdjacent) return false;
+                    }
+
+                    // ★今回追加：臣従願は、相手の威信が自家の「5倍以上」ないと選べないようにします！
+                    if (type === 'vassalage') {
+                        const myClan = this.game.clans.find(c => Number(c.id) === playerClanId);
+                        const targetClan = this.game.clans.find(c => Number(c.id) === target.ownerClan);
+                        if (myClan && targetClan) {
+                            if (targetClan.daimyoPrestige < myClan.daimyoPrestige * 5) {
+                                return false;
+                            }
+                        }
                     }
                     
                     // その大名家の「大名（当主）」を探して、その人がいる城だけをOK（選択可能）にします！
