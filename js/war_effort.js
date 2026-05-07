@@ -2046,7 +2046,7 @@ Object.assign(WarManager.prototype, {
                 } else {
                     // 登用失敗時
                     prisoner.hasRefusedHire = true;
-                    this.game.ui.showDialog(`「断る。煮るなり焼くなり好きにせい。」`, false, stayStep, null, {
+                    this.game.ui.showDialog(`「断る。煮るなり焼くなり好きにせい」`, false, stayStep, null, {
                         leftFace: prisoner.faceIcon,
                         leftName: prisoner.name
                     });

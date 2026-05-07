@@ -435,7 +435,8 @@ class IndependenceSystem {
                 const oldLeaderName = currentOldDaimyo.name.replace('|', '');
                 const newLeaderName = rebellionLeader.name.replace('|', '');
 
-                await new Promise(resolve => {
+                // ★変更：選んだ大名家のID（番号）を受け取るようにします
+                const chosenClanId = await new Promise(resolve => {
                     const showSelectMenu = () => {
                         this.game.ui.showDialog("操作する勢力を選択してください。", false, null, null, {
                             choices: [
@@ -459,12 +460,12 @@ class IndependenceSystem {
                                 // 「はい」を選んだら担当大名家を決定
                                 this.game.playerClanId = targetClanId;
                                 
-                                // パネルやメニューを新しい担当勢力の情報で更新します
+                                // パネルを新しい担当勢力の情報で更新します（メニューの描画は消しました！）
                                 if (this.game.ui) {
                                     this.game.ui.updatePanelHeader();
-                                    this.game.ui.renderCommandMenu();
                                 }
-                                resolve();
+                                // 選んだIDを外に渡して約束（Promise）を終わらせます
+                                resolve(targetClanId);
                             },
                             () => {
                                 // 「いいえ」を選んだら最初の選択画面に戻る
@@ -476,6 +477,15 @@ class IndependenceSystem {
                     // 最初にメニューを呼び出します
                     showSelectMenu();
                 });
+
+                // ★追加：メニューの選択が終わったあとに、ナレーションを表示します！
+                if (chosenClanId === oldClanId) {
+                    // 旧勢力を選んだ場合
+                    await this.game.ui.showDialogAsync(`引き続き${oldClanName}を操作します。`, false, 0);
+                } else {
+                    // 新勢力を選んだ場合
+                    await this.game.ui.showDialogAsync(`これ以降、${newClanName}を操作します。`, false, 0);
+                }
             }
         }
     }

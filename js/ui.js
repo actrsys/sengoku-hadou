@@ -1964,7 +1964,7 @@ class UIManager {
     
     showTurnStartDialog(castle, onProceed) {
         const nav = this.game.getNavigatorInfo(castle);
-        const msg = `「殿、${castle.name}にご命令ください。」`;
+        const msg = `「殿、${castle.name}にご命令ください」`;
 
         if (window.AudioManager) {
             window.AudioManager.playSE('myturn.ogg');
