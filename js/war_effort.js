@@ -1944,7 +1944,7 @@ Object.assign(WarManager.prototype, {
             choices: [
                 {
                     label: '登用',
-                    className: 'btn-success',
+                    className: 'btn-primary',
                     onClick: () => this.handleDaimyoPrisonerAction(prisoner, 'hire')
                 },
                 {
