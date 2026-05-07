@@ -90,7 +90,8 @@ class Clan {
                             sentiment: sentimentVal,
                             trucePeriod: trucePeriod,
                             isMarriage: isMarriage,
-                            hostageIds: [] // ★新しく人質の出席番号リスト（配列）を追加します
+                            hostageIds: [], // ★新しく人質の出席番号リスト（配列）を追加します
+                            subordinateMonths: 0 // ★追加：従属・支配関係の継続月数を覚える箱
                         };
                     }
                 }

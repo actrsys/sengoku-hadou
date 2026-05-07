@@ -32,7 +32,8 @@ class DiplomacyManager {
                     sentiment: oppData.sentiment,
                     trucePeriod: oppData.trucePeriod || 0,
                     isMarriage: oppData.isMarriage || false,
-                    hostageIds: oppData.hostageIds ? [...oppData.hostageIds] : [] // ★相手が人質リストを持っていればコピー（同期）します
+                    hostageIds: oppData.hostageIds ? [...oppData.hostageIds] : [], // ★相手が人質リストを持っていればコピー（同期）します
+                    subordinateMonths: oppData.subordinateMonths || 0 // ★追加：従属・支配の継続月数も同期します
                 };
             } else {
                 // どちらも持っていなければ、初期値の50になります
@@ -41,7 +42,8 @@ class DiplomacyManager {
                     sentiment: 50,  // 感情値: 0 - 100
                     trucePeriod: 0, // ★初期値は0にします
                     isMarriage: false, // ★今回追加：最初は結婚のシールは貼っていません
-                    hostageIds: [] // ★新しく空っぽの人質リストを用意します
+                    hostageIds: [], // ★新しく空っぽの人質リストを用意します
+                    subordinateMonths: 0 // ★追加：従属・支配関係の継続月数を覚える箱
                 };
             }
         }
@@ -93,6 +95,13 @@ class DiplomacyManager {
 
         if (!dataA || !dataB) return;
 
+        // ★追加：新しく設定される状態が「支配」でも「従属」でもない場合は、継続期間をリセットします。
+        // （元々が支配・従属ではなく、今回新しく支配・従属になった場合も0からスタートさせます）
+        if (!['支配', '従属'].includes(newStatus) || !['支配', '従属'].includes(dataA.status)) {
+            dataA.subordinateMonths = 0;
+            dataB.subordinateMonths = 0;
+        }
+
         dataA.status = newStatus;
         if (newStatus === '和睦') dataA.trucePeriod = trucePeriod;
 
@@ -129,6 +138,11 @@ class DiplomacyManager {
             for (const targetId in clan.diplomacyValue) {
                 const data = clan.diplomacyValue[targetId];
                 
+                // ★追加：状態が「支配」か「従属」だったら、継続期間を1ヶ月増やします
+                if (data.status === '支配' || data.status === '従属') {
+                    data.subordinateMonths = (data.subordinateMonths || 0) + 1;
+                }
+
                 // もし状態が「和睦」で、期間が1以上残っていたら…
                 if (data.status === '和睦' && data.trucePeriod > 0) {
                     data.trucePeriod -= 1; // 期間を1ヶ月減らします
