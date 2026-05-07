@@ -650,26 +650,58 @@ class DiplomacyManager {
         } else if (type === 'subordinate') {
             this.calcDiplomacyExp(doer, type, true, true);
 
-            this.changeStatus(doer.clan, targetClanId, '従属');
-            
-            // ★追加：従属した時に、関係値を調整します！
-            const relation = this.getRelation(doer.clan, targetClanId);
-            if (relation) {
-                // 40以下なら50にし、41以上なら10足します（100を超えないようにします）
-                if (relation.sentiment <= 40) {
-                    relation.sentiment = 50;
-                } else {
-                    relation.sentiment = Math.min(100, relation.sentiment + 10);
-                }
-                // 相手から見た関係値も同じ数字に揃えておきます
-                const oppRelation = this.getRelation(targetClanId, doer.clan);
-                if (oppRelation) oppRelation.sentiment = relation.sentiment;
-            }
+            // 交渉の魔法を呼び出します
+            this.negotiateSubordinationConditions(doer.clan, targetClanId,
+                (conditionType, conditionData) => {
+                    // 要求を呑んで従属が成立した場合
+                    this.changeStatus(doer.clan, targetClanId, '従属');
+                    
+                    const relation = this.getRelation(doer.clan, targetClanId);
+                    if (relation) {
+                        if (relation.sentiment <= 40) {
+                            relation.sentiment = 50;
+                        } else {
+                            relation.sentiment = Math.min(100, relation.sentiment + 10);
+                        }
+                        const oppRelation = this.getRelation(targetClanId, doer.clan);
+                        if (oppRelation) oppRelation.sentiment = relation.sentiment;
+                    }
 
-            msg = `${this.game.clans.find(c => c.id === targetClanId).name} に従属しました！`;
-            if (!isPlayerInvolved) aiMsg = `${targetClanName} が ${doerClanName} を支配下に置きました！`;
-            doer.achievementTotal += Math.floor(doer.diplomacy * 0.2) + 10;
-            this.game.factionSystem.updateRecognition(doer, 30);
+                    // どの条件を呑んだかでメッセージを変えます
+                    let conditionMsg = "";
+                    if (conditionType === 'marriage') {
+                        conditionMsg = `\n${conditionData.princess.name} が ${conditionData.busho.name} の正室として迎えられました。`;
+                    } else if (conditionType === 'hostage') {
+                        conditionMsg = `\n${conditionData.busho.name} を人質として差し出しました。（※機能準備中）`;
+                    } else if (conditionType === 'castle') {
+                        conditionMsg = `\n${conditionData.castle.name} を割譲しました。（※機能準備中）`;
+                    }
+
+                    msg = `${this.game.clans.find(c => c.id === targetClanId).name} に従属しました！${conditionMsg}`;
+                    if (!isPlayerInvolved) aiMsg = `${targetClanName} が ${doerClanName} を支配下に置きました！`;
+                    doer.achievementTotal += Math.floor(doer.diplomacy * 0.2) + 10;
+                    this.game.factionSystem.updateRecognition(doer, 30);
+
+                    doer.isActionDone = true;
+                    if (isPlayerInvolved) {
+                        this.game.ui.showResultModal(msg);
+                        if (doer.clan === this.game.playerClanId) {
+                            this.game.ui.updatePanelHeader();
+                            this.game.ui.renderCommandMenu();
+                        }
+                    }
+                },
+                () => {
+                    // 要求をすべて断って交渉決裂した場合
+                    msg = `条件が折り合わず、${this.game.clans.find(c => c.id === targetClanId).name} への従属を断念しました。`;
+                    if (isPlayerInvolved) {
+                        this.game.ui.showResultModal(msg);
+                    }
+                }
+            );
+
+            // この場での処理は一旦終了し、あとは交渉のダイアログに任せます
+            return;
 
         } else if (type === 'dominate') {
             let isSuccess = false;
@@ -745,6 +777,167 @@ class DiplomacyManager {
                 }
             }
         });
+    }
+
+    /**
+     * 従属・支配の際の条件交渉を行う魔法です
+     * subordinateClanId: 従属する側（条件を呑む側）
+     * dominantClanId: 支配する側（条件を出す側）
+     */
+    negotiateSubordinationConditions(subordinateClanId, dominantClanId, onSuccess, onFailure) {
+        const subClan = this.game.clans.find(c => c.id === subordinateClanId);
+        const domClan = this.game.clans.find(c => c.id === dominantClanId);
+        if (!subClan || !domClan) {
+            if (onFailure) onFailure();
+            return;
+        }
+
+        // プレイヤーが従属する側（要求を突きつけられる側）かどうか
+        const isPlayer = (subordinateClanId === this.game.playerClanId);
+        
+        // AI同士、またはAIがプレイヤーに従属を申し入れてきた場合は、
+        // 将来拡張できるように一旦「無条件で受け入れる」設定にしておきます
+        if (!isPlayer) {
+            if (onSuccess) onSuccess('none', null);
+            return;
+        }
+
+        // ステップ1：姫の要求
+        const checkStep1 = () => {
+            let availablePrincess = null;
+            if (subClan.princessIds && subClan.princessIds.length > 0) {
+                for (let pId of subClan.princessIds) {
+                    const p = this.game.princesses.find(pr => pr.id === pId && pr.status === 'unmarried');
+                    if (p) {
+                        availablePrincess = p;
+                        break;
+                    }
+                }
+            }
+
+            if (availablePrincess) {
+                // 相手勢力の中で、正室がおらず、姫と一番年齢が近い武将を探します
+                let targetBusho = null;
+                let minDiff = 999;
+                const domBushos = this.game.bushos.filter(b => b.clan === dominantClanId && b.status === 'active' && (!b.wifeIds || b.wifeIds.length === 0));
+                
+                domBushos.forEach(b => {
+                    const diff = Math.abs(b.birthYear - availablePrincess.birthYear);
+                    if (diff < minDiff) {
+                        minDiff = diff;
+                        targetBusho = b;
+                    }
+                });
+
+                if (targetBusho) {
+                    const msg = `${domClan.name}は従属の証として${availablePrincess.name}を${targetBusho.name}に嫁がせることを要求してきました。\n${availablePrincess.name}を差し出しますか？`;
+                    this.game.ui.showDialog(msg, true, 
+                        () => {
+                            // 嫁がせる（成立）
+                            this.applyMarriageData(availablePrincess.id, targetBusho.id, dominantClanId);
+                            if (onSuccess) onSuccess('marriage', { princess: availablePrincess, busho: targetBusho });
+                        },
+                        () => {
+                            // 断ったら次のステップへ
+                            checkStep2();
+                        },
+                        { okText: '嫁がせる', okClass: 'btn-danger', cancelText: '断る' }
+                    );
+                    return;
+                }
+            }
+            checkStep2();
+        };
+
+        // ステップ2：人質の要求
+        const checkStep2 = () => {
+            const daimyo = this.game.bushos.find(b => b.clan === subordinateClanId && b.isDaimyo);
+            let hostage = null;
+            if (daimyo) {
+                const dFamily = Array.isArray(daimyo.familyIds) ? daimyo.familyIds : [];
+                const kinsmen = this.game.bushos.filter(b => {
+                    if (b.clan !== subordinateClanId || b.isDaimyo || b.status !== 'active') return false;
+                    const bFamily = Array.isArray(b.familyIds) ? b.familyIds : [];
+                    return bFamily.includes(daimyo.id) || dFamily.includes(b.id);
+                });
+                if (kinsmen.length > 0) {
+                    // とりあえず見つかった最初の武将を人質候補にします
+                    hostage = kinsmen[0];
+                }
+            }
+
+            if (hostage) {
+                const msg = `${domClan.name}は従属の証として${hostage.name}を人質として差し出すことを要求してきました。\n${hostage.name}を人質として送りますか？`;
+                this.game.ui.showDialog(msg, true,
+                    () => {
+                        // 人質を送る（成立）※中身は後日作成
+                        if (onSuccess) onSuccess('hostage', { busho: hostage });
+                    },
+                    () => {
+                        // 断ったら次のステップへ
+                        checkStep3();
+                    },
+                    { okText: '人質を送る', okClass: 'btn-danger', cancelText: '断る' }
+                );
+                return;
+            }
+            checkStep3();
+        };
+
+        // ステップ3：領地の要求
+        const checkStep3 = () => {
+            const subCastles = this.game.castles.filter(c => Number(c.ownerClan) === subordinateClanId);
+            if (subCastles.length >= 2) {
+                let targetCastle = null;
+                const domCastles = this.game.castles.filter(c => Number(c.ownerClan) === dominantClanId);
+                
+                for (let sc of subCastles) {
+                    // 大名のいる城は避けます
+                    const castellan = this.game.getBusho(sc.castellanId);
+                    if (castellan && castellan.isDaimyo) continue;
+
+                    // 相手の領土と隣接しているかチェック
+                    let isAdjacent = false;
+                    for (let dc of domCastles) {
+                        if (typeof window.GameSystem !== 'undefined' && window.GameSystem.isAdjacent) {
+                            if (window.GameSystem.isAdjacent(sc, dc)) {
+                                isAdjacent = true;
+                                break;
+                            }
+                        } else if (sc.adjacentCastleIds && sc.adjacentCastleIds.includes(dc.id)) {
+                            isAdjacent = true;
+                            break;
+                        }
+                    }
+                    if (isAdjacent) {
+                        targetCastle = sc;
+                        break;
+                    }
+                }
+
+                if (targetCastle) {
+                    const msg = `${domClan.name}は、従属の証として${targetCastle.name}を割譲することを要求してきました。\n${targetCastle.name}を明け渡しますか？`;
+                    this.game.ui.showDialog(msg, true,
+                        () => {
+                            // 明け渡す（成立）※中身は後日作成
+                            if (onSuccess) onSuccess('castle', { castle: targetCastle });
+                        },
+                        () => {
+                            // すべて断ったので交渉決裂（失敗）
+                            if (onFailure) onFailure();
+                        },
+                        { okText: '明け渡す', okClass: 'btn-danger', cancelText: '断る' }
+                    );
+                    return;
+                }
+            }
+            
+            // 要求できるものが何も無かった場合も交渉決裂とします
+            if (onFailure) onFailure();
+        };
+
+        // 最初のステップを開始します
+        checkStep1();
     }
     
     /**

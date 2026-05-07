@@ -170,6 +170,35 @@ const CAN_EXECUTE_RULES = {
         const currentTrust = game.courtRankSystem ? game.courtRankSystem.getTrust(game.playerClanId) : 0;
         return currentTrust >= 500;
     },
+    canSubordinate: (game, castle) => {
+        const myClanId = game.playerClanId;
+        // 条件①：未婚の一門の姫がいるか
+        const myClan = game.clans.find(c => c.id === myClanId);
+        const hasPrincess = myClan && myClan.princessIds && myClan.princessIds.some(pId => {
+            const p = game.princesses.find(princess => princess.id === pId);
+            return p && p.status === 'unmarried';
+        });
+        if (hasPrincess) return true;
+
+        // 条件②：大名以外の一門武将がいるか
+        const daimyo = game.bushos.find(b => b.clan === myClanId && b.isDaimyo);
+        let hasKinsman = false;
+        if (daimyo) {
+            const dFamily = Array.isArray(daimyo.familyIds) ? daimyo.familyIds : [];
+            hasKinsman = game.bushos.some(b => {
+                if (b.clan !== myClanId || b.isDaimyo || b.status !== 'active') return false;
+                const bFamily = Array.isArray(b.familyIds) ? b.familyIds : [];
+                return bFamily.includes(daimyo.id) || dFamily.includes(b.id);
+            });
+        }
+        if (hasKinsman) return true;
+
+        // 条件③：城を２つ以上持っているか
+        const myCastles = game.castles.filter(c => Number(c.ownerClan) === Number(myClanId));
+        if (myCastles.length >= 2) return true;
+
+        return false;
+    },
     // --- 移動・輸送用 ---
     canTransport: (game, castle) => {
         if (castle.soldiers <= 0 && castle.gold <= 0 && castle.rice <= 0 && (castle.horses || 0) <= 0 && (castle.guns || 0) <= 0) {
@@ -515,7 +544,8 @@ const COMMAND_SPECS = {
         label: "従属嘆願", category: 'FOREIGN_DAIMYO',
         costGold: 0, costRice: 0,
         isMulti: false, hasAdvice: true,
-        startMode: 'map_select', targetType: 'other_clan_all'
+        startMode: 'map_select', targetType: 'other_clan_all',
+        canExecute: (game, castle) => CAN_EXECUTE_RULES.canSubordinate(game, castle)
     },
     'break_alliance': {
         label: "関係破棄", category: 'FOREIGN_DAIMYO',
