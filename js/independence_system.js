@@ -425,6 +425,59 @@ class IndependenceSystem {
         if (extraMsg !== "") {
             await this.game.ui.showDialogAsync(extraMsg, false, 0);
         }
+
+        // ★追加：自分の担当大名家から独立が起きて新大名家が誕生した場合に、どちらを担当するか選べる魔法！
+        if (oldClanId === this.game.playerClanId && !isDefection) {
+            // 現在の旧勢力の大名（討死して代替わりしている可能性も考慮）を探します
+            const currentOldDaimyo = this.game.bushos.find(b => b.clan === oldClanId && b.isDaimyo);
+            if (currentOldDaimyo && rebellionLeader) {
+                // 名前から「|」を取り除いて綺麗な表示にします
+                const oldLeaderName = currentOldDaimyo.name.replace('|', '');
+                const newLeaderName = rebellionLeader.name.replace('|', '');
+
+                await new Promise(resolve => {
+                    const showSelectMenu = () => {
+                        this.game.ui.showDialog("操作する勢力を選択してください。", false, null, null, {
+                            choices: [
+                                {
+                                    label: oldLeaderName,
+                                    className: 'btn-primary', // 緑色のボタン（旧勢力）
+                                    onClick: () => confirmSelection(oldClanName, oldClanId)
+                                },
+                                {
+                                    label: newLeaderName,
+                                    className: 'btn-danger', // 赤色の警告ボタン（新勢力）
+                                    onClick: () => confirmSelection(newClanName, newClanId)
+                                }
+                            ]
+                        });
+                    };
+
+                    const confirmSelection = (targetClanName, targetClanId) => {
+                        this.game.ui.showDialog(`${targetClanName}を操作します。本当によろしいですか？`, true, 
+                            () => {
+                                // 「はい」を選んだら担当大名家を決定
+                                this.game.playerClanId = targetClanId;
+                                
+                                // パネルやメニューを新しい担当勢力の情報で更新します
+                                if (this.game.ui) {
+                                    this.game.ui.updatePanelHeader();
+                                    this.game.ui.renderCommandMenu();
+                                }
+                                resolve();
+                            },
+                            () => {
+                                // 「いいえ」を選んだら最初の選択画面に戻る
+                                showSelectMenu();
+                            }
+                        );
+                    };
+
+                    // 最初にメニューを呼び出します
+                    showSelectMenu();
+                });
+            }
+        }
     }
 
     // ★修正：独立処理中に派閥がリセットされても判定できるように、記憶した元の派閥ID(targetFactionId)をオプションで受け取れるようにします
