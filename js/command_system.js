@@ -534,14 +534,14 @@ const COMMAND_SPECS = {
         canExecute: (game, castle) => CAN_EXECUTE_RULES.hasUnmarriedPrincess(game)
     },
     'dominate': {
-        label: "支配勧告", category: 'FOREIGN_DAIMYO',
+        label: "降伏勧告", category: 'FOREIGN_DAIMYO',
         costGold: 0, costRice: 0,
         isMulti: false, hasAdvice: true,
         startMode: 'map_select', targetType: 'other_clan_all',
         canExecute: (game, castle) => CAN_EXECUTE_RULES.isNotSubordinate(game)
     },
     'subordinate': {
-        label: "従属嘆願", category: 'FOREIGN_DAIMYO',
+        label: "従属願", category: 'FOREIGN_DAIMYO',
         costGold: 0, costRice: 0,
         isMulti: false, hasAdvice: true,
         startMode: 'map_select', targetType: 'other_clan_all',
@@ -1035,7 +1035,7 @@ class CommandSystem {
                         if (type === 'subordinate' && rel.status === '従属') return false;
                     }
 
-                    // ★追加：支配勧告と従属嘆願は、自領と接している勢力に限定します！
+                    // ★追加：降伏勧告と従属願は、自領と接している勢力に限定します！
                     if (type === 'dominate' || type === 'subordinate') {
                         let isAdjacent = false;
                         const myCastles = this.game.castles.filter(c => Number(c.ownerClan) === playerClanId);
@@ -2355,8 +2355,8 @@ class CommandSystem {
             case 'headhunt': case 'headhunt_select_castle': return "引抜対象の居城を選択してください";
             case 'goodwill': return "親善を行う相手を選択してください";
             case 'alliance': return "同盟を行う相手を選択してください";
-            case 'dominate': return "支配勧告を行う相手を選択してください";
-            case 'subordinate': return "従属嘆願を行う相手を選択してください";
+            case 'dominate': return "降伏勧告を行う相手を選択してください";
+            case 'subordinate': return "従属願を行う相手を選択してください";
             case 'kunishu_goodwill': return "親善を行う諸勢力がいる城を選択してください";
             case 'kunishu_incorporate': return "取込を行う諸勢力がいる城を選択してください";
             case 'break_alliance': return "断交する相手を選択してください";
