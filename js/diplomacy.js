@@ -674,7 +674,7 @@ class DiplomacyManager {
                     if (conditionType === 'marriage') {
                         conditionMsg = `\n${conditionData.princess.name} が ${conditionData.busho.name} の側室として迎えられました。`;
                     } else if (conditionType === 'hostage') {
-                        conditionMsg = `\n${conditionData.busho.name} を人質として差し出しました。（※機能準備中）`;
+                        conditionMsg = `\n${conditionData.busho.name} を人質として差し出しました。`;
                     } else if (conditionType === 'castle') {
                         conditionMsg = `\n${conditionData.castle.name} を割譲しました。（※機能準備中）`;
                     }
@@ -883,7 +883,8 @@ class DiplomacyManager {
                 const msg = `${domClan.name}は従属の証として${hostage.name}を人質として差し出すことを要求してきました。\n${hostage.name}を人質として送りますか？`;
                 this.game.ui.showDialog(msg, true,
                     () => {
-                        // 人質を送る（成立）※中身は後日作成
+                        // 人質を送る（成立）
+                        this.applyHostageData(hostage.id, subordinateClanId, dominantClanId);
                         if (onSuccess) onSuccess('hostage', { busho: hostage });
                     },
                     () => {
@@ -953,6 +954,40 @@ class DiplomacyManager {
         checkStep1();
     }
     
+    /**
+     * 人質が送られた時のデータ書き換え魔法です
+     */
+    applyHostageData(hostageId, subordinateClanId, dominantClanId) {
+        const hostage = this.game.getBusho(hostageId);
+        if (!hostage) return;
+
+        // 相手の大名（当主）がどこにいるか探します
+        const dominantDaimyo = this.game.bushos.find(b => b.clan === dominantClanId && b.isDaimyo);
+        const targetCastleId = dominantDaimyo ? dominantDaimyo.castleId : null;
+
+        if (!targetCastleId) return;
+
+        // 元の大名家のIDを覚えておきます
+        hostage.originalClanId = subordinateClanId;
+        // 人質シールのフラグを立てます
+        hostage.isHostage = true;
+
+        // 人事部（お引越しセンター）にお願いして、相手大名の居城へお引越し＆所属変更させます
+        // ※この時、相性計算を飛ばして忠誠度を強制的に100にします！
+        this.game.affiliationSystem.joinClan(hostage, dominantClanId, targetCastleId, 100);
+
+        // 人質リストに追加します（自分と相手、両方の外交データに同じように記録します）
+        const relationA = this.getDiplomacyData(subordinateClanId, dominantClanId);
+        if (relationA && relationA.hostageIds && !relationA.hostageIds.includes(hostageId)) {
+            relationA.hostageIds.push(hostageId);
+        }
+        
+        const relationB = this.getDiplomacyData(dominantClanId, subordinateClanId);
+        if (relationB && relationB.hostageIds && !relationB.hostageIds.includes(hostageId)) {
+            relationB.hostageIds.push(hostageId);
+        }
+    }
+
     /**
      * 婚姻が成立した時の、データ書き換え一斉処理です
      */
