@@ -1440,9 +1440,13 @@ class CommandSystem {
             } else if (extraData.subAction === 'subordinate') {
                 this.showAdviceAndExecute('diplomacy', () => this.game.diplomacyManager.executeDiplomacy(firstId, targetId, 'subordinate'), { trueProb: 1.0 });
             } else if (extraData.subAction === 'vassalage') {
-                this.game.ui.showDialog(`本当に臣従しますか？\n当家は滅亡し、全ての領地を明け渡します。`, true, () => {
-                    this.executeWithEvent('vassalage', () => this.game.diplomacyManager.executeVassalage(firstId, targetId));
-                });
+                this.game.ui.showDialog(`本当に臣従しますか？\n当家は滅亡し、全ての領地を明け渡します。`, true, 
+                    () => {
+                        this.executeWithEvent('vassalage', () => this.game.diplomacyManager.executeVassalage(firstId, targetId));
+                    },
+                    null,
+                    { okText: '臣従する', okClass: 'btn-danger', cancelText: 'やめる' }
+                );
             } else if (extraData.subAction === 'dominate') {
                 const prob = this.game.diplomacyManager.getDiplomacyProb(doer.clan, targetClanId, 'dominate', doer.diplomacy, myPower, targetPower);
                 this.showAdviceAndExecute('diplomacy', () => this.game.diplomacyManager.executeDiplomacy(firstId, targetId, 'dominate'), { trueProb: prob / 100 });
