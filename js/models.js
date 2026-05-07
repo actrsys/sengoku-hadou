@@ -89,7 +89,8 @@ class Clan {
                             status: statusStr,
                             sentiment: sentimentVal,
                             trucePeriod: trucePeriod,
-                            isMarriage: isMarriage 
+                            isMarriage: isMarriage,
+                            hostageIds: [] // ★新しく人質の出席番号リスト（配列）を追加します
                         };
                     }
                 }
@@ -452,6 +453,12 @@ class Busho {
 
         // 諸勢力関連のパラメータ追加
         this.belongKunishuId = Number(this.belongKunishuId || 0);   // 所属する諸勢力ID（0なら未所属）
+
+        // ★人質システムの追加
+        // 元々の所属（実家）を覚える箱です。最初は今の所属と同じにします。
+        this.originalClanId = Number(data.originalClanId || data.clan || 0);
+        // 今人質として働いているかどうかのシールです。デフォルトは「いいえ(false)」です。
+        this.isHostage = data.isHostage === true;
 
         // 履歴配列の初期化
         this.battleHistory = Array.isArray(this.battleHistory) ? this.battleHistory : [];
