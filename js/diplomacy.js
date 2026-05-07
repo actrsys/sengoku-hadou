@@ -818,32 +818,29 @@ class DiplomacyManager {
             }
 
             if (availablePrincess) {
-                // 相手勢力の中で、正室がおらず、姫と一番年齢が近い武将を探します
-                let targetBusho = null;
-                let minDiff = 999;
-                const domBushos = this.game.bushos.filter(b => b.clan === dominantClanId && b.status === 'active' && (!b.wifeIds || b.wifeIds.length === 0));
-                
-                // 大名とその一門武将を探します
+                // 相手勢力の中で活躍中の武将を候補にします（複室制に対応し、既婚者も除外しません）
+                const domBushos = this.game.bushos.filter(b => b.clan === dominantClanId && b.status === 'active');
                 const domDaimyo = this.game.bushos.find(b => b.clan === dominantClanId && b.isDaimyo);
-                let kinsmen = [];
-                if (domDaimyo) {
-                    const dFamily = Array.isArray(domDaimyo.familyIds) ? domDaimyo.familyIds : [];
-                    kinsmen = domBushos.filter(b => {
-                        const bFamily = Array.isArray(b.familyIds) ? b.familyIds : [];
-                        return bFamily.includes(domDaimyo.id) || dFamily.includes(b.id) || b.id === domDaimyo.id;
-                    });
-                }
                 
-                // 一門武将がいれば優先し、いなければ全体から探します
-                const candidates = kinsmen.length > 0 ? kinsmen : domBushos;
-                
-                candidates.forEach(b => {
-                    const diff = Math.abs(b.birthYear - availablePrincess.birthYear);
-                    if (diff < minDiff) {
-                        minDiff = diff;
-                        targetBusho = b;
-                    }
+                // 優先順位（一門かつ未婚 > 一門かつ既婚 > 家臣かつ未婚 > 家臣かつ既婚）をつけて並び替えます
+                // その中で最も年齢が近い者を選びます
+                domBushos.sort((a, b) => {
+                    const getWeight = (target) => {
+                        const isKinsman = domDaimyo && (target.id === domDaimyo.id || (Array.isArray(target.familyIds) && target.familyIds.includes(domDaimyo.id)) || (domDaimyo.familyIds && domDaimyo.familyIds.includes(target.id)));
+                        const isUnmarried = (!target.wifeIds || target.wifeIds.length === 0);
+                        if (isKinsman && isUnmarried) return 4;
+                        if (isKinsman) return 3;
+                        if (isUnmarried) return 2;
+                        return 1;
+                    };
+                    const weightA = getWeight(a);
+                    const weightB = getWeight(b);
+                    if (weightA !== weightB) return weightB - weightA;
+                    
+                    return Math.abs(a.birthYear - availablePrincess.birthYear) - Math.abs(b.birthYear - availablePrincess.birthYear);
                 });
+
+                const targetBusho = domBushos.length > 0 ? domBushos[0] : null;
 
                 if (targetBusho) {
                     const msg = `${domClan.name}は従属の証として${availablePrincess.name}を${targetBusho.name}に嫁がせることを要求してきました。\n${availablePrincess.name}を差し出しますか？`;
@@ -959,7 +956,7 @@ class DiplomacyManager {
     /**
      * 婚姻が成立した時の、データ書き換え一斉処理です
      */
-    applyMarriageData(princessId, targetBushoId, targetClanId) {
+    applyMarriageData(princessId, targetBushoId, targetClanId, isMainWife = false) {
         const myClan = this.game.clans.find(c => c.id === this.game.playerClanId);
         const princess = this.game.princesses.find(p => p.id === princessId);
         const targetBusho = this.game.getBusho(targetBushoId);
@@ -973,7 +970,11 @@ class DiplomacyManager {
         myClan.princessIds = myClan.princessIds.filter(id => id !== princessId);
 
         if (!targetBusho.wifeIds.includes(princessId)) {
-            targetBusho.wifeIds.push(princessId);
+            if (isMainWife) {
+                targetBusho.wifeIds.unshift(princessId); // 正室なのでリストの先頭（一番目）に割り込ませます
+            } else {
+                targetBusho.wifeIds.push(princessId);    // 側室なのでリストの末尾に並ばせます
+            }
         }
         targetBusho.updateFamilyIds(this.game.princesses);
 
@@ -1020,7 +1021,7 @@ class DiplomacyManager {
         this.calcDiplomacyExp(doer, 'marriage', isSuccess, true);
 
         if (isSuccess) {
-            this.applyMarriageData(princessId, targetBushoId, targetClanId);
+            this.applyMarriageData(princessId, targetBushoId, targetClanId, true); // ★最後に true を渡して「正室」扱いと伝えます
             doer.isActionDone = true;
             doer.achievementTotal += Math.floor(doer.diplomacy * 0.2) + 20;
             this.game.factionSystem.updateRecognition(doer, 30);
