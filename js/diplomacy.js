@@ -470,18 +470,17 @@ class DiplomacyManager {
         let targetDrop = -60; 
         let globalDrop = 0; 
         let isBetrayal = false;
-        let isBreakDomination = false; // ★追加：支配関係を破棄したかどうかのシールです
+        let isBreakDomination = false;
 
         if (oldStatus === '同盟' && oldSentiment >= 70) {
             targetDrop = -70; globalDrop = -10; isBetrayal = true;
         } else if (oldStatus === '従属' && oldSentiment >= 70) {
             targetDrop = -100; globalDrop = -10; isBetrayal = true;
         } else if (oldStatus === '支配') {
-            // ★追加：自分が支配している相手を切り捨てた時の重いペナルティです！
-            targetDrop = -100; // 対象の大名家との友好度を0にするため、-100します
-            globalDrop = -15;  // 他の全ての大名家との友好度が15下がります
-            isBetrayal = true; // 周りからの心証が悪くなるシールを貼ります
-            isBreakDomination = true; // 忠誠度を下げるための専用シールも貼ります
+            targetDrop = -100; 
+            globalDrop = -15;  
+            isBetrayal = true; 
+            isBreakDomination = true; 
         }
 
         this.updateSentiment(doerClanId, targetClanId, targetDrop);
@@ -500,18 +499,132 @@ class DiplomacyManager {
             });
         }
 
-        // ★追加：もし「支配」を破棄していたら、自分の家の武将たちの忠誠度を5下げます
         if (isBreakDomination) {
             this.game.bushos.forEach(busho => {
-                // 同じ家（clan）にいて、活動中（active）で、大名本人ではない武将を探します
                 if (busho.clan === doerClanId && busho.status === 'active' && !busho.isDaimyo) {
-                    busho.loyalty = Math.max(0, busho.loyalty - 5); // 0未満にはならないように下げます
+                    busho.loyalty = Math.max(0, busho.loyalty - 5); 
                 }
             });
         }
 
-        // 最後に、結果をお知らせする魔法にシール（isBreakDomination）も一緒に渡してあげます
-        return { oldStatus, isBetrayal, isBreakDomination };
+        // ★ここから追加：人質や姫の処刑・捕縛判定
+        let executedHostages = [];
+        let executedPrincesses = [];
+        let escapedHostages = [];
+        let executedEnemyHostages = [];
+        let hiredEnemyHostages = []; // ★追加：家臣になった人質のリスト
+
+        // １．破棄した側（A）から、破棄された側（B）への人質 -> 怒ったBに処断されます
+        this.game.bushos.forEach(b => {
+            if (b.isHostage && b.originalClanId === doerClanId && b.clan === targetClanId) {
+                executedHostages.push(b);
+            }
+        });
+
+        // ２．破棄した側（A）から、破棄された側（B）へ嫁いでいる姫 -> 怒ったBに処断されます
+        if (this.game.princesses) {
+            this.game.princesses.forEach(p => {
+                let father = p.fatherId ? this.game.getBusho(p.fatherId) : null;
+                let originClan = p.originalClanId !== undefined ? p.originalClanId : (father ? father.clan : null);
+
+                if (p.status === 'married' && originClan === doerClanId && p.currentClanId === targetClanId) {
+                    executedPrincesses.push(p);
+                }
+            });
+        }
+        
+        // 当主（A）の情報を取得します（登用判定用）
+        const doerDaimyo = this.game.bushos.find(b => b.clan === doerClanId && b.isDaimyo) || { charm: 50, affinity: 0 };
+
+        // ３．破棄された側（B）から、破棄した側（A）への人質 -> Aが捕獲判定を行います
+        this.game.bushos.forEach(b => {
+            if (b.isHostage && b.originalClanId === targetClanId && b.clan === doerClanId) {
+                // まずは武力（strength）を使って逃げ切れるかサイコロを振ります
+                let captureChance = 0.5 - ((b.strength || 30) * 0.002) + (Math.random() * 0.3);
+                
+                if (captureChance > 0.5) {
+                    // 捕まったら、次は登用（家臣になるか）の判定をします
+                    let baseProb = ((doerDaimyo.charm || 50) * 1.5) / ((b.loyalty || 50) * 3);
+                    let randomBonus = (Math.random() * 0.2) - 0.1;
+                    let affinityDiff = Math.abs((doerDaimyo.affinity || 0) - (b.affinity || 0));
+                    let affinityBonus = affinityDiff <= 10 ? 0.1 : (affinityDiff >= 50 ? -0.3 : 0.1 - (affinityDiff - 10) * 0.01);
+                    
+                    let hireProb = baseProb + randomBonus + affinityBonus;
+                    hireProb = Math.max(0, Math.min(0.99, hireProb));
+                    
+                    if (hireProb > Math.random()) {
+                        // 登用成功！家臣になります
+                        hiredEnemyHostages.push(b);
+                    } else {
+                        // 登用失敗…処断リストへ
+                        executedEnemyHostages.push(b);
+                    }
+                } else {
+                    // 逃げ切ったら脱出リストへ
+                    escapedHostages.push(b);
+                }
+            }
+        });
+
+        // 処断の実行
+        executedHostages.forEach(b => {
+            if (this.game.lifeSystem && this.game.lifeSystem.executeDeath) {
+                this.game.lifeSystem.executeDeath(b);
+            }
+        });
+        executedPrincesses.forEach(p => {
+            p.status = 'dead';
+            const husband = this.game.getBusho(p.husbandId);
+            if (husband && husband.wifeIds) {
+                husband.wifeIds = husband.wifeIds.filter(id => id !== p.id);
+            }
+        });
+        executedEnemyHostages.forEach(b => {
+            if (this.game.lifeSystem && this.game.lifeSystem.executeDeath) {
+                this.game.lifeSystem.executeDeath(b);
+            }
+        });
+        
+        // 逃げ切った人質の帰還処理
+        escapedHostages.forEach(b => {
+            const friendlyCastles = this.game.castles.filter(c => c.ownerClan === targetClanId);
+            if (friendlyCastles.length > 0) {
+                const escapeCastle = friendlyCastles[Math.floor(Math.random() * friendlyCastles.length)];
+                if (this.game.affiliationSystem && this.game.affiliationSystem.moveCastle) {
+                    this.game.affiliationSystem.moveCastle(b, escapeCastle.id);
+                } else {
+                    b.clan = targetClanId;
+                    b.castleId = escapeCastle.id;
+                }
+            } else {
+                if (this.game.affiliationSystem && this.game.affiliationSystem.becomeRonin) {
+                    this.game.affiliationSystem.becomeRonin(b);
+                } else {
+                    b.status = 'ronin';
+                    b.clan = 0;
+                    b.castleId = 0;
+                }
+            }
+            // 人質のシールを剥がして自由の身にします
+            b.isHostage = false;
+            b.originalClanId = undefined;
+        });
+
+        // ★追加：家臣になった人質の処理
+        hiredEnemyHostages.forEach(b => {
+            // 人質のシールを剥がして、完全に家臣（Aの所属）として扱います
+            b.isHostage = false;
+            b.originalClanId = undefined;
+        });
+
+        // お互いの外交データから、人質と婚姻のシールを完全に剥がします
+        const dataA = this.getDiplomacyData(doerClanId, targetClanId);
+        const dataB = this.getDiplomacyData(targetClanId, doerClanId);
+        if (dataA) { dataA.hostageIds = []; dataA.isMarriage = false; }
+        if (dataB) { dataB.hostageIds = []; dataB.isMarriage = false; }
+
+        // 最後に、結果をお知らせする魔法にシールや処遇の結果も一緒に渡してあげます
+        return { oldStatus, isBetrayal, isBreakDomination, executedHostages, executedPrincesses, escapedHostages, executedEnemyHostages, hiredEnemyHostages };
     }
     
     /**
@@ -642,10 +755,38 @@ class DiplomacyManager {
             if (result.isBetrayal) {
                 msg += `\n諸大名からの心証が悪化しました……`;
             }
-            // ★追加：もし支配関係を破棄して忠誠度が下がっていたら、メッセージを書き足します
+            
             if (result.isBreakDomination) {
                 msg += `\n家臣団の中でも動揺が広がっているようです……`;
             }
+
+            if (result.executedHostages && result.executedHostages.length > 0) {
+                const names = result.executedHostages.map(b => b.name).join('、');
+                msg += `\n激怒した${targetClanName}により、人質として送られていた ${names} が処断されました。`;
+                if (aiMsg !== "") aiMsg += `\n激怒した${targetClanName}は、人質の ${names} を処断しました。`;
+            }
+            if (result.executedPrincesses && result.executedPrincesses.length > 0) {
+                const names = result.executedPrincesses.map(p => p.name).join('、');
+                msg += `\n激怒した${targetClanName}により、嫁いでいた ${names} が処断されました。`;
+                if (aiMsg !== "") aiMsg += `\n激怒した${targetClanName}は、嫁いでいた ${names} を処断しました。`;
+            }
+            if (result.executedEnemyHostages && result.executedEnemyHostages.length > 0) {
+                const names = result.executedEnemyHostages.map(b => b.name).join('、');
+                msg += `\n預かっていた人質 ${names} を処断しました。`;
+                if (aiMsg !== "") aiMsg += `\n${doerClanName}は、預かっていた人質 ${names} を処断しました。`;
+            }
+            if (result.escapedHostages && result.escapedHostages.length > 0) {
+                const names = result.escapedHostages.map(b => b.name).join('、');
+                msg += `\n預かっていた人質 ${names} には逃げられてしまいました……`;
+                if (aiMsg !== "") aiMsg += `\n預かっていた人質 ${names} は、間一髪で逃亡したようです。`;
+            }
+            // ★追加：家臣になった人質のメッセージ
+            if (result.hiredEnemyHostages && result.hiredEnemyHostages.length > 0) {
+                const names = result.hiredEnemyHostages.map(b => b.name).join('、');
+                msg += `\n預かっていた人質 ${names} は当家に臣従しました。`;
+                if (aiMsg !== "") aiMsg += `\n預かっていた人質 ${names} は、${doerClanName}に臣従したようです。`;
+            }
+
             doer.achievementTotal += 5;
             this.game.factionSystem.updateRecognition(doer, 10);
 
