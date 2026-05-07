@@ -548,7 +548,7 @@ const COMMAND_SPECS = {
         canExecute: (game, castle) => CAN_EXECUTE_RULES.canSubordinate(game, castle)
     },
     'break_alliance': {
-        label: "関係破棄", category: 'FOREIGN_DAIMYO',
+        label: "断交", category: 'FOREIGN_DAIMYO',
         costGold: 0, costRice: 0,
         isMulti: false, hasAdvice: false,
         startMode: 'map_select', targetType: 'breakable_clan'
