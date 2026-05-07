@@ -936,7 +936,8 @@ class DiplomacyManager {
                     } else if (conditionType === 'hostage') {
                         conditionMsg = `\n${conditionData.busho.name} を人質として差し出しました。`;
                     } else if (conditionType === 'castle') {
-                        conditionMsg = `\n${conditionData.castle.name} を割譲しました。（※機能準備中）`;
+                        this.applyCastleCessionData(conditionData.castle.id, doer.clan, targetClanId);
+                        conditionMsg = `\n${conditionData.castle.name} を割譲しました。`;
                     }
 
                     msg = `${this.game.clans.find(c => c.id === targetClanId).name} に従属しました！${conditionMsg}`;
@@ -1030,7 +1031,7 @@ class DiplomacyManager {
             this.game.ui.log(aiMsg);
         }
     }
-
+    
     /**
      * 指定した大名家の支配・従属関係をクリアする魔法です
      */
@@ -1046,9 +1047,99 @@ class DiplomacyManager {
     }
 
     /**
+     * 従属により指定した拠点を割譲する処理
+     */
+    applyCastleCessionData(castleId, subordinateClanId, dominantClanId) {
+        const castleA = this.game.getCastle(castleId);
+        if (!castleA) return;
+
+        const myCastles = this.game.castles.filter(c => c.ownerClan === subordinateClanId && c.id !== castleId);
+        if (myCastles.length === 0) return;
+
+        const myLegionCastles = myCastles.filter(c => c.legionId === castleA.legionId);
+        const daimyo = this.game.bushos.find(b => b.clan === subordinateClanId && b.isDaimyo);
+        const isDaimyoInA = (daimyo && daimyo.castleId === castleId);
+        const commanderInA = this.game.bushos.find(b => b.castleId === castleId && b.isCommander && b.status === 'active');
+
+        let castleB = null;
+
+        if (isDaimyoInA) {
+            const directCastles = myCastles.filter(c => c.legionId === 0);
+            if (directCastles.length > 0) {
+                castleB = directCastles[0];
+            } else {
+                const noCommanderCastles = myCastles.filter(c => {
+                    const lord = this.game.getBusho(c.castellanId);
+                    return !(lord && lord.isCommander);
+                });
+                if (noCommanderCastles.length > 0) {
+                    castleB = noCommanderCastles[0];
+                } else {
+                    castleB = myCastles[0];
+                }
+            }
+        } else {
+            if (myLegionCastles.length > 0) {
+                castleB = myLegionCastles[0];
+            } else {
+                const directCastles = myCastles.filter(c => c.legionId === 0);
+                if (directCastles.length > 0) {
+                    castleB = directCastles[0];
+                } else if (daimyo && daimyo.castleId) {
+                    castleB = this.game.getCastle(daimyo.castleId);
+                } else {
+                    castleB = myCastles[0];
+                }
+            }
+        }
+
+        if (!castleB) castleB = myCastles[0];
+
+        const bushosInA = this.game.getCastleBushos(castleId).filter(b => b.clan === subordinateClanId && b.status === 'active');
+        const lordB = this.game.getBusho(castleB.castellanId);
+
+        if (isDaimyoInA && castleB.legionId !== 0 && lordB && lordB.isCommander) {
+            lordB.isCommander = false;
+            lordB.isCastellan = false;
+            const legion = this.game.legions.find(l => l.clanId === subordinateClanId && l.legionNo === castleB.legionId);
+            if (legion) {
+                this.game.castleManager.disbandLegion(legion.id);
+            }
+        }
+
+        let disbandedCommander = false;
+        if (commanderInA && myLegionCastles.length === 0) {
+            commanderInA.isCommander = false;
+            commanderInA.isCastellan = false;
+            const legion = this.game.legions.find(l => l.clanId === subordinateClanId && l.legionNo === castleA.legionId);
+            if (legion) {
+                this.game.castleManager.disbandLegion(legion.id);
+            }
+            disbandedCommander = true;
+        }
+
+        bushosInA.forEach(b => {
+            const wasCastellan = b.isCastellan;
+            b.isCastellan = false;
+
+            if (wasCastellan && b.isCommander && !disbandedCommander) {
+                if (lordB && lordB.isCommander) {
+                    // 移動先の拠点Bの城主が国主だった場合は、Aの城主身分は剥奪のまま
+                } else {
+                    if (lordB) lordB.isCastellan = false;
+                    b.isCastellan = true;
+                    castleB.castellanId = b.id;
+                }
+            }
+
+            this.game.affiliationSystem.moveCastle(b, castleB.id);
+        });
+
+        this.game.castleManager.changeOwner(castleA, dominantClanId, true);
+    }
+
+    /**
      * 従属・支配の際の条件交渉を行う魔法です
-     * subordinateClanId: 従属する側（条件を呑む側）
-     * dominantClanId: 支配する側（条件を出す側）
      */
     negotiateSubordinationConditions(subordinateClanId, dominantClanId, onSuccess, onFailure) {
         const subClan = this.game.clans.find(c => c.id === subordinateClanId);
