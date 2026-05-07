@@ -1927,32 +1927,81 @@ Object.assign(WarManager.prototype, {
         // ①大名処遇フェーズ：まずは大名がいるかチェックします
         const daimyoIndex = this.pendingPrisoners.findIndex(p => p.isDaimyo);
         if (daimyoIndex !== -1) {
-            this.game.ui.showDaimyoPrisonerModal(this.pendingPrisoners[daimyoIndex]);
+            this.showDaimyoDialog(this.pendingPrisoners[daimyoIndex]);
         } else {
             // 大名がいなければ登用フェーズへ進みます
             this.startHirePhaseIntro();
         }
     },
 
-    async handleDaimyoPrisonerAction(action) {
-        // 大名の画面を閉じてから処理を行います
-        this.game.ui.closeResultModal();
-        const index = this.pendingPrisoners.findIndex(p => p.isDaimyo);
+    showDaimyoDialog(prisoner) {
+        const clanData = this.game.clans.find(c => c.id === prisoner.clan);
+        const clanName = clanData ? clanData.name : "不明";
+        const msg = `＜${clanName}当主・${prisoner.name}を捕えました。処遇を決定してください。＞`;
+
+        let selectedAction = null;
+
+        // ダイアログを表示
+        this.game.ui.showDialog(msg, true, 
+            () => {
+                // 「はい」ボタンが押された時の処理（デフォルトは登用、解放ボタンからも裏で呼ばれます）
+                this.handleDaimyoPrisonerAction(prisoner, selectedAction || 'hire');
+            }, 
+            () => {
+                // 「いいえ」ボタンが押された時の処理（処断）
+                this.handleDaimyoPrisonerAction(prisoner, selectedAction || 'kill');
+            }
+        );
+
+        // ★魔法の裏技：ダイアログが出た直後にボタンを３つに書き換えます！
+        setTimeout(() => {
+            const buttons = Array.from(document.querySelectorAll('button'));
+            const yesBtn = buttons.find(b => b.textContent === 'はい');
+            const noBtn = buttons.find(b => b.textContent === 'いいえ');
+
+            if (yesBtn && noBtn) {
+                // 1つ目：登用ボタン（緑）
+                yesBtn.textContent = '登用';
+                yesBtn.classList.remove('btn-primary');
+                yesBtn.classList.add('btn-success'); 
+                yesBtn.addEventListener('click', () => { selectedAction = 'hire'; });
+
+                // 2つ目：処断ボタン（赤）
+                noBtn.textContent = '処断';
+                noBtn.classList.remove('btn-secondary', 'btn-primary');
+                noBtn.classList.add('btn-danger');
+                noBtn.addEventListener('click', () => { selectedAction = 'kill'; });
+
+                // 3つ目：解放ボタン（灰）を新しく作って追加
+                const releaseBtn = document.createElement('button');
+                releaseBtn.textContent = '解放';
+                releaseBtn.className = noBtn.className;
+                releaseBtn.classList.remove('btn-danger');
+                releaseBtn.classList.add('btn-secondary');
+                
+                releaseBtn.onclick = () => {
+                    selectedAction = 'release';
+                    yesBtn.click(); // 登用ボタンの動作を借りてダイアログを閉じます
+                };
+                noBtn.parentNode.appendChild(releaseBtn);
+            }
+        }, 10);
+    },
+
+    async handleDaimyoPrisonerAction(prisoner, action) {
+        const index = this.pendingPrisoners.findIndex(p => p.id === prisoner.id);
         if (index === -1) {
             this.startHirePhaseIntro();
             return;
         }
         
-        const prisoner = this.pendingPrisoners[index];
         const originalClanId = prisoner.clan;
         const friendlyCastles = this.game.castles.filter(c => c.ownerClan === originalClanId && originalClanId !== 0);
         const isExtinct = (friendlyCastles.length === 0);
         
-        // もう一度選び直す時の魔法
         const stayStep = () => {
-             this.game.ui.showDaimyoPrisonerModal(prisoner);
+             this.showDaimyoDialog(prisoner);
         };
-        // 大名の処遇が終わって次へ進む時の魔法
         const nextStep = async () => {
              this.pendingPrisoners.splice(index, 1);
              this.startHirePhaseIntro();
@@ -1963,9 +2012,11 @@ Object.assign(WarManager.prototype, {
             const recruiter = myBushos.find(b => b.isDaimyo) || myBushos[0];
             
             if (!isExtinct) {
+                // 所領が残っている時（確定失敗）
                 prisoner.hasRefusedHire = true;
-                this.game.ui.showDialog(`${prisoner.name}「敵の軍門には下らぬ！」`, false, stayStep);
+                this.game.ui.showDialog(`${prisoner.name}\n「敵の軍門には降らぬ！」`, false, stayStep);
             } else {
+                // 滅亡時の登用判定
                 let baseProb = ((recruiter.charm || 50) * 1.5) / ((prisoner.loyalty || 50) * 3);
                 let randomBonus = (Math.random() * 0.2) - 0.1;
                 const recruiterAffinity = recruiter.affinity || 0;
@@ -1980,7 +2031,7 @@ Object.assign(WarManager.prototype, {
                 hireProb = Math.max(0, Math.min(0.99, hireProb));
                 hireProb *= 0.5; // 大名は登用しにくくします
 
-                // ★追加：宿敵が登用先の大名家にいる場合は成功率を半分にします
+                // 宿敵が登用先の大名家にいる場合は成功率を半分にします
                 if (prisoner.nemesisIds && prisoner.nemesisIds.length > 0) {
                     const hasNemesis = prisoner.nemesisIds.some(nId => {
                         const nBusho = this.game.getBusho(nId);
@@ -1992,6 +2043,7 @@ Object.assign(WarManager.prototype, {
                 }
 
                 if (hireProb > Math.random()) {
+                    // 登用成功時
                     prisoner.isDaimyo = false;
                     this.daimyoHiredBonus = 0.5; 
                     prisoner.belongKunishuId = 0;
@@ -1999,17 +2051,24 @@ Object.assign(WarManager.prototype, {
                     if(targetC) { 
                         this.game.affiliationSystem.joinClan(prisoner, this.game.playerClanId, targetC.id);
                     }
-                    this.game.ui.showDialog(`${prisoner.name}は臣従を誓いました！`, false, nextStep);
+                    this.game.ui.showDialog(`${prisoner.name}\n「もはや趨勢は決したか……致し方あるまい」`, false, () => {
+                        this.game.ui.showDialog(`＜${prisoner.name}は当家に臣従を誓いました！＞`, false, nextStep);
+                    });
                 } else {
+                    // 登用失敗時
                     prisoner.hasRefusedHire = true;
-                    this.game.ui.showDialog(`${prisoner.name}「……煮るなり焼くなり好きにせい。」\n${prisoner.name}は拒否しました`, false, stayStep);
+                    this.game.ui.showDialog(`${prisoner.name}\n「断る。煮るなり焼くなり好きにせい。」`, false, stayStep);
                 }
             }
         } else if (action === 'kill') {
-            this.registerNemesisForExecuted(prisoner, this.game.playerClanId);
-            await this.game.lifeSystem.executeDeath(prisoner);
-            nextStep();
+            // 処断時
+            this.game.ui.showDialog(`${prisoner.name}\n「斯様な所で果てようとは……ぐふっ」`, false, async () => {
+                this.registerNemesisForExecuted(prisoner, this.game.playerClanId);
+                await this.game.lifeSystem.executeDeath(prisoner);
+                this.game.ui.showDialog(`＜${prisoner.name}を処断しました。＞`, false, nextStep);
+            });
         } else if (action === 'release') {
+            // 解放時
             if (isExtinct) prisoner.isDaimyo = false;
             
             if (!isExtinct) {
@@ -2021,7 +2080,9 @@ Object.assign(WarManager.prototype, {
             } else {
                 this.game.affiliationSystem.becomeRonin(prisoner);
             }
-            this.game.ui.showDialog(`${prisoner.name}を解放しました。`, false, nextStep);
+            this.game.ui.showDialog(`${prisoner.name}\n「生きて恥を晒せと申すか……」`, false, () => {
+                this.game.ui.showDialog(`＜${prisoner.name}を解放しました。＞`, false, nextStep);
+            });
         }
     },
 
