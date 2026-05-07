@@ -827,7 +827,7 @@ class DiplomacyManager {
             doer.achievementTotal += 5;
             this.game.factionSystem.updateRecognition(doer, 10);
 
-            this.game.ui.showResultModal(`${targetClan.name} に婚姻を断られました……\n使者は失意のまま帰還しました。`, () => {
+            this.game.ui.showResultModal(`${targetClan.name} との婚姻同盟の締結に失敗しました……`, () => {
                 this.game.ui.updatePanelHeader();
                 this.game.ui.renderCommandMenu();
                 this.game.ui.renderMap();
