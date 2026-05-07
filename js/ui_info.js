@@ -1030,14 +1030,30 @@ class UIInfoManager {
         const titleText = options.hideHire ? '姫の処遇' : '敵大名 捕縛！';
         const descText = options.hideHire ? `<strong>${prisoner.name}</strong>を捕らえました。<br>処遇を決めてください。` : `敵大名・<strong>${prisoner.name}</strong>を捕縛しました。<br>処遇を決めてください。`;
 
+        // ボタンの並びを姫と大名で切り替えます
+        let buttonsHtml = '';
+        if (options.hideHire) {
+            // 姫の場合：解放（灰）、据置（青）、処断（赤）の順番にします
+            buttonsHtml = `
+                <button class="btn-secondary" onclick="window.GameApp.warManager.handleDaimyoPrisonerAction('release')">解放</button>
+                <button class="btn-primary" onclick="window.GameApp.warManager.handleDaimyoPrisonerAction('keep')">据置</button>
+                <button class="btn-danger" onclick="window.GameApp.warManager.handleDaimyoPrisonerAction('kill')">処断</button>
+            `;
+        } else {
+            // 大名の場合：登用（青）、解放（灰）、処断（赤）
+            buttonsHtml = `
+                ${hireBtnHtml}
+                <button class="btn-secondary" onclick="window.GameApp.warManager.handleDaimyoPrisonerAction('release')">解放</button>
+                <button class="btn-danger" onclick="window.GameApp.warManager.handleDaimyoPrisonerAction('kill')">処断</button>
+            `;
+        }
+
         const content = `
             <div style="text-align:center; padding: 10px;">
                 <h3 style="margin-top:0;">${titleText}</h3>
                 <p style="font-size:1.1rem;">${descText}</p>
                 <div style="margin-top:20px; display:flex; justify-content:center; gap:10px;">
-                    ${hireBtnHtml}
-                    <button class="btn-secondary" onclick="window.GameApp.warManager.handleDaimyoPrisonerAction('release')">解放</button>
-                    <button class="btn-danger" onclick="window.GameApp.warManager.handleDaimyoPrisonerAction('kill')">処断</button>
+                    ${buttonsHtml}
                 </div>
             </div>
         `;
