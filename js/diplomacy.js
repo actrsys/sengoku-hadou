@@ -750,39 +750,71 @@ class DiplomacyManager {
                 }
 
                 const p = result.atMercyPrincesses[index];
-                const isCapturedByPlayer = (p.currentClanId === this.game.playerClanId);
+                
+                // 姫の出身地を調べます
+                let father = p.fatherId ? this.game.getBusho(p.fatherId) : null;
+                let originClan = p.originalClanId !== undefined ? p.originalClanId : (father ? father.clan : null);
 
-                if (isCapturedByPlayer) {
-                    // プレイヤーが捕まえている場合、大名処遇の画面を「登用なし」で出します
-                    // 第２引数に { hideHire: true } を渡して、ui.js側でボタンを隠すようにお願いします
-                    this.game.ui.showDaimyoPrisonerModal(p, { hideHire: true });
-                    
-                    // ui.jsからの「解放」や「処断」の結果を待つようにします
-                    // ※ ここでは handleDaimyoPrisonerAction が次を呼ぶように作られている前提です
-                    // 次の姫の処理は、画面が閉じられた時に呼ばれるようにイベントをセットします
-                    const originalAction = this.game.warManager.handleDaimyoPrisonerAction;
-                    this.game.warManager.handleDaimyoPrisonerAction = async (action) => {
-                        // 姫が解放（離縁）された時の特別な処理です
-                        if (action === 'release') {
-                            p.status = 'unmarried'; // 未婚に戻します
-                            p.currentClanId = p.originalClanId; // 実家に帰します
-                            // 旦那様の奥様リストから消します
-                            const husband = this.game.getBusho(p.husbandId);
-                            if (husband && husband.wifeIds) husband.wifeIds = husband.wifeIds.filter(id => id !== p.id);
-                            p.husbandId = 0;
-                        }
-                        // 元の処理を実行します（処断などは元々入っているので）
-                        await originalAction.call(this.game.warManager, action);
-                        // 魔法を元に戻して、次の姫へ進みます
-                        this.game.warManager.handleDaimyoPrisonerAction = originalAction;
-                        processPrincesses(index + 1);
-                    };
-                } else {
-                    // AIが捕まえている場合、今はとりあえず離縁して生かしておきます
-                    p.status = 'unmarried';
+                const isBreakerPrincessInTarget = (originClan === doer.clan && p.currentClanId === targetClanId);
+                const isTargetPrincessInBreaker = (originClan === targetClanId && p.currentClanId === doer.clan);
+
+                const targetClanObj = this.game.clans.find(c => c.id === targetClanId);
+                const doerClanObj = this.game.clans.find(c => c.id === doer.clan);
+                const targetClanName = targetClanObj ? targetClanObj.name : "他勢力";
+                const doerClanName = doerClanObj ? doerClanObj.name : "他勢力";
+
+                // 旦那様の奥様リストから消すための共通の魔法
+                const removeWife = () => {
                     const husband = this.game.getBusho(p.husbandId);
                     if (husband && husband.wifeIds) husband.wifeIds = husband.wifeIds.filter(id => id !== p.id);
                     p.husbandId = 0;
+                };
+
+                if (isBreakerPrincessInTarget) {
+                    // 破棄した側の姫は、怒った相手によって処断されます
+                    p.status = 'dead';
+                    removeWife();
+                    p.currentClanId = 0;
+
+                    if (isPlayerInvolved) {
+                        let msg = "";
+                        if (doer.clan === this.game.playerClanId) {
+                            msg = `関係破棄の報復として、${targetClanName}に嫁いでいた ${p.name} は処断されました……`;
+                        } else {
+                            msg = `関係破棄の報復として、当家に嫁いできていた ${p.name} を処断しました。`;
+                        }
+                        this.game.ui.log(`${p.name} が処断されました`);
+                        this.game.ui.showDialog(msg, false, () => {
+                            processPrincesses(index + 1);
+                        });
+                    } else {
+                        processPrincesses(index + 1);
+                    }
+                } else if (isTargetPrincessInBreaker) {
+                    // 破棄された側の姫は、破棄した側によって実家に送り返されます（離縁）
+                    p.status = 'unmarried';
+                    removeWife();
+                    p.currentClanId = p.originalClanId; // 実家に帰します
+
+                    if (isPlayerInvolved) {
+                        let msg = "";
+                        if (doer.clan === this.game.playerClanId) {
+                            msg = `関係破棄に伴い、当家に嫁いできていた ${p.name} を離縁し、${targetClanName}へ送り返しました。`;
+                        } else {
+                            msg = `関係破棄に伴い、${doerClanName}に嫁いでいた ${p.name} は離縁され、当家へ送り返されてきました。`;
+                        }
+                        this.game.ui.log(`${p.name} が実家へ送り返されました`);
+                        this.game.ui.showDialog(msg, false, () => {
+                            processPrincesses(index + 1);
+                        });
+                    } else {
+                        processPrincesses(index + 1);
+                    }
+                } else {
+                    // どちらでもない場合（通常はありえませんが安全のため）
+                    p.status = 'unmarried';
+                    removeWife();
+                    p.currentClanId = p.originalClanId;
                     processPrincesses(index + 1);
                 }
             };
