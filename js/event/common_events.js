@@ -1220,3 +1220,189 @@ window.GameEvents.push({
         }
     }
 });
+
+// ==========================================
+// ★ AI勢力からの臣従申し出イベント（月初処理後）
+// ==========================================
+window.GameEvents.push({
+    id: "ai_vassalage_offer_monthly",
+    timing: "startMonth_after",
+    isOneTime: false,
+    
+    checkCondition: function(game) {
+        return true; 
+    },
+    
+    execute: async function(game) {
+        if (!game.ui) return;
+
+        const playerClanId = game.playerClanId;
+        const playerClan = game.clans.find(c => c.id === playerClanId);
+        const playerDaimyo = game.bushos.find(b => b.clan === playerClanId && b.isDaimyo);
+        if (!playerClan || !playerDaimyo) return;
+
+        let vassalageOfferClan = null;
+        let envoy = null;
+        let aiDaimyo = null;
+
+        // すべての大名家の中から、条件を満たす勢力を順番に探していきます
+        for (const clan of game.clans) {
+            // 空き城データやプレイヤー自身の勢力は飛ばします
+            if (clan.id === 0 || clan.id === playerClanId) continue;
+
+            const diplomacyData = game.diplomacyManager.getDiplomacyData(clan.id, playerClanId);
+            // プレイヤーに「従属」していない場合は飛ばします
+            if (!diplomacyData || diplomacyData.status !== '従属') continue;
+
+            // 従属・支配期間のカウントが24未満なら飛ばします
+            if (diplomacyData.subordinateMonths < 24) continue;
+            // プレイヤーとの関係値が100じゃないなら飛ばします
+            if (diplomacyData.sentiment !== 100) continue;
+
+            // プレイヤーの威信が相手の威信の12倍未満なら飛ばします
+            if (playerClan.daimyoPrestige < clan.daimyoPrestige * 12) continue;
+
+            // 複数の勢力に従属していないか（八方美人じゃないか）をチェックします
+            let subordinateCount = 0;
+            if (clan.diplomacyValue) {
+                Object.values(clan.diplomacyValue).forEach(d => {
+                    if (d.status === '従属') subordinateCount++;
+                });
+            }
+            if (subordinateCount > 1) continue;
+
+            const tempAiDaimyo = game.bushos.find(b => b.clan === clan.id && b.isDaimyo);
+            if (!tempAiDaimyo) continue;
+
+            // 大名同士の相性のズレを計算します（0〜50の数字になります）
+            let affDiff = 25;
+            if (typeof GameSystem !== 'undefined' && GameSystem.calcAffinityDiff) {
+                affDiff = GameSystem.calcAffinityDiff(playerDaimyo.affinity, tempAiDaimyo.affinity);
+            } else {
+                const diff = Math.abs(playerDaimyo.affinity - tempAiDaimyo.affinity);
+                affDiff = Math.min(diff, 100 - diff);
+            }
+
+            // 確率の計算です（相性差50で0%、0で2%になります）
+            let prob = 2.0 * (1.0 - (affDiff / 50));
+            // さらに、従属期間が長いほど確率をアップさせます（最大3%まで）
+            prob += Math.min(3.0, Math.max(0, diplomacyData.subordinateMonths - 24) * 0.03);
+
+            // サイコロを振って当たった場合、臣従イベントの対象に決定します！
+            if (Math.random() * 100 < prob) {
+                vassalageOfferClan = clan;
+                aiDaimyo = tempAiDaimyo;
+                break; // １度にいくつも来ると大変なので、１か月に１勢力までとします
+            }
+        }
+
+        // 条件を満たす勢力がいなかったら、ここで魔法は終了です
+        if (!vassalageOfferClan) return;
+
+        // 使者役として、対象勢力の武将の中から一番「外交」の能力が高い人を選びます
+        const envoys = game.bushos.filter(b => b.clan === vassalageOfferClan.id && b.status === 'active' && !b.isDaimyo).sort((a,b) => b.diplomacy - a.diplomacy);
+        // もし他に武将がいなければ、仕方ないので大名自身にお使いに行ってもらいます
+        envoy = envoys.length > 0 ? envoys[0] : aiDaimyo;
+
+        // メッセージでお見せするための名前を綺麗に整えます（「織田|信長」の「|」を消す魔法です）
+        const envoyName = envoy.name.replace(/\|/g, '');
+        const playerDaimyoName = playerDaimyo.name.replace(/\|/g, '');
+        const aiClanName = vassalageOfferClan.name;
+        const aiDaimyoName = aiDaimyo.name.replace(/\|/g, '');
+        // 下の名前がわかれば下の名前を、わからなければフルネームを使います
+        const aiDaimyoGivenName = aiDaimyo.givenName ? aiDaimyo.givenName : aiDaimyoName;
+
+        // ダイアログを出す前に、音を鳴らしてバリアを張る魔法を呼びます！
+        if (window.playEventSoundAndBlock) window.playEventSoundAndBlock();
+        
+        await game.ui.showDialogAsync(`${aiClanName}より御使者が参っております。`, false, 0);
+
+        await game.ui.showDialogAsync(`「此度は${aiClanName}当主・${aiDaimyoName}の名代として罷り越しました。急な訪問、平にご容赦くだされ」`, false, 0, {
+            leftFace: envoy.faceIcon, leftName: envoyName
+        });
+
+        await game.ui.showDialogAsync(`「うむ。して、御用向きはいかに？」`, false, 0, {
+            leftFace: playerDaimyo.faceIcon, leftName: playerDaimyoName
+        });
+
+        await game.ui.showDialogAsync(`「はっ……どうか我らを${playerClan.name}の末席にお加えいただきたく存じます」`, false, 0, {
+            leftFace: envoy.faceIcon, leftName: envoyName
+        });
+
+        await game.ui.showDialogAsync(`「なんと、家臣になりたいと申されるか」`, false, 0, {
+            leftFace: playerDaimyo.faceIcon, leftName: playerDaimyoName
+        });
+
+        // プレイヤーに決断してもらいます！
+        const isAccepted = await new Promise(resolve => {
+            game.ui.showDialog(`${aiClanName}を家臣に加えますか？`, true, 
+                () => resolve(true),
+                () => resolve(false),
+                { okText: '家臣にする', okClass: 'btn-primary', cancelText: '断る' }
+            );
+        });
+
+        if (isAccepted) {
+            // 家臣にすることを承諾した時のお返事です
+            await game.ui.showDialogAsync(`「よくぞご決心なされた。今後はその力、${playerClan.name}にて存分に振るわれよ」`, false, 0, {
+                leftFace: playerDaimyo.faceIcon, leftName: playerDaimyoName
+            });
+            await game.ui.showDialogAsync(`「ははっ！　ありがたき幸せに存じまする！　何なりとお申し付けくださりませ」`, false, 0, {
+                leftFace: envoy.faceIcon, leftName: envoyName
+            });
+
+            await game.ui.showDialogAsync(`${aiClanName} が ${playerClan.name} に臣従しました！`, false, 0);
+
+            // ここから、相手の勢力を自分の勢力に吸収する魔法（臣従の処理）を行います
+            const myClanId = vassalageOfferClan.id; // 吸収される側（AI）
+            const targetClanId = playerClanId;      // 吸収する側（プレイヤー）
+
+            // 1. AI側の軍団をすべて解散させます（お片付け）
+            if (game.legions) {
+                const myLegions = game.legions.filter(l => Number(l.clanId) === Number(myClanId));
+                myLegions.forEach(l => {
+                    if (game.castleManager && game.castleManager.disbandLegion) {
+                        game.castleManager.disbandLegion(l.id);
+                    }
+                });
+            }
+
+            // 2. AI側のお城をすべてプレイヤーの大名家にプレゼントして、直轄（0）にします
+            const myCastles = game.castles.filter(c => Number(c.ownerClan) === Number(myClanId));
+            myCastles.forEach(c => {
+                if (game.castleManager && game.castleManager.changeOwner) {
+                    game.castleManager.changeOwner(c, targetClanId, true, 0);
+                }
+            });
+
+            // 3. AI側の武将のバッジ（身分）を外し、プレイヤーの大名家に入れます
+            const myBushos = game.bushos.filter(b => Number(b.clan) === Number(myClanId));
+            myBushos.forEach(b => {
+                b.isDaimyo = false;
+                b.isCommander = false;
+                b.isGunshi = false;
+                
+                b.clan = targetClanId;
+                
+                // 人事部（お引越しセンター）にお願いして、新しい殿様との相性で忠誠度を再計算します！
+                if (game.affiliationSystem && game.affiliationSystem.updateLoyaltyForNewLord) {
+                    game.affiliationSystem.updateLoyaltyForNewLord(b, targetClanId);
+                }
+            });
+
+            // 最後に、新しい大名家の情報に合わせて画面を綺麗に描き直します
+            if (game.ui.updatePanelHeader) game.ui.updatePanelHeader();
+            if (game.ui.renderCommandMenu) game.ui.renderCommandMenu();
+            if (game.ui.renderMap) game.ui.renderMap();
+
+        } else {
+            // 家臣にすることを断った時のお返事です
+            await game.ui.showDialogAsync(`「すまぬが、他家を取り込むつもりはない。これまで通り当家を支えていただききたく存ずる」`, false, 0, {
+                leftFace: playerDaimyo.faceIcon, leftName: playerDaimyoName
+            });
+            await game.ui.showDialogAsync(`「……承知仕った。${aiDaimyoGivenName}様にはそのようにお伝えし申す」`, false, 0, {
+                leftFace: envoy.faceIcon, leftName: envoyName
+            });
+        }
+    }
+});
