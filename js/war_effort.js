@@ -1935,9 +1935,17 @@ Object.assign(WarManager.prototype, {
     },
 
     showDaimyoDialog(prisoner) {
+        // ★追加：登用のチャレンジ回数を数える箱を用意します。まだなければ0にします。
+        prisoner.hireChallengeCount = prisoner.hireChallengeCount || 0;
+        // ★追加：3回以上チャレンジしていたら「押せない状態」にするフラグを作ります。
+        const isHireDisabled = prisoner.hireChallengeCount >= 3;
+
         const clanData = this.game.clans.find(c => c.id === prisoner.clan);
         const clanName = clanData ? clanData.name : "不明";
-        const msg = `＜${clanName}当主・${prisoner.name}を捕えました。処遇を決定してください。＞`;
+        
+        // ★変更：何回チャレンジしたか分かるように、残り回数をメッセージに追加します。
+        const remainCount = 3 - prisoner.hireChallengeCount;
+        const msg = `${clanName}当主・${prisoner.name}を捕えました。処遇を決定してください。`;
 
         // 共通化されたUIの選択肢機能を使って3つのボタンを並べます
         this.game.ui.showDialog(msg, false, null, null, {
@@ -1945,6 +1953,7 @@ Object.assign(WarManager.prototype, {
                 {
                     label: '登用',
                     className: 'btn-primary',
+                    disabled: isHireDisabled, // ★追加：ここで押せないボタンにする魔法をかけます！
                     onClick: () => this.handleDaimyoPrisonerAction(prisoner, 'hire')
                 },
                 {
@@ -1981,6 +1990,9 @@ Object.assign(WarManager.prototype, {
         };
 
         if (action === 'hire') {
+            // ★追加：登用を選んだので、チャレンジ回数を1回増やします！
+            prisoner.hireChallengeCount = (prisoner.hireChallengeCount || 0) + 1;
+
             const myBushos = this.game.bushos.filter(b=>b.clan===this.game.playerClanId && b.status !== 'unborn');
             const recruiter = myBushos.find(b => b.isDaimyo) || myBushos[0];
             
@@ -2025,7 +2037,7 @@ Object.assign(WarManager.prototype, {
                         this.game.affiliationSystem.joinClan(prisoner, this.game.playerClanId, targetC.id);
                     }
                     this.game.ui.showDialog(`${prisoner.name}\n「もはや趨勢は決したか……致し方あるまい」`, false, () => {
-                        this.game.ui.showDialog(`＜${prisoner.name}は当家に臣従を誓いました！＞`, false, nextStep);
+                        this.game.ui.showDialog(`${prisoner.name}は当家に臣従を誓いました！`, false, nextStep);
                     });
                 } else {
                     // 登用失敗時
@@ -2038,7 +2050,7 @@ Object.assign(WarManager.prototype, {
             this.game.ui.showDialog(`${prisoner.name}\n「斯様な所で果てようとは……ぐふっ」`, false, async () => {
                 this.registerNemesisForExecuted(prisoner, this.game.playerClanId);
                 await this.game.lifeSystem.executeDeath(prisoner);
-                this.game.ui.showDialog(`＜${prisoner.name}を処断しました。＞`, false, nextStep);
+                this.game.ui.showDialog(`${prisoner.name}を処断しました。`, false, nextStep);
             });
         } else if (action === 'release') {
             // 解放時
@@ -2054,7 +2066,7 @@ Object.assign(WarManager.prototype, {
                 this.game.affiliationSystem.becomeRonin(prisoner);
             }
             this.game.ui.showDialog(`${prisoner.name}\n「生きて恥を晒せと申すか……」`, false, () => {
-                this.game.ui.showDialog(`＜${prisoner.name}を解放しました。＞`, false, nextStep);
+                this.game.ui.showDialog(`${prisoner.name}を解放しました。`, false, nextStep);
             });
         }
     },
