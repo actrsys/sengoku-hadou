@@ -99,8 +99,8 @@ class UIManager {
                 // ウインドウの外側（黒い背景）を押したか確認します
                 if (e.target === dialogModal) {
                     const cancelBtn = document.getElementById('dialog-btn-cancel');
-                    // キャンセルボタンが隠れている（＝選択肢がない単なるメッセージの）時だけ閉じます
-                    if (cancelBtn && cancelBtn.classList.contains('hidden')) {
+                    // キャンセルボタンが無い、または隠れている（＝選択肢がない単なるメッセージの）時だけ閉じます
+                    if (!cancelBtn || cancelBtn.classList.contains('hidden')) {
                         const okBtn = document.getElementById('dialog-btn-ok');
                         if (okBtn) {
                             // イベント中の場合は選択音、そうでない場合はキャンセル音を鳴らします
@@ -592,8 +592,10 @@ class UIManager {
         const leftNameEl = document.getElementById('dialog-left-name');
         const rightFaceEl = document.getElementById('dialog-right-face');
         const rightNameEl = document.getElementById('dialog-right-name');
-        const okBtn = document.getElementById('dialog-btn-ok');
-        const cancelBtn = document.getElementById('dialog-btn-cancel');
+        
+        // ★修正：okBtnが消えてしまっていてもエラーにならないように安全に探します！
+        let okBtn = document.getElementById('dialog-btn-ok');
+        let cancelBtn = document.getElementById('dialog-btn-cancel');
 
         this.hideAIGuardTemporarily();
 
@@ -700,7 +702,14 @@ class UIManager {
             executeNext();
         };
 
-        const footer = okBtn.parentElement;
+        // ★修正：okBtnが見つからなくても、安全にフッター（ボタンの置き場）を見つける魔法です！
+        let footer = null;
+        if (okBtn) {
+            footer = okBtn.parentElement;
+        } else {
+            footer = modal.querySelector('.modal-footer');
+        }
+
         const choicesContainer = document.getElementById('dialog-choices-container');
         const modalContent = modal.querySelector('.modal-content');
 
@@ -713,7 +722,7 @@ class UIManager {
         }
 
         // --- 根本改修：フッターのボタンを動的に生成し、何個でも並べられるようにします ---
-        footer.innerHTML = ''; 
+        if (footer) footer.innerHTML = ''; 
         if (choicesContainer) choicesContainer.classList.add('hidden');
 
         // イベントモード専用のクリック操作
@@ -741,29 +750,34 @@ class UIManager {
             } else {
                 modal.classList.remove('event-dialog-modal');
             }
-            footer.classList.remove('hidden');
-            footer.style.justifyContent = 'center';
+            if (footer) {
+                footer.classList.remove('hidden');
+                footer.style.justifyContent = 'center';
 
-            dialog.customOpts.choices.forEach(choice => {
-                const btn = document.createElement('button');
-                // 3色ボタン（btn-primary, btn-danger, btn-secondary）を適用できるようにします
-                btn.className = choice.className || 'btn-secondary';
-                btn.textContent = choice.label;
-                btn.onclick = (e) => {
-                    e.stopPropagation();
-                    if (window.AudioManager) {
-                        if (choice.label === "戻る" || choice.label === "いいえ") window.AudioManager.playSE('cancel.ogg');
-                        else window.AudioManager.playSE('decision.ogg');
-                    }
-                    modal.classList.remove('event-choices-active');
-                    cleanupAndNext(choice.onClick);
-                };
-                footer.appendChild(btn);
-            });
+                dialog.customOpts.choices.forEach((choice, index) => {
+                    const btn = document.createElement('button');
+                    // ★追加：最初の選択肢を「okBtn」として扱えるようにお名前シールを貼ります
+                    if (index === 0) btn.id = 'dialog-btn-ok';
+
+                    // 3色ボタン（btn-primary, btn-danger, btn-secondary）を適用できるようにします
+                    btn.className = choice.className || 'btn-secondary';
+                    btn.textContent = choice.label;
+                    btn.onclick = (e) => {
+                        e.stopPropagation();
+                        if (window.AudioManager) {
+                            if (choice.label === "戻る" || choice.label === "いいえ") window.AudioManager.playSE('cancel.ogg');
+                            else window.AudioManager.playSE('decision.ogg');
+                        }
+                        modal.classList.remove('event-choices-active');
+                        cleanupAndNext(choice.onClick);
+                    };
+                    footer.appendChild(btn);
+                });
+            }
         } else if (isEventMode) {
             // 選択肢のないイベント：フッターを隠して画面クリックで進行
             modal.classList.add('event-dialog-modal');
-            footer.classList.add('hidden');
+            if (footer) footer.classList.add('hidden');
             if (modalContent) {
                 modalContent.style.cursor = 'pointer';
                 modalContent.addEventListener('click', this._currentEventClickHandler);
@@ -771,27 +785,32 @@ class UIManager {
         } else {
             // 通常のダイアログ：はい/いいえ、または閉じる
             modal.classList.remove('event-dialog-modal');
-            footer.classList.remove('hidden');
-            footer.style.justifyContent = 'center';
+            if (footer) {
+                footer.classList.remove('hidden');
+                footer.style.justifyContent = 'center';
 
-            if (dialog.isConfirm) {
-                const okB = document.createElement('button');
-                okB.className = dialog.customOpts?.okClass || 'btn-primary';
-                okB.textContent = dialog.customOpts?.okText || 'はい';
-                okB.onclick = () => cleanupAndNext(dialog.onOk);
-                footer.appendChild(okB);
+                if (dialog.isConfirm) {
+                    const okB = document.createElement('button');
+                    okB.id = 'dialog-btn-ok'; // ★追加：次回のためにお名前シールを貼っておきます
+                    okB.className = dialog.customOpts?.okClass || 'btn-primary';
+                    okB.textContent = dialog.customOpts?.okText || 'はい';
+                    okB.onclick = () => cleanupAndNext(dialog.onOk);
+                    footer.appendChild(okB);
 
-                const canB = document.createElement('button');
-                canB.className = dialog.customOpts?.cancelClass || 'btn-secondary';
-                canB.textContent = dialog.customOpts?.cancelText || 'いいえ';
-                canB.onclick = () => cleanupAndNext(dialog.onCancel);
-                footer.appendChild(canB);
-            } else {
-                const closeB = document.createElement('button');
-                closeB.className = dialog.customOpts?.okClass || 'btn-secondary';
-                closeB.textContent = dialog.customOpts?.okText || '閉じる';
-                closeB.onclick = () => cleanupAndNext(dialog.onOk);
-                footer.appendChild(closeB);
+                    const canB = document.createElement('button');
+                    canB.id = 'dialog-btn-cancel'; // ★追加：次回のためにお名前シールを貼っておきます
+                    canB.className = dialog.customOpts?.cancelClass || 'btn-secondary';
+                    canB.textContent = dialog.customOpts?.cancelText || 'いいえ';
+                    canB.onclick = () => cleanupAndNext(dialog.onCancel);
+                    footer.appendChild(canB);
+                } else {
+                    const closeB = document.createElement('button');
+                    closeB.id = 'dialog-btn-ok'; // ★追加：単なるメッセージでも「okBtn」として扱います
+                    closeB.className = dialog.customOpts?.okClass || 'btn-secondary';
+                    closeB.textContent = dialog.customOpts?.okText || '閉じる';
+                    closeB.onclick = () => cleanupAndNext(dialog.onOk);
+                    footer.appendChild(closeB);
+                }
             }
         }
 
@@ -800,7 +819,9 @@ class UIManager {
         if (dialog.autoCloseTime > 0) {
             autoCloseTimer = setTimeout(() => {
                 if (!modal.classList.contains('hidden')) {
-                    okBtn.click();
+                    // ★修正：今の画面にある本物のokBtnを探して押します
+                    const currentOkBtn = document.getElementById('dialog-btn-ok');
+                    if (currentOkBtn) currentOkBtn.click();
                 }
             }, dialog.autoCloseTime);
         }
