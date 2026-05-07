@@ -766,7 +766,7 @@ class DiplomacyManager {
                     const pOriginClanName = pOriginClan ? pOriginClan.name : "他勢力";
                     
                     this.game.ui.showDialog(
-                        `＜${pOriginClanName}から嫁いできた${p.name}の処遇を決定してください。＞`,
+                        `${pOriginClanName}から嫁いできた${p.name}の処遇を決定してください。`,
                         false,
                         null,
                         null,
@@ -800,7 +800,7 @@ class DiplomacyManager {
                                             () => {
                                                 // ② ナレーション：顔グラなし
                                                 this.game.ui.showDialog(
-                                                    `＜${p.name}を処断しました。＞`,
+                                                    `${p.name}を処断しました。`,
                                                     false,
                                                     () => {
                                                         p.status = 'dead';
@@ -828,7 +828,7 @@ class DiplomacyManager {
                                             () => {
                                                 // ② ナレーション：顔グラなし
                                                 this.game.ui.showDialog(
-                                                    `＜${p.name}を親元へと送り返しました。＞`,
+                                                    `${p.name}を親元へと送り返しました。`,
                                                     false,
                                                     () => {
                                                         p.status = 'unmarried';
