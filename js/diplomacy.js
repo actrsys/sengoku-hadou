@@ -900,6 +900,7 @@ class DiplomacyManager {
                 if (doer.clan === this.game.playerClanId) {
                     this.game.ui.updatePanelHeader();
                     this.game.ui.renderCommandMenu();
+                    this.game.ui.renderMap();
                 }
                 this.game.ui.showResultModal(msg, () => {
                     processPrincesses(0); // 最初の姫からスタート！
@@ -953,6 +954,7 @@ class DiplomacyManager {
                         if (doer.clan === this.game.playerClanId) {
                             this.game.ui.updatePanelHeader();
                             this.game.ui.renderCommandMenu();
+                            this.game.ui.renderMap();
                         }
                     }
                 },
@@ -1025,6 +1027,7 @@ class DiplomacyManager {
             if (doer.clan === this.game.playerClanId) {
                 this.game.ui.updatePanelHeader();
                 this.game.ui.renderCommandMenu();
+                this.game.ui.renderMap();
             }
         } else if (aiMsg !== "") {
             this.game.ui.showDialog(aiMsg, false);
@@ -1163,6 +1166,11 @@ class DiplomacyManager {
 
             this.game.affiliationSystem.moveCastle(b, castleB.id);
         });
+
+        if (castleA.soldiers < 1500) castleA.soldiers = 1500;
+        if (castleA.rice < 2500) castleA.rice = 2500;
+        if (castleA.defense < 200) castleA.defense = Math.min(200, castleA.maxDefense || 9999);
+        if (castleA.peoplesLoyalty < 51) castleA.peoplesLoyalty = 51;
 
         this.game.castleManager.changeOwner(castleA, dominantClanId, true);
     }
