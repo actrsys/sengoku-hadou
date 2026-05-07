@@ -1503,8 +1503,6 @@ class UIInfoManager {
 
     confirmPrincessSelection(targetCastleId, doerId) {
         if (!this.selectedPrincessId) return;
-
-        if (window.AudioManager) window.AudioManager.playSE('choice.ogg');
         
         this.closeCommonModal(); 
         
