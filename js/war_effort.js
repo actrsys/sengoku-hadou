@@ -1943,8 +1943,6 @@ Object.assign(WarManager.prototype, {
         const clanData = this.game.clans.find(c => c.id === prisoner.clan);
         const clanName = clanData ? clanData.name : "不明";
         
-        // ★変更：何回チャレンジしたか分かるように、残り回数をメッセージに追加します。
-        const remainCount = 3 - prisoner.hireChallengeCount;
         const msg = `${clanName}当主・${prisoner.name}を捕えました。処遇を決定してください。`;
 
         // 共通化されたUIの選択肢機能を使って3つのボタンを並べます

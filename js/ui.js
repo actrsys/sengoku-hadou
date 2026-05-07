@@ -762,6 +762,13 @@ class UIManager {
                     // 3色ボタン（btn-primary, btn-danger, btn-secondary）を適用できるようにします
                     btn.className = choice.className || 'btn-secondary';
                     btn.textContent = choice.label;
+                    
+                    // ★追加：ボタンを押せない状態（disabled）にする指示を読み取ります！
+                    if (choice.disabled) {
+                        btn.disabled = true;
+                        btn.classList.add('disabled'); // 見た目もグレーアウトさせます
+                    }
+
                     btn.onclick = (e) => {
                         e.stopPropagation();
                         if (window.AudioManager) {
