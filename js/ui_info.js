@@ -664,7 +664,7 @@ class UIInfoManager {
 
         const castle = this.game.getCastle(busho.castleId);
         const castleName = castle ? castle.name : "不明";
-        const age = busho.isAutoLeader ? "" : (this.game.year - busho.birthYear);
+        const age = busho.isAutoLeader ? "" : (this.game.year - busho.birthYear + 1);
         const ageStr = busho.isAutoLeader ? age : `${age}歳`;
 
         let rankName = "";
@@ -1420,7 +1420,7 @@ class UIInfoManager {
         }
 
         const items = princesses.map(p => {
-            const age = this.game.year - p.birthYear;
+            const age = this.game.year - p.birthYear + 1;
             const father = this.game.getBusho(p.fatherId);
             const husband = this.game.getBusho(p.husbandId);
             
@@ -2689,7 +2689,7 @@ class UIInfoManager {
                     }
                 }
                 const bCastleName = bCastle ? bCastle.name : "";
-                const age = b.isAutoLeader ? "" : (this.game.year - b.birthYear);
+                const age = b.isAutoLeader ? "" : (this.game.year - b.birthYear + 1);
                 let salary = "";
                 if (b.clan > 0 && !b.isDaimyo && b.status !== 'ronin') {
                     const clan = this.game.clans.find(c => c.id === b.clan);
