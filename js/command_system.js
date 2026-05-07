@@ -2359,7 +2359,7 @@ class CommandSystem {
             case 'subordinate': return "従属嘆願を行う相手を選択してください";
             case 'kunishu_goodwill': return "親善を行う諸勢力がいる城を選択してください";
             case 'kunishu_incorporate': return "取込を行う諸勢力がいる城を選択してください";
-            case 'break_alliance': return "関係を破棄する相手を選択してください";
+            case 'break_alliance': return "断交する相手を選択してください";
             case 'court_truce': return "朝廷を介して和睦を行う相手を選択してください";
             case 'marriage': return "婚姻同盟を行う相手を選択してください";
             case 'atk_self_reinforcement': return "援軍を出陣させる城を選択してください";
