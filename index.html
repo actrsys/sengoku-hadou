@@ -610,13 +610,6 @@
                 canvasH = minMobileWidth / targetRatio;
                 scale = finalW / minMobileWidth;
             }
-
-            // ★ 小数点や奇数ピクセルの計算誤差による「隙間から地図が透ける現象」を根本から防ぐ魔法
-            // サイズを必ず「偶数の整数」に丸め込むことで、画面の中央配置（-50%）をピッタリ合わせます
-            canvasW = Math.ceil(canvasW);
-            canvasH = Math.ceil(canvasH);
-            if (canvasW % 2 !== 0) canvasW++;
-            if (canvasH % 2 !== 0) canvasH++;
             
             // 計算したサイズと縮小率を割り当てます
             screen.style.width = canvasW + 'px';
