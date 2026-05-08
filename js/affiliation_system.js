@@ -109,7 +109,7 @@ class AffiliationSystem {
         if (oldClanId !== 0 && !isClanDestroyed) {
             const daimyo = this.game.bushos.find(b => b.clan === oldClanId && b.isDaimyo);
             if (daimyo && busho.id !== daimyo.id && !busho.nemesisIds.includes(daimyo.id)) {
-                const nemesisCount = (reason === 'banish') ? 120 : 60;
+                const nemesisCount = (reason === 'banish') ? 180 : 60;
                 busho.nemesisList.push({ id: daimyo.id, count: nemesisCount });
                 busho.nemesisIds.push(daimyo.id);
             }
