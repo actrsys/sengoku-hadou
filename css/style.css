@@ -305,12 +305,12 @@ body:not(.is-pc) .status-marks-carousel .status-mark.fade-in {
    メインマップ・城関連
    ========================================================= */
 #map-wrapper { flex: 1; position: relative; background-color: #81c784; overflow: hidden; display: flex; justify-content: center; align-items: center; touch-action: none; }
-#map-scroll-container { width: 100%; height: 100%; overflow: auto; display: flex; flex-direction: column; padding: 0; box-sizing: border-box; -webkit-overflow-scrolling: touch; overscroll-behavior: none; -ms-overflow-style: none; scrollbar-width: none; }
+#map-scroll-container { width: 100%; height: 100%; overflow: auto; display: flex; flex-direction: column; padding: 0; box-sizing: border-box; -webkit-overflow-scrolling: touch; overscroll-behavior: none; -ms-overflow-style: none; scrollbar-width: none; will-change: scroll-position; }
 #map-scroll-container::-webkit-scrollbar { display: none; }
 #map-scroll-container.grab { cursor: grab; }
 #map-scroll-container.grabbing { cursor: grabbing; }
 
-#map-container { position: relative; background-image: url('../data/images/map/japan_map.png'); background-size: 100% 100%; background-repeat: no-repeat; transform-origin: 0 0; margin: 0; flex: none; }
+#map-container { position: relative; background-image: url('../data/images/map/japan_map.png'); background-size: 100% 100%; background-repeat: no-repeat; transform-origin: 0 0; margin: 0; flex: none; will-change: transform; backface-visibility: hidden; }
 #pc-map-overlay { display: none !important; }
 #zoom-controls { display: none !important; }
 

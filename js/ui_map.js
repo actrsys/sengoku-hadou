@@ -95,44 +95,58 @@ Object.assign(UIManager.prototype, {
                 this.applyInertia(sc);
             }
         };
-
+        
         sc.addEventListener('mouseleave', endDrag);
         sc.addEventListener('mouseup', endDrag);
+
+        // ★追加：マウスが動きすぎた時にブラウザがパンクしないよう、処理を間引くためのスイッチです
+        this.isMapTicking = false;
 
         sc.addEventListener('mousemove', (e) => {
             if (!this.isMouseDown) return;
             e.preventDefault(); 
-            const x = e.pageX - sc.offsetLeft;
-            const y = e.pageY - sc.offsetTop;
-            const walkX = (x - this.dragStartX);
-            const walkY = (y - this.dragStartY);
             
-            // ★遊び（デッドゾーン）の追加：10ピクセル動くまではクリックのブレとみなします
-            if (!this.isDraggingMap) {
-                if (Math.abs(walkX) > 10 || Math.abs(walkY) > 10) {
-                    this.isDraggingMap = true;
-                } else {
-                    return; // まだ遊びの範囲内なので、ここで処理をストップして地図を動かしません
-                }
-            }
+            // ★追加：まだ前の画面を描き終わっていない時は、新しいマウスの動きを一旦無視します（カクツキ防止！）
+            if (!this.isMapTicking) {
+                window.requestAnimationFrame(() => {
+                    const x = e.pageX - sc.offsetLeft;
+                    const y = e.pageY - sc.offsetTop;
+                    const walkX = (x - this.dragStartX);
+                    const walkY = (y - this.dragStartY);
+                    
+                    // ★遊び（デッドゾーン）の追加：10ピクセル動くまではクリックのブレとみなします
+                    if (!this.isDraggingMap) {
+                        if (Math.abs(walkX) > 10 || Math.abs(walkY) > 10) {
+                            this.isDraggingMap = true;
+                        } else {
+                            this.isMapTicking = false; // ★忘れずにスイッチを戻します
+                            return; // まだ遊びの範囲内なので、ここで処理をストップして地図を動かしません
+                        }
+                    }
 
-            sc.scrollLeft = this.scrollLeft - walkX;
-            sc.scrollTop = this.scrollTop - walkY;
+                    sc.scrollLeft = this.scrollLeft - walkX;
+                    sc.scrollTop = this.scrollTop - walkY;
 
-            if (document.body.classList.contains('is-pc')) {
-                const now = performance.now();
-                const dt = now - this.lastDragTime;
-                if (dt > 0) {
-                    this.velocityX = (x - this.lastDragX) / dt * 15;
-                    this.velocityY = (y - this.lastDragY) / dt * 15;
-                }
-                this.lastDragTime = now;
-                this.lastDragX = x;
-                this.lastDragY = y;
+                    if (document.body.classList.contains('is-pc')) {
+                        const now = performance.now();
+                        const dt = now - this.lastDragTime;
+                        if (dt > 0) {
+                            this.velocityX = (x - this.lastDragX) / dt * 15;
+                            this.velocityY = (y - this.lastDragY) / dt * 15;
+                        }
+                        this.lastDragTime = now;
+                        this.lastDragX = x;
+                        this.lastDragY = y;
+                    }
+                    
+                    this.isMapTicking = false; // ★画面を描き終わったらスイッチを戻して、次の動きを受け付けます
+                });
+                
+                this.isMapTicking = true; // ★処理中（描画中）の目印をつけます
             }
         });
         
-        this.isZooming = false; 
+        this.isZooming = false;
         sc.addEventListener('wheel', (e) => {
             if (document.body.classList.contains('is-pc')) {
                 e.preventDefault(); 
@@ -280,7 +294,8 @@ Object.assign(UIManager.prototype, {
                 this.mapEl.style.margin = '0px'; 
                 
                 this.mapEl.style.transformOrigin = '0 0';
-                this.mapEl.style.transform = `scale(${this.mapScale})`;
+                // ★スマホのグラフィック専用の脳みそ（GPU）に描画を任せて、スクロールを滑らかにする魔法です！
+                this.mapEl.style.transform = `scale(${this.mapScale}) translateZ(0)`;
 
                 let spacer = document.getElementById('map-spacer');
                 if (!spacer) {
@@ -397,12 +412,13 @@ Object.assign(UIManager.prototype, {
                 }
                 spacer.style.width = `${Math.floor(mapW * currentScale + currentMarginX * 2)}px`;
                 spacer.style.height = `${Math.floor(mapH * currentScale + currentMarginY * 2)}px`;
-
+                
                 this.mapEl.style.position = 'absolute';
                 this.mapEl.style.left = `${currentMarginX}px`;
                 this.mapEl.style.top = `${currentMarginY}px`;
                 this.mapEl.style.transformOrigin = '0 0';
-                this.mapEl.style.transform = `scale(${currentScale})`;
+                // ★ズーム中もグラフィック専用の脳みそ（GPU）を使って滑らかに動かします！
+                this.mapEl.style.transform = `scale(${currentScale}) translateZ(0)`;
 
                 sc.scrollLeft = currentScrollLeft;
                 sc.scrollTop = currentScrollTop;
