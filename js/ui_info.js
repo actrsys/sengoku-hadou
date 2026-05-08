@@ -335,10 +335,10 @@ class UIInfoManager {
                         </div>
                     </div>
                     <div style="display: flex; justify-content: flex-end; gap: 10px; margin-top: 15px;">
-                        <button class="daimyo-detail-action-btn" id="temp-kyoten-btn">拠点</button>
-                        <button class="daimyo-detail-action-btn" id="temp-busho-btn">武将</button>
-                        <button class="daimyo-detail-action-btn" id="temp-hime-btn">姫</button>
-                        <button class="daimyo-detail-action-btn" id="temp-faction-btn">派閥</button>
+                        <button class="daimyo-detail-action-btn" id="temp-kyoten-btn" ${castlesCount === 0 ? 'disabled' : ''}>拠点</button>
+                        <button class="daimyo-detail-action-btn" id="temp-busho-btn" ${bushosCount === 0 ? 'disabled' : ''}>武将</button>
+                        <button class="daimyo-detail-action-btn" id="temp-hime-btn" ${princessCount === 0 ? 'disabled' : ''}>姫</button>
+                        <button class="daimyo-detail-action-btn" id="temp-faction-btn" ${bushosCount === 0 ? 'disabled' : ''}>派閥</button>
                         <button class="daimyo-detail-action-btn" id="temp-diplo-btn">外交</button>
                     </div>
                 </div>
