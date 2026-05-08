@@ -20,16 +20,17 @@ const INITIAL_MAP_CENTER_CONFIG = {
 };
 
 // ★ マップのズーム設定を1箇所で管理する箱
+// ここでの数字は「画面にピッタリ収まる（または覆い尽くす）最小サイズ」を『 1.0 』とした時の倍率です！
 const MAP_ZOOM_CONFIG = {
     PC: {
-        minMargin: 1.0, // PCの最小サイズの時の余白（1.0で縦の高さにピッタリ合わせます！）
-        mid: 1.1,        // PCの中間サイズ
-        max: 2.5         // PCの最大サイズ
+        min: 1.0, // PCの最小サイズ（1.0でピッタリ）
+        mid: 1.5, // PCの中間サイズ（1.5倍）
+        max: 2.5  // PCの最大サイズ（2.5倍）
     },
     MOBILE: {
-        minMargin: 1, // スマホの最小サイズの時の余白
-        mid: 1,        // スマホの中間サイズ
-        max: 1.5         // スマホの最大サイズ
+        min: 1.0, // スマホの最小サイズ（1.0で画面全体を覆います）
+        mid: 1.5, // スマホの中間サイズ（1.5倍）
+        max: 2.5  // スマホの最大サイズ（2.5倍）
     }
 };
 
@@ -246,12 +247,14 @@ Object.assign(UIManager.prototype, {
         const isPC = document.body.classList.contains('is-pc');
         const config = isPC ? MAP_ZOOM_CONFIG.PC : MAP_ZOOM_CONFIG.MOBILE;
 
-        let minScale = isPC ? Math.min(scaleX, scaleY) * config.minMargin : Math.max(scaleX, scaleY) * config.minMargin;
+        // ★ 基準となる「画面にピッタリ合わせる（または覆い尽くす）ためのスケール」を計算します
+        let baseScale = isPC ? Math.min(scaleX, scaleY) : Math.max(scaleX, scaleY);
 
+        // ★ 基準のスケールに対して、設定した倍率（min, mid, max）を掛け算してそれぞれのズームサイズを作ります！
         this.zoomStages = [
-            minScale,       
-            config.mid,    
-            config.max     
+            baseScale * (config.min || 1.0),       
+            baseScale * (config.mid || 1.5),    
+            baseScale * (config.max || 2.5)     
         ];
         
         if (this.zoomLevel === undefined) {
